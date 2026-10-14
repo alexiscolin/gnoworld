@@ -1,4 +1,5 @@
 #!/bin/sh
+set -eu
 # The gate runs before every commit that touches code (ADR-0001 §14), on what is
 # staged rather than on the working tree. There is no CI until there is a remote.
 git diff --cached --quiet -- r tools scripts .githooks go.mod gnowork.toml && exit 0
