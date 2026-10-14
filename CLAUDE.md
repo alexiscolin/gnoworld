@@ -18,7 +18,8 @@ gnoworld: a social, on-chain, graphical hub for gno.land. The design is
 - Strict TypeScript: no `any`, no `@ts-ignore`, no `!`. Data from the relay, the indexer or a realm goes through Zod first.
 - Never change a test to make code pass without saying so in the review card.
 - No new dependency without asking.
-- Division of work. Alexis writes and reviews the TypeScript, line by line: in `app/src/core/**`, and wherever a slice plan says "human", write the failing test and stop, then review his code. Claude writes the realms and any Go; `gno-auditor` audits each realm. For every realm function, explain in plain French who may call it, what it checks in order, what it changes, its cost and the tests that prove it: Alexis reviews behaviour and test scenarios, not Go syntax.
+- Pairing: in `app/src/core/**`, and wherever a slice plan says "human", write the failing test and stop. Alexis writes the code; then review it.
+- Claude writes the realms and any Go (who reviews what: docs/REVIEW.md).
 - Explain a language, React or tooling feature newer than 2025 the first time it appears, in two lines.
 - Work one slice at a time (`docs/plans/`). Stop at the end of a slice for review.
 
@@ -30,5 +31,6 @@ gnoworld: a social, on-chain, graphical hub for gno.land. The design is
 4. What the tests prove, and what they do not.
 5. Do not trust me on: what I did not run, verify or understand.
 6. Changed: dependencies, tests, deviations from the plan.
+7. For each changed realm function, its card: who may call it, what it checks in order, what it changes, its cost, the tests that prove it.
 
-In the first slices, give items 1–3 only and wait for Alexis's review before sharing findings (docs/REVIEW.md, "Blind first").
+In the first slices, give items 1–3 and 7 only, and wait for Alexis's review before sharing findings. While he reviews, answer only the question asked, with no hint of other problems (docs/REVIEW.md, "Blind first").

@@ -44,7 +44,7 @@ slice 1. The last one needs a live chain: test 8 of slice 1.
   - Bind's signature check (covered);
   - the `sigB` branch of Seal's check (not covered).
 
-  There are now 6 known gaps, all listed in `GAPS`.
+  The known gaps are listed in `GAPS`.
 - **Hooks:**
   - the gate runs on what is staged, and skips commits with no code;
   - merges pass it too;

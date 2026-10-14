@@ -4,19 +4,13 @@ Review by risk, not line by line everywhere.
 
 ## What to read, and how
 
-| Tier | What | How |
-|---|---|---|
-| 1. Every line | Realms (`r/`, `p/`), crypto (signed statements, Merkle, key storage, the MLS boundary), the sponsor (key, caps), relay authorization, the CSP | Every line, plus a fresh-context `gno-auditor` pass for realms. External audit before mainnet |
-| 2. Tests first | Client logic (state, queries), relay plumbing | Read the tests closely, skim the code. The tests are the spec |
-| 3. Use it | Interface, 3D, motion | Run it and use it; read the budgets the gate prints |
-
-## Who reviews what
-
-| Code | Written by | Reviewed by Alexis through |
-|---|---|---|
-| TypeScript (client) | Alexis for the core, Claude elsewhere | Every line |
-| Realms (gno) | Claude | Function cards (who calls, checks in order, effects, cost, tests) and attack scenarios; `gno-auditor` and Claude read every line |
-| Go (reference client, relay if Go) | Claude | Behaviour and tests |
+| Tier | What | Written by | How it is reviewed |
+|---|---|---|---|
+| 1 | Realms (`r/`, `p/`), the sponsor, relay authorization | Claude | Claude and a fresh-context `gno-auditor` read every line. Alexis reviews the function cards and the attack scenarios. External audit before mainnet |
+| 1 | Client crypto (keys, signed statements, Merkle, the MLS boundary), the CSP | Alexis for the core, Claude elsewhere | Alexis reads every line |
+| 2 | Other TypeScript (state, queries, views) | Alexis for the core, Claude elsewhere | Alexis reads the tests first, then every line |
+| 2 | Go (reference client, relay plumbing) | Claude | Behaviour and tests |
+| 3 | Interface, 3D, motion | Either | Run it; read the budgets the gate prints |
 
 ## Order
 
