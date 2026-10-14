@@ -30,4 +30,7 @@ go run ./tools/sealvec | cmp -s - r/seal/vectors_test.gno || {
 	exit 1
 }
 
+echo "== hooks"
+sh scripts/test_hooks.sh
+
 echo "all checks passed"

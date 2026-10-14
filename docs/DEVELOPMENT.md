@@ -34,7 +34,7 @@ GNO_TOOLCHAIN=$T GNOROOT=$T/src ./scripts/check.sh   # the first run downloads p
    what `go run ./tools/sealvec` prints. To regenerate it:
    `go run ./tools/sealvec > r/seal/vectors_test.gno`.
 
-The pre-commit hook runs the gate on what is staged, and skips it when no code is staged.
+The pre-commit hook runs the gate on what is staged, and skips it when only docs are staged (`docs/`, `adr/`, Markdown, `.claude/`). `scripts/test_hooks.sh`, run by the gate, checks the hooks themselves.
 
 ## Slices
 

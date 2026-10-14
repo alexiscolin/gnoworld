@@ -1,9 +1,12 @@
 #!/bin/sh
 set -eu
-# The gate runs before every commit that touches code (ADR-0001 §14), on what is
-# staged rather than on the working tree. There is no CI until there is a remote.
-git diff --cached --quiet -- r tools scripts .githooks go.mod gnowork.toml && exit 0
+# The gate runs before every commit that changes code (ADR-0001 §14), on what is
+# staged rather than on the working tree. Only docs are exempt, so a new code
+# folder is gated by default; a hook change runs it too, and scripts/test_hooks.sh
+# checks the hooks. There is no CI until there is a remote.
+git diff --cached --quiet -- . ':!docs' ':!adr' ':!*.md' ':!.claude' && exit 0
 staged=$(mktemp -d)
-trap 'rm -rf "$staged"' EXIT
-git checkout-index -a --prefix="$staged/"
-"$staged/scripts/check.sh"
+trap 'rm -rf "$staged" || :' EXIT
+trap 'exit 1' HUP INT TERM # so the EXIT trap also runs on Ctrl-C under dash
+git checkout-index -a --ignore-skip-worktree-bits --prefix="$staged/"
+sh "$staged/scripts/check.sh"
