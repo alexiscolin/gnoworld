@@ -1,3 +1,8 @@
 #!/bin/sh
-# The gate runs before every commit (ADR-0001 §14). There is no CI until there is a remote.
-exec "$(git rev-parse --show-toplevel)/scripts/check.sh"
+# The gate runs before every commit that touches code (ADR-0001 §14), on what is
+# staged rather than on the working tree. There is no CI until there is a remote.
+git diff --cached --quiet -- r tools scripts .githooks go.mod gnowork.toml && exit 0
+staged=$(mktemp -d)
+trap 'rm -rf "$staged"' EXIT
+git checkout-index -a --prefix="$staged/"
+"$staged/scripts/check.sh"

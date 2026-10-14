@@ -28,3 +28,24 @@ Six of `r/seal`'s ten guards are covered by a test. Four are not:
 
 The ADR said "every guard is tested", which was too broad. The first three are closed in
 slice 1. The last one needs a live chain: test 8 of slice 1.
+
+## After review (/simplify and /code-review)
+
+- **Vectors:** `tools/sealvec` now generates `r/seal/vectors_test.gno`, and the gate
+  compares the regenerated file byte for byte. This replaces the grep and its skip list.
+- **The mutation check now:**
+  - finds the guards itself, and mutates each `||` branch separately;
+  - copies the workspace, not the package (`seal/v1` will import `store`);
+  - runs one `gno test` (5.2 s → 1.6 s);
+  - reports a mutant that does not compile as an error, never as a kill;
+  - times out instead of hanging.
+- **It found guards the hand-written list had missed:**
+  - `if n < 1`;
+  - Bind's signature check (covered);
+  - the `sigB` branch of Seal's check (not covered).
+
+  There are now 5 known gaps, all listed in `GAPS`.
+- **Hooks:**
+  - the gate runs on what is staged, and skips commits with no code;
+  - merges pass it too;
+  - the commit-msg filter no longer refuses "Generated with tools/sealvec".

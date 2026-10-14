@@ -629,16 +629,9 @@ As in gnoradio and gnogolf:
   - `docs/DEVELOPMENT.md` and `docs/DEPLOY.md`.
 - **Small slices.** The proof of concept moves one slice at a time: planned, tested,
   checked and reviewed before the next.
-- **Strict TypeScript:**
-  - `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`;
-  - typescript-eslint's `strictTypeChecked`;
-  - no `any`, no `@ts-ignore`, no `!`;
-  - outside data typed only after Zod.
-- **Review by risk, and pairing.** `docs/REVIEW.md` sets what is read line by line, what is
-  read through its tests, and what is tried. In the client's core, the assistant writes the
-  failing test and the owner writes the code. In the first slices, the owner reviews before
-  seeing the assistant's findings, and `docs/review-log.md` records what was caught and
-  missed.
+- **Strict TypeScript** (`strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`,
+  typescript-eslint's `strictTypeChecked`), with the working rules in `CLAUDE.md`.
+- **Review by risk, and pairing:** `docs/REVIEW.md` and `CLAUDE.md`.
 
 ## Feasibility, verified
 
@@ -655,7 +648,7 @@ As in gnoradio and gnogolf:
 | Revocation by rotation | `Seal` refuses rotated-out keys | `TestRotationRevokes` | ✅ |
 | Bind refused under a session | `GetSessionInfo` | Code only: the `testing` stdlib cannot fake a session | ⏳ phase 0, on onyx |
 | Replay of kept seals | Dedup by (root, a, b) | `TestSeal`: `already sealed` | ✅ |
-| Every guard is tested | Mutation check, automated in the gate (`scripts/mutations.txt`) | 6 of 10 guards fail a test when removed. Known gaps: `mustStrong(b)`, `mustBeCurrent(kb)` and the owner check in `Bind` (closed in slice 1); the session check (needs a live chain) | ⚠️ 6/10, gaps listed |
+| Every guard is tested | Mutation check, automated in the gate (`scripts/mutate.py`): every guard found in a realm, and each branch of an "or" condition, is removed in turn | Known gaps are listed there with their reason; slice 1 closes those a local test can reach | ⚠️ gaps listed |
 | Popup-free signing | Sessions (ADR-002) | Code at v1.5.1; `GetSessionInfo` in use on mainnet | ✅ code, ⏳ not yet exercised by us |
 | App-paid fees | First signer pays | `ante.go` Phase 2b; ADR-002 text | ⏳ code only |
 | Reading events | `indexer.gno.land` GraphQL | Public RPC `tx_index` is off (checked 2026-10-13) | ✅, single provider |
@@ -1000,17 +993,12 @@ Gaps found while building this. Each comes with what it costs gnoworld today.
 
 ## Reproduce
 
-```bash
-# toolchain = the release mainnet runs
-mkdir -p /tmp/gno-v151 /tmp/bin
-git -C ~/Server/gno archive v1.5.1 | tar -x -C /tmp/gno-v151
-(cd /tmp/gno-v151 && go build -o /tmp/bin/gno ./gnovm/cmd/gno && cd contribs/gnodev && go build -o /tmp/bin/gnodev .)
+The toolchain that matches the chain is built as `docs/DEVELOPMENT.md` describes.
 
+```bash
 cd ~/Server/gnoworld
-go run tools/sealvec/main.go -chain dev -realm gno.land/r/gnoworld/seal \
-  -a g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5 -b g1y2tswmrtlany2ffmpyc0uyunk4gt4gv8gtf736
-(cd r/seal && GNOROOT=/tmp/gno-v151 /tmp/bin/gno test -v .)
-GNOROOT=/tmp/gno-v151 /tmp/bin/gnodev local -no-watch   # then call Bind/Seal/Anchor with the vectors above
+./scripts/check.sh                       # realm tests, mutation check, test vectors
+"$GNO_TOOLCHAIN/gnodev" local -no-watch  # then call Bind, Seal and Anchor with r/seal/vectors_test.gno
 ```
 
 ## References

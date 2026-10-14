@@ -13,7 +13,7 @@ gnoworld: a social, on-chain, graphical hub for gno.land. The design is
 
 ## How we work
 
-- Test first: write the failing test, run it, see it fail, then write the code. A new guard in a realm gets a line in `scripts/mutations.txt`.
+- Test first: write the failing test, run it, see it fail, then write the code. The mutation check finds every guard; one no test can catch yet goes into `GAPS` in `scripts/mutate.py`, with the reason.
 - `scripts/check.sh` must pass before every commit (the pre-commit hook runs it). Never skip it.
 - Strict TypeScript: no `any`, no `@ts-ignore`, no `!`. Data from the relay, the indexer or a realm goes through Zod first.
 - Never change a test to make code pass without saying so in the review card.
@@ -24,7 +24,7 @@ gnoworld: a social, on-chain, graphical hub for gno.land. The design is
 
 ## Review card (end of every change)
 
-1. Read line by line: realms (`r/`, `p/`), crypto, sponsor, relay auth, CSP. Name the files.
+1. Read line by line: the tier-1 files (docs/REVIEW.md). Name them.
 2. Read the tests, skim the code: name the files.
 3. Try it: what to run or click.
 4. What the tests prove, and what they do not.

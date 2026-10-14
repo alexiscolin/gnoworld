@@ -30,12 +30,11 @@ Most important first:
   - storage per object;
   - escaping in `Render`;
   - cross-realm calls;
-  - a guard with no line in `scripts/mutations.txt`.
+  - a new entry in `GAPS` (`scripts/mutate.py`).
 - **TypeScript and React:**
   - promises that are not awaited;
   - `as` on outside data;
   - effect dependencies, and stale closures;
-  - unchecked index access;
   - a new dependency.
 - **Go (relay):**
   - goroutine leaks;

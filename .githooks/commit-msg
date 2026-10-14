@@ -1,6 +1,8 @@
 #!/bin/sh
-# Refuse any co-author or AI attribution line in commit messages.
-if grep -qiE '^(co-authored-by|generated with|🤖)|claude\.(com|ai)|noreply@anthropic\.com' "$1"; then
-  echo "commit-msg: co-author / attribution lines are not allowed in this repo." >&2
-  exit 1
+# Refuse co-author and AI attribution lines. Comment lines and the diff that
+# `git commit -v` appends below the scissors line are not part of the message.
+if sed '/^# -* >8 -*$/,$d' "$1" | grep -v '^#' |
+	grep -qiE '^co-authored-by:|^🤖|generated with \[?claude|noreply@anthropic\.com'; then
+	echo "commit-msg: co-author / attribution lines are not allowed in this repo." >&2
+	exit 1
 fi
