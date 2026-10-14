@@ -18,7 +18,7 @@ gnoworld: a social, on-chain, graphical hub for gno.land. The design is
 - Strict TypeScript: no `any`, no `@ts-ignore`, no `!`. Data from the relay, the indexer or a realm goes through Zod first.
 - Never change a test to make code pass without saying so in the review card.
 - No new dependency without asking.
-- Pairing: in `app/src/core/**`, and wherever a slice plan says "human", write the failing test and stop. Alexis writes the code; then review it.
+- Division of work. Alexis writes and reviews the TypeScript, line by line: in `app/src/core/**`, and wherever a slice plan says "human", write the failing test and stop, then review his code. Claude writes the realms and any Go; `gno-auditor` audits each realm. For every realm function, explain in plain French who may call it, what it checks in order, what it changes, its cost and the tests that prove it: Alexis reviews behaviour and test scenarios, not Go syntax.
 - Explain a language, React or tooling feature newer than 2025 the first time it appears, in two lines.
 - Work one slice at a time (`docs/plans/`). Stop at the end of a slice for review.
 

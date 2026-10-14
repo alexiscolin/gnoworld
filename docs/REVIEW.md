@@ -10,6 +10,14 @@ Review by risk, not line by line everywhere.
 | 2. Tests first | Client logic (state, queries), relay plumbing | Read the tests closely, skim the code. The tests are the spec |
 | 3. Use it | Interface, 3D, motion | Run it and use it; read the budgets the gate prints |
 
+## Who reviews what
+
+| Code | Written by | Reviewed by Alexis through |
+|---|---|---|
+| TypeScript (client) | Alexis for the core, Claude elsewhere | Every line |
+| Realms (gno) | Claude | Function cards (who calls, checks in order, effects, cost, tests) and attack scenarios; `gno-auditor` and Claude read every line |
+| Go (reference client, relay if Go) | Claude | Behaviour and tests |
+
 ## Order
 
 Most important first:
