@@ -1,0 +1,3 @@
+#!/bin/sh
+# The gate runs before every commit (ADR-0001 §14). There is no CI until there is a remote.
+exec "$(git rev-parse --show-toplevel)/scripts/check.sh"

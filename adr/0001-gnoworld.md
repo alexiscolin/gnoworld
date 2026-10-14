@@ -629,6 +629,16 @@ As in gnoradio and gnogolf:
   - `docs/DEVELOPMENT.md` and `docs/DEPLOY.md`.
 - **Small slices.** The proof of concept moves one slice at a time: planned, tested,
   checked and reviewed before the next.
+- **Strict TypeScript:**
+  - `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`;
+  - typescript-eslint's `strictTypeChecked`;
+  - no `any`, no `@ts-ignore`, no `!`;
+  - outside data typed only after Zod.
+- **Review by risk, and pairing.** `docs/REVIEW.md` sets what is read line by line, what is
+  read through its tests, and what is tried. In the client's core, the assistant writes the
+  failing test and the owner writes the code. In the first slices, the owner reviews before
+  seeing the assistant's findings, and `docs/review-log.md` records what was caught and
+  missed.
 
 ## Feasibility, verified
 
@@ -645,7 +655,7 @@ As in gnoradio and gnogolf:
 | Revocation by rotation | `Seal` refuses rotated-out keys | `TestRotationRevokes` | ✅ |
 | Bind refused under a session | `GetSessionInfo` | Code only: the `testing` stdlib cannot fake a session | ⏳ phase 0, on onyx |
 | Replay of kept seals | Dedup by (root, a, b) | `TestSeal`: `already sealed` | ✅ |
-| Every guard is tested | Mutation check | Removing the weak-key check, the rotation check or the dedup check each fails a test | ✅ |
+| Every guard is tested | Mutation check, automated in the gate (`scripts/mutations.txt`) | 6 of 10 guards fail a test when removed. Known gaps: `mustStrong(b)`, `mustBeCurrent(kb)` and the owner check in `Bind` (closed in slice 1); the session check (needs a live chain) | ⚠️ 6/10, gaps listed |
 | Popup-free signing | Sessions (ADR-002) | Code at v1.5.1; `GetSessionInfo` in use on mainnet | ✅ code, ⏳ not yet exercised by us |
 | App-paid fees | First signer pays | `ante.go` Phase 2b; ADR-002 text | ⏳ code only |
 | Reading events | `indexer.gno.land` GraphQL | Public RPC `tx_index` is off (checked 2026-10-13) | ✅, single provider |
