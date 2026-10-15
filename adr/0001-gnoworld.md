@@ -407,13 +407,23 @@ not yet exercised (phase 1, see Rollout).
 | Cosmos | gno.land as the sun, pulsing on each block; hubs as planets | Distance to the sun = public activity in the last hour; size = people present |
 | Hub | The planet opens into its rooms (moons) and the people present (satellites) | Moon size = people in the room |
 | Room | The room at the centre, its card on the left, its chat on the right | Live cards for the realms, proposals, contracts and seals the room links |
-| Earth | A body of the same cosmos; public rooms pinned to places; "N here now · in X countries" | Presence by country, opt-in only |
+| Earth | A body of the same cosmos; public rooms pinned to places; speech bubbles where people speak from; "N here now · in X countries" | A bubble is a public message at its speaker's country, opt-in only |
 
 Navigation rules:
 
 - **Every change is a camera move.** There are no page loads and no cuts. Back is the
   breadcrumb or `Esc`.
 - **Semantic zoom.** A planet splits into its rooms as the camera approaches.
+- **Travel like a ship, without the ship.** The feel is No Man's Sky's, steered from the
+  interface. You pick where to go (a planet, a room, a person, a country) in the panel, the
+  search or the scene. The camera makes the trip: it leaves orbit, crosses space with the
+  stars streaking, slows down, and settles into orbit around the destination, through the
+  atmosphere when it is a planet. About 2 s; a click or `Esc` lands at once. There is no
+  vehicle and nothing to pilot. Landing on a hub joins its rooms, and the chat follows.
+- **The 3D turns around.** At rest, the camera slowly orbits what it looks at. Dragging takes
+  over, and the orbit resumes after a few idle seconds.
+- **The interface is clean and polished.** HTML panels on veils over the canvas, two type
+  families, one accent colour. It is designed and mocked up before it is built.
 - **The detail panel is on the left, and the object stays in view.**
 - **The chat is docked on the right at every level.** A chain object pasted into a message
   becomes a live card.
@@ -426,7 +436,9 @@ Navigation rules:
 - **Creating a hub is a birth:** presets, then the planet forms in place.
 - **A sealed conversation leaves a light trail** to the user's logbook.
 - **Mobile is the same space**, with a bottom tab bar.
-- **Text lives on panels, never in 3D.** One accent colour is reserved for actions.
+- **Text is HTML, never 3D geometry.** Panels, labels and bubbles are HTML anchored to a
+  point of the scene, so text stays sharp, selectable and readable by screen readers. One
+  accent colour is reserved for actions.
 
 **Activity uses public signals only:**
 - presence in public rooms;
@@ -434,6 +446,27 @@ Navigation rules:
 - its public proposals.
 
 Private-room traffic never moves a planet, or the orbit would show who is talking.
+
+**Who speaks from where.** On the Earth, a public message pops up as a bubble over its
+speaker's country.
+- **The country is declared, never detected.** It is opt-in, suggested from the browser's
+  time zone, and never finer than a country; there is no IP lookup. It travels as a
+  client-only IRCv3 tag on each message.
+- **The client shows the rooms it has joined:** the current hub's and the lobby. Ergo allows
+  100 channels per client. A world-wide feed, sampled by the server, comes when traffic
+  needs it.
+- **Rules filter what shows**, so ten thousand people never pop up at once. Starting values,
+  kept in one data file and tuned by looking:
+  - at most 6 bubbles on screen, each for 5 s;
+  - one bubble per country at a time; the others add to a count, "Japan · 12";
+  - one bubble per speaker every 30 s;
+  - mentions of you first, then your hub, then the rest, newest first;
+  - text cut at 80 characters, links as plain text, muted and banned speakers never shown;
+  - countries on the far side of the globe show only as counts at its edge.
+- **The filter is one pure function**, `pickBubbles(messages, now, viewer, rules)`, in
+  `app/src/core`, tested first.
+- Bubbles repeat the chat, so screen readers skip them, and with reduced motion they appear
+  without popping.
 
 **The space is never the only way in.** The left panel always lists what the 3D shows.
 `prefers-reduced-motion` replaces flights with crossfades. Every level is reachable from the
@@ -572,7 +605,8 @@ follows gnoradio and gnogolf. Every package below was checked on npm on 2026-10-
 | Lint | ESLint 10 with typescript-eslint 8.71 and `eslint-plugin-react-hooks` 7.1 | The react-hooks plugin carries the React Compiler's rules |
 
 **Performance and debugging:**
-- The scene renders on demand, never at 60 fps while nothing moves.
+- The scene renders on demand: 60 fps while travelling, 30 fps for the idle orbit, nothing
+  when the page is hidden or reduced motion is on.
 - Planets, moons and people are instanced, so thousands of hubs cost a few draw calls. The
   pixel ratio is capped at 2.
 - Loading is staged:
@@ -999,7 +1033,8 @@ Gaps found while building this. Each comes with what it costs gnoworld today.
   - Web client, a PWA from the first build: simple, clean, solid and beautiful.
     - Public rooms over IRC: guests read, a gno name and one Adena signature to speak.
     - The interface first, in 2D: the hub list (a data file), the rooms, the chat.
-    - Then the 3D cosmos over it, on the same data.
+    - Then the 3D space over it, on the same data: flights from planet to planet, and the
+      Earth with its speech bubbles, filtered by rules (§7).
   - Moderation and its legal side settled before any public launch (question 5).
   - Exit criteria:
     - a guest reads a room with no wallet, on a phone;
@@ -1040,7 +1075,7 @@ phase. Phase 0 takes none of them.
 | **Saturn: game tiles.** Each tile on Saturn's rings is a game; discover new games | Saturn, a fixed planet of the cosmos (§7); each tile is a hub of kind "game" (§8) | The hub records in `r/gnoworld/hubs` | 1 | gnoworld stays a social app: tiles lead to games built on gno.land |
 | **Ads: pay for ads on gno.land** | Paid slots in the space: a billboard, Saturn's tiles | A slot realm paid in GNOT in the same transaction, slots expiring like the beacons' ring buffer (§1) | 2 | Moderation and legal exposure (question 5); tier 2 only (§10); never in private rooms. "On gno.land": in gnoworld only, or on gnoweb too? |
 | **User profile, user feed** | The detail panel on a person; the feed in the chat dock | Already planned: a profile realm on `r/sys/users` names, with posts and follows (§1, phase 1). Posts as events (≈ 0.0015 GNOT), not state (0.22–0.44 GNOT) | 1 | Posts are public forever: the client says so before posting |
-| **Tweets on a giant TV** | A screen in the cosmos or on the Earth, showing the public feed live | Nothing new: it reads the feed's events | 1, after the feed | Conflicts with "text lives on panels, never in 3D" (§7): an exception, or a panel anchored in the scene? |
+| **Tweets on a giant TV** | A screen in the cosmos or on the Earth, showing the public feed live | Nothing new: it reads the feed's events | 1, after the feed | Text is HTML anchored in the scene (§7), like the Earth's bubbles |
 | **Galactic council for governance** | A place near the sun, with proposals and votes | Compose (§11): GovDAO, BUBBLE's governor, Memba DAOs. Votes stay in their realms | 2 | Votes are tier 2 (§10) |
 | **Short-form videos** | Cards in rooms and on profiles | A hash and a link at most; the video lives off chain | 3 or later | Storage and bandwidth end 0 € hosting (§13); moderation |
 | **Real-time voice translation** | Calls in rooms | Nothing | 3 or later | Translation sends audio to a speech service, so the call is no longer end-to-end encrypted: opt-in and labelled |

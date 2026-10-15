@@ -45,8 +45,10 @@ Phase 0, a public hub (ADR-0001, Rollout), in order. Each slice gets its plan be
 0. Harness and gate. Done.
 1. Client skeleton and its gate; the IRCv3 line and tag parser in `app/src/core/irc` (human).
 2. Ergo and the login program: Adena's signature and a gno name (ADR §1, §2).
-3. Public rooms in the browser: guests read, logged-in users speak.
-4. The interface in 2D: hub list, rooms, chat.
-5. The 3D cosmos over it.
+3. Public rooms in the browser: guests read, logged-in users speak, with an opt-in country.
+4. Design: the look of the panels and of a trip, mocked up and approved before code.
+5. The interface in 2D: hub list, rooms, chat.
+6. `pickBubbles`: which messages pop up on the Earth, by rules (ADR §7) (human).
+7. The 3D space over it: trips from planet to planet, the idle orbit, the Earth and its bubbles.
 
 Later: the seal store (`docs/plans/seal-store.md`), with private rooms in phase 2.
