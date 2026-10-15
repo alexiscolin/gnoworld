@@ -26,6 +26,10 @@ It rests on four principles:
    maintained library. Putting it on chain was measured and ruled out. It moves through
    interchangeable relays that hold no truth. The client is a static site that anyone can
    host. No cryptographic protocol is invented here.
+
+   **Phase 0 starts simpler, on plain IRC** (Ergo, §1). The server can read private
+   messages there, so phase 0 stays on testnet, and MLS replaces IRC for private rooms
+   before mainnet.
 3. **Highly graphical.** One continuous 3D space:
    - gno.land is the sun;
    - hubs are planets, and their rooms are moons;
@@ -217,6 +221,31 @@ How the rest stays decentralized:
   - `indexer.gno.land` as the live event feed;
   - mainnet's realm approval.
 
+**Phase 0 starts on plain IRC, to start simple.** The table above is the target. Phase 0
+replaces its MLS rows with [Ergo](https://github.com/ergochat/ergo) v2.19.1, an IRCv3
+server in one Go binary:
+
+| Need | Phase 0, with Ergo |
+|---|---|
+| Chat server | Ergo as is. No relay code of ours |
+| Browser | IRC over WebSocket |
+| Identity | Ergo's `auth-script` asks a small Go program, over a Unix socket. It checks a login statement (§2) signed by the chat key against `seal.KeyOf(address)`. The chain stays the source of identity |
+| Rooms | One IRC channel per room, prefixed by its hub (§9) |
+| Private messages | IRC private messages. **The server can read them**, and the client says so |
+| Seals, 1:1 conversations | The client carries each leaf's salt and index in IRCv3 client-only tags (§2). Both parties sign the root, and the sponsor submits `Seal` |
+| Offline history | Ergo's history, kept in SQLite, with tags, expired after 7 days |
+| Long messages | `draft/multiline`, up to 4096 bytes |
+
+Phase 0 drops the relay, ts-mls, device keys and their certificates, KeyPackages and the
+offline queue. Three rules keep it safe:
+1. **Onyx only.** No mainnet while any private room runs on IRC. MLS arrives in phase 2.
+2. **Private rooms are labelled "not end-to-end encrypted"**, with the server's retention.
+3. **The seal format does not change.** Moving to MLS does not touch `r/seal`.
+
+Checked in Ergo's source on 2026-10-15: `message-tags`, `draft/multiline`,
+`draft/chathistory`, WebSocket listeners, `auth-script` over a Unix socket, and SQLite
+history that stores each message's tags.
+
 ### 2. Transcript and signing format (normative)
 
 All hashes are SHA-256. The tree is the Tendermint simple Merkle tree:
@@ -236,10 +265,18 @@ seal statement   = "gnoworld/seal/v1|"   ‖ chain_id ‖ "|" ‖ realm_path ‖
                    with key_a < key_b bytewise
 device statement = "gnoworld/device/v1|" ‖ chain_id ‖ "|" ‖ realm_path ‖ "|" ‖ bech32(address) ‖ "|" ‖ device_mls_key(32)
                    off chain: carried in the device's MLS credential, checked by clients against KeyOf(address)
+login statement  = "gnoworld/login/v1|"  ‖ chain_id ‖ "|" ‖ realm_path ‖ "|" ‖ bech32(address) ‖ "|" ‖ server_name ‖ "|" ‖ decimal(unix_time)
+                   off chain, phase 0 only: the IRC login, accepted once, within 60 s
 ```
 
+**Phase 0 (IRC).** `plaintext` is the IRC message text as delivered, multiline batches
+joined. `salt_i` and `i` travel in client-only IRCv3 tags; each side recomputes the hash
+chain. There is no per-message signature, so a message the server forged or altered shows
+up only when the roots differ at seal time. The chat key signs the login statement, which
+names the server so a login cannot be replayed elsewhere.
+
 Per-message signatures come from MLS: each device signs its messages with its own MLS key.
-The chat key never signs MLS content, only the three statements above. MLS authenticates
+The chat key never signs MLS content, only the statements above. MLS authenticates
 each message, and the seal authenticates the transcript.
 
 Each part of this format closes one hole:
@@ -439,6 +476,10 @@ A new version means a new adapter.
 
 Public rooms are moderated on the relay: rate limits, reports, and the name filter.
 
+**Phase 0 (IRC, §1):** each room is an Ergo channel prefixed by its hub, moderated with
+Ergo's own tools. Private rooms are not end-to-end encrypted and are kept by the server for
+7 days. DMs need a login, so a bound chat key; guests read public rooms only.
+
 **Group seals** (k of n members signing one root, for a team decision) are a follow-up
 `SealGroup` call. They cost one ed25519 verification per signer and are measured before
 being built (phase 2).
@@ -460,6 +501,9 @@ then checks three things by free reads:
 - the device statement is signed by the chat key;
 - `seal.KeyOf(address)` is that chat key;
 - `users.ResolveAddress(address)` returns a live name.
+
+In phase 0 (IRC, §1), the chat key signs a login statement instead (§2), and the IRC
+account is the gno name, or the address when there is none.
 
 **Display.**
 - A name is always shown with an identicon and a short address.
@@ -509,7 +553,8 @@ follows gnoradio and gnogolf. Every package below was checked on npm on 2026-10-
 | Animation | GSAP 3.15 core, loaded with the 3D | Sequences: a planet's birth, a light trail |
 | Wallet | Adena through `@adena-wallet/sdk` 0.1 | Young (0.1.0): its session support is open question 2 |
 | Live events | `graphql-ws` 6.4 against `indexer.gno.land` | Subscriptions without a GraphQL framework |
-| Crypto | WebCrypto (Ed25519, SHA-256, X25519); ts-mls 1.6 in a Web Worker, behind a thin interface | Crypto never blocks the interface. npm's `openmls-wasm` is a 0.1.0 from 2025-10, not a product; the mainnet library is chosen before phase 3 (open question 7) |
+| Chat transport | Phase 0: IRC over WebSocket to Ergo (§1), through a small IRCv3 module in `app/src/core/irc`, written test first. Phase 2: MLS over the relay | Parsing IRCv3 lines and tags takes a few dozen lines; no IRC library to depend on |
+| Crypto | WebCrypto (Ed25519, SHA-256, X25519); from phase 2, ts-mls 1.6 in a Web Worker, behind a thin interface | Crypto never blocks the interface. npm's `openmls-wasm` is a 0.1.0 from 2025-10, not a product; the mainnet library is chosen before phase 3 (open question 7) |
 | PWA | `vite-plugin-pwa` 2.0 | iOS delivers push only to an installed app, and an installed app keeps its storage |
 | Earth | NASA Blue Marble and Black Marble textures (public domain), as KTX2 | Day and night with city lights; small on the wire |
 | Tests | Vitest 5; Playwright 1.64 with `@axe-core/playwright`, desktop and mobile | As gnoradio |
@@ -550,6 +595,12 @@ Not used:
 ### 13. Servers, data and hosting
 
 Two pieces run: the static client and one Go binary.
+
+**In phase 0 (IRC, §1)**, Ergo takes the relay role. Three pieces run on one small server:
+the static client, Ergo with its history in SQLite, and the Go binary with the sponsor role
+plus a login role that answers Ergo's `auth-script` socket. The relay role below arrives
+with MLS in phase 2. Until then the server keeps message history in plaintext for 7 days,
+private messages included.
 
 | Piece | Host | Notes |
 |---|---|---|
@@ -827,15 +878,15 @@ Gaps found while building this. Each comes with what it costs gnoworld today.
    realms already run on mainnet (§11).
 10. **Channels stored on chain, as Memba does.** Public and paid per post; kept for what
     must be public, not for conversation.
-11. **An IRC gateway, as gno.world runs today** (port 6667, rooms reachable from any IRC
-    client, bridges to Libera and others). Rejected:
-    - it serves none of the four principles;
-    - IRC nicknames are unverified, while identity here is anchored on chain;
-    - it is a second protocol to moderate;
-    - gno.world's version exposes "private" rooms in plaintext.
+11. **IRC, as gno.world runs today** (port 6667, rooms reachable from any IRC client,
+    bridges to Libera and others). Rejected as the end state:
+    - gno.world's version exposes "private" rooms in plaintext;
+    - there is no end-to-end encryption and no per-message signature.
 
-    It could return as a TLS gateway for public rooms only, if gno.world's logs show real
-    IRC users.
+    **Accepted for phase 0 only** (§1), to start simple: Ergo, logged in by a chat-key
+    signature checked against the chain, which answers "nicknames are unverified". It stays
+    on testnet, and private rooms move to MLS before mainnet. Public rooms could stay on IRC
+    after that, if real IRC users show up.
 12. **A server framework (TanStack Start, Next.js server mode).** Rejected: a Node server in
     production, against the static-client principle, and server rendering adds nothing to a
     WebGL canvas.
@@ -847,6 +898,10 @@ Gaps found while building this. Each comes with what it costs gnoworld today.
 
 ## Security considerations
 
+- **Phase 0 server (Ergo, §1).** It reads every message, private ones included, keeps
+  them for 7 days, and could forge or alter one. A forged or altered 1:1 message shows up
+  only as roots that differ at seal time. This is why phase 0 stays on testnet and private
+  rooms are labelled. A stolen login statement is useless after 60 s or once used.
 - **Relay.** It can drop, delay or reorder messages. Sequence numbers and hash chaining make
   each of these visible. It cannot read or forge messages. It does see metadata: who talks
   to whom, when, and from which IP. It deletes ciphertext once delivered.
@@ -912,6 +967,8 @@ Gaps found while building this. Each comes with what it costs gnoworld today.
   - realm reads as access lists.
 
 **Negative:**
+- Phase 0's private messages are readable by the server, and the move to MLS in phase 2
+  replaces the client's chat transport.
 - One Go binary to operate (relay and sponsor), at least the default one, besides the static
   client.
 - Three kinds of keys per user: the wallet, the chat key, and one MLS key per device. Only
@@ -933,11 +990,12 @@ Gaps found while building this. Each comes with what it costs gnoworld today.
   - First the harness and the gate (§14), on 0 € hosting (§13).
   - Split `r/seal` into its store and `seal/v1` (§14), test first, then deploy it (onyx
     auto-approves).
+  - Ergo on one small server, with the login role of the Go binary (§13).
   - Web client, a PWA from the first build:
-    - chat key and device keys in the browser;
+    - chat key in the browser;
     - one Adena session per device;
-    - MLS (ts-mls) over the existing relay;
-    - hash-chained transcripts and a "Seal" button.
+    - IRC over WebSocket to Ergo (§1), private rooms labelled "not end-to-end encrypted";
+    - hash-chained 1:1 transcripts in IRCv3 tags, and a "Seal" button.
   - Navigation prototype (cosmos, hub, room, Earth) on placeholder data, with the chat
     docked and inline transaction states for `Bind` and `Seal`.
   - Prove a sponsored transaction end to end.
@@ -955,6 +1013,8 @@ Gaps found while building this. Each comes with what it costs gnoworld today.
   - Globe beacons as a ring buffer.
   - Tips and stamps in the same transaction.
 - **Phase 2, depth.**
+  - MLS (ts-mls) for private rooms, with device keys and their certificates, KeyPackages
+    and the relay role (§13). Nothing private stays on IRC.
   - DAO adapters (BUBBLE, Memba), and rooms gated by BUBBLE balance or by kept seals with
     members the room trusts (`Kept`), never by the raw `Seals()` count.
   - Escrow cards.
@@ -966,6 +1026,21 @@ Gaps found while building this. Each comes with what it costs gnoworld today.
   - Register the `gnoworld` namespace so one session `AllowPaths` entry covers everything.
   - Submit for approval.
   - Migrate gno.world users, keeping BUBBLE.
+
+## Ideas to place
+
+From a team discussion. None is decided: each needs its own decision before it enters a
+phase. Phase 0 takes none of them.
+
+| Idea | Where it lives | On chain | Earliest phase | Watch out |
+|---|---|---|---|---|
+| **Saturn: game tiles.** Each tile on Saturn's rings is a game; discover new games | Saturn, a fixed planet of the cosmos (§7); each tile is a hub of kind "game" (§8) | The hub records in `r/gnoworld/hubs` | 1 | gnoworld stays a social app: tiles lead to games built on gno.land |
+| **Ads: pay for ads on gno.land** | Paid slots in the space: a billboard, Saturn's tiles | A slot realm paid in GNOT in the same transaction, slots expiring like the beacons' ring buffer (§1) | 2 | Moderation and legal exposure (question 5); tier 2 only (§10); never in private rooms. "On gno.land": in gnoworld only, or on gnoweb too? |
+| **User profile, user feed** | The detail panel on a person; the feed in the chat dock | Already planned: a profile realm on `r/sys/users` names, with posts and follows (§1, phase 1). Posts as events (≈ 0.0015 GNOT), not state (0.22–0.44 GNOT) | 1 | Posts are public forever: the client says so before posting |
+| **Tweets on a giant TV** | A screen in the cosmos or on the Earth, showing the public feed live | Nothing new: it reads the feed's events | 1, after the feed | Conflicts with "text lives on panels, never in 3D" (§7): an exception, or a panel anchored in the scene? |
+| **Galactic council for governance** | A place near the sun, with proposals and votes | Compose (§11): GovDAO, BUBBLE's governor, Memba DAOs. Votes stay in their realms | 2 | Votes are tier 2 (§10) |
+| **Short-form videos** | Cards in rooms and on profiles | A hash and a link at most; the video lives off chain | 3 or later | Storage and bandwidth end 0 € hosting (§13); moderation |
+| **Real-time voice translation** | Calls in rooms | Nothing | 3 or later | Translation sends audio to a speech service, so the call is no longer end-to-end encrypted: opt-in and labelled |
 
 ## Open questions
 
@@ -986,8 +1061,8 @@ Gaps found while building this. Each comes with what it costs gnoworld today.
 9. Which DAO adapter comes first: BUBBLE or Memba?
 10. Who maintains the name display filter?
 11. Should a hub be able to hide from the cosmos (unlisted), while staying reachable by link?
-12. Where does the relay run in phase 0: on the server that runs gno.world, or on a laptop
-    behind Cloudflare Tunnel?
+12. Where do Ergo and the Go binary run in phase 0: on the server that runs gno.world, or
+    on a laptop behind Cloudflare Tunnel?
 13. Under which namespace do the onyx deploys go: the owner's `nym-` name (signed with the
     owner's key) or the agent key's own address?
 
