@@ -27,7 +27,7 @@ Six of `r/seal`'s ten guards are covered by a test. Four are not:
 - the session check in `Bind`.
 
 The ADR said "every guard is tested", which was too broad. The first three are closed in
-slice 1. The last one needs a live chain: test 8 of slice 1.
+the seal-store slice (`seal-store.md`). The last one needs a live chain: its test 8.
 
 ## After review (/simplify and /code-review)
 

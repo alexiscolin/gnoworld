@@ -19,12 +19,12 @@ import sys
 import tempfile
 
 GAPS = {
-    "mustStrong(b)": "no test seals with a weak key as b: slice 1",
-    "mustBeCurrent(kb)": "no test seals with a rotated key as b (needs vectors): slice 1",
-    "if v := owner.Get(k); v != nil && v.(address) != caller {": "no test binds one key to a second address (needs vectors): slice 1",
-    "if _, _, _, isSession := runtime.GetSessionInfo(); isSession {": "gno test cannot fake a session: phase 0, on onyx",
-    "if n < 1 {": "no test seals with n < 1: slice 1",
-    "!ed25519.Verify(b[:], msg, sigB[:])": "no test pairs a valid sigA with a bad sigB: slice 1",
+    "mustStrong(b)": "no test seals with a weak key as b: seal-store slice",
+    "mustBeCurrent(kb)": "no test seals with a rotated key as b (needs vectors): seal-store slice",
+    "if v := owner.Get(k); v != nil && v.(address) != caller {": "no test binds one key to a second address (needs vectors): seal-store slice",
+    "if _, _, _, isSession := runtime.GetSessionInfo(); isSession {": "gno test cannot fake a session: phase 2, on onyx",
+    "if n < 1 {": "no test seals with n < 1: seal-store slice",
+    "!ed25519.Verify(b[:], msg, sigB[:])": "no test pairs a valid sigA with a bad sigB: seal-store slice",
 }
 # Mutations that are not guards: (file, text found exactly once, replacement).
 EXTRA = [("r/seal/seal.gno", ' + string(a[:]) + string(b[:]) + "|"', ' + "|"')]

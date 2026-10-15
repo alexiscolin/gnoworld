@@ -1,6 +1,6 @@
-# Slice 1 — `r/seal`: data apart from rules, the gaps closed, on onyx
+# Seal store — `r/seal`: data apart from rules, the gaps closed, on onyx
 
-Status: proposed. The tests below are written first, and are approved before any code.
+Status: deferred to phase 2, with private rooms (ADR-0001, Rollout). The tests below are written first, and are approved before any code.
 
 ## Goal
 
@@ -27,11 +27,11 @@ Status: proposed. The tests below are written first, and are approved before any
 ## Out of scope
 
 - The hubs realm (phase 1).
-- The client (slice 2).
+- The client.
 
 ## Open before starting
 
 - **Question 13:** which namespace do we deploy to on onyx? Either Alexis's `nym-` name,
   which Alexis signs, or the agent key's own address.
-- **Check Adena early:** can it create a session (question 2)? Test 8 and slice 6 depend
+- **Check Adena early:** can it create a session (question 2)? Test 8 and the sessions depend
   on it.

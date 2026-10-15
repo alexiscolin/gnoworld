@@ -40,13 +40,13 @@ The pre-commit hook runs the gate on what is staged, and skips it when only docs
 
 One slice at a time, each with its plan in `docs/plans/` (ADR-0001 §14, CLAUDE.md).
 
-Phase 0, in order. Each slice gets its plan before it starts.
+Phase 0, a public hub (ADR-0001, Rollout), in order. Each slice gets its plan before it starts.
 
 0. Harness and gate. Done.
-1. `r/seal` split into store and rules, gaps closed, on onyx.
-2. Client skeleton and its gate; the IRCv3 line and tag parser in `app/src/core/irc` (human).
-3. Ergo and the login role: a login statement checked against `seal.KeyOf` (ADR §1, §2).
-4. Chat in the browser: rooms and DMs over Ergo, private rooms labelled.
-5. 1:1 transcripts in IRCv3 tags (human) and the "Seal" button.
-6. Adena sessions and the sponsor: sealing with no popup.
-7. Navigation prototype: cosmos, hub, room, Earth, on placeholder data.
+1. Client skeleton and its gate; the IRCv3 line and tag parser in `app/src/core/irc` (human).
+2. Ergo and the login program: Adena's signature and a gno name (ADR §1, §2).
+3. Public rooms in the browser: guests read, logged-in users speak.
+4. The interface in 2D: hub list, rooms, chat.
+5. The 3D cosmos over it.
+
+Later: the seal store (`docs/plans/seal-store.md`), with private rooms in phase 2.
