@@ -182,8 +182,9 @@ with a global chat. Reviewed frame by frame on 2026-10-14, it shows:
     field, very large thin numerals, one bright accent kept for actions, and the same space
     on mobile with a tab bar.
 
-It is a third party's work: gnoworld takes its navigation patterns, not its visual
-identity.
+It is a third party's work. gnoworld takes ideas and the feel of its motion: one continuous
+space, zooms, fluid moves. It does not copy its interface: no layout, colours, type, icons,
+labels, wording or assets. gnoworld's look is its own, designed in slice 4.
 
 ## Decision
 
@@ -406,7 +407,7 @@ not yet exercised (phase 1, see Rollout).
 |---|---|---|
 | Cosmos | gno.land as the sun, pulsing on each block; hubs as planets | Distance to the sun = public activity in the last hour; size = people present |
 | Hub | The planet opens into its rooms (moons) and the people present (satellites) | Moon size = people in the room |
-| Room | The room at the centre, its card on the left, its chat on the right | Live cards for the realms, proposals, contracts and seals the room links |
+| Room | The room at the centre, with its card and its chat | Live cards for the realms, proposals, contracts and seals the room links |
 | Earth | A body of the same cosmos; public rooms pinned to places; speech bubbles where people speak from; "N here now · in X countries" | A bubble is a public message at its speaker's country, opt-in only |
 
 Navigation rules:
@@ -414,6 +415,8 @@ Navigation rules:
 - **Every change is a camera move.** There are no page loads and no cuts. Back is the
   breadcrumb or `Esc`.
 - **Semantic zoom.** A planet splits into its rooms as the camera approaches.
+- **Zoom is continuous.** Scroll or pinch zooms toward the pointer, from the cosmos down to
+  a room and back, with no step. Everything moves with easing; nothing jumps.
 - **Travel like a ship, without the ship.** The feel is No Man's Sky's, steered from the
   interface. You pick where to go (a planet, a room, a person, a country) in the panel, the
   search or the scene. The camera makes the trip: it leaves orbit, crosses space with the
@@ -425,18 +428,19 @@ Navigation rules:
   over, and the orbit resumes after a few idle seconds.
 - **The interface is clean and polished.** HTML panels on veils over the canvas, two type
   families, one accent colour. It is designed and mocked up before it is built.
-- **The detail panel is on the left, and the object stays in view.**
-- **The chat is docked on the right at every level.** A chain object pasted into a message
+- **A detail panel opens beside the object, which stays in view.**
+- **The chat is docked at every level.** A chain object pasted into a message
   becomes a live card.
-- **A toggle at the top centre switches `Cosmos | Earth`.** These are two lenses on one
+- **One control switches between the cosmos and the Earth.** These are two lenses on one
   space: switching flies the camera.
-- **Filter pills at the bottom** (All, Active, Mine, Saved), and **one primary action at the
-  bottom right** (open a hub or a room).
+- **Filters, and one primary action** (open a hub or a room).
 - **Transactions are inline:** sign, then "landing in a block", then the result. There are
   no modals and no optimistic chain effects.
 - **Creating a hub is a birth:** presets, then the planet forms in place.
 - **A sealed conversation leaves a light trail** to the user's logbook.
-- **Mobile is the same space**, with a bottom tab bar.
+- **Mobile is the same space.**
+- **Our own look.** Where things sit and how they look come from gnoworld's own design
+  (slice 4), never from the reference below.
 - **Text is HTML, never 3D geometry.** Panels, labels and bubbles are HTML anchored to a
   point of the scene, so text stays sharp, selectable and readable by screen readers. One
   accent colour is reserved for actions.
@@ -1127,7 +1131,8 @@ cd ~/Server/gnoworld
   - `r/sys/namereg/v0`, `r/sys/users`;
   - `r/g1leu8d2vsplhehcfkjg50mwgdpxdkt8tztu95wr/bubble`;
   - `r/samcrew/memba_dao_channels_v2`, `r/samcrew/escrow_v4`, `r/samcrew/memba_feed_v1`.
-- Dmitriy Dintsen, Bubble Rumble design concept, X, 2026-10-11
+- Dmitriy Dintsen, Bubble Rumble design concept, X, 2026-10-11:
+  https://x.com/DmitriyDintsen/status/2109320428892176603
 - Prior study (private): gno.world on-chain feasibility, 2026-10-13
 
 ## Appendix: independent audit
