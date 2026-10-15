@@ -417,9 +417,10 @@ Navigation rules:
 - **Travel like a ship, without the ship.** The feel is No Man's Sky's, steered from the
   interface. You pick where to go (a planet, a room, a person, a country) in the panel, the
   search or the scene. The camera makes the trip: it leaves orbit, crosses space with the
-  stars streaking, slows down, and settles into orbit around the destination, through the
-  atmosphere when it is a planet. About 2 s; a click or `Esc` lands at once. There is no
-  vehicle and nothing to pilot. Landing on a hub joins its rooms, and the chat follows.
+  stars streaking, slows down, and settles into orbit around the destination. Everything
+  happens in space: no descent, no sky, no clouds; a planet shows its atmosphere only as a
+  glowing rim. About 2 s; a click or `Esc` lands at once. There is no vehicle and nothing
+  to pilot. Landing on a hub joins its rooms, and the chat follows.
 - **The 3D turns around.** At rest, the camera slowly orbits what it looks at. Dragging takes
   over, and the orbit resumes after a few idle seconds.
 - **The interface is clean and polished.** HTML panels on veils over the canvas, two type
