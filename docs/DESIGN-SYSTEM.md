@@ -145,7 +145,7 @@ the component.
 | `Card` | message card, call card (preview → sign → landing → result), realm digest, proposal, event, announcement | Call cards and digests follow ADR-0002 §4 |
 | `Row` | with a planet thumbnail, a title, a subtitle, a trailing action | Lists, connected worlds, notifications |
 | `Field` | text, search; the composer | The composer is a rich text box: bold shows as bold, Markdown on the wire |
-| `Avatar` | sizes 20, 24, 48 | An identicon generated from the name (ADR-0001 §10). No uploaded picture: gnoworld hosts no media (ADR-0002 §6). Never a "verified" badge |
+| `Avatar` | sizes 20, 24, 48 | An astronaut generated from the name (ADR-0002 §1, §8 row 9): a stylized, futuristic suit and helmet, few details, readable at 20 px. Phase 1: its parts chosen by the person. Never a planet. No uploaded picture (ADR-0002 §6). Never a "verified" badge |
 | `PlanetThumb` | world, ecosystem cluster, star, station, signal; dock magnification | Rendered from the same look as the 3D world |
 | `Stat` | number, unit, caption | Tabular numbers |
 | `ActivityChart` | 24 h bars, a hover tooltip | SVG, no chart library |

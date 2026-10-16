@@ -5,7 +5,7 @@
 | Status | Proposed. The lead approved the prototype on 2026-10-16. Alexis made the open decisions on 2026-10-17 (§8, questions 14–20). This text waits for his reading |
 | Date | 2026-10-16, revised 2026-10-17 |
 | Author | Alexis Colin |
-| Builds on | [ADR-0001](0001-gnoworld.md). Amends its §7 (levels and two navigation rules), §12 (routing, rendering), §13 (pieces and hosting) and its "Ideas to place". Answers part of its question 5 (moderation of public rooms) |
+| Builds on | [ADR-0001](0001-gnoworld.md). Amends its §7 (levels and two navigation rules), §10 (the generated face), §12 (routing, rendering), §13 (pieces and hosting) and its "Ideas to place". Answers part of its question 5 (moderation of public rooms) |
 | Prototype | [docs/prototype](../docs/prototype/README.md): live artifact (version 57), two walkthrough videos, five reviews |
 | Verified | **2026-10-16:**<br>- npm: `react-dom` 19.3.1 exports `react-dom/static`; `react-router` and `@react-router/dev` are at 8.4.0.<br>- React Router's pre-rendering guide.<br>- `gno.land/r/gov/dao` on onyx with gnomcp: `Render` and `GetProposal` are free reads; `MustVoteOnProposalSimple(cur realm, pid int64, option string)` is a call.<br>**2026-10-17:**<br>- The Claude Agent SDK docs: MCP, permissions, skills, hooks, observability, cost.<br>- gnomcp 0.12.0's `docs/security.md`: a read-only chain has no write path.<br>- seedfall's ADR-002 §2.2, §2.6 and ADR-008 §12.3.<br>- gnomcp's `docs/tools.md`: `gno_status`, `gno_history`, `gno_activity` (the tx-indexer has no transaction time yet).<br>- gno's `gno.land/pkg/sdk/vm/convert.go` (2026-10-15): a call's arguments are primitive types and bytes only.<br>- gnoweb serves a realm's page as raw Markdown on `Accept: text/markdown` (gno PR #5794).<br>**Secondary sources only, to confirm in their slice:** OpenAI's Moderation API and PostHog |
 
@@ -40,7 +40,8 @@ This ADR records:
 
 **A word on words.** The product says "world" where ADR-0001 says "hub". The code and the
 realm (`r/gnoworld/hubs`) keep "hub". "Satellite" means a sponsored slot (§1); people are
-not drawn as satellites (§8).
+not drawn as satellites (§8). People are astronauts: an avatar is never a planet, since
+planets are worlds (§1).
 
 ## Context
 
@@ -131,7 +132,7 @@ Phases are ADR-0001's:
 | Contextual quick actions: Who's here, Calendar, Realm, Proposal, Station, Catch up, Poll | 0 for those that read; 1 for those that call (votes), and for Catch up and Poll | — |
 | Who's here: the people in the room | 0 | Ergo `NAMES` |
 | Person card: the worlds a person belongs to, message them, fly to them | 0 for the worlds they are in; 1 for the profile realm and "helped N" | Ergo; `r/sys/users` |
-| Your name and face | 0: a gno name read from `r/sys/users` and a generated identicon (ADR-0001 §10). Registering a name happens on gno.land. No uploaded picture: gnoworld hosts no media (§6) | — |
+| Your name and face | 0: a gno name read from `r/sys/users`, and an astronaut generated from the name: a stylized, futuristic suit and helmet with few details, readable at 20 px. The same name gives the same astronaut everywhere. Registering a name happens on gno.land. 1: choose the suit, helmet, visor and emblem, saved in the profile realm. Never a planet; no uploaded picture (§6) | The astronaut generator (SVG from parts); the profile realm |
 | Notifications filtered by kind (messages, worlds, news) and by world | 0 in the app. News comes from a file the team curates | Ergo mentions |
 | Push notifications | 1 | `draft/webpush`, and the PWA (ADR-0001 §12) |
 | Photos and videos, gallery and lightbox | 0: links from accepted services render as embeds once the moderation check passes. gnoworld hosts no uploads (§6) | The embed allowlist |
@@ -625,6 +626,7 @@ All decided by Alexis on 2026-10-17.
 | 6 | No voice | Voice rooms, and events in a "voice lounge" | A WebRTC voice room in phase 1, after phase 0, with its own ADR first |
 | 7 | "Ideas to place": phase 0 takes none of them; ads tier 2 in phase 2; short videos in phase 3 or later | Satellites, Broadcast Moon, the GovDAO world, the person card, video embeds | **Satellites, phase 2:**<br>- a fixed daily price in GNOT, set by the team in the slot realm;<br>- the payment is held until the team approves, and refunded if refused;<br>- at most one per world;<br>- labelled "Sponsored", as advertising law requires.<br>**Broadcast Moon:** a curated station in phase 0, with videos embedded from accepted services (§6).<br>**The person card:** phase 0 in its basic form.<br>**Embeds:** links in phase 0. No uploads are hosted (§6) |
 | 8 | Rollout: "tips and stamps in the same transaction" | Passport stamps | Two different things. Passport stamps record visits on the device. ADR-0001's stamps travel with a tip |
+| 9 | §10: a generated identicon | A planet chosen as an avatar | An astronaut generated from the name; its parts chosen in phase 1 and saved in the profile realm. Never a planet (§1) |
 
 **Checks for slice 1.** These are not differences with the prototype:
 - **The React Compiler.** ADR-0001 §12 plugs it in through `@vitejs/plugin-react`, while
