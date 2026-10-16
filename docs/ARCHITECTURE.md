@@ -41,6 +41,7 @@ app/                         the web client
                              passport, notifications, events, search, profile
   tests/e2e/                 Playwright: journeys, axe, budgets (bundle, Web Vitals, memory)
 cmd/gnoworld/                the Go binary, one role per package: login, moderation, signals
+admin/                       the admin console, on its own origin (ADR-0002 §6): reuses ui and lib
 jarvis/                      the Jarvis service: TypeScript on the Claude Agent SDK
   src/                       the harness: tool allowlist, hooks, limits, our own MCP tools
   skills/                    SKILL.md folders: concierge, realm reader, catch up, translation

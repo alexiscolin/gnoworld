@@ -31,8 +31,8 @@ This ADR records:
 4. **Realm calls.** Reads are free; calls are inline cards signed in Adena (§4).
 5. **Jarvis.** It reads realms with you and never signs. It runs on a Claude key, gnomcp,
    skills and a harness, with evals and full observability (§5).
-6. **Moderation and measurement.** A moderation bot with contests, no hosted media,
-   cookieless product analytics (§6).
+6. **Moderation, admin and measurement.** A moderation bot with contests, an admin console
+   with roles and an audit log, no hosted media, cookieless product analytics (§6).
 7. **What changes in ADR-0001.** Every difference with the prototype is decided (§8).
 
 **The prototype's code is not reused.** Every concept is rebuilt slice by slice, test first
@@ -663,7 +663,7 @@ they change, our own spans wrap each turn.
 runs over stdio. It is not eligible for zero data retention, and it has no hook to block a
 call.
 
-### 6. Moderation, media, prices and measurement
+### 6. Moderation, admin, media, prices and measurement
 
 **Moderation of public rooms** (phase 0). This answers part of ADR-0001's question 5;
 jurisdiction and retention stay open there.
@@ -690,6 +690,37 @@ jurisdiction and retention stay open there.
 - **Satellites are checked before they show** (§8, row 7).
 - **The privacy policy** says public messages are checked by this service.
 - **The key stays on the server,** and the bot rate-limits by account.
+
+**Admin: roles, the console and the log.** Curation and moderation are a lot of work, done
+by few hands, so they get the safest path.
+- **Three roles**, each seeing and doing only its part:
+  - **admin:** gno's core team;
+  - **moderator:** for every world or for one;
+  - **curator.**
+
+  The admins choose the moderators and curators.
+- **Where the roles live:**
+  - in phase 0, a file in the repo, changed only by a pull request that two admins approve;
+  - in phase 1, on chain in `r/gnoworld/hubs`, where a world's owner also names its
+    moderators.
+- **The console is its own small app, on its own origin** (`admin.` the site's domain), never
+  part of the public client, so a flaw in a public page can never reach an admin session.
+  It reuses the design system and `lib`, is `noindex`, and loads no third-party script.
+- **Login:**
+  - the same Adena signature, for a session of one hour;
+  - a fresh signature for each sensitive action: a takedown with refund, hiding a realm, a
+    quota, anything about roles;
+  - rotating gnoworld's keys, and the slot realm's admin, take two admins (a multisig).
+- **The moderation queue:** reports, contests, flagged messages and satellites, each with
+  its context and one-click actions.
+  - Moderators act through the server, which sends the commands to Ergo, so nobody needs
+    IRC operator rights.
+  - Actions are rate-limited.
+- **Curation:** the console edits the data files and opens the pull request through a
+  GitHub App limited to this repo. Nothing goes live without review.
+- **The audit log:** every action, with who, what, when and why, signed and append-only.
+  - The person affected always sees the reason.
+  - A monthly transparency summary, counts only, is public.
 
 **Media.** gnoworld hosts no media, because it cannot moderate uploads alone.
 - Links and embeds come from an allowlist of accepted services that moderate their own
@@ -732,6 +763,7 @@ jurisdiction and retention stay open there.
 | Moderation bot | 0 | §6; it also signs the satellites' approvals | A role of the Go binary. An OpenAI API key and the approval key, server-side |
 | Prices job | 0 | Writes `markets.json` every 5 minutes (§6) | The host's scheduler |
 | PostHog | 0 | Product analytics (§6) | A third party, in the CSP's `connect-src` |
+| Admin console | 0 | Roles, the moderation queue, curation edits as pull requests, settings, the audit log (§6) | Its own origin; a GitHub App to open pull requests |
 | Signals | 0 for new realms, first to chart and first words; 1 for the rest | Heat with realm calls, routes, new realms, who charted first; the rank, the dust, the seasons and the tiles of §3. It reads Ergo and the public indexer and serves a small JSON feed | A role of the Go binary. ADR-0001 §13 holds: we run no indexer |
 | Jarvis | 0 | §5 | A TypeScript service beside the Go binary |
 | Observability | 0 | Grafana and Langfuse, fed by OpenTelemetry (§5) | Self-hosted |
@@ -896,7 +928,7 @@ from gno-golf's engine, measured there.
 - **Validation:** Zod checks Ergo, the indexer, realm reads and every data file.
 - **Untrusted text:** realm text and chat, for Jarvis too (§5).
 - **Secrets:** the client holds none. The Claude and OpenAI keys, the moderation approval
-  key and the slot realm's admin key live only on the server; services rate-limit by
+  key, the slot realm's admin key and the GitHub App's key live only on the server; services rate-limit by
   account.
 - **Dependencies:** locked, and the gate audits them.
 
