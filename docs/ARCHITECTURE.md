@@ -26,7 +26,7 @@ export OpenTelemetry to Grafana and Langfuse (phase 1).
 ```
 app/                         the web client
   react-router.config.ts     ssr: false; prerender lists every place from data/
-  data/                      hubs, ecosystems, systems, stations, events, expedition stops, quests,
+  data/                      universes, hubs, ecosystems, stations, events, expedition stops, quests,
                              news, bubble rules (Zod-checked at build, ADR-0002 §7)
   public/                    fonts, KTX2 textures, preview captures, generated OG images
   src/

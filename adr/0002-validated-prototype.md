@@ -87,7 +87,7 @@ Phases are ADR-0001's:
 |---|---|---|---|---|
 | The cosmos | gno.land as the sun; namespaces as star systems, realms as planets generated from their path (same path, same planet), placed by §3; the asteroid belt; the uncharted frontier | 0 from the hubs data file; 1 from the chain (§3) | Scene; the hubs data file, then `r/gnoworld/hubs` and the signals | Read |
 | Ecosystems | Curated regions: the namespaces of one project or topic placed together, with a group view | 0 | Ecosystems data file, curated by the team | — |
-| Other systems | Onyx and community systems, each a star with its worlds | 0 | Systems data file | Read |
+| Universes | One per chain, never shown together. Mainnet (`gnoland-1`) is the default; Onyx, the testnet, and community chains are other universes, reached by a switcher with a jump, not a flight. A testnet is always labelled "Testnet", so test tokens never pass for real ones. Each universe reads and calls its own chain. The Earth and its general room live in the main universe | 0 | The universes data file; one RPC per chain | Read |
 | Namespace systems | One star per registered namespace, its realms and packages in orbit | 1 | `vm/qpaths` by namespace; §3 | Read |
 | Genres | What a realm is: token, DAO, game, social… A realm can have several. A lens on the map lights one genre wherever it is | 0 from the data file; 1 computed from imports (§3) | The genre classifier | Read |
 | Visibility rank and dust | Realms with real signals are planets; quiet realms are dust around their star, still found by search, by URL and in the list (§3) | 1. In phase 0, every world in the data file is a planet | The signals (§7) | Read |
@@ -114,7 +114,7 @@ Phases are ADR-0001's:
 | Ticker | A pausable line of what is happening: votes, events, new worlds | 0 from data and rooms; 1 adds chain events | — | Read |
 | Rail | The worlds or the groups, magnified like a dock under the pointer | 0 | — | — |
 | List view | Everything as panels, no 3D, filterable by genre | 0 | — | — |
-| Search | ⌘K over worlds, ecosystems, systems, stations and genres; in phase 1 over every realm, dust included | 0 | — | — |
+| Search | ⌘K over the current universe's worlds, ecosystems, stations and genres; in phase 1 over every realm, dust included | 0 | — | — |
 | Loader | Real texture progress, then the space opens like an iris | 0 | — | — |
 
 **Chat** (Ergo in phase 0, ADR-0001 §1)
@@ -203,13 +203,13 @@ changes ADR-0001 §12, where the URL held the camera state. It replaces ADR-0001
 | `/w/:world` | A world's focus view, chat on its main room. Stations are worlds of kind "station" | Yes, one page per world | Yes |
 | `/w/:world/:room` | A world on one of its public rooms | Yes, for public rooms | Yes |
 | `/e/:ecosystem` | An ecosystem and its worlds | Yes | Yes |
-| `/s/:system` | A system and its worlds | Yes | Yes |
 | `/n/:namespace` | A namespace system (phase 1) | Yes | Yes |
 | `/r/*`, `/p/*` | A realm or a package by its path, as on gnoweb (phase 1). A realm that is also a world points its canonical to `/w/:world` | Planets only; dust uses the SPA fallback | Planets only; dust is `noindex` until it becomes a planet |
 | `/list` | Everything as panels | Yes | Yes |
 | `/events` | The calendar | Yes, rebuilt when the events file changes | Yes, with `Event` structured data |
 | `/@:name` | A person (phase 1) | Yes, from `r/sys/users` at build time | Yes |
 | `/passport`, `/saved` | Device-only views, shown as dialogs over the current place | No: the SPA fallback | `noindex` |
+| `/net/:network/…` | Another universe (Onyx, a community chain): the same paths under its prefix, for example `/net/onyx/w/bubble` | Yes | Mainnet only. A testnet's pages are `noindex`, as gnoweb does for testnets (gno PR #6256) |
 
 The `/n/`, `/r/` and `/p/` paths are proposed here and confirmed in the namespace-systems
 slice.
@@ -454,7 +454,8 @@ between worlds. None may saturate the map:
   Their results show in the card with "read on chain, free, no signature".
 - **A call is a transaction the user signs in Adena.** It shows as an inline card in the
   room or on the plate, in four steps (ADR-0001 §7):
-  1. the preview: realm, function, arguments, network, fee;
+  1. the preview: realm, function, arguments, network, fee. The network is the universe's
+     chain, and Adena must be on it;
   2. "sign in Adena": the wallet opens;
   3. "landing in a block";
   4. the result.
@@ -700,7 +701,7 @@ jurisdiction and retention stay open there.
 
 | Piece | Phase | What it does | Notes |
 |---|---|---|---|
-| Data files | 0 | Hubs, ecosystems, systems, stations, events, expedition stops, quests, news, the bubble rules (ADR-0001 §7) | Versioned in the repo; curated by the team through reviewed pull requests; validated with Zod at build time |
+| Data files | 0 | Universes, hubs, ecosystems, stations, events, expedition stops, quests, news, the bubble rules (ADR-0001 §7) | Versioned in the repo; curated by the team through reviewed pull requests; validated with Zod at build time |
 | Preview captures | 0 | A build job (Playwright) captures each world's public page | Refreshed on a schedule; no capture, no preview |
 | Moderation bot | 0 | §6 | A role of the Go binary. An OpenAI API key, server-side |
 | Prices job | 0 | Writes `markets.json` every 5 minutes (§6) | The host's scheduler |
@@ -819,7 +820,7 @@ risk. This section adds what the prototype showed was needed.
 - the URLs and the pre-rendering;
 - the design system;
 - the passport and the expedition, on the device;
-- worlds, ecosystems, systems, stations and genres from data files;
+- universes, worlds, ecosystems, stations and genres from data files;
 - the map view, the hero, the ticker and the rail;
 - the preview captures and the prices file;
 - the moderation bot, with contests;
