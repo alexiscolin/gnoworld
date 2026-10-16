@@ -77,7 +77,8 @@ planets are worlds (§1).
 ### 1. The concepts, by phase
 
 Phases are ADR-0001's:
-- **0**: a public hub; the chain is read, never written.
+- **0**: a public hub. Users sign their own calls; gnoworld's only write of its own is the
+  slot realm (§8, row 11).
 - **1**: social on chain.
 - **2**: private, and depth.
 - **3**: mainnet.
@@ -106,16 +107,16 @@ Phases are ADR-0001's:
 | Status ring | A thin arc around a world for what the realm itself reports: a proposal's tally, a deadline the realm defines. gnoworld invents no timer (§8, row 2). Activity trends belong to the heat badge, never the ring | 0 | Realm reads | Read |
 | Rooms as moons | The busiest rooms orbit as moons, four at most, and the room you are in is always one: a moon's size follows the people present, it flares when someone speaks, a click joins the room. A "+96" chip beside them opens the room switcher. The Earth keeps one moon, the real Moon, for its busiest room after the general one (§3) | 0 | Ergo counts | — |
 | Storms | A conversation speeding up forms a storm's eye on the planet, growing with the pace of messages; a click joins that room | 0 | Ergo | — |
-| Auroras | The poles light with calls to the realm, stronger with calls per minute | 1 | The indexer | Read |
+| Auroras | The poles light with calls to the realm, stronger with calls per minute | 1 | The signals at scale (§7) | Read |
 | Comets in space | A message sent to another world's room crosses space as a comet (Chat, comets) | 1 | The comets bot | — |
 | Talk box | With the chat closed, the last lines of the world's room on its plate | 0 | — | — |
-| Realm facts | Path, deployer, first block, calls in 24 h | 0 for the path; 1 for the rest | The indexer | Read |
+| Realm facts | Path, deployer, first block, calls in 24 h | 0 | The public indexer | Read |
 | Latest post on X | — | Cut, unless a source is decided | — | — |
 | The Earth | Bubbles where people speak from, with counts for the far side ("Japan · 12, far side"); hotspots per country with the last hour's trend ("+15% · 1 h"); the globe turns to show your own message; "N realms deployed in 24 h" from the indexer | 0 | `pickBubbles` and its rules file (ADR-0001 §7) | — |
 | Bubbles on other worlds | The prototype pops messages on any planet | Cut: bubbles are the Earth's, by country (ADR-0001 §7). Moons, storms, auroras and heat carry activity elsewhere (§3) | — | — |
 | Hero | The number of people online, one line, two big actions | 0 | Ergo counts | — |
 | Markets row | GNOT, ATONE and BTC with a 24 h line; the block height | 0 | The prices file (§6) | Read |
-| Ticker | A pausable line of what is happening: votes, events, new worlds | 0 from data and rooms; 1 adds chain events | — | Read |
+| Ticker | A pausable line of what is happening: votes, events, new worlds | 0, chain events included | The public indexer | Read |
 | Rail | The worlds or the groups, magnified like a dock under the pointer. By default, the most used worlds right now (social and realm), after the ones you follow: 25 at most, scrolling, then a "See all" button to the list view. The order changes at most once a minute, only when a world stays clearly ahead, and never under the pointer | 0 | Ergo counts; the signals in phase 1 | — |
 | List view | Everything as panels, no 3D, filterable by genre | 0 | — | — |
 | Search | ⌘K over the current universe's worlds, ecosystems, stations and genres, grouped with their counts, with "Go explore" on top; satellites labelled "Sponsored"; in phase 1 over every realm, dust included | 0 | — | — |
