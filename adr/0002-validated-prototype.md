@@ -363,6 +363,9 @@ ADR-008 §12.3.
 **What a realm shows: a digest, not its page.** gnoworld stays a chat. A realm appears as a
 few simple blocks; its whole page stays one link away, on gnoweb.
 
+**gnoweb is the source of truth.** Every realm card, digest and realm view carries a link
+to the realm on gnoweb. A digest is a reading aid, never the reference.
+
 | Block | What it holds | Design-system pieces |
 |---|---|---|
 | Facts | A few labelled values | `Stat`, `Row` |
