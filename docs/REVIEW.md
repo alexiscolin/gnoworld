@@ -58,6 +58,19 @@ Most important first:
 
 Use [Conventional Comments](https://conventionalcomments.org): `issue:` (blocks the merge), `question:`, `suggestion:`, `nit:`. For an `issue:`, write the scenario: who calls what, with which arguments, and what they get.
 
+## AI review before a merge
+
+Code written by an agent gets the same reading as anyone's, plus this:
+
+1. **Five fresh-context lenses** read the diff, each an agent that did not write it:
+   correctness, security, performance, accessibility and UX, simplicity.
+2. **Verify each finding.** A second pass checks it against the code and drops the false
+   positives.
+3. **Nothing is waved through.** Every remaining finding is fixed, or put to Alexis with
+   the scenario.
+4. **Learn from it.** Findings and outcomes go into the review log. A miss that repeats
+   becomes a rule here, a lint, or a test.
+
 ## Blind first
 
 In the first slices, the author gives only the review card's first three items: what to read, what to skim, what to try. Alexis reviews and writes findings, then compares them with the author's and with a fresh-context reviewer's. Each comparison goes into [review-log.md](review-log.md): what was caught, what was missed, and why.

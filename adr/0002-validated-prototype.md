@@ -989,6 +989,44 @@ from gno-golf's engine, measured there.
     chat's CPU close to a plain chat page's;
   - **the GPU variety view of §3.**
 
+**Tests in every direction.** Each slice adds its tests at every level that applies:
+
+| Kind | What it proves | Tool | When |
+|---|---|---|---|
+| Unit | Every rule in `core`, and every parser; properties for parsers, placement and ranking (any input, the invariant holds) | Vitest; a property-testing library | Every commit |
+| Component | Each design-system component in each state, the keyboard, axe | Vitest with Testing Library | Every commit |
+| Feature | A feature with its store and its boundaries, against fakes: a fake Ergo, recorded chain answers, a fake model | Vitest | Every commit |
+| Contract | Each Zod schema against recorded real answers (Ergo, the RPC, the indexer, gnoscope, Adena); live again each night, so a change outside fails loudly | Vitest | Every commit; nightly live |
+| End-to-end | Every journey in a real browser against a local stack: Ergo, a local chain (gnodev), Jarvis with a recorded model, Adena's test double | Playwright, axe | Every pull request; nightly |
+| Visual | Key screens and every component, as screenshots compared with the approved ones | Playwright | Every pull request |
+| Faults | Ergo drops, the indexer is down, Jarvis is down, the moderation API is slow: each degrades as written | Playwright | Every pull request |
+| Performance and memory | The bench, idle, hidden tab, full-screen chat, 20 flights, the GPU variety view | Playwright | Every pull request; GPU bench nightly |
+| Mutation | Every guard fails a test when removed: realms (`scripts/mutate.py`) and `core` | `mutate.py`; a TypeScript mutation tester | Nightly |
+| Realms | Tests, filetests, `gno-audit` | gno | Every commit |
+| AI | Jarvis's evals (§5) | Our harness | On every change to it; nightly sample |
+| Security | Dependency audit, secret scan, the CSP, the injection suite, the admin console's penetration test | The gate; before launch | Every commit; before launch |
+
+`core` keeps 100% of lines and functions covered and 95% of branches; coverage alone never
+counts as proof, mutation does.
+
+**CI first, for code written by AI.**
+- The CI and the gate come before the first feature (slice 1). The gate is
+  `scripts/check.sh`, and CI runs the same script on every push, so there is one truth.
+- Every change starts with its failing test, committed and seen failing in CI, then the
+  code (ADR-0001 §14).
+- Nothing merges without a green CI. An agent never merges, never pushes on its own, and
+  never skips a hook.
+- A test is never edited to pass. A plan that proves wrong stops the slice and goes to
+  Alexis.
+
+**Review, with AI and people** (`docs/REVIEW.md`):
+- before a merge, fresh-context review agents read the diff through five lenses:
+  correctness, security, performance, accessibility and UX, simplicity;
+- a second pass checks each finding against the code, to drop false positives;
+- every finding left is fixed or put to Alexis;
+- Alexis reviews blind first, and the review log keeps what each side caught or missed,
+  so a repeated miss becomes a rule, a lint or a test.
+
 **Security.**
 - **CSP:** strict, with no inline script and no `eval`. Pre-rendered JSON-LD is allowed by
   hash. `frame-src` lists only the accepted embed services.
