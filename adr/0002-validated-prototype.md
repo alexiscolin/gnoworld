@@ -800,6 +800,57 @@ risk. This section adds what the prototype showed was needed.
   - videos pause and unload off screen.
 - HTML labels are pooled, never recreated each frame.
 
+**Rendering: smooth, calm, and light on the battery.** The scene must never lag, never heat
+a machine and never drain a battery, even open for hours beside the chat. The rules come
+from gno-golf's engine, measured there.
+- **The GPU:** the low-power adapter where there are two, so the fans stay off; no stencil.
+- **The pixel ratio** is capped at 1.25 on desktop and 1 on touch screens; Low takes 1 and
+  0.8. The cap is applied again when the window moves to another screen.
+- **The frame rate follows what happens, never above 60:**
+  - 60 fps while flying or interacting;
+  - 30 fps when only scenery moves;
+  - 10 fps after a minute with no input;
+  - 0 fps under reduced motion once nothing changes.
+
+  A frame budget carried over keeps 75 to 165 Hz screens at exactly those rates.
+- **Nothing is drawn** when the tab is hidden, when an opaque view covers the scene (the
+  full-screen chat, a realm view, the list), or when the window is blurred and nothing is
+  moving.
+- **Quality: Auto, High or Low**, in the settings. Low thins the dust and the effects, drops
+  far glows and simplifies atmospheres.
+  - **Auto** times the first 2 s or 90 busy frames. Above 20 ms a frame on average, the
+    slowest tenth ignored, it drops to Low and remembers it on the device.
+  - A steady 33 ms reads as the browser's battery saver, and is not remembered.
+  - A known weak GPU (software renderers, old mobile and integrated chips, by the
+    renderer's name) gets the list and planet stills, never WebGL.
+- **"Reduce animations" on demand.** It is a setting in the app, as well as the system's
+  reduced motion:
+  - the shader clock and idle orbits freeze;
+  - flights become crossfades;
+  - effects become counts (§3).
+- **Data saver** (`saveData`, a 2G link) shows stills instead of embeds, and never
+  autoloads the 3D.
+- **Few draw calls:**
+  - static meshes are merged per material;
+  - planets, dust, moons and comets are instanced;
+  - materials are shared, and static objects skip matrix updates.
+- **No hitch on arrival.** The shaders a flight will need are compiled ahead
+  (`compileAsync`, 2 s at most), and a scene shows only when ready. Heavy building waits
+  for idle time.
+- **Off the main thread:** planet parameters and tiles are computed in workers.
+- **Labels and the interface over the scene** update 10 times a second at most.
+- **A second renderer** (a shared snapshot) runs only when asked, then releases its
+  context.
+- **Measured in the field,** once per visit, never per frame, through PostHog: median fps,
+  the slowest tenth, frames over 50 ms, heap size.
+- **Checked in the gate:**
+  - **a bench:** 60 fps and at most 33 ms of main-thread work per frame with the CPU slowed
+    4×;
+  - **an idle test:** a minute with no input asks no frame, or at most 10 a second, and
+    uses next to no CPU;
+  - **a hidden-tab test:** no frame at all;
+  - **the GPU variety view of §3.**
+
 **Security.**
 - **CSP:** strict, with no inline script and no `eval`. Pre-rendered JSON-LD is allowed by
   hash. `frame-src` lists only the accepted embed services.
