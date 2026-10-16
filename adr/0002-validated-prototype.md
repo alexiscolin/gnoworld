@@ -1000,14 +1000,22 @@ from gno-golf's engine, measured there.
 | End-to-end | Every journey in a real browser against a local stack: Ergo, a local chain (gnodev), Jarvis with a recorded model, Adena's test double | Playwright, axe | Every pull request; nightly |
 | Visual | Key screens and every component, as screenshots compared with the approved ones | Playwright | Every pull request |
 | Faults | Ergo drops, the indexer is down, Jarvis is down, the moderation API is slow: each degrades as written | Playwright | Every pull request |
-| Performance and memory | The bench, idle, hidden tab, full-screen chat, 20 flights, the GPU variety view | Playwright | Every pull request; GPU bench nightly |
+| Performance and memory | The bench, idle, hidden tab, full-screen chat, 20 flights, the bundle sizes, Lighthouse's budgets, the GPU variety view | Playwright, Lighthouse | Every pull request; the GPU bench nightly on a machine with a GPU |
+| Algorithms | Every hot path has a bench with a stored baseline; a slowdown past 10% fails. Its growth is measured at n, 4n and 16n, so an O(n²) hiding in an O(n log n) path fails too | Vitest bench | Every pull request |
+| Scale | Synthetic universes at 10×, 100× and a million realms: placement time per system stays flat, tiles stay bounded, the draw count stays bounded, ⌘K answers within budget; a 100,000-message history and a 1,000-room switcher stay smooth | Vitest bench, Playwright | Nightly |
+| Load | Ergo with thousands of clients, Jarvis with concurrent questions, the moderation queue at peak: latency and errors within budget | A load-testing tool, against a staging stack | Nightly, and before launch |
 | Mutation | Every guard fails a test when removed: realms (`scripts/mutate.py`) and `core` | `mutate.py`; a TypeScript mutation tester | Nightly |
 | Realms | Tests, filetests, `gno-audit` | gno | Every commit |
-| AI | Jarvis's evals (§5) | Our harness | On every change to it; nightly sample |
+| AI | Jarvis's evals (§5), non-hallucination first: every number, name, link and function in an answer is checked by string match against the tool results; an answer with nothing to ground it must say it does not know; a different model grades the rest. A grounded rate below the threshold fails | Our harness | On every change to it; nightly sample |
 | Security | Dependency audit, secret scan, the CSP, the injection suite, the admin console's penetration test | The gate; before launch | Every commit; before launch |
 
 `core` keeps 100% of lines and functions covered and 95% of branches; coverage alone never
 counts as proof, mutation does.
+
+**The CI measures, and fails on a regression:** speed, algorithmic growth, scale, memory,
+bundle size, Web Vitals and hallucination. Every run stores its numbers, so a trend shows
+before a budget breaks. Hosted CI runners have no GPU, so the GPU bench runs nightly on a
+machine that has one, and in `/pre-merge`.
 
 **CI first, for code written by AI.**
 - The CI and the gate come before the first feature (slice 1). The gate is
