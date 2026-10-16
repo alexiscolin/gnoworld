@@ -336,6 +336,78 @@ ADR-008 §12.3.
 - **Placement never depends on genre.** A realm with two genres appears in both lenses and
   stays in one place.
 
+**Planets: every world a different place.** The bar is seedfall's and No Man's Sky's: as
+many kinds of world as there are worlds, some of them breathtaking. The look stays
+realistic, like space photography, never cartoon (docs/DESIGN-SYSTEM.md).
+- **The space is the seed, not a catalogue.** A planet's look comes from
+  `sha256("gnoworld/planet/v1" ‖ path)`. Its 256 bits feed continuous parameters at every
+  layer, so no two planets repeat. The named lists below are anchors an artist can paint,
+  never the number of possible planets. A look never depends on the neighbours.
+- **Layer 1, the class.** About twelve anchors, each a data row:
+  - rocky and cratered;
+  - temperate, with oceans and continents;
+  - desert;
+  - ocean;
+  - ice, cracked like Europa;
+  - volcanic, like Io;
+  - gas giant, banded with storms;
+  - ice giant;
+  - a world under a thick cloud deck, like Venus;
+  - tidally locked: one side scorched, the other frozen;
+  - dark carbon;
+  - shattered, with its debris in orbit.
+
+  The strange ones stay rare, about 10%, so they stay memorable. A planet draws a dominant
+  class and a minor one, and the dominant never falls below about 60%, so it reads as one
+  place from afar.
+- **Layer 2, the surface.** Continuous: continent scale, warp, erosion, crater density,
+  sea level, ice caps, band count and turbulence, storms, cloud cover and speed, rifts.
+  Real planetary maps from NASA and USGS are the anchors: public domain, or CC BY with
+  credit. They are warped, recoloured and mixed by noise.
+- **Layer 3, the palette.** Interpolated between anchors taken from real planets (Mars's
+  rusts, Neptune's blues, Io's sulphur, Titan's haze). A namespace shifts the hue by ±12°,
+  so a system's planets look related. The grade keeps every colour plausible, never neon.
+- **Layer 4, atmosphere, rings and moons.**
+  - The rim's scattering colour and thickness, haze layers, and auroras at the poles.
+  - Rings: common on giants, rare elsewhere, with a tilt, gaps and a density.
+  - Up to four small moons. They are scenery: rooms stay markers on the surface.
+- **Layer 5, what the data says.** Data never passes a verdict, and a quiet world looks
+  resting, never decayed.
+  - **Size** follows the rank (above).
+  - **Genre nudges the class weights** without fixing them:
+    - tokens lean to giants;
+    - DAOs lean to temperate worlds;
+    - games lean to volcanic and strange worlds;
+    - pure packages (`/p/`) lean to mineral worlds.
+  - **Lights on the night side** show people in its rooms now.
+  - **Heat** stays the warm glow (§1).
+- **Layer 6, wonders.** About one planet in fifty carries a rare trait, for example:
+  - a storm larger than a continent;
+  - a ring standing on edge;
+  - a double planet;
+  - a rogue world lit only by its own volcanoes;
+  - an evaporating world with a tail.
+
+  Each wonder casts a cue readable from afar, so the next one is always somewhere on the
+  horizon. The passport keeps the wonders found, never out of a total (above).
+- **Hand-made, not generated:** the Earth (real maps), GovDAO and the stations.
+- **Variety is measured, not counted.** Each planet has a feature vector:
+  - class;
+  - the palette's centre in Lab;
+  - surface statistics;
+  - rings and atmosphere.
+
+  A golden test requires a minimum perceptual distance between any two planets in a system
+  or in one view. It is tuned on the real list and on a synthetic universe ten times
+  larger.
+- **Performance.**
+  - A class is data, not a shader. A few material graphs carry everything as uniforms:
+    solid surface, gas bands, cloud deck, rings, atmosphere.
+  - Surface maps stream as KTX2 only near a planet. Far away, the ladder above draws
+    points.
+  - The GPU bench adds a variety view: eight planets of different classes and a wonder in
+    frame, within the frame budget.
+
 **The infinite, felt.**
 - Haze closes the view before any edge.
 - No counter announces the total, as in "42 of 551".
