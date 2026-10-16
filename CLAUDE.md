@@ -1,7 +1,11 @@
 # Notes for AI assistants
 
 gnoworld: a social, on-chain, graphical hub for gno.land. The design is
-[ADR-0001](adr/0001-gnoworld.md); how to build and test is
+[ADR-0001](adr/0001-gnoworld.md), with the approved prototype's scope in
+[ADR-0002](adr/0002-validated-prototype.md). The code layout and its rules are
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); the look is
+[docs/DESIGN-SYSTEM.md](docs/DESIGN-SYSTEM.md); the order of work is
+[docs/plans/backlog.md](docs/plans/backlog.md). How to build and test is
 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md); how changes are reviewed is
 [docs/REVIEW.md](docs/REVIEW.md).
 
@@ -22,6 +26,7 @@ gnoworld: a social, on-chain, graphical hub for gno.land. The design is
 - Claude writes the realms and any Go (who reviews what: docs/REVIEW.md).
 - Explain a language, React or tooling feature newer than 2025 the first time it appears, in two lines.
 - Work one slice at a time (`docs/plans/`). Stop at the end of a slice for review.
+- The prototype (`docs/prototype/`) is the reference for what to build and how it feels. Never copy its code: rebuild each concept test first, with the design system's components.
 
 ## Review card (end of every change)
 

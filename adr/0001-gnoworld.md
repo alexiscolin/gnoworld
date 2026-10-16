@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Proposed |
+| Status | Proposed. Amended by [ADR-0002](0002-validated-prototype.md): §7 (levels and two navigation rules), §12 (routing and rendering), §13 (pieces and hosting from phase 1), and "Ideas to place" |
 | Date | 2026-10-14 |
 | Author | Alexis Colin |
 | Verified against | `gnoland-1` (mainnet, `v1.5.1`, height 786,583) and `onyx-1` (`v1.5.1-rc.1`, height 385,528), both at commit `07e44776c`; source read at tag `v1.5.1`. Mainnet realms and names read on 2026-10-14 (gnoscope index height 789,357). |

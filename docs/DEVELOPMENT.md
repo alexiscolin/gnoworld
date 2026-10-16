@@ -40,15 +40,7 @@ The pre-commit hook runs the gate on what is staged, and skips it when only docs
 
 One slice at a time, each with its plan in `docs/plans/` (ADR-0001 §14, CLAUDE.md).
 
-Phase 0, a public hub (ADR-0001, Rollout), in order. Each slice gets its plan before it starts.
-
-0. Harness and gate. Done.
-1. Client skeleton and its gate; the IRCv3 line and tag parser in `app/src/core/irc` (human).
-2. Ergo and the login program: Adena's signature and a gno name (ADR §1, §2).
-3. Public rooms in the browser: guests read, logged-in users speak, with an opt-in country.
-4. Design: the look of the panels and of a trip, mocked up and approved before code.
-5. The interface in 2D: hub list, rooms, chat.
-6. `pickBubbles`: which messages pop up on the Earth, by rules (ADR §7) (human).
-7. The 3D space over it: trips from planet to planet, the idle orbit, the Earth and its bubbles.
+The order, from phase 0 to phase 3, is in [plans/backlog.md](plans/backlog.md), with the
+concepts of ADR-0002 placed in it. Each slice gets its plan before it starts.
 
 Later: the seal store (`docs/plans/seal-store.md`), with private rooms in phase 2.
