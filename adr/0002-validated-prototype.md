@@ -946,6 +946,13 @@ from gno-golf's engine, measured there.
 - **Nothing is drawn** when the tab is hidden, when an opaque view covers the scene (the
   full-screen chat, a realm view, the list), or when the window is blurred and nothing is
   moving.
+- **The full-screen chat costs what a plain chat app costs:**
+  - the scene stops: no frame, no animation clock, no store subscription;
+  - after five minutes covered, the scene releases its GPU memory beyond the current place,
+    and reloads it behind a crossfade on return;
+  - the chat itself stays light: a windowed history, embeds loaded only in view, no video
+    playing by itself, typing and presence updates throttled;
+  - only the chat socket stays open; nothing else polls.
 - **Quality: Auto, High or Low**, in the settings. Low thins the dust and the effects, drops
   far glows and simplifies atmospheres.
   - **Auto** times the first 2 s or 90 busy frames. Above 20 ms a frame on average, the
@@ -978,7 +985,8 @@ from gno-golf's engine, measured there.
     4×;
   - **an idle test:** a minute with no input asks no frame, or at most 10 a second, and
     uses next to no CPU;
-  - **a hidden-tab test:** no frame at all;
+  - **a hidden-tab test and a full-screen-chat test:** no frame at all, and the full-screen
+    chat's CPU close to a plain chat page's;
   - **the GPU variety view of §3.**
 
 **Security.**
