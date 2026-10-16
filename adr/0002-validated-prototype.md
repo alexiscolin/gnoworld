@@ -594,7 +594,9 @@ To act, Jarvis proposes an action that opens the call card (§4). The user signs
   answer, and the evals look for exactly that.
 
 **Limits.**
-- 20 questions per person per day.
+- 20 questions per person per day by default. The team can raise it for a person
+  (moderators, builders, partners), in the service's settings. The daily budget still caps
+  the total.
 - **A budget of 50 $ a day.**
   - An alert fires at 80%.
   - At 100%, Jarvis answers with Haiku until the next UTC day.
@@ -756,7 +758,7 @@ jurisdiction and retention stay open there.
 | The build | One page per place | Planets only, never dust (§2) |
 | Ergo | About 10,000 clients per instance, 2,000 per room (ADR-0001 §1) | More instances; each hub names its server (ADR-0001 §8) |
 | Moderation bot | The Moderation API's rate limit, measured in slice 12 | Batch messages per request; a queue with back-pressure. Previews wait; text never does |
-| Jarvis | 50 $ a day; 20 questions per person | Digests and translations cached per content hash; more service instances behind a queue |
+| Jarvis | 50 $ a day; 20 questions per person by default | Digests and translations cached per content hash; more service instances behind a queue |
 | The public indexer | A third party's rate limits and uptime | The signals role caches and fans out; the client subscribes only to what it shows |
 | Signals | One JSON feed | Spatial tiles and per-region feeds (§3) |
 | The slot realm | Gas per rent; one slot per world, so storage is bounded | Expired slots are reused |
