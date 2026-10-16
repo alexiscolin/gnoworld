@@ -149,7 +149,7 @@ Phases are ADR-0001's:
 | Routed questions: an unanswered question reaches people from the world that knows; a "Thanks" counts toward "helped N" | 1 | Opt-in helpers |
 | Translation | 1, on request | Jarvis's service with Haiku, within Jarvis's budget (§5) |
 | Voice rooms | 1, after phase 0, with its own ADR first | WebRTC: a media server, TURN, live moderation |
-| Direct messages, and the seal | 2 (ADR-0001) | MLS |
+| Direct messages, and the seal | 2 (ADR-0001 §2–§4). A seal records a conversation's Merkle root and both signatures, never the messages. Putting messages themselves on chain is the user's explicit choice: an encrypted archive, or a public excerpt (ADR-0001 §4). Public rooms are not sealed: they are public already | MLS; `r/seal` |
 
 **Realms** (§4)
 
