@@ -10,13 +10,16 @@ and [ADR-0002](../adr/0002-validated-prototype.md).
 Browser: the static client (React Router 8, pre-rendered pages, one three.js scene)
   ├─ Ergo over WebSocket .................. rooms, history, presence (IRCv3)
   ├─ gno.land RPC ......................... free reads: vm/qrender, vm/qeval, vm/qfile, vm/qpaths
+  ├─ markets.json ......................... prices, written every 5 minutes by a scheduled job
+  ├─ PostHog, EU cloud .................... counts only, cookieless (ADR-0002 §6)
   ├─ indexer.gno.land (graphql-ws) ........ chain events, live (phase 1)
   ├─ Adena (extension) .................... the login signature; signed calls (phase 1)
-  ├─ the Go binary ........................ login for Ergo (phase 0); signals, maybe Jarvis (phase 1)
-  └─ the media service .................... uploads (phase 1, ADR-0002 §5)
+  ├─ the Go binary ........................ login for Ergo and the moderation bot (phase 0); signals (phase 1)
+  └─ Jarvis ............................... Claude Agent SDK service with gnomcp (phase 1, ADR-0002 §5)
 ```
 
-The client is a static site. Anyone can host it, and it never holds a secret.
+The client is a static site. Anyone can host it, and it never holds a secret. The services
+export OpenTelemetry to Grafana and Langfuse (phase 1).
 
 ## Repository layout
 
@@ -24,7 +27,7 @@ The client is a static site. Anyone can host it, and it never holds a secret.
 app/                         the web client
   react-router.config.ts     ssr: false; prerender lists every place from data/
   data/                      hubs, ecosystems, systems, stations, events, expedition stops, quests,
-                             news, bubble rules (Zod-checked at build, ADR-0002 §5)
+                             news, bubble rules (Zod-checked at build, ADR-0002 §7)
   public/                    fonts, KTX2 textures, preview captures, generated OG images
   src/
     root.tsx                 document shell, providers, top error boundary
@@ -37,7 +40,11 @@ app/                         the web client
     features/                one folder per feature: chat, universe, world, realms, jarvis,
                              passport, notifications, events, search, profile
   tests/e2e/                 Playwright: journeys, axe, budgets (bundle, Web Vitals, memory)
-cmd/gnoworld/                the Go binary, one role per package
+cmd/gnoworld/                the Go binary, one role per package: login, moderation (phase 0); signals (phase 1)
+jarvis/                      the Jarvis service (phase 1): TypeScript on the Claude Agent SDK
+  src/                       the harness: tool allowlist, hooks, limits, our own MCP tools
+  skills/                    SKILL.md folders: concierge, realm reader, catch up, translation
+  evals/                     cases, chain answers recorded at a block height, graders
 r/gnoworld/                  realms (phase 1 on): a permanent store plus versioned rules (ADR-0001 §14)
 ```
 
@@ -105,7 +112,7 @@ Rules:
 ## React
 
 - React 19 with the React Compiler: no hand-written `memo`, `useMemo` or `useCallback`
-  (ADR-0002 §6, item 4 checks the setup).
+  (ADR-0002 §8, checks for slice 1).
 - **Effects only synchronize with something outside React:**
   - the socket;
   - the scene;
@@ -159,27 +166,30 @@ Each slice that adds a resource proves it is released:
 
 ## Security: the checklist
 
-- [ ] **CSP:** no inline script, no `eval`, `connect-src` limited to the hosts above, and
-      JSON-LD allowed by hash.
+- [ ] **CSP:** no inline script, no `eval`, `connect-src` limited to the hosts above,
+      `frame-src` limited to the accepted embed services, and JSON-LD allowed by hash.
 - [ ] **Markdown** becomes DOM nodes from an allowlist (bold, italic, underline, strike,
       code, block, lists, quote, links, mentions). Nothing from data reaches `innerHTML`.
 - [ ] **Links and media:**
   - https only;
-  - media from an allowlist of hosts;
+  - embeds only from the accepted services (ADR-0002 §6), shown once the moderation check
+    passes;
   - links open with `rel="noopener noreferrer"`.
 - [ ] **Zod** at every boundary: Ergo, RPC, indexer, data files, IndexedDB.
 - [ ] **Realm text, rendered pages and messages are untrusted**, for Jarvis too
-      (ADR-0002 §4).
+      (ADR-0002 §5).
 - [ ] **Calls are signed in Adena only**, after an inline preview, with ADR-0001 §11's
       warnings. Nothing is sent from sample data.
-- [ ] **No secret in the client.** Services rate-limit by account and by address.
+- [ ] **No secret in the client.** The Claude and OpenAI keys live only in their services,
+      which rate-limit by account and by address.
 - [ ] **Dependencies:** locked, audited in the gate, and every new one asked for
       (CLAUDE.md).
 
 ## Search and pages
 
 - `react-router.config.ts` lists the places from `data/`. In phase 1, `r/gnoworld/hubs`
-  is read at build time.
+  and the signals are read at build time. Only planets are pre-rendered; dust uses the
+  fallback and is `noindex` (ADR-0002 §3).
 - Each route exports its `meta`: title, description, canonical, Open Graph, Twitter Card
   and JSON-LD.
 - A build step renders one Open Graph image per world from its planet. It writes
@@ -196,9 +206,9 @@ Each slice that adds a resource proves it is released:
 | LCP, CLS, TBT (the lab stand-in for INP) on a mid-range mobile profile | 2.5 s, 0.1, 200 ms | ADR-0002 §2. INP itself is measured in the field |
 | Frames while travelling | 60 fps on a mid-range phone | ADR-0001 §12 |
 | Memory after 20 flights | GPU resources at baseline, JS heap within 10% | Above |
-| Lighthouse SEO and accessibility | 100 | ADR-0002 §7 |
+| Lighthouse SEO and accessibility | 100 | ADR-0002 §9 |
 | The PWA installs and updates explicitly | — | ADR-0001 §12 |
-| Unused code, exports and dependencies | 0 | ADR-0002 §7 |
+| Unused code, exports and dependencies | 0 | ADR-0002 §9 |
 
 ## Naming
 

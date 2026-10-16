@@ -37,8 +37,8 @@ scope and the decisions it changes are in [ADR-0002](../../adr/0002-validated-pr
 | Fixes stacked on fixes, dead code from earlier versions | Each slice reviewed, with no dead code |
 | No tests | Test first, with one gate (`scripts/check.sh`) |
 | A modal for signatures | Inline transaction cards (ADR-0001 §7). The modal stood in for the card |
-| Jarvis answers a routed question on its own, and its prompt still mentions code help | Jarvis speaks only when asked, and reads realms; it writes no contract (ADR-0002 §4) |
-| Bubbles on every planet, voice rooms, a quiz, a pot clock | Cut or changed: ADR-0002 §1 and §6 |
+| Jarvis answers a routed question on its own, and its prompt still mentions code help | Jarvis speaks only when asked, and reads realms; it writes no contract (ADR-0002 §5) |
+| Bubbles on every planet, voice rooms, a quiz, a pot clock | Cut or changed: ADR-0002 §1 and §8 |
 
 ## Reviews
 
