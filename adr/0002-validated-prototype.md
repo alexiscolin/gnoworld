@@ -854,8 +854,10 @@ risk. This section adds what the prototype showed was needed.
 
 **Phase 2 gets** satellites under the rules of §8, with DMs and the seal as before.
 
-The prototype stays the reference for the look and the feel until slice 2's designs replace
-it (ADR-0001 §7: "our own look").
+**The prototype's style is kept.** It is the reference for the look and the feel, and the
+design system takes its values from it. Slice 2's designs refine it (ADR-0001 §7: "our own
+look"); nothing in the style changes without Alexis's approval. Only the code underneath
+is rebuilt.
 
 ## Questions answered
 
