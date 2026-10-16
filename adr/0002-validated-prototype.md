@@ -137,7 +137,7 @@ Phases are ADR-0001's:
 | Person card: the worlds a person belongs to, message them, fly to them | 0 for the worlds they are in; 1 for the profile realm and "helped N" | Ergo; `r/sys/users` |
 | Your name and face | 0: a gno name read from `r/sys/users`, and an astronaut generated from the name: a stylized, futuristic suit and helmet with few details, readable at 20 px. The same name gives the same astronaut everywhere. Registering a name happens on gno.land. 1: choose the suit, helmet, visor and emblem, saved in the profile realm. Never a planet; no uploaded picture (§6) | The astronaut generator (SVG from parts); the profile realm |
 | Notifications filtered by kind (messages, worlds, news) and by world | 0 in the app. News comes from a file the team curates | Ergo mentions |
-| Push notifications | 1 | `draft/webpush`, and the PWA (ADR-0001 §12) |
+| Push notifications | 1, through the PWA: desktop, Android, and the iPhone from iOS 16.4 once the site is added to the home screen. Native apps come only when measurement justifies them, with their own ADR: Capacitor on mobile, Tauri on desktop, both wrapping the same React code. Never a rewrite such as React Native | `draft/webpush`, and the PWA (ADR-0001 §12) |
 | Photos and videos, gallery and lightbox | 0: links from accepted services render as embeds once the moderation check passes. gnoworld hosts no uploads (§6) | The embed allowlist |
 | Polls | 1 | A bot, `TAGMSG`, one vote per account (`account-tag`) |
 | Room games: social mini-games in a room (a quiz, an emoji race, "guess the realm"), with no money. Results are kept on chain in a game realm; each move is signed by the player's session key, with the gas sponsored | 1, after phase 0, with its own ADR first | A game bot; sessions and the sponsor (ADR-0001 phase 1); a game realm |
@@ -877,7 +877,8 @@ They follow ADR-0001's numbering. Alexis answered them on 2026-10-17.
 - voice rooms (phase 1);
 - room games on chain (phase 1);
 - hosted uploads;
-- pots in games.
+- pots in games;
+- native apps (Capacitor, Tauri), when measurement justifies them.
 
 ADR-0001's question 5 keeps its jurisdiction and retention parts.
 
