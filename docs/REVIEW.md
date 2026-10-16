@@ -60,7 +60,9 @@ Use [Conventional Comments](https://conventionalcomments.org): `issue:` (blocks 
 
 ## AI review before a merge
 
-Code written by an agent gets the same reading as anyone's, plus this:
+Code written by an agent gets the same reading as anyone's, plus this. `/pre-merge`
+(`.claude/commands/pre-merge.md`) runs it, with the `test-auditor` and `reviewer` agents
+(`.claude/agents/`):
 
 1. **The test audit comes first.** A fresh agent whose only job is the tests checks each
    new or changed one: it runs the mutation tester on the changed code, and looks for
