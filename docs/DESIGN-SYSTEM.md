@@ -22,7 +22,7 @@ These are the lead's and Alexis's rules from the prototype reviews.
     the same row.
 - **Nothing overlaps; everything aligns.**
   - Consistent heights and baselines.
-  - Long lists scale: forty rooms still fit.
+  - Long lists scale: a hundred rooms still fit.
 - **Smooth.**
   - Things appear at the right time and place, with a transition.
   - Hovered items follow the pointer at once and ease back on leave.

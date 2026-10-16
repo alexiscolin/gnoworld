@@ -100,7 +100,7 @@ Phases are ADR-0001's:
 | Embassies | A room shared by two worlds, drawn as a small station between them | 0 | One Ergo channel listed by two worlds | — |
 | Focus view | The plate: name, two facts, activity chart, one main action, connected worlds, a real capture of the world's page, links. The planet sits on the plate's edge; the chat is docked | 0 | — | Read |
 | Status ring | A thin arc around a world for what the realm itself reports: a proposal's tally, a deadline the realm defines. gnoworld invents no timer (§8, row 2) | 0 | Realm reads | Read |
-| Rooms as moons | The busiest rooms orbit as moons, four at most: a moon's size follows the people present, it flares when someone speaks, a click joins the room. The other rooms are in the room switcher | 0 | Ergo counts | — |
+| Rooms as moons | The busiest rooms orbit as moons, four at most, and the room you are in is always one: a moon's size follows the people present, it flares when someone speaks, a click joins the room. A "+96" chip beside them opens the room switcher. The Earth keeps one moon, the real Moon, for its busiest room after the general one (§3) | 0 | Ergo counts | — |
 | Storms | A conversation speeding up forms a storm's eye on the planet, growing with the pace of messages; a click joins that room | 0 | Ergo | — |
 | Auroras | The poles light with calls to the realm, stronger with calls per minute | 1 | The indexer | Read |
 | Comets in space | A message sent to another world's room crosses space as a comet (Chat, comets) | 1 | The comets bot | — |
@@ -121,7 +121,7 @@ Phases are ADR-0001's:
 
 | Concept | Phase | Needs |
 |---|---|---|
-| Rooms, a room switcher with search (scales past 40 rooms), shared rooms | 0 | Ergo channels |
+| Rooms, shared rooms, and a room switcher that scales to hundreds: groups set by the world's moderators, pinned, joined, "active now", then the rest; search, unread counts, the keyboard, a windowed list | 0 | Ergo channels; groups in the hubs data file, then `r/gnoworld/hubs` |
 | Replies, reactions, mentions, threads built from reply chains | 0 | `+draft/reply`, `+draft/react` (message-tags) |
 | Rich composer: bold and italic show as such; Markdown on the wire; code blocks and lists | 0 | `draft/multiline` |
 | Slash commands with autocomplete; `#room` and `@name` completion; Alt+Up and Alt+Down between rooms | 0 | — |
@@ -424,7 +424,13 @@ between worlds. None may saturate the map:
 - **Log scales.** Every intensity (a moon's size, a storm's, an aurora's, the night lights)
   follows the logarithm of its count, relative to the busiest world of the day, and is
   capped. A quiet world still shows a little; the busiest never floods the view.
-- **Caps per planet:** four moons; one large storm and two small ones.
+- **Caps per planet:** four moons, one on the Earth, drawn as it really is; one large
+  storm and two small ones.
+- **Moons stay steady.** The set changes at most once a minute, and a room takes a moon's
+  place only when it stays clearly busier for several minutes, so moons never flicker.
+- **Moons never cover the plate.** In a world's focus view they orbit only in the free
+  space beside the planet, away from the plate; a moon reaching the plate's edge fades
+  out. Their labels follow the no-overlap rule (§1, level of detail).
 - **Auroras merge.** Calls add to one smoothed intensity; there is no flash per call.
 - **Comets merge and queue.** Messages on the same route within a minute fly as one brighter
   comet, with the count on hover. At most twelve comets are in view at once: the place you
