@@ -748,6 +748,20 @@ jurisdiction and retention stay open there.
   - the signals at scale, voice and room games are added;
   - costs: the voice server.
 
+**Scale: each piece's first limit, and the next step.**
+
+| Piece | First limit | Next step |
+|---|---|---|
+| The static client | None in practice: a CDN serves it | — |
+| The build | One page per place | Planets only, never dust (§2) |
+| Ergo | About 10,000 clients per instance, 2,000 per room (ADR-0001 §1) | More instances; each hub names its server (ADR-0001 §8) |
+| Moderation bot | The Moderation API's rate limit, measured in slice 12 | Batch messages per request; a queue with back-pressure. Previews wait; text never does |
+| Jarvis | 50 $ a day; 20 questions per person | Digests and translations cached per content hash; more service instances behind a queue |
+| The public indexer | A third party's rate limits and uptime | The signals role caches and fans out; the client subscribes only to what it shows |
+| Signals | One JSON feed | Spatial tiles and per-region feeds (§3) |
+| The slot realm | Gas per rent; one slot per world, so storage is bounded | Expired slots are reused |
+| PostHog | 1 million events a month free | Sampling, or the paid plan |
+
 ### 8. Differences with ADR-0001
 
 All decided by Alexis on 2026-10-17.
@@ -778,6 +792,26 @@ All decided by Alexis on 2026-10-17.
 
 ADR-0001 §14 stands: test first, one gate, strict TypeScript, Zod at boundaries, review by
 risk. This section adds what the prototype showed was needed.
+
+**At the core: security, performance and scale.** Every slice's plan answers three
+questions before any code, and its review card checks the answers:
+1. **Threat model.** What it adds (assets, entry points, who could abuse it and how), the
+   mitigations, and the tests that prove each one.
+2. **Cost.** The work per item on every hot path: per frame, per message, per call, per
+   realm. Hot paths never grow with the size of the universe or the history, and never
+   exceed O(n log n) in what a person can see. Each hot path has a bench, and its budget
+   is in the gate.
+3. **Scale.** The limit it hits first, and the next step (§7, scale).
+
+**gnoworld's own keys** (the moderation approval key, the slot realm's admin):
+- they live only on the server, in a secret store, one key per role, never in the
+  client or the repo;
+- the slot realm stores the approver's public key, and its admin can rotate it;
+- **an approval is bound to everything it allows**, so it cannot be reused elsewhere:
+  `"gnoworld/satellite/v1|"`, the chain id, the realm path, the slot, the text's hash, the
+  payer, the days and an expiry height;
+- the realm refuses an expired or already-used approval;
+- every use and every takedown is logged and observable (§5, observability).
 
 **Architecture.** It is laid out in `docs/ARCHITECTURE.md`:
 - feature modules with one owner each;

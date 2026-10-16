@@ -9,6 +9,8 @@ pairing). "Asks" lists the dependencies to ask for in that slice. Each slice end
 review card and stops.
 
 **Every slice also:**
+- answers ADR-0002 §9's three questions in its plan, before code: its threat model, the
+  cost of its hot paths with their benches, and the limit it hits first;
 - passes the memory and security checklists (`docs/ARCHITECTURE.md`) for what it adds;
 - uses only design-system components and tokens (`docs/DESIGN-SYSTEM.md`);
 - adds its Playwright journey, with axe;
