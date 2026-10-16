@@ -239,6 +239,7 @@ slice.
 **Also generated at build time:** `sitemap.xml` and `robots.txt`.
 
 **Text first.**
+- On phones, the chat comes first and the 3D loads only on request (§8, row 10).
 - The pre-rendered HTML holds the place's name, description, rooms and links as real text.
 - The canvas loads after it and never blocks the first paint, so the largest contentful
   paint is text.
@@ -743,6 +744,7 @@ All decided by Alexis on 2026-10-17.
 | 7 | "Ideas to place": phase 0 takes none of them; ads tier 2 in phase 2; short videos in phase 3 or later | Satellites, Broadcast Moon, the GovDAO world, the person card, video embeds | **Satellites, phase 2:**<br>- a fixed daily price in GNOT, set by the team in the slot realm;<br>- the payment is held until the team approves, and refunded if refused;<br>- at most one per world;<br>- labelled "Sponsored", as advertising law requires.<br>**Broadcast Moon:** a curated station in phase 0, with videos embedded from accepted services (§6).<br>**The person card:** phase 0 in its basic form.<br>**Embeds:** links in phase 0. No uploads are hosted (§6) |
 | 8 | Rollout: "tips and stamps in the same transaction" | Passport stamps | Two different things. Passport stamps record visits on the device. ADR-0001's stamps travel with a tip |
 | 9 | §10: a generated identicon | A planet chosen as an avatar | An astronaut generated from the name; its parts chosen in phase 1 and saved in the profile realm. Never a planet (§1) |
+| 10 | §7: "mobile is the same space" | The full 3D on a phone | Chat first on phones: the chat full screen, the places as a list with planet thumbnails (the Open Graph images of §2), and the 3D only on request ("View in space"), loaded when asked and when the device can. Nothing of three.js or its textures loads before that |
 
 **Checks for slice 1.** These are not differences with the prototype:
 - **The React Compiler.** ADR-0001 §12 plugs it in through `@vitejs/plugin-react`, while

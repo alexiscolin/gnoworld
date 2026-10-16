@@ -173,7 +173,9 @@ the component.
 | Ticker | Bottom | 34 px, pausable |
 
 Breakpoints:
-- 900 px: phone layout. The plate goes below the planet, and the chat becomes a sheet.
+- 900 px: phone layout, chat first (ADR-0002 §8, row 10). The chat is full screen; places
+  are a list with planet thumbnails; "View in space" loads the 3D on request, and then the
+  plate goes below the planet.
 - 1200 px: the dock opens by itself on a world.
 - 1400 px: the dock's width.
 
