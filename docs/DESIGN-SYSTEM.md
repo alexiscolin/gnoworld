@@ -142,7 +142,7 @@ the component.
 | `Tabs` | segmented, with counts | ARIA `tablist`. Notifications, the library filter, the rail |
 | `Popover` | anchored, with arrow keys inside | The native `popover` attribute where it fits; outside click and `Esc` close it |
 | `Dialog` | standard, wide | The native `<dialog>`. Focus moves to the first field or the title, never to a primary button. Device-only routes (`/passport`, `/saved`) open as dialogs over the current place. Not for transactions (ADR-0002 §4) |
-| `Card` | message card, call card (preview → sign → landing → result), proposal, event | Call cards follow ADR-0002 §4 |
+| `Card` | message card, call card (preview → sign → landing → result), realm digest, proposal, event, announcement | Call cards and digests follow ADR-0002 §4 |
 | `Row` | with a planet thumbnail, a title, a subtitle, a trailing action | Lists, connected worlds, notifications |
 | `Field` | text, search; the composer | The composer is a rich text box: bold shows as bold, Markdown on the wire |
 | `Avatar` | sizes 20, 24, 48 | An identicon generated from the name (ADR-0001 §10). No uploaded picture: gnoworld hosts no media (ADR-0002 §6). Never a "verified" badge |

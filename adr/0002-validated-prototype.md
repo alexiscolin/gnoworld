@@ -7,7 +7,7 @@
 | Author | Alexis Colin |
 | Builds on | [ADR-0001](0001-gnoworld.md). Amends its §7 (levels and two navigation rules), §12 (routing, rendering), §13 (pieces and hosting) and its "Ideas to place". Answers part of its question 5 (moderation of public rooms) |
 | Prototype | [docs/prototype](../docs/prototype/README.md): live artifact (version 57), two walkthrough videos, five reviews |
-| Verified | **2026-10-16:**<br>- npm: `react-dom` 19.3.1 exports `react-dom/static`; `react-router` and `@react-router/dev` are at 8.4.0.<br>- React Router's pre-rendering guide.<br>- `gno.land/r/gov/dao` on onyx with gnomcp: `Render` and `GetProposal` are free reads; `MustVoteOnProposalSimple(cur realm, pid int64, option string)` is a call.<br>**2026-10-17:**<br>- The Claude Agent SDK docs: MCP, permissions, skills, hooks, observability, cost.<br>- gnomcp 0.12.0's `docs/security.md`: a read-only chain has no write path.<br>- seedfall's ADR-002 §2.2, §2.6 and ADR-008 §12.3.<br>- gnomcp's `docs/tools.md`: `gno_status`, `gno_history`, `gno_activity` (the tx-indexer has no transaction time yet).<br>- gno's `gno.land/pkg/sdk/vm/convert.go` (2026-10-15): a call's arguments are primitive types and bytes only.<br>**Secondary sources only, to confirm in their slice:** OpenAI's Moderation API and PostHog |
+| Verified | **2026-10-16:**<br>- npm: `react-dom` 19.3.1 exports `react-dom/static`; `react-router` and `@react-router/dev` are at 8.4.0.<br>- React Router's pre-rendering guide.<br>- `gno.land/r/gov/dao` on onyx with gnomcp: `Render` and `GetProposal` are free reads; `MustVoteOnProposalSimple(cur realm, pid int64, option string)` is a call.<br>**2026-10-17:**<br>- The Claude Agent SDK docs: MCP, permissions, skills, hooks, observability, cost.<br>- gnomcp 0.12.0's `docs/security.md`: a read-only chain has no write path.<br>- seedfall's ADR-002 §2.2, §2.6 and ADR-008 §12.3.<br>- gnomcp's `docs/tools.md`: `gno_status`, `gno_history`, `gno_activity` (the tx-indexer has no transaction time yet).<br>- gno's `gno.land/pkg/sdk/vm/convert.go` (2026-10-15): a call's arguments are primitive types and bytes only.<br>- gnoweb serves a realm's page as raw Markdown on `Accept: text/markdown` (gno PR #5794).<br>**Secondary sources only, to confirm in their slice:** OpenAI's Moderation API and PostHog |
 
 ## Summary
 
@@ -151,7 +151,7 @@ Phases are ADR-0001's:
 
 | Concept | Phase | Chain |
 |---|---|---|
-| Realm card and realm view: its page with gnoweb's extensions, its functions as forms (§4). BUBBLE gets the same card as any realm | 0 for the page and the read functions; 1 for calls | `vm/qrender`, `vm/qfuncs`, `vm/qeval` |
+| Realm card: a digest of the realm in simple chat blocks (facts, chart, links, form, announcement, text), never its whole page; the full page on gnoweb. Its functions as forms in the realm view (§4). BUBBLE gets the same card as any realm | 0 without a model (first lines, pinned actions, read functions); 1 with Jarvis's digest and calls | `vm/qrender`, `vm/qfuncs`, `vm/qeval` |
 | Proposed actions: one or two per world pinned by the team; one fitting the conversation proposed by Jarvis, prefilled (§4) | 0 for pinned reads; 1 for calls and Jarvis | `vm/qfuncs` |
 | Calls from a card: a vote, a `<gno-form>`, any function with `cur realm` | 1 | Signed by the user in Adena (§4) |
 | On-chain activity in a room ("kaito voted yes on proposal 15", with "Vote" next to it) | 1 | Indexer events |
@@ -168,7 +168,7 @@ Phases are ADR-0001's:
 | Realm reader: what a realm does, what can be read for free, what can be called | 1 |
 | Catch up: what you missed in a room | 1 |
 | Chain questions: blocks, transactions, a realm's activity and state, a transaction explained (§5) | 1 |
-| A realm summarised, when its page does not fit or is missing (§4) | 1 |
+| Realm digests: a realm's page turned into simple chat blocks (§4) | 1 |
 | Translation, on request | 1 |
 | Site evolutions: Jarvis prebuilds a change, a person reviews it | Later. Not in the product before the review process exists |
 | Writing or deploying contracts | Cut (Alexis, 2026-10-16) |
@@ -360,27 +360,37 @@ ADR-008 §12.3.
 - **Nothing is optimistic.** The room shows "kaito voted yes" only from the chain event.
 - **gnoworld never signs, and Jarvis never signs.** No call is ever sent from sample data.
 
-**What a realm shows, by place.**
+**What a realm shows: a digest, not its page.** gnoworld stays a chat. A realm appears as a
+few simple blocks; its whole page stays one link away, on gnoweb.
 
-| Place | Shows |
-|---|---|
-| Chat (narrow) | A compact card: the realm's name, the first heading and paragraph of its page (cut short), one action, and "View the page". Never the whole page |
-| Plate | An excerpt of the page and its main action |
-| Realm view: a full page over the chat, with a back button and its own URL | The whole page, and an Actions tab |
+| Block | What it holds | Design-system pieces |
+|---|---|---|
+| Facts | A few labelled values | `Stat`, `Row` |
+| Chart | A series of numbers from the page or the realm's state | `ActivityChart` |
+| Links | Realms, which fly to their world; external pages, behind a warning | `Row` |
+| Form | One action, prefilled (Actions, below) | `Field`, then the call card |
+| Announcement | One short notice the realm states: a vote closing, a launch | `Card` |
+| Text | A few sentences, Markdown from the allowlist | — |
 
-- **Jarvis's summary** (phase 1) answers "what does this realm do?" in the chat. It replaces
-  the excerpt on the card when the page is empty, missing or unreadable at that size.
-  Summaries are cached per realm and code version, so one serves every reader.
-- **A realm with no `Render`** shows its package doc and its actions.
-
-**The realm's page.**
-- `vm/qrender`, built into DOM by our Markdown builder from an allowlist, with gnoweb's
-  extensions: alerts, columns, mentions, links.
-- **A `<gno-form exec="Func">` is a transaction on gnoweb,** so here it becomes a call card
-  (phase 1; a link to gnoweb in phase 0).
-- **No hidden field:** gnoweb strips them so people see all they submit, and so do we.
-- **Links and images:** a link to a realm flies to its world; an external link passes a
-  warning; images come only from the accepted hosts.
+- **Phase 0, without a model:** the page's first heading and paragraph as text, the team's
+  pinned actions, and the link to gnoweb.
+- **Phase 1, Jarvis's digest:** Jarvis reads the page's raw Markdown (`vm/qrender`; gnoweb
+  also serves it as `text/markdown`) and the realm's functions. It returns the digest as
+  data: a list of blocks from the table, checked with Zod. Never HTML, never interface
+  code.
+- **Grounded:** every number, link and function in a digest appears in the page, the
+  state or `vm/qfuncs`. The server checks this by string match before caching; the evals
+  check it too.
+- **Cached** per realm and per page hash, refreshed at most every 10 minutes. The card
+  shows the block height it was read at. One digest serves every reader.
+- **By place:**
+  - in the chat, a compact card: a few blocks and "View the page";
+  - on the plate, the same with more room;
+  - in the realm view (a full page over the chat, with a back button and its own URL), the
+    digest and every action.
+- **A `<gno-form exec="Func">` in the page** is a transaction on gnoweb, so it becomes a
+  Form block and then a call card (phase 1). No hidden field: gnoweb strips them so people
+  see all they submit, and so do we.
 
 **Actions: every function as a form,** like gnoweb's actions page.
 - `vm/qfuncs` (free) lists the exported functions, their parameters and their doc.
@@ -395,7 +405,7 @@ ADR-008 §12.3.
 - **Pinned by the team:** one or two per world, in the data file ("Vote", "Answer the
   poll"). They show as quick actions.
 - **Proposed by Jarvis** (phase 1): one action that fits the conversation, prefilled, for
-  example `addPollAnswer` with its own field.
+  example `addPollAnswer` with its own field. It arrives as a Form block.
   - Jarvis returns a structured proposal, never interface code: realm, function, arguments,
     one sentence of why.
   - Zod checks it on the server. The client checks the function and its types against
@@ -417,7 +427,7 @@ routed question (product review).
 |---|---|---|
 | Harness | The Claude Agent SDK (TypeScript), in a small service of its own beside the Go binary | It gives the agent loop, MCP, skills, hooks and limits. It exists in TypeScript and Python only, so Jarvis is not a role of the Go binary |
 | Key | The Anthropic API key, in the service's environment only | The client holds no secret (§9) |
-| Tools | **gnomcp** over stdio, seven read tools allowed: `gno_packages`, `gno_read`, `gno_render`, `gno_eval`, `gno_status`, `gno_history`, `gno_activity`. **Our own MCP server**: a room's recent public history; the places and their URLs; the latest transactions and blocks from the public indexer and the RPC; the action proposals of §4. **gnoscope** (`https://gnoscope.com/mcp`, remote, read-only by design): a transaction explained, a realm's decoded state, an address, search over all code on chain | Free reads only, and nothing that writes |
+| Tools | **gnomcp** over stdio, seven read tools allowed: `gno_packages`, `gno_read`, `gno_render`, `gno_eval`, `gno_status`, `gno_history`, `gno_activity`. **Our own MCP server**: a room's recent public history; the places and their URLs; the latest transactions and blocks from the public indexer and the RPC; the digests and action proposals of §4, checked before they reach the client. **gnoscope** (`https://gnoscope.com/mcp`, remote, read-only by design): a transaction explained, a realm's decoded state, an address, search over all code on chain | Free reads only, and nothing that writes |
 | Skills | `SKILL.md` folders versioned in the repo: gnomcp's `gno` skill (Apache-2.0), to read realms correctly; ours: concierge, realm reader, catch up, translation. Text only, no scripts | Loaded on demand; part of the prompt version |
 | Models | Sonnet 5.5 by default. Haiku 5.5 to sort, summarise and translate. Opus 5.5 for hard realm code | Cost and quality per task |
 
@@ -473,7 +483,8 @@ A drop below a threshold fails the run. It checks:
   to the call card instead.
 - **Chain facts:** the block height cited, no invented figure, an honest answer when the
   index lags.
-- **Action proposals:** only functions that exist, with arguments of the right types.
+- **Digests and action proposals:** every number, link and function traces to the page, the
+  state or `vm/qfuncs`; arguments have the right types.
 - **Format:** canonical links, the question's language, length.
 - **Cost and latency** per case, under ceilings.
 
