@@ -721,6 +721,30 @@ by few hands, so they get the safest path.
 - **The audit log:** every action, with who, what, when and why, signed and append-only.
   - The person affected always sees the reason.
   - A monthly transparency summary, counts only, is public.
+- **Complete:** the queue; people (history, mute, ban, reported DMs); worlds and realms
+  (hide, feature, pinned actions); satellites; curation, with a preview before the pull
+  request; Jarvis (quotas, budget, use); settings (moderation thresholds, the name
+  filter); roles, read-only, since they change by pull request; the audit log, searchable.
+- **Simple, with no frills, and the best UX:**
+  - the queue comes first, sorted by urgency;
+  - each item shows its context: the message and the thread around it, the author's
+    history, the score and the reason;
+  - each action shows its effect before it is confirmed, and can be undone where it is
+    reversible;
+  - keyboard shortcuts, bulk actions, an empty state for every list;
+  - it works on a phone for quick moderation;
+  - design-system components only, no 3D and no decoration, accessible like the rest.
+- **Hardened:**
+  - the signed message for a sensitive action is the action itself, in words ("hide this
+    message in #bubble/general: harassment"), so the log proves who decided what;
+  - the session cookie is `HttpOnly`, `Secure` and `SameSite=Strict`, bound to the
+    signer's address;
+  - every right is checked on the server, never trusted from the client;
+  - inputs pass Zod; the log is a hash chain, so a removed or edited line shows;
+  - the admin API is not on the public API's host; a new login alerts the admins;
+  - hardware wallets are recommended for admins;
+  - the console is tier-1 code in review (`docs/REVIEW.md`), with a penetration test
+    before launch.
 
 **Media.** gnoworld hosts no media, because it cannot moderate uploads alone.
 - Links and embeds come from an allowlist of accepted services that moderate their own
