@@ -377,7 +377,10 @@ realistic, like space photography, never cartoon (docs/DESIGN-SYSTEM.md).
   - Moons are the busiest rooms (§1). A world with no active room has none.
 - **Layer 5, what the data says.** Data never passes a verdict, and a quiet world looks
   resting, never decayed.
-  - **Size** follows the rank (above).
+  - **Size** follows use, half social (distinct people speaking in its rooms, follows) and
+    half realm (distinct callers, imports from other namespaces), on a log scale relative
+    to the universe. It moves a few percent a day at most, so it never jumps. The Earth,
+    hand-made, keeps its size.
   - **Genre nudges the class weights** without fixing them:
     - tokens lean to giants;
     - DAOs lean to temperate worlds;
