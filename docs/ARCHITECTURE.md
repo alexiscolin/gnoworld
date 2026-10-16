@@ -15,7 +15,7 @@ Browser: the static client (React Router 8, pre-rendered pages, one three.js sce
   ├─ indexer.gno.land (graphql-ws) ........ chain events, live (phase 1)
   ├─ Adena (extension) .................... the login signature; signed calls (phase 1)
   ├─ the Go binary ........................ login for Ergo and the moderation bot (phase 0); signals (phase 1)
-  └─ Jarvis ............................... Claude Agent SDK service with gnomcp (phase 1, ADR-0002 §5)
+  └─ Jarvis ............................... Claude Agent SDK service with gnomcp and gnoscope (phase 1, ADR-0002 §5)
 ```
 
 The client is a static site. Anyone can host it, and it never holds a secret. The services
