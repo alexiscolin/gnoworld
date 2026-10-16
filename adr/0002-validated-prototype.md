@@ -588,11 +588,46 @@ To act, Jarvis proposes an action that opens the call card (§4). The user signs
 - gnoscope is a third party whose operator we do not know. If it is down, Jarvis says so
   and answers from gnomcp and our server.
 
-**Everything it reads is untrusted:** realm source, rendered pages and messages.
-- It reaches the model inside marked data blocks, never as instructions.
-- Jarvis's answers render like any message: Markdown to DOM, with no HTML.
-- An injected instruction finds no write tool and no key. At worst it causes a wrong
-  answer, and the evals look for exactly that.
+**Prompt injection: defence in depth.** Everything Jarvis reads is untrusted: realm source,
+rendered pages, messages, indexer data. Any of it may hold instructions written to steer
+it. No single layer is trusted to stop that; each layer limits what the next one has to
+catch.
+1. **Nothing to steal, nothing to do.** The model sees only public data and the asker's own
+   question: no keys, no tokens, no DMs, nobody else's data, no memory across people. It
+   has no write tool and no key (the four locks above). An injection can only change words.
+2. **Data stays data.** Untrusted text reaches the model inside blocks marked with a random
+   tag per turn, after the instructions, with the rule that nothing inside is an
+   instruction. gnomcp and gnoscope already wrap their results as untrusted. Tool results
+   are cut to a size limit.
+3. **No way out through the answer.**
+   - Answers render as Markdown to DOM from the allowlist, with **no images**, so an answer
+     can never make the browser fetch an address that carries data away.
+   - Links go only to gnoworld places, gnoweb and the accepted hosts. Any other link shows
+     its full domain behind a warning.
+   - Jarvis never follows a link it reads: it has no web tool.
+4. **Effects pass checks the model cannot bend.** Digests, proposals and answer buttons are
+   structured data, checked with Zod, grounded by string match against their sources
+   (§4), and checked again by the client against `vm/qfuncs`.
+   - A proposal never carries coins: if a function takes a payment, the person types the
+     amount in the call card themselves.
+   - The person sees and can edit every field, with ADR-0001 §11's warnings, and signs in
+     Adena. Jarvis never signs.
+5. **Translations are checked too.** A translation may not add a link, a mention or a
+   number that the original lacks; one that does is dropped and the original shows.
+6. **Watched.** A screen flags text that looks like an instruction aimed at an assistant.
+   It is quoted with a note, and the turn is logged for review. A spike in flags or denials
+   raises an alert (§5, observability).
+7. **Tested.** The injection suite grows with every incident and every published technique.
+   A red-team pass runs before launch, and the nightly sample includes injection checks.
+
+**The service itself, hardened:**
+- it runs in its own container, not as root, on a read-only file system;
+- its network reaches only the Anthropic API, the chain's nodes, the public indexer and
+  gnoscope;
+- it accepts only requests carrying a gnoworld session, with per-person rate limits and a
+  size limit on every request;
+- secrets come from the secret store; logs redact them;
+- Jarvis's answers in a public room pass the moderation check like any message.
 
 **Limits.**
 - 20 questions per person per day by default. The team can raise it for a person
