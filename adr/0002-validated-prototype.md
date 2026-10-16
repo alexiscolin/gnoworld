@@ -1020,12 +1020,32 @@ counts as proof, mutation does.
   Alexis.
 
 **Review, with AI and people** (`docs/REVIEW.md`):
-- before a merge, fresh-context review agents read the diff through five lenses:
-  correctness, security, performance, accessibility and UX, simplicity;
+- **the tests are audited first,** by a fresh agent whose only job is to catch tests that
+  pass while the code is wrong (below), and a slice is not reviewed further until they
+  are sound;
+- then fresh-context review agents read the diff through five lenses: correctness,
+  security, performance, accessibility and UX, simplicity;
 - a second pass checks each finding against the code, to drop false positives;
 - every finding left is fixed or put to Alexis;
 - Alexis reviews blind first, and the review log keeps what each side caught or missed,
   so a repeated miss becomes a rule, a lint or a test.
+
+**The test audit: no false green.** A test is worthless when a wrong change to the code
+leaves it green. The auditor checks every new or changed test:
+- **It breaks the code on purpose:** it runs the mutation tester on the changed code, and a
+  surviving mutant is a missing test;
+- **tautologies:** an expected value computed by the code under test, or copied from its
+  output, instead of stated independently;
+- **mocks that hide the truth:** the thing under test mocked, or a fake that cannot fail;
+- **empty assertions:** "it was called", "it is defined", a snapshot nobody reads, a matcher
+  so loose anything passes;
+- **missing cases:** no failure path, no boundary (empty, zero, maximum, malformed, the
+  wrong network), no refusal for the wrong caller;
+- **flaky or hidden:** timing guesses instead of waiting on a state, `.skip`, `.only`, a
+  test changed to pass;
+- **checked it fails:** each new test was seen failing before its code, in CI.
+
+Its findings are fixed before any other lens runs.
 
 **Security.**
 - **CSP:** strict, with no inline script and no `eval`. Pre-rendered JSON-LD is allowed by

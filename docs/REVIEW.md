@@ -62,13 +62,18 @@ Use [Conventional Comments](https://conventionalcomments.org): `issue:` (blocks 
 
 Code written by an agent gets the same reading as anyone's, plus this:
 
-1. **Five fresh-context lenses** read the diff, each an agent that did not write it:
+1. **The test audit comes first.** A fresh agent whose only job is the tests checks each
+   new or changed one: it runs the mutation tester on the changed code, and looks for
+   tautologies, mocks of the thing under test, empty assertions ("was called", unread
+   snapshots, loose matchers), missing failure and boundary cases, timing guesses, and a
+   test not seen failing first (ADR-0002 §9). Its findings are fixed before anything else.
+2. **Five fresh-context lenses** then read the diff, each an agent that did not write it:
    correctness, security, performance, accessibility and UX, simplicity.
-2. **Verify each finding.** A second pass checks it against the code and drops the false
+3. **Verify each finding.** A second pass checks it against the code and drops the false
    positives.
-3. **Nothing is waved through.** Every remaining finding is fixed, or put to Alexis with
+4. **Nothing is waved through.** Every remaining finding is fixed, or put to Alexis with
    the scenario.
-4. **Learn from it.** Findings and outcomes go into the review log. A miss that repeats
+5. **Learn from it.** Findings and outcomes go into the review log. A miss that repeats
    becomes a rule here, a lint, or a test.
 
 ## Blind first
