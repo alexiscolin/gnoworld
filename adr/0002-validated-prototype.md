@@ -876,7 +876,9 @@ questions before any code, and its review card checks the answers:
 - a pure `core` for the rules;
 - the scene kept out of React;
 - one store between them;
-- a dependency direction that lint enforces.
+- a dependency direction that lint enforces;
+- TypeScript rules for types that carry meaning and files that read well (its
+  "TypeScript" section).
 
 **Memory.** A long session must not grow.
 - One render loop, owned by the scene. React never runs in it.

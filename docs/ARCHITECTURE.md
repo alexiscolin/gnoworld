@@ -78,6 +78,50 @@ Lint enforces it with ESLint's built-in `no-restricted-imports`, configured per 
 This is ADR-0001 §12's split, kept: a bug is either in the scene or in the interface, and
 the store is where they meet.
 
+## TypeScript
+
+Fully typed, safe, and easy to find your way in. The compiler and lint enforce what they
+can; review checks the rest.
+
+**The compiler** (`tsconfig.json`): `strict`, plus `noUncheckedIndexedAccess`,
+`exactOptionalPropertyTypes`, `noImplicitOverride`, `noFallthroughCasesInSwitch`,
+`noPropertyAccessFromIndexSignature`, `noUnusedLocals`, `noUnusedParameters`,
+`verbatimModuleSyntax` and `isolatedModules`.
+
+**Lint:** typescript-eslint's `strict-type-checked` and `stylistic-type-checked`, the import
+boundaries above, and no import cycles (a cycle check, asked for in slice 1).
+
+**Types carry the meaning:**
+- **No `any`, no `@ts-ignore`, no `!`, and no `as` on outside data** (CLAUDE.md). `satisfies`
+  checks literal tables and configs; `as const` keeps them literal.
+- **Outside data has one schema.** Each boundary's Zod schema lives in `lib`, and its type is
+  `z.infer` of it: one source, never a hand-written twin.
+- **Branded types for ids and units,** made only by their parser: `WorldId`, `RoomName`,
+  `Address`, `BlockHeight`, `Ugnot`. A room name can never be passed where an address is
+  expected, nor ugnot where GNOT is.
+- **States are discriminated unions,** switched on exhaustively with an `assertNever`: a
+  connection, a call card's four steps, a digest's blocks. A missing case fails to compile.
+- **Readonly by default:** `readonly` properties and `ReadonlyArray` in `core` and in the
+  store's public types.
+- **Expected failures are values.** A `lib` function that can fail for a known reason (a
+  refused call, a node that does not answer, a schema mismatch) returns a typed result
+  (`{ ok: true, value } | { ok: false, error }`). Exceptions are for bugs only.
+- **Time, randomness and I/O are parameters in `core`,** so every rule is a pure function
+  with a test.
+
+**Files that read well:**
+- One concept per file, named after what it exports. A file past about 300 lines is split.
+- Named exports only, except route modules (React Router). No barrel files, except each
+  feature's `index.ts`, its public surface.
+- Imports by path alias (`@/core`, `@/lib`, `@/ui`, `@/features/chat`), and `import type` for
+  types.
+- Functions are verbs (`pickBubbles`, `placeSystem`), types are nouns, booleans read as
+  questions (`isLive`, `hasDigest`). No abbreviations a newcomer would have to guess.
+- Exported functions in `core` and `lib` carry a one-line TSDoc: what it returns and when it
+  fails. Comments say why, never what.
+- Classes only where an object owns a lifecycle (a scene part and its disposer); elsewhere,
+  functions and plain data.
+
 ## State
 
 | Kind | Lives in | Read by |
