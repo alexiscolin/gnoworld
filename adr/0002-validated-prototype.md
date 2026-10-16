@@ -371,7 +371,8 @@ realistic, like space photography, never cartoon (docs/DESIGN-SYSTEM.md).
   rusts, Neptune's blues, Io's sulphur, Titan's haze). A namespace shifts the hue by ±12°,
   so a system's planets look related. The grade keeps every colour plausible, never neon.
 - **Layer 4, atmosphere, rings and moons.**
-  - The rim's scattering colour and thickness, haze layers, and auroras at the poles.
+  - The rim's scattering colour and thickness, and haze layers. No decorative aurora: an
+    aurora always means calls (below).
   - Rings: common on giants, rare elsewhere, with a tilt, gaps and a density.
   - Moons are the busiest rooms (§1). A world with no active room has none.
 - **Layer 5, what the data says.** Data never passes a verdict, and a quiet world looks
