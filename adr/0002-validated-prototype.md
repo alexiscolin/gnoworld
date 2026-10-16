@@ -388,8 +388,14 @@ realistic, like space photography, never cartoon (docs/DESIGN-SYSTEM.md).
   - a rogue world lit only by its own volcanoes;
   - an evaporating world with a tail.
 
-  Each wonder casts a cue readable from afar, so the next one is always somewhere on the
-  horizon. The passport keeps the wonders found, never out of a total (above).
+  **A wonder never outranks the rank or the curation.** Far away, only landmarks show
+  (above):
+  - on a ranked or curated world, a wonder adds to its landmark;
+  - on any other planet, it is a surprise found up close;
+  - dust has no look, so no wonder;
+  - the team may give a curated world a chosen wonder.
+
+  The passport keeps the wonders found, never out of a total (above).
 - **Hand-made, not generated:** the Earth (real maps), GovDAO and the stations.
 - **Variety is measured, not counted.** Each planet has a feature vector:
   - class;
