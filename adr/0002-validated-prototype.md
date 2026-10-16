@@ -68,6 +68,9 @@ planets are worlds (§1).
   calls. It does not write or deploy contracts.
 - **Alexis set Jarvis's stack on 2026-10-17:** a Claude key, MCP, skills and a harness,
   with evals and complete observability (§5).
+- **On 2026-10-17 Alexis moved into phase 0:** Jarvis, calls signed by users (names, votes,
+  any function), the chain's activity in rooms, new realms and firsts, plain DMs, automatic
+  translation and satellites (§8, rows 5, 7 and 11).
 
 ## Decision
 
@@ -91,15 +94,16 @@ Phases are ADR-0001's:
 | Namespace systems | One star per registered namespace, its realms and packages in orbit | 1 | `vm/qpaths` by namespace; §3 | Read |
 | Genres | What a realm is: token, DAO, game, social… A realm can have several. A lens on the map lights one genre wherever it is | 0 from the data file; 1 computed from imports (§3) | The genre classifier | Read |
 | Visibility rank and dust | Realms with real signals are planets; quiet realms are dust around their star, still found by search, by URL and in the list (§3) | 1. In phase 0, every world in the data file is a planet | The signals (§7) | Read |
-| Stations | Places the team designs and builds in full, then open to everyone: anyone visits, talks in their rooms and uses their content. Not realms, and not necessarily tied to one; labelled as stations. Hand-made realistic 3D, never generated. The team places them in well-defined zones of the map, and they always show, outside the rank (§3). Today: AI Ring (something built with AI), Broadcast Moon (a moon of screens), Harbor (long reads) | 0 | Stations data file and their 3D models, by the team. Broadcast Moon's videos are embeds from accepted services (§6) | — |
+| Stations | Places the team designs and builds in full, then open to everyone: anyone visits, talks in their rooms and uses their content. Not realms, and not necessarily tied to one; labelled as stations. Hand-made realistic 3D, never generated. The team places them in well-defined zones of the map, and they always show, outside the rank (§3). Today: AI Ring (something built with AI), Broadcast Moon (a moon of screens: videos embedded from accepted services and generative pieces the team makes, in categories, with a viewer), Harbor (long reads) | 0 | Stations data file and their 3D models, by the team. Broadcast Moon's videos are embeds from accepted services (§6) | — |
 | Map view | The same space from above, condensed: distances shortened so the universe fits one screen; each cluster (an ecosystem, a namespace system, a region) one mark with its count; only the landmarks named (rank and curation, stations, the Earth, GovDAO, what you follow); zone captions. Never every planet. A click on a cluster flies into it | 0 | Scene; the ladder of §3 | — |
 | Level of detail | The ladder of §3. Key labels from afar: groups, Earth, GovDAO, systems, signals, the two hottest worlds, what you follow, the next event. The rest appear on approach. Labels never overlap | 0 | Scene, labels layer | — |
 | Heat | A steady warm glow on the busiest worlds, stronger with activity, with a "24% · 148/h" badge and a rising icon. No rings, no lines | 0 from room user counts; 1 adds realm calls | Ergo `LIST` counts (checked in slice 4); the indexer | Read |
 | Telescope | Hover a world's name to read its room's last lines without flying there | 0 if Ergo serves history to a non-member (checked in slice 4), otherwise 1 through the signals feed | Ergo history | — |
 | Routes | On hover, lines to the realms a world calls or imports, with traffic moving on them | 1 | Indexer for calls; `vm/qfile` for imports | Read |
 | Embassies | A room shared by two worlds, drawn as a small station between them | 0 | One Ergo channel listed by two worlds | — |
-| Focus view | The plate: name, two facts, activity chart, one main action, connected worlds, a real capture of the world's page, links. The planet sits on the plate's edge; the chat is docked | 0 | — | Read |
-| Status ring | A thin arc around a world for what the realm itself reports: a proposal's tally, a deadline the realm defines. gnoworld invents no timer (§8, row 2) | 0 | Realm reads | Read |
+| Focus view | The plate: name, two facts, activity chart, one main action, connected worlds, a real capture of the world's page, links. The planet sits on the plate's edge; the chat is docked. A connected world is one of three rows: a realm it calls or that calls it, with calls a day; a shared room; "N people from X are here now · say hi". Each row flies there or sends a comet (phase 1) | 0 | — | Read |
+| Flight panel | During a flight: "In transit", the target, distance, speed, arrival and a progress bar; "Course plotted" on leaving, "Entering orbit" on arrival | 0 | Scene | — |
+| Status ring | A thin arc around a world for what the realm itself reports: a proposal's tally, a deadline the realm defines. gnoworld invents no timer (§8, row 2). Activity trends belong to the heat badge, never the ring | 0 | Realm reads | Read |
 | Rooms as moons | The busiest rooms orbit as moons, four at most, and the room you are in is always one: a moon's size follows the people present, it flares when someone speaks, a click joins the room. A "+96" chip beside them opens the room switcher. The Earth keeps one moon, the real Moon, for its busiest room after the general one (§3) | 0 | Ergo counts | — |
 | Storms | A conversation speeding up forms a storm's eye on the planet, growing with the pace of messages; a click joins that room | 0 | Ergo | — |
 | Auroras | The poles light with calls to the realm, stronger with calls per minute | 1 | The indexer | Read |
@@ -107,14 +111,14 @@ Phases are ADR-0001's:
 | Talk box | With the chat closed, the last lines of the world's room on its plate | 0 | — | — |
 | Realm facts | Path, deployer, first block, calls in 24 h | 0 for the path; 1 for the rest | The indexer | Read |
 | Latest post on X | — | Cut, unless a source is decided | — | — |
-| The Earth | Bubbles where people speak from, with counts for the far side ("Japan · 12, far side"); the globe turns to show your own message | 0 | `pickBubbles` and its rules file (ADR-0001 §7) | — |
+| The Earth | Bubbles where people speak from, with counts for the far side ("Japan · 12, far side"); hotspots per country with the last hour's trend ("+15% · 1 h"); the globe turns to show your own message; "N realms deployed in 24 h" from the indexer | 0 | `pickBubbles` and its rules file (ADR-0001 §7) | — |
 | Bubbles on other worlds | The prototype pops messages on any planet | Cut: bubbles are the Earth's, by country (ADR-0001 §7). Moons, storms, auroras and heat carry activity elsewhere (§3) | — | — |
 | Hero | The number of people online, one line, two big actions | 0 | Ergo counts | — |
 | Markets row | GNOT, ATONE and BTC with a 24 h line; the block height | 0 | The prices file (§6) | Read |
 | Ticker | A pausable line of what is happening: votes, events, new worlds | 0 from data and rooms; 1 adds chain events | — | Read |
 | Rail | The worlds or the groups, magnified like a dock under the pointer. By default, the most used worlds right now (social and realm), after the ones you follow: 25 at most, scrolling, then a "See all" button to the list view. The order changes at most once a minute, only when a world stays clearly ahead, and never under the pointer | 0 | Ergo counts; the signals in phase 1 | — |
 | List view | Everything as panels, no 3D, filterable by genre | 0 | — | — |
-| Search | ⌘K over the current universe's worlds, ecosystems, stations and genres; in phase 1 over every realm, dust included | 0 | — | — |
+| Search | ⌘K over the current universe's worlds, ecosystems, stations and genres, grouped with their counts, with "Go explore" on top; satellites labelled "Sponsored"; in phase 1 over every realm, dust included | 0 | — | — |
 | Loader | Real texture progress, then the space opens like an iris | 0 | — | — |
 
 **Chat** (Ergo in phase 0, ADR-0001 §1)
@@ -123,19 +127,19 @@ Phases are ADR-0001's:
 |---|---|---|
 | Rooms, shared rooms, and a room switcher that scales to hundreds: groups set by the world's moderators, pinned, joined, "active now", then the rest; search, unread counts, the keyboard, a windowed list | 0 | Ergo channels; groups in the hubs data file, then `r/gnoworld/hubs` |
 | Replies, reactions, mentions, threads built from reply chains | 0 | `+draft/reply`, `+draft/react` (message-tags) |
-| Rich composer: bold and italic show as such; Markdown on the wire; code blocks and lists | 0 | `draft/multiline` |
+| Rich composer with a format bar: bold, italic, strikethrough, code, quote and lists show as such; Markdown on the wire. No underline: Markdown has none | 0 | `draft/multiline` |
 | Slash commands with autocomplete; `#room` and `@name` completion; Alt+Up and Alt+Down between rooms | 0 | — |
 | Message menu: copy, room link, save, report, delete your own | 0. Delete needs `allow-individual-delete` on (it is off by default); report goes to moderation (§6) | `draft/message-redaction` |
 | Moderation: a bot checks each public message; a hidden message says why and can be contested | 0 | The moderation bot (§6) |
 | Mark unread | 0, on the device | — |
 | Edit a message | Cut in phase 0: no IRCv3 capability (product review) | — |
-| Pins | 0 | Channel `TOPIC` |
+| Pins: the room's moderators pin; the room shows a stack of pins | 0: one pin through `TOPIC`; several through channel metadata if Ergo supports it (checked in slice 4), otherwise 1 | Channel `TOPIC` |
 | Saved messages and drafts | 0 | Device |
 | Place links (`#bubble/arcade` flies there) | 0 | — |
-| Contextual quick actions: Who's here, Calendar, Realm, Proposal, Station, Catch up, Poll | 0 for those that read; 1 for those that call (votes), and for Catch up and Poll | — |
+| Contextual quick actions: Who's here, Calendar, Realm, Proposal, Station, Catch up, Poll | 0, votes and Catch up included; Poll in 1 | — |
 | Who's here: the people in the room | 0 | Ergo `NAMES` |
-| Person card: the worlds a person belongs to, message them, fly to them | 0 for the worlds they are in; 1 for the profile realm and "helped N" | Ergo; `r/sys/users` |
-| Your name and face | 0: a gno name read from `r/sys/users`, and an astronaut generated from the name: a stylized, futuristic suit and helmet with few details, readable at 20 px. The same name gives the same astronaut everywhere. Registering a name happens on gno.land. 1: choose the suit, helmet, visor and emblem, saved in the profile realm. Never a planet; no uploaded picture (§6) | The astronaut generator (SVG from parts); the profile realm |
+| Person card: the worlds a person belongs to, message them, fly to them | 0 for the worlds they are in and "Message", a plain DM (below); 1 for the profile realm, "helped N" and the stamp count if the person publishes it | Ergo; `r/sys/users` |
+| Your name and face | 0: a gno name read from `r/sys/users`, and an astronaut generated from the name: a stylized, futuristic suit and helmet with few details, readable at 20 px. The same name gives the same astronaut everywhere. Registering a name happens in the app from phase 0: a call card to `r/sys/users`, signed in Adena (§4). 1: choose the suit, helmet, visor and emblem, saved in the profile realm. Never a planet; no uploaded picture (§6) | The astronaut generator (SVG from parts); `r/sys/users`; the profile realm |
 | Notifications filtered by kind (messages, worlds, news) and by world | 0 in the app. News comes from a file the team curates | Ergo mentions |
 | Push notifications | 1, through the PWA: desktop, Android, and the iPhone from iOS 16.4 once the site is added to the home screen. Native apps come only when measurement justifies them, with their own ADR: Capacitor on mobile, Tauri on desktop, both wrapping the same React code. Never a rewrite such as React Native | `draft/webpush`, and the PWA (ADR-0001 §12) |
 | Photos and videos, gallery and lightbox | 0: links from accepted services render as embeds once the moderation check passes. gnoworld hosts no uploads (§6) | The embed allowlist |
@@ -147,33 +151,34 @@ Phases are ADR-0001's:
 | Weekly report, posted in the Earth's room | 1 | Written by the team (question 19) |
 | "New here" on a first message, and a welcome | 1 | A server-side tag |
 | Routed questions: an unanswered question reaches people from the world that knows; a "Thanks" counts toward "helped N" | 1 | Opt-in helpers |
-| Translation | 1, on request | Jarvis's service with Haiku, within Jarvis's budget (§5) |
+| Translation: a message in another language arrives translated, with "show original"; anyone can turn it off | 0 | Jarvis's service with Haiku: one translation per message and language serves every reader, within Jarvis's budget; the original shows when the budget is spent (§5) |
 | Voice rooms | 1, after phase 0, with its own ADR first | WebRTC: a media server, TURN, live moderation |
-| Direct messages, and the seal | 2 (ADR-0001 §2–§4). A seal records a conversation's Merkle root and both signatures, never the messages. Putting messages themselves on chain is the user's explicit choice: an encrypted archive, or a public excerpt (ADR-0001 §4). Public rooms are not sealed: they are public already | MLS; `r/seal` |
+| Plain direct messages: between named people, through the server and not encrypted, labelled "not encrypted: the server can read these"; block, report, and DMs from strangers can be turned off. The moderation bot does not read them; a report sends the reported messages to a person | 0 | Ergo private messages; a name |
+| Encrypted direct messages, and the seal | 2 (ADR-0001 §2–§4). A seal records a conversation's Merkle root and both signatures, never the messages. Putting messages themselves on chain is the user's explicit choice: an encrypted archive, or a public excerpt (ADR-0001 §4). Public rooms are not sealed: they are public already | MLS; `r/seal` |
 
 **Realms** (§4)
 
 | Concept | Phase | Chain |
 |---|---|---|
-| Realm card: a digest of the realm in simple chat blocks (facts, chart, links, form, announcement, text), never its whole page; the full page on gnoweb. Its functions as forms in the realm view (§4). BUBBLE gets the same card as any realm | 0 without a model (first lines, the whole page in the realm view, pinned actions, read functions); 1 with Jarvis's digest and calls, and the whole page whenever no digest is available | `vm/qrender`, `vm/qfuncs`, `vm/qeval` |
-| Proposed actions: one or two per world pinned by the team; one fitting the conversation proposed by Jarvis, prefilled (§4) | 0 for pinned reads; 1 for calls and Jarvis | `vm/qfuncs` |
-| Calls from a card: a vote, a `<gno-form>`, any function with `cur realm` | 1 | Signed by the user in Adena (§4) |
-| On-chain activity in a room ("kaito voted yes on proposal 15", with "Vote" next to it) | 1 | Indexer events |
-| Proposal cards (GovDAO, Memba). GovDAO is a world near the sun: ADR-0001's "galactic council" | 0 to read; 1 to vote | Votes stay in their realms (ADR-0001 §11) |
-| A new realm appears as a signal; the first to fly there charts it, and the first to speak there leaves "first words" | 1 | Indexer (`addpkg` events, once live); the signals feed knows who came first |
+| Realm card: a digest of the realm in simple chat blocks (facts, chart, links, form, announcement, text), never its whole page; the full page on gnoweb. Its functions as forms in the realm view (§4). BUBBLE gets the same card as any realm | 0, with Jarvis's digest and calls; the first lines and the whole page whenever no digest is available | `vm/qrender`, `vm/qfuncs`, `vm/qeval` |
+| Proposed actions: one or two per world pinned by the team; one fitting the conversation proposed by Jarvis, prefilled (§4) | 0 | `vm/qfuncs` |
+| Calls from a card: a name, a vote, a `<gno-form>`, any function with `cur realm` | 0 | Signed by the user in Adena (§4) |
+| On-chain activity in a room ("kaito voted yes on proposal 15", with "Vote" next to it) | 0 | Indexer events, read by the client from the public indexer |
+| Proposal cards (GovDAO, Memba). GovDAO is a world near the sun: ADR-0001's "galactic council" | 0, to read and to vote | Votes stay in their realms (ADR-0001 §11) |
+| A new realm appears as a signal; the first to fly there charts it, and the first to speak there leaves "first words" | 0 | Indexer (`addpkg` events, once live); the signals role knows who came first; Ergo's history gives the first words |
 | Real previews: a capture of the world's public page | 0 | None: a build job captures gnoweb or the world's site |
-| Satellites: sponsored words in orbit around a world, rented by the day (rules in §8, row 7) | 2 | A slot realm paid in GNOT, approved by the team |
+| Satellites: sponsored words in orbit around a world, rented by the day (rules in §8, row 7) | 0, once the slot realm is audited and approved on mainnet | A slot realm paid in GNOT; the moderation service's approval |
 
 **Jarvis** (§5)
 
 | Concept | Phase |
 |---|---|
-| Concierge: where to go, who to meet | 1 |
-| Realm reader: what a realm does, what can be read for free, what can be called | 1 |
-| Catch up: what you missed in a room | 1 |
-| Chain questions: blocks, transactions, a realm's activity and state, a transaction explained (§5) | 1 |
-| Realm digests: a realm's page turned into simple chat blocks (§4) | 1 |
-| Translation, on request | 1 |
+| Concierge: where to go, who to meet. It suggests people; it never contacts anyone for you | 0 |
+| Realm reader: what a realm does, what can be read for free, what can be called | 0 |
+| Catch up: what you missed in a room | 0 |
+| Chain questions: blocks, transactions, a realm's activity and state, a transaction explained (§5) | 0 |
+| Realm digests: a realm's page turned into simple chat blocks (§4) | 0 |
+| Translation, automatic and cached (Chat) | 0 |
 | Site evolutions: Jarvis prebuilds a change, a person reviews it | Later. Not in the product before the review process exists |
 | Writing or deploying contracts | Cut (Alexis, 2026-10-16) |
 
@@ -181,10 +186,10 @@ Phases are ADR-0001's:
 
 | Concept | Phase | Where |
 |---|---|---|
-| Passport: a stamp per world visited, constellations per ecosystem | 0 | Device. On chain is a later decision. These are not ADR-0001's paid stamps, which travel with a tip |
-| "You charted it": the uncharted worlds you were the first on your device to visit | 0 | Device. The shared "first to chart" is phase 1 (Realms, above) |
+| Passport: a stamp per world visited, constellations per ecosystem | 0 | Device. Progress shows per constellation, never against the universe's total (§3). A person may publish their stamp count on their profile (phase 1); otherwise nobody else sees it. These are not ADR-0001's paid stamps, which travel with a tip |
+| "You charted it": the uncharted worlds you were the first on your device to visit. On a first visit a scan sweeps the planet, then "Stamped" and, for the first in the universe, "First to chart · your name stays on it · Share" | 0 | Device; the shared "first to chart" from the signals role (Realms, above) |
 | Daily expedition: the same three stops for everyone, the first where something is live; a streak; a shareable route | 0 | Device; the stops from a data file the team curates |
-| Quests across worlds, each ending on a realm action. Rewards stay on the device: no NFT badges (ADR-0001 §11) | 0 to read; 1 for steps that call | Device; the quests data file |
+| Quests across worlds, each ending on a realm action. Rewards stay on the device: no NFT badges (ADR-0001 §11) | 0 | Device; the quests data file |
 | "Go explore": the live moment if one is near, otherwise the expedition | 0 | — |
 | Follow: followed worlds first in the rail, their activity in the bell | 0 on the device; 1 on chain (profile realm, ADR-0001 phase 1) | — |
 | Friends on the map ("noor is here") | 1 | Following people, on chain |
@@ -446,7 +451,8 @@ between worlds. None may saturate the map:
 
 **The infinite, felt.**
 - Haze closes the view before any edge.
-- No counter announces the total, as in "42 of 551".
+- No counter announces the total, as in "42 of 551". Progress shows per constellation
+  ("DeFi 3/5"), per session or as a rank.
 - The rim thins instead of stopping.
 
 ### 4. Realm calls: read for free, sign inline
@@ -457,6 +463,8 @@ between worlds. None may saturate the map:
   - its source (`vm/qfile`).
 
   Their results show in the card with "read on chain, free, no signature".
+- **From phase 0, users sign their own calls in Adena:** a name, a vote, any function (§8,
+  row 11).
 - **A call is a transaction the user signs in Adena.** It shows as an inline card in the
   room or on the plate, in four steps (ADR-0001 §7):
   1. the preview: realm, function, arguments, network, fee. The network is the universe's
@@ -485,8 +493,8 @@ to the realm on gnoweb. A digest is a reading aid, never the reference.
 | Announcement | One short notice the realm states: a vote closing, a launch | `Card` |
 | Text | A few sentences, Markdown from the allowlist | — |
 
-- **Without a digest, the whole page.** In phase 0, and in phase 1 whenever Jarvis cannot
-  give one (down, an error, the budget spent):
+- **Without a digest, the whole page.** Whenever Jarvis cannot give one (down, an error,
+  the budget spent):
   - the card shows the page's first heading and paragraph, the team's pinned actions and
     the link to gnoweb;
   - the realm view shows the whole page, built from its raw Markdown by `core/markdown`'s
@@ -494,7 +502,7 @@ to the realm on gnoweb. A digest is a reading aid, never the reference.
   - gnoweb's extensions degrade simply: an alert becomes a quote, columns stack, a
     `<gno-form>` becomes a Form block, and any other tag shows as plain text;
   - images come only from the accepted hosts.
-- **Phase 1, Jarvis's digest:** Jarvis reads the page's raw Markdown (`vm/qrender`; gnoweb
+- **Jarvis's digest:** Jarvis reads the page's raw Markdown (`vm/qrender`; gnoweb
   also serves it as `text/markdown`) and the realm's functions. It returns the digest as
   data: a list of blocks from the table, checked with Zod. Never HTML, never interface
   code.
@@ -510,14 +518,14 @@ to the realm on gnoweb. A digest is a reading aid, never the reference.
   - in the realm view (a full page over the chat, with a back button and its own URL), the
     digest, or the whole page when there is none, and every action.
 - **A `<gno-form exec="Func">` in the page** is a transaction on gnoweb, so it becomes a
-  Form block and then a call card (phase 1). No hidden field: gnoweb strips them so people
+  Form block and then a call card. No hidden field: gnoweb strips them so people
   see all they submit, and so do we.
 
 **Actions: every function as a form,** like gnoweb's actions page.
 - `vm/qfuncs` (free) lists the exported functions, their parameters and their doc.
 - **Read functions** (no `cur realm`): a form, and the result at once through `vm/qeval`.
   Free, from phase 0.
-- **Write functions** (`cur realm`): a form, then the call card, then Adena. Phase 1.
+- **Write functions** (`cur realm`): a form, then the call card, then Adena.
 - **Fields follow the types.** A call carries only primitive types and bytes (gno's
   `gno.land/pkg/sdk/vm/convert.go`). Any other parameter shows "open in gnoweb".
 - The list is searchable when it is long.
@@ -525,7 +533,7 @@ to the realm on gnoweb. A digest is a reading aid, never the reference.
 **Proposed actions.**
 - **Pinned by the team:** one or two per world, in the data file ("Vote", "Answer the
   poll"). They show as quick actions.
-- **Proposed by Jarvis** (phase 1): one action that fits the conversation, prefilled, for
+- **Proposed by Jarvis:** one action that fits the conversation, prefilled, for
   example `addPollAnswer` with its own field. It arrives as a Form block.
   - Jarvis returns a structured proposal, never interface code: realm, function, arguments,
     one sentence of why.
@@ -541,6 +549,12 @@ Jarvis is the concierge in every room. `@jarvis` calls it, and so does one butto
 and explains, and it prepares calls the user signs. It speaks only when asked: `@jarvis`, a
 quick action, or its button. It never answers on its own in a public room, not even to a
 routed question (product review).
+
+- **Its button** opens with an introduction and suggestions ("What can I do here?", "What
+  is new today?"). Its answers carry buttons that fly to a place or open a card, built from
+  the same checked proposals as actions (§4).
+- **Who to talk to:** Jarvis suggests people and worlds. It never contacts anyone for you;
+  you write.
 
 **The stack.**
 
@@ -584,6 +598,8 @@ To act, Jarvis proposes an action that opens the call card (§4). The user signs
   - An alert fires at 80%.
   - At 100%, Jarvis answers with Haiku until the next UTC day.
 - A maximum number of turns and a timeout per question.
+- **Translation:** one per message and language, cached, serves every reader, with Haiku.
+  When the budget is spent, the original shows.
 - The tools, the system prompt and the skills are frozen per version, so prompt-cache
   reads cost a twentieth of the input price on Sonnet and Opus 5.5.
 
@@ -638,7 +654,7 @@ they change, our own spans wrap each turn.
   - a question's text is kept only with the person's consent, and deleted after a fixed
     period;
   - account ids are hashed;
-  - Jarvis never reads DMs: from phase 2 they are encrypted end to end.
+  - Jarvis never reads DMs, plain or encrypted.
 
 **Rejected: the Messages API's MCP connector.** It needs a remote MCP server, and gnomcp
 runs over stdio. It is not eligible for zero data retention, and it has no hook to block a
@@ -649,7 +665,7 @@ call.
 **Moderation of public rooms** (phase 0). This answers part of ADR-0001's question 5;
 jurisdiction and retention stay open there.
 - **A moderation bot,** a role of the Go binary, checks each public message with OpenAI's
-  Moderation API (`omni-moderation-latest`: text and images, free of charge; slice 9
+  Moderation API (`omni-moderation-latest`: text and images, free of charge; slice 12
   confirms both against OpenAI's docs).
 - **Text is checked after it is posted.** A message appears at once, and the check follows
   within a second. A flagged message is hidden with `draft/message-redaction`. Holding
@@ -665,8 +681,10 @@ jurisdiction and retention stay open there.
 - **Thresholds:**
   - the bot acts only on high scores, and always on anything involving minors;
   - repeat offences escalate: hide and explain, then a timed mute, then a person.
-- **What is never sent:** DMs. From phase 2 they are encrypted end to end, and the server
+- **DMs are never sent to it.** Plain DMs (phase 0) are not checked; a report sends the
+  reported messages to a person. From phase 2, DMs are encrypted end to end and the server
   cannot read them.
+- **Satellites are checked before they show** (§8, row 7).
 - **The privacy policy** says public messages are checked by this service.
 - **The key stays on the server,** and the bot rate-limits by account.
 
@@ -691,7 +709,7 @@ jurisdiction and retention stay open there.
 - **Retention** is measured only for logged-in people who accepted once.
 - **Loading:** after the first usable screen, within the JavaScript budget.
 - **Field Web Vitals** (INP, LCP) come from PostHog if it measures them. Otherwise we send
-  them as our own events (slice 9 checks).
+  them as our own events (slice 12 checks).
 - **The events:**
   - first visit;
   - first flight;
@@ -700,7 +718,7 @@ jurisdiction and retention stay open there.
   - came back;
   - shared a link;
   - opened a realm card;
-  - signed a call (phase 1).
+  - signed a call.
 
 ### 7. New pieces
 
@@ -708,26 +726,26 @@ jurisdiction and retention stay open there.
 |---|---|---|---|
 | Data files | 0 | Universes, hubs, ecosystems, stations, events, expedition stops, quests, news, the bubble rules (ADR-0001 §7) | Versioned in the repo; curated by the team through reviewed pull requests; validated with Zod at build time |
 | Preview captures | 0 | A build job (Playwright) captures each world's public page | Refreshed on a schedule; no capture, no preview |
-| Moderation bot | 0 | §6 | A role of the Go binary. An OpenAI API key, server-side |
+| Moderation bot | 0 | §6; it also signs the satellites' approvals | A role of the Go binary. An OpenAI API key and the approval key, server-side |
 | Prices job | 0 | Writes `markets.json` every 5 minutes (§6) | The host's scheduler |
 | PostHog | 0 | Product analytics (§6) | A third party, in the CSP's `connect-src` |
-| Signals | 1 | Heat with realm calls, routes, new realms, who charted first; the rank, the dust, the seasons and the tiles of §3. It reads Ergo and the public indexer and serves a small JSON feed | A role of the Go binary. ADR-0001 §13 holds: we run no indexer |
-| Jarvis | 1 | §5 | A TypeScript service beside the Go binary |
-| Observability | 1 | Grafana and Langfuse, fed by OpenTelemetry (§5) | Self-hosted |
+| Signals | 0 for new realms, first to chart and first words; 1 for the rest | Heat with realm calls, routes, new realms, who charted first; the rank, the dust, the seasons and the tiles of §3. It reads Ergo and the public indexer and serves a small JSON feed | A role of the Go binary. ADR-0001 §13 holds: we run no indexer |
+| Jarvis | 0 | §5 | A TypeScript service beside the Go binary |
+| Observability | 0 | Grafana and Langfuse, fed by OpenTelemetry (§5) | Self-hosted |
 | Voice | 1 | A WebRTC media server and TURN | Its own ADR first |
 | Room games | 1 | A game bot and a game realm (§1) | Its own ADR first. Needs sessions and the sponsor |
-| Satellites | 2 | The slot realm (§8, row 7) | Audited before mainnet |
+| Satellites | 0, once audited and approved on mainnet | The slot realm (§8, row 7) | Audited; mainnet's deploy approval is the gate (ADR-0001, question 6) |
 
 **ADR-0001 §13 changes.**
 - It had two pieces: the static client and one Go binary.
 - **Phase 0:**
-  - the pieces are the client, Ergo, the Go binary (login and moderation) and the prices
-    job;
-  - the third parties are OpenAI's moderation and PostHog, both free at this size;
-  - hosting stays near 0 €.
+  - the pieces are the client, Ergo, the Go binary (login, moderation, first signals), the
+    prices job, Jarvis, observability and the slot realm;
+  - the third parties are Anthropic, OpenAI's moderation, PostHog and gnoscope;
+  - costs: Jarvis at up to 50 $ a day, and hosting Grafana and Langfuse.
 - **Phase 1:**
-  - Jarvis, the signals, observability, voice and room games are added;
-  - costs: Jarvis at up to 50 $ a day, the voice server, and hosting Grafana and Langfuse.
+  - the signals at scale, voice and room games are added;
+  - costs: the voice server.
 
 ### 8. Differences with ADR-0001
 
@@ -739,12 +757,13 @@ All decided by Alexis on 2026-10-17.
 | 2 | §7: "dropped from the concept: pots, boops, timers, claims and payout bars" | A Play card with BUBBLE's pot, a boop, and a pot clock on the status ring | gnoworld builds social room games, with no money and with results on chain (§1, Chat), after phase 0, with its own ADR first. No pots: a separate, later decision. gnoworld invents no timer: the ring shows only what a realm reports. BUBBLE gets the same realm card as any realm |
 | 3 | §7: distance to the sun is activity; rooms are moons; people are satellites | Stable orbits; activity as heat; rooms as markers on the surface; people in lists | Stable places, with the scale rules of §3: one place per namespace, a slow seasonal drift, a rank from signals and curation, dust, and genres as lenses. Activity is heat, storms and auroras. The busiest rooms are moons, the others are in the room switcher; people are in lists; "satellite" means a sponsored slot |
 | 4 | §12: no router and no server framework; the URL holds the camera state. §13: `/h/<hub>` | A URL per place, for search | React Router 8 framework mode, static pre-rendering, no Node server; the camera follows the URL (§2). Its two dependencies are asked for in slice 1 |
-| 5 | Phase 0 has no private messages | DMs and the seal | Kept in phase 2 |
+| 5 | Phase 0 has no private messages; DMs arrive encrypted in phase 2 | DMs and the seal | Plain DMs from phase 0, labelled "not encrypted" (§1, Chat). Encrypted DMs and the seal stay in phase 2 |
 | 6 | No voice | Voice rooms, and events in a "voice lounge" | A WebRTC voice room in phase 1, after phase 0, with its own ADR first |
-| 7 | "Ideas to place": phase 0 takes none of them; ads tier 2 in phase 2; short videos in phase 3 or later | Satellites, Broadcast Moon, the GovDAO world, the person card, video embeds | **Satellites, phase 2:**<br>- a fixed daily price in GNOT, set by the team in the slot realm;<br>- the payment is held until the team approves, and refunded if refused;<br>- at most one per world;<br>- labelled "Sponsored", as advertising law requires.<br>**Broadcast Moon:** a curated station in phase 0, with videos embedded from accepted services (§6).<br>**The person card:** phase 0 in its basic form.<br>**Embeds:** links in phase 0. No uploads are hosted (§6) |
+| 7 | "Ideas to place": phase 0 takes none of them; ads tier 2 in phase 2; short videos in phase 3 or later | Satellites, Broadcast Moon, the GovDAO world, the person card, video embeds | **Satellites, phase 0, once the slot realm is audited and approved on mainnet:**<br>- a fixed daily price in GNOT, set by the team in the slot realm;<br>- 40 characters at most, for 1, 3 or 7 days; at most one per world;<br>- the text passes the name filter and the moderation API before the transaction: the moderation service signs an approval that the slot realm verifies (ed25519), so a satellite goes live at once, and only after that check;<br>- moderators can take one down after a report, refunding the days left;<br>- labelled "Sponsored", as advertising law requires.<br>**Broadcast Moon:** a curated station in phase 0, with videos embedded from accepted services (§6).<br>**The person card:** phase 0 in its basic form.<br>**Embeds:** links in phase 0. No uploads are hosted (§6) |
 | 8 | Rollout: "tips and stamps in the same transaction" | Passport stamps | Two different things. Passport stamps record visits on the device. ADR-0001's stamps travel with a tip |
 | 9 | §10: a generated identicon | A planet chosen as an avatar | An astronaut generated from the name; its parts chosen in phase 1 and saved in the profile realm. Never a planet (§1) |
 | 10 | §7: "mobile is the same space" | The full 3D on a phone | Chat first on phones: the chat full screen, the places as a list with planet thumbnails (the Open Graph images of §2), and the 3D only on request ("View in space"), loaded when asked and when the device can. Nothing of three.js or its textures loads before that |
+| 11 | Rollout: in phase 0 "the chain is read, never written" | Calls, votes, a name registered in the app, satellites | From phase 0, users sign their own calls in Adena (§4). gnoworld's own write in phase 0 is the slot realm, once audited and approved on mainnet; its approvals and takedowns are signed by gnoworld's keys, on the server |
 
 **Checks for slice 1.** These are not differences with the prototype:
 - **The React Compiler.** ADR-0001 §12 plugs it in through `@vitejs/plugin-react`, while
@@ -788,8 +807,9 @@ risk. This section adds what the prototype showed was needed.
 - **Links and media:** https only, and only from the accepted services (§6).
 - **Validation:** Zod checks Ergo, the indexer, realm reads and every data file.
 - **Untrusted text:** realm text and chat, for Jarvis too (§5).
-- **Secrets:** the client holds none. The Claude and OpenAI keys live only on their
-  services, which rate-limit by account.
+- **Secrets:** the client holds none. The Claude and OpenAI keys, the moderation approval
+  key and the slot realm's admin key live only on the server; services rate-limit by
+  account.
 - **Dependencies:** locked, and the gate audits them.
 
 **Accessibility.**
@@ -817,8 +837,8 @@ risk. This section adds what the prototype showed was needed.
 **Dependencies to ask for, each in its slice:**
 - `react-router` and `@react-router/dev` (slice 1);
 - a CSS linter, an unused-code finder and a Lighthouse runner (slice 1);
-- `posthog-js` (slice 9);
-- `@anthropic-ai/claude-agent-sdk` and the OpenTelemetry SDK (Jarvis, phase 1).
+- `posthog-js` (slice 12);
+- `@anthropic-ai/claude-agent-sdk` and the OpenTelemetry SDK (slice 10).
 
 ## Consequences
 
@@ -830,31 +850,38 @@ risk. This section adds what the prototype showed was needed.
 - the map view, the hero, the ticker and the rail;
 - the preview captures and the prices file;
 - the moderation bot, with contests;
-- product analytics.
+- product analytics;
+- Jarvis, with its evals and observability, digests, chain questions and translation;
+- calls signed by users (names, votes, any function), with the chain's activity in rooms,
+  new realms and firsts;
+- plain DMs;
+- satellites, once the slot realm is audited and approved on mainnet.
 
-**Its exit criteria add five:**
+**Its exit criteria add:**
 - a world's page is found by its own name, with its own title and image;
 - the Core Web Vitals and memory budgets hold;
 - a person reaches every place with the 3D off;
 - a hidden message tells its author why, and a contest reaches a person;
-- PostHog receives counts only: no text, no names.
+- PostHog receives counts only: no text, no names;
+- a call signed in Adena lands, and its room shows it only from the chain event;
+- Jarvis's evals pass their thresholds;
+- a satellite shows only after its moderation check.
 
 **Phase 1 gets:**
-- Jarvis, with its evals and observability;
-- the signals: heat with calls, routes, new realms, "first to chart" and "first words";
+- the signals at scale: heat with calls, routes;
 - the universe at scale (§3): namespace systems, the rank and dust, computed genres, the
   seasons, and tiles when the count needs them;
-- realm calls from cards, with the on-chain activity in rooms;
-- polls, comets and translation;
+- polls and comets;
 - voice rooms and room games, each after its own ADR;
 - events added by moderators;
 - push notifications;
 - friends on the map;
 - "new here";
 - routed questions;
-- the weekly report, written by the team.
+- the weekly report, written by the team;
+- the profile realm: the astronaut's parts, the stamp count if published.
 
-**Phase 2 gets** satellites under the rules of §8, with DMs and the seal as before.
+**Phase 2 gets** encrypted DMs and the seal, as before.
 
 **The prototype's style is kept, and only rebuilt cleanly.** It is the reference for the look and the feel, and the
 design system takes its values from it. Slice 2's designs refine it (ADR-0001 §7: "our own
@@ -868,12 +895,12 @@ They follow ADR-0001's numbering. Alexis answered them on 2026-10-17.
 | # | Question | Answer |
 |---|---|---|
 | 14 | The markets row's source | A scheduled job reads CoinGecko into `markets.json`; the client reads only that file (§6) |
-| 15 | Jarvis: model, host, budget, translation | Sonnet 5.5 by default, Haiku 5.5 and Opus 5.5 by task; a TypeScript service on the Agent SDK beside the Go binary; 50 $ a day; translation through the same service with Haiku; chain data from gnomcp, the public indexer and gnoscope (§5) |
+| 15 | Jarvis: model, host, budget, translation | Sonnet 5.5 by default, Haiku 5.5 and Opus 5.5 by task; a TypeScript service on the Agent SDK beside the Go binary; 50 $ a day; automatic, cached translation through the same service with Haiku; chain data from gnomcp, the public indexer and gnoscope (§5) |
 | 16 | Media: storage, budget, moderation | No hosted media at first: embeds from accepted services. Messages are moderated by a bot on OpenAI's Moderation API, checked after posting, with contests (§6) |
 | 17 | Public room archives as indexed pages | No, at first (§2) |
 | 18 | Measurement | PostHog, EU cloud, cookieless, counts only (§6) |
 | 19 | Curation of stations, expedition stops, news and the weekly report | The team alone, through the data files and pull requests |
-| 20 | Satellites | Rules set in §8, row 7. Built in phase 2 |
+| 20 | Satellites | Rules in §8, row 7: checked by the moderation API before they show. Phase 0, once the slot realm is audited and approved on mainnet |
 
 **Decisions still to come, each with its own ADR:**
 - voice rooms (phase 1);

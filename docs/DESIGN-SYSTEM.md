@@ -151,6 +151,7 @@ the component.
 | `ActivityChart` | 24 h bars, a hover tooltip | SVG, no chart library |
 | `Kicker` | with a dot | `--text-label` |
 | `Flash` | title, line, one action | One at a time; the next waits |
+| `FlightPanel` | in transit, course plotted, entering orbit | Target, distance, speed, arrival and a progress bar, in tabular numbers (ADR-0002 §1) |
 | `EmptyState` | text and one action | Every list has one |
 | `Skeleton` | line, card | Only where data takes longer than 300 ms |
 
@@ -169,7 +170,7 @@ the component.
 | Hero | Bottom left of the cosmos | The number, one line of text, two big actions, the markets row |
 | Rail | Right of the cosmos | Planets at 64 px, magnified like a dock; names on two lines |
 | Plate | Left of a world's frame | Content column up to 620 px; its right edge melts into space behind the planet |
-| Chat dock | Right | 360 px, 320 px under 1400 px; full screen on demand |
+| Chat dock | Right | 360 px, 320 px under 1400 px; full screen on demand: a column of worlds, a room sidebar (rooms, Media, Saved, DMs), the conversation, and an info panel (Here now, pins) |
 | Ticker | Bottom | 34 px, pausable |
 
 Breakpoints:

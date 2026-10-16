@@ -12,14 +12,14 @@ Browser: the static client (React Router 8, pre-rendered pages, one three.js sce
   ├─ gno.land RPC ......................... free reads: vm/qrender, vm/qeval, vm/qfile, vm/qpaths
   ├─ markets.json ......................... prices, written every 5 minutes by a scheduled job
   ├─ PostHog, EU cloud .................... counts only, cookieless (ADR-0002 §6)
-  ├─ indexer.gno.land (graphql-ws) ........ chain events, live (phase 1)
-  ├─ Adena (extension) .................... the login signature; signed calls (phase 1)
-  ├─ the Go binary ........................ login for Ergo and the moderation bot (phase 0); signals (phase 1)
-  └─ Jarvis ............................... Claude Agent SDK service with gnomcp and gnoscope (phase 1, ADR-0002 §5)
+  ├─ indexer.gno.land (graphql-ws) ........ chain events, live
+  ├─ Adena (extension) .................... the login signature; calls the user signs
+  ├─ the Go binary ........................ login, moderation, first signals; signals at scale (phase 1)
+  └─ Jarvis ............................... Claude Agent SDK service with gnomcp and gnoscope (ADR-0002 §5)
 ```
 
 The client is a static site. Anyone can host it, and it never holds a secret. The services
-export OpenTelemetry to Grafana and Langfuse (phase 1).
+export OpenTelemetry to Grafana and Langfuse.
 
 ## Repository layout
 
@@ -40,12 +40,12 @@ app/                         the web client
     features/                one folder per feature: chat, universe, world, realms, jarvis,
                              passport, notifications, events, search, profile
   tests/e2e/                 Playwright: journeys, axe, budgets (bundle, Web Vitals, memory)
-cmd/gnoworld/                the Go binary, one role per package: login, moderation (phase 0); signals (phase 1)
-jarvis/                      the Jarvis service (phase 1): TypeScript on the Claude Agent SDK
+cmd/gnoworld/                the Go binary, one role per package: login, moderation, signals
+jarvis/                      the Jarvis service: TypeScript on the Claude Agent SDK
   src/                       the harness: tool allowlist, hooks, limits, our own MCP tools
   skills/                    SKILL.md folders: concierge, realm reader, catch up, translation
   evals/                     cases, chain answers recorded at a block height, graders
-r/gnoworld/                  realms (phase 1 on): a permanent store plus versioned rules (ADR-0001 §14)
+r/gnoworld/                  realms: the slot realm (phase 0), then hubs and profiles; a store plus versioned rules (ADR-0001 §14)
 ```
 
 Inside a feature:
@@ -168,8 +168,8 @@ Each slice that adds a resource proves it is released:
 
 - [ ] **CSP:** no inline script, no `eval`, `connect-src` limited to the hosts above,
       `frame-src` limited to the accepted embed services, and JSON-LD allowed by hash.
-- [ ] **Markdown** becomes DOM nodes from an allowlist (bold, italic, underline, strike,
-      code, block, lists, quote, links, mentions). Nothing from data reaches `innerHTML`.
+- [ ] **Markdown** becomes DOM nodes from an allowlist (bold, italic, strike, code, block,
+      lists, quote, links, mentions). Nothing from data reaches `innerHTML`.
 - [ ] **Links and media:**
   - https only;
   - embeds only from the accepted services (ADR-0002 §6), shown once the moderation check
