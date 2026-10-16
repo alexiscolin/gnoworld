@@ -152,7 +152,7 @@ Phases are ADR-0001's:
 
 | Concept | Phase | Chain |
 |---|---|---|
-| Realm card: a digest of the realm in simple chat blocks (facts, chart, links, form, announcement, text), never its whole page; the full page on gnoweb. Its functions as forms in the realm view (§4). BUBBLE gets the same card as any realm | 0 without a model (first lines, pinned actions, read functions); 1 with Jarvis's digest and calls | `vm/qrender`, `vm/qfuncs`, `vm/qeval` |
+| Realm card: a digest of the realm in simple chat blocks (facts, chart, links, form, announcement, text), never its whole page; the full page on gnoweb. Its functions as forms in the realm view (§4). BUBBLE gets the same card as any realm | 0 without a model (first lines, the whole page in the realm view, pinned actions, read functions); 1 with Jarvis's digest and calls, and the whole page whenever no digest is available | `vm/qrender`, `vm/qfuncs`, `vm/qeval` |
 | Proposed actions: one or two per world pinned by the team; one fitting the conversation proposed by Jarvis, prefilled (§4) | 0 for pinned reads; 1 for calls and Jarvis | `vm/qfuncs` |
 | Calls from a card: a vote, a `<gno-form>`, any function with `cur realm` | 1 | Signed by the user in Adena (§4) |
 | On-chain activity in a room ("kaito voted yes on proposal 15", with "Vote" next to it) | 1 | Indexer events |
@@ -376,8 +376,15 @@ to the realm on gnoweb. A digest is a reading aid, never the reference.
 | Announcement | One short notice the realm states: a vote closing, a launch | `Card` |
 | Text | A few sentences, Markdown from the allowlist | — |
 
-- **Phase 0, without a model:** the page's first heading and paragraph as text, the team's
-  pinned actions, and the link to gnoweb.
+- **Without a digest, the whole page.** In phase 0, and in phase 1 whenever Jarvis cannot
+  give one (down, an error, the budget spent):
+  - the card shows the page's first heading and paragraph, the team's pinned actions and
+    the link to gnoweb;
+  - the realm view shows the whole page, built from its raw Markdown by `core/markdown`'s
+    allowlist, with no model;
+  - gnoweb's extensions degrade simply: an alert becomes a quote, columns stack, a
+    `<gno-form>` becomes a Form block, and any other tag shows as plain text;
+  - images come only from the accepted hosts.
 - **Phase 1, Jarvis's digest:** Jarvis reads the page's raw Markdown (`vm/qrender`; gnoweb
   also serves it as `text/markdown`) and the realm's functions. It returns the digest as
   data: a list of blocks from the table, checked with Zod. Never HTML, never interface
@@ -386,12 +393,13 @@ to the realm on gnoweb. A digest is a reading aid, never the reference.
   state or `vm/qfuncs`. The server checks this by string match before caching; the evals
   check it too.
 - **Cached** per realm and per page hash, refreshed at most every 10 minutes. The card
-  shows the block height it was read at. One digest serves every reader.
+  shows the block height it was read at. One digest serves every reader. A digest of an
+  older page is never shown: its numbers would be stale, so the whole page shows instead.
 - **By place:**
   - in the chat, a compact card: a few blocks and "View the page";
   - on the plate, the same with more room;
   - in the realm view (a full page over the chat, with a back button and its own URL), the
-    digest and every action.
+    digest, or the whole page when there is none, and every action.
 - **A `<gno-form exec="Func">` in the page** is a transaction on gnoweb, so it becomes a
   Form block and then a call card (phase 1). No hidden field: gnoweb strips them so people
   see all they submit, and so do we.
