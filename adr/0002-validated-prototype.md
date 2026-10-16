@@ -100,12 +100,15 @@ Phases are ADR-0001's:
 | Embassies | A room shared by two worlds, drawn as a small station between them | 0 | One Ergo channel listed by two worlds | — |
 | Focus view | The plate: name, two facts, activity chart, one main action, connected worlds, a real capture of the world's page, links. The planet sits on the plate's edge; the chat is docked | 0 | — | Read |
 | Status ring | A thin arc around a world for what the realm itself reports: a proposal's tally, a deadline the realm defines. gnoworld invents no timer (§8, row 2) | 0 | Realm reads | Read |
-| Room markers | A world's rooms as markers on its surface, each opening its room | 0 | — | — |
+| Rooms as moons | The busiest rooms orbit as moons, four at most: a moon's size follows the people present, it flares when someone speaks, a click joins the room. The other rooms are in the room switcher | 0 | Ergo counts | — |
+| Storms | A conversation speeding up forms a storm's eye on the planet, growing with the pace of messages; a click joins that room | 0 | Ergo | — |
+| Auroras | The poles light with calls to the realm, stronger with calls per minute | 1 | The indexer | Read |
+| Comets in space | A message sent to another world's room crosses space as a comet (Chat, comets) | 1 | The comets bot | — |
 | Talk box | With the chat closed, the last lines of the world's room on its plate | 0 | — | — |
 | Realm facts | Path, deployer, first block, calls in 24 h | 0 for the path; 1 for the rest | The indexer | Read |
 | Latest post on X | — | Cut, unless a source is decided | — | — |
 | The Earth | Bubbles where people speak from, with counts for the far side ("Japan · 12, far side"); the globe turns to show your own message | 0 | `pickBubbles` and its rules file (ADR-0001 §7) | — |
-| Bubbles on other worlds | The prototype pops messages on any planet | Cut: bubbles are the Earth's, by country (ADR-0001 §7). Room markers and heat carry activity elsewhere | — | — |
+| Bubbles on other worlds | The prototype pops messages on any planet | Cut: bubbles are the Earth's, by country (ADR-0001 §7). Moons, storms, auroras and heat carry activity elsewhere (§3) | — | — |
 | Hero | The number of people online, one line, two big actions | 0 | Ergo counts | — |
 | Markets row | GNOT, ATONE and BTC with a 24 h line; the block height | 0 | The prices file (§6) | Read |
 | Ticker | A pausable line of what is happening: votes, events, new worlds | 0 from data and rooms; 1 adds chain events | — | Read |
@@ -370,7 +373,7 @@ realistic, like space photography, never cartoon (docs/DESIGN-SYSTEM.md).
 - **Layer 4, atmosphere, rings and moons.**
   - The rim's scattering colour and thickness, haze layers, and auroras at the poles.
   - Rings: common on giants, rare elsewhere, with a tilt, gaps and a density.
-  - Up to four small moons. They are scenery: rooms stay markers on the surface.
+  - Moons are the busiest rooms (§1). A world with no active room has none.
 - **Layer 5, what the data says.** Data never passes a verdict, and a quiet world looks
   resting, never decayed.
   - **Size** follows the rank (above).
@@ -413,6 +416,21 @@ realistic, like space photography, never cartoon (docs/DESIGN-SYSTEM.md).
     points.
   - The GPU bench adds a variety view: eight planets of different classes and a wonder in
     frame, within the frame budget.
+
+**What a planet shows from afar, bounded.** A planet is seen whole, so its signs read at
+that scale: moons for rooms, night lights for people, storms and auroras for pace, comets
+between worlds. None may saturate the map:
+- **Log scales.** Every intensity (a moon's size, a storm's, an aurora's, the night lights)
+  follows the logarithm of its count, relative to the busiest world of the day, and is
+  capped. A quiet world still shows a little; the busiest never floods the view.
+- **Caps per planet:** four moons; one large storm and two small ones.
+- **Auroras merge.** Calls add to one smoothed intensity; there is no flash per call.
+- **Comets merge and queue.** Messages on the same route within a minute fly as one brighter
+  comet, with the count on hover. At most twelve comets are in view at once: the place you
+  are, what you follow and the highest ranks first.
+- **Reduced motion:** nothing flies or flares; counts show instead.
+- **Budgets:** these effects count in the frame budget, and the GPU variety view includes
+  them at their caps.
 
 **The infinite, felt.**
 - Haze closes the view before any edge.
@@ -706,7 +724,7 @@ All decided by Alexis on 2026-10-17.
 |---|---|---|---|
 | 1 | §7: transactions are inline, with no modals | A modal signature request | Inline cards (§4). The modal was a placeholder |
 | 2 | §7: "dropped from the concept: pots, boops, timers, claims and payout bars" | A Play card with BUBBLE's pot, a boop, and a pot clock on the status ring | gnoworld builds social room games, with no money and with results on chain (§1, Chat), after phase 0, with its own ADR first. No pots: a separate, later decision. gnoworld invents no timer: the ring shows only what a realm reports. BUBBLE gets the same realm card as any realm |
-| 3 | §7: distance to the sun is activity; rooms are moons; people are satellites | Stable orbits; activity as heat; rooms as markers on the surface; people in lists | Stable places, with the scale rules of §3: one place per namespace, a slow seasonal drift, a rank from signals and curation, dust, and genres as lenses. Activity is heat. Rooms are markers; people are in lists; "satellite" means a sponsored slot |
+| 3 | §7: distance to the sun is activity; rooms are moons; people are satellites | Stable orbits; activity as heat; rooms as markers on the surface; people in lists | Stable places, with the scale rules of §3: one place per namespace, a slow seasonal drift, a rank from signals and curation, dust, and genres as lenses. Activity is heat, storms and auroras. The busiest rooms are moons, the others are in the room switcher; people are in lists; "satellite" means a sponsored slot |
 | 4 | §12: no router and no server framework; the URL holds the camera state. §13: `/h/<hub>` | A URL per place, for search | React Router 8 framework mode, static pre-rendering, no Node server; the camera follows the URL (§2). Its two dependencies are asked for in slice 1 |
 | 5 | Phase 0 has no private messages | DMs and the seal | Kept in phase 2 |
 | 6 | No voice | Voice rooms, and events in a "voice lounge" | A WebRTC voice room in phase 1, after phase 0, with its own ADR first |
