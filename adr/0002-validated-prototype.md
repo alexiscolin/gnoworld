@@ -112,7 +112,7 @@ Phases are ADR-0001's:
 | Hero | The number of people online, one line, two big actions | 0 | Ergo counts | — |
 | Markets row | GNOT, ATONE and BTC with a 24 h line; the block height | 0 | The prices file (§6) | Read |
 | Ticker | A pausable line of what is happening: votes, events, new worlds | 0 from data and rooms; 1 adds chain events | — | Read |
-| Rail | The worlds or the groups, magnified like a dock under the pointer | 0 | — | — |
+| Rail | The worlds or the groups, magnified like a dock under the pointer. By default, the most used worlds right now (social and realm), after the ones you follow: 25 at most, scrolling, then a "See all" button to the list view. The order changes at most once a minute, only when a world stays clearly ahead, and never under the pointer | 0 | Ergo counts; the signals in phase 1 | — |
 | List view | Everything as panels, no 3D, filterable by genre | 0 | — | — |
 | Search | ⌘K over the current universe's worlds, ecosystems, stations and genres; in phase 1 over every realm, dust included | 0 | — | — |
 | Loader | Real texture progress, then the space opens like an iris | 0 | — | — |
