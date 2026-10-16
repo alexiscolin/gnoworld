@@ -91,7 +91,7 @@ Phases are ADR-0001's:
 | Namespace systems | One star per registered namespace, its realms and packages in orbit | 1 | `vm/qpaths` by namespace; §3 | Read |
 | Genres | What a realm is: token, DAO, game, social… A realm can have several. A lens on the map lights one genre wherever it is | 0 from the data file; 1 computed from imports (§3) | The genre classifier | Read |
 | Visibility rank and dust | Realms with real signals are planets; quiet realms are dust around their star, still found by search, by URL and in the list (§3) | 1. In phase 0, every world in the data file is a planet | The signals (§7) | Read |
-| Stations | Places curated by the team for its topics: AI Ring (something built with AI), Broadcast Moon (a moon of screens), Harbor (long reads). Not realms, and labelled so; realistic 3D | 0 | Stations data file. Broadcast Moon's videos are embeds from accepted services (§6) | — |
+| Stations | Places the team designs and builds in full, then open to everyone: anyone visits, talks in their rooms and uses their content. Not realms, and not necessarily tied to one; labelled as stations. Hand-made realistic 3D, never generated. The team places them in well-defined zones of the map, and they always show, outside the rank (§3). Today: AI Ring (something built with AI), Broadcast Moon (a moon of screens), Harbor (long reads) | 0 | Stations data file and their 3D models, by the team. Broadcast Moon's videos are embeds from accepted services (§6) | — |
 | Map view | The same space from above, with zone captions | 0 | Scene | — |
 | Level of detail | The ladder of §3. Key labels from afar: groups, Earth, GovDAO, systems, signals, the two hottest worlds, what you follow, the next event. The rest appear on approach. Labels never overlap | 0 | Scene, labels layer | — |
 | Heat | A steady warm glow on the busiest worlds, stronger with activity, with a "24% · 148/h" badge and a rising icon. No rings, no lines | 0 from room user counts; 1 adds realm calls | Ergo `LIST` counts (checked in slice 4); the indexer | Read |
@@ -309,7 +309,8 @@ ADR-008 §12.3.
   - imports from other namespaces;
   - distinct people speaking in its rooms;
   - follows;
-  - the team's curation (ecosystems, stations), as a boost.
+  - the team's curation (ecosystems, featured worlds), as a boost.
+- **Stations are outside the rank.** The team places them and they always show (§1).
 - **Counting rules:**
   - each account counts once per signal;
   - calls a namespace makes to itself do not count;
