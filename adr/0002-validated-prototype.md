@@ -121,6 +121,7 @@ Phases are ADR-0001's:
 | List view | Everything as panels, no 3D, filterable by genre | 0 | — | — |
 | Search | ⌘K over the current universe's worlds, ecosystems, stations and genres, grouped with their counts, with "Go explore" on top; satellites labelled "Sponsored"; in phase 1 over every realm, dust included | 0 | — | — |
 | Loader | Real texture progress, then the space opens like an iris | 0 | — | — |
+| Menu and settings | The account button (your astronaut) opens a menu: passport, saved, settings, help, log out; on a phone, a menu button holds it with the navigation. Settings gather every choice in one place: **display** (quality Auto, High or Low; reduce animations; the 3D on a phone), **language** (yours, and automatic translation on or off), **notifications** (by kind and by world; push), **privacy** (DMs from strangers; Earth presence; the country tag; analytics; keeping your Jarvis questions), **account** (your name, your astronaut), **this device** (export or clear the passport, saved messages and drafts) | 0 | The device, and the server for DMs and push | — |
 
 **Chat** (Ergo in phase 0, ADR-0001 §1)
 
@@ -214,7 +215,7 @@ changes ADR-0001 §12, where the URL held the camera state. It replaces ADR-0001
 | `/list` | Everything as panels | Yes | Yes |
 | `/events` | The calendar | Yes, rebuilt when the events file changes | Yes, with `Event` structured data |
 | `/@:name` | A person (phase 1) | Yes, from `r/sys/users` at build time | Yes |
-| `/passport`, `/saved` | Device-only views, shown as dialogs over the current place | No: the SPA fallback | `noindex` |
+| `/passport`, `/saved`, `/settings` | Device-only views, shown as dialogs over the current place | No: the SPA fallback | `noindex` |
 | `/net/:network/…` | Another universe (Onyx, a community chain): the same paths under its prefix, for example `/net/onyx/w/bubble` | Yes | Mainnet only. A testnet's pages are `noindex`, as gnoweb does for testnets (gno PR #6256) |
 
 The `/n/`, `/r/` and `/p/` paths are proposed here and confirmed in the namespace-systems

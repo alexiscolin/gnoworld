@@ -38,7 +38,7 @@ app/                         the web client
     scene/                   three.js only: renderer, loop, flights, bodies, level of detail, labels
     ui/                      the design system: tokens, layers, components (docs/DESIGN-SYSTEM.md)
     features/                one folder per feature: chat, universe, world, realms, jarvis,
-                             passport, notifications, events, search, profile
+                             passport, notifications, events, search, profile, settings
   tests/e2e/                 Playwright: journeys, axe, budgets (bundle, Web Vitals, memory)
 cmd/gnoworld/                the Go binary, one role per package: login, moderation, signals
 admin/                       the admin console, on its own origin (ADR-0002 §6): reuses ui and lib
@@ -129,7 +129,7 @@ boundaries above, and no import cycles (a cycle check, asked for in slice 1).
 | Where you are, what is selected, panels open | The store (`store/`), and the URL for the place | React with `useStore(selector)`; the scene with `store.subscribe(selector, fn)` |
 | Chain and service data | TanStack Query. The key is the request; events from the indexer invalidate it | React |
 | Live rooms | The store's chat slice, fed by `lib/ergo` | React; the scene for bubbles and heat |
-| Device data: passport, saved, drafts, follows | IndexedDB through `lib/storage`, Zod on read | The store at start, written back on change |
+| Device data: passport, saved, drafts, follows, settings | IndexedDB through `lib/storage`, Zod on read | The store at start, written back on change |
 | The canonical place | The URL (ADR-0002 §2) | The router puts it in the store, and the scene flies there |
 
 Rules:

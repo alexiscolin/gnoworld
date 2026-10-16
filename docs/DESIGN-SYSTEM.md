@@ -166,7 +166,7 @@ the component.
 
 | Region | Place | Size |
 |---|---|---|
-| Header | Top, 34 px from the edge | Controls at `--control-l`. Logo left; Universe and List and search centre; Jarvis, chat, passport, bell, account right |
+| Header | Top, 34 px from the edge | Controls at `--control-l`. Logo left; Universe and List and search centre; Jarvis, chat, passport, bell, account right. The account button opens the menu (passport, saved, settings, help, log out); on a phone, a menu button holds it with the navigation (ADR-0002 §1, menu and settings) |
 | Hero | Bottom left of the cosmos | The number, one line of text, two big actions, the markets row |
 | Rail | Right of the cosmos | Planets at 64 px, magnified like a dock; names on two lines |
 | Plate | Left of a world's frame | Content column up to 620 px; its right edge melts into space behind the planet |
