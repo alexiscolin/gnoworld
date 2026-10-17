@@ -20,6 +20,12 @@ review card and stops.
 - runs in the demo stack (`docker compose up`), with its service's image, settings and
   runbook notes (ADR-0002 §7, where it runs).
 
+## The harness, after slice 1
+
+| Item | Delivers | Why |
+|---|---|---|
+| The reviewers' exam | The ledger's reproduced findings (`docs/review/findings.md`) become a fixed set: each one's commit before its fix, and the bug it holds. A script runs a reviewer (agent, prompt or model) over the set and scores what it finds; any change to a reviewer is rescored before it lands. The same run on known-clean commits counts the false alarms. Repeat findings are dropped, and after three rounds a review reads only the new diff | A reviewer is judged by the bugs it finds, not by how it reads; how Anthropic tunes its own code review ("Solving code review at Anthropic", claude.dev, read 2026-10-17) |
+
 ## Phase 0: a public hub
 
 Users sign their own calls in Adena, on a computer. gnoworld's only write of its own is the
