@@ -32,7 +32,9 @@ and the deployment live in one repository, with one lockfile and one gate:
   them all, with the realms and the Go reference client;
 - a change that spans the client and the server lands in one commit, tested together;
 - `admin/` stays in the monorepo; it is hidden on the network, never by splitting the repo
-  (ADR-0002 §6).
+  (ADR-0002 §6);
+- the repository is private, but nothing relies on that: no secret ever lives in the code,
+  and every protection holds as if the code were public.
 
 ```
 app/                         the web client
