@@ -9,7 +9,7 @@
 # (docs/DEVELOPMENT.md, "Toolchain"). Node comes from .node-version, through nvm when the
 # shell's own differs.
 set -eu
-cd "$(dirname "$0")/.."
+cd "$(realpath "$(dirname "$0")/..")" # the folder's own case: a $PWD spelled otherwise loads a tool twice (F081)
 unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a hook's git environment must not steer the gate's git calls
 unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO # the scripts' test switches, which would fake a pass
 full=false

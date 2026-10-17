@@ -231,7 +231,10 @@ try:
         # The compiler flags hold in the app too.
         plant({"unchecked.ts": "export function first(a: number[]): string {\n  return a[0].toFixed();\n}\n",
                "erasable.ts": "export enum Kind {\n  A,\n}\n"}, where=app)
-        out = run(["node_modules/.bin/tsc", "-p", "app/tsconfig.json"])
+        # Through the typecheck script the gate runs, so its app half is proven with the flags.
+        with open("package.json") as f:
+            typecheck = json.load(f)["scripts"]["typecheck"]
+        out = run(["sh", "-c", f'PATH="$PWD/node_modules/.bin:$PATH" {typecheck}'])
         expect("unchecked.ts" in out.stdout and "possibly 'undefined'" in out.stdout, "tsc refuses an unchecked index in the app")
         expect("erasable.ts" in out.stdout and "erasableSyntaxOnly" in out.stdout, "tsc refuses syntax Node cannot erase in the app")
         shutil.rmtree(app)

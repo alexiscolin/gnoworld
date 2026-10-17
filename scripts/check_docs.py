@@ -65,7 +65,7 @@ problems = ledger_problems(root)
 if problems:
     print("check_docs: the findings ledger (docs/review/findings.md):", *problems, sep="\n  ", file=sys.stderr)
 # A test sits beside the file it tests, under its name (docs/ARCHITECTURE.md, "Naming").
-tests = [p for p in root.glob("*/**/src/**/*.test.ts*") if "node_modules" not in p.parts]
+tests = [p for p in listed(root, {".ts", ".tsx"}) if re.search(r"\.test\.tsx?$", p.name) and "src" in p.relative_to(root).parts]
 orphans = [t.relative_to(root) for t in tests if not any(t.with_name(t.name.replace(".test.", ".", 1)).with_suffix(s).exists() for s in (".ts", ".tsx"))]
 if orphans:
     print("check_docs: these tests sit beside no file of their name:", *orphans, sep="\n  ", file=sys.stderr)

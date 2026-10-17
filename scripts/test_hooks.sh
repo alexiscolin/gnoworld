@@ -80,6 +80,15 @@ for step in "run format:check" "run typecheck" "run lint" "run test" "run unused
 	'unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO' '[ "$took" -gt 60 ]' "python3 -I scripts/prove_fix.py" "python3 -I scripts/audit.py"; do
 	grep -v '^[[:space:]]*#' "$gate_file" | grep -qF -- "$step" || fail "check.sh no longer runs: $step"
 done
+# The app's step comes after the copy and dead-code checks (F082), and its guard (F080) snapshots
+# every package file before the build and compares after it.
+python3 -I - "$gate_file" <<'PY' || fail "check.sh's app step lost its order or its package guard"
+import sys
+lines = [l.strip() for l in open(sys.argv[1]) if not l.lstrip().startswith("#")]
+at = lambda text: next(i for i, l in enumerate(lines) if l.startswith(text))
+assert "packages() { cat package.json app/package.json pnpm-lock.yaml | cksum; }" in lines
+assert at("copies=$(run copies") < at("installed=$(packages)") < at("node app/node_modules/@playwright/test/cli.js test") < at('[ "$(packages)" = "$installed" ]')
+PY
 # An EXIT trap keeps a failure: under macOS's sh, a plain one turns an unbound variable into exit 0.
 for f in "$here"/*.sh "$hooks"/*; do
 	grep -n "^[[:space:]]*trap .* EXIT$" "$f" | grep -v '|| status=1; exit "$status"' | grep -q . && fail "$(basename "$f") has an EXIT trap that can hide a failure"
@@ -254,6 +263,11 @@ for orphan in app/src/routes/routes.test.tsx packages/core/src/parse.test.ts; do
 	python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted $orphan, beside no file of its name"
 	rm "$d/$orphan"
 done
+# What git ignores (a mutation tester's sandbox) and what is no test (a snapshot) are not read.
+printf '.stryker-tmp/\n' >>"$d/.gitignore" && mkdir -p "$d/.stryker-tmp/x/app/src" "$d/app/src/routes/__snapshots__"
+touch "$d/.stryker-tmp/x/app/src/orphan.test.ts" "$d/app/src/routes/__snapshots__/home.test.tsx.snap" "$d/app/src/routes/home.test.data.ts"
+python3 -I "$docs" "$d" >/dev/null 2>&1 || fail "check_docs read a folder git ignores, or a snapshot, as tests"
+rm -r "$d/.stryker-tmp" "$d/app/src/routes/__snapshots__" "$d/app/src/routes/home.test.data.ts"
 rm -r "$d/app" "$d/packages"
 fi
 
@@ -261,7 +275,7 @@ if part patch_coverage; then
 # patch_coverage: the share of changed lines that the tests run, like a pull request's
 # patch coverage, from Vitest's JSON report and git's diff.
 patch="$here"/patch_coverage.py
-c="$t/cov"
+c="$t/tests/cov" # under a folder named tests: only paths inside the repository count (F098)
 mkdir -p "$c/src" "$c/coverage"
 git -C "$c" init -q && printf 'one\n' >"$c/src/a.ts" && git -C "$c" add -A && git -C "$c" commit -qm base
 printf 'one\ntwo\nthree\nfour\n' >"$c/src/a.ts"
