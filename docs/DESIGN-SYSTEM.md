@@ -132,7 +132,8 @@ Under `prefers-reduced-motion: reduce`:
 
 They live in `app/src/ui`, each a component with its CSS Module, documented by its props.
 Features compose them and never restyle them from outside. A missing variant is added to
-the component.
+the component. A gallery page, built in development only, shows every component in every
+state; Playwright screenshots it and runs axe on it, so a style change shows in review.
 
 | Component | Variants and states | Notes |
 |---|---|---|
@@ -191,9 +192,22 @@ Components use container queries, so they fit wherever they are placed.
 
 ## CSS rules
 
-- **Cascade layers**, declared once: `@layer reset, tokens, base, components, utilities;`.
-  - The reset and the base style elements.
-  - Components are CSS Modules, so class names never leak.
+- **The method is CUBE CSS** (composition, utility, block, exception) on CSS Modules, in
+  cascade layers declared once: `@layer reset, tokens, base, compositions, components,
+  utilities;`.
+  - **Base** styles the elements globally first (type, links, focus, `::selection`), so
+    components write little.
+  - **Compositions** are the layout primitives, `Stack`, `Cluster`, `Grid`, `Sidebar`,
+    `Switcher`, `Center`: intrinsic layouts that place things without styling them. Most
+    layout is one of them, never new CSS.
+  - **Blocks** are the components, one CSS Module each, so class names never leak.
+  - **Utilities** are a handful of single-purpose classes (`visually-hidden`, the flow
+    space), driven by tokens.
+  - **Exceptions** are states read from attributes, `[aria-pressed="true"]`,
+    `[aria-expanded]`, `[data-state="busy"]`, never modifier classes: the state the
+    accessibility tree sees is the state the CSS draws, and tests select it by role.
+- **Fluid, not breakpoints:** type and space scale with `clamp()` tokens; components adapt
+  with container queries; a media query is for the device (pointer, motion, contrast).
 - **No `!important`, no ID selectors, no styling from outside a component.** The CSS
   linter enforces it.
 - **Values come from tokens:**
