@@ -98,7 +98,7 @@ New: `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `eslint.config
   No `@types/node` yet: config files are linted without types.
 - **Only `packages/core` exists:** each workspace arrives with its slice, since knip would
   flag an empty one.
-- **Added at Alexis's request:** coverage at 85% everywhere and on the changed lines
+- **Added at Alexis's request:** Prettier 3.9.10 (print width 120; Markdown left as written); coverage at 85% everywhere and on the changed lines
   (`patch_coverage.py`); short comments (`check_comments.py`); a `prepare` script rather
   than Husky.
 - **The sandbox** is set, and is checked at the start of the next session: it does not
