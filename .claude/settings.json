@@ -8,14 +8,40 @@
   },
   "permissions": {
     "deny": [
-      "Read(./.env)",
-      "Read(./.env.local)",
-      "Read(./deploy/secrets/**)",
-      "Read(./**/dist/**)",
-      "Read(./**/coverage/**)",
-      "Read(./reports/**)"
+      "Read(/.env)",
+      "Read(/.env.local)",
+      "Read(/deploy/secrets/**)",
+      "Read(/**/dist/**)",
+      "Read(/**/coverage/**)",
+      "Read(/reports/**)",
+      "Read(~/.ssh/**)",
+      "Read(~/.config/gh/**)",
+      "Read(~/.npmrc)",
+      "Read(~/.aws/**)"
     ],
-    "ask": ["Bash(git push)", "Bash(git push *)", "Bash(pnpm add *)", "Bash(rm -rf *)"]
+    "ask": [
+      "Bash(git push)",
+      "Bash(git push *)",
+      "Bash(pnpm add *)",
+      "Bash(rm -rf *)",
+      "Edit(/scripts/**)",
+      "Edit(/.githooks/**)",
+      "Edit(/.claude/**)",
+      "Edit(/*.config.ts)",
+      "Edit(/**/package.json)",
+      "Edit(/pnpm-workspace.yaml)",
+      "Edit(/packages/core/**)",
+      "mcp__gnomcp__gno_addpkg",
+      "mcp__gnomcp__gno_call",
+      "mcp__gnomcp__gno_run",
+      "mcp__gnomcp__gno_key_send",
+      "mcp__gnomcp__gno_cla_sign",
+      "mcp__plugin_gnomcp_gnomcp__gno_addpkg",
+      "mcp__plugin_gnomcp_gnomcp__gno_call",
+      "mcp__plugin_gnomcp_gnomcp__gno_run",
+      "mcp__plugin_gnomcp_gnomcp__gno_key_send",
+      "mcp__plugin_gnomcp_gnomcp__gno_cla_sign"
+    ]
   },
   "hooks": {
     "Stop": [
@@ -34,7 +60,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -I \"$CLAUDE_PROJECT_DIR/scripts/guard.py\""
+            "command": "python3 -I \"$CLAUDE_PROJECT_DIR/scripts/guard.py\"",
+            "onFailure": "block"
           }
         ]
       }
@@ -58,25 +85,36 @@
   },
   "sandbox": {
     "enabled": true,
+    "allowUnsandboxedCommands": false,
     "network": {
-      "allowedDomains": [
-        "registry.npmjs.org",
-        "proxy.golang.org",
-        "sum.golang.org",
-        "github.com",
-        "api.github.com",
-        "codeload.github.com",
-        "objects.githubusercontent.com"
-      ]
+      "allowedDomains": ["registry.npmjs.org", "proxy.golang.org", "sum.golang.org", "github.com"]
     },
     "filesystem": {
       "allowWrite": [
         "~/.cache/gno-toolchains",
         "~/.cache/gnoworld-tools",
+        "~/.cache/go-build",
         "~/Library/Caches/go-build",
         "~/go/pkg/mod",
+        "~/.local/share/pnpm",
         "~/Library/pnpm"
-      ]
+      ],
+      "denyWrite": [
+        "scripts",
+        ".githooks",
+        "package.json",
+        "pnpm-workspace.yaml",
+        "eslint.config.ts",
+        "vitest.config.ts",
+        "stryker.config.json",
+        "knip.json",
+        ".jscpd.json",
+        "tsconfig.base.json",
+        "tsconfig.json",
+        ".prettierrc.json",
+        ".prettierignore"
+      ],
+      "denyRead": ["~/.ssh", "~/.config/gh", "~/.npmrc", "~/.aws"]
     }
   }
 }

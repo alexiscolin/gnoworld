@@ -19,6 +19,23 @@ hooks = json.load(open(sys.argv[1]))["hooks"]
 wired = {event: " ".join(h["command"] for entry in hooks.get(event, []) for h in entry["hooks"]) for event in hooks}
 assert "scripts/guard.py" in wired["PreToolUse"] and "scripts/format_hook.sh" in wired["PostToolUse"] and "scripts/stop_gate.sh" in wired["Stop"]
 PY
+# The boundary settings.json promises (docs/DEVELOPMENT.md, "The harness"): a guard that crashes
+# blocks; no unsandboxed retry; credentials unreadable; the harness and chain writes ask first.
+python3 -I - "$here/../.claude/settings.json" <<'PY' || fail "settings.json dropped a boundary"
+import json, sys
+s = json.load(open(sys.argv[1]))
+guard = [h for e in s["hooks"]["PreToolUse"] for h in e["hooks"] if "guard.py" in h["command"]]
+assert guard and all(h.get("onFailure") == "block" for h in guard), "guard does not block when it fails"
+box = s["sandbox"]
+assert box["enabled"] is True and box["allowUnsandboxedCommands"] is False, "the sandbox can be left"
+assert {"~/.ssh", "~/.config/gh", "~/.npmrc", "~/.aws"} <= set(box["filesystem"]["denyRead"]), "a credential is readable"
+assert {"scripts", ".githooks", "package.json"} <= set(box["filesystem"]["denyWrite"]), "a command can rewrite the harness"
+assert not any("api.github.com" in d for d in box["network"]["allowedDomains"]), "the GitHub API is reachable"
+ask, deny = set(s["permissions"]["ask"]), set(s["permissions"]["deny"])
+assert {"Edit(/scripts/**)", "Edit(/.githooks/**)", "Edit(/.claude/**)", "Edit(/packages/core/**)"} <= ask, "an edit of the harness or core asks no one"
+assert {f"mcp__{p}__gno_{t}" for p in ("gnomcp", "plugin_gnomcp_gnomcp") for t in ("addpkg", "call", "run", "key_send", "cla_sign")} <= ask, "a chain write asks no one"
+assert {"Read(~/.ssh/**)", "Read(~/.config/gh/**)"} <= deny, "the Read tool can open a credential"
+PY
 # check.sh runs every step it promises: removing one fails here.
 gate_file="$here/check.sh"
 for step in "run format:check" "run typecheck" "run lint" "run test" "run unused" "run copies" \
@@ -202,9 +219,12 @@ printf '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Rea
 printf '{"type":"assistant","message":{"content":[{"type":"text","text":"I will call mcp__gnomcp__gno_read"}]}}\n' >"$t/says.jsonl"
 printf '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"mcp__gnomcp__gno_packages","input":{}}]}}\n' >"$t/asked.jsonl"
 printf '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"mcp__plugin_gnomcp_gnomcp__gno_read","input":{}}]}}\n' >"$t/plugin.jsonl"
+skill='{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Skill","input":{"skill":"gnomcp:gno-build"}}]}}'
+{ cat "$t/asked.jsonl" && printf '%s\n' "$skill"; } >"$t/skilled.jsonl"
+{ cat "$t/plugin.jsonl" && printf '%s\n' "$skill"; } >"$t/plugin_skilled.jsonl"
 guarded() { # $1: the event as JSON, $2: the exit code expected, $3: what it is
 	code=0
-	printf '%s' "$1" | python3 -I "$gd" 2>/dev/null || code=$?
+	printf '%s' "$1" | python3 -I "$gd" >/dev/null 2>&1 || code=$?
 	[ "$code" = "$2" ] || fail "guard gave $code, not $2, for $3"
 }
 sh_() { # $1: a shell command, $2: the exit code expected, $3: the transcript (default: no gnomcp call)
@@ -247,14 +267,18 @@ package slot
 EOF" 2
 sh_ "cat > gno/r/slot/slot.gno <<EOF
 package slot
-EOF" 0 "$t/asked.jsonl"
+EOF" 2 "$t/asked.jsonl"
+sh_ "cat > gno/r/slot/slot.gno <<EOF
+package slot
+EOF" 0 "$t/skilled.jsonl"
 sh_ "sed -i '' s/a/b/ gno/r/seal/seal.gno" 2
 sh_ "cp /tmp/x.gno gno/r/seal/seal.gno" 2
 sh_ "cat gno/r/seal/seal.gno" 0
 tool_ Write '{"file_path":"/x/gno/r/slot/slot.gno"}' "$t/plain.jsonl" 2
 tool_ Write '{"file_path":"/x/gno/r/slot/slot.gno"}' "$t/says.jsonl" 2
-tool_ Edit '{"file_path":"/x/gno/p/util/util.gno"}' "$t/asked.jsonl" 0
-tool_ Edit '{"file_path":"/x/gno/p/util/util.gno"}' "$t/plugin.jsonl" 0
+tool_ Edit '{"file_path":"/x/gno/p/util/util.gno"}' "$t/asked.jsonl" 2
+tool_ Edit '{"file_path":"/x/gno/p/util/util.gno"}' "$t/skilled.jsonl" 0
+tool_ Edit '{"file_path":"/x/gno/p/util/util.gno"}' "$t/plugin_skilled.jsonl" 0
 tool_ Write '{"file_path":"/x/packages/core/src/a.ts"}' "$t/plain.jsonl" 0
 tool_ WebFetch '{"url":"https://gno.land/r/gnoland/home"}' "$t/asked.jsonl" 2
 tool_ WebFetch '{"url":"https://GNO.LAND/r/gnoland/home"}' "$t/asked.jsonl" 2
@@ -262,6 +286,36 @@ tool_ WebFetch '{"url":"https://rpc.onyx.testnets.gno.land/status"}' "$t/asked.j
 tool_ WebFetch '{"url":"https://docs.gno.land/resources/gno-interrealm"}' "$t/plain.jsonl" 0
 guarded 'not json' 2 "unreadable input"
 guarded '{"tool_name":"Bash","tool_input":null}' 2 "a null tool_input"
+# What a wrapper, an abbreviation or an environment variable used to slip past.
+sh_ "git commit --no-veri -m x" 2
+sh_ "HUSKY=0 git commit --no-verify -m x" 2
+sh_ "git -c core.hookspath=/dev/null commit -m x" 2
+sh_ "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null git commit -m x" 2
+sh_ "env git commit --no-verify -m x" 2
+sh_ "env -i PATH=/usr/bin git commit -n -m x" 2
+sh_ "eval 'git commit --no-verify -m x'" 2
+sh_ "echo x | xargs git commit --no-verify -m" 2
+sh_ "nohup git commit -n -m x" 2
+sh_ "timeout 60 git commit -n -m x" 2
+sh_ "command git commit -n -m x" 2
+sh_ 'echo $(gnokey list)' 2
+sh_ 'echo `gnokey list`' 2
+sh_ "git commit-tree HEAD^{tree} -m x" 2
+sh_ "python3 -c \"open('gno/r/x/x.gno','w').write('package x')\"" 2
+sh_ "node -e \"require('fs').writeFileSync('x.gno', '')\"" 2
+sh_ "python3 -c \"open('gno/r/x/x.gno','w').write('package x')\"" 0 "$t/skilled.jsonl"
+sh_ "git commit -m 'note: --no-verify is refused'" 0
+sh_ "GIT_PAGER=cat git log -n 3" 0
+sh_ "python3 -I scripts/probe.py" 0
+# A push, in any form, waits for Alexis: the guard asks, since a rule cannot see every form.
+asks() { # $1: a shell command
+	python3 -I -c 'import json,sys; print(json.dumps({"tool_name":"Bash","tool_input":{"command":sys.argv[1]}}))' "$1" | python3 -I "$gd" 2>/dev/null | grep -q '"permissionDecision": "ask"' || fail "guard did not ask before: $1"
+}
+asks "git push origin slice-1a"
+asks "git -C . push origin slice-1a"
+asks "cd gno && git push"
+asks "git -c push.default=current push"
+python3 -I -c 'import json; print(json.dumps({"tool_name":"Bash","tool_input":{"command":"git status"}}))' | python3 -I "$gd" | grep -q . && fail "guard printed a decision for git status"
 
 # check_regressions: its rules on small cases (the real run needs a base branch and Vitest).
 python3 -I "$here/check_regressions.py" --self-test >/dev/null || fail "check_regressions's rules do not hold"
