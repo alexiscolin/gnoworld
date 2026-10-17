@@ -91,7 +91,7 @@ assert trigger and re.findall(r"^  (\S+):", trigger.group(1), re.M) == ["push"],
 assert ci.count("permissions:") == 1 and "write" not in ci, "the CI may write"
 has(r"permissions:\n  contents: read", "the CI may write")
 assert "secrets." not in ci and "continue-on-error" not in ci, "the CI reads a secret or lets a step fail"
-assert not re.search(r"^\s+if:", ci, re.M), "a CI step can be skipped"
+assert not re.search(r"^\s+(- )?if:", ci, re.M), "a CI step can be skipped"
 has(r"    runs-on: ubuntu-24\.04", "the CI runs on a machine it does not name")
 has(r"        run: sh scripts/check\.sh --full", "the CI does not run the full gate, or lets it fail")
 has(r"          persist-credentials: false", "the CI keeps its token on disk for the gate")
