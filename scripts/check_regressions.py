@@ -1,12 +1,13 @@
 """check_regressions.py: the safety net never shrinks quietly (CLAUDE.md, "No regression").
 
 Against the base (where the branch left main), it refuses, unless a commit of the branch says
-so with its reason, which Alexis reads in review:
-- a test that existed and is gone, a rename included: `Removed-test: <its name> - why`;
-- a quality floor lowered (vitest.config.ts's coverage thresholds, StrykerJS's break):
-  `Lowered-floor: <the floor as printed below> - why`;
-- an approved screenshot changed or deleted: `Updated-baseline: <its path> - why`.
+so on a line of its own, `Key: <item> - why`, which Alexis reads in review:
+- a test gone (Vitest, gno, Go; a rename included), or switched to `.fails`: `Removed-test:`;
+- a floor lowered (coverage thresholds, StrykerJS's break), a known gap added to a mutation
+  check's GAPS, or an ignore added to a tool's ignore list: `Lowered-floor:`;
+- an approved screenshot changed or deleted: `Updated-baseline:`.
 Usage: check_regressions.py <base>, from the repository root; --self-test checks the rules."""
+import ast
 import json
 import os
 import re
@@ -15,11 +16,18 @@ import sys
 import tempfile
 
 SHOT = re.compile(r"(-snapshots|__screenshots__)/.+\.(png|jpe?g)$")
+GAP_FILES = ["scripts/mutate.py", "scripts/harness_mutate.py"]
+IGNORE_FILES = [".jscpd.json", "knip.json", "stryker.config.json", "eslint.config.ts", "vitest.config.ts", ".prettierignore", "scripts/check_comments.mjs"]
 
 
-def removed_tests(before, after, declared):
-    """Tests in `before` missing from `after`, less those a `Removed-test:` line names."""
-    return sorted(t for t in before - after if not any(t in line for line in declared))
+def declared(lines, key):
+    """The items a commit names on a `Key: <item> - why` line; a line without its reason names nothing."""
+    return {m.group(1).strip() for line in lines if (m := re.fullmatch(rf"{key}: (.+?) - \S.*", line.strip()))}
+
+
+def removed_tests(before, after, excused):
+    """Tests in `before` missing from `after`, less those named exactly."""
+    return sorted(before - after - excused)
 
 
 def floors(vitest_config, stryker_config):
@@ -37,18 +45,75 @@ def floors(vitest_config, stryker_config):
     return found
 
 
-def lowered_floors(before, after, declared):
-    """Floors lower than they were, or gone, less those a `Lowered-floor:` line names."""
+def lowered_floors(before, after, excused):
+    """Floors lower than they were, or gone, less those named exactly."""
     return sorted(f"{name} {old} -> {after.get(name, 'gone')}" for name, old in before.items()
-                  if after.get(name, 0) < old and not any(name in line for line in declared))
+                  if after.get(name, 0) < old and name not in excused)
 
 
-def changed_baselines(name_status, declared):
-    """Approved screenshots modified, renamed or deleted, less those an `Updated-baseline:` line names."""
+def weakened(before, after, excused, kind):
+    """Entries added to a list that loosens a check (a gap, an ignore), less those named `<kind> <entry>`."""
+    return sorted(e for e in after - before if f"{kind} {e}" not in excused)
+
+
+def gaps(read):
+    """Each known gap, as `<file> <label>`, from the GAPS dict of each mutation check."""
+    out = set()
+    for name in GAP_FILES:
+        for node in ast.parse(read(name) or "").body:
+            if isinstance(node, ast.Assign) and any(getattr(t, "id", "") == "GAPS" for t in node.targets):
+                out |= {f"{name} {key}" for key in ast.literal_eval(node.value)}
+    return out
+
+
+def ignores(read):
+    """Each entry of the lists that keep files from a check, as `<file> <entry>`."""
+    out = set()
+    for name in IGNORE_FILES:
+        text = read(name) or ""
+        if name.endswith(".json") and text:
+            for key, value in json.loads(text).items():
+                if "ignore" in key.lower():
+                    out |= {f"{name} {v}" for v in (value if isinstance(value, list) else [value])}
+        elif name == ".prettierignore":
+            out |= {f"{name} {line.strip()}" for line in text.splitlines() if line.strip() and not line.startswith("#")}
+        else:
+            for m in re.finditer(r"(?:globalIgnores\(|ignores:\s*|exclude:\s*|SKIP = new Set\()\[([^\]]*)\]", text):
+                out |= {f"{name} {entry}" for entry in re.findall(r'"([^"]*)"', m.group(1))}
+    return out
+
+
+def switched_to_fails(diff):
+    """Tests a diff turned into `.fails`: an added line that, without `.fails`, is a removed one."""
+    out, gone, current = [], {}, ""
+    for line in diff.splitlines():
+        if line.startswith("+++ "):
+            current = line[6:]
+        elif line.startswith("-") and not line.startswith("---"):
+            gone.setdefault(current, set()).add(line[1:].strip())
+        elif line.startswith("+") and ".fails" in line and line[1:].replace(".fails", "", 1).strip() in gone.get(current, set()):
+            title = re.search(r"\(\s*([\"'`])(.*?)\1", line)
+            out.append(f"{current} > {title.group(2) if title else line[1:].strip()}")
+    return out
+
+
+def source_tests(files):
+    """gno and Go tests by file and name ({path: text}); a filetest is its file."""
+    out = set()
+    for path, text in files.items():
+        if path.endswith("_filetest.gno"):
+            out.add(path)
+        elif path.endswith(("_test.gno", "_test.go")):
+            out |= {f"{path} > {name}" for name in re.findall(r"^func (Test\w*)\(", text, re.M)}
+    return out
+
+
+def changed_baselines(name_status, excused):
+    """Approved screenshots modified, renamed or deleted, less those named exactly."""
     out = []
     for line in name_status.splitlines():
         status, *paths = line.split("\t")
-        if status[0] in "MDR" and SHOT.search(paths[0]) and not any(paths[0] in d for d in declared):
+        if status[0] in "MDR" and SHOT.search(paths[0]) and paths[0] not in excused:
             out.append(paths[0])
     return out
 
@@ -64,8 +129,12 @@ def show(base, path):
         return ""
 
 
+def here(path):
+    return open(path).read() if os.path.exists(path) else ""
+
+
 def test_names(root):
-    """Every test's file and full name, from `vitest list`; none when the tree has no Vitest."""
+    """Every Vitest test's file and full name, from `vitest list`; none when the tree has no Vitest."""
     if not os.path.exists(os.path.join(root, "vitest.config.ts")):
         return set()
     out = subprocess.run(["node_modules/.bin/vitest", "list", "--json"], cwd=root, capture_output=True, text=True, check=True).stdout
@@ -73,7 +142,7 @@ def test_names(root):
 
 
 def base_tests(base):
-    """The base's tests, listed in a throwaway worktree that borrows node_modules."""
+    """The base's Vitest tests, listed in a throwaway worktree that borrows node_modules."""
     with tempfile.TemporaryDirectory(dir=".claude/tmp") as where:
         tree = os.path.join(where, "base")
         git("worktree", "add", "-q", "--detach", tree, base)
@@ -86,18 +155,31 @@ def base_tests(base):
 
 def self_test():
     """The rules on small cases: each refuses its fault and lets a declared one through."""
-    assert removed_tests({"a > x", "a > y"}, {"a > x"}, []) == ["a > y"]
-    assert removed_tests({"a > y"}, set(), ["Removed-test: a > y - merged into x"]) == []
+    log = ["docs: explain why the mutation break follows the score", "Removed-test: a > xy - another test",
+           "Removed-test: a > z", "Lowered-floor: mutation break - see the plan", "Removed-test: a > y - merged into x"]
+    assert declared(log, "Lowered-floor") == {"mutation break"} and declared(log, "Removed-test") == {"a > xy", "a > y"}
+    assert removed_tests({"a > x", "a > y", "a > z"}, set(), declared(log, "Removed-test")) == ["a > x", "a > z"]
     vitest = 'thresholds: {\n  lines: 85,\n  "packages/core/**": { lines: 100, branches: 95 },\n}'
     before = floors(vitest, '{"thresholds": {"break": 80}}')
     assert before == {"coverage everywhere lines": 85, "coverage packages/core/** lines": 100, "coverage packages/core/** branches": 95, "mutation break": 80}
     after = floors(vitest.replace("95", "90"), '{"thresholds": {"break": null}}')
-    assert lowered_floors(before, after, []) == ["coverage packages/core/** branches 95 -> 90", "mutation break 80 -> 0"]
-    assert lowered_floors(before, after, ["Lowered-floor: mutation break - x", "Lowered-floor: coverage packages/core/** branches - y"]) == []
-    assert lowered_floors(before, before, []) == []
+    assert lowered_floors(before, after, set()) == ["coverage packages/core/** branches 95 -> 90", "mutation break 80 -> 0"]
+    assert lowered_floors(before, after, declared(log[:1], "Lowered-floor")) == lowered_floors(before, after, set()), "a sentence excused a floor"
+    assert lowered_floors(before, after, {"mutation break", "coverage packages/core/** branches"}) == []
+    old = {"scripts/mutate.py": 'GAPS = {\n    "a": "why",\n}\n', ".jscpd.json": '{"ignore": ["docs/**"], "exitCode": 1}',
+           "eslint.config.ts": 'globalIgnores(["docs/"]),\n  { ignores: ["packages/core/**"] }', ".prettierignore": "# x\n*.md\n"}
+    new = {**old, "scripts/mutate.py": 'GAPS = {\n    "a": "why",\n    "b": "no test yet",\n}\n', ".jscpd.json": '{"ignore": ["docs/**", "app/**"]}',
+           "eslint.config.ts": 'globalIgnores(["docs/", "server/"]),\n  { ignores: ["packages/core/**"] }', ".prettierignore": "*.md\n*.ts\n"}
+    assert gaps(old.get) == {"scripts/mutate.py a"} and weakened(gaps(old.get), gaps(new.get), set(), "gap") == ["scripts/mutate.py b"]
+    assert weakened(ignores(old.get), ignores(new.get), set(), "ignore") == [".jscpd.json app/**", ".prettierignore *.ts", "eslint.config.ts server/"]
+    assert weakened(ignores(old.get), ignores(new.get), {"ignore .jscpd.json app/**", "ignore .prettierignore *.ts", "ignore eslint.config.ts server/"}, "ignore") == []
+    diff = "+++ b/p/a.test.ts\n-  test(\"parses x\", () => {\n+  test.fails(\"parses x\", () => {\n+  test.fails(\"new one\", () => {\n+++ b/p/b.test.ts\n-  test.fails(\"done\", () => {\n+  test(\"done\", () => {\n"
+    assert switched_to_fails(diff) == ["p/a.test.ts > parses x"]
+    files = {"r/s/s_test.gno": "func TestBind(t *testing.T) {}\nfunc helper() {}\n", "r/s/z1_filetest.gno": "", "tools/v/main_test.go": "func TestVec(t *testing.T) {}\n", "r/s/s.gno": "func TestNot() {}\n"}
+    assert source_tests(files) == {"r/s/s_test.gno > TestBind", "r/s/z1_filetest.gno", "tools/v/main_test.go > TestVec"}
     diff = "M\tapp/tests/e2e/home.spec.ts-snapshots/home.png\nA\tapp/tests/e2e/x.spec.ts-snapshots/new.png\nD\tapp/__screenshots__/old.png"
-    assert changed_baselines(diff, []) == ["app/tests/e2e/home.spec.ts-snapshots/home.png", "app/__screenshots__/old.png"]
-    assert changed_baselines(diff, ["Updated-baseline: app/tests/e2e/home.spec.ts-snapshots/home.png - new header", "Updated-baseline: app/__screenshots__/old.png - gone with the page"]) == []
+    assert changed_baselines(diff, set()) == ["app/tests/e2e/home.spec.ts-snapshots/home.png", "app/__screenshots__/old.png"]
+    assert changed_baselines(diff, {"app/tests/e2e/home.spec.ts-snapshots/home.png", "app/__screenshots__/old.png"}) == []
     print("check_regressions: self-test passed")
 
 
@@ -105,12 +187,20 @@ if sys.argv[1:] == ["--self-test"]:
     self_test()
     sys.exit(0)
 base = sys.argv[1]
-declared = [line.strip() for line in git("log", "--format=%B", f"{base}..HEAD").splitlines() if line.strip()]
-problems = [f"a test is gone: {t}" for t in removed_tests(base_tests(base), test_names("."), declared)]
+log = git("log", "--format=%B", f"{base}..HEAD").splitlines()
+tests_ok, floors_ok, shots_ok = declared(log, "Removed-test"), declared(log, "Lowered-floor"), declared(log, "Updated-baseline")
+sources = lambda paths, read: source_tests({p: read(p) for p in paths.splitlines() if p.endswith((".gno", ".go"))})
+before = base_tests(base) | sources(git("ls-tree", "-r", "--name-only", base, "--", "gno"), lambda p: show(base, p))
+after = test_names(".") | sources(git("ls-files", "gno"), here)
+problems = [f"a test is gone: {t}" for t in removed_tests(before, after, tests_ok)]
+problems += [f"a test is switched to fails: {t}" for t in switched_to_fails(git("diff", "-U0", base, "--", "*.test.ts", "*.test.tsx")) if t not in tests_ok]
 problems += [f"a floor is lower: {f}" for f in lowered_floors(floors(show(base, "vitest.config.ts"), show(base, "stryker.config.json")),
-                                                               floors(open("vitest.config.ts").read(), open("stryker.config.json").read()), declared)]
-problems += [f"an approved screenshot changed: {p}" for p in changed_baselines(git("diff", "--name-status", f"{base}..HEAD"), declared)]
+                                                               floors(here("vitest.config.ts"), here("stryker.config.json")), floors_ok)]
+problems += [f"a known gap is added: {g}" for g in weakened(gaps(lambda p: show(base, p)), gaps(here), floors_ok, "gap")]
+problems += [f"an ignore is added: {i}" for i in weakened(ignores(lambda p: show(base, p)), ignores(here), floors_ok, "ignore")]
+problems += [f"an approved screenshot changed: {p}" for p in changed_baselines(git("diff", "--name-status", f"{base}..HEAD"), shots_ok)]
 if problems:
-    print("check_regressions: the safety net shrank. Undo it, or say why in a commit (Removed-test:, Lowered-floor:, Updated-baseline:):", *problems, sep="\n  ", file=sys.stderr)
+    print("check_regressions: the safety net shrank. Undo it, or say why on a line of a commit, `Key: <item> - why`"
+          " (Removed-test:, Lowered-floor: [gap |ignore ]<item>, Updated-baseline:):", *problems, sep="\n  ", file=sys.stderr)
     sys.exit(1)
-print("check_regressions: no test gone, no floor lower, no approved screenshot changed")
+print("check_regressions: no test gone or switched off, no floor lower, no gap or ignore added, no approved screenshot changed")

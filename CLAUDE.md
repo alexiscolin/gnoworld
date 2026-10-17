@@ -42,7 +42,7 @@ gnoworld: a social, on-chain, graphical hub for gno.land. The design is
 
 - A fix starts with a test that reproduces the bug, seen failing, and is committed with it; the test's name says the bug.
 - A feature lands with its journey (Playwright) and, when it shows something, its approved screenshots.
-- The safety net never shrinks quietly: a test gone (a rename included), a floor lowered (coverage, mutation) or an approved screenshot changed fails the push unless a commit of the branch says why (`Removed-test:`, `Lowered-floor:`, `Updated-baseline:`), which Alexis reads in review (`scripts/check_regressions.py`). No test is switched off (`.skip`, `.only`, `.todo`); `.fails` is for pairing, in core only.
+- The safety net never shrinks quietly: a test gone (Vitest, gno or Go; a rename included) or switched to `.fails`, a floor lowered (coverage, mutation), a known gap or an ignore added, or an approved screenshot changed fails the push unless a commit of the branch says why on a line of its own, `Key: <item> - why` (`Removed-test:`, `Lowered-floor:`, `Updated-baseline:`), which Alexis reads in review (`scripts/check_regressions.py`). No test is switched off (`.skip`, `.only`, `.todo`); `.fails` is for pairing, in core only.
 - Floors rise with the scores, and never come down.
 
 ## Stop and ask
