@@ -155,4 +155,27 @@ push main || fail "pre-push refused main with a committed review pass"
 printf '#!/bin/sh\nexit 1\n' >"$w/scripts/check.sh"
 push slice-1a && fail "pre-push let a push through a failing gate"
 
+# guard_gno: everything about gno goes through gnomcp. A .gno file is written only after the
+# session called a gnomcp tool; gnokey, raw RPC calls and fetched realm pages are refused.
+gg=$(cd "$(dirname "$0")" && pwd)/guard_gno.py
+printf '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{}}]}}\n' >"$t/plain.jsonl"
+printf '{"type":"assistant","message":{"content":[{"type":"text","text":"I will call mcp__gnomcp__gno_read"}]}}\n' >"$t/says.jsonl"
+printf '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"mcp__gnomcp__gno_packages","input":{}}]}}\n' >"$t/asked.jsonl"
+gno() { # $1: tool, $2: its input as JSON, $3: transcript, $4: the exit code expected
+	code=0
+	printf '{"tool_name":"%s","tool_input":%s,"transcript_path":"%s"}' "$1" "$2" "$3" | python3 -I "$gg" 2>/dev/null || code=$?
+	[ "$code" = "$4" ] || fail "guard_gno gave $code, not $4, for $1 $2 with $(basename "$3")"
+}
+gno Write '{"file_path":"/x/gno/r/slot/slot.gno"}' "$t/plain.jsonl" 2
+gno Write '{"file_path":"/x/gno/r/slot/slot.gno"}' "$t/says.jsonl" 2
+gno Edit '{"file_path":"/x/gno/p/util/util.gno"}' "$t/asked.jsonl" 0
+gno Write '{"file_path":"/x/packages/core/src/a.ts"}' "$t/plain.jsonl" 0
+gno Bash '{"command":"gnokey maketx call -pkgpath gno.land/r/x"}' "$t/asked.jsonl" 2
+gno Bash '{"command":"cd gno && gnokey list"}' "$t/asked.jsonl" 2
+gno Bash '{"command":"curl -s https://rpc.gno.land:443/status"}' "$t/asked.jsonl" 2
+gno Bash '{"command":"cd gno && gno test ./r/..."}' "$t/plain.jsonl" 0
+gno WebFetch '{"url":"https://gno.land/r/gnoland/home"}' "$t/asked.jsonl" 2
+gno WebFetch '{"url":"https://rpc.onyx.testnets.gno.land/status"}' "$t/asked.jsonl" 2
+gno WebFetch '{"url":"https://docs.gno.land/resources/gno-interrealm"}' "$t/plain.jsonl" 0
+
 echo "hooks: ok"

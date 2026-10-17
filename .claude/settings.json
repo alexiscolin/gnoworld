@@ -37,6 +37,15 @@
             "command": "python3 -I \"$CLAUDE_PROJECT_DIR/scripts/guard_git.py\""
           }
         ]
+      },
+      {
+        "matcher": "Bash|WebFetch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -I \"$CLAUDE_PROJECT_DIR/scripts/guard_gno.py\""
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -53,7 +62,8 @@
   },
   "enabledPlugins": {
     "typescript-lsp@claude-plugins-official": true,
-    "context7@claude-plugins-official": true
+    "context7@claude-plugins-official": true,
+    "gnomcp@gnoverse": true
   },
   "sandbox": {
     "enabled": true,
