@@ -49,8 +49,11 @@ Three ideas run through it:
    finding is reproduced, then fixed or put to Alexis, and written to
    `docs/review/findings.md`. Then it records a review pass (`scripts/review_pass.py`).
 8. **Alexis reviews,** blind first, in revdiff (`docs/REVIEW.md`).
-9. **Merge and push.** The merge is made locally; pushing `main` runs the full gate again and
-   needs the committed review pass for exactly that tree.
+9. **Merge and push, by Alexis, in his own shell.** The merge is made locally; pushing `main`
+   runs the full gate again and needs the committed review pass for exactly that tree. Claude
+   cannot do either: the sandbox refuses the merge's writes to the harness (F063), and over a
+   remote session its commands cannot read the keychain that holds the GitHub token (F064).
+10. **The CI** runs the full gate again on GitHub's machines, for every push and pull request.
 
 ## The gate
 
@@ -124,9 +127,10 @@ comes back is a regression. The review agents (`.claude/agents/`) report rows fo
 with `/cd`:
 - **Deny:** reading `.env`, `deploy/secrets/`, `~/.ssh`, `~/.config/gh`, `~/.npmrc`, `~/.aws`.
 - **Ask Alexis first:** `git push` (the guard asks for any form of it), `pnpm add`, `rm -rf`,
-  an edit of `scripts/`, `.githooks/`, `.claude/`, a config, a `package.json`, or
-  `packages/core/`, and every gnomcp write (`gno_addpkg`, `gno_call`, `gno_run`,
-  `gno_key_send`, `gno_cla_sign`). Ask and deny rules hold in every permission mode.
+  and every gnomcp write (`gno_addpkg`, `gno_call`, `gno_run`, `gno_key_send`,
+  `gno_cla_sign`). Edits ask no one: Claude works alone (Alexis, 2026-10-17), and what an edit
+  changes is read in review and checked by the gate. Ask and deny rules hold in every
+  permission mode.
 - **The sandbox** around shell commands: they write only in the project and its caches,
   never in the harness's files; they reach only the npm and Go registries and github.com;
   no command may leave the sandbox.
@@ -182,9 +186,10 @@ measure, slice 1a's merge, found 25 or more, one of them a way out of the sandbo
 
 ## Known limits
 
-- **Nothing runs on the server.** No CI, and GitHub cannot protect a branch on this
-  repository's plan; the git hooks run on this machine and can be skipped by someone who
-  means to (findings F009, F001).
+- **The server reports, it does not block.** The CI (`.github/workflows/gate.yml`) runs the
+  full gate on every push and pull request, but GitHub cannot protect a branch on this
+  repository's plan: a red run cannot stop a merge, and the git hooks on this machine can be
+  skipped by someone who means to (findings F009, F001).
 - **Claude Code's layer is active only in a session started in this folder,** or moved into
   it with `/cd`.
 - **`prove_fix.py` covers the product;** a fix of the harness is proven by
