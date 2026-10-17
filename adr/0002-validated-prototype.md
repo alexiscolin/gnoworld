@@ -925,7 +925,7 @@ an image we configure and never write.
 | Need | Choice | Why |
 |---|---|---|
 | Runtime | Node's LTS line, pinned (Adena's SDK is developed on Node 24) | Node runs TypeScript directly, so the server has no build step; `tsc` checks the types |
-| Shared code | `packages/core` (pure rules) and `packages/schemas` (Zod), used by the client, the console and the server | One type per piece of data, on both sides |
+| Shared code | One monorepo with workspaces: `packages/core` (pure rules) and `packages/schemas` (Zod), used by the client, the console and the server (`docs/ARCHITECTURE.md`) | One type per piece of data, on both sides; one lockfile, one gate |
 | HTTP | Hono (proposed; asked in slice 3) | Small and fast; the browser's own `Request` and `Response`; official Zod validation; tested without starting a server; runs wherever ops puts it |
 | Logins | Adena's SDK, `verifyArbitrarySignature` (§4, Adena) | The wallet's own verifier: no crypto written by us |
 | Moderation bot | Our `core/irc` parser over a WebSocket to Ergo | No extra dependency: the client's code, reused |

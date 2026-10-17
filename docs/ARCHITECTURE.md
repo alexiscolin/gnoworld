@@ -22,6 +22,16 @@ export OpenTelemetry to Grafana and Langfuse.
 
 ## Repository layout
 
+**One monorepo.** The client, the admin console, the server, the shared packages, the realms
+and the deployment live in one repository, with one lockfile and one gate:
+- each of `app/`, `admin/`, `server/`, `packages/core` and `packages/schemas` is a
+  workspace; the package manager is set in slice 1;
+- a workspace imports another only through its `package.json` name (`@gnoworld/core`,
+  `@gnoworld/schemas`), never by a relative path across folders;
+- no build orchestrator: each workspace has its own scripts, and `scripts/check.sh` runs
+  them all, with the realms and the Go reference client;
+- a change that spans the client and the server lands in one commit, tested together.
+
 ```
 app/                         the web client
   react-router.config.ts     ssr: false; prerender lists every place from data/
