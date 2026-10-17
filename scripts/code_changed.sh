@@ -7,7 +7,7 @@
 set -eu
 mode=${1:-}
 if [ "$mode" = --state ]; then
-	{ git rev-parse HEAD; git diff HEAD --binary; git ls-files -o --exclude-standard -z | xargs -0 -r git hash-object --; } | git hash-object --stdin
+	{ git rev-parse HEAD; git diff HEAD --binary; git ls-files -o --exclude-standard -z | xargs -0 git hash-object --; } | git hash-object --stdin
 	exit 0
 fi
 set -- . ':!docs' ':!adr' ':!*.md'
