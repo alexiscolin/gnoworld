@@ -26,3 +26,4 @@ once (CLAUDE.md). Newest last.
 | 2026-10-17 | CI on GitHub Actions, for every branch pushed; it reports, it cannot block a merge on this plan | A check outside this machine; the company's Team plan will let it block | `.github/workflows/gate.yml` |
 | 2026-10-17 | No edit asks Alexis first, config files included; a new dependency, a push, `rm -rf` and chain writes still do | Too many manual approvals; the sandbox, the gate and review hold the rest | `.claude/settings.json` |
 | 2026-10-17 | React's lint presets come with slice 1b; three.js gets our own skill, written from r186, in slice 7 | No external skill targets our exact stack | `docs/plans/backlog.md` |
+| 2026-10-17 | An edit of the six files run outside the sandbox asks Alexis first: the guard, the Stop hook, `code_changed.sh`, the git hooks, `settings.json`, the `package.json` files | Edits are not sandboxed: an edit there would run with his full access | `.claude/settings.json`, finding F068 |

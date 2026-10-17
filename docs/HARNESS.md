@@ -128,8 +128,9 @@ with `/cd`:
 - **Deny:** reading `.env`, `deploy/secrets/`, `~/.ssh`, `~/.config/gh`, `~/.npmrc`, `~/.aws`.
 - **Ask Alexis first:** `git push` (the guard asks for any form of it), `pnpm add`, `rm -rf`,
   and every gnomcp write (`gno_addpkg`, `gno_call`, `gno_run`, `gno_key_send`,
-  `gno_cla_sign`). Edits ask no one: Claude works alone (Alexis, 2026-10-17), and what an edit
-  changes is read in review and checked by the gate. Ask and deny rules hold in every
+  `gno_cla_sign`). Claude edits alone (Alexis, 2026-10-17), except the files something runs
+  outside the sandbox: the guard, the Stop hook and `code_changed.sh`, the git hooks,
+  `settings.json` and the `package.json` files (finding F068). Ask and deny rules hold in every
   permission mode.
 - **The sandbox** around shell commands: they write only in the project and its caches,
   never in the harness's files; they reach only the npm and Go registries and github.com;
