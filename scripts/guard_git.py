@@ -1,6 +1,6 @@
 # guard_git.py: Claude Code's PreToolUse hook on git commands (.claude/settings.json).
-# A git hook is never skipped (CLAUDE.md): it refuses --no-verify, `git commit -n` and a
-# hooksPath override, and lets everything else through. Exit 2 blocks the call.
+# A git hook is never skipped and history is never forced (CLAUDE.md): it refuses --no-verify,
+# `git commit -n`, a hooksPath override and a forced push. Exit 2 blocks the call.
 import json
 import re
 import shlex
@@ -8,7 +8,7 @@ import sys
 
 
 def refuse(why):
-    print(f"guard_git: {why}. Git hooks are never skipped (CLAUDE.md).", file=sys.stderr)
+    print(f"guard_git: {why} (CLAUDE.md).", file=sys.stderr)
     sys.exit(2)
 
 
@@ -28,3 +28,5 @@ for part in re.split(r"&&|\|\||[;|\n]", command):
         refuse("--no-verify")
     if "git" in words and "commit" in words and any(re.fullmatch(r"-[a-zA-Z]*n[a-zA-Z]*", w) for w in words):
         refuse("git commit -n is --no-verify")
+    if "git" in words and "push" in words and any(w.startswith("--force") or re.fullmatch(r"-[a-zA-Z]*f[a-zA-Z]*", w) for w in words):
+        refuse("a forced push rewrites what others have; Alexis forces, if ever")

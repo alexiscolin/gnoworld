@@ -74,6 +74,10 @@ guard "git commit -m 'fix -n handling'" 0
 guard "git commit -m x && git log -n 5" 0
 guard "git merge -n main" 0
 guard "git commit --amend -m x" 0
+guard "git push --force origin slice-1a" 2
+guard "git push -f origin slice-1a" 2
+guard "git push --force-with-lease origin slice-1a" 2
+guard "git push origin slice-1a" 0
 
 # check_docs: a harness doc that names a missing harness file fails the gate.
 docs=$(cd "$(dirname "$0")" && pwd)/check_docs.py
