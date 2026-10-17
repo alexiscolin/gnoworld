@@ -23,7 +23,7 @@ TESTS = {"probe": [sys.executable, "-I", "scripts/probe.py"], "hooks": ["sh", "s
 # Each guard's file, and the sections of its test that must notice the guard gone (their ONLY=):
 # a mutant runs those alone, not the whole suite. A guard file missing here stops the run.
 SECTIONS = {
-    "eslint.config.ts": "lint,outside_core", "scripts/check_css.py": "css", "scripts/check_comments.mjs": "comments",
+    "eslint.config.ts": "lint,outside_core,react", "package.json": "react", "app/tsconfig.json": "react","scripts/check_css.py": "css", "scripts/check_comments.mjs": "comments",
     ".jscpd.json": "jscpd", "tsconfig.base.json": "tsc", "vitest.config.ts": "vitest",
     "scripts/guard.py": "guard", "scripts/review_pass.py": "review_pass", "scripts/patch_coverage.py": "patch_coverage",
     "scripts/check_docs.py": "check_docs", "scripts/check_regressions.py": "regressions", ".githooks/commit-msg": "commit_msg",
@@ -94,6 +94,16 @@ def mutants():
     yield from selectors("eslint.config.ts", "probe")
     yield from each("eslint.config.ts", 'property: "', 'property: "never_', "probe", "eslint restricted property")
     yield from each("eslint.config.ts", "noInlineConfig: true", "noInlineConfig: false", "probe", "eslint inline config")
+    # The app's React lint, and the files its rules reach.
+    yield from each("eslint.config.ts", 'reactHooks.configs.flat["recommended-latest"], ', "", "probe", "eslint React hooks preset")
+    yield from each("eslint.config.ts", ', eslintReact.configs["strict-type-checked"]', "", "probe", "eslint @eslint-react preset")
+    yield from each("eslint.config.ts", '{ name: "react", importNames: ["memo", "useMemo", "useCallback"], message: MEMO },', "", "probe", "eslint no hand-written memo")
+    yield from each("eslint.config.ts", '...["memo", "useMemo", "useCallback"].map(', "...[].map(", "probe", "eslint no React.useMemo")
+    yield from each("eslint.config.ts", '...["innerHTML", "outerHTML", "insertAdjacentHTML"].map(', "...[].map(", "probe", "eslint no raw HTML")
+    yield from each("eslint.config.ts", 'name: "DataWithResponseInit"', 'name: "Nothing"', "probe", "eslint lets a route throw data()")
+    yield from each("eslint.config.ts", '"**/*.spec.ts"', '"**/*.never.ts"', "probe", "eslint reads Playwright's tests")
+    yield from each("package.json", "--max-warnings 0 ", "", "probe", "lint fails on a warning")
+    yield from each("app/tsconfig.json", '"extends": "../tsconfig.base.json",', "", "probe", "the app takes the compiler flags")
     # The style checks.
     yield from each("scripts/check_css.py", "problems.append(", OFF, "probe", "check_css problem")
     yield from each("scripts/check_css.py", "problems += [", "problems += [] and [", "probe", "check_css unused tokens")
@@ -139,6 +149,8 @@ def mutants():
     yield from each("scripts/check_regressions.py", "ast.literal_eval(node.value)", "{}", "hooks", "check_regressions reads GAPS")
     yield from each("scripts/check_regressions.py", 'if "ignore" in key.lower():', "if False:", "hooks", "check_regressions reads ignore lists")
     yield from each("scripts/check_regressions.py", 'elif key == "mutate":', "elif False:", "hooks", "check_regressions reads StrykerJS's negated globs")
+    yield from each("scripts/check_regressions.py", '    if report["errors"]:', "    if False:", "hooks", "check_regressions stops on a failed Playwright listing")
+    yield from each("scripts/check_regressions.py", 'walk(child, [*path, child["title"]])', "walk(child, path)", "hooks", "check_regressions names a journey with its describe")
     yield from each("scripts/check_regressions.py", ', "scripts/.gitleaksignore", "pnpm-workspace.yaml"]', ', "pnpm-workspace.yaml"]', "hooks", "check_regressions reads the secret scan's exceptions")
     yield from each("scripts/check_regressions.py", ', "pnpm-workspace.yaml"]', "]", "hooks", "check_regressions reads pnpm's exemptions")
     yield from each("scripts/check_regressions.py", 'elif re.search(rf"^{key}:", text, re.M):', "elif False:", "hooks", "check_regressions reports a list it cannot read")

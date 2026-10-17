@@ -105,7 +105,7 @@ def reported(messages):
 
 def carries(got, rule):
     """A rule alone matches its name; "rule: words" matches a message that starts with them."""
-    return rule in got if ": " not in rule else any(g.startswith(rule) for g in got)
+    return rule in got if ": " not in rule else any(str(g).startswith(rule) for g in got)
 
 
 def expect(ok, what):
@@ -161,6 +161,79 @@ try:
             got = report.get(name, set())
             expect(carries(got, rule), f"eslint outside core {name}: expected {rule}, got {sorted(map(str, got))}")
         shutil.rmtree("packages/probe")
+
+    if part("react"):
+        # React in the app: hooks' rules, the compiler's memoization, nothing raw into the DOM.
+        component = "export function Card({{ n }}: {{ n: number }}) {{\n{body}}}\n".format
+        uses = 'import {{ {} }} from "react";\n\n'.format
+        def effect(code):
+            return uses("useEffect") + component(body=f"  useEffect(() => {{\n    {code}\n  }}, []);\n  return <p>{{n}}</p>;\n")
+
+        def ref(code):
+            return uses("useEffect, useRef") + component(body=f"  const boxRef = useRef<HTMLDivElement>(null);\n  useEffect(() => {{\n    if (boxRef.current) {code}\n  }});\n  return <div ref={{boxRef}} />;\n")
+        off = "no-restricted-syntax: A test is never switched off"
+
+        def banned(name):
+            return f"no-restricted-imports: '{name}' import from 'react' is restricted. The React Compiler memoizes"
+
+        def restricted(name):
+            return f"no-restricted-properties: {name} is restricted from being used. Nothing reaches the DOM as HTML"
+        react = [
+            ("clean.tsx", component(body="  return <p>{n}</p>;\n"), None),
+            ("route_404.ts", 'import { data } from "react-router";\n\nexport function loader(): never {\n  throw data(null, { status: 404 });\n}\n', None),
+            ("throw_string.ts", 'export function loader(): never {\n  throw "missing";\n}\n', "@typescript-eslint/only-throw-error"),
+            ("conditional_hook.tsx", uses("useState") + component(body="  if (n > 1) {\n    useState(0);\n  }\n  return <p>{n}</p>;\n"), "react-hooks/rules-of-hooks"),
+            ("manual_memo.tsx", uses("useMemo") + component(body="  const twice = useMemo(() => n * 2, [n]);\n  return <p>{twice}</p>;\n"), banned("useMemo")),
+            ("manual_callback.tsx", uses("useCallback") + component(body="  const f = useCallback(() => n, [n]);\n  return <p>{f()}</p>;\n"), banned("useCallback")),
+            ("memo_wrap.tsx", uses("memo") + "export const Card = memo(function Card({ n }: { n: number }) {\n  return <p>{n}</p>;\n});\n", banned("memo")),
+            ("namespace_memo.tsx", 'import * as React from "react";\n\n' + component(body="  const twice = React.useMemo(() => n * 2, [n]);\n  return <p>{twice}</p>;\n"), "no-restricted-imports: * import is invalid because 'memo', 'useMemo', and 'useCallback'"),
+            ("forward_ref.tsx", uses("forwardRef") + "export const Card = forwardRef<HTMLParagraphElement>(function Card(_, r) {\n  return <p ref={r} />;\n});\n", "@eslint-react/no-forward-ref"),
+            ("nested.tsx", component(body="  function Inner() {\n    return <p>{n}</p>;\n  }\n  return <Inner />;\n"), "@eslint-react/no-nested-component-definitions"),
+            ("effect_state.tsx", uses("useEffect, useState") + component(body="  const [m, setM] = useState(0);\n  useEffect(() => {\n    setM(n);\n  }, [n]);\n  return <p>{m}</p>;\n"), "react-hooks/set-state-in-effect"),
+            ("render_state.tsx", uses("useState") + component(body="  const [m, setM] = useState(0);\n  setM(n);\n  return <p>{m}</p>;\n"), "react-hooks/set-state-in-render"),
+            ("impure.tsx", component(body="  const t = Date.now();\n  return <p>{t + n}</p>;\n"), "react-hooks/purity"),
+            ("ref_in_render.tsx", uses("useRef") + component(body="  const r = useRef(n);\n  return <p>{r.current}</p>;\n"), "react-hooks/refs"),
+            ("mutated_prop.tsx", "export function Card({ item }: { item: { n: number } }) {\n  item.n = 1;\n  return <p>{item.n}</p>;\n}\n", "react-hooks/immutability"),
+            ("deps.tsx", effect("document.title = String(n);"), "react-hooks/exhaustive-deps"),
+            ("listener.tsx", effect('window.addEventListener("resize", () => n);'), "@eslint-react/web-api-no-leaked-event-listener"),
+            ("timeout.tsx", effect("setTimeout(() => n, 1);"), "@eslint-react/web-api-no-leaked-timeout"),
+            ("raw_html.tsx", component(body="  return <p dangerouslySetInnerHTML={{ __html: String(n) }} />;\n"), "@eslint-react/dom-no-dangerously-set-innerhtml"),
+            ("inner_html.tsx", ref("boxRef.current.innerHTML = String(n);"), restricted("'innerHTML'")),
+            ("adjacent_html.tsx", ref('boxRef.current.insertAdjacentHTML("beforeend", String(n));'), restricted("'insertAdjacentHTML'")),
+            ("document_write.tsx", ref("document.write(String(n));"), restricted("'document.write'")),
+            ("leaked.tsx", component(body="  return <div>{n && <p>{n}</p>}</div>;\n"), "@eslint-react/no-leaked-conditional-rendering"),
+            ("index_key.tsx", component(body="  return <ul>{[n].map((v, i) => <li key={i}>{v}</li>)}</ul>;\n"), "@eslint-react/no-array-index-key"),
+            ("missing_key.tsx", component(body="  return <ul>{[n].map((v) => <li>{v}</li>)}</ul>;\n"), "@eslint-react/no-missing-key"),
+            ("script_url.tsx", component(body='  return <a href="javascript:void(0)">{n}</a>;\n'), "@eslint-react/dom-no-script-url"),
+            ("blank.tsx", component(body='  return <a href="https://gno.land" target="_blank">{n}</a>;\n'), "@eslint-react/dom-no-unsafe-target-blank"),
+            ("fixme.spec.ts", 'import { test } from "@playwright/test";\n\ntest.fixme("x", () => {});\n', off),
+            ("expected_fail.spec.ts", 'import { test } from "@playwright/test";\n\ntest.fail("x", () => {});\n', off),
+            ("skipped.spec.ts", 'import { test } from "@playwright/test";\n\ntest.describe.skip("x", () => {});\n', off),
+        ]
+        app = "app/src/__probe__"
+        plant({name: content for name, content, _ in react}, where=app)
+        out = run(["node_modules/.bin/eslint", "--no-cache", "--format", "json", app])
+        try:
+            report = {os.path.basename(r["filePath"]): reported(r["messages"]) for r in json.loads(out.stdout)}
+        except ValueError:
+            report = {}
+            expect(False, "eslint ran on the app: " + (out.stderr or out.stdout)[-300:])
+        for name, _, rule in react:
+            got = report.get(name, set())
+            expect(got == set() if rule is None else carries(got, rule), f"eslint app {name}: expected {rule or 'nothing'}, got {sorted(map(str, got))}")
+        # Several of these rules only warn: the lint script must fail on a warning.
+        with open("package.json") as f:
+            lint = json.load(f)["scripts"]["lint"].split()
+        out = run(["node_modules/.bin/eslint", *lint[1:-1], f"{app}/forward_ref.tsx"])
+        expect(out.returncode != 0, "the lint script fails on a warning")
+        shutil.rmtree(app)
+        # The compiler flags hold in the app too.
+        plant({"unchecked.ts": "export function first(a: number[]): string {\n  return a[0].toFixed();\n}\n",
+               "erasable.ts": "export enum Kind {\n  A,\n}\n"}, where=app)
+        out = run(["node_modules/.bin/tsc", "-p", "app/tsconfig.json"])
+        expect("unchecked.ts" in out.stdout and "possibly 'undefined'" in out.stdout, "tsc refuses an unchecked index in the app")
+        expect("erasable.ts" in out.stdout and "erasableSyntaxOnly" in out.stdout, "tsc refuses syntax Node cannot erase in the app")
+        shutil.rmtree(app)
 
     if part("knip"):
         # knip: a file nothing imports.
@@ -270,6 +343,7 @@ try:
 finally:
     shutil.rmtree(HERE, ignore_errors=True)
     shutil.rmtree("packages/probe", ignore_errors=True)
+    shutil.rmtree("app/src/__probe__", ignore_errors=True)
 
 if ONLY - ran:
     failures.append(f"ONLY names no block: {', '.join(sorted(ONLY - ran))}")

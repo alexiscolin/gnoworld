@@ -167,12 +167,37 @@ def relative(path, root):
     return os.path.relpath(os.path.realpath(path), os.path.realpath(root))
 
 
+def journeys(listing, root):
+    """Playwright's tests, `<file> > <describe> > <title>`, from its JSON listing; a listing that failed stops the check."""
+    report = json.loads(listing)
+    if report["errors"]:
+        sys.exit("check_regressions: Playwright could not list its journeys: " + report["errors"][0]["message"].splitlines()[0])
+    out = set()
+
+    def walk(suite, path):
+        for spec in suite.get("specs", []):
+            name = " > ".join([*path, spec["title"]])
+            out.add(f"{relative(os.path.join(report['config']['rootDir'], spec['file']), root)} > {name}")
+        for child in suite.get("suites", []):
+            walk(child, [*path, child["title"]])
+
+    for suite in report["suites"]:
+        walk(suite, [])
+    return out
+
+
 def test_names(root):
-    """Every Vitest test's file and full name, from `vitest list`; none when the tree has no Vitest."""
-    if not os.path.exists(os.path.join(root, "vitest.config.ts")):
-        return set()
-    out = subprocess.run(["node_modules/.bin/vitest", "list", "--json"], cwd=root, capture_output=True, text=True, check=True).stdout
-    return {f"{relative(t['file'], root)} > {t['name']}" for t in json.loads(out)}
+    """Every Vitest test and Playwright journey, by file and full name; none of a kind the tree does not run."""
+    names = set()
+    if os.path.exists(os.path.join(root, "vitest.config.ts")):
+        out = subprocess.run(["node_modules/.bin/vitest", "list", "--json"], cwd=root, capture_output=True, text=True, check=True).stdout
+        names |= {f"{relative(t['file'], root)} > {t['name']}" for t in json.loads(out)}
+    if os.path.exists(os.path.join(root, "app/playwright.config.ts")):
+        # Node, not pnpm's shim: the shim spells paths from $PWD, whose case can differ from the
+        # directory's on macOS, and Playwright loaded under two spellings lists no test.
+        command = ["node", "app/node_modules/@playwright/test/cli.js", "test", "-c", "app/playwright.config.ts", "--list", "--reporter=json"]
+        names |= journeys(subprocess.run(command, cwd=root, capture_output=True, text=True).stdout, root)
+    return names
 
 
 def base_tests(base):
@@ -224,6 +249,14 @@ def self_test():
     diff = "M\tapp/tests/e2e/home.spec.ts-snapshots/home.png\nA\tapp/tests/e2e/x.spec.ts-snapshots/new.png\nD\tapp/__screenshots__/old.png"
     assert changed_baselines(diff, set()) == ["app/tests/e2e/home.spec.ts-snapshots/home.png", "app/__screenshots__/old.png"]
     assert changed_baselines(diff, {"app/tests/e2e/home.spec.ts-snapshots/home.png", "app/__screenshots__/old.png"}) == []
+    listing = {"config": {"rootDir": "/r/app/tests/e2e"}, "errors": [], "suites": [{"title": "a.spec.ts", "specs": [{"file": "a.spec.ts", "title": "top"}],
+               "suites": [{"title": "pages", "specs": [{"file": "a.spec.ts", "title": "/ has a title"}], "suites": []}]}]}
+    assert journeys(json.dumps(listing), "/r") == {"app/tests/e2e/a.spec.ts > top", "app/tests/e2e/a.spec.ts > pages > / has a title"}
+    try:
+        journeys(json.dumps({**listing, "errors": [{"message": "Error: No tests found"}]}), "/r")
+        raise AssertionError("a listing that failed counted as no journey")
+    except SystemExit:
+        pass
     with tempfile.TemporaryDirectory() as real:  # macOS's /tmp is a link to /private/tmp; Vitest reports real paths
         link = os.path.join(real, "link")
         os.symlink(real, link)

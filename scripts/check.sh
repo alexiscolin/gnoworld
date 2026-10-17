@@ -49,6 +49,16 @@ copies=$(run copies 2>&1) || { printf '%s\n' "$copies"; exit 1; }
 python3 -I scripts/check_css.py
 run comments
 
+# After the checks above: pre-commit's staged copy is no repository, so they would read the
+# build's output, which .gitignore keeps from them only in one.
+echo "== the app: built, pre-rendered, and its journeys walked in a browser (Playwright, axe)"
+# A build never installs: React Router's default server entry adds isbot and runs the package
+# manager, with whatever access the build has (finding F080).
+packages() { cat package.json app/package.json pnpm-lock.yaml | cksum; }
+installed=$(packages)
+node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot # node: see check_regressions.py
+[ "$(packages)" = "$installed" ] || { echo "check.sh: building the app changed package.json or the lockfile" >&2; exit 1; }
+
 echo "== gno (realms and packages): lint and tests"
 (cd gno && "$GNO" lint ./... && "$GNO" test ./...)
 
