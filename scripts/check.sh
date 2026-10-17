@@ -76,8 +76,10 @@ echo "== Go tools (gno/tools): format, vet, and the seal vectors they generate"
 	}
 )
 
-echo "== harness docs name only files that exist"
+echo "== harness docs name only files that exist; every harness script parses"
 python3 -I scripts/check_docs.py
+# Some scripts run only in --full: a broken one would pass every commit (finding F084).
+python3 -I -c 'import ast, sys; [ast.parse(open(f).read(), f) for f in sys.argv[1:]]' scripts/*.py
 
 echo "== hooks"
 sh scripts/test_hooks.sh

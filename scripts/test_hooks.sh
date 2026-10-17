@@ -64,6 +64,7 @@ gate_file="$here/check.sh"
 for step in "run format:check" "run typecheck" "run lint" "run test" "run unused" "run copies" \
 	"python3 -I scripts/check_css.py" "run comments" '"$GNO" lint ./...' '"$GNO" test ./...' \
 	"node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts" '[ "$(packages)" = "$installed" ]' \
+	"ast.parse(open(f).read(), f) for f in sys.argv[1:]]' scripts/*.py" \
 	"python3 -I ../scripts/mutate.py" "go vet ./tools/..." "go run ./tools/sealvec | cmp" "python3 -I scripts/check_docs.py" \
 	"sh scripts/test_hooks.sh" "python3 -I scripts/probe.py" "run coverage" "python3 -I scripts/patch_coverage.py" \
 	"run mutate" "sh scripts/scan_secrets.sh" "python3 -I scripts/harness_mutate.py" "python3 -I scripts/check_regressions.py" \
@@ -251,14 +252,17 @@ cover 1 && fail "patch_coverage accepted a changed file the coverage report does
 git -C "$c" rm -q --cached src/b.ts && rm "$c/src/b.ts"
 printf 'x\n' >"$c/src/a.test.ts" && printf 'x\n' >"$c/vitest.config.ts" && git -C "$c" add src/a.test.ts vitest.config.ts
 cover 1 || fail "patch_coverage refused a changed test or config file, which coverage never measures"
-# Playwright's tests and their helpers are tests; the app's React components are walked by the
-# journeys until slice 2's component tests; the app's other code is measured like any.
+# Playwright's tests and their helpers are tests; the app's document shell and server entry
+# render only in the build, which the journeys walk; the app's other code is measured like any.
 mkdir -p "$c/app/tests/e2e" "$c/app/src/routes"
-printf 'x\n' >"$c/app/tests/e2e/a.spec.ts" && printf 'x\n' >"$c/app/tests/e2e/fixtures.ts" && printf 'x\n' >"$c/app/src/routes/a.tsx"
-git -C "$c" add app
-cover 1 || fail "patch_coverage asked coverage of a Playwright test or an app component"
-printf 'x\n' >"$c/app/src/site.ts" && git -C "$c" add app/src/site.ts
-cover 1 && fail "patch_coverage let the app's logic go unmeasured"
+printf 'x\n' >"$c/app/tests/e2e/a.spec.ts" && printf 'x\n' >"$c/app/tests/e2e/fixtures.ts"
+printf 'x\n' >"$c/app/src/root.tsx" && printf 'x\n' >"$c/app/src/entry.server.tsx" && git -C "$c" add app
+cover 1 || fail "patch_coverage asked coverage of a Playwright test, the document shell or the server entry"
+for f in app/src/site.ts app/src/routes/a.tsx; do
+	printf 'x\n' >"$c/$f" && git -C "$c" add "$f"
+	cover 1 && fail "patch_coverage let $f go unmeasured"
+	git -C "$c" rm -q --cached "$f" && rm "$c/$f"
+done
 git -C "$c" rm -rq --cached app && rm -r "$c/app"
 # A statement over several lines counts when any of its lines changed, not only its first.
 git -C "$c" rm -q --cached src/a.test.ts vitest.config.ts && rm "$c/src/a.test.ts" "$c/vitest.config.ts" && git -C "$c" add src/a.ts && git -C "$c" commit -qm four

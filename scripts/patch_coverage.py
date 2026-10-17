@@ -34,9 +34,9 @@ with open("coverage/coverage-final.json") as f:
     report = {os.path.realpath(k): v for k, v in json.load(f).items()}
 
 total = run = 0
-# Tests and configs are never measured. ponytail: the app's React components are walked by the
-# Playwright journeys, not measured, until slice 2's component tests (docs/decisions.md).
-UNMEASURED = r"\.(test|config)\.tsx?$|\.d\.ts$|/tests/|/app/src/.+\.tsx$"
+# Tests and configs are never measured; nor the app's document shell and server entry, which
+# only the build renders: the Playwright journeys walk them (docs/decisions.md).
+UNMEASURED = r"\.(test|config)\.tsx?$|\.d\.ts$|/tests/|/app/src/(root|entry\.server)\.tsx$"
 unmeasured = [p for p in changed if p not in report and not re.search(UNMEASURED, p)]
 for path in sorted(unmeasured):
     print(f"{os.path.relpath(path)}: changed, but no coverage measures it: add it to vitest.config.ts's coverage include")
