@@ -13,6 +13,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 
 sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no __pycache__
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # -I leaves this folder off the path
@@ -152,12 +153,17 @@ def here(path):
     return open(path).read() if os.path.exists(path) else ""
 
 
+def relative(path, root):
+    """path from root, both with their links resolved: Vitest reports real paths."""
+    return os.path.relpath(os.path.realpath(path), os.path.realpath(root))
+
+
 def test_names(root):
     """Every Vitest test's file and full name, from `vitest list`; none when the tree has no Vitest."""
     if not os.path.exists(os.path.join(root, "vitest.config.ts")):
         return set()
     out = subprocess.run(["node_modules/.bin/vitest", "list", "--json"], cwd=root, capture_output=True, text=True, check=True).stdout
-    return {f"{os.path.relpath(t['file'], root)} > {t['name']}" for t in json.loads(out)}
+    return {f"{relative(t['file'], root)} > {t['name']}" for t in json.loads(out)}
 
 
 def base_tests(base):
@@ -198,6 +204,13 @@ def self_test():
     diff = "M\tapp/tests/e2e/home.spec.ts-snapshots/home.png\nA\tapp/tests/e2e/x.spec.ts-snapshots/new.png\nD\tapp/__screenshots__/old.png"
     assert changed_baselines(diff, set()) == ["app/tests/e2e/home.spec.ts-snapshots/home.png", "app/__screenshots__/old.png"]
     assert changed_baselines(diff, {"app/tests/e2e/home.spec.ts-snapshots/home.png", "app/__screenshots__/old.png"}) == []
+    with tempfile.TemporaryDirectory() as real:  # macOS's /tmp is a link to /private/tmp; Vitest reports real paths
+        link = real + "-link"
+        os.symlink(real, link)
+        try:
+            assert relative(os.path.join(os.path.realpath(real), "a.test.ts"), link) == "a.test.ts"
+        finally:
+            os.remove(link)
     print("check_regressions: self-test passed")
 
 
