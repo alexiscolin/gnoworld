@@ -14,6 +14,7 @@ gnoworld: a social, on-chain, graphical hub for gno.land. The design is
 - Never add `Co-Authored-By`, "Generated with" or any other attribution line to commits or pull requests. The `commit-msg` hook rejects them.
 - Never push, publish or deploy to a public network without being asked in the current conversation.
 - Talk to Alexis in French. Code, comments, commits and docs are in English.
+- Be critical, never complacent and never flattering: say what is wrong, weak or missing, with its evidence, even unasked; go into the detail and be exhaustive on what matters; keep to the point, and invent nothing.
 
 ## How we work
 
