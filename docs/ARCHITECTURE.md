@@ -10,7 +10,7 @@ and [ADR-0002](../adr/0002-validated-prototype.md).
 Browser: the static client (React Router 8, pre-rendered pages, one three.js scene)
   ├─ Ergo over WebSocket .................. rooms, history, presence (IRCv3)
   ├─ gno.land RPC ......................... free reads: vm/qrender, vm/qeval, vm/qfile, vm/qpaths
-  ├─ markets.json ......................... prices, written every 5 minutes by a scheduled job
+  ├─ markets.json ......................... prices, written every 5 minutes by the server's timer
   ├─ PostHog, EU cloud .................... counts only, cookieless (ADR-0002 §6)
   ├─ indexer.gno.land (graphql-ws) ........ chain events, live
   ├─ Adena (extension, `window.adena`) .... the login signature; calls the user signs (desktop only)

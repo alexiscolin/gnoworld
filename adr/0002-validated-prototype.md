@@ -1423,7 +1423,7 @@ answered them on 2026-10-17.
 | # | Question | Answer |
 |---|---|---|
 | 12 (ADR-0001) | Where Ergo and the servers run | In Docker: demos on the homelab, production where ops decides (§7) |
-| 14 | The markets row's source | A scheduled job reads CoinGecko into `markets.json`; the client reads only that file (§6) |
+| 14 | The markets row's source | A timer in the server reads CoinGecko into `markets.json`; the client reads only that file (§6) |
 | 15 | Jarvis: model, host, budget, translation | Sonnet 5.5 by default, Haiku 5.5 and Opus 5.5 by task; its own container `jarvis`, on the official Anthropic and MCP SDKs; 50 $ a day as a hard cap; automatic, cached translation with Haiku, on its own budget; chain data from gnomcp, the public indexer and gnoscope; Langfuse Cloud from phase 1 (§5) |
 | 16 | Media: storage, budget, moderation | No hosted media at first: embeds from accepted services. Messages are moderated by a bot on OpenAI's Moderation API, checked after posting, with contests (§6) |
 | 17 | Public room archives as indexed pages | No, at first (§2) |
