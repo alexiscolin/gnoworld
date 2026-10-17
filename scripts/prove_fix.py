@@ -11,7 +11,10 @@ import os
 import re
 import subprocess
 import sys
-import tempfile
+
+sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no __pycache__
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # -I leaves this folder off the path
+from repo_files import git, worktree
 
 PRODUCT = ("packages/", "gno/", "app/", "admin/", "server/")
 TEST = re.compile(r"(\.test\.tsx?|_test\.gno|_filetest\.gno|_test\.go)$")
@@ -19,10 +22,6 @@ TEST = re.compile(r"(\.test\.tsx?|_test\.gno|_filetest\.gno|_test\.go)$")
 VITEST = os.environ.get("PROVE_FIX_VITEST", "node_modules/.bin/vitest run")
 GNO_TEST = os.environ.get("PROVE_FIX_GNO", f"{os.environ.get('GNO', 'gno')} test")
 GO_TEST = os.environ.get("PROVE_FIX_GO", "go test")
-
-
-def git(*args, cwd="."):
-    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=True).stdout
 
 
 def runs(tests):
@@ -38,16 +37,10 @@ def runs(tests):
 
 def fails_before(commit, tests):
     """Whether the commit's tests fail on its parent: a worktree of the parent, with only them added."""
-    with tempfile.TemporaryDirectory(dir=".claude/tmp") as where:
-        tree = os.path.join(where, "parent")
-        git("worktree", "add", "-q", "--detach", tree, f"{commit}^")
-        try:
-            os.symlink(os.path.abspath("node_modules"), os.path.join(tree, "node_modules"))
-            git("checkout", commit, "--", *tests, cwd=tree)
-            return all(subprocess.run(cmd, shell=True, cwd=os.path.join(tree, folder), capture_output=True).returncode != 0
-                       for folder, cmd in runs(tests))
-        finally:
-            git("worktree", "remove", "--force", tree)
+    with worktree(f"{commit}^") as tree:
+        git("-C", tree, "checkout", commit, "--", *tests)
+        return all(subprocess.run(cmd, shell=True, cwd=os.path.join(tree, folder), capture_output=True).returncode != 0
+                   for folder, cmd in runs(tests))
 
 
 def verdict(commit):

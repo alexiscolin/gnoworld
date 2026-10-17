@@ -13,7 +13,10 @@ import os
 import re
 import subprocess
 import sys
-import tempfile
+
+sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no __pycache__
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # -I leaves this folder off the path
+from repo_files import git, worktree
 
 SHOT = re.compile(r"(-snapshots|__screenshots__)/.+\.(png|jpe?g)$")
 GAP_FILES = ["scripts/mutate.py", "scripts/harness_mutate.py"]
@@ -118,10 +121,6 @@ def changed_baselines(name_status, excused):
     return out
 
 
-def git(*args):
-    return subprocess.run(["git", *args], capture_output=True, text=True, check=True).stdout
-
-
 def show(base, path):
     try:
         return git("show", f"{base}:{path}")
@@ -142,15 +141,9 @@ def test_names(root):
 
 
 def base_tests(base):
-    """The base's Vitest tests, listed in a throwaway worktree that borrows node_modules."""
-    with tempfile.TemporaryDirectory(dir=".claude/tmp") as where:
-        tree = os.path.join(where, "base")
-        git("worktree", "add", "-q", "--detach", tree, base)
-        try:
-            os.symlink(os.path.abspath("node_modules"), os.path.join(tree, "node_modules"))
-            return test_names(tree)
-        finally:
-            git("worktree", "remove", "--force", tree)
+    """The base's Vitest tests, listed in a throwaway worktree of it."""
+    with worktree(base) as tree:
+        return test_names(tree)
 
 
 def self_test():

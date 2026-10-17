@@ -8,11 +8,14 @@ with their reason; a gap that gets killed must leave the list. Usage: scripts/ha
 from the repository root; it takes minutes, so the full gate runs it when the harness changes."""
 import os
 import re
-import shutil
 import subprocess
 import sys
 
-WORKTREE = ".claude/tmp/harness-mutate"
+sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no __pycache__
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # -I leaves this folder off the path
+from repo_files import worktree
+
+WORKTREE = ""  # the throwaway worktree of HEAD, set by the run below
 OFF = "(lambda *a: None)("
 GAPS = {}  # label -> why no test can notice it yet
 
@@ -163,23 +166,17 @@ def run(test, only=""):
     return subprocess.run(TESTS[test], cwd=WORKTREE, env=env, capture_output=True, text=True, timeout=600).returncode
 
 
-def proposal(label):
+def proposal(test, path):
     """The smallest change that would make a test notice this guard."""
-    if label.startswith("eslint"):
-        return "add to LINT in scripts/probe.py a case only this rule or selector refuses, or drop it if another already holds it"
-    if label.startswith("check.sh drops"):
+    if path == "scripts/check.sh":
         return 'add the step to the list in scripts/test_hooks.sh ("check.sh runs every step it promises")'
-    if label.split()[0] in ("guard", "review_pass", "patch_coverage", "check_docs", "check_regressions", "commit-msg", "pre-push", "pre-commit", "code_changed", "stop_gate", "format_hook"):
-        return "add to scripts/test_hooks.sh the input this line refuses, and the exit code it must give"
-    return "plant in scripts/probe.py a fault that only this guard catches"
+    if test == "probe":
+        return f"plant in scripts/probe.py, block {SECTIONS[path]}, a fault only this guard catches, or drop the guard if another holds it"
+    return f"add to scripts/test_hooks.sh, section {SECTIONS[path]}, the input this line refuses and the exit code it must give"
 
 
-shutil.rmtree(WORKTREE, ignore_errors=True)
-subprocess.run(["git", "worktree", "prune"], check=True)
-subprocess.run(["git", "worktree", "add", "-q", "--detach", WORKTREE, "HEAD"], check=True)
-subprocess.run(["sh", "scripts/borrow_node_modules.sh", WORKTREE], check=True)
 failures = []
-try:
+with worktree("HEAD") as WORKTREE:
     for test in TESTS:  # the control: an untouched copy passes, so a failure means the mutant
         if run(test) != 0:
             sys.exit(f"harness_mutate: {test} fails on the untouched copy; fix that first")
@@ -203,10 +200,8 @@ try:
         elif label in GAPS:
             print(f"ok    survives: {label}  (known gap: {GAPS[label]})")
         else:
-            print(f"FAIL  survives: {label}\n      → {proposal(label)}")
+            print(f"FAIL  survives: {label}\n      → {proposal(test, path)}")
             failures.append(label)
-finally:
-    subprocess.run(["git", "worktree", "remove", "--force", WORKTREE])
 if failures:
     sys.exit(f"harness_mutate: {len(failures)} guards are not proven by a test")
 print("harness_mutate: removing any guard fails a test")
