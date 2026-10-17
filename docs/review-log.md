@@ -6,6 +6,7 @@ over a few slices, where the eye is sharp and where it does not look.
 | Date | Review | Caught | Missed | Why missed | False alarms |
 |---|---|---|---|---|---|
 | 2026-10-17 | slice-1a, /pre-merge: 5 reviewers, 4 Opus verifications | 30 findings, 28 reproduced (F032-F061); Alexis's /code-review caught F028, F029 | Alexis had not read the diff in revdiff yet: blind-first not done for this merge | The slice grew to 8,456 lines, far past the 400 a review reads well | 2 refuted (F055, part of F060), 2 lowered (F058, F059) |
+| 2026-10-17 | slice-1-ci, /pre-merge: code review, security review, green pass | 8 findings, all reproduced and fixed (F066-F073); the green pass found the CI's checks let 14 of 15 broken workflows through (F071); harness_mutate then caught a check of mine that missed `- if:` | Alexis's own review not done yet | Not read yet | None; the code review's IRC host remark became a test comment |
 
 ## The harness, measured
 
@@ -15,3 +16,4 @@ merge", item 7). Falling means solid; flat over three merges means simplify, not
 | Date | Branch | Harness lines read | Verified findings in the harness | Of them blocking |
 |---|---|---|---|---|
 | 2026-10-17 | slice-1a | 2,597 | 13 (F032-F044) | 5 (F038 high; F037, F041, F042, F043 medium) |
+| 2026-10-17 | slice-1-ci | 200 | 8 (F066-F073) | 2 (F067, F068 medium) |
