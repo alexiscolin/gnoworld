@@ -12,12 +12,15 @@ the real app is being rebuilt from it, slice by slice.
 | Folder | What it holds |
 |---|---|
 | `packages/core` | The rules, pure TypeScript shared by everything else (today: the IRC line parser) |
-| `r/` | The realms, in gno |
-| `tools/` | A Go reference client for the seal realm |
+| `gno/r/` | The realms, in gno: today `seal`; then the satellites' slot realm, the hubs and the profiles |
+| `gno/p/` | Gno packages shared by realms, once two realms need the same code |
+| `gno/tools/` | Go tools around the chain: reference clients, generators of test data, scripts for the chain (today `sealvec`, which writes the seal realm's test vectors) |
 | `scripts/` | The gate and the harness that keeps the code honest |
 | `docs/`, `adr/` | How it is designed, built and reviewed |
 
-The web app (`app/`), the server and the demo stack arrive in the next merges of slice 1.
+Each other folder arrives with its slice: the web app `app/` (1b), the demo stack `deploy/`
+(1c), the `server/` (3), `packages/schemas` with the first boundary that needs one, and the
+admin console `admin/` (12).
 
 ## Install
 

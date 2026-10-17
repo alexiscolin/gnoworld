@@ -20,5 +20,5 @@
     "low": 85,
     "break": null
   },
-  "ignorePatterns": ["docs", "r", "tools", ".claude", "coverage", "reports"]
+  "ignorePatterns": ["docs", "gno", ".claude", "coverage", "reports"]
 }

@@ -6,16 +6,7 @@ import importX from "eslint-plugin-import-x";
 import tseslint from "typescript-eslint";
 
 export default defineConfig(
-  globalIgnores([
-    "**/node_modules/",
-    "coverage/",
-    "reports/",
-    ".stryker-tmp/",
-    ".claude/tmp/",
-    "docs/",
-    "r/",
-    "tools/",
-  ]),
+  globalIgnores(["**/node_modules/", "coverage/", "reports/", ".stryker-tmp/", ".claude/tmp/", "docs/", "gno/"]),
   {
     files: ["**/*.ts", "**/*.tsx"],
     extends: [tseslint.configs.strictTypeChecked, tseslint.configs.stylisticTypeChecked],

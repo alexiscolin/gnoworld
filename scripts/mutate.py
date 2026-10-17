@@ -9,7 +9,7 @@ mutant that does not compile is an error of this script, never a kill.
 
 GAPS holds the guards no test catches yet, with the reason. They must keep
 surviving, so closing a gap means deleting its line here.
-Usage: GNO=<gno binary> scripts/mutate.py, from the repository root."""
+Usage: GNO=<gno binary> ../scripts/mutate.py, from gno/ (scripts/check.sh does this)."""
 import glob
 import os
 import re

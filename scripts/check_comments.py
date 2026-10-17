@@ -8,7 +8,7 @@ import pathlib
 import re
 import sys
 
-SKIP = {"node_modules", "docs", "coverage", "reports", ".stryker-tmp", ".git", "r", "tools"}
+SKIP = {"node_modules", "docs", "coverage", "reports", ".stryker-tmp", ".git", "gno"}
 MARKER = re.compile(r"\b(TODO|FIXME|XXX|HACK)\b")
 BANNER = re.compile(r"[-=*#~_]{4,}")
 STEP = re.compile(r"^\s*(\d+[.)]\s|step \d+\b)", re.I)

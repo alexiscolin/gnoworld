@@ -2,8 +2,7 @@
 *.md
 docs/
 adr/
-r/
-tools/
+gno/
 pnpm-lock.yaml
 coverage/
 reports/

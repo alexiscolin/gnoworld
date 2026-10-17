@@ -62,7 +62,7 @@ server/                      the server: TypeScript on Node (ADR-0002 §7), one 
   jarvis/                    the harness, its skills (SKILL.md folders) and its evals
 deploy/                      compose.yaml (the demo stack, the reference wiring for ops), .env.example
 admin/                       the admin console, on its own origin (ADR-0002 §6): reuses ui and lib
-r/gnoworld/                  realms: the slot realm (phase 0), then hubs and profiles; a store plus versioned rules (ADR-0001 §14)
+gno/r/gnoworld/              realms: the slot realm (phase 0), then hubs and profiles; a store plus versioned rules (ADR-0001 §14)
 ```
 
 Inside a feature:

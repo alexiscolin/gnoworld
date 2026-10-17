@@ -1,7 +1,7 @@
 ---
 paths:
-  - "r/**"
-  - "p/**"
+  - "gno/r/**"
+  - "gno/p/**"
 ---
 
 # Realms (gno), tier 1

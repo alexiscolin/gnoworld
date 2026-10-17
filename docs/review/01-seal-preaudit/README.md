@@ -13,7 +13,7 @@
 
 ## Règles
 
-- 45 minutes au plus. Ne lis ni `r/seal/seal.gno` (la version corrigée) ni l'annexe de l'ADR avant d'avoir fini.
+- 45 minutes au plus. Ne lis ni `gno/r/seal/seal.gno` (la version corrigée) ni l'annexe de l'ADR avant d'avoir fini.
 - Si tu as déjà lu les décisions 2 et 3 de l'ADR, tu connais une partie des réponses. Cherche alors surtout les autres, et vérifie que tu sais montrer la ligne exacte.
 - Suis l'ordre de [`docs/REVIEW.md`](../../REVIEW.md) : l'intention, les tests, les frontières, les erreurs, l'état, la sécurité et les coûts, la lisibilité.
 - Pour chaque `issue:`, écris le scénario : qui appelle quoi, avec quels arguments, et ce qu'il obtient.

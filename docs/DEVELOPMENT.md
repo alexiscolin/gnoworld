@@ -26,12 +26,13 @@ GNO_TOOLCHAIN=$T GNOROOT=$T/src ./scripts/check.sh   # the first run downloads p
 
 `./scripts/check.sh` stops at the first failure:
 
-1. **Realms:** `gno lint` and `gno test` on `./r/...`.
+1. **Realms:** `gno lint` and `gno test` on `./r/...`, from `gno/`, where everything on the
+   chain lives (realms, later gno packages, and the Go tools around them).
 2. **Mutation check** (`scripts/mutate.py`; its header says how it works): every guard in a
    realm, removed in turn, must fail a test. The known gaps are listed there, with their
    reason.
-3. **Reference client:** `gofmt` and `go vet`. `r/seal/vectors_test.gno` must be exactly
-   what `go run ./tools/sealvec` prints. To regenerate it:
+3. **Reference client:** `gofmt` and `go vet`. `gno/r/seal/vectors_test.gno` must be exactly
+   what `go run ./tools/sealvec` prints in `gno/`. To regenerate it, in `gno/`:
    `go run ./tools/sealvec > r/seal/vectors_test.gno`.
 
 The pre-commit hook runs the gate on what is staged, and skips it when only docs are staged (`docs/`, `adr/`, Markdown, `.claude/`). `scripts/test_hooks.sh`, run by the gate, checks the hooks themselves. Claude Code's Stop hook

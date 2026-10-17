@@ -43,20 +43,22 @@ node scripts/clones.mjs
 python3 -I scripts/check_css.py
 python3 -I scripts/check_comments.py
 
-echo "== realms: lint and tests"
-"$GNO" lint ./r/...
-"$GNO" test ./r/...
+echo "== realms (gno/): lint and tests"
+(cd gno && "$GNO" lint ./r/... && "$GNO" test ./r/...)
 
 echo "== realms: removing any guard fails a test"
-python3 -I scripts/mutate.py
+(cd gno && python3 -I ../scripts/mutate.py)
 
-echo "== reference client: format, vet, and the vectors file it generates"
-test -z "$(gofmt -l tools)" || { gofmt -l tools >&2; exit 1; }
-go vet ./tools/...
-go run ./tools/sealvec | cmp -s - r/seal/vectors_test.gno || {
-	echo "r/seal/vectors_test.gno differs from: go run ./tools/sealvec" >&2
-	exit 1
-}
+echo "== Go tools (gno/tools): format, vet, and the seal vectors they generate"
+(
+	cd gno
+	test -z "$(gofmt -l tools)" || { gofmt -l tools >&2; exit 1; }
+	go vet ./tools/...
+	go run ./tools/sealvec | cmp -s - r/seal/vectors_test.gno || {
+		echo "gno/r/seal/vectors_test.gno differs from: go run ./tools/sealvec, in gno/" >&2
+		exit 1
+	}
+)
 
 echo "== harness docs name only files that exist"
 python3 -I scripts/check_docs.py
