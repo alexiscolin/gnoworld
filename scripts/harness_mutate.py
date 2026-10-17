@@ -129,6 +129,8 @@ def mutants():
     yield from each(".githooks/pre-push", "exit 1", ":", "hooks", "pre-push refusal")
     yield from each(".githooks/pre-push", 'python3 -I scripts/review_pass.py check "$local_sha"', ":", "hooks", "pre-push review check")
     yield from each(".githooks/pre-push", "sh scripts/check.sh --full </dev/null", ":", "hooks", "pre-push gate")
+    yield from each(".githooks/pre-push", "		sh scripts/check.sh </dev/null", "		:", "hooks", "pre-push fast gate")
+    yield from each(".githooks/pre-push", "gitleaks git --no-banner --redact .", ":", "hooks", "pre-push secret scan")
     yield from each(".githooks/pre-commit", 'sh "$staged/scripts/check.sh"', "true", "hooks", "pre-commit gate")
     yield from each("scripts/code_changed.sh", "! git diff --cached", "git diff --cached", "hooks", "code_changed staged")
     yield from each("scripts/code_changed.sh", '[ -n "$(git status', '[ -z "$(git status', "hooks", "code_changed working tree")

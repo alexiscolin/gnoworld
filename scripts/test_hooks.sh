@@ -197,21 +197,27 @@ echo two >>"$v/src/a.ts" && commit code
 fi
 
 if part pre_push; then
-# pre-push: the full gate before any push; main only with a review pass. A fake gate and a
-# throwaway repository stand in.
+# pre-push: a work branch gets the fast gate and the secret scan, main the full gate and a
+# review pass. A fake gate, a fake gitleaks and a throwaway repository stand in.
 w="$t/push"
-mkdir -p "$w/scripts" "$w/.githooks" "$w/docs"
-printf '#!/bin/sh\nexit 0\n' >"$w/scripts/check.sh"
+mkdir -p "$w/scripts" "$w/.githooks" "$w/docs" "$t/pushbin"
+printf '#!/bin/sh\necho "gate $*" >>"$(dirname "$0")/../gate.log"\n' >"$w/scripts/check.sh"
+printf '#!/bin/sh\necho scanned >>"%s/leaks.log"\nexit "${LEAKS:-0}"\n' "$w" >"$t/pushbin/gitleaks" && chmod +x "$t/pushbin/gitleaks"
+printf 'gate.log\nleaks.log\n' >"$w/.gitignore"
 cp "$rp" "$here/repo_files.py" "$w/scripts/" && cp "$hooks/pre-push" "$w/.githooks/pre-push"
 git -C "$w" init -q && echo x >"$w/a.ts" && git -C "$w" add -A && git -C "$w" commit -qm base
 head=$(git -C "$w" rev-parse HEAD)
-push() { printf 'refs/heads/%s %s refs/heads/%s 0000000000000000000000000000000000000000\n' "$1" "$head" "$1" | (cd "$w" && sh .githooks/pre-push origin url >/dev/null 2>&1); }
+push() { printf 'refs/heads/%s %s refs/heads/%s 0000000000000000000000000000000000000000\n' "$1" "$head" "$1" | (cd "$w" && PATH="$t/pushbin:$PATH" sh .githooks/pre-push origin url >/dev/null 2>&1); }
 push slice-1a || fail "pre-push refused a work branch whose gate passes"
+[ "$(tail -n 1 "$w/gate.log")" = "gate " ] || fail "pre-push ran more than the fast gate for a work branch"
+grep -q scanned "$w/leaks.log" || fail "pre-push did not scan a work branch for secrets"
+LEAKS=1 push slice-1a && fail "pre-push let a work branch through with a secret found"
 push main && fail "pre-push let main through with no review pass"
 (cd "$w" && python3 -I scripts/review_pass.py record HEAD test >/dev/null)
 push main && fail "pre-push let main through with a pass not yet committed"
 git -C "$w" add -A && git -C "$w" commit -qm pass && head=$(git -C "$w" rev-parse HEAD)
 push main || fail "pre-push refused main with a committed review pass"
+[ "$(tail -n 1 "$w/gate.log")" = "gate --full" ] || fail "pre-push did not run the full gate for main"
 printf '#!/bin/sh\nexit 1\n' >"$w/scripts/check.sh"
 git -C "$w" add -A && git -C "$w" commit -qm "failing gate" && head=$(git -C "$w" rev-parse HEAD)
 push slice-1a && fail "pre-push let a push through a failing gate"

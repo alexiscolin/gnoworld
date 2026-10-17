@@ -1,6 +1,7 @@
 #!/bin/sh
-# pre-push: the full gate before any push, and main only with a committed review pass
-# (docs/REVIEW.md). Git sends one line per ref: <local ref> <local sha> <remote ref> <remote sha>.
+# pre-push: main gets the full gate and needs a committed review pass (docs/REVIEW.md); a work
+# branch gets the fast gate and the secret scan, since nothing leaves with a secret. Git sends one
+# line per ref: <local ref> <local sha> <remote ref> <remote sha>.
 set -eu
 zero=0000000000000000000000000000000000000000
 gated=false
@@ -12,6 +13,10 @@ while read -r _ local_sha remote_ref _; do
 	fi
 	if [ "$remote_ref" = refs/heads/main ]; then
 		python3 -I scripts/review_pass.py check "$local_sha" # cheap, so before the gate
+		sh scripts/check.sh --full </dev/null
+	elif ! $gated; then
+		sh scripts/check.sh </dev/null
+		gitleaks git --no-banner --redact .
+		gated=true
 	fi
-	$gated || { sh scripts/check.sh --full </dev/null; gated=true; }
 done
