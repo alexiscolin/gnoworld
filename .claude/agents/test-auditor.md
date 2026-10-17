@@ -44,8 +44,10 @@ assume:
    the way the real one does.
 4. **Empty assertions:** only "was called", "is defined", "truthy", an unread snapshot, or a
    matcher loose enough for anything to pass.
-5. **Drift since the red pass:** a test weakened, skipped (`.skip`, `.only`) or edited with
-   the code without a stated reason; a timing guess instead of waiting on a state.
+5. **Drift since the red pass:** find the commit whose message has a `Red-pass:` line
+   (`git log --grep '^Red-pass:'`), diff the test files since it, and look for a test
+   weakened, skipped (`.skip`, `.only`) or edited with the code without a stated reason; a
+   timing guess instead of waiting on a state. No such commit is itself a finding.
 6. **Seen failing:** each new test failed before its code existed (the commit order, or a
    run against the base).
 
