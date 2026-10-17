@@ -205,12 +205,9 @@ def self_test():
     assert changed_baselines(diff, set()) == ["app/tests/e2e/home.spec.ts-snapshots/home.png", "app/__screenshots__/old.png"]
     assert changed_baselines(diff, {"app/tests/e2e/home.spec.ts-snapshots/home.png", "app/__screenshots__/old.png"}) == []
     with tempfile.TemporaryDirectory() as real:  # macOS's /tmp is a link to /private/tmp; Vitest reports real paths
-        link = real + "-link"
+        link = os.path.join(real, "link")
         os.symlink(real, link)
-        try:
-            assert relative(os.path.join(os.path.realpath(real), "a.test.ts"), link) == "a.test.ts"
-        finally:
-            os.remove(link)
+        assert relative(os.path.join(os.path.realpath(real), "a.test.ts"), link) == "a.test.ts"
     print("check_regressions: self-test passed")
 
 
