@@ -87,7 +87,7 @@ Three ideas run through it:
 | `scripts/prove_fix.py` | a fix of the product whose tests did not fail on the commit before it |
 | StrykerJS | a mutant of the TypeScript that no test kills |
 | `scripts/check_regressions.py` | the safety net shrinking (next section) |
-| gitleaks | a secret anywhere in the history |
+| gitleaks | a secret anywhere in the history; a path into a home folder or a service of the demo's host (`gitleaks-private.toml`: the repository will be public) |
 | `pnpm audit` | a dependency with a known advisory, moderate or worse |
 | `scripts/harness_mutate.py` | when the harness changed: a guard of the harness that no test notices switched off |
 
@@ -215,7 +215,7 @@ measure, slice 1a's merge, found 25 or more, one of them a way out of the sandbo
 | `.githooks/` | `commit-msg`, `pre-commit`, `pre-push` (`pnpm install` points git at them) |
 | `scripts/check.sh` | the gate |
 | `scripts/guard.py`, `scripts/stop_gate.sh` | Claude Code's hooks |
-| `scripts/scan_secrets.sh`, `scripts/gitleaks.toml`, `scripts/audit.py` | the secret scan and the dependency audit |
+| `scripts/scan_secrets.sh`, `scripts/gitleaks.toml`, `scripts/gitleaks-private.toml`, `scripts/.gitleaksignore`, `scripts/audit.py` | the secret scan and the dependency audit |
 | `scripts/code_changed.sh`, `scripts/borrow_node_modules.sh`, `scripts/repo_files.py` | what the hooks and scripts share |
 | `scripts/check_css.py`, `scripts/check_comments.mjs`, `scripts/check_docs.py` | the style and docs checks |
 | `scripts/mutate.py` | the realms' mutation check |
