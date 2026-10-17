@@ -49,6 +49,7 @@ first.
 | Hard rules | Git hooks: the gate before each commit and merge, no attribution lines. Claude Code hooks: the Stop gate, `scripts/guard_git.py` (no hook is ever skipped), and from slice 1 `eslint --fix` on each edited file. Permissions: secrets unreadable; `git push`, `pnpm add` and `rm -rf` ask first | None |
 | Checks | `scripts/check.sh`: realms, their mutation check, Go, the hooks. From slice 1: `tsc`, ESLint, Vitest with fast-check, StrykerJS on what changed, Playwright with axe, Lighthouse, the unused-code finder, the CSS linter, the benches | None |
 | Plan | `/slice-plan <n>` writes the slice's plan; Alexis approves it before code | One short pass |
+| Tests first | After the failing tests, before the code: the `test-auditor`'s red pass (complete, relevant, impact first, security, against the plan) | One short pass |
 | Review | `/pre-merge`: the gate and mutations, the `test-auditor` (Sonnet) on the survivors, `/code-review`, and the `security-reviewer` (Opus) on tier-1 changes. At the end of a slice with tier-1 code, Alexis may run `/code-review ultra` | One pass per merge |
 | Jarvis | promptfoo in `evals/`: the evals and the red team, answers cached | Only changed cases |
 

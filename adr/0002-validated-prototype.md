@@ -1296,6 +1296,10 @@ remote.
   (CLAUDE.md).
 
 **Review, with AI and people** (`docs/REVIEW.md`):
+- **the tests are reviewed before the code:** once the failing tests are written, a fresh
+  agent checks them against the slice plan (every case and boundary, behaviour rather than
+  build, the riskiest paths first, the threat model's abuse cases), and its findings are
+  fixed before any code;
 - **what costs no tokens runs first:** the gate, then the mutation tester on the changed
   code, so a missing test is found without a model;
 - **the tests are audited next,** by a fresh agent whose only job is to catch tests that

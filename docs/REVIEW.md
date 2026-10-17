@@ -52,8 +52,10 @@ Code written by an agent gets the same reading as anyone's, plus this. `/pre-mer
 
 1. **No tokens first.** The gate, then the mutation tester on the changed code: a surviving
    mutant is a missing test, found without a model.
-2. **The test audit.** A fresh agent whose only job is the tests reads the survivors and each
-   new or changed test, and looks for
+2. **The test audit, in two passes.** Before any code, a fresh agent reviews the failing
+   tests against the plan: complete, relevant, riskiest paths first, the threat model's abuse
+   cases present. At the merge, it reads the mutation survivors and each new or changed
+   test, and looks for
    tautologies, mocks of the thing under test, empty assertions ("was called", unread
    snapshots, loose matchers), missing failure and boundary cases, timing guesses, and a
    test not seen failing first (ADR-0002 §9). Its findings are fixed before anything else.

@@ -10,8 +10,8 @@ or edit a test to make it pass.
    files. If the gate fails, stop and report its output. Write the diff to
    `.claude/tmp/diff.patch` and pass agents its path, never its content. Over about 400
    lines, say so and propose a split before reviewing.
-2. **The test audit.** Launch the `test-auditor` agent with the diff path and the surviving
-   mutants. If it reports findings, stop: list them and wait.
+2. **The test audit.** Launch the `test-auditor` agent for its green pass, with the diff
+   path and the surviving mutants. If it reports findings, stop: list them and wait.
 3. **One review pass, sized by risk:**
    - always: Claude Code's `/code-review` on the range;
    - a tier-1 file (`docs/REVIEW.md`): also the `security-reviewer` agent (Opus);
