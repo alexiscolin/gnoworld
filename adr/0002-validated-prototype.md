@@ -498,7 +498,7 @@ between worlds. None may saturate the map:
      the card follows its hash until the block and its result;
   4. the result.
 - **A call with more than two fields** opens in the realm view, a full page over the chat;
-  the chat keeps only the compact card. Never a modal.
+  the chat keeps only the compact card.
 - **It is never a modal** (§8, row 1). The prototype's dialog stood in for this card.
 - **ADR-0001 §11's warnings apply to every call**, for example "gnoworld does not check
   what this realm does" and "this text goes to {realm} on gno.land, publicly and forever".
@@ -705,10 +705,10 @@ catch.
   - At 100%, Jarvis stops until the next UTC day, and every feature falls back to its
     form without a model (§4).
   - An Anthropic workspace spend limit per environment backs it.
-- **Translation has its own budget,** and the same hard stop: the original shows.
 - **Every model call has its own timeout** and at most two retries (the SDKs wait ten
   minutes by default), and each question a maximum number of turns.
 - **Translation:** one per message and language, cached, serves every reader, with Haiku.
+  It has its own budget and the same hard stop: the original shows.
 - The tools, the system prompt and the skills are frozen per version, so prompt-cache
   reads cost a tenth of the input price on Sonnet 5.5 and a twentieth on Opus 5.5.
 
