@@ -13,8 +13,11 @@ or edit a test to make it pass.
 2. **The test audit.** Launch the `test-auditor` agent with the diff path and the surviving
    mutants. If it reports findings, stop: list them and wait.
 3. **One review pass, sized by risk:**
-   - no tier-1 file (`docs/REVIEW.md`): one `reviewer` agent, every lens at once;
-   - a tier-1 file: that, plus one `reviewer` on the security lens alone, with `model: opus`.
+      - always: Claude Code's `/code-review` on the range;
+   - a tier-1 file (`docs/REVIEW.md`): also one `reviewer` agent on the security lens alone,
+     with `model: opus`;
+   - the last merge of a slice with tier-1 code: propose to Alexis that he runs
+     `/code-review ultra` (a deeper review in the cloud, billed per run; Claude cannot start it).
 4. **Check each finding** against the code before fixing it; drop a false positive with its
    reason. Fixes are re-checked by the gate and the mutation tester, not by a new pass. A
    second pass runs only for a high finding fixed in a tier-1 file, and only that lens.

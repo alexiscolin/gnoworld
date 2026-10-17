@@ -80,9 +80,9 @@ Code written by an agent gets the same reading as anyone's, plus this. `/pre-mer
    tautologies, mocks of the thing under test, empty assertions ("was called", unread
    snapshots, loose matchers), missing failure and boundary cases, timing guesses, and a
    test not seen failing first (ADR-0002 §9). Its findings are fixed before anything else.
-3. **One review pass, sized by risk.** A fresh agent that did not write the change reads the
-   diff, by its path, through every lens at once: correctness, security, performance,
-   accessibility and UX, simplicity. A change to a tier-1 file adds one more agent, on the
+3. **One review pass, sized by risk.** Claude Code's own `/code-review` reads the change in a
+   fresh context, through every lens at once: correctness, security, performance,
+   accessibility and UX, simplicity, with this file's checklists. A change to a tier-1 file adds one more agent, on the
    strongest model, for security alone. Fixes are re-checked by the gate and the mutation
    tester; a second pass runs only for a high finding fixed in tier-1 code.
 4. **Each finding is checked against the code** before it is fixed, and a false positive is

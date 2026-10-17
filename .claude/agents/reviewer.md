@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: A fresh-context reviewer that reads a change through one lens it is given (correctness, security, performance, accessibility and UX, or simplicity), or verifies other reviewers' findings. Use in /pre-merge after the test audit. Read-only.
+description: A fresh-context reviewer for one lens, chiefly security on tier-1 changes, beside /code-review. Use in /pre-merge after the test audit. Read-only.
 tools: Read, Grep, Glob, Bash
 model: sonnet
 ---

@@ -1246,7 +1246,7 @@ from gno-golf's engine, measured there.
 
 | Kind | What it proves | Tool | When |
 |---|---|---|---|
-| Unit | Every rule in `core`, and every parser; properties for parsers, placement and ranking (any input, the invariant holds) | Vitest; a property-testing library | Every commit |
+| Unit | Every rule in `core`, and every parser; properties for parsers, placement and ranking (any input, the invariant holds) | Vitest; fast-check | Every commit |
 | Component | Each design-system component in each state, the keyboard, axe | Vitest with Testing Library | Every commit |
 | Feature | A feature with its store and its boundaries, against fakes: a fake Ergo, recorded chain answers, a fake model | Vitest | Every commit |
 | Contract | Each Zod schema against recorded real answers (Ergo, the RPC, the indexer, gnoscope, Adena); live again each night, so a change outside fails loudly | Vitest | Every commit; nightly live |
@@ -1257,7 +1257,7 @@ from gno-golf's engine, measured there.
 | Algorithms | Every hot path has a bench with a stored baseline; a slowdown past 10% fails. Its growth is measured at n, 4n and 16n, so an O(n²) hiding in an O(n log n) path fails too | Vitest bench | Every pull request |
 | Scale | Synthetic universes at 10×, 100× and a million realms: placement time per system stays flat, tiles stay bounded, the draw count stays bounded, ⌘K answers within budget; a 100,000-message history and a 1,000-room switcher stay smooth | Vitest bench, Playwright | Nightly |
 | Load | Ergo with thousands of clients, Jarvis with concurrent questions against a fake model, the moderation queue at peak: latency and errors within budget | k6, against a local stack, never the homelab demo | Before launch |
-| Mutation | Every guard fails a test when removed: realms (`scripts/mutate.py`) and `core` | `mutate.py`; a TypeScript mutation tester | Nightly |
+| Mutation | Every guard fails a test when removed: realms (`scripts/mutate.py`), and all TypeScript with tests (StrykerJS: its TypeScript checker drops mutants that would not compile, so the score is honest; incremental mode reruns only what changed) | `mutate.py`; StrykerJS | The changed lines before each merge; everything nightly. A score below its floor fails, the floor set from slice 1's first run and only ever raised |
 | Realms | Tests, filetests, `gno-audit` | gno | Every commit |
 | AI | Jarvis's evals (§5), non-hallucination first: every number, name, link and function in an answer is checked by string match against the tool results; an answer with nothing to ground it must say it does not know; a different model grades the rest. A grounded rate below the threshold fails | Our harness | On every change to it; nightly sample |
 | Security | Dependency audit, secret scan, the CSP, the injection suite, the admin console's penetration test | The gate; before launch | Every commit; before launch |
@@ -1293,10 +1293,10 @@ remote.
 - **the tests are audited next,** by a fresh agent whose only job is to catch tests that
   pass while the code is wrong (below), and a slice is not reviewed further until they
   are sound;
-- **one review pass, sized by risk:** one fresh-context agent reads the diff, by its path,
-  through five lenses at once (correctness, security, performance, accessibility and UX,
-  simplicity); a change to a tier-1 file adds one agent on the strongest model, for
-  security alone;
+- **one review pass, sized by risk:** Claude Code's own `/code-review` reads the change in a
+  fresh context (it follows `CLAUDE.md`, which sends it to `docs/REVIEW.md`'s checklists:
+  correctness, security, performance, accessibility and UX, simplicity); a change to a
+  tier-1 file adds one agent on the strongest model, for security alone;
 - each finding is checked against the code before it is fixed; fixes are re-checked by the
   gate and the mutation tester, and a second pass runs only for a high finding fixed in
   tier-1 code;
@@ -1360,8 +1360,7 @@ Its findings are fixed before any other lens runs.
 
 **Dependencies to ask for, each in its slice:**
 - slice 1: `react-router`, `@react-router/dev`, `vite-plugin-pwa`, a CSS linter, an
-  unused-code finder, a Lighthouse runner, an import-cycle check, Testing Library, a
-  property-testing library, a TypeScript mutation tester;
+  unused-code finder, a Lighthouse runner, an import-cycle check, Testing Library, fast-check with `@fast-check/vitest`, and StrykerJS (`@stryker-mutator/core`, `@stryker-mutator/vitest-runner`, `@stryker-mutator/typescript-checker`);
 - slice 3: `hono`, `@hono/node-server`, `@hono/zod-validator`, `@adena-wallet/sdk` (the
   server's verifier);
 - slice 10: `@anthropic-ai/sdk`, `@modelcontextprotocol/client`, `@opentelemetry/api`,

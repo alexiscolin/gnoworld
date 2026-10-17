@@ -21,6 +21,7 @@ gnoworld: a social, on-chain, graphical hub for gno.land. The design is
 - `scripts/check.sh` must pass before every commit that changes code (the pre-commit hook runs it). Never commit with `--no-verify`.
 - Strict TypeScript: no `any`, no `@ts-ignore`, no `!`. Data from the relay, the indexer or a realm goes through Zod first.
 - Never change a test to make code pass without saying so in the review card.
+- Every review, `/code-review` included, reads `docs/REVIEW.md` first: the tier-1 list and its checklists.
 - No new dependency without asking.
 - Pairing: in `packages/core/**`, and wherever a slice plan says "human", write the failing test, commit it marked `test.fails` (the gate and the Stop hook accept it), and stop. Alexis writes the code and removes the mark; then review it.
 - Claude writes the realms, the server and any Go (who reviews what: docs/REVIEW.md).
