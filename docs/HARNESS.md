@@ -170,6 +170,14 @@ mutation 118 s for 148 guards, against 384 s for 127 before each mutant ran only
 section. Subagents run on Sonnet unless their file says
 otherwise; agents get the diff's path, never its content; one review pass per merge.
 
+## Is it solid?
+
+Measured, not claimed: each `/pre-merge` records in `docs/review-log.md` how many verified
+findings it found in the harness itself. Falling from merge to merge means solid. Flat over
+three merges means the harness is simplified, not extended: a guard that keeps leaking gives
+way to a boundary the system enforces (the sandbox, a server check), or goes. The first
+measure, slice 1a's merge, found 25 or more, one of them a way out of the sandbox.
+
 ## Known limits
 
 - **Nothing runs on the server.** No CI, and GitHub cannot protect a branch on this

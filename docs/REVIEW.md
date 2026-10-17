@@ -77,6 +77,12 @@ Code written by an agent gets the same reading as anyone's, plus this. `/pre-mer
    without new evidence, and a fixed one that comes back filed as a regression. What Alexis
    caught and missed goes into the review log. A miss that repeats becomes a rule here, a
    lint, or a test; a lens whose findings are mostly dropped is narrowed or removed.
+7. **Measure the harness by its findings.** Each `/pre-merge` writes to the review log how
+   many verified findings it found in the harness itself (`scripts/`, `.githooks/`,
+   `.claude/`), against the lines of harness it read. If that number falls from one merge to
+   the next, the harness is getting solid. If it does not fall over three merges, the
+   harness is simplified, not extended: a guard that keeps leaking is replaced by a boundary
+   the system enforces (the sandbox, a server check), or removed.
 
 ## Before a push
 
