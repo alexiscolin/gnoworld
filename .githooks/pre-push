@@ -1,0 +1,17 @@
+#!/bin/sh
+# pre-push: the full gate before any push, and main only with a committed review pass
+# (docs/REVIEW.md). Git sends one line per ref: <local ref> <local sha> <remote ref> <remote sha>.
+set -eu
+zero=0000000000000000000000000000000000000000
+gated=false
+while read -r _ local_sha remote_ref _; do
+	[ "$local_sha" = "$zero" ] && continue # a deleted branch
+	if [ "$local_sha" != "$(git rev-parse HEAD)" ] || ! git diff --quiet HEAD; then
+		echo "pre-push: push the commit you have checked out, with nothing uncommitted, so the gate checks what leaves" >&2
+		exit 1
+	fi
+	$gated || { sh scripts/check.sh --full && gated=true; } || exit 1
+	if [ "$remote_ref" = refs/heads/main ]; then
+		python3 -I scripts/review_pass.py check "$local_sha"
+	fi
+done

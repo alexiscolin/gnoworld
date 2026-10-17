@@ -109,4 +109,37 @@ cover() { # $1: hit count of line 3's statement
 cover 1 || fail "patch_coverage refused a patch whose lines are all run"
 cover 0 && fail "patch_coverage accepted a patch at 67%, under 85%"
 
+# review_pass: /pre-merge records the tree it reviewed; a later change to the code voids it,
+# the review log committed after it does not.
+rp=$(cd "$(dirname "$0")" && pwd)/review_pass.py
+v="$t/review"
+mkdir -p "$v/docs" "$v/src"
+git -C "$v" init -q
+commit() { git -C "$v" add -A && git -C "$v" -c user.name=t -c user.email=t@t commit -qm "$1"; }
+echo one >"$v/src/a.ts" && echo log >"$v/docs/review-log.md" && commit base
+(cd "$v" && python3 -I "$rp" check HEAD >/dev/null 2>&1) && fail "review_pass accepted a tree nobody reviewed"
+(cd "$v" && python3 -I "$rp" record HEAD "test-auditor, code-review" >/dev/null) || fail "review_pass could not record a pass"
+echo more >>"$v/docs/review-log.md" && commit log
+(cd "$v" && python3 -I "$rp" check HEAD >/dev/null 2>&1) || fail "review_pass refused a tree whose only change is the review's own record"
+echo two >>"$v/src/a.ts" && commit code
+(cd "$v" && python3 -I "$rp" check HEAD >/dev/null 2>&1) && fail "review_pass accepted code changed after the review"
+
+# pre-push: the full gate before any push; main only with a review pass. A fake gate and a
+# throwaway repository stand in.
+w="$t/push"
+mkdir -p "$w/scripts" "$w/.githooks" "$w/docs"
+printf '#!/bin/sh\nexit 0\n' >"$w/scripts/check.sh"
+cp "$rp" "$w/scripts/review_pass.py" && cp "$hooks/pre-push" "$w/.githooks/pre-push"
+git -C "$w" init -q && echo x >"$w/a.ts" && git -C "$w" add -A && git -C "$w" -c user.name=t -c user.email=t@t commit -qm base
+head=$(git -C "$w" rev-parse HEAD)
+push() { printf 'refs/heads/%s %s refs/heads/%s 0000000000000000000000000000000000000000\n' "$1" "$head" "$1" | (cd "$w" && sh .githooks/pre-push origin url >/dev/null 2>&1); }
+push slice-1a || fail "pre-push refused a work branch whose gate passes"
+push main && fail "pre-push let main through with no review pass"
+(cd "$w" && python3 -I scripts/review_pass.py record HEAD test >/dev/null)
+push main && fail "pre-push let main through with a pass not yet committed"
+git -C "$w" add -A && git -C "$w" -c user.name=t -c user.email=t@t commit -qm pass && head=$(git -C "$w" rev-parse HEAD)
+push main || fail "pre-push refused main with a committed review pass"
+printf '#!/bin/sh\nexit 1\n' >"$w/scripts/check.sh"
+push slice-1a && fail "pre-push let a push through a failing gate"
+
 echo "hooks: ok"

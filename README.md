@@ -49,7 +49,7 @@ of those, that is the protection working, not a bug.
 | Command | What it does |
 |---|---|
 | `./scripts/check.sh` | The fast gate: formatting, types, lint, tests, dead code, copies, CSS and comment rules, the realms, the hooks. It runs before every commit and at the end of every Claude Code turn |
-| `./scripts/check.sh --full` | Everything above, plus the harness's own probe, coverage (85% everywhere, 100% in `core`), the coverage of the lines you changed, mutation testing and a scan of the whole history for secrets. It runs before a merge |
+| `./scripts/check.sh --full` | Everything above, plus the harness's own probe, coverage (85% everywhere, 100% in `core`), the coverage of the lines you changed, mutation testing and a scan of the whole history for secrets. It runs before every push; `main` also needs a review pass (docs/REVIEW.md) |
 | `pnpm run test` | The unit tests |
 | `pnpm run coverage` | The tests with coverage, under `coverage/` |
 | `pnpm run mutate` | Mutation testing, with its report in `reports/mutation/index.html` |

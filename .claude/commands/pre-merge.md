@@ -28,7 +28,11 @@ or edit a test to make it pass.
      findings held back until Alexis has reviewed, per "Blind first");
    - the findings, most severe first, each with its scenario;
    - what was dropped as a false positive, in one line each.
-7. **Log.** Append to `docs/review-log.md`: the date, the branch, each finding with its lens
+7. **Record the pass.** Once every finding is fixed or put to Alexis and the gate is green,
+   run `python3 -I scripts/review_pass.py record HEAD "<the lenses that ran>"`. Without it,
+   the pre-push hook refuses `main`.
+8. **Log.** Append to `docs/review-log.md`: the date, the branch, each finding with its lens
    and outcome (fixed, put to Alexis, false positive), and what Alexis caught that the
    agents missed. A miss seen twice becomes a proposed rule, lint or test; a lens whose
-   findings are mostly dropped over five slices is narrowed or removed.
+   findings are mostly dropped over five slices is narrowed or removed. Commit the log and
+   `docs/review-passes.txt` together; that commit keeps the pass valid.

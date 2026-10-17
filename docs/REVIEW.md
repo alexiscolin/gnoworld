@@ -72,6 +72,14 @@ Code written by an agent gets the same reading as anyone's, plus this. `/pre-mer
    becomes a rule here, a lint, or a test; a lens whose findings are mostly dropped is
    narrowed or removed.
 
+## Before a push
+
+Each merge lives on its branch. Pushing runs the full gate (`.githooks/pre-push`); pushing
+`main` also needs a committed `/pre-merge` pass whose fingerprint matches the code
+(`scripts/review_pass.py`): a change after the review voids it, the review's own record does
+not. Until CI exists, these hooks are the barrier; a merge made on GitHub skips them, so
+merges happen locally after `/pre-merge`, then `main` is pushed.
+
 ## Blind first
 
 Alexis reads the diff in revdiff, beside the session: `revdiff origin/main -o .claude/tmp/review.txt`. His notes land in that file, which git ignores; "read the review" asks Claude to read them and answer each one.
