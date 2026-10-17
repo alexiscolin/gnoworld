@@ -68,6 +68,8 @@ planets are worlds (§1).
   calls. It does not write or deploy contracts.
 - **Alexis set Jarvis's stack on 2026-10-17:** a Claude key, MCP, skills and a harness,
   with evals and complete observability (§5).
+- **Alexis set the delivery on 2026-10-17:** a simple stack for demos inside the company,
+  then everything handed to ops in Docker; ops decides where it runs (§7).
 - **On 2026-10-17 Alexis moved into phase 0:** Jarvis, calls signed by users (names, votes,
   any function), the chain's activity in rooms, new realms and firsts, plain DMs, automatic
   translation and satellites (§8, rows 5, 7 and 11).
@@ -688,7 +690,8 @@ they change, our own spans wrap each turn.
   - Grafana (Tempo, Loki, Prometheus) for operations across Ergo, the Go binary and Jarvis;
   - Langfuse for conversations, prompt versions, eval scores and feedback.
 
-  Both are open source and self-hosted. OpenTelemetry keeps either one replaceable.
+  The demo stack runs both. In production, ops chooses self-hosted or their clouds;
+  OpenTelemetry keeps either one replaceable (§7, where it runs).
 - **Privacy:**
   - a question's text is kept only with the person's consent, and deleted after a fixed
     period;
@@ -826,7 +829,7 @@ by few hands, so they get the safest path.
 | Admin console | 0 | Roles, the moderation queue, curation edits as pull requests, settings, the audit log (§6) | Its own origin; a GitHub App to open pull requests |
 | Signals | 0 for new realms, first to chart and first words; 1 for the rest | Heat with realm calls, routes, new realms, who charted first; the rank, the dust, the seasons and the tiles of §3. It reads Ergo and the public indexer and serves a small JSON feed | A role of the Go binary. ADR-0001 §13 holds: we run no indexer |
 | Jarvis | 0 | §5 | A TypeScript service beside the Go binary |
-| Observability | 0 | Grafana and Langfuse, fed by OpenTelemetry (§5) | Self-hosted |
+| Observability | 0 | Grafana and Langfuse, fed by OpenTelemetry (§5) | In the demo stack; in production where ops decides |
 | Voice | 1 | A WebRTC media server and TURN | Its own ADR first |
 | Room games | 1 | A game bot and a game realm (§1) | Its own ADR first. Needs sessions and the sponsor |
 | Satellites | 0, once audited and approved on mainnet | The slot realm (§8, row 7) | Audited; mainnet's deploy approval is the gate (ADR-0001, question 6) |
@@ -834,13 +837,36 @@ by few hands, so they get the safest path.
 **ADR-0001 §13 changes.**
 - It had two pieces: the static client and one Go binary.
 - **Phase 0:**
-  - the pieces are the client, Ergo, the Go binary (login, moderation, first signals), the
-    prices job, Jarvis, observability and the slot realm;
+  - the pieces are the client, the admin console, Ergo, the Go binary (login, moderation,
+    first signals), the prices job, Jarvis, observability, and the slot realm on chain;
   - the third parties are Anthropic, OpenAI's moderation, PostHog and gnoscope;
-  - costs: Jarvis at up to 50 $ a day, and hosting Grafana and Langfuse.
-- **Phase 1:**
-  - the signals at scale, voice and room games are added;
-  - costs: the voice server.
+  - costs: Jarvis at up to 50 $ a day; hosting as ops chooses (below).
+- **Phase 1:** the signals at scale, voice and room games are added.
+
+**Where it runs: delivered in Docker, placed by ops** (Alexis, 2026-10-17). gnoworld does
+not choose its hosts.
+- **Demos:** one `docker compose up` runs everything on one machine, for demos inside the
+  company:
+  - the client and the admin console, served as static files;
+  - Ergo, the Go binary and Jarvis;
+  - observability: Grafana's all-in-one OpenTelemetry image, and Langfuse as an optional
+    profile.
+- **The hand-off to ops:**
+  - each service is an image: a multi-stage build, a non-root user, a read-only file
+    system, a health check;
+  - the compose file is the reference wiring;
+  - every setting is an environment variable, listed with its meaning in `.env.example`;
+  - secrets are mounted at run time, never baked into an image;
+  - volumes are named: Ergo's history, the Go binary's SQLite;
+  - `docs/OPERATIONS.md` is the runbook: what each service does, its resources, its limits
+    and next steps (the scale table below), and how to deploy, update, roll back, back up,
+    read logs and metrics, and set alerts.
+- **Ops decides:**
+  - where each piece runs: a server, a platform such as Fly.io, a cluster;
+  - which backend receives OpenTelemetry;
+  - where secrets live.
+
+  Nothing in the code assumes a host.
 
 **Scale: each piece's first limit, and the next step.**
 

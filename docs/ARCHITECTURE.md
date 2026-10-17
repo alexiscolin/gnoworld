@@ -40,6 +40,7 @@ app/                         the web client
     features/                one folder per feature: chat, universe, world, realms, jarvis,
                              passport, notifications, events, search, profile, settings
   tests/e2e/                 Playwright: journeys, axe, budgets (bundle, Web Vitals, memory)
+deploy/                      compose.yaml (the demo stack, the reference wiring for ops), .env.example
 cmd/gnoworld/                the Go binary, one role per package: login, moderation, signals
 admin/                       the admin console, on its own origin (ADR-0002 §6): reuses ui and lib
 jarvis/                      the Jarvis service: TypeScript on the Claude Agent SDK
