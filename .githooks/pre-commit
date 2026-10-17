@@ -17,11 +17,12 @@ if ! sh "$s/code_changed.sh" --staged; then
 	finished=1
 	exit 0
 fi
-for f in $(git diff --cached --name-only -- scripts .githooks .claude/settings.json); do # the staged gate is the one that runs
-	git diff --quiet -- "$f" && continue
-	echo "pre-commit: the staged $f differs from the working tree's; stage it as it is on disk" >&2
+# The staged gate is the one that runs; -z keeps a name with a space or an accent whole.
+differ=$(git diff --cached --name-only -z -- scripts .githooks .claude/settings.json | xargs -0 -r git -c core.quotePath=false diff --name-only --)
+if [ -n "$differ" ]; then
+	echo "pre-commit: staged harness files differ from the working tree's; stage them as they are on disk: $differ" >&2
 	exit 1
-done
+fi
 sh "$s/borrow_node_modules.sh" "$staged" # the staged copy has no installed packages
 # A `commit -a` hands the hook its own index; the gate's git calls must not touch it.
 env -u GIT_INDEX_FILE -u GIT_DIR -u GIT_WORK_TREE sh "$s/check.sh"

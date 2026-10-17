@@ -319,6 +319,13 @@ echo yet >>"$c2/a.ts" && git -C "$c2" add a.ts
 git -C "$c2" checkout -q -- scripts/borrow_node_modules.sh && printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/code_changed.sh"
 (cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit ran an unstaged code_changed.sh that skipped the gate"
 git -C "$c2" checkout -q -- scripts/code_changed.sh
+# Every staged harness file is compared, whatever its name: a space or an accent included.
+printf '#!/bin/sh\nexit 0\n' >"$c2/scripts/check.sh" && git -C "$c2" add scripts/check.sh
+for name in 'my file.sh' 'é.sh'; do
+	echo 'exit 0' >"$c2/scripts/$name" && git -C "$c2" add "scripts/$name" && echo 'exit 1' >"$c2/scripts/$name"
+	(cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a staged scripts/$name differ from the working tree's"
+	git -C "$c2" rm -qf --cached "scripts/$name" && rm "$c2/scripts/$name"
+done
 fi
 
 if part guard; then
