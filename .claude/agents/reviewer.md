@@ -13,7 +13,9 @@ that the change touches. Then read the diff against the base, and the code aroun
 
 **The lenses:**
 - **Correctness:** does it do what the slice plan says, and only that? Errors surfaced, not
-  swallowed; state, ordering, races and cleanup; promises awaited.
+  swallowed; state, ordering, races and cleanup; promises awaited. Every API it uses exists
+  at the pinned version: check the installed types or source, and the target chain for gno.
+  An invented or outdated API is an `issue:`.
 - **Security:** untrusted input validated at the boundary (Zod); who may call what; secrets;
   the CSP; `innerHTML`; links and media hosts; for Jarvis, ADR-0002 §5's injection layers;
   for realms, `docs/REVIEW.md`'s gno list.

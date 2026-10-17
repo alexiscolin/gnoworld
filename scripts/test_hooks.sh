@@ -43,4 +43,19 @@ if PATH="$t/bin:$PATH" "$hooks/pre-commit" 2>/dev/null; then
 fi
 [ ! -e "$t/exported" ] || fail "pre-commit exported the index after mktemp failed: $(cat "$t/exported")"
 
+# stop_gate: it passes on a second stop, and on docs-only changes; it blocks (exit 2)
+# when code changed and the gate fails. A throwaway repo with a failing fake gate.
+gate=$(cd "$(dirname "$0")" && pwd)/stop_gate.sh
+r="$t/repo"
+mkdir -p "$r/scripts" "$r/docs"
+printf '#!/bin/sh\nexit 1\n' >"$r/scripts/check.sh"
+git -C "$r" init -q && git -C "$r" add -A && git -C "$r" -c user.name=t -c user.email=t@t commit -qm init
+stop() { printf '%s' "$1" | CLAUDE_PROJECT_DIR="$r" sh "$gate" 2>/dev/null; }
+echo note >"$r/docs/n.md"
+stop '{"stop_hook_active":false}' || fail "stop_gate blocked a docs-only change"
+echo 'package x' >"$r/x.go"
+code=0; stop '{"stop_hook_active":false}' || code=$?
+[ "$code" = 2 ] || fail "stop_gate did not block a code change with a failing gate (exit $code)"
+stop '{"stop_hook_active":true}' || fail "stop_gate blocked a second stop in a row"
+
 echo "hooks: ok"

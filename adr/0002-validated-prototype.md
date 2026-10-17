@@ -1014,8 +1014,10 @@ counts as proof, mutation does.
 
 **The CI measures, and fails on a regression:** speed, algorithmic growth, scale, memory,
 bundle size, Web Vitals and hallucination. Every run stores its numbers, so a trend shows
-before a budget breaks. Hosted CI runners have no GPU, so the GPU bench runs nightly on a
-machine that has one, and in `/pre-merge`.
+before a budget breaks. Everything runs locally first: the pre-commit hook and Claude
+Code's Stop hook run the gate, and `/pre-merge` runs the full set on the development
+machine, the GPU bench included. A hosted CI runs the same script once the repo has a
+remote.
 
 **CI first, for code written by AI.**
 - The CI and the gate come before the first feature (slice 1). The gate is
@@ -1026,6 +1028,10 @@ machine that has one, and in `/pre-merge`.
   never skips a hook.
 - A test is never edited to pass. A plan that proves wrong stops the slice and goes to
   Alexis.
+- **The agent invents nothing.** A claim about a library, a browser API or a gno package
+  comes from the installed types or source at the pinned version, docs read in the session,
+  or a live query of the chain, never from memory; review cards cite their evidence
+  (CLAUDE.md).
 
 **Review, with AI and people** (`docs/REVIEW.md`):
 - **the tests are audited first,** by a fresh agent whose only job is to catch tests that

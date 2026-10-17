@@ -25,6 +25,8 @@ gnoworld: a social, on-chain, graphical hub for gno.land. The design is
 - Pairing: in `app/src/core/**`, and wherever a slice plan says "human", write the failing test and stop. Alexis writes the code; then review it.
 - Claude writes the realms and any Go (who reviews what: docs/REVIEW.md).
 - Explain a language, React or tooling feature newer than 2025 the first time it appears, in two lines.
+- Invent nothing. A claim about a library, a browser API or a gno package comes from the installed types or source at the pinned version, official docs read in this session, or a live query of the target chain (gnomcp); never from memory. Every claim in a review card cites its evidence (a command's output, `file:line`, a URL), and what was not verified is named.
+- A turn that changes code ends with the gate green: the Stop hook runs `scripts/check.sh` and blocks once. Speed, algorithmic growth, scale and memory are measured locally by the gate's benches; `/pre-merge` runs the full set on this machine, the GPU bench included.
 - Work one slice at a time (`docs/plans/`). Stop at the end of a slice for review.
 - The prototype (`docs/prototype/`) is the reference for what to build and how it feels. Never copy its code: rebuild each concept test first, with the design system's components.
 
