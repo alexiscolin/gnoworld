@@ -243,8 +243,15 @@ Components use container queries, so they fit wherever they are placed.
   - ESLint lints the CSS too (`@eslint/css`): only Baseline features for our browsers,
     every rule in a layer, logical properties, no `!important`, no invalid property or
     value, a cap on selector complexity;
-  - `scripts/check_css.py` refuses a raw colour, size, radius, duration or z-index, a token
+    - `scripts/check_css.py` refuses a raw colour, size, radius, duration or z-index, a token
     that does not exist, a token nothing uses and a module class nothing uses;
+  - **compositions, not blocks, do layout:** `check_css.py` refuses `display: flex` or
+    `grid`, `gap`, the `flex-*`, `grid-*`, `justify-*` and `align-*` properties, and any
+    outer `margin`, in a block's module. A block that truly needs one (an icon beside a
+    label) says why in a `/* layout: … */` comment, and the gate prints the count of those
+    exceptions so review sees it grow;
+  - **no copied rules:** the same set of three or more declarations in two modules fails
+    `check_css.py`; it becomes a composition, a utility or a `composes`;
   - modules are typed (`vite-css-modules`, `generateSourceTypes`, named exports), so a class
     used in a component but missing from its CSS fails `tsc`;
   - a copied block of CSS fails jscpd.
