@@ -30,6 +30,8 @@ You need macOS or Linux, git, Python 3, Go 1.26, and:
 3. **A gno toolchain** that matches the chain, for the realms: see
    [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md), "Toolchain".
 4. **gitleaks**, for the full gate: `brew install gitleaks`.
+5. **The TypeScript language server**, which Claude Code's `typescript-lsp` plugin (on for
+   this project) uses to navigate the code: `brew install typescript-language-server`.
 
 Then, in the repository:
 

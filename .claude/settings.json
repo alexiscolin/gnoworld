@@ -1,4 +1,7 @@
 {
+  "env": {
+    "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet"
+  },
   "attribution": {
     "commit": "",
     "pr": ""
@@ -48,21 +51,8 @@
       }
     ]
   },
-  "env": {
-    "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet"
-  },
   "sandbox": {
     "enabled": true,
-    "filesystem": {
-      "allowWrite": [
-        "~/.cache/gno-toolchains",
-        "~/.cache/gnoworld-tools",
-        "~/Library/Caches/go-build",
-        "~/go/pkg/mod",
-        "~/Library/pnpm",
-        "~/Library/Caches/ms-playwright"
-      ]
-    },
     "network": {
       "allowedDomains": [
         "registry.npmjs.org",
@@ -76,6 +66,19 @@
         "rpc.onyx.testnets.gno.land",
         "semgrep.dev"
       ]
+    },
+    "filesystem": {
+      "allowWrite": [
+        "~/.cache/gno-toolchains",
+        "~/.cache/gnoworld-tools",
+        "~/Library/Caches/go-build",
+        "~/go/pkg/mod",
+        "~/Library/pnpm",
+        "~/Library/Caches/ms-playwright"
+      ]
     }
+  },
+  "enabledPlugins": {
+    "typescript-lsp@claude-plugins-official": true
   }
 }
