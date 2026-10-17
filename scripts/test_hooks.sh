@@ -67,26 +67,6 @@ code=0; stop '{"stop_hook_active":false}' || code=$?
 [ "$code" = 2 ] || fail "stop_gate did not block a code change with a failing gate (exit $code)"
 stop '{"stop_hook_active":true}' || fail "stop_gate blocked a second stop in a row"
 
-# guard_git: Claude Code never skips a git hook. It blocks (exit 2) only a real skip.
-guard=$(cd "$(dirname "$0")" && pwd)/guard_git.py
-guard() {
-	code=0
-	printf '{"tool_input":{"command":"%s"}}' "$1" | python3 -I "$guard" 2>/dev/null || code=$?
-	[ "$code" = "$2" ] || fail "guard_git gave $code, not $2, for: $1"
-}
-guard "git commit --no-verify -m x" 2
-guard "git commit -nm x" 2
-guard "git -c core.hooksPath=/dev/null commit -m x" 2
-guard "git merge --no-verify main" 2
-guard "cd r && git commit -n -m x" 2
-guard "git commit -m 'fix -n handling'" 0
-guard "git commit -m x && git log -n 5" 0
-guard "git merge -n main" 0
-guard "git commit --amend -m x" 0
-guard "git push --force origin slice-1a" 2
-guard "git push -f origin slice-1a" 2
-guard "git push --force-with-lease origin slice-1a" 2
-guard "git push origin slice-1a" 0
 
 # check_docs: a harness doc that names a missing harness file fails the gate.
 docs=$(cd "$(dirname "$0")" && pwd)/check_docs.py
@@ -160,35 +140,7 @@ printf '#!/bin/sh\nexit 1\n' >"$w/scripts/check.sh"
 git -C "$w" add -A && git -C "$w" -c user.name=t -c user.email=t@t commit -qm "failing gate" && head=$(git -C "$w" rev-parse HEAD)
 push slice-1a && fail "pre-push let a push through a failing gate"
 
-# guard_gno: everything about gno goes through gnomcp. A .gno file is written only after the
-# session called a gnomcp tool; gnokey, raw RPC calls and fetched realm pages are refused.
-gg=$(cd "$(dirname "$0")" && pwd)/guard_gno.py
-printf '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{}}]}}\n' >"$t/plain.jsonl"
-printf '{"type":"assistant","message":{"content":[{"type":"text","text":"I will call mcp__gnomcp__gno_read"}]}}\n' >"$t/says.jsonl"
-printf '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"mcp__gnomcp__gno_packages","input":{}}]}}\n' >"$t/asked.jsonl"
-gno() { # $1: tool, $2: its input as JSON, $3: transcript, $4: the exit code expected
-	code=0
-	printf '{"tool_name":"%s","tool_input":%s,"transcript_path":"%s"}' "$1" "$2" "$3" | python3 -I "$gg" 2>/dev/null || code=$?
-	[ "$code" = "$4" ] || fail "guard_gno gave $code, not $4, for $1 $2 with $(basename "$3")"
-}
-gno Write '{"file_path":"/x/gno/r/slot/slot.gno"}' "$t/plain.jsonl" 2
-gno Write '{"file_path":"/x/gno/r/slot/slot.gno"}' "$t/says.jsonl" 2
-gno Edit '{"file_path":"/x/gno/p/util/util.gno"}' "$t/asked.jsonl" 0
-gno Write '{"file_path":"/x/packages/core/src/a.ts"}' "$t/plain.jsonl" 0
-gno Bash '{"command":"gnokey maketx call -pkgpath gno.land/r/x"}' "$t/asked.jsonl" 2
-gno Bash '{"command":"cd gno && gnokey list"}' "$t/asked.jsonl" 2
-gno Bash '{"command":"curl -s https://rpc.gno.land:443/status"}' "$t/asked.jsonl" 2
-gno Bash '{"command":"cd gno && gno test ./r/..."}' "$t/plain.jsonl" 0
-gno WebFetch '{"url":"https://gno.land/r/gnoland/home"}' "$t/asked.jsonl" 2
-gno WebFetch '{"url":"https://rpc.onyx.testnets.gno.land/status"}' "$t/asked.jsonl" 2
-gno WebFetch '{"url":"https://docs.gno.land/resources/gno-interrealm"}' "$t/plain.jsonl" 0
 
-# The guards refuse what they cannot read.
-for g in "$guard" "$gg"; do
-	code=0
-	printf 'not json' | python3 -I "$g" 2>/dev/null || code=$?
-	[ "$code" = 2 ] || fail "$(basename "$g") let unreadable input through (exit $code)"
-done
 
 # pre-push refuses a push of anything but the checked-out commit, clean.
 echo y >"$w/b.ts" && git -C "$w" add -A && git -C "$w" -c user.name=t -c user.email=t@t commit -qm more
@@ -217,5 +169,72 @@ for step in "run format:check" "run typecheck" "run lint" "run test" "run unused
 	"run mutate" "gitleaks git" "python3 -I scripts/harness_mutate.py"; do
 	grep -v '^[[:space:]]*#' "$gate_file" | grep -qF -- "$step" || fail "check.sh no longer runs: $step"
 done
+
+# guard: no git hook skipped, no forced push, gno only through gnomcp. Exit 2 blocks the call.
+gd=$(cd "$(dirname "$0")" && pwd)/guard.py
+printf '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{}}]}}\n' >"$t/plain.jsonl"
+printf '{"type":"assistant","message":{"content":[{"type":"text","text":"I will call mcp__gnomcp__gno_read"}]}}\n' >"$t/says.jsonl"
+printf '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"mcp__gnomcp__gno_packages","input":{}}]}}\n' >"$t/asked.jsonl"
+printf '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"mcp__plugin_gnomcp_gnomcp__gno_read","input":{}}]}}\n' >"$t/plugin.jsonl"
+guarded() { # $1: the event as JSON, $2: the exit code expected, $3: what it is
+	code=0
+	printf '%s' "$1" | python3 -I "$gd" 2>/dev/null || code=$?
+	[ "$code" = "$2" ] || fail "guard gave $code, not $2, for $3"
+}
+sh_() { # $1: a shell command, $2: the exit code expected, $3: the transcript (default: no gnomcp call)
+	guarded "$(python3 -I -c 'import json,sys; print(json.dumps({"tool_name":"Bash","tool_input":{"command":sys.argv[1]},"transcript_path":sys.argv[2]}))' "$1" "${3:-$t/plain.jsonl}")" "$2" "Bash: $1"
+}
+tool_() { # $1: the tool, $2: its input as JSON, $3: the transcript, $4: the exit code expected
+	guarded "{\"tool_name\":\"$1\",\"tool_input\":$2,\"transcript_path\":\"$3\"}" "$4" "$1 $2 with $(basename "$3")"
+}
+sh_ "git commit --no-verify -m x" 2
+sh_ "git commit -nm x" 2
+sh_ "git -c core.hooksPath=/dev/null commit -m x" 2
+sh_ "git merge --no-verify main" 2
+sh_ "cd r && git commit -n -m x" 2
+sh_ "sh -c 'git commit --no-verify -m x'" 2
+sh_ "/usr/bin/git -C . commit -n -m x" 2
+sh_ "git commit -m 'fix -n handling'" 0
+sh_ "git commit -m x && git log -n 5" 0
+sh_ "git merge -n main" 0
+sh_ "git commit --amend -m x" 0
+sh_ "git push --force origin slice-1a" 2
+sh_ "git push -f origin slice-1a" 2
+sh_ "git push --force-with-lease origin slice-1a" 2
+sh_ "git push origin +slice-1a" 2
+sh_ "git push origin +HEAD:main" 2
+sh_ "git push --mirror origin" 2
+sh_ "git push origin slice-1a" 0
+sh_ "gnokey maketx call -pkgpath gno.land/r/x" 2
+sh_ "cd gno && gnokey list" 2
+sh_ "/usr/local/bin/gnokey list" 2
+sh_ '"$GNO_TOOLCHAIN/gnokey" list' 2
+sh_ "sh -c 'gnokey list'" 2
+sh_ "grep -rn gnokey docs" 0
+sh_ "git commit -m 'docs: never call gnokey'" 0
+sh_ "curl -s https://rpc.gno.land:443/status" 2
+sh_ "curl -s HTTPS://GNO.LAND/r/gnoland/home" 2
+sh_ "rg 'https://rpc.gno.land' docs" 0
+sh_ "cd gno && gno test ./r/..." 0
+sh_ "cat > gno/r/slot/slot.gno <<EOF
+package slot
+EOF" 2
+sh_ "cat > gno/r/slot/slot.gno <<EOF
+package slot
+EOF" 0 "$t/asked.jsonl"
+sh_ "sed -i '' s/a/b/ gno/r/seal/seal.gno" 2
+sh_ "cp /tmp/x.gno gno/r/seal/seal.gno" 2
+sh_ "cat gno/r/seal/seal.gno" 0
+tool_ Write '{"file_path":"/x/gno/r/slot/slot.gno"}' "$t/plain.jsonl" 2
+tool_ Write '{"file_path":"/x/gno/r/slot/slot.gno"}' "$t/says.jsonl" 2
+tool_ Edit '{"file_path":"/x/gno/p/util/util.gno"}' "$t/asked.jsonl" 0
+tool_ Edit '{"file_path":"/x/gno/p/util/util.gno"}' "$t/plugin.jsonl" 0
+tool_ Write '{"file_path":"/x/packages/core/src/a.ts"}' "$t/plain.jsonl" 0
+tool_ WebFetch '{"url":"https://gno.land/r/gnoland/home"}' "$t/asked.jsonl" 2
+tool_ WebFetch '{"url":"https://GNO.LAND/r/gnoland/home"}' "$t/asked.jsonl" 2
+tool_ WebFetch '{"url":"https://rpc.onyx.testnets.gno.land/status"}' "$t/asked.jsonl" 2
+tool_ WebFetch '{"url":"https://docs.gno.land/resources/gno-interrealm"}' "$t/plain.jsonl" 0
+guarded 'not json' 2 "unreadable input"
+guarded '{"tool_name":"Bash","tool_input":null}' 2 "a null tool_input"
 
 echo "hooks: ok"

@@ -57,9 +57,8 @@ def mutants():
     yield from each(".jscpd.json", '"threshold": 0', '"threshold": 100', "probe", "jscpd threshold")
     yield from each("tsconfig.base.json", '"lib": ["es2024"],', "", "probe", "tsconfig lib")
     yield from each("tsconfig.base.json", '"types": [],', "", "probe", "tsconfig types")
-    for path in ("scripts/guard_git.py", "scripts/guard_gno.py"):
-        yield from each(path, "\n        refuse(", "\n        " + OFF, "hooks", f"{path} refusal")
-        yield from each(path, "\n    refuse(", "\n    " + OFF, "hooks", f"{path} refusal (outer)")
+    for indent in ("\n    ", "\n        ", "\n            "):
+        yield from each("scripts/guard.py", indent + "refuse(", indent + OFF, "hooks", f"guard refusal ({len(indent) - 1} spaces)")
     yield from each("scripts/review_pass.py", 'sys.exit(f"review_pass: no', 'print(f"review_pass: no', "hooks", "review_pass check")
     yield from each("scripts/patch_coverage.py", "    sys.exit(1)", "    pass", "hooks", "patch_coverage floor")
     yield from each("scripts/check_docs.py", "    sys.exit(1)", "    pass", "hooks", "check_docs")

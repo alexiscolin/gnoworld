@@ -30,20 +30,11 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 -I \"$CLAUDE_PROJECT_DIR/scripts/guard_git.py\""
-          }
-        ]
-      },
-      {
         "matcher": "Bash|WebFetch|Edit|Write",
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -I \"$CLAUDE_PROJECT_DIR/scripts/guard_gno.py\""
+            "command": "python3 -I \"$CLAUDE_PROJECT_DIR/scripts/guard.py\""
           }
         ]
       }
@@ -75,10 +66,7 @@
         "github.com",
         "api.github.com",
         "codeload.github.com",
-        "objects.githubusercontent.com",
-        "rpc.gno.land",
-        "rpc.onyx.testnets.gno.land",
-        "semgrep.dev"
+        "objects.githubusercontent.com"
       ]
     },
     "filesystem": {
@@ -87,8 +75,7 @@
         "~/.cache/gnoworld-tools",
         "~/Library/Caches/go-build",
         "~/go/pkg/mod",
-        "~/Library/pnpm",
-        "~/Library/Caches/ms-playwright"
+        "~/Library/pnpm"
       ]
     }
   }

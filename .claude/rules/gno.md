@@ -8,7 +8,7 @@ paths:
 
 Everything about gno, realms and pure packages alike, goes through gnomcp: what exists on a
 chain (`gno_packages`), its source (`gno_read`), its state (`gno_render`, `gno_eval`), and every
-write (`gno_call`, `gno_addpkg`, sessions). `scripts/guard_gno.py` holds it: no `.gno` file before
+write (`gno_call`, `gno_addpkg`, sessions). `scripts/guard.py` holds it: no `.gno` file before
 a gnomcp call in the session, no `gnokey`, no raw RPC, no fetched realm page. Locally, `gno test`,
 `gno lint` and `gnodev` stay free.
 

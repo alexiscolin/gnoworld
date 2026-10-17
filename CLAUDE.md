@@ -24,7 +24,7 @@ gnoworld: a social, on-chain, graphical hub for gno.land. The design is
 - Each area's rules are in `.claude/rules/`, loaded when its files are touched. Every review, `/code-review` included, also reads the tiers in `docs/REVIEW.md`.
 - Pairing: in `packages/core/**` (`.claude/rules/core.md`), and wherever a slice plan says "human", write the failing test, commit it marked `test.fails` (the gate and the Stop hook accept it), and stop. Alexis writes the code and removes the mark; then review it.
 - Claude writes the realms, the server and any Go (who reviews what: docs/REVIEW.md).
-- Everything about gno (realms, pure packages, chain reads and writes) goes through gnomcp, never memory, `gnokey` or raw RPC; `scripts/guard_gno.py` refuses the rest (`.claude/rules/gno.md`).
+- Everything about gno (realms, pure packages, chain reads and writes) goes through gnomcp, never memory, `gnokey` or raw RPC; `scripts/guard.py` refuses the rest (`.claude/rules/gno.md`).
 - Read a file before changing it; before changing an exported symbol, find every reference through the language server (`typescript-lsp`), not by text search.
 - Commits: conventional subjects, `type(scope): what` in 72 characters at most (`feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `build`, `ci`, `chore`, `style`, `revert`; the commit-msg hook holds it); one behaviour each, and a refactor apart. Stage files by name, never everything at once (an editor's swap file went in that way once).
 - A speed, size or score claim compares the same work before and after (same inputs, same counts), with both numbers shown.
