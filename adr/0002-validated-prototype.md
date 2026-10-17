@@ -1288,15 +1288,22 @@ remote.
   (CLAUDE.md).
 
 **Review, with AI and people** (`docs/REVIEW.md`):
-- **the tests are audited first,** by a fresh agent whose only job is to catch tests that
+- **what costs no tokens runs first:** the gate, then the mutation tester on the changed
+  code, so a missing test is found without a model;
+- **the tests are audited next,** by a fresh agent whose only job is to catch tests that
   pass while the code is wrong (below), and a slice is not reviewed further until they
   are sound;
-- then fresh-context review agents read the diff through five lenses: correctness,
-  security, performance, accessibility and UX, simplicity;
-- a second pass checks each finding against the code, to drop false positives;
+- **one review pass, sized by risk:** one fresh-context agent reads the diff, by its path,
+  through five lenses at once (correctness, security, performance, accessibility and UX,
+  simplicity); a change to a tier-1 file adds one agent on the strongest model, for
+  security alone;
+- each finding is checked against the code before it is fixed; fixes are re-checked by the
+  gate and the mutation tester, and a second pass runs only for a high finding fixed in
+  tier-1 code;
 - every finding left is fixed or put to Alexis;
 - Alexis reviews blind first, and the review log keeps what each side caught or missed,
-  so a repeated miss becomes a rule, a lint or a test.
+  so a repeated miss becomes a rule, a lint or a test, and a lens whose findings are
+  mostly dropped is narrowed or removed.
 
 **The test audit: no false green.** A test is worthless when a wrong change to the code
 leaves it green. The auditor checks every new or changed test:

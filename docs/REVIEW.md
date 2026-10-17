@@ -73,19 +73,25 @@ Code written by an agent gets the same reading as anyone's, plus this. `/pre-mer
 (`.claude/commands/pre-merge.md`) runs it, with the `test-auditor` and `reviewer` agents
 (`.claude/agents/`):
 
-1. **The test audit comes first.** A fresh agent whose only job is the tests checks each
-   new or changed one: it runs the mutation tester on the changed code, and looks for
+1. **No tokens first.** The gate, then the mutation tester on the changed code: a surviving
+   mutant is a missing test, found without a model.
+2. **The test audit.** A fresh agent whose only job is the tests reads the survivors and each
+   new or changed test, and looks for
    tautologies, mocks of the thing under test, empty assertions ("was called", unread
    snapshots, loose matchers), missing failure and boundary cases, timing guesses, and a
    test not seen failing first (ADR-0002 §9). Its findings are fixed before anything else.
-2. **Five fresh-context lenses** then read the diff, each an agent that did not write it:
-   correctness, security, performance, accessibility and UX, simplicity.
-3. **Verify each finding.** A second pass checks it against the code and drops the false
-   positives.
-4. **Nothing is waved through.** Every remaining finding is fixed, or put to Alexis with
+3. **One review pass, sized by risk.** A fresh agent that did not write the change reads the
+   diff, by its path, through every lens at once: correctness, security, performance,
+   accessibility and UX, simplicity. A change to a tier-1 file adds one more agent, on the
+   strongest model, for security alone. Fixes are re-checked by the gate and the mutation
+   tester; a second pass runs only for a high finding fixed in tier-1 code.
+4. **Each finding is checked against the code** before it is fixed, and a false positive is
+   dropped with its reason.
+5. **Nothing is waved through.** Every remaining finding is fixed, or put to Alexis with
    the scenario.
-5. **Learn from it.** Findings and outcomes go into the review log. A miss that repeats
-   becomes a rule here, a lint, or a test.
+6. **Learn from it.** Findings and outcomes go into the review log. A miss that repeats
+   becomes a rule here, a lint, or a test; a lens whose findings are mostly dropped is
+   narrowed or removed.
 
 ## Blind first
 
