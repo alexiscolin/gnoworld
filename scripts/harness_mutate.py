@@ -45,6 +45,30 @@ def lines(path, pattern, replace, test, label):
         yield f"{label} `{m.group(0).strip()[:50]}`", path, text[: m.start()] + m.expand(replace) + text[m.end():], test
 
 
+def alternatives(selector):
+    """The top-level alternatives of an esquery selector: its commas outside brackets and parentheses."""
+    parts, depth, start = [], 0, 0
+    for i, c in enumerate(selector):
+        depth += (c in "([") - (c in ")]")
+        if c == "," and depth == 0:
+            parts.append(selector[start:i])
+            start = i + 1
+    return parts + [selector[start:]]
+
+
+def selectors(path, test):
+    """One mutant per alternative of each selector, made to match nothing; the others stay."""
+    text = read(path)
+    found = list(re.finditer(r'selector:\s*(["`])(.*?)\1', text, re.S))
+    if not found:
+        yield "eslint selector", path, None, test
+    for m in found:
+        parts = alternatives(m.group(2))
+        for n, part in enumerate(parts):
+            off = ",".join(parts[:n] + [" Never" if n else "Never"] + parts[n + 1:])
+            yield f"eslint selector `{part.strip()[:100]}`", path, text[: m.start(2)] + off + text[m.end(2):], test
+
+
 def mutants():
     """Every guard of the harness, each with the test that must notice it gone."""
     # ESLint: each rule set to "error", switched off; each selector and restricted name, never matching.
@@ -52,8 +76,7 @@ def mutants():
     for m in re.finditer(r'^\s+"?([\w@/-]+)"?:\s*(?=\[?\s*"error"|\[\s*$)', text, re.M):
         at = text.find('"error"', m.end())
         yield f"eslint {m.group(1)} (line {text.count(chr(10), 0, m.start()) + 1})", "eslint.config.ts", text[:at] + '"off"' + text[at + 7:], "probe"
-    yield from each("eslint.config.ts", 'selector: "', 'selector: "Never ', "probe", "eslint selector")
-    yield from each("eslint.config.ts", "selector: `", "selector: `Never ", "probe", "eslint selector")
+    yield from selectors("eslint.config.ts", "probe")
     yield from each("eslint.config.ts", 'property: "', 'property: "never_', "probe", "eslint restricted property")
     yield from each("eslint.config.ts", "noInlineConfig: true", "noInlineConfig: false", "probe", "eslint inline config")
     # The style checks.
