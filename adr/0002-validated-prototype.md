@@ -712,7 +712,12 @@ catch.
 - The tools, the system prompt and the skills are frozen per version, so prompt-cache
   reads cost a tenth of the input price on Sonnet 5.5 and a twentieth on Opus 5.5.
 
-**Evals.** A suite lives in the repo. CI runs it whenever any of these changes:
+**Evals.** A suite lives in the repo, run with promptfoo (MIT; owned by OpenAI since March
+2026, its licence unchanged). It sits in its own `evals/` workspace, a development tool
+that never enters an image. It calls our real loop through a small provider file, grades
+with a model other than the one that answered, keeps every answer in its cache so an
+unchanged case costs nothing, and carries the red team below. Our cases stay plain JSON
+files, so the suite outlives the tool. CI runs it whenever any of these changes:
 - the model;
 - the prompt;
 - a skill;
@@ -724,7 +729,10 @@ A drop below a threshold fails the run. It checks:
   allowlist, read from the loop's log.
 - **Grounding:** every fact traces to a tool result. A different model grades this against
   a rubric.
-- **Prompt injection:** realms and messages with planted instructions.
+- **Prompt injection:** realms and messages with planted instructions; promptfoo's red team
+  adds indirect injection, data exfiltration, excessive agency, goal hijacking, tool
+  discovery, prompt extraction, MCP attacks and cross-session leaks, on every tool change
+  and before launch.
 - **Refusals:** writing or deploying a contract, signing, sending coins. The answer points
   to the call card instead.
 - **Chain facts:** the block height cited, no invented figure, an honest answer when the
@@ -1259,7 +1267,7 @@ from gno-golf's engine, measured there.
 | Load | Ergo with thousands of clients, Jarvis with concurrent questions against a fake model, the moderation queue at peak: latency and errors within budget | k6, against a local stack, never the homelab demo | Before launch |
 | Mutation | Every guard fails a test when removed: realms (`scripts/mutate.py`), and all TypeScript with tests (StrykerJS: its TypeScript checker drops mutants that would not compile, so the score is honest; incremental mode reruns only what changed) | `mutate.py`; StrykerJS | The changed lines before each merge; everything nightly. A score below its floor fails, the floor set from slice 1's first run and only ever raised |
 | Realms | Tests, filetests, `gno-audit` | gno | Every commit |
-| AI | Jarvis's evals (§5), non-hallucination first: every number, name, link and function in an answer is checked by string match against the tool results; an answer with nothing to ground it must say it does not know; a different model grades the rest. A grounded rate below the threshold fails | Our harness | On every change to it; nightly sample |
+| AI | Jarvis's evals (§5), non-hallucination first: every number, name, link and function in an answer is checked by string match against the tool results; an answer with nothing to ground it must say it does not know; a different model grades the rest. A grounded rate below the threshold fails | promptfoo, with our grounding check as a JavaScript assertion | On every change to it; nightly sample |
 | Security | Dependency audit, secret scan, the CSP, the injection suite, the admin console's penetration test | The gate; before launch | Every commit; before launch |
 
 `core` keeps 100% of lines and functions covered and 95% of branches; coverage alone never
@@ -1364,7 +1372,7 @@ Its findings are fixed before any other lens runs.
 - slice 3: `hono`, `@hono/node-server`, `@hono/zod-validator`, `@adena-wallet/sdk` (the
   server's verifier);
 - slice 10: `@anthropic-ai/sdk`, `@modelcontextprotocol/client`, `@opentelemetry/api`,
-  `@opentelemetry/sdk-trace-node`, `@opentelemetry/exporter-trace-otlp-http`;
+  `@opentelemetry/sdk-trace-node`, `@opentelemetry/exporter-trace-otlp-http`, and `promptfoo` in `evals/`;
 - slice 12: `posthog-js`.
 
 k6 runs as a binary or an image, not as a package.
