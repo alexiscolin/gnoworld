@@ -97,6 +97,10 @@ printf 'Run `scripts/real.sh`, see `docs/plans/slice-$ARGUMENTS.md`.\n' >"$d/CLA
 python3 -I "$docs" "$d" >/dev/null 2>&1 || fail "check_docs refused a doc whose files exist"
 printf 'Run `scripts/gone.sh`.\n' >"$d/.claude/rules/x.md"
 python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted a doc naming a missing file"
+rm "$d/.claude/rules/x.md"
+git -C "$d" init -q && printf '.claude/tmp/\n' >"$d/.gitignore" && mkdir -p "$d/.claude/tmp/copy"
+printf 'Run `scripts/gone.sh`.\n' >"$d/.claude/tmp/copy/x.md"
+python3 -I "$docs" "$d" >/dev/null 2>&1 || fail "check_docs read a doc in a folder git ignores"
 
 # format_hook: after an edit, eslint --fix rewrites the file; it never blocks.
 fmt=$(cd "$(dirname "$0")" && pwd)/format_hook.sh
