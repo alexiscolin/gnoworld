@@ -126,7 +126,8 @@ describe("parseLine reads", () => {
     ["@a=b\\ PING x", message("PING", ["x"], { tags: [["a", "b"]] })],
     ["@k=1;k=2 PING x", message("PING", ["x"], { tags: [["k", "2"]] })],
     ["@ok=1;=bad;bad/=x;é=2 PING x", message("PING", ["x"], { tags: [["ok", "1"]] })],
-    // A key is [+][vendor/]name: name is letters, digits and hyphens; vendor is a host name.
+    // A key is [+][vendor/]name: name is letters, digits and hyphens; vendor is a host, which we
+    // take to mean a DNS host name (IRCv3 does not say; an IPv6 literal would hold colons).
     ["@ok=1;a_b=2;++k=3;a:b/k=4;a_b/k=5;-a/k=6 PING x", message("PING", ["x"], { tags: [["ok", "1"]] })],
     ["@a=b  PING x", message("PING", ["x"], { tags: [["a", "b"]] })],
     ["@a=b  :src   PING x", message("PING", ["x"], { tags: [["a", "b"]], source: "src" })],
@@ -208,6 +209,9 @@ describe("parseLine's limits, in UTF-8 bytes", () => {
     ["8191 bytes of tags with the @ and the space", "@k=" + "a".repeat(8187) + " PING x", true],
     ["8192 bytes of tags", "@k=" + "a".repeat(8188) + " PING x", false],
     ["8192 bytes of tags with no command after them", "@k=" + "a".repeat(8189), false],
+    // IRCv3 counts one trailing space; the extra ones before the command are not tags.
+    ["8191 bytes of tags, then extra spaces", "@k=" + "a".repeat(8187) + "   PING x", true],
+    ["8192 bytes of tags, then extra spaces", "@k=" + "a".repeat(8188) + "   PING x", false],
     ["8190 bytes of two-byte characters", "@k=" + "é".repeat(4093) + " PING x", true],
     ["8192 bytes of two-byte characters", "@k=" + "é".repeat(4094) + " PING x", false],
   ])("%s", (_, line, ok) => {
