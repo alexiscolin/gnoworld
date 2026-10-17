@@ -39,7 +39,7 @@ assert guard and all(h.get("onFailure") == "block" for h in guard), "guard does 
 box = s["sandbox"]
 assert box["enabled"] is True and box["allowUnsandboxedCommands"] is False, "the sandbox can be left"
 assert {"~/.ssh", "~/.config/gh", "~/.npmrc", "~/.aws"} <= set(box["filesystem"]["denyRead"]), "a credential is readable"
-assert {"scripts", ".githooks", "package.json", ".node-version", "pnpm-lock.yaml", ".gitignore", "CLAUDE.md", ".claude/rules"} <= set(box["filesystem"]["denyWrite"]), "a command can rewrite the harness, the lockfile or the rules"
+assert {"scripts", ".githooks", ".github", "package.json", ".node-version", "pnpm-lock.yaml", ".gitignore", "CLAUDE.md", ".claude/rules"} <= set(box["filesystem"]["denyWrite"]), "a command can rewrite the harness, the lockfile or the rules"
 assert not [p for p in box["filesystem"]["allowWrite"] if "pnpm" in p], "a command can rewrite the pnpm that Alexis's install runs"
 assert not any("api.github.com" in d for d in box["network"]["allowedDomains"]), "the GitHub API is reachable"
 ask, deny = set(s["permissions"]["ask"]), set(s["permissions"]["deny"])
@@ -308,6 +308,15 @@ echo more >>"$c2/a.ts" && git -C "$c2" add a.ts
 git -C "$c2" reset -q && printf '#!/bin/sh\nexit 0\n' >"$c2/scripts/check.sh" && git -C "$c2" add scripts/check.sh && git -C "$c2" commit -qm green
 printf '#!/bin/sh\nexit 0\n# being edited\n' >"$c2/scripts/check.sh" && echo again >>"$c2/a.ts" && git -C "$c2" add a.ts
 (cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) || fail "pre-commit refused a commit for a harness edit it does not hold"
+# The helpers it runs come from what is staged, not from the disk: an unstaged edit of one
+# must not neuter the gate (finding F067).
+git -C "$c2" checkout -q -- scripts/check.sh && printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && git -C "$c2" add scripts/check.sh && git -C "$c2" commit -qm red
+printf '#!/bin/sh\ncp /dev/null "$1/scripts/check.sh"\n' >"$c2/scripts/borrow_node_modules.sh"
+echo yet >>"$c2/a.ts" && git -C "$c2" add a.ts
+(cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit ran an unstaged helper that emptied the gate"
+git -C "$c2" checkout -q -- scripts/borrow_node_modules.sh && printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/code_changed.sh"
+(cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit ran an unstaged code_changed.sh that skipped the gate"
+git -C "$c2" checkout -q -- scripts/code_changed.sh
 fi
 
 if part guard; then

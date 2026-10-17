@@ -53,7 +53,7 @@ Three ideas run through it:
    runs the full gate again and needs the committed review pass for exactly that tree. Claude
    cannot do either: the sandbox refuses the merge's writes to the harness (F063), and over a
    remote session its commands cannot read the keychain that holds the GitHub token (F064).
-10. **The CI** runs the full gate again on GitHub's machines, for every push and pull request.
+10. **The CI** runs the full gate again on GitHub's machines, for every branch pushed.
 
 ## The gate
 
@@ -187,7 +187,7 @@ measure, slice 1a's merge, found 25 or more, one of them a way out of the sandbo
 ## Known limits
 
 - **The server reports, it does not block.** The CI (`.github/workflows/gate.yml`) runs the
-  full gate on every push and pull request, but GitHub cannot protect a branch on this
+  full gate on every branch pushed, but GitHub cannot protect a branch on this
   repository's plan: a red run cannot stop a merge, and the git hooks on this machine can be
   skipped by someone who means to (findings F009, F001).
 - **Claude Code's layer is active only in a session started in this folder,** or moved into
