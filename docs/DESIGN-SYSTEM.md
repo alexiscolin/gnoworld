@@ -138,16 +138,16 @@ the component.
 |---|---|---|
 | `Button` | primary, secondary, text; sizes m, l, xl; with an icon; disabled; busy | A primary is filled with `--color-primary`. Never two primaries side by side |
 | `IconButton` | sizes s, m; pressed | Always an `aria-label`. The tooltip shows the same text |
-| `Chip` | default, selected, with a count | Room chips, quick actions, filters, genre lenses (ADR-0002 §3) |
+| `Chip` | default, selected, with a count; the "Testnet" and "Sponsored" badges | Room chips, quick actions, filters, genre lenses (ADR-0002 §3), the universe switcher |
 | `Tabs` | segmented, with counts | ARIA `tablist`. Notifications, the library filter, the rail |
 | `Popover` | anchored, with arrow keys inside | The native `popover` attribute where it fits; outside click and `Esc` close it |
 | `Dialog` | standard, wide | The native `<dialog>`. Focus moves to the first field or the title, never to a primary button. Device-only routes (`/passport`, `/saved`) open as dialogs over the current place. Not for transactions (ADR-0002 §4) |
 | `Card` | message card, call card (preview → sign → landing → result), realm digest, proposal, event, announcement | Call cards and digests follow ADR-0002 §4 |
-| `Row` | with a planet thumbnail, a title, a subtitle, a trailing action | Lists, connected worlds, notifications |
+| `Row` | with a planet thumbnail, a title, a subtitle, an activity slot (people here, messages an hour), a trailing action | Lists, connected worlds, notifications. The activity slot carries in words what the 3D shows, for phones, reduced motion and screen readers |
 | `Field` | text, search; the composer | The composer is a rich text box: bold shows as bold, Markdown on the wire |
 | `Avatar` | sizes 20, 24, 48 | An astronaut generated from the name (ADR-0002 §1, §8 row 9): a stylized, futuristic suit and helmet, few details, readable at 20 px. Phase 1: its parts chosen by the person. Never a planet. No uploaded picture (ADR-0002 §6). Never a "verified" badge |
 | `PlanetThumb` | world, ecosystem cluster, star, station, signal; dock magnification | Rendered from the same look as the 3D world |
-| `Stat` | number, unit, caption | Tabular numbers |
+| `Stat` | number, unit, caption; the heat badge | Tabular numbers. Under reduced motion, effects become `Stat` counts |
 | `ActivityChart` | 24 h bars, a hover tooltip | SVG, no chart library |
 | `Kicker` | with a dot | `--text-label` |
 | `Flash` | title, line, one action | One at a time; the next waits |
@@ -179,6 +179,13 @@ Breakpoints:
   plate goes below the planet.
 - 1200 px: the dock opens by itself on a world.
 - 1400 px: the dock's width.
+
+**When space runs short,** things drop in this order, never overlapping:
+- a world's focus view (for example 1280 px with the plate and the dock): the flight
+  panel's details, comets, auroras, small storms, moon labels (the moons stay), the rings'
+  detail. The planet, its heat and its status ring never drop;
+- the cosmos: the ticker, then the markets row, then the rail shortens to twelve worlds.
+  The hero's number and its two actions never drop.
 
 Components use container queries, so they fit wherever they are placed.
 

@@ -13,12 +13,14 @@ Browser: the static client (React Router 8, pre-rendered pages, one three.js sce
   ├─ markets.json ......................... prices, written every 5 minutes by a scheduled job
   ├─ PostHog, EU cloud .................... counts only, cookieless (ADR-0002 §6)
   ├─ indexer.gno.land (graphql-ws) ........ chain events, live
-  ├─ Adena (extension) .................... the login signature; calls the user signs
-  └─ the server (TypeScript on Node) ..... login, moderation, signals, prices, the admin API, Jarvis
+  ├─ Adena (extension, `window.adena`) .... the login signature; calls the user signs (desktop only)
+  ├─ server (TypeScript on Node) ......... login for Ergo, moderation and the activity API, signals, prices, the admin API
+  └─ jarvis (same image) .................. Jarvis, gnomcp as a child process, translation
 ```
 
 The client is a static site. Anyone can host it, and it never holds a secret. The services
-export OpenTelemetry to Grafana and Langfuse.
+export OpenTelemetry to whatever backend ops chooses: Grafana in the demo, Langfuse Cloud
+for Jarvis from phase 1 (ADR-0002 §5, §7).
 
 ## Repository layout
 
@@ -45,8 +47,8 @@ app/                         the web client
   src/
     root.tsx                 document shell, providers, top error boundary
     routes/                  one module per URL: meta, build-time loader, the screen
-    core/                    pure rules: no DOM, no React, no three, no network
-    lib/                     the boundaries: Ergo client, chain reads, indexer, Adena, IndexedDB, schemas
+    lib/                     the boundaries: Ergo client, chain reads, indexer, Adena (`lib/adena`), IndexedDB;
+                             they parse with `@gnoworld/schemas` and apply `@gnoworld/core`
     store/                   the one Zustand store, one slice per feature
     scene/                   three.js only: renderer, loop, flights, bodies, level of detail, labels
     ui/                      the design system: tokens, layers, components (docs/DESIGN-SYSTEM.md)
@@ -101,7 +103,10 @@ can; review checks the rest.
 **The compiler** (`tsconfig.json`): `strict`, plus `noUncheckedIndexedAccess`,
 `exactOptionalPropertyTypes`, `noImplicitOverride`, `noFallthroughCasesInSwitch`,
 `noPropertyAccessFromIndexSignature`, `noUnusedLocals`, `noUnusedParameters`,
-`verbatimModuleSyntax` and `isolatedModules`.
+`verbatimModuleSyntax`, `isolatedModules`, `erasableSyntaxOnly` and
+`rewriteRelativeImportExtensions`: Node runs the server's TypeScript directly, so only
+syntax it can erase is allowed (no enums, no namespaces with code, no parameter
+properties).
 
 **Lint:** typescript-eslint's `strict-type-checked` and `stylistic-type-checked`, the import
 boundaries above, and no import cycles (a cycle check, asked for in slice 1).
@@ -109,8 +114,9 @@ boundaries above, and no import cycles (a cycle check, asked for in slice 1).
 **Types carry the meaning:**
 - **No `any`, no `@ts-ignore`, no `!`, and no `as` on outside data** (CLAUDE.md). `satisfies`
   checks literal tables and configs; `as const` keeps them literal.
-- **Outside data has one schema.** Each boundary's Zod schema lives in `lib`, and its type is
-  `z.infer` of it: one source, never a hand-written twin.
+- **Outside data has one schema.** Each boundary's Zod schema lives in `packages/schemas`,
+  and its type is `z.infer` of it: one source, never a hand-written twin. `lib` parses with
+  it.
 - **Branded types for ids and units,** made only by their parser: `WorldId`, `RoomName`,
   `Address`, `BlockHeight`, `Ugnot`. A room name can never be passed where an address is
   expected, nor ugnot where GNOT is.
@@ -128,8 +134,9 @@ boundaries above, and no import cycles (a cycle check, asked for in slice 1).
 - One concept per file, named after what it exports. A file past about 300 lines is split.
 - Named exports only, except route modules (React Router). No barrel files, except each
   feature's `index.ts`, its public surface.
-- Imports by path alias (`@/core`, `@/lib`, `@/ui`, `@/features/chat`), and `import type` for
-  types.
+- Imports by package name across workspaces (`@gnoworld/core`, `@gnoworld/schemas`) and by
+  `#` subpath imports inside one (`#ui/Button`), with `import type` for types. Never tsconfig
+  `paths`: Node ignores them.
 - Functions are verbs (`pickBubbles`, `placeSystem`), types are nouns, booleans read as
   questions (`isLive`, `hasDigest`). No abbreviations a newcomer would have to guess.
 - Exported functions in `core` and `lib` carry a one-line TSDoc: what it returns and when it

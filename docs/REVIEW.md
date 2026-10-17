@@ -9,7 +9,7 @@ Review by risk, not line by line everywhere.
 | 1 | Realms (`r/`, `p/`), the sponsor, relay authorization | Claude | Claude and a fresh-context `gno-auditor` read every line. Alexis reviews the function cards and the attack scenarios. External audit before mainnet |
 | 1 | Client crypto (keys, signed statements, Merkle, the MLS boundary), the CSP | Alexis for the core, Claude elsewhere | Alexis reads every line |
 | 2 | Other TypeScript (state, queries, views) | Alexis for the core, Claude elsewhere | Alexis reads the tests first, then every line |
-| 1 | The server's login, the admin API's rights, the approval signing | Claude | Alexis reads every line |
+| 1 | The server's login, the admin API's rights, the approval signing, the admin console, Jarvis's tool-allowlist loop, `lib/adena` | Claude | Alexis reads every line |
 | 2 | The rest of the server (TypeScript on Node) | Claude | Alexis reads the tests first, then every line |
 | 2 | Go (the seal reference client) | Claude | Behaviour and tests |
 | 3 | Interface, 3D, motion | Either | Run it; read the budgets the gate prints |

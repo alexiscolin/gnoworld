@@ -5,9 +5,9 @@
 | Status | Proposed. The lead approved the prototype on 2026-10-16. Alexis made the open decisions on 2026-10-17 (§8, questions 14–20). This text waits for his reading |
 | Date | 2026-10-16, revised 2026-10-17 |
 | Author | Alexis Colin |
-| Builds on | [ADR-0001](0001-gnoworld.md). Amends its §7 (levels and navigation rules, mobile included), §10 (the generated face), §12 (routing, rendering), §13 (pieces and hosting), its "Ideas to place" and its rollout (§8, rows 5 and 11). Answers part of its question 5 (moderation of public rooms) |
+| Builds on | [ADR-0001](0001-gnoworld.md). Amends its §1 and §2 (the login program), §7 (levels and navigation rules, mobile included), §9 (moderation), §10 (the generated face, the tiers), §12 (routing, rendering, a Node server), §13 (pieces and hosting), its "Ideas to place" and its rollout (§8). Answers part of its question 5 (moderation of public rooms) and its question 12 (where the servers run) |
 | Prototype | [docs/prototype](../docs/prototype/README.md): live artifact (version 57), two walkthrough videos, five reviews |
-| Verified | **2026-10-16:**<br>- npm: `react-dom` 19.3.1 exports `react-dom/static`; `react-router` and `@react-router/dev` are at 8.4.0.<br>- React Router's pre-rendering guide.<br>- `gno.land/r/gov/dao` on onyx with gnomcp: `Render` and `GetProposal` are free reads; `MustVoteOnProposalSimple(cur realm, pid int64, option string)` is a call.<br>**2026-10-17:**<br>- The Claude Agent SDK docs: MCP, permissions, skills, hooks, observability, cost.<br>- gnomcp 0.12.0's `docs/security.md`: a read-only chain has no write path.<br>- seedfall's ADR-002 §2.2, §2.6 and ADR-008 §12.3.<br>- gnomcp's `docs/tools.md`: `gno_status`, `gno_history`, `gno_activity` (the tx-indexer has no transaction time yet).<br>- gno's `gno.land/pkg/sdk/vm/convert.go` (2026-10-15): a call's arguments are primitive types and bytes only.<br>- gnoweb serves a realm's page as raw Markdown on `Accept: text/markdown` (gno PR #5794).<br>**Secondary sources only, to confirm in their slice:** OpenAI's Moderation API and PostHog |
+| Verified | **2026-10-16:**<br>- npm: `react-dom` 19.3.1 exports `react-dom/static`; `react-router` and `@react-router/dev` are at 8.4.0.<br>- React Router's pre-rendering guide.<br>- `gno.land/r/gov/dao` on onyx with gnomcp: `Render` and `GetProposal` are free reads; `MustVoteOnProposalSimple(cur realm, pid int64, option string)` is a call.<br>**2026-10-17:**<br>- gnomcp 0.12.0: a read-only chain has no write path (`docs/security.md`); `gno_status`, `gno_history`, `gno_activity` (`docs/tools.md`); its audit file is written under `$HOME` (`cmd/gnomcp/main.go`).<br>- gno: a call's arguments are primitive types and bytes (`gno.land/pkg/sdk/vm/convert.go`); gnoweb serves pages as `text/markdown` (PR #5794); onyx approves deploys automatically, mainnet by approvers (the gno skill's `networks.md`); names are registered with `r/sys/namereg/v0.Register`.<br>- Adena: SDK 0.1.1 and extension 1.22.3, read in their source and tested in Node (sign-in, its verifier, errors, networks, events, fees, mobile, sessions).<br>- The server's stack on npm and in Docker on arm64: Node 24.22.0, Hono 4.13.13, `node:sqlite`, pnpm 12.14.0, `@anthropic-ai/sdk` 0.135.0, `@modelcontextprotocol/client` 2.3.1, a distroless Node 24 image.<br>- The homelab's Caddy, Funnel and Docker setup, for the demo.<br>- seedfall's ADR-002 §2.2, §2.6 and ADR-008 §12.3.<br>**Secondary sources only, to confirm in their slice:** OpenAI's Moderation API and PostHog |
 
 ## Summary
 
@@ -24,8 +24,8 @@ This ADR records:
 
 1. **The concepts.** What the product does, each concept placed in a phase with the pieces
    it needs (§1).
-2. **Addresses and search.** Every place has a URL and a pre-rendered page, with no server
-   in production (§2).
+2. **Addresses and search.** Every place has a URL and a pre-rendered page, with no
+   rendering server in production (§2).
 3. **The universe at scale.** Millions of realms stay readable: one stable place each, a
    rank from real signals, and a bounded level of detail (§3).
 4. **Realm calls.** Reads are free; calls are inline cards signed in Adena (§4).
@@ -38,10 +38,20 @@ This ADR records:
 **The prototype's code is not reused.** Every concept is rebuilt slice by slice, test first
 (§9, `docs/plans/backlog.md`).
 
-**A word on words.** The product says "world" where ADR-0001 says "hub". The code and the
-realm (`r/gnoworld/hubs`) keep "hub". "Satellite" means a sponsored slot (§1); people are
-not drawn as satellites (§8). People are astronauts: an avatar is never a planet, since
-planets are worlds (§1).
+**A word on words.** One meaning per word:
+- **world:** a place with rooms, shown as a planet: a realm's world, or a station. The code
+  and the realm (`r/gnoworld/hubs`) say "hub", as ADR-0001 does.
+- **realm:** a gno.land package with state. Every realm has a URL; only those with signals
+  are worlds drawn as planets, the others are **dust** (§3).
+- **system:** a namespace's star and its realms. **Universe:** one chain (§1).
+- **station:** a world the team builds, not a realm.
+- **moon:** one of a world's busiest rooms. The Earth's Moon, and Broadcast Moon (a
+  station), keep their names.
+- **status ring:** the arc a realm's state draws. **Rings:** a planet's own. AI Ring is a
+  station.
+- **signal:** a new realm not yet charted.
+- **satellite:** a sponsored slot (§1); people are not drawn as satellites (§8). People are
+  **astronauts**: an avatar is never a planet.
 
 ## Context
 
@@ -70,6 +80,8 @@ planets are worlds (§1).
   with evals and complete observability (§5).
 - **Alexis set the server on 2026-10-17:** TypeScript on Node, sharing its rules and schemas
   with the client; Ergo stays, as an image (§7).
+- **Alexis set identity and phones on 2026-10-17:** an account is its address, the same on
+  every chain; phones read in phase 0, since Adena cannot sign on a phone yet (§1, §4).
 - **Alexis set the delivery on 2026-10-17:** a simple stack for demos inside the company,
   then everything handed to ops in Docker; ops decides where it runs (§7).
 - **On 2026-10-17 Alexis moved into phase 0:** Jarvis, calls signed by users (names, votes,
@@ -95,33 +107,33 @@ Phases are ADR-0001's:
 |---|---|---|---|---|
 | The cosmos | gno.land as the sun; namespaces as star systems, realms as planets generated from their path (same path, same planet), placed by §3; the asteroid belt; the uncharted frontier | 0 from the hubs data file; 1 from the chain (§3) | Scene; the hubs data file, then `r/gnoworld/hubs` and the signals | Read |
 | Ecosystems | Curated regions: the namespaces of one project or topic placed together, with a group view | 0 | Ecosystems data file, curated by the team | — |
-| Universes | One per chain, never shown together. Mainnet (`gnoland-1`) is the default; Onyx, the testnet, and community chains are other universes, reached by a switcher with a jump, not a flight. A testnet is always labelled "Testnet", so test tokens never pass for real ones. Each universe reads and calls its own chain. The Earth and its general room live in the main universe | 0 | The universes data file; one RPC per chain | Read |
+| Universes | One per chain, never shown together. Mainnet (`gnoland-1`) is the default; Onyx, the testnet, and community chains are other universes, reached by a switcher with a jump, not a flight. A testnet is always labelled "Testnet", so test tokens never pass for real ones. Each universe reads and calls its own chain. People belong to no chain, so the Earth and its general room appear in every universe. The demo opens on Onyx | 0 | The universes data file; one RPC per chain | Read |
 | Namespace systems | One star per registered namespace, its realms and packages in orbit | 1 | `vm/qpaths` by namespace; §3 | Read |
 | Genres | What a realm is: token, DAO, game, social… A realm can have several. A lens on the map lights one genre wherever it is | 0 from the data file; 1 computed from imports (§3) | The genre classifier | Read |
 | Visibility rank and dust | Realms with real signals are planets; quiet realms are dust around their star, still found by search, by URL and in the list (§3) | 1. In phase 0, every world in the data file is a planet | The signals (§7) | Read |
 | Stations | Places the team designs and builds in full, then open to everyone: anyone visits, talks in their rooms and uses their content. Not realms, and not necessarily tied to one; labelled as stations. Hand-made realistic 3D, never generated. The team places them in well-defined zones of the map, and they always show, outside the rank (§3). Today: AI Ring (something built with AI), Broadcast Moon (a moon of screens: videos embedded from accepted services and generative pieces the team makes, in categories, with a viewer), Harbor (long reads) | 0 | Stations data file and their 3D models, by the team. Broadcast Moon's videos are embeds from accepted services (§6) | — |
 | Map view | The same space from above, condensed: distances shortened so the universe fits one screen; each cluster (an ecosystem, a namespace system, a region) one mark with its count; only the landmarks named (rank and curation, stations, the Earth, GovDAO, what you follow); zone captions. Never every planet. A click on a cluster flies into it | 0 | Scene; the ladder of §3 | — |
 | Level of detail | The ladder of §3. Key labels from afar: groups, Earth, GovDAO, systems, signals, the two hottest worlds, what you follow, the next event. The rest appear on approach. Labels never overlap | 0 | Scene, labels layer | — |
-| Heat | A steady warm glow on the busiest worlds, stronger with activity, with a "24% · 148/h" badge and a rising icon. No rings, no lines | 0 from room user counts; 1 adds realm calls | Ergo `LIST` counts (checked in slice 4); the indexer | Read |
+| Heat | A steady warm glow on the busiest worlds, stronger with activity, with a "24% · 148/h" badge and a rising icon. No rings, no lines | 0 from the people present, which the client reads from Ergo's `LIST` (checked in slice 4); 1 adds realm calls | Ergo; the signals | Read |
 | Telescope | Hover a world's name to read its room's last lines without flying there | 0 if Ergo serves history to a non-member (checked in slice 4), otherwise 1 through the signals feed | Ergo history | — |
 | Routes | On hover, lines to the realms a world calls or imports, with traffic moving on them | 1 | Indexer for calls; `vm/qfile` for imports | Read |
 | Embassies | A room shared by two worlds, drawn as a small station between them | 0 | One Ergo channel listed by two worlds | — |
 | Focus view | The plate: name, two facts, activity chart, one main action, connected worlds, a real capture of the world's page, links. The planet sits on the plate's edge; the chat is docked. A connected world is one of three rows: a realm it calls or that calls it, with calls a day; a shared room; "N people from X are here now · say hi". Each row flies there or sends a comet (phase 1) | 0 | — | Read |
 | Flight panel | During a flight: "In transit", the target, distance, speed, arrival and a progress bar; "Course plotted" on leaving, "Entering orbit" on arrival | 0 | Scene | — |
 | Status ring | A thin arc around a world for what the realm itself reports: a proposal's tally, a deadline the realm defines. gnoworld invents no timer (§8, row 2). Activity trends belong to the heat badge, never the ring | 0 | Realm reads | Read |
-| Rooms as moons | The busiest rooms orbit as moons, four at most, and the room you are in is always one: a moon's size follows the people present, it flares when someone speaks, a click joins the room. A "+96" chip beside them opens the room switcher. The Earth keeps one moon, the real Moon, for its busiest room after the general one (§3) | 0 | Ergo counts | — |
-| Storms | A conversation speeding up forms a storm's eye on the planet, growing with the pace of messages; a click joins that room | 0 | Ergo | — |
+| Rooms as moons | The busiest rooms orbit as moons, four at most, and the room you are in is always one: a moon's size follows the people present, it flares when someone speaks (the activity API, near a world), a click joins the room. A "+96" chip beside them opens the room switcher. The Earth keeps one moon, the real Moon, for its busiest room after the general one (§3) | 0 | Ergo counts | — |
+| Storms | A conversation speeding up forms a storm's eye on the planet, growing with the pace of messages; a click joins that room. Shown near a world or a system, never from afar | 0 | The activity API (§7) | — |
 | Auroras | The poles light with calls to the realm, stronger with calls per minute | 1 | The signals at scale (§7) | Read |
 | Comets in space | A message sent to another world's room crosses space as a comet (Chat, comets) | 1 | The comets bot | — |
 | Talk box | With the chat closed, the last lines of the world's room on its plate | 0 | — | — |
 | Realm facts | Path, deployer, first block, calls in 24 h | 0 | The public indexer | Read |
 | Latest post on X | — | Cut, unless a source is decided | — | — |
-| The Earth | Bubbles where people speak from, with counts for the far side ("Japan · 12, far side"); hotspots per country with the last hour's trend ("+15% · 1 h"); the globe turns to show your own message; "N realms deployed in 24 h" from the indexer | 0 | `pickBubbles` and its rules file (ADR-0001 §7) | — |
+| The Earth | Bubbles where people speak from, with counts for the far side ("Japan · 12, far side"); hotspots per country with the last hour's trend ("+15% · 1 h", from the activity API); the globe turns to show your own message; "N realms deployed in 24 h" from the indexer | 0 | `pickBubbles` and its rules file (ADR-0001 §7) | — |
 | Bubbles on other worlds | The prototype pops messages on any planet | Cut: bubbles are the Earth's, by country (ADR-0001 §7). Moons, storms, auroras and heat carry activity elsewhere (§3) | — | — |
 | Hero | The number of people online, one line, two big actions | 0 | Ergo counts | — |
 | Markets row | GNOT, ATONE and BTC with a 24 h line; the block height | 0 | The prices file (§6) | Read |
 | Ticker | A pausable line of what is happening: votes, events, new worlds | 0, chain events included | The public indexer | Read |
-| Rail | The worlds or the groups, magnified like a dock under the pointer. By default, the most used worlds right now (social and realm), after the ones you follow: 25 at most, scrolling, then a "See all" button to the list view. The order changes at most once a minute, only when a world stays clearly ahead, and never under the pointer | 0 | Ergo counts; the signals in phase 1 | — |
+| Rail | The worlds or the groups, magnified like a dock under the pointer. By default, the most used worlds right now (social and realm), after the ones you follow: 25 at most, scrolling, then a "See all" button to the list view. "Most used" means the most people present now; phase 1 adds realm calls. The order changes at most once a minute, only when a world stays clearly ahead, and never under the pointer | 0 | Ergo's `LIST`; the signals in phase 1 | — |
 | List view | Everything as panels, no 3D, filterable by genre | 0 | — | — |
 | Search | ⌘K over the current universe's worlds, ecosystems, stations and genres, grouped with their counts, with "Go explore" on top; satellites labelled "Sponsored"; in phase 1 over every realm, dust included | 0 | — | — |
 | Loader | Real texture progress, then the space opens like an iris | 0 | — | — |
@@ -145,7 +157,7 @@ Phases are ADR-0001's:
 | Contextual quick actions: Who's here, Calendar, Realm, Proposal, Station, Catch up, Poll | 0, votes and Catch up included; Poll in 1 | — |
 | Who's here: the people in the room | 0 | Ergo `NAMES` |
 | Person card: the worlds a person belongs to, message them, fly to them | 0 for the worlds they are in and "Message", a plain DM (below); 1 for the profile realm, "helped N" and the stamp count if the person publishes it | Ergo; `r/sys/users` |
-| Your name and face | 0: a gno name read from `r/sys/users`, and an astronaut generated from the name: a stylized, futuristic suit and helmet with few details, readable at 20 px. The same name gives the same astronaut everywhere. Registering a name happens in the app from phase 0: a call card to `r/sys/users`, signed in Adena (§4). 1: choose the suit, helmet, visor and emblem, saved in the profile realm. Never a planet; no uploaded picture (§6) | The astronaut generator (SVG from parts); `r/sys/users`; the profile realm |
+| Your name and face | 0: your account is your address `g1…`, the same on every chain. The name shown is your mainnet name (`r/sys/users`), or your short address if you have none. Your astronaut is generated from the address: a stylized, futuristic suit and helmet with few details, readable at 20 px, the same everywhere. Registering a name happens in the app from phase 0: a call card to `r/sys/namereg/v0.Register` (`nym-` names), signed in Adena (§4). 1: choose the suit, helmet, visor and emblem, saved in the profile realm. Never a planet; no uploaded picture (§6) | The astronaut generator (SVG from parts); `r/sys/users`, `r/sys/namereg/v0`; the profile realm |
 | Notifications filtered by kind (messages, worlds, news) and by world | 0 in the app. News comes from a file the team curates | Ergo mentions |
 | Push notifications | 1, through the PWA: desktop, Android, and the iPhone from iOS 16.4 once the site is added to the home screen. Native apps come only when measurement justifies them, with their own ADR: Capacitor on mobile, Tauri on desktop, both wrapping the same React code. Never a rewrite such as React Native | `draft/webpush`, and the PWA (ADR-0001 §12) |
 | Photos and videos, gallery and lightbox | 0: links from accepted services render as embeds once the moderation check passes. gnoworld hosts no uploads (§6) | The embed allowlist |
@@ -157,9 +169,10 @@ Phases are ADR-0001's:
 | Weekly report, posted in the Earth's room | 1 | Written by the team (question 19) |
 | "New here" on a first message, and a welcome | 1 | A server-side tag |
 | Routed questions: an unanswered question reaches people from the world that knows; a "Thanks" counts toward "helped N" | 1 | Opt-in helpers |
-| Translation: a message in another language arrives translated, with "show original"; anyone can turn it off | 0 | Jarvis's service with Haiku: one translation per message and language serves every reader, within Jarvis's budget; the original shows when the budget is spent (§5) |
+| Translation: a message in another language arrives translated, with "show original"; anyone can turn it off | 0 | Jarvis's service with Haiku: one translation per message and language serves every reader, within its own budget; the original shows when it is spent (§5) |
 | Voice rooms | 1, after phase 0, with its own ADR first | WebRTC: a media server, TURN, live moderation |
-| Plain direct messages: between named people, through the server and not encrypted, labelled "not encrypted: the server can read these"; block, report, and DMs from strangers can be turned off. The moderation bot does not read them; a report sends the reported messages to a person | 0 | Ergo private messages; a name |
+| On a phone | 0: read and follow; speaking, Jarvis and signing happen on a computer, said in place ("To speak, log in on a computer"). Adena cannot sign on a phone yet; this opens again when it can (§4) | — |
+| Plain direct messages: between logged-in people, through the server and not encrypted, labelled "not encrypted: the server can read these"; block, report, and "only from people I have talked with" (the server knows past DM partners). Kept for a fixed number of days. The moderation bot does not read them; a report sends the reported messages to a person | 0 | Ergo private messages; a login |
 | Encrypted direct messages, and the seal | 2 (ADR-0001 §2–§4). A seal records a conversation's Merkle root and both signatures, never the messages. Putting messages themselves on chain is the user's explicit choice: an encrypted archive, or a public excerpt (ADR-0001 §4). Public rooms are not sealed: they are public already | MLS; `r/seal` |
 
 **Realms** (§4)
@@ -173,7 +186,7 @@ Phases are ADR-0001's:
 | Proposal cards (GovDAO, Memba). GovDAO is a world near the sun: ADR-0001's "galactic council" | 0, to read and to vote | Votes stay in their realms (ADR-0001 §11) |
 | A new realm appears as a signal; the first to fly there charts it, and the first to speak there leaves "first words" | 0 | Indexer (`addpkg` events, once live); the signals role knows who came first; Ergo's history gives the first words |
 | Real previews: a capture of the world's public page | 0 | None: a build job captures gnoweb or the world's site |
-| Satellites: sponsored words in orbit around a world, rented by the day (rules in §8, row 7) | 0, once the slot realm is audited and approved on mainnet | A slot realm paid in GNOT; the moderation service's approval |
+| Satellites: sponsored words in orbit around a world, rented by the day (rules in §8, row 7) | 0 on Onyx, where deploys are approved automatically, shown only in the Onyx universe; mainnet after an external audit and mainnet's approval, without holding back phase 0's exit | A slot realm paid in GNOT; the moderation service's approval |
 
 **Jarvis** (§5)
 
@@ -193,7 +206,7 @@ Phases are ADR-0001's:
 | Concept | Phase | Where |
 |---|---|---|
 | Passport: a stamp per world visited, constellations per ecosystem | 0 | Device. Progress shows per constellation, never against the universe's total (§3). A person may publish their stamp count on their profile (phase 1); otherwise nobody else sees it. These are not ADR-0001's paid stamps, which travel with a tip |
-| "You charted it": the uncharted worlds you were the first on your device to visit. On a first visit a scan sweeps the planet, then "Stamped" and, for the first in the universe, "First to chart · your name stays on it · Share" | 0 | Device; the shared "first to chart" from the signals role (Realms, above) |
+| "You charted it": the uncharted worlds you were the first on your device to visit. On a first visit a scan sweeps the planet, then "Stamped" and, for the first in the universe, "First to chart · your name stays on it · Share" | 0 | Device. Only a first visit to an uncharted world reaches the server, for the shared "first to chart" (Realms, above); nothing else of the passport leaves the device |
 | Daily expedition: the same three stops for everyone, the first where something is live; a streak; a shareable route | 0 | Device; the stops from a data file the team curates |
 | Quests across worlds, each ending on a realm action. Rewards stay on the device: no NFT badges (ADR-0001 §11) | 0 | Device; the quests data file |
 | "Go explore": the live moment if one is near, otherwise the expedition | 0 | — |
@@ -218,14 +231,14 @@ changes ADR-0001 §12, where the URL held the camera state. It replaces ADR-0001
 | `/r/*`, `/p/*` | A realm or a package by its path, as on gnoweb (phase 1). A realm that is also a world points its canonical to `/w/:world` | Planets only; dust uses the SPA fallback | Planets only; dust is `noindex` until it becomes a planet |
 | `/list` | Everything as panels | Yes | Yes |
 | `/events` | The calendar | Yes, rebuilt when the events file changes | Yes, with `Event` structured data |
-| `/@:name` | A person (phase 1) | Yes, from `r/sys/users` at build time | Yes |
+| `/@:name` | A person by their mainnet name, or `/@g1…` by address (phase 1) | Yes, from `r/sys/users` at build time | Yes |
 | `/passport`, `/saved`, `/settings` | Device-only views, shown as dialogs over the current place | No: the SPA fallback | `noindex` |
 | `/net/:network/…` | Another universe (Onyx, a community chain): the same paths under its prefix, for example `/net/onyx/w/bubble` | Yes | Mainnet only. A testnet's pages are `noindex`, as gnoweb does for testnets (gno PR #6256) |
 
 The `/n/`, `/r/` and `/p/` paths are proposed here and confirmed in the namespace-systems
 slice.
 
-**Pre-rendering, with no server in production.**
+**Pre-rendering, with no rendering server in production.**
 - React Router 8 in framework mode, with `ssr: false` and an async `prerender` that lists
   every place from the data files. In phase 1 it lists them from `r/gnoworld/hubs` and the
   signals at build time.
@@ -250,7 +263,8 @@ slice.
 **Also generated at build time:** `sitemap.xml` and `robots.txt`.
 
 **Text first.**
-- On phones, the chat comes first and the 3D loads only on request (§8, row 10).
+- On phones, the chat comes first, read-only in phase 0, and the 3D loads only on request
+  (§8, row 10).
 - The pre-rendered HTML holds the place's name, description, rooms and links as real text.
 - The canvas loads after it and never blocks the first paint, so the largest contentful
   paint is text.
@@ -423,9 +437,9 @@ realistic, like space photography, never cartoon (docs/DESIGN-SYSTEM.md).
   - surface statistics;
   - rings and atmosphere.
 
-  A golden test requires a minimum perceptual distance between any two planets in a system
-  or in one view. It is tuned on the real list and on a synthetic universe ten times
-  larger.
+  A golden test bounds the share of near-identical neighbours in any view: looks stay a
+  pure function of the path, so a few close pairs are expected, never many. It is tuned
+  on the real list and on a synthetic universe ten times larger.
 - **Performance.**
   - A class is data, not a shader. A few material graphs carry everything as uniforms:
     solid surface, gas bands, cloud deck, rings, atmosphere.
@@ -443,7 +457,11 @@ between worlds. None may saturate the map:
 - **Caps per planet:** four moons, one on the Earth, drawn as it really is; one large
   storm and two small ones.
 - **Moons stay steady.** The set changes at most once a minute, and a room takes a moon's
-  place only when it stays clearly busier for several minutes, so moons never flicker.
+  place only when it stays clearly busier for several minutes, so moons never flicker. The
+  room you are in has its own slot, outside that rule.
+- **Near, not far.** From afar a planet shows only the people present, as heat. Storms,
+  moon flares and message rates appear near a world or a system, where they are big enough
+  to see; only then does the client ask the activity API (§7), for the worlds in view.
 - **Moons never cover the plate.** In a world's focus view they orbit only in the free
   space beside the planet, away from the plate; a moon reaching the plate's edge fades
   out. Their labels follow the no-overlap rule (§1, level of detail).
@@ -476,34 +494,55 @@ between worlds. None may saturate the map:
   1. the preview: realm, function, arguments, network, fee. The network is the universe's
      chain, and Adena must be on it;
   2. "sign in Adena": the wallet opens;
-  3. "landing in a block";
+  3. "landing in a block": Adena answers once the network accepts the transaction, so
+     the card follows its hash until the block and its result;
   4. the result.
+- **A call with more than two fields** opens in the realm view, a full page over the chat;
+  the chat keeps only the compact card. Never a modal.
 - **It is never a modal** (§8, row 1). The prototype's dialog stood in for this card.
 - **ADR-0001 §11's warnings apply to every call**, for example "gnoworld does not check
   what this realm does" and "this text goes to {realm} on gno.land, publicly and forever".
 - **Nothing is optimistic.** The room shows "kaito voted yes" only from the chain event.
-- **gnoworld never signs, and Jarvis never signs.** No call is ever sent from sample data.
+- **gnoworld never signs for a user, and Jarvis never signs.** gnoworld's own keys sign only
+  its approvals and takedowns (§9). No call is ever sent from sample data.
 
-**Adena, through its SDK, by its rules** (`@adena-wallet/sdk`, pinned exactly; it is young,
-0.1.x, so its behaviour has contract tests):
-- **One SDK instance** for the app. A connection is never assumed: it is checked before
-  each action, and the app listens to connection, account and network changes, removing
-  every listener on cleanup.
+**Adena, by its rules.** The browser talks to the extension through its injected API,
+`window.adena`, wrapped in `lib/adena`: a small typed adapter whose every answer passes
+Zod. Nothing of Adena loads before the first wallet gesture. The server verifies logins
+with the SDK's own verifier (`@adena-wallet/sdk`). Both are pinned, with contract tests,
+since Adena's SDK is young (0.1.x) and its docs lag its code.
+- **Detect it first.** Without `window.adena`, the app says how to install it. The
+  extension's version is read at start; one too old for a request (sign-in needs 1.22.2)
+  asks for an update.
+- **Check, never assume.** The connection is checked with `GetAccount` and `GetNetwork`
+  before each action; a refused connection returns no error, so the state is read again.
+  A connection belongs to one account and one site.
+- **One listener per page.** Adena's events cannot be removed, and only the first listener
+  hears them, so `lib/adena` registers once and passes account and network changes to the
+  store. A change of account or network ends the old account's session.
+- **One request at a time.** A new popup closes the open one, so requests queue.
 - **Sign-in is `signArbitrary`** over plain words the person reads: "Sign in to gnoworld",
   the domain, a single-use nonce from the server, the issue and expiry times (4096 bytes at
-  most). The server checks it with the SDK's `verifyArbitrarySignature`, pinning the
-  signer, the chain id and the exact text, and spends the nonce. The proof carries the
-  chain id, so a proof made on one network is refused on another.
-- **A change of account or network** ends the old account's session; the app asks again.
-- **Before "sign in Adena"**, the card checks the wallet's network against the universe's
-  chain, and asks Adena to switch (or to add a community chain) rather than ever signing on
-  the wrong one. Gas is simulated first, then the fee shown in the preview, with a margin:
-  gno charges the whole fee, not the gas used.
-- **Every failure is a state with its next step,** never a crash: Adena missing (install
-  it), locked, the person refused, the wrong account, an Adena too old for a request
-  (update it), the network not answering.
-- **The SDK's other providers** (a key held locally, social login) are a later decision,
-  with signing on phones.
+  most). The server checks it with `verifyArbitrarySignature`, always passing the signer,
+  the chain id (`gnoland-1`, `onyx-1`) and the exact text, since with nothing to check it
+  says yes. The server then checks the nonce (unused, unexpired) and the domain itself.
+  Session and multisig accounts cannot sign in.
+- **A login lasts 30 days on a device,** renewed on use and revocable in the settings and
+  by moderators. Ergo checks a token the server issued, so a reconnect needs no new
+  signature and no chain read (§7).
+- **Before "sign in Adena",** the network is read again and compared with the universe's
+  chain. Adena is asked to switch, or to add a community chain and then switch; it never
+  signs on the wrong one.
+- **The fee is an estimate.** Adena simulates again and sets the gas and fee itself
+  (gas used × 1.1 by default), so the preview labels its fee an estimate. gno charges the
+  whole fee, not the gas used.
+- **Every failure is a state with its next step,** from Adena's error codes: connect (1000),
+  finish the open request (1001), unlock (2000), the wrong account (3001), set up Adena
+  (3002), refused (4000), failed, with its log (4001), Adena too old or the account type
+  unsupported (4005).
+- **Phones:** Adena has no mobile signing today (no app, no WalletConnect, no deep link),
+  so phones read in phase 0 (§1). The SDK's social login, with a key kept in the page, is
+  a later decision.
 
 **What a realm shows: a digest, not its page.** gnoworld stays a chat. A realm appears as a
 few simple blocks; its whole page stays one link away, on gnoweb.
@@ -536,9 +575,9 @@ to the realm on gnoweb. A digest is a reading aid, never the reference.
 - **Grounded:** every number, link and function in a digest appears in the page, the
   state or `vm/qfuncs`. The server checks this by string match before caching; the evals
   check it too.
-- **Cached** per realm and per page hash, refreshed at most every 10 minutes. The card
-  shows the block height it was read at. One digest serves every reader. A digest of an
-  older page is never shown: its numbers would be stale, so the whole page shows instead.
+- **Cached** per realm, refreshed in the background at most every 10 minutes. One digest
+  serves every reader. The card always shows the block height it was read at, with
+  "refresh", so a number is never shown without its age.
 - **By place:**
   - in the chat, a compact card: a few blocks and "View the page";
   - on the plate, the same with more room;
@@ -551,7 +590,7 @@ to the realm on gnoweb. A digest is a reading aid, never the reference.
 **Actions: every function as a form,** like gnoweb's actions page.
 - `vm/qfuncs` (free) lists the exported functions, their parameters and their doc.
 - **Read functions** (no `cur realm`): a form, and the result at once through `vm/qeval`.
-  Free, from phase 0.
+  Free.
 - **Write functions** (`cur realm`): a form, then the call card, then Adena.
 - **Fields follow the types.** A call carries only primitive types and bytes (gno's
   `gno.land/pkg/sdk/vm/convert.go`). Any other parameter shows "open in gnoweb".
@@ -587,15 +626,16 @@ routed question (product review).
 
 | Part | What | Why |
 |---|---|---|
-| Harness | Our own small loop in the server (§7), on Anthropic's official TypeScript SDK (`@anthropic-ai/sdk`) and the official MCP TypeScript SDK (`@modelcontextprotocol/sdk`). Not the Agent SDK: it starts a Claude Code process per conversation, with its own file, shell and web tools to lock away (Alexis, 2026-10-17) | One API key, in-process and light. The model only ever sees the tools we hand it |
+| Harness | Our own small loop, in its own container `jarvis`, built from the server's image (§7), on Anthropic's official TypeScript SDK (`@anthropic-ai/sdk`) and the official MCP client (`@modelcontextprotocol/client`, v2). Not the Agent SDK: it starts a Claude Code process per conversation (about 1 GiB each), with its own file, shell and web tools to lock away (Alexis, 2026-10-17) | One API key, light. The model only ever sees the tools we hand it, and the container holds no other key |
 | Key | The Anthropic API key, in the service's environment only | The client holds no secret (§9) |
-| Tools | **gnomcp** over stdio, seven read tools allowed: `gno_packages`, `gno_read`, `gno_render`, `gno_eval`, `gno_status`, `gno_history`, `gno_activity`. **Our own MCP server**: a room's recent public history; the places and their URLs; the latest transactions and blocks from the public indexer and the RPC; the digests and action proposals of §4, checked before they reach the client. **gnoscope** (`https://gnoscope.com/mcp`, remote, read-only by design): a transaction explained, a realm's decoded state, an address, search over all code on chain | Free reads only, and nothing that writes |
+| Tools | **gnomcp** over stdio, one long-lived process for every conversation, seven read tools allowed: `gno_packages`, `gno_read`, `gno_render`, `gno_eval`, `gno_status`, `gno_history`, `gno_activity`. It starts read-only: an empty working directory, no agent key, its audit log on stderr. **Our own tools,** defined in the loop: a room's recent public history; the places and their URLs; the latest transactions and blocks from the public indexer and the RPC; the digests and action proposals of §4, checked before they reach the client. **gnoscope** (`https://gnoscope.com/mcp`, remote, read-only by design, behind a switch): a transaction explained, a realm's decoded state, an address, search over all code on chain | Free reads only, and nothing that writes |
 | Skills | `SKILL.md` folders versioned in the repo: gnomcp's `gno` skill (Apache-2.0), to read realms correctly; ours: concierge, realm reader, catch up, translation. Text only, no scripts | Loaded on demand; part of the prompt version |
 | Models | Sonnet 5.5 by default. Haiku 5.5 to sort, summarise and translate. Opus 5.5 for hard realm code | Cost and quality per task |
 
 **It can write nothing. Four locks:**
 1. **No key.** gnomcp runs with no agent key. On mainnet, gnomcp has no write path at all
-   (its `docs/security.md`).
+   (its `docs/security.md`). On Onyx it does offer write tools, so there the next three
+   locks are what hold.
 2. **Only our tools exist.** The model is offered the read tools listed above, and nothing
    else: no shell, no file writing, no web. Skills are loaded by our own loader, from the
    skills folder only.
@@ -647,26 +687,30 @@ catch.
    A red-team pass runs before launch, and the nightly sample includes injection checks.
 
 **The service itself, hardened:**
-- it runs in its own container, not as root, on a read-only file system;
+- it runs in its own container, `jarvis`, not as root, on a read-only file system, holding
+  only its own key;
 - its network reaches only the Anthropic API, the chain's nodes, the public indexer and
-  gnoscope;
+  gnoscope, through the egress proxy (§7);
 - it accepts only requests carrying a gnoworld session, with per-person rate limits and a
   size limit on every request;
 - secrets come from the secret store; logs redact them;
 - Jarvis's answers in a public room pass the moderation check like any message.
 
 **Limits.**
-- 20 questions per person per day by default. The team can raise it for a person
-  (moderators, builders, partners), in the service's settings. The daily budget still caps
-  the total.
-- **A budget of 50 $ a day.**
+- 20 questions per account per day by default; an account with no mainnet name gets
+  fewer, since addresses are free. The team can raise it for a person (moderators,
+  builders, partners), in the service's settings.
+- **A budget of 50 $ a day, a hard cap.**
   - An alert fires at 80%.
-  - At 100%, Jarvis answers with Haiku until the next UTC day.
-- A maximum number of turns and a timeout per question.
+  - At 100%, Jarvis stops until the next UTC day, and every feature falls back to its
+    form without a model (§4).
+  - An Anthropic workspace spend limit per environment backs it.
+- **Translation has its own budget,** and the same hard stop: the original shows.
+- **Every model call has its own timeout** and at most two retries (the SDKs wait ten
+  minutes by default), and each question a maximum number of turns.
 - **Translation:** one per message and language, cached, serves every reader, with Haiku.
-  When the budget is spent, the original shows.
 - The tools, the system prompt and the skills are frozen per version, so prompt-cache
-  reads cost a twentieth of the input price on Sonnet and Opus 5.5.
+  reads cost a tenth of the input price on Sonnet 5.5 and a twentieth on Opus 5.5.
 
 **Evals.** A suite lives in the repo. CI runs it whenever any of these changes:
 - the model;
@@ -692,8 +736,8 @@ A drop below a threshold fails the run. It checks:
 
 Chain answers are recorded at a fixed block height, so a run is reproducible. A short live
 pass runs on onyx. In production, a nightly sample is graded the same way, beside people's
-thumbs up and down. Results are kept with the prompt version: in Langfuse when it runs,
-and as JSON files in the repo otherwise.
+thumbs up and down. Results are kept with the prompt version, as JSON files in the repo
+that CI compares run to run; from phase 1, in Langfuse too.
 
 **Observability.** The server exports OpenTelemetry; our own spans wrap each turn.
 - **One trace per question**, recording:
@@ -711,15 +755,16 @@ and as JSON files in the repo otherwise.
   - feedback.
 - **Alerts:** the budget at 80% and 100%; spikes in errors or denials.
 - **Where it goes:**
-  - Grafana (Tempo, Loki, Prometheus) for operations across Ergo and the server;
-  - Langfuse for conversations, prompt versions, eval scores and feedback.
+  - phase 0: Grafana (Tempo, Loki, Prometheus), for Jarvis as for Ergo and the server;
+  - phase 1: Langfuse Cloud's free tier too, for conversations, prompt versions, eval
+    scores and feedback. A question's text goes there only with the person's consent;
+    otherwise only numbers: cost, time, tools called, scores (Alexis, 2026-10-17).
 
-  The demo stack runs both. In production, ops chooses self-hosted or their clouds;
-  OpenTelemetry keeps either one replaceable (§7, where it runs).
+  OpenTelemetry keeps every backend replaceable; in production ops chooses (§7).
 - **Privacy:**
   - a question's text is kept only with the person's consent, and deleted after a fixed
     period;
-  - account ids are hashed;
+  - account ids are hashed with a secret key (§6, personal data);
   - Jarvis never reads DMs, plain or encrypted.
 
 **Rejected: the Messages API's MCP connector.** It needs a remote MCP server, and gnomcp
@@ -731,8 +776,14 @@ call.
 **Moderation of public rooms** (phase 0). This answers part of ADR-0001's question 5;
 jurisdiction and retention stay open there.
 - **A moderation bot,** a role of the server, checks each public message with OpenAI's
-  Moderation API (`omni-moderation-latest`: text and images, free of charge; slice 12
+  Moderation API (`omni-moderation-latest`: text and images, free of charge; slice 3
   confirms both against OpenAI's docs).
+  - It sits in every public room: Ergo's channel cap is raised for it, and its operator
+    credential is a secret (§9).
+  - It catches up after an outage: it keeps the last message it checked in each room and
+    replays the rest with `CHATHISTORY AFTER`.
+  - It also counts messages per room and per minute, for the activity API (§7). Counting
+    costs nothing: no service is called for it.
 - **Text is checked after it is posted.** A message appears at once, and the check follows
   within a second. A flagged message is hidden with `draft/message-redaction`. Holding
   every message until the check returns would end the live chat, and an outage would stop
@@ -751,7 +802,10 @@ jurisdiction and retention stay open there.
   reported messages to a person. From phase 2, DMs are encrypted end to end and the server
   cannot read them.
 - **Satellites are checked before they show** (§8, row 7).
-- **The privacy policy** says public messages are checked by this service.
+- **Preview captures** of worlds' pages pass the same check at build time before they are
+  published.
+- **The privacy policy** says public messages are checked by this service, and that
+  translation and Jarvis go through Anthropic.
 - **The key stays on the server,** and the bot rate-limits by account.
 
 **Admin: roles, the console and the log.** Curation and moderation are a lot of work, done
@@ -787,7 +841,11 @@ by few hands, so they get the safest path.
   - Actions are rate-limited.
 - **Curation:** the console edits the data files and opens the pull request through a
   GitHub App limited to this repo. Nothing goes live without review.
+- **Kill switches** in the console: Jarvis, translation, satellites, and read-only chat;
+  a moderator's rights can be revoked at once.
 - **The audit log:** every action, with who, what, when and why, signed and append-only.
+  Each entry is also shipped to the log backend, and the latest hash is published every
+  month, so the server alone cannot rewrite it.
   - The person affected always sees the reason.
   - A monthly transparency summary, counts only, is public.
 - **Complete:** the queue; people (history, mute, ban, reported DMs); worlds and realms
@@ -815,9 +873,23 @@ by few hands, so they get the safest path.
   - the console is tier-1 code in review (`docs/REVIEW.md`), with a penetration test
     before launch.
 
+**Personal data.**
+- **An account is an address** (§1). Account ids in logs, traces and analytics are hashed
+  with a secret key (HMAC with a pepper), never a plain hash, which anyone could reverse
+  from a public address.
+- **Each store has a retention:** Ergo's public history, plain DMs, logs and traces,
+  backups. Ergo's account indexing is on from the start, so a person's messages can be
+  found.
+- **Erasure reaches everything:** Ergo, the server's database, caches, logs and backups.
+  The audit log refers to people by id, so erasing them never breaks its chain.
+- **Subprocessors are listed** in the privacy policy: Anthropic (Jarvis, translation),
+  OpenAI (moderation), PostHog, gnoscope, and the hosts ops chooses.
+
 **Media.** gnoworld hosts no media, because it cannot moderate uploads alone.
 - Links and embeds come from an allowlist of accepted services that moderate their own
   content: YouTube, Vimeo, Imgur and Giphy, for example.
+- An embed loads on a click, so no third party is reached before it (and no consent banner
+  is needed); YouTube through its no-cookie domain.
 - Broadcast Moon's videos come from the same services.
 - Uploads are a later decision.
 
@@ -852,104 +924,163 @@ by few hands, so they get the safest path.
 | Piece | Phase | What it does | Notes |
 |---|---|---|---|
 | Data files | 0 | Universes, hubs, ecosystems, stations, events, expedition stops, quests, news, the bubble rules (ADR-0001 §7) | Versioned in the repo; curated by the team through reviewed pull requests; validated with Zod at build time |
-| Preview captures | 0 | A build job (Playwright) captures each world's public page | Refreshed on a schedule; no capture, no preview |
-| Moderation bot | 0 | §6; it also signs the satellites' approvals | A role of the server. An OpenAI API key and the approval key, server-side |
-| Prices job | 0 | Writes `markets.json` every 5 minutes (§6) | A timer in the server |
+| Preview captures | 0 | A build job (Playwright) captures each world's public page | Refreshed on a schedule; checked like a link preview (§6); no capture, no preview |
+| The server | 0 | Login for Ergo, the moderation bot, the activity API, the first signals, the prices timer, the admin API, the satellites' approvals | TypeScript on Node (below); one container, `server`, a singleton |
+| Jarvis | 0 | §5 | Its own container, `jarvis`, from the server's image |
+| The activity API | 0 | Message rates per room, for the worlds in view, from the moderation bot's counters (§3) | A route of the server, cached a few seconds |
 | PostHog | 0 | Product analytics (§6) | A third party, in the CSP's `connect-src` |
-| Admin console | 0 | Roles, the moderation queue, curation edits as pull requests, settings, the audit log (§6) | Its own origin; a GitHub App to open pull requests |
+| Admin console | 0 | Roles, the moderation queue, curation edits as pull requests, settings, kill switches, the audit log (§6) | Its own origin, on the private network only; a GitHub App to open pull requests |
 | Signals | 0 for new realms, first to chart and first words; 1 for the rest | Heat with realm calls, routes, new realms, who charted first; the rank, the dust, the seasons and the tiles of §3. It reads Ergo and the public indexer and serves a small JSON feed | A role of the server. ADR-0001 §13 holds: we run no indexer |
-| Jarvis | 0 | §5 | A role of the server |
-| Observability | 0 | Grafana and Langfuse, fed by OpenTelemetry (§5) | In the demo stack; in production where ops decides |
+| Observability | 0 | Grafana, fed by OpenTelemetry; Langfuse Cloud from phase 1 (§5) | In the demo stack; in production where ops decides |
+| Satellites | 0 on Onyx; mainnet after its audit and approval | The slot realm (§8, row 7) | Onyx approves deploys automatically; mainnet's approval is item 6 of ADR-0001's "What the chain needs" |
 | Voice | 1 | A WebRTC media server and TURN | Its own ADR first |
 | Room games | 1 | A game bot and a game realm (§1) | Its own ADR first. Needs sessions and the sponsor |
-| Satellites | 0, once audited and approved on mainnet | The slot realm (§8, row 7) | Audited; mainnet's deploy approval is the gate (ADR-0001, question 6) |
 
 **ADR-0001 §13 changes.**
 - It had two pieces: the static client and one Go binary. The server is now TypeScript on
   Node (below).
 - **Phase 0:**
-  - the pieces are the client, the admin console, Ergo, the server (login, moderation,
-    first signals, prices, the admin API, Jarvis), observability, and the slot realm on
-    chain;
-  - the third parties are Anthropic, OpenAI's moderation, PostHog and gnoscope;
+  - the pieces are the static client and the admin console, Ergo, `server`, `jarvis`,
+    observability, and the slot realm on Onyx;
+  - the third parties are Anthropic, OpenAI's moderation, PostHog, gnoscope and CoinGecko;
   - costs: Jarvis at up to 50 $ a day; hosting as ops chooses (below).
-- **Phase 1:** the signals at scale, voice and room games are added.
+- **Phase 1:** the signals at scale, Langfuse Cloud, voice, room games, and satellites on
+  mainnet once approved.
+
+**Containers.** One image for the server's code, run as two containers, each with only its
+own secrets and its own way out:
+
+| Container | Roles | Secrets | Reaches |
+|---|---|---|---|
+| `server` | Login, moderation and activity, signals, prices, the admin API, approvals | OpenAI, the approval key, the slot realm's operator key, the bot's Ergo credential, the GitHub App, the session secret, the pepper | Ergo, the chain's nodes, the indexer, OpenAI, CoinGecko, GitHub |
+| `jarvis` | Jarvis, gnomcp as a child process, translation | Anthropic | The Anthropic API, the chain's nodes, the indexer, gnoscope |
+
+- `server` is a singleton: the moderation bot, the timers and SQLite. It takes a lock at
+  start, and the runbook says never two replicas.
+- **Ergo logs people in through the server:** its `auth-script` runs in socket mode, on a
+  socket the server serves on a shared volume. The first login checks the Adena proof (§4);
+  the server then issues a token, and every reconnect presents it, checked locally, with
+  no new signature and no chain read. Clients reconnect with jittered backoff, so a restart
+  of Ergo is never a storm of logins.
+- **gnomcp** is copied into the `jarvis` image from its signed release, pinned by digest,
+  and started once with an explicit configuration, an empty read-only working directory,
+  its audit log on stderr, and its key and session paths empty. `init: true` reaps it.
 
 **Where it runs: delivered in Docker, placed by ops** (Alexis, 2026-10-17). gnoworld does
 not choose its hosts.
 - **Demos:** one `docker compose up` runs everything on one machine, for demos inside the
-  company:
-  - the client and the admin console, served as static files;
-  - Ergo and the server;
-  - observability: Grafana's all-in-one OpenTelemetry image, and Langfuse as an optional
-    profile.
-- **The team's demo URL:** the demo stack runs on Alexis's homelab and is published with
-  Tailscale Funnel, which the homelab already uses, as a stable HTTPS address the team
-  opens in a browser.
+  company: the client and the console served as static files, Ergo, `server`, `jarvis`, and
+  Grafana's all-in-one OpenTelemetry image, capped and with its retention set.
+- **The team's demo URL:** a Tailscale container inside the demo project joins the tailnet
+  as its own machine and publishes the public site with Funnel. The demo binds no port on
+  the host, and the homelab's own Funnel and Caddy are never touched.
 - **The demo never harms the host, and never touches its installation:**
-  - **Apart:** its own folder and Compose project, its own networks and volumes. It never
-    edits the homelab's Compose file, its Caddy configuration or its certificates, and
-    reaches none of its services. On the host it binds one port, on `127.0.0.1`, which
-    Funnel publishes. Removing it is `docker compose down -v` and one Funnel entry.
-  - **Capped:** every container has CPU, memory and process limits, set so the whole demo
-    stays under a fixed share of the machine (2 cores and 2 GB to start). A container that
-    hits its limit is stopped by Docker; the host is not. Logs rotate at a fixed size;
-    history is kept for a fixed number of days, so the volumes stay bounded.
+  - **Apart:** its own folder and Compose project, networks and volumes. It never edits the
+    homelab's Compose file, its Caddy configuration or its certificates.
+  - **Sealed:** every service sits on internal networks. The only way out is the demo's own
+    proxy, which allows a list of hosts and refuses private addresses (`NODE_USE_ENV_PROXY`
+    is set, since Node's `fetch` ignores proxies otherwise). A test proves that the
+    homelab's services, for example n8n through `host.docker.internal`, cannot be reached.
+  - **Capped:** CPU, memory and process limits on every container, the whole demo under 2
+    cores and 2 GB. A container that hits its limit is stopped by Docker; the host is not.
+    Logs rotate; histories and Grafana keep a fixed number of days, since Docker volumes
+    have no size quota.
   - **Locked down:** no privileged container, no host network, no Docker socket, a
-    read-only root file system, a non-root user, every Linux capability dropped, and no
-    new privileges.
-  - **Guarded at the door:** a shared demo password; `noindex` on every page; Ergo's
-    connection cap and per-address limits; rate limits in the services; Jarvis's demo
-    budget capped at a few dollars a day; moderation on.
-  - **Safe to try:** the default universe is Onyx, so calls tried in the demo spend test
-    tokens.
-  - **Restarts politely:** a health check on each service, restarts on failure with a
-    limit, never a restart loop.
+    read-only root file system, a non-root user, every Linux capability dropped, no new
+    privileges.
+  - **Guarded at the door:** a shared demo password; `noindex`; the visitor's real address
+    reaches Ergo and the server through the PROXY protocol from Funnel to the demo's proxy,
+    so per-address limits work; rate limits; Jarvis's demo budget capped at a few dollars a
+    day; moderation on.
+  - **Private parts stay private:** the admin console, Grafana and a plain IRC port are
+    reachable on the tailnet only, never through Funnel.
+  - **Safe to try:** the default universe is Onyx, so calls spend test tokens.
+  - **Disposable:** no backups. Load tests never run on it. Removing it is
+    `docker compose down -v` and deleting its tailnet machine.
 
   Once a domain exists, a Cloudflare Tunnel can replace Funnel with the same stack.
 - **The hand-off to ops:**
-  - each service is an image: a multi-stage build, a non-root user, a read-only file
-    system, a health check;
+  - each service is an image, multi-architecture (amd64 and arm64), with its SBOM and
+    provenance, pinned by digest: a multi-stage build, a non-root user, a read-only root
+    file system with a `tmpfs` for `/tmp`, a health check that never depends on a third
+    party;
   - the compose file is the reference wiring;
-  - every setting is an environment variable, listed with its meaning in `.env.example`;
-  - secrets are mounted at run time, never baked into an image;
-  - volumes are named: Ergo's history, the server's SQLite;
-  - `docs/OPERATIONS.md` is the runbook: what each service does, its resources, its limits
-    and next steps (the scale table below), and how to deploy, update, roll back, back up,
-    read logs and metrics, and set alerts.
-- **Ops decides:**
-  - where each piece runs: a server, a platform such as Fly.io, a cluster;
-  - which backend receives OpenTelemetry;
-  - where secrets live.
+  - every setting is an environment variable in `.env.example`, with its meaning, its
+    default and whether it is required; a secret is only ever a `*_FILE` path;
+  - volumes are named: Ergo's `ircd.db` and history, the server's SQLite;
+  - backups use `VACUUM INTO` (or `backup()`), encrypted and kept off the host, with a
+    restore tested every month; Ergo is backed up before each upgrade, since its schema
+    upgrade is one-way;
+  - migrations are expand, then contract, so a rollback stays possible;
+  - one source for the CSP, written both into the static host's headers and the demo's
+    proxy; it lists each universe's RPC from the universes data file;
+  - `docs/OPERATIONS.md` is the runbook. For each service: its image, ports, what health
+    and readiness check, its limits, whether it is a singleton, the state it holds. Then:
+    recovery targets, backup and restore, deploy, migrate, roll back, drain; each secret,
+    its scope, its rotation and its emergency revocation; ingress, egress and how the
+    client's address arrives; each third party with its timeout, retries, breaker,
+    fallback and alert; SLOs, alerts and who is paged; log fields, redaction and
+    retention; erasing a person's data; the kill switches; removing the demo.
+- **On call:** a probe from outside opens a WebSocket, logs in, joins a room and hears its
+  own echo. It pages when the probe fails, logins fail, the moderation backlog is older
+  than two minutes, approvals spike, Jarvis hits its hard stop, a disk passes 80%, or the
+  last backup is older than 26 hours. A moderation on-call is named.
+- **Working locally, simply** (one compose file, three uses):
+  - **develop:** `pnpm dev` serves the client with hot reload, and
+    `docker compose --profile dev up` starts Ergo, `server` and `jarvis` beside it, with the
+    same images as everywhere else;
+  - **demo:** `docker compose --profile demo up -d` adds the Tailscale container, the egress
+    proxy and the caps above;
+  - **ops:** the same file is the reference wiring they adapt.
+- **Deploying on its own, after a merge:**
+  - a merge to `main` with the CI green builds the images, signs them and pushes them to a
+    private registry; the static client goes to its host the same way;
+  - the demo updates itself: an updater inside the demo project, limited to the demo's own
+    containers by label, pulls new images within minutes. Nothing reaches into the machine
+    from outside, and the homelab's own updater is left alone;
+  - each pull request gets a preview of the static client at its own address, against the
+    demo's services;
+  - a rollback is the previous image digest; migrations run at start and are written expand
+    then contract, so the previous image still works;
+  - production uses the same images, promoted by ops with an approval;
+  - this starts once the repository has a remote; until then the local gate is the CI.
+- **Ops decides:** where each piece runs (a server, a platform such as Fly.io, a cluster),
+  which backend receives OpenTelemetry, and where secrets live. Nothing in the code
+  assumes a host.
 
-  Nothing in the code assumes a host.
-
-**The server: TypeScript on Node** (Alexis, 2026-10-17; amends ADR-0001 §13's Go binary).
+**The server: TypeScript on Node** (Alexis, 2026-10-17; amends ADR-0001 §12 and §13).
 Everything gnoworld writes for the server is TypeScript, beside the client; Ergo stays, as
-an image we configure and never write.
+an image we configure and never write. Versions were read on npm on 2026-10-17 and run in
+Docker on arm64.
 
 | Need | Choice | Why |
 |---|---|---|
-| Runtime | Node's LTS line, pinned (Adena's SDK is developed on Node 24) | Node runs TypeScript directly, so the server has no build step; `tsc` checks the types |
-| Shared code | One monorepo with workspaces: `packages/core` (pure rules) and `packages/schemas` (Zod), used by the client, the console and the server (`docs/ARCHITECTURE.md`) | One type per piece of data, on both sides; one lockfile, one gate |
-| HTTP | Hono (proposed; asked in slice 3) | Small and fast; the browser's own `Request` and `Response`; official Zod validation; tested without starting a server; runs wherever ops puts it |
+| Runtime | Node 24 LTS, pinned exactly (24.22.0) in `engines`, `.node-version` and the image digest; supported to 2028-04-30. Node 26 once it is LTS and Adena's SDK passes on it | Node runs TypeScript directly (stable since 24.12), so the server has no build step |
+| Types | TypeScript 6 (`tsc --noEmit`), with `erasableSyntaxOnly`, `verbatimModuleSyntax` and `rewriteRelativeImportExtensions`. TypeScript 7 waits for typescript-eslint | Node only strips types: no enums, no namespaces with code, no parameter properties, no tsconfig `paths` |
+| Monorepo | pnpm 12 workspaces, one catalog of versions, `--frozen-lockfile`. Shared packages export their `.ts` sources; imports go by package name and `#` subpath imports. The image copies the workspace as it is, never `pnpm deploy` | pnpm installs no package scripts and no package younger than a day by default. Node refuses `.ts` inside `node_modules` |
+| HTTP | Hono 4 with `@hono/node-server` 2 and `@hono/zod-validator` | No dependencies of its own; secure headers, body limit, timeout, CSRF and SSE built in; tested with `app.request()`, no server started; about 59 MB at rest |
+| Rate limits | About twenty lines of ours, in memory, with a size cap | One process, nothing to share |
 | Logins | Adena's SDK, `verifyArbitrarySignature` (§4, Adena) | The wallet's own verifier: no crypto written by us |
-| Moderation bot | Our `core/irc` parser over a WebSocket to Ergo | No extra dependency: the client's code, reused |
-| Storage | `node:sqlite` if stable at the pinned version, otherwise `better-sqlite3` | One file, fast, nothing to run beside it |
-| Scheduled work (prices) | A timer in the process | No cron library |
-| Jarvis | §5, harness row | — |
-| Observability | OpenTelemetry's Node SDK | To any backend ops chooses |
-| Tests | Vitest, as in the client; integration against a real Ergo in Docker; load with a load-testing tool | One set of tools everywhere |
+| Moderation bot | Our `core/irc` parser over a WebSocket to Ergo | The client's code, reused |
+| Storage | `node:sqlite`, built in (release candidate on Node 24; it works on a read-only root and under the permission model). `better-sqlite3` if it stalls | One file, nothing to run beside it, no native module |
+| Scheduled work | A timer in the process | No cron library |
+| Claude and MCP | `@anthropic-ai/sdk` and `@modelcontextprotocol/client` (§5) | — |
+| Tracing | `@opentelemetry/api`, `sdk-trace-node` and `exporter-trace-otlp-http`: spans by hand, one per request and one per Jarvis turn | 14 packages, against 71 for the full Node SDK |
+| Logs | JSON lines on stdout | The log backend reads the containers' output |
+| Tests | Vitest, as in the client; integration with `docker compose up --wait` against a real Ergo; load with k6 (HTTP and WebSocket), never on the homelab | One set of tools everywhere |
+| Image | Distroless Node 24, `nonroot`, pinned by digest (amd64 and arm64) | No shell, 162 MB |
 
 **Node, fast and calm:**
 - nothing heavy on the event loop: CPU work goes to worker threads;
-- every outbound call has a timeout and an abort signal;
-- every queue is bounded, with back-pressure; nothing grows without a cap;
-- the heap limit matches the container's memory;
-- `SIGTERM` drains connections and stops cleanly; health and readiness endpoints for
-  the container;
-- no unhandled promise: lint forbids floating promises, and a rejection that escapes stops
-  the process loudly instead of hiding.
+- every outbound call carries `signal: AbortSignal.timeout(ms)`;
+- every map, queue and list of streaming clients has a cap, with back-pressure;
+- the heap follows the container's limit, set by hand to about 70% of it, since gnomcp
+  shares the `jarvis` container's memory;
+- the HTTP server's own timeouts are tightened; `--disallow-code-generation-from-strings`
+  is on;
+- SQLite: one connection, WAL mode, `STRICT` tables, short indexed queries only;
+- `SIGTERM` drains connections and stops cleanly; health and readiness endpoints;
+- no floating promise (lint), and a rejection that escapes stops the process loudly.
 
 **Scale: each piece's first limit, and the next step.**
 
@@ -957,10 +1088,13 @@ an image we configure and never write.
 |---|---|---|
 | The static client | None in practice: a CDN serves it | — |
 | The build | One page per place | Planets only, never dust (§2) |
-| Ergo | About 10,000 clients per instance, 2,000 per room (ADR-0001 §1) | More instances; each hub names its server (ADR-0001 §8) |
-| Moderation bot | The Moderation API's rate limit, measured in slice 12 | Batch messages per request; a queue with back-pressure. Previews wait; text never does |
-| Jarvis | 50 $ a day; 20 questions per person by default | Digests and translations cached per content hash; more service instances behind a queue |
-| The public indexer | A third party's rate limits and uptime | The signals role caches and fans out; the client subscribes only to what it shows |
+| Ergo | About 10,000 clients per instance, 2,000 per room (ADR-0001 §1) | More instances, each hub naming its server (ADR-0001 §8). Several instances split DMs, so that step needs its own design |
+| The server | A singleton: the moderation bot, the timers, SQLite | Roles split into their own processes; SQLite to Postgres when two instances are needed |
+| Moderation bot | The Moderation API's rate limit, measured in slice 3 | Batch messages per request; a queue with back-pressure. Previews wait; text never does |
+| Jarvis | 50 $ a day; quotas per account | Digests and translations cached per content hash; more `jarvis` containers. Load-tested against a fake model |
+| The public indexer | A third party's rate limits and uptime | The server caches and fans out; the client subscribes only to what it shows |
+| The chain's RPC (`rpc.gno.land`) | A public node's limits | The server caches reads; ops may run its own node |
+| gnoscope | A third party | Behind a switch; Jarvis answers without it |
 | Signals | One JSON feed | Spatial tiles and per-region feeds (§3) |
 | The slot realm | Gas per rent; one slot per world, so storage is bounded | Expired slots are reused |
 | PostHog | 1 million events a month free | Sampling, or the paid plan |
@@ -974,15 +1108,17 @@ All decided by Alexis on 2026-10-17.
 | 1 | §7: transactions are inline, with no modals | A modal signature request | Inline cards (§4). The modal was a placeholder |
 | 2 | §7: "dropped from the concept: pots, boops, timers, claims and payout bars" | A Play card with BUBBLE's pot, a boop, and a pot clock on the status ring | gnoworld builds social room games, with no money and with results on chain (§1, Chat), after phase 0, with its own ADR first. No pots: a separate, later decision. gnoworld invents no timer: the ring shows only what a realm reports. BUBBLE gets the same realm card as any realm |
 | 3 | §7: distance to the sun is activity; rooms are moons; people are satellites | Stable orbits; activity as heat; rooms as markers on the surface; people in lists | Stable places, with the scale rules of §3: one place per namespace, a slow seasonal drift, a rank from signals and curation, dust, and genres as lenses. Activity is heat, storms and auroras. The busiest rooms are moons, the others are in the room switcher; people are in lists; "satellite" means a sponsored slot |
-| 4 | §12: no router and no server framework; the URL holds the camera state. §13: `/h/<hub>` | A URL per place, for search | React Router 8 framework mode, static pre-rendering, no Node server; the camera follows the URL (§2). Its two dependencies are asked for in slice 1 |
+| 4 | §12: no router and no server framework; the URL holds the camera state. §13: `/h/<hub>` | A URL per place, for search | React Router 8 framework mode, static pre-rendering, no rendering server; the camera follows the URL (§2). Its two dependencies are asked for in slice 1 |
 | 5 | Phase 0 has no private messages; DMs arrive encrypted in phase 2 | DMs and the seal | Plain DMs from phase 0, labelled "not encrypted" (§1, Chat). Encrypted DMs and the seal stay in phase 2 |
 | 6 | No voice | Voice rooms, and events in a "voice lounge" | A WebRTC voice room in phase 1, after phase 0, with its own ADR first |
-| 7 | "Ideas to place": phase 0 takes none of them; ads tier 2 in phase 2; short videos in phase 3 or later | Satellites, Broadcast Moon, the GovDAO world, the person card, video embeds | **Satellites, phase 0, once the slot realm is audited and approved on mainnet:**<br>- a fixed daily price in GNOT, set by the team in the slot realm;<br>- 40 characters at most, for 1, 3 or 7 days; at most one per world;<br>- the text passes the name filter and the moderation API before the transaction: the moderation service signs an approval that the slot realm verifies (ed25519), so a satellite goes live at once, and only after that check;<br>- moderators can take one down after a report, refunding the days left;<br>- labelled "Sponsored", as advertising law requires.<br>**Broadcast Moon:** a curated station in phase 0, with videos embedded from accepted services (§6).<br>**The person card:** phase 0 in its basic form.<br>**Embeds:** links in phase 0. No uploads are hosted (§6) |
+| 7 | "Ideas to place": phase 0 takes none of them; ads tier 2 in phase 2; short videos in phase 3 or later | Satellites, Broadcast Moon, the GovDAO world, the person card, video embeds | **Satellites:** on Onyx in phase 0, shown only in the Onyx universe; on mainnet after an external audit and mainnet's approval, without holding back phase 0's exit (Alexis, 2026-10-17).<br>- a fixed daily price in GNOT, set by the team in the slot realm; 40 characters at most, for 1, 3 or 7 days; at most one per world; renting needs a login (tier 1), and a limit per address;<br>- the text passes the name filter and the moderation API before the transaction: the moderation service signs an approval that the slot realm verifies (ed25519), so a satellite goes live at once, and only after that check;<br>- the realm's operator key, on the server, takes one down after a report and refunds the days left; its owner, a multisig of two admins on hardware wallets, rotates the approver's key and can pause renting;<br>- on mainnet, the revenue's recipient is named in the realm before launch;<br>- labelled "Sponsored", as advertising law requires.<br>**Broadcast Moon:** a curated station in phase 0, with videos embedded from accepted services (§6).<br>**The person card:** phase 0 in its basic form.<br>**Embeds:** links in phase 0. No uploads are hosted (§6) |
 | 8 | Rollout: "tips and stamps in the same transaction" | Passport stamps | Two different things. Passport stamps record visits on the device. ADR-0001's stamps travel with a tip |
 | 9 | §10: a generated identicon | A planet chosen as an avatar | An astronaut generated from the name; its parts chosen in phase 1 and saved in the profile realm. Never a planet (§1) |
 | 10 | §7: "mobile is the same space" | The full 3D on a phone | Chat first on phones: the chat full screen, the places as a list with planet thumbnails (the Open Graph images of §2), and the 3D only on request ("View in space"), loaded when asked and when the device can. Nothing of three.js or its textures loads before that |
-| 12 | §13: one Go binary (the stdlib, `coder/websocket`, `gnoclient`) | — | One TypeScript server on Node, sharing `core` and the schemas with the client; Adena's SDK verifies logins; Ergo stays, as an image (§7) |
-| 11 | Rollout: in phase 0 "the chain is read, never written" | Calls, votes, a name registered in the app, satellites | From phase 0, users sign their own calls in Adena (§4). gnoworld's own write in phase 0 is the slot realm, once audited and approved on mainnet; its approvals and takedowns are signed by gnoworld's keys, on the server |
+| 11 | Rollout: in phase 0 "the chain is read, never written" | Calls, votes, a name registered in the app, satellites | From phase 0, users sign their own calls in Adena (§4). gnoworld's own write in phase 0 is the slot realm on Onyx; its approvals and takedowns are signed by gnoworld's keys, on the server |
+| 12 | §1, §2, §12 and §13: a small Go program on `auth-script`; "no Node server in production"; one Go binary (the stdlib, `coder/websocket`, `gnoclient`) | — | One TypeScript server on Node, sharing `core` and the schemas with the client, run as two containers (`server`, `jarvis`); still no rendering server. Adena's SDK verifies logins; Ergo stays, as an image (§7) |
+| 13 | §9: "the hub's operators moderate with Ergo's tools" | — | Moderators act in the admin console; the server sends Ergo's commands (§6) |
+| 14 | §10: tier 0 includes DMs; tier 2 gates votes | — | Plain DMs need a login (tier 1). Votes are calls the realm itself authorises: gnoworld gates nothing on them. An account is an address, its name shown from mainnet (§1) |
 
 **Checks for slice 1.** These are not differences with the prototype:
 - **The React Compiler.** ADR-0001 §12 plugs it in through `@vitejs/plugin-react`, while
@@ -1007,10 +1143,12 @@ questions before any code, and its review card checks the answers:
    is in the gate.
 3. **Scale.** The limit it hits first, and the next step (§7, scale).
 
-**gnoworld's own keys** (the moderation approval key, the slot realm's admin):
+**gnoworld's own keys** (the moderation approval key, the slot realm's operator key; its
+owner is a multisig of two admins on hardware wallets):
 - they live only on the server, in a secret store, one key per role, never in the
   client or the repo;
-- the slot realm stores the approver's public key, and its admin can rotate it;
+- the slot realm stores the approver's public key; its owner multisig rotates it and can
+  pause renting; approvals expire quickly;
 - **an approval is bound to everything it allows**, so it cannot be reused elsewhere:
   `"gnoworld/satellite/v1|"`, the chain id, the realm path, the slot, the text's hash, the
   payer, the days and an expiry height;
@@ -1069,7 +1207,9 @@ from gno-golf's engine, measured there.
     slowest tenth ignored, it drops to Low and remembers it on the device.
   - A steady 33 ms reads as the browser's battery saver, and is not remembered.
   - A known weak GPU (software renderers, old mobile and integrated chips, by the
-    renderer's name) gets the list and planet stills, never WebGL.
+    renderer's name) gets the list and planet stills, never WebGL. The gate's browsers
+    use a software renderer, so a test switch turns this off there; the GPU bench runs on
+    a real GPU.
 - **"Reduce animations" on demand.** It is a setting in the app, as well as the system's
   reduced motion:
   - the shader clock and idle orbits freeze;
@@ -1085,7 +1225,8 @@ from gno-golf's engine, measured there.
   (`compileAsync`, 2 s at most), and a scene shows only when ready. Heavy building waits
   for idle time.
 - **Off the main thread:** planet parameters and tiles are computed in workers.
-- **Labels and the interface over the scene** update 10 times a second at most.
+- **Labels follow the scene every frame**, as cheap position updates; their text and the
+  interface over the scene change 10 times a second at most.
 - **A second renderer** (a shared snapshot) runs only when asked, then releases its
   context.
 - **Measured in the field,** once per visit, never per frame, through PostHog: median fps,
@@ -1113,7 +1254,7 @@ from gno-golf's engine, measured there.
 | Performance and memory | The bench, idle, hidden tab, full-screen chat, 20 flights, the bundle sizes, Lighthouse's budgets, the GPU variety view | Playwright, Lighthouse | Every pull request; the GPU bench nightly on a machine with a GPU |
 | Algorithms | Every hot path has a bench with a stored baseline; a slowdown past 10% fails. Its growth is measured at n, 4n and 16n, so an O(n²) hiding in an O(n log n) path fails too | Vitest bench | Every pull request |
 | Scale | Synthetic universes at 10×, 100× and a million realms: placement time per system stays flat, tiles stay bounded, the draw count stays bounded, ⌘K answers within budget; a 100,000-message history and a 1,000-room switcher stay smooth | Vitest bench, Playwright | Nightly |
-| Load | Ergo with thousands of clients, Jarvis with concurrent questions, the moderation queue at peak: latency and errors within budget | A load-testing tool, against a staging stack | Nightly, and before launch |
+| Load | Ergo with thousands of clients, Jarvis with concurrent questions against a fake model, the moderation queue at peak: latency and errors within budget | k6, against a local stack, never the homelab demo | Before launch |
 | Mutation | Every guard fails a test when removed: realms (`scripts/mutate.py`) and `core` | `mutate.py`; a TypeScript mutation tester | Nightly |
 | Realms | Tests, filetests, `gno-audit` | gno | Every commit |
 | AI | Jarvis's evals (§5), non-hallucination first: every number, name, link and function in an answer is checked by string match against the tool results; an answer with nothing to ground it must say it does not know; a different model grades the rest. A grounded rate below the threshold fails | Our harness | On every change to it; nightly sample |
@@ -1132,8 +1273,9 @@ remote.
 **CI first, for code written by AI.**
 - The CI and the gate come before the first feature (slice 1). The gate is
   `scripts/check.sh`, and CI runs the same script on every push, so there is one truth.
-- Every change starts with its failing test, committed and seen failing in CI, then the
-  code (ADR-0001 §14).
+- Every change starts with its failing test, seen failing, then the code (ADR-0001 §14).
+  A failing test is committed marked as expected to fail (`test.fails`), which the gate and
+  the Stop hook accept; the commit with the code removes the mark.
 - Nothing merges without a green CI. An agent never merges, never pushes on its own, and
   never skips a hook.
 - A test is never edited to pass. A plan that proves wrong stops the slice and goes to
@@ -1179,9 +1321,10 @@ Its findings are fixed before any other lens runs.
 - **Links and media:** https only, and only from the accepted services (§6).
 - **Validation:** Zod checks Ergo, the indexer, realm reads and every data file.
 - **Untrusted text:** realm text and chat, for Jarvis too (§5).
-- **Secrets:** the client holds none. The Claude and OpenAI keys, the moderation approval
-  key, the slot realm's admin key and the GitHub App's key live only on the server; services rate-limit by
-  account.
+- **Secrets:** the client holds none. Each container holds only its own (§7): the Claude
+  key in `jarvis`; in `server` the OpenAI key, the approval key, the slot realm's operator
+  key, the bot's Ergo credential, the GitHub App's key, the session secret and the pepper.
+  Services rate-limit by account and by address.
 - **Dependencies:** locked, and the gate audits them.
 
 **Accessibility.**
@@ -1207,10 +1350,16 @@ Its findings are fixed before any other lens runs.
 - the TypeScript flags `noUnusedLocals` and `noUnusedParameters`.
 
 **Dependencies to ask for, each in its slice:**
-- `react-router` and `@react-router/dev` (slice 1);
-- a CSS linter, an unused-code finder and a Lighthouse runner (slice 1);
-- `posthog-js` (slice 12);
-- `@anthropic-ai/sdk`, `@modelcontextprotocol/sdk` and the OpenTelemetry SDK (slice 10).
+- slice 1: `react-router`, `@react-router/dev`, `vite-plugin-pwa`, a CSS linter, an
+  unused-code finder, a Lighthouse runner, an import-cycle check, Testing Library, a
+  property-testing library, a TypeScript mutation tester;
+- slice 3: `hono`, `@hono/node-server`, `@hono/zod-validator`, `@adena-wallet/sdk` (the
+  server's verifier);
+- slice 10: `@anthropic-ai/sdk`, `@modelcontextprotocol/client`, `@opentelemetry/api`,
+  `@opentelemetry/sdk-trace-node`, `@opentelemetry/exporter-trace-otlp-http`;
+- slice 12: `posthog-js`.
+
+k6 runs as a binary or an image, not as a package.
 
 ## Consequences
 
@@ -1221,13 +1370,14 @@ Its findings are fixed before any other lens runs.
 - universes, worlds, ecosystems, stations and genres from data files;
 - the map view, the hero, the ticker and the rail;
 - the preview captures and the prices file;
-- the moderation bot, with contests;
+- the moderation bot, with contests, and the activity API;
 - product analytics;
 - Jarvis, with its evals and observability, digests, chain questions and translation;
 - calls signed by users (names, votes, any function), with the chain's activity in rooms,
   new realms and firsts;
 - plain DMs;
-- satellites, once the slot realm is audited and approved on mainnet.
+- satellites on Onyx;
+- phones that read; speaking and signing on a computer.
 
 **Its exit criteria add:**
 - a world's page is found by its own name, with its own title and image;
@@ -1237,7 +1387,7 @@ Its findings are fixed before any other lens runs.
 - PostHog receives counts only: no text, no names;
 - a call signed in Adena lands, and its room shows it only from the chain event;
 - Jarvis's evals pass their thresholds;
-- a satellite shows only after its moderation check.
+- a satellite shows on Onyx only after its moderation check.
 
 **Phase 1 gets:**
 - the signals at scale: heat with calls, routes;
@@ -1251,7 +1401,10 @@ Its findings are fixed before any other lens runs.
 - "new here";
 - routed questions;
 - the weekly report, written by the team;
-- the profile realm: the astronaut's parts, the stamp count if published.
+- the profile realm: the astronaut's parts, the stamp count if published;
+- Langfuse Cloud for Jarvis;
+- satellites on mainnet, once audited and approved;
+- speaking and signing on phones, when Adena can sign there (a decision first).
 
 **Phase 2 gets** encrypted DMs and the seal, as before.
 
@@ -1262,24 +1415,27 @@ is rebuilt.
 
 ## Questions answered
 
-They follow ADR-0001's numbering. Alexis answered them on 2026-10-17.
+They continue ADR-0001's numbering, which stops at 13, and close its question 12. Alexis
+answered them on 2026-10-17.
 
 | # | Question | Answer |
 |---|---|---|
+| 12 (ADR-0001) | Where Ergo and the servers run | In Docker: demos on the homelab, production where ops decides (§7) |
 | 14 | The markets row's source | A scheduled job reads CoinGecko into `markets.json`; the client reads only that file (§6) |
-| 15 | Jarvis: model, host, budget, translation | Sonnet 5.5 by default, Haiku 5.5 and Opus 5.5 by task; a role of the TypeScript server; 50 $ a day; automatic, cached translation through the same service with Haiku; chain data from gnomcp, the public indexer and gnoscope (§5) |
+| 15 | Jarvis: model, host, budget, translation | Sonnet 5.5 by default, Haiku 5.5 and Opus 5.5 by task; its own container `jarvis`, on the official Anthropic and MCP SDKs; 50 $ a day as a hard cap; automatic, cached translation with Haiku, on its own budget; chain data from gnomcp, the public indexer and gnoscope; Langfuse Cloud from phase 1 (§5) |
 | 16 | Media: storage, budget, moderation | No hosted media at first: embeds from accepted services. Messages are moderated by a bot on OpenAI's Moderation API, checked after posting, with contests (§6) |
 | 17 | Public room archives as indexed pages | No, at first (§2) |
 | 18 | Measurement | PostHog, EU cloud, cookieless, counts only (§6) |
 | 19 | Curation of stations, expedition stops, news and the weekly report | The team alone, through the data files and pull requests |
-| 20 | Satellites | Rules in §8, row 7: checked by the moderation API before they show. Phase 0, once the slot realm is audited and approved on mainnet |
+| 20 | Satellites | Rules in §8, row 7: checked by the moderation API before they show. On Onyx in phase 0; mainnet after audit and approval |
 
 **Decisions still to come, each with its own ADR:**
 - voice rooms (phase 1);
 - room games on chain (phase 1);
 - hosted uploads;
 - pots in games;
-- native apps (Capacitor, Tauri), when measurement justifies them.
+- native apps (Capacitor, Tauri), when measurement justifies them;
+- signing on phones: Adena's mobile app when it ships, or the SDK's social login.
 
 ADR-0001's question 5 keeps its jurisdiction and retention parts.
 
