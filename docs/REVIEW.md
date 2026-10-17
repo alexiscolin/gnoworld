@@ -64,18 +64,22 @@ Code written by an agent gets the same reading as anyone's, plus this. `/pre-mer
    accessibility and UX, simplicity, with this file's checklists. A change to a tier-1 file adds one more agent, on the
    strongest model, for security alone. Fixes are re-checked by the gate and the mutation
    tester; a second pass runs only for a high finding fixed in tier-1 code.
-4. **Each finding is checked against the code** before it is fixed, and a false positive is
-   dropped with its reason.
+4. **Each finding is reproduced before it is fixed:** a command, or a test seen failing. One
+   nobody could reproduce stays `claimed`; a false positive is `rejected`, with its reason.
+   A fix of the product proves itself: its tests, run on the commit before it, must fail
+   (`scripts/prove_fix.py`, in the full gate).
 5. **Nothing is waved through.** Every remaining finding is fixed, or put to Alexis with
    the scenario.
-6. **Learn from it.** Findings and outcomes go into the review log. A miss that repeats
-   becomes a rule here, a lint, or a test; a lens whose findings are mostly dropped is
-   narrowed or removed.
+6. **Learn from it.** Every finding goes into [the findings ledger](review/findings.md), with
+   its status and evidence, and a review reads it first: no rejected claim raised again
+   without new evidence, and a fixed one that comes back filed as a regression. What Alexis
+   caught and missed goes into the review log. A miss that repeats becomes a rule here, a
+   lint, or a test; a lens whose findings are mostly dropped is narrowed or removed.
 
 ## Before a push
 
-Each merge lives on its branch. Pushing runs the full gate (`.githooks/pre-push`); pushing
-`main` also needs a committed `/pre-merge` pass whose fingerprint matches the code
+Each merge lives on its branch. Pushing a work branch runs the fast gate and the secret scan
+(`.githooks/pre-push`); pushing `main` runs the full gate and needs a committed `/pre-merge` pass whose fingerprint matches the code
 (`scripts/review_pass.py`): a change after the review voids it, the review's own record does
 not. Until CI exists, these hooks are the barrier; a merge made on GitHub skips them, so
 merges happen locally after `/pre-merge`, then `main` is pushed.

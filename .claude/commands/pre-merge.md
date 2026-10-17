@@ -6,7 +6,7 @@ Run the review before merging the current branch (base: $ARGUMENTS, or `main` if
 Follow `docs/REVIEW.md` ("AI review before a merge"). Never merge, push, rebase, skip a hook,
 or edit a test to make it pass.
 
-1. **No tokens first.** Run `scripts/check.sh --full`: the gate, the probe, coverage and patch coverage, mutations, secrets. If the gate fails, stop and report its output. Write the diff to
+1. **No tokens first.** Run `scripts/check.sh --full`: the gate, the probe, coverage and patch coverage, the proof of each fix, mutations, secrets. If the gate fails, stop and report its output. Write the diff to
    `.claude/tmp/diff.patch` and pass agents its path, never its content. Over about 400
    lines, say so and propose a split before reviewing.
 2. **The plan.** List the files changed that the slice plan does not name; each gets its
@@ -20,8 +20,10 @@ or edit a test to make it pass.
      `/code-review ultra` (a deeper review in the cloud, billed per run; Claude cannot start it);
       - the last merge of a slice: `/code-review` on each workspace the slice touched, as a
      path, so it reads the whole folder and not only the diff, with the export map; then `/simplify` on the slice's changes, and the gate again.
-5. **Check each finding** against the code before fixing it; drop a false positive with its
-   reason. Fixes are re-checked by the gate and the mutation tester, not by a new pass. A
+5. **Reproduce each finding** before fixing it: the command, or a test seen failing. Write every
+   finding to `docs/review/findings.md` with its status and evidence: `rejected` with its reason,
+   `fixed` with its commit; a finding nobody reproduced stays `claimed`. A fix's commit body names
+   its finding (`Finding: F012`). Fixes are re-checked by the gate and the mutation tester, not by a new pass. A
    second pass runs only for a high finding fixed in a tier-1 file, and only that lens.
 6. **Report** to Alexis, in French:
    - the review card of `CLAUDE.md` (in the first slices, only its items 1–3 and 7, and the

@@ -10,7 +10,7 @@ You review tests you did not write. You never edit, create or delete a file, nev
 and never change a test. You may run the test suites and the mutation tools, which work on
 copies.
 
-Read first: the slice plan in `docs/plans/` (its "Done when", threat model and tests by
+Read first: `docs/review/findings.md`, every finding raised before (raise a `rejected` one again only with new evidence, and a `fixed` one that comes back as a regression); the slice plan in `docs/plans/` (its "Done when", threat model and tests by
 level), `docs/REVIEW.md`, the `.claude/rules/` files for the areas touched, and ADR-0002 §9
 ("The test audit: no false green"). Your caller names the pass.
 
@@ -51,7 +51,8 @@ assume:
 
 ## Report
 
-Only what you verified. For each finding: the file and line, the item above, a concrete
+Only what you verified. For each finding, as a row for the ledger: the file and line, the
+item above, the command you ran or the test that fails, with what it printed, and a concrete
 scenario ("change `>=` to `>` on line 42 and every test stays green", or "no test sends a
 proof signed for another chain"), and the missing case or assertion. End with one line:
 the pass, tests read, mutants run and survived, findings. With none, say so plainly. Do not
