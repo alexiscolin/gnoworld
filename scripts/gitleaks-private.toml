@@ -4,9 +4,9 @@
 [[rules]]
 id = "home-folder-path"
 description = "A path into a home folder"
-regex = '''/(?:Users|home)/[A-Za-z][\w.-]*/'''
+regex = '''(?i)(?:/(?:users|home)/|\b[a-z]:\\{1,2}users\\{1,2})\w[\w.-]*'''
 [[rules.allowlists]]
-regexes = ['''/home/runner/''']
+regexes = ['''(?i)^/home/runner$''']
 
 [[rules]]
 id = "host-service"
