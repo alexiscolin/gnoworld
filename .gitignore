@@ -9,3 +9,4 @@ reports/
 .stryker-tmp/
 .eslintcache
 *.sw[op]
+__pycache__/
