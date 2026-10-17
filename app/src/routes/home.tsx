@@ -1,13 +1,8 @@
 import { Link } from "react-router";
-import { pageMeta, WORLDS } from "../site.ts";
+import { homeMeta, WORLDS } from "../site.ts";
 
 export function meta() {
-  return pageMeta({
-    title: "gno.world",
-    description:
-      "gno.world: the social, on-chain hub of gno.land, where its worlds, their rooms and their realms meet.",
-    path: "/",
-  });
+  return homeMeta();
 }
 
 export default function Home() {

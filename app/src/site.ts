@@ -1,5 +1,6 @@
-// The site's one origin, and the places slice 1 pre-renders: slice 5's data files replace the list.
-import type { MetaDescriptor } from "react-router";
+// The site's one origin, the places slice 1 pre-renders (slice 5's data files replace the list),
+// and the tags each page carries.
+import { data, type MetaDescriptor } from "react-router";
 
 const ORIGIN = "https://gno.world";
 
@@ -18,14 +19,32 @@ export const WORLDS: readonly World[] = [
   },
 ];
 
-/** The world a path names, or undefined when none has that name. */
-export function worldBySlug(slug: string | undefined): World | undefined {
-  return WORLDS.find((world) => world.slug === slug);
+/** The world a path names; throws React Router's 404 when none has that name. */
+export function findWorld(slug: string | undefined): World {
+  const world = WORLDS.find((each) => each.slug === slug);
+  if (!world) throw data(null, { status: 404 });
+  return world;
 }
 
-/** A page's tags: its title, its description and its one canonical address, with their Open Graph twins. */
-export function pageMeta(page: { title: string; description: string; path: string }): MetaDescriptor[] {
-  const url = new URL(page.path, ORIGIN).href;
+/** The home page's tags. */
+export function homeMeta(): MetaDescriptor[] {
+  return pageMeta({
+    title: "gno.world",
+    description:
+      "gno.world: the social, on-chain hub of gno.land, where its worlds, their rooms and their realms meet.",
+    path: "/",
+  });
+}
+
+/** A world's tags, or, with no world, a not-found page's: no address of its own, not indexed. */
+export function worldMeta(world: World | undefined): MetaDescriptor[] {
+  if (!world) return [{ title: "No world here · gno.world" }, { name: "robots", content: "noindex" }];
+  return pageMeta({ title: `${world.name} · gno.world`, description: world.description, path: `/w/${world.slug}` });
+}
+
+// A page's title, description and one canonical address, with their Open Graph twins.
+function pageMeta(page: { title: string; description: string; path: string }): MetaDescriptor[] {
+  const url = ORIGIN + page.path;
   return [
     { title: page.title },
     { name: "description", content: page.description },
