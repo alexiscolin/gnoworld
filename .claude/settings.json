@@ -87,6 +87,7 @@
     "enabled": true,
     "allowUnsandboxedCommands": false,
     "network": {
+      "allowLocalBinding": true,
       "allowedDomains": ["registry.npmjs.org", "proxy.golang.org", "sum.golang.org", "github.com"]
     },
     "filesystem": {
