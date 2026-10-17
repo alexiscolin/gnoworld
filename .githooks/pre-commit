@@ -18,7 +18,7 @@ if ! sh "$s/code_changed.sh" --staged; then
 	exit 0
 fi
 # The staged gate is the one that runs; -z keeps a name with a space or an accent whole.
-differ=$(git diff --cached --name-only -z -- scripts .githooks .claude/settings.json | xargs -0 -r git -c core.quotePath=false diff --name-only --)
+differ=$(git diff --cached --name-only -z -- scripts .githooks .github .claude/settings.json | xargs -0 -r git -c core.quotePath=false diff --name-only --)
 if [ -n "$differ" ]; then
 	echo "pre-commit: staged harness files differ from the working tree's; stage them as they are on disk: $differ" >&2
 	exit 1

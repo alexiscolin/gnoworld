@@ -304,51 +304,52 @@ fi
 if part pre_commit; then
 # pre-commit runs the gate on the staged files, and a failing gate stops the commit.
 c2="$t/precommit"
+precommit() { (cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1); }
 mkdir -p "$c2/scripts" && git -C "$c2" init -q
 printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/repo_files.py" "$here/scan_secrets.sh" "$here/gitleaks.toml" "$c2/scripts/" && git -C "$c2" add -A && git -C "$c2" commit -qm base
 echo code >"$c2/a.ts" && git -C "$c2" add a.ts
-(cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a commit through a failing gate"
+precommit && fail "pre-commit let a commit through a failing gate"
 printf '#!/bin/sh\nexit 0\n' >"$c2/scripts/check.sh" && git -C "$c2" add -A
-(cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) || fail "pre-commit stopped a commit whose gate passes"
+precommit || fail "pre-commit stopped a commit whose gate passes"
 # A secret in what is staged stops the commit, docs included.
 mkdir -p "$t/leakbin" && printf '#!/bin/sh\nexit 1\n' >"$t/leakbin/gitleaks" && chmod +x "$t/leakbin/gitleaks"
 (cd "$c2" && PATH="$t/leakbin:$PATH" sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a commit through a secret scan that found one"
 git -C "$c2" commit -qm code && mkdir -p "$c2/docs" && echo prose >"$c2/docs/a.md" && git -C "$c2" add docs/a.md
-(cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) || fail "pre-commit stopped a docs-only commit with no secret"
+precommit || fail "pre-commit stopped a docs-only commit with no secret"
 (cd "$c2" && PATH="$t/leakbin:$PATH" sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a docs-only commit through a secret scan that found one"
 # The staged gate is the one that runs: it must match the working tree's, or a commit gates itself.
 git -C "$c2" commit -qm docs && printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && git -C "$c2" add scripts/check.sh && git -C "$c2" commit -qm red
 blob=$(printf '#!/bin/sh\nexit 0\n' | git -C "$c2" hash-object -w --stdin) && git -C "$c2" update-index --cacheinfo "100755,$blob,scripts/check.sh"
 echo more >>"$c2/a.ts" && git -C "$c2" add a.ts
-(cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a staged gate differ from the working tree's"
+precommit && fail "pre-commit let a staged gate differ from the working tree's"
 # An edit of the harness that is not staged is not in the commit: it does not stop one.
 git -C "$c2" reset -q && printf '#!/bin/sh\nexit 0\n' >"$c2/scripts/check.sh" && git -C "$c2" add scripts/check.sh && git -C "$c2" commit -qm green
 printf '#!/bin/sh\nexit 0\n# being edited\n' >"$c2/scripts/check.sh" && echo again >>"$c2/a.ts" && git -C "$c2" add a.ts
-(cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) || fail "pre-commit refused a commit for a harness edit it does not hold"
+precommit || fail "pre-commit refused a commit for a harness edit it does not hold"
 # The helpers it runs come from what is staged, not from the disk: an unstaged edit of one
 # must not neuter the gate (finding F067).
 git -C "$c2" checkout -q -- scripts/check.sh && printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && git -C "$c2" add scripts/check.sh && git -C "$c2" commit -qm red
 printf '#!/bin/sh\ncp /dev/null "$1/scripts/check.sh"\n' >"$c2/scripts/borrow_node_modules.sh"
 echo yet >>"$c2/a.ts" && git -C "$c2" add a.ts
-(cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit ran an unstaged helper that emptied the gate"
+precommit && fail "pre-commit ran an unstaged helper that emptied the gate"
 git -C "$c2" checkout -q -- scripts/borrow_node_modules.sh && printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/code_changed.sh"
-(cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit ran an unstaged code_changed.sh that skipped the gate"
+precommit && fail "pre-commit ran an unstaged code_changed.sh that skipped the gate"
 git -C "$c2" checkout -q -- scripts/code_changed.sh
 # Every staged harness file is compared, whatever its name: a space or an accent included.
 printf '#!/bin/sh\nexit 0\n' >"$c2/scripts/check.sh" && git -C "$c2" add scripts/check.sh
 for name in 'my file.sh' 'é.sh'; do
 	echo 'exit 0' >"$c2/scripts/$name" && git -C "$c2" add "scripts/$name" && echo 'exit 1' >"$c2/scripts/$name"
-	(cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a staged scripts/$name differ from the working tree's"
+	precommit && fail "pre-commit let a staged scripts/$name differ from the working tree's"
 	git -C "$c2" rm -qf --cached "scripts/$name" && rm "$c2/scripts/$name"
 done
 # The hooks and the settings are harness too; a code file partly staged is not.
-for f in .githooks/pre-push .claude/settings.json; do
+for f in .githooks/pre-push .github/workflows/gate.yml .claude/settings.json; do
 	mkdir -p "$c2/${f%/*}" && echo '{}' >"$c2/$f" && git -C "$c2" add "$f" && echo '{"x":1}' >"$c2/$f"
-	(cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a staged $f differ from the working tree's"
+	precommit && fail "pre-commit let a staged $f differ from the working tree's"
 	git -C "$c2" rm -qf --cached "$f" && rm "$c2/$f"
 done
 echo partly >>"$c2/a.ts" && git -C "$c2" add a.ts && echo unstaged >>"$c2/a.ts"
-(cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) || fail "pre-commit refused a code file only partly staged"
+precommit || fail "pre-commit refused a code file only partly staged"
 fi
 
 if part guard; then
