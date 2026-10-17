@@ -108,6 +108,10 @@ New: `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `eslint.config
 - **Also for 1b:** `packages/*/src` is written in `tsconfig.json`, `vitest.config.ts` (twice),
   `stryker.config.json` and `scripts/clones.mjs`; `app/` joins each, with its own tsconfig for
   the DOM. `.gitignore` is the one list of generated folders: no tool repeats it.
+- **Also for 1b (Alexis, 2026-10-17):** a test that kills no mutant fails the full gate.
+  StrykerJS runs with `disableBail`, so its report lists every test that kills each mutant
+  (`killedBy`); a test in none of them sees no change to the code, however it is written
+  (`expect(1).toBe(1)`, or the same through a variable). Its cost is measured before and after.
 - **The tests were checked before Alexis's turn:** all 52 pass against a throwaway parser
   kept out of the repo, and StrykerJS kills 96.5% of its mutants. Of the 8 left, 7 are
   equivalent (error texts, cases filtered earlier); the last was closed by a new case.

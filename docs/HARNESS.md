@@ -128,9 +128,13 @@ with `/cd`:
 - **Deny:** reading `.env`, `deploy/secrets/`, `~/.ssh`, `~/.config/gh`, `~/.npmrc`, `~/.aws`.
 - **Ask Alexis first:** `git push` (the guard asks for any form of it), `pnpm add`, `rm -rf`,
   and every gnomcp write (`gno_addpkg`, `gno_call`, `gno_run`, `gno_key_send`,
-  `gno_cla_sign`). Claude edits alone (Alexis, 2026-10-17), except the files something runs
-  outside the sandbox: the guard, the Stop hook and `code_changed.sh`, the git hooks,
-  `settings.json` and the `package.json` files (finding F068). Ask and deny rules hold in every
+  `gno_cla_sign`). Claude edits alone (Alexis, 2026-10-17), except what runs with Alexis's
+  full access: `scripts/`, the git hooks and `.claude/` (the Claude Code hooks run outside the
+  sandbox, and the git hooks run the gate in his shell when he pushes or merges), the
+  `*.config.ts` files and `stryker.config.json` the gate loads, and what pnpm runs at his
+  install (`package.json`, `pnpm-workspace.yaml`, `.npmrc`, `.pnpmfile.cjs`) (findings F068,
+  F076). The tests and `gno/tools` still run at his push with no ask; the backlog's
+  "hooks that run no repository code" closes that. Ask and deny rules hold in every
   permission mode.
 - **The sandbox** around shell commands: they write only in the project and its caches,
   never in the harness's files; they reach only the npm and Go registries and github.com;
