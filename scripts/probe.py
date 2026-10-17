@@ -68,6 +68,12 @@ try:
         expect(got == set() if rule is None else rule in got, f"eslint {name}: expected {rule or 'nothing'}, got {sorted(map(str, got))}")
     shutil.rmtree(HERE)
 
+    # Prettier: a file that is not formatted.
+    plant({"messy.ts": "export const  a={b:1,\n c :2}\n"})
+    out = run(["pnpm", "exec", "prettier", "--check", HERE])
+    expect(out.returncode != 0 and "messy.ts" in out.stdout + out.stderr, "prettier refuses an unformatted file")
+    shutil.rmtree(HERE)
+
     # knip: a file nothing imports.
     plant({"unused.ts": "export function lonely(): number {\n  return 1;\n}\n"})
     out = run(["pnpm", "exec", "knip", "--no-progress"])

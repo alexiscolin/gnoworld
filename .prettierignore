@@ -1,0 +1,10 @@
+# Hand-written prose, generated files and other languages.
+*.md
+docs/
+adr/
+r/
+tools/
+pnpm-lock.yaml
+coverage/
+reports/
+.claude/tmp/

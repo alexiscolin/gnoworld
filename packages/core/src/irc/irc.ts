@@ -13,9 +13,11 @@ export interface IrcMessage {
   readonly params: readonly string[];
 }
 
-export type IrcParseError = "empty" | "bad-character" | "no-command" | "bad-command" | "tags-too-long" | "body-too-long";
+export type IrcParseError =
+  "empty" | "bad-character" | "no-command" | "bad-command" | "tags-too-long" | "body-too-long";
 
-export type IrcParsed = { readonly ok: true; readonly message: IrcMessage } | { readonly ok: false; readonly error: IrcParseError };
+export type IrcParsed =
+  { readonly ok: true; readonly message: IrcMessage } | { readonly ok: false; readonly error: IrcParseError };
 
 /** Reads one line from the relay, which is untrusted: it never throws. It refuses lines over the limits
  * (UTF-8 bytes: 8191 of tags with the @ and the space, 510 of the rest), NUL, and CR or LF but at the end. */

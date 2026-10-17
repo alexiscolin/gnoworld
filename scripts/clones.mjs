@@ -35,7 +35,8 @@ function* sources(dir) {
   }
 }
 
-const folders = process.argv.length > 2 ? process.argv.slice(2) : ["packages", "app", "admin", "server"].filter(existsSync);
+const folders =
+  process.argv.length > 2 ? process.argv.slice(2) : ["packages", "app", "admin", "server"].filter(existsSync);
 const seen = new Map();
 for (const path of folders.flatMap((f) => [...sources(f)])) {
   const file = ts.createSourceFile(path, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true);

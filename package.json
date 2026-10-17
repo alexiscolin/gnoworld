@@ -8,6 +8,8 @@
   },
   "scripts": {
     "prepare": "git config core.hooksPath .githooks",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint --cache --max-warnings 0 .",
     "test": "vitest run",
@@ -28,6 +30,7 @@
     "fast-check": "4.10.2",
     "jscpd": "5.4.1",
     "knip": "6.41.0",
+    "prettier": "3.9.10",
     "typescript": "6.0.3",
     "typescript-eslint": "8.71.2",
     "vitest": "4.1.12"

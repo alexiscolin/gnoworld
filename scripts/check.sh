@@ -27,7 +27,8 @@ if [ ! -x "$GNO" ]; then
 	exit 1
 fi
 
-echo "== TypeScript: types, lint, tests"
+echo "== TypeScript: format, types, lint, tests"
+pnpm run --silent format:check >/dev/null
 pnpm run --silent typecheck
 pnpm run --silent lint
 pnpm run --silent test

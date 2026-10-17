@@ -6,7 +6,16 @@ import importX from "eslint-plugin-import-x";
 import tseslint from "typescript-eslint";
 
 export default defineConfig(
-  globalIgnores(["**/node_modules/", "coverage/", "reports/", ".stryker-tmp/", ".claude/tmp/", "docs/", "r/", "tools/"]),
+  globalIgnores([
+    "**/node_modules/",
+    "coverage/",
+    "reports/",
+    ".stryker-tmp/",
+    ".claude/tmp/",
+    "docs/",
+    "r/",
+    "tools/",
+  ]),
   {
     files: ["**/*.ts", "**/*.tsx"],
     extends: [tseslint.configs.strictTypeChecked, tseslint.configs.stylisticTypeChecked],
@@ -28,7 +37,8 @@ export default defineConfig(
       "no-restricted-syntax": [
         "error",
         {
-          selector: "CatchClause > BlockStatement[body.length=1] > ExpressionStatement > CallExpression[callee.object.name=/^(console|logger)$/]",
+          selector:
+            "CatchClause > BlockStatement[body.length=1] > ExpressionStatement > CallExpression[callee.object.name=/^(console|logger)$/]",
           message: "A catch that only logs swallows the error: act on it, or let it rise.",
         },
       ],
@@ -60,7 +70,10 @@ export default defineConfig(
     files: ["packages/core/**/*.ts"],
     ignores: ["**/*.test.ts"],
     rules: {
-      "no-restricted-imports": ["error", { patterns: [{ regex: "^[^.]", message: "core imports only core (docs/ARCHITECTURE.md)." }] }],
+      "no-restricted-imports": [
+        "error",
+        { patterns: [{ regex: "^[^.]", message: "core imports only core (docs/ARCHITECTURE.md)." }] },
+      ],
       "no-restricted-properties": [
         "error",
         { object: "Date", property: "now", message: "core takes the time as a parameter." },

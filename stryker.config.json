@@ -1,26 +1,13 @@
 {
   "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
-  "plugins": [
-    "@stryker-mutator/vitest-runner",
-    "@stryker-mutator/typescript-checker"
-  ],
+  "plugins": ["@stryker-mutator/vitest-runner", "@stryker-mutator/typescript-checker"],
   "testRunner": "vitest",
-  "checkers": [
-    "typescript"
-  ],
+  "checkers": ["typescript"],
   "tsconfigFile": "tsconfig.json",
-  "mutate": [
-    "packages/*/src/**/*.ts",
-    "!packages/*/src/**/*.test.ts",
-    "!packages/*/src/index.ts"
-  ],
+  "mutate": ["packages/*/src/**/*.ts", "!packages/*/src/**/*.test.ts", "!packages/*/src/index.ts"],
   "incremental": true,
   "incrementalFile": "reports/stryker-incremental.json",
-  "reporters": [
-    "clear-text",
-    "progress",
-    "html"
-  ],
+  "reporters": ["clear-text", "progress", "html"],
   "htmlReporter": {
     "fileName": "reports/mutation/index.html"
   },
@@ -33,12 +20,5 @@
     "low": 85,
     "break": null
   },
-  "ignorePatterns": [
-    "docs",
-    "r",
-    "tools",
-    ".claude",
-    "coverage",
-    "reports"
-  ]
+  "ignorePatterns": ["docs", "r", "tools", ".claude", "coverage", "reports"]
 }

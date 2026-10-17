@@ -89,9 +89,10 @@ python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted a doc namin
 fmt=$(cd "$(dirname "$0")" && pwd)/format_hook.sh
 repo=$(cd "$(dirname "$0")/.." && pwd)
 probe="$repo/packages/core/src/__format_probe__.ts"
-printf 'export type Point = { x: number };\n' >"$probe"
+printf 'export type Point = { x: number };\nexport const  origin={x:0}\n' >"$probe"
 printf '{"tool_input":{"file_path":"%s"}}' "$probe" | CLAUDE_PROJECT_DIR="$repo" sh "$fmt" || { rm -f "$probe"; fail "format_hook blocked an edit"; }
 grep -q "interface Point" "$probe" || { rm -f "$probe"; fail "format_hook did not run eslint --fix"; }
+grep -q "export const origin = { x: 0 };" "$probe" || { rm -f "$probe"; fail "format_hook did not run prettier"; }
 rm -f "$probe"
 
 # patch_coverage: the share of changed lines that the tests run, like a pull request's
