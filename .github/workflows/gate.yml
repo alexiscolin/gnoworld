@@ -18,7 +18,7 @@ jobs:
     env:
       GNO_TOOLCHAIN: /home/runner/.cache/gno-toolchain
       GNOROOT: /home/runner/.cache/gno-toolchain/src
-      GNO_COMMIT: 07e44776c26187830b7dcbd2454991b5a1960378 # v1.5.1, what onyx runs
+      GNO_COMMIT: 07e44776c26187830b7dcbd2454991b5a1960378 # v1.5.1, the local toolchain; onyx runs v1.5.1-rc.1 (F062)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
