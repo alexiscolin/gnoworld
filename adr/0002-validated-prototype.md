@@ -68,6 +68,8 @@ planets are worlds (§1).
   calls. It does not write or deploy contracts.
 - **Alexis set Jarvis's stack on 2026-10-17:** a Claude key, MCP, skills and a harness,
   with evals and complete observability (§5).
+- **Alexis set the server on 2026-10-17:** TypeScript on Node, sharing its rules and schemas
+  with the client; Ergo stays, as an image (§7).
 - **Alexis set the delivery on 2026-10-17:** a simple stack for demos inside the company,
   then everything handed to ops in Docker; ops decides where it runs (§7).
 - **On 2026-10-17 Alexis moved into phase 0:** Jarvis, calls signed by users (names, votes,
@@ -482,6 +484,27 @@ between worlds. None may saturate the map:
 - **Nothing is optimistic.** The room shows "kaito voted yes" only from the chain event.
 - **gnoworld never signs, and Jarvis never signs.** No call is ever sent from sample data.
 
+**Adena, through its SDK, by its rules** (`@adena-wallet/sdk`, pinned exactly; it is young,
+0.1.x, so its behaviour has contract tests):
+- **One SDK instance** for the app. A connection is never assumed: it is checked before
+  each action, and the app listens to connection, account and network changes, removing
+  every listener on cleanup.
+- **Sign-in is `signArbitrary`** over plain words the person reads: "Sign in to gnoworld",
+  the domain, a single-use nonce from the server, the issue and expiry times (4096 bytes at
+  most). The server checks it with the SDK's `verifyArbitrarySignature`, pinning the
+  signer, the chain id and the exact text, and spends the nonce. The proof carries the
+  chain id, so a proof made on one network is refused on another.
+- **A change of account or network** ends the old account's session; the app asks again.
+- **Before "sign in Adena"**, the card checks the wallet's network against the universe's
+  chain, and asks Adena to switch (or to add a community chain) rather than ever signing on
+  the wrong one. Gas is simulated first, then the fee shown in the preview, with a margin:
+  gno charges the whole fee, not the gas used.
+- **Every failure is a state with its next step,** never a crash: Adena missing (install
+  it), locked, the person refused, the wrong account, an Adena too old for a request
+  (update it), the network not answering.
+- **The SDK's other providers** (a key held locally, social login) are a later decision,
+  with signing on phones.
+
 **What a realm shows: a digest, not its page.** gnoworld stays a chat. A realm appears as a
 few simple blocks; its whole page stays one link away, on gnoweb.
 
@@ -564,7 +587,7 @@ routed question (product review).
 
 | Part | What | Why |
 |---|---|---|
-| Harness | The Claude Agent SDK (TypeScript), in a small service of its own beside the Go binary | It gives the agent loop, MCP, skills, hooks and limits. It exists in TypeScript and Python only, so Jarvis is not a role of the Go binary |
+| Harness | The Claude Agent SDK (TypeScript), a role of the server (§7). Whether the official Anthropic and MCP SDKs, inside the server's process, replace it is to be decided: they are lighter, since the Agent SDK starts a Claude Code process per conversation | It gives the agent loop, MCP, skills, hooks and limits |
 | Key | The Anthropic API key, in the service's environment only | The client holds no secret (§9) |
 | Tools | **gnomcp** over stdio, seven read tools allowed: `gno_packages`, `gno_read`, `gno_render`, `gno_eval`, `gno_status`, `gno_history`, `gno_activity`. **Our own MCP server**: a room's recent public history; the places and their URLs; the latest transactions and blocks from the public indexer and the RPC; the digests and action proposals of §4, checked before they reach the client. **gnoscope** (`https://gnoscope.com/mcp`, remote, read-only by design): a transaction explained, a realm's decoded state, an address, search over all code on chain | Free reads only, and nothing that writes |
 | Skills | `SKILL.md` folders versioned in the repo: gnomcp's `gno` skill (Apache-2.0), to read realms correctly; ours: concierge, realm reader, catch up, translation. Text only, no scripts | Loaded on demand; part of the prompt version |
@@ -687,7 +710,7 @@ they change, our own spans wrap each turn.
   - feedback.
 - **Alerts:** the budget at 80% and 100%; spikes in errors or denials.
 - **Where it goes:**
-  - Grafana (Tempo, Loki, Prometheus) for operations across Ergo, the Go binary and Jarvis;
+  - Grafana (Tempo, Loki, Prometheus) for operations across Ergo and the server;
   - Langfuse for conversations, prompt versions, eval scores and feedback.
 
   The demo stack runs both. In production, ops chooses self-hosted or their clouds;
@@ -706,7 +729,7 @@ call.
 
 **Moderation of public rooms** (phase 0). This answers part of ADR-0001's question 5;
 jurisdiction and retention stay open there.
-- **A moderation bot,** a role of the Go binary, checks each public message with OpenAI's
+- **A moderation bot,** a role of the server, checks each public message with OpenAI's
   Moderation API (`omni-moderation-latest`: text and images, free of charge; slice 12
   confirms both against OpenAI's docs).
 - **Text is checked after it is posted.** A message appears at once, and the check follows
@@ -823,22 +846,24 @@ by few hands, so they get the safest path.
 |---|---|---|---|
 | Data files | 0 | Universes, hubs, ecosystems, stations, events, expedition stops, quests, news, the bubble rules (ADR-0001 §7) | Versioned in the repo; curated by the team through reviewed pull requests; validated with Zod at build time |
 | Preview captures | 0 | A build job (Playwright) captures each world's public page | Refreshed on a schedule; no capture, no preview |
-| Moderation bot | 0 | §6; it also signs the satellites' approvals | A role of the Go binary. An OpenAI API key and the approval key, server-side |
-| Prices job | 0 | Writes `markets.json` every 5 minutes (§6) | The host's scheduler |
+| Moderation bot | 0 | §6; it also signs the satellites' approvals | A role of the server. An OpenAI API key and the approval key, server-side |
+| Prices job | 0 | Writes `markets.json` every 5 minutes (§6) | A timer in the server |
 | PostHog | 0 | Product analytics (§6) | A third party, in the CSP's `connect-src` |
 | Admin console | 0 | Roles, the moderation queue, curation edits as pull requests, settings, the audit log (§6) | Its own origin; a GitHub App to open pull requests |
-| Signals | 0 for new realms, first to chart and first words; 1 for the rest | Heat with realm calls, routes, new realms, who charted first; the rank, the dust, the seasons and the tiles of §3. It reads Ergo and the public indexer and serves a small JSON feed | A role of the Go binary. ADR-0001 §13 holds: we run no indexer |
-| Jarvis | 0 | §5 | A TypeScript service beside the Go binary |
+| Signals | 0 for new realms, first to chart and first words; 1 for the rest | Heat with realm calls, routes, new realms, who charted first; the rank, the dust, the seasons and the tiles of §3. It reads Ergo and the public indexer and serves a small JSON feed | A role of the server. ADR-0001 §13 holds: we run no indexer |
+| Jarvis | 0 | §5 | A role of the server |
 | Observability | 0 | Grafana and Langfuse, fed by OpenTelemetry (§5) | In the demo stack; in production where ops decides |
 | Voice | 1 | A WebRTC media server and TURN | Its own ADR first |
 | Room games | 1 | A game bot and a game realm (§1) | Its own ADR first. Needs sessions and the sponsor |
 | Satellites | 0, once audited and approved on mainnet | The slot realm (§8, row 7) | Audited; mainnet's deploy approval is the gate (ADR-0001, question 6) |
 
 **ADR-0001 §13 changes.**
-- It had two pieces: the static client and one Go binary.
+- It had two pieces: the static client and one Go binary. The server is now TypeScript on
+  Node (below).
 - **Phase 0:**
-  - the pieces are the client, the admin console, Ergo, the Go binary (login, moderation,
-    first signals), the prices job, Jarvis, observability, and the slot realm on chain;
+  - the pieces are the client, the admin console, Ergo, the server (login, moderation,
+    first signals, prices, the admin API, Jarvis), observability, and the slot realm on
+    chain;
   - the third parties are Anthropic, OpenAI's moderation, PostHog and gnoscope;
   - costs: Jarvis at up to 50 $ a day; hosting as ops chooses (below).
 - **Phase 1:** the signals at scale, voice and room games are added.
@@ -848,7 +873,7 @@ not choose its hosts.
 - **Demos:** one `docker compose up` runs everything on one machine, for demos inside the
   company:
   - the client and the admin console, served as static files;
-  - Ergo, the Go binary and Jarvis;
+  - Ergo and the server;
   - observability: Grafana's all-in-one OpenTelemetry image, and Langfuse as an optional
     profile.
 - **The team's demo URL:** the demo stack runs on Alexis's homelab and is published with
@@ -881,7 +906,7 @@ not choose its hosts.
   - the compose file is the reference wiring;
   - every setting is an environment variable, listed with its meaning in `.env.example`;
   - secrets are mounted at run time, never baked into an image;
-  - volumes are named: Ergo's history, the Go binary's SQLite;
+  - volumes are named: Ergo's history, the server's SQLite;
   - `docs/OPERATIONS.md` is the runbook: what each service does, its resources, its limits
     and next steps (the scale table below), and how to deploy, update, roll back, back up,
     read logs and metrics, and set alerts.
@@ -891,6 +916,33 @@ not choose its hosts.
   - where secrets live.
 
   Nothing in the code assumes a host.
+
+**The server: TypeScript on Node** (Alexis, 2026-10-17; amends ADR-0001 §13's Go binary).
+Everything gnoworld writes for the server is TypeScript, beside the client; Ergo stays, as
+an image we configure and never write.
+
+| Need | Choice | Why |
+|---|---|---|
+| Runtime | Node's LTS line, pinned (Adena's SDK is developed on Node 24) | Node runs TypeScript directly, so the server has no build step; `tsc` checks the types |
+| Shared code | `packages/core` (pure rules) and `packages/schemas` (Zod), used by the client, the console and the server | One type per piece of data, on both sides |
+| HTTP | Hono (proposed; asked in slice 3) | Small and fast; the browser's own `Request` and `Response`; official Zod validation; tested without starting a server; runs wherever ops puts it |
+| Logins | Adena's SDK, `verifyArbitrarySignature` (§4, Adena) | The wallet's own verifier: no crypto written by us |
+| Moderation bot | Our `core/irc` parser over a WebSocket to Ergo | No extra dependency: the client's code, reused |
+| Storage | `node:sqlite` if stable at the pinned version, otherwise `better-sqlite3` | One file, fast, nothing to run beside it |
+| Scheduled work (prices) | A timer in the process | No cron library |
+| Jarvis | §5, harness row | — |
+| Observability | OpenTelemetry's Node SDK | To any backend ops chooses |
+| Tests | Vitest, as in the client; integration against a real Ergo in Docker; load with a load-testing tool | One set of tools everywhere |
+
+**Node, fast and calm:**
+- nothing heavy on the event loop: CPU work goes to worker threads;
+- every outbound call has a timeout and an abort signal;
+- every queue is bounded, with back-pressure; nothing grows without a cap;
+- the heap limit matches the container's memory;
+- `SIGTERM` drains connections and stops cleanly; health and readiness endpoints for
+  the container;
+- no unhandled promise: lint forbids floating promises, and a rejection that escapes stops
+  the process loudly instead of hiding.
 
 **Scale: each piece's first limit, and the next step.**
 
@@ -922,6 +974,7 @@ All decided by Alexis on 2026-10-17.
 | 8 | Rollout: "tips and stamps in the same transaction" | Passport stamps | Two different things. Passport stamps record visits on the device. ADR-0001's stamps travel with a tip |
 | 9 | §10: a generated identicon | A planet chosen as an avatar | An astronaut generated from the name; its parts chosen in phase 1 and saved in the profile realm. Never a planet (§1) |
 | 10 | §7: "mobile is the same space" | The full 3D on a phone | Chat first on phones: the chat full screen, the places as a list with planet thumbnails (the Open Graph images of §2), and the 3D only on request ("View in space"), loaded when asked and when the device can. Nothing of three.js or its textures loads before that |
+| 12 | §13: one Go binary (the stdlib, `coder/websocket`, `gnoclient`) | — | One TypeScript server on Node, sharing `core` and the schemas with the client; Adena's SDK verifies logins; Ergo stays, as an image (§7) |
 | 11 | Rollout: in phase 0 "the chain is read, never written" | Calls, votes, a name registered in the app, satellites | From phase 0, users sign their own calls in Adena (§4). gnoworld's own write in phase 0 is the slot realm, once audited and approved on mainnet; its approvals and takedowns are signed by gnoworld's keys, on the server |
 
 **Checks for slice 1.** These are not differences with the prototype:
@@ -1207,7 +1260,7 @@ They follow ADR-0001's numbering. Alexis answered them on 2026-10-17.
 | # | Question | Answer |
 |---|---|---|
 | 14 | The markets row's source | A scheduled job reads CoinGecko into `markets.json`; the client reads only that file (§6) |
-| 15 | Jarvis: model, host, budget, translation | Sonnet 5.5 by default, Haiku 5.5 and Opus 5.5 by task; a TypeScript service on the Agent SDK beside the Go binary; 50 $ a day; automatic, cached translation through the same service with Haiku; chain data from gnomcp, the public indexer and gnoscope (§5) |
+| 15 | Jarvis: model, host, budget, translation | Sonnet 5.5 by default, Haiku 5.5 and Opus 5.5 by task; a role of the TypeScript server; 50 $ a day; automatic, cached translation through the same service with Haiku; chain data from gnomcp, the public indexer and gnoscope (§5) |
 | 16 | Media: storage, budget, moderation | No hosted media at first: embeds from accepted services. Messages are moderated by a bot on OpenAI's Moderation API, checked after posting, with contests (§6) |
 | 17 | Public room archives as indexed pages | No, at first (§2) |
 | 18 | Measurement | PostHog, EU cloud, cookieless, counts only (§6) |

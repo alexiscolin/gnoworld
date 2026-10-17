@@ -9,7 +9,9 @@ Review by risk, not line by line everywhere.
 | 1 | Realms (`r/`, `p/`), the sponsor, relay authorization | Claude | Claude and a fresh-context `gno-auditor` read every line. Alexis reviews the function cards and the attack scenarios. External audit before mainnet |
 | 1 | Client crypto (keys, signed statements, Merkle, the MLS boundary), the CSP | Alexis for the core, Claude elsewhere | Alexis reads every line |
 | 2 | Other TypeScript (state, queries, views) | Alexis for the core, Claude elsewhere | Alexis reads the tests first, then every line |
-| 2 | Go (reference client, relay plumbing) | Claude | Behaviour and tests |
+| 1 | The server's login, the admin API's rights, the approval signing | Claude | Alexis reads every line |
+| 2 | The rest of the server (TypeScript on Node) | Claude | Alexis reads the tests first, then every line |
+| 2 | Go (the seal reference client) | Claude | Behaviour and tests |
 | 3 | Interface, 3D, motion | Either | Run it; read the budgets the gate prints |
 
 ## Order
@@ -38,7 +40,14 @@ Most important first:
   - `as` on outside data;
   - effect dependencies, and stale closures;
   - a new dependency.
-- **Go (relay):**
+- **Node (the server):**
+  - work that blocks the event loop;
+  - a promise left floating, or a rejection swallowed;
+  - an outbound call without a timeout;
+  - a map, a queue or a cache without a bound;
+  - authorization checked before any work;
+  - a clean stop on `SIGTERM`.
+- **Go (the reference client):**
   - goroutine leaks;
   - context cancellation;
   - maps that grow without bound;

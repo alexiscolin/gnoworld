@@ -14,8 +14,7 @@ Browser: the static client (React Router 8, pre-rendered pages, one three.js sce
   ├─ PostHog, EU cloud .................... counts only, cookieless (ADR-0002 §6)
   ├─ indexer.gno.land (graphql-ws) ........ chain events, live
   ├─ Adena (extension) .................... the login signature; calls the user signs
-  ├─ the Go binary ........................ login, moderation, first signals; signals at scale (phase 1)
-  └─ Jarvis ............................... Claude Agent SDK service with gnomcp and gnoscope (ADR-0002 §5)
+  └─ the server (TypeScript on Node) ..... login, moderation, signals, prices, the admin API, Jarvis
 ```
 
 The client is a static site. Anyone can host it, and it never holds a secret. The services
@@ -40,13 +39,13 @@ app/                         the web client
     features/                one folder per feature: chat, universe, world, realms, jarvis,
                              passport, notifications, events, search, profile, settings
   tests/e2e/                 Playwright: journeys, axe, budgets (bundle, Web Vitals, memory)
+packages/core/               pure rules, shared by app, admin and server: no DOM, no React, no network
+packages/schemas/            Zod schemas for every boundary, shared the same way
+server/                      the server: TypeScript on Node (ADR-0002 §7), one folder per role
+  login/ moderation/ signals/ prices/ admin/
+  jarvis/                    the harness, its skills (SKILL.md folders) and its evals
 deploy/                      compose.yaml (the demo stack, the reference wiring for ops), .env.example
-cmd/gnoworld/                the Go binary, one role per package: login, moderation, signals
 admin/                       the admin console, on its own origin (ADR-0002 §6): reuses ui and lib
-jarvis/                      the Jarvis service: TypeScript on the Claude Agent SDK
-  src/                       the harness: tool allowlist, hooks, limits, our own MCP tools
-  skills/                    SKILL.md folders: concierge, realm reader, catch up, translation
-  evals/                     cases, chain answers recorded at a block height, graders
 r/gnoworld/                  realms: the slot realm (phase 0), then hubs and profiles; a store plus versioned rules (ADR-0001 §14)
 ```
 
@@ -68,12 +67,13 @@ Lint enforces it with ESLint's built-in `no-restricted-imports`, configured per 
 
 | Folder | May import | Never imports |
 |---|---|---|
-| `core` | `core` | Anything else, and no globals (`window`, `document`, `Date.now()`: time is a parameter) |
+| `core` (`packages/core`) | `core` | Anything else, and no globals (`window`, `document`, `Date.now()`: time is a parameter) |
 | `lib` | `core`, Zod, the chain client libraries | React, `scene`, `features`, `ui` |
 | `store` | `core`, `lib` types | React, `scene`, `features` |
 | `scene` | `core`, `store` (read and subscribe), three, camera-controls, GSAP | React, `features`, `ui` |
 | `ui` | `ui` | `features`, `scene`, `store`, `lib` |
 | `features/x` | `ui`, `core`, `lib`, `store`, another feature's `index.ts` | Another feature's files |
+| `server` | `core`, `schemas`, Node's built-ins, its framework | React, `scene`, `ui`, `features` |
 | `routes` | `features`, `ui`, `lib` (build-time loaders), `store` (to set the place) | `scene` directly: the canvas is mounted by the universe feature |
 
 This is ADR-0001 §12's split, kept: a bug is either in the scene or in the interface, and
