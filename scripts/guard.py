@@ -15,7 +15,9 @@ import shlex
 import sys
 
 SHELLS = {"sh", "bash", "zsh", "dash"}
-WRAPPERS = {"env", "nohup", "time", "timeout", "nice", "stdbuf", "command", "builtin", "noglob", "exec", "xargs"}
+WRAPPERS = {"env", "nohup", "time", "timeout", "nice", "stdbuf", "command", "builtin", "noglob", "exec", "xargs", "sudo", "doas"}
+KEYWORDS = {"!", "{", "}", "if", "then", "else", "elif", "do", "while", "until"}  # words that open a command, not name it
+SEPARATORS = {";", "&&", "||", "|", "&", "(", ")", ";;", "|&"}
 TAKES_ARG = {"-u", "--unset", "-C", "--chdir", "-S", "-s", "-k", "-n", "-I", "-P", "-L", "-d"}  # wrappers' options
 INTERPRETERS = {"python", "python3", "node", "perl", "ruby", "deno", "bun"}
 WRITERS = {"cp", "mv", "tee", "install", "rsync", "dd"}
@@ -31,7 +33,7 @@ def refuse(why):
 def unwrap(words):
     """The command itself, past leading VAR=value words and wrappers with their options."""
     while words:
-        if ASSIGNMENT.fullmatch(words[0]):
+        if ASSIGNMENT.fullmatch(words[0]) or words[0] in KEYWORDS:
             words = words[1:]
         elif os.path.basename(words[0]) in WRAPPERS:
             words = words[1:]
@@ -42,19 +44,35 @@ def unwrap(words):
     return words
 
 
+def simple_commands(text):
+    """Each simple command's words, line by line, split at the shell's separators outside quotes."""
+    for line in text.split("\n"):
+        lexer = shlex.shlex(line, posix=True, punctuation_chars=True)
+        lexer.whitespace_split = True
+        try:
+            tokens = list(lexer)
+        except ValueError:  # an unbalanced quote (a heredoc's body, a message over several lines): judge the raw words
+            tokens = re.sub(r"([;|&()])", r" \1 ", line).split()
+        words = []
+        for token in tokens:
+            if token in SEPARATORS:
+                yield words
+                words = []
+            else:
+                words.append(token)
+        yield words
+
+
 def commands(text):
     """The words of each simple command in a shell line, looking inside `sh -c`, `eval`, `$(...)` and backticks."""
+    text = text.replace("\\\n", "")  # a continued line is one line to the shell
     for inner in re.findall(r"\$\(([^()]*)\)|`([^`]*)`", text):
         yield from commands("".join(inner))
-    for part in re.split(r"&&|\|\||[;|\n]", text):
-        try:
-            raw = shlex.split(part)
-        except ValueError:  # an unbalanced quote: judge the raw words
-            raw = part.split()
+    for raw in simple_commands(text):
         if any(w.upper().startswith("GIT_CONFIG") or "hookspath" in w.lower() for w in raw):
             refuse("git's hooks overridden (core.hooksPath, a GIT_CONFIG variable)")
         words = unwrap(raw)
-        if len(words) >= 3 and os.path.basename(words[0]) in SHELLS and words[1] == "-c":
+        if len(words) >= 3 and os.path.basename(words[0]) in SHELLS and re.fullmatch(r"-[a-zA-Z]*c[a-zA-Z]*", words[1]):
             yield from commands(words[2])
         elif words and words[0] == "eval":
             yield from commands(" ".join(words[1:]))

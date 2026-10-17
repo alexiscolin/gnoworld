@@ -373,6 +373,23 @@ sh_ "python3 -c \"open('gno/r/x/x.gno','w').write('package x')\"" 0 "$t/skilled.
 sh_ "git commit -m 'note: --no-verify is refused'" 0
 sh_ "GIT_PAGER=cat git log -n 3" 0
 sh_ "python3 -I scripts/probe.py" 0
+# Ordinary multi-line shell, which an agent writes without meaning to evade (findings F032, F036).
+sh_ "git commit -m x \\
+  --no-verify" 2
+sh_ "git push origin main \\
+  --force" 2
+sh_ "git commit -m y --no-ver\\
+ify" 2
+sh_ "(git commit --no-verify -m y)" 2
+sh_ "{ git commit --no-verify -m y; }" 2
+sh_ "! git commit --no-verify -m y" 2
+sh_ "if true; then git commit --no-verify -m y; fi" 2
+sh_ 'bash -lc "git commit --no-verify -m y"' 2
+sh_ "sudo git commit --no-verify -m y" 2
+sh_ "(git push --force origin main)" 2
+sh_ 'git commit -m "does -n; whatever"' 0
+sh_ 'git commit -m "feat(core): a (b) {c}"' 0
+sh_ "git log --oneline -n 3 2>&1 | head" 0
 # A push, in any form, waits for Alexis: the guard asks, since a rule cannot see every form.
 asks() { # $1: a shell command
 	python3 -I -c 'import json,sys; print(json.dumps({"tool_name":"Bash","tool_input":{"command":sys.argv[1]}}))' "$1" | python3 -I "$gd" 2>/dev/null | grep -q '"permissionDecision": "ask"' || fail "guard did not ask before: $1"
