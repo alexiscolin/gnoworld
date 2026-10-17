@@ -94,7 +94,7 @@ This ADR records:
 
 Phases are ADR-0001's:
 - **0**: a public hub. Users sign their own calls; gnoworld's only write of its own is the
-  slot realm (§8, row 11).
+  slot realm, on Onyx (§8, row 11).
 - **1**: social on chain.
 - **2**: private, and depth.
 - **3**: mainnet.
@@ -133,11 +133,11 @@ Phases are ADR-0001's:
 | Hero | The number of people online, one line, two big actions | 0 | Ergo counts | — |
 | Markets row | GNOT, ATONE and BTC with a 24 h line; the block height | 0 | The prices file (§6) | Read |
 | Ticker | A pausable line of what is happening: votes, events, new worlds | 0, chain events included | The public indexer | Read |
-| Rail | The worlds or the groups, magnified like a dock under the pointer. By default, the most used worlds right now (social and realm), after the ones you follow: 25 at most, scrolling, then a "See all" button to the list view. "Most used" means the most people present now; phase 1 adds realm calls. The order changes at most once a minute, only when a world stays clearly ahead, and never under the pointer | 0 | Ergo's `LIST`; the signals in phase 1 | — |
+| Rail | The worlds or the groups, magnified like a dock under the pointer. By default, the worlds with the most people present right now, after the ones you follow; phase 1 adds realm calls. 25 at most, scrolling, then a "See all" button to the list view. The order changes at most once a minute, only when a world stays clearly ahead, and never under the pointer | 0 | Ergo's `LIST`; the signals in phase 1 | — |
 | List view | Everything as panels, no 3D, filterable by genre | 0 | — | — |
 | Search | ⌘K over the current universe's worlds, ecosystems, stations and genres, grouped with their counts, with "Go explore" on top; satellites labelled "Sponsored"; in phase 1 over every realm, dust included | 0 | — | — |
 | Loader | Real texture progress, then the space opens like an iris | 0 | — | — |
-| Menu and settings | The account button (your astronaut) opens a menu: passport, saved, settings, help, log out; on a phone, a menu button holds it with the navigation. Settings gather every choice in one place: **display** (quality Auto, High or Low; reduce animations; the 3D on a phone), **language** (yours, and automatic translation on or off), **notifications** (by kind and by world; push), **privacy** (DMs from strangers; Earth presence; the country tag; analytics; keeping your Jarvis questions), **account** (your name, your astronaut), **this device** (export or clear the passport, saved messages and drafts) | 0 | The device, and the server for DMs and push | — |
+| Menu and settings | The account button (your astronaut) opens a menu: passport, saved, settings, help, log out; on a phone, a menu button holds it with the navigation. Settings gather every choice in one place: **display** (quality Auto, High or Low; reduce animations; the 3D on a phone), **language** (yours, and automatic translation on or off), **notifications** (by kind and by world; push), **privacy** (DMs only from people you have talked with; Earth presence; the country tag; analytics; keeping your Jarvis questions), **account** (your name, your astronaut), **this device** (export or clear the passport, saved messages and drafts) | 0 | The device, and the server for DMs and push | — |
 
 **Chat** (Ergo in phase 0, ADR-0001 §1)
 
