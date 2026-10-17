@@ -18,7 +18,7 @@ export default defineConfig(
       "import-x/resolver-next": [importX.createNodeResolver()],
     },
     languageOptions: {
-      parserOptions: { projectService: { allowDefaultProject: ["*.config.ts"] }, tsconfigRootDir: import.meta.dirname },
+      parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
     },
     rules: {
       // Errors are handled where something can be done about them, or they rise.
