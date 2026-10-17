@@ -105,8 +105,7 @@ def mutants():
     yield from each("eslint.config.ts", '...["memo", "useMemo", "useCallback"].map(', "...[].map(", "probe", "eslint no React.useMemo")
     yield from each("eslint.config.ts", '...["innerHTML", "outerHTML", "insertAdjacentHTML"].map(', "...[].map(", "probe", "eslint no raw HTML")
     yield from each("eslint.config.ts", 'name: "DataWithResponseInit"', 'name: "Nothing"', "probe", "eslint lets a route throw data()")
-    # Two blocks name Playwright's tests, each with the switched-off rule: both go at once.
-    yield "eslint reads Playwright's tests", "eslint.config.ts", read("eslint.config.ts").replace('"**/*.spec.ts"', '"**/*.never.ts"'), "probe"
+    yield from each("eslint.config.ts", ', "**/*.spec.ts"];', "];", "probe", "eslint reads Playwright's tests")
     yield from each("package.json", "--max-warnings 0 ", "", "probe", "lint fails on a warning")
     yield from each("package.json", "command -p git", "git", "hooks", "prepare finds the system's git")
     yield from each("package.json", " && tsc -p app/tsconfig.json", "", "probe", "typecheck covers the app")
@@ -166,6 +165,7 @@ def mutants():
     yield from each("scripts/check_regressions.py", "ast.literal_eval(node.value)", "{}", "hooks", "check_regressions reads GAPS")
     yield from each("scripts/check_regressions.py", 'if "ignore" in key.lower():', "if False:", "hooks", "check_regressions reads ignore lists")
     yield from each("scripts/check_regressions.py", 'elif key == "mutate":', "elif False:", "hooks", "check_regressions reads StrykerJS's negated globs")
+    yield from each("scripts/check_regressions.py", "elif isinstance(value, dict):", "elif False:", "hooks", "check_regressions reads a workspace's ignore lists")
     yield from each("scripts/check_regressions.py", '    if report["errors"]:', "    if False:", "hooks", "check_regressions stops on a failed Playwright listing")
     yield from each("scripts/check_regressions.py", 'walk(child, [*path, child["title"]])', "walk(child, path)", "hooks", "check_regressions names a journey with its describe")
     yield from each("scripts/check_regressions.py", ', "scripts/.gitleaksignore"]', "]", "hooks", "check_regressions reads the secret scan's exceptions")

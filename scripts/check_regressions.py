@@ -99,11 +99,17 @@ def ignores(read):
     for name in IGNORE_FILES:
         text = read(name) or ""
         if name.endswith(".json") and text:
-            for key, value in json.loads(text).items():
-                if "ignore" in key.lower():
-                    out |= {f"{name} {v}" for v in (value if isinstance(value, list) else [value])}
-                elif key == "mutate":  # a negated glob takes files out of the mutation test
-                    out |= {f"{name} {v}" for v in value if str(v).startswith("!")}
+            # Nested too: knip takes an ignore list per workspace (F101).
+            pending, found = [json.loads(text)], []
+            while pending:
+                for key, value in pending.pop().items():
+                    if "ignore" in key.lower():
+                        found += value if isinstance(value, list) else [value]
+                    elif key == "mutate":  # a negated glob takes files out of the mutation test
+                        found += [v for v in value if str(v).startswith("!")]
+                    elif isinstance(value, dict):
+                        pending.append(value)
+            out |= {f"{name} {v}" for v in found}
         elif name in (".prettierignore", "scripts/.gitleaksignore"):
             out |= {f"{name} {line.strip()}" for line in text.splitlines() if line.strip() and not line.startswith("#")}
         else:
@@ -222,6 +228,9 @@ def self_test():
     assert gaps(old.get) == {"scripts/mutate.py a"} and weakened(gaps(old.get), gaps(new.get), set(), "gap") == ["scripts/mutate.py b"]
     assert weakened(ignores(old.get), ignores(new.get), set(), "ignore") == [".jscpd.json app/**", ".prettierignore *.ts", "eslint.config.ts server/"]
     assert weakened(ignores(old.get), ignores(new.get), {"ignore .jscpd.json app/**", "ignore .prettierignore *.ts", "ignore eslint.config.ts server/"}, "ignore") == []
+    knip = {"knip.json": '{"ignoreFiles": ["docs/**"], "workspaces": {"app": {"entry": ["src/x.ts"]}}}'}
+    nested = {"knip.json": '{"ignoreFiles": ["docs/**"], "workspaces": {"app": {"entry": ["src/x.ts"], "ignoreDependencies": ["left-pad"]}}}'}
+    assert weakened(ignores(knip.get), ignores(nested.get), set(), "ignore") == ["knip.json left-pad"], "a workspace's ignore list went unseen (F101)"
     stryker = {"stryker.config.json": '{"mutate": ["packages/*/src/**/*.ts"]}'}
     unmutated = {"stryker.config.json": '{"mutate": ["packages/*/src/**/*.ts", "!packages/core/src/x.ts"]}'}
     assert weakened(ignores(stryker.get), ignores(unmutated.get), set(), "ignore") == ["stryker.config.json !packages/core/src/x.ts"]

@@ -209,6 +209,7 @@ try:
             ("blank.tsx", component(body='  return <a href="https://gno.land" target="_blank">{n}</a>;\n'), "@eslint-react/dom-no-unsafe-target-blank"),
             ("fixme.spec.ts", 'import { test } from "@playwright/test";\n\ntest.fixme("x", () => {});\n', off),
             ("expected_fail.spec.ts", 'import { test } from "@playwright/test";\n\ntest.fail("x", () => {});\n', off),
+            ("renamed_fail.spec.ts", 'import { test as base } from "@playwright/test";\n\nbase.fail("x", () => {});\n', off),
             ("skipped.spec.ts", 'import { test } from "@playwright/test";\n\ntest.describe.skip("x", () => {});\n', off),
         ]
         app = "app/src/__probe__"

@@ -40,9 +40,11 @@ const SWALLOWED = [
 const SWITCHED_OFF = {
   // Vitest's and Playwright's ways: skip, focus, leave for later, run on a condition, expect to fail.
   selector:
-    "MemberExpression[property.name=/^(only|skip|todo|skipIf|runIf|fixme)$/], MemberExpression[object.name=/^(test|it)$/][property.name='fail']",
+    "MemberExpression[property.name=/^(only|skip|todo|skipIf|runIf|fixme)$/], MemberExpression[property.name='fail']:not([object.name=/^(expect|assert)$/])",
   message: "A test is never switched off or focused: fix it, or remove it with `Removed-test:` in the commit.",
 };
+// Vitest's tests and Playwright's journeys.
+const TESTS = ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts"];
 const MEMO = "The React Compiler memoizes: no hand-written memo, useMemo or useCallback (docs/ARCHITECTURE.md).";
 const HTML = "Nothing reaches the DOM as HTML: render it as React elements (docs/ARCHITECTURE.md, security).";
 // core reaches no clock, network or global of its own: time and chance come in as parameters.
@@ -112,13 +114,11 @@ export default defineConfig(
     files: ["app/src/**/*.{ts,tsx}"],
     extends: [reactHooks.configs.flat["recommended-latest"], eslintReact.configs["strict-type-checked"]],
     rules: {
-      "react-hooks/exhaustive-deps": "error",
       // A route answers "not found" by throwing React Router's data(); nothing else but an Error.
       "@typescript-eslint/only-throw-error": [
         "error",
         { allow: [{ from: "package", package: "react-router", name: "DataWithResponseInit" }] },
       ],
-      "@eslint-react/dom-no-dangerously-set-innerhtml": "error",
       "no-restricted-imports": [
         "error",
         { name: "react", importNames: ["memo", "useMemo", "useCallback"], message: MEMO },
@@ -138,7 +138,7 @@ export default defineConfig(
   },
   {
     // Tests read as lists of cases, so they may run long.
-    files: ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts"],
+    files: TESTS,
     rules: {
       "max-lines": "off",
       "max-lines-per-function": "off",
@@ -147,7 +147,7 @@ export default defineConfig(
   },
   {
     // `fails` marks a test waiting for Alexis's code (pairing), which happens only in core.
-    files: ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts"],
+    files: TESTS,
     ignores: ["packages/core/**"],
     rules: {
       "no-restricted-syntax": [
