@@ -10,3 +10,6 @@ reports/
 .eslintcache
 *.sw[op]
 __pycache__/
+
+# Each person's own instructions for Claude Code (CLAUDE.md, "Rules")
+CLAUDE.local.md
