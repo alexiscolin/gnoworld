@@ -15,7 +15,8 @@ const SWALLOWED = [
     message: "A catch that only logs swallows the error: act on it, or let it rise.",
   },
   {
-    selector: `CatchClause > BlockStatement[body.length=2]:has(> ExpressionStatement > ${LOG}):has(> ReturnStatement)`,
+    // esquery's :has never matches a relative selector of two steps (`:has(> A > B)`).
+    selector: `CatchClause > BlockStatement[body.length=2] > ExpressionStatement:first-child:has(> ${LOG}) + ReturnStatement`,
     message: "A catch that logs, then returns a default, swallows the error: act on it, or let it rise.",
   },
   {

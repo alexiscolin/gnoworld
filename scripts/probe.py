@@ -16,18 +16,21 @@ HERE = "packages/core/src/__probe__"
 LONG = "export function long(): number {\n  let n = 0;\n" + "  n += 1;\n" * 85 + "  return n;\n}\n"
 BLOCK = "".join(f"  total += values[{i}] * {i + 1};\n" for i in range(14))
 
-# File name, content, the ESLint rule that must report it (None: no report at all).
+# File name, content, and what ESLint must report: a rule, or "rule: the start of its message" when
+# one rule holds several guards (no-restricted-syntax's selectors); None: no report at all.
 LINT = [
     ("clean.ts", "export function twice(n: number): number {\n  return n * 2;\n}\n", None),
     ("forbidden_import.ts", 'import { readFileSync } from "node:fs";\n\nexport function read(p: string): string {\n  return readFileSync(p, "utf8");\n}\n', "no-restricted-imports"),
     ("cycle_a.ts", 'import { b } from "./cycle_b.ts";\n\nexport function a(): number {\n  return b() + 1;\n}\n', "import-x/no-cycle"),
     ("cycle_b.ts", 'import { a } from "./cycle_a.ts";\n\nexport function b(): number {\n  return a() + 1;\n}\n', "import-x/no-cycle"),
     ("empty_catch.ts", "export function run(g: () => void): void {\n  try {\n    g();\n  } catch {}\n}\n", "no-empty"),
-    ("log_catch.ts", "declare const logger: { error: (e: unknown) => void };\n\nexport function run(g: () => void): void {\n  try {\n    g();\n  } catch (e) {\n    logger.error(e);\n  }\n}\n", "no-restricted-syntax"),
+    ("log_catch.ts", "declare const logger: { error: (e: unknown) => void };\n\nexport function run(g: () => void): void {\n  try {\n    g();\n  } catch (e) {\n    logger.error(e);\n  }\n}\n", "no-restricted-syntax: A catch that only logs"),
     ("no_cause.ts", 'export function run(g: () => void): void {\n  try {\n    g();\n  } catch (e) {\n    throw new Error("run failed");\n  }\n}\n', "preserve-caught-error"),
     ("floating.ts", "async function save(): Promise<void> {}\n\nexport function run(): void {\n  save();\n}\n", "@typescript-eslint/no-floating-promises"),
     ("switch.ts", 'type Kind = "a" | "b";\n\nexport function code(k: Kind): number {\n  switch (k) {\n    case "a":\n      return 1;\n  }\n  return 0;\n}\n', "@typescript-eslint/switch-exhaustiveness-check"),
-    ("clock.ts", "export function now(): number {\n  return Date.now();\n}\n", "no-restricted-properties"),
+    ("clock.ts", "export function now(): number {\n  return Date.now();\n}\n", "no-restricted-properties: 'Date.now'"),
+    ("chance.ts", "export function roll(): number {\n  return Math.random();\n}\n", "no-restricted-properties: 'Math.random'"),
+    ("perf.ts", "export function tick(): number {\n  return performance.now();\n}\n", "no-restricted-properties: 'performance.now'"),
     ("long.ts", LONG, "max-lines-per-function"),
     ("eval.ts", "export function run(code: string): unknown {\n  return eval(code);\n}\n", "no-eval"),
     ("useless_catch.ts", "export function run(g: () => void): void {\n  try {\n    g();\n  } catch (e) {\n    throw e;\n  }\n}\n", "no-useless-catch"),
@@ -40,25 +43,32 @@ LINT = [
     ("unlayered.css", ".a {\n  color: var(--color-text);\n}\n", "css/use-layers"),
     ("physical.css", "@layer components {\n  .a {\n    margin-left: 0;\n  }\n}\n", "css/prefer-logical-properties"),
     ("clean.css", "@layer components {\n  .a {\n    margin-inline-start: 0;\n  }\n}\n", None),
-    ("skipped.test.ts", 'import { test } from "vitest";\n\ntest.skip("x", () => {});\n', "no-restricted-syntax"),
-    ("focused.test.ts", 'import { test } from "vitest";\n\ntest.only("x", () => {});\n', "no-restricted-syntax"),
-    ("todo.test.ts", 'import { test } from "vitest";\n\ntest.todo("x");\n', "no-restricted-syntax"),
-    ("skip_each.test.ts", 'import { test } from "vitest";\n\ntest.skip.each([1])("x %i", () => {});\n', "no-restricted-syntax"),
+    ("skipped.test.ts", 'import { test } from "vitest";\n\ntest.skip("x", () => {});\n', "no-restricted-syntax: A test is never switched off"),
+    ("focused.test.ts", 'import { test } from "vitest";\n\ntest.only("x", () => {});\n', "no-restricted-syntax: A test is never switched off"),
+    ("todo.test.ts", 'import { test } from "vitest";\n\ntest.todo("x");\n', "no-restricted-syntax: A test is never switched off"),
+    ("skip_each.test.ts", 'import { test } from "vitest";\n\ntest.skip.each([1])("x %i", () => {});\n', "no-restricted-syntax: A test is never switched off"),
+    ("skip_if.test.ts", 'import { test } from "vitest";\n\ntest.skipIf(true)("x", () => {});\n', "no-restricted-syntax: A test is never switched off"),
+    ("run_if.test.ts", 'import { test } from "vitest";\n\ntest.runIf(false)("x", () => {});\n', "no-restricted-syntax: A test is never switched off"),
     ("pending.test.ts", 'import { expect, test } from "vitest";\n\ntest.fails("x", () => {\n  expect(1).toBe(2);\n});\n', None),
     ("inline_disable.ts", "export function run(code: string): unknown {\n  // eslint-disable-next-line no-eval\n  return eval(code);\n}\n", "no-eval"),
     ("expect_error.ts", "// @ts-expect-error: the reason\nexport const n: number = \"x\";\n", "@typescript-eslint/ban-ts-comment"),
-    ("catch_undefined.ts", "export function load(p: Promise<number>): Promise<number | undefined> {\n  return p.catch(() => undefined);\n}\n", "no-restricted-syntax"),
-    ("catch_log.ts", "declare const logger: { error: (e: unknown) => void };\n\nexport function load(p: Promise<number>): Promise<number | undefined> {\n  return p.catch((e: unknown) => logger.error(e));\n}\n", "no-restricted-syntax"),
-    ("log_return.ts", "declare const logger: { error: (e: unknown) => void };\n\nexport function run(g: () => number): number {\n  try {\n    return g();\n  } catch (e) {\n    logger.error(e);\n    return 0;\n  }\n}\n", "no-restricted-syntax"),
+    ("catch_undefined.ts", "export function load(p: Promise<number>): Promise<number | undefined> {\n  return p.catch(() => undefined);\n}\n", "no-restricted-syntax: A .catch that returns undefined"),
+    ("catch_empty.ts", "export function load(p: Promise<number>): Promise<number | undefined> {\n  return p.catch(() => {});\n}\n", "no-restricted-syntax: An empty .catch"),
+    ("catch_log.ts", "declare const logger: { error: (e: unknown) => void };\n\nexport function load(p: Promise<number>): Promise<number | undefined> {\n  return p.catch((e: unknown) => logger.error(e));\n}\n", "no-restricted-syntax: A .catch that only logs"),
+    ("log_return.ts", "declare const logger: { error: (e: unknown) => void };\n\nexport function run(g: () => number): number {\n  try {\n    return g();\n  } catch (e) {\n    logger.error(e);\n    return 0;\n  }\n}\n", "no-restricted-syntax: A catch that logs, then returns"),
     ("void_promise.ts", "async function save(): Promise<void> {}\n\nexport function run(): void {\n  void save();\n}\n", "@typescript-eslint/no-floating-promises"),
     ("finally_return.ts", "export function run(g: () => number): number {\n  try {\n    return g();\n  } finally {\n    return 1;\n  }\n}\n", "no-unsafe-finally"),
-    ("new_date.ts", "export function stamp(): number {\n  return new Date().getTime();\n}\n", "no-restricted-syntax"),
+    ("new_date.ts", "export function stamp(): number {\n  return new Date().getTime();\n}\n", "no-restricted-syntax: core takes the time"),
+    ("date_call.ts", "export function stamp(): string {\n  return Date();\n}\n", "no-restricted-syntax: core takes the time"),
     ("global_this.ts", "export function reach(): unknown {\n  return globalThis;\n}\n", "no-restricted-globals"),
-    ("ambient.ts", "declare const fetch: (url: string) => unknown;\n\nexport function load(): unknown {\n  return fetch(\"x\");\n}\n", "no-restricted-syntax"),
-    ("dynamic_import.ts", "export async function load(): Promise<unknown> {\n  return import(\"./clean.ts\");\n}\n", "no-restricted-syntax"),
+    ("ambient.ts", "declare const fetch: (url: string) => unknown;\n\nexport function load(): unknown {\n  return fetch(\"x\");\n}\n", "no-restricted-syntax: core declares no ambient global"),
+    ("declare_function.ts", "declare function fetch(url: string): unknown;\n\nexport function load(): unknown {\n  return fetch(\"x\");\n}\n", "no-restricted-syntax: core declares no ambient global"),
+    ("declare_module.ts", "declare namespace host {\n  const secret: string;\n}\n\nexport const n: string = host.secret;\n", "no-restricted-syntax: core declares no ambient global"),
+    ("dynamic_import.ts", "export async function load(): Promise<unknown> {\n  return import(\"./clean.ts\");\n}\n", "no-restricted-syntax: core imports only core"),
     ("escape.ts", "import config from \"../../../../vitest.config.ts\";\n\nexport const c: unknown = config;\n", "import-x/no-restricted-paths"),
     ("dom_lib.ts", "/// <reference lib=\"dom\" />\nexport const n = 1;\n", "@typescript-eslint/triple-slash-reference"),
     ("token_elsewhere.css", "@layer components {\n  .a {\n    color: var(--color-text);\n  }\n}\n", None),
+    ("invalid.css", "@layer components {\n  .a {\n    color: 12px;\n  }\n}\n", "css/no-invalid-properties"),
     ("important.css", ".a {\n  color: var(--color-text) !important;\n}\n", "css/no-important"),
 ]
 
@@ -77,6 +87,16 @@ def plant(files, where=HERE):
 failures = []
 
 
+def reported(messages):
+    """Each rule an ESLint report names, alone and with its message."""
+    return {m.get("ruleId") for m in messages} | {f"{m.get('ruleId')}: {m['message']}" for m in messages}
+
+
+def carries(got, rule):
+    """A rule alone matches its name; "rule: words" matches a message that starts with them."""
+    return rule in got if ": " not in rule else any(g.startswith(rule) for g in got)
+
+
 def expect(ok, what):
     print(("ok    " if ok else "FAIL  ") + what)
     if not ok:
@@ -88,13 +108,13 @@ try:
     plant({name: content for name, content, _ in LINT})
     out = run(["node_modules/.bin/eslint", "--no-cache", "--format", "json", HERE])
     try:
-        report = {os.path.basename(r["filePath"]): {m.get("ruleId") for m in r["messages"]} for r in json.loads(out.stdout)}
+        report = {os.path.basename(r["filePath"]): reported(r["messages"]) for r in json.loads(out.stdout)}
     except ValueError:
         report = {}
         expect(False, "eslint ran: " + (out.stderr or out.stdout)[-300:])
     for name, _, rule in LINT:
         got = report.get(name, set())
-        expect(got == set() if rule is None else rule in got, f"eslint {name}: expected {rule or 'nothing'}, got {sorted(map(str, got))}")
+        expect(got == set() if rule is None else carries(got, rule), f"eslint {name}: expected {rule or 'nothing'}, got {sorted(map(str, got))}")
     shutil.rmtree(HERE)
 
     # Prettier: a file that is not formatted.
@@ -109,12 +129,15 @@ try:
     expect(out.returncode != 0 and "Cannot find name 'fetch'" in out.stdout, "tsc refuses fetch in core")
     shutil.rmtree(HERE)
 
-    # Outside core, `fails` is refused: pairing happens only in core.
+    # Outside core: `fails` is refused (pairing happens only in core), and a swallowed error too.
     other = "packages/probe/src"
-    plant({"pending.test.ts": 'import { expect, test } from "vitest";\n\ntest.fails("x", () => {\n  expect(1).toBe(2);\n});\n'}, where=other)
+    plant({"pending.test.ts": 'import { expect, test } from "vitest";\n\ntest.fails("x", () => {\n  expect(1).toBe(2);\n});\n',
+           "log_catch.ts": dict((n, c) for n, c, _ in LINT)["log_catch.ts"]}, where=other)
     out = run(["node_modules/.bin/eslint", "--no-cache", "-f", "json", other])
-    got = {m.get("ruleId") for r in json.loads(out.stdout or "[]") for m in r["messages"]}
-    expect("no-restricted-syntax" in got, f"eslint refuses test.fails outside core, got {sorted(map(str, got))}")
+    report = {os.path.basename(r["filePath"]): reported(r["messages"]) for r in json.loads(out.stdout or "[]")}
+    for name, rule in (("pending.test.ts", "no-restricted-syntax: `fails` is for pairing"), ("log_catch.ts", "no-restricted-syntax: A catch that only logs")):
+        got = report.get(name, set())
+        expect(carries(got, rule), f"eslint outside core {name}: expected {rule}, got {sorted(map(str, got))}")
     shutil.rmtree("packages/probe")
 
     # knip: a file nothing imports.
@@ -137,6 +160,9 @@ try:
     plant({"two.ts": shape.replace("-= ", "+= ").format(f="beta", v="items", t="acc", x="item").replace("> 10", ">= 10 && item < 99")})
     out = run(["node_modules/.bin/jscpd", HERE])
     expect(out.returncode == 0, "jscpd lets a function of another shape pass")
+    plant({"two.ts": shape.replace("  return {t};", "  {t} += 1;\n  return {t};").format(f="beta", v="items", t="acc", x="item")})
+    out = run(["node_modules/.bin/jscpd", HERE])
+    expect(out.returncode != 0 and "one.ts" in out.stdout + out.stderr, "jscpd refuses a near copy (one line added), which scores under 0.9")
     shutil.rmtree(HERE)
 
     # check_comments: short comments, none of the kinds that rot, no escape hatch; found by
