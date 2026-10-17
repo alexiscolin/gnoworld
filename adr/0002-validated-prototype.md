@@ -853,12 +853,26 @@ not choose its hosts.
     profile.
 - **The team's demo URL:** the demo stack runs on Alexis's homelab and is published with
   Tailscale Funnel, which the homelab already uses, as a stable HTTPS address the team
-  opens in a browser. Because that machine runs other services:
-  - the demo runs as its own Compose project, in its own Docker network, with CPU and
-    memory limits, and reaches none of the homelab's other services;
-  - a shared demo password stands in front, and every page is `noindex`;
-  - the default universe is Onyx, so calls tried in the demo spend test tokens;
-  - Jarvis's demo budget is capped low (a few dollars a day).
+  opens in a browser.
+- **The demo never harms the host, and never touches its installation:**
+  - **Apart:** its own folder and Compose project, its own networks and volumes. It never
+    edits the homelab's Compose file, its Caddy configuration or its certificates, and
+    reaches none of its services. On the host it binds one port, on `127.0.0.1`, which
+    Funnel publishes. Removing it is `docker compose down -v` and one Funnel entry.
+  - **Capped:** every container has CPU, memory and process limits, set so the whole demo
+    stays under a fixed share of the machine (2 cores and 2 GB to start). A container that
+    hits its limit is stopped by Docker; the host is not. Logs rotate at a fixed size;
+    history is kept for a fixed number of days, so the volumes stay bounded.
+  - **Locked down:** no privileged container, no host network, no Docker socket, a
+    read-only root file system, a non-root user, every Linux capability dropped, and no
+    new privileges.
+  - **Guarded at the door:** a shared demo password; `noindex` on every page; Ergo's
+    connection cap and per-address limits; rate limits in the services; Jarvis's demo
+    budget capped at a few dollars a day; moderation on.
+  - **Safe to try:** the default universe is Onyx, so calls tried in the demo spend test
+    tokens.
+  - **Restarts politely:** a health check on each service, restarts on failure with a
+    limit, never a restart loop.
 
   Once a domain exists, a Cloudflare Tunnel can replace Funnel with the same stack.
 - **The hand-off to ops:**
