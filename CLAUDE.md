@@ -25,7 +25,7 @@ gnoworld: a social, on-chain, graphical hub for gno.land. The design is
 - Pairing: in `packages/core/**` (`.claude/rules/core.md`), and wherever a slice plan says "human", write the failing test, commit it marked `test.fails` (the gate and the Stop hook accept it), and stop. Alexis writes the code and removes the mark; then review it.
 - Claude writes the realms, the server and any Go (who reviews what: docs/REVIEW.md).
 - Read a file before changing it; before changing an exported symbol, find every reference through the language server (`typescript-lsp`), not by text search.
-- Commits: one behaviour each, and a refactor apart. Stage files by name, never everything at once (an editor's swap file went in that way once).
+- Commits: conventional subjects, `type(scope): what` in 72 characters at most (`feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `build`, `ci`, `chore`, `style`, `revert`; the commit-msg hook holds it); one behaviour each, and a refactor apart. Stage files by name, never everything at once (an editor's swap file went in that way once).
 - A speed, size or score claim compares the same work before and after (same inputs, same counts), with both numbers shown.
 - Explain a language, React or tooling feature newer than 2025 the first time it appears, in two lines.
 - Invent nothing. A claim about a library, a browser API or a gno package comes from the installed types or source at the pinned version, official docs read in this session, or a live query of the target chain (gnomcp); never from memory. Every claim in a review card cites its evidence (a command's output, `file:line`, a URL), and what was not verified is named.
