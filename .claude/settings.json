@@ -78,6 +78,9 @@
       }
     ]
   },
+  "extraKnownMarketplaces": {
+    "gnoverse": { "source": { "source": "github", "repo": "gnoverse/gno-mcp" } }
+  },
   "enabledPlugins": {
     "typescript-lsp@claude-plugins-official": true,
     "context7@claude-plugins-official": true,

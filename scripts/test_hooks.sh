@@ -43,6 +43,8 @@ ask, deny = set(s["permissions"]["ask"]), set(s["permissions"]["deny"])
 assert {"Edit(/scripts/**)", "Edit(/.githooks/**)", "Edit(/.claude/**)", "Edit(/packages/core/**)"} <= ask, "an edit of the harness or core asks no one"
 assert {f"mcp__{p}__gno_{t}" for p in ("gnomcp", "plugin_gnomcp_gnomcp") for t in ("addpkg", "call", "run", "key_send", "cla_sign")} <= ask, "a chain write asks no one"
 assert {"Read(~/.ssh/**)", "Read(~/.config/gh/**)"} <= deny, "the Read tool can open a credential"
+market = s.get("extraKnownMarketplaces", {}).get("gnoverse", {}).get("source", {})
+assert market.get("repo") == "gnoverse/gno-mcp", "a teammate's Claude Code cannot find gnomcp's marketplace"
 PY
 # check.sh runs every step it promises: removing one fails here.
 gate_file="$here/check.sh"
