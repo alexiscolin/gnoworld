@@ -9,7 +9,7 @@ mutant that does not compile is an error of this script, never a kill.
 
 GAPS holds the guards no test catches yet, with the reason. They must keep
 surviving, so closing a gap means deleting its line here.
-Usage: GNO=<gno binary> scripts/mutate.py, from the repository root."""
+Usage: GNO=<gno binary> ../scripts/mutate.py, from gno/ (scripts/check.sh does this)."""
 import glob
 import os
 import re
@@ -99,7 +99,7 @@ def verdict(out, i):
     return "no result"
 
 
-packages = {os.path.dirname(p) for p in glob.glob("r/**/gnomod.toml", recursive=True)}
+packages = {os.path.dirname(p) for p in glob.glob("**/gnomod.toml", recursive=True)}
 failed, seen = False, set()
 for pkg in sorted(packages):
     sources = [f for f in glob.glob(f"{pkg}/*.gno") if not f.endswith(("_test.gno", "_filetest.gno"))]

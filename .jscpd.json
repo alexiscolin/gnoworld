@@ -1,0 +1,5 @@
+{
+  "ignore": ["docs/**", "gno/**", "pnpm-lock.yaml", "**/*.test.ts"],
+  "exitCode": 1,
+  "similarity": 0.8
+}

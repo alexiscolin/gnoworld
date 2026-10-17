@@ -6,7 +6,7 @@
 | Date | 2026-10-14 |
 | Author | Alexis Colin |
 | Verified against | `gnoland-1` (mainnet, `v1.5.1`, height 786,583) and `onyx-1` (`v1.5.1-rc.1`, height 385,528), both at commit `07e44776c`; source read at tag `v1.5.1`. Mainnet realms and names read on 2026-10-14 (gnoscope index height 789,357). |
-| Prototype | [`r/seal`](../r/seal/seal.gno), [tests](../r/seal/seal_test.gno), [reference client](../tools/sealvec/main.go) |
+| Prototype | [`r/seal`](../gno/r/seal/seal.gno), [tests](../gno/r/seal/seal_test.gno), [reference client](../gno/tools/sealvec/main.go) |
 
 ## Summary
 
@@ -1116,7 +1116,7 @@ The toolchain that matches the chain is built as `docs/DEVELOPMENT.md` describes
 ```bash
 cd ~/Server/gnoworld
 ./scripts/check.sh                       # realm tests, mutation check, test vectors
-"$GNO_TOOLCHAIN/gnodev" local -no-watch  # then call Bind, Seal and Anchor with r/seal/vectors_test.gno
+"$GNO_TOOLCHAIN/gnodev" local -no-watch  # then call Bind, Seal and Anchor with gno/r/seal/vectors_test.gno
 ```
 
 ## References

@@ -19,4 +19,7 @@ Check, in a change and in a review:
   the error rise, rethrow with `{ cause }`, never log and carry on; boundaries return a
   result;
 - every listener, timer, socket and subscription has its teardown (`AbortSignal`);
-- a refactor is its own commit, and changes no test.
+- a refactor is its own commit, and changes no test;
+- comments say only what the code cannot (a constraint, a surprise, a reason): a file's
+  header 6 lines at most, any other comment 3; no TODO, banner, numbered steps or emoji
+  (`scripts/check_comments.mjs`).

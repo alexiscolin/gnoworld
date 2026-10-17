@@ -1,34 +1,34 @@
-# Exercice de relecture 01 — `r/seal` avant l'audit
+# Review exercise 01: `r/seal` before the audit
 
-`seal.gno` est la version exacte de `r/seal` avant l'audit indépendant. Relis-la à froid.
+`seal.gno` is the exact version of `r/seal` before the independent audit. Read it cold.
 
-## Ce que le realm doit garantir
+## What the realm must guarantee
 
-1. Seul le détenteur d'une clé de chat peut la lier (`Bind`), et seulement à sa propre adresse.
-2. Un sceau prouve que les détenteurs des clés `a` et `b` ont tous les deux signé la même racine, pour ces `n` messages.
-3. N'importe qui peut soumettre un sceau : une des deux parties ou un sponsor paie.
-4. Les sceaux gardés (`keep`) sont lisibles par d'autres realms, qui s'en servent comme réputation.
-5. Une clé de chat volée peut être neutralisée.
-6. Une clé de session (déléguée, ADR-002) ne peut pas changer la clé de chat de l'utilisateur.
+1. Only the holder of a chat key can bind it (`Bind`), and only to their own address.
+2. A seal proves that the holders of keys `a` and `b` both signed the same root, for these `n` messages.
+3. Anyone can submit a seal: one of the two parties or a sponsor pays.
+4. Kept seals (`keep`) can be read by other realms, which use them as reputation.
+5. A stolen chat key can be neutralised.
+6. A session key (delegated, ADR-002) cannot change the user's chat key.
 
-## Règles
+## Rules
 
-- 45 minutes au plus. Ne lis ni `r/seal/seal.gno` (la version corrigée) ni l'annexe de l'ADR avant d'avoir fini.
-- Si tu as déjà lu les décisions 2 et 3 de l'ADR, tu connais une partie des réponses. Cherche alors surtout les autres, et vérifie que tu sais montrer la ligne exacte.
-- Suis l'ordre de [`docs/REVIEW.md`](../../REVIEW.md) : l'intention, les tests, les frontières, les erreurs, l'état, la sécurité et les coûts, la lisibilité.
-- Pour chaque `issue:`, écris le scénario : qui appelle quoi, avec quels arguments, et ce qu'il obtient.
+- 45 minutes at most. Read neither `gno/r/seal/seal.gno` (the fixed version) nor the ADR's appendix before you have finished.
+- If you have already read decisions 2 and 3 of the ADR, you know some of the answers. Then look mostly for the others, and check that you can point to the exact line.
+- Follow the order of [`docs/REVIEW.md`](../../REVIEW.md): intent, tests, boundaries, errors, state, security and costs, readability.
+- For each `issue:`, write the scenario: who calls what, with which arguments, and what they get.
 
-Pour te calibrer : l'audit a trouvé 2 failles bloquantes, 4 problèmes sérieux et 1 détail. Tu peux en trouver d'autres.
+To calibrate: the audit found 2 blocking flaws, 4 serious problems and 1 detail. You may find others.
 
-## Où écrire
+## Where to write
 
-Dans `findings.md` (à créer), une remarque par entrée :
+In `findings.md` (to create), one note per entry:
 
 ```
-- issue (L66): <le problème>
-  scénario: <qui fait quoi, et le résultat>
+- issue (L66): <the problem>
+  scenario: <who does what, and the result>
 - question (L…): …
 - nit (L…): …
 ```
 
-Ensuite, on compare avec l'annexe de l'ADR et le code corrigé, et on note ce que tu as vu ou raté dans `docs/review-log.md`.
+Then we compare with the ADR's appendix and the fixed code, and note what you saw or missed in `docs/review-log.md`.

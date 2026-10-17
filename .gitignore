@@ -3,3 +3,13 @@
 .env
 .env.local
 deploy/secrets/
+node_modules/
+coverage/
+reports/
+.stryker-tmp/
+.eslintcache
+*.sw[op]
+__pycache__/
+
+# Each person's own instructions for Claude Code (CLAUDE.md, "Rules")
+CLAUDE.local.md

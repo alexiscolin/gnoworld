@@ -6,7 +6,7 @@ Review by risk, not line by line everywhere.
 
 | Tier | What | Written by | How it is reviewed |
 |---|---|---|---|
-| 1 | Realms (`r/`, `p/`), the sponsor, relay authorization | Claude | Claude and a fresh-context `gno-auditor` read every line. Alexis reviews the function cards and the attack scenarios. External audit before mainnet |
+| 1 | Realms (`gno/r/`, `gno/p/`), the sponsor, relay authorization | Claude | Claude and a fresh-context `gno-auditor` read every line. Alexis reviews the function cards and the attack scenarios. External audit before mainnet |
 | 1 | Client crypto (keys, signed statements, Merkle, the MLS boundary), the CSP | Alexis for the core, Claude elsewhere | Alexis reads every line |
 | 2 | Other TypeScript (state, queries, views) | Alexis for the core, Claude elsewhere | Alexis reads the tests first, then every line |
 | 1 | The server's login, the admin API's rights, the approval signing, the admin console, Jarvis's tool-allowlist loop, `lib/adena` | Claude | Alexis reads every line |
@@ -64,14 +64,36 @@ Code written by an agent gets the same reading as anyone's, plus this. `/pre-mer
    accessibility and UX, simplicity, with this file's checklists. A change to a tier-1 file adds one more agent, on the
    strongest model, for security alone. Fixes are re-checked by the gate and the mutation
    tester; a second pass runs only for a high finding fixed in tier-1 code.
-4. **Each finding is checked against the code** before it is fixed, and a false positive is
-   dropped with its reason.
+4. **Each finding is verified, then reproduced, before it is fixed.** On a tier-1 lot, the
+   `finding-verifier` agent (Opus) first tries to refute each finding, then to reproduce it, and
+   its severity stands. Then: a command, or a test seen failing. One
+   nobody could reproduce stays `claimed`; a false positive is `rejected`, with its reason.
+   A fix of the product proves itself: its tests, run on the commit before it, must fail
+   (`scripts/prove_fix.py`, in the full gate).
 5. **Nothing is waved through.** Every remaining finding is fixed, or put to Alexis with
    the scenario.
-6. **Learn from it.** Findings and outcomes go into the review log. A miss that repeats
-   becomes a rule here, a lint, or a test; a lens whose findings are mostly dropped is
-   narrowed or removed.
+6. **Learn from it.** Every finding goes into [the findings ledger](review/findings.md), with
+   its status and evidence, and a review reads it first: no rejected claim raised again
+   without new evidence, and a fixed one that comes back filed as a regression. What Alexis
+   caught and missed goes into the review log. A miss that repeats becomes a rule here, a
+   lint, or a test; a lens whose findings are mostly dropped is narrowed or removed.
+7. **Measure the harness by its findings.** Each `/pre-merge` writes to the review log how
+   many verified findings it found in the harness itself (`scripts/`, `.githooks/`,
+   `.claude/`), against the lines of harness it read. If that number falls from one merge to
+   the next, the harness is getting solid. If it does not fall over three merges, the
+   harness is simplified, not extended: a guard that keeps leaking is replaced by a boundary
+   the system enforces (the sandbox, a server check), or removed.
+
+## Before a push
+
+Each merge lives on its branch. Pushing a work branch runs the fast gate and the secret scan
+(`.githooks/pre-push`); pushing `main` runs the full gate and needs a committed `/pre-merge` pass whose fingerprint matches the code
+(`scripts/review_pass.py`): a change after the review voids it, the review's own record does
+not. Until CI exists, these hooks are the barrier; a merge made on GitHub skips them, so
+merges happen locally after `/pre-merge`, then `main` is pushed.
 
 ## Blind first
+
+Alexis reads the diff in revdiff, beside the session: `revdiff origin/main -o .claude/tmp/review.txt`. His notes land in that file, which git ignores; "read the review" asks Claude to read them and answer each one.
 
 In the first slices, the author gives only the review card's first three items: what to read, what to skim, what to try. Alexis reviews and writes findings, then compares them with the author's and with a fresh-context reviewer's. Each comparison goes into [review-log.md](review-log.md): what was caught, what was missed, and why.

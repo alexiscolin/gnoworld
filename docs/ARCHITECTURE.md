@@ -62,7 +62,7 @@ server/                      the server: TypeScript on Node (ADR-0002 §7), one 
   jarvis/                    the harness, its skills (SKILL.md folders) and its evals
 deploy/                      compose.yaml (the demo stack, the reference wiring for ops), .env.example
 admin/                       the admin console, on its own origin (ADR-0002 §6): reuses ui and lib
-r/gnoworld/                  realms: the slot realm (phase 0), then hubs and profiles; a store plus versioned rules (ADR-0001 §14)
+gno/r/gnoworld/              realms: the slot realm (phase 0), then hubs and profiles; a store plus versioned rules (ADR-0001 §14)
 ```
 
 Inside a feature:
@@ -104,7 +104,7 @@ can; review checks the rest.
 `exactOptionalPropertyTypes`, `noImplicitOverride`, `noFallthroughCasesInSwitch`,
 `noPropertyAccessFromIndexSignature`, `noUnusedLocals`, `noUnusedParameters`,
 `verbatimModuleSyntax`, `isolatedModules`, `erasableSyntaxOnly` and
-`rewriteRelativeImportExtensions`: Node runs the server's TypeScript directly, so only
+`allowImportingTsExtensions` with `noEmit` (imports name their `.ts` file; nothing is compiled): Node runs the server's TypeScript directly, so only
 syntax it can erase is allowed (no enums, no namespaces with code, no parameter
 properties).
 
@@ -112,9 +112,8 @@ properties).
 already refuse a floating or misused promise, a thrown non-error and an untyped `catch`
 value), plus `switch-exhaustiveness-check`; ESLint's `no-empty`, `no-useless-catch` and
 `preserve-caught-error` (a rethrow keeps its `cause`), and a `catch` that only logs; the
-import boundaries above; no import cycles (`eslint-plugin-import-x`). **Copies:** jscpd fails the gate on a new copied block, and similarity-ts on a new
-function, type or class whose syntax tree is close to an existing one, anywhere in the repo
-(a wrapper compares with a baseline, since its exit code is not documented). **One way to
+import boundaries above; no import cycles (`eslint-plugin-import-x`). **Copies:** jscpd fails the gate on a new copied block, including a function copied with its names changed or a line added (its `similarity`
+option compares syntax trees). **One way to
 do each thing,** enforced per folder by `no-restricted-globals` and `no-restricted-syntax`:
 `fetch` and storage only in `lib`, `Intl` formatting only in `core`'s formatters, no clock
 in `core`, `console` only through the logger. **A map for agents:** the gate regenerates

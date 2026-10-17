@@ -136,7 +136,8 @@ One page under test, the component gallery, plus the journeys; no extra service.
 - **Pictures:** every component, in every state, at three container widths and with reduced
   motion, screenshotted by Playwright and compared with the approved images. The browsers
   run in Playwright's Docker image, so pixels match on every machine. A new baseline is
-  its own commit, which Alexis reviews.
+  its own commit, which Alexis reviews; changing or deleting an approved one fails the push
+  unless the commit says why (`Updated-baseline:`, `scripts/check_regressions.py`).
 - **Invariants,** measured in the browser on the gallery and the journeys:
   - nothing overlaps: the point at the centre of each control hits that control;
   - every target is at least 44 px;

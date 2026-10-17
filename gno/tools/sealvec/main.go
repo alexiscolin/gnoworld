@@ -30,7 +30,7 @@ func main() {
 	pubA, pubB := alice.Public().(ed25519.PublicKey), bob.Public().(ed25519.PublicKey)
 
 	// Each leaf: salt(32) | sender key(32) | seq(8, BE) | previous leaf hash(32) | plaintext.
-	texts := []string{"on se voit a 18h ?", "ok, devant la gare", "deal"}
+	texts := []string{"see you at 6pm?", "ok, in front of the station", "deal"}
 	senders := []ed25519.PublicKey{pubA, pubB, pubA}
 	var leaves [][]byte
 	prev := make([]byte, 32)

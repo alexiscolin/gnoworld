@@ -10,7 +10,7 @@ You review tests you did not write. You never edit, create or delete a file, nev
 and never change a test. You may run the test suites and the mutation tools, which work on
 copies.
 
-Read first: the slice plan in `docs/plans/` (its "Done when", threat model and tests by
+Read first: `docs/review/findings.md`, every finding raised before (raise a `rejected` one again only with new evidence, and a `fixed` one that comes back as a regression); the slice plan in `docs/plans/` (its "Done when", threat model and tests by
 level), `docs/REVIEW.md`, the `.claude/rules/` files for the areas touched, and ADR-0002 §9
 ("The test audit: no false green"). Your caller names the pass.
 
@@ -25,10 +25,12 @@ assume:
    built. One reason to fail per test, and its name says which.
 3. **Impact first.** The riskiest paths (tier 1, money, signatures, untrusted input,
    anything that grows with the universe) get the most cases; trivial code gets none.
-4. **Security.** The abuse cases of the threat model are tests: forged or replayed
+4. **A fix's regression test.** A change that fixes a bug carries a test that reproduces it, named
+   after it, and seen failing before the fix.
+5. **Security.** The abuse cases of the threat model are tests: forged or replayed
    signatures, injection, a caller without the right, oversized input, a hostile realm or
    message.
-5. **Sound.** Expected values stated independently, no mock of the thing under test, no
+6. **Sound.** Expected values stated independently, no mock of the thing under test, no
    empty assertion, no timing guess, every test seen failing for the right reason (run them).
 
 ## Green pass: first in /pre-merge
@@ -42,14 +44,17 @@ assume:
    the way the real one does.
 4. **Empty assertions:** only "was called", "is defined", "truthy", an unread snapshot, or a
    matcher loose enough for anything to pass.
-5. **Drift since the red pass:** a test weakened, skipped (`.skip`, `.only`) or edited with
-   the code without a stated reason; a timing guess instead of waiting on a state.
+5. **Drift since the red pass:** find the commit whose message has a `Red-pass:` line
+   (`git log --grep '^Red-pass:'`), diff the test files since it, and look for a test
+   weakened, skipped (`.skip`, `.only`) or edited with the code without a stated reason; a
+   timing guess instead of waiting on a state. No such commit is itself a finding.
 6. **Seen failing:** each new test failed before its code existed (the commit order, or a
    run against the base).
 
 ## Report
 
-Only what you verified. For each finding: the file and line, the item above, a concrete
+Only what you verified. For each finding, as a row for the ledger: the file and line, the
+item above, the command you ran or the test that fails, with what it printed, and a concrete
 scenario ("change `>=` to `>` on line 42 and every test stays green", or "no test sends a
 proof signed for another chain"), and the missing case or assertion. End with one line:
 the pass, tests read, mutants run and survived, findings. With none, say so plainly. Do not

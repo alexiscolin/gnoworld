@@ -1,6 +1,6 @@
 # Slice 1 — skeleton, routes, the gate and CI
 
-Status: plan, waiting for Alexis's approval (2026-10-17).
+Status: approved (2026-10-17). 1a: the harness is in; `core/irc`'s tests wait for Alexis's parser.
 
 Three merges, each under about 400 lines of diff and each with its own `/pre-merge`:
 **1a** the monorepo and the gate; **1b** the app's routes, pre-rendering and PWA; **1c** the
@@ -82,3 +82,33 @@ New: `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `eslint.config
 3. Move the load-testing tool (k6) to slice 3, where Ergo first needs it? **Yes.**
 4. The sandbox in the project's settings, so it applies to every session in this repo? **Yes, in the project's settings.**
 5. You create the Tailscale auth key and the demo password, as files in `deploy/secrets/`; Claude never reads them. **Yes (2026-10-17): the demo stays shut in its own project and tag, even for the team, and `deploy/` is turnkey for ops.** Agreed?
+
+## 1a, as built: what changed on the way
+
+- **eslint 10.12.0,** not 10.13.0: pnpm refused a release younger than a day.
+- **Vitest 4.1.12,** not 5.0.5: StrykerJS's Vitest runner 10.0.0 is built against Vitest
+  4.1.10, and with Vitest 5 it activated no mutant (11% on a reference parser, 96.5% with
+  4.1.12). Back to 5 when the runner supports it.
+- **Dropped:** `@fast-check/vitest` (fast-check alone, inside plain tests, which can be
+  marked `fails`); similarity-ts 0.5.0 (it missed a renamed copy and its exit codes were
+  inconsistent), replaced by `scripts/clones.mjs` on the TypeScript compiler.
+- **semgrep** missed a direct `eval` with its community rules; it waits for 1c, on the
+  Dockerfiles and the compose file. ESLint's `no-eval` and `no-new-func` cover TypeScript.
+- **TypeScript:** `allowImportingTsExtensions` with `noEmit`, since nothing is compiled.
+  No `@types/node` yet: config files are linted without types.
+- **Only `packages/core` exists:** each workspace arrives with its slice, since knip would
+  flag an empty one.
+- **Added at Alexis's request:** Prettier 3.9.10 (print width 120; Markdown left as written); coverage at 85% everywhere and on the changed lines
+  (`patch_coverage.py`); short comments (`check_comments.py`); a `prepare` script rather
+  than Husky.
+- **The sandbox** is set, and is checked at the start of the next session: it does not
+  apply to the session that wrote it.
+- **For 1b:** `scripts/check_regressions.py` also lists the Playwright journeys
+  (`playwright test --list`), so a journey gone fails like a test gone.
+- **Also for 1b:** `packages/*/src` is written in `tsconfig.json`, `vitest.config.ts` (twice),
+  `stryker.config.json` and `scripts/clones.mjs`; `app/` joins each, with its own tsconfig for
+  the DOM. `.gitignore` is the one list of generated folders: no tool repeats it.
+- **The tests were checked before Alexis's turn:** all 52 pass against a throwaway parser
+  kept out of the repo, and StrykerJS kills 96.5% of its mutants. Of the 8 left, 7 are
+  equivalent (error texts, cases filtered earlier); the last was closed by a new case.
+

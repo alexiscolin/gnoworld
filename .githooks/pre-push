@@ -1,0 +1,22 @@
+#!/bin/sh
+# pre-push: main gets the full gate and needs a committed review pass (docs/REVIEW.md); a work
+# branch gets the fast gate and the secret scan, since nothing leaves with a secret. Git sends one
+# line per ref: <local ref> <local sha> <remote ref> <remote sha>.
+set -eu
+zero=0000000000000000000000000000000000000000
+gated=false
+while read -r _ local_sha remote_ref _; do
+	[ "$local_sha" = "$zero" ] && continue # a deleted branch
+	if [ "$local_sha" != "$(git rev-parse HEAD)" ] || [ -n "$(git status --porcelain)" ]; then
+		echo "pre-push: push the commit you have checked out, with nothing uncommitted or untracked, so the gate checks what leaves" >&2
+		exit 1
+	fi
+	if [ "$remote_ref" = refs/heads/main ]; then
+		python3 -I scripts/review_pass.py check "$local_sha" # cheap, so before the gate
+		sh scripts/check.sh --full </dev/null
+	elif ! $gated; then
+		sh scripts/check.sh </dev/null
+		sh scripts/scan_secrets.sh
+		gated=true
+	fi
+done
