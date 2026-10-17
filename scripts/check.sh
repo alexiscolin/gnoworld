@@ -13,6 +13,7 @@ cd "$(dirname "$0")/.."
 unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a hook's git environment must not steer the gate's git calls
 full=false
 [ "${1:-}" = "--full" ] && full=true
+started=$(date +%s)
 
 want="v$(cat .node-version)"
 nvm_node="${NVM_DIR:-$HOME/.nvm}/versions/node/$want/bin"
@@ -68,6 +69,12 @@ python3 -I scripts/check_docs.py
 echo "== hooks"
 sh scripts/test_hooks.sh
 
+took=$(($(date +%s) - started))
+if ! $full && [ "$took" -gt 60 ]; then
+	echo "check.sh: the fast gate took ${took} s, over its 60 s budget (docs/plans/slice-1.md): find what grew" >&2
+	exit 1
+fi
+
 if $full; then
 	echo "== the harness keeps its promises (scripts/probe.py)"
 	python3 -I scripts/probe.py
@@ -89,4 +96,4 @@ if $full; then
 	fi
 fi
 
-echo "all checks passed"
+echo "all checks passed in $(($(date +%s) - started)) s"

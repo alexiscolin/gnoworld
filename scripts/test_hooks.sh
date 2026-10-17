@@ -50,7 +50,8 @@ for step in "run format:check" "run typecheck" "run lint" "run test" "run unused
 	"python3 -I scripts/check_css.py" "run comments" '"$GNO" lint ./...' '"$GNO" test ./...' \
 	"python3 -I ../scripts/mutate.py" "go vet ./tools/..." "go run ./tools/sealvec | cmp" "python3 -I scripts/check_docs.py" \
 	"sh scripts/test_hooks.sh" "python3 -I scripts/probe.py" "run coverage" "python3 -I scripts/patch_coverage.py" \
-	"run mutate" "gitleaks git" "python3 -I scripts/harness_mutate.py" "python3 -I scripts/check_regressions.py"; do
+	"run mutate" "gitleaks git" "python3 -I scripts/harness_mutate.py" "python3 -I scripts/check_regressions.py" \
+	'[ "$took" -gt 60 ]'; do
 	grep -v '^[[:space:]]*#' "$gate_file" | grep -qF -- "$step" || fail "check.sh no longer runs: $step"
 done
 # An EXIT trap keeps a failure: under macOS's sh, a plain one turns an unbound variable into exit 0.
