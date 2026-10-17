@@ -1,0 +1,14 @@
+# What would name a person or a machine once the repository is public (Alexis, 2026-10-17): a
+# path into a home folder, a service of the demo's host. Apart from gitleaks.toml, because
+# gitleaks' default allowlist hides /home/ paths. The CI's runner folder is not a person's.
+[[rules]]
+id = "home-folder-path"
+description = "A path into a home folder"
+regex = '''/(?:Users|home)/[A-Za-z][\w.-]*/'''
+[[rules.allowlists]]
+regexes = ['''/home/runner/''']
+
+[[rules]]
+id = "host-service"
+description = "A service of the demo's host"
+regex = '''(?i)\bn[8]n\b''' # a class, so the rule does not match itself
