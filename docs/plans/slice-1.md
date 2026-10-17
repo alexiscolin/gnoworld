@@ -79,5 +79,5 @@ New: `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `eslint.config
 1. Three merges (1a, 1b, 1c) rather than one? **Yes.**
 2. A fast gate for the Stop hook and pre-commit, the full set in `/pre-merge`? **Yes.**
 3. Move the load-testing tool (k6) to slice 3, where Ergo first needs it? **Yes.**
-4. The sandbox in the project's settings, so it applies to every session in this repo?
+4. The sandbox in the project's settings, so it applies to every session in this repo? **Yes, in the project's settings.**
 5. You create the Tailscale auth key and the demo password, as files in `deploy/secrets/`; Claude never reads them. Agreed?
