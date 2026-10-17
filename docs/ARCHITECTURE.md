@@ -30,7 +30,9 @@ and the deployment live in one repository, with one lockfile and one gate:
   `@gnoworld/schemas`), never by a relative path across folders;
 - no build orchestrator: each workspace has its own scripts, and `scripts/check.sh` runs
   them all, with the realms and the Go reference client;
-- a change that spans the client and the server lands in one commit, tested together.
+- a change that spans the client and the server lands in one commit, tested together;
+- `admin/` stays in the monorepo; it is hidden on the network, never by splitting the repo
+  (ADR-0002 §6).
 
 ```
 app/                         the web client

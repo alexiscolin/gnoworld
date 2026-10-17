@@ -769,6 +769,12 @@ by few hands, so they get the safest path.
 - **The console is its own small app, on its own origin** (`admin.` the site's domain), never
   part of the public client, so a flaw in a public page can never reach an admin session.
   It reuses the design system and `lib`, is `noindex`, and loads no third-party script.
+- **Hidden from the internet.** The console and the admin API are never reachable from the
+  public internet: only through the team's private network (Tailscale in the demo; a VPN
+  or an access gateway in production, as ops chooses). That barrier comes before the Adena
+  login, the roles and the log.
+- **Hidden, but not secret code.** The console stays in the monorepo. Its safety never
+  depends on its code being hidden, and no secret ever lives in the code.
 - **Login:**
   - the same Adena signature, for a session of one hour;
   - a fresh signature for each sensitive action: a takedown with refund, hiding a realm, a
