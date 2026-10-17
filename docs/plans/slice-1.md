@@ -6,6 +6,10 @@ Three merges, each under about 400 lines of diff and each with its own `/pre-mer
 **1a** the monorepo and the gate; **1b** the app's routes, pre-rendering and PWA; **1c** the
 demo stack. CI and the automatic deployment wait for a remote (backlog).
 
+1b is itself two merges (Alexis, 2026-10-17): **1b** the app, `/` and `/w/:world` pre-rendered
+with their tags, the React Compiler, React's lint and Playwright with axe; **1b-2** the PWA, the
+budgets, Lighthouse and the check that every test kills a mutant.
+
 ## 1. Done when
 
 The backlog's tests, word for word: `/` and one `/w/:world` pre-render with their own title,
