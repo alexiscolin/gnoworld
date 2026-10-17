@@ -33,7 +33,8 @@ export function parseLine(line: string): IrcParsed {
 }
 
 /** Writes one line, without CR LF, the last parameter's colon only when needed. Throws a RangeError
- * on a message no IRC line can carry, or one parseLine would read differently. */
+ * on a message no IRC line can carry, or one parseLine would read differently. A client sends at
+ * most 4094 UTF-8 bytes of tag data (IRCv3 message-tags), not the 8191 a server may send. */
 export function formatLine(message: IrcMessage): string {
   throw new Error(`formatLine(${message.command}): not written yet (pairing: Alexis)`);
 }

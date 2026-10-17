@@ -186,7 +186,7 @@ describe("parseLine's limits, in UTF-8 bytes", () => {
   test.fails.each([
     ["8191 bytes of tags with the @ and the space", "@k=" + "a".repeat(8187) + " PING x", true],
     ["8192 bytes of tags", "@k=" + "a".repeat(8188) + " PING x", false],
-    ["8192 bytes of tags with no command after them", "@k=" + "a".repeat(8188), false],
+    ["8192 bytes of tags with no command after them", "@k=" + "a".repeat(8189), false],
     ["8190 bytes of two-byte characters", "@k=" + "é".repeat(4093) + " PING x", true],
     ["8192 bytes of two-byte characters", "@k=" + "é".repeat(4094) + " PING x", false],
   ])("%s", (_, line, ok) => {
@@ -283,14 +283,17 @@ describe("formatLine", () => {
     ["a source with a NUL", message("PING", ["x"], { source: "a\0b" })],
     ["an empty source", message("PING", ["x"], { source: "" })],
     ["a body of 511 bytes", message("PRIVMSG", ["#gno", "a".repeat(498)])],
-    ["8192 bytes of tags", message("PING", ["x"], { tags: [["k", "a".repeat(8188)]] })],
+    [
+      "4095 bytes of tag data, over what IRCv3 lets a client send",
+      message("PING", ["x"], { tags: [["k", "a".repeat(4093)]] }),
+    ],
   ])("refuses %s", (_, bad) => {
     expect(() => formatLine(bad)).toThrow(RangeError);
   });
 
   test.fails.each<[string, IrcMessage]>([
     ["a body of 510 bytes", message("PRIVMSG", ["#gno", "a".repeat(497)])],
-    ["8191 bytes of tags", message("PING", ["x"], { tags: [["k", "a".repeat(8187)]] })],
+    ["4094 bytes of tag data, the most a client may send", message("PING", ["x"], { tags: [["k", "a".repeat(4092)]] })],
     ["a tab inside a middle parameter, which IRC does not split on", message("PRIVMSG", ["#g\tno", "hi"])],
   ])("accepts %s", (_, m) => {
     expect(parseLine(formatLine(m))).toStrictEqual({ ok: true, message: m });
