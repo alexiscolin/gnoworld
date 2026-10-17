@@ -128,6 +128,24 @@ Under `prefers-reduced-motion: reduce`:
 - nothing bounces or loops;
 - the dock magnification is off.
 
+## Testing the CSS
+
+One page under test, the component gallery, plus the journeys; no extra service.
+- **Lint and types,** in the fast gate: `@eslint/css`, `check_css.py`, typed modules
+  (`tsc`), jscpd.
+- **Pictures:** every component, in every state, at three container widths and with reduced
+  motion, screenshotted by Playwright and compared with the approved images. The browsers
+  run in Playwright's Docker image, so pixels match on every machine. A new baseline is
+  its own commit, which Alexis reviews.
+- **Invariants,** measured in the browser on the gallery and the journeys:
+  - nothing overlaps: the point at the centre of each control hits that control;
+  - every target is at least 44 px;
+  - `:focus-visible` draws its ring;
+  - no horizontal scroll from 320 px wide; text still fits at 200% zoom;
+  - forced colours keep every control visible; reduced motion stops transitions;
+  - axe passes, contrast included.
+- **Budgets:** the CSS's size in the build budget, and layout shift in Lighthouse.
+
 ## Components
 
 They live in `app/src/ui`, each a component with its CSS Module, documented by its props.
@@ -220,14 +238,13 @@ Components use container queries, so they fit wherever they are placed.
 - **Motion:** `transition` names its properties, never `all`. Prefer animating
   `transform` and `opacity`.
 - **Stacking:** a `backdrop-filter` blur only on surfaces over the scene, and only one deep.
-- **No dead CSS:**
-  - a module's unused class fails the gate (a short script of ours: the maintained
-    linters for it stopped in 2021 and 2023);
-  - a token nothing uses is removed.
+- **No dead CSS:** a module's unused class and a token nothing uses fail the gate.
 - **Enforced, not hoped for:**
-  - a raw colour, size, radius, duration or z-index fails stylelint
-    (`stylelint-declaration-strict-value`), and so does a token that does not exist
-    (`stylelint-value-no-unknown-custom-properties`);
+  - ESLint lints the CSS too (`@eslint/css`): only Baseline features for our browsers,
+    every rule in a layer, logical properties, no `!important`, no invalid property or
+    value, a cap on selector complexity;
+  - `scripts/check_css.py` refuses a raw colour, size, radius, duration or z-index, a token
+    that does not exist, a token nothing uses and a module class nothing uses;
   - modules are typed (`vite-css-modules`, `generateSourceTypes`, named exports), so a class
     used in a component but missing from its CSS fails `tsc`;
   - a copied block of CSS fails jscpd.
