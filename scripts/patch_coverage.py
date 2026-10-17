@@ -3,7 +3,8 @@ coverage, with no service: Vitest's coverage/coverage-final.json against `git di
 
 Every statement that starts on an added or changed line of a .ts or .tsx file counts. It
 prints the uncovered lines per file and fails under the floor.
-Usage: patch_coverage.py <base> [floor percent, default 85], after `pnpm run coverage`."""
+Usage: patch_coverage.py <base> [floor], after `pnpm run coverage`; the floor defaults to 85, the
+same as vitest.config.ts's."""
 import json
 import os
 import re

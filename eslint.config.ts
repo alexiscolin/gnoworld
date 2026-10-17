@@ -1,12 +1,13 @@
 // The lint half of the gate (docs/ARCHITECTURE.md, "TypeScript" and "Which way dependencies
 // point"; docs/DESIGN-SYSTEM.md, "CSS rules"). scripts/probe.py proves each promise holds.
 import css from "@eslint/css";
-import { defineConfig, globalIgnores } from "eslint/config";
+import { defineConfig, globalIgnores, includeIgnoreFile } from "eslint/config";
 import importX from "eslint-plugin-import-x";
 import tseslint from "typescript-eslint";
 
 export default defineConfig(
-  globalIgnores(["**/node_modules/", "coverage/", "reports/", ".stryker-tmp/", ".claude/tmp/", "docs/", "gno/"]),
+  includeIgnoreFile(`${import.meta.dirname}/.gitignore`),
+  globalIgnores(["docs/", "gno/"]),
   {
     files: ["**/*.ts", "**/*.tsx"],
     extends: [tseslint.configs.strictTypeChecked, tseslint.configs.stylisticTypeChecked],

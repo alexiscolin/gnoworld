@@ -27,19 +27,21 @@ if [ ! -x "$GNO" ]; then
 	exit 1
 fi
 
-# The tools run straight from node_modules/.bin, not through `pnpm run`: the pre-commit copy
-# borrows node_modules, where pnpm would try to install first. package.json has the same commands.
-bin=node_modules/.bin
+# The tools run as package.json's scripts, the one place their commands are written, with
+# node_modules/.bin first on PATH: what `pnpm run` does, minus its install check, which fails in
+# the pre-commit copy that borrows node_modules.
+PATH="$PWD/node_modules/.bin:$PATH"
+run() { sh -c "$(node -p "require('./package.json').scripts['$1']")"; }
 echo "== TypeScript: format, types, lint, tests"
-"$bin/prettier" --check --log-level warn .
-"$bin/tsc" -p tsconfig.json
-"$bin/eslint" --cache --max-warnings 0 .
-"$bin/vitest" run
+run format:check
+run typecheck
+run lint
+run test
 
 echo "== no dead code, no copy, no renamed copy, CSS and comment rules"
-"$bin/knip" --no-progress
-"$bin/jscpd" . >/dev/null
-node scripts/clones.mjs
+run unused
+run copies >/dev/null
+run clones
 python3 -I scripts/check_css.py
 python3 -I scripts/check_comments.py
 
@@ -70,10 +72,10 @@ if $full; then
 	echo "== the harness keeps its promises (scripts/probe.py)"
 	python3 -I scripts/probe.py
 	echo "== coverage: 85% everywhere, core 100%; and 85% of the lines this branch changed"
-	"$bin/vitest" run --coverage
-	python3 -I scripts/patch_coverage.py "$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse HEAD)" 85
+	run coverage
+	python3 -I scripts/patch_coverage.py "$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse HEAD)"
 	echo "== mutations (StrykerJS, incremental)"
-	"$bin/stryker" run
+	run mutate
 	echo "== no secret anywhere in the history"
 	gitleaks git --no-banner --redact .
 fi

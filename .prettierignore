@@ -1,9 +1,6 @@
-# Hand-written prose, generated files and other languages.
+# Besides .gitignore, which Prettier reads: hand-written prose, the lockfile, other languages.
 *.md
 docs/
 adr/
 gno/
 pnpm-lock.yaml
-coverage/
-reports/
-.claude/tmp/

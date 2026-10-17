@@ -15,10 +15,13 @@ import pathlib
 import re
 import sys
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))  # -I leaves this folder off the path
+from repo_files import listed
+
 LAYOUT = re.compile(r"^(gap|row-gap|column-gap|flex(-[\w-]+)?|grid(-[\w-]+)?|justify-[\w-]+|align-[\w-]+|place-[\w-]+|margin(-[\w-]+)?)$")
 DISPLAY = re.compile(r"^(inline-)?(flex|grid)$")
 RAW = re.compile(r"#[0-9a-fA-F]{3,8}\b|\b(rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(|(?<![\w.-])\d*\.?\d+(px|rem|em|ms|s)\b")
-SKIP = {"node_modules", "coverage", "reports", "docs", ".stryker-tmp", ".git"}
+SKIP = {"docs"}  # besides .gitignore: the frozen prototype
 
 
 def parse(text):
@@ -48,13 +51,9 @@ def declare(block, raw):
         block.append((prop.lower(), value, marks))
 
 
-def files(root, *patterns):
-    return [p for pat in patterns for p in root.rglob(pat) if not SKIP & set(p.relative_to(root).parts)]
-
-
 root = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else ".")
-sheets = {p: parse(p.read_text()) for p in files(root, "*.css")}
-code = {p: p.read_text() for p in files(root, "*.ts", "*.tsx")}
+sheets = {p: parse(p.read_text()) for p in listed(root, {".css"}, SKIP)}
+code = {p: p.read_text() for p in listed(root, {".ts", ".tsx"}, SKIP)}
 tokens = {t for p in sheets if p.name == "tokens.css" for t in re.findall(r"(--[\w-]+)\s*:", p.read_text())}
 problems, exceptions = [], 0
 

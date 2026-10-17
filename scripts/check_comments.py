@@ -8,7 +8,10 @@ import pathlib
 import re
 import sys
 
-SKIP = {"node_modules", "docs", "coverage", "reports", ".stryker-tmp", ".git", "gno"}
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))  # -I leaves this folder off the path
+from repo_files import listed
+
+SKIP = {"docs", "gno"}  # besides .gitignore: the frozen prototype, and gno's own conventions
 MARKER = re.compile(r"\b(TODO|FIXME|XXX|HACK)\b")
 BANNER = re.compile(r"[-=*#~_]{4,}")
 STEP = re.compile(r"^\s*(\d+[.)]\s|step \d+\b)", re.I)
@@ -32,7 +35,7 @@ def comments(lines):
 
 
 root = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else ".")
-files = [p for ext in ("ts", "tsx", "mjs", "css") for p in root.rglob(f"*.{ext}") if not SKIP & set(p.relative_to(root).parts)]
+files = listed(root, {".ts", ".tsx", ".mjs", ".css"}, SKIP)
 problems = []
 for path in files:
     lines = path.read_text().splitlines()

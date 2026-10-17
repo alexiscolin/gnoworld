@@ -9,7 +9,7 @@
   "scripts": {
     "prepare": "git config core.hooksPath .githooks",
     "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "format:check": "prettier --check --log-level warn .",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint --cache --max-warnings 0 .",
     "test": "vitest run",

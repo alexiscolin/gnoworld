@@ -57,7 +57,7 @@ def expect(ok, what):
 try:
     # ESLint: one run over every planted file, then each file must carry its rule.
     plant({name: content for name, content, _ in LINT})
-    out = run(["pnpm", "exec", "eslint", "--no-cache", "--format", "json", HERE])
+    out = run(["node_modules/.bin/eslint", "--no-cache", "--format", "json", HERE])
     try:
         report = {os.path.basename(r["filePath"]): {m.get("ruleId") for m in r["messages"]} for r in json.loads(out.stdout)}
     except ValueError:
@@ -70,25 +70,25 @@ try:
 
     # Prettier: a file that is not formatted.
     plant({"messy.ts": "export const  a={b:1,\n c :2}\n"})
-    out = run(["pnpm", "exec", "prettier", "--check", HERE])
+    out = run(["node_modules/.bin/prettier", "--check", HERE])
     expect(out.returncode != 0 and "messy.ts" in out.stdout + out.stderr, "prettier refuses an unformatted file")
     shutil.rmtree(HERE)
 
     # tsc: core sees neither the DOM nor Node, so it cannot reach the network.
     plant({"net.ts": "export function load(): unknown {\n  return fetch;\n}\n"})
-    out = run(["pnpm", "exec", "tsc", "-p", "tsconfig.json"])
+    out = run(["node_modules/.bin/tsc", "-p", "tsconfig.json"])
     expect(out.returncode != 0 and "Cannot find name 'fetch'" in out.stdout, "tsc refuses fetch in core")
     shutil.rmtree(HERE)
 
     # knip: a file nothing imports.
     plant({"unused.ts": "export function lonely(): number {\n  return 1;\n}\n"})
-    out = run(["pnpm", "exec", "knip", "--no-progress"])
+    out = run(["node_modules/.bin/knip", "--no-progress"])
     expect(out.returncode != 0 and "__probe__/unused.ts" in out.stdout, "knip reports an unused file")
     shutil.rmtree(HERE)
 
     # jscpd: the same block in two files.
     plant({f"copy_{x}.ts": f"export function sum_{x}(values: number[]): number {{\n  let total = 0;\n{BLOCK}  return total;\n}}\n" for x in "ab"})
-    out = run(["pnpm", "exec", "jscpd", HERE])
+    out = run(["node_modules/.bin/jscpd", HERE])
     expect(out.returncode != 0, "jscpd refuses a copied block")
     shutil.rmtree(HERE)
 
