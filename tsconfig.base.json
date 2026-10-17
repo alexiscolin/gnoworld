@@ -1,10 +1,11 @@
 {
   "compilerOptions": {
     "target": "es2024",
+    // No DOM, which es2024 would bring by default, and no Node types: core reaches no network,
+    // window or process. Each workspace that needs them adds its own.
     "lib": ["es2024"],
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
     "types": [],
+    "module": "nodenext",
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,

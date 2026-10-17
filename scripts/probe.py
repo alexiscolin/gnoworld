@@ -74,6 +74,12 @@ try:
     expect(out.returncode != 0 and "messy.ts" in out.stdout + out.stderr, "prettier refuses an unformatted file")
     shutil.rmtree(HERE)
 
+    # tsc: core sees neither the DOM nor Node, so it cannot reach the network.
+    plant({"net.ts": "export function load(): unknown {\n  return fetch;\n}\n"})
+    out = run(["pnpm", "exec", "tsc", "-p", "tsconfig.json"])
+    expect(out.returncode != 0 and "Cannot find name 'fetch'" in out.stdout, "tsc refuses fetch in core")
+    shutil.rmtree(HERE)
+
     # knip: a file nothing imports.
     plant({"unused.ts": "export function lonely(): number {\n  return 1;\n}\n"})
     out = run(["pnpm", "exec", "knip", "--no-progress"])
