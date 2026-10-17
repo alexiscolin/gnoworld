@@ -71,6 +71,10 @@ done
 for f in "$here"/*.sh "$hooks"/*; do
 	grep -nE '^[[:space:]]*[A-Za-z_]+=\$\(mktemp' "$f" | grep -vE 'mktemp (-d )?"\$\{TMPDIR:-/tmp\}/' | grep -q . && fail "$(basename "$f") makes a temporary file outside \$TMPDIR"
 done
+# check.sh refuses a .node-version that is more than a version, which would steer PATH.
+nv="$t/nodeversion" && mkdir -p "$nv/scripts" && cp "$gate_file" "$nv/scripts/check.sh"
+printf '24.22.0/../../../../evil\n' >"$nv/.node-version"
+sh "$nv/scripts/check.sh" 2>&1 | grep -q ".node-version must be a version" || fail "check.sh accepted a .node-version that is a path"
 # Every gno package is mutated, gno/p as well as gno/r: discovery names no area.
 grep -qF 'glob.glob("**/gnomod.toml"' "$here/mutate.py" || fail "mutate.py no longer mutates every gno package"
 fi
