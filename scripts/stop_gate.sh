@@ -7,7 +7,7 @@ input=$(cat)
 case $input in *'"stop_hook_active":true'* | *'"stop_hook_active": true'*) exit 0 ;; esac
 cd "${CLAUDE_PROJECT_DIR:-$(dirname "$0")/..}"
 sh scripts/code_changed.sh || exit 0
-out=$(mktemp)
+out=$(mktemp "${TMPDIR:-/tmp}/stop_gate.XXXXXX")
 # bash 3.2, macOS's sh, exits 0 through an EXIT trap after an unbound variable: `finished`, set
 # on the last line, tells a run that reached its end from one that died on the way.
 trap 'status=$?; rm -f "$out"; [ "$status" != 0 ] || [ "${finished:-}" = 1 ] || status=1; exit "$status"' EXIT
