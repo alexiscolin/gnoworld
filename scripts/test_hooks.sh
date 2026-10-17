@@ -51,7 +51,7 @@ for step in "run format:check" "run typecheck" "run lint" "run test" "run unused
 	"python3 -I ../scripts/mutate.py" "go vet ./tools/..." "go run ./tools/sealvec | cmp" "python3 -I scripts/check_docs.py" \
 	"sh scripts/test_hooks.sh" "python3 -I scripts/probe.py" "run coverage" "python3 -I scripts/patch_coverage.py" \
 	"run mutate" "gitleaks git" "python3 -I scripts/harness_mutate.py" "python3 -I scripts/check_regressions.py" \
-	'[ "$took" -gt 60 ]'; do
+	'[ "$took" -gt 60 ]' "python3 -I scripts/prove_fix.py"; do
 	grep -v '^[[:space:]]*#' "$gate_file" | grep -qF -- "$step" || fail "check.sh no longer runs: $step"
 done
 # An EXIT trap keeps a failure: under macOS's sh, a plain one turns an unbound variable into exit 0.
@@ -352,6 +352,36 @@ asks "git -C . push origin slice-1a"
 asks "cd gno && git push"
 asks "git -c push.default=current push"
 python3 -I -c 'import json; print(json.dumps({"tool_name":"Bash","tool_input":{"command":"git status"}}))' | python3 -I "$gd" | grep -q . && fail "guard printed a decision for git status"
+fi
+
+if part prove_fix; then
+# prove_fix: a product fix's tests fail on the commit before it. A fake Vitest stands in: a
+# test passes when the code holds what its `// expects:` line names.
+pf="$t/prove"
+mkdir -p "$pf/packages/x/src" "$pf/.claude/tmp" "$pf/node_modules"
+git -C "$pf" init -q
+printf '#!/bin/sh\nfor f in "$@"; do grep -qF "$(sed -n "s|^// expects: ||p" "$f")" packages/x/src/a.ts || exit 1; done\n' >"$t/fake_vitest" && chmod +x "$t/fake_vitest"
+printf '.claude/tmp\nnode_modules\n' >"$pf/.gitignore" && printf 'export const twice = (n: number) => n * 3;\n' >"$pf/packages/x/src/a.ts"
+git -C "$pf" add -A && git -C "$pf" commit -qm "feat: twice"
+prove() { (cd "$pf" && PROVE_FIX_VITEST="$t/fake_vitest" python3 -I "$here/prove_fix.py" "$1" >/dev/null 2>&1); }
+fix() { git -C "$pf" add -A && git -C "$pf" commit -qm "$1"; }
+base=$(git -C "$pf" rev-parse HEAD)
+printf 'export const twice = (n: number) => n * 2;\n' >"$pf/packages/x/src/a.ts" && printf '// expects: n * 2\n' >"$pf/packages/x/src/a.test.ts"
+fix "fix(x): twice doubles"
+prove "$base" || fail "prove_fix refused a fix whose test failed before it"
+base=$(git -C "$pf" rev-parse HEAD)
+printf 'export const twice = (n: number) => 2 * n;\n' >"$pf/packages/x/src/a.ts" && printf '// expects: export\n' >"$pf/packages/x/src/b.test.ts"
+fix "fix(x): a test that passed already"
+prove "$base" && fail "prove_fix accepted a fix whose test passed before it"
+base=$(git -C "$pf" rev-parse HEAD)
+printf 'export const twice = (n: number) => n + n;\n' >"$pf/packages/x/src/a.ts"
+fix "fix(x): no test"
+prove "$base" && fail "prove_fix accepted a fix with no test"
+git -C "$pf" commit -q --amend -m "fix(x): no test" -m "No-test: the same sum, written as an addition"
+prove "$base" || fail "prove_fix refused a fix that says why it has no test"
+base=$(git -C "$pf" rev-parse HEAD)
+mkdir -p "$pf/scripts" && echo x >"$pf/scripts/tool.py" && fix "fix(harness): a harness fix"
+prove "$base" || fail "prove_fix refused a harness fix, which harness_mutate proves"
 fi
 
 if part regressions; then

@@ -82,6 +82,8 @@ if $full; then
 	echo "== coverage: 85% everywhere, core 100%; and 85% of the lines this branch changed"
 	run coverage
 	python3 -I scripts/patch_coverage.py "$base"
+	echo "== every fix of the product comes with a test that failed before it"
+	python3 -I scripts/prove_fix.py "$base"
 	echo "== mutations (StrykerJS, incremental)"
 	run mutate
 	echo "== no regression: no test gone, no floor lower, no approved screenshot changed, unless a commit says why"
