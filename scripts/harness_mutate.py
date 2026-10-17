@@ -1,10 +1,11 @@
 """harness_mutate.py: the harness's own mutation test.
 
-Each guard of the harness (a lint rule, a check in a script, a refusal in a hook, a limit in a
-config) is switched off in turn, in a throwaway worktree, and the harness's tests (probe.py,
-test_hooks.sh) must then fail. A guard whose removal they do not notice is a guard nobody
-checks: it is listed in GAPS with its reason, or the tests grow. Usage: scripts/harness_mutate.py
-from the repository root; it takes several minutes, so it runs on harness changes, not per commit."""
+Each guard of the harness (a lint rule or selector, a check in a script, a refusal in a hook, a
+limit in a config, a step of the gate) is switched off in turn, in a throwaway worktree of HEAD,
+and the harness's tests (probe.py, test_hooks.sh) must then fail. A guard whose removal they do
+not notice is a guard nobody checks: the run prints the test to add. GAPS lists the known ones,
+with their reason; a gap that gets killed must leave the list. Usage: scripts/harness_mutate.py,
+from the repository root; it takes minutes, so the full gate runs it when the harness changes."""
 import os
 import re
 import shutil
@@ -13,89 +14,100 @@ import sys
 
 WORKTREE = ".claude/tmp/harness-mutate"
 OFF = "(lambda *a: None)("
-GAPS = {  # label -> why no test can notice it yet
-    "tsconfig types #1": "no @types package is installed, so types: [] changes nothing yet; testable once @types/node arrives (slice 3)",
-}
+GAPS = {}  # label -> why no test can notice it yet
 
 TESTS = {"probe": [sys.executable, "-I", "scripts/probe.py"], "hooks": ["sh", "scripts/test_hooks.sh"]}
 
 
-def nth(text, find, replace, n):
-    """text with the n-th occurrence of find replaced, or None when there is no n-th."""
-    at = -1
-    for _ in range(n + 1):
-        at = text.find(find, at + 1)
-        if at < 0:
-            return None
-    return text[:at] + replace + text[at + len(find):]
+def read(path):
+    """A file of the worktree: the mutants come from the code under test, not the working tree."""
+    with open(os.path.join(WORKTREE, path)) as f:
+        return f.read()
 
 
 def each(path, find, replace, test, label):
-    text = open(path).read()
-    for n in range(text.count(find)):
-        yield f"{label} #{n + 1}", path, nth(text, find, replace, n), test
+    """One mutant per occurrence of `find`; none at all means this script is out of date."""
+    text = read(path)
+    spots = [m.start() for m in re.finditer(re.escape(find), text)]
+    if not spots:
+        yield label, path, None, test
+    for n, at in enumerate(spots):
+        yield f"{label} #{n + 1}", path, text[:at] + replace + text[at + len(find):], test
 
 
-def eslint_rules():
-    """Every rule set to "error" in eslint.config.ts, switched to "off"."""
-    text = open("eslint.config.ts").read()
-    for m in re.finditer(r'^\s+"?([\w@/-]+)"?:\s*(?=\[?\s*"error"|\[\s*$)', text, re.M):
-        at = text.find('"error"', m.end())
-        yield f"eslint {m.group(1)}", "eslint.config.ts", text[:at] + '"off"' + text[at + 7:], "probe"
+def lines(path, pattern, replace, test, label):
+    """One mutant per line matching `pattern`, the line rewritten by `replace`."""
+    text = read(path)
+    found = list(re.finditer(pattern, text, re.M))
+    if not found:
+        yield label, path, None, test
+    for m in found:
+        yield f"{label} `{m.group(0).strip()[:50]}`", path, text[: m.start()] + m.expand(replace) + text[m.end():], test
 
 
 def mutants():
-    yield from eslint_rules()
-    for path in ("scripts/check_css.py", "scripts/check_comments.py"):
-        yield from each(path, "problems.append(", OFF, "probe", f"{path} problem")
+    """Every guard of the harness, each with the test that must notice it gone."""
+    # ESLint: each rule set to "error", switched off; each selector and restricted name, never matching.
+    text = read("eslint.config.ts")
+    for m in re.finditer(r'^\s+"?([\w@/-]+)"?:\s*(?=\[?\s*"error"|\[\s*$)', text, re.M):
+        at = text.find('"error"', m.end())
+        yield f"eslint {m.group(1)} (line {text.count(chr(10), 0, m.start()) + 1})", "eslint.config.ts", text[:at] + '"off"' + text[at + 7:], "probe"
+    yield from each("eslint.config.ts", 'selector: "', 'selector: "Never ', "probe", "eslint selector")
+    yield from each("eslint.config.ts", "selector: `", "selector: `Never ", "probe", "eslint selector")
+    yield from each("eslint.config.ts", 'property: "', 'property: "never_', "probe", "eslint restricted property")
+    yield from each("eslint.config.ts", "noInlineConfig: true", "noInlineConfig: false", "probe", "eslint inline config")
+    # The style checks.
+    yield from each("scripts/check_css.py", "problems.append(", OFF, "probe", "check_css problem")
     yield from each("scripts/check_css.py", "problems += [", "problems += [] and [", "probe", "check_css unused tokens")
-    for name in ("MARKER", "BANNER", "STEP", "EMOJI"):
-        text = open("scripts/check_comments.py").read()
-        yield f"check_comments {name}", "scripts/check_comments.py", re.sub(rf"^{name} = re\.compile\(.*$", f'{name} = re.compile(r"(?!)")', text, count=1, flags=re.M), "probe"
-    yield from each("scripts/check_comments.py", "limit = 6 if header else 3", "limit = 60 if header else 30", "probe", "check_comments limits")
-    yield from each("scripts/clones.mjs", "process.exit(copies.length === 0 ? 0 : 1)", "process.exit(0)", "probe", "clones exit")
-    yield from each(".jscpd.json", '"threshold": 0', '"threshold": 100', "probe", "jscpd threshold")
+    yield from lines("scripts/check_comments.mjs", r'^(  \["[^"]+", )/.*/\w*\],$', r"\1/(?!)/],", "probe", "check_comments rule")
+    yield from each("scripts/check_comments.mjs", "{ header: 6, other: 3 }", "{ header: 60, other: 30 }", "probe", "check_comments limits")
+    yield from each("scripts/check_comments.mjs", "problems.push(", "(() => {})(", "probe", "check_comments problem")
+    yield from each(".jscpd.json", '"exitCode": 1', '"exitCode": 0', "probe", "jscpd exit code")
+    yield from each(".jscpd.json", '"similarity": 0.8', '"similarity": 1', "probe", "jscpd similarity")
     yield from each("tsconfig.base.json", '"lib": ["es2024"],', "", "probe", "tsconfig lib")
-    yield from each("tsconfig.base.json", '"types": [],', "", "probe", "tsconfig types")
-    for indent in ("\n    ", "\n        ", "\n            "):
-        yield from each("scripts/guard.py", indent + "refuse(", indent + OFF, "hooks", f"guard refusal ({len(indent) - 1} spaces)")
+    # The hooks and their scripts.
+    yield from each("scripts/guard.py", ' refuse("', " " + OFF + '"', "hooks", "guard refusal")
+    yield from each("scripts/guard.py", " refuse(UNREAD)", " " + OFF + "UNREAD)", "hooks", "guard unread .gno")
     yield from each("scripts/review_pass.py", 'sys.exit(f"review_pass: no', 'print(f"review_pass: no', "hooks", "review_pass check")
     yield from each("scripts/patch_coverage.py", "    sys.exit(1)", "    pass", "hooks", "patch_coverage floor")
     yield from each("scripts/check_docs.py", "    sys.exit(1)", "    pass", "hooks", "check_docs")
+    yield from each("scripts/check_regressions.py", "before - after", "set()", "hooks", "check_regressions tests")
+    yield from each("scripts/check_regressions.py", "after.get(name, 0) < old", "False", "hooks", "check_regressions floors")
+    yield from each("scripts/check_regressions.py", 'status[0] in "MDR"', "False", "hooks", "check_regressions baselines")
     yield from each(".githooks/commit-msg", "exit 1", ":", "hooks", "commit-msg refusal")
     yield from each(".githooks/pre-push", "exit 1", ":", "hooks", "pre-push refusal")
     yield from each(".githooks/pre-push", 'python3 -I scripts/review_pass.py check "$local_sha"', ":", "hooks", "pre-push review check")
+    yield from each(".githooks/pre-push", "sh scripts/check.sh --full </dev/null", ":", "hooks", "pre-push gate")
     yield from each(".githooks/pre-commit", 'sh "$staged/scripts/check.sh"', "true", "hooks", "pre-commit gate")
     yield from each("scripts/code_changed.sh", "! git diff --cached", "git diff --cached", "hooks", "code_changed staged")
     yield from each("scripts/code_changed.sh", '[ -n "$(git status', '[ -z "$(git status', "hooks", "code_changed working tree")
     yield from each("scripts/stop_gate.sh", "exit 2", "exit 0", "hooks", "stop_gate block")
     yield from each("scripts/format_hook.sh", "node_modules/.bin/eslint --fix", ": eslint --fix", "hooks", "format_hook eslint")
     yield from each("scripts/format_hook.sh", "node_modules/.bin/prettier --write", ": prettier --write", "hooks", "format_hook prettier")
-    text = open("scripts/check.sh").read()
-    for m in re.finditer(r'^(\s*)((?:run |python3 -I |sh scripts/|gitleaks |go vet |go run |\(cd gno ).*)$', text, re.M):
-        yield f"check.sh drops `{m.group(2)[:50]}`", "scripts/check.sh", text[: m.start(2)] + ":" + text[m.end(2):], "hooks"
-
-
-def proposal(label):
-    """The smallest change that would make a test notice this guard."""
-    if label.startswith("eslint "):
-        return f"add a case to LINT in scripts/probe.py that only {label[7:]} refuses, or drop the rule if another already holds it"
-    if label.startswith("check.sh drops"):
-        return 'add the step to the list in scripts/test_hooks.sh ("check.sh runs every step it promises")'
-    if any(word in label for word in ("guard", "review_pass", "patch_coverage", "check_docs", "commit-msg", "pre-push", "pre-commit", "stop_gate", "format_hook")):
-        return "add to scripts/test_hooks.sh the input this line refuses, and the exit code it must give"
-    return "plant in scripts/probe.py a fault that only this guard catches"
+    # The gate: each step dropped.
+    yield from lines("scripts/check.sh", r"^(\s*)((?:run |python3 -I |sh scripts/|gitleaks |go vet |go run |\(cd gno |\$full \|\| run ).*)$", r"\1:", "hooks", "check.sh drops")
 
 
 def run(test):
     return subprocess.run(TESTS[test], cwd=WORKTREE, capture_output=True, text=True, timeout=600).returncode
 
 
+def proposal(label):
+    """The smallest change that would make a test notice this guard."""
+    if label.startswith("eslint"):
+        return "add to LINT in scripts/probe.py a case only this rule or selector refuses, or drop it if another already holds it"
+    if label.startswith("check.sh drops"):
+        return 'add the step to the list in scripts/test_hooks.sh ("check.sh runs every step it promises")'
+    if label.split()[0] in ("guard", "review_pass", "patch_coverage", "check_docs", "check_regressions", "commit-msg", "pre-push", "pre-commit", "code_changed", "stop_gate", "format_hook"):
+        return "add to scripts/test_hooks.sh the input this line refuses, and the exit code it must give"
+    return "plant in scripts/probe.py a fault that only this guard catches"
+
+
 shutil.rmtree(WORKTREE, ignore_errors=True)
 subprocess.run(["git", "worktree", "prune"], check=True)
 subprocess.run(["git", "worktree", "add", "-q", "--detach", WORKTREE, "HEAD"], check=True)
-os.symlink(os.path.abspath("node_modules"), os.path.join(WORKTREE, "node_modules"))
-survivors = []
+subprocess.run(["sh", "scripts/borrow_node_modules.sh", WORKTREE], check=True)
+failures = []
 try:
     for test in TESTS:  # the control: an untouched copy passes, so a failure means the mutant
         if run(test) != 0:
@@ -104,7 +116,7 @@ try:
         if mutated is None:
             sys.exit(f"harness_mutate: {label}: nothing to mutate in {path}; this script is out of date")
         target = os.path.join(WORKTREE, path)
-        original = open(target).read()
+        original = read(path)
         with open(target, "w") as f:
             f.write(mutated)
         try:
@@ -112,15 +124,18 @@ try:
         finally:
             with open(target, "w") as f:
                 f.write(original)
-        if killed:
+        if killed and label in GAPS:
+            print(f"FAIL  killed, yet listed in GAPS: {label}\n      → delete its line from GAPS")
+            failures.append(label)
+        elif killed:
             print(f"ok    killed: {label}")
         elif label in GAPS:
             print(f"ok    survives: {label}  (known gap: {GAPS[label]})")
         else:
             print(f"FAIL  survives: {label}\n      → {proposal(label)}")
-            survivors.append(label)
+            failures.append(label)
 finally:
     subprocess.run(["git", "worktree", "remove", "--force", WORKTREE])
-if survivors:
-    sys.exit(f"harness_mutate: {len(survivors)} guards are switched off with no test noticing")
+if failures:
+    sys.exit(f"harness_mutate: {len(failures)} guards are not proven by a test")
 print("harness_mutate: removing any guard fails a test")

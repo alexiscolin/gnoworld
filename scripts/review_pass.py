@@ -9,17 +9,17 @@ import pathlib
 import subprocess
 import sys
 
-OWN = {"docs/review-log.md", "docs/review-passes.txt"}
+sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no __pycache__
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))  # -I leaves this folder off the path
+from repo_files import git
+
 PASSES = "docs/review-passes.txt"
-
-
-def git(*args, stdin=None):
-    return subprocess.run(["git", *args], input=stdin, capture_output=True, text=True, check=True).stdout
+OWN = {"docs/review-log.md", PASSES}
 
 
 def fingerprint(commit):
     kept = [line for line in git("ls-tree", "-r", commit).splitlines() if line.split("\t", 1)[1] not in OWN]
-    return git("hash-object", "--stdin", stdin="\n".join(kept)).strip()
+    return subprocess.run(["git", "hash-object", "--stdin"], input="\n".join(kept), capture_output=True, text=True, check=True).stdout.strip()
 
 
 action, commit = sys.argv[1], sys.argv[2]

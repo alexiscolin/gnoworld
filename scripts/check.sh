@@ -39,12 +39,11 @@ run typecheck
 run lint
 $full || run test # --full runs the tests once, with coverage
 
-echo "== no dead code, no copy, no renamed copy, CSS and comment rules"
+echo "== no dead code, no copy (renamed or near ones too), CSS and comment rules"
 run unused
 copies=$(run copies 2>&1) || { printf '%s\n' "$copies"; exit 1; }
-run clones
 python3 -I scripts/check_css.py
-python3 -I scripts/check_comments.py
+run comments
 
 echo "== realms (gno/): lint and tests"
 (cd gno && "$GNO" lint ./r/... && "$GNO" test ./r/...)

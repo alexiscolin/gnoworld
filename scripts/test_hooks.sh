@@ -21,8 +21,8 @@ assert "scripts/guard.py" in wired["PreToolUse"] and "scripts/format_hook.sh" in
 PY
 # check.sh runs every step it promises: removing one fails here.
 gate_file="$here/check.sh"
-for step in "run format:check" "run typecheck" "run lint" "run test" "run unused" "run copies" "run clones" \
-	"python3 -I scripts/check_css.py" "python3 -I scripts/check_comments.py" '"$GNO" lint ./r/...' '"$GNO" test ./r/...' \
+for step in "run format:check" "run typecheck" "run lint" "run test" "run unused" "run copies" \
+	"python3 -I scripts/check_css.py" "run comments" '"$GNO" lint ./r/...' '"$GNO" test ./r/...' \
 	"python3 -I ../scripts/mutate.py" "go vet ./tools/..." "go run ./tools/sealvec | cmp" "python3 -I scripts/check_docs.py" \
 	"sh scripts/test_hooks.sh" "python3 -I scripts/probe.py" "run coverage" "python3 -I scripts/patch_coverage.py" \
 	"run mutate" "gitleaks git" "python3 -I scripts/harness_mutate.py" "python3 -I scripts/check_regressions.py"; do
@@ -152,7 +152,7 @@ echo two >>"$v/src/a.ts" && commit code
 w="$t/push"
 mkdir -p "$w/scripts" "$w/.githooks" "$w/docs"
 printf '#!/bin/sh\nexit 0\n' >"$w/scripts/check.sh"
-cp "$rp" "$w/scripts/review_pass.py" && cp "$hooks/pre-push" "$w/.githooks/pre-push"
+cp "$rp" "$here/repo_files.py" "$w/scripts/" && cp "$hooks/pre-push" "$w/.githooks/pre-push"
 git -C "$w" init -q && echo x >"$w/a.ts" && git -C "$w" add -A && git -C "$w" commit -qm base
 head=$(git -C "$w" rev-parse HEAD)
 push() { printf 'refs/heads/%s %s refs/heads/%s 0000000000000000000000000000000000000000\n' "$1" "$head" "$1" | (cd "$w" && sh .githooks/pre-push origin url >/dev/null 2>&1); }
@@ -182,7 +182,7 @@ rm "$w/stray.ts"
 # pre-commit runs the gate on the staged files, and a failing gate stops the commit.
 c2="$t/precommit"
 mkdir -p "$c2/scripts" && git -C "$c2" init -q
-printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && cp "$here/code_changed.sh" "$c2/scripts/" && git -C "$c2" add -A && git -C "$c2" commit -qm base
+printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$c2/scripts/" && git -C "$c2" add -A && git -C "$c2" commit -qm base
 echo code >"$c2/a.ts" && git -C "$c2" add a.ts
 (cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a commit through a failing gate"
 printf '#!/bin/sh\nexit 0\n' >"$c2/scripts/check.sh" && git -C "$c2" add -A

@@ -1,7 +1,5 @@
 {
-  "minTokens": 50,
-  "gitignore": true,
   "ignore": ["docs/**", "gno/**", "pnpm-lock.yaml", "**/*.test.ts"],
-  "reporters": ["console"],
-  "exitCode": 1
+  "exitCode": 1,
+  "similarity": 0.8
 }

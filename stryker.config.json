@@ -3,22 +3,17 @@
   "plugins": ["@stryker-mutator/vitest-runner", "@stryker-mutator/typescript-checker"],
   "testRunner": "vitest",
   "checkers": ["typescript"],
-  "tsconfigFile": "tsconfig.json",
   "mutate": ["packages/*/src/**/*.ts", "!packages/*/src/**/*.test.ts", "!packages/*/src/index.ts"],
   "incremental": true,
-  "incrementalFile": "reports/stryker-incremental.json",
-  "reporters": ["clear-text", "progress", "html"],
   "htmlReporter": {
     "fileName": "reports/mutation/index.html"
   },
   "clearTextReporter": {
     "allowColor": false
   },
-  "tempDirName": ".stryker-tmp",
   "thresholds": {
     "high": 95,
-    "low": 85,
-    "break": null
+    "low": 85
   },
   "ignorePatterns": ["docs", "gno", ".claude", "coverage"]
 }

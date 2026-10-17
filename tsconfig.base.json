@@ -1,10 +1,9 @@
 {
   "compilerOptions": {
     "target": "es2024",
-    // No DOM, which es2024 would bring by default, and no Node types: core reaches no network,
-    // window or process. Each workspace that needs them adds its own.
+    // No DOM, which es2024 would bring by default; and TypeScript 6 loads no @types unless asked,
+    // so core reaches no network, window or process. A workspace that needs them adds its own.
     "lib": ["es2024"],
-    "types": [],
     "module": "nodenext",
     "strict": true,
     "noUncheckedIndexedAccess": true,
@@ -15,7 +14,6 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "verbatimModuleSyntax": true,
-    "isolatedModules": true,
     "erasableSyntaxOnly": true,
     "allowImportingTsExtensions": true,
     "noEmit": true,

@@ -4,10 +4,8 @@ export default defineConfig({
   test: {
     include: ["packages/*/src/**/*.test.ts"],
     coverage: {
-      provider: "v8",
       // Every source file counts, tested or not, so an untested file shows as 0%.
       include: ["packages/*/src/**/*.{ts,tsx}"],
-      exclude: ["**/*.test.{ts,tsx}"],
       reporter: ["text-summary", "json"],
       // 85% everywhere (Alexis, 2026-10-17); core's rules at 100%, branches 95%.
       thresholds: {

@@ -129,34 +129,54 @@ try:
     expect(out.returncode != 0, "jscpd refuses a copied block")
     shutil.rmtree(HERE)
 
-    # clones: the same function with every name changed, which jscpd cannot see.
+    # jscpd's similarity: the same function with every name changed, or with a line added.
     shape = "export function {f}({v}: number[]): number {{\n  let {t} = 0;\n  for (const {x} of {v}) {{\n    if ({x} > 10) {{\n      {t} += {x} * 2;\n    }} else {{\n      {t} -= {x};\n    }}\n  }}\n  return {t};\n}}\n"
     plant({"one.ts": shape.format(f="alpha", v="values", t="total", x="v"), "two.ts": shape.format(f="beta", v="items", t="acc", x="item")})
-    out = run(["node", "scripts/clones.mjs", HERE])
-    expect(out.returncode != 0 and "one.ts" in out.stdout + out.stderr, "clones refuses a renamed copy")
-    plant({"two.ts": shape.replace("* 2", "* 3").replace("-= ", "+= ").format(f="beta", v="items", t="acc", x="item").replace("> 10", ">= 10 && item < 99")})
-    out = run(["node", "scripts/clones.mjs", HERE])
-    expect(out.returncode == 0, "clones lets a function of another shape pass")
+    out = run(["node_modules/.bin/jscpd", HERE])
+    expect(out.returncode != 0 and "one.ts" in out.stdout + out.stderr, "jscpd refuses a renamed copy")
+    plant({"two.ts": shape.replace("-= ", "+= ").format(f="beta", v="items", t="acc", x="item").replace("> 10", ">= 10 && item < 99")})
+    out = run(["node_modules/.bin/jscpd", HERE])
+    expect(out.returncode == 0, "jscpd lets a function of another shape pass")
     shutil.rmtree(HERE)
 
-    # check_comments: short comments, and none of the kinds that rot.
+    # check_comments: short comments, none of the kinds that rot, no escape hatch; found by
+    # TypeScript's own scanner, so a "//" in a string is no comment.
     body = "export function f(): number {\n  NOTE\n  return 1;\n}\n".replace
     comment_cases = {
         "a short header and a short note": ("// The file says what it is.\n" + body("NOTE", "// Why: the chain counts from one."), None),
+        "a // inside a string": (body("NOTE", 'const url = "https://x.org/a // TODO b"; void url;'), None),
+        "a six-line header under a shebang": ("#!/usr/bin/env node\n" + "".join(f"// line {i}\n" for i in range(6)) + body("NOTE", ""), None),
         "a note over three lines": (body("NOTE", "// one\n  // two\n  // three\n  // four"), "longer than 3 lines"),
         "a header over six lines": ("".join(f"// line {i}\n" for i in range(7)) + body("NOTE", ""), "header longer than 6 lines"),
         "a TODO": (body("NOTE", "// TODO: later"), "todo"),
+        "an @todo in lower case": (body("NOTE", "// @todo later"), "todo"),
+        "a TODO in a block after code": (body("NOTE", "const n = 1; /* todo: n */ void n;"), "todo"),
         "a banner": (body("NOTE", "// ==========="), "banner"),
         "numbered steps": (body("NOTE", "// 1. read the line"), "numbered step"),
         "an emoji": (body("NOTE", "// works 🚀"), "emoji"),
+        "a coverage escape": (body("NOTE", "/* v8 ignore next */"), "escape hatch"),
+        "a copy escape": (body("NOTE", "// jscpd:ignore-start"), "escape hatch"),
+        "a mutation escape": (body("NOTE", "// Stryker disable next-line all"), "escape hatch"),
     }
     folder = tempfile.mkdtemp()
     for case, (content, word) in comment_cases.items():
         with open(os.path.join(folder, "f.ts"), "w") as f:
             f.write(content)
-        out = run([sys.executable, "-I", "scripts/check_comments.py", folder])
+        out = run(["node", "scripts/check_comments.mjs", folder])
         said = (out.stdout + out.stderr).lower()
         expect(out.returncode == 0 if word is None else out.returncode != 0 and word in said, f"check_comments {case}")
+    with open(os.path.join(folder, "f.ts"), "w") as f:
+        f.write("")
+    with open(os.path.join(folder, "s.css"), "w") as f:
+        f.write("@layer x {\n  .a {\n    color: var(--c); /* TODO later */\n  }\n}\n")
+    out = run(["node", "scripts/check_comments.mjs", folder])
+    expect(out.returncode != 0 and "todo" in (out.stdout + out.stderr).lower(), "check_comments a TODO in CSS")
+    os.remove(os.path.join(folder, "s.css"))
+    os.makedirs(os.path.join(folder, "node_modules", "dep"))
+    with open(os.path.join(folder, "node_modules", "dep", "index.js"), "w") as f:
+        f.write("// TODO: a dependency's own business\n")
+    out = run(["node", "scripts/check_comments.mjs", folder])
+    expect(out.returncode == 0, "check_comments reads no node_modules outside a repository")
     shutil.rmtree(folder)
 
     # check_css: in a folder of its own, with its own tokens.
@@ -173,6 +193,17 @@ try:
         "an unknown token": ({"Card.module.css": card(ok_decls + "  background: var(--color-txt);\n"), "Card.tsx": use("card")}, "unknown token"),
         "an unused token": ({"Card.module.css": card("  padding: var(--space-2);\n  color: var(--color-text);\n"), "Card.tsx": use("card")}, "unused token"),
         "an unused class": ({"Card.module.css": card(ok_decls) + ".extra {\n  color: var(--color-text);\n}\n", "Card.tsx": use("card")}, "unused class"),
+        "a raw value in a private property": ({"Card.module.css": card(ok_decls + "  --_size: 13px;\n"), "Card.tsx": use("card")}, "raw value"),
+        "a raw fallback in var()": ({"Card.module.css": card(ok_decls + "  margin-block: var(--space-2, 13px);\n"), "Card.tsx": use("card")}, "raw value"),
+        "a colour by name": ({"Card.module.css": card(ok_decls + "  background: white;\n"), "Card.tsx": use("card")}, "raw value"),
+        "a length in ch": ({"Card.module.css": card(ok_decls + "  max-inline-size: 60ch;\n"), "Card.tsx": use("card")}, "raw value"),
+        "display: block flex": ({"Card.module.css": card(ok_decls + "  display: block flex;\n"), "Card.tsx": use("card")}, "layout"),
+        "display: FLEX": ({"Card.module.css": card(ok_decls + "  display: FLEX;\n"), "Card.tsx": use("card")}, "layout"),
+        "a float": ({"Card.module.css": card(ok_decls + "  float: inline-start;\n"), "Card.tsx": use("card")}, "layout"),
+        "an ID selector": ({"Card.module.css": card(ok_decls) + "#main {\n  color: var(--color-text);\n}\n", "Card.tsx": use("card")}, "id selector"),
+        "transition: all": ({"Card.module.css": card(ok_decls + "  transition: all var(--space-2);\n"), "Card.tsx": use("card")}, "transition"),
+        "a brace in a string hiding layout": ({"Card.module.css": card(ok_decls + '  --_mark: "}}";\n  display: flex;\n'), "Card.tsx": use("card")}, "layout"),
+        "a raw value in a plain stylesheet": ({"base.css": "body {\n  color: #fff;\n}\n", "Card.module.css": card(ok_decls), "Card.tsx": use("card")}, "raw value"),
         "copied rules": ({"Card.module.css": card(ok_decls), "Card.tsx": use("card"), "Tile.module.css": ".tile {\n" + ok_decls + "}\n", "Tile.tsx": "import styles from './Tile.module.css';\nexport const tile = styles.tile;\n"}, "copied"),
     }
     for case, (files, word) in cases.items():

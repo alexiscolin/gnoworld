@@ -17,7 +17,7 @@
     "mutate": "stryker run",
     "unused": "knip --no-progress",
     "copies": "jscpd .",
-    "clones": "node scripts/clones.mjs"
+    "comments": "node scripts/check_comments.mjs"
   },
   "devDependencies": {
     "@eslint/css": "2.0.1",

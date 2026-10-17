@@ -7,13 +7,17 @@ Usage: patch_coverage.py <base> [floor], after `pnpm run coverage`; the floor de
 same as vitest.config.ts's."""
 import json
 import os
+import pathlib
 import re
-import subprocess
 import sys
+
+sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no __pycache__
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))  # -I leaves this folder off the path
+from repo_files import git
 
 base = sys.argv[1]
 floor = float(sys.argv[2]) if len(sys.argv) > 2 else 85.0
-diff = subprocess.run(["git", "diff", "-U0", base, "--", "*.ts", "*.tsx"], capture_output=True, text=True, check=True).stdout
+diff = git("diff", "-U0", base, "--", "*.ts", "*.tsx")
 
 changed, current = {}, None
 for line in diff.splitlines():
