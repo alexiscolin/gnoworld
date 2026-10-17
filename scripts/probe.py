@@ -85,6 +85,17 @@ def plant(files, where=HERE):
 
 
 failures = []
+# ONLY=<block>[,<block>...] runs only those blocks: harness_mutate runs the one a guard belongs to.
+ONLY = set(filter(None, os.environ.get("ONLY", "").split(",")))
+ran = set()
+
+
+def part(name):
+    """Whether this block runs: all of them, unless ONLY names some."""
+    if not ONLY or name in ONLY:
+        ran.add(name)
+        return True
+    return False
 
 
 def reported(messages):
@@ -104,151 +115,164 @@ def expect(ok, what):
 
 
 try:
-    # ESLint: one run over every planted file, then each file must carry its rule.
-    plant({name: content for name, content, _ in LINT})
-    out = run(["node_modules/.bin/eslint", "--no-cache", "--format", "json", HERE])
-    try:
-        report = {os.path.basename(r["filePath"]): reported(r["messages"]) for r in json.loads(out.stdout)}
-    except ValueError:
-        report = {}
-        expect(False, "eslint ran: " + (out.stderr or out.stdout)[-300:])
-    for name, _, rule in LINT:
-        got = report.get(name, set())
-        expect(got == set() if rule is None else carries(got, rule), f"eslint {name}: expected {rule or 'nothing'}, got {sorted(map(str, got))}")
-    shutil.rmtree(HERE)
+    if part("lint"):
+        # ESLint: one run over every planted file, then each file must carry its rule.
+        plant({name: content for name, content, _ in LINT})
+        out = run(["node_modules/.bin/eslint", "--no-cache", "--format", "json", HERE])
+        try:
+            report = {os.path.basename(r["filePath"]): reported(r["messages"]) for r in json.loads(out.stdout)}
+        except ValueError:
+            report = {}
+            expect(False, "eslint ran: " + (out.stderr or out.stdout)[-300:])
+        for name, _, rule in LINT:
+            got = report.get(name, set())
+            expect(got == set() if rule is None else carries(got, rule), f"eslint {name}: expected {rule or 'nothing'}, got {sorted(map(str, got))}")
+        shutil.rmtree(HERE)
 
-    # Vitest: a test that asserts nothing fails (expect.requireAssertions).
-    plant({"empty.test.ts": 'import { test } from "vitest";\n\ntest("x", () => {});\n'})
-    out = run(["node_modules/.bin/vitest", "run", f"{HERE}/empty.test.ts"])
-    expect(out.returncode != 0 and "assertion" in (out.stdout + out.stderr).lower(), "vitest refuses a test with no assertion")
-    shutil.rmtree(HERE)
+    if part("vitest"):
+        # Vitest: a test that asserts nothing fails (expect.requireAssertions).
+        plant({"empty.test.ts": 'import { test } from "vitest";\n\ntest("x", () => {});\n'})
+        out = run(["node_modules/.bin/vitest", "run", f"{HERE}/empty.test.ts"])
+        expect(out.returncode != 0 and "assertion" in (out.stdout + out.stderr).lower(), "vitest refuses a test with no assertion")
+        shutil.rmtree(HERE)
 
-    # Prettier: a file that is not formatted.
-    plant({"messy.ts": "export const  a={b:1,\n c :2}\n"})
-    out = run(["node_modules/.bin/prettier", "--check", HERE])
-    expect(out.returncode != 0 and "messy.ts" in out.stdout + out.stderr, "prettier refuses an unformatted file")
-    shutil.rmtree(HERE)
+    if part("prettier"):
+        # Prettier: a file that is not formatted.
+        plant({"messy.ts": "export const  a={b:1,\n c :2}\n"})
+        out = run(["node_modules/.bin/prettier", "--check", HERE])
+        expect(out.returncode != 0 and "messy.ts" in out.stdout + out.stderr, "prettier refuses an unformatted file")
+        shutil.rmtree(HERE)
 
-    # tsc: core sees neither the DOM nor Node, so it cannot reach the network.
-    plant({"net.ts": "export function load(): unknown {\n  return fetch;\n}\n"})
-    out = run(["node_modules/.bin/tsc", "-p", "tsconfig.json"])
-    expect(out.returncode != 0 and "Cannot find name 'fetch'" in out.stdout, "tsc refuses fetch in core")
-    shutil.rmtree(HERE)
+    if part("tsc"):
+        # tsc: core sees neither the DOM nor Node, so it cannot reach the network.
+        plant({"net.ts": "export function load(): unknown {\n  return fetch;\n}\n"})
+        out = run(["node_modules/.bin/tsc", "-p", "tsconfig.json"])
+        expect(out.returncode != 0 and "Cannot find name 'fetch'" in out.stdout, "tsc refuses fetch in core")
+        shutil.rmtree(HERE)
 
-    # Outside core: `fails` is refused (pairing happens only in core), and a swallowed error too.
-    other = "packages/probe/src"
-    plant({"pending.test.ts": 'import { expect, test } from "vitest";\n\ntest.fails("x", () => {\n  expect(1).toBe(2);\n});\n',
-           "log_catch.ts": dict((n, c) for n, c, _ in LINT)["log_catch.ts"]}, where=other)
-    out = run(["node_modules/.bin/eslint", "--no-cache", "-f", "json", other])
-    report = {os.path.basename(r["filePath"]): reported(r["messages"]) for r in json.loads(out.stdout or "[]")}
-    for name, rule in (("pending.test.ts", "no-restricted-syntax: `fails` is for pairing"), ("log_catch.ts", "no-restricted-syntax: A catch that only logs")):
-        got = report.get(name, set())
-        expect(carries(got, rule), f"eslint outside core {name}: expected {rule}, got {sorted(map(str, got))}")
-    shutil.rmtree("packages/probe")
+    if part("outside_core"):
+        # Outside core: `fails` is refused (pairing happens only in core), and a swallowed error too.
+        other = "packages/probe/src"
+        plant({"pending.test.ts": 'import { expect, test } from "vitest";\n\ntest.fails("x", () => {\n  expect(1).toBe(2);\n});\n',
+               "log_catch.ts": dict((n, c) for n, c, _ in LINT)["log_catch.ts"]}, where=other)
+        out = run(["node_modules/.bin/eslint", "--no-cache", "-f", "json", other])
+        report = {os.path.basename(r["filePath"]): reported(r["messages"]) for r in json.loads(out.stdout or "[]")}
+        for name, rule in (("pending.test.ts", "no-restricted-syntax: `fails` is for pairing"), ("log_catch.ts", "no-restricted-syntax: A catch that only logs")):
+            got = report.get(name, set())
+            expect(carries(got, rule), f"eslint outside core {name}: expected {rule}, got {sorted(map(str, got))}")
+        shutil.rmtree("packages/probe")
 
-    # knip: a file nothing imports.
-    plant({"unused.ts": "export function lonely(): number {\n  return 1;\n}\n"})
-    out = run(["node_modules/.bin/knip", "--no-progress"])
-    expect(out.returncode != 0 and "__probe__/unused.ts" in out.stdout, "knip reports an unused file")
-    shutil.rmtree(HERE)
+    if part("knip"):
+        # knip: a file nothing imports.
+        plant({"unused.ts": "export function lonely(): number {\n  return 1;\n}\n"})
+        out = run(["node_modules/.bin/knip", "--no-progress"])
+        expect(out.returncode != 0 and "__probe__/unused.ts" in out.stdout, "knip reports an unused file")
+        shutil.rmtree(HERE)
 
-    # jscpd: the same block in two files.
-    plant({f"copy_{x}.ts": f"export function sum_{x}(values: number[]): number {{\n  let total = 0;\n{BLOCK}  return total;\n}}\n" for x in "ab"})
-    out = run(["node_modules/.bin/jscpd", HERE])
-    expect(out.returncode != 0, "jscpd refuses a copied block")
-    shutil.rmtree(HERE)
+    if part("jscpd"):
+        # jscpd: the same block in two files.
+        plant({f"copy_{x}.ts": f"export function sum_{x}(values: number[]): number {{\n  let total = 0;\n{BLOCK}  return total;\n}}\n" for x in "ab"})
+        out = run(["node_modules/.bin/jscpd", HERE])
+        expect(out.returncode != 0, "jscpd refuses a copied block")
+        shutil.rmtree(HERE)
 
-    # jscpd's similarity: the same function with every name changed, or with a line added.
-    shape = "export function {f}({v}: number[]): number {{\n  let {t} = 0;\n  for (const {x} of {v}) {{\n    if ({x} > 10) {{\n      {t} += {x} * 2;\n    }} else {{\n      {t} -= {x};\n    }}\n  }}\n  return {t};\n}}\n"
-    plant({"one.ts": shape.format(f="alpha", v="values", t="total", x="v"), "two.ts": shape.format(f="beta", v="items", t="acc", x="item")})
-    out = run(["node_modules/.bin/jscpd", HERE])
-    expect(out.returncode != 0 and "one.ts" in out.stdout + out.stderr, "jscpd refuses a renamed copy")
-    plant({"two.ts": shape.replace("-= ", "+= ").format(f="beta", v="items", t="acc", x="item").replace("> 10", ">= 10 && item < 99")})
-    out = run(["node_modules/.bin/jscpd", HERE])
-    expect(out.returncode == 0, "jscpd lets a function of another shape pass")
-    plant({"two.ts": shape.replace("  return {t};", "  {t} += 1;\n  return {t};").format(f="beta", v="items", t="acc", x="item")})
-    out = run(["node_modules/.bin/jscpd", HERE])
-    expect(out.returncode != 0 and "one.ts" in out.stdout + out.stderr, "jscpd refuses a near copy (one line added), which scores under 0.9")
-    shutil.rmtree(HERE)
+    if part("jscpd"):
+        # jscpd's similarity: the same function with every name changed, or with a line added.
+        shape = "export function {f}({v}: number[]): number {{\n  let {t} = 0;\n  for (const {x} of {v}) {{\n    if ({x} > 10) {{\n      {t} += {x} * 2;\n    }} else {{\n      {t} -= {x};\n    }}\n  }}\n  return {t};\n}}\n"
+        plant({"one.ts": shape.format(f="alpha", v="values", t="total", x="v"), "two.ts": shape.format(f="beta", v="items", t="acc", x="item")})
+        out = run(["node_modules/.bin/jscpd", HERE])
+        expect(out.returncode != 0 and "one.ts" in out.stdout + out.stderr, "jscpd refuses a renamed copy")
+        plant({"two.ts": shape.replace("-= ", "+= ").format(f="beta", v="items", t="acc", x="item").replace("> 10", ">= 10 && item < 99")})
+        out = run(["node_modules/.bin/jscpd", HERE])
+        expect(out.returncode == 0, "jscpd lets a function of another shape pass")
+        plant({"two.ts": shape.replace("  return {t};", "  {t} += 1;\n  return {t};").format(f="beta", v="items", t="acc", x="item")})
+        out = run(["node_modules/.bin/jscpd", HERE])
+        expect(out.returncode != 0 and "one.ts" in out.stdout + out.stderr, "jscpd refuses a near copy (one line added), which scores under 0.9")
+        shutil.rmtree(HERE)
 
-    # check_comments: short comments, none of the kinds that rot, no escape hatch; found by
-    # TypeScript's own scanner, so a "//" in a string is no comment.
-    body = "export function f(): number {\n  NOTE\n  return 1;\n}\n".replace
-    comment_cases = {
-        "a short header and a short note": ("// The file says what it is.\n" + body("NOTE", "// Why: the chain counts from one."), None),
-        "a // inside a string": (body("NOTE", 'const url = "https://x.org/a // TODO b"; void url;'), None),
-        "a six-line header under a shebang": ("#!/usr/bin/env node\n" + "".join(f"// line {i}\n" for i in range(6)) + body("NOTE", ""), None),
-        "a note over three lines": (body("NOTE", "// one\n  // two\n  // three\n  // four"), "longer than 3 lines"),
-        "a header over six lines": ("".join(f"// line {i}\n" for i in range(7)) + body("NOTE", ""), "header longer than 6 lines"),
-        "a TODO": (body("NOTE", "// TODO: later"), "todo"),
-        "an @todo in lower case": (body("NOTE", "// @todo later"), "todo"),
-        "a TODO in a block after code": (body("NOTE", "const n = 1; /* todo: n */ void n;"), "todo"),
-        "a banner": (body("NOTE", "// ==========="), "banner"),
-        "numbered steps": (body("NOTE", "// 1. read the line"), "numbered step"),
-        "an emoji": (body("NOTE", "// works 🚀"), "emoji"),
-        "a coverage escape": (body("NOTE", "/* v8 ignore next */"), "escape hatch"),
-        "a copy escape": (body("NOTE", "// jscpd:ignore-start"), "escape hatch"),
-        "a mutation escape": (body("NOTE", "// Stryker disable next-line all"), "escape hatch"),
-    }
-    folder = tempfile.mkdtemp()
-    for case, (content, word) in comment_cases.items():
+    if part("comments"):
+        # check_comments: short comments, none of the kinds that rot, no escape hatch; found by
+        # TypeScript's own scanner, so a "//" in a string is no comment.
+        body = "export function f(): number {\n  NOTE\n  return 1;\n}\n".replace
+        comment_cases = {
+            "a short header and a short note": ("// The file says what it is.\n" + body("NOTE", "// Why: the chain counts from one."), None),
+            "a // inside a string": (body("NOTE", 'const url = "https://x.org/a // TODO b"; void url;'), None),
+            "a six-line header under a shebang": ("#!/usr/bin/env node\n" + "".join(f"// line {i}\n" for i in range(6)) + body("NOTE", ""), None),
+            "a note over three lines": (body("NOTE", "// one\n  // two\n  // three\n  // four"), "longer than 3 lines"),
+            "a header over six lines": ("".join(f"// line {i}\n" for i in range(7)) + body("NOTE", ""), "header longer than 6 lines"),
+            "a TODO": (body("NOTE", "// TODO: later"), "todo"),
+            "an @todo in lower case": (body("NOTE", "// @todo later"), "todo"),
+            "a TODO in a block after code": (body("NOTE", "const n = 1; /* todo: n */ void n;"), "todo"),
+            "a banner": (body("NOTE", "// ==========="), "banner"),
+            "numbered steps": (body("NOTE", "// 1. read the line"), "numbered step"),
+            "an emoji": (body("NOTE", "// works 🚀"), "emoji"),
+            "a coverage escape": (body("NOTE", "/* v8 ignore next */"), "escape hatch"),
+            "a copy escape": (body("NOTE", "// jscpd:ignore-start"), "escape hatch"),
+            "a mutation escape": (body("NOTE", "// Stryker disable next-line all"), "escape hatch"),
+        }
+        folder = tempfile.mkdtemp()
+        for case, (content, word) in comment_cases.items():
+            with open(os.path.join(folder, "f.ts"), "w") as f:
+                f.write(content)
+            out = run(["node", "scripts/check_comments.mjs", folder])
+            said = (out.stdout + out.stderr).lower()
+            expect(out.returncode == 0 if word is None else out.returncode != 0 and word in said, f"check_comments {case}")
         with open(os.path.join(folder, "f.ts"), "w") as f:
-            f.write(content)
+            f.write("")
+        with open(os.path.join(folder, "s.css"), "w") as f:
+            f.write("@layer x {\n  .a {\n    color: var(--c); /* TODO later */\n  }\n}\n")
         out = run(["node", "scripts/check_comments.mjs", folder])
-        said = (out.stdout + out.stderr).lower()
-        expect(out.returncode == 0 if word is None else out.returncode != 0 and word in said, f"check_comments {case}")
-    with open(os.path.join(folder, "f.ts"), "w") as f:
-        f.write("")
-    with open(os.path.join(folder, "s.css"), "w") as f:
-        f.write("@layer x {\n  .a {\n    color: var(--c); /* TODO later */\n  }\n}\n")
-    out = run(["node", "scripts/check_comments.mjs", folder])
-    expect(out.returncode != 0 and "todo" in (out.stdout + out.stderr).lower(), "check_comments a TODO in CSS")
-    os.remove(os.path.join(folder, "s.css"))
-    os.makedirs(os.path.join(folder, "node_modules", "dep"))
-    with open(os.path.join(folder, "node_modules", "dep", "index.js"), "w") as f:
-        f.write("// TODO: a dependency's own business\n")
-    out = run(["node", "scripts/check_comments.mjs", folder])
-    expect(out.returncode == 0, "check_comments reads no node_modules outside a repository")
-    shutil.rmtree(folder)
+        expect(out.returncode != 0 and "todo" in (out.stdout + out.stderr).lower(), "check_comments a TODO in CSS")
+        os.remove(os.path.join(folder, "s.css"))
+        os.makedirs(os.path.join(folder, "node_modules", "dep"))
+        with open(os.path.join(folder, "node_modules", "dep", "index.js"), "w") as f:
+            f.write("// TODO: a dependency's own business\n")
+        out = run(["node", "scripts/check_comments.mjs", folder])
+        expect(out.returncode == 0, "check_comments reads no node_modules outside a repository")
+        shutil.rmtree(folder)
 
-    # check_css: in a folder of its own, with its own tokens.
-    css = tempfile.mkdtemp()
-    tokens = ":root {\n  --space-2: 0.5rem;\n  --color-text: #eee;\n  --radius-m: 8px;\n}\n"
-    use = lambda *names: "import styles from './Card.module.css';\n" + "".join(f"export const {n} = styles.{n};\n" for n in names)
-    card = ".card {{\n{}}}\n".format
-    ok_decls = "  padding: var(--space-2);\n  color: var(--color-text);\n  border-radius: var(--radius-m);\n"
-    cases = {
-        "clean": ({"Card.module.css": card(ok_decls), "Card.tsx": use("card")}, None),
-        "a layout exception with its reason": ({"Card.module.css": card(ok_decls + "  /* layout: an icon beside its label */ display: inline-flex;\n"), "Card.tsx": use("card")}, None),
-        "layout in a block": ({"Card.module.css": card(ok_decls + "  display: flex;\n  gap: var(--space-2);\n"), "Card.tsx": use("card")}, "layout"),
-        "a raw value": ({"Card.module.css": card(ok_decls + "  outline-color: #fff;\n"), "Card.tsx": use("card")}, "raw value"),
-        "an unknown token": ({"Card.module.css": card(ok_decls + "  background: var(--color-txt);\n"), "Card.tsx": use("card")}, "unknown token"),
-        "an unused token": ({"Card.module.css": card("  padding: var(--space-2);\n  color: var(--color-text);\n"), "Card.tsx": use("card")}, "unused token"),
-        "an unused class": ({"Card.module.css": card(ok_decls) + ".extra {\n  color: var(--color-text);\n}\n", "Card.tsx": use("card")}, "unused class"),
-        "a raw value in a private property": ({"Card.module.css": card(ok_decls + "  --_size: 13px;\n"), "Card.tsx": use("card")}, "raw value"),
-        "a raw fallback in var()": ({"Card.module.css": card(ok_decls + "  margin-block: var(--space-2, 13px);\n"), "Card.tsx": use("card")}, "raw value"),
-        "a colour by name": ({"Card.module.css": card(ok_decls + "  background: white;\n"), "Card.tsx": use("card")}, "raw value"),
-        "a length in ch": ({"Card.module.css": card(ok_decls + "  max-inline-size: 60ch;\n"), "Card.tsx": use("card")}, "raw value"),
-        "display: block flex": ({"Card.module.css": card(ok_decls + "  display: block flex;\n"), "Card.tsx": use("card")}, "layout"),
-        "display: FLEX": ({"Card.module.css": card(ok_decls + "  display: FLEX;\n"), "Card.tsx": use("card")}, "layout"),
-        "a float": ({"Card.module.css": card(ok_decls + "  float: inline-start;\n"), "Card.tsx": use("card")}, "layout"),
-        "an ID selector": ({"Card.module.css": card(ok_decls) + "#main {\n  color: var(--color-text);\n}\n", "Card.tsx": use("card")}, "id selector"),
-        "transition: all": ({"Card.module.css": card(ok_decls + "  transition: all var(--space-2);\n"), "Card.tsx": use("card")}, "transition"),
-        "a brace in a string hiding layout": ({"Card.module.css": card(ok_decls + '  --_mark: "}}";\n  display: flex;\n'), "Card.tsx": use("card")}, "layout"),
-        "a raw value in a plain stylesheet": ({"base.css": "body {\n  color: #fff;\n}\n", "Card.module.css": card(ok_decls), "Card.tsx": use("card")}, "raw value"),
-        "copied rules": ({"Card.module.css": card(ok_decls), "Card.tsx": use("card"), "Tile.module.css": ".tile {\n" + ok_decls + "}\n", "Tile.tsx": "import styles from './Tile.module.css';\nexport const tile = styles.tile;\n"}, "copied"),
-    }
-    for case, (files, word) in cases.items():
-        root = os.path.join(css, case.replace(" ", "_"))
-        plant({"tokens.css": tokens, **files}, where=os.path.join(root, "ui"))
-        out = run([sys.executable, "-I", "scripts/check_css.py", root])
-        said = (out.stdout + out.stderr).lower()
-        expect(out.returncode == 0 if word is None else out.returncode != 0 and word in said, f"check_css {case}")
-    shutil.rmtree(css)
+    if part("css"):
+        # check_css: in a folder of its own, with its own tokens.
+        css = tempfile.mkdtemp()
+        tokens = ":root {\n  --space-2: 0.5rem;\n  --color-text: #eee;\n  --radius-m: 8px;\n}\n"
+        use = lambda *names: "import styles from './Card.module.css';\n" + "".join(f"export const {n} = styles.{n};\n" for n in names)
+        card = ".card {{\n{}}}\n".format
+        ok_decls = "  padding: var(--space-2);\n  color: var(--color-text);\n  border-radius: var(--radius-m);\n"
+        cases = {
+            "clean": ({"Card.module.css": card(ok_decls), "Card.tsx": use("card")}, None),
+            "a layout exception with its reason": ({"Card.module.css": card(ok_decls + "  /* layout: an icon beside its label */ display: inline-flex;\n"), "Card.tsx": use("card")}, None),
+            "layout in a block": ({"Card.module.css": card(ok_decls + "  display: flex;\n  gap: var(--space-2);\n"), "Card.tsx": use("card")}, "layout"),
+            "a raw value": ({"Card.module.css": card(ok_decls + "  outline-color: #fff;\n"), "Card.tsx": use("card")}, "raw value"),
+            "an unknown token": ({"Card.module.css": card(ok_decls + "  background: var(--color-txt);\n"), "Card.tsx": use("card")}, "unknown token"),
+            "an unused token": ({"Card.module.css": card("  padding: var(--space-2);\n  color: var(--color-text);\n"), "Card.tsx": use("card")}, "unused token"),
+            "an unused class": ({"Card.module.css": card(ok_decls) + ".extra {\n  color: var(--color-text);\n}\n", "Card.tsx": use("card")}, "unused class"),
+            "a raw value in a private property": ({"Card.module.css": card(ok_decls + "  --_size: 13px;\n"), "Card.tsx": use("card")}, "raw value"),
+            "a raw fallback in var()": ({"Card.module.css": card(ok_decls + "  margin-block: var(--space-2, 13px);\n"), "Card.tsx": use("card")}, "raw value"),
+            "a colour by name": ({"Card.module.css": card(ok_decls + "  background: white;\n"), "Card.tsx": use("card")}, "raw value"),
+            "a length in ch": ({"Card.module.css": card(ok_decls + "  max-inline-size: 60ch;\n"), "Card.tsx": use("card")}, "raw value"),
+            "display: block flex": ({"Card.module.css": card(ok_decls + "  display: block flex;\n"), "Card.tsx": use("card")}, "layout"),
+            "display: FLEX": ({"Card.module.css": card(ok_decls + "  display: FLEX;\n"), "Card.tsx": use("card")}, "layout"),
+            "a float": ({"Card.module.css": card(ok_decls + "  float: inline-start;\n"), "Card.tsx": use("card")}, "layout"),
+            "an ID selector": ({"Card.module.css": card(ok_decls) + "#main {\n  color: var(--color-text);\n}\n", "Card.tsx": use("card")}, "id selector"),
+            "transition: all": ({"Card.module.css": card(ok_decls + "  transition: all var(--space-2);\n"), "Card.tsx": use("card")}, "transition"),
+            "a brace in a string hiding layout": ({"Card.module.css": card(ok_decls + '  --_mark: "}}";\n  display: flex;\n'), "Card.tsx": use("card")}, "layout"),
+            "a raw value in a plain stylesheet": ({"base.css": "body {\n  color: #fff;\n}\n", "Card.module.css": card(ok_decls), "Card.tsx": use("card")}, "raw value"),
+            "copied rules": ({"Card.module.css": card(ok_decls), "Card.tsx": use("card"), "Tile.module.css": ".tile {\n" + ok_decls + "}\n", "Tile.tsx": "import styles from './Tile.module.css';\nexport const tile = styles.tile;\n"}, "copied"),
+        }
+        for case, (files, word) in cases.items():
+            root = os.path.join(css, case.replace(" ", "_"))
+            plant({"tokens.css": tokens, **files}, where=os.path.join(root, "ui"))
+            out = run([sys.executable, "-I", "scripts/check_css.py", root])
+            said = (out.stdout + out.stderr).lower()
+            expect(out.returncode == 0 if word is None else out.returncode != 0 and word in said, f"check_css {case}")
+        shutil.rmtree(css)
+
 finally:
     shutil.rmtree(HERE, ignore_errors=True)
     shutil.rmtree("packages/probe", ignore_errors=True)
 
+if ONLY - ran:
+    failures.append(f"ONLY names no block: {', '.join(sorted(ONLY - ran))}")
 if failures:
     print("\nprobe: proposed fixes")
     for what in failures:

@@ -17,6 +17,17 @@ OFF = "(lambda *a: None)("
 GAPS = {}  # label -> why no test can notice it yet
 
 TESTS = {"probe": [sys.executable, "-I", "scripts/probe.py"], "hooks": ["sh", "scripts/test_hooks.sh"]}
+# Each guard's file, and the sections of its test that must notice the guard gone (their ONLY=):
+# a mutant runs those alone, not the whole suite. A guard file missing here stops the run.
+SECTIONS = {
+    "eslint.config.ts": "lint,outside_core", "scripts/check_css.py": "css", "scripts/check_comments.mjs": "comments",
+    ".jscpd.json": "jscpd", "tsconfig.base.json": "tsc", "vitest.config.ts": "vitest",
+    "scripts/guard.py": "guard", "scripts/review_pass.py": "review_pass", "scripts/patch_coverage.py": "patch_coverage",
+    "scripts/check_docs.py": "check_docs", "scripts/check_regressions.py": "regressions", ".githooks/commit-msg": "commit_msg",
+    ".githooks/pre-push": "pre_push", ".githooks/pre-commit": "pre_commit", "scripts/code_changed.sh": "pre_commit,stop_gate",
+    "scripts/stop_gate.sh": "stop_gate", "scripts/format_hook.sh": "format_hook", ".claude/settings.json": "wiring",
+    "scripts/check.sh": "wiring", "scripts/mutate.py": "wiring",
+}
 
 
 def read(path):
@@ -134,8 +145,10 @@ def mutants():
     yield from lines("scripts/check.sh", r"^(\s*)((?:run |python3 -I |sh scripts/|gitleaks |go vet |go run |\(cd gno |\$full \|\| run ).*)$", r"\1:", "hooks", "check.sh drops")
 
 
-def run(test):
-    return subprocess.run(TESTS[test], cwd=WORKTREE, capture_output=True, text=True, timeout=600).returncode
+def run(test, only=""):
+    """A test's exit code in the worktree; `only` names its sections, empty for all of them."""
+    env = {**os.environ, "ONLY": only}
+    return subprocess.run(TESTS[test], cwd=WORKTREE, env=env, capture_output=True, text=True, timeout=600).returncode
 
 
 def proposal(label):
@@ -166,7 +179,7 @@ try:
         with open(target, "w") as f:
             f.write(mutated)
         try:
-            killed = run(test) != 0
+            killed = run(test, SECTIONS[path]) != 0
         finally:
             with open(target, "w") as f:
                 f.write(original)

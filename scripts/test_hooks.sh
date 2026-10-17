@@ -12,6 +12,11 @@ fail() {
 	exit 1
 }
 
+# ONLY=<section>[,<section>...] runs only those sections: harness_mutate runs the one a guard
+# belongs to. Unset, every section runs.
+part() { case ",${ONLY:-$1}," in *",$1,"*) ran=1 && return 0 ;; *) return 1 ;; esac; }
+
+if part wiring; then
 # The wiring: settings.json runs each Claude Code hook, and check.sh runs every step it promises.
 python3 -I - "$here/../.claude/settings.json" <<'PY' || fail "settings.json no longer wires a Claude Code hook"
 import json, sys
@@ -47,7 +52,9 @@ for step in "run format:check" "run typecheck" "run lint" "run test" "run unused
 done
 # Every gno package is mutated, gno/p as well as gno/r: discovery names no area.
 grep -qF 'glob.glob("**/gnomod.toml"' "$here/mutate.py" || fail "mutate.py no longer mutates every gno package"
+fi
 
+if part commit_msg; then
 # commit-msg: a conventional subject of 72 characters at most, or git's own merge and revert
 # subjects; no attribution line.
 refused() {
@@ -81,7 +88,9 @@ refused "feature: add the parser" || fail "an unknown type was accepted"
 refused "feat:add the parser" || fail "a type with no space after it was accepted"
 refused "feat: $(printf 'a%.0s' $(seq 1 67))" || fail "a 73-character subject was accepted"
 refused "feat: $(printf 'a%.0s' $(seq 1 66))" && fail "a 72-character subject was refused"
+fi
 
+if part pre_commit; then
 # pre-commit: when mktemp fails, it stops before exporting anything. Fake
 # mktemp and git binaries make the failure happen without touching the disk.
 mkdir "$t/bin"
@@ -92,7 +101,9 @@ if PATH="$t/bin:$PATH" "$hooks/pre-commit" 2>/dev/null; then
 	fail "pre-commit passed though mktemp failed"
 fi
 [ ! -e "$t/exported" ] || fail "pre-commit exported the index after mktemp failed: $(cat "$t/exported")"
+fi
 
+if part stop_gate; then
 # stop_gate: it passes on a second stop, and on docs-only changes; it blocks (exit 2)
 # when code changed and the gate fails. A throwaway repo with a failing fake gate.
 gate="$here"/stop_gate.sh
@@ -111,8 +122,9 @@ stop '{"stop_hook_active":true}' || fail "stop_gate blocked a second stop in a r
 rm "$r/x.go" && mkdir -p "$r/.claude" && echo '{}' >"$r/.claude/settings.json"
 code=0; stop '{"stop_hook_active":false}' || code=$?
 [ "$code" = 2 ] || fail "stop_gate let a settings.json change through a failing gate (exit $code)"
+fi
 
-
+if part check_docs; then
 # check_docs: a harness doc that names a missing harness file fails the gate.
 docs="$here"/check_docs.py
 d="$t/docs-root"
@@ -126,7 +138,9 @@ rm "$d/.claude/rules/x.md"
 git -C "$d" init -q && printf '.claude/tmp/\n' >"$d/.gitignore" && mkdir -p "$d/.claude/tmp/copy"
 printf 'Run `scripts/gone.sh`.\n' >"$d/.claude/tmp/copy/x.md"
 python3 -I "$docs" "$d" >/dev/null 2>&1 || fail "check_docs read a doc in a folder git ignores"
+fi
 
+if part format_hook; then
 # format_hook: after an edit, eslint --fix rewrites the file; it never blocks.
 fmt="$here"/format_hook.sh
 repo=$(cd "$(dirname "$0")/.." && pwd)
@@ -136,7 +150,9 @@ printf '{"tool_input":{"file_path":"%s"}}' "$probe" | CLAUDE_PROJECT_DIR="$repo"
 grep -q "interface Point" "$probe" || { rm -f "$probe"; fail "format_hook did not run eslint --fix"; }
 grep -q "export const origin = { x: 0 };" "$probe" || { rm -f "$probe"; fail "format_hook did not run prettier"; }
 rm -f "$probe"
+fi
 
+if part patch_coverage; then
 # patch_coverage: the share of changed lines that the tests run, like a pull request's
 # patch coverage, from Vitest's JSON report and git's diff.
 patch="$here"/patch_coverage.py
@@ -155,7 +171,9 @@ cover 1 && fail "patch_coverage accepted a changed file the coverage report does
 git -C "$c" rm -q --cached src/b.ts && rm "$c/src/b.ts"
 printf 'x\n' >"$c/src/a.test.ts" && printf 'x\n' >"$c/vitest.config.ts" && git -C "$c" add src/a.test.ts vitest.config.ts
 cover 1 || fail "patch_coverage refused a changed test or config file, which coverage never measures"
+fi
 
+if part review_pass; then
 # review_pass: /pre-merge records the tree it reviewed; a later change to the code voids it,
 # the review log committed after it does not.
 rp="$here"/review_pass.py
@@ -170,7 +188,9 @@ echo more >>"$v/docs/review-log.md" && commit log
 (cd "$v" && python3 -I "$rp" check HEAD >/dev/null 2>&1) || fail "review_pass refused a tree whose only change is the review's own record"
 echo two >>"$v/src/a.ts" && commit code
 (cd "$v" && python3 -I "$rp" check HEAD >/dev/null 2>&1) && fail "review_pass accepted code changed after the review"
+fi
 
+if part pre_push; then
 # pre-push: the full gate before any push; main only with a review pass. A fake gate and a
 # throwaway repository stand in.
 w="$t/push"
@@ -202,7 +222,9 @@ head=$(git -C "$w" rev-parse HEAD) && push slice-1a && fail "pre-push let throug
 git -C "$w" checkout -q -- b.ts
 touch "$w/stray.ts" && push slice-1a && fail "pre-push let through a tree with an untracked file"
 rm "$w/stray.ts"
+fi
 
+if part pre_commit; then
 # pre-commit runs the gate on the staged files, and a failing gate stops the commit.
 c2="$t/precommit"
 mkdir -p "$c2/scripts" && git -C "$c2" init -q
@@ -211,8 +233,9 @@ echo code >"$c2/a.ts" && git -C "$c2" add a.ts
 (cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a commit through a failing gate"
 printf '#!/bin/sh\nexit 0\n' >"$c2/scripts/check.sh" && git -C "$c2" add -A
 (cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) || fail "pre-commit stopped a commit whose gate passes"
+fi
 
-
+if part guard; then
 # guard: no git hook skipped, no forced push, gno only through gnomcp. Exit 2 blocks the call.
 gd="$here"/guard.py
 printf '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{}}]}}\n' >"$t/plain.jsonl"
@@ -316,8 +339,12 @@ asks "git -C . push origin slice-1a"
 asks "cd gno && git push"
 asks "git -c push.default=current push"
 python3 -I -c 'import json; print(json.dumps({"tool_name":"Bash","tool_input":{"command":"git status"}}))' | python3 -I "$gd" | grep -q . && fail "guard printed a decision for git status"
+fi
 
+if part regressions; then
 # check_regressions: its rules on small cases (the real run needs a base branch and Vitest).
 python3 -I "$here/check_regressions.py" --self-test >/dev/null || fail "check_regressions's rules do not hold"
+fi
 
+[ -z "${ONLY:-}" ] || [ "${ran:-}" = 1 ] || fail "ONLY=$ONLY names no section"
 echo "hooks: ok"
