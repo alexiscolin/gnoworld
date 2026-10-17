@@ -851,6 +851,16 @@ not choose its hosts.
   - Ergo, the Go binary and Jarvis;
   - observability: Grafana's all-in-one OpenTelemetry image, and Langfuse as an optional
     profile.
+- **The team's demo URL:** the demo stack runs on Alexis's homelab and is published with
+  Tailscale Funnel, which the homelab already uses, as a stable HTTPS address the team
+  opens in a browser. Because that machine runs other services:
+  - the demo runs as its own Compose project, in its own Docker network, with CPU and
+    memory limits, and reaches none of the homelab's other services;
+  - a shared demo password stands in front, and every page is `noindex`;
+  - the default universe is Onyx, so calls tried in the demo spend test tokens;
+  - Jarvis's demo budget is capped low (a few dollars a day).
+
+  Once a domain exists, a Cloudflare Tunnel can replace Funnel with the same stack.
 - **The hand-off to ops:**
   - each service is an image: a multi-stage build, a non-root user, a read-only file
     system, a health check;
