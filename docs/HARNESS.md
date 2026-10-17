@@ -113,6 +113,7 @@ comes back is a regression. The review agents (`.claude/agents/`) report rows fo
 | `test-auditor`, green pass | first in `/pre-merge`, on the mutation survivors | Sonnet |
 | `/code-review` | every merge | Claude Code's |
 | `security-reviewer` | a merge touching a tier-1 file | Opus |
+| `finding-verifier` | after the review pass, on each tier-1 lot: refutes or reproduces each finding | Opus |
 | Alexis | every merge, blind first | — |
 
 ## The boundary: what Claude may do

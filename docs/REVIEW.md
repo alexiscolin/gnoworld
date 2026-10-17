@@ -64,7 +64,9 @@ Code written by an agent gets the same reading as anyone's, plus this. `/pre-mer
    accessibility and UX, simplicity, with this file's checklists. A change to a tier-1 file adds one more agent, on the
    strongest model, for security alone. Fixes are re-checked by the gate and the mutation
    tester; a second pass runs only for a high finding fixed in tier-1 code.
-4. **Each finding is reproduced before it is fixed:** a command, or a test seen failing. One
+4. **Each finding is verified, then reproduced, before it is fixed.** On a tier-1 lot, the
+   `finding-verifier` agent (Opus) first tries to refute each finding, then to reproduce it, and
+   its severity stands. Then: a command, or a test seen failing. One
    nobody could reproduce stays `claimed`; a false positive is `rejected`, with its reason.
    A fix of the product proves itself: its tests, run on the commit before it, must fail
    (`scripts/prove_fix.py`, in the full gate).

@@ -20,7 +20,11 @@ or edit a test to make it pass.
      `/code-review ultra` (a deeper review in the cloud, billed per run; Claude cannot start it);
       - the last merge of a slice: `/code-review` on each workspace the slice touched, as a
      path, so it reads the whole folder and not only the diff, with the export map; then `/simplify` on the slice's changes, and the gate again.
-5. **Reproduce each finding** before fixing it: the command, or a test seen failing. Write every
+5. **Verify, then reproduce each finding** before fixing it. For each tier-1 lot (the harness,
+   a realm, a security path), give its findings to the `finding-verifier` agent (Opus), which
+   tries to refute each one, then to reproduce it, and rates it again; a `refuted` finding is
+   `rejected` with its evidence. Then reproduce what is left yourself: the command, or a test
+   seen failing. Write every
    finding to `docs/review/findings.md` with its status and evidence: `rejected` with its reason,
    `fixed` with its commit; a finding nobody reproduced stays `claimed`. A fix's commit body names
    its finding (`Finding: F012`). Fixes are re-checked by the gate and the mutation tester, not by a new pass. A
