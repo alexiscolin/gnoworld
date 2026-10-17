@@ -10,7 +10,7 @@ permissions:
   contents: read
 concurrency:
   group: gate-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }} # every merge on main gets its report
 jobs:
   gate:
     runs-on: ubuntu-24.04
@@ -41,8 +41,8 @@ jobs:
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: /home/runner/.cache/gno-toolchain
-          key: gno-${{ env.GNO_COMMIT }}
+          path: ${{ env.GNO_TOOLCHAIN }}
+          key: gno-${{ runner.os }}-go1.26-${{ env.GNO_COMMIT }} # a new Go or runner builds gno again
       - name: The gno toolchain at GNO_COMMIT, unless the cache holds it
         run: |
           T="$GNO_TOOLCHAIN"
