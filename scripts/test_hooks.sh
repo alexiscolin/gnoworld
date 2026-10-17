@@ -59,7 +59,7 @@ for step in "run format:check" "run typecheck" "run lint" "run test" "run unused
 	"python3 -I ../scripts/mutate.py" "go vet ./tools/..." "go run ./tools/sealvec | cmp" "python3 -I scripts/check_docs.py" \
 	"sh scripts/test_hooks.sh" "python3 -I scripts/probe.py" "run coverage" "python3 -I scripts/patch_coverage.py" \
 	"run mutate" "sh scripts/scan_secrets.sh" "python3 -I scripts/harness_mutate.py" "python3 -I scripts/check_regressions.py" \
-	'[ "$took" -gt 60 ]' "python3 -I scripts/prove_fix.py" "python3 -I scripts/audit.py"; do
+	'unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO' '[ "$took" -gt 60 ]' "python3 -I scripts/prove_fix.py" "python3 -I scripts/audit.py"; do
 	grep -v '^[[:space:]]*#' "$gate_file" | grep -qF -- "$step" || fail "check.sh no longer runs: $step"
 done
 # An EXIT trap keeps a failure: under macOS's sh, a plain one turns an unbound variable into exit 0.
@@ -282,6 +282,11 @@ mkdir -p "$t/leakbin" && printf '#!/bin/sh\nexit 1\n' >"$t/leakbin/gitleaks" && 
 git -C "$c2" commit -qm code && mkdir -p "$c2/docs" && echo prose >"$c2/docs/a.md" && git -C "$c2" add docs/a.md
 (cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) || fail "pre-commit stopped a docs-only commit with no secret"
 (cd "$c2" && PATH="$t/leakbin:$PATH" sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a docs-only commit through a secret scan that found one"
+# The staged gate is the one that runs: it must match the working tree's, or a commit gates itself.
+git -C "$c2" commit -qm docs && printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && git -C "$c2" add scripts/check.sh && git -C "$c2" commit -qm red
+blob=$(printf '#!/bin/sh\nexit 0\n' | git -C "$c2" hash-object -w --stdin) && git -C "$c2" update-index --cacheinfo "100755,$blob,scripts/check.sh"
+echo more >>"$c2/a.ts" && git -C "$c2" add a.ts
+(cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a staged gate differ from the working tree's"
 fi
 
 if part guard; then
@@ -396,6 +401,14 @@ sh_ "(git push --force origin main)" 2
 sh_ 'git commit -m "does -n; whatever"' 0
 sh_ 'git commit -m "feat(core): a (b) {c}"' 0
 sh_ "git log --oneline -n 3 2>&1 | head" 0
+# An alias can carry any flag past the checks; send-pack pushes with no pre-push (finding F042).
+sh_ "git -c alias.ci='commit --no-verify' ci -m x" 2
+sh_ "git -c alias.p='push --force' p origin HEAD:main" 2
+sh_ "git config alias.c 'commit -n'" 2
+sh_ "git config --global alias.c 'commit -n'" 2
+sh_ "git send-pack https://github.com/x/y.git HEAD:refs/heads/x" 2
+sh_ "git http-push https://example.org/y.git main" 2
+sh_ "git config --get user.name" 0
 # A push, in any form, waits for Alexis: the guard asks, since a rule cannot see every form.
 asks() { # $1: a shell command
 	python3 -I -c 'import json,sys; print(json.dumps({"tool_name":"Bash","tool_input":{"command":sys.argv[1]}}))' "$1" | python3 -I "$gd" 2>/dev/null | grep -q '"permissionDecision": "ask"' || fail "guard did not ask before: $1"

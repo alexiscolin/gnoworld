@@ -11,6 +11,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a hook's git environment must not steer the gate's git calls
+unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO # the scripts' test switches, which would fake a pass
 full=false
 [ "${1:-}" = "--full" ] && full=true
 started=$(date +%s)

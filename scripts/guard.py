@@ -98,6 +98,10 @@ def check_git(words):
         refuse("git commit -n is --no-verify")
     if sub in ("commit-tree", "fast-import"):
         refuse(f"git {sub} makes commits no hook sees")
+    if sub in ("send-pack", "http-push", "receive-pack"):
+        refuse(f"git {sub} pushes with no pre-push hook")
+    if any(w.lower().startswith("alias.") or w.lower().startswith("--config-env=alias.") for w in words[1:]):
+        refuse("a git alias can carry any flag past these checks: write the command out")
     if sub == "push" and (any("f" in flag for flag in short) or any(w.startswith(("--force", "+")) or w == "--mirror" for w in words[2:])):
         refuse("a forced push rewrites what others have; Alexis forces, if ever")
     return sub == "push"
