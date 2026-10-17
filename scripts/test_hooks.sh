@@ -190,6 +190,16 @@ code=0; stop '{"stop_hook_active":false}' || code=$?
 rm "$r/x.go" && echo '{}' >"$r/.claude/settings.json"
 code=0; stop '{"stop_hook_active":false}' || code=$?
 [ "$code" = 2 ] || fail "stop_gate let a settings.json change through (exit $code)"
+# Docs written or committed after the gate passed leave the code it passed on unchanged.
+green && echo more >>"$r/docs/n.md" && { stop '{"stop_hook_active":false}' || fail "stop_gate blocked a docs edit after the gate passed"; }
+git -C "$r" add docs/n.md && git -C "$r" commit -qm docs
+stop '{"stop_hook_active":false}' || fail "stop_gate blocked a docs-only commit after the gate passed"
+git -C "$r" add .claude/settings.json && git -C "$r" commit -qm settings && echo '{"a":1}' >"$r/.claude/settings.json"
+code=0; stop '{"stop_hook_active":false}' || code=$?
+[ "$code" = 2 ] || fail "stop_gate let a code change through after a commit (exit $code)"
+green && echo '{"a":2}' >"$r/.claude/settings.json"
+code=0; stop '{"stop_hook_active":false}' || code=$?
+[ "$code" = 2 ] || fail "stop_gate let an unstaged edit of a tracked file through (exit $code)"
 fi
 
 if part check_docs; then
