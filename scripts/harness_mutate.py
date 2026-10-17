@@ -30,7 +30,7 @@ SECTIONS = {
     ".githooks/pre-push": "pre_push", ".githooks/pre-commit": "pre_commit,wiring", "scripts/code_changed.sh": "pre_commit,stop_gate",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
     "scripts/check.sh": "wiring", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
-    "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets",
+    "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", ".github/workflows/gate.yml": "wiring",
 }
 
 
@@ -151,7 +151,7 @@ def mutants():
     yield from each("scripts/scan_secrets.sh", "if [ -e .gitleaksignore ]; then", "if false; then", "hooks", "scan_secrets refuses a root .gitleaksignore")
     yield from each(".githooks/pre-commit", 'sh "$staged/scripts/check.sh"', "true", "hooks", "pre-commit gate")
     yield from each(".githooks/pre-commit", "sh scripts/scan_secrets.sh --staged", ":", "hooks", "pre-commit secret scan")
-    yield from each(".githooks/pre-commit", "if ! git diff --quiet -- scripts .githooks .claude/settings.json; then", "if false; then", "hooks", "pre-commit refuses a staged harness unlike the working tree")
+    yield from each(".githooks/pre-commit", '	git diff --quiet -- "$f" && continue', "	continue", "hooks", "pre-commit refuses a staged harness unlike the working tree")
     yield from each("scripts/guard.py", 'if sub in ("send-pack", "http-push", "receive-pack"):', "if False:", "hooks", "guard refuses send-pack")
     yield from each("scripts/guard.py", 'w.lower().startswith("alias.") or', "False or", "hooks", "guard refuses git aliases")
     yield from each("scripts/check.sh", "unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO", "true", "hooks", "check.sh clears the test switches")
@@ -175,6 +175,12 @@ def mutants():
     yield from each("scripts/audit.py", 'if a.get("severity") in SEVERE]', "if False]", "hooks", "audit fails on an advisory")
     yield from each("scripts/audit.py", "locked.setdefault(name, set()).add(version)", "pass", "hooks", "audit asks about every package")
     yield from each("scripts/audit.py", '''sys.exit(f"audit: no readable answer from npm's advisory database: {e}")''', "answer = {}", "hooks", "audit fails without an answer")
+    ci = ".github/workflows/gate.yml"
+    yield from each(ci, "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1", "actions/checkout@v7", "hooks", "CI pins its actions")
+    yield from each(ci, "  contents: read\n", "  contents: write\n", "hooks", "CI only reads")
+    yield from each(ci, "run: sh scripts/check.sh --full", "run: sh scripts/check.sh", "hooks", "CI runs the full gate")
+    yield from each(ci, "| sha256sum -c", "| cat", "hooks", "CI checks gitleaks' checksum")
+    yield from each(ci, " --frozen-lockfile", "", "hooks", "CI keeps the lockfile frozen")
     # The gate: each step dropped.
     yield from lines("scripts/check.sh", r"^(\s*)((?:run |python3 -I |sh scripts/|gitleaks |go vet |go run |\(cd gno |\$full \|\| run ).*)$", r"\1:", "hooks", "check.sh drops")
 

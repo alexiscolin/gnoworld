@@ -71,6 +71,17 @@ done
 for f in "$here"/*.sh "$hooks"/*; do
 	grep -nE '^[[:space:]]*[A-Za-z_]+=\$\(mktemp' "$f" | grep -vE 'mktemp (-d )?"\$\{TMPDIR:-/tmp\}/' | grep -q . && fail "$(basename "$f") makes a temporary file outside \$TMPDIR"
 done
+# The CI runs the full gate, reads the repository and nothing more, and pins every action and
+# download: a tag or a branch can be moved to code nobody reviewed.
+python3 -I - "$here/../.github/workflows/gate.yml" <<'PY' || fail "the CI workflow lost a promise"
+import re, sys
+ci = open(sys.argv[1]).read()
+uses = re.findall(r"uses:\s*(\S+)", ci)
+assert uses and all(re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", u) for u in uses), f"an action not pinned to a commit: {uses}"
+assert re.search(r"^permissions:\n  contents: read\n", ci, re.M) and "write" not in ci, "the CI may write"
+assert "sh scripts/check.sh --full" in ci, "the CI does not run the full gate"
+assert re.search(r"sha256sum -c", ci) and "--frozen-lockfile" in ci, "the CI trusts a download or a lockfile it did not check"
+PY
 # check.sh refuses a .node-version that is more than a version, which would steer PATH.
 nv="$t/nodeversion" && mkdir -p "$nv/scripts" && cp "$gate_file" "$nv/scripts/check.sh"
 printf '24.22.0/../../../../evil\n' >"$nv/.node-version"
@@ -291,6 +302,10 @@ git -C "$c2" commit -qm docs && printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check
 blob=$(printf '#!/bin/sh\nexit 0\n' | git -C "$c2" hash-object -w --stdin) && git -C "$c2" update-index --cacheinfo "100755,$blob,scripts/check.sh"
 echo more >>"$c2/a.ts" && git -C "$c2" add a.ts
 (cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a staged gate differ from the working tree's"
+# An edit of the harness that is not staged is not in the commit: it does not stop one.
+git -C "$c2" reset -q && printf '#!/bin/sh\nexit 0\n' >"$c2/scripts/check.sh" && git -C "$c2" add scripts/check.sh && git -C "$c2" commit -qm green
+printf '#!/bin/sh\nexit 0\n# being edited\n' >"$c2/scripts/check.sh" && echo again >>"$c2/a.ts" && git -C "$c2" add a.ts
+(cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) || fail "pre-commit refused a commit for a harness edit it does not hold"
 fi
 
 if part guard; then

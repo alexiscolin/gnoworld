@@ -94,7 +94,7 @@ if $full; then
 	echo "== no secret anywhere in the history, no known vulnerability in a dependency"
 	sh scripts/scan_secrets.sh
 	python3 -I scripts/audit.py
-	if ! git diff --quiet "$base" -- scripts .githooks .claude/settings.json package.json pnpm-workspace.yaml \
+	if ! git diff --quiet "$base" -- scripts .githooks .github .claude/settings.json package.json pnpm-workspace.yaml \
 		eslint.config.ts tsconfig.base.json tsconfig.json vitest.config.ts stryker.config.json knip.json .jscpd.json \
 		.prettierrc.json .prettierignore .gitignore; then
 		echo "== the harness changed: each guard switched off must fail a test (several minutes)"

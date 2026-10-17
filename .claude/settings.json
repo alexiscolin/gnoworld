@@ -91,6 +91,7 @@
       "denyWrite": [
         "scripts",
         ".githooks",
+        ".github",
         "package.json",
         "pnpm-lock.yaml",
         ".node-version",
