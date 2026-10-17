@@ -207,5 +207,17 @@ Components use container queries, so they fit wherever they are placed.
   `transform` and `opacity`.
 - **Stacking:** a `backdrop-filter` blur only on surfaces over the scene, and only one deep.
 - **No dead CSS:**
-  - a module's unused class fails the lint;
+  - a module's unused class fails the gate (a short script of ours: the maintained
+    linters for it stopped in 2021 and 2023);
   - a token nothing uses is removed.
+- **Enforced, not hoped for:**
+  - a raw colour, size, radius, duration or z-index fails stylelint
+    (`stylelint-declaration-strict-value`), and so does a token that does not exist
+    (`stylelint-value-no-unknown-custom-properties`);
+  - modules are typed (`vite-css-modules`, `generateSourceTypes`, named exports), so a class
+    used in a component but missing from its CSS fails `tsc`;
+  - a copied block of CSS fails jscpd.
+- **DRY by composition:** a pattern used twice becomes a component in `ui` (the layout
+  primitives `Stack`, `Cluster`, `Grid` and `Panel` first), or a shared class reached with
+  CSS Modules' `composes`; never a copy. Native CSS only: nesting, `@layer`, container
+  queries, logical properties; no preprocessor, no utility framework.

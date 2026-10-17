@@ -67,15 +67,15 @@ New: `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `eslint.config
 
 ## 8. Dependencies to ask for (read on npm on 2026-10-17)
 
-- **1a:** pnpm 12.14.0; typescript 6.0.3 (typescript-eslint 8.71.2 caps it below 6.1; TypeScript 7.0.2 waits); eslint 10.13.0; typescript-eslint 8.71.2; eslint-plugin-import-x 4.17.1 (cycles); vitest 5.0.5 with @vitest/coverage-v8; fast-check 4.10.2 with @fast-check/vitest 0.5.0; @stryker-mutator/core, vitest-runner and typescript-checker 10.0.0; knip 6.41.0; jscpd 5.4.1 (copies); stylelint 17.16.0 with stylelint-config-standard 40.0.0.
-- **1b:** react and react-dom 19.3.1; react-router and @react-router/dev 8.4.0; vite 8.3.4; @vitejs/plugin-react 6.1.2 with babel-plugin-react-compiler 1.0.0 (ADR-0002 §8's compiler check); vite-plugin-pwa 2.0.0; eslint-plugin-react-hooks 7.1.1; jsdom 30.1.3; @testing-library/react 16.3.3; @playwright/test 1.64.1; @axe-core/playwright 4.14.0; lighthouse 13.5.0 (@lhci/cli's last release is 0.15.1, from June 2025).
+- **1a:** pnpm 12.14.0; typescript 6.0.3 (typescript-eslint 8.71.2 caps it below 6.1; TypeScript 7.0.2 waits); eslint 10.13.0; typescript-eslint 8.71.2; eslint-plugin-import-x 4.17.1 (cycles); vitest 5.0.5 with @vitest/coverage-v8; fast-check 4.10.2 with @fast-check/vitest 0.5.0; @stryker-mutator/core, vitest-runner and typescript-checker 10.0.0; knip 6.41.0; jscpd 5.4.1 (copies); stylelint 17.16.0 with stylelint-config-standard 40.0.0, stylelint-declaration-strict-value 1.12.1 and stylelint-value-no-unknown-custom-properties 6.1.1.
+- **1b:** react and react-dom 19.3.1; react-router and @react-router/dev 8.4.0; vite 8.3.4; @vitejs/plugin-react 6.1.2 with babel-plugin-react-compiler 1.0.0 (ADR-0002 §8's compiler check); vite-plugin-pwa 2.0.0; vite-css-modules 1.16.0 (typed modules); eslint-plugin-react-hooks 7.1.1; jsdom 30.1.3; @testing-library/react 16.3.3; @playwright/test 1.64.1; @axe-core/playwright 4.14.0; lighthouse 13.5.0 (@lhci/cli's last release is 0.15.1, from June 2025).
 - **Tools, as binaries (Homebrew and CI), not packages:** gitleaks 8.30.1 (MIT); semgrep 1.181.0 (LGPL-2.1, its community rules); similarity-ts 0.5.0 (crates.io, AST clones).
 - **1c (images, pinned by digest):** Node 24 distroless, the static server, Tailscale, the egress proxy (chosen and verified in 1c).
 
 ## 9. Questions for Alexis
 
-1. Three merges (1a, 1b, 1c) rather than one?
-2. A fast gate for the Stop hook and pre-commit, the full set in `/pre-merge`?
-3. Move the load-testing tool (k6) to slice 3, where Ergo first needs it?
+1. Three merges (1a, 1b, 1c) rather than one? **Yes.**
+2. A fast gate for the Stop hook and pre-commit, the full set in `/pre-merge`? **Yes.**
+3. Move the load-testing tool (k6) to slice 3, where Ergo first needs it? **Yes.**
 4. The sandbox in the project's settings, so it applies to every session in this repo?
 5. You create the Tailscale auth key and the demo password, as files in `deploy/secrets/`; Claude never reads them. Agreed?
