@@ -251,6 +251,15 @@ cover 1 && fail "patch_coverage accepted a changed file the coverage report does
 git -C "$c" rm -q --cached src/b.ts && rm "$c/src/b.ts"
 printf 'x\n' >"$c/src/a.test.ts" && printf 'x\n' >"$c/vitest.config.ts" && git -C "$c" add src/a.test.ts vitest.config.ts
 cover 1 || fail "patch_coverage refused a changed test or config file, which coverage never measures"
+# Playwright's tests and their helpers are tests; the app's React components are walked by the
+# journeys until slice 2's component tests; the app's other code is measured like any.
+mkdir -p "$c/app/tests/e2e" "$c/app/src/routes"
+printf 'x\n' >"$c/app/tests/e2e/a.spec.ts" && printf 'x\n' >"$c/app/tests/e2e/fixtures.ts" && printf 'x\n' >"$c/app/src/routes/a.tsx"
+git -C "$c" add app
+cover 1 || fail "patch_coverage asked coverage of a Playwright test or an app component"
+printf 'x\n' >"$c/app/src/site.ts" && git -C "$c" add app/src/site.ts
+cover 1 && fail "patch_coverage let the app's logic go unmeasured"
+git -C "$c" rm -rq --cached app && rm -r "$c/app"
 # A statement over several lines counts when any of its lines changed, not only its first.
 git -C "$c" rm -q --cached src/a.test.ts vitest.config.ts && rm "$c/src/a.test.ts" "$c/vitest.config.ts" && git -C "$c" add src/a.ts && git -C "$c" commit -qm four
 printf 'one\ntwo\nTHREE\nfour\n' >"$c/src/a.ts"
