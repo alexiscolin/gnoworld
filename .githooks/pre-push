@@ -16,7 +16,7 @@ while read -r _ local_sha remote_ref _; do
 		sh scripts/check.sh --full </dev/null
 	elif ! $gated; then
 		sh scripts/check.sh </dev/null
-		gitleaks git --no-banner --redact .
+		sh scripts/scan_secrets.sh
 		gated=true
 	fi
 done

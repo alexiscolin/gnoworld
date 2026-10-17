@@ -30,7 +30,7 @@ SECTIONS = {
     ".githooks/pre-push": "pre_push", ".githooks/pre-commit": "pre_commit,wiring", "scripts/code_changed.sh": "pre_commit,stop_gate",
     "scripts/stop_gate.sh": "stop_gate,wiring", "scripts/format_hook.sh": "format_hook", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
     "scripts/check.sh": "wiring", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
-    "scripts/audit.py": "audit",
+    "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets",
 }
 
 
@@ -145,9 +145,13 @@ def mutants():
     yield from each(".githooks/pre-push", 'python3 -I scripts/review_pass.py check "$local_sha"', ":", "hooks", "pre-push review check")
     yield from each(".githooks/pre-push", "sh scripts/check.sh --full </dev/null", ":", "hooks", "pre-push gate")
     yield from each(".githooks/pre-push", "		sh scripts/check.sh </dev/null", "		:", "hooks", "pre-push fast gate")
-    yield from each(".githooks/pre-push", "gitleaks git --no-banner --redact .", ":", "hooks", "pre-push secret scan")
+    yield from each(".githooks/pre-push", "		sh scripts/scan_secrets.sh", "		:", "hooks", "pre-push secret scan")
+    yield from each("scripts/scan_secrets.sh", "-u GITLEAKS_CONFIG_TOML ", "", "hooks", "scan_secrets ignores GITLEAKS_CONFIG_TOML")
+    yield from each("scripts/scan_secrets.sh", "--config \"$here/gitleaks.toml\" ", "", "hooks", "scan_secrets imposes its rules")
+    yield from each("scripts/scan_secrets.sh", " --ignore-gitleaks-allow", "", "hooks", "scan_secrets ignores gitleaks:allow")
+    yield from each("scripts/scan_secrets.sh", "if [ -e .gitleaksignore ]; then", "if false; then", "hooks", "scan_secrets refuses a root .gitleaksignore")
     yield from each(".githooks/pre-commit", 'sh "$staged/scripts/check.sh"', "true", "hooks", "pre-commit gate")
-    yield from each(".githooks/pre-commit", "gitleaks git --staged --no-banner --redact .", ":", "hooks", "pre-commit secret scan")
+    yield from each(".githooks/pre-commit", "sh scripts/scan_secrets.sh --staged", ":", "hooks", "pre-commit secret scan")
     yield from each("scripts/code_changed.sh", "! git diff --cached", "git diff --cached", "hooks", "code_changed staged")
     yield from each("scripts/code_changed.sh", '[ -n "$(git status', '[ -z "$(git status', "hooks", "code_changed working tree")
     yield from each("scripts/stop_gate.sh", "exit 2", "exit 0", "hooks", "stop_gate block")

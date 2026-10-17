@@ -55,7 +55,7 @@ for step in "run format:check" "run typecheck" "run lint" "run test" "run unused
 	"python3 -I scripts/check_css.py" "run comments" '"$GNO" lint ./...' '"$GNO" test ./...' \
 	"python3 -I ../scripts/mutate.py" "go vet ./tools/..." "go run ./tools/sealvec | cmp" "python3 -I scripts/check_docs.py" \
 	"sh scripts/test_hooks.sh" "python3 -I scripts/probe.py" "run coverage" "python3 -I scripts/patch_coverage.py" \
-	"run mutate" "gitleaks git" "python3 -I scripts/harness_mutate.py" "python3 -I scripts/check_regressions.py" \
+	"run mutate" "sh scripts/scan_secrets.sh" "python3 -I scripts/harness_mutate.py" "python3 -I scripts/check_regressions.py" \
 	'[ "$took" -gt 60 ]' "python3 -I scripts/prove_fix.py" "python3 -I scripts/audit.py"; do
 	grep -v '^[[:space:]]*#' "$gate_file" | grep -qF -- "$step" || fail "check.sh no longer runs: $step"
 done
@@ -237,7 +237,7 @@ mkdir -p "$w/scripts" "$w/.githooks" "$w/docs" "$t/pushbin"
 printf '#!/bin/sh\necho "gate $*" >>"$(dirname "$0")/../gate.log"\n' >"$w/scripts/check.sh"
 printf '#!/bin/sh\necho scanned >>"%s/leaks.log"\nexit "${LEAKS:-0}"\n' "$w" >"$t/pushbin/gitleaks" && chmod +x "$t/pushbin/gitleaks"
 printf 'gate.log\nleaks.log\n' >"$w/.gitignore"
-cp "$rp" "$here/repo_files.py" "$w/scripts/" && cp "$hooks/pre-push" "$w/.githooks/pre-push"
+cp "$rp" "$here/repo_files.py" "$here/scan_secrets.sh" "$here/gitleaks.toml" "$w/scripts/" && cp "$hooks/pre-push" "$w/.githooks/pre-push"
 git -C "$w" init -q && echo x >"$w/a.ts" && git -C "$w" add -A && git -C "$w" commit -qm base
 head=$(git -C "$w" rev-parse HEAD)
 push() { printf 'refs/heads/%s %s refs/heads/%s 0000000000000000000000000000000000000000\n' "$1" "$head" "$1" | (cd "$w" && PATH="$t/pushbin:$PATH" sh .githooks/pre-push origin url >/dev/null 2>&1); }
@@ -273,7 +273,7 @@ if part pre_commit; then
 # pre-commit runs the gate on the staged files, and a failing gate stops the commit.
 c2="$t/precommit"
 mkdir -p "$c2/scripts" && git -C "$c2" init -q
-printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/repo_files.py" "$c2/scripts/" && git -C "$c2" add -A && git -C "$c2" commit -qm base
+printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/repo_files.py" "$here/scan_secrets.sh" "$here/gitleaks.toml" "$c2/scripts/" && git -C "$c2" add -A && git -C "$c2" commit -qm base
 echo code >"$c2/a.ts" && git -C "$c2" add a.ts
 (cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a commit through a failing gate"
 printf '#!/bin/sh\nexit 0\n' >"$c2/scripts/check.sh" && git -C "$c2" add -A
@@ -453,6 +453,24 @@ audit '{"qs":[{"severity":"low","title":"minor","url":"u","vulnerable_versions":
 audit 'not json' && fail "audit passed on an answer it could not read"
 printf "lockfileVersion: '10.0'\n\npackages:\n    \"lodash@4.17.20\":\n      resolution: {}\n" >"$au/pnpm-lock.yaml"
 audit '{}' && fail "audit passed on a lockfile it read no package from"
+fi
+
+if part secrets; then
+# scan_secrets: a secret is found whatever the repository or the environment says to ignore.
+sc="$t/secrets"
+mkdir -p "$sc/scripts" && git -C "$sc" init -q && cp "$here/scan_secrets.sh" "$here/gitleaks.toml" "$sc/scripts/"
+key="AKIA""J7Q2XRT4LMNB5VWZ" # assembled, so this file holds no key
+scan() { (cd "$sc" && sh scripts/scan_secrets.sh --staged >/dev/null 2>&1); }
+printf 'x = 1\n' >"$sc/ok.py" && git -C "$sc" add ok.py
+scan || fail "scan_secrets refused a commit with no secret"
+printf 'aws = "%s"\n' "$key" >"$sc/leak.py" && git -C "$sc" add leak.py
+scan && fail "scan_secrets missed a staged key"
+(cd "$sc" && GITLEAKS_CONFIG_TOML='title = "empty"' sh scripts/scan_secrets.sh --staged >/dev/null 2>&1) && fail "scan_secrets obeyed GITLEAKS_CONFIG_TOML"
+printf 'title = "empty"\n' >"$sc/.gitleaks.toml" && scan && fail "scan_secrets obeyed the repository's .gitleaks.toml"
+rm "$sc/.gitleaks.toml"
+printf 'leak.py:aws-access-token:1\n' >"$sc/.gitleaksignore" && scan && fail "scan_secrets obeyed the repository's .gitleaksignore"
+rm "$sc/.gitleaksignore"
+printf 'aws = "%s" # gitleaks:allow\n' "$key" >"$sc/leak.py" && git -C "$sc" add leak.py && scan && fail "scan_secrets obeyed a gitleaks:allow comment"
 fi
 
 if part regressions; then

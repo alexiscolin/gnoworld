@@ -1,0 +1,4 @@
+# The secret scan's rules: gitleaks' own, nothing turned off. scripts/scan_secrets.sh passes
+# this file, so a .gitleaks.toml in the repository or a variable cannot replace it.
+[extend]
+useDefault = true

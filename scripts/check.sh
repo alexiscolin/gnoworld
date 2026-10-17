@@ -89,7 +89,7 @@ if $full; then
 	echo "== no regression: no test gone, no floor lower, no approved screenshot changed, unless a commit says why"
 	python3 -I scripts/check_regressions.py "$base"
 	echo "== no secret anywhere in the history, no known vulnerability in a dependency"
-	gitleaks git --no-banner --redact .
+	sh scripts/scan_secrets.sh
 	python3 -I scripts/audit.py
 	if ! git diff --quiet "$base" -- scripts .githooks .claude/settings.json package.json pnpm-workspace.yaml \
 		eslint.config.ts tsconfig.base.json tsconfig.json vitest.config.ts stryker.config.json knip.json .jscpd.json \
