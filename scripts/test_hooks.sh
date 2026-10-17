@@ -43,10 +43,12 @@ assert {"scripts", ".githooks", ".github", "package.json", ".node-version", "pnp
 assert not [p for p in box["filesystem"]["allowWrite"] if "pnpm" in p], "a command can rewrite the pnpm that Alexis's install runs"
 assert not any("api.github.com" in d for d in box["network"]["allowedDomains"]), "the GitHub API is reachable"
 ask, deny = set(s["permissions"]["ask"]), set(s["permissions"]["deny"])
-# Claude edits alone (Alexis, 2026-10-17), but for the files something runs outside the sandbox
-# (finding F068); a new dependency and a push still ask.
+# Claude edits alone (Alexis, 2026-10-17), but for what runs with Alexis's full access: the
+# hooks, the gate and every script or config they reach when he pushes or merges, and what pnpm
+# runs at his install (findings F068, F076); a new dependency and a push still ask.
 assert {"Bash(pnpm add *)", "Bash(git push *)"} <= ask, "a new dependency or a push asks no one"
-outside = {"Edit(/scripts/guard.py)", "Edit(/scripts/stop_gate.sh)", "Edit(/scripts/code_changed.sh)", "Edit(/.githooks/**)", "Edit(/.claude/settings.json)", "Edit(/**/package.json)"}
+outside = {"Edit(/scripts/**)", "Edit(/.githooks/**)", "Edit(/.claude/**)", "Edit(/*.config.ts)", "Edit(/stryker.config.json)",
+           "Edit(/**/package.json)", "Edit(/pnpm-workspace.yaml)", "Edit(/.npmrc)", "Edit(/.pnpmfile.cjs)"}
 writes = {r for r in ask if r.split("(")[0] in {"Edit", "Write", "MultiEdit", "NotebookEdit"}}
 assert writes == outside, "the edits that ask are not exactly the files run outside the sandbox"
 assert {f"mcp__{p}__gno_{t}" for p in ("gnomcp", "plugin_gnomcp_gnomcp") for t in ("addpkg", "call", "run", "key_send", "cla_sign")} <= ask, "a chain write asks no one"
