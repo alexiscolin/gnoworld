@@ -3,6 +3,7 @@ set -eu
 # The gate runs before every commit that changes code (ADR-0001 §14), on what is
 # staged rather than on the working tree. Only prose is exempt (scripts/code_changed.sh),
 # so a new code folder or a settings change is gated; scripts/test_hooks.sh checks the hooks.
+gitleaks git --staged --no-banner --redact . # no secret enters a commit, prose included
 if ! sh scripts/code_changed.sh --staged; then
 	exec python3 -I scripts/check_docs.py # docs only: the files they name must still exist
 fi

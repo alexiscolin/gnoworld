@@ -104,7 +104,8 @@ if part pre_commit; then
 mkdir "$t/bin"
 printf '#!/bin/sh\nexit 1\n' >"$t/bin/mktemp"
 printf '#!/bin/sh\ncase $1 in diff) exit 1 ;; checkout-index) echo "$*" >>"%s/exported" ;; esac\n' "$t" >"$t/bin/git"
-chmod +x "$t/bin/mktemp" "$t/bin/git"
+printf '#!/bin/sh\nexit 0\n' >"$t/bin/gitleaks" # the secret scan passes, so mktemp is what fails
+chmod +x "$t/bin/mktemp" "$t/bin/git" "$t/bin/gitleaks"
 if PATH="$t/bin:$PATH" "$hooks/pre-commit" 2>/dev/null; then
 	fail "pre-commit passed though mktemp failed"
 fi
@@ -254,11 +255,17 @@ if part pre_commit; then
 # pre-commit runs the gate on the staged files, and a failing gate stops the commit.
 c2="$t/precommit"
 mkdir -p "$c2/scripts" && git -C "$c2" init -q
-printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$c2/scripts/" && git -C "$c2" add -A && git -C "$c2" commit -qm base
+printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/repo_files.py" "$c2/scripts/" && git -C "$c2" add -A && git -C "$c2" commit -qm base
 echo code >"$c2/a.ts" && git -C "$c2" add a.ts
 (cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a commit through a failing gate"
 printf '#!/bin/sh\nexit 0\n' >"$c2/scripts/check.sh" && git -C "$c2" add -A
 (cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) || fail "pre-commit stopped a commit whose gate passes"
+# A secret in what is staged stops the commit, docs included.
+mkdir -p "$t/leakbin" && printf '#!/bin/sh\nexit 1\n' >"$t/leakbin/gitleaks" && chmod +x "$t/leakbin/gitleaks"
+(cd "$c2" && PATH="$t/leakbin:$PATH" sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a commit through a secret scan that found one"
+git -C "$c2" commit -qm code && mkdir -p "$c2/docs" && echo prose >"$c2/docs/a.md" && git -C "$c2" add docs/a.md
+(cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) || fail "pre-commit stopped a docs-only commit with no secret"
+(cd "$c2" && PATH="$t/leakbin:$PATH" sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a docs-only commit through a secret scan that found one"
 fi
 
 if part guard; then
