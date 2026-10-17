@@ -69,6 +69,24 @@ def gaps(read):
     return out
 
 
+SETTINGS = {".jscpd.json": ("exitCode", "threshold", "similarity", "minTokens", "minLines", "mode")}
+
+
+def settings(read):
+    """The settings that decide how strict a check is, as `<file> <key>`: their value, or None."""
+    out = {}
+    for name, keys in SETTINGS.items():
+        data = json.loads(read(name) or "{}")
+        out |= {f"{name} {key}": data.get(key) for key in keys}
+    return out
+
+
+def changed_settings(before, after, excused):
+    """Settings changed either way, less those named `setting <file> <key>`: a change of strictness is read in review."""
+    return sorted(f"{name} {old if old is not None else 'unset'} -> {after.get(name) if after.get(name) is not None else 'gone'}"
+                  for name, old in before.items() if after.get(name) != old and f"setting {name}" not in excused)
+
+
 def ignores(read):
     """Each entry of the lists that keep files from a check, as `<file> <entry>`."""
     out = set()
@@ -78,6 +96,8 @@ def ignores(read):
             for key, value in json.loads(text).items():
                 if "ignore" in key.lower():
                     out |= {f"{name} {v}" for v in (value if isinstance(value, list) else [value])}
+                elif key == "mutate":  # a negated glob takes files out of the mutation test
+                    out |= {f"{name} {v}" for v in value if str(v).startswith("!")}
         elif name == ".prettierignore":
             out |= {f"{name} {line.strip()}" for line in text.splitlines() if line.strip() and not line.startswith("#")}
         else:
@@ -166,6 +186,11 @@ def self_test():
     assert gaps(old.get) == {"scripts/mutate.py a"} and weakened(gaps(old.get), gaps(new.get), set(), "gap") == ["scripts/mutate.py b"]
     assert weakened(ignores(old.get), ignores(new.get), set(), "ignore") == [".jscpd.json app/**", ".prettierignore *.ts", "eslint.config.ts server/"]
     assert weakened(ignores(old.get), ignores(new.get), {"ignore .jscpd.json app/**", "ignore .prettierignore *.ts", "ignore eslint.config.ts server/"}, "ignore") == []
+    stryker = {"stryker.config.json": '{"mutate": ["packages/*/src/**/*.ts"]}'}
+    unmutated = {"stryker.config.json": '{"mutate": ["packages/*/src/**/*.ts", "!packages/core/src/x.ts"]}'}
+    assert weakened(ignores(stryker.get), ignores(unmutated.get), set(), "ignore") == ["stryker.config.json !packages/core/src/x.ts"]
+    assert changed_settings(settings(old.get), settings(new.get), set()) == [".jscpd.json exitCode 1 -> gone"]
+    assert changed_settings(settings(old.get), settings(new.get), {"setting .jscpd.json exitCode"}) == []
     diff = "+++ b/p/a.test.ts\n-  test(\"parses x\", () => {\n+  test.fails(\"parses x\", () => {\n+  test.fails(\"new one\", () => {\n+++ b/p/b.test.ts\n-  test.fails(\"done\", () => {\n+  test(\"done\", () => {\n"
     assert switched_to_fails(diff) == ["p/a.test.ts > parses x"]
     files = {"r/s/s_test.gno": "func TestBind(t *testing.T) {}\nfunc helper() {}\n", "r/s/z1_filetest.gno": "", "tools/v/main_test.go": "func TestVec(t *testing.T) {}\n", "r/s/s.gno": "func TestNot() {}\n"}
@@ -191,6 +216,7 @@ problems += [f"a floor is lower: {f}" for f in lowered_floors(floors(show(base, 
                                                                floors(here("vitest.config.ts"), here("stryker.config.json")), floors_ok)]
 problems += [f"a known gap is added: {g}" for g in weakened(gaps(lambda p: show(base, p)), gaps(here), floors_ok, "gap")]
 problems += [f"an ignore is added: {i}" for i in weakened(ignores(lambda p: show(base, p)), ignores(here), floors_ok, "ignore")]
+problems += [f"a check's setting changed: {s}" for s in changed_settings(settings(lambda p: show(base, p)), settings(here), floors_ok)]
 problems += [f"an approved screenshot changed: {p}" for p in changed_baselines(git("diff", "--name-status", f"{base}..HEAD"), shots_ok)]
 if problems:
     print("check_regressions: the safety net shrank. Undo it, or say why on a line of a commit, `Key: <item> - why`"
