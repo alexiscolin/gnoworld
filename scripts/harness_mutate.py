@@ -164,7 +164,7 @@ def mutants():
     yield from each(".claude/settings.json", '"allowUnsandboxedCommands": false', '"allowUnsandboxedCommands": true', "hooks", "settings: no unsandboxed retry")
     yield from each(".claude/settings.json", '"denyRead": ["~/.ssh"', '"denyRead": ["~/.nothing"', "hooks", "settings: credentials unreadable")
     yield from each(".claude/settings.json", '"scripts",\n', '"nothing",\n', "hooks", "settings: harness unwritable")
-    yield from each(".claude/settings.json", '"Edit(/scripts/**)"', '"Edit(/nothing/**)"', "hooks", "settings: harness edits ask")
+    yield from each(".claude/settings.json", '"Edit(/*.config.ts)"', '"Edit(/nothing)"', "hooks", "settings: config edits ask")
     yield from each(".claude/settings.json", '"mcp__gnomcp__gno_addpkg"', '"mcp__nothing"', "hooks", "settings: chain writes ask")
     yield from each(".claude/settings.json", '"repo": "gnoverse/gno-mcp"', '"repo": "nowhere/nothing"', "hooks", "settings: gnomcp's marketplace")
     for path in ("scripts/test_hooks.sh", ".githooks/pre-commit"):

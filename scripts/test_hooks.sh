@@ -43,7 +43,9 @@ assert {"scripts", ".githooks", "package.json", ".node-version", "pnpm-lock.yaml
 assert not [p for p in box["filesystem"]["allowWrite"] if "pnpm" in p], "a command can rewrite the pnpm that Alexis's install runs"
 assert not any("api.github.com" in d for d in box["network"]["allowedDomains"]), "the GitHub API is reachable"
 ask, deny = set(s["permissions"]["ask"]), set(s["permissions"]["deny"])
-assert {"Edit(/scripts/**)", "Edit(/.githooks/**)", "Edit(/.claude/**)", "Edit(/packages/core/**)"} <= ask, "an edit of the harness or core asks no one"
+# Claude edits code alone; a config file asks Alexis first (2026-10-17).
+assert {"Edit(/.claude/**)", "Edit(/.github/**)", "Edit(/CLAUDE.md)", "Edit(/*.config.ts)", "Edit(/tsconfig*.json)", "Edit(/**/package.json)", "Edit(/pnpm-workspace.yaml)"} <= ask, "an edit of a config file asks no one"
+assert not {"Edit(/scripts/**)", "Edit(/packages/core/**)"} & ask, "an edit of code asks Alexis, who wants Claude to work alone"
 assert {f"mcp__{p}__gno_{t}" for p in ("gnomcp", "plugin_gnomcp_gnomcp") for t in ("addpkg", "call", "run", "key_send", "cla_sign")} <= ask, "a chain write asks no one"
 assert {"Read(~/.ssh/**)", "Read(~/.config/gh/**)"} <= deny, "the Read tool can open a credential"
 # The sandbox turns Read denies into its own: one on dist, coverage or reports stops the gate
