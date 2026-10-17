@@ -11,7 +11,7 @@ case $subject in
 		echo "commit-msg: the subject is 'type(scope): what', type one of feat fix docs test refactor perf build ci chore style revert." >&2
 		exit 1
 	fi
-	if [ "$(printf '%s' "$subject" | wc -m)" -gt 72 ]; then
+	if [ "$(printf '%s' "$subject" | python3 -I -c 'import sys; print(len(sys.stdin.buffer.read().decode()))')" -gt 72 ]; then # characters, in any locale
 		echo "commit-msg: the subject is over 72 characters." >&2
 		exit 1
 	fi

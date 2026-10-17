@@ -1,7 +1,7 @@
 """patch_coverage.py: how much of a change the tests run, like a pull request's patch
 coverage, with no service: Vitest's coverage/coverage-final.json against `git diff`.
 
-Every statement that starts on an added or changed line of a .ts or .tsx file counts. It
+Every statement with a line added or changed, in a .ts or .tsx file, counts. It
 prints the uncovered lines per file and fails under the floor, or when a changed source file is
 missing from the report (vitest.config.ts's coverage include does not reach it).
 Usage: patch_coverage.py <base> [floor], after `pnpm run coverage`; the floor defaults to 85, the
@@ -43,7 +43,8 @@ for path, lines in sorted(changed.items()):
     file = report[path]
     missed = []
     for sid, where in file["statementMap"].items():
-        if where["start"]["line"] in lines:
+        span = range(where["start"]["line"], where.get("end", where["start"])["line"] + 1)  # any changed line of it
+        if lines.intersection(span):
             total += 1
             if file["s"][sid] > 0:
                 run += 1

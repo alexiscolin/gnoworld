@@ -17,6 +17,8 @@ SEVERE = {"moderate", "high", "critical"}
 locked = {}
 for name, version in re.findall(r"^  '?(@?[^@'\s]+)@(\d[^('\s:]*)", open("pnpm-lock.yaml").read(), re.M):
     locked.setdefault(name, set()).add(version)
+if not locked:  # a lockfile format this parser does not know would otherwise pass for clean
+    sys.exit("audit: no package read from pnpm-lock.yaml; its format changed, so this parser is out of date")
 request = json.dumps({name: sorted(versions) for name, versions in sorted(locked.items())})
 
 try:

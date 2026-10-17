@@ -106,6 +106,9 @@ refused "feature: add the parser" || fail "an unknown type was accepted"
 refused "feat:add the parser" || fail "a type with no space after it was accepted"
 refused "feat: $(printf 'a%.0s' $(seq 1 67))" || fail "a 73-character subject was accepted"
 refused "feat: $(printf 'a%.0s' $(seq 1 66))" && fail "a 72-character subject was refused"
+# Characters, not bytes, whatever the locale: 66 characters, 78 bytes.
+printf '%s\n' "docs(review): café résumé naïve déjà vu — été, hiver, février, déc" >"$t/msg"
+LC_ALL=C "$hooks/commit-msg" "$t/msg" 2>/dev/null || fail "commit-msg counted bytes, not characters, under the C locale"
 fi
 
 if part pre_commit; then
@@ -203,6 +206,11 @@ cover 1 && fail "patch_coverage accepted a changed file the coverage report does
 git -C "$c" rm -q --cached src/b.ts && rm "$c/src/b.ts"
 printf 'x\n' >"$c/src/a.test.ts" && printf 'x\n' >"$c/vitest.config.ts" && git -C "$c" add src/a.test.ts vitest.config.ts
 cover 1 || fail "patch_coverage refused a changed test or config file, which coverage never measures"
+# A statement over several lines counts when any of its lines changed, not only its first.
+git -C "$c" rm -q --cached src/a.test.ts vitest.config.ts && rm "$c/src/a.test.ts" "$c/vitest.config.ts" && git -C "$c" add src/a.ts && git -C "$c" commit -qm four
+printf 'one\ntwo\nTHREE\nfour\n' >"$c/src/a.ts"
+printf '{"%s/src/a.ts":{"statementMap":{"0":{"start":{"line":2},"end":{"line":4}}},"s":{"0":0}}}' "$c" >"$c/coverage/coverage-final.json"
+(cd "$c" && python3 -I "$patch" HEAD 85 >/dev/null 2>&1) && fail "patch_coverage passed an untested statement whose inner line changed"
 fi
 
 if part review_pass; then
@@ -443,6 +451,8 @@ python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d == {"qs
 audit '{"qs":[{"severity":"moderate","title":"DoS","url":"u","vulnerable_versions":"<6.16.0"}]}' && fail "audit let a moderate advisory through"
 audit '{"qs":[{"severity":"low","title":"minor","url":"u","vulnerable_versions":"<6.16.0"}]}' || fail "audit refused a low advisory"
 audit 'not json' && fail "audit passed on an answer it could not read"
+printf "lockfileVersion: '10.0'\n\npackages:\n    \"lodash@4.17.20\":\n      resolution: {}\n" >"$au/pnpm-lock.yaml"
+audit '{}' && fail "audit passed on a lockfile it read no package from"
 fi
 
 if part regressions; then
