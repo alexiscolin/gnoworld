@@ -21,7 +21,7 @@ from repo_files import git, worktree
 
 SHOT = re.compile(r"(-snapshots|__screenshots__)/.+\.(png|jpe?g)$")
 GAP_FILES = ["scripts/mutate.py", "scripts/harness_mutate.py"]
-IGNORE_FILES = [".jscpd.json", "knip.json", "stryker.config.json", "eslint.config.ts", "vitest.config.ts", ".prettierignore", "scripts/check_comments.mjs"]
+IGNORE_FILES = [".jscpd.json", "knip.json", "stryker.config.json", "eslint.config.ts", "vitest.config.ts", ".prettierignore", "scripts/check_comments.mjs", "scripts/.gitleaksignore"]
 
 
 def declared(lines, key):
@@ -99,7 +99,7 @@ def ignores(read):
                     out |= {f"{name} {v}" for v in (value if isinstance(value, list) else [value])}
                 elif key == "mutate":  # a negated glob takes files out of the mutation test
                     out |= {f"{name} {v}" for v in value if str(v).startswith("!")}
-        elif name == ".prettierignore":
+        elif name in (".prettierignore", "scripts/.gitleaksignore"):
             out |= {f"{name} {line.strip()}" for line in text.splitlines() if line.strip() and not line.startswith("#")}
         else:
             for m in re.finditer(r"(?:globalIgnores\(|ignores:\s*|exclude:\s*|SKIP = new Set\()\[([^\]]*)\]", text):
@@ -195,6 +195,9 @@ def self_test():
     stryker = {"stryker.config.json": '{"mutate": ["packages/*/src/**/*.ts"]}'}
     unmutated = {"stryker.config.json": '{"mutate": ["packages/*/src/**/*.ts", "!packages/core/src/x.ts"]}'}
     assert weakened(ignores(stryker.get), ignores(unmutated.get), set(), "ignore") == ["stryker.config.json !packages/core/src/x.ts"]
+    leaks = {"scripts/.gitleaksignore": "# a reason\n"}
+    hidden = {"scripts/.gitleaksignore": "# a reason\nabc:docs/a.md:home-folder-path:4\n"}
+    assert weakened(ignores(leaks.get), ignores(hidden.get), set(), "ignore") == ["scripts/.gitleaksignore abc:docs/a.md:home-folder-path:4"]
     assert changed_settings(settings(old.get), settings(new.get), set()) == [".jscpd.json exitCode 1 -> gone"]
     assert changed_settings(settings(old.get), settings(new.get), {"setting .jscpd.json exitCode"}) == []
     diff = "+++ b/p/a.test.ts\n-  test(\"parses x\", () => {\n+  test.fails(\"parses x\", () => {\n+  test.fails(\"new one\", () => {\n+++ b/p/b.test.ts\n-  test.fails(\"done\", () => {\n+  test(\"done\", () => {\n"
