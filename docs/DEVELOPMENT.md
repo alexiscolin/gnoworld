@@ -56,9 +56,13 @@ first.
 (`CLAUDE_CODE_SUBAGENT_MODEL` in `.claude/settings.json`); agents get the diff's path, never
 its content; one review pass; `/clear` between slices; `/usage` shows a session's cost.
 
-**Once the repo has a remote:** CI runs `scripts/check.sh`; `/security-review` works (it
+**Once the repo is pushed** (`origin`: github.com/alexiscolin/gnoworld, private): CI runs `scripts/check.sh`; `/security-review` works (it
 compares with `origin`); Code Review can review each pull request if the organization is on
 a Team or Enterprise plan; any scripted `claude -p` run carries `--max-budget-usd`.
+
+**Secrets** live in `deploy/secrets/`, one file each, gitignored and unreadable by Claude
+Code; the code reads them through `*_FILE` variables. Nobody pastes a key into a chat. The
+Anthropic key is Alexis's own for tests, then the company's.
 
 ## Slices
 
