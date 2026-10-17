@@ -30,6 +30,7 @@ SECTIONS = {
     ".githooks/pre-push": "pre_push", ".githooks/pre-commit": "pre_commit,wiring", "scripts/code_changed.sh": "pre_commit,stop_gate",
     "scripts/stop_gate.sh": "stop_gate,wiring", "scripts/format_hook.sh": "format_hook", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
     "scripts/check.sh": "wiring", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
+    "scripts/audit.py": "audit",
 }
 
 
@@ -157,6 +158,9 @@ def mutants():
     yield from each("scripts/prove_fix.py", "return all(subprocess.run(cmd", "return True or all(subprocess.run(cmd", "hooks", "prove_fix runs the tests on the parent")
     yield from each("scripts/prove_fix.py", 're.search(r"^No-test: \\S", message, re.M)', "True", "hooks", "prove_fix wants a reason for no test")
     yield from each("scripts/prove_fix.py", "    if not product:\n", "    if True:\n", "hooks", "prove_fix checks product fixes")
+    yield from each("scripts/audit.py", 'if a.get("severity") in SEVERE]', "if False]", "hooks", "audit fails on an advisory")
+    yield from each("scripts/audit.py", "locked.setdefault(name, set()).add(version)", "pass", "hooks", "audit asks about every package")
+    yield from each("scripts/audit.py", '''sys.exit(f"audit: no readable answer from npm's advisory database: {e}")''', "answer = {}", "hooks", "audit fails without an answer")
     # The gate: each step dropped.
     yield from lines("scripts/check.sh", r"^(\s*)((?:run |python3 -I |sh scripts/|gitleaks |go vet |go run |\(cd gno |\$full \|\| run ).*)$", r"\1:", "hooks", "check.sh drops")
 

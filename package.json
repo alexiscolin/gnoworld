@@ -15,7 +15,6 @@
     "test": "vitest run",
     "coverage": "vitest run --coverage",
     "mutate": "stryker run",
-    "audit": "pnpm audit --audit-level moderate",
     "unused": "knip --no-progress",
     "copies": "jscpd .",
     "comments": "node scripts/check_comments.mjs"

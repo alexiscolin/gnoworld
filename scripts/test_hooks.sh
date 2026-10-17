@@ -56,7 +56,7 @@ for step in "run format:check" "run typecheck" "run lint" "run test" "run unused
 	"python3 -I ../scripts/mutate.py" "go vet ./tools/..." "go run ./tools/sealvec | cmp" "python3 -I scripts/check_docs.py" \
 	"sh scripts/test_hooks.sh" "python3 -I scripts/probe.py" "run coverage" "python3 -I scripts/patch_coverage.py" \
 	"run mutate" "gitleaks git" "python3 -I scripts/harness_mutate.py" "python3 -I scripts/check_regressions.py" \
-	'[ "$took" -gt 60 ]' "python3 -I scripts/prove_fix.py" "run audit"; do
+	'[ "$took" -gt 60 ]' "python3 -I scripts/prove_fix.py" "python3 -I scripts/audit.py"; do
 	grep -v '^[[:space:]]*#' "$gate_file" | grep -qF -- "$step" || fail "check.sh no longer runs: $step"
 done
 # An EXIT trap keeps a failure: under macOS's sh, a plain one turns an unbound variable into exit 0.
@@ -412,6 +412,20 @@ prove "$base" || fail "prove_fix refused a fix that says why it has no test"
 base=$(git -C "$pf" rev-parse HEAD)
 mkdir -p "$pf/scripts" && echo x >"$pf/scripts/tool.py" && fix "fix(harness): a harness fix"
 prove "$base" || fail "prove_fix refused a harness fix, which harness_mutate proves"
+fi
+
+if part audit; then
+# audit: every locked package goes to npm's advisory database, and a moderate or worse
+# advisory fails. A recorded answer stands in for the network (AUDIT_ANSWER).
+au="$t/audit"
+mkdir -p "$au"
+printf "lockfileVersion: '9.0'\n\npackages:\n\n  qs@6.15.1:\n    resolution: {}\n\n  '@scope/tool@1.2.0':\n    resolution: {}\n\nsnapshots:\n\n  '@scope/tool@1.2.0(qs@6.15.1)':\n    dependencies: {}\n" >"$au/pnpm-lock.yaml"
+audit() { printf '%s' "$1" >"$au/answer.json" && (cd "$au" && AUDIT_ANSWER="$au/answer.json" python3 -I "$here/audit.py" >/dev/null 2>&1); }
+audit '{}' || fail "audit refused a lockfile with no advisory"
+python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d == {"qs": ["6.15.1"], "@scope/tool": ["1.2.0"]}, d' "$au/answer.json.request" || fail "audit did not ask about every locked package and version"
+audit '{"qs":[{"severity":"moderate","title":"DoS","url":"u","vulnerable_versions":"<6.16.0"}]}' && fail "audit let a moderate advisory through"
+audit '{"qs":[{"severity":"low","title":"minor","url":"u","vulnerable_versions":"<6.16.0"}]}' || fail "audit refused a low advisory"
+audit 'not json' && fail "audit passed on an answer it could not read"
 fi
 
 if part regressions; then
