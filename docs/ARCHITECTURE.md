@@ -207,6 +207,21 @@ Rules:
   - HTML labels on the scene pooled and reused.
 - **Forms** use the platform: `<form>`, `<button type="submit">`, native validation where
   it fits.
+- **Composable before configurable.** Many small components that fit together, not few
+  big ones with many switches:
+  - content goes in through `children` and named slots, not through text and boolean props;
+  - a widget with parts is a compound component (`<Dialog>`, `<Dialog.Title>`,
+    `<Dialog.Actions>`), its parts sharing state through a context of their own;
+  - one `variant` prop, a union type, instead of several booleans that can contradict;
+  - logic lives in hooks without markup (`useRoom`, `useFlight`), so the same behaviour
+    can wear another look;
+  - every `ui` component works alone: the gallery renders it with no store, no network
+    and no feature around it;
+  - features build screens from `ui` and their own small parts; a second look for the same
+    thing is a new variant of the component, never a copy.
+- **Sizes that lint holds** (ESLint's own rules): a file under 200 lines, a function under
+  80, a cyclomatic `complexity` of 10 at most, a nesting depth of 3, three parameters at
+  most (more go in one object). Past these, the code splits into parts that compose.
 
 ## The scene
 
