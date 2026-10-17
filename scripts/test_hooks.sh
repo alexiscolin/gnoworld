@@ -178,4 +178,39 @@ gno WebFetch '{"url":"https://gno.land/r/gnoland/home"}' "$t/asked.jsonl" 2
 gno WebFetch '{"url":"https://rpc.onyx.testnets.gno.land/status"}' "$t/asked.jsonl" 2
 gno WebFetch '{"url":"https://docs.gno.land/resources/gno-interrealm"}' "$t/plain.jsonl" 0
 
+# The guards refuse what they cannot read.
+for g in "$guard" "$gg"; do
+	code=0
+	printf 'not json' | python3 -I "$g" 2>/dev/null || code=$?
+	[ "$code" = 2 ] || fail "$(basename "$g") let unreadable input through (exit $code)"
+done
+
+# pre-push refuses a push of anything but the checked-out commit, clean.
+echo y >"$w/b.ts" && git -C "$w" add -A && git -C "$w" -c user.name=t -c user.email=t@t commit -qm more
+printf '#!/bin/sh\nexit 0\n' >"$w/scripts/check.sh"
+old=$(git -C "$w" rev-parse HEAD~1)
+printf 'refs/heads/x %s refs/heads/x 0000000000000000000000000000000000000000\n' "$old" | (cd "$w" && sh .githooks/pre-push origin url >/dev/null 2>&1) && fail "pre-push let through a commit other than the checked-out one"
+echo dirty >>"$w/b.ts"
+head=$(git -C "$w" rev-parse HEAD) && push slice-1a && fail "pre-push let through a tree with uncommitted changes"
+git -C "$w" checkout -q -- b.ts
+
+# pre-commit runs the gate on the staged files, and a failing gate stops the commit.
+c2="$t/precommit"
+mkdir -p "$c2/scripts" && git -C "$c2" init -q
+printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && git -C "$c2" add -A && git -C "$c2" -c user.name=t -c user.email=t@t commit -qm base
+echo code >"$c2/a.ts" && git -C "$c2" add a.ts
+(cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a commit through a failing gate"
+printf '#!/bin/sh\nexit 0\n' >"$c2/scripts/check.sh" && git -C "$c2" add -A
+(cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) || fail "pre-commit stopped a commit whose gate passes"
+
+# check.sh runs every step it promises: removing one fails here.
+gate_file=$(cd "$(dirname "$0")" && pwd)/check.sh
+for step in "run format:check" "run typecheck" "run lint" "run test" "run unused" "run copies" "run clones" \
+	"python3 -I scripts/check_css.py" "python3 -I scripts/check_comments.py" '"$GNO" lint ./r/...' '"$GNO" test ./r/...' \
+	"python3 -I ../scripts/mutate.py" "go vet ./tools/..." "go run ./tools/sealvec" "python3 -I scripts/check_docs.py" \
+	"sh scripts/test_hooks.sh" "python3 -I scripts/probe.py" "run coverage" "python3 -I scripts/patch_coverage.py" \
+	"run mutate" "gitleaks git" "python3 -I scripts/harness_mutate.py"; do
+	grep -v '^[[:space:]]*#' "$gate_file" | grep -qF -- "$step" || fail "check.sh no longer runs: $step"
+done
+
 echo "hooks: ok"

@@ -71,13 +71,20 @@ sh scripts/test_hooks.sh
 if $full; then
 	echo "== the harness keeps its promises (scripts/probe.py)"
 	python3 -I scripts/probe.py
+	base=$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse HEAD)
 	echo "== coverage: 85% everywhere, core 100%; and 85% of the lines this branch changed"
 	run coverage
-	python3 -I scripts/patch_coverage.py "$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse HEAD)"
+	python3 -I scripts/patch_coverage.py "$base"
 	echo "== mutations (StrykerJS, incremental)"
 	run mutate
 	echo "== no secret anywhere in the history"
 	gitleaks git --no-banner --redact .
+	if ! git diff --quiet "$base" -- scripts .githooks .claude/settings.json package.json pnpm-workspace.yaml \
+		eslint.config.ts tsconfig.base.json tsconfig.json vitest.config.ts stryker.config.json knip.json .jscpd.json \
+		.prettierrc.json .prettierignore .gitignore; then
+		echo "== the harness changed: each guard switched off must fail a test (several minutes)"
+		python3 -I scripts/harness_mutate.py
+	fi
 fi
 
 echo "all checks passed"

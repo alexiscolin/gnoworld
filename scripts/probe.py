@@ -30,6 +30,16 @@ LINT = [
     ("clock.ts", "export function now(): number {\n  return Date.now();\n}\n", "no-restricted-properties"),
     ("long.ts", LONG, "max-lines-per-function"),
     ("eval.ts", "export function run(code: string): unknown {\n  return eval(code);\n}\n", "no-eval"),
+    ("useless_catch.ts", "export function run(g: () => void): void {\n  try {\n    g();\n  } catch (e) {\n    throw e;\n  }\n}\n", "no-useless-catch"),
+    ("new_function.ts", 'export function make(): unknown {\n  return new Function("return 1");\n}\n', "@typescript-eslint/no-implied-eval"),
+    ("long_file.ts", "".join(f"export const v{i} = {i};\n" for i in range(205)), "max-lines"),
+    ("complex.ts", "export function grade(n: number): number {\n" + "".join(f"  if (n === {i}) return {i};\n" for i in range(11)) + "  return -1;\n}\n", "complexity"),
+    ("deep.ts", "export function deep(a: boolean): number {\n  if (a) {\n    if (a) {\n      if (a) {\n        if (a) {\n          return 1;\n        }\n      }\n    }\n  }\n  return 0;\n}\n", "max-depth"),
+    ("params.ts", "export function four(a: number, b: number, c: number, d: number): number {\n  return a + b + c + d;\n}\n", "max-params"),
+    ("baseline.css", "@layer components {\n  .a {\n    field-sizing: content;\n  }\n}\n", "css/use-baseline"),
+    ("unlayered.css", ".a {\n  color: var(--color-text);\n}\n", "css/use-layers"),
+    ("physical.css", "@layer components {\n  .a {\n    margin-left: 0;\n  }\n}\n", "css/prefer-logical-properties"),
+    ("clean.css", "@layer components {\n  .a {\n    margin-inline-start: 0;\n  }\n}\n", None),
     ("important.css", ".a {\n  color: var(--color-text) !important;\n}\n", "css/no-important"),
 ]
 
@@ -149,5 +159,11 @@ finally:
     shutil.rmtree(HERE, ignore_errors=True)
 
 if failures:
+    print("\nprobe: proposed fixes")
+    for what in failures:
+        if "expected nothing" in what or "lets" in what:
+            print(f"  {what}\n    → a clean case is refused: a guard misfires; narrow it, or fix the case")
+        else:
+            print(f"  {what}\n    → the guard is off or broken, or the case no longer plants its fault: fix the guard first")
     sys.exit(f"probe: {len(failures)} of the harness's promises do not hold")
 print("probe: every planted fault was caught")

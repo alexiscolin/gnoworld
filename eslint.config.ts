@@ -35,9 +35,8 @@ export default defineConfig(
         },
       ],
       "@typescript-eslint/switch-exhaustiveness-check": "error",
-      // No code built from strings.
+      // No code built from strings (`new Function` is refused by the preset's no-implied-eval).
       "no-eval": "error",
-      "no-new-func": "error",
       "import-x/no-cycle": "error",
       // Past these sizes, code splits into parts that compose.
       "max-lines": ["error", { max: 200, skipBlankLines: true, skipComments: true }],
