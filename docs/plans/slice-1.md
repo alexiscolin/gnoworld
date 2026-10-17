@@ -28,7 +28,8 @@ auto-deployment, the CSP (it arrives with the first third party).
 
 | Asset | Threat | Mitigation | Proof |
 |---|---|---|---|
-| The homelab | A demo container reaches its services or the host | Internal networks; the only exit is the egress proxy, which refuses private addresses; no Docker socket, no privilege, every capability dropped, read-only root, caps of 2 cores and 2 GB | A test from inside the demo: n8n through `host.docker.internal`, the LAN and the host's ports all fail; the proxy allows only its list |
+| Alexis's Mac (the homelab) | A demo container reaches its services or the host | Internal networks; the only exit is the egress proxy, which refuses private addresses; no Docker socket, no privilege, every capability dropped, read-only root, caps of 2 cores and 2 GB | A test from inside the demo: n8n through `host.docker.internal`, the LAN and the host's ports all fail; the proxy allows only its list |
+| Alexis's tailnet | The demo's Tailscale machine reaches his other devices | A tagged auth key; access rules that let the tag reach nothing; Funnel only brings visitors in; the admin, Grafana and IRC ports only for his devices | From inside the demo, his other tailnet devices do not answer |
 | This machine | A package's install script, or an agent misled by repo content | pnpm runs no scripts and refuses packages younger than a day; the sandbox limits writes to the project and the network to a list | `pnpm install` output; a sandboxed write outside the project is refused |
 | The demo's secrets | The Tailscale key or the demo password in the repo or a log | `*_FILE` secrets in `deploy/secrets/`, gitignored and unreadable by Claude Code | `git check-ignore`; `deny` rules in `.claude/settings.json` |
 | The public URL | Flooding | Caps; rate limits at the proxy; `noindex`; the shared password | A burst test answers 429, the host stays idle |
@@ -80,4 +81,4 @@ New: `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `eslint.config
 2. A fast gate for the Stop hook and pre-commit, the full set in `/pre-merge`? **Yes.**
 3. Move the load-testing tool (k6) to slice 3, where Ergo first needs it? **Yes.**
 4. The sandbox in the project's settings, so it applies to every session in this repo? **Yes, in the project's settings.**
-5. You create the Tailscale auth key and the demo password, as files in `deploy/secrets/`; Claude never reads them. Agreed?
+5. You create the Tailscale auth key and the demo password, as files in `deploy/secrets/`; Claude never reads them. **Yes (2026-10-17): the demo stays shut in its own project and tag, even for the team, and `deploy/` is turnkey for ops.** Agreed?

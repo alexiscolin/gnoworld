@@ -1003,7 +1003,17 @@ not choose its hosts.
     so per-address limits work; rate limits; Jarvis's demo budget capped at a few dollars a
     day; moderation on.
   - **Private parts stay private:** the admin console, Grafana and a plain IRC port are
-    reachable on the tailnet only, never through Funnel.
+    reachable on the tailnet only, never through Funnel, and only from Alexis's own
+    devices. The team uses the public URL.
+  - **Shut in the tailnet too:** the demo machine joins with a tagged key, and the
+    tailnet's access rules let that tag reach nothing: Funnel brings visitors in, and
+    nothing leaves it for the Mac or Alexis's other devices. A test from inside the demo
+    proves it.
+  - **Turnkey for ops:** `deploy/` holds everything: `compose.yaml` is what ops runs, the
+    `demo` profile only adds the Tailscale machine, the egress proxy and the caps;
+    `.env.example` and a list of the secret files; `docs/OPERATIONS.md`. One command
+    starts each: `docker compose --profile demo up -d` here, `docker compose up -d` with
+    their own settings and secrets there.
   - **Safe to try:** the default universe is Onyx, so calls spend test tokens.
   - **Disposable:** no backups. Load tests never run on it. Removing it is
     `docker compose down -v` and deleting its tailnet machine.
