@@ -46,7 +46,7 @@ def ledger_problems(root):
     return out
 
 root = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else ".")
-harness = ("CLAUDE.md", "docs/DEVELOPMENT.md", "docs/REVIEW.md")
+harness = ("CLAUDE.md", "docs/DEVELOPMENT.md", "docs/REVIEW.md", "docs/HARNESS.md")
 files = [p for p in listed(root, {".md"}) if p.relative_to(root).as_posix() in harness or p.relative_to(root).parts[0] == ".claude"]
 path = re.compile(r"`((?:scripts|\.claude|docs|adr|\.githooks)/[^`\s*]*)`")
 missing = []
