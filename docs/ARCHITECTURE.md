@@ -108,8 +108,12 @@ can; review checks the rest.
 syntax it can erase is allowed (no enums, no namespaces with code, no parameter
 properties).
 
-**Lint:** typescript-eslint's `strict-type-checked` and `stylistic-type-checked`, the import
-boundaries above, and no import cycles (a cycle check, asked for in slice 1).
+**Lint:** typescript-eslint's `strict-type-checked` and `stylistic-type-checked` (they
+already refuse a floating or misused promise, a thrown non-error and an untyped `catch`
+value), plus `switch-exhaustiveness-check`; ESLint's `no-empty`, `no-useless-catch` and
+`preserve-caught-error` (a rethrow keeps its `cause`), and a `catch` that only logs; the
+import boundaries above; no import cycles (`eslint-plugin-import-x`). **Copies:** jscpd
+fails the gate on a new copied block. **Dead code:** knip, at zero.
 
 **Types carry the meaning:**
 - **No `any`, no `@ts-ignore`, no `!`, and no `as` on outside data** (CLAUDE.md). `satisfies`

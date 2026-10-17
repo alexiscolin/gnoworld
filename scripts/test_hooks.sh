@@ -75,4 +75,14 @@ guard "git commit -m x && git log -n 5" 0
 guard "git merge -n main" 0
 guard "git commit --amend -m x" 0
 
+# check_docs: a harness doc that names a missing harness file fails the gate.
+docs=$(cd "$(dirname "$0")" && pwd)/check_docs.py
+d="$t/docs-root"
+mkdir -p "$d/scripts" "$d/.claude/rules"
+touch "$d/scripts/real.sh"
+printf 'Run `scripts/real.sh`, see `docs/plans/slice-$ARGUMENTS.md`.\n' >"$d/CLAUDE.md"
+python3 -I "$docs" "$d" >/dev/null 2>&1 || fail "check_docs refused a doc whose files exist"
+printf 'Run `scripts/gone.sh`.\n' >"$d/.claude/rules/x.md"
+python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted a doc naming a missing file"
+
 echo "hooks: ok"

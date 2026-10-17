@@ -1366,9 +1366,21 @@ Its findings are fixed before any other lens runs.
 
 **Jarvis.** Its evals gate any change to its model, prompt, skills or tools (§5).
 
-**No dead code:**
-- unused exports, files and dependencies fail the gate;
-- the TypeScript flags `noUnusedLocals` and `noUnusedParameters`.
+**No dead code, no copy, no swallowed error, no drift, nothing invented:**
+- unused exports, files and dependencies fail the gate (knip), with the TypeScript flags
+  `noUnusedLocals` and `noUnusedParameters`;
+- a copied block fails the gate (jscpd); an agent that cannot see the whole repo searches it
+  before writing a helper, and review checks reuse;
+- lint refuses an empty or log-only `catch`, a rethrow that drops its `cause`, a floating
+  promise and a `switch` that misses a case;
+- a refactor is its own commit and changes no test; the mutation score never drops;
+- leaks: the 20-flight test and memlab on the client's journeys; a soak test on the server,
+  whose heap after collection stays flat;
+- drift: the harness's docs name only files that exist (`scripts/check_docs.py`, even on a
+  docs-only commit); the green test pass flags a test weakened since the red pass; a merge
+  names every file it changes outside its plan;
+- nothing invented: a wrong API fails `tsc` or `gno lint`; a finding without its `file:line`
+  and scenario is dropped; a claim comes with its evidence or is not made.
 
 **Dependencies to ask for, each in its slice:**
 - slice 1: `react-router`, `@react-router/dev`, `vite-plugin-pwa`, a CSS linter, an

@@ -30,6 +30,9 @@ go run ./tools/sealvec | cmp -s - r/seal/vectors_test.gno || {
 	exit 1
 }
 
+echo "== harness docs name only files that exist"
+python3 -I scripts/check_docs.py
+
 echo "== hooks"
 sh scripts/test_hooks.sh
 

@@ -4,7 +4,9 @@ set -eu
 # staged rather than on the working tree. Only docs are exempt, so a new code
 # folder is gated by default; a hook change runs it too, and scripts/test_hooks.sh
 # checks the hooks. There is no CI until there is a remote.
-git diff --cached --quiet -- . ':!docs' ':!adr' ':!*.md' ':!.claude' && exit 0
+if git diff --cached --quiet -- . ':!docs' ':!adr' ':!*.md' ':!.claude'; then
+	exec python3 -I scripts/check_docs.py # docs only: the files they name must still exist
+fi
 staged=$(mktemp -d)
 trap 'rm -rf "$staged" || :' EXIT
 trap 'exit 1' HUP INT TERM # so the EXIT trap also runs on Ctrl-C under dash
