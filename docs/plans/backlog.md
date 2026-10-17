@@ -20,6 +20,13 @@ review card and stops.
 - runs in the demo stack (`docker compose up`), with its service's image, settings and
   runbook notes (ADR-0002 §7, where it runs).
 
+## The harness, after slice 1
+
+| Item | Delivers | Why |
+|---|---|---|
+| Hooks that run no repository code | When Alexis pushes or merges, the git hooks run with his full access, and today they run the gate: every script, config, test and Go tool it reaches. The push checks instead the fingerprint the sandboxed gate recorded (as the Stop hook does) and the review pass; the merge does the same on the merged tree; the CI runs the full gate again, and blocks once the plan allows. Then the edit asks of F076 can go | A careless or injected edit anywhere the gate reaches runs outside the sandbox at his next push (finding F076); asking before each edit only narrows it |
+| The reviewers' exam | The ledger's reproduced findings (`docs/review/findings.md`) become a fixed set: each one's commit before its fix, and the bug it holds. A script runs a reviewer (agent, prompt or model) over the set and scores what it finds; any change to a reviewer is rescored before it lands. The same run on known-clean commits counts the false alarms. Repeat findings are dropped, and after three rounds a review reads only the new diff | A reviewer is judged by the bugs it finds, not by how it reads; how Anthropic tunes its own code review ("Solving code review at Anthropic", claude.dev, read 2026-10-17) |
+
 ## Phase 0: a public hub
 
 Users sign their own calls in Adena, on a computer. gnoworld's only write of its own is the

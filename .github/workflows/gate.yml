@@ -1,0 +1,56 @@
+# The gate on GitHub's machines: every push of a branch runs scripts/check.sh --full, as
+# /pre-merge and the pre-push hook do on Alexis's Mac (docs/HARNESS.md). It reads the
+# repository and nothing more, needs no secret, pins its actions, gitleaks and gno by commit or
+# checksum (scripts/test_hooks.sh holds it). On this plan it reports a failure; it cannot block a merge.
+name: gate
+on:
+  push:
+    branches: ["**"] # branches only: merges are made locally, so no pull request runs it twice
+permissions:
+  contents: read
+concurrency:
+  group: gate-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }} # every merge on main gets its report
+jobs:
+  gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      GNO_TOOLCHAIN: /home/runner/.cache/gno-toolchain
+      GNOROOT: /home/runner/.cache/gno-toolchain/src
+      GNO_COMMIT: 07e44776c26187830b7dcbd2454991b5a1960378 # v1.5.1, the local toolchain; onyx runs v1.5.1-rc.1 (F062)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the full gate compares the branch with where it left main
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.26"
+          cache: false # its key is a root go.mod, which this repository has not
+      - name: pnpm 12.14.0, then the locked dependencies (no package's install script runs)
+        run: npm install --global --ignore-scripts pnpm@12.14.0 && pnpm install --frozen-lockfile
+      - name: gitleaks 8.30.1, checked against the checksum it published
+        run: |
+          curl --fail --retry 3 -sSLo "$RUNNER_TEMP/gitleaks.tgz" https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $RUNNER_TEMP/gitleaks.tgz" | sha256sum -c
+          mkdir -p "$RUNNER_TEMP/bin" && tar -xzf "$RUNNER_TEMP/gitleaks.tgz" -C "$RUNNER_TEMP/bin" gitleaks
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.GNO_TOOLCHAIN }}
+          key: gno-${{ runner.os }}-go1.26-${{ env.GNO_COMMIT }} # a new Go or runner builds gno again
+      - name: The gno toolchain at GNO_COMMIT, unless the cache holds it
+        run: |
+          T="$GNO_TOOLCHAIN"
+          if [ ! -x "$T/gno" ]; then
+            git init -q "$T/src"
+            git -C "$T/src" fetch -q --depth 1 https://github.com/gnolang/gno "$GNO_COMMIT"
+            git -C "$T/src" checkout -q FETCH_HEAD
+            (cd "$T/src" && go build -o "$T/gno" ./gnovm/cmd/gno)
+          fi
+      - name: The full gate
+        run: sh scripts/check.sh --full

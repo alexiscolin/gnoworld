@@ -1,0 +1,33 @@
+# Decisions
+
+The day-to-day decisions Alexis made with Claude, one row each, with the reason: what the ADRs
+are for design, this is for the way of working. A decision taken in conversation goes here at
+once (CLAUDE.md). Newest last.
+
+| Date | Decision | Why | Where it lives |
+|---|---|---|---|
+| 2026-10-17 | Slice 1 ships as three merges: 1a the gate, 1b the app's routes, 1c the demo stack | Each under about 400 lines, so each is reviewed for real | `docs/plans/slice-1.md` |
+| 2026-10-17 | `IrcMessage.command` is a branded `IrcCommand` now; typed views of commands wait for slice 4 | A bare string lets any text pass for a command | `packages/core/src/irc/irc.ts` |
+| 2026-10-17 | CUBE CSS on CSS Modules, no Tailwind or SCSS; Prettier on | Compositions keep layout out of blocks; one formatter ends style debates | `docs/DESIGN-SYSTEM.md` |
+| 2026-10-17 | Code, comments, commits and docs in English; Claude talks to Alexis in French and explains as to a beginner | The team reads English; Alexis wants to understand every step | `CLAUDE.md`, `CLAUDE.local.md` |
+| 2026-10-17 | Coverage floor 85% everywhere and on the changed lines; core at 100% | A floor the gate holds, with no outside service | `vitest.config.ts`, `scripts/patch_coverage.py` |
+| 2026-10-17 | Every review finding is reproduced before it is fixed, kept in a ledger, and the tier-1 ones go through an Opus verifier first | A claim is not evidence; Dora showed how many "confirmed" findings never ran | `docs/REVIEW.md`, `docs/review/findings.md` |
+| 2026-10-17 | The harness is measured by its verified findings per merge: falling means solid, flat over three merges means simplify | Adding guards forever is a race no one wins | `docs/REVIEW.md` item 7, `docs/review-log.md` |
+| 2026-10-17 | Claude Code starts in the repository, never moved there with `/cd` | `/cd` leaves the hooks pointing at the old folder and locks the session | `docs/DEVELOPMENT.md`, finding F026 |
+| 2026-10-17 | The sandbox may open local ports | StrykerJS's workers, and later Playwright and the dev server, need them | `.claude/settings.json` |
+| 2026-10-17 | No hook outside the sandbox runs repository code: the format hook is gone, the Stop hook only compares a recorded state | A hook runs with full access; it was a way out of the sandbox | finding F038 |
+| 2026-10-17 | `qs` forced to `^6.16.0` | Three moderate advisories, reached only through StrykerJS | `pnpm-workspace.yaml`, finding F025 |
+| 2026-10-17 | The dependency audit asks npm's advisory database directly (`scripts/audit.py`) | pnpm cannot run inside the sandbox | finding F027 |
+| 2026-10-17 | `formatLine` sends at most 4094 bytes of tag data | IRCv3: what a client may send; 8191 is a server's limit | finding F047 |
+| 2026-10-17 | Core keeps no DOM or Node types; Alexis counts UTF-8 bytes with a loop over code points | `TextEncoder` would need either, for one line of code | finding F050 |
+| 2026-10-17 | The stolen-but-unbound key in `r/seal` is fixed in the seal-store slice | The fix changes the realm's storage, which that slice changes anyway | finding F057 |
+| 2026-10-17 | RTK leaves `git diff`, `git show`, `git log`, `grep` and `rg` alone | It summarized a review's diff to a fifth, silently | Alexis's RTK config, finding F046 |
+| 2026-10-17 | Merges and pushes are Alexis's, typed in his own shell; the GitHub token stays in the macOS keychain | The sandbox refuses a merge's writes; the keychain keeps the token unreadable to Claude | `docs/HARNESS.md`, findings F063, F064 |
+| 2026-10-17 | CI on GitHub Actions, for every branch pushed; it reports, it cannot block a merge on this plan | A check outside this machine; the company's Team plan will let it block | `.github/workflows/gate.yml` |
+| 2026-10-17 | No edit asks Alexis first, config files included; a new dependency, a push, `rm -rf` and chain writes still do | Too many manual approvals; the sandbox, the gate and review hold the rest | `.claude/settings.json` |
+| 2026-10-17 | React's lint presets come with slice 1b; three.js gets our own skill, written from r186, in slice 7 | No external skill targets our exact stack | `docs/plans/backlog.md` |
+| 2026-10-17 | An edit of the six files run outside the sandbox asks Alexis first: the guard, the Stop hook, `code_changed.sh`, the git hooks, `settings.json`, the `package.json` files | Edits are not sandboxed: an edit there would run with his full access | `.claude/settings.json`, finding F068 |
+| 2026-10-17 | The reviewers get an exam: the ledger's reproduced findings, rerun whenever a reviewer changes; it comes after slice 1 | A reviewer is judged by the bugs it finds; Anthropic tunes its own code review this way | `docs/plans/backlog.md` |
+| 2026-10-17 | An edit asks Alexis first again for `scripts/`, `.githooks/`, `.claude/`, the gate's configs and what pnpm runs | The git hooks run the gate with his full access when he pushes or merges: an edit there escaped the sandbox (finding F076) | `.claude/settings.json` |
+| 2026-10-17 | The hooks Alexis's git runs stop running repository code; a backlog item, after slice 1 | The real fix for F076: asking before edits only narrows it | `docs/plans/backlog.md` |
+| 2026-10-17 | In 1b, a test that kills no mutant fails the full gate (StrykerJS `disableBail`, `killedBy`) | A lint rule against `expect(1)` is easy to get around; a test that sees no change to the code is useless however it is written | `docs/plans/slice-1.md` |

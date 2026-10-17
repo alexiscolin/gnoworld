@@ -126,6 +126,11 @@ describe("parseLine reads", () => {
     ["@a=b\\ PING x", message("PING", ["x"], { tags: [["a", "b"]] })],
     ["@k=1;k=2 PING x", message("PING", ["x"], { tags: [["k", "2"]] })],
     ["@ok=1;=bad;bad/=x;é=2 PING x", message("PING", ["x"], { tags: [["ok", "1"]] })],
+    // A key is [+][vendor/]name: name is letters, digits and hyphens; vendor is a host, which we
+    // take to mean a DNS host name (IRCv3 does not say; an IPv6 literal would hold colons).
+    ["@ok=1;a_b=2;++k=3;a:b/k=4;a_b/k=5;-a/k=6 PING x", message("PING", ["x"], { tags: [["ok", "1"]] })],
+    ["@a=b  PING x", message("PING", ["x"], { tags: [["a", "b"]] })],
+    ["@a=b  :src   PING x", message("PING", ["x"], { tags: [["a", "b"]], source: "src" })],
   ])("%j", (line, expected) => {
     expect(parseLine(line)).toStrictEqual({ ok: true, message: expected });
   });
@@ -148,6 +153,21 @@ describe("parseLine refuses", () => {
     ["PRIVMSG #gno :a\rb", "bad-character"],
     ["PRIVMSG #gno :a\0b", "bad-character"],
     ["PING x\r\n\r\n", "bad-character"],
+    // Anywhere, not only in the parameters: a tag value, the source, the command.
+    ["@a=x\ny PING x", "bad-character"],
+    ["@a=\0 PING x", "bad-character"],
+    [":ni\nck PING x", "bad-character"],
+    [":ni\0ck PING x", "bad-character"],
+    ["PI\nNG x", "bad-character"],
+    // A lone surrogate has no UTF-8 form, so the line has no byte count.
+    ["PING \uD800", "bad-character"],
+    ["PING \uDC00", "bad-character"],
+    ["PING 🪐\uD800", "bad-character"],
+    ["@a=\uD800 PING x", "bad-character"],
+    [":ni\uD800ck PING x", "bad-character"],
+    [":ni\rck PING x", "bad-character"],
+    ["@a=x\ry PING x", "bad-character"],
+    ["PI\rNG x", "bad-character"],
     ["PRIVMSG #gno :" + "a".repeat(1_000_000), "body-too-long"],
     ["@" + "a".repeat(1_000_000) + " PING x", "tags-too-long"],
   ])("%j: %s", (line, error) => {
@@ -161,6 +181,8 @@ describe("parseLine's limits, in UTF-8 bytes", () => {
     ["a body of 510 bytes", body(510), true],
     ["a body of 511 bytes", body(510) + "a", false],
     ["510 bytes, then CR LF, which do not count", body(510) + "\r\n", true],
+    ["8191 bytes of tags, then a body of 510", "@k=" + "a".repeat(8187) + " " + body(510), true],
+    ["a few tags, then a body of 511", "@k=" + "a".repeat(96) + " " + body(510) + "a", false],
     ["510 bytes with the source", ":nick PRIVMSG #gno :" + "a".repeat(490), true],
     ["511 bytes with the source", ":nick PRIVMSG #gno :" + "a".repeat(491), false],
   ])("%s", (_, line, ok) => {
@@ -187,6 +209,9 @@ describe("parseLine's limits, in UTF-8 bytes", () => {
     ["8191 bytes of tags with the @ and the space", "@k=" + "a".repeat(8187) + " PING x", true],
     ["8192 bytes of tags", "@k=" + "a".repeat(8188) + " PING x", false],
     ["8192 bytes of tags with no command after them", "@k=" + "a".repeat(8189), false],
+    // IRCv3 counts one trailing space; the extra ones before the command are not tags.
+    ["8191 bytes of tags, then extra spaces", "@k=" + "a".repeat(8187) + "   PING x", true],
+    ["8192 bytes of tags, then extra spaces", "@k=" + "a".repeat(8188) + "   PING x", false],
     ["8190 bytes of two-byte characters", "@k=" + "é".repeat(4093) + " PING x", true],
     ["8192 bytes of two-byte characters", "@k=" + "é".repeat(4094) + " PING x", false],
   ])("%s", (_, line, ok) => {
@@ -278,6 +303,18 @@ describe("formatLine", () => {
     ["a tag key with an equals sign", message("PING", ["x"], { tags: [["a=b", "1"]] })],
     ["a tag key with a semicolon", message("PING", ["x"], { tags: [["a;b", "1"]] })],
     ["an empty tag key", message("PING", ["x"], { tags: [["", "1"]] })],
+    [
+      "a tag key with a space, which would split the line",
+      message("PING", ["x"], { tags: [["a :evil PRIVMSG #x", "1"]] }),
+    ],
+    ["a tag key that is not ASCII", message("PING", ["x"], { tags: [["é", "1"]] })],
+    ["a tag key with an empty name after the vendor", message("PING", ["x"], { tags: [["bad/", "1"]] })],
+    ["a tag key with an underscore", message("PING", ["x"], { tags: [["a_b", "1"]] })],
+    ["a tag key whose vendor carries a command", message("PING", ["x"], { tags: [["a :evil PRIVMSG #x/k", "1"]] })],
+    ["a tag key whose vendor is not a host name", message("PING", ["x"], { tags: [["a:b/k", "1"]] })],
+    ["a tag key with two plus signs", message("PING", ["x"], { tags: [["++k", "1"]] })],
+    ["a source with a CR", message("PING", ["x"], { source: "ni\rck" })],
+    ["a tag value with a lone surrogate", message("PING", ["x"], { tags: [["k", "a\uD800"]] })],
     ["a source with a space", message("PING", ["x"], { source: "a b" })],
     ["a source with a LF", message("PING", ["x"], { source: "a\nQUIT" })],
     ["a source with a NUL", message("PING", ["x"], { source: "a\0b" })],

@@ -39,11 +39,18 @@ assert guard and all(h.get("onFailure") == "block" for h in guard), "guard does 
 box = s["sandbox"]
 assert box["enabled"] is True and box["allowUnsandboxedCommands"] is False, "the sandbox can be left"
 assert {"~/.ssh", "~/.config/gh", "~/.npmrc", "~/.aws"} <= set(box["filesystem"]["denyRead"]), "a credential is readable"
-assert {"scripts", ".githooks", "package.json", ".node-version", "pnpm-lock.yaml", ".gitignore", "CLAUDE.md", ".claude/rules"} <= set(box["filesystem"]["denyWrite"]), "a command can rewrite the harness, the lockfile or the rules"
+assert {"scripts", ".githooks", ".github", "package.json", ".node-version", "pnpm-lock.yaml", ".gitignore", "CLAUDE.md", ".claude/rules"} <= set(box["filesystem"]["denyWrite"]), "a command can rewrite the harness, the lockfile or the rules"
 assert not [p for p in box["filesystem"]["allowWrite"] if "pnpm" in p], "a command can rewrite the pnpm that Alexis's install runs"
 assert not any("api.github.com" in d for d in box["network"]["allowedDomains"]), "the GitHub API is reachable"
 ask, deny = set(s["permissions"]["ask"]), set(s["permissions"]["deny"])
-assert {"Edit(/scripts/**)", "Edit(/.githooks/**)", "Edit(/.claude/**)", "Edit(/packages/core/**)"} <= ask, "an edit of the harness or core asks no one"
+# Claude edits alone (Alexis, 2026-10-17), but for what runs with Alexis's full access: the
+# hooks, the gate and every script or config they reach when he pushes or merges, and what pnpm
+# runs at his install (findings F068, F076); a new dependency and a push still ask.
+assert {"Bash(pnpm add *)", "Bash(git push *)"} <= ask, "a new dependency or a push asks no one"
+outside = {"Edit(/scripts/**)", "Edit(/.githooks/**)", "Edit(/.claude/**)", "Edit(/*.config.ts)", "Edit(/stryker.config.json)",
+           "Edit(/**/package.json)", "Edit(/pnpm-workspace.yaml)", "Edit(/.npmrc)", "Edit(/.pnpmfile.cjs)"}
+writes = {r for r in ask if r.split("(")[0] in {"Edit", "Write", "MultiEdit", "NotebookEdit"}}
+assert writes == outside, "the edits that ask are not exactly the files run outside the sandbox"
 assert {f"mcp__{p}__gno_{t}" for p in ("gnomcp", "plugin_gnomcp_gnomcp") for t in ("addpkg", "call", "run", "key_send", "cla_sign")} <= ask, "a chain write asks no one"
 assert {"Read(~/.ssh/**)", "Read(~/.config/gh/**)"} <= deny, "the Read tool can open a credential"
 # The sandbox turns Read denies into its own: one on dist, coverage or reports stops the gate
@@ -71,6 +78,31 @@ done
 for f in "$here"/*.sh "$hooks"/*; do
 	grep -nE '^[[:space:]]*[A-Za-z_]+=\$\(mktemp' "$f" | grep -vE 'mktemp (-d )?"\$\{TMPDIR:-/tmp\}/' | grep -q . && fail "$(basename "$f") makes a temporary file outside \$TMPDIR"
 done
+# The CI runs the full gate, reads the repository and nothing more, and pins every action and
+# download: a tag or a branch can be moved to code nobody reviewed.
+python3 -I - "$here/../.github/workflows/gate.yml" <<'PY' || fail "the CI workflow lost a promise"
+import re, sys
+# Comments out: a promise kept only in a comment is not kept.
+ci = re.sub(r"[ \t]*#.*$", "", open(sys.argv[1]).read(), flags=re.M)
+def has(line, why):
+    assert re.search("^" + line + "$", ci, re.M), why
+uses = re.findall(r"uses:\s*(\S+)", ci)
+assert uses and all(re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", u) for u in uses), f"an action not pinned to a commit: {uses}"
+trigger = re.search(r"^on:\n((?:  .*\n)+)", ci, re.M)
+assert trigger and re.findall(r"^  (\S+):", trigger.group(1), re.M) == ["push"], "the CI runs on something else than a push"
+assert ci.count("permissions:") == 1 and "write" not in ci, "the CI may write"
+has(r"permissions:\n  contents: read", "the CI may write")
+assert "secrets." not in ci and "continue-on-error" not in ci, "the CI reads a secret or lets a step fail"
+assert not re.search(r"^\s+(- )?if:", ci, re.M), "a CI step can be skipped"
+has(r"    runs-on: ubuntu-24\.04", "the CI runs on a machine it does not name")
+has(r"        run: sh scripts/check\.sh --full", "the CI does not run the full gate, or lets it fail")
+has(r"          persist-credentials: false", "the CI keeps its token on disk for the gate")
+has(r"          fetch-depth: 0", "the CI cannot compare the branch with main")
+has(r"      GNO_COMMIT: [0-9a-f]{40}", "the CI builds gno from a name that can move")
+has(r'          echo "[0-9a-f]{64}  \$RUNNER_TEMP/gitleaks\.tgz" \| sha256sum -c', "the CI trusts a download it did not check")
+assert not re.search(r"\|\s*(ba)?sh\b", ci), "the CI runs a download"
+assert "--frozen-lockfile" in ci and "--ignore-scripts" in ci, "the CI trusts a lockfile it did not check"
+PY
 # check.sh refuses a .node-version that is more than a version, which would steer PATH.
 nv="$t/nodeversion" && mkdir -p "$nv/scripts" && cp "$gate_file" "$nv/scripts/check.sh"
 printf '24.22.0/../../../../evil\n' >"$nv/.node-version"
@@ -274,23 +306,52 @@ fi
 if part pre_commit; then
 # pre-commit runs the gate on the staged files, and a failing gate stops the commit.
 c2="$t/precommit"
+precommit() { (cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1); }
 mkdir -p "$c2/scripts" && git -C "$c2" init -q
 printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/repo_files.py" "$here/scan_secrets.sh" "$here/gitleaks.toml" "$c2/scripts/" && git -C "$c2" add -A && git -C "$c2" commit -qm base
 echo code >"$c2/a.ts" && git -C "$c2" add a.ts
-(cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a commit through a failing gate"
+precommit && fail "pre-commit let a commit through a failing gate"
 printf '#!/bin/sh\nexit 0\n' >"$c2/scripts/check.sh" && git -C "$c2" add -A
-(cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) || fail "pre-commit stopped a commit whose gate passes"
+precommit || fail "pre-commit stopped a commit whose gate passes"
 # A secret in what is staged stops the commit, docs included.
 mkdir -p "$t/leakbin" && printf '#!/bin/sh\nexit 1\n' >"$t/leakbin/gitleaks" && chmod +x "$t/leakbin/gitleaks"
 (cd "$c2" && PATH="$t/leakbin:$PATH" sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a commit through a secret scan that found one"
 git -C "$c2" commit -qm code && mkdir -p "$c2/docs" && echo prose >"$c2/docs/a.md" && git -C "$c2" add docs/a.md
-(cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) || fail "pre-commit stopped a docs-only commit with no secret"
+precommit || fail "pre-commit stopped a docs-only commit with no secret"
 (cd "$c2" && PATH="$t/leakbin:$PATH" sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a docs-only commit through a secret scan that found one"
 # The staged gate is the one that runs: it must match the working tree's, or a commit gates itself.
 git -C "$c2" commit -qm docs && printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && git -C "$c2" add scripts/check.sh && git -C "$c2" commit -qm red
 blob=$(printf '#!/bin/sh\nexit 0\n' | git -C "$c2" hash-object -w --stdin) && git -C "$c2" update-index --cacheinfo "100755,$blob,scripts/check.sh"
 echo more >>"$c2/a.ts" && git -C "$c2" add a.ts
-(cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a staged gate differ from the working tree's"
+precommit && fail "pre-commit let a staged gate differ from the working tree's"
+# An edit of the harness that is not staged is not in the commit: it does not stop one.
+git -C "$c2" reset -q && printf '#!/bin/sh\nexit 0\n' >"$c2/scripts/check.sh" && git -C "$c2" add scripts/check.sh && git -C "$c2" commit -qm green
+printf '#!/bin/sh\nexit 0\n# being edited\n' >"$c2/scripts/check.sh" && echo again >>"$c2/a.ts" && git -C "$c2" add a.ts
+precommit || fail "pre-commit refused a commit for a harness edit it does not hold"
+# The helpers it runs come from what is staged, not from the disk: an unstaged edit of one
+# must not neuter the gate (finding F067).
+git -C "$c2" checkout -q -- scripts/check.sh && printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && git -C "$c2" add scripts/check.sh && git -C "$c2" commit -qm red
+printf '#!/bin/sh\ncp /dev/null "$1/scripts/check.sh"\n' >"$c2/scripts/borrow_node_modules.sh"
+echo yet >>"$c2/a.ts" && git -C "$c2" add a.ts
+precommit && fail "pre-commit ran an unstaged helper that emptied the gate"
+git -C "$c2" checkout -q -- scripts/borrow_node_modules.sh && printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/code_changed.sh"
+precommit && fail "pre-commit ran an unstaged code_changed.sh that skipped the gate"
+git -C "$c2" checkout -q -- scripts/code_changed.sh
+# Every staged harness file is compared, whatever its name: a space or an accent included.
+printf '#!/bin/sh\nexit 0\n' >"$c2/scripts/check.sh" && git -C "$c2" add scripts/check.sh
+for name in 'my file.sh' 'é.sh'; do
+	echo 'exit 0' >"$c2/scripts/$name" && git -C "$c2" add "scripts/$name" && echo 'exit 1' >"$c2/scripts/$name"
+	precommit && fail "pre-commit let a staged scripts/$name differ from the working tree's"
+	git -C "$c2" rm -qf --cached "scripts/$name" && rm "$c2/scripts/$name"
+done
+# The hooks and the settings are harness too; a code file partly staged is not.
+for f in .githooks/pre-push .github/workflows/gate.yml .claude/settings.json; do
+	mkdir -p "$c2/${f%/*}" && echo '{}' >"$c2/$f" && git -C "$c2" add "$f" && echo '{"x":1}' >"$c2/$f"
+	precommit && fail "pre-commit let a staged $f differ from the working tree's"
+	git -C "$c2" rm -qf --cached "$f" && rm "$c2/$f"
+done
+echo partly >>"$c2/a.ts" && git -C "$c2" add a.ts && echo unstaged >>"$c2/a.ts"
+precommit || fail "pre-commit refused a code file only partly staged"
 fi
 
 if part guard; then
