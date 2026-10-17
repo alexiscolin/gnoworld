@@ -28,7 +28,7 @@ SECTIONS = {
     "scripts/guard.py": "guard", "scripts/review_pass.py": "review_pass", "scripts/patch_coverage.py": "patch_coverage",
     "scripts/check_docs.py": "check_docs", "scripts/check_regressions.py": "regressions", ".githooks/commit-msg": "commit_msg",
     ".githooks/pre-push": "pre_push", ".githooks/pre-commit": "pre_commit,wiring", "scripts/code_changed.sh": "pre_commit,stop_gate",
-    "scripts/stop_gate.sh": "stop_gate,wiring", "scripts/format_hook.sh": "format_hook", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
+    "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
     "scripts/check.sh": "wiring", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
     "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets",
 }
@@ -155,8 +155,8 @@ def mutants():
     yield from each("scripts/code_changed.sh", "! git diff --cached", "git diff --cached", "hooks", "code_changed staged")
     yield from each("scripts/code_changed.sh", '[ -n "$(git status', '[ -z "$(git status', "hooks", "code_changed working tree")
     yield from each("scripts/stop_gate.sh", "exit 2", "exit 0", "hooks", "stop_gate block")
-    yield from each("scripts/format_hook.sh", "node_modules/.bin/eslint --fix", ": eslint --fix", "hooks", "format_hook eslint")
-    yield from each("scripts/format_hook.sh", "node_modules/.bin/prettier --write", ": prettier --write", "hooks", "format_hook prettier")
+    yield from each("scripts/stop_gate.sh", '" = "$(sh scripts/code_changed.sh --state)"', '" != "x"', "hooks", "stop_gate compares the state the gate passed")
+    yield from each("scripts/check.sh", "printf '%s' \"${want#v}\" | grep -qxE", "true || printf '%s' \"${want#v}\" | grep -qxE", "hooks", "check.sh refuses a .node-version that is not a version")
     yield from each(".claude/settings.json", '"onFailure": "block"', '"onFailure": "ignore"', "hooks", "settings: guard blocks on a crash")
     yield from each(".claude/settings.json", '"allowUnsandboxedCommands": false', '"allowUnsandboxedCommands": true', "hooks", "settings: no unsandboxed retry")
     yield from each(".claude/settings.json", '"denyRead": ["~/.ssh"', '"denyRead": ["~/.nothing"', "hooks", "settings: credentials unreadable")

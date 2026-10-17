@@ -24,6 +24,7 @@
       "Edit(/scripts/**)",
       "Edit(/.githooks/**)",
       "Edit(/.claude/**)",
+      "Edit(/CLAUDE.md)",
       "Edit(/*.config.ts)",
       "Edit(/**/package.json)",
       "Edit(/pnpm-workspace.yaml)",
@@ -62,17 +63,6 @@
           }
         ]
       }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/scripts/format_hook.sh\""
-          }
-        ]
-      }
     ]
   },
   "extraKnownMarketplaces": {
@@ -92,18 +82,22 @@
     },
     "filesystem": {
       "allowWrite": [
-        "~/.cache/gno-toolchains",
+        "~/.cache/gno-toolchains/onyx/gnohome",
         "~/.cache/gnoworld-tools",
         "~/.cache/go-build",
         "~/Library/Caches/go-build",
-        "~/go/pkg/mod",
-        "~/.local/share/pnpm",
-        "~/Library/pnpm"
+        "~/go/pkg/mod"
       ],
       "denyWrite": [
         "scripts",
         ".githooks",
         "package.json",
+        "pnpm-lock.yaml",
+        ".node-version",
+        ".gitignore",
+        "CLAUDE.md",
+        ".claude/rules",
+        ".npmrc",
         "pnpm-workspace.yaml",
         "eslint.config.ts",
         "vitest.config.ts",

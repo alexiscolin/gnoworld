@@ -16,6 +16,8 @@ full=false
 started=$(date +%s)
 
 want="v$(cat .node-version)"
+# A version and nothing else: anything more would put a folder of its choice first on PATH.
+printf '%s' "${want#v}" | grep -qxE '[0-9]+\.[0-9]+\.[0-9]+' || { echo "check.sh: .node-version must be a version such as 24.22.0" >&2; exit 1; }
 nvm_node="${NVM_DIR:-$HOME/.nvm}/versions/node/$want/bin"
 PATH="$nvm_node:$PATH"
 [ "$(node -v 2>/dev/null)" = "$want" ] || {
@@ -99,4 +101,7 @@ if $full; then
 	fi
 fi
 
+if git rev-parse --git-dir >/dev/null 2>&1; then # not in pre-commit's staged copy, which has no repository
+	mkdir -p .claude/tmp && sh scripts/code_changed.sh --state >.claude/tmp/gate-green # what stop_gate.sh compares
+fi
 echo "all checks passed in $(($(date +%s) - started)) s"

@@ -33,10 +33,12 @@ Three ideas run through it:
    agent reviews them before any code (the red pass: complete, relevant, riskiest first,
    security). Their commit carries a line `Red-pass: <findings fixed>`. In `packages/core`
    the tests are marked `test.fails` and Alexis writes the code (pairing).
-3. **Code.** Before each Bash command, web fetch or edit, `scripts/guard.py` runs; after each
-   edit, `scripts/format_hook.sh` runs ESLint's fixes and Prettier on the file.
-4. **End of each turn.** The Stop hook (`scripts/stop_gate.sh`) runs the fast gate when code
-   changed, and stops the turn once if it fails.
+3. **Code.** Before each Bash command, web fetch or edit, `scripts/guard.py` runs. Formatting
+   is the gate's (`pnpm format` fixes it): a hook runs outside the sandbox, so no hook runs a
+   tool a sandboxed command could rewrite.
+4. **End of each turn.** When code changed, the Stop hook (`scripts/stop_gate.sh`) stops the turn
+   once unless the fast gate, which Claude runs in the sandbox, passed on exactly this tree
+   (`check.sh` records it). The hook itself runs nothing from the repository.
 5. **Each commit.** `commit-msg` holds the subject's form and refuses attribution lines.
    `pre-commit` scans what is staged for secrets, then runs the fast gate on a copy of what
    is staged, not on the working tree.
@@ -202,7 +204,8 @@ measure, slice 1a's merge, found 25 or more, one of them a way out of the sandbo
 | `.claude/commands/` | `/slice-plan`, `/pre-merge` |
 | `.githooks/` | `commit-msg`, `pre-commit`, `pre-push` (`pnpm install` points git at them) |
 | `scripts/check.sh` | the gate |
-| `scripts/guard.py`, `scripts/format_hook.sh`, `scripts/stop_gate.sh` | Claude Code's hooks |
+| `scripts/guard.py`, `scripts/stop_gate.sh` | Claude Code's hooks |
+| `scripts/scan_secrets.sh`, `scripts/gitleaks.toml`, `scripts/audit.py` | the secret scan and the dependency audit |
 | `scripts/code_changed.sh`, `scripts/borrow_node_modules.sh`, `scripts/repo_files.py` | what the hooks and scripts share |
 | `scripts/check_css.py`, `scripts/check_comments.mjs`, `scripts/check_docs.py` | the style and docs checks |
 | `scripts/mutate.py` | the realms' mutation check |

@@ -25,7 +25,9 @@ python3 -I - "$here/../.claude/settings.json" <<'PY' || fail "settings.json no l
 import json, sys
 hooks = json.load(open(sys.argv[1]))["hooks"]
 wired = {event: " ".join(h["command"] for entry in hooks.get(event, []) for h in entry["hooks"]) for event in hooks}
-assert "scripts/guard.py" in wired["PreToolUse"] and "scripts/format_hook.sh" in wired["PostToolUse"] and "scripts/stop_gate.sh" in wired["Stop"]
+assert "scripts/guard.py" in wired["PreToolUse"] and "scripts/stop_gate.sh" in wired["Stop"]
+# A hook runs outside the sandbox: none may run a tool a sandboxed command can rewrite (finding F038).
+assert not wired.get("PostToolUse"), "a PostToolUse hook runs outside the sandbox"
 PY
 # The boundary settings.json promises (docs/DEVELOPMENT.md, "The harness"): a guard that crashes
 # blocks; no unsandboxed retry; credentials unreadable; the harness and chain writes ask first.
@@ -37,7 +39,8 @@ assert guard and all(h.get("onFailure") == "block" for h in guard), "guard does 
 box = s["sandbox"]
 assert box["enabled"] is True and box["allowUnsandboxedCommands"] is False, "the sandbox can be left"
 assert {"~/.ssh", "~/.config/gh", "~/.npmrc", "~/.aws"} <= set(box["filesystem"]["denyRead"]), "a credential is readable"
-assert {"scripts", ".githooks", "package.json"} <= set(box["filesystem"]["denyWrite"]), "a command can rewrite the harness"
+assert {"scripts", ".githooks", "package.json", ".node-version", "pnpm-lock.yaml", ".gitignore", "CLAUDE.md", ".claude/rules"} <= set(box["filesystem"]["denyWrite"]), "a command can rewrite the harness, the lockfile or the rules"
+assert not [p for p in box["filesystem"]["allowWrite"] if "pnpm" in p], "a command can rewrite the pnpm that Alexis's install runs"
 assert not any("api.github.com" in d for d in box["network"]["allowedDomains"]), "the GitHub API is reachable"
 ask, deny = set(s["permissions"]["ask"]), set(s["permissions"]["deny"])
 assert {"Edit(/scripts/**)", "Edit(/.githooks/**)", "Edit(/.claude/**)", "Edit(/packages/core/**)"} <= ask, "an edit of the harness or core asks no one"
@@ -126,24 +129,31 @@ fi
 fi
 
 if part stop_gate; then
-# stop_gate: it passes on a second stop, and on docs-only changes; it blocks (exit 2)
-# when code changed and the gate fails. A throwaway repo with a failing fake gate.
+# stop_gate runs outside the sandbox, so it runs nothing a sandboxed command could write: it
+# compares the tree with the state check.sh last passed on. It passes on a second stop, on
+# docs-only changes, and on a state the gate passed; otherwise it blocks (exit 2).
 gate="$here"/stop_gate.sh
 r="$t/repo"
-mkdir -p "$r/scripts" "$r/docs"
-printf '#!/bin/sh\nexit 1\n' >"$r/scripts/check.sh"
-cp "$here/code_changed.sh" "$r/scripts/"
+mkdir -p "$r/scripts" "$r/docs" "$r/.claude/tmp"
+printf '#!/bin/sh\ntouch "%s/gate-ran"\n' "$t" >"$r/scripts/check.sh"
+cp "$here/code_changed.sh" "$r/scripts/" && printf '.claude/tmp/\n' >"$r/.gitignore"
 git -C "$r" init -q && git -C "$r" add -A && git -C "$r" commit -qm init
 stop() { printf '%s' "$1" | CLAUDE_PROJECT_DIR="$r" sh "$gate" 2>/dev/null; }
+green() { (cd "$r" && sh scripts/code_changed.sh --state >.claude/tmp/gate-green); }
 echo note >"$r/docs/n.md"
 stop '{"stop_hook_active":false}' || fail "stop_gate blocked a docs-only change"
 echo 'package x' >"$r/x.go"
 code=0; stop '{"stop_hook_active":false}' || code=$?
-[ "$code" = 2 ] || fail "stop_gate did not block a code change with a failing gate (exit $code)"
+[ "$code" = 2 ] || fail "stop_gate did not block a code change the gate never passed (exit $code)"
+[ ! -e "$t/gate-ran" ] || fail "stop_gate ran the repository's check.sh outside the sandbox"
 stop '{"stop_hook_active":true}' || fail "stop_gate blocked a second stop in a row"
-rm "$r/x.go" && mkdir -p "$r/.claude" && echo '{}' >"$r/.claude/settings.json"
+green && { stop '{"stop_hook_active":false}' || fail "stop_gate blocked a state the gate passed"; }
+echo 'package y' >"$r/x.go"
 code=0; stop '{"stop_hook_active":false}' || code=$?
-[ "$code" = 2 ] || fail "stop_gate let a settings.json change through a failing gate (exit $code)"
+[ "$code" = 2 ] || fail "stop_gate let through a change made after the gate passed (exit $code)"
+rm "$r/x.go" && echo '{}' >"$r/.claude/settings.json"
+code=0; stop '{"stop_hook_active":false}' || code=$?
+[ "$code" = 2 ] || fail "stop_gate let a settings.json change through (exit $code)"
 fi
 
 if part check_docs; then
@@ -173,18 +183,6 @@ row "| F001 | 2026-10-17 | a | x.py:1 | a bug | rejected | — |" && fail "check
 row "| F001 | 2026-10-17 | a | x.py:1 | a | claimed | — |
 | F001 | 2026-10-17 | b | y.py:1 | b | claimed | — |" && fail "check_docs accepted an id used twice"
 rm -r "$d/docs/review"
-fi
-
-if part format_hook; then
-# format_hook: after an edit, eslint --fix rewrites the file; it never blocks.
-fmt="$here"/format_hook.sh
-repo=$(cd "$(dirname "$0")/.." && pwd)
-probe="$repo/packages/core/src/__format_probe__.ts"
-printf 'export type Point = { x: number };\nexport const  origin={x:0}\n' >"$probe"
-printf '{"tool_input":{"file_path":"%s"}}' "$probe" | CLAUDE_PROJECT_DIR="$repo" sh "$fmt" || { rm -f "$probe"; fail "format_hook blocked an edit"; }
-grep -q "interface Point" "$probe" || { rm -f "$probe"; fail "format_hook did not run eslint --fix"; }
-grep -q "export const origin = { x: 0 };" "$probe" || { rm -f "$probe"; fail "format_hook did not run prettier"; }
-rm -f "$probe"
 fi
 
 if part patch_coverage; then
