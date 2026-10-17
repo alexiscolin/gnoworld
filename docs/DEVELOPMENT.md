@@ -57,6 +57,11 @@ first.
 (`CLAUDE_CODE_SUBAGENT_MODEL` in `.claude/settings.json`); agents get the diff's path, never
 its content; one review pass; `/clear` between slices; `/usage` shows a session's cost.
 
+**Claude Code plugins,** on for this project (`.claude/settings.json`): `typescript-lsp`, to
+navigate the code through the TypeScript language server; `context7`, for libraries' docs at
+the pinned version. Each later one comes with its slice, since every plugin costs context in
+every session: `chrome-devtools-mcp` (1b), `frontend-design` (2), `posthog` (12). Not Figma.
+
 **Once the repo is pushed** (`origin`: github.com/alexiscolin/gnoworld, private): CI runs `scripts/check.sh`; `/security-review` works (it
 compares with `origin`); Code Review can review each pull request if the organization is on
 a Team or Enterprise plan; any scripted `claude -p` run carries `--max-budget-usd`.

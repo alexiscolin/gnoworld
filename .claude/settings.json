@@ -51,6 +51,10 @@
       }
     ]
   },
+  "enabledPlugins": {
+    "typescript-lsp@claude-plugins-official": true,
+    "context7@claude-plugins-official": true
+  },
   "sandbox": {
     "enabled": true,
     "network": {
@@ -77,8 +81,5 @@
         "~/Library/Caches/ms-playwright"
       ]
     }
-  },
-  "enabledPlugins": {
-    "typescript-lsp@claude-plugins-official": true
   }
 }
