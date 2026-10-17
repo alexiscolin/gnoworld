@@ -7,7 +7,8 @@ import {
   type LoaderFunctionArgs,
   type MetaArgs,
 } from "react-router";
-import { findWorld, worldMeta } from "../site.ts";
+import { failedWorldMeta, findWorld, worldMeta } from "../site.ts";
+import { ErrorNotice } from "../ui/ErrorNotice.tsx";
 
 export function loader({ params }: LoaderFunctionArgs) {
   return findWorld(params["world"]);
@@ -19,8 +20,12 @@ export function clientLoader({ params }: ClientLoaderFunctionArgs) {
   return findWorld(params["world"]);
 }
 
-export function meta({ loaderData }: MetaArgs<typeof loader>) {
-  return worldMeta(loaderData);
+export function meta({ loaderData, error }: MetaArgs<typeof loader>) {
+  return loaderData || isMissing(error) ? worldMeta(loaderData) : failedWorldMeta();
+}
+
+function isMissing(error: unknown): boolean {
+  return isRouteErrorResponse(error) && error.status === 404;
 }
 
 export default function World() {
@@ -35,11 +40,10 @@ export default function World() {
 
 export function ErrorBoundary() {
   const error = useRouteError();
-  const missing = isRouteErrorResponse(error) && error.status === 404;
-  return (
-    <div role="alert">
-      <h1>{missing ? "No world here" : "This world could not load"}</h1>
-      <p>{missing ? "No world of gno.land goes by that name." : "Try again in a moment."}</p>
-    </div>
+  const missing = isMissing(error);
+  return missing ? (
+    <ErrorNotice title="No world here">No world of gno.land goes by that name.</ErrorNotice>
+  ) : (
+    <ErrorNotice title="This world could not load">Try again in a moment.</ErrorNotice>
   );
 }

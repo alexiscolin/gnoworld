@@ -1,53 +1,61 @@
 import { data, type ClientLoaderFunctionArgs, type MetaArgs, type RouteObject } from "react-router";
 import { describe, expect, test } from "vitest";
-import { render } from "../../tests/render.tsx";
-import { findWorld, worldMeta } from "../site.ts";
+import { render, routeError } from "../../tests/render.tsx";
+import { failedWorldMeta, findWorld, worldMeta } from "../site.ts";
 import World, { clientLoader, ErrorBoundary, loader, meta } from "./world.tsx";
 
-function page(path: string, worldLoader: RouteObject["loader"] = loader): Promise<string> {
-  return render({ path: "/w/:world", Component: World, loader: worldLoader, ErrorBoundary }, path);
+function route(worldLoader: RouteObject["loader"] = loader): RouteObject {
+  return { path: "/w/:world", Component: World, loader: worldLoader, ErrorBoundary };
 }
+
+const failures: [string, () => never][] = [
+  [
+    "an error",
+    () => {
+      throw new Error("the chain did not answer");
+    },
+  ],
+  ...[403, 410, 503].map((status): [string, () => never] => [
+    `an answer of ${String(status)}`,
+    () => {
+      throw data(null, { status });
+    },
+  ]),
+];
 
 describe("a world's page", () => {
   test("shows the world's name and its description", async () => {
-    const html = await page("/w/bubble");
+    const html = await render(route(), "/w/bubble");
     expect(html).toContain("<h1>Bubble</h1>");
     expect(html).toContain("the BUBBLE token, its governance");
   });
 
   test("shows not found, as an alert, for a world that does not exist", async () => {
-    const html = await page("/w/nowhere");
+    const html = await render(route(), "/w/nowhere");
     expect(html).toContain('role="alert"');
     expect(html).toContain("<h1>No world here</h1>");
     expect(html).toContain("<p>No world of gno.land goes by that name.</p>");
   });
 
-  test.each([
-    [
-      "an error",
-      () => {
-        throw new Error("the chain did not answer");
-      },
-    ],
-    [
-      "an answer other than 404",
-      () => {
-        throw data(null, { status: 503 });
-      },
-    ],
-  ])("says it could not load on %s, apart from not found", async (_, failing) => {
-    const html = await page("/w/bubble", failing);
+  test.each(failures)("says it could not load on %s, apart from not found", async (_, failing) => {
+    const html = await render(route(failing), "/w/bubble");
     expect(html).toContain('role="alert"');
     expect(html).toContain("<h1>This world could not load</h1>");
     expect(html).toContain("<p>Try again in a moment.</p>");
     expect(html).not.toContain("No world here");
   });
 
-  test("carries the tags site.ts builds, for a world or for none", () => {
+  test("carries a world's tags, or not found's when no world has the name", async () => {
+    const args = (loaderData: ReturnType<typeof findWorld> | undefined, error?: unknown) =>
+      ({ loaderData, error }) as MetaArgs<typeof loader>;
     const world = findWorld("bubble");
-    const args = (loaderData: typeof world | undefined) => ({ loaderData }) as MetaArgs<typeof loader>;
     expect(meta(args(world))).toEqual(worldMeta(world));
-    expect(meta(args(undefined))).toEqual(worldMeta(undefined));
+    expect(meta(args(undefined, await routeError(route(), "/w/nowhere")))).toEqual(worldMeta(undefined));
+  });
+
+  test.each(failures)("carries could-not-load tags on %s, not not-found ones", async (_, failing) => {
+    const error = await routeError(route(failing), "/w/bubble");
+    expect(meta({ loaderData: undefined, error } as MetaArgs<typeof loader>)).toEqual(failedWorldMeta());
   });
 
   test("finds a world in the browser as at build time, with no request", () => {

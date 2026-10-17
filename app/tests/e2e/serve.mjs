@@ -1,8 +1,8 @@
 // The built site as a static host serves it (ADR-0002 §2): the file for a path where one exists,
-// otherwise the SPA fallback with a 404, never a page that is not the place asked for.
-import { createReadStream, statSync } from "node:fs";
+// spelled exactly, otherwise the SPA fallback with a 404, never a page that is not the place asked for.
+import { createReadStream, realpathSync, statSync } from "node:fs";
 import { createServer } from "node:http";
-import { extname, join, normalize, sep } from "node:path";
+import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../../build/client/", import.meta.url));
@@ -14,18 +14,18 @@ const TYPES = {
   ".svg": "image/svg+xml",
 };
 
+// A file as the path spells it: macOS finds one in another case, where a Linux host would not.
 function isFile(path) {
   try {
-    return statSync(path).isFile();
+    return statSync(path).isFile() && realpathSync.native(path) === path;
   } catch {
     return false;
   }
 }
 
 function find(pathname) {
-  const path = normalize(join(root, pathname));
-  if (!path.startsWith(root.endsWith(sep) ? root : root + sep)) return undefined;
-  return [path, join(path, "index.html")].find(isFile);
+  const path = join(root, pathname);
+  return path.startsWith(root) ? [path, join(path, "index.html")].find(isFile) : undefined;
 }
 
 createServer((request, response) => {
@@ -39,5 +39,7 @@ createServer((request, response) => {
   const found = find(pathname);
   const served = found ?? join(root, "__spa-fallback.html");
   response.writeHead(found ? 200 : 404, { "content-type": TYPES[extname(served)] ?? "application/octet-stream" });
-  createReadStream(served).pipe(response);
+  createReadStream(served)
+    .on("error", () => response.destroy())
+    .pipe(response);
 }).listen(4173, "127.0.0.1");

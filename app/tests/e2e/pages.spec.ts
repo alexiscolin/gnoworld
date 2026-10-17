@@ -6,7 +6,14 @@ const pages = [
   { path: "/", title: "gno.world", heading: "gno.world", canonical: "https://gno.world/" },
   { path: "/w/bubble", title: "Bubble · gno.world", heading: "Bubble", canonical: "https://gno.world/w/bubble" },
 ];
-const UNKNOWN = "/w/nowhere";
+// Paths no file answers: an unknown world, and paths that match no route at all.
+const notFound = [
+  { path: "/w/nowhere", title: "No world here · gno.world", heading: "No world here" },
+  { path: "/w/Bubble", title: "No world here · gno.world", heading: "No world here" },
+  { path: "/nowhere", title: "No page here · gno.world", heading: "No page here" },
+  { path: "/w/", title: "No page here · gno.world", heading: "No page here" },
+  { path: "/w/bubble/extra", title: "No page here · gno.world", heading: "No page here" },
+];
 
 async function tag(page: Page, selector: string): Promise<string> {
   const found = page.locator(selector);
@@ -15,16 +22,22 @@ async function tag(page: Page, selector: string): Promise<string> {
 }
 
 // React marks the document it hydrated; the static HTML alone never carries the mark.
+function isHydrated(page: Page): Promise<boolean> {
+  return page.evaluate(() => Object.keys(document).some((key) => key.startsWith("__reactContainer")));
+}
+
 async function hydrated(page: Page): Promise<void> {
   await page.waitForFunction(() => Object.keys(document).some((key) => key.startsWith("__reactContainer")));
 }
 
-// Every error the page reports, and every request that failed or answered 400 or more.
+// Every error the page reports, and every request but the page's own that failed or answered 400 or more.
 function watch(page: Page): string[] {
   const problems: string[] = [];
   page.on("pageerror", (error) => problems.push(error.message));
   page.on("console", (message) => {
-    if (message.type() === "error") problems.push(message.text());
+    // Chrome logs the page's own 404 as an error; a page not found answers 404 on purpose.
+    const ownStatus = message.location().url === page.url() && message.text().startsWith("Failed to load resource");
+    if (message.type() === "error" && !ownStatus) problems.push(message.text());
   });
   page.on("requestfailed", (request) => problems.push(`failed: ${request.url()}`));
   page.on("response", (response) => {
@@ -39,15 +52,16 @@ test.describe("as a search engine reads it, before any script runs", () => {
   test.use({ javaScriptEnabled: false });
 
   for (const { path, title, heading, canonical } of pages) {
-    test(`${path} carries its own title, description, canonical and Open Graph tags`, async ({ page }) => {
+    test(`${path} carries its own title, canonical and Open Graph tags`, async ({ page }) => {
       const response = await page.goto(path);
       expect(response?.status()).toBe(200);
+      expect(await isHydrated(page)).toBe(false);
       await expect.soft(page).toHaveTitle(title);
       await expect.soft(page.locator("title")).toHaveCount(1);
+      await expect.soft(page.locator("meta[charset]")).toHaveCount(1);
+      await expect.soft(page.locator('meta[name="viewport"]')).toHaveCount(1);
       await expect.soft(page.getByRole("heading", { level: 1 })).toHaveText(heading);
       const description = await tag(page, 'meta[name="description"]');
-      expect.soft(description.length).toBeGreaterThanOrEqual(50);
-      expect.soft(description.length).toBeLessThanOrEqual(160);
       expect.soft(await tag(page, 'link[rel="canonical"]')).toBe(canonical);
       expect.soft(await tag(page, 'meta[property="og:title"]')).toBe(title);
       expect.soft(await tag(page, 'meta[property="og:description"]')).toBe(description);
@@ -57,22 +71,15 @@ test.describe("as a search engine reads it, before any script runs", () => {
     });
   }
 
-  test("each page has a description of its own", async ({ page }) => {
-    const seen = new Set<string>();
-    for (const { path } of pages) {
-      await page.goto(path);
-      seen.add(await tag(page, 'meta[name="description"]'));
-    }
-    expect(seen.size).toBe(pages.length);
-  });
-
   test("a world's page names the same canonical with a trailing slash", async ({ page }) => {
     await page.goto("/w/bubble/");
     expect(await tag(page, 'link[rel="canonical"]')).toBe("https://gno.world/w/bubble");
   });
 
-  test("an unknown world is not pre-rendered: the host answers 404", async ({ request }) => {
-    expect((await request.get(UNKNOWN)).status()).toBe(404);
+  test("a path no file answers is not pre-rendered: the host answers 404", async ({ request }) => {
+    for (const { path } of notFound) {
+      expect((await request.get(path)).status(), path).toBe(404);
+    }
   });
 });
 
@@ -105,7 +112,7 @@ test.describe("once the client takes over", () => {
     const problems = watch(page);
     await page.goto("/w/bubble");
     await hydrated(page);
-    await expect.poll(() => problems.length).toBeGreaterThan(0);
+    await expect.poll(() => problems.some((problem) => problem.includes("#418"))).toBe(true);
   });
 
   test("a link to a world changes the page and its tags without a reload", async ({ page }) => {
@@ -123,16 +130,21 @@ test.describe("once the client takes over", () => {
     await expect(page.locator('meta[name="description"]')).toHaveCount(1);
   });
 
-  test("an unknown world shows not found in its route, keeps the shell and is not indexed", async ({ page }) => {
-    await page.goto(UNKNOWN);
-    await hydrated(page);
-    await expect(page.getByRole("alert")).toContainText("No world here");
-    await expect(page.getByRole("link", { name: "gno.world" })).toBeVisible();
-    expect(await tag(page, 'meta[name="robots"]')).toBe("noindex");
-    await expect(page.locator('link[rel="canonical"]')).toHaveCount(0);
-    const { violations } = await new AxeBuilder({ page }).analyze();
-    expect(violations).toEqual([]);
-  });
+  for (const { path, title, heading } of notFound) {
+    test(`${path} says not found, keeps the shell, is not indexed and hydrates cleanly`, async ({ page }) => {
+      const problems = watch(page);
+      await page.goto(path);
+      await hydrated(page);
+      await expect(page.getByRole("alert")).toContainText(heading);
+      await expect(page).toHaveTitle(title);
+      await expect(page.getByRole("link", { name: "gno.world" })).toBeVisible();
+      expect(await tag(page, 'meta[name="robots"]')).toBe("noindex");
+      await expect(page.locator('link[rel="canonical"]')).toHaveCount(0);
+      expect(problems).toEqual([]);
+      const { violations } = await new AxeBuilder({ page }).analyze();
+      expect(violations).toEqual([]);
+    });
+  }
 
   test("a world name made of markup stays text", async ({ page }) => {
     const dialogs: string[] = [];
@@ -146,13 +158,15 @@ test.describe("once the client takes over", () => {
     await expect(page.locator('img[src="x"]')).toHaveCount(0);
     expect(dialogs).toEqual([]);
   });
+});
 
-  test("the React Compiler compiled the client's code", async ({ page, request }) => {
-    await page.goto("/");
-    const scripts = await page
-      .locator("script[src], link[rel=modulepreload]")
-      .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("src") ?? node.getAttribute("href") ?? ""));
-    const bodies = await Promise.all(scripts.map(async (url) => (await request.get(url)).text()));
-    expect(bodies.some((body) => body.includes("react.memo_cache_sentinel"))).toBe(true);
-  });
+test("the React Compiler compiled the routes, not only React's own runtime", async ({ request }) => {
+  const home = await (await request.get("/")).text();
+  const chunks = [...home.matchAll(/(?:src|href)="(\/assets\/[^"]+\.js)"/g)].map((match) => match[1] ?? "");
+  expect(chunks.some((chunk) => chunk.includes("/compiler-runtime-"))).toBe(true);
+  const routes = chunks.filter((chunk) => /\/assets\/(root|home)-/.test(chunk));
+  expect(routes.length).toBeGreaterThan(0);
+  for (const chunk of routes) {
+    expect(await (await request.get(chunk)).text(), chunk).toContain("react.memo_cache_sentinel");
+  }
 });

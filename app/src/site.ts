@@ -26,7 +26,11 @@ export function findWorld(slug: string | undefined): World {
   return world;
 }
 
-/** The home page's tags. */
+/** A world's one address on the site: its links, its pre-rendered page and its canonical. */
+export function worldPath(world: World): string {
+  return `/w/${world.slug}`;
+}
+
 export function homeMeta(): MetaDescriptor[] {
   return pageMeta({
     title: "gno.world",
@@ -38,8 +42,22 @@ export function homeMeta(): MetaDescriptor[] {
 
 /** A world's tags, or, with no world, a not-found page's: no address of its own, not indexed. */
 export function worldMeta(world: World | undefined): MetaDescriptor[] {
-  if (!world) return [{ title: "No world here · gno.world" }, { name: "robots", content: "noindex" }];
-  return pageMeta({ title: `${world.name} · gno.world`, description: world.description, path: `/w/${world.slug}` });
+  if (!world) return unindexed("No world here");
+  return pageMeta({ title: `${world.name} · gno.world`, description: world.description, path: worldPath(world) });
+}
+
+/** A world that failed to load for another reason than its name: said so, and not indexed. */
+export function failedWorldMeta(): MetaDescriptor[] {
+  return unindexed("This world could not load");
+}
+
+/** A path no route matches. */
+export function notFoundMeta(): MetaDescriptor[] {
+  return unindexed("No page here");
+}
+
+function unindexed(title: string): MetaDescriptor[] {
+  return [{ title: `${title} · gno.world` }, { name: "robots", content: "noindex" }];
 }
 
 // A page's title, description and one canonical address, with their Open Graph twins.

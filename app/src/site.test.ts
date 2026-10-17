@@ -1,6 +1,6 @@
 import type { MetaDescriptor } from "react-router";
 import { describe, expect, test } from "vitest";
-import { findWorld, homeMeta, worldMeta, WORLDS } from "./site.ts";
+import { failedWorldMeta, findWorld, homeMeta, notFoundMeta, worldMeta, worldPath, WORLDS } from "./site.ts";
 
 // The value of each tag a page carries, by its name, property, rel or title; a tag given twice is a fault.
 function tags(meta: MetaDescriptor[]): Map<string, string> {
@@ -60,12 +60,22 @@ describe("the tags of a page", () => {
     expect(bubble.get("robots")).toBeUndefined();
   });
 
-  test("no world: not found, not indexed, and no address of its own", () => {
-    const missing = tags(worldMeta(undefined));
-    expect(missing.get("title")).toBe("No world here · gno.world");
-    expect(missing.get("robots")).toBe("noindex");
-    expect(missing.has("link:canonical")).toBe(false);
-    expect(missing.has("og:url")).toBe(false);
+  test.each([
+    ["no world", worldMeta(undefined), "No world here · gno.world"],
+    ["a world that could not load", failedWorldMeta(), "This world could not load · gno.world"],
+    ["a path no route matches", notFoundMeta(), "No page here · gno.world"],
+  ])("%s: its own title, not indexed, and no address of its own", (_, meta, title) => {
+    const page = tags(meta);
+    expect(page.get("title")).toBe(title);
+    expect(page.get("robots")).toBe("noindex");
+    expect(page.has("link:canonical")).toBe(false);
+    expect(page.has("og:url")).toBe(false);
+  });
+
+  test("a world's path is the one its page names as canonical", () => {
+    const bubble = findWorld("bubble");
+    expect(worldPath(bubble)).toBe("/w/bubble");
+    expect(tags(worldMeta(bubble)).get("link:canonical")).toBe(`https://gno.world${worldPath(bubble)}`);
   });
 
   test("home and each world describe themselves differently", () => {

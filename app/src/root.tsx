@@ -1,6 +1,7 @@
 // The document shell every page shares, and the boundary for an error no route caught.
 import type { ReactNode } from "react";
 import { Link, Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
+import { ErrorNotice } from "./ui/ErrorNotice.tsx";
 
 export function Layout({ children }: { children: ReactNode }) {
   return (
@@ -28,5 +29,5 @@ export default function App() {
 }
 
 export function ErrorBoundary() {
-  return <p role="alert">Something went wrong. Reload the page to try again.</p>;
+  return <ErrorNotice title="Something went wrong">Reload the page to try again.</ErrorNotice>;
 }

@@ -1,9 +1,7 @@
 import { Link } from "react-router";
-import { homeMeta, WORLDS } from "../site.ts";
+import { homeMeta, worldPath, WORLDS } from "../site.ts";
 
-export function meta() {
-  return homeMeta();
-}
+export const meta = homeMeta;
 
 export default function Home() {
   return (
@@ -12,7 +10,7 @@ export default function Home() {
       <ul>
         {WORLDS.map((world) => (
           <li key={world.slug}>
-            <Link to={`/w/${world.slug}`}>{world.name}</Link>
+            <Link to={worldPath(world)}>{world.name}</Link>
           </li>
         ))}
       </ul>
