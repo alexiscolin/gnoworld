@@ -8,3 +8,4 @@ coverage/
 reports/
 .stryker-tmp/
 .eslintcache
+*.sw[op]
