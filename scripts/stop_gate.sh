@@ -8,9 +8,12 @@ case $input in *'"stop_hook_active":true'* | *'"stop_hook_active": true'*) exit 
 cd "${CLAUDE_PROJECT_DIR:-$(dirname "$0")/..}"
 sh scripts/code_changed.sh || exit 0
 out=$(mktemp)
-trap 'rm -f "$out"' EXIT
+# bash 3.2, macOS's sh, exits 0 through an EXIT trap after an unbound variable: `finished`, set
+# on the last line, tells a run that reached its end from one that died on the way.
+trap 'status=$?; rm -f "$out"; [ "$status" != 0 ] || [ "${finished:-}" = 1 ] || status=1; exit "$status"' EXIT
 if ! sh scripts/check.sh >"$out" 2>&1; then
 	echo "The gate failed (scripts/check.sh). Fix it before ending the turn:" >&2
 	tail -n 40 "$out" >&2
 	exit 2
 fi
+finished=1

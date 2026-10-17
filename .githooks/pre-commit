@@ -7,9 +7,12 @@ if ! sh scripts/code_changed.sh --staged; then
 	exec python3 -I scripts/check_docs.py # docs only: the files they name must still exist
 fi
 staged=$(mktemp -d)
-trap 'rm -rf "$staged" || :' EXIT
+# bash 3.2, macOS's sh, exits 0 through an EXIT trap after an unbound variable: `finished`, set
+# on the last line, tells a run that reached its end from one that died on the way.
+trap 'status=$?; rm -rf "$staged" || :; [ "$status" != 0 ] || [ "${finished:-}" = 1 ] || status=1; exit "$status"' EXIT
 trap 'exit 1' HUP INT TERM # so the EXIT trap also runs on Ctrl-C under dash
 git checkout-index -a --ignore-skip-worktree-bits --prefix="$staged/"
 sh scripts/borrow_node_modules.sh "$staged" # the staged copy has no installed packages
 # A `commit -a` hands the hook its own index; the gate's git calls must not touch it.
 env -u GIT_INDEX_FILE -u GIT_DIR -u GIT_WORK_TREE sh "$staged/scripts/check.sh"
+finished=1

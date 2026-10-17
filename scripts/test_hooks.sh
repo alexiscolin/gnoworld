@@ -5,8 +5,11 @@ unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a `commit -a` hands its own index d
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
 here=$(cd "$(dirname "$0")" && pwd)
 hooks=$(cd "$here/../.githooks" && pwd)
+rp="$here"/review_pass.py # review_pass and pre_push both use it
 t=$(mktemp -d)
-trap 'rm -rf "$t" || :' EXIT
+# bash 3.2, macOS's sh, exits 0 through an EXIT trap after an unbound variable: `finished`, set
+# on the last line, tells a run that reached its end from one that died on the way.
+trap 'status=$?; rm -rf "$t" || :; [ "$status" != 0 ] || [ "${finished:-}" = 1 ] || status=1; exit "$status"' EXIT
 fail() {
 	echo "test_hooks: $*" >&2
 	exit 1
@@ -49,6 +52,10 @@ for step in "run format:check" "run typecheck" "run lint" "run test" "run unused
 	"sh scripts/test_hooks.sh" "python3 -I scripts/probe.py" "run coverage" "python3 -I scripts/patch_coverage.py" \
 	"run mutate" "gitleaks git" "python3 -I scripts/harness_mutate.py" "python3 -I scripts/check_regressions.py"; do
 	grep -v '^[[:space:]]*#' "$gate_file" | grep -qF -- "$step" || fail "check.sh no longer runs: $step"
+done
+# An EXIT trap keeps a failure: under macOS's sh, a plain one turns an unbound variable into exit 0.
+for f in "$here"/*.sh "$hooks"/*; do
+	grep -n "^[[:space:]]*trap .* EXIT$" "$f" | grep -v '|| status=1; exit "$status"' | grep -q . && fail "$(basename "$f") has an EXIT trap that can hide a failure"
 done
 # Every gno package is mutated, gno/p as well as gno/r: discovery names no area.
 grep -qF 'glob.glob("**/gnomod.toml"' "$here/mutate.py" || fail "mutate.py no longer mutates every gno package"
@@ -176,7 +183,6 @@ fi
 if part review_pass; then
 # review_pass: /pre-merge records the tree it reviewed; a later change to the code voids it,
 # the review log committed after it does not.
-rp="$here"/review_pass.py
 v="$t/review"
 mkdir -p "$v/docs" "$v/src"
 git -C "$v" init -q
@@ -348,3 +354,4 @@ fi
 
 [ -z "${ONLY:-}" ] || [ "${ran:-}" = 1 ] || fail "ONLY=$ONLY names no section"
 echo "hooks: ok"
+finished=1
