@@ -7,5 +7,9 @@ packages:
 minimumReleaseAge: 1440
 trustPolicy: no-downgrade
 engineStrict: true
+# qs below 6.16.0 has three denial-of-service advisories (docs/review/findings.md, F025); it
+# comes only through StrykerJS's typed-rest-client.
+overrides:
+  qs: "^6.16.0"
 allowBuilds:
   unrs-resolver: false # its postinstall only re-fetches the native binding, which optionalDependencies already install
