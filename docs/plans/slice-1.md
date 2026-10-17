@@ -103,7 +103,9 @@ New: `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `eslint.config
   than Husky.
 - **The sandbox** is set, and is checked at the start of the next session: it does not
   apply to the session that wrote it.
-- **For 1b:** `packages/*/src` is written in `tsconfig.json`, `vitest.config.ts` (twice),
+- **For 1b:** `scripts/check_regressions.py` also lists the Playwright journeys
+  (`playwright test --list`), so a journey gone fails like a test gone.
+- **Also for 1b:** `packages/*/src` is written in `tsconfig.json`, `vitest.config.ts` (twice),
   `stryker.config.json` and `scripts/clones.mjs`; `app/` joins each, with its own tsconfig for
   the DOM. `.gitignore` is the one list of generated folders: no tool repeats it.
 - **The tests were checked before Alexis's turn:** all 52 pass against a throwaway parser

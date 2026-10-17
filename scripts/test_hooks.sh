@@ -166,7 +166,7 @@ for step in "run format:check" "run typecheck" "run lint" "run test" "run unused
 	"python3 -I scripts/check_css.py" "python3 -I scripts/check_comments.py" '"$GNO" lint ./r/...' '"$GNO" test ./r/...' \
 	"python3 -I ../scripts/mutate.py" "go vet ./tools/..." "go run ./tools/sealvec | cmp" "python3 -I scripts/check_docs.py" \
 	"sh scripts/test_hooks.sh" "python3 -I scripts/probe.py" "run coverage" "python3 -I scripts/patch_coverage.py" \
-	"run mutate" "gitleaks git" "python3 -I scripts/harness_mutate.py"; do
+	"run mutate" "gitleaks git" "python3 -I scripts/harness_mutate.py" "python3 -I scripts/check_regressions.py"; do
 	grep -v '^[[:space:]]*#' "$gate_file" | grep -qF -- "$step" || fail "check.sh no longer runs: $step"
 done
 
@@ -236,5 +236,8 @@ tool_ WebFetch '{"url":"https://rpc.onyx.testnets.gno.land/status"}' "$t/asked.j
 tool_ WebFetch '{"url":"https://docs.gno.land/resources/gno-interrealm"}' "$t/plain.jsonl" 0
 guarded 'not json' 2 "unreadable input"
 guarded '{"tool_name":"Bash","tool_input":null}' 2 "a null tool_input"
+
+# check_regressions: its rules on small cases (the real run needs a base branch and Vitest).
+python3 -I "$(cd "$(dirname "$0")" && pwd)/check_regressions.py" --self-test >/dev/null || fail "check_regressions's rules do not hold"
 
 echo "hooks: ok"

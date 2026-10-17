@@ -77,6 +77,8 @@ if $full; then
 	python3 -I scripts/patch_coverage.py "$base"
 	echo "== mutations (StrykerJS, incremental)"
 	run mutate
+	echo "== no regression: no test gone, no floor lower, no approved screenshot changed, unless a commit says why"
+	python3 -I scripts/check_regressions.py "$base"
 	echo "== no secret anywhere in the history"
 	gitleaks git --no-banner --redact .
 	if ! git diff --quiet "$base" -- scripts .githooks .claude/settings.json package.json pnpm-workspace.yaml \

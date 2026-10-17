@@ -25,10 +25,12 @@ assume:
    built. One reason to fail per test, and its name says which.
 3. **Impact first.** The riskiest paths (tier 1, money, signatures, untrusted input,
    anything that grows with the universe) get the most cases; trivial code gets none.
-4. **Security.** The abuse cases of the threat model are tests: forged or replayed
+4. **A fix's regression test.** A change that fixes a bug carries a test that reproduces it, named
+   after it, and seen failing before the fix.
+5. **Security.** The abuse cases of the threat model are tests: forged or replayed
    signatures, injection, a caller without the right, oversized input, a hostile realm or
    message.
-5. **Sound.** Expected values stated independently, no mock of the thing under test, no
+6. **Sound.** Expected values stated independently, no mock of the thing under test, no
    empty assertion, no timing guess, every test seen failing for the right reason (run them).
 
 ## Green pass: first in /pre-merge

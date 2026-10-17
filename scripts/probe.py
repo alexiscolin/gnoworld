@@ -40,6 +40,11 @@ LINT = [
     ("unlayered.css", ".a {\n  color: var(--color-text);\n}\n", "css/use-layers"),
     ("physical.css", "@layer components {\n  .a {\n    margin-left: 0;\n  }\n}\n", "css/prefer-logical-properties"),
     ("clean.css", "@layer components {\n  .a {\n    margin-inline-start: 0;\n  }\n}\n", None),
+    ("skipped.test.ts", 'import { test } from "vitest";\n\ntest.skip("x", () => {});\n', "no-restricted-syntax"),
+    ("focused.test.ts", 'import { test } from "vitest";\n\ntest.only("x", () => {});\n', "no-restricted-syntax"),
+    ("todo.test.ts", 'import { test } from "vitest";\n\ntest.todo("x");\n', "no-restricted-syntax"),
+    ("skip_each.test.ts", 'import { test } from "vitest";\n\ntest.skip.each([1])("x %i", () => {});\n', "no-restricted-syntax"),
+    ("pending.test.ts", 'import { expect, test } from "vitest";\n\ntest.fails("x", () => {\n  expect(1).toBe(2);\n});\n', None),
     ("important.css", ".a {\n  color: var(--color-text) !important;\n}\n", "css/no-important"),
 ]
 
@@ -89,6 +94,14 @@ try:
     out = run(["node_modules/.bin/tsc", "-p", "tsconfig.json"])
     expect(out.returncode != 0 and "Cannot find name 'fetch'" in out.stdout, "tsc refuses fetch in core")
     shutil.rmtree(HERE)
+
+    # Outside core, `fails` is refused: pairing happens only in core.
+    other = "packages/probe/src"
+    plant({"pending.test.ts": 'import { expect, test } from "vitest";\n\ntest.fails("x", () => {\n  expect(1).toBe(2);\n});\n'}, where=other)
+    out = run(["node_modules/.bin/eslint", "--no-cache", "-f", "json", other])
+    got = {m.get("ruleId") for r in json.loads(out.stdout or "[]") for m in r["messages"]}
+    expect("no-restricted-syntax" in got, f"eslint refuses test.fails outside core, got {sorted(map(str, got))}")
+    shutil.rmtree("packages/probe")
 
     # knip: a file nothing imports.
     plant({"unused.ts": "export function lonely(): number {\n  return 1;\n}\n"})
@@ -157,6 +170,7 @@ try:
     shutil.rmtree(css)
 finally:
     shutil.rmtree(HERE, ignore_errors=True)
+    shutil.rmtree("packages/probe", ignore_errors=True)
 
 if failures:
     print("\nprobe: proposed fixes")
