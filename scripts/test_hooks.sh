@@ -157,6 +157,7 @@ push main && fail "pre-push let main through with a pass not yet committed"
 git -C "$w" add -A && git -C "$w" -c user.name=t -c user.email=t@t commit -qm pass && head=$(git -C "$w" rev-parse HEAD)
 push main || fail "pre-push refused main with a committed review pass"
 printf '#!/bin/sh\nexit 1\n' >"$w/scripts/check.sh"
+git -C "$w" add -A && git -C "$w" -c user.name=t -c user.email=t@t commit -qm "failing gate" && head=$(git -C "$w" rev-parse HEAD)
 push slice-1a && fail "pre-push let a push through a failing gate"
 
 # guard_gno: everything about gno goes through gnomcp. A .gno file is written only after the
@@ -211,7 +212,7 @@ printf '#!/bin/sh\nexit 0\n' >"$c2/scripts/check.sh" && git -C "$c2" add -A
 gate_file=$(cd "$(dirname "$0")" && pwd)/check.sh
 for step in "run format:check" "run typecheck" "run lint" "run test" "run unused" "run copies" "run clones" \
 	"python3 -I scripts/check_css.py" "python3 -I scripts/check_comments.py" '"$GNO" lint ./r/...' '"$GNO" test ./r/...' \
-	"python3 -I ../scripts/mutate.py" "go vet ./tools/..." "go run ./tools/sealvec" "python3 -I scripts/check_docs.py" \
+	"python3 -I ../scripts/mutate.py" "go vet ./tools/..." "go run ./tools/sealvec | cmp" "python3 -I scripts/check_docs.py" \
 	"sh scripts/test_hooks.sh" "python3 -I scripts/probe.py" "run coverage" "python3 -I scripts/patch_coverage.py" \
 	"run mutate" "gitleaks git" "python3 -I scripts/harness_mutate.py"; do
 	grep -v '^[[:space:]]*#' "$gate_file" | grep -qF -- "$step" || fail "check.sh no longer runs: $step"
