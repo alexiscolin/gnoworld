@@ -231,6 +231,16 @@ row "| F001 | 2026-10-17 | a | x.py:1 | a bug | rejected | — |" && fail "check
 row "| F001 | 2026-10-17 | a | x.py:1 | a | claimed | — |
 | F001 | 2026-10-17 | b | y.py:1 | b | claimed | — |" && fail "check_docs accepted an id used twice"
 rm -r "$d/docs/review"
+# A test sits beside the file it tests, under its name (docs/ARCHITECTURE.md, "Naming").
+mkdir -p "$d/app/src/routes" "$d/packages/core/src"
+touch "$d/app/src/routes/home.tsx" "$d/app/src/routes/home.test.tsx" "$d/packages/core/src/irc.ts" "$d/packages/core/src/irc.test.ts"
+python3 -I "$docs" "$d" >/dev/null 2>&1 || fail "check_docs refused tests beside their files"
+for orphan in app/src/routes/routes.test.tsx packages/core/src/parse.test.ts; do
+	touch "$d/$orphan"
+	python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted $orphan, beside no file of its name"
+	rm "$d/$orphan"
+done
+rm -r "$d/app" "$d/packages"
 fi
 
 if part patch_coverage; then
