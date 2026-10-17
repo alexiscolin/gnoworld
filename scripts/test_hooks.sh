@@ -47,7 +47,8 @@ ask, deny = set(s["permissions"]["ask"]), set(s["permissions"]["deny"])
 # (finding F068); a new dependency and a push still ask.
 assert {"Bash(pnpm add *)", "Bash(git push *)"} <= ask, "a new dependency or a push asks no one"
 outside = {"Edit(/scripts/guard.py)", "Edit(/scripts/stop_gate.sh)", "Edit(/scripts/code_changed.sh)", "Edit(/.githooks/**)", "Edit(/.claude/settings.json)", "Edit(/**/package.json)"}
-assert {r for r in ask if r.startswith("Edit(")} == outside, "the edits that ask are not exactly the files run outside the sandbox"
+writes = {r for r in ask if r.split("(")[0] in {"Edit", "Write", "MultiEdit", "NotebookEdit"}}
+assert writes == outside, "the edits that ask are not exactly the files run outside the sandbox"
 assert {f"mcp__{p}__gno_{t}" for p in ("gnomcp", "plugin_gnomcp_gnomcp") for t in ("addpkg", "call", "run", "key_send", "cla_sign")} <= ask, "a chain write asks no one"
 assert {"Read(~/.ssh/**)", "Read(~/.config/gh/**)"} <= deny, "the Read tool can open a credential"
 # The sandbox turns Read denies into its own: one on dist, coverage or reports stops the gate
@@ -79,12 +80,26 @@ done
 # download: a tag or a branch can be moved to code nobody reviewed.
 python3 -I - "$here/../.github/workflows/gate.yml" <<'PY' || fail "the CI workflow lost a promise"
 import re, sys
-ci = open(sys.argv[1]).read()
+# Comments out: a promise kept only in a comment is not kept.
+ci = re.sub(r"[ \t]*#.*$", "", open(sys.argv[1]).read(), flags=re.M)
+def has(line, why):
+    assert re.search("^" + line + "$", ci, re.M), why
 uses = re.findall(r"uses:\s*(\S+)", ci)
 assert uses and all(re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", u) for u in uses), f"an action not pinned to a commit: {uses}"
-assert re.search(r"^permissions:\n  contents: read\n", ci, re.M) and "write" not in ci, "the CI may write"
-assert "sh scripts/check.sh --full" in ci, "the CI does not run the full gate"
-assert re.search(r"sha256sum -c", ci) and "--frozen-lockfile" in ci, "the CI trusts a download or a lockfile it did not check"
+trigger = re.search(r"^on:\n((?:  .*\n)+)", ci, re.M)
+assert trigger and re.findall(r"^  (\S+):", trigger.group(1), re.M) == ["push"], "the CI runs on something else than a push"
+assert ci.count("permissions:") == 1 and "write" not in ci, "the CI may write"
+has(r"permissions:\n  contents: read", "the CI may write")
+assert "secrets." not in ci and "continue-on-error" not in ci, "the CI reads a secret or lets a step fail"
+assert not re.search(r"^\s+if:", ci, re.M), "a CI step can be skipped"
+has(r"    runs-on: ubuntu-24\.04", "the CI runs on a machine it does not name")
+has(r"        run: sh scripts/check\.sh --full", "the CI does not run the full gate, or lets it fail")
+has(r"          persist-credentials: false", "the CI keeps its token on disk for the gate")
+has(r"          fetch-depth: 0", "the CI cannot compare the branch with main")
+has(r"      GNO_COMMIT: [0-9a-f]{40}", "the CI builds gno from a name that can move")
+has(r'          echo "[0-9a-f]{64}  \$RUNNER_TEMP/gitleaks\.tgz" \| sha256sum -c', "the CI trusts a download it did not check")
+assert not re.search(r"\|\s*(ba)?sh\b", ci), "the CI runs a download"
+assert "--frozen-lockfile" in ci and "--ignore-scripts" in ci, "the CI trusts a lockfile it did not check"
 PY
 # check.sh refuses a .node-version that is more than a version, which would steer PATH.
 nv="$t/nodeversion" && mkdir -p "$nv/scripts" && cp "$gate_file" "$nv/scripts/check.sh"
@@ -326,6 +341,14 @@ for name in 'my file.sh' 'é.sh'; do
 	(cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a staged scripts/$name differ from the working tree's"
 	git -C "$c2" rm -qf --cached "scripts/$name" && rm "$c2/scripts/$name"
 done
+# The hooks and the settings are harness too; a code file partly staged is not.
+for f in .githooks/pre-push .claude/settings.json; do
+	mkdir -p "$c2/${f%/*}" && echo '{}' >"$c2/$f" && git -C "$c2" add "$f" && echo '{"x":1}' >"$c2/$f"
+	(cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a staged $f differ from the working tree's"
+	git -C "$c2" rm -qf --cached "$f" && rm "$c2/$f"
+done
+echo partly >>"$c2/a.ts" && git -C "$c2" add a.ts && echo unstaged >>"$c2/a.ts"
+(cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1) || fail "pre-commit refused a code file only partly staged"
 fi
 
 if part guard; then
