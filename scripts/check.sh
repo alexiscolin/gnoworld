@@ -10,13 +10,14 @@
 # shell's own differs.
 set -eu
 cd "$(dirname "$0")/.."
+unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a hook's git environment must not steer the gate's git calls
 full=false
 [ "${1:-}" = "--full" ] && full=true
 
 want="v$(cat .node-version)"
 nvm_node="${NVM_DIR:-$HOME/.nvm}/versions/node/$want/bin"
-[ "$(node -v 2>/dev/null || :)" = "$want" ] || [ ! -x "$nvm_node/node" ] || PATH="$nvm_node:$PATH"
-[ "$(node -v 2>/dev/null || :)" = "$want" ] || {
+PATH="$nvm_node:$PATH"
+[ "$(node -v 2>/dev/null)" = "$want" ] || {
 	echo "check.sh: Node $want is needed (.node-version; docs/DEVELOPMENT.md, \"Setup\")" >&2
 	exit 1
 }
@@ -36,11 +37,11 @@ echo "== TypeScript: format, types, lint, tests"
 run format:check
 run typecheck
 run lint
-run test
+$full || run test # --full runs the tests once, with coverage
 
 echo "== no dead code, no copy, no renamed copy, CSS and comment rules"
 run unused
-run copies >/dev/null
+copies=$(run copies 2>&1) || { printf '%s\n' "$copies"; exit 1; }
 run clones
 python3 -I scripts/check_css.py
 python3 -I scripts/check_comments.py
@@ -71,7 +72,7 @@ sh scripts/test_hooks.sh
 if $full; then
 	echo "== the harness keeps its promises (scripts/probe.py)"
 	python3 -I scripts/probe.py
-	base=$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse HEAD)
+	base=$(git merge-base HEAD origin/main) || { echo "check.sh --full: needs origin/main to compare with (git fetch)" >&2; exit 1; }
 	echo "== coverage: 85% everywhere, core 100%; and 85% of the lines this branch changed"
 	run coverage
 	python3 -I scripts/patch_coverage.py "$base"

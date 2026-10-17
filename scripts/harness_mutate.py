@@ -65,10 +65,12 @@ def mutants():
     yield from each(".githooks/commit-msg", "exit 1", ":", "hooks", "commit-msg refusal")
     yield from each(".githooks/pre-push", "exit 1", ":", "hooks", "pre-push refusal")
     yield from each(".githooks/pre-push", 'python3 -I scripts/review_pass.py check "$local_sha"', ":", "hooks", "pre-push review check")
-    yield from each(".githooks/pre-commit", 'sh "$staged/scripts/check.sh"', ":", "hooks", "pre-commit gate")
+    yield from each(".githooks/pre-commit", 'sh "$staged/scripts/check.sh"', "true", "hooks", "pre-commit gate")
+    yield from each("scripts/code_changed.sh", "! git diff --cached", "git diff --cached", "hooks", "code_changed staged")
+    yield from each("scripts/code_changed.sh", '[ -n "$(git status', '[ -z "$(git status', "hooks", "code_changed working tree")
     yield from each("scripts/stop_gate.sh", "exit 2", "exit 0", "hooks", "stop_gate block")
-    yield from each("scripts/format_hook.sh", "pnpm exec eslint --fix", ": eslint --fix", "hooks", "format_hook eslint")
-    yield from each("scripts/format_hook.sh", "pnpm exec prettier --write", ": prettier --write", "hooks", "format_hook prettier")
+    yield from each("scripts/format_hook.sh", "node_modules/.bin/eslint --fix", ": eslint --fix", "hooks", "format_hook eslint")
+    yield from each("scripts/format_hook.sh", "node_modules/.bin/prettier --write", ": prettier --write", "hooks", "format_hook prettier")
     text = open("scripts/check.sh").read()
     for m in re.finditer(r'^(\s*)((?:run |python3 -I |sh scripts/|gitleaks |go vet |go run |\(cd gno ).*)$', text, re.M):
         yield f"check.sh drops `{m.group(2)[:50]}`", "scripts/check.sh", text[: m.start(2)] + ":" + text[m.end(2):], "hooks"

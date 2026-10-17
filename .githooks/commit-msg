@@ -5,7 +5,7 @@
 msg=$(sed '/^# -* >8 -*$/,$d' "$1" | grep -v '^#')
 subject=$(printf '%s\n' "$msg" | sed -n '1p')
 case $subject in
-"Merge "* | "Revert \""*) ;;
+"Merge "* | "Revert \""* | "fixup! "* | "squash! "* | "amend! "*) ;;
 *)
 	if ! printf '%s\n' "$subject" | grep -qE '^(feat|fix|docs|test|refactor|perf|build|ci|chore|style|revert)(\([a-z0-9-]+\))?!?: [^ ]'; then
 		echo "commit-msg: the subject is 'type(scope): what', type one of feat fix docs test refactor perf build ci chore style revert." >&2

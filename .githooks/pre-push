@@ -6,12 +6,12 @@ zero=0000000000000000000000000000000000000000
 gated=false
 while read -r _ local_sha remote_ref _; do
 	[ "$local_sha" = "$zero" ] && continue # a deleted branch
-	if [ "$local_sha" != "$(git rev-parse HEAD)" ] || ! git diff --quiet HEAD; then
-		echo "pre-push: push the commit you have checked out, with nothing uncommitted, so the gate checks what leaves" >&2
+	if [ "$local_sha" != "$(git rev-parse HEAD)" ] || [ -n "$(git status --porcelain)" ]; then
+		echo "pre-push: push the commit you have checked out, with nothing uncommitted or untracked, so the gate checks what leaves" >&2
 		exit 1
 	fi
-	$gated || { sh scripts/check.sh --full && gated=true; } || exit 1
 	if [ "$remote_ref" = refs/heads/main ]; then
-		python3 -I scripts/review_pass.py check "$local_sha"
+		python3 -I scripts/review_pass.py check "$local_sha" # cheap, so before the gate
 	fi
+	$gated || { sh scripts/check.sh --full </dev/null; gated=true; }
 done
