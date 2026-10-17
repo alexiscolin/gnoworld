@@ -587,7 +587,7 @@ routed question (product review).
 
 | Part | What | Why |
 |---|---|---|
-| Harness | The Claude Agent SDK (TypeScript), a role of the server (§7). Whether the official Anthropic and MCP SDKs, inside the server's process, replace it is to be decided: they are lighter, since the Agent SDK starts a Claude Code process per conversation | It gives the agent loop, MCP, skills, hooks and limits |
+| Harness | Our own small loop in the server (§7), on Anthropic's official TypeScript SDK (`@anthropic-ai/sdk`) and the official MCP TypeScript SDK (`@modelcontextprotocol/sdk`). Not the Agent SDK: it starts a Claude Code process per conversation, with its own file, shell and web tools to lock away (Alexis, 2026-10-17) | One API key, in-process and light. The model only ever sees the tools we hand it |
 | Key | The Anthropic API key, in the service's environment only | The client holds no secret (§9) |
 | Tools | **gnomcp** over stdio, seven read tools allowed: `gno_packages`, `gno_read`, `gno_render`, `gno_eval`, `gno_status`, `gno_history`, `gno_activity`. **Our own MCP server**: a room's recent public history; the places and their URLs; the latest transactions and blocks from the public indexer and the RPC; the digests and action proposals of §4, checked before they reach the client. **gnoscope** (`https://gnoscope.com/mcp`, remote, read-only by design): a transaction explained, a realm's decoded state, an address, search over all code on chain | Free reads only, and nothing that writes |
 | Skills | `SKILL.md` folders versioned in the repo: gnomcp's `gno` skill (Apache-2.0), to read realms correctly; ours: concierge, realm reader, catch up, translation. Text only, no scripts | Loaded on demand; part of the prompt version |
@@ -596,13 +596,14 @@ routed question (product review).
 **It can write nothing. Four locks:**
 1. **No key.** gnomcp runs with no agent key. On mainnet, gnomcp has no write path at all
    (its `docs/security.md`).
-2. **An allowlist.** Only the read tools listed above are allowed. The SDK's built-in tools
-   are removed: the shell, file writing, the web. File reading is allowed only inside the
-   skills folder.
-3. **A hook.** A `PreToolUse` hook denies any other tool and logs every call. A denial holds
-   in every permission mode.
-4. **The permission mode.** It is `dontAsk`: whatever is not allowed is denied, since no
-   person approves tool calls on a server.
+2. **Only our tools exist.** The model is offered the read tools listed above, and nothing
+   else: no shell, no file writing, no web. Skills are loaded by our own loader, from the
+   skills folder only.
+3. **Every call is checked and logged.** Before running a tool call, the loop checks its
+   name against the allowlist and its arguments against the tool's schema, refuses
+   anything else, and logs every call and refusal.
+4. **No one to ask, nothing to approve.** There is no permission prompt to answer: what is
+   not on the allowlist does not exist for the model, and what is refused stays refused.
 
 To act, Jarvis proposes an action that opens the call card (§4). The user signs in Adena.
 
@@ -676,7 +677,7 @@ catch.
 
 A drop below a threshold fails the run. It checks:
 - **Tool use:** the right tool with the right arguments, and never a tool off the
-  allowlist, read from the hook log.
+  allowlist, read from the loop's log.
 - **Grounding:** every fact traces to a tool result. A different model grades this against
   a rubric.
 - **Prompt injection:** realms and messages with planted instructions.
@@ -691,15 +692,15 @@ A drop below a threshold fails the run. It checks:
 
 Chain answers are recorded at a fixed block height, so a run is reproducible. A short live
 pass runs on onyx. In production, a nightly sample is graded the same way, beside people's
-thumbs up and down. Results go to Langfuse with the prompt version.
+thumbs up and down. Results are kept with the prompt version: in Langfuse when it runs,
+and as JSON files in the repo otherwise.
 
-**Observability.** The service exports OpenTelemetry. The SDK's own traces are in beta; if
-they change, our own spans wrap each turn.
+**Observability.** The server exports OpenTelemetry; our own spans wrap each turn.
 - **One trace per question**, recording:
   - the model and the prompt version: a hash of the prompt, skills and tool list;
   - each model request: tokens, cache, latency, stop reason;
   - each tool call: duration, error;
-  - each hook denial.
+  - each refused tool call.
 - **From each result:** the estimated cost, tokens per model, turns and duration. The
   estimate is reconciled with Anthropic's usage report.
 - **Metrics:**
@@ -1203,7 +1204,7 @@ Its findings are fixed before any other lens runs.
 - `react-router` and `@react-router/dev` (slice 1);
 - a CSS linter, an unused-code finder and a Lighthouse runner (slice 1);
 - `posthog-js` (slice 12);
-- `@anthropic-ai/claude-agent-sdk` and the OpenTelemetry SDK (slice 10).
+- `@anthropic-ai/sdk`, `@modelcontextprotocol/sdk` and the OpenTelemetry SDK (slice 10).
 
 ## Consequences
 
@@ -1281,13 +1282,7 @@ ADR-0001's question 5 keeps its jurisdiction and retention parts.
 - [The prototype, its videos and its reviews](../docs/prototype/README.md)
 - [ADR-0001](0001-gnoworld.md)
 - React Router, [pre-rendering](https://reactrouter.com/how-to/pre-rendering)
-- **The Claude Agent SDK:**
-  - [MCP](https://code.claude.com/docs/en/agent-sdk/mcp)
-  - [permissions](https://code.claude.com/docs/en/agent-sdk/permissions)
-  - [skills](https://code.claude.com/docs/en/agent-sdk/skills)
-  - [hooks](https://code.claude.com/docs/en/agent-sdk/hooks)
-  - [observability](https://code.claude.com/docs/en/agent-sdk/observability)
-  - [cost tracking](https://code.claude.com/docs/en/agent-sdk/cost-tracking)
+- **The Claude Agent SDK, considered and set aside:** [MCP](https://code.claude.com/docs/en/agent-sdk/mcp), [permissions](https://code.claude.com/docs/en/agent-sdk/permissions)
 - **The Claude API:**
   - [MCP connector](https://platform.claude.com/docs/en/agents-and-tools/mcp-connector)
   - [prompt caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)
