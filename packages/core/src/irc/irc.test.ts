@@ -1,7 +1,15 @@
 // Every case is marked `fails` until Alexis's code makes it pass (pairing, .claude/rules/core.md).
 import fc from "fast-check";
 import { describe, expect, test } from "vitest";
-import { escapeTagValue, formatLine, type IrcMessage, parseLine, unescapeTagValue } from "./irc.ts";
+import {
+  escapeTagValue,
+  formatLine,
+  type IrcCommand,
+  type IrcMessage,
+  parseLine,
+  toIrcCommand,
+  unescapeTagValue,
+} from "./irc.ts";
 
 // A fixed seed keeps the gate from flapping; the nightly fuzz runs the same properties unseeded.
 const PROPERTY = { seed: 20261017, numRuns: 300 };
@@ -13,7 +21,8 @@ const message = (
   more: { tags?: [string, string][]; source?: string | undefined } = {},
 ): IrcMessage => ({
   tags: new Map(more.tags ?? []),
-  command,
+  // A fixture states its command; formatLine's refusals check what a cast elsewhere could smuggle in.
+  command: command as IrcCommand,
   params,
   ...(more.source === undefined ? {} : { source: more.source }),
 });
@@ -36,6 +45,9 @@ describe("tag values", () => {
     ["test\\", "test", "a trailing backslash is dropped"],
     [String.raw`a\\`, "a\\", "an escaped backslash at the end is kept"],
     [String.raw`\\s`, String.raw`\s`, "an escaped backslash before s is not a space"],
+    ["", "", "nothing stays nothing"],
+    ["\\", "", "a lone backslash is dropped"],
+    [String.raw`\é`, "é", "an unknown escape of a non-ASCII character keeps the character"],
   ])("unescape %j as %j: %s", (escaped, raw) => {
     expect(unescapeTagValue(escaped)).toBe(raw);
   });
@@ -51,6 +63,24 @@ describe("tag values", () => {
       PROPERTY,
     );
   });
+});
+
+describe("toIrcCommand", () => {
+  test.fails.each([
+    ["PRIVMSG", "PRIVMSG"],
+    ["privmsg", "PRIVMSG"],
+    ["PiNg", "PING"],
+    ["001", "001"],
+  ])("names %j as %j", (raw, command) => {
+    expect(toIrcCommand(raw)).toBe(command);
+  });
+
+  test.fails.each(["", "PRIV MSG", "PRIV.MSG", "12", "1234", "ß", "ſ", "ı", "PING\n"])(
+    "names nothing with %j",
+    (raw) => {
+      expect(toIrcCommand(raw)).toBeUndefined();
+    },
+  );
 });
 
 describe("parseLine reads", () => {
