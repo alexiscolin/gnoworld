@@ -833,7 +833,8 @@ by few hands, so they get the safest path.
   - the same Adena signature, for a session of one hour;
   - a fresh signature for each sensitive action: a takedown with refund, hiding a realm, a
     quota, anything about roles;
-  - rotating gnoworld's keys, and the slot realm's admin, take two admins (a multisig).
+  - rotating gnoworld's keys, and the slot realm's owner actions, take two admins (a
+    multisig).
 - **The moderation queue:** reports, contests, flagged messages and satellites, each with
   its context and one-click actions.
   - Moderators act through the server, which sends the commands to Ergo, so nobody needs
@@ -859,7 +860,8 @@ by few hands, so they get the safest path.
   - each action shows its effect before it is confirmed, and can be undone where it is
     reversible;
   - keyboard shortcuts, bulk actions, an empty state for every list;
-  - it works on a phone for quick moderation;
+  - it works in a narrow window beside the chat; not on a phone in phase 0, since Adena
+    cannot sign there;
   - design-system components only, no 3D and no decoration, accessible like the rest.
 - **Hardened:**
   - the signed message for a sensitive action is the action itself, in words ("hide this
@@ -894,8 +896,8 @@ by few hands, so they get the safest path.
 - Uploads are a later decision.
 
 **Prices.**
-- A scheduled job reads a public source (CoinGecko) every 5 minutes and writes a static
-  `markets.json`.
+- A timer in the server reads a public source (CoinGecko) every 5 minutes and writes a
+  static `markets.json`.
 - The client reads only that file: no third-party call, no rate limit.
 - The row shows the source and the time.
 - A token with no public price is not shown.
