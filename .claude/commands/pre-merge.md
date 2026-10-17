@@ -19,7 +19,9 @@ or edit a test to make it pass.
    - a tier-1 file (`docs/REVIEW.md`): also the `security-reviewer` agent (Opus);
    - the last merge of a slice with tier-1 code: propose to Alexis that he runs
      `/code-review ultra` (a deeper review in the cloud, billed per run; Claude cannot start it);
-   - the last merge of a slice: `/simplify` on the slice's changes, then the gate again.
+      - the last merge of a slice: `/code-review` on each workspace the slice touched, as a
+     path, so it reads the whole folder and not only the diff, with the export map and
+     similarity-ts's candidates; then `/simplify` on the slice's changes, and the gate again.
 5. **Check each finding** against the code before fixing it; drop a false positive with its
    reason. Fixes are re-checked by the gate and the mutation tester, not by a new pass. A
    second pass runs only for a high finding fixed in a tier-1 file, and only that lens.

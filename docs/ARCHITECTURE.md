@@ -112,8 +112,14 @@ properties).
 already refuse a floating or misused promise, a thrown non-error and an untyped `catch`
 value), plus `switch-exhaustiveness-check`; ESLint's `no-empty`, `no-useless-catch` and
 `preserve-caught-error` (a rethrow keeps its `cause`), and a `catch` that only logs; the
-import boundaries above; no import cycles (`eslint-plugin-import-x`). **Copies:** jscpd
-fails the gate on a new copied block. **Dead code:** knip, at zero.
+import boundaries above; no import cycles (`eslint-plugin-import-x`). **Copies:** jscpd fails the gate on a new copied block, and similarity-ts on a new
+function, type or class whose syntax tree is close to an existing one, anywhere in the repo
+(a wrapper compares with a baseline, since its exit code is not documented). **One way to
+do each thing,** enforced per folder by `no-restricted-globals` and `no-restricted-syntax`:
+`fetch` and storage only in `lib`, `Intl` formatting only in `core`'s formatters, no clock
+in `core`, `console` only through the logger. **A map for agents:** the gate regenerates
+`docs/generated/exports.md`, every exported function and type with its signature, from the
+TypeScript compiler; a reviewer reads the map to see the whole repo without reading it all. **Dead code:** knip, at zero.
 
 **Types carry the meaning:**
 - **No `any`, no `@ts-ignore`, no `!`, and no `as` on outside data** (CLAUDE.md). `satisfies`

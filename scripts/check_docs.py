@@ -1,5 +1,6 @@
 # check_docs.py: the harness's docs name only harness files that exist, so they cannot drift
-# from the repo unnoticed. It reads CLAUDE.md, docs/*.md and .claude/**/*.md, and checks
+# from the repo unnoticed. It reads CLAUDE.md, docs/DEVELOPMENT.md, docs/REVIEW.md and
+# .claude/**/*.md (the ADRs, plans and ARCHITECTURE describe the future too), and checks
 # every `scripts/`, `.claude/`, `docs/`, `adr/` or `.githooks/` path written in backticks.
 # Paths with a template variable or under .claude/tmp/ are skipped. Usage: check_docs.py [root]
 import pathlib
@@ -7,7 +8,7 @@ import re
 import sys
 
 root = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else ".")
-files = [root / "CLAUDE.md", *root.glob("docs/*.md"), *root.glob(".claude/**/*.md")]
+files = [root / p for p in ("CLAUDE.md", "docs/DEVELOPMENT.md", "docs/REVIEW.md")] + [*root.glob(".claude/**/*.md")]
 path = re.compile(r"`((?:scripts|\.claude|docs|adr|\.githooks)/[^`\s*]*)`")
 missing = []
 for f in files:
