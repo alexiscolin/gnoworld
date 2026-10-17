@@ -187,6 +187,7 @@ try:
             ("manual_callback.tsx", uses("useCallback") + component(body="  const f = useCallback(() => n, [n]);\n  return <p>{f()}</p>;\n"), banned("useCallback")),
             ("memo_wrap.tsx", uses("memo") + "export const Card = memo(function Card({ n }: { n: number }) {\n  return <p>{n}</p>;\n});\n", banned("memo")),
             ("namespace_memo.tsx", 'import * as React from "react";\n\n' + component(body="  const twice = React.useMemo(() => n * 2, [n]);\n  return <p>{twice}</p>;\n"), "no-restricted-imports: * import is invalid because 'memo', 'useMemo', and 'useCallback'"),
+            ("default_memo.tsx", 'import React from "react";\n\n' + component(body="  const twice = React.useMemo(() => n * 2, [n]);\n  return <p>{twice}</p>;\n"), "no-restricted-properties: 'React.useMemo' is restricted from being used. The React Compiler memoizes"),
             ("forward_ref.tsx", uses("forwardRef") + "export const Card = forwardRef<HTMLParagraphElement>(function Card(_, r) {\n  return <p ref={r} />;\n});\n", "@eslint-react/no-forward-ref"),
             ("nested.tsx", component(body="  function Inner() {\n    return <p>{n}</p>;\n  }\n  return <Inner />;\n"), "@eslint-react/no-nested-component-definitions"),
             ("effect_state.tsx", uses("useEffect, useState") + component(body="  const [m, setM] = useState(0);\n  useEffect(() => {\n    setM(n);\n  }, [n]);\n  return <p>{m}</p>;\n"), "react-hooks/set-state-in-effect"),

@@ -101,7 +101,8 @@ def mutants():
     yield from each("eslint.config.ts", '...["memo", "useMemo", "useCallback"].map(', "...[].map(", "probe", "eslint no React.useMemo")
     yield from each("eslint.config.ts", '...["innerHTML", "outerHTML", "insertAdjacentHTML"].map(', "...[].map(", "probe", "eslint no raw HTML")
     yield from each("eslint.config.ts", 'name: "DataWithResponseInit"', 'name: "Nothing"', "probe", "eslint lets a route throw data()")
-    yield from each("eslint.config.ts", '"**/*.spec.ts"', '"**/*.never.ts"', "probe", "eslint reads Playwright's tests")
+    # Two blocks name Playwright's tests, each with the switched-off rule: both go at once.
+    yield "eslint reads Playwright's tests", "eslint.config.ts", read("eslint.config.ts").replace('"**/*.spec.ts"', '"**/*.never.ts"'), "probe"
     yield from each("package.json", "--max-warnings 0 ", "", "probe", "lint fails on a warning")
     yield from each("app/tsconfig.json", '"extends": "../tsconfig.base.json",', "", "probe", "the app takes the compiler flags")
     # The style checks.
