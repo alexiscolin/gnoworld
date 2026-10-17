@@ -23,7 +23,11 @@ TESTS = {"probe": [sys.executable, "-I", "scripts/probe.py"], "hooks": ["sh", "s
 # Each guard's file, and the sections of its test that must notice the guard gone (their ONLY=):
 # a mutant runs those alone, not the whole suite. A guard file missing here stops the run.
 SECTIONS = {
-    "eslint.config.ts": "lint,outside_core,react", "package.json": "react", "app/tsconfig.json": "react","scripts/check_css.py": "css", "scripts/check_comments.mjs": "comments",
+    "eslint.config.ts": "lint,outside_core,react", "app/tsconfig.json": "react",
+    # A file both suites guard names each one's sections: a section of the other suite would
+    # fail the run as unknown, and count a mutant killed that no test saw.
+    "package.json": {"probe": "react", "hooks": "wiring"}, "pnpm-workspace.yaml": {"hooks": "wiring,regressions"},
+    "scripts/check_css.py": "css", "scripts/check_comments.mjs": "comments",
     ".jscpd.json": "jscpd", "tsconfig.base.json": "tsc", "vitest.config.ts": "vitest",
     "scripts/guard.py": "guard", "scripts/review_pass.py": "review_pass", "scripts/patch_coverage.py": "patch_coverage",
     "scripts/check_docs.py": "check_docs", "scripts/check_regressions.py": "regressions", ".githooks/commit-msg": "commit_msg",
@@ -104,6 +108,10 @@ def mutants():
     # Two blocks name Playwright's tests, each with the switched-off rule: both go at once.
     yield "eslint reads Playwright's tests", "eslint.config.ts", read("eslint.config.ts").replace('"**/*.spec.ts"', '"**/*.never.ts"'), "probe"
     yield from each("package.json", "--max-warnings 0 ", "", "probe", "lint fails on a warning")
+    yield from each("package.json", "command -p git", "git", "hooks", "prepare finds the system's git")
+    yield from each("pnpm-workspace.yaml", "ignorePnpmfile: true", "ignorePnpmfile: false", "hooks", "pnpm runs no pnpmfile")
+    yield from each(".claude/settings.json", '"Edit(/pnpm-workspace.yaml)"', '"Edit(/nothing)"', "hooks", "settings: an edit of what pnpm loads asks")
+    yield from each(".claude/settings.json", '".pnpmfile.mjs",\n', '"nothing",\n', "hooks", "settings: no command plants a pnpmfile")
     yield from each("app/tsconfig.json", '"extends": "../tsconfig.base.json",', "", "probe", "the app takes the compiler flags")
     # The style checks.
     yield from each("scripts/check_css.py", "problems.append(", OFF, "probe", "check_css problem")
@@ -156,10 +164,9 @@ def mutants():
     yield from each("scripts/check_regressions.py", 'elif key == "mutate":', "elif False:", "hooks", "check_regressions reads StrykerJS's negated globs")
     yield from each("scripts/check_regressions.py", '    if report["errors"]:', "    if False:", "hooks", "check_regressions stops on a failed Playwright listing")
     yield from each("scripts/check_regressions.py", 'walk(child, [*path, child["title"]])', "walk(child, path)", "hooks", "check_regressions names a journey with its describe")
-    yield from each("scripts/check_regressions.py", ', "scripts/.gitleaksignore", "pnpm-workspace.yaml"]', ', "pnpm-workspace.yaml"]', "hooks", "check_regressions reads the secret scan's exceptions")
-    yield from each("scripts/check_regressions.py", ', "pnpm-workspace.yaml"]', "]", "hooks", "check_regressions reads pnpm's exemptions")
-    yield from each("scripts/check_regressions.py", 'elif re.search(rf"^{key}:", text, re.M):', "elif False:", "hooks", "check_regressions reports a list it cannot read")
-    yield from each("scripts/check_regressions.py", '("minimumReleaseAge", "trustPolicy", "engineStrict")', "()", "hooks", "check_regressions watches pnpm's supply-chain settings")
+    yield from each("scripts/check_regressions.py", ', "scripts/.gitleaksignore"]', "]", "hooks", "check_regressions reads the secret scan's exceptions")
+    yield from each("scripts/check_regressions.py", 'out["pnpm-workspace.yaml outside packages"] = ', "_ = ", "hooks", "check_regressions watches pnpm's supply-chain file")
+    yield from each("scripts/check_regressions.py", r'r"^packages:\n(?:[ \t]+-.*\n)*"', 'r"(?s).*"', "hooks", "check_regressions sees past the packages list")
     yield from each("scripts/check_regressions.py", "os.path.relpath(os.path.realpath(path), os.path.realpath(root))", "os.path.relpath(path, root)", "hooks", "check_regressions resolves links")
     yield from each("scripts/check_regressions.py", "if after.get(name) != old and", "if False and", "hooks", "check_regressions watches a check's settings")
     yield from each(".githooks/commit-msg", "exit 1", ":", "hooks", "commit-msg refusal")
@@ -167,6 +174,9 @@ def mutants():
     yield from each(".githooks/pre-push", 'python3 -I scripts/review_pass.py check "$local_sha"', ":", "hooks", "pre-push review check")
     yield from each(".githooks/pre-push", "sh scripts/check.sh --full </dev/null", ":", "hooks", "pre-push gate")
     yield from each(".githooks/pre-push", "		sh scripts/check.sh </dev/null", "		:", "hooks", "pre-push fast gate")
+    yield from each(".githooks/pre-push", '"Harness-changed: $1 - "?*', "*", "hooks", "pre-push wants each harness change declared with its reason")
+    yield from each(".githooks/pre-push", 'harness "$remote_sha" "$local_sha" |', ": |", "hooks", "pre-push lists the harness files main gets")
+    yield from each(".githooks/pre-push", 'if [ "$remote_sha" != "$zero" ]; then', "if false; then", "hooks", "pre-push compares main with the remote's")
     yield from each(".githooks/pre-push", "		sh scripts/scan_secrets.sh", "		:", "hooks", "pre-push secret scan")
     yield from each("scripts/scan_secrets.sh", "--config \"$here/$config\" ", "", "hooks", "scan_secrets imposes its rules")
     yield from each("scripts/scan_secrets.sh", "gitleaks.toml gitleaks-private.toml; do", "gitleaks.toml; do", "hooks", "scan_secrets keeps private names out")
@@ -228,11 +238,12 @@ def run(test, only=""):
 
 def proposal(test, path):
     """The smallest change that would make a test notice this guard."""
+    sections = SECTIONS[path][test] if isinstance(SECTIONS[path], dict) else SECTIONS[path]
     if path == "scripts/check.sh":
         return 'add the step to the list in scripts/test_hooks.sh ("check.sh runs every step it promises")'
     if test == "probe":
-        return f"plant in scripts/probe.py, block {SECTIONS[path]}, a fault only this guard catches, or drop the guard if another holds it"
-    return f"add to scripts/test_hooks.sh, section {SECTIONS[path]}, the input this line refuses and the exit code it must give"
+        return f"plant in scripts/probe.py, block {sections}, a fault only this guard catches, or drop the guard if another holds it"
+    return f"add to scripts/test_hooks.sh, section {sections}, the input this line refuses and the exit code it must give"
 
 
 failures = []
@@ -248,7 +259,8 @@ with worktree("HEAD") as WORKTREE:
         with open(target, "w") as f:
             f.write(mutated)
         try:
-            killed = run(test, SECTIONS[path]) != 0
+            only = SECTIONS[path]
+            killed = run(test, only[test] if isinstance(only, dict) else only) != 0
         finally:
             with open(target, "w") as f:
                 f.write(original)

@@ -7,6 +7,9 @@ packages:
 # with its earlier releases.
 minimumReleaseAge: 1440
 trustPolicy: no-downgrade
+# No pnpmfile runs: pnpm loads one at every install and run, with the access of whoever runs pnpm
+# (docs/review/findings.md, F087).
+ignorePnpmfile: true
 # semver 6.3.1 is the fix of GHSA-c2qf-rxjj-qqgw, released by npm's team in July 2023 before
 # semver 6 had provenance; @babel/core 7, which React's hooks lint needs, requires it.
 trustPolicyExclude:

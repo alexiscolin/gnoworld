@@ -40,15 +40,17 @@ box = s["sandbox"]
 assert box["enabled"] is True and box["allowUnsandboxedCommands"] is False, "the sandbox can be left"
 assert {"~/.ssh", "~/.config/gh", "~/.npmrc", "~/.aws"} <= set(box["filesystem"]["denyRead"]), "a credential is readable"
 assert {"scripts", ".githooks", ".github", "package.json", ".node-version", "pnpm-lock.yaml", ".gitignore", "CLAUDE.md", ".claude/rules"} <= set(box["filesystem"]["denyWrite"]), "a command can rewrite the harness, the lockfile or the rules"
+assert {"pnpm-workspace.yaml", ".pnpmfile.cjs", ".pnpmfile.mjs"} <= set(box["filesystem"]["denyWrite"]), "a command can plant what pnpm runs (F087)"
 assert not [p for p in box["filesystem"]["allowWrite"] if "pnpm" in p], "a command can rewrite the pnpm that Alexis's install runs"
 assert not any("api.github.com" in d for d in box["network"]["allowedDomains"]), "the GitHub API is reachable"
 ask, deny = set(s["permissions"]["ask"]), set(s["permissions"]["deny"])
 # Claude builds a whole feature alone (Alexis, 2026-10-17): only the files run outside the
-# sandbox themselves ask (F068). What the gate reaches at his push is F076's risk, closed by
-# hooks that run no repository code (backlog). A new dependency and a push still ask.
+# sandbox themselves ask: the hooks and their scripts, Claude Code's own settings, skills and
+# agents (F068), and what pnpm loads at Alexis's install (F087). What the gate reaches at his
+# push is F076's risk, closed by hooks that run no repository code (backlog).
 assert {"Bash(pnpm add *)", "Bash(git push *)"} <= ask, "a new dependency or a push asks no one"
 outside = {"Edit(/scripts/guard.py)", "Edit(/scripts/stop_gate.sh)", "Edit(/scripts/code_changed.sh)", "Edit(/.githooks/**)",
-           "Edit(/.claude/settings.json)", "Edit(/**/package.json)"}
+           "Edit(/.claude/**)", "Edit(/**/package.json)", "Edit(/pnpm-workspace.yaml)", "Edit(/.pnpmfile.cjs)", "Edit(/.pnpmfile.mjs)"}
 writes = {r for r in ask if r.split("(")[0] in {"Edit", "Write", "MultiEdit", "NotebookEdit"}}
 assert writes == outside, "the edits that ask are not exactly the files run outside the sandbox"
 assert {f"mcp__{p}__gno_{t}" for p in ("gnomcp", "plugin_gnomcp_gnomcp") for t in ("addpkg", "call", "run", "key_send", "cla_sign")} <= ask, "a chain write asks no one"
@@ -59,6 +61,13 @@ assert not [r for r in deny if any(w in r for w in ("dist", "coverage", "reports
 market = s.get("extraKnownMarketplaces", {}).get("gnoverse", {}).get("source", {})
 assert market.get("repo") == "gnoverse/gno-mcp", "a teammate's Claude Code cannot find gnomcp's marketplace"
 PY
+# pnpm runs no pnpmfile, and the prepare script that Alexis's install runs finds git on the
+# system's path, never one planted in node_modules/.bin, which pnpm puts first (F087).
+grep -qx 'ignorePnpmfile: true' "$here/../pnpm-workspace.yaml" || fail "pnpm may run a pnpmfile"
+pp="$t/prepare" && mkdir -p "$pp/bin" && git -C "$pp" init -q
+printf '#!/bin/sh\ntouch "%s/planted-ran"\n' "$pp" >"$pp/bin/git" && chmod +x "$pp/bin/git"
+(cd "$pp" && PATH="$pp/bin:$PATH" sh -c "$(node -p "require('$here/../package.json').scripts.prepare")") >/dev/null 2>&1
+[ ! -e "$pp/planted-ran" ] || fail "the prepare script ran a git planted on its path"
 # check.sh runs every step it promises: removing one fails here.
 gate_file="$here/check.sh"
 for step in "run format:check" "run typecheck" "run lint" "run test" "run unused" "run copies" \
@@ -319,6 +328,18 @@ push main && fail "pre-push let main through with a pass not yet committed"
 git -C "$w" add -A && git -C "$w" commit -qm pass && head=$(git -C "$w" rev-parse HEAD)
 push main || fail "pre-push refused main with a committed review pass"
 [ "$(tail -n 1 "$w/gate.log")" = "gate --full" ] || fail "pre-push did not run the full gate for main"
+# Main gets no harness change a commit does not declare: the branch's gate is its own harness (F089).
+since() { printf 'refs/heads/main %s refs/heads/main %s\n' "$head" "$1" | (cd "$w" && PATH="$t/pushbin:$PATH" sh .githooks/pre-push origin url >/dev/null 2>&1); }
+base=$head && printf 'allow = []\n' >"$w/scripts/gitleaks.toml" && echo z >"$w/c.ts"
+git -C "$w" add -A && git -C "$w" commit -qm "loosen the scan" && (cd "$w" && python3 -I scripts/review_pass.py record HEAD test >/dev/null)
+git -C "$w" add -A && git -C "$w" commit -qm pass && head=$(git -C "$w" rev-parse HEAD)
+since "$base" && fail "pre-push let main take a harness change no commit declares"
+git -C "$w" commit -q --allow-empty -m "declare" -m "Harness-changed: scripts/gitleaks.toml" && head=$(git -C "$w" rev-parse HEAD)
+(cd "$w" && python3 -I scripts/review_pass.py record HEAD test >/dev/null) && git -C "$w" add -A && git -C "$w" commit -qm pass && head=$(git -C "$w" rev-parse HEAD)
+since "$base" && fail "pre-push took a declaration with no reason"
+git -C "$w" commit -q --allow-empty -m "declare" -m "Harness-changed: scripts/gitleaks.toml - the test's own rules" && head=$(git -C "$w" rev-parse HEAD)
+(cd "$w" && python3 -I scripts/review_pass.py record HEAD test >/dev/null) && git -C "$w" add -A && git -C "$w" commit -qm pass && head=$(git -C "$w" rev-parse HEAD)
+since "$base" || fail "pre-push refused main with its harness change declared"
 printf '#!/bin/sh\nexit 1\n' >"$w/scripts/check.sh"
 git -C "$w" add -A && git -C "$w" commit -qm "failing gate" && head=$(git -C "$w" rev-parse HEAD)
 push slice-1a && fail "pre-push let a push through a failing gate"

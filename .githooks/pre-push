@@ -5,13 +5,35 @@
 set -eu
 zero=0000000000000000000000000000000000000000
 gated=false
-while read -r _ local_sha remote_ref _; do
+# A branch's gate is its own harness, so a harness file it changes is declared on a line of a
+# commit, `Harness-changed: <path> - why`, which Alexis reads in review (F089). This hook asks
+# before any edit, so a branch cannot drop the check.
+harness() {
+	git -c core.quotePath=false diff --name-only "$1" "$2" -- scripts .githooks .github .claude package.json pnpm-workspace.yaml \
+		'*.config.ts' tsconfig.json tsconfig.base.json stryker.config.json knip.json .jscpd.json .prettierrc.json .prettierignore .gitignore
+}
+declared() { # $1: the path; stdin: the commit messages
+	while IFS= read -r line; do
+		case $line in "Harness-changed: $1 - "?*) return 0 ;; esac
+	done
+	return 1
+}
+while read -r _ local_sha remote_ref remote_sha; do
 	[ "$local_sha" = "$zero" ] && continue # a deleted branch
 	if [ "$local_sha" != "$(git rev-parse HEAD)" ] || [ -n "$(git status --porcelain)" ]; then
 		echo "pre-push: push the commit you have checked out, with nothing uncommitted or untracked, so the gate checks what leaves" >&2
 		exit 1
 	fi
 	if [ "$remote_ref" = refs/heads/main ]; then
+		if [ "$remote_sha" != "$zero" ]; then
+			undeclared=$(harness "$remote_sha" "$local_sha" | while IFS= read -r f; do
+				git log --format=%B "$remote_sha..$local_sha" | declared "$f" || printf '%s\n' "$f"
+			done)
+			if [ -n "$undeclared" ]; then
+				printf 'pre-push: harness files changed with no `Harness-changed: <path> - why` line in a commit:\n%s\n' "$undeclared" >&2
+				exit 1
+			fi
+		fi
 		python3 -I scripts/review_pass.py check "$local_sha" # cheap, so before the gate
 		sh scripts/check.sh --full </dev/null
 	elif ! $gated; then
