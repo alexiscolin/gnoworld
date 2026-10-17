@@ -12,10 +12,11 @@ def git(*args):
 
 @contextlib.contextmanager
 def worktree(rev):
-    """A throwaway worktree of rev under .claude/tmp, borrowing the working tree's node_modules
-    at the same paths (borrow_node_modules.sh), removed when done."""
+    """A throwaway worktree of rev in $TMPDIR, borrowing the working tree's node_modules at the
+    same paths (borrow_node_modules.sh), removed when done. Not inside the repo: the sandbox
+    refuses to write a `.claude/commands` there, even in a copy."""
     git("worktree", "prune")  # a run killed before its cleanup leaves a stale entry
-    with tempfile.TemporaryDirectory(dir=".claude/tmp") as where:
+    with tempfile.TemporaryDirectory() as where:
         tree = os.path.join(where, "tree")
         git("worktree", "add", "-q", "--detach", tree, rev)
         try:
