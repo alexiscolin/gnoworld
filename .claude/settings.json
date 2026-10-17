@@ -40,9 +40,47 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$CLAUDE_PROJECT_DIR/scripts/format_hook.sh\""
+          }
+        ]
+      }
     ]
   },
   "env": {
     "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet"
+  },
+  "sandbox": {
+    "enabled": true,
+    "filesystem": {
+      "allowWrite": [
+        "~/.cache/gno-toolchains",
+        "~/.cache/gnoworld-tools",
+        "~/Library/Caches/go-build",
+        "~/go/pkg/mod",
+        "~/Library/pnpm",
+        "~/Library/Caches/ms-playwright"
+      ]
+    },
+    "network": {
+      "allowedDomains": [
+        "registry.npmjs.org",
+        "proxy.golang.org",
+        "sum.golang.org",
+        "github.com",
+        "api.github.com",
+        "codeload.github.com",
+        "objects.githubusercontent.com",
+        "rpc.gno.land",
+        "rpc.onyx.testnets.gno.land",
+        "semgrep.dev"
+      ]
+    }
   }
 }

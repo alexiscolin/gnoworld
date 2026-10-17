@@ -6,8 +6,7 @@ Run the review before merging the current branch (base: $ARGUMENTS, or `main` if
 Follow `docs/REVIEW.md` ("AI review before a merge"). Never merge, push, rebase, skip a hook,
 or edit a test to make it pass.
 
-1. **No tokens first.** Run `scripts/check.sh`, then the mutation tester on the changed
-   files. If the gate fails, stop and report its output. Write the diff to
+1. **No tokens first.** Run `scripts/check.sh --full`: the gate, the probe, coverage and patch coverage, mutations, secrets. If the gate fails, stop and report its output. Write the diff to
    `.claude/tmp/diff.patch` and pass agents its path, never its content. Over about 400
    lines, say so and propose a split before reviewing.
 2. **The plan.** List the files changed that the slice plan does not name; each gets its
@@ -20,8 +19,7 @@ or edit a test to make it pass.
    - the last merge of a slice with tier-1 code: propose to Alexis that he runs
      `/code-review ultra` (a deeper review in the cloud, billed per run; Claude cannot start it);
       - the last merge of a slice: `/code-review` on each workspace the slice touched, as a
-     path, so it reads the whole folder and not only the diff, with the export map and
-     similarity-ts's candidates; then `/simplify` on the slice's changes, and the gate again.
+     path, so it reads the whole folder and not only the diff, with the export map; then `/simplify` on the slice's changes, and the gate again.
 5. **Check each finding** against the code before fixing it; drop a false positive with its
    reason. Fixes are re-checked by the gate and the mutation tester, not by a new pass. A
    second pass runs only for a high finding fixed in a tier-1 file, and only that lens.

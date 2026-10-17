@@ -1,0 +1,11 @@
+packages:
+  - packages/*
+
+# Supply chain, made explicit: no package younger than a day, no dependency build script
+# unless it is listed in allowBuilds, and no version whose trust evidence dropped compared
+# with its earlier releases.
+minimumReleaseAge: 1440
+trustPolicy: no-downgrade
+engineStrict: true
+allowBuilds:
+  unrs-resolver: false # its postinstall only re-fetches the native binding, which optionalDependencies already install

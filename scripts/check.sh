@@ -1,19 +1,43 @@
 #!/bin/sh
-# check.sh: everything that must pass before a commit or a deploy (ADR-0001 §14).
-# The pre-commit hook runs it; CI will too, once there is a remote. It stops at
-# the first failure.
+# check.sh: the gate (ADR-0001 §14, ADR-0002 §9). It stops at the first failure.
+# - Fast, by default: every commit (the pre-commit hook) and every turn of Claude Code
+#   (the Stop hook) run it; it stays under a minute.
+# - `--full` adds what /pre-merge and CI run: the harness's own probe, coverage and patch
+#   coverage, mutations, and the scan of the whole history for secrets.
 #
-# GNO_TOOLCHAIN is the folder holding a gno that matches the chain, and its
-# gnohome (docs/DEVELOPMENT.md, "Toolchain").
+# GNO_TOOLCHAIN is the folder holding a gno that matches the chain, and its gnohome
+# (docs/DEVELOPMENT.md, "Toolchain"). Node comes from .node-version, through nvm when the
+# shell's own differs.
 set -eu
 cd "$(dirname "$0")/.."
+full=false
+[ "${1:-}" = "--full" ] && full=true
 
+want="v$(cat .node-version)"
+nvm_node="${NVM_DIR:-$HOME/.nvm}/versions/node/$want/bin"
+[ "$(node -v 2>/dev/null || :)" = "$want" ] || [ ! -x "$nvm_node/node" ] || PATH="$nvm_node:$PATH"
+[ "$(node -v 2>/dev/null || :)" = "$want" ] || {
+	echo "check.sh: Node $want is needed (.node-version; docs/DEVELOPMENT.md, \"Setup\")" >&2
+	exit 1
+}
 toolchain=$(cd "${GNO_TOOLCHAIN:-$HOME/.cache/gno-toolchains/onyx}" && pwd) # absolute: gno also runs from temporary folders
 export GNO="$toolchain/gno" GNOHOME="$toolchain/gnohome"
 if [ ! -x "$GNO" ]; then
 	echo "check.sh: no gno at $GNO (docs/DEVELOPMENT.md, \"Toolchain\")" >&2
 	exit 1
 fi
+
+echo "== TypeScript: types, lint, tests"
+pnpm run --silent typecheck
+pnpm run --silent lint
+pnpm run --silent test
+
+echo "== no dead code, no copy, no renamed copy, CSS and comment rules"
+pnpm run --silent unused
+pnpm run --silent copies >/dev/null
+pnpm run --silent clones
+python3 -I scripts/check_css.py
+python3 -I scripts/check_comments.py
 
 echo "== realms: lint and tests"
 "$GNO" lint ./r/...
@@ -35,5 +59,17 @@ python3 -I scripts/check_docs.py
 
 echo "== hooks"
 sh scripts/test_hooks.sh
+
+if $full; then
+	echo "== the harness keeps its promises (scripts/probe.py)"
+	python3 -I scripts/probe.py
+	echo "== coverage: 85% everywhere, core 100%; and 85% of the lines this branch changed"
+	pnpm run --silent coverage
+	python3 -I scripts/patch_coverage.py "$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse HEAD)" 85
+	echo "== mutations (StrykerJS, incremental)"
+	pnpm run --silent mutate
+	echo "== no secret anywhere in the history"
+	gitleaks git --no-banner --redact .
+fi
 
 echo "all checks passed"

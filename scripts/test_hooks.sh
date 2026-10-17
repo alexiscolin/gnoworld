@@ -85,4 +85,27 @@ python3 -I "$docs" "$d" >/dev/null 2>&1 || fail "check_docs refused a doc whose 
 printf 'Run `scripts/gone.sh`.\n' >"$d/.claude/rules/x.md"
 python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted a doc naming a missing file"
 
+# format_hook: after an edit, eslint --fix rewrites the file; it never blocks.
+fmt=$(cd "$(dirname "$0")" && pwd)/format_hook.sh
+repo=$(cd "$(dirname "$0")/.." && pwd)
+probe="$repo/packages/core/src/__format_probe__.ts"
+printf 'export type Point = { x: number };\n' >"$probe"
+printf '{"tool_input":{"file_path":"%s"}}' "$probe" | CLAUDE_PROJECT_DIR="$repo" sh "$fmt" || { rm -f "$probe"; fail "format_hook blocked an edit"; }
+grep -q "interface Point" "$probe" || { rm -f "$probe"; fail "format_hook did not run eslint --fix"; }
+rm -f "$probe"
+
+# patch_coverage: the share of changed lines that the tests run, like a pull request's
+# patch coverage, from Vitest's JSON report and git's diff.
+patch=$(cd "$(dirname "$0")" && pwd)/patch_coverage.py
+c="$t/cov"
+mkdir -p "$c/src" "$c/coverage"
+git -C "$c" init -q && printf 'one\n' >"$c/src/a.ts" && git -C "$c" add -A && git -C "$c" -c user.name=t -c user.email=t@t commit -qm base
+printf 'one\ntwo\nthree\nfour\n' >"$c/src/a.ts"
+cover() { # $1: hit count of line 3's statement
+	printf '{"%s/src/a.ts":{"statementMap":{"0":{"start":{"line":2}},"1":{"start":{"line":3}},"2":{"start":{"line":4}}},"s":{"0":1,"1":%s,"2":1}}}' "$c" "$1" >"$c/coverage/coverage-final.json"
+	(cd "$c" && python3 -I "$patch" HEAD 85 >/dev/null 2>&1)
+}
+cover 1 || fail "patch_coverage refused a patch whose lines are all run"
+cover 0 && fail "patch_coverage accepted a patch at 67%, under 85%"
+
 echo "hooks: ok"

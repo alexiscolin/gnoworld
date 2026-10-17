@@ -1,0 +1,35 @@
+{
+  "name": "gnoworld",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.14.0",
+  "engines": {
+    "node": "24.22.0"
+  },
+  "scripts": {
+    "prepare": "git config core.hooksPath .githooks",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint --cache --max-warnings 0 .",
+    "test": "vitest run",
+    "coverage": "vitest run --coverage",
+    "mutate": "stryker run",
+    "unused": "knip --no-progress",
+    "copies": "jscpd .",
+    "clones": "node scripts/clones.mjs"
+  },
+  "devDependencies": {
+    "@eslint/css": "2.0.1",
+    "@stryker-mutator/core": "10.0.0",
+    "@stryker-mutator/typescript-checker": "10.0.0",
+    "@stryker-mutator/vitest-runner": "10.0.0",
+    "@vitest/coverage-v8": "4.1.12",
+    "eslint": "10.12.0",
+    "eslint-plugin-import-x": "4.17.1",
+    "fast-check": "4.10.2",
+    "jscpd": "5.4.1",
+    "knip": "6.41.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.2",
+    "vitest": "4.1.12"
+  }
+}

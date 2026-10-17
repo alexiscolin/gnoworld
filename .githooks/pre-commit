@@ -11,4 +11,8 @@ staged=$(mktemp -d)
 trap 'rm -rf "$staged" || :' EXIT
 trap 'exit 1' HUP INT TERM # so the EXIT trap also runs on Ctrl-C under dash
 git checkout-index -a --ignore-skip-worktree-bits --prefix="$staged/"
+# The staged copy has no installed packages: it borrows the working tree's.
+find . -name node_modules -type d -prune -not -path './.git/*' | while read -r m; do
+	mkdir -p "$staged/$(dirname "$m")" && ln -s "$PWD/$m" "$staged/$m"
+done
 sh "$staged/scripts/check.sh"

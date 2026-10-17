@@ -1076,7 +1076,7 @@ Docker on arm64.
 | Need | Choice | Why |
 |---|---|---|
 | Runtime | Node 24 LTS, pinned exactly (24.22.0) in `engines`, `.node-version` and the image digest; supported to 2028-04-30. Node 26 once it is LTS and Adena's SDK passes on it | Node runs TypeScript directly (stable since 24.12), so the server has no build step |
-| Types | TypeScript 6 (`tsc --noEmit`), with `erasableSyntaxOnly`, `verbatimModuleSyntax` and `rewriteRelativeImportExtensions`. TypeScript 7 waits for typescript-eslint | Node only strips types: no enums, no namespaces with code, no parameter properties, no tsconfig `paths` |
+| Types | TypeScript 6 (`tsc --noEmit`), with `erasableSyntaxOnly`, `verbatimModuleSyntax` and `allowImportingTsExtensions` (no emit). TypeScript 7 waits for typescript-eslint | Node only strips types: no enums, no namespaces with code, no parameter properties, no tsconfig `paths` |
 | Monorepo | pnpm 12 workspaces, one catalog of versions, `--frozen-lockfile`. Shared packages export their `.ts` sources; imports go by package name and `#` subpath imports. The image copies the workspace as it is, never `pnpm deploy` | pnpm installs no package scripts and no package younger than a day by default. Node refuses `.ts` inside `node_modules` |
 | HTTP | Hono 4 with `@hono/node-server` 2 and `@hono/zod-validator` | No dependencies of its own; secure headers, body limit, timeout, CSRF and SSE built in; tested with `app.request()`, no server started; about 59 MB at rest |
 | Rate limits | About twenty lines of ours, in memory, with a size cap | One process, nothing to share |
@@ -1394,7 +1394,7 @@ Its findings are fixed before any other lens runs.
 
 **Dependencies to ask for, each in its slice:**
 - slice 1: `react-router`, `@react-router/dev`, `vite-plugin-pwa`, a CSS linter, an
-  unused-code finder, a Lighthouse runner, an import-cycle check, Testing Library, fast-check with `@fast-check/vitest`, and StrykerJS (`@stryker-mutator/core`, `@stryker-mutator/vitest-runner`, `@stryker-mutator/typescript-checker`);
+  unused-code finder, a Lighthouse runner, an import-cycle check, Testing Library, fast-check, and StrykerJS (`@stryker-mutator/core`, `@stryker-mutator/vitest-runner`, `@stryker-mutator/typescript-checker`);
 - slice 3: `hono`, `@hono/node-server`, `@hono/zod-validator`, `@adena-wallet/sdk` (the
   server's verifier);
 - slice 10: `@anthropic-ai/sdk`, `@modelcontextprotocol/client`, `@opentelemetry/api`,

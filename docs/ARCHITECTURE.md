@@ -104,7 +104,7 @@ can; review checks the rest.
 `exactOptionalPropertyTypes`, `noImplicitOverride`, `noFallthroughCasesInSwitch`,
 `noPropertyAccessFromIndexSignature`, `noUnusedLocals`, `noUnusedParameters`,
 `verbatimModuleSyntax`, `isolatedModules`, `erasableSyntaxOnly` and
-`rewriteRelativeImportExtensions`: Node runs the server's TypeScript directly, so only
+`allowImportingTsExtensions` with `noEmit` (imports name their `.ts` file; nothing is compiled): Node runs the server's TypeScript directly, so only
 syntax it can erase is allowed (no enums, no namespaces with code, no parameter
 properties).
 
@@ -112,9 +112,8 @@ properties).
 already refuse a floating or misused promise, a thrown non-error and an untyped `catch`
 value), plus `switch-exhaustiveness-check`; ESLint's `no-empty`, `no-useless-catch` and
 `preserve-caught-error` (a rethrow keeps its `cause`), and a `catch` that only logs; the
-import boundaries above; no import cycles (`eslint-plugin-import-x`). **Copies:** jscpd fails the gate on a new copied block, and similarity-ts on a new
-function, type or class whose syntax tree is close to an existing one, anywhere in the repo
-(a wrapper compares with a baseline, since its exit code is not documented). **One way to
+import boundaries above; no import cycles (`eslint-plugin-import-x`). **Copies:** jscpd fails the gate on a new copied block, and `scripts/clones.mjs` on a function whose syntax tree has the same shape as another's,
+whatever its names (the TypeScript compiler, already installed). **One way to
 do each thing,** enforced per folder by `no-restricted-globals` and `no-restricted-syntax`:
 `fetch` and storage only in `lib`, `Intl` formatting only in `core`'s formatters, no clock
 in `core`, `console` only through the logger. **A map for agents:** the gate regenerates
