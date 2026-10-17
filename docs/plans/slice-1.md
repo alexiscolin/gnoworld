@@ -15,6 +15,7 @@ the gate; the PWA installs and asks before updating; a demo container cannot rea
 homelab's services. This plan adds:
 - the fast gate (the Stop hook and pre-commit) stays under 60 s; the full set runs in `/pre-merge`;
 - `pnpm install` runs no package script, and the lockfile is frozen;
+- gitleaks finds no secret in the whole history before the first push, then runs on each staged change; semgrep runs in `/pre-merge`;
 - Claude Code's sandbox is on, and the gate passes inside it;
 - `core/irc`'s tests are committed `test.fails`, and StrykerJS records `core`'s first score as its floor.
 
@@ -68,6 +69,7 @@ New: `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `eslint.config
 
 - **1a:** pnpm 12.14.0; typescript 6.0.3 (typescript-eslint 8.71.2 caps it below 6.1; TypeScript 7.0.2 waits); eslint 10.13.0; typescript-eslint 8.71.2; eslint-plugin-import-x 4.17.1 (cycles); vitest 5.0.5 with @vitest/coverage-v8; fast-check 4.10.2 with @fast-check/vitest 0.5.0; @stryker-mutator/core, vitest-runner and typescript-checker 10.0.0; knip 6.41.0; jscpd 5.4.1 (copies); stylelint 17.16.0 with stylelint-config-standard 40.0.0.
 - **1b:** react and react-dom 19.3.1; react-router and @react-router/dev 8.4.0; vite 8.3.4; @vitejs/plugin-react 6.1.2 with babel-plugin-react-compiler 1.0.0 (ADR-0002 §8's compiler check); vite-plugin-pwa 2.0.0; eslint-plugin-react-hooks 7.1.1; jsdom 30.1.3; @testing-library/react 16.3.3; @playwright/test 1.64.1; @axe-core/playwright 4.14.0; lighthouse 13.5.0 (@lhci/cli's last release is 0.15.1, from June 2025).
+- **Tools, as binaries (Homebrew and CI), not packages:** gitleaks 8.30.1 (MIT); semgrep 1.181.0 (LGPL-2.1, its community rules).
 - **1c (images, pinned by digest):** Node 24 distroless, the static server, Tailscale, the egress proxy (chosen and verified in 1c).
 
 ## 9. Questions for Alexis

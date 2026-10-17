@@ -1254,7 +1254,7 @@ from gno-golf's engine, measured there.
 
 | Kind | What it proves | Tool | When |
 |---|---|---|---|
-| Unit | Every rule in `core`, and every parser; properties for parsers, placement and ranking (any input, the invariant holds) | Vitest; fast-check | Every commit |
+| Unit | Every rule in `core`, and every parser; properties for parsers, placement and ranking (any input, the invariant holds), and every parser of untrusted input fuzzed with many more runs each night | Vitest; fast-check | Every commit; the long fuzz nightly |
 | Component | Each design-system component in each state, the keyboard, axe | Vitest with Testing Library | Every commit |
 | Feature | A feature with its store and its boundaries, against fakes: a fake Ergo, recorded chain answers, a fake model | Vitest | Every commit |
 | Contract | Each Zod schema against recorded real answers (Ergo, the RPC, the indexer, gnoscope, Adena); live again each night, so a change outside fails loudly | Vitest | Every commit; nightly live |
@@ -1268,7 +1268,7 @@ from gno-golf's engine, measured there.
 | Mutation | Every guard fails a test when removed: realms (`scripts/mutate.py`), and all TypeScript with tests (StrykerJS: its TypeScript checker drops mutants that would not compile, so the score is honest; incremental mode reruns only what changed) | `mutate.py`; StrykerJS | The changed lines before each merge; everything nightly. A score below its floor fails, the floor set from slice 1's first run and only ever raised |
 | Realms | Tests, filetests, `gno-audit` | gno | Every commit |
 | AI | Jarvis's evals (§5), non-hallucination first: every number, name, link and function in an answer is checked by string match against the tool results; an answer with nothing to ground it must say it does not know; a different model grades the rest. A grounded rate below the threshold fails | promptfoo, with our grounding check as a JavaScript assertion | On every change to it; nightly sample |
-| Security | Dependency audit, secret scan, the CSP, the injection suite, the admin console's penetration test | The gate; before launch | Every commit; before launch |
+| Security | Dependency audit; secrets in the staged change and, before the first push, in the whole history; static analysis for TypeScript, Docker and the compose file; the CSP; the injection suite; races on every single-use proof (nonces, approvals); the admin console's penetration test | `pnpm audit`, gitleaks, semgrep, Vitest, the gate; a penetration tester before launch | Every commit; the full scan in `/pre-merge`; before launch |
 
 `core` keeps 100% of lines and functions covered and 95% of branches; coverage alone never
 counts as proof, mutation does.
