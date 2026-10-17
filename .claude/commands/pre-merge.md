@@ -14,8 +14,7 @@ or edit a test to make it pass.
    mutants. If it reports findings, stop: list them and wait.
 3. **One review pass, sized by risk:**
    - always: Claude Code's `/code-review` on the range;
-   - a tier-1 file (`docs/REVIEW.md`): also one `reviewer` agent on the security lens alone,
-     with `model: opus`;
+   - a tier-1 file (`docs/REVIEW.md`): also the `security-reviewer` agent (Opus);
    - the last merge of a slice with tier-1 code: propose to Alexis that he runs
      `/code-review ultra` (a deeper review in the cloud, billed per run; Claude cannot start it).
 4. **Check each finding** against the code before fixing it; drop a false positive with its

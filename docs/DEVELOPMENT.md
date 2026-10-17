@@ -38,6 +38,28 @@ The pre-commit hook runs the gate on what is staged, and skips it when only docs
 (`scripts/stop_gate.sh`, set in `.claude/settings.json`) runs the gate when a turn changed
 code, and blocks the turn once if it fails.
 
+## The harness
+
+What keeps code written with Claude Code correct, cheap and fast. What costs no tokens runs
+first.
+
+| Layer | What | Cost |
+| --- | --- | --- |
+| Context | `CLAUDE.md`, short, always loaded; `.claude/rules/`, one file per area, loaded when its files are touched | Small, cached |
+| Hard rules | Git hooks: the gate before each commit and merge, no attribution lines. Claude Code hooks: the Stop gate, `scripts/guard_git.py` (no hook is ever skipped), and from slice 1 `eslint --fix` on each edited file. Permissions: secrets unreadable; `git push`, `pnpm add` and `rm -rf` ask first | None |
+| Checks | `scripts/check.sh`: realms, their mutation check, Go, the hooks. From slice 1: `tsc`, ESLint, Vitest with fast-check, StrykerJS on what changed, Playwright with axe, Lighthouse, the unused-code finder, the CSS linter, the benches | None |
+| Plan | `/slice-plan <n>` writes the slice's plan; Alexis approves it before code | One short pass |
+| Review | `/pre-merge`: the gate and mutations, the `test-auditor` (Sonnet) on the survivors, `/code-review`, and the `security-reviewer` (Opus) on tier-1 changes. At the end of a slice with tier-1 code, Alexis may run `/code-review ultra` | One pass per merge |
+| Jarvis | promptfoo in `evals/`: the evals and the red team, answers cached | Only changed cases |
+
+**Keeping it cheap:** subagents run on Sonnet unless their file says otherwise
+(`CLAUDE_CODE_SUBAGENT_MODEL` in `.claude/settings.json`); agents get the diff's path, never
+its content; one review pass; `/clear` between slices; `/usage` shows a session's cost.
+
+**Once the repo has a remote:** CI runs `scripts/check.sh`; `/security-review` works (it
+compares with `origin`); Code Review can review each pull request if the organization is on
+a Team or Enterprise plan; any scripted `claude -p` run carries `--max-budget-usd`.
+
 ## Slices
 
 One slice at a time, each with its plan in `docs/plans/` (ADR-0001 §14, CLAUDE.md).

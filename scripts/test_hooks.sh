@@ -58,4 +58,21 @@ code=0; stop '{"stop_hook_active":false}' || code=$?
 [ "$code" = 2 ] || fail "stop_gate did not block a code change with a failing gate (exit $code)"
 stop '{"stop_hook_active":true}' || fail "stop_gate blocked a second stop in a row"
 
+# guard_git: Claude Code never skips a git hook. It blocks (exit 2) only a real skip.
+guard=$(cd "$(dirname "$0")" && pwd)/guard_git.py
+guard() {
+	code=0
+	printf '{"tool_input":{"command":"%s"}}' "$1" | python3 -I "$guard" 2>/dev/null || code=$?
+	[ "$code" = "$2" ] || fail "guard_git gave $code, not $2, for: $1"
+}
+guard "git commit --no-verify -m x" 2
+guard "git commit -nm x" 2
+guard "git -c core.hooksPath=/dev/null commit -m x" 2
+guard "git merge --no-verify main" 2
+guard "cd r && git commit -n -m x" 2
+guard "git commit -m 'fix -n handling'" 0
+guard "git commit -m x && git log -n 5" 0
+guard "git merge -n main" 0
+guard "git commit --amend -m x" 0
+
 echo "hooks: ok"

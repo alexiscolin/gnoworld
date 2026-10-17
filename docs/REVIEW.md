@@ -28,31 +28,8 @@ Most important first:
 
 ## What to look for, by technology
 
-- **gno:**
-  - caller identity (`cur.Previous()`, never `OriginCaller` for authority);
-  - panic versus error, since an error does not revert;
-  - storage per object;
-  - escaping in `Render`;
-  - cross-realm calls;
-  - a new entry in `GAPS` (`scripts/mutate.py`).
-- **TypeScript and React:**
-  - promises that are not awaited;
-  - `as` on outside data;
-  - effect dependencies, and stale closures;
-  - a new dependency.
-- **Node (the server):**
-  - work that blocks the event loop;
-  - a promise left floating, or a rejection swallowed;
-  - an outbound call without a timeout;
-  - a map, a queue or a cache without a bound;
-  - authorization checked before any work;
-  - a clean stop on `SIGTERM`.
-- **Go (the reference client):**
-  - goroutine leaks;
-  - context cancellation;
-  - maps that grow without bound;
-  - timeouts;
-  - authorization checked before any work.
+The checklists live in `.claude/rules/`, one file per area (realms, TypeScript, the server,
+Go, `packages/core`). Claude Code loads each one when a change or a review touches its files.
 
 ## Warning signs
 
@@ -70,7 +47,7 @@ Use [Conventional Comments](https://conventionalcomments.org): `issue:` (blocks 
 ## AI review before a merge
 
 Code written by an agent gets the same reading as anyone's, plus this. `/pre-merge`
-(`.claude/commands/pre-merge.md`) runs it, with the `test-auditor` and `reviewer` agents
+(`.claude/commands/pre-merge.md`) runs it, with the `test-auditor` and `security-reviewer` agents
 (`.claude/agents/`):
 
 1. **No tokens first.** The gate, then the mutation tester on the changed code: a surviving
