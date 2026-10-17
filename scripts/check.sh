@@ -45,10 +45,10 @@ copies=$(run copies 2>&1) || { printf '%s\n' "$copies"; exit 1; }
 python3 -I scripts/check_css.py
 run comments
 
-echo "== realms (gno/): lint and tests"
-(cd gno && "$GNO" lint ./r/... && "$GNO" test ./r/...)
+echo "== gno (realms and packages): lint and tests"
+(cd gno && "$GNO" lint ./... && "$GNO" test ./...)
 
-echo "== realms: removing any guard fails a test"
+echo "== gno: removing any guard fails a test"
 (cd gno && python3 -I ../scripts/mutate.py)
 
 echo "== Go tools (gno/tools): format, vet, and the seal vectors they generate"

@@ -2,7 +2,8 @@
 coverage, with no service: Vitest's coverage/coverage-final.json against `git diff`.
 
 Every statement that starts on an added or changed line of a .ts or .tsx file counts. It
-prints the uncovered lines per file and fails under the floor.
+prints the uncovered lines per file and fails under the floor, or when a changed source file is
+missing from the report (vitest.config.ts's coverage include does not reach it).
 Usage: patch_coverage.py <base> [floor], after `pnpm run coverage`; the floor defaults to 85, the
 same as vitest.config.ts's."""
 import json
@@ -33,6 +34,9 @@ with open("coverage/coverage-final.json") as f:
     report = {os.path.realpath(k): v for k, v in json.load(f).items()}
 
 total = run = 0
+unmeasured = [p for p in changed if p not in report and not re.search(r"\.(test|config)\.tsx?$|\.d\.ts$", p)]
+for path in sorted(unmeasured):
+    print(f"{os.path.relpath(path)}: changed, but no coverage measures it: add it to vitest.config.ts's coverage include")
 for path, lines in sorted(changed.items()):
     if path not in report:
         continue
@@ -50,5 +54,5 @@ for path, lines in sorted(changed.items()):
 
 share = 100.0 if total == 0 else 100.0 * run / total
 print(f"patch coverage: {share:.1f}% of {total} changed statements (floor {floor:g}%)")
-if share < floor:
+if share < floor or unmeasured:
     sys.exit(1)

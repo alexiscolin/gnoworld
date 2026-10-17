@@ -117,6 +117,12 @@ try:
         expect(got == set() if rule is None else carries(got, rule), f"eslint {name}: expected {rule or 'nothing'}, got {sorted(map(str, got))}")
     shutil.rmtree(HERE)
 
+    # Vitest: a test that asserts nothing fails (expect.requireAssertions).
+    plant({"empty.test.ts": 'import { test } from "vitest";\n\ntest("x", () => {});\n'})
+    out = run(["node_modules/.bin/vitest", "run", f"{HERE}/empty.test.ts"])
+    expect(out.returncode != 0 and "assertion" in (out.stdout + out.stderr).lower(), "vitest refuses a test with no assertion")
+    shutil.rmtree(HERE)
+
     # Prettier: a file that is not formatted.
     plant({"messy.ts": "export const  a={b:1,\n c :2}\n"})
     out = run(["node_modules/.bin/prettier", "--check", HERE])

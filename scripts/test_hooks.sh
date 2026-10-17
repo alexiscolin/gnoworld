@@ -22,12 +22,14 @@ PY
 # check.sh runs every step it promises: removing one fails here.
 gate_file="$here/check.sh"
 for step in "run format:check" "run typecheck" "run lint" "run test" "run unused" "run copies" \
-	"python3 -I scripts/check_css.py" "run comments" '"$GNO" lint ./r/...' '"$GNO" test ./r/...' \
+	"python3 -I scripts/check_css.py" "run comments" '"$GNO" lint ./...' '"$GNO" test ./...' \
 	"python3 -I ../scripts/mutate.py" "go vet ./tools/..." "go run ./tools/sealvec | cmp" "python3 -I scripts/check_docs.py" \
 	"sh scripts/test_hooks.sh" "python3 -I scripts/probe.py" "run coverage" "python3 -I scripts/patch_coverage.py" \
 	"run mutate" "gitleaks git" "python3 -I scripts/harness_mutate.py" "python3 -I scripts/check_regressions.py"; do
 	grep -v '^[[:space:]]*#' "$gate_file" | grep -qF -- "$step" || fail "check.sh no longer runs: $step"
 done
+# Every gno package is mutated, gno/p as well as gno/r: discovery names no area.
+grep -qF 'glob.glob("**/gnomod.toml"' "$here/mutate.py" || fail "mutate.py no longer mutates every gno package"
 
 # commit-msg: a conventional subject of 72 characters at most, or git's own merge and revert
 # subjects; no attribution line.
@@ -131,6 +133,11 @@ cover() { # $1: hit count of line 3's statement
 }
 cover 1 || fail "patch_coverage refused a patch whose lines are all run"
 cover 0 && fail "patch_coverage accepted a patch at 67%, under 85%"
+printf 'export const b = 1;\n' >"$c/src/b.ts" && git -C "$c" add src/b.ts
+cover 1 && fail "patch_coverage accepted a changed file the coverage report does not measure"
+git -C "$c" rm -q --cached src/b.ts && rm "$c/src/b.ts"
+printf 'x\n' >"$c/src/a.test.ts" && printf 'x\n' >"$c/vitest.config.ts" && git -C "$c" add src/a.test.ts vitest.config.ts
+cover 1 || fail "patch_coverage refused a changed test or config file, which coverage never measures"
 
 # review_pass: /pre-merge records the tree it reviewed; a later change to the code voids it,
 # the review log committed after it does not.

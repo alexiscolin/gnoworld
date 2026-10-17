@@ -3,6 +3,8 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     include: ["packages/*/src/**/*.test.ts"],
+    // A test that asserts nothing passes whatever the code does.
+    expect: { requireAssertions: true },
     coverage: {
       // Every source file counts, tested or not, so an untested file shows as 0%.
       include: ["packages/*/src/**/*.{ts,tsx}"],

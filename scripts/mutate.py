@@ -99,7 +99,7 @@ def verdict(out, i):
     return "no result"
 
 
-packages = {os.path.dirname(p) for p in glob.glob("r/**/gnomod.toml", recursive=True)}
+packages = {os.path.dirname(p) for p in glob.glob("**/gnomod.toml", recursive=True)}
 failed, seen = False, set()
 for pkg in sorted(packages):
     sources = [f for f in glob.glob(f"{pkg}/*.gno") if not f.endswith(("_test.gno", "_filetest.gno"))]
