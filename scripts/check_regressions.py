@@ -21,7 +21,7 @@ from repo_files import git, worktree
 
 SHOT = re.compile(r"(-snapshots|__screenshots__)/.+\.(png|jpe?g)$")
 GAP_FILES = ["scripts/mutate.py", "scripts/harness_mutate.py"]
-IGNORE_FILES = [".jscpd.json", "knip.json", "stryker.config.json", "eslint.config.ts", "vitest.config.ts", ".prettierignore", "scripts/check_comments.mjs", "scripts/.gitleaksignore"]
+IGNORE_FILES = [".jscpd.json", "knip.json", "stryker.config.json", "eslint.config.ts", "vitest.config.ts", ".prettierignore", "scripts/check_comments.mjs", "scripts/.gitleaksignore", "pnpm-workspace.yaml"]
 
 
 def declared(lines, key):
@@ -70,14 +70,16 @@ def gaps(read):
     return out
 
 
-SETTINGS = {".jscpd.json": ("exitCode", "threshold", "similarity", "minTokens", "minLines", "mode")}
+SETTINGS = {".jscpd.json": ("exitCode", "threshold", "similarity", "minTokens", "minLines", "mode"),
+            "pnpm-workspace.yaml": ("minimumReleaseAge", "trustPolicy", "engineStrict")}
 
 
 def settings(read):
     """The settings that decide how strict a check is, as `<file> <key>`: their value, or None."""
     out = {}
     for name, keys in SETTINGS.items():
-        data = json.loads(read(name) or "{}")
+        text = read(name) or ""
+        data = dict(re.findall(r"^(\w+):[ \t]*([^\s#]+)", text, re.M)) if name.endswith(".yaml") else json.loads(text or "{}")
         out |= {f"{name} {key}": data.get(key) for key in keys}
     return out
 
@@ -99,6 +101,13 @@ def ignores(read):
                     out |= {f"{name} {v}" for v in (value if isinstance(value, list) else [value])}
                 elif key == "mutate":  # a negated glob takes files out of the mutation test
                     out |= {f"{name} {v}" for v in value if str(v).startswith("!")}
+        elif name == "pnpm-workspace.yaml":  # packages let past the supply-chain checks
+            # ponytail: top-level block or flow lists only, any other form reported; a YAML parser if it nests
+            for key in ("trustPolicyExclude", "minimumReleaseAgeExclude"):
+                if m := re.search(rf"^{key}:[ \t]*(\[.*\]|\n(?:[ \t]+-.*\n?)+)", text, re.M):
+                    out |= {f"{name} {e}" for e in re.findall(r"(?:^|[\[,-])[ \t]*[\"']?([^\"'\s,\[\]#-][^\"'\s,\]#]*)", m.group(1), re.M)}
+                elif re.search(rf"^{key}:", text, re.M):
+                    out.add(f"{name} {key} in a form this check cannot read")
         elif name in (".prettierignore", "scripts/.gitleaksignore"):
             out |= {f"{name} {line.strip()}" for line in text.splitlines() if line.strip() and not line.startswith("#")}
         else:
@@ -198,6 +207,14 @@ def self_test():
     leaks = {"scripts/.gitleaksignore": "# a reason\n"}
     hidden = {"scripts/.gitleaksignore": "# a reason\nabc:docs/a.md:home-folder-path:4\n"}
     assert weakened(ignores(leaks.get), ignores(hidden.get), set(), "ignore") == ["scripts/.gitleaksignore abc:docs/a.md:home-folder-path:4"]
+    strict = {"pnpm-workspace.yaml": "minimumReleaseAge: 1440\ntrustPolicy: no-downgrade\n"}
+    loose = {"pnpm-workspace.yaml": 'minimumReleaseAge: 60\ntrustPolicy: no-downgrade\ntrustPolicyExclude:\n  - "semver@6.3.1" # why\nminimumReleaseAgeExclude:\n  - left-pad\n'}
+    assert weakened(ignores(strict.get), ignores(loose.get), set(), "ignore") == ["pnpm-workspace.yaml left-pad", "pnpm-workspace.yaml semver@6.3.1"]
+    assert changed_settings(settings(strict.get), settings(loose.get), set()) == ["pnpm-workspace.yaml minimumReleaseAge 1440 -> 60"]
+    inline = {"pnpm-workspace.yaml": "trustPolicyExclude: ['a@1.0.0', \"@b/c@2.0.0\"]\n"}
+    assert weakened(ignores(strict.get), ignores(inline.get), set(), "ignore") == ["pnpm-workspace.yaml @b/c@2.0.0", "pnpm-workspace.yaml a@1.0.0"]
+    odd = {"pnpm-workspace.yaml": "trustPolicyExclude:\n    nested:\n      - x\n"}
+    assert weakened(ignores(strict.get), ignores(odd.get), set(), "ignore") == ["pnpm-workspace.yaml trustPolicyExclude in a form this check cannot read"]
     assert changed_settings(settings(old.get), settings(new.get), set()) == [".jscpd.json exitCode 1 -> gone"]
     assert changed_settings(settings(old.get), settings(new.get), {"setting .jscpd.json exitCode"}) == []
     diff = "+++ b/p/a.test.ts\n-  test(\"parses x\", () => {\n+  test.fails(\"parses x\", () => {\n+  test.fails(\"new one\", () => {\n+++ b/p/b.test.ts\n-  test.fails(\"done\", () => {\n+  test(\"done\", () => {\n"
