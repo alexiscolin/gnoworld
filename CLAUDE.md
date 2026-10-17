@@ -37,6 +37,7 @@ gnoworld: a social, on-chain, graphical hub for gno.land. The design is
 - Work one slice at a time (`docs/plans/`), each merge on its own branch (`slice-1a`), pushed only when asked; `main` takes a merge only after `/pre-merge` (the pre-push hook refuses it otherwise). Stop at the end of a slice for review.
 - The prototype (`docs/prototype/`) is the reference for what to build and how it feels. Never copy its code: rebuild each concept test first, with the design system's components.
 - When Alexis corrects something this file or `.claude/rules/` could have prevented, propose the line that would have.
+- A decision Alexis makes in conversation goes into `docs/decisions.md` at once: one row, with its reason and where it lives.
 
 ## No regression
 
