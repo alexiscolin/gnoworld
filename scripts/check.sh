@@ -27,16 +27,19 @@ if [ ! -x "$GNO" ]; then
 	exit 1
 fi
 
+# The tools run straight from node_modules/.bin, not through `pnpm run`: the pre-commit copy
+# borrows node_modules, where pnpm would try to install first. package.json has the same commands.
+bin=node_modules/.bin
 echo "== TypeScript: format, types, lint, tests"
-pnpm run --silent format:check >/dev/null
-pnpm run --silent typecheck
-pnpm run --silent lint
-pnpm run --silent test
+"$bin/prettier" --check --log-level warn .
+"$bin/tsc" -p tsconfig.json
+"$bin/eslint" --cache --max-warnings 0 .
+"$bin/vitest" run
 
 echo "== no dead code, no copy, no renamed copy, CSS and comment rules"
-pnpm run --silent unused
-pnpm run --silent copies >/dev/null
-pnpm run --silent clones
+"$bin/knip" --no-progress
+"$bin/jscpd" . >/dev/null
+node scripts/clones.mjs
 python3 -I scripts/check_css.py
 python3 -I scripts/check_comments.py
 
@@ -65,10 +68,10 @@ if $full; then
 	echo "== the harness keeps its promises (scripts/probe.py)"
 	python3 -I scripts/probe.py
 	echo "== coverage: 85% everywhere, core 100%; and 85% of the lines this branch changed"
-	pnpm run --silent coverage
+	"$bin/vitest" run --coverage
 	python3 -I scripts/patch_coverage.py "$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse HEAD)" 85
 	echo "== mutations (StrykerJS, incremental)"
-	pnpm run --silent mutate
+	"$bin/stryker" run
 	echo "== no secret anywhere in the history"
 	gitleaks git --no-banner --redact .
 fi
