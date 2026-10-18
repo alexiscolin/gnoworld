@@ -885,6 +885,20 @@ git -C "$tx" checkout -q -b side && leak x.py && git -C "$tx" commit -qm side &&
 (cd "$tx" && sh scripts/scan_secrets.sh >/dev/null 2>&1) && fail "scan_secrets missed a key on another branch"
 printf '*.png binary\n' >"$tx/.gitattributes" && git -C "$tx" add .gitattributes
 (cd "$tx" && sh scripts/scan_secrets.sh --staged >/dev/null 2>&1) || fail "scan_secrets refused a lawful .gitattributes"
+# Names live in text: an image whose bytes spell a host's service by chance passes the private
+# rules, staged and committed; a key in a staged image is still found (F139).
+git -C "$tx" reset -q --hard "$base" && git -C "$tx" branch -qD side
+printf 'x %s8%s x\n' n n >"$tx/img.png" && git -C "$tx" add img.png
+(cd "$tx" && sh scripts/scan_secrets.sh --staged >/dev/null 2>&1) || fail "scan_secrets read an image's bytes for a name (F139)"
+git -C "$tx" commit -qm image
+(cd "$tx" && sh scripts/scan_secrets.sh >/dev/null 2>&1) || fail "scan_secrets read a committed image's bytes for a name (F139)"
+leak img.png # gitleaks's own rules skip images in the history; the staged scan reads them
+(cd "$tx" && sh scripts/scan_secrets.sh --staged >/dev/null 2>&1) && fail "scan_secrets missed a key in a staged image (F139)"
+git -C "$tx" reset -q --hard "$base"
+# gitleaks scans nothing, and passes, when git cannot read: the scan fails instead (F140).
+mkdir -p "$t/badgit" && printf '#!/bin/sh\ncase " $* " in *" log "*|*" diff "*) exit 128 ;; esac\nexec "%s" "$@"\n' "$(command -v git)" >"$t/badgit/git" && chmod +x "$t/badgit/git"
+(cd "$tx" && PATH="$t/badgit:$PATH" sh scripts/scan_secrets.sh >/dev/null 2>&1) && fail "scan_secrets passed a history git could not read (F140)"
+(cd "$tx" && PATH="$t/badgit:$PATH" sh scripts/scan_secrets.sh --staged >/dev/null 2>&1) && fail "scan_secrets passed a staged diff git could not read (F140)"
 fi
 
 if part regressions; then
