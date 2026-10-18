@@ -563,6 +563,11 @@ untouched pre-merge-commit
 # A print is recorded once, however often its gate passes.
 (cd "$o" && . .githooks/records.sh && record HEAD "$t/once" && record HEAD "$t/once") || fail "records.sh could not record a print"
 [ "$(wc -l <"$t/once")" -eq 1 ] || fail "records.sh recorded the same print twice"
+# A longer line that holds the print is no record of it: the print is still written, whole.
+p=$(cd "$o" && . .githooks/records.sh && code_print HEAD)
+printf '%sx\n' "$p" >"$t/near"
+(cd "$o" && . .githooks/records.sh && record HEAD "$t/near")
+grep -qxF "$p" "$t/near" || fail "records.sh took a longer line for the print it records"
 fi
 
 if part guard; then
