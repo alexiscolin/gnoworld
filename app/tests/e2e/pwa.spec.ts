@@ -22,12 +22,6 @@ const cacheContents = (page: Page) =>
     return { names, paths: paths.sort() };
   });
 
-// The list the build wrote into the worker.
-async function listed(page: Page, url: string): Promise<unknown> {
-  const worker = await (await page.request.get(url)).text();
-  return JSON.parse(/\["\/assets\/[^\]]*\]/.exec(worker)?.[0] ?? "[]");
-}
-
 test("Chromium reads the manifest with no error: the name, the root as scope and start, standalone", async ({
   page,
 }) => {
@@ -85,6 +79,11 @@ test("the worker answers the build's hashed files from its cache, and caches no 
 }) => {
   await page.goto("/");
   await controlled(page);
+  // What install wrote: one cache, the build's hashed files only.
+  const installed = await cacheContents(page);
+  expect(installed.names).toEqual(["gnoworld-precache"]);
+  expect(installed.paths.length, "install precached nothing").toBeGreaterThan(0);
+  for (const path of installed.paths) expect(path).toMatch(HASHED);
   const fromWorker: string[] = [];
   const scripts: string[] = [];
   page.on("response", (response) => {
@@ -95,7 +94,7 @@ test("the worker answers the build's hashed files from its cache, and caches no 
   await page.reload();
   await hydrated(page);
   expect(fromWorker.length, "the worker answered nothing").toBeGreaterThan(0);
-  for (const path of fromWorker) expect(path).toMatch(HASHED);
+  for (const path of fromWorker) expect(installed.paths).toContain(path);
   // Every script the first screen needs comes from the cache: offline, the page still starts.
   expect(
     scripts.filter((path) => !fromWorker.includes(path)),
@@ -105,10 +104,8 @@ test("the worker answers the build's hashed files from its cache, and caches no 
     await page.goto(path);
     await hydrated(page);
   }
-  // The cache holds the worker's list, exactly: a file written as pages load would show.
-  const cached = await cacheContents(page);
-  expect(cached.names).toEqual(["gnoworld-precache"]);
-  expect(cached.paths).toEqual(await listed(page, "/sw.js"));
+  // A file written as pages load would show.
+  expect(await cacheContents(page)).toEqual(installed);
   await page.context().setOffline(true);
   const offline = await page.evaluate(async (asset) => {
     const answer = async (url: string) => (await fetch(url).catch(() => null))?.status ?? "no answer";
@@ -159,6 +156,7 @@ test.describe("updates", () => {
     request,
   }) => {
     await open(page);
+    const installed = await cacheContents(page);
     // An older version's file, and one of this list's gone: the new worker fetches what it lacks,
     // and drops what it does not list once it takes over.
     await page.evaluate(async () => {
@@ -177,8 +175,7 @@ test.describe("updates", () => {
     expect((await untouched(page)).waiting).toBe(false);
     await expect(page.locator("body[data-before]")).toHaveCount(0);
     await expect(promptOf(page)).toHaveCount(0);
-    const list = await listed(page, `${site}/sw.js`);
-    await expect.poll(async () => (await cacheContents(page)).paths).toEqual(list);
+    await expect.poll(async () => cacheContents(page)).toEqual(installed);
   });
 
   test("two tabs: the one clicked reloads; the other keeps its page until its own click", async ({ page, request }) => {

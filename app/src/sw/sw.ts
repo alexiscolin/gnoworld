@@ -1,4 +1,4 @@
-// The worker the build ships as /sw.js: app/vite.config.ts writes the list below into it.
+// The worker the build ships as /sw.js: app/vite.config.ts defines the list below.
 import { precache, takeOver, type WorkerScope } from "./worker.ts";
 
 declare const __GNOWORLD_PRECACHE__: readonly string[];
