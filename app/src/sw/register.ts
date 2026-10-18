@@ -3,30 +3,31 @@
 // taken over. The browser's objects are parameters, so the tests can play them.
 import { TAKE_OVER } from "./worker.ts";
 
+// Every listener goes with the page: one without its signal would outlive it.
 interface Listening {
-  signal?: AbortSignal;
+  readonly signal: AbortSignal;
 }
 
 interface PageWorker {
   readonly state: string;
   postMessage(message: unknown): void;
-  addEventListener(type: "statechange", listener: () => void, options?: Listening): void;
+  addEventListener(type: "statechange", listener: () => void, options: Listening): void;
 }
 
 export interface WorkerRegistration {
   readonly waiting: PageWorker | null;
   readonly installing: PageWorker | null;
-  addEventListener(type: "updatefound", listener: () => void, options?: Listening): void;
+  addEventListener(type: "updatefound", listener: () => void, options: Listening): void;
 }
 
 export interface WorkerContainer {
   readonly controller: unknown;
   register(url: string): Promise<WorkerRegistration>;
   getRegistrations(): Promise<readonly { unregister(): Promise<boolean> }[]>;
-  addEventListener(type: "controllerchange", listener: () => void, options?: Listening): void;
+  addEventListener(type: "controllerchange", listener: () => void, options: Listening): void;
 }
 
-export interface Start {
+interface Start {
   readonly container: WorkerContainer | undefined;
   readonly search: string;
   readonly production: boolean;
