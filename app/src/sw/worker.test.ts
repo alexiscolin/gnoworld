@@ -15,7 +15,7 @@ const OWN = PRECACHE.map((path) => SITE + path);
 // A service worker's global scope with nothing but what the worker uses: caches in memory, keyed
 // by the whole URL as the browser keys them (with a put that records, so a worker that caches
 // what it fetches is seen), a network that records what it was asked, and the listeners added.
-function scope({ failing = false } = {}) {
+function scope({ failing = false, unreadable = false } = {}) {
   const stores = new Map<string, Map<string, string>>();
   const listeners = new Map<string, ((event: never) => void)[]>();
   const network: string[] = [];
@@ -47,6 +47,7 @@ function scope({ failing = false } = {}) {
     caches: {
       open: (name: string) => Promise.resolve(cache(name)),
       match: (request: Request, { cacheName }: { cacheName: string }) => {
+        if (unreadable) return Promise.reject(new Error("UnknownError: the store cannot be read"));
         const body = stores.get(cacheName)?.get(request.url);
         return Promise.resolve(body === undefined ? undefined : new Response(body));
       },
@@ -154,6 +155,16 @@ test("a precached file missing from the cache comes from the network, and is not
   expect(await (await answer())?.text()).toBe(`network ${url}`);
   expect(network).toEqual([url]);
   expect(held()).toEqual([]);
+});
+
+test("a cache that cannot be read is passed over: the file comes from the network", async () => {
+  const { worker, network, fire } = scope({ unreadable: true });
+  precache(worker, PRECACHE);
+  const url = OWN[0] ?? "";
+  const { event, answer } = request(url);
+  fire("fetch", event);
+  expect(await (await answer())?.text()).toBe(`network ${url}`);
+  expect(network).toEqual([url]);
 });
 
 test("nothing else is answered: a page, its data, another file or query, another site, any method but GET", () => {

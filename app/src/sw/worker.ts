@@ -67,8 +67,12 @@ export function precache(scope: WorkerScope, files: readonly string[]): void {
   scope.addEventListener("fetch", (event) => {
     const { request } = event;
     if (request.method !== "GET" || !listed.has(request.url)) return;
+    // A store that cannot be read is passed over: the host still has the file.
     event.respondWith(
-      scope.caches.match(request, { cacheName: CACHE }).then((cached) => cached ?? scope.fetch(request)),
+      scope.caches.match(request, { cacheName: CACHE }).then(
+        (cached) => cached ?? scope.fetch(request),
+        () => scope.fetch(request),
+      ),
     );
   });
 }
