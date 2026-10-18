@@ -14,7 +14,7 @@ concurrency:
 jobs:
   gate:
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 180 # GitHub's machines take far longer than a workstation; tuned once measured
     env:
       GNO_TOOLCHAIN: /home/runner/.cache/gno-toolchain
       GNOROOT: /home/runner/.cache/gno-toolchain/src
