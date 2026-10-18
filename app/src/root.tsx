@@ -2,6 +2,7 @@
 import type { ReactNode } from "react";
 import { Link, Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
 import { ErrorNotice } from "./ui/ErrorNotice.tsx";
+import { UpdatePrompt } from "./ui/UpdatePrompt.tsx";
 
 export function Layout({ children }: { children: ReactNode }) {
   return (
@@ -9,6 +10,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="manifest" href="/manifest.webmanifest" />
         <Meta />
         <Links />
       </head>
@@ -17,6 +19,7 @@ export function Layout({ children }: { children: ReactNode }) {
           <Link to="/">gno.world</Link>
         </header>
         <main>{children}</main>
+        <UpdatePrompt />
         <ScrollRestoration />
         <Scripts />
       </body>
