@@ -424,6 +424,7 @@ mkdir -p "$c2/scripts" && git -C "$c2" init -q
 printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/repo_files.py" "$c2/scripts/" && secrets_into "$c2/scripts/" && git -C "$c2" add -A && git -C "$c2" commit -qm base
 echo code >"$c2/a.ts" && git -C "$c2" add a.ts
 precommit && fail "pre-commit let a commit through a failing gate"
+[ ! -e "$c2/.claude/tmp/green-fast" ] || fail "pre-commit recorded code whose gate failed (F076)"
 printf '#!/bin/sh\nexit 0\n' >"$c2/scripts/check.sh" && git -C "$c2" add -A
 precommit || fail "pre-commit stopped a commit whose gate passes"
 grep -qxF "$(cd "$c2" && . "$hooks/records.sh" && code_print "$(git write-tree)")" "$c2/.claude/tmp/green-fast" || fail "pre-commit did not record the code it passed (F076)"
@@ -486,11 +487,17 @@ echo two >>"$o/a.ts" && git -C "$o" add a.ts
 out sh .githooks/pre-commit && fail "pre-commit outside the sandbox took code no gate passed"
 (cd "$o" && SANDBOX_RUNTIME= sh .githooks/pre-commit >/dev/null 2>&1) && fail "pre-commit took an empty SANDBOX_RUNTIME for the sandbox"
 untouched pre-commit
-full=$(cd "$o" && . .githooks/records.sh && code_print "$(git write-tree)") && printf '%s\n\n%sx\n' "${full%??????????}" "$full" >>"$o/.claude/tmp/green-fast"
+full=$(cd "$o" && . .githooks/records.sh && code_print "$(git write-tree)")
+printf '%s\n\n%sx\n' "${full%??????????}" "$full" >>"$o/.claude/tmp/green-fast"
 out sh .githooks/pre-commit && fail "pre-commit outside the sandbox took a partial or empty record"
+out sh .githooks/pre-merge-commit && fail "pre-merge-commit outside the sandbox took code no gate passed"
 record "$(git -C "$o" write-tree)" fast
 out sh .githooks/pre-commit || fail "pre-commit outside the sandbox refused code the gate passed"
 out sh .githooks/pre-merge-commit || fail "pre-merge-commit outside the sandbox refused code the gate passed"
+echo five >"$o/b.ts" && git -C "$o" add b.ts
+record "$(git -C "$o" write-tree)" full
+out sh .githooks/pre-commit || fail "pre-commit outside the sandbox refused code its full gate passed"
+git -C "$o" rm -qf --cached b.ts && rm "$o/b.ts"
 for f in docs/n.md adr/figure.svg NOTES.md; do
 	case $f in */*) mkdir -p "$o/${f%/*}" ;; esac
 	echo prose >"$o/$f" && git -C "$o" add "$f"
@@ -499,7 +506,14 @@ out sh .githooks/pre-commit || fail "pre-commit outside the sandbox refused pros
 printf 'aws = "%s"\n' "AKIA""J7Q2XRT4LMNB5VWZ" >"$o/leak.py" && git -C "$o" add leak.py && record "$(git -C "$o" write-tree)" fast
 out sh .githooks/pre-commit && fail "pre-commit outside the sandbox let a staged key through"
 (cd "$o" && env -u SANDBOX_RUNTIME PATH=/usr/bin:/bin sh .githooks/pre-commit >/dev/null 2>&1) && fail "pre-commit outside the sandbox passed with no gitleaks"
-git -C "$o" rm -qf --cached leak.py && rm "$o/leak.py" && git -C "$o" commit -qm two
+git -C "$o" rm -qf --cached leak.py && rm "$o/leak.py"
+printf 'p = "/Us''ers/alice/x"\n' >"$o/private.py" && git -C "$o" add private.py
+record "$(git -C "$o" write-tree)" fast
+out sh .githooks/pre-commit && fail "pre-commit outside the sandbox let a home folder's path through"
+git -C "$o" rm -qf --cached private.py && rm "$o/private.py"
+printf 'fix: x\n\nSeen in /Us''ers/alice/notes\n' >"$t/outside-msg"
+out sh .githooks/commit-msg "$t/outside-msg" && fail "commit-msg outside the sandbox let a home folder's path through"
+git -C "$o" commit -qm two
 untouched "pre-commit, pre-merge-commit"
 # pre-push: a work branch wants a recorded gate; main the full gate, a review pass, its declarations.
 head=$(git -C "$o" rev-parse HEAD)
@@ -512,12 +526,19 @@ git -C "$o" commit -qm prose && head=$(git -C "$o" rev-parse HEAD)
 push slice-1a && fail "pre-push outside the sandbox took a branch no gate passed"
 record "$head" fast && push slice-1a || fail "pre-push outside the sandbox refused a branch once recorded"
 pass() { p=$(cd "$o" && . .githooks/records.sh && review_print HEAD) && echo "2026-10-18 $p test" >>"$o/docs/review-passes.txt" && git -C "$o" add docs && git -C "$o" commit -qm pass && head=$(git -C "$o" rev-parse HEAD); }
-pass && push main && fail "pre-push outside the sandbox took main the full gate never passed"
+pass
+push main && fail "pre-push outside the sandbox took main the full gate never passed"
 record "$head" full && push main || fail "pre-push outside the sandbox refused main with its gate and review"
 (cd "$o" && python3 -I "$here/review_pass.py" check HEAD >/dev/null) || fail "records.sh and review_pass.py print a tree differently"
 echo log >>"$o/docs/review-log.md" && git -C "$o" add docs && git -C "$o" commit -qm log && head=$(git -C "$o" rev-parse HEAD)
 push main || fail "pre-push outside the sandbox refused main once its review log was written"
-base=$head && echo x >"$o/scripts/tool.sh" && git -C "$o" add scripts && git -C "$o" commit -qm tool && head=$(git -C "$o" rev-parse HEAD) && record "$head" full
+base=$head
+echo x >"$o/scripts/tool.sh"
+git -C "$o" add scripts
+git -C "$o" commit -qm tool
+head=$(git -C "$o" rev-parse HEAD)
+record "$head" full
+push slice-1a || fail "pre-push outside the sandbox refused a branch its full gate passed"
 push main && fail "pre-push outside the sandbox took main whose review pass is for other code"
 pass
 push main "$base" && fail "pre-push outside the sandbox took an undeclared harness change"
@@ -528,6 +549,17 @@ printf 'aws = "%s"\n' "AKIA""J7Q2XRT4LMNB5VWZ" >"$o/leak.py" && git -C "$o" add 
 push main && fail "pre-push outside the sandbox let main through with a key in its history"
 push slice-1a && fail "pre-push outside the sandbox let a branch through with a key in its history"
 untouched pre-push
+# A merge of a branch onto the main it left gives the branch's code, which its gate recorded.
+git -C "$o" checkout -q -b feature
+echo four >>"$o/a.ts"
+git -C "$o" commit -qam four
+git -C "$o" checkout -q -
+git -C "$o" merge -q --no-ff --no-commit feature >/dev/null 2>&1 || :
+out sh .githooks/pre-merge-commit && fail "pre-merge-commit outside the sandbox took a merge no gate passed"
+record feature full
+out sh .githooks/pre-merge-commit || fail "pre-merge-commit outside the sandbox refused a merge of a branch its gate passed"
+git -C "$o" merge --abort
+untouched pre-merge-commit
 fi
 
 if part guard; then

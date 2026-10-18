@@ -49,8 +49,9 @@ code on Alexis's machine.
    no marker appears.
 2. Outside the sandbox: `pre-push` refuses a work branch whose tree is not in `green-fast`, and
    `main` whose tree is not in `green-full` or has no review pass; it takes both once recorded.
-3. `pre-merge-commit` refuses a merged tree the full gate never passed. A merge of a branch
-   onto the `main` it left gives the branch's tree, which the full gate passed.
+3. `pre-merge-commit` refuses a merged tree no gate passed. A merge of a branch onto the
+   `main` it left gives the branch's tree, which its gate passed. (Written: a fast record is
+   enough to merge, since pushing `main` then wants the full one.)
 4. `check.sh` writes no record on a failure or on a dirty tree.
 5. Each still refuses a secret, a home folder's path and an undeclared harness change.
 

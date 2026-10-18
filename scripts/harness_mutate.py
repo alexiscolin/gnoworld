@@ -31,7 +31,7 @@ SECTIONS = {
     ".jscpd.json": "jscpd", "tsconfig.base.json": "tsc", "vitest.config.ts": "vitest",
     "scripts/guard.py": "guard", "scripts/review_pass.py": "review_pass", "scripts/patch_coverage.py": "patch_coverage",
     "scripts/check_docs.py": "check_docs", "scripts/check_regressions.py": "regressions", ".githooks/commit-msg": "commit_msg",
-    ".githooks/pre-push": "pre_push,wiring,outside", ".githooks/pre-commit": "pre_commit,wiring,outside", ".githooks/records.sh": "outside,pre_commit,pre_push", "scripts/code_changed.sh": "pre_commit,stop_gate",
+    ".githooks/pre-push": "pre_push,wiring,outside", ".githooks/pre-commit": "pre_commit,wiring,outside", ".githooks/records.sh": "outside,pre_commit,pre_push", ".githooks/pre-merge-commit": "outside", "scripts/code_changed.sh": "pre_commit,stop_gate",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
     "scripts/check.sh": "wiring", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
     "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
@@ -213,6 +213,11 @@ def mutants():
     yield from each(".githooks/pre-push", 'reviewed "$local_sha" ||', "true ||", "hooks", "pre-push wants main's review pass")
     yield from each(".githooks/pre-push", 'green "$local_sha" .claude/tmp/green-fast .claude/tmp/green-full ||', "true ||", "hooks", "pre-push wants a branch's gate recorded")
     yield from each(".githooks/pre-push", '. "$(dirname "$0")/records.sh"', ":", "hooks", "pre-push loads the records")
+    yield from each(".githooks/pre-push", 'green "$local_sha" .claude/tmp/green-fast .claude/tmp/green-full', 'green "$local_sha" .claude/tmp/green-fast', "hooks", "pre-push takes a branch whose full gate passed")
+    yield from each(".githooks/pre-commit", ".claude/tmp/green-fast .claude/tmp/green-full;", ".claude/tmp/green-fast;", "hooks", "pre-commit takes code whose full gate passed")
+    yield from each(".githooks/pre-merge-commit", 'exec "$(dirname "$0")/pre-commit"', "exit 0", "hooks", "pre-merge-commit gates a merge")
+    gate, rec_line = 'env -u GIT_INDEX_FILE -u GIT_DIR -u GIT_WORK_TREE sh "$s/check.sh"\n', 'mkdir -p .claude/tmp && code_print "$(git write-tree)" >>.claude/tmp/green-fast'
+    yield from each(".githooks/pre-commit", gate + rec_line, rec_line + "\n" + gate.rstrip("\n"), "hooks", "pre-commit records only after its gate passed")
     yield from each("scripts/check.sh", 'if [ -z "$(git status --porcelain)" ]; then', "if true; then", "hooks", "check.sh records only a clean tree")
     yield from each("scripts/check.sh", ". .githooks/records.sh && code_print HEAD", ": && code_print HEAD", "hooks", "check.sh records the tree it passed")
     yield from each(".claude/settings.json", '      "Edit(/scripts/scan_secrets.sh)",\n', "", "hooks", "settings keep the secret scan Claude cannot edit")
