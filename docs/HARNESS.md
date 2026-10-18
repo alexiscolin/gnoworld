@@ -241,10 +241,14 @@ same kind of change, the hooks run from outside the repository.
   Alexis's machine. Nor do the hooks in his shell run `check_docs.py` on a docs-only commit:
   the sandboxed gate and the CI do (F136).
 - **Claude's sandbox shares Alexis's `.git`** (Alexis, 2026-10-18: one repository). It cannot
-  write `.git/hooks`, `.git/config` or `.git/commondir` (F150), but it writes refs and objects:
-  it could move or shadow `main`, or forge an object, so that the install command or a checkout
-  in Alexis's shell writes or runs its files (F152, F153). The boundary is `main` protected with
-  the CI required, first in the backlog; until then the local hooks are a safety net, not a wall.
+  write `.git/hooks`, `.git/config` or `.git/commondir` (F150), but it writes refs, objects and
+  the index: it could move or shadow `main`, or forge an object, so that the install command or
+  a checkout in Alexis's shell writes or runs its files (F152, F153); or plant a nested
+  repository with its own config, registered as a submodule, which Alexis's next `git status`
+  reads and runs (F163). The boundary is `main` protected with the CI required, first in the
+  backlog; until then the local hooks are a safety net, not a wall.
+- **A merge refuses a path with a non-ASCII character** (F164): the disk folds more letters than
+  git can match (`ſ` is `s`), so no list could name every harness path.
 - **Only merge.sh shows a merge before git writes it** (F129). A plain merge that changes the
   harness is refused at its commit, its files written already: it must be undone at once
   (`git merge --abort`, or `git reset --hard` after a squash), before Claude Code reads a planted
