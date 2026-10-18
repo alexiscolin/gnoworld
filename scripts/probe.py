@@ -207,6 +207,7 @@ try:
             ("timeout.tsx", effect("setTimeout(() => n, 1);"), "@eslint-react/web-api-no-leaked-timeout"),
             ("raw_html.tsx", component(body="  return <p dangerouslySetInnerHTML={{ __html: String(n) }} />;\n"), "@eslint-react/dom-no-dangerously-set-innerhtml"),
             ("inner_html.tsx", ref("boxRef.current.innerHTML = String(n);"), restricted("'innerHTML'")),
+            ("outer_html.tsx", ref("boxRef.current.outerHTML = String(n);"), restricted("'outerHTML'")),
             ("adjacent_html.tsx", ref('boxRef.current.insertAdjacentHTML("beforeend", String(n));'), restricted("'insertAdjacentHTML'")),
             ("document_write.tsx", ref("document.write(String(n));"), restricted("'document.write'")),
             ("leaked.tsx", component(body="  return <div>{n && <p>{n}</p>}</div>;\n"), "@eslint-react/no-leaked-conditional-rendering"),
