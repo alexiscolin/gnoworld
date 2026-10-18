@@ -66,7 +66,7 @@ function container({ controlled = true, waiting = null as Worker | null, install
       changed.add(type, listener, options);
     },
   } satisfies WorkerContainer;
-  const updateFound = (next: Worker) => {
+  const updateFound = (next: Worker | null) => {
     registration.installing = next;
     found.fire();
   };
@@ -213,6 +213,14 @@ test("a worker waiting while a newer one installs: both are offered, and the cli
   updates[0]?.();
   expect(older.sent).toEqual([]);
   expect(newer.sent).toEqual([{ type: "SKIP_WAITING" }]);
+});
+
+test("an update found with no worker installing, which the browser never sends, is passed over", async () => {
+  const { page, updateFound } = container();
+  const { started, updates } = start(page);
+  await started;
+  updateFound(null);
+  expect(updates).toEqual([]);
 });
 
 test("a worker that fails to install shows no prompt", async () => {

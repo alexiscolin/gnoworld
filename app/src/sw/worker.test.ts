@@ -28,7 +28,7 @@ const OWN = PATHS.map((path) => SITE + path);
 // A service worker's global scope with nothing but what the worker uses: caches in memory, keyed
 // by the whole URL (a put records, so a worker caching what it fetches shows; addAll records each
 // request's digest, which the browser checks, not this fake), a network, the listeners added.
-function scope({ failing = false, unreadable = false, stuck = false } = {}) {
+function scope({ failing = false, unreadable = false, stuck = false, vanishing = false } = {}) {
   const stores = new Map<string, Map<string, string>>();
   const listeners = new Map<string, ((event: never) => void)[]>();
   const network: string[] = [];
@@ -52,7 +52,7 @@ function scope({ failing = false, unreadable = false, stuck = false } = {}) {
       },
       keys: () => Promise.resolve([...store(name).keys()].map((url) => new Request(url))),
       match: (request: Request) => {
-        const body = store(name).get(request.url);
+        const body = vanishing ? undefined : store(name).get(request.url);
         return Promise.resolve(body === undefined ? undefined : new Response(body));
       },
       delete: (request: Request) => Promise.resolve(store(name).delete(request.url)),
@@ -158,6 +158,14 @@ test("a listed file held with other bytes is dropped at once, and fetched again 
   await install.done();
   expect(added).toEqual([PRECACHE[0]]);
   expect(store("gnoworld-precache").get(OWN[0] ?? "")).toBe(`build ${PATHS[0] ?? ""}`);
+});
+
+test("a file gone between the cache's list and its read is fetched again", async () => {
+  const site = scope({ vanishing: true });
+  site.store("gnoworld-precache").set(OWN[1] ?? "", `build ${PATHS[1] ?? ""}`);
+  const { added, install } = installed(site);
+  await install.done();
+  expect(added).toEqual(PRECACHE);
 });
 
 test("a file held with other bytes is not kept even when the install fails", async () => {
