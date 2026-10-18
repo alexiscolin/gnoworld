@@ -1,0 +1,494 @@
+<!doctype html>
+<!-- The source of docs/harness.png; docs/HARNESS.md says how to render it again. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>gnoworld: the harness</title>
+    <style>
+      :root {
+        --ink: #1d2433;
+        --muted: #5b6475;
+        --line: #d9dde5;
+        --page: #f6f7f9;
+        --card: #ffffff;
+        --code: #eef1f6;
+        --read: #6b4fbb;
+        --flow: #2f5bd3;
+        --gate: #0f8a7e;
+        --review: #8a4fb0;
+        --safe: #c2334d;
+        --proof: #2e8540;
+        --limit: #b7791f;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+      body {
+        width: 1600px;
+        padding: 40px 44px 44px;
+        background: var(--page);
+        color: var(--ink);
+        font: 15px/1.45 -apple-system, "Helvetica Neue", Arial, sans-serif;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+      }
+      h1 {
+        font-size: 34px;
+        letter-spacing: -0.5px;
+      }
+      header p {
+        color: var(--muted);
+        max-width: 1000px;
+        margin-top: 6px;
+        font-size: 16px;
+      }
+      .asof {
+        color: var(--muted);
+        font-size: 14px;
+        text-align: right;
+      }
+      section {
+        margin-top: 24px;
+      }
+      h2 {
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 1.2px;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      h2::before {
+        content: "";
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+        background: var(--accent);
+      }
+      .grid {
+        display: grid;
+        gap: 14px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-top: 4px solid var(--accent);
+        border-radius: 8px;
+        padding: 12px 14px;
+      }
+      .card h3 {
+        font-size: 15px;
+        margin-bottom: 6px;
+      }
+      .card p,
+      .card li,
+      td {
+        font-size: 13.5px;
+      }
+      ul {
+        padding-left: 16px;
+      }
+      li + li {
+        margin-top: 3px;
+      }
+      code {
+        font: 12.5px/1.3 "SF Mono", Menlo, monospace;
+        background: var(--code);
+        border-radius: 4px;
+        padding: 0 4px;
+      }
+      .cols {
+        columns: 2;
+        column-gap: 28px;
+      }
+      .cols li {
+        break-inside: avoid;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+      td {
+        border-top: 1px solid var(--line);
+        padding: 4px 8px 4px 0;
+        vertical-align: top;
+      }
+      tr:first-child td {
+        border-top: 0;
+      }
+      td:first-child {
+        white-space: nowrap;
+        font-weight: 600;
+      }
+      .flow {
+        grid-template-columns: repeat(5, 1fr);
+        gap: 14px 28px;
+      }
+      .flow .card {
+        position: relative;
+      }
+      .flow .card:not(:nth-child(5n))::after {
+        content: "→";
+        position: absolute;
+        right: -22px;
+        top: 40%;
+        color: var(--flow);
+        font-size: 20px;
+        font-weight: 700;
+      }
+      .step {
+        color: var(--flow);
+        font-weight: 700;
+        font-size: 12px;
+        margin-bottom: 2px;
+      }
+      .life {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        margin: 6px 0 10px;
+      }
+      .chip {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 2px 10px;
+        font-size: 12.5px;
+        font-weight: 600;
+        background: var(--code);
+      }
+      .chip.ok {
+        background: #e3f3e7;
+        border-color: #b9dfc2;
+      }
+      .chip.no {
+        background: #f7e4e8;
+        border-color: #ebc0ca;
+      }
+      .chip.ask {
+        background: #fbf0dc;
+        border-color: #efd4a4;
+      }
+      .note {
+        color: var(--muted);
+        font-size: 12.5px;
+        margin-top: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>gnoworld · the harness</h1>
+        <p>
+          Everything around Claude Code that keeps the code it writes correct, safe and cheap. A claim is not evidence: a
+          finding counts once reproduced, a fix once its test failed without it. Every guard is proven by a planted fault
+          it must catch, and by a mutant that switches it off and must fail a test.
+        </p>
+      </div>
+      <div class="asof">2026-10-18 · slice 1b<br />docs/HARNESS.md describes each part</div>
+    </header>
+
+    <section style="--accent: var(--read)">
+      <h2>What Claude reads, how we work, who does what</h2>
+      <div class="grid" style="grid-template-columns: 1fr 1.15fr 1.25fr">
+        <div class="card">
+          <h3>Read at every session</h3>
+          <ul>
+            <li><code>CLAUDE.md</code>: the rules, what stops work to ask, the review card</li>
+            <li><code>CLAUDE.local.md</code>: each person's own, never committed</li>
+            <li><code>.claude/rules/</code>: core, gno, go, server, typescript, each loaded when its files are touched</li>
+            <li><code>.claude/agents/</code>: test-auditor, security-reviewer, finding-verifier</li>
+            <li><code>.claude/commands/</code>: <code>/slice-plan</code>, <code>/pre-merge</code></li>
+            <li><code>docs/</code>: the ADRs, ARCHITECTURE, DESIGN-SYSTEM, REVIEW, the plans, every decision</li>
+            <li>The findings ledger, read before any review</li>
+            <li>Plugins: typescript-lsp, context7, gnomcp</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>How we work</h3>
+          <ul>
+            <li>One slice at a time, on its own branch, its plan approved first</li>
+            <li>Tests first, seen failing; the test-auditor's red pass, then the code</li>
+            <li>A fix starts with the test that reproduces the bug; a feature lands with its journey</li>
+            <li>In core, Claude writes the failing test marked <code>test.fails</code>, and Alexis writes the code</li>
+            <li>Everything about gno through gnomcp; every claim cites its evidence</li>
+            <li>A decision goes into <code>docs/decisions.md</code> at once</li>
+            <li>
+              <b>Stop and ask:</b> a new dependency; a public signature, store or schema in use; a diff past the plan; a
+              test that would have to change; the same problem twice; secrets, permissions, the sandbox, deployment
+            </li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Who writes, who reviews (docs/REVIEW.md)</h3>
+          <table>
+            <tr>
+              <td>Tier 1</td>
+              <td>Realms: Claude writes; Claude and a fresh <code>gno-auditor</code> read every line; Alexis reviews each function's card; an external audit before mainnet</td>
+            </tr>
+            <tr>
+              <td>Tier 1</td>
+              <td>Client crypto, the CSP, the server's login and rights, Jarvis's allowlist, <code>lib/adena</code>: Alexis reads every line</td>
+            </tr>
+            <tr>
+              <td>Tier 2</td>
+              <td>Other TypeScript, the server, Go: the tests first, then every line or the behaviour</td>
+            </tr>
+            <tr>
+              <td>Tier 3</td>
+              <td>Interface, 3D, motion: run it, read the budgets</td>
+            </tr>
+            <tr>
+              <td>Always</td>
+              <td>Claude writes realms, server and Go; Alexis writes core; only Alexis merges and pushes</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section style="--accent: var(--flow)">
+      <h2>A change, from the plan to main</h2>
+      <div class="grid flow">
+        <div class="card">
+          <div class="step">1 · PLAN</div>
+          <p><code>/slice-plan</code> writes the slice's plan in <code>docs/plans/</code>; Alexis approves it.</p>
+        </div>
+        <div class="card">
+          <div class="step">2 · TESTS FIRST</div>
+          <p>Failing tests, seen failing; the <code>test-auditor</code>'s red pass, named on a <code>Red-pass:</code> line. Then the code.</p>
+        </div>
+        <div class="card">
+          <div class="step">3 · EACH COMMAND AND EDIT</div>
+          <p><code>guard.py</code>: no git hook skipped, no forced push, no <code>gnokey</code> or raw chain call, no <code>.gno</code> before the gno skill. Then the permissions, the sandbox.</p>
+        </div>
+        <div class="card">
+          <div class="step">4 · END OF EACH TURN</div>
+          <p>The Stop hook ends the turn only once the fast gate passed on exactly this tree. It runs nothing from the repository.</p>
+        </div>
+        <div class="card">
+          <div class="step">5 · EACH COMMIT</div>
+          <p><code>commit-msg</code>: a conventional subject of 72 characters, no attribution, no secret or private name. <code>pre-commit</code>: the staged files scanned, the fast gate on a copy of them.</p>
+        </div>
+        <div class="card">
+          <div class="step">6 · PUSH OF A BRANCH</div>
+          <p><code>pre-push</code>: the checked-out commit, nothing uncommitted; the fast gate; the whole history scanned.</p>
+        </div>
+        <div class="card">
+          <div class="step">7 · /PRE-MERGE</div>
+          <p>The full gate, then the review pass below, each finding reproduced into the ledger; the pass recorded and committed.</p>
+        </div>
+        <div class="card">
+          <div class="step">8 · ALEXIS</div>
+          <p>Reviews in revdiff, blind first, with the review card; then merges in his own shell. Claude never merges or pushes.</p>
+        </div>
+        <div class="card">
+          <div class="step">9 · PUSH OF MAIN</div>
+          <p><code>pre-push</code>: each harness change declared on a <code>Harness-changed:</code> line, the review pass for this tree, the full gate.</p>
+        </div>
+        <div class="card">
+          <div class="step">10 · THE CI</div>
+          <p>GitHub runs the full gate again on every branch pushed: read-only, no secret, every action and tool pinned.</p>
+        </div>
+      </div>
+    </section>
+
+    <section style="--accent: var(--gate)">
+      <h2>The gate · scripts/check.sh, and the net that never shrinks</h2>
+      <div class="grid" style="grid-template-columns: 1.55fr 1fr 1fr">
+        <div class="card">
+          <h3>Fast: each turn, commit and branch push (60 s at most; about 20 s)</h3>
+          <ul class="cols">
+            <li>Prettier; <code>tsc</code>, where core sees no DOM and no Node</li>
+            <li>ESLint: floating promises, swallowed errors, <code>any</code>, cycles, size, an impure core, switched-off tests, CSS</li>
+            <li>On the app: React's hooks and compiler rules, no hand-written memo, no raw HTML</li>
+            <li>Vitest, core's and the app's: a test with no assertion fails</li>
+            <li>knip and jscpd: dead code and copies</li>
+            <li>CUBE CSS and comment rules</li>
+            <li>The app built, pre-rendered and walked by Playwright with axe; a build that edits a package file fails</li>
+            <li><code>gno lint</code>, <code>gno test</code>; each realm guard removed must fail a test</li>
+            <li>Go: <code>gofmt</code>, <code>go vet</code>, the seal vectors</li>
+            <li>Docs name real files; the ledger's rows; each test beside its file; every script parses</li>
+            <li><code>test_hooks.sh</code>: the hooks, the guard, the settings, the CI's promises</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Full: /pre-merge and a push of main add (about 4.5 min)</h3>
+          <ul>
+            <li><code>probe.py</code>: each rule still catches its planted fault</li>
+            <li>Coverage 85% everywhere, 100% in core; 85% of the lines the branch changed</li>
+            <li><code>prove_fix.py</code>: a fix's test or journey failed on the commit before it</li>
+            <li>StrykerJS: the TypeScript's mutants</li>
+            <li><code>check_regressions.py</code>: the net, at the right</li>
+            <li>gitleaks over the history; <code>pnpm audit</code></li>
+            <li><code>harness_mutate.py</code>, when a harness file changed</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>No regression, unless a commit says why</h3>
+          <ul>
+            <li>A test gone, renamed or switched to <code>.fails</code>: <code>Removed-test:</code></li>
+            <li>A floor lowered, a known gap or an ignore added, a pnpm setting outside its packages: <code>Lowered-floor:</code></li>
+            <li>An approved screenshot changed: <code>Updated-baseline:</code></li>
+            <li>On main, a harness file changed: <code>Harness-changed:</code></li>
+            <li>Floors rise with the scores and never come down; Alexis reads each line in review</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section style="--accent: var(--review)">
+      <h2>Reviews and findings</h2>
+      <div class="grid" style="grid-template-columns: 1.3fr 1fr">
+        <div class="card">
+          <h3>The review pass of /pre-merge, sized by risk</h3>
+          <table>
+            <tr>
+              <td>test-auditor</td>
+              <td>Red pass before the code; green pass first in /pre-merge, on the mutation survivors (Sonnet)</td>
+            </tr>
+            <tr>
+              <td>/code-review</td>
+              <td>Every merge, in a fresh context, through every lens</td>
+            </tr>
+            <tr>
+              <td>security-reviewer</td>
+              <td>A change to a tier-1 file (Opus)</td>
+            </tr>
+            <tr>
+              <td>finding-verifier</td>
+              <td>Each tier-1 lot of findings: refutes, then reproduces (Opus)</td>
+            </tr>
+            <tr>
+              <td>gno-auditor</td>
+              <td>Every realm, read line by line</td>
+            </tr>
+            <tr>
+              <td>/simplify</td>
+              <td>The last merge of a slice: reuse, simplicity, efficiency, altitude</td>
+            </tr>
+            <tr>
+              <td>Alexis</td>
+              <td>Blind first, in revdiff; the card's tier-1 files, tests, how to try it, each realm function's card</td>
+            </tr>
+          </table>
+          <p class="note">Three review rounds at most per branch; after the third, a review reads only the new diff.</p>
+        </div>
+        <div class="card">
+          <h3>A finding's life, in docs/review/findings.md</h3>
+          <div class="life">
+            <span class="chip">claimed</span>→<span class="chip">verifier: refute, then reproduce</span>→<span class="chip">reproduced</span>→<span class="chip ok">fixed</span><span class="chip no">rejected</span><span class="chip ask">asked</span>
+          </div>
+          <ul>
+            <li>Reproduced: a command's output, or a test seen failing</li>
+            <li>Fixed: its commit, a <code>Finding:</code> line, the test that failed before it</li>
+            <li>Rejected: with the evidence that refutes it; never raised again</li>
+            <li>Asked: Alexis decides; the decision goes into <code>docs/decisions.md</code></li>
+            <li>A miss seen twice becomes a rule, a lint or a test</li>
+            <li><code>docs/review-log.md</code>: what each review caught and missed, and its false alarms</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section style="--accent: var(--safe)">
+      <h2>Security boundaries</h2>
+      <div class="grid" style="grid-template-columns: repeat(3, 1fr)">
+        <div class="card">
+          <h3>The sandbox, around every shell command</h3>
+          <ul>
+            <li>Writes only in the project and its caches, never in the harness's files</li>
+            <li>Reaches only the npm and Go registries and github.com</li>
+            <li>No command may leave it; <code>~/.ssh</code>, <code>~/.config/gh</code>, <code>~/.npmrc</code>, <code>~/.aws</code> unreadable</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Permissions (.claude/settings.json)</h3>
+          <ul>
+            <li>Asks only before a <code>git push</code> and a chain write</li>
+            <li>Refuses any edit of a file run outside the sandbox: the git hooks, the guard, the Stop hook, Claude Code's settings, agents, commands, skills, rules and hooks, the package files, <code>pnpm-workspace.yaml</code>, <code>.npmrc</code>, a pnpmfile</li>
+            <li>Refuses <code>pnpm add</code> and <code>rm -rf</code>; <code>.env</code> and <code>deploy/secrets/</code> unreadable</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Secrets and privacy: the repository will be public</h3>
+          <ul>
+            <li>gitleaks on what is staged, the whole history and every commit message</li>
+            <li>Two rule sets, both always run: secrets, and what must not be named (a home folder, the host's services)</li>
+            <li><code>gitleaks:allow</code> and a root <code>.gitleaksignore</code> do not count</li>
+            <li>No key is ever pasted in a chat; secrets live in gitignored files, read through <code>*_FILE</code></li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Supply chain</h3>
+          <ul>
+            <li>pnpm takes packages a day old at least, no trust downgrade, no pnpmfile, no install script</li>
+            <li>A dependency is Alexis's to add; <code>pnpm audit</code> in the full gate</li>
+            <li><code>prepare</code> runs the system's git, never one planted in <code>node_modules</code></li>
+            <li>A build that edits <code>package.json</code> or the lockfile fails the gate</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>The CI (.github/workflows/gate.yml)</h3>
+          <ul>
+            <li>Read-only permissions, no secret, credentials not kept</li>
+            <li>Actions pinned by commit, gitleaks by checksum, gno by commit</li>
+            <li>The frozen lockfile, installed with no install script; Chromium's headless shell</li>
+            <li>Reports on every push; cannot yet block a merge</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>The chain</h3>
+          <ul>
+            <li>Everything about gno goes through gnomcp; the guard refuses <code>gnokey</code> and raw RPC</li>
+            <li>Keys and mnemonics never enter the conversation</li>
+            <li>Every chain write asks Alexis; mainnet is read-only</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="grid" style="grid-template-columns: 1.25fr 1fr 1fr">
+        <div class="card" style="--accent: var(--proof)">
+          <h2>The harness proves itself</h2>
+          <ul>
+            <li><code>probe.py</code>: one planted fault per lint rule and check, named by its own message</li>
+            <li><code>test_hooks.sh</code>: each hook and script on throwaway repositories</li>
+            <li><code>harness_mutate.py</code>: each guard switched off in turn must fail a test</li>
+            <li><code>mutate.py</code>, StrykerJS: the realms' and the TypeScript's mutants</li>
+            <li><code>prove_fix.py</code>: a fix counts once its test failed without it</li>
+            <li><code>check_regressions.py</code>: no test gone, no floor lower, unless a commit says why</li>
+            <li>A new guard lands with its planted fault and its mutant</li>
+          </ul>
+        </div>
+        <div class="card" style="--accent: var(--proof)">
+          <h2>Measured on 2026-10-18</h2>
+          <ul>
+            <li>Fast gate: about 20 s of its 60, the app's build and 18 journeys included</li>
+            <li>Full gate: 263 s</li>
+            <li>255 harness guards, each switched off fails a test</li>
+            <li>Findings in the harness per merge: 13, 11, then 22 and 14 in slice 1b; blocking: 5, 3, 5, then 0</li>
+            <li>127 findings in the ledger, 6 of them false alarms</li>
+          </ul>
+        </div>
+        <div class="card" style="--accent: var(--limit)">
+          <h2>Known limits</h2>
+          <ul>
+            <li>The CI reports but cannot block a merge on this plan</li>
+            <li>At a push, the git hooks run the repository's code with Alexis's access (F076: the backlog's hooks that run no repository code)</li>
+            <li>The guard is a pattern list: a seatbelt, not a wall</li>
+            <li>The review pass is recorded by the agent that ran it; the round limit is a written rule</li>
+            <li><code>prove_fix.py</code> takes any failure before the fix as proof, a crash included</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>

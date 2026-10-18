@@ -47,6 +47,8 @@ app/                         the web client
   src/
     root.tsx                 document shell, providers, top error boundary
     routes/                  one module per URL: meta, build-time loader, the screen
+    meta.ts                  each page's title, description, canonical and Open Graph tags
+    worlds.ts                the worlds slice 1 pre-renders, until data/ holds them (slice 5)
     lib/                     the boundaries: Ergo client, chain reads, indexer, Adena (`lib/adena`), IndexedDB;
                              they parse with `@gnoworld/schemas` and apply `@gnoworld/core`
     store/                   the one Zustand store, one slice per feature
