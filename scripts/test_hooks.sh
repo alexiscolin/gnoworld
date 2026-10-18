@@ -348,7 +348,9 @@ printf 'gate.log\nleaks.log\n' >"$w/.gitignore"
 cp "$rp" "$here/repo_files.py" "$w/scripts/" && secrets_into "$w/scripts/" && cp "$hooks/pre-push" "$w/.githooks/pre-push"
 git -C "$w" init -q && echo x >"$w/a.ts" && git -C "$w" add -A && git -C "$w" commit -qm base
 head=$(git -C "$w" rev-parse HEAD)
-push() { printf 'refs/heads/%s %s refs/heads/%s 0000000000000000000000000000000000000000\n' "$1" "$head" "$1" | (cd "$w" && PATH="$t/pushbin:$PATH" sh .githooks/pre-push origin url >/dev/null 2>&1); }
+hook() { (cd "$w" && PATH="$t/pushbin:$PATH" sh .githooks/pre-push origin url >/dev/null 2>&1); }
+push() { printf 'refs/heads/%s %s refs/heads/%s 0000000000000000000000000000000000000000\n' "$1" "$head" "$1" | hook; }
+passed() { (cd "$w" && python3 -I scripts/review_pass.py record HEAD test >/dev/null) && git -C "$w" add -A && git -C "$w" commit -qm pass && head=$(git -C "$w" rev-parse HEAD); }
 push slice-1a || fail "pre-push refused a work branch whose gate passes"
 [ "$(tail -n 1 "$w/gate.log")" = "gate " ] || fail "pre-push ran more than the fast gate for a work branch"
 grep -q scanned "$w/leaks.log" || fail "pre-push did not scan a work branch for secrets"
@@ -360,28 +362,23 @@ git -C "$w" add -A && git -C "$w" commit -qm pass && head=$(git -C "$w" rev-pars
 push main || fail "pre-push refused main with a committed review pass"
 [ "$(tail -n 1 "$w/gate.log")" = "gate --full" ] || fail "pre-push did not run the full gate for main"
 # Main gets no harness change a commit does not declare: the branch's gate is its own harness (F089).
-since() { printf 'refs/heads/main %s refs/heads/main %s\n' "$head" "$1" | (cd "$w" && PATH="$t/pushbin:$PATH" sh .githooks/pre-push origin url >/dev/null 2>&1); }
+since() { printf 'refs/heads/main %s refs/heads/main %s\n' "$head" "$1" | hook; }
 base=$head && printf 'allow = []\n' >"$w/scripts/gitleaks.toml" && echo z >"$w/c.ts"
-git -C "$w" add -A && git -C "$w" commit -qm "loosen the scan" && (cd "$w" && python3 -I scripts/review_pass.py record HEAD test >/dev/null)
-git -C "$w" add -A && git -C "$w" commit -qm pass && head=$(git -C "$w" rev-parse HEAD)
+git -C "$w" add -A && git -C "$w" commit -qm "loosen the scan" && passed
 since "$base" && fail "pre-push let main take a harness change no commit declares"
-git -C "$w" commit -q --allow-empty -m "declare" -m "Harness-changed: scripts/gitleaks.toml" && head=$(git -C "$w" rev-parse HEAD)
-(cd "$w" && python3 -I scripts/review_pass.py record HEAD test >/dev/null) && git -C "$w" add -A && git -C "$w" commit -qm pass && head=$(git -C "$w" rev-parse HEAD)
+git -C "$w" commit -q --allow-empty -m "declare" -m "Harness-changed: scripts/gitleaks.toml" && passed
 since "$base" && fail "pre-push took a declaration with no reason"
-git -C "$w" commit -q --allow-empty -m "declare" -m "Harness-changed: scripts/gitleaks.toml - the test's own rules" && head=$(git -C "$w" rev-parse HEAD)
-(cd "$w" && python3 -I scripts/review_pass.py record HEAD test >/dev/null) && git -C "$w" add -A && git -C "$w" commit -qm pass && head=$(git -C "$w" rev-parse HEAD)
+git -C "$w" commit -q --allow-empty -m "declare" -m "Harness-changed: scripts/gitleaks.toml - the test's own rules" && passed
 since "$base" || fail "pre-push refused main with its harness change declared"
 printf '#!/bin/sh\nexit 1\n' >"$w/scripts/check.sh"
 git -C "$w" add -A && git -C "$w" commit -qm "failing gate" && head=$(git -C "$w" rev-parse HEAD)
 push slice-1a && fail "pre-push let a push through a failing gate"
 
-
-
 # pre-push refuses a push of anything but the checked-out commit, clean.
 echo y >"$w/b.ts" && git -C "$w" add -A && git -C "$w" commit -qm more
 printf '#!/bin/sh\nexit 0\n' >"$w/scripts/check.sh"
 old=$(git -C "$w" rev-parse HEAD~1)
-printf 'refs/heads/x %s refs/heads/x 0000000000000000000000000000000000000000\n' "$old" | (cd "$w" && sh .githooks/pre-push origin url >/dev/null 2>&1) && fail "pre-push let through a commit other than the checked-out one"
+printf 'refs/heads/x %s refs/heads/x 0000000000000000000000000000000000000000\n' "$old" | hook && fail "pre-push let through a commit other than the checked-out one"
 echo dirty >>"$w/b.ts"
 head=$(git -C "$w" rev-parse HEAD) && push slice-1a && fail "pre-push let through a tree with uncommitted changes"
 git -C "$w" checkout -q -- b.ts

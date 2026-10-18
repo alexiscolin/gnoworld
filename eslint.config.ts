@@ -45,6 +45,7 @@ const SWITCHED_OFF = {
 };
 // Vitest's tests and Playwright's journeys.
 const TESTS = ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts"];
+const MEMOS = ["memo", "useMemo", "useCallback"];
 const MEMO = "The React Compiler memoizes: no hand-written memo, useMemo or useCallback (docs/ARCHITECTURE.md).";
 const HTML = "Nothing reaches the DOM as HTML: render it as React elements (docs/ARCHITECTURE.md, security).";
 // core reaches no clock, network or global of its own: time and chance come in as parameters.
@@ -119,13 +120,10 @@ export default defineConfig(
         "error",
         { allow: [{ from: "package", package: "react-router", name: "DataWithResponseInit" }] },
       ],
-      "no-restricted-imports": [
-        "error",
-        { name: "react", importNames: ["memo", "useMemo", "useCallback"], message: MEMO },
-      ],
+      "no-restricted-imports": ["error", { name: "react", importNames: MEMOS, message: MEMO }],
       "no-restricted-properties": [
         "error",
-        ...["memo", "useMemo", "useCallback"].map((property) => ({ object: "React", property, message: MEMO })),
+        ...MEMOS.map((property) => ({ object: "React", property, message: MEMO })),
         ...["innerHTML", "outerHTML", "insertAdjacentHTML"].map((property) => ({ property, message: HTML })),
         { object: "document", property: "write", message: HTML },
       ],

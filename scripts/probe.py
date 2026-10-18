@@ -15,6 +15,8 @@ import tempfile
 HERE = "packages/core/src/__probe__"
 APP = "app/src/__probe__"
 LONG = "export function long(): number {\n  let n = 0;\n" + "  n += 1;\n" * 85 + "  return n;\n}\n"
+with open("package.json") as f:
+    SCRIPTS = json.load(f)["scripts"]  # the gate's own commands, so a case proves what the gate runs
 BLOCK = "".join(f"  total += values[{i}] * {i + 1};\n" for i in range(14))
 
 # File name, content, and what ESLint must report: a rule, or "rule: the start of its message" when
@@ -219,9 +221,7 @@ try:
     if part("react_warn"):
         # Several of the app's rules only warn: the lint script must fail on a warning.
         plant({"warned.tsx": 'import { forwardRef } from "react";\n\nexport const Card = forwardRef<HTMLParagraphElement>(function Card(_, r) {\n  return <p ref={r} />;\n});\n'}, where=APP)
-        with open("package.json") as f:
-            lint = json.load(f)["scripts"]["lint"].split()
-        out = run(["node_modules/.bin/eslint", *lint[1:-1], f"{APP}/warned.tsx"])
+        out = run(["node_modules/.bin/eslint", *SCRIPTS["lint"].split()[1:-1], f"{APP}/warned.tsx"])
         expect(out.returncode != 0, "the lint script fails on a warning")
         shutil.rmtree(APP)
 
@@ -230,9 +230,7 @@ try:
         plant({"unchecked.ts": "export function first(a: number[]): string {\n  return a[0].toFixed();\n}\n",
                "erasable.ts": "export enum Kind {\n  A,\n}\n"}, where=APP)
         # Through the typecheck script the gate runs, so its app half is proven with the flags.
-        with open("package.json") as f:
-            typecheck = json.load(f)["scripts"]["typecheck"]
-        out = run(["sh", "-c", f'PATH="$PWD/node_modules/.bin:$PATH" {typecheck}'])
+        out = run(["sh", "-c", f'PATH="$PWD/node_modules/.bin:$PATH" {SCRIPTS["typecheck"]}'])
         expect("unchecked.ts" in out.stdout and "possibly 'undefined'" in out.stdout, "tsc refuses an unchecked index in the app")
         expect("erasable.ts" in out.stdout and "erasableSyntaxOnly" in out.stdout, "tsc refuses syntax Node cannot erase in the app")
         shutil.rmtree(APP)

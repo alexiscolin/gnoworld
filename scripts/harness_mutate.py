@@ -101,8 +101,8 @@ def mutants():
     # The app's React lint, and the files its rules reach.
     yield from each("eslint.config.ts", 'reactHooks.configs.flat["recommended-latest"], ', "", "probe", "eslint React hooks preset")
     yield from each("eslint.config.ts", ', eslintReact.configs["strict-type-checked"]', "", "probe", "eslint @eslint-react preset")
-    yield from each("eslint.config.ts", '{ name: "react", importNames: ["memo", "useMemo", "useCallback"], message: MEMO },', "", "probe", "eslint no hand-written memo")
-    yield from each("eslint.config.ts", '...["memo", "useMemo", "useCallback"].map(', "...[].map(", "probe", "eslint no React.useMemo")
+    yield from each("eslint.config.ts", '{ name: "react", importNames: MEMOS, message: MEMO }', "", "probe", "eslint no hand-written memo")
+    yield from each("eslint.config.ts", "...MEMOS.map(", "...[].map(", "probe", "eslint no React.useMemo")
     yield from each("eslint.config.ts", '...["innerHTML", "outerHTML", "insertAdjacentHTML"].map(', "...[].map(", "probe", "eslint no raw HTML")
     yield from each("eslint.config.ts", 'name: "DataWithResponseInit"', 'name: "Nothing"', "probe", "eslint lets a route throw data()")
     yield from each("eslint.config.ts", ', "**/*.spec.ts"];', "];", "probe", "eslint reads Playwright's tests")
@@ -246,6 +246,12 @@ def mutants():
     yield from lines("scripts/check.sh", r"^(\s*)((?:run |python3 -I |sh scripts/|gitleaks |go vet |go run |\(cd gno |\$full \|\| run ).*)$", r"\1:", "hooks", "check.sh drops")
 
 
+def sections(path, test):
+    """The sections of `test` that read `path`: one string, or one per suite."""
+    only = SECTIONS[path]
+    return only[test] if isinstance(only, dict) else only
+
+
 def run(test, only=""):
     """A test's exit code in the worktree; `only` names its sections, empty for all of them."""
     env = {**os.environ, "ONLY": only}
@@ -254,12 +260,11 @@ def run(test, only=""):
 
 def proposal(test, path):
     """The smallest change that would make a test notice this guard."""
-    sections = SECTIONS[path][test] if isinstance(SECTIONS[path], dict) else SECTIONS[path]
     if path == "scripts/check.sh":
         return 'add the step to the list in scripts/test_hooks.sh ("check.sh runs every step it promises")'
     if test == "probe":
-        return f"plant in scripts/probe.py, block {sections}, a fault only this guard catches, or drop the guard if another holds it"
-    return f"add to scripts/test_hooks.sh, section {sections}, the input this line refuses and the exit code it must give"
+        return f"plant in scripts/probe.py, block {sections(path, test)}, a fault only this guard catches, or drop the guard if another holds it"
+    return f"add to scripts/test_hooks.sh, section {sections(path, test)}, the input this line refuses and the exit code it must give"
 
 
 failures = []
@@ -275,8 +280,7 @@ with worktree("HEAD") as WORKTREE:
         with open(target, "w") as f:
             f.write(mutated)
         try:
-            only = SECTIONS[path]
-            killed = run(test, only[test] if isinstance(only, dict) else only) != 0
+            killed = run(test, sections(path, test)) != 0
         finally:
             with open(target, "w") as f:
                 f.write(original)
