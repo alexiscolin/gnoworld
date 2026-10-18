@@ -52,6 +52,8 @@ of those, that is the protection working, not a bug.
 
 | Command | What it does |
 |---|---|
+| `cd app && node_modules/.bin/react-router dev` | The site, on your machine, with hot reload (the PWA's worker is off in development); no Docker, no secret |
+| `docker compose -f deploy/compose.yaml --profile demo up -d --build` | The demo, published through Tailscale: its secrets first ([docs/OPERATIONS.md](docs/OPERATIONS.md)) |
 | `./scripts/check.sh` | The fast gate: formatting, types, lint, tests, dead code, copies, CSS and comment rules, the realms, the hooks. It runs before every commit and at the end of every Claude Code turn |
 | `./scripts/check.sh --full` | Everything above, plus the harness's own probe, coverage (85% everywhere, 100% in `core`), the coverage of the lines you changed, mutation testing and a scan of the whole history for secrets. It runs before every push; `main` also needs a review pass (docs/REVIEW.md) |
 | `pnpm run test` | The unit tests |
