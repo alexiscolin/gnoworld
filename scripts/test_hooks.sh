@@ -134,7 +134,7 @@ has(r"      GNO_COMMIT: [0-9a-f]{40}", "the CI builds gno from a name that can m
 has(r'          echo "[0-9a-f]{64}  \$RUNNER_TEMP/gitleaks\.tgz" \| sha256sum -c', "the CI trusts a download it did not check")
 assert not re.search(r"\|\s*(ba)?sh\b", ci), "the CI runs a download"
 assert "--frozen-lockfile" in ci and "--ignore-scripts" in ci, "the CI trusts a lockfile it did not check"
-has(r"        run: node app/node_modules/@playwright/test/cli\.js install --with-deps chromium", "the CI has no browser for the journeys")
+has(r"        run: node app/node_modules/@playwright/test/cli\.js install --with-deps --only-shell chromium", "the CI has no browser for the journeys")
 PY
 # check.sh refuses a .node-version that is more than a version, which would steer PATH.
 nv="$t/nodeversion" && mkdir -p "$nv/scripts" && cp "$gate_file" "$nv/scripts/check.sh"

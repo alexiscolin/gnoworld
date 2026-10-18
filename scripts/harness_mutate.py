@@ -236,7 +236,7 @@ def mutants():
     yield from each(ci, "\n  push:\n", "\n  pull_request_target:\n  push:\n", "hooks", "CI runs on a push only")
     yield from each(ci, "persist-credentials: false", "persist-credentials: true", "hooks", "CI drops its token")
     yield from each(ci, "fetch-depth: 0", "fetch-depth: 1", "hooks", "CI fetches main")
-    yield from each(ci, "install --with-deps chromium", "--version", "hooks", "CI installs the journeys' browser")
+    yield from each(ci, "install --with-deps --only-shell chromium", "--version", "hooks", "CI installs the journeys' browser")
     yield from each(ci, "GNO_COMMIT: 07e44776c26187830b7dcbd2454991b5a1960378", "GNO_COMMIT: master", "hooks", "CI pins gno")
     # The app's step and its package guard (F080), which the step-dropping pattern below misses.
     yield from each("scripts/check.sh", "installed=$(packages)\n", "", "hooks", "check.sh snapshots the package files before the build")
