@@ -5,6 +5,8 @@ import { cacheContents, controlled, expect, hydrated, PAGES, test, type Page } f
 // (Chromium's own installability check answers nothing in a one-process browser, so it is not used.)
 const HASHED = /^\/assets\/[\w.-]+-[\w-]{8,}\.(js|css)$/;
 
+const promptOf = (page: Page) => page.getByRole("status").filter({ hasText: "New version available." });
+
 async function appManifest(page: Page) {
   return (await page.context().newCDPSession(page)).send("Page.getAppManifest");
 }
@@ -49,6 +51,46 @@ for (const path of PAGES) {
     await expect(page.locator('link[rel="manifest"]')).toHaveAttribute("href", "/manifest.webmanifest");
   });
 }
+
+// The demo asks for a shared password (deploy/web/nginx.conf): Chromium fetches the manifest
+// without credentials unless its link asks for them, and then reads an empty one, with no error.
+test.describe("behind the demo's password", () => {
+  test.describe.configure({ mode: "serial" });
+  test.use({ contextOptions: { httpCredentials: { username: "team", password: "a test password" } } });
+  const site = "http://127.0.0.1:4175";
+  const password = { authorization: `Basic ${btoa("team:a test password")}` };
+
+  // Node's own fetch: Playwright's request client would answer the challenge with the test's password.
+  test("the host asks for it, so these checks are not blind", async () => {
+    expect((await fetch(`${site}/`)).status).toBe(401);
+    expect((await fetch(`${site}/`, { headers: password })).status).toBe(200);
+  });
+
+  test("Chromium reads the manifest, and the worker takes the page", async ({ page }) => {
+    await page.goto(`${site}/`);
+    await controlled(page);
+    const { errors, manifest } = await appManifest(page);
+    expect(errors).toEqual([]);
+    expect(manifest).toMatchObject({ name: "gno.world", display: "kStandalone" });
+  });
+
+  test("a new version is found, offered and taken behind it", async ({ page, request }) => {
+    await page.goto(`${site}/`);
+    await controlled(page);
+    const before = await page.evaluate(
+      async () => (await navigator.serviceWorker.getRegistration())?.active?.scriptURL,
+    );
+    expect((await request.post(`${site}/__bump`, { headers: password })).status()).toBe(204);
+    await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+    await Promise.all([page.waitForEvent("load"), promptOf(page).getByRole("button", { name: "Reload" }).click()]);
+    await controlled(page);
+    const after = await page.evaluate(async () => {
+      const registration = await navigator.serviceWorker.getRegistration();
+      return { waiting: registration?.waiting ?? null, url: registration?.active?.scriptURL };
+    });
+    expect(after).toEqual({ waiting: null, url: before });
+  });
+});
 
 test("each icon the manifest names is a PNG of the size it states, 192 and 512", async ({ page }) => {
   await page.goto("/");
@@ -140,8 +182,6 @@ test.describe("updates", () => {
     expect((await request.post(`${site}/__bump`)).status()).toBe(204);
     await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
   }
-
-  const promptOf = (page: Page) => page.getByRole("status").filter({ hasText: "New version available." });
 
   test("a new version waits: the prompt shows, and the page changes only after the click", async ({
     page,
