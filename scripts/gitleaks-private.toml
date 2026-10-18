@@ -1,12 +1,20 @@
 # What would name a person or a machine once the repository is public (Alexis, 2026-10-17): a
 # path into a home folder, a service of the demo's host. Apart from gitleaks.toml, because
 # gitleaks' default allowlist hides /home/ paths. The CI's runner folder is not a person's.
+# A home folder starts a path: a users folder after a word (gno.land/r/gnoland/users, /api/users)
+# is a route, and so is a name that does not start with a letter (/users/42). gitleaks takes the
+# group, the path alone, as the secret the allowlist reads.
 [[rules]]
 id = "home-folder-path"
 description = "A path into a home folder"
-regex = '''(?i)(?:/(?:users|home)/|\b[a-z]:\\{1,2}users\\{1,2})\w[\w.-]*'''
+regex = '''(?i)(?:^|[^\w./~]|file://)(/(?:users|home)/[a-z_][\w.-]*)'''
 [[rules.allowlists]]
 regexes = ['''(?i)^/home/runner$''']
+
+[[rules]]
+id = "windows-home-folder-path"
+description = "A path into a Windows home folder"
+regex = '''(?i)\b[a-z]:\\{1,2}users\\{1,2}\w[\w.-]*'''
 
 [[rules]]
 id = "host-service"

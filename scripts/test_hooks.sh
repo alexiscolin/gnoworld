@@ -644,11 +644,15 @@ printf 'aws = "%s" # gitleaks:allow\n' "$key" >"$sc/leak.py" && git -C "$sc" add
 git -C "$sc" rm -qf --cached leak.py
 # Each form a home folder takes, whatever the case, with or without what follows (F090).
 for line in 'p = "/Us''ers/alice/x"' 'p = "/ho''me/alice/x"' 'host = "N''8N"' 'p = "/Us''ers/alice"' 'cd /Us''ers/alice' \
-	"p = '/ho""me/alice'" 'p = "/us''ers/alice/x"' 'p = "/Us''ers/_alice/x"' 'p = "C:\\Us''ers\\alice"' 'p = "/ho''me/runner-alice/x"'; do # split, so this file holds none
+	"p = '/ho""me/alice'" 'p = "/us''ers/alice/x"' 'p = "/Us''ers/_alice/x"' 'p = "C:\\Us''ers\\alice"' 'p = "/ho''me/runner-alice/x"' \
+	'u = "file:///Us''ers/alice/x"' 'PATH=/bin:/Us''ers/alice/bin'; do # split, so this file holds none
 	printf '%s\n' "$line" >"$sc/private.py" && git -C "$sc" add private.py && scan && fail "scan_secrets let through: $line"
 done
-printf 'p = "/home/runner/.cache"\nq = "~/x"\nr = "/api/user/1"\n' >"$sc/private.py" && git -C "$sc" add private.py
-scan || fail "scan_secrets refused the CI runner's folder, a ~ path or a route"
+# A users folder inside a path or a route is no one's home: gno's name registry, an API (F117).
+for line in 'p = "/home/runner/.cache"' 'q = "~/x"' 'r = "/api/user/1"' 'import "gno.land/r/gnoland/users/v1"' \
+	'r = "GET /api/users/42"' 'r = "GET /users/42"' 'r = "/users/:id"'; do
+	printf '%s\n' "$line" >"$sc/private.py" && git -C "$sc" add private.py && { scan || fail "scan_secrets refused: $line"; }
+done
 fi
 
 if part regressions; then
