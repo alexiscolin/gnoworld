@@ -2,6 +2,9 @@
   "name": "@gnoworld/app",
   "private": true,
   "type": "module",
+  "scripts": {
+    "dev": "react-router dev"
+  },
   "dependencies": {
     "react": "19.3.1",
     "react-dom": "19.3.1",

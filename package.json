@@ -7,6 +7,7 @@
     "node": "24.22.0"
   },
   "scripts": {
+    "dev": "pnpm --filter @gnoworld/app dev",
     "format": "prettier --write .",
     "format:check": "prettier --check --log-level warn .",
     "typecheck": "tsc -p tsconfig.json && tsc -p app/tsconfig.json",
