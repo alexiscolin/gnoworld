@@ -40,8 +40,11 @@ export interface WorkerScope {
 // only the files it lacks, and drops the others once it takes over.
 const CACHE = "gnoworld-precache";
 
+// What the page sends when its visitor asks for the new version (register.ts).
+export const TAKE_OVER = { type: "SKIP_WAITING" } as const;
+
 const asksToTakeOver = (data: unknown) =>
-  typeof data === "object" && data !== null && "type" in data && data.type === "SKIP_WAITING";
+  typeof data === "object" && data !== null && "type" in data && data.type === TAKE_OVER.type;
 
 export function precache(scope: WorkerScope, files: readonly string[]): void {
   const listed = new Set(files.map((file) => new URL(file, scope.location.origin).href));

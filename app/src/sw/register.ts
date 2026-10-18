@@ -1,6 +1,7 @@
 // The page's side of the worker (ADR-0001 §12): none in development, and `?nosw` removes any. An
 // update shows a prompt and waits for the click; the page then reloads once the new worker has
 // taken over. The browser's objects are parameters, so the tests can play them.
+import { TAKE_OVER } from "./worker.ts";
 
 interface Listening {
   signal?: AbortSignal;
@@ -61,7 +62,7 @@ export async function startServiceWorker(start: Start): Promise<void> {
     if (asked) return;
     asked = true;
     container.addEventListener("controllerchange", reloadOnce, { signal });
-    next.postMessage({ type: "SKIP_WAITING" });
+    next.postMessage(TAKE_OVER);
   };
   // The first worker replaces no version, so it needs no prompt.
   const offer = (next: PageWorker) => {
