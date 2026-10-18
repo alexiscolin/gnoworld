@@ -6,5 +6,5 @@ export function precacheList(fileNames: Iterable<string>): string[] {
   return [...fileNames]
     .filter((name) => HASHED.test(name))
     .map((name) => `/${name}`)
-    .sort((a, b) => (a < b ? -1 : 1));
+    .sort();
 }
