@@ -873,7 +873,8 @@ mark_i folded fast
 echo folded | in_i sh .git/hooks/merge.sh folded >"$t/folded" 2>&1 && fail "merge.sh merged a path this disk may read as another (F164)"
 grep -q 'non-ASCII' "$t/folded" || fail "merge.sh refused the folded path for another reason than its name (F164)"
 untouched_main "$base" || fail "merge.sh began a merge of a path this disk may read as another"
-in_i git merge -q --no-ff folded >/dev/null 2>&1 && fail "a merge took a path this disk may read as another (F164)"
+in_i git merge -q --no-ff folded >"$t/out" 2>&1 && fail "a merge took a path this disk may read as another (F164)"
+grep -q 'non-ASCII' "$t/out" && grep -q 'git reset --hard after a squash' "$t/out" || fail "pre-commit refused the folded path without saying why and how to undo it (F164)"
 git -C "$i" merge --abort
 # pre-push runs its own records and scan, not those of the branch it pushes.
 git -C "$i" checkout -q planted
