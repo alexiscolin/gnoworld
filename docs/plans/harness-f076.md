@@ -1,6 +1,6 @@
 # F076: hooks that run no repository code
 
-Status: proposed, 2026-10-18. The backlog's first harness item; it touches the hooks and the
+Status: built, 2026-10-18 (`8cc4ce3`). The backlog's first harness item; it touches the hooks and the
 permissions, so Alexis approves it before any code (CLAUDE.md, "Stop and ask").
 
 ## The problem

@@ -38,10 +38,13 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
    (`check.sh` records it). The hook itself runs nothing from the repository.
 5. **Each commit.** `commit-msg` holds the subject's form, refuses attribution lines, and
    scans the message with both secret rule sets, `gitleaks:allow` ignored (F090, F113).
-   `pre-commit` scans what is staged for secrets, then runs the fast gate on a copy of what
-   is staged, not on the working tree.
+   `pre-commit` scans what is staged for secrets, then, in Claude Code's sandbox, runs the fast
+   gate on a copy of what is staged, not on the working tree, and records the code it passed.
+   In Alexis's shell it runs no gate: the staged code must be code the sandboxed gate recorded
+   green (`.githooks/records.sh`, F076); prose alone needs none.
 6. **A push of a work branch.** `pre-push` wants the checked-out commit with nothing
-   uncommitted, runs the fast gate and scans the history for secrets.
+   uncommitted, a gate that passed on its code (in the sandbox it runs it; in Alexis's shell it
+   reads the record), and scans the history for secrets.
 7. **Before a merge.** `/pre-merge` runs the full gate, the `test-auditor`'s green pass on the
    mutation survivors, `/code-review`, the `security-reviewer` for a tier-1 change, and
    `/simplify` at the last merge of a slice. The `finding-verifier` tries to refute each
@@ -50,7 +53,8 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
    pass (`scripts/review_pass.py`).
 8. **Alexis reviews,** blind first, in revdiff (`docs/REVIEW.md`).
 9. **Merge and push, by Alexis, in his own shell.** The merge is made locally; pushing `main`
-   runs the full gate again, needs the committed review pass for exactly that tree, and each
+   runs no gate there: it wants the full gate recorded green on that code, the committed review
+   pass for exactly that tree, and each
    harness file changed since the remote's `main` declared on a line `Harness-changed: <path>
    - why` (F089); a `main` the clone cannot compare is refused (F116). Claude cannot do
    either: the sandbox refuses the merge's writes to the harness (F063), and over a remote
@@ -145,15 +149,14 @@ with `/cd`:
   and integrates a whole feature alone (Alexis, 2026-10-18), checked by the gate and the
   review; Alexis reviews before he merges and pushes.
 - **Refused outright, so nothing asks:** an edit of a file run outside the sandbox, the guard,
-  the Stop hook, `code_changed.sh`, the git hooks, Claude Code's settings, agents, commands,
+  the Stop hook, `code_changed.sh`, `scan_secrets.sh`, the git hooks, Claude Code's settings, agents, commands,
   skills, rules and hooks in `.claude/` (not `.claude/tmp/`, where the gate writes its state,
   F111) and the `package.json` files (finding F068), and what pnpm loads at Alexis's install, `pnpm-workspace.yaml`, `.npmrc` and a
   pnpmfile (F087, F115); `pnpm add` (a dependency is Alexis's) and `rm -rf`. A change to one of these
-  files is written out for Alexis to apply. What the gate reaches when he pushes or merges
-  (the other scripts, the configs, the tests) still runs with his access: F076, closed by the
-  backlog's hooks that run no repository code; until then, `pre-push` wants each harness
-  change on main declared (`Harness-changed: <path> - why`, F089). Ask and deny rules hold in
-  every permission mode.
+  files is written out for Alexis to apply. In his shell the hooks run nothing else of the
+  repository: no gate, no other script, config or test, only the records the sandboxed gate
+  wrote (F076); `pre-push` also wants each harness change on main declared
+  (`Harness-changed: <path> - why`, F089). Ask and deny rules hold in every permission mode.
 - **The sandbox** around shell commands: they write only in the project and its caches,
   never in the harness's files; they reach only the npm and Go registries and github.com;
   no command may leave the sandbox.
@@ -211,8 +214,8 @@ way to a boundary the system enforces (the sandbox, a server check), or goes. Th
 measure, slice 1a's merge, found 25 or more, one of them a way out of the sandbox. Since then:
 13, 11, then 22 and 14 at slice 1b's two rounds. The count is not falling, but the severity
 is: the last round found nothing blocking, and most of its findings sat in the fixes of the
-round before. By the rule above, the next harness work removes more than it adds: the
-backlog's hooks that run no repository code first.
+round before. By the rule above, the next harness work removes more than it adds. The first
+such change, F076, took the gate out of the hooks in Alexis's shell.
 
 ## Known limits
 
@@ -220,6 +223,9 @@ backlog's hooks that run no repository code first.
   full gate on every branch pushed, but GitHub cannot protect a branch on this
   repository's plan: a red run cannot stop a merge, and the git hooks on this machine can be
   skipped by someone who means to (findings F009, F001).
+- **A record of a green gate can be forged from the sandbox,** since the sandbox writes it
+  (F076): it lets a broken tree reach `main` until the CI's red report, and runs nothing on
+  Alexis's machine.
 - **Claude Code's layer is active only in a session started in this folder,** or moved into
   it with `/cd`.
 - **`prove_fix.py` covers the product;** a fix of the harness is proven by
@@ -239,7 +245,7 @@ backlog's hooks that run no repository code first.
 | `.claude/settings.json` | permissions, the sandbox, the hooks, the plugins |
 | `.claude/agents/` | `test-auditor`, `security-reviewer`, `finding-verifier` |
 | `.claude/commands/` | `/slice-plan`, `/pre-merge` |
-| `.githooks/` | `commit-msg`, `pre-commit`, `pre-push` (`pnpm install` points git at them) |
+| `.githooks/` | `commit-msg`, `pre-commit`, `pre-merge-commit`, `pre-push` (`pnpm install` points git at them); `records.sh`, the prints they and `check.sh` share (F076) |
 | `scripts/check.sh` | the gate |
 | `.github/workflows/gate.yml` | the full gate on GitHub's machines, for every branch pushed |
 | `app/playwright.config.ts`, `app/tests/e2e/` | the app's journeys: a build per run, served as a static host serves it (`serve.mjs`) |
