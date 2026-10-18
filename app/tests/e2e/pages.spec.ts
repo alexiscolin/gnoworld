@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "./fixtures.ts";
+import { expect, hydrated, reactMark, test, type Page } from "./fixtures.ts";
 
 // The pages slice 1 pre-renders (ADR-0002 §2), with the address each names as its own.
 const pages = [
@@ -19,13 +19,6 @@ async function tag(page: Page, selector: string): Promise<string> {
   const found = page.locator(selector);
   await expect(found).toHaveCount(1);
   return (await found.getAttribute(selector.startsWith("link") ? "href" : "content")) ?? "";
-}
-
-// React marks the document it hydrated; the static HTML alone never carries the mark.
-const reactMark = () => Object.keys(document).some((key) => key.startsWith("__reactContainer"));
-
-async function hydrated(page: Page): Promise<void> {
-  await page.waitForFunction(reactMark);
 }
 
 async function violations(page: Page): Promise<unknown[]> {
