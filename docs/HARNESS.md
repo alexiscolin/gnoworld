@@ -240,12 +240,19 @@ same kind of change, the hooks run from outside the repository.
   (F076): it lets a broken tree reach `main` until the CI's red report, and runs nothing on
   Alexis's machine. Nor do the hooks in his shell run `check_docs.py` on a docs-only commit:
   the sandboxed gate and the CI do (F136).
+- **Claude's sandbox shares Alexis's `.git`** (Alexis, 2026-10-18: one repository). It cannot
+  write `.git/hooks`, `.git/config` or `.git/commondir` (F150), but it writes refs and objects:
+  it could move or shadow `main`, or forge an object, so that the install command or a checkout
+  in Alexis's shell writes or runs its files (F152, F153). The boundary is `main` protected with
+  the CI required, first in the backlog; until then the local hooks are a safety net, not a wall.
 - **Only merge.sh shows a merge before git writes it** (F129). A plain merge that changes the
-  harness is refused at its commit, its files written already: `git merge --abort` must follow
-  at once, before Claude Code reads a planted setting. A fast-forward, a cherry-pick, a rebase
-  or a checkout of Claude's branch in Alexis's shell runs no such check; Claude works in the
-  same folder, so none is needed. A merge with a conflict in the harness cannot be concluded:
-  the branch is rebased on `main` first.
+  harness is refused at its commit, its files written already: it must be undone at once
+  (`git merge --abort`, or `git reset --hard` after a squash), before Claude Code reads a planted
+  setting. A cherry-pick, a rebase, a checkout or a `merge --ff-only` of Claude's branch in
+  Alexis's shell runs no such check (F153). A merge with a conflict cannot be concluded once it
+  changes the harness: the branch is rebased on `main` first (F155).
+- **The install is not atomic** (F159): a failure halfway leaves hooks of two versions until the
+  next install; `pre-push` refuses `main` meanwhile.
 - **A fresh clone has no hooks** until its owner installs them from `main`.
 - **The history scan is defence in depth, not a guarantee.** It reads git's diffs, which show
   no merge commit, drop type changes and skip gitleaks's default paths (F141 to F143): a key

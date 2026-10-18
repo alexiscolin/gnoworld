@@ -39,7 +39,8 @@ You need macOS or Linux, git, Python 3, Go 1.26, and:
 Then, in the repository:
 
 ```sh
-pnpm install          # also turns on the git hooks
+pnpm install          # runs no script of the repository
+git --no-replace-objects show main:scripts/install_hooks.sh | sh   # the git hooks, from main
 ./scripts/check.sh    # the gate, in under a minute
 ```
 
