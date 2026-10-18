@@ -211,7 +211,8 @@ costs context in every session: `chrome-devtools-mcp` (1b), `frontend-design` (2
 
 Measured on this machine, 2026-10-18: the fast gate 19 to 24 s (budget 60 s), the app's
 build and its 18 journeys included; the full gate 263 s, with the harness mutation proving
-255 guards, then 343 s for 308 guards once F076 was built. On 2026-10-17 the fast gate took 10 to 13 s, before the app, and the harness
+255 guards, then 343 s for 308 guards once F076 was built, and 1079 s for 388 once F129 was;
+the fast gate 18 s since the hook sections run side by side. On 2026-10-17 the fast gate took 10 to 13 s, before the app, and the harness
 mutation 118 s for 148 guards. Subagents run on Sonnet unless their file says otherwise;
 agents get the diff's path, never its content. A review reads the branch once, then only the
 diff of its fixes, three rounds at most; F076's three cost about 1.3 million tokens.
@@ -228,7 +229,11 @@ found nothing blocking; F076's found 6 that let a secret or untested code throug
 and one, F129, its own next branch. F076 is the first change the rule above asked for: it took
 the gate out of the hooks in Alexis's shell, a boundary rather than one more guard. Its
 findings sat in what that boundary now leans on, the secret scan and the records; F129 is the
-same kind of change, the hooks run from outside the repository.
+same kind of change, the hooks run from outside the repository. F129's review found 21, 6 of
+them blocking, and most in one class: Claude's sandbox shares Alexis's `.git`, and git reads
+more there than the two paths denied. A clone of Claude's own would close the class; Alexis
+kept one repository (2026-10-18), so the boundary is `main` protected with the CI required,
+and the harness is frozen until a real bug crosses it.
 
 ## Known limits
 
