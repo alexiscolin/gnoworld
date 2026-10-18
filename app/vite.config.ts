@@ -5,11 +5,11 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
-import { cacheVersion, precacheList } from "./src/sw/precache.ts";
+import { precacheList } from "./src/sw/precache.ts";
 
 // The PWA's worker (ADR-0001 §12): src/sw/sw.ts becomes /sw.js in the browser's build. Its list of
-// hashed files, with their version, is written once the whole build is done: React Router writes
-// its route manifest during the server build, after the browser's.
+// hashed files is written once the whole build is done: React Router writes its route manifest
+// during the server build, after the browser's.
 const serviceWorker: Plugin[] = [
   {
     name: "gnoworld:service-worker",
@@ -28,8 +28,7 @@ const serviceWorker: Plugin[] = [
         const out = resolve(builder.config.root, builder.environments["client"]?.config.build.outDir ?? "");
         const list = precacheList(readdirSync(join(out, "assets")).map((name) => `assets/${name}`));
         const worker = join(out, "sw.js");
-        const filled = fill(readFileSync(worker, "utf8"), "__GNOWORLD_PRECACHE__", JSON.stringify(list));
-        writeFileSync(worker, fill(filled, "__GNOWORLD_VERSION__", JSON.stringify(cacheVersion(list))));
+        writeFileSync(worker, fill(readFileSync(worker, "utf8"), "__GNOWORLD_PRECACHE__", JSON.stringify(list)));
         return Promise.resolve();
       },
     },

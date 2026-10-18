@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
-import { cacheVersion, precacheList } from "./precache.ts";
+import { precacheList } from "./precache.ts";
 
-// The file names a client build writes, as Vite's bundle keys them (no leading slash).
+// The files a client build writes, as paths from its folder (no leading slash).
 const BUILD = [
   "assets/entry.client-Bx3f9a1Q.js",
   "assets/root-Dk2l0p9Z.css",
@@ -40,18 +40,4 @@ test("only whole names count: no source map, no nested path, no hash under eight
 
 test("the list is the same whatever order the build gives its files in", () => {
   expect(precacheList([...BUILD].reverse())).toEqual(precacheList(BUILD));
-});
-
-test("the version follows the list: the same list, the same version; another list, another", () => {
-  const list = precacheList(BUILD);
-  expect(cacheVersion(list)).toBe(cacheVersion([...list]));
-  expect(cacheVersion(list)).toMatch(/^[0-9a-f]{8}$/);
-  expect(cacheVersion(list.slice(1))).not.toBe(cacheVersion(list));
-  expect(cacheVersion(["/assets/a-AAAAAAAA.js"])).not.toBe(cacheVersion(["/assets/a-AAAAAAAB.js"]));
-  expect(cacheVersion(["/a", "/b"])).not.toBe(cacheVersion(["/a\n/b"]));
-});
-
-test("a version keeps its leading zeros, so every version has eight digits", () => {
-  // Computed apart, with FNV-1a in Python over the same JSON.
-  expect(cacheVersion(["/assets/a-AAAAAAA97.js"])).toBe("00dda788");
 });

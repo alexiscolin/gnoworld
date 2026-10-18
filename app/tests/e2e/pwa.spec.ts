@@ -22,6 +22,12 @@ const cacheContents = (page: Page) =>
     return { names, paths: paths.sort() };
   });
 
+// The list the build wrote into the worker.
+async function listed(page: Page, url: string): Promise<unknown> {
+  const worker = await (await page.request.get(url)).text();
+  return JSON.parse(/\["\/assets\/[^\]]*\]/.exec(worker)?.[0] ?? "[]");
+}
+
 test("Chromium reads the manifest with no error: the name, the root as scope and start, standalone", async ({
   page,
 }) => {
@@ -100,12 +106,9 @@ test("the worker answers the build's hashed files from its cache, and caches no 
     await hydrated(page);
   }
   // The cache holds the worker's list, exactly: a file written as pages load would show.
-  const worker = await (await page.request.get("/sw.js")).text();
-  const listed: unknown = JSON.parse(/\["\/assets\/[^\]]*\]/.exec(worker)?.[0] ?? "[]");
   const cached = await cacheContents(page);
-  expect(cached.names).toHaveLength(1);
-  expect(cached.names[0]).toMatch(/^gnoworld-[0-9a-f]{8}$/);
-  expect(cached.paths).toEqual(listed);
+  expect(cached.names).toEqual(["gnoworld-precache"]);
+  expect(cached.paths).toEqual(await listed(page, "/sw.js"));
   await page.context().setOffline(true);
   const offline = await page.evaluate(async (asset) => {
     const answer = async (url: string) => (await fetch(url).catch(() => null))?.status ?? "no answer";
@@ -156,6 +159,15 @@ test.describe("updates", () => {
     request,
   }) => {
     await open(page);
+    // An older version's file, and one of this list's gone: the new worker fetches what it lacks,
+    // and drops what it does not list once it takes over.
+    await page.evaluate(async () => {
+      const [name] = await caches.keys();
+      const cache = await caches.open(name ?? "the worker's cache");
+      const [first] = await cache.keys();
+      if (first !== undefined) await cache.delete(first);
+      await cache.put("/assets/older-AAAAAAAA.js", new Response("an older version's"));
+    });
     await bump(page, request);
     await expect(promptOf(page)).toBeVisible();
     expect(await untouched(page)).toEqual({ same: true, waiting: true, marked: true });
@@ -165,6 +177,8 @@ test.describe("updates", () => {
     expect((await untouched(page)).waiting).toBe(false);
     await expect(page.locator("body[data-before]")).toHaveCount(0);
     await expect(promptOf(page)).toHaveCount(0);
+    const list = await listed(page, `${site}/sw.js`);
+    await expect.poll(async () => (await cacheContents(page)).paths).toEqual(list);
   });
 
   test("two tabs: the one clicked reloads; the other keeps its page until its own click", async ({ page, request }) => {
