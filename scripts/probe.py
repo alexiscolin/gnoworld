@@ -94,7 +94,11 @@ ran = set()
 
 
 def part(name):
-    """Whether this block runs: all of them, unless ONLY names some."""
+    """Whether this block runs: all of them, unless ONLY names some. With ONLY, the first failure
+    ends the run: harness_mutate needs one failing block to count a mutant killed."""
+    if ONLY and failures:
+        ran.add(name)
+        return False
     if not ONLY or name in ONLY:
         ran.add(name)
         return True
