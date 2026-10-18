@@ -1,0 +1,17 @@
+# What a build in this repository may read (deploy/web/Dockerfile): nothing, but the files listed.
+*
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!tsconfig.base.json
+!packages/*/package.json
+!app
+app/node_modules
+app/build
+app/.react-router
+app/test-results
+app/playwright-report
+app/tests
+!deploy/web/nginx.conf
+# Named as well, should the list above ever open: the demo's secrets never reach a build.
+deploy/secrets
