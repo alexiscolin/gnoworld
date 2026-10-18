@@ -179,6 +179,97 @@
         font-size: 12.5px;
         margin-top: 8px;
       }
+      .numbers {
+        grid-template-columns: repeat(5, 1fr);
+      }
+      .number {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px 14px;
+      }
+      .number b {
+        display: block;
+        font-size: 30px;
+        letter-spacing: -0.5px;
+        font-variant-numeric: tabular-nums;
+      }
+      .number span {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .lanes-wrap {
+        overflow-x: auto;
+      }
+      .lanes {
+        min-width: 900px;
+        display: grid;
+        grid-template-columns: 170px repeat(5, 1fr);
+        gap: 8px 10px;
+        margin-top: 14px;
+      }
+      .phase {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        color: var(--muted);
+        padding: 0 4px;
+        position: relative;
+      }
+      .phase:not(:nth-child(6))::after {
+        content: "→";
+        position: absolute;
+        right: -8px;
+        color: var(--muted);
+      }
+      .who {
+        font-weight: 700;
+        font-size: 14px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        color: var(--card);
+        background: var(--accent);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      .who small {
+        font-weight: 400;
+        font-size: 12px;
+        opacity: 0.9;
+      }
+      .cell {
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-size: 13.5px;
+        border: 1px solid var(--line);
+        background: var(--card);
+        border-left: 4px solid var(--accent);
+      }
+      .cell.empty {
+        border: 1px dashed var(--line);
+        background: transparent;
+      }
+      .human {
+        --accent: var(--limit);
+      }
+      .agent {
+        --accent: var(--flow);
+      }
+      .machine {
+        --accent: var(--gate);
+      }
+      .loop {
+        margin-top: 12px;
+        border: 2px dashed var(--proof);
+        border-radius: 10px;
+        padding: 10px 14px;
+        font-size: 14px;
+      }
+      .loop b {
+        color: var(--proof);
+      }
     </style>
   </head>
   <body>
@@ -193,6 +284,52 @@
       </div>
       <div class="asof">2026-10-18 · slice 1b<br />docs/HARNESS.md describes each part</div>
     </header>
+
+    <section style="--accent: var(--flow)">
+      <h2>At a glance: Alexis decides, the rest runs on its own</h2>
+      <div class="grid numbers">
+        <div class="number"><b>3</b><span>moments where Alexis acts: the plan, the review, the merge</span></div>
+        <div class="number"><b>~20 s</b><span>of checks after every turn and every commit, with no one asking</span></div>
+        <div class="number"><b>6</b><span>reviewing agents, and a verifier that refutes or reproduces each finding</span></div>
+        <div class="number"><b>255</b><span>guards of the harness, each switched off once to prove a test sees it</span></div>
+        <div class="number"><b>127</b><span>findings in the ledger, each reproduced or refuted; 6 false alarms</span></div>
+      </div>
+      <div class="lanes-wrap">
+      <div class="lanes">
+        <div></div>
+        <div class="phase">Ask and plan</div>
+        <div class="phase">Build</div>
+        <div class="phase">Check</div>
+        <div class="phase">Review</div>
+        <div class="phase">Ship</div>
+
+        <div class="who human">Alexis<small>decides</small></div>
+        <div class="cell human">Says what to build; approves the plan</div>
+        <div class="cell empty"></div>
+        <div class="cell empty"></div>
+        <div class="cell human">Reads the review card in revdiff; settles what is asked</div>
+        <div class="cell human">Merges and pushes main, in his shell</div>
+
+        <div class="who agent">Claude and its agents<small>write, then review</small></div>
+        <div class="cell agent">Writes the plan, then the failing tests, seen failing</div>
+        <div class="cell agent">Writes the code; fixes what fails; one commit per behaviour</div>
+        <div class="cell agent">Runs the gate itself, in the sandbox, until it is green</div>
+        <div class="cell agent">Six reviewers in parallel; each finding verified, reproduced, then fixed with a test that failed first</div>
+        <div class="cell agent">Records the review pass and the log; declares every harness change</div>
+
+        <div class="who machine">The machine<small>checks, with no tokens</small></div>
+        <div class="cell machine">The rules load as the files are touched; the ledger is read first</div>
+        <div class="cell machine">The guard on every command and edit; the sandbox around every shell</div>
+        <div class="cell machine">The fast gate every turn and commit; the full gate before a merge: tests, mutants, coverage, secrets</div>
+        <div class="cell machine">Planted faults and mutants prove each guard still catches what it promises</div>
+        <div class="cell machine">pre-push and the CI run everything again before main moves</div>
+      </div>
+      </div>
+      <div class="loop">
+        <b>The loop that learns:</b> what slips through once comes back as a rule, a planted fault and a mutant, so the
+        same slip fails the gate the next time.
+      </div>
+    </section>
 
     <section style="--accent: var(--read)">
       <h2>What Claude reads, how we work, who does what</h2>

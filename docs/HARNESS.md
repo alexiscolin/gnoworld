@@ -14,7 +14,7 @@ Three ideas run through it:
 
 ## The picture
 
-![The harness: what Claude reads, a change from the plan to main, the gate, the reviews, the security boundaries, how the harness proves itself, its measures and its limits](harness.png)
+![The harness: at a glance, what Alexis decides and what runs on its own; then what Claude reads, a change from the plan to main, the gate, the reviews, the security boundaries, how the harness proves itself, its measures and its limits](harness.png)
 
 Its source is [harness.html](harness.html). After changing it, render the image again from the
 repository's root (in Claude Code's sandbox, launch Chromium with `args: ["--single-process"]`):
