@@ -551,6 +551,8 @@
           <ul>
             <li>The CI reports but cannot block a merge on this plan (next: main protected, with code owners)</li>
             <li>A record of a green gate can be forged from the sandbox: a broken tree reaches main until the CI's red report, and nothing runs on Alexis's machine</li>
+            <li>A branch planted through git's plumbing carries its own hooks into a merge (next: the hooks outside the repository, F129)</li>
+            <li>The history scan is defence in depth: merges, type changes and gitleaks's default paths escape it; the staged scan is the barrier</li>
             <li>The guard is a pattern list: a seatbelt, not a wall</li>
             <li>The review pass is recorded by the agent that ran it; the round limit is a written rule</li>
             <li><code>prove_fix.py</code> takes any failure before the fix as proof, a crash included</li>

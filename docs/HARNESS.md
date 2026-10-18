@@ -233,6 +233,10 @@ such change, F076, took the gate out of the hooks in Alexis's shell.
   the sandboxed gate and the CI do (F136).
 - **A branch planted through git's plumbing** can carry its own hooks into Alexis's merge,
   which then runs them (F129): the hooks' move out of the repository is the next harness work.
+- **The history scan is defence in depth, not a guarantee.** It reads git's diffs, which show
+  no merge commit, drop type changes and skip gitleaks's default paths (F141 to F143): a key
+  committed without pre-commit (`git stash`, plumbing) could pass it. The staged scan, which
+  reads each commit's content as text, is the barrier; F129 closes the commits that skip it.
 - **Claude Code's layer is active only in a session started in this folder,** or moved into
   it with `/cd`.
 - **`prove_fix.py` covers the product;** a fix of the harness is proven by
