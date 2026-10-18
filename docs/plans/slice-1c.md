@@ -5,7 +5,7 @@ ADR-0002 §7 (lines 978-1066), what `slice-1b-2.md` §2 deferred here, and the d
 
 ## 1. Done when
 
-From the backlog's row, word for word: "a demo container cannot reach the homelab's services".
+From the backlog's row, word for word: "a demo container cannot reach its host's services".
 From `slice-1.md` §3: the hardening is read back with `docker inspect`; a burst answers 429 and
 the host stays idle; the secrets are gitignored and denied to Claude. From 1b-2: `sw.js` and the
 HTML always revalidated (`Cache-Control: no-cache`), `/assets/*` immutable. This plan adds:
@@ -27,8 +27,8 @@ distroless Node images, PROXY protocol to them. The CSP (with the first third pa
 
 | Asset | Threat | Mitigation | Proof (`deploy/test.sh`) |
 |---|---|---|---|
-| Alexis's Mac | The static server reaches the host or the LAN | `web` on an `internal` network only; non-root, read-only root, `tmpfs` for `/tmp`, every capability dropped, no new privileges, no host port, caps (2 cores, 2 GB, pids) | A throwaway container on that network: `host.docker.internal`, the gateway, the LAN and `1.1.1.1` fail, `web:8080` answers; `docker inspect` reads each setting back |
-| Alexis's Mac | The Tailscale container, which needs the internet, reaches the host | Alone on its own bridge network and on `internal`; the same hardening where userspace networking allows it (to check first) | The same probes from its bridge network; what answers is reported, and a host answer stops the merge |
+| The demo's host | The static server reaches the host or the LAN | `web` on an `internal` network only; non-root, read-only root, `tmpfs` for `/tmp`, every capability dropped, no new privileges, no host port, caps (2 cores, 2 GB, pids) | A throwaway container on that network: `host.docker.internal`, the gateway, the LAN and `1.1.1.1` fail, `web:8080` answers; `docker inspect` reads each setting back |
+| The demo's host | The Tailscale container, which needs the internet, reaches the host | Alone on its own bridge network and on `internal`; the same hardening where userspace networking allows it (to check first) | The same probes from its bridge network; what answers is reported, and a host answer stops the merge |
 | His tailnet | The demo's machine reaches his devices | A tagged auth key; the policy lets the tag reach nothing, with Funnel's `nodeAttr` | From the container, `tailscale ping` to his other devices fails |
 | The secrets | The auth key or the password in the repo or a log | Files in `deploy/secrets/` (gitignored, denied to Claude), read as `file:` and `auth_basic_user_file` | `git check-ignore`; `docker inspect` holds no secret value |
 | The public URL | Flooding; indexing | Basic auth; `limit_req` per PROXY address, 429; `X-Robots-Tag: noindex` | A burst from one address gets 429, another address still 200 |

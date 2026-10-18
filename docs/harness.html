@@ -550,7 +550,7 @@
           <h2>Known limits</h2>
           <ul>
             <li>The CI reports but cannot block a merge on this plan (next: main protected, with code owners)</li>
-            <li>A record of a green gate can be forged from the sandbox: a broken tree reaches main until the CI's red report, and nothing runs on Alexis's machine</li>
+            <li>A record of a green gate can be forged from the sandbox: a broken tree reaches main until the CI's red report, and nothing runs on the maintainer's machine</li>
             <li>One repository: Claude's sandbox shares Alexis's <code>.git</code>, so it could move <code>main</code>, forge an object or plant a submodule that git runs in his shell (F152, F153, F163); <code>main</code> protected with the CI required is the boundary</li>
             <li>Only <code>merge.sh</code> shows a merge before git writes it; a cherry-pick, a rebase or a checkout of Claude's branch in Alexis's shell does not (F129)</li>
             <li>The history scan is defence in depth: merges, type changes and gitleaks's default paths escape it; the staged scan is the barrier</li>

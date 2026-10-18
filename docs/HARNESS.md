@@ -243,7 +243,7 @@ and the harness is frozen until a real bug crosses it.
   skipped by someone who means to (findings F009, F001).
 - **A record of a green gate can be forged from the sandbox,** since the sandbox writes it
   (F076): it lets a broken tree reach `main` until the CI's red report, and runs nothing on
-  Alexis's machine. Nor do the hooks in his shell run `check_docs.py` on a docs-only commit:
+  the maintainer's machine. Nor do the hooks in his shell run `check_docs.py` on a docs-only commit:
   the sandboxed gate and the CI do (F136).
 - **Claude's sandbox shares Alexis's `.git`** (Alexis, 2026-10-18: one repository). It cannot
   write `.git/hooks`, `.git/config` or `.git/commondir` (F150), but it writes refs, objects and
