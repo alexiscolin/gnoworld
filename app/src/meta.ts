@@ -1,38 +1,9 @@
-// The site's one origin, the places slice 1 pre-renders (slice 5's data files replace the list),
-// and the tags each page carries.
-import { data, type MetaDescriptor } from "react-router";
+// The tags each page carries: a title, a description and one canonical address on the site's
+// origin, with their Open Graph twins; a page with no address of its own is not indexed.
+import type { MetaDescriptor } from "react-router";
+import { worldPath, type World } from "./worlds.ts";
 
 const ORIGIN = "https://gno.world";
-
-export interface World {
-  slug: string;
-  name: string;
-  description: string;
-}
-
-export const WORLDS: readonly World[] = [
-  {
-    slug: "bubble",
-    name: "Bubble",
-    description:
-      "Bubble, a world of gno.land: the BUBBLE token, its governance, and the games played with it on chain.",
-  },
-];
-
-/** React Router's 404, thrown from a loader: the route's error boundary says not found. */
-export function notFound(): never {
-  throw data(null, { status: 404 });
-}
-
-/** The world a path names; throws React Router's 404 when none has that name. */
-export function findWorld(slug: string | undefined): World {
-  return WORLDS.find((each) => each.slug === slug) ?? notFound();
-}
-
-/** A world's one address on the site: its links, its pre-rendered page and its canonical. */
-export function worldPath(world: World): string {
-  return `/w/${world.slug}`;
-}
 
 export function homeMeta(): MetaDescriptor[] {
   return pageMeta({
@@ -43,13 +14,13 @@ export function homeMeta(): MetaDescriptor[] {
   });
 }
 
-/** A world's tags, or, with no world, a not-found page's: no address of its own, not indexed. */
+/** A world's tags, or, with no world, a not-found page's. */
 export function worldMeta(world: World | undefined): MetaDescriptor[] {
   if (!world) return unindexed("No world here");
   return pageMeta({ title: `${world.name} · gno.world`, description: world.description, path: worldPath(world) });
 }
 
-/** A world that failed to load for another reason than its name: said so, and not indexed. */
+/** A world that failed to load for another reason than its name. */
 export function failedWorldMeta(): MetaDescriptor[] {
   return unindexed("This world could not load");
 }
@@ -63,7 +34,6 @@ function unindexed(title: string): MetaDescriptor[] {
   return [{ title: `${title} · gno.world` }, { name: "robots", content: "noindex" }];
 }
 
-// A page's title, description and one canonical address, with their Open Graph twins.
 function pageMeta(page: { title: string; description: string; path: string }): MetaDescriptor[] {
   const url = ORIGIN + page.path;
   return [

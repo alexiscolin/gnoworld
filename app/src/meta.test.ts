@@ -1,6 +1,7 @@
 import type { MetaDescriptor } from "react-router";
 import { describe, expect, test } from "vitest";
-import { failedWorldMeta, findWorld, homeMeta, notFoundMeta, worldMeta, worldPath, WORLDS } from "./site.ts";
+import { failedWorldMeta, homeMeta, notFoundMeta, worldMeta } from "./meta.ts";
+import { findWorld, worldPath, WORLDS } from "./worlds.ts";
 
 // The value of each tag a page carries, by its name, property, rel or title; a tag given twice is a fault.
 function tags(meta: MetaDescriptor[]): Map<string, string> {
@@ -19,22 +20,6 @@ function tags(meta: MetaDescriptor[]): Map<string, string> {
   }
   return found;
 }
-
-describe("findWorld", () => {
-  test("finds a world by its name in the path", () => {
-    expect(findWorld("bubble").name).toBe("Bubble");
-  });
-
-  test.each([["nowhere"], [undefined], [""], ["Bubble"], ["bubble/"]])("answers %j with a 404", (slug) => {
-    let thrown: unknown;
-    try {
-      findWorld(slug);
-    } catch (error) {
-      thrown = error;
-    }
-    expect(thrown).toMatchObject({ init: { status: 404 } });
-  });
-});
 
 describe("the tags of a page", () => {
   test("home names https://gno.world/ as its one address", () => {
@@ -81,20 +66,5 @@ describe("the tags of a page", () => {
   test("home and each world describe themselves differently", () => {
     const descriptions = [homeMeta(), ...WORLDS.map(worldMeta)].map((meta) => tags(meta).get("description"));
     expect(new Set(descriptions).size).toBe(descriptions.length);
-  });
-});
-
-describe("the list of worlds", () => {
-  test.each(WORLDS.map((world) => [world.slug, world]))(
-    "%s has a name fit for a path and a description fit for search",
-    (_, world) => {
-      expect(world.slug).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
-      expect(world.description.length).toBeGreaterThanOrEqual(50);
-      expect(world.description.length).toBeLessThanOrEqual(160);
-    },
-  );
-
-  test("no two worlds share a name", () => {
-    expect(new Set(WORLDS.map((world) => world.slug)).size).toBe(WORLDS.length);
   });
 });

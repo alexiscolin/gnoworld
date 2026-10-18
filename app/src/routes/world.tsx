@@ -7,7 +7,8 @@ import {
   type LoaderFunctionArgs,
   type MetaArgs,
 } from "react-router";
-import { failedWorldMeta, findWorld, worldMeta } from "../site.ts";
+import { failedWorldMeta, worldMeta } from "../meta.ts";
+import { findWorld } from "../worlds.ts";
 import { ErrorNotice } from "../ui/ErrorNotice.tsx";
 
 export function loader({ params }: LoaderFunctionArgs) {

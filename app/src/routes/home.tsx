@@ -1,5 +1,6 @@
 import { Link } from "react-router";
-import { homeMeta, worldPath, WORLDS } from "../site.ts";
+import { homeMeta } from "../meta.ts";
+import { worldPath, WORLDS } from "../worlds.ts";
 
 export const meta = homeMeta;
 
