@@ -1,7 +1,7 @@
 // The built site as a static host serves it (ADR-0002 §2): the file for a path where one exists,
 // spelled exactly, otherwise the SPA fallback with a 404, never a page that is not the place asked for.
 // Port 4174 serves the same build for the PWA's update journey: a POST to /__bump makes its sw.js
-// a new version, as a deploy would.
+// a new version, as a deploy would; one to /__tamper turns on and off a changed route file.
 import { createReadStream, readFileSync, realpathSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, join } from "node:path";
@@ -34,6 +34,7 @@ function find(pathname) {
 
 function host({ bumping }) {
   let bumps = 0;
+  let tampered = false;
   return (request, response) => {
     let pathname;
     try {
@@ -47,6 +48,11 @@ function host({ bumping }) {
       response.writeHead(204).end();
       return;
     }
+    if (bumping && request.method === "POST" && pathname === "/__tamper") {
+      tampered = !tampered;
+      response.writeHead(204).end();
+      return;
+    }
     const found = find(pathname);
     const served = found ?? join(root, "__spa-fallback.html");
     const type = TYPES[extname(served)];
@@ -57,6 +63,10 @@ function host({ bumping }) {
     response.writeHead(found ? 200 : 404, { "content-type": type });
     if (bumps > 0 && pathname === "/sw.js") {
       response.end(`${readFileSync(served, "utf8")}\n// bumped ${String(bumps)}\n`);
+      return;
+    }
+    if (tampered && pathname.startsWith("/assets/notFound-main-")) {
+      response.end(`${readFileSync(served, "utf8")}\n// tampered\n`);
       return;
     }
     createReadStream(served)

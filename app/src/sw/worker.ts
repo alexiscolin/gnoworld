@@ -15,10 +15,18 @@ interface WorkerMessage extends LifecycleEvent {
   readonly data: unknown;
 }
 
+// A file to precache: its path, and the digest its bytes must have, as subresource integrity
+// spells it (app/vite.config.ts computes it from the build).
+export interface Precached {
+  readonly url: string;
+  readonly integrity: string;
+}
+
 // No put: the worker writes nothing but the precache list.
 export interface WorkerCache {
-  addAll(urls: readonly string[]): Promise<void>;
+  addAll(requests: readonly Request[]): Promise<void>;
   keys(): Promise<readonly Request[]>;
+  match(request: Request): Promise<Response | undefined>;
   delete(request: Request): Promise<boolean>;
 }
 
@@ -36,9 +44,24 @@ export interface WorkerScope {
   addEventListener(type: "message", listener: (event: WorkerMessage) => void): void;
 }
 
-// One cache for every version: a hashed name never holds other bytes, so a new version fetches
-// only the files it lacks, and drops the others once it takes over.
+// One cache for every version: a file stays while its bytes are the build's, so a new version
+// fetches only the files it lacks, and drops the others once it takes over.
 const CACHE = "gnoworld-precache";
+
+async function integrityOf(response: Response): Promise<string> {
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-384", await response.arrayBuffer()));
+  return `sha384-${btoa(String.fromCharCode(...digest))}`;
+}
+
+// A listed file held with other bytes is dropped at once: the version still running then fetches
+// it, and this one fetches it again with its digest, which the browser checks.
+async function kept(cache: WorkerCache, request: Request, integrity: string | undefined) {
+  if (integrity === undefined) return undefined;
+  const held = await cache.match(request);
+  if (held !== undefined && (await integrityOf(held)) === integrity) return request.url;
+  await cache.delete(request);
+  return undefined;
+}
 
 // What the page sends when its visitor asks for the new version (register.ts).
 export const TAKE_OVER = { type: "SKIP_WAITING" } as const;
@@ -46,13 +69,17 @@ export const TAKE_OVER = { type: "SKIP_WAITING" } as const;
 const asksToTakeOver = (data: unknown) =>
   typeof data === "object" && data !== null && "type" in data && data.type === TAKE_OVER.type;
 
-export function precache(scope: WorkerScope, files: readonly string[]): void {
-  const listed = new Set(files.map((file) => new URL(file, scope.location.origin).href));
+export function precache(scope: WorkerScope, files: readonly Precached[]): void {
+  const listed = new Map(files.map(({ url, integrity }) => [new URL(url, scope.location.origin).href, integrity]));
   scope.addEventListener("install", (event) => {
     event.waitUntil(
       scope.caches.open(CACHE).then(async (cache) => {
-        const held = new Set((await cache.keys()).map((request) => request.url));
-        await cache.addAll(files.filter((file) => !held.has(new URL(file, scope.location.origin).href)));
+        const requests = await cache.keys();
+        const held = new Set(
+          await Promise.all(requests.map((request) => kept(cache, request, listed.get(request.url)))),
+        );
+        const missing = [...listed].filter(([url]) => !held.has(url));
+        await cache.addAll(missing.map(([url, integrity]) => new Request(url, { integrity })));
       }),
     );
   });

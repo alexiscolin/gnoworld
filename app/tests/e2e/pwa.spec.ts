@@ -150,14 +150,16 @@ test.describe("updates", () => {
   }) => {
     await open(page);
     const installed = await cacheContents(page);
-    // An older version's file, and one of this list's gone: the new worker fetches what it lacks,
-    // and drops what it does not list once it takes over.
-    await page.evaluate(async () => {
+    // An older version's file, one of this list's gone and one changed: the new worker fetches
+    // what it lacks or holds wrong, and drops what it does not list once it takes over.
+    const changed = await page.evaluate(async () => {
       const [name] = await caches.keys();
       const cache = await caches.open(name ?? "the worker's cache");
-      const [first] = await cache.keys();
+      const [first, second] = await cache.keys();
       if (first !== undefined) await cache.delete(first);
+      if (second !== undefined) await cache.put(second, new Response("a file someone changed"));
       await cache.put("/assets/older-AAAAAAAA.js", new Response("an older version's"));
+      return second?.url ?? "";
     });
     await bump(page, request);
     await expect(promptOf(page)).toBeVisible();
@@ -169,6 +171,8 @@ test.describe("updates", () => {
     await expect(page.locator("body[data-before]")).toHaveCount(0);
     await expect(promptOf(page)).toHaveCount(0);
     await expect.poll(async () => cacheContents(page)).toEqual(installed);
+    const held = await page.evaluate(async (url) => (await caches.match(url))?.text(), changed);
+    expect(held).toBe(await (await request.get(changed)).text());
   });
 
   test("two tabs: the one clicked reloads; the other keeps its page until its own click", async ({ page, request }) => {
@@ -184,6 +188,32 @@ test.describe("updates", () => {
     await Promise.all([other.waitForEvent("load"), promptOf(other).getByRole("button", { name: "Reload" }).click()]);
     await hydrated(other);
     await expect(other.locator("body[data-before]")).toHaveCount(0);
+  });
+
+  test("a file whose bytes are not the build's fails the install: no worker keeps it", async ({ page, request }) => {
+    // Each first worker's last state, kept on the page: installing ends activated or redundant.
+    await page.addInitScript(() => {
+      const container = navigator.serviceWorker;
+      const register = container.register.bind(container);
+      container.register = async (...args: Parameters<ServiceWorkerContainer["register"]>) => {
+        const registration = await register(...args);
+        const worker = registration.installing;
+        worker?.addEventListener("statechange", () => {
+          document.documentElement.dataset["install"] = worker.state;
+        });
+        return registration;
+      };
+    });
+    expect((await request.post(`${site}/__tamper`)).status()).toBe(204);
+    try {
+      await page.goto(`${site}/`);
+      await hydrated(page);
+      await expect(page.locator("html")).toHaveAttribute("data-install", /^(redundant|activated)$/);
+      await expect(page.locator("html")).toHaveAttribute("data-install", "redundant");
+      expect((await cacheContents(page)).paths).toEqual([]);
+    } finally {
+      expect((await request.post(`${site}/__tamper`)).status()).toBe(204);
+    }
   });
 });
 
