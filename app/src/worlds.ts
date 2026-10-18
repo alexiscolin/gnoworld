@@ -2,6 +2,7 @@
 import { data } from "react-router";
 
 export interface World {
+  /** Its name in a path: lower-case letters, digits and single hyphens, unique (worlds.test.ts). */
   slug: string;
   name: string;
   description: string;

@@ -131,8 +131,9 @@ with `/cd`:
   and integrates a whole feature alone (Alexis, 2026-10-18), checked by the gate and the
   review; Alexis reviews before he merges and pushes.
 - **Refused outright, so nothing asks:** an edit of a file run outside the sandbox, the guard,
-  the Stop hook, `code_changed.sh`, the git hooks, `.claude/**` and the `package.json` files
-  (finding F068), and what pnpm loads at Alexis's install, `pnpm-workspace.yaml` and a
+  the Stop hook, `code_changed.sh`, the git hooks, Claude Code's settings, agents, commands,
+  skills, rules and hooks in `.claude/` (not `.claude/tmp/`, where the gate writes its state,
+  F111) and the `package.json` files (finding F068), and what pnpm loads at Alexis's install, `pnpm-workspace.yaml` and a
   pnpmfile (F087); `pnpm add` (a dependency is Alexis's) and `rm -rf`. A change to one of these
   files is written out for Alexis to apply. What the gate reaches when he pushes or merges
   (the other scripts, the configs, the tests) still runs with his access: F076, closed by the

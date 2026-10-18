@@ -146,6 +146,7 @@ test.describe("once the client takes over", () => {
     });
   }
 
+  // No page prints the name it was asked for yet (F119): this guards the day one does.
   test("a world name made of markup stays text", async ({ page }) => {
     const dialogs: string[] = [];
     page.on("dialog", async (dialog) => {
