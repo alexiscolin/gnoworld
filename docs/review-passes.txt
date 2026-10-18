@@ -5,3 +5,4 @@
 2026-10-18 07d95e22d6b85a659f039171ea23cebd76e5ac17 test-auditor red+green, security-reviewer, /code-review (Alexis), code review, simplify, finding-verifier x5, full gate
 2026-10-18 b8887d67805d74efe3c87b8cdab8314b28823a71 slice-1b round 3: /simplify (4 angles), Alexis's /code-review, finding-verifier (Opus), Alexis's revdiff, the full gate
 2026-10-18 1d37f6cdeca1feb068e09823ddba3c32e6f4df48 slice-1b round 3, then the harness picture (docs only, checked by its render at desktop and phone width)
+2026-10-18 96448bc557e27ff2255b4cd6f01cc5fdf86697b2 slice-1b round 3, then the harness picture (docs only, checked by its render at desktop and phone width)
