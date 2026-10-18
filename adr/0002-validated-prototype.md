@@ -1007,7 +1007,7 @@ not choose its hosts.
     devices. The team uses the public URL.
   - **Shut in the tailnet too:** the demo machine joins with a tagged key, and the
     tailnet's access rules let that tag reach nothing: Funnel brings visitors in, and
-    nothing leaves it for the Mac or Alexis's other devices. A test from inside the demo
+    nothing leaves it for the host or any other device. A test from inside the demo
     proves it.
   - **Turnkey for ops:** `deploy/` holds everything: `compose.yaml` is what ops runs, the
     `demo` profile only adds the Tailscale machine, the egress proxy and the caps;
