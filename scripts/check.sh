@@ -15,6 +15,11 @@ unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO # the scripts' te
 full=false
 [ "${1:-}" = "--full" ] && full=true
 started=$(date +%s)
+# The code this run tests; at the end it is recorded, unless it changed meanwhile (F076).
+tested=
+if git rev-parse --git-dir >/dev/null 2>&1; then # not in pre-commit's staged copy, which has no repository
+	. .githooks/records.sh && tested=$(worktree_print)
+fi
 
 want="v$(cat .node-version)"
 # A version and nothing else: anything more would put a folder of its choice first on PATH.
@@ -114,11 +119,8 @@ if $full; then
 	fi
 fi
 
-if git rev-parse --git-dir >/dev/null 2>&1; then # not in pre-commit's staged copy, which has no repository
+if [ -n "$tested" ]; then
 	mkdir -p .claude/tmp && sh scripts/code_changed.sh --state >.claude/tmp/gate-green # what stop_gate.sh compares
-	# A clean tree that passed is recorded, for the hooks outside the sandbox, which run no gate (F076).
-	if [ -z "$(git status --porcelain)" ]; then
-		. .githooks/records.sh && record HEAD ".claude/tmp/green-$($full && echo full || echo fast)"
-	fi
+	gate_passed "$tested" "$full" # for the hooks outside the sandbox, which run no gate (F076)
 fi
 echo "all checks passed in $(($(date +%s) - started)) s"

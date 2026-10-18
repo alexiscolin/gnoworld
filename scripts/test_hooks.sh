@@ -10,6 +10,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 hooks=$(cd "$here/../.githooks" && pwd)
 rp="$here"/review_pass.py # review_pass and pre_push both use it
 secrets_into() { cp "$here/scan_secrets.sh" "$here/gitleaks.toml" "$here/gitleaks-private.toml" "$1"; } # the secret scan, whole
+key="AKIA""J7Q2XRT4LMNB5VWZ" # assembled, so this file holds no key
 t=$(mktemp -d "${TMPDIR:-/tmp}/test_hooks.XXXXXX")
 # bash 3.2, macOS's sh, exits 0 through an EXIT trap after an unbound variable: `finished`, set
 # on the last line, tells a run that reached its end from one that died on the way.
@@ -55,7 +56,8 @@ ask, deny = set(s["permissions"]["ask"]), set(s["permissions"]["deny"])
 assert {"Bash(git push)", "Bash(git push *)"} <= ask, "a push asks no one"
 assert {"Bash(pnpm add *)", "Bash(rm -rf *)"} <= deny, "Claude can add a dependency or delete a tree"
 outside = {"Edit(/scripts/guard.py)", "Edit(/scripts/stop_gate.sh)", "Edit(/scripts/code_changed.sh)", "Edit(/.githooks/**)",
-           "Edit(/scripts/scan_secrets.sh)", "Edit(/.claude/settings.json)", "Edit(/.claude/settings.local.json)", "Edit(/.claude/agents/**)", "Edit(/.claude/commands/**)",
+           "Edit(/scripts/scan_secrets.sh)", "Edit(/scripts/gitleaks.toml)", "Edit(/scripts/gitleaks-private.toml)", "Edit(/scripts/.gitleaksignore)",
+           "Edit(/.claude/settings.json)", "Edit(/.claude/settings.local.json)", "Edit(/.claude/agents/**)", "Edit(/.claude/commands/**)",
            "Edit(/.claude/skills/**)", "Edit(/.claude/rules/**)", "Edit(/.claude/hooks/**)",
            "Edit(/package.json)", "Edit(/app/package.json)", "Edit(/packages/*/package.json)",
            "Edit(/.npmrc)", "Edit(/pnpm-workspace.yaml)", "Edit(/.pnpmfile.cjs)", "Edit(/.pnpmfile.mjs)"}
@@ -117,8 +119,11 @@ guarded = next(ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast
 missed = [p for p in guarded if not any(fnmatch.fnmatch(p, s) or p.startswith(s + "/") for s in gate)]
 assert not missed, missed
 PY
-grep -B1 -F '. .githooks/records.sh && record HEAD ".claude/tmp/green-$($full && echo full || echo fast)"' "$gate_file" | grep -qF 'if [ -z "$(git status --porcelain)" ]; then' || fail "check.sh records a tree it did not pass clean (F076)"
-[ "$(grep -n 'record HEAD' "$gate_file" | cut -d: -f1)" -gt "$(grep -n 'python3 -I scripts/harness_mutate.py' "$gate_file" | cut -d: -f1)" ] || fail "check.sh records its tree before its last step (F076)"
+# check.sh prints the code it tests before its first step, and records it after its last one,
+# through records.sh, whose own cases are in the section `outside` (F076, F133).
+at() { grep -nF -- "$1" "$gate_file" | head -1 | cut -d: -f1; }
+[ "$(at '. .githooks/records.sh && tested=$(worktree_print)')" -lt "$(at 'run format:check')" ] || fail "check.sh prints its code after a step ran (F133)"
+[ "$(at 'gate_passed "$tested" "$full"')" -gt "$(at 'python3 -I scripts/harness_mutate.py')" ] || fail "check.sh records its code before its last step (F076)"
 # An EXIT trap keeps a failure: under macOS's sh, a plain one turns an unbound variable into exit 0.
 for f in "$here"/*.sh "$hooks"/*; do
 	grep -n "^[[:space:]]*trap .* EXIT$" "$f" | grep -v '|| status=1; exit "$status"' | grep -q . && fail "$(basename "$f") has an EXIT trap that can hide a failure"
@@ -190,7 +195,7 @@ refused "fix: x
 Seen in /Us""ers/alice/notes gitleaks:allow" || fail "gitleaks:allow let a home folder through a message (F113)"
 refused "fix: x
 
-aws = AKIA""J7Q2XRT4LMNB5VWZ" || fail "a message holding a key was accepted"
+aws = $key" || fail "a message holding a key was accepted"
 printf 'fix: x\n' >"$t/msg"
 PATH=/usr/bin:/bin "$hooks/commit-msg" "$t/msg" 2>"$t/err" && fail "commit-msg passed with no gitleaks to scan the message"
 grep -q "gitleaks is not installed" "$t/err" || fail "commit-msg did not say gitleaks is missing (F125)"
@@ -291,6 +296,11 @@ row "| F001 | 2026-10-17 | a | x.py:1 | a bug | rejected | the code already chec
 row "| F001 | 2026-10-17 | a | x.py:1 | a bug | done | x |" && fail "check_docs accepted an unknown status"
 row "| F001 | 2026-10-17 | a | x.py:1 | a bug | fixed | \`0badc0de\` |" && fail "check_docs accepted a fixed finding naming no commit of the repo"
 row "| F001 | 2026-10-17 | a | x.py:1 | a bug | rejected | — |" && fail "check_docs accepted a rejected finding with no reason"
+# As Anthropic sorts its reviewer's comments: true but wanted, or true and of no matter, each with its reason.
+row "| F001 | 2026-10-17 | a | x.py:1 | a bug | intended | the plan wants it |" || fail "check_docs refused an intended finding with its reason"
+row "| F001 | 2026-10-17 | a | x.py:1 | a bug | moot | nothing reads it |" || fail "check_docs refused a moot finding with its reason"
+row "| F001 | 2026-10-17 | a | x.py:1 | a bug | intended | — |" && fail "check_docs accepted an intended finding with no reason"
+row "| F001 | 2026-10-17 | a | x.py:1 | a bug | moot | — |" && fail "check_docs accepted a moot finding with no reason"
 row "| F001 | 2026-10-17 | a | x.py:1 | a | claimed | — |
 | F001 | 2026-10-17 | b | y.py:1 | b | claimed | — |" && fail "check_docs accepted an id used twice"
 rm -r "$d/docs/review"
@@ -467,6 +477,11 @@ for f in .githooks/pre-push .github/workflows/gate.yml .claude/settings.json; do
 done
 echo partly >>"$c2/a.ts" && git -C "$c2" add a.ts && echo unstaged >>"$c2/a.ts"
 precommit || fail "pre-commit refused a code file only partly staged"
+# A code_changed.sh that fails is no proof of prose alone, in the sandbox too (F133).
+git -C "$c2" checkout -q -- a.ts && printf 'exit 2\n' >"$c2/scripts/code_changed.sh" && git -C "$c2" add scripts/code_changed.sh
+echo broken >>"$c2/a.ts" && git -C "$c2" add a.ts
+precommit && fail "pre-commit took a failing code_changed.sh for prose alone (F133)"
+git -C "$c2" checkout -q HEAD -- scripts/code_changed.sh a.ts
 fi
 
 if part outside; then
@@ -481,7 +496,7 @@ for f in review_pass.py check_docs.py repo_files.py; do printf 'open("%s/ran", "
 printf '.claude/tmp\nran\n' >"$o/.gitignore" && echo one >"$o/a.ts"
 git -C "$o" init -q && git -C "$o" add -A && git -C "$o" commit -qm base
 out() { (cd "$o" && env -u SANDBOX_RUNTIME "$@" >/dev/null 2>&1); }
-mark() { (cd "$o" && . .githooks/records.sh && code_print "$1") >>"$o/.claude/tmp/green-$2"; } # as a gate records
+mark() { (cd "$o" && . .githooks/records.sh && p=$(code_print "$1") && put "$p" "$2" && if [ "$2" = full ]; then put "$p" fast; fi); } # as a gate records: the full one writes both
 untouched() { [ ! -e "$o/ran" ] || fail "$1 ran the repository's code outside the sandbox (F076)"; }
 echo two >>"$o/a.ts" && git -C "$o" add a.ts
 out sh .githooks/pre-commit && fail "pre-commit outside the sandbox took code no gate passed"
@@ -503,7 +518,7 @@ for f in docs/n.md adr/figure.svg NOTES.md; do
 	echo prose >"$o/$f" && git -C "$o" add "$f"
 done
 out sh .githooks/pre-commit || fail "pre-commit outside the sandbox refused prose added to code the gate passed"
-printf 'aws = "%s"\n' "AKIA""J7Q2XRT4LMNB5VWZ" >"$o/leak.py" && git -C "$o" add leak.py && mark "$(git -C "$o" write-tree)" fast
+printf 'aws = "%s"\n' "$key" >"$o/leak.py" && git -C "$o" add leak.py && mark "$(git -C "$o" write-tree)" fast
 out sh .githooks/pre-commit && fail "pre-commit outside the sandbox let a staged key through"
 (cd "$o" && env -u SANDBOX_RUNTIME PATH=/usr/bin:/bin sh .githooks/pre-commit >/dev/null 2>&1) && fail "pre-commit outside the sandbox passed with no gitleaks"
 git -C "$o" rm -qf --cached leak.py && rm "$o/leak.py"
@@ -545,7 +560,7 @@ push main "$base" && fail "pre-push outside the sandbox took an undeclared harne
 push main 1111111111111111111111111111111111111111 && fail "pre-push outside the sandbox took a main it cannot compare"
 git -C "$o" commit -q --allow-empty -m declare -m "Harness-changed: scripts/tool.sh - a test" && head=$(git -C "$o" rev-parse HEAD)
 push main "$base" || fail "pre-push outside the sandbox refused main with its harness change declared"
-printf 'aws = "%s"\n' "AKIA""J7Q2XRT4LMNB5VWZ" >"$o/leak.py" && git -C "$o" add leak.py && git -C "$o" commit -qm leak && head=$(git -C "$o" rev-parse HEAD) && mark "$head" full && pass
+printf 'aws = "%s"\n' "$key" >"$o/leak.py" && git -C "$o" add leak.py && git -C "$o" commit -qm leak && head=$(git -C "$o" rev-parse HEAD) && mark "$head" full && pass
 push main && fail "pre-push outside the sandbox let main through with a key in its history"
 push slice-1a && fail "pre-push outside the sandbox let a branch through with a key in its history"
 untouched pre-push
@@ -561,13 +576,43 @@ out sh .githooks/pre-merge-commit || fail "pre-merge-commit outside the sandbox 
 git -C "$o" merge --abort
 untouched pre-merge-commit
 # A print is recorded once, however often its gate passes.
-(cd "$o" && . .githooks/records.sh && record HEAD "$t/once" && record HEAD "$t/once") || fail "records.sh could not record a print"
-[ "$(wc -l <"$t/once")" -eq 1 ] || fail "records.sh recorded the same print twice"
-# A longer line that holds the print is no record of it: the print is still written, whole.
 p=$(cd "$o" && . .githooks/records.sh && code_print HEAD)
-printf '%sx\n' "$p" >"$t/near"
-(cd "$o" && . .githooks/records.sh && record HEAD "$t/near")
-grep -qxF "$p" "$t/near" || fail "records.sh took a longer line for the print it records"
+(cd "$o" && . .githooks/records.sh && put "$p" once && put "$p" once) || fail "records.sh could not record a print"
+[ "$(wc -l <"$o/.claude/tmp/green-once")" -eq 1 ] || fail "records.sh recorded the same print twice"
+# A longer line that holds the print is no record of it: the print is still written, whole.
+printf '%sx\n' "$p" >"$o/.claude/tmp/green-near"
+(cd "$o" && . .githooks/records.sh && put "$p" near)
+grep -qxF "$p" "$o/.claude/tmp/green-near" || fail "records.sh took a longer line for the print it records"
+# The gate records the code it tested: the working tree's, prose aside and untracked files in,
+# and nothing when that code changed while it ran (F133).
+wt() { (cd "$o" && . .githooks/records.sh && worktree_print); }
+[ "$(wt)" = "$p" ] || fail "records.sh printed a clean working tree unlike its HEAD"
+echo prose >"$o/docs/w.md"
+[ "$(wt)" = "$p" ] || fail "records.sh counted an untracked doc as code"
+echo code >"$o/w.ts"
+tested=$(wt)
+[ "$tested" != "$p" ] || fail "records.sh left an untracked code file out"
+echo more >>"$o/w.ts"
+(cd "$o" && . .githooks/records.sh && gate_passed "$tested" true 2>/dev/null)
+grep -qxF "$tested" "$o/.claude/tmp/green-fast" && fail "records.sh recorded code that changed while its gate ran (F133)"
+tested=$(wt)
+(cd "$o" && . .githooks/records.sh && gate_passed "$tested" true)
+grep -qxF "$tested" "$o/.claude/tmp/green-full" && grep -qxF "$tested" "$o/.claude/tmp/green-fast" || fail "records.sh did not record a full gate's code in both records"
+rm "$o/w.ts" "$o/docs/w.md"
+(cd "$o" && . .githooks/records.sh && f=kept && p=kept && { green HEAD fast || :; } && [ "$f$p" = keptkept ]) || fail "records.sh left a variable set in the shell that sources it (F133)"
+# A prose name with an accent stays prose, as code_changed.sh reads it (F133).
+mark HEAD fast
+mkdir -p "$o/adr" && echo prose >"$o/docs/café.md" && echo prose >"$o/adr/décision.md"
+git -C "$o" add docs adr && git -C "$o" commit -qm accents
+(cd "$o" && . .githooks/records.sh && green HEAD fast) || fail "records.sh took an accented doc for code (F133)"
+# A code_changed.sh that fails, missing or broken, is no proof of prose alone (F133).
+echo again >>"$o/a.ts" && git -C "$o" add a.ts
+printf 'exit 2\n' >"$o/scripts/code_changed.sh"
+out sh .githooks/pre-commit && fail "pre-commit outside the sandbox took a failing code_changed.sh for prose alone (F133)"
+rm "$o/scripts/code_changed.sh"
+out sh .githooks/pre-commit && fail "pre-commit outside the sandbox took a missing code_changed.sh for prose alone (F133)"
+git -C "$o" checkout -q HEAD -- scripts/code_changed.sh a.ts
+untouched records
 fi
 
 if part guard; then
@@ -760,7 +805,6 @@ if part secrets; then
 # scan_secrets: a secret is found whatever the repository or the environment says to ignore.
 sc="$t/secrets"
 mkdir -p "$sc/scripts" && git -C "$sc" init -q && secrets_into "$sc/scripts/"
-key="AKIA""J7Q2XRT4LMNB5VWZ" # assembled, so this file holds no key
 scan() { (cd "$sc" && sh scripts/scan_secrets.sh --staged >/dev/null 2>&1); }
 printf 'x = 1\n' >"$sc/ok.py" && git -C "$sc" add ok.py
 scan || fail "scan_secrets refused a commit with no secret"
@@ -803,6 +847,44 @@ mkdir -p "$info" && printf '* -diff\n' >"$info/attributes"
 scan && fail "scan_secrets passed beside .git/info/attributes (F130)"
 git -C "$sc" rm -qf --cached leak.py && rm "$sc/leak.py" && : >"$info/attributes"
 scan || fail "scan_secrets refused an empty .git/info/attributes"
+# Git hands gitleaks every change as text: no NUL byte, attributes file, diff driver, external
+# diff or replace ref hides a key, staged or committed, on any branch; a lawful attributes file
+# stops nothing (F132, F133).
+tx="$t/text"
+mkdir -p "$tx/scripts" && git -C "$tx" init -q && secrets_into "$tx/scripts/"
+git -C "$tx" add scripts && git -C "$tx" commit -qm base
+base=$(git -C "$tx" rev-parse HEAD)
+hidden() { # $1: the case, its key staged in $tx; with $2, a replace ref hides the commit
+	(cd "$tx" && sh scripts/scan_secrets.sh --staged >/dev/null 2>&1) && fail "scan_secrets missed a staged key: $1 (F132)"
+	git -C "$tx" commit -qm "$1"
+	[ -z "${2:-}" ] || git -C "$tx" replace HEAD HEAD~1
+	(cd "$tx" && sh scripts/scan_secrets.sh >/dev/null 2>&1) && fail "scan_secrets missed a committed key: $1 (F132)"
+	git -C "$tx" replace -l | xargs -r git -C "$tx" replace -d >/dev/null
+	git -C "$tx" reset -q --hard "$base" && git -C "$tx" clean -qfdx
+	: >"$tx/.git/info/exclude" && git -C "$tx" config --unset-all diff.x.textconv || :
+	git -C "$tx" config --unset-all diff.external || :
+}
+leak() { printf 'aws = "%s"%s\n' "$key" "${2:-}" >"$tx/$1" && git -C "$tx" add "$1"; }
+printf '\000' >"$tx/x.py" && printf 'aws = "%s"\n' "$key" >>"$tx/x.py" && git -C "$tx" add x.py && hidden "a NUL byte before it"
+printf '* -diff\n' >"$tx/.gitattributes" && echo .gitattributes >>"$tx/.git/info/exclude" && leak x.py && hidden "an ignored .gitattributes"
+mkdir -p "$tx/sub" && printf '* -diff\n' >"$tx/sub/.GitAttributes" && leak sub/x.py && hidden "a .GitAttributes"
+printf '*.py diff=x\n' >"$tx/.gitattributes" && echo .gitattributes >>"$tx/.git/info/exclude"
+git -C "$tx" config diff.x.textconv "sed s/AKIA/XXXX/" && leak x.py && hidden "a diff driver's textconv"
+printf '#!/bin/sh\n' >"$t/nodiff" && chmod +x "$t/nodiff" && git -C "$tx" config diff.external "$t/nodiff" && leak x.py && hidden "an external diff"
+leak x.py && hidden "a replace ref" replace
+leak x.py ' # gitleaks:allow' && hidden "a gitleaks:allow comment"
+printf 'p = "/Us''ers/alice/x"\n' >"$tx/home.py" && git -C "$tx" add home.py && hidden "a home folder's path"
+leak x.py && printf 'p = "/Us''ers/alice/x"\n' >"$tx/home.py" && git -C "$tx" add home.py && git -C "$tx" commit -qm both
+[ "$(cd "$tx" && sh scripts/scan_secrets.sh 2>&1 | grep -c 'leaks found')" = 2 ] || fail "scan_secrets stopped the history scan at its first rule set (F120)"
+git -C "$tx" reset -q --hard "$base"
+leak x.py && git -C "$tx" commit -qm ignored
+printf '%s:x.py:aws-access-token:1\n' "$(git -C "$tx" rev-parse HEAD)" >"$tx/.gitleaksignore"
+(cd "$tx" && sh scripts/scan_secrets.sh >/dev/null 2>&1) && fail "scan_secrets obeyed a root .gitleaksignore in the history"
+rm "$tx/.gitleaksignore" && git -C "$tx" reset -q --hard "$base"
+git -C "$tx" checkout -q -b side && leak x.py && git -C "$tx" commit -qm side && git -C "$tx" checkout -q -
+(cd "$tx" && sh scripts/scan_secrets.sh >/dev/null 2>&1) && fail "scan_secrets missed a key on another branch"
+printf '*.png binary\n' >"$tx/.gitattributes" && git -C "$tx" add .gitattributes
+(cd "$tx" && sh scripts/scan_secrets.sh --staged >/dev/null 2>&1) || fail "scan_secrets refused a lawful .gitattributes"
 fi
 
 if part regressions; then

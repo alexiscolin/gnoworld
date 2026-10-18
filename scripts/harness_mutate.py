@@ -31,7 +31,7 @@ SECTIONS = {
     ".jscpd.json": "jscpd", "tsconfig.base.json": "tsc", "vitest.config.ts": "vitest",
     "scripts/guard.py": "guard", "scripts/review_pass.py": "review_pass", "scripts/patch_coverage.py": "patch_coverage",
     "scripts/check_docs.py": "check_docs", "scripts/check_regressions.py": "regressions", ".githooks/commit-msg": "commit_msg",
-    ".githooks/pre-push": "pre_push,wiring,outside", ".githooks/pre-commit": "pre_commit,wiring,outside", ".githooks/records.sh": "outside,pre_commit,pre_push", ".githooks/pre-merge-commit": "outside", "scripts/code_changed.sh": "pre_commit,stop_gate",
+    ".githooks/pre-push": "pre_push,wiring,outside", ".githooks/pre-commit": "pre_commit,wiring,outside", ".githooks/records.sh": "outside", ".githooks/pre-merge-commit": "outside", "scripts/code_changed.sh": "pre_commit,stop_gate",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
     "scripts/check.sh": "wiring", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
     "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
@@ -191,40 +191,56 @@ def mutants():
     yield from each("scripts/gitleaks-private.toml", "/[a-z_][", r"/[\w][", "hooks", "the private scan lets a route's number pass (F117)")
     yield from each("scripts/gitleaks-private.toml", "(?i)^/home/runner$", "(?i)/home/runner", "hooks", "the private scan lets only the CI runner's folder pass")
     yield from each(".githooks/pre-push", 'changed=$(harness "$remote_sha" "$local_sha")', "changed=$(:)", "hooks", "pre-push lists the harness files main gets")
-    yield from each(".githooks/pre-push", '"$local_sha") || {', '"$local_sha" || :) || {', "hooks", "pre-push refuses a main it cannot compare (F116)")
+    yield from each(".githooks/pre-push", '"$local_sha") || refuse "fetch main first', '"$local_sha" || :) || refuse "fetch main first', "hooks", "pre-push refuses a main it cannot compare (F116)")
     yield from each(".githooks/pre-push", " app/tsconfig.json", "", "hooks", "pre-push's harness list is check.sh's (F124)")
     yield from each("scripts/check.sh", " app/tsconfig.json", "", "hooks", "check.sh's harness list is pre-push's (F124)")
     yield from each(".githooks/pre-push", 'if [ "$remote_sha" != "$zero" ]; then', "if false; then", "hooks", "pre-push compares main with the remote's")
-    yield from each(".githooks/pre-push", "		sh scripts/scan_secrets.sh", "		:", "hooks", "pre-push secret scan")
+    yield from each(".githooks/pre-push", "! $gated || sh scripts/scan_secrets.sh", ":", "hooks", "pre-push scans the history it sends")
     # F076: outside the sandbox the hooks run no repository code, and check the gate's records.
     rec = ".githooks/records.sh"
     for part in (" -e '\tdocs/'", " -e '\tadr/'", " -e '\\.md$'", " -e '\tdocs/review-log\\.md$'", " -e '\tdocs/review-passes\\.txt$'"):
         yield from each(rec, part, "", "hooks", f"records.sh leaves{part} out of its print")
-    yield from each(rec, 'grep -qxF "$p" "$f"', "true", "hooks", "records.sh wants the code recorded")
-    yield from each(rec, 'grep -qxF "$p"', 'grep -qF "$p"', "hooks", "records.sh wants a whole record line")
+    yield from each(rec, "git -c core.quotePath=false ls-tree", "git ls-tree", "hooks", "records.sh reads an accented name as code_changed.sh does (F133)")
+    yield from each(rec, "git add -A", "git add -u", "hooks", "records.sh prints untracked code too (F133)")
+    yield from each(rec, 'if [ "$(worktree_print)" != "$1" ]; then', "if false; then", "hooks", "records.sh records no code that changed while its gate ran (F133)")
+    yield from each(rec, '[ "$2" != true ] || put "$1" full', ":", "hooks", "records.sh records a full gate as full")
+    yield from each(rec, 'grep -qxF "$1" ".claude/tmp/green-$2" 2>/dev/null || ', "", "hooks", "records.sh records a print once")
+    yield from each(rec, 'grep -qxF "$1"', 'grep -qF "$1"', "hooks", "records.sh writes a print beside a longer line")
+    green_line = 'green() ( grep -qxF "$(code_print "$1")" ".claude/tmp/green-$2" 2>/dev/null )'
+    yield from each(rec, green_line, green_line.replace("-qxF", "-qF"), "hooks", "records.sh wants a whole record line")
+    yield from each(rec, green_line, "green() ( true )", "hooks", "records.sh wants the code recorded")
+    yield from each(rec, green_line, 'green() { p=leaked f=leaked; grep -qxF "$(code_print "$1")" ".claude/tmp/green-$2" 2>/dev/null; }', "hooks", "records.sh leaves no variable behind (F133)")
     yield from each(rec, 'grep -qxF "$(review_print "$1")"', "grep -q .", "hooks", "records.sh wants the review pass of this tree")
-    yield from each(".githooks/pre-commit", 'if [ -z "${SANDBOX_RUNTIME:-}" ]; then', "if false; then", "hooks", "pre-commit runs no gate outside the sandbox")
-    yield from each(".githooks/pre-commit", "	sh scripts/scan_secrets.sh --staged", "	:", "hooks", "pre-commit scans outside the sandbox")
-    yield from each(".githooks/pre-commit", "sh scripts/code_changed.sh --staged && ", "", "hooks", "pre-commit lets prose alone through outside the sandbox")
-    yield from each(".githooks/pre-commit", ' && ! green "$(git write-tree)" .claude/tmp/green-fast .claude/tmp/green-full', "", "hooks", "pre-commit wants recorded code outside the sandbox")
-    yield from each(".githooks/pre-commit", 'record "$(git write-tree)" .claude/tmp/green-fast', "true", "hooks", "pre-commit records the code it passed")
-    yield from each(".githooks/pre-push", 'if [ -z "${SANDBOX_RUNTIME:-}" ]; then', "if false; then", "hooks", "pre-push runs no gate outside the sandbox")
-    yield from each(".githooks/pre-push", 'green "$local_sha" .claude/tmp/green-full ||', "true ||", "hooks", "pre-push wants main's full gate recorded")
-    yield from each(".githooks/pre-push", 'reviewed "$local_sha" ||', "true ||", "hooks", "pre-push wants main's review pass")
-    yield from each(".githooks/pre-push", 'green "$local_sha" .claude/tmp/green-fast .claude/tmp/green-full ||', "true ||", "hooks", "pre-push wants a branch's gate recorded")
-    yield from each(".githooks/pre-push", '. "$(dirname "$0")/records.sh"', ":", "hooks", "pre-push loads the records")
-    yield from each(".githooks/pre-push", 'green "$local_sha" .claude/tmp/green-fast .claude/tmp/green-full', 'green "$local_sha" .claude/tmp/green-fast', "hooks", "pre-push takes a branch whose full gate passed")
-    yield from each(".githooks/pre-commit", ".claude/tmp/green-fast .claude/tmp/green-full;", ".claude/tmp/green-fast;", "hooks", "pre-commit takes code whose full gate passed")
-    yield from each(rec, 'grep -qxF "$p" "$2" 2>/dev/null || ', "", "hooks", "records.sh records a print once")
-    attributes = 'if [ -n "$(git ls-files -co --exclude-standard -- ' + "'*.gitattributes'" + ')" ] ||'
-    yield from each("scripts/scan_secrets.sh", attributes, "if", "hooks", "scan_secrets refuses a .gitattributes (F130)")
-    yield from each("scripts/scan_secrets.sh", ' || [ -s "$(git rev-parse --git-path info/attributes)" ]', "", "hooks", "scan_secrets refuses .git/info/attributes (F130)")
+    pc = ".githooks/pre-commit"
+    yield from each(pc, 'if [ -z "${SANDBOX_RUNTIME:-}" ]; then', "if false; then", "hooks", "pre-commit runs no gate outside the sandbox")
+    yield from each(pc, "	sh scripts/scan_secrets.sh --staged", "	:", "hooks", "pre-commit scans outside the sandbox")
+    yield from each(pc, '[ "$prose" -le 1 ] ||', "true ||", "hooks", "pre-commit refuses a failing code_changed.sh (F133)")
+    yield from each(pc, 'if [ "$prose" = 0 ] && ! green "$(git write-tree)" fast; then', "if false; then", "hooks", "pre-commit wants recorded code outside the sandbox")
+    yield from each(pc, 'or let Claude commit it there" >&2\n\t\texit 1', 'or let Claude commit it there" >&2', "hooks", "pre-commit refuses unrecorded code outside the sandbox")
+    yield from each(pc, "\texit 0\nfi\nstaged=", "fi\nstaged=", "hooks", "pre-commit ends outside the sandbox before any gate")
+    gate_line, rec_line = 'env -u GIT_INDEX_FILE -u GIT_DIR -u GIT_WORK_TREE sh "$s/check.sh"\n', 'put "$(code_print "$(git write-tree)")" fast'
+    yield from each(pc, rec_line, "true", "hooks", "pre-commit records the code it passed")
+    yield from each(pc, gate_line + rec_line, rec_line + "\n" + gate_line.rstrip("\n"), "hooks", "pre-commit records only after its gate passed")
+    pp = ".githooks/pre-push"
+    yield from each(pp, '[ -n "${SANDBOX_RUNTIME:-}" ] || outside=true', ":", "hooks", "pre-push runs no gate outside the sandbox")
+    yield from each(pp, 'green "$local_sha" full ||', "true ||", "hooks", "pre-push wants main's full gate recorded")
+    yield from each(pp, 'reviewed "$local_sha" ||', "true ||", "hooks", "pre-push wants main's review pass")
+    yield from each(pp, 'green "$local_sha" fast ||', "true ||", "hooks", "pre-push wants a branch's gate recorded")
+    yield from each(pp, "\t\tgated=true\n", "\n", "hooks", "pre-push scans what each kind of push sends")
+    yield from each(pp, '. "$(dirname "$0")/records.sh"', ":", "hooks", "pre-push loads the records")
     yield from each(".githooks/pre-merge-commit", 'exec "$(dirname "$0")/pre-commit"', "exit 0", "hooks", "pre-merge-commit gates a merge")
-    gate, rec_line = 'env -u GIT_INDEX_FILE -u GIT_DIR -u GIT_WORK_TREE sh "$s/check.sh"\n', 'mkdir -p .claude/tmp && record "$(git write-tree)" .claude/tmp/green-fast'
-    yield from each(".githooks/pre-commit", gate + rec_line, rec_line + "\n" + gate.rstrip("\n"), "hooks", "pre-commit records only after its gate passed")
-    yield from each("scripts/check.sh", 'if [ -z "$(git status --porcelain)" ]; then', "if true; then", "hooks", "check.sh records only a clean tree")
-    yield from each("scripts/check.sh", ". .githooks/records.sh && record HEAD", ": && record HEAD", "hooks", "check.sh records the tree it passed")
-    yield from each(".claude/settings.json", '      "Edit(/scripts/scan_secrets.sh)",\n', "", "hooks", "settings keep the secret scan Claude cannot edit")
+    yield from each("scripts/check.sh", ". .githooks/records.sh && tested=$(worktree_print)", ": && tested=", "hooks", "check.sh prints the code it tests (F133)")
+    yield from each("scripts/check.sh", 'gate_passed "$tested" "$full"', ":", "hooks", "check.sh records the code it passed")
+    for rule in ("scan_secrets.sh", "gitleaks.toml", "gitleaks-private.toml", ".gitleaksignore"):
+        yield from each(".claude/settings.json", f'      "Edit(/scripts/{rule})",\n', "", "hooks", f"settings keep {rule} out of Claude's edits")
+    yield from each("scripts/check_docs.py", '"intended", "moot", "asked"}', '"asked"}', "hooks", "check_docs knows Anthropic's outcomes")
+    yield from each("scripts/check_docs.py", '"intended", "moot", "reproduced"', '"reproduced"', "hooks", "check_docs wants a reason for an intended or moot finding")
+    yield from each("scripts/scan_secrets.sh", "export GIT_NO_REPLACE_OBJECTS=1", ":", "hooks", "scan_secrets reads past a replace ref (F132)")
+    for flag in ('"--text', " --no-ext-diff", " --no-textconv"):
+        yield from each("scripts/scan_secrets.sh", flag, '"' if flag.startswith('"') else "", "hooks", f"scan_secrets hands gitleaks text: {flag.strip(chr(34))} (F132)")
+    yield from each("scripts/scan_secrets.sh", "--full-history --all ", "--full-history ", "hooks", "scan_secrets reads every branch")
+    yield from each("scripts/scan_secrets.sh", "--ignore-gitleaks-allow || found=1", "--ignore-gitleaks-allow || :", "hooks", "scan_secrets fails on what the staged scan found")
+    yield from each("scripts/scan_secrets.sh", "--ignore-gitleaks-allow || found=1", "--ignore-gitleaks-allow", "hooks", "scan_secrets runs both rule sets on what is staged (F120)")
     yield from each("scripts/scan_secrets.sh", "--config \"$here/$config\" ", "", "hooks", "scan_secrets imposes its rules")
     yield from each("scripts/scan_secrets.sh", "gitleaks.toml gitleaks-private.toml; do", "gitleaks.toml; do", "hooks", "scan_secrets keeps private names out")
     yield from each("scripts/scan_secrets.sh", " --ignore-gitleaks-allow", "", "hooks", "scan_secrets ignores gitleaks:allow")

@@ -1,11 +1,18 @@
 #!/bin/sh
-# pre-push: main gets the full gate and needs a committed review pass (docs/REVIEW.md); a work
-# branch gets the fast gate and the secret scan, since nothing leaves with a secret. Git sends one
+# pre-push: main needs the full gate and a committed review pass (docs/REVIEW.md), a work branch
+# the fast gate, every push the secret scan, since nothing leaves with a secret. Outside Claude
+# Code's sandbox no gate runs, only the records the sandboxed gate wrote (F076). Git sends one
 # line per ref: <local ref> <local sha> <remote ref> <remote sha>.
 set -eu
 . "$(dirname "$0")/records.sh"
 zero=0000000000000000000000000000000000000000
+outside=false
+[ -n "${SANDBOX_RUNTIME:-}" ] || outside=true
 gated=false
+refuse() {
+	echo "pre-push: $1" >&2
+	exit 1
+}
 # A branch's gate is its own harness, so a harness file it changes is declared on a line of a
 # commit, `Harness-changed: <path> - why`, which Alexis reads in review (F089). This hook asks
 # before any edit, so a branch cannot drop the check.
@@ -23,37 +30,33 @@ declared() { # $1: the path; stdin: the commit messages
 while read -r _ local_sha remote_ref remote_sha; do
 	[ "$local_sha" = "$zero" ] && continue # a deleted branch
 	if [ "$local_sha" != "$(git rev-parse HEAD)" ] || [ -n "$(git status --porcelain)" ]; then
-		echo "pre-push: push the commit you have checked out, with nothing uncommitted or untracked, so the gate checks what leaves" >&2
-		exit 1
+		refuse "push the commit you have checked out, with nothing uncommitted or untracked, so the gate checks what leaves"
 	fi
 	if [ "$remote_ref" = refs/heads/main ]; then
 		if [ "$remote_sha" != "$zero" ]; then
 			# A main this clone has not fetched cannot be compared: refused, not passed (F116).
-			changed=$(harness "$remote_sha" "$local_sha") || { echo "pre-push: fetch main first: $remote_sha is not in this clone" >&2; exit 1; }
+			changed=$(harness "$remote_sha" "$local_sha") || refuse "fetch main first: $remote_sha is not in this clone"
 			undeclared=$(printf '%s\n' "$changed" | while IFS= read -r f; do
 				git log --format=%B "$remote_sha..$local_sha" | declared "$f" || printf '%s\n' "$f"
 			done)
-			if [ -n "$undeclared" ]; then
-				printf 'pre-push: harness files changed with no `Harness-changed: <path> - why` line in a commit:\n%s\n' "$undeclared" >&2
-				exit 1
-			fi
+			[ -z "$undeclared" ] || refuse "harness files changed with no \`Harness-changed: <path> - why\` line in a commit:
+$undeclared"
 		fi
-		if [ -z "${SANDBOX_RUNTIME:-}" ]; then
-			# Outside the sandbox no gate runs (F076): the full gate and a review recorded this code.
-			green "$local_sha" .claude/tmp/green-full || { echo "pre-push: the full gate never passed on this code; run /pre-merge in Claude Code" >&2; exit 1; }
-			reviewed "$local_sha" || { echo "pre-push: no committed review pass for this code; run /pre-merge and commit its record" >&2; exit 1; }
-			sh scripts/scan_secrets.sh
+		if $outside; then
+			green "$local_sha" full || refuse "the full gate never passed on this code; run /pre-merge in Claude Code"
+			reviewed "$local_sha" || refuse "no committed review pass for this code; run /pre-merge and commit its record"
+			gated=true
 		else
 			python3 -I scripts/review_pass.py check "$local_sha" # cheap, so before the gate
 			sh scripts/check.sh --full </dev/null
 		fi
+	elif $outside; then
+		green "$local_sha" fast || refuse "no gate passed on this code; run sh scripts/check.sh in Claude Code's sandbox"
+		gated=true
 	elif ! $gated; then
-		if [ -z "${SANDBOX_RUNTIME:-}" ]; then
-			green "$local_sha" .claude/tmp/green-fast .claude/tmp/green-full || { echo "pre-push: no gate passed on this code; run sh scripts/check.sh in Claude Code's sandbox" >&2; exit 1; }
-		else
-			sh scripts/check.sh </dev/null
-		fi
-		sh scripts/scan_secrets.sh
+		sh scripts/check.sh </dev/null
 		gated=true
 	fi
 done
+# One scan of the whole history covers every ref this push sends; the full gate scans it too.
+! $gated || sh scripts/scan_secrets.sh

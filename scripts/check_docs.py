@@ -13,7 +13,9 @@ sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no _
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))  # -I leaves this folder off the path
 from repo_files import listed
 
-STATUSES = {"claimed", "reproduced", "fixed", "rejected", "asked"}
+# As Anthropic sorts its reviewer's comments: fixed, wrong (rejected), wanted (intended), of no
+# matter (moot); and the ones still open: claimed, reproduced, asked.
+STATUSES = {"claimed", "reproduced", "fixed", "rejected", "intended", "moot", "asked"}
 
 
 def is_commit(root, sha):
@@ -41,7 +43,7 @@ def ledger_problems(root):
             out.append(f"{fid}: status {status!r} is none of {', '.join(sorted(STATUSES))}")
         elif status == "fixed" and not any(is_commit(root, s) is not False for s in shas):
             out.append(f"{fid}: fixed, but its evidence names no commit of this repository in backticks")
-        elif status in ("rejected", "reproduced", "asked") and evidence in ("", "—", "-"):
+        elif status in ("rejected", "intended", "moot", "reproduced", "asked") and evidence in ("", "—", "-"):
             out.append(f"{fid}: {status}, with no evidence or reason")
     return out
 

@@ -10,8 +10,11 @@ if [ -z "${SANDBOX_RUNTIME:-}" ]; then
 	# runs with his access (F076): only the scripts it cannot edit, and the staged code must be
 	# code the sandboxed gate passed. Prose alone needs no gate.
 	sh scripts/scan_secrets.sh --staged
-	if sh scripts/code_changed.sh --staged && ! green "$(git write-tree)" .claude/tmp/green-fast .claude/tmp/green-full; then
-		echo "pre-commit: no gate passed on this code; run sh scripts/check.sh in Claude Code's sandbox" >&2
+	prose=0 # code_changed.sh exits 1 for prose alone; any other failure refuses the commit
+	sh scripts/code_changed.sh --staged || prose=$?
+	[ "$prose" -le 1 ] || { echo "pre-commit: scripts/code_changed.sh failed (exit $prose); nothing is committed unchecked" >&2; exit 1; }
+	if [ "$prose" = 0 ] && ! green "$(git write-tree)" fast; then
+		echo "pre-commit: no gate passed on exactly this code; let sh scripts/check.sh pass on it in Claude Code's sandbox, then stage all of it, or let Claude commit it there" >&2
 		exit 1
 	fi
 	exit 0
@@ -24,7 +27,10 @@ trap 'exit 1' HUP INT TERM # so the EXIT trap also runs on Ctrl-C under dash
 git checkout-index -a --ignore-skip-worktree-bits --prefix="$staged/"
 s="$staged/scripts"
 sh "$s/scan_secrets.sh" --staged # no secret enters a commit, prose included
-if ! sh "$s/code_changed.sh" --staged; then
+prose=0 # as outside: exit 1 is prose alone, any other failure refuses the commit
+sh "$s/code_changed.sh" --staged || prose=$?
+[ "$prose" -le 1 ] || { echo "pre-commit: code_changed.sh failed (exit $prose); nothing is committed unchecked" >&2; exit 1; }
+if [ "$prose" = 1 ]; then
 	python3 -I "$s/check_docs.py" # docs only: the files they name must still exist
 	finished=1
 	exit 0
@@ -38,5 +44,5 @@ fi
 sh "$s/borrow_node_modules.sh" "$staged" # the staged copy has no installed packages
 # A `commit -a` hands the hook its own index; the gate's git calls must not touch it.
 env -u GIT_INDEX_FILE -u GIT_DIR -u GIT_WORK_TREE sh "$s/check.sh"
-mkdir -p .claude/tmp && record "$(git write-tree)" .claude/tmp/green-fast # for the hooks outside the sandbox
+put "$(code_print "$(git write-tree)")" fast # for the hooks outside the sandbox
 finished=1
