@@ -24,7 +24,7 @@ write `.git` (code.claude.com/docs/en/permissions, "Protected paths").
   the scripts they run (`records.sh`, `scan_secrets.sh`, `code_changed.sh`, gitleaks's two rule
   files and their ignore file, itself), into `.git/hooks`, and removes git's override of that
   folder. Alexis runs main's copy, never the working tree's:
-  `git show main:scripts/install_hooks.sh | sh`. With `--check` it changes nothing and fails
+  `git --no-replace-objects show main:scripts/install_hooks.sh | sh` (F144). With `--check` it changes nothing and fails
   when `.git/hooks` does not hold exactly that commit's files. (Added at the red pass: it
   refuses a commit missing a hook, removes any other hook and any link there, removes every
   override, fails when one it cannot change remains, and turns off fast-forward merges, which

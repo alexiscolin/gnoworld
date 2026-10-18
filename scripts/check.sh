@@ -19,20 +19,20 @@ started=$(date +%s)
 tested=
 if git rev-parse --git-dir >/dev/null 2>&1; then # not in pre-commit's staged copy, which has no repository
 	# Git runs the hooks of its own folder, which no branch writes and the sandbox cannot (F129).
-	git_hooks="$(git rev-parse --path-format=absolute --git-common-dir)/hooks"
-	if [ "$(git rev-parse --path-format=absolute --git-path hooks)" != "$git_hooks" ]; then
-		echo "check.sh: git runs hooks from $(git rev-parse --git-path hooks), not $git_hooks; install them: git --no-replace-objects show main:scripts/install_hooks.sh | sh" >&2
+	git_dir=$(git rev-parse --path-format=absolute --git-common-dir)
+	runs_from=$(git rev-parse --path-format=absolute --git-path hooks)
+	if [ "$runs_from" != "$git_dir/hooks" ]; then
+		echo "check.sh: git runs hooks from $runs_from, not $git_dir/hooks; install them: git --no-replace-objects show main:scripts/install_hooks.sh | sh" >&2
 		exit 1
 	fi
 	if [ -n "${SANDBOX_RUNTIME:-}" ]; then
-		if (: >>"$git_hooks/../config") 2>/dev/null || probe=$(mktemp "$git_hooks/probe.XXXXXX" 2>/dev/null); then
-			[ -z "${probe:-}" ] || rm "$probe"
+		if (: >>"$git_dir/config") 2>/dev/null || { probe=$(mktemp "$git_dir/hooks/probe.XXXXXX" 2>/dev/null) && rm "$probe"; }; then
 			echo "check.sh: a command in the sandbox can write git's hooks or config; .claude/settings.json's sandbox must deny .git/hooks and .git/config" >&2
 			exit 1
 		fi
 		for hook in commit-msg pre-commit pre-merge-commit pre-push; do
-			[ -x "$git_hooks/$hook" ] || {
-				echo "check.sh: no $hook in $git_hooks, so git checks no commit there; install the hooks: git --no-replace-objects show main:scripts/install_hooks.sh | sh" >&2
+			[ -x "$git_dir/hooks/$hook" ] || {
+				echo "check.sh: no $hook in $git_dir/hooks, so git checks no commit there; install the hooks: git --no-replace-objects show main:scripts/install_hooks.sh | sh" >&2
 				exit 1
 			}
 		done

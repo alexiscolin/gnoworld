@@ -252,15 +252,11 @@ try:
         plant({f"copy_{x}.ts": f"export function sum_{x}(values: number[]): number {{\n  let total = 0;\n{BLOCK}  return total;\n}}\n" for x in "ab"})
         out = run(["node_modules/.bin/jscpd", HERE])
         expect(out.returncode != 0, "jscpd refuses a copied block")
-        shutil.rmtree(HERE)
-
-    if part("jscpd"):
         # git's own folder is no source: the hooks installed there are copies of the repository's (F129).
-        hook = f"export function sum(values: number[]): number {{\n  let total = 0;\n{BLOCK}  return total;\n}}\n"
-        plant({"hook.ts": hook})
-        plant({"hook.ts": hook}, where=os.path.join(HERE, ".git"))
+        os.makedirs(os.path.join(HERE, ".git"))
+        os.rename(os.path.join(HERE, "copy_b.ts"), os.path.join(HERE, ".git", "copy_b.ts"))
         out = run(["node_modules/.bin/jscpd", HERE])
-        expect(out.returncode == 0, "jscpd reads git's own folder as source")
+        expect(out.returncode == 0, "jscpd skips git's own folder")
         shutil.rmtree(HERE)
 
     if part("jscpd"):
