@@ -126,14 +126,19 @@ comes back is a regression. The review agents (`.claude/agents/`) report rows fo
 `.claude/settings.json`, read only when Claude Code starts in this folder or moves into it
 with `/cd`:
 - **Deny:** reading `.env`, `deploy/secrets/`, `~/.ssh`, `~/.config/gh`, `~/.npmrc`, `~/.aws`.
-- **Ask Alexis first:** `git push` (the guard asks for any form of it), `pnpm add`, `rm -rf`,
-  and every gnomcp write (`gno_addpkg`, `gno_call`, `gno_run`, `gno_key_send`,
-  `gno_cla_sign`). Claude builds a whole feature alone (Alexis, 2026-10-17): only an edit of a file run outside
-  the sandbox itself asks, the guard, the Stop hook, `code_changed.sh`, the git hooks,
-  `settings.json` and the `package.json` files (finding F068). What the gate reaches when he
-  pushes or merges (the other scripts, the configs, the tests) runs with his access unasked:
-  finding F076's risk, closed by the backlog's hooks that run no repository code. Ask and deny rules hold in every
-  permission mode.
+- **Ask Alexis first:** only `git push` (the guard asks for any form of it) and every gnomcp
+  write (`gno_addpkg`, `gno_call`, `gno_run`, `gno_key_send`, `gno_cla_sign`). Claude builds
+  and integrates a whole feature alone (Alexis, 2026-10-18), checked by the gate and the
+  review; Alexis reviews before he merges and pushes.
+- **Refused outright, so nothing asks:** an edit of a file run outside the sandbox, the guard,
+  the Stop hook, `code_changed.sh`, the git hooks, `.claude/**` and the `package.json` files
+  (finding F068), and what pnpm loads at Alexis's install, `pnpm-workspace.yaml` and a
+  pnpmfile (F087); `pnpm add` (a dependency is Alexis's) and `rm -rf`. A change to one of these
+  files is written out for Alexis to apply. What the gate reaches when he pushes or merges
+  (the other scripts, the configs, the tests) still runs with his access: F076, closed by the
+  backlog's hooks that run no repository code; until then, `pre-push` wants each harness
+  change on main declared (`Harness-changed: <path> - why`, F089). Ask and deny rules hold in
+  every permission mode.
 - **The sandbox** around shell commands: they write only in the project and its caches,
   never in the harness's files; they reach only the npm and Go registries and github.com;
   no command may leave the sandbox.
