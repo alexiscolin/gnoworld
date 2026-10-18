@@ -160,9 +160,27 @@ test.describe("once the client takes over", () => {
   });
 });
 
-test("the React Compiler compiled the routes, not only React's own runtime", async ({ request }) => {
+// The scripts a page loads, by the paths its HTML names.
+function scripts(html: string): string[] {
+  return [...html.matchAll(/(?:src|href)="(\/assets\/[^"]+\.js)"/g)].map((match) => match[1] ?? "");
+}
+
+test("the test host serves each kind of file the build writes with its type, as a real host would", async ({
+  request,
+}) => {
   const home = await (await request.get("/")).text();
-  const chunks = [...home.matchAll(/(?:src|href)="(\/assets\/[^"]+\.js)"/g)].map((match) => match[1] ?? "");
+  const files = [
+    ["/", "text/html"],
+    ["/w/bubble.data", "text/x-script"],
+    ...scripts(home).map((path) => [path, "text/javascript"]),
+  ];
+  for (const [path = "", type = ""] of files) {
+    expect((await request.get(path)).headers()["content-type"], path).toContain(type);
+  }
+});
+
+test("the React Compiler compiled the routes, not only React's own runtime", async ({ request }) => {
+  const chunks = scripts(await (await request.get("/")).text());
   expect(chunks.some((chunk) => chunk.includes("/compiler-runtime-"))).toBe(true);
   const routes = chunks.filter((chunk) => /\/assets\/(root|home)-/.test(chunk));
   expect(routes.length).toBeGreaterThan(0);

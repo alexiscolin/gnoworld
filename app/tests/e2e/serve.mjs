@@ -6,13 +6,9 @@ import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../../build/client/", import.meta.url));
-const TYPES = {
-  ".html": "text/html; charset=utf-8",
-  ".js": "text/javascript",
-  ".css": "text/css",
-  ".json": "application/json",
-  ".svg": "image/svg+xml",
-};
+// The types of what the build writes (`.data`: React Router's single-fetch.js). Any other kind of
+// file answers 500, so the journeys fail on it rather than pass on a type no real host would give.
+const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".data": "text/x-script" };
 
 // A file as the path spells it: macOS finds one in another case, where a Linux host would not.
 function isFile(path) {
@@ -38,7 +34,12 @@ createServer((request, response) => {
   }
   const found = find(pathname);
   const served = found ?? join(root, "__spa-fallback.html");
-  response.writeHead(found ? 200 : 404, { "content-type": TYPES[extname(served)] ?? "application/octet-stream" });
+  const type = TYPES[extname(served)];
+  if (!type) {
+    response.writeHead(500).end();
+    return;
+  }
+  response.writeHead(found ? 200 : 404, { "content-type": type });
   createReadStream(served)
     .on("error", () => response.destroy())
     .pipe(response);
