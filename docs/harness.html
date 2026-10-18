@@ -250,7 +250,7 @@
       <div class="grid numbers">
         <div class="number"><b>3</b><span>moments where Alexis acts: the plan, the review, the merge</span></div>
         <div class="number"><b>~20 s</b><span>of checks after every turn and every commit, with no one asking</span></div>
-        <div class="number"><b>6</b><span>reviewing agents, and a verifier that refutes or reproduces each finding</span></div>
+        <div class="number"><b>7</b><span>review lenses, and a verifier that refutes or reproduces each finding</span></div>
         <div class="number"><b>255</b><span>guards of the harness, each switched off once to prove a test sees it</span></div>
         <div class="number"><b>127</b><span>findings in the ledger, each reproduced or refuted; 6 false alarms</span></div>
       </div>
@@ -345,7 +345,7 @@
         </div>
         <div class="card">
           <div class="step">7 · /PRE-MERGE</div>
-          <p>The full gate, then the review pass below, each finding reproduced into the ledger; the pass recorded and committed.</p>
+          <p>The full gate, /simplify, then every review lens below; each finding verified and reproduced into the ledger; the full gate on the final code; the pass recorded.</p>
         </div>
         <div class="card">
           <div class="step">8 · ALEXIS</div>
@@ -417,12 +417,20 @@
               <td>Red pass before the code; green pass first in /pre-merge, on the mutation survivors (Sonnet)</td>
             </tr>
             <tr>
+              <td>/simplify</td>
+              <td>Every merge, first: reuse, simplicity, efficiency, altitude; then the gate again</td>
+            </tr>
+            <tr>
               <td>/code-review</td>
-              <td>Every merge, in a fresh context, through every lens</td>
+              <td>Every merge, in a fresh context: correctness, performance, accessibility and UX</td>
+            </tr>
+            <tr>
+              <td>/security-review</td>
+              <td>Every merge; keeps only what it rates 8 out of 10 or more</td>
             </tr>
             <tr>
               <td>security-reviewer</td>
-              <td>A change to a tier-1 file (Opus)</td>
+              <td>Also on a tier-1 file, with the project's threat model (Opus)</td>
             </tr>
             <tr>
               <td>finding-verifier</td>
@@ -433,25 +441,21 @@
               <td>Every realm, read line by line</td>
             </tr>
             <tr>
-              <td>/simplify</td>
-              <td>The last merge of a slice: reuse, simplicity, efficiency, altitude</td>
-            </tr>
-            <tr>
               <td>Alexis</td>
               <td>Blind first, in revdiff; the card's tier-1 files, tests, how to try it, each realm function's card</td>
             </tr>
           </table>
-          <p class="note">Three review rounds at most per branch; after the third, a review reads only the new diff.</p>
+          <p class="note">Rounds converge, as Anthropic's do: from the second, only the new diff; after three, stop and reconsider the approach. Each finding names its class, and its fix covers every instance.</p>
         </div>
         <div class="card">
           <h3>A finding's life, in docs/review/findings.md</h3>
           <div class="life">
-            <span class="chip">claimed</span>→<span class="chip">verifier: refute, then reproduce</span>→<span class="chip">reproduced</span>→<span class="chip ok">fixed</span><span class="chip no">rejected</span><span class="chip ask">asked</span>
+            <span class="chip">claimed</span>→<span class="chip">verifier: refute, then reproduce</span>→<span class="chip">reproduced</span>→<span class="chip ok">fixed</span><span class="chip no">rejected</span><span class="chip">intended</span><span class="chip">moot</span><span class="chip ask">asked</span>
           </div>
           <ul>
             <li>Reproduced: a command's output, or a test seen failing</li>
             <li>Fixed: its commit, a <code>Finding:</code> line, the test that failed before it</li>
-            <li>Rejected: with the evidence that refutes it; never raised again</li>
+            <li>Rejected (wrong), intended (wanted) or moot (of no matter): each with its reason; never raised again</li>
             <li>Asked: Alexis decides; the decision goes into <code>docs/decisions.md</code></li>
             <li>A miss seen twice becomes a rule, a lint or a test</li>
             <li><code>docs/review-log.md</code>: what each review caught and missed, and its false alarms</li>

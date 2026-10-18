@@ -94,7 +94,7 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
 | `scripts/prove_fix.py` | a fix of the product whose tests or journeys did not fail on the commit before it (F126) |
 | StrykerJS | a mutant of the TypeScript that no test kills |
 | `scripts/check_regressions.py` | the safety net shrinking (next section) |
-| gitleaks | a secret anywhere in the history; a path into a home folder or a service of the demo's host (`gitleaks-private.toml`: the repository will be public); both rule sets always run (F120) |
+| gitleaks | a secret anywhere in the history; a path into a home folder or a service of the demo's host (`gitleaks-private.toml`: the repository will be public); both rule sets always run (F120); every change reaches it as text, on every branch, whatever an attribute, a NUL byte, a diff driver or a replace ref would show (F132) |
 | `pnpm audit` | a dependency with a known advisory, moderate or worse |
 | `scripts/harness_mutate.py` | when a file of the harness list changed (one list, word for word `pre-push`'s, F124): a guard of the harness that no test notices switched off |
 
@@ -119,7 +119,8 @@ also wants each harness file changed on a line `Harness-changed: <path> - why`.
 
 A finding is a claim until it is reproduced: a command, or a test seen failing. Every finding
 goes into `docs/review/findings.md` with its status (`claimed`, `reproduced`, `fixed`,
-`rejected`, `asked`) and its evidence; a fixed one names its commit, a rejected one says why.
+`rejected`, `intended`, `moot`, `asked`, the outcomes Anthropic sorts its reviewer's comments
+by) and its evidence; a fixed one names its commit, the others say why.
 Reviews read the ledger first, so a rejected claim is not raised again and a fixed one that
 comes back is a regression. The review agents (`.claude/agents/`) report rows for it.
 
@@ -127,15 +128,18 @@ comes back is a regression. The review agents (`.claude/agents/`) report rows fo
 |---|---|---|
 | `test-auditor`, red pass | after the failing tests, before code | Sonnet |
 | `test-auditor`, green pass | first in `/pre-merge`, on the mutation survivors | Sonnet |
+| `/simplify` | every merge, first: reuse, simplicity, efficiency, altitude; its fixes, then the gate | Claude Code's |
 | `/code-review` | every merge | Claude Code's |
-| `security-reviewer` | a merge touching a tier-1 file | Opus |
+| `/security-review` | every merge; it keeps only the findings it rates 8 out of 10 or more | Claude Code's |
+| `security-reviewer` | a merge touching a tier-1 file, beside `/security-review` | Opus |
 | `finding-verifier` | after the review pass, on each tier-1 lot: refutes or reproduces each finding | Opus |
 | `gno-auditor` | every realm, line by line | gnomcp's |
-| `/simplify` | the last merge of a slice: reuse, simplicity, efficiency, altitude | Claude Code's |
 | Alexis | every merge, blind first | — |
 
-A branch gets three review rounds at most; after the third, a review reads only the diff since
-the last one (`docs/REVIEW.md`). Alexis reviews in revdiff; started as
+Rounds converge, as Anthropic's own reviewer does: the first reads the branch, any later one
+only the diff since the last, and after three the review stops and the approach is
+reconsidered with Alexis (`docs/REVIEW.md`). Each finding names its class, and its fix covers
+every instance. Alexis reviews in revdiff; started as
 `revdiff -o .claude/tmp/revdiff.md main`, it writes his notes there whenever he presses `O`,
 and Claude reads them from that file.
 
@@ -225,7 +229,10 @@ such change, F076, took the gate out of the hooks in Alexis's shell.
   skipped by someone who means to (findings F009, F001).
 - **A record of a green gate can be forged from the sandbox,** since the sandbox writes it
   (F076): it lets a broken tree reach `main` until the CI's red report, and runs nothing on
-  Alexis's machine.
+  Alexis's machine. Nor do the hooks in his shell run `check_docs.py` on a docs-only commit:
+  the sandboxed gate and the CI do (F136).
+- **A branch planted through git's plumbing** can carry its own hooks into Alexis's merge,
+  which then runs them (F129): the hooks' move out of the repository is the next harness work.
 - **Claude Code's layer is active only in a session started in this folder,** or moved into
   it with `/cd`.
 - **`prove_fix.py` covers the product;** a fix of the harness is proven by

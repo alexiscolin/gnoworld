@@ -3,8 +3,9 @@
 ## Setup
 
 The README's "Install" lists what to install. `pnpm install` runs the `prepare` script,
-which points git at `.githooks` (the gate before each commit and merge; no attribution
-lines). It finds git on the system's default path only (`command -p git`), never one planted in
+which points git at `.githooks` (no attribution lines, no secret; in Claude Code's sandbox the
+gate before each commit; in your own shell no gate runs, the hooks check the code it recorded,
+F076). It finds git on the system's default path only (`command -p git`), never one planted in
 `node_modules/.bin` (F087). Where git lives elsewhere (Nix, Homebrew without Xcode's command
 line tools), the install stops there: point git at the hooks once by hand
 (`git config core.hooksPath .githooks`), then run `pnpm install --ignore-scripts` (F122). The gate needs Node 24.22.0 (from `.node-version`, found through nvm when the shell
