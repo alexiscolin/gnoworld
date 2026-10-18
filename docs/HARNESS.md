@@ -36,7 +36,9 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
 4. **End of each turn.** When code changed, the Stop hook (`scripts/stop_gate.sh`) stops the turn
    once unless the fast gate, which Claude runs in the sandbox, passed on exactly this tree
    (`check.sh` records it). The hook itself runs nothing from the repository.
-5. **Each commit.** `commit-msg` holds the subject's form, refuses attribution lines, and
+5. **Each commit.** The git hooks run from `.git/hooks`, installed from `main` with the scripts
+   they run, where no merge, checkout or sandboxed command writes: no branch brings its own
+   (F129). `commit-msg` holds the subject's form, refuses attribution lines, and
    scans the message with both secret rule sets, `gitleaks:allow` ignored (F090, F113).
    `pre-commit` scans what is staged for secrets, then, in Claude Code's sandbox, runs the fast
    gate on a copy of what is staged, not on the working tree, and records the code it passed.
@@ -52,8 +54,11 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
    `docs/review/findings.md`. Three review rounds at most per branch. Then it records a review
    pass (`scripts/review_pass.py`).
 8. **Alexis reviews,** blind first, in revdiff (`docs/REVIEW.md`).
-9. **Merge and push, by Alexis, in his own shell.** The merge is made locally; pushing `main`
-   runs no gate there: it wants the full gate recorded green on that code, the committed review
+9. **Merge and push, by Alexis, in his own shell.** The merge is made locally, through
+   `.git/hooks/merge.sh`, which shows each harness file the branch changes, with its diff,
+   before git writes it, and merges once he types the branch's name; a merge that changes the
+   harness otherwise is refused at its commit (F129). Pushing `main` wants the hooks installed
+   from it, and runs no gate there: it wants the full gate recorded green on that code, the committed review
    pass for exactly that tree, and each
    harness file changed since the remote's `main` declared on a line `Harness-changed: <path>
    - why` (F089); a `main` the clone cannot compare is refused (F116). Claude cannot do
@@ -153,7 +158,8 @@ with `/cd`:
   and integrates a whole feature alone (Alexis, 2026-10-18), checked by the gate and the
   review; Alexis reviews before he merges and pushes.
 - **Refused outright, so nothing asks:** an edit of a file run outside the sandbox, the guard,
-  the Stop hook, `code_changed.sh`, `scan_secrets.sh`, the git hooks, Claude Code's settings, agents, commands,
+  the Stop hook, `code_changed.sh`, `scan_secrets.sh`, `install_hooks.sh`, the git hooks and git's
+  own hooks folder and config, which bypass mode would let the file tools write (F129), Claude Code's settings, agents, commands,
   skills, rules and hooks in `.claude/` (not `.claude/tmp/`, where the gate writes its state,
   F111) and the `package.json` files (finding F068), and what pnpm loads at Alexis's install, `pnpm-workspace.yaml`, `.npmrc` and a
   pnpmfile (F087, F115); `pnpm add` (a dependency is Alexis's) and `rm -rf`. A change to one of these
@@ -162,7 +168,7 @@ with `/cd`:
   wrote (F076); `pre-push` also wants each harness change on main declared
   (`Harness-changed: <path> - why`, F089). Ask and deny rules hold in every permission mode.
 - **The sandbox** around shell commands: they write only in the project and its caches,
-  never in the harness's files; they reach only the npm and Go registries and github.com;
+  never in the harness's files, `.git/hooks` or `.git/config` (`check.sh` probes it, F129); they reach only the npm and Go registries and github.com;
   no command may leave the sandbox.
 - **`scripts/guard.py`,** before each Bash call, web fetch and edit: no git hook skipped
   (`--no-verify` or its prefixes, `commit -n`, a hooks path or `GIT_CONFIG` override,
@@ -234,12 +240,17 @@ same kind of change, the hooks run from outside the repository.
   (F076): it lets a broken tree reach `main` until the CI's red report, and runs nothing on
   Alexis's machine. Nor do the hooks in his shell run `check_docs.py` on a docs-only commit:
   the sandboxed gate and the CI do (F136).
-- **A branch planted through git's plumbing** can carry its own hooks into Alexis's merge,
-  which then runs them (F129): the hooks' move out of the repository is the next harness work.
+- **Only merge.sh shows a merge before git writes it** (F129). A plain merge that changes the
+  harness is refused at its commit, its files written already: `git merge --abort` must follow
+  at once, before Claude Code reads a planted setting. A fast-forward, a cherry-pick, a rebase
+  or a checkout of Claude's branch in Alexis's shell runs no such check; Claude works in the
+  same folder, so none is needed. A merge with a conflict in the harness cannot be concluded:
+  the branch is rebased on `main` first.
+- **A fresh clone has no hooks** until its owner installs them from `main`.
 - **The history scan is defence in depth, not a guarantee.** It reads git's diffs, which show
   no merge commit, drop type changes and skip gitleaks's default paths (F141 to F143): a key
   committed without pre-commit (`git stash`, plumbing) could pass it. The staged scan, which
-  reads each commit's content as text, is the barrier; F129 closes the commits that skip it.
+  reads each commit's content as text, is the barrier; a commit made without it skips it.
 - **Claude Code's layer is active only in a session started in this folder,** or moved into
   it with `/cd`.
 - **`prove_fix.py` covers the product;** a fix of the harness is proven by
@@ -259,7 +270,8 @@ same kind of change, the hooks run from outside the repository.
 | `.claude/settings.json` | permissions, the sandbox, the hooks, the plugins |
 | `.claude/agents/` | `test-auditor`, `security-reviewer`, `finding-verifier` |
 | `.claude/commands/` | `/slice-plan`, `/pre-merge` |
-| `.githooks/` | `commit-msg`, `pre-commit`, `pre-merge-commit`, `pre-push` (`pnpm install` points git at them); `records.sh`, the prints they and `check.sh` share (F076) |
+| `.githooks/` | `commit-msg`, `pre-commit`, `pre-merge-commit`, `pre-push`; `records.sh`, the prints and the harness list they and `check.sh` share (F076); `merge.sh`, the merge that shows the harness first (F129) |
+| `scripts/install_hooks.sh` | puts `main`'s hooks and the scripts they run in `.git/hooks`; `--check` for `pre-push` (F129) |
 | `scripts/check.sh` | the gate |
 | `.github/workflows/gate.yml` | the full gate on GitHub's machines, for every branch pushed |
 | `app/playwright.config.ts`, `app/tests/e2e/` | the app's journeys: a build per run, served as a static host serves it (`serve.mjs`) |

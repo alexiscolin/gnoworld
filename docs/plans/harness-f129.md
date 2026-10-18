@@ -1,6 +1,6 @@
 # F129: hooks no branch can bring
 
-Status: planned, 2026-10-18. Alexis asked for it ("corrige ça"): the hooks run from a folder
+Status: built, 2026-10-18 (`7117336`). Alexis asked for it ("corrige ça"): the hooks run from a folder
 outside the repository that only he updates. It touches the hooks and the permissions; his
 script applies the files Claude cannot edit.
 

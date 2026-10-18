@@ -2,13 +2,22 @@
 
 ## Setup
 
-The README's "Install" lists what to install. `pnpm install` runs the `prepare` script,
-which points git at `.githooks` (no attribution lines, no secret; in Claude Code's sandbox the
-gate before each commit; in your own shell no gate runs, the hooks check the code it recorded,
-F076). It finds git on the system's default path only (`command -p git`), never one planted in
-`node_modules/.bin` (F087). Where git lives elsewhere (Nix, Homebrew without Xcode's command
-line tools), the install stops there: point git at the hooks once by hand
-(`git config core.hooksPath .githooks`), then run `pnpm install --ignore-scripts` (F122). The gate needs Node 24.22.0 (from `.node-version`, found through nvm when the shell
+The README's "Install" lists what to install. `pnpm install` runs no script. The git hooks
+(no attribution lines, no secret; in Claude Code's sandbox the gate before each commit; in your
+own shell no gate runs, the hooks check the code it recorded, F076) live in `.git/hooks`, where
+no merge, checkout or sandboxed command writes, so no branch brings its own (F129). Install
+them, and again after a merge that changes them, from `main`, never from the working tree:
+
+```bash
+git show main:scripts/install_hooks.sh | sh
+```
+
+Merge a branch into `main` with `sh .git/hooks/merge.sh <branch>`: it shows each harness file
+the branch changes, with its diff, and merges once you type the branch's name. The install turns
+off fast-forward merges in this clone, which run no hook (`merge.ff false`; a pull stays a
+fast-forward, `pull.ff only`). A plain merge
+that changes the harness has written it before any hook runs, and its commit is refused; abort
+it at once (`git merge --abort`). Pushing `main` wants the hooks installed from it. The gate needs Node 24.22.0 (from `.node-version`, found through nvm when the shell
 has another; in a shell, `nvm use` picks it, since `.nvmrc` links to `.node-version`; nvm must be loaded
 first, by `source ~/.nvm/nvm.sh` or the shell's profile), pnpm, Go 1.26, Python 3, gitleaks, and a gno toolchain that matches the chain.
 The app's journeys need Playwright's Chromium, once per Playwright version: `node app/node_modules/@playwright/test/cli.js install chromium`

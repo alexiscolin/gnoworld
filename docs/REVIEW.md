@@ -101,7 +101,9 @@ record of exactly that code and a committed `/pre-merge` pass whose fingerprint 
 (`scripts/review_pass.py`): a change after the review voids both, the review's own record does
 not. In Alexis's shell the hooks run no gate, only these checks (F076); the CI runs the full
 gate again, and blocks nothing until `main` is protected. A merge made on GitHub skips the
-hooks, so merges happen locally after `/pre-merge`, then `main` is pushed.
+hooks, so merges happen locally after `/pre-merge`, through `sh .git/hooks/merge.sh <branch>`,
+which shows each harness file the branch changes before git writes it (F129); then `main` is
+pushed, with the hooks installed from it.
 
 ## Blind first
 
