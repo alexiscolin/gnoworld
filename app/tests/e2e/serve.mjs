@@ -55,7 +55,7 @@ function host({ bumping }) {
       return;
     }
     response.writeHead(found ? 200 : 404, { "content-type": type });
-    if (bumping && bumps > 0 && pathname === "/sw.js") {
+    if (bumps > 0 && pathname === "/sw.js") {
       response.end(`${readFileSync(served, "utf8")}\n// bumped ${String(bumps)}\n`);
       return;
     }

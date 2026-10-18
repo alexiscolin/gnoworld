@@ -1,29 +1,17 @@
-import { expect, hydrated, test, type Page } from "./fixtures.ts";
+import { cacheContents, controlled, expect, hydrated, PAGES, test, type Page } from "./fixtures.ts";
 
 // The PWA as ADR-0001 §12 asks: a manifest Chromium reads, the build's hashed files answered
 // from the worker's cache and nothing else cached, updates that wait for a click, and `?nosw`.
 // (Chromium's own installability check answers nothing in a one-process browser, so it is not used.)
 const HASHED = /^\/assets\/[\w.-]+-[\w-]{8,}\.(js|css)$/;
 
-async function controlled(page: Page): Promise<void> {
-  await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
-}
-
 async function appManifest(page: Page) {
   return (await page.context().newCDPSession(page)).send("Page.getAppManifest");
 }
 
-const cacheContents = (page: Page) =>
-  page.evaluate(async () => {
-    const names = await caches.keys();
-    const paths: string[] = [];
-    for (const name of names)
-      for (const request of await (await caches.open(name)).keys()) paths.push(new URL(request.url).pathname);
-    return { names, paths: paths.sort() };
-  });
-
 test("Chromium reads the manifest with no error: the name, the root as scope and start, standalone", async ({
   page,
+  baseURL,
 }) => {
   await page.goto("/");
   const { url, errors, manifest, data } = await appManifest(page);
@@ -33,8 +21,8 @@ test("Chromium reads the manifest with no error: the name, the root as scope and
   // the colours as DESIGN-SYSTEM.md's --color-space, the page behind the scene.
   expect(manifest).toMatchObject({
     name: "gno.world",
-    scope: "http://127.0.0.1:4173/",
-    startUrl: "http://127.0.0.1:4173/",
+    scope: new URL("/", baseURL).href,
+    startUrl: new URL("/", baseURL).href,
     display: "kStandalone",
   });
   expect(JSON.parse(data ?? "{}")).toMatchObject({
@@ -55,7 +43,7 @@ test("the manifest check sees a page that links none, so it is not blind", async
   expect((await appManifest(page)).url).toBe("");
 });
 
-for (const path of ["/", "/w/bubble"]) {
+for (const path of PAGES) {
   test(`${path} links the manifest`, async ({ page }) => {
     await page.goto(path);
     await expect(page.locator('link[rel="manifest"]')).toHaveAttribute("href", "/manifest.webmanifest");
