@@ -35,6 +35,8 @@ if $check; then
 			exit 1
 		}
 	done
+	# Without it a merge may fast-forward, which runs no hook.
+	[ "$(git config merge.ff)" = false ] || { echo "install_hooks: fast-forward merges are on; install the hooks again" >&2; exit 1; }
 	exit 0
 fi
 printf '%s\n' "$others" | while IFS= read -r f; do [ -z "$f" ] || rm -rf -- "${hooks:?}/$f"; done

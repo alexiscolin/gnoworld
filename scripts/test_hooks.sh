@@ -17,7 +17,7 @@ key="AKIA""J7Q2XRT4LMNB5VWZ" # assembled, so this file holds no key
 t=$(mktemp -d "${TMPDIR:-/tmp}/test_hooks.XXXXXX")
 # bash 3.2, macOS's sh, exits 0 through an EXIT trap after an unbound variable: `finished`, set
 # on the last line, tells a run that reached its end from one that died on the way.
-trap 'status=$?; rm -rf "$t" || :; [ "$status" != 0 ] || [ "${finished:-}" = 1 ] || status=1; exit "$status"' EXIT
+trap 'status=$?; chmod -R u+w "$t" 2>/dev/null; rm -rf "$t" || :; [ "$status" != 0 ] || [ "${finished:-}" = 1 ] || status=1; exit "$status"' EXIT
 fail() {
 	echo "test_hooks: $*" >&2
 	exit 1
@@ -26,10 +26,15 @@ fail() {
 # ONLY=<section>[,<section>...] runs only those sections: harness_mutate runs the ones a guard
 # belongs to. Unset, every section runs. Each builds its own throwaway repositories, so several
 # run side by side, each in a process of its own; a failing one's output is shown.
+sections=$(sed -n 's/^if part \([a-z0-9_]*\); then$/\1/p' "$0")
+if [ "$(grep -c '^if part ' "$0")" != "$(printf '%s\n' "$sections" | grep -c .)" ]; then
+	echo "test_hooks: a section is opened in a form the runner does not list, so it would never run" >&2
+	exit 1
+fi
 case ${ONLY:-,} in
 *,*)
 	pids=
-	for s in $(printf '%s' "${ONLY:-$(sed -n 's/^if part \([a-z_]*\); then$/\1/p' "$0" | sort -u | paste -sd, -)}" | tr , ' '); do
+	for s in $(printf '%s' "${ONLY:-$(printf '%s\n' "$sections" | sort -u | paste -sd, -)}" | tr , ' '); do
 		ONLY=$s sh "$0" >"$t/$s.out" 2>&1 &
 		pids="$pids $!:$s"
 	done
@@ -65,7 +70,8 @@ assert box["enabled"] is True and box["allowUnsandboxedCommands"] is False, "the
 assert {"~/.ssh", "~/.config/gh", "~/.npmrc", "~/.aws"} <= set(box["filesystem"]["denyRead"]), "a credential is readable"
 assert {"scripts", ".githooks", ".github", "package.json", ".node-version", "pnpm-lock.yaml", ".gitignore", "CLAUDE.md", ".claude/rules"} <= set(box["filesystem"]["denyWrite"]), "a command can rewrite the harness, the lockfile or the rules"
 assert {"pnpm-workspace.yaml", ".pnpmfile.cjs", ".pnpmfile.mjs"} <= set(box["filesystem"]["denyWrite"]), "a command can plant what pnpm runs (F087)"
-assert {".git/hooks", ".git/config"} <= set(box["filesystem"]["denyWrite"]), "a command can rewrite git's hooks or point git at others (F129)"
+assert {".git/hooks", ".git/config", ".git/commondir"} <= set(box["filesystem"]["denyWrite"]), "a command can rewrite git's hooks or point git at others (F129, F150)"
+assert ".mcp.json" in box["filesystem"]["denyWrite"], "a command can add a server Claude Code starts (F158)"
 assert not [p for p in box["filesystem"]["allowWrite"] if "pnpm" in p], "a command can rewrite the pnpm that Alexis's install runs"
 assert not any("api.github.com" in d for d in box["network"]["allowedDomains"]), "the GitHub API is reachable"
 ask, deny = set(s["permissions"]["ask"]), set(s["permissions"]["deny"])
@@ -78,7 +84,7 @@ assert {"Bash(git push)", "Bash(git push *)"} <= ask, "a push asks no one"
 assert {"Bash(pnpm add *)", "Bash(rm -rf *)"} <= deny, "Claude can add a dependency or delete a tree"
 outside = {"Edit(/scripts/guard.py)", "Edit(/scripts/stop_gate.sh)", "Edit(/scripts/code_changed.sh)", "Edit(/.githooks/**)",
            "Edit(/scripts/scan_secrets.sh)", "Edit(/scripts/gitleaks.toml)", "Edit(/scripts/gitleaks-private.toml)", "Edit(/scripts/.gitleaksignore)",
-           "Edit(/scripts/install_hooks.sh)", "Edit(/.git/hooks/**)", "Edit(/.git/config)",
+           "Edit(/scripts/install_hooks.sh)", "Edit(/.git/hooks/**)", "Edit(/.git/config)", "Edit(/.git/commondir)", "Edit(/.mcp.json)",
            "Edit(/.claude/settings.json)", "Edit(/.claude/settings.local.json)", "Edit(/.claude/agents/**)", "Edit(/.claude/commands/**)",
            "Edit(/.claude/skills/**)", "Edit(/.claude/rules/**)", "Edit(/.claude/hooks/**)",
            "Edit(/package.json)", "Edit(/app/package.json)", "Edit(/packages/*/package.json)",
@@ -105,8 +111,9 @@ PY
 grep -qx 'ignorePnpmfile: true' "$here/../pnpm-workspace.yaml" || fail "pnpm may run a pnpmfile"
 python3 -I - "$here/.." <<'PY' || fail "pnpm install runs a package.json script (F087, F129)"
 import glob, json, os, sys
-for p in ["package.json", "app/package.json", *glob.glob("packages/*/package.json", root_dir=sys.argv[1])]:
-    scripts = json.load(open(os.path.join(sys.argv[1], p))).get("scripts", {})
+root = sys.argv[1]
+for p in [os.path.join(root, "package.json"), os.path.join(root, "app/package.json"), *glob.glob(os.path.join(root, "packages/*/package.json"))]:
+    scripts = json.load(open(p)).get("scripts", {})
     run = {"preinstall", "install", "postinstall", "preprepare", "prepare", "postprepare"} & set(scripts)
     assert not run, (p, run)
 PY
@@ -115,6 +122,10 @@ PY
 if grep -rn --exclude=test_hooks.sh --exclude-dir=review 'git show main:scripts/install_hooks' "$hooks" "$here" "$here/../docs"; then
 	fail "the install command is given without --no-replace-objects"
 fi
+# A section opened in another form would never run in the default run: the runner refuses it (F160).
+mkdir -p "$t/form/scripts" "$t/form/.githooks"
+{ cat "$0"; printf 'if part Regress2 ; then\nfi\n'; } >"$t/form/scripts/test_hooks.sh"
+ONLY=wiring sh "$t/form/scripts/test_hooks.sh" 2>&1 | grep -q "opened in a form the runner does not list" || fail "a section opened in another form would never run, unnoticed (F160)"
 # check.sh runs every step it promises: removing one fails here.
 gate_file="$here/check.sh"
 for step in "run format:check" "run typecheck" "run lint" "run test" "run unused" "run copies" \
@@ -146,7 +157,7 @@ assert 'harness --quiet "$base"' in text(1), "check.sh has its own harness list"
 assert 'harness --name-only "$remote_sha" "$local_sha"' in text(2), "pre-push has its own harness list"
 assert 'harness --name-only HEAD..."$tip"' in text(3), "merge.sh shows no harness list"
 assert not [n for n in (1, 2, 3) if "pnpm-workspace.yaml" in text(n)], "a second harness list is left"
-listed = re.search(r'^harness\(\) \( git .*? -- (.*?) \)$', text(4), re.S | re.M).group(1).replace("\\\n", " ").replace("'", "").split()
+listed = re.search(r'^harness\(\) \( [^\n]*?git .*? -- (.*?) \)$', text(4), re.S | re.M).group(1).replace("\\\n", " ").replace("'", "").split()
 assert {".mcp.json", ".pnpmfile.cjs", ".pnpmfile.mjs", "packages/*/package.json"} <= set(listed), "the harness list leaves out what Claude Code or pnpm runs"
 tree = ast.parse(text(5))
 guarded = next(ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == "SECTIONS")
@@ -698,6 +709,13 @@ git -C "$i" commit -qm settings
 git -C "$i" checkout -q -b feature main
 echo two >>"$i/a.ts"
 git -C "$i" commit -qam feature
+# cased: harness files spelled with capitals, which a case-blind disk takes for the real ones.
+git -C "$i" checkout -q -b cased main
+blob=$(echo 'echo planted' | git -C "$i" hash-object -w --stdin)
+git -C "$i" update-index --add --cacheinfo "100644,$blob,Scripts/guard.py"
+git -C "$i" update-index --add --cacheinfo "100644,$blob,.Claude/settings.json"
+git -C "$i" commit -qm cased
+git -C "$i" checkout -q -f main
 git -C "$i" checkout -q -b shadow main
 plant .githooks/scan_secrets.sh
 git -C "$i" add .githooks
@@ -750,6 +768,9 @@ in_i env GIT_CONFIG_GLOBAL="$t/global-config" sh scripts/install_hooks.sh >/dev/
 # else that could run; it changes nothing.
 installed || fail "install_hooks.sh --check refused the hooks it installed"
 installed tweak && fail "install_hooks.sh --check took the hooks of another commit"
+git -C "$i" config merge.ff true
+installed && fail "install_hooks.sh --check took fast-forward merges back on, which run no hook (F159)"
+git -C "$i" config merge.ff false
 echo '# changed' >>"$i/.git/hooks/scan_secrets.sh"
 installed && fail "install_hooks.sh --check took a changed scan_secrets.sh"
 grep -q '# changed' "$i/.git/hooks/scan_secrets.sh" || fail "install_hooks.sh --check rewrote what it checks"
@@ -821,6 +842,26 @@ grep -q '^+: >' "$t/merged" || fail "merge.sh did not show the harness's diff"
 grep -q 'echo innocent' "$t/merged" && fail "merge.sh showed what a replace ref shows, not what merges (F132)"
 grep -q 'echo hidden' "$t/merged" || fail "merge.sh showed a file holding a NUL byte as binary (F132)"
 grep -q "$(printf '\033')" "$t/merged" && fail "merge.sh passed an escape sequence to the terminal, which can hide a line"
+# What Alexis's own git would show instead: an external diff, a text conversion, colours.
+printf '#!/bin/sh\necho NOTHING TO SEE\n' >"$t/fakediff"
+chmod +x "$t/fakediff"
+git -C "$i" config diff.external "$t/fakediff"
+git -C "$i" config diff.fake.textconv "$t/fakediff"
+echo '* diff=fake' >"$i/.git/info/attributes"
+git -C "$i" config color.diff always
+echo wrong | in_i sh .git/hooks/merge.sh planted >"$t/merged" 2>&1 || :
+grep -q 'NOTHING TO SEE' "$t/merged" && fail "merge.sh showed a diff tool's rendering, not the text that merges (F156)"
+grep -q '^+: >' "$t/merged" || fail "merge.sh showed no text of the harness's diff beside a diff tool (F156)"
+grep -q '\^\[\[32m' "$t/merged" && fail "merge.sh showed colour codes, which can hide a line (F156)"
+git -C "$i" config --unset diff.external
+git -C "$i" config --unset diff.fake.textconv
+git -C "$i" config --unset color.diff
+rm "$i/.git/info/attributes"
+# Capitals: on a case-blind disk, Scripts/guard.py is scripts/guard.py; merge.sh shows it (F151).
+mark_i cased fast
+echo wrong | in_i sh .git/hooks/merge.sh cased >"$t/cased" 2>&1 && fail "merge.sh merged harness files spelled with capitals unshown (F151)"
+grep -qx 'Scripts/guard.py' "$t/cased" && grep -qx '.Claude/settings.json' "$t/cased" || fail "merge.sh did not show harness files spelled with capitals (F151)"
+untouched_main "$base" || fail "merge.sh began a merge on a wrong answer"
 # pre-push runs its own records and scan, not those of the branch it pushes.
 git -C "$i" checkout -q planted
 printf 'refs/heads/planted %s refs/heads/planted 0000000000000000000000000000000000000000\n' "$(git -C "$i" rev-parse HEAD)" |
@@ -901,7 +942,8 @@ git -C "$i" merge --abort
 in_i git merge -q --squash settings >/dev/null 2>&1 && fail "git took a squash merge with fast-forwards off"
 in_i git -c merge.ff=true merge -q --squash settings >/dev/null 2>&1 || fail "the squash merge, allowed, did not run"
 [ -e "$i/.git/SQUASH_MSG" ] || fail "the squash merge left no message to commit"
-in_i git commit -qm "chore: squash settings" >/dev/null 2>&1 && fail "a squash merge took harness changes merge.sh did not show (F129)"
+in_i git commit -qm "chore: squash settings" >"$t/out" 2>&1 && fail "a squash merge took harness changes merge.sh did not show (F129)"
+grep -q 'git reset --hard' "$t/out" || fail "pre-commit told Alexis to abort a squash with git merge --abort, which cannot (F154)"
 git -C "$i" reset -q --hard "$base"
 rm -f "$i/.git/SQUASH_MSG"
 ran "a refused merge"

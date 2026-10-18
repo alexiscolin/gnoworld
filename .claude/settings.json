@@ -27,6 +27,8 @@
       "Edit(/scripts/install_hooks.sh)",
       "Edit(/.git/hooks/**)",
       "Edit(/.git/config)",
+      "Edit(/.git/commondir)",
+      "Edit(/.mcp.json)",
       "Edit(/.githooks/**)",
       "Edit(/.claude/settings.json)",
       "Edit(/.claude/settings.local.json)",
@@ -129,7 +131,9 @@
         ".prettierrc.json",
         ".prettierignore",
         ".git/hooks",
-        ".git/config"
+        ".git/config",
+        ".git/commondir",
+        ".mcp.json"
       ],
       "denyRead": ["~/.ssh", "~/.config/gh", "~/.npmrc", "~/.aws"]
     }

@@ -36,7 +36,8 @@ reviewed() ( git show "$1:docs/review-passes.txt" 2>/dev/null | cut -d' ' -f2 | 
 # The harness: the files that make the gate and Claude's limits, or that run at Alexis's install
 # or in Claude Code outside the sandbox. A branch declares each one it changes (pre-push, F089),
 # the full gate mutates them (check.sh), and a merge shows them first (merge.sh, F129).
-# $@: git diff's options and commits.
-harness() ( git -c core.quotePath=false diff "$@" -- scripts .githooks .github .claude .mcp.json package.json app/package.json \
+# Case-blind, as this disk is: Scripts/guard.py is scripts/guard.py there (F151). $@: git diff's
+# options and commits.
+harness() ( GIT_ICASE_PATHSPECS=1 git -c core.quotePath=false diff "$@" -- scripts .githooks .github .claude .mcp.json package.json app/package.json \
 	'packages/*/package.json' pnpm-workspace.yaml pnpm-lock.yaml .pnpmfile.cjs .pnpmfile.mjs .node-version .nvmrc .npmrc '*.config.ts' tsconfig.json \
 	tsconfig.base.json app/tsconfig.json stryker.config.json knip.json .jscpd.json .prettierrc.json .prettierignore .gitignore )
