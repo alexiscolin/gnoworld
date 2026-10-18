@@ -55,7 +55,7 @@ outside = {"Edit(/scripts/guard.py)", "Edit(/scripts/stop_gate.sh)", "Edit(/scri
            "Edit(/.claude/settings.json)", "Edit(/.claude/settings.local.json)", "Edit(/.claude/agents/**)", "Edit(/.claude/commands/**)",
            "Edit(/.claude/skills/**)", "Edit(/.claude/rules/**)", "Edit(/.claude/hooks/**)",
            "Edit(/package.json)", "Edit(/app/package.json)", "Edit(/packages/*/package.json)",
-           "Edit(/pnpm-workspace.yaml)", "Edit(/.pnpmfile.cjs)", "Edit(/.pnpmfile.mjs)"}
+           "Edit(/.npmrc)", "Edit(/pnpm-workspace.yaml)", "Edit(/.pnpmfile.cjs)", "Edit(/.pnpmfile.mjs)"}
 edits = lambda rules: {r for r in rules if r.split("(")[0] in {"Edit", "Write", "MultiEdit", "NotebookEdit"}}
 assert edits(deny) == outside, "the edits refused are not exactly the files run outside the sandbox"
 assert not edits(ask), "an edit asks Alexis: Claude works alone, and the files run outside the sandbox are refused"
@@ -101,14 +101,17 @@ at = lambda text: next(i for i, l in enumerate(lines) if l.startswith(text))
 assert "packages() { cat package.json app/package.json pnpm-lock.yaml | cksum; }" in lines
 assert at("copies=$(run copies") < at("installed=$(packages)") < at("node app/node_modules/@playwright/test/cli.js test") < at('[ "$(packages)" = "$installed" ]')
 PY
-# Every file harness_mutate guards makes --full run it when the file changes: one list, held.
-python3 -I - "$gate_file" "$here/harness_mutate.py" <<'PY' || fail "check.sh's harness list misses a file harness_mutate guards"
-import ast, re, sys
-gate = open(sys.argv[1]).read()
-specs = re.search(r'git diff --quiet "\$base" -- (.*?); then', gate, re.S).group(1).replace("\\\n", " ").split()
-tree = ast.parse(open(sys.argv[2]).read())
+# One harness list: --full runs harness_mutate when a file of it changes, and pre-push wants each
+# declared on main; every file harness_mutate guards is in it (F112, F114, F124).
+python3 -I - "$gate_file" "$hooks/pre-push" "$here/harness_mutate.py" <<'PY' || fail "check.sh's and pre-push's harness lists differ, or miss a file harness_mutate guards"
+import ast, fnmatch, re, sys
+spec = lambda text, start, end: re.search(start + r" (.*?)" + end, text, re.S).group(1).replace("\\\n", " ").replace("'", "").split()
+gate = spec(open(sys.argv[1]).read(), r'git diff --quiet "\$base" --', "; then")
+push = spec(open(sys.argv[2]).read(), r'--name-only "\$1" "\$2" --', "\n}")
+assert gate == push, sorted(set(gate) ^ set(push))
+tree = ast.parse(open(sys.argv[3]).read())
 guarded = next(ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == "SECTIONS")
-missed = [p for p in guarded if not any(p == s or p.startswith(s + "/") for s in specs)]
+missed = [p for p in guarded if not any(fnmatch.fnmatch(p, s) or p.startswith(s + "/") for s in gate)]
 assert not missed, missed
 PY
 # An EXIT trap keeps a failure: under macOS's sh, a plain one turns an unbound variable into exit 0.
@@ -177,6 +180,15 @@ Assisted-by: Claude" || fail "'Assisted-by' was accepted"
 refused "fix: x
 
 Seen in /Us""ers/alice/notes." || fail "a message naming a home folder was accepted"
+refused "fix: x
+
+Seen in /Us""ers/alice/notes gitleaks:allow" || fail "gitleaks:allow let a home folder through a message (F113)"
+refused "fix: x
+
+aws = AKIA""J7Q2XRT4LMNB5VWZ" || fail "a message holding a key was accepted"
+printf 'fix: x\n' >"$t/msg"
+PATH=/usr/bin:/bin "$hooks/commit-msg" "$t/msg" 2>"$t/err" && fail "commit-msg passed with no gitleaks to scan the message"
+grep -q "gitleaks is not installed" "$t/err" || fail "commit-msg blamed the message for a missing gitleaks (F125)"
 refused "chore(seal): regenerate the vectors
 
 Generated with tools/sealvec after the rotation." && fail "a plain 'Generated with' was refused"
@@ -376,6 +388,7 @@ since() { printf 'refs/heads/main %s refs/heads/main %s\n' "$head" "$1" | hook; 
 base=$head && printf 'allow = []\n' >"$w/scripts/gitleaks.toml" && echo z >"$w/c.ts"
 git -C "$w" add -A && git -C "$w" commit -qm "loosen the scan" && passed
 since "$base" && fail "pre-push let main take a harness change no commit declares"
+since 1111111111111111111111111111111111111111 && fail "pre-push passed main against a remote commit it cannot read (F116)"
 git -C "$w" commit -q --allow-empty -m "declare" -m "Harness-changed: scripts/gitleaks.toml" && passed
 since "$base" && fail "pre-push took a declaration with no reason"
 git -C "$w" commit -q --allow-empty -m "declare" -m "Harness-changed: scripts/gitleaks.toml - the test's own rules" && passed

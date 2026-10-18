@@ -31,6 +31,7 @@
       "Edit(/package.json)",
       "Edit(/app/package.json)",
       "Edit(/packages/*/package.json)",
+      "Edit(/.npmrc)",
       "Edit(/pnpm-workspace.yaml)",
       "Edit(/.pnpmfile.cjs)",
       "Edit(/.pnpmfile.mjs)"

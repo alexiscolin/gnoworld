@@ -21,9 +21,13 @@ if printf '%s\n' "$msg" | grep -qiE '^(co-authored|assisted)-by:|^🤖|^generate
 	echo "commit-msg: co-author / attribution lines are not allowed in this repo." >&2
 	exit 1
 fi
-# The repository will be public, messages included: gitleaks scans files, so the message here (F090).
-if ! printf '%s\n' "$msg" | gitleaks stdin --no-banner --redact --log-level error \
-	--config "$(dirname "$0")/../scripts/gitleaks-private.toml" >/dev/null 2>&1; then
-	echo "commit-msg: the message names a person's machine or a service of the demo's host (scripts/gitleaks-private.toml)." >&2
-	exit 1
-fi
+# The repository will be public, messages included: gitleaks scans files, so the message here,
+# with both rule sets and no `gitleaks:allow` way out (F090, F113).
+command -v gitleaks >/dev/null || { echo "commit-msg: gitleaks is not installed (docs/DEVELOPMENT.md)" >&2; exit 1; }
+for config in gitleaks.toml gitleaks-private.toml; do
+	if ! printf '%s\n' "$msg" | gitleaks stdin --no-banner --redact --log-level error --ignore-gitleaks-allow \
+		--config "$(dirname "$0")/../scripts/$config" >&2; then
+		echo "commit-msg: the message holds what scripts/$config refuses (above)." >&2
+		exit 1
+	fi
+done

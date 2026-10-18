@@ -9,8 +9,9 @@ gated=false
 # commit, `Harness-changed: <path> - why`, which Alexis reads in review (F089). This hook asks
 # before any edit, so a branch cannot drop the check.
 harness() {
-	git -c core.quotePath=false diff --name-only "$1" "$2" -- scripts .githooks .github .claude package.json pnpm-workspace.yaml \
-		'*.config.ts' tsconfig.json tsconfig.base.json stryker.config.json knip.json .jscpd.json .prettierrc.json .prettierignore .gitignore
+	git -c core.quotePath=false diff --name-only "$1" "$2" -- scripts .githooks .github .claude package.json app/package.json \
+		pnpm-workspace.yaml pnpm-lock.yaml .node-version .nvmrc .npmrc '*.config.ts' tsconfig.json tsconfig.base.json app/tsconfig.json \
+		stryker.config.json knip.json .jscpd.json .prettierrc.json .prettierignore .gitignore
 }
 declared() { # $1: the path; stdin: the commit messages
 	while IFS= read -r line; do
@@ -26,7 +27,9 @@ while read -r _ local_sha remote_ref remote_sha; do
 	fi
 	if [ "$remote_ref" = refs/heads/main ]; then
 		if [ "$remote_sha" != "$zero" ]; then
-			undeclared=$(harness "$remote_sha" "$local_sha" | while IFS= read -r f; do
+			# A main this clone has not fetched cannot be compared: refused, not passed (F116).
+			changed=$(harness "$remote_sha" "$local_sha") || { echo "pre-push: fetch main first: $remote_sha is not in this clone" >&2; exit 1; }
+			undeclared=$(printf '%s\n' "$changed" | while IFS= read -r f; do
 				git log --format=%B "$remote_sha..$local_sha" | declared "$f" || printf '%s\n' "$f"
 			done)
 			if [ -n "$undeclared" ]; then
