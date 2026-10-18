@@ -203,11 +203,12 @@ costs context in every session: `chrome-devtools-mcp` (1b), `frontend-design` (2
 
 ## Speed and cost
 
-Measured on this machine, 2026-10-18: the fast gate 19 to 23 s (budget 60 s), the app's
+Measured on this machine, 2026-10-18: the fast gate 19 to 24 s (budget 60 s), the app's
 build and its 18 journeys included; the full gate 263 s, with the harness mutation proving
-255 guards. On 2026-10-17 the fast gate took 10 to 13 s, before the app, and the harness
+255 guards, then 343 s for 308 guards once F076 was built. On 2026-10-17 the fast gate took 10 to 13 s, before the app, and the harness
 mutation 118 s for 148 guards. Subagents run on Sonnet unless their file says otherwise;
-agents get the diff's path, never its content; one review pass per merge.
+agents get the diff's path, never its content. A review reads the branch once, then only the
+diff of its fixes, three rounds at most; F076's three cost about 1.3 million tokens.
 
 ## Is it solid?
 
@@ -216,10 +217,12 @@ findings it found in the harness itself. Falling from merge to merge means solid
 three merges means the harness is simplified, not extended: a guard that keeps leaking gives
 way to a boundary the system enforces (the sandbox, a server check), or goes. The first
 measure, slice 1a's merge, found 25 or more, one of them a way out of the sandbox. Since then:
-13, 11, then 22 and 14 at slice 1b's two rounds. The count is not falling, but the severity
-is: the last round found nothing blocking, and most of its findings sat in the fixes of the
-round before. By the rule above, the next harness work removes more than it adds. The first
-such change, F076, took the gate out of the hooks in Alexis's shell.
+13, 11, then 22 and 14 at slice 1b's two rounds, then 16 at F076. Slice 1b's last round
+found nothing blocking; F076's found 6 that let a secret or untested code through, five fixed
+and one, F129, its own next branch. F076 is the first change the rule above asked for: it took
+the gate out of the hooks in Alexis's shell, a boundary rather than one more guard. Its
+findings sat in what that boundary now leans on, the secret scan and the records; F129 is the
+same kind of change, the hooks run from outside the repository.
 
 ## Known limits
 
