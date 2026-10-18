@@ -46,17 +46,20 @@ assert box["enabled"] is True and box["allowUnsandboxedCommands"] is False, "the
 assert {"~/.ssh", "~/.config/gh", "~/.npmrc", "~/.aws"} <= set(box["filesystem"]["denyRead"]), "a credential is readable"
 assert {"scripts", ".githooks", ".github", "package.json", ".node-version", "pnpm-lock.yaml", ".gitignore", "CLAUDE.md", ".claude/rules"} <= set(box["filesystem"]["denyWrite"]), "a command can rewrite the harness, the lockfile or the rules"
 assert {"pnpm-workspace.yaml", ".pnpmfile.cjs", ".pnpmfile.mjs"} <= set(box["filesystem"]["denyWrite"]), "a command can plant what pnpm runs (F087)"
+assert {".git/hooks", ".git/config"} <= set(box["filesystem"]["denyWrite"]), "a command can rewrite git's hooks or point git at others (F129)"
 assert not [p for p in box["filesystem"]["allowWrite"] if "pnpm" in p], "a command can rewrite the pnpm that Alexis's install runs"
 assert not any("api.github.com" in d for d in box["network"]["allowedDomains"]), "the GitHub API is reachable"
 ask, deny = set(s["permissions"]["ask"]), set(s["permissions"]["deny"])
 # Claude works alone and asks only before a push or a chain write (Alexis, 2026-10-18). The files
 # run outside the sandbox themselves cannot be edited at all: the hooks and their scripts,
 # Claude Code's own settings, skills and agents (F068), what pnpm loads at Alexis's install
-# (F087). A dependency is Alexis's to add, and rm -rf no one's.
+# (F087), and git's own hooks folder and config, which bypass mode lets the file tools write
+# otherwise (F129). A dependency is Alexis's to add, and rm -rf no one's.
 assert {"Bash(git push)", "Bash(git push *)"} <= ask, "a push asks no one"
 assert {"Bash(pnpm add *)", "Bash(rm -rf *)"} <= deny, "Claude can add a dependency or delete a tree"
 outside = {"Edit(/scripts/guard.py)", "Edit(/scripts/stop_gate.sh)", "Edit(/scripts/code_changed.sh)", "Edit(/.githooks/**)",
            "Edit(/scripts/scan_secrets.sh)", "Edit(/scripts/gitleaks.toml)", "Edit(/scripts/gitleaks-private.toml)", "Edit(/scripts/.gitleaksignore)",
+           "Edit(/scripts/install_hooks.sh)", "Edit(/.git/hooks/**)", "Edit(/.git/config)",
            "Edit(/.claude/settings.json)", "Edit(/.claude/settings.local.json)", "Edit(/.claude/agents/**)", "Edit(/.claude/commands/**)",
            "Edit(/.claude/skills/**)", "Edit(/.claude/rules/**)", "Edit(/.claude/hooks/**)",
            "Edit(/package.json)", "Edit(/app/package.json)", "Edit(/packages/*/package.json)",
@@ -78,13 +81,16 @@ assert not [r for r in deny if any(w in r for w in ("dist", "coverage", "reports
 market = s.get("extraKnownMarketplaces", {}).get("gnoverse", {}).get("source", {})
 assert market.get("repo") == "gnoverse/gno-mcp", "a teammate's Claude Code cannot find gnomcp's marketplace"
 PY
-# pnpm runs no pnpmfile, and the prepare script that Alexis's install runs finds git on the
-# system's path, never one planted in node_modules/.bin, which pnpm puts first (F087).
+# pnpm runs no pnpmfile (F087), and no script at Alexis's install: one pointed git at the
+# repository's hooks, which a branch can change (F129).
 grep -qx 'ignorePnpmfile: true' "$here/../pnpm-workspace.yaml" || fail "pnpm may run a pnpmfile"
-pp="$t/prepare" && mkdir -p "$pp/bin" && git -C "$pp" init -q
-printf '#!/bin/sh\ntouch "%s/planted-ran"\n' "$pp" >"$pp/bin/git" && chmod +x "$pp/bin/git"
-(cd "$pp" && PATH="$pp/bin:$PATH" sh -c "$(node -p "require('$here/../package.json').scripts.prepare")") >/dev/null 2>&1
-[ ! -e "$pp/planted-ran" ] || fail "the prepare script ran a git planted on its path"
+python3 -I - "$here/.." <<'PY' || fail "pnpm install runs a package.json script (F087, F129)"
+import glob, json, os, sys
+for p in ["package.json", "app/package.json", *glob.glob("packages/*/package.json", root_dir=sys.argv[1])]:
+    scripts = json.load(open(os.path.join(sys.argv[1], p))).get("scripts", {})
+    run = {"preinstall", "install", "postinstall", "preprepare", "prepare", "postprepare"} & set(scripts)
+    assert not run, (p, run)
+PY
 # check.sh runs every step it promises: removing one fails here.
 gate_file="$here/check.sh"
 for step in "run format:check" "run typecheck" "run lint" "run test" "run unused" "run copies" \
@@ -106,17 +112,21 @@ at = lambda text: next(i for i, l in enumerate(lines) if l.startswith(text))
 assert "packages() { cat package.json app/package.json pnpm-lock.yaml | cksum; }" in lines
 assert at("copies=$(run copies") < at("installed=$(packages)") < at("node app/node_modules/@playwright/test/cli.js test") < at('[ "$(packages)" = "$installed" ]')
 PY
-# One harness list: --full runs harness_mutate when a file of it changes, and pre-push wants each
-# declared on main; every file harness_mutate guards is in it (F112, F114, F124).
-python3 -I - "$gate_file" "$hooks/pre-push" "$here/harness_mutate.py" <<'PY' || fail "check.sh's and pre-push's harness lists differ, or miss a file harness_mutate guards"
+# One harness list, records.sh's: --full runs harness_mutate when a file of it changes, pre-push
+# wants each declared on main, merge.sh shows each first (F129); every file harness_mutate
+# guards is in it (F112, F114, F124), and what Claude Code starts, .mcp.json's servers.
+python3 -I - "$gate_file" "$hooks/pre-push" "$hooks/merge.sh" "$hooks/records.sh" "$here/harness_mutate.py" <<'PY' || fail "a harness list other than records.sh's, or one missing a file harness_mutate guards"
 import ast, fnmatch, re, sys
-spec = lambda text, start, end: re.search(start + r" (.*?)" + end, text, re.S).group(1).replace("\\\n", " ").replace("'", "").split()
-gate = spec(open(sys.argv[1]).read(), r'git diff --quiet "\$base" --', "; then")
-push = spec(open(sys.argv[2]).read(), r'--name-only "\$1" "\$2" --', "\n}")
-assert gate == push, sorted(set(gate) ^ set(push))
-tree = ast.parse(open(sys.argv[3]).read())
+text = lambda n: open(sys.argv[n]).read()
+assert 'harness --quiet "$base"' in text(1), "check.sh has its own harness list"
+assert 'harness --name-only "$remote_sha" "$local_sha"' in text(2), "pre-push has its own harness list"
+assert 'harness --name-only HEAD..."$tip"' in text(3), "merge.sh shows no harness list"
+assert not [n for n in (1, 2, 3) if "pnpm-workspace.yaml" in text(n)], "a second harness list is left"
+listed = re.search(r'^harness\(\) \( git .*? -- (.*?) \)$', text(4), re.S | re.M).group(1).replace("\\\n", " ").replace("'", "").split()
+assert {".mcp.json", ".pnpmfile.cjs", ".pnpmfile.mjs", "packages/*/package.json"} <= set(listed), "the harness list leaves out what Claude Code or pnpm runs"
+tree = ast.parse(text(5))
 guarded = next(ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == "SECTIONS")
-missed = [p for p in guarded if not any(fnmatch.fnmatch(p, s) or p.startswith(s + "/") for s in gate)]
+missed = [p for p in guarded if not any(fnmatch.fnmatch(p, s) or p.startswith(s + "/") for s in listed)]
 assert not missed, missed
 PY
 # check.sh prints the code it tests before its first step, and records it after its last one,
@@ -169,10 +179,14 @@ fi
 
 if part commit_msg; then
 # commit-msg: a conventional subject of 72 characters at most, or git's own merge and revert
-# subjects; no attribution line.
+# subjects; no attribution line. It runs as installed, beside its rule files (F129).
+cm="$t/commit-msg"
+mkdir "$cm"
+cp "$hooks/commit-msg" "$cm/"
+secrets_into "$cm/"
 refused() {
 	printf '%s\n' "$1" >"$t/msg"
-	! "$hooks/commit-msg" "$t/msg" 2>/dev/null
+	! "$cm/commit-msg" "$t/msg" 2>/dev/null
 }
 refused "fix: x
 
@@ -197,7 +211,7 @@ refused "fix: x
 
 aws = $key" || fail "a message holding a key was accepted"
 printf 'fix: x\n' >"$t/msg"
-PATH=/usr/bin:/bin "$hooks/commit-msg" "$t/msg" 2>"$t/err" && fail "commit-msg passed with no gitleaks to scan the message"
+PATH=/usr/bin:/bin "$cm/commit-msg" "$t/msg" 2>"$t/err" && fail "commit-msg passed with no gitleaks to scan the message"
 grep -q "gitleaks is not installed" "$t/err" || fail "commit-msg did not say gitleaks is missing (F125)"
 grep -q "the message holds" "$t/err" && fail "commit-msg blamed the message for a missing gitleaks (F125)"
 refused "chore(seal): regenerate the vectors
@@ -217,7 +231,7 @@ refused "feat: $(printf 'a%.0s' $(seq 1 67))" || fail "a 73-character subject wa
 refused "feat: $(printf 'a%.0s' $(seq 1 66))" && fail "a 72-character subject was refused"
 # Characters, not bytes, whatever the locale: 66 characters, 78 bytes.
 printf '%s\n' "docs(review): café résumé naïve déjà vu — été, hiver, février, déc" >"$t/msg"
-LC_ALL=C "$hooks/commit-msg" "$t/msg" 2>/dev/null || fail "commit-msg counted bytes, not characters, under the C locale"
+LC_ALL=C "$cm/commit-msg" "$t/msg" 2>/dev/null || fail "commit-msg counted bytes, not characters, under the C locale"
 fi
 
 if part pre_commit; then
@@ -383,7 +397,7 @@ mkdir -p "$w/scripts" "$w/.githooks" "$w/docs" "$t/pushbin"
 printf '#!/bin/sh\necho "gate $*" >>"$(dirname "$0")/../gate.log"\n' >"$w/scripts/check.sh"
 printf '#!/bin/sh\necho scanned >>"%s/leaks.log"\nexit "${LEAKS:-0}"\n' "$w" >"$t/pushbin/gitleaks" && chmod +x "$t/pushbin/gitleaks"
 printf 'gate.log\nleaks.log\n' >"$w/.gitignore"
-cp "$rp" "$here/repo_files.py" "$w/scripts/" && secrets_into "$w/scripts/" && cp "$hooks/pre-push" "$hooks/records.sh" "$w/.githooks/"
+cp "$rp" "$here/repo_files.py" "$w/scripts/" && secrets_into "$w/scripts/" && cp "$hooks/pre-push" "$hooks/records.sh" "$w/.githooks/" && secrets_into "$w/.githooks/"
 git -C "$w" init -q && echo x >"$w/a.ts" && git -C "$w" add -A && git -C "$w" commit -qm base
 head=$(git -C "$w" rev-parse HEAD)
 hook() { (cd "$w" && PATH="$t/pushbin:$PATH" sh .githooks/pre-push origin url >/dev/null 2>&1); }
@@ -489,12 +503,17 @@ if part outside; then
 # scripts Claude cannot edit; it takes the code the sandboxed gate recorded green (F076).
 o="$t/outside"
 mkdir -p "$o/scripts" "$o/.githooks" "$o/.claude/tmp" "$o/docs"
-cp "$hooks"/* "$o/.githooks/" && cp "$here/code_changed.sh" "$o/scripts/" && secrets_into "$o/scripts/"
+# The hooks run beside the scripts they run, as installed (F129).
+cp "$hooks"/* "$here/code_changed.sh" "$here/install_hooks.sh" "$o/.githooks/" && secrets_into "$o/.githooks/"
 # What Claude can edit, and a hook could reach, leaves a mark when it runs.
 for f in check.sh borrow_node_modules.sh; do printf '#!/bin/sh\n: >"%s/ran"\n' "$o" >"$o/scripts/$f"; done
 for f in review_pass.py check_docs.py repo_files.py; do printf 'open("%s/ran", "w")\n' "$o" >"$o/scripts/$f"; done
 printf '.claude/tmp\nran\n' >"$o/.gitignore" && echo one >"$o/a.ts"
 git -C "$o" init -q && git -C "$o" add -A && git -C "$o" commit -qm base
+# Installed as Alexis does, so pre-push finds the hooks of the main it pushes (F129); the section
+# runs each hook itself, so git, pointed at an empty folder, runs none at a commit.
+(cd "$o" && sh .githooks/install_hooks.sh HEAD >/dev/null)
+mkdir "$t/no-hooks" && git -C "$o" config core.hooksPath "$t/no-hooks"
 out() { (cd "$o" && env -u SANDBOX_RUNTIME "$@" >/dev/null 2>&1); }
 mark() { (cd "$o" && . .githooks/records.sh && p=$(code_print "$1") && put "$p" "$2" && if [ "$2" = full ]; then put "$p" fast; fi); } # as a gate records: the full one writes both
 untouched() { [ ! -e "$o/ran" ] || fail "$1 ran the repository's code outside the sandbox (F076)"; }
@@ -607,12 +626,253 @@ git -C "$o" add docs adr && git -C "$o" commit -qm accents
 (cd "$o" && . .githooks/records.sh && green HEAD fast) || fail "records.sh took an accented doc for code (F133)"
 # A code_changed.sh that fails, missing or broken, is no proof of prose alone (F133).
 echo again >>"$o/a.ts" && git -C "$o" add a.ts
-printf 'exit 2\n' >"$o/scripts/code_changed.sh"
+printf 'exit 2\n' >"$o/.githooks/code_changed.sh"
 out sh .githooks/pre-commit && fail "pre-commit outside the sandbox took a failing code_changed.sh for prose alone (F133)"
-rm "$o/scripts/code_changed.sh"
+rm "$o/.githooks/code_changed.sh"
 out sh .githooks/pre-commit && fail "pre-commit outside the sandbox took a missing code_changed.sh for prose alone (F133)"
-git -C "$o" checkout -q HEAD -- scripts/code_changed.sh a.ts
+git -C "$o" checkout -q HEAD -- .githooks/code_changed.sh a.ts
 untouched records
+fi
+
+if part installed; then
+# The hooks live in .git/hooks, where no merge, checkout or sandboxed command writes, installed
+# from main with the scripts they run: no branch brings its own into Alexis's shell (F129).
+i="$t/installed"
+mkdir -p "$i/scripts" "$i/.githooks" "$i/.claude/tmp" "$i/docs"
+cp "$hooks"/* "$i/.githooks/"
+cp "$here/code_changed.sh" "$here/install_hooks.sh" "$here/.gitleaksignore" "$i/scripts/"
+secrets_into "$i/scripts/"
+printf '.claude/tmp\nran\n' >"$i/.gitignore"
+echo one >"$i/a.ts"
+git -C "$i" init -q -b main
+git -C "$i" add -A
+git -C "$i" commit -qm base
+base=$(git -C "$i" rev-parse HEAD)
+plant() { printf '#!/bin/sh\n: >"%s/ran"\n' "$i" >"$i/$1"; } # it leaves a mark when it runs
+# Branches made before any hook is installed, so none runs at their commits:
+# - planted: code where the hooks and their scripts are, a rule file that finds nothing, and a
+#   script holding a NUL byte and an escape sequence, which a display could hide;
+# - tweak: a hook changed and declared; settings: Claude Code's settings changed;
+# - feature: code only; shadow: a script in the hooks folder named as one they run;
+# - nohook: no pre-commit.
+git -C "$i" checkout -q -b planted
+for f in .githooks/pre-commit .githooks/pre-merge-commit .githooks/commit-msg .githooks/records.sh .githooks/merge.sh \
+	scripts/scan_secrets.sh scripts/code_changed.sh scripts/install_hooks.sh; do
+	plant "$f"
+done
+printf 'title = "finds nothing"\n' >"$i/scripts/gitleaks.toml"
+printf 'echo hidden\0\n\033[1A\033[2Kecho covered\n' >"$i/scripts/nul.sh"
+git -C "$i" add -A
+git -C "$i" commit -qm plant
+git -C "$i" checkout -q -b tweak main
+echo '# a comment' >>"$i/.githooks/pre-push"
+git -C "$i" commit -qam tweak -m "Harness-changed: .githooks/pre-push - a test"
+git -C "$i" checkout -q -b settings main
+echo '{}' >"$i/.claude/settings.json"
+git -C "$i" add .claude/settings.json
+git -C "$i" commit -qm settings
+git -C "$i" checkout -q -b feature main
+echo two >>"$i/a.ts"
+git -C "$i" commit -qam feature
+git -C "$i" checkout -q -b shadow main
+plant .githooks/scan_secrets.sh
+git -C "$i" add .githooks
+git -C "$i" commit -qm shadow
+git -C "$i" checkout -q -b nohook main
+git -C "$i" rm -q .githooks/pre-commit
+git -C "$i" commit -qm nohook
+git -C "$i" checkout -q main
+# As in Alexis's shell, with no mark of merge.sh and no hooks path of his own.
+in_i() { (cd "$i" && env -u SANDBOX_RUNTIME -u GNOWORLD_MERGE GIT_CONFIG_GLOBAL=/dev/null GIT_MERGE_AUTOEDIT=no "$@"); }
+mark_i() { (cd "$i" && . .git/hooks/records.sh && p=$(code_print "$1") && put "$p" "$2" && if [ "$2" = full ]; then put "$p" fast; fi); }
+ran() { [ ! -e "$i/ran" ] || fail "$1 ran code a branch planted in the hooks or their scripts (F129)"; }
+in_docs() { (cd "$i/docs" && env -u SANDBOX_RUNTIME -u GNOWORLD_MERGE GIT_CONFIG_GLOBAL=/dev/null GIT_MERGE_AUTOEDIT=no "$@"); } # from a folder below the root
+installed() { in_i sh .git/hooks/install_hooks.sh --check "${1:-main}" >/dev/null 2>&1; }
+install() { in_i sh scripts/install_hooks.sh "$@" >/dev/null 2>&1; }
+untouched_main() { [ "$(git -C "$i" rev-parse HEAD)" = "$1" ] && [ ! -e "$i/.git/MERGE_HEAD" ]; }
+# Alexis's own command, from a branch other than main and a folder below the root: main's hooks
+# and scripts land in .git/hooks, executable, and git is taken off the repository's hooks, as
+# prepare had pointed it, however many times; merges stop fast-forwarding, which runs no hook.
+git -C "$i" config core.hooksPath .githooks
+git -C "$i" config --add core.hooksPath .githooks
+git -C "$i" checkout -q tweak
+(cd "$i/docs" && env -u SANDBOX_RUNTIME GIT_CONFIG_GLOBAL=/dev/null sh -c 'git show main:scripts/install_hooks.sh | sh' >/dev/null 2>&1) || fail "Alexis's install command failed"
+git -C "$i" checkout -q main
+[ "$(git -C "$i" rev-parse --git-path hooks)" = .git/hooks ] || fail "install_hooks.sh left git running the repository's hooks (F129)"
+for f in $(git -C "$i" ls-tree -r --name-only main -- .githooks scripts/install_hooks.sh scripts/scan_secrets.sh scripts/code_changed.sh \
+	scripts/gitleaks.toml scripts/gitleaks-private.toml scripts/.gitleaksignore); do
+	git -C "$i" show "main:$f" | cmp -s - "$i/.git/hooks/${f##*/}" || fail "install_hooks.sh did not install main's $f"
+done
+for f in commit-msg pre-commit pre-merge-commit pre-push; do [ -x "$i/.git/hooks/$f" ] || fail "install_hooks.sh left $f not executable, which git skips"; done
+[ "$(git -C "$i" config merge.ff)" = false ] || fail "install_hooks.sh left merges free to fast-forward, which runs no hook (F129)"
+install || fail "install_hooks.sh failed with no override left to remove"
+printf '[core]\n\thooksPath = /elsewhere\n' >"$t/global-config"
+(cd "$i" && env -u SANDBOX_RUNTIME GIT_CONFIG_GLOBAL="$t/global-config" sh scripts/install_hooks.sh >/dev/null 2>&1) && fail "install_hooks.sh passed with git's hooks still taken from elsewhere"
+# --check: .git/hooks holds exactly a commit's files, real files, the hooks executable, nothing
+# else that could run; it changes nothing.
+installed || fail "install_hooks.sh --check refused the hooks it installed"
+installed tweak && fail "install_hooks.sh --check took the hooks of another commit"
+echo '# changed' >>"$i/.git/hooks/scan_secrets.sh"
+installed && fail "install_hooks.sh --check took a changed scan_secrets.sh"
+grep -q '# changed' "$i/.git/hooks/scan_secrets.sh" || fail "install_hooks.sh --check rewrote what it checks"
+install
+rm "$i/.git/hooks/gitleaks-private.toml"
+installed && fail "install_hooks.sh --check took a missing rule file"
+install
+chmod a-x "$i/.git/hooks/pre-commit"
+installed && fail "install_hooks.sh --check took a hook git would skip, not executable"
+install
+ln -sf ../../.githooks/pre-commit "$i/.git/hooks/pre-commit"
+installed && fail "install_hooks.sh --check took a link into the working tree, which a checkout changes"
+install
+plant .git/hooks/post-checkout
+chmod +x "$i/.git/hooks/post-checkout"
+installed && fail "install_hooks.sh --check took a hook main does not hold"
+install
+[ ! -e "$i/.git/hooks/post-checkout" ] || fail "install_hooks.sh left a hook main does not hold"
+# The install writes in place of a link, not through it into the working tree.
+git -C "$i" checkout -q tweak
+ln -sf ../../.githooks/pre-push "$i/.git/hooks/pre-push"
+install
+[ ! -L "$i/.git/hooks/pre-push" ] || fail "install_hooks.sh left a link for a hook"
+git -C "$i" diff --quiet || fail "install_hooks.sh wrote through a link into the working tree"
+git -C "$i" checkout -q main
+# A commit with no hooks, or no pre-commit, or two files under one name: refused, and nothing
+# installed changes.
+empty=$(git -C "$i" hash-object -w -t tree /dev/null)
+installed "$empty" && fail "install_hooks.sh --check took a commit that holds no hooks"
+install nohook && fail "install_hooks.sh installed hooks with no pre-commit, so git would check no commit"
+install shadow && fail "install_hooks.sh installed two files under one name"
+installed || fail "install_hooks.sh changed the hooks before refusing a commit"
+ran "install_hooks.sh"
+# merge.sh merges no code its gate did not pass, then shows each harness file a branch changes,
+# with its diff as text and its control bytes visible, and merges once the name is typed, from
+# any folder of the repository.
+echo planted | in_i sh .git/hooks/merge.sh planted >/dev/null 2>&1 && fail "merge.sh merged code no gate passed"
+git -C "$i" merge --abort
+mark_i planted fast
+for answer in wrong '*' '' plante; do
+	printf '%s\n' "$answer" | in_docs sh ../.git/hooks/merge.sh planted >"$t/merged" 2>&1 && fail "merge.sh merged on the answer '$answer'"
+	untouched_main "$base" || fail "merge.sh began a merge on the answer '$answer'"
+done
+in_i sh .git/hooks/merge.sh planted </dev/null >/dev/null 2>&1 && fail "merge.sh merged with no answer"
+for f in $(git -C "$i" diff --name-only main planted); do grep -qxF "$f" "$t/merged" || fail "merge.sh did not list $f"; done
+grep -q '^+: >' "$t/merged" || fail "merge.sh did not show the harness's diff"
+grep -q 'echo hidden' "$t/merged" || fail "merge.sh showed a file holding a NUL byte as binary (F132)"
+grep -q "$(printf '\033')" "$t/merged" && fail "merge.sh passed an escape sequence to the terminal, which can hide a line"
+echo planted | in_i sh .git/hooks/merge.sh planted >/dev/null 2>&1 || fail "merge.sh refused to merge on the branch's name"
+[ "$(git -C "$i" rev-parse HEAD^2)" = "$(git -C "$i" rev-parse planted)" ] || fail "merge.sh did not merge the branch"
+ran "a merge"
+# The working tree now holds the planted scripts and a rule file that finds nothing; the hooks
+# scan with their own: a clean change passes, a key is refused by the scan.
+echo clean >"$i/clean.ts"
+git -C "$i" add clean.ts
+mark_i "$(git -C "$i" write-tree)" fast
+in_i sh .git/hooks/pre-commit >/dev/null 2>&1 || fail "pre-commit refused a clean change after the merge"
+printf 'aws = "%s"\n' "$key" >"$i/leak.py"
+git -C "$i" add leak.py
+mark_i "$(git -C "$i" write-tree)" fast
+in_i sh .git/hooks/pre-commit >"$t/out" 2>&1 && fail "pre-commit let a key through, with the working tree's rule file (F129)"
+grep -q 'leaks found' "$t/out" || fail "pre-commit refused the key for another reason than the scan's"
+git -C "$i" rm -qf --cached leak.py clean.ts
+rm "$i/leak.py" "$i/clean.ts"
+printf 'fix: x\n' >"$t/installed-msg"
+in_i sh .git/hooks/commit-msg "$t/installed-msg" >/dev/null 2>&1 || fail "commit-msg refused a clean message after the merge"
+printf 'fix: x\n\naws = %s\n' "$key" >"$t/installed-msg"
+in_i sh .git/hooks/commit-msg "$t/installed-msg" >"$t/out" 2>&1 && fail "commit-msg let a key through, with the working tree's rule file (F129)"
+grep -q 'the message holds' "$t/out" || fail "commit-msg refused the key for another reason than the scan's"
+ran "pre-commit or commit-msg"
+# merge.sh merges onto main only, with nothing uncommitted, staged or untracked, and starts
+# nothing otherwise; with no harness change it asks for nothing.
+git -C "$i" reset -q --hard "$base"
+git -C "$i" checkout -q feature
+echo planted | in_i sh .git/hooks/merge.sh planted >/dev/null 2>&1 && fail "merge.sh merged onto a branch other than main"
+untouched_main "$(git -C "$i" rev-parse feature)" || fail "merge.sh began a merge onto a branch other than main"
+git -C "$i" checkout -q main
+for dirt in 'echo dirty >>a.ts' 'echo staged >>a.ts && git add a.ts' 'echo new >new.ts'; do
+	(cd "$i" && sh -c "$dirt")
+	echo planted | in_i sh .git/hooks/merge.sh planted >/dev/null 2>&1 && fail "merge.sh merged onto: $dirt"
+	untouched_main "$base" || fail "merge.sh began a merge onto: $dirt"
+	git -C "$i" reset -q --hard
+	rm -f "$i/new.ts"
+done
+mark_i feature fast
+in_i sh .git/hooks/merge.sh feature </dev/null >/dev/null 2>&1 || fail "merge.sh wanted a name for a merge with no harness change"
+[ "$(git -C "$i" rev-parse HEAD^2)" = "$(git -C "$i" rev-parse feature)" ] || fail "merge.sh did not merge a branch with no harness change"
+git -C "$i" reset -q --hard "$base"
+# A merge that did not come through merge.sh has written the harness unseen: its commit is
+# refused, whether git makes it or Alexis does after a conflict, and main does not
+# fast-forward past every hook. A merge with no harness change needs no merge.sh.
+in_i git merge -q planted >/dev/null 2>&1 && fail "a plain merge took harness changes merge.sh did not show (F129)"
+[ "$(git -C "$i" rev-parse HEAD)" = "$base" ] || fail "a plain merge fast-forwarded main past every hook (F129)"
+git -C "$i" merge --abort
+mark_i settings fast
+in_i git merge -q --no-ff settings >/dev/null 2>&1 && fail "a plain merge took a change of Claude Code's settings (F129)"
+git -C "$i" merge --abort
+for mark in "$base" ''; do
+	(cd "$i" && env -u SANDBOX_RUNTIME GIT_CONFIG_GLOBAL=/dev/null GIT_MERGE_AUTOEDIT=no GNOWORLD_MERGE="$mark" git merge -q --no-ff planted >/dev/null 2>&1) && fail "a merge took the mark '$mark' (F129)"
+	git -C "$i" merge --abort
+done
+in_i git merge -q --no-ff --no-commit planted >/dev/null 2>&1 || :
+in_i git commit -qm "Merge branch 'planted'" >/dev/null 2>&1 && fail "a merge concluded by hand took harness changes merge.sh did not show (F129)"
+git -C "$i" merge --abort
+ran "a refused merge"
+in_i git merge -q --no-ff feature >/dev/null 2>&1 || fail "a merge with no harness change wanted merge.sh"
+# pre-push wants .git/hooks to hold the hooks of the main it pushes, checked by the install
+# script beside it: what runs is what was reviewed.
+git -C "$i" reset -q --hard "$base"
+mark_i tweak full
+echo tweak | in_i sh .git/hooks/merge.sh tweak >/dev/null 2>&1 || fail "merge.sh refused a declared harness change"
+p=$(cd "$i" && . .git/hooks/records.sh && review_print HEAD)
+echo "2026-10-18 $p test" >"$i/docs/review-passes.txt"
+git -C "$i" add docs
+in_i git commit -qm "docs: pass" >/dev/null 2>&1 || fail "pre-commit refused a review pass"
+push_i() { printf 'refs/heads/main %s refs/heads/main %s\n' "$(git -C "$i" rev-parse HEAD)" "$base" | in_i sh .git/hooks/pre-push origin url >/dev/null 2>&1; }
+push_i && fail "pre-push let main leave with hooks not installed from it (F129)"
+install
+push_i || fail "pre-push refused main once its hooks were installed"
+mv "$i/.git/hooks/install_hooks.sh" "$t/install_hooks.sh"
+push_i && fail "pre-push let main leave with nothing to check its hooks"
+mv "$t/install_hooks.sh" "$i/.git/hooks/"
+# check.sh refuses git's hooks taken from elsewhere than .git/hooks; in the sandbox, a .git/hooks
+# or a .git/config a command may write, and hooks not installed; a linked worktree's are the
+# common folder's.
+ck="$t/checkhooks"
+mkdir -p "$ck/scripts"
+cp "$here/check.sh" "$ck/scripts/"
+git -C "$ck" init -q
+outer() { (env -u SANDBOX_RUNTIME sh -c 'cd "$1" && sh scripts/check.sh 2>&1' - "$1"); }
+boxed() { (cd "$ck" && SANDBOX_RUNTIME=1 sh scripts/check.sh 2>&1); }
+refused_any() { grep -q -e 'git runs hooks from' -e 'can write' -e 'so git checks no commit'; }
+git -C "$ck" config core.hooksPath .githooks
+outer "$ck" | grep -q "git runs hooks from" || fail "check.sh took git's hooks from the repository (F129)"
+git -C "$ck" config --unset core.hooksPath
+outer "$ck" | refused_any && fail "check.sh refused git's own hooks folder"
+before=$(ls -A "$ck/.git/hooks")
+cp "$ck/.git/config" "$t/config-before"
+boxed | grep -q "a command in the sandbox can write" || fail "check.sh took a sandbox that lets a command write git's hooks and config (F129)"
+[ "$(ls -A "$ck/.git/hooks")" = "$before" ] || fail "check.sh left its probe in .git/hooks"
+cmp -s "$ck/.git/config" "$t/config-before" || fail "check.sh changed git's config while probing it"
+chmod a-w "$ck/.git/config"
+boxed | grep -q "a command in the sandbox can write" || fail "check.sh took a sandbox that lets a command write git's hooks (F129)"
+chmod u+w "$ck/.git/config"
+chmod a-w "$ck/.git/hooks"
+boxed | grep -q "a command in the sandbox can write" || fail "check.sh took a sandbox that lets a command write git's config (F129)"
+chmod a-w "$ck/.git/config"
+boxed | grep -q "so git checks no commit" || fail "check.sh took a repository whose hooks are not installed (F129)"
+chmod u+w "$ck/.git/hooks"
+for f in commit-msg pre-commit pre-merge-commit pre-push; do
+	printf '#!/bin/sh\n' >"$ck/.git/hooks/$f"
+	chmod +x "$ck/.git/hooks/$f"
+done
+chmod a-w "$ck/.git/hooks"
+boxed | refused_any && fail "check.sh refused a sealed sandbox with its hooks installed"
+chmod u+w "$ck/.git/hooks" "$ck/.git/config"
+git -C "$ck" commit -q --allow-empty -m x
+git -C "$ck" worktree add -q "$t/ckwt"
+mkdir -p "$t/ckwt/scripts"
+cp "$here/check.sh" "$t/ckwt/scripts/"
+outer "$t/ckwt" | refused_any && fail "check.sh refused a linked worktree, whose hooks are the common folder's"
 fi
 
 if part guard; then

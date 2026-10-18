@@ -24,6 +24,9 @@
       "Edit(/scripts/gitleaks.toml)",
       "Edit(/scripts/gitleaks-private.toml)",
       "Edit(/scripts/.gitleaksignore)",
+      "Edit(/scripts/install_hooks.sh)",
+      "Edit(/.git/hooks/**)",
+      "Edit(/.git/config)",
       "Edit(/.githooks/**)",
       "Edit(/.claude/settings.json)",
       "Edit(/.claude/settings.local.json)",
@@ -124,7 +127,9 @@
         "tsconfig.base.json",
         "tsconfig.json",
         ".prettierrc.json",
-        ".prettierignore"
+        ".prettierignore",
+        ".git/hooks",
+        ".git/config"
       ],
       "denyRead": ["~/.ssh", "~/.config/gh", "~/.npmrc", "~/.aws"]
     }

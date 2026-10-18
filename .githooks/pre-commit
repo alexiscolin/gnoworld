@@ -7,12 +7,24 @@ set -eu
 . "$(dirname "$0")/records.sh"
 if [ -z "${SANDBOX_RUNTIME:-}" ]; then
 	# Outside Claude Code's sandbox, in Alexis's shell, no gate runs, so no code Claude can edit
-	# runs with his access (F076): only the scripts it cannot edit, and the staged code must be
-	# code the sandboxed gate passed. Prose alone needs no gate.
-	sh scripts/scan_secrets.sh --staged
+	# runs with his access (F076): only the scripts installed beside the hooks, where no branch
+	# writes (F129), and the staged code must be code the sandboxed gate passed. Prose alone
+	# needs no gate.
+	# A merge writes the branch's files before any hook runs: one that changes the harness came
+	# through merge.sh, which showed them to Alexis first and names the commit it merges; the
+	# merge of that commit must be what is committed (F129). pre-merge-commit says --merge, since
+	# git writes MERGE_HEAD only after it; a merge concluded by hand has one.
+	if [ "${1:-}" = --merge ] || git rev-parse -q --verify MERGE_HEAD >/dev/null; then
+		changed=$(harness --cached --name-only HEAD)
+		if [ -n "$changed" ] && [ "$(git merge-tree --write-tree HEAD "${GNOWORLD_MERGE:-}" 2>/dev/null)" != "$(git write-tree)" ]; then
+			echo "pre-commit: this merge changes the harness, which merge.sh did not show you first, and has written it: run git merge --abort now, then sh .git/hooks/merge.sh <branch>" >&2
+			exit 1
+		fi
+	fi
+	sh "$(dirname "$0")/scan_secrets.sh" --staged
 	prose=0 # code_changed.sh exits 1 for prose alone; any other failure refuses the commit
-	sh scripts/code_changed.sh --staged || prose=$?
-	[ "$prose" -le 1 ] || { echo "pre-commit: scripts/code_changed.sh failed (exit $prose); nothing is committed unchecked" >&2; exit 1; }
+	sh "$(dirname "$0")/code_changed.sh" --staged || prose=$?
+	[ "$prose" -le 1 ] || { echo "pre-commit: code_changed.sh failed (exit $prose); nothing is committed unchecked" >&2; exit 1; }
 	if [ "$prose" = 0 ] && ! green "$(git write-tree)" fast; then
 		echo "pre-commit: no gate passed on exactly this code; let sh scripts/check.sh pass on it in Claude Code's sandbox, then stage all of it, or let Claude commit it there" >&2
 		exit 1

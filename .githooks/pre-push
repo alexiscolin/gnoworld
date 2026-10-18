@@ -13,14 +13,8 @@ refuse() {
 	echo "pre-push: $1" >&2
 	exit 1
 }
-# A branch's gate is its own harness, so a harness file it changes is declared on a line of a
-# commit, `Harness-changed: <path> - why`, which Alexis reads in review (F089). This hook asks
-# before any edit, so a branch cannot drop the check.
-harness() {
-	git -c core.quotePath=false diff --name-only "$1" "$2" -- scripts .githooks .github .claude package.json app/package.json \
-		pnpm-workspace.yaml pnpm-lock.yaml .node-version .nvmrc .npmrc '*.config.ts' tsconfig.json tsconfig.base.json app/tsconfig.json \
-		stryker.config.json knip.json .jscpd.json .prettierrc.json .prettierignore .gitignore
-}
+# A branch's gate is its own harness, so a harness file it changes (records.sh's list) is declared
+# on a line of a commit, `Harness-changed: <path> - why`, which Alexis reads in review (F089).
 declared() { # $1: the path; stdin: the commit messages
 	while IFS= read -r line; do
 		case $line in "Harness-changed: $1 - "?*) return 0 ;; esac
@@ -35,7 +29,7 @@ while read -r _ local_sha remote_ref remote_sha; do
 	if [ "$remote_ref" = refs/heads/main ]; then
 		if [ "$remote_sha" != "$zero" ]; then
 			# A main this clone has not fetched cannot be compared: refused, not passed (F116).
-			changed=$(harness "$remote_sha" "$local_sha") || refuse "fetch main first: $remote_sha is not in this clone"
+			changed=$(harness --name-only "$remote_sha" "$local_sha") || refuse "fetch main first: $remote_sha is not in this clone"
 			undeclared=$(printf '%s\n' "$changed" | while IFS= read -r f; do
 				git log --format=%B "$remote_sha..$local_sha" | declared "$f" || printf '%s\n' "$f"
 			done)
@@ -43,6 +37,8 @@ while read -r _ local_sha remote_ref remote_sha; do
 $undeclared"
 		fi
 		if $outside; then
+			# What runs in Alexis's shell is what was reviewed: the hooks of the main that leaves (F129).
+			sh "$(dirname "$0")/install_hooks.sh" --check "$local_sha" || refuse "install the hooks of this main first: git show main:scripts/install_hooks.sh | sh"
 			green "$local_sha" full || refuse "the full gate never passed on this code; run /pre-merge in Claude Code"
 			reviewed "$local_sha" || refuse "no committed review pass for this code; run /pre-merge and commit its record"
 			gated=true
@@ -59,4 +55,4 @@ $undeclared"
 	fi
 done
 # One scan of the whole history covers every ref this push sends; the full gate scans it too.
-! $gated || sh scripts/scan_secrets.sh
+! $gated || sh "$(dirname "$0")/scan_secrets.sh"

@@ -255,6 +255,15 @@ try:
         shutil.rmtree(HERE)
 
     if part("jscpd"):
+        # git's own folder is no source: the hooks installed there are copies of the repository's (F129).
+        hook = f"export function sum(values: number[]): number {{\n  let total = 0;\n{BLOCK}  return total;\n}}\n"
+        plant({"hook.ts": hook})
+        plant({"hook.ts": hook}, where=os.path.join(HERE, ".git"))
+        out = run(["node_modules/.bin/jscpd", HERE])
+        expect(out.returncode == 0, "jscpd reads git's own folder as source")
+        shutil.rmtree(HERE)
+
+    if part("jscpd"):
         # jscpd's similarity: the same function with every name changed, or with a line added.
         shape = "export function {f}({v}: number[]): number {{\n  let {t} = 0;\n  for (const {x} of {v}) {{\n    if ({x} > 10) {{\n      {t} += {x} * 2;\n    }} else {{\n      {t} -= {x};\n    }}\n  }}\n  return {t};\n}}\n"
         plant({"one.ts": shape.format(f="alpha", v="values", t="total", x="v"), "two.ts": shape.format(f="beta", v="items", t="acc", x="item")})
