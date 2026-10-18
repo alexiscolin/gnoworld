@@ -855,6 +855,7 @@ boxed | grep -q "a command in the sandbox can write" || fail "check.sh took a sa
 cmp -s "$ck/.git/config" "$t/config-before" || fail "check.sh changed git's config while probing it"
 chmod a-w "$ck/.git/config"
 boxed | grep -q "a command in the sandbox can write" || fail "check.sh took a sandbox that lets a command write git's hooks (F129)"
+[ "$(ls -A "$ck/.git/hooks")" = "$before" ] || fail "check.sh left in .git/hooks the file it probed with"
 chmod u+w "$ck/.git/config"
 chmod a-w "$ck/.git/hooks"
 boxed | grep -q "a command in the sandbox can write" || fail "check.sh took a sandbox that lets a command write git's config (F129)"
