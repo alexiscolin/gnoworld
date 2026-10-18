@@ -36,12 +36,17 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
 4. **End of each turn.** When code changed, the Stop hook (`scripts/stop_gate.sh`) stops the turn
    once unless the fast gate, which Claude runs in the sandbox, passed on exactly this tree
    (`check.sh` records it). The hook itself runs nothing from the repository.
-5. **Each commit.** `commit-msg` holds the subject's form, refuses attribution lines, and
+5. **Each commit.** The git hooks run from `.git/hooks`, installed from `main` with the scripts
+   they run, where no merge, checkout or sandboxed command writes: no branch brings its own
+   (F129). `commit-msg` holds the subject's form, refuses attribution lines, and
    scans the message with both secret rule sets, `gitleaks:allow` ignored (F090, F113).
-   `pre-commit` scans what is staged for secrets, then runs the fast gate on a copy of what
-   is staged, not on the working tree.
+   `pre-commit` scans what is staged for secrets, then, in Claude Code's sandbox, runs the fast
+   gate on a copy of what is staged, not on the working tree, and records the code it passed.
+   In Alexis's shell it runs no gate: the staged code must be code the sandboxed gate recorded
+   green (`.githooks/records.sh`, F076); prose alone needs none.
 6. **A push of a work branch.** `pre-push` wants the checked-out commit with nothing
-   uncommitted, runs the fast gate and scans the history for secrets.
+   uncommitted, a gate that passed on its code (in the sandbox it runs it; in Alexis's shell it
+   reads the record), and scans the history for secrets.
 7. **Before a merge.** `/pre-merge` runs the full gate, the `test-auditor`'s green pass on the
    mutation survivors, `/code-review`, the `security-reviewer` for a tier-1 change, and
    `/simplify` at the last merge of a slice. The `finding-verifier` tries to refute each
@@ -49,8 +54,12 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
    `docs/review/findings.md`. Three review rounds at most per branch. Then it records a review
    pass (`scripts/review_pass.py`).
 8. **Alexis reviews,** blind first, in revdiff (`docs/REVIEW.md`).
-9. **Merge and push, by Alexis, in his own shell.** The merge is made locally; pushing `main`
-   runs the full gate again, needs the committed review pass for exactly that tree, and each
+9. **Merge and push, by Alexis, in his own shell.** The merge is made locally, through
+   `.git/hooks/merge.sh`, which shows each harness file the branch changes, with its diff,
+   before git writes it, and merges once he types the branch's name; a merge that changes the
+   harness otherwise is refused at its commit (F129). Pushing `main` wants the hooks installed
+   from it, and runs no gate there: it wants the full gate recorded green on that code, the committed review
+   pass for exactly that tree, and each
    harness file changed since the remote's `main` declared on a line `Harness-changed: <path>
    - why` (F089); a `main` the clone cannot compare is refused (F116). Claude cannot do
    either: the sandbox refuses the merge's writes to the harness (F063), and over a remote
@@ -90,7 +99,7 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
 | `scripts/prove_fix.py` | a fix of the product whose tests or journeys did not fail on the commit before it (F126) |
 | StrykerJS | a mutant of the TypeScript that no test kills |
 | `scripts/check_regressions.py` | the safety net shrinking (next section) |
-| gitleaks | a secret anywhere in the history; a path into a home folder or a service of the demo's host (`gitleaks-private.toml`: the repository will be public); both rule sets always run (F120) |
+| gitleaks | a secret anywhere in the history; a path into a home folder or a service of the demo's host (`gitleaks-private.toml`: the repository will be public); both rule sets always run (F120); every change reaches it as text, on every branch, whatever an attribute, a NUL byte, a diff driver or a replace ref would show (F132) |
 | `pnpm audit` | a dependency with a known advisory, moderate or worse |
 | `scripts/harness_mutate.py` | when a file of the harness list changed (one list, word for word `pre-push`'s, F124): a guard of the harness that no test notices switched off |
 
@@ -115,7 +124,8 @@ also wants each harness file changed on a line `Harness-changed: <path> - why`.
 
 A finding is a claim until it is reproduced: a command, or a test seen failing. Every finding
 goes into `docs/review/findings.md` with its status (`claimed`, `reproduced`, `fixed`,
-`rejected`, `asked`) and its evidence; a fixed one names its commit, a rejected one says why.
+`rejected`, `intended`, `moot`, `asked`, the outcomes Anthropic sorts its reviewer's comments
+by) and its evidence; a fixed one names its commit, the others say why.
 Reviews read the ledger first, so a rejected claim is not raised again and a fixed one that
 comes back is a regression. The review agents (`.claude/agents/`) report rows for it.
 
@@ -123,15 +133,18 @@ comes back is a regression. The review agents (`.claude/agents/`) report rows fo
 |---|---|---|
 | `test-auditor`, red pass | after the failing tests, before code | Sonnet |
 | `test-auditor`, green pass | first in `/pre-merge`, on the mutation survivors | Sonnet |
+| `/simplify` | every merge, first: reuse, simplicity, efficiency, altitude; its fixes, then the gate | Claude Code's |
 | `/code-review` | every merge | Claude Code's |
-| `security-reviewer` | a merge touching a tier-1 file | Opus |
+| `/security-review` | every merge; it keeps only the findings it rates 8 out of 10 or more | Claude Code's |
+| `security-reviewer` | a merge touching a tier-1 file, beside `/security-review` | Opus |
 | `finding-verifier` | after the review pass, on each tier-1 lot: refutes or reproduces each finding | Opus |
 | `gno-auditor` | every realm, line by line | gnomcp's |
-| `/simplify` | the last merge of a slice: reuse, simplicity, efficiency, altitude | Claude Code's |
 | Alexis | every merge, blind first | — |
 
-A branch gets three review rounds at most; after the third, a review reads only the diff since
-the last one (`docs/REVIEW.md`). Alexis reviews in revdiff; started as
+Rounds converge, as Anthropic's own reviewer does: the first reads the branch, any later one
+only the diff since the last, and after three the review stops and the approach is
+reconsidered with Alexis (`docs/REVIEW.md`). Each finding names its class, and its fix covers
+every instance. Alexis reviews in revdiff; started as
 `revdiff -o .claude/tmp/revdiff.md main`, it writes his notes there whenever he presses `O`,
 and Claude reads them from that file.
 
@@ -145,17 +158,17 @@ with `/cd`:
   and integrates a whole feature alone (Alexis, 2026-10-18), checked by the gate and the
   review; Alexis reviews before he merges and pushes.
 - **Refused outright, so nothing asks:** an edit of a file run outside the sandbox, the guard,
-  the Stop hook, `code_changed.sh`, the git hooks, Claude Code's settings, agents, commands,
+  the Stop hook, `code_changed.sh`, `scan_secrets.sh`, `install_hooks.sh`, the git hooks and git's
+  own hooks folder and config, which bypass mode would let the file tools write (F129), Claude Code's settings, agents, commands,
   skills, rules and hooks in `.claude/` (not `.claude/tmp/`, where the gate writes its state,
   F111) and the `package.json` files (finding F068), and what pnpm loads at Alexis's install, `pnpm-workspace.yaml`, `.npmrc` and a
   pnpmfile (F087, F115); `pnpm add` (a dependency is Alexis's) and `rm -rf`. A change to one of these
-  files is written out for Alexis to apply. What the gate reaches when he pushes or merges
-  (the other scripts, the configs, the tests) still runs with his access: F076, closed by the
-  backlog's hooks that run no repository code; until then, `pre-push` wants each harness
-  change on main declared (`Harness-changed: <path> - why`, F089). Ask and deny rules hold in
-  every permission mode.
+  files is written out for Alexis to apply. In his shell the hooks run nothing else of the
+  repository: no gate, no other script, config or test, only the records the sandboxed gate
+  wrote (F076); `pre-push` also wants each harness change on main declared
+  (`Harness-changed: <path> - why`, F089). Ask and deny rules hold in every permission mode.
 - **The sandbox** around shell commands: they write only in the project and its caches,
-  never in the harness's files; they reach only the npm and Go registries and github.com;
+  never in the harness's files, `.git/hooks` or `.git/config` (`check.sh` probes it, F129); they reach only the npm and Go registries and github.com;
   no command may leave the sandbox.
 - **`scripts/guard.py`,** before each Bash call, web fetch and edit: no git hook skipped
   (`--no-verify` or its prefixes, `commit -n`, a hooks path or `GIT_CONFIG` override,
@@ -196,11 +209,13 @@ costs context in every session: `chrome-devtools-mcp` (1b), `frontend-design` (2
 
 ## Speed and cost
 
-Measured on this machine, 2026-10-18: the fast gate 19 to 23 s (budget 60 s), the app's
+Measured on this machine, 2026-10-18: the fast gate 19 to 24 s (budget 60 s), the app's
 build and its 18 journeys included; the full gate 263 s, with the harness mutation proving
-255 guards. On 2026-10-17 the fast gate took 10 to 13 s, before the app, and the harness
+255 guards, then 343 s for 308 guards once F076 was built, and 1079 s for 388 once F129 was;
+the fast gate 18 s since the hook sections run side by side. On 2026-10-17 the fast gate took 10 to 13 s, before the app, and the harness
 mutation 118 s for 148 guards. Subagents run on Sonnet unless their file says otherwise;
-agents get the diff's path, never its content; one review pass per merge.
+agents get the diff's path, never its content. A review reads the branch once, then only the
+diff of its fixes, three rounds at most; F076's three cost about 1.3 million tokens.
 
 ## Is it solid?
 
@@ -209,10 +224,16 @@ findings it found in the harness itself. Falling from merge to merge means solid
 three merges means the harness is simplified, not extended: a guard that keeps leaking gives
 way to a boundary the system enforces (the sandbox, a server check), or goes. The first
 measure, slice 1a's merge, found 25 or more, one of them a way out of the sandbox. Since then:
-13, 11, then 22 and 14 at slice 1b's two rounds. The count is not falling, but the severity
-is: the last round found nothing blocking, and most of its findings sat in the fixes of the
-round before. By the rule above, the next harness work removes more than it adds: the
-backlog's hooks that run no repository code first.
+13, 11, then 22 and 14 at slice 1b's two rounds, then 16 at F076. Slice 1b's last round
+found nothing blocking; F076's found 6 that let a secret or untested code through, five fixed
+and one, F129, its own next branch. F076 is the first change the rule above asked for: it took
+the gate out of the hooks in Alexis's shell, a boundary rather than one more guard. Its
+findings sat in what that boundary now leans on, the secret scan and the records; F129 is the
+same kind of change, the hooks run from outside the repository. F129's review found 21, 6 of
+them blocking, and most in one class: Claude's sandbox shares Alexis's `.git`, and git reads
+more there than the two paths denied. A clone of Claude's own would close the class; Alexis
+kept one repository (2026-10-18), so the boundary is `main` protected with the CI required,
+and the harness is frozen until a real bug crosses it.
 
 ## Known limits
 
@@ -220,6 +241,32 @@ backlog's hooks that run no repository code first.
   full gate on every branch pushed, but GitHub cannot protect a branch on this
   repository's plan: a red run cannot stop a merge, and the git hooks on this machine can be
   skipped by someone who means to (findings F009, F001).
+- **A record of a green gate can be forged from the sandbox,** since the sandbox writes it
+  (F076): it lets a broken tree reach `main` until the CI's red report, and runs nothing on
+  Alexis's machine. Nor do the hooks in his shell run `check_docs.py` on a docs-only commit:
+  the sandboxed gate and the CI do (F136).
+- **Claude's sandbox shares Alexis's `.git`** (Alexis, 2026-10-18: one repository). It cannot
+  write `.git/hooks`, `.git/config` or `.git/commondir` (F150), but it writes refs, objects and
+  the index: it could move or shadow `main`, or forge an object, so that the install command or
+  a checkout in Alexis's shell writes or runs its files (F152, F153); or plant a nested
+  repository with its own config, registered as a submodule, which Alexis's next `git status`
+  reads and runs (F163). The boundary is `main` protected with the CI required, first in the
+  backlog; until then the local hooks are a safety net, not a wall.
+- **A merge refuses a path with a non-ASCII character** (F164): the disk folds more letters than
+  git can match (`ſ` is `s`), so no list could name every harness path.
+- **Only merge.sh shows a merge before git writes it** (F129). A plain merge that changes the
+  harness is refused at its commit, its files written already: it must be undone at once
+  (`git merge --abort`, or `git reset --hard` after a squash), before Claude Code reads a planted
+  setting. A cherry-pick, a rebase, a checkout or a `merge --ff-only` of Claude's branch in
+  Alexis's shell runs no such check (F153). A merge with a conflict cannot be concluded once it
+  changes the harness: the branch is rebased on `main` first (F155).
+- **The install is not atomic** (F159): a failure halfway leaves hooks of two versions until the
+  next install; `pre-push` refuses `main` meanwhile.
+- **A fresh clone has no hooks** until its owner installs them from `main`.
+- **The history scan is defence in depth, not a guarantee.** It reads git's diffs, which show
+  no merge commit, drop type changes and skip gitleaks's default paths (F141 to F143): a key
+  committed without pre-commit (`git stash`, plumbing) could pass it. The staged scan, which
+  reads each commit's content as text, is the barrier; a commit made without it skips it.
 - **Claude Code's layer is active only in a session started in this folder,** or moved into
   it with `/cd`.
 - **`prove_fix.py` covers the product;** a fix of the harness is proven by
@@ -239,7 +286,8 @@ backlog's hooks that run no repository code first.
 | `.claude/settings.json` | permissions, the sandbox, the hooks, the plugins |
 | `.claude/agents/` | `test-auditor`, `security-reviewer`, `finding-verifier` |
 | `.claude/commands/` | `/slice-plan`, `/pre-merge` |
-| `.githooks/` | `commit-msg`, `pre-commit`, `pre-push` (`pnpm install` points git at them) |
+| `.githooks/` | `commit-msg`, `pre-commit`, `pre-merge-commit`, `pre-push`; `records.sh`, the prints and the harness list they and `check.sh` share (F076); `merge.sh`, the merge that shows the harness first (F129) |
+| `scripts/install_hooks.sh` | puts `main`'s hooks and the scripts they run in `.git/hooks`; `--check` for `pre-push` (F129) |
 | `scripts/check.sh` | the gate |
 | `.github/workflows/gate.yml` | the full gate on GitHub's machines, for every branch pushed |
 | `app/playwright.config.ts`, `app/tests/e2e/` | the app's journeys: a build per run, served as a static host serves it (`serve.mjs`) |

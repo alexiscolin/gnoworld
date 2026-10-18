@@ -59,17 +59,24 @@ Code written by an agent gets the same reading as anyone's, plus this. `/pre-mer
    tautologies, mocks of the thing under test, empty assertions ("was called", unread
    snapshots, loose matchers), missing failure and boundary cases, timing guesses, and a
    test not seen failing first (ADR-0002 §9). Its findings are fixed before anything else.
-3. **One review pass, sized by risk.** Claude Code's own `/code-review` reads the change in a
-   fresh context, through every lens at once: correctness, security, performance,
-   accessibility and UX, simplicity, with this file's checklists. A change to a tier-1 file adds one more agent, on the
-   strongest model, for security alone. Fixes are re-checked by the gate and the mutation
-   tester; a second pass runs only for a high finding fixed in tier-1 code. A branch gets three
-   review rounds at most; after the third, a review reads only the diff since the last one, and
-   the gate and the mutation checks hold the rest.
+3. **Every lens, at every merge.** `/simplify` first, its fixes applied and the gate run again;
+   then Claude Code's `/code-review` (correctness, performance, accessibility and UX, with this
+   file's checklists) and `/security-review` together, in a fresh context; a change to a tier-1
+   file adds the `security-reviewer` agent, on the strongest model, which reads the project's
+   threat model (Alexis, 2026-10-18: add lenses, remove none). Each finding names its class, the
+   kind of bug, and its fix covers every instance; one only about style, diagnostics or cleanup
+   is dropped, `/simplify` owning those. Fixes are re-checked by the gate and the mutation
+   tester; a second pass runs only for a high finding fixed in tier-1 code, and only its lens.
+   **Rounds converge**, as Anthropic's own reviewer does ("Solving code review at Anthropic"):
+   the first round reads the branch, any later one only the diff since the last; after three
+   rounds the review stops, and Claude and Alexis reconsider the approach before more code.
+   A merge carries about 400 lines of product code at most (DORA's small batches): a slice is
+   cut into merges of that size, and the review log notes each one's size, rounds and tokens.
 4. **Each finding is verified, then reproduced, before it is fixed.** On a tier-1 lot, the
    `finding-verifier` agent (Opus) first tries to refute each finding, then to reproduce it, and
    its severity stands. Then: a command, or a test seen failing. One
-   nobody could reproduce stays `claimed`; a false positive is `rejected`, with its reason.
+   nobody could reproduce stays `claimed`; a false positive is `rejected`, a true one whose
+   behaviour is wanted `intended`, a true one of no matter `moot`, each with its reason.
    A fix of the product proves itself: its tests, run on the commit before it, must fail
    (`scripts/prove_fix.py`, in the full gate).
 5. **Nothing is waved through.** Every remaining finding is fixed, or put to Alexis with
@@ -88,11 +95,15 @@ Code written by an agent gets the same reading as anyone's, plus this. `/pre-mer
 
 ## Before a push
 
-Each merge lives on its branch. Pushing a work branch runs the fast gate and the secret scan
-(`.githooks/pre-push`); pushing `main` runs the full gate and needs a committed `/pre-merge` pass whose fingerprint matches the code
-(`scripts/review_pass.py`): a change after the review voids it, the review's own record does
-not. Until CI exists, these hooks are the barrier; a merge made on GitHub skips them, so
-merges happen locally after `/pre-merge`, then `main` is pushed.
+Each merge lives on its branch. Pushing a work branch wants a gate that passed on its code, and
+scans the history for secrets (`.githooks/pre-push`); pushing `main` wants the full gate's
+record of exactly that code and a committed `/pre-merge` pass whose fingerprint matches it
+(`scripts/review_pass.py`): a change after the review voids both, the review's own record does
+not. In Alexis's shell the hooks run no gate, only these checks (F076); the CI runs the full
+gate again, and blocks nothing until `main` is protected. A merge made on GitHub skips the
+hooks, so merges happen locally after `/pre-merge`, through `sh .git/hooks/merge.sh <branch>`,
+which shows each harness file the branch changes before git writes it (F129); then `main` is
+pushed, with the hooks installed from it.
 
 ## Blind first
 

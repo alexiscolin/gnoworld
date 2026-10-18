@@ -20,6 +20,15 @@
       "Edit(/scripts/guard.py)",
       "Edit(/scripts/stop_gate.sh)",
       "Edit(/scripts/code_changed.sh)",
+      "Edit(/scripts/scan_secrets.sh)",
+      "Edit(/scripts/gitleaks.toml)",
+      "Edit(/scripts/gitleaks-private.toml)",
+      "Edit(/scripts/.gitleaksignore)",
+      "Edit(/scripts/install_hooks.sh)",
+      "Edit(/.git/hooks/**)",
+      "Edit(/.git/config)",
+      "Edit(/.git/commondir)",
+      "Edit(/.mcp.json)",
       "Edit(/.githooks/**)",
       "Edit(/.claude/settings.json)",
       "Edit(/.claude/settings.local.json)",
@@ -120,7 +129,11 @@
         "tsconfig.base.json",
         "tsconfig.json",
         ".prettierrc.json",
-        ".prettierignore"
+        ".prettierignore",
+        ".git/hooks",
+        ".git/config",
+        ".git/commondir",
+        ".mcp.json"
       ],
       "denyRead": ["~/.ssh", "~/.config/gh", "~/.npmrc", "~/.aws"]
     }

@@ -1,5 +1,5 @@
 {
-  "ignore": ["docs/**", "gno/**", "pnpm-lock.yaml", "**/*.test.ts"],
+  "ignore": ["docs/**", "gno/**", "pnpm-lock.yaml", "**/*.test.ts", "**/.git/**"],
   "exitCode": 1,
   "similarity": 0.8
 }

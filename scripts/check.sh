@@ -15,6 +15,30 @@ unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO # the scripts' te
 full=false
 [ "${1:-}" = "--full" ] && full=true
 started=$(date +%s)
+# The code this run tests; at the end it is recorded, unless it changed meanwhile (F076).
+tested=
+if git rev-parse --git-dir >/dev/null 2>&1; then # not in pre-commit's staged copy, which has no repository
+	# Git runs the hooks of its own folder, which no branch writes and the sandbox cannot (F129).
+	git_dir=$(git rev-parse --path-format=absolute --git-common-dir)
+	runs_from=$(git rev-parse --path-format=absolute --git-path hooks)
+	if [ "$runs_from" != "$git_dir/hooks" ]; then
+		echo "check.sh: git runs hooks from $runs_from, not $git_dir/hooks; install them: git --no-replace-objects show main:scripts/install_hooks.sh | sh" >&2
+		exit 1
+	fi
+	if [ -n "${SANDBOX_RUNTIME:-}" ]; then
+		if (: >>"$git_dir/config") 2>/dev/null || { probe=$(mktemp "$git_dir/hooks/probe.XXXXXX" 2>/dev/null) && rm "$probe"; }; then
+			echo "check.sh: a command in the sandbox can write git's hooks or config; .claude/settings.json's sandbox must deny .git/hooks and .git/config" >&2
+			exit 1
+		fi
+		for hook in commit-msg pre-commit pre-merge-commit pre-push; do
+			[ -x "$git_dir/hooks/$hook" ] || {
+				echo "check.sh: no $hook in $git_dir/hooks, so git checks no commit there; install the hooks: git --no-replace-objects show main:scripts/install_hooks.sh | sh" >&2
+				exit 1
+			}
+		done
+	fi
+	. .githooks/records.sh && tested=$(worktree_print)
+fi
 
 want="v$(cat .node-version)"
 # A version and nothing else: anything more would put a folder of its choice first on PATH.
@@ -106,15 +130,14 @@ if $full; then
 	echo "== no secret anywhere in the history, no known vulnerability in a dependency"
 	sh scripts/scan_secrets.sh
 	python3 -I scripts/audit.py
-	if ! git diff --quiet "$base" -- scripts .githooks .github .claude package.json app/package.json \
-		pnpm-workspace.yaml pnpm-lock.yaml .node-version .nvmrc .npmrc '*.config.ts' tsconfig.json tsconfig.base.json app/tsconfig.json \
-		stryker.config.json knip.json .jscpd.json .prettierrc.json .prettierignore .gitignore; then
+	if ! harness --quiet "$base"; then # records.sh's list
 		echo "== the harness changed: each guard switched off must fail a test (several minutes)"
 		python3 -I scripts/harness_mutate.py
 	fi
 fi
 
-if git rev-parse --git-dir >/dev/null 2>&1; then # not in pre-commit's staged copy, which has no repository
+if [ -n "$tested" ]; then
 	mkdir -p .claude/tmp && sh scripts/code_changed.sh --state >.claude/tmp/gate-green # what stop_gate.sh compares
+	gate_passed "$tested" "$full" # for the hooks outside the sandbox, which run no gate (F076)
 fi
 echo "all checks passed in $(($(date +%s) - started)) s"
