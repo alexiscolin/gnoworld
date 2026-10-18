@@ -11,9 +11,7 @@ test("before any update, the prompt shows nothing: the pre-rendered page holds n
 });
 
 test("an update is announced politely, with one button that reloads", () => {
-  const html = renderToStaticMarkup(<UpdateNotice onReload={() => undefined} />);
-  expect(html).toContain('role="status"');
-  expect(html).toContain("New version available.");
-  expect(html.match(/<button[^>]*>Reload<\/button>/g)).toHaveLength(1);
-  expect(html).toContain('type="button"');
+  expect(renderToStaticMarkup(<UpdateNotice onReload={() => undefined} />)).toBe(
+    '<div role="status">New version available. <button type="button">Reload</button></div>',
+  );
 });

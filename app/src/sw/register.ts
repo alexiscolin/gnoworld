@@ -44,18 +44,22 @@ export async function startServiceWorker(start: Start): Promise<void> {
   if (!start.production) return;
   const registration = await container.register("/sw.js");
   if (signal.aborted) return;
+  // One page reloads once, however many clicks and takeovers it sees.
+  let asked = false;
+  let reloaded = false;
+  const reloadOnce = () => {
+    if (reloaded) return;
+    reloaded = true;
+    start.reload();
+  };
   const apply = (next: PageWorker) => () => {
     // Another tab's click may have made it active already: there is nothing left to wait for.
     if (registration.waiting === null) {
-      start.reload();
+      reloadOnce();
       return;
     }
-    let reloading = false;
-    const reloadOnce = () => {
-      if (reloading) return;
-      reloading = true;
-      start.reload();
-    };
+    if (asked) return;
+    asked = true;
     container.addEventListener("controllerchange", reloadOnce, { signal });
     next.postMessage({ type: "SKIP_WAITING" });
   };

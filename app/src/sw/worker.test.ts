@@ -8,7 +8,7 @@ const PRECACHE = ["/assets/entry.client-Bx3f9a1Q.js", "/assets/root-Dk2l0p9Z.css
 // what it was asked, and the listeners the worker adds.
 function scope({ failing = false } = {}) {
   const stores = new Map<string, Map<string, string>>();
-  const listeners = new Map<string, (event: never) => void>();
+  const listeners = new Map<string, ((event: never) => void)[]>();
   const network: string[] = [];
   const cache = (name: string) => {
     const store = stores.get(name) ?? new Map<string, string>();
@@ -43,13 +43,14 @@ function scope({ failing = false } = {}) {
       return Promise.resolve(new Response(`network ${request.url}`));
     },
     addEventListener: (type: string, listener: (event: never) => void) => {
-      listeners.set(type, listener);
+      listeners.set(type, [...(listeners.get(type) ?? []), listener]);
     },
   } satisfies WorkerScope;
+  // Every listener of the type hears it, as in the browser: one added twice would show.
   const fire = (type: string, event: unknown) => {
-    const listener = listeners.get(type);
-    if (listener === undefined) throw new Error(`the worker listens to no ${type}`);
-    (listener as (event: unknown) => void)(event);
+    const all = listeners.get(type) ?? [];
+    if (all.length === 0) throw new Error(`the worker listens to no ${type}`);
+    for (const listener of all) (listener as (event: unknown) => void)(event);
   };
   return { worker, stores, network, fire };
 }

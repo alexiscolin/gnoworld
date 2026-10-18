@@ -3,11 +3,16 @@ import { startServiceWorker, type WorkerContainer, type WorkerRegistration } fro
 
 type Options = { signal?: AbortSignal } | undefined;
 
-// Listeners as the DOM keeps them: one whose signal has aborted hears nothing more.
-function listeners() {
+// Listeners of one event as the DOM keeps them: one whose signal has aborted hears nothing more,
+// and a listener for any other event name is refused, as the browser would never call it.
+function listeners(event: string) {
   const all: { listener: () => void; options: Options }[] = [];
   return {
-    add: (listener: () => void, options: Options) => all.push({ listener, options }),
+    add: (type: string, listener: () => void, options: Options) => {
+      if (type !== event) throw new Error(`listened to "${type}", not "${event}"`);
+      all.push({ listener, options });
+    },
+    count: () => all.length,
     fire: () => {
       for (const { listener, options } of all) if (options?.signal?.aborted !== true) listener();
     },
@@ -16,16 +21,17 @@ function listeners() {
 
 // A worker as the page sees it: a state that changes, and the messages it was sent.
 function worker(state = "installed") {
-  const changes = listeners();
+  const changes = listeners("statechange");
   const sent: unknown[] = [];
   return {
     state,
     sent,
+    listening: changes.count,
     postMessage: (message: unknown) => {
       sent.push(message);
     },
-    addEventListener: (_type: "statechange", listener: () => void, options?: Options) => {
-      changes.add(listener, options);
+    addEventListener: (type: "statechange", listener: () => void, options?: Options) => {
+      changes.add(type, listener, options);
     },
     becomes(state: string) {
       this.state = state;
@@ -37,13 +43,13 @@ type Worker = ReturnType<typeof worker>;
 
 // navigator.serviceWorker with one registration, whose waiting and installing workers a test sets.
 function container({ controlled = true, waiting = null as Worker | null, installing = null as Worker | null } = {}) {
-  const found = listeners();
-  const changed = listeners();
+  const found = listeners("updatefound");
+  const changed = listeners("controllerchange");
   const registration = {
     waiting,
     installing,
-    addEventListener: (_type: "updatefound", listener: () => void, options?: Options) => {
-      found.add(listener, options);
+    addEventListener: (type: "updatefound", listener: () => void, options?: Options) => {
+      found.add(type, listener, options);
     },
   } satisfies WorkerRegistration;
   const unregistered: string[] = [];
@@ -55,8 +61,8 @@ function container({ controlled = true, waiting = null as Worker | null, install
         { unregister: () => Promise.resolve(unregistered.push("a") > 0) },
         { unregister: () => Promise.resolve(unregistered.push("b") > 0) },
       ]),
-    addEventListener: (_type: "controllerchange", listener: () => void, options?: Options) => {
-      changed.add(listener, options);
+    addEventListener: (type: "controllerchange", listener: () => void, options?: Options) => {
+      changed.add(type, listener, options);
     },
   } satisfies WorkerContainer;
   const updateFound = (next: Worker) => {
@@ -203,7 +209,7 @@ test("another tab's update takes over this page without reloading it; this page'
   expect(waiting.sent).toEqual([]);
 });
 
-test("once the page has gone (its signal aborted), no update shows a prompt", async () => {
+test("once the page has gone (its signal aborted), no update shows a prompt, nor is even watched", async () => {
   const leaving = new AbortController();
   const { page, updateFound } = container();
   const { started, updates } = start(page, { signal: leaving.signal });
@@ -211,8 +217,21 @@ test("once the page has gone (its signal aborted), no update shows a prompt", as
   leaving.abort();
   const next = worker("installing");
   updateFound(next);
+  expect(next.listening()).toBe(0);
   next.becomes("installed");
   expect(updates).toEqual([]);
+});
+
+test("a second click before the takeover sends nothing more, and the page reloads once", async () => {
+  const waiting = worker();
+  const { page, takeOver } = container({ waiting });
+  const { started, updates, reload } = start(page);
+  await started;
+  updates[0]?.();
+  updates[0]?.();
+  takeOver();
+  expect(waiting.sent).toEqual([{ type: "SKIP_WAITING" }]);
+  expect(reload).toHaveBeenCalledOnce();
 });
 
 test("a page gone between the found update and its install shows no prompt", async () => {

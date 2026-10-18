@@ -25,6 +25,19 @@ test("the precache list holds the build's hashed scripts and styles only, as the
   ]);
 });
 
+test("only whole names count: no source map, no nested path, no hash under eight characters", () => {
+  expect(
+    precacheList([
+      "assets/entry.client-Bx3f9a1Q.js.map",
+      "assets/root-Dk2l0p9Z.css.map",
+      "x/assets/entry.client-Bx3f9a1Q.js",
+      "assets/app-abc.js",
+      "assets/app-1234567.js",
+      "assets/app-12345678.js",
+    ]),
+  ).toEqual(["/assets/app-12345678.js"]);
+});
+
 test("the list is the same whatever order the build gives its files in", () => {
   expect(precacheList([...BUILD].reverse())).toEqual(precacheList(BUILD));
 });
@@ -36,4 +49,9 @@ test("the version follows the list: the same list, the same version; another lis
   expect(cacheVersion(list.slice(1))).not.toBe(cacheVersion(list));
   expect(cacheVersion(["/assets/a-AAAAAAAA.js"])).not.toBe(cacheVersion(["/assets/a-AAAAAAAB.js"]));
   expect(cacheVersion(["/a", "/b"])).not.toBe(cacheVersion(["/a\n/b"]));
+});
+
+test("a version keeps its leading zeros, so every version has eight digits", () => {
+  // Computed apart, with FNV-1a in Python over the same JSON.
+  expect(cacheVersion(["/assets/a-AAAAAAA97.js"])).toBe("00dda788");
 });

@@ -166,6 +166,9 @@ test("the test host serves each kind of file the build writes with its type, as 
   const files = [
     ["/", "text/html"],
     ["/w/bubble.data", "text/x-script"],
+    ["/manifest.webmanifest", "application/manifest+json"],
+    ["/icon-192.png", "image/png"],
+    ["/sw.js", "text/javascript"],
     ...scripts(home).map((path) => [path, "text/javascript"]),
   ];
   for (const [path = "", type = ""] of files) {

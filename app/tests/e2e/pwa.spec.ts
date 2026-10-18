@@ -40,14 +40,13 @@ test("Chromium reads the manifest with no error: the name, the root as scope and
 });
 
 test("the manifest check sees a page that links none, so it is not blind", async ({ page }) => {
-  await page.route("http://127.0.0.1:4173/", async (route) => {
-    const original = await route.fetch();
-    await route.fulfill({
-      response: original,
-      body: (await original.text()).replace(/<link rel="manifest"[^>]*>/, ""),
-    });
-  });
-  await page.goto("/");
+  await page.route("**/no-manifest", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: "<!doctype html><title>No manifest</title><p>Nothing linked.</p>",
+    }),
+  );
+  await page.goto("/no-manifest");
   expect((await appManifest(page)).url).toBe("");
 });
 
@@ -81,23 +80,32 @@ test("the worker answers the build's hashed files from its cache, and caches no 
   await page.goto("/");
   await controlled(page);
   const fromWorker: string[] = [];
+  const scripts: string[] = [];
   page.on("response", (response) => {
-    if (response.fromServiceWorker()) fromWorker.push(new URL(response.url()).pathname);
+    const path = new URL(response.url()).pathname;
+    if (response.fromServiceWorker()) fromWorker.push(path);
+    if (response.request().resourceType() === "script") scripts.push(path);
   });
   await page.reload();
   await hydrated(page);
   expect(fromWorker.length, "the worker answered nothing").toBeGreaterThan(0);
   for (const path of fromWorker) expect(path).toMatch(HASHED);
+  // Every script the first screen needs comes from the cache: offline, the page still starts.
+  expect(
+    scripts.filter((path) => !fromWorker.includes(path)),
+    "scripts the worker did not answer",
+  ).toEqual([]);
   for (const path of ["/w/bubble", "/nowhere"]) {
     await page.goto(path);
     await hydrated(page);
   }
-  await page.waitForLoadState("networkidle");
+  // The cache holds the worker's list, exactly: a file written as pages load would show.
+  const worker = await (await page.request.get("/sw.js")).text();
+  const listed: unknown = JSON.parse(/\["\/assets\/[^\]]*\]/.exec(worker)?.[0] ?? "[]");
   const cached = await cacheContents(page);
   expect(cached.names).toHaveLength(1);
   expect(cached.names[0]).toMatch(/^gnoworld-[0-9a-f]{8}$/);
-  for (const path of cached.paths) expect(path).toMatch(HASHED);
-  expect(await cacheContents(page)).toEqual(cached);
+  expect(cached.paths).toEqual(listed);
   await page.context().setOffline(true);
   const offline = await page.evaluate(async (asset) => {
     const answer = async (url: string) => (await fetch(url).catch(() => null))?.status ?? "no answer";
@@ -184,9 +192,21 @@ test("?nosw unregisters the worker for that visit; the next visit without it reg
   await expect.poll(registrations).toBe(0);
   await page.reload();
   await hydrated(page);
-  await page.waitForLoadState("networkidle");
+  expect(await page.evaluate(() => navigator.serviceWorker.controller)).toBeNull();
   expect(await registrations()).toBe(0);
+  // The caches stay: no worker reads them, and the next one deletes those of other versions.
+  expect((await cacheContents(page)).names).toHaveLength(1);
   await page.goto("/");
   await hydrated(page);
   await expect.poll(registrations).toBe(1);
+});
+
+test("a worker that cannot register reports its error, and the page still works", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.context().route("**/sw.js", (route) => route.fulfill({ status: 404, body: "" }));
+  await page.goto("/");
+  await hydrated(page);
+  await expect.poll(() => errors.some((message) => message.includes("ServiceWorker"))).toBe(true);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("gno.world");
 });
