@@ -13,6 +13,7 @@ import sys
 import tempfile
 
 HERE = "packages/core/src/__probe__"
+APP = "app/src/__probe__"
 LONG = "export function long(): number {\n  let n = 0;\n" + "  n += 1;\n" * 85 + "  return n;\n}\n"
 BLOCK = "".join(f"  total += values[{i}] * {i + 1};\n" for i in range(14))
 
@@ -114,19 +115,24 @@ def expect(ok, what):
         failures.append(what)
 
 
+def lint_cases(cases, where, label):
+    """Plant each case in `where`, lint them in one ESLint run, and check each names its rule (None: nothing)."""
+    plant({name: content for name, content, _ in cases}, where=where)
+    out = run(["node_modules/.bin/eslint", "--no-cache", "--format", "json", where])
+    try:
+        report = {os.path.basename(r["filePath"]): reported(r["messages"]) for r in json.loads(out.stdout)}
+    except ValueError:
+        report = {}
+        expect(False, f"eslint ran on {label}: " + (out.stderr or out.stdout)[-300:])
+    for name, _, rule in cases:
+        got = report.get(name, set())
+        expect(got == set() if rule is None else carries(got, rule), f"eslint {label} {name}: expected {rule or 'nothing'}, got {sorted(map(str, got))}")
+
+
 try:
     if part("lint"):
         # ESLint: one run over every planted file, then each file must carry its rule.
-        plant({name: content for name, content, _ in LINT})
-        out = run(["node_modules/.bin/eslint", "--no-cache", "--format", "json", HERE])
-        try:
-            report = {os.path.basename(r["filePath"]): reported(r["messages"]) for r in json.loads(out.stdout)}
-        except ValueError:
-            report = {}
-            expect(False, "eslint ran: " + (out.stderr or out.stdout)[-300:])
-        for name, _, rule in LINT:
-            got = report.get(name, set())
-            expect(got == set() if rule is None else carries(got, rule), f"eslint {name}: expected {rule or 'nothing'}, got {sorted(map(str, got))}")
+        lint_cases(LINT, HERE, "core")
         shutil.rmtree(HERE)
 
     if part("vitest"):
@@ -152,14 +158,9 @@ try:
 
     if part("outside_core"):
         # Outside core: `fails` is refused (pairing happens only in core), and a swallowed error too.
-        other = "packages/probe/src"
-        plant({"pending.test.ts": 'import { expect, test } from "vitest";\n\ntest.fails("x", () => {\n  expect(1).toBe(2);\n});\n',
-               "log_catch.ts": dict((n, c) for n, c, _ in LINT)["log_catch.ts"]}, where=other)
-        out = run(["node_modules/.bin/eslint", "--no-cache", "-f", "json", other])
-        report = {os.path.basename(r["filePath"]): reported(r["messages"]) for r in json.loads(out.stdout or "[]")}
-        for name, rule in (("pending.test.ts", "no-restricted-syntax: `fails` is for pairing"), ("log_catch.ts", "no-restricted-syntax: A catch that only logs")):
-            got = report.get(name, set())
-            expect(carries(got, rule), f"eslint outside core {name}: expected {rule}, got {sorted(map(str, got))}")
+        lint_cases([("pending.test.ts", 'import { expect, test } from "vitest";\n\ntest.fails("x", () => {\n  expect(1).toBe(2);\n});\n', "no-restricted-syntax: `fails` is for pairing"),
+                    ("log_catch.ts", dict((n, c) for n, c, _ in LINT)["log_catch.ts"], "no-restricted-syntax: A catch that only logs")],
+                   "packages/probe/src", "outside core")
         shutil.rmtree("packages/probe")
 
     if part("react"):
@@ -212,33 +213,29 @@ try:
             ("renamed_fail.spec.ts", 'import { test as base } from "@playwright/test";\n\nbase.fail("x", () => {});\n', off),
             ("skipped.spec.ts", 'import { test } from "@playwright/test";\n\ntest.describe.skip("x", () => {});\n', off),
         ]
-        app = "app/src/__probe__"
-        plant({name: content for name, content, _ in react}, where=app)
-        out = run(["node_modules/.bin/eslint", "--no-cache", "--format", "json", app])
-        try:
-            report = {os.path.basename(r["filePath"]): reported(r["messages"]) for r in json.loads(out.stdout)}
-        except ValueError:
-            report = {}
-            expect(False, "eslint ran on the app: " + (out.stderr or out.stdout)[-300:])
-        for name, _, rule in react:
-            got = report.get(name, set())
-            expect(got == set() if rule is None else carries(got, rule), f"eslint app {name}: expected {rule or 'nothing'}, got {sorted(map(str, got))}")
-        # Several of these rules only warn: the lint script must fail on a warning.
+        lint_cases(react, APP, "app")
+        shutil.rmtree(APP)
+
+    if part("react_warn"):
+        # Several of the app's rules only warn: the lint script must fail on a warning.
+        plant({"warned.tsx": 'import { forwardRef } from "react";\n\nexport const Card = forwardRef<HTMLParagraphElement>(function Card(_, r) {\n  return <p ref={r} />;\n});\n'}, where=APP)
         with open("package.json") as f:
             lint = json.load(f)["scripts"]["lint"].split()
-        out = run(["node_modules/.bin/eslint", *lint[1:-1], f"{app}/forward_ref.tsx"])
+        out = run(["node_modules/.bin/eslint", *lint[1:-1], f"{APP}/warned.tsx"])
         expect(out.returncode != 0, "the lint script fails on a warning")
-        shutil.rmtree(app)
+        shutil.rmtree(APP)
+
+    if part("react_tsc"):
         # The compiler flags hold in the app too.
         plant({"unchecked.ts": "export function first(a: number[]): string {\n  return a[0].toFixed();\n}\n",
-               "erasable.ts": "export enum Kind {\n  A,\n}\n"}, where=app)
+               "erasable.ts": "export enum Kind {\n  A,\n}\n"}, where=APP)
         # Through the typecheck script the gate runs, so its app half is proven with the flags.
         with open("package.json") as f:
             typecheck = json.load(f)["scripts"]["typecheck"]
         out = run(["sh", "-c", f'PATH="$PWD/node_modules/.bin:$PATH" {typecheck}'])
         expect("unchecked.ts" in out.stdout and "possibly 'undefined'" in out.stdout, "tsc refuses an unchecked index in the app")
         expect("erasable.ts" in out.stdout and "erasableSyntaxOnly" in out.stdout, "tsc refuses syntax Node cannot erase in the app")
-        shutil.rmtree(app)
+        shutil.rmtree(APP)
 
     if part("knip"):
         # knip: a file nothing imports.
@@ -348,7 +345,7 @@ try:
 finally:
     shutil.rmtree(HERE, ignore_errors=True)
     shutil.rmtree("packages/probe", ignore_errors=True)
-    shutil.rmtree("app/src/__probe__", ignore_errors=True)
+    shutil.rmtree(APP, ignore_errors=True)
 
 if ONLY - ran:
     failures.append(f"ONLY names no block: {', '.join(sorted(ONLY - ran))}")

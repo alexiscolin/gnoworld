@@ -23,10 +23,10 @@ TESTS = {"probe": [sys.executable, "-I", "scripts/probe.py"], "hooks": ["sh", "s
 # Each guard's file, and the sections of its test that must notice the guard gone (their ONLY=):
 # a mutant runs those alone, not the whole suite. A guard file missing here stops the run.
 SECTIONS = {
-    "eslint.config.ts": "lint,outside_core,react", "app/tsconfig.json": "react",
+    "eslint.config.ts": "lint,outside_core,react", "app/tsconfig.json": "react_tsc",
     # A file both suites guard names each one's sections: a section of the other suite would
     # fail the run as unknown, and count a mutant killed that no test saw.
-    "package.json": {"probe": "react", "hooks": "wiring"}, "pnpm-workspace.yaml": {"hooks": "wiring,regressions"},
+    "package.json": {"probe": "react_warn,react_tsc", "hooks": "wiring"}, "pnpm-workspace.yaml": {"hooks": "wiring,regressions"},
     "scripts/check_css.py": "css", "scripts/check_comments.mjs": "comments",
     ".jscpd.json": "jscpd", "tsconfig.base.json": "tsc", "vitest.config.ts": "vitest",
     "scripts/guard.py": "guard", "scripts/review_pass.py": "review_pass", "scripts/patch_coverage.py": "patch_coverage",
