@@ -52,10 +52,19 @@ ask, deny = set(s["permissions"]["ask"]), set(s["permissions"]["deny"])
 assert {"Bash(git push)", "Bash(git push *)"} <= ask, "a push asks no one"
 assert {"Bash(pnpm add *)", "Bash(rm -rf *)"} <= deny, "Claude can add a dependency or delete a tree"
 outside = {"Edit(/scripts/guard.py)", "Edit(/scripts/stop_gate.sh)", "Edit(/scripts/code_changed.sh)", "Edit(/.githooks/**)",
-           "Edit(/.claude/**)", "Edit(/**/package.json)", "Edit(/pnpm-workspace.yaml)", "Edit(/.pnpmfile.cjs)", "Edit(/.pnpmfile.mjs)"}
+           "Edit(/.claude/settings.json)", "Edit(/.claude/settings.local.json)", "Edit(/.claude/agents/**)", "Edit(/.claude/commands/**)",
+           "Edit(/.claude/skills/**)", "Edit(/.claude/rules/**)", "Edit(/.claude/hooks/**)",
+           "Edit(/package.json)", "Edit(/app/package.json)", "Edit(/packages/*/package.json)",
+           "Edit(/pnpm-workspace.yaml)", "Edit(/.pnpmfile.cjs)", "Edit(/.pnpmfile.mjs)"}
 edits = lambda rules: {r for r in rules if r.split("(")[0] in {"Edit", "Write", "MultiEdit", "NotebookEdit"}}
 assert edits(deny) == outside, "the edits refused are not exactly the files run outside the sandbox"
 assert not edits(ask), "an edit asks Alexis: Claude works alone, and the files run outside the sandbox are refused"
+# The sandbox turns an Edit deny into a write ban: none may reach what the gate writes itself, its
+# state in .claude/tmp or StrykerJS's copies of the package files (F111).
+import fnmatch
+for rule in edits(deny):
+    for written in ("/.claude/tmp/gate-green", "/.stryker-tmp/sandbox-x/app/package.json", "/.stryker-tmp/sandbox-x/packages/core/package.json"):
+        assert not fnmatch.fnmatch(written, rule[5:-1]), f"{rule} bans the gate's own write to {written}"
 assert {f"mcp__{p}__gno_{t}" for p in ("gnomcp", "plugin_gnomcp_gnomcp") for t in ("addpkg", "call", "run", "key_send", "cla_sign")} <= ask, "a chain write asks no one"
 assert {"Read(~/.ssh/**)", "Read(~/.config/gh/**)"} <= deny, "the Read tool can open a credential"
 # The sandbox turns Read denies into its own: one on dist, coverage or reports stops the gate
