@@ -600,7 +600,7 @@ git -C "$pf" init -q
 printf '#!/bin/sh\nfor f in "$@"; do grep -qF "$(sed -n "s|^// expects: ||p" "$f")" packages/x/src/a.ts || exit 1; done\n' >"$t/fake_vitest" && chmod +x "$t/fake_vitest"
 printf '.claude/tmp\nnode_modules\n' >"$pf/.gitignore" && printf 'export const twice = (n: number) => n * 3;\n' >"$pf/packages/x/src/a.ts"
 git -C "$pf" add -A && git -C "$pf" commit -qm "feat: twice"
-prove() { (cd "$pf" && PROVE_FIX_VITEST="$t/fake_vitest" python3 -I "$here/prove_fix.py" "$1" >/dev/null 2>&1); }
+prove() { (cd "$pf" && PROVE_FIX_VITEST="$t/fake_vitest" PROVE_FIX_PLAYWRIGHT="$t/fake_vitest" python3 -I "$here/prove_fix.py" "$1" >/dev/null 2>&1); }
 fix() { git -C "$pf" add -A && git -C "$pf" commit -qm "$1"; }
 base=$(git -C "$pf" rev-parse HEAD)
 printf 'export const twice = (n: number) => n * 2;\n' >"$pf/packages/x/src/a.ts" && printf '// expects: n * 2\n' >"$pf/packages/x/src/a.test.ts"
@@ -616,6 +616,15 @@ fix "fix(x): no test"
 prove "$base" && fail "prove_fix accepted a fix with no test"
 git -C "$pf" commit -q --amend -m "fix(x): no test" -m "No-test: the same sum, written as an addition"
 prove "$base" || fail "prove_fix refused a fix that says why it has no test"
+# A journey proves a fix as a unit test does (F126).
+base=$(git -C "$pf" rev-parse HEAD) && mkdir -p "$pf/app/tests"
+printf 'export const twice = (n: number) => n * 2 + 0;\n' >"$pf/packages/x/src/a.ts" && printf '// expects: + 0\n' >"$pf/app/tests/a.spec.ts"
+fix "fix(x): a journey shows it"
+prove "$base" || fail "prove_fix refused a fix whose journey failed before it (F126)"
+base=$(git -C "$pf" rev-parse HEAD)
+printf 'export const twice = (n: number) => n * 2 + 1 - 1;\n' >"$pf/packages/x/src/a.ts" && printf '// expects: export\n' >"$pf/app/tests/b.spec.ts"
+fix "fix(x): a journey that passed already"
+prove "$base" && fail "prove_fix accepted a fix whose journey passed before it"
 base=$(git -C "$pf" rev-parse HEAD)
 mkdir -p "$pf/scripts" && echo x >"$pf/scripts/tool.py" && fix "fix(harness): a harness fix"
 prove "$base" || fail "prove_fix refused a harness fix, which harness_mutate proves"

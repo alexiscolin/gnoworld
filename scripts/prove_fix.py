@@ -17,9 +17,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # -I leaves this
 from repo_files import git, worktree
 
 PRODUCT = ("packages/", "gno/", "app/", "admin/", "server/")
-TEST = re.compile(r"(\.test\.tsx?|_test\.gno|_filetest\.gno|_test\.go)$")
+TEST = re.compile(r"(\.test\.tsx?|\.spec\.ts|_test\.gno|_filetest\.gno|_test\.go)$")
 # The command per kind of test, run from the worktree's root; tests override them (test_hooks.sh).
 VITEST = os.environ.get("PROVE_FIX_VITEST", "node_modules/.bin/vitest run")
+PLAYWRIGHT = os.environ.get("PROVE_FIX_PLAYWRIGHT", "node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts")
 GNO_TEST = os.environ.get("PROVE_FIX_GNO", f"{os.environ.get('GNO', 'gno')} test")
 GO_TEST = os.environ.get("PROVE_FIX_GO", "go test")
 
@@ -29,7 +30,9 @@ def runs(tests):
     vitest = [t for t in tests if t.endswith((".test.ts", ".test.tsx"))]
     gno = sorted({os.path.relpath(os.path.dirname(t), "gno") for t in tests if t.endswith(".gno")})
     go = sorted({os.path.relpath(os.path.dirname(t), "gno") for t in tests if t.endswith("_test.go")})
+    journeys = [t for t in tests if t.endswith(".spec.ts")]
     out = [(".", f"{VITEST} {' '.join(vitest)}")] if vitest else []
+    out += [(".", f"{PLAYWRIGHT} {' '.join(journeys)}")] if journeys else []
     out += [("gno", f"{GNO_TEST} {' '.join('./' + d for d in gno)}")] if gno else []
     out += [("gno", f"{GO_TEST} {' '.join('./' + d for d in go)}")] if go else []
     return out

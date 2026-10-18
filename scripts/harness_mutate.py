@@ -233,6 +233,8 @@ def mutants():
         yield from each(path, "|| status=1; exit \"$status\"' EXIT", "exit \"$status\"' EXIT", "hooks", f"{path} keeps a failure through its EXIT trap")
     yield from each("scripts/prove_fix.py", "return all(subprocess.run(cmd", "return True or all(subprocess.run(cmd", "hooks", "prove_fix runs the tests on the parent")
     yield from each("scripts/prove_fix.py", 're.search(r"^No-test: \\S", message, re.M)', "True", "hooks", "prove_fix wants a reason for no test")
+    yield from each("scripts/prove_fix.py", r"|\.spec\.ts", "", "hooks", "prove_fix takes a journey for a fix's test (F126)")
+    yield from each("scripts/prove_fix.py", """    out += [(".", f"{PLAYWRIGHT} {' '.join(journeys)}")] if journeys else []\n""", "", "hooks", "prove_fix runs a fix's journeys before it (F126)")
     yield from each("scripts/prove_fix.py", "    if not product:\n", "    if True:\n", "hooks", "prove_fix checks product fixes")
     yield from each("scripts/audit.py", 'if a.get("severity") in SEVERE]', "if False]", "hooks", "audit fails on an advisory")
     yield from each("scripts/audit.py", "locked.setdefault(name, set()).add(version)", "pass", "hooks", "audit asks about every package")
