@@ -13,8 +13,8 @@ if [ -z "${SANDBOX_RUNTIME:-}" ]; then
 	# A merge writes the branch's files before any hook runs: one that changes the harness came
 	# through merge.sh, which showed them to Alexis first and names the commit it merges; the
 	# merge of that commit must be what is committed (F129). pre-merge-commit says --merge, since
-	# git writes MERGE_HEAD only after it; a merge concluded by hand has one.
-	if [ "${1:-}" = --merge ] || git rev-parse -q --verify MERGE_HEAD >/dev/null; then
+	# git writes MERGE_HEAD only after it; a merge concluded by hand has one, a squash its message.
+	if [ "${1:-}" = --merge ] || git rev-parse -q --verify MERGE_HEAD >/dev/null || [ -e "$(git rev-parse --git-path SQUASH_MSG)" ]; then
 		changed=$(harness --cached --name-only HEAD)
 		if [ -n "$changed" ] && [ "$(git merge-tree --write-tree HEAD "${GNOWORLD_MERGE:-}" 2>/dev/null)" != "$(git write-tree)" ]; then
 			echo "pre-commit: this merge changes the harness, which merge.sh did not show you first, and has written it: run git merge --abort now, then sh .git/hooks/merge.sh <branch>" >&2

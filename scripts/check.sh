@@ -21,7 +21,7 @@ if git rev-parse --git-dir >/dev/null 2>&1; then # not in pre-commit's staged co
 	# Git runs the hooks of its own folder, which no branch writes and the sandbox cannot (F129).
 	git_hooks="$(git rev-parse --path-format=absolute --git-common-dir)/hooks"
 	if [ "$(git rev-parse --path-format=absolute --git-path hooks)" != "$git_hooks" ]; then
-		echo "check.sh: git runs hooks from $(git rev-parse --git-path hooks), not $git_hooks; install them: git show main:scripts/install_hooks.sh | sh" >&2
+		echo "check.sh: git runs hooks from $(git rev-parse --git-path hooks), not $git_hooks; install them: git --no-replace-objects show main:scripts/install_hooks.sh | sh" >&2
 		exit 1
 	fi
 	if [ -n "${SANDBOX_RUNTIME:-}" ]; then
@@ -32,7 +32,7 @@ if git rev-parse --git-dir >/dev/null 2>&1; then # not in pre-commit's staged co
 		fi
 		for hook in commit-msg pre-commit pre-merge-commit pre-push; do
 			[ -x "$git_hooks/$hook" ] || {
-				echo "check.sh: no $hook in $git_hooks, so git checks no commit there; install the hooks: git show main:scripts/install_hooks.sh | sh" >&2
+				echo "check.sh: no $hook in $git_hooks, so git checks no commit there; install the hooks: git --no-replace-objects show main:scripts/install_hooks.sh | sh" >&2
 				exit 1
 			}
 		done

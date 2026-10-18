@@ -38,7 +38,7 @@ $undeclared"
 		fi
 		if $outside; then
 			# What runs in Alexis's shell is what was reviewed: the hooks of the main that leaves (F129).
-			sh "$(dirname "$0")/install_hooks.sh" --check "$local_sha" || refuse "install the hooks of this main first: git show main:scripts/install_hooks.sh | sh"
+			sh "$(dirname "$0")/install_hooks.sh" --check "$local_sha" || refuse "install the hooks of this main first: git --no-replace-objects show main:scripts/install_hooks.sh | sh"
 			green "$local_sha" full || refuse "the full gate never passed on this code; run /pre-merge in Claude Code"
 			reviewed "$local_sha" || refuse "no committed review pass for this code; run /pre-merge and commit its record"
 			gated=true

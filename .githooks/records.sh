@@ -2,6 +2,8 @@
 # by the hooks and by check.sh; it runs nothing but git. A record is one code print per line, in
 # .claude/tmp/green-fast, or green-full for the full gate, which writes both. Each function runs in
 # a subshell, so it leaves no variable behind in the shell that sources this file.
+# Git shows each object itself, whatever a replace ref would show instead (F132).
+export GIT_NO_REPLACE_OBJECTS=1
 # A tree's code: every file but prose (docs/, adr/, *.md), as scripts/code_changed.sh leaves it
 # out; names unquoted, so an accented one is matched as code_changed.sh matches it.
 code_print() ( printf '%s' "$(git -c core.quotePath=false ls-tree -r "$1" | grep -v -e '	docs/' -e '	adr/' -e '\.md$')" | git hash-object --stdin )

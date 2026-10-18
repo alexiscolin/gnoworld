@@ -2,9 +2,11 @@
 # install_hooks.sh [--check] [<commit>]: puts the hooks of <commit>, main by default, and the
 # scripts they run in git's own hooks folder, where no merge, checkout or command in Claude
 # Code's sandbox writes: no branch brings its own into Alexis's shell (F129). He runs main's
-# copy, never the working tree's: git show main:scripts/install_hooks.sh | sh
+# copy, never the working tree's, and the object itself, whatever a replace ref would show:
+# git --no-replace-objects show main:scripts/install_hooks.sh | sh
 # --check writes nothing, and fails unless the folder holds exactly those files.
 set -eu
+export GIT_NO_REPLACE_OBJECTS=1 # the commit's own bytes, whatever a replace ref shows (F132)
 check=false
 if [ "${1:-}" = --check ]; then
 	check=true
@@ -29,7 +31,7 @@ if $check; then
 		to="$hooks/${f##*/}"
 		# A link, which a checkout could change, or a hook git would skip, is not the commit's.
 		[ ! -L "$to" ] && [ -x "$to" ] && git show "$ref:$f" | cmp -s - "$to" || {
-			echo "install_hooks: $to is not $ref's $f; install the hooks: git show main:scripts/install_hooks.sh | sh" >&2
+			echo "install_hooks: $to is not $ref's $f; install the hooks: git --no-replace-objects show main:scripts/install_hooks.sh | sh" >&2
 			exit 1
 		}
 	done
