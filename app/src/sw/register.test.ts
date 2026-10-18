@@ -48,6 +48,7 @@ function container({ controlled = true, waiting = null as Worker | null, install
   const registration = {
     waiting,
     installing,
+    update: vi.fn<() => Promise<unknown>>(() => Promise.resolve(undefined)),
     addEventListener: (type: "updatefound", listener: () => void, options?: Options) => {
       found.add(type, listener, options);
     },
@@ -77,21 +78,41 @@ function container({ controlled = true, waiting = null as Worker | null, install
   return { page, registration, unregistered, updateFound, takeOver };
 }
 
+// The page's document, as far as its visibility goes: a test shows or hides it.
+function shown() {
+  const changes = listeners("visibilitychange");
+  return {
+    visibilityState: "visible",
+    listening: changes.count,
+    addEventListener: (type: "visibilitychange", listener: () => void, options?: Options) => {
+      changes.add(type, listener, options);
+    },
+    becomes(state: string) {
+      this.visibilityState = state;
+      changes.fire();
+    },
+  };
+}
+
 function start(
   page: WorkerContainer | undefined,
   { search = "", production = true, signal = new AbortController().signal } = {},
 ) {
   const updates: (() => void)[] = [];
   const reload = vi.fn();
+  const report = vi.fn();
+  const document = shown();
   const started = startServiceWorker({
     container: page,
+    document,
     search,
     production,
     signal,
     reload,
+    report,
     onUpdate: (apply) => updates.push(apply),
   });
-  return { started, updates, reload };
+  return { started, updates, reload, report, document };
 }
 
 test("?nosw unregisters every worker and registers none, in production as in development", async () => {
@@ -115,9 +136,11 @@ test("?nosw among other parameters still unregisters; a parameter that only cont
 
 test("in development no worker registers", async () => {
   const { page, unregistered } = container();
-  await start(page, { production: false }).started;
+  const { started, document } = start(page, { production: false });
+  await started;
   expect(page.register).not.toHaveBeenCalled();
   expect(unregistered).toEqual([]);
+  expect(document.listening()).toBe(0);
 });
 
 test("a browser with no service workers gets none, and no error", async () => {
@@ -288,4 +311,35 @@ test("a registration that fails rejects, so the error rises", async () => {
   const { page } = container();
   page.register.mockRejectedValueOnce(new Error("no worker here"));
   await expect(start(page).started).rejects.toThrow("no worker here");
+});
+
+test("a page shown again asks the browser for a newer worker; hidden, it does not", async () => {
+  const { page, registration } = container();
+  const { started, document } = start(page);
+  await started;
+  document.becomes("hidden");
+  expect(registration.update).not.toHaveBeenCalled();
+  document.becomes("visible");
+  expect(registration.update).toHaveBeenCalledOnce();
+});
+
+test("a check that fails, offline say, is reported, and the page goes on", async () => {
+  const { page, registration } = container();
+  const { started, document, report } = start(page);
+  await started;
+  registration.update.mockRejectedValueOnce(new Error("offline"));
+  document.becomes("visible");
+  await vi.waitFor(() => {
+    expect(report).toHaveBeenCalledWith(new Error("offline"));
+  });
+});
+
+test("once the page has gone, being shown asks for nothing", async () => {
+  const leaving = new AbortController();
+  const { page, registration } = container();
+  const { started, document } = start(page, { signal: leaving.signal });
+  await started;
+  leaving.abort();
+  document.becomes("visible");
+  expect(registration.update).not.toHaveBeenCalled();
 });

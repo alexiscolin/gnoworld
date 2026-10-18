@@ -22,11 +22,15 @@ export function UpdatePrompt() {
     const leaving = new AbortController();
     startServiceWorker({
       container: "serviceWorker" in navigator ? navigator.serviceWorker : undefined,
+      document,
       search: location.search,
       production: PRODUCTION,
       signal: leaving.signal,
       reload: () => {
         location.reload();
+      },
+      report: (error) => {
+        reportError(error);
       },
       onUpdate: (next) => {
         setApply(() => next);

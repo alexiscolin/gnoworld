@@ -17,6 +17,7 @@ interface PageWorker {
 export interface WorkerRegistration {
   readonly waiting: PageWorker | null;
   readonly installing: PageWorker | null;
+  update(): Promise<unknown>;
   addEventListener(type: "updatefound", listener: () => void, options: Listening): void;
 }
 
@@ -27,12 +28,19 @@ export interface WorkerContainer {
   addEventListener(type: "controllerchange", listener: () => void, options: Listening): void;
 }
 
+interface Shown {
+  readonly visibilityState: string;
+  addEventListener(type: "visibilitychange", listener: () => void, options: Listening): void;
+}
+
 interface Start {
   readonly container: WorkerContainer | undefined;
+  readonly document: Shown;
   readonly search: string;
   readonly production: boolean;
   readonly signal: AbortSignal;
   readonly reload: () => void;
+  readonly report: (error: unknown) => void;
   readonly onUpdate: (apply: () => void) => void;
 }
 
@@ -46,6 +54,15 @@ export async function startServiceWorker(start: Start): Promise<void> {
   if (!start.production) return;
   const registration = await container.register("/sw.js");
   if (signal.aborted) return;
+  // The browser looks for a new worker when a page loads; one kept open for days moves in place,
+  // so it asks each time it is shown again.
+  start.document.addEventListener(
+    "visibilitychange",
+    () => {
+      if (start.document.visibilityState === "visible") registration.update().catch(start.report);
+    },
+    { signal },
+  );
   // One page reloads once, however many clicks and takeovers it sees.
   let asked = false;
   let reloaded = false;

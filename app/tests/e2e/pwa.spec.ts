@@ -135,11 +135,10 @@ test.describe("updates", () => {
       };
     });
 
+  // A deploy, then the tab shown again, which is when an open page asks for a newer worker.
   async function bump(page: Page, request: { post(url: string): Promise<{ status(): number }> }): Promise<void> {
     expect((await request.post(`${site}/__bump`)).status()).toBe(204);
-    await page.evaluate(async () => {
-      await (await navigator.serviceWorker.getRegistration())?.update();
-    });
+    await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
   }
 
   const promptOf = (page: Page) => page.getByRole("status").filter({ hasText: "New version available." });
