@@ -228,11 +228,29 @@ test("?nosw unregisters the worker for that visit; the next visit without it reg
   await hydrated(page);
   expect(await page.evaluate(() => navigator.serviceWorker.controller)).toBeNull();
   expect(await registrations()).toBe(0);
-  // The caches stay: no worker reads them, and the next one deletes those of other versions.
-  expect((await cacheContents(page)).names).toHaveLength(1);
+  // The worker took its cache with it.
+  expect((await cacheContents(page)).names).toEqual([]);
   await page.goto("/");
   await hydrated(page);
   await expect.poll(registrations).toBe(1);
+});
+
+test("?nosw frees the site even when the scripts the worker holds cannot run", async ({ page }) => {
+  await page.goto("/");
+  await controlled(page);
+  // The first screen's entry, broken in the worker's cache: the pages it serves cannot start.
+  await page.evaluate(async () => {
+    const cache = await caches.open("gnoworld-precache");
+    for (const request of await cache.keys())
+      if (request.url.includes("/entry.client-"))
+        await cache.put(
+          request,
+          new Response("throw new Error('broken')", { headers: { "content-type": "text/javascript" } }),
+        );
+  });
+  await page.goto("/?nosw");
+  await hydrated(page);
+  expect(await cacheContents(page)).toEqual({ names: [], paths: [] });
 });
 
 test("a worker that cannot register reports its error, and the page still works", async ({ page }) => {

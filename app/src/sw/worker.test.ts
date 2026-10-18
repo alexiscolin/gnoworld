@@ -1,6 +1,7 @@
 import { expect, test, vi } from "vitest";
 import {
   precache,
+  release,
   takeOver,
   type LifecycleEvent,
   type Precached,
@@ -27,11 +28,12 @@ const OWN = PATHS.map((path) => SITE + path);
 // A service worker's global scope with nothing but what the worker uses: caches in memory, keyed
 // by the whole URL (a put records, so a worker caching what it fetches shows; addAll records each
 // request's digest, which the browser checks, not this fake), a network, the listeners added.
-function scope({ failing = false, unreadable = false } = {}) {
+function scope({ failing = false, unreadable = false, stuck = false } = {}) {
   const stores = new Map<string, Map<string, string>>();
   const listeners = new Map<string, ((event: never) => void)[]>();
   const network: string[] = [];
   const added: { url: string; integrity: string }[] = [];
+  const order: string[] = [];
   const store = (name: string) => {
     const urls = stores.get(name) ?? new Map<string, string>();
     stores.set(name, urls);
@@ -63,6 +65,10 @@ function scope({ failing = false, unreadable = false } = {}) {
     location: { origin: SITE },
     caches: {
       open: (name: string) => Promise.resolve(cache(name)),
+      delete: (name: string) => {
+        order.push(`delete ${name}`);
+        return Promise.resolve(stores.delete(name));
+      },
       match: (request: Request, { cacheName }: { cacheName: string }) => {
         if (unreadable) return Promise.reject(new Error("UnknownError: the store cannot be read"));
         const body = stores.get(cacheName)?.get(request.url);
@@ -70,8 +76,15 @@ function scope({ failing = false, unreadable = false } = {}) {
       },
     },
     clients: { claim: vi.fn(() => Promise.resolve()) },
+    registration: {
+      unregister: vi.fn(() => {
+        order.push("unregister");
+        return stuck ? Promise.reject(new Error("cannot unregister")) : Promise.resolve(true);
+      }),
+    },
     skipWaiting: vi.fn(() => Promise.resolve()),
     fetch: (request: Request) => {
+      order.push(`fetch ${request.url}`);
       network.push(request.url);
       return Promise.resolve(new Response(`network ${request.url}`));
     },
@@ -86,7 +99,7 @@ function scope({ failing = false, unreadable = false } = {}) {
     for (const listener of all) (listener as (event: unknown) => void)(event);
   };
   const held = (name = "gnoworld-precache") => [...(stores.get(name)?.keys() ?? [])];
-  return { worker, store, held, added, network, fire };
+  return { worker, store, held, added, network, order, fire };
 }
 
 // An install or activate event; the worker must hand the browser the work it waits for.
@@ -236,4 +249,34 @@ test("the open page asks it to take over with SKIP_WAITING; any other message do
   fire("message", { ...event, data: { type: "SKIP_WAITING" } });
   await done();
   expect(worker.skipWaiting).toHaveBeenCalledOnce();
+});
+
+test("?nosw on a request: the worker drops its cache and unregisters, then the host answers", async () => {
+  const site = installed();
+  await site.install.done();
+  release(site.worker);
+  const { event, answer } = request(`${SITE}/w/bubble?nosw`);
+  site.fire("fetch", event);
+  expect(await (await answer())?.text()).toBe(`network ${SITE}/w/bubble?nosw`);
+  expect(site.held()).toEqual([]);
+  expect(site.order).toEqual(["delete gnoworld-precache", "unregister", `fetch ${SITE}/w/bubble?nosw`]);
+});
+
+test("?nosw is still answered by the host when the worker cannot leave", async () => {
+  const { worker, fire } = scope({ stuck: true });
+  release(worker);
+  const { event, answer } = request(`${SITE}/?nosw`);
+  fire("fetch", event);
+  expect(await (await answer())?.text()).toBe(`network ${SITE}/?nosw`);
+});
+
+test("without ?nosw, the worker stays: another parameter, a listed file, a page", () => {
+  const { worker, fire } = scope();
+  release(worker);
+  for (const url of [`${SITE}/?nosweat`, `${SITE}/?q=nosw`, OWN[0] ?? "", `${SITE}/`]) {
+    const { event, answer } = request(url);
+    fire("fetch", event);
+    expect(answer(), url).toBeUndefined();
+  }
+  expect(worker.registration.unregister).not.toHaveBeenCalled();
 });

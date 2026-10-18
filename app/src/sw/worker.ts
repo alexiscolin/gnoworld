@@ -34,9 +34,11 @@ export interface WorkerScope {
   readonly location: { readonly origin: string };
   readonly caches: {
     open(name: string): Promise<WorkerCache>;
+    delete(name: string): Promise<boolean>;
     match(request: Request, options: { cacheName: string }): Promise<Response | undefined>;
   };
   readonly clients: { claim(): Promise<void> };
+  readonly registration: { unregister(): Promise<boolean> };
   skipWaiting(): Promise<void>;
   fetch(request: Request): Promise<Response>;
   addEventListener(type: "install" | "activate", listener: (event: LifecycleEvent) => void): void;
@@ -110,5 +112,21 @@ export function takeOver(scope: WorkerScope): void {
   });
   scope.addEventListener("message", (event) => {
     if (asksToTakeOver(event.data)) event.waitUntil(scope.skipWaiting());
+  });
+}
+
+// `?nosw` on any request, a page's first among them: the worker drops its cache and unregisters,
+// then the host answers, so the escape works even when the pages it served cannot start.
+export function release(scope: WorkerScope): void {
+  scope.addEventListener("fetch", (event) => {
+    const { request } = event;
+    if (!new URL(request.url).searchParams.has("nosw")) return;
+    const fromHost = () => scope.fetch(request);
+    event.respondWith(
+      scope.caches
+        .delete(CACHE)
+        .then(() => scope.registration.unregister())
+        .then(fromHost, fromHost),
+    );
   });
 }
