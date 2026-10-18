@@ -12,11 +12,14 @@ asks before updating". The budget is a journey, which the gate already runs. The
 - Chromium reads the manifest with no error, its icons are PNGs of their stated sizes, and a
   worker controls the page (Chromium's own installability check answers nothing in the
   sandbox's one-process browser, so it proves nothing there);
-- only the app's hashed files are precached, and the worker caches nothing at run time;
+- only the app's hashed files are precached, each held only while its bytes match the digest
+  the build gave it, and the worker caches nothing at run time;
 - updates are explicit: a new worker waits, "New version, reload" shows, the page changes
-  only after the click, in each open tab;
-- no service worker in development; `?nosw` unregisters it for that visit (the next visit
-  without it registers again; the caches stay, read by no worker);
+  only after the click, in each open tab; an open page asks for a new version each time it
+  is shown again;
+- no service worker in development; `?nosw`, on any request, makes the worker drop its cache
+  and unregister before the host answers, so it works when the pages cannot start (the next
+  visit without it registers again);
 - the two pages stay within ADR-0001 §12's budgets: at most 150 KB of compressed JavaScript
   before the first usable screen, 3 MB in all.
 
@@ -33,7 +36,7 @@ the real icons (slice 2's designs; these are placeholders), screenshots (slice 2
 
 | Asset | Threat | Mitigation | Proof |
 |---|---|---|---|
-| What visitors run | A worker serves stale or foreign code for good | Precache only hashed files; a new version waits for a click; `?nosw` | Journeys: the update waits for the click; `?nosw` leaves no registration |
+| What visitors run | A worker serves stale or foreign code for good | Precache only hashed files, each with its digest, which the browser checks at install and the worker checks on what it holds; a new version waits for a click; `?nosw` handled by the worker itself | Journeys: the update waits for the click; a changed file fails the install; a file changed in the cache is replaced at the next update; `?nosw` frees a site whose cached entry is broken |
 | Later chain and relay reads | Cached, so a visitor sees a false state | The worker answers only the precache list, and its cache type has no `put` | Unit: a miss is fetched, not stored; journey: after browsing, the cache holds the list only, and offline a page has no answer |
 | This machine | A build dependency taken over | No dependency: `workbox-build` 7.4.1 pulls a pre-release fork from one person's scope, which pnpm refused as a possible takeover (`docs/decisions.md`) | The worker is our code, under the gate's lint, tests and mutations |
 
