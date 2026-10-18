@@ -63,7 +63,9 @@ Code written by an agent gets the same reading as anyone's, plus this. `/pre-mer
    fresh context, through every lens at once: correctness, security, performance,
    accessibility and UX, simplicity, with this file's checklists. A change to a tier-1 file adds one more agent, on the
    strongest model, for security alone. Fixes are re-checked by the gate and the mutation
-   tester; a second pass runs only for a high finding fixed in tier-1 code. A branch gets three
+   tester; a second pass runs only for a high finding fixed in tier-1 code. A merge carries about 400 lines of product code at most (DORA's small
+   batches): a slice is cut into merges of that size, and the review log notes each one's size.
+   A branch gets three
    review rounds at most; after the third, a review reads only the diff since the last one, and
    the gate and the mutation checks hold the rest.
 4. **Each finding is verified, then reproduced, before it is fixed.** On a tier-1 lot, the

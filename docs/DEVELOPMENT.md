@@ -4,7 +4,10 @@
 
 The README's "Install" lists what to install. `pnpm install` runs the `prepare` script,
 which points git at `.githooks` (the gate before each commit and merge; no attribution
-lines). The gate needs Node 24.22.0 (from `.node-version`, found through nvm when the shell
+lines). It finds git on the system's default path only (`command -p git`), never one planted in
+`node_modules/.bin` (F087). Where git lives elsewhere (Nix, Homebrew without Xcode's command
+line tools), the install stops there: point git at the hooks once by hand
+(`git config core.hooksPath .githooks`), then run `pnpm install --ignore-scripts` (F122). The gate needs Node 24.22.0 (from `.node-version`, found through nvm when the shell
 has another; in a shell, `nvm use` picks it, since `.nvmrc` links to `.node-version`; nvm must be loaded
 first, by `source ~/.nvm/nvm.sh` or the shell's profile), pnpm, Go 1.26, Python 3, gitleaks, and a gno toolchain that matches the chain.
 The app's journeys need Playwright's Chromium, once per Playwright version: `node app/node_modules/@playwright/test/cli.js install chromium`
