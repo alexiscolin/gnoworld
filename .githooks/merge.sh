@@ -9,6 +9,10 @@ branch=${1:?usage: sh .git/hooks/merge.sh <branch>}
 tip=$(git rev-parse --verify "$branch^{commit}")
 [ "$(git symbolic-ref -q --short HEAD)" = main ] || { echo "merge.sh: check out main first" >&2; exit 1; }
 [ -z "$(git status --porcelain)" ] || { echo "merge.sh: main has uncommitted or untracked files; commit or remove them first" >&2; exit 1; }
+if foreign HEAD..."$tip"; then
+	echo "merge.sh: the branch changes a path with a non-ASCII character, which this disk may read as another path; nothing merged (F164)" >&2
+	exit 1
+fi
 changed=$(harness --name-only HEAD..."$tip")
 if [ -n "$changed" ]; then
 	# As text, whatever an attribute or a driver would show instead (F132), and its control bytes

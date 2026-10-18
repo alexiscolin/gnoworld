@@ -716,6 +716,11 @@ git -C "$i" update-index --add --cacheinfo "100644,$blob,Scripts/guard.py"
 git -C "$i" update-index --add --cacheinfo "100644,$blob,.Claude/settings.json"
 git -C "$i" commit -qm cased
 git -C "$i" checkout -q -f main
+# folded: a path whose letter this disk folds beyond ASCII (ſ is s there), unknown to git (F164).
+git -C "$i" checkout -q -b folded main
+git -C "$i" update-index --add --cacheinfo "100644,$blob,packageſ/evil/package.json"
+git -C "$i" commit -qm folded
+git -C "$i" checkout -q -f main
 git -C "$i" checkout -q -b shadow main
 plant .githooks/scan_secrets.sh
 git -C "$i" add .githooks
@@ -862,6 +867,14 @@ mark_i cased fast
 echo wrong | in_i sh .git/hooks/merge.sh cased >"$t/cased" 2>&1 && fail "merge.sh merged harness files spelled with capitals unshown (F151)"
 grep -qx 'Scripts/guard.py' "$t/cased" && grep -qx '.Claude/settings.json' "$t/cased" || fail "merge.sh did not show harness files spelled with capitals (F151)"
 untouched_main "$base" || fail "merge.sh began a merge on a wrong answer"
+# Beyond ASCII, git cannot tell what the disk folds: a path holding such a letter is refused,
+# by merge.sh before it writes, and at the merge's commit (F164).
+mark_i folded fast
+echo folded | in_i sh .git/hooks/merge.sh folded >"$t/folded" 2>&1 && fail "merge.sh merged a path this disk may read as another (F164)"
+grep -q 'non-ASCII' "$t/folded" || fail "merge.sh refused the folded path for another reason than its name (F164)"
+untouched_main "$base" || fail "merge.sh began a merge of a path this disk may read as another"
+in_i git merge -q --no-ff folded >/dev/null 2>&1 && fail "a merge took a path this disk may read as another (F164)"
+git -C "$i" merge --abort
 # pre-push runs its own records and scan, not those of the branch it pushes.
 git -C "$i" checkout -q planted
 printf 'refs/heads/planted %s refs/heads/planted 0000000000000000000000000000000000000000\n' "$(git -C "$i" rev-parse HEAD)" |
