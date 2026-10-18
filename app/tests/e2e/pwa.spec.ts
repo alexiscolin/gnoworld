@@ -29,14 +29,19 @@ test("Chromium reads the manifest with no error: the name, the root as scope and
   const { url, errors, manifest, data } = await appManifest(page);
   expect(errors).toEqual([]);
   expect(new URL(url).pathname).toBe("/manifest.webmanifest");
-  // Chromium names display modes by its own enum, and reports no short name: that one is read raw.
+  // Chromium names display modes by its own enum, and reports no short name: those are read raw,
+  // the colours as DESIGN-SYSTEM.md's --color-space, the page behind the scene.
   expect(manifest).toMatchObject({
     name: "gno.world",
     scope: "http://127.0.0.1:4173/",
     startUrl: "http://127.0.0.1:4173/",
     display: "kStandalone",
   });
-  expect(JSON.parse(data ?? "{}")).toMatchObject({ short_name: "gno.world" });
+  expect(JSON.parse(data ?? "{}")).toMatchObject({
+    short_name: "gno.world",
+    background_color: "#05070D",
+    theme_color: "#05070D",
+  });
 });
 
 test("the manifest check sees a page that links none, so it is not blind", async ({ page }) => {
