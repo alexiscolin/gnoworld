@@ -369,7 +369,7 @@
           <h3>Fast: each turn, commit and branch push (60 s at most; about 20 s)</h3>
           <ul class="cols">
             <li>Prettier; <code>tsc</code>, where core sees no DOM and no Node</li>
-            <li>ESLint: floating promises, swallowed errors, <code>any</code>, cycles, size, an impure core, switched-off tests, CSS</li>
+            <li>ESLint: floating promises, swallowed errors, <code>any</code>, an import across a boundary (core imports only core), cycles, size, an impure core, switched-off tests, CSS</li>
             <li>On the app: React's hooks and compiler rules, no hand-written memo, no raw HTML</li>
             <li>Vitest, core's and the app's: a test with no assertion fails</li>
             <li>knip and jscpd: dead code and copies</li>
@@ -512,6 +512,7 @@
             <li>Everything about gno goes through gnomcp; the guard refuses <code>gnokey</code> and raw RPC</li>
             <li>Keys and mnemonics never enter the conversation</li>
             <li>Every chain write asks Alexis; mainnet is read-only</li>
+            <li>gno is pinned by commit to the chains' release line (v1.5.1)</li>
           </ul>
         </div>
       </div>
@@ -544,11 +545,12 @@
         <div class="card" style="--accent: var(--limit)">
           <h2>Known limits</h2>
           <ul>
-            <li>The CI reports but cannot block a merge on this plan</li>
-            <li>At a push, the git hooks run the repository's code with Alexis's access (F076: the backlog's hooks that run no repository code)</li>
+            <li>The CI reports but cannot block a merge on this plan (next: main protected, with code owners)</li>
+            <li>At a push, the git hooks run the repository's code with Alexis's access (next: hooks that run no repository code, F076)</li>
             <li>The guard is a pattern list: a seatbelt, not a wall</li>
             <li>The review pass is recorded by the agent that ran it; the round limit is a written rule</li>
             <li><code>prove_fix.py</code> takes any failure before the fix as proof, a crash included</li>
+            <li>No reviewer is scored yet on bugs it should find (next: the reviewers' exam)</li>
           </ul>
         </div>
       </div>
