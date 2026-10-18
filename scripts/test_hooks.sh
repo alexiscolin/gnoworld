@@ -6,6 +6,7 @@ export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER
 here=$(cd "$(dirname "$0")" && pwd)
 hooks=$(cd "$here/../.githooks" && pwd)
 rp="$here"/review_pass.py # review_pass and pre_push both use it
+secrets_into() { cp "$here/scan_secrets.sh" "$here/gitleaks.toml" "$here/gitleaks-private.toml" "$1"; } # the secret scan, whole
 t=$(mktemp -d "${TMPDIR:-/tmp}/test_hooks.XXXXXX")
 # bash 3.2, macOS's sh, exits 0 through an EXIT trap after an unbound variable: `finished`, set
 # on the last line, tells a run that reached its end from one that died on the way.
@@ -40,17 +41,30 @@ box = s["sandbox"]
 assert box["enabled"] is True and box["allowUnsandboxedCommands"] is False, "the sandbox can be left"
 assert {"~/.ssh", "~/.config/gh", "~/.npmrc", "~/.aws"} <= set(box["filesystem"]["denyRead"]), "a credential is readable"
 assert {"scripts", ".githooks", ".github", "package.json", ".node-version", "pnpm-lock.yaml", ".gitignore", "CLAUDE.md", ".claude/rules"} <= set(box["filesystem"]["denyWrite"]), "a command can rewrite the harness, the lockfile or the rules"
+assert {"pnpm-workspace.yaml", ".pnpmfile.cjs", ".pnpmfile.mjs"} <= set(box["filesystem"]["denyWrite"]), "a command can plant what pnpm runs (F087)"
 assert not [p for p in box["filesystem"]["allowWrite"] if "pnpm" in p], "a command can rewrite the pnpm that Alexis's install runs"
 assert not any("api.github.com" in d for d in box["network"]["allowedDomains"]), "the GitHub API is reachable"
 ask, deny = set(s["permissions"]["ask"]), set(s["permissions"]["deny"])
-# Claude edits alone (Alexis, 2026-10-17), but for what runs with Alexis's full access: the
-# hooks, the gate and every script or config they reach when he pushes or merges, and what pnpm
-# runs at his install (findings F068, F076); a new dependency and a push still ask.
-assert {"Bash(pnpm add *)", "Bash(git push *)"} <= ask, "a new dependency or a push asks no one"
-outside = {"Edit(/scripts/**)", "Edit(/.githooks/**)", "Edit(/.claude/**)", "Edit(/*.config.ts)", "Edit(/stryker.config.json)",
-           "Edit(/**/package.json)", "Edit(/pnpm-workspace.yaml)", "Edit(/.npmrc)", "Edit(/.pnpmfile.cjs)"}
-writes = {r for r in ask if r.split("(")[0] in {"Edit", "Write", "MultiEdit", "NotebookEdit"}}
-assert writes == outside, "the edits that ask are not exactly the files run outside the sandbox"
+# Claude works alone and asks only before a push or a chain write (Alexis, 2026-10-18). The files
+# run outside the sandbox themselves cannot be edited at all: the hooks and their scripts,
+# Claude Code's own settings, skills and agents (F068), what pnpm loads at Alexis's install
+# (F087). A dependency is Alexis's to add, and rm -rf no one's.
+assert {"Bash(git push)", "Bash(git push *)"} <= ask, "a push asks no one"
+assert {"Bash(pnpm add *)", "Bash(rm -rf *)"} <= deny, "Claude can add a dependency or delete a tree"
+outside = {"Edit(/scripts/guard.py)", "Edit(/scripts/stop_gate.sh)", "Edit(/scripts/code_changed.sh)", "Edit(/.githooks/**)",
+           "Edit(/.claude/settings.json)", "Edit(/.claude/settings.local.json)", "Edit(/.claude/agents/**)", "Edit(/.claude/commands/**)",
+           "Edit(/.claude/skills/**)", "Edit(/.claude/rules/**)", "Edit(/.claude/hooks/**)",
+           "Edit(/package.json)", "Edit(/app/package.json)", "Edit(/packages/*/package.json)",
+           "Edit(/.npmrc)", "Edit(/pnpm-workspace.yaml)", "Edit(/.pnpmfile.cjs)", "Edit(/.pnpmfile.mjs)"}
+edits = lambda rules: {r for r in rules if r.split("(")[0] in {"Edit", "Write", "MultiEdit", "NotebookEdit"}}
+assert edits(deny) == outside, "the edits refused are not exactly the files run outside the sandbox"
+assert not edits(ask), "an edit asks Alexis: Claude works alone, and the files run outside the sandbox are refused"
+# The sandbox turns an Edit deny into a write ban: none may reach what the gate writes itself, its
+# state in .claude/tmp or StrykerJS's copies of the package files (F111).
+import fnmatch
+for rule in edits(deny):
+    for written in ("/.claude/tmp/gate-green", "/.stryker-tmp/sandbox-x/app/package.json", "/.stryker-tmp/sandbox-x/packages/core/package.json"):
+        assert not fnmatch.fnmatch(written, rule[5:-1]), f"{rule} bans the gate's own write to {written}"
 assert {f"mcp__{p}__gno_{t}" for p in ("gnomcp", "plugin_gnomcp_gnomcp") for t in ("addpkg", "call", "run", "key_send", "cla_sign")} <= ask, "a chain write asks no one"
 assert {"Read(~/.ssh/**)", "Read(~/.config/gh/**)"} <= deny, "the Read tool can open a credential"
 # The sandbox turns Read denies into its own: one on dist, coverage or reports stops the gate
@@ -59,16 +73,47 @@ assert not [r for r in deny if any(w in r for w in ("dist", "coverage", "reports
 market = s.get("extraKnownMarketplaces", {}).get("gnoverse", {}).get("source", {})
 assert market.get("repo") == "gnoverse/gno-mcp", "a teammate's Claude Code cannot find gnomcp's marketplace"
 PY
+# pnpm runs no pnpmfile, and the prepare script that Alexis's install runs finds git on the
+# system's path, never one planted in node_modules/.bin, which pnpm puts first (F087).
+grep -qx 'ignorePnpmfile: true' "$here/../pnpm-workspace.yaml" || fail "pnpm may run a pnpmfile"
+pp="$t/prepare" && mkdir -p "$pp/bin" && git -C "$pp" init -q
+printf '#!/bin/sh\ntouch "%s/planted-ran"\n' "$pp" >"$pp/bin/git" && chmod +x "$pp/bin/git"
+(cd "$pp" && PATH="$pp/bin:$PATH" sh -c "$(node -p "require('$here/../package.json').scripts.prepare")") >/dev/null 2>&1
+[ ! -e "$pp/planted-ran" ] || fail "the prepare script ran a git planted on its path"
 # check.sh runs every step it promises: removing one fails here.
 gate_file="$here/check.sh"
 for step in "run format:check" "run typecheck" "run lint" "run test" "run unused" "run copies" \
 	"python3 -I scripts/check_css.py" "run comments" '"$GNO" lint ./...' '"$GNO" test ./...' \
+	"node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts" '[ "$(packages)" = "$installed" ]' \
+	"ast.parse(open(f).read(), f) for f in sys.argv[1:]]' scripts/*.py" \
 	"python3 -I ../scripts/mutate.py" "go vet ./tools/..." "go run ./tools/sealvec | cmp" "python3 -I scripts/check_docs.py" \
 	"sh scripts/test_hooks.sh" "python3 -I scripts/probe.py" "run coverage" "python3 -I scripts/patch_coverage.py" \
 	"run mutate" "sh scripts/scan_secrets.sh" "python3 -I scripts/harness_mutate.py" "python3 -I scripts/check_regressions.py" \
 	'unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO' '[ "$took" -gt 60 ]' "python3 -I scripts/prove_fix.py" "python3 -I scripts/audit.py"; do
 	grep -v '^[[:space:]]*#' "$gate_file" | grep -qF -- "$step" || fail "check.sh no longer runs: $step"
 done
+# The app's step comes after the copy and dead-code checks (F082), and its guard (F080) snapshots
+# every package file before the build and compares after it.
+python3 -I - "$gate_file" <<'PY' || fail "check.sh's app step lost its order or its package guard"
+import sys
+lines = [l.strip() for l in open(sys.argv[1]) if not l.lstrip().startswith("#")]
+at = lambda text: next(i for i, l in enumerate(lines) if l.startswith(text))
+assert "packages() { cat package.json app/package.json pnpm-lock.yaml | cksum; }" in lines
+assert at("copies=$(run copies") < at("installed=$(packages)") < at("node app/node_modules/@playwright/test/cli.js test") < at('[ "$(packages)" = "$installed" ]')
+PY
+# One harness list: --full runs harness_mutate when a file of it changes, and pre-push wants each
+# declared on main; every file harness_mutate guards is in it (F112, F114, F124).
+python3 -I - "$gate_file" "$hooks/pre-push" "$here/harness_mutate.py" <<'PY' || fail "check.sh's and pre-push's harness lists differ, or miss a file harness_mutate guards"
+import ast, fnmatch, re, sys
+spec = lambda text, start, end: re.search(start + r" (.*?)" + end, text, re.S).group(1).replace("\\\n", " ").replace("'", "").split()
+gate = spec(open(sys.argv[1]).read(), r'git diff --quiet "\$base" --', "; then")
+push = spec(open(sys.argv[2]).read(), r'--name-only "\$1" "\$2" --', "\n}")
+assert gate == push, sorted(set(gate) ^ set(push))
+tree = ast.parse(open(sys.argv[3]).read())
+guarded = next(ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == "SECTIONS")
+missed = [p for p in guarded if not any(fnmatch.fnmatch(p, s) or p.startswith(s + "/") for s in gate)]
+assert not missed, missed
+PY
 # An EXIT trap keeps a failure: under macOS's sh, a plain one turns an unbound variable into exit 0.
 for f in "$here"/*.sh "$hooks"/*; do
 	grep -n "^[[:space:]]*trap .* EXIT$" "$f" | grep -v '|| status=1; exit "$status"' | grep -q . && fail "$(basename "$f") has an EXIT trap that can hide a failure"
@@ -102,6 +147,7 @@ has(r"      GNO_COMMIT: [0-9a-f]{40}", "the CI builds gno from a name that can m
 has(r'          echo "[0-9a-f]{64}  \$RUNNER_TEMP/gitleaks\.tgz" \| sha256sum -c', "the CI trusts a download it did not check")
 assert not re.search(r"\|\s*(ba)?sh\b", ci), "the CI runs a download"
 assert "--frozen-lockfile" in ci and "--ignore-scripts" in ci, "the CI trusts a lockfile it did not check"
+has(r"        run: node app/node_modules/@playwright/test/cli\.js install --with-deps --only-shell chromium", "the CI has no browser for the journeys")
 PY
 # check.sh refuses a .node-version that is more than a version, which would steer PATH.
 nv="$t/nodeversion" && mkdir -p "$nv/scripts" && cp "$gate_file" "$nv/scripts/check.sh"
@@ -130,6 +176,20 @@ Generated by Claude Code" || fail "'Generated by Claude' was accepted"
 refused "fix: x
 
 Assisted-by: Claude" || fail "'Assisted-by' was accepted"
+# gitleaks reads files, not messages: a message holds no home folder either (F090).
+refused "fix: x
+
+Seen in /Us""ers/alice/notes." || fail "a message naming a home folder was accepted"
+refused "fix: x
+
+Seen in /Us""ers/alice/notes gitleaks:allow" || fail "gitleaks:allow let a home folder through a message (F113)"
+refused "fix: x
+
+aws = AKIA""J7Q2XRT4LMNB5VWZ" || fail "a message holding a key was accepted"
+printf 'fix: x\n' >"$t/msg"
+PATH=/usr/bin:/bin "$hooks/commit-msg" "$t/msg" 2>"$t/err" && fail "commit-msg passed with no gitleaks to scan the message"
+grep -q "gitleaks is not installed" "$t/err" || fail "commit-msg did not say gitleaks is missing (F125)"
+grep -q "the message holds" "$t/err" && fail "commit-msg blamed the message for a missing gitleaks (F125)"
 refused "chore(seal): regenerate the vectors
 
 Generated with tools/sealvec after the rotation." && fail "a plain 'Generated with' was refused"
@@ -190,6 +250,16 @@ code=0; stop '{"stop_hook_active":false}' || code=$?
 rm "$r/x.go" && echo '{}' >"$r/.claude/settings.json"
 code=0; stop '{"stop_hook_active":false}' || code=$?
 [ "$code" = 2 ] || fail "stop_gate let a settings.json change through (exit $code)"
+# Docs written or committed after the gate passed leave the code it passed on unchanged.
+green && echo more >>"$r/docs/n.md" && { stop '{"stop_hook_active":false}' || fail "stop_gate blocked a docs edit after the gate passed"; }
+git -C "$r" add docs/n.md && git -C "$r" commit -qm docs
+stop '{"stop_hook_active":false}' || fail "stop_gate blocked a docs-only commit after the gate passed"
+git -C "$r" add .claude/settings.json && git -C "$r" commit -qm settings && echo '{"a":1}' >"$r/.claude/settings.json"
+code=0; stop '{"stop_hook_active":false}' || code=$?
+[ "$code" = 2 ] || fail "stop_gate let a code change through after a commit (exit $code)"
+green && echo '{"a":2}' >"$r/.claude/settings.json"
+code=0; stop '{"stop_hook_active":false}' || code=$?
+[ "$code" = 2 ] || fail "stop_gate let an unstaged edit of a tracked file through (exit $code)"
 fi
 
 if part check_docs; then
@@ -219,13 +289,28 @@ row "| F001 | 2026-10-17 | a | x.py:1 | a bug | rejected | — |" && fail "check
 row "| F001 | 2026-10-17 | a | x.py:1 | a | claimed | — |
 | F001 | 2026-10-17 | b | y.py:1 | b | claimed | — |" && fail "check_docs accepted an id used twice"
 rm -r "$d/docs/review"
+# A test sits beside the file it tests, under its name (docs/ARCHITECTURE.md, "Naming").
+mkdir -p "$d/app/src/routes" "$d/packages/core/src"
+touch "$d/app/src/routes/home.tsx" "$d/app/src/routes/home.test.tsx" "$d/packages/core/src/irc.ts" "$d/packages/core/src/irc.test.ts"
+python3 -I "$docs" "$d" >/dev/null 2>&1 || fail "check_docs refused tests beside their files"
+for orphan in app/src/routes/routes.test.tsx packages/core/src/parse.test.ts; do
+	touch "$d/$orphan"
+	python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted $orphan, beside no file of its name"
+	rm "$d/$orphan"
+done
+# What git ignores (a mutation tester's sandbox) and what is no test (a snapshot) are not read.
+printf '.stryker-tmp/\n' >>"$d/.gitignore" && mkdir -p "$d/.stryker-tmp/x/app/src" "$d/app/src/routes/__snapshots__"
+touch "$d/.stryker-tmp/x/app/src/orphan.test.ts" "$d/app/src/routes/__snapshots__/home.test.tsx.snap" "$d/app/src/routes/home.test.data.ts"
+python3 -I "$docs" "$d" >/dev/null 2>&1 || fail "check_docs read a folder git ignores, or a snapshot, as tests"
+rm -r "$d/.stryker-tmp" "$d/app/src/routes/__snapshots__" "$d/app/src/routes/home.test.data.ts"
+rm -r "$d/app" "$d/packages"
 fi
 
 if part patch_coverage; then
 # patch_coverage: the share of changed lines that the tests run, like a pull request's
 # patch coverage, from Vitest's JSON report and git's diff.
 patch="$here"/patch_coverage.py
-c="$t/cov"
+c="$t/tests/cov" # under a folder named tests: only paths inside the repository count (F098)
 mkdir -p "$c/src" "$c/coverage"
 git -C "$c" init -q && printf 'one\n' >"$c/src/a.ts" && git -C "$c" add -A && git -C "$c" commit -qm base
 printf 'one\ntwo\nthree\nfour\n' >"$c/src/a.ts"
@@ -240,6 +325,18 @@ cover 1 && fail "patch_coverage accepted a changed file the coverage report does
 git -C "$c" rm -q --cached src/b.ts && rm "$c/src/b.ts"
 printf 'x\n' >"$c/src/a.test.ts" && printf 'x\n' >"$c/vitest.config.ts" && git -C "$c" add src/a.test.ts vitest.config.ts
 cover 1 || fail "patch_coverage refused a changed test or config file, which coverage never measures"
+# Playwright's tests and their helpers are tests; the app's document shell and server entry
+# render only in the build, which the journeys walk; the app's other code is measured like any.
+mkdir -p "$c/app/tests/e2e" "$c/app/src/routes"
+printf 'x\n' >"$c/app/tests/e2e/a.spec.ts" && printf 'x\n' >"$c/app/tests/e2e/fixtures.ts"
+printf 'x\n' >"$c/app/src/root.tsx" && printf 'x\n' >"$c/app/src/entry.server.tsx" && git -C "$c" add app
+cover 1 || fail "patch_coverage asked coverage of a Playwright test, the document shell or the server entry"
+for f in app/src/site.ts app/src/routes/a.tsx; do
+	printf 'x\n' >"$c/$f" && git -C "$c" add "$f"
+	cover 1 && fail "patch_coverage let $f go unmeasured"
+	git -C "$c" rm -q --cached "$f" && rm "$c/$f"
+done
+git -C "$c" rm -rq --cached app && rm -r "$c/app"
 # A statement over several lines counts when any of its lines changed, not only its first.
 git -C "$c" rm -q --cached src/a.test.ts vitest.config.ts && rm "$c/src/a.test.ts" "$c/vitest.config.ts" && git -C "$c" add src/a.ts && git -C "$c" commit -qm four
 printf 'one\ntwo\nTHREE\nfour\n' >"$c/src/a.ts"
@@ -271,31 +368,42 @@ mkdir -p "$w/scripts" "$w/.githooks" "$w/docs" "$t/pushbin"
 printf '#!/bin/sh\necho "gate $*" >>"$(dirname "$0")/../gate.log"\n' >"$w/scripts/check.sh"
 printf '#!/bin/sh\necho scanned >>"%s/leaks.log"\nexit "${LEAKS:-0}"\n' "$w" >"$t/pushbin/gitleaks" && chmod +x "$t/pushbin/gitleaks"
 printf 'gate.log\nleaks.log\n' >"$w/.gitignore"
-cp "$rp" "$here/repo_files.py" "$here/scan_secrets.sh" "$here/gitleaks.toml" "$w/scripts/" && cp "$hooks/pre-push" "$w/.githooks/pre-push"
+cp "$rp" "$here/repo_files.py" "$w/scripts/" && secrets_into "$w/scripts/" && cp "$hooks/pre-push" "$w/.githooks/pre-push"
 git -C "$w" init -q && echo x >"$w/a.ts" && git -C "$w" add -A && git -C "$w" commit -qm base
 head=$(git -C "$w" rev-parse HEAD)
-push() { printf 'refs/heads/%s %s refs/heads/%s 0000000000000000000000000000000000000000\n' "$1" "$head" "$1" | (cd "$w" && PATH="$t/pushbin:$PATH" sh .githooks/pre-push origin url >/dev/null 2>&1); }
+hook() { (cd "$w" && PATH="$t/pushbin:$PATH" sh .githooks/pre-push origin url >/dev/null 2>&1); }
+push() { printf 'refs/heads/%s %s refs/heads/%s 0000000000000000000000000000000000000000\n' "$1" "$head" "$1" | hook; }
+passed() { (cd "$w" && python3 -I scripts/review_pass.py record HEAD test >/dev/null) && git -C "$w" add -A && git -C "$w" commit -qm pass && head=$(git -C "$w" rev-parse HEAD); }
 push slice-1a || fail "pre-push refused a work branch whose gate passes"
 [ "$(tail -n 1 "$w/gate.log")" = "gate " ] || fail "pre-push ran more than the fast gate for a work branch"
 grep -q scanned "$w/leaks.log" || fail "pre-push did not scan a work branch for secrets"
-LEAKS=1 push slice-1a && fail "pre-push let a work branch through with a secret found"
+# In a subshell: sh keeps a variable set before a function call, which made every later push fail (F127).
+(LEAKS=1 push slice-1a) && fail "pre-push let a work branch through with a secret found"
 push main && fail "pre-push let main through with no review pass"
 (cd "$w" && python3 -I scripts/review_pass.py record HEAD test >/dev/null)
 push main && fail "pre-push let main through with a pass not yet committed"
 git -C "$w" add -A && git -C "$w" commit -qm pass && head=$(git -C "$w" rev-parse HEAD)
 push main || fail "pre-push refused main with a committed review pass"
 [ "$(tail -n 1 "$w/gate.log")" = "gate --full" ] || fail "pre-push did not run the full gate for main"
+# Main gets no harness change a commit does not declare: the branch's gate is its own harness (F089).
+since() { printf 'refs/heads/main %s refs/heads/main %s\n' "$head" "$1" | hook; }
+base=$head && printf 'allow = []\n' >"$w/scripts/gitleaks.toml" && echo z >"$w/c.ts"
+git -C "$w" add -A && git -C "$w" commit -qm "loosen the scan" && passed
+since "$base" && fail "pre-push let main take a harness change no commit declares"
+since 1111111111111111111111111111111111111111 && fail "pre-push passed main against a remote commit it cannot read (F116)"
+git -C "$w" commit -q --allow-empty -m "declare" -m "Harness-changed: scripts/gitleaks.toml" && passed
+since "$base" && fail "pre-push took a declaration with no reason"
+git -C "$w" commit -q --allow-empty -m "declare" -m "Harness-changed: scripts/gitleaks.toml - the test's own rules" && passed
+since "$base" || fail "pre-push refused main with its harness change declared"
 printf '#!/bin/sh\nexit 1\n' >"$w/scripts/check.sh"
 git -C "$w" add -A && git -C "$w" commit -qm "failing gate" && head=$(git -C "$w" rev-parse HEAD)
 push slice-1a && fail "pre-push let a push through a failing gate"
-
-
 
 # pre-push refuses a push of anything but the checked-out commit, clean.
 echo y >"$w/b.ts" && git -C "$w" add -A && git -C "$w" commit -qm more
 printf '#!/bin/sh\nexit 0\n' >"$w/scripts/check.sh"
 old=$(git -C "$w" rev-parse HEAD~1)
-printf 'refs/heads/x %s refs/heads/x 0000000000000000000000000000000000000000\n' "$old" | (cd "$w" && sh .githooks/pre-push origin url >/dev/null 2>&1) && fail "pre-push let through a commit other than the checked-out one"
+printf 'refs/heads/x %s refs/heads/x 0000000000000000000000000000000000000000\n' "$old" | hook && fail "pre-push let through a commit other than the checked-out one"
 echo dirty >>"$w/b.ts"
 head=$(git -C "$w" rev-parse HEAD) && push slice-1a && fail "pre-push let through a tree with uncommitted changes"
 git -C "$w" checkout -q -- b.ts
@@ -308,7 +416,7 @@ if part pre_commit; then
 c2="$t/precommit"
 precommit() { (cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1); }
 mkdir -p "$c2/scripts" && git -C "$c2" init -q
-printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/repo_files.py" "$here/scan_secrets.sh" "$here/gitleaks.toml" "$c2/scripts/" && git -C "$c2" add -A && git -C "$c2" commit -qm base
+printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/repo_files.py" "$c2/scripts/" && secrets_into "$c2/scripts/" && git -C "$c2" add -A && git -C "$c2" commit -qm base
 echo code >"$c2/a.ts" && git -C "$c2" add a.ts
 precommit && fail "pre-commit let a commit through a failing gate"
 printf '#!/bin/sh\nexit 0\n' >"$c2/scripts/check.sh" && git -C "$c2" add -A
@@ -494,7 +602,7 @@ git -C "$pf" init -q
 printf '#!/bin/sh\nfor f in "$@"; do grep -qF "$(sed -n "s|^// expects: ||p" "$f")" packages/x/src/a.ts || exit 1; done\n' >"$t/fake_vitest" && chmod +x "$t/fake_vitest"
 printf '.claude/tmp\nnode_modules\n' >"$pf/.gitignore" && printf 'export const twice = (n: number) => n * 3;\n' >"$pf/packages/x/src/a.ts"
 git -C "$pf" add -A && git -C "$pf" commit -qm "feat: twice"
-prove() { (cd "$pf" && PROVE_FIX_VITEST="$t/fake_vitest" python3 -I "$here/prove_fix.py" "$1" >/dev/null 2>&1); }
+prove() { (cd "$pf" && PROVE_FIX_VITEST="$t/fake_vitest" PROVE_FIX_PLAYWRIGHT="$t/fake_vitest" python3 -I "$here/prove_fix.py" "$1" >/dev/null 2>&1); }
 fix() { git -C "$pf" add -A && git -C "$pf" commit -qm "$1"; }
 base=$(git -C "$pf" rev-parse HEAD)
 printf 'export const twice = (n: number) => n * 2;\n' >"$pf/packages/x/src/a.ts" && printf '// expects: n * 2\n' >"$pf/packages/x/src/a.test.ts"
@@ -510,6 +618,15 @@ fix "fix(x): no test"
 prove "$base" && fail "prove_fix accepted a fix with no test"
 git -C "$pf" commit -q --amend -m "fix(x): no test" -m "No-test: the same sum, written as an addition"
 prove "$base" || fail "prove_fix refused a fix that says why it has no test"
+# A journey proves a fix as a unit test does (F126).
+base=$(git -C "$pf" rev-parse HEAD) && mkdir -p "$pf/app/tests"
+printf 'export const twice = (n: number) => n * 2 + 0;\n' >"$pf/packages/x/src/a.ts" && printf '// expects: + 0\n' >"$pf/app/tests/a.spec.ts"
+fix "fix(x): a journey shows it"
+prove "$base" || fail "prove_fix refused a fix whose journey failed before it (F126)"
+base=$(git -C "$pf" rev-parse HEAD)
+printf 'export const twice = (n: number) => n * 2 + 1 - 1;\n' >"$pf/packages/x/src/a.ts" && printf '// expects: export\n' >"$pf/app/tests/b.spec.ts"
+fix "fix(x): a journey that passed already"
+prove "$base" && fail "prove_fix accepted a fix whose journey passed before it"
 base=$(git -C "$pf" rev-parse HEAD)
 mkdir -p "$pf/scripts" && echo x >"$pf/scripts/tool.py" && fix "fix(harness): a harness fix"
 prove "$base" || fail "prove_fix refused a harness fix, which harness_mutate proves"
@@ -534,7 +651,7 @@ fi
 if part secrets; then
 # scan_secrets: a secret is found whatever the repository or the environment says to ignore.
 sc="$t/secrets"
-mkdir -p "$sc/scripts" && git -C "$sc" init -q && cp "$here/scan_secrets.sh" "$here/gitleaks.toml" "$sc/scripts/"
+mkdir -p "$sc/scripts" && git -C "$sc" init -q && secrets_into "$sc/scripts/"
 key="AKIA""J7Q2XRT4LMNB5VWZ" # assembled, so this file holds no key
 scan() { (cd "$sc" && sh scripts/scan_secrets.sh --staged >/dev/null 2>&1); }
 printf 'x = 1\n' >"$sc/ok.py" && git -C "$sc" add ok.py
@@ -547,6 +664,23 @@ rm "$sc/.gitleaks.toml"
 printf 'leak.py:aws-access-token:1\n' >"$sc/.gitleaksignore" && scan && fail "scan_secrets obeyed the repository's .gitleaksignore"
 rm "$sc/.gitleaksignore"
 printf 'aws = "%s" # gitleaks:allow\n' "$key" >"$sc/leak.py" && git -C "$sc" add leak.py && scan && fail "scan_secrets obeyed a gitleaks:allow comment"
+# The repository will be public: no home folder's path, no service of the demo's host.
+git -C "$sc" rm -qf --cached leak.py
+# Each form a home folder takes, whatever the case, with or without what follows (F090).
+for line in 'p = "/Us''ers/alice/x"' 'p = "/ho''me/alice/x"' 'host = "N''8N"' 'p = "/Us''ers/alice"' 'cd /Us''ers/alice' \
+	"p = '/ho""me/alice'" 'p = "/us''ers/alice/x"' 'p = "/Us''ers/_alice/x"' 'p = "C:\\Us''ers\\alice"' 'p = "/ho''me/runner-alice/x"' \
+	'u = "file:///Us''ers/alice/x"' 'PATH=/bin:/Us''ers/alice/bin'; do # split, so this file holds none
+	printf '%s\n' "$line" >"$sc/private.py" && git -C "$sc" add private.py && scan && fail "scan_secrets let through: $line"
+done
+# A users folder inside a path or a route is no one's home: gno's name registry, an API (F117).
+for line in 'p = "/home/runner/.cache"' 'q = "~/x"' 'r = "/api/user/1"' 'import "gno.land/r/gnoland/users/v1"' \
+	'r = "GET /api/users/42"' 'r = "GET /users/42"' 'r = "/users/:id"'; do
+	printf '%s\n' "$line" >"$sc/private.py" && git -C "$sc" add private.py && { scan || fail "scan_secrets refused: $line"; }
+done
+# A secret found does not hide a private name beside it: both rule sets run, then the scan fails (F120).
+printf 'aws = "%s"\n' "$key" >"$sc/leak.py" && printf 'p = "/Us''ers/alice/x"\n' >"$sc/private.py" && git -C "$sc" add leak.py private.py
+both=$(cd "$sc" && sh scripts/scan_secrets.sh --staged 2>&1) && fail "scan_secrets passed a key and a home folder"
+[ "$(printf '%s\n' "$both" | grep -c 'leaks found')" = 2 ] || fail "scan_secrets stopped at the first rule set that found something"
 fi
 
 if part regressions; then

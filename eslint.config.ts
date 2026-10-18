@@ -1,8 +1,10 @@
 // The lint half of the gate (docs/ARCHITECTURE.md, "TypeScript" and "Which way dependencies
 // point"; docs/DESIGN-SYSTEM.md, "CSS rules"). scripts/probe.py proves each promise holds.
 import css from "@eslint/css";
+import eslintReact from "@eslint-react/eslint-plugin";
 import { defineConfig, globalIgnores, includeIgnoreFile } from "eslint/config";
 import importX from "eslint-plugin-import-x";
+import reactHooks from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
 
 // An error swallowed: a catch, or a promise's .catch, that only logs, returns nothing or does
@@ -36,9 +38,16 @@ const SWALLOWED = [
 ];
 // No test is switched off or focused, so none stops guarding quietly (CLAUDE.md, "No regression").
 const SWITCHED_OFF = {
-  selector: "MemberExpression[property.name=/^(only|skip|todo|skipIf|runIf)$/]",
+  // Vitest's and Playwright's ways: skip, focus, leave for later, run on a condition, expect to fail.
+  selector:
+    "MemberExpression[property.name=/^(only|skip|todo|skipIf|runIf|fixme)$/], MemberExpression[property.name='fail']:not([object.name=/^(expect|assert)$/])",
   message: "A test is never switched off or focused: fix it, or remove it with `Removed-test:` in the commit.",
 };
+// Vitest's tests and Playwright's journeys.
+const TESTS = ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts"];
+const MEMOS = ["memo", "useMemo", "useCallback"];
+const MEMO = "The React Compiler memoizes: no hand-written memo, useMemo or useCallback (docs/ARCHITECTURE.md).";
+const HTML = "Nothing reaches the DOM as HTML: render it as React elements (docs/ARCHITECTURE.md, security).";
 // core reaches no clock, network or global of its own: time and chance come in as parameters.
 const IMPURE = [
   {
@@ -97,12 +106,37 @@ export default defineConfig(
   },
   {
     // Config files run on Node, whose types core must not see: lint them without types.
-    files: ["*.config.ts"],
+    files: ["*.config.ts", "app/*.config.ts"],
     extends: [tseslint.configs.disableTypeChecked],
   },
   {
+    // The app: React's hooks and the compiler's rules, and nothing from data into the DOM as HTML
+    // (docs/ARCHITECTURE.md, "React" and the security checklist). Their warnings fail too.
+    files: ["app/src/**/*.{ts,tsx}"],
+    extends: [reactHooks.configs.flat["recommended-latest"], eslintReact.configs["strict-type-checked"]],
+    rules: {
+      // A route answers "not found" by throwing React Router's data(); nothing else but an Error.
+      "@typescript-eslint/only-throw-error": [
+        "error",
+        { allow: [{ from: "package", package: "react-router", name: "DataWithResponseInit" }] },
+      ],
+      "no-restricted-imports": ["error", { name: "react", importNames: MEMOS, message: MEMO }],
+      "no-restricted-properties": [
+        "error",
+        ...MEMOS.map((property) => ({ object: "React", property, message: MEMO })),
+        ...["innerHTML", "outerHTML", "insertAdjacentHTML"].map((property) => ({ property, message: HTML })),
+        { object: "document", property: "write", message: HTML },
+      ],
+    },
+  },
+  {
+    // React Router calls the server entry with four arguments; it runs only at build time.
+    files: ["app/src/entry.server.tsx"],
+    rules: { "max-params": ["error", 4] },
+  },
+  {
     // Tests read as lists of cases, so they may run long.
-    files: ["**/*.test.ts", "**/*.test.tsx"],
+    files: TESTS,
     rules: {
       "max-lines": "off",
       "max-lines-per-function": "off",
@@ -111,7 +145,7 @@ export default defineConfig(
   },
   {
     // `fails` marks a test waiting for Alexis's code (pairing), which happens only in core.
-    files: ["**/*.test.ts", "**/*.test.tsx"],
+    files: TESTS,
     ignores: ["packages/core/**"],
     rules: {
       "no-restricted-syntax": [

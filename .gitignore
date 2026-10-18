@@ -8,6 +8,10 @@ coverage/
 reports/
 .stryker-tmp/
 .eslintcache
+/app/build/
+/app/.react-router/
+/app/test-results/
+/app/playwright-report/
 *.sw[op]
 __pycache__/
 

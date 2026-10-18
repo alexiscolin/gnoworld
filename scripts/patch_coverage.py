@@ -34,7 +34,11 @@ with open("coverage/coverage-final.json") as f:
     report = {os.path.realpath(k): v for k, v in json.load(f).items()}
 
 total = run = 0
-unmeasured = [p for p in changed if p not in report and not re.search(r"\.(test|config)\.tsx?$|\.d\.ts$", p)]
+# Tests and configs are never measured; nor the app's document shell and server entry, which
+# only the build renders: the Playwright journeys walk them (docs/decisions.md).
+# Matched on the path inside the repository, never on the folders above it (F098).
+UNMEASURED = r"\.(test|config)\.tsx?$|\.d\.ts$|(^|/)tests/|^app/src/(root|entry\.server)\.tsx$"
+unmeasured = [p for p in changed if p not in report and not re.search(UNMEASURED, os.path.relpath(p))]
 for path in sorted(unmeasured):
     print(f"{os.path.relpath(path)}: changed, but no coverage measures it: add it to vitest.config.ts's coverage include")
 for path, lines in sorted(changed.items()):

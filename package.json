@@ -7,10 +7,10 @@
     "node": "24.22.0"
   },
   "scripts": {
-    "prepare": "git config core.hooksPath .githooks",
+    "prepare": "command -p git config core.hooksPath .githooks",
     "format": "prettier --write .",
     "format:check": "prettier --check --log-level warn .",
-    "typecheck": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p app/tsconfig.json",
     "lint": "eslint --max-warnings 0 .",
     "test": "vitest run",
     "coverage": "vitest run --coverage",
@@ -20,6 +20,7 @@
     "comments": "node scripts/check_comments.mjs"
   },
   "devDependencies": {
+    "@eslint-react/eslint-plugin": "5.28.0",
     "@eslint/css": "2.0.1",
     "@stryker-mutator/core": "10.0.0",
     "@stryker-mutator/typescript-checker": "10.0.0",
@@ -27,6 +28,7 @@
     "@vitest/coverage-v8": "4.1.12",
     "eslint": "10.12.0",
     "eslint-plugin-import-x": "4.17.1",
+    "eslint-plugin-react-hooks": "7.1.1",
     "fast-check": "4.10.2",
     "jscpd": "5.4.1",
     "knip": "6.41.0",

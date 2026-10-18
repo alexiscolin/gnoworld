@@ -14,16 +14,13 @@ Three ideas run through it:
 
 ## The picture
 
-```
- what Claude reads          what Claude may do           what every change goes through
-┌──────────────────┐   ┌──────────────────────────┐   ┌───────────────────────────────────┐
-│ CLAUDE.md        │   │ .claude/settings.json    │   │ scripts/check.sh: the gate        │
-│ CLAUDE.local.md  │   │  deny / ask rules        │   │  fast: every turn, every commit   │
-│ .claude/rules/   │   │  the sandbox             │   │  full: /pre-merge, a push of main │
-│ .claude/agents/  │   │ hooks: guard, format,    │   │ the no-regression net             │
-│ .claude/commands/│   │  Stop gate               │   │ reviews and the findings ledger   │
-└──────────────────┘   └──────────────────────────┘   └───────────────────────────────────┘
-                 the harness tests itself: probe.py, test_hooks.sh, harness_mutate.py
+![The harness: at a glance, what Alexis decides and what runs on its own; then what Claude reads, a change from the plan to main, the gate, the reviews, the security boundaries, how the harness proves itself, its measures and its limits](harness.png)
+
+Its source is [harness.html](harness.html). After changing it, render the image again from the
+repository's root (in Claude Code's sandbox, launch Chromium with `args: ["--single-process"]`):
+
+```sh
+node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); chromium.launch().then(async (b) => { const p = await b.newPage({ viewport: { width: 1600, height: 900 } }); await p.goto("file://" + process.cwd() + "/docs/harness.html"); await p.screenshot({ path: "docs/harness.png", fullPage: true }); await b.close(); });'
 ```
 
 ## A change, from plan to merge
@@ -39,20 +36,25 @@ Three ideas run through it:
 4. **End of each turn.** When code changed, the Stop hook (`scripts/stop_gate.sh`) stops the turn
    once unless the fast gate, which Claude runs in the sandbox, passed on exactly this tree
    (`check.sh` records it). The hook itself runs nothing from the repository.
-5. **Each commit.** `commit-msg` holds the subject's form and refuses attribution lines.
+5. **Each commit.** `commit-msg` holds the subject's form, refuses attribution lines, and
+   scans the message with both secret rule sets, `gitleaks:allow` ignored (F090, F113).
    `pre-commit` scans what is staged for secrets, then runs the fast gate on a copy of what
    is staged, not on the working tree.
-6. **A push of a work branch.** `pre-push` runs the fast gate and scans the history for
-   secrets.
+6. **A push of a work branch.** `pre-push` wants the checked-out commit with nothing
+   uncommitted, runs the fast gate and scans the history for secrets.
 7. **Before a merge.** `/pre-merge` runs the full gate, the `test-auditor`'s green pass on the
-   mutation survivors, `/code-review`, and the `security-reviewer` for a tier-1 change. Each
-   finding is reproduced, then fixed or put to Alexis, and written to
-   `docs/review/findings.md`. Then it records a review pass (`scripts/review_pass.py`).
+   mutation survivors, `/code-review`, the `security-reviewer` for a tier-1 change, and
+   `/simplify` at the last merge of a slice. The `finding-verifier` tries to refute each
+   tier-1 finding, then to reproduce it; each is then fixed or put to Alexis, and written to
+   `docs/review/findings.md`. Three review rounds at most per branch. Then it records a review
+   pass (`scripts/review_pass.py`).
 8. **Alexis reviews,** blind first, in revdiff (`docs/REVIEW.md`).
 9. **Merge and push, by Alexis, in his own shell.** The merge is made locally; pushing `main`
-   runs the full gate again and needs the committed review pass for exactly that tree. Claude
-   cannot do either: the sandbox refuses the merge's writes to the harness (F063), and over a
-   remote session its commands cannot read the keychain that holds the GitHub token (F064).
+   runs the full gate again, needs the committed review pass for exactly that tree, and each
+   harness file changed since the remote's `main` declared on a line `Harness-changed: <path>
+   - why` (F089); a `main` the clone cannot compare is refused (F116). Claude cannot do
+   either: the sandbox refuses the merge's writes to the harness (F063), and over a remote
+   session its commands cannot read the keychain that holds the GitHub token (F064).
 10. **The CI** runs the full gate again on GitHub's machines, for every branch pushed.
 
 ## The gate
@@ -64,18 +66,19 @@ Three ideas run through it:
 | Step | What it catches |
 |---|---|
 | Prettier | unformatted code |
-| `tsc` | type errors; `core` sees no DOM and no Node, so it cannot reach the network |
-| ESLint, with `@eslint/css` | floating promises, swallowed errors, `any`, an incomplete switch, `eval`, import cycles, size and complexity limits, impure `core` (clock, chance, globals), switched-off tests, invalid CSS, unlayered CSS, physical properties |
-| Vitest, with fast-check | failing tests; a test with no assertion |
+| `tsc` | type errors in `core` and the app; `core` sees no DOM and no Node, so it cannot reach the network |
+| ESLint, with `@eslint/css` | floating promises, swallowed errors, `any`, an incomplete switch, `eval`, import cycles, size and complexity limits, impure `core` (clock, chance, globals), switched-off tests (Vitest's and Playwright's), invalid CSS, unlayered CSS, physical properties; in the app, React's hooks and compiler rules, a hand-written `memo`, `useMemo` or `useCallback`, raw HTML into the DOM |
+| Vitest, with fast-check | failing tests, `core`'s and the app's (its routes rendered by React Router's static handler); a test with no assertion |
 | knip | unused files, exports and dependencies |
 | jscpd | copies, renamed ones and near ones (similarity 0.8) |
 | `scripts/check_css.py` | CUBE CSS: raw values outside tokens, layout outside compositions, unknown or unused tokens and classes, copied rules |
 | `scripts/check_comments.mjs` | long comments, to-do markers, banners, numbered steps, emoji, escape hatches |
+| the app, in Playwright | a page that fails to build, pre-render or hydrate, with the wrong tags, or with an accessibility violation (axe); a build that edits `package.json` or the lockfile (F080) |
 | `gno lint`, `gno test` on `gno/...` | every realm and package |
 | `scripts/mutate.py` | a realm guard no test notices when removed |
 | `gofmt`, `go vet`, the seal vectors | Go tools; `gno/r/seal/vectors_test.gno` equals what `go run ./tools/sealvec` prints |
-| `scripts/check_docs.py` | a harness doc naming a file that does not exist; a bad row in the findings ledger |
-| `scripts/test_hooks.sh` | the hooks, the guard, the settings' boundary, and the scripts below |
+| `scripts/check_docs.py` | a harness doc naming a file that does not exist; a bad row in the findings ledger; a test with no file of its name beside it (F085); a harness script that does not parse (F084) |
+| `scripts/test_hooks.sh` | the hooks, the guard, the settings' boundary, the CI's promises, and the scripts below |
 
 **Full** (`--full`: `/pre-merge` and a push of `main`) adds:
 
@@ -84,25 +87,29 @@ Three ideas run through it:
 | `scripts/probe.py` | a lint rule, selector or check that no longer catches its planted fault |
 | coverage | under 85% anywhere, under 100% (95% branches) in `core` |
 | `scripts/patch_coverage.py` | under 85% of the changed lines run by a test, or a changed file no coverage measures |
-| `scripts/prove_fix.py` | a fix of the product whose tests did not fail on the commit before it |
+| `scripts/prove_fix.py` | a fix of the product whose tests or journeys did not fail on the commit before it (F126) |
 | StrykerJS | a mutant of the TypeScript that no test kills |
 | `scripts/check_regressions.py` | the safety net shrinking (next section) |
-| gitleaks | a secret anywhere in the history |
+| gitleaks | a secret anywhere in the history; a path into a home folder or a service of the demo's host (`gitleaks-private.toml`: the repository will be public); both rule sets always run (F120) |
 | `pnpm audit` | a dependency with a known advisory, moderate or worse |
-| `scripts/harness_mutate.py` | when the harness changed: a guard of the harness that no test notices switched off |
+| `scripts/harness_mutate.py` | when a file of the harness list changed (one list, word for word `pre-push`'s, F124): a guard of the harness that no test notices switched off |
 
 ## The safety net never shrinks quietly
 
 `scripts/check_regressions.py` compares the branch with where it left `main`, and refuses:
-- a test gone (Vitest, gno or Go; a rename included), or switched to `.fails`;
+- a test gone (Vitest, a Playwright journey, gno or Go; a rename included), or switched to
+  `.fails`;
 - a coverage threshold or the mutation floor lowered;
-- a known gap added to a mutation check's `GAPS`, or an entry added to an ignore list;
+- a known gap added to a mutation check's `GAPS`, or an entry added to an ignore list, a
+  nested one included (F101);
+- a change to `pnpm-workspace.yaml` outside its packages list (F088);
 - an approved screenshot changed.
 
 Each is allowed only when a commit of the branch says why, on a line of its own:
 `Removed-test: <test> - why`, `Lowered-floor: <floor>`, `Lowered-floor: gap <label>`,
 `Lowered-floor: ignore <file> <entry>`, `Updated-baseline: <path> - why`. Alexis reads them
-in review. A sentence that merely mentions a floor excuses nothing.
+in review. A sentence that merely mentions a floor excuses nothing. On `main`, `pre-push`
+also wants each harness file changed on a line `Harness-changed: <path> - why`.
 
 ## Reviews and findings
 
@@ -119,23 +126,34 @@ comes back is a regression. The review agents (`.claude/agents/`) report rows fo
 | `/code-review` | every merge | Claude Code's |
 | `security-reviewer` | a merge touching a tier-1 file | Opus |
 | `finding-verifier` | after the review pass, on each tier-1 lot: refutes or reproduces each finding | Opus |
+| `gno-auditor` | every realm, line by line | gnomcp's |
+| `/simplify` | the last merge of a slice: reuse, simplicity, efficiency, altitude | Claude Code's |
 | Alexis | every merge, blind first | — |
+
+A branch gets three review rounds at most; after the third, a review reads only the diff since
+the last one (`docs/REVIEW.md`). Alexis reviews in revdiff; started as
+`revdiff -o .claude/tmp/revdiff.md main`, it writes his notes there whenever he presses `O`,
+and Claude reads them from that file.
 
 ## The boundary: what Claude may do
 
 `.claude/settings.json`, read only when Claude Code starts in this folder or moves into it
 with `/cd`:
 - **Deny:** reading `.env`, `deploy/secrets/`, `~/.ssh`, `~/.config/gh`, `~/.npmrc`, `~/.aws`.
-- **Ask Alexis first:** `git push` (the guard asks for any form of it), `pnpm add`, `rm -rf`,
-  and every gnomcp write (`gno_addpkg`, `gno_call`, `gno_run`, `gno_key_send`,
-  `gno_cla_sign`). Claude edits alone (Alexis, 2026-10-17), except what runs with Alexis's
-  full access: `scripts/`, the git hooks and `.claude/` (the Claude Code hooks run outside the
-  sandbox, and the git hooks run the gate in his shell when he pushes or merges), the
-  `*.config.ts` files and `stryker.config.json` the gate loads, and what pnpm runs at his
-  install (`package.json`, `pnpm-workspace.yaml`, `.npmrc`, `.pnpmfile.cjs`) (findings F068,
-  F076). The tests and `gno/tools` still run at his push with no ask; the backlog's
-  "hooks that run no repository code" closes that. Ask and deny rules hold in every
-  permission mode.
+- **Ask Alexis first:** only `git push` (the guard asks for any form of it) and every gnomcp
+  write (`gno_addpkg`, `gno_call`, `gno_run`, `gno_key_send`, `gno_cla_sign`). Claude builds
+  and integrates a whole feature alone (Alexis, 2026-10-18), checked by the gate and the
+  review; Alexis reviews before he merges and pushes.
+- **Refused outright, so nothing asks:** an edit of a file run outside the sandbox, the guard,
+  the Stop hook, `code_changed.sh`, the git hooks, Claude Code's settings, agents, commands,
+  skills, rules and hooks in `.claude/` (not `.claude/tmp/`, where the gate writes its state,
+  F111) and the `package.json` files (finding F068), and what pnpm loads at Alexis's install, `pnpm-workspace.yaml`, `.npmrc` and a
+  pnpmfile (F087, F115); `pnpm add` (a dependency is Alexis's) and `rm -rf`. A change to one of these
+  files is written out for Alexis to apply. What the gate reaches when he pushes or merges
+  (the other scripts, the configs, the tests) still runs with his access: F076, closed by the
+  backlog's hooks that run no repository code; until then, `pre-push` wants each harness
+  change on main declared (`Harness-changed: <path> - why`, F089). Ask and deny rules hold in
+  every permission mode.
 - **The sandbox** around shell commands: they write only in the project and its caches,
   never in the harness's files; they reach only the npm and Go registries and github.com;
   no command may leave the sandbox.
@@ -168,18 +186,21 @@ costs context in every session: `chrome-devtools-mcp` (1b), `frontend-design` (2
 - **`scripts/harness_mutate.py`** switches each guard off in turn, in a throwaway copy, and
   runs the one section of the probe or hook tests that belongs to it (`ONLY=<section>`): a
   guard whose removal no test notices is a guard nobody checks, and the run prints the test
-  to add. It takes about two minutes, and runs in the full gate when the harness changed.
+  to add. With `ONLY` set, the probe stops at its first failing block. It runs in the full
+  gate when the harness changed.
 - **A new guard lands with its planted fault and its mutant;** a check whose test passes
   for the wrong reason is caught by the mutation. On 2026-10-17 this found a lint selector
-  that had never matched, and an exit trap that turned any crash into success.
+  that had never matched, and an exit trap that turned any crash into success; on
+  2026-10-18, a variable one hook case left set, which made three later cases pass whatever
+  the hook did (F127).
 
 ## Speed and cost
 
-Measured on this machine, 2026-10-17: the fast gate 10 to 13 s (budget 60 s); the probe
-4.7 s and the hook tests 5.9 s (both while the harness mutation ran beside them); the harness
-mutation 118 s for 148 guards, against 384 s for 127 before each mutant ran only its own
-section. Subagents run on Sonnet unless their file says
-otherwise; agents get the diff's path, never its content; one review pass per merge.
+Measured on this machine, 2026-10-18: the fast gate 19 to 23 s (budget 60 s), the app's
+build and its 18 journeys included; the full gate 263 s, with the harness mutation proving
+255 guards. On 2026-10-17 the fast gate took 10 to 13 s, before the app, and the harness
+mutation 118 s for 148 guards. Subagents run on Sonnet unless their file says otherwise;
+agents get the diff's path, never its content; one review pass per merge.
 
 ## Is it solid?
 
@@ -187,7 +208,11 @@ Measured, not claimed: each `/pre-merge` records in `docs/review-log.md` how man
 findings it found in the harness itself. Falling from merge to merge means solid. Flat over
 three merges means the harness is simplified, not extended: a guard that keeps leaking gives
 way to a boundary the system enforces (the sandbox, a server check), or goes. The first
-measure, slice 1a's merge, found 25 or more, one of them a way out of the sandbox.
+measure, slice 1a's merge, found 25 or more, one of them a way out of the sandbox. Since then:
+13, 11, then 22 and 14 at slice 1b's two rounds. The count is not falling, but the severity
+is: the last round found nothing blocking, and most of its findings sat in the fixes of the
+round before. By the rule above, the next harness work removes more than it adds: the
+backlog's hooks that run no repository code first.
 
 ## Known limits
 
@@ -198,7 +223,9 @@ measure, slice 1a's merge, found 25 or more, one of them a way out of the sandbo
 - **Claude Code's layer is active only in a session started in this folder,** or moved into
   it with `/cd`.
 - **`prove_fix.py` covers the product;** a fix of the harness is proven by
-  `harness_mutate.py` instead.
+  `harness_mutate.py` instead. It takes any failure on the commit before the fix as proof, a
+  crash included.
+- **The three-round limit is a written rule;** nothing counts the rounds.
 - **`scripts/mutate.py` mutates every realm on every commit;** it will need to mutate only
   the changed packages once there are many.
 - **The review pass is recorded by the agent that ran the review;** the pre-push hook checks
@@ -210,12 +237,14 @@ measure, slice 1a's merge, found 25 or more, one of them a way out of the sandbo
 |---|---|
 | `CLAUDE.md`, `.claude/rules/` | the rules Claude reads; each area's file loads when its files are touched |
 | `.claude/settings.json` | permissions, the sandbox, the hooks, the plugins |
-| `.claude/agents/` | `test-auditor`, `security-reviewer` |
+| `.claude/agents/` | `test-auditor`, `security-reviewer`, `finding-verifier` |
 | `.claude/commands/` | `/slice-plan`, `/pre-merge` |
 | `.githooks/` | `commit-msg`, `pre-commit`, `pre-push` (`pnpm install` points git at them) |
 | `scripts/check.sh` | the gate |
+| `.github/workflows/gate.yml` | the full gate on GitHub's machines, for every branch pushed |
+| `app/playwright.config.ts`, `app/tests/e2e/` | the app's journeys: a build per run, served as a static host serves it (`serve.mjs`) |
 | `scripts/guard.py`, `scripts/stop_gate.sh` | Claude Code's hooks |
-| `scripts/scan_secrets.sh`, `scripts/gitleaks.toml`, `scripts/audit.py` | the secret scan and the dependency audit |
+| `scripts/scan_secrets.sh`, `scripts/gitleaks.toml`, `scripts/gitleaks-private.toml`, `scripts/.gitleaksignore`, `scripts/audit.py` | the secret scan and the dependency audit |
 | `scripts/code_changed.sh`, `scripts/borrow_node_modules.sh`, `scripts/repo_files.py` | what the hooks and scripts share |
 | `scripts/check_css.py`, `scripts/check_comments.mjs`, `scripts/check_docs.py` | the style and docs checks |
 | `scripts/mutate.py` | the realms' mutation check |
@@ -223,3 +252,4 @@ measure, slice 1a's merge, found 25 or more, one of them a way out of the sandbo
 | `scripts/review_pass.py` | records and checks a `/pre-merge` pass |
 | `scripts/probe.py`, `scripts/test_hooks.sh`, `scripts/harness_mutate.py` | the harness's own tests |
 | `docs/review/findings.md`, `docs/review-log.md` | every finding; what Alexis caught and missed |
+| `docs/harness.html`, `docs/harness.png` | the picture above, and its source |

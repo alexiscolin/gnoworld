@@ -1,5 +1,9 @@
 {
   "$schema": "./node_modules/knip/schema.json",
   "ignoreFiles": ["docs/**"],
-  "treatConfigHintsAsErrors": true
+  "treatConfigHintsAsErrors": true,
+  "workspaces": {
+    ".": {},
+    "app": { "react-router": { "config": ["react-router.config.ts"] } }
+  }
 }

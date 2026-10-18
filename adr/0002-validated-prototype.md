@@ -7,7 +7,7 @@
 | Author | Alexis Colin |
 | Builds on | [ADR-0001](0001-gnoworld.md). Amends its §1 and §2 (the login program), §7 (levels and navigation rules, mobile included), §9 (moderation), §10 (the generated face, the tiers), §12 (routing, rendering, a Node server), §13 (pieces and hosting), its "Ideas to place" and its rollout (§8). Answers part of its question 5 (moderation of public rooms) and its question 12 (where the servers run) |
 | Prototype | [docs/prototype](../docs/prototype/README.md): live artifact (version 57), two walkthrough videos, five reviews |
-| Verified | **2026-10-16:**<br>- npm: `react-dom` 19.3.1 exports `react-dom/static`; `react-router` and `@react-router/dev` are at 8.4.0.<br>- React Router's pre-rendering guide.<br>- `gno.land/r/gov/dao` on onyx with gnomcp: `Render` and `GetProposal` are free reads; `MustVoteOnProposalSimple(cur realm, pid int64, option string)` is a call.<br>**2026-10-17:**<br>- gnomcp 0.12.0: a read-only chain has no write path (`docs/security.md`); `gno_status`, `gno_history`, `gno_activity` (`docs/tools.md`); its audit file is written under `$HOME` (`cmd/gnomcp/main.go`).<br>- gno: a call's arguments are primitive types and bytes (`gno.land/pkg/sdk/vm/convert.go`); gnoweb serves pages as `text/markdown` (PR #5794); onyx approves deploys automatically, mainnet by approvers (the gno skill's `networks.md`); names are registered with `r/sys/namereg/v0.Register`.<br>- Adena: SDK 0.1.1 and extension 1.22.3, read in their source and tested in Node (sign-in, its verifier, errors, networks, events, fees, mobile, sessions).<br>- The server's stack on npm and in Docker on arm64: Node 24.22.0, Hono 4.13.13, `node:sqlite`, pnpm 12.14.0, `@anthropic-ai/sdk` 0.135.0, `@modelcontextprotocol/client` 2.3.1, a distroless Node 24 image.<br>- The homelab's Caddy, Funnel and Docker setup, for the demo.<br>- seedfall's ADR-002 §2.2, §2.6 and ADR-008 §12.3.<br>**Secondary sources only, to confirm in their slice:** OpenAI's Moderation API and PostHog |
+| Verified | **2026-10-16:**<br>- npm: `react-dom` 19.3.1 exports `react-dom/static`; `react-router` and `@react-router/dev` are at 8.4.0.<br>- React Router's pre-rendering guide.<br>- `gno.land/r/gov/dao` on onyx with gnomcp: `Render` and `GetProposal` are free reads; `MustVoteOnProposalSimple(cur realm, pid int64, option string)` is a call.<br>**2026-10-17:**<br>- gnomcp 0.12.0: a read-only chain has no write path (`docs/security.md`); `gno_status`, `gno_history`, `gno_activity` (`docs/tools.md`); its audit file is written under `$HOME` (`cmd/gnomcp/main.go`).<br>- gno: a call's arguments are primitive types and bytes (`gno.land/pkg/sdk/vm/convert.go`); gnoweb serves pages as `text/markdown` (PR #5794); onyx approves deploys automatically, mainnet by approvers (the gno skill's `networks.md`); names are registered with `r/sys/namereg/v0.Register`.<br>- Adena: SDK 0.1.1 and extension 1.22.3, read in their source and tested in Node (sign-in, its verifier, errors, networks, events, fees, mobile, sessions).<br>- The server's stack on npm and in Docker on arm64: Node 24.22.0, Hono 4.13.13, `node:sqlite`, pnpm 12.14.0, `@anthropic-ai/sdk` 0.135.0, `@modelcontextprotocol/client` 2.3.1, a distroless Node 24 image.<br>- The demo host's Docker setup.<br>- seedfall's ADR-002 §2.2, §2.6 and ADR-008 §12.3.<br>**Secondary sources only, to confirm in their slice:** OpenAI's Moderation API and PostHog |
 
 ## Summary
 
@@ -983,14 +983,14 @@ not choose its hosts.
   Grafana's all-in-one OpenTelemetry image, capped and with its retention set.
 - **The team's demo URL:** a Tailscale container inside the demo project joins the tailnet
   as its own machine and publishes the public site with Funnel. The demo binds no port on
-  the host, and the homelab's own Funnel and Caddy are never touched.
+  the host, and the host's own services are never touched.
 - **The demo never harms the host, and never touches its installation:**
   - **Apart:** its own folder and Compose project, networks and volumes. It never edits the
-    homelab's Compose file, its Caddy configuration or its certificates.
+    host's own Compose files, its proxy's configuration or its certificates.
   - **Sealed:** every service sits on internal networks. The only way out is the demo's own
     proxy, which allows a list of hosts and refuses private addresses (`NODE_USE_ENV_PROXY`
     is set, since Node's `fetch` ignores proxies otherwise). A test proves that the
-    homelab's services, for example n8n through `host.docker.internal`, cannot be reached.
+    host's services, through `host.docker.internal` or the LAN, cannot be reached.
   - **Capped:** CPU, memory and process limits on every container, the whole demo under 2
     cores and 2 GB. A container that hits its limit is stopped by Docker; the host is not.
     Logs rotate; histories and Grafana keep a fixed number of days, since Docker volumes

@@ -3,7 +3,16 @@
   "plugins": ["@stryker-mutator/vitest-runner", "@stryker-mutator/typescript-checker"],
   "testRunner": "vitest",
   "checkers": ["typescript"],
-  "mutate": ["packages/*/src/**/*.ts", "!packages/*/src/**/*.test.ts", "!packages/*/src/index.ts"],
+  "mutate": [
+    "packages/*/src/**/*.ts",
+    "!packages/*/src/**/*.test.ts",
+    "!packages/*/src/index.ts",
+    "app/src/**/*.{ts,tsx}",
+    "!app/src/**/*.test.{ts,tsx}",
+    "!app/src/routes.ts",
+    "!app/src/root.tsx",
+    "!app/src/entry.server.tsx"
+  ],
   "incremental": true,
   "htmlReporter": {
     "fileName": "reports/mutation/index.html"

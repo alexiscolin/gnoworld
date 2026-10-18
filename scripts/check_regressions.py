@@ -8,6 +8,7 @@ so on a line of its own, `Key: <item> - why`, which Alexis reads in review:
 - an approved screenshot changed or deleted: `Updated-baseline:`.
 Usage: check_regressions.py <base>, from the repository root; --self-test checks the rules."""
 import ast
+import hashlib
 import json
 import os
 import re
@@ -21,7 +22,7 @@ from repo_files import git, worktree
 
 SHOT = re.compile(r"(-snapshots|__screenshots__)/.+\.(png|jpe?g)$")
 GAP_FILES = ["scripts/mutate.py", "scripts/harness_mutate.py"]
-IGNORE_FILES = [".jscpd.json", "knip.json", "stryker.config.json", "eslint.config.ts", "vitest.config.ts", ".prettierignore", "scripts/check_comments.mjs"]
+IGNORE_FILES = [".jscpd.json", "knip.json", "stryker.config.json", "eslint.config.ts", "vitest.config.ts", ".prettierignore", "scripts/check_comments.mjs", "scripts/.gitleaksignore"]
 
 
 def declared(lines, key):
@@ -79,6 +80,10 @@ def settings(read):
     for name, keys in SETTINGS.items():
         data = json.loads(read(name) or "{}")
         out |= {f"{name} {key}": data.get(key) for key in keys}
+    # pnpm reads keys in more forms than a pattern can follow (quoted, spaced, nested): every
+    # change outside the packages list counts, as a fingerprint of the rest (F088).
+    rest = re.sub(r"^packages:\n(?:[ \t]*(?:-.*|#.*)?\n)*", "", read("pnpm-workspace.yaml") or "", flags=re.M)
+    out["pnpm-workspace.yaml outside packages"] = hashlib.sha256(rest.encode()).hexdigest()[:12]
     return out
 
 
@@ -94,12 +99,18 @@ def ignores(read):
     for name in IGNORE_FILES:
         text = read(name) or ""
         if name.endswith(".json") and text:
-            for key, value in json.loads(text).items():
-                if "ignore" in key.lower():
-                    out |= {f"{name} {v}" for v in (value if isinstance(value, list) else [value])}
-                elif key == "mutate":  # a negated glob takes files out of the mutation test
-                    out |= {f"{name} {v}" for v in value if str(v).startswith("!")}
-        elif name == ".prettierignore":
+            # Nested too: knip takes an ignore list per workspace (F101).
+            pending, found = [json.loads(text)], []
+            while pending:
+                for key, value in pending.pop().items():
+                    if "ignore" in key.lower():
+                        found += value if isinstance(value, list) else [value]
+                    elif key == "mutate":  # a negated glob takes files out of the mutation test
+                        found += [v for v in value if str(v).startswith("!")]
+                    elif isinstance(value, dict):
+                        pending.append(value)
+            out |= {f"{name} {v}" for v in found}
+        elif name in (".prettierignore", "scripts/.gitleaksignore"):
             out |= {f"{name} {line.strip()}" for line in text.splitlines() if line.strip() and not line.startswith("#")}
         else:
             for m in re.finditer(r"(?:globalIgnores\(|ignores:\s*|exclude:\s*|SKIP = new Set\()\[([^\]]*)\]", text):
@@ -158,12 +169,37 @@ def relative(path, root):
     return os.path.relpath(os.path.realpath(path), os.path.realpath(root))
 
 
+def journeys(listing, root):
+    """Playwright's tests, `<file> > <describe> > <title>`, from its JSON listing; a listing that failed stops the check."""
+    report = json.loads(listing)
+    if report["errors"]:
+        sys.exit("check_regressions: Playwright could not list its journeys: " + report["errors"][0]["message"].splitlines()[0])
+    out = set()
+
+    def walk(suite, path):
+        for spec in suite.get("specs", []):
+            name = " > ".join([*path, spec["title"]])
+            out.add(f"{relative(os.path.join(report['config']['rootDir'], spec['file']), root)} > {name}")
+        for child in suite.get("suites", []):
+            walk(child, [*path, child["title"]])
+
+    for suite in report["suites"]:
+        walk(suite, [])
+    return out
+
+
 def test_names(root):
-    """Every Vitest test's file and full name, from `vitest list`; none when the tree has no Vitest."""
-    if not os.path.exists(os.path.join(root, "vitest.config.ts")):
-        return set()
-    out = subprocess.run(["node_modules/.bin/vitest", "list", "--json"], cwd=root, capture_output=True, text=True, check=True).stdout
-    return {f"{relative(t['file'], root)} > {t['name']}" for t in json.loads(out)}
+    """Every Vitest test and Playwright journey, by file and full name; none of a kind the tree does not run."""
+    names = set()
+    if os.path.exists(os.path.join(root, "vitest.config.ts")):
+        out = subprocess.run(["node_modules/.bin/vitest", "list", "--json"], cwd=root, capture_output=True, text=True, check=True).stdout
+        names |= {f"{relative(t['file'], root)} > {t['name']}" for t in json.loads(out)}
+    if os.path.exists(os.path.join(root, "app/playwright.config.ts")):
+        # Node, not pnpm's shim: the shim spells paths from $PWD, whose case can differ from the
+        # directory's on macOS, and Playwright loaded under two spellings lists no test.
+        command = ["node", "app/node_modules/@playwright/test/cli.js", "test", "-c", "app/playwright.config.ts", "--list", "--reporter=json"]
+        names |= journeys(subprocess.run(command, cwd=root, capture_output=True, text=True).stdout, root)
+    return names
 
 
 def base_tests(base):
@@ -192,9 +228,31 @@ def self_test():
     assert gaps(old.get) == {"scripts/mutate.py a"} and weakened(gaps(old.get), gaps(new.get), set(), "gap") == ["scripts/mutate.py b"]
     assert weakened(ignores(old.get), ignores(new.get), set(), "ignore") == [".jscpd.json app/**", ".prettierignore *.ts", "eslint.config.ts server/"]
     assert weakened(ignores(old.get), ignores(new.get), {"ignore .jscpd.json app/**", "ignore .prettierignore *.ts", "ignore eslint.config.ts server/"}, "ignore") == []
+    knip = {"knip.json": '{"ignoreFiles": ["docs/**"], "workspaces": {"app": {"entry": ["src/x.ts"]}}}'}
+    nested = {"knip.json": '{"ignoreFiles": ["docs/**"], "workspaces": {"app": {"entry": ["src/x.ts"], "ignoreDependencies": ["left-pad"]}}}'}
+    assert weakened(ignores(knip.get), ignores(nested.get), set(), "ignore") == ["knip.json left-pad"], "a workspace's ignore list went unseen (F101)"
     stryker = {"stryker.config.json": '{"mutate": ["packages/*/src/**/*.ts"]}'}
     unmutated = {"stryker.config.json": '{"mutate": ["packages/*/src/**/*.ts", "!packages/core/src/x.ts"]}'}
     assert weakened(ignores(stryker.get), ignores(unmutated.get), set(), "ignore") == ["stryker.config.json !packages/core/src/x.ts"]
+    leaks = {"scripts/.gitleaksignore": "# a reason\n"}
+    hidden = {"scripts/.gitleaksignore": "# a reason\nabc:docs/a.md:home-folder-path:4\n"}
+    assert weakened(ignores(leaks.get), ignores(hidden.get), set(), "ignore") == ["scripts/.gitleaksignore abc:docs/a.md:home-folder-path:4"]
+    # pnpm's supply-chain file: any change outside its packages list is read in review, whatever
+    # its form (F079, F088): quoted or spaced keys, a pnpmfile, builds, overrides, a lower age.
+    strict = "packages:\n  - app\nminimumReleaseAge: 1440\ntrustPolicy: no-downgrade\n"
+    workspace = lambda text: settings({"pnpm-workspace.yaml": text}.get)
+    for loose in ['"minimumReleaseAgeExclude":\n  - left-pad\n', "minimumReleaseAgeExclude :\n  - left-pad\n", "pnpmfile: app/x.cjs\n",
+                  "dangerouslyAllowAllBuilds: true\n", "allowBuilds:\n  esbuild: true\n", 'overrides:\n  qs: "npm:evil-qs@1.0.0"\n',
+                  '"minimumReleaseAge": 1440\nminimumReleaseAge : 0\n']:
+        changed = changed_settings(workspace(strict), workspace(strict + loose), set())
+        assert len(changed) == 1 and changed[0].startswith("pnpm-workspace.yaml outside packages "), loose
+        assert changed_settings(workspace(strict), workspace(strict + loose), {"setting pnpm-workspace.yaml outside packages"}) == []
+    assert changed_settings(workspace(strict), workspace(strict.replace("  - app\n", "  - app\n  - admin\n")), set()) == []
+    # A list with a comment, a blank line or items flush with its key is still the list (F123).
+    for listed, more in (("  # the client\n  - app\n\n", "  # the client\n  - app\n\n  - admin\n"), ("- app\n", "- app\n- admin\n")):
+        before, after = (f"packages:\n{items}minimumReleaseAge: 1440\n" for items in (listed, more))
+        assert changed_settings(workspace(before), workspace(after), set()) == [], listed
+        assert changed_settings(workspace(before), workspace(after + "pnpmfile: x.cjs\n"), set()) != [], listed
     assert changed_settings(settings(old.get), settings(new.get), set()) == [".jscpd.json exitCode 1 -> gone"]
     assert changed_settings(settings(old.get), settings(new.get), {"setting .jscpd.json exitCode"}) == []
     diff = "+++ b/p/a.test.ts\n-  test(\"parses x\", () => {\n+  test.fails(\"parses x\", () => {\n+  test.fails(\"new one\", () => {\n+++ b/p/b.test.ts\n-  test.fails(\"done\", () => {\n+  test(\"done\", () => {\n"
@@ -204,6 +262,14 @@ def self_test():
     diff = "M\tapp/tests/e2e/home.spec.ts-snapshots/home.png\nA\tapp/tests/e2e/x.spec.ts-snapshots/new.png\nD\tapp/__screenshots__/old.png"
     assert changed_baselines(diff, set()) == ["app/tests/e2e/home.spec.ts-snapshots/home.png", "app/__screenshots__/old.png"]
     assert changed_baselines(diff, {"app/tests/e2e/home.spec.ts-snapshots/home.png", "app/__screenshots__/old.png"}) == []
+    listing = {"config": {"rootDir": "/r/app/tests/e2e"}, "errors": [], "suites": [{"title": "a.spec.ts", "specs": [{"file": "a.spec.ts", "title": "top"}],
+               "suites": [{"title": "pages", "specs": [{"file": "a.spec.ts", "title": "/ has a title"}], "suites": []}]}]}
+    assert journeys(json.dumps(listing), "/r") == {"app/tests/e2e/a.spec.ts > top", "app/tests/e2e/a.spec.ts > pages > / has a title"}
+    try:
+        journeys(json.dumps({**listing, "errors": [{"message": "Error: No tests found"}]}), "/r")
+        raise AssertionError("a listing that failed counted as no journey")
+    except SystemExit:
+        pass
     with tempfile.TemporaryDirectory() as real:  # macOS's /tmp is a link to /private/tmp; Vitest reports real paths
         link = os.path.join(real, "link")
         os.symlink(real, link)
