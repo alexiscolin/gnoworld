@@ -188,7 +188,8 @@ refused "fix: x
 aws = AKIA""J7Q2XRT4LMNB5VWZ" || fail "a message holding a key was accepted"
 printf 'fix: x\n' >"$t/msg"
 PATH=/usr/bin:/bin "$hooks/commit-msg" "$t/msg" 2>"$t/err" && fail "commit-msg passed with no gitleaks to scan the message"
-grep -q "gitleaks is not installed" "$t/err" || fail "commit-msg blamed the message for a missing gitleaks (F125)"
+grep -q "gitleaks is not installed" "$t/err" || fail "commit-msg did not say gitleaks is missing (F125)"
+grep -q "the message holds" "$t/err" && fail "commit-msg blamed the message for a missing gitleaks (F125)"
 refused "chore(seal): regenerate the vectors
 
 Generated with tools/sealvec after the rotation." && fail "a plain 'Generated with' was refused"
@@ -376,7 +377,8 @@ passed() { (cd "$w" && python3 -I scripts/review_pass.py record HEAD test >/dev/
 push slice-1a || fail "pre-push refused a work branch whose gate passes"
 [ "$(tail -n 1 "$w/gate.log")" = "gate " ] || fail "pre-push ran more than the fast gate for a work branch"
 grep -q scanned "$w/leaks.log" || fail "pre-push did not scan a work branch for secrets"
-LEAKS=1 push slice-1a && fail "pre-push let a work branch through with a secret found"
+# In a subshell: sh keeps a variable set before a function call, which made every later push fail (F127).
+(LEAKS=1 push slice-1a) && fail "pre-push let a work branch through with a secret found"
 push main && fail "pre-push let main through with no review pass"
 (cd "$w" && python3 -I scripts/review_pass.py record HEAD test >/dev/null)
 push main && fail "pre-push let main through with a pass not yet committed"
