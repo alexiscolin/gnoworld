@@ -5,13 +5,19 @@ import { startServiceWorker } from "../sw/register.ts";
 
 export const PRODUCTION = import.meta.env.PROD;
 
-export function UpdateNotice({ onReload }: { readonly onReload: () => void }) {
+// The status region is on the page from the start, empty: a screen reader announces a region's
+// change, and may say nothing of one that arrives already filled.
+export function UpdateNotice({ onReload }: { readonly onReload: (() => void) | null }) {
   return (
     <div role="status">
-      New version available.{" "}
-      <button type="button" onClick={onReload}>
-        Reload
-      </button>
+      {onReload === null ? null : (
+        <>
+          New version available.{" "}
+          <button type="button" onClick={onReload}>
+            Reload
+          </button>
+        </>
+      )}
     </div>
   );
 }
@@ -40,5 +46,5 @@ export function UpdatePrompt() {
       leaving.abort();
     };
   }, []);
-  return apply === null ? null : <UpdateNotice onReload={apply} />;
+  return <UpdateNotice onReload={apply} />;
 }

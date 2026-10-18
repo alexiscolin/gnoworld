@@ -6,8 +6,8 @@ test("the worker registers only in a production build: the flag comes from the b
   expect(PRODUCTION).toBe(false);
 });
 
-test("before any update, the prompt shows nothing: the pre-rendered page holds no notice", () => {
-  expect(renderToStaticMarkup(<UpdatePrompt />)).toBe("");
+test("before any update, the pre-rendered page holds the status region, empty: what fills it later is announced", () => {
+  expect(renderToStaticMarkup(<UpdatePrompt />)).toBe('<div role="status"></div>');
 });
 
 test("an update is announced politely, with one button that reloads", () => {

@@ -160,8 +160,13 @@ test.describe("updates", () => {
       await cache.put("/assets/older-AAAAAAAA.js", new Response("an older version's"));
       return second?.url ?? "";
     });
+    // The region the prompt fills is there, empty, before it: a screen reader announces the change.
+    await page.getByRole("status").evaluate((region) => {
+      region.id = "there-before";
+    });
     await bump(page, request);
     await expect(promptOf(page)).toBeVisible();
+    await expect(promptOf(page)).toHaveAttribute("id", "there-before");
     expect(await untouched(page)).toEqual({ same: true, waiting: true, marked: true });
     await Promise.all([page.waitForEvent("load"), promptOf(page).getByRole("button", { name: "Reload" }).click()]);
     await controlled(page);
