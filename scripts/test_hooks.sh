@@ -45,15 +45,17 @@ assert {"pnpm-workspace.yaml", ".pnpmfile.cjs", ".pnpmfile.mjs"} <= set(box["fil
 assert not [p for p in box["filesystem"]["allowWrite"] if "pnpm" in p], "a command can rewrite the pnpm that Alexis's install runs"
 assert not any("api.github.com" in d for d in box["network"]["allowedDomains"]), "the GitHub API is reachable"
 ask, deny = set(s["permissions"]["ask"]), set(s["permissions"]["deny"])
-# Claude builds a whole feature alone (Alexis, 2026-10-17): only the files run outside the
-# sandbox themselves ask: the hooks and their scripts, Claude Code's own settings, skills and
-# agents (F068), and what pnpm loads at Alexis's install (F087). What the gate reaches at his
-# push is F076's risk, closed by hooks that run no repository code (backlog).
-assert {"Bash(pnpm add *)", "Bash(git push *)"} <= ask, "a new dependency or a push asks no one"
+# Claude works alone and asks only before a push or a chain write (Alexis, 2026-10-18). The files
+# run outside the sandbox themselves cannot be edited at all: the hooks and their scripts,
+# Claude Code's own settings, skills and agents (F068), what pnpm loads at Alexis's install
+# (F087). A dependency is Alexis's to add, and rm -rf no one's.
+assert {"Bash(git push)", "Bash(git push *)"} <= ask, "a push asks no one"
+assert {"Bash(pnpm add *)", "Bash(rm -rf *)"} <= deny, "Claude can add a dependency or delete a tree"
 outside = {"Edit(/scripts/guard.py)", "Edit(/scripts/stop_gate.sh)", "Edit(/scripts/code_changed.sh)", "Edit(/.githooks/**)",
            "Edit(/.claude/**)", "Edit(/**/package.json)", "Edit(/pnpm-workspace.yaml)", "Edit(/.pnpmfile.cjs)", "Edit(/.pnpmfile.mjs)"}
-writes = {r for r in ask if r.split("(")[0] in {"Edit", "Write", "MultiEdit", "NotebookEdit"}}
-assert writes == outside, "the edits that ask are not exactly the files run outside the sandbox"
+edits = lambda rules: {r for r in rules if r.split("(")[0] in {"Edit", "Write", "MultiEdit", "NotebookEdit"}}
+assert edits(deny) == outside, "the edits refused are not exactly the files run outside the sandbox"
+assert not edits(ask), "an edit asks Alexis: Claude works alone, and the files run outside the sandbox are refused"
 assert {f"mcp__{p}__gno_{t}" for p in ("gnomcp", "plugin_gnomcp_gnomcp") for t in ("addpkg", "call", "run", "key_send", "cla_sign")} <= ask, "a chain write asks no one"
 assert {"Read(~/.ssh/**)", "Read(~/.config/gh/**)"} <= deny, "the Read tool can open a credential"
 # The sandbox turns Read denies into its own: one on dist, coverage or reports stops the gate

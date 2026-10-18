@@ -14,11 +14,7 @@
       "Read(~/.ssh/**)",
       "Read(~/.config/gh/**)",
       "Read(~/.npmrc)",
-      "Read(~/.aws/**)"
-    ],
-    "ask": [
-      "Bash(git push)",
-      "Bash(git push *)",
+      "Read(~/.aws/**)",
       "Bash(pnpm add *)",
       "Bash(rm -rf *)",
       "Edit(/scripts/guard.py)",
@@ -29,7 +25,11 @@
       "Edit(/**/package.json)",
       "Edit(/pnpm-workspace.yaml)",
       "Edit(/.pnpmfile.cjs)",
-      "Edit(/.pnpmfile.mjs)",
+      "Edit(/.pnpmfile.mjs)"
+    ],
+    "ask": [
+      "Bash(git push)",
+      "Bash(git push *)",
       "mcp__gnomcp__gno_addpkg",
       "mcp__gnomcp__gno_call",
       "mcp__gnomcp__gno_run",
