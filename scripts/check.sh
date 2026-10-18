@@ -118,7 +118,7 @@ if git rev-parse --git-dir >/dev/null 2>&1; then # not in pre-commit's staged co
 	mkdir -p .claude/tmp && sh scripts/code_changed.sh --state >.claude/tmp/gate-green # what stop_gate.sh compares
 	# A clean tree that passed is recorded, for the hooks outside the sandbox, which run no gate (F076).
 	if [ -z "$(git status --porcelain)" ]; then
-		. .githooks/records.sh && code_print HEAD >>".claude/tmp/green-$($full && echo full || echo fast)"
+		. .githooks/records.sh && record HEAD ".claude/tmp/green-$($full && echo full || echo fast)"
 	fi
 fi
 echo "all checks passed in $(($(date +%s) - started)) s"

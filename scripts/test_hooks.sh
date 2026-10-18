@@ -117,8 +117,8 @@ guarded = next(ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast
 missed = [p for p in guarded if not any(fnmatch.fnmatch(p, s) or p.startswith(s + "/") for s in gate)]
 assert not missed, missed
 PY
-grep -B1 -F '. .githooks/records.sh && code_print HEAD >>".claude/tmp/green-$($full && echo full || echo fast)"' "$gate_file" | grep -qF 'if [ -z "$(git status --porcelain)" ]; then' || fail "check.sh records a tree it did not pass clean (F076)"
-[ "$(grep -n 'code_print HEAD' "$gate_file" | cut -d: -f1)" -gt "$(grep -n 'python3 -I scripts/harness_mutate.py' "$gate_file" | cut -d: -f1)" ] || fail "check.sh records its tree before its last step (F076)"
+grep -B1 -F '. .githooks/records.sh && record HEAD ".claude/tmp/green-$($full && echo full || echo fast)"' "$gate_file" | grep -qF 'if [ -z "$(git status --porcelain)" ]; then' || fail "check.sh records a tree it did not pass clean (F076)"
+[ "$(grep -n 'record HEAD' "$gate_file" | cut -d: -f1)" -gt "$(grep -n 'python3 -I scripts/harness_mutate.py' "$gate_file" | cut -d: -f1)" ] || fail "check.sh records its tree before its last step (F076)"
 # An EXIT trap keeps a failure: under macOS's sh, a plain one turns an unbound variable into exit 0.
 for f in "$here"/*.sh "$hooks"/*; do
 	grep -n "^[[:space:]]*trap .* EXIT$" "$f" | grep -v '|| status=1; exit "$status"' | grep -q . && fail "$(basename "$f") has an EXIT trap that can hide a failure"
@@ -481,7 +481,7 @@ for f in review_pass.py check_docs.py repo_files.py; do printf 'open("%s/ran", "
 printf '.claude/tmp\nran\n' >"$o/.gitignore" && echo one >"$o/a.ts"
 git -C "$o" init -q && git -C "$o" add -A && git -C "$o" commit -qm base
 out() { (cd "$o" && env -u SANDBOX_RUNTIME "$@" >/dev/null 2>&1); }
-record() { (cd "$o" && . .githooks/records.sh && code_print "$1") >>"$o/.claude/tmp/green-$2"; }
+mark() { (cd "$o" && . .githooks/records.sh && code_print "$1") >>"$o/.claude/tmp/green-$2"; } # as a gate records
 untouched() { [ ! -e "$o/ran" ] || fail "$1 ran the repository's code outside the sandbox (F076)"; }
 echo two >>"$o/a.ts" && git -C "$o" add a.ts
 out sh .githooks/pre-commit && fail "pre-commit outside the sandbox took code no gate passed"
@@ -491,11 +491,11 @@ full=$(cd "$o" && . .githooks/records.sh && code_print "$(git write-tree)")
 printf '%s\n\n%sx\n' "${full%??????????}" "$full" >>"$o/.claude/tmp/green-fast"
 out sh .githooks/pre-commit && fail "pre-commit outside the sandbox took a partial or empty record"
 out sh .githooks/pre-merge-commit && fail "pre-merge-commit outside the sandbox took code no gate passed"
-record "$(git -C "$o" write-tree)" fast
+mark "$(git -C "$o" write-tree)" fast
 out sh .githooks/pre-commit || fail "pre-commit outside the sandbox refused code the gate passed"
 out sh .githooks/pre-merge-commit || fail "pre-merge-commit outside the sandbox refused code the gate passed"
 echo five >"$o/b.ts" && git -C "$o" add b.ts
-record "$(git -C "$o" write-tree)" full
+mark "$(git -C "$o" write-tree)" full
 out sh .githooks/pre-commit || fail "pre-commit outside the sandbox refused code its full gate passed"
 git -C "$o" rm -qf --cached b.ts && rm "$o/b.ts"
 for f in docs/n.md adr/figure.svg NOTES.md; do
@@ -503,12 +503,12 @@ for f in docs/n.md adr/figure.svg NOTES.md; do
 	echo prose >"$o/$f" && git -C "$o" add "$f"
 done
 out sh .githooks/pre-commit || fail "pre-commit outside the sandbox refused prose added to code the gate passed"
-printf 'aws = "%s"\n' "AKIA""J7Q2XRT4LMNB5VWZ" >"$o/leak.py" && git -C "$o" add leak.py && record "$(git -C "$o" write-tree)" fast
+printf 'aws = "%s"\n' "AKIA""J7Q2XRT4LMNB5VWZ" >"$o/leak.py" && git -C "$o" add leak.py && mark "$(git -C "$o" write-tree)" fast
 out sh .githooks/pre-commit && fail "pre-commit outside the sandbox let a staged key through"
 (cd "$o" && env -u SANDBOX_RUNTIME PATH=/usr/bin:/bin sh .githooks/pre-commit >/dev/null 2>&1) && fail "pre-commit outside the sandbox passed with no gitleaks"
 git -C "$o" rm -qf --cached leak.py && rm "$o/leak.py"
 printf 'p = "/Us''ers/alice/x"\n' >"$o/private.py" && git -C "$o" add private.py
-record "$(git -C "$o" write-tree)" fast
+mark "$(git -C "$o" write-tree)" fast
 out sh .githooks/pre-commit && fail "pre-commit outside the sandbox let a home folder's path through"
 git -C "$o" rm -qf --cached private.py && rm "$o/private.py"
 printf 'fix: x\n\nSeen in /Us''ers/alice/notes\n' >"$t/outside-msg"
@@ -524,11 +524,11 @@ echo prose >"$o/docs/m.md" && git -C "$o" add docs/m.md
 out sh .githooks/pre-commit || fail "pre-commit outside the sandbox refused prose alone on code no gate passed"
 git -C "$o" commit -qm prose && head=$(git -C "$o" rev-parse HEAD)
 push slice-1a && fail "pre-push outside the sandbox took a branch no gate passed"
-record "$head" fast && push slice-1a || fail "pre-push outside the sandbox refused a branch once recorded"
+mark "$head" fast && push slice-1a || fail "pre-push outside the sandbox refused a branch once recorded"
 pass() { p=$(cd "$o" && . .githooks/records.sh && review_print HEAD) && echo "2026-10-18 $p test" >>"$o/docs/review-passes.txt" && git -C "$o" add docs && git -C "$o" commit -qm pass && head=$(git -C "$o" rev-parse HEAD); }
 pass
 push main && fail "pre-push outside the sandbox took main the full gate never passed"
-record "$head" full && push main || fail "pre-push outside the sandbox refused main with its gate and review"
+mark "$head" full && push main || fail "pre-push outside the sandbox refused main with its gate and review"
 (cd "$o" && python3 -I "$here/review_pass.py" check HEAD >/dev/null) || fail "records.sh and review_pass.py print a tree differently"
 echo log >>"$o/docs/review-log.md" && git -C "$o" add docs && git -C "$o" commit -qm log && head=$(git -C "$o" rev-parse HEAD)
 push main || fail "pre-push outside the sandbox refused main once its review log was written"
@@ -537,7 +537,7 @@ echo x >"$o/scripts/tool.sh"
 git -C "$o" add scripts
 git -C "$o" commit -qm tool
 head=$(git -C "$o" rev-parse HEAD)
-record "$head" full
+mark "$head" full
 push slice-1a || fail "pre-push outside the sandbox refused a branch its full gate passed"
 push main && fail "pre-push outside the sandbox took main whose review pass is for other code"
 pass
@@ -545,7 +545,7 @@ push main "$base" && fail "pre-push outside the sandbox took an undeclared harne
 push main 1111111111111111111111111111111111111111 && fail "pre-push outside the sandbox took a main it cannot compare"
 git -C "$o" commit -q --allow-empty -m declare -m "Harness-changed: scripts/tool.sh - a test" && head=$(git -C "$o" rev-parse HEAD)
 push main "$base" || fail "pre-push outside the sandbox refused main with its harness change declared"
-printf 'aws = "%s"\n' "AKIA""J7Q2XRT4LMNB5VWZ" >"$o/leak.py" && git -C "$o" add leak.py && git -C "$o" commit -qm leak && head=$(git -C "$o" rev-parse HEAD) && record "$head" full && pass
+printf 'aws = "%s"\n' "AKIA""J7Q2XRT4LMNB5VWZ" >"$o/leak.py" && git -C "$o" add leak.py && git -C "$o" commit -qm leak && head=$(git -C "$o" rev-parse HEAD) && mark "$head" full && pass
 push main && fail "pre-push outside the sandbox let main through with a key in its history"
 push slice-1a && fail "pre-push outside the sandbox let a branch through with a key in its history"
 untouched pre-push
@@ -556,10 +556,13 @@ git -C "$o" commit -qam four
 git -C "$o" checkout -q -
 git -C "$o" merge -q --no-ff --no-commit feature >/dev/null 2>&1 || :
 out sh .githooks/pre-merge-commit && fail "pre-merge-commit outside the sandbox took a merge no gate passed"
-record feature full
+mark feature full
 out sh .githooks/pre-merge-commit || fail "pre-merge-commit outside the sandbox refused a merge of a branch its gate passed"
 git -C "$o" merge --abort
 untouched pre-merge-commit
+# A print is recorded once, however often its gate passes.
+(cd "$o" && . .githooks/records.sh && record HEAD "$t/once" && record HEAD "$t/once") || fail "records.sh could not record a print"
+[ "$(wc -l <"$t/once")" -eq 1 ] || fail "records.sh recorded the same print twice"
 fi
 
 if part guard; then
@@ -781,6 +784,20 @@ done
 printf 'aws = "%s"\n' "$key" >"$sc/leak.py" && printf 'p = "/Us''ers/alice/x"\n' >"$sc/private.py" && git -C "$sc" add leak.py private.py
 both=$(cd "$sc" && sh scripts/scan_secrets.sh --staged 2>&1) && fail "scan_secrets passed a key and a home folder"
 [ "$(printf '%s\n' "$both" | grep -c 'leaks found')" = 2 ] || fail "scan_secrets stopped at the first rule set that found something"
+# An attribute that makes git print a file as binary hides it from gitleaks: any is refused (F130).
+git -C "$sc" rm -qf --cached private.py && rm "$sc/private.py"
+for where in .gitattributes sub/.gitattributes; do
+	mkdir -p "$sc/sub" && printf '* -diff\n' >"$sc/$where"
+	scan && fail "scan_secrets passed beside an untracked $where (F130)"
+	git -C "$sc" add "$where"
+	scan && fail "scan_secrets passed beside a tracked $where (F130)"
+	git -C "$sc" rm -qf --cached "$where" && rm "$sc/$where"
+done
+info="$(git -C "$sc" rev-parse --absolute-git-dir)/info"
+mkdir -p "$info" && printf '* -diff\n' >"$info/attributes"
+scan && fail "scan_secrets passed beside .git/info/attributes (F130)"
+git -C "$sc" rm -qf --cached leak.py && rm "$sc/leak.py" && : >"$info/attributes"
+scan || fail "scan_secrets refused an empty .git/info/attributes"
 fi
 
 if part regressions; then

@@ -5,6 +5,11 @@
 code_print() { printf '%s' "$(git ls-tree -r "$1" | grep -v -e '	docs/' -e '	adr/' -e '\.md$')" | git hash-object --stdin; }
 # A tree without the review's own files, as scripts/review_pass.py prints it.
 review_print() { printf '%s' "$(git ls-tree -r "$1" | grep -v -e '	docs/review-log\.md$' -e '	docs/review-passes\.txt$')" | git hash-object --stdin; }
+# Appends $1's code print to the file $2, once however often its gate passes.
+record() {
+	p=$(code_print "$1") || return 1
+	grep -qxF "$p" "$2" 2>/dev/null || printf '%s\n' "$p" >>"$2"
+}
 # Whether a gate recorded $1's code green in one of the files that follow.
 green() {
 	p=$(code_print "$1") || return 1

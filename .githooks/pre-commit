@@ -38,5 +38,5 @@ fi
 sh "$s/borrow_node_modules.sh" "$staged" # the staged copy has no installed packages
 # A `commit -a` hands the hook its own index; the gate's git calls must not touch it.
 env -u GIT_INDEX_FILE -u GIT_DIR -u GIT_WORK_TREE sh "$s/check.sh"
-mkdir -p .claude/tmp && code_print "$(git write-tree)" >>.claude/tmp/green-fast # for the hooks outside the sandbox
+mkdir -p .claude/tmp && record "$(git write-tree)" .claude/tmp/green-fast # for the hooks outside the sandbox
 finished=1

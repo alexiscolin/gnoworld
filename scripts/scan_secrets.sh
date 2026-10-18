@@ -11,6 +11,11 @@ if [ -e .gitleaksignore ]; then # gitleaks reads it at the root whatever --gitle
 	exit 1
 fi
 found=0 # both rule sets run, so a secret does not hide a private name beside it (F120)
+# An attribute can make git print a file as binary, which gitleaks then never reads (F130).
+if [ -n "$(git ls-files -co --exclude-standard -- '*.gitattributes')" ] || [ -s "$(git rev-parse --git-path info/attributes)" ]; then
+	echo "scan_secrets: a .gitattributes or .git/info/attributes could hide a file from the scan; remove it" >&2
+	exit 1
+fi
 for config in gitleaks.toml gitleaks-private.toml; do
 	gitleaks git --no-banner --redact \
 		--config "$here/$config" --gitleaks-ignore-path "$here" --ignore-gitleaks-allow ${1:+"$1"} . || found=1
