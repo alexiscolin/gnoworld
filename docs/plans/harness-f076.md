@@ -24,11 +24,16 @@ the sandboxed gate wrote; it runs no script, config or test of the repository.
 | `pre-push`, a work branch | as today | the pushed tree passed the fast gate; gitleaks over the history |
 | `pre-push`, `main` | as today | the pushed tree passed the full gate; a review pass for it; each harness change declared |
 
-**The records.** When `check.sh` passes on a clean tree, it appends that tree's hash
-(`git rev-parse HEAD^{tree}`) to `.claude/tmp/green-fast` or, with `--full`, to
-`.claude/tmp/green-full`. The hooks compare with `git rev-parse <commit>^{tree}`. The review
-pass's fingerprint (the tree without the review's own files) is computed by the hook's own
-lines, the way `review_pass.py` does, so the hook does not run that script.
+**The records.** When `check.sh` passes on a clean tree, it appends the print of that tree's
+code (prose left out, as `code_changed.sh` does) to `.claude/tmp/green-fast` or, with
+`--full`, to `.claude/tmp/green-full`; `pre-commit` in the sandbox appends the print of the
+staged code it passed. The hooks compare the print of the commit they check. Both prints, and
+the review pass's (the tree without the review's own files, as `review_pass.py` prints it), are
+defined once in `.githooks/records.sh`, which runs only git and which Claude cannot edit.
+
+**Changed while writing the tests:** the hooks outside the sandbox call `scan_secrets.sh` rather
+than repeat its rules, so it joins the files Claude cannot edit, as `code_changed.sh` did for
+the Stop hook. Prose alone needs no record, as today.
 
 **What a record proves, and what it does not.** Code in the sandbox can write a record without
 running the gate. So a record proves nothing on its own: it moves the integrity check to the
