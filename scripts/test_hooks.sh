@@ -101,6 +101,16 @@ at = lambda text: next(i for i, l in enumerate(lines) if l.startswith(text))
 assert "packages() { cat package.json app/package.json pnpm-lock.yaml | cksum; }" in lines
 assert at("copies=$(run copies") < at("installed=$(packages)") < at("node app/node_modules/@playwright/test/cli.js test") < at('[ "$(packages)" = "$installed" ]')
 PY
+# Every file harness_mutate guards makes --full run it when the file changes: one list, held.
+python3 -I - "$gate_file" "$here/harness_mutate.py" <<'PY' || fail "check.sh's harness list misses a file harness_mutate guards"
+import ast, re, sys
+gate = open(sys.argv[1]).read()
+specs = re.search(r'git diff --quiet "\$base" -- (.*?); then', gate, re.S).group(1).replace("\\\n", " ").split()
+tree = ast.parse(open(sys.argv[2]).read())
+guarded = next(ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == "SECTIONS")
+missed = [p for p in guarded if not any(p == s or p.startswith(s + "/") for s in specs)]
+assert not missed, missed
+PY
 # An EXIT trap keeps a failure: under macOS's sh, a plain one turns an unbound variable into exit 0.
 for f in "$here"/*.sh "$hooks"/*; do
 	grep -n "^[[:space:]]*trap .* EXIT$" "$f" | grep -v '|| status=1; exit "$status"' | grep -q . && fail "$(basename "$f") has an EXIT trap that can hide a failure"

@@ -108,7 +108,7 @@ if $full; then
 	python3 -I scripts/audit.py
 	if ! git diff --quiet "$base" -- scripts .githooks .github .claude/settings.json package.json pnpm-workspace.yaml \
 		eslint.config.ts tsconfig.base.json tsconfig.json vitest.config.ts stryker.config.json knip.json .jscpd.json \
-		.prettierrc.json .prettierignore .gitignore; then
+		.prettierrc.json .prettierignore .gitignore app/tsconfig.json; then
 		echo "== the harness changed: each guard switched off must fail a test (several minutes)"
 		python3 -I scripts/harness_mutate.py
 	fi
