@@ -9,3 +9,4 @@
 2026-10-18 09f96f0ce9edc805aa6c78e4627c97e7e1764ff3 slice-1b round 3, then the harness picture (docs only, checked by its render at desktop and phone width)
 2026-10-18 bf00c6e6e83f1cd90b1a19249971868826db0ae5 harness-f076, three rounds: test-auditor green, /simplify, /code-review, /security-review, security-reviewer, finding-verifier x3; round 3 security-reviewer on the fix diff; the full gate on the final code
 2026-10-18 eb9ec91b9fffa8a9fa67801abc6e197a33c59b8d harness-f129, two rounds: test-auditor red and green, /simplify (4 angles), /code-review, /security-review, security-reviewer, finding-verifier; round 2 security-reviewer on the fix diff; the full gate on the final code
+2026-10-18 a2ead2cb97e61e1f33a935c146e38e3b80800664 slice-1b-2, one round: test-auditor red and green, /simplify (4 angles), /code-review, /security-review (one candidate, dropped at 3/10, its true part fixed), the full gate on the final code
