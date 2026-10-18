@@ -1,0 +1,9 @@
+// The worker the build ships as /sw.js: app/vite.config.ts defines the list below.
+import { precache, release, takeOver, type Precached, type WorkerScope } from "./worker.ts";
+
+declare const __GNOWORLD_PRECACHE__: readonly Precached[];
+
+const scope = self as unknown as WorkerScope;
+precache(scope, __GNOWORLD_PRECACHE__);
+takeOver(scope);
+release(scope);

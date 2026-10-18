@@ -22,6 +22,16 @@ const RULES = [
 ];
 const LIMITS = { header: 6, other: 3 };
 
+/** The paths under dir, from the root, as git lists them: node_modules is not entered, nor is a
+ * link, which a dirent never calls a directory; listed() then keeps a link to a file. */
+function walk(dir, prefix) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    if (entry.name === "node_modules") return [];
+    const path = prefix + entry.name;
+    return entry.isDirectory() ? walk(join(dir, entry.name), `${path}/`) : [path];
+  });
+}
+
 /** The files git would track under root, or every file when root is not in a repository. */
 function listed(root) {
   let paths;
@@ -33,10 +43,9 @@ function listed(root) {
       .split("\n")
       .filter(Boolean);
   } catch {
-    // Outside a repository (the pre-commit's staged copy holds only tracked files), skip what it borrows.
-    paths = readdirSync(root, { recursive: true })
-      .map(String)
-      .filter((p) => !p.split("/").includes("node_modules"));
+    // Outside a repository (the pre-commit's staged copy holds only tracked files), skip what it
+    // borrows: a link is listed, never entered, as git lists a link, not the files behind it.
+    paths = walk(root, "");
   }
   return paths.filter(
     (p) =>
