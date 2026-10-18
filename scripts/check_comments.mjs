@@ -22,6 +22,15 @@ const RULES = [
 ];
 const LIMITS = { header: 6, other: 3 };
 
+/** The files under dir, as paths from the root; node_modules and links are not entered. */
+function walk(dir, prefix) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    if (entry.name === "node_modules" || entry.isSymbolicLink()) return [];
+    const path = prefix + entry.name;
+    return entry.isDirectory() ? walk(join(dir, entry.name), `${path}/`) : [path];
+  });
+}
+
 /** The files git would track under root, or every file when root is not in a repository. */
 function listed(root) {
   let paths;
@@ -33,10 +42,9 @@ function listed(root) {
       .split("\n")
       .filter(Boolean);
   } catch {
-    // Outside a repository (the pre-commit's staged copy holds only tracked files), skip what it borrows.
-    paths = readdirSync(root, { recursive: true })
-      .map(String)
-      .filter((p) => !p.split("/").includes("node_modules"));
+    // Outside a repository (the pre-commit's staged copy holds only tracked files), skip what it
+    // borrows: its links are never entered, as git lists a link, not what it points to.
+    paths = walk(root, "");
   }
   return paths.filter(
     (p) =>

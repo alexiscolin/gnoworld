@@ -312,7 +312,18 @@ try:
             f.write("// TODO: a dependency's own business\n")
         out = run(["node", "scripts/check_comments.mjs", folder])
         expect(out.returncode == 0, "check_comments reads no node_modules outside a repository")
+        # The staged copy borrows node_modules through links, which Node 24's recursive readdir
+        # follows (3 million entries, 85 s): the walk skips links, so one back to the folder ends.
+        shutil.rmtree(os.path.join(folder, "node_modules"))
+        elsewhere = tempfile.mkdtemp()
+        with open(os.path.join(elsewhere, "g.ts"), "w") as f:
+            f.write("// TODO: another tree's own business\n")
+        os.symlink(elsewhere, os.path.join(folder, "node_modules"))
+        os.symlink(elsewhere, os.path.join(folder, "linked"))
+        out = run(["node", "scripts/check_comments.mjs", folder])
+        expect(out.returncode == 0, "check_comments follows no link outside a repository, as git lists none")
         shutil.rmtree(folder)
+        shutil.rmtree(elsewhere)
 
     if part("css"):
         # check_css: in a folder of its own, with its own tokens.
