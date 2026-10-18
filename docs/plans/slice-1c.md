@@ -1,6 +1,6 @@
 # Slice 1c: the demo stack
 
-Status: draft, for Alexis's approval. The last merge of slice 1, under about 400 lines. Read first: `slice-1.md`,
+Status: approved by Alexis, 2026-10-18, every answer as recommended. The last merge of slice 1, under about 400 lines. Read first: `slice-1.md`,
 ADR-0002 §7 (lines 978-1066), what `slice-1b-2.md` §2 deferred here, and the decisions and ledger rows naming 1c.
 
 ## 1. Done when
@@ -68,13 +68,6 @@ No tier-1 file; `deploy/` is security-sensitive, so `/pre-merge` adds the securi
 
 ## 9. Questions for Alexis
 
-1. The egress proxy waits for slice 3, where something first calls out (the backlog's row says 1c)?
-2. Tailscale cannot sit on an internal network; alone on its own bridge, tested as above. Agreed?
-3. nginx (it has a shell; it does all five jobs itself) over static-web-server (no shell, but no
-   429, no PROXY protocol, no password file)?
-4. semgrep's registry rules for Dockerfile and Compose, fetched at run time (their licence forbids
-   committing them), in `/pre-merge` only, the gate staying frozen? Or only `docker inspect`?
-5. The client built inside its image (multi-stage, reproducible, `--build` in the one command),
-   or the host's `app/build/client` copied in (simpler, but a stale build can ship)?
-6. You create, outside the repo: the tagged auth key (`tag:gnoworld-demo`), the policy lines
-   (I write them), and the password file (`htpasswd`), all in `deploy/secrets/`.
+Answered on 2026-10-18 (`docs/decisions.md`): the egress proxy waits for slice 3; Tailscale alone
+on its own bridge network, tested; nginx; semgrep's registry rules in `/pre-merge` only; the
+client built inside its image. Alexis creates the key, the policy lines and the password file.
