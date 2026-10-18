@@ -82,7 +82,7 @@ def settings(read):
         out |= {f"{name} {key}": data.get(key) for key in keys}
     # pnpm reads keys in more forms than a pattern can follow (quoted, spaced, nested): every
     # change outside the packages list counts, as a fingerprint of the rest (F088).
-    rest = re.sub(r"^packages:\n(?:[ \t]+-.*\n)*", "", read("pnpm-workspace.yaml") or "", flags=re.M)
+    rest = re.sub(r"^packages:\n(?:[ \t]*(?:-.*|#.*)?\n)*", "", read("pnpm-workspace.yaml") or "", flags=re.M)
     out["pnpm-workspace.yaml outside packages"] = hashlib.sha256(rest.encode()).hexdigest()[:12]
     return out
 
@@ -248,6 +248,11 @@ def self_test():
         assert len(changed) == 1 and changed[0].startswith("pnpm-workspace.yaml outside packages "), loose
         assert changed_settings(workspace(strict), workspace(strict + loose), {"setting pnpm-workspace.yaml outside packages"}) == []
     assert changed_settings(workspace(strict), workspace(strict.replace("  - app\n", "  - app\n  - admin\n")), set()) == []
+    # A list with a comment, a blank line or items flush with its key is still the list (F123).
+    for listed, more in (("  # the client\n  - app\n\n", "  # the client\n  - app\n\n  - admin\n"), ("- app\n", "- app\n- admin\n")):
+        before, after = (f"packages:\n{items}minimumReleaseAge: 1440\n" for items in (listed, more))
+        assert changed_settings(workspace(before), workspace(after), set()) == [], listed
+        assert changed_settings(workspace(before), workspace(after + "pnpmfile: x.cjs\n"), set()) != [], listed
     assert changed_settings(settings(old.get), settings(new.get), set()) == [".jscpd.json exitCode 1 -> gone"]
     assert changed_settings(settings(old.get), settings(new.get), {"setting .jscpd.json exitCode"}) == []
     diff = "+++ b/p/a.test.ts\n-  test(\"parses x\", () => {\n+  test.fails(\"parses x\", () => {\n+  test.fails(\"new one\", () => {\n+++ b/p/b.test.ts\n-  test.fails(\"done\", () => {\n+  test(\"done\", () => {\n"
