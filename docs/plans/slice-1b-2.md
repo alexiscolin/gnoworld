@@ -45,7 +45,9 @@ budget holds; measured before and after).
 
 ## 5. Scale
 
-The precache list grows with the app's files; textures stay out of it (slice 7).
+The precache list grows with the app's files; textures stay out of it (slice 7). One cache holds
+every version, keyed by URL: a hashed name never holds other bytes, so a deploy fetches only the
+files it changed, and the new version drops the rest once it takes over.
 
 ## 6. Tests, by level
 
@@ -59,12 +61,14 @@ with a budget lowered by hand, since the gate's probe is frozen). No `packages/c
 
 ## 7. Files
 
-New: `app/src/sw/` (`worker.ts`, the worker's rules; `sw.ts`, its entry; `precache.ts`, the
-list and version; `register.ts`, the page's side), `app/src/ui/UpdatePrompt.tsx`,
-`app/public/manifest.webmanifest` and two placeholder icons, the specs. Changed:
-`app/vite.config.ts` (a plugin, in the browser's build only, emits `sw.js` and writes the list
-and version into it), `app/src/root.tsx`, `app/tests/e2e/serve.mjs` (the manifest's and icons'
-types; port 4174 for the update journeys). No tier-1 file; no package added.
+New: `app/src/sw/` (`worker.ts`, the worker's rules, `precache()` and `takeOver()` apart, so
+push and an outbox add their own beside them; `sw.ts`, its entry; `precache.ts`, the list;
+`register.ts`, the page's side), `app/src/ui/UpdatePrompt.tsx`, `app/public/manifest.webmanifest`
+and two placeholder icons, the specs. Changed: `app/vite.config.ts` (a plugin builds `sw.js` on
+its own once the whole build is done, one classic script with its list as a define, so code it
+shares with the pages stays in it), `app/src/root.tsx`, `app/tests/e2e/serve.mjs` (the
+manifest's and icons' types; port 4174 for the update journeys). No tier-1 file; no package
+added.
 
 ## 8. Dependencies
 
