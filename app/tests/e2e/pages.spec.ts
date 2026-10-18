@@ -22,12 +22,14 @@ async function tag(page: Page, selector: string): Promise<string> {
 }
 
 // React marks the document it hydrated; the static HTML alone never carries the mark.
-function isHydrated(page: Page): Promise<boolean> {
-  return page.evaluate(() => Object.keys(document).some((key) => key.startsWith("__reactContainer")));
-}
+const reactMark = () => Object.keys(document).some((key) => key.startsWith("__reactContainer"));
 
 async function hydrated(page: Page): Promise<void> {
-  await page.waitForFunction(() => Object.keys(document).some((key) => key.startsWith("__reactContainer")));
+  await page.waitForFunction(reactMark);
+}
+
+async function violations(page: Page): Promise<unknown[]> {
+  return (await new AxeBuilder({ page }).analyze()).violations;
 }
 
 // Every error the page reports, and every request but the page's own that failed or answered 400 or more.
@@ -55,7 +57,7 @@ test.describe("as a search engine reads it, before any script runs", () => {
     test(`${path} carries its own title, canonical and Open Graph tags`, async ({ page }) => {
       const response = await page.goto(path);
       expect(response?.status()).toBe(200);
-      expect(await isHydrated(page)).toBe(false);
+      expect(await page.evaluate(reactMark)).toBe(false);
       await expect.soft(page).toHaveTitle(title);
       await expect.soft(page.locator("title")).toHaveCount(1);
       await expect.soft(page.locator("meta[charset]")).toHaveCount(1);
@@ -96,8 +98,7 @@ test.describe("once the client takes over", () => {
     test(`${path} has no accessibility violation (axe)`, async ({ page }) => {
       await page.goto(path);
       await hydrated(page);
-      const { violations } = await new AxeBuilder({ page }).analyze();
-      expect(violations).toEqual([]);
+      expect(await violations(page)).toEqual([]);
     });
   }
 
@@ -141,8 +142,7 @@ test.describe("once the client takes over", () => {
       expect(await tag(page, 'meta[name="robots"]')).toBe("noindex");
       await expect(page.locator('link[rel="canonical"]')).toHaveCount(0);
       expect(problems).toEqual([]);
-      const { violations } = await new AxeBuilder({ page }).analyze();
-      expect(violations).toEqual([]);
+      expect(await violations(page)).toEqual([]);
     });
   }
 

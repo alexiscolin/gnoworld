@@ -8,6 +8,10 @@ function route(worldLoader: RouteObject["loader"] = loader): RouteObject {
   return { path: "/w/:world", Component: World, loader: worldLoader, ErrorBoundary };
 }
 
+function metaArgs(loaderData: ReturnType<typeof findWorld> | undefined, error?: unknown) {
+  return { loaderData, error } as MetaArgs<typeof loader>;
+}
+
 const failures: [string, () => never][] = [
   [
     "an error",
@@ -46,16 +50,14 @@ describe("a world's page", () => {
   });
 
   test("carries a world's tags, or not found's when no world has the name", async () => {
-    const args = (loaderData: ReturnType<typeof findWorld> | undefined, error?: unknown) =>
-      ({ loaderData, error }) as MetaArgs<typeof loader>;
     const world = findWorld("bubble");
-    expect(meta(args(world))).toEqual(worldMeta(world));
-    expect(meta(args(undefined, await routeError(route(), "/w/nowhere")))).toEqual(worldMeta(undefined));
+    expect(meta(metaArgs(world))).toEqual(worldMeta(world));
+    expect(meta(metaArgs(undefined, await routeError(route(), "/w/nowhere")))).toEqual(worldMeta(undefined));
   });
 
   test.each(failures)("carries could-not-load tags on %s, not not-found ones", async (_, failing) => {
     const error = await routeError(route(failing), "/w/bubble");
-    expect(meta({ loaderData: undefined, error } as MetaArgs<typeof loader>)).toEqual(failedWorldMeta());
+    expect(meta(metaArgs(undefined, error))).toEqual(failedWorldMeta());
   });
 
   test("finds a world in the browser as at build time, with no request", () => {
