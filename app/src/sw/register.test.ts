@@ -174,6 +174,24 @@ test("a worker found later shows the prompt once installed, once, whatever state
   expect(next.sent).toEqual([]);
 });
 
+test("a worker waiting while a newer one installs: both are offered, and the click goes to the one waiting then", async () => {
+  const older = worker();
+  const newer = worker("installing");
+  const { page, registration } = container({ waiting: older, installing: newer });
+  const { started, updates } = start(page);
+  await started;
+  expect(updates).toHaveLength(1);
+  // The newer one installs: the browser sets the older one aside, and the newer one waits.
+  registration.installing = null;
+  registration.waiting = newer;
+  older.becomes("redundant");
+  newer.becomes("installed");
+  expect(updates).toHaveLength(2);
+  updates[0]?.();
+  expect(older.sent).toEqual([]);
+  expect(newer.sent).toEqual([{ type: "SKIP_WAITING" }]);
+});
+
 test("a worker that fails to install shows no prompt", async () => {
   const { page, updateFound } = container();
   const { started, updates } = start(page);

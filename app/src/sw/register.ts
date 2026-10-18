@@ -54,32 +54,34 @@ export async function startServiceWorker(start: Start): Promise<void> {
     reloaded = true;
     start.reload();
   };
-  const apply = (next: PageWorker) => () => {
+  // The click goes to the worker waiting then: a newer one may have set aside the one offered.
+  const apply = () => {
+    const waiting = registration.waiting;
     // Another tab's click may have made it active already: there is nothing left to wait for.
-    if (registration.waiting === null) {
+    if (waiting === null) {
       reloadOnce();
       return;
     }
     if (asked) return;
     asked = true;
     container.addEventListener("controllerchange", reloadOnce, { signal });
-    next.postMessage(TAKE_OVER);
+    waiting.postMessage(TAKE_OVER);
   };
   // The first worker replaces no version, so it needs no prompt.
-  const offer = (next: PageWorker) => {
-    if (container.controller !== null) start.onUpdate(apply(next));
+  const offer = () => {
+    if (container.controller !== null) start.onUpdate(apply);
   };
   const watch = (next: PageWorker) => {
     next.addEventListener(
       "statechange",
       () => {
-        if (next.state === "installed") offer(next);
+        if (next.state === "installed") offer();
       },
       { signal },
     );
   };
-  if (registration.waiting !== null) offer(registration.waiting);
-  else if (registration.installing !== null) watch(registration.installing);
+  if (registration.waiting !== null) offer();
+  if (registration.installing !== null) watch(registration.installing);
   registration.addEventListener(
     "updatefound",
     () => {
