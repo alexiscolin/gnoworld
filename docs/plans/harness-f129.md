@@ -25,20 +25,28 @@ write `.git` (code.claude.com/docs/en/permissions, "Protected paths").
   files and their ignore file, itself), into `.git/hooks`, and removes git's override of that
   folder. Alexis runs main's copy, never the working tree's:
   `git show main:scripts/install_hooks.sh | sh`. With `--check` it changes nothing and fails
-  when `.git/hooks` does not hold exactly that commit's files.
+  when `.git/hooks` does not hold exactly that commit's files. (Added at the red pass: it
+  refuses a commit missing a hook, removes any other hook and any link there, removes every
+  override, fails when one it cannot change remains, and turns off fast-forward merges, which
+  run no hook.)
 - The hooks run their scripts from their own folder (`$(dirname "$0")`), never from the working
   tree. In the sandbox, pre-commit still runs the staged gate, as before (F067).
 - `prepare` goes: `pnpm install` would point git back at `.githooks`.
 - pre-push wants, before `main` leaves, `.git/hooks` to hold that `main`'s hooks: a merge that
   changed them is installed before it is pushed, so what runs is what was reviewed.
-- check.sh, in the sandbox, fails if git's hooks are elsewhere than `.git/hooks`, or if it can
-  write there or to `.git/config`: the boundary stays proven.
+- check.sh fails if git's hooks are elsewhere than `.git/hooks`, and, in the sandbox, if it can
+  write there or to `.git/config`, or if the hooks are missing: the boundary stays proven.
+- jscpd skips `.git`, where the installed hooks are copies of the repository's (found by the
+  gate).
 
 **A merge shows the harness first.** A merge writes the branch's files before any hook runs, so
 the check comes before it. `merge.sh <branch>`, installed beside the hooks, shows every harness
 file the branch changes, with the diff, and merges only once Alexis types the branch's name.
 In his shell, pre-merge-commit refuses a merge that changes the harness and did not come
-through merge.sh, and says to abort it. The harness list, today written twice (check.sh and
+through merge.sh, and says to abort it. (Changed at the red pass: git writes `MERGE_HEAD` only
+after pre-merge-commit, so merge.sh's mark is the commit it showed, and the hook checks that
+merging it gives exactly the tree being committed.) What it shows is text, its control bytes
+visible. The harness list, today written twice (check.sh and
 pre-push), is defined once in `records.sh` and gains `.mcp.json`, whose servers Claude Code
 starts.
 
