@@ -31,7 +31,7 @@ SECTIONS = {
     ".jscpd.json": "jscpd", "tsconfig.base.json": "tsc", "vitest.config.ts": "vitest",
     "scripts/guard.py": "guard", "scripts/review_pass.py": "review_pass", "scripts/patch_coverage.py": "patch_coverage",
     "scripts/check_docs.py": "check_docs", "scripts/check_regressions.py": "regressions", ".githooks/commit-msg": "commit_msg",
-    ".githooks/pre-push": "pre_push,wiring", ".githooks/pre-commit": "pre_commit,wiring", "scripts/code_changed.sh": "pre_commit,stop_gate",
+    ".githooks/pre-push": "pre_push,wiring,outside", ".githooks/pre-commit": "pre_commit,wiring,outside", ".githooks/records.sh": "outside,pre_commit,pre_push", "scripts/code_changed.sh": "pre_commit,stop_gate",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
     "scripts/check.sh": "wiring", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
     "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
@@ -196,6 +196,26 @@ def mutants():
     yield from each("scripts/check.sh", " app/tsconfig.json", "", "hooks", "check.sh's harness list is pre-push's (F124)")
     yield from each(".githooks/pre-push", 'if [ "$remote_sha" != "$zero" ]; then', "if false; then", "hooks", "pre-push compares main with the remote's")
     yield from each(".githooks/pre-push", "		sh scripts/scan_secrets.sh", "		:", "hooks", "pre-push secret scan")
+    # F076: outside the sandbox the hooks run no repository code, and check the gate's records.
+    rec = ".githooks/records.sh"
+    for part in (" -e '\tdocs/'", " -e '\tadr/'", " -e '\\.md$'", " -e '\tdocs/review-log\\.md$'", " -e '\tdocs/review-passes\\.txt$'"):
+        yield from each(rec, part, "", "hooks", f"records.sh leaves{part} out of its print")
+    yield from each(rec, 'grep -qxF "$p" "$f"', "true", "hooks", "records.sh wants the code recorded")
+    yield from each(rec, 'grep -qxF "$p"', 'grep -qF "$p"', "hooks", "records.sh wants a whole record line")
+    yield from each(rec, 'grep -qxF "$(review_print "$1")"', "grep -q .", "hooks", "records.sh wants the review pass of this tree")
+    yield from each(".githooks/pre-commit", 'if [ -z "${SANDBOX_RUNTIME:-}" ]; then', "if false; then", "hooks", "pre-commit runs no gate outside the sandbox")
+    yield from each(".githooks/pre-commit", "	sh scripts/scan_secrets.sh --staged", "	:", "hooks", "pre-commit scans outside the sandbox")
+    yield from each(".githooks/pre-commit", "sh scripts/code_changed.sh --staged && ", "", "hooks", "pre-commit lets prose alone through outside the sandbox")
+    yield from each(".githooks/pre-commit", ' && ! green "$(git write-tree)" .claude/tmp/green-fast .claude/tmp/green-full', "", "hooks", "pre-commit wants recorded code outside the sandbox")
+    yield from each(".githooks/pre-commit", 'code_print "$(git write-tree)" >>.claude/tmp/green-fast', "true", "hooks", "pre-commit records the code it passed")
+    yield from each(".githooks/pre-push", 'if [ -z "${SANDBOX_RUNTIME:-}" ]; then', "if false; then", "hooks", "pre-push runs no gate outside the sandbox")
+    yield from each(".githooks/pre-push", 'green "$local_sha" .claude/tmp/green-full ||', "true ||", "hooks", "pre-push wants main's full gate recorded")
+    yield from each(".githooks/pre-push", 'reviewed "$local_sha" ||', "true ||", "hooks", "pre-push wants main's review pass")
+    yield from each(".githooks/pre-push", 'green "$local_sha" .claude/tmp/green-fast .claude/tmp/green-full ||', "true ||", "hooks", "pre-push wants a branch's gate recorded")
+    yield from each(".githooks/pre-push", '. "$(dirname "$0")/records.sh"', ":", "hooks", "pre-push loads the records")
+    yield from each("scripts/check.sh", 'if [ -z "$(git status --porcelain)" ]; then', "if true; then", "hooks", "check.sh records only a clean tree")
+    yield from each("scripts/check.sh", ". .githooks/records.sh && code_print HEAD", ": && code_print HEAD", "hooks", "check.sh records the tree it passed")
+    yield from each(".claude/settings.json", '      "Edit(/scripts/scan_secrets.sh)",\n', "", "hooks", "settings keep the secret scan Claude cannot edit")
     yield from each("scripts/scan_secrets.sh", "--config \"$here/$config\" ", "", "hooks", "scan_secrets imposes its rules")
     yield from each("scripts/scan_secrets.sh", "gitleaks.toml gitleaks-private.toml; do", "gitleaks.toml; do", "hooks", "scan_secrets keeps private names out")
     yield from each("scripts/scan_secrets.sh", " --ignore-gitleaks-allow", "", "hooks", "scan_secrets ignores gitleaks:allow")

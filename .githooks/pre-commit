@@ -4,6 +4,18 @@ set -eu
 # staged rather than on the working tree. Only prose is exempt (scripts/code_changed.sh),
 # so a new code folder or a settings change is gated; scripts/test_hooks.sh checks the hooks.
 # Every script it runs comes from the staged copy, the one the commit holds (finding F067).
+. "$(dirname "$0")/records.sh"
+if [ -z "${SANDBOX_RUNTIME:-}" ]; then
+	# Outside Claude Code's sandbox, in Alexis's shell, no gate runs, so no code Claude can edit
+	# runs with his access (F076): only the scripts it cannot edit, and the staged code must be
+	# code the sandboxed gate passed. Prose alone needs no gate.
+	sh scripts/scan_secrets.sh --staged
+	if sh scripts/code_changed.sh --staged && ! green "$(git write-tree)" .claude/tmp/green-fast .claude/tmp/green-full; then
+		echo "pre-commit: no gate passed on this code; run sh scripts/check.sh in Claude Code's sandbox" >&2
+		exit 1
+	fi
+	exit 0
+fi
 staged=$(mktemp -d "${TMPDIR:-/tmp}/pre-commit.XXXXXX") # in $TMPDIR, which the sandbox allows
 # bash 3.2, macOS's sh, exits 0 through an EXIT trap after an unbound variable: `finished`, set
 # on the last line, tells a run that reached its end from one that died on the way.
@@ -26,4 +38,5 @@ fi
 sh "$s/borrow_node_modules.sh" "$staged" # the staged copy has no installed packages
 # A `commit -a` hands the hook its own index; the gate's git calls must not touch it.
 env -u GIT_INDEX_FILE -u GIT_DIR -u GIT_WORK_TREE sh "$s/check.sh"
+mkdir -p .claude/tmp && code_print "$(git write-tree)" >>.claude/tmp/green-fast # for the hooks outside the sandbox
 finished=1

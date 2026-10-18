@@ -3,6 +3,7 @@
 # branch gets the fast gate and the secret scan, since nothing leaves with a secret. Git sends one
 # line per ref: <local ref> <local sha> <remote ref> <remote sha>.
 set -eu
+. "$(dirname "$0")/records.sh"
 zero=0000000000000000000000000000000000000000
 gated=false
 # A branch's gate is its own harness, so a harness file it changes is declared on a line of a
@@ -37,10 +38,21 @@ while read -r _ local_sha remote_ref remote_sha; do
 				exit 1
 			fi
 		fi
-		python3 -I scripts/review_pass.py check "$local_sha" # cheap, so before the gate
-		sh scripts/check.sh --full </dev/null
+		if [ -z "${SANDBOX_RUNTIME:-}" ]; then
+			# Outside the sandbox no gate runs (F076): the full gate and a review recorded this code.
+			green "$local_sha" .claude/tmp/green-full || { echo "pre-push: the full gate never passed on this code; run /pre-merge in Claude Code" >&2; exit 1; }
+			reviewed "$local_sha" || { echo "pre-push: no committed review pass for this code; run /pre-merge and commit its record" >&2; exit 1; }
+			sh scripts/scan_secrets.sh
+		else
+			python3 -I scripts/review_pass.py check "$local_sha" # cheap, so before the gate
+			sh scripts/check.sh --full </dev/null
+		fi
 	elif ! $gated; then
-		sh scripts/check.sh </dev/null
+		if [ -z "${SANDBOX_RUNTIME:-}" ]; then
+			green "$local_sha" .claude/tmp/green-fast .claude/tmp/green-full || { echo "pre-push: no gate passed on this code; run sh scripts/check.sh in Claude Code's sandbox" >&2; exit 1; }
+		else
+			sh scripts/check.sh </dev/null
+		fi
 		sh scripts/scan_secrets.sh
 		gated=true
 	fi

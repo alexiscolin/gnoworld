@@ -2,6 +2,9 @@
 # test_hooks.sh: the git hooks do what docs/DEVELOPMENT.md says. check.sh runs it.
 set -eu
 unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a `commit -a` hands its own index down; the throwaway repos must not touch it
+# The hooks run the gate as they do in Claude Code's sandbox, the CI included; the section
+# `outside` runs them as in Alexis's shell (F076).
+export SANDBOX_RUNTIME="${SANDBOX_RUNTIME:-test_hooks}"
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
 here=$(cd "$(dirname "$0")" && pwd)
 hooks=$(cd "$here/../.githooks" && pwd)
@@ -52,7 +55,7 @@ ask, deny = set(s["permissions"]["ask"]), set(s["permissions"]["deny"])
 assert {"Bash(git push)", "Bash(git push *)"} <= ask, "a push asks no one"
 assert {"Bash(pnpm add *)", "Bash(rm -rf *)"} <= deny, "Claude can add a dependency or delete a tree"
 outside = {"Edit(/scripts/guard.py)", "Edit(/scripts/stop_gate.sh)", "Edit(/scripts/code_changed.sh)", "Edit(/.githooks/**)",
-           "Edit(/.claude/settings.json)", "Edit(/.claude/settings.local.json)", "Edit(/.claude/agents/**)", "Edit(/.claude/commands/**)",
+           "Edit(/scripts/scan_secrets.sh)", "Edit(/.claude/settings.json)", "Edit(/.claude/settings.local.json)", "Edit(/.claude/agents/**)", "Edit(/.claude/commands/**)",
            "Edit(/.claude/skills/**)", "Edit(/.claude/rules/**)", "Edit(/.claude/hooks/**)",
            "Edit(/package.json)", "Edit(/app/package.json)", "Edit(/packages/*/package.json)",
            "Edit(/.npmrc)", "Edit(/pnpm-workspace.yaml)", "Edit(/.pnpmfile.cjs)", "Edit(/.pnpmfile.mjs)"}
@@ -114,6 +117,8 @@ guarded = next(ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast
 missed = [p for p in guarded if not any(fnmatch.fnmatch(p, s) or p.startswith(s + "/") for s in gate)]
 assert not missed, missed
 PY
+grep -B1 -F '. .githooks/records.sh && code_print HEAD >>".claude/tmp/green-$($full && echo full || echo fast)"' "$gate_file" | grep -qF 'if [ -z "$(git status --porcelain)" ]; then' || fail "check.sh records a tree it did not pass clean (F076)"
+[ "$(grep -n 'code_print HEAD' "$gate_file" | cut -d: -f1)" -gt "$(grep -n 'python3 -I scripts/harness_mutate.py' "$gate_file" | cut -d: -f1)" ] || fail "check.sh records its tree before its last step (F076)"
 # An EXIT trap keeps a failure: under macOS's sh, a plain one turns an unbound variable into exit 0.
 for f in "$here"/*.sh "$hooks"/*; do
 	grep -n "^[[:space:]]*trap .* EXIT$" "$f" | grep -v '|| status=1; exit "$status"' | grep -q . && fail "$(basename "$f") has an EXIT trap that can hide a failure"
@@ -368,7 +373,7 @@ mkdir -p "$w/scripts" "$w/.githooks" "$w/docs" "$t/pushbin"
 printf '#!/bin/sh\necho "gate $*" >>"$(dirname "$0")/../gate.log"\n' >"$w/scripts/check.sh"
 printf '#!/bin/sh\necho scanned >>"%s/leaks.log"\nexit "${LEAKS:-0}"\n' "$w" >"$t/pushbin/gitleaks" && chmod +x "$t/pushbin/gitleaks"
 printf 'gate.log\nleaks.log\n' >"$w/.gitignore"
-cp "$rp" "$here/repo_files.py" "$w/scripts/" && secrets_into "$w/scripts/" && cp "$hooks/pre-push" "$w/.githooks/pre-push"
+cp "$rp" "$here/repo_files.py" "$w/scripts/" && secrets_into "$w/scripts/" && cp "$hooks/pre-push" "$hooks/records.sh" "$w/.githooks/"
 git -C "$w" init -q && echo x >"$w/a.ts" && git -C "$w" add -A && git -C "$w" commit -qm base
 head=$(git -C "$w" rev-parse HEAD)
 hook() { (cd "$w" && PATH="$t/pushbin:$PATH" sh .githooks/pre-push origin url >/dev/null 2>&1); }
@@ -421,6 +426,7 @@ echo code >"$c2/a.ts" && git -C "$c2" add a.ts
 precommit && fail "pre-commit let a commit through a failing gate"
 printf '#!/bin/sh\nexit 0\n' >"$c2/scripts/check.sh" && git -C "$c2" add -A
 precommit || fail "pre-commit stopped a commit whose gate passes"
+grep -qxF "$(cd "$c2" && . "$hooks/records.sh" && code_print "$(git write-tree)")" "$c2/.claude/tmp/green-fast" || fail "pre-commit did not record the code it passed (F076)"
 # A secret in what is staged stops the commit, docs included.
 mkdir -p "$t/leakbin" && printf '#!/bin/sh\nexit 1\n' >"$t/leakbin/gitleaks" && chmod +x "$t/leakbin/gitleaks"
 (cd "$c2" && PATH="$t/leakbin:$PATH" sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a commit through a secret scan that found one"
@@ -460,6 +466,68 @@ for f in .githooks/pre-push .github/workflows/gate.yml .claude/settings.json; do
 done
 echo partly >>"$c2/a.ts" && git -C "$c2" add a.ts && echo unstaged >>"$c2/a.ts"
 precommit || fail "pre-commit refused a code file only partly staged"
+fi
+
+if part outside; then
+# Outside the sandbox, in Alexis's shell, a hook runs only its own lines, git, gitleaks and the
+# scripts Claude cannot edit; it takes the code the sandboxed gate recorded green (F076).
+o="$t/outside"
+mkdir -p "$o/scripts" "$o/.githooks" "$o/.claude/tmp" "$o/docs"
+cp "$hooks"/* "$o/.githooks/" && cp "$here/code_changed.sh" "$o/scripts/" && secrets_into "$o/scripts/"
+# What Claude can edit, and a hook could reach, leaves a mark when it runs.
+for f in check.sh borrow_node_modules.sh; do printf '#!/bin/sh\n: >"%s/ran"\n' "$o" >"$o/scripts/$f"; done
+for f in review_pass.py check_docs.py repo_files.py; do printf 'open("%s/ran", "w")\n' "$o" >"$o/scripts/$f"; done
+printf '.claude/tmp\nran\n' >"$o/.gitignore" && echo one >"$o/a.ts"
+git -C "$o" init -q && git -C "$o" add -A && git -C "$o" commit -qm base
+out() { (cd "$o" && env -u SANDBOX_RUNTIME "$@" >/dev/null 2>&1); }
+record() { (cd "$o" && . .githooks/records.sh && code_print "$1") >>"$o/.claude/tmp/green-$2"; }
+untouched() { [ ! -e "$o/ran" ] || fail "$1 ran the repository's code outside the sandbox (F076)"; }
+echo two >>"$o/a.ts" && git -C "$o" add a.ts
+out sh .githooks/pre-commit && fail "pre-commit outside the sandbox took code no gate passed"
+(cd "$o" && SANDBOX_RUNTIME= sh .githooks/pre-commit >/dev/null 2>&1) && fail "pre-commit took an empty SANDBOX_RUNTIME for the sandbox"
+untouched pre-commit
+full=$(cd "$o" && . .githooks/records.sh && code_print "$(git write-tree)") && printf '%s\n\n%sx\n' "${full%??????????}" "$full" >>"$o/.claude/tmp/green-fast"
+out sh .githooks/pre-commit && fail "pre-commit outside the sandbox took a partial or empty record"
+record "$(git -C "$o" write-tree)" fast
+out sh .githooks/pre-commit || fail "pre-commit outside the sandbox refused code the gate passed"
+out sh .githooks/pre-merge-commit || fail "pre-merge-commit outside the sandbox refused code the gate passed"
+for f in docs/n.md adr/figure.svg NOTES.md; do
+	case $f in */*) mkdir -p "$o/${f%/*}" ;; esac
+	echo prose >"$o/$f" && git -C "$o" add "$f"
+done
+out sh .githooks/pre-commit || fail "pre-commit outside the sandbox refused prose added to code the gate passed"
+printf 'aws = "%s"\n' "AKIA""J7Q2XRT4LMNB5VWZ" >"$o/leak.py" && git -C "$o" add leak.py && record "$(git -C "$o" write-tree)" fast
+out sh .githooks/pre-commit && fail "pre-commit outside the sandbox let a staged key through"
+(cd "$o" && env -u SANDBOX_RUNTIME PATH=/usr/bin:/bin sh .githooks/pre-commit >/dev/null 2>&1) && fail "pre-commit outside the sandbox passed with no gitleaks"
+git -C "$o" rm -qf --cached leak.py && rm "$o/leak.py" && git -C "$o" commit -qm two
+untouched "pre-commit, pre-merge-commit"
+# pre-push: a work branch wants a recorded gate; main the full gate, a review pass, its declarations.
+head=$(git -C "$o" rev-parse HEAD)
+push() { printf 'refs/heads/%s %s refs/heads/%s %s\n' "$1" "$head" "$1" "${2:-0000000000000000000000000000000000000000}" | out sh .githooks/pre-push origin url; }
+push slice-1a || fail "pre-push outside the sandbox refused a branch the gate passed"
+echo three >>"$o/a.ts" && git -C "$o" commit -qam three && head=$(git -C "$o" rev-parse HEAD)
+echo prose >"$o/docs/m.md" && git -C "$o" add docs/m.md
+out sh .githooks/pre-commit || fail "pre-commit outside the sandbox refused prose alone on code no gate passed"
+git -C "$o" commit -qm prose && head=$(git -C "$o" rev-parse HEAD)
+push slice-1a && fail "pre-push outside the sandbox took a branch no gate passed"
+record "$head" fast && push slice-1a || fail "pre-push outside the sandbox refused a branch once recorded"
+pass() { p=$(cd "$o" && . .githooks/records.sh && review_print HEAD) && echo "2026-10-18 $p test" >>"$o/docs/review-passes.txt" && git -C "$o" add docs && git -C "$o" commit -qm pass && head=$(git -C "$o" rev-parse HEAD); }
+pass && push main && fail "pre-push outside the sandbox took main the full gate never passed"
+record "$head" full && push main || fail "pre-push outside the sandbox refused main with its gate and review"
+(cd "$o" && python3 -I "$here/review_pass.py" check HEAD >/dev/null) || fail "records.sh and review_pass.py print a tree differently"
+echo log >>"$o/docs/review-log.md" && git -C "$o" add docs && git -C "$o" commit -qm log && head=$(git -C "$o" rev-parse HEAD)
+push main || fail "pre-push outside the sandbox refused main once its review log was written"
+base=$head && echo x >"$o/scripts/tool.sh" && git -C "$o" add scripts && git -C "$o" commit -qm tool && head=$(git -C "$o" rev-parse HEAD) && record "$head" full
+push main && fail "pre-push outside the sandbox took main whose review pass is for other code"
+pass
+push main "$base" && fail "pre-push outside the sandbox took an undeclared harness change"
+push main 1111111111111111111111111111111111111111 && fail "pre-push outside the sandbox took a main it cannot compare"
+git -C "$o" commit -q --allow-empty -m declare -m "Harness-changed: scripts/tool.sh - a test" && head=$(git -C "$o" rev-parse HEAD)
+push main "$base" || fail "pre-push outside the sandbox refused main with its harness change declared"
+printf 'aws = "%s"\n' "AKIA""J7Q2XRT4LMNB5VWZ" >"$o/leak.py" && git -C "$o" add leak.py && git -C "$o" commit -qm leak && head=$(git -C "$o" rev-parse HEAD) && record "$head" full && pass
+push main && fail "pre-push outside the sandbox let main through with a key in its history"
+push slice-1a && fail "pre-push outside the sandbox let a branch through with a key in its history"
+untouched pre-push
 fi
 
 if part guard; then

@@ -20,6 +20,7 @@
       "Edit(/scripts/guard.py)",
       "Edit(/scripts/stop_gate.sh)",
       "Edit(/scripts/code_changed.sh)",
+      "Edit(/scripts/scan_secrets.sh)",
       "Edit(/.githooks/**)",
       "Edit(/.claude/settings.json)",
       "Edit(/.claude/settings.local.json)",
