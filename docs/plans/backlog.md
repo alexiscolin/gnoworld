@@ -70,7 +70,7 @@ phase 0 is done. Realms are written by Claude and audited (`docs/REVIEW.md`, tie
 | Chat bots | Polls and comets (`TAGMSG`, `draft/relaymsg`), rate-limited; comets fly in space, merged and capped (ADR-0002 §3) |
 | Voice rooms | Its ADR first; then a WebRTC voice room per world, with live moderation |
 | Room games | Its ADR first, after sessions and the sponsor; a game bot and a game realm, results on chain, no money |
-| Push | `draft/webpush` through the PWA: mentions, followed worlds, event reminders |
+| Push | `draft/webpush` through the PWA: mentions, followed worlds, event reminders; and chosen chain events, which the server reads from the public indexer (we run none, ADR-0001 §13) and turns into a wake-up with no content (§12), the worker then asking the server what to show |
 | Events by moderators | `/event` in a world, on the calendar and in its JSON-LD |
 | Social details | "New here"; routed questions with opt-in helpers, "Thanks" and "helped N"; the weekly report, written by the team |
 | On-chain extras of ADR-0001 | Globe beacons as a ring buffer; tips and stamps in the same transaction |
