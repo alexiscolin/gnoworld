@@ -42,7 +42,9 @@ and every capability dropped, except `guard`'s `NET_ADMIN`.
    would let the demo reach every device. Access is denied by default.
 3. A single-use auth key with that tag (Settings, Keys), into `deploy/secrets/ts_authkey`.
 4. The demo's password: `htpasswd -cB deploy/secrets/demo_htpasswd team` (`htpasswd` comes with
-   macOS, and with `apache2-utils` or `httpd-tools` on Linux).
+   macOS, and with `apache2-utils` or `httpd-tools` on Linux), then
+   `chmod 644 deploy/secrets/demo_htpasswd`: nginx reads it as its own user, and it holds a hash,
+   not the password.
 5. Optional: `cp deploy/.env.example deploy/.env`, to change the machine's name.
 
 `deploy/secrets/` is ignored by git, left out of every build (`.dockerignore`) and closed to

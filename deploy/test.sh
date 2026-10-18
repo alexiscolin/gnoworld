@@ -23,7 +23,7 @@ missing() {
 	exit 2
 }
 case $os in
-Darwin) host_tools="lsof route ipconfig arp" ;;
+Darwin) host_tools="netstat route ifconfig arp" ;;
 Linux) host_tools="ss ip" ;;
 *) missing "it runs on macOS or Linux, not $os" ;;
 esac
@@ -44,22 +44,27 @@ is_public() { python3 -c "import ipaddress, sys; a = ipaddress.ip_address(sys.ar
 
 # --- What the host offers: its services, its addresses, its router, its LAN, Docker's gateways. --
 
+# Every user's listeners (netstat on macOS, where lsof lists one's own), and the ports of the
+# services a system runs as root, listening or not: SSH, Kerberos, file and screen sharing, print.
 host_ports() {
+	{
+		case $os in
+		Darwin) netstat -an -p tcp 2>/dev/null | awk '$6 == "LISTEN" { sub(/.*\./, "", $4); print $4 }' ;;
+		Linux) ss -ltnH 2>/dev/null | awk '{ sub(/.*:/, "", $4); print $4 }' ;;
+		esac
+		printf '%s\n' 22 88 445 548 631 2049 3283 5900
+	} | grep -E '^[0-9]+$' | sort -un
+}
+host_addresses() { # every IPv4 address of the host, its tailnet's and its VPNs' included
 	case $os in
-	Darwin) lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null | awk 'NR > 1 { sub(/.*:/, "", $9); print $9 }' ;;
-	Linux) ss -ltnH 2>/dev/null | awk '{ sub(/.*:/, "", $4); print $4 }' ;;
-	esac | sort -un
+	Darwin) ifconfig 2>/dev/null | awk '/inet / { print $2 }' ;;
+	Linux) ip -4 -o addr show 2>/dev/null | awk '{ sub(/\/.*/, "", $4); print $4 }' ;;
+	esac | grep -v '^127\.' | sort -u
 }
 default_route() { # "<gateway> <interface>"
 	case $os in
 	Darwin) route -n get default 2>/dev/null | awk '/gateway:/ { g = $2 } /interface:/ { i = $2 } END { print g, i }' ;;
 	Linux) ip route show default 2>/dev/null | awk '{ print $3, $5; exit }' ;;
-	esac
-}
-address_of() {
-	case $os in
-	Darwin) ipconfig getifaddr "$1" 2>/dev/null || true ;;
-	Linux) ip -4 -o addr show dev "$1" 2>/dev/null | awk '{ sub(/\/.*/, "", $4); print $4; exit }' ;;
 	esac
 }
 neighbours() {
@@ -116,16 +121,22 @@ if [ "$seen" != "1.1.1.1:443 host.docker.internal:$canary " ]; then
 fi
 [ "$seen" = "1.1.1.1:443 host.docker.internal:$canary " ] ||
 	missing "a plain container sees [$seen], not the host's canary and the internet: the probe is blind"
+host_ports | grep -qx "$canary" || missing "the host's listening ports cannot be read: the canary is not among them"
+# The address a container reaches the host by, which no gateway or interface of the host may show.
+hostip=$(docker run --rm --network bridge $hostmap "$CURL" -s -o /dev/null -w '%{remote_ip}' "http://host.docker.internal:$canary/" || true)
 
 targets() {
 	ports=$(host_ports)
 	route=$(default_route)
 	router=${route% *}
-	address=$(address_of "${route#* }")
-	if [ -z "$ports" ] || [ -z "$router" ] || [ -z "$address" ]; then
-		missing "cannot read the host's ports, router or address"
+	addresses=$(host_addresses)
+	if [ -z "$router" ] || [ -z "$addresses" ] || [ -z "$hostip" ]; then
+		missing "cannot read the host's router, addresses or the address containers reach it by"
 	fi
-	for port in $ports; do printf 'host.docker.internal:%s\n%s:%s\n' "$port" "$address" "$port"; done
+	for port in $ports "$canary"; do
+		printf 'host.docker.internal:%s\n%s:%s\n' "$port" "$hostip" "$port"
+		for address in $addresses; do printf '%s:%s\n' "$address" "$port"; done
+	done
 	for gateway in $(gateways); do
 		for port in $ports 22 53 80 443 2375 2376; do printf '%s:%s\n' "$gateway" "$port"; done
 	done
@@ -140,8 +151,10 @@ targets() {
 reach() {
 	network=$1 name=$2 internet=$3
 	list=$(targets | sort -u)
-	found=$(answering "$network" $list 1.1.1.1:443)
-	host=$(printf '%s\n' "$found" | grep -v '^1\.1\.1\.1:443$' | grep . | sort | tr '\n' ' ' | sed 's/ $//' || true)
+	# web:8080 rides along: if it is missing from the answers, the fan-out saw nothing at all.
+	found=$(answering "$network" $list 1.1.1.1:443 web:8080)
+	expect "$name: the probe sees web among its targets" "$(printf '%s\n' "$found" | grep -c '^web:8080$' || true)" 1
+	host=$(printf '%s\n' "$found" | grep -v '^1\.1\.1\.1:443$' | grep -v '^web:8080$' | grep . | sort | tr '\n' ' ' | sed 's/ $//' || true)
 	expect "$name reaches nothing of the host, its LAN or Docker's networks ($(printf '%s\n' "$list" | grep -c .) tried, the canary among them)" "$host" ""
 	out=$(printf '%s\n' "$found" | grep -c '^1\.1\.1\.1:443$' || true)
 	if [ "$internet" = yes ]; then expect "$name reaches the internet" "$out" 1; else expect "$name has no way out to the internet" "$out" 0; fi
@@ -165,6 +178,7 @@ hardened() {
 	*) fail "$name: $added added back" ;;
 	esac
 	case $(field '{{json .HostConfig.SecurityOpt}}') in *no-new-privileges:true*) pass "$name: no new privileges" ;; *) fail "$name may gain privileges" ;; esac
+	case $(field '{{json .HostConfig.SecurityOpt}}') in *unconfined*) fail "$name: seccomp or AppArmor turned off" ;; *) pass "$name: seccomp and AppArmor as Docker sets them" ;; esac
 	expect "$name: not privileged" "$(field '{{.HostConfig.Privileged}}')" false
 	case $(field '{{.HostConfig.NetworkMode}}') in
 	host | none) fail "$name: the host's network, or none" ;;
@@ -178,7 +192,10 @@ hardened() {
 	case $mounts in *docker.sock*) fail "$name holds Docker's socket" ;; *) pass "$name: no Docker socket" ;; esac
 	case $mounts in *"bind "*" true;"*) fail "$name: a file of the host mounted writable" ;; *) pass "$name: the host's files read-only" ;; esac
 	case $(field '{{json .HostConfig.Tmpfs}}') in *'"/tmp"'*) pass "$name: /tmp in memory" ;; *) fail "$name: no /tmp in memory" ;; esac
-	case $(field '{{json .HostConfig.LogConfig.Config}}') in *max-size*) pass "$name: its logs rotate" ;; *) fail "$name: its logs grow for good" ;; esac
+	case $(field '{{index .HostConfig.LogConfig.Config "max-size"}}') in # an engine may rotate by default: the size counts
+	*[0-9]k | *[0-9]m) pass "$name: its logs rotate, at a size in KB or MB" ;;
+	*) fail "$name: its logs grow for good" ;;
+	esac
 	memory=$(field '{{.HostConfig.Memory}}')
 	cpus=$(field '{{.HostConfig.NanoCpus}}')
 	if [ "$memory" -gt 0 ] && [ "$memory" -le 1073741824 ]; then pass "$name: memory capped"; else fail "$name: memory [$memory]"; fi
@@ -213,31 +230,56 @@ if [ "${1:-}" = --mutants ]; then
 		"$@" "$here/web/nginx.conf" >"$tmp/nginx.conf"
 		printf 'services:\n  web:\n    volumes:\n      - %s:/etc/nginx/nginx.conf:ro\n' "$tmp/nginx.conf"
 	}
-	guard() { # the guard's script through one sed edit, mounted over deploy/guard
+	guard() { # the guard's script through one edit (a sed or awk command), mounted over deploy/guard
 		mkdir -p "$tmp/guard"
-		sed "$1" "$here/guard/guard.sh" >"$tmp/guard/guard.sh"
+		"$@" "$here/guard/guard.sh" >"$tmp/guard/guard.sh"
 		printf 'services:\n  guard:\n    volumes: !override\n      - %s:/guard:ro\n' "$tmp/guard"
 	}
-	# Not planted: web on the host's own network, which would publish the site there for the run;
-	# hardened() still refuses it, a guard no fault proves.
+	# Not planted, since they would hand the container the host for the run: the host's network,
+	# its pid or ipc, privileged, a device, Docker's socket, seccomp or AppArmor off. Nor root:
+	# nginx, with no capability, cannot drop to its workers' user, and does not start.
 	mutant "the internal network let out" "the internal network has no way out to the internet" \
 		compose 'networks: { inside: { internal: false, driver_opts: !reset {} } }'
 	mutant "the internal network keeps its gateway" "the internal network has a gateway" \
 		compose 'networks: { inside: { driver_opts: !reset {} } }'
 	mutant "a writable root" "web: read-only root" compose 'services: { web: { read_only: false } }'
 	mutant "capabilities kept" "web: every capability dropped" compose 'services: { web: { cap_drop: !reset [] } }'
+	mutant "a capability added back" "added back" compose 'services: { web: { cap_add: [NET_RAW] } }'
+	mutant "privileges may be gained" "web may gain privileges" compose 'services: { web: { security_opt: !reset [] } }'
+	mutant "a port published on the host" "web binds a port on the host" \
+		compose 'services: { web: { ports: ["127.0.0.1:18080:8080"] } }'
+	mutant "a folder of the host mounted writable" "web: a file of the host mounted writable" \
+		compose "services: { web: { volumes: [\"$tmp:/mnt/test\"] } }"
 	mutant "no memory cap" "web: memory" compose 'services: { web: { mem_limit: 8g } }'
+	mutant "no cpu cap" "web: cpu" compose 'services: { web: { cpus: 8 } }'
+	mutant "no process cap" "web: no process cap" compose 'services: { web: { pids_limit: -1 } }'
+	mutant "logs that grow for good" "web: its logs grow for good" compose 'services: { web: { logging: { options: { max-size: 50g } } } }'
 	mutant "the guard loads no rule" "the guard's network, which Tailscale shares, reaches nothing" \
 		compose 'services: { guard: { entrypoint: [sleep, "2147483647"], healthcheck: { test: [CMD, "true"] } } }'
-	mutant "the guard lets a private range out" "the guard's network, which Tailscale shares, reaches nothing" \
-		guard 's# 192\.168\.0\.0/16##'
+	mutant "the guard forgets a private range" "the guard refuses 192.168.0.0/16" guard sed 's# 192\.168\.0\.0/16##'
+	mutant "the guard forgets the tailnets' range" "the guard refuses 100.64.0.0/10" guard sed 's# 100\.64\.0\.0/10##'
+	mutant "the guard lets UDP out before it refuses" "the guard lets something out before it refuses" \
+		guard awk '!done && /--dport 8080 -j ACCEPT/ { print; print "\techo \"-A OUTPUT -p udp -j ACCEPT\""; done = 1; next } { print }'
 	mutant "the guard lets every port out" "the guard lets out no other public port" \
-		guard 's#-A OUTPUT -p tcp -m multiport --dports 80,443 -j ACCEPT#-A OUTPUT -p tcp -j ACCEPT#'
+		guard sed 's#-A OUTPUT -p tcp -m multiport --dports 80,443 -j ACCEPT#-A OUTPUT -p tcp -j ACCEPT#'
+	mutant "the guard lets any DNS out" "the guard lets nothing else out" \
+		guard awk '!done && /-A OUTPUT -o lo -j ACCEPT/ { print; print "\techo \"-A OUTPUT -p udp --dport 53 -j ACCEPT\""; done = 1; next } { print }'
+	mutant "the guard leaves IPv6 open" "IPv6: the guard drops all but loopback" guard sed '/^printf/ s#:OUTPUT DROP#:OUTPUT ACCEPT#'
 	mutant "no rate limit" "a burst with no password gets 429" nginx sed '/limit_req zone=/d'
+	mutant "a flood answered 503" "a burst with no password gets 429" nginx sed '/limit_req_status 429/d'
+	mutant "a first load cut short" "a visitor's first load" nginx sed 's#burst=60#burst=25#'
+	mutant "one limit for every visitor" "a visitor is served right after another's burst" \
+		nginx sed 's#limit_req_zone $proxy_protocol_addr#limit_req_zone $server_port#'
+	mutant "no password at all" "no password, no /" nginx sed 's#auth_basic "gno.world demo";#auth_basic off;#'
 	mutant "the worker served without the password" "no password, no /sw.js" \
 		nginx awk '/location \/assets\// { print "    location = /sw.js { auth_basic off; }" } { print }'
+	mutant "the server's own 404 page" "the app's own fallback" nginx sed '/error_page 404/d'
+	mutant "the password logged" "no log holds the password" nginx sed 's#$status $body_bytes_sent#$status $body_bytes_sent $http_authorization#'
 	mutant "noindex only on success" "the 401 is not indexed" nginx sed 's#X-Robots-Tag "noindex" always#X-Robots-Tag "noindex"#'
+	mutant "sniffing allowed" "is never sniffed" nginx sed '/X-Content-Type-Options/d'
 	mutant "hashed files not kept" "is kept a year" nginx sed 's#public, max-age=31536000, immutable#no-cache#'
+	mutant "no manifest type" "the manifest's type" nginx sed '/application\/manifest+json webmanifest;/d'
+	mutant "no data type" "a world's data's type" nginx sed '/text\/x-script data;/d'
 	mutant "no PROXY protocol" "the server is up and asks" nginx sed 's#listen 8080 proxy_protocol#listen 8080#'
 	mutant "a page cached" "/ revalidates" nginx sed 's#"no-cache" always#"max-age=600" always#'
 elif [ "${1:-}" != --demo ]; then
@@ -264,7 +306,7 @@ elif [ "${1:-}" != --demo ]; then
 	started=yes
 	docker compose -p "$project" $files down -v >/dev/null 2>&1 || true # what an interrupted run left
 	if ! docker compose -p "$project" $files up -d --build --wait web guard; then
-		echo "test.sh: the static server or the guard did not start" >&2
+		echo "test.sh: the static server or the guard did not start: $(docker compose -p "$project" $files logs --no-log-prefix --tail 1 guard web 2>&1 | tr '\n' ' ')" >&2
 		exit 3
 	fi
 	web=$(docker compose -p "$project" $files ps -q web)
@@ -295,6 +337,25 @@ elif [ "${1:-}" != --demo ]; then
 	# TCP leaves on 80 and 443 only: a public port that a plain container reaches stays shut.
 	expect "a plain container reaches a public port beside 80 and 443 (the next check sees)" "$(answering bridge 1.1.1.1:853)" 1.1.1.1:853
 	expect "the guard lets out no other public port" "$(answering "container:$guard" 1.1.1.1:853)" ""
+	# The rules as the kernel holds them, against ranges typed here, apart from guard.sh: each one
+	# refused for every protocol, before anything leaves; nothing else let out; IPv6 closed.
+	v4=$(docker exec "$guard" iptables-nft -S OUTPUT)
+	v6=$(docker exec "$guard" ip6tables-nft -S OUTPUT)
+	expect "the guard drops what no rule lets out" "$(printf '%s\n' "$v4" | grep -cx -- '-P OUTPUT DROP' || true)" 1
+	for range in 0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16 172.16.0.0/12 192.0.0.0/24 \
+		192.168.0.0/16 198.18.0.0/15 224.0.0.0/4 240.0.0.0/4; do
+		expect "the guard refuses $range, every protocol" "$(printf '%s\n' "$v4" | grep -c -- "^-A OUTPUT -d $range -j REJECT" || true)" 1
+	done
+	last_refusal=$(printf '%s\n' "$v4" | grep -n -- '-j REJECT' | tail -1 | cut -d: -f1)
+	first_way_out=$(printf '%s\n' "$v4" | grep -n -e '--dports 80,443 -j ACCEPT' -e '^-A OUTPUT -p udp -j ACCEPT' | head -1 | cut -d: -f1)
+	if [ -n "$last_refusal" ] && [ -n "$first_way_out" ] && [ "$last_refusal" -lt "$first_way_out" ]; then
+		pass "the guard refuses before it lets anything out"
+	else
+		fail "the guard lets something out before it refuses"
+	fi
+	expect "the guard lets nothing else out" "$(printf '%s\n' "$v4" | grep -e '-j ACCEPT' | grep -vx -e '-A OUTPUT -o lo -j ACCEPT' -e '-A OUTPUT -p udp -j ACCEPT' |
+		grep -v -e ' --dport 8080 -j ACCEPT$' -e ' --dports 80,443 -j ACCEPT$' -e '^-A OUTPUT -d [0-9.]*/32 -p [a-z]* -m [a-z]* --dport 53 -j ACCEPT$' || true)" ""
+	expect "IPv6: the guard drops all but loopback" "$(printf '%s\n' "$v6" | tr '\n' '|')" "-P OUTPUT DROP|-A OUTPUT -o lo -j ACCEPT|"
 
 	# Requests as Tailscale sends them: through the PROXY protocol, with the visitor's address.
 	ask() {
@@ -338,9 +399,16 @@ elif [ "${1:-}" != --demo ]; then
 		expect "the page $path" "$(status "$path" 203.0.113.1 -u "$auth")" 200
 	done
 	expect "a path no page has: the fallback, with a 404" "$(status /nowhere 203.0.113.1 -u "$auth")" 404
+	body() { docker run --rm --network "$inside" "$CURL" -s --haproxy-protocol --haproxy-clientip 203.0.113.1 -u "$auth" "http://web:8080$1" | cksum; }
+	expect "and that 404 is the app's own fallback, not the server's page" "$(body /nowhere)" "$(body /__spa-fallback.html)"
 	expect "a path in another case is no page" "$(status /W/BUBBLE 203.0.113.1 -u "$auth")" 404
-	case $(status '/..%2f..%2fetc/passwd' 203.0.113.1 -u "$auth") in 200) fail "a path out of the site answers" ;; *) pass "no path leads out of the site" ;; esac
-	case $(status / 203.0.113.1 -u "$auth" -X POST) in 2*) fail "a POST is answered" ;; *) pass "a POST is refused" ;; esac
+	case $(status '/..%2f..%2f..%2f..%2f..%2fetc/passwd' 203.0.113.1 -u "$auth") in
+	400 | 404) pass "no path leads out of the site" ;;
+	*) fail "a path out of the site gets something else than 400 or 404" ;;
+	esac
+	expect "a POST is refused" "$(status / 203.0.113.1 -u "$auth" -X POST)" 405
+	world=$(printf '%s\n' "$pages" | grep -vx / | head -1)
+	expect "a world's data's type" "$(header content-type "$world.data" 203.0.113.1 -u "$auth")" text/x-script
 	for path in $pages /nowhere /sw.js /manifest.webmanifest /icon-192.png $assets; do
 		expect "$path is not indexed" "$(header x-robots-tag "$path" 203.0.113.1 -u "$auth")" noindex
 		expect "$path is never sniffed" "$(header x-content-type-options "$path" 203.0.113.1 -u "$auth")" nosniff
@@ -362,8 +430,19 @@ elif [ "${1:-}" != --demo ]; then
 	at_least "a burst on a hashed file gets 429" "$(codes 429 198.51.100.4 -u "$auth" "http://web:8080$first?[1-200]")" 100
 	urls=""
 	for path in $pages /sw.js /manifest.webmanifest /icon-192.png /icon-512.png $assets; do urls="$urls http://web:8080$path"; done
-	expect "a visitor's whole first load, at once, gets no 429" "$(codes 429 198.51.100.9 -u "$auth" --parallel --parallel-max 50 $urls)" 0
-	expect "another visitor is still served" "$(status / 198.51.100.10 -u "$auth")" 200
+	# A first visit loads the pages' files and the worker's precache, about twice the list at once.
+	fetches="" # curl's -o holds for one URL: each gets its own, or the bodies reach the codes counted
+	for url in $urls $urls; do fetches="$fetches -o /dev/null $url"; done
+	load=$(docker run --rm --network "$inside" "$CURL" -s -w '%{http_code}\n' --haproxy-protocol \
+		--haproxy-clientip 198.51.100.9 -u "$auth" --parallel --parallel-max 50 $fetches || true)
+	expect "a visitor's first load, twice its files at once, gets no 429" "$(printf '%s\n' "$load" | grep -c '^429$' || true)" 0
+	expect "and every request of it is served" "$(printf '%s\n' "$load" | grep -c '^200$' || true)" "$(printf '%s\n' $urls $urls | grep -c .)"
+	# One container, two visitors, the second right after the first's burst: the limit is each one's.
+	expect "a visitor is served right after another's burst" "$(docker run --rm --network "$inside" --entrypoint sh "$CURL" -c '
+		curl -s -o /dev/null --haproxy-protocol --haproxy-clientip 198.51.100.11 -u "$1" "http://web:8080/[1-200]"
+		curl -s -o /dev/null -w "%{http_code}" --haproxy-protocol --haproxy-clientip 198.51.100.12 -u "$1" http://web:8080/' sh "$auth")" 200
+	expect "no log holds the password, its hash or the header that carries it" \
+		"$(docker logs "$web" 2>&1 | grep -cF -e "$password" -e "$hash" -e "$(printf 'team:%s' "$password" | base64)" || true)" 0
 else
 	# The running demo.
 	: "${DEMO_PASSWORD:?set it to the demo password, to check the public URL}"
