@@ -19,11 +19,14 @@ export const WORLDS: readonly World[] = [
   },
 ];
 
+/** React Router's 404, thrown from a loader: the route's error boundary says not found. */
+export function notFound(): never {
+  throw data(null, { status: 404 });
+}
+
 /** The world a path names; throws React Router's 404 when none has that name. */
 export function findWorld(slug: string | undefined): World {
-  const world = WORLDS.find((each) => each.slug === slug);
-  if (!world) throw data(null, { status: 404 });
-  return world;
+  return WORLDS.find((each) => each.slug === slug) ?? notFound();
 }
 
 /** A world's one address on the site: its links, its pre-rendered page and its canonical. */
