@@ -1,10 +1,12 @@
-// One browser per test: in one-process Chromium (playwright.config.ts, in the sandbox), closing a
-// context ends the browser, so no test may share one with the test before it.
+// In Claude Code's sandbox Chromium runs as one process (playwright.config.ts), where closing a
+// context ends the browser, so each test gets a browser of its own; elsewhere, Playwright's own.
 import { test as base } from "@playwright/test";
 
 export { expect, type Page } from "@playwright/test";
 
-export const test = base.extend({
+declare const process: { env: Record<string, string | undefined> };
+
+const ownBrowser = base.extend({
   context: async ({ playwright, launchOptions, contextOptions, baseURL, javaScriptEnabled }, use) => {
     const browser = await playwright.chromium.launch(launchOptions);
     await use(
@@ -13,3 +15,5 @@ export const test = base.extend({
     await browser.close();
   },
 });
+
+export const test = process.env["SANDBOX_RUNTIME"] ? ownBrowser : base;
