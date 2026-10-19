@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import { Grid, Stack } from "../compositions/index.ts";
-import { GROUPS, TOKENS } from "../tokens.ts";
+import { groups, tokens } from "../tokens.ts";
 import styles from "./TokensPage.module.css";
 
 // A private property set from a token's name: what each sample below reads.
@@ -28,22 +28,25 @@ function Sample({ name }: { name: string }) {
 
 /** Every token of tokens.css, by group, read from the file itself (docs/DESIGN-SYSTEM.md, "Tokens"). */
 export function TokensPage() {
+  const all = tokens();
   return (
     <Stack space="xl">
-      {GROUPS.map((group) => (
+      {groups().map((group) => (
         <section key={group.name} aria-label={group.name}>
           <Stack>
             <h2>{group.name}</h2>
             <Grid as="ul" min="s">
-              {TOKENS.filter((token) => token.group === group.name).map(({ name, value }) => (
-                <li key={name} data-preview={name}>
-                  <Stack space="2xs">
-                    <Sample name={name} />
-                    <code>{name}</code>
-                    <small className={styles["value"]}>{value}</small>
-                  </Stack>
-                </li>
-              ))}
+              {all
+                .filter((token) => token.group === group.name)
+                .map(({ name, value }) => (
+                  <li key={name} data-preview={name}>
+                    <Stack space="2xs">
+                      <Sample name={name} />
+                      <code>{name}</code>
+                      <small className={styles["value"]}>{value}</small>
+                    </Stack>
+                  </li>
+                ))}
             </Grid>
           </Stack>
         </section>

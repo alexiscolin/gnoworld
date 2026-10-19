@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import css from "./tokens.css?raw";
-import { GROUPS, parseTokens, TOKENS } from "./tokens.ts";
+import { groups, parseTokens, tokens } from "./tokens.ts";
 
-const value = (name: string) => TOKENS.find((token) => token.name === name)?.value;
+const value = (name: string) => tokens().find((token) => token.name === name)?.value;
 
 // WCAG 2.2's contrast ratio, from two #rrggbb colours.
 function luminance(hex: string) {
@@ -26,8 +26,61 @@ describe("parseTokens", () => {
   });
 
   it("puts every token of the file in a group the page draws", () => {
-    expect(TOKENS.length).toBeGreaterThan(0);
-    for (const token of TOKENS) expect(GROUPS.map((g) => g.name)).toContain(token.group);
+    expect(tokens().length).toBeGreaterThan(0);
+    for (const token of tokens()) expect(groups().map((g) => g.name)).toContain(token.group);
+  });
+
+  it("keeps the page's groups in their order", () => {
+    expect(groups().map((g) => g.name)).toEqual([
+      "Primitives",
+      "Colour",
+      "Type",
+      "Space",
+      "Size",
+      "Shape",
+      "Motion",
+      "Effects",
+    ]);
+  });
+
+  it.each([
+    ["--p-mint", "Primitives"],
+    ["--color-text", "Colour"],
+    ["--family-sans", "Type"],
+    ["--font-body", "Type"],
+    ["--tracking-caps", "Type"],
+    ["--space-s", "Space"],
+    ["--control-m", "Size"],
+    ["--icon-m", "Size"],
+    ["--size-dot", "Size"],
+    ["--column-m", "Size"],
+    ["--measure", "Size"],
+    ["--dialog-w", "Size"],
+    ["--radius-s", "Shape"],
+    ["--line-width", "Shape"],
+    ["--focus-width", "Shape"],
+    ["--motion-fast", "Motion"],
+    ["--ease-standard", "Motion"],
+    ["--opacity-disabled", "Effects"],
+  ])("puts %s in %s", (name, group) => {
+    expect(tokens().find((token) => token.name === name)?.group).toBe(group);
+  });
+
+  it("puts a name no group claims in none the page draws", () => {
+    expect(parseTokens(":root { --unclaimed: 1px; }")).toEqual([{ name: "--unclaimed", value: "1px", group: "Other" }]);
+  });
+
+  it("reads a value whatever the spaces around its colon, and drops a comment inside it", () => {
+    const text = ":root { --a:1px; --b : 2px; --c: /* why */ 3px; }";
+    expect(parseTokens(text).map(({ name, value: v }) => [name, v])).toEqual([
+      ["--a", "1px"],
+      ["--b", "2px"],
+      ["--c", "3px"],
+    ]);
+  });
+
+  it("keeps a value's inner spaces and drops its outer ones", () => {
+    expect(parseTokens(":root { --a:   1px  solid  ; }")[0]?.value).toBe("1px  solid");
   });
 });
 
@@ -44,7 +97,7 @@ describe("the tokens", () => {
       violet: "#B79CFF",
       coral: "#FF8A7A",
     };
-    const primitives = TOKENS.filter((t) => t.group === "Primitives");
+    const primitives = tokens().filter((t) => t.group === "Primitives");
     for (const [name, hex] of Object.entries(base)) {
       const found = primitives.find((t) => t.name === `--p-${name}`);
       if (found !== undefined) expect(found.value.toUpperCase()).toBe(hex);
@@ -53,7 +106,7 @@ describe("the tokens", () => {
   });
 
   it("make every colour role of primitives only, never of a raw value", () => {
-    for (const token of TOKENS.filter((t) => t.name.startsWith("--color-"))) {
+    for (const token of tokens().filter((t) => t.name.startsWith("--color-"))) {
       expect(token.value).not.toMatch(/#[0-9a-f]{3,8}\b|\b(rgb|hsl|oklch|oklab)a?\(/i);
       expect(token.value).toMatch(/var\(--p-[\w-]+\)/);
     }

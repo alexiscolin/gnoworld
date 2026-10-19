@@ -7,29 +7,38 @@ export interface Token {
   group: string;
 }
 
-// The page's groups, each by the prefixes of its names; a token in none of them fails a test.
-export const GROUPS = [
-  { name: "Primitives", prefixes: ["--p-"] },
-  { name: "Colour", prefixes: ["--color-"] },
-  { name: "Type", prefixes: ["--family-", "--font-", "--tracking-"] },
-  { name: "Space", prefixes: ["--space-"] },
-  { name: "Size", prefixes: ["--control-", "--icon-", "--size-", "--column-", "--measure", "--dialog-"] },
-  { name: "Shape", prefixes: ["--radius-", "--line-", "--focus-"] },
-  { name: "Motion", prefixes: ["--motion-", "--ease-"] },
-  { name: "Effects", prefixes: ["--opacity-"] },
-];
+// Functions, not constants: what a module computes once as it loads, a mutant switched on during a
+// test never reaches.
+
+/** The page's groups, in order, each by the prefixes of its names; a token in none fails a test. */
+export function groups() {
+  return [
+    { name: "Primitives", prefixes: ["--p-"] },
+    { name: "Colour", prefixes: ["--color-"] },
+    { name: "Type", prefixes: ["--family-", "--font-", "--tracking-"] },
+    { name: "Space", prefixes: ["--space-"] },
+    { name: "Size", prefixes: ["--control-", "--icon-", "--size-", "--column-", "--measure", "--dialog-"] },
+    { name: "Shape", prefixes: ["--radius-", "--line-", "--focus-"] },
+    { name: "Motion", prefixes: ["--motion-", "--ease-"] },
+    { name: "Effects", prefixes: ["--opacity-"] },
+  ];
+}
 
 /** Each name once, with its first value: the media queries' overrides keep the base one. */
 export function parseTokens(text: string): Token[] {
   const seen = new Map<string, Token>();
+  const table = groups();
   for (const [, name = "", value = ""] of text
     .replaceAll(/\/\*[\s\S]*?\*\//g, "")
     .matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)) {
     if (seen.has(name)) continue;
-    const group = GROUPS.find((g) => g.prefixes.some((prefix) => name.startsWith(prefix)))?.name ?? "Other";
+    const group = table.find((g) => g.prefixes.some((prefix) => name.startsWith(prefix)))?.name ?? "Other";
     seen.set(name, { name, value: value.trim(), group });
   }
   return [...seen.values()];
 }
 
-export const TOKENS = parseTokens(css);
+/** The tokens of tokens.css. */
+export function tokens() {
+  return parseTokens(css);
+}
