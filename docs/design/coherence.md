@@ -43,7 +43,7 @@ targets and rules the mapping used).
 - **Type:** 11 (label, mono caps 0.14em), 12, 13, 14, 16, 20, 28, 36, display and hero clamps;
   weights 300/400/500/600; tracking caps 0.14em, tight -0.03em, display -0.04em, hero -0.06em;
   leading 0.9, 1, 1.4, 1.5; `--text-data` 12 px mono for addresses, code, the ticker.
-- **Space:** steps 4 to 64 named by step (`--space-3xs` … `--space-3xl`); section space and titles
+- **Space:** steps 4 to 64 named by step (`--space-3xs` … `--space-2xl`); section space and titles
   fluid with `clamp()`, interface text and controls fixed.
 - **Radius:** 8, 12, 24, pill. **Controls:** 24, 32, 40, 56 (40 grows to 44 on touch).
 - **Motion:** 120 / 200 / 400 ms, flights 1.3-3.2 s, spin 0.8 s, ambient loops 3 s; arrival

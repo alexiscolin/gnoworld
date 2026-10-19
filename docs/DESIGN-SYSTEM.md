@@ -127,7 +127,7 @@ the brightest planet behind the header's pills.
 
 | Token | Values |
 |---|---|
-| `--space-3xs` … `--space-3xl` | 4, 8, 12, 16, 24, 32, 48, 64 px, a 4 px grid; section space is fluid with `clamp()` |
+| `--space-3xs` … `--space-2xl` | 4, 8, 12, 16, 24, 32, 48, 64 px, a 4 px grid; section space is fluid with `clamp()` |
 | `--control-xs` / `--control-s` / `--control-m` / `--control-l` | 24 / 32 / 40 / 56 px: badges and reactions / toolbars, chips, tabs / default / the main action. Under `pointer: coarse`, `--control-m` is 44 |
 | `--radius-s` / `--radius-m` / `--radius-l` / `--radius-pill` | 8 / 12 / 24 / 999 px: small controls, rows, menus / cards, fields, popovers, bubbles / panels, dialogs / buttons, chips, tabs |
 | `--icon-m` / `--icon-l` | 16 / 20 px |
