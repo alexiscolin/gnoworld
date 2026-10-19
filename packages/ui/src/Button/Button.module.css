@@ -1,0 +1,133 @@
+/* Button and IconButton: one control, its variants setting private properties only. */
+@layer components {
+  .button {
+    /* layout: an icon sits beside the label */
+    display: inline-flex;
+    /* layout: an icon sits beside the label */
+    align-items: center;
+    /* layout: an icon sits beside the label */
+    gap: var(--space-2xs);
+    min-block-size: var(--_h);
+    /* A label that wraps keeps clear of the edge; one line stays at the control's height. */
+    padding-block: var(--space-3xs);
+    padding-inline: var(--_pad);
+    border: var(--line-width) solid var(--_line);
+    border-radius: var(--radius-pill);
+    background: var(--_fill);
+    color: var(--_ink);
+    font: var(--_font);
+    cursor: pointer;
+    transition:
+      background-color var(--motion-fast) var(--ease-standard),
+      border-color var(--motion-fast) var(--ease-standard);
+  }
+
+  .button[data-size="s"] {
+    --_h: var(--control-s);
+    --_pad: var(--space-s);
+    --_font: var(--font-ui);
+  }
+
+  .button[data-size="m"] {
+    --_h: var(--control-m);
+    --_pad: var(--space-s);
+    --_font: var(--font-ui);
+  }
+
+  .button[data-size="l"] {
+    --_h: var(--control-l);
+    --_pad: var(--space-m);
+    --_font: var(--font-action);
+  }
+
+  .button[data-tone="neutral"] {
+    --_accent: var(--color-primary);
+    --_text: var(--color-text);
+    --_edge: var(--color-line-strong);
+  }
+
+  .button[data-tone="danger"] {
+    --_accent: var(--color-danger);
+    --_text: var(--color-danger);
+    --_edge: var(--color-danger-line);
+  }
+
+  .button[data-emphasis="solid"] {
+    --_fill: var(--_accent);
+    --_ink: var(--color-ink);
+    --_line: var(--_accent);
+  }
+
+  .button[data-emphasis="outline"] {
+    --_fill: transparent;
+    --_ink: var(--_text);
+    --_line: var(--_edge);
+  }
+
+  /* A transparent edge still shows under forced colours. */
+  .button:is([data-emphasis="quiet"], [data-emphasis="plain"]) {
+    --_fill: transparent;
+    --_ink: var(--_text);
+    --_line: transparent;
+  }
+
+  .button:hover:not(:disabled, [aria-disabled="true"]) {
+    background-image: linear-gradient(var(--color-fill-hover), var(--color-fill-hover));
+  }
+
+  .button:disabled {
+    cursor: not-allowed;
+    opacity: var(--opacity-disabled);
+  }
+
+  .button[aria-busy="true"] {
+    cursor: progress;
+  }
+
+  .spinner {
+    inline-size: var(--icon-m);
+    block-size: var(--icon-m);
+    border: var(--line-width) solid currentcolor;
+    border-block-start-color: transparent;
+    border-radius: var(--radius-pill);
+    animation: spin var(--motion-spin) linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      rotate: 1turn;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .spinner {
+      animation: none;
+    }
+  }
+
+  .square {
+    /* layout: the icon sits in the middle of its square */
+    justify-content: center;
+    position: relative;
+    min-inline-size: var(--_h);
+    padding-inline: 0;
+  }
+
+  .square[data-emphasis="plain"] {
+    border-radius: var(--radius-s);
+  }
+
+  .count {
+    position: absolute;
+    inset-block-start: calc(var(--space-3xs) * -1);
+    inset-inline-end: calc(var(--space-3xs) * -1);
+    min-inline-size: var(--size-counter);
+    padding-inline: var(--space-3xs);
+    border-radius: var(--radius-pill);
+    background: var(--color-mine);
+    color: var(--color-ink);
+    font: var(--font-label);
+    line-height: var(--size-counter);
+    text-align: center;
+  }
+}

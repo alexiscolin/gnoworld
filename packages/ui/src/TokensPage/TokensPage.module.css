@@ -1,0 +1,40 @@
+/* The token page's samples, each drawn from the private property its token sets. */
+@layer components {
+  .swatch {
+    --_swatch: transparent;
+
+    inline-size: var(--control-m);
+    block-size: var(--control-m);
+    border: var(--line-width) solid var(--color-line);
+    border-radius: var(--radius-s);
+    background: var(--_swatch);
+  }
+
+  .length {
+    --_length: 0;
+
+    inline-size: var(--_length);
+    block-size: var(--space-2xs);
+    background: var(--color-text-muted);
+  }
+
+  .corner {
+    --_radius: 0;
+
+    inline-size: var(--control-l);
+    block-size: var(--control-m);
+    border: var(--line-width) solid var(--color-line-strong);
+    border-radius: var(--_radius);
+  }
+
+  .type {
+    --_font: inherit;
+
+    font: var(--_font);
+  }
+
+  .value {
+    color: var(--color-text-muted);
+    overflow-wrap: anywhere;
+  }
+}

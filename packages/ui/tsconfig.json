@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // The browser's DOM and JSX; Vite's client types give CSS Modules and `?raw` imports a type.
+    "lib": ["es2024", "dom", "dom.iterable"],
+    "jsx": "react-jsx",
+    "types": ["vite/client"]
+  },
+  "include": ["src", ".storybook/main.ts", ".storybook/preview.ts"]
+}

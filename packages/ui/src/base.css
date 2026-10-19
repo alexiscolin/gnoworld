@@ -1,0 +1,48 @@
+/* The elements styled once, globally, so components write little (docs/DESIGN-SYSTEM.md, "CSS rules"). */
+@layer base {
+  body {
+    background: var(--color-space);
+    color: var(--color-text);
+    font: var(--font-body);
+  }
+
+  h1 {
+    font: var(--font-title-l);
+    letter-spacing: var(--tracking-tight);
+  }
+
+  h2 {
+    font: var(--font-title-m);
+    letter-spacing: var(--tracking-tight);
+  }
+
+  h3 {
+    font: var(--font-title-s);
+  }
+
+  small {
+    font: var(--font-meta);
+  }
+
+  a {
+    color: inherit;
+  }
+
+  code {
+    padding-inline: var(--space-3xs);
+    border-radius: var(--radius-s);
+    background: var(--color-fill);
+    font: var(--font-data);
+  }
+
+  hr {
+    border: 0;
+    border-block-start: var(--line-width) solid var(--color-line);
+  }
+
+  /* One ring everywhere, fields included; nothing hides it. */
+  :focus-visible {
+    outline: var(--focus-width) solid var(--color-mine);
+    outline-offset: var(--focus-offset);
+  }
+}

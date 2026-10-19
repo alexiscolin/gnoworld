@@ -12,6 +12,7 @@ reports/
 /app/.react-router/
 /app/test-results/
 /app/playwright-report/
+/packages/ui/storybook-static/
 *.sw[op]
 __pycache__/
 

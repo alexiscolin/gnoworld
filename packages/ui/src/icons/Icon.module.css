@@ -1,0 +1,21 @@
+@layer components {
+  .icon {
+    /* layout: an icon keeps its size beside the words of a row */
+    flex: none;
+    inline-size: var(--_size);
+    block-size: var(--_size);
+  }
+
+  .icon[data-size="m"] {
+    --_size: var(--icon-m);
+  }
+
+  .icon[data-size="l"] {
+    --_size: var(--icon-l);
+  }
+
+  /* Not :dir(rtl), which the build's minifier turns into a list of languages. */
+  [dir="rtl"] .icon[data-mirror] {
+    scale: -1 1;
+  }
+}

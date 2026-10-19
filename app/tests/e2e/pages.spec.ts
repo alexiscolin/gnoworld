@@ -139,6 +139,29 @@ test.describe("once the client takes over", () => {
     });
   }
 
+  for (const { path } of pages) {
+    test(`${path} wears the design system, its fonts served from the site itself`, async ({ page, baseURL }) => {
+      const site = new URL(baseURL ?? "http://unset").origin;
+      const elsewhere: string[] = [];
+      page.on("request", (request) => {
+        if (new URL(request.url()).origin !== site) elsewhere.push(request.url());
+      });
+      await page.goto(path);
+      await hydrated(page);
+      await page.evaluate(() => document.fonts.ready);
+      // check() answers true for a family no face declares: only a loaded face proves the font.
+      const look = await page.evaluate(() => ({
+        loaded: [...document.fonts].filter((face) => face.status === "loaded").map((face) => face.family),
+        family: getComputedStyle(document.body).fontFamily,
+        ground: getComputedStyle(document.body).backgroundColor,
+      }));
+      expect(look.family).toContain("Geist Variable");
+      expect(look.loaded.some((family) => family.includes("Geist Variable"))).toBe(true);
+      expect(look.ground).toBe("rgb(5, 7, 13)");
+      expect(elsewhere).toEqual([]);
+    });
+  }
+
   // No page prints the name it was asked for yet (F119): this guards the day one does.
   test("a world name made of markup stays text", async ({ page }) => {
     const dialogs: string[] = [];
@@ -163,6 +186,12 @@ test("the test host serves each kind of file the build writes with its type, as 
   request,
 }) => {
   const home = await (await request.get("/")).text();
+  const sheets = [...home.matchAll(/href="(\/assets\/[^"]+\.css)"/g)].map((match) => match[1] ?? "");
+  expect(sheets.length).toBeGreaterThan(0);
+  const fonts = (await Promise.all(sheets.map(async (sheet) => (await request.get(sheet)).text()))).flatMap((css) =>
+    [...css.matchAll(/url\((\/assets\/[^)]+\.woff2)\)/g)].map((match) => match[1] ?? ""),
+  );
+  expect(fonts.length).toBeGreaterThan(0);
   const files = [
     ["/", "text/html"],
     ["/w/bubble.data", "text/x-script"],
@@ -170,6 +199,8 @@ test("the test host serves each kind of file the build writes with its type, as 
     ["/icon-192.png", "image/png"],
     ["/sw.js", "text/javascript"],
     ...scripts(home).map((path) => [path, "text/javascript"]),
+    ...sheets.map((path) => [path, "text/css"]),
+    ...fonts.map((path) => [path, "font/woff2"]),
   ];
   for (const [path = "", type = ""] of files) {
     expect((await request.get(path)).headers()["content-type"], path).toContain(type);

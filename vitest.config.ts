@@ -1,10 +1,31 @@
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    include: ["packages/*/src/**/*.test.ts", "app/src/**/*.test.{ts,tsx}"],
     // A test that asserts nothing passes whatever the code does.
     expect: { requireAssertions: true },
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "node",
+          include: ["packages/*/src/**/*.test.ts", "app/src/**/*.test.{ts,tsx}"],
+          exclude: [...configDefaults.exclude, "packages/ui/**"],
+        },
+      },
+      {
+        // The design system's components, rendered in jsdom through their stories.
+        extends: true,
+        test: {
+          name: "ui",
+          include: ["packages/ui/src/**/*.test.{ts,tsx}"],
+          environment: "jsdom",
+          setupFiles: ["packages/ui/src/testSetup.ts"],
+          // Vitest reads a stylesheet as empty unless named here: the token page reads the token file.
+          css: { include: [/tokens\.css/] },
+        },
+      },
+    ],
     coverage: {
       // Every source file counts, tested or not, so an untested file shows as 0%.
       // The app too, but for the document shell and the server entry, which only the build
