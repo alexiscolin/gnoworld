@@ -6,7 +6,7 @@ note (no style change without Alexis). Deferred here: 1b-2's icons and pictures,
 ## 1. Done when
 
 From the backlog's row, word for word: "Each component's states render and pass axe; the same
-address gives the same astronaut, readable at 20 px; focus is visible; the keyboard works in
+address gives the same nebula, readable at 20 px; focus is visible; the keyboard works in
 `Tabs`, `Popover` and `Dialog`; no `!important` and no raw colour (lint)". This plan adds:
 - the designs of the panels and of a trip, approved by Alexis before any component's code;
 - Storybook shows at a glance every token (colours, type, space, sizes, radii, layers, motion)
@@ -45,7 +45,7 @@ Pictures first: the gate renders stories as tests; the full gate shoots them (`r
 
 - **Component** (new: Vitest, jsdom, Testing Library): every story rendered, its ARIA, the
   keyboard in `Tabs`, `Popover` and `Dialog` (arrow keys, `Esc`, focus on open and back).
-- **Unit and property:** the avatar (fast-check: an address, one astronaut; spread); the chart's.
+- **Unit and property:** the avatar (fast-check: an address, one nebula; spread); the chart's.
 - **Visual** (new): every story's pictures, approved one commit at a time (`Updated-baseline:`).
 - **End-to-end:** the invariants and axe on every story; the update journey through `Flash`.
 - **Lint:** `ui/`'s imports; the CSS rules, each proven by a planted case in `scripts/probe.py`.
