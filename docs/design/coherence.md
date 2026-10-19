@@ -1,8 +1,8 @@
 # Coherence review of the prototype (slice 2a)
 
-Status: proposed, 2026-10-19; Alexis answers the 38 decisions below, and approves the visible
-changes on the before/after designs of 2a (decision 36). Until then `docs/DESIGN-SYSTEM.md` stays
-the reference. Each value and element of the approved prototype (`docs/prototype/`) was mapped to
+Status: approved by Alexis, 2026-10-19 ("go": every recommendation below), and written into
+`docs/DESIGN-SYSTEM.md`; the visible changes are shown again on the before/after designs of 2a
+(decision 36). Each value and element of the approved prototype (`docs/prototype/`) was mapped to
 one token and one component, so the design system can be rebuilt with nothing duplicated.
 
 ## Coverage
@@ -105,7 +105,7 @@ evolutions board, the range slider, avatar upload.
 The phone layout in pictures (the tour is filmed wide), keyboard paths, anything shorter than a
 second between two frames, the 3D art (slice 7), a voice-and-tone guide.
 
-## Decisions (proposed; Alexis answers each)
+## Decisions (approved, 2026-10-19)
 
 1. One secondary grey. 2. One label style (mono 11 caps 0.14em), the header's links included.
 3. Selected is the cream fill; current row a quiet fill. 4. Targets 24 px with a pointer, 44 by
