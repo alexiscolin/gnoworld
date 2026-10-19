@@ -45,7 +45,7 @@ Pictures first: the gate renders stories as tests; the full gate shoots them (`r
 
 - **Component** (new: Vitest, jsdom, Testing Library): every story rendered, its ARIA, the
   keyboard in `Tabs`, `Popover` and `Dialog` (arrow keys, `Esc`, focus on open and back).
-- **Unit and property:** the avatar (fast-check: an address, one nebula; spread); the chart's.
+- **Unit and property:** the avatar (fast-check: an address, one nebula); its spread, a journey since it draws in the browser: each face at 20 px blurred to 4 × 4 zones, two random addresses look alike (mean OKLab distance under 0.06) in under 1% of pairs (0.2% on the 2a generator, 200 addresses); the chart's.
 - **Visual** (new): every story's pictures, approved one commit at a time (`Updated-baseline:`).
 - **End-to-end:** the invariants and axe on every story; the update journey through `Flash`.
 - **Lint:** `ui/`'s imports; the CSS rules, each proven by a planted case in `scripts/probe.py`.
