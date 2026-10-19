@@ -4,10 +4,11 @@
 FROM node:24.22.0-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS build
 WORKDIR /repo
 RUN corepack enable
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/core/package.json packages/core/
 COPY app/package.json app/
 RUN pnpm install --frozen-lockfile --filter @gnoworld/app
+COPY tsconfig.base.json ./
 COPY app app
 RUN cd app && node_modules/.bin/react-router build
 
