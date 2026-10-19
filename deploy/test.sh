@@ -278,7 +278,7 @@ if [ "${1:-}" = --mutants ]; then
 		nginx sed 's#limit_req_zone $proxy_protocol_addr#limit_req_zone $server_port#'
 	mutant "no password at all" "no password, no /" nginx sed 's#auth_basic "gno.world demo";#auth_basic off;#'
 	mutant "the worker served without the password" "no password, no /sw.js" \
-		nginx awk '/location \/assets\// { print "    location = /sw.js { auth_basic off; }" } { print }'
+		nginx awk 'index($0, "location / {") { print "        location = /sw.js { auth_basic off; }" } { print }'
 	mutant "the server's own 404 page" "the app's own fallback" nginx sed '/error_page 404/d'
 	mutant "the password logged" "no log holds the password" nginx sed 's#$status $body_bytes_sent#$status $body_bytes_sent $http_authorization#'
 	mutant "noindex only on success" "the 401 is not indexed" nginx sed 's#X-Robots-Tag "noindex" always#X-Robots-Tag "noindex"#'
@@ -287,7 +287,7 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "no manifest type" "the manifest's type" nginx sed '/application\/manifest+json webmanifest;/d'
 	mutant "no data type" "a world's data's type" nginx sed '/text\/x-script data;/d'
 	mutant "no PROXY protocol" "the server is up and asks" nginx sed 's#listen 8080 proxy_protocol#listen 8080#'
-	mutant "a page cached" "/ revalidates" nginx sed 's#"no-cache" always#"max-age=600" always#'
+	mutant "a page cached" "/ revalidates" nginx sed 's#default "no-cache";#default "max-age=600";#'
 elif [ "${1:-}" != --demo ]; then
 	# The static server and the guard, with a password of their own; no Tailscale key is needed.
 	inside=${project}_inside
