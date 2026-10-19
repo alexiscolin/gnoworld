@@ -500,7 +500,7 @@ else
 		"$(visit -o /dev/null -D - -u "team:$DEMO_PASSWORD" "https://$name/" | tr -d '\r' | awk -F': ' 'tolower($1) == "x-robots-tag" { print $2 }')" noindex
 	seen=$(docker logs --tail 1 "$web" 2>&1 | awk '{ print $1 }')
 	expect "web sees the visitor's own address, not the tailnet's" "$(is_public "$seen")" True
-	key=$(cat "$here/secrets/ts_authkey")
+	key=$(docker exec "$ts" cat /run/secrets/ts_authkey) # the key it was given, wherever its file lives
 	expect "Docker holds no copy of the auth key" "$(docker inspect "$ts" | grep -cF "$key" || true)" 0
 	expect "no log holds it" "$( (docker logs "$ts" 2>&1 && docker logs "$guard" 2>&1 && docker logs "$web" 2>&1) | grep -cF "$key" || true)" 0
 fi
