@@ -117,6 +117,8 @@ fi
 if $full; then
 	echo "== the harness keeps its promises (scripts/probe.py)"
 	python3 -I scripts/probe.py
+	echo "== the design system's stories in a browser: axe, the invariants and the CSS jsdom cannot see"
+	node app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts --reporter=dot
 	base=$(git merge-base HEAD origin/main) || { echo "check.sh --full: needs origin/main to compare with (git fetch)" >&2; exit 1; }
 	echo "== coverage: 85% everywhere, core 100%; and 85% of the lines this branch changed"
 	run coverage
