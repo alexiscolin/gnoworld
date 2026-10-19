@@ -44,7 +44,11 @@ Pictures first: the gate renders stories as tests; the full gate shoots them (`r
 ## 6. Tests, by level
 
 - **Component** (new: Vitest, jsdom, Testing Library): every story rendered, its ARIA, the
-  keyboard in `Tabs`, `Popover` and `Dialog` (arrow keys, `Esc`, focus on open and back).
+  keyboard in `Tabs`, `Popover` and `Dialog` (arrow keys, `Esc`, focus on open and back). The
+  stories render through `storiesOf` (`packages/ui/src/testing.tsx`), since Storybook's runtime
+  stops Vitest counting assertions.
+- **Stories in a browser** (new, the full gate: `app/tests/stories`): what jsdom cannot see, as
+  `docs/DESIGN-SYSTEM.md`, "Testing the CSS", lists it.
 - **Unit and property:** the avatar (fast-check: an address, one nebula); its spread, a journey since it draws in the browser: each face at 20 px blurred to 4 × 4 zones, two random addresses look alike (mean OKLab distance under 0.06) in under 1% of pairs (0.2% on the 2a generator, 200 addresses); the chart's.
 - **Visual** (new): every story's pictures, approved one commit at a time (`Updated-baseline:`).
 - **End-to-end:** the invariants and axe on every story; the update journey through `Flash`.
@@ -57,8 +61,12 @@ New: `packages/ui/` (tokens, layers, base, compositions, the components with the
 `SignPanel`, 55 icons, the avatar), Storybook, the PWA's icons. Changed: `root.tsx`, F212, the
 configs, the `package.json` files. No tier-1 file; no code of Alexis's. Merges of ~400 lines: 2a designs; 2b
 tokens, base, compositions, Storybook, the new test levels, `Button`, `IconButton`, `Kicker`,
-icons; 2c `Chip`, `Tabs`, `Popover`, `Dialog`, `Flash`, `EmptyState`, `Skeleton`; 2d `Card`,
+icons, the token page and the page of every component; 2c `Chip`, `Tabs`, `Popover`, `Dialog`,
+`Flash`, `EmptyState`, `Skeleton`, and `Tooltip`, which `IconButton` then wears; 2d `Card`,
 `Row`, `Field`, `Stat`, `ActivityChart`, `PlanetThumb`; 2e `Avatar` and the PWA's icons.
+The designs' 2a merge folds into 2b's: it holds only documents, and one review round covers
+both. `IconButton` shares `Button`'s folder and module, since it is the same control without its
+label (`check_css.py` refuses three declarations copied between modules).
 
 ## 8. Dependencies to ask for (read on npm, 2026-10-19)
 

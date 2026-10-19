@@ -46,16 +46,17 @@ These are the lead's and Alexis's rules from the prototype reviews.
 
 | Tier | File | Holds | Read by |
 |---|---|---|---|
-| Primitives | `packages/ui/tokens/primitives.css` | The nine base colours, the 4 px steps, the type sizes, the durations | Semantic tokens only: a component that reads one fails the lint |
-| Semantic | `packages/ui/tokens/semantic.css` | The roles below, each made only of primitives | Components and compositions |
+| Primitives | `packages/ui/src/tokens.css`, named `--p-*` | The nine base colours, the only raw colours | Semantic tokens only: `check_css.py` refuses one read anywhere else |
+| Semantic | `packages/ui/src/tokens.css` | The roles below, colours made only of primitives; the steps of space, size, type and time, which name a role already, hold their value | Components and compositions |
 | Private | Inside a component's module, named `--_*` | What a variant or a context sets (`--_h`, `--_tone`) | That module only |
 
 - Names say a role or a step, never a value (`--space-m`, not `--space-16`): a value can change
   without a rename.
 - Shades are computed, not copied: `--color-mine-soft: color-mix(in oklab, var(--color-mine) 12%,
   transparent)`. One source per colour.
-- The token files are the only list: Storybook reads its token page from them, and this document
-  states the rules.
+- The token file is the only list: Storybook reads its token page from it, and this document
+  states the rules. A token joins it with the first component that reads it: one nothing reads
+  fails `check_css.py`.
 
 ### Colour
 
@@ -259,7 +260,10 @@ small function of ours until CSS anchor positioning (Baseline 2026) is widely av
 
 ## Testing the CSS
 
-Storybook, plus the journeys; no extra service.
+Storybook, plus the journeys; no extra service. The component tests render each story through a
+helper of ours, not Storybook's `composeStories`, whose runtime brings an `expect` of its own that
+stops Vitest counting assertions. The stories' journeys (`app/tests/stories`) build Storybook and
+walk every story in Chromium, in the full gate.
 - **Lint and types,** in the fast gate: `@eslint/css`, `check_css.py`, typed modules (`tsc`),
   jscpd.
 - **Pictures:** every story, at three container widths and with reduced motion, screenshotted
@@ -307,7 +311,7 @@ component with its CSS Module, documented by its props.
 | Component | Variants and states | Notes |
 |---|---|---|
 | `Button` | emphasis solid, outline, quiet; tone neutral, danger; sizes s, m, l; with an icon; disabled; busy | The solid neutral (cream) is the primary: one per region. A danger button names its act |
-| `IconButton` | sizes s, m, l (the header, 44 by touch); outline, plain; pressed; a count | Always an `aria-label`, and a `Tooltip` with the same text |
+| `IconButton` | sizes s, m, l (the header, 44 by touch); outline, plain; pressed; a count | Always an `aria-label`, and a `Tooltip` with the same text (2c). A count shows past 99 as 99+, and the name holds it as shown ("Notifications, over 99 unread"): WCAG's label in name |
 | `Chip` | interactive (default, selected, with a count); static, at `--control-xs`, with a tone (a card's state, a badge) | Room chips, quick actions, filters, reactions, genre lenses (ADR-0002 §3); "Testnet" and "Sponsored" are uses of the static chip |
 | `Tabs` | segmented, with counts, icon-only; none selected | ARIA `tablist`. The views (Earth, Cosmos, List), notifications, the library filter, a world's rooms in the dock |
 | `ChoiceGroup` | segmented, list | ARIA `radiogroup`, one look: each option a boxed row; the chosen one cream with the check. The days to rent, a poll's and a quiz's answers |
@@ -360,7 +364,9 @@ assembly in its own slice, with its story.
   list-numbered, quote, pause, play, pin, more, pencil, link, comet, at, mail, check, calendar,
   spark, news, satellite, planet, cluster, bold, italic, underline, strikethrough, slash, caret,
   share, menu, people, star, chart, info, warning, alert, lock, shield, key. A new icon joins the
-  list in the slice that needs it; directional ones mirror right to left.
+  list in the slice that needs it. Those that point along the text turn right to left: arrow,
+  arrow-up-right, reply, list-bulleted, list-numbered and quote; the chevron and the caret point
+  across it and stay.
 - A 16 px grid, a 1.5 px stroke, round caps and joins, `currentColor`, drawn at `--icon-m` or
   `--icon-l` only.
 - Each icon is a component that renders inline SVG with `aria-hidden="true"`. Its button
@@ -403,11 +409,11 @@ Components use container queries, so they fit wherever they are placed.
 - **The method is CUBE CSS** (composition, utility, block, exception) on CSS Modules, in
   cascade layers declared once: `@layer reset, tokens, base, compositions, components,
   utilities;`.
-  - **Base** styles the elements globally first (type, links, focus, `::selection`, `hr`, rich
-    text: code, quote, mention), so components write little.
+  - **Base** styles the elements globally first (type, links, focus, `hr`, rich text: code,
+    quote, mention), so components write little. `::selection` waits for Baseline.
   - **Compositions** are the layout primitives, `Stack`, `Cluster`, `Grid`, `Sidebar`,
     `Switcher`, `Center`: intrinsic layouts that place things without styling them, each taking
-    a space step. All layout is one of them, never new CSS.
+    a space step (Center's is its gutter). All layout is one of them, never new CSS.
   - **Blocks** are the components, one CSS Module each, so class names never leak.
   - **Utilities** are a handful of single-purpose classes, driven by tokens: visually-hidden,
     the flow space, truncate, list-reset, scroll-body, the label style.
@@ -425,6 +431,8 @@ Components use container queries, so they fit wherever they are placed.
   - a raw value needs a comment saying why.
 - **Logical properties** (`margin-inline`, `inset-block`), so the layout can follow the
   writing direction.
+- **Direction** is read from `[dir="rtl"]`, not `:dir()`: the build's minifier turns `:dir()` into a
+  list of languages, which a page set right to left by `dir` alone does not match.
 - **Focus:** one ring everywhere, `:focus-visible` with a 2 px mint outline and an offset;
   fields included. Nothing hides focus.
 - **Motion:** `transition` names its properties, never `all`. Prefer animating
@@ -438,7 +446,7 @@ Components use container queries, so they fit wherever they are placed.
   - `scripts/check_css.py` refuses:
     - a raw colour, size, radius, duration or z-index;
     - a token that does not exist, a token nothing uses, and a module class nothing uses;
-    - a primitive read outside the token files;
+    - a primitive read outside the token file;
     - a private property read outside its module;
   - **compositions, not blocks, do layout:** `check_css.py` refuses `display: flex` or
     `grid`, `gap`, the `flex-*`, `grid-*`, `justify-*` and `align-*` properties, and any
@@ -447,8 +455,8 @@ Components use container queries, so they fit wherever they are placed.
     exceptions so review sees it grow;
   - **no copied rules:** the same set of three or more declarations in two modules fails
     `check_css.py`; it becomes a composition, a utility or a `composes`;
-  - modules are typed (`vite-css-modules`, `generateSourceTypes`, named exports), so a class
-    used in a component but missing from its CSS fails `tsc`;
+  - a class a component names (`styles.x`, `styles["x"]`) that its module lacks fails
+    `check_css.py`;
   - a copied block of CSS fails jscpd.
 - **DRY by composition:** a pattern used twice becomes a component in `ui` (the layout
   primitives first), or a shared class reached with CSS Modules' `composes`; never a copy.
