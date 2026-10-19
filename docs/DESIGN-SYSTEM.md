@@ -16,6 +16,11 @@ These are the lead's and Alexis's rules from the prototype reviews.
   - The 3D carries the page; panels are light and few.
   - No dashboard feeling (the public client; the admin console may be dense).
   - Air everywhere.
+- **People and help first.**
+  - A room shows the people and what they say; counts, links and tools come on demand (a
+    menu, the world's page, the composer's focus).
+  - Jarvis offers the next step where a person may hesitate: at most three suggestions above
+    the composer, and a "For you" card in the room's side panel, each with its source.
 - **Realistic, not cartoon.** Planets, stations and light look like space photography.
 - **Our own look.** Learn from references; never copy their interface.
 - **One accent for actions.**
@@ -313,7 +318,7 @@ component with its CSS Module, documented by its props.
 | `Card` | header, body, actions; tones; dashed; density | Layout only. Its kinds (message, call, digest, proposal, event, announcement, media, poll, quiz, seal) are assemblies in their features (ADR-0002 §4) |
 | `SignPanel` | preview, waiting, signed, in a block, done; refused, failed, too late, wrong network, wallet missing or locked | The one signing block, whoever signs (Adena, a session, a signature that is not a transaction). It shows the account, the realm, the function, the arguments, the network with its label, the fee as an estimate and who pays, the steps in words, the ADR-0001 §11 warnings and a link to gnoweb. Only it renders the confirm control |
 | `Row` | plain, divided, boxed; current; with a thumbnail, an icon or an avatar | Lists, connected worlds, notifications, search results, agenda entries. The activity slot carries in words what the 3D shows |
-| `Field` | text, search, composer, date (the browser's `datetime-local`); label, help, error, prefix | The composer is a rich text box: bold shows as bold, Markdown on the wire. A name is typed at body size, never in data mono |
+| `Field` | text, search, composer, date (the browser's `datetime-local`); label, help, error, prefix | The composer is a rich text box: bold shows as bold, Markdown on the wire. At rest it is one line (add, emoji, mention, send); the formatting tools show when it has focus. A name is typed at body size, never in data mono |
 | `Avatar` | sizes s, m, l; kind person, assistant, bot; presence; speaking ring | A person's astronaut is generated from the address (ADR-0002 §1, §8 row 9): `partsFrom(address)`, then `draw(parts)`; a stylized, futuristic suit and helmet, few details, readable at 20 px, the colour from the address filling the largest area. One part always comes from the address; the others are chosen in phase 1. The short address shows wherever a person matters (person card, mention list, DM header, signing). An assistant or a bot has its own mark and a word, never mint. Never a planet. No uploaded picture (ADR-0002 §6). Never a badge granted by the platform |
 | `PlanetThumb` | world, ecosystem cluster, star, station, signal; dock magnification | Rendered from the same look as the 3D world |
 | `Stat` | number, unit, caption; the heat badge; delta | Tabular numbers that count up on arrival. Under reduced motion, effects become `Stat` counts |
