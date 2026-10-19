@@ -14,8 +14,9 @@ if [ -z "$web" ] || [ -z "$inside" ]; then
 fi
 
 # Docker's resolver writes its upstreams here; one marked host(...) is reached from the host's
-# own network, so no rule of this one applies to it.
-dns=$(sed -n 's/^# ExtServers: \[\(.*\)\]$/\1/p' /etc/resolv.conf | tr ' ' '\n' | grep -v '^host(' | grep . || true)
+# own network, so no rule of this one applies to it. IPv4 only: IPv6 is closed, and an IPv6
+# server would fail the whole restore below.
+dns=$(sed -n 's/^# ExtServers: \[\(.*\)\]$/\1/p' /etc/resolv.conf | tr ' ' '\n' | grep -E '^[0-9]+(\.[0-9]+){3}$' || true)
 
 {
 	echo '*filter'
