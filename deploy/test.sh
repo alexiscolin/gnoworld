@@ -298,6 +298,7 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "an error on a hashed file kept a year" "a 401 on a hashed file revalidates" \
 		nginx sed 's#~^(200|206|304)/assets/#~^[0-9]*/assets/#'
 	mutant "no manifest type" "the manifest's type" nginx sed '/application\/manifest+json webmanifest;/d'
+	mutant "nothing compressed" "is sent compressed" nginx sed '/gzip on;/d'
 	mutant "no data type" "a world's data's type" nginx sed '/text\/x-script data;/d'
 	mutant "no PROXY protocol" "the server is up and asks" nginx sed 's#listen 8080 proxy_protocol#listen 8080#'
 	mutant "a page cached" "/ revalidates" nginx sed 's#default "no-cache";#default "max-age=600";#'
@@ -441,6 +442,9 @@ elif [ "${1:-}" != --demo ]; then
 	done
 	for path in $assets; do
 		expect "$path is kept a year" "$(header cache-control "$path" 203.0.113.1 -u "$auth")" "public, max-age=31536000, immutable"
+	done
+	for path in / "$first" /manifest.webmanifest "$world.data"; do
+		expect "$path is sent compressed" "$(header content-encoding "$path" 203.0.113.1 -u "$auth" -H 'Accept-Encoding: gzip')" gzip
 	done
 	expect "the server names no version" "$(header server / 203.0.113.1 -u "$auth")" nginx
 	case $(header content-type /sw.js 203.0.113.1 -u "$auth") in */javascript*) pass "the worker is a script" ;; *) fail "the worker is no script" ;; esac
