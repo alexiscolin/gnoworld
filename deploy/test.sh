@@ -146,14 +146,15 @@ targets() {
 }
 
 # What a network reaches: no service of the host (the canary among them), its addresses, its LAN
-# or Docker's gateways; the internet only when $3 says yes.
+# or Docker's gateways; the internet only when $3 says yes; $4, the DNS servers the guard lets out.
 reach() {
-	network=$1 name=$2 internet=$3
+	network=$1 name=$2 internet=$3 allowed=${4:-}
 	[ -n "${list:-}" ] || list=$(targets | sort -u)
 	# web:8080 rides along: if it is missing from the answers, the fan-out saw nothing at all.
 	found=$(answering "$network" $list 1.1.1.1:443 web:8080)
 	expect "$name: the probe sees web among its targets" "$(printf '%s\n' "$found" | grep -c '^web:8080$' || true)" 1
-	printf '%s\n' 1.1.1.1:443 web:8080 >"$tmp/expected"
+	for server in $allowed; do printf 'waived %s: %s, a DNS server the guard lets it ask\n' "$name" "$server"; done
+	printf '%s\n' 1.1.1.1:443 web:8080 $allowed >"$tmp/expected"
 	host=$(printf '%s\n' "$found" | grep -vxF -f "$tmp/expected" | grep . | sort | tr '\n' ' ' | sed 's/ $//' || true)
 	expect "$name reaches nothing of the host, its LAN or Docker's networks ($(printf '%s\n' "$list" | grep -c .) tried, the canary among them)" "$host" ""
 	out=$(printf '%s\n' "$found" | grep -c '^1\.1\.1\.1:443$' || true)
@@ -205,6 +206,10 @@ hardened() {
 }
 
 networks_of() { docker inspect --format '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}' "$1" | tr ' ' '\n' | grep . | sort | tr '\n' ' '; }
+# The DNS servers guard.sh lets out, "<address>:53", as the kernel holds its rules. On a host whose
+# resolver is its router, the router's port 53 is one: allowed by design, not a way to the host.
+guard_dns() { docker exec "$guard" iptables-nft -S OUTPUT | sed -n 's#^-A OUTPUT -d \([0-9.]*\)/32 -p tcp -m tcp --dport 53 -j ACCEPT$#\1:53#p'; }
+
 if [ "${1:-}" = --mutants ]; then
 	# The faults each check must catch (CLAUDE.md: a guard lands with the fault that proves it).
 	# Each fault names the check that must catch it: killed by another one, it proves nothing.
@@ -336,7 +341,7 @@ elif [ "${1:-}" != --demo ]; then
 	expect "the guard sits on the internal network and its own" "$(networks_of "$guard")" "$inside $outside "
 	expect "its own network lets out" "$(docker network inspect --format '{{.Internal}}' "$outside")" false
 	expect "it is alone there" "$(docker network inspect --format '{{len .Containers}}' "$outside")" 1
-	reach "container:$guard" "the guard's network, which Tailscale shares," yes
+	reach "container:$guard" "the guard's network, which Tailscale shares," yes "$(guard_dns)"
 	# TCP leaves on 80 and 443 only: a public port that a plain container reaches stays shut.
 	expect "a plain container reaches a public port beside 80 and 443 (the next check sees)" "$(answering bridge 1.1.1.1:853)" 1.1.1.1:853
 	expect "the guard lets out no other public port" "$(answering "container:$guard" 1.1.1.1:853)" ""
@@ -465,7 +470,7 @@ else
 	fi
 	hardened "$ts" tailscale "user network"
 	expect "Tailscale's network is the guard's" "$(docker inspect --format '{{.HostConfig.NetworkMode}}' "$ts")" "container:$(docker inspect --format '{{.Id}}' "$guard")"
-	reach "container:$ts" "Tailscale's network" yes
+	reach "container:$ts" "Tailscale's network" yes "$(guard_dns)"
 	memory=0 cpus=0
 	for id in $ts $guard $web; do
 		memory=$((memory + $(docker inspect --format '{{.HostConfig.Memory}}' "$id")))
