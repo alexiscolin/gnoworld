@@ -290,6 +290,8 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "noindex only on success" "the 401 is not indexed" nginx sed 's#X-Robots-Tag "noindex" always#X-Robots-Tag "noindex"#'
 	mutant "sniffing allowed" "is never sniffed" nginx sed '/X-Content-Type-Options/d'
 	mutant "hashed files not kept" "is kept a year" nginx sed 's#public, max-age=31536000, immutable#no-cache#'
+	mutant "an error on a hashed file kept a year" "a 401 on a hashed file revalidates" \
+		nginx sed 's#~^(200|206|304)/assets/#~^[0-9]*/assets/#'
 	mutant "no manifest type" "the manifest's type" nginx sed '/application\/manifest+json webmanifest;/d'
 	mutant "no data type" "a world's data's type" nginx sed '/text\/x-script data;/d'
 	mutant "no PROXY protocol" "the server is up and asks" nginx sed 's#listen 8080 proxy_protocol#listen 8080#'
@@ -442,7 +444,12 @@ elif [ "${1:-}" != --demo ]; then
 	at_least "a burst with no password gets 429" "$(codes 429 198.51.100.1 'http://web:8080/[1-200]')" 100
 	at_least "a burst with a wrong password gets 429" "$(codes 429 198.51.100.2 -u team:wrong 'http://web:8080/[1-200]')" 100
 	at_least "a burst on the worker gets 429" "$(codes 429 198.51.100.3 -u "$auth" 'http://web:8080/sw.js?[1-200]')" 100
-	at_least "a burst on a hashed file gets 429" "$(codes 429 198.51.100.4 -u "$auth" "http://web:8080$first?[1-200]")" 100
+	# Each answer's code with its Cache-Control: a browser keeps a 429 that says immutable.
+	kept=$(docker run --rm --network "$inside" "$CURL" -s -o /dev/null -w '%{http_code} %header{cache-control}\n' --haproxy-protocol \
+		--haproxy-clientip 198.51.100.4 -u "$auth" "http://web:8080$first?[1-200]" || true)
+	at_least "a burst on a hashed file gets 429" "$(printf '%s\n' "$kept" | grep -c '^429 ' || true)" 100
+	expect "a 429 on a hashed file revalidates" "$(printf '%s\n' "$kept" | grep '^429 ' | sort -u)" "429 no-cache"
+	expect "a 401 on a hashed file revalidates" "$(header cache-control "$first" 203.0.113.1)" no-cache
 	urls=""
 	for path in $pages /sw.js /manifest.webmanifest /icon-192.png /icon-512.png $assets; do urls="$urls http://web:8080$path"; done
 	# A first visit loads the pages' files and the worker's precache, about twice the list at once.
