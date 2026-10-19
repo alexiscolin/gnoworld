@@ -6,6 +6,10 @@ Run the review before merging the current branch (base: $ARGUMENTS, or `main` if
 Follow `docs/REVIEW.md` ("AI review before a merge"). Never merge, push, rebase, skip a hook,
 or edit a test to make it pass. Claude runs every step itself, through the real commands and
 agents, in this order; it never hands a step to Alexis, and never stands in for a command.
+A branch that changes `deploy/` also runs semgrep's Dockerfile and Compose rules
+(`p/dockerfile`, `p/docker-compose`) in step 1, and the operator's own tests on the host
+(`deploy/test.sh`, then its `--mutants`). Those are asked for once, after every fix of steps 4
+to 6 is committed, never in between: each run costs him its whole length.
 
 1. **No tokens first.** Run `scripts/check.sh --full`: the gate, the probe, coverage and patch coverage, the proof of each fix, mutations, secrets. If the gate fails, stop and report its output. Write the diff to
    `.claude/tmp/diff.patch` and pass agents its path, never its content. Over about 400
@@ -32,6 +36,9 @@ agents, in this order; it never hands a step to Alexis, and never stands in for 
    A finding names its class, the kind of bug, and its fix covers every instance of the class,
    not the one line. A finding only about style, diagnostics or cleanup is dropped: `/simplify`
    owns those.
+   A finding beyond the plan (its "done when" and threat model) that is not high is verified
+   and recorded like any other, then put to Alexis with a recommendation, fix now or a backlog
+   row, instead of being fixed by default.
 6. **Verify, then reproduce each finding** before fixing it. For each tier-1 lot (the harness,
    a realm, a security path), give its findings to the `finding-verifier` agent (Opus), which
    tries to refute each one, then to reproduce it, and rates it again; a `refuted` finding is
