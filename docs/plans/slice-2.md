@@ -69,12 +69,14 @@ icons; 2c `Chip`, `Tabs`, `Popover`, `Dialog`, `Flash`, `EmptyState`, `Skeleton`
 
 ## 9. Questions for Alexis
 
-1. The designs: as private claude.ai design artifacts, like the prototype, or in code with the
-   `frontend-design` plugin? Recommended: artifacts, which you review on a page and comment on.
+1. The designs: as private claude.ai design artifacts. Answered: artifacts; approved 2026-10-20
+   (`docs/design/review-2a.md`).
 2. The new test levels change the harness (configs, `package.json`, the gate): thaw it for 2b,
    each change with its planted fault? Recommended: yes; the ADR asks for these levels.
 3. The pictures: the sandbox's Chromium, per platform, as Playwright's image cannot run there?
-4. The icons: our own set on DESIGN-SYSTEM.md's 16 px grid (recommended), or an open set?
+4. The icons: our own set on DESIGN-SYSTEM.md's 16 px grid. Answered: our own, the 55 drawn in
+   the approved designs.
 5. Storybook in place of DESIGN-SYSTEM.md's hand-made gallery (Alexis's question, 2026-10-19):
    its stories are the one list of states the component tests, the pictures and axe read, with
-   the props to play with and a tokens page. Recommended: yes. And the five merges above.
+   the props to play with and a tokens page. Answered: yes (Alexis, 2026-10-19). And the five
+   merges above.

@@ -38,6 +38,15 @@ Three independent reviews (Opus) of the first designs of slice 2a, each read aga
 - **In the designs:** rebuilt from token reads only; the false copy fixed; valid names; the phone
   reads; the header the same everywhere; no overlap; the signing block in all its states.
 
+## Approved (2026-10-20)
+
+Alexis approved the designs as they stand in the private design canvas
+https://claude.ai/artifact/4jCyjV2cxNjadXsPuHa7k2, version 15: the system at a glance, before and
+after, the face, the cosmos, a trip, an arrival, the full chat, its states, the rich cards and the
+phone. Changed with him after the reviews: Jarvis's answers stand out in the violet tone; a room
+shows people and help first; a person's face is a nebula with its constellation, its spread
+measured; a country is its flag (`docs/decisions.md`, 2026-10-20).
+
 ## Left for later, by the review's own judgement
 
 Table, Checkbox, Switch, Select (slices 8 and 12); QR codes and fingerprints (phase 2); amounts
