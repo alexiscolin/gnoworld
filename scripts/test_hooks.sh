@@ -402,6 +402,17 @@ for f in app/src/site.ts app/src/routes/a.tsx; do
 	git -C "$c" rm -q --cached "$f" && rm "$c/$f"
 done
 git -C "$c" rm -rq --cached app && rm -r "$c/app"
+# Storybook's config is a config and a test setup a test's, so neither is measured; code named alike is.
+mkdir -p "$c/packages/ui/.storybook" "$c/packages/ui/src"
+printf 'x\n' >"$c/packages/ui/.storybook/main.ts" && printf 'x\n' >"$c/packages/ui/.storybook/preview.ts"
+printf 'x\n' >"$c/packages/ui/src/testSetup.ts" && git -C "$c" add packages
+cover 1 || fail "patch_coverage asked coverage of Storybook's config or the tests' setup"
+for f in packages/ui/src/storybook.ts packages/ui/src/setup.ts; do
+	printf 'x\n' >"$c/$f" && git -C "$c" add "$f"
+	cover 1 && fail "patch_coverage let $f go unmeasured"
+	git -C "$c" rm -q --cached "$f" && rm "$c/$f"
+done
+git -C "$c" rm -rq --cached packages && rm -r "$c/packages"
 # A statement over several lines counts when any of its lines changed, not only its first.
 git -C "$c" rm -q --cached src/a.test.ts vitest.config.ts && rm "$c/src/a.test.ts" "$c/vitest.config.ts" && git -C "$c" add src/a.ts && git -C "$c" commit -qm four
 printf 'one\ntwo\nTHREE\nfour\n' >"$c/src/a.ts"
