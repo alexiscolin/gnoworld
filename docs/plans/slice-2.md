@@ -9,8 +9,9 @@ From the backlog's row, word for word: "Each component's states render and pass 
 name gives the same astronaut, readable at 20 px; focus is visible; the keyboard works in
 `Tabs`, `Popover` and `Dialog`; no `!important` and no raw colour (lint)". This plan adds:
 - the designs of the panels and of a trip, approved by Alexis before any component's code;
-- Storybook holds every component in every state (its stories), its props and the tokens; each
-  story is screenshotted at three container widths and with reduced motion, approved by Alexis;
+- Storybook shows at a glance every token (colours, type, space, sizes, radii, layers, motion)
+  and every component on one page, then each one's states (its stories) and props; each story
+  is screenshotted at three container widths and with reduced motion, approved by Alexis;
 - DESIGN-SYSTEM.md's invariants hold on every story: nothing overlaps, targets of 44 px, the
   focus ring, no horizontal scroll from 320 px, text at 200% zoom, forced colours;
 - `ui/` imports only `ui/`, by lint; the update notice is a `Flash`; the PWA has its icons.
@@ -72,8 +73,7 @@ icons; 2c `Chip`, `Tabs`, `Popover`, `Dialog`, `Flash`, `EmptyState`, `Skeleton`
    `frontend-design` plugin? Recommended: artifacts, which you review on a page and comment on.
 2. The new test levels change the harness (configs, `package.json`, the gate): thaw it for 2b,
    each change with its planted fault? Recommended: yes; the ADR asks for these levels.
-3. The pictures: Playwright's Docker image cannot run in the sandbox. Recommended: the
-   sandbox's Chromium, its pictures per platform; the CI's later.
+3. The pictures: the sandbox's Chromium, per platform, as Playwright's image cannot run there?
 4. The icons: our own set on DESIGN-SYSTEM.md's 16 px grid (recommended), or an open set?
 5. Storybook in place of DESIGN-SYSTEM.md's hand-made gallery (Alexis's question, 2026-10-19):
    its stories are the one list of states the component tests, the pictures and axe read, with
