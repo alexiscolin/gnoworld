@@ -40,7 +40,7 @@ running the gate. So a record proves nothing on its own: it moves the integrity 
 CI, which runs the full gate again on GitHub's machines, with no secret and no access to this
 Mac. The CI reports today and blocks once `main` is protected (the backlog's second item). Until
 then, a forged record lets a broken tree reach `main` until the CI's red report; it cannot run
-code on Alexis's machine.
+code on the maintainer's machine.
 
 ## Tests first (`scripts/test_hooks.sh`, a section `outside`)
 

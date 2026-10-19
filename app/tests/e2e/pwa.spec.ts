@@ -5,6 +5,22 @@ import { cacheContents, controlled, expect, hydrated, PAGES, test, type Page } f
 // (Chromium's own installability check answers nothing in a one-process browser, so it is not used.)
 const HASHED = /^\/assets\/[\w.-]+-[\w-]{8,}\.(js|css)$/;
 
+const promptOf = (page: Page) => page.getByRole("status").filter({ hasText: "New version available." });
+
+const reload = (page: Page) =>
+  Promise.all([page.waitForEvent("load"), promptOf(page).getByRole("button", { name: "Reload" }).click()]);
+
+// A deploy on a host that bumps (tests/e2e/serve.mjs), then the tab shown again, which is when an
+// open page asks for a newer worker.
+async function bump(
+  page: Page,
+  request: { post(url: string, options?: { headers?: Record<string, string> }): Promise<{ status(): number }> },
+  { site, headers = {} }: { site: string; headers?: Record<string, string> },
+): Promise<void> {
+  expect((await request.post(`${site}/__bump`, { headers })).status()).toBe(204);
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+}
+
 async function appManifest(page: Page) {
   return (await page.context().newCDPSession(page)).send("Page.getAppManifest");
 }
@@ -49,6 +65,45 @@ for (const path of PAGES) {
     await expect(page.locator('link[rel="manifest"]')).toHaveAttribute("href", "/manifest.webmanifest");
   });
 }
+
+// The demo asks for a shared password (deploy/web/nginx.conf): Chromium fetches the manifest
+// without credentials unless its link asks for them, and then reads an empty one, with no error.
+test.describe("behind the demo's password", () => {
+  test.describe.configure({ mode: "serial" });
+  test.use({ contextOptions: { httpCredentials: { username: "team", password: "a test password" } } });
+  const site = "http://127.0.0.1:4175";
+  const password = { authorization: `Basic ${btoa("team:a test password")}` };
+
+  // Node's own fetch: Playwright's request client would answer the challenge with the test's password.
+  test("the host asks for it, so these checks are not blind", async () => {
+    expect((await fetch(`${site}/`)).status).toBe(401);
+    expect((await fetch(`${site}/`, { headers: password })).status).toBe(200);
+  });
+
+  test("Chromium reads the manifest, and the worker takes the page", async ({ page }) => {
+    await page.goto(`${site}/`);
+    await controlled(page);
+    const { errors, manifest } = await appManifest(page);
+    expect(errors).toEqual([]);
+    expect(manifest).toMatchObject({ name: "gno.world", display: "kStandalone" });
+  });
+
+  test("a new version is found, offered and taken behind it", async ({ page, request }) => {
+    await page.goto(`${site}/`);
+    await controlled(page);
+    const before = await page.evaluate(
+      async () => (await navigator.serviceWorker.getRegistration())?.active?.scriptURL,
+    );
+    await bump(page, request, { site, headers: password });
+    await reload(page);
+    await controlled(page);
+    const after = await page.evaluate(async () => {
+      const registration = await navigator.serviceWorker.getRegistration();
+      return { waiting: registration?.waiting ?? null, url: registration?.active?.scriptURL };
+    });
+    expect(after).toEqual({ waiting: null, url: before });
+  });
+});
 
 test("each icon the manifest names is a PNG of the size it states, 192 and 512", async ({ page }) => {
   await page.goto("/");
@@ -135,14 +190,6 @@ test.describe("updates", () => {
       };
     });
 
-  // A deploy, then the tab shown again, which is when an open page asks for a newer worker.
-  async function bump(page: Page, request: { post(url: string): Promise<{ status(): number }> }): Promise<void> {
-    expect((await request.post(`${site}/__bump`)).status()).toBe(204);
-    await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
-  }
-
-  const promptOf = (page: Page) => page.getByRole("status").filter({ hasText: "New version available." });
-
   test("a new version waits: the prompt shows, and the page changes only after the click", async ({
     page,
     request,
@@ -164,11 +211,11 @@ test.describe("updates", () => {
     await page.getByRole("status").evaluate((region) => {
       region.id = "there-before";
     });
-    await bump(page, request);
+    await bump(page, request, { site });
     await expect(promptOf(page)).toBeVisible();
     await expect(promptOf(page)).toHaveAttribute("id", "there-before");
     expect(await untouched(page)).toEqual({ same: true, waiting: true, marked: true });
-    await Promise.all([page.waitForEvent("load"), promptOf(page).getByRole("button", { name: "Reload" }).click()]);
+    await reload(page);
     await controlled(page);
     await hydrated(page);
     expect((await untouched(page)).waiting).toBe(false);
@@ -183,13 +230,13 @@ test.describe("updates", () => {
     const other = await page.context().newPage();
     await open(page);
     await open(other);
-    await bump(page, request);
+    await bump(page, request, { site });
     await expect(promptOf(page)).toBeVisible();
     await expect(promptOf(other)).toBeVisible();
-    await Promise.all([page.waitForEvent("load"), promptOf(page).getByRole("button", { name: "Reload" }).click()]);
+    await reload(page);
     await hydrated(page);
     await expect(other.locator("body[data-before]")).toHaveCount(1);
-    await Promise.all([other.waitForEvent("load"), promptOf(other).getByRole("button", { name: "Reload" }).click()]);
+    await reload(other);
     await hydrated(other);
     await expect(other.locator("body[data-before]")).toHaveCount(0);
   });

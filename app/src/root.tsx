@@ -10,7 +10,8 @@ export function Layout({ children }: { children: ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="manifest" href="/manifest.webmanifest" />
+        {/* With credentials: the demo asks for a password, and Chromium sends none for a manifest otherwise. */}
+        <link rel="manifest" href="/manifest.webmanifest" crossOrigin="use-credentials" />
         <Meta />
         <Links />
       </head>

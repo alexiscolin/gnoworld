@@ -1,0 +1,12 @@
+{
+  "TCP": {
+    "443": {
+      "TCPForward": "web:8080",
+      "TerminateTLS": "${TS_CERT_DOMAIN}",
+      "ProxyProtocol": 2
+    }
+  },
+  "AllowFunnel": {
+    "${TS_CERT_DOMAIN}:443": true
+  }
+}

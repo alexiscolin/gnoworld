@@ -67,6 +67,8 @@ Code written by an agent gets the same reading as anyone's, plus this. `/pre-mer
    kind of bug, and its fix covers every instance; one only about style, diagnostics or cleanup
    is dropped, `/simplify` owning those. Fixes are re-checked by the gate and the mutation
    tester; a second pass runs only for a high finding fixed in tier-1 code, and only its lens.
+   Tests only the operator can run (`deploy/test.sh`, its mutants) run once, after every fix is
+   in; a finding beyond the plan that is not high is put to Alexis, fix now or backlog.
    **Rounds converge**, as Anthropic's own reviewer does ("Solving code review at Anthropic"):
    the first round reads the branch, any later one only the diff since the last; after three
    rounds the review stops, and Claude and Alexis reconsider the approach before more code.

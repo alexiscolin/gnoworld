@@ -1007,7 +1007,7 @@ not choose its hosts.
     devices. The team uses the public URL.
   - **Shut in the tailnet too:** the demo machine joins with a tagged key, and the
     tailnet's access rules let that tag reach nothing: Funnel brings visitors in, and
-    nothing leaves it for the Mac or Alexis's other devices. A test from inside the demo
+    nothing leaves it for the host or any other device. A test from inside the demo
     proves it.
   - **Turnkey for ops:** `deploy/` holds everything: `compose.yaml` is what ops runs, the
     `demo` profile only adds the Tailscale machine, the egress proxy and the caps;
@@ -1057,7 +1057,7 @@ not choose its hosts.
     private registry; the static client goes to its host the same way;
   - the demo updates itself: an updater inside the demo project, limited to the demo's own
     containers by label, pulls new images within minutes. Nothing reaches into the machine
-    from outside, and the homelab's own updater is left alone;
+    from outside, and the host's own updater is left alone;
   - each pull request gets a preview of the static client at its own address, against the
     demo's services;
   - a rollback is the previous image digest; migrations run at start and are written expand
@@ -1087,7 +1087,7 @@ Docker on arm64.
 | Claude and MCP | `@anthropic-ai/sdk` and `@modelcontextprotocol/client` (§5) | — |
 | Tracing | `@opentelemetry/api`, `sdk-trace-node` and `exporter-trace-otlp-http`: spans by hand, one per request and one per Jarvis turn | 14 packages, against 71 for the full Node SDK |
 | Logs | JSON lines on stdout | The log backend reads the containers' output |
-| Tests | Vitest, as in the client; integration with `docker compose up --wait` against a real Ergo; load with k6 (HTTP and WebSocket), never on the homelab | One set of tools everywhere |
+| Tests | Vitest, as in the client; integration with `docker compose up --wait` against a real Ergo; load with k6 (HTTP and WebSocket), never on the demo's host | One set of tools everywhere |
 | Image | Distroless Node 24, `nonroot`, pinned by digest (amd64 and arm64) | No shell, 162 MB |
 
 **Node, fast and calm:**
@@ -1274,7 +1274,7 @@ from gno-golf's engine, measured there.
 | Performance and memory | The bench, idle, hidden tab, full-screen chat, 20 flights, the bundle sizes, Lighthouse's budgets, the GPU variety view | Playwright, Lighthouse | Every pull request; the GPU bench nightly on a machine with a GPU |
 | Algorithms | Every hot path has a bench with a stored baseline; a slowdown past 10% fails. Its growth is measured at n, 4n and 16n, so an O(n²) hiding in an O(n log n) path fails too | Vitest bench | Every pull request |
 | Scale | Synthetic universes at 10×, 100× and a million realms: placement time per system stays flat, tiles stay bounded, the draw count stays bounded, ⌘K answers within budget; a 100,000-message history and a 1,000-room switcher stay smooth | Vitest bench, Playwright | Nightly |
-| Load | Ergo with thousands of clients, Jarvis with concurrent questions against a fake model, the moderation queue at peak: latency and errors within budget | k6, against a local stack, never the homelab demo | Before launch |
+| Load | Ergo with thousands of clients, Jarvis with concurrent questions against a fake model, the moderation queue at peak: latency and errors within budget | k6, against a local stack, never the demo | Before launch |
 | Mutation | Every guard fails a test when removed: realms (`scripts/mutate.py`), and all TypeScript with tests (StrykerJS: its TypeScript checker drops mutants that would not compile, so the score is honest; incremental mode reruns only what changed) | `mutate.py`; StrykerJS | The changed lines before each merge; everything nightly. A score below its floor fails, the floor set from slice 1's first run and only ever raised |
 | Realms | Tests, filetests, `gno-audit` | gno | Every commit |
 | AI | Jarvis's evals (§5), non-hallucination first: every number, name, link and function in an answer is checked by string match against the tool results; an answer with nothing to ground it must say it does not know; a different model grades the rest. A grounded rate below the threshold fails | promptfoo, with our grounding check as a JavaScript assertion | On every change to it; nightly sample |
@@ -1462,7 +1462,7 @@ answered them on 2026-10-17.
 
 | # | Question | Answer |
 |---|---|---|
-| 12 (ADR-0001) | Where Ergo and the servers run | In Docker: demos on the homelab, production where ops decides (§7) |
+| 12 (ADR-0001) | Where Ergo and the servers run | In Docker: demos on one Docker host, production where ops decides (§7) |
 | 14 | The markets row's source | A timer in the server reads CoinGecko into `markets.json`; the client reads only that file (§6) |
 | 15 | Jarvis: model, host, budget, translation | Sonnet 5.5 by default, Haiku 5.5 and Opus 5.5 by task; its own container `jarvis`, on the official Anthropic and MCP SDKs; 50 $ a day as a hard cap; automatic, cached translation with Haiku, on its own budget; chain data from gnomcp, the public indexer and gnoscope; Langfuse Cloud from phase 1 (§5) |
 | 16 | Media: storage, budget, moderation | No hosted media at first: embeds from accepted services. Messages are moderated by a bot on OpenAI's Moderation API, checked after posting, with contests (§6) |

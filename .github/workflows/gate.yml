@@ -1,5 +1,5 @@
 # The gate on GitHub's machines: every push of a branch runs scripts/check.sh --full, as
-# /pre-merge and the pre-push hook do on Alexis's Mac (docs/HARNESS.md). It reads the
+# /pre-merge and the pre-push hook do on the maintainer's machine (docs/HARNESS.md). It reads the
 # repository and nothing more, needs no secret, pins its actions, gitleaks and gno by commit or
 # checksum (scripts/test_hooks.sh holds it). On this plan it reports a failure; it cannot block a merge.
 name: gate
@@ -14,7 +14,7 @@ concurrency:
 jobs:
   gate:
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 180 # GitHub's machines take far longer than a workstation; tuned once measured
     env:
       GNO_TOOLCHAIN: /home/runner/.cache/gno-toolchain
       GNOROOT: /home/runner/.cache/gno-toolchain/src
