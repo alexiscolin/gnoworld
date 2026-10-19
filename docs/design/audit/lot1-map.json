@@ -1,0 +1,7079 @@
+[
+ {
+  "line": 6,
+  "selector": ":root",
+  "target": "tokens",
+  "offtoken": [
+   {
+    "prop": "--space",
+    "value": "#05070D",
+    "snap": "--color-space (exact)"
+   },
+   {
+    "prop": "--dock",
+    "value": "rgba(11,15,24,0.78)",
+    "snap": "--color-surface (rgba 0.86 in the DS)"
+   },
+   {
+    "prop": "--edge",
+    "value": "rgba(255,255,255,0.1)",
+    "snap": "--color-line (exact)"
+   },
+   {
+    "prop": "--edge-strong",
+    "value": "rgba(255,255,255,0.2)",
+    "snap": "--color-line-strong (exact)"
+   },
+   {
+    "prop": "--text",
+    "value": "#F4F6FA",
+    "snap": "--color-text (exact)"
+   },
+   {
+    "prop": "--soft",
+    "value": "#8E99AD",
+    "snap": "--color-text-muted: delete the token, the DS merged the two greys"
+   },
+   {
+    "prop": "--muted",
+    "value": "#9DA8BC",
+    "snap": "--color-text-muted (exact)"
+   },
+   {
+    "prop": "--pill / --pill-ink",
+    "value": "#F2EFEA / #15161A",
+    "snap": "--color-primary / --color-primary-ink (exact)"
+   },
+   {
+    "prop": "--action / --action-ink",
+    "value": "#5CF2C8 / #04201A",
+    "snap": "--color-action / --color-action-ink (exact)"
+   },
+   {
+    "prop": "--life",
+    "value": "#FFC46B",
+    "snap": "--color-warm (exact)"
+   },
+   {
+    "prop": "--unknown",
+    "value": "#B79CFF",
+    "snap": "--color-signal (exact)"
+   },
+   {
+    "prop": "--down",
+    "value": "#FF8A7A",
+    "snap": "--color-danger (exact)"
+   },
+   {
+    "prop": "--top / --bottom",
+    "value": "0px",
+    "snap": "drop: no-op zeros; region offsets live in the regions (Header 34px from the edge, Ticker 34px)"
+   },
+   {
+    "prop": "--left / --right",
+    "value": "0px (288px / 340px at <=1280px)",
+    "snap": "drop: the chat dock is 360px (320px under 1400px) in the DS, set on the region"
+   },
+   {
+    "prop": "--pad",
+    "value": "24px (16px at <=1280px)",
+    "snap": "NEW TOKEN --gutter = clamp(1rem, 2vw, 1.5rem): replaces the media query with a fluid token"
+   },
+   {
+    "prop": "--sans",
+    "value": "'Geist', system-ui, ...",
+    "snap": "--font-sans (NEW TOKEN name; DS: Geist, self-hosted, font-display swap)"
+   },
+   {
+    "prop": "--mono",
+    "value": "'Geist Mono', ui-monospace, ...",
+    "snap": "--font-mono (NEW TOKEN name; DS: Geist Mono)"
+   }
+  ],
+  "dup_of": [
+   957
+  ],
+  "note": "Prototype names -> DS names: --space=--color-space, --dock=--color-surface (alpha .78 vs DS .86), --edge/--edge-strong=--color-line/-strong, --text, --muted=--color-text-muted, --soft (#8E99AD) merged into muted (the DS keeps one grey), --pill/--pill-ink=--color-primary/-ink, --life=--color-warm, --unknown=--color-signal, --down=--color-danger. --top/--bottom are 0px no-ops; --left/--right are 0px (288/340 at <=1280px, L957) and only feed #flight, #bigTitle, #board: region sizes belong to the regions. --pad (24px, 16px <=1280px) is a fluid gutter. Fonts load from Google Fonts here; DS self-hosts Geist."
+ },
+ {
+  "line": 30,
+  "selector": "html, body",
+  "target": "base",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "`html, body {height:100%}` plus body `overflow:hidden` (L31) locks the page: at 200% zoom or 320px wide nothing scrolls, which the DS invariants (no horizontal scroll from 320px, text fits at 200% zoom) forbid; the shell must scroll or reflow."
+ },
+ {
+  "line": 31,
+  "selector": "body",
+  "target": "base",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "(unset: browser 16px)",
+    "snap": "--text-body (14px) + line-height 1.5 on body"
+   },
+   {
+    "prop": "-webkit-font-smoothing",
+    "value": "antialiased",
+    "snap": "drop (non-standard; @eslint/css Baseline flags it)"
+   }
+  ],
+  "dup_of": [],
+  "note": "No base font-size or line-height on body: every component restates its own size, which is how the prototype reached 20 sizes. Base should set --text-body (14px/1.5) and Geist. `-webkit-font-smoothing` is non-standard (WebKit/macOS only): drop or comment."
+ },
+ {
+  "line": 32,
+  "selector": "#scene",
+  "target": "scene",
+  "offtoken": [
+   {
+    "prop": "z-index",
+    "value": "(none)",
+    "snap": "--z-scene"
+   }
+  ],
+  "dup_of": [
+   188
+  ],
+  "note": "The canvas. No z-index: it relies on DOM order; give it --z-scene. Other scene overlays (#adOverlay L188, #labels) sit above it."
+ },
+ {
+  "line": 33,
+  "selector": "button",
+  "target": "base",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "(unset: browser 13.33px)",
+    "snap": "--text-ui (13px, weight 500) so buttons stop restating it"
+   },
+   {
+    "prop": "border / background",
+    "value": "(unset: UA chrome)",
+    "snap": "reset to none in base, as 36 later rules do one by one"
+   }
+  ],
+  "dup_of": [],
+  "note": "Base `button` sets only family, colour and cursor. 36 rules in the file repeat `border:0; background:none` and 50 button rules restate font or font-size, so base should reset border, background, padding and `font: inherit` and set the control size."
+ },
+ {
+  "line": 34,
+  "selector": "button:focus-visible, input:focus-visible",
+  "target": "base",
+  "offtoken": [],
+  "dup_of": [
+   259,
+   281,
+   805,
+   820
+  ],
+  "note": "Matches the DS ring (2px --color-action, offset 2px). Only button and input: a, select, textarea, [contenteditable], summary and [tabindex] get none. Overridden to `outline:none` at L199 (#chatInput), L284 (.namefield input, same specificity and later, so it wins: the name field shows no focus at all), L758, L1168; drawn in --text, not --color-action, at L259 (offset 3), L805 (offset 2), L820 (offset 4); L281 reuses that outline for a selected state."
+ },
+ {
+  "line": 35,
+  "selector": "small",
+  "target": "base",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "10px",
+    "snap": "--text-label (11px)"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "0.12em",
+    "snap": "--text-label tracking (0.14em)"
+   }
+  ],
+  "dup_of": [
+   53,
+   77,
+   93,
+   151,
+   175,
+   232,
+   244,
+   282,
+   310,
+   537,
+   547,
+   628,
+   792,
+   885,
+   925,
+   942,
+   987,
+   994,
+   1025,
+   1044,
+   1047,
+   1063,
+   1141,
+   1149,
+   1162,
+   1166
+  ],
+  "note": "`small` is the caps mono label (= Kicker). Its font-size 10px is fully overridden by `small{font-size:11px}` (L885, same specificity, later); letter-spacing .12em should be the label's .14em. About 26 other rules repeat this label style by hand (see dup_of)."
+ },
+ {
+  "line": 36,
+  "selector": ".big",
+  "target": "component:Stat/number",
+  "offtoken": [
+   {
+    "prop": "letter-spacing",
+    "value": "-0.03em",
+    "snap": "title tracking -0.03em (--text-title-m/l)"
+   },
+   {
+    "prop": "line-height",
+    "value": "1",
+    "snap": "NEW TOKEN --leading-tight = 1 (display numbers and titles)"
+   }
+  ],
+  "dup_of": [
+   57,
+   100,
+   423,
+   517,
+   523,
+   538,
+   653,
+   684,
+   771,
+   795
+  ],
+  "note": "`.big` is the Stat number (300, -0.03em, tabular, line-height 1) but its size is set per place: 20 (L57, dead), 40 (L100), 26 (L423), 16 (L538, hero), 28 (L76, L653), clamp(30px,2.9vw,46px) (L684). Stat needs one size scale (title-s/m/l) as a prop."
+ },
+ {
+  "line": 37,
+  "selector": ".big sup",
+  "target": "component:Stat/unit",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "0.4em",
+    "snap": "--text-label (11px): the unit is a caption, not 0.4em of the number"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "0.02em",
+    "snap": "0 (normal)"
+   },
+   {
+    "prop": "margin-left",
+    "value": "3px",
+    "snap": "--space-4"
+   },
+   {
+    "prop": "vertical-align",
+    "value": "0.9em",
+    "snap": "drop: unit sits on the baseline"
+   }
+  ],
+  "dup_of": [
+   539,
+   685,
+   796
+  ],
+  "note": "`<sup>` is used for a unit (USD, '/ 18'), which is not a superscript: Stat gets a `unit` slot on the baseline. Overridden by #heroStats (L539: 9px), #fFacts (L685) and #loader (L796)."
+ },
+ {
+  "line": 38,
+  "selector": ".delta",
+  "target": "component:Stat/delta",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "10.5px",
+    "snap": "--text-label (11px)"
+   }
+  ],
+  "dup_of": [
+   540
+  ],
+  "note": "Change under a price. Colour is set inline per sign (app.js:4166-4167) and the text carries typed arrows (▲ ▼), which the DS bans: rising/falling become a Stat attribute with --color-action / --color-danger (falling trend is the one danger use)."
+ },
+ {
+  "line": 39,
+  "selector": ".tag",
+  "target": "component:Chip/badge/filled",
+  "offtoken": [
+   {
+    "prop": "height",
+    "value": "24px",
+    "snap": "24=--hit-min"
+   },
+   {
+    "prop": "padding",
+    "value": "0 10px",
+    "snap": "10->--space-12"
+   },
+   {
+    "prop": "border-radius",
+    "value": "999px",
+    "snap": "999=--radius-pill"
+   },
+   {
+    "prop": "font-size",
+    "value": "12px",
+    "snap": "--text-ui (13px, weight 500) by role: DS sets controls, chips and tabs at 13"
+   }
+  ],
+  "dup_of": [
+   40,
+   158,
+   177,
+   324,
+   442,
+   603,
+   628,
+   918,
+   1019,
+   1102,
+   1137,
+   1138
+  ],
+  "note": "Filled pill label (card kind and tags), non-interactive. Height 24 is --hit-min, while DS chips are --control-s (32): pick one badge height. Chip heights in the file: 24 (.tag, .pill, .reacts), 28 (#fRooms chips, #notifWhere), 30 (.room), 32 (#quick)."
+ },
+ {
+  "line": 40,
+  "selector": ".tag.dim",
+  "target": "component:Chip/badge/default",
+  "offtoken": [
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.08)",
+    "snap": "NEW TOKEN --color-fill-strong = rgba(255,255,255,0.10): hover/selected fill"
+   }
+  ],
+  "dup_of": [
+   39,
+   158,
+   177,
+   324,
+   442,
+   603,
+   628,
+   918,
+   1019,
+   1102,
+   1137,
+   1138
+  ],
+  "note": "The dim twin of `.tag`: one component with a `tone` prop, not two classes (`.tag.dim` is a modifier class; the DS wants attributes)."
+ },
+ {
+  "line": 41,
+  "selector": ".primary",
+  "target": "component:Button/primary/m",
+  "offtoken": [
+   {
+    "prop": "height",
+    "value": "40px",
+    "snap": "40=--control-m"
+   },
+   {
+    "prop": "padding",
+    "value": "0 16px",
+    "snap": "16=--space-16"
+   },
+   {
+    "prop": "border-radius",
+    "value": "999px",
+    "snap": "999=--radius-pill"
+   },
+   {
+    "prop": "font-size",
+    "value": "13px",
+    "snap": "--text-ui (13px)"
+   }
+  ],
+  "dup_of": [
+   210,
+   287,
+   303,
+   316,
+   513,
+   625,
+   814,
+   815,
+   870,
+   1073,
+   1118,
+   1173
+  ],
+  "note": "Primary button: 40px (control-m), pill, 13/500, on-token. Heights are overridden to 32 (L210), 34 (L625, off the scale) and 44 (L287, L303, L316, L870, L1073, L1118, L1173), paddings range 12 to 24: Button sizes m/l/xl as a prop. Also used as `.primary` for submit, send, follow, connect (L1087 makes it look secondary): the look must follow the variant, not the class."
+ },
+ {
+  "line": 42,
+  "selector": ".primary[aria-pressed=\"true\"]",
+  "target": "component:Button/primary/pressed",
+  "offtoken": [],
+  "dup_of": [
+   41,
+   210,
+   287,
+   303,
+   316,
+   513,
+   625,
+   814,
+   815,
+   870,
+   1073,
+   1118,
+   1173
+  ],
+  "note": "Pressed state read from [aria-pressed] (the DS convention) but only the Follow button uses it; it turns the primary green, which is the one place a primary is not --color-primary."
+ },
+ {
+  "line": 43,
+  "selector": ".ghost",
+  "target": "component:Button/secondary/m",
+  "offtoken": [
+   {
+    "prop": "height",
+    "value": "40px",
+    "snap": "40=--control-m"
+   },
+   {
+    "prop": "padding",
+    "value": "0 16px",
+    "snap": "16=--space-16"
+   },
+   {
+    "prop": "border-radius",
+    "value": "999px",
+    "snap": "999=--radius-pill"
+   },
+   {
+    "prop": "font-size",
+    "value": "13px",
+    "snap": "--text-ui (13px)"
+   }
+  ],
+  "dup_of": [
+   80,
+   543,
+   772,
+   810,
+   896,
+   1072
+  ],
+  "note": "Secondary button (line-strong border, DS match). Used on <a> and <button>: no display/align set, so an anchor styled this way misaligns (L1118 patches dialogs only). Heights overridden to 32 (L80, L1072), 44 (L1118) and 56 (L810)."
+ },
+ {
+  "line": 44,
+  "selector": ".sr",
+  "target": "utility:visually-hidden",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Incomplete pattern: `clip` is deprecated and there is no `clip-path:inset(50%)`, `white-space:nowrap`, `margin:-1px`, `padding:0`, `border:0`. 1px size is the pattern, not a design value."
+ },
+ {
+  "line": 45,
+  "selector": ".dock",
+  "target": "component:Panel/docked",
+  "offtoken": [
+   {
+    "prop": "backdrop-filter",
+    "value": "blur(24px) saturate(1.25)",
+    "snap": "NEW TOKEN --blur-surface = 24px (surfaces over the scene)"
+   }
+  ],
+  "dup_of": [
+   71,
+   134,
+   355,
+   384,
+   389,
+   396,
+   485,
+   486,
+   488,
+   491,
+   666,
+   745,
+   749,
+   756,
+   808,
+   903,
+   905,
+   912,
+   952,
+   959,
+   965,
+   999
+  ],
+  "note": "Docked surface: --dock fill + blur(24px) saturate(1.25), plus `position:fixed`, which is placement and belongs to the region. Reused by #chat, #leftdock, #notif, #flight, #toast. The file has 20 backdrop-filter declarations in 9 blur values (4, 6, 8, 10, 12, 14, 16, 18, 24px); DS: blur only on surfaces over the scene, one deep."
+ },
+ {
+  "line": 46,
+  "selector": ".section",
+  "target": "component:Panel/section",
+  "offtoken": [
+   {
+    "prop": "padding",
+    "value": "16px var(--pad)",
+    "snap": "16=--space-16; var(--pad)->--gutter (NEW TOKEN, fluid 16-24px, see L6)"
+   }
+  ],
+  "dup_of": [
+   99,
+   114,
+   115,
+   683,
+   699,
+   831,
+   857,
+   989,
+   1032,
+   1142,
+   1148
+  ],
+  "note": "A padded block with a hairline under it: padding is a Stack/Box composition, the line a Divider. Used 30 times in the markup."
+ },
+ {
+  "line": 49,
+  "selector": "#topbar",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   484,
+   957
+  ],
+  "note": "dead: #topbar is display:none !important (L484), so everything inside it never shows. Its `.dock` class and every #brand/#crumb/#account child are dead with it."
+ },
+ {
+  "line": 50,
+  "selector": "#brand",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   55,
+   494,
+   505
+  ],
+  "note": "dead: child of the hidden #topbar. The visible brand is `#hnav .brand` (L494-L497)."
+ },
+ {
+  "line": 51,
+  "selector": "#brand .mark",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   497
+  ],
+  "note": "dead: child of the hidden #topbar. Its sun gradient is repeated for `#hnav .brand i` (L497), an <i> the markup does not contain either."
+ },
+ {
+  "line": 52,
+  "selector": "#brand strong",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   494
+  ],
+  "note": "dead: child of the hidden #topbar (the visible wordmark is `#hnav .brand`)."
+ },
+ {
+  "line": 53,
+  "selector": "#crumb",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: child of the hidden #topbar. app.js still writes its text (1262, 1280) and wires its click (1283): dead code on the JS side too."
+ },
+ {
+  "line": 54,
+  "selector": "#stats",
+  "target": "region:Hero",
+  "offtoken": [],
+  "dup_of": [
+   521,
+   527,
+   534,
+   956,
+   957
+  ],
+  "note": "The markets row: app.js:4184 moves #stats into #heroStats at load, where `display:flex !important` (L534) kills this rule's grid and columns; only `min-width:0` still counts. Slice 5 builds the row from markets.json."
+ },
+ {
+  "line": 55,
+  "selector": ".stat",
+  "target": "component:Stat",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "12px",
+    "snap": "12=--space-12"
+   },
+   {
+    "prop": "padding",
+    "value": "0 var(--pad)",
+    "snap": "var(--pad) -> --gutter (NEW TOKEN, fluid 16-24px, see L6)"
+   }
+  ],
+  "dup_of": [
+   50,
+   98,
+   114,
+   391,
+   457,
+   652,
+   683,
+   699,
+   989
+  ],
+  "note": "Stat cell. In the hero its padding and border are overridden to 0 with !important (L535) and its gap to 10 (L535), so `padding`, `border-right`, `gap` and `align-items` here are dead; `display:flex` and `min-width:0` live."
+ },
+ {
+  "line": 56,
+  "selector": ".stat .col",
+  "target": "composition:Stack",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "4px",
+    "snap": "4=--space-4"
+   }
+  ],
+  "dup_of": [
+   78,
+   167,
+   391,
+   419,
+   695,
+   836,
+   851,
+   1109
+  ],
+  "note": "Column of two lines (caption, number, delta): a Stack with gap 4, which L536 changes to 2 in the hero."
+ },
+ {
+  "line": 57,
+  "selector": ".stat .big",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   100,
+   523,
+   538
+  ],
+  "note": "dead: fully overridden by `#heroStats .stat .big {font-size:16px !important}` (L538); every .stat lives in #heroStats."
+ },
+ {
+  "line": 58,
+  "selector": ".stat svg",
+  "target": "component:Stat/sparkline",
+  "offtoken": [
+   {
+    "prop": "min-width",
+    "value": "40px",
+    "snap": "40=--control-m"
+   },
+   {
+    "prop": "height",
+    "value": "24px",
+    "snap": "24=--hit-min"
+   }
+  ],
+  "dup_of": [
+   524,
+   529,
+   541
+  ],
+  "note": "Sparkline box. In the hero L541 forces width 56px and height 20px (`!important`), L524 `flex:none`: `flex:1` and `height:24px` here are dead; `display:block` and the min-width stay."
+ },
+ {
+  "line": 59,
+  "selector": ".orb",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   344
+  ],
+  "note": "dead: only element is `.orb` inside `.stat.online`, which is `display:none` in the hero (L526). Same breathing glow as `#guideBtn .eye` (L344, inside the hidden #bottombar)."
+ },
+ {
+  "line": 61,
+  "selector": "#account",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   504
+  ],
+  "note": "dead: #account sits in the hidden #topbar and is empty (passBtn, bellBtn, connectBtn are moved to #hnavActs by app.js:4183). The live cluster is `#hnav .acts` (L504)."
+ },
+ {
+  "line": 62,
+  "selector": ".iconbtn",
+  "target": "component:IconButton/m",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "40px",
+    "snap": "Button size: --control-m (40px) exact"
+   },
+   {
+    "prop": "height",
+    "value": "40px",
+    "snap": "Button size: --control-m (40px) exact"
+   },
+   {
+    "prop": "border-radius",
+    "value": "50%",
+    "snap": "--radius-pill (999px) on a square"
+   }
+  ],
+  "dup_of": [
+   155,
+   166,
+   187,
+   191,
+   194,
+   206,
+   215,
+   242,
+   334,
+   490,
+   582,
+   871,
+   921,
+   927,
+   1124,
+   1146
+  ],
+  "note": "Round 40px icon button. Sizes elsewhere: 32 (L582, L166, L242), 44 (L871), 28x26 (.mact), 30/34 (.tbtn), 24 (#fmtBar): DS has IconButton s and m, the header needs a 44px touch size (control-l)."
+ },
+ {
+  "line": 63,
+  "selector": ".iconbtn .badge",
+  "target": "component:Badge/count",
+  "offtoken": [
+   {
+    "prop": "top",
+    "value": "-4px",
+    "snap": "--space-4 negated: offset the count from the button corner"
+   },
+   {
+    "prop": "right",
+    "value": "-4px",
+    "snap": "--space-4 negated"
+   },
+   {
+    "prop": "min-width",
+    "value": "18px",
+    "snap": "Badge size: --space-16 (16px)"
+   },
+   {
+    "prop": "height",
+    "value": "18px",
+    "snap": "Badge size: --space-16 (16px)"
+   },
+   {
+    "prop": "padding",
+    "value": "0 5px",
+    "snap": "5->--space-4"
+   },
+   {
+    "prop": "border-radius",
+    "value": "999px",
+    "snap": "999=--radius-pill"
+   },
+   {
+    "prop": "color",
+    "value": "#2A0C08",
+    "snap": "--color-action-ink (the count badge becomes action: DS reserves danger for errors)"
+   },
+   {
+    "prop": "font-size",
+    "value": "10.5px (in `font`)",
+    "snap": "--text-label (11px)"
+   },
+   {
+    "prop": "background",
+    "value": "var(--down)",
+    "snap": "--color-action (DS: unread counts are action)"
+   }
+  ],
+  "dup_of": [
+   358,
+   628,
+   1078,
+   1099,
+   1139
+  ],
+  "note": "Notification count. The prototype fills it with --down (red); the DS reserves danger for errors and falling trends and gives unread counts to --color-action, so it becomes action/action-ink (which also removes #2A0C08)."
+ },
+ {
+  "line": 64,
+  "selector": ".iconbtn .badge[hidden]",
+  "target": "utility:[hidden]",
+  "offtoken": [],
+  "dup_of": [
+   67,
+   91,
+   161,
+   190,
+   214,
+   238,
+   272,
+   327,
+   333,
+   367,
+   385,
+   397,
+   410,
+   441,
+   479,
+   608,
+   611,
+   663,
+   693,
+   734,
+   759,
+   906,
+   949,
+   972,
+   1000,
+   1131,
+   1170
+  ],
+  "note": "Redundant: L759 `[hidden]{display:none!important}` already does this. Delete."
+ },
+ {
+  "line": 65,
+  "selector": "#connectBtn",
+  "target": "component:Button/secondary/m",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "8px",
+    "snap": "8=--space-8"
+   },
+   {
+    "prop": "max-width",
+    "value": "220px",
+    "snap": "drop: truncate inside the header Cluster (container query), not a fixed 220px"
+   }
+  ],
+  "dup_of": [
+   43,
+   80,
+   543,
+   772,
+   810,
+   896,
+   1072
+  ],
+  "note": "The connect button: markup says `.primary`, L1087 repaints it as secondary, and app.js:3770 swaps the class to `ghost` once connected: the look is picked by swapping classes. Leading Avatar slot (`.who`)."
+ },
+ {
+  "line": 66,
+  "selector": "#connectBtn .who",
+  "target": "component:Avatar/24",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "22px",
+    "snap": "Avatar size 24 (DS sizes 20/24/48)"
+   },
+   {
+    "prop": "height",
+    "value": "22px",
+    "snap": "Avatar size 24 (DS sizes 20/24/48)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "50%",
+    "snap": "--radius-pill (999px) on a square"
+   },
+   {
+    "prop": "background",
+    "value": "conic-gradient(from 40deg, #5CF2C8, #8FB8FF, #FFC46B, #5CF2C",
+    "snap": "art: gradient (scene/brand/avatar art, not a token)"
+   }
+  ],
+  "dup_of": [
+   106,
+   142,
+   143,
+   279,
+   372,
+   613,
+   715,
+   1008
+  ],
+  "note": "Placeholder avatar before login (conic gradient #5CF2C8/#8FB8FF/#FFC46B). #8FB8FF is in no token. The DS avatar is a generated astronaut, so this gradient disappears."
+ },
+ {
+  "line": 67,
+  "selector": "#connectBtn .who[hidden]",
+  "target": "utility:[hidden]",
+  "offtoken": [],
+  "dup_of": [
+   64,
+   91,
+   161,
+   190,
+   214,
+   238,
+   272,
+   327,
+   333,
+   367,
+   385,
+   397,
+   410,
+   441,
+   479,
+   608,
+   611,
+   663,
+   693,
+   734,
+   759,
+   906,
+   949,
+   972,
+   1000,
+   1131,
+   1170
+  ],
+  "note": "Redundant with L759."
+ },
+ {
+  "line": 68,
+  "selector": "#connectText",
+  "target": "utility:truncate",
+  "offtoken": [],
+  "dup_of": [
+   53,
+   89,
+   147,
+   168,
+   182,
+   245,
+   260,
+   267,
+   349,
+   392,
+   568,
+   574,
+   580,
+   615,
+   837,
+   930,
+   1017,
+   1033,
+   1063
+  ],
+  "note": "NEW utility (the DS lists only visually-hidden and the flow space): the same three ellipsis declarations are repeated in 20 rules (dup_of), so it earns a class."
+ },
+ {
+  "line": 71,
+  "selector": "#leftdock",
+  "target": "region:SearchDrawer",
+  "offtoken": [
+   {
+    "prop": "top",
+    "value": "var(--top)",
+    "snap": "var(--top) -> drop: zero or region size, see L6"
+   },
+   {
+    "prop": "bottom",
+    "value": "var(--bottom)",
+    "snap": "var(--bottom) -> drop: zero or region size, see L6"
+   },
+   {
+    "prop": "width",
+    "value": "var(--left)",
+    "snap": "var(--left) -> drop: zero or region size, see L6"
+   }
+  ],
+  "dup_of": [
+   486,
+   487
+  ],
+  "note": "NEW: the left drawer (no DS region fits). The DS Layout has no left drawer; it now holds only the places search and list (+ the place card when Jarvis flies you). Top, bottom and width are overridden with !important (L486: 0, 0, 360px). Slice 5's ⌘K search suggests a command-palette Dialog instead."
+ },
+ {
+  "line": 72,
+  "selector": "#explored",
+  "target": "feature:passport-progress",
+  "offtoken": [
+   {
+    "prop": "grid-template-columns",
+    "value": "96px minmax(0, 1fr)",
+    "snap": "96->keep raw (comment: intrinsic size)"
+   },
+   {
+    "prop": "gap",
+    "value": "16px",
+    "snap": "16=--space-16"
+   }
+  ],
+  "dup_of": [],
+  "note": "Slice 8. Worlds-visited arc + count + explore button, always shown at the top of the drawer. L830 `#places #explored{display:none}` never matches (#explored is a sibling of #places), so it shows."
+ },
+ {
+  "line": 73,
+  "selector": "#explored svg",
+  "target": "component:Progress/arc",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "96px",
+    "snap": "keep raw (comment: the arc's own size, viewBox 120x66)"
+   },
+   {
+    "prop": "height",
+    "value": "54px",
+    "snap": "keep raw (comment: the arc's own size, viewBox 120x66)"
+   }
+  ],
+  "dup_of": [
+   74,
+   75,
+   461,
+   462
+  ],
+  "note": "SVG arc box 96x54 (viewBox 120x66). Intrinsic to the arc: keep as a component-local size with a comment."
+ },
+ {
+  "line": 74,
+  "selector": "#explored .track",
+  "target": "component:Progress/arc/track",
+  "offtoken": [
+   {
+    "prop": "stroke",
+    "value": "rgba(255, 255, 255, 0.12)",
+    "snap": "--color-line"
+   }
+  ],
+  "dup_of": [
+   75,
+   461,
+   462
+  ],
+  "note": "Same arc track as `.gauge .gt` (L461)."
+ },
+ {
+  "line": 75,
+  "selector": "#explored .fill",
+  "target": "component:Progress/arc/fill",
+  "offtoken": [
+   {
+    "prop": "transition",
+    "value": "stroke-dasharray 0.8s",
+    "snap": "0.8s->--motion-slow"
+   },
+   {
+    "prop": "stroke",
+    "value": "url(#arcGrad): #F2EFEA > #FFC46B > #FF9C4A",
+    "snap": "--color-primary > --color-warm (#FF9C4A has no token: snap to the warm)"
+   }
+  ],
+  "dup_of": [
+   74,
+   461,
+   462
+  ],
+  "note": "Gradient #F2EFEA > #FFC46B > #FF9C4A defined in the markup (#arcGrad): #FF9C4A has no token (snap to --color-warm). 0.8s sweep is longer than any DS duration."
+ },
+ {
+  "line": 76,
+  "selector": "#explored .gv",
+  "target": "component:Stat/number",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "28px",
+    "snap": "--text-title-m (28px)"
+   }
+  ],
+  "dup_of": [
+   36,
+   57,
+   100,
+   423,
+   517,
+   523,
+   538,
+   653,
+   684,
+   771,
+   795
+  ],
+  "note": "28px number, on the DS scale (title-m)."
+ },
+ {
+  "line": 77,
+  "selector": "#explored .glab",
+  "target": "component:Kicker",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "10.5px (in `font`)",
+    "snap": "--text-label (11px)"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "0.14em",
+    "snap": "--text-label tracking (0.14em) ="
+   }
+  ],
+  "dup_of": [
+   35,
+   53,
+   93,
+   151,
+   175,
+   232,
+   244,
+   282,
+   310,
+   537,
+   547,
+   628,
+   792,
+   925,
+   942,
+   987,
+   994,
+   1025,
+   1044,
+   1047,
+   1063,
+   1141,
+   1149,
+   1162,
+   1166
+  ],
+  "note": "Identical to base `small` once on the token (10.5px -> 11px): the rule becomes redundant."
+ },
+ {
+  "line": 78,
+  "selector": "#explored .col",
+  "target": "composition:Stack",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "6px",
+    "snap": "6->--space-8"
+   }
+  ],
+  "dup_of": [
+   56
+  ],
+  "note": "Column with start alignment: a Stack."
+ },
+ {
+  "line": 79,
+  "selector": "#signalsText",
+  "target": "component:Stat/caption",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "10.5px",
+    "snap": "--text-label (11px)"
+   }
+  ],
+  "dup_of": [
+   35,
+   53,
+   77,
+   93,
+   151,
+   175,
+   232,
+   244,
+   282,
+   310,
+   537,
+   547,
+   628,
+   792,
+   925,
+   942,
+   987,
+   994,
+   1025,
+   1044,
+   1047,
+   1063,
+   1141,
+   1149,
+   1162,
+   1166
+  ],
+  "note": "Signals count in --color-signal (mono): a Stat caption with a tone."
+ },
+ {
+  "line": 80,
+  "selector": "#exploreBtn",
+  "target": "component:Button/secondary/s",
+  "offtoken": [
+   {
+    "prop": "height",
+    "value": "32px",
+    "snap": "32=--control-s"
+   },
+   {
+    "prop": "padding",
+    "value": "0 12px",
+    "snap": "12=--space-12"
+   },
+   {
+    "prop": "font-size",
+    "value": "12px",
+    "snap": "--text-ui (13px, weight 500) by role: DS sets controls, chips and tabs at 13"
+   }
+  ],
+  "dup_of": [
+   43,
+   543,
+   772,
+   810,
+   896,
+   1072
+  ],
+  "note": "`.ghost` shrunk to 32px/12px: DS Button has sizes m, l, xl only; add s (--control-s) or this is a Chip. Duplicate of the hero's own 'Go explore' (#hExplore, L543-L544)."
+ },
+ {
+  "line": 81,
+  "selector": "#leftbody",
+  "target": "utility:scroll-body",
+  "offtoken": [],
+  "dup_of": [
+   137,
+   169,
+   252,
+   551,
+   928
+  ],
+  "note": "NEW utility: flex child that scrolls (`flex:1; min-height:0; overflow:auto`), repeated in 6 rules, none of which a composition covers."
+ },
+ {
+  "line": 82,
+  "selector": "#places",
+  "target": "composition:Stack",
+  "offtoken": [
+   {
+    "prop": "padding",
+    "value": "16px var(--pad) 24px",
+    "snap": "16=--space-16; 24=--space-24; var(--pad)->--gutter (NEW TOKEN, fluid 16-24px, see L6)"
+   },
+   {
+    "prop": "gap",
+    "value": "8px",
+    "snap": "8=--space-8"
+   }
+  ],
+  "dup_of": [
+   98,
+   196
+  ],
+  "note": "Search field + list in a column (gap 8); the padding is the drawer's gutter, not the Stack's."
+ },
+ {
+  "line": 83,
+  "selector": "#search",
+  "target": "component:Field/search",
+  "offtoken": [
+   {
+    "prop": "height",
+    "value": "40px",
+    "snap": "40=--control-m"
+   },
+   {
+    "prop": "border-radius",
+    "value": "999px",
+    "snap": "--radius-l (16px): DS puts inputs at radius-l; the prototype gives the same role 999, 16, 12 and 10"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.05)",
+    "snap": "NEW TOKEN --color-fill = rgba(255,255,255,0.05): idle field/chip/row fill"
+   },
+   {
+    "prop": "padding",
+    "value": "0 16px",
+    "snap": "16=--space-16"
+   },
+   {
+    "prop": "font-size",
+    "value": "13px (in `font`)",
+    "snap": "--text-ui (13px)"
+   }
+  ],
+  "dup_of": [
+   131,
+   197,
+   264,
+   283,
+   311,
+   894,
+   1073
+  ],
+  "note": "Search field. Radius 999 here, 16 for the composer, 12 for the name field, 10 for #roomPop .rfind: four radii for one component."
+ },
+ {
+  "line": 84,
+  "selector": "#placeList",
+  "target": "composition:Stack",
+  "offtoken": [],
+  "dup_of": [
+   92,
+   711,
+   974,
+   988
+  ],
+  "note": "Plain column."
+ },
+ {
+  "line": 85,
+  "selector": "#placeList small",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: fully overridden by the inline style renderList sets on every <small> (app.js:1147: `display:block; padding:10px 6px 4px`); inline styles beat this rule. The inline style should become a class."
+ },
+ {
+  "line": 86,
+  "selector": ".place",
+  "target": "component:Row/place",
+  "offtoken": [
+   {
+    "prop": "grid-template-columns",
+    "value": "12px minmax(0, 1fr) auto",
+    "snap": "12=--space-12"
+   },
+   {
+    "prop": "gap",
+    "value": "12px",
+    "snap": "12=--space-12"
+   },
+   {
+    "prop": "min-height",
+    "value": "40px",
+    "snap": "40=--control-m"
+   },
+   {
+    "prop": "padding",
+    "value": "0 8px",
+    "snap": "8=--space-8"
+   },
+   {
+    "prop": "margin",
+    "value": "0 -8px",
+    "snap": "-8=--space-8"
+   },
+   {
+    "prop": "border-radius",
+    "value": "8px",
+    "snap": "8=--radius-s"
+   },
+   {
+    "prop": "font-size",
+    "value": "13px",
+    "snap": "--text-ui (13px)"
+   }
+  ],
+  "dup_of": [
+   105,
+   117,
+   402,
+   431,
+   474,
+   552,
+   713,
+   833,
+   865,
+   929,
+   934,
+   975,
+   1049,
+   1106
+  ],
+  "note": "List row: dot + name + count. `margin:0 -8px` is an outer margin used to bleed the hover (DS check_css forbids it). Min-height 40 = control-m. Its dot is a PlanetThumb in the DS."
+ },
+ {
+  "line": 87,
+  "selector": ".place:hover, .place[aria-current=\"true\"]",
+  "target": "component:Row/place/hover",
+  "offtoken": [
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.07)",
+    "snap": "--color-fill-strong (NEW TOKEN rgba(255,255,255,0.10))"
+   }
+  ],
+  "dup_of": [
+   86,
+   105,
+   117,
+   402,
+   431,
+   474,
+   552,
+   713,
+   833,
+   865,
+   929,
+   934,
+   975,
+   1049,
+   1106
+  ],
+  "note": "Hover and current state: current is read from [aria-current] (DS ok)."
+ },
+ {
+  "line": 88,
+  "selector": ".place .dot",
+  "target": "component:PlanetThumb/dot",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "12px",
+    "snap": "12=--space-12"
+   },
+   {
+    "prop": "height",
+    "value": "12px",
+    "snap": "12=--space-12"
+   },
+   {
+    "prop": "border-radius",
+    "value": "50%",
+    "snap": "--radius-pill (999px) on a square"
+   },
+   {
+    "prop": "box-shadow",
+    "value": "inset -3px -2px 4px rgba(0, 0, 0, 0.55)",
+    "snap": "art: planet shading (Avatar/PlanetThumb)"
+   }
+  ],
+  "dup_of": [
+   931,
+   933,
+   935
+  ],
+  "note": "12px colored dot with inset shading, a PlanetThumb at its smallest size; the DS PlanetThumb renders from the same look as the 3D world."
+ },
+ {
+  "line": 89,
+  "selector": ".place .nm",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   68
+  ],
+  "note": "dead: no element matches. renderList makes the name a bare <span> (app.js:1155); `.nm` exists only in `.hubcard` (L419) and one person-card line."
+ },
+ {
+  "line": 90,
+  "selector": ".place .n",
+  "target": "component:Row/activity-slot",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "11px",
+    "snap": "--text-label (11px)"
+   }
+  ],
+  "dup_of": [
+   108,
+   357,
+   477,
+   605
+  ],
+  "note": "The count column (people here). Same style as `.people .v` (L108), `.roomlist .v` (L477) and `.label .n` (L357)."
+ },
+ {
+  "line": 91,
+  "selector": "#card[hidden], #places[hidden], #guide[hidden]",
+  "target": "utility:[hidden]",
+  "offtoken": [],
+  "dup_of": [
+   64,
+   67,
+   161,
+   190,
+   214,
+   238,
+   272,
+   327,
+   333,
+   367,
+   385,
+   397,
+   410,
+   441,
+   479,
+   608,
+   611,
+   663,
+   693,
+   734,
+   759,
+   906,
+   949,
+   972,
+   1000,
+   1131,
+   1170
+  ],
+  "note": "Redundant: L759 already hides every [hidden]; the `!important` is also what the DS bans."
+ },
+ {
+  "line": 92,
+  "selector": "#card",
+  "target": "feature:place-card",
+  "offtoken": [],
+  "dup_of": [
+   84,
+   711,
+   974,
+   988
+  ],
+  "note": "Slice 5. The world card in the drawer. Reachable only while the drawer is open (after a Jarvis action or from a search): the Plate (#fLeft, L672) shows the same facts, so slice 5's page for a world should be one view."
+ },
+ {
+  "line": 93,
+  "selector": "#card .back",
+  "target": "component:Button/text",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "8px",
+    "snap": "8=--space-8"
+   },
+   {
+    "prop": "height",
+    "value": "48px",
+    "snap": "--control-l (44px): 48 is not a control size"
+   },
+   {
+    "prop": "font-size",
+    "value": "11px (in `font`)",
+    "snap": "--text-label (11px)"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "0.08em",
+    "snap": "--text-label tracking (0.14em)"
+   },
+   {
+    "prop": "padding",
+    "value": "0 var(--pad)",
+    "snap": "var(--pad) -> --gutter (NEW TOKEN, fluid 16-24px, see L6)"
+   }
+  ],
+  "dup_of": [
+   35,
+   53,
+   77,
+   151,
+   175,
+   232,
+   244,
+   282,
+   310,
+   511,
+   537,
+   547,
+   559,
+   628,
+   674,
+   792,
+   803,
+   925,
+   942,
+   987,
+   994,
+   1025,
+   1044,
+   1047,
+   1063,
+   1141,
+   1149,
+   1162,
+   1166
+  ],
+  "note": "Back button 'Cosmos' in mono caps with a typed `‹` in the markup (DS: no typed arrows, an Icon). Height 48 is not a control size."
+ },
+ {
+  "line": 94,
+  "selector": "#card h2",
+  "target": "feature:place-card",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "36px",
+    "snap": "--text-title-l (36px)"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "-0.035em",
+    "snap": "title tracking -0.03em (--text-title-m/l)"
+   },
+   {
+    "prop": "line-height",
+    "value": "1.02",
+    "snap": "NEW TOKEN --leading-tight = 1 (display numbers and titles)"
+   }
+  ],
+  "dup_of": [
+   122,
+   136,
+   275,
+   292,
+   308,
+   411,
+   426,
+   480,
+   649,
+   679,
+   1045,
+   1095,
+   1163
+  ],
+  "note": "Slice 5. Card title, 36px/300 = title-l, tracking -0.035em should be -0.03em, line-height 1.02 should be a token. The Plate uses --text-display for the same name."
+ },
+ {
+  "line": 95,
+  "selector": "#card h2 .soft",
+  "target": "feature:place-card",
+  "offtoken": [
+   {
+    "prop": "color",
+    "value": "var(--soft) #8E99AD",
+    "snap": "--color-text-muted"
+   }
+  ],
+  "dup_of": [
+   427
+  ],
+  "note": "Slice 5. Soft half of the name in --soft: the DS merged --soft into muted. Same rule as L427."
+ },
+ {
+  "line": 96,
+  "selector": "#cardDesc",
+  "target": "feature:place-card",
+  "offtoken": [
+   {
+    "prop": "margin",
+    "value": "12px 0 0",
+    "snap": "12=--space-12"
+   },
+   {
+    "prop": "font-size",
+    "value": "14px",
+    "snap": "--text-body (14px)"
+   },
+   {
+    "prop": "color",
+    "value": "#C8D0DE",
+    "snap": "--color-text (no mid grey in the DS)"
+   }
+  ],
+  "dup_of": [
+   428
+  ],
+  "note": "Slice 5. World description, 14/1.5 = --text-body exact. Same role as `#boardDetail .desc` (L428)."
+ },
+ {
+  "line": 97,
+  "selector": "#card .metrics",
+  "target": "composition:Grid",
+  "offtoken": [],
+  "dup_of": [
+   113
+  ],
+  "note": "Two equal columns: `Grid` with repeat(2, 1fr)."
+ },
+ {
+  "line": 98,
+  "selector": "#card .metrics div",
+  "target": "component:Stat/cell",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "8px",
+    "snap": "8=--space-8"
+   },
+   {
+    "prop": "padding",
+    "value": "16px var(--pad)",
+    "snap": "16=--space-16; var(--pad)->--gutter (NEW TOKEN, fluid 16-24px, see L6)"
+   }
+  ],
+  "dup_of": [
+   55,
+   114,
+   391,
+   457,
+   652,
+   683,
+   699,
+   989
+  ],
+  "note": "Stat cell (number + caption stacked)."
+ },
+ {
+  "line": 99,
+  "selector": "#card .metrics div + div",
+  "target": "component:Divider",
+  "offtoken": [],
+  "dup_of": [
+   46,
+   114,
+   115,
+   683,
+   699,
+   831,
+   857,
+   989,
+   1032,
+   1142,
+   1148
+  ],
+  "note": "Vertical hairline between the two cells."
+ },
+ {
+  "line": 100,
+  "selector": "#card .metrics .big",
+  "target": "component:Stat/number",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "40px",
+    "snap": "--text-title-l (36px)"
+   }
+  ],
+  "dup_of": [
+   36,
+   57,
+   423,
+   517,
+   523,
+   538,
+   653,
+   684,
+   771,
+   795
+  ],
+  "note": "40px has no token: nearest is title-l 36."
+ },
+ {
+  "line": 101,
+  "selector": "#card .chips",
+  "target": "composition:Cluster",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "8px",
+    "snap": "8=--space-8"
+   }
+  ],
+  "dup_of": [
+   129,
+   429,
+   741,
+   917,
+   1029
+  ],
+  "note": "Wrapping row of chips, gap 8. Same rule at L429 and L917."
+ },
+ {
+  "line": 102,
+  "selector": "#card .hist",
+  "target": "component:ActivityChart",
+  "offtoken": [
+   {
+    "prop": "height",
+    "value": "40px",
+    "snap": "40=--control-m"
+   },
+   {
+    "prop": "margin-top",
+    "value": "8px",
+    "snap": "8=--space-8"
+   }
+  ],
+  "dup_of": [
+   58,
+   424,
+   524,
+   529,
+   541,
+   778
+  ],
+  "note": "Histogram svg; height 40 is the chart's own size: ActivityChart prop."
+ },
+ {
+  "line": 103,
+  "selector": "#card .histlabels",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: no element has class `histlabels` (markup or app.js)."
+ },
+ {
+  "line": 104,
+  "selector": ".people",
+  "target": "utility:list-reset",
+  "offtoken": [
+   {
+    "prop": "margin",
+    "value": "8px 0 0",
+    "snap": "drop: outer margin, the parent Stack spaces it"
+   }
+  ],
+  "dup_of": [
+   123,
+   137,
+   169,
+   296,
+   401,
+   430,
+   473,
+   862,
+   888,
+   1015,
+   1055,
+   1066
+  ],
+  "note": "NEW utility (or base `ol,ul` once lists are reset globally): `list-style:none; margin:0; padding:0` is repeated for every list in the file; `margin: 8px 0 0` is an outer margin."
+ },
+ {
+  "line": 105,
+  "selector": ".people li",
+  "target": "component:Row/person",
+  "offtoken": [
+   {
+    "prop": "grid-template-columns",
+    "value": "24px minmax(0, 1fr) 18px 48px",
+    "snap": "24=--hit-min; 18->--space-16; 48=--space-48"
+   },
+   {
+    "prop": "gap",
+    "value": "10px",
+    "snap": "10->--space-12"
+   },
+   {
+    "prop": "height",
+    "value": "40px",
+    "snap": "40=--control-m"
+   },
+   {
+    "prop": "font-size",
+    "value": "13px",
+    "snap": "--text-ui (13px)"
+   }
+  ],
+  "dup_of": [
+   86,
+   117,
+   402,
+   431,
+   474,
+   552,
+   713,
+   833,
+   865,
+   929,
+   934,
+   975,
+   1049,
+   1106
+  ],
+  "note": "Person row: avatar 24 | name | country code 18 | count 48, in a 40px row. Used for 'speaking now' and the chat side panel ('Here now', slice 4)."
+ },
+ {
+  "line": 106,
+  "selector": ".people .av",
+  "target": "component:Avatar/24",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "24px",
+    "snap": "Avatar size 24"
+   },
+   {
+    "prop": "height",
+    "value": "24px",
+    "snap": "Avatar size 24"
+   },
+   {
+    "prop": "border-radius",
+    "value": "50%",
+    "snap": "--radius-pill (999px) on a square"
+   },
+   {
+    "prop": "box-shadow",
+    "value": "inset -5px -3px 6px rgba(0, 0, 0, 0.65), inset 2px 1px 4px rgba(255, 255, 255, 0.25)",
+    "snap": "art: planet shading (Avatar/PlanetThumb)"
+   }
+  ],
+  "dup_of": [
+   66,
+   142,
+   143,
+   279,
+   372,
+   613,
+   715,
+   1008
+  ],
+  "note": "Avatar at 24 with its own shading: the same circle as `.av` (L142, 20px) and `.dm .av` (L715, 22px): one Avatar with sizes 20/24/48."
+ },
+ {
+  "line": 107,
+  "selector": ".people .fl",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   1078
+  ],
+  "note": "dead: fully overridden by `.fl {font: 500 9px/1.2 var(--mono) !important}` (L1078), which sets font-size and line-height with !important."
+ },
+ {
+  "line": 108,
+  "selector": ".people .v",
+  "target": "component:Row/activity-slot",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "11px",
+    "snap": "--text-label (11px)"
+   }
+  ],
+  "dup_of": [
+   90,
+   357,
+   477,
+   605
+  ],
+  "note": "Count/value column, mono tabular."
+ },
+ {
+  "line": 109,
+  "selector": ".cbar",
+  "target": "component:Progress/bar",
+  "offtoken": [
+   {
+    "prop": "height",
+    "value": "6px",
+    "snap": "6->--space-8"
+   },
+   {
+    "prop": "border-radius",
+    "value": "999px",
+    "snap": "999=--radius-pill"
+   },
+   {
+    "prop": "gap",
+    "value": "2px",
+    "snap": "2->--space-4"
+   },
+   {
+    "prop": "margin-top",
+    "value": "12px",
+    "snap": "12=--space-12"
+   }
+  ],
+  "dup_of": [
+   393,
+   475,
+   1028
+  ],
+  "note": "Segmented share bar (country mix), 6px high with 2px gaps; segments get their colours inline from CCOL (app.js:1326), 6 colours of which #8FB8FF is in no token."
+ },
+ {
+  "line": 110,
+  "selector": ".ckey",
+  "target": "feature:place-card",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "6px 12px",
+    "snap": "6->--space-8; 12=--space-12"
+   },
+   {
+    "prop": "margin-top",
+    "value": "12px",
+    "snap": "12=--space-12"
+   },
+   {
+    "prop": "font-size",
+    "value": "12px",
+    "snap": "--text-meta (12px)"
+   },
+   {
+    "prop": "color",
+    "value": "#C8D0DE",
+    "snap": "--color-text (no mid grey in the DS)"
+   }
+  ],
+  "dup_of": [],
+  "note": "Slice 5. Legend grid for the bar above. Text #C8D0DE is the 'mid grey' that has no DS token."
+ },
+ {
+  "line": 111,
+  "selector": ".ckey span",
+  "target": "composition:Cluster",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "8px",
+    "snap": "8=--space-8"
+   }
+  ],
+  "dup_of": [
+   297,
+   417,
+   465,
+   516,
+   591,
+   890,
+   1006,
+   1016,
+   1056,
+   1069
+  ],
+  "note": "Swatch + label in a row."
+ },
+ {
+  "line": 112,
+  "selector": ".ckey i",
+  "target": "component:Progress/bar",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "8px",
+    "snap": "8=--space-8"
+   },
+   {
+    "prop": "height",
+    "value": "8px",
+    "snap": "8=--space-8"
+   },
+   {
+    "prop": "border-radius",
+    "value": "2px",
+    "snap": "--radius-pill: the swatch becomes a dot, like Kicker"
+   }
+  ],
+  "dup_of": [
+   1070,
+   1155
+  ],
+  "note": "Legend swatch. Radius 2px has no token; at 8px the nearest (--radius-s 8) makes a dot, which also matches the Kicker dot."
+ },
+ {
+  "line": 113,
+  "selector": "#card .tiles",
+  "target": "composition:Grid",
+  "offtoken": [],
+  "dup_of": [
+   97
+  ],
+  "note": "Two columns of facts."
+ },
+ {
+  "line": 114,
+  "selector": "#card .tiles div",
+  "target": "component:Stat/cell",
+  "offtoken": [
+   {
+    "prop": "padding",
+    "value": "16px var(--pad)",
+    "snap": "16=--space-16; var(--pad)->--gutter (NEW TOKEN, fluid 16-24px, see L6)"
+   },
+   {
+    "prop": "gap",
+    "value": "6px",
+    "snap": "6->--space-8"
+   }
+  ],
+  "dup_of": [
+   55,
+   98,
+   391,
+   457,
+   652,
+   683,
+   699,
+   989
+  ],
+  "note": "Fact cell with a hairline under it."
+ },
+ {
+  "line": 115,
+  "selector": "#card .tiles div:nth-child(2n)",
+  "target": "component:Divider",
+  "offtoken": [],
+  "dup_of": [
+   46,
+   99,
+   114,
+   683,
+   699,
+   831,
+   857,
+   989,
+   1032,
+   1142,
+   1148
+  ],
+  "note": "Hairline between columns, read by position (`:nth-child(2n)`): fragile if a tile count is odd."
+ },
+ {
+  "line": 116,
+  "selector": "#card .tiles b",
+  "target": "component:Stat/cell",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "13px",
+    "snap": "--text-ui (13px)"
+   }
+  ],
+  "dup_of": [],
+  "note": "Fact value 13px/400 (the cell's caption is a <small> label)."
+ },
+ {
+  "line": 117,
+  "selector": "#cardNearby button",
+  "target": "component:Row/nearby",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "12px",
+    "snap": "12=--space-12"
+   },
+   {
+    "prop": "height",
+    "value": "40px",
+    "snap": "40=--control-m"
+   },
+   {
+    "prop": "font-size",
+    "value": "13px",
+    "snap": "--text-ui (13px)"
+   }
+  ],
+  "dup_of": [
+   86,
+   105,
+   402,
+   431,
+   474,
+   552,
+   713,
+   833,
+   865,
+   929,
+   934,
+   975,
+   1049,
+   1106
+  ],
+  "note": "Row: name + travel time. Height 40 = control-m."
+ },
+ {
+  "line": 118,
+  "selector": "#card .seed",
+  "target": "component:Stat/caption",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "10.5px",
+    "snap": "--text-label (11px)"
+   }
+  ],
+  "dup_of": [
+   433
+  ],
+  "note": "Mono 10.5px seed line. Same as `#boardDetail .seed` (L433)."
+ },
+ {
+  "line": 119,
+  "selector": "#card .actions",
+  "target": "composition:Grid",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "8px",
+    "snap": "8=--space-8"
+   },
+   {
+    "prop": "padding",
+    "value": "16px var(--pad) 24px",
+    "snap": "16=--space-16; 24=--space-24; var(--pad)->--gutter (NEW TOKEN, fluid 16-24px, see L6)"
+   }
+  ],
+  "dup_of": [],
+  "note": "Two equal buttons (Ask Jarvis, Follow). The padding is the drawer's."
+ },
+ {
+  "line": 120,
+  "selector": "#guide",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: the whole #guide view is never shown. app.js:1574 `leftView` hides #guide unless called with 'guide', and nothing calls it that way: setGuide() (app.js:3620) opens the chat with '@jarvis ' instead. #guideLog, #guideSuggest, #guideForm and #guideInput have no JS at all."
+ },
+ {
+  "line": 121,
+  "selector": "#guide .top",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   1094
+  ],
+  "note": "dead: the whole #guide view is never shown. app.js:1574 `leftView` hides #guide unless called with 'guide', and nothing calls it that way: setGuide() (app.js:3620) opens the chat with '@jarvis ' instead. #guideLog, #guideSuggest, #guideForm and #guideInput have no JS at all."
+ },
+ {
+  "line": 122,
+  "selector": "#guide .top b",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: the whole #guide view is never shown. app.js:1574 `leftView` hides #guide unless called with 'guide', and nothing calls it that way: setGuide() (app.js:3620) opens the chat with '@jarvis ' instead. #guideLog, #guideSuggest, #guideForm and #guideInput have no JS at all."
+ },
+ {
+  "line": 123,
+  "selector": "#guideLog",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: the whole #guide view is never shown. app.js:1574 `leftView` hides #guide unless called with 'guide', and nothing calls it that way: setGuide() (app.js:3620) opens the chat with '@jarvis ' instead. #guideLog, #guideSuggest, #guideForm and #guideInput have no JS at all."
+ },
+ {
+  "line": 124,
+  "selector": "#guideLog li",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: the whole #guide view is never shown. app.js:1574 `leftView` hides #guide unless called with 'guide', and nothing calls it that way: setGuide() (app.js:3620) opens the chat with '@jarvis ' instead. #guideLog, #guideSuggest, #guideForm and #guideInput have no JS at all."
+ },
+ {
+  "line": 125,
+  "selector": "#guideLog li p",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: the whole #guide view is never shown. app.js:1574 `leftView` hides #guide unless called with 'guide', and nothing calls it that way: setGuide() (app.js:3620) opens the chat with '@jarvis ' instead. #guideLog, #guideSuggest, #guideForm and #guideInput have no JS at all."
+ },
+ {
+  "line": 126,
+  "selector": "#guideLog li.you",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: the whole #guide view is never shown. app.js:1574 `leftView` hides #guide unless called with 'guide', and nothing calls it that way: setGuide() (app.js:3620) opens the chat with '@jarvis ' instead. #guideLog, #guideSuggest, #guideForm and #guideInput have no JS at all."
+ },
+ {
+  "line": 127,
+  "selector": "#guideLog li.you p",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   251,
+   343,
+   400,
+   503,
+   558,
+   600,
+   714
+  ],
+  "note": "dead: the whole #guide view is never shown. app.js:1574 `leftView` hides #guide unless called with 'guide', and nothing calls it that way: setGuide() (app.js:3620) opens the chat with '@jarvis ' instead. #guideLog, #guideSuggest, #guideForm and #guideInput have no JS at all."
+ },
+ {
+  "line": 128,
+  "selector": "#guideLog .acts",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: the whole #guide view is never shown. app.js:1574 `leftView` hides #guide unless called with 'guide', and nothing calls it that way: setGuide() (app.js:3620) opens the chat with '@jarvis ' instead. #guideLog, #guideSuggest, #guideForm and #guideInput have no JS at all."
+ },
+ {
+  "line": 129,
+  "selector": "#guideSuggest",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   101,
+   429,
+   741,
+   1029
+  ],
+  "note": "dead: the whole #guide view is never shown. app.js:1574 `leftView` hides #guide unless called with 'guide', and nothing calls it that way: setGuide() (app.js:3620) opens the chat with '@jarvis ' instead. #guideLog, #guideSuggest, #guideForm and #guideInput have no JS at all."
+ },
+ {
+  "line": 130,
+  "selector": "#guideForm",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   287,
+   313,
+   843,
+   893,
+   1017
+  ],
+  "note": "dead: the whole #guide view is never shown. app.js:1574 `leftView` hides #guide unless called with 'guide', and nothing calls it that way: setGuide() (app.js:3620) opens the chat with '@jarvis ' instead. #guideLog, #guideSuggest, #guideForm and #guideInput have no JS at all."
+ },
+ {
+  "line": 131,
+  "selector": "#guideInput",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: the whole #guide view is never shown. app.js:1574 `leftView` hides #guide unless called with 'guide', and nothing calls it that way: setGuide() (app.js:3620) opens the chat with '@jarvis ' instead. #guideLog, #guideSuggest, #guideForm and #guideInput have no JS at all."
+ },
+ {
+  "line": 134,
+  "selector": "#chat",
+  "target": "region:ChatDock",
+  "offtoken": [
+   {
+    "prop": "top",
+    "value": "var(--top)",
+    "snap": "var(--top) -> drop: zero or region size, see L6"
+   },
+   {
+    "prop": "bottom",
+    "value": "var(--bottom)",
+    "snap": "var(--bottom) -> drop: zero or region size, see L6"
+   },
+   {
+    "prop": "width",
+    "value": "var(--right)",
+    "snap": "var(--right) -> drop: zero or region size, see L6"
+   }
+  ],
+  "dup_of": [
+   488,
+   632,
+   874,
+   876,
+   914,
+   915,
+   959
+  ],
+  "note": "Chat dock. Top, bottom and width are overridden with !important (L488: 0, 0, 400px), then re-set per breakpoint (L874, L876); only `right:0`, the border and `display:flex` still count. DS: 360px, 320px under 1400px."
+ },
+ {
+  "line": 135,
+  "selector": "#chat .head",
+  "target": "region:ChatDock",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "8px",
+    "snap": "8=--space-8"
+   },
+   {
+    "prop": "padding",
+    "value": "16px var(--pad)",
+    "snap": "16=--space-16; var(--pad)->--gutter (NEW TOKEN, fluid 16-24px, see L6)"
+   }
+  ],
+  "dup_of": [
+   572,
+   633,
+   1043,
+   1094
+  ],
+  "note": "Dock header. L572 makes it a grid (display, align-items, gap overridden), so `display:flex`, `align-items:baseline`, `gap:8px` and `justify-content` are dead; padding and border remain."
+ },
+ {
+  "line": 136,
+  "selector": "#chat .head b",
+  "target": "region:ChatDock",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "28px",
+    "snap": "--text-title-m (28px)"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "-0.03em",
+    "snap": "title tracking -0.03em (--text-title-m/l)"
+   },
+   {
+    "prop": "line-height",
+    "value": "1",
+    "snap": "NEW TOKEN --leading-tight = 1 (display numbers and titles)"
+   }
+  ],
+  "dup_of": [
+   94,
+   122,
+   275,
+   292,
+   308,
+   411,
+   426,
+   480,
+   649,
+   679,
+   1045,
+   1095,
+   1163
+  ],
+  "note": "Room name 28px/300 = title-m (22px in the full-screen dock, L634: a second off-scale size). Line-height 1."
+ },
+ {
+  "line": 137,
+  "selector": "#chatList",
+  "target": "feature:chat-thread",
+  "offtoken": [
+   {
+    "prop": "padding",
+    "value": "16px var(--pad)",
+    "snap": "16=--space-16; var(--pad)->--gutter (NEW TOKEN, fluid 16-24px, see L6)"
+   },
+   {
+    "prop": "gap",
+    "value": "16px",
+    "snap": "16=--space-16"
+   }
+  ],
+  "dup_of": [
+   81,
+   169,
+   252,
+   551,
+   928
+  ],
+  "note": "Slice 4. The message list. Same list as #threadList (L169) and #fMsgs (L888). Padding is overridden in the full dock (L644), hidden while a thread is open (L162)."
+ },
+ {
+  "line": 138,
+  "selector": "#chatList li",
+  "target": "component:Message",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "13.5px",
+    "snap": "--text-body (14px)"
+   },
+   {
+    "prop": "line-height",
+    "value": "1.45",
+    "snap": "--text-body (1.5)"
+   },
+   {
+    "prop": "color",
+    "value": "#DDE3EE",
+    "snap": "--color-text (no mid grey in the DS)"
+   }
+  ],
+  "dup_of": [
+   141,
+   170,
+   889
+  ],
+  "note": "Message text 13.5px/1.45 in #DDE3EE, repeated three times: #chatList (L138), #threadList (L170), #fMsgs (L889). DS: --text-body 14/1.5 in --color-text."
+ },
+ {
+  "line": 139,
+  "selector": "#chatList li .meta",
+  "target": "component:Message/meta",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "8px",
+    "snap": "8=--space-8"
+   },
+   {
+    "prop": "margin-bottom",
+    "value": "2px",
+    "snap": "2->--space-4"
+   }
+  ],
+  "dup_of": [
+   171,
+   890
+  ],
+  "note": "Author line (avatar, code, name, time). Repeated at L171 and L890."
+ },
+ {
+  "line": 140,
+  "selector": "#chatList li .fl",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   1078
+  ],
+  "note": "dead: fully overridden by `.fl {font: ... !important}` (L1078)."
+ },
+ {
+  "line": 141,
+  "selector": "#chatList li",
+  "target": "component:Message",
+  "offtoken": [],
+  "dup_of": [
+   138
+  ],
+  "note": "Second rule on the same element: `position:relative` anchors the action bar. Merge into L138."
+ },
+ {
+  "line": 142,
+  "selector": ".av",
+  "target": "component:Avatar/20",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "20px",
+    "snap": "Avatar size 20"
+   },
+   {
+    "prop": "height",
+    "value": "20px",
+    "snap": "Avatar size 20"
+   },
+   {
+    "prop": "border-radius",
+    "value": "50%",
+    "snap": "--radius-pill (999px) on a square"
+   },
+   {
+    "prop": "box-shadow",
+    "value": "inset -4px -3px 6px rgba(0, 0, 0, 0.6)",
+    "snap": "art: planet shading (Avatar/PlanetThumb)"
+   }
+  ],
+  "dup_of": [
+   66,
+   106,
+   143,
+   279,
+   372,
+   613,
+   715,
+   1008
+  ],
+  "note": "Base avatar: 20px circle with a background texture (a planet photo, `./jupiter.jpg` etc.) and inset shading. DS Avatar is a generated astronaut, 20/24/48. Sizes in the file: 20, 22, 24, 26 (.bubble i), 40 (voice), 48."
+ },
+ {
+  "line": 143,
+  "selector": "#connectBtn .who.av",
+  "target": "component:Avatar/24",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "22px",
+    "snap": "Avatar size 24"
+   },
+   {
+    "prop": "height",
+    "value": "22px",
+    "snap": "Avatar size 24"
+   }
+  ],
+  "dup_of": [
+   66,
+   106,
+   142,
+   279,
+   372,
+   613,
+   715,
+   1008
+  ],
+  "note": "22px override for the connect-button avatar: becomes size 24."
+ },
+ {
+  "line": 144,
+  "selector": "#chatList .body",
+  "target": "component:Message/body",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Scoped to #chatList: the same `.body` in #threadList and #fMsgs (both built by msgParts) gets no pre-wrap or anywhere-wrap, so a multi-line message reflows differently in a thread."
+ },
+ {
+  "line": 145,
+  "selector": "#chatList .body a",
+  "target": "base",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Link colour, scoped to message bodies only. There is no base `a` in the prototype: underline, hover and visited come from the browser. Base `a` = --color-action."
+ },
+ {
+  "line": 146,
+  "selector": "#chatList .embed",
+  "target": "component:Message/embed",
+  "offtoken": [
+   {
+    "prop": "max-height",
+    "value": "220px",
+    "snap": "220->keep raw (comment: intrinsic size)"
+   },
+   {
+    "prop": "margin-top",
+    "value": "6px",
+    "snap": "6->--space-8"
+   },
+   {
+    "prop": "border-radius",
+    "value": "10px",
+    "snap": "10->--radius-m"
+   }
+  ],
+  "dup_of": [
+   257,
+   842,
+   986
+  ],
+  "note": "Image/video under a message. Max-height 220 is intrinsic; radius 10 is off the scale."
+ },
+ {
+  "line": 147,
+  "selector": "#chatList .quote",
+  "target": "component:Message/quote",
+  "offtoken": [
+   {
+    "prop": "margin",
+    "value": "0 0 4px 26px",
+    "snap": "4=--space-4; 26->--space-24"
+   },
+   {
+    "prop": "padding-left",
+    "value": "8px",
+    "snap": "8=--space-8"
+   },
+   {
+    "prop": "font-size",
+    "value": "12px",
+    "snap": "--text-meta (12px)"
+   }
+  ],
+  "dup_of": [
+   225,
+   923
+  ],
+  "note": "Reply quote. `margin-left:26px` is the avatar (20) + gap (8) minus 2: a magic number the Message grid should own. Same left bar as `.body blockquote` (L225)."
+ },
+ {
+  "line": 148,
+  "selector": "#chatList .quote b",
+  "target": "component:Message/quote",
+  "offtoken": [],
+  "dup_of": [
+   173,
+   272,
+   293,
+   319,
+   520,
+   548,
+   681,
+   891,
+   996
+  ],
+  "note": "Author in the quote."
+ },
+ {
+  "line": 149,
+  "selector": "#chatList .edited",
+  "target": "component:Message/edited",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "11px",
+    "snap": "--text-meta (12px): sentence-case sans, not a caps label"
+   }
+  ],
+  "dup_of": [],
+  "note": "'edited' mark, 11px sans."
+ },
+ {
+  "line": 150,
+  "selector": "#chatList li.reported",
+  "target": "component:Message/reported",
+  "offtoken": [
+   {
+    "prop": "opacity",
+    "value": "0.45",
+    "snap": "NEW TOKEN --opacity-dim = 0.4"
+   }
+  ],
+  "dup_of": [],
+  "note": "Reported message dimmed to .45: the DS has no opacity token; disabled buttons use .4 (L287) and .5 (L303)."
+ },
+ {
+  "line": 151,
+  "selector": "#chatList li.unread",
+  "target": "component:Divider/labelled",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "8px",
+    "snap": "8=--space-8"
+   },
+   {
+    "prop": "color",
+    "value": "#FF7A66",
+    "snap": "--color-action (DS: unread is action; this is a second red beside --down)"
+   },
+   {
+    "prop": "font-size",
+    "value": "10.5px (in `font`)",
+    "snap": "--text-label (11px)"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "0.12em",
+    "snap": "--text-label tracking (0.14em)"
+   }
+  ],
+  "dup_of": [
+   35,
+   53,
+   77,
+   93,
+   152,
+   175,
+   176,
+   232,
+   244,
+   282,
+   310,
+   537,
+   547,
+   628,
+   792,
+   925,
+   942,
+   987,
+   994,
+   1025,
+   1044,
+   1047,
+   1063,
+   1141,
+   1149,
+   1162,
+   1166
+  ],
+  "note": "'New' marker in a second red (#FF7A66) beside --down (#FF8A7A). DS: unread is --color-action. Same pattern as the thread separator (L175)."
+ },
+ {
+  "line": 152,
+  "selector": "#chatList li.unread::after",
+  "target": "component:Divider/labelled",
+  "offtoken": [
+   {
+    "prop": "background",
+    "value": "#FF7A66",
+    "snap": "color-mix(--color-action 50%) (NEW --tint-line 50%)"
+   },
+   {
+    "prop": "opacity",
+    "value": "0.6",
+    "snap": "drop: tint the line instead"
+   }
+  ],
+  "dup_of": [
+   151,
+   175,
+   176
+  ],
+  "note": "The line after the label. Tint at 50% of the colour instead of opacity .6."
+ },
+ {
+  "line": 153,
+  "selector": ".mact",
+  "target": "component:Popover/toolbar",
+  "offtoken": [
+   {
+    "prop": "top",
+    "value": "-16px",
+    "snap": "-16=--space-16"
+   },
+   {
+    "prop": "gap",
+    "value": "2px",
+    "snap": "2->--space-4"
+   },
+   {
+    "prop": "padding",
+    "value": "3px",
+    "snap": "3->--space-4"
+   },
+   {
+    "prop": "border-radius",
+    "value": "10px",
+    "snap": "10->--radius-m"
+   },
+   {
+    "prop": "background",
+    "value": "#0B0F18",
+    "snap": "= --color-surface-raised"
+   },
+   {
+    "prop": "box-shadow",
+    "value": "0 6px 18px rgba(0, 0, 0, 0.45)",
+    "snap": "NEW TOKEN --shadow-popover = 0 12px 32px rgba(0,0,0,0.55)"
+   },
+   {
+    "prop": "z-index",
+    "value": "2",
+    "snap": "drop: it is the last positioned child of a position:relative <li>; DOM order stacks it"
+   }
+  ],
+  "dup_of": [
+   189,
+   326,
+   332,
+   992,
+   1005
+  ],
+  "note": "Hover toolbar for a message (react, reply, thread, pin, more). Shadow (0 6px 18px) is a second popover shadow beside L189's 0 12px 32px. Radius 10 vs .pop 12."
+ },
+ {
+  "line": 154,
+  "selector": "#chatList li:hover .mact, #chatList li:focus-within .mact",
+  "target": "component:Popover/toolbar",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "The toolbar shows on :hover and :focus-within of the <li>, but the buttons are display:none until then and the <li> has no tabindex (no tabindex in app.js): a keyboard user can never reach them. Real accessibility hole."
+ },
+ {
+  "line": 155,
+  "selector": ".mact button",
+  "target": "component:IconButton/s",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "28px",
+    "snap": "--control-s (32px)"
+   },
+   {
+    "prop": "height",
+    "value": "26px",
+    "snap": "--control-s (32px)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "7px",
+    "snap": "7->--radius-s"
+   },
+   {
+    "prop": "font-size",
+    "value": "13px",
+    "snap": "--text-ui (13px)"
+   }
+  ],
+  "dup_of": [
+   62,
+   166,
+   187,
+   191,
+   194,
+   206,
+   215,
+   242,
+   334,
+   490,
+   582,
+   871,
+   921,
+   927,
+   1124,
+   1146
+  ],
+  "note": "Toolbar button 28x26 with radius 7: off every scale; IconButton s is 32."
+ },
+ {
+  "line": 156,
+  "selector": ".mact button:hover, .mact button:focus-visible",
+  "target": "component:IconButton/s/hover",
+  "offtoken": [
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.1)",
+    "snap": "NEW TOKEN --color-fill-strong = rgba(255,255,255,0.10): hover/selected fill"
+   }
+  ],
+  "dup_of": [
+   62,
+   155,
+   166,
+   187,
+   191,
+   194,
+   206,
+   207,
+   215,
+   242,
+   334,
+   490,
+   582,
+   599,
+   871,
+   921,
+   927,
+   1124,
+   1146
+  ],
+  "note": "Hover and focus-visible fill, 0.1 white."
+ },
+ {
+  "line": 157,
+  "selector": ".reacts",
+  "target": "composition:Cluster",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "4px",
+    "snap": "4=--space-4"
+   },
+   {
+    "prop": "margin-top",
+    "value": "6px",
+    "snap": "6->--space-8"
+   }
+  ],
+  "dup_of": [
+   128,
+   629
+  ],
+  "note": "Wrapping row of reaction chips. `margin-top:6px` is an outer margin."
+ },
+ {
+  "line": 158,
+  "selector": ".reacts button",
+  "target": "component:Chip/default/with-count",
+  "offtoken": [
+   {
+    "prop": "height",
+    "value": "24px",
+    "snap": "24=--hit-min"
+   },
+   {
+    "prop": "padding",
+    "value": "0 8px",
+    "snap": "8=--space-8"
+   },
+   {
+    "prop": "border-radius",
+    "value": "999px",
+    "snap": "999=--radius-pill"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.04)",
+    "snap": "NEW TOKEN --color-fill = rgba(255,255,255,0.05): idle field/chip/row fill"
+   },
+   {
+    "prop": "font-size",
+    "value": "12px",
+    "snap": "--text-ui (13px, weight 500) by role: DS sets controls, chips and tabs at 13"
+   }
+  ],
+  "dup_of": [
+   39,
+   40,
+   177,
+   324,
+   442,
+   603,
+   628,
+   918,
+   1019,
+   1102,
+   1137,
+   1138
+  ],
+  "note": "Reaction chip. app.js sets aria-pressed on it (app.js:2166) but the CSS reads a class (`.on`, L159): the DS wants the attribute. Height 24 again (chip heights in the file: 24, 28, 30, 32)."
+ },
+ {
+  "line": 159,
+  "selector": ".reacts button.on",
+  "target": "component:Chip/selected",
+  "offtoken": [
+   {
+    "prop": "background",
+    "value": "rgba(92, 242, 200, 0.12)",
+    "snap": "color-mix(--color-action 12%) (NEW --tint-wash 12% / --tint-line 50%)"
+   }
+  ],
+  "dup_of": [
+   39,
+   40,
+   158,
+   177,
+   324,
+   442,
+   603,
+   628,
+   918,
+   1019,
+   1102,
+   1137,
+   1138
+  ],
+  "note": "Selected reaction: action border + green wash. Should read [aria-pressed=\"true\"]."
+ },
+ {
+  "line": 160,
+  "selector": "#threadPane",
+  "target": "feature:chat-thread",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Slice 4. Thread pane."
+ },
+ {
+  "line": 161,
+  "selector": "#threadPane[hidden]",
+  "target": "utility:[hidden]",
+  "offtoken": [],
+  "dup_of": [
+   64,
+   67,
+   91,
+   190,
+   214,
+   238,
+   272,
+   327,
+   333,
+   367,
+   385,
+   397,
+   410,
+   441,
+   479,
+   608,
+   611,
+   663,
+   693,
+   734,
+   759,
+   906,
+   949,
+   972,
+   1000,
+   1131,
+   1170
+  ],
+  "note": "Redundant with L759."
+ },
+ {
+  "line": 162,
+  "selector": "body[data-thread=\"open\"]:not([data-chat=\"full\"]) #chatList, body[data-thread=\"open\"]:not([data-chat=\"full\"]) #pinBar",
+  "target": "feature:chat-thread",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Slice 4. Hides the list and pins while a thread is open: state read from a <body> data attribute. A body-state selector repeated for two targets, each with a `:not()` (selector-complexity cap)."
+ },
+ {
+  "line": 163,
+  "selector": "body[data-chat=\"full\"][data-thread=\"open\"] #chatSide",
+  "target": "feature:chat-thread",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Slice 4. Same, in the full dock; `!important` (DS: none)."
+ },
+ {
+  "line": 164,
+  "selector": "body[data-chat=\"full\"] #threadPane",
+  "target": "feature:chat-thread",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Slice 4. Places the thread in column 3 of the full dock's grid."
+ },
+ {
+  "line": 165,
+  "selector": "#threadPane .thead",
+  "target": "component:Panel/header",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "12px",
+    "snap": "12=--space-12"
+   },
+   {
+    "prop": "padding",
+    "value": "12px var(--pad)",
+    "snap": "12=--space-12; var(--pad)->--gutter (NEW TOKEN, fluid 16-24px, see L6)"
+   }
+  ],
+  "dup_of": [
+   241
+  ],
+  "note": "Back button + title row. Same rule as `#libPane .thead` (L241), which also wraps."
+ },
+ {
+  "line": 166,
+  "selector": "#threadPane .thead button",
+  "target": "component:IconButton/s",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "32px",
+    "snap": "32=--control-s"
+   },
+   {
+    "prop": "height",
+    "value": "32px",
+    "snap": "32=--control-s"
+   },
+   {
+    "prop": "border-radius",
+    "value": "50%",
+    "snap": "--radius-pill (999px) on a square"
+   }
+  ],
+  "dup_of": [
+   62,
+   155,
+   187,
+   191,
+   194,
+   206,
+   215,
+   242,
+   334,
+   490,
+   582,
+   871,
+   921,
+   927,
+   1124,
+   1146
+  ],
+  "note": "Back button 32px circle. Same as L242."
+ },
+ {
+  "line": 167,
+  "selector": "#threadPane .ttl2",
+  "target": "composition:Stack",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "2px",
+    "snap": "2->--space-4"
+   }
+  ],
+  "dup_of": [
+   56,
+   243,
+   391,
+   419,
+   695,
+   836,
+   851,
+   1109
+  ],
+  "note": "Title over subtitle."
+ },
+ {
+  "line": 168,
+  "selector": "#threadPane .ttl2 b",
+  "target": "component:Panel/header",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "13.5px",
+    "snap": "--text-body (14px)"
+   }
+  ],
+  "dup_of": [
+   53,
+   68,
+   89,
+   147,
+   182,
+   245,
+   260,
+   267,
+   349,
+   392,
+   568,
+   574,
+   580,
+   615,
+   837,
+   930,
+   1017,
+   1033,
+   1063
+  ],
+  "note": "Title 13.5px; the library's equivalent is 15px (L245): one header title size."
+ },
+ {
+  "line": 169,
+  "selector": "#threadList",
+  "target": "feature:chat-thread",
+  "offtoken": [
+   {
+    "prop": "padding",
+    "value": "14px var(--pad)",
+    "snap": "14->--space-16; var(--pad)->--gutter (NEW TOKEN, fluid 16-24px, see L6)"
+   },
+   {
+    "prop": "gap",
+    "value": "14px",
+    "snap": "14->--space-16"
+   }
+  ],
+  "dup_of": [
+   81,
+   137,
+   252,
+   551,
+   928
+  ],
+  "note": "Slice 4. The thread list: a copy of #chatList with padding 14 and gap 14 instead of 16."
+ },
+ {
+  "line": 170,
+  "selector": "#threadList li",
+  "target": "component:Message",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "13.5px",
+    "snap": "--text-body (14px)"
+   },
+   {
+    "prop": "line-height",
+    "value": "1.45",
+    "snap": "--text-body (1.5)"
+   },
+   {
+    "prop": "color",
+    "value": "#DDE3EE",
+    "snap": "--color-text (no mid grey in the DS)"
+   }
+  ],
+  "dup_of": [
+   138,
+   141,
+   889
+  ],
+  "note": "Copy of L138."
+ },
+ {
+  "line": 171,
+  "selector": "#threadList li .meta",
+  "target": "component:Message/meta",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "8px",
+    "snap": "8=--space-8"
+   },
+   {
+    "prop": "margin-bottom",
+    "value": "2px",
+    "snap": "2->--space-4"
+   }
+  ],
+  "dup_of": [
+   139,
+   890
+  ],
+  "note": "Copy of L139."
+ },
+ {
+  "line": 172,
+  "selector": "#threadList li .meta em",
+  "target": "component:Message/time",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "10px",
+    "snap": "--text-label (11px)"
+   }
+  ],
+  "dup_of": [
+   320,
+   892
+  ],
+  "note": "Time stamp: mono 10px, pushed right."
+ },
+ {
+  "line": 173,
+  "selector": "#threadList li b",
+  "target": "component:Message/author",
+  "offtoken": [],
+  "dup_of": [
+   148,
+   272,
+   293,
+   319,
+   520,
+   548,
+   681,
+   891,
+   996
+  ],
+  "note": "Author in 500 weight."
+ },
+ {
+  "line": 173,
+  "selector": "#threadList li.mine b",
+  "target": "component:Message/author/own",
+  "offtoken": [],
+  "dup_of": [
+   321
+  ],
+  "note": "Own message author in --color-action: read from a `.mine` class on the <li>, the DS wants an attribute."
+ },
+ {
+  "line": 174,
+  "selector": "#threadList .tparent",
+  "target": "component:Card/message",
+  "offtoken": [
+   {
+    "prop": "padding",
+    "value": "10px 12px",
+    "snap": "10->--space-12; 12=--space-12"
+   },
+   {
+    "prop": "border-radius",
+    "value": "12px",
+    "snap": "12=--radius-m"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.05)",
+    "snap": "NEW TOKEN --color-fill = rgba(255,255,255,0.05): idle field/chip/row fill"
+   }
+  ],
+  "dup_of": [
+   185,
+   271,
+   294,
+   304,
+   654,
+   692,
+   858,
+   865,
+   1024,
+   1035,
+   1053,
+   1067,
+   1152,
+   1165
+  ],
+  "note": "The parent message at the top of a thread: a card with fill .05, radius 12."
+ },
+ {
+  "line": 175,
+  "selector": "#threadList .tsep",
+  "target": "component:Divider/labelled",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "10px",
+    "snap": "10->--space-12"
+   },
+   {
+    "prop": "font-size",
+    "value": "10.5px (in `font`)",
+    "snap": "--text-label (11px)"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "0.12em",
+    "snap": "--text-label tracking (0.14em)"
+   }
+  ],
+  "dup_of": [
+   35,
+   53,
+   77,
+   93,
+   151,
+   152,
+   176,
+   232,
+   244,
+   282,
+   310,
+   537,
+   547,
+   628,
+   792,
+   925,
+   942,
+   987,
+   994,
+   1025,
+   1044,
+   1047,
+   1063,
+   1141,
+   1149,
+   1162,
+   1166
+  ],
+  "note": "Reply count separator, same pattern as the 'New' line (L151)."
+ },
+ {
+  "line": 176,
+  "selector": "#threadList .tsep::after",
+  "target": "component:Divider/labelled",
+  "offtoken": [],
+  "dup_of": [
+   151,
+   152,
+   175
+  ],
+  "note": "The line after the label."
+ },
+ {
+  "line": 177,
+  "selector": ".tchip",
+  "target": "component:Chip/default",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "6px",
+    "snap": "6->--space-8"
+   },
+   {
+    "prop": "margin-top",
+    "value": "6px",
+    "snap": "6->--space-8"
+   },
+   {
+    "prop": "padding",
+    "value": "4px 10px",
+    "snap": "4=--space-4; 10->--space-12"
+   },
+   {
+    "prop": "border-radius",
+    "value": "999px",
+    "snap": "999=--radius-pill"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.04)",
+    "snap": "NEW TOKEN --color-fill = rgba(255,255,255,0.05): idle field/chip/row fill"
+   },
+   {
+    "prop": "font-size",
+    "value": "12px (in `font`)",
+    "snap": "--text-ui (13px, weight 500) by role: DS sets controls, chips and tabs at 13"
+   }
+  ],
+  "dup_of": [
+   39,
+   40,
+   158,
+   324,
+   442,
+   603,
+   628,
+   918,
+   1019,
+   1102,
+   1137,
+   1138
+  ],
+  "note": "'Thread: N replies' chip, 12px, padding 4px 10px and no height: a fifth chip height (about 26px)."
+ },
+ {
+  "line": 178,
+  "selector": ".tchip:hover",
+  "target": "component:Chip/default/hover",
+  "offtoken": [],
+  "dup_of": [
+   39,
+   40,
+   158,
+   177,
+   324,
+   442,
+   585,
+   603,
+   628,
+   918,
+   1019,
+   1102,
+   1137,
+   1138
+  ],
+  "note": "Hover: text colour and line-strong border."
+ },
+ {
+  "line": 179,
+  "selector": "#pinBar",
+  "target": "feature:chat-pins",
+  "offtoken": [
+   {
+    "prop": "margin",
+    "value": "0 var(--pad)",
+    "snap": "var(--pad) -> --gutter (NEW TOKEN, fluid 16-24px, see L6)"
+   }
+  ],
+  "dup_of": [],
+  "note": "Slice 4. Pins. `margin: 0 var(--pad)` is an outer margin that aligns it with the list."
+ },
+ {
+  "line": 180,
+  "selector": "#pinBar .pinhead",
+  "target": "feature:chat-pins",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "10px",
+    "snap": "10->--space-12"
+   },
+   {
+    "prop": "padding",
+    "value": "10px 0",
+    "snap": "10->--space-12"
+   },
+   {
+    "prop": "font-size",
+    "value": "13px (in `font`)",
+    "snap": "--text-ui (13px)"
+   }
+  ],
+  "dup_of": [
+   86,
+   105,
+   117,
+   402,
+   431,
+   474,
+   552,
+   713,
+   833,
+   865,
+   929,
+   934,
+   975,
+   1049,
+   1106
+  ],
+  "note": "Slice 4. Pin header button with the first pin and a count."
+ },
+ {
+  "line": 181,
+  "selector": "#pinBar .pinic",
+  "target": "feature:chat-pins",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Slice 4. Pin icon holder."
+ },
+ {
+  "line": 182,
+  "selector": "#pinBar .pintext",
+  "target": "feature:chat-pins",
+  "offtoken": [
+   {
+    "prop": "color",
+    "value": "#DDE3EE",
+    "snap": "--color-text (no mid grey in the DS)"
+   }
+  ],
+  "dup_of": [
+   53,
+   68,
+   89,
+   147,
+   168,
+   245,
+   260,
+   267,
+   349,
+   392,
+   568,
+   574,
+   580,
+   615,
+   837,
+   930,
+   1017,
+   1033,
+   1063
+  ],
+  "note": "Slice 4. First pin text, truncated; #DDE3EE again."
+ },
+ {
+  "line": 183,
+  "selector": "#pinBar .pintext b",
+  "target": "feature:chat-pins",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Slice 4. Author of the pin."
+ },
+ {
+  "line": 184,
+  "selector": "#pinBar small",
+  "target": "feature:chat-pins",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "11px (in `font`)",
+    "snap": "--text-label (11px)"
+   }
+  ],
+  "dup_of": [
+   35,
+   53,
+   77,
+   93,
+   151,
+   175,
+   232,
+   244,
+   282,
+   310,
+   537,
+   547,
+   628,
+   792,
+   925,
+   942,
+   987,
+   994,
+   1025,
+   1044,
+   1047,
+   1063,
+   1141,
+   1149,
+   1162,
+   1166
+  ],
+  "note": "Slice 4. '+2' / 'Hide' counter. Base `small` already gives this; the font here is a repeat."
+ },
+ {
+  "line": 185,
+  "selector": "#pinBar .pin",
+  "target": "component:Card/message",
+  "offtoken": [
+   {
+    "prop": "margin-bottom",
+    "value": "8px",
+    "snap": "8=--space-8"
+   },
+   {
+    "prop": "padding",
+    "value": "8px 28px 8px 10px",
+    "snap": "8=--space-8; 28->--space-32; 10->--space-12"
+   },
+   {
+    "prop": "border-radius",
+    "value": "10px",
+    "snap": "10->--radius-m"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.05)",
+    "snap": "NEW TOKEN --color-fill = rgba(255,255,255,0.05): idle field/chip/row fill"
+   },
+   {
+    "prop": "font-size",
+    "value": "13px",
+    "snap": "--text-body (14px) by role: 13px is the control size, paragraph text is body"
+   },
+   {
+    "prop": "line-height",
+    "value": "1.45",
+    "snap": "--text-body (1.5)"
+   }
+  ],
+  "dup_of": [
+   174,
+   271,
+   294,
+   304,
+   654,
+   692,
+   858,
+   865,
+   1024,
+   1035,
+   1053,
+   1067,
+   1152,
+   1165
+  ],
+  "note": "One pin: fill .05, radius 10, padding 8 28 8 10 (room on the right for the unpin button)."
+ },
+ {
+  "line": 186,
+  "selector": "#pinBar .pin b",
+  "target": "feature:chat-pins",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "12px",
+    "snap": "--text-meta (12px)"
+   }
+  ],
+  "dup_of": [],
+  "note": "Slice 4. Pin author."
+ },
+ {
+  "line": 187,
+  "selector": "#pinBar .unpin",
+  "target": "component:IconButton/s",
+  "offtoken": [
+   {
+    "prop": "right",
+    "value": "6px",
+    "snap": "6->--space-8"
+   },
+   {
+    "prop": "top",
+    "value": "6px",
+    "snap": "6->--space-8"
+   }
+  ],
+  "dup_of": [
+   62,
+   155,
+   166,
+   191,
+   194,
+   206,
+   215,
+   242,
+   334,
+   490,
+   582,
+   871,
+   921,
+   927,
+   1124,
+   1146
+  ],
+  "note": "Unpin cross, absolute, bare."
+ },
+ {
+  "line": 188,
+  "selector": "#adOverlay",
+  "target": "scene",
+  "offtoken": [
+   {
+    "prop": "z-index",
+    "value": "2",
+    "snap": "--z-scene (it is scene art)"
+   }
+  ],
+  "dup_of": [
+   3
+  ],
+  "note": "Overlay canvas over the 3D canvas (satellites' ads), pointer-events none."
+ },
+ {
+  "line": 189,
+  "selector": ".pop",
+  "target": "component:Popover/base",
+  "offtoken": [
+   {
+    "prop": "z-index",
+    "value": "70",
+    "snap": "--z-popover"
+   },
+   {
+    "prop": "padding",
+    "value": "6px",
+    "snap": "6->--space-8"
+   },
+   {
+    "prop": "border-radius",
+    "value": "12px",
+    "snap": "12=--radius-m"
+   },
+   {
+    "prop": "background",
+    "value": "#0B0F18",
+    "snap": "= --color-surface-raised"
+   },
+   {
+    "prop": "box-shadow",
+    "value": "0 12px 32px rgba(0, 0, 0, 0.55)",
+    "snap": "NEW TOKEN --shadow-popover = 0 12px 32px rgba(0,0,0,0.55)"
+   }
+  ],
+  "dup_of": [
+   153,
+   326,
+   332,
+   992,
+   1005
+  ],
+  "note": "Base popover: fixed, z 70, radius 12, shadow 0 12px 32px. `border` is line-strong here but `--edge` on #reactPop and #msgMenu (L191, L192): one popover border."
+ },
+ {
+  "line": 190,
+  "selector": ".pop[hidden]",
+  "target": "utility:[hidden]",
+  "offtoken": [],
+  "dup_of": [
+   64,
+   67,
+   91,
+   161,
+   214,
+   238,
+   272,
+   327,
+   333,
+   367,
+   385,
+   397,
+   410,
+   441,
+   479,
+   608,
+   611,
+   663,
+   693,
+   734,
+   759,
+   906,
+   949,
+   972,
+   1000,
+   1131,
+   1170
+  ],
+  "note": "Redundant with L759."
+ },
+ {
+  "line": 191,
+  "selector": "#reactPop",
+  "target": "component:Popover/emoji-quick",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "2px",
+    "snap": "2->--space-4"
+   },
+   {
+    "prop": "padding",
+    "value": "3px",
+    "snap": "3->--space-4"
+   },
+   {
+    "prop": "border-radius",
+    "value": "10px",
+    "snap": "10->--radius-m"
+   }
+  ],
+  "dup_of": [
+   153,
+   189,
+   326,
+   332,
+   992,
+   1005
+  ],
+  "note": "Reaction picker. Its radius 10 and padding 3 override `.pop`'s 12 and 6; at 12 the radius override is redundant."
+ },
+ {
+  "line": 191,
+  "selector": "#reactPop button",
+  "target": "component:IconButton/s",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "28px",
+    "snap": "--control-s (32px)"
+   },
+   {
+    "prop": "height",
+    "value": "26px",
+    "snap": "--control-s (32px)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "7px",
+    "snap": "7->--radius-s"
+   },
+   {
+    "prop": "font-size",
+    "value": "14px",
+    "snap": "--text-body (14px)"
+   }
+  ],
+  "dup_of": [
+   62,
+   155,
+   166,
+   187,
+   194,
+   206,
+   215,
+   242,
+   334,
+   490,
+   582,
+   871,
+   921,
+   927,
+   1124,
+   1146
+  ],
+  "note": "Emoji button 28x26, 14px glyph (an emoji, allowed here: messages and reactions)."
+ },
+ {
+  "line": 191,
+  "selector": "#reactPop button:hover",
+  "target": "component:IconButton/s/hover",
+  "offtoken": [
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.1)",
+    "snap": "NEW TOKEN --color-fill-strong = rgba(255,255,255,0.10): hover/selected fill"
+   }
+  ],
+  "dup_of": [
+   62,
+   155,
+   166,
+   187,
+   194,
+   206,
+   215,
+   242,
+   334,
+   490,
+   582,
+   871,
+   921,
+   927,
+   1124,
+   1146
+  ],
+  "note": "Hover fill."
+ },
+ {
+  "line": 192,
+  "selector": "#msgMenu",
+  "target": "component:Menu",
+  "offtoken": [
+   {
+    "prop": "border-radius",
+    "value": "10px",
+    "snap": "10->--radius-m"
+   }
+  ],
+  "dup_of": [
+   153,
+   189,
+   326,
+   332,
+   992,
+   1005
+  ],
+  "note": "Radius 10 snaps to .pop's 12, so it is redundant; the only real difference left is `border-color:--edge` (see L189)."
+ },
+ {
+  "line": 193,
+  "selector": ".mact .sep",
+  "target": "component:Divider/vertical",
+  "offtoken": [
+   {
+    "prop": "margin",
+    "value": "4px 2px",
+    "snap": "--space-4 on both axes"
+   }
+  ],
+  "dup_of": [
+   219,
+   502
+  ],
+  "note": "Vertical hairline in the toolbar (1px)."
+ },
+ {
+  "line": 194,
+  "selector": ".mact button",
+  "target": "component:IconButton/s",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "13px",
+    "snap": "--text-ui (13px)"
+   }
+  ],
+  "dup_of": [
+   155
+  ],
+  "note": "Pure repeat of `.mact button{font-size:13px}` already in L155: delete."
+ },
+ {
+  "line": 195,
+  "selector": "#msgMenu",
+  "target": "component:Menu",
+  "offtoken": [
+   {
+    "prop": "min-width",
+    "value": "180px",
+    "snap": "keep raw (comment: the menu's own minimum width) or NEW TOKEN --menu-min = 180px"
+   }
+  ],
+  "dup_of": [
+   153,
+   189,
+   326,
+   332,
+   992,
+   1005
+  ],
+  "note": "Popover's list (message menu, 'more'): column, min width 180."
+ },
+ {
+  "line": 195,
+  "selector": "#msgMenu button",
+  "target": "component:Menu/item",
+  "offtoken": [
+   {
+    "prop": "padding",
+    "value": "8px 10px",
+    "snap": "8=--space-8; 10->--space-12"
+   },
+   {
+    "prop": "border-radius",
+    "value": "8px",
+    "snap": "8=--radius-s"
+   },
+   {
+    "prop": "font-size",
+    "value": "13px (in `font`)",
+    "snap": "--text-ui (13px)"
+   }
+  ],
+  "dup_of": [
+   233,
+   328
+  ],
+  "note": "Menu entry. Same as `#cmdHint button` (L328) and the library's `button.it` (L233)."
+ },
+ {
+  "line": 195,
+  "selector": "#msgMenu button:hover",
+  "target": "component:Menu/item/hover",
+  "offtoken": [
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.08)",
+    "snap": "NEW TOKEN --color-fill-strong = rgba(255,255,255,0.10): hover/selected fill"
+   }
+  ],
+  "dup_of": [
+   233,
+   328
+  ],
+  "note": "Hover fill .08 (others .09, .1)."
+ },
+ {
+  "line": 196,
+  "selector": "#chatForm",
+  "target": "feature:composer",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "8px",
+    "snap": "8=--space-8"
+   },
+   {
+    "prop": "padding",
+    "value": "12px var(--pad) 16px",
+    "snap": "12=--space-12; 16=--space-16; var(--pad)->--gutter (NEW TOKEN, fluid 16-24px, see L6)"
+   }
+  ],
+  "dup_of": [],
+  "note": "Slice 4. The composer form. The padding aligns it with the list gutter."
+ },
+ {
+  "line": 197,
+  "selector": ".cbox",
+  "target": "component:Field/composer",
+  "offtoken": [
+   {
+    "prop": "border-radius",
+    "value": "16px",
+    "snap": "16=--radius-l"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.05)",
+    "snap": "NEW TOKEN --color-fill = rgba(255,255,255,0.05): idle field/chip/row fill"
+   },
+   {
+    "prop": "transition",
+    "value": "border-color 0.2s",
+    "snap": "0.2s->--motion-base ="
+   }
+  ],
+  "dup_of": [
+   83,
+   131,
+   264,
+   283,
+   311,
+   894,
+   1073
+  ],
+  "note": "Composer shell: radius 16 = radius-l, DS match; transition 0.2s names its property and equals --motion-base."
+ },
+ {
+  "line": 198,
+  "selector": ".cbox:focus-within",
+  "target": "component:Field/composer/focus",
+  "offtoken": [
+   {
+    "prop": "border-color",
+    "value": "rgba(92, 242, 200, 0.55)",
+    "snap": "--color-action (plus the base 2px focus ring)"
+   }
+  ],
+  "dup_of": [
+   83,
+   131,
+   197,
+   264,
+   283,
+   311,
+   894,
+   1073
+  ],
+  "note": "Focus = border at .55 green, while the inner field has `outline:none` (L199): no 2px ring, so it breaks the DS focus rule. Should be the base ring on :focus-within."
+ },
+ {
+  "line": 199,
+  "selector": "#chatInput",
+  "target": "component:Field/composer",
+  "offtoken": [
+   {
+    "prop": "min-height",
+    "value": "40px",
+    "snap": "40=--control-m"
+   },
+   {
+    "prop": "max-height",
+    "value": "168px",
+    "snap": "8lh (8 lines of --text-body)"
+   },
+   {
+    "prop": "padding",
+    "value": "11px 14px 2px",
+    "snap": "11->--space-12; 14->--space-16; 2->--space-4"
+   },
+   {
+    "prop": "font-size",
+    "value": "13.5px (in `font`)",
+    "snap": "--text-body (14px)"
+   },
+   {
+    "prop": "line-height",
+    "value": "1.45 (in `font`)",
+    "snap": "--text-body (1.5)"
+   }
+  ],
+  "dup_of": [
+   131,
+   200,
+   284,
+   894,
+   1073
+  ],
+  "note": "The input is a contenteditable <div> (markup line 1345). 168px max-height = exactly 8 lines at --text-body (14px x 1.5 x 8): `max-block-size:8lh`. Padding 11/14/2 is off-grid. `outline:none` hides focus."
+ },
+ {
+  "line": 200,
+  "selector": "#chatInput",
+  "target": "component:Field/composer",
+  "offtoken": [],
+  "dup_of": [
+   199
+  ],
+  "note": "Second rule on the same element (L199): merge."
+ },
+ {
+  "line": 201,
+  "selector": "#chatInput.empty::before",
+  "target": "component:Field/composer",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Placeholder via ::before and a data attribute: needed because the field is contenteditable."
+ },
+ {
+  "line": 202,
+  "selector": "#chatInput b, #chatInput strong",
+  "target": "component:Message/body",
+  "offtoken": [
+   {
+    "prop": "font-weight",
+    "value": "650",
+    "snap": "600 (DS weights: 300/400/500/600)"
+   }
+  ],
+  "dup_of": [
+   220
+  ],
+  "note": "Bold weight 650 is off the DS weights (300/400/500/600): variable-font value, snap to 600."
+ },
+ {
+  "line": 203,
+  "selector": "#fmtBar button.on",
+  "target": "component:IconButton/s/pressed",
+  "offtoken": [
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.12)",
+    "snap": "--color-fill-strong (NEW TOKEN)"
+   }
+  ],
+  "dup_of": [
+   62,
+   155,
+   166,
+   187,
+   191,
+   194,
+   206,
+   215,
+   242,
+   334,
+   490,
+   582,
+   871,
+   921,
+   927,
+   1124,
+   1146
+  ],
+  "note": "Active format button via a `.on` class: the DS wants aria-pressed."
+ },
+ {
+  "line": 204,
+  "selector": ".ctools",
+  "target": "composition:Cluster",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "2px",
+    "snap": "2->--space-4"
+   },
+   {
+    "prop": "padding",
+    "value": "2px 6px 6px",
+    "snap": "2->--space-4; 6->--space-8"
+   }
+  ],
+  "dup_of": [
+   213,
+   553,
+   593
+  ],
+  "note": "Row of composer buttons, gap 2."
+ },
+ {
+  "line": 205,
+  "selector": ".tbtn svg, #fmtBar svg, .mact svg, .tpause svg",
+  "target": "component:Icon",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "SVG as block: belongs in base (`svg{display:block}`) or in Icon."
+ },
+ {
+  "line": 206,
+  "selector": ".tbtn, #fmtBar button",
+  "target": "component:IconButton/s",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "30px",
+    "snap": "--control-s (32px)"
+   },
+   {
+    "prop": "height",
+    "value": "30px",
+    "snap": "--control-s (32px)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "8px",
+    "snap": "8=--radius-s"
+   },
+   {
+    "prop": "font-size",
+    "value": "14px (in `font`)",
+    "snap": "--text-ui (13px, weight 500) by role: DS sets controls, chips and tabs at 13"
+   }
+  ],
+  "dup_of": [
+   62,
+   155,
+   166,
+   187,
+   191,
+   194,
+   215,
+   242,
+   334,
+   490,
+   582,
+   871,
+   921,
+   927,
+   1124,
+   1146
+  ],
+  "note": "Composer button 30x30, radius 8, 14px/500 glyph. Heights in the same toolbars: 30 (.tbtn), 34 (.ctools .tbtn, L217), 24 (#fmtBar button, L215), 32 (send)."
+ },
+ {
+  "line": 207,
+  "selector": ".tbtn:hover, .tbtn[aria-expanded=\"true\"], #fmtBar button:hover",
+  "target": "component:IconButton/s/hover",
+  "offtoken": [
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.1)",
+    "snap": "--color-fill-strong (NEW TOKEN)"
+   }
+  ],
+  "dup_of": [
+   62,
+   155,
+   156,
+   166,
+   187,
+   191,
+   194,
+   206,
+   215,
+   242,
+   334,
+   490,
+   582,
+   599,
+   871,
+   921,
+   927,
+   1124,
+   1146
+  ],
+  "note": "Hover and [aria-expanded] state: the DS convention."
+ },
+ {
+  "line": 208,
+  "selector": "#helpBtn, #mentionBtn",
+  "target": "component:IconButton/s",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Mono family so the typed glyphs `@` and `?` look right: those buttons are text, not icons (DS: icons are components, no typed arrows)."
+ },
+ {
+  "line": 209,
+  "selector": ".ctools .hint",
+  "target": "feature:composer",
+  "offtoken": [
+   {
+    "prop": "margin-right",
+    "value": "8px",
+    "snap": "8=--space-8"
+   },
+   {
+    "prop": "font-size",
+    "value": "10.5px (in `font`)",
+    "snap": "--text-meta (12px): sentence-case sans, not a caps label"
+   }
+  ],
+  "dup_of": [
+   285,
+   312,
+   317,
+   318,
+   1065,
+   1174
+  ],
+  "note": "Slice 4. 'Shift+Enter for a new line': sentence-case 10.5px: it is meta text, not a label."
+ },
+ {
+  "line": 210,
+  "selector": ".ctools .primary",
+  "target": "component:Button/primary/icon-only",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "32px",
+    "snap": "32=--control-s"
+   },
+   {
+    "prop": "height",
+    "value": "32px",
+    "snap": "32=--control-s"
+   },
+   {
+    "prop": "font-size",
+    "value": "15px",
+    "snap": "drop: dead declaration (svg-only button)"
+   }
+  ],
+  "dup_of": [
+   41,
+   287,
+   303,
+   316,
+   513,
+   625,
+   814,
+   815,
+   870,
+   1073,
+   1118,
+   1173
+  ],
+  "note": "Send button 32px. `font-size:15px` does nothing: the button holds only an svg (markup line 1346). The svg itself is hard-coded 15px."
+ },
+ {
+  "line": 211,
+  "selector": "body[data-chat=\"full\"] .ctools .hint + .primary",
+  "target": "feature:composer",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Slice 4. Margin tweak in the full dock when the hint is shown."
+ },
+ {
+  "line": 212,
+  "selector": "body:not([data-chat=\"full\"]) .ctools .hint",
+  "target": "feature:composer",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Slice 4. Hides the hint in the compact dock."
+ },
+ {
+  "line": 213,
+  "selector": "#fmtBar",
+  "target": "feature:composer",
+  "offtoken": [
+   {
+    "prop": "margin",
+    "value": "0 8px",
+    "snap": "8=--space-8"
+   },
+   {
+    "prop": "padding",
+    "value": "5px 0 4px",
+    "snap": "5->--space-4; 4=--space-4"
+   },
+   {
+    "prop": "border-bottom",
+    "value": "rgba(255, 255, 255, 0.06)",
+    "snap": "--color-line"
+   }
+  ],
+  "dup_of": [
+   204,
+   553,
+   593
+  ],
+  "note": "Slice 4. Format bar. `margin:0 8px` outer margin."
+ },
+ {
+  "line": 214,
+  "selector": "#fmtBar[hidden]",
+  "target": "utility:[hidden]",
+  "offtoken": [],
+  "dup_of": [
+   64,
+   67,
+   91,
+   161,
+   190,
+   238,
+   272,
+   327,
+   333,
+   367,
+   385,
+   397,
+   410,
+   441,
+   479,
+   608,
+   611,
+   663,
+   693,
+   734,
+   759,
+   906,
+   949,
+   972,
+   1000,
+   1131,
+   1170
+  ],
+  "note": "Redundant with L759 (and uses !important)."
+ },
+ {
+  "line": 215,
+  "selector": "#fmtBar button",
+  "target": "component:IconButton/s",
+  "offtoken": [
+   {
+    "prop": "min-width",
+    "value": "26px",
+    "snap": "--hit-min (24px)"
+   },
+   {
+    "prop": "height",
+    "value": "24px",
+    "snap": "--control-s (32px): DS invariant is 44px touch, 24 is --hit-min only"
+   },
+   {
+    "prop": "padding",
+    "value": "0 5px",
+    "snap": "5->--space-4"
+   },
+   {
+    "prop": "font-size",
+    "value": "11.5px",
+    "snap": "--text-ui (13px, weight 500) by role: DS sets controls, chips and tabs at 13"
+   },
+   {
+    "prop": "color",
+    "value": "rgba(154, 164, 182, 0.62)",
+    "snap": "--color-text-muted (62% opacity dropped)"
+   }
+  ],
+  "dup_of": [
+   62,
+   155,
+   166,
+   187,
+   191,
+   194,
+   206,
+   242,
+   334,
+   490,
+   582,
+   871,
+   921,
+   927,
+   1124,
+   1146
+  ],
+  "note": "Format button 24px high, 26 min-width: under the 44px touch target the DS invariants test, in the same bar as 30px and 34px buttons."
+ },
+ {
+  "line": 216,
+  "selector": "#fmtBar svg",
+  "target": "component:Icon",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "13px",
+    "snap": "--icon-s (NEW TOKEN, 12px)"
+   },
+   {
+    "prop": "height",
+    "value": "13px",
+    "snap": "--icon-s (NEW TOKEN, 12px)"
+   }
+  ],
+  "dup_of": [],
+  "note": "13px icon: off the 16px icon grid."
+ },
+ {
+  "line": 217,
+  "selector": ".ctools .tbtn",
+  "target": "component:IconButton/s",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "34px",
+    "snap": "--control-s (32px)"
+   },
+   {
+    "prop": "height",
+    "value": "34px",
+    "snap": "--control-s (32px)"
+   },
+   {
+    "prop": "color",
+    "value": "#C8D0DE",
+    "snap": "--color-text (no mid grey in the DS)"
+   }
+  ],
+  "dup_of": [
+   62,
+   155,
+   166,
+   187,
+   191,
+   194,
+   206,
+   215,
+   242,
+   334,
+   490,
+   582,
+   871,
+   921,
+   927,
+   1124,
+   1146
+  ],
+  "note": "34px override of the same button (L206 is 30)."
+ },
+ {
+  "line": 218,
+  "selector": ".ctools .tbtn svg",
+  "target": "component:Icon",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "18px",
+    "snap": "--icon-m (NEW TOKEN, 16px: the DS icon grid)"
+   },
+   {
+    "prop": "height",
+    "value": "18px",
+    "snap": "--icon-m (NEW TOKEN, 16px: the DS icon grid)"
+   }
+  ],
+  "dup_of": [
+   555,
+   817
+  ],
+  "note": "18px icon: off the grid."
+ },
+ {
+  "line": 219,
+  "selector": "#fmtBar .sep",
+  "target": "component:Divider/vertical",
+  "offtoken": [
+   {
+    "prop": "height",
+    "value": "12px",
+    "snap": "12=--space-12"
+   },
+   {
+    "prop": "margin",
+    "value": "0 4px",
+    "snap": "4=--space-4"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.08)",
+    "snap": "--color-line"
+   }
+  ],
+  "dup_of": [
+   193,
+   502
+  ],
+  "note": "1px x 12px separator, white .08."
+ },
+ {
+  "line": 220,
+  "selector": ".body strong",
+  "target": "component:Message/body",
+  "offtoken": [
+   {
+    "prop": "font-weight",
+    "value": "650",
+    "snap": "600 (DS weights: 300/400/500/600)"
+   }
+  ],
+  "dup_of": [],
+  "note": "Bold in messages: 650 (see L202) and an explicit --text colour that equals the new body colour."
+ },
+ {
+  "line": 220,
+  "selector": ".body em",
+  "target": "component:Message/body",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Italic: base `em` already does this; line is redundant."
+ },
+ {
+  "line": 220,
+  "selector": ".body u",
+  "target": "component:Message/body",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Underline offset 2px (markdown `__x__`, app.js:2270): slice 4's format bar has no underline (backlog row 4), so this has no producer once it lands."
+ },
+ {
+  "line": 221,
+  "selector": ".body code",
+  "target": "component:Message/body",
+  "offtoken": [
+   {
+    "prop": "padding",
+    "value": "1px 5px",
+    "snap": "5->--space-4"
+   },
+   {
+    "prop": "border-radius",
+    "value": "5px",
+    "snap": "5->--radius-s"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.08)",
+    "snap": "NEW TOKEN --color-fill-strong = rgba(255,255,255,0.10): hover/selected fill"
+   },
+   {
+    "prop": "font-size",
+    "value": "12.5px (in `font`)",
+    "snap": "--text-meta (12px)"
+   }
+  ],
+  "dup_of": [
+   277,
+   295,
+   1033,
+   1135
+  ],
+  "note": "Inline code: radius 5, padding 1/5, 12.5px mono."
+ },
+ {
+  "line": 222,
+  "selector": ".body pre",
+  "target": "component:Message/body",
+  "offtoken": [
+   {
+    "prop": "margin",
+    "value": "6px 0 2px",
+    "snap": "drop: outer margin, the body Stack spaces it"
+   },
+   {
+    "prop": "padding",
+    "value": "10px 12px",
+    "snap": "10->--space-12; 12=--space-12"
+   },
+   {
+    "prop": "border-radius",
+    "value": "10px",
+    "snap": "10->--radius-m"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(0, 0, 0, 0.35)",
+    "snap": "--color-space"
+   }
+  ],
+  "dup_of": [],
+  "note": "Code block: black .35 fill, radius 10. Outer margins 6/2."
+ },
+ {
+  "line": 223,
+  "selector": ".body pre code",
+  "target": "component:Message/body",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "12px",
+    "snap": "--text-meta (12px)"
+   }
+  ],
+  "dup_of": [
+   221,
+   277,
+   295,
+   1033,
+   1135
+  ],
+  "note": "Code inside a block: resets the inline chip; 12px/1.5 on the scale."
+ },
+ {
+  "line": 224,
+  "selector": ".body ul, .body ol",
+  "target": "component:Message/body",
+  "offtoken": [
+   {
+    "prop": "margin",
+    "value": "4px 0",
+    "snap": "drop: outer margin"
+   },
+   {
+    "prop": "padding-left",
+    "value": "20px",
+    "snap": "20->--space-24"
+   }
+  ],
+  "dup_of": [],
+  "note": "Lists in a message: outer margin and a 20px indent."
+ },
+ {
+  "line": 224,
+  "selector": ".body li",
+  "target": "component:Message/body",
+  "offtoken": [
+   {
+    "prop": "margin",
+    "value": "2px 0",
+    "snap": "drop: outer margin, use gap"
+   }
+  ],
+  "dup_of": [],
+  "note": "List item gap via margin."
+ },
+ {
+  "line": 225,
+  "selector": ".body blockquote",
+  "target": "component:Message/body",
+  "offtoken": [
+   {
+    "prop": "margin",
+    "value": "4px 0",
+    "snap": "drop: outer margin"
+   },
+   {
+    "prop": "padding-left",
+    "value": "10px",
+    "snap": "10->--space-12"
+   }
+  ],
+  "dup_of": [
+   147,
+   923
+  ],
+  "note": "Markdown quote: 2px line-strong bar and muted text, like the reply quote (L147)."
+ },
+ {
+  "line": 226,
+  "selector": ".body .mention",
+  "target": "component:Message/mention",
+  "offtoken": [
+   {
+    "prop": "padding",
+    "value": "0 3px",
+    "snap": "3->--space-4"
+   },
+   {
+    "prop": "border-radius",
+    "value": "4px",
+    "snap": "4->--radius-s"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(92, 242, 200, 0.12)",
+    "snap": "color-mix(--color-action 12%) (NEW --tint-wash 12% / --tint-line 50%)"
+   }
+  ],
+  "dup_of": [
+   63,
+   358,
+   628,
+   1078,
+   1099,
+   1139
+  ],
+  "note": "Inline mention: green wash, radius 4 (off scale)."
+ },
+ {
+  "line": 227,
+  "selector": ".body .mention.me",
+  "target": "component:Message/mention/own",
+  "offtoken": [
+   {
+    "prop": "background",
+    "value": "rgba(255, 196, 107, 0.18)",
+    "snap": "color-mix(--color-warm 12%) (NEW --tint-wash 12% / --tint-line 50%)"
+   },
+   {
+    "prop": "color",
+    "value": "#FFC46B",
+    "snap": "= --color-warm"
+   }
+  ],
+  "dup_of": [],
+  "note": "Mention of you: warm wash .18 and #FFC46B."
+ },
+ {
+  "line": 228,
+  "selector": "#chatList li.mentionsme",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: no code ever adds the class `mentionsme` (app.js has no such string)."
+ },
+ {
+  "line": 229,
+  "selector": "#chatList li .saved-mark",
+  "target": "component:Message/saved-mark",
+  "offtoken": [
+   {
+    "prop": "color",
+    "value": "#FFC46B",
+    "snap": "= --color-warm"
+   }
+  ],
+  "dup_of": [],
+  "note": "Saved bookmark in --color-warm (exact)."
+ },
+ {
+  "line": 230,
+  "selector": ".room.draft span:first-of-type::after",
+  "target": "component:Chip/default/draft",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "10px",
+    "snap": "--icon-s (NEW TOKEN, 12px)"
+   },
+   {
+    "prop": "height",
+    "value": "10px",
+    "snap": "--icon-s (NEW TOKEN, 12px)"
+   },
+   {
+    "prop": "margin-left",
+    "value": "6px",
+    "snap": "6->--space-8"
+   },
+   {
+    "prop": "opacity",
+    "value": "0.6",
+    "snap": "drop: colour the icon --color-text-muted"
+   }
+  ],
+  "dup_of": [],
+  "note": "Draft pencil drawn from a CSS mask holding an inline SVG data URI, duplicating the icon set (app.js has `icon('pencil')`): breaks 'each icon is a component'. Opacity .6 joins .4, .45 and .5 as a fourth opacity."
+ },
+ {
+  "line": 231,
+  "selector": "#roomPop",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: #roomPop is never referenced by app.js (0 matches) so it is never filled or opened; the room switch became chips (#roomChips)."
+ },
+ {
+  "line": 232,
+  "selector": "#roomPop small.h, #libBody small.h",
+  "target": "component:Kicker",
+  "offtoken": [
+   {
+    "prop": "padding",
+    "value": "6px 6px 2px",
+    "snap": "6->--space-8; 2->--space-4"
+   },
+   {
+    "prop": "font-size",
+    "value": "10.5px (in `font`)",
+    "snap": "--text-label (11px)"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "0.14em",
+    "snap": "--text-label tracking (0.14em) ="
+   }
+  ],
+  "dup_of": [
+   35,
+   53,
+   77,
+   93,
+   151,
+   175,
+   244,
+   282,
+   310,
+   537,
+   547,
+   628,
+   792,
+   925,
+   942,
+   987,
+   994,
+   1025,
+   1044,
+   1047,
+   1063,
+   1141,
+   1149,
+   1162,
+   1166
+  ],
+  "note": "Library section heading ('Saved · 2'); the #libBody half is live (app.js:2767 `small.h`), the #roomPop half is dead. Same label style as base `small`."
+ },
+ {
+  "line": 233,
+  "selector": "#libBody button.it, #roomPop button.it",
+  "target": "component:Card/message",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "2px",
+    "snap": "2->--space-4"
+   },
+   {
+    "prop": "padding",
+    "value": "8px 10px",
+    "snap": "8=--space-8; 10->--space-12"
+   },
+   {
+    "prop": "border-radius",
+    "value": "10px",
+    "snap": "10->--radius-m"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.04)",
+    "snap": "NEW TOKEN --color-fill = rgba(255,255,255,0.05): idle field/chip/row fill"
+   },
+   {
+    "prop": "font-size",
+    "value": "13px (in `font`)",
+    "snap": "--text-ui (13px)"
+   },
+   {
+    "prop": "line-height",
+    "value": "1.4 (in `font`)",
+    "snap": "--text-body (1.5)"
+   }
+  ],
+  "dup_of": [
+   174,
+   185,
+   195,
+   271,
+   294,
+   304,
+   328,
+   654,
+   692,
+   858,
+   865,
+   1024,
+   1035,
+   1053,
+   1067,
+   1152,
+   1165
+  ],
+  "note": "Saved and draft entries in the library (button.it, app.js:2769). Live half is #libBody; #roomPop half is dead. Radius 10, padding 8/10, fill .04: another card variant."
+ },
+ {
+  "line": 234,
+  "selector": "#libBody button.it:hover, #roomPop button.it:hover",
+  "target": "component:Card/message/hover",
+  "offtoken": [
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.09)",
+    "snap": "--color-fill-strong (NEW TOKEN)"
+   }
+  ],
+  "dup_of": [
+   195,
+   233,
+   328
+  ],
+  "note": "Hover fill .09 (L164 uses .08, L156 .1): one hover fill."
+ },
+ {
+  "line": 235,
+  "selector": "#libBody button.it span, #roomPop button.it span",
+  "target": "component:Card/message",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "11px (in `font`)",
+    "snap": "--text-meta (12px): sentence-case sans, not a caps label"
+   }
+  ],
+  "dup_of": [],
+  "note": "Caption line in the entry, 11px sans."
+ },
+ {
+  "line": 236,
+  "selector": "#chatList img.embed",
+  "target": "component:Message/embed",
+  "offtoken": [],
+  "dup_of": [
+   146
+  ],
+  "note": "`cursor:zoom-in` on the same element as L146: merge."
+ },
+ {
+  "line": 237,
+  "selector": "#libPane",
+  "target": "feature:library",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Slice 4. Library pane over the chat: photos and videos, saved and drafts (backlog row 4: gallery and lightbox, saved messages and drafts)."
+ },
+ {
+  "line": 238,
+  "selector": "#libPane[hidden]",
+  "target": "utility:[hidden]",
+  "offtoken": [],
+  "dup_of": [
+   64,
+   67,
+   91,
+   161,
+   190,
+   214,
+   272,
+   327,
+   333,
+   367,
+   385,
+   397,
+   410,
+   441,
+   479,
+   608,
+   611,
+   663,
+   693,
+   734,
+   759,
+   906,
+   949,
+   972,
+   1000,
+   1131,
+   1170
+  ],
+  "note": "Redundant with L759."
+ },
+ {
+  "line": 239,
+  "selector": "body[data-lib]:not([data-chat=\"full\"]) #chat > :not(.head):not(#libPane)",
+  "target": "feature:library",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Slice 4. Hides every dock child but the header and the library while it is open: a body-data selector with three `:not()` and `!important`, which the DS lint refuses (selector-complexity cap, no !important)."
+ },
+ {
+  "line": 240,
+  "selector": "body[data-chat=\"full\"] #libPane",
+  "target": "feature:library",
+  "offtoken": [
+   {
+    "prop": "z-index",
+    "value": "2",
+    "snap": "drop: grid cell over siblings, DOM order is enough (or local isolation)"
+   },
+   {
+    "prop": "background",
+    "value": "#080B12",
+    "snap": "= --color-surface-raised"
+   }
+  ],
+  "dup_of": [],
+  "note": "Slice 4. Full dock placement; `z-index:2` and a seventh dark surface (#080B12)."
+ },
+ {
+  "line": 241,
+  "selector": "#libPane .thead",
+  "target": "component:Panel/header",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "12px",
+    "snap": "12=--space-12"
+   },
+   {
+    "prop": "padding",
+    "value": "12px var(--pad)",
+    "snap": "12=--space-12; var(--pad)->--gutter (NEW TOKEN, fluid 16-24px, see L6)"
+   }
+  ],
+  "dup_of": [
+   165
+  ],
+  "note": "Copy of `#threadPane .thead` (L165) plus flex-wrap."
+ },
+ {
+  "line": 242,
+  "selector": "#libPane .thead button#libBack, #threadPane .thead button",
+  "target": "component:IconButton/s",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "32px",
+    "snap": "32=--control-s"
+   },
+   {
+    "prop": "height",
+    "value": "32px",
+    "snap": "32=--control-s"
+   },
+   {
+    "prop": "border-radius",
+    "value": "50%",
+    "snap": "--radius-pill (999px) on a square"
+   }
+  ],
+  "dup_of": [
+   62,
+   155,
+   166,
+   187,
+   191,
+   194,
+   206,
+   215,
+   334,
+   490,
+   582,
+   871,
+   921,
+   927,
+   1124,
+   1146
+  ],
+  "note": "Second half of the selector is exactly L166: one of the two rules is a duplicate. `button#libBack` qualifies an id with an element (lint: no ids)."
+ },
+ {
+  "line": 243,
+  "selector": "#libPane .ttl2",
+  "target": "composition:Stack",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "2px",
+    "snap": "2->--space-4"
+   }
+  ],
+  "dup_of": [
+   167,
+   618
+  ],
+  "note": "Copy of L167 plus `margin-right:auto` (an outer margin)."
+ },
+ {
+  "line": 244,
+  "selector": "#libPane .ttl2 small",
+  "target": "component:Kicker",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "10.5px (in `font`)",
+    "snap": "--text-label (11px)"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "0.14em",
+    "snap": "--text-label tracking (0.14em) ="
+   }
+  ],
+  "dup_of": [
+   35,
+   53,
+   77,
+   93,
+   151,
+   175,
+   232,
+   282,
+   310,
+   537,
+   547,
+   628,
+   792,
+   925,
+   942,
+   987,
+   994,
+   1025,
+   1044,
+   1047,
+   1063,
+   1141,
+   1149,
+   1162,
+   1166
+  ],
+  "note": "Identical to base `small` once on the token."
+ },
+ {
+  "line": 245,
+  "selector": "#libPane .ttl2 b",
+  "target": "component:Panel/header",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "15px",
+    "snap": "--text-body (14px), like the thread title"
+   }
+  ],
+  "dup_of": [
+   53,
+   68,
+   89,
+   147,
+   168,
+   182,
+   260,
+   267,
+   349,
+   392,
+   568,
+   574,
+   580,
+   615,
+   837,
+   930,
+   1017,
+   1033,
+   1063
+  ],
+  "note": "Library title 15px, thread title 13.5px (L168): both become one header title."
+ },
+ {
+  "line": 246,
+  "selector": "body:not([data-chat=\"full\"]) #libTabs",
+  "target": "feature:library",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Slice 4. Moves the tab bar to its own line in the compact dock (`order:3`)."
+ },
+ {
+  "line": 247,
+  "selector": "body:not([data-chat=\"full\"]) #libTabs button",
+  "target": "component:Tabs/segmented",
+  "offtoken": [],
+  "dup_of": [
+   249,
+   250,
+   346,
+   347,
+   398,
+   399,
+   438,
+   439,
+   498,
+   499,
+   553,
+   554,
+   1097,
+   1098
+  ],
+  "note": "Tabs fill the line in the compact dock."
+ },
+ {
+  "line": 248,
+  "selector": ".rtools .tbtn svg",
+  "target": "component:Icon",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Icon does not shrink: belongs to Icon (`flex:none`)."
+ },
+ {
+  "line": 249,
+  "selector": "#libTabs",
+  "target": "component:Tabs/segmented",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "2px",
+    "snap": "2->--space-4"
+   },
+   {
+    "prop": "padding",
+    "value": "3px",
+    "snap": "3->--space-4"
+   },
+   {
+    "prop": "border-radius",
+    "value": "999px",
+    "snap": "999=--radius-pill"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.05)",
+    "snap": "NEW TOKEN --color-fill = rgba(255,255,255,0.05): idle field/chip/row fill"
+   }
+  ],
+  "dup_of": [
+   250,
+   346,
+   347,
+   398,
+   399,
+   438,
+   439,
+   498,
+   499,
+   553,
+   554,
+   1097,
+   1098
+  ],
+  "note": "Segmented tablist (role=tablist in markup). Track padding 3 and gap 2 are off-grid."
+ },
+ {
+  "line": 250,
+  "selector": "#libTabs button",
+  "target": "component:Tabs/segmented/tab",
+  "offtoken": [
+   {
+    "prop": "height",
+    "value": "26px",
+    "snap": "--control-s (32px)"
+   },
+   {
+    "prop": "padding",
+    "value": "0 10px",
+    "snap": "10->--space-12"
+   },
+   {
+    "prop": "border-radius",
+    "value": "999px",
+    "snap": "999=--radius-pill"
+   },
+   {
+    "prop": "font-size",
+    "value": "11.5px (in `font`)",
+    "snap": "--text-ui (13px, weight 500) by role: DS sets controls, chips and tabs at 13"
+   }
+  ],
+  "dup_of": [
+   249,
+   346,
+   347,
+   398,
+   399,
+   438,
+   439,
+   498,
+   499,
+   553,
+   554,
+   1097,
+   1098
+  ],
+  "note": "Tab: 26px high, 11.5px/500, padding 0 10. Tab heights in the file: 26 (#libTabs), 30 (#notifTabs), 32 (#lens, .seg, #hRailTabs), 34 (#hnav .links)."
+ },
+ {
+  "line": 251,
+  "selector": "#libTabs button[aria-selected=\"true\"]",
+  "target": "component:Tabs/segmented/tab/selected",
+  "offtoken": [],
+  "dup_of": [
+   127,
+   343,
+   348,
+   400,
+   440,
+   503,
+   558,
+   600,
+   714
+  ],
+  "note": "Selected via [aria-selected], the DS convention; same colours as every other selected tab (L348, L400, L440, L503, L558)."
+ },
+ {
+  "line": 252,
+  "selector": "#libBody",
+  "target": "feature:library",
+  "offtoken": [
+   {
+    "prop": "padding",
+    "value": "16px var(--pad)",
+    "snap": "16=--space-16; var(--pad)->--gutter (NEW TOKEN, fluid 16-24px, see L6)"
+   },
+   {
+    "prop": "gap",
+    "value": "6px",
+    "snap": "6->--space-8"
+   }
+  ],
+  "dup_of": [
+   81,
+   137,
+   169,
+   551,
+   928
+  ],
+  "note": "Slice 4. Library body (scroll area)."
+ },
+ {
+  "line": 253,
+  "selector": "body[data-chat=\"full\"] #libBody",
+  "target": "feature:library",
+  "offtoken": [
+   {
+    "prop": "padding",
+    "value": "24px 32px",
+    "snap": "24=--space-24; 32=--space-32"
+   }
+  ],
+  "dup_of": [],
+  "note": "Slice 4. Full dock gives it more padding (24/32)."
+ },
+ {
+  "line": 254,
+  "selector": ".lgrid",
+  "target": "composition:Grid",
+  "offtoken": [
+   {
+    "prop": "grid-template-columns",
+    "value": "repeat(auto-fill, minmax(130px, 1fr))",
+    "snap": "Grid min column: keep raw 130px as a prop (comment: thumbnail width)"
+   },
+   {
+    "prop": "gap",
+    "value": "10px",
+    "snap": "10->--space-12"
+   }
+  ],
+  "dup_of": [
+   255
+  ],
+  "note": "Thumbnail grid, auto-fill minmax(130px, 1fr): the Grid composition's min column as a prop."
+ },
+ {
+  "line": 255,
+  "selector": "body[data-chat=\"full\"] .lgrid",
+  "target": "composition:Grid",
+  "offtoken": [
+   {
+    "prop": "grid-template-columns",
+    "value": "repeat(auto-fill, minmax(200px, 1fr))",
+    "snap": "Grid min column: keep raw 200px as a prop (comment: thumbnail width)"
+   },
+   {
+    "prop": "gap",
+    "value": "14px",
+    "snap": "14->--space-16"
+   }
+  ],
+  "dup_of": [
+   254
+  ],
+  "note": "Same grid at 200px min and gap 14 in the full dock."
+ },
+ {
+  "line": 256,
+  "selector": ".lgrid button",
+  "target": "component:Card/media",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "6px",
+    "snap": "6->--space-8"
+   }
+  ],
+  "dup_of": [],
+  "note": "Thumbnail tile: image + caption in a column; zoom-in cursor."
+ },
+ {
+  "line": 257,
+  "selector": ".lgrid img, .lgrid video",
+  "target": "component:Card/media",
+  "offtoken": [
+   {
+    "prop": "border-radius",
+    "value": "12px",
+    "snap": "12=--radius-m"
+   },
+   {
+    "prop": "background",
+    "value": "#000",
+    "snap": "= --color-space"
+   },
+   {
+    "prop": "transition",
+    "value": "transform 0.35s, filter 0.35s",
+    "snap": "--motion-base (200ms) on transform and filter"
+   }
+  ],
+  "dup_of": [
+   146,
+   842,
+   986
+  ],
+  "note": "Thumbnail: radius 12 (radius-m, DS ok); black background; 0.35s transitions (a hover effect: DS hover is --motion-fast)."
+ },
+ {
+  "line": 258,
+  "selector": ".lgrid button:hover img, .lgrid button:hover video",
+  "target": "component:Card/media/hover",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Zoom 1.03 and brightness 1.08 on hover."
+ },
+ {
+  "line": 259,
+  "selector": ".lgrid button:focus-visible",
+  "target": "component:Card/media/focus",
+  "offtoken": [
+   {
+    "prop": "border-radius",
+    "value": "12px",
+    "snap": "12=--radius-m"
+   }
+  ],
+  "dup_of": [
+   5
+  ],
+  "note": "Focus ring in --text with offset 3: a second ring colour beside the base's green (L34)."
+ },
+ {
+  "line": 260,
+  "selector": ".lgrid small",
+  "target": "component:Card/media",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "10.5px (in `font`)",
+    "snap": "--text-label (11px)"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "0.06em",
+    "snap": "--text-label tracking (0.14em)"
+   }
+  ],
+  "dup_of": [
+   35,
+   53,
+   77,
+   93,
+   151,
+   175,
+   232,
+   244,
+   282,
+   310,
+   537,
+   547,
+   628,
+   792,
+   925,
+   942,
+   987,
+   994,
+   1025,
+   1044,
+   1047,
+   1063,
+   1141,
+   1149,
+   1162,
+   1166
+  ],
+  "note": "Caption (author and time), mono, truncated; spacing .06em is a fourth label tracking."
+ },
+ {
+  "line": 261,
+  "selector": ".lgrid .play",
+  "target": "component:Badge/overlay",
+  "offtoken": [
+   {
+    "prop": "left",
+    "value": "8px",
+    "snap": "8=--space-8"
+   },
+   {
+    "prop": "top",
+    "value": "8px",
+    "snap": "8=--space-8"
+   },
+   {
+    "prop": "gap",
+    "value": "4px",
+    "snap": "4=--space-4"
+   },
+   {
+    "prop": "padding",
+    "value": "3px 8px",
+    "snap": "3->--space-4; 8=--space-8"
+   },
+   {
+    "prop": "border-radius",
+    "value": "999px",
+    "snap": "999=--radius-pill"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(3, 5, 9, 0.72)",
+    "snap": "NEW TOKEN --color-scrim = rgba(3,5,9,0.65)"
+   },
+   {
+    "prop": "font-size",
+    "value": "10px (in `font`)",
+    "snap": "--text-label (11px)"
+   }
+  ],
+  "dup_of": [
+   63,
+   358,
+   628,
+   1078,
+   1099,
+   1139
+  ],
+  "note": "Play/duration badge on a video tile; the 0.72 scrim colour is a second scrim."
+ },
+ {
+  "line": 262,
+  "selector": "#libBody .lnote",
+  "target": "component:EmptyState/text",
+  "offtoken": [
+   {
+    "prop": "margin",
+    "value": "4px 0 10px",
+    "snap": "4=--space-4; 10->--space-12"
+   },
+   {
+    "prop": "font-size",
+    "value": "13px",
+    "snap": "--text-body (14px) by role: 13px is the control size, paragraph text is body"
+   }
+  ],
+  "dup_of": [],
+  "note": "The library's empty/notice text ('Nothing saved yet', app.js:2739). DS EmptyState = text and one action; these have no action."
+ },
+ {
+  "line": 263,
+  "selector": "#libBody small.h",
+  "target": "component:Kicker",
+  "offtoken": [
+   {
+    "prop": "margin-top",
+    "value": "10px",
+    "snap": "drop: outer margin"
+   }
+  ],
+  "dup_of": [],
+  "note": "Extra top margin for the second heading: an outer margin, give it to the parent Stack."
+ },
+ {
+  "line": 264,
+  "selector": "#roomPop .rfind",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: #roomPop is never referenced by app.js (0 matches) so it is never filled or opened; the room switch became chips (#roomChips). `.rfind` appears nowhere in app.js or the markup."
+ },
+ {
+  "line": 265,
+  "selector": "#roomPop .rfind:focus",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: #roomPop is never referenced by app.js (0 matches) so it is never filled or opened; the room switch became chips (#roomChips). Also a `:focus` rule with `outline:none`."
+ },
+ {
+  "line": 266,
+  "selector": "#roomPop button.it",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: #roomPop is never referenced by app.js (0 matches) so it is never filled or opened; the room switch became chips (#roomChips)."
+ },
+ {
+  "line": 267,
+  "selector": "#roomPop button.it b",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: #roomPop is never referenced by app.js (0 matches) so it is never filled or opened; the room switch became chips (#roomChips)."
+ },
+ {
+  "line": 268,
+  "selector": "#roomPop button.it[aria-current=\"true\"]",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: #roomPop is never referenced by app.js (0 matches) so it is never filled or opened; the room switch became chips (#roomChips)."
+ },
+ {
+  "line": 269,
+  "selector": "#roomPop button.it svg",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: #roomPop is never referenced by app.js (0 matches) so it is never filled or opened; the room switch became chips (#roomChips)."
+ },
+ {
+  "line": 270,
+  "selector": "#roomPop p, #libBody p",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   262
+  ],
+  "note": "dead: the #roomPop half is dead; the #libBody half styles only `p.lnote`, whose own rule `#libBody .lnote` (L262, higher specificity) sets margin, font-size and colour, so all three declarations here lose."
+ },
+ {
+  "line": 271,
+  "selector": "#replyBar",
+  "target": "feature:composer",
+  "offtoken": [
+   {
+    "prop": "padding",
+    "value": "6px 12px",
+    "snap": "6->--space-8; 12=--space-12"
+   },
+   {
+    "prop": "border-radius",
+    "value": "10px",
+    "snap": "10->--radius-m"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.05)",
+    "snap": "NEW TOKEN --color-fill = rgba(255,255,255,0.05): idle field/chip/row fill"
+   },
+   {
+    "prop": "font-size",
+    "value": "12px",
+    "snap": "--text-meta (12px)"
+   }
+  ],
+  "dup_of": [
+   174,
+   185,
+   294,
+   304,
+   654,
+   692,
+   858,
+   865,
+   1024,
+   1035,
+   1053,
+   1067,
+   1152,
+   1165
+  ],
+  "note": "Slice 4. Reply preview bar above the composer. Fill .05, radius 10."
+ },
+ {
+  "line": 272,
+  "selector": "#replyBar[hidden]",
+  "target": "utility:[hidden]",
+  "offtoken": [],
+  "dup_of": [
+   64,
+   67,
+   91,
+   161,
+   190,
+   214,
+   238,
+   327,
+   333,
+   367,
+   385,
+   397,
+   410,
+   441,
+   479,
+   608,
+   611,
+   663,
+   693,
+   734,
+   759,
+   906,
+   949,
+   972,
+   1000,
+   1131,
+   1170
+  ],
+  "note": "Redundant with L759."
+ },
+ {
+  "line": 272,
+  "selector": "#replyBar b",
+  "target": "feature:composer",
+  "offtoken": [],
+  "dup_of": [
+   148,
+   173,
+   293,
+   319,
+   520,
+   548,
+   681,
+   891,
+   996
+  ],
+  "note": "Slice 4. Author of the reply."
+ },
+ {
+  "line": 272,
+  "selector": "#replyBar button",
+  "target": "component:IconButton/s",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "15px",
+    "snap": "drop: dead declaration (svg-only button)"
+   }
+  ],
+  "dup_of": [
+   62,
+   155,
+   166,
+   187,
+   191,
+   194,
+   206,
+   215,
+   242,
+   334,
+   490,
+   582,
+   871,
+   921,
+   927,
+   1124,
+   1146
+  ],
+  "note": "Cancel cross. `font-size:15px` does nothing: the button holds only an svg (markup line 1344)."
+ },
+ {
+  "line": 273,
+  "selector": "#profile",
+  "target": "component:Dialog/standard",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "min(440px, 92vw)",
+    "snap": "NEW TOKEN --dialog-width = 440px (min(440px, 92vw)); #sealBox 460 snaps to it"
+   },
+   {
+    "prop": "padding",
+    "value": "24px",
+    "snap": "24=--space-24"
+   },
+   {
+    "prop": "border-radius",
+    "value": "22px",
+    "snap": "22->--radius-xl"
+   },
+   {
+    "prop": "background",
+    "value": "#0B0F18",
+    "snap": "= --color-surface-raised"
+   }
+  ],
+  "dup_of": [
+   290,
+   306,
+   840,
+   1041,
+   1160
+  ],
+  "note": "Name and face dialog (slice 9: register a name; avatar parts in phase 1). Width min(440px, 92vw) = standard; radius 22 is off the scale (24 is radius-xl); same box as #sealBox and #rentBox (L290, L306)."
+ },
+ {
+  "line": 274,
+  "selector": "#profile::backdrop",
+  "target": "component:Dialog/backdrop",
+  "offtoken": [
+   {
+    "prop": "background",
+    "value": "rgba(3, 5, 9, 0.7)",
+    "snap": "NEW TOKEN --color-scrim = rgba(3,5,9,0.65)"
+   },
+   {
+    "prop": "backdrop-filter",
+    "value": "blur(6px)",
+    "snap": "NEW TOKEN --blur-scrim = 6px (dialog backdrop)"
+   }
+  ],
+  "dup_of": [
+   291,
+   307,
+   841,
+   1042,
+   1161
+  ],
+  "note": "Scrim .7 + blur 6px; the other dialogs use .6 + blur 4px: one scrim."
+ },
+ {
+  "line": 275,
+  "selector": "#profile h2",
+  "target": "component:Dialog/title",
+  "offtoken": [
+   {
+    "prop": "margin",
+    "value": "6px 0 8px",
+    "snap": "6->--space-8; 8=--space-8"
+   },
+   {
+    "prop": "font-size",
+    "value": "26px",
+    "snap": "--text-title-s (20px) by role (DS: panel and dialog titles); nearest value would be title-m 28"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "-0.02em",
+    "snap": "0 (title-s has no tracking)"
+   },
+   {
+    "prop": "font-weight",
+    "value": "300",
+    "snap": "400 (--text-title-s)"
+   }
+  ],
+  "dup_of": [
+   94,
+   122,
+   136,
+   292,
+   308,
+   411,
+   426,
+   480,
+   649,
+   679,
+   1045,
+   1095,
+   1163
+  ],
+  "note": "Dialog title 26px/300/-0.02em; #sealBox is 24px (L292), #rentBox 26px (L308): three titles for one role. DS: --text-title-s (20px, weight 400, no tracking) for dialog titles."
+ },
+ {
+  "line": 276,
+  "selector": "#profile p",
+  "target": "component:Dialog/text",
+  "offtoken": [
+   {
+    "prop": "margin",
+    "value": "0 0 16px",
+    "snap": "16=--space-16"
+   },
+   {
+    "prop": "font-size",
+    "value": "13px",
+    "snap": "--text-body (14px) by role: 13px is the control size, paragraph text is body"
+   }
+  ],
+  "dup_of": [
+   293,
+   309,
+   1046,
+   1164
+  ],
+  "note": "Dialog paragraph 13px/1.5 muted; copies at L293, L309, L1164."
+ },
+ {
+  "line": 277,
+  "selector": "#profile code",
+  "target": "component:Message/body",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "12px",
+    "snap": "--text-meta (12px)"
+   }
+  ],
+  "dup_of": [
+   221,
+   295,
+   1033,
+   1135
+  ],
+  "note": "Inline code in a dialog, mono 12."
+ },
+ {
+  "line": 278,
+  "selector": "#profAvatars",
+  "target": "composition:Cluster",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "10px",
+    "snap": "10->--space-12"
+   },
+   {
+    "prop": "margin-bottom",
+    "value": "18px",
+    "snap": "drop: outer margin"
+   }
+  ],
+  "dup_of": [],
+  "note": "Avatar choices wrap with gap 10; the margin below is an outer margin."
+ },
+ {
+  "line": 279,
+  "selector": ".avpick",
+  "target": "component:Avatar/48/choice",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "48px",
+    "snap": "Avatar size 48 (exact)"
+   },
+   {
+    "prop": "height",
+    "value": "48px",
+    "snap": "Avatar size 48 (exact)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "50%",
+    "snap": "--radius-pill (999px) on a square"
+   },
+   {
+    "prop": "box-shadow",
+    "value": "inset -9px -6px 12px rgba(0, 0, 0, 0.6)",
+    "snap": "art: planet shading (Avatar/PlanetThumb)"
+   },
+   {
+    "prop": "font-size",
+    "value": "20px",
+    "snap": "drop: glyph size of a typed `+`; use an Icon"
+   }
+  ],
+  "dup_of": [
+   66,
+   106,
+   142,
+   143,
+   372,
+   613,
+   715,
+   1008
+  ],
+  "note": "Avatar choice, 48px (DS size ok). Planet photos as avatars: the DS says 'never a planet', an astronaut generated from the name."
+ },
+ {
+  "line": 280,
+  "selector": ".avpick.up",
+  "target": "component:Avatar/48/choice",
+  "offtoken": [
+   {
+    "prop": "background-color",
+    "value": "rgba(255, 255, 255, 0.06)",
+    "snap": "NEW TOKEN --color-fill = rgba(255,255,255,0.05): idle field/chip/row fill"
+   }
+  ],
+  "dup_of": [],
+  "note": "Upload tile (dashed, `+`). DS: no uploaded picture (ADR-0002 §6): this variant and #profFile are to delete."
+ },
+ {
+  "line": 281,
+  "selector": ".avpick[aria-pressed=\"true\"]",
+  "target": "component:Avatar/48/choice/selected",
+  "offtoken": [],
+  "dup_of": [
+   5,
+   708
+  ],
+  "note": "Selected = a 2px --text outline with offset 3: the same cue as a focus ring (L259, L805), so selected and focused look alike."
+ },
+ {
+  "line": 282,
+  "selector": "#profile label",
+  "target": "component:Field/label",
+  "offtoken": [
+   {
+    "prop": "margin-bottom",
+    "value": "6px",
+    "snap": "drop: outer margin"
+   },
+   {
+    "prop": "font-size",
+    "value": "10.5px (in `font`)",
+    "snap": "--text-label (11px)"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "0.14em",
+    "snap": "--text-label tracking (0.14em) ="
+   }
+  ],
+  "dup_of": [
+   35,
+   53,
+   77,
+   93,
+   151,
+   175,
+   232,
+   244,
+   310,
+   537,
+   547,
+   628,
+   792,
+   925,
+   942,
+   987,
+   994,
+   1025,
+   1044,
+   1047,
+   1063,
+   1141,
+   1149,
+   1162,
+   1166
+  ],
+  "note": "Field label in the caps mono style; the third copy of the label."
+ },
+ {
+  "line": 283,
+  "selector": ".namefield",
+  "target": "component:Field/text/with-prefix",
+  "offtoken": [
+   {
+    "prop": "height",
+    "value": "44px",
+    "snap": "44=--control-l"
+   },
+   {
+    "prop": "padding",
+    "value": "0 14px",
+    "snap": "14->--space-16"
+   },
+   {
+    "prop": "border-radius",
+    "value": "12px",
+    "snap": "--radius-l (16px): DS puts inputs at radius-l; the prototype gives the same role 999, 16, 12 and 10"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.04)",
+    "snap": "NEW TOKEN --color-fill = rgba(255,255,255,0.05): idle field/chip/row fill"
+   },
+   {
+    "prop": "font-size",
+    "value": "15px (in `font`)",
+    "snap": "--text-lead (16px)"
+   }
+  ],
+  "dup_of": [
+   83,
+   131,
+   197,
+   264,
+   311,
+   894,
+   1073
+  ],
+  "note": "Name field with a `nym-` prefix. 44px = control-l; radius 12; 15px mono."
+ },
+ {
+  "line": 284,
+  "selector": ".namefield span",
+  "target": "component:Field/text/with-prefix",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "The `nym-` prefix in muted."
+ },
+ {
+  "line": 284,
+  "selector": ".namefield input",
+  "target": "component:Field/text/with-prefix",
+  "offtoken": [],
+  "dup_of": [
+   5
+  ],
+  "note": "`outline:none` on the input, and no `.namefield:focus-within` rule exists: the field shows no focus at all (and it wins over the base ring on specificity tie + order). Accessibility bug."
+ },
+ {
+  "line": 285,
+  "selector": "#profCheck",
+  "target": "component:Field/hint",
+  "offtoken": [
+   {
+    "prop": "min-height",
+    "value": "18px",
+    "snap": "18->--space-16"
+   },
+   {
+    "prop": "margin",
+    "value": "8px 0 16px",
+    "snap": "8=--space-8; 16=--space-16"
+   },
+   {
+    "prop": "font-size",
+    "value": "12px (in `font`)",
+    "snap": "--text-meta (12px)"
+   }
+  ],
+  "dup_of": [
+   209,
+   312,
+   317,
+   318,
+   1065,
+   1174
+  ],
+  "note": "Availability message under the field, sans 12px with its own letter-spacing/transform reset (it is a <small>)."
+ },
+ {
+  "line": 286,
+  "selector": "#profCheck.ok",
+  "target": "component:Field/hint/valid",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Valid name in --color-action (DS: action = success). JS toggles a `.ok` class (app.js:3723), the DS wants a state attribute."
+ },
+ {
+  "line": 287,
+  "selector": "#profile .row",
+  "target": "composition:Cluster",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "8px",
+    "snap": "8=--space-8"
+   }
+  ],
+  "dup_of": [
+   130,
+   303,
+   313,
+   316,
+   843,
+   893,
+   1017,
+   1173
+  ],
+  "note": "Dialog actions row; same at L303, L316, L1173."
+ },
+ {
+  "line": 287,
+  "selector": "#profile .row .primary",
+  "target": "component:Button/primary/l",
+  "offtoken": [
+   {
+    "prop": "height",
+    "value": "44px",
+    "snap": "44=--control-l"
+   },
+   {
+    "prop": "padding",
+    "value": "0 20px",
+    "snap": "20->--space-24"
+   }
+  ],
+  "dup_of": [
+   41,
+   210,
+   303,
+   316,
+   513,
+   625,
+   814,
+   815,
+   870,
+   1073,
+   1118,
+   1173
+  ],
+  "note": "Primary at 44px (control-l), padding 20; #sealBox and #rentBox use 22, #evoForm 18: Button l has one padding."
+ },
+ {
+  "line": 287,
+  "selector": "#profile .row .primary:disabled",
+  "target": "component:Button/primary/disabled",
+  "offtoken": [
+   {
+    "prop": "opacity",
+    "value": "0.4",
+    "snap": "NEW TOKEN --opacity-dim = 0.4"
+   }
+  ],
+  "dup_of": [
+   41,
+   210,
+   303,
+   316,
+   513,
+   625,
+   814,
+   815,
+   870,
+   1073,
+   1118,
+   1173
+  ],
+  "note": "Disabled at opacity .4 (L303 .5)."
+ },
+ {
+  "line": 288,
+  "selector": "#sealBtn",
+  "target": "component:Button/secondary/s",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "6px",
+    "snap": "6->--space-8"
+   },
+   {
+    "prop": "margin-right",
+    "value": "4px",
+    "snap": "drop: outer margin"
+   }
+  ],
+  "dup_of": [
+   43,
+   80,
+   543,
+   772,
+   810,
+   896,
+   1072
+  ],
+  "note": "'Seal' button in the dock header (markup: `.pillbtn.small`); gap 6 and an outer margin 4. Seal flow is phase 2 (backlog)."
+ },
+ {
+  "line": 289,
+  "selector": "#sealBtn.done",
+  "target": "component:Button/secondary/s/done",
+  "offtoken": [
+   {
+    "prop": "border-color",
+    "value": "rgba(255, 196, 107, 0.6)",
+    "snap": "color-mix(--color-warm 50%) (NEW --tint-wash 12% / --tint-line 50%)"
+   },
+   {
+    "prop": "color",
+    "value": "#FFC46B",
+    "snap": "= --color-warm"
+   }
+  ],
+  "dup_of": [],
+  "note": "Sealed state: a `.done` class with a warm border; DS wants an attribute, and success is --color-action, not warm."
+ },
+ {
+  "line": 290,
+  "selector": "#sealBox",
+  "target": "component:Dialog/standard",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "min(460px, 92vw)",
+    "snap": "NEW TOKEN --dialog-width = 440px"
+   },
+   {
+    "prop": "padding",
+    "value": "24px",
+    "snap": "24=--space-24"
+   },
+   {
+    "prop": "border-radius",
+    "value": "22px",
+    "snap": "22->--radius-xl"
+   },
+   {
+    "prop": "background",
+    "value": "#0B0F18",
+    "snap": "= --color-surface-raised"
+   }
+  ],
+  "dup_of": [
+   273,
+   306,
+   840,
+   1041,
+   1160
+  ],
+  "note": "Seal dialog (feature: seal-flow, phase 2). Width 460 vs 440 for the other two."
+ },
+ {
+  "line": 291,
+  "selector": "#sealBox::backdrop",
+  "target": "component:Dialog/backdrop",
+  "offtoken": [
+   {
+    "prop": "background",
+    "value": "rgba(3, 5, 9, 0.6)",
+    "snap": "NEW TOKEN --color-scrim = rgba(3,5,9,0.65)"
+   },
+   {
+    "prop": "backdrop-filter",
+    "value": "blur(4px)",
+    "snap": "NEW TOKEN --blur-scrim = 6px (dialog backdrop)"
+   }
+  ],
+  "dup_of": [
+   274,
+   307,
+   841,
+   1042,
+   1161
+  ],
+  "note": "Scrim .6 + blur 4px."
+ },
+ {
+  "line": 292,
+  "selector": "#sealBox h2",
+  "target": "component:Dialog/title",
+  "offtoken": [
+   {
+    "prop": "margin",
+    "value": "6px 0 8px",
+    "snap": "6->--space-8; 8=--space-8"
+   },
+   {
+    "prop": "font-size",
+    "value": "24px",
+    "snap": "--text-title-s (20px) by role (DS: dialog titles)"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "-0.02em",
+    "snap": "0 (title-s has no tracking)"
+   }
+  ],
+  "dup_of": [
+   94,
+   122,
+   136,
+   275,
+   308,
+   411,
+   426,
+   480,
+   649,
+   679,
+   1045,
+   1095,
+   1163
+  ],
+  "note": "24px: the second dialog title size (L275 26px)."
+ },
+ {
+  "line": 293,
+  "selector": "#sealBox p",
+  "target": "component:Dialog/text",
+  "offtoken": [
+   {
+    "prop": "margin",
+    "value": "0 0 14px",
+    "snap": "drop: outer margin"
+   },
+   {
+    "prop": "font-size",
+    "value": "13px",
+    "snap": "--text-body (14px) by role: 13px is the control size, paragraph text is body"
+   }
+  ],
+  "dup_of": [
+   276,
+   309,
+   1046,
+   1164
+  ],
+  "note": "Paragraph 13px; margin-bottom 14 (L276 uses 16)."
+ },
+ {
+  "line": 293,
+  "selector": "#sealBox p b",
+  "target": "component:Dialog/text",
+  "offtoken": [],
+  "dup_of": [
+   148,
+   173,
+   272,
+   319,
+   520,
+   548,
+   681,
+   891,
+   996
+  ],
+  "note": "Bold in the paragraph."
+ },
+ {
+  "line": 294,
+  "selector": "#sealBox .fp",
+  "target": "component:Card/message",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "4px",
+    "snap": "4=--space-4"
+   },
+   {
+    "prop": "padding",
+    "value": "10px 12px",
+    "snap": "10->--space-12; 12=--space-12"
+   },
+   {
+    "prop": "border-radius",
+    "value": "12px",
+    "snap": "12=--radius-m"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.05)",
+    "snap": "NEW TOKEN --color-fill = rgba(255,255,255,0.05): idle field/chip/row fill"
+   }
+  ],
+  "dup_of": [
+   174,
+   185,
+   271,
+   304,
+   654,
+   692,
+   858,
+   865,
+   1024,
+   1035,
+   1053,
+   1067,
+   1152,
+   1165
+  ],
+  "note": "Fingerprint box: fill .05, radius 12, padding 10/12."
+ },
+ {
+  "line": 295,
+  "selector": "#sealBox .fp code, #sealBox ol code",
+  "target": "component:Message/body",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "13px (in `font`)",
+    "snap": "--text-meta (12px): inline code at one size (12.5, 12, 13 in the prototype)"
+   },
+   {
+    "prop": "color",
+    "value": "#FFC46B",
+    "snap": "= --color-warm"
+   }
+  ],
+  "dup_of": [
+   221,
+   277,
+   1033,
+   1135
+  ],
+  "note": "Mono code in --color-warm. The warm also marks saved (L229), mentions of you (L227) and seal success (L289, L300, L302, L305); DS: heat, the sun, live moments, and success is --color-action."
+ },
+ {
+  "line": 296,
+  "selector": "#sealSteps",
+  "target": "component:Progress/steps",
+  "offtoken": [
+   {
+    "prop": "margin",
+    "value": "14px 0",
+    "snap": "drop: outer margin"
+   },
+   {
+    "prop": "gap",
+    "value": "8px",
+    "snap": "8=--space-8"
+   },
+   {
+    "prop": "font-size",
+    "value": "13px",
+    "snap": "--text-body (14px) by role: 13px is the control size, paragraph text is body"
+   }
+  ],
+  "dup_of": [],
+  "note": "Seal steps list (stepper): a stepper is a Progress variant."
+ },
+ {
+  "line": 297,
+  "selector": "#sealSteps li",
+  "target": "composition:Cluster",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "10px",
+    "snap": "10->--space-12"
+   }
+  ],
+  "dup_of": [
+   111,
+   417,
+   465,
+   516,
+   591,
+   890,
+   1006,
+   1016,
+   1056,
+   1069
+  ],
+  "note": "Marker + label."
+ },
+ {
+  "line": 298,
+  "selector": "#sealSteps li::before",
+  "target": "component:Progress/steps",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "14px",
+    "snap": "--space-16 (marker circle; 14 rounds up)"
+   },
+   {
+    "prop": "height",
+    "value": "14px",
+    "snap": "--space-16 (marker circle; 14 rounds up)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "50%",
+    "snap": "--radius-pill (999px) on a square"
+   }
+  ],
+  "dup_of": [
+   1057,
+   1171
+  ],
+  "note": "Step marker: 14px circle, 1.5px border; same circle as `.quest li::before` (L1057) and `#signWait i` (L1171)."
+ },
+ {
+  "line": 299,
+  "selector": "#sealSteps li.go",
+  "target": "component:Progress/steps",
+  "offtoken": [],
+  "dup_of": [
+   300
+  ],
+  "note": "Current step in --color-text, from a `.go` class (DS: data-state)."
+ },
+ {
+  "line": 299,
+  "selector": "#sealSteps li.go::before",
+  "target": "component:Progress/steps",
+  "offtoken": [
+   {
+    "prop": "border-color",
+    "value": "#FFC46B",
+    "snap": "= --color-warm"
+   },
+   {
+    "prop": "animation",
+    "value": "spin 0.8s linear infinite",
+    "snap": "keep raw (comment: spinner revolution) or NEW TOKEN --motion-spin = 800ms linear"
+   }
+  ],
+  "dup_of": [
+   298,
+   1057,
+   1171
+  ],
+  "note": "Spinner: 0.8s linear infinite; it is a spinner, not a DS duration. Loops stop under reduced motion (L967 kills all animation)."
+ },
+ {
+  "line": 300,
+  "selector": "#sealSteps li.ok",
+  "target": "component:Progress/steps",
+  "offtoken": [],
+  "dup_of": [
+   299
+  ],
+  "note": "Done step in --color-text (same as current)."
+ },
+ {
+  "line": 300,
+  "selector": "#sealSteps li.ok::before",
+  "target": "component:Progress/steps",
+  "offtoken": [
+   {
+    "prop": "border-color",
+    "value": "#FFC46B",
+    "snap": "= --color-warm"
+   },
+   {
+    "prop": "background",
+    "value": "#FFC46B",
+    "snap": "= --color-warm"
+   },
+   {
+    "prop": "box-shadow",
+    "value": "inset 0 0 0 3px #0B0F18",
+    "snap": "inset ring 3px in --color-surface-raised (no token needed: a ring on the dot)"
+   }
+  ],
+  "dup_of": [
+   298,
+   1057,
+   1171
+  ],
+  "note": "Filled warm dot with an inner ring (box-shadow). Done in warm; DS: success is --color-action."
+ },
+ {
+  "line": 302,
+  "selector": "#sealBox p.done",
+  "target": "component:Dialog/text",
+  "offtoken": [
+   {
+    "prop": "color",
+    "value": "#FFC46B",
+    "snap": "= --color-warm"
+   }
+  ],
+  "dup_of": [],
+  "note": "Seal confirmation in warm, a class on the paragraph."
+ },
+ {
+  "line": 303,
+  "selector": "#sealBox .row",
+  "target": "composition:Cluster",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "8px",
+    "snap": "8=--space-8"
+   },
+   {
+    "prop": "margin-top",
+    "value": "8px",
+    "snap": "drop: outer margin"
+   }
+  ],
+  "dup_of": [
+   287,
+   316,
+   1017,
+   1173
+  ],
+  "note": "Same as L287."
+ },
+ {
+  "line": 303,
+  "selector": "#sealBox .row .primary",
+  "target": "component:Button/primary/l",
+  "offtoken": [
+   {
+    "prop": "height",
+    "value": "44px",
+    "snap": "44=--control-l"
+   },
+   {
+    "prop": "padding",
+    "value": "0 22px",
+    "snap": "22->--space-24"
+   }
+  ],
+  "dup_of": [
+   41,
+   210,
+   287,
+   316,
+   513,
+   625,
+   814,
+   815,
+   870,
+   1073,
+   1118,
+   1173
+  ],
+  "note": "44px with padding 22."
+ },
+ {
+  "line": 303,
+  "selector": "#sealBox .row .primary:disabled",
+  "target": "component:Button/primary/disabled",
+  "offtoken": [
+   {
+    "prop": "opacity",
+    "value": "0.5",
+    "snap": "NEW TOKEN --opacity-dim = 0.4"
+   }
+  ],
+  "dup_of": [
+   41,
+   210,
+   287,
+   316,
+   513,
+   625,
+   814,
+   815,
+   870,
+   1073,
+   1118,
+   1173
+  ],
+  "note": "Disabled at .5; L287 says .4."
+ },
+ {
+  "line": 304,
+  "selector": ".sealcard",
+  "target": "component:Card/message",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "3px",
+    "snap": "3->--space-4"
+   },
+   {
+    "prop": "padding",
+    "value": "10px 12px",
+    "snap": "10->--space-12; 12=--space-12"
+   },
+   {
+    "prop": "border-radius",
+    "value": "12px",
+    "snap": "12=--radius-m"
+   },
+   {
+    "prop": "border",
+    "value": "rgba(255, 196, 107, 0.45)",
+    "snap": "color-mix(--color-warm 50%) (NEW --tint-wash 12% / --tint-line 50%)"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(255, 196, 107, 0.07)",
+    "snap": "color-mix(--color-warm 12%) (NEW --tint-wash 12% / --tint-line 50%)"
+   }
+  ],
+  "dup_of": [
+   174,
+   185,
+   271,
+   294,
+   654,
+   692,
+   858,
+   865,
+   1024,
+   1035,
+   1053,
+   1067,
+   1152,
+   1165
+  ],
+  "note": "A system card in the chat announcing a seal (app.js:2699): warm border .45 and fill .07."
+ },
+ {
+  "line": 305,
+  "selector": ".sealcard b",
+  "target": "component:Card/message",
+  "offtoken": [
+   {
+    "prop": "color",
+    "value": "#FFC46B",
+    "snap": "= --color-warm"
+   },
+   {
+    "prop": "font-size",
+    "value": "13px",
+    "snap": "--text-ui (13px)"
+   }
+  ],
+  "dup_of": [],
+  "note": "Card title in warm 13px."
+ },
+ {
+  "line": 305,
+  "selector": ".sealcard span",
+  "target": "component:Card/message",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "11px (in `font`)",
+    "snap": "--text-label (11px)"
+   }
+  ],
+  "dup_of": [
+   35,
+   53,
+   77,
+   93,
+   151,
+   175,
+   232,
+   244,
+   282,
+   310,
+   537,
+   547,
+   628,
+   792,
+   925,
+   942,
+   987,
+   994,
+   1025,
+   1044,
+   1047,
+   1063,
+   1135,
+   1141,
+   1149,
+   1162,
+   1166
+  ],
+  "note": "Card line, mono 11px."
+ },
+ {
+  "line": 306,
+  "selector": "#rentBox",
+  "target": "component:Dialog/standard",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "min(440px, 92vw)",
+    "snap": "NEW TOKEN --dialog-width = 440px"
+   },
+   {
+    "prop": "padding",
+    "value": "24px",
+    "snap": "24=--space-24"
+   },
+   {
+    "prop": "border-radius",
+    "value": "22px",
+    "snap": "22->--radius-xl"
+   },
+   {
+    "prop": "background",
+    "value": "#0B0F18",
+    "snap": "= --color-surface-raised"
+   }
+  ],
+  "dup_of": [
+   273,
+   290,
+   840,
+   1041,
+   1160
+  ],
+  "note": "Rent a satellite dialog (slice 11). Same box as #profile."
+ },
+ {
+  "line": 307,
+  "selector": "#rentBox::backdrop",
+  "target": "component:Dialog/backdrop",
+  "offtoken": [
+   {
+    "prop": "background",
+    "value": "rgba(3, 5, 9, 0.6)",
+    "snap": "NEW TOKEN --color-scrim = rgba(3,5,9,0.65)"
+   },
+   {
+    "prop": "backdrop-filter",
+    "value": "blur(4px)",
+    "snap": "NEW TOKEN --blur-scrim = 6px (dialog backdrop)"
+   }
+  ],
+  "dup_of": [
+   274,
+   291,
+   841,
+   1042,
+   1161
+  ],
+  "note": "Scrim .6 + blur 4px."
+ }
+]
