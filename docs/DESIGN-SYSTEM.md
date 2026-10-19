@@ -65,7 +65,7 @@ The theme is dark only (`color-scheme: dark`). Nine base colours:
 | cream | `#F2EFEA` | The primary button (one per region); what is selected |
 | mint | `#5CF2C8` | `--color-mine`: what is mine, the focus ring, unread counts. Nothing else |
 | amber | `#FFC46B` | Heat, the sun, live moments, what is about me; caution |
-| violet | `#B79CFF` | Uncharted signals |
+| violet | `#B79CFF` | What a machine says: uncharted signals, and the assistant (Jarvis's orb and the card of its answers) |
 | coral | `#FF8A7A` | Errors, danger, a falling trend |
 
 Semantic roles, all computed from them:
@@ -335,6 +335,12 @@ admin console need them (8, 12). Menu is a `Popover`, a badge a static `Chip`, a
 - a body of blocks: `Row`, `ChoiceGroup`, `Progress`, `Stat`, `Grid`, `Field`, media `Card`,
   `Avatar`;
 - a footer: actions and a meta line (a count, a clock with its unit).
+
+Jarvis's answer stands out from the people's messages, as in the prototype: a `Card` in the violet
+tone (`--color-signal-soft` fill, `--color-signal-line` border), its orb, the word "Assistant" beside
+its name, its source in the meta line, and its next steps as at most three chips ("Ask them", "Fly to
+Dev help"). A person's message stays a plain row; the composer's placeholder names it ("Message
+#general or ask @jarvis").
 
 This covers the calendar (an agenda of `Row`s by day, no calendar widget), who's here, catch up,
 realm and vote, station, quest and expedition, poll, room games and contest. A new kind is an
