@@ -5,8 +5,8 @@
 #   sh deploy/test.sh            builds the static server, starts it with the guard in a throwaway
 #                                project and a password of its own, checks both, then removes it;
 #   sh deploy/test.sh --mutants  the same against faults planted one at a time: each must fail;
-#   DEMO_PASSWORD=... sh deploy/test.sh --demo
-#                                checks the running demo: Tailscale, its tailnet, the public URL.
+#   sh deploy/test.sh --demo     checks the running demo: Tailscale, its tailnet, the public URL;
+#                                it asks for the demo's password, which no command line shows.
 # Its output names the host's own addresses and ports: never commit it, nor paste it in public.
 # Exit: 0 every check passed, 1 a check failed, 2 a tool or a fact of the host is missing, 3 the
 # stack did not start.
@@ -473,7 +473,13 @@ elif [ "${1:-}" != --demo ]; then
 		"$(docker logs "$web" 2>&1 | grep -cF -e "$password" -e "$hash" -e "$(printf 'team:%s' "$password" | base64)" || true)" 0
 else
 	# The running demo.
-	: "${DEMO_PASSWORD:?set it to the demo password, to check the public URL}"
+	if [ -z "${DEMO_PASSWORD:-}" ]; then # read, not typed on a command line: none in the shell's history
+		printf "The demo's password (not shown): " >&2
+		stty -echo 2>/dev/null || :
+		read -r DEMO_PASSWORD
+		stty echo 2>/dev/null || :
+		echo >&2
+	fi
 	project=gnoworld-demo
 	of() { docker ps -q --filter "label=com.docker.compose.project=$project" --filter "label=com.docker.compose.service=$1"; }
 	ts=$(of tailscale)
@@ -493,13 +499,13 @@ else
 	done
 	if [ "$memory" -le 2147483648 ] && [ "$cpus" -le 2000000000 ]; then pass "the demo stays under 2 GB and 2 cores"; else fail "the demo: $memory bytes, $cpus nano-cpus"; fi
 
-	json=$(docker exec "$ts" tailscale status --json)
+	json=$(docker exec "$ts" tailscale --socket=/tmp/tailscaled.sock status --json)
 	read_json() { printf '%s' "$json" | python3 -c "import json, sys; d = json.load(sys.stdin); print($1)"; }
 	expect "the demo machine is logged in and running" "$(read_json 'd["BackendState"]')" Running
 	expect "it is online" "$(read_json 'd["Self"]["Online"]')" True
 	expect "it carries the demo's tag" "$(read_json '" ".join(d["Self"].get("Tags") or [])')" tag:gnoworld-demo
 	expect "it sees no device of the tailnet" "$(read_json 'len(d.get("Peer") or {})')" 0
-	serve=$(docker exec "$ts" tailscale serve status --json)
+	serve=$(docker exec "$ts" tailscale --socket=/tmp/tailscaled.sock serve status --json)
 	expect "Funnel forwards 443 to web, with the visitor's address" \
 		"$(printf '%s' "$serve" | python3 -c 'import json, sys; t = json.load(sys.stdin)["TCP"]; print(sorted(t), t["443"].get("TCPForward"), t["443"].get("ProxyProtocol"))')" "['443'] web:8080 2"
 	expect "and only there, to the public" \
@@ -509,10 +515,11 @@ else
 	address=$(dig +short @1.1.1.1 "$name" A | tail -1)
 	expect "the public URL resolves, through public DNS, to a public address" "$(is_public "$address")" True
 	visit() { curl -s --max-time 20 --resolve "$name:443:$address" "$@"; }
+	signed() { printf 'user = "team:%s"\n' "$DEMO_PASSWORD" | visit -K - "$@"; } # on stdin: no ps shows it
 	expect "the public URL wants the password" "$(visit -o /dev/null -w '%{http_code}' "https://$name/")" 401
-	expect "the public URL serves the site with it" "$(visit -o /dev/null -w '%{http_code}' -u "team:$DEMO_PASSWORD" "https://$name/")" 200
+	expect "the public URL serves the site with it" "$(signed -o /dev/null -w '%{http_code}' "https://$name/")" 200
 	expect "the public URL is not indexed" \
-		"$(visit -o /dev/null -D - -u "team:$DEMO_PASSWORD" "https://$name/" | tr -d '\r' | awk -F': ' 'tolower($1) == "x-robots-tag" { print $2 }')" noindex
+		"$(signed -o /dev/null -D - "https://$name/" | tr -d '\r' | awk -F': ' 'tolower($1) == "x-robots-tag" { print $2 }')" noindex
 	seen=$(docker logs --tail 1 "$web" 2>&1 | awk '{ print $1 }')
 	expect "web sees the visitor's own address, not the tailnet's" "$(is_public "$seen")" True
 	key=$(docker exec "$ts" cat /run/secrets/ts_authkey) # the key it was given, wherever its file lives
