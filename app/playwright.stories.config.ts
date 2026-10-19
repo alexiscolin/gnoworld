@@ -6,6 +6,8 @@ export default defineConfig({
   testDir: "tests/stories",
   forbidOnly: true,
   fullyParallel: true,
+  // One folder of approved pictures per platform (slice 2's plan, the pictures' answer).
+  snapshotPathTemplate: "{testDir}/__screenshots__/{platform}/{arg}{ext}",
   // In the sandbox, Chromium runs as one process, and eight at once each building Storybook's pages crash.
   ...(process.env["SANDBOX_RUNTIME"] ? { workers: 1 } : {}),
   use: {
