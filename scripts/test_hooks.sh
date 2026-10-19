@@ -197,7 +197,12 @@ assert trigger and re.findall(r"^  (\S+):", trigger.group(1), re.M) == ["push"],
 assert ci.count("permissions:") == 1 and "write" not in ci, "the CI may write"
 has(r"permissions:\n  contents: read", "the CI may write")
 assert "secrets." not in ci and "continue-on-error" not in ci, "the CI reads a secret or lets a step fail"
-assert not re.search(r"^\s+(- )?if:", ci, re.M), "a CI step can be skipped"
+# One condition only, on one step: when the gate fails, the pictures the stories' journeys wrote
+# where Linux had none are kept for review; no step of the gate itself can be skipped.
+conditions = re.findall(r"^\s+(?:- )?if:.*$", ci, re.M)
+assert [c.strip() for c in conditions] == ["if: failure()"], f"a CI step can be skipped: {conditions}"
+has(r"      - name: Linux's pictures of the stories, written where none was approved\n        if: failure\(\)\n        uses: actions/upload-artifact@[0-9a-f]{40}\n        with:\n          name: stories-pictures-linux\n          path: app/tests/stories/__screenshots__/linux/\n          if-no-files-found: ignore\n          retention-days: 7",
+    "the CI does not keep Linux's pictures when the gate fails, or keeps more")
 has(r"    runs-on: ubuntu-24\.04", "the CI runs on a machine it does not name")
 has(r"        run: sh scripts/check\.sh --full", "the CI does not run the full gate, or lets it fail")
 has(r"          persist-credentials: false", "the CI keeps its token on disk for the gate")
