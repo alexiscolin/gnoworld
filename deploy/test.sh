@@ -515,7 +515,8 @@ else
 	address=$(dig +short @1.1.1.1 "$name" A | tail -1)
 	expect "the public URL resolves, through public DNS, to a public address" "$(is_public "$address")" True
 	visit() { curl -s --max-time 20 --resolve "$name:443:$address" "$@"; }
-	signed() { printf 'user = "team:%s"\n' "$DEMO_PASSWORD" | visit -K - "$@"; } # on stdin: no ps shows it
+	# On stdin, quoted as curl's config wants: a " or a \ in the password is escaped.
+	signed() { printf 'user = "team:%s"\n' "$(printf '%s' "$DEMO_PASSWORD" | sed 's/[\\"]/\\&/g')" | visit -K - "$@"; }
 	expect "the public URL wants the password" "$(visit -o /dev/null -w '%{http_code}' "https://$name/")" 401
 	expect "the public URL serves the site with it" "$(signed -o /dev/null -w '%{http_code}' "https://$name/")" 200
 	expect "the public URL is not indexed" \
