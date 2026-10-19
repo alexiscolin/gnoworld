@@ -72,8 +72,11 @@ icons; 2c `Chip`, `Tabs`, `Popover`, `Dialog`, `Flash`, `EmptyState`, `Skeleton`
 1. The designs: as private claude.ai design artifacts. Answered: artifacts; approved 2026-10-20
    (`docs/design/review-2a.md`).
 2. The new test levels change the harness (configs, `package.json`, the gate): thaw it for 2b,
-   each change with its planted fault? Recommended: yes; the ADR asks for these levels.
+   each change with its planted fault? Answered: yes (Alexis, 2026-10-20).
 3. The pictures: the sandbox's Chromium, per platform, as Playwright's image cannot run there?
+   Answered: one baseline per platform, the Mac's sandbox Chromium and the CI's Linux; each
+   component declares the axes its stories cross, and `Updated-baseline:` may name a story
+   folder with one reason (Alexis, 2026-10-20).
 4. The icons: our own set on DESIGN-SYSTEM.md's 16 px grid. Answered: our own, the 55 drawn in
    the approved designs.
 5. Storybook in place of DESIGN-SYSTEM.md's hand-made gallery (Alexis's question, 2026-10-19):
