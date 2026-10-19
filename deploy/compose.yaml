@@ -43,6 +43,7 @@ services:
     profiles: [demo]
     image: *tailscale-image
     entrypoint: [sh, /guard/guard.sh]
+    stop_signal: SIGKILL # its sleep, as PID 1, ignores SIGTERM: a stop would wait 10 s for nothing
     user: "0:0"
     cap_add: [NET_ADMIN]
     environment:

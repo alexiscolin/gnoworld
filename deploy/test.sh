@@ -61,10 +61,10 @@ host_addresses() { # every IPv4 address of the host, its tailnet's and its VPNs'
 	Linux) ip -4 -o addr show 2>/dev/null | awk '{ sub(/\/.*/, "", $4); print $4 }' ;;
 	esac | grep -v '^127\.' | sort -u
 }
-default_route() { # "<gateway> <interface>"
+default_gateway() {
 	case $os in
-	Darwin) route -n get default 2>/dev/null | awk '/gateway:/ { g = $2 } /interface:/ { i = $2 } END { print g, i }' ;;
-	Linux) ip route show default 2>/dev/null | awk '{ print $3, $5; exit }' ;;
+	Darwin) route -n get default 2>/dev/null | awk '/gateway:/ { print $2 }' ;;
+	Linux) ip route show default 2>/dev/null | awk '{ print $3; exit }' ;;
 	esac
 }
 neighbours() {
@@ -126,14 +126,13 @@ host_ports | grep -qx "$canary" || missing "the host's listening ports cannot be
 hostip=$(docker run --rm --network bridge $hostmap "$CURL" -s -o /dev/null -w '%{remote_ip}' "http://host.docker.internal:$canary/" || true)
 
 targets() {
-	ports=$(host_ports)
-	route=$(default_route)
-	router=${route% *}
+	ports=$(host_ports) # the canary among them (checked above)
+	router=$(default_gateway)
 	addresses=$(host_addresses)
 	if [ -z "$router" ] || [ -z "$addresses" ] || [ -z "$hostip" ]; then
 		missing "cannot read the host's router, addresses or the address containers reach it by"
 	fi
-	for port in $ports "$canary"; do
+	for port in $ports; do
 		printf 'host.docker.internal:%s\n%s:%s\n' "$port" "$hostip" "$port"
 		for address in $addresses; do printf '%s:%s\n' "$address" "$port"; done
 	done
@@ -150,11 +149,12 @@ targets() {
 # or Docker's gateways; the internet only when $3 says yes.
 reach() {
 	network=$1 name=$2 internet=$3
-	list=$(targets | sort -u)
+	[ -n "${list:-}" ] || list=$(targets | sort -u)
 	# web:8080 rides along: if it is missing from the answers, the fan-out saw nothing at all.
 	found=$(answering "$network" $list 1.1.1.1:443 web:8080)
 	expect "$name: the probe sees web among its targets" "$(printf '%s\n' "$found" | grep -c '^web:8080$' || true)" 1
-	host=$(printf '%s\n' "$found" | grep -v '^1\.1\.1\.1:443$' | grep -v '^web:8080$' | grep . | sort | tr '\n' ' ' | sed 's/ $//' || true)
+	printf '%s\n' 1.1.1.1:443 web:8080 >"$tmp/expected"
+	host=$(printf '%s\n' "$found" | grep -vxF -f "$tmp/expected" | grep . | sort | tr '\n' ' ' | sed 's/ $//' || true)
 	expect "$name reaches nothing of the host, its LAN or Docker's networks ($(printf '%s\n' "$list" | grep -c .) tried, the canary among them)" "$host" ""
 	out=$(printf '%s\n' "$found" | grep -c '^1\.1\.1\.1:443$' || true)
 	if [ "$internet" = yes ]; then expect "$name reaches the internet" "$out" 1; else expect "$name has no way out to the internet" "$out" 0; fi
@@ -205,7 +205,6 @@ hardened() {
 }
 
 networks_of() { docker inspect --format '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}' "$1" | tr ' ' '\n' | grep . | sort | tr '\n' ' '; }
-
 if [ "${1:-}" = --mutants ]; then
 	# The faults each check must catch (CLAUDE.md: a guard lands with the fault that proves it).
 	# Each fault names the check that must catch it: killed by another one, it proves nothing.
@@ -331,14 +330,12 @@ elif [ "${1:-}" != --demo ]; then
 	expect "Docker holds no copy of the password's hash" "$(docker inspect "$web" | grep -cF "$hash" || true)" 0
 	expect "the image holds no secret file" \
 		"$(docker run --rm --entrypoint sh "$(docker inspect --format '{{.Image}}' "$web")" -c 'find / -xdev \( -name "*htpasswd*" -o -name ts_authkey \) 2>/dev/null' || true)" ""
-	expect "web answers its own network (the probe sees what is there)" "$(answering "$inside" web:8080)" web:8080
 	reach "$inside" "the internal network" no
 
 	hardened "$guard" guard "user net-admin"
 	expect "the guard sits on the internal network and its own" "$(networks_of "$guard")" "$inside $outside "
 	expect "its own network lets out" "$(docker network inspect --format '{{.Internal}}' "$outside")" false
 	expect "it is alone there" "$(docker network inspect --format '{{len .Containers}}' "$outside")" 1
-	expect "from the guard's network, web answers on its port" "$(answering "container:$guard" web:8080)" web:8080
 	reach "container:$guard" "the guard's network, which Tailscale shares," yes
 	# TCP leaves on 80 and 443 only: a public port that a plain container reaches stays shut.
 	expect "a plain container reaches a public port beside 80 and 443 (the next check sees)" "$(answering bridge 1.1.1.1:853)" 1.1.1.1:853
@@ -363,12 +360,17 @@ elif [ "${1:-}" != --demo ]; then
 		grep -v -e ' --dport 8080 -j ACCEPT$' -e ' --dports 80,443 -j ACCEPT$' -e '^-A OUTPUT -d [0-9.]*/32 -p [a-z]* -m [a-z]* --dport 53 -j ACCEPT$' || true)" ""
 	expect "IPv6: the guard drops all but loopback" "$(printf '%s\n' "$v6" | tr '\n' '|')" "-P OUTPUT DROP|-A OUTPUT -o lo -j ACCEPT|"
 
-	# Requests as Tailscale sends them: through the PROXY protocol, with the visitor's address.
+	# Requests as Tailscale sends them: through the PROXY protocol, with the visitor's address. Each
+	# is sent once, and its headers answer every question about it.
 	ask() {
-		path=$1 client=$2
-		shift 2
-		docker run --rm --network "$inside" "$CURL" -s -o /dev/null -D - --haproxy-protocol \
-			--haproxy-clientip "$client" "$@" "http://web:8080$path" | tr -d '\r'
+		answer=$tmp/ask.$(printf '%s\n' "$@" | cksum | tr ' ' -)
+		if [ ! -f "$answer" ]; then
+			path=$1 client=$2
+			shift 2
+			docker run --rm --network "$inside" "$CURL" -s -o /dev/null -D - --haproxy-protocol \
+				--haproxy-clientip "$client" "$@" "http://web:8080$path" | tr -d '\r' >"$answer"
+		fi
+		cat "$answer"
 	}
 	status() { ask "$@" | awk 'NR == 1 { print $2 }'; }
 	header() {
