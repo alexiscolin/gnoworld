@@ -1,29 +1,8 @@
 // The design system's stories in a real browser (docs/DESIGN-SYSTEM.md, "Testing the CSS"): what
 // jsdom cannot see, since it applies no stylesheet. Each test walks every story Storybook built.
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "../e2e/fixtures.ts";
-
-interface Entry {
-  id: string;
-  type: string;
-  title: string;
-}
-
-async function stories(page: Page): Promise<string[]> {
-  const response = await page.request.get("/index.json");
-  const index = (await response.json()) as { entries: Record<string, Entry> };
-  const ids = Object.values(index.entries)
-    .filter((entry) => entry.type === "story")
-    .map((entry) => entry.id);
-  expect(ids.length).toBeGreaterThan(10);
-  return ids;
-}
-
-async function open(page: Page, id: string) {
-  await page.goto(`/iframe.html?id=${id}&viewMode=story`);
-  await page.locator("#storybook-root > *").first().waitFor();
-  await page.evaluate(() => document.fonts.ready);
-}
+import { expect, test } from "../e2e/fixtures.ts";
+import { open, stories } from "./storybook.ts";
 
 test("every story renders with no error and passes axe", async ({ page }) => {
   const errors: string[] = [];
