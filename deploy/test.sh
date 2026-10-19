@@ -226,14 +226,20 @@ if [ "${1:-}" = --mutants ]; then
 		fi
 	}
 	compose() { printf '%s\n' "$1"; }
+	# Each edit goes to a new path: a file rewritten in place can reach the container with the
+	# old one's size (seen on OrbStack: the guard's script cut at its previous length). Not mktemp,
+	# whose 0600 nginx's user cannot read, nor the guard's root, which lacks CAP_DAC_OVERRIDE.
+	n=0
 	nginx() { # nginx.conf through one edit (a sed or awk command), mounted over the image's own
-		"$@" "$here/web/nginx.conf" >"$tmp/nginx.conf"
-		printf 'services:\n  web:\n    volumes:\n      - %s:/etc/nginx/nginx.conf:ro\n' "$tmp/nginx.conf"
+		n=$((n + 1))
+		"$@" "$here/web/nginx.conf" >"$tmp/nginx.$n.conf"
+		printf 'services:\n  web:\n    volumes:\n      - %s:/etc/nginx/nginx.conf:ro\n' "$tmp/nginx.$n.conf"
 	}
 	guard() { # the guard's script through one edit (a sed or awk command), mounted over deploy/guard
-		mkdir -p "$tmp/guard"
-		"$@" "$here/guard/guard.sh" >"$tmp/guard/guard.sh"
-		printf 'services:\n  guard:\n    volumes: !override\n      - %s:/guard:ro\n' "$tmp/guard"
+		n=$((n + 1))
+		mkdir "$tmp/guard.$n"
+		"$@" "$here/guard/guard.sh" >"$tmp/guard.$n/guard.sh"
+		printf 'services:\n  guard:\n    volumes: !override\n      - %s:/guard:ro\n' "$tmp/guard.$n"
 	}
 	# Not planted, since they would hand the container the host for the run: the host's network,
 	# its pid or ipc, privileged, a device, Docker's socket, seccomp or AppArmor off. Nor root:
