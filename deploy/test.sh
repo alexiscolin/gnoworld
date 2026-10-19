@@ -237,7 +237,7 @@ if [ "${1:-}" = --mutants ]; then
 	}
 	compose() { printf '%s\n' "$1"; }
 	# Each edit goes to a new path: a file rewritten in place can reach the container with the
-	# old one's size (seen on OrbStack: the guard's script cut at its previous length). Not mktemp,
+	# old one's size (seen on a host's file sharing: the guard's script cut at its previous length). Not mktemp,
 	# whose 0600 nginx's user cannot read, nor the guard's root, which lacks CAP_DAC_OVERRIDE.
 	n=0
 	nginx() { # nginx.conf through one edit (a sed or awk command), mounted over the image's own

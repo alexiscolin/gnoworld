@@ -39,14 +39,20 @@ and every capability dropped, except `guard`'s `NET_ADMIN`.
    "nodeAttrs": [{ "target": ["tag:gnoworld-demo"], "attr": ["funnel"] }]
    ```
 
-   No grant or ACL rule may name the tag as a source or a destination, nor `*`: a rule from `*`
-   would let the demo reach every device. Access is denied by default.
-3. A single-use auth key with that tag (Settings, Keys), into `deploy/secrets/ts_authkey`.
-4. The demo's password: `htpasswd -cB deploy/secrets/demo_htpasswd team` (`htpasswd` comes with
-   macOS, and with `apache2-utils` or `httpd-tools` on Linux), then
-   `chmod 644 deploy/secrets/demo_htpasswd`: nginx reads it as its own user, and it holds a hash,
-   not the password.
+   A new tailnet's policy lets every device reach every other: delete its default rule, so that
+   no grant or ACL rule names the tag as a source or a destination, nor `*` (a rule from `*`
+   would let the demo reach every device). With no rule, access is denied.
+3. `mkdir -m 700 deploy/secrets` (a fresh clone has none). A single-use auth key with that tag
+   (Settings, Keys), into `deploy/secrets/ts_authkey`, then `chmod 644` it: on Linux, Tailscale's
+   root, with every capability dropped, cannot read a file another user owns; the folder keeps
+   the host's other users out, and the key is spent at the first login.
+4. The demo's password: make a strong one (`openssl rand -base64 24`), then
+   `htpasswd -cB deploy/secrets/demo_htpasswd team` (`htpasswd` comes with macOS, and with
+   `apache2-utils` or `httpd-tools` on Linux), then `chmod 644 deploy/secrets/demo_htpasswd`:
+   nginx reads it as its own user, and it holds a hash, not the password.
 5. Optional: `cp deploy/.env.example deploy/.env`, to change the machine's name.
+6. On Linux, a clone made with a umask of 077 leaves `deploy/guard` and `deploy/tailscale`
+   unreadable to the containers: `chmod -R a+rX deploy/guard deploy/tailscale`.
 
 `deploy/secrets/` is ignored by git, left out of every build (`.dockerignore`) and closed to
 Claude Code (`.claude/settings.json`). Nothing in the repository names a host, an address or a
@@ -59,7 +65,7 @@ tailnet; keep it so.
 | Start, or rebuild after a merge | `docker compose -f deploy/compose.yaml --profile demo up -d --build` |
 | Test the static server and the guard (no secret needed) | `sh deploy/test.sh` |
 | Test that each check catches its fault | `sh deploy/test.sh --mutants` |
-| Test the running demo | `DEMO_PASSWORD=... sh deploy/test.sh --demo` |
+| Test the running demo | `sh deploy/test.sh --demo`, which asks for the password |
 | Its logs | `docker compose -f deploy/compose.yaml --profile demo logs -f` |
 | Stop | `docker compose -f deploy/compose.yaml --profile demo down` |
 | Remove it all | `docker compose -f deploy/compose.yaml --profile demo down -v`, then delete the machine in the admin console |

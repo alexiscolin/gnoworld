@@ -13,6 +13,6 @@ COPY app app
 RUN cd app && node_modules/.bin/react-router build
 
 FROM nginxinc/nginx-unprivileged:1.30.6-alpine-slim@sha256:4ac59c85c8c46d9e91eaabd2122cda4923ba380cf11f4138e389f069bcdc77a3
-COPY deploy/web/nginx.conf /etc/nginx/nginx.conf
+COPY --chmod=644 deploy/web/nginx.conf /etc/nginx/nginx.conf
 COPY --from=build /repo/app/build/client /usr/share/nginx/html
 USER 101
