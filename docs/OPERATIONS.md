@@ -96,6 +96,26 @@ two minutes to make again. Clone it, write a new password file, make a new auth 
 was used once, and the old machine's identity stayed in its `tailscale` volume), remove the old
 machine in the admin console, so the new one keeps the name, then start it and test it.
 
+## Known limits
+
+Alexis, 2026-10-19: written here, each with its backlog row, not fixed in 1c.
+
+- **A host whose own public address serves something.** The guard refuses private addresses,
+  then lets out TCP 80 and 443 and UDP to the rest: on a host with a public address on an
+  interface (a rented server), Tailscale's network would reach that address's services.
+  `sh deploy/test.sh` fails there for TCP, and probes no UDP. Run the demo on a host behind a
+  router, as at home or in an office (F202).
+- **A restart of the whole host, or of Docker.** Docker restarts the three containers itself,
+  without Compose's order: for a moment, Tailscale may run before the guard's rules are in, and
+  if `web` is not up yet the guard stops, leaving Tailscale on a network with nothing in it.
+  After such a restart, Compose's order again: `docker compose -f deploy/compose.yaml --profile demo
+  down`, then `up -d` (the node key stays in its volume) (F203).
+- **DNS through the router.** On a host whose resolver is its router or a LAN server, the guard
+  lets that server's port 53 out, for Tailscale's name lookups: an exception to "every private
+  address refused" (F205).
+- **Open connections.** The limit counts requests per visitor, not open connections, and a team
+  behind one address shares one limit (F208).
+
 ## Secrets: rotation and revocation
 
 - **The password:** write a new file with `htpasswd -cB`, then `docker compose ... restart web`.

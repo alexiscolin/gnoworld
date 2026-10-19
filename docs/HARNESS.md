@@ -157,7 +157,7 @@ with `/cd`:
   write (`gno_addpkg`, `gno_call`, `gno_run`, `gno_key_send`, `gno_cla_sign`). Claude builds
   and integrates a whole feature alone (Alexis, 2026-10-18), checked by the gate and the
   review; Alexis reviews before he merges and pushes.
-- **Refused outright, so nothing asks:** an edit of a file run outside the sandbox, the guard,
+- **Refused outright, so nothing asks:** an edit of a harness file run outside the sandbox, the guard,
   the Stop hook, `code_changed.sh`, `scan_secrets.sh`, `install_hooks.sh`, the git hooks and git's
   own hooks folder and config, which bypass mode would let the file tools write (F129), Claude Code's settings, agents, commands,
   skills, rules and hooks in `.claude/` (not `.claude/tmp/`, where the gate writes its state,
@@ -277,6 +277,12 @@ and the harness is frozen until a real bug crosses it.
   the changed packages once there are many.
 - **The review pass is recorded by the agent that ran the review;** the pre-push hook checks
   it matches the tree, not who wrote it.
+- **Product files Claude writes run outside the sandbox** (F204): `deploy/test.sh`, the compose
+  file and the guard's script, which Docker runs as root on Linux, and the app's code, which
+  `pnpm test` and `pnpm dev` run in Alexis's shell. Nothing refuses Claude's edits of them, so a
+  misled session's line would run with his rights at his next run. The boundary is the one
+  above: `main` protected with the CI required (Alexis, 2026-10-19: a known limit, not a
+  refusal, which would send every change through a script of his).
 
 ## Files
 
