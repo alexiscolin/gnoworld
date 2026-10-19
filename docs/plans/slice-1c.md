@@ -48,9 +48,9 @@ The sandbox refuses Docker's socket by design, so `deploy/test.sh` runs on the h
 Linux), by the operator; Claude writes it and reads its output, never committed. Default: `web`
 and `guard` with a password of their own, no Tailscale key: the hardening read back, the probes
 above (a canary first, or the probe is blind), the headers and types per path, 401s, 429s.
-`--mutants`: fifteen planted faults (the network let out or with its gateway, a writable root,
-capabilities kept, the host's network, no cap, the guard's rules off or narrowed, no rate limit,
-the worker without password, the headers, no PROXY protocol), each must fail. `--demo`:
+`--mutants`: 34 planted faults (the network, the hardening, the caps, the guard's rules, the rate
+limit, the password, the headers, the fallback, the types, the logs, the PROXY protocol), each
+killed by the check it names; those that would hand a container the host are not planted. `--demo`:
 Tailscale, its tailnet and the public URL. In the gate: the manifest read behind a password
 (Playwright). semgrep's Dockerfile and Compose rules in `/pre-merge`.
 

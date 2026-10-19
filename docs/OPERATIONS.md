@@ -22,8 +22,9 @@ and every capability dropped, except `guard`'s `NET_ADMIN`.
 - `guard` holds the only network that lets out, and `tailscale` shares it. Before anything else
   runs there, it loads its rules: web's port, Docker's DNS, then every private, local, carrier
   and reserved address refused, so neither reaches the host, its LAN or a tailnet; then public
-  TCP 80 and 443 and UDP, which Tailscale needs. IPv6 is closed. If `guard` restarts, `tailscale`
-  restarts with it; until then it has no network at all, which fails closed.
+  TCP 80 and 443 and UDP, which Tailscale needs. IPv6 is closed. When Compose restarts `guard`,
+  `tailscale` restarts with it; when Docker restarts `guard` on its own, `tailscale` keeps a
+  network with nothing in it, which fails closed, until `docker compose ... restart tailscale`.
 - Funnel hides the host's address: the public name leads to Tailscale's relays, never to the host.
 
 ## Before the first start (once)
@@ -68,9 +69,9 @@ socket. Their output names the host's addresses and ports: never commit it, nor 
 
 ## When something goes wrong: cut the public URL
 
-A flood meets the password, a limit per visitor (429 after a burst) and the containers' caps (2
-cores and 2 GB for the whole demo: Docker stops a container at its cap, not the host). To cut the
-public URL at once:
+A flood meets the password, a limit per visitor (429 after a burst) and the containers' caps (1.1
+cores and 416 MB in all, under the 2 cores and 2 GB the test holds as a ceiling: Docker stops a
+container at its cap, not the host). To cut the public URL at once:
 
 | Where | How | Back |
 |---|---|---|
