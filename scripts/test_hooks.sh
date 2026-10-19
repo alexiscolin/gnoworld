@@ -148,6 +148,9 @@ at = lambda text: next(i for i, l in enumerate(lines) if l.startswith(text))
 assert "packages() { cat package.json app/package.json pnpm-lock.yaml | cksum; }" in lines
 assert at("copies=$(run copies") < at("installed=$(packages)") < at("node app/node_modules/@playwright/test/cli.js test") < at('[ "$(packages)" = "$installed" ]')
 PY
+# The full gate walks the stories: a command of its own, not a line that names it and runs nothing.
+grep -v '^[[:space:]]*#' "$gate_file" | grep -qE '^[[:space:]]*node app/node_modules/@playwright/test/cli\.js test -c app/playwright\.stories\.config\.ts( |$)' ||
+	fail "check.sh no longer walks the design system's stories in a browser"
 # One harness list, records.sh's: --full runs harness_mutate when a file of it changes, pre-push
 # wants each declared on main, merge.sh shows each first (F129); every file harness_mutate
 # guards is in it (F112, F114, F124), and what Claude Code starts, .mcp.json's servers.
