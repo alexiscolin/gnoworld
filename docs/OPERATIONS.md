@@ -39,9 +39,10 @@ and every capability dropped, except `guard`'s `NET_ADMIN`.
    "nodeAttrs": [{ "target": ["tag:gnoworld-demo"], "attr": ["funnel"] }]
    ```
 
-   A new tailnet's policy lets every device reach every other: delete its default rule, so that
-   no grant or ACL rule names the tag as a source or a destination, nor `*` (a rule from `*`
-   would let the demo reach every device). With no rule, access is denied.
+   A new tailnet's policy lets every device reach every other: replace its default rule with
+   `"acls": []`, an empty list (with no `acls` section at all, Tailscale allows everything), and
+   let no grant name the tag as a source or a destination, nor `*`, which would let the demo
+   reach every device.
 3. `mkdir -m 700 deploy/secrets` (a fresh clone has none). A single-use auth key with that tag
    (Settings, Keys), into `deploy/secrets/ts_authkey`, then `chmod 644` it: on Linux, Tailscale's
    root, with every capability dropped, cannot read a file another user owns; the folder keeps
