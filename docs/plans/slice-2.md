@@ -63,9 +63,12 @@ icons; 2c `Chip`, `Tabs`, `Popover`, `Dialog`, `Flash`, `EmptyState`, `Skeleton`
 ## 8. Dependencies to ask for (read on npm, 2026-10-19)
 
 - `jsdom` 30.1.3 (MIT, 2026-10-15; Node 24.15+); `@testing-library/react` 16.3.3, `/dom` 10.4.2,
-  `/user-event` 14.6.8 (MIT; React 19 in peers); `vite-css-modules` 1.16.0 (MIT, 2026-05-05; Vite
-  8 in peers); `geist` 1.8.1 (SIL OFL, 2026-10-16); `storybook`, `@storybook/react-vite` 10.6.2
-  (MIT, 2026-10-12; Vite 8, React 19 in peers); the `frontend-design` plugin if question 1 says so.
+  `/user-event` 14.6.8 (MIT; React 19 in peers); `@fontsource-variable/geist` and `/geist-mono`
+  5.3.0 (OFL-1.1, 2026-07-19, no peers); `storybook`, `@storybook/react-vite` 10.6.2 (MIT,
+  2026-10-12; Vite 8, React 19 in peers). Approved by Alexis, 2026-10-20.
+- Not added: `geist` 1.8.1, whose only exports are Next.js loaders and which requires `next`;
+  `vite-css-modules`, since `check_css.py` checks that each class a component names exists in
+  its module.
 
 ## 9. Questions for Alexis
 
