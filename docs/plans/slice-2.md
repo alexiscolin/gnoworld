@@ -6,7 +6,7 @@ note (no style change without Alexis). Deferred here: 1b-2's icons and pictures,
 ## 1. Done when
 
 From the backlog's row, word for word: "Each component's states render and pass axe; the same
-name gives the same astronaut, readable at 20 px; focus is visible; the keyboard works in
+address gives the same astronaut, readable at 20 px; focus is visible; the keyboard works in
 `Tabs`, `Popover` and `Dialog`; no `!important` and no raw colour (lint)". This plan adds:
 - the designs of the panels and of a trip, approved by Alexis before any component's code;
 - Storybook shows at a glance every token (colours, type, space, sizes, radii, layers, motion)
@@ -14,7 +14,8 @@ name gives the same astronaut, readable at 20 px; focus is visible; the keyboard
   is screenshotted at three container widths and with reduced motion, approved by Alexis;
 - DESIGN-SYSTEM.md's invariants hold on every story: nothing overlaps, targets of 44 px, the
   focus ring, no horizontal scroll from 320 px, text at 200% zoom, forced colours;
-- `ui/` imports only `ui/`, by lint; the update notice is a `Flash`; the PWA has its icons.
+- `ui` is the `packages/ui` workspace and imports only itself, by lint; the update notice is a
+  `Flash`; the PWA has its icons; the 2a designs follow `docs/design/review-2a.md`.
 
 ## 2. Out of scope
 
@@ -38,14 +39,13 @@ The fonts and the CSS count in the budgets the journeys measure (3 MB; 150 KB of
 
 ## 5. Scale
 
-The pictures first: 17 components × states × 3 widths × 2 motion settings. The gate renders
-the stories as component tests; the full gate builds Storybook and takes the pictures.
+Pictures first: the gate renders stories as tests; the full gate shoots them (`review-2a.md`).
 
 ## 6. Tests, by level
 
 - **Component** (new: Vitest, jsdom, Testing Library): every story rendered, its ARIA, the
   keyboard in `Tabs`, `Popover` and `Dialog` (arrow keys, `Esc`, focus on open and back).
-- **Unit and property:** the avatar (fast-check: a name, one astronaut; spread); the chart's scale.
+- **Unit and property:** the avatar (fast-check: an address, one astronaut; spread); the chart's.
 - **Visual** (new): every story's pictures, approved one commit at a time (`Updated-baseline:`).
 - **End-to-end:** the invariants and axe on every story; the update journey through `Flash`.
 - **Lint:** `ui/`'s imports; the CSS rules, each proven by a planted case in `scripts/probe.py`.
@@ -53,9 +53,9 @@ the stories as component tests; the full gate builds Storybook and takes the pic
 
 ## 7. Files
 
-New: `app/src/ui/` (tokens, layers, base, compositions, 17 components and their stories, icons,
-the avatar), Storybook's config and tokens page, the PWA's icons. Changed: `root.tsx`, F212, the
-configs, `package.json`. No tier-1 file; no code of Alexis's. Merges of ~400 lines: 2a designs; 2b
+New: `packages/ui/` (tokens, layers, base, compositions, the components with their stories and
+`SignPanel`, 55 icons, the avatar), Storybook, the PWA's icons. Changed: `root.tsx`, F212, the
+configs, the `package.json` files. No tier-1 file; no code of Alexis's. Merges of ~400 lines: 2a designs; 2b
 tokens, base, compositions, Storybook, the new test levels, `Button`, `IconButton`, `Kicker`,
 icons; 2c `Chip`, `Tabs`, `Popover`, `Dialog`, `Flash`, `EmptyState`, `Skeleton`; 2d `Card`,
 `Row`, `Field`, `Stat`, `ActivityChart`, `PlanetThumb`; 2e `Avatar` and the PWA's icons.

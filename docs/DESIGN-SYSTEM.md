@@ -3,8 +3,10 @@
 The look and the rules every screen follows. Values come from the approved prototype
 (`docs/prototype`), reduced by the coherence review of 2026-10-19 (`docs/design/coherence.md`):
 every CSS rule, script style, icon, screen and second of the recorded tour mapped to one token and
-one component, its 38 decisions approved by Alexis. The changes that show are approved again on
-the before/after designs of slice 2a; nothing in the style changes without his approval.
+one component, its 38 decisions approved by Alexis. Then independent UX, UI and design-systems
+reviews of the 2a designs, against the needs of phases 0 to 3 (`docs/design/review-2a.md`), and
+Alexis's four decisions on them. The changes that show are approved again on the before/after
+designs of slice 2a; nothing in the style changes without his approval.
 
 ## Principles
 
@@ -12,7 +14,7 @@ These are the lead's and Alexis's rules from the prototype reviews.
 
 - **Space first.**
   - The 3D carries the page; panels are light and few.
-  - No dashboard feeling.
+  - No dashboard feeling (the public client; the admin console may be dense).
   - Air everywhere.
 - **Realistic, not cartoon.** Planets, stations and light look like space photography.
 - **Our own look.** Learn from references; never copy their interface.
@@ -39,14 +41,14 @@ These are the lead's and Alexis's rules from the prototype reviews.
 
 | Tier | File | Holds | Read by |
 |---|---|---|---|
-| Primitives | `app/src/ui/tokens/primitives.css` | The nine base colours, the 4 px steps, the type sizes, the durations | Semantic tokens only: a component that reads one fails the lint |
-| Semantic | `app/src/ui/tokens/semantic.css` | The roles below, each made only of primitives | Components and compositions |
+| Primitives | `packages/ui/tokens/primitives.css` | The nine base colours, the 4 px steps, the type sizes, the durations | Semantic tokens only: a component that reads one fails the lint |
+| Semantic | `packages/ui/tokens/semantic.css` | The roles below, each made only of primitives | Components and compositions |
 | Private | Inside a component's module, named `--_*` | What a variant or a context sets (`--_h`, `--_tone`) | That module only |
 
 - Names say a role or a step, never a value (`--space-m`, not `--space-16`): a value can change
   without a rename.
-- Shades are computed, not copied: `--color-action-soft: color-mix(in oklab, var(--color-action)
-  12%, transparent)`. One source per colour.
+- Shades are computed, not copied: `--color-mine-soft: color-mix(in oklab, var(--color-mine) 12%,
+  transparent)`. One source per colour.
 - The token files are the only list: Storybook reads its token page from them, and this document
   states the rules.
 
@@ -60,11 +62,11 @@ The theme is dark only (`color-scheme: dark`). Nine base colours:
 | night | `#0B0F18` | Surfaces: popovers, dialogs, cards on panels |
 | text | `#F4F6FA` | Text; the base of the translucent fills |
 | muted | `#9DA8BC` | The one secondary grey |
-| cream | `#F2EFEA` | The primary button; what is selected |
-| mint | `#5CF2C8` | The single accent: live, unread, focus, success, what is mine |
-| amber | `#FFC46B` | Heat, the sun, live moments, what is about me |
+| cream | `#F2EFEA` | The primary button (one per region); what is selected |
+| mint | `#5CF2C8` | `--color-mine`: what is mine, the focus ring, unread counts. Nothing else |
+| amber | `#FFC46B` | Heat, the sun, live moments, what is about me; caution |
 | violet | `#B79CFF` | Uncharted signals |
-| coral | `#FF8A7A` | Errors and a falling trend only |
+| coral | `#FF8A7A` | Errors, danger, a falling trend |
 
 Semantic roles, all computed from them:
 
@@ -75,14 +77,37 @@ Semantic roles, all computed from them:
 | `--color-panel`, `--color-glass` | night at 86% and 60% | Docked panels; what floats over the scene |
 | `--color-scrim` | space at 70% | Behind a dialog |
 | `--color-<accent>-soft`, `--color-<accent>-line` | the accent at 12% and 50% | Tinted fills and borders of mint, amber, violet, coral |
-| `--world` | a world's own colour, set from its data | A surface over a world is `color-mix(in oklab, var(--world) 12%, var(--color-panel))` |
+| `--world` | a world's own colour, set from its data | The plate over a world is `color-mix(in oklab, var(--world) 12%, var(--color-panel))`; the dock keeps the plain panel colour |
+| `--texture-grid` | text at 6%, a 14 px dot grid | The plate's surface, from the prototype |
 
 **Three meanings, three colours, never colour alone:**
-- selected (navigation, a choice): the cream fill;
+- selected (navigation, a choice): the cream fill; on a thing that is not text (a planet, an
+  avatar), a cream ring drawn with `box-shadow`, since `outline` is the focus ring's alone;
 - mine (my vote, my reaction, my name): mint;
 - about me (a mention of me): amber.
 
-Each one comes with an icon or a word as well.
+Each one comes with an icon or a word as well. The current row of a list is the hover fill one
+step stronger and its title at 500; hover alone is the resting fill. Live is amber; progress is
+text on the hover fill; a trend is text with its caret, coral when it falls.
+
+**One cream primary per region** (the plate, the dock, a card, a dialog). The flash carries none.
+
+**Severity, three levels, each an icon and a word:**
+- notice: neutral, with the info icon;
+- caution: amber, with the warning icon ("Testnet", "This realm is not checked by gnoworld");
+- danger: coral, with the alert icon (an irreversible or costly act, an error).
+
+**Confirmation follows reversibility:**
+- reversible: act at once, then a flash with Undo;
+- irreversible off chain: a dialog whose danger button names the act;
+- on chain: the signing block (Components);
+- value at risk on mainnet: the person types the amount.
+
+**Trust, shown in words.** A conversation's header and its row show one of: not encrypted,
+encrypted, key changed, checked by you; each an icon (lock, shield, key) and a word, never on the
+avatar. "Never a verified badge" means no badge granted by the platform; a check the person made
+is theirs. The network is always named, and a testnet always says "Testnet". "Sponsored" is for
+paid placement only; a fee someone else pays reads "Fee paid by gnoworld".
 
 **Contrast,** every pair at least 6.3:1. These are measured on 2026-10-19 with an sRGB mix: the
 oklab mix differs by little, and axe in the gate measures the real pixels.
@@ -109,6 +134,7 @@ the brightest planet behind the header's pills.
 | `--font-ui` | 13 px | Geist 500 | Controls, chips, tabs |
 | `--font-body` | 14 px, leading 1.5 | Geist 400 | Messages, panels; item titles at 500 |
 | `--font-lead` | 16 px, leading 1.5 | Geist 400 | A world's description |
+| `--font-action` | 16 px | Geist 500 | The 56 px main action |
 | `--font-title-s` | 20 px | Geist 400 | Small headers (notifications) |
 | `--font-title-m` | 28 px, -0.03em | Geist 300 | Panel and dialog titles, room names, big facts |
 | `--font-title-l` | 36 px, -0.03em | Geist 300 | Dialogs that tell a story (passport) |
@@ -116,10 +142,15 @@ the brightest planet behind the header's pills.
 | `--font-hero` | `clamp(5.5rem, 11vw, 11rem)`, -0.06em, leading 0.9 | Geist Mono 400, tabular | The hero number |
 
 - Each role is a composite token (`font: var(--font-body)`). The label's tracking and caps are a
-  utility that components compose once.
+  utility that components compose once; no component sets caps or tracking itself, units and
+  domains inside a label keep their case, and the utility resets both under `:lang()` for scripts
+  that caps break (Arabic, Hebrew, Persian…).
 - 11 px is the floor; nothing is smaller.
 - Two families, Geist and Geist Mono, self-hosted with `font-display: swap` and preloaded for the
-  first screen. The first paint is measured for layout shift.
+  first screen; beyond the scripts Geist covers, a system fallback per script. The first paint is
+  measured for layout shift.
+- Message text holds at most `--measure` (65ch); text that people or realms write sits in a slot
+  with `dir="auto"`.
 - Sizes are in rem so the reader's zoom works; numbers that change are tabular.
 - Weights: 300, 400, 500, 600. Leading: 0.9, 1, 1.4, 1.5.
 
@@ -130,15 +161,18 @@ the brightest planet behind the header's pills.
 | `--space-3xs` … `--space-2xl` | 4, 8, 12, 16, 24, 32, 48, 64 px, a 4 px grid; section space is fluid with `clamp()` |
 | `--control-xs` / `--control-s` / `--control-m` / `--control-l` | 24 / 32 / 40 / 56 px: badges and reactions / toolbars, chips, tabs / default / the main action. Under `pointer: coarse`, `--control-m` is 44 |
 | `--radius-s` / `--radius-m` / `--radius-l` / `--radius-pill` | 8 / 12 / 24 / 999 px: small controls, rows, menus / cards, fields, popovers, bubbles / panels, dialogs / buttons, chips, tabs |
-| `--icon-m` / `--icon-l` | 16 / 20 px |
+| `--icon-m` / `--icon-l` | 16 / 20 px, the only icon sizes |
+| `--size-counter` / `--size-progress` | 18 px (an unread count) / 4 px (every progress bar) |
 | `--avatar-s` / `-m` / `-l` | 20 / 24 / 48 px |
 | `--thumb-*` | 16, 24, 32, 48, 64 px |
-| Layout | header clearance 96, dock 360 (320 under 1400), plate 620, rail 120, dialog 460 and wide 760, popover 300 px |
+| Layout | header clearance 96, dock 360 (320 under 1400), plate 620 with a 440 text column, rail 120, dialog 460 and wide 760, popover 300 px; `--measure` 65ch |
 
 - Controls are a minimum height with padding, never a fixed height, so text zoomed to 200% grows
   the control instead of spilling out.
 - A target is at least 24 px with a pointer and 44 px by touch (WCAG 2.2).
 - Interface text and controls do not scale with the window; section space and titles do.
+- **Density:** `comfortable` (default) or `compact`, set once with `data-density` on a container;
+  it remaps the control and row aliases, so no component holds a density rule of its own.
 
 ### Elevation and effects
 
@@ -161,8 +195,9 @@ the brightest planet behind the header's pills.
 | `--z-popover` | Popovers, menus |
 | `--z-toast` | The flash: one at a time, queued |
 
-Dialogs use the native `<dialog>` and the browser's top layer. The flash is never under a
-dialog's scrim: it shows above it, or waits until the dialog closes.
+Dialogs, popovers and the flash use the browser's top layer, which stacks by opening order, not
+by these tokens. The flash is never under a dialog's scrim: it opens after the dialog, or waits
+until the dialog closes.
 
 ### Motion
 
@@ -181,6 +216,7 @@ Named behaviours:
 - **Arrival on a world:** the planet settles, the plate comes in, the figures count up. All of it
   takes 1.2 s at most.
 - **Lifetimes:** a flash and a scene bubble live 5 s.
+- **Landing at once:** a click or `Esc` during a flight lands immediately (ADR-0001 §7).
 
 Under `prefers-reduced-motion: reduce`:
 - flights become crossfades of `--motion-base`;
@@ -189,6 +225,24 @@ Under `prefers-reduced-motion: reduce`:
 - the dock magnification is off.
 
 The scene keeps its own speeds.
+
+## Data graphics
+
+Bars, sparklines and deltas hold at least 3:1 against their ground; past bars in muted, the
+current one in text; thin bars (24 for a day); the peak and the current value written in
+`--font-data`, and the same values as text for assistive technology.
+
+## Words
+
+- A claim about security, cost or a format (encrypted, free, a fee, a name's rule) cites its
+  source, an ADR line or a read of the chain; sample data in designs and stories is valid on the
+  chain (a name passes `r/sys/namereg`).
+- One time rule: the reader's local time, with UTC beside it; one way to write a deadline.
+- No count against the universe's total ("42 of 551"); progress shows per constellation.
+- Text written by a realm, a bot or Jarvis always shows its source and never speaks in
+  gnoworld's voice.
+- Reactions are emoji with their count, named for screen readers ("Rocket, 4, including you").
+- Buttons start with a verb and name what happens ("Vote… · signs in Adena", "Read it · free").
 
 ## Browsers
 
@@ -214,68 +268,73 @@ Storybook, plus the journeys; no extra service.
   - forced colours keep every control visible; reduced motion stops transitions;
   - axe passes, contrast included.
 - **Stories that stress:**
-  - a text 40% longer and a 40-character name;
+  - a text 40% longer, a 40-character name, a right-to-left message;
   - every state of the coherence review that the prototype lacked: sending, failed, typing,
     empty, loading, broken media, too late, no selection.
 - **Budgets:** the CSS's size in the build budget, and layout shift at first paint.
 
 ## Components
 
-They live in `app/src/ui`, each a component with its CSS Module, documented by its props.
+They live in `packages/ui` (`@gnoworld/ui`), shared by the client and the admin console, each a
+component with its CSS Module, documented by its props.
 
 **How they compose:**
 - **Named parts.** Card.Header, Card.Body and Card.Actions; Row's lead, title, subtitle,
   activity and trail; Field's label, help, error and prefix.
-- **Closed variants.** `size`, `tone` (neutral, action, warm, danger, signal), `emphasis`
-  (solid, outline, quiet) and `density` are TypeScript unions, and each value only sets private
-  properties.
+- **Closed variants.** `size`, `emphasis` (solid, outline, quiet), `tone` (neutral, danger; and
+  for static marks mine, warm, signal) and `density` are TypeScript unions, and each value only
+  sets private properties. A primary button is `emphasis="solid" tone="neutral"` (cream); a
+  destructive one is `tone="danger"`.
 - **No outside styling.** No component accepts `className` or `style`: TypeScript refuses them.
 - **Context cascades.** `data-tone` and `data-density` on a container, and the surface level (a
   card on a panel is one step lighter), reach everything inside.
 
 **Where they live:**
-- **A component exists once two places use it;** otherwise it is a variant.
+- **A component exists once two places use it;** otherwise it is a variant, or an assembly that
+  lives in its feature. `ui` holds layout and states, never a domain: a call, a poll, a proposal,
+  a quiz or a seal is an assembly in its feature, built from `Card` and the signing block.
 - **Storybook shows everything.** One page shows every token. Another shows every component at
   once. Then come each component's matrix (size × tone × emphasis × state) and the real
   assemblies.
 
 | Component | Variants and states | Notes |
 |---|---|---|
-| `Button` | primary, secondary, text; sizes s, m, l; with an icon; disabled; busy | A primary is filled with cream. Never two primaries side by side |
-| `IconButton` | sizes s, m; pressed | Always an `aria-label`, and a `Tooltip` with the same text |
-| `Chip` | interactive (default, selected, with a count); static (tones, as badges and tags); the "Testnet" and "Sponsored" badges | Room chips, quick actions, filters, reactions, genre lenses (ADR-0002 §3) |
-| `Tabs` | segmented, with counts, icon-only; none selected | ARIA `tablist`. The views (Earth, Universe, List), notifications, the library filter |
-| `ChoiceGroup` | segmented, list | ARIA `radiogroup`: the days to rent, a poll's answers |
+| `Button` | emphasis solid, outline, quiet; tone neutral, danger; sizes s, m, l; with an icon; disabled; busy | The solid neutral (cream) is the primary: one per region. A danger button names its act |
+| `IconButton` | sizes s, m, l (the header, 44 by touch); outline, plain; pressed; a count | Always an `aria-label`, and a `Tooltip` with the same text |
+| `Chip` | interactive (default, selected, with a count); static, at `--control-xs`, with a tone (a card's state, a badge) | Room chips, quick actions, filters, reactions, genre lenses (ADR-0002 §3); "Testnet" and "Sponsored" are uses of the static chip |
+| `Tabs` | segmented, with counts, icon-only; none selected | ARIA `tablist`. The views (Earth, Cosmos, List), notifications, the library filter, a world's rooms in the dock |
+| `ChoiceGroup` | segmented, list | ARIA `radiogroup`, one look: each option a boxed row; the chosen one cream with the check. The days to rent, a poll's and a quiz's answers |
 | `Popover` | anchored; menu; listbox | The native `popover` attribute; outside click and `Esc` close it |
 | `Combobox` | mentions, commands, search | A list moved with the arrow keys in a `Popover`, ARIA `combobox`: `@`, `/` and ⌘K |
 | `Tooltip` | | On every icon-only control |
 | `Toolbar` | | ARIA `toolbar` with roving focus: a message's actions, formatting, the composer's tools |
-| `Dialog` | standard, wide (the ⌘K palette, the lightbox, the passport) | The native `<dialog>`. Focus moves to the first field or the title, never to a primary button. Device-only routes (`/passport`, `/saved`) open as dialogs over the current place. Not for transactions (ADR-0002 §4) |
-| `Panel` | docked, floating; world-tinted | Header, body, footer; the plate and the chat dock are panels |
-| `Card` | message, call (preview → sign → waiting → landing → result; refused, failed, too late), realm digest, proposal, event, announcement, media; tones; dashed | Call cards and digests follow ADR-0002 §4 |
+| `Dialog` | standard, wide (the ⌘K palette, the lightbox, the passport) | The native `<dialog>`. Focus moves to the first field or the title, never to a primary button. Device-only routes (`/passport`, `/saved`) open as dialogs over the current place. A signing block may sit inside one (registering a name, setting up a session); a dialog is never the transaction itself (ADR-0002 §4) |
+| `Panel` | docked, floating; the plate (world-tinted, dot grid, fading edge, a vertical caption) | Header (one height), body, footer; the plate and the chat dock are panels |
+| `Card` | header, body, actions; tones; dashed; density | Layout only. Its kinds (message, call, digest, proposal, event, announcement, media, poll, quiz, seal) are assemblies in their features (ADR-0002 §4) |
+| `SignPanel` | preview, waiting, signed, in a block, done; refused, failed, too late, wrong network, wallet missing or locked | The one signing block, whoever signs (Adena, a session, a signature that is not a transaction). It shows the account, the realm, the function, the arguments, the network with its label, the fee as an estimate and who pays, the steps in words, the ADR-0001 §11 warnings and a link to gnoweb. Only it renders the confirm control |
 | `Row` | plain, divided, boxed; current; with a thumbnail, an icon or an avatar | Lists, connected worlds, notifications, search results, agenda entries. The activity slot carries in words what the 3D shows |
-| `Field` | text, search, composer, date (the browser's `datetime-local`); label, help, error, prefix | The composer is a rich text box: bold shows as bold, Markdown on the wire |
-| `Avatar` | sizes s, m, l; presence; speaking ring | An astronaut generated from the name (ADR-0002 §1, §8 row 9): a stylized, futuristic suit and helmet, few details, readable at 20 px. Phase 1: its parts chosen by the person. Never a planet. No uploaded picture (ADR-0002 §6). Never a "verified" badge |
+| `Field` | text, search, composer, date (the browser's `datetime-local`); label, help, error, prefix | The composer is a rich text box: bold shows as bold, Markdown on the wire. A name is typed at body size, never in data mono |
+| `Avatar` | sizes s, m, l; kind person, assistant, bot; presence; speaking ring | A person's astronaut is generated from the address (ADR-0002 §1, §8 row 9): `partsFrom(address)`, then `draw(parts)`; a stylized, futuristic suit and helmet, few details, readable at 20 px, the colour from the address filling the largest area. One part always comes from the address; the others are chosen in phase 1. The short address shows wherever a person matters (person card, mention list, DM header, signing). An assistant or a bot has its own mark and a word, never mint. Never a planet. No uploaded picture (ADR-0002 §6). Never a badge granted by the platform |
 | `PlanetThumb` | world, ecosystem cluster, star, station, signal; dock magnification | Rendered from the same look as the 3D world |
 | `Stat` | number, unit, caption; the heat badge; delta | Tabular numbers that count up on arrival. Under reduced motion, effects become `Stat` counts |
-| `ActivityChart` | 24 h bars, a hover tooltip, sparkline | SVG, no chart library |
+| `ActivityChart` | 24 h bars, a hover tooltip, sparkline | SVG, no chart library; Data graphics, above |
 | `Progress` | bar, steps, spinner, wave, arc | The flight, a quest, the signing wait, a speaker, the passport's gauge |
-| `Kicker` | with a dot | `--font-label` |
-| `Flash` | title, line, one action | One at a time; the next waits; arrival banners are its variants |
-| `FlightPanel` | in transit, course plotted, entering orbit | Target, distance, speed, arrival and a progress bar, in tabular numbers (ADR-0002 §1) |
+| `Kicker` | with a dot; vertical (the plate's atlas caption) | `--font-label` |
+| `Flash` | title, line, one action (never cream) | One at a time; the next waits; arrival banners are its variants |
 | `EmptyState` | text and one action | Every list has one |
 | `Skeleton` | line, card | Only where data takes longer than 300 ms |
 | `Logo` | mark, mark and wordmark | The header and the loader |
 
 Later, each in its slice: `Message` (4, on Card), `Breadcrumb` and the ⌘K palette (5, on
-Dialog), the scene `Label` (7). Menu is a `Popover`, a badge a static `Chip`, a presence dot an
-`Avatar` slot, a divider a base `hr`.
+Dialog), the scene `Label` (7); `Table`, `Checkbox`, `Switch`, `Select` when the settings and the
+admin console need them (8, 12). Menu is a `Popover`, a badge a static `Chip`, a presence dot an
+`Avatar` slot, a divider a base `hr`. The flight panel is the flight feature's assembly.
 
 **Rich cards in the chat.** Every interactive structure of a room is one `Card`:
 - a header: the type's icon, a kicker, a title and a state (live, ended, won, signed);
 - a body of blocks: `Row`, `ChoiceGroup`, `Progress`, `Stat`, `Grid`, `Field`, media `Card`,
   `Avatar`;
-- a footer: actions and a meta line ("42 of 551", a clock).
+- a footer: actions and a meta line (a count, a clock with its unit).
 
 This covers the calendar (an agenda of `Row`s by day, no calendar widget), who's here, catch up,
 realm and vote, station, quest and expedition, poll, room games and contest. A new kind is an
@@ -283,11 +342,14 @@ assembly in its own slice, with its story.
 
 ### Icons
 
-- One set of 44: close, plus, arrow, arrow-up-right, chevron, search, chat, thread, reply, bell,
+- One set of 55: close, plus, arrow, arrow-up-right, chevron, search, chat, thread, reply, bell,
   passport, seal, expand, shrink, image, bookmark, smile, code, code-block, list-bulleted,
   list-numbered, quote, pause, play, pin, more, pencil, link, comet, at, mail, check, calendar,
-  spark, news, satellite, planet, cluster, bold, italic, underline, strikethrough, slash, caret.
-- A 16 px grid, a 1.5 px stroke, round caps and joins, `currentColor`.
+  spark, news, satellite, planet, cluster, bold, italic, underline, strikethrough, slash, caret,
+  share, menu, people, star, chart, info, warning, alert, lock, shield, key. A new icon joins the
+  list in the slice that needs it; directional ones mirror right to left.
+- A 16 px grid, a 1.5 px stroke, round caps and joins, `currentColor`, drawn at `--icon-m` or
+  `--icon-l` only.
 - Each icon is a component that renders inline SVG with `aria-hidden="true"`. Its button
   carries the label.
 - No emoji, no typed arrows or glyphs (→ ↑ ✓ ▲ ‹) in the interface.
@@ -296,12 +358,12 @@ assembly in its own slice, with its story.
 
 | Region | Place | Size |
 |---|---|---|
-| Header | Top, 34 px from the edge | Controls at `--control-m` (44 by touch). Logo left; the views (Earth, Universe, List) and search centre; Jarvis, chat, passport, bell, account right. The account button opens the menu (passport, saved, settings, help, log out); on a phone, a menu button holds it with the navigation (ADR-0002 §1, menu and settings). Its pills have a backdrop that keeps them readable over any planet |
-| Top centre | Under the header | One slot: the flight panel, the expedition pill, the flash |
-| Hero | Bottom left of the cosmos | The number, one line of text, two big actions, the markets row |
-| Rail | Right of the cosmos | Planets at 64 px, magnified like a dock; names on two lines |
-| Plate | Left of a world's frame | Content column up to 620 px; its right edge melts into space behind the planet; a scroll cue when its content is cut |
-| Chat dock | Right | 360 px, 320 px under 1400 px; full screen on demand: a column of worlds, a room sidebar (rooms, Media, Saved, DMs), the conversation, and an info panel (Here now, pins) |
+| Header | Top, 34 px from the edge, the same on every view | Controls at `--control-m` (44 by touch). Logo left; the views (Earth, Cosmos, List), the network (the universe switcher, "Testnet" on a testnet) and search centre; Jarvis, chat, passport, bell, account right. The account button opens the menu (passport, saved, settings, help, log out); on a phone, a menu button holds it with the navigation (ADR-0002 §1, menu and settings). When narrow, labels drop before icons; the network and the account never drop. Its pills have a backdrop that keeps them readable over any planet |
+| Top centre | Under the header, centred in the scene's free area (between the plate and the dock) | One slot: the flight panel, the expedition pill, the flash |
+| Hero | Bottom left of the cosmos | The number, one line that says what gnoworld is, two big actions, the markets row; the scene keeps it clear (a safe area) |
+| Rail | Right of the cosmos | Planets at 64 px, magnified like a dock; names on two lines; as tall as its worlds; labels keep out of it |
+| Plate | Left of a world's frame | 620 px, a 440 px text column; its background fades into space over its last 64 px, with no border, so the planet keeps the frame's free area; the dot grid and the vertical atlas caption; a scroll cue when its content is cut |
+| Chat dock | Right | 360 px, 320 px under 1400 px, in the plain panel colour; messages anchored at the bottom; full screen on demand: a column of worlds, a room sidebar (rooms, Media, Saved, DMs), the conversation, and an info panel (Here now, pins) |
 | Ticker | Bottom | 34 px, pausable |
 | Credits | A fixed corner, wherever textures show, on phones too | One 11 px "Credits" link in the muted grey, opening the full attributions (CC BY 4.0 §3(a)(2) allows a link) |
 
@@ -385,4 +447,5 @@ Components use container queries, so they fit wherever they are placed.
 These are kept out on purpose (`docs/design/coherence.md`, "Not to rebuild"):
 - **The prototype's dead UI:** the side card, the old Jarvis panel, the toast, the top and
   bottom bars, the evolutions board, the range slider, avatar upload.
+- **Its invented timers:** the pot and its countdown (ADR-0002 §8, row 2).
 - **Its bugs**, each with a test that holds it once the component exists.
