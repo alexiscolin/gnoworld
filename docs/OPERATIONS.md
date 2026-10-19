@@ -64,6 +64,10 @@ tailnet; keep it so.
 | Stop | `docker compose -f deploy/compose.yaml --profile demo down` |
 | Remove it all | `docker compose -f deploy/compose.yaml --profile demo down -v`, then delete the machine in the admin console |
 
+Run `sh deploy/test.sh` after every change to `deploy/`, and when the app changes what it serves
+(a new kind of file, many more files on a first load); `--mutants` in `/pre-merge` of a branch
+that changes `deploy/`. App code alone needs neither: the gate's journeys test it.
+
 The tests run on the host (macOS or Linux), outside Claude Code's sandbox, which refuses Docker's
 socket. Their output names the host's addresses and ports: never commit it, nor paste it in public.
 
