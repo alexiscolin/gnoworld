@@ -7,6 +7,20 @@ const HASHED = /^\/assets\/[\w.-]+-[\w-]{8,}\.(js|css)$/;
 
 const promptOf = (page: Page) => page.getByRole("status").filter({ hasText: "New version available." });
 
+const reload = (page: Page) =>
+  Promise.all([page.waitForEvent("load"), promptOf(page).getByRole("button", { name: "Reload" }).click()]);
+
+// A deploy on a host that bumps (tests/e2e/serve.mjs), then the tab shown again, which is when an
+// open page asks for a newer worker.
+async function bump(
+  page: Page,
+  request: { post(url: string, options?: { headers?: Record<string, string> }): Promise<{ status(): number }> },
+  { site, headers = {} }: { site: string; headers?: Record<string, string> },
+): Promise<void> {
+  expect((await request.post(`${site}/__bump`, { headers })).status()).toBe(204);
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+}
+
 async function appManifest(page: Page) {
   return (await page.context().newCDPSession(page)).send("Page.getAppManifest");
 }
@@ -80,9 +94,8 @@ test.describe("behind the demo's password", () => {
     const before = await page.evaluate(
       async () => (await navigator.serviceWorker.getRegistration())?.active?.scriptURL,
     );
-    expect((await request.post(`${site}/__bump`, { headers: password })).status()).toBe(204);
-    await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
-    await Promise.all([page.waitForEvent("load"), promptOf(page).getByRole("button", { name: "Reload" }).click()]);
+    await bump(page, request, { site, headers: password });
+    await reload(page);
     await controlled(page);
     const after = await page.evaluate(async () => {
       const registration = await navigator.serviceWorker.getRegistration();
@@ -177,12 +190,6 @@ test.describe("updates", () => {
       };
     });
 
-  // A deploy, then the tab shown again, which is when an open page asks for a newer worker.
-  async function bump(page: Page, request: { post(url: string): Promise<{ status(): number }> }): Promise<void> {
-    expect((await request.post(`${site}/__bump`)).status()).toBe(204);
-    await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
-  }
-
   test("a new version waits: the prompt shows, and the page changes only after the click", async ({
     page,
     request,
@@ -204,11 +211,11 @@ test.describe("updates", () => {
     await page.getByRole("status").evaluate((region) => {
       region.id = "there-before";
     });
-    await bump(page, request);
+    await bump(page, request, { site });
     await expect(promptOf(page)).toBeVisible();
     await expect(promptOf(page)).toHaveAttribute("id", "there-before");
     expect(await untouched(page)).toEqual({ same: true, waiting: true, marked: true });
-    await Promise.all([page.waitForEvent("load"), promptOf(page).getByRole("button", { name: "Reload" }).click()]);
+    await reload(page);
     await controlled(page);
     await hydrated(page);
     expect((await untouched(page)).waiting).toBe(false);
@@ -223,13 +230,13 @@ test.describe("updates", () => {
     const other = await page.context().newPage();
     await open(page);
     await open(other);
-    await bump(page, request);
+    await bump(page, request, { site });
     await expect(promptOf(page)).toBeVisible();
     await expect(promptOf(other)).toBeVisible();
-    await Promise.all([page.waitForEvent("load"), promptOf(page).getByRole("button", { name: "Reload" }).click()]);
+    await reload(page);
     await hydrated(page);
     await expect(other.locator("body[data-before]")).toHaveCount(1);
-    await Promise.all([other.waitForEvent("load"), promptOf(other).getByRole("button", { name: "Reload" }).click()]);
+    await reload(other);
     await hydrated(other);
     await expect(other.locator("body[data-before]")).toHaveCount(0);
   });
