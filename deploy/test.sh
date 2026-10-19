@@ -22,6 +22,7 @@ missing() {
 	echo "test.sh: $1" >&2
 	exit 2
 }
+case ${1:-} in "" | --mutants | --demo) ;; *) missing "no such mode [$1]: none, --mutants or --demo" ;; esac
 case $os in
 Darwin) host_tools="netstat route ifconfig arp" ;;
 Linux) host_tools="ss ip" ;;
@@ -191,7 +192,8 @@ hardened() {
 	case $(field '{{json .HostConfig.PortBindings}}') in null | '{}') pass "$name binds no port on the host" ;; *) fail "$name binds a port on the host" ;; esac
 	mounts=$(field '{{range .Mounts}}{{.Type}} {{.Source}} {{.RW}};{{end}}')
 	case $mounts in *docker.sock*) fail "$name holds Docker's socket" ;; *) pass "$name: no Docker socket" ;; esac
-	case $mounts in *"bind "*" true;"*) fail "$name: a file of the host mounted writable" ;; *) pass "$name: the host's files read-only" ;; esac
+	# One mount at a time: a glob over the list matched a read-only bind with a writable volume.
+	if printf '%s' "$mounts" | tr ';' '\n' | grep -q '^bind .* true$'; then fail "$name: a file of the host mounted writable"; else pass "$name: the host's files read-only"; fi
 	case $(field '{{json .HostConfig.Tmpfs}}') in *'"/tmp"'*) pass "$name: /tmp in memory" ;; *) fail "$name: no /tmp in memory" ;; esac
 	case $(field '{{index .HostConfig.LogConfig.Config "max-size"}}') in # an engine may rotate by default: the size counts
 	*[0-9]k | *[0-9]m) pass "$name: its logs rotate, at a size in KB or MB" ;;
