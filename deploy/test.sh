@@ -28,7 +28,8 @@ Darwin) host_tools="netstat route ifconfig arp" ;;
 Linux) host_tools="ss ip" ;;
 *) missing "it runs on macOS or Linux, not $os" ;;
 esac
-for tool in docker curl python3 openssl htpasswd dig git $host_tools; do
+[ "${1:-}" != --demo ] || host_tools="$host_tools dig" # only --demo resolves the public name
+for tool in docker curl python3 openssl htpasswd git $host_tools; do
 	command -v "$tool" >/dev/null || missing "$tool is missing (htpasswd: apache2-utils or httpd-tools on Linux; dig: dnsutils)"
 done
 engine=$(docker version --format '{{.Server.Version}}' 2>/dev/null || true)
@@ -150,7 +151,10 @@ targets() {
 # or Docker's gateways; the internet only when $3 says yes; $4, the DNS servers the guard lets out.
 reach() {
 	network=$1 name=$2 internet=$3 allowed=${4:-}
-	[ -n "${list:-}" ] || list=$(targets | sort -u)
+	if [ -z "${list:-}" ]; then
+		targets >"$tmp/targets" # in this shell, not a subshell: a missing fact stops the run
+		list=$(sort -u "$tmp/targets")
+	fi
 	# web:8080 rides along: if it is missing from the answers, the fan-out saw nothing at all.
 	found=$(answering "$network" $list 1.1.1.1:443 web:8080)
 	expect "$name: the probe sees web among its targets" "$(printf '%s\n' "$found" | grep -c '^web:8080$' || true)" 1
@@ -277,6 +281,7 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "the guard lets any DNS out" "the guard lets nothing else out" \
 		guard awk '!done && /-A OUTPUT -o lo -j ACCEPT/ { print; print "\techo \"-A OUTPUT -p udp --dport 53 -j ACCEPT\""; done = 1; next } { print }'
 	mutant "the guard leaves IPv6 open" "IPv6: the guard drops all but loopback" guard sed '/^printf/ s#:OUTPUT DROP#:OUTPUT ACCEPT#'
+	mutant "web's port let out to any network" "the guard lets nothing else out" guard sed 's#-o $inside ##'
 	mutant "no rate limit" "a burst with no password gets 429" nginx sed '/limit_req zone=/d'
 	mutant "a flood answered 503" "a burst with no password gets 429" nginx sed '/limit_req_status 429/d'
 	mutant "a first load cut short" "a visitor's first load" nginx sed 's#burst=60#burst=25#'
@@ -366,7 +371,8 @@ elif [ "${1:-}" != --demo ]; then
 		fail "the guard lets something out before it refuses"
 	fi
 	expect "the guard lets nothing else out" "$(printf '%s\n' "$v4" | grep -e '-j ACCEPT' | grep -vx -e '-A OUTPUT -o lo -j ACCEPT' -e '-A OUTPUT -p udp -j ACCEPT' |
-		grep -v -e ' --dport 8080 -j ACCEPT$' -e ' --dports 80,443 -j ACCEPT$' -e '^-A OUTPUT -d [0-9.]*/32 -p [a-z]* -m [a-z]* --dport 53 -j ACCEPT$' || true)" ""
+		grep -vx -e '-A OUTPUT -o [^ ]* -p tcp -m tcp --dport 8080 -j ACCEPT' -e '-A OUTPUT -p tcp -m multiport --dports 80,443 -j ACCEPT' \
+			-e '-A OUTPUT -d [0-9.]*/32 -p [a-z]* -m [a-z]* --dport 53 -j ACCEPT' || true)" ""
 	expect "IPv6: the guard drops all but loopback" "$(printf '%s\n' "$v6" | tr '\n' '|')" "-P OUTPUT DROP|-A OUTPUT -o lo -j ACCEPT|"
 
 	# Requests as Tailscale sends them: through the PROXY protocol, with the visitor's address. Each
