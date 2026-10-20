@@ -30,7 +30,7 @@ function IconButtons() {
   return (
     <Cluster>
       <IconButton icon="search" label="Search" />
-      <IconButton icon="bell" label="Notifications, 8 unread" count={8} />
+      <IconButton icon="bell" label="Unread notifications" count={8} />
       <IconButton icon="star" label="Save the room" pressed />
       <IconButton icon="bold" label="Bold" emphasis="plain" size="s" />
       <IconButton icon="close" label="Close" size="l" />

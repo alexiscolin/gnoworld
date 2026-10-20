@@ -5,8 +5,8 @@ import styles from "./Button.module.css";
 
 export interface IconButtonProps {
   icon: IconName;
-  // Its whole name, with the count as shown ("Notifications, 8 unread", "over 99"): the icon and the
-  // count are hidden, and a name that lacks the visible count fails WCAG's label in name.
+  // Its name without the count: the button adds the count as shown ("Notifications, 8", "Notifications,
+  // over 99"), since the icon and the badge are hidden and WCAG's label in name wants the count.
   label: string;
   size?: ControlSize;
   emphasis?: "outline" | "plain";
@@ -15,10 +15,10 @@ export interface IconButtonProps {
   onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
 }
 
-/** What the count shows: nothing at zero, below it or for no number; 99+ past 99. */
+/** What the count shows and says: nothing at zero, below it or for no number; 99+, over 99, past 99. */
 function shown(count: number | undefined) {
   if (count === undefined || !(count > 0)) return null;
-  return count > 99 ? "99+" : String(count);
+  return count > 99 ? { badge: "99+", said: "over 99" } : { badge: String(count), said: String(count) };
 }
 
 /** Button's control without its words, in the same module: the same look, square. */
@@ -31,11 +31,11 @@ export function IconButton({
   count,
   onClick,
 }: IconButtonProps) {
-  const badge = shown(count);
+  const counted = shown(count);
   return (
     <button
       type="button"
-      aria-label={label}
+      aria-label={counted === null ? label : `${label}, ${counted.said}`}
       aria-pressed={pressed}
       className={[styles["button"], styles["square"]].join(" ")}
       data-emphasis={emphasis}
@@ -44,9 +44,9 @@ export function IconButton({
       onClick={onClick}
     >
       <Icon name={icon} size={iconSize(size)} />
-      {badge === null ? null : (
+      {counted === null ? null : (
         <span className={styles["count"]} aria-hidden="true">
-          {badge}
+          {counted.badge}
         </span>
       )}
     </button>

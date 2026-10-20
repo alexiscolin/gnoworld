@@ -312,7 +312,7 @@ component with its CSS Module, documented by its props.
 | Component | Variants and states | Notes |
 |---|---|---|
 | `Button` | emphasis solid, outline, quiet; tone neutral, danger; sizes s, m, l; with an icon; disabled; busy | The solid neutral (cream) is the primary: one per region. A danger button names its act |
-| `IconButton` | sizes s, m, l (the header, 44 by touch); outline, plain; pressed; a count | Always an `aria-label`, and a `Tooltip` with the same text (2c). A count shows past 99 as 99+, and the name holds it as shown ("Notifications, over 99 unread"): WCAG's label in name |
+| `IconButton` | sizes s, m, l (the header, 44 by touch); outline, plain; pressed; a count | Always an `aria-label`, and a `Tooltip` with the same text (2c). A count shows past 99 as 99+, and the button adds it to its name as shown ("Unread notifications, over 99"): WCAG's label in name |
 | `Chip` | interactive (default, selected, with a count); static, at `--control-xs`, with a tone (a card's state, a badge) | Room chips, quick actions, filters, reactions, genre lenses (ADR-0002 §3); "Testnet" and "Sponsored" are uses of the static chip |
 | `Tabs` | segmented, with counts, icon-only; none selected | ARIA `tablist`. The views (Earth, Cosmos, List), notifications, the library filter, a world's rooms in the dock |
 | `ChoiceGroup` | segmented, list | ARIA `radiogroup`, one look: each option a boxed row; the chosen one cream with the check. The days to rent, a poll's and a quiz's answers |

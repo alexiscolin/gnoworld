@@ -11,8 +11,8 @@ type Story = StoryObj<typeof meta>;
 export const Outline: Story = {};
 export const Plain: Story = { args: { emphasis: "plain", icon: "bold", label: "Bold" } };
 export const Pressed: Story = { args: { icon: "star", label: "Save the room", pressed: true } };
-export const WithCount: Story = { args: { label: "Notifications, 8 unread", count: 8 } };
-export const CountPast99: Story = { args: { label: "Notifications, over 99 unread", count: 120 } };
+export const WithCount: Story = { args: { label: "Unread notifications", count: 8 } };
+export const CountPast99: Story = { args: { label: "Unread notifications", count: 120 } };
 
 export const Sizes: Story = {
   render: (args) => (

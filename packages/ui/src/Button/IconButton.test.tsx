@@ -46,20 +46,21 @@ describe("IconButton", () => {
     expect(screen.getByRole("button", { pressed: false })).toBeTruthy();
   });
 
+  // The name holds the count as shown, so no caller can leave it out (WCAG's label in name).
   it.each([
-    [1, "1"],
-    [8, "8"],
-    [99, "99"],
-    [100, "99+"],
-    [1000, "99+"],
-  ])("shows a count of %i as %s, hidden since its label says it", (count, shown) => {
-    render(<IconButton icon="bell" label={`Notifications, ${String(count)} unread`} count={count} />);
-    expect(countOf(screen.getByRole("button", { name: `Notifications, ${String(count)} unread` }))).toBe(shown);
+    [1, "1", "1"],
+    [8, "8", "8"],
+    [99, "99", "99"],
+    [100, "99+", "over 99"],
+    [1000, "99+", "over 99"],
+  ])("shows a count of %i as %s, and adds it to its name as %s", (count, shown, said) => {
+    render(<IconButton icon="bell" label="Notifications" count={count} />);
+    expect(countOf(screen.getByRole("button", { name: `Notifications, ${said}` }))).toBe(shown);
   });
 
-  it.each([0, -1, Number.NaN])("shows no count for %s", (count) => {
+  it.each([0, -1, Number.NaN])("shows no count for %s, and its name is its label alone", (count) => {
     render(<IconButton icon="bell" label="Notifications" count={count} />);
-    expect(screen.getByRole("button").textContent).toBe("");
+    expect(screen.getByRole("button", { name: "Notifications" }).textContent).toBe("");
   });
 
   it("calls its handler on a click", async () => {
