@@ -8,8 +8,8 @@
   included), no bare z-index, unless a `/* raw: why */` comment sits right before it.
 - One token file. Its primitives, `--p-*`, are the only raw colours: a semantic token is made
   of them, and nothing else reads one, in a stylesheet or named in code (tests aside).
-- Every `var(--x)` names a token (or a `--_private` property of its own module), and every
-  token is used somewhere. Every class of a module is used by a component in its folder, and
+- Every `var(--x)`, in a stylesheet or in code, names a token (or a `--_private` property of its
+  own module), and every token is used somewhere; a comment neither uses, sets nor defines one. Every class of a module is used by a component in its folder, and
   every class a component names (`styles.x`, `styles["x"]`) is in the module it imports, named
   statically; every `[data-x]` a module styles is an attribute a component of its folder sets.
 - No ID selector, no `transition: all`, and no two modules sharing three identical declarations.
@@ -34,6 +34,9 @@ NAMED = r"black|white|red|green|blue|yellow|orange|purple|pink|gr[ae]y|silver|go
 COLOUR = re.compile(rf"#[0-9a-fA-F]{{3,8}}\b|\b(rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(|\b({NAMED})\b", re.I)
 RAW = re.compile(rf"{COLOUR.pattern}|\bcolor-mix\(|(?<![\w.-])\d*\.?\d+({UNIT})\b", re.I)
 PRIMITIVE = re.compile(r"--p-[\w-]+$")
+# Code without its comments: a string is kept whole, so a `//` inside one starts no comment.
+CODE_COMMENT = re.compile(r"""("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\.|[^`\\])*`)|//[^\n]*|/\*.*?\*/""", re.S)
+TEST = re.compile(r"\.(test|spec)\.")
 
 
 def parse(text):
@@ -69,9 +72,15 @@ def classes_of(blocks):
     return {c for selector, _ in blocks for c in re.findall(r"\.([A-Za-z_][\w-]*)", selector)}
 
 
-def module_uses(path, text):
+def uncommented(path, text):
+    """The text with its comments blanked: a name only a comment holds is neither used, set nor defined."""
+    if path.suffix == ".css":
+        return re.sub(r"/\*.*?\*/", " ", text, flags=re.S)
+    return CODE_COMMENT.sub(lambda m: m.group(1) or " ", text)
+
+
+def module_uses(path, code):
     """Each CSS module a code file imports, with the classes it names and its unchecked uses."""
-    code = re.sub(r"/\*.*?\*/|(?<![:\"'`])//[^\n]*", " ", text, flags=re.S)
     for binding, source in re.findall(r"import\s+(\w+)\s+from\s+[\"'](\.{1,2}/[^\"']+\.module\.css)[\"']", code):
         at = rf"(?<![\w$.]){re.escape(binding)}"
         named = re.findall(rf"{at}\.([A-Za-z_$][\w$]*)", code) + [m[1] for m in re.findall(rf"{at}\[\s*([\"'`])([\w-]+)\1\s*\]", code)]
@@ -82,17 +91,19 @@ def module_uses(path, text):
 
 root = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else ".")
 texts = {p: p.read_text() for p in listed(root, {".css", ".ts", ".tsx"})}
+plain = {p: uncommented(p, t) for p, t in texts.items()}
 sheets = {p: parse(t) for p, t in texts.items() if p.suffix == ".css"}
+# The components of each folder: a state only a test sets is set by none.
 code_by_folder = collections.defaultdict(str)
-for p, t in texts.items():
-    if p.suffix != ".css":
+for p, t in plain.items():
+    if p.suffix != ".css" and not TEST.search(p.name):
         code_by_folder[p.parent] += t + "\n"
 token_files = [p for p in sheets if p.name == "tokens.css"]
-tokens = {t for p in token_files for t in re.findall(r"(--[\w-]+)\s*:", texts[p])}
+tokens = {t for p in token_files for t in re.findall(r"(--[\w-]+)\s*:", plain[p])}
 problems, exceptions, used = [], 0, set()
 # Each module's classes that some component names from it: a class only a comment or a string
 # mentions is not used.
-uses = {p: list(module_uses(p, t)) for p, t in texts.items() if p.suffix != ".css"}
+uses = {p: list(module_uses(p, t)) for p, t in plain.items() if p.suffix != ".css"}
 named_by_module = collections.defaultdict(set)
 module_classes = {p.resolve(): classes_of(blocks) for p, blocks in sheets.items() if p.name.endswith(".module.css")}
 for found in uses.values():
@@ -102,8 +113,8 @@ if len(token_files) > 1:
     problems.append(f"a second token file: {', '.join(map(str, token_files))}; tokens.css is the one list")
 
 for p, blocks in sheets.items():
-    own = set(re.findall(r"(--_[\w-]+)\s*:", texts[p]))
-    for name in re.findall(r"var\(\s*(--[\w-]+)", texts[p]):
+    own = set(re.findall(r"(--_[\w-]+)\s*:", plain[p]))
+    for name in re.findall(r"var\(\s*(--[\w-]+)", plain[p]):
         used.add(name)
         if name not in tokens and name not in own:
             problems.append(f"{p}: unknown token {name}")
@@ -135,7 +146,7 @@ for p, blocks in sheets.items():
             if not re.search(rf"\b{re.escape(attribute)}=|[\"']{re.escape(attribute)}[\"']\s*:", code_by_folder[p.parent]):
                 problems.append(f"{p}: [{attribute}] is a state no component sets in its folder")
 
-for p, text in texts.items():
+for p, text in plain.items():
     if p.suffix == ".css":
         continue
     for source, named, computed, destructured in uses[p]:
@@ -146,13 +157,16 @@ for p, text in texts.items():
             problems.append(f"{p}: a computed class of {source.name}; name each class, so a missing one is seen")
         if destructured:
             problems.append(f"{p}: {source.name} destructured; name each class from the module")
-    quoted = re.findall(r"['\"`](--[\w-]+)", text)
-    if ".test." not in p.name:  # a test that names a token neither uses it nor reads a primitive
-        used.update(quoted)
-        problems += [f"{p}: the primitive {name} named outside the token file; name its semantic token" for name in quoted if PRIMITIVE.match(name)]
+    if not TEST.search(p.name):  # a test that names a token neither uses it nor reads a primitive
+        quoted = re.findall(r"['\"`](--[\w-]+)", text)
+        read = re.findall(r"var\(\s*(--[\w-]+)", text)
+        used.update(quoted + read)
+        problems += [f"{p}: the primitive {name} named outside the token file; name its semantic token" for name in quoted + read if PRIMITIVE.match(name)]
+        problems += [f"{p}: unknown token {name}" for name in read if name not in tokens]
 problems += [f"unused token {t}" for t in sorted(tokens - used)]
 
-# ponytail: compares every pair of blocks across modules; an index by declaration if it gets slow.
+# ponytail: compares every pair of blocks across modules, 0.3 s at 2,200 blocks (69 today) and
+# 1.3 s at 4,400; an index by declaration past that.
 flat = [(p, frozenset((d[0], d[1]) for d in decls)) for p, blocks in sheets.items() if p.name.endswith(".module.css") for _, decls in blocks]
 for (a, da), (b, db) in itertools.combinations(flat, 2):
     if a != b and len(da & db) >= 3:

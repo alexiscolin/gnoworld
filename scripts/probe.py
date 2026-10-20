@@ -430,6 +430,16 @@ try:
             "a state attribute no component sets": ({"Card.module.css": card(ok_decls) + ".card[data-spacing=\"s\"] {\n  color: var(--color-text);\n}\n", "Card.tsx": use("card") + "export const a = <div data-space=\"s\" />;\n"}, "no component sets"),
             "a state attribute its component sets as an object's key": ({"Card.module.css": card(ok_decls) + ".card[data-space=\"s\"] {\n  color: var(--color-text);\n}\n", "Card.tsx": use("card") + "export const a = { \"data-space\": \"s\" };\n"}, None),
             "a state attribute its component sets": ({"Card.module.css": card(ok_decls) + ".card[data-space=\"s\"] {\n  color: var(--color-text);\n}\n", "Card.tsx": use("card") + "export const a = <div data-space=\"s\" />;\n"}, None),
+            "a primitive read through var() in a component": ({"Card.module.css": card(ok_decls), "Card.tsx": use("card") + "export const s = { color: \"var(--p-grey)\" };\n"}, "primitive"),
+            "an unknown token read in a component": ({"Card.module.css": card(ok_decls), "Card.tsx": use("card") + "export const s = { color: \"var(--nope)\" };\n"}, "unknown token"),
+            "a token read only by a component's var()": ({"Card.module.css": card("  padding: var(--space-2);\n  color: var(--color-text);\n"), "Card.tsx": use("card") + "export const s = { borderRadius: \"var(--radius-m)\" };\n"}, None),
+            "a token named only in a CSS comment": ({"Card.module.css": "/* var(--radius-m) */\n" + card("  padding: var(--space-2);\n  color: var(--color-text);\n"), "Card.tsx": use("card")}, "unused token"),
+            "a token named only in a code comment": ({"Card.module.css": card("  padding: var(--space-2);\n  color: var(--color-text);\n"), "Card.tsx": use("card") + "// it read \"--radius-m\"\n"}, "unused token"),
+            "a token defined only in a comment": ({"tokens.css": tokens.replace("}", "  /* --ghost: 1px; */\n}"), "Card.module.css": card(ok_decls + "  outline-width: var(--ghost);\n"), "Card.tsx": use("card")}, "unknown token"),
+            "a state set only in a code comment": ({"Card.module.css": card(ok_decls) + ".card[data-spacing=\"s\"] {\n  color: var(--color-text);\n}\n", "Card.tsx": use("card") + "// data-spacing=\"s\" went\n"}, "no component sets"),
+            "a state set only by a test": ({"Card.module.css": card(ok_decls) + ".card[data-spacing=\"s\"] {\n  color: var(--color-text);\n}\n", "Card.tsx": use("card"), "Card.test.tsx": "export const a = <div data-spacing=\"s\" />;\n"}, "no component sets"),
+            "a token only a journey names": ({"Card.module.css": card("  padding: var(--space-2);\n  color: var(--color-text);\n"), "Card.tsx": use("card"), "card.spec.ts": "export const r = \"--radius-m\";\n"}, "unused token"),
+            "a primitive after a string that holds //": ({"Card.module.css": card(ok_decls), "Card.tsx": use("card") + "export const u = \"a//b\", p = \"--p-grey\";\n"}, "primitive"),
             "copied rules": ({"Card.module.css": card(ok_decls), "Card.tsx": use("card"), "Tile.module.css": ".tile {\n" + ok_decls + "}\n", "Tile.tsx": "import styles from './Tile.module.css';\nexport const tile = styles.tile;\n"}, "copied"),
         }
         for n, (case, (files, word)) in enumerate(cases.items()):
