@@ -242,22 +242,33 @@ test("a busy button's spinner turns, and stops under reduced motion", async ({ p
   expect((await spin()).map(([name]) => name)).toEqual(["none"]);
 });
 
-test("controls ease their changes, and change at once under reduced motion", async ({ page }) => {
-  const durations = async () => {
+// The design's motion: "Hovered items follow the pointer at once and ease back on leave". Each
+// button's transitions are slowed to 10 s, so a transition that runs is still running when read.
+test("every button lightens at once under the pointer and eases back on leave, at once under reduced motion", async ({
+  page,
+}) => {
+  for (const reduced of [false, true]) {
+    await page.emulateMedia({ reducedMotion: reduced ? "reduce" : "no-preference" });
     await open(page, "button--matrix");
-    return page.evaluate(() => [
-      ...new Set(
-        [...document.querySelectorAll("#storybook-root button")].flatMap((b) =>
-          getComputedStyle(b).transitionDuration.split(", "),
-        ),
-      ),
-    ]);
-  };
-  expect(await durations()).toEqual(["0.12s"]);
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  expect(await durations()).toEqual(["0s"]);
+    const buttons = page.locator("#storybook-root button:not(:disabled):not([aria-busy='true'])");
+    expect(await buttons.count()).toBeGreaterThan(0);
+    for (const button of await buttons.all()) {
+      if (!reduced) {
+        await button.evaluate((b) => {
+          b.style.setProperty("--motion-fast", "10s");
+        });
+      }
+      const name = await button.evaluate((b) => b.outerHTML.slice(0, 60));
+      await button.hover();
+      expect.soft(await button.evaluate((b) => b.getAnimations().length), `${name}: on enter`).toBe(0);
+      await page.mouse.move(0, 0);
+      const easing = await button.evaluate((b) => b.getAnimations().length);
+      expect.soft(easing > 0, `${name}: easing back${reduced ? " under reduced motion" : ""}`).toBe(!reduced);
+    }
+  }
 });
 
+// What the pointer changes, read from every property that paints a box, whatever draws it.
 test("a button lightens under the pointer, unless it is disabled or busy", async ({ page }) => {
   for (const [id, lit] of [
     ["button--primary", true],
@@ -267,8 +278,15 @@ test("a button lightens under the pointer, unless it is disabled or busy", async
   ] as const) {
     await open(page, id);
     const button = page.locator("#storybook-root button");
+    const paint = () =>
+      button.evaluate((b) => {
+        const s = getComputedStyle(b);
+        return [s.backgroundColor, s.backgroundImage, s.boxShadow, s.borderColor, s.color, s.opacity].join();
+      });
+    const resting = await paint();
     await button.hover({ force: true });
-    expect(await button.evaluate((b) => getComputedStyle(b).backgroundImage !== "none"), id).toBe(lit);
+    expect((await paint()) !== resting, id).toBe(lit);
+    await page.mouse.move(0, 0);
   }
 });
 

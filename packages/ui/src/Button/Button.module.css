@@ -5,6 +5,7 @@
     --_pad: var(--space-s);
     --_fill: transparent;
     --_ink: var(--_text);
+    --_veil: transparent;
 
     /* layout: an icon sits beside the label */
     display: inline-flex;
@@ -22,9 +23,13 @@
     color: var(--_ink);
     font: var(--_font);
     cursor: pointer;
+    /* The hover's veil: an inset shadow paints above the fill and below the label, and eases. */
+    /* raw: a spread past any control's size, so the veil covers it whole */
+    box-shadow: inset 0 0 0 100vmax var(--_veil);
     transition:
       background-color var(--motion-fast) var(--ease-standard),
-      border-color var(--motion-fast) var(--ease-standard);
+      border-color var(--motion-fast) var(--ease-standard),
+      box-shadow var(--motion-fast) var(--ease-standard);
   }
 
   .button[data-size="s"] {
@@ -73,8 +78,11 @@
     --_line: transparent;
   }
 
+  /* At once under the pointer: the veil is left out of the transitions here, and eases back on leave. */
   .button:hover:not(:disabled, [aria-disabled="true"]) {
-    background-image: linear-gradient(var(--color-fill-hover), var(--color-fill-hover));
+    --_veil: var(--color-fill-hover);
+
+    transition-property: background-color, border-color;
   }
 
   .button:disabled {
