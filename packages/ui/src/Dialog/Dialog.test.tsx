@@ -85,9 +85,11 @@ describe("Dialog", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("gives the focus to its title when it has no field", () => {
+  it("gives the focus to its title when it has no field, a title Tab never stops on", () => {
     render(<Held />);
-    expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Passport" }));
+    const title = screen.getByRole("heading", { name: "Passport" });
+    expect(document.activeElement).toBe(title);
+    expect(title.tabIndex).toBe(-1);
   });
 
   it("gives the focus to its first field, not to a button before it", () => {

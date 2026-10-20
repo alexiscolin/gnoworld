@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { storiesOf } from "./testing.tsx";
+import { ABUSE, storiesOf } from "./testing.tsx";
 
 function Echo({ text, tone }: { text: string; tone: string }) {
   return <p data-tone={tone}>{text}</p>;
@@ -63,5 +63,12 @@ describe("storiesOf", () => {
     ],
   ])("refuses %s", (_what, module, message) => {
     expect(() => storiesOf(module)).toThrow(message);
+  });
+});
+
+// The threat model's two cases (slice 2's plan, §3): every staysText proof rests on them.
+describe("ABUSE", () => {
+  it("holds markup that would run if parsed, and a name of 10,000 letters", () => {
+    expect(ABUSE).toEqual(['<img src="x" onerror="alert(1)">', `nym-${"a".repeat(9_996)}`]);
   });
 });

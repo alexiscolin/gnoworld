@@ -55,6 +55,19 @@ describe("ActivityChart", () => {
     expect(Math.max(...tall)).toBe(Number(container.querySelector("svg")?.getAttribute("height")));
   });
 
+  it("stands its bars on the baseline, in order, each beside the last and none over another", () => {
+    const { container } = render(<ActivityChart label="Calls" values={[3, 9, 4, 7]} />);
+    const height = Number(container.querySelector("svg")?.getAttribute("height"));
+    const bars = [...container.querySelectorAll("svg [data-hour]")].map((b) => {
+      const read = (name: string) => Number(b.getAttribute(name));
+      return { x: read("x"), y: read("y"), width: read("width"), tall: read("height") };
+    });
+    expect(bars.map(({ y, tall }) => y + tall)).toEqual(bars.map(() => height));
+    expect(bars.every(({ x, width }) => x >= 0 && width > 0)).toBe(true);
+    const gaps = bars.slice(1).map((bar, at) => bar.x - ((bars[at]?.x ?? 0) + (bars[at]?.width ?? 0)));
+    expect(gaps.every((gap) => gap >= 0)).toBe(true);
+  });
+
   it("draws a flat day without dividing by zero", () => {
     const { container } = render(<ActivityChart label="Calls" values={[0, 0, 0]} />);
     expect(heights(container)).toEqual([0, 0, 0]);
@@ -83,6 +96,9 @@ describe("ActivityChart", () => {
     const height = Number(container.querySelector("svg")?.getAttribute("height"));
     expect(points).toHaveLength(4);
     expect(points[0]?.[0]).toBe(0);
+    const steps = points.slice(1).map((point, at) => (point[0] ?? 0) - (points[at]?.[0] ?? 0));
+    expect(new Set(steps).size).toBe(1);
+    expect(steps[0]).toBeGreaterThan(0);
     expect(points[1]?.[1]).toBe(0);
     expect(points[3]?.[1]).toBe(height);
     expect(rows("Calls this week").at(-1)).toEqual(["Today", "0"]);

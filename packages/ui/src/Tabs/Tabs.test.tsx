@@ -97,6 +97,22 @@ describe("Tabs", () => {
     expect(document.activeElement).toBe(screen.getByRole("tab", { name: "Cosmos", selected: true }));
   });
 
+  it("shows no count of nothing, and names its tab by its label alone then", () => {
+    render(
+      <Tabs label="Calls" tabs={[{ id: "calls", label: "Calls", count: 0 }]} selected="calls" onSelect={vi.fn()} />,
+    );
+    expect(screen.getByRole("tab", { name: "Calls" }).textContent).toBe("Calls");
+  });
+
+  it("shows a tab's label beside its icon unless asked for the icon alone", () => {
+    render(
+      <Tabs label="Filter" tabs={[{ id: "all", label: "All", icon: "chat" }]} selected="all" onSelect={vi.fn()} />,
+    );
+    const tab = screen.getByRole("tab", { name: "All" });
+    expect([tab.textContent, tab.querySelector("svg")?.dataset["icon"]]).toEqual(["All", "chat"]);
+    expect(tab.hasAttribute("aria-label")).toBe(false);
+  });
+
   it("names an icon-only tab by its label, shows its icon, and wears its label as a tooltip", () => {
     render(
       <Tabs

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { eachStory, staysText } from "../testing.tsx";
@@ -7,6 +7,18 @@ import * as stories from "./Popover.stories.tsx";
 
 // jsdom has no popover API: the test setup's stand-in opens one by its trigger, as the browser does.
 // Light dismiss, Esc and the placement are the stories' journeys'.
+// A popover holding a button, opened by its trigger, the focus on the button inside: its panel.
+async function focusedInside() {
+  render(
+    <Popover trigger="Network" label="Choose the network">
+      <button type="button">Switch to Onyx</button>
+    </Popover>,
+  );
+  await userEvent.click(screen.getByRole("button", { name: "Network" }));
+  screen.getByRole("button", { name: "Switch to Onyx" }).focus();
+  return screen.getByRole("dialog");
+}
+
 describe("Popover", () => {
   it("is opened by its trigger, a button that names it and says it pops up", () => {
     render(
@@ -24,14 +36,7 @@ describe("Popover", () => {
   });
 
   it("gives the focus back to its trigger when it closes with the focus inside it", async () => {
-    render(
-      <Popover trigger="Network" label="Choose the network">
-        <button type="button">Switch to Onyx</button>
-      </Popover>,
-    );
-    await userEvent.click(screen.getByRole("button", { name: "Network" }));
-    screen.getByRole("button", { name: "Switch to Onyx" }).focus();
-    screen.getByRole("dialog").hidePopover();
+    (await focusedInside()).hidePopover();
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Network" }));
   });
 
@@ -48,6 +53,49 @@ describe("Popover", () => {
     screen.getByRole("button", { name: "Search" }).focus();
     screen.getByRole("dialog").hidePopover();
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Search" }));
+  });
+
+  it("gives the focus back to its trigger when the browser drops it on the page as it closes", async () => {
+    const panel = await focusedInside();
+    // As a browser that focuses nothing on a click does: the focus falls to the page as the panel hides.
+    panel.addEventListener("beforetoggle", () => {
+      screen.getByRole("button", { name: "Switch to Onyx" }).blur();
+    });
+    panel.hidePopover();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Network" }));
+  });
+
+  it("leaves the focus on the page when it closes with the focus there, never pulling it to the trigger", async () => {
+    render(
+      <Popover trigger="Network" label="Choose the network">
+        <p>Onyx</p>
+      </Popover>,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Network" }));
+    screen.getByRole("button", { name: "Network" }).blur();
+    screen.getByRole("dialog").hidePopover();
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it("listens to the page's scroll and size only while open, and stops when it closes", async () => {
+    const listened = vi.spyOn(window, "addEventListener");
+    render(
+      <Popover trigger="Network" label="Choose the network">
+        <p>Onyx</p>
+      </Popover>,
+    );
+    const placing = () => listened.mock.calls.filter(([type]) => type === "scroll" || type === "resize");
+    expect(placing()).toEqual([]);
+    await userEvent.click(screen.getByRole("button", { name: "Network" }));
+    const signals = placing().flatMap(([, , options]) =>
+      typeof options === "object" && options.signal !== undefined ? [options.signal] : [],
+    );
+    expect(signals).toHaveLength(2);
+    act(() => {
+      screen.getByRole("dialog").hidePopover();
+    });
+    expect(signals.every((signal) => signal.aborted)).toBe(true);
+    listened.mockRestore();
   });
 
   it("gives each popover an id of its own", () => {
@@ -157,6 +205,15 @@ describe("Menu", () => {
     await userEvent.click(item(all, 2));
     expect(onSelect).toHaveBeenCalledOnce();
     expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("opens again after it closed, placed and its first item focused", async () => {
+    const all = await opened();
+    screen.getByRole("menu").hidePopover();
+    expect(screen.queryByRole("menu")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "More" }));
+    expect(screen.getByRole("menu")).toBeTruthy();
+    expect(document.activeElement).toBe(screen.getAllByRole("menuitem")[0] ?? all[0]);
   });
 
   it("closes when Tab leaves it", async () => {

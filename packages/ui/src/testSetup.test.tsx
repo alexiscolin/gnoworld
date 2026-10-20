@@ -32,6 +32,24 @@ it("opens a popover from its trigger, and closes it from there again, saying so 
   expect(states).toEqual(["open", "closed"]);
 });
 
+it("says nothing of a popover asked to be what it is already, as the browser does", () => {
+  const states: string[] = [];
+  render(
+    <div data-testid="p" popover="auto" onToggle={(event) => states.push(event.newState)}>
+      <p>Inside</p>
+    </div>,
+  );
+  const panel = screen.getByTestId("p");
+  act(() => {
+    panel.showPopover();
+    panel.showPopover();
+    panel.togglePopover(true);
+    panel.hidePopover();
+    panel.hidePopover();
+  });
+  expect(states).toEqual(["open", "closed"]);
+});
+
 it("closes an open dialog once, saying so with its close event, and a closed one not again", () => {
   let closes = 0;
   render(

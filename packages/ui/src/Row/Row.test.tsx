@@ -29,6 +29,16 @@ describe("Row", () => {
     expect(row()?.getAttribute("aria-current")).toBe("true");
   });
 
+  it("without an href, is no link at all, not even an anchor that goes nowhere", () => {
+    const { container } = render(<Row title="Bubble" subtitle="The BUBBLE token" />);
+    expect(container.querySelector("a")).toBeNull();
+  });
+
+  it("keeps its trail out of its link, so a control in it is never inside a link", () => {
+    render(<Row title="Bubble" href="/w/bubble" trail={<button type="button">Join</button>} />);
+    expect(screen.getByRole("link").contains(screen.getByRole("button", { name: "Join" }))).toBe(false);
+  });
+
   it("with an href, is one link named by its title, the rest of its words inside", () => {
     render(<Row title="Bubble" subtitle="The BUBBLE token" href="/w/bubble" />);
     const link = screen.getByRole("link", { name: /Bubble/ });

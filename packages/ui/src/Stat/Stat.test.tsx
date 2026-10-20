@@ -1,4 +1,5 @@
 import { act, render, screen } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { eachStory, staysText } from "../testing.tsx";
 import { Stat } from "./Stat.tsx";
@@ -58,6 +59,29 @@ describe("Stat", () => {
     expect(values.some((v) => v > 0 && v < 21480)).toBe(true);
     expect(values.every((v, at) => at === 0 || v >= (values[at - 1] ?? 0))).toBe(true);
     expect(values.at(-1)).toBe(21480);
+  });
+
+  it("sends its value from the server, which cannot know the reader's motion setting", () => {
+    motion(true);
+    expect(renderToString(<Stat value={21480} caption="Today" />)).toContain('aria-hidden="true">21,480</span>');
+  });
+
+  it("asks for no more frames once it has arrived", () => {
+    motion(true);
+    render(<Stat value={21480} caption="Today" />);
+    advance(1_200);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("counts from nothing on a page open for a while, its clock far from zero", () => {
+    motion(true);
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    const { container } = render(<Stat value={21480} caption="Today" />);
+    advance(300);
+    const now = Number((drawn(container) ?? "").replaceAll(",", ""));
+    expect(now > 0 && now < 21480).toBe(true);
   });
 
   it("stands at its value at once under reduced motion", () => {

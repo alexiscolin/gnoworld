@@ -23,6 +23,12 @@ describe("Field", () => {
     expect(said).toEqual(["On gno.land", "Taken already"]);
   });
 
+  it("is described by its error alone when it has no help", () => {
+    render(<Field label="Name" error="Too short" value="ab" onChange={vi.fn()} />);
+    const said = screen.getByRole("textbox").getAttribute("aria-describedby") ?? "";
+    expect(said.split(" ").map((id) => document.getElementById(id)?.textContent)).toEqual(["Too short"]);
+  });
+
   it("is a search box, or a date and time, when asked", () => {
     const { rerender } = render(<Field kind="search" label="Search" value="" onChange={vi.fn()} />);
     expect(screen.getByRole("searchbox", { name: "Search" })).toBeTruthy();

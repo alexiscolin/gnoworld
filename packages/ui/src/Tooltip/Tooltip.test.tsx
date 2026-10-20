@@ -14,6 +14,15 @@ function advance(ms: number) {
   });
 }
 
+// The focus the keyboard brings: Tab first, as jsdom's :focus-visible reads the events before the
+// focus, and whatever an earlier test of the file left would answer otherwise.
+function keyboardFocus() {
+  fireEvent.keyDown(document.activeElement ?? document.body, { key: "Tab" });
+  act(() => {
+    button().focus();
+  });
+}
+
 describe("Tooltip", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -62,9 +71,7 @@ describe("Tooltip", () => {
 
   it("shows them at once when the keyboard brings the focus, and hides them when it leaves", () => {
     draw();
-    act(() => {
-      button().focus();
-    });
+    keyboardFocus();
     expect(shown()).toBe("true");
     act(() => {
       button().blur();
@@ -74,9 +81,7 @@ describe("Tooltip", () => {
 
   it("hides them on Esc, until the pointer or the focus comes again", () => {
     draw();
-    act(() => {
-      button().focus();
-    });
+    keyboardFocus();
     fireEvent.keyDown(button(), { key: "Escape" });
     expect(shown()).toBe("false");
     fireEvent.pointerEnter(button());
@@ -102,12 +107,43 @@ describe("Tooltip", () => {
     expect(shown()).toBe("false");
   });
 
-  it("stops its count when it leaves the page", () => {
+  it("shows them again on the pointer's next visit, after it went once", () => {
+    draw();
+    fireEvent.pointerEnter(button());
+    advance(500);
+    fireEvent.pointerLeave(button());
+    fireEvent.pointerEnter(button());
+    advance(500);
+    expect(shown()).toBe("true");
+  });
+
+  it("keeps them on any key but Esc", () => {
+    draw();
+    fireEvent.pointerEnter(button());
+    advance(500);
+    fireEvent.keyDown(document.body, { key: "a" });
+    expect(shown()).toBe("true");
+  });
+
+  it("keeps the words the keyboard showed when the pointer comes too", () => {
+    draw();
+    keyboardFocus();
+    fireEvent.pointerEnter(button());
+    expect(shown()).toBe("true");
+  });
+
+  it("leaves no count and no listener behind when it leaves the page", () => {
+    const listened = vi.spyOn(document, "addEventListener");
     const { unmount } = draw();
     fireEvent.pointerEnter(button());
+    const signals = listened.mock.calls.flatMap(([, , options]) =>
+      typeof options === "object" && options.signal !== undefined ? [options.signal] : [],
+    );
     unmount();
-    advance(500);
-    expect(screen.queryByText("Search the universe")).toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
+    expect(signals.length).toBeGreaterThan(0);
+    expect(signals.every((signal) => signal.aborted)).toBe(true);
+    listened.mockRestore();
   });
 
   it("keeps its words from assistive technology, which has the control's name already", () => {

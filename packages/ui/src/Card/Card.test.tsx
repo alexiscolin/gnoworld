@@ -62,6 +62,15 @@ describe("Card", () => {
     for (const card of both) expect(within(card).getByRole("heading").id).toBe(card.getAttribute("aria-labelledby"));
   });
 
+  it("shows no state when it has none", () => {
+    render(
+      <Card>
+        <Card.Header kicker="Poll" title="Which realm next?" />
+      </Card>,
+    );
+    expect(screen.getByRole("article").textContent).toBe("PollWhich realm next?");
+  });
+
   it("shows a header's words made of markup, or very long, as text", () => {
     staysText((text) => (
       <Card>
