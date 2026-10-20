@@ -33,6 +33,9 @@ export const Boxed: Story = {
     href: "#bubble",
   },
 };
+export const CurrentLink: Story = {
+  args: { look: "divided", href: "#bubble", current: true, activity: "214 here now" },
+};
 export const LongText: Story = {
   args: {
     title: "The GovDAO world, where proposals are read, argued over and voted on",

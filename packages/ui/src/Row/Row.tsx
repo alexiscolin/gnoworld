@@ -17,15 +17,28 @@ export interface RowProps {
   href?: string;
 }
 
-/** One line of a list: its lead, its words, its trail. */
-export function Row({ title, subtitle, activity, lead, trail, look = "plain", current = false, href }: RowProps) {
-  const words = (
+// The row's words: its title, and its subtitle and activity when it has them.
+function Words({
+  title,
+  subtitle,
+  activity,
+}: {
+  title: string;
+  subtitle: string | undefined;
+  activity: string | undefined;
+}) {
+  return (
     <Stack space="3xs">
       <span className={styles["title"]}>{title}</span>
       {subtitle === undefined ? null : <span className={styles["subtitle"]}>{subtitle}</span>}
       {activity === undefined ? null : <span className={styles["activity"]}>{activity}</span>}
     </Stack>
   );
+}
+
+/** One line of a list: its lead, its words, its trail. */
+export function Row({ title, subtitle, activity, lead, trail, look = "plain", current = false, href }: RowProps) {
+  const words = <Words title={title} subtitle={subtitle} activity={activity} />;
   const led =
     lead === undefined ? (
       words
@@ -39,12 +52,12 @@ export function Row({ title, subtitle, activity, lead, trail, look = "plain", cu
     href === undefined ? (
       led
     ) : (
-      <a href={href} className={styles["link"]}>
+      <a href={href} className={styles["link"]} aria-current={current ? "true" : undefined}>
         {led}
       </a>
     );
   return (
-    <div className={styles["row"]} data-look={look} aria-current={current ? "true" : undefined}>
+    <div className={styles["row"]} data-look={look} aria-current={current && href === undefined ? "true" : undefined}>
       {trail === undefined ? (
         body
       ) : (

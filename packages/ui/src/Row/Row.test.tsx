@@ -29,6 +29,13 @@ describe("Row", () => {
     expect(row()?.getAttribute("aria-current")).toBe("true");
   });
 
+  it("says it is current on its link, which takes the focus, when it is one", () => {
+    render(<Row title="Bubble" href="/w/bubble" current />);
+    const link = screen.getByRole("link");
+    expect(link.getAttribute("aria-current")).toBe("true");
+    expect(link.closest("[data-look]")?.hasAttribute("aria-current")).toBe(false);
+  });
+
   it("without an href, is no link at all, not even an anchor that goes nowhere", () => {
     const { container } = render(<Row title="Bubble" subtitle="The BUBBLE token" />);
     expect(container.querySelector("a")).toBeNull();

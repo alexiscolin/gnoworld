@@ -27,7 +27,8 @@
     border-radius: var(--radius-m);
   }
 
-  .row[aria-current="true"] {
+  /* Current is said on what takes the focus: the row, or its link when it is one. */
+  .row:is([aria-current="true"], :has(.link[aria-current="true"])) {
     --_fill: var(--color-fill-hover);
     --_weight: 500;
   }
@@ -40,6 +41,10 @@
   .link {
     display: block;
     text-decoration: none;
+  }
+
+  .link[aria-current="true"] {
+    font-weight: 500;
   }
 
   .title {
