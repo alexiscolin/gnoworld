@@ -13,10 +13,7 @@ import { Menu, Popover } from "../Popover/Popover.tsx";
 import { Row } from "../Row/Row.tsx";
 import { Stat } from "../Stat/Stat.tsx";
 import { Tabs } from "../Tabs/Tabs.tsx";
-
-// A picture drawn here, so the page asks no other host for one; slice 7 draws the planets.
-const disc = (colour: string) =>
-  `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='20' fill='%23${colour}'/%3E%3C/svg%3E`;
+import { DAY, disc } from "./samples.ts";
 
 export function Chips() {
   const [lens, setLens] = useState("games");
@@ -157,12 +154,7 @@ export function Stats() {
 }
 
 export function Activity() {
-  return (
-    <ActivityChart
-      label="Calls per hour, today"
-      values={[4, 3, 2, 2, 1, 1, 3, 8, 14, 22, 30, 34, 41, 38, 36, 40, 52, 70, 96, 88, 61, 40, 22, 12]}
-    />
-  );
+  return <ActivityChart label="Calls per hour, today" values={DAY} />;
 }
 
 export function Planets() {

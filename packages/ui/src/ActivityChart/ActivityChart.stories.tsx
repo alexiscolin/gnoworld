@@ -1,9 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { DAY } from "../Overview/samples.ts";
 import { ActivityChart } from "./ActivityChart.tsx";
 
-const day = [4, 3, 2, 2, 1, 1, 3, 8, 14, 22, 30, 34, 41, 38, 36, 40, 52, 70, 96, 88, 61, 40, 22, 12];
-
-const meta = { component: ActivityChart, args: { label: "Calls per hour, today", values: day } } satisfies Meta<
+const meta = { component: ActivityChart, args: { label: "Calls per hour, today", values: DAY } } satisfies Meta<
   typeof ActivityChart
 >;
 export default meta;

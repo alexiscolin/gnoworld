@@ -1,10 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Cluster } from "../compositions/index.ts";
+import { disc } from "../Overview/samples.ts";
 import { PlanetThumb } from "./PlanetThumb.tsx";
-
-// A picture drawn here, so no story asks another host for one; slice 7 draws the planets.
-const disc = (colour: string) =>
-  `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='20' fill='%23${colour}'/%3E%3C/svg%3E`;
 
 const meta = { component: PlanetThumb, args: { src: disc("5cf2c8"), name: "Bubble" } } satisfies Meta<
   typeof PlanetThumb
