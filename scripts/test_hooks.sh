@@ -412,12 +412,17 @@ printf 'x\n' >"$c/app/src/root.tsx" && printf 'x\n' >"$c/app/src/entry.server.ts
 cover 1 || fail "patch_coverage asked coverage of a Playwright test, the document shell or the server entry"
 unmeasured app/src/site.ts app/src/routes/a.tsx
 git -C "$c" rm -rq --cached app && rm -r "$c/app"
-# Storybook's config is a config and a test setup a test's, so neither is measured; code named alike is.
-mkdir -p "$c/packages/ui/.storybook" "$c/packages/ui/src"
+# Storybook's config is a config and a test setup a test's, and its pages (the stories, the
+# overview) the journeys shoot, so none is measured; code named alike is.
+mkdir -p "$c/packages/ui/.storybook" "$c/packages/ui/src/Overview"
 printf 'x\n' >"$c/packages/ui/.storybook/main.ts" && printf 'x\n' >"$c/packages/ui/.storybook/preview.ts"
-printf 'x\n' >"$c/packages/ui/src/testSetup.ts" && git -C "$c" add packages
-cover 1 || fail "patch_coverage asked coverage of Storybook's config or the tests' setup"
-unmeasured packages/ui/src/storybook.ts packages/ui/src/setup.ts
+printf 'x\n' >"$c/packages/ui/src/testSetup.ts" && printf 'x\n' >"$c/packages/ui/src/Card.stories.tsx"
+printf 'x\n' >"$c/packages/ui/src/Overview/Overview.tsx" && git -C "$c" add packages
+cover 1 || fail "patch_coverage asked coverage of Storybook's config, its pages or the tests' setup"
+unmeasured packages/ui/src/storybook.ts packages/ui/src/setup.ts packages/ui/src/stories.tsx packages/ui/src/Overview.tsx
+# Coverage measures Storybook's pages too: a story's or the overview's handler that no test runs counts not.
+printf '{"%s/src/a.ts":{"statementMap":{"0":{"start":{"line":2}},"1":{"start":{"line":3}},"2":{"start":{"line":4}}},"s":{"0":1,"1":1,"2":1}},"%s/packages/ui/src/Card.stories.tsx":{"statementMap":{"0":{"start":{"line":1}}},"s":{"0":0}},"%s/packages/ui/src/Overview/Overview.tsx":{"statementMap":{"0":{"start":{"line":1}}},"s":{"0":0}}}' "$c" "$c" "$c" >"$c/coverage/coverage-final.json"
+(cd "$c" && python3 -I "$patch" HEAD 85 >/dev/null 2>&1) || fail "patch_coverage counted a story's or the overview's handler, which the journeys run"
 git -C "$c" rm -rq --cached packages && rm -r "$c/packages"
 # A statement over several lines counts when any of its lines changed, not only its first.
 git -C "$c" rm -q --cached src/a.test.ts vitest.config.ts && rm "$c/src/a.test.ts" "$c/vitest.config.ts" && git -C "$c" add src/a.ts && git -C "$c" commit -qm four

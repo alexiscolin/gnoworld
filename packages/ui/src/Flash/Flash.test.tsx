@@ -166,15 +166,11 @@ describe("Flash", () => {
     ));
   });
 
-  // A story's handlers do nothing: its buttons answer a click, and it keeps what it says.
-  it("has stories with an action, without one, and empty, whose buttons answer a click", () => {
-    const shown = eachStory(stories, (container) => {
-      const said = container.querySelector("[role='status']")?.textContent ?? "";
-      const buttons = [...container.querySelectorAll("button")];
-      for (const button of buttons) fireEvent.click(button);
-      return { said, buttons: buttons.length, kept: container.querySelector("[role='status']")?.textContent === said };
-    });
-    expect(shown.every((s) => s.kept)).toBe(true);
+  it("has stories with an action, without one, and empty", () => {
+    const shown = eachStory(stories, (container) => ({
+      said: container.querySelector("[role='status']")?.textContent ?? "",
+      buttons: container.querySelectorAll("button").length,
+    }));
     expect(shown.some((s) => s.said !== "" && s.buttons === 0)).toBe(true);
     expect(shown.some((s) => s.said !== "" && s.buttons === 2)).toBe(true);
     expect(shown.some((s) => s.said === "" && s.buttons === 0)).toBe(true);

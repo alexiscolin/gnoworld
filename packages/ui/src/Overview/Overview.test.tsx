@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { eachStory } from "../testing.tsx";
 import { ICON_NAMES } from "../icons/Icon.tsx";
@@ -54,15 +54,6 @@ describe("Overview", () => {
     const icons = screen.getByRole("region", { name: "Icons" });
     expect(icons.querySelectorAll("svg")).toHaveLength(ICON_NAMES.length);
     for (const name of ICON_NAMES) expect(within(icons).getByText(name, { exact: true })).toBeTruthy();
-  });
-
-  it("shows a flash with an action whose buttons answer a click, the overview drawn as before", () => {
-    render(<Overview />);
-    const flashes = screen.getByRole("region", { name: "Flashes" });
-    const before = flashes.textContent;
-    for (const button of within(flashes).getAllByRole("button")) fireEvent.click(button);
-    expect(within(flashes).getByRole("button", { name: "Reload" })).toBeTruthy();
-    expect(flashes.textContent).toBe(before);
   });
 
   it("renders its story", () => {
