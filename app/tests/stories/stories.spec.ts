@@ -337,6 +337,25 @@ test("the base styles text with the tokens, and the label keeps its case where c
   expect(await style(".label:lang(ar)", "text-transform")).toBe("none");
 });
 
+// The scripts that caps or tracking break, Arabic's and Hebrew's, each by the languages written in
+// them; the label's own language is set in turn, and English keeps its caps.
+test("the label keeps its case and its spacing in every language whose script caps break", async ({ page }) => {
+  await open(page, "overview--all");
+  const languages = ["ar", "fa", "ur", "ps", "ckb", "sd", "ug", "ks", "he", "yi", "en"];
+  const looks = await page.evaluate((all) => {
+    const label = document.querySelector<HTMLElement>("#storybook-root .label");
+    if (label === null) return {};
+    return Object.fromEntries(
+      all.map((language) => {
+        label.lang = language;
+        const style = getComputedStyle(label);
+        return [language, style.textTransform === "none" && style.letterSpacing === "normal"];
+      }),
+    );
+  }, languages);
+  expect(looks).toEqual(Object.fromEntries(languages.map((language) => [language, language !== "en"])));
+});
+
 // A layer ranks by where it first appears, whatever form the minifier gives it: were a component's
 // sheet to name its layer first, the reset's `button { font: inherit }` would beat Button's font.
 test("the layers rank reset, tokens, base, compositions, components, utilities, as the sheets load", async ({

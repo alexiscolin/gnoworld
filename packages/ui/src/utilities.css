@@ -8,7 +8,19 @@
     text-transform: uppercase;
   }
 
-  .label:is(:lang(ar), :lang(fa), :lang(he)) {
+  /* Arabic's script and Hebrew's, by the languages written in them. */
+  .label:is(
+    :lang(ar),
+    :lang(fa),
+    :lang(ur),
+    :lang(ps),
+    :lang(ckb),
+    :lang(sd),
+    :lang(ug),
+    :lang(ks),
+    :lang(he),
+    :lang(yi)
+  ) {
     letter-spacing: normal;
     text-transform: none;
   }
