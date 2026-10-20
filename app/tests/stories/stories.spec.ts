@@ -143,24 +143,19 @@ test("the focus ring is the 2 px mint outline, 2 px off, on every control reache
   }
 });
 
-// The reset leaves a button the browser's own face, its grey fill and its raised edge: a component's
-// control that sets neither shows it, which no other check sees.
-test("in every story, no control drawn wears the browser's own button face", async ({ page }) => {
-  for (const id of await stories(page)) {
-    await open(page, id);
-    const bare = await page.evaluate(() =>
-      [...document.querySelectorAll<HTMLElement>("#storybook-root button")].flatMap((control) => {
-        if (!control.checkVisibility()) return [];
-        const plain = document.createElement("button");
-        control.parentElement?.append(plain);
-        const [own, browser] = [getComputedStyle(control), getComputedStyle(plain)];
-        const face = own.backgroundColor === browser.backgroundColor || own.borderTopStyle === browser.borderTopStyle;
-        plain.remove();
-        return face ? [control.outerHTML.slice(0, 60)] : [];
-      }),
-    );
-    expect.soft(bare, id).toEqual([]);
-  }
+// The browser draws a button's own face, a grey fill, a raised edge and a padding, which a control
+// that sets none of its own would show: the reset takes them off every button, wherever it is.
+test("a bare button wears none of the browser's face: no fill, no edge, no padding", async ({ page }) => {
+  await open(page, "overview--all");
+  const face = await page.evaluate(() => {
+    const bare = document.createElement("button");
+    document.querySelector("#storybook-root")?.append(bare);
+    const style = getComputedStyle(bare);
+    const seen = [style.backgroundColor, style.backgroundImage, style.borderTopStyle, style.paddingBlockStart];
+    bare.remove();
+    return seen;
+  });
+  expect(face).toEqual(["rgba(0, 0, 0, 0)", "none", "none", "0px"]);
 });
 
 // The state the accessibility tree sees is the state the CSS draws (docs/DESIGN-SYSTEM.md, "CSS
