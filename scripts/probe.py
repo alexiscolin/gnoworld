@@ -77,6 +77,15 @@ LINT = [
 ]
 
 
+# The messages of React's two bans, in the app and the design system alike.
+def banned(name):
+    return f"no-restricted-imports: '{name}' import from 'react' is restricted. The React Compiler memoizes"
+
+
+def restricted(name):
+    return f"no-restricted-properties: {name} is restricted from being used. Nothing reaches the DOM as HTML"
+
+
 def run(cmd, cwd="."):
     return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
 
@@ -195,12 +204,6 @@ try:
         def ref(code):
             return uses("useEffect, useRef") + component(body=f"  const boxRef = useRef<HTMLDivElement>(null);\n  useEffect(() => {{\n    if (boxRef.current) {code}\n  }});\n  return <div ref={{boxRef}} />;\n")
         off = "no-restricted-syntax: A test is never switched off"
-
-        def banned(name):
-            return f"no-restricted-imports: '{name}' import from 'react' is restricted. The React Compiler memoizes"
-
-        def restricted(name):
-            return f"no-restricted-properties: {name} is restricted from being used. Nothing reaches the DOM as HTML"
         react = [
             ("clean.tsx", component(body="  return <p>{n}</p>;\n"), None),
             ("route_404.ts", 'import { data } from "react-router";\n\nexport function loader(): never {\n  throw data(null, { status: 404 });\n}\n', None),
@@ -244,7 +247,7 @@ try:
         ui = [
             ("clean.tsx", "export function Card({ n }: { n: number }) {\n  return <p>{n}</p>;\n}\n", None),
             ("manual_memo.tsx", 'import { useMemo } from "react";\n\nexport function Card({ n }: { n: number }) {\n  const twice = useMemo(() => n * 2, [n]);\n  return <p>{twice}</p>;\n}\n',
-             "no-restricted-imports: 'useMemo' import from 'react' is restricted. The React Compiler memoizes"),
+             banned("useMemo")),
             ("nested.tsx", "export function Card({ n }: { n: number }) {\n  function Inner() {\n    return <p>{n}</p>;\n  }\n  return <Inner />;\n}\n", "@eslint-react/no-nested-component-definitions"),
             ("reaches_app.ts", 'import { WORLDS } from "../../../../app/src/worlds.ts";\n\nexport const w: unknown = WORLDS;\n', "import-x/no-restricted-paths"),
             ("reaches_core.ts", 'import * as core from "../../../core/src/index.ts";\n\nexport const c: unknown = core;\n', "import-x/no-restricted-paths"),
@@ -253,7 +256,7 @@ try:
             ("loads_app.ts", 'export async function load(): Promise<unknown> {\n  return import("../../../../app/src/worlds.ts");\n}\n', "import-x/no-restricted-paths"),
             ("raw_html.tsx", "export function Card({ n }: { n: string }) {\n  return <p dangerouslySetInnerHTML={{ __html: n }} />;\n}\n", "@eslint-react/dom-no-dangerously-set-innerhtml"),
             ("inner_html.tsx", 'import { useEffect, useRef } from "react";\n\nexport function Card({ n }: { n: string }) {\n  const boxRef = useRef<HTMLDivElement>(null);\n  useEffect(() => {\n    if (boxRef.current) boxRef.current.innerHTML = n;\n  });\n  return <div ref={boxRef} />;\n}\n',
-             "no-restricted-properties: 'innerHTML' is restricted from being used. Nothing reaches the DOM as HTML"),
+             restricted("'innerHTML'")),
         ]
         lint_cases(ui, UI, "ui")
         shutil.rmtree(UI)

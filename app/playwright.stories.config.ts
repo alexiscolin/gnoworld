@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const sandboxed = Boolean(process.env["SANDBOX_RUNTIME"]);
+
 // The design system's stories in a browser (tests/stories): Storybook built before every run, so no
 // test reads an old build, then served as files. The full gate runs it; the fast one stays under 60 s.
 export default defineConfig({
@@ -11,10 +13,10 @@ export default defineConfig({
   snapshotPathTemplate: "{testDir}/__screenshots__/{platform}/{arg}{ext}",
   expect: { toHaveScreenshot: { threshold: 0, maxDiffPixels: 0 } },
   // In the sandbox, Chromium runs as one process, and eight at once each building Storybook's pages crash.
-  ...(process.env["SANDBOX_RUNTIME"] ? { workers: 1 } : {}),
+  ...(sandboxed ? { workers: 1 } : {}),
   use: {
     baseURL: "http://127.0.0.1:6007",
-    launchOptions: { args: process.env["SANDBOX_RUNTIME"] ? ["--single-process"] : [] },
+    launchOptions: { args: sandboxed ? ["--single-process"] : [] },
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {

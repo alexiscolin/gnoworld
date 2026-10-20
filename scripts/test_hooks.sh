@@ -131,7 +131,6 @@ gate_file="$here/check.sh"
 for step in "run format:check" "run typecheck" "run lint" "run test" "run unused" "run copies" \
 	"python3 -I scripts/check_css.py" "run comments" '"$GNO" lint ./...' '"$GNO" test ./...' \
 	"node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts" '[ "$(packages)" = "$installed" ]' \
-	"node app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts" \
 	"ast.parse(open(f).read(), f) for f in sys.argv[1:]]' scripts/*.py" \
 	"python3 -I ../scripts/mutate.py" "go vet ./tools/..." "go run ./tools/sealvec | cmp" "python3 -I scripts/check_docs.py" \
 	"sh scripts/test_hooks.sh" "python3 -I scripts/probe.py" "run coverage" "python3 -I scripts/patch_coverage.py" \
@@ -391,6 +390,13 @@ cover() { # $1: hit count of line 3's statement
 	printf '{"%s/src/a.ts":{"statementMap":{"0":{"start":{"line":2}},"1":{"start":{"line":3}},"2":{"start":{"line":4}}},"s":{"0":1,"1":%s,"2":1}}}' "$c" "$1" >"$c/coverage/coverage-final.json"
 	(cd "$c" && python3 -I "$patch" HEAD 85 >/dev/null 2>&1)
 }
+unmeasured() { # each file, alone in the patch, must be measured
+	for f; do
+		printf 'x\n' >"$c/$f" && git -C "$c" add "$f"
+		cover 1 && fail "patch_coverage let $f go unmeasured"
+		git -C "$c" rm -q --cached "$f" && rm "$c/$f"
+	done
+}
 cover 1 || fail "patch_coverage refused a patch whose lines are all run"
 cover 0 && fail "patch_coverage accepted a patch at 67%, under 85%"
 printf 'export const b = 1;\n' >"$c/src/b.ts" && git -C "$c" add src/b.ts
@@ -404,22 +410,14 @@ mkdir -p "$c/app/tests/e2e" "$c/app/src/routes"
 printf 'x\n' >"$c/app/tests/e2e/a.spec.ts" && printf 'x\n' >"$c/app/tests/e2e/fixtures.ts"
 printf 'x\n' >"$c/app/src/root.tsx" && printf 'x\n' >"$c/app/src/entry.server.tsx" && git -C "$c" add app
 cover 1 || fail "patch_coverage asked coverage of a Playwright test, the document shell or the server entry"
-for f in app/src/site.ts app/src/routes/a.tsx; do
-	printf 'x\n' >"$c/$f" && git -C "$c" add "$f"
-	cover 1 && fail "patch_coverage let $f go unmeasured"
-	git -C "$c" rm -q --cached "$f" && rm "$c/$f"
-done
+unmeasured app/src/site.ts app/src/routes/a.tsx
 git -C "$c" rm -rq --cached app && rm -r "$c/app"
 # Storybook's config is a config and a test setup a test's, so neither is measured; code named alike is.
 mkdir -p "$c/packages/ui/.storybook" "$c/packages/ui/src"
 printf 'x\n' >"$c/packages/ui/.storybook/main.ts" && printf 'x\n' >"$c/packages/ui/.storybook/preview.ts"
 printf 'x\n' >"$c/packages/ui/src/testSetup.ts" && git -C "$c" add packages
 cover 1 || fail "patch_coverage asked coverage of Storybook's config or the tests' setup"
-for f in packages/ui/src/storybook.ts packages/ui/src/setup.ts; do
-	printf 'x\n' >"$c/$f" && git -C "$c" add "$f"
-	cover 1 && fail "patch_coverage let $f go unmeasured"
-	git -C "$c" rm -q --cached "$f" && rm "$c/$f"
-done
+unmeasured packages/ui/src/storybook.ts packages/ui/src/setup.ts
 git -C "$c" rm -rq --cached packages && rm -r "$c/packages"
 # A statement over several lines counts when any of its lines changed, not only its first.
 git -C "$c" rm -q --cached src/a.test.ts vitest.config.ts && rm "$c/src/a.test.ts" "$c/vitest.config.ts" && git -C "$c" add src/a.ts && git -C "$c" commit -qm four

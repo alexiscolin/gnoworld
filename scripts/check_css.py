@@ -30,8 +30,9 @@ DISPLAY = re.compile(r"\b(inline-)?(flex|grid)\b", re.I)
 UNIT = r"px|rem|em|ex|ch|pt|pc|cm|mm|in|q|vh|vw|vmin|vmax|vi|vb|svh|lvh|dvh|ms|s"
 # ponytail: common colour names only; the full CSS list of 148 if one ever slips through.
 NAMED = r"black|white|red|green|blue|yellow|orange|purple|pink|gr[ae]y|silver|gold|navy|teal|maroon|olive|lime|aqua|fuchsia|cyan|magenta|brown|indigo|violet|beige|coral|crimson|salmon|tomato|khaki"
-RAW = re.compile(rf"#[0-9a-fA-F]{{3,8}}\b|\b(rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|color-mix)\(|(?<![\w.-])\d*\.?\d+({UNIT})\b|\b({NAMED})\b", re.I)
+# A semantic token may mix primitives (color-mix); a stylesheet may not.
 COLOUR = re.compile(rf"#[0-9a-fA-F]{{3,8}}\b|\b(rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(|\b({NAMED})\b", re.I)
+RAW = re.compile(rf"{COLOUR.pattern}|\bcolor-mix\(|(?<![\w.-])\d*\.?\d+({UNIT})\b", re.I)
 PRIMITIVE = re.compile(r"--p-[\w-]+$")
 
 
@@ -93,6 +94,7 @@ problems, exceptions, used = [], 0, set()
 # mentions is not used.
 uses = {p: list(module_uses(p, t)) for p, t in texts.items() if p.suffix != ".css"}
 named_by_module = collections.defaultdict(set)
+module_classes = {p.resolve(): classes_of(blocks) for p, blocks in sheets.items() if p.name.endswith(".module.css")}
 for found in uses.values():
     for source, named, _, _ in found:
         named_by_module[source].update(named)
@@ -127,13 +129,12 @@ for p, blocks in sheets.items():
             if p.name == "tokens.css" and prop.startswith("--") and not PRIMITIVE.match(prop) and COLOUR.search(bare):
                 problems.append(f"{p}: {prop} holds a raw colour ({value}); a semantic token is made of primitives")
     if module:
-        for name in sorted(classes_of(blocks) - named_by_module[p.resolve()]):
+        for name in sorted(module_classes[p.resolve()] - named_by_module[p.resolve()]):
             problems.append(f"{p}: unused class .{name}; no component names it from this module")
         for attribute in {a for selector, _ in blocks for a in re.findall(r"\[(data-[\w-]+)", selector)}:
             if not re.search(rf"\b{re.escape(attribute)}=|[\"']{re.escape(attribute)}[\"']\s*:", code_by_folder[p.parent]):
                 problems.append(f"{p}: [{attribute}] is a state no component sets in its folder")
 
-module_classes = {p.resolve(): classes_of(blocks) for p, blocks in sheets.items() if p.name.endswith(".module.css")}
 for p, text in texts.items():
     if p.suffix == ".css":
         continue
