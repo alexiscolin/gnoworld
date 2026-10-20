@@ -86,6 +86,15 @@ describe("Tabs", () => {
     expect(fireEvent.keyDown(tab, { key: "a" })).toBe(true);
   });
 
+  it("leaves a key held with a modifier to the browser: Alt and an arrow is Back", () => {
+    const onSelect = vi.fn();
+    render(<Tabs label="Views" tabs={views} selected="cosmos" onSelect={onSelect} />);
+    const tab = screen.getByRole("tab", { name: "Cosmos" });
+    for (const held of ["altKey", "ctrlKey", "metaKey", "shiftKey"])
+      expect(fireEvent.keyDown(tab, { key: "ArrowLeft", [held]: true }), held).toBe(true);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
   it("turns the arrows round in a right-to-left page", async () => {
     render(
       <div dir="rtl">

@@ -184,6 +184,12 @@ describe("Menu", () => {
     expect(document.activeElement).toBe(item(all, 0));
   });
 
+  it("leaves a key held with a modifier to the browser", async () => {
+    const all = await opened();
+    expect(fireEvent.keyDown(item(all, 0), { key: "End", ctrlKey: true })).toBe(true);
+    expect(document.activeElement).toBe(item(all, 0));
+  });
+
   it("keeps the page from scrolling on the keys it takes", async () => {
     const all = await opened();
     for (const key of ["ArrowDown", "ArrowUp", "Home", "End"])
