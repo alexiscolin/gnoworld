@@ -1235,6 +1235,9 @@ grep -qxF -- "--passWithNoTests packages/x/src/c.test.ts" "$t/runner.log" || fai
 base=$(git -C "$pf" rev-parse HEAD)
 mkdir -p "$pf/scripts" && echo x >"$pf/scripts/tool.py" && fix "fix(harness): a harness fix"
 prove "$base" || fail "prove_fix refused a harness fix, which harness_mutate proves"
+base=$(git -C "$pf" rev-parse HEAD)
+printf '// expects: export\n' >"$pf/packages/x/src/d.test.ts" && fix "fix(x): a test's own fault, and no product code"
+prove "$base" || fail "prove_fix refused a fix of tests alone, which changes no product code"
 fi
 
 if part audit; then
