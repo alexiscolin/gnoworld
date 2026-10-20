@@ -81,6 +81,7 @@ Semantic roles, all computed from them:
 | `--color-fill`, `--color-fill-hover` | text at 5% and 10% | The resting fill of fields, chips and cards; hover |
 | `--color-line`, `--color-line-strong` | text at 10% and 20% | Borders and dividers; secondary buttons, hover |
 | `--color-panel`, `--color-glass` | night at 86% and 60% | Docked panels; what floats over the scene |
+| `--color-surface` | night | What floats over the page: popovers, menus, tooltips, dialogs |
 | `--color-scrim` | space at 70% | Behind a dialog |
 | `--color-<accent>-soft`, `--color-<accent>-line` | the accent at 12% and 50% | Tinted fills and borders of mint, amber, violet, coral |
 | `--world` | a world's own colour, set from its data | The plate over a world is `color-mix(in oklab, var(--world) 12%, var(--color-panel))`; the dock keeps the plain panel colour |
@@ -170,7 +171,7 @@ the brightest planet behind the header's pills.
 | `--icon-m` / `--icon-l` | 16 / 20 px, the only icon sizes |
 | `--size-counter` / `--size-progress` | 18 px (an unread count) / 4 px (every progress bar) |
 | `--avatar-s` / `-m` / `-l` | 20 / 24 / 48 px |
-| `--thumb-*` | 16, 24, 32, 48, 64 px |
+| `--thumb-s` / `-m` / `-l` | 32 / 48 / 64 px: a row's lead / a card / the rail; 16 and 24 join with their first readers |
 | Layout | header clearance 96, dock 360 (320 under 1400), plate 620 with a 440 text column, rail 120, dialog 460 and wide 760, popover 300 px; `--measure` 65ch; `--switch-at` 38rem, under which a Switcher stacks its children, about 65ch of body text in one unit for every child |
 
 - Controls are a minimum height with padding, never a fixed height, so text zoomed to 200% grows
@@ -185,8 +186,8 @@ the brightest planet behind the header's pills.
 
 | Token | Value | Use |
 |---|---|---|
-| `--shadow-popover` | `0 12px 32px` black 55% | Popovers, menus |
-| `--shadow-float` | `0 16px 40px` black 45% | The flash, the big action |
+| `--shadow-popover` | `0 12px 32px` space 55% | Popovers, menus, dialogs |
+| `--shadow-float` | `0 16px 40px` space 45% | The flash, the big action |
 | `--blur-glass` | 12 px | Small surfaces over the scene: labels, pills, the flash |
 | `--blur-surface` | 24 px | Only where the slice 7 bench allows it; large panels use the near-opaque panel colour |
 | `--opacity-disabled` | 0.4 | Every disabled control |
@@ -212,6 +213,7 @@ until the dialog closes.
 |---|---|---|
 | `--motion-fast` | 120 ms | Hover, press, a popover's fade |
 | `--motion-base` | 200 ms | Panels, tabs, chips |
+| `--motion-wait` | 300 ms | What waits before it shows: a skeleton |
 | `--motion-slow` | 400 ms | The dock sliding, the library view |
 | `--motion-scene` | 1.3–3.2 s, by distance | Flights (the scene, not CSS) |
 | `--motion-spin` | 0.8 s | The spinner |

@@ -1,0 +1,59 @@
+/* The row: plain, divided by a line, or boxed on the resting fill; current is the hover fill one step
+   stronger and its title at 500 (docs/DESIGN-SYSTEM.md, "Colour"). */
+@layer components {
+  .row {
+    --_fill: transparent;
+    --_weight: 400;
+
+    padding-block: var(--space-2xs);
+    padding-inline: var(--space-xs);
+    border-radius: var(--radius-s);
+    background: var(--_fill);
+  }
+
+  .row:hover {
+    --_fill: var(--color-fill);
+  }
+
+  .row[data-look="divided"] {
+    border-block-end: var(--line-width) solid var(--color-line);
+    border-radius: 0;
+  }
+
+  .row[data-look="boxed"] {
+    --_fill: var(--color-fill);
+
+    border: var(--line-width) solid var(--color-line);
+    border-radius: var(--radius-m);
+  }
+
+  .row[aria-current="true"] {
+    --_fill: var(--color-fill-hover);
+    --_weight: 500;
+  }
+
+  .lead {
+    display: inline-block;
+    color: var(--color-text-muted);
+  }
+
+  .link {
+    display: block;
+    text-decoration: none;
+  }
+
+  .title {
+    font: var(--font-body);
+    font-weight: var(--_weight);
+  }
+
+  .subtitle {
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+  }
+
+  .activity {
+    color: var(--color-text-muted);
+    font: var(--font-data);
+  }
+}

@@ -1,0 +1,64 @@
+/* The chip: the shared pill (Button/control.module.css) on the resting fill, or in its tone's tint and
+   line; selected, the cream fill. */
+@layer components {
+  .chip {
+    --_fill: var(--color-fill);
+  }
+
+  /* A mark's one line of text fills its height with its own leading. */
+  .chip[data-size="xs"] {
+    --_h: var(--control-xs);
+    --_pad: var(--space-2xs);
+    --_font: var(--font-meta);
+
+    padding-block: 0;
+    cursor: auto;
+  }
+
+  .chip[data-size="s"] {
+    --_h: var(--control-s);
+    --_pad: var(--space-xs);
+
+    transition:
+      background-color var(--motion-base) var(--ease-standard),
+      color var(--motion-base) var(--ease-standard);
+  }
+
+  .chip[data-size="s"]:hover {
+    --_fill: var(--color-fill-hover);
+  }
+
+  .chip[data-tone="mine"] {
+    --_fill: var(--color-mine-soft);
+    --_line: var(--color-mine-line);
+    --_ink: var(--color-mine);
+  }
+
+  .chip[data-tone="warm"] {
+    --_fill: var(--color-warm-soft);
+    --_line: var(--color-warm-line);
+    --_ink: var(--color-warm);
+  }
+
+  .chip[data-tone="signal"] {
+    --_fill: var(--color-signal-soft);
+    --_line: var(--color-signal-line);
+    --_ink: var(--color-signal);
+  }
+
+  .chip[data-tone="danger"] {
+    --_fill: var(--color-danger-soft);
+    --_line: var(--color-danger-line);
+    --_ink: var(--color-danger);
+  }
+
+  /* Selected is the cream fill (docs/DESIGN-SYSTEM.md, "Colour"). */
+  .chip[aria-pressed="true"] {
+    --_fill: var(--color-primary);
+    --_ink: var(--color-ink);
+  }
+
+  .count {
+    font: var(--font-data);
+  }
+}

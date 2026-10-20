@@ -22,6 +22,19 @@ const SHOWN: Record<keyof typeof ui, readonly [region: string, mark: string]> = 
   Sidebar: ["Compositions", "[data-side]"],
   Switcher: ["Compositions", "[data-side] > [data-space] > [data-max]"],
   Center: ["Compositions", "[data-max]"],
+  Tooltip: ["Icon buttons", "[aria-hidden='true'][data-shown]"],
+  Chip: ["Chips", "[data-tone]"],
+  Tabs: ["Tabs", "[role='tablist']"],
+  Popover: ["Popovers", "[popover]"],
+  Menu: ["Popovers", "[role='menu']"],
+  Dialog: ["Dialogs", "dialog"],
+  Skeleton: ["Skeletons", "[data-shape]"],
+  Card: ["Cards", "article"],
+  Row: ["Rows", "[data-look]"],
+  Field: ["Fields", "input"],
+  Stat: ["Stats", "[data-value]"],
+  ActivityChart: ["Activity", "svg [data-hour]"],
+  PlanetThumb: ["Planets", "[data-kind]"],
 };
 
 describe("Overview", () => {

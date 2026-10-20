@@ -1,0 +1,30 @@
+/* The chart: past bars in the muted grey, the current one in text, the line in text; each holds 3:1
+   or more on the page (docs/DESIGN-SYSTEM.md, "Data graphics"). */
+@layer components {
+  /* Thin bars: a day's 24 fill a column at most, whatever the room. */
+  .chart {
+    display: block;
+    inline-size: 100%;
+    max-inline-size: var(--column-l);
+  }
+
+  .bar {
+    fill: var(--color-text-muted);
+  }
+
+  .bar[data-current="true"] {
+    fill: var(--color-text);
+  }
+
+  .line {
+    fill: none;
+    stroke: var(--color-text);
+    stroke-width: var(--line-width);
+    vector-effect: non-scaling-stroke;
+  }
+
+  .figure {
+    color: var(--color-text-muted);
+    font: var(--font-data);
+  }
+}

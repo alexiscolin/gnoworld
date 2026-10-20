@@ -275,6 +275,25 @@ for (const touch of [false, true]) {
         square: true,
       });
     });
+
+    // A chip that is a mark sits at the smallest control, one that acts and a tab at the small one; a
+    // field's box at the default one, 44 by touch.
+    test("chips, tabs and fields are as tall as their size's control", async ({ page }) => {
+      const heights = async (id: string, selector: string) => {
+        await open(page, id);
+        return [
+          ...new Set(
+            await page
+              .locator(`#storybook-root ${selector}`)
+              .evaluateAll((all) => all.map((e) => e.getBoundingClientRect().height)),
+          ),
+        ];
+      };
+      expect(await heights("chip--marks", "[data-tone]"), "marks").toEqual([24]);
+      expect(await heights("chip--control", "button"), "a chip that acts").toEqual([32]);
+      expect(await heights("tabs--segmented", "[role='tab']"), "tabs").toEqual([32]);
+      expect(await heights("field--text", "input"), "a field").toEqual([touch ? 44 : 40]);
+    });
   });
 }
 

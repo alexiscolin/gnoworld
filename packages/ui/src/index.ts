@@ -1,8 +1,20 @@
 // @gnoworld/ui, the design system (docs/DESIGN-SYSTEM.md): its components; its sheet is ./styles.css.
+export { ActivityChart, type ActivityChartProps } from "./ActivityChart/ActivityChart.tsx";
 export { Button, type ButtonProps } from "./Button/Button.tsx";
 export { IconButton, type IconButtonProps } from "./Button/IconButton.tsx";
+export { Card, type CardHeaderProps, type CardProps } from "./Card/Card.tsx";
+export { Chip, type ChipProps } from "./Chip/Chip.tsx";
 export * from "./compositions/index.ts";
+export { Dialog, type DialogProps } from "./Dialog/Dialog.tsx";
 export { EmptyState, type EmptyStateProps } from "./EmptyState/EmptyState.tsx";
+export { Field, type FieldProps } from "./Field/Field.tsx";
 export { Flash, type FlashMessage, type FlashProps } from "./Flash/Flash.tsx";
 export { Icon, type IconName, type IconProps } from "./icons/Icon.tsx";
 export { Kicker, type KickerProps } from "./Kicker/Kicker.tsx";
+export { PlanetThumb, type PlanetThumbProps } from "./PlanetThumb/PlanetThumb.tsx";
+export { Menu, Popover, type MenuItem, type MenuProps, type PopoverProps } from "./Popover/Popover.tsx";
+export { Row, type RowProps } from "./Row/Row.tsx";
+export { Skeleton, type SkeletonProps } from "./Skeleton/Skeleton.tsx";
+export { Stat, type StatProps } from "./Stat/Stat.tsx";
+export { Tabs, type Tab, type TabsProps } from "./Tabs/Tabs.tsx";
+export { Tooltip, type TooltipProps } from "./Tooltip/Tooltip.tsx";

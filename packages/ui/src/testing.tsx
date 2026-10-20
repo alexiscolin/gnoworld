@@ -55,7 +55,8 @@ export function eachStory<T>(module: Record<string, unknown>, read: (container: 
   });
 }
 
-const ABUSE = ['<img src="x" onerror="alert(1)">', "nym-".padEnd(10_000, "a")];
+/** The threat model's abuse cases: markup that would run if parsed, and a name of 10,000 letters. */
+export const ABUSE = ['<img src="x" onerror="alert(1)">', "nym-".padEnd(10_000, "a")];
 
 /** Text that looks like markup, or runs to 10,000 characters, reaches the page as text. */
 export function staysText(draw: (text: string) => ReactElement) {

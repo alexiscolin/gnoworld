@@ -1,5 +1,6 @@
 import type { MouseEvent } from "react";
 import { Icon, type IconName } from "../icons/Icon.tsx";
+import { Tooltip } from "../Tooltip/Tooltip.tsx";
 import { iconSize, pill, type ControlSize } from "./control.ts";
 import styles from "./Button.module.css";
 
@@ -21,7 +22,8 @@ function shown(count: number | undefined) {
   return count > 99 ? { badge: "99+", said: "over 99" } : { badge: String(count), said: String(count) };
 }
 
-/** Button's control without its words, in the same module: the same look, square. */
+/** Button's control without its words, in the same module: the same look, square, its label in a
+ * tooltip. */
 export function IconButton({
   icon,
   label,
@@ -33,22 +35,24 @@ export function IconButton({
 }: IconButtonProps) {
   const counted = shown(count);
   return (
-    <button
-      type="button"
-      aria-label={counted === null ? label : `${label}, ${counted.said}`}
-      aria-pressed={pressed}
-      className={pill(styles["button"], styles["square"])}
-      data-emphasis={emphasis}
-      data-tone="neutral"
-      data-size={size}
-      onClick={onClick}
-    >
-      <Icon name={icon} size={iconSize(size)} />
-      {counted === null ? null : (
-        <span className={styles["count"]} aria-hidden="true">
-          {counted.badge}
-        </span>
-      )}
-    </button>
+    <Tooltip label={label}>
+      <button
+        type="button"
+        aria-label={counted === null ? label : `${label}, ${counted.said}`}
+        aria-pressed={pressed}
+        className={pill(styles["button"], styles["square"])}
+        data-emphasis={emphasis}
+        data-tone="neutral"
+        data-size={size}
+        onClick={onClick}
+      >
+        <Icon name={icon} size={iconSize(size)} />
+        {counted === null ? null : (
+          <span className={styles["count"]} aria-hidden="true">
+            {counted.badge}
+          </span>
+        )}
+      </button>
+    </Tooltip>
   );
 }

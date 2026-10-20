@@ -1,0 +1,21 @@
+/* The dialog: a surface (Popover/surface.module.css) in the top layer, 460 px or 760, never wider than
+   the screen, over the scrim. */
+@layer components {
+  .dialog {
+    --_w: var(--dialog-w);
+
+    inline-size: var(--_w);
+    max-inline-size: calc(100% - 2 * var(--space-s));
+    padding: var(--space-m);
+    border-radius: var(--radius-l);
+    box-shadow: var(--shadow-popover);
+  }
+
+  .dialog[data-width="wide"] {
+    --_w: var(--dialog-wide);
+  }
+
+  .dialog::backdrop {
+    background: var(--color-scrim);
+  }
+}

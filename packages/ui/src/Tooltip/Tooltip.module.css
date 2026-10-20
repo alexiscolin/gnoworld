@@ -1,0 +1,24 @@
+/* The tooltip: a small floating surface (Popover/surface.module.css) above its control. */
+@layer components {
+  .anchor {
+    /* layout: the control is its one child, with no line box under it */
+    display: inline-flex;
+  }
+
+  .tip {
+    max-inline-size: var(--column-s);
+    padding-block: var(--space-3xs);
+    padding-inline: var(--space-2xs);
+    overflow: visible;
+    border-radius: var(--radius-s);
+    font: var(--font-meta);
+  }
+
+  /* Its edge reaches its control's across the gap, so the pointer can move onto it and keep it. */
+  .tip::after {
+    content: "";
+    position: absolute;
+    inset-block: calc(var(--space-2xs) * -1);
+    inset-inline: 0;
+  }
+}

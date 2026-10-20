@@ -20,6 +20,13 @@ describe("IconButton", () => {
     expect(button.textContent).toBe("");
   });
 
+  it("wears its label as a tooltip beside it, hidden from assistive technology, its name unchanged", () => {
+    render(<IconButton icon="search" label="Search the room" />);
+    const tip = screen.getByText("Search the room");
+    expect(tip.closest("[aria-hidden='true']")).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Search the room" }).contains(tip)).toBe(false);
+  });
+
   it("is outline and medium unless asked otherwise, with the 16 px icon", () => {
     render(<IconButton icon="bell" label="Notifications" />);
     const button = screen.getByRole("button");

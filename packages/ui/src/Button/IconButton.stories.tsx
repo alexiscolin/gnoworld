@@ -14,6 +14,15 @@ export const Pressed: Story = { args: { icon: "star", label: "Save the room", pr
 export const WithCount: Story = { args: { label: "Unread notifications", count: 8 } };
 export const CountPast99: Story = { args: { label: "Unread notifications", count: 120 } };
 
+// Its tooltip, shown as the keyboard brings the focus: in the top layer, pictured as the screen.
+export const WithTooltip: Story = {
+  args: { icon: "search", label: "Search the universe" },
+  tags: ["viewport"],
+  play: ({ canvas }) => {
+    canvas.getByRole("button").focus();
+  },
+};
+
 export const Sizes: Story = {
   render: (args) => (
     <Cluster>

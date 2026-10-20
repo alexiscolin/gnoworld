@@ -1,0 +1,20 @@
+/* The stat: a large tabular figure, its unit in the muted grey, its change in words, coral when it falls. */
+@layer components {
+  .figure {
+    font: var(--font-title-m);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .unit {
+    color: var(--color-text-muted);
+    font: var(--font-body);
+  }
+
+  .delta {
+    font: var(--font-meta);
+  }
+
+  .delta[data-trend="down"] {
+    color: var(--color-danger);
+  }
+}

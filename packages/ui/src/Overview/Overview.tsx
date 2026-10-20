@@ -5,6 +5,8 @@ import { EmptyState } from "../EmptyState/EmptyState.tsx";
 import { Flash } from "../Flash/Flash.tsx";
 import { Icon, ICON_NAMES } from "../icons/Icon.tsx";
 import { Kicker } from "../Kicker/Kicker.tsx";
+import { Skeleton } from "../Skeleton/Skeleton.tsx";
+import { Activity, Cards, Chips, Dialogs, Fields, Planets, Popovers, Rows, Stats, TabRows } from "./Interface.tsx";
 import { Region } from "./Region.tsx";
 
 function Buttons() {
@@ -77,6 +79,36 @@ function Text() {
   );
 }
 
+function Flashes() {
+  return (
+    <Stack>
+      <Flash
+        message={{ title: "Saved to your rooms", line: "Bubble · the AMA on sessions" }}
+        onClose={() => undefined}
+      />
+      <Flash
+        message={{ title: "New version available.", action: { label: "Reload", onAction: () => undefined } }}
+        onClose={() => undefined}
+      />
+    </Stack>
+  );
+}
+
+function Icons() {
+  return (
+    <Grid as="ul" min="s" space="xs">
+      {ICON_NAMES.map((name) => (
+        <li key={name}>
+          <Cluster space="2xs">
+            <Icon name={name} />
+            <code>{name}</code>
+          </Cluster>
+        </li>
+      ))}
+    </Grid>
+  );
+}
+
 /** Every component at once (docs/DESIGN-SYSTEM.md, "Storybook shows everything"). */
 export function Overview() {
   return (
@@ -96,16 +128,7 @@ export function Overview() {
         </Cluster>
       </Region>
       <Region name="Flashes">
-        <Stack>
-          <Flash
-            message={{ title: "Saved to your rooms", line: "Bubble · the AMA on sessions" }}
-            onClose={() => undefined}
-          />
-          <Flash
-            message={{ title: "New version available.", action: { label: "Reload", onAction: () => undefined } }}
-            onClose={() => undefined}
-          />
-        </Stack>
+        <Flashes />
       </Region>
       <Region name="Empty states">
         <EmptyState
@@ -116,16 +139,40 @@ export function Overview() {
         />
       </Region>
       <Region name="Icons">
-        <Grid as="ul" min="s" space="xs">
-          {ICON_NAMES.map((name) => (
-            <li key={name}>
-              <Cluster space="2xs">
-                <Icon name={name} />
-                <code>{name}</code>
-              </Cluster>
-            </li>
-          ))}
-        </Grid>
+        <Icons />
+      </Region>
+      <Region name="Chips">
+        <Chips />
+      </Region>
+      <Region name="Tabs">
+        <TabRows />
+      </Region>
+      <Region name="Popovers">
+        <Popovers />
+      </Region>
+      <Region name="Dialogs">
+        <Dialogs />
+      </Region>
+      <Region name="Skeletons">
+        <Skeleton lines={2} />
+      </Region>
+      <Region name="Cards">
+        <Cards />
+      </Region>
+      <Region name="Rows">
+        <Rows />
+      </Region>
+      <Region name="Fields">
+        <Fields />
+      </Region>
+      <Region name="Stats">
+        <Stats />
+      </Region>
+      <Region name="Activity">
+        <Activity />
+      </Region>
+      <Region name="Planets">
+        <Planets />
       </Region>
       <Region name="Text">
         <Text />
