@@ -1,6 +1,7 @@
 import type { KeyboardEvent } from "react";
 import { pill } from "../Button/control.ts";
 import { Icon, type IconName } from "../icons/Icon.tsx";
+import { rove } from "../roving.ts";
 import { Tooltip } from "../Tooltip/Tooltip.tsx";
 import styles from "./Tabs.module.css";
 
@@ -21,21 +22,6 @@ export interface TabsProps {
   iconOnly?: boolean;
 }
 
-interface Place {
-  at: number;
-  last: number;
-  // 1 left to right; -1 right to left, where the arrows turn round.
-  ahead: number;
-}
-
-// The keys the tablist takes, as the tab they go to from the focused one.
-const MOVES: Record<string, (place: Place) => number> = {
-  ArrowRight: ({ at, ahead }) => at + ahead,
-  ArrowLeft: ({ at, ahead }) => at - ahead,
-  Home: () => 0,
-  End: ({ last }) => last,
-};
-
 /** A tablist with one tab reached by the keyboard, the selected one; the arrows move and select, round
  * the ends and turned round right to left, and Home and End go to the ends (WAI-ARIA's tabs). */
 export function Tabs({ label, tabs, selected, onSelect, iconOnly = false }: TabsProps) {
@@ -43,18 +29,12 @@ export function Tabs({ label, tabs, selected, onSelect, iconOnly = false }: Tabs
     0,
     tabs.findIndex((tab) => tab.id === selected),
   );
+  // Right to left, the arrows turn round.
   const move = (event: KeyboardEvent<HTMLDivElement>) => {
-    const go = MOVES[event.key];
-    const all = [...event.currentTarget.querySelectorAll<HTMLElement>("[role='tab']")];
-    const at = all.indexOf(event.target as HTMLElement);
-    if (go === undefined || at === -1) return;
-    event.preventDefault();
-    const ahead = getComputedStyle(event.currentTarget).direction === "rtl" ? -1 : 1;
-    const to = (go({ at, last: all.length - 1, ahead }) + all.length) % all.length;
-    const tab = tabs[to];
-    if (tab === undefined) return;
-    onSelect(tab.id);
-    all[to]?.focus();
+    const rtl = getComputedStyle(event.currentTarget).direction === "rtl";
+    const to = rove(event, "[role='tab']", rtl ? ["ArrowRight", "ArrowLeft"] : ["ArrowLeft", "ArrowRight"]);
+    const tab = to === undefined ? undefined : tabs[to];
+    if (tab !== undefined) onSelect(tab.id);
   };
   return (
     <div role="tablist" aria-label={label} className={styles["tabs"]} onKeyDown={move}>

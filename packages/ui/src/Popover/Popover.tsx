@@ -9,6 +9,7 @@ import {
   type ToggleEvent,
 } from "react";
 import { buttonLook } from "../Button/control.ts";
+import { rove } from "../roving.ts";
 import { usePlaced } from "./floating.ts";
 import styles from "./Popover.module.css";
 import shared from "./surface.module.css";
@@ -97,14 +98,6 @@ export interface MenuProps {
   items: MenuItem[];
 }
 
-// The keys a menu takes, as the item they go to from the focused one, of so many.
-const MOVES: Record<string, (at: number, count: number) => number> = {
-  ArrowDown: (at, count) => (at + 1) % count,
-  ArrowUp: (at, count) => (at - 1 + count) % count,
-  Home: () => 0,
-  End: (_, count) => count - 1,
-};
-
 /** A list of acts under its trigger, its first item focused as it opens; the arrows move among the
  * items, round the ends, Home and End go to the ends, and an act closes it first (WAI-ARIA's menu). */
 export function Menu({ trigger: words, label, items }: MenuProps) {
@@ -116,12 +109,7 @@ export function Menu({ trigger: words, label, items }: MenuProps) {
       event.currentTarget.hidePopover();
       return;
     }
-    const go = MOVES[event.key];
-    const all = [...event.currentTarget.querySelectorAll<HTMLElement>("[role='menuitem']")];
-    const at = all.indexOf(event.target as HTMLElement);
-    if (go === undefined || at === -1) return;
-    event.preventDefault();
-    all[go(at, all.length)]?.focus();
+    rove(event, "[role='menuitem']", ["ArrowUp", "ArrowDown"]);
   };
   return (
     <>
