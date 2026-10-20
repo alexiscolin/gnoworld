@@ -23,6 +23,9 @@ Slice 2's row, for the avatar: "the same address gives the same nebula, readable
   fills once, at its root, with React Router's `Link`; `Button`, `Row` and `Card` use it for an
   internal link, a plain anchor without it (Storybook); a journey clicks the way home and sees no
   document load.
+- the flash (Alexis, F260, F262): a Close on every flash, held while the focus is in it as while the
+  pointer is over it (WCAG 2.2.1); its panel opaque, the surface's night, until the blur is widely
+  Baseline.
 
 ## 2. The generator (Claude's proposal, for Alexis to read)
 

@@ -419,7 +419,8 @@ Components use container queries, so they fit wherever they are placed.
   - **Compositions** are the layout primitives, `Stack`, `Cluster`, `Grid`, `Sidebar`,
     `Switcher`, `Center`: intrinsic layouts that place things without styling them, each taking
     a space step (Center's is its gutter). All layout is one of them, never new CSS.
-  - **Blocks** are the components, one CSS Module each, so class names never leak.
+  - **Blocks** are the components, one CSS Module each, so class names never leak: no prefix,
+    as the module renames each class with a hash; the utilities keep their plain names.
   - **Utilities** are a handful of single-purpose classes, driven by tokens: visually-hidden,
     the flow space, truncate, list-reset, scroll-body, the label style.
   - **Exceptions** are states read from attributes, `[aria-pressed="true"]`,
