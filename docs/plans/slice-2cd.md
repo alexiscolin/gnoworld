@@ -56,7 +56,7 @@ the accents' `-soft` and `-line`, `--shadow-popover`, `--motion-base`, `--popove
 | Markup through a prop | Every text prop is text | `staysText` on each |
 | A focus trap with no way out | `Esc` closes every popover and dialog, and focus goes back | Journeys, per component |
 | A picture from another host (`PlanetThumb`, a row's lead) | The stories' guard fails any off-site request | The guard, on every story |
-| A link-button to `javascript:` | React 19 refuses it (checked in 2c-1's red pass) | — |
+| A link to `javascript:` | React 19 refuses it (checked in 2c-1's red pass) | `Row.test.tsx`, four spellings |
 
 ## 5. Tests, by level
 
