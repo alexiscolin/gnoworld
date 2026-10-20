@@ -21,28 +21,28 @@ test("every story renders with no error and passes axe", async ({ page }) => {
 });
 
 // Each control is brought into view first: elementFromPoint sees nothing outside the viewport. A link
-// with words of its own around it, inside a sentence, is left out, as WCAG 2.5.8 leaves it out.
+// with words of its own around it, inside a sentence, is left out, as WCAG 2.5.8 leaves it out; so is
+// a control not drawn, as a closed menu's items are.
 test("in every story, each control is a target of 24 px or more that nothing covers", async ({ page }) => {
   for (const id of await stories(page)) {
     await open(page, id);
     const faults = await page.evaluate(() =>
-      [...document.querySelectorAll<HTMLElement>("#storybook-root button, #storybook-root a[href]")].flatMap(
-        (control) => {
-          const inSentence =
-            control instanceof HTMLAnchorElement &&
-            !control.hasAttribute("data-emphasis") &&
-            control.parentElement?.textContent.trim() !== control.textContent.trim();
-          if (inSentence) return [];
-          control.scrollIntoView({ block: "center", inline: "center" });
-          const box = control.getBoundingClientRect();
-          const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
-          const name = control.outerHTML.slice(0, 60);
-          const small =
-            box.width < 24 || box.height < 24 ? [`${name} is ${String(box.width)}x${String(box.height)}`] : [];
-          const covered = hit === null || !control.contains(hit) ? [`${name} is covered or out of view`] : [];
-          return [...small, ...covered];
-        },
-      ),
+      [...document.querySelectorAll<HTMLElement>("#storybook-root :is(button, a[href], input)")].flatMap((control) => {
+        if (!control.checkVisibility()) return [];
+        const inSentence =
+          control instanceof HTMLAnchorElement &&
+          !control.hasAttribute("data-emphasis") &&
+          control.parentElement?.textContent.trim() !== control.textContent.trim();
+        if (inSentence) return [];
+        control.scrollIntoView({ block: "center", inline: "center" });
+        const box = control.getBoundingClientRect();
+        const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+        const name = control.outerHTML.slice(0, 60);
+        const small =
+          box.width < 24 || box.height < 24 ? [`${name} is ${String(box.width)}x${String(box.height)}`] : [];
+        const covered = hit === null || !control.contains(hit) ? [`${name} is covered or out of view`] : [];
+        return [...small, ...covered];
+      }),
     );
     expect.soft(faults, id).toEqual([]);
   }
@@ -105,14 +105,26 @@ test("no story scrolls sideways at 320 px when its longest text is one word of 4
   }
 });
 
-// Every control of every story, tabbed to in turn: a component rule that hides or clips the one
-// ring would show here.
+// Every control of every story that Tab reaches, tabbed to in turn from the top: a component rule that
+// hides or clips the one ring would show here. Those the arrows reach instead, a tablist's and a
+// menu's, are the behaviours' journeys'.
 test("the focus ring is the 2 px mint outline, 2 px off, on every control reached by the keyboard", async ({
   page,
 }) => {
   for (const id of await stories(page)) {
     await open(page, id);
-    const controls = await page.locator("#storybook-root :is(button:not(:disabled), a[href])").count();
+    // Tab starts from the top of what can take the focus, the open dialog's or the page's, whatever a
+    // story focused: a blur would leave Tab's starting point where the focus was.
+    const controls = await page.evaluate(() => {
+      const top = document.createElement("span");
+      top.tabIndex = -1;
+      (document.querySelector("dialog:modal") ?? document.body).prepend(top);
+      top.focus();
+      top.remove();
+      return [...document.querySelectorAll<HTMLElement>("#storybook-root :is(button, a[href], input)")].filter(
+        (control) => control.checkVisibility() && control.tabIndex >= 0 && !control.matches(":disabled"),
+      ).length;
+    });
     const reached = new Set<string>();
     for (let step = 0; step < controls; step += 1) {
       await page.keyboard.press("Tab");
