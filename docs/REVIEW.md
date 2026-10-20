@@ -61,7 +61,8 @@ Code written by an agent gets the same reading as anyone's, plus this. `/pre-mer
    test not seen failing first (ADR-0002 §9). Its findings are fixed before anything else.
 3. **Every lens, at every merge.** `/simplify` first, its fixes applied and the gate run again;
    then Claude Code's `/code-review` (correctness, performance, accessibility and UX, with this
-   file's checklists) and `/security-review` together, in a fresh context; a change to a tier-1
+   file's checklists), `/security-review` and the `complexity-reviewer` (the cost in big O of each
+   loop, against the size its input can reach) together, in a fresh context; a change to a tier-1
    file adds the `security-reviewer` agent, on the strongest model, which reads the project's
    threat model (Alexis, 2026-10-18: add lenses, remove none). Each finding names its class, the
    kind of bug, and its fix covers every instance; one only about style, diagnostics or cleanup
