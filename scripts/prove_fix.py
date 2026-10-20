@@ -58,10 +58,12 @@ def verdict(commit):
     message = git("log", "-1", "--format=%B", commit)
     if not re.match(r"fix(\(.+?\))?!?:", message):
         return None
-    files = git("diff-tree", "--no-commit-id", "--name-only", "-r", "--diff-filter=AM", commit).splitlines()
-    product = [f for f in files if f.startswith(PRODUCT)]
-    tests = [f for f in product if TEST.search(f)]
-    if len(tests) == len(product):  # the harness alone, or tests alone: no product code to prove
+    # Every product file it touches, a deleted one included; the tests it runs, those it leaves.
+    changed = git("diff-tree", "--no-commit-id", "--name-only", "-r", "--diff-filter=AMDT", commit).splitlines()
+    left = set(git("diff-tree", "--no-commit-id", "--name-only", "-r", "--diff-filter=AM", commit).splitlines())
+    product = [f for f in changed if f.startswith(PRODUCT)]
+    tests = [f for f in product if TEST.search(f) and f in left]
+    if all(TEST.search(f) for f in product):  # the harness alone, or tests alone: no product code to prove
         return None
     if not tests:
         return None if re.search(r"^No-test: \S", message, re.M) else "a fix with no test that reproduces the bug (or a `No-test: <why>` line)"

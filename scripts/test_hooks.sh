@@ -1238,6 +1238,20 @@ prove "$base" || fail "prove_fix refused a harness fix, which harness_mutate pro
 base=$(git -C "$pf" rev-parse HEAD)
 printf '// expects: export\n' >"$pf/packages/x/src/d.test.ts" && fix "fix(x): a test's own fault, and no product code"
 prove "$base" || fail "prove_fix refused a fix of tests alone, which changes no product code"
+# Deleted code is product code too: a fix that drops a module needs a test that failed, or a reason.
+printf 'export const gone = 1;\n' >"$pf/packages/x/src/gone.ts" && fix "feat(x): a module to drop"
+base=$(git -C "$pf" rev-parse HEAD)
+git -C "$pf" rm -q packages/x/src/gone.ts && printf '// expects: export\n' >"$pf/packages/x/src/e.test.ts" && fix "fix(x): the module goes, with a test that passed already"
+prove "$base" && fail "prove_fix accepted a fix that deletes code, its test passing before it"
+printf 'export const gone2 = 1;\n' >"$pf/packages/x/src/gone2.ts" && fix "feat(x): another module"
+base=$(git -C "$pf" rev-parse HEAD)
+git -C "$pf" rm -q packages/x/src/gone2.ts && fix "fix(x): it goes, untested"
+prove "$base" && fail "prove_fix accepted a fix that deletes code with no test and no reason"
+# A fix that drops an old test runs only the tests it leaves.
+base=$(git -C "$pf" rev-parse HEAD)
+git -C "$pf" rm -q packages/x/src/e.test.ts && printf 'export const twice = (n: number) => n * 2 + 3 - 3;\n' >"$pf/packages/x/src/a.ts"
+printf '// expects: + 3\n' >"$pf/packages/x/src/f.test.ts" && fix "fix(x): a new test, an old one gone"
+prove "$base" || fail "prove_fix ran a test the fix deleted"
 fi
 
 if part audit; then
