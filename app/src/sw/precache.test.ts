@@ -43,6 +43,28 @@ test("a dashed name with no hash counts for nothing, its last words taken for no
   expect(precacheList(["assets/entry-client-chunk.js", "assets/route-world-main.css"])).toEqual([]);
 });
 
+// The fonts too, so that offline the page keeps Geist (docs/plans/slice-2cd.md); nothing else.
+test("the precache list holds the build's hashed fonts as well, and no other kind of file", () => {
+  expect(
+    precacheList([
+      "assets/geist-latin-wght-normal-BgDaEnEv.woff2",
+      "assets/geist-latin-wght-normal-BgDaEnEv.woff",
+      "assets/planet-12345678.png",
+      "assets/geist-latin-wght-normal-BgDaEnEv.woff2.map",
+    ]),
+  ).toEqual(["/assets/geist-latin-wght-normal-BgDaEnEv.woff2"]);
+});
+
+test("a font counts only by its whole name: no nested path, no hash under eight characters, no hash at all", () => {
+  expect(
+    precacheList([
+      "assets/fonts/geist-latin-wght-normal-BgDaEnEv.woff2",
+      "assets/geist-latin-wght-normal-BgDaEnE.woff2",
+      "assets/geist-latin-wght-normal.woff2",
+    ]),
+  ).toEqual([]);
+});
+
 test("the list is the same whatever order the build gives its files in", () => {
   expect(precacheList([...BUILD].reverse())).toEqual(precacheList(BUILD));
 });

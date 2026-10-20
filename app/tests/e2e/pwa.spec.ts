@@ -3,7 +3,7 @@ import { cacheContents, controlled, expect, hydrated, PAGES, test, type Page } f
 // The PWA as ADR-0001 §12 asks: a manifest Chromium reads, the build's hashed files answered
 // from the worker's cache and nothing else cached, updates that wait for a click, and `?nosw`.
 // (Chromium's own installability check answers nothing in a one-process browser, so it is not used.)
-const HASHED = /^\/assets\/[\w.-]+-[\w-]{8,}\.(js|css)$/;
+const HASHED = /^\/assets\/[\w.-]+-[\w-]{8}\.(js|css|woff2)$/;
 
 const promptOf = (page: Page) => page.getByRole("status").filter({ hasText: "New version available." });
 
@@ -132,6 +132,8 @@ test("the worker answers the build's hashed files from its cache, and caches no 
   expect(installed.names).toEqual(["gnoworld-precache"]);
   expect(installed.paths.length, "install precached nothing").toBeGreaterThan(0);
   for (const path of installed.paths) expect(path).toMatch(HASHED);
+  // The fonts too, the text's latin face among them: offline, the page keeps its face.
+  expect(installed.paths.filter((path) => /\/geist-latin-wght-normal-[\w-]{8}\.woff2$/.test(path))).toHaveLength(1);
   const fromWorker: string[] = [];
   const scripts: string[] = [];
   page.on("response", (response) => {
@@ -143,6 +145,10 @@ test("the worker answers the build's hashed files from its cache, and caches no 
   await hydrated(page);
   expect(fromWorker.length, "the worker answered nothing").toBeGreaterThan(0);
   for (const path of fromWorker) expect(installed.paths).toContain(path);
+  expect(
+    fromWorker.filter((path) => path.endsWith(".woff2")),
+    "the fonts the first screen draws with, from the cache",
+  ).not.toEqual([]);
   // Every script the first screen needs comes from the cache: offline, the page still starts.
   expect(
     scripts.filter((path) => !fromWorker.includes(path)),
