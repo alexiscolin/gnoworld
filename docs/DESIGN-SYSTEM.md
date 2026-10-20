@@ -175,7 +175,8 @@ the brightest planet behind the header's pills.
 
 - Controls are a minimum height with padding, never a fixed height, so text zoomed to 200% grows
   the control instead of spilling out.
-- A target is at least 24 px with a pointer and 44 px by touch (WCAG 2.2).
+- A target is at least 24 px (WCAG 2.2, 2.5.8; a link inside a sentence aside), and the default
+  control is 44 px by touch; a toolbar's small controls stay at 32.
 - Interface text and controls do not scale with the window; section space and titles do.
 - **Density:** `comfortable` (default) or `compact`, set once with `data-density` on a container;
   it remaps the control and row aliases, so no component holds a density rule of its own.
@@ -273,7 +274,7 @@ walk every story in Chromium, in the full gate.
   `scripts/check_regressions.py`).
 - **Invariants,** measured in the browser on every story and the journeys:
   - nothing overlaps: the point at the centre of each control hits that control;
-  - every target is at least 24 px with a pointer and 44 px by touch;
+  - every target is at least 24 px, the default control 44 px by touch;
   - `:focus-visible` draws its ring;
   - no horizontal scroll from 320 px wide; text still fits at 200% zoom;
   - forced colours keep every control visible; reduced motion stops transitions;

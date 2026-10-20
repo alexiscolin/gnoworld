@@ -62,7 +62,8 @@ New: `packages/ui/` (tokens, layers, base, compositions, the components with the
 configs, the `package.json` files. No tier-1 file; no code of Alexis's. Merges of ~400 lines: 2a designs; 2b
 tokens, base, compositions, Storybook, the new test levels, `Button`, `IconButton`, `Kicker`,
 icons, the token page and the page of every component; 2c `Chip`, `Tabs`, `Popover`, `Dialog`,
-`Flash`, `EmptyState`, `Skeleton`, and `Tooltip`, which `IconButton` then wears; 2d `Card`,
+`Flash`, `EmptyState`, `Skeleton`, and `Tooltip`, which `IconButton` then wears, with StrykerJS
+mutating `.tsx` (F225) and `UpdatePrompt` leaving `ui/` for `Flash` (F212); 2d `Card`,
 `Row`, `Field`, `Stat`, `ActivityChart`, `PlanetThumb`; 2e `Avatar` and the PWA's icons.
 The designs' 2a merge folds into 2b's: it holds only documents, and one review round covers
 both. `IconButton` shares `Button`'s folder and module, since it is the same control without its
