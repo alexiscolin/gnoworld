@@ -63,7 +63,9 @@ configs, the `package.json` files. No tier-1 file; no code of Alexis's. Merges o
 tokens, base, compositions, Storybook, the new test levels, `Button`, `IconButton`, `Kicker`,
 icons, the token page and the page of every component; 2c `Chip`, `Tabs`, `Popover`, `Dialog`,
 `Flash`, `EmptyState`, `Skeleton`, and `Tooltip`, which `IconButton` then wears, with StrykerJS
-mutating `.tsx` (F225) and `UpdatePrompt` leaving `ui/` for `Flash` (F212); 2d `Card`,
+mutating `.tsx` (F225), `UpdatePrompt` leaving `ui/` for `Flash` (F212), and the fonts: the
+worker precaches the woff2 files too (ADR-0001 §12 names scripts and styles only), so offline the
+page keeps Geist, and the first screen's font is preloaded, as DESIGN-SYSTEM.md promises; 2d `Card`,
 `Row`, `Field`, `Stat`, `ActivityChart`, `PlanetThumb`; 2e `Avatar` and the PWA's icons.
 The designs' 2a merge folds into 2b's: it holds only documents, and one review round covers
 both. `IconButton` shares `Button`'s folder and module, since it is the same control without its
