@@ -1,7 +1,8 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eachStory, staysText } from "../testing.tsx";
-import { Flash } from "./Flash.tsx";
+import { Flash, type FlashMessage } from "./Flash.tsx";
 import * as stories from "./Flash.stories.tsx";
 
 const saved = { title: "Saved to your rooms", line: "Bubble · the AMA on sessions" };
@@ -20,6 +21,31 @@ function endsIn5s(onClose: ReturnType<typeof vi.fn>) {
   expect(onClose).not.toHaveBeenCalled();
   advance(1);
   expect(onClose).toHaveBeenCalledOnce();
+}
+
+// A flash as a page holds it: its message is state, its close clears it, and its action may set the next.
+function Held({ start, next = null }: { start: FlashMessage; next?: FlashMessage | null }) {
+  const [message, setMessage] = useState<FlashMessage | null>({
+    ...start,
+    ...(start.action === undefined
+      ? {}
+      : {
+          action: {
+            ...start.action,
+            onAction: () => {
+              setMessage(next);
+            },
+          },
+        }),
+  });
+  return (
+    <Flash
+      message={message}
+      onClose={() => {
+        setMessage(null);
+      }}
+    />
+  );
 }
 
 describe("Flash", () => {
@@ -129,14 +155,39 @@ describe("Flash", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("ends when its action is taken, after doing it", () => {
+  // It closes before it acts: the act may raise the next flash, which a close after it would wipe.
+  it("ends when its action is taken, then does it, so the act may raise the next flash", () => {
+    render(<Held start={deleted(() => undefined)} next={{ title: "Restored" }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(screen.getByRole("status").textContent).toBe("Restored");
+  });
+
+  it("hands its handlers nothing of the click", () => {
     const onAction = vi.fn();
     const onClose = vi.fn();
-    render(<Flash message={deleted(onAction)} onClose={onClose} />);
+    const { rerender } = render(<Flash message={deleted(onAction)} onClose={onClose} />);
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
-    expect(onAction).toHaveBeenCalledOnce();
-    expect(onClose).toHaveBeenCalledOnce();
-    expect(onAction.mock.invocationCallOrder[0]).toBeLessThan(onClose.mock.invocationCallOrder[0] ?? 0);
+    expect(onClose).toHaveBeenCalledWith();
+    expect(onAction).toHaveBeenCalledWith();
+    rerender(<Flash message={deleted(onAction)} onClose={onClose} />);
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(onClose).toHaveBeenLastCalledWith();
+  });
+
+  it.each(["Undo", "Close"])("gives the focus back to where it was when %s takes it away", (name) => {
+    render(
+      <>
+        <button type="button">Before</button>
+        <Held start={deleted(() => undefined)} />
+      </>,
+    );
+    act(() => {
+      screen.getByRole("button", { name: "Before" }).focus();
+      screen.getByRole("button", { name }).focus();
+    });
+    fireEvent.click(screen.getByRole("button", { name }));
+    expect(screen.queryByText("Message deleted")).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Before" }));
   });
 
   it("ends when closed, without its action", () => {

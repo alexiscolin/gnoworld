@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { Button } from "../Button/Button.tsx";
 import { IconButton } from "../Button/IconButton.tsx";
 import { Cluster, Stack } from "../compositions/index.ts";
@@ -24,8 +24,16 @@ const LIFETIME = 5_000;
 // no pointerleave would end.
 function Pill({ message, onClose }: { message: FlashMessage; onClose: () => void }) {
   const [held, setHeld] = useState(false);
+  // Where the focus was before it came in: closed from its own button, the flash gives it back, where
+  // it would otherwise fall to the page.
+  const backRef = useRef<HTMLElement | null>(null);
   const close = useEffectEvent(onClose);
   const { title, line, action } = message;
+  // It closes before its action acts, so the act may raise the next flash, which a close after would wipe.
+  const leave = (button: HTMLElement) => {
+    if (document.activeElement === button) backRef.current?.focus();
+    onClose();
+  };
   const timed = action === undefined && !held;
   // Its words, not its object: the same words in a new object keep their count.
   useEffect(() => {
@@ -46,6 +54,10 @@ function Pill({ message, onClose }: { message: FlashMessage; onClose: () => void
       onPointerLeave={() => {
         setHeld(false);
       }}
+      onFocus={(event) => {
+        const from = event.relatedTarget;
+        if (from instanceof HTMLElement && !event.currentTarget.contains(from)) backRef.current = from;
+      }}
     >
       <Cluster space="m">
         <Stack space="3xs">
@@ -56,14 +68,22 @@ function Pill({ message, onClose }: { message: FlashMessage; onClose: () => void
           <Cluster space="2xs">
             <Button
               size="s"
-              onClick={() => {
+              onClick={(event) => {
+                leave(event.currentTarget);
                 action.onAction();
-                onClose();
               }}
             >
               {action.label}
             </Button>
-            <IconButton icon="close" label="Close" emphasis="plain" size="s" onClick={onClose} />
+            <IconButton
+              icon="close"
+              label="Close"
+              emphasis="plain"
+              size="s"
+              onClick={(event) => {
+                leave(event.currentTarget);
+              }}
+            />
           </Cluster>
         )}
       </Cluster>
