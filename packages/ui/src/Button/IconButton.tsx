@@ -1,5 +1,6 @@
 import type { MouseEvent } from "react";
 import { Icon, type IconName } from "../icons/Icon.tsx";
+import { iconSize, type ControlSize } from "./control.ts";
 import styles from "./Button.module.css";
 
 export interface IconButtonProps {
@@ -7,7 +8,7 @@ export interface IconButtonProps {
   // Its whole name, with the count as shown ("Notifications, 8 unread", "over 99"): the icon and the
   // count are hidden, and a name that lacks the visible count fails WCAG's label in name.
   label: string;
-  size?: "s" | "m" | "l";
+  size?: ControlSize;
   emphasis?: "outline" | "plain";
   pressed?: boolean;
   count?: number;
@@ -42,7 +43,7 @@ export function IconButton({
       data-size={size}
       onClick={onClick}
     >
-      <Icon name={icon} size={size === "l" ? "l" : "m"} />
+      <Icon name={icon} size={iconSize(size)} />
       {badge === null ? null : (
         <span className={styles["count"]} aria-hidden="true">
           {badge}

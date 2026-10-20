@@ -1,6 +1,11 @@
 /* Button and IconButton: one control, its variants setting private properties only. */
 @layer components {
   .button {
+    /* The padding and the empty fill in the tone's ink that most variants keep. */
+    --_pad: var(--space-s);
+    --_fill: transparent;
+    --_ink: var(--_text);
+
     /* layout: an icon sits beside the label */
     display: inline-flex;
     /* layout: an icon sits beside the label */
@@ -24,13 +29,13 @@
 
   .button[data-size="s"] {
     --_h: var(--control-s);
-    --_pad: var(--space-s);
-    --_font: var(--font-ui);
   }
 
   .button[data-size="m"] {
     --_h: var(--control-m);
-    --_pad: var(--space-s);
+  }
+
+  .button:is([data-size="s"], [data-size="m"]) {
     --_font: var(--font-ui);
   }
 
@@ -59,15 +64,11 @@
   }
 
   .button[data-emphasis="outline"] {
-    --_fill: transparent;
-    --_ink: var(--_text);
     --_line: var(--_edge);
   }
 
   /* A transparent edge still shows under forced colours. */
   .button:is([data-emphasis="quiet"], [data-emphasis="plain"]) {
-    --_fill: transparent;
-    --_ink: var(--_text);
     --_line: transparent;
   }
 

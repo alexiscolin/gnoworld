@@ -1,12 +1,13 @@
 import type { MouseEvent, ReactNode } from "react";
 import { Icon, type IconName } from "../icons/Icon.tsx";
+import { iconSize, type ControlSize } from "./control.ts";
 import styles from "./Button.module.css";
 
 export interface ButtonProps {
   children: ReactNode;
   emphasis?: "solid" | "outline" | "quiet";
   tone?: "neutral" | "danger";
-  size?: "s" | "m" | "l";
+  size?: ControlSize;
   icon?: IconName;
   type?: "button" | "submit";
   disabled?: boolean;
@@ -44,7 +45,7 @@ export function Button({
       aria-disabled={busy}
       onClick={busy === true ? refuse : onClick}
     >
-      {icon === undefined ? null : <Icon name={icon} size={size === "l" ? "l" : "m"} />}
+      {icon === undefined ? null : <Icon name={icon} size={iconSize(size)} />}
       {children}
       {busy === true ? <span className={styles["spinner"]} aria-hidden="true" /> : null}
     </button>
