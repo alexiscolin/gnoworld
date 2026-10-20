@@ -133,7 +133,9 @@ test("the worker answers the build's hashed files from its cache, and caches no 
   expect(installed.paths.length, "install precached nothing").toBeGreaterThan(0);
   for (const path of installed.paths) expect(path).toMatch(HASHED);
   // The fonts too, the text's latin face among them: offline, the page keeps its face.
-  expect(installed.paths.filter((path) => /\/geist-latin-wght-normal-[\w-]{8}\.woff2$/.test(path))).toHaveLength(1);
+  const faces = installed.paths.filter((path) => /\/geist-latin-wght-normal-[\w-]{8}\.woff2$/.test(path));
+  expect(faces).toHaveLength(1);
+  const face = faces[0] ?? "";
   const fromWorker: string[] = [];
   const scripts: string[] = [];
   page.on("response", (response) => {
@@ -145,10 +147,7 @@ test("the worker answers the build's hashed files from its cache, and caches no 
   await hydrated(page);
   expect(fromWorker.length, "the worker answered nothing").toBeGreaterThan(0);
   for (const path of fromWorker) expect(installed.paths).toContain(path);
-  expect(
-    fromWorker.filter((path) => path.endsWith(".woff2")),
-    "the fonts the first screen draws with, from the cache",
-  ).not.toEqual([]);
+  expect(fromWorker, "the first screen's own face, from the cache").toContain(face);
   // Every script the first screen needs comes from the cache: offline, the page still starts.
   expect(
     scripts.filter((path) => !fromWorker.includes(path)),
@@ -161,11 +160,14 @@ test("the worker answers the build's hashed files from its cache, and caches no 
   // A file written as pages load would show.
   expect(await cacheContents(page)).toEqual(installed);
   await page.context().setOffline(true);
-  const offline = await page.evaluate(async (asset) => {
-    const answer = async (url: string) => (await fetch(url).catch(() => null))?.status ?? "no answer";
-    return { asset: await answer(asset), page: await answer("/w/bubble") };
-  }, fromWorker[0] ?? "");
-  expect(offline).toEqual({ asset: 200, page: "no answer" });
+  const offline = await page.evaluate(
+    async ([asset, font]) => {
+      const answer = async (url: string) => (await fetch(url).catch(() => null))?.status ?? "no answer";
+      return { asset: await answer(asset), font: await answer(font), page: await answer("/w/bubble") };
+    },
+    [fromWorker[0] ?? "", face] as const,
+  );
+  expect(offline).toEqual({ asset: 200, font: 200, page: "no answer" });
 });
 
 // The second host (tests/e2e/serve.mjs) serves the same build, and a new worker once bumped: one
