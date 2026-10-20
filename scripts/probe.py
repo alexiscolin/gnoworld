@@ -429,8 +429,12 @@ try:
             "a state attribute its component sets": ({"Card.module.css": card(ok_decls) + ".card[data-space=\"s\"] {\n  color: var(--color-text);\n}\n", "Card.tsx": use("card") + "export const a = <div data-space=\"s\" />;\n"}, None),
             "copied rules": ({"Card.module.css": card(ok_decls), "Card.tsx": use("card"), "Tile.module.css": ".tile {\n" + ok_decls + "}\n", "Tile.tsx": "import styles from './Tile.module.css';\nexport const tile = styles.tile;\n"}, "copied"),
         }
-        for case, (files, word) in cases.items():
-            root = os.path.join(css, case.replace(" ", "_"))
+        for n, (case, (files, word)) in enumerate(cases.items()):
+            if ONLY and failures:
+                break  # harness_mutate needs one failure, and the rest cost seconds per mutant
+            # A folder named by number: check_css prints paths, and a case's title in one would
+            # hold the very word the case waits for (the destructured case passed with its rule off).
+            root = os.path.join(css, f"case{n}")
             plant({"tokens.css": tokens, **files}, where=os.path.join(root, "ui"))
             out = run([sys.executable, "-I", "scripts/check_css.py", root])
             said = (out.stdout + out.stderr).lower()
