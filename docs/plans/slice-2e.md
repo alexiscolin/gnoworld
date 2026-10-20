@@ -19,6 +19,10 @@ Slice 2's row, for the avatar: "the same address gives the same nebula, readable
   generator: 0.2%);
 - the face memoised by address, with a bench of 1,000 addresses for its baseline (slice 2, §4);
 - the PWA's icons drawn, 192 and 512, and a maskable 512 inside its safe zone (§7, Q1).
+- a link inside the app never reloads the page (Alexis, F259): `ui` offers a link slot the app
+  fills once, at its root, with React Router's `Link`; `Button`, `Row` and `Card` use it for an
+  internal link, a plain anchor without it (Storybook); a journey clicks the way home and sees no
+  document load.
 
 ## 2. The generator (Claude's proposal, for Alexis to read)
 
