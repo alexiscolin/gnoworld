@@ -1,20 +1,9 @@
-import type { ReactNode } from "react";
 import { Button } from "../Button/Button.tsx";
 import { IconButton } from "../Button/IconButton.tsx";
 import { Center, Cluster, Grid, Sidebar, Stack, Switcher } from "../compositions/index.ts";
 import { Icon, ICON_NAMES } from "../icons/Icon.tsx";
 import { Kicker } from "../Kicker/Kicker.tsx";
-
-function Region({ name, children }: { name: string; children: ReactNode }) {
-  return (
-    <section aria-label={name}>
-      <Stack>
-        <h2>{name}</h2>
-        {children}
-      </Stack>
-    </section>
-  );
-}
+import { Region } from "./Region.tsx";
 
 function Buttons() {
   return (
