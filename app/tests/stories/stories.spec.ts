@@ -349,6 +349,7 @@ test("a link-button wears its button's look, with no underline", async ({ page }
         s.borderTopWidth,
         s.borderRadius,
         s.font,
+        s.textAlign,
         s.paddingInlineStart,
         s.blockSize,
         s.cursor,
