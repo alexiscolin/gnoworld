@@ -7,27 +7,32 @@ import { Overview } from "./Overview.tsx";
 import * as stories from "./Overview.stories.tsx";
 
 // docs/DESIGN-SYSTEM.md, "Storybook shows everything": one page shows every component at once.
-// Each component the entry gives, by the region that shows it: tsc fails this object the day a
-// component joins the entry with no region named here, and each region is checked below.
-const REGION_OF: Record<keyof typeof ui, string> = {
-  Button: "Buttons",
-  IconButton: "Icon buttons",
-  Kicker: "Kickers",
-  Flash: "Flashes",
-  EmptyState: "Empty states",
-  Icon: "Icons",
-  Stack: "Compositions",
-  Cluster: "Compositions",
-  Grid: "Compositions",
-  Sidebar: "Compositions",
-  Switcher: "Compositions",
-  Center: "Compositions",
+// Each component the entry gives, by the region that shows it and the mark it leaves there: tsc
+// fails this object the day a component joins the entry with nothing named here.
+const SHOWN: Record<keyof typeof ui, readonly [region: string, mark: string]> = {
+  Button: ["Buttons", "button[data-emphasis]:not([aria-label])"],
+  IconButton: ["Icon buttons", "button[data-emphasis][aria-label]"],
+  Kicker: ["Kickers", "p.label"],
+  Flash: ["Flashes", "[role='status'] p"],
+  EmptyState: ["Empty states", "h3 + p"],
+  Icon: ["Icons", "svg[data-icon]"],
+  Stack: ["Buttons", "[data-space]"],
+  Cluster: ["Kickers", "[data-justify]"],
+  Grid: ["Compositions", "[data-min]"],
+  Sidebar: ["Compositions", "[data-side]"],
+  Switcher: ["Compositions", "[data-side] > [data-space] > [data-max]"],
+  Center: ["Compositions", "[data-max]"],
 };
 
 describe("Overview", () => {
-  it.each([...new Set(Object.values(REGION_OF)), "Text"])("has a region for %s", (name) => {
+  it.each(Object.entries(SHOWN))("shows %s in its region", (_, [name, mark]) => {
     render(<Overview />);
-    expect(screen.getByRole("region", { name })).toBeTruthy();
+    expect(screen.getByRole("region", { name }).querySelector(mark)).not.toBeNull();
+  });
+
+  it("has a region for Text", () => {
+    render(<Overview />);
+    expect(screen.getByRole("region", { name: "Text" })).toBeTruthy();
   });
 
   it("shows each emphasis and tone of Button, and its disabled and busy states", () => {
