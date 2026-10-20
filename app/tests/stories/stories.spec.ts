@@ -30,6 +30,7 @@ test("in every story, each control is a target of 24 px or more that nothing cov
         (control) => {
           const inSentence =
             control instanceof HTMLAnchorElement &&
+            !control.hasAttribute("data-emphasis") &&
             control.parentElement?.textContent.trim() !== control.textContent.trim();
           if (inSentence) return [];
           control.scrollIntoView({ block: "center", inline: "center" });
@@ -60,7 +61,7 @@ test("no story scrolls sideways at 320 px, and text at 200% still fits its contr
     // What is hidden from assistive technology is decoration, as a count's badge on a corner.
     const spilled = await page.evaluate(
       () =>
-        [...document.querySelectorAll("#storybook-root button")].filter((button) => {
+        [...document.querySelectorAll("#storybook-root :is(button, a[data-emphasis])")].filter((button) => {
           const outer = button.getBoundingClientRect();
           const walker = document.createTreeWalker(button, NodeFilter.SHOW_TEXT);
           for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
@@ -291,9 +292,10 @@ test("a button lightens under the pointer, unless it is disabled or busy", async
     ["button--outline", true],
     ["button--disabled", false],
     ["button--busy", false],
+    ["button--as-link", true],
   ] as const) {
     await open(page, id);
-    const button = page.locator("#storybook-root button");
+    const button = page.locator("#storybook-root :is(button, a[data-emphasis])");
     const paint = () =>
       button.evaluate((b) => {
         const s = getComputedStyle(b);
@@ -306,12 +308,68 @@ test("a button lightens under the pointer, unless it is disabled or busy", async
   }
 });
 
+// A link with the button's look is the button, read from every property that draws it, and no underline.
+test("a link-button wears its button's look, with no underline", async ({ page }) => {
+  const look = async (id: string, selector: string) => {
+    await open(page, id);
+    return page.locator(`#storybook-root ${selector}`).evaluate((e) => {
+      const s = getComputedStyle(e);
+      return [
+        s.textDecorationLine,
+        s.color,
+        s.backgroundColor,
+        s.borderTopColor,
+        s.borderTopWidth,
+        s.borderRadius,
+        s.font,
+        s.paddingInlineStart,
+        s.blockSize,
+        s.cursor,
+        s.display,
+      ];
+    });
+  };
+  const link = await look("button--as-link", "a");
+  expect(link[0]).toBe("none");
+  expect(link).toEqual(await look("button--primary", "button"));
+});
+
+// The flash is in the page's flow, where its slot puts it: empty, it takes no room and paints nothing;
+// full, nothing in it is fixed or absolute.
+test("the flash sits in the flow: empty it takes no room and paints nothing, full it holds no fixed box", async ({
+  page,
+}) => {
+  await open(page, "flash--empty");
+  const empty = await page.getByRole("status").evaluate((region) => {
+    const s = getComputedStyle(region);
+    return {
+      height: region.getBoundingClientRect().height,
+      inside: region.childElementCount,
+      ground: s.backgroundColor,
+      position: s.position,
+    };
+  });
+  expect(empty).toEqual({ height: 0, inside: 0, ground: "rgba(0, 0, 0, 0)", position: "static" });
+  await open(page, "flash--timed");
+  const placed = await page
+    .getByRole("status")
+    .evaluate((region) => [region, ...region.querySelectorAll("*")].map((e) => getComputedStyle(e).position));
+  expect(new Set(placed)).toEqual(new Set(["static"]));
+});
+
 test("under forced colours, every button keeps a visible edge", async ({ page }) => {
   await page.emulateMedia({ forcedColors: "active" });
-  await open(page, "button--matrix");
-  const edges = await page.evaluate(() =>
-    [...document.querySelectorAll("#storybook-root button")].map((b) => getComputedStyle(b).borderTopWidth),
-  );
+  const edges: string[] = [];
+  for (const id of ["button--matrix", "button--as-link"]) {
+    await open(page, id);
+    edges.push(
+      ...(await page.evaluate(() =>
+        [...document.querySelectorAll("#storybook-root :is(button, a[data-emphasis])")].map(
+          (b) => getComputedStyle(b).borderTopWidth,
+        ),
+      )),
+    );
+  }
   expect(edges.length).toBeGreaterThan(0);
   expect(edges.every((width) => Number.parseFloat(width) >= 1)).toBe(true);
 });

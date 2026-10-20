@@ -23,7 +23,7 @@ export function groups() {
     },
     { name: "Shape", prefixes: ["--radius-", "--line-", "--focus-"] },
     { name: "Motion", prefixes: ["--motion-", "--ease-"] },
-    { name: "Effects", prefixes: ["--opacity-"] },
+    { name: "Effects", prefixes: ["--opacity-", "--shadow-"] },
   ];
 }
 

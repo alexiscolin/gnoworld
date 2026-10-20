@@ -1,6 +1,8 @@
 import { Button } from "../Button/Button.tsx";
 import { IconButton } from "../Button/IconButton.tsx";
 import { Center, Cluster, Grid, Sidebar, Stack, Switcher } from "../compositions/index.ts";
+import { EmptyState } from "../EmptyState/EmptyState.tsx";
+import { Flash } from "../Flash/Flash.tsx";
 import { Icon, ICON_NAMES } from "../icons/Icon.tsx";
 import { Kicker } from "../Kicker/Kicker.tsx";
 import { Region } from "./Region.tsx";
@@ -92,6 +94,26 @@ export function Overview() {
           <Kicker dot="mine">Your vote</Kicker>
           <Kicker dot="signal">An uncharted signal</Kicker>
         </Cluster>
+      </Region>
+      <Region name="Flashes">
+        <Stack>
+          <Flash
+            message={{ title: "Saved to your rooms", line: "Bubble · the AMA on sessions" }}
+            onClose={() => undefined}
+          />
+          <Flash
+            message={{ title: "New version available.", action: { label: "Reload", onAction: () => undefined } }}
+            onClose={() => undefined}
+          />
+        </Stack>
+      </Region>
+      <Region name="Empty states">
+        <EmptyState
+          level={3}
+          title="No messages yet"
+          line="Say hello: the room keeps what you write."
+          action={{ label: "Open the chat", href: "#chat" }}
+        />
       </Region>
       <Region name="Icons">
         <Grid as="ul" min="s" space="xs">

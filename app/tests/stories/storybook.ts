@@ -41,7 +41,8 @@ export async function stories(page: Page, prefix = ""): Promise<string[]> {
 
 export async function open(page: Page, id: string) {
   await page.goto(`/iframe.html?id=${id}&viewMode=story`);
-  await page.locator("#storybook-root > *").first().waitFor();
+  // Attached, not visible: an empty story, as an empty flash, has nothing to see.
+  await page.locator("#storybook-root > *").first().waitFor({ state: "attached" });
   await page.evaluate(() => document.fonts.ready);
 }
 
