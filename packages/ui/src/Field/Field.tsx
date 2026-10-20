@@ -29,7 +29,7 @@ export function Field({ label, value, onChange, kind = "text", help, error, pref
       className={styles["box"]}
       value={value}
       aria-invalid={error === undefined ? undefined : true}
-      aria-describedby={described.length === 0 ? undefined : described.join(" ")}
+      aria-describedby={described.join(" ") || undefined}
       onChange={(event) => {
         onChange(event.target.value);
       }}

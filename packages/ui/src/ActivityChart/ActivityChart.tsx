@@ -28,11 +28,10 @@ function when(back: number, unit: "hour" | "day") {
  * current value written beside it, and every value in a table for assistive technology. */
 export function ActivityChart({ label, values, sparkline = false, unit = "hour" }: ActivityChartProps) {
   const counts = values.map((value) => (Number.isFinite(value) && value > 0 ? value : 0));
-  // Each value by its place in time, which is what tells one from another.
-  const points = counts.map((count, at) => ({ count, at }));
   const peak = Math.max(0, ...counts);
   const last = counts.length - 1;
-  const tall = (count: number) => (peak === 0 ? 0 : Math.round((count / peak) * HEIGHT));
+  // Each value by its place in time, which tells one from another, and its height in the drawing.
+  const points = counts.map((count, at) => ({ count, at, high: peak === 0 ? 0 : Math.round((count / peak) * HEIGHT) }));
   const width = sparkline ? Math.max(0, last) * STEP : Math.max(0, counts.length * (BAR + GAP) - GAP);
   return (
     <Stack space="2xs">
@@ -46,19 +45,19 @@ export function ActivityChart({ label, values, sparkline = false, unit = "hour" 
         {sparkline ? (
           <polyline
             className={styles["line"]}
-            points={counts.map((count, at) => `${String(at * STEP)},${String(HEIGHT - tall(count))}`).join(" ")}
+            points={points.map(({ at, high }) => `${String(at * STEP)},${String(HEIGHT - high)}`).join(" ")}
           />
         ) : (
-          points.map(({ count, at }) => (
+          points.map(({ at, high }) => (
             <rect
               key={at}
               className={styles["bar"]}
               data-hour={at}
               data-current={at === last ? "true" : undefined}
               x={at * (BAR + GAP)}
-              y={HEIGHT - tall(count)}
+              y={HEIGHT - high}
               width={BAR}
-              height={tall(count)}
+              height={high}
             />
           ))
         )}

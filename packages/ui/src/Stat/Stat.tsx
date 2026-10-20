@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Chip } from "../Chip/Chip.tsx";
 import { Cluster, Stack } from "../compositions/index.ts";
 import { grouped } from "../format.ts";
@@ -28,25 +28,24 @@ function useCounted(value: number) {
     () => matchMedia(MOTION).matches,
     () => false,
   );
-  // The count on its way, or null once it has arrived.
-  const [counted, setCounted] = useState<number | null>(0);
-  const target = useEffectEvent(() => value);
+  // How far the count has come, from nothing to its value: 0 to 1.
+  const [done, setDone] = useState(0);
   useEffect(() => {
     if (!moving) return;
     // A frame's time can come just before the effect's: the count starts at nothing, never below.
     const start = performance.now();
     let frame = 0;
     const step = (now: number) => {
-      const done = Math.min(1, Math.max(0, (now - start) / COUNT));
-      setCounted(done < 1 ? Math.round(target() * (1 - (1 - done) ** 3)) : null);
-      if (done < 1) frame = requestAnimationFrame(step);
+      const far = Math.min(1, Math.max(0, (now - start) / COUNT));
+      setDone(far);
+      if (far < 1) frame = requestAnimationFrame(step);
     };
     frame = requestAnimationFrame(step);
     return () => {
       cancelAnimationFrame(frame);
     };
   }, [moving]);
-  return !moving || counted === null ? value : counted;
+  return moving && done < 1 ? Math.round(value * (1 - (1 - done) ** 3)) : value;
 }
 
 function said(delta: number) {
