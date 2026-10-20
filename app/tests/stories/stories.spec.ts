@@ -107,9 +107,9 @@ test("no story scrolls sideways at 320 px when its longest text is one word of 4
   }
 });
 
-// Every control of every story that Tab reaches, tabbed to in turn from the top: a component rule that
-// hides or clips the one ring would show here. Those the arrows reach instead, a tablist's and a
-// menu's, are the behaviours' journeys'.
+// Every control of every story, tabbed to in turn from the top: a component rule that hides or clips
+// the one ring, or one that takes a control out of the tab order, would show here. Those the arrows
+// reach instead, a tablist's other tabs and a menu's items, are the behaviours' journeys'.
 test("the focus ring is the 2 px mint outline, 2 px off, on every control reached by the keyboard", async ({
   page,
 }) => {
@@ -124,7 +124,8 @@ test("the focus ring is the 2 px mint outline, 2 px off, on every control reache
       top.focus();
       top.remove();
       return [...document.querySelectorAll<HTMLElement>(selector)].filter(
-        (control) => control.checkVisibility() && control.tabIndex >= 0 && !control.matches(":disabled"),
+        (control) =>
+          control.checkVisibility() && !control.matches(":disabled, [role='menuitem'], [role='tab'][tabindex='-1']"),
       ).length;
     }, CONTROLS);
     const reached = new Set<string>();
