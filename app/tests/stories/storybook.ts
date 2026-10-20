@@ -28,6 +28,8 @@ interface Entry {
 // Storybook's index, read once by each worker: one build serves every test. A failed read is not
 // kept, and says so.
 let index: Promise<Entry[]> | undefined;
+// Its ids, for open() to check each story it opens against, once per worker.
+let built: Promise<Set<string>> | undefined;
 
 function entries(page: Page): Promise<Entry[]> {
   index ??= page.request
@@ -81,10 +83,8 @@ export async function stories(page: Page, prefix = ""): Promise<string[]> {
 /** A story, opened once it is drawn, played and its fonts loaded. An id Storybook did not build fails
  * here, where an unknown story would otherwise wait out its time drawing nothing. */
 export async function open(page: Page, id: string) {
-  expect(
-    (await entries(page)).map((entry) => entry.id),
-    "a story Storybook built",
-  ).toContain(id);
+  built ??= entries(page).then((all) => new Set(all.map((entry) => entry.id)));
+  expect((await built).has(id), `${id} is a story Storybook built`).toBe(true);
   const nothing = (await tagged(page, "empty")).has(id);
   await page.goto(`/iframe.html?id=${id}&viewMode=story`);
   // A story shows something, unless it draws nothing on purpose; checked each frame, as a story that
