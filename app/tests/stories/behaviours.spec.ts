@@ -139,41 +139,90 @@ test.describe("Popover", () => {
     await expect(page.getByRole("dialog")).toBeHidden();
   });
 
-  test("opens above a trigger at the screen's bottom end, still inside the screen", async ({ page }) => {
-    await page.setViewportSize({ width: 320, height: 640 });
+  // The anchored popover at a width, a test's own step run before its trigger opens it: both, open.
+  async function anchored(page: Page, width: number, before?: (trigger: Locator) => Promise<void>) {
+    await page.setViewportSize({ width, height: 700 });
     await open(page, "popover--anchored");
     const trigger = page.getByRole("button", { name: "Network" });
-    await trigger.evaluate((t) => {
-      Object.assign(t.style, { position: "fixed", insetBlockEnd: "8px", insetInlineEnd: "8px" });
-    });
+    await before?.(trigger);
     await trigger.click();
     const panel = page.getByRole("dialog");
     await expect(panel).toBeVisible();
+    return { trigger, panel };
+  }
+
+  // The trigger set fixed at a corner of the screen, as a test asks.
+  const pinned = (where: Record<string, string>) => (trigger: Locator) =>
+    trigger.evaluate((t, how) => {
+      Object.assign(t.style, { position: "fixed", ...how });
+    }, where);
+
+  // The gap from the trigger's bottom to the panel's top, as it settles: one step when placed under.
+  const under = (trigger: Locator, panel: Locator) =>
+    expect.poll(async () => (await box(panel)).y - ((await box(trigger)).y + (await box(trigger)).height));
+
+  test("opens above a trigger at the screen's bottom end, still inside the screen", async ({ page }) => {
+    const { trigger, panel } = await anchored(page, 320, pinned({ insetBlockEnd: "8px", insetInlineEnd: "8px" }));
     const [t, p] = [await box(trigger), await box(panel)];
-    expect(p.y + p.height, "above the trigger").toBeLessThanOrEqual(t.y);
+    expect(t.y - (p.y + p.height), "a step above the trigger").toBe(8);
     expect(p.x >= 0 && p.x + p.width <= 320, "inside the screen").toBe(true);
   });
 
+  test("starts at its trigger's end in a right-to-left page", async ({ page }) => {
+    const { trigger, panel } = await anchored(page, 1280, () =>
+      page.evaluate(() => {
+        document.documentElement.dir = "rtl";
+      }),
+    );
+    const [t, p] = [await box(trigger), await box(panel)];
+    expect(Math.abs(p.x + p.width - (t.x + t.width)), "its right edge on the trigger's").toBeLessThanOrEqual(1);
+  });
+
+  test("follows its trigger as the window narrows", async ({ page }) => {
+    const { panel } = await anchored(page, 1280, pinned({ insetBlockStart: "100px", insetInlineEnd: "8px" }));
+    for (const width of [1280, 800]) {
+      await page.setViewportSize({ width, height: 700 });
+      await expect.poll(async () => (await box(panel)).x + (await box(panel)).width, String(width)).toBe(width - 8);
+    }
+  });
+
+  test("follows its trigger as a box it sits in scrolls", async ({ page }) => {
+    await page.addInitScript(() => {
+      addEventListener("DOMContentLoaded", () => {
+        const root = document.querySelector<HTMLElement>("#storybook-root");
+        root?.style.setProperty("overflow", "auto");
+        root?.style.setProperty("block-size", "300px");
+        root?.style.setProperty("padding-block", "200px 600px");
+      });
+    });
+    const { trigger, panel } = await anchored(page, 1280);
+    await under(trigger, panel).toBe(8);
+    await page.evaluate(() => {
+      document.querySelector("#storybook-root")?.scrollBy(0, 100);
+    });
+    await under(trigger, panel).toBe(8);
+  });
+
   test("stays under its trigger on a scrolled page, and as the page scrolls on", async ({ page }) => {
+    await page.addInitScript(() => {
+      addEventListener("DOMContentLoaded", () => {
+        document.body.style.minBlockSize = "300vh";
+        document.querySelector<HTMLElement>("#storybook-root")?.style.setProperty("padding-block-start", "400px");
+      });
+    });
     await page.setViewportSize({ width: 1280, height: 700 });
     await open(page, "popover--anchored");
     await page.evaluate(() => {
-      document.body.style.minBlockSize = "300vh";
-      document.querySelector<HTMLElement>("#storybook-root")?.style.setProperty("padding-block-start", "400px");
       scrollTo(0, 200);
     });
     const trigger = page.getByRole("button", { name: "Network" });
     await trigger.click();
     const panel = page.getByRole("dialog");
-    for (const scrolled of [false, true]) {
-      if (scrolled)
-        await page.evaluate(() => {
-          scrollBy(0, 100);
-        });
-      await expect
-        .poll(async () => (await box(panel)).y - ((await box(trigger)).y + (await box(trigger)).height))
-        .toBe(8);
-    }
+    await under(trigger, panel).toBe(8);
+    await page.evaluate(() => {
+      scrollBy(0, 100);
+    });
+    await under(trigger, panel).toBe(8);
   });
 
   test("a menu focuses its first item, moves with the arrows, does an item's act and closes", async ({ page }) => {
@@ -233,15 +282,17 @@ test.describe("an icon button's tooltip", () => {
   test("shows its label at once on keyboard focus, above it when there is room, and Esc hides it", async ({ page }) => {
     await open(page, "button-iconbutton--outline");
     await page.evaluate(() => {
-      document.querySelector<HTMLElement>("#storybook-root")?.style.setProperty("padding-block-start", "200px");
+      const root = document.querySelector<HTMLElement>("#storybook-root");
+      root?.style.setProperty("padding-block-start", "200px");
+      root?.style.setProperty("padding-inline-start", "300px");
     });
     await page.keyboard.press("Tab");
     await expect(tip(page)).toHaveAttribute("data-shown", "true");
     await expect(tip(page)).toHaveCSS("opacity", "1");
     expect(Number.parseFloat(await tip(page).evaluate((t) => getComputedStyle(t).fontSize))).toBeGreaterThanOrEqual(11);
     const [b, t] = [await box(page.getByRole("button")), await box(tip(page))];
-    expect(t.y + t.height, "above the button").toBeLessThanOrEqual(b.y);
-    expect(t.x >= 0 && t.x + t.width <= (page.viewportSize()?.width ?? 0), "inside the screen").toBe(true);
+    expect(b.y - (t.y + t.height), "a step above the button").toBe(8);
+    expect(Math.abs(t.x + t.width / 2 - (b.x + b.width / 2)), "centred on the button").toBeLessThanOrEqual(1);
     await page.keyboard.press("Escape");
     await expect(tip(page)).toHaveAttribute("data-shown", "false");
     await expect(tip(page)).toBeHidden();
