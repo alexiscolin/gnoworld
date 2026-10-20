@@ -62,6 +62,7 @@
     --column-m: 288px;
     --column-l: 384px;
     --measure: 65ch;
+    --switch-at: 38rem;
     --dialog-w: 460px;
 
     --radius-s: 8px;

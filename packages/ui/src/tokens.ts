@@ -17,7 +17,10 @@ export function groups() {
     { name: "Colour", prefixes: ["--color-"] },
     { name: "Type", prefixes: ["--family-", "--font-", "--tracking-"] },
     { name: "Space", prefixes: ["--space-"] },
-    { name: "Size", prefixes: ["--control-", "--icon-", "--size-", "--column-", "--measure", "--dialog-"] },
+    {
+      name: "Size",
+      prefixes: ["--control-", "--icon-", "--size-", "--column-", "--measure", "--switch-", "--dialog-"],
+    },
     { name: "Shape", prefixes: ["--radius-", "--line-", "--focus-"] },
     { name: "Motion", prefixes: ["--motion-", "--ease-"] },
     { name: "Effects", prefixes: ["--opacity-"] },

@@ -119,9 +119,10 @@
     flex-wrap: wrap;
   }
 
+  /* One width for every child, in rem: 65ch would be measured in each child's own font. */
   .switcher > * {
     flex-grow: 1;
-    flex-basis: calc((var(--measure) - 100%) * 999);
+    flex-basis: calc((var(--switch-at) - 100%) * 999);
   }
 
   .center {

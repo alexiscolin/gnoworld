@@ -171,7 +171,7 @@ the brightest planet behind the header's pills.
 | `--size-counter` / `--size-progress` | 18 px (an unread count) / 4 px (every progress bar) |
 | `--avatar-s` / `-m` / `-l` | 20 / 24 / 48 px |
 | `--thumb-*` | 16, 24, 32, 48, 64 px |
-| Layout | header clearance 96, dock 360 (320 under 1400), plate 620 with a 440 text column, rail 120, dialog 460 and wide 760, popover 300 px; `--measure` 65ch |
+| Layout | header clearance 96, dock 360 (320 under 1400), plate 620 with a 440 text column, rail 120, dialog 460 and wide 760, popover 300 px; `--measure` 65ch; `--switch-at` 38rem, under which a Switcher stacks its children, about 65ch of body text in one unit for every child |
 
 - Controls are a minimum height with padding, never a fixed height, so text zoomed to 200% grows
   the control instead of spilling out.

@@ -95,6 +95,22 @@ test("a Switcher's children share one row when it is wide, and each has its own 
   }
 });
 
+// Children of mixed fonts switch together: one width for all, not 65 characters of each one's font.
+test("a Switcher's children of mixed fonts share one row or each take their own, never half", async ({ page }) => {
+  for (const width of [400, 600, 800, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    await open(page, "compositions-compositions--switcher");
+    const { rows, children } = await page.evaluate(() => {
+      const kids = [...document.querySelectorAll<HTMLElement>("#storybook-root > * > *")];
+      ["36px", "11px", ""].forEach((size, n) => {
+        kids[n]?.style.setProperty("font-size", size);
+      });
+      return { rows: new Set(kids.map((k) => Math.round(k.getBoundingClientRect().top))).size, children: kids.length };
+    });
+    expect([1, children], `${String(width)} px: ${String(rows)} rows`).toContain(rows);
+  }
+});
+
 // Every Center of every story, so both widths are seen: the dialog's and the measure's.
 test("a Center holds its width, in the middle of its room", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
