@@ -68,6 +68,20 @@ describe("ActivityChart", () => {
     expect(gaps.every((gap) => gap >= 0)).toBe(true);
   });
 
+  it("draws a value of one beside a peak of thousands, never as none", () => {
+    const { container } = render(<ActivityChart label="Calls" values={[1, 5_000]} />);
+    expect(heights(container)[0]).toBeGreaterThanOrEqual(1);
+  });
+
+  it("draws a sparkline of one value as a level line, never an empty drawing", () => {
+    const { container } = render(<ActivityChart label="Calls" values={[7]} sparkline unit="day" />);
+    const [, , width] = (container.querySelector("svg")?.getAttribute("viewBox") ?? "").split(" ").map(Number);
+    const points = (container.querySelector("polyline")?.getAttribute("points") ?? "").split(" ");
+    expect(width).toBeGreaterThan(0);
+    expect(points).toHaveLength(2);
+    expect(new Set(points.map((point) => point.split(",")[1])).size).toBe(1);
+  });
+
   it("draws a flat day without dividing by zero", () => {
     const { container } = render(<ActivityChart label="Calls" values={[0, 0, 0]} />);
     expect(heights(container)).toEqual([0, 0, 0]);

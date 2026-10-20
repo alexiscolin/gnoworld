@@ -30,9 +30,16 @@ export function ActivityChart({ label, values, sparkline = false, unit = "hour" 
   const counts = values.map((value) => (Number.isFinite(value) && value > 0 ? value : 0));
   const peak = Math.max(0, ...counts);
   const last = counts.length - 1;
-  // Each value by its place in time, which tells one from another, and its height in the drawing.
-  const points = counts.map((count, at) => ({ count, at, high: peak === 0 ? 0 : Math.round((count / peak) * HEIGHT) }));
-  const width = sparkline ? Math.max(0, last) * STEP : Math.max(0, counts.length * (BAR + GAP) - GAP);
+  // Each value by its place in time, which tells one from another, and its height in the drawing: a
+  // pixel at least for a value that is not none.
+  const points = counts.map((count, at) => ({
+    count,
+    at,
+    high: count === 0 ? 0 : Math.max(1, Math.round((count / peak) * HEIGHT)),
+  }));
+  // A line of one value is level across one step.
+  const line = points.length === 1 ? points.flatMap((point) => [point, { ...point, at: 1 }]) : points;
+  const width = sparkline ? Math.max(1, last) * STEP : Math.max(0, counts.length * (BAR + GAP) - GAP);
   return (
     <Stack space="2xs">
       <svg
@@ -45,7 +52,7 @@ export function ActivityChart({ label, values, sparkline = false, unit = "hour" 
         {sparkline ? (
           <polyline
             className={styles["line"]}
-            points={points.map(({ at, high }) => `${String(at * STEP)},${String(HEIGHT - high)}`).join(" ")}
+            points={line.map(({ at, high }) => `${String(at * STEP)},${String(HEIGHT - high)}`).join(" ")}
           />
         ) : (
           points.map(({ at, high }) => (
