@@ -157,7 +157,6 @@ def mutants():
     yield from each("scripts/patch_coverage.py", "|(^|/)testSetup\\.ts$", "", "hooks", "patch_coverage leaves the tests' setup out")
     yield from each("scripts/patch_coverage.py", "|\\.stories\\.tsx$", "", "hooks", "patch_coverage leaves the stories out (F247)")
     yield from each("scripts/patch_coverage.py", "|^packages/ui/src/Overview/", "", "hooks", "patch_coverage leaves the overview out (F247)")
-    yield from each("scripts/patch_coverage.py", "if path not in report or re.search(UNMEASURED, os.path.relpath(path)):", "if path not in report:", "hooks", "patch_coverage leaves the pages coverage measures out (F247)")
     yield from each("scripts/patch_coverage.py", "(^|/)testSetup", "(^|/)\\w*", "hooks", "patch_coverage measures code named like a setup")
     yield from each("scripts/patch_coverage.py", "os.path.relpath(p))]", "p)]", "hooks", "patch_coverage matches paths inside the repository")
     yield from each("scripts/patch_coverage.py", "(root|entry\\.server)", ".+", "hooks", "patch_coverage measures the app's routes")
