@@ -35,7 +35,7 @@ export default defineConfig({
         "app/src/root.tsx",
         "app/src/entry.server.tsx",
         "packages/ui/src/**/*.stories.tsx",
-        "packages/ui/src/Overview/**",
+        "packages/ui/src/Overview/Overview.tsx",
       ],
       reporter: ["text-summary", "json"],
       // 85% everywhere (Alexis, 2026-10-17); core's rules at 100%, branches 95%.

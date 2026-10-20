@@ -422,6 +422,8 @@ cover 1 || fail "patch_coverage asked coverage of Storybook's config, its pages 
 unmeasured packages/ui/src/storybook.ts packages/ui/src/setup.ts packages/ui/src/stories.tsx packages/ui/src/Overview.tsx
 # A file named like a story outside the design system is no page Storybook builds: it is measured.
 mkdir -p "$c/app/src" && unmeasured app/src/limit.stories.tsx && rm -r "$c/app/src"
+# Beside the overview's page, its folder's other files are code like any.
+mkdir -p "$c/packages/ui/src/Overview" && unmeasured packages/ui/src/Overview/Region.tsx
 git -C "$c" rm -rq --cached packages && rm -r "$c/packages"
 # A statement over several lines counts when any of its lines changed, not only its first.
 git -C "$c" rm -q --cached src/a.test.ts vitest.config.ts && rm "$c/src/a.test.ts" "$c/vitest.config.ts" && git -C "$c" add src/a.ts && git -C "$c" commit -qm four
