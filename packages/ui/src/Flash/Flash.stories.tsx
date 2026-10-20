@@ -9,12 +9,9 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Timed: Story = {};
-export const Empty: Story = { args: { message: null } };
+export const Empty: Story = { args: { message: null }, tags: ["empty"] };
 export const WithAction: Story = {
   args: { message: { title: "Message deleted", action: { label: "Undo", onAction: () => undefined } } },
-};
-export const Update: Story = {
-  args: { message: { title: "New version available.", action: { label: "Reload", onAction: () => undefined } } },
 };
 export const LongText: Story = {
   args: {

@@ -23,6 +23,9 @@ export async function routeError(route: RouteObject, path: string): Promise<unkn
   return Object.values(context.errors ?? {})[0];
 }
 
+/** The way home a page that failed offers: the primary link to the universe. */
+export const BACK_HOME = /<a [^>]*href="\/"[^>]*>Back to the universe<\/a>/;
+
 /** What the page's alert holds: the markup inside its first role="alert" div, nested divs included. */
 export function alertOf(html: string): string {
   const opening = '<div role="alert">';

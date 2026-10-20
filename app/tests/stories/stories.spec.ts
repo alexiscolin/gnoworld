@@ -2,7 +2,7 @@
 // jsdom cannot see, since it applies no stylesheet. Each test walks every story Storybook built.
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "../e2e/fixtures.ts";
-import { expect, open, stories, test } from "./storybook.ts";
+import { BUTTONS, expect, open, stories, test } from "./storybook.ts";
 
 test("every story renders with no error and passes axe", async ({ page }) => {
   const errors: string[] = [];
@@ -60,8 +60,8 @@ test("no story scrolls sideways at 320 px, and text at 200% still fits its contr
     // Each word's box against its control's: a control grows with its text, so no word sticks out.
     // What is hidden from assistive technology is decoration, as a count's badge on a corner.
     const spilled = await page.evaluate(
-      () =>
-        [...document.querySelectorAll("#storybook-root :is(button, a[data-emphasis])")].filter((button) => {
+      (buttons) =>
+        [...document.querySelectorAll(buttons)].filter((button) => {
           const outer = button.getBoundingClientRect();
           const walker = document.createTreeWalker(button, NodeFilter.SHOW_TEXT);
           for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
@@ -78,6 +78,7 @@ test("no story scrolls sideways at 320 px, and text at 200% still fits its contr
           }
           return false;
         }).length,
+      BUTTONS,
     );
     expect.soft(spilled, `${id}: controls whose text spills at 200%`).toBe(0);
   }
@@ -264,10 +265,15 @@ test("a busy button's spinner turns, and stops under reduced motion", async ({ p
 test("every button lightens at once under the pointer and eases back on leave, at once under reduced motion", async ({
   page,
 }) => {
-  for (const reduced of [false, true]) {
+  for (const [reduced, id] of [
+    [false, "button--matrix"],
+    [false, "button--as-link"],
+    [true, "button--matrix"],
+    [true, "button--as-link"],
+  ] as const) {
     await page.emulateMedia({ reducedMotion: reduced ? "reduce" : "no-preference" });
-    await open(page, "button--matrix");
-    const buttons = page.locator("#storybook-root button:not(:disabled):not([aria-busy='true'])");
+    await open(page, id);
+    const buttons = page.locator(`${BUTTONS}:not(:disabled):not([aria-busy='true'])`);
     expect(await buttons.count()).toBeGreaterThan(0);
     for (const button of await buttons.all()) {
       if (!reduced) {
@@ -295,7 +301,7 @@ test("a button lightens under the pointer, unless it is disabled or busy", async
     ["button--as-link", true],
   ] as const) {
     await open(page, id);
-    const button = page.locator("#storybook-root :is(button, a[data-emphasis])");
+    const button = page.locator(BUTTONS);
     const paint = () =>
       button.evaluate((b) => {
         const s = getComputedStyle(b);
@@ -363,10 +369,9 @@ test("under forced colours, every button keeps a visible edge", async ({ page })
   for (const id of ["button--matrix", "button--as-link"]) {
     await open(page, id);
     edges.push(
-      ...(await page.evaluate(() =>
-        [...document.querySelectorAll("#storybook-root :is(button, a[data-emphasis])")].map(
-          (b) => getComputedStyle(b).borderTopWidth,
-        ),
+      ...(await page.evaluate(
+        (buttons) => [...document.querySelectorAll(buttons)].map((b) => getComputedStyle(b).borderTopWidth),
+        BUTTONS,
       )),
     );
   }

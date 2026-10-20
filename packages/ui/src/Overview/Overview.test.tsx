@@ -8,7 +8,7 @@ import * as stories from "./Overview.stories.tsx";
 
 // docs/DESIGN-SYSTEM.md, "Storybook shows everything": one page shows every component at once.
 // Each component the entry gives, by the region that shows it: tsc fails this object the day a
-// component joins the entry with no region named here.
+// component joins the entry with no region named here, and each region is checked below.
 const REGION_OF: Record<keyof typeof ui, string> = {
   Button: "Buttons",
   IconButton: "Icon buttons",
@@ -25,18 +25,10 @@ const REGION_OF: Record<keyof typeof ui, string> = {
 };
 
 describe("Overview", () => {
-  it("has a region for every component the entry gives", () => {
+  it.each([...new Set(Object.values(REGION_OF)), "Text"])("has a region for %s", (name) => {
     render(<Overview />);
-    for (const name of new Set(Object.values(REGION_OF))) expect(screen.getByRole("region", { name })).toBeTruthy();
+    expect(screen.getByRole("region", { name })).toBeTruthy();
   });
-
-  it.each(["Buttons", "Icon buttons", "Kickers", "Flashes", "Empty states", "Icons", "Text", "Compositions"])(
-    "has a region for %s",
-    (name) => {
-      render(<Overview />);
-      expect(screen.getByRole("region", { name })).toBeTruthy();
-    },
-  );
 
   it("shows each emphasis and tone of Button, and its disabled and busy states", () => {
     render(<Overview />);

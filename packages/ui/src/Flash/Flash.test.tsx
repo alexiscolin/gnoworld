@@ -7,15 +7,18 @@ import * as stories from "./Flash.stories.tsx";
 const saved = { title: "Saved to your rooms", line: "Bubble · the AMA on sessions" };
 const deleted = (onAction: () => void) => ({ title: "Message deleted", action: { label: "Undo", onAction } });
 
+// Time goes on by so many milliseconds, and React draws what it changed.
+function advance(ms: number) {
+  act(() => {
+    vi.advanceTimersByTime(ms);
+  });
+}
+
 // The count ends 5 s from now, to the millisecond: nothing at 4,999 ms, one close at 5,000.
 function endsIn5s(onClose: ReturnType<typeof vi.fn>) {
-  act(() => {
-    vi.advanceTimersByTime(4_999);
-  });
+  advance(4_999);
   expect(onClose).not.toHaveBeenCalled();
-  act(() => {
-    vi.advanceTimersByTime(1);
-  });
+  advance(1);
   expect(onClose).toHaveBeenCalledOnce();
 }
 
@@ -55,13 +58,9 @@ describe("Flash", () => {
     const onClose = vi.fn();
     render(<Flash message={saved} onClose={onClose} />);
     const flash = screen.getByText(saved.title);
-    act(() => {
-      vi.advanceTimersByTime(3_000);
-    });
+    advance(3_000);
     fireEvent.pointerEnter(flash);
-    act(() => {
-      vi.advanceTimersByTime(60_000);
-    });
+    advance(60_000);
     expect(onClose).not.toHaveBeenCalled();
     fireEvent.pointerLeave(flash);
     endsIn5s(onClose);
@@ -70,9 +69,7 @@ describe("Flash", () => {
   it("gives a new message its own 5 s", () => {
     const onClose = vi.fn();
     const { rerender } = render(<Flash message={saved} onClose={onClose} />);
-    act(() => {
-      vi.advanceTimersByTime(3_000);
-    });
+    advance(3_000);
     rerender(<Flash message={{ title: "Left the room" }} onClose={onClose} />);
     endsIn5s(onClose);
   });
@@ -80,13 +77,9 @@ describe("Flash", () => {
   it("keeps its count when its page hands it the same words in a new object", () => {
     const onClose = vi.fn();
     const { rerender } = render(<Flash message={{ ...saved }} onClose={onClose} />);
-    act(() => {
-      vi.advanceTimersByTime(3_000);
-    });
+    advance(3_000);
     rerender(<Flash message={{ ...saved }} onClose={onClose} />);
-    act(() => {
-      vi.advanceTimersByTime(2_000);
-    });
+    advance(2_000);
     expect(onClose).toHaveBeenCalledOnce();
   });
 
@@ -95,9 +88,7 @@ describe("Flash", () => {
     const { rerender } = render(<Flash message={saved} onClose={onClose} />);
     fireEvent.pointerEnter(screen.getByText(saved.title));
     rerender(<Flash message={{ title: "Left the room" }} onClose={onClose} />);
-    act(() => {
-      vi.advanceTimersByTime(60_000);
-    });
+    advance(60_000);
     expect(onClose).not.toHaveBeenCalled();
   });
 
@@ -116,13 +107,9 @@ describe("Flash", () => {
     const first = vi.fn();
     const latest = vi.fn();
     const { rerender } = render(<Flash message={saved} onClose={first} />);
-    act(() => {
-      vi.advanceTimersByTime(3_000);
-    });
+    advance(3_000);
     rerender(<Flash message={saved} onClose={latest} />);
-    act(() => {
-      vi.advanceTimersByTime(2_000);
-    });
+    advance(2_000);
     expect(first).not.toHaveBeenCalled();
     expect(latest).toHaveBeenCalledOnce();
   });
@@ -131,18 +118,14 @@ describe("Flash", () => {
     const onClose = vi.fn();
     const { unmount } = render(<Flash message={saved} onClose={onClose} />);
     unmount();
-    act(() => {
-      vi.advanceTimersByTime(60_000);
-    });
+    advance(60_000);
     expect(onClose).not.toHaveBeenCalled();
   });
 
   it("keeps a flash with an action until it is taken or closed", () => {
     const onClose = vi.fn();
     render(<Flash message={deleted(vi.fn())} onClose={onClose} />);
-    act(() => {
-      vi.advanceTimersByTime(60_000);
-    });
+    advance(60_000);
     expect(onClose).not.toHaveBeenCalled();
   });
 

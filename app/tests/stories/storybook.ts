@@ -22,15 +22,33 @@ export const test = base.extend({
 interface Entry {
   id: string;
   type: string;
+  tags?: string[];
 }
+
+// Storybook's index, read once by each worker: one build serves every test.
+let index: Promise<Entry[]> | undefined;
+
+function entries(page: Page): Promise<Entry[]> {
+  index ??= page.request.get("/index.json").then(async (response) => {
+    const read = (await response.json()) as { entries: Record<string, Entry> };
+    return Object.values(read.entries).filter((entry) => entry.type === "story");
+  });
+  return index;
+}
+
+/** The stories that draw nothing on purpose, tagged "empty" in their file, as the empty flash. */
+export async function empties(page: Page): Promise<Set<string>> {
+  return new Set(
+    (await entries(page)).filter((entry) => entry.tags?.includes("empty") === true).map((entry) => entry.id),
+  );
+}
+
+/** Every control with a button's look: the button, and the link that wears it. */
+export const BUTTONS = "#storybook-root :is(button, a[data-emphasis])";
 
 /** Every story's id, or those that start with a prefix ("compositions-"). */
 export async function stories(page: Page, prefix = ""): Promise<string[]> {
-  const response = await page.request.get("/index.json");
-  const index = (await response.json()) as { entries: Record<string, Entry> };
-  const ids = Object.values(index.entries)
-    .filter((entry) => entry.type === "story")
-    .map((entry) => entry.id);
+  const ids = (await entries(page)).map((entry) => entry.id);
   expect(ids.length).toBeGreaterThan(10);
   const chosen = ids.filter((id) => id.startsWith(prefix));
   // A walk costs about a tenth of a second a story, and the stories grow with each slice: a test
@@ -40,9 +58,13 @@ export async function stories(page: Page, prefix = ""): Promise<string[]> {
 }
 
 export async function open(page: Page, id: string) {
+  const nothing = (await empties(page)).has(id);
   await page.goto(`/iframe.html?id=${id}&viewMode=story`);
-  // Attached, not visible: an empty story, as an empty flash, has nothing to see.
-  await page.locator("#storybook-root > *").first().waitFor({ state: "attached" });
+  // A story shows something, unless it draws nothing on purpose.
+  await page
+    .locator("#storybook-root > *")
+    .first()
+    .waitFor({ state: nothing ? "attached" : "visible" });
   await page.evaluate(() => document.fonts.ready);
 }
 
