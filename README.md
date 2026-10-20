@@ -9,18 +9,31 @@ the real app is being rebuilt from it, slice by slice.
 
 ## What is here
 
-| Folder | What it holds |
-|---|---|
-| `packages/core` | The rules, pure TypeScript shared by everything else (today: the IRC line parser) |
-| `gno/r/` | The realms, in gno: today `seal`; then the satellites' slot realm, the hubs and the profiles |
-| `gno/p/` | Gno packages shared by realms, once two realms need the same code |
-| `gno/tools/` | Go tools around the chain: reference clients, generators of test data, scripts for the chain (today `sealvec`, which writes the seal realm's test vectors) |
-| `scripts/` | The gate and the harness that keeps the code honest |
-| `docs/`, `adr/` | How it is designed, built and reviewed |
+The applications sit at the root; the libraries they import sit under `packages/`
+([docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), "Repository layout").
 
-Each other folder arrives with its slice: the web app `app/` (1b), the demo stack `deploy/`
-(1c), the `server/` (3), `packages/schemas` with the first boundary that needs one, and the
-admin console `admin/` (12).
+| Folder | Inside | What it holds |
+|---|---|---|
+| `app/` | | The web app: React Router, pre-rendered, installable as a PWA |
+| | `src/` | Its code: the document shell, one module per page (`routes/`), the service worker (`sw/`), and `ui/`, slice 1's two components, which leave in 2c for the design system's |
+| | `tests/` | Playwright: the pages' journeys (`e2e/`) and the design system's stories in a browser, with their approved pictures (`stories/`) |
+| | `public/` | The files served as they are: the manifest and the icons |
+| `packages/` | `core/` | The rules, pure TypeScript shared by everything else (today: the IRC line parser) |
+| | `ui/` | The design system: tokens, CSS layers, compositions, components and icons, and its Storybook |
+| `gno/` | `r/` | The realms, in gno: today `seal` |
+| | `tools/` | Go tools around the chain (today `sealvec`, which writes the seal realm's test vectors) |
+| `deploy/` | `web/` | The demo's image: the app built, then served by nginx |
+| | `guard/`, `tailscale/` | The demo's network: a guard that lets out only what it must, and Tailscale, which publishes the demo |
+| `scripts/` | | The gate (`check.sh`) and the harness that keeps the code honest: its checks, its probe, its mutation testers |
+| `.githooks/` | | The git hooks, installed from `main`, and `merge.sh`, the one way into `main` |
+| `.github/` | `workflows/` | The CI: the full gate on every push |
+| `.claude/` | `rules/`, `agents/`, `commands/` | Claude Code's rules per area, its review agents, and `/slice-plan` and `/pre-merge` |
+| `docs/` | `plans/`, `design/`, `review/`, `prototype/` | How it is built, looks and is reviewed: the slices' plans, the approved designs, the findings ledger, the approved prototype |
+| `adr/` | | The design: ADR-0001, and ADR-0002, the prototype's scope |
+
+Each other folder arrives with its slice: the `server/` (3), `packages/schemas` with the
+first boundary that needs one, `gno/p/` once two realms share code, and the admin console
+`admin/` (12).
 
 ## Install
 
