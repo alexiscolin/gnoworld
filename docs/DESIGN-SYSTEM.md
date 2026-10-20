@@ -222,7 +222,8 @@ until the dialog closes.
 Named behaviours:
 - **Arrival on a world:** the planet settles, the plate comes in, the figures count up. All of it
   takes 1.2 s at most.
-- **Lifetimes:** a flash and a scene bubble live 5 s.
+- **Lifetimes:** a flash and a scene bubble live 5 s, paused while hovered or focused; a flash that
+  carries an action stays until it is taken or closed (WCAG 2.2.1).
 - **Landing at once:** a click or `Esc` during a flight lands immediately (ADR-0001 §7).
 
 Under `prefers-reduced-motion: reduce`:
