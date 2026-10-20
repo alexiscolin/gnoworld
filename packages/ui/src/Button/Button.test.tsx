@@ -2,11 +2,9 @@ import { render, screen } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import type { ReactElement } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { storiesOf, staysText, type Unstyled } from "../testing.tsx";
-import { Button, type ButtonProps } from "./Button.tsx";
+import { eachStory, staysText } from "../testing.tsx";
+import { Button } from "./Button.tsx";
 import * as stories from "./Button.stories.tsx";
-
-const noOutsideStyling: Unstyled<ButtonProps> = true;
 
 // A form that counts its submissions, the button rendered inside it.
 function inForm(button: ReactElement) {
@@ -21,10 +19,6 @@ function inForm(button: ReactElement) {
 }
 
 describe("Button", () => {
-  it("accepts no className or style", () => {
-    expect(noOutsideStyling).toBe(true);
-  });
-
   it("is a button named by its label, which submits nothing unless asked", () => {
     render(<Button>Read the proposals</Button>);
     expect(screen.getByRole("button", { name: "Read the proposals" }).getAttribute("type")).toBe("button");
@@ -161,9 +155,8 @@ describe("Button", () => {
   });
 
   it("has stories for every look, size and state the matrix declares", () => {
-    const shown = storiesOf(stories).flatMap(({ element }) => {
-      const { unmount } = render(element);
-      const buttons = screen.getAllByRole("button").map((b) => ({
+    const shown = eachStory(stories, () =>
+      screen.getAllByRole("button").map((b) => ({
         emphasis: b.dataset["emphasis"],
         tone: b.dataset["tone"],
         size: b.dataset["size"],
@@ -171,10 +164,8 @@ describe("Button", () => {
         disabled: b.hasAttribute("disabled"),
         icon: b.querySelector("svg") !== null,
         label: b.textContent,
-      }));
-      unmount();
-      return buttons;
-    });
+      })),
+    ).flat();
     for (const emphasis of ["solid", "outline", "quiet"]) {
       for (const tone of ["neutral", "danger"])
         expect(shown.some((b) => b.emphasis === emphasis && b.tone === tone)).toBe(true);

@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { storiesOf } from "../testing.tsx";
+import { eachStory } from "../testing.tsx";
 import { tokens } from "../tokens.ts";
 import * as stories from "./TokensPage.stories.tsx";
 import { TokensPage } from "./TokensPage.tsx";
@@ -56,10 +56,8 @@ describe("TokensPage", () => {
   });
 
   it("renders its story", () => {
-    for (const { element } of storiesOf(stories)) {
-      const { unmount } = render(element);
-      expect(screen.getByRole("region", { name: "Primitives" })).toBeTruthy();
-      unmount();
-    }
+    const found = eachStory(stories, () => screen.queryByRole("region", { name: "Primitives" }));
+    expect(found.length).toBeGreaterThan(0);
+    for (const region of found) expect(region).not.toBeNull();
   });
 });

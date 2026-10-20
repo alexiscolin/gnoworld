@@ -32,6 +32,16 @@ export function storiesOf(module: Record<string, unknown>): { name: string; elem
     });
 }
 
+/** Each story of a file drawn alone, read, then taken off the page: one read per story. */
+export function eachStory<T>(module: Record<string, unknown>, read: (container: HTMLElement) => T): T[] {
+  return storiesOf(module).map(({ element }) => {
+    const { container, unmount } = render(element);
+    const found = read(container);
+    unmount();
+    return found;
+  });
+}
+
 const ABUSE = ['<img src="x" onerror="alert(1)">', "nym-".padEnd(10_000, "a")];
 
 /** Text that looks like markup, or runs to 10,000 characters, reaches the page as text. */

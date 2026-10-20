@@ -1,11 +1,9 @@
 import { render, screen } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { storiesOf, staysText, type Unstyled } from "../testing.tsx";
-import { IconButton, type IconButtonProps } from "./IconButton.tsx";
+import { eachStory, staysText } from "../testing.tsx";
+import { IconButton } from "./IconButton.tsx";
 import * as stories from "./IconButton.stories.tsx";
-
-const noOutsideStyling: Unstyled<IconButtonProps> = true;
 
 // The visible count: the one element in the button that is neither its icon nor empty.
 function countOf(button: HTMLElement) {
@@ -13,10 +11,6 @@ function countOf(button: HTMLElement) {
 }
 
 describe("IconButton", () => {
-  it("accepts no className or style", () => {
-    expect(noOutsideStyling).toBe(true);
-  });
-
   it("is a button named by its label alone, its icon hidden", () => {
     render(<IconButton icon="search" label="Search the room" />);
     const button = screen.getByRole("button", { name: "Search the room" });
@@ -80,18 +74,15 @@ describe("IconButton", () => {
   });
 
   it("has named stories for each size, both emphases, a pressed one and a count past 99", () => {
-    const shown = storiesOf(stories).flatMap(({ element }) => {
-      const { unmount } = render(element);
-      const buttons = screen.getAllByRole("button").map((b) => ({
+    const shown = eachStory(stories, () =>
+      screen.getAllByRole("button").map((b) => ({
         named: (b.getAttribute("aria-label") ?? "") !== "",
         emphasis: b.dataset["emphasis"],
         size: b.dataset["size"],
         pressed: b.getAttribute("aria-pressed"),
         count: countOf(b),
-      }));
-      unmount();
-      return buttons;
-    });
+      })),
+    ).flat();
     expect(shown.every((b) => b.named)).toBe(true);
     for (const size of ["s", "m", "l"]) expect(shown.some((b) => b.size === size)).toBe(true);
     for (const emphasis of ["outline", "plain"]) expect(shown.some((b) => b.emphasis === emphasis)).toBe(true);

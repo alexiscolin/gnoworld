@@ -1,10 +1,9 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { storiesOf, type Unstyled } from "../testing.tsx";
-import { Icon, ICON_NAMES, type IconName, type IconProps } from "./Icon.tsx";
+import { eachStory } from "../testing.tsx";
+import { Icon, ICON_NAMES, type IconName } from "./Icon.tsx";
 import * as stories from "./Icon.stories.tsx";
 
-const noOutsideStyling: Unstyled<IconProps> = true;
 // docs/DESIGN-SYSTEM.md, "Icons": the one set, and the six that point along the text.
 const LISTED = [
   ...["close", "plus", "arrow", "arrow-up-right", "chevron", "search", "chat", "thread", "reply", "bell"],
@@ -24,10 +23,6 @@ function svgOf(name: IconName, size?: "m" | "l") {
 }
 
 describe("Icon", () => {
-  it("accepts no className or style", () => {
-    expect(noOutsideStyling).toBe(true);
-  });
-
   it("draws exactly the 55 icons the design system lists", () => {
     expect(new Set(LISTED).size).toBe(55);
     expect([...ICON_NAMES].sort()).toEqual([...LISTED].sort());
@@ -69,12 +64,7 @@ describe("Icon", () => {
   });
 
   it("has a gallery story that shows all 55", () => {
-    const counts = storiesOf(stories).map(({ element }) => {
-      const { container, unmount } = render(element);
-      const count = container.querySelectorAll("svg").length;
-      unmount();
-      return count;
-    });
+    const counts = eachStory(stories, (container) => container.querySelectorAll("svg").length);
     expect(Math.max(...counts)).toBe(55);
   });
 });

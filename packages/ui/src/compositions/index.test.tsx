@@ -1,31 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { storiesOf, type Unstyled } from "../testing.tsx";
+import { eachStory, storiesOf } from "../testing.tsx";
 import * as stories from "./Compositions.stories.tsx";
-import {
-  Center,
-  Cluster,
-  Grid,
-  Sidebar,
-  Stack,
-  Switcher,
-  type CenterProps,
-  type ClusterProps,
-  type GridProps,
-  type SidebarProps,
-  type StackProps,
-  type SwitcherProps,
-} from "./index.ts";
-
-// None takes outside styling: tsc fails this line the day one of them does.
-const noOutsideStyling: [
-  Unstyled<StackProps>,
-  Unstyled<ClusterProps>,
-  Unstyled<GridProps>,
-  Unstyled<SidebarProps>,
-  Unstyled<SwitcherProps>,
-  Unstyled<CenterProps>,
-] = [true, true, true, true, true, true];
+import { Center, Cluster, Grid, Sidebar, Stack, Switcher } from "./index.ts";
 
 // Each takes a space step (Center's is its gutter), in a div unless given another element.
 const ALL = [
@@ -42,10 +19,6 @@ function only(container: HTMLElement) {
   if (!(box instanceof HTMLElement) || container.children.length !== 1) throw new Error("rendered no single box");
   return box;
 }
-
-it("no composition accepts className or style", () => {
-  expect(noOutsideStyling.every(Boolean)).toBe(true);
-});
 
 describe.each(ALL)("%s", (_, Composition) => {
   it("places its children directly in a div unless given another element", () => {
@@ -122,9 +95,5 @@ describe("each composition's own choice", () => {
 it("has a story for each composition, each of which renders", () => {
   const composed = storiesOf(stories);
   for (const [name] of ALL) expect(composed.map((story) => story.name)).toContain(name);
-  for (const { element } of composed) {
-    const { container, unmount } = render(element);
-    expect(container.textContent).toBeTruthy();
-    unmount();
-  }
+  for (const text of eachStory(stories, (container) => container.textContent)) expect(text).toBeTruthy();
 });

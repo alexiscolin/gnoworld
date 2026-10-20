@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { storiesOf } from "../testing.tsx";
+import { eachStory } from "../testing.tsx";
 import { ICON_NAMES } from "../icons/Icon.tsx";
 import { Overview } from "./Overview.tsx";
 import * as stories from "./Overview.stories.tsx";
@@ -31,10 +31,8 @@ describe("Overview", () => {
   });
 
   it("renders its story", () => {
-    for (const { element } of storiesOf(stories)) {
-      const { unmount } = render(element);
-      expect(screen.getByRole("region", { name: "Buttons" })).toBeTruthy();
-      unmount();
-    }
+    const found = eachStory(stories, () => screen.queryByRole("region", { name: "Buttons" }));
+    expect(found.length).toBeGreaterThan(0);
+    for (const region of found) expect(region).not.toBeNull();
   });
 });
