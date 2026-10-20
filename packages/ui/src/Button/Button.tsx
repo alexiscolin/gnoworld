@@ -3,17 +3,32 @@ import { Icon, type IconName } from "../icons/Icon.tsx";
 import { iconSize, type ControlSize } from "./control.ts";
 import styles from "./Button.module.css";
 
-export interface ButtonProps {
+interface Look {
   children: ReactNode;
   emphasis?: "solid" | "outline" | "quiet";
   tone?: "neutral" | "danger";
   size?: ControlSize;
   icon?: IconName;
+}
+
+interface Pressed extends Look {
+  href?: undefined;
   type?: "button" | "submit";
   disabled?: boolean;
   busy?: boolean;
   onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
 }
+
+// A link with the button's look goes where its href says: it is never disabled, busy or a handler.
+interface Linked extends Look {
+  href: string;
+  type?: never;
+  disabled?: never;
+  busy?: never;
+  onClick?: never;
+}
+
+export type ButtonProps = Pressed | Linked;
 
 // A busy button keeps the focus, so it is not disabled: it refuses the click, and with it the form's
 // submission, which Enter would otherwise send again.
@@ -22,31 +37,33 @@ function refuse(event: MouseEvent<HTMLButtonElement>) {
 }
 
 /** The one button (docs/DESIGN-SYSTEM.md): solid and neutral is the primary, one per region. */
-export function Button({
-  children,
-  emphasis = "outline",
-  tone = "neutral",
-  size = "m",
-  icon,
-  type = "button",
-  disabled,
-  busy,
-  onClick,
-}: ButtonProps) {
+export function Button(props: ButtonProps) {
+  const { children, emphasis = "outline", tone = "neutral", size = "m", icon } = props;
+  const look = { className: styles["button"], "data-emphasis": emphasis, "data-tone": tone, "data-size": size };
+  const face = (
+    <>
+      {icon === undefined ? null : <Icon name={icon} size={iconSize(size)} />}
+      {children}
+    </>
+  );
+  if (props.href !== undefined) {
+    return (
+      <a href={props.href} {...look}>
+        {face}
+      </a>
+    );
+  }
+  const { type = "button", disabled, busy, onClick } = props;
   return (
     <button
       type={type}
-      className={styles["button"]}
-      data-emphasis={emphasis}
-      data-tone={tone}
-      data-size={size}
+      {...look}
       disabled={disabled}
       aria-busy={busy}
       aria-disabled={busy}
       onClick={busy === true ? refuse : onClick}
     >
-      {icon === undefined ? null : <Icon name={icon} size={iconSize(size)} />}
-      {children}
+      {face}
       {busy === true ? <span className={styles["spinner"]} aria-hidden="true" /> : null}
     </button>
   );

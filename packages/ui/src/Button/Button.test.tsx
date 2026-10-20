@@ -3,7 +3,7 @@ import { userEvent } from "@testing-library/user-event";
 import type { ReactElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { eachStory, staysText } from "../testing.tsx";
-import { Button } from "./Button.tsx";
+import { Button, type ButtonProps } from "./Button.tsx";
 import * as stories from "./Button.stories.tsx";
 
 // A form that counts its submissions, the button rendered inside it.
@@ -17,6 +17,16 @@ function inForm(button: ReactElement) {
   render(button, { container: form });
   return submitted;
 }
+
+// tsc fails this line the day a link-button takes disabled, busy or a click handler.
+type Linked = Extract<ButtonProps, { href: string }>;
+const linkTakesNoPress: [Linked["disabled"], Linked["busy"], Linked["onClick"]] extends [
+  undefined,
+  undefined,
+  undefined,
+]
+  ? true
+  : false = true;
 
 describe("Button", () => {
   it("is a button named by its label, which submits nothing unless asked", () => {
@@ -150,13 +160,42 @@ describe("Button", () => {
     expect(svg?.dataset["size"]).toBe(iconSize);
   });
 
+  it("with an href, is a link that wears the button's look, and no button", () => {
+    render(
+      <Button href="/w/bubble" emphasis="solid" icon="planet">
+        Fly to Bubble
+      </Button>,
+    );
+    const link = screen.getByRole("link", { name: "Fly to Bubble" });
+    expect(link.getAttribute("href")).toBe("/w/bubble");
+    expect([link.dataset["emphasis"], link.dataset["tone"], link.dataset["size"]]).toEqual(["solid", "neutral", "m"]);
+    expect(link.hasAttribute("type")).toBe(false);
+    expect(link.querySelector("svg")?.dataset["icon"]).toBe("planet");
+    expect(screen.queryByRole("button")).toBeNull();
+  });
+
+  it("as a link, wears its tone and size too", () => {
+    render(
+      <Button href="/rooms/leave" tone="danger" size="l">
+        Leave the room
+      </Button>,
+    );
+    const link = screen.getByRole("link", { name: "Leave the room" });
+    expect([link.dataset["tone"], link.dataset["size"]]).toEqual(["danger", "l"]);
+  });
+
+  it("as a link, takes no disabled, busy or handler: it goes where its href says", () => {
+    expect(linkTakesNoPress).toBe(true);
+  });
+
   it("shows a label made of markup, or very long, as text", () => {
     staysText((text) => <Button>{text}</Button>);
   });
 
-  it("has stories for every look, size and state the matrix declares", () => {
-    const shown = eachStory(stories, () =>
-      screen.getAllByRole("button").map((b) => ({
+  it("has stories for every look, size and state the matrix declares, and one as a link", () => {
+    const shown = eachStory(stories, (container) =>
+      [...container.querySelectorAll<HTMLElement>("button, a[data-emphasis]")].map((b) => ({
+        link: b.tagName === "A",
         emphasis: b.dataset["emphasis"],
         tone: b.dataset["tone"],
         size: b.dataset["size"],
@@ -175,5 +214,6 @@ describe("Button", () => {
       true,
     );
     expect(Math.max(...shown.map((b) => b.label.length))).toBeGreaterThanOrEqual(40);
+    expect(shown.some((b) => b.link)).toBe(true);
   });
 });

@@ -13,6 +13,7 @@ export const Danger: Story = { args: { emphasis: "solid", tone: "danger", childr
 export const WithIcon: Story = { args: { icon: "planet", children: "Fly to Earth" } };
 export const Disabled: Story = { args: { disabled: true, children: "Register" } };
 export const Busy: Story = { args: { busy: true, children: "Waiting for Adena" } };
+export const AsLink: Story = { args: { href: "#rooms", emphasis: "solid", children: "Open the rooms" } };
 export const LongLabel: Story = { args: { children: "Vote yes on proposal 15 · signs in Adena, the fee is yours" } };
 
 export const Sizes: Story = {
