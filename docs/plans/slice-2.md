@@ -64,7 +64,8 @@ tokens, base, compositions, Storybook, the new test levels, `Button`, `IconButto
 icons, the token page and the page of every component; 2c-1 `Flash` and `EmptyState`, and
 `app/src/ui/` emptied, so `packages/ui` is the one source of components: `UpdatePrompt` a feature
 that shows a `Flash` (F212), the error and not-found pages an `EmptyState` with a link home, the
-flash fixed under the header until `Dialog` brings the top layer; 2c-2 `Chip`, `Tabs`, `Popover`,
+flash in the page's flow, where its slot puts it (the shell's top-centre slot comes with the header,
+the top layer with `Dialog`); 2c-2 `Chip`, `Tabs`, `Popover`,
 `Dialog`, `Skeleton`, and `Tooltip`, which `IconButton` then wears, with StrykerJS
 mutating `.tsx` (F225), and the fonts: the
 worker precaches the woff2 files too (ADR-0001 §12 names scripts and styles only), so offline the
