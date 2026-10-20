@@ -1,0 +1,141 @@
+/* The layout primitives: intrinsic layouts that place their children without styling them. */
+@layer compositions {
+  /* Every composition takes a step: a gap between its children, or Center's gutter. */
+  .space {
+    gap: var(--_space);
+  }
+
+  .center {
+    padding-inline: var(--_space);
+  }
+
+  .space[data-space="3xs"] {
+    --_space: var(--space-3xs);
+  }
+
+  .space[data-space="2xs"] {
+    --_space: var(--space-2xs);
+  }
+
+  .space[data-space="xs"] {
+    --_space: var(--space-xs);
+  }
+
+  .space[data-space="s"] {
+    --_space: var(--space-s);
+  }
+
+  .space[data-space="m"] {
+    --_space: var(--space-m);
+  }
+
+  .space[data-space="l"] {
+    --_space: var(--space-l);
+  }
+
+  .space[data-space="xl"] {
+    --_space: var(--space-xl);
+  }
+
+  .space[data-space="2xl"] {
+    --_space: var(--space-2xl);
+  }
+
+  /* A list that a composition places keeps none of its own marks, margins or indent; Center's
+     inline padding is its gutter. */
+  :is(ul, ol).space {
+    margin-block: 0;
+    list-style: none;
+  }
+
+  :is(ul, ol).space:not(.center) {
+    padding-inline-start: 0;
+  }
+
+  .stack {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .cluster {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: var(--_justify);
+  }
+
+  .cluster[data-justify="start"] {
+    --_justify: flex-start;
+  }
+
+  .cluster[data-justify="center"] {
+    --_justify: center;
+  }
+
+  .cluster[data-justify="between"] {
+    --_justify: space-between;
+  }
+
+  .cluster[data-justify="end"] {
+    --_justify: flex-end;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(var(--_min), 100%), 1fr));
+  }
+
+  .grid[data-min="s"] {
+    --_min: var(--column-s);
+  }
+
+  .grid[data-min="m"] {
+    --_min: var(--column-m);
+  }
+
+  .grid[data-min="l"] {
+    --_min: var(--column-l);
+  }
+
+  .sidebar {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .sidebar[data-side="start"] > :first-child,
+  .sidebar[data-side="end"] > :last-child {
+    flex-grow: 1;
+  }
+
+  .sidebar[data-side="start"] > :last-child,
+  .sidebar[data-side="end"] > :first-child {
+    flex-basis: 0;
+    flex-grow: 999;
+    min-inline-size: 50%;
+  }
+
+  .switcher {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  /* One width for every child, in rem: 65ch would be measured in each child's own font. */
+  .switcher > * {
+    flex-grow: 1;
+    flex-basis: calc((var(--switch-at) - 100%) * 999);
+  }
+
+  .center {
+    box-sizing: content-box;
+    max-inline-size: var(--_max);
+    margin-inline: auto;
+  }
+
+  .center[data-max="measure"] {
+    --_max: var(--measure);
+  }
+
+  .center[data-max="dialog"] {
+    --_max: var(--dialog-w);
+  }
+}

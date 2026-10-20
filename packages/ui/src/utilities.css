@@ -1,0 +1,27 @@
+/* Single-purpose classes, driven by tokens, that components add by name. */
+@layer utilities {
+  /* The one label style: caps and tracking live here, and scripts that caps break keep their case. */
+  .label {
+    color: var(--color-text-muted);
+    font: var(--font-label);
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+  }
+
+  /* Arabic's script and Hebrew's, by the languages written in them. */
+  .label:is(
+    :lang(ar),
+    :lang(fa),
+    :lang(ur),
+    :lang(ps),
+    :lang(ckb),
+    :lang(sd),
+    :lang(ug),
+    :lang(ks),
+    :lang(he),
+    :lang(yi)
+  ) {
+    letter-spacing: normal;
+    text-transform: none;
+  }
+}

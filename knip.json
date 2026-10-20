@@ -4,6 +4,10 @@
   "treatConfigHintsAsErrors": true,
   "workspaces": {
     ".": {},
-    "app": { "react-router": { "config": ["react-router.config.ts"] } }
+    "app": {
+      "react-router": { "config": ["react-router.config.ts"] },
+      "playwright": { "config": ["playwright.config.ts", "playwright.stories.config.ts"] }
+    },
+    "packages/ui": { "ignoreDependencies": ["@fontsource-variable/geist", "@fontsource-variable/geist-mono"] }
   }
 }

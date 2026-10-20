@@ -1,4 +1,5 @@
 // The document shell every page shares, and the boundary for an error no route caught.
+import "@gnoworld/ui/styles.css";
 import type { ReactNode } from "react";
 import { Link, Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
 import { ErrorNotice } from "./ui/ErrorNotice.tsx";

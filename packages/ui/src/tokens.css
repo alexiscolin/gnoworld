@@ -1,0 +1,91 @@
+/* The design system's one list of values (docs/DESIGN-SYSTEM.md, "Tokens"). Primitives, named
+   --p-*, are its base colours: only this file reads them. A token joins with its first reader. */
+@layer tokens {
+  :root {
+    color-scheme: dark;
+
+    --p-space: #05070d;
+    --p-text: #f4f6fa;
+    --p-muted: #9da8bc;
+    --p-cream: #f2efea;
+    --p-mint: #5cf2c8;
+    --p-amber: #ffc46b;
+    --p-violet: #b79cff;
+    --p-coral: #ff8a7a;
+
+    --color-space: var(--p-space);
+    --color-text: var(--p-text);
+    --color-text-muted: var(--p-muted);
+    --color-primary: var(--p-cream);
+    --color-ink: var(--p-space);
+    --color-mine: var(--p-mint);
+    --color-warm: var(--p-amber);
+    --color-signal: var(--p-violet);
+    --color-danger: var(--p-coral);
+    --color-danger-line: color-mix(in oklab, var(--p-coral) 50%, transparent);
+    --color-fill: color-mix(in oklab, var(--p-text) 5%, transparent);
+    --color-fill-hover: color-mix(in oklab, var(--p-text) 10%, transparent);
+    --color-line: color-mix(in oklab, var(--p-text) 10%, transparent);
+    --color-line-strong: color-mix(in oklab, var(--p-text) 20%, transparent);
+
+    --family-sans: "Geist Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --family-mono: "Geist Mono Variable", ui-monospace, Menlo, Consolas, monospace;
+    --font-label: 500 0.6875rem/1 var(--family-mono);
+    --font-meta: 400 0.75rem/1.4 var(--family-sans);
+    --font-data: 400 0.75rem/1.4 var(--family-mono);
+    --font-ui: 500 0.8125rem/1 var(--family-sans);
+    --font-body: 400 0.875rem/1.5 var(--family-sans);
+    --font-action: 500 1rem/1 var(--family-sans);
+    --font-title-s: 400 1.25rem/1.4 var(--family-sans);
+    --font-title-m: 300 1.75rem/1 var(--family-sans);
+    --font-title-l: 300 2.25rem/1 var(--family-sans);
+    --tracking-caps: 0.14em;
+    --tracking-tight: -0.03em;
+
+    --space-3xs: 4px;
+    --space-2xs: 8px;
+    --space-xs: 12px;
+    --space-s: 16px;
+    --space-m: 24px;
+    --space-l: 32px;
+    --space-xl: 48px;
+    --space-2xl: 64px;
+
+    --control-s: 32px;
+    --control-m: 40px;
+    --control-l: 56px;
+    --icon-m: 16px;
+    --icon-l: 20px;
+    --size-counter: 18px;
+    --size-dot: 6px;
+    --column-s: 192px;
+    --column-m: 288px;
+    --column-l: 384px;
+    --measure: 65ch;
+    --switch-at: 38rem;
+    --dialog-w: 460px;
+
+    --radius-s: 8px;
+    --radius-pill: 999px;
+    --line-width: 1px;
+    --focus-width: 2px;
+    --focus-offset: 2px;
+
+    --motion-fast: 120ms;
+    --motion-spin: 0.8s;
+    --ease-standard: cubic-bezier(0.2, 0.7, 0.1, 1);
+    --opacity-disabled: 0.4;
+  }
+
+  @media (pointer: coarse) {
+    :root {
+      --control-m: 44px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --motion-fast: 0s;
+    }
+  }
+}

@@ -15,6 +15,8 @@ Check, in a change and in a review:
 - a new dependency (ask first);
 - a helper that already exists: search the repo for its name and its shape before writing
   one; a second way to do the same thing is a finding;
+- a loop's cost in big O: a lookup inside a loop goes through a Map or Set when its input
+  can grow; a heavier cost kept on purpose says its ceiling in a `ponytail:` comment;
 - a `catch` that cannot act (retry, fall back, show the error) has no reason to exist: let
   the error rise, rethrow with `{ cause }`, never log and carry on; boundaries return a
   result;

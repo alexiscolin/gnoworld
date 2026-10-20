@@ -17,6 +17,8 @@ const TYPES = {
   ".data": "text/x-script",
   ".webmanifest": "application/manifest+json",
   ".png": "image/png",
+  ".css": "text/css; charset=utf-8",
+  ".woff2": "font/woff2",
 };
 
 // A file as the path spells it: macOS finds one in another case, where a Linux host would not.

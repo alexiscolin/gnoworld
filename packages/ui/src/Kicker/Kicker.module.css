@@ -1,0 +1,29 @@
+@layer components {
+  .kicker[data-orientation="vertical"] {
+    rotate: 180deg;
+    writing-mode: vertical-rl;
+  }
+
+  .dot {
+    display: inline-block;
+    inline-size: var(--size-dot);
+    block-size: var(--size-dot);
+    /* layout: the dot sits before the words */
+    margin-inline-end: var(--space-2xs);
+    border-radius: var(--radius-pill);
+    background: var(--_dot);
+    vertical-align: middle;
+  }
+
+  .dot[data-tone="warm"] {
+    --_dot: var(--color-warm);
+  }
+
+  .dot[data-tone="mine"] {
+    --_dot: var(--color-mine);
+  }
+
+  .dot[data-tone="signal"] {
+    --_dot: var(--color-signal);
+  }
+}

@@ -1,0 +1,5355 @@
+[
+ {
+  "line": 308,
+  "selector": "#rentBox h2",
+  "target": "component:Dialog/standard/title",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "26px",
+    "snap": "--text-title-s (20px) (DS: panel and dialog titles)"
+   },
+   {
+    "prop": "margin",
+    "value": "6px",
+    "snap": "--space (8px)"
+   },
+   {
+    "prop": "margin",
+    "value": "8px",
+    "snap": "--space (8px)"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "-0.02em",
+    "snap": "none (title-s has no tracking)"
+   },
+   {
+    "prop": "font-weight",
+    "value": "300",
+    "snap": "--text-title-s weight 400"
+   }
+  ],
+  "dup_of": [
+   275,
+   292,
+   1163
+  ],
+  "note": "Rent dialog title (slice 11). Same h2 in 4 dialogs at 26/24/26/26 px (36px in .dlgHead h2, 1045). DS: panel and dialog titles are --text-title-s. Outer margin: Stack space."
+ },
+ {
+  "line": 309,
+  "selector": "#rentBox p",
+  "target": "component:Dialog/standard/body",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "13px",
+    "snap": "--text-body (14px, line-height 1.5)"
+   },
+   {
+    "prop": "margin",
+    "value": "16px",
+    "snap": "--space (16px)"
+   }
+  ],
+  "dup_of": [
+   276,
+   293,
+   1164
+  ],
+  "note": "Dialog paragraph, copied in 4 dialogs (13px/1.5 muted). A paragraph is --text-body, not the 13px control size. Outer margin: Stack space."
+ },
+ {
+  "line": 310,
+  "selector": "#rentBox label",
+  "target": "component:Field/text/label",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "10.5px",
+    "snap": "--text-label (11px)"
+   },
+   {
+    "prop": "margin",
+    "value": "12px",
+    "snap": "--space (12px)"
+   },
+   {
+    "prop": "margin",
+    "value": "6px",
+    "snap": "--space (8px)"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "0.14em",
+    "snap": "--text-label tracking (0.14em)"
+   }
+  ],
+  "dup_of": [
+   282,
+   1047,
+   232,
+   244,
+   1044,
+   77
+  ],
+  "note": "A form label drawn as a Kicker (caps mono 10.5px, 0.14em). Reuse --text-label; one label look for Field. Outer margin: Stack space."
+ },
+ {
+  "line": 311,
+  "selector": "#rentText",
+  "target": "component:Field/text",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "15px",
+    "snap": "--text-lead (16px)"
+   },
+   {
+    "prop": "height",
+    "value": "44px",
+    "snap": "--control-l (44px) (control)"
+   },
+   {
+    "prop": "padding",
+    "value": "14px",
+    "snap": "--space (16px)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "12px",
+    "snap": "--radius-l (16px) (DS: inputs and the composer)"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.04)",
+    "snap": "NEW TOKEN --color-fill = rgba(255,255,255,0.05): the field/chip/card ground"
+   }
+  ],
+  "dup_of": [
+   83,
+   131,
+   264,
+   283,
+   894,
+   1073,
+   1074
+  ],
+  "note": "Text input (slice 11). 8 inputs re-declare height 40/42/44/38, radius 10/12/999 and font 13-15px; one Field. DS: inputs use --radius-l."
+ },
+ {
+  "line": 312,
+  "selector": "#rentLeft",
+  "target": "component:Field/text/hint",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "11px",
+    "snap": "--text-meta (12px)"
+   },
+   {
+    "prop": "margin-top",
+    "value": "6px",
+    "snap": "--space (8px)"
+   }
+  ],
+  "dup_of": [
+   285,
+   317,
+   318,
+   1174,
+   209
+  ],
+  "note": "Character counter under the input. Re-declares font, letter-spacing 0 and text-transform none only to undo the global `small` caps style (35): `small` should be --text-meta and Kicker a component."
+ },
+ {
+  "line": 313,
+  "selector": "#rentDays",
+  "target": "composition:Cluster",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "8px",
+    "snap": "--space (8px)"
+   }
+  ],
+  "dup_of": [
+   130,
+   287,
+   316,
+   1173,
+   843
+  ],
+  "note": "Three equal day buttons in a row (flex:1 on the children). Cluster with equal-width children; the buttons are exclusive toggles (radiogroup)."
+ },
+ {
+  "line": 314,
+  "selector": "#rentDays button",
+  "target": "component:Chip/default",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "13px",
+    "snap": "--text-ui (13px)"
+   },
+   {
+    "prop": "height",
+    "value": "38px",
+    "snap": "--control-m (40px) (control)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "999px",
+    "snap": "--radius-pill (999px)"
+   }
+  ],
+  "dup_of": [
+   177,
+   324,
+   603,
+   1102,
+   158,
+   918,
+   1030
+  ],
+  "note": "Day choice chip, 38px high. Chip-like pills in the file are 24, 26, 28, 30, 32, 38px high with edge, edge-strong or no border: one Chip. flex:1 is layout, it belongs to the composition."
+ },
+ {
+  "line": 315,
+  "selector": "#rentDays button[aria-pressed=\"true\"]",
+  "target": "component:Chip/selected",
+  "offtoken": [],
+  "dup_of": [
+   251,
+   343,
+   348,
+   400,
+   440,
+   503,
+   509,
+   558,
+   571,
+   604,
+   811,
+   919
+  ],
+  "note": "Pressed chip = primary fill. The same fill (background primary, color primary-ink, often border-color) is repeated in 12 more rules, driven by aria-pressed, aria-selected, aria-current or aria-expanded: one selected state on Chip and Tabs."
+ },
+ {
+  "line": 316,
+  "selector": "#rentBox .row",
+  "target": "composition:Cluster",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "8px",
+    "snap": "--space (8px)"
+   },
+   {
+    "prop": "margin-top",
+    "value": "20px",
+    "snap": "--space (24px)"
+   }
+  ],
+  "dup_of": [
+   287,
+   303,
+   1173,
+   1118
+  ],
+  "note": "Dialog button row, repeated per dialog (rent 316, seal 303, profile 287, sign 1173). One Cluster in Dialog's footer. Outer margin-top: Stack space."
+ },
+ {
+  "line": 316,
+  "selector": "#rentBox .row .primary",
+  "target": "component:Button/primary/l",
+  "offtoken": [
+   {
+    "prop": "height",
+    "value": "44px",
+    "snap": "--control-l (44px) (control)"
+   },
+   {
+    "prop": "padding",
+    "value": "22px",
+    "snap": "--space (24px)"
+   }
+  ],
+  "dup_of": [
+   303,
+   287,
+   1173,
+   1118
+  ],
+  "note": "Dialog primary button: 44 px high, padding 0 22/20/22/22 in four dialogs. Button/primary/l = --control-l; 1118 already sets height 44 for every `dialog .row > button`, so the height here is redundant."
+ },
+ {
+  "line": 316,
+  "selector": "#rentBox .row .primary:disabled",
+  "target": "component:Button/primary/disabled",
+  "offtoken": [
+   {
+    "prop": "opacity",
+    "value": "0.4",
+    "snap": "NEW TOKEN --opacity-disabled = 0.4 (the file uses 0.4, 0.5, 0.6 for the same state)"
+   }
+  ],
+  "dup_of": [
+   287,
+   303,
+   1173
+  ],
+  "note": "Disabled primary: opacity 0.4 here and in 287, 0.5 in 303, 0.6 in 1173. One [disabled] rule."
+ },
+ {
+  "line": 317,
+  "selector": "#rentBox .fine",
+  "target": "component:Dialog/standard/note",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "11.5px",
+    "snap": "--text-meta (12px)"
+   },
+   {
+    "prop": "margin-top",
+    "value": "12px",
+    "snap": "--space (12px)"
+   }
+  ],
+  "dup_of": [
+   318,
+   1065,
+   1174
+  ],
+  "note": "Dialog footnote (slice 11). Identical to 318 except color; the `small` base caps style is undone by hand again (letter-spacing 0, text-transform none, font-family)."
+ },
+ {
+  "line": 318,
+  "selector": "#profile .fine",
+  "target": "component:Dialog/standard/note",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "11.5px",
+    "snap": "--text-meta (12px)"
+   },
+   {
+    "prop": "margin-top",
+    "value": "12px",
+    "snap": "--space (12px)"
+   }
+  ],
+  "dup_of": [
+   317,
+   1065,
+   1174
+  ],
+  "note": "Profile dialog footnote (slice 9, name registration). Same declarations as 317 minus color (inherits muted from `small`)."
+ },
+ {
+  "line": 319,
+  "selector": "#chatList li b",
+  "target": "component:Message/default/author",
+  "offtoken": [],
+  "dup_of": [
+   173,
+   891,
+   148
+  ],
+  "note": "Author name in a chat message (slice 4). Also matches every <b> inside the li (quote, translation). Same rule for thread (173) and focus talk (891): one Message."
+ },
+ {
+  "line": 320,
+  "selector": "#chatList li em",
+  "target": "component:Message/default/time",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "10px",
+    "snap": "--text-meta (12px) (DS: timestamps)"
+   },
+   {
+    "prop": "font-family",
+    "value": "var(--mono)",
+    "snap": "--text-meta family: Geist 400 (timestamps are not Mono)"
+   }
+  ],
+  "dup_of": [
+   172,
+   892
+  ],
+  "note": "Time of a message, an <em> turned into mono 10px; identical to 172 (thread) and near 892. DS: timestamps are --text-meta (Geist). Use <time>, then `.body em` (359) needs no reset."
+ },
+ {
+  "line": 321,
+  "selector": "#chatList li.mine b",
+  "target": "component:Message/mine/author",
+  "offtoken": [],
+  "dup_of": [
+   173
+  ],
+  "note": "Your own author name in the action colour (173 does the same for threads). Class `mine` should be a data/aria state on Message."
+ },
+ {
+  "line": 322,
+  "selector": "#chatList li.sys",
+  "target": "component:Message/system",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "11.5px",
+    "snap": "--text-meta (12px)"
+   },
+   {
+    "prop": "font-family",
+    "value": "var(--mono)",
+    "snap": "--text-meta family: Geist 400"
+   }
+  ],
+  "dup_of": [
+   1135
+  ],
+  "note": "System line (Type / for commands, reports, seals). A sentence set in mono 11.5px; DS: a sentence is --text-meta Geist, mono is for labels and counts."
+ },
+ {
+  "line": 323,
+  "selector": "#quick",
+  "target": "feature:quick-actions",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "8px",
+    "snap": "--space (8px)"
+   },
+   {
+    "prop": "padding",
+    "value": "16px",
+    "snap": "--space (16px)"
+   },
+   {
+    "prop": "padding",
+    "value": "var(--pad)",
+    "snap": "--space (24px)"
+   }
+  ],
+  "dup_of": [
+   213,
+   590,
+   1101
+  ],
+  "note": "Contextual quick actions row above the composer (slice 5 'contextual quick actions'). Scrolling row of Chips: Cluster(scroll) + Chip, with a Divider for border-top. 213, 590, 1101 repeat the same scroll recipe (overflow-x:auto, scrollbar hidden)."
+ },
+ {
+  "line": 324,
+  "selector": "#quick button",
+  "target": "component:Chip/default",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "12px",
+    "snap": "--text-ui (13px)"
+   },
+   {
+    "prop": "height",
+    "value": "32px",
+    "snap": "--control-s (32px) (control)"
+   },
+   {
+    "prop": "padding",
+    "value": "12px",
+    "snap": "--space (12px)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "999px",
+    "snap": "--radius-pill (999px)"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.04)",
+    "snap": "NEW TOKEN --color-fill = rgba(255,255,255,0.05): the field/chip/card ground"
+   }
+  ],
+  "dup_of": [
+   177,
+   603,
+   1102,
+   158,
+   918,
+   1030
+  ],
+  "note": "Quick action chip: height 32 here, 30 for .room, 24-28 elsewhere. flex:1 0 auto is layout. DS Chips use --text-ui."
+ },
+ {
+  "line": 325,
+  "selector": "#quick button:hover",
+  "target": "component:Chip/default/hover",
+  "offtoken": [
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.09)",
+    "snap": "NEW TOKEN --color-fill-hover = rgba(255,255,255,0.10): hover and soft-selected ground"
+   }
+  ],
+  "dup_of": [
+   416,
+   1050,
+   861,
+   834
+  ],
+  "note": "Chip hover: border to edge-strong plus a white wash; same wash at .07/.08/.09/.1/.12 in 12 other places: one --color-fill-hover."
+ },
+ {
+  "line": 326,
+  "selector": "#cmdHint",
+  "target": "component:Menu/command-list",
+  "offtoken": [
+   {
+    "prop": "margin",
+    "value": "8px",
+    "snap": "--space (8px)"
+   },
+   {
+    "prop": "margin",
+    "value": "var(--pad)",
+    "snap": "--space (24px)"
+   },
+   {
+    "prop": "gap",
+    "value": "2px",
+    "snap": "--space (4px)"
+   },
+   {
+    "prop": "padding",
+    "value": "6px",
+    "snap": "--space (8px)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "12px",
+    "snap": "--radius-m (12px)"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(5, 7, 13, 0.75)",
+    "snap": "--color-surface-raised (popover surface)"
+   }
+  ],
+  "dup_of": [
+   189,
+   195,
+   231,
+   332,
+   1005
+  ],
+  "note": "Slash-command / mention autocomplete (slice 4), role=listbox shown inline above the composer, while the other popovers (.pop, #roomPop) float. One Popover with an anchored placement. Radius 12 matches DS popovers. Outer margin: Stack space."
+ },
+ {
+  "line": 327,
+  "selector": "#cmdHint[hidden]",
+  "target": "utility:hidden",
+  "offtoken": [],
+  "dup_of": [
+   759,
+   333,
+   367,
+   385
+  ],
+  "note": "Redundant: line 759's `[hidden] { display: none !important }` already does it; keep one `[hidden]` utility."
+ },
+ {
+  "line": 328,
+  "selector": "#cmdHint button",
+  "target": "component:Menu/command-list/item",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "12px",
+    "snap": "--text-ui (13px)"
+   },
+   {
+    "prop": "gap",
+    "value": "12px",
+    "snap": "--space (12px)"
+   },
+   {
+    "prop": "padding",
+    "value": "6px",
+    "snap": "--space (8px)"
+   },
+   {
+    "prop": "padding",
+    "value": "8px",
+    "snap": "--space (8px)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "8px",
+    "snap": "--radius-s (8px)"
+   }
+  ],
+  "dup_of": [
+   195,
+   233,
+   86,
+   713
+  ],
+  "note": "Command row: mono 12px, justify space-between, radius 8. Same box as #msgMenu button (195), .it (233), .place (86), .dm (713): one Menu item."
+ },
+ {
+  "line": 329,
+  "selector": "#cmdHint button:hover, #cmdHint button[aria-selected=\"true\"]",
+  "target": "component:Menu/command-list/item/selected",
+  "offtoken": [
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.1)",
+    "snap": "NEW TOKEN --color-fill-hover = rgba(255,255,255,0.10): hover and soft-selected ground"
+   }
+  ],
+  "dup_of": [
+   156,
+   207,
+   335,
+   191,
+   501
+  ],
+  "note": "Hover and aria-selected share one wash (0.1); the same wash is repeated as .07 .08 .09 .12 in other lists."
+ },
+ {
+  "line": 330,
+  "selector": "#cmdHint .keys",
+  "target": "component:Menu/command-list/hint",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "10.5px",
+    "snap": "--text-meta (12px)"
+   },
+   {
+    "prop": "padding",
+    "value": "6px",
+    "snap": "--space (8px)"
+   },
+   {
+    "prop": "padding",
+    "value": "8px",
+    "snap": "--space (8px)"
+   },
+   {
+    "prop": "padding",
+    "value": "2px",
+    "snap": "--space (4px)"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "0.06em",
+    "snap": "none (not caps)"
+   }
+  ],
+  "dup_of": [
+   209,
+   1001
+  ],
+  "note": "Keyboard hint line under the list: mono 10.5px with .06em tracking, not caps. A caption, so --text-meta."
+ },
+ {
+  "line": 331,
+  "selector": "#cmdHint span",
+  "target": "component:Menu/command-list/item/description",
+  "offtoken": [],
+  "dup_of": [
+   235
+  ],
+  "note": "Right-hand description of a command: muted, and font-family set back to sans only because the item is mono."
+ },
+ {
+  "line": 332,
+  "selector": "#emojiPop",
+  "target": "component:Popover/anchored/emoji-grid",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "2px",
+    "snap": "--space (4px)"
+   },
+   {
+    "prop": "margin",
+    "value": "8px",
+    "snap": "--space (8px)"
+   },
+   {
+    "prop": "margin",
+    "value": "var(--pad)",
+    "snap": "--space (24px)"
+   },
+   {
+    "prop": "padding",
+    "value": "8px",
+    "snap": "--space (8px)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "14px",
+    "snap": "--radius-m (12px) (DS: popovers)"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(5, 7, 13, 0.9)",
+    "snap": "--color-surface-raised (popover surface)"
+   }
+  ],
+  "dup_of": [
+   189,
+   195,
+   231,
+   326,
+   1005
+  ],
+  "note": "Emoji picker, inline above the composer like #cmdHint; 14px radius here, 12 for cmdHint, 10 for #reactPop/#msgMenu: one popover radius (--radius-m). 8-column grid is a Grid composition."
+ },
+ {
+  "line": 333,
+  "selector": "#emojiPop[hidden]",
+  "target": "utility:hidden",
+  "offtoken": [],
+  "dup_of": [
+   759,
+   327,
+   367,
+   385
+  ],
+  "note": "Redundant: line 759's `[hidden] { display: none !important }` already does it; keep one `[hidden]` utility."
+ },
+ {
+  "line": 334,
+  "selector": "#emojiPop button",
+  "target": "component:IconButton/s",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "18px",
+    "snap": "--text-title-s (20px)"
+   },
+   {
+    "prop": "height",
+    "value": "32px",
+    "snap": "--control-s (32px) (control)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "8px",
+    "snap": "--radius-s (8px)"
+   }
+  ],
+  "dup_of": [
+   155,
+   191,
+   206,
+   335
+  ],
+  "note": "Emoji key: 32 px high, radius 8, glyph 18px (emoji are allowed in messages and reactions). One IconButton/s; width comes from the Grid."
+ },
+ {
+  "line": 335,
+  "selector": "#emojiPop button:hover, #emojiPop button:focus-visible",
+  "target": "component:IconButton/s/hover",
+  "offtoken": [
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.1)",
+    "snap": "NEW TOKEN --color-fill-hover = rgba(255,255,255,0.10): hover and soft-selected ground"
+   }
+  ],
+  "dup_of": [
+   156,
+   207,
+   329,
+   191,
+   501
+  ],
+  "note": "Hover and focus-visible wash on an icon key; focus-visible must keep the ring from base (34), here it only tints the background."
+ },
+ {
+  "line": 336,
+  "selector": "body[data-chat=\"full\"] #emojiPop",
+  "target": "region:ChatDock",
+  "offtoken": [],
+  "dup_of": [
+   646
+  ],
+  "note": "Places the emoji picker in the full-screen chat's grid (column 2, row 6). Magic row numbers shared with 642-647: the full chat needs one named grid. Slice 4."
+ },
+ {
+  "line": 339,
+  "selector": "#bottombar",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: #bottombar is display:none !important (line 484), so nothing inside it renders. Delete the element and rules 339-350."
+ },
+ {
+  "line": 340,
+  "selector": "#bottombar > *",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: #bottombar is display:none !important (line 484), so nothing inside it renders. Child reset of a dead container."
+ },
+ {
+  "line": 341,
+  "selector": "#guideCell",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   50,
+   55
+  ],
+  "note": "dead: #bottombar is display:none !important (line 484), so nothing inside it renders. 'Ask Jarvis' cell; the same action is #hGuide in the header (507-508)."
+ },
+ {
+  "line": 342,
+  "selector": "#guideBtn",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   513,
+   43,
+   508
+  ],
+  "note": "dead: #bottombar is display:none !important (line 484), so nothing inside it renders. Second 'Ask Jarvis' button (#hGuide is the live one: 508); app.js still wires it (3632) but nothing shows it."
+ },
+ {
+  "line": 343,
+  "selector": "#guideBtn[aria-expanded=\"true\"]",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: #bottombar is display:none !important (line 484), so nothing inside it renders. Pressed state of the dead Ask Jarvis button."
+ },
+ {
+  "line": 344,
+  "selector": "#guideBtn .eye",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   507,
+   627,
+   818
+  ],
+  "note": "dead: #bottombar is display:none !important (line 484), so nothing inside it renders. The Jarvis orb is drawn 4 times (344, 507, 627, 818) at 26/14/16/14px: one Icon."
+ },
+ {
+  "line": 345,
+  "selector": "#middle",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   50,
+   55
+  ],
+  "note": "dead: #bottombar is display:none !important (line 484), so nothing inside it renders. Centre cell of the dead bar."
+ },
+ {
+  "line": 346,
+  "selector": "#lens",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   249,
+   398,
+   438,
+   498,
+   553
+  ],
+  "note": "dead: #bottombar is display:none !important (line 484), so nothing inside it renders. Cosmos/Map/Earth/List lens switch; replaced by #hnav .links ([data-flens], 498). The Map lens stays reachable only by Alt+T (app.js 4195)."
+ },
+ {
+  "line": 347,
+  "selector": "#lens button",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   250,
+   399,
+   439,
+   499,
+   554
+  ],
+  "note": "dead: #bottombar is display:none !important (line 484), so nothing inside it renders. Lens button; replaced by 499."
+ },
+ {
+  "line": 348,
+  "selector": "#lens button[aria-pressed=\"true\"]",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   251,
+   315,
+   343,
+   400,
+   440,
+   503,
+   509,
+   558,
+   571,
+   604,
+   811,
+   919
+  ],
+  "note": "dead: #bottombar is display:none !important (line 484), so nothing inside it renders. Pressed lens button; replaced by 503."
+ },
+ {
+  "line": 349,
+  "selector": "#hint",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   53,
+   168
+  ],
+  "note": "dead: #bottombar is display:none !important (line 484), so nothing inside it renders. Hint line; app.js writes #hint (26 references) but it never shows."
+ },
+ {
+  "line": 350,
+  "selector": "#credit",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   880
+  ],
+  "note": "dead: #bottombar is display:none !important (line 484), so nothing inside it renders. Credit line; the same text is in #ticker .tcredit (880)."
+ },
+ {
+  "line": 353,
+  "selector": "#labels",
+  "target": "scene",
+  "offtoken": [],
+  "dup_of": [
+   188,
+   664
+  ],
+  "note": "Fixed pointer-events:none overlay that holds the labels (slice 7). Same 3 declarations as #adOverlay (188) and #focus (664). It sets no z-index: the labels layer (--z-labels) is not applied, stacking relies on DOM order."
+ },
+ {
+  "line": 354,
+  "selector": ".label",
+  "target": "component:Label/world",
+  "offtoken": [],
+  "dup_of": [
+   368,
+   371,
+   783,
+   1130,
+   944
+  ],
+  "note": "World label, a <button> placed by script (transform). Six absolute left:0/top:0 overlays (.zone, .bubble, .hot, #fRingLabel, .embtag, .station) share this base: one Label (slice 7)."
+ },
+ {
+  "line": 355,
+  "selector": ".label .pill",
+  "target": "component:Label/world/pill",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "8px",
+    "snap": "--space (8px)"
+   },
+   {
+    "prop": "padding",
+    "value": "5px",
+    "snap": "--space (4px)"
+   },
+   {
+    "prop": "padding",
+    "value": "10px",
+    "snap": "--space (12px)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "999px",
+    "snap": "--radius-pill (999px)"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(12, 16, 26, 0.62)",
+    "snap": "NEW TOKEN --color-glass = rgba(8,11,18,0.5): chrome floating over the scene"
+   },
+   {
+    "prop": "backdrop-filter",
+    "value": "blur(10px)",
+    "snap": "NEW TOKEN --blur-glass = 14px (one blur for every surface over the scene)"
+   }
+  ],
+  "dup_of": [
+   371,
+   783,
+   1130,
+   513
+  ],
+  "note": "Label body: glass pill with blur 10px; glass fills .45/.5/.62/.74/.82/.85/.9/.92 and blurs 6-24px exist in the file: one --color-glass and one --blur-glass. The global .pill (442) also leaks its 24px height here."
+ },
+ {
+  "line": 356,
+  "selector": ".label b",
+  "target": "component:Label/world/name",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "12.5px",
+    "snap": "--text-ui (13px)"
+   }
+  ],
+  "dup_of": [],
+  "note": "Planet name in the label: 12.5px 500 = --text-ui."
+ },
+ {
+  "line": 357,
+  "selector": ".label .n",
+  "target": "component:Label/world/count",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "10px",
+    "snap": "--text-label (11px)"
+   }
+  ],
+  "dup_of": [
+   90,
+   108,
+   477
+  ],
+  "note": "People-here count in warm mono 10px. DS: counts use --text-label."
+ },
+ {
+  "line": 358,
+  "selector": ".label .heat",
+  "target": "component:Stat/heat",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "10px",
+    "snap": "--text-label (11px)"
+   },
+   {
+    "prop": "font-weight",
+    "value": "600",
+    "snap": "a token weight (500)"
+   },
+   {
+    "prop": "margin-left",
+    "value": "8px",
+    "snap": "--space (8px) (drop: the flex gap already spaces it)"
+   },
+   {
+    "prop": "padding",
+    "value": "2px",
+    "snap": "--space (4px)"
+   },
+   {
+    "prop": "padding",
+    "value": "7px",
+    "snap": "--space (8px)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "999px",
+    "snap": "--radius-pill (999px)"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(255, 179, 107, 0.16)",
+    "snap": "color-mix(in srgb, var(--color-warm) 16%, transparent)"
+   },
+   {
+    "prop": "color",
+    "value": "#FFC98A",
+    "snap": "--color-warm"
+   }
+  ],
+  "dup_of": [
+   997,
+   1127,
+   628,
+   1139,
+   226
+  ],
+  "note": "Heat badge (trend and messages an hour). Same tinted-pill recipe as .heat.ev (997), .heat.fr (1127), .gtag (628), .newbie (1139), .mention (226): one tinted Badge. margin-left 8px is added on top of the flex gap 8px (16px gap)."
+ },
+ {
+  "line": 359,
+  "selector": "#chatList li .body em, #threadList .body em",
+  "target": "component:Message/default/body",
+  "offtoken": [],
+  "dup_of": [
+   320,
+   172,
+   892
+  ],
+  "note": "Exists only to undo `#chatList li em` (320: time style) inside message bodies. Disappears when the time is <time>. Note: italic em stays a text style, not a rule."
+ },
+ {
+  "line": 360,
+  "selector": ".label .stem",
+  "target": "component:Label/world/stem",
+  "offtoken": [
+   {
+    "prop": "height",
+    "value": "24px",
+    "snap": "--space (24px)"
+   },
+   {
+    "prop": "margin-left",
+    "value": "14px",
+    "snap": "--space (16px)"
+   },
+   {
+    "prop": "background",
+    "value": "linear-gradient(180deg, rgba(255,255,255,0.55), transparent)",
+    "snap": "linear-gradient(180deg, --color-text, transparent) at 50% opacity (token colour)"
+   }
+  ],
+  "dup_of": [],
+  "note": "Stem from label to planet: 1px wide, 24px high, white .55 fading to nothing."
+ },
+ {
+  "line": 361,
+  "selector": ".label.on .pill",
+  "target": "component:Label/world/current",
+  "offtoken": [],
+  "dup_of": [
+   251,
+   315,
+   343,
+   348,
+   400,
+   440,
+   503,
+   509,
+   558,
+   571,
+   604,
+   811,
+   919
+  ],
+  "note": "Label of the focused world: primary fill, same as every other selected pill (12 rules)."
+ },
+ {
+  "line": 362,
+  "selector": ".label.on b",
+  "target": "component:Label/world/current",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Name colour on the primary-filled label."
+ },
+ {
+  "line": 363,
+  "selector": ".label.on .n",
+  "target": "component:Label/world/current",
+  "offtoken": [
+   {
+    "prop": "color",
+    "value": "#7A5A1E",
+    "snap": "--color-primary-ink (text on the primary-filled label)"
+   }
+  ],
+  "dup_of": [],
+  "note": "Count colour on the primary fill: brown #7A5A1E."
+ },
+ {
+  "line": 364,
+  "selector": ".label.on .heat",
+  "target": "component:Stat/heat/current",
+  "offtoken": [
+   {
+    "prop": "background",
+    "value": "rgba(5, 7, 12, 0.12)",
+    "snap": "color-mix(in srgb, var(--color-primary-ink) 12%, transparent)"
+   },
+   {
+    "prop": "color",
+    "value": "#6B3E12",
+    "snap": "--color-primary-ink"
+   }
+  ],
+  "dup_of": [
+   1128
+  ],
+  "note": "Heat badge on the primary fill: three different dark inks (#6B3E12, #0E5A45 in 364, #1B3A66 in 1128). One --color-primary-ink."
+ },
+ {
+  "line": 364,
+  "selector": ".label.on .heat.ev",
+  "target": "component:Stat/heat/current",
+  "offtoken": [
+   {
+    "prop": "color",
+    "value": "#0E5A45",
+    "snap": "--color-primary-ink"
+   }
+  ],
+  "dup_of": [
+   1128
+  ],
+  "note": "Event heat badge on the primary fill (#0E5A45); see 364 and 1128."
+ },
+ {
+  "line": 365,
+  "selector": ".label.unknown .pill",
+  "target": "component:Label/world/signal",
+  "offtoken": [
+   {
+    "prop": "border-color",
+    "value": "rgba(183, 156, 255, 0.7)",
+    "snap": "color-mix(in srgb, var(--color-signal) 70%, transparent)"
+   }
+  ],
+  "dup_of": [
+   936,
+   563
+  ],
+  "note": "Uncharted signal label: dashed border in the signal colour at 70%. Dashed outlines are drawn 3 ways (936, 563, here)."
+ },
+ {
+  "line": 366,
+  "selector": ".label.unknown .n",
+  "target": "component:Label/world/signal",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Count in the signal colour."
+ },
+ {
+  "line": 367,
+  "selector": ".label[hidden], .zone[hidden], .bubble[hidden], .hot[hidden]",
+  "target": "utility:hidden",
+  "offtoken": [],
+  "dup_of": [
+   759,
+   327,
+   333,
+   385
+  ],
+  "note": "Redundant: line 759's `[hidden] { display: none !important }` already does it; keep one `[hidden]` utility."
+ },
+ {
+  "line": 368,
+  "selector": ".zone",
+  "target": "component:Label/zone",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "4px",
+    "snap": "--space (4px)"
+   }
+  ],
+  "dup_of": [
+   354,
+   371
+  ],
+  "note": "Zone caption written into space (Home, Asteroid belt, Frontier, Stations). Dropped by 764 under 900px. Slice 7."
+ },
+ {
+  "line": 369,
+  "selector": ".zone small",
+  "target": "component:Label/zone",
+  "offtoken": [
+   {
+    "prop": "letter-spacing",
+    "value": "0.32em",
+    "snap": "--text-label tracking (0.14em)"
+   },
+   {
+    "prop": "color",
+    "value": "rgba(214, 226, 245, 0.75)",
+    "snap": "--color-text-muted"
+   }
+  ],
+  "dup_of": [],
+  "note": "Zone name: caps mono with 0.32em tracking, the widest of 8 tracking values (0.06-0.32em). DS has one: 0.14em."
+ },
+ {
+  "line": 370,
+  "selector": ".zone span",
+  "target": "component:Label/zone",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "11.5px",
+    "snap": "--text-meta (12px)"
+   },
+   {
+    "prop": "color",
+    "value": "rgba(214, 226, 245, 0.5)",
+    "snap": "--color-text-muted"
+   }
+  ],
+  "dup_of": [],
+  "note": "Zone description over the scene: legibility comes from the text-shadow in 828 (other rule)."
+ },
+ {
+  "line": 371,
+  "selector": ".bubble",
+  "target": "component:Label/bubble",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "232px",
+    "snap": "component constant on the 8px grid (29x8): keep with a /* why */ comment"
+   },
+   {
+    "prop": "gap",
+    "value": "10px",
+    "snap": "--space (12px)"
+   },
+   {
+    "prop": "padding",
+    "value": "10px",
+    "snap": "--space (12px)"
+   },
+   {
+    "prop": "padding",
+    "value": "12px",
+    "snap": "--space (12px)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "16px",
+    "snap": "--radius-l (16px)"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(12, 16, 26, 0.74)",
+    "snap": "NEW TOKEN --color-glass = rgba(8,11,18,0.5): chrome floating over the scene"
+   },
+   {
+    "prop": "backdrop-filter",
+    "value": "blur(12px)",
+    "snap": "NEW TOKEN --blur-glass = 14px (one blur for every surface over the scene)"
+   }
+  ],
+  "dup_of": [
+   354,
+   368,
+   783
+  ],
+  "note": "Chat bubble over a world (slice 6, pickBubbles). 232px wide is on the 8px grid (29x8). Radius 16, glass fill and blur as the Label pill."
+ },
+ {
+  "line": 372,
+  "selector": ".bubble i",
+  "target": "component:Avatar/24",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "12px",
+    "snap": "--text-meta (12px)"
+   },
+   {
+    "prop": "width",
+    "value": "26px",
+    "snap": "--space (24px) = Avatar 24"
+   },
+   {
+    "prop": "height",
+    "value": "26px",
+    "snap": "--space (24px) = Avatar 24"
+   },
+   {
+    "prop": "border-radius",
+    "value": "50%",
+    "snap": "--radius-pill (999px) (a circle on a square box)"
+   }
+  ],
+  "dup_of": [
+   142,
+   715,
+   106
+  ],
+  "note": "Initial letter in a 26px circle. DS Avatar is a generated astronaut at 20/24/48, never a letter: use Avatar/24."
+ },
+ {
+  "line": 373,
+  "selector": ".bubble small",
+  "target": "component:Label/bubble",
+  "offtoken": [
+   {
+    "prop": "letter-spacing",
+    "value": "0.06em",
+    "snap": "--text-label tracking (0.14em)"
+   }
+  ],
+  "dup_of": [],
+  "note": "Bubble author line: caps mono (inherited from `small`) with 0.06em tracking."
+ },
+ {
+  "line": 374,
+  "selector": ".bubble p",
+  "target": "component:Label/bubble",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "13px",
+    "snap": "--text-body (14px)"
+   },
+   {
+    "prop": "margin",
+    "value": "2px",
+    "snap": "--space (4px)"
+   },
+   {
+    "prop": "line-height",
+    "value": "1.35",
+    "snap": "--text-body line-height (1.5)"
+   }
+  ],
+  "dup_of": [],
+  "note": "Bubble text: 13px/1.35. DS messages are --text-body 14px/1.5. Outer margin: Stack space."
+ },
+ {
+  "line": 375,
+  "selector": ".hot",
+  "target": "scene",
+  "offtoken": [],
+  "dup_of": [
+   944
+  ],
+  "note": "Earth hotspot rings and dot (slice 7). Container identical to .station (944, 6 of 7 declarations). Scene art: raw values allowed."
+ },
+ {
+  "line": 376,
+  "selector": ".hot.down",
+  "target": "scene",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Falling-trend hotspot: --c becomes the danger colour; DS reserves danger for errors and a falling trend only, so this is right."
+ },
+ {
+  "line": 377,
+  "selector": ".hot i",
+  "target": "scene",
+  "offtoken": [],
+  "dup_of": [
+   945
+  ],
+  "note": "Hotspot ring, scaled 0.6 to 1.5 and faded, 2.4s infinite; .station i (945) is the same ring at 2.8s. DS: nothing loops under reduced motion (the global rule 967 stops it)."
+ },
+ {
+  "line": 378,
+  "selector": ".hot i + i",
+  "target": "scene",
+  "offtoken": [],
+  "dup_of": [
+   946
+  ],
+  "note": "Second, smaller ring with a half-period delay; same as .station i + i (946)."
+ },
+ {
+  "line": 379,
+  "selector": ".hot b",
+  "target": "scene",
+  "offtoken": [],
+  "dup_of": [
+   947
+  ],
+  "note": "Hotspot dot with glow; same as .station b (947)."
+ },
+ {
+  "line": 380,
+  "selector": ".hot span",
+  "target": "component:Label/hotspot",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "11px",
+    "snap": "--text-label (11px)"
+   },
+   {
+    "prop": "left",
+    "value": "20px",
+    "snap": "--space (24px)"
+   },
+   {
+    "prop": "top",
+    "value": "-38px",
+    "snap": "negative of --space (32px)"
+   },
+   {
+    "prop": "padding",
+    "value": "3px",
+    "snap": "--space (4px)"
+   },
+   {
+    "prop": "padding",
+    "value": "8px",
+    "snap": "--space (8px)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "999px",
+    "snap": "--radius-pill (999px)"
+   }
+  ],
+  "dup_of": [
+   948,
+   781,
+   783,
+   442,
+   39
+  ],
+  "note": "Country heat tag at a hotspot (+12% . 1 h): a primary-filled pill like .station span (948), #fSparkTip (781), .pill (442), .tag (39). Slice 7 (hotspots per country)."
+ },
+ {
+  "line": 382,
+  "selector": ".center",
+  "target": "region:TopCenter",
+  "offtoken": [
+   {
+    "prop": "top",
+    "value": "102px",
+    "snap": "NEW TOKEN --stage-top = calc(var(--chrome-edge) + var(--control-l) + var(--space-24)) = 102px (replaces 86, 96, 98, 102)"
+   },
+   {
+    "prop": "z-index",
+    "value": "3",
+    "snap": "--z-chrome"
+   }
+  ],
+  "dup_of": [
+   999,
+   755
+  ],
+  "note": "NEW region TopCenter: DS Layout has no row for the slot under the header that hosts the flight panel, the first-visit toast and the far-side counts. top 102 equals 34 header offset + 44 control + 24 space. #flash centres another way (left 0, right 0, margin auto, 999): two methods for one slot."
+ },
+ {
+  "line": 383,
+  "selector": ".center",
+  "target": "region:TopCenter",
+  "offtoken": [
+   {
+    "prop": "top",
+    "value": "72px",
+    "snap": "--stage-top with --chrome-edge = 12px on phones (12 + 44 + 16)"
+   },
+   {
+    "prop": "@media",
+    "value": "(max-width: 860px)",
+    "snap": "DS breakpoint 900px"
+   }
+  ],
+  "dup_of": [],
+  "note": "Phone variant: top 72 = 12 header offset + 44 + 16, so --chrome-edge is 12px on phones and 34px on desktop. 860px is not a DS breakpoint (DS: 900)."
+ },
+ {
+  "line": 384,
+  "selector": "#toast",
+  "target": "component:Flash/default",
+  "offtoken": [
+   {
+    "prop": "padding",
+    "value": "16px",
+    "snap": "--space (16px)"
+   },
+   {
+    "prop": "padding",
+    "value": "24px",
+    "snap": "--space (24px)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "16px",
+    "snap": "--radius-l (16px)"
+   },
+   {
+    "prop": "border",
+    "value": "rgba(92, 242, 200, 0.5)",
+    "snap": "color-mix(in srgb, var(--color-action) 50%, transparent)"
+   },
+   {
+    "prop": "gap",
+    "value": "4px",
+    "snap": "--space (4px)"
+   }
+  ],
+  "dup_of": [
+   999
+  ],
+  "note": "First-visit toast (slice 8, first-visit moment). It is a Flash: DS has one (title, line, one action) but the file has two looks, this card (radius 16) and #flash (999, pill). It is also the .dock glass (45)."
+ },
+ {
+  "line": 385,
+  "selector": "#toast[hidden], #flight[hidden]",
+  "target": "utility:hidden",
+  "offtoken": [],
+  "dup_of": [
+   759,
+   327,
+   333,
+   367
+  ],
+  "note": "Redundant: line 759's `[hidden] { display: none !important }` already does it; keep one `[hidden]` utility."
+ },
+ {
+  "line": 386,
+  "selector": "#toast small",
+  "target": "component:Flash/default/kicker",
+  "offtoken": [],
+  "dup_of": [
+   35,
+   537
+  ],
+  "note": "Kicker of the toast in the action colour."
+ },
+ {
+  "line": 387,
+  "selector": "#toast b",
+  "target": "component:Flash/default/title",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "24px",
+    "snap": "--text-title-s (20px)"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "-0.02em",
+    "snap": "none (title-s has no tracking)"
+   },
+   {
+    "prop": "font-weight",
+    "value": "300",
+    "snap": "--text-title-s weight 400"
+   }
+  ],
+  "dup_of": [
+   292,
+   392,
+   1001
+  ],
+  "note": "Toast title 24px/300; the other Flash title (#flash b, 1001) is 14px/500. One Flash title: --text-title-s."
+ },
+ {
+  "line": 388,
+  "selector": "#toast span",
+  "target": "component:Flash/default/line",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "12px",
+    "snap": "--text-meta (12px)"
+   }
+  ],
+  "dup_of": [
+   1001,
+   270
+  ],
+  "note": "Toast line, 12px muted = --text-meta."
+ },
+ {
+  "line": 389,
+  "selector": "#flight",
+  "target": "component:FlightPanel/in-transit",
+  "offtoken": [
+   {
+    "prop": "padding",
+    "value": "16px",
+    "snap": "--space (16px)"
+   },
+   {
+    "prop": "padding",
+    "value": "var(--pad)",
+    "snap": "--space (24px)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "16px",
+    "snap": "--radius-l (16px)"
+   },
+   {
+    "prop": "gap",
+    "value": "12px",
+    "snap": "--space (12px)"
+   },
+   {
+    "prop": "width",
+    "value": "min(560px, calc(100% - var(--left) - var(--right) - 48px))",
+    "snap": "max-inline-size 560px (on the 8px grid) in the TopCenter region; drop --left/--right"
+   }
+  ],
+  "dup_of": [
+   396,
+   903
+  ],
+  "note": "Flight panel (slice 7: flights and the flight panel). Width depends on --left/--right, which are 0 on desktop and 288/340 under 1280px although the docks are drawers, not columns, so it shrinks for nothing."
+ },
+ {
+  "line": 390,
+  "selector": "#flight .trow",
+  "target": "composition:Grid",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "16px",
+    "snap": "--space (16px)"
+   }
+  ],
+  "dup_of": [],
+  "note": "Four stats with fr ratios 1.4/1/1/.8: a Grid parameter. DS: details drop when space runs short."
+ },
+ {
+  "line": 391,
+  "selector": "#flight .trow div",
+  "target": "composition:Stack",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "6px",
+    "snap": "--space (8px)"
+   }
+  ],
+  "dup_of": [
+   56,
+   78,
+   114,
+   695,
+   710,
+   851
+  ],
+  "note": "Label above value, gap 6: the same flex column as 5 other rules (56, 78, 114, 695, 710, 851)."
+ },
+ {
+  "line": 392,
+  "selector": "#flight b",
+  "target": "component:FlightPanel/in-transit/value",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "22px",
+    "snap": "--text-title-s (20px)"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "-0.02em",
+    "snap": "none (title-s has no tracking)"
+   },
+   {
+    "prop": "font-weight",
+    "value": "300",
+    "snap": "--text-title-s weight 400"
+   }
+  ],
+  "dup_of": [
+   458,
+   523,
+   538
+  ],
+  "note": "Flight figure: 22px/300, tabular, ellipsis. DS: --text-title-s, tabular. Same figure style as .rvals b (458, dead)."
+ },
+ {
+  "line": 393,
+  "selector": "#flight .fbar",
+  "target": "component:Progress/track",
+  "offtoken": [
+   {
+    "prop": "height",
+    "value": "2px",
+    "snap": "--space (4px)"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.14)",
+    "snap": "NEW TOKEN --color-fill-hover = rgba(255,255,255,0.10): hover and soft-selected ground"
+   },
+   {
+    "prop": "border-radius",
+    "value": "2px",
+    "snap": "--radius-pill (999px) for bars and dots, --radius-s (8px) for boxes"
+   }
+  ],
+  "dup_of": [
+   454,
+   475,
+   797,
+   1028,
+   109
+  ],
+  "note": "Progress track, 2px high with a .14 white fill. Bar tracks in the file are 2, 3 and 6px with .08, .1 and .14 fills (454, 475, 797, 1028, 109): one Progress (DS FlightPanel: progress bar)."
+ },
+ {
+  "line": 394,
+  "selector": "#fProg",
+  "target": "component:Progress/fill",
+  "offtoken": [
+   {
+    "prop": "height",
+    "value": "2px",
+    "snap": "--space (4px)"
+   }
+  ],
+  "dup_of": [
+   454,
+   476,
+   1028
+  ],
+  "note": "Progress fill, width written by script every frame (app.js 3943). Animate transform: scaleX or a --progress variable instead."
+ },
+ {
+  "line": 395,
+  "selector": "#edge",
+  "target": "feature:far-side-counts",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "8px",
+    "snap": "--space (8px)"
+   },
+   {
+    "prop": "max-width",
+    "value": "520px",
+    "snap": "composition parameter on the 8px grid (65x8): keep"
+   }
+  ],
+  "dup_of": [
+   101,
+   128,
+   129,
+   429,
+   741
+  ],
+  "note": "Counts of bubbles on the far side of the Earth (slice 6). A Cluster of tags inside the TopCenter slot. 520px is on the 8px grid."
+ },
+ {
+  "line": 396,
+  "selector": "#notif",
+  "target": "region:Notifications",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "360px",
+    "snap": "NEW TOKEN --panel-w = 360px (chat dock, notifications, search drawer)"
+   },
+   {
+    "prop": "padding",
+    "value": "16px",
+    "snap": "--space (16px)"
+   },
+   {
+    "prop": "padding",
+    "value": "var(--pad)",
+    "snap": "--space (24px)"
+   },
+   {
+    "prop": "gap",
+    "value": "12px",
+    "snap": "--space (12px)"
+   },
+   {
+    "prop": "max-height",
+    "value": "calc(100% - var(--top) - var(--bottom))",
+    "snap": "100% (--top and --bottom are 0px: drop the legacy variables)"
+   }
+  ],
+  "dup_of": [
+   389,
+   648,
+   134
+  ],
+  "note": "Bell panel (slice 4). top and right here are overridden by 491 (86px, 24px !important) and the border by 491: only width, padding, flex and overflow survive. Width 360 = chat dock width (DS)."
+ },
+ {
+  "line": 397,
+  "selector": "#notif[hidden]",
+  "target": "utility:hidden",
+  "offtoken": [],
+  "dup_of": [
+   759,
+   327,
+   333,
+   367
+  ],
+  "note": "Redundant: line 759's `[hidden] { display: none !important }` already does it; keep one `[hidden]` utility."
+ },
+ {
+  "line": 398,
+  "selector": "#notifTabs",
+  "target": "component:Tabs/segmented",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "2px",
+    "snap": "--space (4px)"
+   },
+   {
+    "prop": "padding",
+    "value": "3px",
+    "snap": "--space (4px)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "999px",
+    "snap": "--radius-pill (999px)"
+   }
+  ],
+  "dup_of": [
+   249,
+   346,
+   438,
+   498,
+   553
+  ],
+  "note": "Notification kinds. Six segmented groups (249, 346, 398, 438, 498, 553) with border or fill, gap 2-4, padding 3-4. 1097 later forces display:flex !important and width 100%. One Tabs."
+ },
+ {
+  "line": 399,
+  "selector": "#notifTabs button",
+  "target": "component:Tabs/segmented/tab",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "12.5px",
+    "snap": "--text-ui (13px)"
+   },
+   {
+    "prop": "height",
+    "value": "30px",
+    "snap": "--control-s (32px)"
+   },
+   {
+    "prop": "padding",
+    "value": "14px",
+    "snap": "--space (16px)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "999px",
+    "snap": "--radius-pill (999px)"
+   }
+  ],
+  "dup_of": [
+   250,
+   347,
+   439,
+   499,
+   554
+  ],
+  "note": "Tab: height 30 here (26-34 in six places). padding and font-size are overridden by 1098 (0 6px !important, 12px !important), so those two values are dead."
+ },
+ {
+  "line": 400,
+  "selector": "#notifTabs button[aria-selected=\"true\"]",
+  "target": "component:Tabs/segmented/selected",
+  "offtoken": [],
+  "dup_of": [
+   251,
+   315,
+   343,
+   348,
+   440,
+   503,
+   509,
+   558,
+   571,
+   604,
+   811,
+   919
+  ],
+  "note": "Selected tab = primary fill; see Chip/selected."
+ },
+ {
+  "line": 401,
+  "selector": "#notifList",
+  "target": "composition:Stack",
+  "offtoken": [],
+  "dup_of": [
+   123,
+   430,
+   473,
+   862,
+   888,
+   1015
+  ],
+  "note": "List reset (list-style none, margin 0, padding 0) on 8 lists: put it once in base for ol/ul."
+ },
+ {
+  "line": 402,
+  "selector": "#notifList li button",
+  "target": "component:Row/notification",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "13px",
+    "snap": "--text-ui (13px)"
+   },
+   {
+    "prop": "grid-template-columns",
+    "value": "8px",
+    "snap": "dead: overridden by 1106 (28px 1fr auto !important)"
+   },
+   {
+    "prop": "gap",
+    "value": "10px",
+    "snap": "--space (12px)"
+   },
+   {
+    "prop": "padding",
+    "value": "12px",
+    "snap": "--space (12px)"
+   },
+   {
+    "prop": "line-height",
+    "value": "1.4",
+    "snap": "--text-body line-height (1.5)"
+   }
+  ],
+  "dup_of": [
+   86,
+   105,
+   117,
+   431,
+   474
+  ],
+  "note": "Notification row (slice 4). grid-template-columns and align-items are overridden by 1106 (28px !important, start !important): only gap/padding/border/font survive. Same box as #cardNearby button (117)."
+ },
+ {
+  "line": 403,
+  "selector": "#notifList li button i",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   995
+  ],
+  "note": "dead: notification buttons contain no <i> (renderNotif builds .nic, .nt, .nw: app.js 3670-3674); 1113 also sets it display:none."
+ },
+ {
+  "line": 404,
+  "selector": "#notifList li.unread button i",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: unread dot on a never-created <i>; unread is shown by .nic (1108)."
+ },
+ {
+  "line": 405,
+  "selector": "#notifList li small",
+  "target": "component:Row/notification/meta",
+  "offtoken": [],
+  "dup_of": [
+   1110
+  ],
+  "note": "Time and place small inside the notification row (.nw and .nt small), nowrap."
+ },
+ {
+  "line": 406,
+  "selector": "#notifNote",
+  "target": "region:Notifications",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "11.5px",
+    "snap": "--text-meta (12px)"
+   }
+  ],
+  "dup_of": [
+   712
+  ],
+  "note": "Footnote of the panel (MLS in phase 2). The same message is worded twice, here and in .rn-note (712, 11px): one note."
+ },
+ {
+  "line": 409,
+  "selector": "#board",
+  "target": "region:Board",
+  "offtoken": [
+   {
+    "prop": "padding",
+    "value": "24px",
+    "snap": "--space (24px)"
+   },
+   {
+    "prop": "grid-template-columns",
+    "value": "352px",
+    "snap": "composition parameter (Sidebar): --panel-w (360px) NEW TOKEN"
+   },
+   {
+    "prop": "gap",
+    "value": "24px",
+    "snap": "--space (24px)"
+   },
+   {
+    "prop": "background",
+    "value": "radial-gradient(1100px 520px at 75% -10%, rgba(92,120,200,0.16), ...), radial-gradient(... rgba(255,156,74,0.09) ...), var(--space)",
+    "snap": "drop: flat --color-space (space first); the glows are art, not tokens"
+   }
+  ],
+  "dup_of": [
+   396,
+   71
+  ],
+  "note": "List view region (slice 5). top/bottom/left/right here are overridden by 492 (98px, 24px x3, !important): only position, padding, overflow and the grid survive. Detail column 352 -> 360."
+ },
+ {
+  "line": 410,
+  "selector": "#board[hidden]",
+  "target": "utility:hidden",
+  "offtoken": [],
+  "dup_of": [
+   759,
+   327,
+   333,
+   367
+  ],
+  "note": "Redundant: line 759's `[hidden] { display: none !important }` already does it; keep one `[hidden]` utility."
+ },
+ {
+  "line": 411,
+  "selector": "#boardGrid h3",
+  "target": "region:Board",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "28px",
+    "snap": "--text-title-m (28px)"
+   },
+   {
+    "prop": "margin",
+    "value": "32px",
+    "snap": "--space (32px)"
+   },
+   {
+    "prop": "margin",
+    "value": "16px",
+    "snap": "--space (16px)"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "-0.03em",
+    "snap": "-0.03em (--text-title-m/l)"
+   }
+  ],
+  "dup_of": [
+   122,
+   136
+  ],
+  "note": "Section title of the board: 28px/300 = --text-title-m exactly. Outer margins 32 0 16 (and margin-top 0 on first-child, 413): Stack space instead."
+ },
+ {
+  "line": 412,
+  "selector": "#boardGrid h3 span",
+  "target": "region:Board",
+  "offtoken": [
+   {
+    "prop": "color",
+    "value": "var(--soft)",
+    "snap": "--color-text-muted (DS: one muted grey)"
+   }
+  ],
+  "dup_of": [
+   95,
+   427
+  ],
+  "note": "Count after the section title in the soft grey; DS merges soft and muted."
+ },
+ {
+  "line": 413,
+  "selector": "#boardGrid h3:first-child",
+  "target": "region:Board",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "First-child margin reset, only needed because h3 has outer margins (411)."
+ },
+ {
+  "line": 414,
+  "selector": ".cards",
+  "target": "composition:Grid",
+  "offtoken": [
+   {
+    "prop": "grid-template-columns",
+    "value": "240px",
+    "snap": "composition parameter (Grid min = 240px, on the 8px grid)"
+   },
+   {
+    "prop": "gap",
+    "value": "16px",
+    "snap": "--space (16px)"
+   }
+  ],
+  "dup_of": [
+   254,
+   984,
+   1048,
+   1052,
+   1059
+  ],
+  "note": "Card grid, auto-fill min 240px. 254 and 1059 are also auto-fill grids, and 984, 1048, 1052 are fixed 3-column grids: one Grid with `min` and `columns` parameters."
+ },
+ {
+  "line": 415,
+  "selector": ".hubcard",
+  "target": "component:Card/world",
+  "offtoken": [
+   {
+    "prop": "padding",
+    "value": "16px",
+    "snap": "--space (16px)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "16px",
+    "snap": "--radius-l (16px)"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.03)",
+    "snap": "NEW TOKEN --color-fill = rgba(255,255,255,0.05): the field/chip/card ground"
+   },
+   {
+    "prop": "gap",
+    "value": "16px",
+    "snap": "--space (16px)"
+   }
+  ],
+  "dup_of": [
+   425,
+   1049,
+   1152
+  ],
+  "note": "World card of the list view (slice 5). NEW variant: DS Card has no world card and Row is for lists. Background .03 and radius 16 (DS: cards use --radius-m)."
+ },
+ {
+  "line": 416,
+  "selector": ".hubcard:hover",
+  "target": "component:Card/world/hover",
+  "offtoken": [
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.06)",
+    "snap": "NEW TOKEN --color-fill-hover = rgba(255,255,255,0.10): hover and soft-selected ground"
+   }
+  ],
+  "dup_of": [
+   861,
+   834,
+   1050
+  ],
+  "note": "Card hover: border to edge-strong, wash .06 (others .07 to .12): one --color-fill-hover."
+ },
+ {
+  "line": 417,
+  "selector": ".hubcard .row",
+  "target": "composition:Cluster",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "12px",
+    "snap": "--space (12px)"
+   }
+  ],
+  "dup_of": [
+   50,
+   55,
+   165,
+   241,
+   598
+  ],
+  "note": "Thumb beside text: the flex row repeated in 6 rules."
+ },
+ {
+  "line": 418,
+  "selector": ".hubcard .thumbp",
+  "target": "component:PlanetThumb/world",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "52px",
+    "snap": "--space (48px) (PlanetThumb 48)"
+   },
+   {
+    "prop": "height",
+    "value": "52px",
+    "snap": "--space (48px) (PlanetThumb 48)"
+   }
+  ],
+  "dup_of": [
+   835,
+   977,
+   1143
+  ],
+  "note": "Thumbnail in the card, 52px; thumbs are 64, 52, 44, 36, 30, 22, 16 px in the file. One PlanetThumb scale (16/24/32/48/64)."
+ },
+ {
+  "line": 419,
+  "selector": ".hubcard .nm",
+  "target": "composition:Stack",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "4px",
+    "snap": "--space (4px)"
+   }
+  ],
+  "dup_of": [
+   56,
+   78,
+   114,
+   695,
+   710,
+   851
+  ],
+  "note": "Kind, name and description stacked (gap 4)."
+ },
+ {
+  "line": 420,
+  "selector": ".hubcard .nm b",
+  "target": "component:Card/world/title",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "18px",
+    "snap": "--text-title-s (20px)"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "-0.01em",
+    "snap": "none (sizes under 28px carry no tracking)"
+   }
+  ],
+  "dup_of": [],
+  "note": "Card title 18px/400 -0.01em. DS --text-title-s is exactly 20px/400."
+ },
+ {
+  "line": 421,
+  "selector": ".hubcard .dd",
+  "target": "component:Card/world/description",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "12px",
+    "snap": "--text-meta (12px)"
+   },
+   {
+    "prop": "line-height",
+    "value": "1.4",
+    "snap": "--text-body line-height (1.5)"
+   }
+  ],
+  "dup_of": [],
+  "note": "Card description 12px/1.4."
+ },
+ {
+  "line": 422,
+  "selector": ".hubcard .stats",
+  "target": "composition:Grid",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "8px",
+    "snap": "--space (8px)"
+   }
+  ],
+  "dup_of": [
+   456
+  ],
+  "note": "Two stats, number then caption, baseline-aligned (auto 1fr auto 1fr)."
+ },
+ {
+  "line": 423,
+  "selector": ".hubcard .stats .big",
+  "target": "component:Stat/default/value",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "26px",
+    "snap": "--text-title-m (28px)"
+   }
+  ],
+  "dup_of": [
+   76,
+   100,
+   523,
+   538,
+   653
+  ],
+  "note": "Big number in the card at 26px; .big appears at 16, 20, 26, 28, 40, 46px. DS: --text-title-m (28px) for big facts."
+ },
+ {
+  "line": 424,
+  "selector": ".hubcard svg.mini",
+  "target": "component:ActivityChart/mini",
+  "offtoken": [
+   {
+    "prop": "height",
+    "value": "28px",
+    "snap": "--space (32px)"
+   }
+  ],
+  "dup_of": [
+   102,
+   778
+  ],
+  "note": "Mini bars in a card, 28px high; ActivityChart appears at 20, 24, 28, 34, 40px. One component with a size."
+ },
+ {
+  "line": 425,
+  "selector": "#boardDetail",
+  "target": "region:Board",
+  "offtoken": [
+   {
+    "prop": "padding",
+    "value": "24px",
+    "snap": "--space (24px)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "16px",
+    "snap": "--radius-l (16px)"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.03)",
+    "snap": "NEW TOKEN --color-fill = rgba(255,255,255,0.05): the field/chip/card ground"
+   },
+   {
+    "prop": "gap",
+    "value": "16px",
+    "snap": "--space (16px)"
+   }
+  ],
+  "dup_of": [
+   415,
+   120
+  ],
+  "note": "Sticky detail column: same card as .hubcard (415, 6 of 9 declarations) but padding 24. A Card on the Board."
+ },
+ {
+  "line": 426,
+  "selector": "#boardDetail h2",
+  "target": "region:Board",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "36px",
+    "snap": "--text-title-l (36px)"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "-0.035em",
+    "snap": "-0.03em (--text-title-m/l)"
+   },
+   {
+    "prop": "line-height",
+    "value": "1.02",
+    "snap": "baked into the display/title token"
+   }
+  ],
+  "dup_of": [
+   94
+  ],
+  "note": "Detail title 36px/300/-0.035em, identical to #card h2 (94, dead): DS --text-title-l (-0.03em)."
+ },
+ {
+  "line": 427,
+  "selector": "#boardDetail h2 .soft",
+  "target": "region:Board",
+  "offtoken": [
+   {
+    "prop": "color",
+    "value": "var(--soft)",
+    "snap": "--color-text-muted (DS: one muted grey)"
+   }
+  ],
+  "dup_of": [
+   95
+  ],
+  "note": "Soft part of the detail title."
+ },
+ {
+  "line": 428,
+  "selector": "#boardDetail .desc",
+  "target": "region:Board",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "14px",
+    "snap": "--text-body (14px)"
+   },
+   {
+    "prop": "color",
+    "value": "#C8D0DE",
+    "snap": "--color-text"
+   }
+  ],
+  "dup_of": [
+   96,
+   519,
+   650
+  ],
+  "note": "Detail description 14px/1.5 in #C8D0DE. Same text style in 3 more places; DS --text-body in --color-text."
+ },
+ {
+  "line": 429,
+  "selector": "#boardDetail .chips",
+  "target": "composition:Cluster",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "8px",
+    "snap": "--space (8px)"
+   }
+  ],
+  "dup_of": [
+   101,
+   128,
+   129,
+   395,
+   741
+  ],
+  "note": "Chips row (flex wrap gap 8), the 6th copy."
+ },
+ {
+  "line": 430,
+  "selector": "#boardDetail .rooms",
+  "target": "composition:Stack",
+  "offtoken": [],
+  "dup_of": [
+   123,
+   401,
+   473,
+   862,
+   888,
+   1015
+  ],
+  "note": "List reset again, plus flex column."
+ },
+ {
+  "line": 431,
+  "selector": "#boardDetail .rooms li",
+  "target": "component:Row/room",
+  "offtoken": [
+   {
+    "prop": "height",
+    "value": "40px",
+    "snap": "--control-m (40px) (control)"
+   }
+  ],
+  "dup_of": [
+   474,
+   105,
+   117
+  ],
+  "note": "Room line (name left, count right), 40px high with a bottom hairline. Same row as .roomlist li (474, dead), .people li (105), #cardNearby button (117)."
+ },
+ {
+  "line": 432,
+  "selector": "#boardDetail .rooms b",
+  "target": "component:Row/room/title",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Room name at weight 400: only resets the bold of <b>; use a span."
+ },
+ {
+  "line": 433,
+  "selector": "#boardDetail .seed",
+  "target": "region:Board",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "10.5px",
+    "snap": "--text-label (11px)"
+   }
+  ],
+  "dup_of": [
+   118
+  ],
+  "note": "Seed caption, mono 10.5px: debug text of the generator. Same as #card .seed (118, dead)."
+ },
+ {
+  "line": 434,
+  "selector": "body[data-ui=\"list\"] #scene, body[data-ui=\"list\"] #labels, body[data-ui=\"list\"] #edge, body[data-ui=\"list\"] #toast, body[data-ui=\"list\"] #flight",
+  "target": "utility:state-ui-list",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "State toggle, body[data-ui=list] hides the 3D and its overlays. In React the list route does not mount the scene: replace the rule with routing (slice 5)."
+ },
+ {
+  "line": 436,
+  "selector": "#card .ttl",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   777
+  ],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (#card .ttl; #fActivity .ttl, 777, is the live twin)"
+ },
+ {
+  "line": 437,
+  "selector": "#card .ttl span",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it."
+ },
+ {
+  "line": 438,
+  "selector": ".seg",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   249,
+   346,
+   398,
+   498,
+   553
+  ],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (.seg is one of six segmented groups)"
+ },
+ {
+  "line": 439,
+  "selector": ".seg button",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   250,
+   347,
+   399,
+   499,
+   554
+  ],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it."
+ },
+ {
+  "line": 440,
+  "selector": ".seg button[aria-selected=\"true\"]",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   251,
+   315,
+   343,
+   348,
+   400,
+   503,
+   509,
+   558,
+   571,
+   604,
+   811,
+   919
+  ],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it."
+ },
+ {
+  "line": 441,
+  "selector": ".tab[hidden]",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   759
+  ],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. Also redundant with line 759's `[hidden]` rule."
+ },
+ {
+  "line": 442,
+  "selector": ".pill",
+  "target": "component:Chip/badge",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "11.5px",
+    "snap": "--text-meta (12px)"
+   },
+   {
+    "prop": "height",
+    "value": "24px",
+    "snap": "--hit-min (24px) (control)"
+   },
+   {
+    "prop": "padding",
+    "value": "10px",
+    "snap": "--space (12px)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "999px",
+    "snap": "--radius-pill (999px)"
+   }
+  ],
+  "dup_of": [
+   39,
+   697,
+   814,
+   380,
+   948,
+   781
+  ],
+  "note": "Filled primary pill, 24px high: .tag (39) has 8 of the same 10 declarations. Used by the label pill base, #btKind (dead) and the card (dead); one Chip badge (DS: the Testnet and Sponsored badges). The global class name leaks into .label .pill (355)."
+ },
+ {
+  "line": 443,
+  "selector": ".pulse",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (#card .pulse: 196px block holding the pulse orb.)"
+ },
+ {
+  "line": 444,
+  "selector": ".pring",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Dashed rotating ring around the orb (40 s infinite).)"
+ },
+ {
+  "line": 446,
+  "selector": ".porb",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Pulse orb, 112px with a 60px glow.)"
+ },
+ {
+  "line": 447,
+  "selector": ".porb b",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   36
+  ],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Orb figure 30px/300.)"
+ },
+ {
+  "line": 448,
+  "selector": ".porb span",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Orb caption.)"
+ },
+ {
+  "line": 449,
+  "selector": ".pulse .p1",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Pulse chip position.)"
+ },
+ {
+  "line": 450,
+  "selector": ".pulse .p2",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Pulse chip position.)"
+ },
+ {
+  "line": 451,
+  "selector": ".range",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Range slider wrapper.)"
+ },
+ {
+  "line": 452,
+  "selector": ".rtrack",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Range slider track.)"
+ },
+ {
+  "line": 453,
+  "selector": ".rtrack::before",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Range slider rail.)"
+ },
+ {
+  "line": 454,
+  "selector": ".rsel",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Range slider selection.)"
+ },
+ {
+  "line": 455,
+  "selector": ".handle",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Range slider handle, 14px circle.)"
+ },
+ {
+  "line": 456,
+  "selector": ".rvals",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Min/Now/Peak values grid.)"
+ },
+ {
+  "line": 457,
+  "selector": ".rvals div",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   56,
+   78,
+   114,
+   695,
+   710,
+   851
+  ],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Value column.)"
+ },
+ {
+  "line": 458,
+  "selector": ".rvals b",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   392
+  ],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Value figure 22px/300.)"
+ },
+ {
+  "line": 459,
+  "selector": ".gauge",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Regulars/newcomers gauge.)"
+ },
+ {
+  "line": 460,
+  "selector": ".gauge svg",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   468
+  ],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Gauge svg.)"
+ },
+ {
+  "line": 461,
+  "selector": ".gauge .gt",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   462
+  ],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Gauge track stroke.)"
+ },
+ {
+  "line": 462,
+  "selector": ".gauge .gf",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   461
+  ],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Gauge fill stroke.)"
+ },
+ {
+  "line": 463,
+  "selector": ".gpill",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Gauge percentage chip.)"
+ },
+ {
+  "line": 464,
+  "selector": ".gkey",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Gauge key.)"
+ },
+ {
+  "line": 465,
+  "selector": ".gkey span",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Gauge key item.)"
+ },
+ {
+  "line": 466,
+  "selector": ".gkey i",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   379,
+   617,
+   947
+  ],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Gauge key dot.)"
+ },
+ {
+  "line": 467,
+  "selector": ".relief",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Conversation relief map.)"
+ },
+ {
+  "line": 468,
+  "selector": ".relief svg",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   460
+  ],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Relief svg.)"
+ },
+ {
+  "line": 469,
+  "selector": ".relief polyline",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Relief contour lines.)"
+ },
+ {
+  "line": 470,
+  "selector": ".relief polyline.c",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Relief minor contour lines.)"
+ },
+ {
+  "line": 471,
+  "selector": "#reliefPills .pill",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Relief room pill placement.)"
+ },
+ {
+  "line": 472,
+  "selector": "#reliefPills .pill::after",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Relief pill stem.)"
+ },
+ {
+  "line": 473,
+  "selector": ".roomlist",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   123,
+   401,
+   430,
+   862,
+   888,
+   1015
+  ],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Room list reset.)"
+ },
+ {
+  "line": 474,
+  "selector": ".roomlist li",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   105,
+   117,
+   86
+  ],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Room list row: name, bar, count.)"
+ },
+ {
+  "line": 475,
+  "selector": ".roomlist .bar",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   454,
+   797,
+   1028,
+   109
+  ],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Room bar, 3px.)"
+ },
+ {
+  "line": 476,
+  "selector": ".roomlist .bar i",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   454,
+   475,
+   797,
+   1028,
+   109
+  ],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Room bar fill.)"
+ },
+ {
+  "line": 477,
+  "selector": ".roomlist .v",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   90,
+   108
+  ],
+  "note": "dead: lives only in #card, a view of the left drawer that is never on screen: showCard() (app.js 1972) switches the drawer to 'card' only from go(), after a click in the place list has closed it (4206); the drawer opens on 'places' (4185); Jarvis runs setGuide(), which opens the chat, never #guide (3620). Seen only during the 0.4-0.6 s the drawer slides out. The plate (#focus) replaced it. (Room count.)"
+ },
+ {
+  "line": 478,
+  "selector": "#bigTitle",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   514
+  ],
+  "note": "dead: #bigTitle is never shown: showBigTitle (app.js 1964) runs only when !focusable(b) (1238), but focusable = !hidden(b) (1675) is always true once arrive() has marked a signal discovered (1221); #bigTitle is also hidden by default and display:none in the focus view (662)."
+ },
+ {
+  "line": 479,
+  "selector": "#bigTitle[hidden]",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   759
+  ],
+  "note": "dead: #bigTitle is never shown: showBigTitle (app.js 1964) runs only when !focusable(b) (1238), but focusable = !hidden(b) (1675) is always true once arrive() has marked a signal discovered (1221); #bigTitle is also hidden by default and display:none in the focus view (662). Also redundant with line 759."
+ },
+ {
+  "line": 480,
+  "selector": "#bigTitle h1",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: #bigTitle is never shown: showBigTitle (app.js 1964) runs only when !focusable(b) (1238), but focusable = !hidden(b) (1675) is always true once arrive() has marked a signal discovered (1221); #bigTitle is also hidden by default and display:none in the focus view (662). (h1: clamp(40px, 5.2vw, 88px); DS --text-display is clamp(4.5rem, 8vw, 7rem).)"
+ },
+ {
+  "line": 481,
+  "selector": "#bigTitle h1 span",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: #bigTitle is never shown: showBigTitle (app.js 1964) runs only when !focusable(b) (1238), but focusable = !hidden(b) (1675) is always true once arrive() has marked a signal discovered (1221); #bigTitle is also hidden by default and display:none in the focus view (662)."
+ },
+ {
+  "line": 482,
+  "selector": "body[data-ui=\"list\"] #bigTitle",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: #bigTitle is never shown: showBigTitle (app.js 1964) runs only when !focusable(b) (1238), but focusable = !hidden(b) (1675) is always true once arrive() has marked a signal discovered (1221); #bigTitle is also hidden by default and display:none in the focus view (662)."
+ },
+ {
+  "line": 484,
+  "selector": "#topbar, #bottombar",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead for the rebuild: its only job is to hide the two abandoned bars; their useful children are moved out by app.js (4183-4184: #stats to the hero, passBtn/bellBtn/connectBtn to the header). Delete #topbar, #bottombar and rules 49-69 and 339-350."
+ },
+ {
+  "line": 485,
+  "selector": "#leftdock, #chat",
+  "target": "region:ChatDock",
+  "offtoken": [
+   {
+    "prop": "transition",
+    "value": "0.6s",
+    "snap": "--motion-slow (400ms)"
+   },
+   {
+    "prop": "transition",
+    "value": "0.4s",
+    "snap": "--motion-slow (400ms)"
+   },
+   {
+    "prop": "z-index",
+    "value": "6",
+    "snap": "--z-dock (chat) / --z-popover (search drawer)"
+   },
+   {
+    "prop": "transition",
+    "value": "cubic-bezier(0.2, 0.7, 0.1, 1)",
+    "snap": "--ease-standard"
+   }
+  ],
+  "dup_of": [
+   659,
+   909
+  ],
+  "note": "Slide-in transition shared by the chat and the search drawer: 0.6s and 0.4s -> --motion-slow, the curve is exactly --ease-standard (0.2, 0.7, 0.1, 1). z-index 6 -> dock layer for the chat, popover layer for the drawer. Slice 4."
+ },
+ {
+  "line": 486,
+  "selector": "#leftdock",
+  "target": "region:SearchDrawer",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "360px",
+    "snap": "--panel-w (360px) NEW TOKEN"
+   }
+  ],
+  "dup_of": [
+   488
+  ],
+  "note": "NEW region SearchDrawer: DS Layout has no drawer; this is the left panel that opens on the search button and cmd+K (slice 5, cmd+K search). It should be a Dialog (native <dialog>) or Popover, not a docked column. top/bottom/width fight 71 with !important."
+ },
+ {
+  "line": 487,
+  "selector": "body[data-drawer=\"left\"] #leftdock",
+  "target": "region:SearchDrawer",
+  "offtoken": [
+   {
+    "prop": "box-shadow",
+    "value": "30px 0 60px rgba(0, 0, 0, 0.45)",
+    "snap": "NEW TOKEN --shadow-raised = 0 16px 48px rgba(0,0,0,0.5)"
+   }
+  ],
+  "dup_of": [
+   489,
+   632
+  ],
+  "note": "Open state of the search drawer, read from body[data-drawer]; DS wants state from attributes of the element itself (aria-expanded on the trigger)."
+ },
+ {
+  "line": 488,
+  "selector": "#chat",
+  "target": "region:ChatDock",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "400px",
+    "snap": "--panel-w (360px) NEW TOKEN (DS: 360)"
+   }
+  ],
+  "dup_of": [
+   486
+  ],
+  "note": "Closed state of the dock. width 400px !important: DS says 360 (320 under 1400); 874 sets 360 !important at 901px and up, so 400 applies only between 861 and 900px. top/bottom !important are overridden by 874 too."
+ },
+ {
+  "line": 489,
+  "selector": "body[data-chat=\"open\"] #chat",
+  "target": "region:ChatDock",
+  "offtoken": [
+   {
+    "prop": "box-shadow",
+    "value": "-30px 0 60px rgba(0, 0, 0, 0.45)",
+    "snap": "NEW TOKEN --shadow-raised = 0 16px 48px rgba(0,0,0,0.5)"
+   }
+  ],
+  "dup_of": [
+   487,
+   632,
+   993
+  ],
+  "note": "Open state of the dock. At 901px and up the box-shadow is overridden by 874 (box-shadow none), so only transform, opacity and pointer-events survive there."
+ },
+ {
+  "line": 490,
+  "selector": ".drawerclose",
+  "target": "region:SearchDrawer",
+  "offtoken": [
+   {
+    "prop": "top",
+    "value": "14px",
+    "snap": "--space (16px)"
+   },
+   {
+    "prop": "right",
+    "value": "16px",
+    "snap": "--space (16px)"
+   },
+   {
+    "prop": "z-index",
+    "value": "1",
+    "snap": "no layer token: local stacking, isolate the parent"
+   }
+  ],
+  "dup_of": [],
+  "note": "Drawer close button position. z-index 1 is local stacking inside the drawer, not a layer."
+ },
+ {
+  "line": 491,
+  "selector": "#notif",
+  "target": "region:Notifications",
+  "offtoken": [
+   {
+    "prop": "top",
+    "value": "86px",
+    "snap": "--stage-top (NEW TOKEN, 102px)"
+   },
+   {
+    "prop": "right",
+    "value": "24px",
+    "snap": "--space (24px)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "16px",
+    "snap": "--radius-l (16px)"
+   },
+   {
+    "prop": "z-index",
+    "value": "9",
+    "snap": "--z-popover"
+   },
+   {
+    "prop": "box-shadow",
+    "value": "0 18px 48px rgba(0, 0, 0, 0.55)",
+    "snap": "NEW TOKEN --shadow-raised = 0 16px 48px rgba(0,0,0,0.5)"
+   }
+  ],
+  "dup_of": [
+   396
+  ],
+  "note": "Override of 396 for the same element, 95 lines later: 4 !important (top, right, border, z-index) that a single rule would not need. top 86 is a fifth header offset (86, 96, 98, 102, 118); z-index 9 -> popover layer."
+ },
+ {
+  "line": 492,
+  "selector": "#board",
+  "target": "region:Board",
+  "offtoken": [
+   {
+    "prop": "top",
+    "value": "98px",
+    "snap": "--stage-top (NEW TOKEN, 102px)"
+   },
+   {
+    "prop": "left",
+    "value": "24px",
+    "snap": "--space (24px)"
+   },
+   {
+    "prop": "right",
+    "value": "24px",
+    "snap": "--space (24px)"
+   },
+   {
+    "prop": "bottom",
+    "value": "24px",
+    "snap": "--space (24px)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "24px",
+    "snap": "--radius-xl (24px)"
+   }
+  ],
+  "dup_of": [
+   409
+  ],
+  "note": "Override of 409 for the same element: 4 !important to replace top/left/right/bottom set 83 lines earlier. Merge the two rules. top 98 -> --stage-top."
+ },
+ {
+  "line": 493,
+  "selector": "#hnav",
+  "target": "region:Header",
+  "offtoken": [
+   {
+    "prop": "left",
+    "value": "32px",
+    "snap": "--space (32px)"
+   },
+   {
+    "prop": "right",
+    "value": "32px",
+    "snap": "--space (32px)"
+   },
+   {
+    "prop": "top",
+    "value": "34px",
+    "snap": "NEW TOKEN --chrome-edge = 34px (DS Layout: header 34 px from the edge, ticker 34 px high; 12px on phones)"
+   },
+   {
+    "prop": "gap",
+    "value": "16px",
+    "snap": "--space (16px)"
+   },
+   {
+    "prop": "z-index",
+    "value": "3",
+    "snap": "--z-chrome"
+   }
+  ],
+  "dup_of": [],
+  "note": "Header (slice 5). DS: 34 px from the edge, grid 1fr auto 1fr. At 900px and below 762 forces display:flex !important, at 860px 962 changes the columns again."
+ },
+ {
+  "line": 494,
+  "selector": "#hnav .brand",
+  "target": "region:Header",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "19px",
+    "snap": "--text-title-s (20px)"
+   },
+   {
+    "prop": "gap",
+    "value": "10px",
+    "snap": "--space (12px)"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "-0.03em",
+    "snap": "none (title-s has no tracking)"
+   }
+  ],
+  "dup_of": [
+   175,
+   297
+  ],
+  "note": "Logotype: mark + wordmark. DS Layout names a logo but no component. 19px/300/-0.03em is logotype art; if text, --text-title-s."
+ },
+ {
+  "line": 495,
+  "selector": "#hnav .brand b",
+  "target": "region:Header",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Bold 'gno' of the logotype (weight 600 = display weight)."
+ },
+ {
+  "line": 496,
+  "selector": "#hnav .brand .mark",
+  "target": "region:Header",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "32px",
+    "snap": "--space (32px)"
+   },
+   {
+    "prop": "height",
+    "value": "32px",
+    "snap": "--control-s (32px) (control)"
+   }
+  ],
+  "dup_of": [
+   242,
+   166
+  ],
+  "note": "Logo mark svg, 32px."
+ },
+ {
+  "line": 497,
+  "selector": "#hnav .brand i",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   51
+  ],
+  "note": "dead: .brand has an svg.mark and no <i> (markup 1178); this orb was the removed topbar's mark (51)."
+ },
+ {
+  "line": 498,
+  "selector": "#hnav .links",
+  "target": "component:Tabs/segmented",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "2px",
+    "snap": "--space (4px)"
+   },
+   {
+    "prop": "padding",
+    "value": "4px",
+    "snap": "--space (4px)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "999px",
+    "snap": "--radius-pill (999px)"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(8, 11, 18, 0.45)",
+    "snap": "NEW TOKEN --color-glass = rgba(8,11,18,0.5): chrome floating over the scene"
+   },
+   {
+    "prop": "backdrop-filter",
+    "value": "blur(14px)",
+    "snap": "NEW TOKEN --blur-glass = 14px (one blur for every surface over the scene)"
+   }
+  ],
+  "dup_of": [
+   249,
+   346,
+   398,
+   438,
+   553
+  ],
+  "note": "Header view switcher (Earth, Universe, List, search). Glass fill .45 and blur 14 (exact). Markup is <nav> with aria-current, not a tablist: Tabs/segmented must allow nav semantics."
+ },
+ {
+  "line": 499,
+  "selector": "#hnav .links button",
+  "target": "component:Tabs/segmented/tab",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "11.5px",
+    "snap": "--text-ui (13px)"
+   },
+   {
+    "prop": "height",
+    "value": "34px",
+    "snap": "derived: fills the --control-l (44px) track (44 - 2x4 - 2)"
+   },
+   {
+    "prop": "padding",
+    "value": "16px",
+    "snap": "--space (16px)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "999px",
+    "snap": "--radius-pill (999px)"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "0.1em",
+    "snap": "none (Tabs use --text-ui, no caps)"
+   },
+   {
+    "prop": "text-transform",
+    "value": "uppercase",
+    "snap": "drop (no caps in Tabs)"
+   }
+  ],
+  "dup_of": [
+   250,
+   347,
+   399,
+   439,
+   554,
+   511
+  ],
+  "note": "Header tab: 11.5px caps with 0.1em tracking. DS Tabs are --text-ui (13px); caps style is repeated in 499, 511, 570, 674, 688, 896 with 11, 11.5 and 12px and 0.08/0.1em: one choice. Tab height 34 = 44 track - 2x4 padding - 2 border: derive, do not set."
+ },
+ {
+  "line": 500,
+  "selector": "#hnav .links #hFind",
+  "target": "component:IconButton/m",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "34px",
+    "snap": "derived: square = the tab height"
+   }
+  ],
+  "dup_of": [
+   206,
+   242,
+   556,
+   1124
+  ],
+  "note": "Search button inside the view switcher; a #id selector. Width 34 = tab height."
+ },
+ {
+  "line": 501,
+  "selector": "#hnav .links #hFind:hover",
+  "target": "component:IconButton/m/hover",
+  "offtoken": [
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.08)",
+    "snap": "NEW TOKEN --color-fill-hover = rgba(255,255,255,0.10): hover and soft-selected ground"
+   }
+  ],
+  "dup_of": [
+   156,
+   207,
+   335,
+   329,
+   191
+  ],
+  "note": "Hover wash .08."
+ },
+ {
+  "line": 502,
+  "selector": "#hnav .links .vsep",
+  "target": "component:Divider/vertical",
+  "offtoken": [
+   {
+    "prop": "height",
+    "value": "16px",
+    "snap": "--space (16px)"
+   },
+   {
+    "prop": "margin",
+    "value": "4px",
+    "snap": "--space (4px)"
+   }
+  ],
+  "dup_of": [
+   219,
+   193,
+   593
+  ],
+  "note": "Vertical separator in the switcher, 1px by 16px. Four separators in the file (193, 219, 502, border-left of 593): one Divider."
+ },
+ {
+  "line": 503,
+  "selector": "#hnav .links button[aria-current=\"true\"]",
+  "target": "component:Tabs/segmented/selected",
+  "offtoken": [],
+  "dup_of": [
+   251,
+   315,
+   343,
+   348,
+   400,
+   440,
+   509,
+   558,
+   571,
+   604,
+   811,
+   919
+  ],
+  "note": "Current view = primary fill."
+ },
+ {
+  "line": 504,
+  "selector": "#hnav .acts",
+  "target": "composition:Cluster",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "10px",
+    "snap": "--space (12px)"
+   }
+  ],
+  "dup_of": [
+   61,
+   569,
+   175,
+   297
+  ],
+  "note": "Right side of the header: Cluster, gap 10 -> 12. Holds the buttons that app.js moves in (4183)."
+ },
+ {
+  "line": 505,
+  "selector": "#hnav .lead",
+  "target": "composition:Cluster",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "22px",
+    "snap": "--space (24px)"
+   }
+  ],
+  "dup_of": [
+   50,
+   55,
+   878
+  ],
+  "note": "Wrapper around the logo only; with one child it is a no-op. gap 22 -> 24."
+ },
+ {
+  "line": 506,
+  "selector": "#hnav .lead .brand",
+  "target": "region:Header",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "flex:none on the logo; redundant once .lead is removed."
+ },
+ {
+  "line": 507,
+  "selector": "#hGuide .gorb",
+  "target": "component:Icon/jarvis-orb",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "14px",
+    "snap": "--space (16px)"
+   },
+   {
+    "prop": "height",
+    "value": "14px",
+    "snap": "--space (16px)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "50%",
+    "snap": "--radius-pill (999px) (a circle on a square box)"
+   },
+   {
+    "prop": "box-shadow",
+    "value": "0 0 8px rgba(92, 242, 200, 0.6)",
+    "snap": "art glow inside the Icon: color-mix of --color-action, no token"
+   },
+   {
+    "prop": "background",
+    "value": "radial-gradient(#FFFFFF, #BFF8E8, #5CF2C8, transparent)",
+    "snap": "--color-text to --color-action radial; #BFF8E8 is a tint of the two"
+   }
+  ],
+  "dup_of": [
+   344,
+   627,
+   818
+  ],
+  "note": "Jarvis orb, 14px. Drawn 4 times (344, 507, 627, 818) at 26/14/16/14px with the same radial gradient: one Icon (slice 10)."
+ },
+ {
+  "line": 508,
+  "selector": "#hGuide, #hChat",
+  "target": "component:Button/secondary/l",
+  "offtoken": [
+   {
+    "prop": "padding",
+    "value": "16px",
+    "snap": "--space (16px)"
+   }
+  ],
+  "dup_of": [
+   513
+  ],
+  "note": "Header Jarvis/Chat buttons: color text and padding 16 where .pillbtn is muted and 18. Two near-identical secondary buttons (.ghost 43, .pillbtn 513). Height 44 comes from 870."
+ },
+ {
+  "line": 509,
+  "selector": "#hChat[aria-expanded=\"true\"]",
+  "target": "component:Button/secondary/pressed",
+  "offtoken": [],
+  "dup_of": [
+   571,
+   315,
+   604,
+   811,
+   919
+  ],
+  "note": "Pressed look driven by aria-expanded here but aria-pressed in 571: DS reads pressed from aria-pressed and disclosure from aria-expanded."
+ },
+ {
+  "line": 510,
+  "selector": "#hnav .views .links",
+  "target": "component:Tabs/segmented/l",
+  "offtoken": [
+   {
+    "prop": "height",
+    "value": "44px",
+    "snap": "--control-l (44px) (control)"
+   }
+  ],
+  "dup_of": [
+   1118
+  ],
+  "note": "Track at --control-l (44px) so the header controls share one height."
+ },
+ {
+  "line": 511,
+  "selector": ".txtbtn",
+  "target": "component:Button/text/m",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "11.5px",
+    "snap": "--text-label (11px)"
+   },
+   {
+    "prop": "padding",
+    "value": "8px",
+    "snap": "--space (8px)"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "0.1em",
+    "snap": "--text-label tracking (0.14em)"
+   }
+  ],
+  "dup_of": [
+   53,
+   93,
+   499,
+   674,
+   688,
+   896
+  ],
+  "note": "Text button, caps 11.5px / 0.1em. Same look as 499, 674 (12px, 0.08em), 688, 896 (12px, 0.08em): one Button/text. Font is Geist where --text-label is Geist Mono: pick one."
+ },
+ {
+  "line": 512,
+  "selector": ".txtbtn:hover",
+  "target": "component:Button/text/hover",
+  "offtoken": [],
+  "dup_of": [
+   675,
+   689
+  ],
+  "note": "Text button hover to the action colour; 675 and 689 are the same."
+ },
+ {
+  "line": 513,
+  "selector": ".pillbtn",
+  "target": "component:Button/secondary/m",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "13px",
+    "snap": "--text-ui (13px)"
+   },
+   {
+    "prop": "height",
+    "value": "40px",
+    "snap": "--control-m (40px) (control)"
+   },
+   {
+    "prop": "padding",
+    "value": "18px",
+    "snap": "--space (16px)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "999px",
+    "snap": "--radius-pill (999px)"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(8, 11, 18, 0.45)",
+    "snap": "NEW TOKEN --color-glass = rgba(8,11,18,0.5): chrome floating over the scene"
+   },
+   {
+    "prop": "backdrop-filter",
+    "value": "blur(14px)",
+    "snap": "NEW TOKEN --blur-glass = 14px (one blur for every surface over the scene)"
+   },
+   {
+    "prop": "gap",
+    "value": "8px",
+    "snap": "--space (8px)"
+   }
+  ],
+  "dup_of": [
+   43,
+   342,
+   508,
+   498
+  ],
+  "note": "Glass pill button, 40px. .ghost (43) is the same button with a transparent fill: one secondary Button. Padding 18 -> 16. Slice 5."
+ },
+ {
+  "line": 514,
+  "selector": "#hero",
+  "target": "region:Hero",
+  "offtoken": [
+   {
+    "prop": "z-index",
+    "value": "2",
+    "snap": "--z-chrome"
+   },
+   {
+    "prop": "left",
+    "value": "48px",
+    "snap": "--space (48px)"
+   },
+   {
+    "prop": "bottom",
+    "value": "64px",
+    "snap": "--space (64px)"
+   },
+   {
+    "prop": "gap",
+    "value": "22px",
+    "snap": "--space (24px)"
+   },
+   {
+    "prop": "transition",
+    "value": "0.5s",
+    "snap": "--motion-slow (400ms)"
+   },
+   {
+    "prop": "transition",
+    "value": "0.6s",
+    "snap": "--motion-slow (400ms)"
+   },
+   {
+    "prop": "width",
+    "value": "min(820px, calc(100% - 260px))",
+    "snap": "max-inline-size 816px (8px grid); replace the raw 260 by a sum of --rail-w and space tokens"
+   }
+  ],
+  "dup_of": [
+   478,
+   550
+  ],
+  "note": "Hero (slice 5). 820px max width is not on the 8px grid (816 is); calc(100% - 260px) is a raw sum with no token: derive it from --rail-w and the space tokens. Transition names its properties (good); 0.5s and 0.6s -> --motion-slow."
+ },
+ {
+  "line": 515,
+  "selector": "#hero > *",
+  "target": "region:Hero",
+  "offtoken": [],
+  "dup_of": [
+   665
+  ],
+  "note": "Pass-through overlay pattern: container pointer-events:none, children auto. Same as #focus > * (665)."
+ },
+ {
+  "line": 516,
+  "selector": "#hero .heroNum",
+  "target": "component:Stat/hero",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "14px",
+    "snap": "--space (16px)"
+   }
+  ],
+  "dup_of": [],
+  "note": "Hero number block: number plus vertical unit, flex-start, gap 14 -> 16."
+ },
+ {
+  "line": 517,
+  "selector": "#hero .num",
+  "target": "component:Stat/hero/value",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "clamp(88px, 11vw, 176px)",
+    "snap": "--text-hero"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "-0.06em",
+    "snap": "--text-hero (add -0.06em to the token or drop)"
+   },
+   {
+    "prop": "line-height",
+    "value": "0.82",
+    "snap": "baked into --text-hero (add 0.82)"
+   },
+   {
+    "prop": "text-shadow",
+    "value": "0 2px 40px rgba(0, 0, 0, 0.55)",
+    "snap": "NEW TOKEN --shadow-text-scene = 0 2px 32px rgba(0,0,0,0.6)"
+   }
+  ],
+  "dup_of": [],
+  "note": "Hero number 88-176px = --text-hero exactly (5.5rem, 11vw, 11rem). Tracking -0.06em and line-height 0.82 are not in the token: add them to it."
+ },
+ {
+  "line": 518,
+  "selector": "#hero .unit",
+  "target": "component:Stat/hero/unit",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "12px",
+    "snap": "--text-label (11px)"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "0.24em",
+    "snap": "--text-label tracking (0.14em)"
+   }
+  ],
+  "dup_of": [],
+  "note": "Vertical 'online' unit in the action colour, caps 12px / 0.24em: --text-label."
+ },
+ {
+  "line": 519,
+  "selector": "#hero .heroCap",
+  "target": "component:Stat/hero/caption",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "17px",
+    "snap": "--text-lead (16px)"
+   },
+   {
+    "prop": "color",
+    "value": "#C8D0DE",
+    "snap": "--color-text"
+   }
+  ],
+  "dup_of": [
+   428,
+   650
+  ],
+  "note": "Hero sentence, 17px nowrap. DS --text-lead is 16px/1.55."
+ },
+ {
+  "line": 520,
+  "selector": "#hero .heroCap b",
+  "target": "component:Stat/hero/caption",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Bold parts of the sentence."
+ },
+ {
+  "line": 521,
+  "selector": "#heroStats #stats",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   534
+  ],
+  "note": "dead: every declaration is overridden by 534 (display !important, nowrap, gap 30px, border 0; same specificity, later); height:auto is a no-op."
+ },
+ {
+  "line": 522,
+  "selector": "#heroStats .stat",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   535,
+   528
+  ],
+  "note": "dead: padding and margin are overridden by 535 (!important, later), border:0 equals 535's, height:auto is a no-op."
+ },
+ {
+  "line": 523,
+  "selector": "#heroStats .stat .big",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   538
+  ],
+  "note": "dead: font-size is overridden by 538 (16px !important, same specificity, later)."
+ },
+ {
+  "line": 524,
+  "selector": "#heroStats .stat svg",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   541,
+   529
+  ],
+  "note": "dead: width is overridden by 541 (56px !important, later); flex:none is repeated there."
+ },
+ {
+  "line": 525,
+  "selector": "#heroStats .stat.optional",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   526,
+   484
+  ],
+  "note": "dead for the rebuild: hides the 'Messages . 24 h' stat that no view shows (also display:none under 1560px, 956). Delete the element and the rule."
+ },
+ {
+  "line": 526,
+  "selector": "#heroStats .stat.online",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   525,
+   484
+  ],
+  "note": "dead for the rebuild: hides the 'Online' stat, which duplicates the hero number. Delete the element and the rule."
+ },
+ {
+  "line": 527,
+  "selector": "#heroStats #stats",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   534
+  ],
+  "note": "dead: flex-wrap overridden by 534 (nowrap, later at the same specificity)."
+ },
+ {
+  "line": 528,
+  "selector": "#heroStats .stat",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   535,
+   522
+  ],
+  "note": "dead: padding-right/margin-right !important overridden by 535 (padding:0 !important, margin:0 !important, later)."
+ },
+ {
+  "line": 529,
+  "selector": "#heroStats .stat svg",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [
+   541,
+   524
+  ],
+  "note": "dead: width 60px !important overridden by 541 (56px !important, later)."
+ },
+ {
+  "line": 530,
+  "selector": "#hero .heroRow",
+  "target": "composition:Cluster",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "28px",
+    "snap": "--space (32px)"
+   }
+  ],
+  "dup_of": [
+   241,
+   673,
+   809,
+   895
+  ],
+  "note": "Hero row: sentence then actions (flex, wrap, gap 28 -> 32). Same Cluster as 673, 809, 895."
+ },
+ {
+  "line": 531,
+  "selector": "#hero .heroRow .cta",
+  "target": "composition:Cluster",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "10px",
+    "snap": "--space (12px)"
+   }
+  ],
+  "dup_of": [
+   809,
+   895
+  ],
+  "note": "Two big actions side by side, gap 10 -> 12. .cta also has gap 24 at 895, so the same class carries two gaps and the id rule wins."
+ },
+ {
+  "line": 533,
+  "selector": "#heroStats",
+  "target": "feature:markets-row",
+  "offtoken": [
+   {
+    "prop": "padding-top",
+    "value": "16px",
+    "snap": "--space (16px)"
+   },
+   {
+    "prop": "border-top",
+    "value": "rgba(255, 255, 255, 0.1)",
+    "snap": "--color-line"
+   }
+  ],
+  "dup_of": [],
+  "note": "Markets and chain row under the hero (slice 5: markets row from markets.json). Border-top is a Divider; padding-top 16."
+ },
+ {
+  "line": 534,
+  "selector": "#heroStats #stats",
+  "target": "feature:markets-row",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "30px",
+    "snap": "--space (32px)"
+   }
+  ],
+  "dup_of": [],
+  "note": "Live part of the row: !important on display only to beat #stats {display:none} at 1280px (957), gap 30 -> 32. DS: this row is the first to drop when space runs short."
+ },
+ {
+  "line": 535,
+  "selector": "#heroStats .stat",
+  "target": "feature:markets-row",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "10px",
+    "snap": "--space (12px)"
+   }
+  ],
+  "dup_of": [
+   55,
+   522,
+   528
+  ],
+  "note": "Exists to cancel 522, 528 and the base .stat (55: padding 0 24px, border-right) with 3 !important. Remove the base rules and this one goes."
+ },
+ {
+  "line": 536,
+  "selector": "#heroStats .stat .col",
+  "target": "composition:Stack",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "2px",
+    "snap": "--space (4px)"
+   }
+  ],
+  "dup_of": [
+   56
+  ],
+  "note": "After snapping 2px -> 4px this equals `.stat .col` (56): delete."
+ },
+ {
+  "line": 537,
+  "selector": "#heroStats .stat small",
+  "target": "component:Stat/compact/caption",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "10px",
+    "snap": "--text-label (11px)"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "0.12em",
+    "snap": "--text-label tracking (0.14em)"
+   }
+  ],
+  "dup_of": [
+   35,
+   994,
+   1149,
+   175,
+   987
+  ],
+  "note": "Caption small: 10px mono caps 0.12em muted = the base `small` (35: same five declarations, before 885 raises the base to 11px). After snapping both are --text-label: delete."
+ },
+ {
+  "line": 538,
+  "selector": "#heroStats .stat .big",
+  "target": "component:Stat/compact/value",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "16px",
+    "snap": "--text-lead (16px)"
+   }
+  ],
+  "dup_of": [
+   523,
+   100,
+   57
+  ],
+  "note": "Price at 16px !important to beat 523 (26px). DS --text-lead (16px)."
+ },
+ {
+  "line": 539,
+  "selector": "#heroStats .stat .big sup",
+  "target": "component:Stat/compact/unit",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "9px",
+    "snap": "--text-label (11px)"
+   },
+   {
+    "prop": "margin-left",
+    "value": "3px",
+    "snap": "--space (4px)"
+   }
+  ],
+  "dup_of": [],
+  "note": "USD unit at 9px, the smallest size in the file (9, 9.5, 10, 10.5, 11 px all exist)."
+ },
+ {
+  "line": 540,
+  "selector": "#heroStats .stat .delta",
+  "target": "component:Stat/compact/delta",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "10.5px",
+    "snap": "--text-label (11px)"
+   }
+  ],
+  "dup_of": [
+   38
+  ],
+  "note": "Trend, mono 10.5px, colour from .delta (38)."
+ },
+ {
+  "line": 541,
+  "selector": "#heroStats .stat svg",
+  "target": "component:ActivityChart/line",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "56px",
+    "snap": "56px on the size scale (--control-xl as a size)"
+   },
+   {
+    "prop": "height",
+    "value": "20px",
+    "snap": "--space (24px)"
+   }
+  ],
+  "dup_of": [
+   58,
+   102
+  ],
+  "note": "Price sparkline (line + area), 56x20 !important to beat 524 and 529. NEW variant: DS ActivityChart is bars; the markets row needs a line. Width is on the size scale, height 20 -> 24."
+ },
+ {
+  "line": 542,
+  "selector": "#heroStats",
+  "target": "feature:markets-row",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Row hidden under 900px: DS drops the markets row when space runs short, after the ticker (not by a device width)."
+ },
+ {
+  "line": 543,
+  "selector": "#hero .cta .link",
+  "target": "component:Button/secondary/xl",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "15px",
+    "snap": "--text-lead (16px)"
+   },
+   {
+    "prop": "gap",
+    "value": "10px",
+    "snap": "--space (12px)"
+   },
+   {
+    "prop": "height",
+    "value": "52px",
+    "snap": "--control-xl (56px) (control)"
+   },
+   {
+    "prop": "padding",
+    "value": "24px",
+    "snap": "--space (24px)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "999px",
+    "snap": "--radius-pill (999px)"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(8, 11, 18, 0.5)",
+    "snap": "NEW TOKEN --color-glass = rgba(8,11,18,0.5): chrome floating over the scene"
+   },
+   {
+    "prop": "backdrop-filter",
+    "value": "blur(12px)",
+    "snap": "NEW TOKEN --blur-glass = 14px (one blur for every surface over the scene)"
+   }
+  ],
+  "dup_of": [
+   814,
+   41,
+   43,
+   897
+  ],
+  "note": "Hero big action: 52px high, glass .5, blur 12. DS: the hero's main action is --control-xl (56px). Resets letter-spacing 0 and text-transform none to undo `.cta button.link` (896). The typed arrow span is forbidden by the DS (Icon instead)."
+ },
+ {
+  "line": 544,
+  "selector": "#hero .cta #hExplore",
+  "target": "component:Button/primary/xl",
+  "offtoken": [],
+  "dup_of": [
+   814,
+   41,
+   1031
+  ],
+  "note": "Hero primary, fill primary. The plate's primary (.bigcta, 814: 56px) is the same button declared again: one Button/primary/xl."
+ },
+ {
+  "line": 545,
+  "selector": "#hero .cta .link:hover",
+  "target": "component:Button/secondary/xl/hover",
+  "offtoken": [],
+  "dup_of": [
+   178,
+   585
+  ],
+  "note": "Hover: border to the text colour. Chip hover (178) goes to edge-strong: one hover border."
+ },
+ {
+  "line": 546,
+  "selector": "#hero .cta .link span",
+  "target": "component:Button/secondary/xl",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "17px",
+    "snap": "--text-lead (16px)"
+   }
+  ],
+  "dup_of": [],
+  "note": "Typed arrow in a span, 17px. DS: no typed arrows; use an Icon (16px grid)."
+ },
+ {
+  "line": 547,
+  "selector": "#hero .explored",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: no `.explored` element in the hero markup (1182-1187) or created by app.js; the only 'explored' block is #explored in the left drawer, itself hidden by 830."
+ },
+ {
+  "line": 548,
+  "selector": "#hero .explored b",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: same, child of the missing `.explored`."
+ },
+ {
+  "line": 549,
+  "selector": "body[data-focus=\"on\"] #hero",
+  "target": "region:Hero",
+  "offtoken": [
+   {
+    "prop": "transform",
+    "value": "translateY(20px)",
+    "snap": "translateY(--space (24px))"
+   }
+  ],
+  "dup_of": [
+   660
+  ],
+  "note": "Hides the hero while body[data-focus=on] (set in showCard, app.js 1975, which go() calls at the start of a flight). 660 hides it for data-view=focus: two attributes for one state."
+ },
+ {
+  "line": 550,
+  "selector": "#hRail",
+  "target": "region:Rail",
+  "offtoken": [
+   {
+    "prop": "right",
+    "value": "24px",
+    "snap": "--space (24px)"
+   },
+   {
+    "prop": "top",
+    "value": "98px",
+    "snap": "--stage-top (NEW TOKEN, 102px)"
+   },
+   {
+    "prop": "bottom",
+    "value": "56px",
+    "snap": "calc(var(--chrome-edge) + var(--space-24)) = 58px (ticker height + space)"
+   },
+   {
+    "prop": "width",
+    "value": "120px",
+    "snap": "NEW TOKEN --rail-w = 120px"
+   },
+   {
+    "prop": "padding",
+    "value": "12px",
+    "snap": "--space (12px)"
+   },
+   {
+    "prop": "z-index",
+    "value": "2",
+    "snap": "--z-chrome"
+   },
+   {
+    "prop": "border-radius",
+    "value": "24px",
+    "snap": "--radius-xl (24px)"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(8, 11, 18, 0.45)",
+    "snap": "NEW TOKEN --color-glass = rgba(8,11,18,0.5): chrome floating over the scene"
+   },
+   {
+    "prop": "backdrop-filter",
+    "value": "blur(18px)",
+    "snap": "NEW TOKEN --blur-glass = 14px (one blur for every surface over the scene)"
+   }
+  ],
+  "dup_of": [
+   926,
+   514
+  ],
+  "note": "Rail of worlds (slice 5 data; slice 7 dock magnification). top 98 -> --stage-top, bottom 56 = ticker 34 + 22. Width 120 is also the width of #fRail (926): NEW TOKEN --rail-w."
+ },
+ {
+  "line": 551,
+  "selector": "#hRailList",
+  "target": "region:Rail",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "2px",
+    "snap": "--space (4px)"
+   }
+  ],
+  "dup_of": [
+   928
+  ],
+  "note": "Rail list, 7 of 8 declarations identical to #fRailList (928): two rails (cosmos and focus) that should be one component."
+ },
+ {
+  "line": 552,
+  "selector": "#hRailList button",
+  "target": "region:Rail",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "104px",
+    "snap": "derived: --rail-w - 2x --space (8px)"
+   },
+   {
+    "prop": "padding",
+    "value": "6px",
+    "snap": "--space (8px)"
+   },
+   {
+    "prop": "gap",
+    "value": "6px",
+    "snap": "--space (8px)"
+   }
+  ],
+  "dup_of": [
+   929
+  ],
+  "note": "Rail item: planet over a two-line name. Identical to #fRailList button (929). Width 104 = rail width - 2x8."
+ },
+ {
+  "line": 553,
+  "selector": "#hRailTabs",
+  "target": "component:Tabs/segmented",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "4px",
+    "snap": "--space (4px)"
+   },
+   {
+    "prop": "margin",
+    "value": "2px",
+    "snap": "--space (4px)"
+   },
+   {
+    "prop": "margin",
+    "value": "14px",
+    "snap": "--space (16px)"
+   },
+   {
+    "prop": "margin",
+    "value": "10px",
+    "snap": "--space (12px)"
+   },
+   {
+    "prop": "padding",
+    "value": "4px",
+    "snap": "--space (4px)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "999px",
+    "snap": "--radius-pill (999px)"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.06)",
+    "snap": "NEW TOKEN --color-fill = rgba(255,255,255,0.05): the field/chip/card ground"
+   }
+  ],
+  "dup_of": [
+   249,
+   346,
+   398,
+   438,
+   498
+  ],
+  "note": "Rail worlds/groups switch, icon only. Here a fill (.06) and no border, like #libTabs (249); #lens, #notifTabs, .seg and #hnav .links use a border instead."
+ },
+ {
+  "line": 554,
+  "selector": "#hRailTabs button",
+  "target": "component:Tabs/segmented/tab",
+  "offtoken": [
+   {
+    "prop": "height",
+    "value": "32px",
+    "snap": "--control-s (32px) (control)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "999px",
+    "snap": "--radius-pill (999px)"
+   }
+  ],
+  "dup_of": [
+   250,
+   347,
+   399,
+   439,
+   499
+  ],
+  "note": "Icon-only tab, 32px."
+ },
+ {
+  "line": 555,
+  "selector": "#hRailTabs svg",
+  "target": "component:Icon/default",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "18px",
+    "snap": "--space (16px)"
+   },
+   {
+    "prop": "height",
+    "value": "18px",
+    "snap": "--space (16px)"
+   }
+  ],
+  "dup_of": [
+   218,
+   817
+  ],
+  "note": "18px icon in a tab; icon sizes 13, 15, 16, 17, 18 exist. DS: one 16px grid."
+ },
+ {
+  "line": 556,
+  "selector": "#fRailList button.up .upic",
+  "target": "component:IconButton/m",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "22px",
+    "snap": "drop with the typed arrow (use an Icon)"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.08)",
+    "snap": "NEW TOKEN --color-fill-hover = rgba(255,255,255,0.10): hover and soft-selected ground"
+   },
+   {
+    "prop": "border",
+    "value": "rgba(255, 255, 255, 0.18)",
+    "snap": "--color-line-strong"
+   }
+  ],
+  "dup_of": [
+   242,
+   500
+  ],
+  "note": "'Up' tile of the focus rail (app.js 1898). Typed arrow glyph at 22px in a .thumbp; 3 !important to undo .thumbp. DS: no typed arrows; it is an IconButton with an arrow Icon, not a PlanetThumb."
+ },
+ {
+  "line": 557,
+  "selector": "#fRailList button.up",
+  "target": "component:IconButton/m",
+  "offtoken": [
+   {
+    "prop": "margin-bottom",
+    "value": "6px",
+    "snap": "--space (8px)"
+   },
+   {
+    "prop": "padding-bottom",
+    "value": "14px",
+    "snap": "--space (16px)"
+   },
+   {
+    "prop": "border-bottom",
+    "value": "rgba(255, 255, 255, 0.12)",
+    "snap": "--color-line"
+   }
+  ],
+  "dup_of": [],
+  "note": "Container of the 'up' tile: margin-bottom 6, padding-bottom 14 and a bottom hairline; the separator is a Divider."
+ },
+ {
+  "line": 558,
+  "selector": "#hRailTabs button[aria-selected=\"true\"]",
+  "target": "component:Tabs/segmented/selected",
+  "offtoken": [],
+  "dup_of": [
+   251,
+   315,
+   343,
+   348,
+   400,
+   440,
+   503,
+   509,
+   571,
+   604,
+   811,
+   919
+  ],
+  "note": "Selected rail tab = primary fill."
+ },
+ {
+  "line": 559,
+  "selector": "#chatList .trnote",
+  "target": "component:Message/default/translation-note",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "11px",
+    "snap": "--text-meta (12px)"
+   },
+   {
+    "prop": "margin-top",
+    "value": "3px",
+    "snap": "--space (4px)"
+   }
+  ],
+  "dup_of": [
+   560
+  ],
+  "note": "'Translated from X . show original' link in a message (slice 10, automatic translation). A text Button/text."
+ },
+ {
+  "line": 560,
+  "selector": "#chatList .trnote:hover",
+  "target": "component:Message/default/translation-note",
+  "offtoken": [],
+  "dup_of": [
+   729,
+   804
+  ],
+  "note": "Hover: text colour plus underline, the same as 729 and 804."
+ },
+ {
+  "line": 561,
+  "selector": "#hRailList small.sec",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead: no element has class `sec` (renderHRail creates plain <small>: app.js 4224); font-size 9px !important would also lose to 884."
+ },
+ {
+  "line": 562,
+  "selector": ".thumbp.star",
+  "target": "component:PlanetThumb/star",
+  "offtoken": [
+   {
+    "prop": "background",
+    "value": "var(--sc, #DDE7FF)",
+    "snap": "--color-text (fallback of the per-star --sc)"
+   }
+  ],
+  "dup_of": [],
+  "note": "Star thumb. 3 !important only because the `.thumbp` base (931) comes 370 lines after its variants (562-567): fix the order."
+ },
+ {
+  "line": 563,
+  "selector": ".thumbp.cluster",
+  "target": "component:PlanetThumb/cluster",
+  "offtoken": [
+   {
+    "prop": "border",
+    "value": "rgba(244, 246, 250, 0.35)",
+    "snap": "--color-line-strong"
+   }
+  ],
+  "dup_of": [
+   936
+  ],
+  "note": "Ecosystem cluster: dashed outline, three small planets inside. 3 !important for the same reason; dashed outlines come in 3 looks (936, 563, 365)."
+ },
+ {
+  "line": 564,
+  "selector": ".thumbp.cluster > .thumbp",
+  "target": "component:PlanetThumb/cluster",
+  "offtoken": [],
+  "dup_of": [
+   933
+  ],
+  "note": "Cluster child size. !important because `#hRailList .thumbp` (933, id specificity) sets width: calc(64px * var(--mag)) on every .thumbp, nested ones too. Magnify the item with transform: scale, not by width."
+ },
+ {
+  "line": 565,
+  "selector": ".thumbp.cluster > .thumbp:nth-child(1)",
+  "target": "component:PlanetThumb/cluster",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "First moon of the cluster, percent position."
+ },
+ {
+  "line": 566,
+  "selector": ".thumbp.cluster > .thumbp:nth-child(2)",
+  "target": "component:PlanetThumb/cluster",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Second moon, 36% (!important, see 564)."
+ },
+ {
+  "line": 567,
+  "selector": ".thumbp.cluster > .thumbp:nth-child(3)",
+  "target": "component:PlanetThumb/cluster",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Third moon, 30% (!important, see 564)."
+ },
+ {
+  "line": 568,
+  "selector": "#hRailList small",
+  "target": "region:Rail",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "9px",
+    "snap": "--text-label (11px)"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "0.08em",
+    "snap": "--text-label tracking (0.14em)"
+   },
+   {
+    "prop": "color",
+    "value": "rgba(244, 246, 250, 0.75)",
+    "snap": "--color-text-muted"
+   },
+   {
+    "prop": "max-width",
+    "value": "100px",
+    "snap": "derived: --rail-w - 2x --space (8px) - gap"
+   }
+  ],
+  "dup_of": [
+   930
+  ],
+  "note": "Planet name under a rail item. font-size 9px loses to 884 (11px !important); white-space/overflow/ellipsis lose to 1082 (2-line clamp): only letter-spacing, colour and max-width survive. 9px is the 3rd smallest size in the file."
+ },
+ {
+  "line": 569,
+  "selector": "#hnav .views",
+  "target": "composition:Cluster",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "8px",
+    "snap": "--space (8px)"
+   }
+  ],
+  "dup_of": [
+   504,
+   61
+  ],
+  "note": "Centre of the header: switcher in a Cluster. At 900px and below 765 pins it to the bottom of the screen with position:fixed."
+ },
+ {
+  "line": 570,
+  "selector": ".pillbtn.small",
+  "target": "component:Button/secondary/s",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "11px",
+    "snap": "--text-label (11px)"
+   },
+   {
+    "prop": "height",
+    "value": "34px",
+    "snap": "--control-s (32px)"
+   },
+   {
+    "prop": "padding",
+    "value": "12px",
+    "snap": "--space (12px)"
+   },
+   {
+    "prop": "letter-spacing",
+    "value": "0.08em",
+    "snap": "--text-label tracking (0.14em)"
+   }
+  ],
+  "dup_of": [
+   43,
+   513
+  ],
+  "note": "Small glass pill used for Seal (phase 2). NEW size: DS Button has m, l, xl; --control-s (32px) is for toolbars and chips. Caps 11px with 0.08em again."
+ },
+ {
+  "line": 571,
+  "selector": ".pillbtn[aria-pressed=\"true\"]",
+  "target": "component:Button/secondary/pressed",
+  "offtoken": [],
+  "dup_of": [
+   251,
+   315,
+   343,
+   348,
+   400,
+   440,
+   503,
+   509,
+   558,
+   604,
+   811,
+   919
+  ],
+  "note": "Pressed state on .pillbtn (the second pressed look for one component; 509 uses aria-expanded)."
+ },
+ {
+  "line": 572,
+  "selector": "#chat .head",
+  "target": "region:ChatDock",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "6px",
+    "snap": "--space (8px)"
+   },
+   {
+    "prop": "gap",
+    "value": "12px",
+    "snap": "--space (12px)"
+   }
+  ],
+  "dup_of": [
+   135,
+   633
+  ],
+  "note": "Chat header grid: title and switch left, window controls right, 2 rows. Placement by grid-area numbers; .ttl is display:contents (573) to flatten it: use a named grid. Slice 4."
+ },
+ {
+  "line": 573,
+  "selector": "#chat .head .ttl",
+  "target": "region:ChatDock",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "display:contents hack to promote .ttl's children into the header grid."
+ },
+ {
+  "line": 574,
+  "selector": "#chat .head #roomPlace",
+  "target": "component:Kicker/default",
+  "offtoken": [],
+  "dup_of": [
+   53,
+   93
+  ],
+  "note": "Place line over the room name, a <small> Kicker with ellipsis; grid-area 1/1."
+ },
+ {
+  "line": 575,
+  "selector": "#chat .head #roomInfo",
+  "target": "dead",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "dead for the rebuild: #roomInfo exists only to be hidden; app.js still writes its text (2479, 2527). Delete the element."
+ },
+ {
+  "line": 576,
+  "selector": "#chat .head #roomSwitch",
+  "target": "component:Button/text/m",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "8px",
+    "snap": "--space (8px)"
+   }
+  ],
+  "dup_of": [
+   93,
+   180
+  ],
+  "note": "Room switcher: room name plus a chevron, opens #roomPop (Popover trigger). Resets the button look with padding 0, border 0 and no background."
+ },
+ {
+  "line": 577,
+  "selector": "#chat .head #roomSwitch svg",
+  "target": "component:Button/text/m",
+  "offtoken": [
+   {
+    "prop": "transition",
+    "value": "0.2s",
+    "snap": "--motion-base (200ms)"
+   }
+  ],
+  "dup_of": [
+   269
+  ],
+  "note": "Chevron turns with the popover: transition: transform 0.2s = --motion-base exactly."
+ },
+ {
+  "line": 578,
+  "selector": "#chat .head #roomSwitch:hover svg, #chat .head #roomSwitch[aria-expanded=\"true\"] svg",
+  "target": "component:Button/text/m",
+  "offtoken": [],
+  "dup_of": [
+   579
+  ],
+  "note": "Chevron colour on hover and when expanded (579 rotates it)."
+ },
+ {
+  "line": 579,
+  "selector": "#chat .head #roomSwitch[aria-expanded=\"true\"] svg",
+  "target": "component:Button/text/m",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Rotates the chevron when aria-expanded: state read from the attribute, as the DS wants."
+ },
+ {
+  "line": 580,
+  "selector": "#chat .head .ttl b",
+  "target": "utility:truncate",
+  "offtoken": [],
+  "dup_of": [
+   53,
+   68,
+   89,
+   168,
+   182,
+   267,
+   349,
+   837
+  ],
+  "note": "NEW utility: `white-space: nowrap; overflow: hidden; text-overflow: ellipsis` is written out in 10 rules (53, 68, 89, 168, 182, 267, 349, 574, 837 and here)."
+ },
+ {
+  "line": 581,
+  "selector": "#chat .head .wctl",
+  "target": "composition:Cluster",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "6px",
+    "snap": "--space (8px)"
+   }
+  ],
+  "dup_of": [
+   586,
+   61
+  ],
+  "note": "Window controls (expand, close): Cluster gap 6 -> 8, placed by grid-area 1/2. DS: window controls sit above content actions, never in the same row."
+ },
+ {
+  "line": 582,
+  "selector": "#chat .head .wctl .iconbtn",
+  "target": "component:IconButton/s",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "32px",
+    "snap": "--space (32px)"
+   },
+   {
+    "prop": "height",
+    "value": "32px",
+    "snap": "--control-s (32px) (control)"
+   }
+  ],
+  "dup_of": [
+   594,
+   166,
+   242,
+   206
+  ],
+  "note": "Window control: .iconbtn is 40px, forced to 32 here; the 32px round line button is also 594, 166, 242. Colour muted."
+ },
+ {
+  "line": 583,
+  "selector": "#chat .head .wctl .iconbtn span",
+  "target": "component:IconButton/s",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Icon wrapper that swaps expand/shrink icons (584): render one icon from aria-pressed instead."
+ },
+ {
+  "line": 584,
+  "selector": "body[data-chat=\"full\"] #chat #chatExpand .i-exp, body:not([data-chat=\"full\"]) #chat #chatExpand .i-shr",
+  "target": "component:IconButton/s/pressed",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Hides one of two icons by body[data-chat]; the button already has aria-pressed (app.js 1949): read the state from it."
+ },
+ {
+  "line": 585,
+  "selector": "#chat .head .wctl .iconbtn:hover",
+  "target": "component:IconButton/s/hover",
+  "offtoken": [],
+  "dup_of": [
+   178,
+   1104
+  ],
+  "note": "Hover: colour to text, border to edge-strong."
+ },
+ {
+  "line": 586,
+  "selector": "#chat .head .hacts",
+  "target": "composition:Cluster",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "2px",
+    "snap": "--space (4px)"
+   }
+  ],
+  "dup_of": [
+   204,
+   61
+  ],
+  "note": "Container of the Seal button (only child): Cluster gap 2 -> 4, grid-area 2/2."
+ },
+ {
+  "line": 587,
+  "selector": "#chat .head #sealBtn",
+  "target": "component:Button/secondary/s",
+  "offtoken": [],
+  "dup_of": [
+   288
+  ],
+  "note": "Undoes #sealBtn's margin-right: 4px (288) set 299 lines earlier: delete both."
+ },
+ {
+  "line": 588,
+  "selector": "#roomNav",
+  "target": "region:ChatDock",
+  "offtoken": [
+   {
+    "prop": "padding",
+    "value": "12px",
+    "snap": "--space (12px)"
+   },
+   {
+    "prop": "padding",
+    "value": "var(--pad)",
+    "snap": "--space (24px)"
+   }
+  ],
+  "dup_of": [
+   165,
+   241
+  ],
+  "note": "Room sidebar header (slice 4): padding 12 24, bottom hairline. Full mode turns it into a grid column (636, 704)."
+ },
+ {
+  "line": 589,
+  "selector": "#roomNav .rn-title",
+  "target": "region:ChatDock",
+  "offtoken": [],
+  "dup_of": [
+   637
+  ],
+  "note": "Section titles of the room nav, hidden in the dock and shown in the full chat (637)."
+ },
+ {
+  "line": 590,
+  "selector": "#roomChips",
+  "target": "composition:Cluster",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "6px",
+    "snap": "--space (8px)"
+   }
+  ],
+  "dup_of": [
+   1101,
+   213,
+   323
+  ],
+  "note": "Room chips: scrolling Cluster, gap 6 -> 8; 825 masks its edge."
+ },
+ {
+  "line": 591,
+  "selector": ".rn-row",
+  "target": "composition:Sidebar",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "8px",
+    "snap": "--space (8px)"
+   }
+  ],
+  "dup_of": [
+   61,
+   65
+  ],
+  "note": "Chips grow, tools stay fixed: a Sidebar composition."
+ },
+ {
+  "line": 592,
+  "selector": ".rn-row #roomChips",
+  "target": "composition:Sidebar",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Chips take the remaining width (flex:1, min-width:0)."
+ },
+ {
+  "line": 593,
+  "selector": ".rtools",
+  "target": "composition:Cluster",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "2px",
+    "snap": "--space (4px)"
+   },
+   {
+    "prop": "padding-left",
+    "value": "8px",
+    "snap": "--space (8px)"
+   }
+  ],
+  "dup_of": [],
+  "note": "Media/Saved tools group; the left border is a Divider."
+ },
+ {
+  "line": 594,
+  "selector": ".rtools .tbtn",
+  "target": "component:IconButton/s",
+  "offtoken": [
+   {
+    "prop": "width",
+    "value": "32px",
+    "snap": "--space (32px)"
+   },
+   {
+    "prop": "height",
+    "value": "32px",
+    "snap": "--control-s (32px) (control)"
+   }
+  ],
+  "dup_of": [
+   166,
+   210,
+   242,
+   496,
+   582
+  ],
+  "note": "Tool button 32px here, 30px in 206, 34px in 217: three sizes in one class (.tbtn)."
+ },
+ {
+  "line": 595,
+  "selector": ".rtools .lbl",
+  "target": "region:ChatDock",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Label of a tool, hidden in the dock and shown in the full chat (602): responsive text, a container query in the DS."
+ },
+ {
+  "line": 596,
+  "selector": "body[data-chat=\"full\"] .rn-row",
+  "target": "region:ChatDock",
+  "offtoken": [
+   {
+    "prop": "gap",
+    "value": "14px",
+    "snap": "--space (16px)"
+   }
+  ],
+  "dup_of": [],
+  "note": "Full chat: tools go from a row to a column, gap 14 -> 16."
+ },
+ {
+  "line": 597,
+  "selector": "body[data-chat=\"full\"] .rtools",
+  "target": "region:ChatDock",
+  "offtoken": [
+   {
+    "prop": "padding",
+    "value": "12px",
+    "snap": "--space (12px)"
+   },
+   {
+    "prop": "padding",
+    "value": "4px",
+    "snap": "--space (4px)"
+   }
+  ],
+  "dup_of": [],
+  "note": "Full chat: tools separated by a top hairline instead of a left one."
+ },
+ {
+  "line": 598,
+  "selector": "body[data-chat=\"full\"] #chat .rtools .tbtn",
+  "target": "component:Row/sidebar",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "14px",
+    "snap": "--text-body (14px)"
+   },
+   {
+    "prop": "height",
+    "value": "38px",
+    "snap": "--control-m (40px) (control)"
+   },
+   {
+    "prop": "gap",
+    "value": "12px",
+    "snap": "--space (12px)"
+   },
+   {
+    "prop": "padding",
+    "value": "12px",
+    "snap": "--space (12px)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "10px",
+    "snap": "--radius-s (8px) (inner control)"
+   }
+  ],
+  "dup_of": [
+   180,
+   264,
+   713,
+   718,
+   833
+  ],
+  "note": "Tool as a sidebar row in the full chat: 38px, radius 10, 14px. Rows of the sidebar (tools 598, rooms 639, DMs 713) share one look: one Row/sidebar. Inner radius 10 -> 8."
+ },
+ {
+  "line": 599,
+  "selector": ".rtools .tbtn[aria-current=\"true\"]",
+  "target": "component:IconButton/s/current",
+  "offtoken": [
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.1)",
+    "snap": "NEW TOKEN --color-fill-hover = rgba(255,255,255,0.10): hover and soft-selected ground"
+   }
+  ],
+  "dup_of": [
+   156,
+   207,
+   604
+  ],
+  "note": "Current tool = white wash (.1); the current room in the same sidebar is primary-filled (604, 641) and the current DM too (714): two 'current' looks in one component."
+ },
+ {
+  "line": 600,
+  "selector": "body[data-chat=\"full\"] #chat .rtools .tbtn[aria-current=\"true\"]",
+  "target": "component:Row/sidebar/selected",
+  "offtoken": [],
+  "dup_of": [
+   251,
+   315,
+   343,
+   348,
+   400,
+   440,
+   503,
+   509,
+   558,
+   571,
+   604,
+   811,
+   919
+  ],
+  "note": "Current tool in the full chat = primary fill: contradicts 599 above (a wash)."
+ },
+ {
+  "line": 601,
+  "selector": "body[data-chat=\"full\"][data-lib] .room[aria-current=\"true\"]",
+  "target": "component:Row/sidebar/current",
+  "offtoken": [
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.06)",
+    "snap": "NEW TOKEN --color-fill-hover = rgba(255,255,255,0.10): hover and soft-selected ground"
+   }
+  ],
+  "dup_of": [
+   604,
+   641
+  ],
+  "note": "Current room while the library is open: a .06 wash instead of the primary fill, because the Media tool is current. Wash .06 -> --color-fill-hover."
+ },
+ {
+  "line": 602,
+  "selector": "body[data-chat=\"full\"] .rtools .lbl",
+  "target": "region:ChatDock",
+  "offtoken": [],
+  "dup_of": [],
+  "note": "Shows the tool label in full chat; pair of 595."
+ },
+ {
+  "line": 603,
+  "selector": ".room",
+  "target": "component:Chip/default",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "12.5px",
+    "snap": "--text-ui (13px)"
+   },
+   {
+    "prop": "gap",
+    "value": "6px",
+    "snap": "--space (8px)"
+   },
+   {
+    "prop": "height",
+    "value": "30px",
+    "snap": "--control-s (32px) (control)"
+   },
+   {
+    "prop": "padding",
+    "value": "12px",
+    "snap": "--space (12px)"
+   },
+   {
+    "prop": "border-radius",
+    "value": "999px",
+    "snap": "--radius-pill (999px)"
+   },
+   {
+    "prop": "background",
+    "value": "rgba(255, 255, 255, 0.04)",
+    "snap": "NEW TOKEN --color-fill = rgba(255,255,255,0.05): the field/chip/card ground"
+   }
+  ],
+  "dup_of": [
+   177,
+   324,
+   1102,
+   158,
+   918,
+   1030
+  ],
+  "note": "Room chip (slice 4): 30px high, radius 999, fill .04, 12.5px. In the full chat it becomes a sidebar row (639-641): same class, two components."
+ },
+ {
+  "line": 604,
+  "selector": ".room[aria-current=\"true\"]",
+  "target": "component:Chip/selected",
+  "offtoken": [],
+  "dup_of": [
+   251,
+   315,
+   343,
+   348,
+   400,
+   440,
+   503,
+   509,
+   558,
+   571,
+   811,
+   919
+  ],
+  "note": "Current room = primary fill (aria-current)."
+ },
+ {
+  "line": 605,
+  "selector": ".room .cnt",
+  "target": "component:Chip/default/count",
+  "offtoken": [
+   {
+    "prop": "font-size",
+    "value": "10.5px",
+    "snap": "--text-label (11px)"
+   },
+   {
+    "prop": "opacity",
+    "value": "0.6",
+    "snap": "--color-text-muted (no opacity on text)"
+   }
+  ],
+  "dup_of": [
+   640
+  ],
+  "note": "Room count, mono 10.5px at 60% opacity. DS: counts are --text-label; use --color-text-muted, not opacity (contrast stays measurable)."
+ }
+]

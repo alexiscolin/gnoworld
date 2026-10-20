@@ -51,7 +51,7 @@ This ADR records:
   station.
 - **signal:** a new realm not yet charted.
 - **satellite:** a sponsored slot (§1); people are not drawn as satellites (§8). People are
-  **astronauts**: an avatar is never a planet.
+  **nebulae** (astronauts until 2026-10-20, `docs/decisions.md`): an avatar is never a planet.
 
 ## Context
 
@@ -137,7 +137,7 @@ Phases are ADR-0001's:
 | List view | Everything as panels, no 3D, filterable by genre | 0 | — | — |
 | Search | ⌘K over the current universe's worlds, ecosystems, stations and genres, grouped with their counts, with "Go explore" on top; satellites labelled "Sponsored"; in phase 1 over every realm, dust included | 0 | — | — |
 | Loader | Real texture progress, then the space opens like an iris | 0 | — | — |
-| Menu and settings | The account button (your astronaut) opens a menu: passport, saved, settings, help, log out; on a phone, a menu button holds it with the navigation. Settings gather every choice in one place: **display** (quality Auto, High or Low; reduce animations; the 3D on a phone), **language** (yours, and automatic translation on or off), **notifications** (by kind and by world; push), **privacy** (DMs only from people you have talked with; Earth presence; the country tag; analytics; keeping your Jarvis questions), **account** (your name, your astronaut), **this device** (export or clear the passport, saved messages and drafts) | 0 | The device, and the server for DMs and push | — |
+| Menu and settings | The account button (your nebula) opens a menu: passport, saved, settings, help, log out; on a phone, a menu button holds it with the navigation. Settings gather every choice in one place: **display** (quality Auto, High or Low; reduce animations; the 3D on a phone), **language** (yours, and automatic translation on or off), **notifications** (by kind and by world; push), **privacy** (DMs only from people you have talked with; Earth presence; the country tag; analytics; keeping your Jarvis questions), **account** (your name, your astronaut), **this device** (export or clear the passport, saved messages and drafts) | 0 | The device, and the server for DMs and push | — |
 
 **Chat** (Ergo in phase 0, ADR-0001 §1)
 
@@ -157,7 +157,7 @@ Phases are ADR-0001's:
 | Contextual quick actions: Who's here, Calendar, Realm, Proposal, Station, Catch up, Poll | 0, votes and Catch up included; Poll in 1 | — |
 | Who's here: the people in the room | 0 | Ergo `NAMES` |
 | Person card: the worlds a person belongs to, message them, fly to them | 0 for the worlds they are in and "Message", a plain DM (below); 1 for the profile realm, "helped N" and the stamp count if the person publishes it | Ergo; `r/sys/users` |
-| Your name and face | 0: your account is your address `g1…`, the same on every chain. The name shown is your mainnet name (`r/sys/users`), or your short address if you have none. Your astronaut is generated from the address: a stylized, futuristic suit and helmet with few details, readable at 20 px, the same everywhere. Registering a name happens in the app from phase 0: a call card to `r/sys/namereg/v0.Register` (`nym-` names), signed in Adena (§4). 1: choose the suit, helmet, visor and emblem, saved in the profile realm. Never a planet; no uploaded picture (§6) | The astronaut generator (SVG from parts); `r/sys/users`, `r/sys/namereg/v0`; the profile realm |
+| Your name and face | 0: your account is your address `g1…`, the same on every chain. The name shown is your mainnet name (`r/sys/users`), or your short address if you have none. Your nebula is generated from the address: three clouds of colour and your constellation over them (five stars and their line), readable at 20 px, the same everywhere. Registering a name happens in the app from phase 0: a call card to `r/sys/namereg/v0.Register` (`nym-` names), signed in Adena (§4). 1: choose its palette, saved in the profile realm; where its clouds and stars sit always comes from the address. Never a planet; no uploaded picture (§6) | The nebula generator (SVG from the address and the palette); `r/sys/users`, `r/sys/namereg/v0`; the profile realm |
 | Notifications filtered by kind (messages, worlds, news) and by world | 0 in the app. News comes from a file the team curates | Ergo mentions |
 | Push notifications | 1, through the PWA: desktop, Android, and the iPhone from iOS 16.4 once the site is added to the home screen. Native apps come only when measurement justifies them, with their own ADR: Capacitor on mobile, Tauri on desktop, both wrapping the same React code. Never a rewrite such as React Native | `draft/webpush`, and the PWA (ADR-0001 §12) |
 | Photos and videos, gallery and lightbox | 0: links from accepted services render as embeds once the moderation check passes. gnoworld hosts no uploads (§6) | The embed allowlist |
@@ -1133,7 +1133,7 @@ All decided by Alexis on 2026-10-17.
 | 6 | No voice | Voice rooms, and events in a "voice lounge" | A WebRTC voice room in phase 1, after phase 0, with its own ADR first |
 | 7 | "Ideas to place": phase 0 takes none of them; ads tier 2 in phase 2; short videos in phase 3 or later | Satellites, Broadcast Moon, the GovDAO world, the person card, video embeds | **Satellites:** on Onyx in phase 0, shown only in the Onyx universe; on mainnet after an external audit and mainnet's approval, without holding back phase 0's exit (Alexis, 2026-10-17).<br>- a fixed daily price in GNOT, set by the team in the slot realm; 40 characters at most, for 1, 3 or 7 days; at most one per world; renting needs a login (tier 1), and a limit per address;<br>- the text passes the name filter and the moderation API before the transaction: the moderation service signs an approval that the slot realm verifies (ed25519), so a satellite goes live at once, and only after that check;<br>- the realm's operator key, on the server, takes one down after a report and refunds the days left; its owner, a multisig of two admins on hardware wallets, rotates the approver's key and can pause renting;<br>- on mainnet, the revenue's recipient is named in the realm before launch;<br>- labelled "Sponsored", as advertising law requires.<br>**Broadcast Moon:** a curated station in phase 0, with videos embedded from accepted services (§6).<br>**The person card:** phase 0 in its basic form.<br>**Embeds:** links in phase 0. No uploads are hosted (§6) |
 | 8 | Rollout: "tips and stamps in the same transaction" | Passport stamps | Two different things. Passport stamps record visits on the device. ADR-0001's stamps travel with a tip |
-| 9 | §10: a generated identicon | A planet chosen as an avatar | An astronaut generated from the name; its parts chosen in phase 1 and saved in the profile realm. Never a planet (§1) |
+| 9 | §10: a generated identicon | A planet chosen as an avatar | A nebula generated from the address (an astronaut as §1 said, until Alexis chose the nebula on 2026-10-20, `docs/decisions.md`): where its clouds and stars sit always comes from the address; its palette is chosen in phase 1 and saved in the profile realm. Never a planet (§1) |
 | 10 | §7: "mobile is the same space" | The full 3D on a phone | Chat first on phones: the chat full screen, the places as a list with planet thumbnails (the Open Graph images of §2), and the 3D only on request ("View in space"), loaded when asked and when the device can. Nothing of three.js or its textures loads before that |
 | 11 | Rollout: in phase 0 "the chain is read, never written" | Calls, votes, a name registered in the app, satellites | From phase 0, users sign their own calls in Adena (§4). gnoworld's own write in phase 0 is the slot realm on Onyx; its approvals and takedowns are signed by gnoworld's keys, on the server |
 | 12 | §1, §2, §12 and §13: a small Go program on `auth-script`; "no Node server in production"; one Go binary (the stdlib, `coder/websocket`, `gnoclient`) | — | One TypeScript server on Node, sharing `core` and the schemas with the client, run as two containers (`server`, `jarvis`); still no rendering server. Adena's SDK verifies logins; Ergo stays, as an image (§7) |
@@ -1443,7 +1443,7 @@ k6 runs as a binary or an image, not as a package.
 - "new here";
 - routed questions;
 - the weekly report, written by the team;
-- the profile realm: the astronaut's parts, the stamp count if published;
+- the profile realm: the nebula's palette, the stamp count if published;
 - Langfuse Cloud for Jarvis;
 - satellites on mainnet, once audited and approved;
 - speaking and signing on phones, when Adena can sign there (a decision first).

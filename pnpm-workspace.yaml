@@ -20,4 +20,5 @@ engineStrict: true
 overrides:
   qs: "^6.16.0"
 allowBuilds:
+  esbuild: false # its postinstall only re-fetches the binary optionalDependencies already install
   unrs-resolver: false # its postinstall only re-fetches the native binding, which optionalDependencies already install

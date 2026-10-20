@@ -56,3 +56,13 @@ jobs:
           fi
       - name: The full gate
         run: sh scripts/check.sh --full
+      # When the gate fails on stories Linux has no approved picture of, Playwright has written one:
+      # the pictures are kept a week, for Alexis to approve and commit (docs/plans/slice-2.md).
+      - name: Linux's pictures of the stories, written where none was approved
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: stories-pictures-linux
+          path: app/tests/stories/__screenshots__/linux/
+          if-no-files-found: ignore
+          retention-days: 7

@@ -110,9 +110,9 @@ export default defineConfig(
     extends: [tseslint.configs.disableTypeChecked],
   },
   {
-    // The app: React's hooks and the compiler's rules, and nothing from data into the DOM as HTML
-    // (docs/ARCHITECTURE.md, "React" and the security checklist). Their warnings fail too.
-    files: ["app/src/**/*.{ts,tsx}"],
+    // The app and the design system: React's hooks and the compiler's rules, and nothing from data
+    // into the DOM as HTML (docs/ARCHITECTURE.md, "React" and the security checklist). Their warnings fail too.
+    files: ["app/src/**/*.{ts,tsx}", "packages/ui/src/**/*.{ts,tsx}"],
     extends: [reactHooks.configs.flat["recommended-latest"], eslintReact.configs["strict-type-checked"]],
     rules: {
       // A route answers "not found" by throwing React Router's data(); nothing else but an Error.
@@ -182,6 +182,25 @@ export default defineConfig(
       "no-restricted-globals": ["error", "globalThis", "window", "document", "self", "fetch", "process"],
       "no-restricted-syntax": ["error", ...SWALLOWED, ...IMPURE],
       "@typescript-eslint/triple-slash-reference": ["error", { lib: "never", path: "never", types: "never" }],
+    },
+  },
+  {
+    // ui: the design system imports only itself and its packages, never the app, core or a config.
+    files: ["packages/ui/**/*.{ts,tsx}"],
+    rules: {
+      "import-x/no-restricted-paths": [
+        "error",
+        {
+          zones: [
+            {
+              target: "./packages/ui",
+              from: "./",
+              except: ["./packages/ui", "./node_modules"],
+              message: "ui imports only ui (docs/ARCHITECTURE.md).",
+            },
+          ],
+        },
+      ],
     },
   },
   {

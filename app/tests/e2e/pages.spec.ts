@@ -139,6 +139,29 @@ test.describe("once the client takes over", () => {
     });
   }
 
+  for (const { path } of pages) {
+    test(`${path} wears the design system, its fonts served from the site itself`, async ({ page, baseURL }) => {
+      const site = new URL(baseURL ?? "http://unset").origin;
+      const elsewhere: string[] = [];
+      page.on("request", (request) => {
+        if (new URL(request.url()).origin !== site) elsewhere.push(request.url());
+      });
+      await page.goto(path);
+      await hydrated(page);
+      await page.evaluate(() => document.fonts.ready);
+      // check() answers true for a family no face declares: only a loaded face proves the font.
+      const look = await page.evaluate(() => ({
+        loaded: [...document.fonts].filter((face) => face.status === "loaded").map((face) => face.family),
+        family: getComputedStyle(document.body).fontFamily,
+        ground: getComputedStyle(document.body).backgroundColor,
+      }));
+      expect(look.family).toContain("Geist Variable");
+      expect(look.loaded.some((family) => family.includes("Geist Variable"))).toBe(true);
+      expect(look.ground).toBe("rgb(5, 7, 13)");
+      expect(elsewhere).toEqual([]);
+    });
+  }
+
   // No page prints the name it was asked for yet (F119): this guards the day one does.
   test("a world name made of markup stays text", async ({ page }) => {
     const dialogs: string[] = [];
@@ -154,22 +177,30 @@ test.describe("once the client takes over", () => {
   });
 });
 
-// The scripts a page loads, by the paths its HTML names.
-function scripts(html: string): string[] {
-  return [...html.matchAll(/(?:src|href)="(\/assets\/[^"]+\.js)"/g)].map((match) => match[1] ?? "");
+// The files of one kind a page loads, by the paths its HTML names.
+function assets(html: string, kind: "js" | "css"): string[] {
+  return [...html.matchAll(new RegExp(`(?:src|href)="(/assets/[^"]+\\.${kind})"`, "g"))].map((match) => match[1] ?? "");
 }
 
 test("the test host serves each kind of file the build writes with its type, as a real host would", async ({
   request,
 }) => {
   const home = await (await request.get("/")).text();
+  const sheets = assets(home, "css");
+  expect(sheets.length).toBeGreaterThan(0);
+  const fonts = (await Promise.all(sheets.map(async (sheet) => (await request.get(sheet)).text()))).flatMap((css) =>
+    [...css.matchAll(/url\((\/assets\/[^)]+\.woff2)\)/g)].map((match) => match[1] ?? ""),
+  );
+  expect(fonts.length).toBeGreaterThan(0);
   const files = [
     ["/", "text/html"],
     ["/w/bubble.data", "text/x-script"],
     ["/manifest.webmanifest", "application/manifest+json"],
     ["/icon-192.png", "image/png"],
     ["/sw.js", "text/javascript"],
-    ...scripts(home).map((path) => [path, "text/javascript"]),
+    ...assets(home, "js").map((path) => [path, "text/javascript"]),
+    ...sheets.map((path) => [path, "text/css"]),
+    ...fonts.map((path) => [path, "font/woff2"]),
   ];
   for (const [path = "", type = ""] of files) {
     expect((await request.get(path)).headers()["content-type"], path).toContain(type);
@@ -177,7 +208,7 @@ test("the test host serves each kind of file the build writes with its type, as 
 });
 
 test("the React Compiler compiled the routes, not only React's own runtime", async ({ request }) => {
-  const chunks = scripts(await (await request.get("/")).text());
+  const chunks = assets(await (await request.get("/")).text(), "js");
   expect(chunks.some((chunk) => chunk.includes("/compiler-runtime-"))).toBe(true);
   const routes = chunks.filter((chunk) => /\/assets\/(root|home)-/.test(chunk));
   expect(routes.length).toBeGreaterThan(0);

@@ -27,6 +27,7 @@ to 6 is committed, never in between: each run costs him its whole length.
    reconsider the approach with Alexis before any more code. Launch these together:
    - always: Claude Code's `/code-review` and `/security-review`; tell each the ledger's open and
      fixed findings for the files it reads, so none is raised again;
+   - always: the `complexity-reviewer` agent, the cost in big O of each loop the range adds;
    - a tier-1 file (`docs/REVIEW.md`): also the `security-reviewer` agent (Opus), which reads
      the project's threat model, and, for a realm, the `gno-auditor`;
    - the last merge of a slice with tier-1 code: propose to Alexis that he runs

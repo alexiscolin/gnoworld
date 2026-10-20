@@ -194,11 +194,12 @@ def test_names(root):
     if os.path.exists(os.path.join(root, "vitest.config.ts")):
         out = subprocess.run(["node_modules/.bin/vitest", "list", "--json"], cwd=root, capture_output=True, text=True, check=True).stdout
         names |= {f"{relative(t['file'], root)} > {t['name']}" for t in json.loads(out)}
-    if os.path.exists(os.path.join(root, "app/playwright.config.ts")):
-        # Node, not pnpm's shim: the shim spells paths from $PWD, whose case can differ from the
-        # directory's on macOS, and Playwright loaded under two spellings lists no test.
-        command = ["node", "app/node_modules/@playwright/test/cli.js", "test", "-c", "app/playwright.config.ts", "--list", "--reporter=json"]
-        names |= journeys(subprocess.run(command, cwd=root, capture_output=True, text=True).stdout, root)
+    for config in ("app/playwright.config.ts", "app/playwright.stories.config.ts"):  # the app's journeys, the stories'
+        if os.path.exists(os.path.join(root, config)):
+            # Node, not pnpm's shim: the shim spells paths from $PWD, whose case can differ from the
+            # directory's on macOS, and Playwright loaded under two spellings lists no test.
+            command = ["node", "app/node_modules/@playwright/test/cli.js", "test", "-c", config, "--list", "--reporter=json"]
+            names |= journeys(subprocess.run(command, cwd=root, capture_output=True, text=True).stdout, root)
     return names
 
 

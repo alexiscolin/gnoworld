@@ -14,6 +14,7 @@ import tempfile
 
 HERE = "packages/core/src/__probe__"
 APP = "app/src/__probe__"
+UI = "packages/ui/src/__probe__"
 LONG = "export function long(): number {\n  let n = 0;\n" + "  n += 1;\n" * 85 + "  return n;\n}\n"
 with open("package.json") as f:
     SCRIPTS = json.load(f)["scripts"]  # the gate's own commands, so a case proves what the gate runs
@@ -76,6 +77,15 @@ LINT = [
 ]
 
 
+# The messages of React's two bans, in the app and the design system alike.
+def banned(name):
+    return f"no-restricted-imports: '{name}' import from 'react' is restricted. The React Compiler memoizes"
+
+
+def restricted(name):
+    return f"no-restricted-properties: {name} is restricted from being used. Nothing reaches the DOM as HTML"
+
+
 def run(cmd, cwd="."):
     return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
 
@@ -83,6 +93,7 @@ def run(cmd, cwd="."):
 def plant(files, where=HERE):
     os.makedirs(where, exist_ok=True)
     for name, content in files.items():
+        os.makedirs(os.path.dirname(os.path.join(where, name)), exist_ok=True)
         with open(os.path.join(where, name), "w") as f:
             f.write(content)
 
@@ -148,6 +159,20 @@ try:
         expect(out.returncode != 0 and "assertion" in (out.stdout + out.stderr).lower(), "vitest refuses a test with no assertion")
         shutil.rmtree(HERE)
 
+    if part("vitest_ui"):
+        # The design system's tests run in jsdom, each on an empty page: none is left out by the
+        # project's globs, and the setup's cleanup holds (the second test sees one paragraph).
+        page = 'test("ui probe {}", () => {{\n  render(<p>once</p>);\n  expect(screen.getAllByText("once")).toHaveLength(1);\n}});\n'.format
+        plant({"probe.test.tsx": 'import { render, screen } from "@testing-library/react";\nimport { expect, test } from "vitest";\n\n' + page("one") + page("two")
+               + 'test("ui probe fails", () => {\n  expect(document.title).toBe("never this title");\n});\n'}, where=UI)
+        out = run(["node_modules/.bin/vitest", "run", "--reporter=json", f"{UI}/probe.test.tsx"])
+        try:
+            states = {t["title"]: t["status"] for f in json.loads(out.stdout)["testResults"] for t in f["assertionResults"]}
+        except (ValueError, KeyError):
+            states = {}
+        expect(states == {"ui probe one": "passed", "ui probe two": "passed", "ui probe fails": "failed"}, f"vitest runs ui's tests in jsdom, each on an empty page: {states}")
+        shutil.rmtree(UI)
+
     if part("prettier"):
         # Prettier: a file that is not formatted.
         plant({"messy.ts": "export const  a={b:1,\n c :2}\n"})
@@ -179,12 +204,6 @@ try:
         def ref(code):
             return uses("useEffect, useRef") + component(body=f"  const boxRef = useRef<HTMLDivElement>(null);\n  useEffect(() => {{\n    if (boxRef.current) {code}\n  }});\n  return <div ref={{boxRef}} />;\n")
         off = "no-restricted-syntax: A test is never switched off"
-
-        def banned(name):
-            return f"no-restricted-imports: '{name}' import from 'react' is restricted. The React Compiler memoizes"
-
-        def restricted(name):
-            return f"no-restricted-properties: {name} is restricted from being used. Nothing reaches the DOM as HTML"
         react = [
             ("clean.tsx", component(body="  return <p>{n}</p>;\n"), None),
             ("route_404.ts", 'import { data } from "react-router";\n\nexport function loader(): never {\n  throw data(null, { status: 404 });\n}\n', None),
@@ -223,6 +242,25 @@ try:
         lint_cases(react, APP, "app")
         shutil.rmtree(APP)
 
+    if part("ui_lint"):
+        # The design system: React's rules as in the app, and it imports nothing but itself.
+        ui = [
+            ("clean.tsx", "export function Card({ n }: { n: number }) {\n  return <p>{n}</p>;\n}\n", None),
+            ("manual_memo.tsx", 'import { useMemo } from "react";\n\nexport function Card({ n }: { n: number }) {\n  const twice = useMemo(() => n * 2, [n]);\n  return <p>{twice}</p>;\n}\n',
+             banned("useMemo")),
+            ("nested.tsx", "export function Card({ n }: { n: number }) {\n  function Inner() {\n    return <p>{n}</p>;\n  }\n  return <Inner />;\n}\n", "@eslint-react/no-nested-component-definitions"),
+            ("reaches_app.ts", 'import { WORLDS } from "../../../../app/src/worlds.ts";\n\nexport const w: unknown = WORLDS;\n', "import-x/no-restricted-paths"),
+            ("reaches_core.ts", 'import * as core from "../../../core/src/index.ts";\n\nexport const c: unknown = core;\n', "import-x/no-restricted-paths"),
+            ("reaches_config.ts", 'import config from "../../../../vitest.config.ts";\n\nexport const c: unknown = config;\n', "import-x/no-restricted-paths"),
+            ("passes_app_on.ts", 'export { WORLDS } from "../../../../app/src/worlds.ts";\n', "import-x/no-restricted-paths"),
+            ("loads_app.ts", 'export async function load(): Promise<unknown> {\n  return import("../../../../app/src/worlds.ts");\n}\n', "import-x/no-restricted-paths"),
+            ("raw_html.tsx", "export function Card({ n }: { n: string }) {\n  return <p dangerouslySetInnerHTML={{ __html: n }} />;\n}\n", "@eslint-react/dom-no-dangerously-set-innerhtml"),
+            ("inner_html.tsx", 'import { useEffect, useRef } from "react";\n\nexport function Card({ n }: { n: string }) {\n  const boxRef = useRef<HTMLDivElement>(null);\n  useEffect(() => {\n    if (boxRef.current) boxRef.current.innerHTML = n;\n  });\n  return <div ref={boxRef} />;\n}\n',
+             restricted("'innerHTML'")),
+        ]
+        lint_cases(ui, UI, "ui")
+        shutil.rmtree(UI)
+
     if part("react_warn"):
         # Several of the app's rules only warn: the lint script must fail on a warning.
         plant({"warned.tsx": 'import { forwardRef } from "react";\n\nexport const Card = forwardRef<HTMLParagraphElement>(function Card(_, r) {\n  return <p ref={r} />;\n});\n'}, where=APP)
@@ -239,6 +277,13 @@ try:
         expect("unchecked.ts" in out.stdout and "possibly 'undefined'" in out.stdout, "tsc refuses an unchecked index in the app")
         expect("erasable.ts" in out.stdout and "erasableSyntaxOnly" in out.stdout, "tsc refuses syntax Node cannot erase in the app")
         shutil.rmtree(APP)
+
+    if part("ui_tsc"):
+        # The design system is type-checked with the same flags, through the gate's own script.
+        plant({"unchecked.ts": "export function first(a: number[]): string {\n  return a[0].toFixed();\n}\n"}, where=UI)
+        out = run(["sh", "-c", f'PATH="$PWD/node_modules/.bin:$PATH" {SCRIPTS["typecheck"]}'])
+        expect("unchecked.ts" in out.stdout and "possibly 'undefined'" in out.stdout, "tsc refuses an unchecked index in ui")
+        shutil.rmtree(UI)
 
     if part("knip"):
         # knip: a file nothing imports.
@@ -332,7 +377,7 @@ try:
     if part("css"):
         # check_css: in a folder of its own, with its own tokens.
         css = tempfile.mkdtemp()
-        tokens = ":root {\n  --space-2: 0.5rem;\n  --color-text: #eee;\n  --radius-m: 8px;\n}\n"
+        tokens = ":root {\n  --p-grey: #eee;\n  --space-2: 0.5rem;\n  --color-text: var(--p-grey);\n  --radius-m: 8px;\n}\n"
         use = lambda *names: "import styles from './Card.module.css';\n" + "".join(f"export const {n} = styles.{n};\n" for n in names)
         card = ".card {{\n{}}}\n".format
         ok_decls = "  padding: var(--space-2);\n  color: var(--color-text);\n  border-radius: var(--radius-m);\n"
@@ -355,10 +400,54 @@ try:
             "transition: all": ({"Card.module.css": card(ok_decls + "  transition: all var(--space-2);\n"), "Card.tsx": use("card")}, "transition"),
             "a brace in a string hiding layout": ({"Card.module.css": card(ok_decls + '  --_mark: "}}";\n  display: flex;\n'), "Card.tsx": use("card")}, "layout"),
             "a raw value in a plain stylesheet": ({"base.css": "body {\n  color: #fff;\n}\n", "Card.module.css": card(ok_decls), "Card.tsx": use("card")}, "raw value"),
+            "a class named by its square brackets": ({"Card.module.css": card(ok_decls), "Card.tsx": "import styles from './Card.module.css';\nexport const c = styles[\"card\"];\n"}, None),
+            "a class the component names but its module lacks": ({"Card.module.css": card(ok_decls), "Card.tsx": use("card", "title")}, "missing class"),
+            "a missing class named by its square brackets": ({"Card.module.css": card(ok_decls), "Card.tsx": use("card") + "export const t = styles[\"title\"];\n"}, "missing class"),
+            "a primitive read outside the token file": ({"Card.module.css": card(ok_decls + "  outline-color: var(--p-grey);\n"), "Card.tsx": use("card")}, "primitive"),
+            "a primitive named in a component": ({"Card.module.css": card(ok_decls), "Card.tsx": use("card") + "export const p = \"--p-grey\";\n"}, "primitive"),
+            "a primitive named in single quotes": ({"Card.module.css": card(ok_decls), "Card.tsx": use("card") + "export const p = '--p-grey';\n"}, "primitive"),
+            "a primitive named in a template": ({"Card.module.css": card(ok_decls), "Card.tsx": use("card") + "export const p = `--p-grey`;\n"}, "primitive"),
+            "a primitive read in a plain stylesheet": ({"base.css": "body {\n  color: var(--p-grey);\n}\n", "Card.module.css": card(ok_decls), "Card.tsx": use("card")}, "primitive"),
+            "a primitive in a var() fallback": ({"Card.module.css": card(ok_decls + "  outline-color: var(--color-text, var(--p-grey));\n"), "Card.tsx": use("card")}, "primitive"),
+            "a class only a comment of its folder names": ({"Card.module.css": card(ok_decls) + ".extra {\n  color: var(--color-text);\n}\n", "Card.tsx": use("card") + "// styles.extra went with the old header\nexport const label = \"extra\";\n"}, "unused class"),
+            "a token only a test names": ({"Card.module.css": card("  padding: var(--space-2);\n  color: var(--color-text);\n"), "Card.tsx": use("card"), "Card.test.tsx": "export const r = \"--radius-m\";\n"}, "unused token"),
+            "a test names a primitive": ({"Card.module.css": card(ok_decls), "Card.tsx": use("card"), "Card.test.tsx": "export const p = \"--p-grey\";\n"}, None),
+            "a token that only starts like a primitive": ({"tokens.css": tokens.replace("}", "  --page-width: 10px;\n}"), "Card.module.css": card(ok_decls + "  max-inline-size: var(--page-width);\n"), "Card.tsx": use("card")}, None),
+            "a raw colour in a semantic token": ({"tokens.css": tokens.replace("var(--p-grey)", "#eee"), "Card.module.css": card(ok_decls), "Card.tsx": use("card")}, "made of primitives"),
+            "a second token file": ({"Card.module.css": card(ok_decls), "Card.tsx": use("card"), "app/tokens.css": ":root {\n  --color-mine: #5cf2c8;\n}\n"}, "second token file"),
+            "a class inside a layer and a container query": ({"Card.module.css": "@layer components {\n  @container (inline-size > 1px) {\n" + card(ok_decls) + "  }\n}\n", "Card.tsx": use("card")}, None),
+            "a kebab class named in camel case": ({"Card.module.css": card(ok_decls) + ".card-title {\n  color: var(--color-text);\n}\n", "Card.tsx": use("card", "cardTitle")}, "missing class"),
+            "a kebab class named by its brackets": ({"Card.module.css": card(ok_decls) + ".card-title {\n  color: var(--color-text);\n}\n", "Card.tsx": use("card") + "export const t = styles[\"card-title\"];\n"}, None),
+            "a module bound to another name": ({"Card.module.css": card(ok_decls), "Card.tsx": "import css from './Card.module.css';\nexport const c = css.card;\nexport const t = css.title;\n"}, "missing class"),
+            "a missing class in single-quoted brackets": ({"Card.module.css": card(ok_decls), "Card.tsx": use("card") + "export const t = styles['title'];\n"}, "missing class"),
+            "a class named only in a CSS comment": ({"Card.module.css": "/* .title */\n" + card(ok_decls), "Card.tsx": use("card", "title")}, "missing class"),
+            "a computed class": ({"Card.module.css": card(ok_decls), "Card.tsx": use("card") + "declare const v: string;\nexport const t = styles[v];\n"}, "computed"),
+            "a destructured module": ({"Card.module.css": card(ok_decls), "Card.tsx": "import styles from './Card.module.css';\nexport const { card } = styles;\n"}, "destructured"),
+            "a member of something else named styles": ({"Card.module.css": card(ok_decls), "Card.tsx": use("card") + "declare const theme: { styles: { title: string } };\nexport const t = theme.styles.title;\n"}, None),
+            "a class only in the sibling module": ({"Card.module.css": card(ok_decls), "Tile.module.css": ".title {\n  color: var(--color-text);\n}\n", "Tile.tsx": "import styles from './Tile.module.css';\nexport const t = styles.title;\n", "Card.tsx": use("card", "title")}, "missing class"),
+            "a module read from another folder": ({"Button/Button.module.css": card(ok_decls), "Button/Button.tsx": use("card").replace("./Card", "./Button"), "Icon/Icon.tsx": "import button from '../Button/Button.module.css';\nexport const c = button.card;\n"}, None),
+            "a missing class of a module from another folder": ({"Button/Button.module.css": card(ok_decls), "Button/Button.tsx": use("card").replace("./Card", "./Button"), "Icon/Icon.tsx": "import button from '../Button/Button.module.css';\nexport const s = button.square;\n"}, "missing class"),
+            "a state attribute no component sets": ({"Card.module.css": card(ok_decls) + ".card[data-spacing=\"s\"] {\n  color: var(--color-text);\n}\n", "Card.tsx": use("card") + "export const a = <div data-space=\"s\" />;\n"}, "no component sets"),
+            "a state attribute its component sets as an object's key": ({"Card.module.css": card(ok_decls) + ".card[data-space=\"s\"] {\n  color: var(--color-text);\n}\n", "Card.tsx": use("card") + "export const a = { \"data-space\": \"s\" };\n"}, None),
+            "a state attribute its component sets": ({"Card.module.css": card(ok_decls) + ".card[data-space=\"s\"] {\n  color: var(--color-text);\n}\n", "Card.tsx": use("card") + "export const a = <div data-space=\"s\" />;\n"}, None),
+            "a primitive read through var() in a component": ({"Card.module.css": card(ok_decls), "Card.tsx": use("card") + "export const s = { color: \"var(--p-grey)\" };\n"}, "primitive"),
+            "an unknown token read in a component": ({"Card.module.css": card(ok_decls), "Card.tsx": use("card") + "export const s = { color: \"var(--nope)\" };\n"}, "unknown token"),
+            "a token read only by a component's var()": ({"Card.module.css": card("  padding: var(--space-2);\n  color: var(--color-text);\n"), "Card.tsx": use("card") + "export const s = { borderRadius: \"var(--radius-m)\" };\n"}, None),
+            "a token named only in a CSS comment": ({"Card.module.css": "/* var(--radius-m) */\n" + card("  padding: var(--space-2);\n  color: var(--color-text);\n"), "Card.tsx": use("card")}, "unused token"),
+            "a token named only in a code comment": ({"Card.module.css": card("  padding: var(--space-2);\n  color: var(--color-text);\n"), "Card.tsx": use("card") + "// it read \"--radius-m\"\n"}, "unused token"),
+            "a token defined only in a comment": ({"tokens.css": tokens.replace("}", "  /* --ghost: 1px; */\n}"), "Card.module.css": card(ok_decls + "  outline-width: var(--ghost);\n"), "Card.tsx": use("card")}, "unknown token"),
+            "a state set only in a code comment": ({"Card.module.css": card(ok_decls) + ".card[data-spacing=\"s\"] {\n  color: var(--color-text);\n}\n", "Card.tsx": use("card") + "// data-spacing=\"s\" went\n"}, "no component sets"),
+            "a state set only by a test": ({"Card.module.css": card(ok_decls) + ".card[data-spacing=\"s\"] {\n  color: var(--color-text);\n}\n", "Card.tsx": use("card"), "Card.test.tsx": "export const a = <div data-spacing=\"s\" />;\n"}, "no component sets"),
+            "a token only a journey names": ({"Card.module.css": card("  padding: var(--space-2);\n  color: var(--color-text);\n"), "Card.tsx": use("card"), "card.spec.ts": "export const r = \"--radius-m\";\n"}, "unused token"),
+            "a primitive after a string that holds //": ({"Card.module.css": card(ok_decls), "Card.tsx": use("card") + "export const u = \"a//b\", p = \"--p-grey\";\n"}, "primitive"),
             "copied rules": ({"Card.module.css": card(ok_decls), "Card.tsx": use("card"), "Tile.module.css": ".tile {\n" + ok_decls + "}\n", "Tile.tsx": "import styles from './Tile.module.css';\nexport const tile = styles.tile;\n"}, "copied"),
         }
-        for case, (files, word) in cases.items():
-            root = os.path.join(css, case.replace(" ", "_"))
+        for n, (case, (files, word)) in enumerate(cases.items()):
+            if ONLY and failures:
+                break  # harness_mutate needs one failure, and the rest cost seconds per mutant
+            # A folder named by number: check_css prints paths, and a case's title in one would
+            # hold the very word the case waits for (the destructured case passed with its rule off).
+            root = os.path.join(css, f"case{n}")
             plant({"tokens.css": tokens, **files}, where=os.path.join(root, "ui"))
             out = run([sys.executable, "-I", "scripts/check_css.py", root])
             said = (out.stdout + out.stderr).lower()
@@ -368,6 +457,7 @@ try:
 finally:
     shutil.rmtree(HERE, ignore_errors=True)
     shutil.rmtree("packages/probe", ignore_errors=True)
+    shutil.rmtree(UI, ignore_errors=True)
     shutil.rmtree(APP, ignore_errors=True)
 
 if ONLY - ran:

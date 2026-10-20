@@ -20,19 +20,25 @@ PRODUCT = ("packages/", "gno/", "app/", "admin/", "server/")
 TEST = re.compile(r"(\.test\.tsx?|\.spec\.ts|_test\.gno|_filetest\.gno|_test\.go)$")
 # The command per kind of test, run from the worktree's root; tests override them (test_hooks.sh).
 VITEST = os.environ.get("PROVE_FIX_VITEST", "node_modules/.bin/vitest run")
-PLAYWRIGHT = os.environ.get("PROVE_FIX_PLAYWRIGHT", "node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts")
+PLAYWRIGHT = os.environ.get("PROVE_FIX_PLAYWRIGHT", "node app/node_modules/@playwright/test/cli.js test")
 GNO_TEST = os.environ.get("PROVE_FIX_GNO", f"{os.environ.get('GNO', 'gno')} test")
 GO_TEST = os.environ.get("PROVE_FIX_GO", "go test")
+# Each journey runs under the config of its folder, the first that holds it.
+CONFIGS = {"app/tests/stories/": "app/playwright.stories.config.ts", "": "app/playwright.config.ts"}
 
 
 def runs(tests):
-    """The commands that run these test files, each with the folder it runs in."""
+    """The commands that run these test files, each with the folder it runs in. A run that finds no
+    test passes, so a test no runner reaches reads as passing before the fix, never as failing."""
     vitest = [t for t in tests if t.endswith((".test.ts", ".test.tsx"))]
     gno = sorted({os.path.relpath(os.path.dirname(t), "gno") for t in tests if t.endswith(".gno")})
     go = sorted({os.path.relpath(os.path.dirname(t), "gno") for t in tests if t.endswith("_test.go")})
-    journeys = [t for t in tests if t.endswith(".spec.ts")]
-    out = [(".", f"{VITEST} {' '.join(vitest)}")] if vitest else []
-    out += [(".", f"{PLAYWRIGHT} {' '.join(journeys)}")] if journeys else []
+    journeys = {}
+    for t in tests:
+        if t.endswith(".spec.ts"):
+            journeys.setdefault(next(c for folder, c in CONFIGS.items() if t.startswith(folder)), []).append(t)
+    out = [(".", f"{VITEST} --passWithNoTests {' '.join(vitest)}")] if vitest else []
+    out += [(".", f"{PLAYWRIGHT} --pass-with-no-tests -c {config} {' '.join(files)}") for config, files in journeys.items()]
     out += [("gno", f"{GNO_TEST} {' '.join('./' + d for d in gno)}")] if gno else []
     out += [("gno", f"{GO_TEST} {' '.join('./' + d for d in go)}")] if go else []
     return out

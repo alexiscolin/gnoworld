@@ -450,6 +450,12 @@ elif [ "${1:-}" != --demo ]; then
 	case $(header content-type /sw.js 203.0.113.1 -u "$auth") in */javascript*) pass "the worker is a script" ;; *) fail "the worker is no script" ;; esac
 	expect "the manifest's type" "$(header content-type /manifest.webmanifest 203.0.113.1 -u "$auth")" application/manifest+json
 	expect "an icon's type" "$(header content-type /icon-192.png 203.0.113.1 -u "$auth")" image/png
+	# The design system's sheet and fonts (slice 2b): CSS and woff2, kept a year as every hashed file.
+	sheet=$(printf '%s\n' "$assets" | grep '\.css$' | head -1)
+	font=$(docker exec "$web" find /usr/share/nginx/html/assets -name '*.woff2' | head -1 | sed 's#^/usr/share/nginx/html##')
+	case $(header content-type "$sheet" 203.0.113.1 -u "$auth") in text/css*) pass "a style sheet is CSS" ;; *) fail "a style sheet ($sheet) is no CSS" ;; esac
+	expect "a font's type" "$(header content-type "$font" 203.0.113.1 -u "$auth")" font/woff2
+	expect "a font is kept a year" "$(header cache-control "$font" 203.0.113.1 -u "$auth")" "public, max-age=31536000, immutable"
 
 	at_least "a burst with no password gets 429" "$(codes 429 198.51.100.1 'http://web:8080/[1-200]')" 100
 	at_least "a burst with a wrong password gets 429" "$(codes 429 198.51.100.2 -u team:wrong 'http://web:8080/[1-200]')" 100

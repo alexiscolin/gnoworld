@@ -53,11 +53,12 @@ app/                         the web client
                              they parse with `@gnoworld/schemas` and apply `@gnoworld/core`
     store/                   the one Zustand store, one slice per feature
     scene/                   three.js only: renderer, loop, flights, bodies, level of detail, labels
-    ui/                      the design system: tokens, layers, components (docs/DESIGN-SYSTEM.md)
     features/                one folder per feature: chat, universe, world, realms, jarvis,
                              passport, notifications, events, search, profile, settings
   tests/e2e/                 Playwright: journeys, axe, budgets (bundle, Web Vitals, memory)
 packages/core/               pure rules, shared by app, admin and server: no DOM, no React, no network
+packages/ui/                 the design system: tokens, layers, compositions, components, Storybook
+                             (docs/DESIGN-SYSTEM.md); shared by app and admin
 packages/schemas/            Zod schemas for every boundary, shared the same way
 server/                      the server: TypeScript on Node (ADR-0002 §7), one folder per role
   login/ moderation/ signals/ prices/ admin/
@@ -146,7 +147,7 @@ TypeScript compiler; a reviewer reads the map to see the whole repo without read
 - Named exports only, except route modules (React Router). No barrel files, except each
   feature's `index.ts`, its public surface.
 - Imports by package name across workspaces (`@gnoworld/core`, `@gnoworld/schemas`) and by
-  `#` subpath imports inside one (`#ui/Button`), with `import type` for types. Never tsconfig
+  `#` subpath imports inside one (`#lib/adena`), with `import type` for types. Never tsconfig
   `paths`: Node ignores them.
 - Functions are verbs (`pickBubbles`, `placeSystem`), types are nouns, booleans read as
   questions (`isLive`, `hasDigest`). No abbreviations a newcomer would have to guess.
@@ -216,7 +217,7 @@ Rules:
   - one `variant` prop, a union type, instead of several booleans that can contradict;
   - logic lives in hooks without markup (`useRoom`, `useFlight`), so the same behaviour
     can wear another look;
-  - every `ui` component works alone: the gallery renders it with no store, no network
+  - every `ui` component works alone: Storybook renders it with no store, no network
     and no feature around it;
   - features build screens from `ui` and their own small parts; a second look for the same
     thing is a new variant of the component, never a copy.

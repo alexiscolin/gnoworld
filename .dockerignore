@@ -5,6 +5,10 @@
 !pnpm-workspace.yaml
 !tsconfig.base.json
 !packages/*/package.json
+!packages/ui/src
+packages/ui/src/**/*.test.ts
+packages/ui/src/**/*.test.tsx
+packages/ui/src/**/*.stories.tsx
 !app
 app/node_modules
 app/build

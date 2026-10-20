@@ -147,6 +147,9 @@ at = lambda text: next(i for i, l in enumerate(lines) if l.startswith(text))
 assert "packages() { cat package.json app/package.json pnpm-lock.yaml | cksum; }" in lines
 assert at("copies=$(run copies") < at("installed=$(packages)") < at("node app/node_modules/@playwright/test/cli.js test") < at('[ "$(packages)" = "$installed" ]')
 PY
+# The full gate walks the stories: a command of its own, not a line that names it and runs nothing.
+grep -v '^[[:space:]]*#' "$gate_file" | grep -qE '^[[:space:]]*node app/node_modules/@playwright/test/cli\.js test -c app/playwright\.stories\.config\.ts( --[a-z]+(=[a-z]+)?)*$' ||
+	fail "check.sh no longer walks the design system's stories in a browser"
 # One harness list, records.sh's: --full runs harness_mutate when a file of it changes, pre-push
 # wants each declared on main, merge.sh shows each first (F129); every file harness_mutate
 # guards is in it (F112, F114, F124), and what Claude Code starts, .mcp.json's servers.
@@ -193,7 +196,12 @@ assert trigger and re.findall(r"^  (\S+):", trigger.group(1), re.M) == ["push"],
 assert ci.count("permissions:") == 1 and "write" not in ci, "the CI may write"
 has(r"permissions:\n  contents: read", "the CI may write")
 assert "secrets." not in ci and "continue-on-error" not in ci, "the CI reads a secret or lets a step fail"
-assert not re.search(r"^\s+(- )?if:", ci, re.M), "a CI step can be skipped"
+# One condition only, on one step: when the gate fails, the pictures the stories' journeys wrote
+# where Linux had none are kept for review; no step of the gate itself can be skipped.
+conditions = re.findall(r"^\s+(?:- )?if:.*$", ci, re.M)
+assert [c.strip() for c in conditions] == ["if: failure()"], f"a CI step can be skipped: {conditions}"
+has(r"      - name: Linux's pictures of the stories, written where none was approved\n        if: failure\(\)\n        uses: actions/upload-artifact@[0-9a-f]{40}\n        with:\n          name: stories-pictures-linux\n          path: app/tests/stories/__screenshots__/linux/\n          if-no-files-found: ignore\n          retention-days: 7",
+    "the CI does not keep Linux's pictures when the gate fails, or keeps more")
 has(r"    runs-on: ubuntu-24\.04", "the CI runs on a machine it does not name")
 has(r"        run: sh scripts/check\.sh --full", "the CI does not run the full gate, or lets it fail")
 has(r"          persist-credentials: false", "the CI keeps its token on disk for the gate")
@@ -382,6 +390,13 @@ cover() { # $1: hit count of line 3's statement
 	printf '{"%s/src/a.ts":{"statementMap":{"0":{"start":{"line":2}},"1":{"start":{"line":3}},"2":{"start":{"line":4}}},"s":{"0":1,"1":%s,"2":1}}}' "$c" "$1" >"$c/coverage/coverage-final.json"
 	(cd "$c" && python3 -I "$patch" HEAD 85 >/dev/null 2>&1)
 }
+unmeasured() { # each file, alone in the patch, must be measured
+	for f; do
+		printf 'x\n' >"$c/$f" && git -C "$c" add "$f"
+		cover 1 && fail "patch_coverage let $f go unmeasured"
+		git -C "$c" rm -q --cached "$f" && rm "$c/$f"
+	done
+}
 cover 1 || fail "patch_coverage refused a patch whose lines are all run"
 cover 0 && fail "patch_coverage accepted a patch at 67%, under 85%"
 printf 'export const b = 1;\n' >"$c/src/b.ts" && git -C "$c" add src/b.ts
@@ -395,12 +410,15 @@ mkdir -p "$c/app/tests/e2e" "$c/app/src/routes"
 printf 'x\n' >"$c/app/tests/e2e/a.spec.ts" && printf 'x\n' >"$c/app/tests/e2e/fixtures.ts"
 printf 'x\n' >"$c/app/src/root.tsx" && printf 'x\n' >"$c/app/src/entry.server.tsx" && git -C "$c" add app
 cover 1 || fail "patch_coverage asked coverage of a Playwright test, the document shell or the server entry"
-for f in app/src/site.ts app/src/routes/a.tsx; do
-	printf 'x\n' >"$c/$f" && git -C "$c" add "$f"
-	cover 1 && fail "patch_coverage let $f go unmeasured"
-	git -C "$c" rm -q --cached "$f" && rm "$c/$f"
-done
+unmeasured app/src/site.ts app/src/routes/a.tsx
 git -C "$c" rm -rq --cached app && rm -r "$c/app"
+# Storybook's config is a config and a test setup a test's, so neither is measured; code named alike is.
+mkdir -p "$c/packages/ui/.storybook" "$c/packages/ui/src"
+printf 'x\n' >"$c/packages/ui/.storybook/main.ts" && printf 'x\n' >"$c/packages/ui/.storybook/preview.ts"
+printf 'x\n' >"$c/packages/ui/src/testSetup.ts" && git -C "$c" add packages
+cover 1 || fail "patch_coverage asked coverage of Storybook's config or the tests' setup"
+unmeasured packages/ui/src/storybook.ts packages/ui/src/setup.ts
+git -C "$c" rm -rq --cached packages && rm -r "$c/packages"
 # A statement over several lines counts when any of its lines changed, not only its first.
 git -C "$c" rm -q --cached src/a.test.ts vitest.config.ts && rm "$c/src/a.test.ts" "$c/vitest.config.ts" && git -C "$c" add src/a.ts && git -C "$c" commit -qm four
 printf 'one\ntwo\nTHREE\nfour\n' >"$c/src/a.ts"
@@ -1174,7 +1192,7 @@ if part prove_fix; then
 pf="$t/prove"
 mkdir -p "$pf/packages/x/src" "$pf/.claude/tmp" "$pf/node_modules"
 git -C "$pf" init -q
-printf '#!/bin/sh\nfor f in "$@"; do grep -qF "$(sed -n "s|^// expects: ||p" "$f")" packages/x/src/a.ts || exit 1; done\n' >"$t/fake_vitest" && chmod +x "$t/fake_vitest"
+printf '#!/bin/sh\necho "$*" >>"%s/runner.log"\nfor f in "$@"; do [ -f "$f" ] || continue; grep -qF "$(sed -n "s|^// expects: ||p" "$f")" packages/x/src/a.ts || exit 1; done\n' "$t" >"$t/fake_vitest" && chmod +x "$t/fake_vitest"
 printf '.claude/tmp\nnode_modules\n' >"$pf/.gitignore" && printf 'export const twice = (n: number) => n * 3;\n' >"$pf/packages/x/src/a.ts"
 git -C "$pf" add -A && git -C "$pf" commit -qm "feat: twice"
 prove() { (cd "$pf" && PROVE_FIX_VITEST="$t/fake_vitest" PROVE_FIX_PLAYWRIGHT="$t/fake_vitest" python3 -I "$here/prove_fix.py" "$1" >/dev/null 2>&1); }
@@ -1202,6 +1220,16 @@ base=$(git -C "$pf" rev-parse HEAD)
 printf 'export const twice = (n: number) => n * 2 + 1 - 1;\n' >"$pf/packages/x/src/a.ts" && printf '// expects: export\n' >"$pf/app/tests/b.spec.ts"
 fix "fix(x): a journey that passed already"
 prove "$base" && fail "prove_fix accepted a fix whose journey passed before it"
+# A run that finds no test passes, and a stories journey runs under the stories' config: run under
+# the app's, it found no test and exited 1, which read as failing before the fix.
+base=$(git -C "$pf" rev-parse HEAD) && mkdir -p "$pf/app/tests/stories" && : >"$t/runner.log"
+printf 'export const twice = (n: number) => n * 2 + 2 - 2;\n' >"$pf/packages/x/src/a.ts"
+printf '// expects: + 2\n' >"$pf/app/tests/stories/a.spec.ts" && printf '// expects: + 2\n' >"$pf/app/tests/c.spec.ts" && printf '// expects: + 2\n' >"$pf/packages/x/src/c.test.ts"
+fix "fix(x): a story's journey, a page's and a unit test show it"
+prove "$base" || fail "prove_fix refused a fix whose tests failed before it"
+grep -qxF -- "--pass-with-no-tests -c app/playwright.stories.config.ts app/tests/stories/a.spec.ts" "$t/runner.log" || fail "prove_fix ran a stories journey without the stories' config, or counted no test as a failure"
+grep -qxF -- "--pass-with-no-tests -c app/playwright.config.ts app/tests/c.spec.ts" "$t/runner.log" || fail "prove_fix ran a page's journey without the app's config, or counted no test as a failure"
+grep -qxF -- "--passWithNoTests packages/x/src/c.test.ts" "$t/runner.log" || fail "prove_fix counted a Vitest run that found no test as a failure"
 base=$(git -C "$pf" rev-parse HEAD)
 mkdir -p "$pf/scripts" && echo x >"$pf/scripts/tool.py" && fix "fix(harness): a harness fix"
 prove "$base" || fail "prove_fix refused a harness fix, which harness_mutate proves"
