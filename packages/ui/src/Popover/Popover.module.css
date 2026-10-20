@@ -17,12 +17,15 @@
     padding: var(--space-3xs);
   }
 
+  /* A row of the menu, on no fill but under the pointer or the keyboard: none of a button's face. */
   .item {
     display: block;
     inline-size: 100%;
     min-block-size: var(--control-m);
     padding-inline: var(--space-xs);
+    border: 0;
     border-radius: var(--radius-s);
+    background: transparent;
     font: var(--font-ui);
     text-align: start;
     cursor: pointer;

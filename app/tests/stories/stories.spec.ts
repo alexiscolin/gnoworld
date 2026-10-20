@@ -143,6 +143,26 @@ test("the focus ring is the 2 px mint outline, 2 px off, on every control reache
   }
 });
 
+// The reset leaves a button the browser's own face, its grey fill and its raised edge: a component's
+// control that sets neither shows it, which no other check sees.
+test("in every story, no control drawn wears the browser's own button face", async ({ page }) => {
+  for (const id of await stories(page)) {
+    await open(page, id);
+    const bare = await page.evaluate(() =>
+      [...document.querySelectorAll<HTMLElement>("#storybook-root button")].flatMap((control) => {
+        if (!control.checkVisibility()) return [];
+        const plain = document.createElement("button");
+        control.parentElement?.append(plain);
+        const [own, browser] = [getComputedStyle(control), getComputedStyle(plain)];
+        const face = own.backgroundColor === browser.backgroundColor || own.borderTopStyle === browser.borderTopStyle;
+        plain.remove();
+        return face ? [control.outerHTML.slice(0, 60)] : [];
+      }),
+    );
+    expect.soft(bare, id).toEqual([]);
+  }
+});
+
 // The state the accessibility tree sees is the state the CSS draws (docs/DESIGN-SYSTEM.md, "CSS
 // rules"): each state is turned off in place, transitions stilled, and the control must look different.
 test("in every story, a pressed, selected, expanded or current control looks unlike its resting self", async ({
