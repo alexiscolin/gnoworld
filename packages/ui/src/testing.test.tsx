@@ -35,4 +35,33 @@ describe("storiesOf", () => {
   it("refuses a story with neither a component nor a render", () => {
     expect(() => storiesOf({ default: {}, Empty: {} })).toThrow(/Empty/);
   });
+
+  // What Storybook would draw and this helper would not: refused, never dropped, so a test never
+  // draws a story unlike Storybook.
+  it.each([
+    ["the file's decorators", { default: { component: Echo, decorators: [] }, Live: {} }, /decorators/],
+    ["a story's decorators", { default: { component: Echo }, Live: { decorators: [] } }, /Live.*decorators/],
+    ["the file's loaders", { default: { component: Echo, loaders: [] }, Live: {} }, /loaders/],
+    ["a story's loaders", { default: { component: Echo }, Live: { loaders: [] } }, /Live.*loaders/],
+    [
+      "the file's excludeStories",
+      { default: { component: Echo, excludeStories: ["Live"] }, Live: {} },
+      /excludeStories/,
+    ],
+    [
+      "the file's includeStories",
+      { default: { component: Echo, includeStories: ["Live"] }, Live: {} },
+      /includeStories/,
+    ],
+    [
+      "a render that reads its context",
+      {
+        default: { component: Echo },
+        Live: { render: (_args: unknown, context: unknown) => <p>{String(context)}</p> },
+      },
+      /Live.*context/,
+    ],
+  ])("refuses %s", (_what, module, message) => {
+    expect(() => storiesOf(module)).toThrow(message);
+  });
 });

@@ -15,16 +15,29 @@ interface Drawn {
   render?: (args: Args) => ReactNode;
 }
 
+// What Storybook draws and storiesOf does not: refused, never dropped, so no test draws a story
+// unlike Storybook.
+const UNDRAWN = ["decorators", "loaders", "excludeStories", "includeStories"];
+
+function refuseUndrawn(where: string, drawn: object) {
+  const found = UNDRAWN.filter((key) => key in drawn);
+  if (found.length > 0) throw new Error(`${where}: ${found.join(", ")}, which storiesOf does not draw`);
+}
+
 /** A stories file's stories as elements, args merged as Storybook merges them. Not Storybook's
  * composeStories: its runtime brings an expect of its own that stops Vitest counting assertions. */
 export function storiesOf(module: Record<string, unknown>): { name: string; element: ReactElement }[] {
   const meta = (module["default"] ?? {}) as Drawn;
+  refuseUndrawn("the file", meta);
   return Object.entries(module)
     .filter(([name]) => name !== "default")
     .map(([name, value]) => {
       const story = value as Drawn;
+      refuseUndrawn(name, story);
       const args = { ...meta.args, ...story.args };
       const draw = story.render ?? meta.render;
+      if (draw !== undefined && draw.length > 1)
+        throw new Error(`${name}: a render that reads its context, which storiesOf does not give`);
       if (draw !== undefined) return { name, element: <>{draw(args)}</> };
       if (typeof meta.component !== "function")
         throw new Error(`${name}: a story with neither a component nor a render`);
