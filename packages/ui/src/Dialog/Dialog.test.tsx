@@ -96,6 +96,8 @@ describe("Dialog", () => {
     render(
       <Held>
         <Button>Paste</Button>
+        <input type="hidden" name="world" value="bubble" />
+        <input aria-label="Locked" disabled />
         <Field label="Name" value="" onChange={vi.fn()} />
       </Held>,
     );
@@ -118,13 +120,43 @@ describe("Dialog", () => {
     expect(dialog().open).toBe(false);
   });
 
-  it("calls its onClose once when the browser closes it, as Esc does", () => {
-    render(<Held />);
+  // Esc asks the browser to close a modal dialog: the cancel event, which the dialog hands its page.
+  const esc = () => {
+    const cancel = new Event("cancel", { cancelable: true });
     act(() => {
-      dialog().close();
+      dialog().dispatchEvent(cancel);
     });
+    return cancel;
+  };
+
+  it("asks its page on Esc, once, and closes when the page says so", () => {
+    render(<Held />);
+    esc();
     expect(screen.getByText("Closed 1")).toBeTruthy();
     expect(dialog().open).toBe(false);
+  });
+
+  it("stays open on Esc when its page keeps it open, the browser's own close refused", () => {
+    const onClose = vi.fn();
+    render(
+      <Dialog title="Passport" open onClose={onClose}>
+        <p>Unsaved stamps</p>
+      </Dialog>,
+    );
+    expect(esc().defaultPrevented).toBe(true);
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(dialog().open).toBe(true);
+  });
+
+  it("calls its onClose with nothing, whatever click closed it", async () => {
+    const onClose = vi.fn();
+    render(
+      <Dialog title="Passport" open onClose={onClose}>
+        <p>Stamps</p>
+      </Dialog>,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(onClose).toHaveBeenCalledExactlyOnceWith();
   });
 
   it("gives each dialog ids of its own, each named by its own title", () => {

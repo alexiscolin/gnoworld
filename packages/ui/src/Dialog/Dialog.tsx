@@ -28,7 +28,10 @@ export function Dialog({ title, open, onClose, wide = false, children }: DialogP
       return;
     }
     shown.showModal();
-    (shown.querySelector<HTMLElement>("input, select, textarea") ?? headingRef.current)?.focus();
+    const field = shown.querySelector<HTMLElement>(
+      "input:not([type='hidden'], :disabled), select:not(:disabled), textarea:not(:disabled)",
+    );
+    (field ?? headingRef.current)?.focus();
   }, [open]);
   return (
     <dialog
@@ -36,9 +39,10 @@ export function Dialog({ title, open, onClose, wide = false, children }: DialogP
       className={surface(styles["dialog"])}
       data-width={wide ? "wide" : "standard"}
       aria-labelledby={titleId}
-      // Esc closes it in the browser: the page hears of it here. A close the page asked for is not news.
-      onClose={() => {
-        if (open) onClose();
+      // Esc would close it in the browser: the page is asked instead, and keeps it open if it chooses.
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
       }}
     >
       <Stack space="m">
@@ -46,7 +50,14 @@ export function Dialog({ title, open, onClose, wide = false, children }: DialogP
           <h2 ref={headingRef} id={titleId} tabIndex={-1}>
             {title}
           </h2>
-          <IconButton icon="close" label="Close" emphasis="plain" onClick={onClose} />
+          <IconButton
+            icon="close"
+            label="Close"
+            emphasis="plain"
+            onClick={() => {
+              onClose();
+            }}
+          />
         </Cluster>
         {children}
       </Stack>
