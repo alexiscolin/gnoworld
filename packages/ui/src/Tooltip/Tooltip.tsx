@@ -31,12 +31,18 @@ export function Tooltip({ label, children }: TooltipProps) {
   useEffect(() => {
     if (state === "idle") return;
     const stop = new AbortController();
+    // A shown tooltip takes the first Esc, before the dialog or popover around its control (WCAG 1.4.13).
     document.addEventListener(
       "keydown",
       (event) => {
-        if (event.key === "Escape") setState("idle");
+        if (event.key !== "Escape") return;
+        if (state === "shown") {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        setState("idle");
       },
-      { signal: stop.signal },
+      { capture: true, signal: stop.signal },
     );
     return () => {
       stop.abort();

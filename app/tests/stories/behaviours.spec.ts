@@ -103,6 +103,19 @@ test.describe("Dialog", () => {
     }
   });
 
+  test("lets a first Esc hide a tooltip shown in it, and only the next one close it", async ({ page }) => {
+    await passport(page);
+    await page.keyboard.press("Tab");
+    expect(await focused(page)).toBe("Close");
+    const tip = page.getByRole("dialog").locator("[data-shown]");
+    await expect(tip).toHaveAttribute("data-shown", "true");
+    await page.keyboard.press("Escape");
+    await expect(tip).toHaveAttribute("data-shown", "false");
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toBeHidden();
+  });
+
   test("with a field, the field takes the focus, not a button", async ({ page }) => {
     await open(page, "dialog--with-field");
     await expect(page.getByRole("dialog")).toBeVisible();
