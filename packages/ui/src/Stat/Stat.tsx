@@ -1,6 +1,7 @@
 import { useEffect, useEffectEvent, useState, useSyncExternalStore } from "react";
 import { Chip } from "../Chip/Chip.tsx";
 import { Cluster, Stack } from "../compositions/index.ts";
+import { grouped } from "../format.ts";
 import styles from "./Stat.module.css";
 
 export interface StatProps {
@@ -13,8 +14,6 @@ export interface StatProps {
   hot?: boolean;
 }
 
-// The app's one language until the interface is translated: a server and a browser group alike.
-const grouped = (n: number) => n.toLocaleString("en-US");
 // The arrival's figures count up within its 1.2 s (docs/DESIGN-SYSTEM.md, "Motion").
 const COUNT = 1_000;
 

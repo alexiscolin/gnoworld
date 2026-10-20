@@ -1,4 +1,5 @@
 import { Cluster, Stack } from "../compositions/index.ts";
+import { grouped } from "../format.ts";
 import styles from "./ActivityChart.module.css";
 
 export interface ActivityChartProps {
@@ -17,8 +18,6 @@ const HEIGHT = 48;
 const BAR = 6;
 const GAP = 2;
 const STEP = 16;
-
-const grouped = (n: number) => n.toLocaleString("en-US");
 
 function when(back: number, unit: "hour" | "day") {
   if (back === 0) return unit === "hour" ? "This hour" : "Today";
