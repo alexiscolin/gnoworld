@@ -25,22 +25,36 @@ interface Entry {
   tags?: string[];
 }
 
-// Storybook's index, read once by each worker: one build serves every test.
+// Storybook's index, read once by each worker: one build serves every test. A failed read is not
+// kept, and says so.
 let index: Promise<Entry[]> | undefined;
 
 function entries(page: Page): Promise<Entry[]> {
-  index ??= page.request.get("/index.json").then(async (response) => {
-    const read = (await response.json()) as { entries: Record<string, Entry> };
-    return Object.values(read.entries).filter((entry) => entry.type === "story");
-  });
+  index ??= page.request
+    .get("/index.json")
+    .then(async (response) => {
+      if (!response.ok()) throw new Error(`Storybook's index.json answered ${String(response.status())}`);
+      const read = (await response.json()) as { entries: Record<string, Entry> };
+      return Object.values(read.entries).filter((entry) => entry.type === "story");
+    })
+    .catch((error: unknown) => {
+      index = undefined;
+      throw error;
+    });
   return index;
 }
 
-/** The stories that draw nothing on purpose, tagged "empty" in their file, as the empty flash. */
-export async function empties(page: Page): Promise<Set<string>> {
-  return new Set(
-    (await entries(page)).filter((entry) => entry.tags?.includes("empty") === true).map((entry) => entry.id),
-  );
+// The ids of the stories that carry a tag, each set made once by each worker.
+const byTag = new Map<string, Promise<Set<string>>>();
+
+/** The stories with a tag: "empty" draws nothing on purpose, "viewport" sits in the top layer. */
+export function tagged(page: Page, tag: string): Promise<Set<string>> {
+  let found = byTag.get(tag);
+  if (found === undefined) {
+    found = entries(page).then((all) => new Set(all.filter((e) => e.tags?.includes(tag) === true).map((e) => e.id)));
+    byTag.set(tag, found);
+  }
+  return found;
 }
 
 /** Every control with a button's look: the button, and the link that wears it. */
@@ -58,7 +72,7 @@ export async function stories(page: Page, prefix = ""): Promise<string[]> {
 }
 
 export async function open(page: Page, id: string) {
-  const nothing = (await empties(page)).has(id);
+  const nothing = (await tagged(page, "empty")).has(id);
   await page.goto(`/iframe.html?id=${id}&viewMode=story`);
   // A story shows something, unless it draws nothing on purpose.
   await page
