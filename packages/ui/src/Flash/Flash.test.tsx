@@ -77,6 +77,30 @@ describe("Flash", () => {
     endsIn5s(onClose);
   });
 
+  it("keeps its count when its page hands it the same words in a new object", () => {
+    const onClose = vi.fn();
+    const { rerender } = render(<Flash message={{ ...saved }} onClose={onClose} />);
+    act(() => {
+      vi.advanceTimersByTime(3_000);
+    });
+    rerender(<Flash message={{ ...saved }} onClose={onClose} />);
+    act(() => {
+      vi.advanceTimersByTime(2_000);
+    });
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  // Closed or taken under the pointer, a flash leaves without a pointerleave: the next is not held.
+  it("leaves the next flash its 5 s when one is closed under the pointer", () => {
+    const { rerender } = render(<Flash message={deleted(vi.fn())} onClose={vi.fn()} />);
+    fireEvent.pointerEnter(screen.getByText("Message deleted"));
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    rerender(<Flash message={null} onClose={vi.fn()} />);
+    const onClose = vi.fn();
+    rerender(<Flash message={saved} onClose={onClose} />);
+    endsIn5s(onClose);
+  });
+
   it("keeps counting when its page hands it a new onClose, and calls the latest one", () => {
     const first = vi.fn();
     const latest = vi.fn();
