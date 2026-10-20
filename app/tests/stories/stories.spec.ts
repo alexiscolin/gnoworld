@@ -84,6 +84,27 @@ test("no story scrolls sideways at 320 px, and text at 200% still fits its contr
   }
 });
 
+// The threat model's name of 10,000 letters, cut to 400: a name or a title with no space in it wraps
+// in its box, and never pushes the page sideways.
+test("no story scrolls sideways at 320 px when its longest text is one word of 400 letters", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  for (const id of await stories(page)) {
+    await open(page, id);
+    const wide = await page.evaluate(() => {
+      const root = document.querySelector("#storybook-root") ?? document.body;
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      let longest: Text | null = null;
+      for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+        if (node instanceof Text && node.data.length > (longest?.data.length ?? 0)) longest = node;
+      }
+      if (longest === null) return false;
+      longest.data = `nym-${"a".repeat(400)}`;
+      return document.documentElement.scrollWidth > document.documentElement.clientWidth;
+    });
+    expect.soft(wide, `${id} scrolls sideways`).toBe(false);
+  }
+});
+
 // Every control of every story, tabbed to in turn: a component rule that hides or clips the one
 // ring would show here.
 test("the focus ring is the 2 px mint outline, 2 px off, on every control reached by the keyboard", async ({

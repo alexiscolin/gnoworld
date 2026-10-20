@@ -1,6 +1,8 @@
 /* The elements styled once, globally, so components write little (docs/DESIGN-SYSTEM.md, "CSS rules"). */
 @layer base {
+  /* A word too long for its box breaks rather than push the page sideways: a name with no space. */
   body {
+    overflow-wrap: anywhere;
     background: var(--color-space);
     color: var(--color-text);
     font: var(--font-body);
