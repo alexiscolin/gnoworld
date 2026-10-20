@@ -152,7 +152,11 @@ test("in every story, a pressed, selected, expanded or current control looks unl
   expect(seen).toBeGreaterThan(0);
 });
 
-test("each composition spaces its children by the token its step names", async ({ page }) => {
+// A copy of each composition as a list too: whatever element it is given, it keeps no marks and no
+// block margins, and only Center keeps an inline padding, its gutter.
+test("each composition spaces its children by the token its step names, and keeps a list's marks off", async ({
+  page,
+}) => {
   for (const id of await stories(page, "compositions-")) {
     await open(page, id);
     const faults = await page.evaluate(() =>
@@ -162,7 +166,19 @@ test("each composition spaces its children by the token its step names", async (
           .trim();
         const style = getComputedStyle(box);
         const used = box.dataset["max"] === undefined ? style.rowGap : style.paddingInlineStart;
-        return used === token && token !== "" ? [] : [`${box.dataset["space"] ?? ""}: ${used} for ${token}`];
+        const list = document.createElement("ul");
+        list.className = box.className;
+        Object.assign(list.dataset, box.dataset);
+        list.append(document.createElement("li"));
+        box.after(list);
+        const listed = getComputedStyle(list);
+        const got = [listed.listStyleType, listed.marginBlockStart, listed.marginBlockEnd, listed.paddingInlineStart];
+        const want = ["none", "0px", "0px", style.paddingInlineStart];
+        list.remove();
+        return [
+          ...(used === token && token !== "" ? [] : [`${box.dataset["space"] ?? ""}: ${used} for ${token}`]),
+          ...(got.join() === want.join() ? [] : [`as a list: ${got.join()} for ${want.join()}`]),
+        ];
       }),
     );
     expect.soft(faults, id).toEqual([]);

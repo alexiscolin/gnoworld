@@ -41,11 +41,15 @@
     --_space: var(--space-2xl);
   }
 
-  /* A list that a composition places keeps none of its own marks or indents. */
-  :is(ul, ol).space:not(.center) {
+  /* A list that a composition places keeps none of its own marks, margins or indent; Center's
+     inline padding is its gutter. */
+  :is(ul, ol).space {
     margin-block: 0;
-    padding-inline-start: 0;
     list-style: none;
+  }
+
+  :is(ul, ol).space:not(.center) {
+    padding-inline-start: 0;
   }
 
   .stack {
