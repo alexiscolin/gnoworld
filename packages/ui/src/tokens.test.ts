@@ -3,6 +3,18 @@ import css from "./tokens.css?raw";
 import { groups, parseTokens, tokens } from "./tokens.ts";
 
 const value = (name: string) => tokens().find((token) => token.name === name)?.value;
+// docs/DESIGN-SYSTEM.md, "Colour": the nine base colours.
+const BASE: Record<string, string> = {
+  space: "#05070D",
+  night: "#0B0F18",
+  text: "#F4F6FA",
+  muted: "#9DA8BC",
+  cream: "#F2EFEA",
+  mint: "#5CF2C8",
+  amber: "#FFC46B",
+  violet: "#B79CFF",
+  coral: "#FF8A7A",
+};
 
 // WCAG 2.2's contrast ratio, from two #rrggbb colours.
 function luminance(hex: string) {
@@ -85,24 +97,11 @@ describe("parseTokens", () => {
 });
 
 describe("the tokens", () => {
-  it('are the nine base colours of docs/DESIGN-SYSTEM.md, "Colour"', () => {
-    const base = {
-      space: "#05070D",
-      night: "#0B0F18",
-      text: "#F4F6FA",
-      muted: "#9DA8BC",
-      cream: "#F2EFEA",
-      mint: "#5CF2C8",
-      amber: "#FFC46B",
-      violet: "#B79CFF",
-      coral: "#FF8A7A",
-    };
+  it('hold the base colours of docs/DESIGN-SYSTEM.md, "Colour", at their values: all but night, which joins with its first reader', () => {
     const primitives = tokens().filter((t) => t.group === "Primitives");
-    for (const [name, hex] of Object.entries(base)) {
-      const found = primitives.find((t) => t.name === `--p-${name}`);
-      if (found !== undefined) expect(found.value.toUpperCase()).toBe(hex);
-    }
-    for (const token of primitives) expect(Object.keys(base).map((n) => `--p-${n}`)).toContain(token.name);
+    const held = Object.keys(BASE).filter((name) => name !== "night");
+    expect(primitives.map((t) => t.name).sort()).toEqual(held.map((name) => `--p-${name}`).sort());
+    for (const { name, value: hex } of primitives) expect(hex.toUpperCase()).toBe(BASE[name.slice(4)]);
   });
 
   it("make every colour role of primitives only, never of a raw value", () => {
@@ -112,18 +111,14 @@ describe("the tokens", () => {
     }
   });
 
-  it("keep every text pair of docs/DESIGN-SYSTEM.md at 6.3:1 or more", () => {
-    const hex = (name: string) => value(`--p-${name}`) ?? "#000000";
+  it("keep every text pair of docs/DESIGN-SYSTEM.md at 6.3:1 or more, night's included", () => {
     for (const ground of ["space", "night"]) {
       for (const ink of ["text", "muted", "mint", "amber", "violet", "coral"]) {
-        if (value(`--p-${ink}`) !== undefined && value(`--p-${ground}`) !== undefined) {
-          expect(contrast(hex(ink), hex(ground)), `${ink} on ${ground}`).toBeGreaterThanOrEqual(6.3);
-        }
+        expect(contrast(BASE[ink] ?? "", BASE[ground] ?? ""), `${ink} on ${ground}`).toBeGreaterThanOrEqual(6.3);
       }
     }
     for (const fill of ["cream", "mint", "amber", "coral"]) {
-      if (value(`--p-${fill}`) !== undefined)
-        expect(contrast(hex("space"), hex(fill)), `ink on ${fill}`).toBeGreaterThanOrEqual(6.3);
+      expect(contrast(BASE["space"] ?? "", BASE[fill] ?? ""), `ink on ${fill}`).toBeGreaterThanOrEqual(6.3);
     }
   });
 

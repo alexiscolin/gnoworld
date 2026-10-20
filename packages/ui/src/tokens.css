@@ -1,5 +1,5 @@
 /* The design system's one list of values (docs/DESIGN-SYSTEM.md, "Tokens"). Primitives, named
-   --p-*, are the nine base colours: only this file reads them. A token joins with its first reader. */
+   --p-*, are its base colours: only this file reads them. A token joins with its first reader. */
 @layer tokens {
   :root {
     color-scheme: dark;
