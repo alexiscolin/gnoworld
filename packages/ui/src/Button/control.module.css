@@ -1,0 +1,33 @@
+/* The pill every control with words shares, Button, Chip and Tabs: what each one sets is its private
+   properties. At no specificity, so a control's own rule wins wherever the sheets load. */
+@layer components {
+  :where(.pill) {
+    /* layout: an icon or a count sits beside the words */
+    display: inline-flex;
+    /* layout: an icon or a count sits beside the words */
+    align-items: center;
+    /* layout: an icon or a count sits beside the words */
+    gap: var(--space-2xs);
+    min-block-size: var(--_h);
+    /* Words that wrap keep clear of the edge; one line stays at the control's height. */
+    padding-block: var(--space-3xs);
+    padding-inline: var(--_pad);
+    border: var(--line-width) solid var(--_line);
+    border-radius: var(--radius-pill);
+    background: var(--_fill);
+    color: var(--_ink);
+    font: var(--_font);
+    text-align: center;
+    cursor: pointer;
+  }
+
+  /* What a control that sets nothing gets: the default size, in the text's ink, with no fill or line. */
+  :where(.pill) {
+    --_h: var(--control-m);
+    --_pad: var(--space-s);
+    --_font: var(--font-ui);
+    --_fill: transparent;
+    --_line: transparent;
+    --_ink: var(--color-text);
+  }
+}
