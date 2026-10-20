@@ -66,6 +66,26 @@ function Compositions() {
   );
 }
 
+// The elements the base layer styles, and the label in a script whose caps it leaves alone.
+function Text() {
+  return (
+    <Stack>
+      <h1>The system at a glance</h1>
+      <h2>Panel and dialog titles</h2>
+      <h3>Notifications</h3>
+      <p>
+        Proposal 15 lives at <code>gno.land/r/gov/dao</code>; <a href="#text">read it</a> before you vote.
+      </p>
+      <small>2 min ago · translated from Portuguese</small>
+      <hr />
+      <p className="label">On chain · 96 calls a day</p>
+      <p className="label" lang="ar">
+        على السلسلة
+      </p>
+    </Stack>
+  );
+}
+
 /** Every component at once (docs/DESIGN-SYSTEM.md, "Storybook shows everything"). */
 export function Overview() {
   return (
@@ -95,6 +115,9 @@ export function Overview() {
             </li>
           ))}
         </Grid>
+      </Region>
+      <Region name="Text">
+        <Text />
       </Region>
       <Region name="Compositions">
         <Compositions />

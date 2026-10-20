@@ -6,8 +6,10 @@ export default defineConfig({
   testDir: "tests/stories",
   forbidOnly: true,
   fullyParallel: true,
-  // One folder of approved pictures per platform (slice 2's plan, the pictures' answer).
+  // One folder of approved pictures per platform (slice 2's plan, the pictures' answer), compared to
+  // the pixel: Playwright's default tolerance let a border go from 20% to 10% white unseen (F218).
   snapshotPathTemplate: "{testDir}/__screenshots__/{platform}/{arg}{ext}",
+  expect: { toHaveScreenshot: { threshold: 0, maxDiffPixels: 0 } },
   // In the sandbox, Chromium runs as one process, and eight at once each building Storybook's pages crash.
   ...(process.env["SANDBOX_RUNTIME"] ? { workers: 1 } : {}),
   use: {

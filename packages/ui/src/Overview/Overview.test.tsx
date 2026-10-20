@@ -7,7 +7,7 @@ import * as stories from "./Overview.stories.tsx";
 
 // docs/DESIGN-SYSTEM.md, "Storybook shows everything": one page shows every component at once.
 describe("Overview", () => {
-  it.each(["Buttons", "Icon buttons", "Kickers", "Icons", "Compositions"])("has a region for %s", (name) => {
+  it.each(["Buttons", "Icon buttons", "Kickers", "Icons", "Text", "Compositions"])("has a region for %s", (name) => {
     render(<Overview />);
     expect(screen.getByRole("region", { name })).toBeTruthy();
   });

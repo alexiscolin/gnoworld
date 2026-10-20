@@ -69,3 +69,61 @@ export const Center: Story = {
     </layout.Center>
   ),
 };
+
+const steps = ["3xs", "2xs", "xs", "s", "m", "l", "xl", "2xl"] as const;
+
+// Every space step, each a Cluster spaced by it.
+export const Steps: Story = {
+  render: () => (
+    <layout.Stack space="m">
+      {steps.map((step) => (
+        <layout.Cluster key={step} space={step}>
+          <Kicker>{step}</Kicker>
+          <Kicker dot="mine">GovDAO</Kicker>
+          <Kicker dot="warm">Earth</Kicker>
+        </layout.Cluster>
+      ))}
+    </layout.Stack>
+  ),
+};
+
+// Each way a Cluster lines up its children.
+export const Justify: Story = {
+  render: () => (
+    <layout.Stack space="m">
+      {(["start", "center", "between", "end"] as const).map((justify) => (
+        <layout.Cluster key={justify} justify={justify}>
+          <Kicker>{justify}</Kicker>
+          <Kicker dot="signal">An uncharted signal</Kicker>
+        </layout.Cluster>
+      ))}
+    </layout.Stack>
+  ),
+};
+
+// Each column minimum, with six worlds to place.
+export const Columns: Story = {
+  render: () => (
+    <layout.Stack space="l">
+      {(["s", "m", "l"] as const).map((min) => (
+        <layout.Grid key={min} as="ul" min={min}>
+          {[...worlds, "Arcade"].map((world) => (
+            <li key={world}>{world}</li>
+          ))}
+        </layout.Grid>
+      ))}
+    </layout.Stack>
+  ),
+};
+
+// A side wider than half the box: the main part takes a row of its own rather than shrink.
+export const WideSide: Story = {
+  render: () => (
+    <layout.Sidebar side="end" space="m">
+      <Button emphasis="solid">Join the chat</Button>
+      <Kicker dot="warm">
+        Where people speak from: countries are opt-in, and a city never shows, so this runs long
+      </Kicker>
+    </layout.Sidebar>
+  ),
+};

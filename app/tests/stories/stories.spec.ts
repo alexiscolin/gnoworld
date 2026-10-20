@@ -1,7 +1,7 @@
 // The design system's stories in a real browser (docs/DESIGN-SYSTEM.md, "Testing the CSS"): what
 // jsdom cannot see, since it applies no stylesheet. Each test walks every story Storybook built.
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "../e2e/fixtures.ts";
+import { expect, test, type Page } from "../e2e/fixtures.ts";
 import { open, stories } from "./storybook.ts";
 
 test("every story renders with no error and passes axe", async ({ page }) => {
@@ -20,22 +20,25 @@ test("every story renders with no error and passes axe", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+// Each control is brought into view first: elementFromPoint sees nothing below the fold.
 test("in every story, each control is a target of 24 px or more that nothing covers", async ({ page }) => {
   for (const id of await stories(page)) {
     await open(page, id);
-    const faults = await page.evaluate(() =>
-      [...document.querySelectorAll("#storybook-root button, #storybook-root a[href]")].flatMap((control) => {
-        const box = control.getBoundingClientRect();
+    for (const control of await page.locator("#storybook-root button, #storybook-root a[href]").all()) {
+      // WCAG 2.5.8 exempts a link inside a sentence; a link that stands alone is a target like any.
+      if (await control.evaluate((element) => getComputedStyle(element).display === "inline")) continue;
+      await control.scrollIntoViewIfNeeded();
+      const faults = await control.evaluate((element) => {
+        const box = element.getBoundingClientRect();
         const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+        const name = element.outerHTML.slice(0, 60);
         const small =
-          box.width < 24 || box.height < 24
-            ? [`${control.outerHTML.slice(0, 60)} is ${String(box.width)}x${String(box.height)}`]
-            : [];
-        const covered = hit !== null && !control.contains(hit) ? [`${control.outerHTML.slice(0, 60)} is covered`] : [];
+          box.width < 24 || box.height < 24 ? [`${name} is ${String(box.width)}x${String(box.height)}`] : [];
+        const covered = hit === null || !element.contains(hit) ? [`${name} is covered or out of view`] : [];
         return [...small, ...covered];
-      }),
-    );
-    expect.soft(faults, id).toEqual([]);
+      });
+      expect.soft(faults, id).toEqual([]);
+    }
   }
 });
 
@@ -74,14 +77,16 @@ test("no story scrolls sideways at 320 px, and text at 200% still fits its contr
   }
 });
 
-test("the focus ring is the 2 px mint outline, on every control reached by the keyboard", async ({ page }) => {
+test("the focus ring is the 2 px mint outline, 2 px off, on every control reached by the keyboard", async ({
+  page,
+}) => {
   await open(page, "button--primary");
   await page.keyboard.press("Tab");
   const ring = await page.evaluate(() => {
     const style = getComputedStyle(document.activeElement ?? document.body);
-    return [style.outlineStyle, style.outlineWidth, style.outlineColor];
+    return [style.outlineStyle, style.outlineWidth, style.outlineColor, style.outlineOffset];
   });
-  expect(ring).toEqual(["solid", "2px", "rgb(92, 242, 200)"]);
+  expect(ring).toEqual(["solid", "2px", "rgb(92, 242, 200)", "2px"]);
 });
 
 test("each composition spaces its children by the token its step names", async ({ page }) => {
@@ -101,15 +106,21 @@ test("each composition spaces its children by the token its step names", async (
   }
 });
 
+// Every icon drawn in these stories, by its size: 16 px at m, 20 px at l, and both seen.
 test("icons are 16 or 20 px, and those that point along the text turn right to left", async ({ page }) => {
+  const seen = new Map<string, Set<number>>();
+  for (const id of ["icons-icon--all", "icons-icon--large", "button--sizes", "button-iconbutton--sizes"]) {
+    await open(page, id);
+    for (const [size, width] of await page.evaluate(() =>
+      [...document.querySelectorAll<SVGElement>("#storybook-root svg")].map(
+        (svg) => [svg.dataset["size"] ?? "", svg.getBoundingClientRect().width] as const,
+      ),
+    )) {
+      seen.set(size, (seen.get(size) ?? new Set()).add(width));
+    }
+  }
+  expect(Object.fromEntries([...seen].map(([size, widths]) => [size, [...widths]]))).toEqual({ m: [16], l: [20] });
   await open(page, "icons-icon--all");
-  const sizes = await page.evaluate(() =>
-    [...document.querySelectorAll<SVGElement>("#storybook-root svg")].map((svg) => [
-      svg.dataset["size"],
-      svg.getBoundingClientRect().width,
-    ]),
-  );
-  expect(new Set(sizes.map(([size, width]) => `${String(size)} ${String(width)}`))).toEqual(new Set(["m 16"]));
   await page.evaluate(() => {
     document.documentElement.dir = "rtl";
   });
@@ -122,7 +133,22 @@ test("icons are 16 or 20 px, and those that point along the text turn right to l
   for (const [mirror, scale] of turned) expect(scale).toBe(mirror ? "-1 1" : "none");
 });
 
-test("buttons are as tall as their size's control, and 44 px by touch", async ({
+// Each control's height by its size, in one story, and whether every one of them is square.
+async function sizes(page: Page, id: string) {
+  await open(page, id);
+  return page.evaluate(() => {
+    const boxes = [...document.querySelectorAll<HTMLElement>("#storybook-root button")].map((b) => ({
+      size: b.dataset["size"] ?? "",
+      box: b.getBoundingClientRect(),
+    }));
+    return {
+      heights: Object.fromEntries(boxes.map(({ size, box }) => [size, box.height])),
+      square: boxes.every(({ box }) => box.width === box.height),
+    };
+  });
+}
+
+test("controls are as tall as their size's control, and the default 44 px by touch", async ({
   playwright,
   launchOptions,
   baseURL,
@@ -136,27 +162,60 @@ test("buttons are as tall as their size's control, and 44 px by touch", async ({
       ...(baseURL === undefined ? {} : { baseURL }),
     });
     const page = await context.newPage();
-    await open(page, "button--sizes");
-    const heights = await page.evaluate(() =>
-      Object.fromEntries(
-        [...document.querySelectorAll<HTMLElement>("#storybook-root button")].map(
-          (b) => [b.dataset["size"] ?? "", b.getBoundingClientRect().height] as const,
-        ),
-      ),
-    );
-    expect(heights, touch ? "by touch" : "with a pointer").toEqual({ s: 32, m: touch ? 44 : 40, l: 56 });
+    const m = touch ? 44 : 40;
+    const how = touch ? "by touch" : "with a pointer";
+    expect((await sizes(page, "button--sizes")).heights, how).toEqual({ s: 32, m, l: 56 });
+    expect(await sizes(page, "button-iconbutton--sizes"), `icon buttons, ${how}`).toEqual({
+      heights: { s: 32, m, l: 56 },
+      square: true,
+    });
     await browser.close();
   }
 });
 
-test("a busy button's spinner stops under reduced motion", async ({ page }) => {
+test("a busy button's spinner turns, and stops under reduced motion", async ({ page }) => {
+  const spin = async () => {
+    await open(page, "button--busy");
+    return page.evaluate(() =>
+      [...document.querySelectorAll("#storybook-root [aria-busy] [aria-hidden='true']")].map((e) => {
+        const style = getComputedStyle(e);
+        return [style.animationName === "none" ? "none" : "spins", style.animationDuration];
+      }),
+    );
+  };
+  expect(await spin()).toEqual([["spins", "0.8s"]]);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await open(page, "button--busy");
-  const names = await page.evaluate(() =>
-    [...document.querySelectorAll("#storybook-root [aria-busy] *")].map((e) => getComputedStyle(e).animationName),
-  );
-  expect(names.length).toBeGreaterThan(0);
-  expect(names.every((name) => name === "none")).toBe(true);
+  expect((await spin()).map(([name]) => name)).toEqual(["none"]);
+});
+
+test("controls ease their changes, and change at once under reduced motion", async ({ page }) => {
+  const durations = async () => {
+    await open(page, "button--matrix");
+    return page.evaluate(() => [
+      ...new Set(
+        [...document.querySelectorAll("#storybook-root button")].flatMap((b) =>
+          getComputedStyle(b).transitionDuration.split(", "),
+        ),
+      ),
+    ]);
+  };
+  expect(await durations()).toEqual(["0.12s"]);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  expect(await durations()).toEqual(["0s"]);
+});
+
+test("a button lightens under the pointer, unless it is disabled or busy", async ({ page }) => {
+  for (const [id, lit] of [
+    ["button--primary", true],
+    ["button--outline", true],
+    ["button--disabled", false],
+    ["button--busy", false],
+  ] as const) {
+    await open(page, id);
+    const button = page.locator("#storybook-root button");
+    await button.hover({ force: true });
+    expect(await button.evaluate((b) => getComputedStyle(b).backgroundImage !== "none"), id).toBe(lit);
+  }
 });
 
 test("under forced colours, every button keeps a visible edge", async ({ page }) => {
@@ -167,6 +226,27 @@ test("under forced colours, every button keeps a visible edge", async ({ page })
   );
   expect(edges.length).toBeGreaterThan(0);
   expect(edges.every((width) => Number.parseFloat(width) >= 1)).toBe(true);
+});
+
+test("the base styles text with the tokens, and the label keeps its case where caps break the script", async ({
+  page,
+}) => {
+  await open(page, "overview--all");
+  const text = page.getByRole("region", { name: "Text" });
+  const style = (selector: string, property: string) =>
+    text
+      .locator(selector)
+      .first()
+      .evaluate((e, p) => getComputedStyle(e).getPropertyValue(p), property);
+  expect(await style("h1", "font-size")).toBe("36px");
+  expect(await style("h2", "font-size")).toBe("28px");
+  expect(await style("h3", "font-size")).toBe("20px");
+  expect(await style("small", "font-size")).toBe("12px");
+  expect(await style("code", "font-family")).toContain("Geist Mono Variable");
+  expect(await style("hr", "border-top-width")).toBe("1px");
+  expect(await style("a", "color")).toBe(await style("p", "color"));
+  expect(await style(".label:not(:lang(ar))", "text-transform")).toBe("uppercase");
+  expect(await style(".label:lang(ar)", "text-transform")).toBe("none");
 });
 
 // A layer ranks by where it first appears, whatever form the minifier gives it: were a component's
