@@ -108,6 +108,50 @@ test("the focus ring is the 2 px mint outline, 2 px off, on every control reache
   }
 });
 
+// The state the accessibility tree sees is the state the CSS draws (docs/DESIGN-SYSTEM.md, "CSS
+// rules"): each state is turned off in place, transitions stilled, and the control must look different.
+test("in every story, a pressed, selected, expanded or current control looks unlike its resting self", async ({
+  page,
+}) => {
+  const states = ["aria-pressed", "aria-selected", "aria-expanded", "aria-current"];
+  let seen = 0;
+  for (const id of await stories(page)) {
+    await open(page, id);
+    const found = await page.evaluate((names) => {
+      const still = document.createElement("style");
+      still.textContent = "* { transition: none !important; }";
+      document.head.append(still);
+      const looks = (e: Element) => {
+        const s = getComputedStyle(e);
+        return [
+          s.backgroundColor,
+          s.backgroundImage,
+          s.color,
+          s.borderColor,
+          s.boxShadow,
+          s.fontWeight,
+          s.outlineStyle,
+        ].join();
+      };
+      const on = names.map((name) => `#storybook-root [${name}]:not([${name}="false"])`).join(", ");
+      const result = [...document.querySelectorAll(on)].map((element) => {
+        const name = names.find((n) => element.hasAttribute(n)) ?? "";
+        const value = element.getAttribute(name) ?? "";
+        const shown = looks(element);
+        element.setAttribute(name, "false");
+        const resting = looks(element);
+        element.setAttribute(name, value);
+        return shown === resting ? `${name} on ${element.outerHTML.slice(0, 60)}` : "";
+      });
+      still.remove();
+      return result;
+    }, states);
+    seen += found.length;
+    expect.soft(found.filter(Boolean), id).toEqual([]);
+  }
+  expect(seen).toBeGreaterThan(0);
+});
+
 test("each composition spaces its children by the token its step names", async ({ page }) => {
   for (const id of await stories(page, "compositions-")) {
     await open(page, id);

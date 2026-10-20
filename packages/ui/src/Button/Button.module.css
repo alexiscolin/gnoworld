@@ -57,7 +57,8 @@
     --_edge: var(--color-danger-line);
   }
 
-  .button[data-emphasis="solid"] {
+  /* Pressed is selected: the cream fill (docs/DESIGN-SYSTEM.md, "Colour"). */
+  .button:is([data-emphasis="solid"], [aria-pressed="true"]) {
     --_fill: var(--_accent);
     --_ink: var(--color-ink);
     --_line: var(--_accent);
