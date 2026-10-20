@@ -31,7 +31,12 @@ export default defineConfig({
       // The app too, but for the document shell and the server entry, which only the build
       // renders, and Storybook's pages, whose handlers do nothing: the Playwright journeys walk them.
       include: ["packages/*/src/**/*.{ts,tsx}", "app/src/**/*.{ts,tsx}"],
-      exclude: ["app/src/root.tsx", "app/src/entry.server.tsx", "**/*.stories.tsx", "packages/ui/src/Overview/**"],
+      exclude: [
+        "app/src/root.tsx",
+        "app/src/entry.server.tsx",
+        "packages/ui/src/**/*.stories.tsx",
+        "packages/ui/src/Overview/**",
+      ],
       reporter: ["text-summary", "json"],
       // 85% everywhere (Alexis, 2026-10-17); core's rules at 100%, branches 95%.
       thresholds: {
