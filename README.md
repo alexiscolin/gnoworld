@@ -15,7 +15,7 @@ The applications sit at the root; the libraries they import sit under `packages/
 | Folder | Inside | What it holds |
 |---|---|---|
 | `app/` | | The web app: React Router, pre-rendered, installable as a PWA |
-| | `src/` | Its code: the document shell, one module per page (`routes/`), the service worker (`sw/`), and `ui/`, slice 1's two components, which leave in 2c for the design system's |
+| | `src/` | Its code: the document shell, one module per page (`routes/`), the service worker (`sw/`), and one folder per feature (`features/`: today the update notice and the page that failed) |
 | | `tests/` | Playwright: the pages' journeys (`e2e/`) and the design system's stories in a browser, with their approved pictures (`stories/`) |
 | | `public/` | The files served as they are: the manifest and the icons |
 | `packages/` | `core/` | The rules, pure TypeScript shared by everything else (today: the IRC line parser) |
