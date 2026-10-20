@@ -1,7 +1,7 @@
 // The compositions' geometry in a browser, wide and narrow: each one places its children as its
 // choices say (docs/DESIGN-SYSTEM.md, "CSS rules"), which no attribute test can see.
 import { expect, test, type Page } from "../e2e/fixtures.ts";
-import { open, stories } from "./storybook.ts";
+import { open, stories, token } from "./storybook.ts";
 
 const WIDTHS = [1280, 320];
 
@@ -58,10 +58,7 @@ test("a Grid holds as many columns as its minimum width allows", async ({ page }
     const found = await boxes(page, "[data-min]");
     expect(found.map((b) => b.data["min"]).sort()).toEqual(["l", "m", "s"]);
     for (const { data, content, gap, children } of found) {
-      const min = await page.evaluate(
-        (step) => Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue(`--column-${step}`)),
-        data["min"] ?? "",
-      );
+      const min = await token(page, `--column-${data["min"] ?? ""}`);
       const columns = new Set(children.map((c) => Math.round(c.left))).size;
       const fit = Math.max(1, Math.min(children.length, Math.floor((content.width + gap) / (min + gap))));
       expect(columns, `min ${String(data["min"])} in ${String(content.width)} px`).toBe(fit);
@@ -70,7 +67,7 @@ test("a Grid holds as many columns as its minimum width allows", async ({ page }
 });
 
 test("a Sidebar's main part keeps half its box, or takes a row of its own", async ({ page }) => {
-  for (const id of (await stories(page)).filter((s) => s.startsWith("compositions-"))) {
+  for (const id of await stories(page, "compositions-")) {
     await eachWidth(page, id, async () => {
       for (const { data, content, children } of await boxes(page, "[data-side]")) {
         const [first, second] = children;
@@ -101,15 +98,11 @@ test("a Switcher's children share one row when it is wide, and each has its own 
 test("a Center holds its width, in the middle of its room", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await open(page, "compositions-compositions--center");
+  const room = await page.evaluate(() => document.querySelector("#storybook-root")?.getBoundingClientRect().width ?? 0);
   for (const { data, content } of await boxes(page, "[data-max]")) {
-    const max = await page.evaluate(
-      (name) => Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)),
-      data["max"] === "dialog" ? "--dialog-w" : "--measure",
+    expect(content.width).toBeLessThanOrEqual(
+      (await token(page, data["max"] === "dialog" ? "--dialog-w" : "--measure")) + 1,
     );
-    const room = await page.evaluate(
-      () => document.querySelector("#storybook-root")?.getBoundingClientRect().width ?? 0,
-    );
-    expect(content.width).toBeLessThanOrEqual(max + 1);
     expect(room).toBeGreaterThan(content.width);
   }
   const margins = await page.evaluate(() => {

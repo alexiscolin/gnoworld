@@ -20,25 +20,30 @@ test("every story renders with no error and passes axe", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-// Each control is brought into view first: elementFromPoint sees nothing below the fold.
+// Each control is brought into view first: elementFromPoint sees nothing outside the viewport. A link
+// with words of its own around it, inside a sentence, is left out, as WCAG 2.5.8 leaves it out.
 test("in every story, each control is a target of 24 px or more that nothing covers", async ({ page }) => {
   for (const id of await stories(page)) {
     await open(page, id);
-    for (const control of await page.locator("#storybook-root button, #storybook-root a[href]").all()) {
-      // WCAG 2.5.8 exempts a link inside a sentence; a link that stands alone is a target like any.
-      if (await control.evaluate((element) => getComputedStyle(element).display === "inline")) continue;
-      await control.scrollIntoViewIfNeeded();
-      const faults = await control.evaluate((element) => {
-        const box = element.getBoundingClientRect();
-        const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
-        const name = element.outerHTML.slice(0, 60);
-        const small =
-          box.width < 24 || box.height < 24 ? [`${name} is ${String(box.width)}x${String(box.height)}`] : [];
-        const covered = hit === null || !element.contains(hit) ? [`${name} is covered or out of view`] : [];
-        return [...small, ...covered];
-      });
-      expect.soft(faults, id).toEqual([]);
-    }
+    const faults = await page.evaluate(() =>
+      [...document.querySelectorAll<HTMLElement>("#storybook-root button, #storybook-root a[href]")].flatMap(
+        (control) => {
+          const inSentence =
+            control instanceof HTMLAnchorElement &&
+            control.parentElement?.textContent.trim() !== control.textContent.trim();
+          if (inSentence) return [];
+          control.scrollIntoView({ block: "center", inline: "center" });
+          const box = control.getBoundingClientRect();
+          const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+          const name = control.outerHTML.slice(0, 60);
+          const small =
+            box.width < 24 || box.height < 24 ? [`${name} is ${String(box.width)}x${String(box.height)}`] : [];
+          const covered = hit === null || !control.contains(hit) ? [`${name} is covered or out of view`] : [];
+          return [...small, ...covered];
+        },
+      ),
+    );
+    expect.soft(faults, id).toEqual([]);
   }
 });
 
@@ -90,7 +95,7 @@ test("the focus ring is the 2 px mint outline, 2 px off, on every control reache
 });
 
 test("each composition spaces its children by the token its step names", async ({ page }) => {
-  for (const id of (await stories(page)).filter((s) => s.startsWith("compositions-"))) {
+  for (const id of await stories(page, "compositions-")) {
     await open(page, id);
     const faults = await page.evaluate(() =>
       [...document.querySelectorAll<HTMLElement>("#storybook-root [data-space]")].flatMap((box) => {
@@ -148,30 +153,21 @@ async function sizes(page: Page, id: string) {
   });
 }
 
-test("controls are as tall as their size's control, and the default 44 px by touch", async ({
-  playwright,
-  launchOptions,
-  baseURL,
-}) => {
-  for (const touch of [false, true]) {
-    // A browser each: in the sandbox's one-process Chromium, closing a context ends its browser.
-    const browser = await playwright.chromium.launch(launchOptions);
-    const context = await browser.newContext({
-      hasTouch: touch,
-      isMobile: touch,
-      ...(baseURL === undefined ? {} : { baseURL }),
+for (const touch of [false, true]) {
+  const how = touch ? "by touch" : "with a pointer";
+  test.describe(how, () => {
+    test.use({ contextOptions: { hasTouch: touch, isMobile: touch } });
+
+    test("controls are as tall as their size's control, the default 44 px by touch", async ({ page }) => {
+      const m = touch ? 44 : 40;
+      expect((await sizes(page, "button--sizes")).heights).toEqual({ s: 32, m, l: 56 });
+      expect(await sizes(page, "button-iconbutton--sizes"), "icon buttons").toEqual({
+        heights: { s: 32, m, l: 56 },
+        square: true,
+      });
     });
-    const page = await context.newPage();
-    const m = touch ? 44 : 40;
-    const how = touch ? "by touch" : "with a pointer";
-    expect((await sizes(page, "button--sizes")).heights, how).toEqual({ s: 32, m, l: 56 });
-    expect(await sizes(page, "button-iconbutton--sizes"), `icon buttons, ${how}`).toEqual({
-      heights: { s: 32, m, l: 56 },
-      square: true,
-    });
-    await browser.close();
-  }
-});
+  });
+}
 
 test("a busy button's spinner turns, and stops under reduced motion", async ({ page }) => {
   const spin = async () => {
