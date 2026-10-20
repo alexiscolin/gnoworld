@@ -6,7 +6,10 @@
 
     inline-size: var(--_w);
     max-inline-size: calc(100% - 2 * var(--space-2xs));
+    /* Never taller than the screen: what does not fit scrolls inside. */
+    max-block-size: calc(100% - 2 * var(--space-2xs));
     padding: var(--space-s);
+    overflow: auto;
     border-radius: var(--radius-m);
     box-shadow: var(--shadow-popover);
   }

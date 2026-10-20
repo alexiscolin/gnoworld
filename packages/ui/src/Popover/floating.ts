@@ -19,8 +19,8 @@ interface Placing {
 }
 
 /** Puts the box on its side of the anchor, or the other one when it does not fit there, and slides it
- * along the edge to stay a step inside the screen: centred, or from the anchor's start. A box kept
- * unseen until placed is seen from then on. */
+ * to stay a step inside the screen's edges: centred, or from the anchor's start. A box kept unseen
+ * until placed is seen from then on. */
 function place(anchor: Element, box: HTMLElement, { side, align }: Placing) {
   const at = anchor.getBoundingClientRect();
   const { width, height } = box.getBoundingClientRect();
@@ -34,7 +34,7 @@ function place(anchor: Element, box: HTMLElement, { side, align }: Placing) {
   if (align === "center") start = at.left + (at.width - width) / 2;
   else if (getComputedStyle(anchor).direction === "rtl") start = at.right - width;
   box.style.left = `${String(Math.max(step, Math.min(start, clientWidth - step - width)))}px`;
-  box.style.top = `${String(top)}px`;
+  box.style.top = `${String(Math.max(step, Math.min(top, clientHeight - step - height)))}px`;
   box.style.removeProperty("visibility");
 }
 

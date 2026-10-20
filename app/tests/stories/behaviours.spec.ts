@@ -257,6 +257,20 @@ test.describe("Popover", () => {
     expect(await focused(page)).toBe("More");
   });
 
+  test("a menu taller than the screen stays inside it, and its last item can be reached", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 200 });
+    await open(page, "popover--message-menu");
+    await page.getByRole("button", { name: "More" }).click();
+    const menu = page.getByRole("menu");
+    await expect(menu).toBeVisible();
+    const m = await box(menu);
+    expect(m.y, "below the screen's top").toBeGreaterThanOrEqual(STEP);
+    expect(m.y + m.height, "above the screen's bottom").toBeLessThanOrEqual(200 - STEP);
+    await page.keyboard.press("End");
+    const last = await box(page.getByRole("menuitem", { name: "Report" }));
+    expect(last.y + last.height, "the last item in sight").toBeLessThanOrEqual(200);
+  });
+
   test("a menu's item taken with the pointer closes it, focus back on the trigger", async ({ page }) => {
     await open(page, "popover--message-menu");
     await page.getByRole("button", { name: "More" }).click();
