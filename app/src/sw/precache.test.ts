@@ -38,6 +38,11 @@ test("only whole names count: no source map, no nested path, no hash under eight
   ).toEqual(["/assets/app-12345678.js"]);
 });
 
+// A hash is Vite's eight characters, dashes among them: a dashed name with none is not one.
+test("a dashed name with no hash counts for nothing, its last words taken for no hash", () => {
+  expect(precacheList(["assets/entry-client-chunk.js", "assets/route-world-main.css"])).toEqual([]);
+});
+
 test("the list is the same whatever order the build gives its files in", () => {
   expect(precacheList([...BUILD].reverse())).toEqual(precacheList(BUILD));
 });
