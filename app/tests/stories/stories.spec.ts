@@ -2,7 +2,7 @@
 // jsdom cannot see, since it applies no stylesheet. Each test walks every story Storybook built.
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "../e2e/fixtures.ts";
-import { BUTTONS, expect, open, stories, test } from "./storybook.ts";
+import { BUTTONS, CONTROLS, expect, open, RING, stories, test } from "./storybook.ts";
 
 test("every story renders with no error and passes axe", async ({ page }) => {
   const errors: string[] = [];
@@ -21,13 +21,15 @@ test("every story renders with no error and passes axe", async ({ page }) => {
 });
 
 // Each control is brought into view first: elementFromPoint sees nothing outside the viewport. A link
-// with words of its own around it, inside a sentence, is left out, as WCAG 2.5.8 leaves it out.
+// with words of its own around it, inside a sentence, is left out, as WCAG 2.5.8 leaves it out; so is
+// a control not drawn, as a closed menu's items are.
 test("in every story, each control is a target of 24 px or more that nothing covers", async ({ page }) => {
   for (const id of await stories(page)) {
     await open(page, id);
-    const faults = await page.evaluate(() =>
-      [...document.querySelectorAll<HTMLElement>("#storybook-root button, #storybook-root a[href]")].flatMap(
-        (control) => {
+    const faults = await page.evaluate(
+      (controls) =>
+        [...document.querySelectorAll<HTMLElement>(controls)].flatMap((control) => {
+          if (!control.checkVisibility()) return [];
           const inSentence =
             control instanceof HTMLAnchorElement &&
             !control.hasAttribute("data-emphasis") &&
@@ -41,8 +43,8 @@ test("in every story, each control is a target of 24 px or more that nothing cov
             box.width < 24 || box.height < 24 ? [`${name} is ${String(box.width)}x${String(box.height)}`] : [];
           const covered = hit === null || !control.contains(hit) ? [`${name} is covered or out of view`] : [];
           return [...small, ...covered];
-        },
-      ),
+        }),
+      CONTROLS,
     );
     expect.soft(faults, id).toEqual([]);
   }
@@ -105,14 +107,27 @@ test("no story scrolls sideways at 320 px when its longest text is one word of 4
   }
 });
 
-// Every control of every story, tabbed to in turn: a component rule that hides or clips the one
-// ring would show here.
+// Every control of every story, tabbed to in turn from the top: a component rule that hides or clips
+// the one ring, or one that takes a control out of the tab order, would show here. Those the arrows
+// reach instead, a tablist's other tabs and a menu's items, are the behaviours' journeys'.
 test("the focus ring is the 2 px mint outline, 2 px off, on every control reached by the keyboard", async ({
   page,
 }) => {
   for (const id of await stories(page)) {
     await open(page, id);
-    const controls = await page.locator("#storybook-root :is(button:not(:disabled), a[href])").count();
+    // Tab starts from the top of what can take the focus, the open dialog's or the page's, whatever a
+    // story focused: a blur would leave Tab's starting point where the focus was.
+    const controls = await page.evaluate((selector) => {
+      const top = document.createElement("span");
+      top.tabIndex = -1;
+      (document.querySelector("dialog:modal") ?? document.body).prepend(top);
+      top.focus();
+      top.remove();
+      return [...document.querySelectorAll<HTMLElement>(selector)].filter(
+        (control) =>
+          control.checkVisibility() && !control.matches(":disabled, [role='menuitem'], [role='tab'][tabindex='-1']"),
+      ).length;
+    }, CONTROLS);
     const reached = new Set<string>();
     for (let step = 0; step < controls; step += 1) {
       await page.keyboard.press("Tab");
@@ -124,11 +139,26 @@ test("the focus ring is the 2 px mint outline, 2 px off, on every control reache
         return [String(where), style.outlineStyle, style.outlineWidth, style.outlineColor, style.outlineOffset];
       });
       reached.add(name);
-      expect.soft(ring, `${id}, control ${name}`).toEqual(["solid", "2px", "rgb(92, 242, 200)", "2px"]);
+      expect.soft(ring, `${id}, control ${name}`).toEqual(RING);
     }
     expect.soft(reached.size, `${id}: controls the keyboard reaches`).toBe(controls);
     expect.soft(reached.has("-1"), `${id}: focus left the story`).toBe(false);
   }
+});
+
+// The browser draws a button's own face, a grey fill, a raised edge and a padding, which a control
+// that sets none of its own would show: the reset takes them off every button, wherever it is.
+test("a bare button wears none of the browser's face: no fill, no edge, no padding", async ({ page }) => {
+  await open(page, "overview--all");
+  const face = await page.evaluate(() => {
+    const bare = document.createElement("button");
+    document.querySelector("#storybook-root")?.append(bare);
+    const style = getComputedStyle(bare);
+    const seen = [style.backgroundColor, style.backgroundImage, style.borderTopStyle, style.paddingBlockStart];
+    bare.remove();
+    return seen;
+  });
+  expect(face).toEqual(["rgba(0, 0, 0, 0)", "none", "none", "0px"]);
 });
 
 // The state the accessibility tree sees is the state the CSS draws (docs/DESIGN-SYSTEM.md, "CSS
@@ -262,6 +292,26 @@ for (const touch of [false, true]) {
         heights: { s: 32, m, l: 56 },
         square: true,
       });
+    });
+
+    // A chip that is a mark sits at the smallest control, one that acts and a tab at the small one; a
+    // field's box and a popover's trigger at the default one, 44 by touch.
+    test("chips, tabs and fields are as tall as their size's control", async ({ page }) => {
+      const heights = async (id: string, selector: string) => {
+        await open(page, id);
+        return [
+          ...new Set(
+            await page
+              .locator(`#storybook-root ${selector}`)
+              .evaluateAll((all) => all.map((e) => e.getBoundingClientRect().height)),
+          ),
+        ];
+      };
+      expect(await heights("chip--marks", "[data-tone]"), "marks").toEqual([24]);
+      expect(await heights("chip--control", "button"), "a chip that acts").toEqual([32]);
+      expect(await heights("tabs--segmented", "[role='tab']"), "tabs").toEqual([32]);
+      expect(await heights("field--text", "input"), "a field").toEqual([touch ? 44 : 40]);
+      expect(await heights("popover--anchored", "[aria-haspopup]"), "a popover's trigger").toEqual([touch ? 44 : 40]);
     });
   });
 }

@@ -3,3 +3,50 @@ import { cleanup } from "@testing-library/react";
 import { afterEach } from "vitest";
 
 afterEach(cleanup);
+
+// jsdom draws no top layer and has no showModal: a dialog it opens is open, and closed by close(),
+// which says so with its close event, as the browser does. Its focus, Esc and scrim are the stories'
+// journeys' (docs/plans/slice-2cd.md).
+Object.assign(HTMLDialogElement.prototype, {
+  showModal(this: HTMLDialogElement) {
+    this.open = true;
+  },
+  close(this: HTMLDialogElement) {
+    if (!this.open) return;
+    this.open = false;
+    this.dispatchEvent(new Event("close"));
+  },
+});
+
+// jsdom has no popover API, and its sheet hides every [popover]: a stand-in shows one as the browser
+// does, by its trigger's popovertarget or its own methods, with the beforetoggle and toggle events the
+// components listen to. Light dismiss, Esc and the top layer are the journeys'.
+function toggled(element: HTMLElement, open: boolean) {
+  const was = element.style.display === "block";
+  if (was === open) return;
+  const states = { oldState: was ? "open" : "closed", newState: open ? "open" : "closed" };
+  element.dispatchEvent(Object.assign(new Event("beforetoggle"), states));
+  element.style.display = open ? "block" : "";
+  element.dispatchEvent(Object.assign(new Event("toggle"), states));
+}
+
+Object.assign(HTMLElement.prototype, {
+  showPopover(this: HTMLElement) {
+    toggled(this, true);
+  },
+  hidePopover(this: HTMLElement) {
+    toggled(this, false);
+  },
+  togglePopover(this: HTMLElement, force?: boolean) {
+    toggled(this, force ?? this.style.display !== "block");
+  },
+});
+
+document.addEventListener("click", (event) => {
+  const trigger = event.target instanceof Element ? event.target.closest("[popovertarget]") : null;
+  const panel = document.getElementById(trigger?.getAttribute("popovertarget") ?? "");
+  panel?.togglePopover();
+});
+
+// jsdom has no matchMedia: every query answers no, so motion that waits for "no-preference" stays still.
+Object.assign(window, { matchMedia: (media: string) => ({ matches: false, media }) });

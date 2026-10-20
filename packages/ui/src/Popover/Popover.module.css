@@ -1,0 +1,38 @@
+/* The popover: a floating surface (surface.module.css) under its trigger; a menu is a column of rows
+   in it. */
+@layer components {
+  .panel {
+    --_w: var(--popover-w);
+
+    inline-size: var(--_w);
+    max-inline-size: calc(100% - 2 * var(--space-2xs));
+    /* Never taller than the screen: what does not fit scrolls inside. */
+    max-block-size: calc(100% - 2 * var(--space-2xs));
+    padding: var(--space-s);
+    overflow: auto;
+    border-radius: var(--radius-m);
+    box-shadow: var(--shadow-popover);
+  }
+
+  .panel[data-kind="menu"] {
+    --_w: max-content;
+
+    padding: var(--space-3xs);
+  }
+
+  /* A row of the menu, on no fill but under the pointer or the keyboard. */
+  .item {
+    display: block;
+    inline-size: 100%;
+    min-block-size: var(--control-m);
+    padding-inline: var(--space-xs);
+    border-radius: var(--radius-s);
+    font: var(--font-ui);
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .item:is(:hover, :focus-visible) {
+    background: var(--color-fill-hover);
+  }
+}

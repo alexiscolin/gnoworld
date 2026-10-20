@@ -213,6 +213,9 @@ export default defineConfig(
       "css/no-invalid-properties": ["error", { allowUnknownVariables: true }],
       "css/use-layers": "error",
       "css/prefer-logical-properties": "error",
+      // docs/DESIGN-SYSTEM.md, "Browsers": Baseline widely available, but for the popover and
+      // @starting-style, from 2024, which a popover's fade in needs.
+      "css/use-baseline": ["error", { allowAtRules: ["starting-style"], allowSelectors: ["popover-open"] }],
     },
   },
 );

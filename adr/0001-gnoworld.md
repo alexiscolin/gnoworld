@@ -627,7 +627,8 @@ follows gnoradio and gnogolf. Every package below was checked on npm on 2026-10-
   - 60 fps on a mid-range phone.
 
 **PWA rules:**
-- Precache only the app's hashed files; textures are cached on first use.
+- Precache only the app's hashed files, its scripts, styles and fonts, so that offline a page keeps
+  its face; textures are cached on first use.
 - Never cache chain reads or relay traffic: the truth is the chain.
 - Updates are explicit: "new version, reload".
 - The service worker is off in development; `?nosw` unregisters it.

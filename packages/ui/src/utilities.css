@@ -24,4 +24,16 @@
     letter-spacing: normal;
     text-transform: none;
   }
+
+  /* Words for assistive technology alone: a figure's value while its digits count, a chart's table. */
+  .visually-hidden {
+    position: absolute;
+    /* raw: one pixel, the least a box can be and still be read */
+    inline-size: 1px;
+    /* raw: one pixel, the least a box can be and still be read */
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }

@@ -1,0 +1,61 @@
+/* The thumb: a picture in a disc, at a thumb size; a station is a rounded square, a star wears amber's
+   line, a cluster the strong line, a signal violet's dashed line. */
+@layer components {
+  .thumb {
+    --_edge: transparent;
+    --_dash: solid;
+    --_round: var(--radius-pill);
+
+    display: inline-block;
+    inline-size: var(--_size);
+    block-size: var(--_size);
+    overflow: hidden;
+    border: var(--line-width) var(--_dash) var(--_edge);
+    border-radius: var(--_round);
+    vertical-align: middle;
+    transition: scale var(--motion-fast) var(--ease-standard);
+  }
+
+  .thumb[data-size="s"] {
+    --_size: var(--thumb-s);
+  }
+
+  .thumb[data-size="m"] {
+    --_size: var(--thumb-m);
+  }
+
+  .thumb[data-size="l"] {
+    --_size: var(--thumb-l);
+  }
+
+  .thumb[data-kind="cluster"] {
+    --_edge: var(--color-line-strong);
+  }
+
+  .thumb[data-kind="star"] {
+    --_edge: var(--color-warm-line);
+  }
+
+  .thumb[data-kind="station"] {
+    --_round: var(--radius-m);
+  }
+
+  .thumb[data-kind="signal"] {
+    --_edge: var(--color-signal-line);
+    --_dash: dashed;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .thumb[data-magnify]:hover {
+      /* raw: the dock's magnification, a quarter more, from the prototype */
+      scale: 1.25;
+    }
+  }
+
+  .picture {
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: cover;
+  }
+}

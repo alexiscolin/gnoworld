@@ -1,0 +1,53 @@
+/* The skeleton: the resting fill in a text line's or a card's shape, hidden for its first 300 ms, then
+   breathing slowly; under reduced motion it stays still. */
+@layer components {
+  .lines {
+    display: block;
+  }
+
+  .skeleton {
+    display: block;
+    border-radius: var(--radius-s);
+    background: var(--color-fill-hover);
+    animation:
+      wait var(--motion-wait),
+      breathe var(--motion-ambient) var(--ease-standard) var(--motion-wait) infinite alternate;
+  }
+
+  .skeleton[data-shape="line"] {
+    block-size: 1lh;
+  }
+
+  .skeleton[data-shape="line"] + .skeleton {
+    /* layout: the lines of a paragraph, a line's leading apart */
+    margin-block-start: var(--space-2xs);
+  }
+
+  .skeleton[data-shape="line"]:last-child:not(:only-child) {
+    inline-size: 60%;
+  }
+
+  .skeleton[data-shape="card"] {
+    block-size: var(--column-s);
+    border-radius: var(--radius-l);
+  }
+
+  @keyframes wait {
+    from,
+    to {
+      visibility: hidden;
+    }
+  }
+
+  @keyframes breathe {
+    to {
+      opacity: var(--opacity-disabled);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton {
+      animation: wait var(--motion-wait);
+    }
+  }
+}

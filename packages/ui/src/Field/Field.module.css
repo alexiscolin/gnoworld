@@ -1,0 +1,44 @@
+/* The field: a box on the resting fill, one line at the default control's height; invalid, coral. */
+@layer components {
+  .label {
+    font: var(--font-ui);
+  }
+
+  .box {
+    --_line: var(--color-line);
+
+    inline-size: 100%;
+    min-block-size: var(--control-m);
+    padding-block: var(--space-2xs);
+    padding-inline: var(--space-s);
+    border: var(--line-width) solid var(--_line);
+    border-radius: var(--radius-m);
+    background: var(--color-fill);
+    font: var(--font-body);
+  }
+
+  .box:hover {
+    --_line: var(--color-line-strong);
+  }
+
+  .box[aria-invalid="true"] {
+    --_line: var(--color-danger-line);
+  }
+
+  .prefix {
+    /* layout: the prefix sits level with the box's text */
+    align-self: center;
+    color: var(--color-text-muted);
+    font: var(--font-body);
+  }
+
+  .help {
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+  }
+
+  .error {
+    color: var(--color-danger);
+    font: var(--font-meta);
+  }
+}

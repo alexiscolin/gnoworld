@@ -19,7 +19,17 @@ export function groups() {
     { name: "Space", prefixes: ["--space-"] },
     {
       name: "Size",
-      prefixes: ["--control-", "--icon-", "--size-", "--column-", "--measure", "--switch-", "--dialog-"],
+      prefixes: [
+        "--control-",
+        "--icon-",
+        "--size-",
+        "--column-",
+        "--measure",
+        "--switch-",
+        "--dialog-",
+        "--popover-",
+        "--thumb-",
+      ],
     },
     { name: "Shape", prefixes: ["--radius-", "--line-", "--focus-"] },
     { name: "Motion", prefixes: ["--motion-", "--ease-"] },

@@ -1,0 +1,24 @@
+/* What floats over the page shares, the popover, the tooltip and the dialog: the surface colour in its
+   strong line; and in the top layer, placed in script (floating.ts), a fade in. At no specificity, so
+   each one's own rule wins wherever the sheets load. */
+@layer components {
+  :where(.surface) {
+    border: var(--line-width) solid var(--color-line-strong);
+    background: var(--color-surface);
+    color: var(--color-text);
+  }
+
+  :where(.floating) {
+    inset: auto;
+    /* layout: the browser centres a popover with its margins; ours is placed in script */
+    margin: 0;
+    opacity: 1;
+    transition: opacity var(--motion-fast) var(--ease-standard);
+  }
+
+  @starting-style {
+    :where(.floating):popover-open {
+      opacity: 0;
+    }
+  }
+}

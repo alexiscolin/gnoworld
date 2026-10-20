@@ -26,6 +26,13 @@
     color: inherit;
   }
 
+  /* The browser's own face of a button, its fill, edge and padding: each control draws its own. */
+  button {
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+
   svg {
     display: block;
   }

@@ -27,6 +27,19 @@ function contrast(a: string, b: string) {
   return ((light ?? 0) + 0.05) / ((dark ?? 0) + 0.05);
 }
 
+// A translucent token laid over a ground, mixed in sRGB as docs/DESIGN-SYSTEM.md measures it: the
+// token's primitive at its share, the ground under the rest.
+function over(name: string, ground: string) {
+  const [, primitive = "", share = "0"] = /var\(--p-(\w+)\) (\d+)%, transparent/.exec(value(name) ?? "") ?? [];
+  const [top, under] = [BASE[primitive] ?? "", BASE[ground] ?? ""];
+  const mixed = [1, 3, 5].map((at) => {
+    const channel = (hex: string) => Number.parseInt(hex.slice(at, at + 2), 16);
+    const blend = (Number(share) / 100) * channel(top) + (1 - Number(share) / 100) * channel(under);
+    return Math.round(blend).toString(16).padStart(2, "0");
+  });
+  return `#${mixed.join("")}`;
+}
+
 describe("parseTokens", () => {
   it("reads each name once, its first value, and nothing inside a comment", () => {
     const text =
@@ -68,6 +81,8 @@ describe("parseTokens", () => {
     ["--column-m", "Size"],
     ["--measure", "Size"],
     ["--dialog-w", "Size"],
+    ["--popover-w", "Size"],
+    ["--thumb-m", "Size"],
     ["--radius-s", "Shape"],
     ["--line-width", "Shape"],
     ["--focus-width", "Shape"],
@@ -122,7 +137,55 @@ describe("the tokens", () => {
     }
   });
 
+  it("keep each accent at 6.3:1 or more on its own soft tint, over night and over space", () => {
+    for (const ground of ["night", "space"]) {
+      for (const [accent, primitive] of [
+        ["mine", "mint"],
+        ["warm", "amber"],
+        ["signal", "violet"],
+        ["danger", "coral"],
+      ] as const) {
+        const tint = over(`--color-${accent}-soft`, ground);
+        expect(contrast(BASE[primitive] ?? "", tint), `${accent} on its tint over ${ground}`).toBeGreaterThanOrEqual(
+          6.3,
+        );
+      }
+    }
+  });
+
+  it("keep the muted grey at 6.3:1 or more on the fill and the hover fill, over night", () => {
+    for (const fill of ["--color-fill", "--color-fill-hover"])
+      expect(contrast(BASE["muted"] ?? "", over(fill, "night")), fill).toBeGreaterThanOrEqual(6.3);
+  });
+
+  it("make the accents' tints and lines of their own primitive, at 12% and 50%", () => {
+    for (const [accent, primitive] of [
+      ["mine", "mint"],
+      ["warm", "amber"],
+      ["signal", "violet"],
+      ["danger", "coral"],
+    ] as const) {
+      expect(value(`--color-${accent}-soft`)).toBe(`color-mix(in oklab, var(--p-${primitive}) 12%, transparent)`);
+      expect(value(`--color-${accent}-line`)).toBe(`color-mix(in oklab, var(--p-${primitive}) 50%, transparent)`);
+    }
+    expect(value("--color-scrim")).toBe("color-mix(in oklab, var(--p-space) 70%, transparent)");
+  });
+
   it.each([
+    ["--control-xs", "24px"],
+    ["--radius-s", "8px"],
+    ["--radius-m", "12px"],
+    ["--radius-l", "24px"],
+    ["--dialog-w", "460px"],
+    ["--dialog-wide", "760px"],
+    ["--popover-w", "300px"],
+    ["--thumb-s", "32px"],
+    ["--thumb-m", "48px"],
+    ["--thumb-l", "64px"],
+    ["--motion-fast", "120ms"],
+    ["--motion-base", "200ms"],
+    ["--motion-wait", "300ms"],
+    ["--motion-ambient", "3s"],
     ["--icon-m", "16px"],
     ["--icon-l", "20px"],
     ["--control-s", "32px"],
@@ -137,5 +200,13 @@ describe("the tokens", () => {
 
   it("set the medium control to 44 px under a coarse pointer, for touch", () => {
     expect(css).toMatch(/@media \(pointer: coarse\)\s*\{\s*:root\s*\{\s*--control-m:\s*44px;/);
+  });
+
+  it("still the fast and the base motion under reduced motion, and keep the wait", () => {
+    const reduced = /@media \(prefers-reduced-motion: reduce\)\s*\{\s*:root\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
+    expect(parseTokens(`:root {${reduced}}`).map(({ name, value: v }) => [name, v])).toEqual([
+      ["--motion-fast", "0s"],
+      ["--motion-base", "0s"],
+    ]);
   });
 });

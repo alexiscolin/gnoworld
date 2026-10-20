@@ -1,0 +1,34 @@
+/* The card: the resting fill in a rounded box; the assistant's in violet's tint and line; dashed for
+   what is not there yet; compact, a step tighter. */
+@layer components {
+  .card {
+    --_fill: var(--color-fill);
+    --_line: var(--color-line);
+    --_edge: solid;
+    --_pad: var(--space-m);
+
+    padding: var(--_pad);
+    border: var(--line-width) var(--_edge) var(--_line);
+    border-radius: var(--radius-m);
+    background: var(--_fill);
+  }
+
+  .card[data-tone="signal"] {
+    --_fill: var(--color-signal-soft);
+    --_line: var(--color-signal-line);
+  }
+
+  .card[data-edge="dashed"] {
+    --_edge: dashed;
+    --_line: var(--color-line-strong);
+  }
+
+  .card[data-density="compact"] {
+    --_pad: var(--space-s);
+  }
+
+  .title {
+    font: var(--font-body);
+    font-weight: 500;
+  }
+}

@@ -1,0 +1,78 @@
+import { render, screen } from "@testing-library/react";
+import { userEvent } from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
+import { eachStory, staysText } from "../testing.tsx";
+import { Field } from "./Field.tsx";
+import * as stories from "./Field.stories.tsx";
+
+describe("Field", () => {
+  it("is a text box named by its label, described by its help", () => {
+    render(<Field label="Room name" help="Up to 32 letters" value="" onChange={vi.fn()} />);
+    const box = screen.getByRole("textbox", { name: "Room name" });
+    expect(box.getAttribute("type")).toBe("text");
+    expect(box.getAttribute("aria-describedby")).toBe(screen.getByText("Up to 32 letters").id);
+  });
+
+  it("says its error, as invalid and described by it, beside its help", () => {
+    render(<Field label="Name" help="On gno.land" error="Taken already" value="x" onChange={vi.fn()} />);
+    const box = screen.getByRole("textbox", { name: "Name" });
+    expect(box.getAttribute("aria-invalid")).toBe("true");
+    const said = (box.getAttribute("aria-describedby") ?? "")
+      .split(" ")
+      .map((id) => document.getElementById(id)?.textContent);
+    expect(said).toEqual(["On gno.land", "Taken already"]);
+  });
+
+  it("is described by its error alone when it has no help", () => {
+    render(<Field label="Name" error="Too short" value="ab" onChange={vi.fn()} />);
+    const said = screen.getByRole("textbox").getAttribute("aria-describedby") ?? "";
+    expect(said.split(" ").map((id) => document.getElementById(id)?.textContent)).toEqual(["Too short"]);
+  });
+
+  it("is a search box, or a date and time, when asked", () => {
+    const { rerender } = render(<Field kind="search" label="Search" value="" onChange={vi.fn()} />);
+    expect(screen.getByRole("searchbox", { name: "Search" })).toBeTruthy();
+    rerender(<Field kind="date" label="Starts" value="2026-10-21T18:00" onChange={vi.fn()} />);
+    expect(screen.getByLabelText("Starts").getAttribute("type")).toBe("datetime-local");
+  });
+
+  it("shows its prefix before the box, outside its value", () => {
+    render(<Field label="Name" prefix="@" value="alexis" onChange={vi.fn()} />);
+    expect(screen.getByText("@")).toBeTruthy();
+    expect(screen.getByRole<HTMLInputElement>("textbox", { name: "Name" }).value).toBe("alexis");
+  });
+
+  it("hands each keystroke's value to its handler", async () => {
+    const onChange = vi.fn();
+    render(<Field label="Name" value="" onChange={onChange} />);
+    await userEvent.type(screen.getByRole("textbox"), "a");
+    expect(onChange).toHaveBeenCalledWith("a");
+  });
+
+  it("gives each field ids of its own, each box named by its own label and described by its own help", () => {
+    render(
+      <>
+        <Field label="Name" help="first" value="" onChange={vi.fn()} />
+        <Field label="Name" help="second" value="" onChange={vi.fn()} />
+      </>,
+    );
+    const said = screen
+      .getAllByRole("textbox", { name: "Name" })
+      .map((box) => document.getElementById(box.getAttribute("aria-describedby") ?? "")?.textContent);
+    expect(said).toEqual(["first", "second"]);
+  });
+
+  it("shows a label, help, error and prefix made of markup, or very long, as text", () => {
+    staysText((text) => <Field label={text} help={text} error={text} value="" onChange={vi.fn()} />);
+    staysText((text) => <Field label="Name" prefix={text} value="" onChange={vi.fn()} />);
+  });
+
+  it("has stories for text, search, date, a prefix, help and an error", () => {
+    const shown = eachStory(stories, (container) => ({
+      type: container.querySelector("input")?.getAttribute("type"),
+      invalid: container.querySelector("[aria-invalid='true']") !== null,
+    }));
+    for (const type of ["text", "search", "datetime-local"]) expect(shown.some((s) => s.type === type)).toBe(true);
+    expect(shown.some((s) => s.invalid)).toBe(true);
+  });
+});

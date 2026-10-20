@@ -1,6 +1,6 @@
 import type { MouseEvent, ReactNode } from "react";
 import { Icon, type IconName } from "../icons/Icon.tsx";
-import { iconSize, type ControlSize } from "./control.ts";
+import { buttonLook, iconSize, type ControlSize } from "./control.ts";
 import styles from "./Button.module.css";
 
 interface Look {
@@ -39,7 +39,7 @@ function refuse(event: MouseEvent<HTMLButtonElement>) {
 /** The one button (docs/DESIGN-SYSTEM.md): solid and neutral is the primary, one per region. */
 export function Button(props: ButtonProps) {
   const { children, emphasis = "outline", tone = "neutral", size = "m", icon } = props;
-  const look = { className: styles["button"], "data-emphasis": emphasis, "data-tone": tone, "data-size": size };
+  const look = buttonLook(emphasis, tone, size);
   const face = (
     <>
       {icon === undefined ? null : <Icon name={icon} size={iconSize(size)} />}
