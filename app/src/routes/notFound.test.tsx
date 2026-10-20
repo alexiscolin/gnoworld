@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { render } from "../../tests/render.tsx";
+import { BACK_HOME, alertOf, render } from "../../tests/render.tsx";
 import { notFoundMeta } from "../meta.ts";
 import { clientLoader, ErrorBoundary, meta } from "./notFound.tsx";
 
@@ -9,6 +9,7 @@ describe("a path no route matches", () => {
     expect(html).toContain('role="alert"');
     expect(html).toContain("<h1>No page here</h1>");
     expect(html).toContain("<p>Nothing on gno.world goes by this address.</p>");
+    expect(alertOf(html)).toMatch(BACK_HOME);
   });
 
   test("answers 404 in the browser, so the router waits before it hydrates", () => {

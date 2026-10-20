@@ -5,6 +5,7 @@
     color-scheme: dark;
 
     --p-space: #05070d;
+    --p-night: #0b0f18;
     --p-text: #f4f6fa;
     --p-muted: #9da8bc;
     --p-cream: #f2efea;
@@ -27,6 +28,7 @@
     --color-fill-hover: color-mix(in oklab, var(--p-text) 10%, transparent);
     --color-line: color-mix(in oklab, var(--p-text) 10%, transparent);
     --color-line-strong: color-mix(in oklab, var(--p-text) 20%, transparent);
+    --color-panel: color-mix(in oklab, var(--p-night) 86%, transparent);
 
     --family-sans: "Geist Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
     --family-mono: "Geist Mono Variable", ui-monospace, Menlo, Consolas, monospace;
@@ -75,6 +77,7 @@
     --motion-spin: 0.8s;
     --ease-standard: cubic-bezier(0.2, 0.7, 0.1, 1);
     --opacity-disabled: 0.4;
+    --shadow-float: 0 16px 40px color-mix(in oklab, var(--p-space) 45%, transparent);
   }
 
   @media (pointer: coarse) {

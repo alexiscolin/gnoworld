@@ -35,9 +35,10 @@ with open("coverage/coverage-final.json") as f:
 
 total = run = 0
 # Tests and configs are never measured (Storybook's config and the tests' setup are of those); nor
-# the app's document shell and server entry, which only the build renders: the Playwright
-# journeys walk them (docs/decisions.md). Matched inside the repository only (F098).
-UNMEASURED = r"\.(test|config)\.tsx?$|\.d\.ts$|(^|/)tests/|(^|/)\.storybook/|(^|/)testSetup\.ts$|^app/src/(root|entry\.server)\.tsx$"
+# what vitest.config.ts leaves out of coverage: the app's document shell and server entry, which only
+# the build renders, and Storybook's pages, whose handlers do nothing; the Playwright journeys walk
+# them (docs/decisions.md, F247). Matched inside the repository only (F098).
+UNMEASURED = r"\.(test|config)\.tsx?$|\.d\.ts$|(^|/)tests/|(^|/)\.storybook/|(^|/)testSetup\.ts$|^packages/ui/src/.*\.stories\.tsx$|^packages/ui/src/Overview/Overview\.tsx$|^app/src/(root|entry\.server)\.tsx$"
 unmeasured = [p for p in changed if p not in report and not re.search(UNMEASURED, os.path.relpath(p))]
 for path in sorted(unmeasured):
     print(f"{os.path.relpath(path)}: changed, but no coverage measures it: add it to vitest.config.ts's coverage include")

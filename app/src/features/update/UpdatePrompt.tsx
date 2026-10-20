@@ -1,24 +1,27 @@
 /// <reference types="vite/client" />
 // "New version available" (ADR-0001 §12): the worker's update waits for this click.
+import { Flash } from "@gnoworld/ui";
 import { useEffect, useState } from "react";
-import { startServiceWorker } from "../sw/register.ts";
+import { startServiceWorker } from "../../sw/register.ts";
 
 export const PRODUCTION = import.meta.env.PROD;
 
-// The status region is on the page from the start, empty: a screen reader announces a region's
-// change, and may say nothing of one that arrives already filled.
-export function UpdateNotice({ onReload }: { readonly onReload: (() => void) | null }) {
+// A Flash keeps its status region on the page from the start, empty: a screen reader announces a
+// region's change, and may say nothing of one that arrives already filled. Closed, the update waits.
+export function UpdateNotice({
+  onReload,
+  onClose,
+}: {
+  readonly onReload: (() => void) | null;
+  readonly onClose: () => void;
+}) {
   return (
-    <div role="status">
-      {onReload === null ? null : (
-        <>
-          New version available.{" "}
-          <button type="button" onClick={onReload}>
-            Reload
-          </button>
-        </>
-      )}
-    </div>
+    <Flash
+      message={
+        onReload === null ? null : { title: "New version available.", action: { label: "Reload", onAction: onReload } }
+      }
+      onClose={onClose}
+    />
   );
 }
 
@@ -46,5 +49,12 @@ export function UpdatePrompt() {
       leaving.abort();
     };
   }, []);
-  return <UpdateNotice onReload={apply} />;
+  return (
+    <UpdateNotice
+      onReload={apply}
+      onClose={() => {
+        setApply(null);
+      }}
+    />
+  );
 }

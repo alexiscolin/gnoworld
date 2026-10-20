@@ -44,11 +44,15 @@ assume:
    the way the real one does.
 4. **Empty assertions:** only "was called", "is defined", "truthy", an unread snapshot, or a
    matcher loose enough for anything to pass.
-5. **Drift since the red pass:** find the commit whose message has a `Red-pass:` line
+5. **The declaration, not the effect:** a test of an invariant that reads what the code
+   declares (a transition's duration, a token's raw text) or one sample (one control, one
+   story) where the invariant holds for every one. It must measure what happens: the
+   animation that runs, the ring on every control, the length as the page resolves it.
+6. **Drift since the red pass:** find the commit whose message has a `Red-pass:` line
    (`git log --grep '^Red-pass:'`), diff the test files since it, and look for a test
    weakened, skipped (`.skip`, `.only`) or edited with the code without a stated reason; a
    timing guess instead of waiting on a state. No such commit is itself a finding.
-6. **Seen failing:** each new test failed before its code existed (the commit order, or a
+7. **Seen failing:** each new test failed before its code existed (the commit order, or a
    run against the base).
 
 ## Report

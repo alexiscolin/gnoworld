@@ -26,8 +26,8 @@ for Jarvis from phase 1 (ADR-0002 §5, §7).
 
 **One monorepo.** The client, the admin console, the server, the shared packages, the realms
 and the deployment live in one repository, with one lockfile and one gate:
-- each of `app/`, `admin/`, `server/`, `packages/core` and `packages/schemas` is a
-  workspace; the package manager is set in slice 1;
+- each of `app/`, `admin/`, `server/`, `packages/core`, `packages/ui` and `packages/schemas` is
+  a workspace: the applications at the root, the libraries they import under `packages/`;
 - a workspace imports another only through its `package.json` name (`@gnoworld/core`,
   `@gnoworld/schemas`), never by a relative path across folders;
 - no build orchestrator: each workspace has its own scripts, and `scripts/check.sh` runs
@@ -53,8 +53,10 @@ app/                         the web client
                              they parse with `@gnoworld/schemas` and apply `@gnoworld/core`
     store/                   the one Zustand store, one slice per feature
     scene/                   three.js only: renderer, loop, flights, bodies, level of detail, labels
+    sw/                      the service worker, and the page's side of it (ADR-0001 §12)
     features/                one folder per feature: chat, universe, world, realms, jarvis,
-                             passport, notifications, events, search, profile, settings
+                             passport, notifications, events, search, profile, settings; today
+                             update (the new version's notice) and errors (a page that failed)
   tests/e2e/                 Playwright: journeys, axe, budgets (bundle, Web Vitals, memory)
 packages/core/               pure rules, shared by app, admin and server: no DOM, no React, no network
 packages/ui/                 the design system: tokens, layers, compositions, components, Storybook
@@ -91,7 +93,8 @@ Lint enforces it with ESLint's built-in `no-restricted-imports`, configured per 
 | `store` | `core`, `lib` types | React, `scene`, `features` |
 | `scene` | `core`, `store` (read and subscribe), three, camera-controls, GSAP | React, `features`, `ui` |
 | `ui` | `ui` | `features`, `scene`, `store`, `lib` |
-| `features/x` | `ui`, `core`, `lib`, `store`, another feature's `index.ts` | Another feature's files |
+| `features/x` | `ui`, `core`, `lib`, `store`, `sw` (the update notice), another feature's `index.ts` | Another feature's files |
+| `sw` | `sw` | Anything else: the worker runs alone, before the page |
 | `server` | `core`, `schemas`, Node's built-ins, its framework | React, `scene`, `ui`, `features` |
 | `routes` | `features`, `ui`, `lib` (build-time loaders), `store` (to set the place) | `scene` directly: the canvas is mounted by the universe feature |
 

@@ -22,15 +22,47 @@ export const test = base.extend({
 interface Entry {
   id: string;
   type: string;
+  tags?: string[];
 }
+
+// Storybook's index, read once by each worker: one build serves every test. A failed read is not
+// kept, and says so.
+let index: Promise<Entry[]> | undefined;
+
+function entries(page: Page): Promise<Entry[]> {
+  index ??= page.request
+    .get("/index.json")
+    .then(async (response) => {
+      if (!response.ok()) throw new Error(`Storybook's index.json answered ${String(response.status())}`);
+      const read = (await response.json()) as { entries: Record<string, Entry> };
+      return Object.values(read.entries).filter((entry) => entry.type === "story");
+    })
+    .catch((error: unknown) => {
+      index = undefined;
+      throw error;
+    });
+  return index;
+}
+
+// The ids of the stories that carry a tag, each set made once by each worker.
+const byTag = new Map<string, Promise<Set<string>>>();
+
+/** The stories with a tag: "empty" draws nothing on purpose, "viewport" sits in the top layer. */
+export function tagged(page: Page, tag: string): Promise<Set<string>> {
+  let found = byTag.get(tag);
+  if (found === undefined) {
+    found = entries(page).then((all) => new Set(all.filter((e) => e.tags?.includes(tag) === true).map((e) => e.id)));
+    byTag.set(tag, found);
+  }
+  return found;
+}
+
+/** Every control with a button's look: the button, and the link that wears it. */
+export const BUTTONS = "#storybook-root :is(button, a[data-emphasis])";
 
 /** Every story's id, or those that start with a prefix ("compositions-"). */
 export async function stories(page: Page, prefix = ""): Promise<string[]> {
-  const response = await page.request.get("/index.json");
-  const index = (await response.json()) as { entries: Record<string, Entry> };
-  const ids = Object.values(index.entries)
-    .filter((entry) => entry.type === "story")
-    .map((entry) => entry.id);
+  const ids = (await entries(page)).map((entry) => entry.id);
   expect(ids.length).toBeGreaterThan(10);
   const chosen = ids.filter((id) => id.startsWith(prefix));
   // A walk costs about a tenth of a second a story, and the stories grow with each slice: a test
@@ -40,8 +72,13 @@ export async function stories(page: Page, prefix = ""): Promise<string[]> {
 }
 
 export async function open(page: Page, id: string) {
+  const nothing = (await tagged(page, "empty")).has(id);
   await page.goto(`/iframe.html?id=${id}&viewMode=story`);
-  await page.locator("#storybook-root > *").first().waitFor();
+  // A story shows something, unless it draws nothing on purpose.
+  await page
+    .locator("#storybook-root > *")
+    .first()
+    .waitFor({ state: nothing ? "attached" : "visible" });
   await page.evaluate(() => document.fonts.ready);
 }
 

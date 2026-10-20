@@ -22,6 +22,8 @@
     background: var(--_fill);
     color: var(--_ink);
     font: var(--_font);
+    text-align: center;
+    text-decoration: none;
     cursor: pointer;
     /* The hover's veil: an inset shadow paints above the fill and below the label, and eases. */
     /* raw: a spread past any control's size, so the veil covers it whole */

@@ -61,11 +61,15 @@ New: `packages/ui/` (tokens, layers, base, compositions, the components with the
 `SignPanel`, 55 icons, the avatar), Storybook, the PWA's icons. Changed: `root.tsx`, F212, the
 configs, the `package.json` files. No tier-1 file; no code of Alexis's. Merges of ~400 lines: 2a designs; 2b
 tokens, base, compositions, Storybook, the new test levels, `Button`, `IconButton`, `Kicker`,
-icons, the token page and the page of every component; 2c `Chip`, `Tabs`, `Popover`, `Dialog`,
-`Flash`, `EmptyState`, `Skeleton`, and `Tooltip`, which `IconButton` then wears, with StrykerJS
-mutating `.tsx` (F225), `UpdatePrompt` leaving `ui/` for `Flash` (F212), and the fonts: the
+icons, the token page and the page of every component; 2c-1 `Flash` and `EmptyState`, and
+`app/src/ui/` emptied, so `packages/ui` is the one source of components: `UpdatePrompt` a feature
+that shows a `Flash` (F212), the error and not-found pages an `EmptyState` with a link home, the
+flash in the page's flow, where its slot puts it (the shell's top-centre slot comes with the header,
+the top layer with `Dialog`); then one merge for 2c-2 and 2d together: `Chip`, `Tabs`, `Popover`,
+`Dialog`, `Skeleton`, and `Tooltip`, which `IconButton` then wears, with StrykerJS
+mutating `.tsx` (F225), and the fonts: the
 worker precaches the woff2 files too (ADR-0001 §12 names scripts and styles only), so offline the
-page keeps Geist, and the first screen's font is preloaded, as DESIGN-SYSTEM.md promises; 2d `Card`,
+page keeps Geist, and the first screen's font is preloaded, as DESIGN-SYSTEM.md promises, with 2d's `Card`,
 `Row`, `Field`, `Stat`, `ActivityChart`, `PlanetThumb`; 2e `Avatar` and the PWA's icons.
 The designs' 2a merge folds into 2b's: it holds only documents, and one review round covers
 both. `IconButton` shares `Button`'s folder and module, since it is the same control without its

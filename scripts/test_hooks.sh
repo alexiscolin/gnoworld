@@ -412,12 +412,18 @@ printf 'x\n' >"$c/app/src/root.tsx" && printf 'x\n' >"$c/app/src/entry.server.ts
 cover 1 || fail "patch_coverage asked coverage of a Playwright test, the document shell or the server entry"
 unmeasured app/src/site.ts app/src/routes/a.tsx
 git -C "$c" rm -rq --cached app && rm -r "$c/app"
-# Storybook's config is a config and a test setup a test's, so neither is measured; code named alike is.
-mkdir -p "$c/packages/ui/.storybook" "$c/packages/ui/src"
+# Storybook's config is a config and a test setup a test's, and its pages (the stories, the
+# overview) the journeys shoot, so none is measured; code named alike is.
+mkdir -p "$c/packages/ui/.storybook" "$c/packages/ui/src/Overview"
 printf 'x\n' >"$c/packages/ui/.storybook/main.ts" && printf 'x\n' >"$c/packages/ui/.storybook/preview.ts"
-printf 'x\n' >"$c/packages/ui/src/testSetup.ts" && git -C "$c" add packages
-cover 1 || fail "patch_coverage asked coverage of Storybook's config or the tests' setup"
-unmeasured packages/ui/src/storybook.ts packages/ui/src/setup.ts
+printf 'x\n' >"$c/packages/ui/src/testSetup.ts" && printf 'x\n' >"$c/packages/ui/src/Card.stories.tsx"
+printf 'x\n' >"$c/packages/ui/src/Overview/Overview.tsx" && git -C "$c" add packages
+cover 1 || fail "patch_coverage asked coverage of Storybook's config, its pages or the tests' setup"
+unmeasured packages/ui/src/storybook.ts packages/ui/src/setup.ts packages/ui/src/stories.tsx packages/ui/src/Overview.tsx
+# A file named like a story outside the design system is no page Storybook builds: it is measured.
+mkdir -p "$c/app/src" && unmeasured app/src/limit.stories.tsx && rm -r "$c/app/src"
+# Beside the overview's page, its folder's other files are code like any.
+mkdir -p "$c/packages/ui/src/Overview" && unmeasured packages/ui/src/Overview/Region.tsx
 git -C "$c" rm -rq --cached packages && rm -r "$c/packages"
 # A statement over several lines counts when any of its lines changed, not only its first.
 git -C "$c" rm -q --cached src/a.test.ts vitest.config.ts && rm "$c/src/a.test.ts" "$c/vitest.config.ts" && git -C "$c" add src/a.ts && git -C "$c" commit -qm four
@@ -1233,6 +1239,23 @@ grep -qxF -- "--passWithNoTests packages/x/src/c.test.ts" "$t/runner.log" || fai
 base=$(git -C "$pf" rev-parse HEAD)
 mkdir -p "$pf/scripts" && echo x >"$pf/scripts/tool.py" && fix "fix(harness): a harness fix"
 prove "$base" || fail "prove_fix refused a harness fix, which harness_mutate proves"
+base=$(git -C "$pf" rev-parse HEAD)
+printf '// expects: export\n' >"$pf/packages/x/src/d.test.ts" && fix "fix(x): a test's own fault, and no product code"
+prove "$base" || fail "prove_fix refused a fix of tests alone, which changes no product code"
+# Deleted code is product code too: a fix that drops a module needs a test that failed, or a reason.
+printf 'export const gone = 1;\n' >"$pf/packages/x/src/gone.ts" && fix "feat(x): a module to drop"
+base=$(git -C "$pf" rev-parse HEAD)
+git -C "$pf" rm -q packages/x/src/gone.ts && printf '// expects: export\n' >"$pf/packages/x/src/e.test.ts" && fix "fix(x): the module goes, with a test that passed already"
+prove "$base" && fail "prove_fix accepted a fix that deletes code, its test passing before it"
+printf 'export const gone2 = 1;\n' >"$pf/packages/x/src/gone2.ts" && fix "feat(x): another module"
+base=$(git -C "$pf" rev-parse HEAD)
+git -C "$pf" rm -q packages/x/src/gone2.ts && fix "fix(x): it goes, untested"
+prove "$base" && fail "prove_fix accepted a fix that deletes code with no test and no reason"
+# A fix that drops an old test runs only the tests it leaves.
+base=$(git -C "$pf" rev-parse HEAD)
+git -C "$pf" rm -q packages/x/src/e.test.ts && printf 'export const twice = (n: number) => n * 2 + 3 - 3;\n' >"$pf/packages/x/src/a.ts"
+printf '// expects: + 3\n' >"$pf/packages/x/src/f.test.ts" && fix "fix(x): a new test, an old one gone"
+prove "$base" || fail "prove_fix ran a test the fix deleted"
 fi
 
 if part audit; then

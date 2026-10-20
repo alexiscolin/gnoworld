@@ -226,6 +226,21 @@ test.describe("updates", () => {
     expect(held).toBe(await (await request.get(changed)).text());
   });
 
+  test("Close puts the notice away and keeps its region; a newer version brings it back", async ({ page, request }) => {
+    await open(page);
+    await bump(page, request, { site });
+    await expect(promptOf(page)).toBeVisible();
+    await page.getByRole("status").evaluate((region) => {
+      region.id = "kept";
+    });
+    await promptOf(page).getByRole("button", { name: "Close" }).click();
+    await expect(promptOf(page)).toHaveCount(0);
+    await expect(page.locator("#kept[role='status']")).toHaveCount(1);
+    expect(await untouched(page)).toEqual({ same: true, waiting: true, marked: true });
+    await bump(page, request, { site });
+    await expect(promptOf(page)).toBeVisible();
+  });
+
   test("two tabs: the one clicked reloads; the other keeps its page until its own click", async ({ page, request }) => {
     const other = await page.context().newPage();
     await open(page);

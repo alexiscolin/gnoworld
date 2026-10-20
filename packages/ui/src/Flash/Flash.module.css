@@ -1,0 +1,27 @@
+/* The flash: a pill of the panel colour, sized to what it says; its slot places it (DESIGN-SYSTEM.md). */
+@layer components {
+  .flash {
+    inline-size: fit-content;
+    max-inline-size: 100%;
+    padding-block: var(--space-2xs);
+    padding-inline: var(--space-m);
+    border: var(--line-width) solid var(--color-line-strong);
+    border-radius: var(--radius-pill);
+    background: var(--color-panel);
+    box-shadow: var(--shadow-float);
+  }
+
+  /* Its buttons sit close to the edge, as a pill's last control does. */
+  .flash:has(button) {
+    padding-inline-end: var(--space-2xs);
+  }
+
+  .title {
+    font: var(--font-ui);
+  }
+
+  .line {
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+  }
+}

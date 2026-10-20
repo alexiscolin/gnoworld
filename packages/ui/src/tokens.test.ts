@@ -97,9 +97,9 @@ describe("parseTokens", () => {
 });
 
 describe("the tokens", () => {
-  it('hold the base colours of docs/DESIGN-SYSTEM.md, "Colour", at their values: all but night, which joins with its first reader', () => {
+  it('hold the base colours of docs/DESIGN-SYSTEM.md, "Colour", at their values, all nine', () => {
     const primitives = tokens().filter((t) => t.group === "Primitives");
-    const held = Object.keys(BASE).filter((name) => name !== "night");
+    const held = Object.keys(BASE);
     expect(primitives.map((t) => t.name).sort()).toEqual(held.map((name) => `--p-${name}`).sort());
     for (const { name, value: hex } of primitives) expect(hex.toUpperCase()).toBe(BASE[name.slice(4)]);
   });

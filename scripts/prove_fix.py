@@ -5,7 +5,8 @@ server), the tests it adds or changes must fail on the commit before it: run the
 show the bug; run on the fix, the gate already saw them pass. A test that passes before the
 fix reproduces nothing, and the fix is refused. A fix with no test is refused, unless its
 message says why on a line `No-test: <why>`, which Alexis reads in review. A fix of the
-harness alone is left to scripts/harness_mutate.py, which proves each guard is watched.
+harness alone is left to scripts/harness_mutate.py, which proves each guard is watched, and one
+of tests alone changes no product code, so it has nothing to prove.
 Usage: prove_fix.py <base>, from the repository root (check.sh --full)."""
 import os
 import re
@@ -57,10 +58,12 @@ def verdict(commit):
     message = git("log", "-1", "--format=%B", commit)
     if not re.match(r"fix(\(.+?\))?!?:", message):
         return None
-    files = git("diff-tree", "--no-commit-id", "--name-only", "-r", "--diff-filter=AM", commit).splitlines()
-    product = [f for f in files if f.startswith(PRODUCT)]
-    tests = [f for f in product if TEST.search(f)]
-    if not product:
+    # Every product file it touches, a deleted one included; the tests it runs, those it leaves.
+    changed = git("diff-tree", "--no-commit-id", "--name-only", "-r", "--diff-filter=AMDT", commit).splitlines()
+    left = set(git("diff-tree", "--no-commit-id", "--name-only", "-r", "--diff-filter=AM", commit).splitlines())
+    product = [f for f in changed if f.startswith(PRODUCT)]
+    tests = [f for f in product if TEST.search(f) and f in left]
+    if all(TEST.search(f) for f in product):  # the harness alone, or tests alone: no product code to prove
         return None
     if not tests:
         return None if re.search(r"^No-test: \S", message, re.M) else "a fix with no test that reproduces the bug (or a `No-test: <why>` line)"
