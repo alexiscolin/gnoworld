@@ -39,7 +39,9 @@ export function Chip({ children, tone = "neutral", onClick, selected, count }: C
       data-tone={tone}
       data-size="s"
       aria-pressed={selected}
-      onClick={onClick}
+      onClick={() => {
+        onClick();
+      }}
     >
       {children}
       {count === undefined ? null : (

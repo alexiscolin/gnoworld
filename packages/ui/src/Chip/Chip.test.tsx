@@ -26,7 +26,7 @@ describe("Chip", () => {
       </Chip>,
     );
     await userEvent.click(screen.getByRole("button", { name: "Games", pressed: true }));
-    expect(onClick).toHaveBeenCalledOnce();
+    expect(onClick).toHaveBeenCalledExactlyOnceWith();
     rerender(
       <Chip selected={false} onClick={onClick}>
         Games
