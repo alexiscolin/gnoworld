@@ -1,40 +1,32 @@
-import {
-  useEffectEvent,
-  useId,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type ReactNode,
-  type ToggleEvent,
-} from "react";
+import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type ToggleEvent } from "react";
 import { buttonLook } from "../Button/control.ts";
 import { rove } from "../roving.ts";
-import { usePlaced } from "./floating.ts";
+import { floating, usePlaced } from "./floating.ts";
 import styles from "./Popover.module.css";
-import shared from "./surface.module.css";
 
-/** A floating surface's classes, with a box's own. */
-export function floating(own: string | undefined) {
-  return [shared["surface"], shared["floating"], own].join(" ");
-}
-
-// What a popover and a menu share: the native popover (light dismiss and Esc are the browser's),
-// unseen until placed, as its toggle event comes after it shows; the focus back on the trigger when
-// it closes with the focus inside, which a browser that never focused the trigger would drop.
-function useAnchored(onOpen?: (panel: HTMLElement) => void) {
+// What a popover and a menu share: a trigger and the native popover it opens (light dismiss and Esc
+// are the browser's), unseen until placed, as its toggle event comes after it shows; the focus back
+// on the trigger when it closes with the focus inside, which a browser that never focused it drops.
+function useAnchored(kind: "dialog" | "menu") {
   const id = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const insideRef = useRef(false);
   usePlaced(triggerRef, panelRef, { open, side: "below", align: "start" });
-  const opened = useEffectEvent((panel: HTMLElement) => onOpen?.(panel));
-  // Once placed, and so seen: a hidden item takes no focus.
-  useLayoutEffect(() => {
-    if (open && panelRef.current !== null) opened(panelRef.current);
-  }, [open]);
-  const events = {
+  const trigger = {
+    ref: triggerRef,
+    ...buttonLook("outline", "neutral", "m"),
+    popoverTarget: id,
+    "aria-haspopup": kind,
+  };
+  const panel = {
+    ref: panelRef,
+    id,
+    popover: "auto" as const,
+    role: kind,
+    className: floating(styles["panel"]),
+    "data-kind": kind,
     onBeforeToggle: (event: ToggleEvent<HTMLDivElement>) => {
       if (event.newState === "open") event.currentTarget.style.visibility = "hidden";
       else insideRef.current = event.currentTarget.contains(document.activeElement);
@@ -47,7 +39,7 @@ function useAnchored(onOpen?: (panel: HTMLElement) => void) {
         triggerRef.current?.focus();
     },
   };
-  return { id, triggerRef, panelRef, events };
+  return { open, panelRef, trigger, panel };
 }
 
 export interface PopoverProps {
@@ -60,27 +52,13 @@ export interface PopoverProps {
 
 /** A panel under its trigger, closed by a click outside or Esc. */
 export function Popover({ trigger: words, label, children }: PopoverProps) {
-  const { id, triggerRef, panelRef, events } = useAnchored();
+  const { trigger, panel } = useAnchored("dialog");
   return (
     <>
-      <button
-        ref={triggerRef}
-        type="button"
-        {...buttonLook("outline", "neutral", "m")}
-        popoverTarget={id}
-        aria-haspopup="dialog"
-      >
+      <button type="button" {...trigger}>
         {words}
       </button>
-      <div
-        ref={panelRef}
-        id={id}
-        popover="auto"
-        role="dialog"
-        aria-label={label}
-        className={floating(styles["panel"])}
-        {...events}
-      >
+      <div {...panel} aria-label={label}>
         {children}
       </div>
     </>
@@ -101,9 +79,11 @@ export interface MenuProps {
 /** A list of acts under its trigger, its first item focused as it opens; the arrows move among the
  * items, round the ends, Home and End go to the ends, and an act closes it first (WAI-ARIA's menu). */
 export function Menu({ trigger: words, label, items }: MenuProps) {
-  const { id, triggerRef, panelRef, events } = useAnchored((opened) => {
-    opened.querySelector<HTMLElement>("[role='menuitem']")?.focus();
-  });
+  const { open, panelRef, trigger, panel } = useAnchored("menu");
+  // Its first item, once placed and so seen: a hidden item takes no focus.
+  useLayoutEffect(() => {
+    if (open) panelRef.current?.querySelector<HTMLElement>("[role='menuitem']")?.focus();
+  }, [open, panelRef]);
   const move = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Tab") {
       event.currentTarget.hidePopover();
@@ -113,26 +93,10 @@ export function Menu({ trigger: words, label, items }: MenuProps) {
   };
   return (
     <>
-      <button
-        ref={triggerRef}
-        type="button"
-        {...buttonLook("outline", "neutral", "m")}
-        popoverTarget={id}
-        aria-haspopup="menu"
-      >
+      <button type="button" {...trigger}>
         {words}
       </button>
-      <div
-        ref={panelRef}
-        id={id}
-        popover="auto"
-        role="menu"
-        aria-label={label}
-        className={floating(styles["panel"])}
-        data-kind="menu"
-        onKeyDown={move}
-        {...events}
-      >
+      <div {...panel} aria-label={label} onKeyDown={move}>
         {items.map((item) => (
           <button
             key={item.label}

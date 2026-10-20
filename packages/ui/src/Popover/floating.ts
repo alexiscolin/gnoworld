@@ -1,8 +1,19 @@
 // Where a box in the top layer goes: beside its anchor, inside the screen. A small function of ours
 // until CSS anchor positioning is widely available (docs/DESIGN-SYSTEM.md, "Browsers").
 import { useLayoutEffect, type RefObject } from "react";
+import shared from "./surface.module.css";
 
-export interface Placing {
+/** What floats over the page wears, the dialog included: the surface's class and a box's own. */
+export function surface(own: string | undefined) {
+  return [shared["surface"], own].join(" ");
+}
+
+/** A box in the top layer, placed in script and faded in: the surface's classes and its own. */
+export function floating(own: string | undefined) {
+  return [shared["surface"], shared["floating"], own].join(" ");
+}
+
+interface Placing {
   side: "above" | "below";
   align: "start" | "center";
 }

@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import { IconButton } from "../Button/IconButton.tsx";
 import { Cluster, Stack } from "../compositions/index.ts";
-import shared from "../Popover/surface.module.css";
+import { surface } from "../Popover/floating.ts";
 import styles from "./Dialog.module.css";
 
 export interface DialogProps {
@@ -33,7 +33,7 @@ export function Dialog({ title, open, onClose, wide = false, children }: DialogP
   return (
     <dialog
       ref={dialogRef}
-      className={[shared["surface"], styles["dialog"]].join(" ")}
+      className={surface(styles["dialog"])}
       data-width={wide ? "wide" : "standard"}
       aria-labelledby={titleId}
       // Esc closes it in the browser: the page hears of it here. A close the page asked for is not news.

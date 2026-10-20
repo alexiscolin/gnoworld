@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { usePlaced } from "../Popover/floating.ts";
-import { floating } from "../Popover/Popover.tsx";
+import { floating, usePlaced } from "../Popover/floating.ts";
 import styles from "./Tooltip.module.css";
 
 export interface TooltipProps {
