@@ -1,15 +1,11 @@
-import type { ReactNode } from "react";
 import styles from "./compositions.module.css";
-import { place, type Box, type Space } from "./place.tsx";
+import { place, type Composed } from "./place.tsx";
 
-export interface SidebarProps {
-  children: ReactNode;
-  space?: Space;
-  as?: Box;
+export interface SidebarProps extends Composed {
   side?: "start" | "end";
 }
 
 /** A side and a main part side by side, stacked once the main part would fall under half. */
-export function Sidebar({ children, space = "s", as = "div", side = "start" }: SidebarProps) {
-  return place({ as, className: styles["sidebar"], attributes: { "data-space": space, "data-side": side }, children });
+export function Sidebar({ side = "start", ...rest }: SidebarProps) {
+  return place({ ...rest, className: styles["sidebar"], own: { "data-side": side } });
 }

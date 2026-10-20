@@ -1,15 +1,11 @@
-import type { ReactNode } from "react";
 import styles from "./compositions.module.css";
-import { place, type Box, type Space } from "./place.tsx";
+import { place, type Composed } from "./place.tsx";
 
-export interface GridProps {
-  children: ReactNode;
-  space?: Space;
-  as?: Box;
+export interface GridProps extends Composed {
   min?: "s" | "m" | "l";
 }
 
 /** Columns as many as fit, each at least a column token wide. */
-export function Grid({ children, space = "s", as = "div", min = "m" }: GridProps) {
-  return place({ as, className: styles["grid"], attributes: { "data-space": space, "data-min": min }, children });
+export function Grid({ min = "m", ...rest }: GridProps) {
+  return place({ ...rest, className: styles["grid"], own: { "data-min": min } });
 }
