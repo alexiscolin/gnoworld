@@ -118,6 +118,13 @@ describe("Stat", () => {
     expect(delta().dataset["trend"]).toBe("flat");
   });
 
+  it("writes a figure that is no number as none, never NaN, and no change for a change that is none", () => {
+    const { container } = render(<Stat value={Number.NaN} unit="calls" caption="Today" delta={Number.NaN} />);
+    expect(drawn(container)).toBe("0");
+    expect(container.textContent).not.toMatch(/NaN|Infinity/);
+    expect(container.querySelector("[data-trend]")).toBeNull();
+  });
+
   it("wears the heat badge only when hot, and says so", () => {
     const { rerender } = render(<Stat value={214} caption="Here now" />);
     expect(screen.queryByText("Hot")).toBeNull();

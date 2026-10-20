@@ -58,9 +58,11 @@ function said(delta: number) {
 
 /** A tabular figure with its unit and caption, its change in words, and the heat badge. Assistive
  * technology reads its value alone, never a count on its way. */
-export function Stat({ value, unit, caption, delta, hot = false }: StatProps) {
+export function Stat({ value: given, unit, caption, delta, hot = false }: StatProps) {
+  // A figure that is no number counts as none, as a chart's value does; a change that is none, unsaid.
+  const value = Number.isFinite(given) ? given : 0;
   const shown = useCounted(value);
-  const change = delta === undefined ? null : said(delta);
+  const change = delta === undefined || !Number.isFinite(delta) ? null : said(delta);
   return (
     <Stack space="3xs">
       <p className={styles["figure"]}>
