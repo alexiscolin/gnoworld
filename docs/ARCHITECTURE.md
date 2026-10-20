@@ -26,8 +26,8 @@ for Jarvis from phase 1 (ADR-0002 §5, §7).
 
 **One monorepo.** The client, the admin console, the server, the shared packages, the realms
 and the deployment live in one repository, with one lockfile and one gate:
-- each of `app/`, `admin/`, `server/`, `packages/core` and `packages/schemas` is a
-  workspace; the package manager is set in slice 1;
+- each of `app/`, `admin/`, `server/`, `packages/core`, `packages/ui` and `packages/schemas` is
+  a workspace: the applications at the root, the libraries they import under `packages/`;
 - a workspace imports another only through its `package.json` name (`@gnoworld/core`,
   `@gnoworld/schemas`), never by a relative path across folders;
 - no build orchestrator: each workspace has its own scripts, and `scripts/check.sh` runs
