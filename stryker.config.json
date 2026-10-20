@@ -9,6 +9,7 @@
     "!packages/*/src/**/*.stories.tsx",
     "!packages/*/src/index.ts",
     "!packages/ui/src/Overview/**",
+    "!packages/*/src/testSetup.ts",
     "app/src/**/*.{ts,tsx}",
     "!app/src/**/*.test.{ts,tsx}",
     "!app/src/routes.ts",
