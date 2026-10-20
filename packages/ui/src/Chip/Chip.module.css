@@ -24,7 +24,8 @@
       color var(--motion-base) var(--ease-standard);
   }
 
-  .chip[data-size="s"]:hover {
+  /* The pointer lightens a neutral chip at rest, never a selected one's cream or a tone's tint. */
+  .chip[data-size="s"][data-tone="neutral"]:not([aria-pressed="true"]):hover {
     --_fill: var(--color-fill-hover);
   }
 

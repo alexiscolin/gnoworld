@@ -266,6 +266,15 @@ test.describe("Popover", () => {
   });
 });
 
+test("a selected chip keeps its cream fill under the pointer, its words as dark as at rest", async ({ page }) => {
+  await open(page, "chip--selected");
+  const chip = page.getByRole("button", { pressed: true });
+  const look = () => chip.evaluate((c) => [getComputedStyle(c).backgroundColor, getComputedStyle(c).color]);
+  const resting = await look();
+  await chip.hover();
+  expect(await look()).toEqual(resting);
+});
+
 test("tabs ring each tab the arrows reach, and select it", async ({ page }) => {
   for (const id of ["tabs--segmented", "tabs--icons-only"]) {
     await open(page, id);
