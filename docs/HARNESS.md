@@ -48,10 +48,10 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
    uncommitted, a gate that passed on its code (in the sandbox it runs it; in Alexis's shell it
    reads the record), and scans the history for secrets.
 7. **Before a merge.** `/pre-merge` runs the full gate, the `test-auditor`'s green pass on the
-   mutation survivors, `/code-review`, the `security-reviewer` for a tier-1 change, and
-   `/simplify` at the last merge of a slice. The `finding-verifier` tries to refute each
-   tier-1 finding, then to reproduce it; each is then fixed or put to Alexis, and written to
-   `docs/review/findings.md`. Three review rounds at most per branch. Then it records a review
+   mutation survivors, `/simplify` and the gate again, then `/code-review`, `/security-review`
+   and the `complexity-reviewer` together, with the `security-reviewer` for a tier-1 change.
+   The `finding-verifier` tries to refute each tier-1 finding, then to reproduce it; each is
+   then fixed or put to Alexis, and written to `docs/review/findings.md`. Three review rounds at most per branch. Then it records a review
    pass (`scripts/review_pass.py`).
 8. **Alexis reviews,** blind first, in revdiff (`docs/REVIEW.md`).
 9. **Merge and push, by Alexis, in his own shell.** The merge is made locally, through
@@ -137,6 +137,7 @@ comes back is a regression. The review agents (`.claude/agents/`) report rows fo
 | `/code-review` | every merge | Claude Code's |
 | `/security-review` | every merge; it keeps only the findings it rates 8 out of 10 or more | Claude Code's |
 | `security-reviewer` | a merge touching a tier-1 file, beside `/security-review` | Opus |
+| `complexity-reviewer` | every merge: the cost in big O of each loop, against its input's size | Opus |
 | `finding-verifier` | after the review pass, on each tier-1 lot: refutes or reproduces each finding | Opus |
 | `gno-auditor` | every realm, line by line | gnomcp's |
 | Alexis | every merge, blind first | — |
@@ -213,7 +214,9 @@ Measured on this machine, 2026-10-18: the fast gate 19 to 24 s (budget 60 s), th
 build and its 18 journeys included; the full gate 263 s, with the harness mutation proving
 255 guards, then 343 s for 308 guards once F076 was built, and 1079 s for 388 once F129 was;
 the fast gate 18 s since the hook sections run side by side. On 2026-10-17 the fast gate took 10 to 13 s, before the app, and the harness
-mutation 118 s for 148 guards. Subagents run on Sonnet unless their file says otherwise;
+mutation 118 s for 148 guards. On 2026-10-20, at slice 2b: the fast gate 25 s with the app's 37
+journeys; the full gate 1094 s, with Storybook built, the stories' 22 journeys and 411 guards.
+Subagents run on Sonnet unless their file says otherwise;
 agents get the diff's path, never its content. A review reads the branch once, then only the
 diff of its fixes, three rounds at most; F076's three cost about 1.3 million tokens.
 
@@ -290,7 +293,7 @@ and the harness is frozen until a real bug crosses it.
 |---|---|
 | `CLAUDE.md`, `.claude/rules/` | the rules Claude reads; each area's file loads when its files are touched |
 | `.claude/settings.json` | permissions, the sandbox, the hooks, the plugins |
-| `.claude/agents/` | `test-auditor`, `security-reviewer`, `finding-verifier` |
+| `.claude/agents/` | `test-auditor`, `security-reviewer`, `complexity-reviewer`, `finding-verifier` |
 | `.claude/commands/` | `/slice-plan`, `/pre-merge` |
 | `.githooks/` | `commit-msg`, `pre-commit`, `pre-merge-commit`, `pre-push`; `records.sh`, the prints and the harness list they and `check.sh` share (F076); `merge.sh`, the merge that shows the harness first (F129) |
 | `scripts/install_hooks.sh` | puts `main`'s hooks and the scripts they run in `.git/hooks`; `--check` for `pre-push` (F129) |
