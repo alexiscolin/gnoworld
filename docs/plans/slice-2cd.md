@@ -89,3 +89,9 @@ blur and the panel's contrast).
 The listbox waits for `Combobox`; the popover placed in script; the tooltip hidden from
 assistive technology; the dialog's focus on its title when it has no field; `PlanetThumb` takes
 a picture until slice 7 draws one.
+
+Made during the work (docs/decisions.md, 2026-10-21): a figure counts in the browser only, grouped
+in English; a popover unseen until placed; one shared pill for the controls with words and one
+surface for what floats; `--color-surface` and the three thumb sizes. The preload of the first
+screen's face waits for `@gnoworld/ui/fonts`, ui's `package.json` being Alexis's to change
+(`.claude/tmp/apply-2cd-fonts.sh`); the precache of the fonts lands in this merge.
