@@ -2,8 +2,8 @@
 import "@gnoworld/ui/styles.css";
 import type { ReactNode } from "react";
 import { Link, Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
-import { ErrorNotice } from "./ui/ErrorNotice.tsx";
-import { UpdatePrompt } from "./ui/UpdatePrompt.tsx";
+import { PageError } from "./features/errors/index.ts";
+import { UpdatePrompt } from "./features/update/index.ts";
 
 export function Layout({ children }: { children: ReactNode }) {
   return (
@@ -34,5 +34,5 @@ export default function App() {
 }
 
 export function ErrorBoundary() {
-  return <ErrorNotice title="Something went wrong">Reload the page to try again.</ErrorNotice>;
+  return <PageError title="Something went wrong" line="Reload the page to try again." />;
 }

@@ -9,7 +9,7 @@ import {
 } from "react-router";
 import { failedWorldMeta, worldMeta } from "../meta.ts";
 import { findWorld } from "../worlds.ts";
-import { ErrorNotice } from "../ui/ErrorNotice.tsx";
+import { PageError } from "../features/errors/index.ts";
 
 export function loader({ params }: LoaderFunctionArgs) {
   return findWorld(params["world"]);
@@ -43,8 +43,8 @@ export function ErrorBoundary() {
   const error = useRouteError();
   const missing = isMissing(error);
   return missing ? (
-    <ErrorNotice title="No world here">No world of gno.land goes by that name.</ErrorNotice>
+    <PageError title="No world here" line="No world of gno.land goes by that name." />
   ) : (
-    <ErrorNotice title="This world could not load">Try again in a moment.</ErrorNotice>
+    <PageError title="This world could not load" line="Try again in a moment." />
   );
 }

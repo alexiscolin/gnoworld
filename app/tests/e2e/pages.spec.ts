@@ -132,10 +132,13 @@ test.describe("once the client takes over", () => {
       await expect(page.getByRole("alert")).toContainText(heading);
       await expect(page).toHaveTitle(title);
       await expect(page.getByRole("link", { name: "gno.world" })).toBeVisible();
+      await expect(page.getByRole("link", { name: "Back to the universe" })).toHaveAttribute("href", "/");
       expect(await tag(page, 'meta[name="robots"]')).toBe("noindex");
       await expect(page.locator('link[rel="canonical"]')).toHaveCount(0);
       expect(problems).toEqual([]);
       expect(await violations(page)).toEqual([]);
+      await page.getByRole("link", { name: "Back to the universe" }).click();
+      await expect(page).toHaveURL("/");
     });
   }
 

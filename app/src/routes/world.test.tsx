@@ -1,6 +1,6 @@
 import { data, type ClientLoaderFunctionArgs, type MetaArgs, type RouteObject } from "react-router";
 import { describe, expect, test } from "vitest";
-import { render, routeError } from "../../tests/render.tsx";
+import { alertOf, render, routeError } from "../../tests/render.tsx";
 import { failedWorldMeta, worldMeta } from "../meta.ts";
 import { findWorld } from "../worlds.ts";
 import World, { clientLoader, ErrorBoundary, loader, meta } from "./world.tsx";
@@ -40,6 +40,7 @@ describe("a world's page", () => {
     expect(html).toContain('role="alert"');
     expect(html).toContain("<h1>No world here</h1>");
     expect(html).toContain("<p>No world of gno.land goes by that name.</p>");
+    expect(alertOf(html)).toMatch(/<a [^>]*href="\/"[^>]*>Back to the universe<\/a>/);
   });
 
   test.each(failures)("says it could not load on %s, apart from not found", async (_, failing) => {
@@ -47,6 +48,7 @@ describe("a world's page", () => {
     expect(html).toContain('role="alert"');
     expect(html).toContain("<h1>This world could not load</h1>");
     expect(html).toContain("<p>Try again in a moment.</p>");
+    expect(alertOf(html)).toMatch(/<a [^>]*href="\/"[^>]*>Back to the universe<\/a>/);
     expect(html).not.toContain("No world here");
   });
 
