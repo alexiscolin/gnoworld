@@ -2,7 +2,7 @@
 // jsdom cannot see, since it applies no stylesheet. Each test walks every story Storybook built.
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "../e2e/fixtures.ts";
-import { BUTTONS, expect, open, stories, test } from "./storybook.ts";
+import { BUTTONS, CONTROLS, expect, open, RING, stories, test } from "./storybook.ts";
 
 test("every story renders with no error and passes axe", async ({ page }) => {
   const errors: string[] = [];
@@ -26,23 +26,25 @@ test("every story renders with no error and passes axe", async ({ page }) => {
 test("in every story, each control is a target of 24 px or more that nothing covers", async ({ page }) => {
   for (const id of await stories(page)) {
     await open(page, id);
-    const faults = await page.evaluate(() =>
-      [...document.querySelectorAll<HTMLElement>("#storybook-root :is(button, a[href], input)")].flatMap((control) => {
-        if (!control.checkVisibility()) return [];
-        const inSentence =
-          control instanceof HTMLAnchorElement &&
-          !control.hasAttribute("data-emphasis") &&
-          control.parentElement?.textContent.trim() !== control.textContent.trim();
-        if (inSentence) return [];
-        control.scrollIntoView({ block: "center", inline: "center" });
-        const box = control.getBoundingClientRect();
-        const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
-        const name = control.outerHTML.slice(0, 60);
-        const small =
-          box.width < 24 || box.height < 24 ? [`${name} is ${String(box.width)}x${String(box.height)}`] : [];
-        const covered = hit === null || !control.contains(hit) ? [`${name} is covered or out of view`] : [];
-        return [...small, ...covered];
-      }),
+    const faults = await page.evaluate(
+      (controls) =>
+        [...document.querySelectorAll<HTMLElement>(controls)].flatMap((control) => {
+          if (!control.checkVisibility()) return [];
+          const inSentence =
+            control instanceof HTMLAnchorElement &&
+            !control.hasAttribute("data-emphasis") &&
+            control.parentElement?.textContent.trim() !== control.textContent.trim();
+          if (inSentence) return [];
+          control.scrollIntoView({ block: "center", inline: "center" });
+          const box = control.getBoundingClientRect();
+          const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+          const name = control.outerHTML.slice(0, 60);
+          const small =
+            box.width < 24 || box.height < 24 ? [`${name} is ${String(box.width)}x${String(box.height)}`] : [];
+          const covered = hit === null || !control.contains(hit) ? [`${name} is covered or out of view`] : [];
+          return [...small, ...covered];
+        }),
+      CONTROLS,
     );
     expect.soft(faults, id).toEqual([]);
   }
@@ -115,16 +117,16 @@ test("the focus ring is the 2 px mint outline, 2 px off, on every control reache
     await open(page, id);
     // Tab starts from the top of what can take the focus, the open dialog's or the page's, whatever a
     // story focused: a blur would leave Tab's starting point where the focus was.
-    const controls = await page.evaluate(() => {
+    const controls = await page.evaluate((selector) => {
       const top = document.createElement("span");
       top.tabIndex = -1;
       (document.querySelector("dialog:modal") ?? document.body).prepend(top);
       top.focus();
       top.remove();
-      return [...document.querySelectorAll<HTMLElement>("#storybook-root :is(button, a[href], input)")].filter(
+      return [...document.querySelectorAll<HTMLElement>(selector)].filter(
         (control) => control.checkVisibility() && control.tabIndex >= 0 && !control.matches(":disabled"),
       ).length;
-    });
+    }, CONTROLS);
     const reached = new Set<string>();
     for (let step = 0; step < controls; step += 1) {
       await page.keyboard.press("Tab");
@@ -136,7 +138,7 @@ test("the focus ring is the 2 px mint outline, 2 px off, on every control reache
         return [String(where), style.outlineStyle, style.outlineWidth, style.outlineColor, style.outlineOffset];
       });
       reached.add(name);
-      expect.soft(ring, `${id}, control ${name}`).toEqual(["solid", "2px", "rgb(92, 242, 200)", "2px"]);
+      expect.soft(ring, `${id}, control ${name}`).toEqual(RING);
     }
     expect.soft(reached.size, `${id}: controls the keyboard reaches`).toBe(controls);
     expect.soft(reached.has("-1"), `${id}: focus left the story`).toBe(false);

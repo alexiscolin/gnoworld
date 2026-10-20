@@ -3,7 +3,7 @@
 // magnification.
 import type { Locator } from "@playwright/test";
 import type { Page } from "../e2e/fixtures.ts";
-import { expect, open, test } from "./storybook.ts";
+import { expect, open, RING, test } from "./storybook.ts";
 
 // The focused control by its name: an icon button has no words of its own.
 const focused = (page: Page) =>
@@ -19,19 +19,48 @@ const box = async (locator: Locator) => {
 };
 
 // The ring of the focused control, as stories.spec.ts reads it on every control Tab reaches.
-const RING = ["solid", "2px", "rgb(92, 242, 200)", "2px"];
 const ring = (page: Page) =>
   page.evaluate(() => {
     const style = getComputedStyle(document.activeElement ?? document.body);
     return [style.outlineStyle, style.outlineWidth, style.outlineColor, style.outlineOffset];
   });
 
+// The gap a floating box keeps from its anchor and from the screen's edge: --space-2xs.
+const STEP = 8;
+
+// The passport's story, its dialog opened from its button.
+async function passport(page: Page) {
+  await open(page, "dialog--from-a-button");
+  await page.getByRole("button", { name: "Open the passport" }).click();
+}
+
+// The anchored popover at a width, a test's own step run before its trigger opens it: both, open.
+async function anchored(page: Page, width: number, before?: (trigger: Locator) => Promise<void>) {
+  await page.setViewportSize({ width, height: 700 });
+  await open(page, "popover--anchored");
+  const trigger = page.getByRole("button", { name: "Network" });
+  await before?.(trigger);
+  await trigger.click();
+  const panel = page.getByRole("dialog");
+  await expect(panel).toBeVisible();
+  return { trigger, panel };
+}
+
+// The trigger set fixed at a corner of the screen, as a test asks.
+const pinned = (where: Record<string, string>) => (trigger: Locator) =>
+  trigger.evaluate((t, how) => {
+    Object.assign(t.style, { position: "fixed", ...how });
+  }, where);
+
+// The gap from the trigger's bottom to the panel's top, as it settles: one step when placed under.
+const under = (trigger: Locator, panel: Locator) =>
+  expect.poll(async () => (await box(panel)).y - ((await box(trigger)).y + (await box(trigger)).height));
+
 test.describe("Dialog", () => {
   test("opens in the top layer over its scrim, its title focused, and Esc closes it once, focus back on the opener", async ({
     page,
   }) => {
-    await open(page, "dialog--from-a-button");
-    await page.getByRole("button", { name: "Open the passport" }).click();
+    await passport(page);
     const dialog = page.getByRole("dialog", { name: "Your passport" });
     await expect(dialog).toBeVisible();
     expect(await dialog.evaluate((d) => d.matches(":modal"))).toBe(true);
@@ -54,8 +83,7 @@ test.describe("Dialog", () => {
   });
 
   test("its Close button closes it once, focus back on the opener", async ({ page }) => {
-    await open(page, "dialog--from-a-button");
-    await page.getByRole("button", { name: "Open the passport" }).click();
+    await passport(page);
     await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
     await expect(page.getByRole("dialog")).toBeHidden();
     expect(await focused(page)).toBe("Open the passport");
@@ -64,8 +92,7 @@ test.describe("Dialog", () => {
 
   // Past its last control Chromium goes to its own buttons, out of the page: the page behind is inert.
   test("never lets Tab reach the page behind it while open", async ({ page }) => {
-    await open(page, "dialog--from-a-button");
-    await page.getByRole("button", { name: "Open the passport" }).click();
+    await passport(page);
     for (let step = 0; step < 4; step += 1) {
       await page.keyboard.press("Tab");
       const where = await page.evaluate(() => {
@@ -106,12 +133,8 @@ test.describe("Dialog", () => {
 test.describe("Popover", () => {
   test("opens under its trigger, inside the screen, and Esc closes it, focus back on the trigger", async ({ page }) => {
     for (const width of [1280, 320]) {
-      await page.setViewportSize({ width, height: 700 });
-      await open(page, "popover--anchored");
-      const trigger = page.getByRole("button", { name: "Network" });
-      await trigger.click();
-      const panel = page.getByRole("dialog", { name: "Choose the network" });
-      await expect(panel).toBeVisible();
+      const { trigger, panel } = await anchored(page, width);
+      await expect(page.getByRole("dialog", { name: "Choose the network" })).toBeVisible();
       const [t, p] = [await box(trigger), await box(panel)];
       expect(p.y, `${String(width)}: under the trigger`).toBeGreaterThanOrEqual(t.y + t.height);
       expect(p.x >= 0 && p.x + p.width <= width, `${String(width)}: inside the screen`).toBe(true);
@@ -122,9 +145,7 @@ test.describe("Popover", () => {
   });
 
   test("gives the focus back to its trigger when Esc closes it with the focus inside", async ({ page }) => {
-    await open(page, "popover--anchored");
-    await page.getByRole("button", { name: "Network" }).click();
-    await expect(page.getByRole("dialog")).toBeVisible();
+    await anchored(page, 1280);
     await page.keyboard.press("Tab");
     expect(await focused(page)).toBe("Switch to Onyx");
     await page.keyboard.press("Escape");
@@ -133,38 +154,19 @@ test.describe("Popover", () => {
   });
 
   test("closes on a click outside it", async ({ page }) => {
-    await open(page, "popover--anchored");
-    await page.getByRole("button", { name: "Network" }).click();
+    await anchored(page, 1280);
     await page.mouse.click(5, 5);
     await expect(page.getByRole("dialog")).toBeHidden();
   });
 
-  // The anchored popover at a width, a test's own step run before its trigger opens it: both, open.
-  async function anchored(page: Page, width: number, before?: (trigger: Locator) => Promise<void>) {
-    await page.setViewportSize({ width, height: 700 });
-    await open(page, "popover--anchored");
-    const trigger = page.getByRole("button", { name: "Network" });
-    await before?.(trigger);
-    await trigger.click();
-    const panel = page.getByRole("dialog");
-    await expect(panel).toBeVisible();
-    return { trigger, panel };
-  }
-
-  // The trigger set fixed at a corner of the screen, as a test asks.
-  const pinned = (where: Record<string, string>) => (trigger: Locator) =>
-    trigger.evaluate((t, how) => {
-      Object.assign(t.style, { position: "fixed", ...how });
-    }, where);
-
-  // The gap from the trigger's bottom to the panel's top, as it settles: one step when placed under.
-  const under = (trigger: Locator, panel: Locator) =>
-    expect.poll(async () => (await box(panel)).y - ((await box(trigger)).y + (await box(trigger)).height));
-
   test("opens above a trigger at the screen's bottom end, still inside the screen", async ({ page }) => {
-    const { trigger, panel } = await anchored(page, 320, pinned({ insetBlockEnd: "8px", insetInlineEnd: "8px" }));
+    const { trigger, panel } = await anchored(
+      page,
+      320,
+      pinned({ insetBlockEnd: `${String(STEP)}px`, insetInlineEnd: `${String(STEP)}px` }),
+    );
     const [t, p] = [await box(trigger), await box(panel)];
-    expect(t.y - (p.y + p.height), "a step above the trigger").toBe(8);
+    expect(t.y - (p.y + p.height), "a step above the trigger").toBe(STEP);
     expect(p.x >= 0 && p.x + p.width <= 320, "inside the screen").toBe(true);
   });
 
@@ -179,10 +181,14 @@ test.describe("Popover", () => {
   });
 
   test("follows its trigger as the window narrows", async ({ page }) => {
-    const { panel } = await anchored(page, 1280, pinned({ insetBlockStart: "100px", insetInlineEnd: "8px" }));
+    const { panel } = await anchored(
+      page,
+      1280,
+      pinned({ insetBlockStart: "100px", insetInlineEnd: `${String(STEP)}px` }),
+    );
     for (const width of [1280, 800]) {
       await page.setViewportSize({ width, height: 700 });
-      await expect.poll(async () => (await box(panel)).x + (await box(panel)).width, String(width)).toBe(width - 8);
+      await expect.poll(async () => (await box(panel)).x + (await box(panel)).width, String(width)).toBe(width - STEP);
     }
   });
 
@@ -196,11 +202,11 @@ test.describe("Popover", () => {
       });
     });
     const { trigger, panel } = await anchored(page, 1280);
-    await under(trigger, panel).toBe(8);
+    await under(trigger, panel).toBe(STEP);
     await page.evaluate(() => {
       document.querySelector("#storybook-root")?.scrollBy(0, 100);
     });
-    await under(trigger, panel).toBe(8);
+    await under(trigger, panel).toBe(STEP);
   });
 
   test("stays under its trigger on a scrolled page, and as the page scrolls on", async ({ page }) => {
@@ -210,19 +216,16 @@ test.describe("Popover", () => {
         document.querySelector<HTMLElement>("#storybook-root")?.style.setProperty("padding-block-start", "400px");
       });
     });
-    await page.setViewportSize({ width: 1280, height: 700 });
-    await open(page, "popover--anchored");
-    await page.evaluate(() => {
-      scrollTo(0, 200);
-    });
-    const trigger = page.getByRole("button", { name: "Network" });
-    await trigger.click();
-    const panel = page.getByRole("dialog");
-    await under(trigger, panel).toBe(8);
+    const { trigger, panel } = await anchored(page, 1280, () =>
+      page.evaluate(() => {
+        scrollTo(0, 200);
+      }),
+    );
+    await under(trigger, panel).toBe(STEP);
     await page.evaluate(() => {
       scrollBy(0, 100);
     });
-    await under(trigger, panel).toBe(8);
+    await under(trigger, panel).toBe(STEP);
   });
 
   test("a menu focuses its first item, moves with the arrows, does an item's act and closes", async ({ page }) => {
@@ -291,7 +294,7 @@ test.describe("an icon button's tooltip", () => {
     await expect(tip(page)).toHaveCSS("opacity", "1");
     expect(Number.parseFloat(await tip(page).evaluate((t) => getComputedStyle(t).fontSize))).toBeGreaterThanOrEqual(11);
     const [b, t] = [await box(page.getByRole("button")), await box(tip(page))];
-    expect(b.y - (t.y + t.height), "a step above the button").toBe(8);
+    expect(b.y - (t.y + t.height), "a step above the button").toBe(STEP);
     expect(Math.abs(t.x + t.width / 2 - (b.x + b.width / 2)), "centred on the button").toBeLessThanOrEqual(1);
     await page.keyboard.press("Escape");
     await expect(tip(page)).toHaveAttribute("data-shown", "false");
@@ -374,7 +377,7 @@ test.describe("a figure", () => {
         const seen: unknown = Reflect.get(window, "counted");
         return Array.isArray(seen) ? (seen as { text: string; at: number }[]) : [];
       });
-    await expect.poll(async () => (await read()).at(-1)?.text).toBe("21,480");
+    await expect.poll(async () => (await read()).at(-1)?.text, { intervals: [50] }).toBe("21,480");
     return read();
   }
 

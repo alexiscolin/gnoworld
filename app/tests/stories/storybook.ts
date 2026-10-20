@@ -61,6 +61,12 @@ export function tagged(page: Page, tag: string): Promise<Set<string>> {
 /** Every control with a button's look: the button, and the link that wears it. */
 export const BUTTONS = "#storybook-root :is(button, a[data-emphasis])";
 
+/** Every control of a story: what Tab reaches and a target is measured on. */
+export const CONTROLS = "#storybook-root :is(button, a[href], input)";
+
+/** The one focus ring (DESIGN-SYSTEM.md, "Focus"): style, width, colour and offset, as computed. */
+export const RING = ["solid", "2px", "rgb(92, 242, 200)", "2px"];
+
 /** Every story's id, or those that start with a prefix ("compositions-"). */
 export async function stories(page: Page, prefix = ""): Promise<string[]> {
   const ids = (await entries(page)).map((entry) => entry.id);
@@ -81,11 +87,14 @@ export async function open(page: Page, id: string) {
   ).toContain(id);
   const nothing = (await tagged(page, "empty")).has(id);
   await page.goto(`/iframe.html?id=${id}&viewMode=story`);
-  // A story shows something, unless it draws nothing on purpose.
-  await page
-    .locator("#storybook-root > *")
-    .first()
-    .waitFor({ state: nothing ? "attached" : "visible" });
+  // A story shows something, unless it draws nothing on purpose; checked each frame, as a story that
+  // waits to show (a skeleton's 300 ms) would wait out a locator's slower polling.
+  await page.waitForFunction((attached) => {
+    const first = document.querySelector("#storybook-root > *");
+    if (first === null || attached) return first !== null;
+    const { width, height } = first.getBoundingClientRect();
+    return width > 0 && height > 0 && first.checkVisibility({ visibilityProperty: true });
+  }, nothing);
   // A story that plays is done when Storybook's render of it is (storybook 10.6's preview, read there).
   if ((await tagged(page, "play-fn")).has(id))
     await page.waitForFunction(() => {
