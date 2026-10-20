@@ -149,7 +149,7 @@ assert "packages() { cat package.json app/package.json pnpm-lock.yaml | cksum; }
 assert at("copies=$(run copies") < at("installed=$(packages)") < at("node app/node_modules/@playwright/test/cli.js test") < at('[ "$(packages)" = "$installed" ]')
 PY
 # The full gate walks the stories: a command of its own, not a line that names it and runs nothing.
-grep -v '^[[:space:]]*#' "$gate_file" | grep -qE '^[[:space:]]*node app/node_modules/@playwright/test/cli\.js test -c app/playwright\.stories\.config\.ts( |$)' ||
+grep -v '^[[:space:]]*#' "$gate_file" | grep -qE '^[[:space:]]*node app/node_modules/@playwright/test/cli\.js test -c app/playwright\.stories\.config\.ts( --[a-z]+(=[a-z]+)?)*$' ||
 	fail "check.sh no longer walks the design system's stories in a browser"
 # One harness list, records.sh's: --full runs harness_mutate when a file of it changes, pre-push
 # wants each declared on main, merge.sh shows each first (F129); every file harness_mutate

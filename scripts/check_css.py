@@ -89,6 +89,13 @@ for p, t in texts.items():
 token_files = [p for p in sheets if p.name == "tokens.css"]
 tokens = {t for p in token_files for t in re.findall(r"(--[\w-]+)\s*:", texts[p])}
 problems, exceptions, used = [], 0, set()
+# Each module's classes that some component names from it: a class only a comment or a string
+# mentions is not used.
+uses = {p: list(module_uses(p, t)) for p, t in texts.items() if p.suffix != ".css"}
+named_by_module = collections.defaultdict(set)
+for found in uses.values():
+    for source, named, _, _ in found:
+        named_by_module[source].update(named)
 if len(token_files) > 1:
     problems.append(f"a second token file: {', '.join(map(str, token_files))}; tokens.css is the one list")
 
@@ -120,10 +127,8 @@ for p, blocks in sheets.items():
             if p.name == "tokens.css" and prop.startswith("--") and not PRIMITIVE.match(prop) and COLOUR.search(bare):
                 problems.append(f"{p}: {prop} holds a raw colour ({value}); a semantic token is made of primitives")
     if module:
-        for name in classes_of(blocks):
-            camel = re.sub(r"-(\w)", lambda m: m.group(1).upper(), name)
-            if not re.search(rf"\b({re.escape(name)}|{re.escape(camel)})\b", code_by_folder[p.parent]):
-                problems.append(f"{p}: unused class .{name}")
+        for name in sorted(classes_of(blocks) - named_by_module[p.resolve()]):
+            problems.append(f"{p}: unused class .{name}; no component names it from this module")
         for attribute in {a for selector, _ in blocks for a in re.findall(r"\[(data-[\w-]+)", selector)}:
             if not re.search(rf"\b{re.escape(attribute)}=|[\"']{re.escape(attribute)}[\"']\s*:", code_by_folder[p.parent]):
                 problems.append(f"{p}: [{attribute}] is a state no component sets in its folder")
@@ -132,7 +137,7 @@ module_classes = {p.resolve(): classes_of(blocks) for p, blocks in sheets.items(
 for p, text in texts.items():
     if p.suffix == ".css":
         continue
-    for source, named, computed, destructured in module_uses(p, text):
+    for source, named, computed, destructured in uses[p]:
         missing = sorted(set(named) - module_classes.get(source, set()))
         if missing:
             problems.append(f"{p}: missing class {', '.join(missing)} in {source.name}")
@@ -141,8 +146,8 @@ for p, text in texts.items():
         if destructured:
             problems.append(f"{p}: {source.name} destructured; name each class from the module")
     quoted = re.findall(r"['\"`](--[\w-]+)", text)
-    used.update(quoted)
-    if ".test." not in p.name:
+    if ".test." not in p.name:  # a test that names a token neither uses it nor reads a primitive
+        used.update(quoted)
         problems += [f"{p}: the primitive {name} named outside the token file; name its semantic token" for name in quoted if PRIMITIVE.match(name)]
 problems += [f"unused token {t}" for t in sorted(tokens - used)]
 

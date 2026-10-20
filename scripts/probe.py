@@ -406,6 +406,8 @@ try:
             "a primitive named in a template": ({"Card.module.css": card(ok_decls), "Card.tsx": use("card") + "export const p = `--p-grey`;\n"}, "primitive"),
             "a primitive read in a plain stylesheet": ({"base.css": "body {\n  color: var(--p-grey);\n}\n", "Card.module.css": card(ok_decls), "Card.tsx": use("card")}, "primitive"),
             "a primitive in a var() fallback": ({"Card.module.css": card(ok_decls + "  outline-color: var(--color-text, var(--p-grey));\n"), "Card.tsx": use("card")}, "primitive"),
+            "a class only a comment of its folder names": ({"Card.module.css": card(ok_decls) + ".extra {\n  color: var(--color-text);\n}\n", "Card.tsx": use("card") + "// styles.extra went with the old header\nexport const label = \"extra\";\n"}, "unused class"),
+            "a token only a test names": ({"Card.module.css": card("  padding: var(--space-2);\n  color: var(--color-text);\n"), "Card.tsx": use("card"), "Card.test.tsx": "export const r = \"--radius-m\";\n"}, "unused token"),
             "a test names a primitive": ({"Card.module.css": card(ok_decls), "Card.tsx": use("card"), "Card.test.tsx": "export const p = \"--p-grey\";\n"}, None),
             "a token that only starts like a primitive": ({"tokens.css": tokens.replace("}", "  --page-width: 10px;\n}"), "Card.module.css": card(ok_decls + "  max-inline-size: var(--page-width);\n"), "Card.tsx": use("card")}, None),
             "a raw colour in a semantic token": ({"tokens.css": tokens.replace("var(--p-grey)", "#eee"), "Card.module.css": card(ok_decls), "Card.tsx": use("card")}, "made of primitives"),
