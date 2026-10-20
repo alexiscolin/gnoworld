@@ -1,7 +1,7 @@
 // The compositions' geometry in a browser, wide and narrow: each one places its children as its
 // choices say (docs/DESIGN-SYSTEM.md, "CSS rules"), which no attribute test can see.
-import { expect, test, type Page } from "../e2e/fixtures.ts";
-import { open, stories, token } from "./storybook.ts";
+import type { Page } from "../e2e/fixtures.ts";
+import { expect, open, stories, test, token } from "./storybook.ts";
 
 const WIDTHS = [1280, 320];
 
@@ -95,21 +95,29 @@ test("a Switcher's children share one row when it is wide, and each has its own 
   }
 });
 
+// Every Center of every story, so both widths are seen: the dialog's and the measure's.
 test("a Center holds its width, in the middle of its room", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await open(page, "compositions-compositions--center");
-  const room = await page.evaluate(() => document.querySelector("#storybook-root")?.getBoundingClientRect().width ?? 0);
-  for (const { data, content } of await boxes(page, "[data-max]")) {
-    expect(content.width).toBeLessThanOrEqual(
-      (await token(page, data["max"] === "dialog" ? "--dialog-w" : "--measure")) + 1,
+  const seen = new Set<string>();
+  for (const id of await stories(page)) {
+    await open(page, id);
+    for (const { data, content } of await boxes(page, "[data-max]")) {
+      const max = data["max"] ?? "";
+      seen.add(max);
+      expect(content.width, `${id}, ${max}`).toBeLessThanOrEqual(
+        (await token(page, max === "dialog" ? "--dialog-w" : "--measure")) + 1,
+      );
+    }
+    const margins = await page.evaluate(() =>
+      [...document.querySelectorAll<HTMLElement>("#storybook-root [data-max]")].map((box) => {
+        // Alone in its parent, its room is the parent's; beside others, it is a share of a row.
+        if (box.parentElement?.children.length !== 1) return 0;
+        const parent = box.parentElement.getBoundingClientRect();
+        const own = box.getBoundingClientRect();
+        return Math.abs(own.left - parent.left - (parent.right - own.right));
+      }),
     );
-    expect(room).toBeGreaterThan(content.width);
+    for (const off of margins) expect(off, `${id}: off the middle`).toBeLessThan(1);
   }
-  const margins = await page.evaluate(() => {
-    const box = document.querySelector<HTMLElement>("#storybook-root [data-max]");
-    const parent = box?.parentElement?.getBoundingClientRect();
-    const own = box?.getBoundingClientRect();
-    return parent && own ? [own.left - parent.left, parent.right - own.right] : [0, 99];
-  });
-  expect(Math.abs((margins[0] ?? 0) - (margins[1] ?? 0))).toBeLessThan(1);
+  expect([...seen].sort()).toEqual(["dialog", "measure"]);
 });

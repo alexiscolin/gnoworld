@@ -1,8 +1,8 @@
 // The design system's stories in a real browser (docs/DESIGN-SYSTEM.md, "Testing the CSS"): what
 // jsdom cannot see, since it applies no stylesheet. Each test walks every story Storybook built.
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "../e2e/fixtures.ts";
-import { open, stories } from "./storybook.ts";
+import type { Page } from "../e2e/fixtures.ts";
+import { expect, open, stories, test } from "./storybook.ts";
 
 test("every story renders with no error and passes axe", async ({ page }) => {
   const errors: string[] = [];
@@ -82,16 +82,30 @@ test("no story scrolls sideways at 320 px, and text at 200% still fits its contr
   }
 });
 
+// Every control of every story, tabbed to in turn: a component rule that hides or clips the one
+// ring would show here.
 test("the focus ring is the 2 px mint outline, 2 px off, on every control reached by the keyboard", async ({
   page,
 }) => {
-  await open(page, "button--primary");
-  await page.keyboard.press("Tab");
-  const ring = await page.evaluate(() => {
-    const style = getComputedStyle(document.activeElement ?? document.body);
-    return [style.outlineStyle, style.outlineWidth, style.outlineColor, style.outlineOffset];
-  });
-  expect(ring).toEqual(["solid", "2px", "rgb(92, 242, 200)", "2px"]);
+  for (const id of await stories(page)) {
+    await open(page, id);
+    const controls = await page.locator("#storybook-root :is(button:not(:disabled), a[href])").count();
+    const reached = new Set<string>();
+    for (let step = 0; step < controls; step += 1) {
+      await page.keyboard.press("Tab");
+      const [name, ...ring] = await page.evaluate(() => {
+        const focused = document.activeElement;
+        const all = [...document.querySelectorAll("#storybook-root *")];
+        const where = focused === null ? -1 : all.indexOf(focused);
+        const style = getComputedStyle(focused ?? document.body);
+        return [String(where), style.outlineStyle, style.outlineWidth, style.outlineColor, style.outlineOffset];
+      });
+      reached.add(name);
+      expect.soft(ring, `${id}, control ${name}`).toEqual(["solid", "2px", "rgb(92, 242, 200)", "2px"]);
+    }
+    expect.soft(reached.size, `${id}: controls the keyboard reaches`).toBe(controls);
+    expect.soft(reached.has("-1"), `${id}: focus left the story`).toBe(false);
+  }
 });
 
 test("each composition spaces its children by the token its step names", async ({ page }) => {
