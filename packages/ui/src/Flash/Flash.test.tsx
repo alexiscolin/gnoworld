@@ -90,6 +90,17 @@ describe("Flash", () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  it("stays held when new words replace it under a resting pointer", () => {
+    const onClose = vi.fn();
+    const { rerender } = render(<Flash message={saved} onClose={onClose} />);
+    fireEvent.pointerEnter(screen.getByText(saved.title));
+    rerender(<Flash message={{ title: "Left the room" }} onClose={onClose} />);
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   // Closed or taken under the pointer, a flash leaves without a pointerleave: the next is not held.
   it("leaves the next flash its 5 s when one is closed under the pointer", () => {
     const { rerender } = render(<Flash message={deleted(vi.fn())} onClose={vi.fn()} />);

@@ -1,12 +1,10 @@
 /* The flash: a pill of the panel colour, sized to what it says; its slot places it (DESIGN-SYSTEM.md). */
 @layer components {
   .flash {
-    --_end: var(--space-m);
-
     inline-size: fit-content;
     max-inline-size: 100%;
     padding-block: var(--space-2xs);
-    padding-inline: var(--space-m) var(--_end);
+    padding-inline: var(--space-m);
     border: var(--line-width) solid var(--color-line-strong);
     border-radius: var(--radius-pill);
     background: var(--color-panel);
@@ -14,8 +12,8 @@
   }
 
   /* Its buttons sit close to the edge, as a pill's last control does. */
-  .flash[data-action] {
-    --_end: var(--space-2xs);
+  .flash:has(button) {
+    padding-inline-end: var(--space-2xs);
   }
 
   .title {
