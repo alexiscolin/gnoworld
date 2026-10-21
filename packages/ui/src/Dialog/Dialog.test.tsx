@@ -197,6 +197,22 @@ describe("Dialog", () => {
     }
   });
 
+  // React passes a close up from a dialog inside it: that close is the inner dialog's (F352, F332's class).
+  it("is not closed by a dialog inside it closing", () => {
+    const onClose = vi.fn();
+    render(
+      <Dialog title="Passport" open onClose={onClose}>
+        <Dialog title="A stamp" open onClose={vi.fn()}>
+          <p>Bubble, 2026-10-21</p>
+        </Dialog>
+      </Dialog>,
+    );
+    act(() => {
+      document.querySelectorAll("dialog")[1]?.close();
+    });
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it("stays closed when its page agrees to the browser's close", () => {
     render(<Held />);
     act(() => {

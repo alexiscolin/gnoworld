@@ -49,9 +49,10 @@ export function Dialog({ title, open, onClose, wide = false, children }: DialogP
         event.preventDefault();
         onClose();
       }}
-      // Closed by the browser itself (a second Esc, a form's dialog method), not by the page.
-      onClose={() => {
-        if (!open) return;
+      // Closed by the browser itself (a second Esc, a form's dialog method), not by the page; a dialog
+      // inside it closing is that dialog's (F352).
+      onClose={(event) => {
+        if (event.target !== event.currentTarget || !open) return;
         onClose();
         setCloses((count) => count + 1);
       }}
