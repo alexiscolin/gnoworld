@@ -46,6 +46,7 @@ const SWITCHED_OFF = {
 // Vitest's tests and Playwright's journeys.
 const TESTS = ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts"];
 const BASELINE_ALSO = { allowSelectors: ["popover-open"], allowProperties: ["forced-color-adjust"] };
+const RAW_ANCHOR = { selector: "JSXOpeningElement[name.name='a']", message: "A link in ui is an Anchor (F259)." };
 const MEMOS = ["memo", "useMemo", "useCallback"];
 const MEMO = "The React Compiler memoizes: no hand-written memo, useMemo or useCallback (docs/ARCHITECTURE.md).";
 const HTML = "Nothing reaches the DOM as HTML: render it as React elements (docs/ARCHITECTURE.md, security).";
@@ -203,6 +204,13 @@ export default defineConfig(
         },
       ],
     },
+  },
+  {
+    // A link in ui is an Anchor (link.tsx), so the site's own paths go through the page's link and
+    // never reload the app (F259, F317). Its stories, its tests and the overview's prose draw plain ones.
+    files: ["packages/ui/src/**/*.tsx"],
+    ignores: ["packages/ui/src/link.tsx", "packages/ui/src/Overview/**", "**/*.stories.tsx", ...TESTS],
+    rules: { "no-restricted-syntax": ["error", ...SWALLOWED, RAW_ANCHOR] },
   },
   {
     files: ["**/*.css"],

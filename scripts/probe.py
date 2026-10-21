@@ -206,6 +206,8 @@ try:
         off = "no-restricted-syntax: A test is never switched off"
         react = [
             ("clean.tsx", component(body="  return <p>{n}</p>;\n"), None),
+            # The app draws its own links (React Router's): ui's rule against a raw <a> is ui's alone.
+            ("anchor.tsx", 'export function Go() {\n  return <a href="/x">Go</a>;\n}\n', None),
             ("route_404.ts", 'import { data } from "react-router";\n\nexport function loader(): never {\n  throw data(null, { status: 404 });\n}\n', None),
             ("throw_string.ts", 'export function loader(): never {\n  throw "missing";\n}\n', "@typescript-eslint/only-throw-error"),
             ("conditional_hook.tsx", uses("useState") + component(body="  if (n > 1) {\n    useState(0);\n  }\n  return <p>{n}</p>;\n"), "react-hooks/rules-of-hooks"),
@@ -255,6 +257,15 @@ try:
             ("passes_app_on.ts", 'export { WORLDS } from "../../../../app/src/worlds.ts";\n', "import-x/no-restricted-paths"),
             ("loads_app.ts", 'export async function load(): Promise<unknown> {\n  return import("../../../../app/src/worlds.ts");\n}\n', "import-x/no-restricted-paths"),
             ("raw_html.tsx", "export function Card({ n }: { n: string }) {\n  return <p dangerouslySetInnerHTML={{ __html: n }} />;\n}\n", "@eslint-react/dom-no-dangerously-set-innerhtml"),
+            # A link drawn past the slot would reload the app on the site's own paths (F259, F317).
+            ("raw_anchor.tsx", "export function Card({ href }: { href: string }) {\n  return <a href={href}>Go</a>;\n}\n",
+             "no-restricted-syntax: A link in ui is an Anchor"),
+            # The rule replaces ui's no-restricted-syntax in .tsx: the swallowed catch must stay refused.
+            ("log_catch.tsx", "declare const logger: { error: (e: unknown) => void };\n\nexport function run(g: () => void): void {\n  try {\n    g();\n  } catch (e) {\n    logger.error(e);\n  }\n}\n",
+             "no-restricted-syntax: A catch that only logs"),
+            # Its exceptions: a story or a test may draw a plain <a>.
+            ("Go.stories.tsx", 'export function Plain() {\n  return <a href="/x">Go</a>;\n}\n', None),
+            ("Go.test.tsx", 'import { render } from "@testing-library/react";\nimport { expect, it } from "vitest";\n\nit("draws a link", () => {\n  const { container } = render(<a href="/x">Go</a>);\n  expect(container.querySelector("a")).not.toBeNull();\n});\n', None),
             ("inner_html.tsx", 'import { useEffect, useRef } from "react";\n\nexport function Card({ n }: { n: string }) {\n  const boxRef = useRef<HTMLDivElement>(null);\n  useEffect(() => {\n    if (boxRef.current) boxRef.current.innerHTML = n;\n  });\n  return <div ref={boxRef} />;\n}\n',
              restricted("'innerHTML'")),
         ]
