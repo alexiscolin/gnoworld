@@ -14,7 +14,10 @@
     "!app/src/**/*.test.{ts,tsx}",
     "!app/src/routes.ts",
     "!app/src/root.tsx",
-    "!app/src/entry.server.tsx"
+    "!app/src/entry.server.tsx",
+    "server/src/**/*.ts",
+    "!server/src/**/*.test.ts",
+    "!server/src/main.ts"
   ],
   "incremental": true,
   "htmlReporter": {

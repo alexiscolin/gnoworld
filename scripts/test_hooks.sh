@@ -88,6 +88,7 @@ outside = {"Edit(/scripts/guard.py)", "Edit(/scripts/stop_gate.sh)", "Edit(/scri
            "Edit(/.claude/settings.json)", "Edit(/.claude/settings.local.json)", "Edit(/.claude/agents/**)", "Edit(/.claude/commands/**)",
            "Edit(/.claude/skills/**)", "Edit(/.claude/rules/**)", "Edit(/.claude/hooks/**)",
            "Edit(/package.json)", "Edit(/app/package.json)", "Edit(/packages/*/package.json)",
+           "Edit(/server/package.json)", "Edit(/packages/schemas/package.json)",
            "Edit(/.npmrc)", "Edit(/pnpm-workspace.yaml)", "Edit(/.pnpmfile.cjs)", "Edit(/.pnpmfile.mjs)"}
 edits = lambda rules: {r for r in rules if r.split("(")[0] in {"Edit", "Write", "MultiEdit", "NotebookEdit"}}
 assert edits(deny) == outside, "the edits refused are not exactly the files run outside the sandbox"
@@ -412,6 +413,13 @@ printf 'x\n' >"$c/app/src/root.tsx" && printf 'x\n' >"$c/app/src/entry.server.ts
 cover 1 || fail "patch_coverage asked coverage of a Playwright test, the document shell or the server entry"
 unmeasured app/src/site.ts app/src/routes/a.tsx
 git -C "$c" rm -rq --cached app && rm -r "$c/app"
+# The server's entry runs in child processes, which coverage does not follow; its other files are measured.
+mkdir -p "$c/server/src"
+printf 'x\n' >"$c/server/src/main.ts" && git -C "$c" add server
+cover 1 || fail "patch_coverage asked coverage of the server's entry, which runs in child processes"
+git -C "$c" rm -rq --cached server && rm "$c/server/src/main.ts"
+unmeasured server/src/app.ts
+rm -r "$c/server"
 # Storybook's config is a config and a test setup a test's, and its pages (the stories, the
 # overview) the journeys shoot, so none is measured; code named alike is.
 mkdir -p "$c/packages/ui/.storybook" "$c/packages/ui/src/Overview"

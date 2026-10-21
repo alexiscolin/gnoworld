@@ -8,6 +8,9 @@
       "react-router": { "config": ["react-router.config.ts"] },
       "playwright": { "config": ["playwright.config.ts", "playwright.stories.config.ts"] }
     },
-    "packages/ui": { "ignoreDependencies": ["@fontsource-variable/geist", "@fontsource-variable/geist-mono"] }
+    "packages/ui": { "ignoreDependencies": ["@fontsource-variable/geist", "@fontsource-variable/geist-mono"] },
+    // Installed by the slice's one script, imported by the merge that uses each: the SDK and the
+    // validator by the login (3c), core by the bot's link (3h). Each merge removes its name.
+    "server": { "ignoreDependencies": ["@adena-wallet/sdk", "@hono/zod-validator", "@gnoworld/core"] }
   }
 }

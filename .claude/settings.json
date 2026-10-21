@@ -18,6 +18,8 @@
       "Bash(pnpm add *)",
       "Bash(rm -rf *)",
       "Edit(/scripts/guard.py)",
+      "Edit(/server/package.json)",
+      "Edit(/packages/schemas/package.json)",
       "Edit(/scripts/stop_gate.sh)",
       "Edit(/scripts/code_changed.sh)",
       "Edit(/scripts/scan_secrets.sh)",

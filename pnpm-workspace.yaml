@@ -1,5 +1,6 @@
 packages:
   - app
+  - server
   - packages/*
 
 # Supply chain, made explicit: no package younger than a day, no dependency build script
@@ -22,3 +23,8 @@ overrides:
 allowBuilds:
   esbuild: false # its postinstall only re-fetches the binary optionalDependencies already install
   unrs-resolver: false # its postinstall only re-fetches the native binding, which optionalDependencies already install
+# @web3auth/auth and @toruslabs/session-manager, under @adena-wallet/sdk, list the Linux binaries
+# of two build tools as optional dependencies; neither tool is in the tree, so nothing loads them.
+ignoredOptionalDependencies:
+  - "@nx/nx-linux-x64-gnu"
+  - "@rollup/rollup-linux-x64-gnu"
