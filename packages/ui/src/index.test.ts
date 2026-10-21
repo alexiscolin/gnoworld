@@ -89,30 +89,30 @@ const ENTRY = "\0layers-entry";
 // The six layers in their order of strength, as styles.css declares them.
 const ORDER = ["reset", "tokens", "base", "compositions", "components", "utilities"];
 
-// Layers rank by their first mention in the page's CSS, and a bundler may emit a component's sheet before
-// styles.css: an app importing the components first, as the import lint orders it, then the sheet, must
-// still meet the six layers in their order, or reset and base outrank the components (F363).
-it("an app importing the components before the sheet meets the layers in their order", async () => {
+// The CSS an app whose entry is this code ships, built as an app is.
+async function cssOf(entry: string): Promise<string> {
   const output = await build({
     configFile: false,
     logLevel: "silent",
     build: { write: false, rolldownOptions: { input: ENTRY } },
     plugins: [
-      {
-        name: "entry",
-        resolveId: (id) => (id === ENTRY ? id : null),
-        load: (id) =>
-          id === ENTRY
-            ? `import { Button } from ${JSON.stringify(here("./index.ts"))};\nimport ${JSON.stringify(here("./styles.css"))};\nexport { Button };\n`
-            : null,
-      },
+      { name: "entry", resolveId: (id) => (id === ENTRY ? id : null), load: (id) => (id === ENTRY ? entry : null) },
     ],
   });
   const chunks = (Array.isArray(output) ? output : [output]).flatMap((o) => (o as Rolldown.RolldownOutput).output);
-  const css = chunks.flatMap((chunk) =>
-    chunk.type === "asset" && chunk.fileName.endsWith(".css") ? [String(chunk.source)] : [],
+  return chunks
+    .flatMap((chunk) => (chunk.type === "asset" && chunk.fileName.endsWith(".css") ? [String(chunk.source)] : []))
+    .join("\n");
+}
+
+// Layers rank by their first mention in the page's CSS, and a bundler may emit a component's sheet before
+// styles.css: an app importing the components first, as the import lint orders it, then the sheet, must
+// still meet the six layers in their order, or reset and base outrank the components (F363).
+it("an app importing the components before the sheet meets the layers in their order", async () => {
+  const css = await cssOf(
+    `import { Button } from ${JSON.stringify(here("./index.ts"))};\nimport ${JSON.stringify(here("./styles.css"))};\nexport { Button };\n`,
   );
-  const named = css.join("\n").matchAll(/@layer\s+([\w\s,]+?)\s*[{;]/g);
+  const named = css.matchAll(/@layer\s+([\w\s,]+?)\s*[{;]/g);
   const met = [...new Set([...named].flatMap((m) => (m[1] ?? "").split(",").map((name) => name.trim())))];
   expect(met).toEqual(ORDER);
 });

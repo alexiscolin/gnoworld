@@ -3,7 +3,7 @@
 // magnification.
 import type { Locator } from "@playwright/test";
 import type { Page } from "../e2e/fixtures.ts";
-import { expect, open, RING, test } from "./storybook.ts";
+import { contrast, expect, open, RING, test } from "./storybook.ts";
 
 // The focused control by its name: an icon button has no words of its own.
 const focused = (page: Page) =>
@@ -452,26 +452,13 @@ test("a chart's bars hold 3:1 against the page, the current one unlike the past,
 }) => {
   await open(page, "activitychart--day");
   await expect(page.getByRole("table", { name: "Calls per hour, today" })).toHaveCount(1);
-  const [past, now, ratios] = await page.evaluate(() => {
-    const rgb = (colour: string) => (colour.match(/\d+/g) ?? []).slice(0, 3).map(Number);
-    const lum = (colour: string) => {
-      const [r = 0, g = 0, b = 0] = rgb(colour).map((c) => {
-        const s = c / 255;
-        return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
-      });
-      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    };
-    const ratio = (a: string, b: string) => {
-      const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
-      return ((hi ?? 0) + 0.05) / ((lo ?? 0) + 0.05);
-    };
-    const ground = getComputedStyle(document.body).backgroundColor;
+  const [past, now, ground] = await page.evaluate(() => {
     const fill = (selector: string) => getComputedStyle(document.querySelector(selector) ?? document.body).fill;
-    const [first, last] = [fill("[data-hour='0']"), fill("[data-current='true']")];
-    return [first, last, [ratio(first, ground), ratio(last, ground)]];
+    return [fill("[data-hour='0']"), fill("[data-current='true']"), getComputedStyle(document.body).backgroundColor];
   });
+  const rgb = (colour: string) => (colour.match(/\d+/g) ?? []).slice(0, 3).map(Number);
   expect(past).not.toBe(now);
-  for (const r of ratios) expect(r).toBeGreaterThanOrEqual(3);
+  for (const bar of [past, now]) expect(contrast(rgb(bar), rgb(ground))).toBeGreaterThanOrEqual(3);
 });
 
 test.describe("a planet's thumb", () => {
