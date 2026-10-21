@@ -165,6 +165,30 @@ describe("Dialog", () => {
     expect(dialog().open).toBe(true);
   });
 
+  // The browser closes a dialog itself on a second Esc, or for a form's dialog method (F330).
+  it("tells its page when the browser closes it, and shows again while its page keeps it open", () => {
+    const onClose = vi.fn();
+    render(
+      <Dialog title="Passport" open onClose={onClose}>
+        <p>Unsaved stamps</p>
+      </Dialog>,
+    );
+    act(() => {
+      dialog().close();
+    });
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(dialog().open).toBe(true);
+  });
+
+  it("stays closed when its page agrees to the browser's close", () => {
+    render(<Held />);
+    act(() => {
+      dialog().close();
+    });
+    expect(screen.getByText("Closed 1")).toBeTruthy();
+    expect(dialog().open).toBe(false);
+  });
+
   it("calls its onClose with nothing, whatever click closed it", async () => {
     const onClose = vi.fn();
     render(

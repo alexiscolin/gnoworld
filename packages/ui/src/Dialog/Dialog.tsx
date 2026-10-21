@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { IconButton } from "../Button/IconButton.tsx";
 import { Cluster, Stack } from "../compositions/index.ts";
 import { surface } from "../Popover/floating.ts";
@@ -20,6 +20,9 @@ export function Dialog({ title, open, onClose, wide = false, children }: DialogP
   const dialogRef = useRef<HTMLDialogElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const titleId = useId();
+  // Each close the browser made itself: the page is told, and while it keeps the dialog open the
+  // dialog shows again (F330).
+  const [closes, setCloses] = useState(0);
   useEffect(() => {
     const shown = dialogRef.current;
     if (shown === null || shown.open === open) return;
@@ -32,7 +35,7 @@ export function Dialog({ title, open, onClose, wide = false, children }: DialogP
       "input:not([type='hidden'], :disabled), select:not(:disabled), textarea:not(:disabled)",
     );
     (field ?? headingRef.current)?.focus();
-  }, [open]);
+  }, [open, closes]);
   return (
     <dialog
       ref={dialogRef}
@@ -45,6 +48,12 @@ export function Dialog({ title, open, onClose, wide = false, children }: DialogP
         if (event.target !== event.currentTarget) return;
         event.preventDefault();
         onClose();
+      }}
+      // Closed by the browser itself (a second Esc, a form's dialog method), not by the page.
+      onClose={() => {
+        if (!open) return;
+        onClose();
+        setCloses((count) => count + 1);
       }}
     >
       <Stack space="m">

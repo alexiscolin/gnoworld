@@ -57,6 +57,19 @@ const under = (trigger: Locator, panel: Locator) =>
   expect.poll(async () => (await box(panel)).y - ((await box(trigger)).y + (await box(trigger)).height));
 
 test.describe("Dialog", () => {
+  // The browser closes a dialog itself on a second Esc with nothing between (the close watcher's
+  // rule): one its page keeps shows again, modal, the focus in it (F330).
+  test("stays open and modal after two Esc when its page keeps it", async ({ page }) => {
+    await open(page, "flash--over-a-dialog");
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Escape");
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect
+      .poll(() => dialog.evaluate((d) => [d.matches(":modal"), d.contains(document.activeElement)]))
+      .toEqual([true, true]);
+  });
+
   test("opens in the top layer over its scrim, its title focused, and Esc closes it once, focus back on the opener", async ({
     page,
   }) => {
