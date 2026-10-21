@@ -54,8 +54,8 @@ Alexis, 2026-10-19: 1c's review found these beyond its plan; each is a known lim
 
 ## The design system, after slice 2
 
-Alexis, 2026-10-21: 2e's review found these; each is true and none bites today, so each comes
-with the slice that brings what it needs.
+Alexis, 2026-10-21: 2e's and 2f's reviews found these; each is true and none bites today, so each
+comes with the slice that brings what it needs.
 
 | Item | Delivers | Why |
 |---|---|---|
@@ -64,6 +64,14 @@ with the slice that brings what it needs.
 | A thumb's picture from data | `PlanetThumb` takes only the site's own paths and data URIs, with no referrer; with the first picture from data | A picture from another host tells it each visitor's address (F336) |
 | Speaking and selected | Speaking gets a mark of its own, or DESIGN-SYSTEM.md says which wins; with the first selected avatar | The speaking ring and the selected cream ring look alike (F322) |
 | The chart's hover tooltip | `ActivityChart`'s tooltip on hover, as DESIGN-SYSTEM.md's table says; with a world's figures (slice 5) | The table promises it, and no plan has it (F304) |
+| A link Row's whole row | A link Row's `<a>` stretched over the row, with a title-only story; with the next Row change | A title-only link Row's target is its words, 21 px tall, under DESIGN-SYSTEM's 24 px (F365) |
+| Empty text is no text | One rule for every optional text slot: an empty string draws nothing and marks nothing; before the first data reaches them (slice 3) | `error=""` marks a Field invalid with an empty description; Row and Card draw empty boxes (F366) |
+| Text people write, either direction | `dir="auto"` on every slot of caller text, and a right-to-left story; with slice 3's room names | DESIGN-SYSTEM.md asks it; no component has it (F368) |
+| A card without a title | Card's `aria-labelledby` only when a `Card.Header` draws the title; with the next Card change | A Card with no header points at an id that does not exist (F372) |
+| A popover whose anchor scrolled away | The floating box hidden while its anchor is off screen; with the next floating change | It stays pinned at the screen's edge, its trigger far above (F374) |
+| A world's path, case by case | A world's clientLoader refuses a path whose case differs from its route; with the next route | `/W/bubble` gets the host's 404 and the client's world page, canonical and indexable; React Router 8.4.0 drops `caseSensitive` on the client (F376) |
+| Focus after a navigation | The page's heading focused and announced on each navigation inside the app; slice 4, where rooms and worlds navigate | Focus falls to `<body>` and nothing is announced (F377) |
+| Error pages leave the app | One way for an error state to make the site's own links load the document, the header's home link included, with no `reload` prop on ui's components (`LinkProvider`); with the next error page | The `reload` flag is opted into by each boundary, and the header's link stays the router's (F350, F379) |
 
 ## Phase 0: a public hub
 
