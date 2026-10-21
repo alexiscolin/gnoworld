@@ -2,7 +2,7 @@
 // jsdom cannot see, since it applies no stylesheet. Each test walks every story Storybook built.
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "../e2e/fixtures.ts";
-import { BUTTONS, CONTROLS, expect, open, RING, stories, test } from "./storybook.ts";
+import { BUTTONS, contrast, CONTROLS, expect, open, pixel, RING, stories, test } from "./storybook.ts";
 
 test("every story renders with no error and passes axe", async ({ page }) => {
   const errors: string[] = [];
@@ -389,6 +389,26 @@ test("a button lightens under the pointer, unless it is disabled or busy", async
     await button.hover({ force: true });
     expect((await paint()) !== resting, id).toBe(lit);
     await page.mouse.move(0, 0);
+  }
+});
+
+// Every button's hover shows: the cream fill and the coral one take a veil of the ink, where the text's
+// veil left them 1.001:1 and 1.068:1 (F369). The floor is the outline button's own 1.22:1, rounded down.
+test("every button's fill under the pointer is 1.2:1 from its fill at rest", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  for (const id of ["button--matrix", "button--as-link", "button-iconbutton--pressed", "button-iconbutton--plain"]) {
+    await open(page, id);
+    for (const button of await page.locator(`${BUTTONS}:not(:disabled):not([aria-busy='true'])`).all()) {
+      const at = await button.boundingBox();
+      if (at === null) throw new Error(`${id} not drawn`);
+      // Inside its edge, level with its middle, clear of its words and its icon.
+      const fill = () => pixel(page, at.x + 4, at.y + at.height / 2);
+      const resting = await fill();
+      await button.hover();
+      const name = await button.evaluate((b) => `${b.dataset["emphasis"] ?? ""} ${b.dataset["tone"] ?? ""}`);
+      expect.soft(contrast(resting, await fill()), `${id}: ${name}`).toBeGreaterThanOrEqual(1.2);
+      await page.mouse.move(0, 0);
+    }
   }
 });
 

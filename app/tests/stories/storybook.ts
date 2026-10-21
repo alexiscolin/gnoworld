@@ -131,3 +131,15 @@ export function contrast(a: readonly number[], b: readonly number[]): number {
   const [hi = 0, lo = 0] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (hi + 0.05) / (lo + 0.05);
 }
+
+/** The colour the screen shows at a point, its 0-255 channels: one pixel of a screenshot, decoded. */
+export async function pixel(page: Page, x: number, y: number): Promise<number[]> {
+  const shot = (await page.screenshot({ clip: { x, y, width: 1, height: 1 }, scale: "css" })).toString("base64");
+  return page.evaluate(async (png) => {
+    const bytes = Uint8Array.from(atob(png), (c) => c.charCodeAt(0));
+    const context = new OffscreenCanvas(1, 1).getContext("2d");
+    if (context === null) throw new Error("no canvas");
+    context.drawImage(await createImageBitmap(new Blob([bytes], { type: "image/png" })), 0, 0);
+    return [...context.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+  }, shot);
+}

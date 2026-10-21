@@ -33,6 +33,7 @@
     --color-danger-line: color-mix(in oklab, var(--p-coral) 50%, transparent);
     --color-fill: color-mix(in oklab, var(--p-text) 5%, transparent);
     --color-fill-hover: color-mix(in oklab, var(--p-text) 10%, transparent);
+    --color-ink-hover: color-mix(in oklab, var(--p-space) 10%, transparent);
     --color-line: color-mix(in oklab, var(--p-text) 10%, transparent);
     --color-line-strong: color-mix(in oklab, var(--p-text) 20%, transparent);
     --color-surface: var(--p-night);

@@ -79,6 +79,7 @@ Semantic roles, all computed from them:
 | Role | Made of | Use |
 |---|---|---|
 | `--color-fill`, `--color-fill-hover` | text at 5% and 10% | The resting fill of fields, chips and cards; hover |
+| `--color-ink-hover` | space at 10% | Hover on a filled control, the cream or the coral, where the text's veil would not show (F369) |
 | `--color-line`, `--color-line-strong` | text at 10% and 20% | Borders and dividers; secondary buttons, hover |
 | `--color-panel`, `--color-glass` | night at 86% and 60% | Docked panels; what floats over the scene |
 | `--color-surface` | night | What floats over the page: popovers, menus, tooltips, dialogs |
