@@ -2,7 +2,7 @@
 // "New version available" (ADR-0001 §12): the worker's update waits for this click.
 import { Flash } from "@gnoworld/ui";
 import { useEffect, useState } from "react";
-import { startServiceWorker } from "../../sw/register.ts";
+import { hostAnswers, startServiceWorker } from "../../sw/register.ts";
 
 export const PRODUCTION = import.meta.env.PROD;
 
@@ -34,7 +34,7 @@ export function UpdatePrompt() {
       document,
       search: location.search,
       production: PRODUCTION,
-      online: () => navigator.onLine,
+      reachable: hostAnswers,
       signal: leaving.signal,
       reload: () => {
         location.reload();
