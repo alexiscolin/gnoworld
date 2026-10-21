@@ -1,6 +1,7 @@
 // The overview's parts for the interface's components, each region's content (Overview.tsx).
 import { useState } from "react";
 import { ActivityChart } from "../ActivityChart/ActivityChart.tsx";
+import { Avatar } from "../Avatar/Avatar.tsx";
 import { Button } from "../Button/Button.tsx";
 import { Card } from "../Card/Card.tsx";
 import { Chip } from "../Chip/Chip.tsx";
@@ -13,7 +14,7 @@ import { Menu, Popover } from "../Popover/Popover.tsx";
 import { Row } from "../Row/Row.tsx";
 import { Stat } from "../Stat/Stat.tsx";
 import { Tabs } from "../Tabs/Tabs.tsx";
-import { DAY, disc } from "./samples.ts";
+import { ADDRESS, DAY, disc } from "./samples.ts";
 
 export function Chips() {
   const [lens, setLens] = useState("games");
@@ -163,6 +164,17 @@ export function Planets() {
       <PlanetThumb src={disc("5cf2c8")} name="Bubble" />
       <PlanetThumb src={disc("ffc46b")} name="The sun" kind="star" />
       <PlanetThumb src={disc("b79cff")} name="An uncharted signal" kind="signal" magnify />
+    </Cluster>
+  );
+}
+
+export function Avatars() {
+  return (
+    <Cluster space="m">
+      <Avatar address={ADDRESS} name="g1qpzr…zry9" size="l" here />
+      <Avatar address={ADDRESS} name="g1qpzr…zry9" speaking />
+      <Avatar address="" name="Jarvis" kind="assistant" />
+      <Avatar address="" name="The quiz bot" kind="bot" size="s" />
     </Cluster>
   );
 }

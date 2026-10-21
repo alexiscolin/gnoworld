@@ -6,6 +6,12 @@ import { WORLDS, worldPath } from "../../src/worlds.ts";
 export { expect, type Page } from "@playwright/test";
 
 declare const process: { env: Record<string, string | undefined> };
+// Playwright hands a screenshot as Node's Buffer, whose types this folder leaves out, as process's.
+declare global {
+  interface Buffer {
+    toString(encoding: "base64"): string;
+  }
+}
 
 const ownBrowser = base.extend({
   context: async ({ playwright, launchOptions, contextOptions, baseURL, javaScriptEnabled }, use) => {

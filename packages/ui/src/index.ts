@@ -1,5 +1,6 @@
 // @gnoworld/ui, the design system (docs/DESIGN-SYSTEM.md): its components; its sheet is ./styles.css.
 export { ActivityChart, type ActivityChartProps } from "./ActivityChart/ActivityChart.tsx";
+export { Avatar, type AvatarProps } from "./Avatar/Avatar.tsx";
 export { Button, type ButtonProps } from "./Button/Button.tsx";
 export { IconButton, type IconButtonProps } from "./Button/IconButton.tsx";
 export { Card, type CardHeaderProps, type CardProps } from "./Card/Card.tsx";
