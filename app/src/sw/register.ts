@@ -97,7 +97,8 @@ export async function startServiceWorker(start: Start): Promise<void> {
       return;
     }
     if (waiting === asked) return;
-    if (asked === null) container.addEventListener("controllerchange", reloadOnce, { signal });
+    // Added at each click, the browser keeps it once; a first install's takeover, unasked, reloads nothing.
+    container.addEventListener("controllerchange", reloadOnce, { signal });
     asked = waiting;
     waiting.postMessage(TAKE_OVER);
   };
