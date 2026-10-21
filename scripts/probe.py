@@ -139,12 +139,15 @@ def lint_cases(cases, where, label):
     plant({name: content for name, content, _ in cases}, where=where)
     out = run(["node_modules/.bin/eslint", "--no-cache", "--format", "json", where])
     try:
-        report = {os.path.basename(r["filePath"]): reported(r["messages"]) for r in json.loads(out.stdout)}
+        report = {r["filePath"]: reported(r["messages"]) for r in json.loads(out.stdout)}
     except ValueError:
         report = {}
         expect(False, f"eslint ran on {label}: " + (out.stderr or out.stdout)[-300:])
     for name, _, rule in cases:
-        got = report.get(name, set())
+        # A case's name may hold its folder under `where`: a report is found by the end of its path.
+        got = next((found for path, found in report.items() if path.endswith(os.sep + name)), None)
+        expect(got is not None, f"eslint {label} {name}: linted")
+        got = got or set()
         expect(got == set() if rule is None else carries(got, rule), f"eslint {label} {name}: expected {rule or 'nothing'}, got {sorted(map(str, got))}")
 
 
