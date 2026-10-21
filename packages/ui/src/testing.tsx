@@ -5,8 +5,10 @@ import { createElement, type ComponentType, type ReactElement, type ReactNode } 
 import { expect } from "vitest";
 
 // True only for props that accept neither className nor style: a test assigns `true` to it, so
-// tsc fails the day either prop is added.
-export type Unstyled<P> = [Extract<keyof P, "className" | "style">] extends [never] ? true : false;
+// tsc fails the day either prop is added. Each member of a union is read, not their shared keys (F333).
+export type Unstyled<P> = [P extends unknown ? Extract<keyof P, "className" | "style"> : never] extends [never]
+  ? true
+  : false;
 
 type Args = Record<string, unknown>;
 interface Drawn {
