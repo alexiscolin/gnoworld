@@ -2,11 +2,11 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ABUSE, eachStory, staysText } from "../testing.tsx";
 import { Avatar } from "./Avatar.tsx";
+import { PEOPLE, SPREAD } from "../Overview/samples.ts";
 import * as stories from "./Avatar.stories.tsx";
 import { partsFrom } from "./parts.ts";
 
-const ONE = "g1leu8d2vsplhehcfkjg50mwgdpxdkt8tztu95wr";
-const OTHER = "g12yg9nh4ncma44emgm8msxe8aavzywt0p95tanv";
+const [ONE, OTHER] = PEOPLE;
 
 // What a face draws, its ids and the references to them left out: two faces of one address draw the
 // same, ids apart.
@@ -100,10 +100,8 @@ describe("Avatar", () => {
   });
 
   it("joins its stars in its address's order: each star once, three orders three lines", () => {
-    const BECH32 = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
     const byOrder = new Map<number, string>();
-    for (let n = 0; byOrder.size < 3 && n < 1_000; n++) {
-      const address = `g1${Array.from({ length: 38 }, (_, i) => BECH32[(n * 7 + i * (n + 3)) % 32] ?? "q").join("")}`;
+    for (const address of SPREAD) {
       const order = partsFrom(address)?.order;
       if (order !== undefined && !byOrder.has(order)) byOrder.set(order, address);
     }
