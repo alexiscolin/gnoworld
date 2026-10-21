@@ -10,10 +10,17 @@ type DrawLink = (props: PageLinkProps) => ReactNode;
 
 const PageLinkContext = createContext<DrawLink | null>(null);
 
-// A path from the site's root: "/" not followed by a second slash or a backslash, which a browser
-// reads as another host's address. A browser drops tabs and line ends from an address first.
-const OWN_PATH = /^\/(?![/\\])/;
-const DROPPED = /[\t\n\r]/g;
+// A path from the site's root, as the browser's own parser reads it: an href it takes for another host
+// ("//…", "/\…", tabs and line ends dropped first) or cannot read stays a plain anchor. The origin
+// stands in for the site's: only its sameness counts.
+const SITE = "https://site.invalid";
+function ownPath(href: string): boolean {
+  try {
+    return href.startsWith("/") && new URL(href, SITE).origin === SITE;
+  } catch {
+    return false;
+  }
+}
 
 /** Hands every link of the design system inside it the page's own link, for the site's own paths. */
 export function LinkProvider({ link, children }: { link: DrawLink; children: ReactNode }) {
@@ -23,5 +30,5 @@ export function LinkProvider({ link, children }: { link: DrawLink; children: Rea
 /** An anchor: the page's link for a path from the site's root, a plain one for anything else. */
 export function Anchor(props: PageLinkProps) {
   const link = use(PageLinkContext);
-  return link !== null && OWN_PATH.test(props.href.replace(DROPPED, "")) ? link(props) : <a {...props} />;
+  return link !== null && ownPath(props.href) ? link(props) : <a {...props} />;
 }
