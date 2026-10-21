@@ -34,7 +34,7 @@ and F350 with F379. F327 still waits for Alexis's VoiceOver check.
 | Threat | Mitigation | Proof |
 |---|---|---|
 | App code reaches the network, storage or another feature's internals past the folder that owns it, and a later slice builds on it | F378's lint, per folder | Its probe cases and harness mutants |
-| A package marked free of side effects drops a sheet the page needs, or reorders the layers | F363's first import of the sheet, kept by its test; F370's build test | Both tests |
+| A package marked free of side effects drops a sheet the page needs, or reorders the layers | The app imports the sheet itself (root.tsx), as a bundler may skip index.ts and its import; F370's build test on the app's entry | F363's and F370's build tests, and the built page's layer journey |
 
 ## 4. Tests, by level
 

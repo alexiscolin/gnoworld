@@ -1,5 +1,6 @@
 // @gnoworld/ui, the design system (docs/DESIGN-SYSTEM.md): its components; its sheet is ./styles.css,
-// imported first, so its layers' order comes before any component's sheet, whatever the app's imports (F363).
+// imported first, so its layers' order comes before any component's sheet (F363). Its JavaScript is free
+// of side effects but for its CSS (F370): a bundler may skip this file, so the app imports the sheet too.
 import "./styles.css";
 export { ActivityChart, type ActivityChartProps } from "./ActivityChart/ActivityChart.tsx";
 export { Avatar, type AvatarProps } from "./Avatar/Avatar.tsx";

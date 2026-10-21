@@ -124,3 +124,15 @@ it("an app importing the components before the sheet meets the layers in their o
   const met = [...new Set([...named].flatMap((m) => (m[1] ?? "").split(",").map((name) => name.trim())))];
   expect(met).toEqual(ORDER);
 });
+
+// ui's JavaScript is free of side effects but for its sheets: an app ships the sheets of the components
+// it uses, not every component's (F370). A sheet is a module's classes, which share its hash.
+it("an app using Button alone ships Button's sheets and no other component's", async () => {
+  const css = await cssOf(APP);
+  const modules = new Map<string, Set<string>>();
+  for (const [, name = "", module = ""] of css.matchAll(/\._([a-z]+)_([0-9a-z]{5})_/g))
+    modules.set(module, (modules.get(module) ?? new Set()).add(name));
+  const others = [...modules.values()].filter((names) => !["button", "pill", "icon"].some((own) => names.has(own)));
+  expect(sheetsIn(css).has("button")).toBe(true);
+  expect(others.map((names) => [...names])).toEqual([]);
+});
