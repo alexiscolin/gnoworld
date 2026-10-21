@@ -41,6 +41,8 @@ interface Start {
   readonly signal: AbortSignal;
   readonly reload: () => void;
   readonly report: (error: unknown) => void;
+  /** Whether the browser says it is online: a check that fails offline is expected (F343). */
+  readonly online: () => boolean;
   readonly onUpdate: (apply: () => void) => void;
 }
 
@@ -59,7 +61,10 @@ export async function startServiceWorker(start: Start): Promise<void> {
   start.document.addEventListener(
     "visibilitychange",
     () => {
-      if (start.document.visibilityState === "visible") registration.update().catch(start.report);
+      if (start.document.visibilityState !== "visible") return;
+      registration.update().catch((error: unknown) => {
+        if (start.online()) start.report(error);
+      });
     },
     { signal },
   );

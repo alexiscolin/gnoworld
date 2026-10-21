@@ -312,6 +312,31 @@ test.describe("updates", () => {
       };
     });
 
+  // Offline, the check an installed page makes when shown again fails, as expected: nothing is
+  // reported (F343). Chromium's own check escapes the page's offline mode, so the host goes down too.
+  test("a check that fails offline reports nothing", async ({ page, request, context }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await open(page);
+    await context.setOffline(true);
+    expect((await request.post(`${site}/__down`)).status()).toBe(204);
+    try {
+      await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+      // Awaited after the page's own: once this one fails, the page's, asked first, has too.
+      const checked = await page.evaluate(async () =>
+        (await navigator.serviceWorker.getRegistration())?.update().then(
+          () => "reached the host",
+          () => "failed",
+        ),
+      );
+      expect(checked).toBe("failed");
+      await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 0)));
+      expect(errors).toEqual([]);
+    } finally {
+      expect((await request.post(`${site}/__down`)).status()).toBe(204);
+    }
+  });
+
   // The notice is a flash, in the top layer at the top of the screen, however long the page (F338).
   test("the prompt shows within the screen on a page longer than it", async ({ page, request }) => {
     await page.setViewportSize({ width: 320, height: 568 });

@@ -1,7 +1,8 @@
 // The built site as a static host serves it (ADR-0002 §2): the file for a path where one exists,
 // spelled exactly, otherwise the SPA fallback with a 404, never a page that is not the place asked for.
 // Port 4174 serves the same build for the PWA's update journey: a POST to /__bump makes its sw.js
-// a new version, as a deploy would; one to /__tamper turns on and off a changed route file. Port
+// a new version, as a deploy would; one to /__tamper turns on and off a changed route file, one to
+// /__down a host that answers 503 for sw.js, as an update check offline finds no host. Port
 // 4175 does the same behind the demo's shared password, as the demo's host asks for one.
 import { createReadStream, readFileSync, realpathSync, statSync } from "node:fs";
 import { createServer } from "node:http";
@@ -42,6 +43,7 @@ const PASSWORD = `Basic ${Buffer.from("team:a test password").toString("base64")
 function host({ bumping = false, password = false }) {
   let bumps = 0;
   let tampered = false;
+  let down = false;
   return (request, response) => {
     if (password && request.headers.authorization !== PASSWORD) {
       response.writeHead(401, { "www-authenticate": 'Basic realm="gno.world demo"' }).end();
@@ -62,6 +64,15 @@ function host({ bumping = false, password = false }) {
     if (bumping && request.method === "POST" && pathname === "/__tamper") {
       tampered = !tampered;
       response.writeHead(204).end();
+      return;
+    }
+    if (bumping && request.method === "POST" && pathname === "/__down") {
+      down = !down;
+      response.writeHead(204).end();
+      return;
+    }
+    if (down && pathname === "/sw.js") {
+      response.writeHead(503).end();
       return;
     }
     const found = find(pathname);

@@ -96,7 +96,7 @@ function shown() {
 
 function start(
   page: WorkerContainer | undefined,
-  { search = "", production = true, signal = new AbortController().signal } = {},
+  { search = "", production = true, signal = new AbortController().signal, online = true } = {},
 ) {
   const updates: (() => void)[] = [];
   const reload = vi.fn();
@@ -110,6 +110,7 @@ function start(
     signal,
     reload,
     report,
+    online: () => online,
     onUpdate: (apply) => updates.push(apply),
   });
   return { started, updates, reload, report, document };
@@ -331,14 +332,28 @@ test("a page shown again asks the browser for a newer worker; hidden, it does no
   expect(registration.update).toHaveBeenCalledOnce();
 });
 
-test("a check that fails, offline say, is reported, and the page goes on", async () => {
+// Offline, a check cannot reach the host: expected of an installed app, so no bug is reported (F343).
+test("a check that fails offline is expected: nothing is reported, and the page goes on", async () => {
   const { page, registration } = container();
-  const { started, document, report } = start(page);
+  const { started, document, report } = start(page, { online: false });
   await started;
   registration.update.mockRejectedValueOnce(new Error("offline"));
   document.becomes("visible");
   await vi.waitFor(() => {
-    expect(report).toHaveBeenCalledWith(new Error("offline"));
+    expect(registration.update).toHaveBeenCalledOnce();
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(report).not.toHaveBeenCalled();
+});
+
+test("a check that fails online is reported, and the page goes on", async () => {
+  const { page, registration } = container();
+  const { started, document, report } = start(page);
+  await started;
+  registration.update.mockRejectedValueOnce(new Error("the host answered 503"));
+  document.becomes("visible");
+  await vi.waitFor(() => {
+    expect(report).toHaveBeenCalledWith(new Error("the host answered 503"));
   });
 });
 

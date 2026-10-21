@@ -34,6 +34,7 @@ export function UpdatePrompt() {
       document,
       search: location.search,
       production: PRODUCTION,
+      online: () => navigator.onLine,
       signal: leaving.signal,
       reload: () => {
         location.reload();
