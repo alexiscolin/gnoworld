@@ -177,18 +177,44 @@ test("the icons draw the mark in cream on space, the maskable one opaque and ins
         if (context === null) throw new Error("no canvas");
         context.drawImage(picture, 0, 0);
         const { data } = context.getImageData(0, 0, side, side);
+        // The mark's points, in icon.svg's units: centre, inner and outer planets, the ring's top, and
+        // the space between the ring and the orbit. The maskable icon is the drawing at 80%, centred.
+        const [offset, scale] = purpose === "maskable" ? [side * 0.1, side * 0.8] : [0, side];
+        const marks = [
+          [16, 16],
+          [24, 16],
+          [6.9, 25.4],
+          [16, 8],
+          [16, 5.25],
+        ].map(([x = 0, y = 0]) => {
+          const at =
+            (Math.round(offset + ((y + 2) / 36) * scale) * side + Math.round(offset + ((x + 2) / 36) * scale)) * 4;
+          return [...data.slice(at, at + 3)];
+        });
         const corners = [0, side - 1, side * (side - 1), side * side - 1].map((at) => [
           ...data.slice(at * 4, at * 4 + 4),
         ]);
-        return { purpose, corners, ...scan(data, side) };
+        return { purpose, corners, marks, ...scan(data, side) };
       }),
     );
   });
   expect(drawn).toHaveLength(3);
-  for (const { chroma, cream } of drawn) {
+  for (const { chroma, cream, marks } of drawn) {
     expect(chroma, "only space, cream and their blends").toBeLessThanOrEqual(16);
     expect(cream, "the mark in cream").toBeGreaterThanOrEqual(225);
+    const [creams, space] = [marks.slice(0, -1), marks.at(-1) ?? []];
+    for (const point of creams)
+      expect(Math.min(...point), "the mark's centre, planets and ring").toBeGreaterThanOrEqual(225);
+    expect(Math.max(...space), "the space between the ring and the orbit").toBeLessThanOrEqual(20);
   }
+  // The drawing itself: the tokens' cream and space, and no other colour.
+  const svg = await (await page.request.get("/icon.svg")).text();
+  const tokens = await page.evaluate(() =>
+    ["--p-cream", "--p-space"].map((name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim()),
+  );
+  expect(new Set([...svg.matchAll(/#[0-9a-f]{3,8}\b/gi)].map(([colour]) => colour.toLowerCase()))).toEqual(
+    new Set(tokens),
+  );
   const maskable = drawn.find(({ purpose }) => purpose === "maskable");
   expect(maskable?.corners).toEqual([
     [5, 7, 13, 255],
