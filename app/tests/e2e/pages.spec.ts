@@ -232,7 +232,10 @@ test("the test host serves each kind of file the build writes with its type, as 
 
 test("the React Compiler compiled the routes, not only React's own runtime", async ({ request }) => {
   const chunks = assets(await (await request.get("/")).text(), "js");
-  expect(chunks.some((chunk) => chunk.includes("/compiler-runtime-"))).toBe(true);
+  // The compiler's runtime module, in whichever file the bundler puts it: it assigns `c`, where React's
+  // own built-in one only lists it (`c:function`).
+  const texts = await Promise.all(chunks.map(async (chunk) => (await request.get(chunk)).text()));
+  expect(texts.some((text) => /\.c=function\(\w+\)\{return \w+\.H\.useMemoCache\(\w+\)\}/.test(text))).toBe(true);
   const routes = chunks.filter((chunk) => /\/assets\/(root|home)-/.test(chunk));
   expect(routes.length).toBeGreaterThan(0);
   for (const chunk of routes) {

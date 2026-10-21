@@ -94,16 +94,11 @@ function Text() {
 
 function Flashes() {
   return (
-    <Stack>
-      <Flash
-        message={{ title: "Saved to your rooms", line: "Bubble · the AMA on sessions" }}
-        onClose={() => undefined}
-      />
-      <Flash
-        message={{ title: "New version available.", action: { label: "Reload", onAction: () => undefined } }}
-        onClose={() => undefined}
-      />
-    </Stack>
+    // One at a time, in the top layer at the top of the screen, as the page shows them (F331).
+    <Flash
+      message={{ title: "New version available.", action: { label: "Reload", onAction: () => undefined } }}
+      onClose={() => undefined}
+    />
   );
 }
 

@@ -148,6 +148,105 @@ describe("Dialog", () => {
     expect(dialog().open).toBe(true);
   });
 
+  // A file picker dismissed inside it fires a cancel that bubbles: the picker's, not an Esc (F332).
+  it("takes a cancel from a control inside it for that control's, not for Esc", () => {
+    const onClose = vi.fn();
+    render(
+      <Dialog title="Passport" open onClose={onClose}>
+        <input type="file" aria-label="A photo" />
+      </Dialog>,
+    );
+    const cancel = new Event("cancel", { bubbles: true, cancelable: true });
+    act(() => {
+      screen.getByLabelText("A photo").dispatchEvent(cancel);
+    });
+    expect(onClose).not.toHaveBeenCalled();
+    expect(cancel.defaultPrevented).toBe(false);
+    expect(dialog().open).toBe(true);
+  });
+
+  // The browser closes a dialog itself on a second Esc, or for a form's dialog method (F330).
+  it("tells its page when the browser closes it, and shows again while its page keeps it open", () => {
+    const onClose = vi.fn();
+    render(
+      <Dialog title="Passport" open onClose={onClose}>
+        <p>Unsaved stamps</p>
+      </Dialog>,
+    );
+    act(() => {
+      dialog().close();
+    });
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(dialog().open).toBe(true);
+  });
+
+  // Each close counts, not only the first: a page that keeps it sees it shown again every time (F347).
+  it("shows again after every close the browser makes while its page keeps it open", () => {
+    const onClose = vi.fn();
+    render(
+      <Dialog title="Passport" open onClose={onClose}>
+        <p>Unsaved stamps</p>
+      </Dialog>,
+    );
+    for (const time of [1, 2, 3]) {
+      act(() => {
+        dialog().close();
+      });
+      expect(onClose).toHaveBeenCalledTimes(time);
+      expect(dialog().open).toBe(true);
+    }
+  });
+
+  // React passes a close up from a dialog inside it: that close is the inner dialog's (F352, F332's class).
+  it("is not closed by a dialog inside it closing", () => {
+    const onClose = vi.fn();
+    render(
+      <Dialog title="Passport" open onClose={onClose}>
+        <Dialog title="A stamp" open onClose={vi.fn()}>
+          <p>Bubble, 2026-10-21</p>
+        </Dialog>
+      </Dialog>,
+    );
+    act(() => {
+      document.querySelectorAll("dialog")[1]?.close();
+    });
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  // A browser queues the close event of its own close(): one still queued when its page opens it again is
+  // not the browser closing it (F361).
+  it("takes the close event of its own close for none of the browser's, even after it opens again", () => {
+    const onClose = vi.fn();
+    const shut = (open: boolean) => (
+      <Dialog title="Passport" open={open} onClose={onClose}>
+        <p>Unsaved stamps</p>
+      </Dialog>
+    );
+    const { rerender } = render(shut(true));
+    const queued: Event[] = [];
+    dialog().close = function (this: HTMLDialogElement) {
+      this.open = false;
+      queued.push(new Event("close"));
+    };
+    rerender(shut(false));
+    rerender(shut(true));
+    act(() => {
+      for (const event of queued) dialog().dispatchEvent(event);
+    });
+    expect(queued).toHaveLength(1);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(dialog().open).toBe(true);
+  });
+
+  it("stays closed when its page agrees to the browser's close", () => {
+    render(<Held />);
+    act(() => {
+      dialog().close();
+    });
+    expect(screen.getByText("Closed 1")).toBeTruthy();
+    expect(dialog().open).toBe(false);
+  });
+
   it("calls its onClose with nothing, whatever click closed it", async () => {
     const onClose = vi.fn();
     render(

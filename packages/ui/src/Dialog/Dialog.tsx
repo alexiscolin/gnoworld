@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { IconButton } from "../Button/IconButton.tsx";
 import { Cluster, Stack } from "../compositions/index.ts";
 import { surface } from "../Popover/floating.ts";
@@ -20,10 +20,16 @@ export function Dialog({ title, open, onClose, wide = false, children }: DialogP
   const dialogRef = useRef<HTMLDialogElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const titleId = useId();
+  // Each close the browser made itself: the page is told, and while it keeps the dialog open the
+  // dialog shows again (F330).
+  const [closes, setCloses] = useState(0);
+  // Its own close() fires a close event too, which the browser queues: that one is not the browser's (F361).
+  const ownCloseRef = useRef(false);
   useEffect(() => {
     const shown = dialogRef.current;
     if (shown === null || shown.open === open) return;
     if (!open) {
+      ownCloseRef.current = true;
       shown.close();
       return;
     }
@@ -32,7 +38,7 @@ export function Dialog({ title, open, onClose, wide = false, children }: DialogP
       "input:not([type='hidden'], :disabled), select:not(:disabled), textarea:not(:disabled)",
     );
     (field ?? headingRef.current)?.focus();
-  }, [open]);
+  }, [open, closes]);
   return (
     <dialog
       ref={dialogRef}
@@ -40,9 +46,22 @@ export function Dialog({ title, open, onClose, wide = false, children }: DialogP
       data-width={wide ? "wide" : "standard"}
       aria-labelledby={titleId}
       // Esc would close it in the browser: the page is asked instead, and keeps it open if it chooses.
+      // A cancel from a control inside it (a file picker dismissed) is that control's (F332).
       onCancel={(event) => {
+        if (event.target !== event.currentTarget) return;
         event.preventDefault();
         onClose();
+      }}
+      // Closed by the browser itself (a second Esc, a form's dialog method), not by the page; a dialog
+      // inside it closing is that dialog's (F352).
+      onClose={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (ownCloseRef.current) {
+          ownCloseRef.current = false;
+          return;
+        }
+        onClose();
+        setCloses((count) => count + 1);
       }}
     >
       <Stack space="m">

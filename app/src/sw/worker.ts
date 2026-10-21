@@ -1,6 +1,7 @@
 // The worker's rules (ADR-0001 §12): precache the build's hashed files, answer them from the
 // cache, cache nothing else, and take over only when the page asks. The scope is a parameter, so
 // the same rules run in the tests and in the browser (sw.ts).
+import { integrity } from "./digest.ts";
 
 export interface LifecycleEvent {
   waitUntil(promise: Promise<unknown>): void;
@@ -50,17 +51,12 @@ export interface WorkerScope {
 // fetches only the files it lacks, and drops the others once it takes over.
 const CACHE = "gnoworld-precache";
 
-async function integrityOf(response: Response): Promise<string> {
-  const digest = new Uint8Array(await crypto.subtle.digest("SHA-384", await response.arrayBuffer()));
-  return `sha384-${btoa(String.fromCharCode(...digest))}`;
-}
-
 // A listed file held with other bytes is dropped at once: the version still running then fetches
 // it, and this one fetches it again with its digest, which the browser checks.
-async function kept(cache: WorkerCache, request: Request, integrity: string | undefined) {
-  if (integrity === undefined) return undefined;
+async function kept(cache: WorkerCache, request: Request, want: string | undefined) {
+  if (want === undefined) return undefined;
   const held = await cache.match(request);
-  if (held !== undefined && (await integrityOf(held)) === integrity) return request.url;
+  if (held !== undefined && (await integrity(await held.arrayBuffer())) === want) return request.url;
   await cache.delete(request);
   return undefined;
 }

@@ -23,6 +23,30 @@ describe("Field", () => {
     expect(said).toEqual(["On gno.land", "Taken already"]);
   });
 
+  // A region inserted already filled may not be announced (F177's class): it waits on the page (F335),
+  // and names its field, the error read alone tying it to none (F356).
+  it("keeps a status region for its error from the start, and says the error there when it comes", () => {
+    const { rerender } = render(<Field label="Name" value="x" onChange={vi.fn()} />);
+    const region = screen.getByRole("status");
+    expect(region.textContent).toBe("");
+    rerender(<Field label="Name" error="Taken already" value="x" onChange={vi.fn()} />);
+    expect(screen.getByRole("status")).toBe(region);
+    expect(region.textContent).toBe("Name: Taken already");
+    rerender(<Field label="Name" value="xy" onChange={vi.fn()} />);
+    expect(screen.getByRole("status")).toBe(region);
+    expect(region.textContent).toBe("");
+  });
+
+  // The region says it; the one shown only describes the box, or a screen reader reads it twice (F348).
+  it("says its error once: the one shown is out of the reading order, still describing the box", () => {
+    render(<Field label="Name" error="Taken already" value="x" onChange={vi.fn()} />);
+    const shown = document.getElementById(screen.getByRole("textbox").getAttribute("aria-describedby") ?? "");
+    expect(shown?.textContent).toBe("Taken already");
+    expect(shown?.getAttribute("aria-hidden")).toBe("true");
+    const read = screen.getAllByText(/Taken already/).filter((said) => said.getAttribute("aria-hidden") !== "true");
+    expect(read).toEqual([screen.getByRole("status")]);
+  });
+
   it("is described by its error alone when it has no help", () => {
     render(<Field label="Name" error="Too short" value="ab" onChange={vi.fn()} />);
     const said = screen.getByRole("textbox").getAttribute("aria-describedby") ?? "";

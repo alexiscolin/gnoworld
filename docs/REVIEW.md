@@ -59,12 +59,14 @@ Code written by an agent gets the same reading as anyone's, plus this. `/pre-mer
    tautologies, mocks of the thing under test, empty assertions ("was called", unread
    snapshots, loose matchers), missing failure and boundary cases, timing guesses, and a
    test not seen failing first (ADR-0002 §9). Its findings are fixed before anything else.
-3. **Every lens, at every merge.** `/simplify` first, its fixes applied and the gate run again;
-   then Claude Code's `/code-review` (correctness, performance, accessibility and UX, with this
-   file's checklists), `/security-review` and the `complexity-reviewer` (the cost in big O of each
+3. **Every lens where it finds.** `/simplify`'s altitude and simplification angles first (its
+   efficiency angle too for a slice with a hot path: the 3D, the chat), their fixes applied and
+   the gate run again; then Claude Code's `/code-review` (correctness, performance, accessibility
+   and UX, with this file's checklists) and the `complexity-reviewer` (the cost in big O of each
    loop, against the size its input can reach) together, in a fresh context; a change to a tier-1
-   file adds the `security-reviewer` agent, on the strongest model, which reads the project's
-   threat model (Alexis, 2026-10-18: add lenses, remove none). Each finding names its class, the
+   file or the harness adds `/security-review`, and a tier-1 file the `security-reviewer` agent,
+   on the strongest model, which reads the project's threat model (Alexis, 2026-10-21: the lenses
+   that found nothing in an interface merge run where they find, docs/decisions.md). Each finding names its class, the
    kind of bug, and its fix covers every instance; one only about style, diagnostics or cleanup
    is dropped, `/simplify` owning those. Fixes are re-checked by the gate and the mutation
    tester; a second pass runs only for a high finding fixed in tier-1 code, and only its lens.

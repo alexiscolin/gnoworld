@@ -41,9 +41,14 @@ export interface CardHeaderProps {
   kicker?: string;
   /** Where it stands: live, ended, won, signed. */
   state?: string;
+  /** Its title's level under the page's headings: 3 unless the page says (F305). */
+  level?: 2 | 3 | 4;
 }
 
-function Header({ title, icon, kicker, state }: CardHeaderProps) {
+const HEADINGS = { 2: "h2", 3: "h3", 4: "h4" } as const;
+
+function Header({ title, icon, kicker, state, level = 3 }: CardHeaderProps) {
+  const Heading = HEADINGS[level];
   const titleId = use(TitleContext);
   return (
     <Cluster justify="between" space="xs">
@@ -54,9 +59,9 @@ function Header({ title, icon, kicker, state }: CardHeaderProps) {
             {kicker === undefined ? null : <Kicker>{kicker}</Kicker>}
           </Cluster>
         )}
-        <h3 id={titleId} className={styles["title"]}>
+        <Heading id={titleId} className={styles["title"]}>
           {title}
-        </h3>
+        </Heading>
       </Stack>
       {state === undefined ? null : <Chip>{state}</Chip>}
     </Cluster>

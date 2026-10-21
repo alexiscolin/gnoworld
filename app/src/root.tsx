@@ -39,5 +39,5 @@ export default function App() {
 }
 
 export function ErrorBoundary() {
-  return <PageError title="Something went wrong" line="Reload the page to try again." />;
+  return <PageError title="Something went wrong" line="Reload the page to try again." reload />;
 }

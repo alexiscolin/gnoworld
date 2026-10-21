@@ -52,11 +52,26 @@ const pinned = (where: Record<string, string>) => (trigger: Locator) =>
     Object.assign(t.style, { position: "fixed", ...how });
   }, where);
 
+// A flash's pill, in its region.
+const pillOf = (page: Page) => page.locator("[role='status'] > *");
 // The gap from the trigger's bottom to the panel's top, as it settles: one step when placed under.
 const under = (trigger: Locator, panel: Locator) =>
   expect.poll(async () => (await box(panel)).y - ((await box(trigger)).y + (await box(trigger)).height));
 
 test.describe("Dialog", () => {
+  // The browser closes a dialog itself on a second Esc with nothing between (the close watcher's
+  // rule): one its page keeps shows again, modal, the focus in it (F330).
+  test("stays open and modal after two Esc when its page keeps it", async ({ page }) => {
+    await open(page, "flash--over-a-dialog");
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Escape");
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect
+      .poll(() => dialog.evaluate((d) => [d.matches(":modal"), d.contains(document.activeElement)]))
+      .toEqual([true, true]);
+  });
+
   test("opens in the top layer over its scrim, its title focused, and Esc closes it once, focus back on the opener", async ({
     page,
   }) => {
@@ -485,6 +500,30 @@ test.describe("a planet's thumb", () => {
   });
 });
 
+// A flash raised from a modal dialog shows above its scrim, at the top centre, as bright as without a
+// dialog (F331). Outside the dialog, it stays inert until the dialog closes: the platform's rule.
+test("a flash raised from a dialog shows above its scrim, at the top centre", async ({ page }) => {
+  const pill = pillOf(page);
+  await open(page, "flash--timed");
+  const alone = await pill.screenshot();
+  await open(page, "flash--over-a-dialog");
+  await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
+  const placed = await box(pill);
+  const screen = page.viewportSize() ?? { width: 0, height: 0 };
+  expect(Math.abs(placed.x + placed.width / 2 - screen.width / 2)).toBeLessThanOrEqual(1);
+  expect(placed.y).toBeLessThan(screen.height / 4);
+  expect(await pill.screenshot()).toEqual(alone);
+});
+
+// A manual popover, as its page holds it: an auto one closes on any click outside while the page
+// still thinks it shown (F346).
+test("a flash stays shown when the page is clicked outside it", async ({ page }) => {
+  await open(page, "flash--with-action");
+  await page.mouse.click(5, 300);
+  await page.evaluate(() => new Promise(requestAnimationFrame));
+  expect(await pillOf(page).evaluate((pill) => pill.matches(":popover-open"))).toBe(true);
+});
+
 test.describe("an avatar", () => {
   test("is a disc of 20, 24 or 48 px by its size", async ({ page }) => {
     await open(page, "avatar--sizes");
@@ -519,6 +558,27 @@ test.describe("an avatar", () => {
       };
     });
     expect(drawn).toEqual({ stars: ["rgb(244, 246, 250)"], line: ["rgb(244, 246, 250)", "none"] });
+  });
+
+  // A face is a picture: forced colours leave it as drawn, night and colours, as they leave a photo
+  // (F319). A bot's mark is the code icon, which takes the system's colours as every icon does.
+  test("keeps its face, night and colours, under forced colours", async ({ page }) => {
+    await open(page, "avatar--kinds");
+    const faces = await page.locator("[data-kind='person'] svg, [data-kind='assistant'] svg").all();
+    expect(faces).toHaveLength(2);
+    // The square inside each disc, a pixel in: around it, the page's colours change with the mode.
+    const inside = async () =>
+      Promise.all(
+        faces.map(async (face) => {
+          const { x, y, width } = await box(face);
+          const side = Math.floor(width / Math.SQRT2) - 2;
+          const from = (start: number) => Math.ceil(start + (width - side) / 2);
+          return page.screenshot({ clip: { x: from(x), y: from(y), width: side, height: side } });
+        }),
+      );
+    const normal = await inside();
+    await page.emulateMedia({ forcedColors: "active" });
+    expect(await inside()).toEqual(normal);
   });
 
   // The ring is a border, which forced colours paint in the system's colour; a box-shadow they drop,

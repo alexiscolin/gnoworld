@@ -50,7 +50,20 @@ Alexis, 2026-10-19: 1c's review found these beyond its plan; each is a known lim
 | Connections | A limit per visitor on open connections, short header, body and keep-alive timeouts, a burst sized for a team behind one address; measured with slice 3's load tests | `limit_req` counts requests, not connections (F208) |
 | The test's own reach | Bounded parallel probes with a count of those that finished; the pin check case-blind, `--from=` included; the image build copies every workspace the app imports, its `package.json` and its sources, checked against `app/package.json` (F232); Docker Engine's version checked before the first start | F211, F213, F214, F217, F232 |
 | `--demo`'s first run | The visitor's address compared with the operator's own, not only found public | F215 |
-| A strict CSP | The demo's server and the client's `_headers` send ADR-0001's strict CSP, `img-src 'self' data:` in it, so a picture from another host (a planet's thumb, a row's lead) is refused; a journey plants one | The design system takes a picture's address as given, the stories' guard sees only our own stories (2c-2's red pass, R18); ADR-0001 plans the CSP, which nothing sends yet |
+| A strict CSP | The demo's server and the client's `_headers` send ADR-0001's strict CSP, `img-src 'self' data:` in it, so a picture from another host (a planet's thumb, a row's lead) is refused; a journey plants one; the inline scripts React Router writes in each page (five, two with per-page or per-build text) hashed at build time into the header, or moved out (F341) | The design system takes a picture's address as given, the stories' guard sees only our own stories (2c-2's red pass, R18); ADR-0001 plans the CSP, which nothing sends yet |
+
+## The design system, after slice 2
+
+Alexis, 2026-10-21: 2e's review found these; each is true and none bites today, so each comes
+with the slice that brings what it needs.
+
+| Item | Delivers | Why |
+|---|---|---|
+| `/index.html` as a page | The host redirects or refuses a path that names an `index.html`, nginx and the test host together, with the operator's tests | It serves a page the router has no route for, which fails to hydrate (React #418) and ends noindexed (F340) |
+| A link to a file of the site | The app hands ui's link slot its route test, so a path that names a file (the sitemap, a download) stays a plain anchor; with the sitemap (slice 5) | Every path from the root goes to the router today, whose catch-all shows "No page here" (F326) |
+| A thumb's picture from data | `PlanetThumb` takes only the site's own paths and data URIs, with no referrer; with the first picture from data | A picture from another host tells it each visitor's address (F336) |
+| Speaking and selected | Speaking gets a mark of its own, or DESIGN-SYSTEM.md says which wins; with the first selected avatar | The speaking ring and the selected cream ring look alike (F322) |
+| The chart's hover tooltip | `ActivityChart`'s tooltip on hover, as DESIGN-SYSTEM.md's table says; with a world's figures (slice 5) | The table promises it, and no plan has it (F304) |
 
 ## Phase 0: a public hub
 

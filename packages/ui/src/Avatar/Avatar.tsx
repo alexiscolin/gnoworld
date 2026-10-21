@@ -91,10 +91,12 @@ function Orb() {
   );
 }
 
-// The face on its night disc, the same at every size: the sheet scales it.
+// The face on its night disc, the same at every size: the sheet scales it. The night is the picture's
+// own, so forced colours, which leave a picture as drawn, keep it (F319).
 function Face({ address, kind }: { address: string; kind: "person" | "assistant" }) {
   return (
     <svg viewBox="0 0 48 48" aria-hidden="true" className={styles["face"]}>
+      <rect className={styles["night"]} width="48" height="48" />
       {kind === "assistant" ? <Orb /> : <Nebula address={address} />}
     </svg>
   );

@@ -32,9 +32,15 @@
     content: "";
   }
 
+  /* A picture: forced colours leave it as drawn, its night included; the ring and the dot stay theirs. */
   .face {
     inline-size: 100%;
     clip-path: circle();
+    forced-color-adjust: none;
+  }
+
+  .night {
+    fill: var(--color-surface);
   }
 
   .line {

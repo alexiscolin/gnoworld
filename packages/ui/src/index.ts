@@ -1,4 +1,6 @@
-// @gnoworld/ui, the design system (docs/DESIGN-SYSTEM.md): its components; its sheet is ./styles.css.
+// @gnoworld/ui, the design system (docs/DESIGN-SYSTEM.md): its components; its sheet is ./styles.css,
+// imported first, so its layers' order comes before any component's sheet, whatever the app's imports (F363).
+import "./styles.css";
 export { ActivityChart, type ActivityChartProps } from "./ActivityChart/ActivityChart.tsx";
 export { Avatar, type AvatarProps } from "./Avatar/Avatar.tsx";
 export { Button, type ButtonProps } from "./Button/Button.tsx";

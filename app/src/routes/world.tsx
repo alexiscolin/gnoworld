@@ -45,6 +45,6 @@ export function ErrorBoundary() {
   return missing ? (
     <PageError title="No world here" line="No world of gno.land goes by that name." />
   ) : (
-    <PageError title="This world could not load" line="Try again in a moment." />
+    <PageError title="This world could not load" line="Try again in a moment." reload />
   );
 }

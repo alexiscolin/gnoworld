@@ -1,5 +1,6 @@
 // A route rendered as the build renders it, through React Router's own static rendering: Vitest
 // runs the app's routes with no DOM.
+import { LinkProvider, type PageLinkProps } from "@gnoworld/ui";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createStaticHandler, createStaticRouter, StaticRouterProvider, type RouteObject } from "react-router";
 
@@ -10,11 +11,14 @@ async function query(route: RouteObject, path: string) {
   return { handler, context };
 }
 
-export async function render(route: RouteObject, path: string): Promise<string> {
+// What the app's router draws for ui's link slot, here a stand-in that marks the links it draws.
+const routed = (props: PageLinkProps) => <a data-routed="" {...props} />;
+
+/** A route as the build renders it; inside ui's link slot when asked, its links through the router marked. */
+export async function render(route: RouteObject, path: string, { slot = false } = {}): Promise<string> {
   const { handler, context } = await query(route, path);
-  return renderToStaticMarkup(
-    <StaticRouterProvider router={createStaticRouter(handler.dataRoutes, context)} context={context} />,
-  );
+  const page = <StaticRouterProvider router={createStaticRouter(handler.dataRoutes, context)} context={context} />;
+  return renderToStaticMarkup(slot ? <LinkProvider link={routed}>{page}</LinkProvider> : page);
 }
 
 /** The error a route's loader gave for a path, as React Router hands it to the route's meta. */

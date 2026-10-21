@@ -45,6 +45,14 @@ const SWITCHED_OFF = {
 };
 // Vitest's tests and Playwright's journeys.
 const TESTS = ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts"];
+const BASELINE_ALSO = { allowAtRules: ["starting-style"], allowSelectors: ["popover-open"] };
+const FACE = { ...BASELINE_ALSO, allowProperties: ["forced-color-adjust"] };
+// A link drawn in JSX or by createElement, or a form, which navigates too (F360).
+const RAW_ANCHOR = {
+  selector:
+    "JSXOpeningElement[name.name=/^(a|form)$/], CallExpression[callee.name='createElement'][arguments.0.value='a'], CallExpression[callee.property.name='createElement'][arguments.0.value='a']",
+  message: "A link in ui is an Anchor, and a form the page's (F259).",
+};
 const MEMOS = ["memo", "useMemo", "useCallback"];
 const MEMO = "The React Compiler memoizes: no hand-written memo, useMemo or useCallback (docs/ARCHITECTURE.md).";
 const HTML = "Nothing reaches the DOM as HTML: render it as React elements (docs/ARCHITECTURE.md, security).";
@@ -104,11 +112,8 @@ export default defineConfig(
       "max-params": "error",
     },
   },
-  {
-    // Config files run on Node, whose types core must not see: lint them without types.
-    files: ["*.config.ts", "app/*.config.ts"],
-    extends: [tseslint.configs.disableTypeChecked],
-  },
+  // Config files run on Node, whose types core must not see: lint them without types.
+  { files: ["*.config.ts", "app/*.config.ts"], extends: [tseslint.configs.disableTypeChecked] },
   {
     // The app and the design system: React's hooks and the compiler's rules, and nothing from data
     // into the DOM as HTML (docs/ARCHITECTURE.md, "React" and the security checklist). Their warnings fail too.
@@ -129,11 +134,8 @@ export default defineConfig(
       ],
     },
   },
-  {
-    // React Router calls the server entry with four arguments; it runs only at build time.
-    files: ["app/src/entry.server.tsx"],
-    rules: { "max-params": ["error", 4] },
-  },
+  // React Router calls the server entry with four arguments; it runs only at build time.
+  { files: ["app/src/entry.server.tsx"], rules: { "max-params": ["error", 4] } },
   {
     // Tests read as lists of cases, so they may run long.
     files: TESTS,
@@ -204,6 +206,13 @@ export default defineConfig(
     },
   },
   {
+    // A link in ui is an Anchor (link.tsx), so the site's own paths go through the page's link and
+    // never reload the app (F259, F317). Its stories, its tests and the overview's prose draw plain ones.
+    files: ["packages/ui/src/**/*.tsx"],
+    ignores: ["packages/ui/src/link.tsx", "packages/ui/src/Overview/**", "**/*.stories.tsx", ...TESTS],
+    rules: { "no-restricted-syntax": ["error", ...SWALLOWED, RAW_ANCHOR] },
+  },
+  {
     files: ["**/*.css"],
     language: "css/css",
     plugins: { css },
@@ -215,7 +224,10 @@ export default defineConfig(
       "css/prefer-logical-properties": "error",
       // docs/DESIGN-SYSTEM.md, "Browsers": Baseline widely available, but for the popover and
       // @starting-style, from 2024, which a popover's fade in needs.
-      "css/use-baseline": ["error", { allowAtRules: ["starting-style"], allowSelectors: ["popover-open"] }],
+      "css/use-baseline": ["error", BASELINE_ALSO],
     },
   },
+  // And forced-color-adjust, which only a picture takes, where forced colours exist: the avatar's face,
+  // never a control (Alexis, F319; F349).
+  { files: ["packages/ui/src/Avatar/**/*.css"], rules: { "css/use-baseline": ["error", FACE] } },
 );

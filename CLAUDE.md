@@ -18,7 +18,7 @@ gnoworld: a social, on-chain, graphical hub for gno.land. The design is
 
 ## How we work
 
-- Test first: write the failing tests, run them, see them fail, then launch the `test-auditor` for its red pass (complete, relevant, impact first, security) and fix its findings; the commit of those tests says so in a line `Red-pass: <findings fixed>`, the mark the green pass measures drift from. Only then write the code. The mutation check finds every guard; one no test can catch yet goes into `GAPS` in `scripts/mutate.py`, with the reason.
+- Test first: write the failing tests, run them, see them fail, then launch the `test-auditor` for its red pass (complete, relevant, impact first, security) and fix its findings; the commit of those tests says so in a line `Red-pass: <findings fixed>` (outside core, the commit that brings their code: a red commit fails the gate), the mark the green pass measures drift from. Only then write the code. The mutation check finds every guard; one no test can catch yet goes into `GAPS` in `scripts/mutate.py`, with the reason.
 - `scripts/check.sh` must pass before every commit that changes code (the pre-commit hook runs it). Never commit with `--no-verify`.
 - Strict TypeScript: no `any`, no `@ts-ignore`, no `!`. Data from the relay, the indexer or a realm goes through Zod first.
 - Never change a test to make code pass without saying so in the review card.
@@ -41,7 +41,7 @@ gnoworld: a social, on-chain, graphical hub for gno.land. The design is
 
 ## No regression
 
-- A fix starts with a test that reproduces the bug, seen failing, and is committed with it; the test's name says the bug.
+- A fix starts with a test that reproduces the bug, seen failing, and is committed with it; the test's name says the bug. A test the fix forces to change lands in its own commit before it: every test of a fix's commit fails without the fix (`prove_fix`, F345).
 - A feature lands with its journey (Playwright) and, when it shows something, its approved screenshots.
 - The safety net never shrinks quietly: a test gone (Vitest, gno or Go; a rename included) or switched to `.fails`, a floor lowered (coverage, mutation), a known gap or an ignore added, or an approved screenshot changed fails the push unless a commit of the branch says why on a line of its own, `Key: <item> - why` (`Removed-test:`, `Lowered-floor:`, `Updated-baseline:`), which Alexis reads in review (`scripts/check_regressions.py`). No test is switched off (`.skip`, `.only`, `.todo`); `.fails` is for pairing, in core only.
 - Floors rise with the scores, and never come down.

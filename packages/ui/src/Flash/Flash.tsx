@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "../Button/Button.tsx";
 import { IconButton } from "../Button/IconButton.tsx";
 import { Cluster, Stack } from "../compositions/index.ts";
@@ -54,9 +54,15 @@ function Pill({ message, onClose }: { message: FlashMessage; onClose: () => void
       clearTimeout(timer);
     };
   }, [timed, title, line, moves]);
+  // In the top layer, over a modal dialog's scrim when raised from it (F331), shown as it comes; its
+  // region stays in the page, where it is announced.
+  useLayoutEffect(() => {
+    pillRef.current?.showPopover();
+  }, []);
   return (
     <div
       ref={pillRef}
+      popover="manual"
       className={surface(styles["flash"])}
       onPointerEnter={() => {
         setPointed(true);
@@ -105,7 +111,7 @@ function Pill({ message, onClose }: { message: FlashMessage; onClose: () => void
   );
 }
 
-/** A short note and at most one action, never the cream primary; where it sits is its slot's. */
+/** A short note and at most one action, never the cream primary; shown at the top of the screen. */
 export function Flash({ message, onClose }: FlashProps) {
   return <div role="status">{message === null ? null : <Pill message={message} onClose={onClose} />}</div>;
 }

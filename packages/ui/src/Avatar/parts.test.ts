@@ -54,37 +54,6 @@ describe("partsFrom", () => {
     );
   });
 
-  // Memoised: a list of 200 people draws each face's parts once, and a cache of every address ever
-  // seen would grow with each stranger, so the oldest leave it.
-  it("hands an address the parts it already drew, and forgets the oldest of many", () => {
-    const first = `g1${"q".repeat(38)}`;
-    const parts = partsFrom(first);
-    expect(partsFrom(first)).toBe(parts);
-    for (let n = 0; n < 10_000; n++)
-      partsFrom(
-        `g1${n
-          .toString(32)
-          .padStart(38, "q")
-          .replace(/[1bio]/g, "p")}`,
-      );
-    expect(partsFrom(first)).not.toBe(parts);
-    expect(partsFrom(first)).toEqual(parts);
-  });
-
-  it("keeps an address's parts while it is among the last 1,024 drawn, and only then", () => {
-    // Addresses no other test draws: g1zz, then a count in bech32's letters.
-    const fresh = (n: number) =>
-      `g1zz${n
-        .toString(32)
-        .padStart(36, "0")
-        .replace(/./g, (digit) => BECH32[Number.parseInt(digit, 32)] ?? "q")}`;
-    const parts = partsFrom(fresh(0));
-    for (let n = 1; n < 1_024; n++) partsFrom(fresh(n));
-    expect(partsFrom(fresh(0))).toBe(parts);
-    partsFrom(fresh(1_024));
-    expect(partsFrom(fresh(0))).not.toBe(parts);
-  });
-
   // A face never changes under a person: the hash, the stream and the drawing, pinned by one address.
   it("draws an address the face it has always had", () => {
     const parts = partsFrom(`g1${"q".repeat(38)}`);

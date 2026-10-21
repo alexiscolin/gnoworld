@@ -79,6 +79,22 @@ describe("Tooltip", () => {
     expect(shown()).toBe("false");
   });
 
+  // A focused control removed may fire no blur (jsdom fires none): the words go with it all the same (F353).
+  it("hides the words the keyboard showed when their control leaves the page", async () => {
+    const tipped = (control: boolean) => (
+      <Tooltip label="Search the universe">
+        {control ? <button type="button" aria-label="Search the universe" /> : null}
+      </Tooltip>
+    );
+    const { rerender } = render(tipped(true));
+    keyboardFocus();
+    expect(shown()).toBe("true");
+    rerender(tipped(false));
+    // The observer answers in a microtask, after the change, as in a browser.
+    await act(() => Promise.resolve());
+    expect(shown()).toBe("false");
+  });
+
   it("hides them on Esc, until the pointer or the focus comes again", () => {
     draw();
     keyboardFocus();
@@ -122,6 +138,27 @@ describe("Tooltip", () => {
     fireEvent.pointerEnter(button());
     advance(500);
     fireEvent.keyDown(document.body, { key: "a" });
+    expect(shown()).toBe("true");
+  });
+
+  // Two holds, each its own (WCAG 1.4.13, F334): the pointer leaving never ends the focus's, nor a blur
+  // the pointer's.
+  it("keeps the words the keyboard showed when the pointer comes and goes", () => {
+    draw();
+    keyboardFocus();
+    fireEvent.pointerEnter(button());
+    fireEvent.pointerLeave(button());
+    expect(shown()).toBe("true");
+  });
+
+  it("keeps the words the pointer showed when the focus leaves under it", () => {
+    draw();
+    fireEvent.pointerEnter(button());
+    advance(500);
+    keyboardFocus();
+    act(() => {
+      screen.getByLabelText("Elsewhere").focus();
+    });
     expect(shown()).toBe("true");
   });
 

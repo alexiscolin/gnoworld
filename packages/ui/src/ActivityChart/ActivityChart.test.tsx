@@ -13,6 +13,11 @@ const written = (container: HTMLElement) =>
   ].join(" ");
 const heights = (container: HTMLElement) =>
   [...container.querySelectorAll("svg [data-hour]")].map((b) => Number(b.getAttribute("height")));
+// The sparkline's points, their heights alone.
+const ys = (container: HTMLElement) =>
+  (container.querySelector("polyline")?.getAttribute("points") ?? "")
+    .split(" ")
+    .map((point) => Number(point.split(",")[1]));
 // Each row of the table as its words: when, and how many.
 const rows = (label: string) =>
   [...screen.getByRole("table", { name: label }).querySelectorAll("tbody tr")].map((row) =>
@@ -73,6 +78,35 @@ describe("ActivityChart", () => {
     expect(heights(container)[0]).toBeGreaterThanOrEqual(1);
   });
 
+  // Its line is --line-width wide (1 px) and centred on its points: at the drawing's edge half of it
+  // was cut. The peak and zero sit half a pixel in, of a drawing 48 high (F337).
+  it.each([
+    [
+      [0, 3, 0],
+      [47.5, 0.5, 47.5],
+    ],
+    [
+      [5, 5, 5],
+      [0.5, 0.5, 0.5],
+    ],
+    [
+      [0, 0, 0],
+      [47.5, 47.5, 47.5],
+    ],
+    [[7], [0.5, 0.5]],
+    [[0], [47.5, 47.5]],
+  ])("keeps its sparkline's whole stroke inside its drawing: %j", (values, expected) => {
+    const { container } = render(<ActivityChart label="Calls" values={values} sparkline unit="day" />);
+    expect(container.querySelector("svg")?.getAttribute("viewBox")?.split(" ")[3]).toBe("48");
+    expect(ys(container)).toEqual(expected);
+  });
+
+  it("keeps a whole day's sparkline inside its drawing, its peak half a pixel in", () => {
+    const { container } = render(<ActivityChart label="Calls" values={day} sparkline unit="day" />);
+    expect(Math.min(...ys(container))).toBe(0.5);
+    expect(Math.max(...ys(container))).toBeLessThanOrEqual(47.5);
+  });
+
   it("draws a sparkline of one value as a level line, never an empty drawing", () => {
     const { container } = render(<ActivityChart label="Calls" values={[7]} sparkline unit="day" />);
     const [, , width] = (container.querySelector("svg")?.getAttribute("viewBox") ?? "").split(" ").map(Number);
@@ -113,8 +147,9 @@ describe("ActivityChart", () => {
     const steps = points.slice(1).map((point, at) => (point[0] ?? 0) - (points[at]?.[0] ?? 0));
     expect(new Set(steps).size).toBe(1);
     expect(steps[0]).toBeGreaterThan(0);
-    expect(points[1]?.[1]).toBe(0);
-    expect(points[3]?.[1]).toBe(height);
+    // Half a pixel in, so the line's stroke is whole (F337).
+    expect(points[1]?.[1]).toBe(0.5);
+    expect(points[3]?.[1]).toBe(height - 0.5);
     expect(rows("Calls this week").at(-1)).toEqual(["Today", "0"]);
     expect(rows("Calls this week")[0]).toEqual(["3 days ago", "3"]);
   });

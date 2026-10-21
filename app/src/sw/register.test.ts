@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import { startServiceWorker, type WorkerContainer, type WorkerRegistration } from "./register.ts";
+import { hostAnswers, startServiceWorker, type WorkerContainer, type WorkerRegistration } from "./register.ts";
 
 type Options = { signal?: AbortSignal } | undefined;
 
@@ -96,7 +96,7 @@ function shown() {
 
 function start(
   page: WorkerContainer | undefined,
-  { search = "", production = true, signal = new AbortController().signal } = {},
+  { search = "", production = true, signal = new AbortController().signal, reachable = true } = {},
 ) {
   const updates: (() => void)[] = [];
   const reload = vi.fn();
@@ -110,6 +110,7 @@ function start(
     signal,
     reload,
     report,
+    reachable: () => Promise.resolve(reachable),
     onUpdate: (apply) => updates.push(apply),
   });
   return { started, updates, reload, report, document };
@@ -331,15 +332,66 @@ test("a page shown again asks the browser for a newer worker; hidden, it does no
   expect(registration.update).toHaveBeenCalledOnce();
 });
 
-test("a check that fails, offline say, is reported, and the page goes on", async () => {
+// A check that cannot reach the host, offline or on a network with no way out, is expected of an
+// installed app: no bug is reported (F343, F351).
+test("a check that cannot reach the host is expected: nothing is reported, and the page goes on", async () => {
   const { page, registration } = container();
-  const { started, document, report } = start(page);
+  const { started, document, report } = start(page, { reachable: false });
   await started;
   registration.update.mockRejectedValueOnce(new Error("offline"));
   document.becomes("visible");
   await vi.waitFor(() => {
-    expect(report).toHaveBeenCalledWith(new Error("offline"));
+    expect(registration.update).toHaveBeenCalledOnce();
   });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(report).not.toHaveBeenCalled();
+});
+
+test("a check that fails while the host answers is reported, and the page goes on", async () => {
+  const { page, registration } = container();
+  const { started, document, report } = start(page);
+  await started;
+  registration.update.mockRejectedValueOnce(new Error("the host answered 503"));
+  document.becomes("visible");
+  await vi.waitFor(() => {
+    expect(report).toHaveBeenCalledWith(new Error("the host answered 503"));
+  });
+});
+
+// The worker's first fetch fails the same way: expected when the host cannot be reached, a bug when it
+// answers, which the page reports (F351).
+test("a worker that cannot register while the host cannot be reached is expected: nothing rejects", async () => {
+  const { page } = container();
+  page.register.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+  await expect(start(page, { reachable: false }).started).resolves.toBeUndefined();
+});
+
+test("a worker that cannot register while the host answers rejects, for the page to report", async () => {
+  const { page } = container();
+  page.register.mockRejectedValueOnce(new TypeError("bad MIME type"));
+  await expect(start(page).started).rejects.toThrow("bad MIME type");
+});
+
+// Whether the host answers for the worker's script: any answer, an error status included, is one;
+// a fetch that fails is none (F351).
+test("the host answers when its fetch gets a response, whatever its status, and not when it fails", async () => {
+  const asked: [string, RequestInit | undefined][] = [];
+  vi.stubGlobal("fetch", (url: string, init?: RequestInit) => {
+    asked.push([url, init]);
+    return asked.length === 1
+      ? Promise.resolve(new Response(null, { status: 503 }))
+      : Promise.reject(new TypeError("Failed to fetch"));
+  });
+  try {
+    expect(await hostAnswers()).toBe(true);
+    expect(await hostAnswers()).toBe(false);
+    expect(asked).toEqual([
+      ["/sw.js", { method: "HEAD", cache: "no-store" }],
+      ["/sw.js", { method: "HEAD", cache: "no-store" }],
+    ]);
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });
 
 test("once the page has gone, being shown asks for nothing", async () => {

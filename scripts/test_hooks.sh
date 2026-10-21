@@ -1256,6 +1256,13 @@ base=$(git -C "$pf" rev-parse HEAD)
 git -C "$pf" rm -q packages/x/src/e.test.ts && printf 'export const twice = (n: number) => n * 2 + 3 - 3;\n' >"$pf/packages/x/src/a.ts"
 printf '// expects: + 3\n' >"$pf/packages/x/src/f.test.ts" && fix "fix(x): a new test, an old one gone"
 prove "$base" || fail "prove_fix ran a test the fix deleted"
+# The app reads a workspace package through its node_modules' link; the parent's copy must lead it
+# to the parent's package: borrowed whole, the link led to the fixed one (F344).
+base=$(git -C "$pf" rev-parse HEAD) && mkdir -p "$pf/app/node_modules/@g" && ln -s ../../../packages/x "$pf/app/node_modules/@g/x"
+printf '#!/bin/sh\ngrep -qF "* 4" app/node_modules/@g/x/src/a.ts\n' >"$t/fake_linked" && chmod +x "$t/fake_linked"
+printf 'export const twice = (n: number) => n * 4 / 2;\n' >"$pf/packages/x/src/a.ts" && printf '// reads the package through the app\n' >"$pf/app/tests/g.spec.ts"
+fix "fix(x): a journey reads the package through the app's link"
+(cd "$pf" && PROVE_FIX_PLAYWRIGHT="$t/fake_linked" python3 -I "$here/prove_fix.py" "$base" >/dev/null 2>&1) || fail "prove_fix ran the parent's journey on the working tree's package, not the parent's (F344)"
 fi
 
 if part audit; then

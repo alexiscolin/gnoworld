@@ -41,8 +41,18 @@ interface Start {
   readonly signal: AbortSignal;
   readonly reload: () => void;
   readonly report: (error: unknown) => void;
+  /** Whether the host answers for the worker's script: a fetch of it that cannot reach the host,
+   * offline or on a network with no way out, is expected of an installed app (F343, F351). */
+  readonly reachable: () => Promise<boolean>;
   readonly onUpdate: (apply: () => void) => void;
 }
+
+/** Whether the host answers for the worker's script: any response is one, an error status included. */
+export const hostAnswers = () =>
+  fetch("/sw.js", { method: "HEAD", cache: "no-store" }).then(
+    () => true,
+    () => false,
+  );
 
 export async function startServiceWorker(start: Start): Promise<void> {
   const { container, signal } = start;
@@ -52,14 +62,20 @@ export async function startServiceWorker(start: Start): Promise<void> {
     return;
   }
   if (!start.production) return;
-  const registration = await container.register("/sw.js");
-  if (signal.aborted) return;
+  const registration = await container.register("/sw.js").catch(async (error: unknown) => {
+    if (await start.reachable()) throw error;
+    return null;
+  });
+  if (registration === null || signal.aborted) return;
   // The browser looks for a new worker when a page loads; one kept open for days moves in place,
   // so it asks each time it is shown again.
   start.document.addEventListener(
     "visibilitychange",
     () => {
-      if (start.document.visibilityState === "visible") registration.update().catch(start.report);
+      if (start.document.visibilityState !== "visible") return;
+      registration.update().catch(async (error: unknown) => {
+        if (await start.reachable()) start.report(error);
+      });
     },
     { signal },
   );

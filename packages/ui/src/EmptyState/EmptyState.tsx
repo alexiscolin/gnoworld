@@ -5,7 +5,8 @@ export interface EmptyStateProps {
   title: string;
   line: string;
   level?: 1 | 2 | 3;
-  action?: { label: string; href: string };
+  /** The one way on; `reload` loads the document again, as an error page's way out does. */
+  action?: { label: string; href: string; reload?: boolean };
 }
 
 const HEADINGS = { 1: "h1", 2: "h2", 3: "h3" } as const;
@@ -19,7 +20,7 @@ export function EmptyState({ title, line, level = 2, action }: EmptyStateProps) 
       <p>{line}</p>
       {action === undefined ? null : (
         <Cluster>
-          <Button href={action.href} emphasis="solid">
+          <Button href={action.href} reload={action.reload === true} emphasis="solid">
             {action.label}
           </Button>
         </Cluster>

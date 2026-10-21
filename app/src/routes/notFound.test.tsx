@@ -12,6 +12,12 @@ describe("a path no route matches", () => {
     expect(alertOf(html)).toMatch(BACK_HOME);
   });
 
+  // Nothing broke: the way home changes the page and keeps the app (F259; F325 keeps it so).
+  test("goes home through the router", async () => {
+    const html = await render({ path: "*", loader: clientLoader, ErrorBoundary }, "/nowhere", { slot: true });
+    expect(alertOf(html)).toContain('data-routed=""');
+  });
+
   test("answers 404 in the browser, so the router waits before it hydrates", () => {
     let thrown: unknown;
     try {

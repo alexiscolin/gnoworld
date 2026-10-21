@@ -204,8 +204,9 @@ the brightest planet behind the header's pills.
 | `--z-toast` | The flash: one at a time, queued |
 
 Dialogs, popovers and the flash use the browser's top layer, which stacks by opening order, not
-by these tokens. The flash is never under a dialog's scrim: it opens after the dialog, or waits
-until the dialog closes.
+by these tokens. The flash shows at the top of the screen, centred, above a dialog's scrim when it
+opens after the dialog (F331). A modal dialog makes everything outside it inert, the top layer
+included: a flash raised over one is seen, and its Close and action wait until the dialog closes.
 
 ### Motion
 
@@ -259,8 +260,11 @@ current one in text; thin bars (24 for a day); the peak and the current value wr
 
 ## Browsers
 
-Baseline "widely available", with two named exceptions from 2024: the `popover` attribute and
-`@starting-style`. The lint holds the line and lists the exceptions. Popovers are positioned by a
+Baseline "widely available", with three named exceptions: from 2024, the `popover` attribute and
+`@starting-style`; and `forced-color-adjust`, for pictures only (the avatar's face), which forced
+colours then leave as drawn, the property doing nothing where forced colours do not exist (Alexis,
+2026-10-21, F319). The lint holds the line and lists the exceptions, the last for the avatar's
+sheets alone (F349). Popovers are positioned by a
 small function of ours until CSS anchor positioning (Baseline 2026) is widely available.
 
 ## Testing the CSS

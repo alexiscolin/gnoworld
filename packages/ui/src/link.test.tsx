@@ -49,6 +49,25 @@ describe("LinkProvider", () => {
     expect(mark).toBe("");
   });
 
+  // An error page's way out: the app may be what failed, so the document loads again (F325).
+  it("leaves a link that reloads the page to a plain anchor, even to the site's own path", () => {
+    render(
+      <LinkProvider link={PageLink}>
+        <Button href="/" reload>
+          Back to the universe
+        </Button>
+        <EmptyState
+          title="Something went wrong"
+          line="Try again."
+          action={{ label: "Home", href: "/", reload: true }}
+        />
+      </LinkProvider>,
+    );
+    const links = screen.getAllByRole("link");
+    expect(links.map((link) => link.getAttribute("href"))).toEqual(["/", "/"]);
+    for (const link of links) expect(link.hasAttribute("data-page-link")).toBe(false);
+  });
+
   it("draws a plain anchor where no page gives its link, as in Storybook", () => {
     render(<Button href="/w/bubble">Fly to Bubble</Button>);
     expect(screen.getByRole("link").hasAttribute("data-page-link")).toBe(false);
