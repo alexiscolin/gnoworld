@@ -105,13 +105,21 @@ async function cssOf(entry: string): Promise<string> {
     .join("\n");
 }
 
+// An app as the app is: a component imported first, as the import lint orders it, then the sheet, as
+// root.tsx does. It uses Button, or the bundler would drop it and its sheet with it.
+const APP = `import { Button } from ${JSON.stringify(here("./index.ts"))};
+import ${JSON.stringify(here("./styles.css"))};
+console.log(Button);
+`;
+// The component sheets in a build's CSS, by their CSS module names (_button_1a2b3_).
+const sheetsIn = (css: string) => new Set([...css.matchAll(/\._([a-z]+)_[0-9a-z]{5}_/g)].map((m) => m[1]));
+
 // Layers rank by their first mention in the page's CSS, and a bundler may emit a component's sheet before
-// styles.css: an app importing the components first, as the import lint orders it, then the sheet, must
-// still meet the six layers in their order, or reset and base outrank the components (F363).
+// styles.css: an app importing the components first, then the sheet, must still meet the six layers in
+// their order, or reset and base outrank the components (F363).
 it("an app importing the components before the sheet meets the layers in their order", async () => {
-  const css = await cssOf(
-    `import { Button } from ${JSON.stringify(here("./index.ts"))};\nimport ${JSON.stringify(here("./styles.css"))};\nexport { Button };\n`,
-  );
+  const css = await cssOf(APP);
+  expect(sheetsIn(css).has("button")).toBe(true);
   const named = css.matchAll(/@layer\s+([\w\s,]+?)\s*[{;]/g);
   const met = [...new Set([...named].flatMap((m) => (m[1] ?? "").split(",").map((name) => name.trim())))];
   expect(met).toEqual(ORDER);
