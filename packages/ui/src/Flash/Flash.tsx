@@ -111,7 +111,7 @@ function Pill({ message, onClose }: { message: FlashMessage; onClose: () => void
   );
 }
 
-/** A short note and at most one action, never the cream primary; where it sits is its slot's. */
+/** A short note and at most one action, never the cream primary; shown at the top of the screen. */
 export function Flash({ message, onClose }: FlashProps) {
   return <div role="status">{message === null ? null : <Pill message={message} onClose={onClose} />}</div>;
 }
