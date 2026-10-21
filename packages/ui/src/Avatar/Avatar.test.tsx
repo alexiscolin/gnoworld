@@ -86,7 +86,17 @@ describe("Avatar", () => {
     }
     const bright = container.querySelectorAll("[data-star='bright']");
     expect(bright).toHaveLength(1);
-    expect(drawnStars.indexOf(bright[0] ?? container)).toBe(partsFrom(ONE)?.bright);
+    const brightest = drawnStars.indexOf(bright[0] ?? container);
+    expect(brightest).toBe(partsFrom(ONE)?.bright);
+    expect(container.querySelectorAll("[data-star='']")).toHaveLength(4);
+    // One halo, round the bright star; the bright star larger than the others, which are alike.
+    const halos = [...container.querySelectorAll("circle:not([data-star]):not([fill])")];
+    expect(halos.map(at)).toEqual([points[brightest]]);
+    const radii = drawnStars.map((star) => Number(star.getAttribute("r")));
+    const others = new Set(radii.filter((_, i) => i !== brightest));
+    expect(others.size).toBe(1);
+    expect(Math.min(...others)).toBeGreaterThan(0);
+    expect(radii[brightest]).toBeGreaterThan(Math.max(...others));
   });
 
   it("joins its stars in its address's order: each star once, three orders three lines", () => {
@@ -138,7 +148,7 @@ describe("Avatar", () => {
 
   it("says who is here now, with a dot, and who speaks, with a ring", () => {
     const { container, rerender } = render(<Avatar address={ONE} name="a" here />);
-    expect(screen.getByRole("img", { name: "a, here now" })).toBeTruthy();
+    expect(screen.getByRole("img", { name: "a, here now" }).hasAttribute("data-speaking")).toBe(false);
     expect(container.querySelector("[data-presence]")).not.toBeNull();
     rerender(<Avatar address={ONE} name="a" speaking />);
     expect(screen.getByRole("img", { name: "a, speaking" }).hasAttribute("data-speaking")).toBe(true);
@@ -156,6 +166,8 @@ describe("Avatar", () => {
       <>
         <Avatar address={ONE} name="a" />
         <Avatar address={ONE} name="a" />
+        <Avatar address={ONE} name="J" kind="assistant" />
+        <Avatar address={ONE} name="J" kind="assistant" />
       </>,
     );
     const ids = [...container.querySelectorAll("[id]")].map((e) => e.id);
@@ -170,7 +182,8 @@ describe("Avatar", () => {
         expect(own.has(target)).toBe(true);
       }
     }
-    expect(references).toBeGreaterThanOrEqual(6);
+    // Three clouds a person, one orb an assistant.
+    expect(references).toBe(8);
   });
 
   it("shows a name made of markup, or very long, as text", () => {

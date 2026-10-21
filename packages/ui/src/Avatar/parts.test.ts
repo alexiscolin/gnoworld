@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { partsFrom } from "./parts.ts";
+import { partsFrom, type Parts } from "./parts.ts";
 
 // An address's shape: g1, then 38 letters of bech32's alphabet. The checksum is not the face's.
 const BECH32 = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
@@ -69,6 +69,33 @@ describe("partsFrom", () => {
       );
     expect(partsFrom(first)).not.toBe(parts);
     expect(partsFrom(first)).toEqual(parts);
+  });
+
+  it("keeps an address's parts while it is among the last 1,024 drawn, and only then", () => {
+    // Addresses no other test draws: g1zz, then a count in bech32's letters.
+    const fresh = (n: number) =>
+      `g1zz${n
+        .toString(32)
+        .padStart(36, "0")
+        .replace(/./g, (digit) => BECH32[Number.parseInt(digit, 32)] ?? "q")}`;
+    const parts = partsFrom(fresh(0));
+    for (let n = 1; n < 1_024; n++) partsFrom(fresh(n));
+    expect(partsFrom(fresh(0))).toBe(parts);
+    partsFrom(fresh(1_024));
+    expect(partsFrom(fresh(0))).not.toBe(parts);
+  });
+
+  // A face never changes under a person: the hash, the stream and the drawing, pinned by one address.
+  it("draws an address the face it has always had", () => {
+    const parts = partsFrom(`g1${"q".repeat(38)}`);
+    const numbers = (p: Parts | null) => (p === null ? [] : [...p.hues, ...p.clouds.flat(), ...p.stars.flat()]);
+    const pinned = [
+      312.041964, 75.856237, 156.292043, 0.583726, 0.876754, 0.542577, 0.652884, 0.460641, 0.539425, 21.775113,
+      39.037271, 9.190826, 22.972454, 16.12685, 14.38627, 32.461294, 10.245514, 37.02421, 33.836201,
+    ];
+    expect(numbers(parts)).toHaveLength(pinned.length);
+    for (const [i, value] of numbers(parts).entries()) expect(value).toBeCloseTo(pinned[i] ?? NaN, 5);
+    expect([parts?.order, parts?.bright]).toEqual([2, 2]);
   });
 
   it("draws three hues round the whole wheel, each at least 60 degrees from the others", () => {
