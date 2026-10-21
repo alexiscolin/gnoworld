@@ -9,7 +9,8 @@ import { SWALLOWED, TESTS } from "./shared.config.ts";
 const MEMOS = ["memo", "useMemo", "useCallback"];
 const MEMO = "The React Compiler memoizes: no hand-written memo, useMemo or useCallback (docs/ARCHITECTURE.md).";
 const HTML = "Nothing reaches the DOM as HTML: render it as React elements (docs/ARCHITECTURE.md, security).";
-const REACT_PROPERTIES = [
+// Shared with the app's folders, whose own no-restricted-properties replaces these there.
+export const REACT_PROPERTIES = [
   ...MEMOS.map((property) => ({ object: "React", property, message: MEMO })),
   ...["innerHTML", "outerHTML", "insertAdjacentHTML"].map((property) => ({ property, message: HTML })),
   { object: "document", property: "write", message: HTML },

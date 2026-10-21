@@ -21,6 +21,8 @@ LONG = "export function long(): number {\n  let n = 0;\n" + "  n += 1;\n" * 85 +
 with open("package.json") as f:
     SCRIPTS = json.load(f)["scripts"]  # the gate's own commands, so a case proves what the gate runs
 BLOCK = "".join(f"  total += values[{i}] * {i + 1};\n" for i in range(14))
+# The network and the device's storage, which the app reaches only from lib and the worker (F378).
+REACHES = ["fetch", "XMLHttpRequest", "WebSocket", "EventSource", "localStorage", "sessionStorage", "indexedDB", "caches"]
 
 # File name, content, and what ESLint must report: a rule, or "rule: the start of its message" when
 # one rule holds several guards (no-restricted-syntax's selectors); None: no report at all.
@@ -286,6 +288,46 @@ try:
         shutil.rmtree(UI)
         lint_cases([("face.css", FORCED, None)], AVATAR, "ui avatar")
         shutil.rmtree(AVATAR)
+
+    if part("app_folders"):
+        # The app's folders (docs/ARCHITECTURE.md, F378), each case planted where its rule reaches: the
+        # worker imports only itself, a feature another only through its index.ts, a route never the
+        # scene; the network and storage only in lib and the worker; console nowhere.
+        src = "app/src"
+        uses = 'import {{ {name} }} from "{path}";\n\nexport const used: unknown = {name};\n'.format
+        reach = "export function load(): unknown {{\n  return {};\n}}\n".format
+        net = "The network and storage are lib's"
+        app = [
+            ("sw/__probe__/sw_clean.ts", uses(name="TAKE_OVER", path="../worker.ts"), None),
+            ("sw/__probe__/sw_feature.ts", uses(name="UpdatePrompt", path="../../features/update/index.ts"), "import-x/no-restricted-paths"),
+            ("sw/__probe__/sw_fetch.ts", reach('fetch("/sw.js")'), None),
+            ("sw/__probe__/sw_tested.test.ts", 'import { expect, test } from "vitest";\n\ntest("x", () => {\n  expect(1).toBe(1);\n});\n', None),
+            ("sw/__probe__/sw_package.ts", uses(name="useState", path="react"), "import-x/no-restricted-paths"),
+            ("features/__probe__/through_index.ts", uses(name="UpdatePrompt", path="../update/index.ts"), None),
+            ("features/__probe__/own_file.ts", uses(name="used", path="./through_index.ts"), None),
+            ("features/__probe__/uses_sw.ts", uses(name="hostAnswers", path="../../sw/register.ts"), None),
+            ("features/__probe__/past_index.ts", uses(name="UpdatePrompt", path="../update/UpdatePrompt.tsx"), "import-x/no-restricted-paths"),
+            # A feature's screens are .tsx, the routes and the app's own root files reach no network either.
+            ("features/__probe__/past_index_view.tsx", uses(name="UpdatePrompt", path="../update/UpdatePrompt.tsx"), "import-x/no-restricted-paths"),
+            ("features/__probe__/view_fetch.tsx", reach('fetch("/x")'), f"no-restricted-globals: Unexpected use of 'fetch'. {net}"),
+            ("routes/__probe__/route_fetch.ts", reach('fetch("/x")'), f"no-restricted-globals: Unexpected use of 'fetch'. {net}"),
+            ("probe_root_fetch.ts", reach('fetch("/x")'), f"no-restricted-globals: Unexpected use of 'fetch'. {net}"),
+            *[(f"features/__probe__/bare_{name}.ts", reach(name), f"no-restricted-globals: Unexpected use of '{name}'. {net}") for name in REACHES],
+            *[(f"features/__probe__/{owner}_fetch.ts", reach(f"{owner}.fetch"), f"no-restricted-properties: '{owner}.fetch' is restricted from being used. {net}") for owner in ("window", "globalThis", "self")],
+            ("features/__probe__/cookie.ts", reach("document.cookie"), f"no-restricted-properties: 'document.cookie' is restricted from being used. {net}"),
+            ("features/__probe__/html_too.ts", "export function put(box: HTMLElement): void {\n  box.innerHTML = \"x\";\n}\n", restricted("'innerHTML'")),
+            ("features/__probe__/stubbed.test.ts", 'import { expect, test } from "vitest";\n\ntest("x", () => {\n  expect(typeof fetch).toBe("function");\n});\n', None),
+            ("lib/__probe__/lib_fetch.ts", reach('fetch("/x")'), None),
+            ("routes/__probe__/route_log.ts", 'export function load(): void {\n  console.log("loaded");\n}\n', "no-console"),
+            ("routes/__probe__/route_scene.ts", uses(name="globe", path="../../scene/__probe__/globe.ts"), "import-x/no-restricted-paths"),
+            ("scene/__probe__/globe.ts", "export const globe = 1;\n", None),
+        ]
+        lint_cases(app, src, "app folders")
+        os.remove(f"{src}/probe_root_fetch.ts")
+        for folder in ("sw", "features", "lib", "routes", "scene"):
+            shutil.rmtree(f"{src}/{folder}/__probe__")
+            if not os.listdir(f"{src}/{folder}"):
+                os.rmdir(f"{src}/{folder}")
 
     if part("react_warn"):
         # Several of the app's rules only warn: the lint script must fail on a warning.

@@ -6,6 +6,7 @@ import css from "@eslint/css";
 import { defineConfig, globalIgnores, includeIgnoreFile } from "eslint/config";
 import importX from "eslint-plugin-import-x";
 import tseslint from "typescript-eslint";
+import app from "./lint/app.config.ts";
 import core from "./lint/core.config.ts";
 import react from "./lint/react.config.ts";
 import { SWALLOWED, SWITCHED_OFF, TESTS } from "./lint/shared.config.ts";
@@ -59,6 +60,7 @@ export default defineConfig(
   // Config files run on Node, whose types core must not see: lint them without types.
   { files: ["*.config.ts", "app/*.config.ts", "lint/*.config.ts"], extends: [tseslint.configs.disableTypeChecked] },
   react,
+  app,
   {
     // Tests read as lists of cases, so they may run long.
     files: TESTS,

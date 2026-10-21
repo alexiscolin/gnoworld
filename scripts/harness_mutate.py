@@ -21,13 +21,15 @@ GAPS = {}  # label -> why no test can notice it yet
 
 TESTS = {"probe": [sys.executable, "-I", "scripts/probe.py"], "hooks": ["sh", "scripts/test_hooks.sh"]}
 # The lint config and its parts: each rule, selector and restricted name lives in one of them.
-ESLINT = ["eslint.config.ts", "lint/shared.config.ts", "lint/core.config.ts", "lint/react.config.ts"]
+ESLINT = ["eslint.config.ts", "lint/shared.config.ts", "lint/core.config.ts", "lint/react.config.ts", "lint/app.config.ts"]
 REACT = "lint/react.config.ts"
+APP = "lint/app.config.ts"
 # Each guard's file, and the sections of its test that must notice the guard gone (their ONLY=):
 # a mutant runs those alone, not the whole suite. A guard file missing here stops the run.
 SECTIONS = {
-    "eslint.config.ts": "lint,outside_core,react,ui_lint", "app/tsconfig.json": "react_tsc",
-    "lint/shared.config.ts": "lint,outside_core,react,ui_lint", "lint/core.config.ts": "lint", "lint/react.config.ts": "react,ui_lint",
+    "eslint.config.ts": "lint,outside_core,react,ui_lint,app_folders", "app/tsconfig.json": "react_tsc",
+    "lint/shared.config.ts": "lint,outside_core,react,ui_lint,app_folders", "lint/core.config.ts": "lint",
+    "lint/react.config.ts": "react,ui_lint,app_folders", "lint/app.config.ts": "app_folders,react",
     # A file both suites guard names each one's sections: a section of the other suite would
     # fail the run as unknown, and count a mutant killed that no test saw.
     "package.json": {"probe": "react_warn,react_tsc,ui_tsc", "hooks": "wiring"}, "pnpm-workspace.yaml": {"hooks": "wiring,regressions"},
@@ -102,9 +104,21 @@ def mutants():
         for m in re.finditer(r'^\s+"?([\w@/-]+)"?:\s*(?=\[?\s*"error"|\[\s*$)', text, re.M):
             at = text.find('"error"', m.end())
             yield f"eslint {m.group(1)} ({path}:{text.count(chr(10), 0, m.start()) + 1})", path, text[:at] + '"off"' + text[at + 7:], "probe"
-        yield from selectors(path, "probe")
-    for path in ("lint/core.config.ts", REACT):
+        if path != APP:  # the app's folders hold no selector
+            yield from selectors(path, "probe")
+    for path in ("lint/core.config.ts", REACT, APP):
         yield from each(path, 'property: "', 'property: "never_', "probe", "eslint restricted property")
+    # The app's folders (F378): each name of the network and storage, each owner, each folder's path,
+    # each exception, and React's bans kept there, alone.
+    for name in ("fetch", "XMLHttpRequest", "WebSocket", "EventSource", "localStorage", "sessionStorage", "indexedDB", "caches", "window", "globalThis", "self"):
+        yield from each(APP, f'"{name}"', '"_"', "probe", f"eslint app reaches {name} only from lib and sw")
+    yield from each(APP, "${SRC}/", "${SRC}/nowhere-", "probe", "eslint app folder path")
+    yield from each(APP, 'from: "./",\n              except: [`${SRC}/sw`],', 'from: SRC,\n              except: ["./sw"],', "probe", "eslint the worker imports no package")
+    yield from each(APP, "{ts,tsx}", "ts", "probe", "eslint reads a feature's screens")
+    yield from each(APP, "`./${feature}`,", "`./nowhere`,", "probe", "eslint a feature imports its own files")
+    yield from each(APP, "/index.ts`)", "/nothing.ts`)", "probe", "eslint a feature imports another's index.ts")
+    yield from each(APP, "ignores: TESTS,", "ignores: [],", "probe", "eslint a test in the app imports what it needs")
+    yield from each(APP, "...REACT_PROPERTIES,", "", "probe", "eslint React's bans hold in the app's folders")
     yield from each("eslint.config.ts", "noInlineConfig: true", "noInlineConfig: false", "probe", "eslint inline config")
     # The app's React lint, and the files its rules reach.
     yield from each(REACT, 'reactHooks.configs.flat["recommended-latest"], ', "", "probe", "eslint React hooks preset")
