@@ -1,13 +1,13 @@
 import { render, screen } from "@testing-library/react";
-import type { AnchorHTMLAttributes, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import { Button } from "./Button/Button.tsx";
 import { EmptyState } from "./EmptyState/EmptyState.tsx";
-import { LinkProvider } from "./link.tsx";
+import { LinkProvider, type PageLinkProps } from "./link.tsx";
 import { Row } from "./Row/Row.tsx";
 
 // A page's link, as the app's router gives one: it marks what it draws, so a test sees it was used.
-function PageLink(props: AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) {
+function PageLink(props: PageLinkProps) {
   return <a data-page-link="" {...props} />;
 }
 

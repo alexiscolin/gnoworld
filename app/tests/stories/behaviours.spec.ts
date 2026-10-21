@@ -526,9 +526,9 @@ test.describe("an avatar", () => {
   test("keeps its speaking ring and its presence dot under forced colours; the ring is no outline", async ({
     page,
   }) => {
+    await open(page, "avatar--here-and-speaking");
     for (const forced of [false, true]) {
       await page.emulateMedia({ forcedColors: forced ? "active" : "none" });
-      await open(page, "avatar--here-and-speaking");
       const marks = await page.evaluate(() => {
         const edge = (e: Element | null, pseudo?: string) => {
           const s = getComputedStyle(e ?? document.body, pseudo);
