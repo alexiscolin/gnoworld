@@ -1,6 +1,6 @@
 // An address's face as numbers (docs/DESIGN-SYSTEM.md, "Avatar"; slice-2e.md §2): a 32-bit hash of
 // its letters seeds a stream of numbers in [0, 1), read in a fixed order. Pure: no clock, no chance,
-// no network. Kept by address, the last 1,024, so a list draws each face once.
+// no network, no cache: about a microsecond a face (F318).
 
 /** A face's parts: in a 48-unit disc centred on (24, 24), the clouds as fractions of its box. */
 export interface Parts {
@@ -13,8 +13,6 @@ export interface Parts {
 
 // An account's address: g1, then 38 letters of bech32's alphabet. Its checksum is not the face's.
 const ADDRESS = /^g1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{38}$/;
-const KEPT = 1_024;
-const kept = new Map<string, Parts>();
 
 /** The three lines through the five stars, by their fifths: round, a star, a zigzag. */
 export const ORDERS = [
@@ -72,14 +70,5 @@ function draw(next: () => number): Parts {
 
 /** The face's parts for an address, the same each time; null for anything that is not one. */
 export function partsFrom(address: string): Parts | null {
-  if (!ADDRESS.test(address)) return null;
-  const known = kept.get(address);
-  if (known !== undefined) return known;
-  const parts = draw(stream(hash(address)));
-  kept.set(address, parts);
-  for (const oldest of kept.keys()) {
-    if (kept.size <= KEPT) break;
-    kept.delete(oldest);
-  }
-  return parts;
+  return ADDRESS.test(address) ? draw(stream(hash(address))) : null;
 }
