@@ -305,6 +305,10 @@ try:
             # A package is refused by its name, installed or not, wherever node_modules sits (F385);
             # a path out of the folder by the zone.
             ("sw/__probe__/sw_package.ts", uses(name="precacheAndRoute", path="workbox-precaching"), "no-restricted-imports"),
+            ("sw/__probe__/sw_scoped.ts", uses(name="precache", path="@workbox/precaching"), "no-restricted-imports"),
+            ("sw/__probe__/sw_node.ts", uses(name="readFileSync", path="node:fs"), "no-restricted-imports"),
+            ("sw/__probe__/sw_dynamic.ts", "export function load(): Promise<unknown> {\n  return import(\"workbox-precaching\");\n}\n", "no-restricted-syntax: The worker imports only sw"),
+            ("sw/__probe__/sw_log_catch.ts", dict((n, c) for n, c, _ in LINT)["log_catch.ts"], "no-restricted-syntax: A catch that only logs"),
             ("sw/__probe__/sw_reaches_ui.ts", uses(name="Button", path="../../../../packages/ui/src/index.ts"), "import-x/no-restricted-paths"),
             ("features/__probe__/through_index.ts", uses(name="UpdatePrompt", path="../update/index.ts"), None),
             ("features/__probe__/own_file.ts", uses(name="used", path="./through_index.ts"), None),

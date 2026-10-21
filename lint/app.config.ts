@@ -5,7 +5,7 @@
 import { readdirSync } from "node:fs";
 import { defineConfig } from "eslint/config";
 import { REACT_PROPERTIES } from "./react.config.ts";
-import { TESTS } from "./shared.config.ts";
+import { SWALLOWED, TESTS } from "./shared.config.ts";
 
 const SRC = "./app/src";
 // Each feature's folder, read as the lint starts: a new feature gets its zone at once.
@@ -63,10 +63,14 @@ export default defineConfig(
     },
   },
   {
-    // No package either, named in the import itself: where node_modules sits, the zone above cannot see.
+    // No package either, refused by its name, which the zone above sees only where node_modules sits
+    // inside the repository; and no import at run time, which no-restricted-imports does not read.
     files: [`${SRC}/sw/**`],
     ignores: TESTS,
-    rules: { "no-restricted-imports": ["error", { patterns: [{ regex: "^[^.]", message: SW }] }] },
+    rules: {
+      "no-restricted-imports": ["error", { patterns: [{ regex: "^[^.]", message: SW }] }],
+      "no-restricted-syntax": ["error", ...SWALLOWED, { selector: "ImportExpression", message: SW }],
+    },
   },
   {
     files: [`${SRC}/**/*.{ts,tsx}`],
