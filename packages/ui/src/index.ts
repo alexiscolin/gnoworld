@@ -12,6 +12,7 @@ export { Field, type FieldProps } from "./Field/Field.tsx";
 export { Flash, type FlashMessage, type FlashProps } from "./Flash/Flash.tsx";
 export { Icon, type IconName, type IconProps } from "./icons/Icon.tsx";
 export { Kicker, type KickerProps } from "./Kicker/Kicker.tsx";
+export { LinkProvider, type PageLinkProps } from "./link.tsx";
 export { PlanetThumb, type PlanetThumbProps } from "./PlanetThumb/PlanetThumb.tsx";
 export { Menu, Popover, type MenuItem, type MenuProps, type PopoverProps } from "./Popover/Popover.tsx";
 export { Row, type RowProps } from "./Row/Row.tsx";

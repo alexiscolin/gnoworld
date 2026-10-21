@@ -9,6 +9,7 @@ import { Cluster, Stack } from "../compositions/index.ts";
 import { Dialog } from "../Dialog/Dialog.tsx";
 import { Field } from "../Field/Field.tsx";
 import { Icon } from "../icons/Icon.tsx";
+import { LinkProvider, type PageLinkProps } from "../link.tsx";
 import { PlanetThumb } from "../PlanetThumb/PlanetThumb.tsx";
 import { Menu, Popover } from "../Popover/Popover.tsx";
 import { Row } from "../Row/Row.tsx";
@@ -176,5 +177,29 @@ export function Avatars() {
       <Avatar address="" name="Jarvis" kind="assistant" />
       <Avatar address="" name="The quiz bot" kind="bot" size="s" />
     </Cluster>
+  );
+}
+
+// What the app's router hands the slot; here a stand-in that marks what it draws and stays put.
+function MarkedLink(props: PageLinkProps) {
+  return (
+    <a
+      data-page-link=""
+      {...props}
+      onClick={(event) => {
+        event.preventDefault();
+      }}
+    />
+  );
+}
+
+export function Links() {
+  return (
+    <LinkProvider link={MarkedLink}>
+      <Cluster space="m">
+        <Button href="/w/bubble">Fly to Bubble</Button>
+        <Row title="Bubble" subtitle="A path from the site's root: the page's own link" href="/w/bubble" />
+      </Cluster>
+    </LinkProvider>
   );
 }

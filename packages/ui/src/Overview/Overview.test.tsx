@@ -36,6 +36,7 @@ const SHOWN: Record<keyof typeof ui, readonly [region: string, mark: string]> = 
   ActivityChart: ["Activity", "svg [data-hour]"],
   PlanetThumb: ["Planets", "[data-kind]"],
   Avatar: ["Avatars", "[data-kind] svg"],
+  LinkProvider: ["Links", "a[data-page-link]"],
 };
 
 describe("Overview", () => {

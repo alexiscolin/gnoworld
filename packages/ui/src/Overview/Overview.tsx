@@ -13,6 +13,7 @@ import {
   Chips,
   Dialogs,
   Fields,
+  Links,
   Planets,
   Popovers,
   Rows,
@@ -188,6 +189,9 @@ export function Overview() {
       </Region>
       <Region name="Avatars">
         <Avatars />
+      </Region>
+      <Region name="Links">
+        <Links />
       </Region>
       <Region name="Text">
         <Text />

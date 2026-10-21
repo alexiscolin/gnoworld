@@ -124,6 +124,19 @@ test.describe("once the client takes over", () => {
     await expect(page.locator('meta[name="description"]')).toHaveCount(1);
   });
 
+  // The way home is the design system's link-button: the router's link fills it (F259).
+  test("the way home from a page not found changes the page without a reload", async ({ page }) => {
+    await page.goto("/nowhere");
+    await hydrated(page);
+    await page.evaluate(() => {
+      Object.assign(window, { stayed: true });
+    });
+    await page.getByRole("alert").getByRole("link", { name: "Back to the universe" }).click();
+    await expect(page).toHaveURL("/");
+    await expect(page).toHaveTitle("gno.world");
+    expect(await page.evaluate(() => "stayed" in window)).toBe(true);
+  });
+
   for (const { path, title, heading } of notFound) {
     test(`${path} says not found, keeps the shell, is not indexed and hydrates cleanly`, async ({ page }) => {
       const problems = watch(page);

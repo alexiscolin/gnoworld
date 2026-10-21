@@ -1,5 +1,6 @@
 import type { MouseEvent, ReactNode } from "react";
 import { Icon, type IconName } from "../icons/Icon.tsx";
+import { Anchor } from "../link.tsx";
 import { buttonLook, iconSize, type ControlSize } from "./control.ts";
 import styles from "./Button.module.css";
 
@@ -48,9 +49,9 @@ export function Button(props: ButtonProps) {
   );
   if (props.href !== undefined) {
     return (
-      <a href={props.href} {...look}>
+      <Anchor href={props.href} {...look}>
         {face}
-      </a>
+      </Anchor>
     );
   }
   const { type = "button", disabled, busy, onClick } = props;

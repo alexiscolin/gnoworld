@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Sidebar, Stack } from "../compositions/index.ts";
+import { Anchor } from "../link.tsx";
 import styles from "./Row.module.css";
 
 export interface RowProps {
@@ -52,9 +53,9 @@ export function Row({ title, subtitle, activity, lead, trail, look = "plain", cu
     href === undefined ? (
       led
     ) : (
-      <a href={href} className={styles["link"]} aria-current={current ? "true" : undefined}>
+      <Anchor href={href} className={styles["link"]} aria-current={current ? "true" : undefined}>
         {led}
-      </a>
+      </Anchor>
     );
   return (
     <div className={styles["row"]} data-look={look} aria-current={current && href === undefined ? "true" : undefined}>
