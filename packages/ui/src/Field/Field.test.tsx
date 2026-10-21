@@ -23,6 +23,19 @@ describe("Field", () => {
     expect(said).toEqual(["On gno.land", "Taken already"]);
   });
 
+  // A region inserted already filled may not be announced (F177's class): it waits on the page (F335).
+  it("keeps a status region for its error from the start, and says the error there when it comes", () => {
+    const { rerender } = render(<Field label="Name" value="x" onChange={vi.fn()} />);
+    const region = screen.getByRole("status");
+    expect(region.textContent).toBe("");
+    rerender(<Field label="Name" error="Taken already" value="x" onChange={vi.fn()} />);
+    expect(screen.getByRole("status")).toBe(region);
+    expect(region.textContent).toBe("Taken already");
+    rerender(<Field label="Name" value="xy" onChange={vi.fn()} />);
+    expect(screen.getByRole("status")).toBe(region);
+    expect(region.textContent).toBe("");
+  });
+
   it("is described by its error alone when it has no help", () => {
     render(<Field label="Name" error="Too short" value="ab" onChange={vi.fn()} />);
     const said = screen.getByRole("textbox").getAttribute("aria-describedby") ?? "";

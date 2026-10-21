@@ -53,11 +53,16 @@ export function Field({ label, value, onChange, kind = "text", help, error, pref
           {help}
         </p>
       )}
+      {/* Shown, and described to the box; said by the region below, which waits on the page empty so
+          the error is announced when it comes (F335). */}
       {error === undefined ? null : (
-        <p id={errorId} className={styles["error"]}>
+        <p id={errorId} className={styles["error"]} aria-hidden="true">
           {error}
         </p>
       )}
+      <span role="status" className="visually-hidden">
+        {error ?? ""}
+      </span>
     </Stack>
   );
 }
