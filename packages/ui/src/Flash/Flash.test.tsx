@@ -289,6 +289,48 @@ describe("Flash", () => {
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Before" }));
   });
 
+  // Its way back is for the focus it took (F307): from nowhere, from inside itself, or gone elsewhere since.
+  it("closes from its Close when the focus came to it from nowhere", () => {
+    const onClose = vi.fn();
+    render(<Flash message={saved} onClose={onClose} />);
+    act(() => {
+      screen.getByRole("button", { name: "Close" }).focus();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("gives the focus back to where it came from outside, not to its own Undo", () => {
+    render(
+      <>
+        <button type="button">Before</button>
+        <Held start={deleted(() => undefined)} />
+      </>,
+    );
+    act(() => {
+      for (const name of ["Before", "Undo", "Close"]) screen.getByRole("button", { name }).focus();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Before" }));
+  });
+
+  it("leaves the focus where it went since, when its Close is clicked without taking it", () => {
+    render(
+      <>
+        <button type="button">Before</button>
+        <Held start={saved} />
+        <input aria-label="Typing" />
+      </>,
+    );
+    act(() => {
+      screen.getByRole("button", { name: "Before" }).focus();
+      screen.getByRole("button", { name: "Close" }).focus();
+      screen.getByRole("textbox", { name: "Typing" }).focus();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Typing" }));
+  });
+
   it("ends when closed, without its action", () => {
     const onAction = vi.fn();
     const onClose = vi.fn();
