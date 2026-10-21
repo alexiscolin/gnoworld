@@ -123,6 +123,7 @@ describe("Dialog", () => {
       </div>,
     ],
     ["a field hidden by its style", <input key="i" aria-label="Draft" style={{ display: "none" }} />],
+    ["a box no one may edit", <div key="i" contentEditable={false} />],
   ])("gives the focus to the first visible field, past %s before it", (_, before) => {
     expect(focusedPast(before)).toBe(screen.getByRole("textbox", { name: "Name" }));
   });
@@ -130,6 +131,12 @@ describe("Dialog", () => {
   // A text area and a select are fields too, the first one focused (F367).
   it.each([
     ["a text area", <textarea key="f" aria-label="First" />, "textbox"],
+    // The composer of slice 4 may be an editable box rather than a text area (F390).
+    [
+      "an editable box",
+      <div key="f" role="textbox" aria-label="First" contentEditable suppressContentEditableWarning />,
+      "textbox",
+    ],
     [
       "a select",
       <select key="f" aria-label="First">

@@ -14,9 +14,9 @@ export interface DialogProps {
   children: ReactNode;
 }
 
-// A field: never an input drawn as a button.
+// A field: never an input drawn as a button; an editable box too.
 const FIELD =
-  "input:not([type='submit'], [type='image'], [type='button'], [type='reset'], [type='hidden']), select, textarea";
+  "input:not([type='submit'], [type='image'], [type='button'], [type='reset'], [type='hidden']), select, textarea, [contenteditable]:not([contenteditable='false'])";
 
 /** The native modal dialog, over its scrim: its first field the browser can focus takes the focus, or
  * its title, never a button; Esc and Close ask the page to close it, and the browser gives the focus
