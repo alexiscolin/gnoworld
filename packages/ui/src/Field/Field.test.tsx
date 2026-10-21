@@ -36,6 +36,16 @@ describe("Field", () => {
     expect(region.textContent).toBe("");
   });
 
+  // The region says it; the one shown only describes the box, or a screen reader reads it twice (F348).
+  it("says its error once: the one shown is out of the reading order, still describing the box", () => {
+    render(<Field label="Name" error="Taken already" value="x" onChange={vi.fn()} />);
+    const shown = document.getElementById(screen.getByRole("textbox").getAttribute("aria-describedby") ?? "");
+    expect(shown?.textContent).toBe("Taken already");
+    expect(shown?.getAttribute("aria-hidden")).toBe("true");
+    const read = screen.getAllByText("Taken already").filter((said) => said.getAttribute("aria-hidden") !== "true");
+    expect(read).toEqual([screen.getByRole("status")]);
+  });
+
   it("is described by its error alone when it has no help", () => {
     render(<Field label="Name" error="Too short" value="ab" onChange={vi.fn()} />);
     const said = screen.getByRole("textbox").getAttribute("aria-describedby") ?? "";
