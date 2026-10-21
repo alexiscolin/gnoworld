@@ -20,8 +20,8 @@ HTML always revalidated (`Cache-Control: no-cache`), `/assets/*` immutable. This
 ## 2. Out of scope
 
 The egress proxy for services that call out, `NODE_USE_ENV_PROXY` and smokescreen: slice 3's,
-where they share the guard's list of refused ranges. Also slice 3's: Ergo, `server`, Grafana, the
-distroless Node images. The CSP (with the first third party, `slice-1.md` §2). The self-updater,
+where they share the guard's list of refused ranges. Also slice 3's: Ergo, `server`, the
+distroless Node images. Grafana is slice 10's (`docs/decisions.md:151`). The CSP (with the first third party, `slice-1.md` §2). The self-updater,
 the registry, signing, SBOMs (with a remote). A domain.
 
 ## 3. Threat model

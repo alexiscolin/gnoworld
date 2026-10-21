@@ -62,8 +62,10 @@ packages/core/               pure rules, shared by app, admin and server: no DOM
 packages/ui/                 the design system: tokens, layers, compositions, components, Storybook
                              (docs/DESIGN-SYSTEM.md); shared by app and admin
 packages/schemas/            Zod schemas for every boundary, shared the same way
-server/                      the server: TypeScript on Node (ADR-0002 §7), one folder per role
-  login/ moderation/ signals/ prices/ admin/
+server/                      the server: TypeScript on Node (ADR-0002 §7); `roles.json`, the roles file (3g)
+  src/                       `main`, `app`, `config`, `log`, `db`, `limit`, `visitor`, `net` (slice 3's 3a),
+                             then one folder per role, from the merge that needs it: login/ ergo/ irc/ roles/ rooms/
+                             activity/ moderation/ stream/ retention/ testing/ (slice 3), prices/ (5), signals/ (9), admin/ (12)
   jarvis/                    the harness, its skills (SKILL.md folders) and its evals
 deploy/                      compose.yaml (the demo stack, the reference wiring for ops), .env.example
 admin/                       the admin console, on its own origin (ADR-0002 §6): reuses ui and lib

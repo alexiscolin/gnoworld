@@ -1,8 +1,8 @@
 # Operations
 
 The runbook (ADR-0002 §7). In slice 1 it holds the demo: the static client behind a password,
-published through Tailscale Funnel from one Docker host. Slice 3 adds Ergo, `server`, `jarvis` and
-Grafana, each with its section here. Everything is in `deploy/`; nothing outside it is touched,
+published through Tailscale Funnel from one Docker host. Slice 3 adds Ergo and `server`, each with
+its section here; `jarvis` and Grafana come with slice 10 (`docs/decisions.md:151`). Everything is in `deploy/`; nothing outside it is touched,
 and no port of the host is opened. It runs on any Docker host: Linux with Docker Engine 28 or
 later, Docker Desktop, or OrbStack.
 
