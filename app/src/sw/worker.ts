@@ -51,16 +51,12 @@ export interface WorkerScope {
 // fetches only the files it lacks, and drops the others once it takes over.
 const CACHE = "gnoworld-precache";
 
-async function integrityOf(response: Response): Promise<string> {
-  return integrity(await response.arrayBuffer());
-}
-
 // A listed file held with other bytes is dropped at once: the version still running then fetches
 // it, and this one fetches it again with its digest, which the browser checks.
-async function kept(cache: WorkerCache, request: Request, integrity: string | undefined) {
-  if (integrity === undefined) return undefined;
+async function kept(cache: WorkerCache, request: Request, want: string | undefined) {
+  if (want === undefined) return undefined;
   const held = await cache.match(request);
-  if (held !== undefined && (await integrityOf(held)) === integrity) return request.url;
+  if (held !== undefined && (await integrity(await held.arrayBuffer())) === want) return request.url;
   await cache.delete(request);
   return undefined;
 }
