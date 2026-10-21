@@ -32,8 +32,14 @@ function Pill({ message, onClose }: { message: FlashMessage; onClose: () => void
   const close = useEffectEvent(onClose);
   const { title, line, action } = message;
   // It closes before its action acts, so the act may raise the next flash, which a close after would wipe.
+  // With nowhere to give it back, the button lets the focus go itself: removed, it would fire no blur,
+  // and the focus's hold would outlive it into the next flash (F308).
   const leave = (button: HTMLElement) => {
-    if (document.activeElement === button) backRef.current?.focus();
+    if (document.activeElement === button) {
+      const back = backRef.current;
+      if (back?.isConnected === true) back.focus();
+      else button.blur();
+    }
     onClose();
   };
   const timed = action === undefined && !pointed && !focused;

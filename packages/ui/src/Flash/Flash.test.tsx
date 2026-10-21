@@ -226,6 +226,37 @@ describe("Flash", () => {
     expect(within(region).queryByText("Message deleted")).toBeNull();
   });
 
+  // The action's button leaves with the flash it ends, and a browser fires no blur for a removed
+  // element: the focus's hold must not wait for one (F308).
+  it("counts 5 s for the timed flash an action raises, though the focus came to it from nowhere", () => {
+    render(<Held start={deleted(() => undefined)} next={{ title: "Restored" }} />);
+    act(() => {
+      screen.getByRole("button", { name: "Undo" }).focus();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(screen.getByRole("status").textContent).toContain("Restored");
+    advance(5_000);
+    expect(screen.getByRole("status").textContent).toBe("");
+  });
+
+  it("counts 5 s for the timed flash an action raises, though the focus's way back has left the page", () => {
+    const page = (before: boolean) => (
+      <>
+        {before ? <button type="button">Before</button> : null}
+        <Held start={deleted(() => undefined)} next={{ title: "Restored" }} />
+      </>
+    );
+    const { rerender } = render(page(true));
+    act(() => {
+      screen.getByRole("button", { name: "Before" }).focus();
+      screen.getByRole("button", { name: "Undo" }).focus();
+    });
+    rerender(page(false));
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    advance(5_000);
+    expect(screen.getByRole("status").textContent).toBe("");
+  });
+
   it("hands its handlers nothing of the click", () => {
     const onAction = vi.fn();
     const onClose = vi.fn();
