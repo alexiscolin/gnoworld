@@ -1,12 +1,11 @@
 import { reactRouter } from "@react-router/dev/vite";
 import babel from "@rolldown/plugin-babel";
 import { reactCompilerPreset } from "@vitejs/plugin-react";
-import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build, defineConfig, type Plugin } from "vite";
-import { precacheList } from "./src/sw/precache.ts";
+import { precached } from "./src/sw/precache.ts";
 
 // The PWA's worker (ADR-0001 §12): src/sw/sw.ts built on its own into /sw.js, one classic script
 // whatever it shares with the pages, with the hashed files it precaches and their digests. Built once
@@ -20,12 +19,11 @@ const serviceWorker: Plugin = {
       const client = builder.environments["client"];
       if (client === undefined) throw new Error("no browser build to precache");
       const out = resolve(builder.config.root, client.config.build.outDir);
-      const list = precacheList(readdirSync(join(out, "assets")).map((name) => `assets/${name}`)).map((url) => ({
-        url,
-        integrity: `sha384-${createHash("sha384")
-          .update(readFileSync(join(out, url)))
-          .digest("base64")}`,
-      }));
+      // Each file's digest spelled once, as the worker checks it (src/sw/digest.ts, F342).
+      const list = await precached(
+        readdirSync(join(out, "assets")).map((name) => `assets/${name}`),
+        (name) => new Uint8Array(readFileSync(join(out, name))),
+      );
       await build({
         configFile: false,
         root: builder.config.root,

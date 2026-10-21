@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { precacheList } from "./precache.ts";
+import { precached, precacheList } from "./precache.ts";
 
 // The files a client build writes, as paths from its folder (no leading slash).
 const BUILD = [
@@ -63,6 +63,26 @@ test("a font counts only by its whole name: no nested path, no hash under eight 
       "assets/geist-latin-wght-normal.woff2",
     ]),
   ).toEqual([]);
+});
+
+// The build's list carries each file's digest as the worker checks it: the first two are
+// worker.test.ts's own, computed apart with Python for the bytes `build <path>`; node's agrees (F342).
+test("lists each file with the digest the worker checks it by", async () => {
+  const read = (name: string) => new TextEncoder().encode(`build /${name}`);
+  expect(await precached(BUILD, read)).toEqual([
+    {
+      url: "/assets/entry.client-Bx3f9a1Q.js",
+      integrity: "sha384-wCxJ9mRS38niqR1WkOqLCIps+SHWLy3826h9Brfdwa0Wj8hiGz44zwXOMa6RJAmL",
+    },
+    {
+      url: "/assets/root-Dk2l0p9Z.css",
+      integrity: "sha384-w9D2omtGrgbOEnFvsYsiOrormQx3OukSZ2noz7qIXEsy6wVLWVPCfZSGnR+mb3gH",
+    },
+    {
+      url: "/assets/world-CwX_9-a2.js",
+      integrity: "sha384-TLireZufnlbiW8ZybSSKVuibTvXBYC9j5W1ouDfp1Kp/JdNPP+8b1ZRLFlE69Mny",
+    },
+  ]);
 });
 
 test("the list is the same whatever order the build gives its files in", () => {
