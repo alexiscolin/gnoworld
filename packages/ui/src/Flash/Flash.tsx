@@ -2,6 +2,7 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { Button } from "../Button/Button.tsx";
 import { IconButton } from "../Button/IconButton.tsx";
 import { Cluster, Stack } from "../compositions/index.ts";
+import { surface } from "../Popover/floating.ts";
 import styles from "./Flash.module.css";
 
 export interface FlashMessage {
@@ -56,7 +57,7 @@ function Pill({ message, onClose }: { message: FlashMessage; onClose: () => void
   return (
     <div
       ref={pillRef}
-      className={styles["flash"]}
+      className={surface(styles["flash"])}
       onPointerEnter={() => {
         setPointed(true);
       }}

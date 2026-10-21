@@ -1,5 +1,5 @@
-/* The flash: an opaque pill of the surface's night, sized to what it says, until the blur behind a
-   panel is widely Baseline (F262); its slot places it (DESIGN-SYSTEM.md). */
+/* The flash: a pill of the surface (opaque night, its strong line) sized to what it says, until the
+   blur behind a panel is widely Baseline (F262); its slot places it (DESIGN-SYSTEM.md). */
 @layer components {
   .flash {
     inline-size: fit-content;
@@ -7,9 +7,7 @@
     padding-block: var(--space-2xs);
     /* Its Close sits close to the edge, as a pill's last control does. */
     padding-inline: var(--space-m) var(--space-2xs);
-    border: var(--line-width) solid var(--color-line-strong);
     border-radius: var(--radius-pill);
-    background: var(--color-surface);
     box-shadow: var(--shadow-float);
   }
 
