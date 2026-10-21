@@ -53,6 +53,19 @@ export function Tooltip({ label, children }: TooltipProps) {
       stop.abort();
     };
   }, [near, shown]);
+  // A focused control removed may fire no blur (jsdom fires none): while the focus holds the words, a
+  // change inside reads where the focus is now (F353, F316's class).
+  useEffect(() => {
+    const anchor = anchorRef.current;
+    if (!focused || anchor === null) return;
+    const watch = new MutationObserver(() => {
+      if (!anchor.contains(document.activeElement)) setFocused(false);
+    });
+    watch.observe(anchor, { childList: true, subtree: true });
+    return () => {
+      watch.disconnect();
+    };
+  }, [focused]);
   // Shown before it is placed: a box out of the top layer has no size to place by.
   useLayoutEffect(() => {
     tipRef.current?.togglePopover(shown);

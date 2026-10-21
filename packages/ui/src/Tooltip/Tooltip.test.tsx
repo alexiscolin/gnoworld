@@ -79,6 +79,22 @@ describe("Tooltip", () => {
     expect(shown()).toBe("false");
   });
 
+  // A focused control removed may fire no blur (jsdom fires none): the words go with it all the same (F353).
+  it("hides the words the keyboard showed when their control leaves the page", async () => {
+    const tipped = (control: boolean) => (
+      <Tooltip label="Search the universe">
+        {control ? <button type="button" aria-label="Search the universe" /> : null}
+      </Tooltip>
+    );
+    const { rerender } = render(tipped(true));
+    keyboardFocus();
+    expect(shown()).toBe("true");
+    rerender(tipped(false));
+    // The observer answers in a microtask, after the change, as in a browser.
+    await act(() => Promise.resolve());
+    expect(shown()).toBe("false");
+  });
+
   it("hides them on Esc, until the pointer or the focus comes again", () => {
     draw();
     keyboardFocus();
