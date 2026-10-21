@@ -47,7 +47,12 @@ const SWITCHED_OFF = {
 const TESTS = ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts"];
 const BASELINE_ALSO = { allowAtRules: ["starting-style"], allowSelectors: ["popover-open"] };
 const FACE = { ...BASELINE_ALSO, allowProperties: ["forced-color-adjust"] };
-const RAW_ANCHOR = { selector: "JSXOpeningElement[name.name='a']", message: "A link in ui is an Anchor (F259)." };
+// A link drawn in JSX or by createElement, or a form, which navigates too (F360).
+const RAW_ANCHOR = {
+  selector:
+    "JSXOpeningElement[name.name=/^(a|form)$/], CallExpression[callee.name='createElement'][arguments.0.value='a'], CallExpression[callee.property.name='createElement'][arguments.0.value='a']",
+  message: "A link in ui is an Anchor, and a form the page's (F259).",
+};
 const MEMOS = ["memo", "useMemo", "useCallback"];
 const MEMO = "The React Compiler memoizes: no hand-written memo, useMemo or useCallback (docs/ARCHITECTURE.md).";
 const HTML = "Nothing reaches the DOM as HTML: render it as React elements (docs/ARCHITECTURE.md, security).";

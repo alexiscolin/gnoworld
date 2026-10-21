@@ -262,6 +262,12 @@ try:
             # A link drawn past the slot would reload the app on the site's own paths (F259, F317).
             ("raw_anchor.tsx", "export function Card({ href }: { href: string }) {\n  return <a href={href}>Go</a>;\n}\n",
              "no-restricted-syntax: A link in ui is an Anchor"),
+            # Nor by createElement, React's or imported, nor a form, which navigates too (F360).
+            ("create_anchor.tsx", 'import { createElement } from "react";\n\nexport function Card({ href }: { href: string }) {\n  return createElement("a", { href }, "Go");\n}\n',
+             "no-restricted-syntax: A link in ui is an Anchor"),
+            ("react_anchor.tsx", 'import React from "react";\n\nexport function Card({ href }: { href: string }) {\n  return React.createElement("a", { href }, "Go");\n}\n',
+             "no-restricted-syntax: A link in ui is an Anchor"),
+            ("raw_form.tsx", 'export function Search() {\n  return <form action="/search" />;\n}\n', "no-restricted-syntax: A link in ui is an Anchor"),
             # The rule replaces ui's no-restricted-syntax in .tsx: the swallowed catch must stay refused.
             ("log_catch.tsx", "declare const logger: { error: (e: unknown) => void };\n\nexport function run(g: () => void): void {\n  try {\n    g();\n  } catch (e) {\n    logger.error(e);\n  }\n}\n",
              "no-restricted-syntax: A catch that only logs"),
