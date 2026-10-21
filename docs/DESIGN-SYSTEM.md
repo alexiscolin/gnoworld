@@ -259,8 +259,10 @@ current one in text; thin bars (24 for a day); the peak and the current value wr
 
 ## Browsers
 
-Baseline "widely available", with two named exceptions from 2024: the `popover` attribute and
-`@starting-style`. The lint holds the line and lists the exceptions. Popovers are positioned by a
+Baseline "widely available", with three named exceptions: from 2024, the `popover` attribute and
+`@starting-style`; and `forced-color-adjust`, for pictures only (the avatar's face), which forced
+colours then leave as drawn, the property doing nothing where forced colours do not exist (Alexis,
+2026-10-21, F319). The lint holds the line and lists the exceptions. Popovers are positioned by a
 small function of ours until CSS anchor positioning (Baseline 2026) is widely available.
 
 ## Testing the CSS

@@ -45,6 +45,7 @@ const SWITCHED_OFF = {
 };
 // Vitest's tests and Playwright's journeys.
 const TESTS = ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts"];
+const BASELINE_ALSO = { allowSelectors: ["popover-open"], allowProperties: ["forced-color-adjust"] };
 const MEMOS = ["memo", "useMemo", "useCallback"];
 const MEMO = "The React Compiler memoizes: no hand-written memo, useMemo or useCallback (docs/ARCHITECTURE.md).";
 const HTML = "Nothing reaches the DOM as HTML: render it as React elements (docs/ARCHITECTURE.md, security).";
@@ -214,8 +215,9 @@ export default defineConfig(
       "css/use-layers": "error",
       "css/prefer-logical-properties": "error",
       // docs/DESIGN-SYSTEM.md, "Browsers": Baseline widely available, but for the popover and
-      // @starting-style, from 2024, which a popover's fade in needs.
-      "css/use-baseline": ["error", { allowAtRules: ["starting-style"], allowSelectors: ["popover-open"] }],
+      // @starting-style, from 2024, which a popover's fade in needs, and forced-color-adjust, which only
+      // a picture takes, and only where forced colours exist (Alexis, F319).
+      "css/use-baseline": ["error", { allowAtRules: ["starting-style"], ...BASELINE_ALSO }],
     },
   },
 );

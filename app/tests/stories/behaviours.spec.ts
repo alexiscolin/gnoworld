@@ -521,6 +521,27 @@ test.describe("an avatar", () => {
     expect(drawn).toEqual({ stars: ["rgb(244, 246, 250)"], line: ["rgb(244, 246, 250)", "none"] });
   });
 
+  // A face is a picture: forced colours leave it as drawn, night and colours, as they leave a photo
+  // (F319). A bot's mark is the code icon, which takes the system's colours as every icon does.
+  test("keeps its face, night and colours, under forced colours", async ({ page }) => {
+    await open(page, "avatar--kinds");
+    const faces = await page.locator("[data-kind='person'] svg, [data-kind='assistant'] svg").all();
+    expect(faces).toHaveLength(2);
+    // The square inside each disc, a pixel in: around it, the page's colours change with the mode.
+    const inside = async () =>
+      Promise.all(
+        faces.map(async (face) => {
+          const { x, y, width } = await box(face);
+          const side = Math.floor(width / Math.SQRT2) - 2;
+          const from = (start: number) => Math.ceil(start + (width - side) / 2);
+          return page.screenshot({ clip: { x: from(x), y: from(y), width: side, height: side } });
+        }),
+      );
+    const normal = await inside();
+    await page.emulateMedia({ forcedColors: "active" });
+    expect(await inside()).toEqual(normal);
+  });
+
   // The ring is a border, which forced colours paint in the system's colour; a box-shadow they drop,
   // and an outline is the focus ring's alone (docs/DESIGN-SYSTEM.md, "Three meanings").
   test("keeps its speaking ring and its presence dot under forced colours; the ring is no outline", async ({
