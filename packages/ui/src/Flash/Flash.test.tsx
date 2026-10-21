@@ -331,6 +331,11 @@ describe("Flash", () => {
     expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Typing" }));
   });
 
+  it("draws no line for a flash that has none", () => {
+    render(<Flash message={{ title: "Left the room" }} onClose={vi.fn()} />);
+    expect(screen.getByRole("status").querySelectorAll("p")).toHaveLength(1);
+  });
+
   it("ends when closed, without its action", () => {
     const onAction = vi.fn();
     const onClose = vi.fn();

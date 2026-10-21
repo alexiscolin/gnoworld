@@ -40,6 +40,15 @@ describe("Button", () => {
     expect(submitted).toHaveBeenCalledOnce();
   });
 
+  it("draws an icon only when given one, and its spinner only while busy", () => {
+    const { container, rerender } = render(<Button>Go</Button>);
+    expect(container.querySelectorAll("svg, span[aria-hidden='true']")).toHaveLength(0);
+    rerender(<Button icon="plus">Go</Button>);
+    expect(container.querySelectorAll("svg")).toHaveLength(1);
+    rerender(<Button busy>Go</Button>);
+    expect(container.querySelectorAll("span[aria-hidden='true']")).toHaveLength(1);
+  });
+
   it("is outline, neutral and medium unless asked otherwise", () => {
     render(<Button>Read it · free</Button>);
     const button = screen.getByRole("button");
