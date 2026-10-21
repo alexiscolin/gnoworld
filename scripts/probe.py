@@ -22,7 +22,7 @@ with open("package.json") as f:
     SCRIPTS = json.load(f)["scripts"]  # the gate's own commands, so a case proves what the gate runs
 BLOCK = "".join(f"  total += values[{i}] * {i + 1};\n" for i in range(14))
 # The network and the device's storage, which the app reaches only from lib and the worker (F378).
-REACHES = ["fetch", "XMLHttpRequest", "WebSocket", "EventSource", "localStorage", "sessionStorage", "indexedDB", "caches"]
+REACHES = ["fetch", "XMLHttpRequest", "WebSocket", "EventSource", "localStorage", "sessionStorage", "indexedDB", "caches", "cookieStore"]
 
 # File name, content, and what ESLint must report: a rule, or "rule: the start of its message" when
 # one rule holds several guards (no-restricted-syntax's selectors); None: no report at all.
@@ -323,6 +323,12 @@ try:
             *[(f"features/__probe__/bare_{name}.ts", reach(name), f"no-restricted-globals: Unexpected use of '{name}'. {net}") for name in REACHES],
             *[(f"features/__probe__/{owner}_fetch.ts", reach(f"{owner}.fetch"), f"no-restricted-properties: '{owner}.fetch' is restricted from being used. {net}") for owner in ("window", "globalThis", "self")],
             ("features/__probe__/cookie.ts", reach("document.cookie"), f"no-restricted-properties: 'document.cookie' is restricted from being used. {net}"),
+            ("features/__probe__/beacon.ts", reach('navigator.sendBeacon("/x")'), f"no-restricted-properties: 'navigator.sendBeacon' is restricted from being used. {net}"),
+            ("features/__probe__/opfs.ts", reach("navigator.storage"), f"no-restricted-properties: 'navigator.storage' is restricted from being used. {net}"),
+            # The worker's folder keeps fetch and caches, nothing else of the network or storage (F395).
+            ("sw/__probe__/sw_caches.ts", reach('caches.open("x")'), None),
+            ("sw/__probe__/sw_storage.ts", reach("localStorage"), f"no-restricted-globals: Unexpected use of 'localStorage'. {net}"),
+            ("sw/__probe__/sw_cookie.ts", reach("document.cookie"), f"no-restricted-properties: 'document.cookie' is restricted from being used. {net}"),
             ("features/__probe__/html_too.ts", "export function put(box: HTMLElement): void {\n  box.innerHTML = \"x\";\n}\n", restricted("'innerHTML'")),
             ("features/__probe__/stubbed.test.ts", 'import { expect, test } from "vitest";\n\ntest("x", () => {\n  expect(typeof fetch).toBe("function");\n});\n', None),
             # A test may read another feature's parts, by a path inside the repository wherever node_modules sits.

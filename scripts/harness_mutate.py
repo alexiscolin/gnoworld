@@ -109,13 +109,14 @@ def mutants():
         yield from each(path, 'property: "', 'property: "never_', "probe", "eslint restricted property")
     # The app's folders (F378): each name of the network and storage, each owner, each folder's path,
     # each exception, and React's bans kept there, alone.
-    for name in ("fetch", "XMLHttpRequest", "WebSocket", "EventSource", "localStorage", "sessionStorage", "indexedDB", "caches", "window", "globalThis", "self"):
+    for name in ("fetch", "XMLHttpRequest", "WebSocket", "EventSource", "localStorage", "sessionStorage", "indexedDB", "caches", "cookieStore", "window", "globalThis", "self"):
         yield from each(APP, f'"{name}"', '"_"', "probe", f"eslint app reaches {name} only from lib and sw")
     yield from each(APP, "${SRC}/", "${SRC}/nowhere-", "probe", "eslint app folder path")
     yield from each(APP, 'from: "./",\n              except: [`${SRC}/sw`],', 'from: SRC,\n              except: ["./sw"],', "probe", "eslint the worker reaches no path out of sw")
     # The worker's packages, refused by name (F385): a scoped one and node: too, and its catches still read.
     yield from each(APP, 'regex: "^[^.]"', 'regex: "^[a-z]"', "probe", "eslint the worker imports no package, scoped or node: (G2)")
     yield from each(APP, "...SWALLOWED, ", "", "probe", "eslint the worker's catches are read")
+    yield from each(APP, "...reaching(REACHES.filter(", "...reaching([].filter(", "probe", "eslint the worker's folder keeps fetch and caches only (F395)")
     yield from each(APP, "{ts,tsx}", "ts", "probe", "eslint reads a feature's screens")
     yield from each(APP, "`./${feature}`,", "`./nowhere`,", "probe", "eslint a feature imports its own files")
     yield from each(APP, "/index.ts`)", "/nothing.ts`)", "probe", "eslint a feature imports another's index.ts")

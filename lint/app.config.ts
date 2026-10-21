@@ -3,6 +3,7 @@
 // the network and storage only in lib and the worker; console nowhere, until the logger. A part of the
 // lint config, which eslint.config.ts composes.
 import { readdirSync } from "node:fs";
+import type { Linter } from "eslint";
 import { defineConfig } from "eslint/config";
 import { REACT_PROPERTIES } from "./react.config.ts";
 import { SWALLOWED, TESTS } from "./shared.config.ts";
@@ -23,8 +24,24 @@ const REACHES = [
   "sessionStorage",
   "indexedDB",
   "caches",
+  "cookieStore",
 ];
-const NET = "The network and storage are lib's, and the worker's (docs/ARCHITECTURE.md).";
+const NET = "The network and storage are lib's; the worker's folder has fetch and caches (docs/ARCHITECTURE.md).";
+// The rules that ban these names, bare or through their owners, with the browser's other doors.
+const reaching = (names: readonly string[]): Linter.RulesRecord => ({
+  "no-restricted-globals": ["error", ...names.map((name) => ({ name, message: NET }))],
+  // React's own, which this rule replaces here.
+  "no-restricted-properties": [
+    "error",
+    ...REACT_PROPERTIES,
+    ...["window", "globalThis", "self"].flatMap((object) =>
+      names.map((property) => ({ object, property, message: NET })),
+    ),
+    { object: "document", property: "cookie", message: NET },
+    { object: "navigator", property: "sendBeacon", message: NET },
+    { object: "navigator", property: "storage", message: NET },
+  ],
+});
 
 export default defineConfig(
   {
@@ -70,22 +87,9 @@ export default defineConfig(
     rules: {
       "no-restricted-imports": ["error", { patterns: [{ regex: "^[^.]", message: SW }] }],
       "no-restricted-syntax": ["error", ...SWALLOWED, { selector: "ImportExpression", message: SW }],
+      // The worker fetches and caches; its page side asks whether the host answers: nothing else.
+      ...reaching(REACHES.filter((name) => name !== "fetch" && name !== "caches")),
     },
   },
-  {
-    files: [`${SRC}/**/*.{ts,tsx}`],
-    ignores: [`${SRC}/lib/**`, `${SRC}/sw/**`, ...TESTS],
-    rules: {
-      "no-restricted-globals": ["error", ...REACHES.map((name) => ({ name, message: NET }))],
-      // React's own, which this rule replaces here, and the network's and storage's by their owners.
-      "no-restricted-properties": [
-        "error",
-        ...REACT_PROPERTIES,
-        ...["window", "globalThis", "self"].flatMap((object) =>
-          REACHES.map((property) => ({ object, property, message: NET })),
-        ),
-        { object: "document", property: "cookie", message: NET },
-      ],
-    },
-  },
+  { files: [`${SRC}/**/*.{ts,tsx}`], ignores: [`${SRC}/lib/**`, `${SRC}/sw/**`, ...TESTS], rules: reaching(REACHES) },
 );
