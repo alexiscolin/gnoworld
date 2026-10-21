@@ -131,6 +131,50 @@ test.describe("Dialog", () => {
     await expect(page.getByRole("dialog")).toBeHidden();
   });
 
+  // A modal dialog's page is inert, and still too (F373): under the wheel, over the scrim or the dialog,
+  // and under the keys; it scrolls again once the dialog closes. The scroll is read two frames on, and
+  // the first wheel, with no dialog, shows those frames are enough to see one.
+  test("keeps a long page behind it still under the wheel and the keys, and lets it scroll once closed", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await open(page, "dialog--from-a-button");
+    await page.evaluate(() => {
+      document.body.style.minBlockSize = "3000px";
+    });
+    const settled = () =>
+      page.evaluate(
+        () =>
+          new Promise<number>((done) => {
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                done(scrollY);
+              });
+            });
+          }),
+      );
+    const wheel = async (x: number, y: number) => {
+      await page.mouse.move(x, y);
+      await page.mouse.wheel(0, 300);
+      return settled();
+    };
+    expect(await wheel(20, 20), "no dialog").toBe(300);
+    await page.evaluate(() => {
+      scrollTo(0, 0);
+    });
+    await page.getByRole("button", { name: "Open the passport" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    expect(await wheel(20, 20), "over the scrim").toBe(0);
+    const at = await box(dialog);
+    expect(await wheel(at.x + at.width / 2, at.y + at.height / 2), "over the dialog").toBe(0);
+    await page.keyboard.press("PageDown");
+    expect(await settled(), "PageDown").toBe(0);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    expect(await wheel(20, 20), "once closed").toBe(300);
+  });
+
   test("with a field, the field takes the focus, not a button", async ({ page }) => {
     await open(page, "dialog--with-field");
     await expect(page.getByRole("dialog")).toBeVisible();

@@ -42,6 +42,11 @@
     border-block-start: var(--line-width) solid var(--color-line);
   }
 
+  /* A modal dialog holds the page behind it still, under the wheel and the keys as under the pointer (F373). */
+  :root:has(dialog:modal) {
+    overflow: hidden;
+  }
+
   /* One ring everywhere, fields included; nothing hides it. */
   :focus-visible {
     outline: var(--focus-width) solid var(--color-mine);
