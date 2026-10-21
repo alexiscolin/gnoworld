@@ -226,8 +226,8 @@ describe("Flash", () => {
     expect(within(region).queryByText("Message deleted")).toBeNull();
   });
 
-  // The action's button leaves with the flash it ends, and a browser fires no blur for a removed
-  // element: the focus's hold must not wait for one (F308).
+  // The action's button leaves with the flash it ends, and a removed element may fire no blur (jsdom
+  // fires none; Chromium 156 does): the focus's hold must not wait for one (F308).
   it("counts 5 s for the timed flash an action raises, though the focus came to it from nowhere", () => {
     render(<Held start={deleted(() => undefined)} next={{ title: "Restored" }} />);
     act(() => {
