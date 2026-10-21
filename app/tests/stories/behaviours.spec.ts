@@ -52,6 +52,8 @@ const pinned = (where: Record<string, string>) => (trigger: Locator) =>
     Object.assign(t.style, { position: "fixed", ...how });
   }, where);
 
+// A flash's pill, in its region.
+const pillOf = (page: Page) => page.locator("[role='status'] > *");
 // The gap from the trigger's bottom to the panel's top, as it settles: one step when placed under.
 const under = (trigger: Locator, panel: Locator) =>
   expect.poll(async () => (await box(panel)).y - ((await box(trigger)).y + (await box(trigger)).height));
@@ -501,7 +503,7 @@ test.describe("a planet's thumb", () => {
 // A flash raised from a modal dialog shows above its scrim, at the top centre, as bright as without a
 // dialog (F331). Outside the dialog, it stays inert until the dialog closes: the platform's rule.
 test("a flash raised from a dialog shows above its scrim, at the top centre", async ({ page }) => {
-  const pill = page.locator("[role='status'] > *");
+  const pill = pillOf(page);
   await open(page, "flash--timed");
   const alone = await pill.screenshot();
   await open(page, "flash--over-a-dialog");
@@ -519,7 +521,7 @@ test("a flash stays shown when the page is clicked outside it", async ({ page })
   await open(page, "flash--with-action");
   await page.mouse.click(5, 300);
   await page.evaluate(() => new Promise(requestAnimationFrame));
-  expect(await page.locator("[role='status'] > *").evaluate((pill) => pill.matches(":popover-open"))).toBe(true);
+  expect(await pillOf(page).evaluate((pill) => pill.matches(":popover-open"))).toBe(true);
 });
 
 test.describe("an avatar", () => {

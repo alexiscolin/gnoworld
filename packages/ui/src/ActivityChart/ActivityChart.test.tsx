@@ -13,6 +13,11 @@ const written = (container: HTMLElement) =>
   ].join(" ");
 const heights = (container: HTMLElement) =>
   [...container.querySelectorAll("svg [data-hour]")].map((b) => Number(b.getAttribute("height")));
+// The sparkline's points, their heights alone.
+const ys = (container: HTMLElement) =>
+  (container.querySelector("polyline")?.getAttribute("points") ?? "")
+    .split(" ")
+    .map((point) => Number(point.split(",")[1]));
 // Each row of the table as its words: when, and how many.
 const rows = (label: string) =>
   [...screen.getByRole("table", { name: label }).querySelectorAll("tbody tr")].map((row) =>
@@ -93,19 +98,13 @@ describe("ActivityChart", () => {
   ])("keeps its sparkline's whole stroke inside its drawing: %j", (values, expected) => {
     const { container } = render(<ActivityChart label="Calls" values={values} sparkline unit="day" />);
     expect(container.querySelector("svg")?.getAttribute("viewBox")?.split(" ")[3]).toBe("48");
-    const ys = (container.querySelector("polyline")?.getAttribute("points") ?? "")
-      .split(" ")
-      .map((point) => Number(point.split(",")[1]));
-    expect(ys).toEqual(expected);
+    expect(ys(container)).toEqual(expected);
   });
 
   it("keeps a whole day's sparkline inside its drawing, its peak half a pixel in", () => {
     const { container } = render(<ActivityChart label="Calls" values={day} sparkline unit="day" />);
-    const ys = (container.querySelector("polyline")?.getAttribute("points") ?? "")
-      .split(" ")
-      .map((point) => Number(point.split(",")[1]));
-    expect(Math.min(...ys)).toBe(0.5);
-    expect(Math.max(...ys)).toBeLessThanOrEqual(47.5);
+    expect(Math.min(...ys(container))).toBe(0.5);
+    expect(Math.max(...ys(container))).toBeLessThanOrEqual(47.5);
   });
 
   it("draws a sparkline of one value as a level line, never an empty drawing", () => {
