@@ -11,8 +11,9 @@ type DrawLink = (props: PageLinkProps) => ReactNode;
 const PageLinkContext = createContext<DrawLink | null>(null);
 
 // A path from the site's root: "/" not followed by a second slash or a backslash, which a browser
-// reads as another host's address.
+// reads as another host's address. A browser drops tabs and line ends from an address first.
 const OWN_PATH = /^\/(?![/\\])/;
+const DROPPED = /[\t\n\r]/g;
 
 /** Hands every link of the design system inside it the page's own link, for the site's own paths. */
 export function LinkProvider({ link, children }: { link: DrawLink; children: ReactNode }) {
@@ -22,5 +23,5 @@ export function LinkProvider({ link, children }: { link: DrawLink; children: Rea
 /** An anchor: the page's link for a path from the site's root, a plain one for anything else. */
 export function Anchor(props: PageLinkProps) {
   const link = use(PageLinkContext);
-  return link !== null && OWN_PATH.test(props.href) ? link(props) : <a {...props} />;
+  return link !== null && OWN_PATH.test(props.href.replace(DROPPED, "")) ? link(props) : <a {...props} />;
 }

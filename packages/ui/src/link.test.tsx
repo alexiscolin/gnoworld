@@ -60,6 +60,11 @@ describe("LinkProvider", () => {
     "https://gno.land/",
     "//gno.land/",
     "/\\gno.land/",
+    // A browser drops tabs and line ends from an address, so these are "//gno.land/" too (F311).
+    "/\t/gno.land/",
+    "/\n/gno.land/",
+    "/\r/gno.land/",
+    "/\t\\gno.land/",
     "mailto:team@gno.land",
     "#text",
     "w/bubble",
