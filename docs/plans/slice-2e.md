@@ -30,8 +30,9 @@ Slice 2's row, for the avatar: "the same address gives the same nebula, readable
   `Link`; `Button` and `Row` (and `EmptyState`, through its `Button`) use it for a path from the
   site's root (`/…`, not `//…`); any other `href` (another site, a mail, `#…`, a relative path, a
   script) stays a plain anchor, as everywhere without the slot (Storybook); a journey clicks the way
-  home and sees no document load. Known gap: no journey reaches the root's error boundary, since
-  every route catches its own errors; the slot's place in `Layout` is read in review.
+  home and sees no document load. Known gap: no journey reaches the root's error boundary. The not-found and world routes catch
+  their own errors; home has no boundary (F329, put to Alexis), so a render error there reaches
+  the root's, which no journey makes. The slot's place in `Layout` is read in review.
 - the flash (Alexis, F260, F262): a Close on every flash, held while the focus is in it as while the
   pointer is over it (WCAG 2.2.1); its panel opaque, the surface's night, until the blur is widely
   Baseline.
