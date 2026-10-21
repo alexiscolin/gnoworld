@@ -131,11 +131,8 @@ export default defineConfig(
       ],
     },
   },
-  {
-    // React Router calls the server entry with four arguments; it runs only at build time.
-    files: ["app/src/entry.server.tsx"],
-    rules: { "max-params": ["error", 4] },
-  },
+  // React Router calls the server entry with four arguments; it runs only at build time.
+  { files: ["app/src/entry.server.tsx"], rules: { "max-params": ["error", 4] } },
   {
     // Tests read as lists of cases, so they may run long.
     files: TESTS,
