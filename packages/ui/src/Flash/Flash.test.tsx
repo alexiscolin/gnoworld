@@ -323,6 +323,22 @@ describe("Flash", () => {
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Before" }));
   });
 
+  it("forgets its way back once the focus has left it: come back from nowhere, the focus goes nowhere", () => {
+    render(
+      <>
+        <button type="button">Before</button>
+        <Held start={saved} />
+      </>,
+    );
+    focusOn("Before", "Close");
+    act(() => {
+      screen.getByRole("button", { name: "Close" }).blur();
+    });
+    focusOn("Close");
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(document.activeElement).toBe(document.body);
+  });
+
   it("leaves the focus where it went since, when its Close is clicked without taking it", () => {
     render(
       <>

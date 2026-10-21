@@ -66,8 +66,10 @@ function Pill({ message, onClose }: { message: FlashMessage; onClose: () => void
       }}
       onFocus={(event) => {
         moved();
+        // Coming in from outside, from nowhere included, it takes a new way back (F323).
         const from = event.relatedTarget;
-        if (from instanceof HTMLElement && !event.currentTarget.contains(from)) backRef.current = from;
+        if (!(from instanceof Node && event.currentTarget.contains(from)))
+          backRef.current = from instanceof HTMLElement ? from : null;
       }}
       onBlur={moved}
     >
