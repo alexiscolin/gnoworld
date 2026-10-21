@@ -429,16 +429,16 @@ test("the flash sits in the flow: empty it takes no room and paints nothing, ful
   });
   expect(empty).toEqual({ height: 0, inside: 0, ground: "rgba(0, 0, 0, 0)", position: "static" });
   await open(page, "flash--timed");
-  // Its Close places its own parts (the button's square, its tooltip in the top layer): the flash's
-  // boxes are the region's and the rest.
+  // Its Close places its own parts: the square button holds its icon (relative), its tooltip sits in the
+  // top layer. All else is in the flow.
   const placed = await page
     .getByRole("status")
     .evaluate((region) =>
       [region, ...region.querySelectorAll("*")]
-        .filter((e) => e.closest("button, [popover]") === null)
-        .map((e) => getComputedStyle(e).position),
+        .filter((e) => e.closest("[popover]") === null)
+        .map((e) => `${e.matches("button") ? "button " : ""}${getComputedStyle(e).position}`),
     );
-  expect(new Set(placed)).toEqual(new Set(["static"]));
+  expect(new Set(placed)).toEqual(new Set(["static", "button relative"]));
 });
 
 // Opaque until the blur behind a panel is widely Baseline: what passes behind never shows through (F262).
