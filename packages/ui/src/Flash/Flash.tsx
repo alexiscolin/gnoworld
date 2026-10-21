@@ -25,36 +25,37 @@ const LIFETIME = 5_000;
 // no pointerleave or blur would end.
 function Pill({ message, onClose }: { message: FlashMessage; onClose: () => void }) {
   const [pointed, setPointed] = useState(false);
-  const [focused, setFocused] = useState(false);
+  // Each move of the focus in or out: it makes the count read again where the focus is.
+  const [moves, setMoves] = useState(0);
+  const pillRef = useRef<HTMLDivElement>(null);
   // Where the focus was before it came in: closed from its own button, the flash gives it back, where
   // it would otherwise fall to the page.
   const backRef = useRef<HTMLElement | null>(null);
   const close = useEffectEvent(onClose);
   const { title, line, action } = message;
   // It closes before its action acts, so the act may raise the next flash, which a close after would wipe.
-  // With nowhere to give it back, the button lets the focus go itself: a removed element fires no blur
-  // in jsdom (Chromium 156 fires one), and the focus's hold would outlive it into the next flash (F308).
   const leave = (button: HTMLElement) => {
-    if (document.activeElement === button) {
-      const back = backRef.current;
-      if (back?.isConnected === true) back.focus();
-      else button.blur();
-    }
+    if (document.activeElement === button) backRef.current?.focus();
     onClose();
   };
-  const timed = action === undefined && !pointed && !focused;
-  // Its words, not its object: the same words in a new object keep their count.
+  const moved = () => {
+    setMoves((count) => count + 1);
+  };
+  const timed = action === undefined && !pointed;
+  // Its words, not its object, keep their count. The focus holds it where the page has it now: a removed
+  // element fires no blur in jsdom (Chromium 156 fires one), so no flag kept by events can say (F316).
   useEffect(() => {
-    if (!timed) return;
+    if (!timed || pillRef.current?.contains(document.activeElement) === true) return;
     const timer = setTimeout(() => {
       close();
     }, LIFETIME);
     return () => {
       clearTimeout(timer);
     };
-  }, [timed, title, line]);
+  }, [timed, title, line, moves]);
   return (
     <div
+      ref={pillRef}
       className={styles["flash"]}
       onPointerEnter={() => {
         setPointed(true);
@@ -63,14 +64,11 @@ function Pill({ message, onClose }: { message: FlashMessage; onClose: () => void
         setPointed(false);
       }}
       onFocus={(event) => {
-        setFocused(true);
+        moved();
         const from = event.relatedTarget;
         if (from instanceof HTMLElement && !event.currentTarget.contains(from)) backRef.current = from;
       }}
-      onBlur={(event) => {
-        const to = event.relatedTarget;
-        if (!(to instanceof Node && event.currentTarget.contains(to))) setFocused(false);
-      }}
+      onBlur={moved}
     >
       <Cluster space="m">
         <Stack space="3xs">
