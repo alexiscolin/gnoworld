@@ -320,6 +320,8 @@ try:
             ("features/__probe__/cookie.ts", reach("document.cookie"), f"no-restricted-properties: 'document.cookie' is restricted from being used. {net}"),
             ("features/__probe__/html_too.ts", "export function put(box: HTMLElement): void {\n  box.innerHTML = \"x\";\n}\n", restricted("'innerHTML'")),
             ("features/__probe__/stubbed.test.ts", 'import { expect, test } from "vitest";\n\ntest("x", () => {\n  expect(typeof fetch).toBe("function");\n});\n', None),
+            # A test may read another feature's parts, by a path inside the repository wherever node_modules sits.
+            ("features/__probe__/peeks.test.ts", 'import { expect, test } from "vitest";\nimport { UpdatePrompt } from "../update/UpdatePrompt.tsx";\n\ntest("x", () => {\n  expect(UpdatePrompt).toBeDefined();\n});\n', None),
             ("lib/__probe__/lib_fetch.ts", reach('fetch("/x")'), None),
             ("routes/__probe__/route_log.ts", 'export function load(): void {\n  console.log("loaded");\n}\n', "no-console"),
             ("routes/__probe__/route_scene.ts", uses(name="globe", path="../../scene/__probe__/globe.ts"), "import-x/no-restricted-paths"),
