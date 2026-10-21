@@ -23,7 +23,8 @@
     margin-block-start: var(--space-2xs);
   }
 
-  .skeleton[data-shape="line"]:last-child:not(:only-child) {
+  /* A paragraph's last line is shorter; a lone line, after a heading say, keeps its width (F375). */
+  .lines > .skeleton:last-child {
     inline-size: 60%;
   }
 

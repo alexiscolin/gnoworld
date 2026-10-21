@@ -455,6 +455,26 @@ test("a skeleton shows only after 300 ms, and breathes then, but stays still und
   }
 });
 
+// The shorter last line belongs to a paragraph of lines, not to a lone line after a heading (F375).
+test("a lone line skeleton after a heading keeps its whole width; a paragraph's last line is shorter", async ({
+  page,
+}) => {
+  await open(page, "skeleton--lines");
+  const [paragraph, last, lone] = await page.evaluate(() => {
+    const lines = document.querySelector("#storybook-root > span");
+    const line = lines?.firstElementChild;
+    if (!lines || !line) throw new Error("no lines");
+    const alone = line.cloneNode();
+    const heading = document.createElement("h2");
+    heading.textContent = "Rooms";
+    lines.after(heading, alone);
+    const width = (shape: Element | null) => shape?.getBoundingClientRect().width ?? 0;
+    return [width(lines), width(lines.lastElementChild), width(heading.nextElementSibling)];
+  });
+  expect(lone).toBe(paragraph);
+  expect(last).toBeCloseTo(paragraph * 0.6, 0);
+});
+
 test.describe("a figure", () => {
   // Each figure the page draws, in turn, with when: recorded from before the story's first render.
   async function recorded(page: Page) {
