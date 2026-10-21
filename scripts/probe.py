@@ -302,7 +302,10 @@ try:
             ("sw/__probe__/sw_feature.ts", uses(name="UpdatePrompt", path="../../features/update/index.ts"), "import-x/no-restricted-paths"),
             ("sw/__probe__/sw_fetch.ts", reach('fetch("/sw.js")'), None),
             ("sw/__probe__/sw_tested.test.ts", 'import { expect, test } from "vitest";\n\ntest("x", () => {\n  expect(1).toBe(1);\n});\n', None),
-            ("sw/__probe__/sw_package.ts", uses(name="useState", path="react"), "import-x/no-restricted-paths"),
+            # A package is refused by its name, installed or not, wherever node_modules sits (F385);
+            # a path out of the folder by the zone.
+            ("sw/__probe__/sw_package.ts", uses(name="precacheAndRoute", path="workbox-precaching"), "no-restricted-imports"),
+            ("sw/__probe__/sw_reaches_ui.ts", uses(name="Button", path="../../../../packages/ui/src/index.ts"), "import-x/no-restricted-paths"),
             ("features/__probe__/through_index.ts", uses(name="UpdatePrompt", path="../update/index.ts"), None),
             ("features/__probe__/own_file.ts", uses(name="used", path="./through_index.ts"), None),
             ("features/__probe__/uses_sw.ts", uses(name="hostAnswers", path="../../sw/register.ts"), None),

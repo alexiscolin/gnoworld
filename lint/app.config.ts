@@ -13,6 +13,7 @@ const FEATURES = readdirSync(new URL("../app/src/features", import.meta.url), { 
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name);
 const ALONE = "A feature reaches another only through its index.ts (docs/ARCHITECTURE.md).";
+const SW = "The worker imports only sw: it runs alone, before the page.";
 const REACHES = [
   "fetch",
   "XMLHttpRequest",
@@ -39,7 +40,7 @@ export default defineConfig(
               target: `${SRC}/sw`,
               from: "./",
               except: [`${SRC}/sw`],
-              message: "The worker imports only sw: it runs alone, before the page.",
+              message: SW,
             },
             ...FEATURES.map((feature) => ({
               target: `${SRC}/features/${feature}`,
@@ -60,6 +61,12 @@ export default defineConfig(
       ],
       "no-console": "error",
     },
+  },
+  {
+    // No package either, named in the import itself: where node_modules sits, the zone above cannot see.
+    files: [`${SRC}/sw/**`],
+    ignores: TESTS,
+    rules: { "no-restricted-imports": ["error", { patterns: [{ regex: "^[^.]", message: SW }] }] },
   },
   {
     files: [`${SRC}/**/*.{ts,tsx}`],
