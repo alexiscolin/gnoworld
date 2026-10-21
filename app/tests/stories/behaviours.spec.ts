@@ -505,8 +505,20 @@ test.describe("an avatar", () => {
       const stops = [...(document.getElementById(target)?.querySelectorAll("stop") ?? [])];
       return stops.map((stop) => getComputedStyle(stop).stopColor);
     });
-    expect(colours).toContain("rgb(183, 156, 255)");
-    expect(colours.some((colour) => colour.startsWith("rgb(92, 242, 200)"))).toBe(false);
+    // A core of the text's colour, then violet to its edge, where it fades.
+    expect(colours).toEqual(["rgb(244, 246, 250)", "rgb(183, 156, 255)", "rgb(183, 156, 255)"]);
+  });
+
+  test("draws its stars and their line in the text's colour, the line unfilled", async ({ page }) => {
+    await open(page, "avatar--person");
+    const drawn = await page.locator("[data-kind='person'] svg").evaluate((svg) => {
+      const line = getComputedStyle(svg.querySelector("polyline") ?? svg);
+      return {
+        stars: [...new Set([...svg.querySelectorAll("[data-star]")].map((star) => getComputedStyle(star).fill))],
+        line: [line.stroke, line.fill],
+      };
+    });
+    expect(drawn).toEqual({ stars: ["rgb(244, 246, 250)"], line: ["rgb(244, 246, 250)", "none"] });
   });
 
   // The ring is a border, which forced colours paint in the system's colour; a box-shadow they drop,
