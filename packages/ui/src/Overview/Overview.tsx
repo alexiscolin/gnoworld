@@ -6,7 +6,20 @@ import { Flash } from "../Flash/Flash.tsx";
 import { Icon, ICON_NAMES } from "../icons/Icon.tsx";
 import { Kicker } from "../Kicker/Kicker.tsx";
 import { Skeleton } from "../Skeleton/Skeleton.tsx";
-import { Activity, Cards, Chips, Dialogs, Fields, Planets, Popovers, Rows, Stats, TabRows } from "./Interface.tsx";
+import {
+  Activity,
+  Avatars,
+  Cards,
+  Chips,
+  Dialogs,
+  Fields,
+  Links,
+  Planets,
+  Popovers,
+  Rows,
+  Stats,
+  TabRows,
+} from "./Interface.tsx";
 import { Region } from "./Region.tsx";
 
 function Buttons() {
@@ -173,6 +186,12 @@ export function Overview() {
       </Region>
       <Region name="Planets">
         <Planets />
+      </Region>
+      <Region name="Avatars">
+        <Avatars />
+      </Region>
+      <Region name="Links">
+        <Links />
       </Region>
       <Region name="Text">
         <Text />

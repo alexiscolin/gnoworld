@@ -429,10 +429,35 @@ test("the flash sits in the flow: empty it takes no room and paints nothing, ful
   });
   expect(empty).toEqual({ height: 0, inside: 0, ground: "rgba(0, 0, 0, 0)", position: "static" });
   await open(page, "flash--timed");
+  // Its Close places its own parts: the square button holds its icon (relative), its tooltip sits in the
+  // top layer. All else is in the flow.
   const placed = await page
     .getByRole("status")
-    .evaluate((region) => [region, ...region.querySelectorAll("*")].map((e) => getComputedStyle(e).position));
-  expect(new Set(placed)).toEqual(new Set(["static"]));
+    .evaluate((region) =>
+      [region, ...region.querySelectorAll("*")]
+        .filter((e) => e.closest("[popover]") === null)
+        .map((e) => `${e.matches("button") ? "button " : ""}${getComputedStyle(e).position}`),
+    );
+  expect(new Set(placed)).toEqual(new Set(["static", "button relative"]));
+});
+
+// Opaque until the blur behind a panel is widely Baseline: what passes behind never shows through (F262).
+test("a flash's panel is the surface's night, opaque", async ({ page }) => {
+  await open(page, "flash--timed");
+  const [panel, night, through] = await page.getByRole("status").evaluate((region) => {
+    const probe = document.body.appendChild(document.createElement("div"));
+    probe.style.background = "var(--color-surface)";
+    const flash = region.firstElementChild ?? region;
+    const seen = [flash, probe].map((e) => getComputedStyle(e).backgroundColor);
+    probe.remove();
+    // What shows through is the product of the panel's opacity and every ancestor's.
+    let opacity = 1;
+    for (let e: Element | null = flash; e !== null; e = e.parentElement) opacity *= Number(getComputedStyle(e).opacity);
+    return [...seen, opacity] as const;
+  });
+  expect(through).toBe(1);
+  expect(panel).toBe(night);
+  expect(panel).toMatch(/^rgb\(\d+, \d+, \d+\)$/);
 });
 
 test("under forced colours, every button keeps a visible edge", async ({ page }) => {

@@ -35,7 +35,6 @@
     --color-fill-hover: color-mix(in oklab, var(--p-text) 10%, transparent);
     --color-line: color-mix(in oklab, var(--p-text) 10%, transparent);
     --color-line-strong: color-mix(in oklab, var(--p-text) 20%, transparent);
-    --color-panel: color-mix(in oklab, var(--p-night) 86%, transparent);
     --color-surface: var(--p-night);
     --color-scrim: color-mix(in oklab, var(--p-space) 70%, transparent);
 
@@ -81,6 +80,9 @@
     --thumb-s: 32px;
     --thumb-m: 48px;
     --thumb-l: 64px;
+    --avatar-s: 20px;
+    --avatar-m: 24px;
+    --avatar-l: 48px;
 
     --radius-s: 8px;
     --radius-m: 12px;

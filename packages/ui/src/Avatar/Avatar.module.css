@@ -1,0 +1,75 @@
+/* The avatar: a disc of night at an avatar size, its face scaled into it. The presence dot and the
+   speaking ring are borders in the text's colour: forced colours keep a border, and drop a shadow. */
+@layer components {
+  .avatar {
+    position: relative;
+    /* layout: a bot's icon sits in the middle of the disc */
+    display: inline-grid;
+    /* layout: a bot's icon sits in the middle of the disc */
+    place-items: center;
+    inline-size: var(--avatar-m);
+    aspect-ratio: 1;
+    border-radius: var(--radius-pill);
+    background: var(--color-surface);
+    color: var(--color-text);
+    vertical-align: middle;
+  }
+
+  .avatar[data-size="s"] {
+    inline-size: var(--avatar-s);
+  }
+
+  .avatar[data-size="l"] {
+    inline-size: var(--avatar-l);
+  }
+
+  /* The ring, as wide as the focus ring and as far from the disc. */
+  .avatar[data-speaking]::after {
+    position: absolute;
+    inset: calc(-2 * var(--focus-width));
+    border: var(--focus-width) solid var(--color-text);
+    border-radius: var(--radius-pill);
+    content: "";
+  }
+
+  .face {
+    inline-size: 100%;
+    clip-path: circle();
+  }
+
+  .line {
+    fill: none;
+    stroke: var(--color-text);
+    /* raw: the canvas's line, 55% of the text over the clouds, 1.2 units of 48 wide */
+    stroke-opacity: 0.55;
+    stroke-width: 1.2;
+  }
+
+  .star {
+    fill: var(--color-text);
+  }
+
+  .halo {
+    fill: var(--color-text);
+    /* raw: the bright star's halo, from the canvas */
+    fill-opacity: 0.25;
+  }
+
+  .core {
+    stop-color: var(--color-text);
+  }
+
+  .glow {
+    stop-color: var(--color-signal);
+  }
+
+  /* The dot: a border all round an empty box, so forced colours paint it. */
+  .presence {
+    position: absolute;
+    inset-block-end: 0;
+    inset-inline-end: 0;
+    border: calc(var(--size-dot) / 2) solid var(--color-text);
+    border-radius: var(--radius-pill);
+    box-shadow: 0 0 0 var(--line-width) var(--color-space);
+  }
+}

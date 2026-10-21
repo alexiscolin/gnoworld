@@ -188,7 +188,7 @@ the brightest planet behind the header's pills.
 |---|---|---|
 | `--shadow-popover` | `0 12px 32px` space 55% | Popovers, menus, dialogs |
 | `--shadow-float` | `0 16px 40px` space 45% | The flash, the big action |
-| `--blur-glass` | 12 px | Small surfaces over the scene: labels, pills, the flash |
+| `--blur-glass` | 12 px | Small surfaces over the scene: labels, pills. The flash is opaque, the surface's night, until the blur is widely Baseline (F262) |
 | `--blur-surface` | 24 px | Only where the slice 7 bench allows it; large panels use the near-opaque panel colour |
 | `--opacity-disabled` | 0.4 | Every disabled control |
 
@@ -224,9 +224,9 @@ until the dialog closes.
 Named behaviours:
 - **Arrival on a world:** the planet settles, the plate comes in, the figures count up. All of it
   takes 1.2 s at most.
-- **Lifetimes:** a flash and a scene bubble live 5 s, held while the pointer is over them and then
-  given 5 s again; a flash that carries an action stays until it is taken or closed, and taking it
-  ends it (WCAG 2.2.1).
+- **Lifetimes:** a flash and a scene bubble live 5 s, held while the pointer is over them or the
+  focus is in them, and then given 5 s again; every flash has its Close; a flash that carries an
+  action stays until it is taken or closed, and taking it ends it (WCAG 2.2.1).
 - **Landing at once:** a click or `Esc` during a flight lands immediately (ADR-0001 §7).
 
 Under `prefers-reduced-motion: reduce`:
@@ -419,7 +419,8 @@ Components use container queries, so they fit wherever they are placed.
   - **Compositions** are the layout primitives, `Stack`, `Cluster`, `Grid`, `Sidebar`,
     `Switcher`, `Center`: intrinsic layouts that place things without styling them, each taking
     a space step (Center's is its gutter). All layout is one of them, never new CSS.
-  - **Blocks** are the components, one CSS Module each, so class names never leak.
+  - **Blocks** are the components, one CSS Module each, so class names never leak: no prefix,
+    as the module renames each class with a hash; the utilities keep their plain names.
   - **Utilities** are a handful of single-purpose classes, driven by tokens: visually-hidden,
     the flow space, truncate, list-reset, scroll-body, the label style.
   - **Exceptions** are states read from attributes, `[aria-pressed="true"]`,

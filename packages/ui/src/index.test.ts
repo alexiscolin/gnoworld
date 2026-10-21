@@ -9,6 +9,7 @@ type Exported = typeof ui;
 const unstyled: { [Name in keyof Exported]: Unstyled<ComponentProps<Exported[Name]>> } = {
   Button: true,
   ActivityChart: true,
+  Avatar: true,
   Card: true,
   Center: true,
   Chip: true,
@@ -21,6 +22,7 @@ const unstyled: { [Name in keyof Exported]: Unstyled<ComponentProps<Exported[Nam
   Icon: true,
   IconButton: true,
   Kicker: true,
+  LinkProvider: true,
   Menu: true,
   PlanetThumb: true,
   Popover: true,
@@ -46,6 +48,7 @@ it("exports every component of the design system, and nothing else", () => {
   expect(Object.keys(ui).sort()).toEqual(
     [
       "ActivityChart",
+      "Avatar",
       "Button",
       "Card",
       "Center",
@@ -59,6 +62,7 @@ it("exports every component of the design system, and nothing else", () => {
       "Icon",
       "IconButton",
       "Kicker",
+      "LinkProvider",
       "Menu",
       "PlanetThumb",
       "Popover",

@@ -1,5 +1,6 @@
 // @gnoworld/ui, the design system (docs/DESIGN-SYSTEM.md): its components; its sheet is ./styles.css.
 export { ActivityChart, type ActivityChartProps } from "./ActivityChart/ActivityChart.tsx";
+export { Avatar, type AvatarProps } from "./Avatar/Avatar.tsx";
 export { Button, type ButtonProps } from "./Button/Button.tsx";
 export { IconButton, type IconButtonProps } from "./Button/IconButton.tsx";
 export { Card, type CardHeaderProps, type CardProps } from "./Card/Card.tsx";
@@ -11,6 +12,7 @@ export { Field, type FieldProps } from "./Field/Field.tsx";
 export { Flash, type FlashMessage, type FlashProps } from "./Flash/Flash.tsx";
 export { Icon, type IconName, type IconProps } from "./icons/Icon.tsx";
 export { Kicker, type KickerProps } from "./Kicker/Kicker.tsx";
+export { LinkProvider, type PageLinkProps } from "./link.tsx";
 export { PlanetThumb, type PlanetThumbProps } from "./PlanetThumb/PlanetThumb.tsx";
 export { Menu, Popover, type MenuItem, type MenuProps, type PopoverProps } from "./Popover/Popover.tsx";
 export { Row, type RowProps } from "./Row/Row.tsx";

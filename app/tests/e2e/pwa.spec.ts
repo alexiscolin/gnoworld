@@ -25,6 +25,21 @@ async function appManifest(page: Page) {
   return (await page.context().newCDPSession(page)).send("Page.getAppManifest");
 }
 
+// The icons the page's manifest names, as the page fetches it: each address resolved, "any" unless said.
+async function manifestIcons(page: Page) {
+  return page.evaluate(async () => {
+    const base = new URL(document.querySelector('link[rel="manifest"]')?.getAttribute("href") ?? "", location.href);
+    const manifest = (await (await fetch(base)).json()) as {
+      icons?: { src: string; sizes: string; type: string; purpose?: string }[];
+    };
+    return (manifest.icons ?? []).map(({ src, purpose = "any", ...icon }) => ({
+      ...icon,
+      purpose,
+      src: new URL(src, base).href,
+    }));
+  });
+}
+
 test("Chromium reads the manifest with no error: the name, the root as scope and start, standalone", async ({
   page,
   baseURL,
@@ -105,21 +120,118 @@ test.describe("behind the demo's password", () => {
   });
 });
 
-test("each icon the manifest names is a PNG of the size it states, 192 and 512", async ({ page }) => {
+test("each icon the manifest names is a PNG of the size it states: 192, 512, and a maskable 512", async ({ page }) => {
   await page.goto("/");
-  const icons = await page.evaluate(async () => {
-    const base = new URL(document.querySelector('link[rel="manifest"]')?.getAttribute("href") ?? "", location.href);
-    const manifest = (await (await fetch(base)).json()) as { icons?: { src: string; sizes: string; type: string }[] };
-    return Promise.all(
-      (manifest.icons ?? []).map(async ({ src, sizes, type }) => {
-        const bytes = new DataView(await (await fetch(new URL(src, base))).arrayBuffer());
-        const png = bytes.getUint32(0) === 0x89504e47 && bytes.getUint32(4) === 0x0d0a1a0a;
-        return { sizes, type, png, read: `${String(bytes.getUint32(16))}x${String(bytes.getUint32(20))}` };
-      }),
-    );
-  });
-  expect(icons.map(({ sizes }) => sizes).sort()).toEqual(["192x192", "512x512"]);
-  for (const icon of icons) expect(icon).toEqual({ sizes: icon.read, type: "image/png", png: true, read: icon.sizes });
+  const icons = await page.evaluate(
+    async (named) => {
+      return Promise.all(
+        named.map(async ({ src, sizes, type, purpose }) => {
+          const bytes = new DataView(await (await fetch(src)).arrayBuffer());
+          const png = bytes.getUint32(0) === 0x89504e47 && bytes.getUint32(4) === 0x0d0a1a0a;
+          return {
+            src,
+            sizes,
+            type,
+            purpose,
+            png,
+            read: `${String(bytes.getUint32(16))}x${String(bytes.getUint32(20))}`,
+          };
+        }),
+      );
+    },
+    await manifestIcons(page),
+  );
+  expect(icons.map(({ sizes, purpose }) => `${sizes} ${purpose}`).sort()).toEqual([
+    "192x192 any",
+    "512x512 any",
+    "512x512 maskable",
+  ]);
+  expect(new Set(icons.map(({ src }) => src)).size).toBe(3);
+  for (const icon of icons) expect(icon).toMatchObject({ sizes: icon.read, type: "image/png", png: true });
+});
+
+// Decision 1 (docs/decisions.md): the mark in cream on space. A platform cuts a maskable icon to its
+// own shape, keeping the circle of radius 2/5 of its side round the centre (W3C Web App Manifest, §2.3).
+test("the icons draw the mark in cream on space, the maskable one opaque and inside its safe zone", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const drawn = await page.evaluate(
+    async (named) => {
+      // The farthest pixel from the centre that is not the space, as a fraction of the side; the most
+      // saturated; the creamiest.
+      const scan = (data: Uint8ClampedArray, side: number) => {
+        let [reach, chroma, cream] = [0, 0, 0];
+        for (let i = 0; i < data.length; i += 4) {
+          const [r = 0, g = 0, b = 0, a = 0] = data.slice(i, i + 4);
+          if (a === 0) continue;
+          chroma = Math.max(chroma, Math.max(r, g, b) - Math.min(r, g, b));
+          cream = Math.max(cream, Math.min(r, g, b));
+          const [x, y] = [(i / 4) % side, Math.floor(i / 4 / side)];
+          if (a !== 255 || Math.max(Math.abs(r - 5), Math.abs(g - 7), Math.abs(b - 13)) > 2)
+            reach = Math.max(reach, Math.hypot(x + 0.5 - side / 2, y + 0.5 - side / 2) / side);
+        }
+        return { reach, chroma, cream };
+      };
+      return Promise.all(
+        named.map(async ({ src, purpose }) => {
+          const picture = await createImageBitmap(await (await fetch(src)).blob());
+          const side = picture.width;
+          const canvas = new OffscreenCanvas(side, side);
+          const context = canvas.getContext("2d");
+          if (context === null) throw new Error("no canvas");
+          context.drawImage(picture, 0, 0);
+          const { data } = context.getImageData(0, 0, side, side);
+          const pixel = (x: number, y: number) => [...context.getImageData(x, y, 1, 1).data];
+          // The mark's points, in icon.svg's units: centre, inner and outer planets, the ring's top, and
+          // the space between the ring and the orbit. The maskable icon is the drawing at 80%, centred.
+          const [offset, scale] = purpose === "maskable" ? [side * 0.1, side * 0.8] : [0, side];
+          const marks = [
+            [16, 16],
+            [24, 16],
+            [6.9, 25.4],
+            [16, 8],
+            [16, 5.25],
+          ].map(([x = 0, y = 0]) =>
+            pixel(Math.round(offset + ((x + 2) / 36) * scale), Math.round(offset + ((y + 2) / 36) * scale)).slice(0, 3),
+          );
+          const corners = [
+            [0, 0],
+            [side - 1, 0],
+            [0, side - 1],
+            [side - 1, side - 1],
+          ].map(([x = 0, y = 0]) => pixel(x, y));
+          return { purpose, corners, marks, ...scan(data, side) };
+        }),
+      );
+    },
+    await manifestIcons(page),
+  );
+  expect(drawn).toHaveLength(3);
+  for (const { chroma, cream, marks } of drawn) {
+    expect(chroma, "only space, cream and their blends").toBeLessThanOrEqual(16);
+    expect(cream, "the mark in cream").toBeGreaterThanOrEqual(225);
+    const [creams, space] = [marks.slice(0, -1), marks.at(-1) ?? []];
+    for (const point of creams)
+      expect(Math.min(...point), "the mark's centre, planets and ring").toBeGreaterThanOrEqual(225);
+    expect(Math.max(...space), "the space between the ring and the orbit").toBeLessThanOrEqual(20);
+  }
+  // The drawing itself: the tokens' cream and space, and no other colour.
+  const svg = await (await page.request.get("/icon.svg")).text();
+  const tokens = await page.evaluate(() =>
+    ["--p-cream", "--p-space"].map((name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim()),
+  );
+  expect(new Set([...svg.matchAll(/#[0-9a-f]{3,8}\b/gi)].map(([colour]) => colour.toLowerCase()))).toEqual(
+    new Set(tokens),
+  );
+  const maskable = drawn.find(({ purpose }) => purpose === "maskable");
+  expect(maskable?.corners).toEqual([
+    [5, 7, 13, 255],
+    [5, 7, 13, 255],
+    [5, 7, 13, 255],
+    [5, 7, 13, 255],
+  ]);
+  expect(maskable?.reach).toBeLessThanOrEqual(0.4);
 });
 
 test("the worker answers the build's hashed files from its cache, and caches no page as they load", async ({

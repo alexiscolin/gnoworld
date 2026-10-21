@@ -15,12 +15,31 @@ function advance(ms: number) {
   });
 }
 
+// The focus moved, in order, to each button named.
+function focusOn(...names: string[]) {
+  act(() => {
+    for (const name of names) screen.getByRole("button", { name }).focus();
+  });
+}
+
 // The count ends 5 s from now, to the millisecond: nothing at 4,999 ms, one close at 5,000.
 function endsIn5s(onClose: ReturnType<typeof vi.fn>) {
   advance(4_999);
   expect(onClose).not.toHaveBeenCalled();
   advance(1);
   expect(onClose).toHaveBeenCalledOnce();
+}
+
+// A timed flash with a button beside it, where the focus can go; its onClose, to watch.
+function withElsewhere() {
+  const onClose = vi.fn();
+  render(
+    <>
+      <Flash message={saved} onClose={onClose} />
+      <button type="button">Elsewhere</button>
+    </>,
+  );
+  return onClose;
 }
 
 // A flash as a page holds it: its message is state, its close clears it, and its action may set the next.
@@ -72,10 +91,56 @@ describe("Flash", () => {
     expect(within(region).getByText(saved.line)).toBeTruthy();
   });
 
-  it("ends a flash with no action after 5 s, not before, and has no button", () => {
+  it("ends a flash with no action after 5 s, not before; its one button is Close", () => {
     const onClose = vi.fn();
     render(<Flash message={saved} onClose={onClose} />);
-    expect(screen.queryAllByRole("button")).toHaveLength(0);
+    expect(screen.getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual(["Close"]);
+    endsIn5s(onClose);
+  });
+
+  // WCAG 2.2.1: the keyboard and touch can end or keep what the pointer can (Alexis, F260).
+  it("ends a flash with no action at once from its Close", () => {
+    const onClose = vi.fn();
+    render(<Flash message={saved} onClose={onClose} />);
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(onClose).toHaveBeenCalledExactlyOnceWith();
+  });
+
+  it("holds a flash with no action while the focus is in it, then gives it 5 s again", () => {
+    const onClose = withElsewhere();
+    advance(3_000);
+    focusOn("Close");
+    advance(60_000);
+    expect(onClose).not.toHaveBeenCalled();
+    focusOn("Elsewhere");
+    endsIn5s(onClose);
+  });
+
+  // Two holds, each its own: the pointer leaving never ends the focus's, nor the focus leaving the pointer's.
+  it.each([
+    ["the pointer leaves while the focus stays", "pointer"],
+    ["the focus leaves while the pointer stays", "focus"],
+  ] as const)("stays held when %s, and counts 5 s once both are gone", (_, first) => {
+    const onClose = withElsewhere();
+    const flash = screen.getByText(saved.title);
+    const close = screen.getByRole("button", { name: "Close" });
+    const elsewhere = screen.getByRole("button", { name: "Elsewhere" });
+    const leave = {
+      pointer: () => fireEvent.pointerLeave(flash),
+      focus: () => {
+        act(() => {
+          elsewhere.focus();
+        });
+      },
+    };
+    fireEvent.pointerEnter(flash);
+    act(() => {
+      close.focus();
+    });
+    leave[first]();
+    advance(60_000);
+    expect(onClose).not.toHaveBeenCalled();
+    leave[first === "pointer" ? "focus" : "pointer"]();
     endsIn5s(onClose);
   });
 
@@ -159,7 +224,53 @@ describe("Flash", () => {
   it("ends when its action is taken, then does it, so the act may raise the next flash", () => {
     render(<Held start={deleted(() => undefined)} next={{ title: "Restored" }} />);
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
-    expect(screen.getByRole("status").textContent).toBe("Restored");
+    const region = screen.getByRole("status");
+    expect(within(region).getByText("Restored")).toBeTruthy();
+    expect(within(region).queryByText("Message deleted")).toBeNull();
+  });
+
+  // The action's button leaves with the flash it ends, and a removed element may fire no blur (jsdom
+  // fires none; Chromium 156 does): where the focus is decides the hold, whatever moved it (F308, F316).
+  // Each case: the focus's way back before the page changes it, and after.
+  it.each([
+    ["the focus came to it from nowhere", () => null],
+    [
+      "the focus's way back has left the page",
+      (after: boolean) => (after ? null : <button type="button">Before</button>),
+    ],
+    [
+      "the focus's way back can no longer take it",
+      (after: boolean) => (
+        <button type="button" disabled={after}>
+          Before
+        </button>
+      ),
+    ],
+  ])("counts 5 s for the timed flash an action raises, though %s", (_, before) => {
+    const page = (after: boolean) => (
+      <>
+        {before(after)}
+        <Held start={deleted(() => undefined)} next={{ title: "Restored" }} />
+      </>
+    );
+    const { rerender } = render(page(false));
+    act(() => {
+      screen.queryByRole("button", { name: "Before" })?.focus();
+      screen.getByRole("button", { name: "Undo" }).focus();
+    });
+    rerender(page(true));
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(screen.getByRole("status").textContent).toContain("Restored");
+    advance(5_000);
+    expect(screen.getByRole("status").textContent).toBe("");
+  });
+
+  it("counts 5 s for a timed flash its page puts in place of one whose action held the focus", () => {
+    const onClose = vi.fn();
+    const { rerender } = render(<Flash message={deleted(vi.fn())} onClose={onClose} />);
+    focusOn("Undo");
+    rerender(<Flash message={{ title: "Connection lost" }} onClose={onClose} />);
+    endsIn5s(onClose);
   });
 
   it("hands its handlers nothing of the click", () => {
@@ -174,20 +285,79 @@ describe("Flash", () => {
     expect(onClose).toHaveBeenLastCalledWith();
   });
 
-  it.each(["Undo", "Close"])("gives the focus back to where it was when %s takes it away", (name) => {
+  it.each([
+    ["Undo", "Message deleted", deleted(() => undefined)],
+    ["Close", "Message deleted", deleted(() => undefined)],
+    ["Close", saved.title, saved],
+  ])("gives the focus back to where it was when %s takes %s away", (name, title, start) => {
+    render(
+      <>
+        <button type="button">Before</button>
+        <Held start={start} />
+      </>,
+    );
+    focusOn("Before", name);
+    fireEvent.click(screen.getByRole("button", { name }));
+    expect(screen.queryByText(title)).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Before" }));
+  });
+
+  // Its way back is for the focus it took (F307): from nowhere, from inside itself, or gone elsewhere since.
+  it("closes from its Close when the focus came to it from nowhere", () => {
+    const onClose = vi.fn();
+    render(<Flash message={saved} onClose={onClose} />);
+    focusOn("Close");
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("gives the focus back to where it came from outside, not to its own Undo", () => {
     render(
       <>
         <button type="button">Before</button>
         <Held start={deleted(() => undefined)} />
       </>,
     );
-    act(() => {
-      screen.getByRole("button", { name: "Before" }).focus();
-      screen.getByRole("button", { name }).focus();
-    });
-    fireEvent.click(screen.getByRole("button", { name }));
-    expect(screen.queryByText("Message deleted")).toBeNull();
+    focusOn("Before", "Undo", "Close");
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Before" }));
+  });
+
+  it("forgets its way back once the focus has left it: come back from nowhere, the focus goes nowhere", () => {
+    render(
+      <>
+        <button type="button">Before</button>
+        <Held start={saved} />
+      </>,
+    );
+    focusOn("Before", "Close");
+    act(() => {
+      screen.getByRole("button", { name: "Close" }).blur();
+    });
+    focusOn("Close");
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it("leaves the focus where it went since, when its Close is clicked without taking it", () => {
+    render(
+      <>
+        <button type="button">Before</button>
+        <Held start={saved} />
+        <input aria-label="Typing" />
+      </>,
+    );
+    focusOn("Before", "Close");
+    act(() => {
+      screen.getByRole("textbox", { name: "Typing" }).focus();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Typing" }));
+  });
+
+  it("draws no line for a flash that has none", () => {
+    render(<Flash message={{ title: "Left the room" }} onClose={vi.fn()} />);
+    expect(screen.getByRole("status").querySelectorAll("p")).toHaveLength(1);
   });
 
   it("ends when closed, without its action", () => {
@@ -216,7 +386,7 @@ describe("Flash", () => {
       said: container.querySelector("[role='status']")?.textContent ?? "",
       buttons: container.querySelectorAll("button").length,
     }));
-    expect(shown.some((s) => s.said !== "" && s.buttons === 0)).toBe(true);
+    expect(shown.some((s) => s.said !== "" && s.buttons === 1)).toBe(true);
     expect(shown.some((s) => s.said !== "" && s.buttons === 2)).toBe(true);
     expect(shown.some((s) => s.said === "" && s.buttons === 0)).toBe(true);
   });

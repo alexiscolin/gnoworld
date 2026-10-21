@@ -484,3 +484,123 @@ test.describe("a planet's thumb", () => {
     expect(Object.fromEntries(widths)).toEqual({ s: 32, m: 48, l: 64 });
   });
 });
+
+test.describe("an avatar", () => {
+  test("is a disc of 20, 24 or 48 px by its size", async ({ page }) => {
+    await open(page, "avatar--sizes");
+    const sides = await page.locator("[data-size]").evaluateAll((all) =>
+      all.map((a) => {
+        const { width, height } = a.getBoundingClientRect();
+        return [a.getAttribute("data-size"), [width, height]];
+      }),
+    );
+    expect(Object.fromEntries(sides)).toEqual({ s: [20, 20], m: [24, 24], l: [48, 48] });
+  });
+
+  // Decision 3 (docs/decisions.md): the assistant's orb is violet, the machine's colour; never mint.
+  test("draws the assistant's orb in violet, never in mint", async ({ page }) => {
+    await open(page, "avatar--kinds");
+    const colours = await page.locator("[data-orb]").evaluate((orb) => {
+      const target = /url\(#([^)]+)\)/.exec(orb.getAttribute("fill") ?? "")?.[1] ?? "";
+      const stops = [...(document.getElementById(target)?.querySelectorAll("stop") ?? [])];
+      return stops.map((stop) => getComputedStyle(stop).stopColor);
+    });
+    // A core of the text's colour, then violet to its edge, where it fades.
+    expect(colours).toEqual(["rgb(244, 246, 250)", "rgb(183, 156, 255)", "rgb(183, 156, 255)"]);
+  });
+
+  test("draws its stars and their line in the text's colour, the line unfilled", async ({ page }) => {
+    await open(page, "avatar--person");
+    const drawn = await page.locator("[data-kind='person'] svg").evaluate((svg) => {
+      const line = getComputedStyle(svg.querySelector("polyline") ?? svg);
+      return {
+        stars: [...new Set([...svg.querySelectorAll("[data-star]")].map((star) => getComputedStyle(star).fill))],
+        line: [line.stroke, line.fill],
+      };
+    });
+    expect(drawn).toEqual({ stars: ["rgb(244, 246, 250)"], line: ["rgb(244, 246, 250)", "none"] });
+  });
+
+  // The ring is a border, which forced colours paint in the system's colour; a box-shadow they drop,
+  // and an outline is the focus ring's alone (docs/DESIGN-SYSTEM.md, "Three meanings").
+  test("keeps its speaking ring and its presence dot under forced colours; the ring is no outline", async ({
+    page,
+  }) => {
+    await open(page, "avatar--here-and-speaking");
+    for (const forced of [false, true]) {
+      await page.emulateMedia({ forcedColors: forced ? "active" : "none" });
+      const marks = await page.evaluate(() => {
+        const edge = (e: Element | null, pseudo?: string) => {
+          const s = getComputedStyle(e ?? document.body, pseudo);
+          return { style: s.borderTopStyle, width: Number.parseFloat(s.borderTopWidth), colour: s.borderTopColor };
+        };
+        const speaking = document.querySelector("[data-speaking]");
+        return {
+          edges: [edge(speaking, "::after"), edge(document.querySelector("[data-presence]"))],
+          outline: getComputedStyle(speaking ?? document.body).outlineStyle,
+          ground: getComputedStyle(document.body).backgroundColor,
+        };
+      });
+      for (const { style, width, colour } of marks.edges) {
+        expect([style, width >= 2]).toEqual(["solid", true]);
+        expect(colour).not.toBe(marks.ground);
+      }
+      expect(marks.outline).toBe("none");
+    }
+  });
+
+  // slice-2.md §5: each face as drawn at 20 px, blurred to 4 x 4 zones; two faces are alike when their
+  // zones differ by under 0.06 in OKLab on average. The browser converts the colours (relative colour).
+  test("tells 200 addresses apart at 20 px: two faces alike in under 1% of pairs", async ({ page }) => {
+    await open(page, "avatar--spread");
+    const list = page.getByRole("list");
+    const png = (await list.screenshot({ scale: "css" })).toString("base64");
+    const measured = await list.evaluate(async (ul, shot) => {
+      const bytes = Uint8Array.from(atob(shot), (c) => c.charCodeAt(0));
+      const picture = await createImageBitmap(new Blob([bytes], { type: "image/png" }));
+      const canvas = new OffscreenCanvas(picture.width, picture.height);
+      const context = canvas.getContext("2d");
+      if (context === null) throw new Error("no canvas");
+      context.drawImage(picture, 0, 0);
+      const origin = ul.getBoundingClientRect();
+      const probe = document.body.appendChild(document.createElement("i"));
+      const oklab = (r: number, g: number, b: number) => {
+        probe.style.color = `oklab(from rgb(${String(r)} ${String(g)} ${String(b)}) l a b)`;
+        return (getComputedStyle(probe).color.match(/-?[\d.]+(e-?\d+)?/g) ?? []).slice(0, 3).map(Number);
+      };
+      const sides = new Set<string>();
+      const zones = [...ul.querySelectorAll("[data-size] svg")].map((face) => {
+        const at = face.getBoundingClientRect();
+        sides.add(`${String(at.width)}x${String(at.height)}`);
+        const { data } = context.getImageData(Math.round(at.x - origin.x), Math.round(at.y - origin.y), 20, 20);
+        return Array.from({ length: 16 }, (_, zone) => {
+          const sum = [0, 0, 0];
+          for (let y = 0; y < 5; y++)
+            for (let x = 0; x < 5; x++) {
+              const i = ((Math.floor(zone / 4) * 5 + y) * 20 + (zone % 4) * 5 + x) * 4;
+              for (let c = 0; c < 3; c++) sum[c] = (sum[c] ?? 0) + (data[i + c] ?? 0);
+            }
+          const [r = 0, g = 0, b = 0] = sum.map((s) => s / 25);
+          return oklab(r, g, b);
+        });
+      });
+      probe.remove();
+      // A distance the browser could not compute is NaN, which no threshold catches: counted apart.
+      let [close, pairs, unread] = [0, 0, 0];
+      for (let i = 0; i < zones.length; i++)
+        for (let j = i + 1; j < zones.length; j++) {
+          const apart = (zones[i] ?? []).map((zone, z) =>
+            Math.hypot(...zone.map((v, c) => v - (zones[j]?.[z]?.[c] ?? NaN))),
+          );
+          const mean = apart.reduce((s, d) => s + d, 0) / 16;
+          pairs++;
+          if (!Number.isFinite(mean)) unread++;
+          else if (mean < 0.06) close++;
+        }
+      return { faces: zones.length, sides: [...sides], pairs, unread, alike: close };
+    }, png);
+    const { alike, ...read } = measured;
+    expect(read).toEqual({ faces: 200, sides: ["20x20"], pairs: (200 * 199) / 2, unread: 0 });
+    expect(alike / read.pairs).toBeLessThan(0.01);
+  });
+});

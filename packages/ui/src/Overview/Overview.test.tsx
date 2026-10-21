@@ -35,6 +35,8 @@ const SHOWN: Record<keyof typeof ui, readonly [region: string, mark: string]> = 
   Stat: ["Stats", "[data-value]"],
   ActivityChart: ["Activity", "svg [data-hour]"],
   PlanetThumb: ["Planets", "[data-kind]"],
+  Avatar: ["Avatars", "[data-kind] svg"],
+  LinkProvider: ["Links", "a[data-page-link]"],
 };
 
 describe("Overview", () => {

@@ -1,6 +1,7 @@
 // The overview's parts for the interface's components, each region's content (Overview.tsx).
 import { useState } from "react";
 import { ActivityChart } from "../ActivityChart/ActivityChart.tsx";
+import { Avatar } from "../Avatar/Avatar.tsx";
 import { Button } from "../Button/Button.tsx";
 import { Card } from "../Card/Card.tsx";
 import { Chip } from "../Chip/Chip.tsx";
@@ -8,12 +9,13 @@ import { Cluster, Stack } from "../compositions/index.ts";
 import { Dialog } from "../Dialog/Dialog.tsx";
 import { Field } from "../Field/Field.tsx";
 import { Icon } from "../icons/Icon.tsx";
+import { LinkProvider, type PageLinkProps } from "../link.tsx";
 import { PlanetThumb } from "../PlanetThumb/PlanetThumb.tsx";
 import { Menu, Popover } from "../Popover/Popover.tsx";
 import { Row } from "../Row/Row.tsx";
 import { Stat } from "../Stat/Stat.tsx";
 import { Tabs } from "../Tabs/Tabs.tsx";
-import { DAY, disc } from "./samples.ts";
+import { ADDRESS, DAY, disc, short } from "./samples.ts";
 
 export function Chips() {
   const [lens, setLens] = useState("games");
@@ -164,5 +166,40 @@ export function Planets() {
       <PlanetThumb src={disc("ffc46b")} name="The sun" kind="star" />
       <PlanetThumb src={disc("b79cff")} name="An uncharted signal" kind="signal" magnify />
     </Cluster>
+  );
+}
+
+export function Avatars() {
+  return (
+    <Cluster space="m">
+      <Avatar address={ADDRESS} name={short(ADDRESS)} size="l" here />
+      <Avatar address={ADDRESS} name={short(ADDRESS)} speaking />
+      <Avatar address="" name="Jarvis" kind="assistant" />
+      <Avatar address="" name="The quiz bot" kind="bot" size="s" />
+    </Cluster>
+  );
+}
+
+// What the app's router hands the slot; here a stand-in that marks what it draws and stays put.
+function MarkedLink(props: PageLinkProps) {
+  return (
+    <a
+      data-page-link=""
+      {...props}
+      onClick={(event) => {
+        event.preventDefault();
+      }}
+    />
+  );
+}
+
+export function Links() {
+  return (
+    <LinkProvider link={MarkedLink}>
+      <Cluster space="m">
+        <Button href="/w/bubble">Fly to Bubble</Button>
+        <Row title="Bubble" subtitle="A path from the site's root: the page's own link" href="/w/bubble" />
+      </Cluster>
+    </LinkProvider>
   );
 }

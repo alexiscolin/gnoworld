@@ -19,6 +19,11 @@ describe("Row", () => {
     expect(row?.textContent).toBe("leadBubbleThe BUBBLE token214 here nowtrail");
   });
 
+  it("draws no box for a part it does not have: a title alone is one span", () => {
+    const { container } = render(<Row title="Bubble" />);
+    expect([...container.querySelectorAll("span")].map((span) => span.textContent)).toEqual(["Bubble"]);
+  });
+
   it("is plain and not current unless asked, and says when it is current", () => {
     const { rerender } = render(<Row title="Bubble" />);
     const row = () => screen.getByText("Bubble").closest<HTMLElement>("[data-look]");

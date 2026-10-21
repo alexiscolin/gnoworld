@@ -2,6 +2,7 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { Button } from "../Button/Button.tsx";
 import { IconButton } from "../Button/IconButton.tsx";
 import { Cluster, Stack } from "../compositions/index.ts";
+import { surface } from "../Popover/floating.ts";
 import styles from "./Flash.module.css";
 
 export interface FlashMessage {
@@ -17,13 +18,17 @@ export interface FlashProps {
   onClose: () => void;
 }
 
-// docs/DESIGN-SYSTEM.md, "Motion": 5 s, held while the pointer is over it; with an action, it stays.
+// docs/DESIGN-SYSTEM.md, "Motion": 5 s, held while the pointer is over it or the focus in it, each a
+// hold of its own; with an action, it stays.
 const LIFETIME = 5_000;
 
-// The flash itself, on the page while it has something to say: closed, it leaves with its hold, which
-// no pointerleave would end.
+// The flash itself, on the page while it has something to say: closed, it leaves with its holds, which
+// no pointerleave or blur would end.
 function Pill({ message, onClose }: { message: FlashMessage; onClose: () => void }) {
-  const [held, setHeld] = useState(false);
+  const [pointed, setPointed] = useState(false);
+  // Each move of the focus in or out: it makes the count read again where the focus is.
+  const [moves, setMoves] = useState(0);
+  const pillRef = useRef<HTMLDivElement>(null);
   // Where the focus was before it came in: closed from its own button, the flash gives it back, where
   // it would otherwise fall to the page.
   const backRef = useRef<HTMLElement | null>(null);
@@ -34,38 +39,47 @@ function Pill({ message, onClose }: { message: FlashMessage; onClose: () => void
     if (document.activeElement === button) backRef.current?.focus();
     onClose();
   };
-  const timed = action === undefined && !held;
-  // Its words, not its object: the same words in a new object keep their count.
+  const moved = () => {
+    setMoves((count) => count + 1);
+  };
+  const timed = action === undefined && !pointed;
+  // Its words, not its object, keep their count. The focus holds it where the page has it now: a removed
+  // element fires no blur in jsdom (Chromium 156 fires one), so no flag kept by events can say (F316).
   useEffect(() => {
-    if (!timed) return;
+    if (!timed || pillRef.current?.contains(document.activeElement) === true) return;
     const timer = setTimeout(() => {
       close();
     }, LIFETIME);
     return () => {
       clearTimeout(timer);
     };
-  }, [timed, title, line]);
+  }, [timed, title, line, moves]);
   return (
     <div
-      className={styles["flash"]}
+      ref={pillRef}
+      className={surface(styles["flash"])}
       onPointerEnter={() => {
-        setHeld(true);
+        setPointed(true);
       }}
       onPointerLeave={() => {
-        setHeld(false);
+        setPointed(false);
       }}
       onFocus={(event) => {
+        moved();
+        // Coming in from outside, from nowhere included, it takes a new way back (F323).
         const from = event.relatedTarget;
-        if (from instanceof HTMLElement && !event.currentTarget.contains(from)) backRef.current = from;
+        if (!(from instanceof Node && event.currentTarget.contains(from)))
+          backRef.current = from instanceof HTMLElement ? from : null;
       }}
+      onBlur={moved}
     >
       <Cluster space="m">
         <Stack space="3xs">
           <p className={styles["title"]}>{title}</p>
           {line === undefined ? null : <p className={styles["line"]}>{line}</p>}
         </Stack>
-        {action === undefined ? null : (
-          <Cluster space="2xs">
+        <Cluster space="2xs">
+          {action === undefined ? null : (
             <Button
               size="s"
               onClick={(event) => {
@@ -75,17 +89,17 @@ function Pill({ message, onClose }: { message: FlashMessage; onClose: () => void
             >
               {action.label}
             </Button>
-            <IconButton
-              icon="close"
-              label="Close"
-              emphasis="plain"
-              size="s"
-              onClick={(event) => {
-                leave(event.currentTarget);
-              }}
-            />
-          </Cluster>
-        )}
+          )}
+          <IconButton
+            icon="close"
+            label="Close"
+            emphasis="plain"
+            size="s"
+            onClick={(event) => {
+              leave(event.currentTarget);
+            }}
+          />
+        </Cluster>
       </Cluster>
     </div>
   );

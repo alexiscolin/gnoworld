@@ -1,4 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
+import type { Locator } from "@playwright/test";
 import { expect, hydrated, reactMark, test, type Page } from "./fixtures.ts";
 
 // The pages slice 1 pre-renders (ADR-0002 §2), with the address each names as its own.
@@ -19,6 +20,21 @@ async function tag(page: Page, selector: string): Promise<string> {
   const found = page.locator(selector);
   await expect(found).toHaveCount(1);
   return (await found.getAttribute(selector.startsWith("link") ? "href" : "content")) ?? "";
+}
+
+// A link followed from a hydrated page, to the page and title it leads to: a mark set on the window
+// before the click is still there after it only if the page changed without a reload.
+async function followInPlace(link: Locator, from: string, to: { url: string; title: string }) {
+  const page = link.page();
+  await page.goto(from);
+  await hydrated(page);
+  await page.evaluate(() => {
+    Object.assign(window, { stayed: true });
+  });
+  await link.click();
+  await expect(page).toHaveURL(to.url);
+  await expect(page).toHaveTitle(to.title);
+  expect(await page.evaluate(() => "stayed" in window)).toBe(true);
 }
 
 async function violations(page: Page): Promise<unknown[]> {
@@ -63,6 +79,7 @@ test.describe("as a search engine reads it, before any script runs", () => {
       expect.soft(await tag(page, 'meta[property="og:url"]')).toBe(canonical);
       expect.soft(await tag(page, 'meta[property="og:type"]')).toBe("website");
       await expect.soft(page.locator('meta[name="robots"]')).toHaveCount(0);
+      expect.soft(await tag(page, 'link[rel="icon"][type="image/svg+xml"]')).toBe("/icon.svg");
     });
   }
 
@@ -110,18 +127,19 @@ test.describe("once the client takes over", () => {
   });
 
   test("a link to a world changes the page and its tags without a reload", async ({ page }) => {
-    await page.goto("/");
-    await hydrated(page);
-    await page.evaluate(() => {
-      Object.assign(window, { stayed: true });
+    await followInPlace(page.getByRole("link", { name: "Bubble" }), "/", {
+      url: "/w/bubble",
+      title: "Bubble · gno.world",
     });
-    await page.getByRole("link", { name: "Bubble" }).click();
-    await expect(page).toHaveURL("/w/bubble");
-    await expect(page).toHaveTitle("Bubble · gno.world");
-    expect(await page.evaluate(() => "stayed" in window)).toBe(true);
     expect(await tag(page, 'link[rel="canonical"]')).toBe("https://gno.world/w/bubble");
     expect(await tag(page, 'meta[property="og:url"]')).toBe("https://gno.world/w/bubble");
     await expect(page.locator('meta[name="description"]')).toHaveCount(1);
+  });
+
+  // The way home is the design system's link-button: the router's link fills it (F259).
+  test("the way home from a page not found changes the page without a reload", async ({ page }) => {
+    const home = page.getByRole("alert").getByRole("link", { name: "Back to the universe" });
+    await followInPlace(home, "/nowhere", { url: "/", title: "gno.world" });
   });
 
   for (const { path, title, heading } of notFound) {
@@ -201,6 +219,7 @@ test("the test host serves each kind of file the build writes with its type, as 
     ["/w/bubble.data", "text/x-script"],
     ["/manifest.webmanifest", "application/manifest+json"],
     ["/icon-192.png", "image/png"],
+    ["/icon.svg", "image/svg+xml"],
     ["/sw.js", "text/javascript"],
     ...assets(home, "js").map((path) => [path, "text/javascript"]),
     ...sheets.map((path) => [path, "text/css"]),
