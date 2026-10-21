@@ -15,6 +15,8 @@ import tempfile
 HERE = "packages/core/src/__probe__"
 APP = "app/src/__probe__"
 UI = "packages/ui/src/__probe__"
+AVATAR = "packages/ui/src/Avatar/__probe__"
+FORCED = "@layer components {\n  .a {\n    forced-color-adjust: none;\n  }\n}\n"
 LONG = "export function long(): number {\n  let n = 0;\n" + "  n += 1;\n" * 85 + "  return n;\n}\n"
 with open("package.json") as f:
     SCRIPTS = json.load(f)["scripts"]  # the gate's own commands, so a case proves what the gate runs
@@ -268,9 +270,13 @@ try:
             ("Go.test.tsx", 'import { render } from "@testing-library/react";\nimport { expect, it } from "vitest";\n\nit("draws a link", () => {\n  const { container } = render(<a href="/x">Go</a>);\n  expect(container.querySelector("a")).not.toBeNull();\n});\n', None),
             ("inner_html.tsx", 'import { useEffect, useRef } from "react";\n\nexport function Card({ n }: { n: string }) {\n  const boxRef = useRef<HTMLDivElement>(null);\n  useEffect(() => {\n    if (boxRef.current) boxRef.current.innerHTML = n;\n  });\n  return <div ref={boxRef} />;\n}\n',
              restricted("'innerHTML'")),
+            # A control keeps the system's colours under forced colours: only the avatar's face may not (F319, F349).
+            ("forced.css", FORCED, "css/use-baseline"),
         ]
         lint_cases(ui, UI, "ui")
         shutil.rmtree(UI)
+        lint_cases([("face.css", FORCED, None)], AVATAR, "ui avatar")
+        shutil.rmtree(AVATAR)
 
     if part("react_warn"):
         # Several of the app's rules only warn: the lint script must fail on a warning.
@@ -469,6 +475,7 @@ finally:
     shutil.rmtree(HERE, ignore_errors=True)
     shutil.rmtree("packages/probe", ignore_errors=True)
     shutil.rmtree(UI, ignore_errors=True)
+    shutil.rmtree(AVATAR, ignore_errors=True)
     shutil.rmtree(APP, ignore_errors=True)
 
 if ONLY - ran:

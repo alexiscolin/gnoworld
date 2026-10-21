@@ -45,7 +45,8 @@ const SWITCHED_OFF = {
 };
 // Vitest's tests and Playwright's journeys.
 const TESTS = ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts"];
-const BASELINE_ALSO = { allowSelectors: ["popover-open"], allowProperties: ["forced-color-adjust"] };
+const BASELINE_ALSO = { allowAtRules: ["starting-style"], allowSelectors: ["popover-open"] };
+const FACE = { ...BASELINE_ALSO, allowProperties: ["forced-color-adjust"] };
 const RAW_ANCHOR = { selector: "JSXOpeningElement[name.name='a']", message: "A link in ui is an Anchor (F259)." };
 const MEMOS = ["memo", "useMemo", "useCallback"];
 const MEMO = "The React Compiler memoizes: no hand-written memo, useMemo or useCallback (docs/ARCHITECTURE.md).";
@@ -220,9 +221,11 @@ export default defineConfig(
       "css/use-layers": "error",
       "css/prefer-logical-properties": "error",
       // docs/DESIGN-SYSTEM.md, "Browsers": Baseline widely available, but for the popover and
-      // @starting-style, from 2024, which a popover's fade in needs, and forced-color-adjust, which only
-      // a picture takes, and only where forced colours exist (Alexis, F319).
-      "css/use-baseline": ["error", { allowAtRules: ["starting-style"], ...BASELINE_ALSO }],
+      // @starting-style, from 2024, which a popover's fade in needs.
+      "css/use-baseline": ["error", BASELINE_ALSO],
     },
   },
+  // And forced-color-adjust, which only a picture takes, where forced colours exist: the avatar's face,
+  // never a control (Alexis, F319; F349).
+  { files: ["packages/ui/src/Avatar/**/*.css"], rules: { "css/use-baseline": ["error", FACE] } },
 );
