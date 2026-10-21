@@ -513,6 +513,15 @@ test("a flash raised from a dialog shows above its scrim, at the top centre", as
   expect(await pill.screenshot()).toEqual(alone);
 });
 
+// A manual popover, as its page holds it: an auto one closes on any click outside while the page
+// still thinks it shown (F346).
+test("a flash stays shown when the page is clicked outside it", async ({ page }) => {
+  await open(page, "flash--with-action");
+  await page.mouse.click(5, 300);
+  await page.evaluate(() => new Promise(requestAnimationFrame));
+  expect(await page.locator("[role='status'] > *").evaluate((pill) => pill.matches(":popover-open"))).toBe(true);
+});
+
 test.describe("an avatar", () => {
   test("is a disc of 20, 24 or 48 px by its size", async ({ page }) => {
     await open(page, "avatar--sizes");
