@@ -107,11 +107,8 @@ export default defineConfig(
       "max-params": "error",
     },
   },
-  {
-    // Config files run on Node, whose types core must not see: lint them without types.
-    files: ["*.config.ts", "app/*.config.ts"],
-    extends: [tseslint.configs.disableTypeChecked],
-  },
+  // Config files run on Node, whose types core must not see: lint them without types.
+  { files: ["*.config.ts", "app/*.config.ts"], extends: [tseslint.configs.disableTypeChecked] },
   {
     // The app and the design system: React's hooks and the compiler's rules, and nothing from data
     // into the DOM as HTML (docs/ARCHITECTURE.md, "React" and the security checklist). Their warnings fail too.
