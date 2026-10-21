@@ -14,6 +14,12 @@
     box-shadow: var(--shadow-float);
   }
 
+  /* While a flash shows, what the keyboard reaches scrolls clear of it (F355, WCAG 2.4.11); */
+  /* ponytail: a one-line pill's room; one that wraps on a narrow screen is taller: measure it then */
+  :root:has(.flash:popover-open) {
+    scroll-padding-block-start: calc(var(--space-m) * 2 + var(--control-l));
+  }
+
   .title {
     font: var(--font-ui);
   }

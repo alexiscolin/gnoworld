@@ -575,6 +575,50 @@ test("a flash stays shown when the page is clicked outside it", async ({ page })
   expect(await pillOf(page).evaluate((pill) => pill.matches(":popover-open"))).toBe(true);
 });
 
+// While a flash that stays shows, scroll padding keeps each link the keyboard reaches clear of it; with
+// none, nothing is padded (F355, WCAG 2.4.11). A link at the page's very top cannot scroll down: it stays
+// under the pill, the backlog's "Where the update notice sits".
+test("a link reached by the keyboard is never under a flash that stays, and is not held off the top without one", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  // Shift+Tab from Room 27 on a page scrolled to Room 25: each link reached, as the screen shows it.
+  const walk = async (id: string) => {
+    await open(page, id);
+    await page.evaluate(() => {
+      const list = document.createElement("div");
+      for (let at = 0; at < 60; at++) {
+        const link = list.appendChild(document.createElement("a"));
+        link.href = `#room-${String(at)}`;
+        link.textContent = `Room ${String(at)}`;
+        link.style.display = "block";
+        link.style.blockSize = "40px";
+      }
+      document.querySelector("#storybook-root")?.append(list);
+      scrollTo(0, 1000);
+      document.querySelector<HTMLElement>("a[href='#room-27']")?.focus({ preventScroll: true });
+    });
+    const reached = [];
+    for (let step = 0; step < 4; step++) {
+      await page.keyboard.press("Shift+Tab");
+      reached.push(
+        await page.evaluate(() => {
+          const { top, bottom } = (document.activeElement ?? document.body).getBoundingClientRect();
+          return { name: document.activeElement?.textContent ?? "", top, bottom, scrolled: scrollY };
+        }),
+      );
+    }
+    return reached;
+  };
+  const shown = await walk("flash--with-action");
+  const pill = await box(pillOf(page));
+  for (const link of shown)
+    expect(link.top >= pill.y + pill.height || link.bottom <= pill.y, `${link.name} under the flash`).toBe(true);
+  // Rooms 26 and 25 are on the screen, clear of anything: with no flash, reaching them scrolls nothing.
+  const unpadded = (await walk("flash--empty")).slice(0, 2).map((link) => link.scrolled);
+  expect(unpadded, "with no flash").toEqual([1000, 1000]);
+});
+
 // A flash shown before a modal dialog opens waits under its scrim, out of reach, and is there again as
 // it was when the dialog closes: the top layer stacks by opening order (F354, DESIGN-SYSTEM.md, Layers).
 test("a flash shown before a modal dialog waits under its scrim, and shows again when it closes", async ({ page }) => {
