@@ -15,7 +15,7 @@ import { Menu, Popover } from "../Popover/Popover.tsx";
 import { Row } from "../Row/Row.tsx";
 import { Stat } from "../Stat/Stat.tsx";
 import { Tabs } from "../Tabs/Tabs.tsx";
-import { ADDRESS, DAY, disc } from "./samples.ts";
+import { ADDRESS, DAY, disc, short } from "./samples.ts";
 
 export function Chips() {
   const [lens, setLens] = useState("games");
@@ -172,8 +172,8 @@ export function Planets() {
 export function Avatars() {
   return (
     <Cluster space="m">
-      <Avatar address={ADDRESS} name="g1qpzr…zry9" size="l" here />
-      <Avatar address={ADDRESS} name="g1qpzr…zry9" speaking />
+      <Avatar address={ADDRESS} name={short(ADDRESS)} size="l" here />
+      <Avatar address={ADDRESS} name={short(ADDRESS)} speaking />
       <Avatar address="" name="Jarvis" kind="assistant" />
       <Avatar address="" name="The quiz bot" kind="bot" size="s" />
     </Cluster>
