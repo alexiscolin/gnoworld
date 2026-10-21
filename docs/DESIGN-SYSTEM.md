@@ -141,6 +141,7 @@ the brightest planet behind the header's pills.
 | `--font-data` | 12 px | Geist Mono 400 | Addresses, hashes, code, the ticker, chart axes |
 | `--font-ui` | 13 px | Geist 500 | Controls, chips, tabs |
 | `--font-body` | 14 px, leading 1.5 | Geist 400 | Messages, panels; item titles at 500 |
+| `--font-field` | 14 px, 16 px under a coarse pointer, leading 1.5 | Geist 400 | A field's text and prefix: at 16 px iOS Safari does not zoom on focus (F371) |
 | `--font-lead` | 16 px, leading 1.5 | Geist 400 | A world's description |
 | `--font-action` | 16 px | Geist 500 | The 56 px main action |
 | `--font-title-s` | 20 px | Geist 400 | Small headers (notifications) |

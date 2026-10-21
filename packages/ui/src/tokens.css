@@ -46,6 +46,7 @@
     --font-data: 400 0.75rem/1.4 var(--family-mono);
     --font-ui: 500 0.8125rem/1 var(--family-sans);
     --font-body: 400 0.875rem/1.5 var(--family-sans);
+    --font-field: var(--font-body);
     --font-action: 500 1rem/1 var(--family-sans);
     --font-title-s: 400 1.25rem/1.4 var(--family-sans);
     --font-title-m: 300 1.75rem/1 var(--family-sans);
@@ -107,6 +108,8 @@
   @media (pointer: coarse) {
     :root {
       --control-m: 44px;
+      /* Under 16 px, iOS Safari zooms into a field that takes the focus (F371). */
+      --font-field: 400 1rem/1.5 var(--family-sans);
     }
   }
 

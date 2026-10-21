@@ -14,7 +14,7 @@
     border: var(--line-width) solid var(--_line);
     border-radius: var(--radius-m);
     background: var(--color-fill);
-    font: var(--font-body);
+    font: var(--font-field);
   }
 
   .box:hover {
@@ -29,7 +29,7 @@
     /* layout: the prefix sits level with the box's text */
     align-self: center;
     color: var(--color-text-muted);
-    font: var(--font-body);
+    font: var(--font-field);
   }
 
   .help {

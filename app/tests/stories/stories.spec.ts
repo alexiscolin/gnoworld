@@ -320,6 +320,17 @@ for (const touch of [false, true]) {
       expect(await heights("field--text", "input"), "a field").toEqual([touch ? 44 : 40]);
       expect(await heights("popover--anchored", "[aria-haspopup]"), "a popover's trigger").toEqual([touch ? 44 : 40]);
     });
+
+    // iOS Safari zooms into a field whose text is under 16 px when it takes the focus (F371).
+    test("a field's text is 16 px by touch, 14 px with a pointer, whatever its kind", async ({ page }) => {
+      for (const id of ["field--text", "field--search", "field--date-and-time"]) {
+        await open(page, id);
+        const sizes = await page
+          .locator("#storybook-root input")
+          .evaluateAll((all) => all.map((field) => getComputedStyle(field).fontSize));
+        expect(new Set(sizes), id).toEqual(new Set([touch ? "16px" : "14px"]));
+      }
+    });
   });
 }
 
