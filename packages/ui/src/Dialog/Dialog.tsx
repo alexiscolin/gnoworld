@@ -40,7 +40,9 @@ export function Dialog({ title, open, onClose, wide = false, children }: DialogP
       data-width={wide ? "wide" : "standard"}
       aria-labelledby={titleId}
       // Esc would close it in the browser: the page is asked instead, and keeps it open if it chooses.
+      // A cancel from a control inside it (a file picker dismissed) is that control's (F332).
       onCancel={(event) => {
+        if (event.target !== event.currentTarget) return;
         event.preventDefault();
         onClose();
       }}

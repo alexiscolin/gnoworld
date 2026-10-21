@@ -148,6 +148,23 @@ describe("Dialog", () => {
     expect(dialog().open).toBe(true);
   });
 
+  // A file picker dismissed inside it fires a cancel that bubbles: the picker's, not an Esc (F332).
+  it("takes a cancel from a control inside it for that control's, not for Esc", () => {
+    const onClose = vi.fn();
+    render(
+      <Dialog title="Passport" open onClose={onClose}>
+        <input type="file" aria-label="A photo" />
+      </Dialog>,
+    );
+    const cancel = new Event("cancel", { bubbles: true, cancelable: true });
+    act(() => {
+      screen.getByLabelText("A photo").dispatchEvent(cancel);
+    });
+    expect(onClose).not.toHaveBeenCalled();
+    expect(cancel.defaultPrevented).toBe(false);
+    expect(dialog().open).toBe(true);
+  });
+
   it("calls its onClose with nothing, whatever click closed it", async () => {
     const onClose = vi.fn();
     render(
