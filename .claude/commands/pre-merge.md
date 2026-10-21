@@ -18,22 +18,30 @@ to 6 is committed, never in between: each run costs him its whole length.
    reason in the review card, or leaves the merge.
 3. **The test audit.** Launch the `test-auditor` agent for its green pass, with the diff
    path and the surviving mutants. If it reports findings, stop: list them and wait.
-4. **Simplify.** Run Claude Code's `/simplify` on the range; apply its fixes (each in its own
-   commit, a refactor apart), note what it skips and why, then run the full gate again. The
-   reviews below read the code as it will merge.
+4. **Simplify.** Run `/simplify`'s altitude and simplification angles on the range, two agents
+   in parallel with its own briefs; add its efficiency angle for a slice with a hot path (the 3D,
+   the chat); its reuse angle no more (docs/decisions.md, 2026-10-21). A follow-up merge of fixes
+   (2f, 2g) runs the altitude angle alone. Apply their fixes (each in
+   its own commit, a refactor apart), note what they skip and why, then run the full gate again.
+   The reviews below read the code as it will merge.
 5. **Every review lens, sized up by risk.** Count the branch's review rounds first (its rows in
    `docs/review-passes.txt` and `docs/review-log.md`). The first round reads the range; any later
    one reads only the diff since the last round. A fourth round does not run: stop, report, and
    reconsider the approach with Alexis before any more code. Launch these together:
-   - always: Claude Code's `/code-review` and `/security-review`; tell each the ledger's open and
-     fixed findings for the files it reads, so none is raised again;
+   - always: Claude Code's `/code-review`; tell it the ledger's open and fixed findings for the
+     files it reads, so none is raised again;
+   - a tier-1 file or the harness (`scripts/`, `.githooks/`, `.claude/`, `.github/`, the tools'
+     configs): also `/security-review`, told the ledger as `/code-review` is;
    - always: the `complexity-reviewer` agent, the cost in big O of each loop the range adds;
    - a tier-1 file (`docs/REVIEW.md`): also the `security-reviewer` agent (Opus), which reads
      the project's threat model, and, for a realm, the `gno-auditor`;
    - the last merge of a slice with tier-1 code: propose to Alexis that he runs
      `/code-review ultra` (a deeper review in the cloud, billed per run; Claude cannot start it);
-   - the last merge of a slice: also `/code-review` on each workspace the slice touched, as a
-     path, so it reads the whole folder and not only the diff, with the export map.
+   - the true last merge of a slice: also `/code-review` on each workspace the slice touched, as
+     a path, so it reads the whole folder and not only the diff, with the export map; once per
+     slice, a follow-up merge of fixes reading only its range.
+   Ask every agent and lens for a short report: its findings, one row each with its evidence,
+   no summary of the diff.
    A finding names its class, the kind of bug, and its fix covers every instance of the class,
    not the one line. A finding only about style, diagnostics or cleanup is dropped: `/simplify`
    owns those.
@@ -63,4 +71,7 @@ to 6 is committed, never in between: each run costs him its whole length.
    each finding with its lens and outcome (fixed, wrong, intended, moot, put to Alexis), and what Alexis caught that the
    agents missed. A miss seen twice becomes a proposed rule, lint or test; a lens whose
    findings are mostly dropped over five slices is narrowed or removed. Commit the log and
-   `docs/review-passes.txt` together; that commit keeps the pass valid.
+   `docs/review-passes.txt` together, with a line `Harness-changed: <path> - why` for each
+   harness file the branch changes (`git diff --name-only main...HEAD` against the list of
+   `harness` in `.githooks/records.sh`): pushing `main` is refused without them. That commit
+   keeps the pass valid.
