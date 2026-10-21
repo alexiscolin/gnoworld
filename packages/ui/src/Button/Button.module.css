@@ -5,6 +5,7 @@
     /* The empty fill in the tone's ink that most variants keep. */
     --_ink: var(--_text);
     --_veil: transparent;
+    --_hover: var(--color-fill-hover);
 
     text-decoration: none;
     /* The hover's veil: an inset shadow paints above the fill and below the label, and eases. */
@@ -51,6 +52,8 @@
     --_fill: var(--_accent);
     --_ink: var(--color-ink);
     --_line: var(--_accent);
+    /* The text's veil is lost on a light fill: the ink's shows (F369). */
+    --_hover: var(--color-ink-hover);
   }
 
   .button[data-emphasis="outline"] {
@@ -64,7 +67,7 @@
 
   /* At once under the pointer: the veil is left out of the transitions here, and eases back on leave. */
   .button:hover:not(:disabled, [aria-disabled="true"]) {
-    --_veil: var(--color-fill-hover);
+    --_veil: var(--_hover);
 
     transition-property: background-color, border-color;
   }

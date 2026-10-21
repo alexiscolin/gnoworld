@@ -3,7 +3,7 @@
 // magnification.
 import type { Locator } from "@playwright/test";
 import type { Page } from "../e2e/fixtures.ts";
-import { expect, open, RING, test } from "./storybook.ts";
+import { contrast, expect, open, RING, test } from "./storybook.ts";
 
 // The focused control by its name: an icon button has no words of its own.
 const focused = (page: Page) =>
@@ -129,6 +129,50 @@ test.describe("Dialog", () => {
     await expect(page.getByRole("dialog")).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toBeHidden();
+  });
+
+  // A modal dialog's page is inert, and still too (F373): under the wheel, over the scrim or the dialog,
+  // and under the keys; it scrolls again once the dialog closes. The scroll is read two frames on, and
+  // the first wheel, with no dialog, shows those frames are enough to see one.
+  test("keeps a long page behind it still under the wheel and the keys, and lets it scroll once closed", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await open(page, "dialog--from-a-button");
+    await page.evaluate(() => {
+      document.body.style.minBlockSize = "3000px";
+    });
+    const settled = () =>
+      page.evaluate(
+        () =>
+          new Promise<number>((done) => {
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                done(scrollY);
+              });
+            });
+          }),
+      );
+    const wheel = async (x: number, y: number) => {
+      await page.mouse.move(x, y);
+      await page.mouse.wheel(0, 300);
+      return settled();
+    };
+    expect(await wheel(20, 20), "no dialog").toBe(300);
+    await page.evaluate(() => {
+      scrollTo(0, 0);
+    });
+    await page.getByRole("button", { name: "Open the passport" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    expect(await wheel(20, 20), "over the scrim").toBe(0);
+    const at = await box(dialog);
+    expect(await wheel(at.x + at.width / 2, at.y + at.height / 2), "over the dialog").toBe(0);
+    await page.keyboard.press("PageDown");
+    expect(await settled(), "PageDown").toBe(0);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    expect(await wheel(20, 20), "once closed").toBe(300);
   });
 
   test("with a field, the field takes the focus, not a button", async ({ page }) => {
@@ -411,6 +455,26 @@ test("a skeleton shows only after 300 ms, and breathes then, but stays still und
   }
 });
 
+// The shorter last line belongs to a paragraph of lines, not to a lone line after a heading (F375).
+test("a lone line skeleton after a heading keeps its whole width; a paragraph's last line is shorter", async ({
+  page,
+}) => {
+  await open(page, "skeleton--lines");
+  const [paragraph, last, lone] = await page.evaluate(() => {
+    const lines = document.querySelector("#storybook-root > span");
+    const line = lines?.firstElementChild;
+    if (!lines || !line) throw new Error("no lines");
+    const alone = line.cloneNode();
+    const heading = document.createElement("h2");
+    heading.textContent = "Rooms";
+    lines.after(heading, alone);
+    const width = (shape: Element | null) => shape?.getBoundingClientRect().width ?? 0;
+    return [width(lines), width(lines.lastElementChild), width(heading.nextElementSibling)];
+  });
+  expect(lone).toBe(paragraph);
+  expect(last).toBeCloseTo(paragraph * 0.6, 0);
+});
+
 test.describe("a figure", () => {
   // Each figure the page draws, in turn, with when: recorded from before the story's first render.
   async function recorded(page: Page) {
@@ -452,26 +516,13 @@ test("a chart's bars hold 3:1 against the page, the current one unlike the past,
 }) => {
   await open(page, "activitychart--day");
   await expect(page.getByRole("table", { name: "Calls per hour, today" })).toHaveCount(1);
-  const [past, now, ratios] = await page.evaluate(() => {
-    const rgb = (colour: string) => (colour.match(/\d+/g) ?? []).slice(0, 3).map(Number);
-    const lum = (colour: string) => {
-      const [r = 0, g = 0, b = 0] = rgb(colour).map((c) => {
-        const s = c / 255;
-        return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
-      });
-      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    };
-    const ratio = (a: string, b: string) => {
-      const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
-      return ((hi ?? 0) + 0.05) / ((lo ?? 0) + 0.05);
-    };
-    const ground = getComputedStyle(document.body).backgroundColor;
+  const [past, now, ground] = await page.evaluate(() => {
     const fill = (selector: string) => getComputedStyle(document.querySelector(selector) ?? document.body).fill;
-    const [first, last] = [fill("[data-hour='0']"), fill("[data-current='true']")];
-    return [first, last, [ratio(first, ground), ratio(last, ground)]];
+    return [fill("[data-hour='0']"), fill("[data-current='true']"), getComputedStyle(document.body).backgroundColor];
   });
+  const rgb = (colour: string) => (colour.match(/\d+/g) ?? []).slice(0, 3).map(Number);
   expect(past).not.toBe(now);
-  for (const r of ratios) expect(r).toBeGreaterThanOrEqual(3);
+  for (const bar of [past, now]) expect(contrast(rgb(bar), rgb(ground))).toBeGreaterThanOrEqual(3);
 });
 
 test.describe("a planet's thumb", () => {
@@ -522,6 +573,71 @@ test("a flash stays shown when the page is clicked outside it", async ({ page })
   await page.mouse.click(5, 300);
   await page.evaluate(() => new Promise(requestAnimationFrame));
   expect(await pillOf(page).evaluate((pill) => pill.matches(":popover-open"))).toBe(true);
+});
+
+// While a flash that stays shows, scroll padding keeps each link the keyboard reaches clear of it; with
+// none, nothing is padded (F355, WCAG 2.4.11). A link at the page's very top cannot scroll down: it stays
+// under the pill, the backlog's "Where the update notice sits".
+test("a link reached by the keyboard is never under a flash that stays, and is not held off the top without one", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  // Shift+Tab from Room 27 on a page scrolled to Room 25: each link reached, as the screen shows it.
+  const walk = async (id: string) => {
+    await open(page, id);
+    await page.evaluate(() => {
+      const list = document.createElement("div");
+      for (let at = 0; at < 60; at++) {
+        const link = list.appendChild(document.createElement("a"));
+        link.href = `#room-${String(at)}`;
+        link.textContent = `Room ${String(at)}`;
+        link.style.display = "block";
+        link.style.blockSize = "40px";
+      }
+      document.querySelector("#storybook-root")?.append(list);
+      scrollTo(0, 1000);
+      document.querySelector<HTMLElement>("a[href='#room-27']")?.focus({ preventScroll: true });
+    });
+    const reached = [];
+    for (let step = 0; step < 4; step++) {
+      await page.keyboard.press("Shift+Tab");
+      reached.push(
+        await page.evaluate(() => {
+          const { top, bottom } = (document.activeElement ?? document.body).getBoundingClientRect();
+          return { name: document.activeElement?.textContent ?? "", top, bottom, scrolled: scrollY };
+        }),
+      );
+    }
+    return reached;
+  };
+  const shown = await walk("flash--with-action");
+  const pill = await box(pillOf(page));
+  for (const link of shown)
+    expect(link.top >= pill.y + pill.height || link.bottom <= pill.y, `${link.name} under the flash`).toBe(true);
+  // Rooms 26 and 25 are on the screen, clear of anything: with no flash, reaching them scrolls nothing.
+  const unpadded = (await walk("flash--empty")).slice(0, 2).map((link) => link.scrolled);
+  expect(unpadded, "with no flash").toEqual([1000, 1000]);
+});
+
+// A flash shown before a modal dialog opens waits under its scrim, out of reach, and is there again as
+// it was when the dialog closes: the top layer stacks by opening order (F354, DESIGN-SYSTEM.md, Layers).
+test("a flash shown before a modal dialog waits under its scrim, and shows again when it closes", async ({ page }) => {
+  await open(page, "flash--with-action");
+  const pill = await box(pillOf(page));
+  const hit = () =>
+    pillOf(page).evaluate(
+      (shown, [x, y]) => shown.contains(document.elementFromPoint(x ?? 0, y ?? 0)),
+      [pill.x + pill.width / 2, pill.y + pill.height / 2],
+    );
+  expect(await hit(), "alone").toBe(true);
+  await page.evaluate(() => {
+    const dialog = document.body.appendChild(document.createElement("dialog"));
+    dialog.textContent = "Passport";
+    dialog.showModal();
+  });
+  expect(await hit(), "under the dialog's scrim").toBe(false);
+  await page.keyboard.press("Escape");
+  expect(await hit(), "once the dialog closed").toBe(true);
 });
 
 test.describe("an avatar", () => {

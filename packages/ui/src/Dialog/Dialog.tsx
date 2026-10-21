@@ -14,8 +14,13 @@ export interface DialogProps {
   children: ReactNode;
 }
 
-/** The native modal dialog, over its scrim: its first field takes the focus, or its title, never a
- * button; Esc and Close ask the page to close it, and the browser gives the focus back to the opener. */
+// A field: never an input drawn as a button; an editable box too.
+const FIELD =
+  "input:not([type='submit'], [type='image'], [type='button'], [type='reset'], [type='hidden']), select, textarea, [contenteditable]:not([contenteditable='false'])";
+
+/** The native modal dialog, over its scrim: its first field the browser can focus takes the focus, or
+ * its title, never a button; Esc and Close ask the page to close it, and the browser gives the focus
+ * back to the opener. */
 export function Dialog({ title, open, onClose, wide = false, children }: DialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -34,10 +39,13 @@ export function Dialog({ title, open, onClose, wide = false, children }: DialogP
       return;
     }
     shown.showModal();
-    const field = shown.querySelector<HTMLElement>(
-      "input:not([type='hidden'], :disabled), select:not(:disabled), textarea:not(:disabled)",
-    );
-    (field ?? headingRef.current)?.focus();
+    // A field hidden by CSS or disabled refuses the focus: the next one is tried (F367).
+    const fields = [...shown.querySelectorAll<HTMLElement>(FIELD)];
+    const focused = fields.some((field) => {
+      field.focus();
+      return document.activeElement === field;
+    });
+    if (!focused) headingRef.current?.focus();
   }, [open, closes]);
   return (
     <dialog

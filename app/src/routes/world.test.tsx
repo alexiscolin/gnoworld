@@ -79,4 +79,10 @@ describe("a world's page", () => {
     expect(clientLoader(params("bubble"))).toEqual(findWorld("bubble"));
     expect(() => clientLoader(params("nowhere"))).toThrow();
   });
+
+  // Any throw passed the case above; only React Router's 404 selects the not-found page (F382).
+  test("throws React Router's 404 in the browser for a world that does not exist", () => {
+    const params = { params: { world: "nowhere" } } as unknown as ClientLoaderFunctionArgs;
+    expect(() => clientLoader(params)).toThrow(expect.objectContaining({ init: { status: 404 } }));
+  });
 });

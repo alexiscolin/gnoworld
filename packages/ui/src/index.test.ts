@@ -89,30 +89,50 @@ const ENTRY = "\0layers-entry";
 // The six layers in their order of strength, as styles.css declares them.
 const ORDER = ["reset", "tokens", "base", "compositions", "components", "utilities"];
 
-// Layers rank by their first mention in the page's CSS, and a bundler may emit a component's sheet before
-// styles.css: an app importing the components first, as the import lint orders it, then the sheet, must
-// still meet the six layers in their order, or reset and base outrank the components (F363).
-it("an app importing the components before the sheet meets the layers in their order", async () => {
+// The CSS an app whose entry is this code ships, built as an app is.
+async function cssOf(entry: string): Promise<string> {
   const output = await build({
     configFile: false,
     logLevel: "silent",
     build: { write: false, rolldownOptions: { input: ENTRY } },
     plugins: [
-      {
-        name: "entry",
-        resolveId: (id) => (id === ENTRY ? id : null),
-        load: (id) =>
-          id === ENTRY
-            ? `import { Button } from ${JSON.stringify(here("./index.ts"))};\nimport ${JSON.stringify(here("./styles.css"))};\nexport { Button };\n`
-            : null,
-      },
+      { name: "entry", resolveId: (id) => (id === ENTRY ? id : null), load: (id) => (id === ENTRY ? entry : null) },
     ],
   });
   const chunks = (Array.isArray(output) ? output : [output]).flatMap((o) => (o as Rolldown.RolldownOutput).output);
-  const css = chunks.flatMap((chunk) =>
-    chunk.type === "asset" && chunk.fileName.endsWith(".css") ? [String(chunk.source)] : [],
-  );
-  const named = css.join("\n").matchAll(/@layer\s+([\w\s,]+?)\s*[{;]/g);
+  return chunks
+    .flatMap((chunk) => (chunk.type === "asset" && chunk.fileName.endsWith(".css") ? [String(chunk.source)] : []))
+    .join("\n");
+}
+
+// An app as the app is: a component imported first, as the import lint orders it, then the sheet, as
+// root.tsx does. It uses Button, or the bundler would drop it and its sheet with it.
+const APP = `import { Button } from ${JSON.stringify(here("./index.ts"))};
+import ${JSON.stringify(here("./styles.css"))};
+console.log(Button);
+`;
+// The component sheets in a build's CSS, by their CSS module names (_button_1a2b3_).
+const sheetsIn = (css: string) => new Set([...css.matchAll(/\._([a-z]+)_[0-9a-z]{5}_/g)].map((m) => m[1]));
+
+// Layers rank by their first mention in the page's CSS, and a bundler may emit a component's sheet before
+// styles.css: an app importing the components first, then the sheet, must still meet the six layers in
+// their order, or reset and base outrank the components (F363).
+it("an app importing the components before the sheet meets the layers in their order", async () => {
+  const css = await cssOf(APP);
+  expect(sheetsIn(css).has("button")).toBe(true);
+  const named = css.matchAll(/@layer\s+([\w\s,]+?)\s*[{;]/g);
   const met = [...new Set([...named].flatMap((m) => (m[1] ?? "").split(",").map((name) => name.trim())))];
   expect(met).toEqual(ORDER);
+});
+
+// ui's JavaScript is free of side effects but for its sheets: an app ships the sheets of the components
+// it uses, not every component's (F370). A sheet is a module's classes, which share its hash.
+it("an app using Button alone ships Button's sheets and no other component's", async () => {
+  const css = await cssOf(APP);
+  const modules = new Map<string, Set<string>>();
+  for (const [, name = "", module = ""] of css.matchAll(/\._([a-z]+)_([0-9a-z]{5})_/g))
+    modules.set(module, (modules.get(module) ?? new Set()).add(name));
+  const others = [...modules.values()].filter((names) => !["button", "pill", "icon"].some((own) => names.has(own)));
+  expect(sheetsIn(css).has("button")).toBe(true);
+  expect(others.map((names) => [...names])).toEqual([]);
 });

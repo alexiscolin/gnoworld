@@ -20,10 +20,16 @@ OFF = "(lambda *a: None)("
 GAPS = {}  # label -> why no test can notice it yet
 
 TESTS = {"probe": [sys.executable, "-I", "scripts/probe.py"], "hooks": ["sh", "scripts/test_hooks.sh"]}
+# The lint config and its parts: each rule, selector and restricted name lives in one of them.
+ESLINT = ["eslint.config.ts", "lint/shared.config.ts", "lint/core.config.ts", "lint/react.config.ts", "lint/app.config.ts"]
+REACT = "lint/react.config.ts"
+APP = "lint/app.config.ts"
 # Each guard's file, and the sections of its test that must notice the guard gone (their ONLY=):
 # a mutant runs those alone, not the whole suite. A guard file missing here stops the run.
 SECTIONS = {
-    "eslint.config.ts": "lint,outside_core,react,ui_lint", "app/tsconfig.json": "react_tsc",
+    "eslint.config.ts": "lint,outside_core,react,ui_lint,app_folders", "app/tsconfig.json": "react_tsc",
+    "lint/shared.config.ts": "lint,outside_core,react,ui_lint,app_folders", "lint/core.config.ts": "lint",
+    "lint/react.config.ts": "react,ui_lint,app_folders", "lint/app.config.ts": "app_folders,react",
     # A file both suites guard names each one's sections: a section of the other suite would
     # fail the run as unknown, and count a mutant killed that no test saw.
     "package.json": {"probe": "react_warn,react_tsc,ui_tsc", "hooks": "wiring"}, "pnpm-workspace.yaml": {"hooks": "wiring,regressions"},
@@ -93,29 +99,46 @@ def selectors(path, test):
 def mutants():
     """Every guard of the harness, each with the test that must notice it gone."""
     # ESLint: each rule set to "error", switched off; each selector and restricted name, never matching.
-    text = read("eslint.config.ts")
-    for m in re.finditer(r'^\s+"?([\w@/-]+)"?:\s*(?=\[?\s*"error"|\[\s*$)', text, re.M):
-        at = text.find('"error"', m.end())
-        yield f"eslint {m.group(1)} (line {text.count(chr(10), 0, m.start()) + 1})", "eslint.config.ts", text[:at] + '"off"' + text[at + 7:], "probe"
-    yield from selectors("eslint.config.ts", "probe")
-    yield from each("eslint.config.ts", 'property: "', 'property: "never_', "probe", "eslint restricted property")
+    for path in ESLINT:
+        text = read(path)
+        for m in re.finditer(r'^\s+"?([\w@/-]+)"?:\s*(?=\[?\s*"error"|\[\s*$)', text, re.M):
+            at = text.find('"error"', m.end())
+            yield f"eslint {m.group(1)} ({path}:{text.count(chr(10), 0, m.start()) + 1})", path, text[:at] + '"off"' + text[at + 7:], "probe"
+        yield from selectors(path, "probe")
+    for path in ("lint/core.config.ts", REACT, APP):
+        yield from each(path, 'property: "', 'property: "never_', "probe", "eslint restricted property")
+    # The app's folders (F378): each name of the network and storage, each owner, each folder's path,
+    # each exception, and React's bans kept there, alone.
+    for name in ("fetch", "XMLHttpRequest", "WebSocket", "EventSource", "localStorage", "sessionStorage", "indexedDB", "caches", "cookieStore", "window", "globalThis", "self"):
+        yield from each(APP, f'"{name}"', '"_"', "probe", f"eslint app reaches {name} only from lib and sw")
+    yield from each(APP, "${SRC}/", "${SRC}/nowhere-", "probe", "eslint app folder path")
+    yield from each(APP, 'from: "./",\n              except: [`${SRC}/sw`],', 'from: SRC,\n              except: ["./sw"],', "probe", "eslint the worker reaches no path out of sw")
+    # The worker's packages, refused by name (F385): a scoped one and node: too, and its catches still read.
+    yield from each(APP, 'regex: "^[^.]"', 'regex: "^[a-z]"', "probe", "eslint the worker imports no package, scoped or node: (G2)")
+    yield from each(APP, "...SWALLOWED, ", "", "probe", "eslint the worker's catches are read")
+    yield from each(APP, "...reaching(REACHES.filter(", "...reaching([].filter(", "probe", "eslint the worker's folder keeps fetch and caches only (F395)")
+    yield from each(APP, "{ts,tsx}", "ts", "probe", "eslint reads a feature's screens")
+    yield from each(APP, "`./${feature}`,", "`./nowhere`,", "probe", "eslint a feature imports its own files")
+    yield from each(APP, "/index.ts`)", "/nothing.ts`)", "probe", "eslint a feature imports another's index.ts")
+    yield from each(APP, "ignores: TESTS,", "ignores: [],", "probe", "eslint a test in the app imports what it needs")
+    yield from each(APP, "...REACT_PROPERTIES,", "", "probe", "eslint React's bans hold in the app's folders")
     yield from each("eslint.config.ts", "noInlineConfig: true", "noInlineConfig: false", "probe", "eslint inline config")
     # The app's React lint, and the files its rules reach.
-    yield from each("eslint.config.ts", 'reactHooks.configs.flat["recommended-latest"], ', "", "probe", "eslint React hooks preset")
-    yield from each("eslint.config.ts", ', eslintReact.configs["strict-type-checked"]', "", "probe", "eslint @eslint-react preset")
-    yield from each("eslint.config.ts", '{ name: "react", importNames: MEMOS, message: MEMO }', "", "probe", "eslint no hand-written memo")
-    yield from each("eslint.config.ts", "...MEMOS.map(", "...[].map(", "probe", "eslint no React.useMemo")
+    yield from each(REACT, 'reactHooks.configs.flat["recommended-latest"], ', "", "probe", "eslint React hooks preset")
+    yield from each(REACT, ', eslintReact.configs["strict-type-checked"]', "", "probe", "eslint @eslint-react preset")
+    yield from each(REACT, '{ name: "react", importNames: MEMOS, message: MEMO }', "", "probe", "eslint no hand-written memo")
+    yield from each(REACT, "...MEMOS.map(", "...[].map(", "probe", "eslint no React.useMemo")
     for name in ("memo", "useMemo", "useCallback", "innerHTML", "outerHTML", "insertAdjacentHTML"):  # each banned name, alone (F118)
-        yield from each("eslint.config.ts", f'"{name}"', '"_"', "probe", f"eslint bans {name}")
-    yield from each("eslint.config.ts", 'name: "DataWithResponseInit"', 'name: "Nothing"', "probe", "eslint lets a route throw data()")
+        yield from each(REACT, f'"{name}"', '"_"', "probe", f"eslint bans {name}")
+    yield from each(REACT, 'name: "DataWithResponseInit"', 'name: "Nothing"', "probe", "eslint lets a route throw data()")
     yield from each("eslint.config.ts", 'files: ["packages/ui/src/Avatar/**/*.css"]', 'files: ["**/*.css"]', "probe", "eslint keeps forced-color-adjust to the avatar (F349)")
     yield from each("eslint.config.ts", 'allowProperties: ["forced-color-adjust"]', "allowProperties: []", "probe", "eslint lets the avatar's face keep its colours (F319)")
-    yield from each("eslint.config.ts", ', "**/*.spec.ts"];', "];", "probe", "eslint reads Playwright's tests")
+    yield from each("lint/shared.config.ts", ', "**/*.spec.ts"];', "];", "probe", "eslint reads Playwright's tests")
     yield from each("package.json", "--max-warnings 0 ", "", "probe", "lint fails on a warning")
     yield from each("package.json", " && tsc -p app/tsconfig.json", "", "probe", "typecheck covers the app")
     yield from each("package.json", " && tsc -p packages/ui/tsconfig.json", "", "probe", "typecheck covers ui")
     # ui: React's lint reaches it, and its tests run in jsdom, all of them, each on an empty page.
-    yield from each("eslint.config.ts", ', "packages/ui/src/**/*.{ts,tsx}"]', "]", "probe", "eslint reads ui as React")
+    yield from each(REACT, ', "packages/ui/src/**/*.{ts,tsx}"]', "]", "probe", "eslint reads ui as React")
     yield from each("vitest.config.ts", 'environment: "jsdom",', "", "probe", "ui's tests run in jsdom")
     yield from each("vitest.config.ts", 'setupFiles: ["packages/ui/src/testSetup.ts"],', "", "probe", "ui's tests clean the page")
     yield from each("vitest.config.ts", '"packages/ui/src/**/*.test.{ts,tsx}"', '"packages/ui/sr/**/*.test.{ts,tsx}"', "probe", "ui's tests are found")

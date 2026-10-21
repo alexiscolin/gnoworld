@@ -118,3 +118,28 @@ export function token(page: Page, name: string): Promise<number> {
     return width;
   }, name);
 }
+
+/** WCAG's contrast ratio of two sRGB colours, each its 0-255 channels. */
+export function contrast(a: readonly number[], b: readonly number[]): number {
+  const luminance = (colour: readonly number[]) => {
+    const [r = 0, g = 0, b = 0] = colour.map((c) => {
+      const s = c / 255;
+      return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const [hi = 0, lo = 0] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/** The colour the screen shows at a point, its 0-255 channels: one pixel of a screenshot, decoded. */
+export async function pixel(page: Page, x: number, y: number): Promise<number[]> {
+  const shot = (await page.screenshot({ clip: { x, y, width: 1, height: 1 }, scale: "css" })).toString("base64");
+  return page.evaluate(async (png) => {
+    const bytes = Uint8Array.from(atob(png), (c) => c.charCodeAt(0));
+    const context = new OffscreenCanvas(1, 1).getContext("2d");
+    if (context === null) throw new Error("no canvas");
+    context.drawImage(await createImageBitmap(new Blob([bytes], { type: "image/png" })), 0, 0);
+    return [...context.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+  }, shot);
+}

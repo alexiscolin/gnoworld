@@ -97,6 +97,11 @@ Code written by an agent gets the same reading as anyone's, plus this. `/pre-mer
    the next, the harness is getting solid. If it does not fall over three merges, the
    harness is simplified, not extended: a guard that keeps leaking is replaced by a boundary
    the system enforces (the sandbox, a server check), or removed.
+8. **Keep it cheap.** Each merge runs in a new Claude Code session: the memory and the docs
+   carry the state, and a session reads its whole history again at every exchange. A
+   workspace is reviewed whole once per slice, at its true last merge; a follow-up merge of
+   fixes reads only its range, with `/simplify`'s altitude angle alone. Every agent and lens
+   is asked for a short report: its findings, one row each with its evidence.
 
 ## Before a push
 

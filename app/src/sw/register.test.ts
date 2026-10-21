@@ -284,6 +284,25 @@ test("a second click before the takeover sends nothing more, and the page reload
   expect(reload).toHaveBeenCalledOnce();
 });
 
+// The page remembers the worker it asked, not that it asked once (F380).
+test("a newer worker waiting after a click is asked at the next click", async () => {
+  const older = worker();
+  const { page, registration, updateFound } = container({ waiting: older });
+  const { started, updates } = start(page);
+  await started;
+  updates[0]?.();
+  const newer = worker("installing");
+  updateFound(newer);
+  registration.installing = null;
+  registration.waiting = newer;
+  older.becomes("redundant");
+  newer.becomes("installed");
+  expect(updates).toHaveLength(2);
+  updates[1]?.();
+  expect(older.sent).toEqual([{ type: "SKIP_WAITING" }]);
+  expect(newer.sent).toEqual([{ type: "SKIP_WAITING" }]);
+});
+
 test("a page gone between the found update and its install shows no prompt", async () => {
   const leaving = new AbortController();
   const { page, updateFound } = container();

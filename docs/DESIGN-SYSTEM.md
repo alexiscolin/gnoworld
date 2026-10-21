@@ -79,6 +79,7 @@ Semantic roles, all computed from them:
 | Role | Made of | Use |
 |---|---|---|
 | `--color-fill`, `--color-fill-hover` | text at 5% and 10% | The resting fill of fields, chips and cards; hover |
+| `--color-ink-hover` | space at 10% | Hover on a filled control, the cream or the coral, where the text's veil would not show (F369) |
 | `--color-line`, `--color-line-strong` | text at 10% and 20% | Borders and dividers; secondary buttons, hover |
 | `--color-panel`, `--color-glass` | night at 86% and 60% | Docked panels; what floats over the scene |
 | `--color-surface` | night | What floats over the page: popovers, menus, tooltips, dialogs |
@@ -140,6 +141,7 @@ the brightest planet behind the header's pills.
 | `--font-data` | 12 px | Geist Mono 400 | Addresses, hashes, code, the ticker, chart axes |
 | `--font-ui` | 13 px | Geist 500 | Controls, chips, tabs |
 | `--font-body` | 14 px, leading 1.5 | Geist 400 | Messages, panels; item titles at 500 |
+| `--font-field` | 14 px, 16 px under a coarse pointer, leading 1.5 | Geist 400 | A field's text and prefix: at 16 px iOS Safari does not zoom on focus (F371) |
 | `--font-lead` | 16 px, leading 1.5 | Geist 400 | A world's description |
 | `--font-action` | 16 px | Geist 500 | The 56 px main action |
 | `--font-title-s` | 20 px | Geist 400 | Small headers (notifications) |
@@ -207,6 +209,9 @@ Dialogs, popovers and the flash use the browser's top layer, which stacks by ope
 by these tokens. The flash shows at the top of the screen, centred, above a dialog's scrim when it
 opens after the dialog (F331). A modal dialog makes everything outside it inert, the top layer
 included: a flash raised over one is seen, and its Close and action wait until the dialog closes.
+A flash shown before a modal dialog opens, such as the update notice, which stays, sits under the
+dialog's scrim, dimmed and inert, and shows again as it was when the dialog closes (F354): raising
+it again would show an action no one can press until then.
 
 ### Motion
 

@@ -48,8 +48,9 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
    uncommitted, a gate that passed on its code (in the sandbox it runs it; in Alexis's shell it
    reads the record), and scans the history for secrets.
 7. **Before a merge.** `/pre-merge` runs the full gate, the `test-auditor`'s green pass on the
-   mutation survivors, `/simplify` and the gate again, then `/code-review`, `/security-review`
-   and the `complexity-reviewer` together, with the `security-reviewer` for a tier-1 change.
+   mutation survivors, `/simplify` and the gate again, then `/code-review` and the
+   `complexity-reviewer` together, with `/security-review` for a tier-1 or harness change and
+   the `security-reviewer` for a tier-1 one; each merge in its own session (`docs/REVIEW.md`).
    The `finding-verifier` tries to refute each tier-1 finding, then to reproduce it; each is
    then fixed or put to Alexis, and written to `docs/review/findings.md`. Three review rounds at most per branch. Then it records a review
    pass (`scripts/review_pass.py`).
@@ -76,7 +77,7 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
 |---|---|
 | Prettier | unformatted code |
 | `tsc` | type errors in `core` and the app; `core` sees no DOM and no Node, so it cannot reach the network |
-| ESLint, with `@eslint/css` | floating promises, swallowed errors, `any`, an incomplete switch, `eval`, import cycles, size and complexity limits, impure `core` (clock, chance, globals), switched-off tests (Vitest's and Playwright's), invalid CSS, unlayered CSS, physical properties; in the app, React's hooks and compiler rules, a hand-written `memo`, `useMemo` or `useCallback`, raw HTML into the DOM |
+| ESLint, with `@eslint/css` | floating promises, swallowed errors, `any`, an incomplete switch, `eval`, import cycles, size and complexity limits, impure `core` (clock, chance, globals), switched-off tests (Vitest's and Playwright's), invalid CSS, unlayered CSS, physical properties; in the app, React's hooks and compiler rules, a hand-written `memo`, `useMemo` or `useCallback`, raw HTML into the DOM, a folder's import against ARCHITECTURE.md's table, the network or storage outside `lib` and `sw`, `console` (F378); the config is `eslint.config.ts` and its parts in `lint/` |
 | Vitest, with fast-check | failing tests, `core`'s and the app's (its routes rendered by React Router's static handler); a test with no assertion |
 | knip | unused files, exports and dependencies |
 | jscpd | copies, renamed ones and near ones (similarity 0.8) |
@@ -133,9 +134,9 @@ comes back is a regression. The review agents (`.claude/agents/`) report rows fo
 |---|---|---|
 | `test-auditor`, red pass | after the failing tests, before code | Sonnet |
 | `test-auditor`, green pass | first in `/pre-merge`, on the mutation survivors | Sonnet |
-| `/simplify` | every merge, first: reuse, simplicity, efficiency, altitude; its fixes, then the gate | Claude Code's |
+| `/simplify` | every merge, first: altitude and simplicity, efficiency for a hot path, altitude alone for a merge of fixes; its fixes, then the gate | Claude Code's |
 | `/code-review` | every merge | Claude Code's |
-| `/security-review` | every merge; it keeps only the findings it rates 8 out of 10 or more | Claude Code's |
+| `/security-review` | a merge touching a tier-1 file or the harness; it keeps only the findings it rates 8 out of 10 or more | Claude Code's |
 | `security-reviewer` | a merge touching a tier-1 file, beside `/security-review` | Opus |
 | `complexity-reviewer` | every merge: the cost in big O of each loop, against its input's size | Opus |
 | `finding-verifier` | after the review pass, on each tier-1 lot: refutes or reproduces each finding | Opus |

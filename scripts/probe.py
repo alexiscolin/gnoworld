@@ -21,6 +21,8 @@ LONG = "export function long(): number {\n  let n = 0;\n" + "  n += 1;\n" * 85 +
 with open("package.json") as f:
     SCRIPTS = json.load(f)["scripts"]  # the gate's own commands, so a case proves what the gate runs
 BLOCK = "".join(f"  total += values[{i}] * {i + 1};\n" for i in range(14))
+# The network and the device's storage, which the app reaches only from lib and the worker (F378).
+REACHES = ["fetch", "XMLHttpRequest", "WebSocket", "EventSource", "localStorage", "sessionStorage", "indexedDB", "caches", "cookieStore"]
 
 # File name, content, and what ESLint must report: a rule, or "rule: the start of its message" when
 # one rule holds several guards (no-restricted-syntax's selectors); None: no report at all.
@@ -137,14 +139,18 @@ def expect(ok, what):
 def lint_cases(cases, where, label):
     """Plant each case in `where`, lint them in one ESLint run, and check each names its rule (None: nothing)."""
     plant({name: content for name, content, _ in cases}, where=where)
-    out = run(["node_modules/.bin/eslint", "--no-cache", "--format", "json", where])
+    # The planted files only: `where` may hold the app's own, which a run need not read again.
+    out = run(["node_modules/.bin/eslint", "--no-cache", "--format", "json", *(os.path.join(where, name) for name, _, _ in cases)])
     try:
-        report = {os.path.basename(r["filePath"]): reported(r["messages"]) for r in json.loads(out.stdout)}
+        report = {r["filePath"]: reported(r["messages"]) for r in json.loads(out.stdout)}
     except ValueError:
         report = {}
         expect(False, f"eslint ran on {label}: " + (out.stderr or out.stdout)[-300:])
     for name, _, rule in cases:
-        got = report.get(name, set())
+        # A case's name may hold its folder under `where`: a report is found by the end of its path.
+        got = next((found for path, found in report.items() if path.endswith(os.sep + name)), None)
+        expect(got is not None, f"eslint {label} {name}: linted")
+        got = got or set()
         expect(got == set() if rule is None else carries(got, rule), f"eslint {label} {name}: expected {rule or 'nothing'}, got {sorted(map(str, got))}")
 
 
@@ -283,6 +289,61 @@ try:
         shutil.rmtree(UI)
         lint_cases([("face.css", FORCED, None)], AVATAR, "ui avatar")
         shutil.rmtree(AVATAR)
+
+    if part("app_folders"):
+        # The app's folders (docs/ARCHITECTURE.md, F378), each case planted where its rule reaches: the
+        # worker imports only itself, a feature another only through its index.ts, a route never the
+        # scene; the network and storage only in lib and the worker; console nowhere.
+        src = "app/src"
+        uses = 'import {{ {name} }} from "{path}";\n\nexport const used: unknown = {name};\n'.format
+        reach = "export function load(): unknown {{\n  return {};\n}}\n".format
+        net = "The network and storage are lib's"
+        app = [
+            ("sw/__probe__/sw_clean.ts", uses(name="TAKE_OVER", path="../worker.ts"), None),
+            ("sw/__probe__/sw_feature.ts", uses(name="UpdatePrompt", path="../../features/update/index.ts"), "import-x/no-restricted-paths"),
+            ("sw/__probe__/sw_fetch.ts", reach('fetch("/sw.js")'), None),
+            ("sw/__probe__/sw_tested.test.ts", 'import { expect, test } from "vitest";\n\ntest("x", () => {\n  expect(1).toBe(1);\n});\n', None),
+            # A package is refused by its name, installed or not, wherever node_modules sits (F385);
+            # a path out of the folder by the zone.
+            ("sw/__probe__/sw_package.ts", uses(name="precacheAndRoute", path="workbox-precaching"), "no-restricted-imports"),
+            ("sw/__probe__/sw_scoped.ts", uses(name="precache", path="@workbox/precaching"), "no-restricted-imports"),
+            ("sw/__probe__/sw_node.ts", uses(name="readFileSync", path="node:fs"), "no-restricted-imports"),
+            ("sw/__probe__/sw_dynamic.ts", "export function load(): Promise<unknown> {\n  return import(\"workbox-precaching\");\n}\n", "no-restricted-syntax: The worker imports only sw"),
+            ("sw/__probe__/sw_log_catch.ts", dict((n, c) for n, c, _ in LINT)["log_catch.ts"], "no-restricted-syntax: A catch that only logs"),
+            ("sw/__probe__/sw_reaches_ui.ts", uses(name="Button", path="../../../../packages/ui/src/index.ts"), "import-x/no-restricted-paths"),
+            ("features/__probe__/through_index.ts", uses(name="UpdatePrompt", path="../update/index.ts"), None),
+            ("features/__probe__/own_file.ts", uses(name="used", path="./through_index.ts"), None),
+            ("features/__probe__/uses_sw.ts", uses(name="hostAnswers", path="../../sw/register.ts"), None),
+            ("features/__probe__/past_index.ts", uses(name="UpdatePrompt", path="../update/UpdatePrompt.tsx"), "import-x/no-restricted-paths"),
+            # A feature's screens are .tsx, the routes and the app's own root files reach no network either.
+            ("features/__probe__/past_index_view.tsx", uses(name="UpdatePrompt", path="../update/UpdatePrompt.tsx"), "import-x/no-restricted-paths"),
+            ("features/__probe__/view_fetch.tsx", reach('fetch("/x")'), f"no-restricted-globals: Unexpected use of 'fetch'. {net}"),
+            ("routes/__probe__/route_fetch.ts", reach('fetch("/x")'), f"no-restricted-globals: Unexpected use of 'fetch'. {net}"),
+            ("probe_root_fetch.ts", reach('fetch("/x")'), f"no-restricted-globals: Unexpected use of 'fetch'. {net}"),
+            *[(f"features/__probe__/bare_{name}.ts", reach(name), f"no-restricted-globals: Unexpected use of '{name}'. {net}") for name in REACHES],
+            *[(f"features/__probe__/{owner}_fetch.ts", reach(f"{owner}.fetch"), f"no-restricted-properties: '{owner}.fetch' is restricted from being used. {net}") for owner in ("window", "globalThis", "self")],
+            ("features/__probe__/cookie.ts", reach("document.cookie"), f"no-restricted-properties: 'document.cookie' is restricted from being used. {net}"),
+            ("features/__probe__/beacon.ts", reach('navigator.sendBeacon("/x")'), f"no-restricted-properties: 'navigator.sendBeacon' is restricted from being used. {net}"),
+            ("features/__probe__/opfs.ts", reach("navigator.storage"), f"no-restricted-properties: 'navigator.storage' is restricted from being used. {net}"),
+            # The worker's folder keeps fetch and caches, nothing else of the network or storage (F395).
+            ("sw/__probe__/sw_caches.ts", reach('caches.open("x")'), None),
+            ("sw/__probe__/sw_storage.ts", reach("localStorage"), f"no-restricted-globals: Unexpected use of 'localStorage'. {net}"),
+            ("sw/__probe__/sw_cookie.ts", reach("document.cookie"), f"no-restricted-properties: 'document.cookie' is restricted from being used. {net}"),
+            ("features/__probe__/html_too.ts", "export function put(box: HTMLElement): void {\n  box.innerHTML = \"x\";\n}\n", restricted("'innerHTML'")),
+            ("features/__probe__/stubbed.test.ts", 'import { expect, test } from "vitest";\n\ntest("x", () => {\n  expect(typeof fetch).toBe("function");\n});\n', None),
+            # A test may read another feature's parts, by a path inside the repository wherever node_modules sits.
+            ("features/__probe__/peeks.test.ts", 'import { expect, test } from "vitest";\nimport { UpdatePrompt } from "../update/UpdatePrompt.tsx";\n\ntest("x", () => {\n  expect(UpdatePrompt).toBeDefined();\n});\n', None),
+            ("lib/__probe__/lib_fetch.ts", reach('fetch("/x")'), None),
+            ("routes/__probe__/route_log.ts", 'export function load(): void {\n  console.log("loaded");\n}\n', "no-console"),
+            ("routes/__probe__/route_scene.ts", uses(name="globe", path="../../scene/__probe__/globe.ts"), "import-x/no-restricted-paths"),
+            ("scene/__probe__/globe.ts", "export const globe = 1;\n", None),
+        ]
+        lint_cases(app, src, "app folders")
+        os.remove(f"{src}/probe_root_fetch.ts")
+        for folder in ("sw", "features", "lib", "routes", "scene"):
+            shutil.rmtree(f"{src}/{folder}/__probe__")
+            if not os.listdir(f"{src}/{folder}"):
+                os.rmdir(f"{src}/{folder}")
 
     if part("react_warn"):
         # Several of the app's rules only warn: the lint script must fail on a warning.
