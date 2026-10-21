@@ -1,6 +1,6 @@
 import { Fragment, useId } from "react";
 import { Icon } from "../icons/Icon.tsx";
-import { ORDERS, partsFrom, type Parts } from "./parts.ts";
+import { ORDERS, partsFrom } from "./parts.ts";
 import styles from "./Avatar.module.css";
 
 export interface AvatarProps {
@@ -28,8 +28,12 @@ function said({ name, kind = "person", here, speaking }: AvatarProps) {
 // A point of the face, to the hundredth of a unit: finer than a pixel at 48 px.
 const xy = ([x, y]: readonly [number, number]) => `${x.toFixed(2)},${y.toFixed(2)}`;
 
-// The address's clouds in its hues, its constellation over them, the bright star with its halo.
-function Nebula({ id, parts }: { id: string; parts: Parts }) {
+// The address's clouds in its hues, its constellation over them, the bright star with its halo; for what
+// is not an address, nothing: the night disc alone.
+function Nebula({ address }: { address: string }) {
+  const id = useId();
+  const parts = partsFrom(address);
+  if (parts === null) return null;
   const { hues, clouds, stars, order, bright } = parts;
   return (
     <>
@@ -49,24 +53,28 @@ function Nebula({ id, parts }: { id: string; parts: Parts }) {
         <circle key={hue} cx="24" cy="24" r="24" fill={`url(#${id}-${String(i)})`} />
       ))}
       <polyline className={styles["line"]} points={ORDERS[order]?.map((i) => xy(stars[i] ?? [24, 24])).join(" ")} />
-      {stars.map(([x, y], i) => (
-        <Fragment key={xy([x, y])}>
-          {i === bright ? <circle className={styles["halo"]} cx={x.toFixed(2)} cy={y.toFixed(2)} r="4.5" /> : null}
-          <circle
-            className={styles["star"]}
-            data-star={i === bright ? "bright" : ""}
-            cx={x.toFixed(2)}
-            cy={y.toFixed(2)}
-            r={i === bright ? "2.3" : "1.4"}
-          />
-        </Fragment>
-      ))}
+      {stars.map(([x, y], i) => {
+        const [cx, cy] = [x.toFixed(2), y.toFixed(2)];
+        return (
+          <Fragment key={`${cx},${cy}`}>
+            {i === bright ? <circle className={styles["halo"]} cx={cx} cy={cy} r="4.5" /> : null}
+            <circle
+              className={styles["star"]}
+              data-star={i === bright ? "bright" : ""}
+              cx={cx}
+              cy={cy}
+              r={i === bright ? "2.3" : "1.4"}
+            />
+          </Fragment>
+        );
+      })}
     </>
   );
 }
 
 // Jarvis's orb: a violet glow, lit from its upper start (decision 3; never mint).
-function Orb({ id }: { id: string }) {
+function Orb() {
+  const id = useId();
   return (
     <>
       <defs>
@@ -83,11 +91,9 @@ function Orb({ id }: { id: string }) {
 
 // The face on its night disc, the same at every size: the sheet scales it.
 function Face({ address, kind }: { address: string; kind: "person" | "assistant" }) {
-  const id = useId();
-  const parts = partsFrom(address);
   return (
     <svg viewBox="0 0 48 48" aria-hidden="true" className={styles["face"]}>
-      {kind === "assistant" ? <Orb id={id} /> : parts === null ? null : <Nebula id={id} parts={parts} />}
+      {kind === "assistant" ? <Orb /> : <Nebula address={address} />}
     </svg>
   );
 }
