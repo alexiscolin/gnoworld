@@ -36,6 +36,25 @@ describe("Card", () => {
     return [card.dataset["tone"], card.dataset["edge"], card.dataset["density"]];
   }
 
+  // Under a page's h1, a card's title is an h2 (F305): its level is the page's to say, 3 unless asked.
+  it.each([2, 3, 4] as const)("titles itself at the level it is given: %i", (level) => {
+    render(
+      <Card>
+        <Card.Header title="Which realm next?" level={level} />
+      </Card>,
+    );
+    expect(screen.getByRole("heading", { name: "Which realm next?", level })).toBeTruthy();
+  });
+
+  it("titles itself at level 3 unless asked", () => {
+    render(
+      <Card>
+        <Card.Header title="Which realm next?" />
+      </Card>,
+    );
+    expect(screen.getByRole("heading", { name: "Which realm next?", level: 3 })).toBeTruthy();
+  });
+
   it("is neutral, solid and comfortable unless asked", () => {
     expect(look({})).toEqual(["neutral", "solid", "comfortable"]);
   });
