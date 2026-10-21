@@ -59,6 +59,7 @@ describe("LinkProvider", () => {
   it.each([
     "https://gno.land/",
     "//gno.land/",
+    "//",
     "/\\gno.land/",
     // A browser drops tabs and line ends from an address, so these are "//gno.land/" too (F311).
     "/\t/gno.land/",
