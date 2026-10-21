@@ -35,7 +35,6 @@
     --color-fill-hover: color-mix(in oklab, var(--p-text) 10%, transparent);
     --color-line: color-mix(in oklab, var(--p-text) 10%, transparent);
     --color-line-strong: color-mix(in oklab, var(--p-text) 20%, transparent);
-    --color-panel: color-mix(in oklab, var(--p-night) 86%, transparent);
     --color-surface: var(--p-night);
     --color-scrim: color-mix(in oklab, var(--p-space) 70%, transparent);
 

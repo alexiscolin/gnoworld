@@ -17,13 +17,15 @@ export interface FlashProps {
   onClose: () => void;
 }
 
-// docs/DESIGN-SYSTEM.md, "Motion": 5 s, held while the pointer is over it; with an action, it stays.
+// docs/DESIGN-SYSTEM.md, "Motion": 5 s, held while the pointer is over it or the focus in it, each a
+// hold of its own; with an action, it stays.
 const LIFETIME = 5_000;
 
-// The flash itself, on the page while it has something to say: closed, it leaves with its hold, which
-// no pointerleave would end.
+// The flash itself, on the page while it has something to say: closed, it leaves with its holds, which
+// no pointerleave or blur would end.
 function Pill({ message, onClose }: { message: FlashMessage; onClose: () => void }) {
-  const [held, setHeld] = useState(false);
+  const [pointed, setPointed] = useState(false);
+  const [focused, setFocused] = useState(false);
   // Where the focus was before it came in: closed from its own button, the flash gives it back, where
   // it would otherwise fall to the page.
   const backRef = useRef<HTMLElement | null>(null);
@@ -34,7 +36,7 @@ function Pill({ message, onClose }: { message: FlashMessage; onClose: () => void
     if (document.activeElement === button) backRef.current?.focus();
     onClose();
   };
-  const timed = action === undefined && !held;
+  const timed = action === undefined && !pointed && !focused;
   // Its words, not its object: the same words in a new object keep their count.
   useEffect(() => {
     if (!timed) return;
@@ -49,14 +51,19 @@ function Pill({ message, onClose }: { message: FlashMessage; onClose: () => void
     <div
       className={styles["flash"]}
       onPointerEnter={() => {
-        setHeld(true);
+        setPointed(true);
       }}
       onPointerLeave={() => {
-        setHeld(false);
+        setPointed(false);
       }}
       onFocus={(event) => {
+        setFocused(true);
         const from = event.relatedTarget;
         if (from instanceof HTMLElement && !event.currentTarget.contains(from)) backRef.current = from;
+      }}
+      onBlur={(event) => {
+        const to = event.relatedTarget;
+        if (!(to instanceof Node && event.currentTarget.contains(to))) setFocused(false);
       }}
     >
       <Cluster space="m">
@@ -64,8 +71,8 @@ function Pill({ message, onClose }: { message: FlashMessage; onClose: () => void
           <p className={styles["title"]}>{title}</p>
           {line === undefined ? null : <p className={styles["line"]}>{line}</p>}
         </Stack>
-        {action === undefined ? null : (
-          <Cluster space="2xs">
+        <Cluster space="2xs">
+          {action === undefined ? null : (
             <Button
               size="s"
               onClick={(event) => {
@@ -75,17 +82,17 @@ function Pill({ message, onClose }: { message: FlashMessage; onClose: () => void
             >
               {action.label}
             </Button>
-            <IconButton
-              icon="close"
-              label="Close"
-              emphasis="plain"
-              size="s"
-              onClick={(event) => {
-                leave(event.currentTarget);
-              }}
-            />
-          </Cluster>
-        )}
+          )}
+          <IconButton
+            icon="close"
+            label="Close"
+            emphasis="plain"
+            size="s"
+            onClick={(event) => {
+              leave(event.currentTarget);
+            }}
+          />
+        </Cluster>
       </Cluster>
     </div>
   );
