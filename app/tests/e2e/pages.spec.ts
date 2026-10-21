@@ -63,6 +63,7 @@ test.describe("as a search engine reads it, before any script runs", () => {
       expect.soft(await tag(page, 'meta[property="og:url"]')).toBe(canonical);
       expect.soft(await tag(page, 'meta[property="og:type"]')).toBe("website");
       await expect.soft(page.locator('meta[name="robots"]')).toHaveCount(0);
+      expect.soft(await tag(page, 'link[rel="icon"][type="image/svg+xml"]')).toBe("/icon.svg");
     });
   }
 
@@ -214,6 +215,7 @@ test("the test host serves each kind of file the build writes with its type, as 
     ["/w/bubble.data", "text/x-script"],
     ["/manifest.webmanifest", "application/manifest+json"],
     ["/icon-192.png", "image/png"],
+    ["/icon.svg", "image/svg+xml"],
     ["/sw.js", "text/javascript"],
     ...assets(home, "js").map((path) => [path, "text/javascript"]),
     ...sheets.map((path) => [path, "text/css"]),
