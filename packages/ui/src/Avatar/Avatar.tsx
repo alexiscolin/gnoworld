@@ -84,7 +84,7 @@ function Orb({ id }: { id: string }) {
 // The face on its night disc, the same at every size: the sheet scales it.
 function Face({ address, kind }: { address: string; kind: "person" | "assistant" }) {
   const id = useId();
-  const parts = kind === "person" ? partsFrom(address) : null;
+  const parts = partsFrom(address);
   return (
     <svg viewBox="0 0 48 48" aria-hidden="true" className={styles["face"]}>
       {kind === "assistant" ? <Orb id={id} /> : parts === null ? null : <Nebula id={id} parts={parts} />}
