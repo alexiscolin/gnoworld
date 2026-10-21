@@ -24,3 +24,8 @@ test("home shows its own alert when it fails, with a way home", async () => {
   expect(html).toContain('role="alert"');
   expect(alertOf(html)).toMatch(BACK_HOME);
 });
+
+// The app may be what failed: the way home loads the document again (F325).
+test("home's way out of a failure loads the document again", async () => {
+  expect(alertOf(await render(failing, "/", { slot: true }))).not.toContain("data-routed");
+});

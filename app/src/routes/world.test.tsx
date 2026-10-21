@@ -52,6 +52,17 @@ describe("a world's page", () => {
     expect(html).not.toContain("No world here");
   });
 
+  // The app may be what failed: the way home loads the document again (F325).
+  test.each(failures)("goes home by loading the document again on %s", async (_, failing) => {
+    const html = await render(route(failing), "/w/bubble", { slot: true });
+    expect(alertOf(html)).toMatch(BACK_HOME);
+    expect(alertOf(html)).not.toContain("data-routed");
+  });
+
+  test("goes home through the router from a world that does not exist", async () => {
+    expect(alertOf(await render(route(), "/w/nowhere", { slot: true }))).toContain('data-routed=""');
+  });
+
   test("carries a world's tags, or not found's when no world has the name", async () => {
     const world = findWorld("bubble");
     expect(meta(metaArgs(world))).toEqual(worldMeta(world));

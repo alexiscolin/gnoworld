@@ -27,8 +27,9 @@ export function LinkProvider({ link, children }: { link: DrawLink; children: Rea
   return <PageLinkContext value={link}>{children}</PageLinkContext>;
 }
 
-/** An anchor: the page's link for a path from the site's root, a plain one for anything else. */
-export function Anchor(props: PageLinkProps) {
+/** An anchor: the page's link for a path from the site's root, a plain one for anything else, or
+ * when it must `reload` the document, as an error page's way out does (F325). */
+export function Anchor({ reload = false, ...props }: PageLinkProps & { reload?: boolean }) {
   const link = use(PageLinkContext);
-  return link !== null && ownPath(props.href) ? link(props) : <a {...props} />;
+  return link !== null && !reload && ownPath(props.href) ? link(props) : <a {...props} />;
 }

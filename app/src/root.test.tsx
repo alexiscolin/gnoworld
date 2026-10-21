@@ -11,3 +11,13 @@ test("an error no route catches shows an alert, never a blank page", async () =>
   expect(html).toContain("<h1>Something went wrong</h1>");
   expect(alertOf(html)).toMatch(BACK_HOME);
 });
+
+// The app may be what failed: the way home loads the document again, which the router cannot (F325).
+test("an error no route catches offers a way home that loads the document again", async () => {
+  const failing = () => {
+    throw new Error("a bug");
+  };
+  const html = await render({ path: "/", loader: failing, ErrorBoundary }, "/", { slot: true });
+  expect(alertOf(html)).toMatch(BACK_HOME);
+  expect(alertOf(html)).not.toContain("data-routed");
+});
