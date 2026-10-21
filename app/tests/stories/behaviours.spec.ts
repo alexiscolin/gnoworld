@@ -511,6 +511,27 @@ test("a flash stays shown when the page is clicked outside it", async ({ page })
   expect(await pillOf(page).evaluate((pill) => pill.matches(":popover-open"))).toBe(true);
 });
 
+// A flash shown before a modal dialog opens waits under its scrim, out of reach, and is there again as
+// it was when the dialog closes: the top layer stacks by opening order (F354, DESIGN-SYSTEM.md, Layers).
+test("a flash shown before a modal dialog waits under its scrim, and shows again when it closes", async ({ page }) => {
+  await open(page, "flash--with-action");
+  const pill = await box(pillOf(page));
+  const hit = () =>
+    pillOf(page).evaluate(
+      (shown, [x, y]) => shown.contains(document.elementFromPoint(x ?? 0, y ?? 0)),
+      [pill.x + pill.width / 2, pill.y + pill.height / 2],
+    );
+  expect(await hit(), "alone").toBe(true);
+  await page.evaluate(() => {
+    const dialog = document.body.appendChild(document.createElement("dialog"));
+    dialog.textContent = "Passport";
+    dialog.showModal();
+  });
+  expect(await hit(), "under the dialog's scrim").toBe(false);
+  await page.keyboard.press("Escape");
+  expect(await hit(), "once the dialog closed").toBe(true);
+});
+
 test.describe("an avatar", () => {
   test("is a disc of 20, 24 or 48 px by its size", async ({ page }) => {
     await open(page, "avatar--sizes");
