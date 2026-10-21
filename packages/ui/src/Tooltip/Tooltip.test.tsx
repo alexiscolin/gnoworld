@@ -125,6 +125,27 @@ describe("Tooltip", () => {
     expect(shown()).toBe("true");
   });
 
+  // Two holds, each its own (WCAG 1.4.13, F334): the pointer leaving never ends the focus's, nor a blur
+  // the pointer's.
+  it("keeps the words the keyboard showed when the pointer comes and goes", () => {
+    draw();
+    keyboardFocus();
+    fireEvent.pointerEnter(button());
+    fireEvent.pointerLeave(button());
+    expect(shown()).toBe("true");
+  });
+
+  it("keeps the words the pointer showed when the focus leaves under it", () => {
+    draw();
+    fireEvent.pointerEnter(button());
+    advance(500);
+    keyboardFocus();
+    act(() => {
+      screen.getByLabelText("Elsewhere").focus();
+    });
+    expect(shown()).toBe("true");
+  });
+
   it("keeps the words the keyboard showed when the pointer comes too", () => {
     draw();
     keyboardFocus();

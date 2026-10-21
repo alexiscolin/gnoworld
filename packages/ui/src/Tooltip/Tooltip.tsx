@@ -14,40 +14,45 @@ const DELAY = 500;
 /** An icon-only control's name above it: under the pointer after a moment, at once with the keyboard's
  * focus; it stays while the pointer is on it, and Esc hides it (WCAG 1.4.13). */
 export function Tooltip({ label, children }: TooltipProps) {
-  const [state, setState] = useState<"idle" | "waiting" | "shown">("idle");
+  // The pointer's hold and the keyboard focus's, each its own (F334), and Esc, which hides the words
+  // until the pointer or the focus comes again.
+  const [pointer, setPointer] = useState<"away" | "waiting" | "over">("away");
+  const [focused, setFocused] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
   const anchorRef = useRef<HTMLSpanElement>(null);
   const tipRef = useRef<HTMLSpanElement>(null);
-  const shown = state === "shown";
+  const shown = !dismissed && (pointer === "over" || focused);
+  const near = pointer !== "away" || focused;
   useEffect(() => {
-    if (state !== "waiting") return;
+    if (pointer !== "waiting") return;
     const timer = setTimeout(() => {
-      setState("shown");
+      setPointer("over");
     }, DELAY);
     return () => {
       clearTimeout(timer);
     };
-  }, [state]);
+  }, [pointer]);
   // Esc wherever the focus is: the pointer may rest on the control while the keyboard works elsewhere.
   useEffect(() => {
-    if (state === "idle") return;
+    if (!near) return;
     const stop = new AbortController();
     // A shown tooltip takes the first Esc, before the dialog or popover around its control (WCAG 1.4.13).
     document.addEventListener(
       "keydown",
       (event) => {
         if (event.key !== "Escape") return;
-        if (state === "shown") {
+        if (shown) {
           event.preventDefault();
           event.stopPropagation();
         }
-        setState("idle");
+        setDismissed(true);
       },
       { capture: true, signal: stop.signal },
     );
     return () => {
       stop.abort();
     };
-  }, [state]);
+  }, [near, shown]);
   // Shown before it is placed: a box out of the top layer has no size to place by.
   useLayoutEffect(() => {
     tipRef.current?.togglePopover(shown);
@@ -58,17 +63,20 @@ export function Tooltip({ label, children }: TooltipProps) {
       ref={anchorRef}
       className={styles["anchor"]}
       onPointerEnter={() => {
-        setState((now) => (now === "idle" ? "waiting" : now));
+        setPointer((now) => (now === "away" ? "waiting" : now));
+        setDismissed(false);
       }}
       onPointerLeave={() => {
-        setState("idle");
+        setPointer("away");
       }}
       onFocus={(event) => {
-        if (event.target instanceof Element && event.target.matches(":focus-visible")) setState("shown");
+        if (!(event.target instanceof Element && event.target.matches(":focus-visible"))) return;
+        setFocused(true);
+        setDismissed(false);
       }}
       onBlur={(event) => {
         if (!(event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)))
-          setState("idle");
+          setFocused(false);
       }}
     >
       {children}
