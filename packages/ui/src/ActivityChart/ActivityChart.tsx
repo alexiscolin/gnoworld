@@ -18,6 +18,11 @@ const HEIGHT = 48;
 const BAR = 6;
 const GAP = 2;
 const STEP = 16;
+// Half the line's width (--line-width, 1 px, which the stroke keeps whatever the drawing's scale): its
+// points sit that far inside the drawing, so neither the peak nor zero is cut in half (F337).
+const INSET = 0.5;
+// A value's height on the line: from zero, half a pixel above the bottom, to the peak, half below the top.
+const lineY = (high: number) => HEIGHT - INSET - (high * (HEIGHT - 2 * INSET)) / HEIGHT;
 
 function when(back: number, unit: "hour" | "day") {
   if (back === 0) return unit === "hour" ? "This hour" : "Today";
@@ -52,7 +57,7 @@ export function ActivityChart({ label, values, sparkline = false, unit = "hour" 
         {sparkline ? (
           <polyline
             className={styles["line"]}
-            points={line.map(({ at, high }) => `${String(at * STEP)},${String(HEIGHT - high)}`).join(" ")}
+            points={line.map(({ at, high }) => `${String(at * STEP)},${String(lineY(high))}`).join(" ")}
           />
         ) : (
           points.map(({ at, high }) => (

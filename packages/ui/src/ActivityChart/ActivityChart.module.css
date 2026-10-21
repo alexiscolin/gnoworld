@@ -20,6 +20,8 @@
     fill: none;
     stroke: var(--color-text);
     stroke-width: var(--line-width);
+    /* A round join stays within half the stroke at a sharp peak; a mitre would reach past the inset. */
+    stroke-linejoin: round;
     vector-effect: non-scaling-stroke;
   }
 
