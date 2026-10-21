@@ -15,6 +15,13 @@ function advance(ms: number) {
   });
 }
 
+// The focus moved, in order, to each button named.
+function focusOn(...names: string[]) {
+  act(() => {
+    for (const name of names) screen.getByRole("button", { name }).focus();
+  });
+}
+
 // The count ends 5 s from now, to the millisecond: nothing at 4,999 ms, one close at 5,000.
 function endsIn5s(onClose: ReturnType<typeof vi.fn>) {
   advance(4_999);
@@ -102,14 +109,10 @@ describe("Flash", () => {
   it("holds a flash with no action while the focus is in it, then gives it 5 s again", () => {
     const onClose = withElsewhere();
     advance(3_000);
-    act(() => {
-      screen.getByRole("button", { name: "Close" }).focus();
-    });
+    focusOn("Close");
     advance(60_000);
     expect(onClose).not.toHaveBeenCalled();
-    act(() => {
-      screen.getByRole("button", { name: "Elsewhere" }).focus();
-    });
+    focusOn("Elsewhere");
     endsIn5s(onClose);
   });
 
@@ -265,9 +268,7 @@ describe("Flash", () => {
   it("counts 5 s for a timed flash its page puts in place of one whose action held the focus", () => {
     const onClose = vi.fn();
     const { rerender } = render(<Flash message={deleted(vi.fn())} onClose={onClose} />);
-    act(() => {
-      screen.getByRole("button", { name: "Undo" }).focus();
-    });
+    focusOn("Undo");
     rerender(<Flash message={{ title: "Connection lost" }} onClose={onClose} />);
     endsIn5s(onClose);
   });
@@ -295,10 +296,7 @@ describe("Flash", () => {
         <Held start={start} />
       </>,
     );
-    act(() => {
-      screen.getByRole("button", { name: "Before" }).focus();
-      screen.getByRole("button", { name }).focus();
-    });
+    focusOn("Before", name);
     fireEvent.click(screen.getByRole("button", { name }));
     expect(screen.queryByText(title)).toBeNull();
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Before" }));
@@ -308,9 +306,7 @@ describe("Flash", () => {
   it("closes from its Close when the focus came to it from nowhere", () => {
     const onClose = vi.fn();
     render(<Flash message={saved} onClose={onClose} />);
-    act(() => {
-      screen.getByRole("button", { name: "Close" }).focus();
-    });
+    focusOn("Close");
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(onClose).toHaveBeenCalledOnce();
   });
@@ -322,9 +318,7 @@ describe("Flash", () => {
         <Held start={deleted(() => undefined)} />
       </>,
     );
-    act(() => {
-      for (const name of ["Before", "Undo", "Close"]) screen.getByRole("button", { name }).focus();
-    });
+    focusOn("Before", "Undo", "Close");
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Before" }));
   });
@@ -337,9 +331,8 @@ describe("Flash", () => {
         <input aria-label="Typing" />
       </>,
     );
+    focusOn("Before", "Close");
     act(() => {
-      screen.getByRole("button", { name: "Before" }).focus();
-      screen.getByRole("button", { name: "Close" }).focus();
       screen.getByRole("textbox", { name: "Typing" }).focus();
     });
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
