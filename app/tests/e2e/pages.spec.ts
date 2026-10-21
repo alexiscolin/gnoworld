@@ -242,3 +242,23 @@ test("the React Compiler compiled the routes, not only React's own runtime", asy
     expect(await (await request.get(chunk)).text(), chunk).toContain("react.memo_cache_sentinel");
   }
 });
+
+// Layers rank by their first mention: the page meets the design system's six in their order, the
+// app importing the sheet itself (root.tsx), the one import that brings it once ui's JavaScript is
+// free of side effects (F363, F370).
+test("a page meets the design system's six layers in their order", async ({ page }) => {
+  await page.goto("/");
+  const met = await page.evaluate(() => {
+    const names: string[] = [];
+    const walk = (rules: CSSRuleList) => {
+      for (const rule of rules) {
+        if (rule instanceof CSSLayerStatementRule) names.push(...rule.nameList);
+        if (rule instanceof CSSLayerBlockRule) names.push(rule.name);
+        if (rule instanceof CSSGroupingRule) walk(rule.cssRules);
+      }
+    };
+    for (const sheet of document.styleSheets) walk(sheet.cssRules);
+    return [...new Set(names)];
+  });
+  expect(met).toEqual(["reset", "tokens", "base", "compositions", "components", "utilities"]);
+});
