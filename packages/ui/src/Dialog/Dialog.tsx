@@ -23,10 +23,13 @@ export function Dialog({ title, open, onClose, wide = false, children }: DialogP
   // Each close the browser made itself: the page is told, and while it keeps the dialog open the
   // dialog shows again (F330).
   const [closes, setCloses] = useState(0);
+  // Its own close() fires a close event too, which the browser queues: that one is not the browser's (F361).
+  const ownCloseRef = useRef(false);
   useEffect(() => {
     const shown = dialogRef.current;
     if (shown === null || shown.open === open) return;
     if (!open) {
+      ownCloseRef.current = true;
       shown.close();
       return;
     }
@@ -52,7 +55,11 @@ export function Dialog({ title, open, onClose, wide = false, children }: DialogP
       // Closed by the browser itself (a second Esc, a form's dialog method), not by the page; a dialog
       // inside it closing is that dialog's (F352).
       onClose={(event) => {
-        if (event.target !== event.currentTarget || !open) return;
+        if (event.target !== event.currentTarget) return;
+        if (ownCloseRef.current) {
+          ownCloseRef.current = false;
+          return;
+        }
         onClose();
         setCloses((count) => count + 1);
       }}

@@ -213,6 +213,31 @@ describe("Dialog", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  // A browser queues the close event of its own close(): one still queued when its page opens it again is
+  // not the browser closing it (F361).
+  it("takes the close event of its own close for none of the browser's, even after it opens again", () => {
+    const onClose = vi.fn();
+    const shut = (open: boolean) => (
+      <Dialog title="Passport" open={open} onClose={onClose}>
+        <p>Unsaved stamps</p>
+      </Dialog>
+    );
+    const { rerender } = render(shut(true));
+    const queued: Event[] = [];
+    dialog().close = function (this: HTMLDialogElement) {
+      this.open = false;
+      queued.push(new Event("close"));
+    };
+    rerender(shut(false));
+    rerender(shut(true));
+    act(() => {
+      for (const event of queued) dialog().dispatchEvent(event);
+    });
+    expect(queued).toHaveLength(1);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(dialog().open).toBe(true);
+  });
+
   it("stays closed when its page agrees to the browser's close", () => {
     render(<Held />);
     act(() => {
