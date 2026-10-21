@@ -79,8 +79,9 @@ export async function startServiceWorker(start: Start): Promise<void> {
     },
     { signal },
   );
-  // One page reloads once, however many clicks and takeovers it sees.
-  let asked = false;
+  // One page reloads once, however many clicks and takeovers it sees. It remembers the worker it
+  // asked, not that it asked: a newer one waiting since is asked at the next click (F380).
+  let asked: PageWorker | null = null;
   let reloaded = false;
   const reloadOnce = () => {
     if (reloaded) return;
@@ -95,9 +96,9 @@ export async function startServiceWorker(start: Start): Promise<void> {
       reloadOnce();
       return;
     }
-    if (asked) return;
-    asked = true;
-    container.addEventListener("controllerchange", reloadOnce, { signal });
+    if (waiting === asked) return;
+    if (asked === null) container.addEventListener("controllerchange", reloadOnce, { signal });
+    asked = waiting;
     waiting.postMessage(TAKE_OVER);
   };
   // The first worker replaces no version, so it needs no prompt.
