@@ -14,15 +14,17 @@ export interface AvatarProps {
   here?: boolean;
   /** Speaking: a ring, and the word in its name. */
   speaking?: boolean;
-  /** Beside a name that says it already, as in a row: the face says nothing more. */
+  /** Beside a name that says it already, as in a row: the face says only here and speaking. */
   decorative?: boolean;
 }
 
 const KIND = { person: "", assistant: ", assistant", bot: ", bot" } as const;
 
-// What assistive technology says: the name, its kind, then here and speaking.
-function said({ name, kind = "person", here, speaking }: AvatarProps) {
-  return `${name}${KIND[kind]}${here === true ? ", here now" : ""}${speaking === true ? ", speaking" : ""}`;
+// What assistive technology says: the name and its kind, unless a name beside says them, then here and
+// speaking, which only the avatar shows (F320).
+function said({ name, kind = "person", here, speaking, decorative }: AvatarProps) {
+  const states = [here === true ? "here now" : "", speaking === true ? "speaking" : ""];
+  return [decorative === true ? "" : `${name}${KIND[kind]}`, ...states].filter((part) => part !== "").join(", ");
 }
 
 // A point of the face, to the hundredth of a unit: finer than a pixel at 48 px.
@@ -100,8 +102,9 @@ function Face({ address, kind }: { address: string; kind: "person" | "assistant"
 
 /** Who someone is at a glance, drawn from their address alone; their name says who they are. */
 export function Avatar(props: AvatarProps) {
-  const { address, size = "m", kind = "person", here, speaking, decorative } = props;
-  const named = decorative === true ? { "aria-hidden": true } : { role: "img", "aria-label": said(props) };
+  const { address, size = "m", kind = "person", here, speaking } = props;
+  const label = said(props);
+  const named = label === "" ? { "aria-hidden": true } : { role: "img", "aria-label": label };
   return (
     <span
       className={styles["avatar"]}
