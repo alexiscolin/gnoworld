@@ -139,7 +139,8 @@ def expect(ok, what):
 def lint_cases(cases, where, label):
     """Plant each case in `where`, lint them in one ESLint run, and check each names its rule (None: nothing)."""
     plant({name: content for name, content, _ in cases}, where=where)
-    out = run(["node_modules/.bin/eslint", "--no-cache", "--format", "json", where])
+    # The planted files only: `where` may hold the app's own, which a run need not read again.
+    out = run(["node_modules/.bin/eslint", "--no-cache", "--format", "json", *(os.path.join(where, name) for name, _, _ in cases)])
     try:
         report = {r["filePath"]: reported(r["messages"]) for r in json.loads(out.stdout)}
     except ValueError:
