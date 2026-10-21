@@ -249,6 +249,9 @@ test("the worker answers the build's hashed files from its cache, and caches no 
   // The fonts too, the text's latin face among them: offline, the page keeps its face.
   const faces = installed.paths.filter((path) => /\/geist-latin-wght-normal-[\w-]{8}\.woff2$/.test(path));
   expect(faces).toHaveLength(1);
+  // Of the fonts, the latin faces only, the text's and the code's (F292).
+  const fonts = installed.paths.filter((path) => path.endsWith(".woff2")).map((path) => path.slice(8, -15));
+  expect(fonts).toEqual(["geist-latin-wght-normal", "geist-mono-latin-wght-normal"]);
   const face = faces[0] ?? "";
   const fromWorker: string[] = [];
   const scripts: string[] = [];

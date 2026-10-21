@@ -55,6 +55,22 @@ test("the precache list holds the build's hashed fonts as well, and no other kin
   ).toEqual(["/assets/geist-latin-wght-normal-BgDaEnEv.woff2"]);
 });
 
+// Offline, latin text keeps Geist; other scripts fall back to the system's font, 94 KB lighter (F292).
+test("of the fonts, the latin faces only: the text's and the code's", () => {
+  expect(
+    precacheList([
+      "assets/geist-latin-wght-normal-BgDaEnEv.woff2",
+      "assets/geist-mono-latin-wght-normal-XN7g48iV.woff2",
+      "assets/geist-latin-ext-wght-normal-DC-KSUi6.woff2",
+      "assets/geist-cyrillic-wght-normal-BEAKL7Jp.woff2",
+      "assets/geist-mono-vietnamese-wght-normal-DadHysG0.woff2",
+      "assets/geist-mono-symbols2-wght-normal-CO5SzqOn.woff2",
+      "assets/geist-mono-latin-ext-wght-normal-Bwz-egvJ.woff2",
+      "assets/inter-latin-wght-normal-AAAAAAAA.woff2",
+    ]),
+  ).toEqual(["/assets/geist-latin-wght-normal-BgDaEnEv.woff2", "/assets/geist-mono-latin-wght-normal-XN7g48iV.woff2"]);
+});
+
 test("a font counts only by its whole name: no nested path, no hash under eight characters, no hash at all", () => {
   expect(
     precacheList([
