@@ -33,6 +33,12 @@ function Held({ children = STAMPS }: { children?: ReactNode }) {
   );
 }
 
+// The element that takes the focus when the dialog opens with these before its Name field.
+function focusedPast(before: ReactNode) {
+  render(<Held>{[before, <Field key="name" label="Name" value="" onChange={vi.fn()} />]}</Held>);
+  return document.activeElement;
+}
+
 // jsdom has no top layer: the test setup's showModal only opens the dialog. Esc, the scrim and the
 // focus given back are the stories' journeys'.
 describe("Dialog", () => {
@@ -102,6 +108,37 @@ describe("Dialog", () => {
       </Held>,
     );
     expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Name" }));
+  });
+
+  // The first field the browser can focus, never a button-typed input: one hidden by CSS cannot take it (F367).
+  it.each([
+    ["a submit input", <input key="i" type="submit" value="Send" />],
+    ["an image input", <input key="i" type="image" alt="Send" src="data:," />],
+    ["a button input", <input key="i" type="button" value="Paste" />],
+    ["a reset input", <input key="i" type="reset" value="Clear" />],
+    [
+      "a field in a hidden section",
+      <div key="i" hidden>
+        <input aria-label="Draft" />
+      </div>,
+    ],
+    ["a field hidden by its style", <input key="i" aria-label="Draft" style={{ display: "none" }} />],
+  ])("gives the focus to the first visible field, past %s before it", (_, before) => {
+    expect(focusedPast(before)).toBe(screen.getByRole("textbox", { name: "Name" }));
+  });
+
+  // A text area and a select are fields too, the first one focused (F367).
+  it.each([
+    ["a text area", <textarea key="f" aria-label="First" />, "textbox"],
+    [
+      "a select",
+      <select key="f" aria-label="First">
+        <option>Onyx</option>
+      </select>,
+      "combobox",
+    ],
+  ] as const)("gives the focus to %s when it is the first field", (_, first, role) => {
+    expect(focusedPast(first)).toBe(screen.getByRole(role, { name: "First" }));
   });
 
   it("never gives the focus to a primary button, even the first thing in it", () => {
