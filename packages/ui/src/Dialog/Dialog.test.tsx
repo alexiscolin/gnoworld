@@ -180,6 +180,23 @@ describe("Dialog", () => {
     expect(dialog().open).toBe(true);
   });
 
+  // Each close counts, not only the first: a page that keeps it sees it shown again every time (F347).
+  it("shows again after every close the browser makes while its page keeps it open", () => {
+    const onClose = vi.fn();
+    render(
+      <Dialog title="Passport" open onClose={onClose}>
+        <p>Unsaved stamps</p>
+      </Dialog>,
+    );
+    for (const time of [1, 2, 3]) {
+      act(() => {
+        dialog().close();
+      });
+      expect(onClose).toHaveBeenCalledTimes(time);
+      expect(dialog().open).toBe(true);
+    }
+  });
+
   it("stays closed when its page agrees to the browser's close", () => {
     render(<Held />);
     act(() => {
