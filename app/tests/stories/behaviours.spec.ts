@@ -485,6 +485,21 @@ test.describe("a planet's thumb", () => {
   });
 });
 
+// A flash raised from a modal dialog shows above its scrim, at the top centre, as bright as without a
+// dialog (F331). Outside the dialog, it stays inert until the dialog closes: the platform's rule.
+test("a flash raised from a dialog shows above its scrim, at the top centre", async ({ page }) => {
+  const pill = page.locator("[role='status'] > *");
+  await open(page, "flash--timed");
+  const alone = await pill.screenshot();
+  await open(page, "flash--over-a-dialog");
+  await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
+  const placed = await box(pill);
+  const screen = page.viewportSize() ?? { width: 0, height: 0 };
+  expect(Math.abs(placed.x + placed.width / 2 - screen.width / 2)).toBeLessThanOrEqual(1);
+  expect(placed.y).toBeLessThan(screen.height / 4);
+  expect(await pill.screenshot()).toEqual(alone);
+});
+
 test.describe("an avatar", () => {
   test("is a disc of 20, 24 or 48 px by its size", async ({ page }) => {
     await open(page, "avatar--sizes");

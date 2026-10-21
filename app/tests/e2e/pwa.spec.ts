@@ -6,6 +6,8 @@ import { cacheContents, controlled, expect, hydrated, PAGES, test, type Page } f
 const HASHED = /^\/assets\/[\w.-]+-[\w-]{8}\.(js|css|woff2)$/;
 
 const promptOf = (page: Page) => page.getByRole("status").filter({ hasText: "New version available." });
+// The notice's words, in the top layer: its region stays in the page's flow and takes no room (F331).
+const noticeOf = (page: Page) => promptOf(page).getByText("New version available.");
 
 const reload = (page: Page) =>
   Promise.all([page.waitForEvent("load"), promptOf(page).getByRole("button", { name: "Reload" }).click()]);
@@ -310,6 +312,24 @@ test.describe("updates", () => {
       };
     });
 
+  // The notice is a flash, in the top layer at the top of the screen, however long the page (F338).
+  test("the prompt shows within the screen on a page longer than it", async ({ page, request }) => {
+    await page.setViewportSize({ width: 320, height: 568 });
+    await open(page);
+    const longer = await page.evaluate(() => {
+      document.querySelector("main")?.setAttribute("style", "min-block-size: 3000px");
+      return document.documentElement.scrollHeight > innerHeight;
+    });
+    expect(longer, "the page is longer than the screen").toBe(true);
+    await bump(page, request, { site });
+    const notice = noticeOf(page);
+    await expect(notice).toBeInViewport();
+    await page.evaluate(() => {
+      scrollTo(0, document.documentElement.scrollHeight);
+    });
+    await expect(notice).toBeInViewport();
+  });
+
   test("a new version waits: the prompt shows, and the page changes only after the click", async ({
     page,
     request,
@@ -332,7 +352,7 @@ test.describe("updates", () => {
       region.id = "there-before";
     });
     await bump(page, request, { site });
-    await expect(promptOf(page)).toBeVisible();
+    await expect(noticeOf(page)).toBeVisible();
     await expect(promptOf(page)).toHaveAttribute("id", "there-before");
     expect(await untouched(page)).toEqual({ same: true, waiting: true, marked: true });
     await reload(page);
@@ -349,7 +369,7 @@ test.describe("updates", () => {
   test("Close puts the notice away and keeps its region; a newer version brings it back", async ({ page, request }) => {
     await open(page);
     await bump(page, request, { site });
-    await expect(promptOf(page)).toBeVisible();
+    await expect(noticeOf(page)).toBeVisible();
     await page.getByRole("status").evaluate((region) => {
       region.id = "kept";
     });
@@ -358,7 +378,7 @@ test.describe("updates", () => {
     await expect(page.locator("#kept[role='status']")).toHaveCount(1);
     expect(await untouched(page)).toEqual({ same: true, waiting: true, marked: true });
     await bump(page, request, { site });
-    await expect(promptOf(page)).toBeVisible();
+    await expect(noticeOf(page)).toBeVisible();
   });
 
   test("two tabs: the one clicked reloads; the other keeps its page until its own click", async ({ page, request }) => {
@@ -366,8 +386,8 @@ test.describe("updates", () => {
     await open(page);
     await open(other);
     await bump(page, request, { site });
-    await expect(promptOf(page)).toBeVisible();
-    await expect(promptOf(other)).toBeVisible();
+    await expect(noticeOf(page)).toBeVisible();
+    await expect(noticeOf(other)).toBeVisible();
     await reload(page);
     await hydrated(page);
     await expect(other.locator("body[data-before]")).toHaveCount(1);

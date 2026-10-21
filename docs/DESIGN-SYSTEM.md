@@ -204,8 +204,9 @@ the brightest planet behind the header's pills.
 | `--z-toast` | The flash: one at a time, queued |
 
 Dialogs, popovers and the flash use the browser's top layer, which stacks by opening order, not
-by these tokens. The flash is never under a dialog's scrim: it opens after the dialog, or waits
-until the dialog closes.
+by these tokens. The flash shows at the top of the screen, centred, above a dialog's scrim when it
+opens after the dialog (F331). A modal dialog makes everything outside it inert, the top layer
+included: a flash raised over one is seen, and its Close and action wait until the dialog closes.
 
 ### Motion
 

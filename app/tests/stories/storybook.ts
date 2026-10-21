@@ -88,12 +88,14 @@ export async function open(page: Page, id: string) {
   const nothing = (await tagged(page, "empty")).has(id);
   await page.goto(`/iframe.html?id=${id}&viewMode=story`);
   // A story shows something, unless it draws nothing on purpose; checked each frame, as a story that
-  // waits to show (a skeleton's 300 ms) would wait out a locator's slower polling.
+  // waits to show (a skeleton's 300 ms) would wait out a locator's slower polling. A flash shows in the
+  // top layer, out of its region's box.
   await page.waitForFunction((attached) => {
     const first = document.querySelector("#storybook-root > *");
     if (first === null || attached) return first !== null;
     const { width, height } = first.getBoundingClientRect();
-    return width > 0 && height > 0 && first.checkVisibility({ visibilityProperty: true });
+    const drawn = width > 0 && height > 0 && first.checkVisibility({ visibilityProperty: true });
+    return drawn || first.querySelector(":popover-open") !== null;
   }, nothing);
   // A story that plays is done when Storybook's render of it is (storybook 10.6's preview, read there).
   if ((await tagged(page, "play-fn")).has(id))

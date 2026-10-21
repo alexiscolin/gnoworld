@@ -412,11 +412,9 @@ test("a link-button wears its button's look, with no underline", async ({ page }
   expect(link).toEqual(await look("button--primary", "button"));
 });
 
-// The flash is in the page's flow, where its slot puts it: empty, it takes no room and paints nothing;
-// full, nothing in it is fixed or absolute.
-test("the flash sits in the flow: empty it takes no room and paints nothing, full it holds no fixed box", async ({
-  page,
-}) => {
+// The flash's region is in the page's flow, where a screen reader finds it: empty, it takes no room and
+// paints nothing; full, its flash is in the top layer (F331), and the region still takes no room.
+test("the flash's region sits in the flow, taking no room; its flash is in the top layer", async ({ page }) => {
   await open(page, "flash--empty");
   const empty = await page.getByRole("status").evaluate((region) => {
     const s = getComputedStyle(region);
@@ -429,16 +427,12 @@ test("the flash sits in the flow: empty it takes no room and paints nothing, ful
   });
   expect(empty).toEqual({ height: 0, inside: 0, ground: "rgba(0, 0, 0, 0)", position: "static" });
   await open(page, "flash--timed");
-  // Its Close places its own parts: the square button holds its icon (relative), its tooltip sits in the
-  // top layer. All else is in the flow.
-  const placed = await page
-    .getByRole("status")
-    .evaluate((region) =>
-      [region, ...region.querySelectorAll("*")]
-        .filter((e) => e.closest("[popover]") === null)
-        .map((e) => `${e.matches("button") ? "button " : ""}${getComputedStyle(e).position}`),
-    );
-  expect(new Set(placed)).toEqual(new Set(["static", "button relative"]));
+  const full = await page.getByRole("status").evaluate((region) => ({
+    height: region.getBoundingClientRect().height,
+    position: getComputedStyle(region).position,
+    raised: region.firstElementChild?.matches(":popover-open") ?? false,
+  }));
+  expect(full).toEqual({ height: 0, position: "static", raised: true });
 });
 
 // Opaque until the blur behind a panel is widely Baseline: what passes behind never shows through (F262).

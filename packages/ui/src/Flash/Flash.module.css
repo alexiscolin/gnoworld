@@ -1,7 +1,10 @@
 /* The flash: a pill of the surface (opaque night, its strong line) sized to what it says, until the
-   blur behind a panel is widely Baseline (F262); its slot places it (DESIGN-SYSTEM.md). */
+   blur behind a panel is widely Baseline (F262); in the top layer, at the top of the screen (F331). */
 @layer components {
   .flash {
+    inset: var(--space-m) 0 auto;
+    /* layout: the top layer places a popover in the middle; the flash goes to the top, centred */
+    margin: 0 auto;
     inline-size: fit-content;
     max-inline-size: 100%;
     padding-block: var(--space-2xs);
