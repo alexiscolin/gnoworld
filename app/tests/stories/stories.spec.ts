@@ -283,7 +283,14 @@ async function sizes(page: Page, id: string) {
 for (const touch of [false, true]) {
   const how = touch ? "by touch" : "with a pointer";
   test.describe(how, () => {
-    test.use({ contextOptions: { hasTouch: touch, isMobile: touch } });
+    // Playwright's own options: a device's (Desktop Chrome's) override contextOptions, so a touch set
+    // there measured a mouse everywhere but in the sandbox (F339).
+    test.use({ hasTouch: touch, isMobile: touch });
+
+    test("the page's pointer is coarse by touch, fine with a pointer", async ({ page }) => {
+      await open(page, "button--sizes");
+      expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(touch);
+    });
 
     test("controls are as tall as their size's control, the default 44 px by touch", async ({ page }) => {
       const m = touch ? 44 : 40;
