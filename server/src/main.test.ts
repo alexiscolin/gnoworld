@@ -209,7 +209,8 @@ describe("the server's process", () => {
       peer.say(message(`account=${team};msgid=t${String(n)}`, `${team}!u@h`, ["#bubble", "buy spam"]));
       peer.say(message(`account=${other};msgid=o${String(n)}`, `${other}!u@h`, ["#bubble", "buy spam"]));
     }
-    expect(await peer.next(/^SAMODE /)).toBe(`SAMODE #bubble +b m:${other}`);
+    // The mute's own line: the room's flags go out first, with the JOINs (3m).
+    expect(await peer.next(/^SAMODE #bubble [+-]b /)).toBe(`SAMODE #bubble +b m:${other}`);
     peer.say("PING :settled");
     await peer.next(/^PONG settled$/);
     expect(peer.lines.filter((line) => line.includes(`m:${team}`))).toEqual([]);

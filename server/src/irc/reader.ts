@@ -91,15 +91,7 @@ export function reader(options: Options, state: State) {
       }
       log("irc_ready");
     },
-    "322": (_, { params: [, name] }) => {
-      if (name?.startsWith("#") === true && state.channels !== undefined && state.channels.length < 10_000) {
-        state.channels.push(name);
-      }
-    },
-    "323": () => {
-      if (state.channels !== undefined) onChannels?.(state.channels);
-      state.channels = undefined;
-    },
+    ...listing(state, onChannels),
     JOIN: joined(state, onJoin),
     ...rejoins(state),
     BATCH: (s, { params: [ref = "", kind, room = ""] }) => {
@@ -118,15 +110,7 @@ export function reader(options: Options, state: State) {
       };
       drained().then(next, next);
     },
-    "433": (s) => {
-      refused(s, "nick");
-    },
-    "464": (s) => {
-      refused(s, "oper");
-    },
-    "491": (s) => {
-      refused(s, "oper");
-    },
+    ...refusals(refused),
     // A hide Ergo refused (F544): the verdict says hidden, the line stays; ops hears of it.
     FAIL: (_, { params: [command] }) => {
       if (command === "REDACT") log("alert", { error: "redact_refused" });
@@ -147,6 +131,39 @@ export function reader(options: Options, state: State) {
   return (s: Socket, message: IrcMessage): void => {
     handlers[message.command]?.(s, message);
     state.states.read(message);
+  };
+}
+
+// Ergo's LIST, its channels kept to 10,000, handed on at its end (3l).
+function listing(
+  state: State,
+  onChannels: Options["onChannels"],
+): Record<string, (s: Socket, message: IrcMessage) => void> {
+  return {
+    "322": (_, { params: [, name] }) => {
+      if (name?.startsWith("#") === true && state.channels !== undefined && state.channels.length < 10_000) {
+        state.channels.push(name);
+      }
+    },
+    "323": () => {
+      if (state.channels !== undefined) onChannels?.(state.channels);
+      state.channels = undefined;
+    },
+  };
+}
+
+// The refusals Ergo will not change by itself: a nick taken (433), a wrong oper password (464, 491).
+function refusals(refused: (s: Socket, error: string) => void): Record<string, (s: Socket) => void> {
+  return {
+    "433": (s) => {
+      refused(s, "nick");
+    },
+    "464": (s) => {
+      refused(s, "oper");
+    },
+    "491": (s) => {
+      refused(s, "oper");
+    },
   };
 }
 
