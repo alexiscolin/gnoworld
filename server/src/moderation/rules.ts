@@ -29,8 +29,8 @@ export function ruleVerdict(
   { newAccount }: { newAccount: boolean },
 ): RuleReason | undefined {
   const folded = fold(text);
-  const links = folded.match(/\bhttps?:\/\/\S+|\bwww\.\S+/g)?.length ?? 0;
-  const mentions = folded.match(/(?:^|\s)@\w+|\bg1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{38}\b/g)?.length ?? 0;
+  const links = folded.match(/\bhttps?:\/\/|(?<!\/\/)\bwww\./g)?.length ?? 0;
+  const mentions = folded.match(/(?<![\p{L}\p{N}_])@\w+|\bg1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{38}\b/gu)?.length ?? 0;
   if (banned(folded, rules.bannedWords)) return "banned_word";
   if (newAccount && links > rules.linksForNewAccount) return "new_account_links";
   if (links > rules.linksPerMessage) return "links";

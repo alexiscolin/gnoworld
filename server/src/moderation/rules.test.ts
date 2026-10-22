@@ -78,11 +78,13 @@ describe("the rules' links and mentions", () => {
     expect(ruleVerdict("https://www.a.test https://www.b.test https://www.c.test", RULES, OLD)).toBeUndefined();
   });
 
-  it("counts once a link that carries another in its address, by scheme or by www.", () => {
+  it("counts each link written, however they are joined: a comma, a slash, one inside another's address", () => {
     const two = { ...RULES, linksPerMessage: 2 };
-    expect(ruleVerdict("https://a.test/?u=http://x.test https://b.test/?u=http://y.test", two, OLD)).toBeUndefined();
-    expect(ruleVerdict("https://a.test/www.b https://c.test/www.d", two, OLD)).toBeUndefined();
-    expect(ruleVerdict("www.a.test/http://b.test www.c.test/http://d.test", two, OLD)).toBeUndefined();
+    expect(ruleVerdict("http://a.test,http://b.test,http://c.test", two, OLD)).toBe("links");
+    expect(ruleVerdict("www.a.test,www.b.test,www.c.test", two, OLD)).toBe("links");
+    expect(ruleVerdict("https://a.test/?u=http://x.test https://b.test", two, OLD)).toBe("links");
+    expect(ruleVerdict("https://a.test/www.b https://c.test", two, OLD)).toBe("links");
+    expect(ruleVerdict("https://www.a.test https://www.b.test", two, OLD)).toBeUndefined();
   });
 
   it("leaves a bare domain uncounted: no scheme, no www (a known limit)", () => {
@@ -97,6 +99,12 @@ describe("the rules' links and mentions", () => {
 
   it("counts no email address or short g1 word as a mention", () => {
     expect(ruleVerdict("a@b.test c@d.test e@f.test g@h.test i@j.test k@l.test g1ven", RULES, OLD)).toBeUndefined();
+  });
+
+  it("counts a mention after punctuation, and still no email address", () => {
+    expect(ruleVerdict("@a,@b,@c,@d,@e,@f", RULES, OLD)).toBe("mentions");
+    expect(ruleVerdict("(@a) (@b) (@c) (@d) (@e) .@f", RULES, OLD)).toBe("mentions");
+    expect(ruleVerdict("a@b.test,c@d.test,e@f.test,g@h.test,i@j.test,k@l.test", RULES, OLD)).toBeUndefined();
   });
 
   it("allows a new account fewer links: two, not three", () => {
