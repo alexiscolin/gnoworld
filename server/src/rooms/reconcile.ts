@@ -63,6 +63,8 @@ export interface Reconciler {
   ask: (room?: string) => void;
   // As ask, settling once no room waits.
   pass: (room?: string) => Promise<void>;
+  // Someone else joined a room: only a room whose type voices someone has a change to make (F582).
+  joined: (room: string) => void;
   // Each room's flags put on at once, before any state is read: sent with the link's JOINs, a room Ergo
   // lost and the bot makes again is closed from its first line (Ergo keeps a channel's history).
   flags: () => void;
@@ -107,6 +109,11 @@ export function makeReconciler({ rooms, desired, state, send, log }: Options): R
     ask,
     flags: () => {
       for (const room of rooms()) for (const flag of desired(room).modes) send("SAMODE", [room, `+${flag}`]);
+    },
+    // ponytail: a JOIN reads the whole room again (10,000 people at most, a few ms); voice the joiner alone
+    // if busy rooms that voice grow.
+    joined: (room) => {
+      if (desired(room).voiced.length > 0) ask(room);
     },
     pass: (room) => {
       ask(room);

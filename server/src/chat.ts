@@ -164,7 +164,7 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
             mutes.reapply();
             reconciler.ask();
           },
-          onJoin: reconciler.ask,
+          onJoin: reconciler.joined,
           onChannels: unknownChannels(db, log),
           onMessage: (said) => {
             activity.count(said.room, said.account, now());

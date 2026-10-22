@@ -1200,6 +1200,17 @@ describe("the chat, as the server starts it", () => {
       ]).toEqual([[], [], ["#bubble/crew"], ["#bubble/attic", "#bubble/crew"], ["#bubble/attic", "#bubble/crew"]]);
     });
 
+    it("reads a room again on a JOIN only when its type voices someone, never an open room's (F582)", async () => {
+      const { peer } = await linked({ worlds: roled(), moderation: OFF });
+      for (const room of ["#bubble", "#bubble/crew", "#bubble/desk"]) await answer(peer, room);
+      const mark = peer.lines.length;
+      peer.say(`@account=${MEMBER} :${MEMBER}!u@h JOIN #bubble ${MEMBER} :m`);
+      peer.say(`@account=${MEMBER} :${MEMBER}!u@h JOIN #bubble/desk ${MEMBER} :m`);
+      await answer(peer, "#bubble/desk", `~@gnoworld ${MEMBER}`);
+      await settle(peer);
+      expect(peer.lines.slice(mark).filter((l) => l.startsWith("MODE "))).toEqual(["MODE #bubble/desk"]);
+    });
+
     it("takes every voice of a room it archives at once, rather than at the next minute's pass (F580)", async () => {
       const { peer, chat } = await linked({ worlds: roled(), moderation: OFF });
       for (const room of ["#bubble", "#bubble/crew", "#bubble/desk"]) await answer(peer, room);
