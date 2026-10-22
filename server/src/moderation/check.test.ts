@@ -284,6 +284,26 @@ describe("checking a message", () => {
     expect(asked).toEqual(["I hit you"]);
   });
 
+  it("records why a members room's line passed unasked: members_room, with no answer (F574)", async () => {
+    const db = openDatabase(":memory:", [LOGIN_TABLES, VERDICT_TABLES]);
+    opened.push(db);
+    db.prepare("INSERT INTO accounts (address, first_seen) VALUES (?, ?)").run(OLD, T0 - 30 * 24 * HOUR);
+    const check = makeChecker({
+      db,
+      rulesOf: () => RULES,
+      provider: () => Promise.resolve(answer()),
+      publicRoom: () => false,
+      thresholds: {},
+      pepper: PEPPER,
+      log: logger(PEPPER, () => true),
+      now: () => T0,
+    });
+    await check({ ...said("between us", "m1"), room: "#bubble/crew" });
+    expect(db.prepare("SELECT action, reason, flags, scores FROM verdicts").all()).toEqual([
+      { action: "pass", reason: "members_room", flags: null, scores: null },
+    ]);
+  });
+
   it("gives a new account fewer links, 24 hours from its first login, not a minute more", async () => {
     const { db, clock, check } = setup(() => Promise.resolve(answer()));
     const fresh = toAddress(new Uint8Array(20).fill(7));
