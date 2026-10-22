@@ -43,10 +43,12 @@ function line(name: string, params: readonly string[]): string {
   return `${formatLine({ tags: new Map(), command, params })}\r\n`;
 }
 
-// The JOIN lines for these rooms, 510 bytes each at most; a name that would break a line is left out.
+// The JOIN lines for these rooms, 510 bytes each at most; a name that would break a line, or fill one
+// alone, is left out.
 function joins(rooms: readonly string[]): string[] {
   const lines: string[][] = [];
-  for (const room of rooms.filter((name) => /^#[^\s,\0-\x1f]+$/.test(name))) {
+  const fits = (name: string): boolean => /^#[^\s,\0-\x1f]+$/.test(name) && Buffer.byteLength(`JOIN ${name}`) <= 510;
+  for (const room of rooms.filter(fits)) {
     const last = lines.at(-1);
     if (last !== undefined && Buffer.byteLength(`JOIN ${[...last, room].join(",")}`) <= 510) last.push(room);
     else lines.push([room]);
@@ -140,7 +142,14 @@ export function ircLink(options: Options): Link {
         }
         const parsed = parseLine(held.subarray(0, end + 1).toString("utf8"));
         held = held.subarray(end + 1);
-        if (parsed.ok) read(s, parsed.message);
+        // A handler's throw (a database that fails) ends this connection, never the process.
+        try {
+          if (parsed.ok) read(s, parsed.message);
+        } catch (error) {
+          log("irc_error", { error: error instanceof Error ? error.name : "unknown" });
+          s.destroy();
+          return;
+        }
       }
       if (held.length > LINE_MAX) s.destroy();
     });

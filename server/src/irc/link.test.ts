@@ -490,6 +490,31 @@ describe("the IRC link, its green pass (3h)", () => {
     expect(Buffer.byteLength(joins[0] ?? "")).toBe(510);
   });
 
+  it("skips a room whose JOIN line could not be written, joins the rest, and stays up", async () => {
+    const ergo = await fakeErgo();
+    start(ergo.port, { rooms: () => [`#${"a".repeat(600)}`, "#ok"] });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    await sync(peer);
+    expect([peer.lines.filter((line) => line.startsWith("JOIN")), ergo.peers.length]).toEqual([["JOIN #ok"], 1]);
+  });
+
+  it("logs a handler's throw and connects again, rather than ending the process", async () => {
+    const ergo = await fakeErgo();
+    const { lines } = start(ergo.port, {
+      onMessage: () => {
+        throw new Error("a database that fails");
+      },
+    });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    peer.say(message("account=g1a;msgid=m1", "a!u@h", ["#bubble", "hello"]));
+    await welcome(await ergo.peer(1));
+    expect(lines.filter((line) => line.includes('"event":"irc_error"'))).toEqual([
+      expect.stringContaining('"error":"Error"'),
+    ]);
+  });
+
   it("reads a line ended by a bare LF", async () => {
     const ergo = await fakeErgo();
     start(ergo.port);
