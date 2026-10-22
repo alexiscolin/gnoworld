@@ -802,6 +802,21 @@ describe("the IRC link's catch-up (3j)", () => {
   });
 });
 
+describe("the IRC link's refused hides (3j's green pass)", () => {
+  it("raises the alert when Ergo refuses a REDACT, and not for another command's FAIL", async () => {
+    const ergo = await fakeErgo();
+    const { lines } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    peer.say(":ergo.test FAIL REDACT REDACT_FORBIDDEN #bubble m1 :You are not authorized to delete this message");
+    peer.say(":ergo.test FAIL CHATHISTORY INVALID_PARAMS AFTER :Invalid parameters");
+    await sync(peer);
+    expect(lines.filter((line) => line.includes('"event":"alert"'))).toEqual([
+      expect.stringContaining('"error":"redact_refused"'),
+    ]);
+  });
+});
+
 describe("retryDelay", () => {
   it("doubles from a second to a minute, jittered by half either way", () => {
     expect([0, 1, 2, 5, 6, 30].map((attempt) => retryDelay(attempt, () => 0.5))).toEqual([

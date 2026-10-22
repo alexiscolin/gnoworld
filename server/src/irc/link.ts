@@ -115,6 +115,10 @@ function reader(options: Options, state: State) {
     "491": (s) => {
       refused(s, "oper");
     },
+    // A hide Ergo refused (F544): the verdict says hidden, the line stays; ops hears of it.
+    FAIL: (_, { params: [command] }) => {
+      if (command === "REDACT") log("alert", { error: "redact_refused" });
+    },
     PING: (s, { params }) => s.write(line("PONG", params)),
     PRIVMSG: (_, message) => {
       const batch = state.batches.get(message.tags.get("batch") ?? "");
