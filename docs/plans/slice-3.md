@@ -547,6 +547,9 @@ mutation. **Files.** New: `server/roles.json` (the demo's few entries), `server/
 | Counters, in bounded structures: messages per room per minute, and per account per minute capped (dec:144; ADR2:793-794: counting calls no service) | A property: memory stays bounded over 100,000 distinct accounts; an account sending 1,000 lines counts as the cap |
 | `GET /api/activity?worlds=a,b`: message rates per room, cached a few seconds (ADR2:940), at most 25 worlds a request (the rail's size: ADR2:136) | **The activity API answers only for the worlds asked**: unknown and private rooms are absent, not errors; the 26th world refused |
 
+**As built** (`docs/decisions.md`, 2026-10-22, 3h's shapes): a TCP link, not a WebSocket; `#<slug>` main
+rooms, `#earth` the general one; an HTTP cache of 5 seconds.
+
 **Out of scope.** Checking messages (3i), acting (3j), mute and edits (3k), rooms made by moderators (3l), room
 types (3m), the heat and storms drawing (slice 7).
 

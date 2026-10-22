@@ -152,6 +152,16 @@ Slice 3, the content security policy (3f):
   file (it is public anyway). A browser that does not read CSP 3's `'self'` as the page's `wss:`
   refuses the chat's WebSocket: slice 4's first one checks Firefox and Safari.
 
+Slice 3, the bot's link and the rooms (3h):
+
+- **The link's settings.** `ERGO_HOST` and `ERGO_PORT` name Ergo's internal listener (127.0.0.1:6667
+  by default); `ERGO_OPER_PASSWORD_FILE` holds the operator's password, one word of printable ASCII,
+  32 characters at least. Unset, the server keeps no link: rooms exist, nobody's activity counts.
+- **Rooms stay.** A world removed from the roles file keeps its room and history; removing one is a
+  moderator's act (3l).
+- **A nick held by a ghost.** After a link drops silently, Ergo may hold `gnoworld` until its own
+  ping timeout: the link logs `irc_refused` (`nick`) and tries again later.
+
 ## Secrets: rotation and revocation
 
 - **The password:** write a new file with `htpasswd -cB`, then `docker compose ... restart web`.
