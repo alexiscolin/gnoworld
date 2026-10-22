@@ -21,7 +21,7 @@ const setup = (options: Parameters<typeof makeStream>[0] = {}, proxy?: string) =
     logger("a-pepper-of-forty-characters-0123456789", () => true),
     () => true,
   );
-  app.route("/api/stream", stream.routes({ proxy }));
+  app.route("/api/stream", stream.routes({ proxy, visible: () => true }));
   const open = async (
     query: string,
     { peer = PEER, last, realIp }: { peer?: string; last?: string; realIp?: string } = {},

@@ -24,7 +24,7 @@ const setup = () => {
     logger("a-pepper-of-forty-characters-0123456789", () => true),
     () => true,
   );
-  app.route("/api/activity", activityRoutes(activity, { db, now: () => T0 }));
+  app.route("/api/activity", activityRoutes(activity, { db, now: () => T0, visible: () => true }));
   const ask = async (query: string) => {
     const response = await app.request(`/api/activity${query}`);
     return [response.status, await response.text(), response.headers.get("cache-control")];

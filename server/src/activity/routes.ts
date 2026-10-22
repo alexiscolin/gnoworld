@@ -13,14 +13,14 @@ import type { Activity } from "./activity.ts";
 interface Options {
   db: DatabaseSync;
   now: () => number;
-  // Whether an account, or a guest (undefined), sees a room listed; every room by default.
-  visible?: ((room: string, who: string | undefined) => boolean) | undefined;
+  // Whether an account, or a guest (undefined), sees a room listed: no default, so none is open by mistake.
+  visible: (room: string, who: string | undefined) => boolean;
   // The account of a session's token (login.ts's session).
   session?: ((token: string | undefined) => string | undefined) | undefined;
 }
 
 export function activityRoutes(activity: Activity, options: Options): Hono {
-  const { db, now, visible = () => true, session = () => undefined } = options;
+  const { db, now, visible, session = () => undefined } = options;
   // 25 worlds at most, each a name as the roles file allows it, 64 characters at most.
   const Slug = z
     .string()

@@ -15,7 +15,7 @@ export interface Stream {
   // visible and session as activity/routes.ts's (3m): a room the reader may not see sends it nothing.
   routes: (options: {
     proxy: string | undefined;
-    visible?: Seeing["visible"] | undefined;
+    visible: Seeing["visible"];
     session?: Seeing["session"] | undefined;
   }) => Hono;
   close: () => void;
@@ -101,7 +101,7 @@ export function makeStream(options: Options = {}): Stream {
       const text = frame(sequence, event);
       for (const client of clients) if (client.rooms.has(event.room)) write(client, text);
     },
-    routes: ({ proxy, visible = () => true, session = () => undefined }) => {
+    routes: ({ proxy, visible, session = () => undefined }) => {
       const app = new Hono();
       app.get("/", (c) => {
         const asked = c.req.queries("rooms") ?? [];
