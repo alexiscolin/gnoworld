@@ -170,6 +170,25 @@ describe("the reconciler's pass", () => {
     ]);
   });
 
+  it("raises no alert for changes that keep a room as closed as it was: flags, a voice, a KICK (F564)", async () => {
+    const lines: string[] = [];
+    const crew = state({
+      flags: "Mint",
+      invites: ["g1a", "g1b"],
+      present: [BOT, { nick: "g1z", powers: "" }, { nick: "g1a", powers: "" }],
+    });
+    const reconciler = makeReconciler({
+      rooms: () => ["#a", "#crew"],
+      desired: (room) => (room === "#a" ? OPEN : DESK),
+      state: (room) => Promise.resolve(room === "#a" ? state({ flags: "msnt" }) : crew),
+      send: () => true,
+      log: logger("a-pepper-of-forty-characters-0123456789", (line) => lines.push(line)),
+    });
+    await reconciler.pass();
+    expect(lines.filter((line) => line.includes('"room_reconciled"'))).toHaveLength(2);
+    expect(lines.filter((line) => line.includes('"event":"alert"'))).toEqual([]);
+  });
+
   it("passes over a room Ergo did not answer for, and runs one pass at a time", async () => {
     let release = (): void => undefined;
     const held = new Promise<undefined>((resolve) => {
