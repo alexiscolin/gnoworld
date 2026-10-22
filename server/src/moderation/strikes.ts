@@ -20,7 +20,7 @@ export interface Strikes {
 export function makeStrikes(db: DatabaseSync, pepper: string): Strikes {
   const Count = z.object({ n: z.number() });
   const hidden = db.prepare(
-    "SELECT count(*) AS n FROM verdicts v JOIN rooms r ON r.name = v.room WHERE v.account = ? AND v.action = 'hide' AND v.at >= ? AND v.at <= ? AND r.world = ?",
+    "SELECT count(*) AS n FROM verdicts v JOIN rooms r ON r.name = v.room WHERE v.account = ? AND v.action = 'hide' AND v.reason IS NOT 'unknown_edit' AND v.at >= ? AND v.at <= ? AND r.world = ?",
   );
   return {
     count: (account, world, { since, to }) => Count.parse(hidden.get(accountKey(pepper, account), since, to, world)).n,

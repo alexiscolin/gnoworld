@@ -202,8 +202,10 @@ Slice 3, the mute and the edits (3k):
 - **What the mutes table keeps:** a muted account's address in clear, its world and its end, while
   the mute lasts; the extban names it.
 - **Known limits.** A mute is evaded with a new address (decision 144). A mute lifts within 10 s of its
-  end (the timer). An edit of a line the bot never checked (one the full queue dropped) is hidden as
-  not its author's.
+  end (the timer). An edit of a line the bot never checked (one the full queue dropped, one said
+  before the bot, one the catch-up missed) is hidden as `unknown_edit`, its owner unknown, and counts
+  no strike (F549). The hides that brought a mute still count after it lifts: one more hide within
+  the window mutes again.
 
 ## Secrets: rotation and revocation
 

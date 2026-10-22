@@ -19,13 +19,18 @@ const setup = () => {
   ensureRooms(db, ["bubble", "earth"], T0);
   let n = 0;
   // A verdict as the check writes it: the account by its key, never in clear.
-  const verdict = (account: string, room: string, { action, at }: { action: string; at: number }) => {
+  const verdict = (
+    account: string,
+    room: string,
+    { action, at, reason = null }: { action: string; at: number; reason?: string | null },
+  ) => {
     n += 1;
-    db.prepare("INSERT INTO verdicts (msgid, room, account, action, at) VALUES (?, ?, ?, ?, ?)").run(
+    db.prepare("INSERT INTO verdicts (msgid, room, account, action, reason, at) VALUES (?, ?, ?, ?, ?, ?)").run(
       `m${String(n)}`,
       room,
       accountKey(PEPPER, account),
       action,
+      reason,
       at,
     );
   };
@@ -51,5 +56,15 @@ describe("an account's strikes", () => {
     // A hide later than the line struck is no strike of it, though its check settled first.
     expect(strikes.count("g1a", "bubble", { since: T0, to: T0 })).toBe(1);
     expect(strikes.count("g1a", "bubble", { since: T0 - 1, to: T0 + MINUTE - 1 })).toBe(2);
+  });
+});
+
+describe("an account's strikes, an edit it could not place (F549)", () => {
+  it("count no hide of an edit of a line the bot never checked, and every other hide", () => {
+    const { verdict, strikes } = setup();
+    verdict("g1a", "#bubble", { action: "hide", at: T0, reason: "unknown_edit" });
+    verdict("g1a", "#bubble", { action: "hide", at: T0, reason: "not_their_edit" });
+    verdict("g1a", "#bubble", { action: "hide", at: T0, reason: "banned_word" });
+    expect(strikes.count("g1a", "bubble", { since: T0, to: T0 })).toBe(2);
   });
 });

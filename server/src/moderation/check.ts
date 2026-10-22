@@ -8,7 +8,7 @@ import type { Said } from "../irc/link.ts";
 import type { Log } from "../log.ts";
 import type { Rules } from "../roles/roles.ts";
 import { decide, type Thresholds } from "./decide.ts";
-import { editsOwn } from "./edits.ts";
+import { editsOwn, lineKnown } from "./edits.ts";
 import type { Answer, Category } from "./provider.ts";
 import { ruleVerdict, type RuleReason } from "./rules.ts";
 
@@ -108,7 +108,10 @@ export function makeChecker(options: Options): (said: Said) => Promise<Verdict |
   // A line counts itself in its rate: it is claimed before the rules run.
   const tooFast = (key: string, at: number): boolean =>
     Count.parse(sql.recent.get(key, at - RATE.ms, at)).n > RATE.lines;
-  const foreign = ({ edits }: Said, key: string): boolean => edits !== undefined && !owns(edits, key);
+  const known = lineKnown(db);
+  // An edit's line: none, its author's, another's, or one it never checked (F549).
+  const editOf = ({ edits }: Said, key: string): "none" | "own" | "other" | "unknown" =>
+    edits === undefined ? "none" : !known(edits) ? "unknown" : owns(edits, key) ? "own" : "other";
   const FirstSeen = z.object({ first_seen: z.number() }).optional();
   // A line a stopped process left pending is checked again when it comes back (one process: 3a's lock).
   db.prepare("UPDATE verdicts SET action = 'unchecked' WHERE action = 'pending'").run();
@@ -134,10 +137,12 @@ export function makeChecker(options: Options): (said: Said) => Promise<Verdict |
     // A room no world of the file names sends nothing anywhere.
     if (rules === undefined) return settle({ action: "unchecked" }, { why: "unknown_room" });
     const firstSeen = FirstSeen.parse(sql.firstSeen.get(account))?.first_seen;
+    const edit = editOf(said, hashed);
     const reason = ruleVerdict(text, rules, {
       newAccount: firstSeen === undefined || at - firstSeen < newAccountMs,
       tooFast: tooFast(hashed, at),
-      foreignEdit: foreign(said, hashed),
+      foreignEdit: edit === "other",
+      unknownEdit: edit === "unknown",
     });
     if (reason !== undefined) return settle({ action: "hide", reason });
     if (ask === undefined) return settle({ action: "unchecked" }, { why: "no_key" });

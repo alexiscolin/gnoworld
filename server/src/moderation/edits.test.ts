@@ -2,7 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import { openDatabase } from "../db.ts";
 import { accountKey, VERDICT_TABLES } from "./check.ts";
-import { editsOwn } from "./edits.ts";
+import { editsOwn, lineKnown } from "./edits.ts";
 
 const PEPPER = "a-pepper-of-forty-characters-0123456789";
 const opened: DatabaseSync[] = [];
@@ -47,5 +47,17 @@ describe("an edit's author", () => {
     );
     const owns = editsOwn(db);
     expect([owns("m1' OR '1'='1", key), owns(`m1${"x".repeat(7000)}`, key)]).toEqual([false, false]);
+  });
+});
+
+describe("an edited line's place (F549)", () => {
+  it("knows a line that has a verdict, whatever became of it, and no other", () => {
+    const db = openDatabase(":memory:", [VERDICT_TABLES]);
+    opened.push(db);
+    db.prepare(
+      "INSERT INTO verdicts (msgid, room, account, action, at) VALUES ('m1', '#bubble', 'h', 'hide', 1)",
+    ).run();
+    const known = lineKnown(db);
+    expect([known("m1"), known("m9")]).toEqual([true, false]);
   });
 });

@@ -240,9 +240,10 @@ describe("checking a message", () => {
       reason: "not_their_edit",
     });
     expect(await check({ ...said("hello, fixed", "m3"), edits: "m1" })).toEqual({ action: "pass" });
+    // A line it never checked: no owner to tell, hidden as an edit it cannot place (F549).
     expect(await check({ ...said("an edit of nothing", "m4"), edits: "m9" })).toEqual({
       action: "hide",
-      reason: "not_their_edit",
+      reason: "unknown_edit",
     });
     expect(asked).toEqual(["hello", "hello, fixed"]);
   });

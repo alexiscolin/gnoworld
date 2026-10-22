@@ -41,6 +41,7 @@ const WORDS: Record<string, string> = {
   new_account_links: "too many links for a new account",
   too_fast: "too many messages too fast",
   not_their_edit: "an edit of a message that is not yours",
+  unknown_edit: "an edit of a message the bot cannot place",
 };
 
 describe("acting on a verdict", () => {
@@ -84,6 +85,7 @@ describe("acting on a verdict", () => {
       "new_account_links",
       "too_fast",
       "not_their_edit",
+      "unknown_edit",
     ] as const;
     expect(Object.keys(REASON_WORDS).toSorted()).toEqual(Object.keys(WORDS).toSorted());
     for (const reason of reasons) {

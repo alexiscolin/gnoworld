@@ -26,6 +26,7 @@ export const REASON_WORDS: Readonly<Record<Category | RuleReason, string>> = {
   new_account_links: "too many links for a new account",
   too_fast: "too many messages too fast",
   not_their_edit: "an edit of a message that is not yours",
+  unknown_edit: "an edit of a message the bot cannot place",
 };
 
 const RULES = "https://gno.world/rules";
