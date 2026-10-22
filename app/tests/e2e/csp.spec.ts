@@ -39,6 +39,32 @@ test.describe("the content security policy", () => {
     expect(nginx).toBe(`add_header Content-Security-Policy "${String(served)}" always;\n`);
   });
 
+  test("names the hash of every inline script the built pages hold, as the browser parses them, and no other", async ({
+    page,
+    request,
+  }) => {
+    const served = String((await request.get("/")).headers()["content-security-policy"]);
+    await page.goto("/");
+    const hashes = new Set<string>();
+    // The pre-rendered pages, and the fallback a path the build never made gets.
+    for (const path of [...PAGES, "/nowhere"]) {
+      const html = await (await request.get(path)).text();
+      // The browser's own parser and digest, apart from the build's reading of the same pages.
+      const found = await page.evaluate(async (source) => {
+        const scripts = [...new DOMParser().parseFromString(source, "text/html").scripts];
+        const texts = scripts.filter((script) => !script.hasAttribute("src")).map((script) => script.text);
+        return Promise.all(
+          texts.map(async (text) => {
+            const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+            return `'sha256-${btoa(String.fromCharCode(...new Uint8Array(digest)))}'`;
+          }),
+        );
+      }, html);
+      for (const hash of found) hashes.add(hash);
+    }
+    expect([...hashes].toSorted()).toEqual((served.match(/'sha256-[^']+'/g) ?? []).toSorted());
+  });
+
   test("lets a page open a WebSocket to its own host", async ({ page }) => {
     await page.goto("/");
     await hydrated(page);
