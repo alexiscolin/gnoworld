@@ -72,7 +72,8 @@ export function ircLink(options: Options): Link {
       silent += 1;
     }, pingMs);
     s.on("connect", () => {
-      s.write(line("CAP", ["REQ", "message-tags account-tag batch draft/chathistory server-time"]));
+      // multi-prefix: NAMES gives each person every power, so the reconciler reads a voiced operator whole.
+      s.write(line("CAP", ["REQ", "message-tags account-tag batch draft/chathistory server-time multi-prefix"]));
       s.write(line("NICK", [NICK]));
       s.write(line("USER", [NICK, "0", "*", "gno.world"]));
     });

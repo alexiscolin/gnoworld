@@ -6,7 +6,7 @@ import { freePort } from "../testing/ergo.ts";
 import { fakeErgo, message, PASSWORD, welcome, type Peer } from "../testing/fakeErgo.ts";
 import { ircLink, retryDelay, type Link, type Said } from "./link.ts";
 
-const CAPS = "CAP REQ :message-tags account-tag batch draft/chathistory server-time";
+const CAPS = "CAP REQ :message-tags account-tag batch draft/chathistory server-time multi-prefix";
 // Stopped before the fake Ergo closes, so no link reconnects to a server that is gone.
 const links: Link[] = [];
 afterEach(async () => {
