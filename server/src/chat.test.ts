@@ -1005,6 +1005,26 @@ describe("the chat, as the server starts it", () => {
       chat.rooms.create("bubble", "garden");
       expect(await peer.next(/^SAMODE #bubble\/garden \+b /)).toBe("SAMODE #bubble/garden +b m:g1a");
     });
+
+    it("puts no mute on again for a room it refuses to make: a name taken, a name too long (F563)", async () => {
+      const { peer, chat } = await linked(
+        { worlds: worlds("bubble"), moderation: OFF },
+        { provider: () => Promise.resolve({ ...OFF_ANSWER, flagged: { ...OFF_ANSWER.flagged, violence: true } }) },
+      );
+      for (let n = 1; n <= 3; n += 1)
+        peer.say(message(`account=g1a;msgid=m${String(n)}`, "g1a!u@h", ["#bubble", "hurt"]));
+      await peer.next(/^SAMODE #bubble \+b m:g1a$/);
+      chat.rooms.create("bubble", "garden");
+      await peer.next(/^SAMODE #bubble\/garden \+b /);
+      const mark = peer.lines.length;
+      expect([chat.rooms.create("bubble", "garden"), chat.rooms.create("bubble", "x".repeat(60))]).toEqual([
+        "exists",
+        "too_long",
+      ]);
+      peer.say("PING :settled");
+      await peer.next(/^PONG settled$/);
+      expect(peer.lines.slice(mark).filter((l) => MUTE_LINE.test(l))).toEqual([]);
+    });
   });
 
   describe("rooms by role (3m)", () => {
