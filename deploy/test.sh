@@ -340,6 +340,7 @@ if [ "${1:-}" = --mutants ]; then
 		nginx awk '{ print } /location \/api\/ \{/ { print "            auth_basic off;" }'
 	mutant "the stream buffered" "the stream comes through web unbuffered" nginx sed '/proxy_buffering off;/d'
 	mutant "no limit of web's own on the login" "a longer burst meets web's own limit" nginx sed '/limit_req zone=login/d'
+	mutant "a backslash in a path handed on" "a backslash in a path is refused" nginx sed '/return 400;/d'
 	mutant "a host added to the way out" "the way out lets one host out" acl awk '{ print } /- api.openai.com/ { print "    - example.com" }'
 	mutant "the way out lets private addresses through" "the way out lets http://10.0.0.1.nip.io/ through" \
 		proxy_config sed 's#^unsafe_allow_private_ranges:.*#unsafe_allow_private_ranges: true#'
@@ -756,6 +757,10 @@ CLIENT
 	# The server through web's /api: the password first, the visitor's address from web alone.
 	expect "no password, no API" "$(status '/api/activity?worlds=earth' 203.0.113.1)" 401
 	expect "the API answers with the password" "$(status '/api/activity?worlds=earth' 203.0.113.1 -u "$auth")" 200
+	# A backslash is a separator to the server's URL parser alone: refused, or web's login limit is skipped (F617).
+	for path in '/api/x/..\login/challenge' '/api/x/..%5Clogin/challenge'; do
+		expect "a backslash in a path is refused: $path" "$(status "$path" 203.0.113.34 -u "$auth" --path-as-is)" 400
+	done
 	# A login challenge's code, and its body's error when it has one (the server's JSON, or web's own page).
 	challenge() {
 		client=$1
