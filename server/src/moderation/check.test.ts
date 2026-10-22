@@ -219,7 +219,7 @@ describe("checking a message", () => {
   it("never finds a backlog spread over ten minutes too fast, however fast it arrives (3k)", async () => {
     const { check } = setup(() => Promise.resolve(answer()));
     const verdicts = await Promise.all(Array.from({ length: 25 }, (_, n) => check(stamped(n, n * 24_000))));
-    expect(verdicts.filter((verdict) => verdict !== "seen" && verdict.action === "hide")).toEqual([]);
+    expect(verdicts.filter((verdict) => typeof verdict !== "string" && verdict.action === "hide")).toEqual([]);
   });
 
   it("counts each account's rate apart (3k)", async () => {
