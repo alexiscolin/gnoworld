@@ -1,9 +1,11 @@
-// What each line Ergo sends means to the server's IRC link (slice 3's plan, 3h, 3j, 3k, 3l): its
-// registration, its rooms, their history a page at a time, their messages, and the refusals that close it.
+// What each line Ergo sends means to the server's IRC link (slice 3's plan, 3h, 3j, 3k, 3l, 3m): its
+// registration, its rooms, their history a page at a time, their messages, who joins them and their state
+// (state.ts), and the refusals that close it.
 import type { Socket } from "node:net";
 import type { IrcMessage } from "@gnoworld/core";
 import type { Log } from "../log.ts";
 import { joins, line, NICK, said, type Said } from "./lines.ts";
+import { roomStates, type States } from "./state.ts";
 
 export interface Options {
   host: string;
@@ -22,6 +24,10 @@ export interface Options {
   onReady?: () => void;
   // Ergo's channels, listed each time it is in its rooms (3l: a channel the server did not make).
   onChannels?: (names: readonly string[]) => void;
+  // Someone else joined one of its rooms (3m: the reconciler voices a writer at once).
+  onJoin?: (room: string) => void;
+  // How long a room's state may take to come (3m).
+  stateMs?: number;
 }
 
 // Half of a check's per-account queue, so a page never fills it with a live line waiting (3j).
@@ -41,12 +47,14 @@ export interface State {
   asked: Set<string>;
   // The channels of a LIST under way, 10,000 at most.
   channels: string[] | undefined;
+  // The rooms' states asked of Ergo (3m).
+  states: States;
 }
 
 // The lines Ergo sends that ask for an answer, as 3b's table found them.
 export function reader(options: Options, state: State) {
   const { password, rooms, onMessage, log, lastChecked = () => undefined, onReady = () => undefined } = options;
-  const { drained = () => Promise.resolve(), onChannels } = options;
+  const { drained = () => Promise.resolve(), onChannels, onJoin = () => undefined } = options;
   // Ergo answers AFTER a msgid it no longer holds (a line hidden by REDACT) with nothing, and AFTER a
   // time from the next millisecond on (irc/history/history.go:171-175, irc/handlers.go:940, v2.19.1).
   const history = (s: Socket, room: string, after: string): void => {
@@ -92,9 +100,8 @@ export function reader(options: Options, state: State) {
       if (state.channels !== undefined) onChannels?.(state.channels);
       state.channels = undefined;
     },
-    JOIN: (_, { source, params: [room = ""] }) => {
-      if (source?.split("!")[0] === NICK && state.asked.has(room)) state.joined.add(room);
-    },
+    JOIN: joined(state, onJoin),
+    ...rejoins(state),
     BATCH: (s, { params: [ref = "", kind, room = ""] }) => {
       if (ref.startsWith("+") && kind === "chathistory") state.batches.set(ref.slice(1), { room, lines: 0, last: "" });
       if (!ref.startsWith("-")) return;
@@ -139,10 +146,30 @@ export function reader(options: Options, state: State) {
   };
   return (s: Socket, message: IrcMessage): void => {
     handlers[message.command]?.(s, message);
+    state.states.read(message);
   };
 }
 
-export const fresh = (): State => ({
+// Ergo's JOIN: the bot's own takes a room it asked as joined (3l); another's, in one of its rooms, is
+// handed on (3m).
+function joined(state: State, onJoin: (room: string) => void): (s: Socket, message: IrcMessage) => void {
+  return (_, { source, params: [room = ""] }) => {
+    if (source?.split("!")[0] !== NICK) {
+      if (state.joined.has(room)) onJoin(room);
+    } else if (state.asked.has(room)) state.joined.add(room);
+  };
+}
+
+// A room of its own that refuses the bot (3m: +i, +R, or an operator's +l, +k or +b) is joined by
+// SAJOIN, which Ergo grants an operator whatever the room's modes (irc/channel.go:786-792, v2.19.1).
+function rejoins(state: State): Record<string, (s: Socket, message: IrcMessage) => void> {
+  const rejoin = (s: Socket, { params: [, room = ""] }: IrcMessage): void => {
+    if (state.joined.has(room) || state.asked.has(room)) s.write(line("SAJOIN", [room]));
+  };
+  return Object.fromEntries(["471", "473", "474", "475", "477"].map((code) => [code, rejoin]));
+}
+
+export const fresh = (stateMs: number): State => ({
   attempt: 0,
   joined: new Set(),
   ready: false,
@@ -150,4 +177,5 @@ export const fresh = (): State => ({
   after: new Map(),
   asked: new Set(),
   channels: undefined,
+  states: roomStates(stateMs),
 });

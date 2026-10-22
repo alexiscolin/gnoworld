@@ -1,10 +1,12 @@
-// The server's IRC link (slice 3's plan, 3h, 3j, 3k): one TCP connection to Ergo's internal listener, as its
-// operator, in every room. It reads the rooms' messages, never a direct one, and sends only the commands
-// lines.ts lists, each through formatLine. It comes back after a close, and after three unanswered pings,
-// then asks each room's history from the time of the last line checked there, a page at a time.
+// The server's IRC link (slice 3's plan, 3h, 3j, 3k, 3m): one TCP connection to Ergo's internal listener,
+// as its operator, in every room. It reads the rooms' messages, never a direct one, and sends only the
+// commands lines.ts lists, each through formatLine. It comes back after a close, and after three
+// unanswered pings, then asks each room's history from the time of the last line checked there, a page at
+// a time. It reads a room's state for the reconciler (rooms/reconcile.ts).
 import { connect, type Socket } from "node:net";
 import { parseLine, type IrcMessage } from "@gnoworld/core";
 import type { Log } from "../log.ts";
+import type { RoomState } from "../rooms/reconcile.ts";
 import { allowed, line, NICK, type Command } from "./lines.ts";
 import { fresh, reader, type Options } from "./reader.ts";
 
@@ -13,6 +15,8 @@ export type { Said } from "./lines.ts";
 export interface Link {
   // The commands of lines.ts alone, in their forms, once it is in its rooms; false when not sent.
   send: (command: Command, params: readonly string[]) => boolean;
+  // A room's flags, invite list and people, once it is in its rooms; undefined otherwise or past stateMs.
+  state: (room: string) => Promise<RoomState | undefined>;
   stop: () => Promise<void>;
 }
 
@@ -56,7 +60,7 @@ export function ircLink(options: Options): Link {
   let retry: ReturnType<typeof setTimeout> | undefined;
   // The backoff starts again from a second only after a minute up: Ergo taking the link in, then
   // dropping it at once, keeps it waiting longer.
-  const state = fresh();
+  const state = fresh(options.stateMs ?? 10_000);
   const read = reader(options, state);
   const open = (): void => {
     const s = connect(port, host);
@@ -87,6 +91,7 @@ export function ircLink(options: Options): Link {
       state.batches.clear();
       state.asked.clear();
       state.channels = undefined;
+      state.states.drop();
       if (stopped) return;
       log("irc_closed");
       if (state.upSince !== undefined && Date.now() - state.upSince >= 60_000) state.attempt = 0;
@@ -110,6 +115,12 @@ export function ircLink(options: Options): Link {
       } catch {
         return false;
       }
+    },
+    state: (room) => {
+      const s = socket;
+      // A room by the JOIN's form: one room, a name no line breaks.
+      if (!state.ready || s === undefined || !allowed("JOIN", [room])) return Promise.resolve(undefined);
+      return state.states.ask((command, params) => s.write(line(command, params)), room);
     },
     stop: async () => {
       stopped = true;

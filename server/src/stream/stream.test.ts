@@ -295,6 +295,81 @@ describe("the verdicts' stream, its green pass (3j)", () => {
   });
 });
 
+describe("the verdicts' stream, rooms by role (3m)", () => {
+  it("sends a members room's events only to whom may read it, asked or not", async () => {
+    const stream = makeStream();
+    streams.push(stream);
+    const app = makeApp(
+      logger("a-pepper-of-forty-characters-0123456789", () => true),
+      () => true,
+    );
+    const visible = (room: string, who: string | undefined) => room !== "#bubble/crew" || who === "member";
+    app.route("/api/stream", stream.routes({ proxy: undefined, visible, session: (token) => token }));
+    const follow = async (who: string | undefined, peer: string) => {
+      const response = await app.request(
+        `/api/stream?rooms=${encodeURIComponent("#bubble,#bubble/crew")}`,
+        { headers: who === undefined ? {} : { cookie: `__Host-session=${who}` } },
+        { incoming: { socket: { remoteAddress: peer } } },
+      );
+      const reader: ReadableStreamDefaultReader<Uint8Array> | undefined = response.body?.getReader();
+      let text = "";
+      return async (count: number) => {
+        while ((text.match(/data: /g) ?? []).length < count) {
+          const chunk = await reader?.read();
+          if (chunk === undefined || chunk.done) break;
+          text += new TextDecoder().decode(chunk.value);
+        }
+        return [...text.matchAll(/data: (.*)\n/g)].map(
+          ([, json = ""]) => (JSON.parse(json) as { msgid: string }).msgid,
+        );
+      };
+    };
+    const guest = await follow(undefined, "198.51.100.1");
+    const member = await follow("member", "198.51.100.2");
+    stream.publish({ msgid: "crew1", room: "#bubble/crew", state: "checked" });
+    stream.publish({ msgid: "open1", room: "#bubble", state: "checked" });
+    expect(await member(2)).toEqual(["crew1", "open1"]);
+    expect(await guest(1)).toEqual(["open1"]);
+  });
+});
+
+describe("the verdicts' stream's replay, rooms by role (3m)", () => {
+  it("replays a members room's events to whom may read it, never to a late guest or one coming back", async () => {
+    const stream = makeStream();
+    streams.push(stream);
+    const app = makeApp(
+      logger("a-pepper-of-forty-characters-0123456789", () => true),
+      () => true,
+    );
+    const visible = (room: string, who: string | undefined) => room !== "#bubble/crew" || who === "member";
+    app.route("/api/stream", stream.routes({ proxy: undefined, visible, session: (token) => token }));
+    stream.publish({ msgid: "crew1", room: "#bubble/crew", state: "checked" });
+    stream.publish({ msgid: "open1", room: "#bubble", state: "checked" });
+    const replayed = async (who: string | undefined, last: string | undefined, peer: string) => {
+      const headers: Record<string, string> = {
+        ...(who === undefined ? {} : { cookie: `__Host-session=${who}` }),
+        ...(last === undefined ? {} : { "last-event-id": last }),
+      };
+      const response = await app.request(
+        `/api/stream?rooms=${encodeURIComponent("#bubble,#bubble/crew")}`,
+        { headers },
+        { incoming: { socket: { remoteAddress: peer } } },
+      );
+      const reader: ReadableStreamDefaultReader<Uint8Array> | undefined = response.body?.getReader();
+      let text = "";
+      while (!text.includes("open1")) {
+        const chunk = await reader?.read();
+        if (chunk === undefined || chunk.done) break;
+        text += new TextDecoder().decode(chunk.value);
+      }
+      return [...text.matchAll(/data: (.*)\n/g)].map(([, json = ""]) => (JSON.parse(json) as { msgid: string }).msgid);
+    };
+    expect(await replayed(undefined, undefined, "198.51.100.1")).toEqual(["open1"]);
+    expect(await replayed(undefined, "0", "198.51.100.2")).toEqual(["open1"]);
+    expect(await replayed("member", undefined, "198.51.100.3")).toEqual(["crew1", "open1"]);
+  });
+});
+
 describe("StreamEvent", () => {
   it("is a message's id, its room and its state, never its text", () => {
     expect(StreamEvent.parse({ msgid: "m1", room: "#bubble", state: "hidden" })).toEqual({

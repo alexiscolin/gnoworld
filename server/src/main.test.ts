@@ -267,6 +267,42 @@ describe("the server's process", () => {
     expect(foreign.status).toBe(403);
   });
 
+  it("answers a members room's activity to the team, never to a guest or a stranger (3m)", async () => {
+    const origin = "http://gnoworld.test";
+    const lead = wallet();
+    const roles = join(folder("gnoworld-roles-"), "roles.json");
+    const rules = { bannedWords: [], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
+    const crew = { room: "#bubble/crew", type: "members", readers: "crew" };
+    writeFileSync(
+      roles,
+      JSON.stringify({
+        team: [lead.address],
+        trusted: [],
+        worlds: [{ slug: "bubble", moderators: [], rules, groups: { crew: [] }, rooms: [crew] }],
+      }),
+    );
+    const port = await listening(start({ ...settings(), ORIGINS: origin, ROLES_FILE: roles }));
+    const at = (path: string) => `http://127.0.0.1:${String(port)}${path}`;
+    const post = (path: string, body: unknown): Promise<Response> =>
+      fetch(at(path), {
+        method: "POST",
+        headers: { origin, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    // The session's cookie of a wallet's login.
+    const session = async (who: ReturnType<typeof wallet>): Promise<string> => {
+      const made = Challenge.parse(await (await post("/api/login/challenge", { chainId: "onyx-1" })).json());
+      const proof = who.sign("onyx-1", made.text);
+      const verified = await post("/api/login/verify", { nonce: made.nonce, address: who.address, proof });
+      return (verified.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
+    };
+    const rooms = async (headers: Record<string, string>) =>
+      (await fetch(at("/api/activity?worlds=bubble"), { headers })).text();
+    expect(await rooms({})).not.toContain("#bubble/crew");
+    expect(await rooms({ cookie: await session(wallet()) })).not.toContain("#bubble/crew");
+    expect(await rooms({ cookie: await session(lead) })).toContain("#bubble/crew");
+  });
+
   it("answers the rooms of the roles file's worlds, made at boot, with no Ergo set", async () => {
     const port = await listening(start(settings()));
     const answer = await fetch(`http://127.0.0.1:${String(port)}/api/activity?worlds=earth,bubble`);

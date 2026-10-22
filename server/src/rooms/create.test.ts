@@ -65,13 +65,11 @@ describe("a moderator's room", () => {
     expect(rooms.create("earth", "a")).toEqual({ made: "#earth/a" });
   });
 
-  it("is recorded while the link is down, and set when it is back", () => {
-    const { link, sent, rooms } = setup();
+  it("is recorded while the link is down; the reconciler sets it when the link is back (3m)", () => {
+    const { db, link, sent, rooms } = setup();
     link.up = false;
     expect(rooms.create("bubble", "garden")).toEqual({ made: "#bubble/garden" });
-    link.up = true;
-    rooms.reapply();
-    expect(sent).toContain("SAMODE #bubble/garden +M");
+    expect([listRooms(db).map(({ name }) => name), sent]).toEqual([["#bubble", "#bubble/garden", "#earth"], []]);
   });
 
   it("is archived, never destroyed: read-only (+m) and unlisted (+s), kept in its world", () => {
@@ -128,22 +126,5 @@ describe("a moderator's room", () => {
     const { rooms } = setup();
     rooms.create("earth", "garden");
     expect([rooms.archive("bubble", "nowhere"), rooms.archive("bubble", "garden")]).toEqual(["not_found", "not_found"]);
-  });
-
-  it("puts every room's modes back when the link is in its rooms: open ones +M, archived ones +m and +s too", () => {
-    const { sent, rooms } = setup();
-    rooms.create("bubble", "garden");
-    rooms.create("bubble", "old");
-    rooms.archive("bubble", "old");
-    sent.splice(0);
-    rooms.reapply();
-    expect(sent).toEqual([
-      "SAMODE #bubble +M",
-      "SAMODE #bubble/garden +M",
-      "SAMODE #bubble/old +M",
-      "SAMODE #bubble/old +m",
-      "SAMODE #bubble/old +s",
-      "SAMODE #earth +M",
-    ]);
   });
 });

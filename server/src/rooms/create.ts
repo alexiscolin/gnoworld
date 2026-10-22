@@ -1,7 +1,7 @@
 // A world's further rooms (slice 3's plan, 3l; decisions 147, 162): made by its moderators as
 // #<world>/<name>, recorded, joined by the bot and open to accounts (+M); archived, never destroyed:
-// read-only (+m) and unlisted (+s), its name and its place in the world's cap kept. Each time the link is
-// in its rooms the modes are put back, so a room Ergo lost comes back as it was.
+// read-only (+m) and unlisted (+s), its name and its place in the world's cap kept. The reconciler
+// (reconcile.ts, 3m) puts the modes back from what Ergo says, so a room Ergo lost comes back as it was.
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import type { Command } from "../irc/lines.ts";
@@ -17,7 +17,7 @@ const CHANNEL_MAX = 64;
 export interface Rooms {
   create: (world: string, name: string) => { made: string } | "exists" | "full" | "too_long";
   archive: (world: string, name: string) => "archived" | "not_found";
-  reapply: () => void;
+  archived: (room: string) => boolean;
 }
 
 interface Options {
@@ -31,16 +31,12 @@ interface Options {
 export function makeRooms({ db, send, now, max }: Options): Rooms {
   const Count = z.object({ n: z.number() });
   const State = z.object({ archived: z.number() }).optional();
-  const All = z.array(z.object({ name: z.string(), archived: z.number() }));
   const sql = {
     count: db.prepare("SELECT count(*) AS n FROM rooms WHERE world = ? AND name <> ?"),
     add: db.prepare("INSERT INTO rooms (name, world, created_at) VALUES (?, ?, ?)"),
     state: db.prepare("SELECT archived FROM rooms WHERE name = ? AND world = ?"),
     archive: db.prepare("UPDATE rooms SET archived = 1 WHERE name = ?"),
-    all: db.prepare("SELECT name, archived FROM rooms ORDER BY name"),
-  };
-  const modes = (room: string, archived: boolean): void => {
-    for (const mode of archived ? ["+M", "+m", "+s"] : ["+M"]) send("SAMODE", [room, mode]);
+    archived: db.prepare("SELECT archived FROM rooms WHERE name = ?"),
   };
   return {
     create(world, name) {
@@ -50,7 +46,7 @@ export function makeRooms({ db, send, now, max }: Options): Rooms {
       if (Count.parse(sql.count.get(world, mainRoom(world))).n >= max) return "full";
       sql.add.run(room, world, now());
       send("JOIN", [room]);
-      modes(room, false);
+      send("SAMODE", [room, "+M"]);
       return { made: room };
     },
     archive(world, name) {
@@ -64,8 +60,6 @@ export function makeRooms({ db, send, now, max }: Options): Rooms {
       }
       return "archived";
     },
-    reapply() {
-      for (const { name, archived } of All.parse(sql.all.all())) modes(name, archived === 1);
-    },
+    archived: (room) => State.parse(sql.archived.get(room))?.archived === 1,
   };
 }

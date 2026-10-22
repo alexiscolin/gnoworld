@@ -1,0 +1,114 @@
+// The rooms' reconciler (slice 3's plan, 3m): each room as Ergo holds it, read through the link (its
+// flags, its invite list, who is in it with what power), made what its type says by the fewest commands.
+// It runs when the link is in its rooms, on a timer and on a JOIN, so an operator's drift or a lost
+// channel comes back, and a member taken off the file is put out. Read whole in review: a wrong command
+// here opens a room or hands out power.
+import { NICK, type Command } from "../irc/lines.ts";
+import type { Log } from "../log.ts";
+import type { Desired } from "./types.ts";
+
+/** A room in Ergo: its flags, its invite list by account, and who is in it with their prefixes. */
+export interface RoomState {
+  flags: string;
+  invites: string[];
+  present: { nick: string; powers: string }[];
+}
+
+// The reconciler's own flags put on or taken off, then its invites, a wildcard an operator set included.
+function listChanges(state: RoomState, want: Desired): string[][] {
+  const out: string[][] = [];
+  for (const flag of want.modes) if (!state.flags.includes(flag)) out.push([`+${flag}`]);
+  for (const flag of state.flags) if ("MmisR".includes(flag) && !want.modes.includes(flag)) out.push([`-${flag}`]);
+  for (const who of want.invites) if (!state.invites.includes(who)) out.push(["+I", who]);
+  for (const mask of state.invites) if (!want.invites.includes(mask)) out.push(["-I", mask]);
+  return out;
+}
+
+// A person but the bot: any power above voice taken (founder, admin, op and half-op, by the prefixes NAMES
+// shows), and voiced as the type says.
+function powerChanges({ nick, powers }: RoomState["present"][number], want: Desired): string[][] {
+  const out: string[][] = [];
+  for (const [prefix, letter] of Object.entries({ "~": "q", "&": "a", "@": "o", "%": "h" }))
+    if (powers.includes(prefix)) out.push([`-${letter}`, nick]);
+  const voiced = powers.includes("+");
+  if (want.voiced.includes(nick) !== voiced) out.push([voiced ? "-v" : "+v", nick]);
+  return out;
+}
+
+/** What a room needs to be as its type says: the reconciler's own flags (M, m, i, s, R) put on or taken
+ * off, its invites, then each person but the bot: put out of a closed room they are not invited to, else
+ * stripped of any power above voice and voiced as the type says. */
+export function changes(room: string, state: RoomState, want: Desired): [Command, ...string[]][] {
+  const out: [Command, ...string[]][] = listChanges(state, want).map((mode) => ["SAMODE", room, ...mode]);
+  for (const person of state.present.filter(({ nick }) => nick !== NICK)) {
+    if (want.modes.includes("i") && !want.invites.includes(person.nick))
+      out.push(["KICK", room, person.nick, "not on this room's list"]);
+    else out.push(...powerChanges(person, want).map((mode): [Command, ...string[]] => ["SAMODE", room, ...mode]));
+  }
+  return out;
+}
+
+interface Options {
+  rooms: () => readonly string[];
+  desired: (room: string) => Desired;
+  state: (room: string) => Promise<RoomState | undefined>;
+  send: (command: Command, params: readonly string[]) => boolean;
+  log: Log;
+}
+
+export interface Reconciler {
+  // Every room, or one; a room asked while a pass runs is done in it, after the others, each room once.
+  ask: (room?: string) => void;
+  // As ask, settling once no room waits.
+  pass: (room?: string) => Promise<void>;
+  // Each room's flags put on at once, before any state is read: sent with the link's JOINs, a room Ergo
+  // lost and the bot makes again is closed from its first line (Ergo keeps a channel's history).
+  flags: () => void;
+}
+
+export function makeReconciler({ rooms, desired, state, send, log }: Options): Reconciler {
+  const waiting = new Set<string>();
+  let running: Promise<void> | undefined;
+  // A room Ergo did not answer for waits for the next pass.
+  const one = async (room: string): Promise<void> => {
+    const now = await state(room);
+    if (now === undefined) return;
+    const todo = changes(room, now, desired(room));
+    if (todo.length === 0) return;
+    for (const [command, ...params] of todo) send(command, params);
+    log("room_reconciled", { room });
+    // A room the file made open, or no longer names, loses its invite-only flag: its history opens with it.
+    if (todo.some(([command, , flag]) => command === "SAMODE" && flag === "-i")) {
+      log("alert", { error: "room_opened", room });
+    }
+  };
+  // A room whose state or changes failed is passed over: the others go on, and the next pass asks it again.
+  const failed =
+    (room: string) =>
+    (error: unknown): void => {
+      log("room_unreconciled", { room, error: error instanceof Error ? error.name : "unknown" });
+    };
+  const drain = async (): Promise<void> => {
+    for (const room of waiting) {
+      waiting.delete(room);
+      await one(room).then(undefined, failed(room));
+    }
+  };
+  const ask = (room?: string): void => {
+    for (const name of room === undefined ? rooms() : [room]) waiting.add(name);
+    // Cleared once the pass has settled, never inside it: a pass that found no room ends too.
+    running ??= drain().finally(() => {
+      running = undefined;
+    });
+  };
+  return {
+    ask,
+    flags: () => {
+      for (const room of rooms()) for (const flag of desired(room).modes) send("SAMODE", [room, `+${flag}`]);
+    },
+    pass: (room) => {
+      ask(room);
+      return running ?? Promise.resolve();
+    },
+  };
+}

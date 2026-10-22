@@ -116,3 +116,39 @@ describe("GET /api/activity", () => {
     );
   });
 });
+
+describe("GET /api/activity, rooms by role (3m)", () => {
+  // The crew's room is its members'; the attic is hidden, listed to its world's moderators alone.
+  const visible = (room: string, who: string | undefined) =>
+    room === "#bubble/crew" ? who === "member" || who === "mod" : room === "#bubble/attic" ? who === "mod" : true;
+  const roleSetup = () => {
+    const db = openDatabase(":memory:", [ROOM_TABLES]);
+    opened.push(db);
+    ensureRooms(db, ["bubble"], T0);
+    for (const name of ["#bubble/crew", "#bubble/attic"]) {
+      db.prepare("INSERT INTO rooms (name, world, created_at) VALUES (?, 'bubble', 0)").run(name);
+    }
+    const app = makeApp(
+      logger("a-pepper-of-forty-characters-0123456789", () => true),
+      () => true,
+    );
+    const session = (token: string | undefined) => (token === "" ? undefined : token);
+    app.route("/api/activity", activityRoutes(makeActivity(), { db, now: () => T0, visible, session }));
+    const ask = async (who?: string) => {
+      const response = await app.request("/api/activity?worlds=bubble", {
+        headers: who === undefined ? {} : { cookie: `__Host-session=${who}` },
+      });
+      const body = JSON.parse(await response.text()) as { rooms: { room: string }[] };
+      return [body.rooms.map(({ room }) => room), response.headers.get("cache-control")];
+    };
+    return { ask };
+  };
+
+  it("answers a members room to whom may read it, a hidden one to its moderators, each privately", async () => {
+    const { ask } = roleSetup();
+    expect(await ask()).toEqual([["#bubble"], "public, max-age=5"]);
+    expect(await ask("stranger")).toEqual([["#bubble"], "private, max-age=5"]);
+    expect(await ask("member")).toEqual([["#bubble", "#bubble/crew"], "private, max-age=5"]);
+    expect(await ask("mod")).toEqual([["#bubble", "#bubble/attic", "#bubble/crew"], "private, max-age=5"]);
+  });
+});

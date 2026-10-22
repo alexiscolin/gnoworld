@@ -40,21 +40,22 @@ const db = openDatabase(config.database, [
 let draining = false;
 const app = makeApp(log, () => !draining);
 app.route("/api/login", loginFrom(db, config, { log }));
+// The login's sessions, read for the rooms' routes (3l) and the rooms a reader may see (3m).
+const { session } = makeLogin(db, { chains: config.chains, now: Date.now });
 const chat = startChat(
   db,
   {
     worlds: roles.worlds,
+    team: roles.team,
     ergo: config.ergo,
     moderation: config.moderation,
     trustedProxy: config.trustedProxy,
     spared: spared(roles),
   },
-  { log, pepper: config.pepper },
+  { log, pepper: config.pepper, session },
 );
 app.route("/api/activity", chat.activity);
 app.route("/api/stream", chat.stream);
-// The login's sessions, read for the rooms' routes (3l).
-const { session } = makeLogin(db, { chains: config.chains, now: Date.now });
 app.route(
   "/api/rooms",
   roomsRoutes({ roles, rooms: chat.rooms, session, origins: config.origins, log, now: Date.now }),

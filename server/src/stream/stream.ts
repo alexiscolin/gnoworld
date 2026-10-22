@@ -1,19 +1,31 @@
 // The verdicts' stream (ADR-0002 §6 and §7; slice 3's plan, 3j): server-sent events a page follows, so a
-// link's preview shows only once its message is checked. Public, as guests read; bounded: 25 rooms a
-// stream, 4 streams a visitor, a total, each room's last events kept for a late client or one coming back.
+// link's preview shows only once its message is checked. Public, as guests read, but for the rooms a
+// reader may not read (3m); bounded: 25 rooms a stream, 4 streams a visitor, a total, each room's last
+// events kept for a late client or one coming back.
 import { getConnInfo } from "@hono/node-server/conninfo";
 import type { ApiError, StreamEvent } from "@gnoworld/schemas";
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
+import { getCookie } from "hono/cookie";
 import { streamSSE, type SSEStreamingApi } from "hono/streaming";
 import { z } from "zod";
 import { visitor } from "../visitor.ts";
 
 export interface Stream {
   publish: (event: StreamEvent) => void;
-  routes: (options: { proxy: string | undefined }) => Hono;
+  // visible and session as activity/routes.ts's (3m): a room the reader may not see sends it nothing.
+  routes: (options: {
+    proxy: string | undefined;
+    visible?: Seeing["visible"] | undefined;
+    session?: Seeing["session"] | undefined;
+  }) => Hono;
   close: () => void;
   // What it holds, for the tests of its bounds: events kept, rooms kept, clients and visitors.
   size: () => { events: number; rooms: number; clients: number; visitors: number };
+}
+
+interface Seeing {
+  visible: (room: string, who: string | undefined) => boolean;
+  session: (token: string | undefined) => string | undefined;
 }
 
 interface Options {
@@ -42,6 +54,13 @@ function writeTo(client: Client, text: string, pending: number): void {
     client.unread -= 1;
   };
   client.stream.write(text).then(sent, sent);
+}
+
+// The rooms a reader may see, by its session's account, read once at the start: live events and replay
+// alike (3m).
+function seenBy(c: Context, rooms: ReadonlySet<string>, { visible, session }: Seeing): Set<string> {
+  const reader = session(getCookie(c, "__Host-session"));
+  return new Set([...rooms].filter((room) => visible(room, reader)));
 }
 
 export function makeStream(options: Options = {}): Stream {
@@ -82,7 +101,7 @@ export function makeStream(options: Options = {}): Stream {
       const text = frame(sequence, event);
       for (const client of clients) if (client.rooms.has(event.room)) write(client, text);
     },
-    routes: ({ proxy }) => {
+    routes: ({ proxy, visible = () => true, session = () => undefined }) => {
       const app = new Hono();
       app.get("/", (c) => {
         const asked = c.req.queries("rooms") ?? [];
@@ -99,12 +118,12 @@ export function makeStream(options: Options = {}): Stream {
           const ended = new Promise<void>((resolve) => {
             stream.onAbort(resolve);
           });
-          const client: Client = { rooms: rooms.data, stream, unread: 0 };
+          const client: Client = { rooms: seenBy(c, rooms.data, { visible, session }), stream, unread: 0 };
           clients.add(client);
           // The newest it missed, or the rooms' last events for a new client, as many as it may leave unread:
           // a client further behind loses the rest. An id past the last is none of ours (a clock set back).
           const after = (last.data ?? 0) > sequence ? 0 : (last.data ?? 0);
-          const missed = [...rooms.data].flatMap((room) => rings.get(room) ?? []).filter(({ id }) => id > after);
+          const missed = [...client.rooms].flatMap((room) => rings.get(room) ?? []).filter(({ id }) => id > after);
           for (const { id, event } of missed.toSorted((a, b) => a.id - b.id).slice(-pending))
             write(client, frame(id, event));
           // A comment line, which keeps a proxy from closing a quiet stream.

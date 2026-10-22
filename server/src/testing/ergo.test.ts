@@ -16,6 +16,7 @@ import { MUTE_TABLES } from "../moderation/mute.ts";
 import { ROOM_STATE } from "../rooms/create.ts";
 import { VERDICT_TABLES } from "../moderation/check.ts";
 import { CATEGORIES, type Answer } from "../moderation/provider.ts";
+import type { Rules } from "../roles/roles.ts";
 import { ROOM_TABLES } from "../rooms/rooms.ts";
 import { openDatabase } from "../db.ts";
 import { logger } from "../log.ts";
@@ -1204,15 +1205,24 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
   const chatFor = async (
     e: Ergo,
     asked: string[],
-    more: { db?: DatabaseSync; now?: () => number; tickMs?: number; lines?: string[] } = {},
+    more: {
+      db?: DatabaseSync;
+      now?: () => number;
+      tickMs?: number;
+      lines?: string[];
+      worlds?: Parameters<typeof startChat>[1]["worlds"];
+      reconcileMs?: number;
+      team?: ReadonlySet<string>;
+    } = {},
   ) => {
     const db = more.db ?? openDatabase(":memory:", TABLES);
     const chat = startChat(
       db,
       {
-        worlds: new Map([["bubble", { rules: RULES }]]),
+        worlds: more.worlds ?? new Map([["bubble", { rules: RULES }]]),
         ergo: { host: "127.0.0.1", port: e.port, password: e.operPassword },
         moderation: { openaiKey: undefined, thresholds: {}, newAccountHours: 24, mute: MUTE },
+        team: more.team,
       },
       {
         log: logger("a-pepper-of-forty-characters-0123456789", (line) => more.lines?.push(line) ?? 0),
@@ -1220,6 +1230,7 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
         provider: provider(asked),
         ...(more.now === undefined ? {} : { now: more.now }),
         ...(more.tickMs === undefined ? {} : { tickMs: more.tickMs }),
+        ...(more.reconcileMs === undefined ? {} : { reconcileMs: more.reconcileMs }),
       },
     );
     stops.push(async () => {
@@ -1423,5 +1434,247 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     await alice.expect(/ MODE #bubble\/garden \+s/);
     alice.send("PRIVMSG #bubble/garden :still archived");
     await alice.expect(/ 404 alice #bubble\/garden :Cannot send to channel \(\+m\)/);
+  });
+
+  describe("rooms by role on real Ergo (3m)", () => {
+    const typed = (rules: Rules = RULES) =>
+      new Map([
+        [
+          "bubble",
+          {
+            rules,
+            moderators: new Set(["mod"]),
+            groups: new Map([
+              ["crew", new Set(["member"])],
+              ["pens", new Set(["writer"])],
+            ]),
+            rooms: new Map([
+              ["#bubble/news", { type: "announcement" as const, hidden: false }],
+              ["#bubble/door", { type: "accounts" as const, hidden: true }],
+              ["#bubble/crew", { type: "members" as const, readers: "crew", hidden: false }],
+              ["#bubble/desk", { type: "members-write" as const, readers: "crew", writers: "pens", hidden: false }],
+            ]),
+          },
+        ],
+      ]);
+    // Ergo, the chat with the typed rooms, and five people: a guest, a stranger, a member, a writer, a moderator.
+    const escaped = (room: string) => room.replace("/", "\\/");
+    // A room's invite list as an operator lists it: Ergo shows it to a channel operator or by SAMODE alone.
+    const invitesOf = async ([nick, c]: [string, Raw], room: string): Promise<string[]> => {
+      const mark = c.lines().length;
+      c.send(`SAMODE ${room} I`);
+      await c.expect(new RegExp(` 347 ${nick} ${escaped(room)} `));
+      return c
+        .lines()
+        .slice(mark)
+        .flatMap((line) => new RegExp(` 346 ${nick} ${escaped(room)} (\\S+)`).exec(line)?.slice(1) ?? []);
+    };
+    const typedRooms = async (more: { reconcileMs?: number; lines?: string[] } = {}) => {
+      const e = await start();
+      await chatFor(e, [], {
+        worlds: typed(),
+        reconcileMs: more.reconcileMs ?? 1000,
+        ...(more.lines ? { lines: more.lines } : {}),
+      });
+      // Ready once both members rooms list their member: a hundred tries 50 ms apart.
+      const lookout: [string, Raw] = ["lookout", await oper(e, "lookout")];
+      for (let n = 0; ; n += 1) {
+        const lists = [await invitesOf(lookout, "#bubble/crew"), await invitesOf(lookout, "#bubble/desk")];
+        if (lists.every((list) => list.includes("member!*@*"))) break;
+        if (n === 100) throw new Error("the members rooms never listed their member");
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      const gus = await guest(e, "gus");
+      const people: [string, Raw][] = [["gus", gus]];
+      for (const name of ["stranger", "member", "writer", "mod"]) people.push([name, await login(e, name)]);
+      return { e, people };
+    };
+    // Joins: the room's names, or a refusal (473 invite only, 477 accounts only).
+    const joins = async (c: Raw, nick: string, room: string): Promise<boolean> => {
+      c.send(`JOIN ${room}`);
+      return (await c.expect(new RegExp(` (366|473|477) ${nick} ${escaped(room)} `))).includes(" 366 ");
+    };
+    const speaks = async (c: Raw, nick: string, room: string): Promise<boolean> => {
+      const text = `${nick} speaks`;
+      c.send(`PRIVMSG ${room} :${text}`);
+      return !(await c.expect(new RegExp(`(PRIVMSG ${escaped(room)} :${text}$| 404 ${nick} )`))).includes(" 404 ");
+    };
+    // Reads: the room's history holds a line said there, or Ergo answers nothing of it.
+    const reads = async (c: Raw, nick: string, room: string): Promise<boolean> => {
+      c.send(`CHATHISTORY LATEST ${room} * 10`);
+      const answer = await c.expect(new RegExp(`(speaks$| FAIL CHATHISTORY | 403 ${nick} |BATCH -)`));
+      return answer.endsWith("speaks");
+    };
+    // gus (a guest), stranger, member, writer, mod: [joins, speaks]; the type's voiced wait for their voice.
+    const matrix = async (people: [string, Raw][], room: string, voiced: readonly string[] = []) => {
+      const seen: [boolean, boolean][] = [];
+      for (const [nick, c] of people) {
+        const joined = await joins(c, nick, room);
+        if (joined && voiced.includes(nick)) await c.expect(new RegExp(` MODE ${escaped(room)} \\+v ${nick}`));
+        seen.push([joined, joined && (await speaks(c, nick, room))]);
+      }
+      return seen;
+    };
+
+    // One Ergo for the four types, each checked softly: a type that fails hides none of the others.
+    it(
+      "gives each type its people: who joins, who speaks, who reads its history, who sees it listed",
+      { timeout: 20_000 },
+      async () => {
+        const { people } = await typedRooms();
+        const client = (at: number): Raw => {
+          const c = people[at]?.[1];
+          if (c === undefined) throw new Error("no such client");
+          return c;
+        };
+        const [gus, member] = [client(0), client(2)];
+        // Announcement: open to all, its moderators alone speaking, a reaction refused.
+        const news = [
+          [true, false],
+          [true, false],
+          [true, false],
+          [true, false],
+          [true, true],
+        ];
+        expect.soft(await matrix(people, "#bubble/news", ["mod"]), "announcement").toEqual(news);
+        member.send("@+draft/react=x TAGMSG #bubble/news");
+        await member.expect(/ 404 member #bubble\/news /);
+        // Accounts: no guest, every account speaking, in no list.
+        const door = [
+          [false, false],
+          [true, true],
+          [true, true],
+          [true, true],
+          [true, true],
+        ];
+        expect.soft(await matrix(people, "#bubble/door"), "accounts").toEqual(door);
+        const mark = gus.lines().length;
+        gus.send("LIST");
+        await gus.expect(/ 323 /);
+        expect.soft(gus.lines().slice(mark).join("\n"), "listed").not.toContain("#bubble/door");
+        // Members: its members and moderators alone, and its history to them alone.
+        const crew = [
+          [false, false],
+          [false, false],
+          [true, true],
+          [false, false],
+          [true, true],
+        ];
+        expect.soft(await matrix(people, "#bubble/crew"), "members").toEqual(crew);
+        const read = [];
+        for (const [nick, c] of people) read.push(await reads(c, nick, "#bubble/crew"));
+        expect.soft(read, "history").toEqual([false, false, true, false, true]);
+        // Members-write: its readers in, its writers and moderators alone speaking.
+        const desk = [
+          [false, false],
+          [false, false],
+          [true, false],
+          [true, true],
+          [true, true],
+        ];
+        expect.soft(await matrix(people, "#bubble/desk", ["writer", "mod"]), "members-write").toEqual(desk);
+      },
+    );
+
+    it("joins its closed rooms again after a restart, a member still in one, and hides there", async () => {
+      const e = await start();
+      const db = openDatabase(":memory:", TABLES);
+      const restart = () =>
+        chatFor(e, [], { worlds: typed({ ...RULES, bannedWords: ["spam"] }), db, reconcileMs: 300 });
+      const first = await restart();
+      const member = await login(e, "member");
+      // In once the reconciler has put the member on the invite list: a hundred tries 50 ms apart.
+      for (let n = 0; !(await joins(member, "member", "#bubble/crew")); n += 1) {
+        if (n === 100) throw new Error("the member never got in");
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      // Whether the bot is in the closed room, as its member sees it.
+      const botIn = async (): Promise<boolean> => {
+        member.send("NAMES #bubble/crew");
+        const names = await member.expect(/ (353|366) member [=@ ]*#bubble\/crew /);
+        return / 353 member [=@] #bubble\/crew :.*gnoworld/.test(names);
+      };
+      // Gone, then back: the room kept its member and its flags, and the bot is the new chat's.
+      await first.stop();
+      await expect.poll(botIn, { timeout: 5000, interval: 50 }).toBe(false);
+      await restart();
+      await expect.poll(botIn, { timeout: 5000, interval: 50 }).toBe(true);
+      const flagged = await say(member, "#bubble/crew", "buy spam");
+      await member.expect(new RegExp(` REDACT #bubble/crew ${flagged} `));
+      // Its list read without a channel operator's power: an operator's wildcard is taken off.
+      const chief = await oper(e, "chief");
+      chief.send("SAMODE #bubble/crew +I *!*@*");
+      await expect.poll(() => invitesOf(["chief", chief], "#bubble/crew"), { timeout: 5000 }).not.toContain("*!*@*");
+      // Closed once every chat has stopped: the cleanups run in turn.
+      stops.push(() => {
+        db.close();
+        return Promise.resolve();
+      });
+    });
+
+    it("undoes an operator's drift, a wildcard invite included, and asks nothing more once the rooms are so", async () => {
+      const lines: string[] = [];
+      const { e, people } = await typedRooms({ reconcileMs: 150, lines });
+      const gus = people[0]?.[1];
+      if (gus === undefined) throw new Error("no guest");
+      // Settled: two passes in a row change nothing.
+      const changed = () => lines.filter((line) => line.includes('"room_reconciled"')).length;
+      await expect
+        .poll(
+          async () => {
+            const before = changed();
+            await new Promise((resolve) => setTimeout(resolve, 350));
+            return changed() === before;
+          },
+          { timeout: 10_000 },
+        )
+        .toBe(true);
+      const chief = await oper(e, "chief");
+      chief.send("SAMODE #bubble/crew +I *!*@*");
+      chief.send("SAMODE #bubble/crew -i");
+      // Closed again, the wildcard gone: the room's modes as a guest reads them, its list as the chief does.
+      const shut = async (): Promise<boolean> => {
+        gus.send("MODE #bubble/crew");
+        const modes = await gus.expect(/ 324 gus #bubble\/crew /);
+        return / \+\S*i/.test(modes) && !(await invitesOf(["chief", chief], "#bubble/crew")).includes("*!*@*");
+      };
+      await expect.poll(shut, { timeout: 5000 }).toBe(true);
+      expect(await joins(gus, "gus", "#bubble/crew")).toBe(false);
+    });
+  });
+
+  it("holds a members room of 100 accounts, and its second pass asks nothing (3m)", { timeout: 60_000 }, async () => {
+    const e = await start();
+    const crew = Array.from({ length: 98 }, (_, n) => `crew${String(n)}`);
+    const worlds = new Map([
+      [
+        "bubble",
+        {
+          rules: RULES,
+          moderators: new Set(["mod"]),
+          groups: new Map([["crew", new Set(crew)]]),
+          rooms: new Map([["#bubble/crew", { type: "members" as const, readers: "crew", hidden: false }]]),
+        },
+      ],
+    ]);
+    const lines: string[] = [];
+    await chatFor(e, [], { worlds, reconcileMs: 200, lines, team: new Set(["lead"]) });
+    const chief = await oper(e, "chief");
+    // Listed by SAMODE: Ergo shows a channel's invites to its operators alone.
+    const invites = async (): Promise<number> => {
+      const mark = chief.lines().length;
+      chief.send("SAMODE #bubble/crew I");
+      await chief.expect(/ 347 chief #bubble\/crew /);
+      return chief
+        .lines()
+        .slice(mark)
+        .filter((line) => line.includes(" 346 chief #bubble/crew ")).length;
+    };
+    await expect.poll(invites, { timeout: 20_000 }).toBe(100);
+    const changed = () => lines.filter((line) => line.includes('"room_reconciled"')).length;
+    const before = changed();
+    // Two passes and more.
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    expect(changed()).toBe(before);
   });
 });

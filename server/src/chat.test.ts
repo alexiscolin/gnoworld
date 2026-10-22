@@ -15,8 +15,8 @@ import { VERDICT_TABLES } from "./moderation/check.ts";
 import { MUTE_TABLES } from "./moderation/mute.ts";
 import { ROOM_STATE } from "./rooms/create.ts";
 import type { Answer } from "./moderation/provider.ts";
-import type { Rules } from "./roles/roles.ts";
-import { ROOM_TABLES } from "./rooms/rooms.ts";
+import type { Room, Rules } from "./roles/roles.ts";
+import { listRooms, ROOM_TABLES } from "./rooms/rooms.ts";
 import { answer } from "./testing/answers.ts";
 import { fakeErgo, message, PASSWORD, welcome } from "./testing/fakeErgo.ts";
 
@@ -47,7 +47,13 @@ const setup = (
     now,
     provider,
     tickMs,
-  }: { now?: () => number; provider?: (text: string) => Promise<Answer | "unchecked">; tickMs?: number } = {},
+    session,
+  }: {
+    now?: () => number;
+    provider?: (text: string) => Promise<Answer | "unchecked">;
+    tickMs?: number;
+    session?: (token: string | undefined) => string | undefined;
+  } = {},
 ) => {
   const db = openDatabase(":memory:", [
     LOGIN_TABLES,
@@ -63,6 +69,7 @@ const setup = (
     ...(now === undefined ? {} : { now }),
     ...(provider === undefined ? {} : { provider }),
     ...(tickMs === undefined ? {} : { tickMs }),
+    ...(session === undefined ? {} : { session }),
   };
   const chat = startChat(db, settings, options);
   started.push({ db, chat });
@@ -927,22 +934,29 @@ describe("the chat, as the server starts it", () => {
       expect(await peer.next(/^SAMODE #bubble\/garden /)).toBe("SAMODE #bubble/garden +M");
     });
 
-    it("puts each room's modes back each time the link is in its rooms", async () => {
+    it("puts each room's flags on with its JOINs, then as Ergo says it stands, each time it is in its rooms (3m)", async () => {
       const { peer, ergo, chat } = await linked({ worlds: worlds("bubble"), moderation: OFF });
-      expect(await peer.next(/^SAMODE #bubble /)).toBe("SAMODE #bubble +M");
+      const flags = (lines: string[]) => lines.filter((l) => /^SAMODE #bubble\S* [+-][MmisR]$/.test(l));
+      await peer.next(/^NAMES #bubble$/);
+      peer.say(":ergo.test 324 gnoworld #bubble +nt");
+      peer.say(":ergo.test 347 gnoworld #bubble :End");
+      peer.say(":ergo.test 366 gnoworld #bubble :End");
+      await expect.poll(() => flags(peer.lines)).toEqual(["SAMODE #bubble +M", "SAMODE #bubble +M"]);
       chat.rooms.create("bubble", "old");
       chat.rooms.archive("bubble", "old");
       peer.socket.destroy();
       const again = await ergo.peer(1);
       await welcome(again);
-      const modes = [];
-      for (let n = 0; n < 4; n += 1) modes.push(await again.next(/^SAMODE #bubble/));
-      expect(modes).toEqual([
-        "SAMODE #bubble +M",
-        "SAMODE #bubble/old +M",
-        "SAMODE #bubble/old +m",
-        "SAMODE #bubble/old +s",
-      ]);
+      for (const room of ["#bubble", "#bubble/old"]) {
+        await again.next(new RegExp(`^NAMES ${room.replace("/", "\\/")}$`));
+        again.say(`:ergo.test 324 gnoworld ${room} +nt`);
+        again.say(`:ergo.test 347 gnoworld ${room} :End`);
+        again.say(`:ergo.test 366 gnoworld ${room} :End`);
+      }
+      const each = ["SAMODE #bubble +M", "SAMODE #bubble/old +M", "SAMODE #bubble/old +m", "SAMODE #bubble/old +s"];
+      // With the JOINs, before any state is read; then the same, since Ergo said none was on.
+      await expect.poll(() => flags(again.lines)).toEqual([...each, ...each]);
+      expect(again.lines.indexOf("SAMODE #bubble/old +s")).toBeLessThan(again.lines.indexOf("MODE #bubble"));
     });
 
     it("raises the alert for a channel in Ergo it did not make, and for no room it made, archived or open", async () => {
@@ -990,6 +1004,172 @@ describe("the chat, as the server starts it", () => {
       await peer.next(/^SAMODE #bubble \+b m:g1a$/);
       chat.rooms.create("bubble", "garden");
       expect(await peer.next(/^SAMODE #bubble\/garden \+b /)).toBe("SAMODE #bubble/garden +b m:g1a");
+    });
+  });
+
+  describe("rooms by role (3m)", () => {
+    const MOD = "g1zgldsmn6ck6w4p325xd3j8y779ky6fpjnz3uh9";
+    const MEMBER = "g1m68zzc430znqyxzv6jsfz45hgccacx3mk6qajw";
+    const WRITER = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+    const roled = () =>
+      new Map([
+        [
+          "bubble",
+          {
+            rules: RULES,
+            moderators: new Set([MOD]),
+            groups: new Map([
+              ["crew", new Set([MEMBER])],
+              ["pens", new Set([WRITER])],
+            ]),
+            rooms: new Map<string, Room>([
+              ["#bubble/crew", { type: "members" as const, readers: "crew", hidden: false }],
+              ["#bubble/desk", { type: "members-write" as const, readers: "crew", writers: "pens", hidden: false }],
+            ]),
+          },
+        ],
+      ]);
+    // Every line before this one has been read by the link.
+    const settle = async (peer: { say: (l: string) => void; next: (p: RegExp) => Promise<string> }) => {
+      peer.say("PING :settled");
+      await peer.next(/^PONG settled$/);
+    };
+    // Ergo's answers to the bot's three questions on a room's state.
+    const answer = async (
+      peer: Awaited<ReturnType<typeof fakeErgo>>["peers"][number],
+      room: string,
+      names = "~@gnoworld",
+    ) => {
+      await peer.next(new RegExp(`^NAMES ${room.replace("/", "\\/")}$`));
+      peer.say(`:ergo.test 324 gnoworld ${room} +nt`);
+      peer.say(`:ergo.test 347 gnoworld ${room} :End`);
+      peer.say(`:ergo.test 353 gnoworld = ${room} :${names}`);
+      peer.say(`:ergo.test 366 gnoworld ${room} :End`);
+    };
+
+    it("makes the roles file's rooms at start, joins them, and sets each as its type says", async () => {
+      const { peer, db } = await linked({ worlds: roled(), moderation: OFF, team: new Set<string>() });
+      expect(listRooms(db).map(({ name }) => name)).toEqual(["#bubble", "#bubble/crew", "#bubble/desk"]);
+      for (const room of ["#bubble", "#bubble/crew", "#bubble/desk"]) await answer(peer, room);
+      // Its flags with the JOINs, then as Ergo said it stands (+nt): the flags again, and the invites.
+      await expect
+        .poll(() => peer.lines.filter((l) => /^SAMODE #bubble\/crew [+-]/.test(l)))
+        .toEqual([
+          "SAMODE #bubble/crew +M",
+          "SAMODE #bubble/crew +i",
+          "SAMODE #bubble/crew +M",
+          "SAMODE #bubble/crew +i",
+          `SAMODE #bubble/crew +I ${MEMBER}`,
+          `SAMODE #bubble/crew +I ${MOD}`,
+        ]);
+      expect(peer.lines.filter((l) => /^SAMODE #bubble [+-][^b]/.test(l))).toEqual([
+        "SAMODE #bubble +M",
+        "SAMODE #bubble +M",
+      ]);
+    });
+
+    it("voices a writer who joins a members-write room, at once", async () => {
+      const { peer } = await linked({ worlds: roled(), moderation: OFF });
+      for (const room of ["#bubble", "#bubble/crew", "#bubble/desk"]) await answer(peer, room);
+      peer.say(`@account=${WRITER} :${WRITER}!u@h JOIN #bubble/desk ${WRITER} :w`);
+      await answer(peer, "#bubble/desk", `~@gnoworld ${WRITER}`);
+      expect(await peer.next(/^SAMODE #bubble\/desk \+v /)).toBe(`SAMODE #bubble/desk +v ${WRITER}`);
+    });
+
+    it("sends no members room's line to the provider, its rules still hiding", async () => {
+      const asked: string[] = [];
+      const { peer, verdicts } = await linked(
+        { worlds: roled(), moderation: OFF },
+        {
+          provider: (text) => {
+            asked.push(text);
+            return Promise.resolve(OFF_ANSWER);
+          },
+        },
+      );
+      peer.say(":gnoworld!u@h JOIN #bubble/crew");
+      peer.say(message(`account=${MEMBER};msgid=m1`, `${MEMBER}!u@h`, ["#bubble/crew", "between us"]));
+      peer.say(message(`account=${MEMBER};msgid=m2`, `${MEMBER}!u@h`, ["#bubble", "in the open"]));
+      await expect.poll(() => verdicts().length).toBe(2);
+      expect(asked).toEqual(["in the open"]);
+    });
+
+    it("answers a members room's activity to its members alone", async () => {
+      const { app } = setup(
+        { worlds: roled(), moderation: OFF, ergo: undefined },
+        { session: (token) => (token === "member" ? MEMBER : undefined) },
+      );
+      const rooms = async (who?: string) =>
+        (
+          await app.request("/api/activity?worlds=bubble", {
+            headers: who === undefined ? {} : { cookie: `__Host-session=${who}` },
+          })
+        ).text();
+      expect(await rooms()).not.toContain("#bubble/crew");
+      expect(await rooms("member")).toContain("#bubble/crew");
+    });
+
+    it("leaves an archived room read-only and unlisted, sending it nothing once Ergo has it so", async () => {
+      const { peer, chat, ergo } = await linked({ worlds: roled(), moderation: OFF });
+      for (const room of ["#bubble", "#bubble/crew", "#bubble/desk"]) await answer(peer, room);
+      chat.rooms.create("bubble", "old");
+      chat.rooms.archive("bubble", "old");
+      await settle(peer);
+      peer.socket.destroy();
+      const again = await ergo.peer(1);
+      await welcome(again);
+      for (const room of ["#bubble", "#bubble/crew", "#bubble/desk"]) await answer(again, room);
+      await again.next(/^NAMES #bubble\/old$/);
+      const mark = again.lines.length;
+      again.say(":ergo.test 324 gnoworld #bubble/old +Mmsnt");
+      again.say(":ergo.test 347 gnoworld #bubble/old :End");
+      again.say(":ergo.test 366 gnoworld #bubble/old :End");
+      await settle(again);
+      expect(again.lines.slice(mark).filter((l) => l.startsWith("SAMODE #bubble/old"))).toEqual([]);
+    });
+
+    it("lists a hidden room to its world's moderators and the team, a members room to its members, never to a stranger", async () => {
+      const tokens = new Map([
+        ["mod", MOD],
+        ["member", MEMBER],
+        ["stranger", "g1uauvt7txunf9zeu2qyrzv0pa5uvwjlq90r3qpa"],
+        ["team", "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5"],
+      ]);
+      const hidden = roled();
+      hidden.get("bubble")?.rooms.set("#bubble/attic", { type: "accounts" as const, hidden: true });
+      const { app } = setup(
+        {
+          worlds: hidden,
+          moderation: OFF,
+          ergo: undefined,
+          team: new Set(["g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5"]),
+        },
+        { session: (token) => tokens.get(token ?? "") },
+      );
+      const listed = async (who?: string) => {
+        const headers = who === undefined ? {} : { cookie: `__Host-session=${who}` };
+        const text = await (await app.request("/api/activity?worlds=bubble", { headers })).text();
+        return ["#bubble/attic", "#bubble/crew"].filter((room) => text.includes(`"${room}"`));
+      };
+      expect([
+        await listed(),
+        await listed("stranger"),
+        await listed("member"),
+        await listed("mod"),
+        await listed("team"),
+      ]).toEqual([[], [], ["#bubble/crew"], ["#bubble/attic", "#bubble/crew"], ["#bubble/attic", "#bubble/crew"]]);
+    });
+
+    it("voices no one else on a JOIN: a reader who is no writer, a guest, the bot itself, anyone in an open room", async () => {
+      const { peer } = await linked({ worlds: roled(), moderation: OFF });
+      for (const room of ["#bubble", "#bubble/crew", "#bubble/desk"]) await answer(peer, room);
+      peer.say(`@account=${MEMBER} :${MEMBER}!u@h JOIN #bubble/desk ${MEMBER} :m`);
+      await answer(peer, "#bubble/desk", `~@gnoworld ${MEMBER}`);
+      peer.say(":gus!u@h JOIN #bubble/desk * :guest");
+      peer.say(":gnoworld!u@h JOIN #bubble/desk");
+      peer.say(`@account=${WRITER} :${WRITER}!u@h JOIN #bubble ${WRITER} :w`);
+      await settle(peer);
+      expect(peer.lines.filter((l) => /^SAMODE \S+ \+v /.test(l))).toEqual([]);
     });
   });
 });

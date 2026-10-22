@@ -609,14 +609,40 @@ describe("the IRC link's own commands (3j)", () => {
     ["a room's mode with a word after it (3l)", "SAMODE", ["#bubble", "+M", "x"]],
     ["a room's mode the bot never sets (3l)", "SAMODE", ["#bubble", "+o"]],
     ["two modes at once (3l)", "SAMODE", ["#bubble", "+ms"]],
-    ["a mode taken off (3l)", "SAMODE", ["#bubble", "-M"]],
+    ["a mode taken off with a word after it (3m)", "SAMODE", ["#bubble", "-M", "x"]],
+    ["an op given (3m)", "SAMODE", ["#bubble", "+o", "g1abc"]],
+    ["a half-op given (3m)", "SAMODE", ["#bubble", "+h", "g1abc"]],
+    ["a voice to no one (3m)", "SAMODE", ["#bubble", "+v"]],
+    ["a voice to two (3m)", "SAMODE", ["#bubble", "+v", "g1a,g1b"]],
+    ["an invite mask by wildcard (3m)", "SAMODE", ["#bubble", "+I", "*!*@*"]],
+    ["an invite to an account with a line break (3m)", "SAMODE", ["#bubble", "+I", "g1a\r\nQUIT"]],
+    ["a voice and an op at once (3m)", "SAMODE", ["#bubble", "+vo", "g1a", "g1a"]],
+    ["an op and a voice at once (3m)", "SAMODE", ["#bubble", "+ov", "g1a"]],
+    ["a voice given and taken at once (3m)", "SAMODE", ["#bubble", "+v-v", "g1a"]],
+    ["a flag and a voice at once (3m)", "SAMODE", ["#bubble", "+iv", "g1a"]],
+    ["an op taken and given at once (3m)", "SAMODE", ["#bubble", "-o+o", "g1a"]],
+    ["a voice taken from two (3m)", "SAMODE", ["#bubble", "-v", "g1a,g1b"]],
+    ["an op taken from two (3m)", "SAMODE", ["#bubble", "-o", "alice,bob"]],
+    ["an invite taken from two (3m)", "SAMODE", ["#bubble", "-I", "g1a,g1b"]],
+    ["a voice taken with a line break (3m)", "SAMODE", ["#bubble", "-v", "g1a\r\nQUIT"]],
+    ["an op taken with a line break (3m)", "SAMODE", ["#bubble", "-o", "g1a\nQUIT"]],
+    ["a founder taken with a line break (3m)", "SAMODE", ["#bubble", "-q", "g1a\rQUIT"]],
+    ["an invite taken with a line break (3m)", "SAMODE", ["#bubble", "-I", "g1a\r\nQUIT"]],
+    ["a voice taken from everyone (3m)", "SAMODE", ["#bubble", "-v", "*"]],
+    ["an op taken from everyone (3m)", "SAMODE", ["#bubble", "-o", "*"]],
+    ["the bot's own op taken (3m)", "SAMODE", ["#bubble", "-o", "gnoworld"]],
+    ["the bot's own founder taken (3m)", "SAMODE", ["#bubble", "-q", "gnoworld"]],
+    ["a KICK of the bot (3m)", "KICK", ["#bubble", "gnoworld", "x"]],
+    ["a KICK of two (3m)", "KICK", ["#bubble", "g1a,g1b", "x"]],
+    ["a KICK in two rooms (3m)", "KICK", ["#bubble,#earth", "g1a", "x"]],
+    ["a KICK with no reason (3m)", "KICK", ["#bubble", "g1a"]],
     ["no mode (3l)", "SAMODE", ["#bubble"]],
     ["a mode with no sign (3l)", "SAMODE", ["#bubble", "M"]],
     ["a ban with no mask (3l)", "SAMODE", ["#bubble", "+b"]],
-    // Every mode letter but M, m and s, put on and taken off.
+    // Every mode letter but the room flags the reconciler sets (M, m, i, s, R), put on and taken off.
     ...[97, 65]
       .flatMap((first) => Array.from({ length: 26 }, (_, n) => String.fromCharCode(first + n)))
-      .filter((letter) => !["M", "m", "s"].includes(letter))
+      .filter((letter) => !["M", "m", "i", "s", "R"].includes(letter))
       .flatMap((letter) =>
         ["+", "-"].map((sign): [string, string, readonly string[]] => [
           `a room's ${sign}${letter} (3l)`,
@@ -792,6 +818,186 @@ describe("the IRC link's rooms (3l)", () => {
     peer.say(":ergo.test 322 gnoworld #rogue 1 :a topic");
     peer.say(":ergo.test 323 gnoworld :End of /LIST");
     await expect.poll(() => found).toEqual([["#bubble", "#rogue"]]);
+  });
+});
+
+describe("the IRC link's room state (3m)", () => {
+  it("puts a room's flags, its invite list, voices and the others' powers in the forms it allows", async () => {
+    const ergo = await fakeErgo();
+    const { link } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    const address = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+    const lines = [
+      ["#bubble", "+i"],
+      ["#bubble", "-i"],
+      ["#bubble", "+R"],
+      ["#bubble", "-s"],
+      ["#bubble", "-m"],
+      ["#bubble", "+I", address],
+      ["#bubble", "-I", address],
+      ["#bubble", "+v", address],
+      ["#bubble", "-v", address],
+      ["#bubble", "-o", "alice"],
+      ["#bubble", "-h", "alice"],
+      ["#bubble", "-a", "alice"],
+      ["#bubble", "-q", "alice"],
+    ];
+    for (const params of lines) expect(link.send("SAMODE", params)).toBe(true);
+    const seen: string[] = [];
+    while (seen.length < lines.length) seen.push(await peer.next(/^SAMODE /));
+    expect(seen).toEqual(lines.map((params) => ["SAMODE", ...params].join(" ")));
+  });
+
+  it("takes off an invite by any mask, and puts one out of a room", async () => {
+    const ergo = await fakeErgo();
+    const { link } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    expect(link.send("SAMODE", ["#bubble", "-I", "*!*@*"])).toBe(true);
+    expect(link.send("KICK", ["#bubble", "g1gone", "not on this room's list"])).toBe(true);
+    expect(await peer.next(/^SAMODE /)).toBe("SAMODE #bubble -I *!*@*");
+    expect(await peer.next(/^KICK /)).toBe("KICK #bubble g1gone :not on this room's list");
+  });
+
+  it("reads a secret room's names over several lines, a wildcard invite and a hundred of them", async () => {
+    const ergo = await fakeErgo();
+    const { link } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    const asked = link.state("#bubble");
+    await peer.next(/^NAMES /);
+    peer.say(":ergo.test 324 gnoworld #bubble +Mis");
+    for (let n = 0; n < 100; n += 1) peer.say(`:ergo.test 346 gnoworld #bubble g${String(n)}!*@* gnoworld 1`);
+    peer.say(":ergo.test 346 gnoworld #bubble *!*@* gnoworld 1");
+    peer.say(":ergo.test 347 gnoworld #bubble :End");
+    peer.say(":ergo.test 353 gnoworld @ #bubble :~@gnoworld +g1a");
+    peer.say(":ergo.test 353 gnoworld @ #bubble :g1b @alice");
+    peer.say(":ergo.test 366 gnoworld #bubble :End");
+    const got = await asked;
+    expect(got?.invites).toHaveLength(101);
+    expect(got?.invites.slice(-2)).toEqual(["g99", "*!*@*"]);
+    expect(got?.present.map(({ nick }) => nick)).toEqual(["gnoworld", "g1a", "g1b", "alice"]);
+  });
+
+  it("answers no state at once for a room Ergo says does not exist", async () => {
+    const ergo = await fakeErgo();
+    const { link } = start(ergo.port, { stateMs: 60_000 });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    const asked = link.state("#gone");
+    await peer.next(/^MODE #gone$/);
+    peer.say(":ergo.test 403 gnoworld #gone :No such channel");
+    expect(await asked).toBeUndefined();
+  });
+
+  it("reads any NAMES line without throwing, and hands on no nick with a space, a comma or a control", async () => {
+    const ergo = await fakeErgo();
+    const { link } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    await fc.assert(
+      fc.asyncProperty(fc.string({ unit: "binary", maxLength: 60 }), async (names) => {
+        const asked = link.state("#bubble");
+        await peer.next(/^NAMES #bubble$/);
+        peer.say(":ergo.test 324 gnoworld #bubble +M");
+        peer.say(":ergo.test 347 gnoworld #bubble :End");
+        peer.say(`:ergo.test 353 gnoworld = #bubble :${names.replace(/[\r\n\0]/g, "")}`);
+        peer.say(":ergo.test 366 gnoworld #bubble :End");
+        for (const { nick } of (await asked)?.present ?? []) expect(nick).toMatch(/^[^\s,\0-\x1f]+$/);
+      }),
+      { numRuns: 50 },
+    );
+  });
+
+  it("reads a room's state from Ergo: its flags, its invite list and who is in it with what power", async () => {
+    const ergo = await fakeErgo();
+    const { link } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    const asked = link.state("#bubble");
+    expect(await peer.next(/^MODE #bubble$/)).toBe("MODE #bubble");
+    // Listed by SAMODE: Ergo lists the invites to a channel operator alone, which a bot back by SAJOIN is not.
+    expect(await peer.next(/^SAMODE #bubble I$/)).toBe("SAMODE #bubble I");
+    expect(await peer.next(/^NAMES #bubble$/)).toBe("NAMES #bubble");
+    peer.say(":ergo.test 324 gnoworld #bubble +Mnt");
+    peer.say(":ergo.test 346 gnoworld #bubble g1a!*@* gnoworld 1");
+    peer.say(":ergo.test 346 gnoworld #bubble g1b gnoworld 1");
+    peer.say(":ergo.test 347 gnoworld #bubble :End of Channel Invite Exception List");
+    peer.say(":ergo.test 353 gnoworld = #bubble :~@gnoworld +g1a @alice g1c");
+    peer.say(":ergo.test 366 gnoworld #bubble :End of NAMES list");
+    expect(await asked).toEqual({
+      flags: "Mnt",
+      invites: ["g1a", "g1b"],
+      present: [
+        { nick: "gnoworld", powers: "~@" },
+        { nick: "g1a", powers: "+" },
+        { nick: "alice", powers: "@" },
+        { nick: "g1c", powers: "" },
+      ],
+    });
+  });
+
+  it("answers no state for a room Ergo does not answer for, nor before it is in its rooms", async () => {
+    const ergo = await fakeErgo();
+    const { link } = start(ergo.port, { stateMs: 50 });
+    const peer = await ergo.peer(0);
+    expect(await link.state("#bubble")).toBeUndefined();
+    await welcome(peer);
+    expect(await link.state("#bubble")).toBeUndefined();
+  });
+
+  it("joins by SAJOIN a room of its own that refuses it: full, invite-only, banned, keyed or accounts only", async () => {
+    const ergo = await fakeErgo();
+    start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    for (const code of ["471", "473", "474", "475", "477"]) {
+      peer.say(`:ergo.test ${code} gnoworld #bubble :Cannot join channel`);
+      expect(await peer.next(/^SAJOIN /)).toBe("SAJOIN #bubble");
+    }
+  });
+
+  it("joins by SAJOIN no room that is not its own, and no room for another refusal", async () => {
+    const ergo = await fakeErgo();
+    start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    peer.say(":ergo.test 473 gnoworld #rogue :Cannot join channel (+i)");
+    peer.say(":ergo.test 403 gnoworld #bubble :No such channel");
+    peer.say(":ergo.test 476 gnoworld #bubble :Bad channel mask");
+    peer.say("PING :settled");
+    await peer.next(/^PONG settled$/);
+    expect(peer.lines.filter((l) => l.startsWith("SAJOIN"))).toEqual([]);
+  });
+
+  it("hands on who joins one of its rooms, never itself nor a room not its own", async () => {
+    const ergo = await fakeErgo();
+    const joined: string[] = [];
+    start(ergo.port, { onJoin: (room) => joined.push(room) });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    peer.say(":g1a!u@h JOIN #bubble");
+    peer.say(":gnoworld!u@h JOIN #earth");
+    peer.say(":g1a!u@h JOIN #rogue");
+    peer.say(":g1b!u@h JOIN #earth g1b :real name");
+    peer.say("PING :settled");
+    await peer.next(/^PONG settled$/);
+    expect(joined).toEqual(["#bubble", "#earth"]);
+  });
+
+  it("keeps two rooms' answers apart when asked at once", async () => {
+    const ergo = await fakeErgo();
+    const { link } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    const [a, b] = [link.state("#a"), link.state("#b")];
+    for (const room of ["#b", "#a"]) {
+      peer.say(`:ergo.test 324 gnoworld ${room} +${room === "#a" ? "M" : "m"}`);
+      peer.say(`:ergo.test 347 gnoworld ${room} :End`);
+      peer.say(`:ergo.test 366 gnoworld ${room} :End`);
+    }
+    expect([(await a)?.flags, (await b)?.flags]).toEqual(["M", "m"]);
   });
 });
 

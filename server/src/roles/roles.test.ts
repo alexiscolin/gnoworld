@@ -3,7 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { inspect } from "node:util";
-import { Address } from "@gnoworld/schemas";
+import { Address, toAddress } from "@gnoworld/schemas";
+import fc from "fast-check";
 import { afterAll, describe, expect, it } from "vitest";
 import { isTeam, isTrusted, loadRoles, mayCreateRoom, moderates, type Roles, spared } from "./roles.ts";
 
@@ -156,6 +157,158 @@ describe("loadRoles", () => {
     expect(failure(content)).toMatch(
       new RegExp(`roles file \\S+\\.json: ${place.replace(/[.()]/g, "\\$&")}: ${code}\\b`),
     );
+  });
+});
+
+describe("groups and rooms by role (3m)", () => {
+  // n accounts no list of the file holds.
+  const accounts = (n: number) => Array.from({ length: n }, (_, i) => toAddress(new Uint8Array(20).fill(i + 1)));
+  // The Earth with its groups and rooms, the Bubble with none.
+  const typed = (patch: object) =>
+    JSON.stringify({
+      ...FILE,
+      worlds: [{ ...FILE.worlds[0], groups: { crew: [STRANGER] }, ...patch }, FILE.worlds[1]],
+    });
+
+  it("reads each world's groups and typed rooms, a room hidden or not, a world with none", () => {
+    const roles = loadRoles(
+      written(
+        typed({
+          rooms: [
+            { room: "#earth", type: "announcement" },
+            { room: "#earth/crew", type: "members", readers: "crew" },
+            { room: "#earth/news", type: "members-write", readers: "crew", writers: "crew", hidden: true },
+            { room: "#earth/door", type: "accounts" },
+          ],
+        }),
+      ),
+    );
+    const earth = roles.worlds.get("earth");
+    expect([...(earth?.groups?.get("crew") ?? [])]).toEqual([STRANGER]);
+    expect([...(earth?.rooms ?? [])]).toEqual([
+      ["#earth", { type: "announcement", hidden: false }],
+      ["#earth/crew", { type: "members", readers: "crew", hidden: false }],
+      ["#earth/news", { type: "members-write", readers: "crew", writers: "crew", hidden: true }],
+      ["#earth/door", { type: "accounts", hidden: false }],
+    ]);
+    expect([roles.worlds.get("bubble")?.groups?.size, roles.worlds.get("bubble")?.rooms?.size]).toEqual([0, 0]);
+  });
+
+  it("takes a members room of 100 accounts, its moderators and the team among them", () => {
+    const crew = accounts(98);
+    const file = typed({ groups: { crew }, rooms: [{ room: "#earth/crew", type: "members", readers: "crew" }] });
+    expect(loadRoles(written(file)).worlds.get("earth")?.groups?.get("crew")?.size).toBe(98);
+  });
+
+  it.each([
+    ["an unknown type", { rooms: [{ room: "#earth", type: "private" }] }, "worlds.0.rooms.0.type"],
+    [
+      "a group no world names",
+      { rooms: [{ room: "#earth/crew", type: "members", readers: "ghosts" }] },
+      "worlds.0.rooms.0.readers",
+    ],
+    ["a room of another world", { rooms: [{ room: "#bubble/x", type: "open" }] }, "worlds.0.rooms.0.room"],
+    [
+      "a room of a world whose slug only starts it",
+      { rooms: [{ room: "#earthling", type: "open" }] },
+      "worlds.0.rooms.0.room",
+    ],
+    [
+      "a members room with no readers",
+      { rooms: [{ room: "#earth/crew", type: "members" }] },
+      "worlds.0.rooms.0.readers",
+    ],
+    [
+      "a members-write room with no writers",
+      { rooms: [{ room: "#earth/crew", type: "members-write", readers: "crew" }] },
+      "worlds.0.rooms.0.writers",
+    ],
+    [
+      "readers on an open room",
+      { rooms: [{ room: "#earth", type: "open", readers: "crew" }] },
+      "worlds.0.rooms.0.readers",
+    ],
+    [
+      "a room twice",
+      {
+        rooms: [
+          { room: "#earth", type: "open" },
+          { room: "#earth", type: "accounts" },
+        ],
+      },
+      "worlds.0.rooms.1.room",
+    ],
+    ["a group's name in upper case", { groups: { Crew: [STRANGER] } }, "worlds.0.groups.Crew"],
+    ["an account twice in a group", { groups: { crew: [STRANGER, STRANGER] } }, "worlds.0.groups.crew"],
+    ["an empty room name", { rooms: [{ room: "#earth/", type: "open" }] }, "worlds.0.rooms.0.room"],
+    ["a room name in upper case", { rooms: [{ room: "#earth/Crew", type: "open" }] }, "worlds.0.rooms.0.room"],
+    ["a room name with a space", { rooms: [{ room: "#earth/a b", type: "open" }] }, "worlds.0.rooms.0.room"],
+    ["a room name with a comma", { rooms: [{ room: "#earth/a,#x", type: "open" }] }, "worlds.0.rooms.0.room"],
+    ["a room name with CR LF", { rooms: [{ room: "#earth/a\r\nQUIT", type: "open" }] }, "worlds.0.rooms.0.room"],
+    ["a room name with a second slash", { rooms: [{ room: "#earth/a/b", type: "open" }] }, "worlds.0.rooms.0.room"],
+    [
+      "a room name of 33 characters",
+      { rooms: [{ room: `#earth/${"a".repeat(33)}`, type: "open" }] },
+      "worlds.0.rooms.0.room",
+    ],
+    // A computed key: a literal __proto__ would set the object's prototype, not a key.
+    ["a group named __proto__", { groups: { ["__proto__"]: [STRANGER] } }, "worlds.0.groups"],
+    ["hidden as text", { rooms: [{ room: "#earth", type: "open", hidden: "yes" }] }, "worlds.0.rooms.0.hidden"],
+    [
+      "writers on a members room",
+      { rooms: [{ room: "#earth/crew", type: "members", readers: "crew", writers: "crew" }] },
+      "worlds.0.rooms.0.writers",
+    ],
+    [
+      "readers on an announcement room",
+      { rooms: [{ room: "#earth", type: "announcement", readers: "crew" }] },
+      "worlds.0.rooms.0.readers",
+    ],
+    [
+      "writers on an accounts room",
+      { rooms: [{ room: "#earth", type: "accounts", writers: "crew" }] },
+      "worlds.0.rooms.0.writers",
+    ],
+    [
+      "a writers group no world names",
+      { rooms: [{ room: "#earth/desk", type: "members-write", readers: "crew", writers: "ghosts" }] },
+      "worlds.0.rooms.0.writers",
+    ],
+  ])("stops on %s, naming its place", (_, patch, place) => {
+    expect(failure(typed(patch))).toContain(`: ${place}: `);
+  });
+
+  it("counts each account once toward the 100: a moderator in the group, readers and writers together", () => {
+    const crew = [...accounts(97), EARTH_MOD, TEAM];
+    const once = typed({ groups: { crew }, rooms: [{ room: "#earth/crew", type: "members", readers: "crew" }] });
+    expect(loadRoles(written(once)).worlds.get("earth")?.groups?.get("crew")?.size).toBe(99);
+    const all = accounts(120);
+    const [readers, writers] = [all.slice(0, 60), all.slice(60, 120)];
+    const desk = { room: "#earth/desk", type: "members-write", readers: "readers", writers: "writers" };
+    expect(failure(typed({ groups: { readers, writers }, rooms: [desk] }))).toContain(
+      ": worlds.0.rooms.0.readers: custom",
+    );
+    const same = { ...desk, writers: "readers" };
+    expect(loadRoles(written(typed({ groups: { readers }, rooms: [same] }))).worlds.get("earth")?.rooms?.size).toBe(1);
+  });
+
+  it("loads any roles file or refuses it naming its place, never anything else", () => {
+    fc.assert(
+      fc.property(fc.jsonValue(), (value) => {
+        try {
+          loadRoles(written(JSON.stringify(value)));
+        } catch (error) {
+          expect(String(error)).toMatch(/^Error: roles file [^\n]*\.json: [^\n]+: \w+$/);
+        }
+      }),
+      { numRuns: 200 },
+    );
+  });
+
+  it("stops on a members room past Ergo's 100-entry list, its moderators and the team counted", () => {
+    const crew = accounts(99);
+    const file = typed({ groups: { crew }, rooms: [{ room: "#earth/crew", type: "members", readers: "crew" }] });
+    expect(failure(file)).toContain(": worlds.0.rooms.0.readers: custom");
   });
 });
 

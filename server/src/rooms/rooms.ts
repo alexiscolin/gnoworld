@@ -18,9 +18,21 @@ export interface Room {
 export const mainRoom = (slug: string): string => `#${slug}`;
 
 export function ensureRooms(db: DatabaseSync, worlds: readonly string[], now: number): void {
-  const add = db.prepare("INSERT OR IGNORE INTO rooms (name, world, created_at) VALUES (?, ?, ?)");
-  for (const world of worlds) add.run(mainRoom(world), world, now);
+  ensureNamed(
+    db,
+    worlds.map((world) => ({ name: mainRoom(world), world })),
+    now,
+  );
 }
+
+/** Rooms by name, as the roles file types them (3m): made once, never removed. */
+export function ensureNamed(db: DatabaseSync, rooms: readonly Room[], now: number): void {
+  const add = db.prepare("INSERT OR IGNORE INTO rooms (name, world, created_at) VALUES (?, ?, ?)");
+  for (const { name, world } of rooms) add.run(name, world, now);
+}
+
+/** A room's world, from its name: #<world> or #<world>/<name>, as the server and the roles file make them. */
+export const worldOf = (room: string): string => room.slice(1).split("/")[0] ?? "";
 
 export function listRooms(db: DatabaseSync): Room[] {
   const Rooms = z.array(z.object({ name: z.string(), world: z.string() }));
