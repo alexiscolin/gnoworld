@@ -26,13 +26,18 @@ export V_ORIGINS="[$origins]" V_AUTH_SCRIPT='"/ircd-bin/authforward"' V_AUTH_TIM
 export V_DATABASE='"/data/ircd.db"' V_HISTORY='"/data/history.db"' V_LOCK='"/data/ircd.lock"'
 export V_LOG_TYPES='"* -userinput -useroutput"' V_LOG_LEVEL='"info"'
 awk '
-	function each(text, key, value,   at, out) {
+	# Each {{NAME}} with its V_NAME; one with none left as it is, for the check below.
+	{
+		line = $0
 		out = ""
-		while ((at = index(text, key)) > 0) { out = out substr(text, 1, at - 1) value; text = substr(text, at + length(key)) }
-		return out text
+		while (match(line, /[{][{][A-Z_]+[}][}]/)) {
+			name = substr(line, RSTART + 2, RLENGTH - 4)
+			value = ("V_" name) in ENVIRON ? ENVIRON["V_" name] : substr(line, RSTART, RLENGTH)
+			out = out substr(line, 1, RSTART - 1) value
+			line = substr(line, RSTART + RLENGTH)
+		}
+		print out line
 	}
-	BEGIN { split("NAME PLAIN WEBSOCKET PROXY_FROM ORIGINS AUTH_SCRIPT AUTH_TIMEOUT OPER_HASH DATABASE HISTORY LOCK LOG_TYPES LOG_LEVEL", names, " ") }
-	{ for (i in names) $0 = each($0, "{{" names[i] "}}", ENVIRON["V_" names[i]]); print }
 ' /ergo/ircd.yaml.tmpl >/tmp/ircd.yaml
 if grep -q '{{' /tmp/ircd.yaml; then fail "a name of the template has no value: $(grep -o '{{[A-Z_]*}}' /tmp/ircd.yaml | head -n 1)"; fi
 # deploy/test.sh asks the render alone, to see each refusal (RENDER_ONLY=1).
