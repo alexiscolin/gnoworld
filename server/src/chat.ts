@@ -186,7 +186,7 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
       visible: (room, who) => mayRead(settings, room, who),
       session: options.session,
     }),
-    rooms: keeping(keeper, mutes),
+    rooms: keeping(keeper, { mutes, reconciler }),
     stop: async () => {
       clearInterval(lifts);
       clearInterval(passes);

@@ -1180,6 +1180,14 @@ describe("the chat, as the server starts it", () => {
       ]).toEqual([[], [], ["#bubble/crew"], ["#bubble/attic", "#bubble/crew"], ["#bubble/attic", "#bubble/crew"]]);
     });
 
+    it("takes every voice of a room it archives at once, rather than at the next minute's pass (F580)", async () => {
+      const { peer, chat } = await linked({ worlds: roled(), moderation: OFF });
+      for (const room of ["#bubble", "#bubble/crew", "#bubble/desk"]) await answer(peer, room);
+      expect(chat.rooms.archive("bubble", "desk")).toBe("archived");
+      await answer(peer, "#bubble/desk", `~@gnoworld +${WRITER}`);
+      expect(await peer.next(/^SAMODE #bubble\/desk -v /)).toBe(`SAMODE #bubble/desk -v ${WRITER}`);
+    });
+
     it("runs its passes with no Ergo set, and logs no room as failed for it (F578)", async () => {
       vi.useFakeTimers();
       try {

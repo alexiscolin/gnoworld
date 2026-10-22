@@ -3,8 +3,8 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { Mutes } from "../moderation/mute.ts";
 import type { Rooms } from "./create.ts";
-import { makeReconciler } from "./reconcile.ts";
-import { listRooms } from "./rooms.ts";
+import { makeReconciler, type Reconciler } from "./reconcile.ts";
+import { listRooms, mainRoom } from "./rooms.ts";
 import { desired, type Typed, type World } from "./types.ts";
 
 // The roles file's typed rooms, each with its world (3m).
@@ -27,14 +27,20 @@ export function reconcilerFor(
   });
 }
 
-// The rooms as the routes make and archive them (3l): a room made gets the live mutes.
-export function keeping(keeper: Rooms, mutes: Mutes): Rooms {
+// The rooms as the routes make and archive them (3l): a room made gets the live mutes; a room archived is
+// put as its type says at once, its voices taken, not at the next minute's pass (F580).
+export function keeping(keeper: Rooms, { mutes, reconciler }: { mutes: Mutes; reconciler: Reconciler }): Rooms {
   return {
     ...keeper,
     create: (world, name) => {
       const made = keeper.create(world, name);
       if (typeof made !== "string") mutes.reapply();
       return made;
+    },
+    archive: (world, name) => {
+      const done = keeper.archive(world, name);
+      if (done === "archived") reconciler.ask(`${mainRoom(world)}/${name}`);
+      return done;
     },
   };
 }
