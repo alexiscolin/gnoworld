@@ -1,6 +1,6 @@
-// The login's HTTP face (slice 3's plan, 3c). Every POST comes from a listed Origin and in JSON, the
-// CSRF guard: Hono's own csrf() checks form types only. Each visitor's login calls are limited before any
-// work, and a failed login gets one answer whatever failed, its cause going to the log alone.
+// The login's HTTP face (slice 3's plan, 3c). Every POST comes from a listed Origin and in JSON (guard.ts).
+// Each visitor's login calls are limited before any work, and a failed login gets one answer whatever
+// failed, its cause going to the log alone.
 import type { DatabaseSync } from "node:sqlite";
 import { getConnInfo } from "@hono/node-server/conninfo";
 import { ChallengeRequest, TicketRequest, VerifyRequest, type ApiError, type Me, type Ticket } from "@gnoworld/schemas";
@@ -8,6 +8,7 @@ import { Hono, type Context } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { routePath } from "hono/route";
 import type { Config } from "../config.ts";
+import { guard, json, type Guarded } from "../guard.ts";
 import { limiter } from "../limit.ts";
 import type { Log } from "../log.ts";
 import { visitor } from "../visitor.ts";
@@ -25,30 +26,13 @@ interface Options {
 
 type Status = 400 | 401 | 403 | 415 | 429;
 
-// The body's JSON, or undefined for text that is not JSON, which the schema then refuses like any bad
-// body. Hono's body limit has read the body whole before a route runs (hono/body-limit, 4.13.13).
-async function json(c: Context): Promise<unknown> {
-  const text = await c.req.text();
-  try {
-    return JSON.parse(text);
-  } catch {
-    return undefined;
-  }
-}
-
-// The host of the POST's Origin, which the guard checked, for the text the challenge writes.
-interface Env {
-  Variables: { host: string };
-}
-
 export function loginRoutes(
   login: Login,
   { log, origins, proxy, newAccountsPerHour, now, tickets }: Options,
-): Hono<Env> {
+): Hono<Guarded> {
   // __Host-: sent only to the host that set it, over HTTPS, for every path, so no sibling site sets it.
   const session = "__Host-session";
   const cookie = { path: "/", httpOnly: true, secure: true, sameSite: "Strict" } as const;
-  const hosts = new Map(origins.map((origin) => [origin, new URL(origin).host]));
   const calls = limiter({ max: 10, windowMs: 60_000, keys: 100_000 });
   const created = limiter({ max: newAccountsPerHour, windowMs: 60 * 60_000, keys: 100_000 });
   // A ticket a reconnect: a household behind one address gets three accounts' worth.
@@ -78,18 +62,9 @@ export function loginRoutes(
     return answer(c, error, status);
   };
 
-  const app = new Hono<Env>();
-  app.use(async (c, next) => {
-    c.header("cache-control", "no-store");
-    if (c.req.method !== "GET" && c.req.method !== "HEAD") {
-      const host = hosts.get(c.req.header("origin") ?? "");
-      if (host === undefined) return refuse(c, "origin");
-      if (!/^application\/json\s*(;|$)/i.test(c.req.header("content-type") ?? "")) return refuse(c, "type");
-      c.set("host", host);
-    }
-    await next();
-    return undefined;
-  });
+  const app = new Hono<Guarded>();
+  // The host of the POST's Origin, for the text the challenge writes.
+  app.use(guard(origins, refuse));
 
   app.post("/challenge", async (c) => {
     if (!calls.take(visitorOf(c), now())) return refuse(c, "limit");
@@ -141,7 +116,7 @@ export function loginFrom(
   db: DatabaseSync,
   { chains, origins, trustedProxy: proxy, newAccountsPerHour }: Settings,
   { log, now = Date.now }: { log: Log; now?: () => number },
-): Hono<Env> {
+): Hono<Guarded> {
   const tickets = makeTickets(db, { now });
   return loginRoutes(makeLogin(db, { chains, now }), { log, origins, proxy, newAccountsPerHour, now, tickets });
 }
