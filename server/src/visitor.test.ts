@@ -67,6 +67,8 @@ describe("visitor", () => {
     ["::1", "0:0:0:0::/64"],
     ["fe80::1%eth0", "fe80:0:0:0::/64"],
     ["64:ff9b::198.51.100.1", "64:ff9b:0:0::/64"],
+    // The "::" early, so groups written after it fall inside the /64.
+    ["1:0:0:4:5:6:7:8", "1:0:0:4::/64"],
   ])("counts the IPv6 address %s by its /64", (address, key) => {
     expect(visitor(address, undefined, undefined)).toBe(key);
     expect(visitor(PROXY, address, PROXY)).toBe(key);

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { inspect } from "node:util";
 import { Address } from "@gnoworld/schemas";
-import { beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { isTeam, isTrusted, loadRoles, moderates, type Roles } from "./roles.ts";
 
 const TEAM = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
@@ -30,11 +30,9 @@ const written = (content: string): string => {
   writeFileSync(path, content);
   return path;
 };
-// Loaded in a test, not at import: StrykerJS only mutates what runs inside one.
-let roles: Roles;
-beforeAll(() => {
-  roles = loadRoles(written(JSON.stringify(FILE)));
-});
+// Loaded in each test, never at import or in a hook: StrykerJS judges only code a test runs.
+const rolesFile = written(JSON.stringify(FILE));
+const load = (): Roles => loadRoles(rolesFile);
 
 // The whole error as a crash would print it: message, stack and causes.
 const failure = (content: string): string => {
@@ -50,6 +48,7 @@ const world = (patch: object): string => JSON.stringify({ ...FILE, worlds: [{ ..
 
 describe("loadRoles", () => {
   it("reads the file's rules for each world", () => {
+    const roles = load();
     expect(roles.worlds.get("earth")?.rules).toEqual(RULES);
     expect([...roles.worlds.keys()]).toEqual(["earth", "bubble"]);
   });
@@ -162,19 +161,19 @@ describe("who may do what", () => {
   const answers = (ask: (who: Address) => boolean): boolean[] => everyone.map(ask);
 
   it("knows the team, and only the team", () => {
-    expect(answers((who) => isTeam(roles, who))).toEqual([true, false, false, false, false]);
+    expect(answers((who) => isTeam(load(), who))).toEqual([true, false, false, false, false]);
   });
 
   it("trusts the team and the trusted, not a moderator by that role alone", () => {
-    expect(answers((who) => isTrusted(roles, who))).toEqual([true, true, false, false, false]);
+    expect(answers((who) => isTrusted(load(), who))).toEqual([true, true, false, false, false]);
   });
 
   it("lets a world's moderators and the team moderate it, and no other world", () => {
-    expect(answers((who) => moderates(roles, who, "earth"))).toEqual([true, false, true, false, false]);
-    expect(answers((who) => moderates(roles, who, "bubble"))).toEqual([true, false, false, true, false]);
+    expect(answers((who) => moderates(load(), who, "earth"))).toEqual([true, false, true, false, false]);
+    expect(answers((who) => moderates(load(), who, "bubble"))).toEqual([true, false, false, true, false]);
   });
 
   it("lets nobody moderate a world the file does not name, the team included", () => {
-    expect(answers((who) => moderates(roles, who, "elsewhere"))).toEqual([false, false, false, false, false]);
+    expect(answers((who) => moderates(load(), who, "elsewhere"))).toEqual([false, false, false, false, false]);
   });
 });
