@@ -434,5 +434,9 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     // Two passes and more.
     await new Promise((resolve) => setTimeout(resolve, 500));
     expect(changed()).toBe(before);
+    // Passes that kept running (F577): an invite taken off by hand comes back.
+    chief.send("SAMODE #bubble/crew -I crew0");
+    await expect.poll(invites, { timeout: 5000 }).toBe(100);
+    expect(changed()).toBeGreaterThan(before);
   });
 });
