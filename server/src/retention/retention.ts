@@ -32,7 +32,8 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
       "DELETE FROM verdicts WHERE rowid IN (SELECT rowid FROM verdicts WHERE action <> 'pending' ORDER BY at, rowid LIMIT ?)",
     ),
     count: db.prepare("SELECT count(*) AS n FROM verdicts"),
-    old: db.prepare("SELECT count(*) AS n FROM verdicts WHERE at < ? AND action <> 'pending'"),
+    // Counted up to the tick's budget, which is all a tick may take of them.
+    old: db.prepare("SELECT count(*) AS n FROM (SELECT 1 FROM verdicts WHERE at < ? AND action <> 'pending' LIMIT ?)"),
     used: db.prepare(
       "SELECT (page_count - freelist_count) * page_size AS n FROM pragma_page_count, pragma_freelist_count, pragma_page_size",
     ),
@@ -51,7 +52,7 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
     tick() {
       let budget = batch * batches;
       // The verdicts past their days are the oldest ones: the same walk takes them and those past the cap.
-      const old = N.parse(sql.old.get(now() - 180 * 24 * 60 * 60_000)).n;
+      const old = N.parse(sql.old.get(now() - 180 * 24 * 60 * 60_000, budget)).n;
       for (let over = Math.max(old, count() - maxVerdicts), removed = 1; over > 0 && budget > 0 && removed > 0;) {
         removed = Number(sql.oldest.run(Math.min(batch, budget, over)).changes);
         [over, budget] = [over - removed, budget - removed];
