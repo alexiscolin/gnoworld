@@ -51,7 +51,8 @@ export async function pagesPolicy(pages: readonly string[]): Promise<string> {
   if (pages.length === 0) throw new Error("csp: the build holds no page");
   for (const page of pages) {
     for (const [tag = ""] of page.matchAll(/<[a-z][^>]*>/gi)) {
-      if (/^<style\b/i.test(tag) || /\s(?:on[a-z]+|style)\s*=/i.test(tag)) {
+      // An attribute starts after a space, a slash or a quote, as the HTML parser reads a tag.
+      if (/^<style\b/i.test(tag) || /[\s/"'](?:on[a-z]+|style)\s*=/i.test(tag)) {
         throw new Error(`csp: a page holds ${tag.slice(0, 40)}, which the policy refuses`);
       }
     }

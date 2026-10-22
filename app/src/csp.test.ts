@@ -119,6 +119,9 @@ describe("pagesPolicy", () => {
     ["a style attribute", ['<p style="color:red">x</p>']],
     ["a style attribute with spaces around its =", ['<p style = "x">x</p>']],
     ["a handler with a space before its =", ['<button onclick ="a()">x</button>']],
+    ["a handler after a slash, which HTML reads as an attribute", ["<img/onerror=a()>"]],
+    ["a handler glued to the quote before it", ['<img src="x"onerror=a()>']],
+    ["a style glued to a single quote", ["<p id='a'style='color:red'>x</p>"]],
   ])("fails the build on %s, which the policy would refuse in the browser", async (_, pages) => {
     await expect(pagesPolicy(pages)).rejects.toThrow(/^csp: /);
   });
