@@ -589,6 +589,9 @@ since slice 1).**
 | Provider down, slow or limited (500, a timeout, 429): text stays up, previews wait, retries back off with a breaker | Fault cases |
 | **Soak: the heap after collection stays flat over 100,000 messages** (a fake provider) | `--expose-gc`, 10 checkpoints, a slope inside a bound set from the first run and only tightened; the full gate only |
 
+**As built** (`docs/decisions.md`, 2026-10-22, 3i's shapes): OpenAI's own flags as the default thresholds,
+a score per category by setting; the answers of OpenAI's API description replayed.
+
 **Out of scope.** Acting on a verdict (3j), the mute (3k), contests and "restored after review" (slice 12: ADR2:803-805),
 images (a link's picture is checked when previews arrive in slice 4, through an SSRF-guarded fetcher: dec:145),
 a live nightly test (dec:153: the real messages are the test).
