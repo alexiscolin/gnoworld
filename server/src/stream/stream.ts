@@ -66,9 +66,8 @@ export function makeStream(options: Options = {}): Stream {
   const write = (client: Client, text: string): void => {
     writeTo(client, text, pending);
   };
-  const send = (client: Client, id: number, event: StreamEvent): void => {
-    write(client, `id: ${String(id)}\nevent: verdict\ndata: ${JSON.stringify(event)}\n\n`);
-  };
+  const frame = (id: number, event: StreamEvent): string =>
+    `id: ${String(id)}\nevent: verdict\ndata: ${JSON.stringify(event)}\n\n`;
 
   return {
     publish(event) {
@@ -77,7 +76,9 @@ export function makeStream(options: Options = {}): Stream {
       kept.push({ id: sequence, event });
       if (kept.length > pending) kept.shift();
       if (kept.length === 1 && rings.size < 10_000) rings.set(event.room, kept);
-      for (const client of clients) if (client.rooms.has(event.room)) send(client, sequence, event);
+      // One frame for every client that follows the room.
+      const text = frame(sequence, event);
+      for (const client of clients) if (client.rooms.has(event.room)) write(client, text);
     },
     routes: ({ proxy }) => {
       const app = new Hono();
@@ -102,7 +103,8 @@ export function makeStream(options: Options = {}): Stream {
           // a client further behind loses the rest. An id past the last is none of ours (a clock set back).
           const after = (last.data ?? 0) > sequence ? 0 : (last.data ?? 0);
           const missed = [...rooms.data].flatMap((room) => rings.get(room) ?? []).filter(({ id }) => id > after);
-          for (const { id, event } of missed.toSorted((a, b) => a.id - b.id).slice(-pending)) send(client, id, event);
+          for (const { id, event } of missed.toSorted((a, b) => a.id - b.id).slice(-pending))
+            write(client, frame(id, event));
           // A comment line, which keeps a proxy from closing a quiet stream.
           const beat = setInterval(() => {
             write(client, ": beat\n\n");
