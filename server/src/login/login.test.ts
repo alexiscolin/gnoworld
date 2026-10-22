@@ -3,8 +3,9 @@ import type { DatabaseSync } from "node:sqlite";
 import { MAX_ARBITRARY_MESSAGE_BYTES } from "@adena-wallet/sdk";
 import { Address, type Proof } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it } from "vitest";
+import { z } from "zod";
 import { openDatabase } from "../db.ts";
-import { wallet } from "../testing/signer.ts";
+import { wallet, type Wallet } from "../testing/signer.ts";
 import { LOGIN_TABLES, makeLogin, verifyProof, type Login, type Verify } from "./login.ts";
 
 const T0 = Date.parse("2026-10-22T12:00:00.000Z");
@@ -161,6 +162,16 @@ describe("verify, with the SDK's verifier", () => {
   });
 
   const otherKey = wallet();
+  type Doc = Parameters<Wallet["signDoc"]>[0];
+  // The SDK types a document's messages as any: read them as the canonical one writes them.
+  const Messages = z.array(z.object({ type: z.string(), value: z.object({ signer: z.string(), data: z.string() }) }));
+  type Messages = z.infer<typeof Messages>;
+  const changed =
+    (change: (doc: Doc, msgs: Messages) => Doc) =>
+    (text: string, me: Wallet): [Address, Proof] => {
+      const doc = me.sign("onyx-1", text).signed;
+      return [me.address, me.signDoc(change(doc, Messages.parse(doc.msgs)))];
+    };
   const vectors: [string, (text: string, me: ReturnType<typeof wallet>) => [Address, Proof]][] = [
     [
       "signed by another key for the same address",
@@ -184,6 +195,20 @@ describe("verify, with the SDK's verifier", () => {
       (text, me) => [me.address, resigned(me.sign("onyx-1", text), (s) => Buffer.concat([s, Buffer.from([0])]))],
     ],
     ["a high-S twin of a valid signature", (text, me) => [me.address, resigned(me.sign("onyx-1", text), highS)]],
+    // The key itself signs a document that is not the canonical one: only the verifier's comparison refuses it.
+    ["a document with a memo", changed((doc) => ({ ...doc, memo: "x" }))],
+    [
+      "a document with a fee",
+      changed((doc) => ({ ...doc, fee: { amount: [{ denom: "ugnot", amount: "1" }], gas: "0" } })),
+    ],
+    ["a document with gas", changed((doc) => ({ ...doc, fee: { ...doc.fee, gas: "1" } }))],
+    ["a document with an account number", changed((doc) => ({ ...doc, account_number: "1" }))],
+    ["a document with a sequence", changed((doc) => ({ ...doc, sequence: "1" }))],
+    ["a document with a second message", changed((doc, msgs) => ({ ...doc, msgs: [...msgs, ...msgs] }))],
+    [
+      "a document whose message is of another type",
+      changed((doc, msgs) => ({ ...doc, msgs: msgs.map((msg) => ({ ...msg, type: "/bank.MsgSend" })) })),
+    ],
   ];
 
   it.each(vectors)("refuses %s, and spends the nonce", async (_, forge) => {
@@ -195,6 +220,14 @@ describe("verify, with the SDK's verifier", () => {
     expect(
       await login.verify({ nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) }, anyone),
     ).toBe("nonce");
+  });
+
+  it("logs in with the canonical document signed whole, so each changed one fails for its change alone", async () => {
+    const { login } = setup();
+    const me = wallet();
+    const made = challenge(login);
+    const proof = me.signDoc(me.sign("onyx-1", made.text).signed);
+    expect(await login.verify({ nonce: made.nonce, address: me.address, proof }, anyone)).toHaveProperty("token");
   });
 
   it("refuses the same proof sent twice in a row", async () => {

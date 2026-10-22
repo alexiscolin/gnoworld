@@ -12,6 +12,8 @@ export interface Wallet {
   address: Address;
   // signer: the address the document names, the key's own unless a test says otherwise.
   sign: (chainId: string, text: string, signer?: string) => SignedArbitraryData;
+  // Any document, the canonical one changed included: the verifier, not the signature, must refuse it.
+  signDoc: (signed: SignedArbitraryData["signed"]) => SignedArbitraryData;
 }
 
 export function wallet(): Wallet {
@@ -20,19 +22,20 @@ export function wallet(): Wallet {
   const parity = (Buffer.from(y, "base64url").at(-1) ?? 0) & 1;
   const compressed = Buffer.concat([Buffer.from([2 + parity]), Buffer.from(x, "base64url")]);
   const address = Address.parse(toAddress(hash("ripemd160", hash("sha256", compressed))));
+  const signDoc = (signed: SignedArbitraryData["signed"]): SignedArbitraryData => {
+    const signature = sign("sha256", getArbitrarySignBytes(signed), { key: privateKey, dsaEncoding: "ieee-p1363" });
+    return {
+      signed,
+      signature: {
+        pubKey: { typeUrl: "/tm.PubKeySecp256k1", value: compressed.toString("base64") },
+        signature: lowS(signature).toString("base64"),
+      },
+    };
+  };
   return {
     address,
-    sign: (chainId, text, signer = address) => {
-      const signed = makeArbitrarySignDoc(chainId, signer, text);
-      const signature = sign("sha256", getArbitrarySignBytes(signed), { key: privateKey, dsaEncoding: "ieee-p1363" });
-      return {
-        signed,
-        signature: {
-          pubKey: { typeUrl: "/tm.PubKeySecp256k1", value: compressed.toString("base64") },
-          signature: lowS(signature).toString("base64"),
-        },
-      };
-    },
+    sign: (chainId, text, signer = address) => signDoc(makeArbitrarySignDoc(chainId, signer, text)),
+    signDoc,
   };
 }
 

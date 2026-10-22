@@ -1,5 +1,6 @@
 import { createHmac } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
+import { isDeepStrictEqual } from "node:util";
 import { Challenge } from "@gnoworld/schemas";
 import fc from "fast-check";
 import { afterEach, describe, expect, it } from "vitest";
@@ -454,7 +455,9 @@ describe("refusals", () => {
           body: { nonce: made.nonce, address: who.address, proof: changed },
           peer,
         });
-        expect([200, 400]).toContain(response.status);
+        // As the server reads it: a value that comes out of JSON as the original is no change.
+        const sent = (data: unknown): unknown => JSON.parse(JSON.stringify(data));
+        expect(response.status).toBe(isDeepStrictEqual(sent(changed), sent(proof)) ? 200 : 400);
       }),
       { numRuns: 60 },
     );
