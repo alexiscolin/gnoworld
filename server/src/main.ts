@@ -10,10 +10,12 @@ import { authServer, listenAt } from "./ergo/auth.ts";
 import { LOGIN_TABLES, NONCE_HOST } from "./login/login.ts";
 import { TICKET_TABLES } from "./login/ticket.ts";
 import { PROGRESS_TABLES } from "./moderation/catchup.ts";
+import { MUTE_TABLES } from "./moderation/mute.ts";
+import { STRIKE_TABLES } from "./moderation/strikes.ts";
 import { VERDICT_TABLES } from "./moderation/check.ts";
 import { ROOM_TABLES } from "./rooms/rooms.ts";
 import { loginFrom } from "./login/routes.ts";
-import { loadRoles } from "./roles/roles.ts";
+import { loadRoles, spared } from "./roles/roles.ts";
 
 const FLAG = "--disallow-code-generation-from-strings";
 if (!process.execArgv.includes(FLAG)) throw new Error(`start the server with ${FLAG} (ADR-0002 §7)`);
@@ -22,13 +24,28 @@ const config = loadConfig(process.env);
 // Checked at boot, so a bad roles file never starts a server; the bot's link (3h) reads it.
 const roles = loadRoles(config.roles);
 const log = logger(config.pepper, (line) => process.stdout.write(line));
-const db = openDatabase(config.database, [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST, ROOM_TABLES, VERDICT_TABLES, PROGRESS_TABLES]);
+const db = openDatabase(config.database, [
+  LOGIN_TABLES,
+  TICKET_TABLES,
+  NONCE_HOST,
+  ROOM_TABLES,
+  VERDICT_TABLES,
+  PROGRESS_TABLES,
+  MUTE_TABLES,
+  STRIKE_TABLES,
+]);
 let draining = false;
 const app = makeApp(log, () => !draining);
 app.route("/api/login", loginFrom(db, config, { log }));
 const chat = startChat(
   db,
-  { worlds: roles.worlds, ergo: config.ergo, moderation: config.moderation, trustedProxy: config.trustedProxy },
+  {
+    worlds: roles.worlds,
+    ergo: config.ergo,
+    moderation: config.moderation,
+    trustedProxy: config.trustedProxy,
+    spared: spared(roles),
+  },
   { log, pepper: config.pepper },
 );
 app.route("/api/activity", chat.activity);

@@ -153,3 +153,12 @@ describe("the rules' links and mentions", () => {
     expect(ruleVerdict("@someone", strict, OLD)).toBe("mentions");
   });
 });
+
+describe("the rules on a line's way in (3k)", () => {
+  it("hide a line too fast, and an edit of a line not the author's, before any other rule", () => {
+    expect(ruleVerdict("spam", RULES, { ...OLD, tooFast: true })).toBe("too_fast");
+    expect(ruleVerdict("spam", RULES, { ...OLD, foreignEdit: true })).toBe("not_their_edit");
+    expect(ruleVerdict("hello", RULES, { ...OLD, tooFast: true, foreignEdit: true })).toBe("too_fast");
+    expect(ruleVerdict("hello", RULES, { ...OLD, tooFast: false, foreignEdit: false })).toBeUndefined();
+  });
+});

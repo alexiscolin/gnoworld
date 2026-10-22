@@ -584,6 +584,23 @@ describe("the IRC link's own commands (3j)", () => {
     ["a NOTICE to nobody", "NOTICE", ["", "x"]],
     ["a REDACT outside a room", "REDACT", ["g1abc", "m1", "x"]],
     ["a REDACT in two rooms", "REDACT", ["#bubble,#earth", "m1", "x"]],
+    ["a SAMODE outside a room (3k)", "SAMODE", ["g1abc", "+b", "m:g1abc"]],
+    ["a SAMODE that is no ban (3k)", "SAMODE", ["#bubble", "+o", "g1abc"]],
+    ["a ban that mutes no one by name (3k)", "SAMODE", ["#bubble", "+b", "g1abc"]],
+    ["a mute of everyone (3k)", "SAMODE", ["#bubble", "+b", "m:*"]],
+    ["a mute by mask (3k)", "SAMODE", ["#bubble", "+b", "m:g1abc!*@*"]],
+    ["a mute of two (3k)", "SAMODE", ["#bubble", "+b", "m:g1a,g1b"]],
+    ["a SAMODE with a fourth word (3k)", "SAMODE", ["#bubble", "+b", "m:g1a", "x"]],
+    ["a mute of nobody (3k)", "SAMODE", ["#bubble", "+b", "m:"]],
+    ["a mute ending in a wildcard (3k)", "SAMODE", ["#bubble", "+b", "m:g1a*"]],
+    ["a mute with a ? wildcard (3k)", "SAMODE", ["#bubble", "+b", "m:g1a?"]],
+    ["a SAMODE in two rooms (3k)", "SAMODE", ["#bubble,#earth", "+b", "m:g1a"]],
+    ["a mode of two letters (3k)", "SAMODE", ["#bubble", "+bb", "m:g1a"]],
+    ["a ban and an op at once (3k)", "SAMODE", ["#bubble", "+bo", "m:g1a"]],
+    ["a capital B (3k)", "SAMODE", ["#bubble", "+B", "m:g1a"]],
+    ["an unmute of everyone (3k)", "SAMODE", ["#bubble", "-b", "m:*"]],
+    ["a line break in the account (3k)", "SAMODE", ["#bubble", "+b", "m:g1a\r\nQUIT"]],
+    ["an account of 600 bytes (3k)", "SAMODE", ["#bubble", "+b", `m:${"a".repeat(600)}`]],
   ])("refuses %s, sending nothing", async (_, command, params) => {
     const ergo = await fakeErgo();
     const { link } = start(ergo.port);
@@ -593,6 +610,53 @@ describe("the IRC link's own commands (3j)", () => {
     expect(link.send(command as "NOTICE", params)).toBe(false);
     await sync(peer);
     expect(since(peer, mark)).toEqual(["PONG sync"]);
+  });
+});
+
+describe("the IRC link's mute and edits (3k)", () => {
+  it("puts a mute on and takes it off with SAMODE, once in its rooms", async () => {
+    const ergo = await fakeErgo();
+    const { link } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    expect(link.send("SAMODE", ["#bubble", "+b", "m:g1abc"])).toBe(false);
+    await welcome(peer);
+    const address = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+    expect(link.send("SAMODE", ["#bubble", "+b", `m:${address}`])).toBe(true);
+    expect(link.send("SAMODE", ["#bubble", "-b", `m:${address}`])).toBe(true);
+    expect(await peer.next(/^SAMODE /)).toBe(`SAMODE #bubble +b m:${address}`);
+    expect(await peer.next(/^SAMODE /)).toBe(`SAMODE #bubble -b m:${address}`);
+  });
+
+  it("says when it is in its rooms, each time it comes back", async () => {
+    const ergo = await fakeErgo();
+    let ready = 0;
+    start(ergo.port, {
+      onReady: () => {
+        ready += 1;
+      },
+    });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    await expect.poll(() => ready).toBe(1);
+    peer.socket.destroy();
+    await welcome(await ergo.peer(1));
+    await expect.poll(() => ready).toBe(2);
+  });
+
+  it("hands on the id a line says it corrects, and none empty or past 128 characters", async () => {
+    const ergo = await fakeErgo();
+    const { said } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    peer.say(message("account=g1a;msgid=m2;+gnoworld/edit=m1", "a!u@h", ["#bubble", "fixed"]));
+    peer.say(message("account=g1a;msgid=m3;+gnoworld/edit=", "a!u@h", ["#bubble", "plain"]));
+    peer.say(message(`account=g1a;msgid=m4;+gnoworld/edit=${"x".repeat(129)}`, "a!u@h", ["#bubble", "long"]));
+    await expect.poll(() => said.length).toBe(3);
+    expect(said).toEqual([
+      { room: "#bubble", account: "g1a", msgid: "m2", text: "fixed", edits: "m1" },
+      { room: "#bubble", account: "g1a", msgid: "m3", text: "plain" },
+      { room: "#bubble", account: "g1a", msgid: "m4", text: "long" },
+    ]);
   });
 });
 

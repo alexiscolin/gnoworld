@@ -39,6 +39,8 @@ const WORDS: Record<string, string> = {
   links: "too many links",
   mentions: "too many mentions",
   new_account_links: "too many links for a new account",
+  too_fast: "too many messages too fast",
+  not_their_edit: "an edit of a message that is not yours",
 };
 
 describe("acting on a verdict", () => {
@@ -74,7 +76,15 @@ describe("acting on a verdict", () => {
   });
 
   it("writes every reason in its own words, never from the message or the answer", () => {
-    const reasons = [...CATEGORIES, "banned_word", "links", "mentions", "new_account_links"] as const;
+    const reasons = [
+      ...CATEGORIES,
+      "banned_word",
+      "links",
+      "mentions",
+      "new_account_links",
+      "too_fast",
+      "not_their_edit",
+    ] as const;
     expect(Object.keys(REASON_WORDS).toSorted()).toEqual(Object.keys(WORDS).toSorted());
     for (const reason of reasons) {
       const { sent } = run({ action: "hide", reason });

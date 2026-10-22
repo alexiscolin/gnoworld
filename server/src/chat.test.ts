@@ -12,6 +12,7 @@ import { logger } from "./log.ts";
 import { LOGIN_TABLES } from "./login/login.ts";
 import { PROGRESS_TABLES } from "./moderation/catchup.ts";
 import { VERDICT_TABLES } from "./moderation/check.ts";
+import { MUTE_TABLES } from "./moderation/mute.ts";
 import type { Answer } from "./moderation/provider.ts";
 import type { Rules } from "./roles/roles.ts";
 import { ROOM_TABLES } from "./rooms/rooms.ts";
@@ -25,7 +26,8 @@ const logged: string[] = [];
 const log = logger(PEPPER, (line) => logged.push(line));
 const RULES: Rules = { bannedWords: ["spam"], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
 const worlds = (...slugs: string[]) => new Map(slugs.map((slug) => [slug, { rules: RULES }]));
-const OFF = { openaiKey: undefined, thresholds: {}, newAccountHours: 24 };
+const MUTE = { strikes: 3, windowMinutes: 10, minutes: 5, max: 50 };
+const OFF = { openaiKey: undefined, thresholds: {}, newAccountHours: 24, mute: MUTE };
 const OFF_ANSWER = answer();
 const started: { db: DatabaseSync; chat: Chat }[] = [];
 afterEach(async () => {
@@ -38,14 +40,19 @@ afterEach(async () => {
 
 const setup = (
   settings: Parameters<typeof startChat>[1],
-  { now, provider }: { now?: () => number; provider?: (text: string) => Promise<Answer | "unchecked"> } = {},
+  {
+    now,
+    provider,
+    tickMs,
+  }: { now?: () => number; provider?: (text: string) => Promise<Answer | "unchecked">; tickMs?: number } = {},
 ) => {
-  const db = openDatabase(":memory:", [LOGIN_TABLES, ROOM_TABLES, VERDICT_TABLES, PROGRESS_TABLES]);
+  const db = openDatabase(":memory:", [LOGIN_TABLES, ROOM_TABLES, VERDICT_TABLES, PROGRESS_TABLES, MUTE_TABLES]);
   const options = {
     log,
     pepper: PEPPER,
     ...(now === undefined ? {} : { now }),
     ...(provider === undefined ? {} : { provider }),
+    ...(tickMs === undefined ? {} : { tickMs }),
   };
   const chat = startChat(db, settings, options);
   started.push({ db, chat });
@@ -167,7 +174,7 @@ describe("the chat, as the server starts it", () => {
       flagged: Object.fromEntries(Object.keys(OFF_ANSWER.flagged).map((c) => [c, false])) as Answer["flagged"],
       scores: { ...OFF_ANSWER.scores, harassment: 0.5 },
     };
-    const moderation = { openaiKey: undefined, thresholds: { harassment: 0.5 }, newAccountHours: 1 };
+    const moderation = { openaiKey: undefined, thresholds: { harassment: 0.5 }, newAccountHours: 1, mute: MUTE };
     const { db, peer, verdicts } = await linked(
       { worlds: worlds("bubble"), moderation },
       { provider: (text) => Promise.resolve(text === "rude words" ? scored : OFF_ANSWER) },
@@ -594,7 +601,8 @@ describe("the chat, as the server starts it", () => {
       for (let n = 1; n <= 105; n += 1) peer.say(line(`m${String(n)}`, n, ["g1a", "flood"]));
       await expect.poll(() => logged.some((l) => l.includes("moderation_account_full"))).toBe(true);
       held.open();
-      await expect.poll(() => verdicts().filter(({ action }) => action === "pass").length).toBe(104);
+      // Settled, each: past 20 a minute the flood is hidden as too fast (3k).
+      await expect.poll(() => verdicts().filter(({ action }) => action !== "pending").length).toBe(104);
       const again = await reconnect(peer, ergo);
       expect(await again.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(105)} 50`);
     });
@@ -614,6 +622,209 @@ describe("the chat, as the server starts it", () => {
       const page = await follow(app);
       await started.at(-1)?.chat.stop();
       expect(await page.read(1)).toEqual([]);
+    });
+
+    describe("the mute and the edits (3k)", () => {
+      const mutes = (peer: { lines: string[] }) => peer.lines.filter((l) => l.startsWith("SAMODE "));
+      const redacts = (peer: { lines: string[] }) => sent(peer).filter((l) => l.startsWith("REDACT"));
+      const hurt = (provider = (text: string) => Promise.resolve(flags(text))) => ({ provider });
+      // A page of history as Ergo sends it after a reconnect: each line with its own time.
+      const page = (peer: { say: (l: string) => void }, lines: [string, number, string, string][]) => {
+        peer.say(":ergo.test BATCH +h chathistory #bubble");
+        for (const [id, ms, account, text] of lines) {
+          peer.say(`@batch=h;account=${account};msgid=${id};time=${T(ms)} :${account}!u@h PRIVMSG #bubble :${text}`);
+        }
+        peer.say(":ergo.test BATCH -h");
+      };
+
+      it("mutes an account hidden three times in ten minutes, in its world's rooms, by itself", async () => {
+        const { peer } = await linked({ worlds: worlds("bubble"), moderation: OFF }, hurt());
+        peer.say(line("m1", 1, ["g1a", "hurt"]));
+        peer.say(line("m2", 2, ["g1a", "hurt"]));
+        peer.say(line("m3", 3, ["g1b", "hurt"]));
+        await expect.poll(() => redacts(peer)).toHaveLength(3);
+        await settle(peer);
+        expect(mutes(peer)).toEqual([]);
+        peer.say(line("m4", 4, ["g1a", "hurt"]));
+        expect(await peer.next(/^SAMODE /)).toBe("SAMODE #bubble +b m:g1a");
+      });
+
+      it("spares whom the roles file spares: hidden ten times, never muted, while another is", async () => {
+        const { peer } = await linked(
+          { worlds: worlds("bubble"), moderation: OFF, spared: (account) => account === "g1a" },
+          hurt(),
+        );
+        for (let n = 1; n <= 10; n += 1) peer.say(line(`a${String(n)}`, n, ["g1a", "hurt"]));
+        for (let n = 1; n <= 3; n += 1) peer.say(line(`b${String(n)}`, 10 + n, ["g1b", "hurt"]));
+        await expect.poll(() => redacts(peer)).toHaveLength(13);
+        await settle(peer);
+        expect(mutes(peer)).toEqual(["SAMODE #bubble +b m:g1b"]);
+      });
+
+      it("mutes once when hides come at once", async () => {
+        const slow = gate();
+        const { peer } = await linked(
+          { worlds: worlds("bubble"), moderation: OFF },
+          hurt(async (text) => {
+            await slow.opened;
+            return flags(text);
+          }),
+        );
+        for (let n = 1; n <= 4; n += 1) peer.say(line(`m${String(n)}`, n, ["g1a", "hurt"]));
+        slow.open();
+        await expect.poll(() => redacts(peer)).toHaveLength(4);
+        await settle(peer);
+        expect(mutes(peer)).toEqual(["SAMODE #bubble +b m:g1a"]);
+      });
+
+      it("reads its numbers from the settings: strikes, their window by Ergo's time, the minutes, the cap", async () => {
+        const clock = { now: T0 };
+        const moderation = { ...OFF, mute: { strikes: 2, windowMinutes: 3, minutes: 7, max: 1 } };
+        const { peer } = await linked(
+          { worlds: worlds("bubble"), moderation },
+          { ...hurt(), now: () => clock.now, tickMs: 10 },
+        );
+        peer.say(line("m1", 0, ["g1a", "hurt"]));
+        peer.say(line("m2", 3 * MINUTE + 1, ["g1a", "hurt"]));
+        await expect.poll(() => redacts(peer)).toHaveLength(2);
+        await settle(peer);
+        expect(mutes(peer)).toEqual([]);
+        peer.say(line("m3", 3 * MINUTE + 2, ["g1a", "hurt"]));
+        expect(await peer.next(/^SAMODE /)).toBe("SAMODE #bubble +b m:g1a");
+        clock.now = T0 + 7 * MINUTE - 1;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        expect(mutes(peer)).toEqual(["SAMODE #bubble +b m:g1a"]);
+        clock.now = T0 + 7 * MINUTE;
+        expect(await peer.next(/^SAMODE /)).toBe("SAMODE #bubble -b m:g1a");
+        peer.say(line("b1", 4 * MINUTE, ["g1b", "hurt"]));
+        peer.say(line("b2", 4 * MINUTE + 1, ["g1b", "hurt"]));
+        expect(await peer.next(/^SAMODE /)).toBe("SAMODE #bubble +b m:g1b");
+        peer.say(line("c1", 4 * MINUTE + 2, ["g1c", "hurt"]));
+        peer.say(line("c2", 4 * MINUTE + 3, ["g1c", "hurt"]));
+        expect([await peer.next(/^SAMODE /), await peer.next(/^SAMODE /)]).toEqual([
+          "SAMODE #bubble -b m:g1b",
+          "SAMODE #bubble +b m:g1c",
+        ]);
+      });
+
+      it("lifts the mute after its minutes, and puts a live one back when the link returns", async () => {
+        const clock = { now: T0 };
+        const { peer, ergo } = await linked(
+          { worlds: worlds("bubble"), moderation: OFF },
+          { ...hurt(), now: () => clock.now, tickMs: 10 },
+        );
+        for (let n = 1; n <= 3; n += 1) peer.say(line(`m${String(n)}`, n, ["g1a", "hurt"]));
+        await peer.next(/^SAMODE #bubble \+b m:g1a$/);
+        const again = await reconnect(peer, ergo);
+        expect(await again.next(/^SAMODE /)).toBe("SAMODE #bubble +b m:g1a");
+        clock.now = T0 + 5 * MINUTE;
+        expect(await again.next(/^SAMODE /)).toBe("SAMODE #bubble -b m:g1a");
+      });
+
+      it("stops its timer when it stops: no lift runs after", async () => {
+        const clock = { now: T0 };
+        const { peer } = await linked(
+          { worlds: worlds("bubble"), moderation: OFF },
+          { ...hurt(), now: () => clock.now, tickMs: 10 },
+        );
+        for (let n = 1; n <= 3; n += 1) peer.say(line(`m${String(n)}`, n, ["g1a", "hurt"]));
+        await peer.next(/^SAMODE #bubble \+b m:g1a$/);
+        await started.at(-1)?.chat.stop();
+        clock.now = T0 + 6 * MINUTE;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        expect(mutes(peer)).toEqual(["SAMODE #bubble +b m:g1a"]);
+      });
+
+      it("counts strikes in a world apart, and mutes in that world's rooms alone", async () => {
+        const { peer } = await linked({ worlds: worlds("bubble", "earth"), moderation: OFF }, hurt());
+        peer.say(line("m1", 1, ["g1a", "hurt"]));
+        peer.say(line("m2", 2, ["g1a", "hurt"]));
+        peer.say(message(`account=g1a;msgid=m3;time=${T(3)}`, "g1a!u@h", ["#earth", "hurt"]));
+        await expect.poll(() => redacts(peer)).toHaveLength(3);
+        await settle(peer);
+        expect(mutes(peer)).toEqual([]);
+        peer.say(line("m4", 4, ["g1a", "hurt"]));
+        expect(await peer.next(/^SAMODE /)).toBe("SAMODE #bubble +b m:g1a");
+        await settle(peer);
+        expect(mutes(peer)).toEqual(["SAMODE #bubble +b m:g1a"]);
+      });
+
+      it("hides a line too fast, past 20 a minute of Ergo's time, in its own words, and three of them mute", async () => {
+        const { peer, verdicts } = await linked(
+          { worlds: worlds("bubble"), moderation: OFF },
+          { provider: () => Promise.resolve(OFF_ANSWER) },
+        );
+        for (let n = 1; n <= 23; n += 1) peer.say(line(`m${String(n)}`, n, ["g1a", "fine"]));
+        expect(await peer.next(/^REDACT /)).toBe("REDACT #bubble m21 :too many messages too fast");
+        await expect.poll(() => verdicts().filter(({ reason }) => reason === "too_fast")).toHaveLength(3);
+        expect(await peer.next(/^SAMODE /)).toBe("SAMODE #bubble +b m:g1a");
+        await settle(peer);
+        expect(mutes(peer)).toHaveLength(1);
+      });
+
+      it("never finds a caught-up backlog too fast: Ergo's times, and a line seen before, once", async () => {
+        const { peer, ergo, verdicts } = await linked(
+          { worlds: worlds("bubble"), moderation: OFF },
+          { provider: () => Promise.resolve(OFF_ANSWER) },
+        );
+        peer.say(line("m0", 0, ["g1a", "before"]));
+        await expect.poll(() => verdicts().length).toBe(1);
+        const again = await reconnect(peer, ergo);
+        await again.next(/^CHATHISTORY /);
+        const backlog: [string, number, string, string][] = Array.from({ length: 25 }, (_, n) => [
+          `x${String(n)}`,
+          (n + 1) * 24_000,
+          "g1a",
+          "missed",
+        ]);
+        page(again, [["m0", 0, "g1a", "before"], ...backlog]);
+        await expect.poll(() => verdicts().length).toBe(26);
+        await settle(again);
+        expect([redacts(again), mutes(again)]).toEqual([[], []]);
+      });
+
+      it("checks an edit as any line: an own edit that breaks no rule stays, one that hurts is hidden alone", async () => {
+        const { peer, verdicts } = await linked({ worlds: worlds("bubble"), moderation: OFF }, hurt());
+        peer.say(line("m1", 1, ["g1a", "hello"]));
+        peer.say(
+          message(`account=g1a;msgid=m2;time=${T(2)};+gnoworld/edit=m1`, "g1a!u@h", ["#bubble", "hello, fixed"]),
+        );
+        peer.say(
+          message(`account=g1a;msgid=m3;time=${T(3)};+gnoworld/edit=m1`, "g1a!u@h", ["#bubble", "I will hurt you"]),
+        );
+        expect(await peer.next(/^REDACT /)).toBe("REDACT #bubble m3 violence");
+        await expect.poll(() => verdicts().length).toBe(3);
+        await settle(peer);
+        expect(redacts(peer)).toEqual(["REDACT #bubble m3 violence"]);
+        expect(verdicts()).toContainEqual({ msgid: "m1", action: "pass", reason: null });
+      });
+
+      it("hides an edit of another's line, an edit sent right behind its own line stays, a forger is muted", async () => {
+        const slow = gate();
+        const { peer, verdicts } = await linked(
+          { worlds: worlds("bubble"), moderation: OFF },
+          {
+            provider: async (text) => {
+              if (text === "slow") await slow.opened;
+              return OFF_ANSWER;
+            },
+          },
+        );
+        peer.say(line("m1", 1, ["g1a", "slow"]));
+        peer.say(message(`account=g1a;msgid=m2;time=${T(2)};+gnoworld/edit=m1`, "g1a!u@h", ["#bubble", "fine"]));
+        for (let n = 3; n <= 5; n += 1) {
+          peer.say(
+            message(`account=g1b;msgid=m${String(n)};time=${T(n)};+gnoworld/edit=m1`, "g1b!u@h", ["#bubble", "x"]),
+          );
+        }
+        expect(await peer.next(/^REDACT /)).toBe("REDACT #bubble m3 :an edit of a message that is not yours");
+        expect(await peer.next(/^SAMODE /)).toBe("SAMODE #bubble +b m:g1b");
+        slow.open();
+        await expect.poll(() => verdicts().length).toBe(5);
+        expect(verdicts()).toContainEqual({ msgid: "m2", action: "pass", reason: null });
+        await settle(peer);
+        expect(mutes(peer)).toEqual(["SAMODE #bubble +b m:g1b"]);
+      });
     });
   });
 });

@@ -1,23 +1,17 @@
-// The server's IRC link (slice 3's plan, 3h, 3j): one TCP connection to Ergo's internal listener, as its
+// The server's IRC link (slice 3's plan, 3h, 3j, 3k): one TCP connection to Ergo's internal listener, as its
 // operator, in every room. It reads the rooms' messages, never a direct one, and sends only the commands
-// written here, each through formatLine. It comes back after a close, and after three unanswered pings,
+// lines.ts lists, each through formatLine. It comes back after a close, and after three unanswered pings,
 // then asks each room's history from the time of the last line checked there, a page at a time.
 import { connect, type Socket } from "node:net";
-import { formatLine, parseLine, toIrcCommand, type IrcMessage } from "@gnoworld/core";
+import { parseLine, type IrcMessage } from "@gnoworld/core";
 import type { Log } from "../log.ts";
+import { allowed, joins, line, NICK, said, type Command, type Said } from "./lines.ts";
 
-/** A room's message, as Ergo marked it: the account it set, the message's id and its time. */
-export interface Said {
-  room: string;
-  account: string;
-  msgid: string;
-  text: string;
-  time?: string;
-}
+export type { Said } from "./lines.ts";
 
 export interface Link {
-  // REDACT and NOTICE alone, once it is in its rooms; false when not sent.
-  send: (command: "REDACT" | "NOTICE", params: readonly string[]) => boolean;
+  // The commands of lines.ts alone, in their forms, once it is in its rooms; false when not sent.
+  send: (command: Command, params: readonly string[]) => boolean;
   stop: () => Promise<void>;
 }
 
@@ -34,6 +28,8 @@ interface Options {
   lastChecked?: (room: string) => string | undefined;
   // Settles once what the link handed on is taken in: the next page waits for it.
   drained?: () => Promise<void>;
+  // Each time it is in its rooms again (3k: the mutes put back).
+  onReady?: () => void;
 }
 
 // Half of a check's per-account queue, so a page never fills it with a live line waiting (3j).
@@ -49,9 +45,6 @@ interface State {
   batches: Map<string, { room: string; lines: number; last: string }>;
 }
 
-const NICK = "gnoworld";
-// A REDACT in one room, a NOTICE to one account: never a list, never a NOTICE to a room.
-const TARGETS = new Map(Object.entries({ REDACT: /^#[^,]+$/, NOTICE: /^[^#,]+$/ }));
 // A server's longest line: 8191 bytes of tags with the @ and the space, 510 more, then CR LF.
 const LINE_MAX = 8191 + 512;
 
@@ -60,46 +53,10 @@ export function retryDelay(attempt: number, random: () => number = Math.random):
   return Math.floor(Math.min(1000 * 2 ** attempt, 60_000) * (0.5 + random()));
 }
 
-function line(name: string, params: readonly string[]): string {
-  const command = toIrcCommand(name);
-  if (command === undefined) throw new RangeError(`link: ${name} is no command`);
-  return `${formatLine({ tags: new Map(), command, params })}\r\n`;
-}
-
-// The JOIN lines for these rooms, 510 bytes each at most; a name that would break a line, or fill one
-// alone, is left out.
-function joins(rooms: readonly string[]): string[] {
-  const lines: string[][] = [];
-  const fits = (name: string): boolean => /^#[^\s,\0-\x1f]+$/.test(name) && Buffer.byteLength(`JOIN ${name}`) <= 510;
-  for (const room of rooms.filter(fits)) {
-    const last = lines.at(-1);
-    if (last !== undefined && Buffer.byteLength(`JOIN ${[...last, room].join(",")}`) <= 510) last.push(room);
-    else lines.push([room]);
-  }
-  return lines.map((names) => line("JOIN", [names.join(",")]));
-}
-
-// Ergo's time for a line, in server-time's form alone, so a mark is always a time Ergo can read back.
-function timeOf(tags: IrcMessage["tags"]): { time?: string } {
-  const time = tags.get("time") ?? "";
-  return /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(time) ? { time } : {};
-}
-
-// A room's message as the link hands it on, or nothing: a channel line of one of its rooms, with the
-// account and the id Ergo set, from someone else, with text.
-function said(
-  { tags, source, params: [room = "", text = ""] }: IrcMessage,
-  joined: ReadonlySet<string>,
-): Said | undefined {
-  const [account = "", msgid = ""] = [tags.get("account"), tags.get("msgid")];
-  const fields = [text, account, msgid];
-  if (fields.includes("") || source?.split("!")[0] === NICK || !joined.has(room)) return undefined;
-  return { room, account, msgid, text, ...timeOf(tags) };
-}
-
 // The lines Ergo sends that ask for an answer, as 3b's table found them.
 function reader(options: Options, state: State) {
-  const { password, rooms, onMessage, log, lastChecked = () => undefined, drained = () => Promise.resolve() } = options;
+  const { password, rooms, onMessage, log, lastChecked = () => undefined, onReady = () => undefined } = options;
+  const { drained = () => Promise.resolve() } = options;
   // Ergo answers AFTER a msgid it no longer holds (a line hidden by REDACT) with nothing, and AFTER a
   // time from the next millisecond on (irc/history/history.go:171-175, irc/handlers.go:940, v2.19.1).
   const history = (s: Socket, room: string, after: string): void => {
@@ -127,6 +84,7 @@ function reader(options: Options, state: State) {
         const last = lastChecked(room);
         if (last !== undefined) history(s, room, new Date(Date.parse(last) - 1).toISOString());
       }
+      onReady();
       log("irc_ready");
     },
     BATCH: (s, { params: [ref = "", kind, room = ""] }) => {
@@ -232,10 +190,8 @@ export function ircLink(options: Options): Link {
   return {
     send: (command, params) => {
       const s = socket;
-      const [target = ""] = params;
-      // Another command, whatever its type says, has no rule and is refused.
-      const aimed = TARGETS.get(command)?.test(target) === true;
-      if (!state.ready || s === undefined || !aimed) return false;
+      // A command or a form lines.ts does not list, whatever its type says, is refused.
+      if (!state.ready || s === undefined || !allowed(command, params)) return false;
       // formatLine refuses a line that would break in two; nothing of it is sent.
       try {
         s.write(line(command, params));
