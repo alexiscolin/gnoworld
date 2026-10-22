@@ -263,6 +263,27 @@ describe("the verdicts' stream, its green pass (3j)", () => {
     );
   });
 
+  it("keeps a visitor's other streams counted when one of them ends", async () => {
+    const { rooms } = setup();
+    const own = [];
+    for (let n = 0; n < 4; n += 1) own.push(await rooms("#bubble"));
+    await own[0]?.cancel();
+    await expect.poll(async () => (await rooms("#bubble")).response.status).toBe(200);
+    expect((await rooms("#bubble")).response.status).toBe(429);
+  });
+
+  it("replays nothing to a client whose Last-Event-ID is the last it gave", async () => {
+    const { stream, rooms } = setup();
+    stream.publish(event(1));
+    const [first] = await (await rooms("#bubble")).read(1);
+    stream.publish(event(2));
+    const [second] = await (await rooms("#bubble", { peer: "198.51.100.1" })).read(2).then((all) => all.slice(1));
+    const back = await rooms("#bubble", { peer: "198.51.100.2", last: second?.id ?? "" });
+    stream.publish(event(3));
+    expect(msgids(await back.read(1))).toEqual(["m3"]);
+    expect(first?.id).toBeDefined();
+  });
+
   it("holds its sizes: a room's ring at its pending, 10,000 rooms at most, nothing left of the streams that ended", async () => {
     const { stream, rooms } = setup({ pending: 8 });
     for (let n = 0; n < 10_000; n += 1) stream.publish(event(n));

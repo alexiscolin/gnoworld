@@ -808,12 +808,13 @@ describe("the IRC link's refused hides (3j's green pass)", () => {
     const { lines } = start(ergo.port);
     const peer = await ergo.peer(0);
     await welcome(peer);
-    peer.say(":ergo.test FAIL REDACT REDACT_FORBIDDEN #bubble m1 :You are not authorized to delete this message");
+    const alerts = () => lines.filter((line) => line.includes('"event":"alert"'));
     peer.say(":ergo.test FAIL CHATHISTORY INVALID_PARAMS AFTER :Invalid parameters");
-    await sync(peer);
-    expect(lines.filter((line) => line.includes('"event":"alert"'))).toEqual([
-      expect.stringContaining('"error":"redact_refused"'),
-    ]);
+    await sync(peer, "other");
+    expect(alerts()).toEqual([]);
+    peer.say(":ergo.test FAIL REDACT REDACT_FORBIDDEN #bubble m1 :You are not authorized to delete this message");
+    await sync(peer, "redact");
+    expect(alerts()).toEqual([expect.stringContaining('"error":"redact_refused"')]);
   });
 });
 
