@@ -454,10 +454,11 @@ Changed: `deploy/compose.yaml`, `deploy/guard/guard.sh`, `deploy/web/nginx.conf`
 
 **As built** (`docs/decisions.md`, 2026-10-23, 3e's stack and known limits): Ergo's own image with
 `render.sh`, its auth script the server's socket (Ergo's `auth-script.socket`), a Go probe for the health
-checks (`deploy/probe`); an OPER through `/ws` is
-held by its password and Ergo's throttle, not refused (Ergo cannot restrict it by listener); history 90
-days for all, direct messages not stored until slice 4; smokescreen built from its source, no port rule;
-`web` at a fixed address; the test writes its own WebSocket client.
+checks (`deploy/probe`); an OPER through `/ws` is held by its password, which Ergo's start refuses under
+32 characters, and Ergo's throttle, not refused (Ergo cannot restrict it by listener); history 90 days for
+all, direct messages not stored until slice 4; smokescreen built from its source, no port rule, a quiet
+tunnel closed after 60 s; `web` at a fixed address, a backslash in a path refused; the guard's inside rules
+name `web` and the way out's replies; the test writes its own WebSocket client (review: F617-F632).
 
 ---
 
