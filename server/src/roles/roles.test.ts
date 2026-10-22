@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { inspect } from "node:util";
 import { Address } from "@gnoworld/schemas";
 import { afterAll, describe, expect, it } from "vitest";
-import { isTeam, isTrusted, loadRoles, moderates, type Roles, spared } from "./roles.ts";
+import { isTeam, isTrusted, loadRoles, mayCreateRoom, moderates, type Roles, spared } from "./roles.ts";
 
 const TEAM = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const TRUSTED = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
@@ -180,6 +180,12 @@ describe("who may do what", () => {
     const isSpared = spared(load());
     expect(answers((who) => isSpared(who))).toEqual([true, true, false, false, false]);
     expect([isSpared("alice"), isSpared(""), isSpared(TEAM.toUpperCase())]).toEqual([false, false, false]);
+  });
+
+  it("lets a world's moderators and the team make its rooms, and nobody else, nor in a world unnamed (3l)", () => {
+    expect(answers((who) => mayCreateRoom(load(), who, "earth"))).toEqual([true, false, true, false, false]);
+    expect(answers((who) => mayCreateRoom(load(), who, "bubble"))).toEqual([true, false, false, true, false]);
+    expect(answers((who) => mayCreateRoom(load(), who, "elsewhere"))).toEqual([false, false, false, false, false]);
   });
 
   it("lets nobody moderate a world the file does not name, the team included", () => {

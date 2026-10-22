@@ -13,6 +13,7 @@ import { LOGIN_TABLES } from "./login/login.ts";
 import { PROGRESS_TABLES } from "./moderation/catchup.ts";
 import { VERDICT_TABLES } from "./moderation/check.ts";
 import { MUTE_TABLES } from "./moderation/mute.ts";
+import { ROOM_STATE } from "./rooms/create.ts";
 import type { Answer } from "./moderation/provider.ts";
 import type { Rules } from "./roles/roles.ts";
 import { ROOM_TABLES } from "./rooms/rooms.ts";
@@ -20,6 +21,8 @@ import { answer } from "./testing/answers.ts";
 import { fakeErgo, message, PASSWORD, welcome } from "./testing/fakeErgo.ts";
 
 const T0 = Date.parse("2026-10-22T12:00:00.000Z");
+// A mute's line, not a room's mode, which the bot sets too (3l).
+const MUTE_LINE = /^SAMODE \S+ [+-]b m:/;
 const MINUTE = 60_000;
 const PEPPER = "a-pepper-of-forty-characters-0123456789";
 const logged: string[] = [];
@@ -46,7 +49,14 @@ const setup = (
     tickMs,
   }: { now?: () => number; provider?: (text: string) => Promise<Answer | "unchecked">; tickMs?: number } = {},
 ) => {
-  const db = openDatabase(":memory:", [LOGIN_TABLES, ROOM_TABLES, VERDICT_TABLES, PROGRESS_TABLES, MUTE_TABLES]);
+  const db = openDatabase(":memory:", [
+    LOGIN_TABLES,
+    ROOM_TABLES,
+    VERDICT_TABLES,
+    PROGRESS_TABLES,
+    MUTE_TABLES,
+    ROOM_STATE,
+  ]);
   const options = {
     log,
     pepper: PEPPER,
@@ -60,7 +70,7 @@ const setup = (
   app.route("/api/activity", chat.activity);
   app.route("/api/stream", chat.stream);
   const rooms = async (worlds: string) => (await app.request(`/api/activity?worlds=${worlds}`)).text();
-  return { db, rooms, app };
+  return { db, rooms, app, chat };
 };
 
 describe("the chat, as the server starts it", () => {
@@ -706,7 +716,7 @@ describe("the chat, as the server starts it", () => {
     });
 
     describe("the mute and the edits (3k)", () => {
-      const mutes = (peer: { lines: string[] }) => peer.lines.filter((l) => l.startsWith("SAMODE "));
+      const mutes = (peer: { lines: string[] }) => peer.lines.filter((l) => MUTE_LINE.test(l));
       const redacts = (peer: { lines: string[] }) => sent(peer).filter((l) => l.startsWith("REDACT"));
       const hurt = (provider = (text: string) => Promise.resolve(flags(text))) => ({ provider });
       // A page of history as Ergo sends it after a reconnect: each line with its own time.
@@ -727,7 +737,7 @@ describe("the chat, as the server starts it", () => {
         await settle(peer);
         expect(mutes(peer)).toEqual([]);
         peer.say(line("m4", 4, ["g1a", "hurt"]));
-        expect(await peer.next(/^SAMODE /)).toBe("SAMODE #bubble +b m:g1a");
+        expect(await peer.next(MUTE_LINE)).toBe("SAMODE #bubble +b m:g1a");
       });
 
       it("spares whom the roles file spares: hidden ten times, never muted, while another is", async () => {
@@ -771,18 +781,18 @@ describe("the chat, as the server starts it", () => {
         await settle(peer);
         expect(mutes(peer)).toEqual([]);
         peer.say(line("m3", 3 * MINUTE + 2, ["g1a", "hurt"]));
-        expect(await peer.next(/^SAMODE /)).toBe("SAMODE #bubble +b m:g1a");
+        expect(await peer.next(MUTE_LINE)).toBe("SAMODE #bubble +b m:g1a");
         clock.now = T0 + 7 * MINUTE - 1;
         await new Promise((resolve) => setTimeout(resolve, 50));
         expect(mutes(peer)).toEqual(["SAMODE #bubble +b m:g1a"]);
         clock.now = T0 + 7 * MINUTE;
-        expect(await peer.next(/^SAMODE /)).toBe("SAMODE #bubble -b m:g1a");
+        expect(await peer.next(MUTE_LINE)).toBe("SAMODE #bubble -b m:g1a");
         peer.say(line("b1", 4 * MINUTE, ["g1b", "hurt"]));
         peer.say(line("b2", 4 * MINUTE + 1, ["g1b", "hurt"]));
-        expect(await peer.next(/^SAMODE /)).toBe("SAMODE #bubble +b m:g1b");
+        expect(await peer.next(MUTE_LINE)).toBe("SAMODE #bubble +b m:g1b");
         peer.say(line("c1", 4 * MINUTE + 2, ["g1c", "hurt"]));
         peer.say(line("c2", 4 * MINUTE + 3, ["g1c", "hurt"]));
-        expect([await peer.next(/^SAMODE /), await peer.next(/^SAMODE /)]).toEqual([
+        expect([await peer.next(MUTE_LINE), await peer.next(MUTE_LINE)]).toEqual([
           "SAMODE #bubble -b m:g1b",
           "SAMODE #bubble +b m:g1c",
         ]);
@@ -797,9 +807,9 @@ describe("the chat, as the server starts it", () => {
         for (let n = 1; n <= 3; n += 1) peer.say(line(`m${String(n)}`, n, ["g1a", "hurt"]));
         await peer.next(/^SAMODE #bubble \+b m:g1a$/);
         const again = await reconnect(peer, ergo);
-        expect(await again.next(/^SAMODE /)).toBe("SAMODE #bubble +b m:g1a");
+        expect(await again.next(MUTE_LINE)).toBe("SAMODE #bubble +b m:g1a");
         clock.now = T0 + 5 * MINUTE;
-        expect(await again.next(/^SAMODE /)).toBe("SAMODE #bubble -b m:g1a");
+        expect(await again.next(MUTE_LINE)).toBe("SAMODE #bubble -b m:g1a");
       });
 
       it("stops its timer when it stops: no lift runs after", async () => {
@@ -825,7 +835,7 @@ describe("the chat, as the server starts it", () => {
         await settle(peer);
         expect(mutes(peer)).toEqual([]);
         peer.say(line("m4", 4, ["g1a", "hurt"]));
-        expect(await peer.next(/^SAMODE /)).toBe("SAMODE #bubble +b m:g1a");
+        expect(await peer.next(MUTE_LINE)).toBe("SAMODE #bubble +b m:g1a");
         await settle(peer);
         expect(mutes(peer)).toEqual(["SAMODE #bubble +b m:g1a"]);
       });
@@ -838,7 +848,7 @@ describe("the chat, as the server starts it", () => {
         for (let n = 1; n <= 23; n += 1) peer.say(line(`m${String(n)}`, n, ["g1a", "fine"]));
         expect(await peer.next(/^REDACT /)).toBe("REDACT #bubble m21 :too many messages too fast");
         await expect.poll(() => verdicts().filter(({ reason }) => reason === "too_fast")).toHaveLength(3);
-        expect(await peer.next(/^SAMODE /)).toBe("SAMODE #bubble +b m:g1a");
+        expect(await peer.next(MUTE_LINE)).toBe("SAMODE #bubble +b m:g1a");
         await settle(peer);
         expect(mutes(peer)).toHaveLength(1);
       });
@@ -899,13 +909,87 @@ describe("the chat, as the server starts it", () => {
           );
         }
         expect(await peer.next(/^REDACT /)).toBe("REDACT #bubble m3 :an edit of a message that is not yours");
-        expect(await peer.next(/^SAMODE /)).toBe("SAMODE #bubble +b m:g1b");
+        expect(await peer.next(MUTE_LINE)).toBe("SAMODE #bubble +b m:g1b");
         slow.open();
         await expect.poll(() => verdicts().length).toBe(5);
         expect(verdicts()).toContainEqual({ msgid: "m2", action: "pass", reason: null });
         await settle(peer);
         expect(mutes(peer)).toEqual(["SAMODE #bubble +b m:g1b"]);
       });
+    });
+  });
+
+  describe("the rooms (3l)", () => {
+    it("makes a moderator's room through the link: joined and open to accounts", async () => {
+      const { peer, chat } = await linked({ worlds: worlds("bubble"), moderation: OFF });
+      expect(chat.rooms.create("bubble", "garden")).toEqual({ made: "#bubble/garden" });
+      expect(await peer.next(/^JOIN #bubble\/garden$/)).toBe("JOIN #bubble/garden");
+      expect(await peer.next(/^SAMODE #bubble\/garden /)).toBe("SAMODE #bubble/garden +M");
+    });
+
+    it("puts each room's modes back each time the link is in its rooms", async () => {
+      const { peer, ergo, chat } = await linked({ worlds: worlds("bubble"), moderation: OFF });
+      expect(await peer.next(/^SAMODE #bubble /)).toBe("SAMODE #bubble +M");
+      chat.rooms.create("bubble", "old");
+      chat.rooms.archive("bubble", "old");
+      peer.socket.destroy();
+      const again = await ergo.peer(1);
+      await welcome(again);
+      const modes = [];
+      for (let n = 0; n < 4; n += 1) modes.push(await again.next(/^SAMODE #bubble/));
+      expect(modes).toEqual([
+        "SAMODE #bubble +M",
+        "SAMODE #bubble/old +M",
+        "SAMODE #bubble/old +m",
+        "SAMODE #bubble/old +s",
+      ]);
+    });
+
+    it("raises the alert for a channel in Ergo it did not make, and for no room it made, archived or open", async () => {
+      const { peer, chat } = await linked({ worlds: worlds("bubble"), moderation: OFF });
+      chat.rooms.create("bubble", "garden");
+      chat.rooms.create("bubble", "old");
+      chat.rooms.archive("bubble", "old");
+      await peer.next(/^LIST$/);
+      for (const name of ["#bubble", "#bubble/garden", "#bubble/old", "#rogue"]) {
+        peer.say(`:ergo.test 322 gnoworld ${name} 1 :`);
+      }
+      peer.say(":ergo.test 323 gnoworld :End of /LIST");
+      await expect
+        .poll(() => logged.filter((l) => l.includes('"event":"alert"') && l.includes('"unknown_room"')))
+        .toEqual([expect.stringContaining('"room":"#rogue"')]);
+    });
+
+    it("checks a new room's lines by its world's rules once the bot is in it, and counts them", async () => {
+      const { peer, chat, rooms } = await linked(
+        { worlds: worlds("bubble"), moderation: OFF },
+        { provider: () => Promise.resolve(OFF_ANSWER) },
+      );
+      chat.rooms.create("bubble", "garden");
+      await peer.next(/^JOIN #bubble\/garden$/);
+      peer.say(":gnoworld!u@h JOIN #bubble/garden");
+      peer.say(message("account=g1a;msgid=m1", "g1a!u@h", ["#bubble/garden", "buy spam"]));
+      expect(await peer.next(/^REDACT /)).toBe("REDACT #bubble/garden m1 :a word this world bans");
+      expect(await rooms("bubble")).toContain('{"world":"bubble","room":"#bubble/garden","perMinute":0.2}');
+    });
+
+    it("puts a live mute on a room made while it lasts", async () => {
+      const { peer, chat } = await linked(
+        { worlds: worlds("bubble"), moderation: OFF },
+        {
+          provider: (text) =>
+            Promise.resolve(
+              text.includes("hurt")
+                ? { ...OFF_ANSWER, flagged: { ...OFF_ANSWER.flagged, violence: true } }
+                : OFF_ANSWER,
+            ),
+        },
+      );
+      for (let n = 1; n <= 3; n += 1)
+        peer.say(message(`account=g1a;msgid=m${String(n)}`, "g1a!u@h", ["#bubble", "hurt"]));
+      await peer.next(/^SAMODE #bubble \+b m:g1a$/);
+      chat.rooms.create("bubble", "garden");
+      expect(await peer.next(/^SAMODE #bubble\/garden \+b /)).toBe("SAMODE #bubble/garden +b m:g1a");
     });
   });
 });

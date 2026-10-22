@@ -13,19 +13,24 @@ export interface Said {
   edits?: string;
 }
 
-export type Command = "REDACT" | "NOTICE" | "SAMODE";
+export type Command = "REDACT" | "NOTICE" | "SAMODE" | "JOIN";
 
 export const NICK = "gnoworld";
 
-const ROOM = /^#[^\s,]+$/;
+// One room, 64 characters at most (Ergo's channellen), no space, comma or control character.
+const ROOM = /^#[^\s,\0-\x1f\x7f]{1,63}$/;
 // A REDACT in one room; a NOTICE to one account, never a room, a list or words; a mute put on or taken
-// off one account, by name, in one room: no wildcard, which would mute others. Another command has no form.
+// off one account, by name, in one room: no wildcard, which would mute others; a room's own mode the bot
+// sets (3l): +M open to accounts, +m read-only, +s unlisted; a JOIN of one room. Another has no form.
 const FORMS = new Map<string, (params: readonly string[]) => boolean>(
   Object.entries({
     REDACT: ([room = ""]: readonly string[]) => ROOM.test(room),
     NOTICE: ([to = ""]: readonly string[]) => /^[^#,:\s\0-\x1f][^,\s\0-\x1f]*$/.test(to),
-    SAMODE: ([room = "", mode = "", mask = "", ...more]: readonly string[]) =>
-      ROOM.test(room) && /^[+-]b$/.test(mode) && /^m:[A-Za-z0-9_-]{1,64}$/.test(mask) && more.length === 0,
+    SAMODE: ([room = "", mode = "", mask, ...more]: readonly string[]) =>
+      ROOM.test(room) &&
+      more.length === 0 &&
+      (mask === undefined ? /^\+[Mms]$/.test(mode) : /^[+-]b$/.test(mode) && /^m:[A-Za-z0-9_-]{1,64}$/.test(mask)),
+    JOIN: ([room = "", ...more]: readonly string[]) => ROOM.test(room) && more.length === 0,
   }),
 );
 

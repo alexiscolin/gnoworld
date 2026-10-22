@@ -99,3 +99,7 @@ export function moderates(roles: Roles, who: Address, slug: string): boolean {
   const world = roles.worlds.get(slug);
   return world !== undefined && (isTeam(roles, who) || world.moderators.has(who));
 }
+
+/** Who may make and archive a world's rooms (3l): its moderators and the team, as `moderates`; rights
+ * earned by activity are a later slice's (decision 162). */
+export const mayCreateRoom = (roles: Roles, who: Address, slug: string): boolean => moderates(roles, who, slug);

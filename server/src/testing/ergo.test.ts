@@ -13,6 +13,7 @@ import { startChat } from "../chat.ts";
 import { ircLink, type Said } from "../irc/link.ts";
 import { PROGRESS_TABLES } from "../moderation/catchup.ts";
 import { MUTE_TABLES } from "../moderation/mute.ts";
+import { ROOM_STATE } from "../rooms/create.ts";
 import { VERDICT_TABLES } from "../moderation/check.ts";
 import { CATEGORIES, type Answer } from "../moderation/provider.ts";
 import { ROOM_TABLES } from "../rooms/rooms.ts";
@@ -1197,13 +1198,13 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
       });
     };
   let watchers = 0;
-  const TABLES = [LOGIN_TABLES, TICKET_TABLES, ROOM_TABLES, VERDICT_TABLES, PROGRESS_TABLES, MUTE_TABLES];
+  const TABLES = [LOGIN_TABLES, TICKET_TABLES, ROOM_TABLES, VERDICT_TABLES, PROGRESS_TABLES, MUTE_TABLES, ROOM_STATE];
   const MUTE = { strikes: 3, windowMinutes: 10, minutes: 5, max: 50 };
   // The chat as main starts it, on its own database or one a restart shares.
   const chatFor = async (
     e: Ergo,
     asked: string[],
-    more: { db?: DatabaseSync; now?: () => number; tickMs?: number } = {},
+    more: { db?: DatabaseSync; now?: () => number; tickMs?: number; lines?: string[] } = {},
   ) => {
     const db = more.db ?? openDatabase(":memory:", TABLES);
     const chat = startChat(
@@ -1214,7 +1215,7 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
         moderation: { openaiKey: undefined, thresholds: {}, newAccountHours: 24, mute: MUTE },
       },
       {
-        log: logger("a-pepper-of-forty-characters-0123456789", () => true),
+        log: logger("a-pepper-of-forty-characters-0123456789", (line) => more.lines?.push(line) ?? 0),
         pepper: "a-pepper-of-forty-characters-0123456789",
         provider: provider(asked),
         ...(more.now === undefined ? {} : { now: more.now }),
@@ -1237,7 +1238,7 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     const ids = z.array(z.object({ msgid: z.string() }));
     const verdicts = () =>
       ids.parse(db.prepare("SELECT msgid FROM verdicts ORDER BY msgid").all()).map(({ msgid }) => msgid);
-    return { db, verdicts, stop: chat.stop };
+    return { db, verdicts, stop: chat.stop, chat };
   };
 
   it("hides the flagged message by its own id for everyone in the room, its author an address, a clean one kept", async () => {
@@ -1343,5 +1344,84 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     await expect.poll(() => verdicts().length).toBe(3);
     await sync(alice);
     expect(alice.lines().filter((line) => line.includes(` REDACT #bubble ${fixed}`))).toEqual([]);
+  });
+
+  it("makes a moderator's room in Ergo: an account speaks there, a guest reads, a plain account makes none (3l)", async () => {
+    const e = await start();
+    const { chat } = await chatFor(e, []);
+    expect(chat.rooms.create("bubble", "garden")).toEqual({ made: "#bubble/garden" });
+    const alice = await login(e, "alice");
+    for (;;) {
+      alice.send("NAMES #bubble/garden");
+      const names = await alice.expect(/ (353|366) \S+ (= )?#bubble\/garden /);
+      if (names.includes(" 353 ") && names.includes("gnoworld")) break;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    await join(alice, "#bubble/garden");
+    await say(alice, "#bubble/garden", "hello garden");
+    const gus = await guest(e, "gus");
+    await join(gus, "#bubble/garden");
+    gus.send("PRIVMSG #bubble/garden :hello from a guest");
+    await gus.expect(/ 404 gus #bubble\/garden :Cannot send to channel \(\+M\)/);
+    alice.send("JOIN #bubble/sneaky");
+    await alice.expect(/ 403 alice #bubble\/sneaky :Only server operators can create new channels/);
+  });
+
+  it("makes a room again that Ergo lost, with its modes, and raises the alert for one it did not make (3l)", async () => {
+    const e = await start();
+    const db = openDatabase(":memory:", TABLES);
+    db.prepare("INSERT INTO rooms (name, world, created_at) VALUES ('#bubble/garden', 'bubble', 0)").run();
+    const chief = await oper(e, "chief");
+    await join(chief, "#rogue");
+    const lines: string[] = [];
+    await chatFor(e, [], { db, lines });
+    stops.push(() => {
+      db.close();
+      return Promise.resolve();
+    });
+    const gus = await guest(e, "gus");
+    await join(gus, "#bubble/garden");
+    gus.send("MODE #bubble/garden");
+    await gus.expect(/ 324 gus #bubble\/garden \+\S*M/);
+    await expect.poll(() => lines.filter((line) => line.includes('"unknown_room"'))).toHaveLength(1);
+  });
+
+  it("archives a room in Ergo: no one speaks there, a plain list leaves it out, a restart keeps both (3l)", async () => {
+    const e = await start();
+    const db = openDatabase(":memory:", TABLES);
+    const first = await chatFor(e, [], { db });
+    first.chat.rooms.create("bubble", "garden");
+    const alice = await login(e, "alice");
+    for (;;) {
+      alice.send("NAMES #bubble/garden");
+      const names = await alice.expect(/ (353|366) \S+ (= )?#bubble\/garden /);
+      if (names.includes(" 353 ") && names.includes("gnoworld")) break;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    await join(alice, "#bubble/garden");
+    await say(alice, "#bubble/garden", "before");
+    expect(first.chat.rooms.archive("bubble", "garden")).toBe("archived");
+    await alice.expect(/ MODE #bubble\/garden \+s/);
+    alice.send("PRIVMSG #bubble/garden :after");
+    await alice.expect(/ 404 alice #bubble\/garden :Cannot send to channel \(\+m\)/);
+    const gus = await guest(e, "gus");
+    const listed = async (): Promise<string> => {
+      gus.send("LIST");
+      await gus.expect(/ 323 /);
+      return gus.lines().join("\n");
+    };
+    expect(await listed()).not.toContain("#bubble/garden");
+    await first.stop();
+    const chief = await oper(e, "chief");
+    chief.send("SAMODE #bubble/garden -ms");
+    await alice.expect(/ MODE #bubble\/garden -ms/);
+    await chatFor(e, [], { db });
+    stops.push(() => {
+      db.close();
+      return Promise.resolve();
+    });
+    await alice.expect(/ MODE #bubble\/garden \+s/);
+    alice.send("PRIVMSG #bubble/garden :still archived");
+    await alice.expect(/ 404 alice #bubble\/garden :Cannot send to channel \(\+m\)/);
   });
 });

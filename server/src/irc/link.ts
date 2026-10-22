@@ -30,6 +30,8 @@ interface Options {
   drained?: () => Promise<void>;
   // Each time it is in its rooms again (3k: the mutes put back).
   onReady?: () => void;
+  // Ergo's channels, listed each time it is in its rooms (3l: a channel the server did not make).
+  onChannels?: (names: readonly string[]) => void;
 }
 
 // Half of a check's per-account queue, so a page never fills it with a live line waiting (3j).
@@ -45,6 +47,10 @@ interface State {
   batches: Map<string, { room: string; lines: number; last: string }>;
   // The time each room's history was last asked after, so a page that makes no progress is passed.
   after: Map<string, string>;
+  // The rooms joined by send since this connection began, taken as joined once Ergo says so (3l).
+  asked: Set<string>;
+  // The channels of a LIST under way, 10,000 at most.
+  channels: string[] | undefined;
 }
 
 // A server's longest line: 8191 bytes of tags with the @ and the space, 510 more, then CR LF.
@@ -58,7 +64,7 @@ export function retryDelay(attempt: number, random: () => number = Math.random):
 // The lines Ergo sends that ask for an answer, as 3b's table found them.
 function reader(options: Options, state: State) {
   const { password, rooms, onMessage, log, lastChecked = () => undefined, onReady = () => undefined } = options;
-  const { drained = () => Promise.resolve() } = options;
+  const { drained = () => Promise.resolve(), onChannels } = options;
   // Ergo answers AFTER a msgid it no longer holds (a line hidden by REDACT) with nothing, and AFTER a
   // time from the next millisecond on (irc/history/history.go:171-175, irc/handlers.go:940, v2.19.1).
   const history = (s: Socket, room: string, after: string): void => {
@@ -89,7 +95,23 @@ function reader(options: Options, state: State) {
         if (last !== undefined) history(s, room, earlier(last));
       }
       onReady();
+      if (onChannels !== undefined) {
+        state.channels = [];
+        s.write(line("LIST", []));
+      }
       log("irc_ready");
+    },
+    "322": (_, { params: [, name] }) => {
+      if (name?.startsWith("#") === true && state.channels !== undefined && state.channels.length < 10_000) {
+        state.channels.push(name);
+      }
+    },
+    "323": () => {
+      if (state.channels !== undefined) onChannels?.(state.channels);
+      state.channels = undefined;
+    },
+    JOIN: (_, { source, params: [room = ""] }) => {
+      if (source?.split("!")[0] === NICK && state.asked.has(room)) state.joined.add(room);
     },
     BATCH: (s, { params: [ref = "", kind, room = ""] }) => {
       if (ref.startsWith("+") && kind === "chathistory") state.batches.set(ref.slice(1), { room, lines: 0, last: "" });
@@ -138,6 +160,16 @@ function reader(options: Options, state: State) {
   };
 }
 
+const fresh = (): State => ({
+  attempt: 0,
+  joined: new Set(),
+  ready: false,
+  batches: new Map(),
+  after: new Map(),
+  asked: new Set(),
+  channels: undefined,
+});
+
 export function ircLink(options: Options): Link {
   const { host, port, log, retryMs = (attempt) => retryDelay(attempt), pingMs = 30_000 } = options;
   let socket: Socket | undefined;
@@ -145,7 +177,7 @@ export function ircLink(options: Options): Link {
   let retry: ReturnType<typeof setTimeout> | undefined;
   // The backoff starts again from a second only after a minute up: Ergo taking the link in, then
   // dropping it at once, keeps it waiting longer.
-  const state: State = { attempt: 0, joined: new Set(), ready: false, batches: new Map(), after: new Map() };
+  const state = fresh();
   const read = reader(options, state);
   const open = (): void => {
     const s = connect(port, host);
@@ -192,6 +224,8 @@ export function ircLink(options: Options): Link {
       clearInterval(watchdog);
       state.ready = false;
       state.batches.clear();
+      state.asked.clear();
+      state.channels = undefined;
       if (stopped) return;
       log("irc_closed");
       if (state.upSince !== undefined && Date.now() - state.upSince >= 60_000) state.attempt = 0;
@@ -210,6 +244,7 @@ export function ircLink(options: Options): Link {
       // formatLine refuses a line that would break in two; nothing of it is sent.
       try {
         s.write(line(command, params));
+        if (command === "JOIN") state.asked.add(params[0] ?? "");
         return true;
       } catch {
         return false;

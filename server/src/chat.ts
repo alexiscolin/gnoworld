@@ -19,11 +19,14 @@ import { makeQueue } from "./moderation/queue.ts";
 import { makeStrike } from "./moderation/strikes.ts";
 import type { Rules } from "./roles/roles.ts";
 import { ensureRooms, listRooms, roomWorld, worldRooms } from "./rooms/rooms.ts";
+import { makeRooms, type Rooms } from "./rooms/create.ts";
 import { makeStream, type Stream } from "./stream/stream.ts";
 
 export interface Chat {
   activity: Hono;
   stream: Hono;
+  // The moderators' rooms (3l), made and archived through the link.
+  rooms: Rooms;
   stop: () => Promise<void>;
 }
 
@@ -81,13 +84,15 @@ function moderate({ db, check, send, stream, progress, strike }: Steps): (said: 
   };
 }
 
-export function startChat(db: DatabaseSync, settings: Settings, options: Options): Chat {
-  const { worlds, ergo, moderation } = settings;
+// A world's rooms at most, its main room aside (3l).
+const ROOMS_PER_WORLD = 20;
+
+// The check of each line: its world's rules, then OpenAI when a key is set, or the alert that none is.
+function checkerFor(db: DatabaseSync, { worlds, moderation }: Settings, options: Options): Steps["check"] {
   const { log, pepper, now = Date.now } = options;
-  ensureRooms(db, [...worlds.keys()], now());
   const key = moderation.openaiKey;
   if (key === undefined && options.provider === undefined) log("alert", { error: "moderation_off" });
-  const check = makeChecker({
+  return makeChecker({
     db,
     rulesOf: (room) => worlds.get(roomWorld(db, room) ?? "")?.rules,
     provider: options.provider ?? (key === undefined ? undefined : moderationClient({ key: key.reveal(), log })),
@@ -97,6 +102,21 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
     now,
     newAccountMs: moderation.newAccountHours * 60 * 60_000,
   });
+}
+
+// A channel in Ergo the server did not make: with operator-only-creation, an operator made it (3l).
+const unknownChannels =
+  (db: DatabaseSync, log: Log) =>
+  (names: readonly string[]): void => {
+    const known = new Set(listRooms(db).map(({ name }) => name));
+    for (const room of names) if (!known.has(room)) log("alert", { error: "unknown_room", room });
+  };
+
+export function startChat(db: DatabaseSync, settings: Settings, options: Options): Chat {
+  const { worlds, ergo, moderation } = settings;
+  const { log, pepper, now = Date.now } = options;
+  ensureRooms(db, [...worlds.keys()], now());
+  const check = checkerFor(db, settings, options);
   const stream = makeStream();
   const progress = makeProgress(db);
   const send = (command: Command, params: readonly string[]): boolean => link?.send(command, params) ?? false;
@@ -111,6 +131,13 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
   });
   const strike = makeStrike(db, { pepper, now, mute, mutes, spared: settings.spared ?? (() => false) });
   const queue = makeQueue<Said>({ run: moderate({ db, check, send, stream, progress, strike }), log, now });
+  const keeper = makeRooms({ db, send, now, max: ROOMS_PER_WORLD });
+  // A room made while a mute lasts gets it too.
+  const create: Rooms["create"] = (world, name) => {
+    const made = keeper.create(world, name);
+    if (typeof made !== "string") mutes.reapply();
+    return made;
+  };
   const lifts = setInterval(mutes.tick, options.tickMs ?? 10_000);
   const activity = makeActivity();
   const link: Link | undefined =
@@ -121,7 +148,11 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
           rooms: () => listRooms(db).map(({ name }) => name),
           lastChecked: progress.last,
           drained: () => queue.idle(),
-          onReady: mutes.reapply,
+          onReady: () => {
+            mutes.reapply();
+            keeper.reapply();
+          },
+          onChannels: unknownChannels(db, log),
           onMessage: (said) => {
             activity.count(said.room, said.account, now());
             progress.heard(said);
@@ -133,6 +164,7 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
   return {
     activity: activityRoutes(activity, { db, now }),
     stream: stream.routes({ proxy: settings.trustedProxy }),
+    rooms: { ...keeper, create },
     stop: async () => {
       clearInterval(lifts);
       // Nothing more starts once stopping: a line left waiting is caught up at the next start.

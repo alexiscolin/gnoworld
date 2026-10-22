@@ -223,6 +223,50 @@ describe("the server's process", () => {
     expect(index).toEqual([{ name: "verdicts_by_account" }]);
   });
 
+  it("makes and archives a room over the real process, for the team of its roles file, and no stranger (3l)", async () => {
+    const origin = "http://gnoworld.test";
+    const [lead, stranger] = [wallet(), wallet()];
+    const roles = join(folder("gnoworld-roles-"), "roles.json");
+    const rules = { bannedWords: [], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
+    writeFileSync(
+      roles,
+      JSON.stringify({ team: [lead.address], trusted: [], worlds: [{ slug: "bubble", moderators: [], rules }] }),
+    );
+    const port = await listening(start({ ...settings(), ORIGINS: origin, ROLES_FILE: roles }));
+    const posted = (path: string, body: unknown, { cookie = "", method = "POST" } = {}): Promise<Response> =>
+      fetch(`http://127.0.0.1:${String(port)}${path}`, {
+        method,
+        headers: { origin, "content-type": "application/json", ...(cookie === "" ? {} : { cookie }) },
+        body: JSON.stringify(body),
+      });
+    const session = async (who: ReturnType<typeof wallet>): Promise<string> => {
+      const made = Challenge.parse(await (await posted("/api/login/challenge", { chainId: "onyx-1" })).json());
+      const proof = who.sign("onyx-1", made.text);
+      const verified = await posted("/api/login/verify", { nonce: made.nonce, address: who.address, proof });
+      return (verified.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
+    };
+    const [leads, strangers] = [await session(lead), await session(stranger)];
+    const room = { world: "bubble", name: "garden" };
+    expect((await posted("/api/rooms", room)).status).toBe(401);
+    expect((await posted("/api/rooms", room, { cookie: strangers })).status).toBe(403);
+    const made = await posted("/api/rooms", room, { cookie: leads });
+    expect([made.status, await made.json()]).toEqual([201, { room: "#bubble/garden" }]);
+    expect((await posted("/api/rooms", room, { cookie: leads })).status).toBe(400);
+    expect((await posted("/api/rooms/bubble/garden", undefined, { cookie: strangers, method: "DELETE" })).status).toBe(
+      403,
+    );
+    expect((await posted("/api/rooms/bubble/garden", undefined, { cookie: leads, method: "DELETE" })).status).toBe(204);
+    const rooms = await (await fetch(`http://127.0.0.1:${String(port)}/api/activity?worlds=bubble`)).text();
+    expect(rooms).toContain('"room":"#bubble/garden"');
+    expect((await posted("/api/rooms", room)).status).toBe(401);
+    const foreign = await fetch(`http://127.0.0.1:${String(port)}/api/rooms`, {
+      method: "POST",
+      headers: { origin: "https://evil.test", "content-type": "application/json", cookie: leads },
+      body: JSON.stringify({ world: "bubble", name: "pond" }),
+    });
+    expect(foreign.status).toBe(403);
+  });
+
   it("answers the rooms of the roles file's worlds, made at boot, with no Ergo set", async () => {
     const port = await listening(start(settings()));
     const answer = await fetch(`http://127.0.0.1:${String(port)}/api/activity?worlds=earth,bubble`);
