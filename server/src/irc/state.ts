@@ -41,7 +41,9 @@ export function roomStates(timeoutMs: number): States {
       const [, account] = /^([^!@*?]+)!\*@\*$/.exec(mask) ?? [];
       if (state.invites.length < MAX) state.invites.push(account ?? mask);
     },
+    // Before its 324, a NAMES answers the bot's own JOIN, written just before the question (F579).
     "353": (state, [, , , names = ""]) => {
+      if (state.flags === undefined) return;
       for (const name of names.split(" ")) {
         const [, powers = "", nick = ""] = /^([~&@%+]*)(.*)$/s.exec(name) ?? [];
         if (/^[^\s,\0-\x1f\x7f]+$/.test(nick) && state.present.length < MAX) state.present.push({ nick, powers });
@@ -49,7 +51,7 @@ export function roomStates(timeoutMs: number): States {
     },
     "366": (state) => {
       const { flags, invites, present } = state;
-      done(state, flags === undefined ? undefined : { flags, invites, present });
+      if (flags !== undefined) done(state, { flags, invites, present });
     },
     "403": (state) => {
       done(state, undefined);

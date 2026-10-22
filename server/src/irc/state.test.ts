@@ -90,6 +90,30 @@ describe("a room's state as the link reads it", () => {
     expect(await flagless).toBeUndefined();
   });
 
+  it("reads a room's state from its MODE's answer on, past the NAMES of the bot's own JOIN before it (F579)", async () => {
+    vi.useFakeTimers();
+    const states = roomStates(1000);
+    const asked = states.ask(silent, "#a");
+    // The JOIN, written just before the question, is answered first.
+    hear(states, ":e 353 gnoworld = #a :~@gnoworld", ":e 366 gnoworld #a :End");
+    hear(
+      states,
+      ":e 324 gnoworld #a +M",
+      ":e 346 gnoworld #a g1a!*@* gnoworld 1",
+      ":e 347 gnoworld #a :End",
+      ":e 353 gnoworld = #a :~@gnoworld +g1a",
+      ":e 366 gnoworld #a :End",
+    );
+    expect(await asked).toEqual({
+      flags: "M",
+      invites: ["g1a"],
+      present: [
+        { nick: "gnoworld", powers: "~@" },
+        { nick: "g1a", powers: "+" },
+      ],
+    });
+  });
+
   it("keeps 10,000 invites and 10,000 people of a room at most, the first ones (F568)", async () => {
     vi.useFakeTimers();
     const states = roomStates(1000);
