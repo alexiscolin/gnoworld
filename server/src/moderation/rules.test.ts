@@ -63,6 +63,19 @@ describe("the rules' banned words as the file writes them", () => {
   });
 });
 
+describe("the rules' banned words in scripts written without spaces", () => {
+  it("finds a word of Chinese, Japanese or Thai inside a sentence, and nothing it does not hold", () => {
+    const rules = { ...RULES, bannedWords: ["广告", "スパム", "โฆษณา"] };
+    const texts = ["这是广告内容", "これはスパムです", "นี่คือโฆษณานะ", "这是内容"];
+    expect(texts.map((text) => ruleVerdict(text, rules, OLD))).toEqual([
+      "banned_word",
+      "banned_word",
+      "banned_word",
+      undefined,
+    ]);
+  });
+});
+
 describe("the rules' links and mentions", () => {
   it("allows the links a message may carry, and hides one more", () => {
     expect(ruleVerdict(links(3), RULES, OLD)).toBeUndefined();

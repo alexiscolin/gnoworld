@@ -12,15 +12,23 @@ const fold = (text: string): string =>
     .replace(/[\p{M}\p{Cf}]/gu, "")
     .toLowerCase();
 
-// All the words in one pass over the line: a pass a word grew with both (the complexity review, F530).
+// All the words in one pass over the line: a pass a word grew with both (the complexity review, F530). A
+// word of a script written without spaces has no edge to find: it matches anywhere (F521).
 function banned(folded: string, words: readonly string[]): boolean {
-  const escaped = words
+  const unspaced = /[\p{sc=Han}\p{sc=Hiragana}\p{sc=Katakana}\p{sc=Thai}\p{sc=Lao}\p{sc=Khmer}\p{sc=Myanmar}]/u;
+  const plain = words
     .map((word) => fold(word).trim())
     // A word that folds to nothing would match everywhere.
-    .filter((word) => word !== "")
-    .map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+"));
-  if (escaped.length === 0) return false;
-  return new RegExp(`(?:^|[^\\p{L}\\p{N}])(?:${escaped.join("|")})(?:$|[^\\p{L}\\p{N}])`, "u").test(folded);
+    .filter((word) => word !== "");
+  const escape = (list: string[]): string =>
+    list.map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+")).join("|");
+  const whole = plain.filter((word) => !unspaced.test(word));
+  const inside = plain.filter((word) => unspaced.test(word));
+  const patterns = [
+    ...(whole.length > 0 ? [`(?:^|[^\\p{L}\\p{N}])(?:${escape(whole)})(?:$|[^\\p{L}\\p{N}])`] : []),
+    ...(inside.length > 0 ? [escape(inside)] : []),
+  ];
+  return patterns.length > 0 && new RegExp(patterns.join("|"), "u").test(folded);
 }
 
 export function ruleVerdict(
