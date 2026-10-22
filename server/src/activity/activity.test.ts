@@ -85,6 +85,12 @@ describe("activity", () => {
     const activity = makeActivity();
     for (let n = 0; n < 150_000; n += 1) activity.count("#bubble", `account-${String(n)}`, T0);
     for (let n = 0; n < 20_000; n += 1) activity.count(`#room-${String(n)}`, `r${String(n)}`, T0 + MINUTE);
-    expect(activity.size()).toEqual({ accounts: 100_000, rooms: 10_000 });
+    expect(activity.size()).toEqual({ accounts: 100_000, rooms: 10_000, minutes: 10_000 });
+  });
+
+  it("keeps a room's last five minutes alone, however many minutes it has counted", () => {
+    const activity = makeActivity();
+    for (let n = 0; n < 1000; n += 1) activity.count("#bubble", `a${String(n)}`, T0 + n * MINUTE);
+    expect(activity.size().minutes).toBeLessThanOrEqual(5);
   });
 });

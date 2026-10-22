@@ -6,7 +6,8 @@ import { limiter } from "../limit.ts";
 export interface Activity {
   count: (room: string, account: string, now: number) => void;
   rates: (rooms: readonly string[], now: number) => Map<string, number>;
-  size: () => { accounts: number; rooms: number };
+  // What it holds: accounts, rooms, and the minutes counted across rooms.
+  size: () => { accounts: number; rooms: number; minutes: number };
 }
 
 export function makeActivity(): Activity {
@@ -40,6 +41,10 @@ export function makeActivity(): Activity {
         }),
       );
     },
-    size: () => ({ accounts: accounts.size(), rooms: rooms.size }),
+    size: () => ({
+      accounts: accounts.size(),
+      rooms: rooms.size,
+      minutes: [...rooms.values()].reduce((held, minutes) => held + minutes.size, 0),
+    }),
   };
 }
