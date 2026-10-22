@@ -171,6 +171,14 @@ export const join = async (c: Raw, channel: string): Promise<void> => {
   await c.expect(new RegExp(` 366 \\S+ ${channel} `));
 };
 
+// A room set to let accounts alone speak (+M), or not, then read back from its modes: Ergo's default since 3e,
+// so the setting itself may change nothing and Ergo says nothing of it.
+export const moderated = async (c: Raw, room: string, on: boolean): Promise<void> => {
+  c.send(`SAMODE ${room} ${on ? "+M" : "-M"}`);
+  c.send(`MODE ${room}`);
+  await c.expect(new RegExp(` 324 \\S+ ${room} \\+${on ? "\\S*M" : "[^M\\s]*(\\s|$)"}`));
+};
+
 // An oper (who may create a channel) sits in #lobby.
 export const lobby = async (e: Ergo): Promise<Raw> => {
   const chief = await oper(e, "chief");

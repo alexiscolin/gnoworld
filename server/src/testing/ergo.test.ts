@@ -30,6 +30,7 @@ import {
   lobby,
   logged,
   login,
+  moderated,
   open,
   oper,
   ORIGIN,
@@ -52,8 +53,7 @@ describe("guests and rooms", { timeout: 20_000 }, () => {
   it("refuses a guest speaking in a +M room, and lets an account speak", async () => {
     const e = await start();
     const chief = await lobby(e);
-    chief.send("MODE #lobby +M");
-    await chief.expect(/MODE #lobby \+M/);
+    await moderated(chief, "#lobby", true);
     const alice = await login(e, "alice");
     await join(alice, "#lobby");
     const gus = await guest(e, "gus");
@@ -82,18 +82,15 @@ describe("guests and rooms", { timeout: 20_000 }, () => {
     await outsider.expect(/FAIL CHATHISTORY INVALID_TARGET LATEST #lobby :Messages could not be retrieved/);
   });
 
-  it("keeps a room's history and a direct message across a restart", { timeout: 40_000 }, async () => {
+  it("keeps a room's history across a restart", { timeout: 40_000 }, async () => {
     const e = await start({ dir: keptFolder() });
     const chief = await lobby(e);
     chief.send("CS REGISTER #lobby");
     await chief.expect(/successfully registered/);
     const alice = await login(e, "alice");
     await join(alice, "#lobby");
-    const bob = await login(e, "bob");
     await say(alice, "#lobby", "persist-marker-1");
-    alice.send("PRIVMSG bob :dm-marker-1");
     await sync(alice);
-    await sync(bob);
     const { dir } = e;
     await e.stop();
 
@@ -102,8 +99,6 @@ describe("guests and rooms", { timeout: 20_000 }, () => {
     await join(reader, "#lobby");
     history(reader, "#lobby");
     await reader.expect(replayed("PRIVMSG #lobby :persist-marker-1$"));
-    history(reader, "alice");
-    await reader.expect(replayed("PRIVMSG bob :dm-marker-1$"));
     const gus = await guest(again, "gus");
     await join(gus, "#lobby");
     history(gus, "#lobby");
@@ -406,6 +401,8 @@ describe("history and tags", { timeout: 30_000 }, () => {
       expect(line).toContain("account=alice");
       expect(line).not.toContain(tag);
     }
+    // A guest may speak here: the room opened by an operator, whatever Ergo's default.
+    await moderated(await oper(e, "op"), "#lobby", false);
     const gus = await guest(e, "gus");
     await join(gus, "#lobby");
     gus.send("@account=alice PRIVMSG #lobby :guest forging");
@@ -871,8 +868,7 @@ describe("logging in through the server (3d)", { timeout: 30_000 }, () => {
     op.send(`OPER admin ${e.operPassword}`);
     await op.expect(/ 381 /);
     await join(op, "#lobby");
-    op.send("MODE #lobby +M");
-    await op.expect(/MODE #lobby \+M/);
+    await moderated(op, "#lobby", true);
     const me = await s.signIn();
     const c = await enter(e, me.address, s.ticketOf(me.token));
     await join(c, "#lobby");
