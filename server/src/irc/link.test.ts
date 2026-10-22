@@ -773,6 +773,20 @@ describe("the IRC link's catch-up (3j)", () => {
     expect(await peer.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(T(48))} 50`);
   });
 
+  it("goes on past a full page in one millisecond, rather than ask it again forever", async () => {
+    const ergo = await fakeErgo();
+    start(ergo.port, { lastChecked: (room) => (room === "#bubble" ? T(5) : undefined) });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    expect(await peer.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(T(5))} 50`);
+    page(
+      peer,
+      "a",
+      Array.from({ length: 50 }, (_, n) => ({ id: `s${String(n)}`, time: T(5) })),
+    );
+    expect(await peer.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${T(5)} 50`);
+  });
+
   it("asks no further page after a full page whose lines carry no time", async () => {
     const ergo = await fakeErgo();
     start(ergo.port, { lastChecked: (room) => (room === "#bubble" ? T(0) : undefined) });
