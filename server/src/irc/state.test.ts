@@ -46,4 +46,34 @@ describe("a room's state as the link reads it", () => {
     states.drop();
     expect(await later).toBeUndefined();
   });
+
+  it("gives up on a question at its own time, never at an earlier answered one's (F567)", async () => {
+    vi.useFakeTimers();
+    const states = roomStates(1000);
+    const first = states.ask(silent, "#a");
+    hear(states, ":e 324 gnoworld #a +M", ":e 366 gnoworld #a :End");
+    expect((await first)?.flags).toBe("M");
+    vi.advanceTimersByTime(500);
+    const second = states.ask(silent, "#a");
+    // Past the first question's time, before the second's.
+    vi.advanceTimersByTime(600);
+    hear(states, ":e 324 gnoworld #a +Mi", ":e 366 gnoworld #a :End");
+    expect((await second)?.flags).toBe("Mi");
+  });
+
+  it("asks a room once while a question about it is under way, and gives both askers its answer (F567)", async () => {
+    vi.useFakeTimers();
+    const states = roomStates(1000);
+    const written: string[] = [];
+    const write = (command: string, params: readonly string[]): void => {
+      written.push([command, ...params].join(" "));
+    };
+    const [a, b] = [states.ask(write, "#a"), states.ask(write, "#a")];
+    expect(written).toEqual(["MODE #a", "SAMODE #a I", "NAMES #a"]);
+    hear(states, ":e 324 gnoworld #a +M", ":e 366 gnoworld #a :End");
+    expect([await a, await b]).toEqual([
+      { flags: "M", invites: [], present: [] },
+      { flags: "M", invites: [], present: [] },
+    ]);
+  });
 });
