@@ -65,6 +65,15 @@ describe("loadConfig", () => {
     });
   });
 
+  it("reads the socket Ergo's auth script dials, an absolute path a socket can hold; none by default", () => {
+    expect(loadConfig(ENV).authSocket).toBeUndefined();
+    expect(loadConfig({ ...ENV, AUTH_SOCKET: "/run/gnoworld/auth.sock" }).authSocket).toBe("/run/gnoworld/auth.sock");
+    expect(loadConfig({ ...ENV, AUTH_SOCKET: `/${"s".repeat(99)}` }).authSocket).toBe(`/${"s".repeat(99)}`);
+    for (const path of ["", "run/auth.sock", `/${"s".repeat(100)}`]) {
+      expect(failure({ ...ENV, AUTH_SOCKET: path })).toMatch(/setting AUTH_SOCKET: /);
+    }
+  });
+
   it("reads every setting it is given", () => {
     expect(
       loadConfig({ ...ENV, HOST: "0.0.0.0", PORT: "9000", TRUSTED_PROXY: "10.0.0.2", ROLES_FILE: "/etc/roles.json" }),

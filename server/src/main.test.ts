@@ -1,12 +1,12 @@
 import { spawn, spawnSync, type ChildProcessByStdio } from "node:child_process";
 import { once } from "node:events";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
-import { Challenge } from "@gnoworld/schemas";
+import { Challenge, Ticket } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it } from "vitest";
 import { wallet } from "./testing/signer.ts";
 
@@ -134,6 +134,40 @@ describe("the server's process", () => {
     for (const path of ["/admin", "/api/admin", "/api/login/admin"]) {
       expect((await fetch(`http://127.0.0.1:${String(port)}${path}`)).status).toBe(404);
     }
+  });
+
+  it("mints a ticket for Ergo over the real process, for the cookie's account", async () => {
+    const origin = "http://gnoworld.test";
+    const port = await listening(start({ ...settings(), ORIGINS: origin }));
+    const posted = (path: string, body: unknown, cookie = ""): Promise<Response> =>
+      fetch(`http://127.0.0.1:${String(port)}/api/login/${path}`, {
+        method: "POST",
+        headers: { origin, "content-type": "application/json", ...(cookie === "" ? {} : { cookie }) },
+        body: JSON.stringify(body),
+      });
+    const who = wallet();
+    const made = Challenge.parse(await (await posted("challenge", { chainId: "onyx-1" })).json());
+    const verified = await posted("verify", {
+      nonce: made.nonce,
+      address: who.address,
+      proof: who.sign("onyx-1", made.text),
+    });
+    const cookie = (verified.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
+    const minted = await posted("ticket", {}, cookie);
+    expect(minted.status).toBe(200);
+    expect(Ticket.parse(await minted.json()).ticket).toMatch(/^[A-Za-z0-9_-]{43}$/);
+  });
+
+  it("stops at boot when it cannot serve Ergo's socket, naming the setting and leaving a file there as it was", async () => {
+    const dir = folder("gnoworld-socket-");
+    const taken = join(dir, "taken");
+    writeFileSync(taken, "not a socket");
+    for (const path of [join(dir, "missing", "auth.sock"), taken]) {
+      const server = start({ ...settings(), AUTH_SOCKET: path });
+      expect(await exited(server)).not.toBe(0);
+      expect(server.out.stderr).toContain("AUTH_SOCKET");
+    }
+    expect(readFileSync(taken, "utf8")).toBe("not a socket");
   });
 
   it("takes the login's chains and its new accounts an hour from its settings", async () => {

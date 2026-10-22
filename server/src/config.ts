@@ -15,6 +15,7 @@ export interface Config {
   chains: string[];
   origins: string[];
   newAccountsPerHour: number;
+  authSocket: string | undefined;
 }
 
 // An origin as a browser sends it: scheme, host and port, nothing else (an Origin header compares to it).
@@ -60,6 +61,11 @@ const Env = z.object({
     .transform(Number)
     .pipe(z.number().max(1000))
     .default(5),
+  // The socket Ergo's auth script dials (3d): an absolute path, within what a socket's address holds.
+  AUTH_SOCKET: z
+    .string()
+    .regex(/^\/.{1,99}$/)
+    .optional(),
 });
 
 export function loadConfig(env: Record<string, string | undefined>): Config {
@@ -71,6 +77,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
   }
   const { HOST, PORT, DATABASE, TRUSTED_PROXY, LOG_PEPPER_FILE, ROLES_FILE, CHAINS, ORIGINS, NEW_ACCOUNTS_PER_HOUR } =
     parsed.data;
+  const { AUTH_SOCKET } = parsed.data;
   return {
     host: HOST,
     port: PORT,
@@ -81,6 +88,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     chains: CHAINS,
     origins: ORIGINS,
     newAccountsPerHour: NEW_ACCOUNTS_PER_HOUR,
+    authSocket: AUTH_SOCKET,
   };
 }
 

@@ -43,7 +43,7 @@ export interface Login {
 }
 
 const Spent = z.object({ chain: z.string(), text: z.string() });
-const Owner = z.object({ address: Address });
+const Live = z.object({ address: Address, signed_at: z.number(), expires_at: z.number() });
 const Count = z.object({ n: z.number() });
 const sha256 = (token: string): Buffer => createHash("sha256").update(token).digest();
 
@@ -69,9 +69,8 @@ export function makeLogin(db: DatabaseSync, { chains, now, verify = verifyProof,
     addAccount: db.prepare("INSERT INTO accounts (address, first_seen) VALUES (?, ?)"),
     purgeTokens: db.prepare("DELETE FROM tokens WHERE expires_at <= ?"),
     addToken: db.prepare("INSERT INTO tokens (hash, address, signed_at, expires_at) VALUES (?, ?, ?, ?)"),
-    renew: db.prepare(
-      "UPDATE tokens SET expires_at = min(? + ?, signed_at + ?) WHERE hash = ? AND expires_at > ? RETURNING address",
-    ),
+    live: db.prepare("SELECT address, signed_at, expires_at FROM tokens WHERE hash = ? AND expires_at > ?"),
+    renew: db.prepare("UPDATE tokens SET expires_at = ? WHERE hash = ?"),
     end: db.prepare("DELETE FROM tokens WHERE hash = ?"),
     // An account keeps its newest tokens only: logins nobody uses would otherwise fill the disk (F435).
     keepNewest: db.prepare(
@@ -127,9 +126,14 @@ export function makeLogin(db: DatabaseSync, { chains, now, verify = verifyProof,
 
     session(token) {
       if (token === undefined) return undefined;
-      const at = now();
-      const row = sql.renew.get(at, sliding, cap, sha256(token), at);
-      return row === undefined ? undefined : Owner.parse(row).address;
+      const [at, hash] = [now(), sha256(token)];
+      const row = sql.live.get(hash, at);
+      if (row === undefined) return undefined;
+      const { address, signed_at: signed, expires_at: expires } = Live.parse(row);
+      // One write a minute at most per token: a stream of uses, a ticket per reconnect, costs one.
+      const renewed = Math.min(at + sliding, signed + cap);
+      if (renewed - expires >= 60_000) sql.renew.run(renewed, hash);
+      return address;
     },
 
     logout(token) {

@@ -35,3 +35,8 @@ export type VerifyRequest = z.infer<typeof VerifyRequest>;
 
 export const Me = z.object({ address: Address });
 export type Me = z.infer<typeof Me>;
+
+// A ticket for Ergo is asked with an empty body: the cookie names the account.
+export const TicketRequest = z.strictObject({});
+export const Ticket = z.object({ ticket: z.string() });
+export type Ticket = z.infer<typeof Ticket>;

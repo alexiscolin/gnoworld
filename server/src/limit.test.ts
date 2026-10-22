@@ -24,6 +24,18 @@ describe("limiter", () => {
     );
   });
 
+  it("says a key is full once its window holds `max` calls, without counting the question", () => {
+    const limit = limiter({ max: 2, windowMs: WINDOW, keys: 10 });
+    expect([limit.full("a", 0), limit.full("a", 0)]).toEqual([false, false]);
+    limit.take("a", 0);
+    expect(limit.full("a", 10)).toBe(false);
+    limit.take("a", 10);
+    expect([limit.full("a", 20), limit.full("a", WINDOW - 1), limit.full("b", 20)]).toEqual([true, true, false]);
+    expect(limit.full("a", WINDOW)).toBe(false);
+    expect(limit.take("a", WINDOW)).toBe(true);
+    expect(limit.size()).toBe(1);
+  });
+
   it("gives a key its calls again once its window is over, not before", () => {
     const limit = limiter({ max: 2, windowMs: WINDOW, keys: 10 });
     expect([limit.take("a", 0), limit.take("a", 10), limit.take("a", 20)]).toEqual([true, true, false]);
