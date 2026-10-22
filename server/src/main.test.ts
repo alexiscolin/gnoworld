@@ -253,6 +253,24 @@ describe("the server's process", () => {
     expect((await fetch(`http://127.0.0.1:${String(port)}/health`)).status).toBe(200);
   });
 
+  it("serves the verdicts' stream, counting visitors by the trusted proxy, and ends it on SIGTERM (3j)", async () => {
+    const server = start({ ...settings(), TRUSTED_PROXY: "127.0.0.1" });
+    const port = await listening(server);
+    const follow = (visitor: string) =>
+      fetch(`http://127.0.0.1:${String(port)}/api/stream?rooms=%23bubble`, { headers: { "x-real-ip": visitor } });
+    const open = [];
+    for (let i = 0; i < 4; i++) open.push(await follow("192.0.2.1"));
+    expect(open.map(({ status, headers }) => [status, headers.get("content-type")])).toEqual(
+      Array.from({ length: 4 }, () => [200, "text/event-stream"]),
+    );
+    expect((await follow("192.0.2.1")).status).toBe(429);
+    const other = await follow("192.0.2.2");
+    expect(other.status).toBe(200);
+    server.child.kill("SIGTERM");
+    expect(await exited(server)).toBe(0);
+    expect((await other.body?.getReader().read())?.done).toBe(true);
+  });
+
   it("drains on SIGTERM: a request already begun is answered, then the process exits 0", async () => {
     const server = start(settings());
     const port = await listening(server);

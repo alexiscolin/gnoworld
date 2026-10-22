@@ -70,6 +70,11 @@ function withBreaker(
   };
 }
 
+/** A hide that could not be done: the line is checked again when it comes back (3j). */
+export function checkAgain(db: DatabaseSync, msgid: string): void {
+  db.prepare("UPDATE verdicts SET action = 'unchecked' WHERE msgid = ?").run(msgid);
+}
+
 export function makeChecker(options: Options): (said: Said) => Promise<Verdict | "seen"> {
   const { db, rulesOf, provider, thresholds, pepper, log, now = Date.now, newAccountMs = 24 * 60 * 60_000 } = options;
   const sql = {
@@ -83,6 +88,8 @@ export function makeChecker(options: Options): (said: Said) => Promise<Verdict |
     firstSeen: db.prepare("SELECT first_seen FROM accounts WHERE address = ?"),
   };
   const FirstSeen = z.object({ first_seen: z.number() }).optional();
+  // A line a stopped process left pending is checked again when it comes back (one process: 3a's lock).
+  db.prepare("UPDATE verdicts SET action = 'unchecked' WHERE action = 'pending'").run();
   const ask = provider === undefined ? undefined : withBreaker(provider, { now, log });
   return async ({ room, account, msgid, text }) => {
     const at = now();

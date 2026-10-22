@@ -8,7 +8,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Address } from "@gnoworld/schemas";
 import { z } from "zod";
 import { authServer } from "../ergo/auth.ts";
+import { startChat } from "../chat.ts";
 import { ircLink, type Said } from "../irc/link.ts";
+import { PROGRESS_TABLES } from "../moderation/catchup.ts";
+import { VERDICT_TABLES } from "../moderation/check.ts";
+import { CATEGORIES, type Answer } from "../moderation/provider.ts";
+import { ROOM_TABLES } from "../rooms/rooms.ts";
 import { openDatabase } from "../db.ts";
 import { logger } from "../log.ts";
 import { LOGIN_TABLES, makeLogin, NONCE_HOST } from "../login/login.ts";
@@ -1171,5 +1176,95 @@ describe("the server's IRC link (3h)", { timeout: 40_000 }, () => {
     const again = await start({ dir, ports: [first.port, first.wsPort], operPassword: first.operPassword });
     // An operator holds its rooms as their op: Ergo shows it with an @.
     expect(await inRoom(await guest(again, "gus2"), "#bubble")).toMatch(/ :(.* )?@gnoworld\b/);
+  });
+});
+
+describe("the bot acts (3j)", { timeout: 40_000 }, () => {
+  const RULES = { bannedWords: [], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
+  const nothing = Object.fromEntries(CATEGORIES.map((c) => [c, 0]));
+  const unflagged = Object.fromEntries(CATEGORIES.map((c) => [c, false]));
+  // A provider that flags violence in any text saying "hurt", and records what it was asked.
+  const provider =
+    (asked: string[]) =>
+    (text: string): Promise<Answer> => {
+      asked.push(text);
+      const hurt = text.includes("hurt");
+      return Promise.resolve({
+        flagged: { ...unflagged, violence: hurt } as Answer["flagged"],
+        scores: { ...nothing, violence: hurt ? 0.99 : 0 } as Answer["scores"],
+      });
+    };
+  const chatFor = async (e: Ergo, asked: string[]) => {
+    const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES, ROOM_TABLES, VERDICT_TABLES, PROGRESS_TABLES]);
+    const chat = startChat(
+      db,
+      {
+        worlds: new Map([["bubble", { rules: RULES }]]),
+        ergo: { host: "127.0.0.1", port: e.port, password: e.operPassword },
+        moderation: { openaiKey: undefined, thresholds: {}, newAccountHours: 24 },
+      },
+      {
+        log: logger("a-pepper-of-forty-characters-0123456789", () => true),
+        pepper: "a-pepper-of-forty-characters-0123456789",
+        provider: provider(asked),
+      },
+    );
+    stops.push(async () => {
+      await chat.stop();
+      db.close();
+    });
+    const watcher = await guest(e, "watcher");
+    for (;;) {
+      watcher.send("NAMES #bubble");
+      const names = await watcher.expect(/ (353|366) \S+ (= )?#bubble /);
+      if (names.includes(" 353 ") && names.includes("gnoworld")) break;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    const ids = z.array(z.object({ msgid: z.string() }));
+    const verdicts = () =>
+      ids.parse(db.prepare("SELECT msgid FROM verdicts ORDER BY msgid").all()).map(({ msgid }) => msgid);
+    return { db, verdicts };
+  };
+
+  it("hides the flagged message by its own id for everyone in the room, its author an address, a clean one kept", async () => {
+    const e = await start();
+    const { verdicts } = await chatFor(e, []);
+    const author = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+    const alice = await login(e, author);
+    await join(alice, "#bubble");
+    const bob = await login(e, "bob");
+    await join(bob, "#bubble");
+    const clean = await say(alice, "#bubble", "hello");
+    const flagged = await say(alice, "#bubble", "I will hurt you");
+    await bob.expect(new RegExp(` REDACT #bubble ${flagged} violence`));
+    await alice.expect(
+      new RegExp(
+        `NOTICE ${author} :Your message in #bubble was hidden: violence\\. The rules: https://gno\\.world/rules`,
+      ),
+    );
+    await expect.poll(() => verdicts().length).toBe(2);
+    await sync(bob);
+    expect(bob.lines().filter((line) => line.includes(` REDACT #bubble ${clean}`))).toEqual([]);
+  });
+
+  it("checks what it missed while its link was down, each message once, after a mark Ergo has erased", async () => {
+    const e = await start();
+    const asked: string[] = [];
+    const { verdicts } = await chatFor(e, asked);
+    const alice = await login(e, "alice");
+    await join(alice, "#bubble");
+    // The mark is a hidden line, which the REDACT takes out of Ergo's history.
+    const hidden = await say(alice, "#bubble", "I will hurt you");
+    await alice.expect(new RegExp(` REDACT #bubble ${hidden} `));
+    await expect.poll(() => verdicts().length).toBe(1);
+    const chief = await oper(e, "chief");
+    chief.send("KILL gnoworld :a test outage");
+    await alice.expect(/:gnoworld!\S+ QUIT /);
+    for (const text of ["one", "two", "three"]) alice.send(`PRIVMSG #bubble :${text}`);
+    await sync(alice);
+    await expect.poll(() => asked.toSorted(), { timeout: 15_000 }).toEqual(["I will hurt you", "one", "three", "two"]);
+    expect(verdicts()).toHaveLength(4);
+    await sync(alice);
+    expect(asked).toHaveLength(4);
   });
 });

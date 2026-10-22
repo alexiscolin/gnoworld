@@ -10,6 +10,7 @@ import { loadConfig } from "./config.ts";
 import { openDatabase } from "./db.ts";
 import { logger } from "./log.ts";
 import { LOGIN_TABLES } from "./login/login.ts";
+import { PROGRESS_TABLES } from "./moderation/catchup.ts";
 import { VERDICT_TABLES } from "./moderation/check.ts";
 import type { Answer } from "./moderation/provider.ts";
 import type { Rules } from "./roles/roles.ts";
@@ -39,7 +40,7 @@ const setup = (
   settings: Parameters<typeof startChat>[1],
   { now, provider }: { now?: () => number; provider?: (text: string) => Promise<Answer | "unchecked"> } = {},
 ) => {
-  const db = openDatabase(":memory:", [LOGIN_TABLES, ROOM_TABLES, VERDICT_TABLES]);
+  const db = openDatabase(":memory:", [LOGIN_TABLES, ROOM_TABLES, VERDICT_TABLES, PROGRESS_TABLES]);
   const options = {
     log,
     pepper: PEPPER,
@@ -49,9 +50,10 @@ const setup = (
   const chat = startChat(db, settings, options);
   started.push({ db, chat });
   const app = makeApp(log, () => true);
-  app.route("/api/activity", chat.routes);
+  app.route("/api/activity", chat.activity);
+  app.route("/api/stream", chat.stream);
   const rooms = async (worlds: string) => (await app.request(`/api/activity?worlds=${worlds}`)).text();
-  return { db, rooms };
+  return { db, rooms, app };
 };
 
 describe("the chat, as the server starts it", () => {
@@ -138,7 +140,7 @@ describe("the chat, as the server starts it", () => {
     const Verdicts = z.array(z.object({ msgid: z.string(), action: z.string(), reason: z.string().nullable() }));
     const verdicts = () =>
       Verdicts.parse(chat.db.prepare("SELECT msgid, action, reason FROM verdicts ORDER BY msgid").all());
-    return { ...chat, peer, verdicts };
+    return { ...chat, peer, verdicts, ergo };
   };
 
   it("applies each world's own rules to its own room", async () => {
@@ -315,6 +317,303 @@ describe("the chat, as the server starts it", () => {
       peer.say(message("account=g1a;msgid=m1", "a!u@h", ["#gone", "hello"]));
       await expect.poll(() => verdictsOf(db)).toEqual([{ msgid: "m1", action: "unchecked", reason: "unknown_room" }]);
       expect(asked).toEqual([]);
+    });
+  });
+
+  describe("acting and streaming (3j)", () => {
+    const T = (ms: number) => new Date(Date.parse("2026-10-22T08:00:00.000Z") + ms).toISOString();
+    const before = (ms: number) => T(ms - 1);
+    // A room's line as Ergo relays it live, with its time.
+    const line = (id: string, ms: number, [account, text]: readonly [string, string]) =>
+      message(`account=${account};msgid=${id};time=${T(ms)}`, `${account}!u@h`, ["#bubble", text]);
+    const flags = (text: string): Answer => ({
+      flagged: { ...OFF_ANSWER.flagged, violence: text.includes("hurt") },
+      scores: { ...OFF_ANSWER.scores, violence: text.includes("hurt") ? 0.99 : 0 },
+    });
+    // A gate a provider's answers wait on, opened by the test.
+    const gate = () => {
+      let open = (): void => undefined;
+      const opened = new Promise<void>((resolve) => {
+        open = resolve;
+      });
+      return { opened, open };
+    };
+    // The verdicts' stream of #bubble as a page reads it, through the chat's own route.
+    const follow = async (
+      app: { request: ReturnType<typeof makeApp>["request"] },
+      more: { peer?: string; realIp?: string } = {},
+    ) => {
+      const response = await app.request(
+        "/api/stream?rooms=%23bubble",
+        { headers: more.realIp === undefined ? {} : { "x-real-ip": more.realIp } },
+        { incoming: { socket: { remoteAddress: more.peer ?? "203.0.113.7" } } },
+      );
+      const reader: ReadableStreamDefaultReader<Uint8Array> | undefined = response.body?.getReader();
+      let text = "";
+      const read = async (count: number): Promise<unknown[]> => {
+        for (;;) {
+          const data = [...text.matchAll(/data: (.*)\n/g)].map(([, json = ""]) => JSON.parse(json) as unknown);
+          if (data.length >= count) return data;
+          const chunk = await reader?.read();
+          if (chunk === undefined || chunk.done) return data;
+          text += new TextDecoder().decode(chunk.value);
+        }
+      };
+      return { response, read };
+    };
+    const sent = (peer: { lines: string[] }) => peer.lines.filter((l) => /^(REDACT|NOTICE) /.test(l));
+    const settle = async (peer: { say: (l: string) => void; next: (p: RegExp) => Promise<string> }) => {
+      peer.say("PING :settled");
+      await peer.next(/^PONG settled$/);
+    };
+    // The link dropped and back: the second connection, welcomed.
+    const reconnect = async (peer: { socket: { destroy: () => void } }, ergo: Awaited<ReturnType<typeof fakeErgo>>) => {
+      peer.socket.destroy();
+      const again = await ergo.peer(1);
+      await welcome(again);
+      return again;
+    };
+
+    it("hides a flagged line in Ergo, tells its author why, and streams each verdict, checked or hidden", async () => {
+      const { app, peer } = await linked(
+        { worlds: worlds("bubble"), moderation: OFF },
+        { provider: (text) => Promise.resolve(flags(text)) },
+      );
+      const page = await follow(app);
+      peer.say(line("m1", 1, ["g1author", "I will hurt you"]));
+      peer.say(line("m2", 2, ["g1author", "sorry"]));
+      expect(await peer.next(/^REDACT /)).toBe("REDACT #bubble m1 violence");
+      expect(await peer.next(/^NOTICE /)).toBe(
+        "NOTICE g1author :Your message in #bubble was hidden: violence. The rules: https://gno.world/rules",
+      );
+      expect(await page.read(2)).toEqual([
+        { msgid: "m1", room: "#bubble", state: "hidden" },
+        { msgid: "m2", room: "#bubble", state: "checked" },
+      ]);
+    });
+
+    it("hides on a world's rule without asking the provider, in the rule's own words", async () => {
+      const asked: string[] = [];
+      const { app, peer } = await linked(
+        { worlds: worlds("bubble"), moderation: OFF },
+        {
+          provider: (text) => {
+            asked.push(text);
+            return Promise.resolve(OFF_ANSWER);
+          },
+        },
+      );
+      const page = await follow(app);
+      peer.say(line("m1", 1, ["g1a", "buy spam"]));
+      expect(await peer.next(/^REDACT /)).toBe("REDACT #bubble m1 :a word this world bans");
+      expect(await peer.next(/^NOTICE /)).toBe(
+        "NOTICE g1a :Your message in #bubble was hidden: a word this world bans. The rules: https://gno.world/rules",
+      );
+      expect(await page.read(1)).toEqual([{ msgid: "m1", room: "#bubble", state: "hidden" }]);
+      expect(asked).toEqual([]);
+    });
+
+    it("streams nothing for an unchecked line, and nothing for a line before its verdict", async () => {
+      const slow = gate();
+      const { app, peer } = await linked(
+        { worlds: worlds("bubble"), moderation: OFF },
+        {
+          provider: async (text) => {
+            if (text === "down") return "unchecked";
+            if (text === "slow") await slow.opened;
+            return OFF_ANSWER;
+          },
+        },
+      );
+      const page = await follow(app);
+      peer.say(line("m1", 1, ["g1a", "down"]));
+      peer.say(line("m2", 2, ["g1b", "slow"]));
+      peer.say(line("m3", 3, ["g1c", "fine"]));
+      expect(await page.read(1)).toEqual([{ msgid: "m3", room: "#bubble", state: "checked" }]);
+      slow.open();
+      expect(await page.read(2)).toEqual([
+        { msgid: "m3", room: "#bubble", state: "checked" },
+        { msgid: "m2", room: "#bubble", state: "checked" },
+      ]);
+      expect(sent(peer)).toEqual([]);
+    });
+
+    it("pairs each hide with its own line and author, answers coming back in reverse", async () => {
+      const slow = gate();
+      const { peer } = await linked(
+        { worlds: worlds("bubble"), moderation: OFF },
+        {
+          provider: async (text) => {
+            if (text.includes("slow")) await slow.opened;
+            return flags(text);
+          },
+        },
+      );
+      peer.say(line("m1", 1, ["g1a", "slow hurt"]));
+      peer.say(line("m2", 2, ["g1b", "hurt"]));
+      expect(await peer.next(/^NOTICE /)).toMatch(/^NOTICE g1b /);
+      slow.open();
+      expect(await peer.next(/^NOTICE /)).toMatch(/^NOTICE g1a /);
+      expect(sent(peer).filter((l) => l.startsWith("REDACT"))).toEqual([
+        "REDACT #bubble m2 violence",
+        "REDACT #bubble m1 violence",
+      ]);
+    });
+
+    it("acts once on a line it hears twice, live then in a catch-up page", async () => {
+      const { app, peer, ergo } = await linked(
+        { worlds: worlds("bubble"), moderation: OFF },
+        { provider: (text) => Promise.resolve(flags(text)) },
+      );
+      peer.say(line("m1", 1, ["g1a", "hurt"]));
+      await peer.next(/^NOTICE /);
+      const again = await reconnect(peer, ergo);
+      expect(await again.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(1)} 50`);
+      again.say(":ergo.test BATCH +a chathistory #bubble");
+      again.say(`@batch=a;account=g1a;msgid=m1;time=${T(1)} :g1a!u@h PRIVMSG #bubble :hurt`);
+      again.say(":ergo.test BATCH -a");
+      again.say(line("m2", 2, ["g1b", "fine"]));
+      await settle(again);
+      const page = await follow(app);
+      expect(await page.read(2)).toEqual([
+        { msgid: "m1", room: "#bubble", state: "hidden" },
+        { msgid: "m2", room: "#bubble", state: "checked" },
+      ]);
+      expect([...sent(peer), ...sent(again)].filter((l) => l.startsWith("REDACT"))).toEqual([
+        "REDACT #bubble m1 violence",
+      ]);
+    });
+
+    it("hides, once the link is back, a line flagged while it was down", async () => {
+      const late = gate();
+      let calls = 0;
+      const { peer, ergo } = await linked(
+        { worlds: worlds("bubble"), moderation: OFF },
+        {
+          provider: async (text) => {
+            calls += 1;
+            if (calls === 1) await late.opened;
+            return flags(text);
+          },
+        },
+      );
+      peer.say(line("m1", 1, ["g1a", "hurt"]));
+      await expect.poll(() => calls).toBe(1);
+      peer.socket.destroy();
+      await expect.poll(() => logged.some((l) => l.includes('"irc_closed"'))).toBe(true);
+      late.open();
+      const again = await ergo.peer(1);
+      await welcome(again);
+      expect(await again.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(1)} 50`);
+      again.say(":ergo.test BATCH +a chathistory #bubble");
+      again.say(`@batch=a;account=g1a;msgid=m1;time=${T(1)} :g1a!u@h PRIVMSG #bubble :hurt`);
+      again.say(":ergo.test BATCH -a");
+      expect(await again.next(/^REDACT /)).toBe("REDACT #bubble m1 violence");
+      expect(await again.next(/^NOTICE /)).toMatch(/^NOTICE g1a /);
+      expect(sent(peer)).toEqual([]);
+    });
+
+    it("asks what it missed after a reconnect, from just before the last line it checked", async () => {
+      const { peer, verdicts, ergo } = await linked(
+        { worlds: worlds("bubble"), moderation: OFF },
+        { provider: () => Promise.resolve(OFF_ANSWER) },
+      );
+      peer.say(line("m7", 7, ["g1a", "hello"]));
+      await expect.poll(verdicts).toEqual([{ msgid: "m7", action: "pass", reason: null }]);
+      const again = await reconnect(peer, ergo);
+      expect(await again.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(7)} 50`);
+    });
+
+    it("moves its mark past an unchecked line: a provider's outage is not caught up", async () => {
+      const { peer, verdicts, ergo } = await linked(
+        { worlds: worlds("bubble"), moderation: OFF },
+        { provider: (text) => Promise.resolve(text === "down" ? "unchecked" : OFF_ANSWER) },
+      );
+      peer.say(line("m1", 1, ["g1a", "down"]));
+      peer.say(line("m2", 2, ["g1b", "fine"]));
+      await expect.poll(() => verdicts().length).toBe(2);
+      const again = await reconnect(peer, ergo);
+      expect(await again.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(2)} 50`);
+    });
+
+    it("asks again from before a line still being checked, never past it", async () => {
+      const slow = gate();
+      const { peer, verdicts, ergo } = await linked(
+        { worlds: worlds("bubble"), moderation: OFF },
+        {
+          provider: async (text) => {
+            if (text === "slow") await slow.opened;
+            return OFF_ANSWER;
+          },
+        },
+      );
+      peer.say(line("m1", 1, ["g1a", "first"]));
+      await expect.poll(verdicts).toEqual([{ msgid: "m1", action: "pass", reason: null }]);
+      peer.say(line("m2", 2, ["g1b", "slow"]));
+      peer.say(line("m3", 3, ["g1c", "third"]));
+      await expect.poll(verdicts).toContainEqual({ msgid: "m3", action: "pass", reason: null });
+      const again = await reconnect(peer, ergo);
+      expect(await again.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(1)} 50`);
+      slow.open();
+    });
+
+    it("checks 300 missed lines of one account page by page, none dropped", async () => {
+      const { peer, verdicts, ergo } = await linked(
+        { worlds: worlds("bubble"), moderation: OFF },
+        { provider: () => Promise.resolve(OFF_ANSWER) },
+      );
+      peer.say(line("m0", 0, ["g1a", "before"]));
+      await expect.poll(() => verdicts().length).toBe(1);
+      const again = await reconnect(peer, ergo);
+      for (let p = 0; p <= 6; p += 1) {
+        await again.next(/^CHATHISTORY /);
+        again.say(`:ergo.test BATCH +p${String(p)} chathistory #bubble`);
+        for (let n = 0; n < (p < 6 ? 50 : 0); n += 1) {
+          const ms = 1 + p * 50 + n;
+          again.say(
+            `@batch=p${String(p)};account=g1a;msgid=x${String(ms)};time=${T(ms)} :g1a!u@h PRIVMSG #bubble :line`,
+          );
+        }
+        again.say(`:ergo.test BATCH -p${String(p)}`);
+      }
+      await expect.poll(() => verdicts().length, { timeout: 10_000 }).toBe(301);
+      expect(logged.filter((l) => l.includes("moderation_account_full"))).toEqual([]);
+    });
+
+    it("moves its mark past a line the full queue refuses, with the log saying so", async () => {
+      const held = gate();
+      const { peer, verdicts, ergo } = await linked(
+        { worlds: worlds("bubble"), moderation: OFF },
+        {
+          provider: async () => {
+            await held.opened;
+            return OFF_ANSWER;
+          },
+        },
+      );
+      for (let n = 1; n <= 105; n += 1) peer.say(line(`m${String(n)}`, n, ["g1a", "flood"]));
+      await expect.poll(() => logged.some((l) => l.includes("moderation_account_full"))).toBe(true);
+      held.open();
+      await expect.poll(() => verdicts().filter(({ action }) => action === "pass").length).toBe(104);
+      const again = await reconnect(peer, ergo);
+      expect(await again.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(105)} 50`);
+    });
+
+    it("counts the stream's visitors by the proxy's X-Real-IP when TRUSTED_PROXY is the peer", async () => {
+      const { app } = setup({ worlds: worlds("bubble"), moderation: OFF, ergo: undefined, trustedProxy: "10.0.0.2" });
+      for (const realIp of ["192.0.2.1", "192.0.2.2"]) {
+        for (let n = 0; n < 4; n += 1) {
+          expect((await follow(app, { peer: "10.0.0.2", realIp })).response.status).toBe(200);
+        }
+      }
+      expect((await follow(app, { peer: "10.0.0.2", realIp: "192.0.2.1" })).response.status).toBe(429);
+    });
+
+    it("ends an open stream when it stops, so the server's drain is not held", async () => {
+      const { app } = setup({ worlds: worlds("bubble"), moderation: OFF, ergo: undefined });
+      const page = await follow(app);
+      await started.at(-1)?.chat.stop();
+      expect(await page.read(1)).toEqual([]);
     });
   });
 });

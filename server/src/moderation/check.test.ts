@@ -7,7 +7,7 @@ import { openDatabase } from "../db.ts";
 import { logger } from "../log.ts";
 import { LOGIN_TABLES } from "../login/login.ts";
 import type { Rules } from "../roles/roles.ts";
-import { makeChecker, VERDICT_TABLES } from "./check.ts";
+import { checkAgain, makeChecker, VERDICT_TABLES } from "./check.ts";
 import { answer } from "../testing/answers.ts";
 import type { Answer } from "./provider.ts";
 
@@ -153,6 +153,36 @@ describe("checking a message", () => {
     expect(await check(said("hit"))).toEqual({ action: "hide", reason: "violence" });
     expect(await check(said("hit"))).toBe("seen");
     expect(asked).toEqual(["hit", "hit"]);
+  });
+
+  it("checks again a message a stopped process left pending, as the next start finds it", async () => {
+    const { db, check, asked, rows } = setup(() => new Promise<Answer>(() => undefined));
+    const stuck = check(said("hi"));
+    await expect.poll(() => rows().map(({ action }) => action)).toEqual(["pending"]);
+    expect(asked).toEqual(["hi"]);
+    const restarted = makeChecker({
+      db,
+      rulesOf: () => RULES,
+      provider: (text) => {
+        asked.push(text);
+        return Promise.resolve(answer());
+      },
+      thresholds: {},
+      pepper: PEPPER,
+      log: logger(PEPPER, () => true),
+    });
+    expect(await restarted(said("hi"))).toEqual({ action: "pass" });
+    expect(asked).toEqual(["hi", "hi"]);
+    expect(await Promise.race([stuck, Promise.resolve("waiting")])).toBe("waiting");
+  });
+
+  it("checks again a hidden message whose hide could not be done, when it comes back", async () => {
+    const { db, check, rows } = setup(() => Promise.resolve(answer()));
+    expect(await check(said("buy spam"))).toEqual({ action: "hide", reason: "banned_word" });
+    checkAgain(db, "m1");
+    expect(rows().map(({ action }) => action)).toEqual(["unchecked"]);
+    expect(await check(said("buy spam"))).toEqual({ action: "hide", reason: "banned_word" });
+    expect(await check(said("buy spam"))).toBe("seen");
   });
 
   it("gives a new account fewer links, 24 hours from its first login, not a minute more", async () => {
