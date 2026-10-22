@@ -1,11 +1,9 @@
 // In Claude Code's sandbox Chromium runs as one process (playwright.config.ts), where closing a
 // context ends the browser, so each test gets a browser of its own; elsewhere, Playwright's own.
-import { test as base, type Page } from "@playwright/test";
+import { expect, test as base, type Page } from "@playwright/test";
 import { WORLDS, worldPath } from "../../src/worlds.ts";
 
-import { expect } from "@playwright/test";
-
-export { expect, type Page } from "@playwright/test";
+export { expect, type Page };
 
 declare const process: { env: Record<string, string | undefined> };
 // Playwright hands a screenshot as Node's Buffer, whose types this folder leaves out, as process's.
@@ -27,6 +25,15 @@ const ownBrowser = base.extend({
 
 const FLUSH = "https://flush.invalid/";
 const MARK = "csp-violation";
+
+// A violation reaches the test as a task: one planted last, once seen, says every earlier one came.
+async function flush(page: Page, seen: string[]): Promise<void> {
+  await page.evaluate((url) => {
+    new Image().src = url;
+  }, FLUSH);
+  await expect.poll(() => seen.at(-1), { message: "the page's policy reported the flush" }).toBe("flush");
+  seen.pop();
+}
 
 // Every journey runs under the site's CSP: a violation no test planted fails it (slice 3's plan, 3f).
 // The directives a page's documents reported, written to its console, which outlives a navigation.
@@ -64,15 +71,7 @@ export const test = (process.env["SANDBOX_RUNTIME"] ? ownBrowser : base).extend<
         [MARK, FLUSH],
       );
       await use(seen);
-      // A violation reaches the test as a task: one planted last, once seen, says every earlier one came.
-      for (const each of javaScriptEnabled ? policed : []) {
-        if (each.isClosed()) continue;
-        await each.evaluate((flush) => {
-          new Image().src = flush;
-        }, FLUSH);
-        await expect.poll(() => seen.at(-1), { message: "the page's policy reported the flush" }).toBe("flush");
-        seen.pop();
-      }
+      for (const each of javaScriptEnabled ? policed : []) if (!each.isClosed()) await flush(each, seen);
       if (!planted) expect(seen, "a CSP violation no test planted").toEqual([]);
     },
     { auto: true },
