@@ -121,6 +121,15 @@ describe("the server's process", () => {
     expect(await exit).toBe(0);
   });
 
+  it("drains on SIGINT as on SIGTERM, and exits 0", async () => {
+    const server = start(settings());
+    await listening(server);
+    const exit = exited(server);
+    server.child.kill("SIGINT");
+    await until(() => server.out.stdout.includes('"event":"stopping"'));
+    expect(await exit).toBe(0);
+  });
+
   it("exits 0 at once on SIGTERM when its only client is an idle kept-alive connection", async () => {
     const server = start(settings());
     const port = await listening(server);

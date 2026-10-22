@@ -23,10 +23,14 @@ const server = await listen(
 const address = server.address();
 log("listening", { port: typeof address === "object" && address !== null ? address.port : config.port });
 
-process.once("SIGTERM", () => {
+// SIGTERM from the container's runtime, SIGINT from a terminal: one drain, however many arrive.
+const drain = (): void => {
+  if (draining) return;
   draining = true;
   log("stopping");
   stop(server, () => {
     db.close();
   });
-});
+};
+process.on("SIGTERM", drain);
+process.on("SIGINT", drain);
