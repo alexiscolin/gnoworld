@@ -36,7 +36,8 @@ function migrate(db: DatabaseSync, migrations: readonly string[]): void {
     if (migrations.length > done) db.exec(`PRAGMA user_version = ${String(migrations.length)}`);
     db.exec("COMMIT");
   } catch (error) {
-    db.exec("ROLLBACK");
+    // A migration that ended the transaction itself leaves none: its own error is the one to see.
+    if (db.isTransaction) db.exec("ROLLBACK");
     throw error;
   }
 }

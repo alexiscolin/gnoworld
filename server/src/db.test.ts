@@ -65,6 +65,13 @@ describe("openDatabase", () => {
     db.close();
   });
 
+  it("keeps a migration's own error when the migration ended the transaction itself", () => {
+    const path = fresh();
+    expect(() => openDatabase(path, ["CREATE TABLE early (id INTEGER) STRICT; COMMIT; CREATE TABLE broken ("])).toThrow(
+      /incomplete input/,
+    );
+  });
+
   it("holds the file alone: a second opening is refused until the first closes", () => {
     const path = fresh();
     const first = openDatabase(path, []);
