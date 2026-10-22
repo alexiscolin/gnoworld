@@ -12,25 +12,15 @@ const fold = (text: string): string =>
     .replace(/[\p{M}\p{Cf}]/gu, "")
     .toLowerCase();
 
-// Each world's words compiled once, by the list the roles file gave: a line costs a test per word.
-const compiled = new WeakMap<readonly string[], RegExp[]>();
-
-function patterns(words: readonly string[]): RegExp[] {
-  const known = compiled.get(words);
-  if (known !== undefined) return known;
-  const made = words.flatMap((word) => {
+function banned(folded: string, words: readonly string[]): boolean {
+  return words.some((word) => {
     const plain = fold(word).trim();
     // A word that folds to nothing would match everywhere.
-    if (plain === "") return [];
+    if (plain === "") return false;
     const escaped = plain.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
-    return [new RegExp(`(?:^|[^\\p{L}\\p{N}])${escaped}(?:$|[^\\p{L}\\p{N}])`, "u")];
+    return new RegExp(`(?:^|[^\\p{L}\\p{N}])${escaped}(?:$|[^\\p{L}\\p{N}])`, "u").test(folded);
   });
-  compiled.set(words, made);
-  return made;
 }
-
-const banned = (folded: string, words: readonly string[]): boolean =>
-  patterns(words).some((pattern) => pattern.test(folded));
 
 export function ruleVerdict(
   text: string,
