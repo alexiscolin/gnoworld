@@ -49,6 +49,12 @@ describe("logger", () => {
     expect(accounts[3]).not.toBe(accounts[0]);
   });
 
+  it("writes a duration in milliseconds as a number", () => {
+    const { log, lines } = capture();
+    log("moderation_backlog", { ms: 30_000 });
+    expect(Line.parse(JSON.parse(lines[0] ?? ""))).toMatchObject({ event: "moderation_backlog", ms: 30_000 });
+  });
+
   it("writes only its own fields, whatever an object passed in carries", () => {
     const { log, lines } = capture();
     const request = { route: "/login", token: "planted-token", ticket: "planted-ticket", signature: "planted-sig" };

@@ -1,0 +1,51 @@
+// The check's soak (slice 3's plan, 3i), run by soak.test.ts in a process of its own with --expose-gc:
+// 100,000 messages through the queue and the checker, half from accounts never seen again (addresses are
+// free), a fake provider answering at once, and the heap after a collection at each of 10 checkpoints,
+// printed as JSON. LEAK=1 keeps every message, the control that shows the bound can fail.
+import { openDatabase } from "../db.ts";
+import { logger } from "../log.ts";
+import { LOGIN_TABLES } from "../login/login.ts";
+import { makeChecker, VERDICT_TABLES } from "../moderation/check.ts";
+import { CATEGORIES, type Answer } from "../moderation/provider.ts";
+import { makeQueue } from "../moderation/queue.ts";
+
+const PEPPER = "a-pepper-of-forty-characters-0123456789";
+const log = logger(PEPPER, () => true);
+const db = openDatabase(":memory:", [LOGIN_TABLES, VERDICT_TABLES]);
+const nothing: Answer = {
+  flagged: Object.fromEntries(CATEGORIES.map((c) => [c, false])) as Answer["flagged"],
+  scores: Object.fromEntries(CATEGORIES.map((c) => [c, 0])) as Answer["scores"],
+};
+const check = makeChecker({
+  db,
+  rulesOf: () => ({ bannedWords: ["spam"], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 }),
+  provider: () => Promise.resolve(nothing),
+  thresholds: {},
+  pepper: PEPPER,
+  log,
+});
+const queue = makeQueue({
+  run: async (said: Parameters<typeof check>[0]) => {
+    await check(said);
+  },
+  cap: 20_000,
+  log,
+});
+const gc = Reflect.get(globalThis, "gc") as () => void;
+const heaps: number[] = [];
+const kept: unknown[] = [];
+for (let checkpoint = 0; checkpoint < 10; checkpoint += 1) {
+  for (let n = 0; n < 10_000; n += 1) {
+    const msgid = `m${String(checkpoint)}-${String(n)}`;
+    const account = n % 2 === 0 ? `a${String(n % 500)}` : `fresh-${msgid}`;
+    const said = { room: "#bubble", account, msgid, text: "hi there, a message of some length" };
+    if (process.env["LEAK"] === "1") kept.push(said);
+    queue.push(said);
+  }
+  await queue.idle();
+  gc();
+  heaps.push(process.memoryUsage().heapUsed);
+}
+queue.stop();
+db.close();
+process.stdout.write(JSON.stringify(heaps));

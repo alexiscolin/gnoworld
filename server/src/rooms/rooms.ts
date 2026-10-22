@@ -33,3 +33,9 @@ export function worldRooms(db: DatabaseSync, world: string): string[] {
     ({ name }) => name,
   );
 }
+
+/** The world a room belongs to, or none for a room the server never made. */
+export function roomWorld(db: DatabaseSync, room: string): string | undefined {
+  const World = z.object({ world: z.string() }).optional();
+  return World.parse(db.prepare("SELECT world FROM rooms WHERE name = ?").get(room))?.world;
+}

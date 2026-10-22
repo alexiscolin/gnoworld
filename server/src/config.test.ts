@@ -40,6 +40,7 @@ describe("loadConfig", () => {
       chains: ["onyx-1", "gnoland-1"],
       origins: [],
       newAccountsPerHour: 5,
+      moderation: { openaiKey: undefined, thresholds: {}, newAccountHours: 24 },
     });
   });
 
@@ -131,6 +132,56 @@ describe("loadConfig", () => {
     const error = failure({ ...ENV, ...env });
     expect(error).toMatch(new RegExp(`setting ${setting}: `));
     expect(error).not.toContain("tiny-secret");
+  });
+
+  it("reads the moderation's settings: OpenAI's key from a file, thresholds by category, a new account's hours", () => {
+    expect(loadConfig(ENV).moderation).toEqual({ openaiKey: undefined, thresholds: {}, newAccountHours: 24 });
+    const key = `sk-${"k".repeat(40)}`;
+    const env = {
+      ...ENV,
+      OPENAI_API_KEY_FILE: file("openai", `${key}\n`),
+      MODERATION_THRESHOLDS: '{"harassment":0.9,"sexual/minors":0}',
+      NEW_ACCOUNT_HOURS: "720",
+    };
+    const { openaiKey, ...rest } = loadConfig(env).moderation;
+    expect([openaiKey?.reveal(), rest]).toEqual([
+      key,
+      { thresholds: { harassment: 0.9, "sexual/minors": 0 }, newAccountHours: 720 },
+    ]);
+  });
+
+  it.each([
+    ["OPENAI_API_KEY_FILE", { OPENAI_API_KEY_FILE: "/nonexistent/gnoworld-openai" }],
+    ["OPENAI_API_KEY_FILE", { OPENAI_API_KEY_FILE: file("openai-empty", "") }],
+    ["OPENAI_API_KEY_FILE", { OPENAI_API_KEY_FILE: file("openai-short", "sk-tiny-secret\n") }],
+    ["OPENAI_API_KEY_FILE", { OPENAI_API_KEY_FILE: file("openai-lines", `sk-${"a".repeat(40)}\r\nX-Evil: 1\n`) }],
+    ["MODERATION_THRESHOLDS", { MODERATION_THRESHOLDS: "harassment=0.9" }],
+    ["MODERATION_THRESHOLDS", { MODERATION_THRESHOLDS: '{"new/kind":0.5}' }],
+    ["MODERATION_THRESHOLDS", { MODERATION_THRESHOLDS: '{"harassment":1.01}' }],
+    ["MODERATION_THRESHOLDS", { MODERATION_THRESHOLDS: '{"harassment":-0.1}' }],
+    ["MODERATION_THRESHOLDS", { MODERATION_THRESHOLDS: '{"harassment":"0.9"}' }],
+    ["NEW_ACCOUNT_HOURS", { NEW_ACCOUNT_HOURS: "0" }],
+    ["NEW_ACCOUNT_HOURS", { NEW_ACCOUNT_HOURS: "721" }],
+    ["NEW_ACCOUNT_HOURS", { NEW_ACCOUNT_HOURS: "1.5" }],
+  ])("stops on a bad %s, naming it and never its content", (setting, env) => {
+    const error = failure({ ...ENV, ...env });
+    expect(error).toMatch(new RegExp(`setting ${setting}: `));
+    expect(error).not.toMatch(/sk-|tiny-secret|X-Evil|harassment=/);
+  });
+
+  it("takes a new account's hours from 1, and thresholds of exactly 0 and 1", () => {
+    expect(loadConfig({ ...ENV, NEW_ACCOUNT_HOURS: "1" }).moderation.newAccountHours).toBe(1);
+    expect(loadConfig({ ...ENV, MODERATION_THRESHOLDS: '{"hate":0,"violence":1}' }).moderation.thresholds).toEqual({
+      hate: 0,
+      violence: 1,
+    });
+  });
+
+  it("never shows OpenAI's key when the settings are printed", () => {
+    const key = `sk-${"z".repeat(40)}`;
+    const config = loadConfig({ ...ENV, OPENAI_API_KEY_FILE: file("openai-shown", `${key}\n`) });
+    expect(inspect(config, { depth: 5 })).not.toContain(key);
+    expect(JSON.stringify(config)).not.toContain(key);
   });
 
   it("reads every setting it is given", () => {
