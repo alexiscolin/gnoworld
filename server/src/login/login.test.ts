@@ -551,6 +551,30 @@ describe("the token", () => {
     expect(db.prepare("SELECT count(*) AS n FROM tokens").get()).toEqual({ n: 1 });
   });
 
+  it.each([MINUTE, 0])(
+    "keeps an account's 10 newest tokens, %i ms apart: its 11th login ends the oldest, no other account's",
+    async (apart) => {
+      const { db, clock, login } = setup();
+      const other = await token(login);
+      const me = wallet();
+      const tokens: string[] = [];
+      for (let n = 0; n < 11; n += 1) {
+        clock.now += apart;
+        const made = challenge(login);
+        const proof = me.sign("onyx-1", made.text);
+        const result = await login.verify({ nonce: made.nonce, address: me.address, proof }, anyone);
+        if (typeof result === "string") throw new Error(result);
+        tokens.push(result.token);
+      }
+      expect(db.prepare("SELECT count(*) AS n FROM tokens WHERE address = ?").get(me.address)).toEqual({ n: 10 });
+      expect(tokens.map((made) => login.session(made))).toEqual([
+        undefined,
+        ...Array.from({ length: 10 }, () => me.address),
+      ]);
+      expect(login.session(other.token)).toBe(other.address);
+    },
+  );
+
   it("purges the ended tokens at the next login, and only those", async () => {
     const { db, clock, login } = setup();
     const ended = await token(login);

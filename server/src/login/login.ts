@@ -18,6 +18,7 @@ CREATE TABLE tokens (
   expires_at INTEGER NOT NULL
 ) STRICT;
 CREATE INDEX tokens_by_expiry ON tokens (expires_at);
+CREATE INDEX tokens_by_address ON tokens (address, signed_at);
 `;
 
 interface Expected {
@@ -58,6 +59,7 @@ export function makeLogin(db: DatabaseSync, { chains, now, verify = verifyProof,
   const ttl = 5 * 60_000;
   const day = 24 * 60 * 60_000;
   const [sliding, cap] = [30 * day, 90 * day];
+  const tokensPerAccount = 10;
   const sql = {
     purgeNonces: db.prepare("DELETE FROM nonces WHERE expires_at <= ?"),
     countNonces: db.prepare("SELECT count(*) AS n FROM nonces"),
@@ -71,6 +73,11 @@ export function makeLogin(db: DatabaseSync, { chains, now, verify = verifyProof,
       "UPDATE tokens SET expires_at = min(? + ?, signed_at + ?) WHERE hash = ? AND expires_at > ? RETURNING address",
     ),
     end: db.prepare("DELETE FROM tokens WHERE hash = ?"),
+    // An account keeps its newest tokens only: logins nobody uses would otherwise fill the disk (F435).
+    keepNewest: db.prepare(
+      `DELETE FROM tokens WHERE address = ? AND rowid NOT IN
+        (SELECT rowid FROM tokens WHERE address = ? ORDER BY signed_at DESC, rowid DESC LIMIT ?)`,
+    ),
   };
 
   return {
@@ -113,6 +120,7 @@ export function makeLogin(db: DatabaseSync, { chains, now, verify = verifyProof,
       sql.purgeTokens.run(at);
       const token = randomBytes(32).toString("base64url");
       sql.addToken.run(sha256(token), address, at, at + sliding);
+      sql.keepNewest.run(address, address, tokensPerAccount);
       return { token, maxAge: cap / 1000 };
     },
 
