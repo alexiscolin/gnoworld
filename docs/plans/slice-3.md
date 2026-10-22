@@ -723,6 +723,10 @@ groups (3m); a console (slice 12).
 creation; the cap per world bounds the rooms. **Files.** New: `server/src/rooms/{create, archive}.ts`,
 `packages/schemas/src/rooms.ts`. Tier 2; the check is read whole, by my proposal. No human part.
 
+**As built** (`docs/decisions.md`, 2026-10-22, 3l's shapes): create and archive in one keeper,
+`server/src/rooms/create.ts`, its routes in `routes.ts` (no `archive.ts`); the POST guard moved to
+`server/src/guard.ts`; each ready puts every room's modes back and lists Ergo's channels.
+
 ---
 
 ## 3m. Rooms by role

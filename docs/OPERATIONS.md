@@ -207,6 +207,15 @@ Slice 3, the mute and the edits (3k):
   no strike (F549). The hides that brought a mute still count after it lifts: one more hide within
   the window mutes again.
 
+Slice 3, the moderators' rooms (3l):
+
+- **Who makes rooms.** A world's moderators and the team, through `POST /api/rooms`; 20 rooms a world
+  besides its main one, archived rooms counted; 10 an hour per account. Ergo lets no one else create a
+  channel (`operator-only-creation`).
+- **Archiving** makes a room read-only (`+m`) and unlisted (`+s`); its history keeps its retention.
+  Nothing removes a room: an operator does it by hand in Ergo, then in the `rooms` table.
+- **The alert `unknown_room`** names a channel in Ergo the server did not make: an operator made it.
+
 ## Secrets: rotation and revocation
 
 - **The password:** write a new file with `htpasswd -cB`, then `docker compose ... restart web`.
