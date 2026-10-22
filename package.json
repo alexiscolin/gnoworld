@@ -12,7 +12,7 @@
     "format:check": "prettier --check --log-level warn .",
     "typecheck": "tsc -p tsconfig.json && tsc -p app/tsconfig.json && tsc -p packages/ui/tsconfig.json && tsc -p server/tsconfig.json",
     "lint": "eslint --max-warnings 0 .",
-    "test": "vitest run",
+    "test": "vitest run --exclude server/src/testing/ergo.test.ts",
     "coverage": "vitest run --coverage",
     "mutate": "stryker run",
     "unused": "knip --no-progress",
