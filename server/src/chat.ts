@@ -14,15 +14,15 @@ import type { Log } from "./log.ts";
 import { act } from "./moderation/act.ts";
 import { makeProgress, type Progress } from "./moderation/catchup.ts";
 import { checkAgain, makeChecker, type Verdict } from "./moderation/check.ts";
-import { makeMutes, type Mutes } from "./moderation/mute.ts";
+import { makeMutes } from "./moderation/mute.ts";
 import { moderationClient, type Answer } from "./moderation/provider.ts";
 import { makeQueue } from "./moderation/queue.ts";
 import { makeStrike } from "./moderation/strikes.ts";
-import { makeReconciler } from "./rooms/reconcile.ts";
 import { ensureNamed, ensureRooms, listRooms, roomWorld, worldRooms } from "./rooms/rooms.ts";
 import { makeRooms, type Rooms } from "./rooms/create.ts";
-import { desired, listed, mayRead, publicRoom, staffOf, type World } from "./rooms/types.ts";
+import { listed, mayRead, publicRoom, staffOf, type World } from "./rooms/types.ts";
 import { makeStream, type Stream } from "./stream/stream.ts";
+import { keeping, reconcilerFor, typedRooms } from "./rooms/wire.ts";
 
 export interface Chat {
   activity: Hono;
@@ -120,38 +120,6 @@ const unknownChannels =
     const known = new Set(listRooms(db).map(({ name }) => name));
     for (const room of names) if (!known.has(room)) log("alert", { error: "unknown_room", room });
   };
-
-// The roles file's typed rooms, each with its world (3m).
-const typedRooms = (worlds: Settings["worlds"]) =>
-  [...worlds].flatMap(([world, { rooms }]) => [...(rooms?.keys() ?? [])].map((name) => ({ name, world })));
-
-// Each room kept as its type says (3m), from what Ergo says it is: an archived room read-only and unlisted.
-function reconcilerFor(
-  db: DatabaseSync,
-  settings: Settings,
-  parts: Pick<Parameters<typeof makeReconciler>[0], "send" | "state" | "log"> & { keeper: Rooms },
-) {
-  const { keeper, send, state, log } = parts;
-  return makeReconciler({
-    rooms: () => listRooms(db).map(({ name }) => name),
-    desired: (room) => desired(settings, room, { archived: keeper.archived(room) }),
-    state,
-    send,
-    log,
-  });
-}
-
-// The rooms as the routes make and archive them (3l): a room made gets the live mutes.
-function keeping(keeper: Rooms, mutes: Mutes): Rooms {
-  return {
-    ...keeper,
-    create: (world, name) => {
-      const made = keeper.create(world, name);
-      if (typeof made !== "string") mutes.reapply();
-      return made;
-    },
-  };
-}
 
 export function startChat(db: DatabaseSync, settings: Settings, options: Options): Chat {
   const { worlds, ergo, moderation } = settings;
