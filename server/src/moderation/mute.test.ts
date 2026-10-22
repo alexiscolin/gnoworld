@@ -16,12 +16,13 @@ const setup = (options: { max?: number; db?: DatabaseSync } = {}) => {
   const db = options.db ?? openDatabase(":memory:", [MUTE_TABLES]);
   if (options.db === undefined) opened.push(db);
   const clock = { now: T0 };
-  const link = { up: true };
+  // Down, or refusing a lift in some rooms.
+  const link = { up: true, refused: new Set<string>() };
   const sent: string[] = [];
   const mutes = makeMutes({
     db,
     send: (command, params) => {
-      if (!link.up) return false;
+      if (!link.up || (params[1] === "-b" && link.refused.has(params[0] ?? ""))) return false;
       sent.push([command, ...params].join(" "));
       return true;
     },
@@ -133,27 +134,12 @@ describe("the mute", () => {
 
 describe("the mute, its green pass (3j)", () => {
   it("keeps a mute whose lift failed in one room of its world, and lifts it in all at the next tick", () => {
-    const db = openDatabase(":memory:", [MUTE_TABLES]);
-    opened.push(db);
-    const clock = { now: T0 };
-    const refused = new Set(["#bubble-ops"]);
-    const sent: string[] = [];
-    const mutes = makeMutes({
-      db,
-      send: (command, params) => {
-        if (params[1] === "-b" && refused.has(params[0] ?? "")) return false;
-        sent.push([command, ...params].join(" "));
-        return true;
-      },
-      roomsOf: (world) => ROOMS[world] ?? [],
-      now: () => clock.now,
-      forMs: 5 * MINUTE,
-      max: 50,
-    });
+    const { clock, link, sent, mutes } = setup();
+    link.refused.add("#bubble-ops");
     mutes.mute("g1a", "bubble");
     clock.now += 5 * MINUTE;
     mutes.tick();
-    refused.clear();
+    link.refused.clear();
     mutes.tick();
     expect(sent.filter((line) => line.includes("-b"))).toEqual([
       "SAMODE #bubble -b m:g1a",

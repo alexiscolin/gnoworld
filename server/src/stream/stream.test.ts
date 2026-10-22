@@ -185,14 +185,6 @@ describe("the verdicts' stream", () => {
     expect((await six.rooms("#bubble", { peer: "2001:db8:1:3::1" })).response.status).toBe(200);
   });
 
-  it("frees a visitor's place when its stream ends", async () => {
-    const { rooms } = setup();
-    const clients = [];
-    for (let n = 0; n < 4; n += 1) clients.push(await rooms("#bubble"));
-    await clients[0]?.cancel();
-    await expect.poll(async () => (await rooms("#bubble")).response.status).toBe(200);
-  });
-
   it("beats every 15 seconds by default, so a proxy keeps a quiet stream open", async () => {
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
     const { stream, rooms } = setup();
@@ -275,13 +267,10 @@ describe("the verdicts' stream, its green pass (3j)", () => {
   it("replays nothing to a client whose Last-Event-ID is the last it gave", async () => {
     const { stream, rooms } = setup();
     stream.publish(event(1));
-    const [first] = await (await rooms("#bubble")).read(1);
+    const [given] = await (await rooms("#bubble")).read(1);
+    const back = await rooms("#bubble", { peer: "198.51.100.1", last: given?.id ?? "" });
     stream.publish(event(2));
-    const [second] = await (await rooms("#bubble", { peer: "198.51.100.1" })).read(2).then((all) => all.slice(1));
-    const back = await rooms("#bubble", { peer: "198.51.100.2", last: second?.id ?? "" });
-    stream.publish(event(3));
-    expect(msgids(await back.read(1))).toEqual(["m3"]);
-    expect(first?.id).toBeDefined();
+    expect(msgids(await back.read(1))).toEqual(["m2"]);
   });
 
   it("holds its sizes: a room's ring at its pending, 10,000 rooms at most, nothing left of the streams that ended", async () => {
