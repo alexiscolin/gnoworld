@@ -1,12 +1,15 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { inspect } from "node:util";
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import { loadConfig } from "./config.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "gnoworld-config-"));
+afterAll(() => {
+  rmSync(dir, { recursive: true, force: true });
+});
 const file = (name: string, content: string): string => {
   const path = join(dir, name);
   writeFileSync(path, content);

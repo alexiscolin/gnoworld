@@ -1,6 +1,6 @@
 import { spawn, spawnSync, type ChildProcessByStdio } from "node:child_process";
 import { once } from "node:events";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -21,10 +21,18 @@ const started: Server[] = [];
 
 afterEach(() => {
   for (const { child } of started.splice(0)) child.kill("SIGKILL");
+  for (const dir of folders.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
+const folders: string[] = [];
+const folder = (prefix: string): string => {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  folders.push(dir);
+  return dir;
+};
+
 const settings = (): Record<string, string> => {
-  const dir = mkdtempSync(join(tmpdir(), "gnoworld-main-"));
+  const dir = folder("gnoworld-main-");
   writeFileSync(join(dir, "pepper"), "a-pepper-of-forty-characters-0123456789");
   return { DATABASE: join(dir, "server.db"), LOG_PEPPER_FILE: join(dir, "pepper"), PORT: "0" };
 };
@@ -84,7 +92,7 @@ describe("the server's process", () => {
   });
 
   it("stops at boot on a roles file it cannot read, naming the file and never its content", async () => {
-    const roles = join(mkdtempSync(join(tmpdir(), "gnoworld-roles-")), "roles.json");
+    const roles = join(folder("gnoworld-roles-"), "roles.json");
     writeFileSync(roles, JSON.stringify({ team: ["planted-value"], trusted: [], worlds: [] }));
     const server = start({ ...settings(), ROLES_FILE: roles });
     expect(await exited(server)).not.toBe(0);
@@ -147,7 +155,7 @@ describe("the server's process", () => {
   });
 
   it("stops when a rejection escapes, rather than serving on", async () => {
-    const hook = join(mkdtempSync(join(tmpdir(), "gnoworld-reject-")), "reject.mjs");
+    const hook = join(folder("gnoworld-reject-"), "reject.mjs");
     writeFileSync(hook, 'setTimeout(() => {\n  Promise.reject(new Error("escaped"));\n}, 500);\n');
     const server = start(settings(), [...FLAGS, "--import", hook]);
     expect(await exited(server)).not.toBe(0);

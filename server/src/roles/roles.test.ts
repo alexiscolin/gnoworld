@@ -1,10 +1,10 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { inspect } from "node:util";
 import { Address } from "@gnoworld/schemas";
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import { isTeam, isTrusted, loadRoles, moderates, type Roles } from "./roles.ts";
 
 const TEAM = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
@@ -24,6 +24,9 @@ const FILE = {
 };
 
 const dir = mkdtempSync(join(tmpdir(), "gnoworld-roles-"));
+afterAll(() => {
+  rmSync(dir, { recursive: true, force: true });
+});
 let files = 0;
 const written = (content: string): string => {
   const path = join(dir, `roles-${String((files += 1))}.json`);

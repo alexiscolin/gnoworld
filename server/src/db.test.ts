@@ -1,11 +1,19 @@
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import { openDatabase } from "./db.ts";
 
-const fresh = (): string => join(mkdtempSync(join(tmpdir(), "gnoworld-db-")), "server.db");
+const folders: string[] = [];
+const fresh = (): string => {
+  const dir = mkdtempSync(join(tmpdir(), "gnoworld-db-"));
+  folders.push(dir);
+  return join(dir, "server.db");
+};
+afterAll(() => {
+  for (const dir of folders) rmSync(dir, { recursive: true, force: true });
+});
 const one = (db: DatabaseSync, sql: string): unknown => db.prepare(sql).get();
 const tables = (db: DatabaseSync): unknown =>
   db.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' ORDER BY name").all();
