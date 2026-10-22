@@ -340,6 +340,26 @@ describe("the retention's runs (3n)", () => {
     expect(times()).toHaveLength(1);
   });
 
+  it("goes on at once while a backlog outlasts a tick's budget, then every five minutes (F600)", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval"] });
+    const { db, verdicts, times, options } = setup({ batch: 10, batches: 2 });
+    verdicts(50, T0 - 200 * DAY);
+    const job = startRetention(db, options);
+    // A timeout of 0 set within a timer is 1 ms to the fake clock (@sinonjs/fake-timers), 0 set outside one.
+    const left = [times().length];
+    vi.advanceTimersByTime(0);
+    left.push(times().length);
+    vi.advanceTimersByTime(1);
+    left.push(times().length);
+    expect(left).toEqual([30, 10, 0]);
+    verdicts(1, T0 - 200 * DAY, { prefix: "late" });
+    vi.advanceTimersByTime(5 * 60_000 - 1);
+    expect(times()).toHaveLength(1);
+    vi.advanceTimersByTime(1);
+    expect(times()).toEqual([]);
+    job.stop();
+  });
+
   it("throws on a database that failed, so the process stops rather than serve unpruned", () => {
     const { db, retention } = setup();
     db.close();

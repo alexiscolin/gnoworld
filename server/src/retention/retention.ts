@@ -18,7 +18,8 @@ interface Options {
 }
 
 export interface Retention {
-  tick: () => void;
+  // Whether rows past their days or the cap were left for a later tick.
+  tick: () => boolean;
 }
 
 export function makeRetention(db: DatabaseSync, options: Options): Retention {
@@ -59,18 +60,23 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
       }
       watch("verdicts_near_cap", count(), maxVerdicts);
       watch("database_near_cap", N.parse(sql.used.get()).n, maxBytes);
+      return budget <= 0;
     },
   };
 }
 
-/** The retention at start, then every five minutes, until its stop. */
+/** The retention at start, then every five minutes, until its stop; a tick that left a backlog is followed
+ * at once by another, the event loop free between them, so the cap holds whatever comes in (F600). */
 export function startRetention(db: DatabaseSync, options: Options & { everyMs?: number }): { stop: () => void } {
   const retention = makeRetention(db, options);
-  retention.tick();
-  const timer = setInterval(retention.tick, options.everyMs ?? 5 * 60_000);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const run = (): void => {
+    timer = setTimeout(run, retention.tick() ? 0 : (options.everyMs ?? 5 * 60_000));
+  };
+  run();
   return {
     stop: () => {
-      clearInterval(timer);
+      clearTimeout(timer);
     },
   };
 }
