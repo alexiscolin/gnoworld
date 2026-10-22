@@ -318,6 +318,19 @@ describe("groups and rooms by role (3m)", () => {
     expect(failure(typed({ groups: null }))).toContain(": worlds.0.groups: ");
   });
 
+  it("holds every room of the file to Ergo's 64 characters: a typed room's and a world's main one (F590)", () => {
+    const at = (slug: string, name: string) =>
+      JSON.stringify({
+        ...FILE,
+        worlds: [{ ...FILE.worlds[0], slug, rooms: [{ room: `#${slug}/${name}`, type: "open" }] }, FILE.worlds[1]],
+      });
+    const name = "a".repeat(32);
+    expect(loadRoles(written(at("w".repeat(30), name))).worlds.get("w".repeat(30))?.rooms?.size).toBe(1);
+    expect(failure(at("w".repeat(31), name))).toContain(": worlds.0.rooms.0.room: ");
+    expect(loadRoles(written(world({ slug: "w".repeat(63) }))).worlds.has("w".repeat(63))).toBe(true);
+    expect(failure(world({ slug: "w".repeat(64) }))).toContain(": worlds.0.slug: ");
+  });
+
   it("counts no invite list for a world of only open rooms, past 100 moderators (F575)", () => {
     const file = typed({ moderators: accounts(101), rooms: [{ room: "#earth", type: "open" }] });
     expect(loadRoles(written(file)).worlds.get("earth")?.moderators.size).toBe(101);

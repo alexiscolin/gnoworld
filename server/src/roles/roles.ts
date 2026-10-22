@@ -42,7 +42,8 @@ function world(Addresses: z.ZodType<Address[]>) {
     .pipe(z.record(slug(), Addresses));
   return z
     .strictObject({
-      slug: slug(),
+      // Its main room, #<slug>, within Ergo's channellen of 64 (deploy/ergo/ircd.yaml.tmpl).
+      slug: slug().max(63),
       moderators: Addresses,
       rules: rules(),
       groups: Groups.default({}),
@@ -54,7 +55,9 @@ function world(Addresses: z.ZodType<Address[]>) {
         // Its main room, or #<slug>/<a room's name>, once.
         const own =
           name === `#${slug}` ||
-          (name.startsWith(`#${slug}/`) && RoomName.safeParse(name.slice(slug.length + 2)).success);
+          (name.startsWith(`#${slug}/`) &&
+            RoomName.safeParse(name.slice(slug.length + 2)).success &&
+            name.length <= 64);
         if (!own || seen.has(name)) ctx.addIssue({ code: "custom", path: ["rooms", at, "room"], message: "room" });
         seen.add(name);
         for (const [key, group] of Object.entries({ readers, writers }))
