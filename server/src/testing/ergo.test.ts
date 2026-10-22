@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Address } from "@gnoworld/schemas";
 import { z } from "zod";
 import { authServer } from "../ergo/auth.ts";
+import { ircLink, type Said } from "../irc/link.ts";
 import { openDatabase } from "../db.ts";
 import { logger } from "../log.ts";
 import { LOGIN_TABLES, makeLogin, NONCE_HOST } from "../login/login.ts";
@@ -1083,5 +1084,69 @@ describe("logging in through the server (3d)", { timeout: 30_000 }, () => {
     await join(gus, "#lobby");
     op.send("PRIVMSG #lobby :still here");
     await gus.expect(/PRIVMSG #lobby :still here/);
+  });
+});
+
+describe("the server's IRC link (3h)", { timeout: 40_000 }, () => {
+  const linked = (e: Ergo, rooms: readonly string[]) => {
+    const said: Said[] = [];
+    const link = ircLink({
+      host: "127.0.0.1",
+      port: e.port,
+      password: e.operPassword,
+      rooms: () => rooms,
+      onMessage: (message) => said.push(message),
+      log: logger("a-pepper-of-forty-characters-0123456789", () => true),
+      retryMs: () => 200,
+    });
+    stops.push(() => link.stop());
+    return said;
+  };
+  // A client sees the bot in a room once NAMES lists it there.
+  const inRoom = async (c: Raw, room: string): Promise<string> => {
+    for (;;) {
+      c.send(`NAMES ${room}`);
+      const names = await c.expect(new RegExp(` (353|366) \\S+ (= )?${room} `));
+      if (names.includes(" 353 ") && / :.*@?gnoworld\b/.test(names)) return names;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  };
+
+  it("logs in as an operator, makes its rooms and reads an account's message, never a direct one", async () => {
+    const e = await start();
+    const said = linked(e, ["#earth", "#bubble"]);
+    const alice = await login(e, "alice");
+    await inRoom(alice, "#bubble");
+    await join(alice, "#bubble");
+    alice.send("PRIVMSG gnoworld :a direct message");
+    alice.send("PRIVMSG #bubble :hello from alice");
+    await expect
+      .poll(() => said.map(({ room, account, text }) => [room, account, text]))
+      .toEqual([["#bubble", "alice", "hello from alice"]]);
+    expect(said[0]?.msgid).toMatch(/^\w+$/);
+  });
+
+  it("sits in 101 rooms, past the 100 Ergo allows a client", async () => {
+    const e = await start();
+    const rooms = Array.from({ length: 101 }, (_, n) => `#room-${String(n)}`);
+    linked(e, rooms);
+    const gus = await guest(e, "gus");
+    await inRoom(gus, "#room-100");
+    gus.send("LIST");
+    await gus.expect(/ 323 /);
+    expect(logged(gus).match(/ 322 gus #room-\d+ 1 /g)).toHaveLength(101);
+  });
+
+  it("comes back to its rooms when Ergo restarts", async () => {
+    const dir = mkdtempSync(joinPath(tmpdir(), "gnoworld-ergo-again-"));
+    kept.push(dir);
+    const first = await start({ dir });
+    linked(first, ["#bubble"]);
+    const gus = await guest(first, "gus");
+    await inRoom(gus, "#bubble");
+    await first.stop();
+    const again = await start({ dir, ports: [first.port, first.wsPort], operPassword: first.operPassword });
+    // An operator holds its rooms as their op: Ergo shows it with an @.
+    expect(await inRoom(await guest(again, "gus2"), "#bubble")).toMatch(/ :(.* )?@gnoworld\b/);
   });
 });
