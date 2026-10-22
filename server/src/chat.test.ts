@@ -84,7 +84,7 @@ describe("the chat, as the server starts it", () => {
   it("leaves Ergo when it stops, and never connects again", async () => {
     const ergo = await fakeErgo();
     const ergoAt = { host: "127.0.0.1", port: ergo.port, password: PASSWORD };
-    setup({ worlds: ["bubble"], ergo: ergoAt }, () => T0);
+    setup({ worlds: worlds("bubble"), ergo: ergoAt, moderation: OFF }, { now: () => T0 });
     const peer = await ergo.peer(0);
     await welcome(peer);
     const left = new Promise((resolve) => peer.socket.once("close", resolve));
