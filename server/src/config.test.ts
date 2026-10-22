@@ -1,6 +1,7 @@
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { inspect } from "node:util";
 import { describe, expect, it } from "vitest";
 import { loadConfig } from "./config.ts";
@@ -32,11 +33,15 @@ describe("loadConfig", () => {
       database: ENV.DATABASE,
       trustedProxy: undefined,
       pepper: PEPPER,
+      roles: fileURLToPath(new URL("../roles.json", import.meta.url)),
     });
   });
 
   it("reads every setting it is given", () => {
-    expect(loadConfig({ ...ENV, HOST: "0.0.0.0", PORT: "9000", TRUSTED_PROXY: "10.0.0.2" })).toMatchObject({
+    expect(
+      loadConfig({ ...ENV, HOST: "0.0.0.0", PORT: "9000", TRUSTED_PROXY: "10.0.0.2", ROLES_FILE: "/etc/roles.json" }),
+    ).toMatchObject({
+      roles: "/etc/roles.json",
       host: "0.0.0.0",
       port: 9000,
       trustedProxy: "10.0.0.2",
@@ -68,6 +73,7 @@ describe("loadConfig", () => {
     ["TRUSTED_PROXY", ""],
     ["TRUSTED_PROXY", "proxy.local"],
     ["TRUSTED_PROXY", "999.1.1.1"],
+    ["ROLES_FILE", ""],
   ])("stops on %s set to %j, naming the setting", (key, value) => {
     expect(() => loadConfig({ ...ENV, [key]: value })).toThrow(new RegExp(`^setting ${key}: `));
   });

@@ -83,6 +83,15 @@ describe("the server's process", () => {
     expect(server.out.stderr).toMatch(/setting DATABASE: /);
   });
 
+  it("stops at boot on a roles file it cannot read, naming the file and never its content", async () => {
+    const roles = join(mkdtempSync(join(tmpdir(), "gnoworld-roles-")), "roles.json");
+    writeFileSync(roles, JSON.stringify({ team: ["planted-value"], trusted: [], worlds: [] }));
+    const server = start({ ...settings(), ROLES_FILE: roles });
+    expect(await exited(server)).not.toBe(0);
+    expect(server.out.stderr).toContain(`roles file ${roles}: team.0: custom`);
+    expect(server.out.stderr).not.toContain("planted-value");
+  });
+
   it("refuses a second process on the same database, and the first keeps serving", async () => {
     const env = settings();
     const port = await listening(start(env));

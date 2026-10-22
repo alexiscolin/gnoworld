@@ -2,6 +2,7 @@
 // comes from the file a *_FILE setting names, and an error names the setting, never its value.
 import { readFileSync } from "node:fs";
 import { isIP } from "node:net";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
 export interface Config {
@@ -10,6 +11,7 @@ export interface Config {
   database: string;
   trustedProxy: string | undefined;
   pepper: string;
+  roles: string;
 }
 
 const Env = z.object({
@@ -26,6 +28,11 @@ const Env = z.object({
     .refine((address) => isIP(address) !== 0)
     .optional(),
   LOG_PEPPER_FILE: z.string().min(1),
+  // The roles file the server ships (server/roles.json), unless a deployment names another.
+  ROLES_FILE: z
+    .string()
+    .min(1)
+    .default(fileURLToPath(new URL("../roles.json", import.meta.url))),
 });
 
 export function loadConfig(env: Record<string, string | undefined>): Config {
@@ -35,13 +42,14 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     const issue = parsed.error.issues[0];
     throw new Error(`setting ${String(issue?.path[0])}: ${issue?.code ?? "invalid"}`);
   }
-  const { HOST, PORT, DATABASE, TRUSTED_PROXY, LOG_PEPPER_FILE } = parsed.data;
+  const { HOST, PORT, DATABASE, TRUSTED_PROXY, LOG_PEPPER_FILE, ROLES_FILE } = parsed.data;
   return {
     host: HOST,
     port: PORT,
     database: DATABASE,
     trustedProxy: TRUSTED_PROXY,
     pepper: secret("LOG_PEPPER_FILE", LOG_PEPPER_FILE),
+    roles: ROLES_FILE,
   };
 }
 
