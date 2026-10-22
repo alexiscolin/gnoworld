@@ -83,6 +83,7 @@ describe("inlineScripts", () => {
       ["{}", "{}"],
     ],
     ["a script inside a comment, hashed: its text is ours", "<!-- <script>a()</script> -->", ["a()"]],
+    ["CR LF and a lone CR, as the browser reads them: LF", "<script>a\r\nb\rc</script>", ["a\nb\nc"]],
   ])("reads %s", (_, html, scripts) => {
     expect(inlineScripts(html)).toEqual(scripts);
   });

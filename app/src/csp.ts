@@ -39,9 +39,12 @@ const SCRIPT = String.raw`<script\b(${ATTRIBUTES})>([\s\S]*?)<\/script(?=[\s/>])
 // What the browser hashes: the text between a script's tags, for each script that loads no file. An
 // attribute starts after a space, a slash or a quote, as the HTML parser reads it.
 export function inlineScripts(html: string): string[] {
-  return [...html.matchAll(new RegExp(SCRIPT, "gi"))]
-    .filter(([, attributes = ""]) => !/[\s/"']src\s*=/i.test(attributes))
-    .map(([, , text = ""]) => text);
+  return (
+    [...html.matchAll(new RegExp(SCRIPT, "gi"))]
+      .filter(([, attributes = ""]) => !/[\s/"']src\s*=/i.test(attributes))
+      // The parser turns CR LF and a lone CR into LF before a script's text is hashed.
+      .map(([, , text = ""]) => text.replace(/\r\n?/g, "\n"))
+  );
 }
 
 export async function sha256(text: string): Promise<string> {
