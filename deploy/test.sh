@@ -334,6 +334,10 @@ if [ "${1:-}" = --mutants ]; then
 		nginx sed 's#proxy_set_header X-Forwarded-For $proxy_protocol_addr;#proxy_set_header X-Forwarded-For $http_x_forwarded_for;#'
 	mutant "a forged X-Real-IP handed on" "is its own visitor" nginx sed 's#proxy_set_header X-Real-IP $proxy_protocol_addr;#proxy_set_header X-Real-IP $http_x_real_ip;#'
 	mutant "the password handed to the upstreams" "and never the demo's password" nginx sed '/proxy_set_header Authorization "";/d'
+	mutant "the WebSocket open without the password" "no password, no WebSocket" \
+		nginx awk '{ print } /location = \/ws \{/ { print "            auth_basic off;" }'
+	mutant "the API open without the password" "no password, no API" \
+		nginx awk '{ print } /location \/api\/ \{/ { print "            auth_basic off;" }'
 	mutant "the stream buffered" "the stream comes through web unbuffered" nginx sed '/proxy_buffering off;/d'
 	mutant "no limit of web's own on the login" "a longer burst meets web's own limit" nginx sed '/limit_req zone=login/d'
 	mutant "a host added to the way out" "the way out lets one host out" acl awk '{ print } /- api.openai.com/ { print "    - example.com" }'
