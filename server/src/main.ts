@@ -20,10 +20,8 @@ const server = await listen(
   makeApp(log, () => !draining),
   config,
 );
-const address = server.address();
-log("listening", { port: typeof address === "object" && address !== null ? address.port : config.port });
-
-// SIGTERM from the container's runtime, SIGINT from a terminal: one drain, however many arrive.
+// SIGTERM from the container's runtime, SIGINT from a terminal: one drain, however many arrive. Set
+// before the server says it listens, so a signal sent on that line is drained, not fatal.
 const drain = (): void => {
   if (draining) return;
   draining = true;
@@ -34,3 +32,5 @@ const drain = (): void => {
 };
 process.on("SIGTERM", drain);
 process.on("SIGINT", drain);
+const address = server.address();
+log("listening", { port: typeof address === "object" && address !== null ? address.port : config.port });
