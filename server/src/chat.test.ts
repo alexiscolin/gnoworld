@@ -267,7 +267,7 @@ describe("the chat, as the server starts it", () => {
 
     it("holds an account 59 minutes old to a new account's links under a one-hour setting", async () => {
       const fresh = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
-      const moderation = { openaiKey: undefined, thresholds: {}, newAccountHours: 1 };
+      const moderation = { ...OFF, newAccountHours: 1 };
       const { db, peer, verdicts } = await linked(
         { worlds: worlds("bubble"), moderation },
         { provider: () => Promise.resolve(OFF_ANSWER) },
