@@ -162,6 +162,15 @@ describe("the retention's alerts (3n)", () => {
     expect(lines).toEqual([]);
   });
 
+  it("logs each alert as the event ops reads, alert, named by its error (F595)", () => {
+    const { retention, verdicts, lines } = setup({ maxVerdicts: 10 });
+    verdicts(9, T0);
+    retention.tick();
+    expect(lines.map((line) => line.replace(/^\{"time":"[^"]+",/, "{").trim())).toEqual([
+      '{"event":"alert","error":"verdicts_near_cap"}',
+    ]);
+  });
+
   it("measures after it removed: rows past their days raise nothing", () => {
     const { retention, verdicts, alerts } = setup({ maxVerdicts: 10 });
     verdicts(9, T0 - 200 * DAY);
