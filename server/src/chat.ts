@@ -48,7 +48,7 @@ interface Options {
 
 interface Steps {
   db: DatabaseSync;
-  check: (said: Said) => Promise<Verdict | "seen">;
+  check: (said: Said) => Promise<Verdict | "seen" | "busy">;
   send: (command: Command, params: readonly string[]) => boolean;
   stream: Stream;
   progress: Progress;
@@ -62,6 +62,11 @@ function moderate({ db, check, send, stream, progress, strike }: Steps): (said: 
     try {
       const verdict = await check(said);
       if (verdict === "seen") return;
+      // Another run checks it now and settles it: settled here, the mark would pass a line not yet done.
+      if (verdict === "busy") {
+        done = false;
+        return;
+      }
       // A hide the link could not send: checked again when the catch-up brings the line back.
       done = act(said, verdict, { send });
       if (!done) checkAgain(db, said.msgid);

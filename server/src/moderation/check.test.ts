@@ -107,7 +107,8 @@ describe("checking a message", () => {
     const first = check(said("hi"));
     const second = check(said("hi"));
     release();
-    expect(await Promise.all([first, second])).toEqual([{ action: "pass" }, "seen"]);
+    // The second arrives while the first is checked: busy, the first settles it.
+    expect(await Promise.all([first, second])).toEqual([{ action: "pass" }, "busy"]);
     expect(asked).toHaveLength(1);
     expect(await check(said("hi"))).toBe("seen");
   });

@@ -88,7 +88,8 @@ export function checkAgain(db: DatabaseSync, msgid: string): void {
   db.prepare("UPDATE verdicts SET action = 'unchecked' WHERE msgid = ?").run(msgid);
 }
 
-export function makeChecker(options: Options): (said: Said) => Promise<Verdict | "seen"> {
+/** "seen": the line has its verdict; "busy": another run is checking it now, and settles it. */
+export function makeChecker(options: Options): (said: Said) => Promise<Verdict | "seen" | "busy"> {
   const { db, rulesOf, provider, thresholds, pepper, log, now = Date.now, newAccountMs = 24 * 60 * 60_000 } = options;
   const sql = {
     claim: db.prepare(
@@ -100,6 +101,7 @@ export function makeChecker(options: Options): (said: Said) => Promise<Verdict |
     ),
     firstSeen: db.prepare("SELECT first_seen FROM accounts WHERE address = ?"),
     recent: db.prepare("SELECT count(*) AS n FROM verdicts WHERE account = ? AND at > ? AND at <= ?"),
+    pending: db.prepare("SELECT 1 FROM verdicts WHERE msgid = ? AND action = 'pending'"),
   };
   const Count = z.object({ n: z.number() });
   const owns = editsOwn(db);
@@ -116,7 +118,7 @@ export function makeChecker(options: Options): (said: Said) => Promise<Verdict |
     const at = lineTime(said, now);
     const hashed = accountKey(pepper, account);
     const claimed = sql.claim.run(msgid, room, hashed, at).changes > 0 || sql.retry.run(at, msgid).changes > 0;
-    if (!claimed) return "seen";
+    if (!claimed) return sql.pending.get(msgid) === undefined ? "seen" : "busy";
     const settle = (verdict: Verdict, { why, answer }: { why?: string; answer?: Answer } = {}): Verdict => {
       const reason = verdict.action === "hide" ? verdict.reason : (why ?? null);
       const used = answer === undefined ? [null, null, null] : [answer.flagged, answer.scores, thresholds];

@@ -615,6 +615,36 @@ describe("the chat, as the server starts it", () => {
       slow.open();
     });
 
+    it("holds its mark before a line still being checked that a page brings again", async () => {
+      const slow = gate();
+      const { peer, verdicts, ergo } = await linked(
+        { worlds: worlds("bubble"), moderation: OFF },
+        {
+          provider: async (text) => {
+            if (text === "slow") await slow.opened;
+            return OFF_ANSWER;
+          },
+        },
+      );
+      peer.say(line("m1", 1, ["g1a", "first"]));
+      await expect.poll(verdicts).toEqual([{ msgid: "m1", action: "pass", reason: null }]);
+      peer.say(line("m2", 2, ["g1b", "slow"]));
+      peer.say(line("m3", 3, ["g1c", "third"]));
+      await expect.poll(verdicts).toContainEqual({ msgid: "m3", action: "pass", reason: null });
+      const again = await reconnect(peer, ergo);
+      await again.next(/^CHATHISTORY /);
+      again.say(":ergo.test BATCH +a chathistory #bubble");
+      again.say(`@batch=a;account=g1b;msgid=m2;time=${T(2)} :g1b!u@h PRIVMSG #bubble :slow`);
+      again.say(`@batch=a;account=g1c;msgid=m3;time=${T(3)} :g1c!u@h PRIVMSG #bubble :third`);
+      again.say(":ergo.test BATCH -a");
+      await settle(again);
+      again.socket.destroy();
+      const third = await ergo.peer(2);
+      await welcome(third);
+      expect(await third.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(1)} 50`);
+      slow.open();
+    });
+
     it("checks 300 missed lines of one account page by page, none dropped", async () => {
       const { peer, verdicts, ergo } = await linked(
         { worlds: worlds("bubble"), moderation: OFF },
