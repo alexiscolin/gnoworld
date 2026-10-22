@@ -305,6 +305,24 @@ describe("groups and rooms by role (3m)", () => {
     );
   });
 
+  it("takes a group named with hyphens, and refuses one with another character or groups of null, naming the place (F575)", () => {
+    const desk = { room: "#earth/desk", type: "members-write", readers: "my-crew", writers: "my-crew" };
+    const roles = loadRoles(written(typed({ groups: { "my-crew": [STRANGER] }, rooms: [desk] })));
+    expect(roles.worlds.get("earth")?.rooms?.get("#earth/desk")).toEqual({
+      type: "members-write",
+      readers: "my-crew",
+      writers: "my-crew",
+      hidden: false,
+    });
+    expect(failure(typed({ groups: { "crew!": [STRANGER] } }))).toContain(": worlds.0.groups.crew!: ");
+    expect(failure(typed({ groups: null }))).toContain(": worlds.0.groups: ");
+  });
+
+  it("counts no invite list for a world of only open rooms, past 100 moderators (F575)", () => {
+    const file = typed({ moderators: accounts(101), rooms: [{ room: "#earth", type: "open" }] });
+    expect(loadRoles(written(file)).worlds.get("earth")?.moderators.size).toBe(101);
+  });
+
   it("stops on a members room past Ergo's 100-entry list, its moderators and the team counted", () => {
     const crew = accounts(99);
     const file = typed({ groups: { crew }, rooms: [{ room: "#earth/crew", type: "members", readers: "crew" }] });
