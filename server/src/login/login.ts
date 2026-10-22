@@ -8,7 +8,13 @@ import { Address, type Challenge, type Proof, type VerifyRequest } from "@gnowor
 import { z } from "zod";
 
 export const LOGIN_TABLES = `
-CREATE TABLE nonces (nonce TEXT PRIMARY KEY, chain TEXT NOT NULL, text TEXT NOT NULL, expires_at INTEGER NOT NULL) STRICT;
+CREATE TABLE nonces (
+  nonce TEXT PRIMARY KEY,
+  chain TEXT NOT NULL,
+  host TEXT NOT NULL,
+  text TEXT NOT NULL,
+  expires_at INTEGER NOT NULL
+) STRICT;
 CREATE INDEX nonces_by_expiry ON nonces (expires_at);
 CREATE TABLE accounts (address TEXT PRIMARY KEY, first_seen INTEGER NOT NULL) STRICT;
 CREATE TABLE tokens (
@@ -37,6 +43,8 @@ export interface Login {
   verify: (
     request: VerifyRequest,
     mayCreate: () => boolean,
+    // The host the proof comes from: its challenge's own, or the nonce is not this one's (F427).
+    host: string,
   ) => Promise<{ token: string; maxAge: number } | "nonce" | "proof" | "new_account">;
   session: (token: string | undefined) => Address | undefined;
   logout: (token: string | undefined) => void;
@@ -63,8 +71,8 @@ export function makeLogin(db: DatabaseSync, { chains, now, verify = verifyProof,
   const sql = {
     purgeNonces: db.prepare("DELETE FROM nonces WHERE expires_at <= ?"),
     countNonces: db.prepare("SELECT count(*) AS n FROM nonces"),
-    addNonce: db.prepare("INSERT INTO nonces (nonce, chain, text, expires_at) VALUES (?, ?, ?, ?)"),
-    spend: db.prepare("DELETE FROM nonces WHERE nonce = ? AND expires_at > ? RETURNING chain, text"),
+    addNonce: db.prepare("INSERT INTO nonces (nonce, chain, host, text, expires_at) VALUES (?, ?, ?, ?, ?)"),
+    spend: db.prepare("DELETE FROM nonces WHERE nonce = ? AND host = ? AND expires_at > ? RETURNING chain, text"),
     known: db.prepare("SELECT 1 FROM accounts WHERE address = ?"),
     addAccount: db.prepare("INSERT INTO accounts (address, first_seen) VALUES (?, ?)"),
     purgeTokens: db.prepare("DELETE FROM tokens WHERE expires_at <= ?"),
@@ -96,13 +104,13 @@ export function makeLogin(db: DatabaseSync, { chains, now, verify = verifyProof,
         `Issued: ${issued}`,
         `Expires: ${expiresAt}`,
       ].join("\n");
-      sql.addNonce.run(nonce, chainId, text, at + ttl);
+      sql.addNonce.run(nonce, chainId, domain, text, at + ttl);
       return { nonce, text, expiresAt };
     },
 
-    async verify({ nonce, address, proof }, mayCreate) {
+    async verify({ nonce, address, proof }, mayCreate, host) {
       // Spent before the first await: a nonce buys one attempt, and the same proof twice at once one login.
-      const spent = sql.spend.get(nonce, now());
+      const spent = sql.spend.get(nonce, host, now());
       if (spent === undefined) return "nonce";
       const { chain, text } = Spent.parse(spent);
       let valid = false;

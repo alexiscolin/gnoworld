@@ -984,6 +984,7 @@ describe("logging in through the server (3d)", { timeout: 30_000 }, () => {
       const done = await login.verify(
         { nonce: made.nonce, address: who.address, proof: who.sign("onyx-1", made.text) },
         () => true,
+        "gnoworld.test",
       );
       if (typeof done === "string") throw new Error(done);
       return { address: who.address, token: done.token };

@@ -125,6 +125,15 @@ describe("logging in", () => {
     expect(await answer(response)).toEqual([200, JSON.stringify({ address: who.address })]);
   });
 
+  it("refuses a proof sent from another listed site than its challenge's, which stays good at home (F427)", async () => {
+    const other = "http://localhost:5173";
+    const { app } = setup({ origins: [other, ORIGIN] });
+    const who = wallet();
+    const made = await challenge(app, { origin: other });
+    expect(await answer(await verify(app, made, { who, origin: ORIGIN }))).toEqual([400, REFUSED]);
+    expect((await verify(app, made, { who, origin: other })).status).toBe(200);
+  });
+
   it("writes the domain of the Origin the challenge came from, port included", async () => {
     const { app } = setup({ origins: ["http://localhost:5173", ORIGIN] });
     expect((await challenge(app, { origin: "http://localhost:5173" })).text).toContain("Domain: localhost:5173\n");
