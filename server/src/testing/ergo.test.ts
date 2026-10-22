@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join as joinPath } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import { startErgo, type Ergo, type ErgoOptions } from "./ergo.ts";
 import { rawClient, type Raw } from "./rawClient.ts";
 
@@ -919,16 +920,16 @@ describe("the helper", { timeout: 30_000 }, () => {
   it("leaves no Ergo running when a test process ends without stopping it", async () => {
     const script = `import { startErgo } from ${JSON.stringify(new URL("ergo.ts", import.meta.url).href)};
 const e = await startErgo();
-process.stdout.write(String(e.pid));
+process.stdout.write(JSON.stringify({ pid: e.pid, dir: e.dir }));
 process.exit(0);`;
     const run = spawnSync(process.execPath, ["--input-type=module", "-e", script], {
       encoding: "utf8",
       timeout: 20_000,
     });
-    const pid = Number(run.stdout);
-    expect(pid).toBeGreaterThan(0);
+    const { pid, dir } = z.object({ pid: z.number().int().positive(), dir: z.string() }).parse(JSON.parse(run.stdout));
     await vi.waitFor(() => {
       expect(() => process.kill(pid, 0)).toThrow(/ESRCH/);
     });
+    expect(existsSync(dir)).toBe(false);
   });
 });
