@@ -43,9 +43,10 @@ export function roomsRoutes({ roles, rooms, session, origins, log, now }: Option
     log("room_refused", { route: routePath(c), status, error: cause });
     return c.json({ error } satisfies ApiError, status);
   };
+  const account = (c: Context): Address | undefined => session(getCookie(c, "__Host-session"));
   // Who acts, and whether on that world: a session and the right, before anything else is read.
   const allowed = (c: Context, world: string): Address | Response => {
-    const who = session(getCookie(c, "__Host-session"));
+    const who = account(c);
     if (who === undefined) return refuse(c, "session");
     return mayCreateRoom(roles, who, world) ? who : refuse(c, "forbidden");
   };
@@ -55,9 +56,7 @@ export function roomsRoutes({ roles, rooms, session, origins, log, now }: Option
 
   app.post("/", async (c) => {
     const body = CreateRoom.safeParse(await json(c));
-    if (!body.success) {
-      return session(getCookie(c, "__Host-session")) === undefined ? refuse(c, "session") : refuse(c, "body");
-    }
+    if (!body.success) return refuse(c, account(c) === undefined ? "session" : "body");
     const { world, name } = body.data;
     const who = allowed(c, world);
     if (who instanceof Response) return who;
