@@ -30,4 +30,20 @@ describe("a room's state as the link reads it", () => {
     );
     expect((await asked)?.invites).toEqual(["g1a!*@*.evil", "x!g1a!*@*", "a!b@*", "g1b"]);
   });
+
+  it("answers every question in flight with no state once its connection closes, and asks anew after (F566)", async () => {
+    vi.useFakeTimers();
+    const states = roomStates(60_000);
+    const written: string[] = [];
+    const write = (command: string, params: readonly string[]): void => {
+      written.push([command, ...params].join(" "));
+    };
+    const [a, b] = [states.ask(write, "#a"), states.ask(write, "#b")];
+    states.drop();
+    expect([await a, await b]).toEqual([undefined, undefined]);
+    const later = states.ask(write, "#a");
+    expect(written.filter((line) => line === "MODE #a")).toHaveLength(2);
+    states.drop();
+    expect(await later).toBeUndefined();
+  });
 });

@@ -999,6 +999,24 @@ describe("the IRC link's room state (3m)", () => {
     }
     expect([(await a)?.flags, (await b)?.flags]).toEqual(["M", "m"]);
   });
+
+  it("answers a room's state with nothing as soon as its connection closes, and asks it on the next (F566)", async () => {
+    const ergo = await fakeErgo();
+    const { link } = start(ergo.port, { stateMs: 60_000 });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    const asked = link.state("#bubble");
+    await peer.next(/^NAMES #bubble$/);
+    peer.socket.destroy();
+    expect(await asked).toBeUndefined();
+    const again = await ergo.peer(1);
+    await welcome(again);
+    const next = link.state("#bubble");
+    await again.next(/^NAMES #bubble$/);
+    again.say(":ergo.test 324 gnoworld #bubble +M");
+    again.say(":ergo.test 366 gnoworld #bubble :End");
+    expect((await next)?.flags).toBe("M");
+  });
 });
 
 describe("the IRC link's catch-up (3j)", () => {
