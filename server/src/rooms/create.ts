@@ -34,15 +34,16 @@ export function makeRooms({ db, send, now, max }: Options): Rooms {
   const sql = {
     count: db.prepare("SELECT count(*) AS n FROM rooms WHERE world = ? AND name <> ?"),
     add: db.prepare("INSERT INTO rooms (name, world, created_at) VALUES (?, ?, ?)"),
-    state: db.prepare("SELECT archived FROM rooms WHERE name = ? AND world = ?"),
+    // A room's name holds its world's.
+    state: db.prepare("SELECT archived FROM rooms WHERE name = ?"),
     archive: db.prepare("UPDATE rooms SET archived = 1 WHERE name = ?"),
-    archived: db.prepare("SELECT archived FROM rooms WHERE name = ?"),
   };
+  const stateOf = (room: string) => State.parse(sql.state.get(room));
   return {
     create(world, name) {
       const room = `${mainRoom(world)}/${name}`;
       if (room.length > CHANNEL_MAX) return "too_long";
-      if (State.parse(sql.state.get(room, world)) !== undefined) return "exists";
+      if (stateOf(room) !== undefined) return "exists";
       if (Count.parse(sql.count.get(world, mainRoom(world))).n >= max) return "full";
       sql.add.run(room, world, now());
       send("JOIN", [room]);
@@ -51,7 +52,7 @@ export function makeRooms({ db, send, now, max }: Options): Rooms {
     },
     archive(world, name) {
       const room = `${mainRoom(world)}/${name}`;
-      const state = State.parse(sql.state.get(room, world));
+      const state = stateOf(room);
       if (state === undefined) return "not_found";
       if (state.archived === 0) {
         sql.archive.run(room);
@@ -60,6 +61,6 @@ export function makeRooms({ db, send, now, max }: Options): Rooms {
       }
       return "archived";
     },
-    archived: (room) => State.parse(sql.archived.get(room))?.archived === 1,
+    archived: (room) => stateOf(room)?.archived === 1,
   };
 }
