@@ -106,11 +106,14 @@ function readBody(body: string, tags: Map<string, string>): IrcParsed {
   return { ok: true, message: { tags, command, params: readParams(rest), ...(source === "" ? {} : { source }) } };
 }
 
+// No NUL, CR or LF, and no lone surrogate: what a line may hold, read or written.
+const clean = (text: string): boolean => !/[\0\r\n]/.test(text) && text.isWellFormed();
+
 /** Reads one line from the relay, which is untrusted: it never throws. It refuses lines over the limits
  * (UTF-8 bytes: 8191 of tags with the @ and the space, 510 of the rest), NUL, and CR or LF but at the end. */
 export function parseLine(line: string): IrcParsed {
   const text = line.replace(/\r\n$|\r$|\n$/, "");
-  if (/[\0\r\n]/.test(text) || !text.isWellFormed()) return { ok: false, error: "bad-character" };
+  if (!clean(text)) return { ok: false, error: "bad-character" };
   // IRC splits on spaces alone: a tab is part of a word.
   if (/^ *$/.test(text)) return { ok: false, error: "empty" };
   if (!text.startsWith("@")) return readBody(text.replace(/^ +/, ""), new Map<string, string>());
@@ -125,8 +128,6 @@ export function parseLine(line: string): IrcParsed {
 function refuse(what: string): never {
   throw new RangeError(`formatLine: ${what}`);
 }
-
-const clean = (text: string): boolean => !/[\0\r\n]/.test(text) && text.isWellFormed();
 
 function formatTags(tags: ReadonlyMap<string, string>): string {
   const written: string[] = [];
@@ -154,7 +155,7 @@ function formatParams(params: readonly string[]): string[] {
  * most 4094 UTF-8 bytes of tag data (IRCv3 message-tags), not the 8191 a server may send. */
 export function formatLine(message: IrcMessage): string {
   const { tags, source, command, params } = message;
-  if (!/^(?:[A-Z]+|\d{3})$/.test(command)) refuse("a command is ASCII letters in upper case or three digits");
+  if (toIrcCommand(command) !== command) refuse("a command is ASCII letters in upper case or three digits");
   const data = formatTags(tags);
   if (source !== undefined && (source === "" || source.includes(" ") || !clean(source))) {
     refuse("a source is a word with no NUL, CR or LF");
