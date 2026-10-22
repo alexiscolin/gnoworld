@@ -520,6 +520,57 @@ describe("the chat, as the server starts it", () => {
       expect(sent(peer)).toEqual([]);
     });
 
+    it("settles a line it hears again in a catch-up page, so its mark moves on past it", async () => {
+      const { peer, verdicts, ergo } = await linked(
+        { worlds: worlds("bubble"), moderation: OFF },
+        { provider: () => Promise.resolve(OFF_ANSWER) },
+      );
+      peer.say(line("m1", 1, ["g1a", "hello"]));
+      await expect.poll(verdicts).toEqual([{ msgid: "m1", action: "pass", reason: null }]);
+      const again = await reconnect(peer, ergo);
+      await again.next(/^CHATHISTORY /);
+      again.say(":ergo.test BATCH +a chathistory #bubble");
+      again.say(`@batch=a;account=g1a;msgid=m1;time=${T(1)} :g1a!u@h PRIVMSG #bubble :hello`);
+      again.say(":ergo.test BATCH -a");
+      again.say(line("m2", 2, ["g1b", "fine"]));
+      await expect.poll(() => verdicts().length).toBe(2);
+      await settle(again);
+      again.socket.destroy();
+      const third = await ergo.peer(2);
+      await welcome(third);
+      expect(await third.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(2)} 50`);
+    });
+
+    it("keeps its mark before a line whose hide failed, though a later line passed", async () => {
+      const late = gate();
+      let calls = 0;
+      const { peer, verdicts, ergo } = await linked(
+        { worlds: worlds("bubble"), moderation: OFF },
+        {
+          provider: async (text) => {
+            calls += 1;
+            if (calls === 1) await late.opened;
+            return flags(text);
+          },
+        },
+      );
+      peer.say(line("m1", 1, ["g1a", "hurt"]));
+      await expect.poll(() => calls).toBe(1);
+      peer.socket.destroy();
+      await expect.poll(() => logged.some((l) => l.includes('"irc_closed"'))).toBe(true);
+      late.open();
+      const again = await ergo.peer(1);
+      await welcome(again);
+      await again.next(/^CHATHISTORY /);
+      again.say(line("m2", 2, ["g1b", "fine"]));
+      await expect.poll(verdicts).toContainEqual({ msgid: "m2", action: "pass", reason: null });
+      await settle(again);
+      again.socket.destroy();
+      const third = await ergo.peer(2);
+      await welcome(third);
+      expect(await third.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(1)} 50`);
+    });
+
     it("asks what it missed after a reconnect, from just before the last line it checked", async () => {
       const { peer, verdicts, ergo } = await linked(
         { worlds: worlds("bubble"), moderation: OFF },

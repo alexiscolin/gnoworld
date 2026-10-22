@@ -587,6 +587,8 @@ describe("the IRC link's own commands (3j)", () => {
     ["a SAMODE outside a room (3k)", "SAMODE", ["g1abc", "+b", "m:g1abc"]],
     ["a SAMODE that is no ban (3k)", "SAMODE", ["#bubble", "+o", "g1abc"]],
     ["a ban that mutes no one by name (3k)", "SAMODE", ["#bubble", "+b", "g1abc"]],
+    ["a ban after another mode in one word (3j's green pass)", "SAMODE", ["#bubble", "+o+b", "m:g1abc"]],
+    ["a mute's mask behind another (3j's green pass)", "SAMODE", ["#bubble", "+b", "x:m:g1abc"]],
     ["a mute of everyone (3k)", "SAMODE", ["#bubble", "+b", "m:*"]],
     ["a mute by mask (3k)", "SAMODE", ["#bubble", "+b", "m:g1abc!*@*"]],
     ["a mute of two (3k)", "SAMODE", ["#bubble", "+b", "m:g1a,g1b"]],
@@ -673,6 +675,11 @@ describe("the IRC link's catch-up (3j)", () => {
   };
   const full = (from: number) => Array.from({ length: 50 }, (_, n) => ({ id: `p${String(from + n)}`, time: T(n) }));
   const asked = (peer: Peer) => peer.lines.filter((line) => line.startsWith("CHATHISTORY"));
+  // Twice: a page's end asks its next page a microtask after it is read, which one PONG may beat.
+  const settled = async (peer: Peer) => {
+    await sync(peer, "a");
+    await sync(peer, "b");
+  };
 
   it("asks each room's history from just before its mark's time, page by page, and hands each on with its time", async () => {
     const ergo = await fakeErgo();
@@ -686,7 +693,7 @@ describe("the IRC link's catch-up (3j)", () => {
       { id: "q1", time: T(50) },
       { id: "q2", time: T(51) },
     ]);
-    await sync(peer);
+    await settled(peer);
     expect(asked(peer)).toHaveLength(2);
     await expect.poll(() => said.length).toBe(52);
     expect(said[51]).toEqual({ room: "#bubble", account: "g1a", msgid: "q2", text: "line q2", time: T(51) });
@@ -710,7 +717,7 @@ describe("the IRC link's catch-up (3j)", () => {
     page(peer, "a", full(0));
     await peer.next(/^CHATHISTORY /);
     page(peer, "b", []);
-    await sync(peer);
+    await settled(peer);
     expect(asked(peer)).toHaveLength(2);
     const other = await fakeErgo();
     start(other.port, { lastChecked: (room) => (room === "#bubble" ? T(0) : undefined) });
@@ -718,7 +725,7 @@ describe("the IRC link's catch-up (3j)", () => {
     await welcome(lone);
     await lone.next(/^CHATHISTORY /);
     page(lone, "c", []);
-    await sync(lone);
+    await settled(lone);
     expect(asked(lone)).toHaveLength(1);
   });
 
@@ -747,10 +754,24 @@ describe("the IRC link's catch-up (3j)", () => {
     await welcome(peer);
     await peer.next(/^CHATHISTORY /);
     page(peer, "a", full(0));
-    await sync(peer);
+    await settled(peer);
     expect(asked(peer)).toHaveLength(1);
     drain();
     expect(await peer.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${T(49)} 50`);
+  });
+
+  it("asks no further page after a full page whose lines carry no time", async () => {
+    const ergo = await fakeErgo();
+    start(ergo.port, { lastChecked: (room) => (room === "#bubble" ? T(0) : undefined) });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    await peer.next(/^CHATHISTORY /);
+    peer.say(":ergo.test BATCH +a chathistory #bubble");
+    for (let n = 0; n < 50; n += 1)
+      peer.say(message(`batch=a;account=g1a;msgid=t${String(n)}`, "a!u@h", ["#bubble", "x"]));
+    peer.say(":ergo.test BATCH -a");
+    await settled(peer);
+    expect(asked(peer)).toHaveLength(1);
   });
 });
 

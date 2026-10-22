@@ -176,6 +176,17 @@ describe("checking a message", () => {
     expect(await Promise.race([stuck, Promise.resolve("waiting")])).toBe("waiting");
   });
 
+  it("checks again only the message whose hide could not be done, none beside it", async () => {
+    const { db, check, rows } = setup(() => Promise.resolve(answer()));
+    await check(said("buy spam", "m1"));
+    await check(said("buy spam", "m2"));
+    checkAgain(db, "m1");
+    expect(rows().map(({ msgid, action }) => [msgid, action])).toEqual([
+      ["m1", "unchecked"],
+      ["m2", "hide"],
+    ]);
+  });
+
   it("checks again a hidden message whose hide could not be done, when it comes back", async () => {
     const { db, check, rows } = setup(() => Promise.resolve(answer()));
     expect(await check(said("buy spam"))).toEqual({ action: "hide", reason: "banned_word" });

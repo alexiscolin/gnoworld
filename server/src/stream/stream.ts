@@ -12,6 +12,8 @@ export interface Stream {
   publish: (event: StreamEvent) => void;
   routes: (options: { proxy: string | undefined }) => Hono;
   close: () => void;
+  // What it holds, for the tests of its bounds: events kept, rooms kept, clients and visitors.
+  size: () => { events: number; rooms: number; clients: number; visitors: number };
 }
 
 interface Options {
@@ -119,5 +121,11 @@ export function makeStream(options: Options = {}): Stream {
     close() {
       for (const client of clients) client.stream.abort();
     },
+    size: () => ({
+      events: [...rings.values()].reduce((sum, kept) => sum + kept.length, 0),
+      rooms: rings.size,
+      clients: clients.size,
+      visitors: byVisitor.size,
+    }),
   };
 }

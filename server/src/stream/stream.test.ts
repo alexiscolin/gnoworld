@@ -227,6 +227,56 @@ describe("the verdicts' stream", () => {
   });
 });
 
+describe("the verdicts' stream, its green pass (3j)", () => {
+  it("frees its place in the total when a stream ends", async () => {
+    const { rooms } = setup({ total: 2 });
+    const first = await rooms("#bubble", { peer: "198.51.100.1" });
+    await rooms("#bubble", { peer: "198.51.100.2" });
+    await first.cancel();
+    await expect.poll(async () => (await rooms("#bubble", { peer: "198.51.100.3" })).response.status).toBe(200);
+  });
+
+  it("stops a stream's beat when the stream ends", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    const { rooms } = setup();
+    const client = await rooms("#bubble");
+    expect(vi.getTimerCount()).toBe(1);
+    await client.cancel();
+    await expect.poll(() => vi.getTimerCount()).toBe(0);
+  });
+
+  it("gives the ring to a client whose Last-Event-ID is past its last, as after a clock set back", async () => {
+    const { stream, rooms } = setup();
+    stream.publish(event(1));
+    const back = await rooms("#bubble", { last: "999999999999999" });
+    expect(msgids(await back.read(1))).toEqual(["m1"]);
+  });
+
+  it("replays two rooms' last events together: the newest it may leave unread, in their order", async () => {
+    const { stream, rooms } = setup({ pending: 4 });
+    for (let n = 1; n <= 8; n += 1) stream.publish(event(n, n % 2 === 0 ? "#b" : "#a"));
+    const late = await rooms("#a,#b");
+    const replayed = await late.read(4);
+    expect(msgids(replayed)).toEqual(["m5", "m6", "m7", "m8"]);
+    expect(replayed.map(({ id }) => Number(id))).toEqual(
+      replayed.map(({ id }) => Number(id)).toSorted((x, y) => x - y),
+    );
+  });
+
+  it("holds its sizes: a room's ring at its pending, 10,000 rooms at most, nothing left of the streams that ended", async () => {
+    const { stream, rooms } = setup({ pending: 8 });
+    for (let n = 0; n < 10_000; n += 1) stream.publish(event(n));
+    expect(stream.size().events).toBe(8);
+    for (let n = 0; n < 10_001; n += 1) stream.publish(event(n, `#r${String(n)}`));
+    expect(stream.size().rooms).toBe(10_000);
+    const open = [];
+    for (let n = 0; n < 50; n += 1) open.push(await rooms("#bubble", { peer: `198.51.100.${String(n)}` }));
+    expect(stream.size()).toMatchObject({ clients: 50, visitors: 50 });
+    for (const client of open) await client.cancel();
+    await expect.poll(() => stream.size()).toMatchObject({ clients: 0, visitors: 0 });
+  });
+});
+
 describe("StreamEvent", () => {
   it("is a message's id, its room and its state, never its text", () => {
     expect(StreamEvent.parse({ msgid: "m1", room: "#bubble", state: "hidden" })).toEqual({

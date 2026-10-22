@@ -22,6 +22,8 @@ export interface Progress {
   heard: (line: Line) => void;
   // A line checked, seen before or dropped: the mark moves past each line settled in a row.
   settled: (line: Line) => void;
+  // The rooms and the lines it holds, for the tests of its bound.
+  size: () => { rooms: number; lines: number };
 }
 
 export function makeProgress(db: DatabaseSync): Progress {
@@ -58,5 +60,6 @@ export function makeProgress(db: DatabaseSync): Progress {
       if (lines.size === 0) open.delete(room);
       if (mark !== undefined) sql.mark.run(room, mark);
     },
+    size: () => ({ rooms: open.size, lines: [...open.values()].reduce((sum, lines) => sum + lines.size, 0) }),
   };
 }

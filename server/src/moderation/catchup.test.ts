@@ -81,3 +81,18 @@ describe("each room's mark", () => {
     expect(progress.last("#bubble")).toBe(T(1));
   });
 });
+
+describe("each room's mark, its bound (3j's green pass)", () => {
+  it("holds no line once 10,000 lines of 100 rooms are heard and settled, in their order or not", () => {
+    const { progress } = setup();
+    const lines = Array.from({ length: 10_000 }, (_, n) => ({
+      room: `#r${String(n % 100)}`,
+      msgid: `m${String(n)}`,
+      time: new Date(Date.parse("2026-10-22T08:00:00.000Z") + n).toISOString(),
+    }));
+    for (const line of lines) progress.heard(line);
+    expect(progress.size()).toEqual({ rooms: 100, lines: 10_000 });
+    for (const line of lines.toReversed()) progress.settled(line);
+    expect(progress.size()).toEqual({ rooms: 0, lines: 0 });
+  });
+});

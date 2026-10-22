@@ -130,3 +130,53 @@ describe("the mute", () => {
     expect(again.mutes.mute("g1b", "earth")).toBe(false);
   });
 });
+
+describe("the mute, its green pass (3j)", () => {
+  it("keeps a mute whose lift failed in one room of its world, and lifts it in all at the next tick", () => {
+    const db = openDatabase(":memory:", [MUTE_TABLES]);
+    opened.push(db);
+    const clock = { now: T0 };
+    const refused = new Set(["#bubble-ops"]);
+    const sent: string[] = [];
+    const mutes = makeMutes({
+      db,
+      send: (command, params) => {
+        if (params[1] === "-b" && refused.has(params[0] ?? "")) return false;
+        sent.push([command, ...params].join(" "));
+        return true;
+      },
+      roomsOf: (world) => ROOMS[world] ?? [],
+      now: () => clock.now,
+      forMs: 5 * MINUTE,
+      max: 50,
+    });
+    mutes.mute("g1a", "bubble");
+    clock.now += 5 * MINUTE;
+    mutes.tick();
+    refused.clear();
+    mutes.tick();
+    expect(sent.filter((line) => line.includes("-b"))).toEqual([
+      "SAMODE #bubble -b m:g1a",
+      "SAMODE #bubble -b m:g1a",
+      "SAMODE #bubble-ops -b m:g1a",
+    ]);
+  });
+
+  it("mutes again, for its whole time, an account whose ended mute waits for its lift", () => {
+    const { clock, link, sent, mutes } = setup();
+    mutes.mute("g1a", "bubble");
+    clock.now += 5 * MINUTE;
+    link.up = false;
+    mutes.tick();
+    link.up = true;
+    expect(mutes.mute("g1a", "bubble")).toBe(true);
+    mutes.tick();
+    expect(sent.filter((line) => line.includes("-b"))).toEqual([]);
+    clock.now += 5 * MINUTE;
+    mutes.tick();
+    expect(sent.filter((line) => line.includes("-b"))).toEqual([
+      "SAMODE #bubble -b m:g1a",
+      "SAMODE #bubble-ops -b m:g1a",
+    ]);
+  });
+});
