@@ -74,9 +74,13 @@ export function mayRead(roles: Typed, room: string, who: string | undefined): bo
 export const publicRoom = (roles: Typed, room: string): boolean =>
   !["members", "members-write"].includes(typeOf(roles, room).type);
 
+/** One of the room's world's moderators or the team: they see a hidden or archived room in the lists. */
+export const staffOf = (roles: Typed, room: string, who: string | undefined): boolean =>
+  who !== undefined && staff(roles, worldOf(room)).includes(who);
+
 /** Who sees a room in the lists: a hidden one its world's moderators and the team alone, another whoever
  * may read it. */
 export function listed(roles: Typed, room: string, who: string | undefined): boolean {
   if (!typeOf(roles, room).hidden) return mayRead(roles, room, who);
-  return who !== undefined && staff(roles, worldOf(room)).includes(who);
+  return staffOf(roles, room, who);
 }

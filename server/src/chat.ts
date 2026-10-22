@@ -21,7 +21,7 @@ import { makeStrike } from "./moderation/strikes.ts";
 import { makeReconciler } from "./rooms/reconcile.ts";
 import { ensureNamed, ensureRooms, listRooms, roomWorld, worldRooms } from "./rooms/rooms.ts";
 import { makeRooms, type Rooms } from "./rooms/create.ts";
-import { desired, listed, mayRead, publicRoom, type World } from "./rooms/types.ts";
+import { desired, listed, mayRead, publicRoom, staffOf, type World } from "./rooms/types.ts";
 import { makeStream, type Stream } from "./stream/stream.ts";
 
 export interface Chat {
@@ -204,7 +204,7 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
     activity: activityRoutes(activity, {
       db,
       now,
-      visible: (room, who) => listed(settings, room, who),
+      visible: (room, who) => (keeper.archived(room) ? staffOf(settings, room, who) : listed(settings, room, who)),
       session: options.session,
     }),
     stream: stream.routes({

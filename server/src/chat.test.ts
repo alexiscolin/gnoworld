@@ -1180,6 +1180,30 @@ describe("the chat, as the server starts it", () => {
       ]).toEqual([[], [], ["#bubble/crew"], ["#bubble/attic", "#bubble/crew"], ["#bubble/attic", "#bubble/crew"]]);
     });
 
+    it("lists an archived room as a hidden one: to its world's moderators and the team alone (F576)", async () => {
+      const tokens = new Map([
+        ["mod", MOD],
+        ["stranger", "g1uauvt7txunf9zeu2qyrzv0pa5uvwjlq90r3qpa"],
+      ]);
+      const { app, chat } = setup(
+        { worlds: roled(), moderation: OFF, ergo: undefined },
+        { session: (token) => tokens.get(token ?? "") },
+      );
+      chat.rooms.create("bubble", "old");
+      chat.rooms.create("bubble", "garden");
+      chat.rooms.archive("bubble", "old");
+      const listed = async (who?: string) => {
+        const headers = who === undefined ? {} : { cookie: `__Host-session=${who}` };
+        const text = await (await app.request("/api/activity?worlds=bubble", { headers })).text();
+        return ["#bubble/garden", "#bubble/old"].filter((room) => text.includes(`"${room}"`));
+      };
+      expect([await listed(), await listed("stranger"), await listed("mod")]).toEqual([
+        ["#bubble/garden"],
+        ["#bubble/garden"],
+        ["#bubble/garden", "#bubble/old"],
+      ]);
+    });
+
     it("voices no one else on a JOIN: a reader who is no writer, a guest, the bot itself, anyone in an open room", async () => {
       const { peer } = await linked({ worlds: roled(), moderation: OFF });
       for (const room of ["#bubble", "#bubble/crew", "#bubble/desk"]) await answer(peer, room);
