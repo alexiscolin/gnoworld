@@ -3,7 +3,7 @@
 // spent whatever the answer; failures count per visitor, never per account, so nobody locks another out.
 import { once } from "node:events";
 import { lstatSync, unlinkSync } from "node:fs";
-import { createServer, type Server } from "node:net";
+import { createServer, isIP, type Server } from "node:net";
 import type { DatabaseSync } from "node:sqlite";
 import { Address } from "@gnoworld/schemas";
 import { z } from "zod";
@@ -38,8 +38,9 @@ export function authServer(db: DatabaseSync, { log, now = Date.now, deadlineMs =
     const input = Input.safeParse(json);
     if (!input.success) return { error: "frame" };
     const { accountName, passphrase, ip } = input.data;
-    // Ergo leaves the address out when it has none: those lines share one count.
-    const who = ip === undefined ? "" : visitor(ip, undefined, undefined);
+    // Ergo leaves the address out when it has none: those lines share one count, as does any ip that is
+    // no address, which would otherwise be a key as long as the line.
+    const who = ip === undefined || isIP(ip) === 0 ? "" : visitor(ip, undefined, undefined);
     const at = now();
     if (failures.full(who, at)) return { error: "limit" };
     let outcome: Outcome = { error: "account" };

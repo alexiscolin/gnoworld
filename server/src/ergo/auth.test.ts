@@ -232,6 +232,15 @@ describe("Ergo's auth script, answered by the server", () => {
     expect(await ask(line({ accountName: ME, passphrase: tickets.mint(ME), ip: "2001:db8:1:3::1" }))).toBe(YES(ME));
   });
 
+  it("counts an ip that is no address with the lines that have none: it never becomes a key of its own", async () => {
+    const { tickets, ask } = await setup();
+    for (let n = 0; n < 4; n += 1) expect(await ask(wrong("not an ip"))).toBe(NO);
+    for (let n = 0; n < 3; n += 1) expect(await ask(wrong("x".repeat(10_000)))).toBe(NO);
+    for (let n = 0; n < 3; n += 1) expect(await ask(wrong())).toBe(NO);
+    expect(await ask(line({ accountName: ME, passphrase: tickets.mint(ME) }))).toBe(NO);
+    expect(await ask(line({ accountName: ME, passphrase: tickets.mint(ME), ip: IP }))).toBe(YES(ME));
+  });
+
   it("counts the lines with no address together, and logs the limit when they pass it", async () => {
     const { tickets, ask, events } = await setup();
     for (let n = 0; n < 10; n += 1) expect(await ask(wrong())).toBe(NO);
