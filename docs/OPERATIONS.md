@@ -240,6 +240,20 @@ Slice 3, rooms by role (3m):
 - **A room that refuses the bot** (invite-only, accounts only, or an operator's limit, key or ban) is
   joined by `SAJOIN`; Ergo's oper log then names it.
 
+Slice 3, the server's retention (3n):
+
+- **The verdicts** (ids, rooms, hashed accounts, categories and scores, never a text) are kept 180 days
+  and 150,000 at most (about 1.2 KB each with their indexes, 176 MB), the oldest going first. A job runs
+  at start and every five minutes, removing 10,000 rows at most a run (6 ms measured), the rest at the
+  next. A verdict removed by the cap before its 180 days lets an edit of its line be taken as another's.
+- **The alerts** `verdicts_near_cap` and `database_near_cap` fire once when the verdicts reach 80% of
+  their cap, or the database's used pages 80% of 256 MB, and again only after a fall below. The
+  database's file does not shrink: freed pages are reused, and its `-wal` file is not counted.
+- **The other stores** purge themselves (nonces, tokens, tickets, mutes) or hold a row a room or an
+  account; the accounts' addresses are kept for the new-account rule, until slice 12's erasure path.
+- **Not yet:** the k6 runs, `web`'s per-visitor limits and Ergo's volume measure wait for 3e's stack
+  (3n-b); the sizes above are a careful start for the demo's 2 GB until those runs.
+
 ## Secrets: rotation and revocation
 
 - **The password:** write a new file with `htpasswd -cB`, then `docker compose ... restart web`.
