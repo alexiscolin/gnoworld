@@ -1017,6 +1017,17 @@ describe("the IRC link's room state (3m)", () => {
     again.say(":ergo.test 366 gnoworld #bubble :End");
     expect((await next)?.flags).toBe("M");
   });
+
+  it("asks no state before it is in its rooms, nor of a name that is no room, and answers those at once (F571)", async () => {
+    const ergo = await fakeErgo();
+    const { link } = start(ergo.port, { stateMs: 60_000 });
+    const peer = await ergo.peer(0);
+    expect(await link.state("#bubble")).toBeUndefined();
+    await welcome(peer);
+    for (const room of ["#a b", "#a\r\nQUIT", "bubble"]) expect(await link.state(room)).toBeUndefined();
+    await sync(peer);
+    expect(peer.lines.filter((line) => /^(MODE|SAMODE|NAMES|QUIT)/.test(line))).toEqual([]);
+  });
 });
 
 describe("the IRC link's catch-up (3j)", () => {
