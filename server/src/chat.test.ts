@@ -274,6 +274,30 @@ describe("the chat, as the server starts it", () => {
       await expect.poll(verdicts).toEqual([{ msgid: "m1", action: "hide", reason: "new_account_links" }]);
     });
 
+    it("stops with lines waiting: none of them is checked once the running ones end", async () => {
+      const asked: string[] = [];
+      let release = (): void => undefined;
+      const held = new Promise<"unchecked">((resolve) => {
+        release = () => {
+          resolve("unchecked");
+        };
+      });
+      const provider = (text: string): Promise<"unchecked"> => {
+        asked.push(text);
+        return held;
+      };
+      const { peer, verdicts } = await linked({ worlds: worlds("bubble"), moderation: OFF }, { provider });
+      // Four checks run at once; the fifth line waits.
+      for (const n of [1, 2, 3, 4, 5])
+        peer.say(message(`account=g1a;msgid=m${String(n)}`, "a!u@h", ["#bubble", `line ${String(n)}`]));
+      await expect.poll(() => asked.length).toBe(4);
+      await expect.poll(() => verdicts().length).toBe(4);
+      const stopping = started.at(-1)?.chat.stop();
+      release();
+      await stopping;
+      expect(asked).toHaveLength(4);
+    });
+
     it("raises no moderation_off alert when a provider is set", async () => {
       const mark = logged.length;
       await linked({ worlds: worlds("bubble"), moderation: OFF }, { provider: () => Promise.resolve(OFF_ANSWER) });

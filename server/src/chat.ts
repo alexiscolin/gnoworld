@@ -71,8 +71,9 @@ export function startChat(db: DatabaseSync, { worlds, ergo, moderation }: Settin
   return {
     routes: activityRoutes(activity, { db, now }),
     stop: async () => {
-      await link?.stop();
+      // Nothing more starts once stopping: a line left waiting goes unchecked, never to OpenAI.
       queue.stop();
+      await link?.stop();
       await queue.idle();
     },
   };
