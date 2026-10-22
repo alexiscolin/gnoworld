@@ -86,6 +86,7 @@ describe("a room's state as the link reads it", () => {
     expect(await short).toEqual({ flags: "", invites: [""], present: [] });
     const flagless = states.ask(silent, "#b");
     hear(states, ":e 353 gnoworld = #b :g1a", ":e 366 gnoworld #b :End");
+    vi.advanceTimersByTime(1000);
     expect(await flagless).toBeUndefined();
   });
 
