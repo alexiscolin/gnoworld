@@ -6,20 +6,23 @@ import { Address } from "@gnoworld/schemas";
 import { z } from "zod";
 
 // Built at each read, not at import: StrykerJS can only mutate what runs inside a test.
-function schema() {
-  const unique = (list: readonly string[]): boolean => new Set(list).size === list.length;
-  const Addresses = z.array(Address).refine(unique);
+function rules() {
   const Count = z.number().int().min(0);
-  const Rules = z.strictObject({
+  return z.strictObject({
     bannedWords: z.array(z.string().min(1)),
     linksPerMessage: Count,
     mentionsPerMessage: Count,
     linksForNewAccount: Count,
   });
+}
+
+function schema() {
+  const unique = (list: readonly string[]): boolean => new Set(list).size === list.length;
+  const Addresses = z.array(Address).refine(unique);
   const World = z.strictObject({
     slug: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/),
     moderators: Addresses,
-    rules: Rules,
+    rules: rules(),
   });
   return z
     .strictObject({
@@ -38,7 +41,7 @@ function schema() {
     });
 }
 
-type Rules = z.infer<ReturnType<typeof schema>>["worlds"][number]["rules"];
+type Rules = z.infer<ReturnType<typeof rules>>;
 
 export interface Roles {
   team: ReadonlySet<Address>;
