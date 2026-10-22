@@ -74,6 +74,15 @@ describe("the rules' banned words in scripts written without spaces", () => {
       undefined,
     ]);
   });
+
+  it("finds either kind in a world that bans both, each line holding one", () => {
+    const rules = { ...RULES, bannedWords: ["spam", "广告"] };
+    expect(["buy spam now", "这是广告内容", "fine words"].map((text) => ruleVerdict(text, rules, OLD))).toEqual([
+      "banned_word",
+      "banned_word",
+      undefined,
+    ]);
+  });
 });
 
 describe("the rules' links and mentions", () => {
