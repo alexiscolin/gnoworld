@@ -288,7 +288,7 @@ describe("the retention's alerts (3n)", () => {
 
 describe("the retention's runs (3n)", () => {
   it("runs at once, then every five minutes, and never after its stop", () => {
-    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval"] });
     const { db, verdicts, times, options } = setup();
     verdicts(1, T0 - 200 * DAY, { prefix: "a" });
     const job = startRetention(db, options);
@@ -313,7 +313,7 @@ describe("the retention's runs (3n)", () => {
   });
 
   it("lets a timed run on a failed database throw too, as the first one does (F596)", () => {
-    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval"] });
     const { db, options } = setup();
     const job = startRetention(db, options);
     db.close();
