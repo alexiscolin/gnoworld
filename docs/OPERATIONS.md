@@ -128,6 +128,9 @@ Slice 3, the login (3c; `docs/decisions.md`, 2026-10-22):
 - **New accounts are free.** An address costs nothing, so a banned person comes back with a
   new one; the limit of new accounts per visitor (`NEW_ACCOUNTS_PER_HOUR`) only slows a farm
   (decision 144).
+- **Ten tokens an account.** An account keeps its 10 newest logins; an eleventh logs the oldest
+  device out. Accounts are free, so the tokens are bounded by the accounts, ten each, not by a
+  fixed number (F435).
 - **A relayed login.** Another site, or its server, can ask for our text, show it to a person
   and send the signature itself, so the cookie lands with it. The server cannot tell; only a
   wallet that shows the requesting site and refuses another domain's text can, which slice
