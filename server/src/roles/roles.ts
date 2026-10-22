@@ -16,10 +16,15 @@ function rules() {
   });
 }
 
+// A world's slug and a group's name: lower-case letters and digits, single hyphens between.
+function slug() {
+  return z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/);
+}
+
 // A room's type (3m): who joins it, who reads it and who speaks in it (rooms/types.ts). Only a members
 // room names its readers, and a members-write room its writers too; hidden leaves it out of the lists.
 function room() {
-  const Group = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/);
+  const Group = slug();
   const none = z.never().optional();
   const base = { room: z.string(), hidden: z.boolean().default(false) };
   return z.discriminatedUnion("type", [
@@ -34,10 +39,10 @@ function world(Addresses: z.ZodType<Address[]>) {
   const Groups = z
     .unknown()
     .refine((value) => typeof value !== "object" || value === null || !Object.hasOwn(value, "__proto__"))
-    .pipe(z.record(z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/), Addresses));
+    .pipe(z.record(slug(), Addresses));
   return z
     .strictObject({
-      slug: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/),
+      slug: slug(),
       moderators: Addresses,
       rules: rules(),
       groups: Groups.default({}),
