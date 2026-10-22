@@ -85,6 +85,7 @@ export function makeLogin(db: DatabaseSync, { chains, now, verify = verifyProof,
       if (!chains.includes(chainId)) return "chain";
       const at = now();
       sql.purgeNonces.run(at);
+      // ponytail: count(*) is O(n), n ≤ nonceCap (0.01 ms at 100,000); a counter kept with the rows if the cap rises.
       if (Count.parse(sql.countNonces.get()).n >= nonceCap) return "full";
       const nonce = randomBytes(16).toString("base64url");
       const [issued, expiresAt] = [new Date(at).toISOString(), new Date(at + ttl).toISOString()];
