@@ -337,7 +337,7 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "the stream buffered" "the stream comes through web unbuffered" nginx sed '/proxy_buffering off;/d'
 	mutant "no limit of web's own on the login" "a longer burst meets web's own limit" nginx sed '/limit_req zone=login/d'
 	mutant "a host added to the way out" "the way out lets one host out" acl awk '{ print } /- api.openai.com/ { print "    - example.com" }'
-	mutant "the way out lets private addresses through" "the way out lets http://localtest.me/ through" \
+	mutant "the way out lets private addresses through" "the way out lets http://10.0.0.1.nip.io/ through" \
 		proxy_config sed 's#^unsafe_allow_private_ranges:.*#unsafe_allow_private_ranges: true#'
 	mutant "the server's requests straight out" "the server does not reach OpenAI's API" compose 'services: { server: { environment: { NODE_USE_ENV_PROXY: "0" } } }'
 	mutant "the guard drops the way out's replies" "does not answer through the way out" guard sed '/--sport 4750/d'
@@ -574,7 +574,8 @@ print("%.2f %d" % (sum(float(s.get("cpus", 0)) for s in services), sum(size(s.ge
 	expect "the server's image installs the lockfile's versions" "$(grep -c -- '--frozen-lockfile' "$here/server/Dockerfile")" 1
 
 	# Ergo's rendered settings, read back (the plan's keys; docs/decisions.md for the history's days).
-	docker cp "$ergo:/tmp/ircd.yaml" - | tar -xO >"$tmp/ircd.yaml"
+	# /tmp is in memory, which docker cp cannot see: read it through the container.
+	docker exec "$ergo" cat /tmp/ircd.yaml >"$tmp/ircd.yaml"
 	for line in "name: \"$SERVER_NAME\"" '":6667": {}' '":8097":' "proxy-allowed-from: [\"$WEB_ADDRESS\"]" \
 		"allowed-origins: [\"$ORIGINS\"]" 'login-via-pass-command: false' 'operator-only-creation: true' \
 		'default-modes: +ntCM' 'max-channels-per-client: 1000' 'expire-time: 90d' 'direct-messages: disabled' \
@@ -659,7 +660,7 @@ const frames = () => {
     let length = held[1] & 127;
     let at = 2;
     if (length === 126) [length, at] = held.length < 4 ? [Infinity, 4] : [held.readUInt16BE(2), 4];
-    if (length === 127) [length, at] = held.length < 10 ? [Infinity, 10] : [Number(held.readBigUInt64BE(2)), 10];
+    else if (length === 127) [length, at] = held.length < 10 ? [Infinity, 10] : [Number(held.readBigUInt64BE(2)), 10];
     if (held.length < at + length) return;
     if ((held[0] & 15) === 1) {
       for (const line of held
@@ -712,15 +713,20 @@ CLIENT
 	ws 203.0.113.25 "$auth" "$ORIGINS" "NICK chief25" "USER c 0 * :c" + "OPER admin $oper" "JOIN $room" "PRIVMSG $room :$marker" \
 		+ + + + + + + + + + + + + + + >"$tmp/chief.txt" &
 	chief=$!
-	sleep 4
-	guest=$(ws 203.0.113.21 "$auth" "$ORIGINS" "NICK guest21" "USER g 0 * :g" + "JOIN $room" "PRIVMSG $room :a guest speaks" \
+	# The guest comes once the room is made and the marker said.
+	for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+		grep -q " 366 chief25 $room " "$tmp/chief.txt" 2>/dev/null && break
+		sleep 1
+	done
+	sleep 1
+	guest=$(ws 203.0.113.21 "$auth" "$ORIGINS" "NICK guest21" "USER g 0 * :g" + "JOIN $room" "CHATHISTORY LATEST $room * 10" "PRIVMSG $room :a guest speaks" \
 		"JOIN #byaguest$(openssl rand -hex 3)" "JOIN #earth" "PRIVMSG #earth :a guest speaks" "REGISTER * * a-password" \
 		"NS REGISTER a-password" "AUTHENTICATE PLAIN" "AUTHENTICATE $(printf 'g1x\0g1x\0a-password' | base64)" "OPER admin wrong" "OPER admin wrong")
 	wait "$chief" || true
 	expect "a visitor's WebSocket reaches Ergo through web" "$(first "$guest")" "HTTP/1.1 101 Switching Protocols"
-	holds "an operator speaks in the room it made (the control of the guest's refusal)" "$(cat "$tmp/chief.txt")" " 381 chief25 "
+	holds "an operator logs in through the WebSocket and makes a room (a known limit, and the control)" "$(cat "$tmp/chief.txt")" " 366 chief25 $room "
 	holds "a guest joins a room" "$guest" "^:guest21![^ ]+ JOIN $room\$"
-	holds "and reads its history, replayed at the join" "$guest" " PRIVMSG $room :$marker\$"
+	holds "and reads its history: the operator's line (CHATHISTORY)" "$guest" " PRIVMSG $room :$marker\$"
 	holds "a guest is refused when it speaks, in a room Ergo made with its default modes" "$guest" " 404 guest21 $room "
 	holds "and in a world's room" "$guest" ' 404 guest21 #earth '
 	holds "a guest makes no room: only operators do" "$guest" ' 403 guest21 #byaguest[0-9a-f]+ :Only server operators can create new channels'
