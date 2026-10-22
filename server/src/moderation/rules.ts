@@ -12,14 +12,15 @@ const fold = (text: string): string =>
     .replace(/[\p{M}\p{Cf}]/gu, "")
     .toLowerCase();
 
+// All the words in one pass over the line: a pass a word grew with both (the complexity review, F530).
 function banned(folded: string, words: readonly string[]): boolean {
-  return words.some((word) => {
-    const plain = fold(word).trim();
+  const escaped = words
+    .map((word) => fold(word).trim())
     // A word that folds to nothing would match everywhere.
-    if (plain === "") return false;
-    const escaped = plain.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
-    return new RegExp(`(?:^|[^\\p{L}\\p{N}])${escaped}(?:$|[^\\p{L}\\p{N}])`, "u").test(folded);
-  });
+    .filter((word) => word !== "")
+    .map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+"));
+  if (escaped.length === 0) return false;
+  return new RegExp(`(?:^|[^\\p{L}\\p{N}])(?:${escaped.join("|")})(?:$|[^\\p{L}\\p{N}])`, "u").test(folded);
 }
 
 export function ruleVerdict(
