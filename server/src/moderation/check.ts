@@ -40,6 +40,34 @@ interface Options {
   newAccountMs?: number;
 }
 
+/** The provider behind a breaker: five failures running leave it alone for 30 seconds, the messages
+ * unchecked; one more failure after the pause pauses it again at once. A throw is a failure. */
+function withBreaker(
+  provider: (text: string) => Promise<Answer | "unchecked">,
+  { now, log }: { now: () => number; log: Log },
+): (text: string) => Promise<Answer | "unchecked"> {
+  const breaker = { failures: 0, until: 0 };
+  const failed = (): void => {
+    breaker.failures += 1;
+    if (breaker.failures < 5 && breaker.until === 0) return;
+    breaker.failures = 0;
+    breaker.until = now() + 30_000;
+    log("alert", { error: "moderation_breaker" });
+  };
+  return async (text) => {
+    if (now() < breaker.until) return "unchecked";
+    let answer: Answer | "unchecked";
+    try {
+      answer = await provider(text);
+    } catch {
+      answer = "unchecked";
+    }
+    if (answer === "unchecked") failed();
+    else [breaker.failures, breaker.until] = [0, 0];
+    return answer;
+  };
+}
+
 export function makeChecker(options: Options): (said: Said) => Promise<Verdict | "seen"> {
   const { db, rulesOf, provider, thresholds, pepper, log, now = Date.now, newAccountMs = 24 * 60 * 60_000 } = options;
   const sql = {
@@ -53,24 +81,7 @@ export function makeChecker(options: Options): (said: Said) => Promise<Verdict |
     firstSeen: db.prepare("SELECT first_seen FROM accounts WHERE address = ?"),
   };
   const FirstSeen = z.object({ first_seen: z.number() }).optional();
-  // A provider that failed five times running is left alone for 30 seconds, the messages unchecked; one
-  // more failure after the pause pauses it again at once.
-  const breaker = { failures: 0, until: 0 };
-  const failed = (): void => {
-    breaker.failures += 1;
-    if (breaker.failures < 5 && breaker.until === 0) return;
-    breaker.failures = 0;
-    breaker.until = now() + 30_000;
-    log("alert", { error: "moderation_breaker" });
-  };
-  const ask = async (text: string): Promise<Answer | "unchecked"> => {
-    if (provider === undefined) return "unchecked";
-    try {
-      return await provider(text);
-    } catch {
-      return "unchecked";
-    }
-  };
+  const ask = provider === undefined ? undefined : withBreaker(provider, { now, log });
   return async ({ room, account, msgid, text }) => {
     const at = now();
     const hashed = createHmac("sha256", pepper).update(account).digest("hex");
@@ -93,15 +104,9 @@ export function makeChecker(options: Options): (said: Said) => Promise<Verdict |
     const firstSeen = FirstSeen.parse(sql.firstSeen.get(account))?.first_seen;
     const reason = ruleVerdict(text, rules, { newAccount: firstSeen === undefined || at - firstSeen < newAccountMs });
     if (reason !== undefined) return settle({ action: "hide", reason });
-    if (provider === undefined) return settle({ action: "unchecked" }, { why: "no_key" });
-    if (at < breaker.until) return settle({ action: "unchecked" });
+    if (ask === undefined) return settle({ action: "unchecked" }, { why: "no_key" });
     const answer = await ask(text);
-    if (answer === "unchecked") {
-      failed();
-      return settle({ action: "unchecked" });
-    }
-    breaker.failures = 0;
-    breaker.until = 0;
+    if (answer === "unchecked") return settle({ action: "unchecked" });
     return settle(decide(answer, thresholds), { answer });
   };
 }
