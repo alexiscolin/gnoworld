@@ -28,6 +28,20 @@ interface Client {
   unread: number;
 }
 
+// Hono's write never rejects (hono 4.13.13, utils/stream.js): a gone client ends by its abort, a slow one
+// by the writes it leaves pending, beats included.
+function writeTo(client: Client, text: string, pending: number): void {
+  if (client.unread >= pending) {
+    client.stream.abort();
+    return;
+  }
+  client.unread += 1;
+  const sent = (): void => {
+    client.unread -= 1;
+  };
+  client.stream.write(text).then(sent, sent);
+}
+
 export function makeStream(options: Options = {}): Stream {
   const { perVisitor = 4, total = 1000, heartbeatMs = 15_000, pending = 64 } = options;
   const Rooms = z
@@ -47,18 +61,8 @@ export function makeStream(options: Options = {}): Stream {
   const byVisitor = new Map<string, number>();
   let admitted = 0;
 
-  // Hono's write never rejects (hono 4.13.13, utils/stream.js): a gone client ends by its abort, a slow
-  // one by the writes it leaves pending, beats included.
   const write = (client: Client, text: string): void => {
-    if (client.unread >= pending) {
-      client.stream.abort();
-      return;
-    }
-    client.unread += 1;
-    const sent = (): void => {
-      client.unread -= 1;
-    };
-    client.stream.write(text).then(sent, sent);
+    writeTo(client, text, pending);
   };
   const send = (client: Client, id: number, event: StreamEvent): void => {
     write(client, `id: ${String(id)}\nevent: verdict\ndata: ${JSON.stringify(event)}\n\n`);
