@@ -120,6 +120,14 @@ test.describe("a planted violation", () => {
     expect(page.url()).toBe("http://127.0.0.1:4173/");
   });
 
+  test("is reported from a second tab of the same context too", async ({ page, violations }) => {
+    const other = await page.context().newPage();
+    await other.goto("/");
+    await hydrated(other);
+    await plant(other, "setTimeout('window.ran = true', 0)");
+    await expect.poll(() => violations).toEqual(["script-src"]);
+  });
+
   test("keeps the page out of another site's frame", async ({ page }) => {
     await page.setContent('<iframe src="http://127.0.0.1:4173/"></iframe>');
     // Chromium shows its own error page in place of a document its frame-ancestors refuse.

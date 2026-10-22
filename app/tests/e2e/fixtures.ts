@@ -37,19 +37,25 @@ export const test = (process.env["SANDBOX_RUNTIME"] ? ownBrowser : base).extend<
   planted: [false, { option: true }],
   violations: [
     async ({ page, planted, javaScriptEnabled }, use) => {
+      const context = page.context();
       const seen: string[] = [];
-      // Whether the page's document came with a policy: one a test makes up itself carries none.
-      const main = { policed: false };
-      page.on("response", (response) => {
-        if (response.request().isNavigationRequest() && response.frame() === page.mainFrame()) {
-          main.policed = response.headers()["content-security-policy"] !== undefined;
-        }
+      // The pages whose document came with a policy, in every tab of the test's context: one a test makes
+      // up itself carries none.
+      const policed = new Set<Page>();
+      context.on("response", (response) => {
+        const request = response.request();
+        // A service worker's own fetch belongs to no frame.
+        if (!request.isNavigationRequest() || request.serviceWorker() !== null) return;
+        const frame = request.frame();
+        if (frame !== frame.page().mainFrame()) return;
+        if (response.headers()["content-security-policy"] === undefined) policed.delete(frame.page());
+        else policed.add(frame.page());
       });
-      page.on("console", (message) => {
+      context.on("console", (message) => {
         const [mark, directive] = message.text().split(" ");
         if (mark === MARK && directive !== undefined) seen.push(directive);
       });
-      await page.addInitScript(
+      await context.addInitScript(
         ([mark, flush]) => {
           document.addEventListener("securitypolicyviolation", (event) => {
             console.info(mark, event.blockedURI === flush ? "flush" : event.effectiveDirective);
@@ -59,8 +65,9 @@ export const test = (process.env["SANDBOX_RUNTIME"] ? ownBrowser : base).extend<
       );
       await use(seen);
       // A violation reaches the test as a task: one planted last, once seen, says every earlier one came.
-      if (javaScriptEnabled && main.policed && !page.isClosed()) {
-        await page.evaluate((flush) => {
+      for (const each of javaScriptEnabled ? policed : []) {
+        if (each.isClosed()) continue;
+        await each.evaluate((flush) => {
           new Image().src = flush;
         }, FLUSH);
         await expect.poll(() => seen.at(-1), { message: "the page's policy reported the flush" }).toBe("flush");
