@@ -45,4 +45,19 @@ describe("the link's own lines (3j's green pass)", () => {
       { numRuns: 2000 },
     );
   });
+
+  it("allows a room flag alone, never inside a longer mode, and a KICK with its reason and nothing after (F570)", () => {
+    expect(["+M", "-i", "+o+M", "x+M", "+M+o", "+MM"].map((mode) => allowed("SAMODE", ["#bubble", mode]))).toEqual([
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+    ]);
+    expect([
+      allowed("KICK", ["#bubble", "g1a", "not on this room's list"]),
+      allowed("KICK", ["#bubble", "g1a", "not on this room's list", "extra"]),
+    ]).toEqual([true, false]);
+  });
 });
