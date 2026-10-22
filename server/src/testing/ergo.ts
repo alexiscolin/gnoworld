@@ -35,10 +35,16 @@ const [TAG = ""] = readFileSync(new URL("deploy/ergo/VERSION", ROOT), "utf8").sp
 const BINARY = join(process.env["GNOWORLD_TOOLS"] ?? join(homedir(), ".cache/gnoworld-tools"), `ergo-${TAG}`, "ergo");
 
 export async function startErgo(options: ErgoOptions = {}): Promise<Ergo> {
+  const [port, wsPort] = [await freePort(), await freePort()];
   const owned = options.dir === undefined;
   const dir = options.dir ?? mkdtempSync(join(tmpdir(), "gnoworld-ergo-"));
-  const [port, wsPort] = [await freePort(), await freePort()];
-  const operPassword = configure(dir, [port, wsPort], options);
+  let operPassword: string;
+  try {
+    operPassword = configure(dir, [port, wsPort], options);
+  } catch (error) {
+    if (owned) rmSync(dir, { recursive: true, force: true });
+    throw error;
+  }
   const child = spawn(BINARY, ["run", "--conf", join(dir, "ircd.yaml")], {
     cwd: dir,
     env: { ...process.env, ...options.env },
@@ -47,7 +53,15 @@ export async function startErgo(options: ErgoOptions = {}): Promise<Ergo> {
   let log = "";
   child.stdout.on("data", (chunk: Buffer) => (log += chunk.toString()));
   child.stderr.on("data", (chunk: Buffer) => (log += chunk.toString()));
-  const exited = once(child, "exit");
+  // A binary that cannot start emits "error" and never "exit": either ends the wait.
+  const exited = new Promise<void>((resolve) => {
+    child.once("exit", () => {
+      resolve();
+    });
+    child.once("error", () => {
+      resolve();
+    });
+  });
   // A test process that ends without stop() leaves no Ergo behind.
   const orphan = (): void => {
     child.kill("SIGKILL");

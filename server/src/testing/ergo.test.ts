@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join as joinPath } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -884,6 +884,19 @@ describe("the helper", { timeout: 30_000 }, () => {
     const listeners = readFileSync(joinPath(e.dir, "ircd.yaml"), "utf8").match(/^\s+"[^"]*:\d+":/gm) ?? [];
     expect(listeners.map((line) => line.trim())).toEqual(ports.map((p) => `"127.0.0.1:${String(p)}":`));
     for (const port of ports) await (await rawClient(port)).close();
+  });
+
+  it("leaves no folder behind when Ergo cannot start at all", () => {
+    const tmp = keptFolder();
+    const script = `import { startErgo } from ${JSON.stringify(new URL("ergo.ts", import.meta.url).href)};
+await startErgo().then(() => process.exit(2), () => process.exit(0));`;
+    const run = spawnSync(process.execPath, ["--input-type=module", "-e", script], {
+      env: { ...process.env, GNOWORLD_TOOLS: "/nonexistent", TMPDIR: tmp },
+      encoding: "utf8",
+      timeout: 20_000,
+    });
+    expect(run.status).toBe(0);
+    expect(readdirSync(tmp)).toEqual([]);
   });
 
   it("frees its ports and removes its folder when stopped, and stopping twice is fine", async () => {
