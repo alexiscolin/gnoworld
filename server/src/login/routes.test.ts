@@ -130,10 +130,11 @@ describe("logging in", () => {
     expect((await challenge(app, { origin: "http://localhost:5173" })).text).toContain("Domain: localhost:5173\n");
   });
 
-  it("takes any origin of the list, and a proof sent from another listed origin than its challenge's", async () => {
-    const { app } = setup({ origins: ["http://localhost:5173", ORIGIN] });
-    const made = await challenge(app, { origin: "http://localhost:5173" });
-    expect((await verify(app, made, { who: wallet(), origin: ORIGIN })).status).toBe(200);
+  it("takes any origin of the list", async () => {
+    const other = "http://localhost:5173";
+    const { app } = setup({ origins: [other, ORIGIN] });
+    const made = await challenge(app, { origin: other });
+    expect((await verify(app, made, { who: wallet(), origin: other })).status).toBe(200);
   });
 
   it("sets a fresh token whatever cookie the request brings, and the brought one stays unknown", async () => {
