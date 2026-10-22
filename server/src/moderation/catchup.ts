@@ -15,6 +15,12 @@ interface Line {
   time?: string;
 }
 
+// A line not yet behind its room's mark: whether it is settled, and its time.
+interface Entry {
+  done: boolean;
+  time: string | undefined;
+}
+
 export interface Progress {
   // The mark, or the time of the first line still waiting when the room has none yet.
   last: (room: string) => string | undefined;
@@ -37,13 +43,13 @@ export function makeProgress(db: DatabaseSync): Progress {
   // Each room's lines not yet behind the mark, in the order heard: whether each is settled, and its time.
   // ponytail: the order heard, not Ergo's: a live line heard before a page of older history moves the mark
   // past that page's lines while they wait, lost if the process dies then. Order by Ergo's time if it matters.
-  const open = new Map<string, Map<string, { done: boolean; time: string | undefined }>>();
+  const open = new Map<string, Map<string, Entry>>();
   return {
     last: (room) =>
       Row.parse(sql.last.get(room))?.time ??
       [...(open.get(room)?.values() ?? [])].find(({ time }) => time !== undefined)?.time,
     heard: ({ room, msgid, time }) => {
-      const lines = open.get(room) ?? new Map<string, { done: boolean; time: string | undefined }>();
+      const lines = open.get(room) ?? new Map<string, Entry>();
       open.set(room, lines.set(msgid, { done: false, time }));
     },
     settled: ({ room, msgid }) => {

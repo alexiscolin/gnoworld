@@ -100,7 +100,8 @@ function reader(options: Options, state: State) {
       // millisecond, which may hold more (F542). A page all in that one millisecond goes past it.
       // ponytail: more than a page of lines in one millisecond loses the rest; pages by msgid lose a hidden one.
       if (done === undefined || done.lines < PAGE || done.last === "") return;
-      const from = earlier(done.last) === state.after.get(done.room) ? done.last : earlier(done.last);
+      const back = earlier(done.last);
+      const from = back === state.after.get(done.room) ? done.last : back;
       const next = (): void => {
         if (!s.destroyed) history(s, done.room, from);
       };
@@ -122,8 +123,10 @@ function reader(options: Options, state: State) {
     PING: (s, { params }) => s.write(line("PONG", params)),
     PRIVMSG: (_, message) => {
       const batch = state.batches.get(message.tags.get("batch") ?? "");
-      if (batch !== undefined)
-        Object.assign(batch, { lines: batch.lines + 1, last: message.tags.get("time") ?? batch.last });
+      if (batch !== undefined) {
+        batch.lines += 1;
+        batch.last = message.tags.get("time") ?? batch.last;
+      }
       const heard = said(message, state.joined);
       if (heard !== undefined) onMessage(heard);
     },
