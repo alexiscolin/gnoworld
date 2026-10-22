@@ -77,6 +77,8 @@ export function makeStream(options: Options = {}): Stream {
       if (kept.length > pending) kept.shift();
       if (kept.length === 1 && rings.size < 10_000) rings.set(event.room, kept);
       // One frame for every client that follows the room.
+      // ponytail: every client is asked whether it follows; 1,000 at most, about 7 us an event. Index
+      // the clients by room if the total grows.
       const text = frame(sequence, event);
       for (const client of clients) if (client.rooms.has(event.room)) write(client, text);
     },

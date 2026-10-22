@@ -100,14 +100,17 @@ export function makeChecker(options: Options): (said: Said) => Promise<Verdict |
       "UPDATE verdicts SET action = ?, reason = ?, flags = ?, scores = ?, thresholds = ? WHERE msgid = ?",
     ),
     firstSeen: db.prepare("SELECT first_seen FROM accounts WHERE address = ?"),
-    recent: db.prepare("SELECT count(*) AS n FROM verdicts WHERE account = ? AND at > ? AND at <= ?"),
+    // Counted up to one past the limit: an account's flood costs no more than the limit to measure.
+    recent: db.prepare(
+      "SELECT count(*) AS n FROM (SELECT 1 FROM verdicts WHERE account = ? AND at > ? AND at <= ? LIMIT ?)",
+    ),
     pending: db.prepare("SELECT 1 FROM verdicts WHERE msgid = ? AND action = 'pending'"),
   };
   const Count = z.object({ n: z.number() });
   const owns = editsOwn(db);
   // A line counts itself in its rate: it is claimed before the rules run.
   const tooFast = (key: string, at: number): boolean =>
-    Count.parse(sql.recent.get(key, at - RATE.ms, at)).n > RATE.lines;
+    Count.parse(sql.recent.get(key, at - RATE.ms, at, RATE.lines + 1)).n > RATE.lines;
   const known = lineKnown(db);
   // An edit's line: none, its author's, another's, or one it never checked (F549).
   const editOf = ({ edits }: Said, key: string): "none" | "own" | "other" | "unknown" =>
