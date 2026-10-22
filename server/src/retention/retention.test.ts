@@ -1,4 +1,4 @@
-import type { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 import fc from "fast-check";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -144,6 +144,35 @@ describe("the retention's budget (3n)", () => {
     verdicts(25, T0 - 100);
     retention.tick();
     expect(times()).toEqual([T0 - 78, T0 - 77, T0 - 76]);
+  });
+
+  it("removes in statements of one batch at most, so none holds the database long (F597)", () => {
+    const db = openDatabase(":memory:", TABLES);
+    opened.push(db);
+    const sizes: number[] = [];
+    // The database as the retention sees it, each DELETE's rows counted.
+    const counted = new Proxy(db, {
+      get(target, key): unknown {
+        if (key !== "prepare") return Reflect.get(target, key);
+        return (sql: string) => {
+          const statement = target.prepare(sql);
+          if (!sql.startsWith("DELETE")) return statement;
+          return {
+            run: (...params: SQLInputValue[]) => {
+              const result = statement.run(...params);
+              sizes.push(Number(result.changes));
+              return result;
+            },
+          };
+        };
+      },
+    });
+    const add = db.prepare(
+      "INSERT INTO verdicts (msgid, room, account, action, at) VALUES (?, '#bubble', 'h', 'pass', ?)",
+    );
+    for (let i = 0; i < 70; i += 1) add.run(`m${String(i)}`, T0 - 200 * DAY + i);
+    makeRetention(counted, { log: logger(PEPPER, () => true), now: () => T0, batch: 10, batches: 3 }).tick();
+    expect(sizes).toEqual([10, 10, 10]);
   });
 
   it("holds its default budget at 10,000 rows a tick", () => {
