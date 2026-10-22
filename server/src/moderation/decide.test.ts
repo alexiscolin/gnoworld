@@ -1,15 +1,8 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { decide } from "./decide.ts";
-import { CATEGORIES, type Answer, type Category } from "./provider.ts";
-
-const answer = (
-  flags: Partial<Record<Category, boolean>> = {},
-  scores: Partial<Record<Category, number>> = {},
-): Answer => ({
-  flagged: Object.fromEntries(CATEGORIES.map((c) => [c, flags[c] ?? false])) as Record<Category, boolean>,
-  scores: Object.fromEntries(CATEGORIES.map((c) => [c, scores[c] ?? 0])) as Record<Category, number>,
-});
+import { answer } from "../testing/answers.ts";
+import { CATEGORIES, type Category } from "./provider.ts";
 
 describe("decide", () => {
   it("passes what OpenAI flags nothing in, with no threshold set", () => {

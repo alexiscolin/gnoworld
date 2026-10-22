@@ -11,9 +11,10 @@ import { openDatabase } from "./db.ts";
 import { logger } from "./log.ts";
 import { LOGIN_TABLES } from "./login/login.ts";
 import { VERDICT_TABLES } from "./moderation/check.ts";
-import { CATEGORIES, type Answer } from "./moderation/provider.ts";
+import type { Answer } from "./moderation/provider.ts";
 import type { Rules } from "./roles/roles.ts";
 import { ROOM_TABLES } from "./rooms/rooms.ts";
+import { answer } from "./testing/answers.ts";
 import { fakeErgo, message, PASSWORD, welcome } from "./testing/fakeErgo.ts";
 
 const T0 = Date.parse("2026-10-22T12:00:00.000Z");
@@ -24,12 +25,7 @@ const log = logger(PEPPER, (line) => logged.push(line));
 const RULES: Rules = { bannedWords: ["spam"], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
 const worlds = (...slugs: string[]) => new Map(slugs.map((slug) => [slug, { rules: RULES }]));
 const OFF = { openaiKey: undefined, thresholds: {}, newAccountHours: 24 };
-const OFF_ANSWER: Answer = JSON.parse(
-  JSON.stringify({
-    flagged: Object.fromEntries(CATEGORIES.map((c) => [c, false])),
-    scores: Object.fromEntries(CATEGORIES.map((c) => [c, 0])),
-  }),
-) as Answer;
+const OFF_ANSWER = answer();
 const started: { db: DatabaseSync; chat: Chat }[] = [];
 afterEach(async () => {
   logged.splice(0);

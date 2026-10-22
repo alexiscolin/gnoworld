@@ -8,7 +8,8 @@ import { logger } from "../log.ts";
 import { LOGIN_TABLES } from "../login/login.ts";
 import type { Rules } from "../roles/roles.ts";
 import { makeChecker, VERDICT_TABLES } from "./check.ts";
-import { CATEGORIES, type Answer, type Category } from "./provider.ts";
+import { answer } from "../testing/answers.ts";
+import type { Answer } from "./provider.ts";
 
 const T0 = Date.parse("2026-10-22T12:00:00.000Z");
 const HOUR = 60 * 60_000;
@@ -16,13 +17,6 @@ const PEPPER = "a-pepper-of-forty-characters-0123456789";
 const OLD = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const RULES: Rules = { bannedWords: ["spam"], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
 const said = (text: string, msgid = "m1", account = OLD) => ({ room: "#bubble", account, msgid, text });
-const answer = (
-  flags: Partial<Record<Category, boolean>> = {},
-  scores: Partial<Record<Category, number>> = {},
-): Answer => ({
-  flagged: Object.fromEntries(CATEGORIES.map((c) => [c, flags[c] ?? false])) as Record<Category, boolean>,
-  scores: Object.fromEntries(CATEGORIES.map((c) => [c, scores[c] ?? 0])) as Record<Category, number>,
-});
 const Row = z.object({
   msgid: z.string(),
   room: z.string(),

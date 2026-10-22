@@ -6,16 +6,13 @@ import { openDatabase } from "../db.ts";
 import { logger } from "../log.ts";
 import { LOGIN_TABLES } from "../login/login.ts";
 import { makeChecker, VERDICT_TABLES } from "../moderation/check.ts";
-import { CATEGORIES, type Answer } from "../moderation/provider.ts";
 import { makeQueue } from "../moderation/queue.ts";
+import { answer } from "./answers.ts";
 
 const PEPPER = "a-pepper-of-forty-characters-0123456789";
 const log = logger(PEPPER, () => true);
 const db = openDatabase(":memory:", [LOGIN_TABLES, VERDICT_TABLES]);
-const nothing: Answer = {
-  flagged: Object.fromEntries(CATEGORIES.map((c) => [c, false])) as Answer["flagged"],
-  scores: Object.fromEntries(CATEGORIES.map((c) => [c, 0])) as Answer["scores"],
-};
+const nothing = answer();
 const check = makeChecker({
   db,
   rulesOf: () => ({ bannedWords: ["spam"], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 }),
