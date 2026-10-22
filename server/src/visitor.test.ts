@@ -52,6 +52,12 @@ describe("visitor", () => {
     expect(visitor("::c633:6401", "198.51.100.9", "::198.51.100.1")).toBe("198.51.100.9");
   });
 
+  it("reads a mapped IPv4 address written in hex as the IPv4 address it is, peer, header or proxy", () => {
+    expect(visitor("::ffff:c633:6401", undefined, undefined)).toBe("198.51.100.1");
+    expect(visitor(PROXY, "::ffff:cb00:7107", PROXY)).toBe("203.0.113.7");
+    expect(visitor("::ffff:10.0.0.2", "198.51.100.1", "::ffff:a00:2")).toBe("198.51.100.1");
+  });
+
   it("reads an IPv4 address that Node shows mapped into IPv6, peer or header", () => {
     expect(visitor("::ffff:10.0.0.2", "::ffff:198.51.100.1", PROXY)).toBe("198.51.100.1");
     expect(visitor("::ffff:203.0.113.7", undefined, undefined)).toBe("203.0.113.7");

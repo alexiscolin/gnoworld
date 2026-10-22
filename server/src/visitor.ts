@@ -10,8 +10,13 @@ export function visitor(peer: string, header: string | undefined, proxy: string 
   return isIP(address) === 6 ? prefix64(address) : address;
 }
 
+// Any IPv4-mapped form, dotted or in hex, as the IPv4 address it is: its canonical form ends in two groups.
 function unmapped(address: string): string {
-  return /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(address)?.[1] ?? address;
+  if (isIP(address) !== 6) return address;
+  const [, high = "", low = ""] = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(canonical(address)) ?? [];
+  if (high === "") return address;
+  const [a, b] = [Number.parseInt(high, 16), Number.parseInt(low, 16)];
+  return [a >> 8, a & 255, b >> 8, b & 255].join(".");
 }
 
 function same(a: string, b: string): boolean {
