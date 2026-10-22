@@ -67,7 +67,7 @@ export function mayRead(roles: Typed, room: string, who: string | undefined): bo
   const type = typeOf(roles, room);
   if (type.type === "open" || type.type === "announcement") return true;
   if (type.type === "accounts") return who !== undefined;
-  return who !== undefined && desired(roles, room, { archived: false }).invites.includes(who);
+  return who !== undefined && people(roles, worldOf(room), type).invites.includes(who);
 }
 
 /** A room whose lines may go to OpenAI: any but a members room, whose lines stay between its members. */
