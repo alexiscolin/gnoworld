@@ -88,9 +88,7 @@ export function loginRoutes(login: Login, { log, origins, proxy, newAccountsPerH
     const body = ChallengeRequest.safeParse(await json(c));
     if (!body.success) return refuse(c, "body");
     const made = login.challenge(body.data.chainId, c.get("host"));
-    if (made === "full") return refuse(c, "full");
-    if (made === "chain") return refuse(c, "chain");
-    return c.json(made);
+    return typeof made === "string" ? refuse(c, made) : c.json(made);
   });
 
   app.post("/verify", async (c) => {
