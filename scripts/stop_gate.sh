@@ -9,6 +9,11 @@ input=$(cat)
 case $input in *'"stop_hook_active":true'* | *'"stop_hook_active": true'*) exit 0 ;; esac
 cd "${CLAUDE_PROJECT_DIR:-$(dirname "$0")/..}"
 sh scripts/code_changed.sh || exit 0
-[ "$(cat .claude/tmp/gate-green 2>/dev/null)" = "$(sh scripts/code_changed.sh --state)" ] && exit 0
+state=$(sh scripts/code_changed.sh --state)
+[ "$(cat .claude/tmp/gate-green 2>/dev/null)" = "$state" ] && exit 0
+# Once per tree: a stop on the very tree it blocked already says nothing new.
+[ "$(cat .claude/tmp/gate-blocked 2>/dev/null)" = "$state" ] && exit 0
+# A record it cannot write still blocks: a hook that fails lets the turn end.
+{ mkdir -p .claude/tmp && printf '%s\n' "$state" >.claude/tmp/gate-blocked; } 2>/dev/null || :
 echo "The code changed since the gate last passed on it: run sh scripts/check.sh, fix what fails, then end the turn." >&2
 exit 2

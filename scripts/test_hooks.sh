@@ -312,10 +312,24 @@ code=0; stop '{"stop_hook_active":false}' || code=$?
 [ "$code" = 2 ] || fail "stop_gate did not block a code change the gate never passed (exit $code)"
 [ ! -e "$t/gate-ran" ] || fail "stop_gate ran the repository's check.sh outside the sandbox"
 stop '{"stop_hook_active":true}' || fail "stop_gate blocked a second stop in a row"
+# Once per tree: a later turn that stops on the tree it blocked already learns nothing new.
+stop '{"stop_hook_active":false}' || fail "stop_gate blocked again a tree it had blocked once"
 green && { stop '{"stop_hook_active":false}' || fail "stop_gate blocked a state the gate passed"; }
 echo 'package y' >"$r/x.go"
 code=0; stop '{"stop_hook_active":false}' || code=$?
 [ "$code" = 2 ] || fail "stop_gate let through a change made after the gate passed (exit $code)"
+stop '{"stop_hook_active":false}' || fail "stop_gate blocked again a second tree it had blocked once"
+echo 'package z' >"$r/x.go"
+code=0; stop '{"stop_hook_active":false}' || code=$?
+[ "$code" = 2 ] || fail "stop_gate let a change through after a stop it had passed (exit $code)"
+echo 'package y' >"$r/x.go"
+code=0; stop '{"stop_hook_active":false}' || code=$?
+[ "$code" = 2 ] || fail "stop_gate let through a tree it blocked before another one (exit $code)"
+# A record it cannot write still blocks: a hook that fails otherwise lets the turn end.
+echo 'package w' >"$r/x.go" && rm -f "$r/.claude/tmp/gate-blocked" && mkdir "$r/.claude/tmp/gate-blocked"
+code=0; stop '{"stop_hook_active":false}' || code=$?
+[ "$code" = 2 ] || fail "stop_gate let a change through when it could not record the tree (exit $code)"
+rmdir "$r/.claude/tmp/gate-blocked"
 rm "$r/x.go" && echo '{}' >"$r/.claude/settings.json"
 code=0; stop '{"stop_hook_active":false}' || code=$?
 [ "$code" = 2 ] || fail "stop_gate let a settings.json change through (exit $code)"
