@@ -23,7 +23,10 @@ services:
       context: ..
       dockerfile: deploy/web/Dockerfile
     user: "101:101"
-    networks: [inside]
+    # A fixed address: Ergo and the server believe the visitor's address from web's alone (3e).
+    networks:
+      inside:
+        ipv4_address: ${WEB_ADDRESS:-172.30.89.10}
     secrets: [demo_htpasswd]
     cpus: 0.5
     mem_limit: 128m
@@ -34,6 +37,82 @@ services:
       timeout: 3s
       retries: 3
       start_period: 10s
+      start_interval: 1s
+    # Its upstreams' names are read once, at its start: a restarted one restarts it.
+    depends_on:
+      ergo: { condition: service_healthy, restart: true }
+      server: { condition: service_healthy, restart: true }
+
+  # The chat (slice 3's plan, 3e): Ergo's settings rendered at its start from these and its secret.
+  ergo:
+    <<: *locked
+    build:
+      context: ..
+      dockerfile: deploy/ergo/Dockerfile
+    user: "65532:65532"
+    networks: [inside]
+    environment:
+      SERVER_NAME: ${SERVER_NAME:-irc.gnoworld.example}
+      ORIGINS: ${ORIGINS:?set ORIGINS in deploy/.env, the app's own https origin}
+      PROXY_FROM: ${WEB_ADDRESS:-172.30.89.10}
+    secrets: [ergo_oper_password]
+    volumes:
+      - ergo:/data
+      - auth:/run/gnoworld
+    cpus: 0.4
+    mem_limit: 256m
+    pids_limit: 128
+    healthcheck:
+      test: [CMD, /ircd-bin/authforward, probe, "127.0.0.1:6667"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+      start_interval: 1s
+
+  # The server (slice 3): the login, the rooms, the bot; OpenAI through the way out, as Node's proxy.
+  server:
+    <<: *locked
+    build:
+      context: ..
+      dockerfile: deploy/server/Dockerfile
+    user: "65532:65532"
+    networks: [inside]
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8080"
+      DATABASE: /data/gnoworld.db
+      ORIGINS: ${ORIGINS:?set ORIGINS in deploy/.env, the app's own https origin}
+      TRUSTED_PROXY: ${WEB_ADDRESS:-172.30.89.10}
+      LOG_PEPPER_FILE: /run/secrets/log_pepper
+      AUTH_SOCKET: /run/gnoworld/auth.sock
+      ERGO_HOST: ergo
+      ERGO_PORT: "6667"
+      ERGO_OPER_PASSWORD_FILE: /run/secrets/ergo_oper_password
+      OPENAI_API_KEY_FILE: /run/secrets/openai_api_key
+      # The demo's way out; ops names its own proxy.
+      HTTPS_PROXY: ${EGRESS_PROXY:-http://guard:4750}
+      NO_PROXY: ergo,localhost,127.0.0.1
+      NODE_USE_ENV_PROXY: "1"
+    secrets: [log_pepper, ergo_oper_password, openai_api_key]
+    volumes:
+      - server:/data
+      - auth:/run/gnoworld
+    cpus: 0.4
+    mem_limit: 512m
+    pids_limit: 128
+    healthcheck:
+      test:
+        [
+          CMD,
+          /nodejs/bin/node,
+          -e,
+          "fetch('http://127.0.0.1:8080/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
       start_interval: 1s
 
   # The demo's only way out: it holds the network Tailscale shares, refuses every private address
@@ -63,6 +142,29 @@ services:
       start_interval: 1s
     depends_on:
       web: { condition: service_healthy }
+
+  # The demo's way out (decision 151): OpenAI's API host alone, in the guard's network behind its rules.
+  egress:
+    <<: *locked
+    profiles: [demo]
+    build:
+      context: ..
+      dockerfile: deploy/egress/Dockerfile
+    user: "65532:65532"
+    network_mode: service:guard
+    cpus: 0.1
+    mem_limit: 64m
+    pids_limit: 64
+    healthcheck:
+      test: [CMD, /probe, probe, "127.0.0.1:4750"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+      start_interval: 1s
+    # A guard restarted holds a new network: the way out restarts with it.
+    depends_on:
+      guard: { condition: service_healthy, restart: true }
 
   tailscale:
     <<: *locked
@@ -105,13 +207,27 @@ networks:
     driver_opts:
       com.docker.network.bridge.gateway_mode_ipv4: isolated
       com.docker.network.bridge.gateway_mode_ipv6: isolated
+    # web's fixed address is in it (deploy/.env.example).
+    ipam:
+      config:
+        - subnet: ${INSIDE_SUBNET:-172.30.89.0/24}
   outside: {}
 
 volumes:
   tailscale: {}
+  ergo: {}
+  server: {}
+  # The auth script's socket, which the server makes and Ergo's forwarder dials.
+  auth: {}
 
 secrets:
   demo_htpasswd:
     file: ${DEMO_HTPASSWD_FILE:-./secrets/demo_htpasswd}
   ts_authkey:
     file: ${TS_AUTHKEY_FILE:-./secrets/ts_authkey}
+  ergo_oper_password:
+    file: ${ERGO_OPER_PASSWORD_FILE:-./secrets/ergo_oper_password}
+  log_pepper:
+    file: ${LOG_PEPPER_FILE:-./secrets/log_pepper}
+  openai_api_key:
+    file: ${OPENAI_API_KEY_FILE:-./secrets/openai_api_key}

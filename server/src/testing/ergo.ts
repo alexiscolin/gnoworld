@@ -103,6 +103,7 @@ function configure(dir: string, [port, wsPort]: readonly [number, number], optio
   const operPassword = options.operPassword ?? randomBytes(12).toString("hex");
   const logTypes = options.logTypes ?? "* -userinput -useroutput";
   const values = {
+    NAME: "irc.gnoworld.test",
     PLAIN: `127.0.0.1:${String(port)}`,
     WEBSOCKET: `127.0.0.1:${String(wsPort)}`,
     PROXY_FROM: options.proxyFrom ?? ["localhost"],

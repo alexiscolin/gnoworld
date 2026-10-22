@@ -104,6 +104,26 @@ describe("guests and rooms", { timeout: 20_000 }, () => {
     history(gus, "#lobby");
     await gus.expect(replayed("PRIVMSG #lobby :persist-marker-1$"));
   });
+
+  it("keeps no direct message across a restart: none is stored until slice 4 (3e)", { timeout: 40_000 }, async () => {
+    const e = await start({ dir: keptFolder() });
+    const alice = await login(e, "alice");
+    const bob = await login(e, "bob");
+    alice.send("PRIVMSG bob :dm-marker-2");
+    await bob.expect(/PRIVMSG bob :dm-marker-2$/);
+    await sync(alice);
+    await sync(bob);
+    const { dir } = e;
+    await e.stop();
+
+    const again = await start({ dir });
+    const reader = await login(again, "bob");
+    history(reader, "alice");
+    const [, batch = ""] =
+      /BATCH \+(\S+) chathistory alice/.exec(await reader.expect(/BATCH \+\S+ chathistory alice/)) ?? [];
+    await reader.expect(new RegExp(`BATCH -${batch}$`));
+    expect(logged(reader)).not.toContain("dm-marker-2");
+  });
 });
 
 describe("logins and the auth script", { timeout: 30_000 }, () => {

@@ -1,7 +1,8 @@
 #!/bin/sh
 # The demo's only way out (docs/decisions.md, 2026-10-18). This container holds the network that
-# Tailscale shares, and loads its rules before anything else runs there: web's port; the DNS
-# servers Docker forwards to from this network; then every private, local, carrier and reserved
+# Tailscale shares, and loads its rules before anything else runs there: web's port; the way out's
+# replies to the internal network (slice 3: smokescreen listens here on 4750, and only that network may
+# reach it); the DNS servers Docker forwards to from this network; then every private, local, carrier and reserved
 # address refused, so the host, its LAN and any tailnet stay out of reach; then public TCP 80 and
 # 443 and UDP, which Tailscale needs. IPv6 is closed. deploy/test.sh proves each line.
 set -eu
@@ -23,8 +24,12 @@ dns=$(sed -n 's/^# ExtServers: \[\(.*\)\]$/\1/p' /etc/resolv.conf | tr ' ' '\n' 
 	echo ':INPUT ACCEPT [0:0]'
 	echo ':FORWARD DROP [0:0]'
 	echo ':OUTPUT DROP [0:0]'
+	echo '-A INPUT -i lo -j ACCEPT'
+	echo "-A INPUT -i $inside -p tcp --dport 4750 -j ACCEPT"
+	echo '-A INPUT -p tcp --dport 4750 -j REJECT'
 	echo '-A OUTPUT -o lo -j ACCEPT'
 	echo "-A OUTPUT -o $inside -p tcp --dport 8080 -j ACCEPT"
+	echo "-A OUTPUT -o $inside -p tcp --sport 4750 -j ACCEPT"
 	for server in $dns; do
 		echo "-A OUTPUT -d $server -p udp --dport 53 -j ACCEPT"
 		echo "-A OUTPUT -d $server -p tcp --dport 53 -j ACCEPT"
