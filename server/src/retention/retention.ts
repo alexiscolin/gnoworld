@@ -27,11 +27,9 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
   const N = z.object({ n: z.number() });
   // By verdicts_by_time, the oldest first, ties by row.
   const sql = {
-    old: db.prepare(
-      "DELETE FROM verdicts WHERE rowid IN (SELECT rowid FROM verdicts WHERE at < ? ORDER BY at, rowid LIMIT ?)",
-    ),
     oldest: db.prepare("DELETE FROM verdicts WHERE rowid IN (SELECT rowid FROM verdicts ORDER BY at, rowid LIMIT ?)"),
     count: db.prepare("SELECT count(*) AS n FROM verdicts"),
+    old: db.prepare("SELECT count(*) AS n FROM verdicts WHERE at < ?"),
     used: db.prepare(
       "SELECT (page_count - freelist_count) * page_size AS n FROM pragma_page_count, pragma_freelist_count, pragma_page_size",
     ),
@@ -49,11 +47,9 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
   return {
     tick() {
       let budget = batch * batches;
-      const cutoff = now() - 180 * 24 * 60 * 60_000;
-      for (let removed = batch; removed === batch && budget > 0; budget -= removed) {
-        removed = Number(sql.old.run(cutoff, Math.min(batch, budget)).changes);
-      }
-      for (let over = count() - maxVerdicts; over > 0 && budget > 0;) {
+      // The verdicts past their days are the oldest ones: the same walk takes them and those past the cap.
+      const old = N.parse(sql.old.get(now() - 180 * 24 * 60 * 60_000)).n;
+      for (let over = Math.max(old, count() - maxVerdicts); over > 0 && budget > 0;) {
         const removed = Number(sql.oldest.run(Math.min(batch, budget, over)).changes);
         [over, budget] = [over - removed, budget - removed];
       }
