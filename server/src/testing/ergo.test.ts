@@ -10,7 +10,7 @@ import { z } from "zod";
 import { authServer } from "../ergo/auth.ts";
 import { openDatabase } from "../db.ts";
 import { logger } from "../log.ts";
-import { LOGIN_TABLES, makeLogin } from "../login/login.ts";
+import { LOGIN_TABLES, makeLogin, NONCE_HOST } from "../login/login.ts";
 import { makeTickets, TICKET_TABLES } from "../login/ticket.ts";
 import { startErgo, type Ergo, type ErgoOptions } from "./ergo.ts";
 import { wallet } from "./signer.ts";
@@ -962,7 +962,7 @@ process.exit(0);`;
 describe("logging in through the server (3d)", { timeout: 30_000 }, () => {
   // The server's half for real: the login, its tickets and the auth handler, which Ergo's script reaches.
   const server = async () => {
-    const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES]);
+    const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST]);
     const login = makeLogin(db, { chains: ["onyx-1"], now: Date.now });
     const tickets = makeTickets(db, { now: Date.now });
     const auth = authServer(db, { log: logger("a-pepper-of-forty-characters-0123456789", () => true) });

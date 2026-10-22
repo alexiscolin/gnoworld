@@ -9,7 +9,7 @@ import { BODY_LIMIT, makeApp } from "../app.ts";
 import { openDatabase } from "../db.ts";
 import { logger } from "../log.ts";
 import { wallet, type Wallet } from "../testing/signer.ts";
-import { LOGIN_TABLES, makeLogin } from "./login.ts";
+import { LOGIN_TABLES, makeLogin, NONCE_HOST } from "./login.ts";
 import { loginFrom, loginRoutes } from "./routes.ts";
 import { makeTickets, TICKET_TABLES } from "./ticket.ts";
 
@@ -32,7 +32,7 @@ afterEach(() => {
 });
 
 const setup = ({ newAccountsPerHour = 5, nonceCap = 100_000, origins = [ORIGIN] } = {}) => {
-  const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES]);
+  const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST]);
   opened.push(db);
   const clock = { now: T0 };
   const now = (): number => clock.now;
@@ -629,7 +629,7 @@ describe("the routes", () => {
 describe("the login from the settings", () => {
   const SETTINGS = { chains: ["onyx-1"], origins: [ORIGIN], trustedProxy: undefined, newAccountsPerHour: 5 };
   const mount = (settings: Partial<typeof SETTINGS> = {}, clock?: { now: number }) => {
-    const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES]);
+    const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST]);
     opened.push(db);
     const log = logger(PEPPER, () => true);
     const app = makeApp(log, () => true);

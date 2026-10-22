@@ -8,13 +8,7 @@ import { Address, type Challenge, type Proof, type VerifyRequest } from "@gnowor
 import { z } from "zod";
 
 export const LOGIN_TABLES = `
-CREATE TABLE nonces (
-  nonce TEXT PRIMARY KEY,
-  chain TEXT NOT NULL,
-  host TEXT NOT NULL,
-  text TEXT NOT NULL,
-  expires_at INTEGER NOT NULL
-) STRICT;
+CREATE TABLE nonces (nonce TEXT PRIMARY KEY, chain TEXT NOT NULL, text TEXT NOT NULL, expires_at INTEGER NOT NULL) STRICT;
 CREATE INDEX nonces_by_expiry ON nonces (expires_at);
 CREATE TABLE accounts (address TEXT PRIMARY KEY, first_seen INTEGER NOT NULL) STRICT;
 CREATE TABLE tokens (
@@ -25,6 +19,12 @@ CREATE TABLE tokens (
 ) STRICT;
 CREATE INDEX tokens_by_expiry ON tokens (expires_at);
 CREATE INDEX tokens_by_address ON tokens (address, signed_at);
+`;
+
+// The host a challenge was written for (F427), added after 3c's file: a migration of its own, so a file
+// made before takes it, and with a default, so the image before still writes a nonce (no host's).
+export const NONCE_HOST = `
+ALTER TABLE nonces ADD COLUMN host TEXT NOT NULL DEFAULT '';
 `;
 
 interface Expected {

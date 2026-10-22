@@ -1,4 +1,7 @@
 import { createHash } from "node:crypto";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { MAX_ARBITRARY_MESSAGE_BYTES } from "@adena-wallet/sdk";
 import { Address, type Proof } from "@gnoworld/schemas";
@@ -6,7 +9,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { openDatabase } from "../db.ts";
 import { wallet, type Wallet } from "../testing/signer.ts";
-import { LOGIN_TABLES, makeLogin, verifyProof, type Login, type Verify } from "./login.ts";
+import { LOGIN_TABLES, makeLogin, NONCE_HOST, verifyProof, type Login, type Verify } from "./login.ts";
+import { TICKET_TABLES } from "./ticket.ts";
 
 const T0 = Date.parse("2026-10-22T12:00:00.000Z");
 const MINUTE = 60_000;
@@ -22,7 +26,7 @@ afterEach(() => {
 });
 
 const setup = (options: { verify?: Verify; nonceCap?: number } = {}) => {
-  const db = openDatabase(":memory:", [LOGIN_TABLES]);
+  const db = openDatabase(":memory:", [LOGIN_TABLES, NONCE_HOST]);
   opened.push(db);
   const clock = { now: T0 };
   const login = makeLogin(db, { chains: CHAINS, now: () => clock.now, ...options });
@@ -36,6 +40,31 @@ const challenge = (login: Login, chainId = "onyx-1") => {
 };
 
 const anyone = (): boolean => true;
+
+describe("the nonces' table", () => {
+  it("takes the host column at the next start of a file made before it, which the image before still writes", () => {
+    const folder = mkdtempSync(join(tmpdir(), "gnoworld-nonces-"));
+    try {
+      const file = join(folder, "gnoworld.sqlite");
+      // As 3c and 3d made it: their migrations, in their order.
+      openDatabase(file, [LOGIN_TABLES, TICKET_TABLES]).close();
+      const db = openDatabase(file, [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST]);
+      try {
+        const login = makeLogin(db, { chains: CHAINS, now: () => T0 });
+        expect(typeof login.challenge("onyx-1", DOMAIN)).toBe("object");
+        // The image before inserts without the host, and its nonce is no other host's.
+        db.prepare("INSERT INTO nonces (nonce, chain, text, expires_at) VALUES ('old', 'onyx-1', 't', ?)").run(
+          T0 + TTL,
+        );
+        expect(db.prepare("SELECT host FROM nonces WHERE nonce = 'old'").get()).toEqual({ host: "" });
+      } finally {
+        db.close();
+      }
+    } finally {
+      rmSync(folder, { recursive: true, force: true });
+    }
+  });
+});
 
 describe("challenge", () => {
   it("writes the whole text the wallet signs: the version, the domain, the nonce, issue and expiry", () => {
@@ -125,9 +154,9 @@ describe("challenge", () => {
   });
 
   it("refuses to start with no chain to log in on", () => {
-    expect(() => makeLogin(openDatabase(":memory:", [LOGIN_TABLES]), { chains: [], now: () => T0 })).toThrow(
-      /^the login needs at least one chain$/,
-    );
+    expect(() =>
+      makeLogin(openDatabase(":memory:", [LOGIN_TABLES, NONCE_HOST]), { chains: [], now: () => T0 }),
+    ).toThrow(/^the login needs at least one chain$/);
   });
 });
 
