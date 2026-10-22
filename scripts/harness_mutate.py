@@ -126,8 +126,7 @@ def mutants():
     # The Ergo the tests start (slice 3b): each refusal of the pin, each check of the cache, each refusal of a build.
     yield from lines("scripts/ergo.sh", r"^case .*refuse .*$", ":", "hooks", "ergo.sh checks the pin")
     yield from lines("scripts/ergo.sh", r'^\[ \$\{#commit\}.*$', ":", "hooks", "ergo.sh checks the pin's length")
-    for check in ('[ -x "$bin" ] && ', '[ -f "$dir/ergo.sha256" ] && ', '[ "$("$bin" --version 2>/dev/null || :)" = "ergo-$tag" ] &&'):
-        yield from each("scripts/ergo.sh", check, "", "hooks", f"ergo.sh checks the cache: {check[:24]}")
+    yield from each("scripts/ergo.sh", '[ "$("$bin" --version 2>/dev/null || :)" = "ergo-$tag" ] && ', "", "hooks", "ergo.sh checks the cached binary's version")
     yield from each("scripts/ergo.sh", "(cd \"$dir\" && shasum -a 256 -c ergo.sha256 >/dev/null 2>&1)", "true", "hooks", "ergo.sh checks the binary's SHA-256")
     yield from each("scripts/ergo.sh", 'command -v go >/dev/null 2>&1 || refuse', "true || refuse", "hooks", "ergo.sh refuses with no go")
     yield from each("scripts/ergo.sh", '[ "$(git -C "$dir" rev-parse HEAD)" = "$commit" ] || refuse', "true || refuse", "hooks", "ergo.sh checks the clone's commit")

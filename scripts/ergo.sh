@@ -16,8 +16,8 @@ case "$commit" in "" | *[!0-9a-f]*) refuse "deploy/ergo/VERSION: then the tag's 
 
 dir="${GNOWORLD_TOOLS:-$HOME/.cache/gnoworld-tools}/ergo-$tag"
 bin="$dir/ergo"
-if [ -x "$bin" ] && [ -f "$dir/ergo.sha256" ] && [ "$("$bin" --version 2>/dev/null || :)" = "ergo-$tag" ] &&
-	(cd "$dir" && shasum -a 256 -c ergo.sha256 >/dev/null 2>&1); then
+# A missing binary prints no version, and a missing hash fails its check: both rebuild.
+if [ "$("$bin" --version 2>/dev/null || :)" = "ergo-$tag" ] && (cd "$dir" && shasum -a 256 -c ergo.sha256 >/dev/null 2>&1); then
 	echo "$bin"
 	exit 0
 fi
