@@ -1292,7 +1292,9 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     const alice = await login(e, "alice");
     const bobby = await login(e, "bobby");
     for (const c of [bob, alice, bobby]) await join(c, "#bubble");
-    for (const n of [1, 2, 3]) await say(bob, "#bubble", `I will hurt you ${String(n)}`);
+    for (const n of [1, 2]) await say(bob, "#bubble", `I will hurt you ${String(n)}`);
+    // Its echo not awaited: Ergo may send bob the mute before it, and expect reads on past what it matched.
+    bob.send("PRIVMSG #bubble :I will hurt you 3");
     await bob.expect(/ MODE #bubble \+b m:bob/);
     bob.send("PRIVMSG #bubble :muted now");
     await bob.expect(/ 404 bob #bubble :Cannot send to channel/);
