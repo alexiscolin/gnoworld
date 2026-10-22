@@ -348,6 +348,7 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "a host added to the way out" "the way out lets one host out" acl awk '{ print } /- api.openai.com/ { print "    - example.com" }'
 	mutant "the way out lets private addresses through" "the way out lets http://10.0.0.1.nip.io/ through" \
 		proxy_config sed 's#^unsafe_allow_private_ranges:.*#unsafe_allow_private_ranges: true#'
+	mutant "a quiet tunnel kept for good" "the way out's settings say idle_timeout: 60s" proxy_config sed '/^idle_timeout:/d'
 	mutant "the server's requests straight out" "the server does not reach OpenAI's API" compose 'services: { server: { environment: { NODE_USE_ENV_PROXY: "0" } } }'
 	mutant "the guard drops the way out's replies" "does not answer through the way out" guard sed '/--sport 4750/d'
 	mutant "the way out open to the guard's other network" "the way out answers nothing from the guard's other network" guard sed '/--dport 4750 -j REJECT/d'
@@ -849,6 +850,10 @@ CLIENT
 	# guard's network on 4751, asked from there: the guard's rules let only 4750's replies out to the network.
 	mkdir "$tmp/egress"
 	docker cp "$egress:/etc/smokescreen/config.yaml" - | tar -xO >"$tmp/egress/config.yaml"
+	# Its tunnels close when quiet, and are capped (F627): read back, as Ergo's settings are.
+	for line in 'idle_timeout: 60s' 'max_concurrent_connect_tunnels: 32' 'max_concurrent_requests: 32'; do
+		expect "the way out's settings say $line" "$(grep -cxF -- "$line" "$tmp/egress/config.yaml")" 1
+	done
 	printf 'version: v1\nservices: []\ndefault:\n  project: test\n  action: enforce\n  allowed_domains:\n    - api.openai.com\n    - localtest.me\n    - 10.0.0.1.nip.io\n' >"$tmp/egress/acl.yaml"
 	chmod 755 "$tmp/egress" && chmod 644 "$tmp/egress"/*
 	for name in localtest.me:127.0.0.1 10.0.0.1.nip.io:10.0.0.1; do

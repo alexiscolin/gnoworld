@@ -9,3 +9,8 @@ allow_missing_role: true
 # Private, local and reserved addresses refused after resolution: smokescreen's default, written out.
 unsafe_allow_private_ranges: false
 connect_timeout: 10s
+# A tunnel quiet for a minute closes (by default none does: v0.1.0's release kept a quiet one open until its
+# far end closed); 32 tunnels and requests at once, the server calling 4 at a time (moderation/queue.ts).
+idle_timeout: 60s
+max_concurrent_connect_tunnels: 32
+max_concurrent_requests: 32
