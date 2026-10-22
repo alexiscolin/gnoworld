@@ -58,7 +58,6 @@ export function authServer(db: DatabaseSync, { log, now = Date.now, deadlineMs =
     const deadline = setTimeout(() => socket.destroy(), deadlineMs);
     const answer = (outcome: Outcome): void => {
       answered = true;
-      clearTimeout(deadline);
       if ("error" in outcome) log("irc_login_refused", outcome);
       else log("irc_login", { account: outcome.address });
       const output = "error" in outcome ? { success: false } : { success: true, accountName: outcome.address };
@@ -75,10 +74,8 @@ export function authServer(db: DatabaseSync, { log, now = Date.now, deadlineMs =
     socket.on("end", () => {
       if (!answered) answer({ error: "frame" });
     });
-    // A reset as the answer goes out: nobody is left to answer.
-    socket.on("error", () => {
-      socket.destroy();
-    });
+    // A reset as the answer goes out: Node destroys the socket, and nobody is left to answer.
+    socket.on("error", () => undefined);
     socket.on("close", () => {
       clearTimeout(deadline);
     });
