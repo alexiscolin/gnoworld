@@ -765,6 +765,25 @@ describe("the IRC link's rooms (3l)", () => {
     expect(said.map(({ msgid }) => msgid)).toEqual(["m3"]);
   });
 
+  it("takes a room as asked by its JOIN alone, never by another command, and forgets it with its connection (F572)", async () => {
+    const ergo = await fakeErgo();
+    const { link, said } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    expect(link.send("SAMODE", ["#x", "+M"])).toBe(true);
+    peer.say(":gnoworld!u@h JOIN #x");
+    peer.say(message("account=g1a;msgid=m1", "a!u@h", ["#x", "never"]));
+    link.send("JOIN", ["#y"]);
+    await sync(peer);
+    peer.socket.destroy();
+    const again = await ergo.peer(1);
+    await welcome(again);
+    again.say(":gnoworld!u@h JOIN #y");
+    again.say(message("account=g1a;msgid=m2", "a!u@h", ["#y", "nor this"]));
+    again.say(message("account=g1a;msgid=m3", "a!u@h", ["#bubble", "this"]));
+    await expect.poll(() => said.map(({ msgid }) => msgid)).toEqual(["m3"]);
+  });
+
   it("asks no list when no one listens", async () => {
     const ergo = await fakeErgo();
     start(ergo.port);
