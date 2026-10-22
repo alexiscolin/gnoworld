@@ -583,7 +583,7 @@ print("%.2f %d" % (sum(float(s.get("cpus", 0)) for s in services), sum(size(s.ge
 	for line in "name: \"$SERVER_NAME\"" '":6667": {}' '":8097":' "proxy-allowed-from: [\"$WEB_ADDRESS\"]" \
 		"allowed-origins: [\"$ORIGINS\"]" 'login-via-pass-command: false' 'operator-only-creation: true' \
 		'default-modes: +ntCM' 'max-channels-per-client: 1000' 'expire-time: 90d' 'direct-messages: disabled' \
-		'allow-individual-delete: true' 'enable-account-indexing: true'; do
+		'allow-individual-delete: true' 'enable-account-indexing: true' 'command: ""' 'socket: "/run/gnoworld/auth.sock"'; do
 		expect "Ergo's settings say $line" "$(grep -cF -- "$line" "$tmp/ircd.yaml")" 1
 	done
 	expect "Ergo's settings close registration" "$(awk '/^  registration:/ { r = 1 } r && /enabled:/ { print $2; exit }' "$tmp/ircd.yaml")" false
@@ -847,8 +847,8 @@ CLIENT
 		case $answer in *"denied by rule"*407) pass "the way out refuses $target, a private address its list allows" ;; *) fail "the way out lets $target through: [$(printf '%s' "$answer" | tr '\n' ' ' | cut -c1-120)]" ;; esac
 	done
 	docker stop "$box" >/dev/null
-	# The forwarder Ergo runs as its auth script (deploy/ergo/authforward), tested where Go is.
-	expect "Ergo's auth forwarder passes its tests" "$(docker run --rm -v "$here/ergo/authforward:/src:ro" -w /src -e GOCACHE=/tmp \
+	# The probe of Ergo's and the way out's health checks (deploy/probe), tested where Go is.
+	expect "the health probe passes its tests" "$(docker run --rm -v "$here/probe:/src:ro" -w /src -e GOCACHE=/tmp \
 		"$GOLANG" go test ./... 2>&1 | tail -n 1 | cut -c1-2)" ok
 else
 	# The running demo.

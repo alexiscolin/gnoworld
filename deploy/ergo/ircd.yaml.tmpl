@@ -34,7 +34,10 @@ accounts:
     auto-away: opt-in
   auth-script:
     enabled: true
+    # One of the two (irc/config.go): the stack's is the server's socket (deploy/compose.yaml), the tests' a
+    # command, the sandbox refusing Unix sockets.
     command: {{AUTH_SCRIPT}}
+    socket: {{SOCKET}}
     args: []
     autocreate: true
     timeout: {{AUTH_TIMEOUT}}

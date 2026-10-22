@@ -14,6 +14,9 @@ x-locked: &locked
     options: { max-size: 10m, max-file: "3" }
   restart: unless-stopped
 
+# The socket the server makes and Ergo dials for each login (3d), in their shared volume.
+x-auth-socket: &auth-socket /run/gnoworld/auth.sock
+
 # web's fixed address on the internal network, the one Ergo and the server believe (deploy/.env.example).
 x-web-address: &web-address ${WEB_ADDRESS:-172.30.89.10}
 
@@ -58,6 +61,7 @@ services:
       SERVER_NAME: ${SERVER_NAME:-irc.gnoworld.example}
       ORIGINS: ${ORIGINS:?set ORIGINS in deploy/.env, the app's own https origin}
       PROXY_FROM: *web-address
+      AUTH_SOCKET: *auth-socket
     secrets: [ergo_oper_password]
     volumes:
       - ergo:/data
@@ -66,7 +70,7 @@ services:
     mem_limit: 256m
     pids_limit: 128
     healthcheck:
-      test: [CMD, /ircd-bin/authforward, probe, "127.0.0.1:6667"]
+      test: [CMD, /ircd-bin/probe, "127.0.0.1:6667"]
       interval: 30s
       timeout: 3s
       retries: 3
@@ -88,7 +92,7 @@ services:
       ORIGINS: ${ORIGINS:?set ORIGINS in deploy/.env, the app's own https origin}
       TRUSTED_PROXY: *web-address
       LOG_PEPPER_FILE: /run/secrets/log_pepper
-      AUTH_SOCKET: /run/gnoworld/auth.sock
+      AUTH_SOCKET: *auth-socket
       ERGO_HOST: ergo
       ERGO_PORT: "6667"
       ERGO_OPER_PASSWORD_FILE: /run/secrets/ergo_oper_password
@@ -159,7 +163,7 @@ services:
     mem_limit: 64m
     pids_limit: 64
     healthcheck:
-      test: [CMD, /probe, probe, "127.0.0.1:4750"]
+      test: [CMD, /probe, "127.0.0.1:4750"]
       interval: 30s
       timeout: 3s
       retries: 3
@@ -220,7 +224,7 @@ volumes:
   tailscale: {}
   ergo: {}
   server: {}
-  # The auth script's socket, which the server makes and Ergo's forwarder dials.
+  # The auth socket's folder, which the server makes the socket in and Ergo dials.
   auth: {}
 
 secrets:

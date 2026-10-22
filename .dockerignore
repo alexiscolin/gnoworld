@@ -29,11 +29,11 @@ server/src/testing
 !packages/schemas/src
 packages/core/src/**/*.test.ts
 packages/schemas/src/**/*.test.ts
-# Ergo's image and the way out's (deploy/ergo/Dockerfile, deploy/egress/Dockerfile).
+# Ergo's image and the way out's (deploy/ergo/Dockerfile, deploy/egress/Dockerfile), and their probe.
 !deploy/ergo/ircd.yaml.tmpl
 !deploy/ergo/render.sh
-!deploy/ergo/authforward
-deploy/ergo/authforward/*_test.go
+!deploy/probe
+deploy/probe/*_test.go
 !deploy/egress/config.yaml
 !deploy/egress/acl.yaml
 # Named as well, should the list above ever open: the demo's secrets never reach a build.

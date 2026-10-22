@@ -18,11 +18,13 @@ done
 printf '%s\n' "${SERVER_NAME:-}" | grep -Eqx '[a-z0-9-]+(\.[a-z0-9-]+)+' || fail "SERVER_NAME: required, a host name"
 # web's address alone may say who a WebSocket's visitor is (X-Forwarded-For, listeners.go:159, F449).
 printf '%s\n' "${PROXY_FROM:-}" | grep -Eqx '[0-9]{1,3}(\.[0-9]{1,3}){3}' || fail "PROXY_FROM: required, web's address"
+# The server's socket, which Ergo dials for each login, with no command (irc/script.go, RunScript).
+printf '%s\n' "${AUTH_SOCKET:-}" | grep -Eqx '/[A-Za-z0-9/._-]+' || fail "AUTH_SOCKET: required, the server's socket"
 hash=$(/ircd-bin/ergo genpasswd </run/secrets/ergo_oper_password | tail -n 1)
 case $hash in '$2'*) ;; *) fail "the oper's password file gave no hash" ;; esac
 
 export V_NAME="\"$SERVER_NAME\"" V_PLAIN='":6667"' V_WEBSOCKET='":8097"' V_PROXY_FROM="[\"$PROXY_FROM\"]"
-export V_ORIGINS="[$origins]" V_AUTH_SCRIPT='"/ircd-bin/authforward"' V_AUTH_TIMEOUT='"9s"' V_OPER_HASH="\"$hash\""
+export V_ORIGINS="[$origins]" V_AUTH_SCRIPT='""' V_SOCKET="\"$AUTH_SOCKET\"" V_AUTH_TIMEOUT='"9s"' V_OPER_HASH="\"$hash\""
 export V_DATABASE='"/data/ircd.db"' V_HISTORY='"/data/history.db"' V_LOCK='"/data/ircd.lock"'
 export V_LOG_TYPES='"* -userinput -useroutput"' V_LOG_LEVEL='"info"'
 awk '

@@ -110,6 +110,8 @@ function configure(dir: string, [port, wsPort]: readonly [number, number], optio
     ORIGINS: options.origins ?? [],
     AUTH_SCRIPT: options.authScript === "absent" ? join(dir, "absent-auth") : writeAuthScript(dir, options.authScript),
     AUTH_TIMEOUT: options.authTimeout ?? "9s",
+    // The stack dials the server's socket instead; the sandbox refuses Unix sockets.
+    SOCKET: "",
     OPER_HASH: hash(operPassword),
     DATABASE: join(dir, "ircd.db"),
     HISTORY: join(dir, "history.db"),
