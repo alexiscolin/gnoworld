@@ -32,10 +32,15 @@ const drain = (): void => {
   if (draining) return;
   draining = true;
   log("stopping");
-  auth.close();
-  stop(server, () => {
-    db.close();
-  });
+  // The database last, once the HTTP server and Ergo's socket have both let their connections go: a line
+  // Ergo sent before the stop still meets an open database (the socket's deadline bounds the wait).
+  let open = 2;
+  const closed = (): void => {
+    open -= 1;
+    if (open === 0) db.close();
+  };
+  auth.close(closed);
+  stop(server, closed);
 };
 process.on("SIGTERM", drain);
 process.on("SIGINT", drain);
