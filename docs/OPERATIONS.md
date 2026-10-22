@@ -1,8 +1,8 @@
 # Operations
 
-The runbook (ADR-0002 §7). In slice 1 it holds the demo: the static client behind a password,
-published through Tailscale Funnel from one Docker host. Slice 3 adds Ergo and `server`, each with
-its section here; `jarvis` and Grafana come with slice 10 (`docs/decisions.md:151`). Everything is in `deploy/`; nothing outside it is touched,
+The runbook (ADR-0002 §7). It holds the demo: the client behind a password, published through
+Tailscale Funnel from one Docker host, with Ergo (the chat), `server` (the login, the rooms, the bot)
+and, in the demo, a way out to OpenAI alone (slice 3, 3e); `jarvis` and Grafana come with slice 10 (`docs/decisions.md:151`). Everything is in `deploy/`; nothing outside it is touched,
 and no port of the host is opened. It runs on any Docker host: Linux with Docker Engine 28 or
 later, Docker Desktop, or OrbStack.
 
@@ -13,9 +13,13 @@ later, Docker Desktop, or OrbStack.
 | `web` | built from `deploy/web/Dockerfile`: the client, on `nginx-unprivileged` 1.30.6, by digest | 8080, PROXY protocol, on `inside` only | `127.0.0.1:8081/health`, inside the container | 0.5 core, 128 MB, 64 processes | none | `demo_htpasswd` |
 | `guard` (profile `demo`) | `tailscale/tailscale` v1.104.1, by digest, running `deploy/guard/guard.sh` | nothing | its rules loaded | 0.1 core, 32 MB, 16 processes | none | none |
 | `tailscale` (profile `demo`) | the same image | Funnel on 443, forwarded to `web:8080` | `127.0.0.1:9002/healthz`, inside its network | 0.5 core, 256 MB, 128 processes | the `tailscale` volume (its node key) | `ts_authkey` |
+| `ergo` | built from `deploy/ergo/Dockerfile`: Ergo's own image v2.19.1, by digest, with `render.sh` and the auth script's forwarder | 6667 (the bot) and 8097 (WebSocket, web's `/ws`), on `inside` only | its 6667 answers | 0.4 core, 256 MB, 128 processes | the `ergo` volume (accounts, history) | `ergo_oper_password` |
+| `server` | built from `deploy/server/Dockerfile`: distroless Node 24, by digest | 8080 (web's `/api/`), on `inside` only; the `auth` volume's socket | `127.0.0.1:8080/health` | 0.4 core, 512 MB, 128 processes | the `server` volume (its SQLite) | `log_pepper`, `ergo_oper_password`, `openai_api_key` |
+| `egress` (profile `demo`) | built from `deploy/egress/Dockerfile`: smokescreen v0.1.0 from its source, on distroless static | 4750 in `guard`'s network, reached from `inside` alone | its 4750 answers | 0.1 core, 64 MB, 64 processes | none | none |
 
-All three have a read-only root with `/tmp` in memory, no new privilege, logs rotated at 3 × 10 MB,
-and every capability dropped, except `guard`'s `NET_ADMIN`.
+All six have a read-only root with `/tmp` in memory, no new privilege, logs rotated at 3 × 10 MB,
+and every capability dropped, except `guard`'s `NET_ADMIN`; `ergo`, `server` and `egress` run as
+65532, the user the auth socket's volume belongs to.
 
 - `web` sits on `inside`, an internal network with no way out and no gateway, so it reaches no
   address of the host either.
@@ -26,6 +30,13 @@ and every capability dropped, except `guard`'s `NET_ADMIN`.
   `tailscale` restarts with it; when Docker restarts `guard` on its own, `tailscale` keeps a
   network with nothing in it, which fails closed, until `docker compose ... restart tailscale`.
 - Funnel hides the host's address: the public name leads to Tailscale's relays, never to the host.
+- `web` holds a fixed address on `inside` (`WEB_ADDRESS`, in `INSIDE_SUBNET`), the only one Ergo
+  (`proxy-allowed-from`) and `server` (`TRUSTED_PROXY`) believe about a visitor's address; it sends
+  the PROXY protocol's address on, overwriting the client's, and never the demo's password.
+- `egress` (smokescreen) lets the server reach `api.openai.com` (`deploy/egress/acl.yaml`, one
+  file the test reads too) and refuses an address that resolves to a private one; it sits in
+  `guard`'s network, so the kernel's rules hold whatever it resolves. The server finds it by
+  `HTTPS_PROXY` and `NODE_USE_ENV_PROXY`; ops, with no `guard`, names its own in `EGRESS_PROXY`.
 
 ## Before the first start (once)
 
@@ -51,8 +62,14 @@ and every capability dropped, except `guard`'s `NET_ADMIN`.
    `htpasswd -cB deploy/secrets/demo_htpasswd team` (`htpasswd` comes with macOS, and with
    `apache2-utils` or `httpd-tools` on Linux), then `chmod 644 deploy/secrets/demo_htpasswd`:
    nginx reads it as its own user, and it holds a hash, not the password.
-5. Optional: `cp deploy/.env.example deploy/.env`, to change the machine's name.
-6. On Linux, a clone made with a umask of 077 leaves `deploy/guard` and `deploy/tailscale`
+5. `cp deploy/.env.example deploy/.env` and set `ORIGINS` to the app's own origin,
+   `https://<machine>.<tailnet>.ts.net` (required: Ergo refuses a WebSocket from any other site,
+   and the server any POST); the machine's name and the internal network's addresses may change there.
+6. Slice 3's secrets, each with `chmod 644`: `openssl rand -hex 24 > deploy/secrets/ergo_oper_password`
+   (the bot's operator password: 48 characters, Ergo takes it on any listener), `openssl rand -hex 32 >
+   deploy/secrets/log_pepper` (the logs' hashing key), and OpenAI's key, one line, in
+   `deploy/secrets/openai_api_key`.
+7. On Linux, a clone made with a umask of 077 leaves `deploy/guard` and `deploy/tailscale`
    unreadable to the containers: `chmod -R a+rX deploy/guard deploy/tailscale`.
 
 `deploy/secrets/` is ignored by git, left out of every build (`.dockerignore`) and closed to
@@ -64,7 +81,7 @@ tailnet; keep it so.
 | What | Command, from the repository's root |
 |---|---|
 | Start, or rebuild after a merge | `docker compose -f deploy/compose.yaml --profile demo up -d --build` |
-| Test the static server and the guard (no secret needed) | `sh deploy/test.sh` |
+| Test the stack: web, the guard, Ergo, the server and the way out (no secret needed) | `sh deploy/test.sh` |
 | Test that each check catches its fault | `sh deploy/test.sh --mutants` |
 | Test the running demo | `sh deploy/test.sh --demo`, which asks for the password |
 | Its logs | `docker compose -f deploy/compose.yaml --profile demo logs -f` |
@@ -80,9 +97,9 @@ socket. Their output names the host's addresses and ports: never commit it, nor 
 
 ## When something goes wrong: cut the public URL
 
-A flood meets the password, a limit per visitor (429 after a burst) and the containers' caps (1.1
-cores and 416 MB in all, under the 2 cores and 2 GB the test holds as a ceiling: Docker stops a
-container at its cap, not the host). To cut the public URL at once:
+A flood meets the password, a limit per visitor (429 after a burst) and the containers' caps (2.0
+cores and 1,248 MB in all, at and under the 2 cores and 2 GB the test holds as a ceiling: Docker
+stops a container at its cap, not the host). To cut the public URL at once:
 
 | Where | How | Back |
 |---|---|---|
@@ -258,8 +275,34 @@ Slice 3, the server's retention (3n):
 - **Not yet:** the k6 runs, `web`'s per-visitor limits and Ergo's volume measure wait for 3e's stack
   (3n-b); the sizes above are a careful start for the demo's 2 GB until those runs.
 
+Slice 3, the stack (3e):
+
+- **The operator's password works on any listener.** Ergo checks an OPER by its password or a client
+  certificate, never by the listener it comes through (irc/handlers.go, v2.19.1), so the bot's
+  password would work through `/ws` too: it is 48 random characters, and Ergo answers one OPER a
+  connection every 10 seconds. A certificate for the bot alone would close it (a later slice).
+- **One time for all history.** Ergo keeps rooms' and messages' history the same 90 days
+  (`history.restrictions.expire-time`); decision 154's 30 days for direct messages cannot be set
+  apart, so direct messages are not stored at all (`persistent.direct-messages: disabled`) until
+  slice 4 makes them a product. History fills the `ergo` volume, which has no quota.
+- **The way out has no port rule.** smokescreen v0.1.0 matches a host, not a port: plain HTTP to
+  `api.openai.com` on port 80 is let out too, and meets OpenAI's redirect alone.
+- **A restart of `ergo` or `server` restarts `web`**, which reads its upstreams' addresses once:
+  the public URL answers nothing for those seconds.
+- **No backup in the demo** (ADR-0002): Ergo's accounts and history live in the `ergo` volume and the
+  server's records in `server`; `down -v` removes both. To upgrade Ergo, change its tag and digest in
+  `deploy/ergo/Dockerfile` and `VERSION`, then `sh deploy/test.sh` before `up -d --build`.
+- **`web`'s fixed address** is in `INSIDE_SUBNET`: a host with another network in that range refuses
+  to start the stack (Compose names the overlap); set both in `deploy/.env`.
+
 ## Secrets: rotation and revocation
 
 - **The password:** write a new file with `htpasswd -cB`, then `docker compose ... restart web`.
 - **The auth key:** used once, at the first login; the node key then lives in the `tailscale`
   volume. Revoking the key does not remove the machine: remove the machine to revoke the demo.
+- **The operator's password:** write a new file, then `docker compose ... restart ergo server`: Ergo
+  hashes it at its start, and the bot logs in with it.
+- **OpenAI's key:** write the new one, `restart server`, then revoke the old one at OpenAI.
+- **The pepper:** it keys the logs' hashed accounts and visitors, and the verdicts' accounts (3i, 3k): a
+  new one matches none of the older ones, so the strikes toward a mute start again and an edit's owner
+  is unknown. Change it only when it may have leaked, then `restart server`.

@@ -452,6 +452,12 @@ semgrep's Dockerfile and Compose rules in `/pre-merge`. **Cost and scale.** Ergo
 Changed: `deploy/compose.yaml`, `deploy/guard/guard.sh`, `deploy/web/nginx.conf`, `deploy/.env.example`,
 `docs/OPERATIONS.md`, `.dockerignore`. Security-sensitive: the security reviewer reads all of it. No human part.
 
+**As built** (`docs/decisions.md`, 2026-10-23, 3e's stack and known limits): Ergo's own image with
+`render.sh` and a Go forwarder for its auth script (`deploy/ergo/authforward`); an OPER through `/ws` is
+held by its password and Ergo's throttle, not refused (Ergo cannot restrict it by listener); history 90
+days for all, direct messages not stored until slice 4; smokescreen built from its source, no port rule;
+`web` at a fixed address; the test writes its own WebSocket client.
+
 ---
 
 ## 3f. The strict CSP (tier 1)
