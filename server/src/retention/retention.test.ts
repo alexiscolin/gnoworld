@@ -283,6 +283,17 @@ describe("the retention's runs (3n)", () => {
     }).toThrow();
   });
 
+  it("lets a timed run on a failed database throw too, as the first one does (F596)", () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    const { db, options } = setup();
+    const job = startRetention(db, options);
+    db.close();
+    expect(() => {
+      vi.advanceTimersByTime(5 * 60_000);
+    }).toThrow();
+    job.stop();
+  });
+
   it("leaves, for any verdicts and caps, none older than its days and no more than its cap, the newest kept", () => {
     fc.assert(
       fc.property(
