@@ -1,0 +1,76 @@
+// The server's retention (slice 3's plan, 3n; decision 154): the bot's verdict records kept 180 days and
+// below a row cap, the oldest going first, a budget of small batches a tick so a backlog never holds the
+// event loop; the verdicts and the database's used pages measured after, with one alert a crossing of 80%.
+// The other stores purge themselves (nonces, tokens, tickets, mutes) or hold one row a room or an account.
+import type { DatabaseSync } from "node:sqlite";
+import { z } from "zod";
+import type { Log } from "../log.ts";
+
+interface Options {
+  log: Log;
+  now?: () => number;
+  // 150,000 verdicts of about 1.2 KB with their indexes (measured), 176 MB; 256 MB for the database.
+  maxVerdicts?: number;
+  maxBytes?: number;
+  // Rows a batch and batches a tick: 10,000 rows at most a tick.
+  batch?: number;
+  batches?: number;
+}
+
+export interface Retention {
+  tick: () => void;
+}
+
+export function makeRetention(db: DatabaseSync, options: Options): Retention {
+  const { log, now = Date.now, maxVerdicts = 150_000, maxBytes = 256 * 1024 * 1024 } = options;
+  const { batch = 500, batches = 20 } = options;
+  const N = z.object({ n: z.number() });
+  // By verdicts_by_time, the oldest first, ties by row.
+  const sql = {
+    old: db.prepare(
+      "DELETE FROM verdicts WHERE rowid IN (SELECT rowid FROM verdicts WHERE at < ? ORDER BY at, rowid LIMIT ?)",
+    ),
+    oldest: db.prepare("DELETE FROM verdicts WHERE rowid IN (SELECT rowid FROM verdicts ORDER BY at, rowid LIMIT ?)"),
+    count: db.prepare("SELECT count(*) AS n FROM verdicts"),
+    used: db.prepare(
+      "SELECT (page_count - freelist_count) * page_size AS n FROM pragma_page_count, pragma_freelist_count, pragma_page_size",
+    ),
+  };
+  const count = (): number => N.parse(sql.count.get()).n;
+  // Each measure's alert, raised at 80% of its cap and armed again below it.
+  const raised = new Set<string>();
+  const watch = (name: string, value: number, cap: number): void => {
+    if (value * 5 < cap * 4) raised.delete(name);
+    else if (!raised.has(name)) {
+      raised.add(name);
+      log("alert", { error: name });
+    }
+  };
+  return {
+    tick() {
+      let budget = batch * batches;
+      const cutoff = now() - 180 * 24 * 60 * 60_000;
+      for (let removed = batch; removed === batch && budget > 0; budget -= removed) {
+        removed = Number(sql.old.run(cutoff, Math.min(batch, budget)).changes);
+      }
+      for (let over = count() - maxVerdicts; over > 0 && budget > 0;) {
+        const removed = Number(sql.oldest.run(Math.min(batch, budget, over)).changes);
+        [over, budget] = [over - removed, budget - removed];
+      }
+      watch("verdicts_near_cap", count(), maxVerdicts);
+      watch("database_near_cap", N.parse(sql.used.get()).n, maxBytes);
+    },
+  };
+}
+
+/** The retention at start, then every five minutes, until its stop. */
+export function startRetention(db: DatabaseSync, options: Options & { everyMs?: number }): { stop: () => void } {
+  const retention = makeRetention(db, options);
+  retention.tick();
+  const timer = setInterval(retention.tick, options.everyMs ?? 5 * 60_000);
+  return {
+    stop: () => {
+      clearInterval(timer);
+    },
+  };
+}
