@@ -73,12 +73,12 @@ export function makeReconciler({ rooms, desired, state, send, log }: Options): R
   const one = async (room: string): Promise<void> => {
     const now = await state(room);
     if (now === undefined) return;
-    const todo = changes(room, now, desired(room));
-    if (todo.length === 0) return;
-    for (const [command, ...params] of todo) send(command, params);
+    // What the link sent: a link down or a form lines.ts refuses changes nothing, and logs nothing (F581).
+    const sent = changes(room, now, desired(room)).filter(([command, ...params]) => send(command, params));
+    if (sent.length === 0) return;
     log("room_reconciled", { room });
     // A room the file made open, or no longer names, loses its invite-only flag: its history opens with it.
-    if (todo.some(([command, , flag]) => command === "SAMODE" && flag === "-i")) {
+    if (sent.some(([command, , flag]) => command === "SAMODE" && flag === "-i")) {
       log("alert", { error: "room_opened", room });
     }
   };

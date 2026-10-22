@@ -189,6 +189,21 @@ describe("the reconciler's pass", () => {
     ]);
   });
 
+  it("logs a room changed, and raises the alert, only for commands the link sent (F581)", async () => {
+    const lines: string[] = [];
+    const reconciler = makeReconciler({
+      rooms: () => ["#crew", "#b"],
+      desired: () => OPEN,
+      state: (room) => Promise.resolve(state(room === "#crew" ? { flags: "Mint", invites: ["g1a"] } : { flags: "nt" })),
+      send: (command, params) => !(command === "SAMODE" && params[0] === "#crew"),
+      log: logger("a-pepper-of-forty-characters-0123456789", (line) => lines.push(line)),
+    });
+    await reconciler.pass();
+    expect(lines.map((line) => line.replace(/^\{"time":"[^"]+",/, "{").trim())).toEqual([
+      '{"event":"room_reconciled","room":"#b"}',
+    ]);
+  });
+
   it("raises no alert for changes that keep a room as closed as it was: flags, a voice, a KICK (F564)", async () => {
     const lines: string[] = [];
     const crew = state({
