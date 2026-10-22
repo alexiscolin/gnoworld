@@ -131,6 +131,15 @@ Slice 3, the login (3c; `docs/decisions.md`, 2026-10-22):
 - **Ten tokens an account.** An account keeps its 10 newest logins; an eleventh logs the oldest
   device out. Accounts are free, so the tokens are bounded by the accounts, ten each, not by a
   fixed number (F435).
+- **A logout or a ban leaves the IRC side for a while** (3d). A ticket minted before the logout logs in
+  until its 60 seconds end, and a connection already open lasts until it drops: only new tickets are
+  refused. A moderator's revoke that cuts live connections is slice 12's.
+- **Ergo's socket.** `AUTH_SOCKET` names the socket Ergo's auth script dials; unset, Ergo lets nobody
+  log in, guests still read. A socket left by a crash is removed at the next start, never a file. The
+  sandbox binds no Unix socket, so the tests reach the same handler over TCP: the bind itself is proven
+  by 3e's operator tests.
+- **Failed IRC logins** count per visitor, 10 a minute, never per account; lines Ergo sends with no
+  address share one count, so a burst of them refuses all such lines for a minute (logged as `limit`).
 - **A relayed login.** Another site, or its server, can ask for our text, show it to a person
   and send the signature itself, so the cookie lands with it. The server cannot tell; only a
   wallet that shows the requesting site and refuses another domain's text can, which slice
