@@ -279,16 +279,21 @@ Slice 3, the stack (3e):
 
 - **The operator's password works on any listener.** Ergo checks an OPER by its password or a client
   certificate, never by the listener it comes through (irc/handlers.go, v2.19.1), so the bot's
-  password would work through `/ws` too: it is 48 random characters, and Ergo answers one OPER a
-  connection every 10 seconds. A certificate for the bot alone would close it (a later slice).
+  password would work through `/ws` too: it is 48 random characters (Ergo's start refuses one under
+  32, F621), and Ergo answers one OPER a connection every 10 seconds. A certificate for the bot alone would close it (a later slice).
 - **One time for all history.** Ergo keeps rooms' and messages' history the same 90 days
   (`history.restrictions.expire-time`); decision 154's 30 days for direct messages cannot be set
   apart, so direct messages are not stored at all (`persistent.direct-messages: disabled`) until
   slice 4 makes them a product. History fills the `ergo` volume, which has no quota.
 - **The way out has no port rule.** smokescreen v0.1.0 matches a host, not a port: plain HTTP to
   `api.openai.com` on port 80 is let out too, and meets OpenAI's redirect alone.
-- **A restart of `ergo` or `server` restarts `web`**, which reads its upstreams' addresses once:
-  the public URL answers nothing for those seconds.
+- **A restart of `ergo` or `server` by Compose restarts `web`**, which reads its upstreams' addresses
+  once: the public URL answers nothing for those seconds. One Docker makes itself, after a crash, does
+  not, nor does `egress` follow `guard` then: if `/ws` or `/api/` answer 502, or the checks stop
+  reaching OpenAI, `docker compose ... restart web egress` (F622, beside F203).
+- **The tailnet's policy stays closed.** In userspace mode, Tailscale hands a device's connection to
+  the demo machine's own address on to `127.0.0.1`, so a device the policy let in would reach the way
+  out on 4750 (to OpenAI's API alone). `"acls": []` keeps every device out (F619).
 - **No backup in the demo** (ADR-0002): Ergo's accounts and history live in the `ergo` volume and the
   server's records in `server`; `down -v` removes both. To upgrade Ergo, change its tag and digest in
   `deploy/ergo/Dockerfile` and `VERSION`, then `sh deploy/test.sh` before `up -d --build`.

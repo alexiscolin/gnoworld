@@ -44,7 +44,8 @@ services:
       retries: 3
       start_period: 10s
       start_interval: 1s
-    # Its upstreams' names are read once, at its start: a restarted one restarts it.
+    # Its upstreams' names are read once, at its start: one Compose restarts restarts it, not one Docker
+    # restarts after a crash (OPERATIONS.md, F622).
     depends_on:
       ergo: { condition: service_healthy, restart: true }
       server: { condition: service_healthy, restart: true }
