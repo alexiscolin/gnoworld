@@ -17,7 +17,8 @@
     "!app/src/entry.server.tsx",
     "server/src/**/*.ts",
     "!server/src/**/*.test.ts",
-    "!server/src/main.ts"
+    "!server/src/main.ts",
+    "!server/src/testing/**"
   ],
   "incremental": true,
   "htmlReporter": {

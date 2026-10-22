@@ -134,7 +134,7 @@ for step in "run format:check" "run typecheck" "run lint" "run test" "run unused
 	"node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts" '[ "$(packages)" = "$installed" ]' \
 	"ast.parse(open(f).read(), f) for f in sys.argv[1:]]' scripts/*.py" \
 	"python3 -I ../scripts/mutate.py" "go vet ./tools/..." "go run ./tools/sealvec | cmp" "python3 -I scripts/check_docs.py" \
-	"sh scripts/test_hooks.sh" "python3 -I scripts/probe.py" "run coverage" "python3 -I scripts/patch_coverage.py" \
+	"sh scripts/test_hooks.sh" "python3 -I scripts/probe.py" "run coverage" "python3 -I scripts/patch_coverage.py" "sh scripts/ergo.sh" \
 	"run mutate" "sh scripts/scan_secrets.sh" "python3 -I scripts/harness_mutate.py" "python3 -I scripts/check_regressions.py" \
 	'unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO' '[ "$took" -gt 60 ]' "python3 -I scripts/prove_fix.py" "python3 -I scripts/audit.py"; do
 	grep -v '^[[:space:]]*#' "$gate_file" | grep -qF -- "$step" || fail "check.sh no longer runs: $step"
@@ -173,6 +173,7 @@ PY
 at() { grep -nF -- "$1" "$gate_file" | head -1 | cut -d: -f1; }
 [ "$(at '. .githooks/records.sh && tested=$(worktree_print)')" -lt "$(at 'run format:check')" ] || fail "check.sh prints its code after a step ran (F133)"
 [ "$(at 'gate_passed "$tested" "$full"')" -gt "$(at 'python3 -I scripts/harness_mutate.py')" ] || fail "check.sh records its code before its last step (F076)"
+[ "$(at 'sh scripts/ergo.sh')" -lt "$(at '$full || run test')" ] || fail "check.sh runs the tests before it builds the Ergo they start"
 # An EXIT trap keeps a failure: under macOS's sh, a plain one turns an unbound variable into exit 0.
 for f in "$here"/*.sh "$hooks"/*; do
 	grep -n "^[[:space:]]*trap .* EXIT$" "$f" | grep -v '|| status=1; exit "$status"' | grep -q . && fail "$(basename "$f") has an EXIT trap that can hide a failure"
@@ -1392,6 +1393,58 @@ fi
 if part regressions; then
 # check_regressions: its rules on small cases (the real run needs a base branch and Vitest).
 python3 -I "$here/check_regressions.py" --self-test >/dev/null || fail "check_regressions's rules do not hold"
+fi
+
+if part ergo; then
+# ergo.sh builds the pinned Ergo once into the tools' cache, checks what it finds there, and refuses
+# what it cannot build (slice 3b). Stubs stand for git and go; each logs its call.
+e="$t/ergo" && mkdir -p "$e/repo/deploy/ergo" "$e/bin" "$e/nogo"
+pin=0123456789abcdef0123456789abcdef01234567
+printf 'v9.9.9 %s\n' "$pin" >"$e/repo/deploy/ergo/VERSION"
+cat >"$e/bin/git" <<'EOF'
+#!/bin/sh
+echo "git $*" >>"$STUB_LOG"
+case "$1" in
+clone) for last; do :; done; mkdir -p "$last/.git" ;;
+-C) echo "$STUB_COMMIT" ;;
+esac
+EOF
+cat >"$e/bin/go" <<'EOF'
+#!/bin/sh
+echo "go CGO_ENABLED=$CGO_ENABLED $*" >>"$STUB_LOG"
+[ -z "$STUB_GO_FAILS" ] || exit 2
+printf '#!/bin/sh\necho ergo-%s\n' "$(printf '%s' "$*" | sed 's/.*main\.version=\([^ ]*\).*/\1/')" >ergo && chmod +x ergo
+EOF
+chmod +x "$e/bin/git" "$e/bin/go" && cp "$e/bin/git" "$e/nogo/git"
+ergo_sh() { (cd "$e/repo" && GNOWORLD_TOOLS="$e/tools" STUB_LOG="$e/log" STUB_COMMIT="${commit:-$pin}" STUB_GO_FAILS="${go_fails:-}" PATH="${path:-$e/bin:$PATH}" /bin/sh "$here/ergo.sh" 2>"$e/err"); }
+builds() { : >"$e/log" && out=$(ergo_sh) && grep -q '^go CGO_ENABLED=[^ ]* build ' "$e/log" && [ "$out" = "$e/tools/ergo-$1/ergo" ]; }
+builds v9.9.9 || fail "ergo.sh did not build the pinned Ergo when none was cached: $(cat "$e/err")"
+# The flags the spike found: static, paths trimmed, and the sqlite tag persistent history needs.
+grep -q '^go CGO_ENABLED=0 build -trimpath -tags i18n mysql postgresql sqlite ' "$e/log" || fail "ergo.sh built without its flags: $(cat "$e/log")"
+: >"$e/log" && [ "$(ergo_sh)" = "$e/tools/ergo-v9.9.9/ergo" ] && ! grep -q '^go' "$e/log" || fail "ergo.sh built again an Ergo it had"
+printf '\n' >>"$e/tools/ergo-v9.9.9/ergo"
+builds v9.9.9 || fail "ergo.sh ran a cached binary whose SHA-256 changed"
+rm "$e/tools/ergo-v9.9.9/ergo.sha256"
+builds v9.9.9 || fail "ergo.sh ran a cached binary with no SHA-256 beside it"
+printf '#!/bin/sh\necho ergo-v0.0.1\n' >"$e/tools/ergo-v9.9.9/ergo" && (cd "$e/tools/ergo-v9.9.9" && shasum -a 256 ergo >ergo.sha256)
+builds v9.9.9 || fail "ergo.sh ran a cached binary of another version"
+printf 'v9.9.10 %s\n' "$pin" >"$e/repo/deploy/ergo/VERSION"
+builds v9.9.10 || fail "ergo.sh did not build a changed pin"
+rm -r "$e/tools"
+# Each in a subshell: sh keeps an assignment made before a function's call once it returns.
+(path="$e/nogo" ergo_sh) >/dev/null && fail "ergo.sh passed with no go to build"
+grep -q 'go is needed' "$e/err" || fail "ergo.sh did not say go is missing: $(cat "$e/err")"
+(go_fails=1 ergo_sh) >/dev/null && fail "ergo.sh passed a failed build"
+grep -q 'building Ergo v9.9.10 failed' "$e/err" || fail "ergo.sh did not say the build failed: $(cat "$e/err")"
+rm -r "$e/tools"
+(commit=fedcba9876543210fedcba9876543210fedcba98 ergo_sh) >/dev/null && fail "ergo.sh built a clone at another commit than the pin"
+grep -q "is not commit $pin" "$e/err" || fail "ergo.sh did not name the commit it wanted: $(cat "$e/err")"
+# A pin it cannot trust names no folder and no commit: refused before anything runs.
+for bad in "" "v9.9.9" "v9.9.9 $pin extra" "v9.9.9 0123" "v9.9.9 ${pin%?}G" "v9/../../x $pin" "9.9.9 $pin"; do
+	printf '%s\n' "$bad" >"$e/repo/deploy/ergo/VERSION" && : >"$e/log"
+	ergo_sh >/dev/null && fail "ergo.sh took the pin '$bad'"
+	grep -q 'deploy/ergo/VERSION' "$e/err" && [ ! -s "$e/log" ] || fail "ergo.sh ran something on the pin '$bad', or did not name the file: $(cat "$e/err")"
+done
 fi
 
 [ -z "${ONLY:-}" ] || [ "${ran:-}" = 1 ] || fail "ONLY=$ONLY names no section"
