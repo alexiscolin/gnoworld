@@ -87,16 +87,17 @@ describe("Ergo's auth script, answered by the server", () => {
   });
 
   it.each([
-    ["another account's ticket", (ticket: string) => ({ accountName: OTHER, passphrase: ticket, ip: IP })],
-    ["an unknown ticket", () => ({ accountName: ME, passphrase: "A".repeat(43), ip: IP })],
-    ["no ticket", () => ({ accountName: ME, ip: IP })],
-    ["no account", (ticket: string) => ({ passphrase: ticket, ip: IP })],
-    ["an account in capitals", (ticket: string) => ({ accountName: ME.toUpperCase(), passphrase: ticket })],
-    ["an account that is an object", (ticket: string) => ({ accountName: { ME }, passphrase: ticket })],
-    ["a ticket that is not a string", () => ({ accountName: ME, passphrase: 1 })],
-  ])("refuses %s", async (_, fields) => {
-    const { tickets, ask } = await setup();
+    ["another account's ticket", (ticket: string) => ({ accountName: OTHER, passphrase: ticket, ip: IP }), "ticket"],
+    ["an unknown ticket", () => ({ accountName: ME, passphrase: "A".repeat(43), ip: IP }), "ticket"],
+    ["no ticket", () => ({ accountName: ME, ip: IP }), "frame"],
+    ["no account", (ticket: string) => ({ passphrase: ticket, ip: IP }), "frame"],
+    ["an account in capitals", (ticket: string) => ({ accountName: ME.toUpperCase(), passphrase: ticket }), "account"],
+    ["an account that is an object", (ticket: string) => ({ accountName: { ME }, passphrase: ticket }), "frame"],
+    ["a ticket that is not a string", () => ({ accountName: ME, passphrase: 1 }), "frame"],
+  ])("refuses %s, logging its cause", async (_, fields, cause) => {
+    const { tickets, ask, events } = await setup();
     expect(await ask(line(fields(tickets.mint(ME))))).toBe(NO);
+    expect(events()).toEqual([{ event: "irc_login_refused", error: cause }]);
   });
 
   it("refuses a spent ticket, and the same ticket twice at once logs in once", async () => {
@@ -131,19 +132,65 @@ describe("Ergo's auth script, answered by the server", () => {
     ["JSON that is not an object", "[1,2]\n"],
     ["null", "null\n"],
     ["a line past 16 KiB that never ends", "x".repeat(16 * 1024 + 1)],
-  ])("refuses %s at once, and stays up for the next", async (_, sent) => {
-    const { tickets, ask } = await setup();
+  ])("refuses %s at once as a bad frame, and stays up for the next", async (_, sent) => {
+    const { tickets, ask, events } = await setup();
     expect(await ask(sent)).toBe(NO);
+    expect(events()).toEqual([{ event: "irc_login_refused", error: "frame" }]);
     expect(await ask(line({ accountName: ME, passphrase: tickets.mint(ME) }))).toBe(YES(ME));
   });
 
-  it("refuses a frame whose end of line never came, a whole one included, spending nothing", async () => {
+  it("takes a line of 16 KiB whose end of line comes in a later write", async () => {
+    const { tickets, port } = await setup();
+    const bare = JSON.stringify({ accountName: ME, passphrase: tickets.mint(ME), pad: "" });
+    const full = bare.replace('"pad":""', `"pad":"${"x".repeat(16 * 1024 - bare.length)}"`);
+    const socket = connect(port, "127.0.0.1");
+    let answer = "";
+    socket.setEncoding("utf8");
+    socket.on("data", (chunk: string) => (answer += chunk));
+    socket.write(full);
+    // The server reads the full 16 KiB, its end of line not yet there, before the end comes.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    socket.write("\n");
+    await new Promise((resolve) => socket.on("close", resolve));
+    expect(answer).toBe(YES(ME));
+  });
+
+  it("clears its deadline when a client goes before its line ends", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const { server, port } = await setup();
+    const socket = connect(port, "127.0.0.1");
+    socket.on("error", () => undefined);
+    await once(server, "connection");
+    expect(vi.getTimerCount()).toBe(1);
+    socket.resetAndDestroy();
+    for (let n = 0; n < 100 && vi.getTimerCount() > 0; n += 1) await new Promise((resolve) => setImmediate(resolve));
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("refuses any shape of a frame Ergo could send with no valid ticket, and stays up", async () => {
     const { tickets, ask } = await setup();
+    const frame = fc.record({
+      accountName: fc.string(),
+      passphrase: fc.string(),
+      ip: fc.option(fc.string(), { nil: undefined }),
+    });
+    await fc.assert(
+      fc.asyncProperty(frame, async (fields) => {
+        expect(await ask(line(fields))).toBe(NO);
+      }),
+      { numRuns: 60 },
+    );
+    expect(await ask(line({ accountName: ME, passphrase: tickets.mint(ME), ip: "198.51.100.200" }))).toBe(YES(ME));
+  });
+
+  it("refuses a frame whose end of line never came, a whole one included, spending nothing", async () => {
+    const { tickets, ask, events } = await setup();
     const ticket = tickets.mint(ME);
     const whole = JSON.stringify({ accountName: ME, passphrase: ticket });
     expect(await ask(whole.slice(0, 30), { end: true })).toBe(NO);
     expect(await ask(whole, { end: true })).toBe(NO);
     expect(await ask(`${whole}\n`)).toBe(YES(ME));
+    expect(events().map(({ error }) => error)).toEqual(["frame", "frame", undefined]);
   });
 
   it("answers anything with a refusal, never a crash: any JSON, any bytes", async () => {
@@ -293,7 +340,15 @@ describe("listenAt", () => {
       const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES]);
       for (const path of [taken, join(dir, "missing", "auth.sock")]) {
         const server = authServer(db, { log: logger(PEPPER, () => true) });
-        await expect(listenAt(server, path)).rejects.toThrow(/^setting AUTH_SOCKET: /);
+        const error = await listenAt(server, path).then(
+          () => undefined,
+          (thrown: unknown) => thrown,
+        );
+        const { message, cause } = z
+          .object({ message: z.string(), cause: z.object({ code: z.string() }) })
+          .parse(error);
+        expect(message).toMatch(/^setting AUTH_SOCKET: /);
+        expect(typeof cause.code).toBe("string");
       }
       db.close();
       expect(readFileSync(taken, "utf8")).toBe("not a socket");
