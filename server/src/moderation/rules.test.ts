@@ -57,6 +57,12 @@ describe("the rules' banned words", () => {
   });
 });
 
+describe("the rules' banned words as the file writes them", () => {
+  it("finds a word the file wrote with spaces around it", () => {
+    expect(ruleVerdict("spam", { ...RULES, bannedWords: [" spam "] }, OLD)).toBe("banned_word");
+  });
+});
+
 describe("the rules' links and mentions", () => {
   it("allows the links a message may carry, and hides one more", () => {
     expect(ruleVerdict(links(3), RULES, OLD)).toBeUndefined();
@@ -70,6 +76,13 @@ describe("the rules' links and mentions", () => {
     expect(ruleVerdict(four("http://N.test"), RULES, OLD)).toBe("links");
     expect(ruleVerdict(four("ｈｔｔｐｓ：／／N.test"), RULES, OLD)).toBe("links");
     expect(ruleVerdict("https://www.a.test https://www.b.test https://www.c.test", RULES, OLD)).toBeUndefined();
+  });
+
+  it("counts once a link that carries another in its address, by scheme or by www.", () => {
+    const two = { ...RULES, linksPerMessage: 2 };
+    expect(ruleVerdict("https://a.test/?u=http://x.test https://b.test/?u=http://y.test", two, OLD)).toBeUndefined();
+    expect(ruleVerdict("https://a.test/www.b https://c.test/www.d", two, OLD)).toBeUndefined();
+    expect(ruleVerdict("www.a.test/http://b.test www.c.test/http://d.test", two, OLD)).toBeUndefined();
   });
 
   it("leaves a bare domain uncounted: no scheme, no www (a known limit)", () => {

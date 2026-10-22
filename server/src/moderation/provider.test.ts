@@ -111,6 +111,16 @@ describe("the moderation client", () => {
     },
   );
 
+  it.each([["illicit"], ["illicit/violent"]])(
+    "reads %s's flag given as true as flagged, as false not",
+    async (category) => {
+      const flagged = await client(ok(changed("categories", category, true))).check("x");
+      const plain = await client(ok(OMNI)).check("x");
+      if (flagged === "unchecked" || plain === "unchecked") throw new Error("unchecked");
+      expect([flagged.flagged[category as "illicit"], plain.flagged[category as "illicit"]]).toEqual([true, false]);
+    },
+  );
+
   const SHAPES = THIRTEEN.flatMap((category) => [
     [`${category}'s flag missing`, changed("categories", category, undefined)],
     [`${category}'s score missing`, changed("category_scores", category, undefined)],

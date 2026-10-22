@@ -1,8 +1,12 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { makeApp } from "./app.ts";
 import { startChat, type Chat } from "./chat.ts";
+import { loadConfig } from "./config.ts";
 import { openDatabase } from "./db.ts";
 import { logger } from "./log.ts";
 import { LOGIN_TABLES } from "./login/login.ts";
@@ -215,5 +219,82 @@ describe("the chat, as the server starts it", () => {
     release();
     await stopping;
     expect(verdicts()).toEqual([{ msgid: "m1", action: "unchecked", reason: null }]);
+  });
+
+  describe("the chat's check, its green pass (3i)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "gnoworld-chat-"));
+    afterAll(() => {
+      rmSync(dir, { recursive: true, force: true });
+    });
+    const verdictsOf = (db: DatabaseSync) =>
+      z
+        .array(z.object({ msgid: z.string(), action: z.string(), reason: z.string().nullable() }))
+        .parse(db.prepare("SELECT msgid, action, reason FROM verdicts ORDER BY msgid").all());
+
+    it("asks OpenAI with the key the settings read, as the server starts it", async () => {
+      const key = `sk-${"k".repeat(40)}`;
+      const files = { key: join(dir, "key"), pepper: join(dir, "pepper") };
+      writeFileSync(files.key, `${key}\n`);
+      writeFileSync(files.pepper, `${PEPPER}\n`);
+      const config = loadConfig({
+        DATABASE: join(dir, "server.db"),
+        LOG_PEPPER_FILE: files.pepper,
+        OPENAI_API_KEY_FILE: files.key,
+      });
+      const calls: { url: string; init: RequestInit }[] = [];
+      const omni = JSON.stringify({
+        results: [{ categories: OFF_ANSWER.flagged, category_scores: OFF_ANSWER.scores }],
+      });
+      vi.stubGlobal("fetch", (url: string, init: RequestInit) => {
+        calls.push({ url, init });
+        return Promise.resolve(new Response(omni));
+      });
+      const mark = logged.length;
+      const { peer, verdicts } = await linked({ worlds: worlds("bubble"), moderation: config.moderation });
+      expect(logged.slice(mark).filter((line) => line.includes('"moderation_off"'))).toEqual([]);
+      peer.say(message("account=g1a;msgid=m1", "a!u@h", ["#bubble", "hello"]));
+      await expect.poll(verdicts).toEqual([{ msgid: "m1", action: "pass", reason: null }]);
+      vi.unstubAllGlobals();
+      expect(calls.map(({ url }) => url)).toEqual(["https://api.openai.com/v1/moderations"]);
+      expect(new Headers(calls[0]?.init.headers).get("authorization")).toBe(`Bearer ${key}`);
+      expect(calls[0]?.init.body).toBe(JSON.stringify({ model: "omni-moderation-latest", input: "hello" }));
+    });
+
+    it("holds an account 59 minutes old to a new account's links under a one-hour setting", async () => {
+      const fresh = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+      const moderation = { openaiKey: undefined, thresholds: {}, newAccountHours: 1 };
+      const { db, peer, verdicts } = await linked(
+        { worlds: worlds("bubble"), moderation },
+        { provider: () => Promise.resolve(OFF_ANSWER) },
+      );
+      db.prepare("INSERT INTO accounts (address, first_seen) VALUES (?, ?)").run(fresh, T0 - 59 * MINUTE);
+      peer.say(
+        message(`account=${fresh};msgid=m1`, "a!u@h", ["#bubble", "https://a.test https://b.test https://c.test"]),
+      );
+      await expect.poll(verdicts).toEqual([{ msgid: "m1", action: "hide", reason: "new_account_links" }]);
+    });
+
+    it("raises no moderation_off alert when a provider is set", async () => {
+      const mark = logged.length;
+      await linked({ worlds: worlds("bubble"), moderation: OFF }, { provider: () => Promise.resolve(OFF_ANSWER) });
+      expect(logged.slice(mark).filter((line) => line.includes('"moderation_off"'))).toEqual([]);
+    });
+
+    it("leaves unchecked, and sends nowhere, a line of a room whose world the file no longer names", async () => {
+      const ergo = await fakeErgo();
+      const asked: string[] = [];
+      const ergoAt = { host: "127.0.0.1", port: ergo.port, password: PASSWORD };
+      const provider = (text: string): Promise<Answer> => {
+        asked.push(text);
+        return Promise.resolve(OFF_ANSWER);
+      };
+      const { db } = setup({ worlds: worlds("bubble"), ergo: ergoAt, moderation: OFF }, { now: () => T0, provider });
+      db.prepare("INSERT INTO rooms (name, world, created_at) VALUES ('#gone', 'gone', 0)").run();
+      const peer = await ergo.peer(0);
+      await welcome(peer);
+      peer.say(message("account=g1a;msgid=m1", "a!u@h", ["#gone", "hello"]));
+      await expect.poll(() => verdictsOf(db)).toEqual([{ msgid: "m1", action: "unchecked", reason: "unknown_room" }]);
+      expect(asked).toEqual([]);
+    });
   });
 });

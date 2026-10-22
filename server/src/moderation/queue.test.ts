@@ -156,3 +156,79 @@ describe("the check's queue", () => {
     queue.stop();
   });
 });
+
+describe("the check's queue, its green pass (3i)", () => {
+  const tick = (): Promise<unknown> => new Promise((resolve) => setImmediate(resolve));
+
+  it("is idle only once every running check has ended, not the first", async () => {
+    const { queue, gates } = setup({ concurrency: 2 });
+    queue.push({ account: "a", n: 0 });
+    queue.push({ account: "b", n: 1 });
+    let idle = false;
+    const waited = queue.idle().then(() => (idle = true));
+    gates[0]?.();
+    await tick();
+    expect(idle).toBe(false);
+    gates[1]?.();
+    await waited;
+    queue.stop();
+  });
+
+  it("once stopped, runs none of the lines left waiting and is idle when the running one ends", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    const { queue, gates, ran, lines } = setup({ concurrency: 1 });
+    for (const n of [0, 1, 2]) queue.push({ account: `a${String(n)}`, n });
+    queue.stop();
+    const waited = queue.idle();
+    gates[0]?.();
+    await waited;
+    await tick();
+    expect([ran.length, queue.size(), gates.length]).toEqual([1, 2, 1]);
+    // Its backlog's timer stopped with it: two lines wait, and nothing is logged.
+    vi.advanceTimersByTime(90_000);
+    expect(lines.filter((line) => line.includes("moderation_backlog"))).toEqual([]);
+  });
+
+  it("raises the backlog's alert at two minutes exactly, naming it", () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    const { queue, lines, clock } = setup({ concurrency: 1 });
+    queue.push({ account: "a", n: 0 });
+    queue.push({ account: "a", n: 1 });
+    clock.now = 120_000;
+    vi.advanceTimersByTime(30_000);
+    queue.stop();
+    expect(lines.filter((line) => line.includes('"event":"alert"'))).toEqual([
+      expect.stringContaining('"error":"moderation_backlog"'),
+    ]);
+  });
+
+  it("logs a failed check by its error's name, or unknown when it is no Error", async () => {
+    const lines: string[] = [];
+    // An error's shape, but no Error: what a library may reject with.
+    const failures: Error[] = [new TypeError("x"), { name: "Fake", message: "no Error instance" }];
+    const queue = makeQueue<Item>({
+      run: (item) => Promise.reject(failures[item.n] ?? new Error("x")),
+      log: logger("a-pepper-of-forty-characters-0123456789", (line) => lines.push(line)),
+    });
+    queue.push({ account: "a", n: 0 });
+    queue.push({ account: "b", n: 1 });
+    await queue.idle();
+    queue.stop();
+    const errors = lines
+      .filter((line) => line.includes("moderation_failed"))
+      .map((line) => /"error":"(\w+)"/.exec(line)?.[1]);
+    expect(errors).toEqual(["TypeError", "unknown"]);
+  });
+
+  it("says it is idle each time it drains, twice in a row", async () => {
+    const { queue, gates } = setup({ concurrency: 1 });
+    for (const n of [0, 1]) {
+      queue.push({ account: "a", n });
+      const waited = queue.idle();
+      gates[n]?.();
+      await waited;
+    }
+    expect(queue.size()).toBe(0);
+    queue.stop();
+  });
+});

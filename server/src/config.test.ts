@@ -182,6 +182,20 @@ describe("loadConfig", () => {
     const config = loadConfig({ ...ENV, OPENAI_API_KEY_FILE: file("openai-shown", `${key}\n`) });
     expect(inspect(config, { depth: 5 })).not.toContain(key);
     expect(JSON.stringify(config)).not.toContain(key);
+    // Shown as [redacted] by inspect, JSON and as a string (a template's form); reveal() alone reads it.
+    const secret = config.moderation.openaiKey;
+    expect([inspect(secret), JSON.stringify({ secret }), String(secret), secret?.reveal()]).toEqual([
+      "[redacted]",
+      '{"secret":"[redacted]"}',
+      "[redacted]",
+      key,
+    ]);
+  });
+
+  it("names the thresholds' setting and the kind of fault when they are not JSON", () => {
+    expect(failure({ ...ENV, MODERATION_THRESHOLDS: "harassment=0.9" })).toMatch(
+      /Error: setting MODERATION_THRESHOLDS: custom\n/,
+    );
   });
 
   it("reads every setting it is given", () => {
