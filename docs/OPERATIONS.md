@@ -176,6 +176,19 @@ Slice 3, the check (3i):
   Japanese, Thai, Lao, Khmer, Myanmar) matches anywhere in a line.
 - **A message caught in a restart** stays `pending` in the verdicts; 3j's catch-up checks it again.
 
+Slice 3, the bot acts and the stream (3j):
+
+- **A mistaken hide stays.** Nothing restores a hidden line until slice 12's console (decision 146);
+  the verdict's row holds its scores and thresholds, and its author got the reason.
+- **The catch-up.** After a reconnect or a restart the bot asks each room's history from the time of
+  the last line it settled in a row, 50 at a time, each page once the check's queue is empty. Not
+  caught up: a line the full queue drops (the log says so), a line left unchecked by a provider
+  outage (its previews wait), a room's first lines said while the link was down, and a line said in
+  the same millisecond as a page's last one.
+- **`GET /api/stream`** is public: 25 rooms a stream, 4 streams a visitor, 1,000 in all, a beat every
+  15 s, a client 64 events behind dropped; each room's last 64 events are kept, which a new client gets
+  and a client coming back gets after its `Last-Event-ID`. nginx must not buffer it (3e).
+
 ## Secrets: rotation and revocation
 
 - **The password:** write a new file with `htpasswd -cB`, then `docker compose ... restart web`.

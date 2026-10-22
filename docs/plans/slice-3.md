@@ -654,6 +654,10 @@ connection count.
 **Files.** New: `server/src/moderation/{act, catchup}.ts`, `server/src/stream/`, `packages/schemas/src/stream.ts`,
 migrations. Tier 2. No human part.
 
+**As built** (`docs/decisions.md`, 2026-10-22, 3j's shapes): the stream through Hono 4.13.13's `streamSSE`,
+read in its installed source; the catch-up by `server-time`, since Ergo 2.19.1 answers nothing after a msgid
+a REDACT erased; pages of 50 that wait for the check's queue; a hide the link could not send retried.
+
 ---
 
 ## 3k. The mute and the edits
