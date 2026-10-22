@@ -257,7 +257,9 @@ describe("the server's process", () => {
       403,
     );
     expect((await posted("/api/rooms/bubble/garden", undefined, { cookie: leads, method: "DELETE" })).status).toBe(204);
-    const rooms = await (await fetch(`http://127.0.0.1:${String(port)}/api/activity?worlds=bubble`)).text();
+    // Kept, not destroyed: the team still finds it listed.
+    const activity = `http://127.0.0.1:${String(port)}/api/activity?worlds=bubble`;
+    const rooms = await (await fetch(activity, { headers: { cookie: leads } })).text();
     expect(rooms).toContain('"room":"#bubble/garden"');
     expect((await posted("/api/rooms", room)).status).toBe(401);
     const foreign = await fetch(`http://127.0.0.1:${String(port)}/api/rooms`, {
