@@ -125,6 +125,15 @@ describe("making a room", () => {
     ]);
   });
 
+  it("answers a bad body with no session 401, as any call with no session, and with one 400 (F569)", async () => {
+    const { sent, create } = setup();
+    for (const body of ["{", { world: "bubble", name: "Bad Name" }]) {
+      expect(await answer(await create(body))).toEqual([401, '{"error":"unauthenticated"}', "no-store"]);
+      expect(await answer(await create(body, { who: "stranger" }))).toEqual([400, REFUSED, "no-store"]);
+    }
+    expect(sent).toEqual([]);
+  });
+
   it("logs who made which room, and each refusal's cause, never the cookie nor a refused name", async () => {
     const { create, events } = setup();
     await create({ world: "bubble", name: "garden" }, { who: "bubble" });
