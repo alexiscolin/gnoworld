@@ -3,8 +3,6 @@
 // /64, which one subscriber holds whole.
 import { isIP } from "node:net";
 
-const MAPPED = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i;
-
 export function visitor(peer: string, header: string | undefined, proxy: string | undefined): string {
   const from = unmapped(peer);
   const trusted = proxy !== undefined && same(from, unmapped(proxy));
@@ -13,7 +11,7 @@ export function visitor(peer: string, header: string | undefined, proxy: string 
 }
 
 function unmapped(address: string): string {
-  return MAPPED.exec(address)?.[1] ?? address;
+  return /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(address)?.[1] ?? address;
 }
 
 function same(a: string, b: string): boolean {
