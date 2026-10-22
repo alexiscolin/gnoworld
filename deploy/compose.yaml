@@ -14,6 +14,9 @@ x-locked: &locked
     options: { max-size: 10m, max-file: "3" }
   restart: unless-stopped
 
+# web's fixed address on the internal network, the one Ergo and the server believe (deploy/.env.example).
+x-web-address: &web-address ${WEB_ADDRESS:-172.30.89.10}
+
 x-tailscale-image: &tailscale-image tailscale/tailscale:v1.104.1@sha256:87c55d6be56ad85b3d8bceca5f87f73de288c609131460dd1be1874c250cc41d
 
 services:
@@ -26,7 +29,7 @@ services:
     # A fixed address: Ergo and the server believe the visitor's address from web's alone (3e).
     networks:
       inside:
-        ipv4_address: ${WEB_ADDRESS:-172.30.89.10}
+        ipv4_address: *web-address
     secrets: [demo_htpasswd]
     cpus: 0.5
     mem_limit: 128m
@@ -54,7 +57,7 @@ services:
     environment:
       SERVER_NAME: ${SERVER_NAME:-irc.gnoworld.example}
       ORIGINS: ${ORIGINS:?set ORIGINS in deploy/.env, the app's own https origin}
-      PROXY_FROM: ${WEB_ADDRESS:-172.30.89.10}
+      PROXY_FROM: *web-address
     secrets: [ergo_oper_password]
     volumes:
       - ergo:/data
@@ -83,7 +86,7 @@ services:
       PORT: "8080"
       DATABASE: /data/gnoworld.db
       ORIGINS: ${ORIGINS:?set ORIGINS in deploy/.env, the app's own https origin}
-      TRUSTED_PROXY: ${WEB_ADDRESS:-172.30.89.10}
+      TRUSTED_PROXY: *web-address
       LOG_PEPPER_FILE: /run/secrets/log_pepper
       AUTH_SOCKET: /run/gnoworld/auth.sock
       ERGO_HOST: ergo
