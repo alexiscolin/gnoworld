@@ -76,4 +76,34 @@ describe("a room's state as the link reads it", () => {
       { flags: "M", invites: [], present: [] },
     ]);
   });
+
+  it("reads a short answer as an empty one, and no state from a room whose flags never came (F568)", async () => {
+    vi.useFakeTimers();
+    const states = roomStates(1000);
+    const short = states.ask(silent, "#a");
+    hear(states, ":e 324 gnoworld #a", ":e 346 gnoworld #a", ":e 353 gnoworld = #a", ":e 366 gnoworld #a");
+    // A mask Ergo did not write stays empty: the link refuses -I of it (lines.ts).
+    expect(await short).toEqual({ flags: "", invites: [""], present: [] });
+    const flagless = states.ask(silent, "#b");
+    hear(states, ":e 353 gnoworld = #b :g1a", ":e 366 gnoworld #b :End");
+    expect(await flagless).toBeUndefined();
+  });
+
+  it("keeps 10,000 invites and 10,000 people of a room at most, the first ones (F568)", async () => {
+    vi.useFakeTimers();
+    const states = roomStates(1000);
+    const full = states.ask(silent, "#a");
+    hear(states, ":e 324 gnoworld #a +M");
+    for (let n = 0; n <= 10_000; n += 1) {
+      hear(states, `:e 346 gnoworld #a g${String(n)}!*@* gnoworld 1`, `:e 353 gnoworld = #a :n${String(n)}`);
+    }
+    hear(states, ":e 366 gnoworld #a :End");
+    const got = await full;
+    expect([got?.invites.length, got?.invites.at(-1), got?.present.length, got?.present.at(-1)?.nick]).toEqual([
+      10_000,
+      "g9999",
+      10_000,
+      "n9999",
+    ]);
+  });
 });
