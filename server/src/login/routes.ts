@@ -1,15 +1,17 @@
 // The login's HTTP face (slice 3's plan, 3c). Every POST comes from a listed Origin and in JSON, the
 // CSRF guard: Hono's own csrf() checks form types only. Each visitor's login calls are limited before any
 // work, and a failed login gets one answer whatever failed, its cause going to the log alone.
+import type { DatabaseSync } from "node:sqlite";
 import { getConnInfo } from "@hono/node-server/conninfo";
 import { ChallengeRequest, VerifyRequest, type ApiError, type Me } from "@gnoworld/schemas";
 import { Hono, type Context } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { routePath } from "hono/route";
+import type { Config } from "../config.ts";
 import { limiter } from "../limit.ts";
 import type { Log } from "../log.ts";
 import { visitor } from "../visitor.ts";
-import type { Login } from "./login.ts";
+import { makeLogin, type Login } from "./login.ts";
 
 interface Options {
   log: Log;
@@ -115,4 +117,15 @@ export function loginRoutes(login: Login, { log, origins, proxy, newAccountsPerH
   });
 
   return app;
+}
+
+type Settings = Pick<Config, "chains" | "origins" | "trustedProxy" | "newAccountsPerHour">;
+
+// The login as the server mounts it, from its settings and one clock.
+export function loginFrom(
+  db: DatabaseSync,
+  { chains, origins, trustedProxy: proxy, newAccountsPerHour }: Settings,
+  { log, now = Date.now }: { log: Log; now?: () => number },
+): Hono<Env> {
+  return loginRoutes(makeLogin(db, { chains, now }), { log, origins, proxy, newAccountsPerHour, now });
 }
