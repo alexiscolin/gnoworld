@@ -26,12 +26,12 @@ function listChanges(state: RoomState, want: Desired): string[][] {
 
 // A person but the bot: any power above voice taken (founder, admin, op and half-op, by the prefixes NAMES
 // shows), and voiced as the type says.
-function powerChanges({ nick, powers }: RoomState["present"][number], want: Desired): string[][] {
+function powerChanges({ nick, powers }: RoomState["present"][number], voice: ReadonlySet<string>): string[][] {
   const out: string[][] = [];
   for (const [prefix, letter] of Object.entries({ "~": "q", "&": "a", "@": "o", "%": "h" }))
     if (powers.includes(prefix)) out.push([`-${letter}`, nick]);
   const voiced = powers.includes("+");
-  if (want.voiced.includes(nick) !== voiced) out.push([voiced ? "-v" : "+v", nick]);
+  if (voice.has(nick) !== voiced) out.push([voiced ? "-v" : "+v", nick]);
   return out;
 }
 
@@ -40,10 +40,12 @@ function powerChanges({ nick, powers }: RoomState["present"][number], want: Desi
  * stripped of any power above voice and voiced as the type says. */
 export function changes(room: string, state: RoomState, want: Desired): [Command, ...string[]][] {
   const out: [Command, ...string[]][] = listChanges(state, want).map((mode) => ["SAMODE", room, ...mode]);
+  // Looked up for each of up to 10,000 people (F592).
+  const [invited, voice] = [new Set(want.invites), new Set(want.voiced)];
   for (const person of state.present.filter(({ nick }) => nick !== NICK)) {
-    if (want.modes.includes("i") && !want.invites.includes(person.nick))
+    if (want.modes.includes("i") && !invited.has(person.nick))
       out.push(["KICK", room, person.nick, "not on this room's list"]);
-    else out.push(...powerChanges(person, want).map((mode): [Command, ...string[]] => ["SAMODE", room, ...mode]));
+    else out.push(...powerChanges(person, voice).map((mode): [Command, ...string[]] => ["SAMODE", room, ...mode]));
   }
   return out;
 }
