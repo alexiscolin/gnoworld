@@ -675,6 +675,8 @@ describe("the IRC link's catch-up (3j)", () => {
   };
   const full = (from: number) => Array.from({ length: 50 }, (_, n) => ({ id: `p${String(from + n)}`, time: T(n) }));
   const asked = (peer: Peer) => peer.lines.filter((line) => line.startsWith("CHATHISTORY"));
+  // A millisecond before a time: the next page starts in the millisecond of the last line it read.
+  const before = (time: string) => new Date(Date.parse(time) - 1).toISOString();
   // Twice: a page's end asks its next page a microtask after it is read, which one PONG may beat.
   const settled = async (peer: Peer) => {
     await sync(peer, "a");
@@ -688,7 +690,7 @@ describe("the IRC link's catch-up (3j)", () => {
     await welcome(peer);
     expect(await peer.next(/^CHATHISTORY /)).toBe("CHATHISTORY AFTER #bubble timestamp=2026-10-22T08:00:04.999Z 50");
     page(peer, "a", full(0));
-    expect(await peer.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${T(49)} 50`);
+    expect(await peer.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(T(49))} 50`);
     page(peer, "b", [
       { id: "q1", time: T(50) },
       { id: "q2", time: T(51) },
@@ -736,7 +738,7 @@ describe("the IRC link's catch-up (3j)", () => {
     await welcome(peer);
     await peer.next(/^CHATHISTORY /);
     page(peer, "a", [...full(0).slice(0, 49), { id: "anon", time: T(59), account: "" }]);
-    expect(await peer.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${T(59)} 50`);
+    expect(await peer.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(T(59))} 50`);
     await expect.poll(() => said.length).toBe(49);
   });
 
@@ -757,7 +759,18 @@ describe("the IRC link's catch-up (3j)", () => {
     await settled(peer);
     expect(asked(peer)).toHaveLength(1);
     drain();
-    expect(await peer.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${T(49)} 50`);
+    expect(await peer.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(T(49))} 50`);
+  });
+
+  it("asks again from a full page's last millisecond, so a line beside its last one is not lost", async () => {
+    const ergo = await fakeErgo();
+    start(ergo.port, { lastChecked: (room) => (room === "#bubble" ? T(0) : undefined) });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    await peer.next(/^CHATHISTORY /);
+    // Its last two lines in one millisecond: Ergo's next page from that millisecond holds the third.
+    page(peer, "a", [...full(0).slice(0, 48), { id: "x1", time: T(48) }, { id: "x2", time: T(48) }]);
+    expect(await peer.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(T(48))} 50`);
   });
 
   it("asks no further page after a full page whose lines carry no time", async () => {

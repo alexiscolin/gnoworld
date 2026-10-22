@@ -43,6 +43,8 @@ interface State {
   ready: boolean;
   // Each chathistory batch open, by its reference: its room, its lines and the last one's time.
   batches: Map<string, { room: string; lines: number; last: string }>;
+  // The time each room's history was last asked after, so a page that makes no progress is passed.
+  after: Map<string, string>;
 }
 
 // A server's longest line: 8191 bytes of tags with the @ and the space, 510 more, then CR LF.
@@ -60,8 +62,10 @@ function reader(options: Options, state: State) {
   // Ergo answers AFTER a msgid it no longer holds (a line hidden by REDACT) with nothing, and AFTER a
   // time from the next millisecond on (irc/history/history.go:171-175, irc/handlers.go:940, v2.19.1).
   const history = (s: Socket, room: string, after: string): void => {
+    state.after.set(room, after);
     s.write(line("CHATHISTORY", ["AFTER", room, `timestamp=${after}`, String(PAGE)]));
   };
+  const earlier = (time: string): string => new Date(Date.parse(time) - 1).toISOString();
   // A refusal Ergo will not change by itself: log it, and try again later and later.
   const refused = (s: Socket, error: string): void => {
     log("irc_refused", { error });
@@ -82,7 +86,7 @@ function reader(options: Options, state: State) {
       // A millisecond before the mark: the mark's own line comes again, seen, and none beside it is lost.
       for (const room of state.joined) {
         const last = lastChecked(room);
-        if (last !== undefined) history(s, room, new Date(Date.parse(last) - 1).toISOString());
+        if (last !== undefined) history(s, room, earlier(last));
       }
       onReady();
       log("irc_ready");
@@ -92,11 +96,13 @@ function reader(options: Options, state: State) {
       if (!ref.startsWith("-")) return;
       const done = state.batches.get(ref.slice(1));
       state.batches.delete(ref.slice(1));
-      // A full page may have more after it, asked once the last page is taken in.
-      // ponytail: a line in the millisecond of a page's last one is lost; pages by msgid lose a hidden one.
+      // A full page may have more after it, asked once the last page is taken in, from its last line's
+      // millisecond, which may hold more (F542). A page all in that one millisecond goes past it.
+      // ponytail: more than a page of lines in one millisecond loses the rest; pages by msgid lose a hidden one.
       if (done === undefined || done.lines < PAGE || done.last === "") return;
+      const from = earlier(done.last) === state.after.get(done.room) ? done.last : earlier(done.last);
       const next = (): void => {
-        if (!s.destroyed) history(s, done.room, done.last);
+        if (!s.destroyed) history(s, done.room, from);
       };
       drained().then(next, next);
     },
@@ -130,7 +136,7 @@ export function ircLink(options: Options): Link {
   let retry: ReturnType<typeof setTimeout> | undefined;
   // The backoff starts again from a second only after a minute up: Ergo taking the link in, then
   // dropping it at once, keeps it waiting longer.
-  const state: State = { attempt: 0, joined: new Set(), ready: false, batches: new Map() };
+  const state: State = { attempt: 0, joined: new Set(), ready: false, batches: new Map(), after: new Map() };
   const read = reader(options, state);
   const open = (): void => {
     const s = connect(port, host);
