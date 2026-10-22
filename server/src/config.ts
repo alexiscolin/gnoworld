@@ -19,7 +19,7 @@ export interface Config {
 
 // An origin as a browser sends it: scheme, host and port, nothing else (an Origin header compares to it).
 const isOrigin = (text: string): boolean =>
-  URL.canParse(text) && ["http:", "https:"].includes(new URL(text).protocol) && new URL(text).origin === text;
+  /^https?:\/\//.test(text) && URL.canParse(text) && new URL(text).origin === text;
 
 const Env = z.object({
   HOST: z.string().min(1).max(253).default("127.0.0.1"),
