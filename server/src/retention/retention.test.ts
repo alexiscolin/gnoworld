@@ -139,6 +139,13 @@ describe("the retention's budget (3n)", () => {
     expect(times()).toEqual(Array.from({ length: 30 }, (_, i) => T0 - 90 + i));
   });
 
+  it("drains a backlog past the cap within one tick's budget, batch after batch (F593)", () => {
+    const { retention, verdicts, times } = setup({ maxVerdicts: 3, batch: 10, batches: 3 });
+    verdicts(25, T0 - 100);
+    retention.tick();
+    expect(times()).toEqual([T0 - 78, T0 - 77, T0 - 76]);
+  });
+
   it("holds its default budget at 10,000 rows a tick", () => {
     const { retention, verdicts, times } = setup();
     verdicts(10_001, T0 - 200 * DAY);
