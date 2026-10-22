@@ -69,7 +69,8 @@ describe("loadConfig", () => {
     expect(loadConfig(ENV).authSocket).toBeUndefined();
     expect(loadConfig({ ...ENV, AUTH_SOCKET: "/run/gnoworld/auth.sock" }).authSocket).toBe("/run/gnoworld/auth.sock");
     expect(loadConfig({ ...ENV, AUTH_SOCKET: `/${"s".repeat(99)}` }).authSocket).toBe(`/${"s".repeat(99)}`);
-    for (const path of ["", "run/auth.sock", `/${"s".repeat(100)}`]) {
+    // A socket's path holds about 100 bytes, not characters: é takes two.
+    for (const path of ["", "run/auth.sock", `/${"s".repeat(100)}`, `/${"é".repeat(50)}`]) {
       expect(failure({ ...ENV, AUTH_SOCKET: path })).toMatch(/setting AUTH_SOCKET: /);
     }
   });

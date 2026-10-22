@@ -64,7 +64,8 @@ const Env = z.object({
   // The socket Ergo's auth script dials (3d): an absolute path, within what a socket's address holds.
   AUTH_SOCKET: z
     .string()
-    .regex(/^\/.{1,99}$/)
+    .regex(/^\/./)
+    .refine((path) => Buffer.byteLength(path) <= 100)
     .optional(),
 });
 
