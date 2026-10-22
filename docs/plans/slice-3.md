@@ -341,6 +341,7 @@ and the device list (slices 12 and 8); the admin cookie of slice 12 (ADR2:877).
 | A token never ends | Sliding 30 days, a hard cap of 90 from the signature | The clock cases |
 | The challenge endpoint is flooded (rows, memory) | The limits above | The 100,000-challenge case |
 | Verification burns CPU | The same limits first; one attempt per nonce; a body limit; a worker thread if the bench puts one verification over a budget (proposal 2 ms; ADR2:1094) | The bench |
+| A key flood resets windows: past the limiter's cap the window that started first goes and starts over (3a, F414) | The cap's value, and whether a ceiling per /48 or a global one sits above the per-visitor limit, decided here with the login's numbers; failing closed when full is refused (a flood would then lock every new visitor out) | The limiter's property tests with the chosen numbers |
 | New accounts are free, so an address farm bypasses a ban | A per-address limit on new accounts only slows it; evasion is accepted and written in the known limits (dec:144) | `OPERATIONS.md` known limits |
 | Which check failed leaks | The uniform refusal (timing is not equalised: the stage is not a secret) | The byte-identical case |
 | An admin right is escalated | No role and no admin route exists; ADR2:881 keeps the admin API off the public host | A route-table test fails on any admin prefix on the public listener |
@@ -433,7 +434,7 @@ product (slice 4: only Ergo's retention for them is set here).
 | A guest speaks (a room made later, a default lost) | `+M` by default; rooms made only by the server (`operator-only-creation`) | Speak in a new room as a guest; a normal account tries to create one |
 | A hand-made account takes the name of someone's address; clients treat the account tag as identity | Native registration and password login off; the script is the only authority | The registration refusals; a mutant that opens them is killed |
 | The operator credential is guessed through the public listener | A second listener on `inside`; operator login refused on the public one | The `/ws` attempt |
-| A cross-site WebSocket from another origin | Allowed origins fixed (**unverified** key) | A handshake with a foreign `Origin` is refused |
+| A cross-site WebSocket from another origin | Allowed origins fixed: `server.websockets.allowed-origins` (3b's table); an empty list lets every origin in, so the image's render of `deploy/ergo/ircd.yaml.tmpl` refuses an absent, empty or `*` ORIGINS (F422) | A handshake with a foreign `Origin`, and one with none, refused through `web` |
 | The visitor's address is forged | `web` overwrites it; upstreams trust only `web` | The forged-header case |
 | The demo password reaches `server` or Ergo | `Authorization` not forwarded | The log case |
 | Ergo or `server` reaches the host or the LAN | `inside` stays internal with an isolated gateway; the proxy is the only exit and sits behind the kernel's rules | 1c's probes from each new container |
