@@ -82,16 +82,16 @@ export function makeReconciler({ rooms, desired, state, send, log }: Options): R
       log("alert", { error: "room_opened", room });
     }
   };
-  // A room whose state or changes failed is passed over: the others go on, and the next pass asks it again.
-  const failed =
-    (room: string) =>
-    (error: unknown): void => {
-      log("room_unreconciled", { room, error: error instanceof Error ? error.name : "unknown" });
-    };
+  // One room at a time; one whose state or changes failed is passed over, and the next pass asks it again.
+  // ponytail: a pass lasts rooms x Ergo's answer, 10 s for a silent room; read a few at once if that grows.
   const drain = async (): Promise<void> => {
     for (const room of waiting) {
       waiting.delete(room);
-      await one(room).then(undefined, failed(room));
+      try {
+        await one(room);
+      } catch (error) {
+        log("room_unreconciled", { room, error: error instanceof Error ? error.name : "unknown" });
+      }
     }
   };
   const ask = (room?: string): void => {
