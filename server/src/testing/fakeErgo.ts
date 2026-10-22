@@ -13,15 +13,23 @@ export interface Peer {
   say: (line: string) => void;
 }
 
-const servers: Server[] = [];
-afterEach(() => {
-  for (const server of servers.splice(0)) server.close();
+const servers: { server: Server; sockets: Socket[] }[] = [];
+// Each server's connections ended and its port freed before the next test.
+afterEach(async () => {
+  await Promise.all(
+    servers.splice(0).map(async ({ server, sockets }) => {
+      for (const socket of sockets) socket.destroy();
+      await new Promise((resolve) => server.close(resolve));
+    }),
+  );
 });
 
 export const fakeErgo = async (at = 0) => {
   const peers: Peer[] = [];
   const waiting: (() => void)[] = [];
+  const sockets: Socket[] = [];
   const server = createServer((socket) => {
+    sockets.push(socket);
     const lines: string[] = [];
     let rest = "";
     const changed: (() => void)[] = [];
@@ -46,7 +54,7 @@ export const fakeErgo = async (at = 0) => {
     peers.push({ socket, lines, next, say: (line) => socket.write(`${line}\r\n`) });
     for (const resolve of waiting.splice(0)) resolve();
   });
-  servers.push(server);
+  servers.push({ server, sockets });
   server.listen(at, "127.0.0.1");
   await once(server, "listening");
   const { port } = server.address() as AddressInfo;
