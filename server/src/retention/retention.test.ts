@@ -87,6 +87,42 @@ describe("the verdicts' retention by days and by cap (3n)", () => {
     expect(times()).toEqual([T0, T0, T0]);
   });
 
+  it("never removes a verdict still pending its check, past its days or the oldest past the cap (F598)", () => {
+    // The cap counts every row, the pending ones too (4 checks at a time, 3i), and removes settled ones.
+    const { db, retention, verdicts } = setup({ maxVerdicts: 4 });
+    const pending = db.prepare(
+      "INSERT INTO verdicts (msgid, room, account, action, at) VALUES (?, '#bubble', 'h', 'pending', ?)",
+    );
+    pending.run("waiting-old", T0 - 200 * DAY);
+    pending.run("waiting", T0 - 100);
+    verdicts(3, T0);
+    retention.tick();
+    const Ids = z.array(z.object({ msgid: z.string() }));
+    expect(
+      Ids.parse(db.prepare("SELECT msgid FROM verdicts ORDER BY at, msgid").all()).map(({ msgid }) => msgid),
+    ).toEqual(["waiting-old", "waiting", "m1", "m2"]);
+  });
+
+  it("counts no pending verdict past its days, so it removes no settled one in its place (F598)", () => {
+    const { db, retention, verdicts, times } = setup();
+    db.prepare(
+      "INSERT INTO verdicts (msgid, room, account, action, at) VALUES ('waiting', '#bubble', 'h', 'pending', ?)",
+    ).run(T0 - 200 * DAY);
+    verdicts(2, T0);
+    retention.tick();
+    expect(times()).toEqual([T0 - 200 * DAY, T0, T0 + 1]);
+  });
+
+  it("stops when only pending verdicts stand past the cap, rather than ask for ever (F598)", () => {
+    const { db, retention, times } = setup({ maxVerdicts: 1 });
+    const pending = db.prepare(
+      "INSERT INTO verdicts (msgid, room, account, action, at) VALUES (?, '#bubble', 'h', 'pending', ?)",
+    );
+    for (const id of ["a", "b", "c"]) pending.run(id, T0);
+    retention.tick();
+    expect(times()).toHaveLength(3);
+  });
+
   it("removes nothing when the clock goes back, nor a verdict dated after it", () => {
     const { clock, retention, verdicts, times } = setup();
     verdicts(1, T0 - 10 * DAY, { prefix: "past" });

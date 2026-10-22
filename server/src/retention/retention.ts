@@ -25,11 +25,14 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
   const { log, now = Date.now, maxVerdicts = 150_000, maxBytes = 256 * 1024 * 1024 } = options;
   const { batch = 500, batches = 20 } = options;
   const N = z.object({ n: z.number() });
-  // By verdicts_by_time, the oldest first, ties by row.
+  // By verdicts_by_time, the oldest first, ties by row; a verdict pending its check stays, its settle to
+  // come (F598).
   const sql = {
-    oldest: db.prepare("DELETE FROM verdicts WHERE rowid IN (SELECT rowid FROM verdicts ORDER BY at, rowid LIMIT ?)"),
+    oldest: db.prepare(
+      "DELETE FROM verdicts WHERE rowid IN (SELECT rowid FROM verdicts WHERE action <> 'pending' ORDER BY at, rowid LIMIT ?)",
+    ),
     count: db.prepare("SELECT count(*) AS n FROM verdicts"),
-    old: db.prepare("SELECT count(*) AS n FROM verdicts WHERE at < ?"),
+    old: db.prepare("SELECT count(*) AS n FROM verdicts WHERE at < ? AND action <> 'pending'"),
     used: db.prepare(
       "SELECT (page_count - freelist_count) * page_size AS n FROM pragma_page_count, pragma_freelist_count, pragma_page_size",
     ),
@@ -49,8 +52,8 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
       let budget = batch * batches;
       // The verdicts past their days are the oldest ones: the same walk takes them and those past the cap.
       const old = N.parse(sql.old.get(now() - 180 * 24 * 60 * 60_000)).n;
-      for (let over = Math.max(old, count() - maxVerdicts); over > 0 && budget > 0;) {
-        const removed = Number(sql.oldest.run(Math.min(batch, budget, over)).changes);
+      for (let over = Math.max(old, count() - maxVerdicts), removed = 1; over > 0 && budget > 0 && removed > 0;) {
+        removed = Number(sql.oldest.run(Math.min(batch, budget, over)).changes);
         [over, budget] = [over - removed, budget - removed];
       }
       watch("verdicts_near_cap", count(), maxVerdicts);
