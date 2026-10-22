@@ -286,6 +286,9 @@ if [ "${1:-}" = --mutants ]; then
 		guard awk '!done && /-A OUTPUT -o lo -j ACCEPT/ { print; print "\techo \"-A OUTPUT -p udp --dport 53 -j ACCEPT\""; done = 1; next } { print }'
 	mutant "the guard leaves IPv6 open" "IPv6: the guard drops all but loopback" guard sed '/^printf/ s#:OUTPUT DROP#:OUTPUT ACCEPT#'
 	mutant "web's port let out to any network" "the guard lets nothing else out" guard sed 's#-o $inside ##'
+	mutant "web's port open to the whole network" "the guard's network reaches the server only through web" guard sed 's#-d $web ##'
+	mutant "the way out's port answers what it did not accept" "the guard lets nothing else out" \
+		guard sed 's# -m conntrack --ctstate ESTABLISHED##'
 	mutant "no rate limit" "a burst with no password gets 429" nginx sed '/limit_req zone=/d'
 	mutant "a flood answered 503" "a burst with no password gets 429" nginx sed '/limit_req_status 429/d'
 	mutant "a first load cut short" "a visitor's first load" nginx sed 's#burst=60#burst=25#'
@@ -409,6 +412,8 @@ elif [ "${1:-}" != --demo ]; then
 	expect "its own network lets out" "$(docker network inspect --format '{{.Internal}}' "$outside")" false
 	expect "it is alone there" "$(docker network inspect --format '{{len .Containers}}' "$outside")" 1
 	reach "container:$guard" "the guard's network, which Tailscale shares," yes "$(guard_dns)"
+	# Its rule for port 8080 names web: the server listens on 8080 too, behind web's password and limits (F618).
+	expect "the guard's network reaches the server only through web" "$(answering "container:$guard" server:8080)" ""
 	# TCP leaves on 80 and 443 only: a public port that a plain container reaches stays shut.
 	expect "a plain container reaches a public port beside 80 and 443 (the next check sees)" "$(answering bridge 1.1.1.1:853)" 1.1.1.1:853
 	expect "the guard lets out no other public port" "$(answering "container:$guard" 1.1.1.1:853)" ""
@@ -429,8 +434,9 @@ elif [ "${1:-}" != --demo ]; then
 		fail "the guard lets something out before it refuses"
 	fi
 	expect "the guard lets nothing else out" "$(printf '%s\n' "$v4" | grep -e '-j ACCEPT' | grep -vx -e '-A OUTPUT -o lo -j ACCEPT' -e '-A OUTPUT -p udp -j ACCEPT' |
-		grep -vx -e '-A OUTPUT -o [^ ]* -p tcp -m tcp --dport 8080 -j ACCEPT' -e '-A OUTPUT -p tcp -m multiport --dports 80,443 -j ACCEPT' \
-			-e '-A OUTPUT -d [0-9.]*/32 -p [a-z]* -m [a-z]* --dport 53 -j ACCEPT' -e '-A OUTPUT -o [^ ]* -p tcp -m tcp --sport 4750 -j ACCEPT' || true)" ""
+		grep -vx -e "-A OUTPUT -d $WEB_ADDRESS/32 -o [^ ]* -p tcp -m tcp --dport 8080 -j ACCEPT" -e '-A OUTPUT -p tcp -m multiport --dports 80,443 -j ACCEPT' \
+			-e '-A OUTPUT -d [0-9.]*/32 -p [a-z]* -m [a-z]* --dport 53 -j ACCEPT' \
+			-e '-A OUTPUT -o [^ ]* -p tcp -m tcp --sport 4750 -m conntrack --ctstate ESTABLISHED -j ACCEPT' || true)" ""
 	expect "IPv6: the guard drops all but loopback" "$(printf '%s\n' "$v6" | tr '\n' '|')" "-P OUTPUT DROP|-A OUTPUT -o lo -j ACCEPT|"
 
 	# Requests as Tailscale sends them: through the PROXY protocol, with the visitor's address. Each
