@@ -170,6 +170,25 @@ describe("the reconciler's pass", () => {
     ]);
   });
 
+  it("logs a room whose state failed, by its name and its error's, and nothing for one Ergo left unanswered (F578)", async () => {
+    const lines: string[] = [];
+    const reconciler = makeReconciler({
+      rooms: () => ["#quiet", "#broken", "#odd"],
+      desired: () => OPEN,
+      state: (room) =>
+        room === "#quiet"
+          ? Promise.resolve(undefined)
+          : Promise.reject(room === "#broken" ? new RangeError("no") : new Error("odd")),
+      send: () => true,
+      log: logger("a-pepper-of-forty-characters-0123456789", (line) => lines.push(line)),
+    });
+    await reconciler.pass();
+    expect(lines.map((line) => line.replace(/^\{"time":"[^"]+",/, "{").trim())).toEqual([
+      '{"event":"room_unreconciled","error":"RangeError","room":"#broken"}',
+      '{"event":"room_unreconciled","error":"Error","room":"#odd"}',
+    ]);
+  });
+
   it("raises no alert for changes that keep a room as closed as it was: flags, a voice, a KICK (F564)", async () => {
     const lines: string[] = [];
     const crew = state({

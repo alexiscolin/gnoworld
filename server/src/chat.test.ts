@@ -1180,6 +1180,17 @@ describe("the chat, as the server starts it", () => {
       ]).toEqual([[], [], ["#bubble/crew"], ["#bubble/attic", "#bubble/crew"], ["#bubble/attic", "#bubble/crew"]]);
     });
 
+    it("runs its passes with no Ergo set, and logs no room as failed for it (F578)", async () => {
+      vi.useFakeTimers();
+      try {
+        setup({ worlds: roled(), moderation: OFF, ergo: undefined });
+        await vi.advanceTimersByTimeAsync(3 * MINUTE);
+        expect(logged.filter((line) => line.includes("room_unreconciled"))).toEqual([]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("lists an archived room as a hidden one: to its world's moderators and the team alone (F576)", async () => {
       const tokens = new Map([
         ["mod", MOD],
