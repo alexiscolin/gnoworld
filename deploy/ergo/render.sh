@@ -20,6 +20,9 @@ printf '%s\n' "${SERVER_NAME:-}" | grep -Eqx '[a-z0-9-]+(\.[a-z0-9-]+)+' || fail
 printf '%s\n' "${PROXY_FROM:-}" | grep -Eqx '[0-9]{1,3}(\.[0-9]{1,3}){3}' || fail "PROXY_FROM: required, web's address"
 # The server's socket, which Ergo dials for each login, with no command (irc/script.go, RunScript).
 printf '%s\n' "${AUTH_SOCKET:-}" | grep -Eqx '/[A-Za-z0-9/._-]+' || fail "AUTH_SOCKET: required, the server's socket"
+# The oper's password as the server takes it (config.ts): 32 characters or more, blanks aside. Ergo's
+# genpasswd hashes any, an empty file too, and OPER is open on /ws (a known limit, OPERATIONS.md).
+tr -d ' \t\r\n' </run/secrets/ergo_oper_password | grep -Eq '^.{32}' || fail "the oper's password: 32 characters or more"
 hash=$(/ircd-bin/ergo genpasswd </run/secrets/ergo_oper_password | tail -n 1)
 case $hash in '$2'*) ;; *) fail "the oper's password file gave no hash" ;; esac
 

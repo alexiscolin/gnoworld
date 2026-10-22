@@ -329,6 +329,7 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "anyone makes a room" "a guest makes no room" template sed 's#operator-only-creation: true#operator-only-creation: false#'
 	mutant "registration open" "a hand-made account is refused" \
 		template awk '/^  registration:/ { r = 1 } r && /enabled: false/ { sub(/false/, "true"); r = 0 } { print }'
+	mutant "a short oper password taken" "Ergo's start refuses a short oper password" render_sh sed '/32 characters or more/d'
 	mutant "a login by PASS" "login-via-pass-command: false" template sed 's#login-via-pass-command: false#login-via-pass-command: true#'
 	mutant "every address believed as a proxy" "never a forged X-Forwarded-For" template sed 's#proxy-allowed-from: {{PROXY_FROM}}#proxy-allowed-from: ["0.0.0.0/0"]#'
 	mutant "the auth script's socket lost" "the refusal came from the server" compose 'services: { server: { environment: { AUTH_SOCKET: /tmp/elsewhere.sock } } }'
@@ -600,6 +601,13 @@ print("%.2f %d" % (sum(float(s.get("cpus", 0)) for s in services), sum(size(s.ge
 	for origins in "" "*" "$ORIGINS,*" "gnoworld.test" "http://gnoworld.test/path"; do
 		case $(render "$origins") in *"render: ORIGINS"*) pass "Ergo's start refuses ORIGINS [$origins]" ;; *) fail "Ergo starts with ORIGINS [$origins]" ;; esac
 	done
+	# A short oper's password, which Ergo's genpasswd hashes all the same (F621).
+	printf 'hunter2\n' >"$tmp/short_oper_password"
+	chmod 644 "$tmp/short_oper_password"
+	case $(ERGO_OPER_PASSWORD_FILE=$tmp/short_oper_password docker compose -p "$project" $files run --rm --no-deps -e RENDER_ONLY=1 ergo 2>&1) in
+	*"render: the oper's password"*) pass "Ergo's start refuses a short oper password" ;;
+	*) fail "Ergo starts with a short oper password" ;;
+	esac
 
 	# No secret of the stack's in Docker's records, a log or an image.
 	oper=$(cat "$tmp/ergo_oper_password")
@@ -748,8 +756,7 @@ CLIENT
 		"$(docker logs "$server" 2>&1 | grep '"irc_login_refused"' || true)" '"error":"(ticket|account)"'
 	holds "an OPER with a wrong password is refused" "$guest" ' 491 guest21 :OPER failed'
 	holds "and the next one waits: Ergo's oper throttle" "$guest" ' 491 guest21 :You must wait'
-	# A known limit (OPERATIONS.md): Ergo takes OPER on any listener; the password's length and the throttle hold it.
-	at_least "the oper's password is long: 32 characters or more" "$(docker exec "$ergo" wc -c /run/secrets/ergo_oper_password 2>/dev/null | awk '{ print $1 }' || echo 0)" 33
+	# A known limit (OPERATIONS.md): Ergo takes OPER on any listener; the password's length (render.sh) and the throttle hold it.
 	expect "a WebSocket from another site is refused" "$(first "$(ws 203.0.113.22 "$auth" https://evil.test "NICK x")")" "HTTP/1.1 403 Forbidden"
 	for origin in - "http://gnoworld.test.evil.test" "https://gnoworld.test" "http://gnoworld.test:81"; do
 		expect "and one from [$origin]" "$(first "$(ws 203.0.113.23 "$auth" "$origin" "NICK y")")" "HTTP/1.1 403 Forbidden"
