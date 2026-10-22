@@ -91,20 +91,21 @@ the first draft: its 3a, 3c and 3d keep their names; its 3b (the stack) is 3e, i
 to 3b's real Ergo; its 3e (egress) joined 3e; its 3f (the bot) is 3h to 3k; its 3g (activity, prices, k6) is
 3h and 3n, the prices going to slice 5; its 3h (the CSP) is 3f; 3g, 3l and 3m are new.
 
-**Eleven merges, not fourteen** (Alexis, 2026-10-22): a merge that touches no tier-1 file carries about
-600 lines (`docs/REVIEW.md`, "Rounds converge"), so 3g lands with 3b, 3k with 3j and 3m with 3l, each pair
-on the first one's branch; 3c, 3d and 3f, tier 1, stay alone. The parts keep their names below. The merges are stacked: while Alexis
+**Ten merges, not fourteen** (Alexis, 2026-10-22): a merge that touches no tier-1 file carries about
+600 lines (`docs/REVIEW.md`, "Rounds converge"), so 3a, 3b and 3g land as one merge on `slice-3a` (3a came
+to 238 lines), 3k with 3j and 3m with 3l, each pair on the first one's branch; 3c, 3d and 3f, tier 1, stay
+alone. The parts keep their names below. The merges are stacked: while Alexis
 reviews one, the next is built on a branch he makes from it, and what his review changes is rebased into it.
 
 | Merge | Branch | Proves on its own | Tier | Est. lines | Waits on |
 |---|---|---|---|---|---|
 | 3a | `slice-3a` | `server` runs from Node-run TypeScript, refuses bad input and stops cleanly; the slice's one script installed the approved list and nothing else; every guard added to the gate fails its planted fault | 2, harness | ~380 | 2g, the dependency check |
-| 3b | `slice-3b` | A real Ergo, built from a pinned source, runs in the gate; each unverified claim about it is a test, and the table of what was found is filled | 2, harness | ~200 | 3a |
+| 3b | `slice-3a` (with 3a) | A real Ergo, built from a pinned source, runs in the gate; each unverified claim about it is a test, and the table of what was found is filled | 2, harness | ~200 | 3a |
 | 3c | `slice-3c` | A forged, replayed, raced, expired or other-network proof is refused; a valid one sets an HttpOnly cookie; CSRF and a foreign origin are refused | **1** | ~380 | 3a |
 | 3d | `slice-3d` | A ticket logs a person into real Ergo, a reconnect needs no signature, a guest reads but cannot speak, a replayed or other account's ticket is refused | **1** | ~300 | 3b, 3c |
 | 3e | `slice-3e` | Through the demo's door a guest reads and cannot speak, no hand-made account exists, `server` reaches only the listed host, nothing reaches the host or the LAN | `deploy/` | ~250 + tests | 3b, 3d |
 | 3f | `slice-3f` | Every response carries one strict CSP from one source, and each planted violation is refused | **1** | ~220 | 3a (after 3e: it names the real paths) |
-| 3g | `slice-3b` (with 3b) | The roles file (team, trusted, world moderators, per-world rules) parses, fails closed and answers who may do what | 2, rights read whole | ~160 | 3a |
+| 3g | `slice-3a` (with 3a) | The roles file (team, trusted, world moderators, per-world rules) parses, fails closed and answers who may do what | 2, rights read whole | ~160 | 3a |
 | 3h | `slice-3h` | The server's IRC link keeps the bot in every room of the file, creates no other, ignores DMs, counts activity; the activity API answers only for the worlds asked | 2 | ~380 | 3d, 3e, 3g, **`core/irc`** |
 | 3i | `slice-3i` | A message is checked once, by the rules then by OpenAI; an unknown answer counts as not checked; the queue is fair and bounded | 2 | ~350 | 3h; 3e's egress for the live path |
 | 3j | `slice-3j` | A flagged message is hidden and its author sees why; a preview never renders before its check; after an outage the bot checks what it missed | 2 | ~330 | 3i |
@@ -249,6 +250,35 @@ refused (which tags a client may send is in the message-tags spec, `cf` source I
 whether an oper may log in on a public listener, and the allowed-origins key; PROXY or `X-Forwarded-For` on the
 WebSocket listener; the retention keys (persistent history days, DMs, any size cap: `cf:71`); how the oper
 password's hash reaches the config; whether Node's global `WebSocket` can send what Ergo needs (an `Origin`).
+
+**Ergo, as found** (v2.19.1, the real binary; `server/src/testing/ergo.test.ts`, test names in quotes; the
+spike's transcripts in `.claude/tmp/ergo-spike/`, not committed). Every row holds unless it says otherwise.
+
+| Claim | Found | Test |
+|---|---|---|
+| A guest joins and reads, and cannot speak in `+M`; an account can | `404 ... (+M)` for the guest | "refuses a guest speaking in a +M room" |
+| History: members only; it survives a restart, DMs included | non-member `FAIL CHATHISTORY INVALID_TARGET` | "lets a guest read the history...", "keeps a room's history... across a restart" |
+| Native registration, `PASS` login, `NS PASSWD` and `SAREGISTER` are closed | as the spike | "refuses registering an account...", "ignores PASS...", "refuses a wrong or empty passphrase..." |
+| `NS IDENTIFY` is another door to the auth script | holds, **and** a second client of a connected account is refused the nick (`433`, "try logging out and logging back in with SASL") | "logs a guest in through the script when it gives NS IDENTIFY..." |
+| The script's input is one JSON line: `accountName`, `passphrase`, `ip` | as the spike | "sends the script one JSON line..." |
+| A refusing, erroring, garbled or crashing script gives `904` | **partly**: "Invalid account credentials" for an account that exists, "Account does not exist" for a new one (the spike's accounts existed from earlier runs) | "answers 904 when the script says no..." |
+| A slow script holds the client the whole timeout; an absent one locks every login out | as the spike | "makes the client wait...", "refuses a new account with 904 when the script file is absent..." |
+| The script's account name wins over SASL's, and the nick follows it | as the spike | "lets the script return another account name..." |
+| The passphrase stays out of the log at the default log types, and is in clear at `*` | as the spike | "keeps the passphrase out of the log...", "writes the passphrase..." |
+| `@clientid` is cut from the SASL name; a 40-character address is a logged-in nick, a guest held to 32 | as the spike | "hands the script the SASL name...", "holds an address of 40 characters..." |
+| Client tags are stored and replayed; reactions are stored, `+typing` is not; `+m` stops a reaction; server-owned tags a client sends are dropped | as the spike | "relays and replays client tags...", "stores reaction TAGMSGs...", "stops a non-voiced account...", "drops server-owned tags..." |
+| `operator-only-creation`; who may `REDACT`; what members see; the mute extban; `+I`; the 100-entry list | as the spike | the "moderation" block |
+| An oper with `chanreg` passes the 15 channels; an account stops at 15 | **now tested both ways**: the 16th by an account: "You have already registered the maximum number of channels" | "lets an oper with chanreg register 17 channels..." |
+| An oper logs in on any listener; the oper hash may come from the environment | holds, **and** `OPER` is throttled for 10 s per client after a failure | "lets an oper log in...", "takes the oper password from the environment..." |
+| Allowed origins; Node's `WebSocket` sends an `Origin` only through its `headers` option | as the spike | the three WebSocket tests |
+| `X-Forwarded-For` and `PROXY` only from an allowed peer | as the spike; a `PROXY` line from another peer closes the connection with no line | the "operators and listeners" block |
+
+Found writing the template (a config of only the keys gnoworld relies on, `deploy/ergo/ircd.yaml.tmpl`): a key left
+out is Go's zero, not `default.yaml`'s value, and Ergo refuses some of them. It needs a hostname as the server's name,
+`max-sendq`, `multiclient` (which `force-nick-equals-account` requires), and `allow-environment-overrides` for the oper
+hash from the environment; `metadata` is on, set by opers alone (my choice, least privilege). **Times:** the cold build
+5.4 s and a cached start about 0.05 s (the spike); the 44 Ergo tests add about 19 s to the fast gate, 32 s before and
+51 s after, within its 60 s.
 
 **Out of scope.** The stack's images (3e), the server's side of the auth-script (3d), anything over HTTP.
 
