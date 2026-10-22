@@ -155,6 +155,13 @@ describe("the retention's budget (3n)", () => {
 });
 
 describe("the retention's alerts (3n)", () => {
+  it("raises nothing on a small database at its default caps: 150,000 verdicts, 256 MB (F594)", () => {
+    const { retention, verdicts, lines } = setup();
+    verdicts(5, T0);
+    retention.tick();
+    expect(lines).toEqual([]);
+  });
+
   it("measures after it removed: rows past their days raise nothing", () => {
     const { retention, verdicts, alerts } = setup({ maxVerdicts: 10 });
     verdicts(9, T0 - 200 * DAY);
