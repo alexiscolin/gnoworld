@@ -75,6 +75,8 @@ export function authServer(db: DatabaseSync, { log, now = Date.now, deadlineMs =
     };
     socket.on("data", (chunk: Buffer) => {
       if (answered) return;
+      // ponytail: the line rebuilt at each chunk, O(L²/k), L ≤ 16 KiB: 6 ms at most, from one-byte chunks,
+      // which only the socket's peer sends (Ergo writes its line at once); a chunk list if another peer comes.
       held = Buffer.concat([held, chunk]);
       const end = held.indexOf(10);
       if (end === -1 ? held.length > lineMax : end > lineMax) answer({ error: "frame" });
