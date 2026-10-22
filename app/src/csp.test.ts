@@ -136,6 +136,7 @@ describe("pagesPolicy", () => {
   it("leaves text that only reads like a handler or a style alone", async () => {
     await expect(pagesPolicy(["<p>onion=3; style=bold</p><script>a()</script>"])).resolves.toContain("'sha256-");
     await expect(pagesPolicy(['<p stylex="1">x</p><script>a()</script>'])).resolves.toContain("'sha256-");
+    await expect(pagesPolicy(['<p title="<style>">x</p><script>a()</script>'])).resolves.toContain("'sha256-");
   });
 });
 
