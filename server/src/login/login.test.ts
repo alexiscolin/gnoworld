@@ -1,0 +1,592 @@
+import { createHash } from "node:crypto";
+import type { DatabaseSync } from "node:sqlite";
+import { MAX_ARBITRARY_MESSAGE_BYTES } from "@adena-wallet/sdk";
+import { Address, type Proof } from "@gnoworld/schemas";
+import { afterEach, describe, expect, it } from "vitest";
+import { openDatabase } from "../db.ts";
+import { wallet } from "../testing/signer.ts";
+import { LOGIN_TABLES, makeLogin, verifyProof, type Login, type Verify } from "./login.ts";
+
+const T0 = Date.parse("2026-10-22T12:00:00.000Z");
+const MINUTE = 60_000;
+const DAY = 24 * 60 * MINUTE;
+const TTL = 5 * MINUTE;
+const DOMAIN = "gnoworld.test";
+const CHAINS = ["onyx-1", "gnoland-1"];
+const OTHER = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
+
+const opened: DatabaseSync[] = [];
+afterEach(() => {
+  for (const db of opened.splice(0)) db.close();
+});
+
+const setup = (options: { verify?: Verify; nonceCap?: number } = {}) => {
+  const db = openDatabase(":memory:", [LOGIN_TABLES]);
+  opened.push(db);
+  const clock = { now: T0 };
+  const login = makeLogin(db, { chains: CHAINS, now: () => clock.now, ...options });
+  return { db, clock, login };
+};
+
+const challenge = (login: Login, chainId = "onyx-1") => {
+  const made = login.challenge(chainId, DOMAIN);
+  if (typeof made === "string") throw new Error(`no challenge: ${made}`);
+  return made;
+};
+
+const anyone = (): boolean => true;
+
+describe("challenge", () => {
+  it("writes the whole text the wallet signs: the version, the domain, the nonce, issue and expiry", () => {
+    const { login } = setup();
+    const made = challenge(login);
+    expect(made.nonce).toMatch(/^[A-Za-z0-9_-]{22}$/);
+    expect(made.expiresAt).toBe("2026-10-22T12:05:00.000Z");
+    expect(made.text).toBe(
+      [
+        "Sign in to gnoworld (login, version 1)",
+        "",
+        `Domain: ${DOMAIN}`,
+        `Nonce: ${made.nonce}`,
+        "Issued: 2026-10-22T12:00:00.000Z",
+        "Expires: 2026-10-22T12:05:00.000Z",
+      ].join("\n"),
+    );
+  });
+
+  it("keeps the text under the SDK's limit with the longest domain a host can have", () => {
+    const { login } = setup();
+    const made = login.challenge("onyx-1", `${"a".repeat(253)}:65535`);
+    if (typeof made === "string") throw new Error(made);
+    expect(Buffer.byteLength(made.text)).toBeLessThanOrEqual(MAX_ARBITRARY_MESSAGE_BYTES);
+  });
+
+  it("stores the very text and chain it returns, with its nonce", () => {
+    const { db, login } = setup();
+    const made = challenge(login, "gnoland-1");
+    expect(db.prepare("SELECT chain, text FROM nonces WHERE nonce = ?").get(made.nonce)).toEqual({
+      chain: "gnoland-1",
+      text: made.text,
+    });
+  });
+
+  it("takes each chain of the list and refuses any other, storing nothing", () => {
+    const { db, login } = setup();
+    for (const chainId of CHAINS) expect(typeof login.challenge(chainId, DOMAIN)).toBe("object");
+    for (const chainId of ["test5", "ONYX-1", "onyx-1 ", "", "gnoland-1\n"]) {
+      expect(login.challenge(chainId, DOMAIN)).toBe("chain");
+    }
+    expect(db.prepare("SELECT count(*) AS n FROM nonces").get()).toEqual({ n: 2 });
+  });
+
+  it("gives every challenge its own nonce", () => {
+    const { login } = setup();
+    const nonces = new Set(Array.from({ length: 1000 }, () => challenge(login).nonce));
+    expect(nonces.size).toBe(1000);
+  });
+
+  it("refuses a challenge past the cap on unspent nonces, and takes one again once they expire", () => {
+    const { clock, login } = setup({ nonceCap: 3 });
+    for (let i = 0; i < 3; i++) challenge(login);
+    expect(login.challenge("onyx-1", DOMAIN)).toBe("full");
+    clock.now += TTL;
+    expect(typeof login.challenge("onyx-1", DOMAIN)).toBe("object");
+  });
+
+  it("holds 100,000 unspent nonces at most, by default", () => {
+    const { db, login } = setup();
+    const insert = db.prepare("INSERT INTO nonces (nonce, chain, text, expires_at) VALUES (?, 'onyx-1', '', ?)");
+    db.exec("BEGIN");
+    for (let i = 0; i < 99_999; i++) insert.run(`n${String(i)}`, T0 + TTL);
+    db.exec("COMMIT");
+    expect(typeof login.challenge("onyx-1", DOMAIN)).toBe("object");
+    expect(login.challenge("onyx-1", DOMAIN)).toBe("full");
+  });
+
+  it("purges the expired nonces when it writes a new one, and keeps the live ones verifiable", async () => {
+    const { db, clock, login } = setup();
+    for (let i = 0; i < 5; i++) challenge(login);
+    clock.now += TTL - 1;
+    const live = challenge(login);
+    clock.now += 1;
+    challenge(login);
+    expect(db.prepare("SELECT count(*) AS n FROM nonces").get()).toEqual({ n: 2 });
+    const me = wallet();
+    expect(
+      typeof (await login.verify(
+        { nonce: live.nonce, address: me.address, proof: me.sign("onyx-1", live.text) },
+        anyone,
+      )),
+    ).toBe("object");
+  });
+
+  it("refuses to start with no chain to log in on", () => {
+    expect(() => makeLogin(openDatabase(":memory:", [LOGIN_TABLES]), { chains: [], now: () => T0 })).toThrow(
+      /^the login needs at least one chain$/,
+    );
+  });
+});
+
+describe("verify, with the SDK's verifier", () => {
+  it("turns a valid proof into a token of 256 bits, of which only the SHA-256 is stored", async () => {
+    const { db, login } = setup();
+    const me = wallet();
+    const made = challenge(login);
+    const result = await login.verify(
+      { nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) },
+      anyone,
+    );
+    if (typeof result === "string") throw new Error(result);
+    expect(result.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(result.maxAge).toBe(90 * 24 * 60 * 60);
+    const stored = db.prepare("SELECT hex(hash) AS hash, address FROM tokens").all();
+    const sha = createHash("sha256").update(result.token).digest("hex").toUpperCase();
+    expect(stored).toEqual([{ hash: sha, address: me.address }]);
+    const everything = JSON.stringify(
+      ["nonces", "accounts", "tokens"].map((table) => db.prepare(`SELECT * FROM ${table}`).all()),
+    );
+    expect(everything).not.toContain(result.token);
+  });
+
+  it.each([
+    ["onyx-1", "gnoland-1"],
+    ["gnoland-1", "onyx-1"],
+  ])("refuses a proof made for %s against a %s challenge", async (signedFor, asked) => {
+    const { login } = setup();
+    const me = wallet();
+    const made = challenge(login, asked);
+    expect(
+      await login.verify({ nonce: made.nonce, address: me.address, proof: me.sign(signedFor, made.text) }, anyone),
+    ).toBe("proof");
+  });
+
+  const otherKey = wallet();
+  const vectors: [string, (text: string, me: ReturnType<typeof wallet>) => [Address, Proof]][] = [
+    [
+      "signed by another key for the same address",
+      (text, me) => [me.address, otherKey.sign("onyx-1", text, me.address)],
+    ],
+    ["signed by another account entirely", (text, me) => [me.address, otherKey.sign("onyx-1", text)]],
+    ["a text with one byte changed", (text, me) => [me.address, me.sign("onyx-1", text.replace("Nonce:", "Nonce;"))]],
+    ["a text with a byte added", (text, me) => [me.address, me.sign("onyx-1", `${text} `)]],
+    ["a proof for another address than the one named", (text, me) => [OTHER, me.sign("onyx-1", text)]],
+    // A gno session key signs a transaction for its master account (tm2/pkg/sdk/auth/ante.go,
+    // SessionAddr); a login proof has no such field, so its key can only stand for itself.
+    ["a session key signing for its master account", (text) => [OTHER, otherKey.sign("onyx-1", text, OTHER)]],
+    [
+      "a key of another type, a multisig's",
+      (text, me) => [me.address, retyped(me.sign("onyx-1", text), "/tm.PubKeyMultisig")],
+    ],
+    ["an empty signature", (text, me) => [me.address, resigned(me.sign("onyx-1", text), "")]],
+    ["a truncated signature", (text, me) => [me.address, resigned(me.sign("onyx-1", text), (s) => s.subarray(0, 63))]],
+    [
+      "an oversize signature",
+      (text, me) => [me.address, resigned(me.sign("onyx-1", text), (s) => Buffer.concat([s, Buffer.from([0])]))],
+    ],
+    ["a high-S twin of a valid signature", (text, me) => [me.address, resigned(me.sign("onyx-1", text), highS)]],
+  ];
+
+  it.each(vectors)("refuses %s, and spends the nonce", async (_, forge) => {
+    const { login } = setup();
+    const me = wallet();
+    const made = challenge(login);
+    const [address, proof] = forge(made.text, me);
+    expect(await login.verify({ nonce: made.nonce, address: address, proof }, anyone)).toBe("proof");
+    expect(
+      await login.verify({ nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) }, anyone),
+    ).toBe("nonce");
+  });
+
+  it("refuses the same proof sent twice in a row", async () => {
+    const { login } = setup();
+    const me = wallet();
+    const made = challenge(login);
+    const proof = me.sign("onyx-1", made.text);
+    expect(typeof (await login.verify({ nonce: made.nonce, address: me.address, proof }, anyone))).toBe("object");
+    expect(await login.verify({ nonce: made.nonce, address: me.address, proof }, anyone)).toBe("nonce");
+  });
+
+  it("refuses an unknown nonce, one that only looks like a known one, and a nonce of another challenge", async () => {
+    const { login } = setup();
+    const me = wallet();
+    const [first, second] = [challenge(login), challenge(login)];
+    const proof = me.sign("onyx-1", first.text);
+    for (const unknown of [
+      "A".repeat(22),
+      "_".repeat(22),
+      "%",
+      first.nonce.toUpperCase(),
+      first.nonce.toLowerCase(),
+      ` ${first.nonce}`,
+    ]) {
+      if (unknown !== first.nonce)
+        expect(await login.verify({ nonce: unknown, address: me.address, proof }, anyone)).toBe("nonce");
+    }
+    expect(await login.verify({ nonce: second.nonce, address: me.address, proof }, anyone)).toBe("proof");
+    expect(typeof (await login.verify({ nonce: first.nonce, address: me.address, proof }, anyone))).toBe("object");
+  });
+
+  it("hands out a new token at each login, the same account at the same instant included", async () => {
+    const { login } = setup();
+    const me = wallet();
+    const tokens = new Set<string>();
+    for (let i = 0; i < 100; i++) {
+      const made = challenge(login);
+      const result = await login.verify(
+        { nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) },
+        anyone,
+      );
+      if (typeof result !== "string") tokens.add(result.token);
+    }
+    expect(tokens.size).toBe(100);
+  });
+
+  it.each([
+    [TTL - 1, "object"],
+    [TTL, "nonce"],
+    [TTL + 1, "nonce"],
+  ])("at %i ms after the challenge, answers a valid proof with %s", async (after, expected) => {
+    const { clock, login } = setup();
+    const me = wallet();
+    const made = challenge(login);
+    clock.now += after;
+    const result = await login.verify(
+      { nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) },
+      anyone,
+    );
+    expect(typeof result === "string" ? result : typeof result).toBe(expected);
+  });
+});
+
+describe("verify, with a verifier the test holds", () => {
+  it("hands the verifier the stored text and chain and the address named, never the client's document", async () => {
+    const seen: Parameters<Verify>[1][] = [];
+    const { login } = setup({
+      verify: (_, expected) => {
+        seen.push(expected);
+        return Promise.resolve(true);
+      },
+    });
+    const me = wallet();
+    const made = challenge(login, "gnoland-1");
+    await login.verify({ nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", "another text") }, anyone);
+    expect(seen).toEqual([{ signer: me.address, chainId: "gnoland-1", data: made.text }]);
+  });
+
+  it.each([2, 50])(
+    "logs in exactly once, verifying once, when the same proof arrives %i times at once",
+    async (times) => {
+      let calls = 0;
+      const { db, login } = setup({
+        verify: () => {
+          calls += 1;
+          return new Promise((resolve) =>
+            setImmediate(() => {
+              resolve(true);
+            }),
+          );
+        },
+      });
+      const me = wallet();
+      const made = challenge(login);
+      const proof = me.sign("onyx-1", made.text);
+      const results = await Promise.all(
+        Array.from({ length: times }, () => login.verify({ nonce: made.nonce, address: me.address, proof }, anyone)),
+      );
+      expect(results.filter((result) => typeof result === "object")).toHaveLength(1);
+      expect(results.filter((result) => result === "nonce")).toHaveLength(times - 1);
+      expect(calls).toBe(1);
+      expect(db.prepare("SELECT count(*) AS n FROM tokens").get()).toEqual({ n: 1 });
+    },
+  );
+
+  it("never calls the verifier for an unknown, expired or spent nonce", async () => {
+    let calls = 0;
+    const { clock, login } = setup({
+      verify: () => {
+        calls += 1;
+        return Promise.resolve(true);
+      },
+    });
+    const me = wallet();
+    const [spent, expired] = [challenge(login), challenge(login)];
+    await login.verify({ nonce: spent.nonce, address: me.address, proof: me.sign("onyx-1", spent.text) }, anyone);
+    calls = 0;
+    await login.verify({ nonce: spent.nonce, address: me.address, proof: me.sign("onyx-1", spent.text) }, anyone);
+    await login.verify({ nonce: "A".repeat(22), address: me.address, proof: me.sign("onyx-1", spent.text) }, anyone);
+    clock.now += TTL;
+    await login.verify({ nonce: expired.nonce, address: me.address, proof: me.sign("onyx-1", expired.text) }, anyone);
+    expect(calls).toBe(0);
+  });
+
+  it.each([
+    [
+      "throws",
+      (): Promise<boolean> => {
+        throw new Error("verifier broke");
+      },
+    ],
+    ["rejects", (): Promise<boolean> => Promise.reject(new Error("verifier broke"))],
+  ])("refuses the proof when the verifier %s, and makes no account or token", async (_, verify) => {
+    const { db, login } = setup({ verify });
+    const me = wallet();
+    const made = challenge(login);
+    expect(
+      await login.verify({ nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) }, anyone),
+    ).toBe("proof");
+    expect([
+      db.prepare("SELECT count(*) AS n FROM accounts").get(),
+      db.prepare("SELECT count(*) AS n FROM tokens").get(),
+    ]).toEqual([{ n: 0 }, { n: 0 }]);
+  });
+
+  it("spends the nonce before verifying, so a refused proof buys no second try", async () => {
+    let answer = false;
+    const { login } = setup({ verify: () => Promise.resolve(answer) });
+    const me = wallet();
+    const made = challenge(login);
+    expect(
+      await login.verify({ nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) }, anyone),
+    ).toBe("proof");
+    answer = true;
+    expect(
+      await login.verify({ nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) }, anyone),
+    ).toBe("nonce");
+  });
+});
+
+describe("accounts", () => {
+  const login1 = async (login: Login, me = wallet(), mayCreate = anyone) => {
+    const made = challenge(login);
+    return {
+      me,
+      result: await login.verify(
+        { nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) },
+        mayCreate,
+      ),
+    };
+  };
+
+  it("creates the account at its first verified login, and keeps its first day after", async () => {
+    const { db, clock, login } = setup();
+    const { me } = await login1(login);
+    clock.now += DAY;
+    await login1(login, me);
+    expect(db.prepare("SELECT address, first_seen FROM accounts").all()).toEqual([
+      { address: me.address, first_seen: T0 },
+    ]);
+  });
+
+  it("asks before creating an account, and refuses when the limit says no", async () => {
+    const { db, login } = setup();
+    expect((await login1(login, wallet(), () => false)).result).toBe("new_account");
+    expect(db.prepare("SELECT count(*) AS n FROM accounts").get()).toEqual({ n: 0 });
+    expect(db.prepare("SELECT count(*) AS n FROM tokens").get()).toEqual({ n: 0 });
+  });
+
+  it("creates one account, asking once, when a new address logs in twice at once", async () => {
+    const { db, login } = setup({
+      verify: () =>
+        new Promise((resolve) =>
+          setImmediate(() => {
+            resolve(true);
+          }),
+        ),
+    });
+    const me = wallet();
+    const [first, second] = [challenge(login), challenge(login)];
+    let asked = 0;
+    const mayCreate = (): boolean => {
+      asked += 1;
+      return true;
+    };
+    const results = await Promise.all(
+      [first, second].map((made) =>
+        login.verify({ nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) }, mayCreate),
+      ),
+    );
+    expect(results.map((result) => typeof result)).toEqual(["object", "object"]);
+    expect([asked, db.prepare("SELECT count(*) AS n FROM accounts").get()]).toEqual([1, { n: 1 }]);
+  });
+
+  it("never asks for a forged proof", async () => {
+    const { login } = setup();
+    const me = wallet();
+    const made = challenge(login);
+    let asked = 0;
+    const result = await login.verify(
+      { nonce: made.nonce, address: me.address, proof: wallet().sign("onyx-1", made.text, me.address) },
+      () => {
+        asked += 1;
+        return true;
+      },
+    );
+    expect([result, asked]).toEqual(["proof", 0]);
+  });
+
+  it("never asks for an account that exists", async () => {
+    const { login } = setup();
+    const { me } = await login1(login);
+    let asked = 0;
+    const { result } = await login1(login, me, () => {
+      asked += 1;
+      return false;
+    });
+    expect([typeof result, asked]).toEqual(["object", 0]);
+  });
+});
+
+describe("the token", () => {
+  const token = async (login: Login): Promise<{ token: string; address: Address }> => {
+    const me = wallet();
+    const made = challenge(login);
+    const result = await login.verify(
+      { nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) },
+      anyone,
+    );
+    if (typeof result === "string") throw new Error(result);
+    return { token: result.token, address: me.address };
+  };
+
+  it.each([
+    [30 * DAY - MINUTE, true],
+    [30 * DAY, false],
+  ])("unused for %i ms, holds: %s", async (after, holds) => {
+    const { clock, login } = setup();
+    const made = await token(login);
+    clock.now += after;
+    expect(login.session(made.token)).toBe(holds ? made.address : undefined);
+  });
+
+  it("renews on use for 30 days, and ends 90 days after its signature whatever the use", async () => {
+    const { clock, login } = setup();
+    const made = await token(login);
+    for (const day of [29, 58, 87, 89]) {
+      clock.now = T0 + day * DAY;
+      expect(login.session(made.token)).toBe(made.address);
+    }
+    clock.now = T0 + 90 * DAY - 1;
+    expect(login.session(made.token)).toBe(made.address);
+    clock.now = T0 + 90 * DAY;
+    expect(login.session(made.token)).toBeUndefined();
+  });
+
+  it("counts the 90 days from the token's own login, not from the account's first", async () => {
+    const { clock, login } = setup();
+    const me = wallet();
+    const once = async () => {
+      const made = challenge(login);
+      const result = await login.verify(
+        { nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) },
+        anyone,
+      );
+      if (typeof result === "string") throw new Error(result);
+      return result.token;
+    };
+    await once();
+    clock.now = T0 + 100 * DAY;
+    const later = await once();
+    expect(login.session(later)).toBe(me.address);
+    for (const day of [129, 158, 187]) {
+      clock.now = T0 + day * DAY;
+      expect(login.session(later)).toBe(me.address);
+    }
+  });
+
+  it("knows no unknown or malformed token", async () => {
+    const { login } = setup();
+    const made = await token(login);
+    for (const other of ["", "x", made.token.slice(1), `${made.token}A`, made.token.toUpperCase(), "A".repeat(43)]) {
+      if (other !== made.token) expect(login.session(other)).toBeUndefined();
+    }
+  });
+
+  it("knows no session and ends nothing without a token", async () => {
+    const { login } = setup();
+    const made = await token(login);
+    login.logout(undefined);
+    expect([login.session(undefined), login.session(made.token)]).toEqual([undefined, made.address]);
+  });
+
+  it("ends at logout, and a logout of an unknown token changes nothing", async () => {
+    const { db, login } = setup();
+    const [kept, ended] = [await token(login), await token(login)];
+    login.logout("A".repeat(43));
+    login.logout(ended.token);
+    expect(login.session(ended.token)).toBeUndefined();
+    expect(login.session(kept.token)).toBe(kept.address);
+    expect(db.prepare("SELECT count(*) AS n FROM tokens").get()).toEqual({ n: 1 });
+  });
+
+  it("purges the ended tokens at the next login, and only those", async () => {
+    const { db, clock, login } = setup();
+    const ended = await token(login);
+    clock.now += DAY;
+    const live = await token(login);
+    clock.now = T0 + 30 * DAY;
+    const fresh = await token(login);
+    expect(db.prepare("SELECT count(*) AS n FROM tokens").get()).toEqual({ n: 2 });
+    expect([login.session(ended.token), login.session(live.token), login.session(fresh.token)]).toEqual([
+      undefined,
+      live.address,
+      fresh.address,
+    ]);
+  });
+});
+
+describe("verifyProof", () => {
+  it("still takes a proof made once and written out, so a new SDK that signs other bytes shows here", async () => {
+    // Made by testing/signer.ts on 2026-10-22, with SDK 0.1.1; the document is ADR-036's, by hand.
+    const text = [
+      "Sign in to gnoworld (login, version 1)",
+      "",
+      "Domain: gnoworld.test",
+      "Nonce: frozen-nonce-0000000000",
+      "Issued: 2026-10-22T12:00:00.000Z",
+      "Expires: 2026-10-22T12:05:00.000Z",
+    ].join("\n");
+    const signer = Address.parse("g1pplvlanvvpecuk0ukgm4g4yltwh6cy6nfq3y4l");
+    const proof: Proof = {
+      signed: {
+        chain_id: "onyx-1",
+        account_number: "0",
+        sequence: "0",
+        fee: { amount: [], gas: "0" },
+        msgs: [{ type: "sign/MsgSignData", value: { signer, data: Buffer.from(text).toString("base64") } }],
+        memo: "",
+      },
+      signature: {
+        pubKey: { typeUrl: "/tm.PubKeySecp256k1", value: "A5cbN2zkrMoLSiHVLBm6AXMee38EmGSLE7tYgWNGkeie" },
+        signature: "bCiZXX6h3CiLOX4pS57TKCyfklV/SERtLXJVlDKj6Zgpd7bX78WkBO15EoelSKzssnKWm7ki4T05EIAojGRLmw==",
+      },
+    };
+    expect(await verifyProof(proof, { signer, chainId: "onyx-1", data: text })).toBe(true);
+  });
+
+  it("is the SDK's verifier: yes for a valid proof, no once any expected value differs", async () => {
+    const me = wallet();
+    const proof = me.sign("onyx-1", "a text");
+    const expected = { signer: me.address, chainId: "onyx-1", data: "a text" };
+    expect(await verifyProof(proof, expected)).toBe(true);
+    expect(await verifyProof(proof, { ...expected, signer: OTHER })).toBe(false);
+    expect(await verifyProof(proof, { ...expected, chainId: "gnoland-1" })).toBe(false);
+    expect(await verifyProof(proof, { ...expected, data: "a text " })).toBe(false);
+  });
+});
+
+function retyped(proof: Proof, typeUrl: string): Proof {
+  return { ...proof, signature: { ...proof.signature, pubKey: { ...proof.signature.pubKey, typeUrl } } };
+}
+
+function resigned(proof: Proof, change: string | ((signature: Buffer) => Buffer)): Proof {
+  const bytes = Buffer.from(proof.signature.signature, "base64");
+  const signature = typeof change === "string" ? change : change(bytes).toString("base64");
+  return { ...proof, signature: { ...proof.signature, signature } };
+}
+
+// The same signature with s replaced by n - s: valid for ECDSA, refused by the low-S rule.
+function highS(signature: Buffer): Buffer {
+  const order = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
+  const s = BigInt(`0x${signature.subarray(32).toString("hex")}`);
+  return Buffer.concat([signature.subarray(0, 32), Buffer.from((order - s).toString(16).padStart(64, "0"), "hex")]);
+}

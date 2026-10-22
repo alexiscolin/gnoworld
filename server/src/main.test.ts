@@ -6,7 +6,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
+import { Challenge } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it } from "vitest";
+import { wallet } from "./testing/signer.ts";
 
 interface Server {
   child: ChildProcessByStdio<null, Readable, Readable>;
@@ -89,6 +91,63 @@ describe("the server's process", () => {
     const server = start(Object.fromEntries(Object.entries(settings()).filter(([key]) => key !== "DATABASE")));
     expect(await exited(server)).not.toBe(0);
     expect(server.out.stderr).toMatch(/setting DATABASE: /);
+  });
+
+  it("stops at boot on an empty list of chains, naming the setting", async () => {
+    const server = start({ ...settings(), CHAINS: "" });
+    expect(await exited(server)).not.toBe(0);
+    expect(server.out.stderr).toMatch(/setting CHAINS: /);
+  });
+
+  it("walks the login over HTTP: a challenge, a signed proof, /me, a logout, then /me again", async () => {
+    const origin = "http://gnoworld.test";
+    const port = await listening(start({ ...settings(), ORIGINS: origin }));
+    const call = (path: string, init: RequestInit = {}): Promise<Response> =>
+      fetch(`http://127.0.0.1:${String(port)}/api/login/${path}`, init);
+    const posted = (path: string, body: unknown, cookie = ""): Promise<Response> =>
+      call(path, {
+        method: "POST",
+        headers: { origin, "content-type": "application/json", ...(cookie === "" ? {} : { cookie }) },
+        body: JSON.stringify(body),
+      });
+    const who = wallet();
+    const made = Challenge.parse(await (await posted("challenge", { chainId: "onyx-1" })).json());
+    expect(made.text).toContain("Domain: gnoworld.test\n");
+    const verified = await posted("verify", {
+      nonce: made.nonce,
+      address: who.address,
+      proof: who.sign("onyx-1", made.text),
+    });
+    expect([verified.status, await verified.json()]).toEqual([200, { address: who.address }]);
+    const cookie = (verified.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
+    expect(cookie).toMatch(/^__Host-session=[A-Za-z0-9_-]{43}$/);
+    const known = await call("me", { headers: { cookie } });
+    expect([known.status, await known.json()]).toEqual([200, { address: who.address }]);
+    expect((await posted("logout", {}, cookie)).status).toBe(204);
+    expect((await call("me", { headers: { cookie } })).status).toBe(401);
+    const foreign = await call("challenge", {
+      method: "POST",
+      headers: { origin: "https://evil.test", "content-type": "application/json" },
+      body: JSON.stringify({ chainId: "onyx-1" }),
+    });
+    expect(foreign.status).toBe(403);
+    for (const path of ["/admin", "/api/admin", "/api/login/admin"]) {
+      expect((await fetch(`http://127.0.0.1:${String(port)}${path}`)).status).toBe(404);
+    }
+  });
+
+  it("limits login calls per visitor as the trusted proxy names them, over the real connection", async () => {
+    const origin = "http://gnoworld.test";
+    const port = await listening(start({ ...settings(), ORIGINS: origin, TRUSTED_PROXY: "127.0.0.1" }));
+    const ask = (visitor: string): Promise<Response> =>
+      fetch(`http://127.0.0.1:${String(port)}/api/login/challenge`, {
+        method: "POST",
+        headers: { origin, "content-type": "application/json", "x-real-ip": visitor },
+        body: JSON.stringify({ chainId: "onyx-1" }),
+      });
+    for (let i = 0; i < 10; i++) expect((await ask("192.0.2.1")).status).toBe(200);
+    expect((await ask("192.0.2.1")).status).toBe(429);
+    expect((await ask("192.0.2.2")).status).toBe(200);
   });
 
   it("stops at boot on a roles file it cannot read, naming the file and never its content", async () => {
