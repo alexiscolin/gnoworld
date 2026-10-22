@@ -1,0 +1,16 @@
+{
+  "team": [],
+  "trusted": [],
+  "worlds": [
+    {
+      "slug": "earth",
+      "moderators": [],
+      "rules": { "bannedWords": [], "linksPerMessage": 3, "mentionsPerMessage": 5, "linksForNewAccount": 2 }
+    },
+    {
+      "slug": "bubble",
+      "moderators": [],
+      "rules": { "bannedWords": [], "linksPerMessage": 3, "mentionsPerMessage": 5, "linksForNewAccount": 2 }
+    }
+  ]
+}

@@ -1,0 +1,105 @@
+# Ergo's configuration for gnoworld (slice 3b): only the keys gnoworld relies on, each set here rather
+# than left to a default. The server's tests render it with folders and ports of their own
+# (server/src/testing/ergo.ts), and the stack's image renders the same file (3e). Each name in double
+# braces is filled at render, as a JSON value; a key's meaning is in Ergo's default.yaml at the tag (deploy/ergo/VERSION).
+network:
+  name: gnoworld
+server:
+  # A hostname, as Ergo asks; .test is reserved for tests (RFC 2606), the stack's image names its own.
+  name: irc.gnoworld.test
+  listeners:
+    {{PLAIN}}: {}
+    {{WEBSOCKET}}:
+      websocket: true
+  casemapping: ascii
+  enforce-utf8: true
+  max-sendq: 96k
+  proxy-allowed-from: {{PROXY_FROM}}
+  websockets:
+    allowed-origins: {{ORIGINS}}
+accounts:
+  authentication-enabled: true
+  registration:
+    enabled: false
+  login-via-pass-command: false
+  nick-reservation:
+    enabled: true
+    method: strict
+    force-nick-equals-account: true
+  # force-nick-equals-account requires it: one account, several connections (a tab each).
+  multiclient:
+    enabled: true
+    allowed-by-default: true
+    always-on: opt-in
+    auto-away: opt-in
+  auth-script:
+    enabled: true
+    command: {{AUTH_SCRIPT}}
+    args: []
+    autocreate: true
+    timeout: {{AUTH_TIMEOUT}}
+    kill-timeout: 1s
+    max-concurrency: 64
+channels:
+  operator-only-creation: true
+  registration:
+    enabled: true
+    operator-only: false
+    max-channels-per-account: 15
+oper-classes:
+  server-admin:
+    title: Server Admin
+    capabilities: [kill, ban, nofakelag, relaymsg, vhosts, sajoin, samode, snomasks, rehash, accreg, chanreg, history, metadata]
+opers:
+  admin:
+    class: server-admin
+    password: {{OPER_HASH}}
+datastore:
+  path: {{DATABASE}}
+  autoupgrade: true
+  sqlite:
+    enabled: true
+    database-path: {{HISTORY}}
+limits:
+  nicklen: 32
+  identlen: 20
+  realnamelen: 150
+  channellen: 64
+  awaylen: 390
+  kicklen: 390
+  topiclen: 390
+  chan-list-modes: 100
+history:
+  enabled: true
+  channel-length: 2048
+  client-length: 256
+  chathistory-maxmessages: 1000
+  restrictions:
+    expire-time: 1w
+  persistent:
+    enabled: true
+    unregistered-channels: true
+    registered-channels: opt-out
+    direct-messages: opt-out
+  retention:
+    allow-individual-delete: true
+  tagmsg-storage:
+    default: false
+    whitelist: ["+draft/react", "+react"]
+# On, as in Ergo's defaults, but set by opers alone (the server), not by any channel member.
+metadata:
+  enabled: true
+  operator-only-modification: true
+  max-subs: 100
+  max-keys: 100
+  client-throttle:
+    enabled: true
+    duration: 2m
+    max-attempts: 10
+lock-file: {{LOCK}}
+# The oper's password hash may come from the environment (ERGO__OPERS__ADMIN__PASSWORD), not the file.
+allow-environment-overrides: true
+logging:
+  - method: stderr
+    type: {{LOG_TYPES}}
+    level: {{LOG_LEVEL}}

@@ -9,6 +9,7 @@ import tseslint from "typescript-eslint";
 import app from "./lint/app.config.ts";
 import core from "./lint/core.config.ts";
 import react from "./lint/react.config.ts";
+import server from "./lint/server.config.ts";
 import { SWALLOWED, SWITCHED_OFF, TESTS } from "./lint/shared.config.ts";
 
 const BASELINE_ALSO = { allowAtRules: ["starting-style"], allowSelectors: ["popover-open"] };
@@ -61,6 +62,7 @@ export default defineConfig(
   { files: ["*.config.ts", "app/*.config.ts", "lint/*.config.ts"], extends: [tseslint.configs.disableTypeChecked] },
   react,
   app,
+  server,
   {
     // Tests read as lists of cases, so they may run long.
     files: TESTS,

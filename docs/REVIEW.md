@@ -75,8 +75,9 @@ Code written by an agent gets the same reading as anyone's, plus this. `/pre-mer
    **Rounds converge**, as Anthropic's own reviewer does ("Solving code review at Anthropic"):
    the first round reads the branch, any later one only the diff since the last; after three
    rounds the review stops, and Claude and Alexis reconsider the approach before more code.
-   A merge carries about 400 lines of product code at most (DORA's small batches): a slice is
-   cut into merges of that size, and the review log notes each one's size, rounds and tokens.
+   A merge carries about 400 lines of product code at most when it touches a tier-1 file, and
+   about 600 otherwise (DORA's small batches; Alexis, 2026-10-22): a slice is cut into merges of
+   that size, and the review log notes each one's size, rounds and tokens.
 4. **Each finding is verified, then reproduced, before it is fixed.** On a tier-1 lot, the
    `finding-verifier` agent (Opus) first tries to refute each finding, then to reproduce it, and
    its severity stands. Then: a command, or a test seen failing. One

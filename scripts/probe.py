@@ -345,6 +345,48 @@ try:
             if not os.listdir(f"{src}/{folder}"):
                 os.rmdir(f"{src}/{folder}")
 
+    if part("server"):
+        # The server's folder (docs/ARCHITECTURE.md): core, schemas, Node and its framework, never the
+        # browser's code, by name or by path; fetch only in net.ts and the tests; console nowhere; and the
+        # typed rules reach it through its own tsconfig.
+        src = "server/src/__probe__"
+        uses = 'import {{ {name} }} from "{path}";\n\nexport const used: unknown = {name};\n'.format
+        lint = dict((n, c) for n, c, _ in LINT)
+        server = [
+            ("framework.ts", uses(name="Hono", path="hono"), None),
+            ("node.ts", uses(name="readFileSync", path="node:fs"), None),
+            ("workspace.ts", uses(name="parseLine", path="@gnoworld/core"), None),
+            ("schemas.ts", uses(name="ApiError", path="@gnoworld/schemas"), None),
+            ("sibling.ts", uses(name="used", path="./framework.ts"), None),
+            # A name that only starts like a banned one is another package.
+            ("reactor.ts", uses(name="x", path="reactor"), None),
+            *[(f"{name.replace('/', '_').replace('@', '')}.ts", uses(name="x", path=name), "no-restricted-imports")
+              for name in ("react", "react-dom/client", "three", "@gnoworld/ui")],
+            ("past_folder.ts", uses(name="Button", path="../../../packages/ui/src/index.ts"), "import-x/no-restricted-paths"),
+            ("app_path.ts", uses(name="Layout", path="../../../app/src/root.tsx"), "import-x/no-restricted-paths"),
+            ("fetch.ts", "export function load(): unknown {\n  return fetch(\"http://x\");\n}\n", "no-restricted-globals: Unexpected use of 'fetch'. The server reaches out"),
+            ("calls.test.ts", 'import { expect, test } from "vitest";\n\ntest("x", () => {\n  expect(typeof fetch).toBe("function");\n});\n', None),
+            ("console.ts", 'export function say(): void {\n  console.log("x");\n}\n', "no-console"),
+            ("floating.ts", lint["floating.ts"], "@typescript-eslint/no-floating-promises"),
+            ("log_catch.ts", lint["log_catch.ts"], "no-restricted-syntax: A catch that only logs"),
+        ]
+        lint_cases(server, src, "server")
+        shutil.rmtree(src)
+        # The one file that may reach out, as it is.
+        out = run(["node_modules/.bin/eslint", "--no-cache", "--format", "json", "server/src/net.ts"])
+        expect(out.returncode == 0, "eslint server: net.ts calls fetch " + out.stdout[-300:])
+        # The gate's typecheck reaches the server, with the flags and Node's types: the planted error alone.
+        plant({"unchecked.ts": "export function first(a: number[]): string {\n  return a[0].toFixed();\n}\n"}, where=src)
+        out = run(["sh", "-c", f'PATH="$PWD/node_modules/.bin:$PATH" {SCRIPTS["typecheck"]}'])
+        errors = [line for line in out.stdout.splitlines() if "error TS" in line]
+        expect(len(errors) == 1 and "__probe__/unchecked.ts" in errors[0] and "possibly 'undefined'" in errors[0], f"tsc refuses an unchecked index in the server, and only it: {errors[:3]}")
+        shutil.rmtree(src)
+        # Vitest finds the server's tests.
+        plant({"found.test.ts": 'import { expect, test } from "vitest";\n\ntest("server probe found", () => {\n  expect(1).toBe(2);\n});\n'}, where=src)
+        out = run(["node_modules/.bin/vitest", "run", src])
+        expect(out.returncode != 0 and "server probe found" in out.stdout + out.stderr, "vitest runs the server's tests")
+        shutil.rmtree(src)
+
     if part("react_warn"):
         # Several of the app's rules only warn: the lint script must fail on a warning.
         plant({"warned.tsx": 'import { forwardRef } from "react";\n\nexport const Card = forwardRef<HTMLParagraphElement>(function Card(_, r) {\n  return <p ref={r} />;\n});\n'}, where=APP)
@@ -375,6 +417,11 @@ try:
         out = run(["node_modules/.bin/knip", "--no-progress"])
         expect(out.returncode != 0 and "__probe__/unused.ts" in out.stdout, "knip reports an unused file")
         shutil.rmtree(HERE)
+        # In the server's workspace too.
+        plant({"unused.ts": "export function lonely(): number {\n  return 1;\n}\n"}, where="server/src/__probe__")
+        out = run(["node_modules/.bin/knip", "--no-progress"])
+        expect(out.returncode != 0 and "server/src/__probe__/unused.ts" in out.stdout, "knip reports an unused file in the server")
+        shutil.rmtree("server/src/__probe__")
 
     if part("jscpd"):
         # jscpd: the same block in two files.

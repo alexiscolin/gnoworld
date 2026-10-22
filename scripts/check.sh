@@ -65,6 +65,7 @@ echo "== TypeScript: format, types, lint, tests"
 run format:check
 run typecheck
 run lint
+sh scripts/ergo.sh >/dev/null # the Ergo the server's tests start, built once from deploy/ergo/VERSION
 $full || run test # --full runs the tests once, with coverage
 
 echo "== no dead code, no copy (renamed or near ones too), CSS and comment rules"

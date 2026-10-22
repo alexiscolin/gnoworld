@@ -1,0 +1,178 @@
+import { spawn, spawnSync, type ChildProcessByStdio } from "node:child_process";
+import { once } from "node:events";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { connect } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import type { Readable } from "node:stream";
+import { fileURLToPath } from "node:url";
+import { afterEach, describe, expect, it } from "vitest";
+
+interface Server {
+  child: ChildProcessByStdio<null, Readable, Readable>;
+  out: { stdout: string; stderr: string };
+}
+
+const SERVER = fileURLToPath(new URL("..", import.meta.url));
+const ENTRY = fileURLToPath(new URL("main.ts", import.meta.url));
+// As the image starts it (ADR-0002 §7).
+const FLAGS = ["--disallow-code-generation-from-strings"];
+const started: Server[] = [];
+
+afterEach(() => {
+  for (const { child } of started.splice(0)) child.kill("SIGKILL");
+  for (const dir of folders.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+
+const folders: string[] = [];
+const folder = (prefix: string): string => {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  folders.push(dir);
+  return dir;
+};
+
+const settings = (): Record<string, string> => {
+  const dir = folder("gnoworld-main-");
+  writeFileSync(join(dir, "pepper"), "a-pepper-of-forty-characters-0123456789");
+  return { DATABASE: join(dir, "server.db"), LOG_PEPPER_FILE: join(dir, "pepper"), PORT: "0" };
+};
+
+const start = (env: Record<string, string>, flags = FLAGS): Server => {
+  const child = spawn(process.execPath, [...flags, ENTRY], {
+    env: { PATH: process.env["PATH"] ?? "", ...env },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const server = { child, out: { stdout: "", stderr: "" } };
+  child.stdout.on("data", (chunk: Buffer) => (server.out.stdout += chunk.toString()));
+  child.stderr.on("data", (chunk: Buffer) => (server.out.stderr += chunk.toString()));
+  started.push(server);
+  return server;
+};
+
+// What a child prints arrives in its own time: wait for it, a little at a time.
+const until = async (seen: () => boolean): Promise<void> => {
+  while (!seen()) await new Promise((resolve) => setTimeout(resolve, 10));
+};
+
+const exited = (server: Server): Promise<number | null> =>
+  new Promise((resolve) =>
+    server.child.once("exit", (code) => {
+      resolve(code);
+    }),
+  );
+
+const listening = (server: Server): Promise<number> =>
+  new Promise((resolve, reject) => {
+    const read = (): void => {
+      const port = /"event":"listening".*"port":(\d+)/.exec(server.out.stdout)?.[1];
+      if (port !== undefined) resolve(Number(port));
+    };
+    server.child.stdout.on("data", read);
+    server.child.once("exit", () => {
+      reject(new Error(`exited before listening: ${server.out.stderr}`));
+    });
+  });
+
+describe("the server's process", () => {
+  it("starts as the image starts it, and answers /health", async () => {
+    const port = await listening(start(settings()));
+    expect((await fetch(`http://127.0.0.1:${String(port)}/health`)).status).toBe(200);
+  });
+
+  it("refuses to start without --disallow-code-generation-from-strings", async () => {
+    const server = start(settings(), []);
+    expect(await exited(server)).not.toBe(0);
+    expect(server.out.stderr).toContain("--disallow-code-generation-from-strings");
+  });
+
+  it("stops at boot on a missing setting, naming it", async () => {
+    const server = start(Object.fromEntries(Object.entries(settings()).filter(([key]) => key !== "DATABASE")));
+    expect(await exited(server)).not.toBe(0);
+    expect(server.out.stderr).toMatch(/setting DATABASE: /);
+  });
+
+  it("stops at boot on a roles file it cannot read, naming the file and never its content", async () => {
+    const roles = join(folder("gnoworld-roles-"), "roles.json");
+    writeFileSync(roles, JSON.stringify({ team: ["planted-value"], trusted: [], worlds: [] }));
+    const server = start({ ...settings(), ROLES_FILE: roles });
+    expect(await exited(server)).not.toBe(0);
+    expect(server.out.stderr).toContain(`roles file ${roles}: team.0: custom`);
+    expect(server.out.stderr).not.toContain("planted-value");
+  });
+
+  it("refuses a second process on the same database, and the first keeps serving", async () => {
+    const env = settings();
+    const port = await listening(start(env));
+    const second = start(env);
+    expect(await exited(second)).not.toBe(0);
+    expect(second.out.stderr).toMatch(/database is locked/);
+    expect((await fetch(`http://127.0.0.1:${String(port)}/health`)).status).toBe(200);
+  });
+
+  it("drains on SIGTERM: a request already begun is answered, then the process exits 0", async () => {
+    const server = start(settings());
+    const port = await listening(server);
+    const socket = connect(port, "127.0.0.1");
+    let answer = "";
+    socket.on("data", (chunk: Buffer) => (answer += chunk.toString()));
+    const closed = once(socket, "close");
+    await once(socket, "connect");
+    // One write: once the first answer is back, the server has read the second request's start too.
+    socket.write("GET /health HTTP/1.1\r\nHost: localhost\r\n\r\nGET /ready HTTP/1.1\r\nHost: localhost\r\n");
+    await until(() => answer.includes("\r\n\r\nok"));
+    const exit = exited(server);
+    server.child.kill("SIGTERM");
+    await until(() => server.out.stdout.includes('"event":"stopping"'));
+    socket.end("\r\n");
+    await closed;
+    expect(answer).toMatch(/^HTTP\/1\.1 200 [\s\S]*HTTP\/1\.1 503 /);
+    expect(await exit).toBe(0);
+  });
+
+  it("drains on SIGINT as on SIGTERM, and exits 0", async () => {
+    const server = start(settings());
+    await listening(server);
+    const exit = exited(server);
+    server.child.kill("SIGINT");
+    await until(() => server.out.stdout.includes('"event":"stopping"'));
+    expect(await exit).toBe(0);
+  });
+
+  it("exits 0 at once on SIGTERM when its only client is an idle kept-alive connection", async () => {
+    const server = start(settings());
+    const port = await listening(server);
+    const socket = connect(port, "127.0.0.1");
+    let answer = "";
+    socket.on("data", (chunk: Buffer) => (answer += chunk.toString()));
+    await once(socket, "connect");
+    socket.write("GET /health HTTP/1.1\r\nHost: localhost\r\n\r\n");
+    await until(() => answer.includes("\r\n\r\nok"));
+    const started = performance.now();
+    server.child.kill("SIGTERM");
+    expect(await exited(server)).toBe(0);
+    // The keep-alive timeout is 5 seconds: closing at once means the idle connection was not waited for.
+    expect(performance.now() - started).toBeLessThan(2000);
+  });
+
+  it("stops when a rejection escapes, rather than serving on", async () => {
+    const hook = join(folder("gnoworld-reject-"), "reject.mjs");
+    writeFileSync(hook, 'setTimeout(() => {\n  Promise.reject(new Error("escaped"));\n}, 500);\n');
+    const server = start(settings(), [...FLAGS, "--import", hook]);
+    expect(await exited(server)).not.toBe(0);
+    expect(server.out.stderr).toContain("escaped");
+  });
+
+  it("loads the workspace's packages as Node runs them, from their TypeScript", () => {
+    const run = spawnSync(
+      process.execPath,
+      [
+        "--input-type=module",
+        "-e",
+        'await import("@gnoworld/schemas"); await import("@gnoworld/core"); process.stdout.write("loaded");',
+      ],
+      { cwd: SERVER, encoding: "utf8" },
+    );
+    expect(run.stderr).not.toMatch(/Error/);
+    expect(run.stdout).toBe("loaded");
+  });
+});
