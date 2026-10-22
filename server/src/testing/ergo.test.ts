@@ -1112,6 +1112,29 @@ describe("the server's IRC link (3h)", { timeout: 40_000 }, () => {
     }
   };
 
+  it("logs a wrong operator password as refused, Ergo answering 491, and joins nothing", async () => {
+    const e = await start();
+    const lines: string[] = [];
+    const link = ircLink({
+      host: "127.0.0.1",
+      port: e.port,
+      password: "a-wrong-operator-password-of-32-chars",
+      rooms: () => ["#bubble"],
+      onMessage: () => undefined,
+      log: logger("a-pepper-of-forty-characters-0123456789", (line) => lines.push(line)),
+      retryMs: () => 60_000,
+    });
+    stops.push(() => link.stop());
+    await expect
+      .poll(() => lines.filter((line) => line.includes('"event":"irc_refused"') && line.includes('"error":"oper"')), {
+        timeout: 10_000,
+      })
+      .toHaveLength(1);
+    const gus = await guest(e, "gus");
+    gus.send("JOIN #bubble");
+    await gus.expect(/ 403 gus #bubble /);
+  });
+
   it("logs in as an operator, makes its rooms and reads an account's message, never a direct one", async () => {
     const e = await start();
     const said = linked(e, ["#earth", "#bubble"]);

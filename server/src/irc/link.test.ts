@@ -1,5 +1,5 @@
 import { once } from "node:events";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { logger } from "../log.ts";
 import fc from "fast-check";
 import { freePort } from "../testing/ergo.ts";
@@ -139,7 +139,7 @@ describe("the IRC link", () => {
     start(ergo.port, { pingMs: 20 });
     const first = await ergo.peer(0);
     await welcome(first);
-    await first.next(/^PING /);
+    expect(await first.next(/^PING /)).toBe("PING gnoworld");
     await welcome(await ergo.peer(1));
     expect(ergo.peers).toHaveLength(2);
   });
@@ -160,7 +160,8 @@ describe("the IRC link", () => {
 
 // The bot's lines since a mark: only commands of its own list, none built from what it read.
 const since = (peer: Peer, mark: number) => peer.lines.slice(mark);
-const OWN = /^(CAP|NICK|USER|OPER|JOIN|PING|PONG|QUIT)( |$)/;
+// After its welcome the link answers with PONG alone; its own PINGs come from the watchdog's clock.
+const OWN = /^(PONG|PING gnoworld$)( |$)/;
 const sync = async (peer: Peer, token = "sync"): Promise<void> => {
   peer.say(`PING :${token}`);
   await peer.next(new RegExp(`^PONG ${token}$`));
@@ -217,12 +218,14 @@ describe("the IRC link, line by line", () => {
     peer.say("PING :a\0b");
     await sync(peer);
     expect(since(peer, mark)).toEqual(["PONG", "PONG :a b", "PONG sync"]);
+    // Lines of any bytes, and PINGs of any token: the PONG must carry the token back, nothing more.
+    const pings = fc.string({ maxLength: 40 }).map((token) => `PING :${token}`);
     await fc.assert(
-      fc.asyncProperty(fc.string({ unit: "binary", maxLength: 80 }), async (line) => {
+      fc.asyncProperty(fc.oneof(fc.string({ unit: "binary", maxLength: 80 }), pings), async (line) => {
         peer.say(line);
         await sync(peer, "p");
       }),
-      { numRuns: 100 },
+      { numRuns: 200 },
     );
     expect(since(peer, mark).filter((sent) => !OWN.test(sent))).toEqual([]);
     for (const { room, account, msgid, text } of said) {
@@ -368,18 +371,132 @@ describe("the IRC link's watchdog", () => {
 describe("the IRC link's stop", () => {
   it("cancels a reconnect it was waiting for, and a second stop does nothing", async () => {
     const ergo = await fakeErgo();
-    start(ergo.port, { retryMs: () => 60_000 });
+    const { lines } = start(ergo.port, { retryMs: () => 100 });
     const peer = await ergo.peer(0);
     await welcome(peer);
-    const closed = once(peer.socket, "close");
     peer.socket.destroy();
-    await closed;
+    // The link saw its close, so its retry is set; the stop must clear it.
+    await expect.poll(() => lines.some((line) => line.includes('"event":"irc_closed"'))).toBe(true);
     const link = links.splice(0)[0];
-    const timers = process.getActiveResourcesInfo().filter((kind) => kind === "Timeout").length;
     await link?.stop();
     await link?.stop();
-    expect(process.getActiveResourcesInfo().filter((kind) => kind === "Timeout").length).toBeLessThan(timers);
+    await new Promise((resolve) => setTimeout(resolve, 400));
     expect(ergo.peers).toHaveLength(1);
+  });
+});
+
+describe("the IRC link, its green pass (3h)", () => {
+  it("on 491, Ergo's answer to a wrong operator password (3b), joins nothing and logs it", async () => {
+    const ergo = await fakeErgo();
+    const { lines } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await peer.next(/^CAP REQ /);
+    peer.say(":ergo.test CAP * ACK :message-tags account-tag");
+    peer.say(":ergo.test 001 gnoworld :Welcome");
+    await peer.next(/^OPER /);
+    peer.say(":ergo.test 491 gnoworld :OPER failed");
+    await ergo.peer(1);
+    expect(peer.lines.filter((line) => line.startsWith("JOIN"))).toEqual([]);
+    expect(
+      lines.filter((line) => line.includes('"event":"irc_refused"') && line.includes('"error":"oper"')),
+    ).toHaveLength(1);
+  });
+
+  it("reads past a PRIVMSG with no source, handing it on as any room's line", async () => {
+    const ergo = await fakeErgo();
+    const { said } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    peer.say("@account=g1a;msgid=m1 PRIVMSG #bubble :no source");
+    peer.say(message("account=g1a;msgid=m2", "a!u@h", ["#bubble", "after"]));
+    await expect.poll(() => said.map(({ msgid }) => msgid)).toEqual(["m1", "m2"]);
+    expect(ergo.peers).toHaveLength(1);
+  });
+
+  it("waits half a second to a second and a half before its first reconnect, by default", async () => {
+    const ergo = await fakeErgo();
+    const delays: number[] = [];
+    const real = globalThis.setTimeout;
+    const spy = vi.spyOn(globalThis, "setTimeout").mockImplementation((handler: () => void, ms?: number) => {
+      delays.push(ms ?? 0);
+      return real(handler, 10);
+    });
+    try {
+      const link = ircLink({
+        host: "127.0.0.1",
+        port: ergo.port,
+        password: PASSWORD,
+        rooms: () => ["#bubble"],
+        onMessage: () => undefined,
+        log: logger("a-pepper-of-forty-characters-0123456789", () => true),
+      });
+      links.push(link);
+      const peer = await ergo.peer(0);
+      await welcome(peer);
+      delays.splice(0);
+      peer.socket.destroy();
+      await ergo.peer(1);
+      expect(delays[0]).toBeGreaterThanOrEqual(500);
+      expect(delays[0]).toBeLessThan(1500);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("ignores a CAP line it did not ask for, NEW among them", async () => {
+    const ergo = await fakeErgo();
+    const { lines } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await peer.next(/^CAP REQ /);
+    peer.say(":ergo.test CAP gnoworld NEW :sasl");
+    peer.say(":ergo.test CAP * ACK :message-tags account-tag");
+    expect(await peer.next(/^CAP END$/)).toBe("CAP END");
+    expect([ergo.peers.length, lines.filter((line) => line.includes("irc_refused"))]).toEqual([1, []]);
+  });
+
+  it("says it is ready once Ergo makes it an operator, and not before", async () => {
+    const ergo = await fakeErgo();
+    const { lines } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await peer.next(/^CAP REQ /);
+    peer.say(":ergo.test CAP * ACK :message-tags account-tag");
+    peer.say(":ergo.test 001 gnoworld :Welcome");
+    await peer.next(/^OPER /);
+    const ready = () => lines.filter((line) => line.includes('"event":"irc_ready"'));
+    expect(ready()).toEqual([]);
+    peer.say(":ergo.test 381 gnoworld :You are now an IRC operator");
+    await expect.poll(ready).toHaveLength(1);
+  });
+
+  it("joins no name that is no room: one without its #, or with a # inside", async () => {
+    const ergo = await fakeErgo();
+    start(ergo.port, { rooms: () => ["bubble", "x#y", "#ok"] });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    await sync(peer);
+    expect(peer.lines.filter((line) => line.startsWith("JOIN"))).toEqual(["JOIN #ok"]);
+  });
+
+  it("fills a JOIN line to exactly 510 bytes, and no further", async () => {
+    const ergo = await fakeErgo();
+    // "JOIN " and two rooms of 252 with their comma: 510 bytes.
+    const [a, b, c] = [`#${"a".repeat(251)}`, `#${"b".repeat(251)}`, `#${"c".repeat(251)}`];
+    start(ergo.port, { rooms: () => [a, b, c] });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    await sync(peer);
+    const joins = peer.lines.filter((line) => line.startsWith("JOIN"));
+    expect(joins).toEqual([`JOIN ${a},${b}`, `JOIN ${c}`]);
+    expect(Buffer.byteLength(joins[0] ?? "")).toBe(510);
+  });
+
+  it("reads a line ended by a bare LF", async () => {
+    const ergo = await fakeErgo();
+    start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    peer.socket.write("PING :abc\n");
+    expect(await peer.next(/^PONG /)).toBe("PONG abc");
   });
 });
 
