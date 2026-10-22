@@ -34,8 +34,16 @@ export function worldRooms(db: DatabaseSync, world: string): string[] {
   );
 }
 
+// Asked for each line the bot checks: its statement and schema made once per database, at its first call.
+const lookups = new WeakMap<DatabaseSync, (room: string) => string | undefined>();
+
 /** The world a room belongs to, or none for a room the server never made. */
 export function roomWorld(db: DatabaseSync, room: string): string | undefined {
+  const known = lookups.get(db);
+  if (known !== undefined) return known(room);
   const World = z.object({ world: z.string() }).optional();
-  return World.parse(db.prepare("SELECT world FROM rooms WHERE name = ?").get(room))?.world;
+  const sql = db.prepare("SELECT world FROM rooms WHERE name = ?");
+  const lookup = (name: string): string | undefined => World.parse(sql.get(name))?.world;
+  lookups.set(db, lookup);
+  return lookup(room);
 }
