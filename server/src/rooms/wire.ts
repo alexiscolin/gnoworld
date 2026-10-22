@@ -34,7 +34,7 @@ export function keeping(keeper: Rooms, { mutes, reconciler }: { mutes: Mutes; re
     ...keeper,
     create: (world, name) => {
       const made = keeper.create(world, name);
-      if (typeof made !== "string") mutes.reapply();
+      if (typeof made !== "string") mutes.putOn(made.made, world);
       return made;
     },
     archive: (world, name) => {

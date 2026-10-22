@@ -15,6 +15,8 @@ export interface Mutes {
   tick: () => void;
   // When the link is back: the live mutes put on again, the ended ones lifted.
   reapply: () => void;
+  // A room made in a world: that world's live mutes put on it, and on no other room (F588).
+  putOn: (room: string, world: string) => void;
 }
 
 interface Options {
@@ -39,6 +41,7 @@ export function makeMutes({ db, send, roomsOf, now, forMs, max }: Options): Mute
     add: db.prepare("INSERT OR REPLACE INTO mutes (account, world, until) VALUES (?, ?, ?)"),
     ended: db.prepare("SELECT account, world FROM mutes WHERE until <= ?"),
     lives: db.prepare("SELECT account, world FROM mutes WHERE until > ?"),
+    livesIn: db.prepare("SELECT account, world FROM mutes WHERE world = ? AND until > ?"),
     lift: db.prepare("DELETE FROM mutes WHERE account = ? AND world = ? AND until <= ?"),
   };
   // Every room of the world, each sent even when one fails: a later call sends them all again.
@@ -68,6 +71,9 @@ export function makeMutes({ db, send, roomsOf, now, forMs, max }: Options): Mute
     reapply() {
       for (const { account, world } of Rows.parse(sql.lives.all(now()))) mode("+", account, world);
       tick();
+    },
+    putOn(room, world) {
+      for (const { account } of Rows.parse(sql.livesIn.all(world, now()))) send("SAMODE", [room, "+b", `m:${account}`]);
     },
   };
 }
