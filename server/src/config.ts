@@ -74,7 +74,10 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
   if (!parsed.success) {
     // The path and the code only: a message may quote the value.
     const issue = parsed.error.issues[0];
-    throw new Error(`setting ${String(issue?.path[0])}: ${issue?.code ?? "invalid"}`);
+    // A list's entry by its place, so a deploy knows which one; its value stays out.
+    const [setting, ...place] = issue?.path ?? [];
+    const at = place.length > 0 ? ` (at ${place.map(String).join(".")})` : "";
+    throw new Error(`setting ${String(setting)}: ${issue?.code ?? "invalid"}${at}`);
   }
   const { HOST, PORT, DATABASE, TRUSTED_PROXY, LOG_PEPPER_FILE, ROLES_FILE, CHAINS, ORIGINS, NEW_ACCOUNTS_PER_HOUR } =
     parsed.data;

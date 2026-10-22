@@ -75,6 +75,12 @@ describe("loadConfig", () => {
     }
   });
 
+  it("names the entry of a list setting it refuses, never its value (F434)", () => {
+    const error = failure({ ...ENV, ORIGINS: "https://gnoworld.test,https://bad.test/path" });
+    expect(error).toMatch(/setting ORIGINS: \w+ \(at 1\)/);
+    expect(error).not.toContain("bad.test");
+  });
+
   it("reads every setting it is given", () => {
     expect(
       loadConfig({ ...ENV, HOST: "0.0.0.0", PORT: "9000", TRUSTED_PROXY: "10.0.0.2", ROLES_FILE: "/etc/roles.json" }),
