@@ -32,7 +32,7 @@ afterEach(async () => {
   for (const { db, server } of opened.splice(0)) {
     server.close();
     await once(server, "close");
-    db.close();
+    if (db.isOpen) db.close();
   }
 });
 
@@ -315,6 +315,30 @@ describe("Ergo's auth script, answered by the server", () => {
     expect(seen.at(-1)).toEqual({ event: "irc_login_refused", error: "limit" });
     const text = JSON.stringify(seen);
     for (const secret of [ticket, ME, "not json"]) expect(text).not.toContain(secret);
+  });
+
+  it.each([
+    [
+      "closed",
+      (db: DatabaseSync) => {
+        db.close();
+      },
+    ],
+    [
+      "refusing writes, as a full disk does",
+      (db: DatabaseSync) => {
+        db.exec("PRAGMA query_only = ON");
+      },
+    ],
+  ])("refuses, and stays up, when its database is %s", async (_, fail) => {
+    const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES]);
+    db.prepare("INSERT INTO accounts (address, first_seen) VALUES (?, ?)").run(ME, T0);
+    const ticket = makeTickets(db, { now: Date.now }).mint(ME);
+    const { ask, events } = await start(db);
+    fail(db);
+    expect(await ask(line({ accountName: ME, passphrase: ticket, ip: IP }))).toBe(NO);
+    expect(events()).toEqual([{ event: "irc_login_refused", error: "failed" }]);
+    expect(await ask(line({ accountName: ME, passphrase: ticket, ip: IP }))).toBe(NO);
   });
 
   it("keeps the system's clock by default: a ticket minted at another time is refused", async () => {

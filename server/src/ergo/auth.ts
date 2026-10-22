@@ -12,7 +12,7 @@ import type { Log } from "../log.ts";
 import { makeTickets } from "../login/ticket.ts";
 import { visitor } from "../visitor.ts";
 
-type Outcome = { address: Address } | { error: "frame" | "limit" | "account" | "ticket" };
+type Outcome = { address: Address } | { error: "frame" | "limit" | "account" | "ticket" | "failed" };
 
 interface Options {
   log: Log;
@@ -52,6 +52,16 @@ export function authServer(db: DatabaseSync, { log, now = Date.now, deadlineMs =
     return outcome;
   };
 
+  // The socket's boundary, where the HTTP side has onError: a database that fails refuses the login,
+  // and the process, the API with it, stays up.
+  const attempt = (line: string): Outcome => {
+    try {
+      return check(line);
+    } catch {
+      return { error: "failed" };
+    }
+  };
+
   return createServer((socket) => {
     let held = Buffer.alloc(0);
     let answered = false;
@@ -68,7 +78,7 @@ export function authServer(db: DatabaseSync, { log, now = Date.now, deadlineMs =
       held = Buffer.concat([held, chunk]);
       const end = held.indexOf(10);
       if (end === -1 ? held.length > lineMax : end > lineMax) answer({ error: "frame" });
-      else if (end !== -1) answer(check(held.subarray(0, end).toString("utf8")));
+      else if (end !== -1) answer(attempt(held.subarray(0, end).toString("utf8")));
     });
     // A frame cut before its end of line is refused, however whole it looks.
     socket.on("end", () => {
