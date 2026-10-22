@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { logger } from "../log.ts";
 import { makeQueue } from "./queue.ts";
@@ -218,6 +219,16 @@ describe("the check's queue, its green pass (3i)", () => {
       .filter((line) => line.includes("moderation_failed"))
       .map((line) => /"error":"(\w+)"/.exec(line)?.[1]);
     expect(errors).toEqual(["TypeError", "unknown"]);
+  });
+
+  it("names the account a full share refuses, by its hash", () => {
+    const { queue, lines } = setup({ perAccount: 1, concurrency: 1 });
+    for (const n of [0, 1, 2]) queue.push({ account: "flood", n });
+    const hash = createHmac("sha256", "a-pepper-of-forty-characters-0123456789").update("flood").digest("hex");
+    expect(lines.filter((line) => line.includes('"moderation_account_full"'))).toEqual([
+      expect.stringContaining(`"account":"${hash}"`),
+    ]);
+    queue.stop();
   });
 
   it("says it is idle each time it drains, twice in a row", async () => {

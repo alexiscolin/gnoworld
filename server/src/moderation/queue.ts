@@ -68,7 +68,7 @@ export function makeQueue<T extends { account: string }>(options: Options<T>): Q
       }
       const lines = waiting.get(item.account) ?? [];
       if (lines.length >= perAccount) {
-        log("moderation_account_full");
+        log("moderation_account_full", { account: item.account });
         return false;
       }
       lines.push({ item, at: now() });
