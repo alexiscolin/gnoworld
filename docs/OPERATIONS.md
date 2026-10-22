@@ -189,6 +189,19 @@ Slice 3, the bot acts and the stream (3j):
   15 s, a client 64 events behind dropped; each room's last 64 events are kept, which a new client gets
   and a client coming back gets after its `Last-Event-ID`. nginx must not buffer it (3e).
 
+Slice 3, the mute and the edits (3k):
+
+- **Its settings.** `MUTE_STRIKES` (3) hides in `MUTE_WINDOW_MINUTES` (10) mute an account in that
+  world's rooms for `MUTE_MINUTES` (5); `MUTE_MAX` (50) mutes at once a world, the one ending first
+  lifted early to make room (Ergo's list holds 100: 3b). The roles file's team and trusted are never
+  muted, their lines still hidden.
+- **A line too fast** is the 21st of an account in a minute of Ergo's time: hidden, and a strike.
+- **What the mutes table keeps:** a muted account's address in clear, its world and its end, while
+  the mute lasts; the extban names it.
+- **Known limits.** A mute is evaded with a new address (decision 144). A mute lifts within 10 s of its
+  end (the timer). An edit of a line the bot never checked (one the full queue dropped) is hidden as
+  not its author's.
+
 ## Secrets: rotation and revocation
 
 - **The password:** write a new file with `htpasswd -cB`, then `docker compose ... restart web`.

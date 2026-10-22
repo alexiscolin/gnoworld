@@ -690,6 +690,10 @@ a REDACT erased; pages of 50 that wait for the check's queue; a hide the link co
 
 **Files.** New: `server/src/moderation/{strikes, mute, edits}.ts`, migrations. Tier 2. No human part.
 
+**As built** (`docs/decisions.md`, 2026-10-22, 3k's shapes): the mute through `SAMODE`, which passes the
+100-entry list; a line's rate and strikes by Ergo's time, from the verdicts; an edit's author from the
+verdicts, no `CHATHISTORY AROUND`; the lines' forms in `server/src/irc/lines.ts`.
+
 ---
 
 ## 3l. Rooms made by moderators
