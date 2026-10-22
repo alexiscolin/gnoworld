@@ -290,6 +290,15 @@ Each slice that adds a resource proves it is released:
       which rate-limit by account and by address.
 - [ ] **Dependencies:** locked, audited in the gate, and every new one asked for
       (CLAUDE.md).
+- [ ] **The login** (`server/src/login/`, tier 1; slice 3's 3c, and 3d's ticket):
+  - a nonce or a ticket is spent by one statement before the first `await`, and the request
+    goes on only if it removed a row;
+  - the verifier gets the signer, the chain and the text the server stored, never the
+    client's, all three required;
+  - a token or a ticket is 256 random bits, stored as its SHA-256 only, never logged, never in
+    a body; the cookie is `__Host-`, HttpOnly, Secure, SameSite=Strict;
+  - every request but GET and HEAD comes from a listed `Origin` and in JSON; each visitor's
+    calls are limited before any work; every failed login gets the same answer.
 
 ## Search and pages
 
