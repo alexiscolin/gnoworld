@@ -67,4 +67,26 @@ describe("VerifyRequest", () => {
   ])("refuses %s", (_, body) => {
     expect(VerifyRequest.safeParse(body).success).toBe(false);
   });
+
+  // Every bound of the proof, at its limit and one past: StrykerJS cannot judge a schema built at import (F412).
+  const coin = { denom: "ugnot", amount: "1" };
+  const text = (n: number): string => "a".repeat(n);
+  const bounds: [string, number, (n: number) => object][] = [
+    ["the chain", 50, (n) => signed({ chain_id: text(n) })],
+    ["the account number", 20, (n) => signed({ account_number: text(n) })],
+    ["the sequence", 20, (n) => signed({ sequence: text(n) })],
+    ["the gas", 20, (n) => signed({ fee: { amount: [], gas: text(n) } })],
+    ["a coin's denomination", 64, (n) => signed({ fee: { amount: [{ ...coin, denom: text(n) }], gas: "0" } })],
+    ["a coin's amount", 64, (n) => signed({ fee: { amount: [{ ...coin, amount: text(n) }], gas: "0" } })],
+    ["the coins", 4, (n) => signed({ fee: { amount: Array.from({ length: n }, () => coin), gas: "0" } })],
+    ["the messages", 4, (n) => signed({ msgs: Array.from({ length: n }, () => ({})) })],
+    ["the memo", 256, (n) => signed({ memo: text(n) })],
+    ["the key type", 64, (n) => pubKey({ typeUrl: text(n) })],
+    ["the public key", 64, (n) => pubKey({ value: text(n) })],
+    ["the signature", 128, (n) => signature({ signature: text(n) })],
+  ];
+  it.each(bounds)("takes %s at %i characters or items, and refuses one more", (_, max, body) => {
+    expect(VerifyRequest.safeParse(body(max)).success).toBe(true);
+    expect(VerifyRequest.safeParse(body(max + 1)).success).toBe(false);
+  });
 });
