@@ -1,7 +1,6 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
-import { connect } from "node:net";
-import { networkInterfaces, tmpdir } from "node:os";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join as joinPath } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { startErgo, type Ergo, type ErgoOptions } from "./ergo.ts";
@@ -39,10 +38,19 @@ const clients: Raw[] = [];
 const sockets: Ws[] = [];
 let pings = 0;
 
+const kept: string[] = [];
+// A folder of the test's own, which Ergo keeps across a stop; the test removes it.
+const keptFolder = (): string => {
+  const dir = mkdtempSync(joinPath(tmpdir(), "gnoworld-ergo-kept-"));
+  kept.push(dir);
+  return dir;
+};
+
 afterEach(async () => {
   for (const ws of sockets.splice(0)) ws.close();
   await Promise.all(clients.splice(0).map((c) => c.close()));
   await Promise.all(ergos.splice(0).map((e) => e.stop()));
+  for (const dir of kept.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
 const start = async (options?: ErgoOptions): Promise<Ergo> => {
@@ -122,11 +130,12 @@ const sasl = async (c: Raw, account: string, passphrase: string): Promise<string
   return c.expect(/ (903|904) /);
 };
 
-const finish = (c: Raw, nick: string): Promise<string> => {
+// Registered (the MOTD's end, or its absence), unless the test waits for a refusal.
+const finish = (c: Raw, nick: string, done = / 376 | 422 /): Promise<string> => {
   c.send("CAP END");
   c.send(`NICK ${nick}`);
   c.send(`USER u 0 * :${nick}`);
-  return c.expect(/ 376 | 422 | 4\d\d /);
+  return c.expect(done);
 };
 
 const login = async (
@@ -223,7 +232,7 @@ describe("guests and rooms", { timeout: 20_000 }, () => {
   });
 
   it("keeps a room's history and a direct message across a restart", { timeout: 40_000 }, async () => {
-    const e = await start({ dir: mkdtempSync(joinPath(tmpdir(), "gnoworld-ergo-kept-")) });
+    const e = await start({ dir: keptFolder() });
     const chief = await lobby(e);
     chief.send("CS REGISTER #lobby");
     await chief.expect(/successfully registered/);
@@ -292,8 +301,13 @@ describe("logins and the auth script", { timeout: 30_000 }, () => {
 
   it("logs a guest in through the script when it gives NS IDENTIFY, and forces its nick", async () => {
     const e = await start();
-    // Its own connection gone: a second client of the same account is refused the nick (433).
-    await (await login(e, "dave")).close();
+    // While dave's own connection is open, a second client of the account is refused its nick.
+    const dave = await login(e, "dave");
+    const early = await guest(e, "dave3");
+    early.send("NS IDENTIFY dave pw");
+    expect(await early.expect(/ 433 dave3 dave /)).toContain("Nickname is already in use");
+    await early.expect(/try logging out and logging back in with SASL/);
+    await dave.close();
     const g = await guest(e, "dave2");
     g.send("NS IDENTIFY dave pw");
     await g.expect(/NOTICE dave :You're now logged in as dave/);
@@ -329,6 +343,15 @@ describe("logins and the auth script", { timeout: 30_000 }, () => {
           expect(e.log()).toContain(why);
         });
       }
+    }
+    // An account never seen: the same refusals tell it does not exist, and none creates it.
+    for (const [passphrase] of cases) {
+      const c = await open(e);
+      await hello(c);
+      expect(await sasl(c, `new-${passphrase}`, passphrase)).toContain(
+        "904 * :SASL authentication failed: Account does not exist",
+      );
+      expect(logged(c)).not.toMatch(/ 900 /);
     }
   });
 
@@ -421,7 +444,7 @@ describe("logins and the auth script", { timeout: 30_000 }, () => {
       const nick = ADDRESS.slice(0, length);
       const g = await open(e);
       await hello(g);
-      expect(await finish(g, nick)).toContain(` 432 * ${nick} :Erroneous nickname`);
+      expect(await finish(g, nick, / 432 /)).toContain(` 432 * ${nick} :Erroneous nickname`);
     }
   });
 
@@ -435,7 +458,7 @@ describe("logins and the auth script", { timeout: 30_000 }, () => {
       const c = await open(e);
       await hello(c);
       expect(await sasl(c, name, "pw")).toContain("904 * :SASL authentication failed: Unknown");
-      expect(await finish(c, name)).toContain(` 432 * ${name} :Erroneous nickname`);
+      expect(await finish(c, name, / 432 /)).toContain(` 432 * ${name} :Erroneous nickname`);
     }
   });
 });
@@ -852,34 +875,14 @@ describe("the helper", { timeout: 30_000 }, () => {
     expect(Date.now() - started).toBeLessThan(5000);
   });
 
-  it("listens on loopback only, not on any other address of the machine", async () => {
+  it("listens on loopback only: its rendered listeners name 127.0.0.1 alone, and those answer", async () => {
+    // From another address of the machine the sandbox lets a connection time out rather than be
+    // refused, which proves nothing: the listeners Ergo was given are the proof.
     const e = await start();
-    const tryPort = (host: string, port: number): Promise<string> =>
-      new Promise((resolve) => {
-        const socket = connect({ host, port, timeout: 1000 });
-        socket.on("connect", () => {
-          socket.destroy();
-          resolve("open");
-        });
-        socket.on("timeout", () => {
-          socket.destroy();
-          resolve("timeout");
-        });
-        socket.on("error", (error: NodeJS.ErrnoException) => {
-          resolve(error.code === "ECONNREFUSED" ? "closed" : (error.code ?? "error"));
-        });
-      });
-    const others = Object.values(networkInterfaces())
-      .flat()
-      .flatMap((i) => (i?.family === "IPv4" && !i.internal ? [i.address] : []));
     const ports = [e.port, e.wsPort];
     const listeners = readFileSync(joinPath(e.dir, "ircd.yaml"), "utf8").match(/^\s+"[^"]*:\d+":/gm) ?? [];
     expect(listeners.map((line) => line.trim())).toEqual(ports.map((p) => `"127.0.0.1:${String(p)}":`));
-    expect(await Promise.all(ports.map((p) => tryPort("127.0.0.1", p)))).toEqual(["open", "open"]);
-    // In the sandbox another address times out rather than refuses: the rendered listeners prove the bind.
-    for (const host of others) {
-      expect(await Promise.all(ports.map((p) => tryPort(host, p)))).not.toContain("open");
-    }
+    for (const port of ports) await (await rawClient(port)).close();
   });
 
   it("frees its ports and removes its folder when stopped, and stopping twice is fine", async () => {
@@ -891,7 +894,7 @@ describe("the helper", { timeout: 30_000 }, () => {
   });
 
   it("keeps a folder it was given, so a test can start again on the same history", async () => {
-    const e = await start({ dir: mkdtempSync(joinPath(tmpdir(), "gnoworld-ergo-kept-")) });
+    const e = await start({ dir: keptFolder() });
     await e.stop();
     const again = await start({ dir: e.dir });
     await again.stop();

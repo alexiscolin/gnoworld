@@ -42,9 +42,22 @@ describe("visitor", () => {
     expect(visitor("fd00::3", "198.51.100.1", "fd00::2")).toBe("fd00:0:0:0::/64");
   });
 
+  it("never takes an IPv4 proxy for an IPv6 peer, or the reverse", () => {
+    expect(visitor("a00:2::", "198.51.100.1", "10.0.0.2")).toBe("a00:2:0:0::/64");
+    expect(visitor("10.0.0.2", "198.51.100.1", "a00:2::")).toBe("10.0.0.2");
+  });
+
+  it("compares an IPv6 proxy written with an IPv4 tail by every bit", () => {
+    expect(visitor("64:ff9b::198.51.100.2", "198.51.100.9", "64:ff9b::198.51.100.1")).toBe("64:ff9b:0:0::/64");
+    expect(visitor("::c633:6401", "198.51.100.9", "::198.51.100.1")).toBe("198.51.100.9");
+  });
+
   it("reads an IPv4 address that Node shows mapped into IPv6, peer or header", () => {
     expect(visitor("::ffff:10.0.0.2", "::ffff:198.51.100.1", PROXY)).toBe("198.51.100.1");
     expect(visitor("::ffff:203.0.113.7", undefined, undefined)).toBe("203.0.113.7");
+    expect(visitor("::ffff:203.0.113.17", undefined, undefined)).toBe("203.0.113.17");
+    // Mapped only at the start: this one is an IPv6 address with an IPv4 tail.
+    expect(visitor("2001:db8::ffff:203.0.113.7", undefined, undefined)).toBe("2001:db8:0:0::/64");
   });
 
   it.each([

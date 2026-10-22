@@ -63,6 +63,18 @@ describe("rawClient", () => {
     await client.close();
   });
 
+  it("hands a line that comes after a match to the next wait, not to the one that ended", async () => {
+    const { port, peer } = await far();
+    const client = await rawClient(port);
+    const socket = await peer;
+    socket.write("PING :one\r\n");
+    await expect(client.expect(/^PING/)).resolves.toBe("PING :one");
+    socket.write("PING :two\r\n");
+    await expect.poll(() => client.lines().length).toBe(2);
+    await expect(client.expect(/^PING/, 500)).resolves.toBe("PING :two");
+    await client.close();
+  });
+
   it("takes the lines it skipped to reach a match", async () => {
     const { port, peer } = await far();
     const client = await rawClient(port);

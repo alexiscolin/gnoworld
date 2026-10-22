@@ -4,8 +4,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { inspect } from "node:util";
 import { Address } from "@gnoworld/schemas";
-import { describe, expect, it } from "vitest";
-import { isTeam, isTrusted, loadRoles, moderates } from "./roles.ts";
+import { beforeAll, describe, expect, it } from "vitest";
+import { isTeam, isTrusted, loadRoles, moderates, type Roles } from "./roles.ts";
 
 const TEAM = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const TRUSTED = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
@@ -30,7 +30,11 @@ const written = (content: string): string => {
   writeFileSync(path, content);
   return path;
 };
-const roles = loadRoles(written(JSON.stringify(FILE)));
+// Loaded in a test, not at import: StrykerJS only mutates what runs inside one.
+let roles: Roles;
+beforeAll(() => {
+  roles = loadRoles(written(JSON.stringify(FILE)));
+});
 
 // The whole error as a crash would print it: message, stack and causes.
 const failure = (content: string): string => {
@@ -62,13 +66,23 @@ describe("loadRoles", () => {
       worlds: [
         { slug: "a1", moderators: [], rules: smallest },
         { slug: "a-b", moderators: [], rules: RULES },
+        { slug: "earth-two", moderators: [], rules: RULES },
+        { slug: "a-bc-de", moderators: [], rules: RULES },
       ],
     };
-    expect([...loadRoles(written(JSON.stringify(file))).worlds.keys()]).toEqual(["a1", "a-b"]);
+    expect([...loadRoles(written(JSON.stringify(file))).worlds.keys()]).toEqual(["a1", "a-b", "earth-two", "a-bc-de"]);
   });
 
   it("stops on a missing file, naming it", () => {
     expect(() => loadRoles(join(dir, "absent.json"))).toThrow(/^roles file .*absent\.json: unreadable$/);
+    // The cause stays, for whoever reads the crash: the path is no secret.
+    let thrown: unknown;
+    try {
+      loadRoles(join(dir, "absent.json"));
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toMatchObject({ cause: { code: "ENOENT" } });
   });
 
   it.each([
@@ -112,6 +126,18 @@ describe("loadRoles", () => {
       code: "custom",
     },
     { kind: "a slug", content: world({ slug: "Earth" }), place: "worlds.0.slug", code: "invalid_format" },
+    {
+      kind: "a team member as trusted",
+      content: JSON.stringify({ ...FILE, trusted: [TRUSTED, TEAM] }),
+      place: "trusted.1",
+      code: "custom",
+    },
+    {
+      kind: "a team member as moderator",
+      content: world({ moderators: [EARTH_MOD, TEAM] }),
+      place: "worlds.0.moderators.1",
+      code: "custom",
+    },
     {
       kind: "a cap",
       content: world({ rules: { ...RULES, linksForNewAccount: -1 } }),

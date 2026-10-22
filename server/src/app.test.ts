@@ -46,7 +46,8 @@ describe("the server's app", () => {
   it("answers /ready with 200 until the server drains, then 503", async () => {
     let draining = false;
     const { app } = setup(() => !draining);
-    expect((await app.request("/ready")).status).toBe(200);
+    const ready = await app.request("/ready");
+    expect([ready.status, await ready.text()]).toEqual([200, "ready"]);
     draining = true;
     const drained = await app.request("/ready");
     expect(drained.status).toBe(503);
@@ -139,6 +140,12 @@ describe("listen", () => {
     await once(s, "connect");
     return { closed, said: () => said, write: (text) => s.write(text) };
   };
+
+  it("sets the HTTP server's own timeouts: headers in 5 s, a request in 10 s, an idle connection 5 s", async () => {
+    const server = await listen(setup().app, { port: 0, host: "127.0.0.1" });
+    servers.push(server);
+    expect([server.headersTimeout, server.requestTimeout, server.keepAliveTimeout]).toEqual([5_000, 10_000, 5_000]);
+  });
 
   it("answers over HTTP with the app", async () => {
     const port = await start();

@@ -51,6 +51,8 @@ describe("openDatabase", () => {
 
   it.each([
     ["a table without STRICT", "CREATE TABLE loose (id INTEGER)", /STRICT/],
+    // Each table named, in no set order: SQLite lists them as it will.
+    ["two, each named", "CREATE TABLE one (id INTEGER); CREATE TABLE two (id INTEGER)", /not (one, two|two, one)$/],
     ["a table made from a query, never STRICT", "CREATE TABLE copied AS SELECT 1 AS id", /STRICT/],
     ["a migration that fails", "CREATE TABLE half (id INTEGER) STRICT; CREATE TABLE broken (", /incomplete input/],
   ])("refuses %s, and leaves the file as it was", (_, migration, error) => {

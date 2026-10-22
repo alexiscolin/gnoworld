@@ -57,7 +57,8 @@ describe("loadConfig", () => {
     ["DATABASE", ""],
     ["LOG_PEPPER_FILE", undefined],
     ["LOG_PEPPER_FILE", ""],
-    ["LOG_PEPPER_FILE", join(dir, "absent")],
+    // A fixed path: a test's name holds it, and StrykerJS's cache matches tests by name.
+    ["LOG_PEPPER_FILE", "/nonexistent/gnoworld-pepper"],
     ["PORT", ""],
     ["PORT", "-1"],
     ["PORT", "65536"],
@@ -76,6 +77,21 @@ describe("loadConfig", () => {
     ["ROLES_FILE", ""],
   ])("stops on %s set to %j, naming the setting", (key, value) => {
     expect(() => loadConfig({ ...ENV, [key]: value })).toThrow(new RegExp(`^setting ${key}: `));
+  });
+
+  it("names the setting and the kind of fault, nothing else", () => {
+    expect(() => loadConfig({ ...ENV, DATABASE: "" })).toThrow(/^setting DATABASE: too_small$/);
+    expect(() => loadConfig({ ...ENV, PORT: "http" })).toThrow(/^setting PORT: invalid_format$/);
+  });
+
+  it("keeps why a secret's file could not be read, as the cause: the path is no secret", () => {
+    let thrown: unknown;
+    try {
+      loadConfig({ ...ENV, LOG_PEPPER_FILE: "/nonexistent/gnoworld-pepper" });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toMatchObject({ message: "setting LOG_PEPPER_FILE: unreadable", cause: { code: "ENOENT" } });
   });
 
   it("takes the widest values each setting allows", () => {

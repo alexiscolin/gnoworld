@@ -45,6 +45,17 @@ describe("limiter", () => {
     expect(most).toBe(1000);
   });
 
+  it("moves a key whose window starts again to the back, so the cap drops another", () => {
+    const limit = limiter({ max: 1, windowMs: WINDOW, keys: 3 });
+    limit.take("a", 0);
+    limit.take("b", 500);
+    limit.take("a", WINDOW);
+    limit.take("c", WINDOW + 1);
+    // The cap drops b, whose window started first: a just started its own again, and stays counted.
+    limit.take("d", WINDOW + 2);
+    expect(limit.take("a", WINDOW + 3)).toBe(false);
+  });
+
   it("drops, past the cap, the key whose window started first, even if it was used last", () => {
     // Its window ends soonest, so dropping it costs the least; it starts over: the limit limit.ts names.
     const limit = limiter({ max: 1, windowMs: WINDOW, keys: 2 });
