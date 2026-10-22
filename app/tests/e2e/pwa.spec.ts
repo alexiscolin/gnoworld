@@ -347,7 +347,8 @@ test.describe("updates", () => {
     await page.setViewportSize({ width: 320, height: 568 });
     await open(page);
     const longer = await page.evaluate(() => {
-      document.querySelector("main")?.setAttribute("style", "min-block-size: 3000px");
+      // Through the CSSOM: the site's policy refuses a style attribute set as text.
+      document.querySelector("main")?.style.setProperty("min-block-size", "3000px");
       return document.documentElement.scrollHeight > innerHeight;
     });
     expect(longer, "the page is longer than the screen").toBe(true);

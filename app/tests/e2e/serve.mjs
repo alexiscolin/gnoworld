@@ -10,6 +10,9 @@ import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../../build/client/", import.meta.url));
+// The policy the build wrote for every answer (src/csp.ts), as a host that reads _headers sends it.
+const POLICY = /^  Content-Security-Policy: (.+)$/m.exec(readFileSync(join(root, "_headers"), "utf8"))?.[1];
+if (POLICY === undefined) throw new Error("serve.mjs: the build's _headers names no Content-Security-Policy");
 // The types of what the build writes (`.data`: React Router's single-fetch.js). Any other kind of
 // file answers 500, so the journeys fail on it rather than pass on a type no real host would give.
 const TYPES = {
@@ -45,6 +48,7 @@ function host({ bumping = false, password = false }) {
   let tampered = false;
   let down = false;
   return (request, response) => {
+    response.setHeader("content-security-policy", POLICY);
     if (password && request.headers.authorization !== PASSWORD) {
       response.writeHead(401, { "www-authenticate": 'Basic realm="gno.world demo"' }).end();
       return;

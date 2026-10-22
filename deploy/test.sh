@@ -294,6 +294,7 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "the password logged" "no log holds the password" nginx sed 's#$status $body_bytes_sent#$status $body_bytes_sent $http_authorization#'
 	mutant "noindex only on success" "the 401 is not indexed" nginx sed 's#X-Robots-Tag "noindex" always#X-Robots-Tag "noindex"#'
 	mutant "sniffing allowed" "is never sniffed" nginx sed '/X-Content-Type-Options/d'
+	mutant "no content security policy" "carries the policy" nginx sed '/include \/etc\/nginx\/csp.conf;/d'
 	mutant "hashed files not kept" "is kept a year" nginx sed 's#public, max-age=31536000, immutable#no-cache#'
 	mutant "an error on a hashed file kept a year" "a 401 on a hashed file revalidates" \
 		nginx sed 's#~^(200|206|304)/assets/#~^[0-9]*/assets/#'
@@ -440,6 +441,14 @@ elif [ "${1:-}" != --demo ]; then
 	for path in $pages /nowhere /sw.js /manifest.webmanifest /icon-192.png; do
 		expect "$path revalidates" "$(header cache-control "$path" 203.0.113.1 -u "$auth")" no-cache
 	done
+	# The build's policy, the one the image's include sets, on every answer: pages, files, errors.
+	policy=$(docker exec "$web" cat /etc/nginx/csp.conf | sed -n 's/^add_header Content-Security-Policy "\(.*\)" always;$/\1/p')
+	case $policy in "default-src 'none'; script-src 'self' 'sha256-"*) pass "the image holds the build's policy" ;; *) fail "no policy in the image's csp.conf" ;; esac
+	for path in $pages /nowhere /sw.js /manifest.webmanifest /icon-192.png $assets; do
+		expect "$path carries the policy" "$(header content-security-policy "$path" 203.0.113.1 -u "$auth")" "$policy"
+	done
+	expect "a 401 carries the policy" "$(header content-security-policy / 203.0.113.1)" "$policy"
+	expect "a 405 carries the policy" "$(header content-security-policy / 203.0.113.1 -u "$auth" -X POST)" "$policy"
 	for path in $assets; do
 		expect "$path is kept a year" "$(header cache-control "$path" 203.0.113.1 -u "$auth")" "public, max-age=31536000, immutable"
 	done

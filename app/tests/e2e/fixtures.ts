@@ -3,6 +3,8 @@
 import { test as base, type Page } from "@playwright/test";
 import { WORLDS, worldPath } from "../../src/worlds.ts";
 
+import { expect } from "@playwright/test";
+
 export { expect, type Page } from "@playwright/test";
 
 declare const process: { env: Record<string, string | undefined> };
@@ -23,7 +25,52 @@ const ownBrowser = base.extend({
   },
 });
 
-export const test = process.env["SANDBOX_RUNTIME"] ? ownBrowser : base;
+const FLUSH = "https://flush.invalid/";
+const MARK = "csp-violation";
+
+// Every journey runs under the site's CSP: a violation no test planted fails it (slice 3's plan, 3f).
+// The directives a page's documents reported, written to its console, which outlives a navigation.
+export const test = (process.env["SANDBOX_RUNTIME"] ? ownBrowser : base).extend<{
+  planted: boolean;
+  violations: string[];
+}>({
+  planted: [false, { option: true }],
+  violations: [
+    async ({ page, planted, javaScriptEnabled }, use) => {
+      const seen: string[] = [];
+      // Whether the page's document came with a policy: one a test makes up itself carries none.
+      const main = { policed: false };
+      page.on("response", (response) => {
+        if (response.request().isNavigationRequest() && response.frame() === page.mainFrame()) {
+          main.policed = response.headers()["content-security-policy"] !== undefined;
+        }
+      });
+      page.on("console", (message) => {
+        const [mark, directive] = message.text().split(" ");
+        if (mark === MARK && directive !== undefined) seen.push(directive);
+      });
+      await page.addInitScript(
+        ([mark, flush]) => {
+          document.addEventListener("securitypolicyviolation", (event) => {
+            console.info(mark, event.blockedURI === flush ? "flush" : event.effectiveDirective);
+          });
+        },
+        [MARK, FLUSH],
+      );
+      await use(seen);
+      // A violation reaches the test as a task: one planted last, once seen, says every earlier one came.
+      if (javaScriptEnabled && main.policed && !page.isClosed()) {
+        await page.evaluate((flush) => {
+          new Image().src = flush;
+        }, FLUSH);
+        await expect.poll(() => seen.at(-1), { message: "the page's policy reported the flush" }).toBe("flush");
+        seen.pop();
+      }
+      if (!planted) expect(seen, "a CSP violation no test planted").toEqual([]);
+    },
+    { auto: true },
+  ],
+});
 
 // React marks the document it hydrated; the static HTML alone never carries the mark.
 export const reactMark = () => Object.keys(document).some((key) => key.startsWith("__reactContainer"));
