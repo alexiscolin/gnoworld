@@ -1047,6 +1047,22 @@ describe("the IRC link's room state (3m)", () => {
     await sync(peer);
     expect(peer.lines.filter((line) => /^(MODE|SAMODE|NAMES|QUIT)/.test(line))).toEqual([]);
   });
+
+  it("stays up on lines it never asked for: a list's end twice, a 322 after it, a batch's end it never opened, a JOIN with no source (F573)", async () => {
+    const ergo = await fakeErgo();
+    const found: string[][] = [];
+    start(ergo.port, { onChannels: (names) => found.push([...names]) });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    await peer.next(/^LIST$/);
+    peer.say(":ergo.test 323 gnoworld :End of /LIST");
+    peer.say(":ergo.test 323 gnoworld :End of /LIST");
+    peer.say(":ergo.test 322 gnoworld #late 1 :");
+    peer.say(":ergo.test BATCH -zz");
+    peer.say("JOIN #bubble");
+    await sync(peer);
+    expect([found, ergo.peers.length]).toEqual([[[]], 1]);
+  });
 });
 
 describe("the IRC link's catch-up (3j)", () => {
@@ -1197,6 +1213,18 @@ describe("the IRC link's catch-up (3j)", () => {
     peer.say(":ergo.test BATCH -a");
     await settled(peer);
     expect(asked(peer)).toHaveLength(1);
+  });
+
+  it("ends a page once: its end said twice asks the next page once (F573)", async () => {
+    const ergo = await fakeErgo();
+    start(ergo.port, { lastChecked: (room) => (room === "#bubble" ? T(0) : undefined) });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    await peer.next(/^CHATHISTORY /);
+    page(peer, "a", full(0));
+    peer.say(":ergo.test BATCH -a");
+    await settled(peer);
+    expect(asked(peer)).toHaveLength(2);
   });
 });
 
