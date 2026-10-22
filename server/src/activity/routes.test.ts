@@ -1,4 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
+import { ActivityRooms } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it } from "vitest";
 import { makeApp } from "../app.ts";
 import { openDatabase } from "../db.ts";
@@ -32,6 +33,15 @@ const setup = () => {
 };
 
 describe("GET /api/activity", () => {
+  it("answers in the shape its clients parse", async () => {
+    const { activity, ask } = setup();
+    activity.count("#bubble", "a", T0);
+    const [, body] = await ask("?worlds=bubble");
+    expect(ActivityRooms.parse(JSON.parse(String(body)))).toEqual({
+      rooms: [{ world: "bubble", room: "#bubble", perMinute: 0.2 }],
+    });
+  });
+
   it("answers each asked world's rooms with their messages a minute, public and kept 5 seconds", async () => {
     const { activity, ask } = setup();
     activity.count("#bubble", "a", T0);

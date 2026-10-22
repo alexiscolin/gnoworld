@@ -56,6 +56,19 @@ describe("the chat, as the server starts it", () => {
     expect(await rooms("bubble")).toBe(rate(0));
   });
 
+  it("leaves Ergo when it stops, and never connects again", async () => {
+    const ergo = await fakeErgo();
+    const ergoAt = { host: "127.0.0.1", port: ergo.port, password: PASSWORD };
+    setup({ worlds: ["bubble"], ergo: ergoAt }, () => T0);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    const left = new Promise((resolve) => peer.socket.once("close", resolve));
+    await started.at(-1)?.chat.stop();
+    await left;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(ergo.peers).toHaveLength(1);
+  });
+
   it("keeps the system's clock by default", () => {
     const before = Date.now();
     const { db } = setup({ worlds: ["earth"], ergo: undefined });
