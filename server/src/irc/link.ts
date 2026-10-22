@@ -69,7 +69,7 @@ function said(
 }
 
 // The lines Ergo sends that ask for an answer, as 3b's table found them.
-function reader(options: Options, state: { attempt: number; joined: Set<string> }) {
+function reader(options: Options, state: { attempt: number; joined: Set<string>; upSince?: number | undefined }) {
   const { password, rooms, onMessage, log } = options;
   // A refusal Ergo will not change by itself: log it, and try again later and later.
   const refused = (s: Socket, error: string): void => {
@@ -83,7 +83,7 @@ function reader(options: Options, state: { attempt: number; joined: Set<string> 
     },
     "001": (s) => s.write(line("OPER", ["admin", password])),
     "381": (s) => {
-      state.attempt = 0;
+      state.upSince = Date.now();
       const names = rooms();
       state.joined = new Set(names);
       for (const join of joins(names)) s.write(join);
@@ -114,7 +114,12 @@ export function ircLink(options: Options): Link {
   let socket: Socket | undefined;
   let stopped = false;
   let retry: ReturnType<typeof setTimeout> | undefined;
-  const state = { attempt: 0, joined: new Set<string>() };
+  // The backoff starts again from a second only after a minute up: Ergo taking the link in, then
+  // dropping it at once, keeps it waiting longer.
+  const state: { attempt: number; joined: Set<string>; upSince?: number | undefined } = {
+    attempt: 0,
+    joined: new Set<string>(),
+  };
   const read = reader(options, state);
   const open = (): void => {
     const s = connect(port, host);
@@ -161,6 +166,8 @@ export function ircLink(options: Options): Link {
       clearInterval(watchdog);
       if (stopped) return;
       log("irc_closed");
+      if (state.upSince !== undefined && Date.now() - state.upSince >= 60_000) state.attempt = 0;
+      state.upSince = undefined;
       retry = setTimeout(open, retryMs(state.attempt));
       state.attempt += 1;
     });

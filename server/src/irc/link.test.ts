@@ -305,24 +305,48 @@ describe("the IRC link, when Ergo refuses it", () => {
     expect(lines.join("")).not.toContain(PASSWORD);
   });
 
-  it("waits for an Ergo that is not up yet, longer each time, and starts again from a second once in", async () => {
+  it("waits for an Ergo that is not up yet, longer each time, and starts again from a second after a minute in", async () => {
     const port = await freePort();
     const attempts: number[] = [];
-    start(port, {
+    const clock = vi.spyOn(Date, "now");
+    try {
+      start(port, {
+        retryMs: (attempt) => {
+          attempts.push(attempt);
+          return 10;
+        },
+      });
+      await expect.poll(() => attempts.length).toBeGreaterThanOrEqual(3);
+      expect(attempts.slice(0, 3)).toEqual([0, 1, 2]);
+      const ergo = await fakeErgo(port);
+      const peer = await ergo.peer(0);
+      await welcome(peer);
+      clock.mockReturnValue(Date.now() + 60_000);
+      const before = attempts.length;
+      peer.socket.destroy();
+      await ergo.peer(1);
+      expect(attempts[before]).toBe(0);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it("keeps backing off when Ergo drops it right after taking it in", async () => {
+    const ergo = await fakeErgo();
+    const attempts: number[] = [];
+    start(ergo.port, {
       retryMs: (attempt) => {
         attempts.push(attempt);
         return 10;
       },
     });
-    await expect.poll(() => attempts.length).toBeGreaterThanOrEqual(3);
-    expect(attempts.slice(0, 3)).toEqual([0, 1, 2]);
-    const ergo = await fakeErgo(port);
-    const peer = await ergo.peer(0);
-    await welcome(peer);
-    const before = attempts.length;
-    peer.socket.destroy();
-    await ergo.peer(1);
-    expect(attempts[before]).toBe(0);
+    for (const nth of [0, 1, 2]) {
+      const peer = await ergo.peer(nth);
+      await welcome(peer);
+      peer.socket.destroy();
+    }
+    await ergo.peer(3);
+    expect(attempts).toEqual([0, 1, 2]);
   });
 
   it("connects again when Ergo says ERROR and closes", async () => {
