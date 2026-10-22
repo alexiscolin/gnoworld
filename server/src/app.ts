@@ -31,12 +31,12 @@ export function makeApp(log: Log, ready: () => boolean): Hono {
   return app;
 }
 
-// Hono hands onError only an Error: anything else thrown becomes one, named by its type.
+// Hono hands onError only an Error, and catches an Error before it reaches here: anything else thrown
+// becomes one, named by its type.
 async function named(_: Context, next: () => Promise<void>): Promise<void> {
   try {
     await next();
   } catch (thrown) {
-    if (thrown instanceof Error) throw thrown;
     const error = new Error("a value that is not an Error was thrown", { cause: thrown });
     error.name = typeof thrown;
     throw error;
