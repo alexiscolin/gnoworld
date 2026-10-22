@@ -1,10 +1,11 @@
 // The site's Content-Security-Policy (ADR-0002 §9; slice 3's plan, 3f), written once at build time for
 // every host: nothing loads unless named, nothing from another host, no eval. React Router writes inline
 // scripts in each pre-rendered page, so the build allows exactly those, by their SHA-256 (F341).
+const SCRIPT_SRC = "script-src 'self'";
 const DIRECTIVES = [
   // Covers frame-src and object-src too, which the planted frame proves.
   "default-src 'none'",
-  "script-src 'self'",
+  SCRIPT_SRC,
   "style-src 'self'",
   "img-src 'self' data:",
   "font-src 'self'",
@@ -26,9 +27,8 @@ export function policy(hashes: readonly string[]): string {
   }
   // Code units, not a locale's order: every machine writes the same policy.
   const scripts = [...new Set(hashes)].sort();
-  return DIRECTIVES.map((directive) =>
-    directive === "script-src 'self'" ? [directive, ...scripts].join(" ") : directive,
-  ).join("; ");
+  const script = [SCRIPT_SRC, ...scripts].join(" ");
+  return DIRECTIVES.map((directive) => (directive === SCRIPT_SRC ? script : directive)).join("; ");
 }
 
 // What the browser hashes: the text between a script's tags, for each script that loads no file. A
