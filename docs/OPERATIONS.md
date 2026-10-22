@@ -243,12 +243,16 @@ Slice 3, rooms by role (3m):
 Slice 3, the server's retention (3n):
 
 - **The verdicts** (ids, rooms, hashed accounts, categories and scores, never a text) are kept 180 days
-  and 150,000 at most (about 1.2 KB each with their indexes, 176 MB), the oldest going first. A job runs
-  at start and every five minutes, removing 10,000 rows at most a run (6 ms measured), the rest at the
-  next. A verdict removed by the cap before its 180 days lets an edit of its line be taken as another's.
+  and 150,000 at most (about 1.2 KB each with their indexes, 176 MB), the oldest going first; a verdict
+  still waiting on OpenAI stays. A job runs at start and every five minutes, removing 10,000 rows at
+  most a run (about 7 ms measured), and runs again at once while a backlog is left, the server free
+  between runs. A verdict removed by the cap before its 180 days makes an edit of its line unknown:
+  the edit is hidden (`unknown_edit`), with no strike.
 - **The alerts** `verdicts_near_cap` and `database_near_cap` fire once when the verdicts reach 80% of
   their cap, or the database's used pages 80% of 256 MB, and again only after a fall below. The
-  database's file does not shrink: freed pages are reused, and its `-wal` file is not counted.
+  database's file does not shrink: freed pages are reused, and its `-wal` file is not counted. A table
+  held at its cap, the cap removing verdicts before their 180 days, says nothing more after its one
+  alert (put to Alexis: an alert of its own).
 - **The other stores** purge themselves (nonces, tokens, tickets, mutes) or hold a row a room or an
   account; the accounts' addresses are kept for the new-account rule, until slice 12's erasure path.
 - **Not yet:** the k6 runs, `web`'s per-visitor limits and Ergo's volume measure wait for 3e's stack
