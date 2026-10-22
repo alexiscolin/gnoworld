@@ -9,7 +9,7 @@ export function visitor(peer: string, header: string | undefined, proxy: string 
   const from = unmapped(peer);
   const trusted = proxy !== undefined && same(from, unmapped(proxy));
   const address = trusted && header !== undefined && isIP(header) !== 0 ? unmapped(header) : from;
-  return isIP(address) === 6 ? `${groups(address).slice(0, 4).join(":")}::/64` : address;
+  return isIP(address) === 6 ? prefix64(address) : address;
 }
 
 function unmapped(address: string): string {
@@ -17,22 +17,19 @@ function unmapped(address: string): string {
 }
 
 function same(a: string, b: string): boolean {
-  return isIP(a) === 6 && isIP(b) === 6 ? groups(a).join(":") === groups(b).join(":") : a === b;
+  return isIP(a) === 6 && isIP(b) === 6 ? canonical(a) === canonical(b) : a === b;
 }
 
-// The eight groups of an IPv6 address, written out: no zone, no "::", no leading zeros, lower case.
-function groups(address: string): string[] {
-  const [head = "", tail] = (address.split("%")[0] ?? "").split("::");
-  const parts = (text: string): string[] => (text === "" ? [] : text.split(":").flatMap(quad));
-  const left = parts(head);
-  const right = tail === undefined ? [] : parts(tail);
-  const zeros = Array.from({ length: 8 - left.length - right.length }, () => "0");
-  return [...left, ...zeros, ...right].map((group) => Number.parseInt(group, 16).toString(16));
+// An IPv6 address as Node's URL writes it: lower case, compressed, an IPv4 tail in hex, no zone.
+function canonical(address: string): string {
+  return new URL(`http://[${address.split("%")[0] ?? ""}]`).hostname.slice(1, -1);
 }
 
-// An IPv4 address at the end of an IPv6 one is its last two groups.
-function quad(group: string): string[] {
-  if (!group.includes(".")) return [group];
-  const [a = 0, b = 0, c = 0, d = 0] = group.split(".").map(Number);
-  return [((a << 8) | b).toString(16), ((c << 8) | d).toString(16)];
+// The first four groups, the "::" of the canonical form written out.
+function prefix64(address: string): string {
+  const [head = "", tail = ""] = canonical(address).split("::");
+  const left = head === "" ? [] : head.split(":");
+  const right = tail === "" ? [] : tail.split(":");
+  const groups = [...left, ...Array.from({ length: 8 - left.length - right.length }, () => "0"), ...right];
+  return `${groups.slice(0, 4).join(":")}::/64`;
 }
