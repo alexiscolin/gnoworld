@@ -273,6 +273,14 @@ describe("the verdicts' stream, its green pass (3j)", () => {
     expect(msgids(await back.read(1))).toEqual(["m2"]);
   });
 
+  it("keeps a client given a full replay when a live event follows at once", async () => {
+    const { stream, rooms } = setup({ pending: 4 });
+    for (let n = 1; n <= 4; n += 1) stream.publish(event(n));
+    const late = await rooms("#bubble");
+    stream.publish(event(5));
+    expect(msgids(await late.read(5))).toEqual(["m1", "m2", "m3", "m4", "m5"]);
+  });
+
   it("holds its sizes: a room's ring at its pending, 10,000 rooms at most, nothing left of the streams that ended", async () => {
     const { stream, rooms } = setup({ pending: 8 });
     for (let n = 0; n < 10_000; n += 1) stream.publish(event(n));
