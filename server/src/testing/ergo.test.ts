@@ -139,7 +139,8 @@ const sasl = async (c: Raw, account: string, passphrase: string): Promise<string
   c.send("AUTHENTICATE PLAIN");
   await c.expect(/AUTHENTICATE \+/);
   c.send(`AUTHENTICATE ${Buffer.from(`\0${account}\0${passphrase}`).toString("base64")}`);
-  return c.expect(/ (903|904) /);
+  // Past the auth script's 9 s (AUTH_TIMEOUT): a slow script shows as Ergo's 904, never as a test's timeout.
+  return c.expect(/ (903|904) /, 10_000);
 };
 
 // Registered (the MOTD's end, or its absence), unless the test waits for a refusal.
