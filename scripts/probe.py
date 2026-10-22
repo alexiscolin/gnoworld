@@ -358,6 +358,8 @@ try:
             ("workspace.ts", uses(name="parseLine", path="@gnoworld/core"), None),
             ("schemas.ts", uses(name="ApiError", path="@gnoworld/schemas"), None),
             ("sibling.ts", uses(name="used", path="./framework.ts"), None),
+            # A name that only starts like a banned one is another package.
+            ("reactor.ts", uses(name="x", path="reactor"), None),
             *[(f"{name.replace('/', '_').replace('@', '')}.ts", uses(name="x", path=name), "no-restricted-imports")
               for name in ("react", "react-dom/client", "three", "@gnoworld/ui")],
             ("past_folder.ts", uses(name="Button", path="../../../packages/ui/src/index.ts"), "import-x/no-restricted-paths"),
