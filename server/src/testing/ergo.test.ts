@@ -66,6 +66,14 @@ describe("guests and rooms", { timeout: 20_000 }, () => {
     expect(logged(alice)).not.toContain("hello from guest");
   });
 
+  it("makes a new room +CMnt and lets a client join 1000 rooms, as the template says (3e)", async () => {
+    const e = await start();
+    const chief = await lobby(e);
+    expect(logged(chief)).toMatch(/ 005 .* CHANLIMIT=#:1000 /);
+    chief.send("MODE #lobby");
+    await chief.expect(/ 324 chief #lobby \+CMnt(\s|$)/);
+  });
+
   it("lets a guest read the history of a room it joined, not of one it did not", async () => {
     const e = await start();
     await lobby(e);
