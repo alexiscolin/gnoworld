@@ -48,6 +48,8 @@ function withBreaker(
 ): (text: string) => Promise<Answer | "unchecked"> {
   const breaker = { failures: 0, until: 0 };
   const failed = (): void => {
+    // Already paused by a probe that failed alongside: one pause, one alert.
+    if (now() < breaker.until) return;
     breaker.failures += 1;
     if (breaker.failures < 5 && breaker.until === 0) return;
     breaker.failures = 0;

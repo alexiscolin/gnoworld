@@ -212,6 +212,17 @@ describe("checking a message", () => {
     expect(asked).toHaveLength(6);
   });
 
+  it("raises the alert once when the probes after a pause fail together, four at once", async () => {
+    const { clock, check, asked, lines } = setup(() => Promise.resolve("unchecked"));
+    for (let n = 0; n < 5; n += 1) await check(said("x", `a${String(n)}`));
+    clock.now += 30_000;
+    await Promise.all([1, 2, 3, 4].map((n) => check(said("x", `b${String(n)}`))));
+    expect(asked).toHaveLength(9);
+    expect(
+      lines.filter((line) => line.includes('"event":"alert"') && line.includes('"moderation_breaker"')),
+    ).toHaveLength(2);
+  });
+
   it("counts failures running: a success between them starts the count again", async () => {
     const answers: (Answer | "unchecked")[] = ["u", "u", "u", "u", "a", "u", "u", "u", "u"].map((kind) =>
       kind === "u" ? "unchecked" : answer(),
