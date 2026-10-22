@@ -45,7 +45,9 @@ export function activityRoutes(activity: Activity, options: Options): Hono {
       rooms.map(({ room }) => room),
       now(),
     );
+    // The answer depends on the session: a shared cache keeps each cookie's apart (F585).
     c.header("cache-control", `${who === undefined ? "public" : "private"}, max-age=5`);
+    c.header("vary", "cookie");
     return c.json({
       rooms: rooms.map(({ world, room }) => ({ world, room, perMinute: rates.get(room) ?? 0 })),
     } satisfies ActivityRooms);

@@ -144,6 +144,21 @@ describe("GET /api/activity, rooms by role (3m)", () => {
     return { ask };
   };
 
+  it("says its answer varies with the cookie, so no cache hands a guest's answer to an account (F585)", async () => {
+    const db = openDatabase(":memory:", [ROOM_TABLES]);
+    opened.push(db);
+    ensureRooms(db, ["bubble"], T0);
+    const app = makeApp(
+      logger("a-pepper-of-forty-characters-0123456789", () => true),
+      () => true,
+    );
+    const session = (token: string | undefined) => token;
+    app.route("/api/activity", activityRoutes(makeActivity(), { db, now: () => T0, visible: () => true, session }));
+    const vary = async (headers: Record<string, string>) =>
+      (await app.request("/api/activity?worlds=bubble", { headers })).headers.get("vary");
+    expect([await vary({}), await vary({ cookie: "__Host-session=g1a" })]).toEqual(["cookie", "cookie"]);
+  });
+
   it("answers a members room to whom may read it, a hidden one to its moderators, each privately", async () => {
     const { ask } = roleSetup();
     expect(await ask()).toEqual([["#bubble"], "public, max-age=5"]);
