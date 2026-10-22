@@ -65,6 +65,14 @@ test.describe("the content security policy", () => {
     expect([...hashes].toSorted()).toEqual((served.match(/'sha256-[^']+'/g) ?? []).toSorted());
   });
 
+  test("ends on a navigation under way, which the fixture's last check waits out", async ({ page }) => {
+    await page.goto("/");
+    await hydrated(page);
+    await page.evaluate(() => {
+      location.href = "/w/bubble";
+    });
+  });
+
   test("lets a page open a WebSocket to its own host", async ({ page }) => {
     await page.goto("/");
     await hydrated(page);

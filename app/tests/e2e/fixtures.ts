@@ -26,13 +26,16 @@ const ownBrowser = base.extend({
 const FLUSH = "https://flush.invalid/";
 const MARK = "csp-violation";
 
-// A violation reaches the test as a task: one planted last, once seen, says every earlier one came.
-async function flush(page: Page, seen: string[]): Promise<void> {
-  await page.evaluate((url) => {
-    new Image().src = url;
-  }, FLUSH);
-  await expect.poll(() => seen.at(-1), { message: "the page's policy reported the flush" }).toBe("flush");
-  seen.pop();
+// A violation reaches the test as a task: one planted last, once seen, says every earlier one came. A
+// navigation under way may take the first try's document away: the next try plants it in the new one.
+async function flush(page: Page): Promise<void> {
+  const done = page.waitForEvent("console", (message) => message.text() === `${MARK} flush`);
+  await expect(async () => {
+    await page.evaluate((url) => {
+      new Image().src = url;
+    }, FLUSH);
+  }).toPass();
+  await done;
 }
 
 // Every journey runs under the site's CSP: a violation no test planted fails it (slice 3's plan, 3f).
@@ -60,7 +63,7 @@ export const test = (process.env["SANDBOX_RUNTIME"] ? ownBrowser : base).extend<
       });
       context.on("console", (message) => {
         const [mark, directive] = message.text().split(" ");
-        if (mark === MARK && directive !== undefined) seen.push(directive);
+        if (mark === MARK && directive !== undefined && directive !== "flush") seen.push(directive);
       });
       await context.addInitScript(
         ([mark, flush]) => {
@@ -71,7 +74,7 @@ export const test = (process.env["SANDBOX_RUNTIME"] ? ownBrowser : base).extend<
         [MARK, FLUSH],
       );
       await use(seen);
-      for (const each of javaScriptEnabled ? policed : []) if (!each.isClosed()) await flush(each, seen);
+      for (const each of javaScriptEnabled ? policed : []) if (!each.isClosed()) await flush(each);
       if (!planted) expect(seen, "a CSP violation no test planted").toEqual([]);
     },
     { auto: true },
