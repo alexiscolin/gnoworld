@@ -70,6 +70,8 @@ describe("inlineScripts", () => {
     ["a single-quoted attribute", "<script id='ab'>a()</script>", ["a()"]],
     ["a > in a single-quoted attribute", "<script data-x='a>b'>a()</script>", ["a()"]],
     ["src with a space before its =", '<script src ="/x.js"></script>', []],
+    ["src after a slash, which HTML reads as an attribute", '<script/src="/x.js"></script>', []],
+    ["src glued to the quote before it", '<script type="module"src="/x.js"></script>', []],
     ["an attribute that only starts with src", '<script srcx="y">a()</script>', ["a()"]],
     ["a closing tag with a space", "<script>a()</script >b", ["a()"]],
     ["a closing tag with a newline", "<script>a()</script\n>b", ["a()"]],

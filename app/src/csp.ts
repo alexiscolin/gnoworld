@@ -32,11 +32,12 @@ export function policy(hashes: readonly string[]): string {
 }
 
 // What the browser hashes: the text between a script's tags, for each script that loads no file. A
-// script ends at the first `</script` that a space, a slash or a > follows, as the HTML parser reads it.
+// script ends at the first `</script` that a space, a slash or a > follows, and an attribute starts after
+// a space, a slash or a quote, as the HTML parser reads them.
 export function inlineScripts(html: string): string[] {
   const scripts = /<script\b((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)<\/script(?=[\s/>])[^>]*>/gi;
   return [...html.matchAll(scripts)]
-    .filter(([, attributes = ""]) => !/(?:^|\s)src\s*=/i.test(attributes))
+    .filter(([, attributes = ""]) => !/[\s/"']src\s*=/i.test(attributes))
     .map(([, , text = ""]) => text);
 }
 
