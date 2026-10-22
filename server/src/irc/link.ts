@@ -123,9 +123,11 @@ function reader(options: Options, state: State) {
     PING: (s, { params }) => s.write(line("PONG", params)),
     PRIVMSG: (_, message) => {
       const batch = state.batches.get(message.tags.get("batch") ?? "");
+      // A time Date cannot read is no page's end (F552): the next page starts from the last one read.
+      const time = message.tags.get("time") ?? "";
       if (batch !== undefined) {
         batch.lines += 1;
-        batch.last = message.tags.get("time") ?? batch.last;
+        if (!Number.isNaN(Date.parse(time))) batch.last = time;
       }
       const heard = said(message, state.joined);
       if (heard !== undefined) onMessage(heard);
