@@ -103,17 +103,28 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     origins: ORIGINS,
     newAccountsPerHour: NEW_ACCOUNTS_PER_HOUR,
     authSocket: AUTH_SOCKET,
-    ergo:
-      ERGO_OPER_PASSWORD_FILE === undefined
-        ? undefined
-        : { host: ERGO_HOST, port: ERGO_PORT, password: operPassword(ERGO_OPER_PASSWORD_FILE) },
+    ergo: ergoOf(env, { host: ERGO_HOST, port: ERGO_PORT, passwordFile: ERGO_OPER_PASSWORD_FILE }),
   };
 }
 
-// One word of printable ASCII: it goes on the OPER line as it is.
+// The link to Ergo, or none without the password's file. Ergo's listener named with no password is a link
+// meant that would not come: the server stops rather than run silent.
+function ergoOf(
+  env: Record<string, string | undefined>,
+  { host, port, passwordFile }: { host: string; port: number; passwordFile: string | undefined },
+): Config["ergo"] {
+  if (passwordFile !== undefined) return { host, port, password: operPassword(passwordFile) };
+  if (env["ERGO_HOST"] !== undefined || env["ERGO_PORT"] !== undefined) {
+    throw new Error("setting ERGO_OPER_PASSWORD_FILE: required");
+  }
+  return undefined;
+}
+
+// One word of printable ASCII, 256 at most: it goes on the OPER line as it is, which holds 510 bytes.
 function operPassword(path: string): string {
   const password = secret("ERGO_OPER_PASSWORD_FILE", path);
   if (!/^[\x21-\x7e]+$/.test(password)) throw new Error("setting ERGO_OPER_PASSWORD_FILE: invalid_characters");
+  if (password.length > 256) throw new Error("setting ERGO_OPER_PASSWORD_FILE: too_long");
   return password;
 }
 

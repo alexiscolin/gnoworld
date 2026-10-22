@@ -97,6 +97,11 @@ describe("loadConfig", () => {
     });
   });
 
+  it("takes an operator password of 256 characters, the longest", () => {
+    const oper = file("oper-long", `${"p".repeat(256)}\n`);
+    expect(loadConfig({ ...ENV, ERGO_OPER_PASSWORD_FILE: oper }).ergo?.password).toHaveLength(256);
+  });
+
   it("takes Ergo's highest port and a host of 253 characters", () => {
     const oper = file("oper-edges", `${"p".repeat(32)}\n`);
     expect(
@@ -112,6 +117,9 @@ describe("loadConfig", () => {
       { ERGO_OPER_PASSWORD_FILE: file("two-lines", `${"a".repeat(32)}\n${"b".repeat(32)}\n`) },
     ],
     ["ERGO_OPER_PASSWORD_FILE", { ERGO_OPER_PASSWORD_FILE: file("a-space", `${"a".repeat(16)} ${"b".repeat(16)}\n`) }],
+    ["ERGO_OPER_PASSWORD_FILE", { ERGO_OPER_PASSWORD_FILE: file("long-oper", `${"p".repeat(257)}\n`) }],
+    ["ERGO_OPER_PASSWORD_FILE", { ERGO_HOST: "ergo" }],
+    ["ERGO_OPER_PASSWORD_FILE", { ERGO_PORT: "6668" }],
     ["ERGO_PORT", { ERGO_PORT: "65536" }],
     ["ERGO_PORT", { ERGO_PORT: "0" }],
     ["ERGO_PORT", { ERGO_PORT: "06667" }],
