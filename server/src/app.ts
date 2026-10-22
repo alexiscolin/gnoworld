@@ -63,9 +63,7 @@ export async function listen(app: Hono, at: { port: number; host: string }, time
 // close() also stops the checks that cut a slow client, so a client stalled in its headers would hold
 // the drain for ever: whatever is still open once a request's time is up is cut.
 export function stop(server: Server, done: () => void, ms = TIMEOUTS.request): void {
-  server.close(() => {
-    done();
-  });
+  server.close(done);
   setTimeout(() => {
     server.closeAllConnections();
   }, ms).unref();
