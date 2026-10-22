@@ -726,7 +726,7 @@ CLIENT
 		[ -z "$bot" ] || break
 		sleep 2
 	done
-	[ -n "$bot" ] || fail "no bot in #earth after 30 s: the server's link to Ergo (its oper password, ERGO_HOST)"
+	[ -n "$bot" ] || fail "no bot in #earth after 15 tries, about 90 s: the server's link to Ergo (its oper password, ERGO_HOST)"
 	room="#made$(od -An -N2 -tu2 /dev/urandom | tr -d ' ')"
 	marker="marker-$(openssl rand -hex 4)"
 	# An operator makes a room and speaks in it, and stays while a guest comes: its history, its default modes.
