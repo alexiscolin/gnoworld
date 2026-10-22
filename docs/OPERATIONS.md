@@ -183,8 +183,11 @@ Slice 3, the bot acts and the stream (3j):
 - **The catch-up.** After a reconnect or a restart the bot asks each room's history from the time of
   the last line it settled in a row, 50 at a time, each page once the check's queue is empty. Not
   caught up: a line the full queue drops (the log says so), a line left unchecked by a provider
-  outage (its previews wait), a room's first lines said while the link was down, and a line said in
-  the same millisecond as a page's last one.
+  outage (its previews wait), a room's first lines said while the link was down, and, past a full
+  page of 50 lines all in one millisecond, the rest of that millisecond (each next page starts in its
+  last line's millisecond, F542).
+- **A hide Ergo refuses** raises the alert `redact_refused`; its verdict still says hidden, the line
+  stays shown, and the author's notice and strike stand: the alert is for ops to look.
 - **`GET /api/stream`** is public: 25 rooms a stream, 4 streams a visitor, 1,000 in all, a beat every
   15 s, a client 64 events behind dropped; each room's last 64 events are kept, which a new client gets
   and a client coming back gets after its `Last-Event-ID`. nginx must not buffer it (3e).
