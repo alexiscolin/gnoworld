@@ -10,7 +10,7 @@ import { openDatabase } from "../db.ts";
 import { logger } from "../log.ts";
 import { wallet, type Wallet } from "../testing/signer.ts";
 import { LOGIN_TABLES, makeLogin } from "./login.ts";
-import { loginRoutes } from "./routes.ts";
+import { loginFrom, loginRoutes } from "./routes.ts";
 
 // Written out, not imported: a cookie that loses its __Host- prefix must fail here.
 const SESSION = "__Host-session";
@@ -611,5 +611,54 @@ describe("the routes", () => {
       ]),
     );
     expect(app.routes.filter(({ path }) => /(^|\/)admin(\/|$)/i.test(path))).toEqual([]);
+  });
+});
+
+describe("the login from the settings", () => {
+  const SETTINGS = { chains: ["onyx-1"], origins: [ORIGIN], trustedProxy: undefined, newAccountsPerHour: 5 };
+  const mount = (settings: Partial<typeof SETTINGS> = {}, clock?: { now: number }) => {
+    const db = openDatabase(":memory:", [LOGIN_TABLES]);
+    opened.push(db);
+    const log = logger(PEPPER, () => true);
+    const app = makeApp(log, () => true);
+    const options = clock === undefined ? { log } : { log, now: () => clock.now };
+    app.route("/api/login", loginFrom(db, { ...SETTINGS, ...settings }, options));
+    return app;
+  };
+
+  it("asks for a chain of its settings only", async () => {
+    const app = mount({ chains: ["test-5"] });
+    expect(await answer(await post(app, "challenge", { body: { chainId: "onyx-1" } }))).toEqual([400, REFUSED]);
+    expect((await post(app, "challenge", { body: { chainId: "test-5" } })).status).toBe(200);
+  });
+
+  it("makes as many new accounts an hour as its settings say", async () => {
+    const app = mount({ newAccountsPerHour: 1 });
+    expect((await login(app)).status).toBe(200);
+    expect(await answer(await login(app))).toEqual([429, TOO_MANY]);
+  });
+
+  it("ends a nonce by the clock it is given", async () => {
+    const clock = { now: T0 };
+    const app = mount({}, clock);
+    const made = await challenge(app);
+    clock.now += 5 * MINUTE;
+    expect(await answer(await verify(app, made, { who: wallet() }))).toEqual([400, REFUSED]);
+  });
+
+  it("frees a visitor's limit by the clock it is given", async () => {
+    const clock = { now: T0 };
+    const app = mount({}, clock);
+    for (let call = 0; call < 10; call += 1) await challenge(app);
+    expect(await answer(await post(app, "challenge", { body: { chainId: "onyx-1" } }))).toEqual([429, TOO_MANY]);
+    clock.now += MINUTE;
+    await challenge(app);
+  });
+
+  it("keeps the system's time by default", async () => {
+    const before = Date.now();
+    const { expiresAt } = await challenge(mount());
+    expect(Date.parse(expiresAt)).toBeGreaterThanOrEqual(before + 5 * MINUTE);
+    expect(Date.parse(expiresAt)).toBeLessThanOrEqual(Date.now() + 5 * MINUTE);
   });
 });

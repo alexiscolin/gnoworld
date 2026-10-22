@@ -136,6 +136,26 @@ describe("the server's process", () => {
     }
   });
 
+  it("takes the login's chains and its new accounts an hour from its settings", async () => {
+    const origin = "http://gnoworld.test";
+    const env = { ...settings(), ORIGINS: origin, CHAINS: "test-5", NEW_ACCOUNTS_PER_HOUR: "1" };
+    const port = await listening(start(env));
+    const posted = (path: string, body: unknown): Promise<Response> =>
+      fetch(`http://127.0.0.1:${String(port)}/api/login/${path}`, {
+        method: "POST",
+        headers: { origin, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    expect((await posted("challenge", { chainId: "onyx-1" })).status).toBe(400);
+    const logIn = async (): Promise<number> => {
+      const who = wallet();
+      const made = Challenge.parse(await (await posted("challenge", { chainId: "test-5" })).json());
+      const proof = who.sign("test-5", made.text);
+      return (await posted("verify", { nonce: made.nonce, address: who.address, proof })).status;
+    };
+    expect([await logIn(), await logIn()]).toEqual([200, 429]);
+  });
+
   it("limits login calls per visitor as the trusted proxy names them, over the real connection", async () => {
     const origin = "http://gnoworld.test";
     const port = await listening(start({ ...settings(), ORIGINS: origin, TRUSTED_PROXY: "127.0.0.1" }));
