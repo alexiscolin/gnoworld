@@ -66,6 +66,7 @@ describe("GET /api/activity", () => {
       "public, max-age=5",
     ]);
     expect((await ask("?worlds=nowhere"))[1]).toBe(JSON.stringify({ rooms: [] }));
+    expect((await ask("?worlds=the-moon,bubble"))[0]).toBe(200);
   });
 
   it("answers a room made after the start", async () => {
