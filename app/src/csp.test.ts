@@ -124,6 +124,13 @@ describe("pagesPolicy", () => {
     ["a handler after a slash, which HTML reads as an attribute", ["<img/onerror=a()>"]],
     ["a handler glued to the quote before it", ['<img src="x"onerror=a()>']],
     ["a style glued to a single quote", ["<p id='a'style='color:red'>x</p>"]],
+    ["a handler after a > in a quoted value", ['<img alt="a>b" onerror=x()>']],
+    ["a style after a > in a quoted value", ['<p title="x>" style="color:red">t</p>']],
+    ["a javascript: link", ['<a href="javascript:alert(1)">x</a>']],
+    [
+      "a javascript: link in capitals, after spaces, unquoted",
+      ["<a href= JavaScript:x>x</a>", "<form action=javascript:x>"],
+    ],
   ])("fails the build on %s, which the policy would refuse in the browser", async (_, pages) => {
     await expect(pagesPolicy(pages)).rejects.toThrow(/^csp: /);
   });
@@ -139,6 +146,8 @@ describe("pagesPolicy", () => {
     await expect(pagesPolicy(["<p>onion=3; style=bold</p><script>a()</script>"])).resolves.toContain("'sha256-");
     await expect(pagesPolicy(['<p stylex="1">x</p><script>a()</script>'])).resolves.toContain("'sha256-");
     await expect(pagesPolicy(['<p title="<style>">x</p><script>a()</script>'])).resolves.toContain("'sha256-");
+    await expect(pagesPolicy(['<script>const s = "<a onclick=";</script>'])).resolves.toContain("'sha256-");
+    await expect(pagesPolicy(['<a href="/javascript:x">x</a><script>a()</script>'])).resolves.toContain("'sha256-");
   });
 });
 
