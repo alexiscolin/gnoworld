@@ -114,7 +114,7 @@ def writes_gno(words, text):
     program = os.path.basename(words[0])
     if program in WRITERS or (program in ("sed", "perl") and any(w.startswith("-i") for w in words)):
         targets += words[1:]
-    return any(t.endswith(".gno") for t in targets) or (program in INTERPRETERS and ".gno" in text)
+    return any(t.endswith(".gno") for t in targets) or (program in INTERPRETERS and re.search(r"\.gno\b", text) is not None)
 
 
 def ready_for_gno(transcript):

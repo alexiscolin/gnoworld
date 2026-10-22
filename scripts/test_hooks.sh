@@ -1175,6 +1175,11 @@ sh_ 'echo `gnokey list`' 2
 sh_ "git commit-tree HEAD^{tree} -m x" 2
 sh_ "python3 -c \"open('gno/r/x/x.gno','w').write('package x')\"" 2
 sh_ "node -e \"require('fs').writeFileSync('x.gno', '')\"" 2
+sh_ "node -e \"require('fs').writeFileSync(process.argv[1], '')\" x.gno" 2
+sh_ "node -e \"require('net').connect(6667, 'irc.gnoworld.test')\"" 0
+sh_ "node -e \"require('net').connect(6667, 'irc.gnoworld.test'); require('fs').writeFileSync('x.gno', '')\"" 2
+sh_ "python3 -c \"open('x.gno.bak','w')\"" 2
+sh_ "python3 -c \"open('x.gno_bak','w')\"" 0
 sh_ "python3 -c \"open('gno/r/x/x.gno','w').write('package x')\"" 0 "$t/skilled.jsonl"
 sh_ "git commit -m 'note: --no-verify is refused'" 0
 sh_ "GIT_PAGER=cat git log -n 3" 0
