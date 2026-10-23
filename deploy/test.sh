@@ -385,18 +385,45 @@ elif [ "${1:-}" != --demo ]; then
 	expect "git tracks nothing in deploy/secrets" "$(git -C "$repo" ls-files deploy/secrets)" ""
 	if grep -qx 'deploy/secrets' "$repo/.dockerignore"; then pass "the build leaves deploy/secrets out"; else fail "the build would send deploy/secrets"; fi
 	if grep -qF 'Read(/deploy/secrets/**)' "$repo/.claude/settings.json"; then pass "Claude Code may not read the secrets"; else fail "Claude Code may read the secrets"; fi
-	# The load runs never beside the demo (deploy/k6/run.sh, 3n-b): a Docker that lists a demo container, and
-	# answers nothing else, stops it before it makes anything.
+	# deploy/k6/run.sh against a Docker that answers as a stack would and logs each call (3n-b): it never starts
+	# beside the demo, and a run stopped in a scenario leaves nothing behind (F642).
 	mkdir "$tmp/fake"
-	printf '#!/bin/sh\ncase "$*" in "ps -q --filter label=com.docker.compose.project=gnoworld-demo") echo d3m0 ;; *) exit 9 ;; esac\n' >"$tmp/fake/docker"
+	cat >"$tmp/fake/docker" <<'FAKE'
+#!/bin/sh
+printf '%s\n' "$*" >>"$FAKE_LOG"
+case "$*" in
+"ps -q --filter label=com.docker.compose.project=gnoworld-demo") [ -z "${FAKE_DEMO:-}" ] || echo d3m0 ;;
+"compose "*" ps -q "*) echo c0ntainer ;;
+"inspect "*) echo 1mage ;;
+*" /k6/load.js") sleep 4 ;;
+esac
+FAKE
 	chmod 755 "$tmp/fake/docker"
+	# exec: the run is the process its caller signals, not a shell around it.
+	load() { exec env FAKE_LOG="$tmp/fake.log" PATH="$tmp/fake:$PATH" FAKE_DEMO="$1" sh "$here/k6/run.sh" "$2"; }
+	: >"$tmp/fake.log"
 	code=0
-	PATH="$tmp/fake:$PATH" sh "$here/k6/run.sh" >"$tmp/load.log" 2>&1 || code=$?
-	if [ "$code" = 2 ] && grep -q 'the demo runs on this host' "$tmp/load.log"; then
-		pass "the load runs refuse to start beside the demo"
+	(load yes all) >"$tmp/load.log" 2>&1 || code=$?
+	if [ "$code" = 2 ] && grep -q 'the demo runs on this host' "$tmp/load.log" && ! grep -q '^compose ' "$tmp/fake.log"; then
+		pass "the load runs refuse to start beside the demo, before making anything"
 	else
 		fail "the load runs start beside the demo (exit $code)"
 	fi
+	# Stopped by TERM (a shell in the background ignores INT), it removes its project, its folder, which holds the
+	# operator's key, and its sampler.
+	: >"$tmp/fake.log"
+	(load "" logins) >"$tmp/load.log" 2>&1 &
+	running=$!
+	for _ in 1 2 3 4 5 6 7 8 9 10; do grep -q '/k6/load.js$' "$tmp/fake.log" && break || sleep 1; done
+	kill -TERM "$running"
+	wait "$running" || true
+	sleep 3
+	sampled=$(grep -c '^stats ' "$tmp/fake.log" || true)
+	sleep 3
+	folder=$(sed -n 's#.* -v \([^ ]*\)/out:/k6:ro .*#\1#p' "$tmp/fake.log" | head -n 1)
+	expect "a stopped load run removes its project" "$(sed -n '/\/k6\/load.js$/,$p' "$tmp/fake.log" | grep -c '^compose .* down -v$' || true)" 1
+	expect "and its folder, the operator's key with it" "$([ -n "$folder" ] && [ ! -e "$folder" ] && echo gone)" gone
+	expect "and stops its sampler" "$(grep -c '^stats ' "$tmp/fake.log" || true)" "$sampled"
 
 	password=$(openssl rand -hex 16)
 	htpasswd -nbB team "$password" | grep . >"$tmp/htpasswd"

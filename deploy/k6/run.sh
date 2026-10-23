@@ -28,18 +28,23 @@ for tool in docker openssl htpasswd; do command -v "$tool" >/dev/null || missing
 [ -z "$(docker ps -q --filter label=com.docker.compose.project=gnoworld-demo)" ] ||
 	missing "the demo runs on this host: stop it first (ADR-0002: load tests never run on it)"
 
-tmp=$(mktemp -d)
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/gnoworld-load.XXXXXX")
 files="-f $deploy/compose.yaml -f $tmp/load.yaml"
 cleanup() {
+	kill "${sampler:-}" 2>/dev/null || true
 	docker compose -p "$project" $files down -v >/dev/null 2>&1 || echo "run.sh: docker compose -p $project down -v" >&2
 	rm -r "$tmp"
 }
 trap cleanup EXIT
+# dash runs no EXIT trap when a signal ends it: a signal ends the run through exit, so cleanup runs (F642).
+trap 'exit 130' INT
+trap 'exit 143' TERM
 # The stack's own secrets; OpenAI's key the operator's, if given.
 htpasswd -nbB team "$(openssl rand -hex 16)" | grep . >"$tmp/htpasswd"
 printf 'not a key\n' >"$tmp/ts_authkey"
 for secret in ergo_oper_password log_pepper openai_api_key; do openssl rand -hex 24 >"$tmp/$secret"; done
-[ -z "${OPENAI_API_KEY_FILE:-}" ] || cat "$OPENAI_API_KEY_FILE" >"$tmp/openai_api_key" # a copy keeps a 0600 mode
+# cat, not cp: a copy would keep the key's own 0600, which the server's user cannot read; the folder is 0700.
+[ -z "${OPENAI_API_KEY_FILE:-}" ] || cat "$OPENAI_API_KEY_FILE" >"$tmp/openai_api_key"
 export DEMO_HTPASSWD_FILE="$tmp/htpasswd" TS_AUTHKEY_FILE="$tmp/ts_authkey" ERGO_OPER_PASSWORD_FILE="$tmp/ergo_oper_password"
 export LOG_PEPPER_FILE="$tmp/log_pepper" OPENAI_API_KEY_FILE="$tmp/openai_api_key"
 export ORIGINS=http://gnoworld.test SERVER_NAME=irc.gnoworld.test INSIDE_SUBNET=172.30.91.0/24 WEB_ADDRESS=172.30.91.10
