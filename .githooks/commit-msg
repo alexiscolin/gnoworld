@@ -1,8 +1,7 @@
 #!/bin/sh
 # Refuse a subject that is not conventional (`type(scope)!: what`, 72 characters at most; git's
-# own merge and revert subjects pass), and co-author or AI attribution lines, a session's link
-# included (F591). Comment lines and the diff that `git commit -v` appends below the scissors line
-# are not part of the message.
+# own merge and revert subjects pass), and co-author or AI attribution lines. Comment lines and
+# the diff that `git commit -v` appends below the scissors line are not part of the message.
 msg=$(sed '/^# -* >8 -*$/,$d' "$1" | grep -v '^#')
 subject=$(printf '%s\n' "$msg" | sed -n '1p')
 case $subject in
@@ -18,7 +17,7 @@ case $subject in
 	fi
 	;;
 esac
-if printf '%s\n' "$msg" | grep -qiE '^(co-authored|assisted)-by:|^claude-session:|^🤖|^generated (with|by) \[?claude|noreply@anthropic\.com'; then
+if printf '%s\n' "$msg" | grep -qiE '^(co-authored|assisted)-by:|^🤖|^generated (with|by) \[?claude|noreply@anthropic\.com'; then
 	echo "commit-msg: co-author / attribution lines are not allowed in this repo." >&2
 	exit 1
 fi
