@@ -325,9 +325,11 @@ elif scenario messages; then
 	during k6 messages || missed=1
 	after=$(volume)
 	echo "ergo's volume: ${before} bytes before, ${after} after"
-	docker exec "$server" /nodejs/bin/node -e '
-const db = new (require("node:sqlite").DatabaseSync)("/data/gnoworld.db", { readOnly: true });
-console.log("verdicts:", JSON.stringify(db.prepare("SELECT action, count(*) AS n FROM verdicts GROUP BY action").all()));'
 	echo "moderation backlog alerts: $(docker logs "$server" 2>&1 | grep -c '"moderation_backlog"' || true)"
+	# The server holds its database alone (server/src/db.ts, EXCLUSIVE): read once it has stopped.
+	docker stop "$server" >/dev/null
+	docker run --rm --volumes-from "$server" --entrypoint /nodejs/bin/node "$server_image" -e '
+const db = new (require("node:sqlite").DatabaseSync)("/data/gnoworld.db");
+console.log("verdicts:", JSON.stringify(db.prepare("SELECT action, count(*) AS n FROM verdicts GROUP BY action").all()));'
 fi
 exit "$missed"
