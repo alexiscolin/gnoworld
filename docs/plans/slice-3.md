@@ -811,6 +811,10 @@ go out with the JOINs, before any read.
 **As built** (`docs/decisions.md`, 2026-10-22, 3n's split): 3n-a is the server's retention, the verdicts
 by days and a row cap, the database's used pages, the alerts; 3n-b, the k6 scripts, `web`'s limits, Ergo's
 volume and the sizes from the runs, waits for 3e's stack, since 3e goes last.
+3n-b (`docs/decisions.md`, 2026-10-23, 3n-b's shapes): Ergo's folder measured read-only against
+`ERGO_DATA_MB` (1024), its two alerts; `web`'s 32 held requests a visitor, 4,096 connections, waits of 10 s and
+15 s idle; `deploy/k6/run.sh` for the operator; `check_docs.py` keeps the runbook's alerts whole. **The first
+numbers** (the operator's run, then the sizes above adjusted): not yet.
 
 **Tests by level.** Unit with the clock, property, operator's load runs. **Cost and scale.** One indexed query a
 tick. **Files.** New: `server/src/retention/`, `deploy/k6/`; changed: `deploy/web/nginx.conf`, `deploy/test.sh`,
