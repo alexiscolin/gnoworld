@@ -47,10 +47,11 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
 6. **A push of a work branch.** `pre-push` wants the checked-out commit with nothing
    uncommitted, a gate that passed on its code (in the sandbox it runs it; in Alexis's shell it
    reads the record), and scans the history for secrets.
-7. **Before a merge.** `/pre-merge` runs the full gate, the `test-auditor`'s green pass on the
-   mutation survivors, `/simplify` and the gate again, then `/code-review` and the
+7. **Before a merge.** `/pre-merge` runs the fast gate and StrykerJS, the `test-auditor`'s green pass
+   on the mutation survivors, `/simplify` and the fast gate again, then `/code-review` and the
    `complexity-reviewer` together, with `/security-review` for a tier-1 or harness change and
-   the `security-reviewer` for a tier-1 one; each merge in its own session (`docs/REVIEW.md`).
+   the `security-reviewer` for a tier-1 one, and the full gate once, on the final code (Alexis,
+   2026-10-23); each merge in its own session (`docs/REVIEW.md`).
    The `finding-verifier` tries to refute each tier-1 finding, then to reproduce it; each is
    then fixed or put to Alexis, and written to `docs/review/findings.md`. Three review rounds at most per branch. Then it records a review
    pass (`scripts/review_pass.py`).
