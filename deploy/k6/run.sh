@@ -137,16 +137,21 @@ const mine = () => {
 };
 
 // One IRC connection through Ergo's WebSocket, as the visitor at `ip`: `on.line` sees each line Ergo sends, and
-// `on.close` whether the connection had reached its goal.
+// `on.close` whether the connection had reached its goal. One still open a minute past the hold is closed, so
+// every connection is counted, a stuck one as missed (F635).
 const irc = (ip, first, on) => {
   const ws = new WebSocket(ERGO, null, { headers: { Origin: ORIGIN, "X-Forwarded-For": ip } });
+  const deadline = setTimeout(() => ws.close(), (HOLD + 60) * 1000);
   ws.onopen = () => first.forEach((line) => ws.send(line));
   ws.onmessage = (event) => {
     const line = String(event.data);
     if (line.startsWith("PING ")) ws.send(`PONG ${line.slice(5)}`);
     else on.line(line, ws);
   };
-  ws.onclose = () => on.close();
+  ws.onclose = () => {
+    clearTimeout(deadline);
+    on.close();
+  };
   return ws;
 };
 
@@ -251,9 +256,11 @@ const read = async (i) => {
   }
   if (beat) held += 1;
 };
-Promise.all(Array.from({ length: count }, (_, i) => read(i))).then(() =>
-  console.log(`streams that answered and beat: ${String(held)} of ${String(count)}`),
-);
+// As k6's checks: 99% of them, or the run says a threshold was missed (F635).
+Promise.all(Array.from({ length: count }, (_, i) => read(i))).then(() => {
+  console.log(`streams that answered and beat: ${String(held)} of ${String(count)}`);
+  process.exit(held >= count * 0.99 ? 0 : 1);
+});
 STREAMS
 chmod 644 "$tmp/out"/*
 k6() {
@@ -286,7 +293,7 @@ fi
 if scenario "${1:-all}" streams; then
 	echo "== streams: $STREAMS readers of #earth's stream for $HOLD s, four a visitor"
 	during docker run --rm --network "$inside" --ip "$load" -v "$tmp/out:/k6:ro" --entrypoint /nodejs/bin/node "$server_image" \
-		/k6/streams.cjs "$STREAMS" "$HOLD"
+		/k6/streams.cjs "$STREAMS" "$HOLD" || missed=1
 fi
 if scenario "${1:-all}" messages; then
 	before=$(volume)
