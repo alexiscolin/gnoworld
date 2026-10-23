@@ -392,17 +392,17 @@ touch "$d/.stryker-tmp/x/app/src/orphan.test.ts" "$d/app/src/routes/__snapshots_
 python3 -I "$docs" "$d" >/dev/null 2>&1 || fail "check_docs read a folder git ignores, or a snapshot, as tests"
 rm -r "$d/.stryker-tmp" "$d/app/src/routes/__snapshots__" "$d/app/src/routes/home.test.data.ts"
 rm -r "$d/app" "$d/packages"
-# Every alert the server logs is named in the runbook, which ops matches (slice 3's plan, 3n): a logged
-# one and a watched one, a test's ignored, both quoted.
+# Every alert the server logs is named in the runbook, which ops matches (slice 3's plan, 3n): each one, a
+# test's ignored, quoted.
 mkdir -p "$d/server/src"
-printf 'log("alert", { error: "disk_full" });\nwatch("rows_near_cap", 1, 2);\n' >"$d/server/src/job.ts"
+printf 'log("alert", { error: "disk_full" });\nlog("alert", { error: "rows_near_cap" });\n' >"$d/server/src/job.ts"
 printf 'log("alert", { error: "only_in_a_test" });\n' >"$d/server/src/job.test.ts"
 printf 'The alerts: `disk_full`, `rows_near_cap`.\n' >"$d/docs/OPERATIONS.md"
 python3 -I "$docs" "$d" >/dev/null 2>&1 || fail "check_docs refused a runbook naming every alert"
 printf 'The alerts: `disk_full`.\n' >"$d/docs/OPERATIONS.md"
-python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted a watched alert the runbook leaves out"
+python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted an alert the runbook leaves out"
 printf 'The alerts: `rows_near_cap`, and disk_full unquoted.\n' >"$d/docs/OPERATIONS.md"
-python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted a logged alert the runbook leaves out"
+python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted an alert the runbook names unquoted"
 # Each spelling Prettier and people write (F637): across lines, the name after another key, single quotes;
 # and a name the check cannot read (a variable) is refused rather than passed over.
 printf 'log(\n  "alert",\n  { room, error: "split_name" },\n);\nlog('"'"'alert'"'"', { error: '"'"'quoted_name'"'"' });\n' >"$d/server/src/job.ts"

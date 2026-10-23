@@ -71,21 +71,18 @@ tests = [p for p in listed(root, {".ts", ".tsx"}) if re.search(r"\.test\.tsx?$",
 orphans = [t.relative_to(root) for t in tests if not any(t.with_name(t.name.replace(".test.", ".", 1)).with_suffix(s).exists() for s in (".ts", ".tsx"))]
 if orphans:
     print("check_docs: these tests sit beside no file of their name:", *orphans, sep="\n  ", file=sys.stderr)
-# Every alert the server logs is named, quoted, in the runbook ops matches (slice 3's plan, 3n): a call's
-# log("alert", { ..., error: "x" }) however it is laid out, and the retention's watch("x", ...); a test's are no
-# alerts. A call whose name is no literal, but the retention's own `name`, cannot be read: it fails (F637).
+# Every alert the server logs is named, quoted, in the runbook ops matches (slice 3's plan, 3n): each call's
+# log("alert", { ..., error: "x" }), however it is laid out; a test's are no alerts. A call whose name is no
+# literal cannot be read: it fails (F637).
 call = re.compile(r"""log\(\s*["']alert["']""")
-body = re.compile(r"""log\(\s*["']alert["']\s*,\s*\{([^}]*)\}""")
-literal = re.compile(r"""\berror:\s*["']([a-z_]+)["']""")
-watched = re.compile(r"""watch\(\s*["']([a-z_]+)["']""")
+named = re.compile(r"""log\(\s*["']alert["']\s*,\s*\{[^}]*?\berror:\s*["']([a-z_]+)["']""")
 sources = [p for p in listed(root, {".ts"}) if p.relative_to(root).parts[:2] == ("server", "src") and ".test." not in p.name]
 alerts, unread = set(), []
 for p in sources:
     text = p.read_text()
-    alerts |= set(watched.findall(text))
-    read = [b for b in body.findall(text) if literal.search(b) or re.fullmatch(r"\s*error:\s*name\s*", b)]
-    alerts |= {m.group(1) for b in read if (m := literal.search(b))}
-    if len(call.findall(text)) > len(read):
+    found = named.findall(text)
+    alerts |= set(found)
+    if len(call.findall(text)) > len(found):
         unread.append(str(p.relative_to(root)))
 runbook = root / "docs/OPERATIONS.md"
 known = runbook.read_text() if runbook.is_file() else ""
