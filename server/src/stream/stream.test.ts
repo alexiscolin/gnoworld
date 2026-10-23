@@ -333,6 +333,33 @@ describe("the verdicts' stream, rooms by role (3m)", () => {
   });
 });
 
+describe("the verdicts' stream when the reader's session cannot be read (F653)", () => {
+  it("answers 500, logged, and holds no slot, so a fault that ends frees every visitor", async () => {
+    const stream = makeStream();
+    streams.push(stream);
+    const lines: string[] = [];
+    const app = makeApp(
+      logger("a-pepper-of-forty-characters-0123456789", (line) => lines.push(line)),
+      () => true,
+    );
+    let failing = true;
+    const session = (): string | undefined => {
+      if (failing) throw new Error("attempt to write a readonly database");
+      return undefined;
+    };
+    app.route("/api/stream", stream.routes({ proxy: undefined, visible: () => true, session }));
+    const ask = () => app.request("/api/stream?rooms=%23bubble", {}, { incoming: { socket: { remoteAddress: PEER } } });
+    // Past the 4 streams a visitor holds: none of them may stay taken.
+    for (let i = 0; i < 5; i += 1) expect((await ask()).status).toBe(500);
+    expect(stream.size()).toMatchObject({ clients: 0, visitors: 0 });
+    expect(lines.filter((line) => line.includes('"event":"failed"'))).toHaveLength(5);
+    failing = false;
+    const back = await ask();
+    expect(back.status).toBe(200);
+    await back.body?.cancel();
+  });
+});
+
 describe("the verdicts' stream's replay, rooms by role (3m)", () => {
   it("replays a members room's events to whom may read it, never to a late guest or one coming back", async () => {
     const stream = makeStream();
