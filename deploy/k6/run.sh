@@ -2,7 +2,7 @@
 # deploy/k6/run.sh: slice 3's first load runs (docs/plans/slice-3.md, 3n), on the operator's host with Docker,
 # which Claude Code's sandbox refuses. A stack of its own in a throwaway project, never the demo (ADR-0002: load
 # tests never run on it), driven from inside its internal network: k6 for the logins, Ergo's crowd and the
-# messages, curl for the streams (k6 reads a response whole, and a stream never ends). It prints k6's summaries,
+# messages, Node for the streams (k6 reads a response whole, and a stream never ends). It prints k6's summaries,
 # each container's memory and CPU at the peak, Ergo's volume and the verdicts, then removes the project.
 #   sh deploy/k6/run.sh             every scenario, at its default size
 #   sh deploy/k6/run.sh messages    one: logins, crowd, streams or messages
@@ -14,7 +14,6 @@ umask 022 # what the run writes, the containers' users read
 deploy=$(cd "$(dirname "$0")/.." && pwd)
 repo=$(dirname "$deploy")
 K6=grafana/k6:2.3.0@sha256:9c2dee7f8ed74d317e4027c06a10f169b625638189de8d4555d0b3486a5aeb34
-CURL=curlimages/curl:8.23.0@sha256:a134550be58ab783810e613ae96fd253c38f7bdd16d9bf9be350700c7a29ac06
 project=gnoworld-load
 ACCOUNTS=${ACCOUNTS:-200} CROWD=${CROWD:-2000} STREAMS=${STREAMS:-1000} HOLD=${HOLD:-60} RATE=${RATE:-5}
 missing() {
@@ -260,13 +259,19 @@ let held = 0;
 const read = async (i) => {
   const visitor = Math.floor(i / 4);
   const ip = `198.20.${String(Math.floor(visitor / 250))}.${String((visitor % 250) + 1)}`;
+  // A heartbeat is a line that starts with ":", wherever the chunks part it (F648).
   let beat = false;
+  let last = "\n";
   try {
     const answer = await fetch(`${process.env.SERVER ?? "http://server:8080"}/api/stream?rooms=%23earth`, {
       headers: { "x-real-ip": ip },
       signal: AbortSignal.timeout(hold * 1000),
     });
-    for await (const chunk of answer.body) beat ||= answer.status === 200 && Buffer.from(chunk).toString().startsWith(":");
+    for await (const chunk of answer.body) {
+      const text = last + Buffer.from(chunk).toString();
+      beat ||= answer.status === 200 && text.includes("\n:");
+      last = text.slice(-1);
+    }
   } catch {
     // The hold's end aborts the stream; a refused or broken one never beat.
   }
