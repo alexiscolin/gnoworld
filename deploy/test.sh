@@ -906,7 +906,7 @@ setTimeout(() => {
 	mounted() { docker inspect --format "{{range .Mounts}}{{if eq .Destination \"$2\"}}{{.Name}}{{end}}{{end}}" "$1"; }
 	expect "and it is Ergo's own volume" "$(mounted "$server" /ergo) $(mounted "$ergo" /data)" "${project}_ergo ${project}_ergo"
 	# Connections that send nothing more are closed (F208): headers never ended, a body never sent, a kept-alive
-	# connection left idle; each one's seconds until web closed it, all three at once.
+	# connection left idle; each one's seconds until web closed it, printed as it closes (F639).
 	timed=$(docker run --rm --network "$inside" --entrypoint /nodejs/bin/node "$server_image" -e '
 const net = require("node:net");
 const started = Date.now();
@@ -917,20 +917,23 @@ const probe = (name, text) =>
     const socket = net.connect(8080, "web", () => socket.write(text));
     socket.on("data", () => {});
     socket.on("error", () => {});
-    socket.on("close", () => resolve(`${name}=${Math.round((Date.now() - started) / 1000)}`));
+    socket.on("close", () => {
+      console.log(`${name}=${String(Math.round((Date.now() - started) / 1000))}`);
+      resolve();
+    });
   });
 Promise.all([
   probe("headers", `${proxy("203.0.113.63")}GET / HTTP/1.1\r\nHost: web\r\n`),
   probe("body", `${proxy("203.0.113.64")}POST /api/login/challenge HTTP/1.1\r\nHost: web\r\nAuthorization: ${auth}\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{`),
   probe("idle", `${proxy("203.0.113.65")}GET / HTTP/1.1\r\nHost: web\r\nAuthorization: ${auth}\r\n\r\n`),
-]).then((closed) => console.log(closed.join(" ")));
+]).then(() => process.exit(0));
 setTimeout(() => {
   console.log("still open after 40 s");
   process.exit(0);
 }, 40_000).unref();' "$auth" 2>&1 || true)
 	closes() { # $1 the probe, $2 the seconds web waits, $3 what the connection did
-		seconds=$(printf '%s\n' "$timed" | tr ' ' '\n' | sed -n "s/^$1=//p")
-		if [ -n "$seconds" ] && [ "$seconds" -ge "$2" ] && [ "$seconds" -le $(($2 + 2)) ]; then
+		seconds=$(printf '%s\n' "$timed" | sed -n "s/^$1=//p")
+		if [ -n "$seconds" ] && [ "$seconds" -ge "$2" ] && [ "$seconds" -le $(($2 + 1)) ]; then
 			pass "web closes a connection that $3 after $2 s"
 		else
 			fail "web closes a connection that $3 after $2 s: [$timed]"
