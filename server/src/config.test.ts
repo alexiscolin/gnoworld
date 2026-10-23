@@ -189,13 +189,13 @@ describe("loadConfig", () => {
     const env = {
       ...ENV,
       OPENAI_API_KEY_FILE: file("openai", `${key}\n`),
-      MODERATION_THRESHOLDS: '{"harassment":0.9,"sexual/minors":0}',
+      MODERATION_THRESHOLDS: '{"harassment":0.9,"sexual/minors":0.01}',
       NEW_ACCOUNT_HOURS: "720",
     };
     const { openaiKey, ...rest } = loadConfig(env).moderation;
     expect([openaiKey?.reveal(), rest]).toEqual([
       key,
-      { thresholds: { harassment: 0.9, "sexual/minors": 0 }, newAccountHours: 720, mute: MUTE },
+      { thresholds: { harassment: 0.9, "sexual/minors": 0.01 }, newAccountHours: 720, mute: MUTE },
     ]);
   });
 
@@ -246,12 +246,11 @@ describe("loadConfig", () => {
     expect(loadConfig(low).moderation.mute).toEqual({ strikes: 1, windowMinutes: 1, minutes: 1, max: 1 });
   });
 
-  it("takes a new account's hours from 1, and thresholds of exactly 0 and 1", () => {
+  it("takes a new account's hours from 1, and thresholds just above 0 and of exactly 1", () => {
     expect(loadConfig({ ...ENV, NEW_ACCOUNT_HOURS: "1" }).moderation.newAccountHours).toBe(1);
-    expect(loadConfig({ ...ENV, MODERATION_THRESHOLDS: '{"hate":0,"violence":1}' }).moderation.thresholds).toEqual({
-      hate: 0,
-      violence: 1,
-    });
+    expect(
+      loadConfig({ ...ENV, MODERATION_THRESHOLDS: '{"hate":0.000001,"violence":1}' }).moderation.thresholds,
+    ).toEqual({ hate: 0.000001, violence: 1 });
   });
 
   it("never shows OpenAI's key when the settings are printed", () => {
