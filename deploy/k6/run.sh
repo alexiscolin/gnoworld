@@ -53,7 +53,16 @@ inside=${project}_inside
 of() { docker compose -p "$project" $files ps -q "$1"; }
 ergo=$(of ergo) server=$(of server)
 server_image=$(docker inspect --format '{{.Image}}' "$server")
-peak() { docker stats --no-stream --format '{{.Name}} {{.MemUsage}} {{.CPUPerc}}' "$ergo" "$server" "$(of web)" | sed 's/^/peak  /'; }
+# Ergo's and the server's memory and CPU at their most during a run, sampled every 2 s (web stands aside: the load
+# goes to them straight).
+peak() {
+	awk '{ mem = $2; unit = mem; sub(/^[0-9.]+/, "", unit); sub(/[A-Za-z]+$/, "", mem)
+		mib = unit == "GiB" ? mem * 1024 : unit == "KiB" ? mem / 1024 : unit == "B" ? mem / 1048576 : mem
+		cpu = $NF; sub(/%/, "", cpu)
+		if (mib + 0 > m[$1] + 0) m[$1] = mib
+		if (cpu + 0 > c[$1] + 0) c[$1] = cpu }
+		END { for (n in m) printf "peak  %s %.0f MiB, %s%% CPU\n", n, m[n], c[n] }' "$tmp/stats"
+}
 volume() { docker exec "$ergo" du -sk /data | awk '{ print $1 }'; }
 
 # The accounts, each logged in as a person is, from an address of its own, with the tests' wallet.
@@ -251,19 +260,24 @@ k6() {
 	docker run --rm --network "$inside" --ip "$load" -v "$tmp/out:/k6:ro" -e SCENARIO="$1" -e ORIGIN="$ORIGINS" \
 		-e HOLD="$HOLD" -e RATE="$RATE" -e CROWD="$CROWD" "$K6" run --quiet /k6/load.js
 }
-# A scenario in the background, the containers' peak sampled halfway through its hold.
+# A scenario, the containers sampled all through it; its own exit code.
 during() {
-	"$@" &
-	running=$!
-	sleep $((HOLD / 2 + 5))
+	while :; do
+		docker stats --no-stream --format '{{.Name}} {{.MemUsage}} {{.CPUPerc}}' "$ergo" "$server"
+		sleep 2
+	done >"$tmp/stats" 2>/dev/null &
+	sampler=$!
+	code=0
+	"$@" || code=$?
+	kill "$sampler"
 	peak
-	wait "$running"
+	return "$code"
 }
 missed=0
 scenario() { [ "${1:-all}" = all ] || [ "$1" = "$2" ]; }
 if scenario "${1:-all}" logins; then
 	echo "== logins: $ACCOUNTS accounts at once, a ticket each, then SASL"
-	k6 logins || missed=1
+	during k6 logins || missed=1
 fi
 if scenario "${1:-all}" crowd; then
 	echo "== crowd: $CROWD guests in #earth for $HOLD s"
