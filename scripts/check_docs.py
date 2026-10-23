@@ -71,10 +71,10 @@ tests = [p for p in listed(root, {".ts", ".tsx"}) if re.search(r"\.test\.tsx?$",
 orphans = [t.relative_to(root) for t in tests if not any(t.with_name(t.name.replace(".test.", ".", 1)).with_suffix(s).exists() for s in (".ts", ".tsx"))]
 if orphans:
     print("check_docs: these tests sit beside no file of their name:", *orphans, sep="\n  ", file=sys.stderr)
-# Every alert the server logs is named, quoted, in the runbook ops matches (slice 3's plan, 3n): each call's
-# log("alert", { ..., error: "x" }), however it is laid out; a test's are no alerts. A call whose name is no
-# literal cannot be read: it fails (F637).
-call = re.compile(r"""log\(\s*["']alert["']""")
+# The alerts the server logs are OPERATIONS.md's "Every alert", which ops matches, both ways (3n; F646): each
+# log("alert", { ..., error: "x" }), however laid out, a test's none. An "alert" written otherwise (a template, a
+# constant) or a name no literal cannot be read: it fails (F637).
+event = re.compile(r"""[`"']alert[`"']""")
 named = re.compile(r"""log\(\s*["']alert["']\s*,\s*\{[^}]*?\berror:\s*["']([a-z_]+)["']""")
 sources = [p for p in listed(root, {".ts"}) if p.relative_to(root).parts[:2] == ("server", "src") and ".test." not in p.name]
 alerts, unread = set(), []
@@ -82,12 +82,15 @@ for p in sources:
     text = p.read_text()
     found = named.findall(text)
     alerts |= set(found)
-    if len(call.findall(text)) > len(found):
+    if len(event.findall(text)) > len(found):
         unread.append(str(p.relative_to(root)))
 runbook = root / "docs/OPERATIONS.md"
-known = runbook.read_text() if runbook.is_file() else ""
-unnamed = sorted(alerts - set(re.findall(r"`([a-z_]+)`", known))) + [f"{f}: an alert whose name is no literal" for f in unread]
+bullet = re.search(r"^- \*\*Every alert\*\*(.*?)(?=^- \*\*|^#|\Z)", runbook.read_text() if runbook.is_file() else "", re.S | re.M)
+listed_alerts = set(re.findall(r"`([a-z_]+)`", bullet.group(1) if bullet else ""))
+unnamed = [f"{a}: logged, not in the alerts list" for a in sorted(alerts - listed_alerts)]
+unnamed += [f"{a}: listed, never logged" for a in sorted(listed_alerts - alerts)]
+unnamed += [f"{f}: an alert whose name is no literal" for f in unread]
 if unnamed:
-    print("check_docs: alerts the server logs that docs/OPERATIONS.md does not name:", *unnamed, sep="\n  ", file=sys.stderr)
+    print("check_docs: the server's alerts and docs/OPERATIONS.md's list of them differ:", *unnamed, sep="\n  ", file=sys.stderr)
 if missing or problems or orphans or unnamed:
     sys.exit(1)

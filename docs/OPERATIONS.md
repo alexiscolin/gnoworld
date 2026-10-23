@@ -293,7 +293,7 @@ Slice 3, the server's retention (3n):
   then.
 - **Logs** have a size and a count (3 × 10 MB a container), no age: decision 154's 14 days hold only
   where ops' log backend sets them.
-- **The alerts**, each a log line `{"event":"alert","error":"<name>"}` that ops matches:
+- **Every alert**, each a log line `{"event":"alert","error":"<name>"}` that ops matches:
   `verdicts_near_cap`, `database_near_cap`, `ergo_volume_near_cap` and `ergo_volume_unreadable` (above);
   `moderation_off` (no key: every message unchecked), `moderation_refused` (OpenAI refused the key or the
   call), `moderation_shape` (an answer of an unknown shape), `moderation_breaker` (checks paused 30 s

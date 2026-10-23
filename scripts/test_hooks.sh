@@ -392,26 +392,36 @@ touch "$d/.stryker-tmp/x/app/src/orphan.test.ts" "$d/app/src/routes/__snapshots_
 python3 -I "$docs" "$d" >/dev/null 2>&1 || fail "check_docs read a folder git ignores, or a snapshot, as tests"
 rm -r "$d/.stryker-tmp" "$d/app/src/routes/__snapshots__" "$d/app/src/routes/home.test.data.ts"
 rm -r "$d/app" "$d/packages"
-# Every alert the server logs is named in the runbook, which ops matches (slice 3's plan, 3n): each one, a
-# test's ignored, quoted.
+# The alerts the server logs are the runbook's list of alerts, which ops matches, both ways (slice 3's plan, 3n;
+# F646): a test's ignored, each quoted in the list's own bullet, a name quoted elsewhere not counting.
 mkdir -p "$d/server/src"
+list() { printf 'Prose quoting `%s` elsewhere.\n\n- **Every alert**: %s.\n- **Next**: none.\n' "${2:-other_name}" "$1" >"$d/docs/OPERATIONS.md"; }
 printf 'log("alert", { error: "disk_full" });\nlog("alert", { error: "rows_near_cap" });\n' >"$d/server/src/job.ts"
 printf 'log("alert", { error: "only_in_a_test" });\n' >"$d/server/src/job.test.ts"
-printf 'The alerts: `disk_full`, `rows_near_cap`.\n' >"$d/docs/OPERATIONS.md"
-python3 -I "$docs" "$d" >/dev/null 2>&1 || fail "check_docs refused a runbook naming every alert"
-printf 'The alerts: `disk_full`.\n' >"$d/docs/OPERATIONS.md"
-python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted an alert the runbook leaves out"
-printf 'The alerts: `rows_near_cap`, and disk_full unquoted.\n' >"$d/docs/OPERATIONS.md"
-python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted an alert the runbook names unquoted"
-# Each spelling Prettier and people write (F637): across lines, the name after another key, single quotes;
-# and a name the check cannot read (a variable) is refused rather than passed over.
+list '`disk_full` (the disk is full), `rows_near_cap` (rows near their cap)'
+python3 -I "$docs" "$d" >/dev/null 2>&1 || fail "check_docs refused a list naming every alert, with its prose"
+list '`disk_full`'
+python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted an alert the list leaves out"
+list '`disk_full`' rows_near_cap
+python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted an alert quoted outside the list only"
+list '`rows_near_cap`, and disk_full unquoted'
+python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted an alert the list names unquoted"
+list '`disk_full`, `rows_near_cap`, `gone_now`'
+python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted a listed alert the server no longer logs"
+# Each spelling Prettier and people write (F637): across lines, the name after another key, single quotes.
 printf 'log(\n  "alert",\n  { room, error: "split_name" },\n);\nlog('"'"'alert'"'"', { error: '"'"'quoted_name'"'"' });\n' >"$d/server/src/job.ts"
-printf 'The alerts: `split_name`, `quoted_name`.\n' >"$d/docs/OPERATIONS.md"
+list '`split_name`, `quoted_name`'
 python3 -I "$docs" "$d" >/dev/null 2>&1 || fail "check_docs refused alerts written across lines or in single quotes"
-printf 'The alerts: `quoted_name`.\n' >"$d/docs/OPERATIONS.md"
-python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted an alert written across lines the runbook leaves out"
-printf 'const which = "hidden_name";\nlog("alert", { error: which });\n' >"$d/server/src/job.ts"
-python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted an alert whose name it cannot read"
+list '`quoted_name`'
+python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted an alert written across lines the list leaves out"
+# An alert it cannot read is refused rather than passed over (F646): a name in a variable, the event as a
+# template or a constant.
+list none
+for call in 'const which = "hidden_name";\nlog("alert", { error: which });' 'log(`alert`, { error: "tpl_name" });' \
+	'const ALERT = "alert";\nlog(ALERT, { error: "const_name" });'; do
+	printf "$call\n" >"$d/server/src/job.ts"
+	python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted an alert it cannot read: $call"
+done
 rm -r "$d/server" "$d/docs/OPERATIONS.md"
 fi
 
