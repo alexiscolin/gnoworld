@@ -353,6 +353,8 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "the limit answered 503" "the 33rd refused" nginx sed '/limit_conn_status/d'
 	mutant "web's room for 256 connections" "five visitors at their 32 WebSockets each, and a sixth is served" \
 		nginx sed 's#worker_connections [0-9]*;#worker_connections 256;#'
+	mutant "the server may write Ergo's volume" "the server holds Ergo's volume read-only" \
+		compose 'services: { server: { volumes: !override [ "server:/data", "auth:/run/gnoworld", "ergo:/ergo" ] } }'
 	mutant "headers waited for a minute" "web closes a connection that never ends its headers" nginx sed '/client_header_timeout/d'
 	mutant "a body waited for a minute" "web closes a connection that never sends its body" nginx sed '/client_body_timeout/d'
 	mutant "an idle connection kept 75 s" "web closes a connection that stays idle between requests" nginx sed '/keepalive_timeout/d'
@@ -879,6 +881,12 @@ setTimeout(() => {
   process.exit(0);
 }, 7000);' "$auth" "$ORIGINS" 2>&1 || true)
 	expect "five visitors at their 32 WebSockets each, and a sixth is served" "$crowded" "160 200"
+	# The server reads Ergo's volume and never writes it (3n-b): mounted read-only, named, and read with no fault.
+	expect "the server holds Ergo's volume read-only" \
+		"$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/ergo"}}{{.RW}}{{end}}{{end}}' "$server")" false
+	expect "and measures it, ERGO_DATA naming it" \
+		"$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$server" | grep -cx 'ERGO_DATA=/ergo' || true)" 1
+	expect "and reads it: no unreadable alert" "$(docker logs "$server" 2>&1 | grep -c '"ergo_volume_unreadable"' || true)" 0
 	# Connections that send nothing more are closed (F208): headers never ended, a body never sent, a kept-alive
 	# connection left idle; each one's seconds until web closed it, all three at once.
 	timed=$(docker run --rm --network "$inside" --entrypoint /nodejs/bin/node "$server_image" -e '
