@@ -10,6 +10,7 @@
 # OPENAI_API_KEY_FILE names a real key for the messages' checks; without one each check fails, as unchecked.
 # Exit: 0 it ran, 1 k6 found a threshold missed, 2 a tool or a fact is missing, 3 the stack did not start.
 set -eu
+umask 022 # what the run writes, the containers' users read
 deploy=$(cd "$(dirname "$0")/.." && pwd)
 repo=$(dirname "$deploy")
 K6=grafana/k6:2.3.0@sha256:9c2dee7f8ed74d317e4027c06a10f169b625638189de8d4555d0b3486a5aeb34
@@ -20,7 +21,8 @@ missing() {
 	echo "run.sh: $1" >&2
 	exit 2
 }
-case ${1:-all} in all | logins | crowd | streams | messages) ;; *) missing "no such scenario [$1]: logins, crowd, streams or messages" ;; esac
+only=${1:-all}
+case $only in all | logins | crowd | streams | messages) ;; *) missing "no such scenario [$only]: logins, crowd, streams or messages" ;; esac
 for tool in docker openssl htpasswd; do command -v "$tool" >/dev/null || missing "$tool is missing"; done
 # Beside the demo, the load would take its CPU and memory: none of its containers may run on this host.
 [ -z "$(docker ps -q --filter label=com.docker.compose.project=gnoworld-demo)" ] ||
@@ -37,8 +39,7 @@ trap cleanup EXIT
 htpasswd -nbB team "$(openssl rand -hex 16)" | grep . >"$tmp/htpasswd"
 printf 'not a key\n' >"$tmp/ts_authkey"
 for secret in ergo_oper_password log_pepper openai_api_key; do openssl rand -hex 24 >"$tmp/$secret"; done
-[ -z "${OPENAI_API_KEY_FILE:-}" ] || cp "$OPENAI_API_KEY_FILE" "$tmp/openai_api_key"
-chmod 644 "$tmp"/*
+[ -z "${OPENAI_API_KEY_FILE:-}" ] || cat "$OPENAI_API_KEY_FILE" >"$tmp/openai_api_key" # a copy keeps a 0600 mode
 export DEMO_HTPASSWD_FILE="$tmp/htpasswd" TS_AUTHKEY_FILE="$tmp/ts_authkey" ERGO_OPER_PASSWORD_FILE="$tmp/ergo_oper_password"
 export LOG_PEPPER_FILE="$tmp/log_pepper" OPENAI_API_KEY_FILE="$tmp/openai_api_key"
 export ORIGINS=http://gnoworld.test SERVER_NAME=irc.gnoworld.test INSIDE_SUBNET=172.30.91.0/24 WEB_ADDRESS=172.30.91.10
@@ -63,7 +64,8 @@ peak() {
 		if (cpu + 0 > c[$1] + 0) c[$1] = cpu }
 		END { for (n in m) printf "peak  %s %.0f MiB, %s%% CPU\n", n, m[n], c[n] }' "$tmp/stats"
 }
-volume() { docker exec "$ergo" du -sk /data | awk '{ print $1 }'; }
+# Ergo's files' bytes as the server sums them (retention.ts, sizeOf): all but folders, a link as itself.
+volume() { docker exec "$ergo" sh -c 'find /data ! -type d -exec ls -ldn {} \; | awk "{ s += \$5 } END { print s + 0 }"'; }
 
 # The accounts, each logged in as a person is, from an address of its own, with the tests' wallet.
 mkdir -m 777 "$tmp/out"
@@ -94,7 +96,6 @@ times.sort((a, b) => a - b);
 const at = (q: number): string => (times[Math.min(times.length - 1, Math.floor(q * times.length))] ?? 0).toFixed(1);
 console.log(`setup: ${String(accounts.length)} logins one after another, median ${at(0.5)} ms, p95 ${at(0.95)} ms`);
 SETUP
-chmod 644 "$tmp/setup.ts"
 docker run --rm --network "$inside" --ip "$load" -v "$repo/server/src/testing/signer.ts:/app/server/src/testing/signer.ts:ro" \
 	-v "$tmp/setup.ts:/app/server/src/load-setup.ts:ro" -v "$tmp/out:/out" --entrypoint /nodejs/bin/node "$server_image" \
 	/app/server/src/load-setup.ts "$ACCOUNTS" "$ORIGINS"
@@ -262,7 +263,6 @@ Promise.all(Array.from({ length: count }, (_, i) => read(i))).then(() => {
   process.exit(held >= count * 0.99 ? 0 : 1);
 });
 STREAMS
-chmod 644 "$tmp/out"/*
 k6() {
 	docker run --rm --network "$inside" --ip "$load" -v "$tmp/out:/k6:ro" -e SCENARIO="$1" -e ORIGIN="$ORIGINS" \
 		-e HOLD="$HOLD" -e RATE="$RATE" -e CROWD="$CROWD" "$K6" run --quiet /k6/load.js
@@ -281,26 +281,26 @@ during() {
 	return "$code"
 }
 missed=0
-scenario() { [ "${1:-all}" = all ] || [ "$1" = "$2" ]; }
-if scenario "${1:-all}" logins; then
+scenario() { [ "$only" = all ] || [ "$only" = "$1" ]; }
+if scenario logins; then
 	echo "== logins: $ACCOUNTS accounts at once, a ticket each, then SASL"
 	during k6 logins || missed=1
 fi
-if scenario "${1:-all}" crowd; then
+if scenario crowd; then
 	echo "== crowd: $CROWD guests in #earth for $HOLD s"
 	during k6 crowd || missed=1
 fi
-if scenario "${1:-all}" streams; then
+if scenario streams; then
 	echo "== streams: $STREAMS readers of #earth's stream for $HOLD s, four a visitor"
 	during docker run --rm --network "$inside" --ip "$load" -v "$tmp/out:/k6:ro" --entrypoint /nodejs/bin/node "$server_image" \
 		/k6/streams.cjs "$STREAMS" "$HOLD" || missed=1
 fi
-if scenario "${1:-all}" messages; then
+if scenario messages; then
 	before=$(volume)
 	echo "== messages: $ACCOUNTS accounts, a line each every $RATE s for $HOLD s"
 	during k6 messages || missed=1
 	after=$(volume)
-	echo "ergo's volume: ${before} KB before, ${after} KB after"
+	echo "ergo's volume: ${before} bytes before, ${after} after"
 	docker exec "$server" /nodejs/bin/node -e '
 const db = new (require("node:sqlite").DatabaseSync)("/data/gnoworld.db", { readOnly: true });
 console.log("verdicts:", JSON.stringify(db.prepare("SELECT action, count(*) AS n FROM verdicts GROUP BY action").all()));'
