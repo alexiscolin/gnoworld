@@ -71,5 +71,14 @@ tests = [p for p in listed(root, {".ts", ".tsx"}) if re.search(r"\.test\.tsx?$",
 orphans = [t.relative_to(root) for t in tests if not any(t.with_name(t.name.replace(".test.", ".", 1)).with_suffix(s).exists() for s in (".ts", ".tsx"))]
 if orphans:
     print("check_docs: these tests sit beside no file of their name:", *orphans, sep="\n  ", file=sys.stderr)
-if missing or problems or orphans:
+# Every alert the server logs is named, quoted, in the runbook ops matches (slice 3's plan, 3n): a line's own
+# log("alert", { error: "x" }) and the retention's watch("x", ...); a test's are no alerts.
+named = re.compile(r'log\("alert", \{ error: "([a-z_]+)"|watch\("([a-z_]+)"')
+sources = [p for p in listed(root, {".ts"}) if p.relative_to(root).parts[:2] == ("server", "src") and ".test." not in p.name]
+runbook = root / "docs/OPERATIONS.md"
+known = runbook.read_text() if runbook.is_file() else ""
+unnamed = sorted({a or b for p in sources for a, b in named.findall(p.read_text())} - {n for n in re.findall(r"`([a-z_]+)`", known)})
+if unnamed:
+    print("check_docs: alerts the server logs that docs/OPERATIONS.md does not name:", *unnamed, sep="\n  ", file=sys.stderr)
+if missing or problems or orphans or unnamed:
     sys.exit(1)
