@@ -191,7 +191,8 @@ Slice 3, the check (3i):
 
 - **Its settings.** `OPENAI_API_KEY_FILE` holds OpenAI's key (one word, 32 characters at least);
   unset, nothing leaves the server, every message is unchecked and the alert says so at the start.
-  `MODERATION_THRESHOLDS` (JSON, a score by category) replaces OpenAI's own flag where set;
+  `MODERATION_THRESHOLDS` (JSON, a score above 0 and at most 1 by category; 0 would hide every line of its
+  category, so the server refuses it, F525) replaces OpenAI's own flag where set;
   `NEW_ACCOUNT_HOURS` (24) is how long an account counts as new.
 - **What reaches OpenAI.** A message's text alone, with the model's name: no account, no room.
   The privacy policy must say so before a public launch (decision 154).

@@ -140,7 +140,7 @@ const Env = z.object({
       }
     })
     .pipe(
-      z.strictObject(Object.fromEntries(CATEGORIES.map((category) => [category, z.number().min(0).max(1).optional()]))),
+      z.strictObject(Object.fromEntries(CATEGORIES.map((category) => [category, z.number().gt(0).max(1).optional()]))),
     )
     .default({}),
   NEW_ACCOUNT_HOURS: whole(720, 24),

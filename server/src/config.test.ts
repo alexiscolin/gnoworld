@@ -208,6 +208,8 @@ describe("loadConfig", () => {
     ["MODERATION_THRESHOLDS", { MODERATION_THRESHOLDS: '{"new/kind":0.5}' }],
     ["MODERATION_THRESHOLDS", { MODERATION_THRESHOLDS: '{"harassment":1.01}' }],
     ["MODERATION_THRESHOLDS", { MODERATION_THRESHOLDS: '{"harassment":-0.1}' }],
+    // A threshold of 0 hides every line of its category: a typo would silence the chat (F525).
+    ["MODERATION_THRESHOLDS", { MODERATION_THRESHOLDS: '{"harassment":0}' }],
     ["MODERATION_THRESHOLDS", { MODERATION_THRESHOLDS: '{"harassment":"0.9"}' }],
     ["NEW_ACCOUNT_HOURS", { NEW_ACCOUNT_HOURS: "0" }],
     ["NEW_ACCOUNT_HOURS", { NEW_ACCOUNT_HOURS: "721" }],
