@@ -1081,8 +1081,9 @@ setTimeout(() => {
 	printf 'version: v1\nservices: []\ndefault:\n  project: test\n  action: enforce\n  allowed_domains:\n    - api.openai.com\n    - localtest.me\n    - 10.0.0.1.nip.io\n' >"$tmp/egress/acl.yaml"
 	chmod 755 "$tmp/egress" && chmod 644 "$tmp/egress"/*
 	for name in localtest.me:127.0.0.1 10.0.0.1.nip.io:10.0.0.1; do
-		resolved=$(docker run --rm --network bridge --entrypoint nslookup "$CURL" "${name%%:*}" 2>/dev/null | sed -n 's/^Address: //p' | tail -n 1)
-		[ "$resolved" = "${name#*:}" ] || missing "${name%%:*} resolves to [$resolved], not ${name#*:}: the resolution check is blind"
+		# Every answer, the DNS server's own line among them: localtest.me's A and AAAA come in either order.
+		resolved=$(docker run --rm --network bridge --entrypoint nslookup "$CURL" "${name%%:*}" 2>/dev/null | sed -n 's/^Address: //p' | tr '\n' ' ')
+		case " $resolved" in *" ${name#*:} "*) ;; *) missing "${name%%:*} resolves to [$resolved], not ${name#*:}: the resolution check is blind" ;; esac
 	done
 	box=$(docker run -d --rm --network "container:$guard" -v "$tmp/egress:/test:ro" --entrypoint /smokescreen \
 		"$(docker inspect --format '{{.Image}}' "$egress")" --config-file /test/config.yaml --listen-port 4751 --egress-acl-file /test/acl.yaml)
