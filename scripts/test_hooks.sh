@@ -135,7 +135,7 @@ for step in "run format:check" "run typecheck" "run lint" "run test" "run unused
 	"ast.parse(open(f).read(), f) for f in sys.argv[1:]]' scripts/*.py" \
 	"python3 -I ../scripts/mutate.py" "go vet ./tools/..." "go run ./tools/sealvec | cmp" "python3 -I scripts/check_docs.py" \
 	"sh scripts/test_hooks.sh" "python3 -I scripts/probe.py" "run coverage" "python3 -I scripts/patch_coverage.py" "sh scripts/ergo.sh" \
-	"run mutate" "sh scripts/scan_secrets.sh" "python3 -I scripts/harness_mutate.py" "python3 -I scripts/check_regressions.py" \
+	"run mutate" "sh scripts/scan_secrets.sh" "python3 -I scripts/harness_mutate.py" "python3 -I scripts/check_regressions.py" "python3 -I scripts/check_migrations.py" \
 	'unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO' '[ "$took" -gt 60 ]' "python3 -I scripts/prove_fix.py" "python3 -I scripts/audit.py"; do
 	grep -v '^[[:space:]]*#' "$gate_file" | grep -qF -- "$step" || fail "check.sh no longer runs: $step"
 done
@@ -501,6 +501,58 @@ printf '%s' "$out" | grep -qF "no_such_section" || fail "harness_mutate --dry di
 out=$(dry 'yield from each("docs/REVIEW.md", "#", "", "probe", "planted misnamed")' '"docs/REVIEW.md": "no_such_block",') && fail "harness_mutate --dry accepted a block probe.py lacks"
 printf '%s' "$out" | grep -qF "no_such_block" || fail "harness_mutate --dry did not name the unknown block: $out"
 [ ! -e "$m/ran" ] || fail "harness_mutate --dry ran a test, which takes minutes"
+fi
+
+if part migrations; then
+# check_migrations: a migration main has keeps its text and its place, since the server applies them by index
+# (server/src/db.ts); F466's, edited in place, never reached a file made before. It reads the working tree, as
+# the gate does; what it cannot read is refused, never passed over.
+mig="$here"/check_migrations.py
+r="$t/migrations"
+mkdir -p "$r/server/src/login" && git -C "$r" init -q && git -C "$r" commit -q --allow-empty -m root && root=$(git -C "$r" rev-parse HEAD)
+open_db() { printf 'const db = openDatabase(config.database, [\n  %s,\n]);\n' "$1" >"$r/server/src/main.ts"; }
+table() { # $1: the constant, $2: its table (default: the constant's name), $3: its folder under server/src
+	printf 'export const %s = `\n  CREATE TABLE %s (x TEXT) STRICT;\n`;\n' "$1" "${2:-$1}" >"$r/server/src/${3:-}$1.ts"
+}
+judge() { out=$(cd "$r" && python3 -I "$mig" "${1:-$base}" 2>&1); }
+refuses() { # $1: what it is, $2: a name its message must give, $3: the base (default: $base)
+	judge "${3:-}" && fail "check_migrations accepted $1"
+	printf '%s' "$out" | grep -qF -- "$2" || fail "check_migrations refused $1 without naming $2: $out"
+}
+table LOGIN_TABLES "" login/ && table ROOM_TABLES && open_db "LOGIN_TABLES, ROOM_TABLES"
+git -C "$r" add -A && git -C "$r" commit -qm base && base=$(git -C "$r" rev-parse HEAD)
+judge || fail "check_migrations refused main's own migrations: $out"
+judge "$root" || fail "check_migrations refused a branch from a main with no server: $out"
+refuses "a base that names no commit" no_such_base no_such_base
+table MUTE_TABLES && open_db "LOGIN_TABLES, ROOM_TABLES, MUTE_TABLES"
+judge || fail "check_migrations refused a migration added after main's: $out"
+table RENAMED LOGIN_TABLES && open_db "RENAMED, ROOM_TABLES, MUTE_TABLES"
+judge || fail "check_migrations refused main's migration renamed, its text kept: $out"
+table LOGIN_TABLES other login/ && open_db "LOGIN_TABLES, ROOM_TABLES, MUTE_TABLES" && refuses "a migration of main edited in place (F466)" LOGIN_TABLES
+table LOGIN_TABLES "" login/
+open_db "ROOM_TABLES, LOGIN_TABLES, MUTE_TABLES" && refuses "main's migrations reordered" LOGIN_TABLES
+open_db "LOGIN_TABLES, MUTE_TABLES" && refuses "a migration of main removed" ROOM_TABLES
+open_db "LOGIN_TABLES" && refuses "main's list cut short" ROOM_TABLES
+rm "$r/server/src/main.ts" && refuses "main.ts gone" LOGIN_TABLES
+printf 'const db = openDatabase(config.database, MIGRATIONS);\n' >"$r/server/src/main.ts" && refuses "a list it cannot read" main.ts
+open_db 'LOGIN_TABLES, ROOM_TABLES, ...MORE' && refuses "a list holding a spread" main.ts
+open_db 'LOGIN_TABLES, ROOM_TABLES, `CREATE TABLE z (x TEXT) STRICT;`' && refuses "a migration written in the list" main.ts
+open_db "LOGIN_TABLES, ROOM_TABLES"
+for form in '"\n  CREATE TABLE ROOM_TABLES (x TEXT) STRICT;\n"' 'sql`\n  CREATE TABLE ROOM_TABLES (x TEXT) STRICT;\n`' 'LOGIN_TABLES'; do
+	printf "export const ROOM_TABLES = $form;\n" >"$r/server/src/ROOM_TABLES.ts" && refuses "main's migration as $form" ROOM_TABLES
+done
+table ROOM_TABLES && judge || fail "check_migrations refused main's migrations, restored: $out"
+table ROOM_TABLES "" login/ && refuses "a migration defined twice" ROOM_TABLES
+rm "$r/server/src/login/ROOM_TABLES.ts"
+# One built from a value is refused on main too: the same source may hold another text.
+printf 'export const ROOM_TABLES = `\n  CREATE TABLE ${ROOM} (x TEXT) STRICT;\n`;\n' >"$r/server/src/ROOM_TABLES.ts"
+git -C "$r" add -A && git -C "$r" commit -qm valued && valued=$(git -C "$r" rev-parse HEAD)
+refuses "a migration built from a value, the same on main" ROOM_TABLES "$valued"
+# An escaped backtick ends the text early, hiding a change past it: an escape is refused.
+printf 'export const ROOM_TABLES = `\n  CREATE TABLE \\`r\\` (x TEXT) STRICT;\n`;\n' >"$r/server/src/ROOM_TABLES.ts"
+git -C "$r" add -A && git -C "$r" commit -qm escaped && escaped=$(git -C "$r" rev-parse HEAD)
+printf 'export const ROOM_TABLES = `\n  CREATE TABLE \\`r\\` (y TEXT) STRICT;\n`;\n' >"$r/server/src/ROOM_TABLES.ts"
+refuses "a migration with an escape, changed past it" ROOM_TABLES "$escaped"
 fi
 
 if part patch_coverage; then
