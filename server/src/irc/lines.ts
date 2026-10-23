@@ -34,13 +34,13 @@ function roomMode([room = "", mode = "", arg, ...more]: readonly string[]): bool
   return /^(?:[+-][Iv]|-[qaoh])$/.test(mode) && person(arg);
 }
 
-// A REDACT in one room; a NOTICE to one account, never a room, a list or words; a room's mode (roomMode);
-// a JOIN of one room; a KICK of one person, never the bot, from one room, with its reason (3m). Another
-// command has no form.
+// A REDACT in one room; a NOTICE to one account, by Ergo's shape of a name (letters, digits, - and _: F655); a
+// room's mode (roomMode); a JOIN of one room; a KICK of one person, never the bot, from one room, with its reason
+// (3m). Another command has no form.
 const FORMS = new Map<string, (params: readonly string[]) => boolean>(
   Object.entries({
     REDACT: ([room = ""]: readonly string[]) => ROOM.test(room),
-    NOTICE: ([to = ""]: readonly string[]) => /^[^#,:\s\0-\x1f][^,\s\0-\x1f]*$/.test(to),
+    NOTICE: ([to = ""]: readonly string[]) => /^[A-Za-z0-9_-]{1,64}$/.test(to),
     SAMODE: roomMode,
     JOIN: ([room = "", ...more]: readonly string[]) => ROOM.test(room) && more.length === 0,
     KICK: ([room = "", who = "", reason = "", ...more]: readonly string[]) =>
