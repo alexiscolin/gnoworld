@@ -875,11 +875,12 @@ CLIENT
 	for path in '/api/x/..\login/challenge' '/api/x/..%5Clogin/challenge'; do
 		expect "a backslash in a path is refused: $path" "$(status "$path" 203.0.113.34 -u "$auth" --path-as-is)" 400
 	done
-	# A login challenge's code, and its body's error when it has one (the server's JSON, or web's own page).
+	# A login challenge's code, and its body's error when it has one (the server's JSON, or web's own page). curl reads
+	# a format that starts with @ as a file's name: the code's mark follows a newline.
 	challenge() {
 		client=$1
 		shift
-		docker run --rm --network "$inside" "$CURL" -s -w '@@%{http_code}\n' --haproxy-protocol --haproxy-clientip "$client" -u "$auth" \
+		docker run --rm --network "$inside" "$CURL" -s -w '\n@@%{http_code}\n' --haproxy-protocol --haproxy-clientip "$client" -u "$auth" \
 			-H "Origin: $ORIGINS" -H 'Content-Type: application/json' -d '{"chainId":"onyx-1"}' "$@" | awk '{ body = body $0 }
 			/@@[0-9]+$/ { kind = body ~ /"error":"too_many"/ ? "too_many" : body ~ /<html/ ? "html" : body ~ /"error":/ ? "error" : "ok"
 				print kind, substr($0, index($0, "@@") + 2); body = "" }' || true
