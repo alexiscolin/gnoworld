@@ -814,7 +814,16 @@ volume and the sizes from the runs, waits for 3e's stack, since 3e goes last.
 3n-b (`docs/decisions.md`, 2026-10-23, 3n-b's shapes): Ergo's folder measured read-only against
 `ERGO_DATA_MB` (1024), its two alerts; `web`'s 32 held requests a visitor, 4,096 connections, waits of 10 s and
 15 s idle; `deploy/k6/run.sh` for the operator; `check_docs.py` keeps the runbook's alerts whole. **The first
-numbers** (the operator's run, then the sizes above adjusted): not yet.
+numbers** (Alexis's run, 2026-10-24, the load's own stack on his host): logins, 200 accounts at once: every
+ticket logged in, the ticket request 17 ms on average and 32 ms at p95, the server at 80 MiB. Crowd, 2,000 guests
+joining #earth at once, straight to Ergo: Ergo reached its 256 MiB cap and by every sign was killed (every session
+ended near 15.5 s of 60, Ergo back at 24 MiB in the next scenario; F691), so its cap is now 512 MiB, the next run
+to say whether 2,000 hold. Streams, 1,000 readers of #earth's stream, four a visitor: 1,000 of 1,000 beat, the
+server at 186 MiB and 19% of a core. Messages, 200 accounts, a line each every 5 s for 60 s, checked by OpenAI:
+2,400 of 2,400, the ticket request 32 ms on average and 58 ms at p95, the server at 210 MiB, Ergo at 50 MiB and
+17%; Ergo's volume grew 1.3 MB (7,377,326 to 8,708,526 bytes); the verdicts were not read (F690). The scenarios go
+straight to the server and Ergo: they size neither `web`'s 32 a visitor nor its 4,096 connections, which stay as
+set, `deploy/test.sh` holding them.
 
 **Tests by level.** Unit with the clock, property, operator's load runs. **Cost and scale.** One indexed query a
 tick. **Files.** New: `server/src/retention/`, `deploy/k6/`; changed: `deploy/web/nginx.conf`, `deploy/test.sh`,
