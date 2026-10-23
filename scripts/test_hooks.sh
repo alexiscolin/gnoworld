@@ -468,6 +468,41 @@ done
 rm -r "$d/server" "$d/docs/OPERATIONS.md"
 fi
 
+if part harness_mutate; then
+# harness_mutate --dry, in the fast gate: each mutant still finds its text, each guard file has its sections and
+# each section exists; the full gate saw a stale one 35 minutes in (3n-b). On a copy whose worktree stops it and
+# whose run() leaves a mark, since a fall-through to the real run takes hours.
+m="$t/mutate" && mkdir -p "$m"
+dry() { # $1: a mutant planted at the end of its list, $2: an entry planted in SECTIONS
+	cp "$here/harness_mutate.py" "$m/"
+	printf 'def worktree(rev):\n    raise SystemExit("harness_mutate --dry made a worktree")\n' >"$m/repo_files.py"
+	python3 -I - "$m/harness_mutate.py" "$m/ran" "${1:-}" "${2:-}" <<'PY'
+import sys
+p, mark, mutant, entry = sys.argv[1:]
+s = open(p).read()
+for a, b in (('def run(test, only=""):\n', f'def run(test, only=""):\n    open({mark!r}, "w").close()\n'),
+             ("\n\n\ndef sections(", "\n    " + mutant + "\n\n\ndef sections("), ("SECTIONS = {\n", "SECTIONS = {\n    " + entry + "\n")):
+    assert s.count(a) == 1, f"harness_mutate.py no longer holds {a!r}: update test_hooks.sh's dry()"
+    s = s.replace(a, b)
+open(p, "w").write(s)
+PY
+	(cd "$here/.." && python3 -I "$m/harness_mutate.py" --dry 2>&1)
+}
+dry || fail "harness_mutate --dry: a mutant of the harness is out of date (above)"
+out=$(dry 'yield from each("scripts/check.sh", "no such text", "", "hooks", "planted stale")') && fail "harness_mutate --dry accepted a mutant that finds no text"
+printf '%s' "$out" | grep -q "planted stale: nothing to mutate" || fail "harness_mutate --dry did not name the stale mutant: $out"
+out=$(dry 'yield from each("docs/REVIEW.md", "#", "", "hooks", "planted unsectioned")') && fail "harness_mutate --dry accepted a guard file with no sections"
+printf '%s' "$out" | grep -qF "docs/REVIEW.md" || fail "harness_mutate --dry did not name the file with no sections: $out"
+out=$(dry 'yield from each("docs/REVIEW.md", "#", "", "hooks", "planted keyless")' '"docs/REVIEW.md": {"probe": "lint"},') && fail "harness_mutate --dry accepted a guard file with no sections for its suite"
+printf '%s' "$out" | grep -qF "docs/REVIEW.md" || fail "harness_mutate --dry did not name the file with no sections for its suite: $out"
+# A section its suite lacks makes every mutant "killed": the suite fails on the unknown name.
+out=$(dry 'yield from each("docs/REVIEW.md", "#", "", "hooks", "planted misnamed")' '"docs/REVIEW.md": "guard,no_such_section",') && fail "harness_mutate --dry accepted a section test_hooks.sh lacks"
+printf '%s' "$out" | grep -qF "no_such_section" || fail "harness_mutate --dry did not name the unknown section: $out"
+out=$(dry 'yield from each("docs/REVIEW.md", "#", "", "probe", "planted misnamed")' '"docs/REVIEW.md": "no_such_block",') && fail "harness_mutate --dry accepted a block probe.py lacks"
+printf '%s' "$out" | grep -qF "no_such_block" || fail "harness_mutate --dry did not name the unknown block: $out"
+[ ! -e "$m/ran" ] || fail "harness_mutate --dry ran a test, which takes minutes"
+fi
+
 if part patch_coverage; then
 # patch_coverage: the share of changed lines that the tests run, like a pull request's
 # patch coverage, from Vitest's JSON report and git's diff.

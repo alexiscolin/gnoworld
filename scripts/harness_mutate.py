@@ -5,7 +5,9 @@ limit in a config, a step of the gate) is switched off in turn, in a throwaway w
 and the harness's tests (probe.py, test_hooks.sh) must then fail. A guard whose removal they do
 not notice is a guard nobody checks: the run prints the test to add. GAPS lists the known ones,
 with their reason; a gap that gets killed must leave the list. Usage: scripts/harness_mutate.py,
-from the repository root; it takes minutes, so the full gate runs it when the harness changes."""
+from the repository root; it takes minutes, so the full gate runs it when the harness changes.
+`--dry` builds every mutant on the working tree and checks its text and sections, no test run: the fast
+gate's check, through test_hooks.sh."""
 import os
 import re
 import subprocess
@@ -38,7 +40,8 @@ SECTIONS = {
     "scripts/check_css.py": "css", "scripts/check_comments.mjs": "comments",
     ".jscpd.json": "jscpd", "tsconfig.base.json": "tsc", "vitest.config.ts": "vitest,vitest_ui,server",
     "scripts/guard.py": "guard", "scripts/review_pass.py": "review_pass", "scripts/patch_coverage.py": "patch_coverage",
-    "scripts/check_docs.py": "check_docs", "scripts/check_regressions.py": "regressions", ".githooks/commit-msg": "commit_msg,installed",
+    "scripts/check_docs.py": "check_docs", "scripts/check_regressions.py": "regressions",
+    "scripts/harness_mutate.py": "harness_mutate", ".githooks/commit-msg": "commit_msg,installed",
     ".githooks/pre-push": "pre_push,wiring,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed",
     ".githooks/records.sh": "outside,installed,wiring", ".githooks/pre-merge-commit": "outside,installed", ".githooks/merge.sh": "installed",
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix",
@@ -186,6 +189,10 @@ def mutants():
     yield from each(".jscpd.json", '"similarity": 0.8', '"similarity": 1', "probe", "jscpd similarity")
     yield from each(".jscpd.json", ', "**/.git/**"', "", "probe", "jscpd reads no file of git's own folder (F129)")
     yield from each("tsconfig.base.json", '"lib": ["es2024"],', "", "probe", "tsconfig lib")
+    # harness_mutate's own dry check.
+    yield from each("scripts/harness_mutate.py", "        if mutated is None:\n", "        if False:\n", "hooks", "harness_mutate --dry sees a stale mutant")
+    yield from each("scripts/harness_mutate.py", "        if unknown:\n", "        if False:\n", "hooks", "harness_mutate --dry sees a section its suite lacks")
+    yield from each("scripts/harness_mutate.py", '    WORKTREE = "."\n    checked()\n', '    WORKTREE = "."\n', "hooks", "harness_mutate --dry checks the mutants")
     # The hooks and their scripts.
     yield from each("scripts/guard.py", ' refuse("', " " + OFF + '"', "hooks", "guard refusal")
     yield from each("scripts/guard.py", " refuse(UNREAD)", " " + OFF + "UNREAD)", "hooks", "guard unread .gno")
@@ -510,14 +517,35 @@ def proposal(test, path):
     return f"add to scripts/test_hooks.sh, section {sections(path, test)}, the input this line refuses and the exit code it must give"
 
 
+def checked():
+    """Every mutant, built before any test runs: one that finds no text, or a section its suite lacks, would
+    count as killed or stop the run late, so it stops the run at once."""
+    named = {"probe": set(re.findall(r'part\("(\w+)"\)', read("scripts/probe.py"))),
+             "hooks": set(re.findall(r"^if part (\w+); then$", read("scripts/test_hooks.sh"), re.M))}
+    found = list(mutants())
+    for label, path, mutated, test in found:
+        if mutated is None:
+            sys.exit(f"harness_mutate: {label}: nothing to mutate in {path}; this script is out of date")
+        try:
+            unknown = set(sections(path, test).split(",")) - named[test]
+        except KeyError:
+            sys.exit(f"harness_mutate: {label}: {path} has no sections for {test} in SECTIONS")
+        if unknown:
+            sys.exit(f"harness_mutate: {label}: {path}'s sections {', '.join(sorted(unknown))} are none of {test}'s")
+    return found
+
+
+if sys.argv[1:] == ["--dry"]:
+    WORKTREE = "."
+    checked()
+    sys.exit(0)
 failures = []
 with worktree("HEAD") as WORKTREE:
+    found = checked()
     for test in TESTS:  # the control: an untouched copy passes, so a failure means the mutant
         if run(test) != 0:
             sys.exit(f"harness_mutate: {test} fails on the untouched copy; fix that first")
-    for label, path, mutated, test in mutants():
-        if mutated is None:
-            sys.exit(f"harness_mutate: {label}: nothing to mutate in {path}; this script is out of date")
+    for label, path, mutated, test in found:
         target = os.path.join(WORKTREE, path)
         original = read(path)
         with open(target, "w") as f:
