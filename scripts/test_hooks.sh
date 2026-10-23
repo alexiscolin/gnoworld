@@ -403,6 +403,15 @@ printf 'The alerts: `disk_full`.\n' >"$d/docs/OPERATIONS.md"
 python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted a watched alert the runbook leaves out"
 printf 'The alerts: `rows_near_cap`, and disk_full unquoted.\n' >"$d/docs/OPERATIONS.md"
 python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted a logged alert the runbook leaves out"
+# Each spelling Prettier and people write (F637): across lines, the name after another key, single quotes;
+# and a name the check cannot read (a variable) is refused rather than passed over.
+printf 'log(\n  "alert",\n  { room, error: "split_name" },\n);\nlog('"'"'alert'"'"', { error: '"'"'quoted_name'"'"' });\n' >"$d/server/src/job.ts"
+printf 'The alerts: `split_name`, `quoted_name`.\n' >"$d/docs/OPERATIONS.md"
+python3 -I "$docs" "$d" >/dev/null 2>&1 || fail "check_docs refused alerts written across lines or in single quotes"
+printf 'The alerts: `quoted_name`.\n' >"$d/docs/OPERATIONS.md"
+python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted an alert written across lines the runbook leaves out"
+printf 'const which = "hidden_name";\nlog("alert", { error: which });\n' >"$d/server/src/job.ts"
+python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted an alert whose name it cannot read"
 rm -r "$d/server" "$d/docs/OPERATIONS.md"
 fi
 
