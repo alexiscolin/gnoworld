@@ -7,7 +7,7 @@
 #   sh deploy/k6/run.sh             every scenario, at its default size
 #   sh deploy/k6/run.sh messages    one: logins, crowd, streams or messages
 # Sizes: ACCOUNTS (200), CROWD (2000), STREAMS (1000), HOLD (60 s), RATE (a message an account every 5 s).
-# OPENAI_API_KEY_FILE names a real key for the messages' checks; without one each check fails, as unchecked.
+# OPENAI_API_KEY_FILE names a real key for the messages' checks; without one the messages are not run (F644).
 # Exit: 0 it ran, 1 k6 found a threshold missed, 2 a tool or a fact is missing, 3 the stack did not start.
 set -eu
 umask 022 # what the run writes, the containers' users read
@@ -23,6 +23,16 @@ missing() {
 }
 only=${1:-all}
 case $only in all | logins | crowd | streams | messages) ;; *) missing "no such scenario [$only]: logins, crowd, streams or messages" ;; esac
+for size in ACCOUNTS CROWD STREAMS HOLD RATE; do
+	eval "value=\$$size"
+	case $value in "" | *[!0-9]* | 0*) missing "$size: a whole number from 1, not [$value]" ;; esac
+done
+# Each visitor's address is one of 250 x 250 (setup.ts, load.js), a stream's four to one (F650).
+[ "$ACCOUNTS" -le 62500 ] && [ "$CROWD" -le 62500 ] && [ "$STREAMS" -le 250000 ] ||
+	missing "ACCOUNTS and CROWD 62,500 at most, STREAMS 250,000: the visitors' addresses"
+# Without OpenAI's key every line is unchecked and the breaker stops calling: the messages measure nothing (F644).
+key=${OPENAI_API_KEY_FILE:-}
+[ "$only" != messages ] || [ -n "$key" ] || missing "messages: set OPENAI_API_KEY_FILE, OpenAI's key, which checks each line"
 for tool in docker openssl htpasswd; do command -v "$tool" >/dev/null || missing "$tool is missing"; done
 # Never on the demo's host (ADR-0002): none of its containers, running or stopped, may be here (F643).
 [ -z "$(docker ps -aq --filter label=com.docker.compose.project=gnoworld-demo)" ] ||
@@ -300,7 +310,9 @@ if scenario streams; then
 	during docker run --rm --network "$inside" --ip "$load" -v "$tmp/out:/k6:ro" --entrypoint /nodejs/bin/node "$server_image" \
 		/k6/streams.cjs "$STREAMS" "$HOLD" || missed=1
 fi
-if scenario messages; then
+if scenario messages && [ -z "$key" ]; then
+	echo "== messages: skipped, OPENAI_API_KEY_FILE names no key"
+elif scenario messages; then
 	before=$(volume)
 	echo "== messages: $ACCOUNTS accounts, a line each every $RATE s for $HOLD s"
 	during k6 messages || missed=1

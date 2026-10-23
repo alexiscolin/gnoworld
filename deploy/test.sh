@@ -401,7 +401,7 @@ esac
 FAKE
 	chmod 755 "$tmp/fake/docker"
 	# exec: the run is the process its caller signals, not a shell around it.
-	load() { exec env FAKE_LOG="$tmp/fake.log" PATH="$tmp/fake:$PATH" FAKE_DEMO="$1" sh "$here/k6/run.sh" "$2"; }
+	load() { exec env FAKE_LOG="$tmp/fake.log" PATH="$tmp/fake:$PATH" FAKE_DEMO="$1" OPENAI_API_KEY_FILE= sh "$here/k6/run.sh" "$2"; }
 	: >"$tmp/fake.log"
 	code=0
 	(load yes all) >"$tmp/load.log" 2>&1 || code=$?
@@ -425,6 +425,25 @@ FAKE
 	expect "a stopped load run removes its project" "$(sed -n '/\/k6\/load.js$/,$p' "$tmp/fake.log" | grep -c '^compose .* down -v$' || true)" 1
 	expect "and its folder, the operator's key with it" "$([ -n "$folder" ] && [ ! -e "$folder" ] && echo gone)" gone
 	expect "and stops its sampler" "$(grep -c '^stats ' "$tmp/fake.log" || true)" "$sampled"
+	# Sizes that are no whole number, or past the visitors' addresses, stop it before it makes anything (F650).
+	for size in ACCOUNTS=abc CROWD=0 HOLD=1.5 RATE=-1 STREAMS=250001 ACCOUNTS=62501; do
+		: >"$tmp/fake.log"
+		code=0
+		(export "$size" && load "" all) >"$tmp/load.log" 2>&1 || code=$?
+		if [ "$code" = 2 ] && ! grep -q '^compose ' "$tmp/fake.log"; then
+			pass "the load runs refuse $size before making anything"
+		else
+			fail "the load runs take $size (exit $code)"
+		fi
+	done
+	# Without OpenAI's key the lines measure no check (F644): the messages alone are refused, among the rest skipped.
+	: >"$tmp/fake.log"
+	code=0
+	(load "" messages) >"$tmp/load.log" 2>&1 || code=$?
+	expect "the messages alone, with no key, are refused before anything is made" "$code $(grep -c '^compose ' "$tmp/fake.log" || true)" "2 0"
+	(load "" all) >"$tmp/load.log" 2>&1 || true
+	expect "and skipped among the rest, no line sent" \
+		"$(grep -c 'messages: skipped' "$tmp/load.log" || true) $(grep -c 'SCENARIO=messages' "$tmp/fake.log" || true)" "1 0"
 
 	password=$(openssl rand -hex 16)
 	htpasswd -nbB team "$password" | grep . >"$tmp/htpasswd"
