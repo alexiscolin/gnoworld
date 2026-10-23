@@ -135,7 +135,10 @@ Alexis, 2026-10-19: written here, each with its backlog row, not fixed in 1c.
   held request (the visitor's and its upstream's): about 64 visitors at their 32 at once, by division;
   `deploy/test.sh` proves 16 at once (more than 1,024), the rest is a margin. A connection
   that sends nothing more is closed, 10 s into its headers or its body, 15 s idle between requests
-  (F208, sized before the first k6 run: 3n-b).
+  (F208, sized before the first k6 run: 3n-b). Still a limit: a connection is counted for its visitor
+  only once its headers are whole, and nginx takes back a silent or idle one when short, never one
+  half-way through its headers; so one address opening about 410 such connections a second holds all
+  4,096 and nobody else is served (F641, measured on nginx 1.30.6 at 64).
 
 Slice 3, the login (3c; `docs/decisions.md`, 2026-10-22):
 
