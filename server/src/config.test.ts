@@ -86,6 +86,7 @@ describe("loadConfig", () => {
       dir: "/ergo",
       maxBytes: MB,
     });
+    expect(loadConfig({ ...ENV, ERGO_DATA: "/var/lib/ergo.d" }).ergoData).toMatchObject({ dir: "/var/lib/ergo.d" });
     expect(loadConfig({ ...ENV, ERGO_DATA: "/e", ERGO_DATA_MB: "1048576" }).ergoData).toEqual({
       dir: "/e",
       maxBytes: 1024 * 1024 * MB,
@@ -97,6 +98,13 @@ describe("loadConfig", () => {
       ["ERGO_DATA", "/"],
       ["ERGO_DATA", "/ergo/.."],
       ["ERGO_DATA", "/../"],
+      // The root again, spelled otherwise: empty and "." segments (F636).
+      ["ERGO_DATA", "//"],
+      ["ERGO_DATA", "///"],
+      ["ERGO_DATA", "/."],
+      ["ERGO_DATA", "/./"],
+      ["ERGO_DATA", "/ergo/"],
+      ["ERGO_DATA", "/ergo/./data"],
       ["ERGO_DATA_MB", "0"],
       ["ERGO_DATA_MB", "1048577"],
       ["ERGO_DATA_MB", "1.5"],

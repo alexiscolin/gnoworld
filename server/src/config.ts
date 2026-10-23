@@ -117,11 +117,17 @@ const Env = z.object({
     .pipe(z.number().max(65_535))
     .default(6667),
   ERGO_OPER_PASSWORD_FILE: z.string().min(1).optional(),
-  // Ergo's data folder, measured (3n-b): absolute, no "..", never the root a walk would take whole.
+  // Ergo's data folder, measured (3n-b): absolute, each part a name (no "", "." or ".."), so never the root a
+  // walk would take whole, however spelled (F636).
   ERGO_DATA: z
     .string()
     .regex(/^\/./)
-    .refine((path) => !path.split("/").includes(".."))
+    .refine((path) =>
+      path
+        .split("/")
+        .slice(1)
+        .every((part) => !["", ".", ".."].includes(part)),
+    )
     .optional(),
   ERGO_DATA_MB: whole(1_048_576, 1024),
   OPENAI_API_KEY_FILE: z.string().min(1).optional(),
