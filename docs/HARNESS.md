@@ -176,7 +176,9 @@ with `/cd`:
   no command may leave the sandbox.
 - **`scripts/guard.py`,** before each Bash call, web fetch and edit: no git hook skipped
   (`--no-verify` or its prefixes, `commit -n`, a hooks path or `GIT_CONFIG` override,
-  `commit-tree`), no forced push; no `gnokey`, no raw call to the chain, and no `.gno` file
+  `commit-tree`), no forced push; no recursive delete (`rm -r`, `find -delete` or `-exec rm`)
+  of a path a variable may leave empty, only `${name:?}` (wt-3e's folder); no `gnokey`, no raw
+  call to the chain, and no `.gno` file
   written before the gno skill is loaded and gnomcp was used. It reads through wrappers
   (`env`, `xargs`, `timeout`...), `sh -c`, `eval` and `$(...)`; if it crashes, the call is
   blocked.

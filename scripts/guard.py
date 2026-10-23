@@ -2,12 +2,15 @@
 
 - git: no hook skipped (--no-verify or a prefix of it, `commit -n`, a hooksPath override, a
   GIT_CONFIG variable, commit-tree), no forced push; any other push asks Alexis first;
+- no recursive delete (rm -r, find -delete or -exec rm) of a path from a variable that may be empty, which
+  reaches / or the current folder: only ${name:?}, which stops the shell first;
 - gno only through gnomcp (.claude/rules/gno.md): no gnokey, no fetched realm page or RPC node,
   and no .gno file written, by any tool, before the session loaded the gno skill and called a
   gnomcp tool. Raw RPC from Bash is also stopped by the sandbox's network list.
 Each command is split into its simple commands, looking inside `sh -c`, `eval`, `$(...)` and
 wrappers (env, xargs, timeout...), so none hides a call; a word that only mentions one (grep
 gnokey) is no call. A seatbelt, not a wall: exit 2 blocks, and settings.json blocks on a crash."""
+import itertools
 import json
 import os
 import re
@@ -23,6 +26,10 @@ INTERPRETERS = {"python", "python3", "node", "perl", "ruby", "deno", "bun"}
 WRITERS = {"cp", "mv", "tee", "install", "rsync", "dd"}
 CHAIN_URL = re.compile(r"https?://(rpc[\w.-]*\.gno\.land|([\w-]+\.)*gno\.land/[rp]/)", re.I)
 ASSIGNMENT = re.compile(r"[A-Za-z_]\w*=.*")
+# A variable, a parameter or a command's output that may be empty: any but ${name:?...}.
+UNGUARDED = re.compile(r"\$(?:\{(?![A-Za-z_]\w*:\?)|[A-Za-z_\d@*#?$!(-]|$)|`")
+# find's options before its paths, BSD's and GNU's: -f names a path, -D takes a word.
+FIND_OPTION = re.compile(r"-[HLPEXdsx]+|-[fD]|-O\d*|--")
 
 
 def refuse(why):
@@ -117,6 +124,22 @@ def writes_gno(words, text):
     return any(t.endswith(".gno") for t in targets) or (program in INTERPRETERS and re.search(r"\.gno\b", text) is not None)
 
 
+def deletes_unguarded(words):
+    """Whether rm -r, or find with -delete or -exec rm, takes a path from a variable that may be empty."""
+    program = os.path.basename(words[0])
+    if program == "find":
+        paths = list(itertools.takewhile(lambda w: w not in ("(", "!") and (not w.startswith("-") or FIND_OPTION.fullmatch(w)), words[1:]))
+        runs = ("-exec", "-execdir", "-ok", "-okdir")
+        deletes = "-delete" in words or any(w in runs and os.path.basename(n) == "rm" for w, n in zip(words, words[1:]))
+    elif program == "rm":
+        paths = [w for w in words[1:] if not w.startswith("-")]
+        flags = itertools.takewhile(lambda w: w != "--", words[1:])
+        deletes = any(re.fullmatch(r"-[a-zA-Z]*[rR][a-zA-Z]*", w) or w == "--recursive" for w in flags)
+    else:
+        return False
+    return deletes and any(UNGUARDED.search(p) for p in paths)
+
+
 def ready_for_gno(transcript):
     """Whether the session loaded the gno skill and called a gnomcp tool; a mention in text counts for neither."""
     found = set()
@@ -167,6 +190,8 @@ elif tool == "Bash":
             push |= check_git(words)
         if program == "gnokey":
             refuse("gnokey: writes and keys go through gnomcp (gno_call, gno_addpkg, sessions)")
+        if deletes_unguarded(words):
+            refuse("a recursive delete of a path a variable may leave empty, reaching / or this folder: write ${name:?}")
         if program in ("curl", "wget") and any(CHAIN_URL.match(w) for w in words):
             refuse("a raw call to the chain: read it with gno_read, gno_render or gno_eval")
         if writes_gno(words, text) and not ready_for_gno(event.get("transcript_path", "")):

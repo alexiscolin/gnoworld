@@ -1375,6 +1375,23 @@ sh_ "git config --global alias.c 'commit -n'" 2
 sh_ "git send-pack https://github.com/x/y.git HEAD:refs/heads/x" 2
 sh_ "git http-push https://example.org/y.git main" 2
 sh_ "git config --get user.name" 0
+# A recursive delete takes no path from a variable that may be empty (wt-3e's folder, emptied by a find -delete
+# whose variable was unset): ${name:?} stops the shell first. BSD's and GNU's options before find's paths, a
+# wrapper, or a :? in a comment or another command change nothing.
+for cmd in 'find $dir -delete' 'find "$dir" -type f -delete' 'find -L "${dir}/x" -delete' 'find "$dir" -exec rm -f {} +' \
+	'rm -r "$dir"' 'rm -fr $dir/*' 'rm -R -- "$1"' 'rm --recursive "$(git rev-parse --show-toplevel)/x"' \
+	'find "${dir:-.}" -delete' "sh -c 'rm -r \"\$d\"'" 'rm -r $(pwd)/x' 'cd x && /usr/bin/find "$TMPDIR/x" -delete' \
+	'find -x "$d" -delete' 'find -E "$d" -delete' 'find -d "$d" -delete' 'find -s "$d" -delete' 'find -Ex "$d" -delete' \
+	'find -f "$d" -delete' 'find -D tree "$d" -delete' 'find -O3 "$d" -delete' 'find -- "$d" -delete' \
+	'rm -rf `pwd`/x' 'find "$d" -execdir rm -rf {} \;' 'find "$d" -ok rm {} \;' 'find "$d" -exec /bin/rm {} +' \
+	'rm -r "$d" # ${d:?}' ': "${d:?}"; rm -r "$d"' 'sudo rm -r "$d"' 'timeout 5 rm -r "$d"' 'VAR=1 rm -r "$d"'; do
+	sh_ "$cmd" 2
+done
+for cmd in 'find "${dir:?}" -delete' 'rm -r "${dir:?no dir}/x"' 'find . -name "$pat" -delete' 'rm -f "$file"' \
+	'find "$dir" -name x -print' "rm -r 'build'" 'find "${a:?}" "${b:?}" -delete' 'rm -r -- "${a:?}" x' \
+	'find "$d" -exec cat {} \;' 'rm -- -r "$d"' 'find "${d:?}" -exec rm -r {} +'; do
+	sh_ "$cmd" 0
+done
 # A push, in any form, waits for Alexis: the guard asks, since a rule cannot see every form.
 asks() { # $1: a shell command
 	python3 -I -c 'import json,sys; print(json.dumps({"tool_name":"Bash","tool_input":{"command":sys.argv[1]}}))' "$1" | python3 -I "$gd" 2>/dev/null | grep -q '"permissionDecision": "ask"' || fail "guard did not ask before: $1"
