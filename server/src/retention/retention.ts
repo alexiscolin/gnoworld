@@ -73,7 +73,7 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
         try {
           bytes = sizeOf(dir);
         } catch {
-          bytes = undefined;
+          // A folder that cannot be listed is unreadable, never empty.
         }
         watch("ergo_volume_unreadable", bytes === undefined ? 1 : 0, 1);
         if (bytes !== undefined) watch("ergo_volume_near_cap", bytes, cap);
@@ -93,7 +93,7 @@ export function sizeOf(dir: string, lstat: (path: string) => Stats = lstatSync):
     try {
       bytes += entry.isDirectory() ? sizeOf(path, lstat) : lstat(path).size;
     } catch (error) {
-      if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+      if (!z.object({ code: z.literal("ENOENT") }).safeParse(error).success) throw error;
     }
   }
   return bytes;
