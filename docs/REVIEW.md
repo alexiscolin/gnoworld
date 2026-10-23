@@ -83,7 +83,9 @@ Code written by an agent gets the same reading as anyone's, plus this. `/pre-mer
    its severity stands. Then: a command, or a test seen failing. One
    nobody could reproduce stays `claimed`; a false positive is `rejected`, a true one whose
    behaviour is wanted `intended`, a true one of no matter `moot`, each with its reason.
-   A fix of the product proves itself: its tests, run on the commit before it, must fail
+   A speed claim, made or refuted, names the call it timed, its input, Node's version and what the call
+   answered: F502's 4,000 tags were refused before any was read, and F668's first count ran on another
+   Node. A fix of the product proves itself: its tests, run on the commit before it, must fail
    (`scripts/prove_fix.py`, in the full gate).
 5. **Nothing is waved through.** Every remaining finding is fixed, or put to Alexis with
    the scenario.
