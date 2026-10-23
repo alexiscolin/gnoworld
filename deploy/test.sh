@@ -383,6 +383,18 @@ elif [ "${1:-}" != --demo ]; then
 	expect "git tracks nothing in deploy/secrets" "$(git -C "$repo" ls-files deploy/secrets)" ""
 	if grep -qx 'deploy/secrets' "$repo/.dockerignore"; then pass "the build leaves deploy/secrets out"; else fail "the build would send deploy/secrets"; fi
 	if grep -qF 'Read(/deploy/secrets/**)' "$repo/.claude/settings.json"; then pass "Claude Code may not read the secrets"; else fail "Claude Code may read the secrets"; fi
+	# The load runs never beside the demo (deploy/k6/run.sh, 3n-b): a Docker that lists a demo container, and
+	# answers nothing else, stops it before it makes anything.
+	mkdir "$tmp/fake"
+	printf '#!/bin/sh\ncase "$*" in "ps -q --filter label=com.docker.compose.project=gnoworld-demo") echo d3m0 ;; *) exit 9 ;; esac\n' >"$tmp/fake/docker"
+	chmod 755 "$tmp/fake/docker"
+	code=0
+	PATH="$tmp/fake:$PATH" sh "$here/k6/run.sh" >"$tmp/load.log" 2>&1 || code=$?
+	if [ "$code" = 2 ] && grep -q 'the demo runs on this host' "$tmp/load.log"; then
+		pass "the load runs refuse to start beside the demo"
+	else
+		fail "the load runs start beside the demo (exit $code)"
+	fi
 
 	password=$(openssl rand -hex 16)
 	htpasswd -nbB team "$password" | grep . >"$tmp/htpasswd"
