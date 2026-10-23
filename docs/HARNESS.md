@@ -88,8 +88,8 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
 | `gno lint`, `gno test` on `gno/...` | every realm and package |
 | `scripts/mutate.py` | a realm guard no test notices when removed |
 | `gofmt`, `go vet`, the seal vectors | Go tools; `gno/r/seal/vectors_test.gno` equals what `go run ./tools/sealvec` prints |
-| `scripts/check_docs.py` | a harness doc naming a file that does not exist; a bad row in the findings ledger; a test with no file of its name beside it (F085); a harness script that does not parse (F084) |
-| `scripts/test_hooks.sh` | the hooks, the guard, the settings' boundary, the CI's promises, and the scripts below |
+| `scripts/check_docs.py` | a harness doc naming a file that does not exist; a bad row in the findings ledger, or one citing a commit the repository lacks; a known limit the runbook no longer says (3M-19); a test with no file of its name beside it (F085); a harness script that does not parse (F084) |
+| `scripts/test_hooks.sh` | the hooks, the guard, the settings' boundary, the CI's promises, and the scripts below; a harness mutant that no longer finds its text or names a section its suite lacks (`harness_mutate.py --dry`, in a second) |
 
 **Full** (`--full`: `/pre-merge` and a push of `main`) adds:
 
@@ -101,6 +101,7 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
 | `scripts/prove_fix.py` | a fix of the product whose tests or journeys did not fail on the commit before it (F126) |
 | StrykerJS | a mutant of the TypeScript that no test kills |
 | `scripts/check_regressions.py` | the safety net shrinking (next section) |
+| `scripts/check_migrations.py` | a migration `main` has, edited, moved or removed (F466), or one it cannot read |
 | gitleaks | a secret anywhere in the history; a path into a home folder or a service of the demo's host (`gitleaks-private.toml`: the repository will be public); both rule sets always run (F120); every change reaches it as text, on every branch, whatever an attribute, a NUL byte, a diff driver or a replace ref would show (F132) |
 | `pnpm audit` | a dependency with a known advisory, moderate or worse |
 | `scripts/harness_mutate.py` | when a file of the harness list changed (one list, word for word `pre-push`'s, F124): a guard of the harness that no test notices switched off |
@@ -203,7 +204,7 @@ costs context in every session: `chrome-devtools-mcp` (1b), `frontend-design` (2
   runs the one section of the probe or hook tests that belongs to it (`ONLY=<section>`): a
   guard whose removal no test notices is a guard nobody checks, and the run prints the test
   to add. With `ONLY` set, the probe stops at its first failing block. It runs in the full
-  gate when the harness changed.
+  gate when the harness changed; its `--dry`, in the fast one, builds every mutant without a test.
 - **A new guard lands with its planted fault and its mutant;** a check whose test passes
   for the wrong reason is caught by the mutation. On 2026-10-17 this found a lint selector
   that had never matched, and an exit trap that turned any crash into success; on
