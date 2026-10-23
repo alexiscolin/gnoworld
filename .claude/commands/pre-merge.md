@@ -11,9 +11,12 @@ A branch that changes `deploy/` also runs semgrep's Dockerfile and Compose rules
 (`deploy/test.sh`, then its `--mutants`). Those are asked for once, after every fix of steps 4
 to 6 is committed, never in between: each run costs him its whole length.
 
-1. **No tokens first.** Run `scripts/check.sh --full`: the gate, the probe, coverage and patch coverage, the proof of each fix, mutations, secrets. If the gate fails, stop and report its output. Write the diff to
-   `.claude/tmp/diff.patch` and pass agents its path, never its content. Over about 400
-   lines of product code, say so and propose a split before reviewing.
+1. **No tokens first.** Run the fast gate (`scripts/check.sh`) and StrykerJS on the range's
+   changes (`pnpm run mutate`, incremental); the full gate runs once a merge, at step 8, on the
+   final code (Alexis, 2026-10-23). If either fails, stop and report its output. Write the diff to
+   `.claude/tmp/diff.patch` and pass agents its path, never its content. Past the size
+   `docs/REVIEW.md` allows (about 400 lines of product code with a tier-1 file, 600 otherwise),
+   say so and propose a split before reviewing.
 2. **The plan.** List the files changed that the slice plan does not name; each gets its
    reason in the review card, or leaves the merge.
 3. **The test audit.** Launch the `test-auditor` agent for its green pass, with the diff
@@ -22,7 +25,8 @@ to 6 is committed, never in between: each run costs him its whole length.
    in parallel with its own briefs; add its efficiency angle for a slice with a hot path (the 3D,
    the chat); its reuse angle no more (docs/decisions.md, 2026-10-21). A follow-up merge of fixes
    (2f, 2g) runs the altitude angle alone. Apply their fixes (each in
-   its own commit, a refactor apart), note what they skip and why, then run the full gate again.
+   its own commit, a refactor apart), note what they skip and why, then the fast gate and StrykerJS on the files they changed (the full gate runs once, at
+   step 8; Alexis, 2026-10-22, docs/decisions.md).
    The reviews below read the code as it will merge.
 5. **Every review lens, sized up by risk.** Count the branch's review rounds first (its rows in
    `docs/review-passes.txt` and `docs/review-log.md`). The first round reads the range; any later
