@@ -249,6 +249,13 @@ if [ "${1:-}" = --mutants ]; then
 		"$@" "$here/web/nginx.conf" >"$tmp/nginx.$n.conf"
 		printf 'services:\n  web:\n    volumes:\n      - %s:/etc/nginx/nginx.conf:ro\n' "$tmp/nginx.$n.conf"
 	}
+	dockerfile() { # a service's Dockerfile through one edit (a sed or awk command), built in its place: $1 the service
+		n=$((n + 1))
+		service=$1
+		shift
+		"$@" "$here/$service/Dockerfile" >"$tmp/Dockerfile.$n"
+		printf 'services:\n  %s:\n    build:\n      dockerfile: %s\n' "$service" "$tmp/Dockerfile.$n"
+	}
 	guard() { # the guard's script through one edit (a sed or awk command), mounted over deploy/guard
 		n=$((n + 1))
 		mkdir "$tmp/guard.$n"
@@ -373,6 +380,9 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "Ergo's root writable" "ergo: read-only root" compose 'services: { ergo: { read_only: false } }'
 	mutant "the server's capabilities kept" "server: every capability dropped" compose 'services: { server: { cap_drop: !reset [] } }'
 	mutant "the way out's process cap off" "egress: no process cap" compose 'services: { egress: { pids_limit: -1 } }'
+	mutant "Ergo's folder closed to its user" "ergo's user may enter /ergo" dockerfile ergo sed 's#chmod 755 /ergo \&\& ##'
+	mutant "the way out's folder closed to its user" "egress's user may enter /etc/smokescreen" dockerfile egress \
+		sed 's#^COPY --from=build /out/etc/ /etc/smokescreen/$#COPY --chmod=644 deploy/egress/config.yaml deploy/egress/acl.yaml /etc/smokescreen/#'
 elif [ "${1:-}" != --demo ]; then
 	# The static server and the guard, with a password of their own; no Tailscale key is needed.
 	inside=${project}_inside
@@ -461,6 +471,17 @@ FAKE
 	export ERGO_OPER_PASSWORD_FILE="$tmp/ergo_oper_password" LOG_PEPPER_FILE="$tmp/log_pepper" OPENAI_API_KEY_FILE="$tmp/openai_api_key"
 	export ORIGINS=http://gnoworld.test SERVER_NAME=irc.gnoworld.test
 	export INSIDE_SUBNET="${TEST_SUBNET:-172.30.90.0/24}" WEB_ADDRESS="${TEST_WEB_ADDRESS:-172.30.90.10}"
+	# Each folder a service reads in its image lets every user in: a COPY --chmod with no execute bit gives the
+	# folder it makes that mode (moby/buildkit#5943), which kept Ergo's user out of /ergo. Checked before the
+	# start, which would only call the service unhealthy.
+	docker compose -p "$project" $files build ergo egress >/dev/null || { echo "test.sh: Ergo's or the way out's image did not build" >&2; exit 3; }
+	before=$failed
+	for pair in ergo:ergo egress:etc/smokescreen; do
+		box=$(docker create "$project-${pair%%:*}")
+		expect "${pair%%:*}'s user may enter /${pair#*:}" "$(docker export "$box" | tar -tvf - "${pair#*:}" 2>/dev/null | awk 'NR == 1 { print substr($1, 8, 3) }')" r-x
+		docker rm "$box" >/dev/null
+	done
+	[ "$failed" = "$before" ] || exit 1
 	started=yes
 	docker compose -p "$project" $files down -v >/dev/null 2>&1 || true # what an interrupted run left
 	if ! docker compose -p "$project" $files up -d --build --wait web guard ergo server egress; then
