@@ -345,6 +345,17 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "the stream buffered" "the stream comes through web unbuffered" nginx sed '/proxy_buffering off;/d'
 	mutant "no limit of web's own on the login" "a longer burst meets web's own limit" nginx sed '/limit_req zone=login/d'
 	mutant "a backslash in a path handed on" "a backslash in a path is refused" nginx sed '/return 400;/d'
+	mutant "no visitor's connection limit" "a visitor holds 32 requests at once" nginx sed '/limit_conn /d'
+	mutant "a visitor's connections limited at 31" "a visitor holding 31 requests, streams among them, is served a 32nd" \
+		nginx sed 's#limit_conn open 32;#limit_conn open 31;#'
+	mutant "every visitor one connection key" "the 33rd refused, another visitor served" \
+		nginx sed 's#limit_conn_zone $proxy_protocol_addr#limit_conn_zone $remote_addr#'
+	mutant "the limit answered 503" "the 33rd refused" nginx sed '/limit_conn_status/d'
+	mutant "web's room for 256 connections" "five visitors at their 32 WebSockets each, and a sixth is served" \
+		nginx sed 's#worker_connections [0-9]*;#worker_connections 256;#'
+	mutant "headers waited for a minute" "web closes a connection that never ends its headers" nginx sed '/client_header_timeout/d'
+	mutant "a body waited for a minute" "web closes a connection that never sends its body" nginx sed '/client_body_timeout/d'
+	mutant "an idle connection kept 75 s" "web closes a connection that stays idle between requests" nginx sed '/keepalive_timeout/d'
 	mutant "a host added to the way out" "the way out lets one host out" acl awk '{ print } /- api.openai.com/ { print "    - example.com" }'
 	mutant "the way out lets private addresses through" "the way out lets http://10.0.0.1.nip.io/ through" \
 		proxy_config sed 's#^unsafe_allow_private_ranges:.*#unsafe_allow_private_ranges: true#'
@@ -800,6 +811,108 @@ CLIENT
 	stream=$(docker run --rm --network "$inside" "$CURL" -s -N --max-time 20 --haproxy-protocol --haproxy-clientip 203.0.113.41 -u "$auth" \
 		'http://web:8080/api/stream?rooms=%23earth' || true)
 	holds "the stream comes through web unbuffered: its heartbeat within 20 s" "$stream" '^:'
+	# Each visitor holds 32 requests at once (F208; a request counts while it is served): $1 WebSockets and $2
+	# streams of one visitor held 12 s; then that visitor's next request and another visitor's, how many of the
+	# first's were held to the end (a WebSocket's 101, a stream's 200), and its request once they ended.
+	hold() {
+		docker run --rm --network "$inside" --entrypoint sh "$CURL" -c '
+			ws=$1 streams=$2 auth=$3 origin=$4
+			me="--haproxy-protocol --haproxy-clientip 203.0.113.61 -u $auth"
+			api=http://web:8080/api/activity?worlds=earth
+			key=$(head -c 16 /dev/urandom | base64)
+			{
+				while [ "$ws" -gt 0 ]; do
+					curl -s -o /dev/null -w "%{http_code}\n" --max-time 12 --http1.1 $me -H "Connection: Upgrade" -H "Upgrade: websocket" \
+						-H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: $key" -H "Origin: $origin" http://web:8080/ws &
+					ws=$((ws - 1))
+				done
+				while [ "$streams" -gt 0 ]; do
+					curl -s -N -o /dev/null -w "%{http_code}\n" --max-time 12 $me "http://web:8080/api/stream?rooms=%23earth" &
+					streams=$((streams - 1))
+				done
+				wait
+			} >/tmp/held &
+			sleep 5
+			curl -s -o /dev/null -w "%{http_code} " $me "$api"
+			curl -s -o /dev/null -w "%{http_code} " --haproxy-protocol --haproxy-clientip 203.0.113.62 -u "$auth" "$api"
+			wait
+			printf "%s " "$(grep -cE "^(101|200)$" /tmp/held)"
+			curl -s -o /dev/null -w "%{http_code}" $me "$api"' sh "$1" "$2" "$auth" "$ORIGINS" || true
+	}
+	expect "a visitor holding 31 requests, streams among them, is served a 32nd" "$(hold 27 4)" "200 200 31 200"
+	expect "a visitor holds 32 requests at once: the 33rd refused, another visitor served, the slots freed after" \
+		"$(hold 28 4)" "429 200 32 200"
+	# Five visitors each at their 32 WebSockets leave room for a sixth (3NB-1): a held request takes two of web's
+	# connections, the visitor's and Ergo's, which nginx never reclaims (a silent one it closes when short, which
+	# 256 already survived). How many were upgraded, then the sixth's code, within 4 s.
+	crowded=$(docker run --rm --network "$inside" --entrypoint /nodejs/bin/node "$server_image" -e '
+const net = require("node:net");
+const { randomBytes } = require("node:crypto");
+const [user, origin] = process.argv.slice(1);
+const auth = `Basic ${Buffer.from(user).toString("base64")}`;
+const proxy = (ip) => `PROXY TCP4 ${ip} 192.0.2.1 40000 8080\r\n`;
+const upgrade = `GET /ws HTTP/1.1\r\nHost: web\r\nAuthorization: ${auth}\r\nOrigin: ${origin}\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: ${randomBytes(16).toString("base64")}\r\n\r\n`;
+let upgraded = 0;
+for (let visitor = 0; visitor < 5; visitor += 1) {
+  for (let i = 0; i < 32; i += 1) {
+    const socket = net.connect(8080, "web", () => socket.write(`${proxy(`203.0.113.${String(70 + visitor)}`)}${upgrade}`));
+    socket.once("data", (chunk) => {
+      if (chunk.toString().startsWith("HTTP/1.1 101")) upgraded += 1;
+    });
+    socket.on("error", () => {});
+  }
+}
+setTimeout(() => {
+  const sixth = net.connect(8080, "web", () =>
+    sixth.write(`${proxy("203.0.113.79")}GET / HTTP/1.1\r\nHost: web\r\nAuthorization: ${auth}\r\nConnection: close\r\n\r\n`),
+  );
+  let answer = "";
+  sixth.on("data", (chunk) => (answer += chunk));
+  sixth.on("error", () => {});
+  sixth.on("close", () => {
+    console.log(`${String(upgraded)} ${answer.split(" ")[1] ?? "none"}`);
+    process.exit(0);
+  });
+}, 3000);
+setTimeout(() => {
+  console.log(`${String(upgraded)} not served within 4 s`);
+  process.exit(0);
+}, 7000);' "$auth" "$ORIGINS" 2>&1 || true)
+	expect "five visitors at their 32 WebSockets each, and a sixth is served" "$crowded" "160 200"
+	# Connections that send nothing more are closed (F208): headers never ended, a body never sent, a kept-alive
+	# connection left idle; each one's seconds until web closed it, all three at once.
+	timed=$(docker run --rm --network "$inside" --entrypoint /nodejs/bin/node "$server_image" -e '
+const net = require("node:net");
+const started = Date.now();
+const proxy = (ip) => `PROXY TCP4 ${ip} 192.0.2.1 40000 8080\r\n`;
+const auth = `Basic ${Buffer.from(process.argv[1]).toString("base64")}`;
+const probe = (name, text) =>
+  new Promise((resolve) => {
+    const socket = net.connect(8080, "web", () => socket.write(text));
+    socket.on("data", () => {});
+    socket.on("error", () => {});
+    socket.on("close", () => resolve(`${name}=${Math.round((Date.now() - started) / 1000)}`));
+  });
+Promise.all([
+  probe("headers", `${proxy("203.0.113.63")}GET / HTTP/1.1\r\nHost: web\r\n`),
+  probe("body", `${proxy("203.0.113.64")}POST /api/login/challenge HTTP/1.1\r\nHost: web\r\nAuthorization: ${auth}\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{`),
+  probe("idle", `${proxy("203.0.113.65")}GET / HTTP/1.1\r\nHost: web\r\nAuthorization: ${auth}\r\n\r\n`),
+]).then((closed) => console.log(closed.join(" ")));
+setTimeout(() => {
+  console.log("still open after 40 s");
+  process.exit(0);
+}, 40_000).unref();' "$auth" 2>&1 || true)
+	closes() { # $1 the probe, $2 the seconds web waits, $3 what the connection did
+		seconds=$(printf '%s\n' "$timed" | tr ' ' '\n' | sed -n "s/^$1=//p")
+		if [ -n "$seconds" ] && [ "$seconds" -ge "$2" ] && [ "$seconds" -le $(($2 + 2)) ]; then
+			pass "web closes a connection that $3 after $2 s"
+		else
+			fail "web closes a connection that $3 after $2 s: [$timed]"
+		fi
+	}
+	closes headers 10 "never ends its headers"
+	closes body 10 "never sends its body"
+	closes idle 15 "stays idle between requests"
 	# What web hands its upstreams, seen in their place by an echo: no password, the visitor's own address. A
 	# second web of the same image and live settings, whose upstreams' names lead to the echo; high addresses of
 	# the internal network, which Docker hands out from its low end.
