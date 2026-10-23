@@ -199,18 +199,22 @@ export function logins() {
   for (const i of mine()) enter(accounts[i], "sasl", (ws) => ws.close());
 }
 
-// Guests, each joining a world's room and staying there, reading.
+// Guests, each joining a world's room and staying there, reading: one dropped before the hold ends did not stay.
 export function crowd() {
   for (const i of mine()) {
     let joined = false;
+    let stayed = false;
     irc(`198.19.${String(Math.floor(i / 250))}.${String((i % 250) + 1)}`, ["CAP LS 302", "CAP END", `NICK g${String(i)}`, "USER g 0 * :g", "JOIN #earth"], {
       line: (line, ws) => {
         if (/ 366 \S+ #earth /.test(line) && !joined) {
           joined = true;
-          setTimeout(() => ws.close(), HOLD * 1000);
+          setTimeout(() => {
+            stayed = true;
+            ws.close();
+          }, HOLD * 1000);
         }
       },
-      close: () => check(null, { "a guest joins and stays": () => joined }),
+      close: () => check(null, { "a guest joins and stays": () => stayed }),
     });
   }
 }
@@ -300,6 +304,8 @@ during() {
 	"$@" || code=$?
 	kill "$sampler"
 	peak "$tmp/stats.$runs"
+	# One the kernel killed for its memory comes back by its restart policy, its sessions gone: said, not guessed.
+	docker inspect --format 'restarts {{.Name}} {{.RestartCount}}, killed for memory: {{.State.OOMKilled}}' "$ergo" "$server"
 	return "$code"
 }
 missed=0
