@@ -121,13 +121,10 @@ const Env = z.object({
   // walk would take whole, however spelled (F636).
   ERGO_DATA: z
     .string()
-    .regex(/^\/./)
-    .refine((path) =>
-      path
-        .split("/")
-        .slice(1)
-        .every((part) => !["", ".", ".."].includes(part)),
-    )
+    .refine((path) => {
+      const [root, ...parts] = path.split("/");
+      return root === "" && parts.length > 0 && parts.every((part) => !["", ".", ".."].includes(part));
+    })
     .optional(),
   ERGO_DATA_MB: whole(1_048_576, 1024),
   OPENAI_API_KEY_FILE: z.string().min(1).optional(),

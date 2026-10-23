@@ -94,6 +94,7 @@ describe("loadConfig", () => {
     for (const [key, value] of [
       ["ERGO_DATA", ""],
       ["ERGO_DATA", "ergo"],
+      ["ERGO_DATA", "ergo/data"],
       // The whole disk, /proc included, walked at each tick (3NB-6).
       ["ERGO_DATA", "/"],
       ["ERGO_DATA", "/ergo/.."],
