@@ -318,6 +318,9 @@ Slice 3, the stack (3e):
   (`history.restrictions.expire-time`); decision 154's 30 days for direct messages cannot be set
   apart, so direct messages are not stored at all (`persistent.direct-messages: disabled`) until
   slice 4 makes them a product. History fills the `ergo` volume, which has no quota.
+- **A thousand rooms a client, guests too.** Ergo has one `max-channels-per-client` for every client
+  (its config.go:1937), and the bot needs 1,000: a guest may join every world's room and receive each one's
+  names. Load, not a hole; k6's crowd measures it (F631).
 - **The way out has no port rule.** smokescreen v0.1.0 matches a host, not a port: plain HTTP to
   `api.openai.com` on port 80 is let out too, and meets OpenAI's redirect alone.
 - **A restart of `ergo` or `server` by Compose restarts `web`**, which reads its upstreams' addresses
