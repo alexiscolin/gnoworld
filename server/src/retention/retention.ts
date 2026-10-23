@@ -1,7 +1,10 @@
 // The server's retention (slice 3's plan, 3n; decision 154): the bot's verdict records kept 180 days and
 // below a row cap, the oldest going first, a budget of small batches a tick so a backlog never holds the
-// event loop; the verdicts and the database's used pages measured after, with one alert a crossing of 80%.
-// The other stores purge themselves (nonces, tokens, tickets, mutes) or hold one row a room or an account.
+// event loop; the verdicts and the database's used pages measured after, with one alert a crossing of 80%,
+// and Ergo's data folder too, read-only (3n-b). The other stores purge themselves (nonces, tokens, tickets,
+// mutes) or hold one row a room or an account.
+import { lstatSync, readdirSync, type Stats } from "node:fs";
+import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import type { Log } from "../log.ts";
@@ -15,6 +18,8 @@ interface Options {
   // Rows a batch and batches a tick: 10,000 rows at most a tick.
   batch?: number;
   batches?: number;
+  // Ergo's data folder and its cap; none, no measure.
+  ergoData?: { dir: string; maxBytes: number } | undefined;
 }
 
 export interface Retention {
@@ -60,9 +65,38 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
       }
       watch("verdicts_near_cap", count(), maxVerdicts);
       watch("database_near_cap", N.parse(sql.used.get()).n, maxBytes);
+      // A backlog's ticks follow at once: Ergo's folder is walked on the timed ones alone (3NB-8). A folder that
+      // cannot be read is an alert of its own and leaves the near-cap one as it was.
+      if (budget > 0 && options.ergoData !== undefined) {
+        const { dir, maxBytes: cap } = options.ergoData;
+        let bytes: number | undefined;
+        try {
+          bytes = sizeOf(dir);
+        } catch {
+          bytes = undefined;
+        }
+        watch("ergo_volume_unreadable", bytes === undefined ? 1 : 0, 1);
+        if (bytes !== undefined) watch("ergo_volume_near_cap", bytes, cap);
+      }
       return budget <= 0;
     },
   };
+}
+
+/** The bytes of the files under `dir`, its sub-folders' included, a link as itself: Node's recursive readdir
+ * would follow a link to a folder. A file gone between the listing and its measure, as a rewrite leaves, counts as
+ * none; a folder that cannot be listed throws. */
+export function sizeOf(dir: string, lstat: (path: string) => Stats = lstatSync): number {
+  let bytes = 0;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    try {
+      bytes += entry.isDirectory() ? sizeOf(path, lstat) : lstat(path).size;
+    } catch (error) {
+      if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+    }
+  }
+  return bytes;
 }
 
 /** The retention at start, then every five minutes, until its stop; a tick that left a backlog is followed

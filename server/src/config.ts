@@ -20,6 +20,8 @@ export interface Config {
   authSocket: string | undefined;
   // Ergo's internal listener and its operator's password; no IRC link without the password's file.
   ergo: { host: string; port: number; password: string } | undefined;
+  // Ergo's data folder, mounted read-only, and the bytes it may fill before the alert's 80% (3n-b).
+  ergoData: { dir: string; maxBytes: number } | undefined;
   moderation: {
     openaiKey: Secret | undefined;
     thresholds: Thresholds;
@@ -115,6 +117,13 @@ const Env = z.object({
     .pipe(z.number().max(65_535))
     .default(6667),
   ERGO_OPER_PASSWORD_FILE: z.string().min(1).optional(),
+  // Ergo's data folder, measured (3n-b): absolute, no "..", never the root a walk would take whole.
+  ERGO_DATA: z
+    .string()
+    .regex(/^\/./)
+    .refine((path) => !path.split("/").includes(".."))
+    .optional(),
+  ERGO_DATA_MB: whole(1_048_576, 1024),
   OPENAI_API_KEY_FILE: z.string().min(1).optional(),
   // A score that hides a category in place of OpenAI's own flag, by category: {"harassment": 0.9}.
   MODERATION_THRESHOLDS: z
@@ -151,7 +160,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
   }
   const { HOST, PORT, DATABASE, TRUSTED_PROXY, LOG_PEPPER_FILE, ROLES_FILE, CHAINS, ORIGINS, NEW_ACCOUNTS_PER_HOUR } =
     parsed.data;
-  const { AUTH_SOCKET, ERGO_HOST, ERGO_PORT, ERGO_OPER_PASSWORD_FILE } = parsed.data;
+  const { AUTH_SOCKET, ERGO_HOST, ERGO_PORT, ERGO_OPER_PASSWORD_FILE, ERGO_DATA, ERGO_DATA_MB } = parsed.data;
   const { OPENAI_API_KEY_FILE, MODERATION_THRESHOLDS, NEW_ACCOUNT_HOURS } = parsed.data;
   const { MUTE_STRIKES, MUTE_WINDOW_MINUTES, MUTE_MINUTES, MUTE_MAX } = parsed.data;
   return {
@@ -166,6 +175,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     newAccountsPerHour: NEW_ACCOUNTS_PER_HOUR,
     authSocket: AUTH_SOCKET,
     ergo: ergoOf(env, { host: ERGO_HOST, port: ERGO_PORT, passwordFile: ERGO_OPER_PASSWORD_FILE }),
+    ergoData: ergoDataOf(env, ERGO_DATA, ERGO_DATA_MB),
     moderation: {
       openaiKey:
         OPENAI_API_KEY_FILE === undefined ? undefined : new Secret(word("OPENAI_API_KEY_FILE", OPENAI_API_KEY_FILE)),
@@ -186,6 +196,14 @@ function ergoOf(
   if (env["ERGO_HOST"] !== undefined || env["ERGO_PORT"] !== undefined) {
     throw new Error("setting ERGO_OPER_PASSWORD_FILE: required");
   }
+  return undefined;
+}
+
+// Ergo's folder and its cap in bytes, or none. A cap with no folder is a measure meant that would not come: the
+// server stops rather than run blind.
+function ergoDataOf(env: Record<string, string | undefined>, dir: string | undefined, mb: number): Config["ergoData"] {
+  if (dir !== undefined) return { dir, maxBytes: mb * 1024 * 1024 };
+  if (env["ERGO_DATA_MB"] !== undefined) throw new Error("setting ERGO_DATA: required");
   return undefined;
 }
 

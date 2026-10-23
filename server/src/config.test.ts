@@ -78,6 +78,39 @@ describe("loadConfig", () => {
     }
   });
 
+  it("reads Ergo's data folder, read-only, and its cap in MB, 1024 by default; none by default (3n-b)", () => {
+    const MB = 1024 * 1024;
+    expect(loadConfig(ENV).ergoData).toBeUndefined();
+    expect(loadConfig({ ...ENV, ERGO_DATA: "/ergo" }).ergoData).toEqual({ dir: "/ergo", maxBytes: 1024 * MB });
+    expect(loadConfig({ ...ENV, ERGO_DATA: "/ergo", ERGO_DATA_MB: "1" }).ergoData).toEqual({
+      dir: "/ergo",
+      maxBytes: MB,
+    });
+    expect(loadConfig({ ...ENV, ERGO_DATA: "/e", ERGO_DATA_MB: "1048576" }).ergoData).toEqual({
+      dir: "/e",
+      maxBytes: 1024 * 1024 * MB,
+    });
+    for (const [key, value] of [
+      ["ERGO_DATA", ""],
+      ["ERGO_DATA", "ergo"],
+      // The whole disk, /proc included, walked at each tick (3NB-6).
+      ["ERGO_DATA", "/"],
+      ["ERGO_DATA", "/ergo/.."],
+      ["ERGO_DATA", "/../"],
+      ["ERGO_DATA_MB", "0"],
+      ["ERGO_DATA_MB", "1048577"],
+      ["ERGO_DATA_MB", "1.5"],
+      ["ERGO_DATA_MB", "1e3"],
+      ["ERGO_DATA_MB", " 5"],
+      ["ERGO_DATA_MB", "05"],
+      ["ERGO_DATA_MB", ""],
+    ] as const) {
+      expect(failure({ ...ENV, ERGO_DATA: "/ergo", [key]: value })).toMatch(new RegExp(`setting ${key}: `));
+    }
+    // A cap with no folder is a measure meant that would not come: the server stops rather than run blind.
+    expect(failure({ ...ENV, ERGO_DATA_MB: "100" })).toMatch(/setting ERGO_DATA: required/);
+  });
+
   it("names the entry of a list setting it refuses, never its value (F434)", () => {
     const error = failure({ ...ENV, ORIGINS: "https://gnoworld.test,https://bad.test/path" });
     expect(error).toMatch(/setting ORIGINS: \w+ \(at 1\)/);

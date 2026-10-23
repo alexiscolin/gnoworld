@@ -38,8 +38,8 @@ const db = openDatabase(config.database, [
   STRIKE_TABLES,
   ROOM_STATE,
 ]);
-// The verdicts kept 180 days and below their cap, now and every five minutes (3n).
-const retention = startRetention(db, { log });
+// The verdicts kept 180 days and below their cap, now and every five minutes (3n), Ergo's folder measured (3n-b).
+const retention = startRetention(db, { log, ergoData: config.ergoData });
 let draining = false;
 const app = makeApp(log, () => !draining);
 app.route("/api/login", loginFrom(db, config, { log }));
