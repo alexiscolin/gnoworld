@@ -877,13 +877,41 @@ CLIENT
 	stream=$(docker run --rm --network "$inside" "$CURL" -s -N --max-time 20 --haproxy-protocol --haproxy-clientip 203.0.113.41 -u "$auth" \
 		'http://web:8080/api/stream?rooms=%23earth' || true)
 	holds "the stream comes through web unbuffered: its heartbeat within 20 s" "$stream" '^:'
+	# Connections that send nothing more are closed (F208): headers never ended, a body never sent, a kept-alive
+	# connection left idle; each one's seconds until web closed it, printed as it closes (F639);
+	# in the background while the holds below run (F651).
+	docker run --rm --network "$inside" --entrypoint /nodejs/bin/node "$server_image" -e '
+const net = require("node:net");
+const started = Date.now();
+const proxy = (ip) => `PROXY TCP4 ${ip} 192.0.2.1 40000 8080\r\n`;
+const auth = `Basic ${Buffer.from(process.argv[1]).toString("base64")}`;
+const probe = (name, text) =>
+  new Promise((resolve) => {
+    const socket = net.connect(8080, "web", () => socket.write(text));
+    socket.on("data", () => {});
+    socket.on("error", () => {});
+    socket.on("close", () => {
+      console.log(`${name}=${String(Math.round((Date.now() - started) / 1000))}`);
+      resolve();
+    });
+  });
+Promise.all([
+  probe("headers", `${proxy("203.0.113.63")}GET / HTTP/1.1\r\nHost: web\r\n`),
+  probe("body", `${proxy("203.0.113.64")}POST /api/login/challenge HTTP/1.1\r\nHost: web\r\nAuthorization: ${auth}\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{`),
+  probe("idle", `${proxy("203.0.113.65")}GET / HTTP/1.1\r\nHost: web\r\nAuthorization: ${auth}\r\n\r\n`),
+]).then(() => process.exit(0));
+setTimeout(() => {
+  console.log("still open after 40 s");
+  process.exit(0);
+}, 40_000).unref();' "$auth" >"$tmp/timed.out" 2>&1 &
+	timing=$!
 	# Each visitor holds 32 requests at once (F208; a request counts while it is served): $1 WebSockets and $2
-	# streams of one visitor held 12 s; then that visitor's next request and another visitor's, how many of the
-	# first's were held to the end (a WebSocket's 101, a stream's 200), and its request once they ended.
+	# streams of visitor $3 held 12 s; then $3's next request and visitor $4's, how many of $3's were held to the
+	# end (a WebSocket's 101, a stream's 200), and $3's request once they ended. Two at once (F651).
 	hold() {
 		docker run --rm --network "$inside" --entrypoint sh "$CURL" -c '
-			ws=$1 streams=$2 auth=$3 origin=$4
-			me="--haproxy-protocol --haproxy-clientip 203.0.113.61 -u $auth"
+			ws=$1 streams=$2 auth=$3 origin=$4 other=$6
+			me="--haproxy-protocol --haproxy-clientip $5 -u $auth"
 			api=http://web:8080/api/activity?worlds=earth
 			key=$(head -c 16 /dev/urandom | base64)
 			{
@@ -900,14 +928,18 @@ CLIENT
 			} >/tmp/held &
 			sleep 5
 			curl -s -o /dev/null -w "%{http_code} " $me "$api"
-			curl -s -o /dev/null -w "%{http_code} " --haproxy-protocol --haproxy-clientip 203.0.113.62 -u "$auth" "$api"
+			curl -s -o /dev/null -w "%{http_code} " --haproxy-protocol --haproxy-clientip "$other" -u "$auth" "$api"
 			wait
 			printf "%s " "$(grep -cE "^(101|200)$" /tmp/held)"
-			curl -s -o /dev/null -w "%{http_code}" $me "$api"' sh "$1" "$2" "$auth" "$ORIGINS" || true
+			curl -s -o /dev/null -w "%{http_code}" $me "$api"' sh "$1" "$2" "$auth" "$ORIGINS" "$3" "$4" || true
 	}
-	expect "a visitor holding 31 requests, streams among them, is served a 32nd" "$(hold 27 4)" "200 200 31 200"
+	hold 27 4 203.0.113.61 203.0.113.62 >"$tmp/hold.31" &
+	first=$!
+	hold 28 4 203.0.113.66 203.0.113.67 >"$tmp/hold.32" &
+	wait "$first" "$!" || true
+	expect "a visitor holding 31 requests, streams among them, is served a 32nd" "$(cat "$tmp/hold.31")" "200 200 31 200"
 	expect "a visitor holds 32 requests at once: the 33rd refused, another visitor served, the slots freed after" \
-		"$(hold 28 4)" "429 200 32 200"
+		"$(cat "$tmp/hold.32")" "429 200 32 200"
 	# Sixteen visitors each at their 32 WebSockets leave room for another (3NB-1, F638): a held request takes two
 	# of web's connections, the visitor's and Ergo's, which nginx never reclaims (a silent one it closes when
 	# short, which 256 already survived), so these need more than 1,024. How many were upgraded, then the other's
@@ -955,32 +987,8 @@ setTimeout(() => {
 	# The volume itself, not only a read-only one: the server's /ergo and Ergo's /data are one (F633).
 	mounted() { docker inspect --format "{{range .Mounts}}{{if eq .Destination \"$2\"}}{{.Name}}{{end}}{{end}}" "$1"; }
 	expect "and it is Ergo's own volume" "$(mounted "$server" /ergo) $(mounted "$ergo" /data)" "${project}_ergo ${project}_ergo"
-	# Connections that send nothing more are closed (F208): headers never ended, a body never sent, a kept-alive
-	# connection left idle; each one's seconds until web closed it, printed as it closes (F639).
-	timed=$(docker run --rm --network "$inside" --entrypoint /nodejs/bin/node "$server_image" -e '
-const net = require("node:net");
-const started = Date.now();
-const proxy = (ip) => `PROXY TCP4 ${ip} 192.0.2.1 40000 8080\r\n`;
-const auth = `Basic ${Buffer.from(process.argv[1]).toString("base64")}`;
-const probe = (name, text) =>
-  new Promise((resolve) => {
-    const socket = net.connect(8080, "web", () => socket.write(text));
-    socket.on("data", () => {});
-    socket.on("error", () => {});
-    socket.on("close", () => {
-      console.log(`${name}=${String(Math.round((Date.now() - started) / 1000))}`);
-      resolve();
-    });
-  });
-Promise.all([
-  probe("headers", `${proxy("203.0.113.63")}GET / HTTP/1.1\r\nHost: web\r\n`),
-  probe("body", `${proxy("203.0.113.64")}POST /api/login/challenge HTTP/1.1\r\nHost: web\r\nAuthorization: ${auth}\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{`),
-  probe("idle", `${proxy("203.0.113.65")}GET / HTTP/1.1\r\nHost: web\r\nAuthorization: ${auth}\r\n\r\n`),
-]).then(() => process.exit(0));
-setTimeout(() => {
-  console.log("still open after 40 s");
-  process.exit(0);
-}, 40_000).unref();' "$auth" 2>&1 || true)
+	wait "$timing" || true
+	timed=$(cat "$tmp/timed.out")
 	closes() { # $1 the probe, $2 the seconds web waits, $3 what the connection did
 		seconds=$(printf '%s\n' "$timed" | sed -n "s/^$1=//p")
 		if [ -n "$seconds" ] && [ "$seconds" -ge "$2" ] && [ "$seconds" -le $(($2 + 1)) ]; then
