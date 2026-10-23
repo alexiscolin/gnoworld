@@ -366,3 +366,54 @@ describe("formatLine", () => {
     );
   });
 });
+
+// Pairing (.claude/rules/core.md): failing tests for Alexis's code, decided 2026-10-23 (docs/decisions.md).
+describe("parseLine counts a line whole, the spaces before its command too (F667)", () => {
+  const body = (bytes: number) => "PRIVMSG #gno :" + "a".repeat(bytes - 14);
+  test.fails("refuses a tagless line led by a million spaces", () => {
+    expect(parseLine(" ".repeat(1_000_000) + "PRIVMSG #gno :x")).toStrictEqual({ ok: false, error: "body-too-long" });
+  });
+  test.fails("refuses a tagged line with a million spaces before its command", () => {
+    expect(parseLine("@a=b" + " ".repeat(1_000_000) + "PRIVMSG #gno :x")).toStrictEqual({
+      ok: false,
+      error: "body-too-long",
+    });
+  });
+  test.fails("refuses a body of 510 bytes led by one space: 511 in all", () => {
+    expect(parseLine(" " + body(510))).toStrictEqual({ ok: false, error: "body-too-long" });
+  });
+  test.fails("refuses 509 bytes led by two spaces: 511 in all", () => {
+    expect(parseLine("  " + body(509))).toStrictEqual({ ok: false, error: "body-too-long" });
+  });
+  // The one space after the tags is theirs (IRCv3); a second one counts in the body.
+  test.fails("refuses tags, two spaces and a body of 510: the second space makes 511", () => {
+    expect(parseLine("@a=b  " + body(510))).toStrictEqual({ ok: false, error: "body-too-long" });
+  });
+  // The side a fix must keep, passing today: 510 in all, spaces included, and CR LF never counted.
+  test.each([
+    ["one space and a body of 509", " " + body(509)],
+    ["two spaces and a body of 508", "  " + body(508)],
+    ["one space, a body of 509, then CR LF", " " + body(509) + "\r\n"],
+    ["tags, their space, one more and a body of 509", "@a=b  " + body(509)],
+    ["tags, their space and a body of 510", "@a=b " + body(510)],
+  ])("takes %s: 510 bytes in all", (_, line) => {
+    expect(parseLine(line).ok).toBe(true);
+  });
+});
+
+describe("parseLine refuses an empty source, as formatLine does (F669)", () => {
+  // The error's name is Alexis's to choose: the test asks only for a refusal.
+  test.fails("refuses a line whose source is a colon alone", () => {
+    expect(parseLine(": NICK x").ok).toBe(false);
+  });
+  test.fails("and after its tags", () => {
+    expect(parseLine("@a=b : NICK x").ok).toBe(false);
+  });
+  test.fails("and with two spaces after the colon", () => {
+    expect(parseLine(":  NICK x").ok).toBe(false);
+  });
+  // A tab is part of the word: the source is "\tNICK", a line a fix must not refuse (passing today).
+  test("still takes a source that starts with a tab", () => {
+    expect(parseLine(":\tNICK x").ok).toBe(true);
+  });
+});
