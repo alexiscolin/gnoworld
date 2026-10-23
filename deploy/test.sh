@@ -386,13 +386,14 @@ elif [ "${1:-}" != --demo ]; then
 	if grep -qx 'deploy/secrets' "$repo/.dockerignore"; then pass "the build leaves deploy/secrets out"; else fail "the build would send deploy/secrets"; fi
 	if grep -qF 'Read(/deploy/secrets/**)' "$repo/.claude/settings.json"; then pass "Claude Code may not read the secrets"; else fail "Claude Code may read the secrets"; fi
 	# deploy/k6/run.sh against a Docker that answers as a stack would and logs each call (3n-b): it never starts
-	# beside the demo, and a run stopped in a scenario leaves nothing behind (F642).
+	# on the demo's host, even with the demo stopped (F643), and a run stopped in a scenario leaves nothing behind
+	# (F642).
 	mkdir "$tmp/fake"
 	cat >"$tmp/fake/docker" <<'FAKE'
 #!/bin/sh
 printf '%s\n' "$*" >>"$FAKE_LOG"
 case "$*" in
-"ps -q --filter label=com.docker.compose.project=gnoworld-demo") [ -z "${FAKE_DEMO:-}" ] || echo d3m0 ;;
+"ps -aq --filter label=com.docker.compose.project=gnoworld-demo") [ -z "${FAKE_DEMO:-}" ] || echo d3m0 ;;
 "compose "*" ps -q "*) echo c0ntainer ;;
 "inspect "*) echo 1mage ;;
 *" /k6/load.js") sleep 4 ;;
@@ -404,10 +405,10 @@ FAKE
 	: >"$tmp/fake.log"
 	code=0
 	(load yes all) >"$tmp/load.log" 2>&1 || code=$?
-	if [ "$code" = 2 ] && grep -q 'the demo runs on this host' "$tmp/load.log" && ! grep -q '^compose ' "$tmp/fake.log"; then
-		pass "the load runs refuse to start beside the demo, before making anything"
+	if [ "$code" = 2 ] && grep -q "the demo's containers are on this host" "$tmp/load.log" && ! grep -q '^compose ' "$tmp/fake.log"; then
+		pass "the load runs refuse the demo's host, its containers stopped, before making anything"
 	else
-		fail "the load runs start beside the demo (exit $code)"
+		fail "the load runs start on the demo's host (exit $code)"
 	fi
 	# Stopped by TERM (a shell in the background ignores INT), it removes its project, its folder, which holds the
 	# operator's key, and its sampler.

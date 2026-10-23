@@ -24,9 +24,9 @@ missing() {
 only=${1:-all}
 case $only in all | logins | crowd | streams | messages) ;; *) missing "no such scenario [$only]: logins, crowd, streams or messages" ;; esac
 for tool in docker openssl htpasswd; do command -v "$tool" >/dev/null || missing "$tool is missing"; done
-# Beside the demo, the load would take its CPU and memory: none of its containers may run on this host.
-[ -z "$(docker ps -q --filter label=com.docker.compose.project=gnoworld-demo)" ] ||
-	missing "the demo runs on this host: stop it first (ADR-0002: load tests never run on it)"
+# Never on the demo's host (ADR-0002): none of its containers, running or stopped, may be here (F643).
+[ -z "$(docker ps -aq --filter label=com.docker.compose.project=gnoworld-demo)" ] ||
+	missing "the demo's containers are on this host: run the load on another (ADR-0002: never on the demo's host)"
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/gnoworld-load.XXXXXX")
 files="-f $deploy/compose.yaml -f $tmp/load.yaml"
