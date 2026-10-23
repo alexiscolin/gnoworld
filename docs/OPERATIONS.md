@@ -132,7 +132,8 @@ Alexis, 2026-10-19: written here, each with its backlog row, not fixed in 1c.
   address refused" (F205).
 - **Open connections.** A visitor holds 32 requests at once, a WebSocket and a stream counting while
   they last, and a team behind one address shares them; `web` holds 4,096 connections, two for each
-  held request (the visitor's and its upstream's): about 64 visitors at their 32 at once. A connection
+  held request (the visitor's and its upstream's): about 64 visitors at their 32 at once, by division;
+  `deploy/test.sh` proves 16 at once (more than 1,024), the rest is a margin. A connection
   that sends nothing more is closed, 10 s into its headers or its body, 15 s idle between requests
   (F208, sized before the first k6 run: 3n-b).
 
