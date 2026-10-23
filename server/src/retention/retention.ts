@@ -45,14 +45,28 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
     ),
   };
   const count = (): number => N.parse(sql.count.get()).n;
-  // Each measure's alert, raised at 80% of its cap and armed again below it.
-  const raised = new Set<string>();
-  const watch = (name: string, value: number, cap: number): void => {
-    if (value * 5 < cap * 4) raised.delete(name);
-    else if (!raised.has(name)) {
-      raised.add(name);
-      log("alert", { error: name });
+  // Whether an alert's condition holds now and did not at the last tick: one alert a crossing, armed again once
+  // it no longer holds. Each alert is logged by its name written out, which scripts/check_docs.py reads.
+  const raised = { verdicts: false, database: false, unreadable: false, ergo: false };
+  const rises = (which: keyof typeof raised, holds: boolean): boolean => {
+    const was = raised[which];
+    raised[which] = holds;
+    return holds && !was;
+  };
+  const near = (value: number, cap: number): boolean => value * 5 >= cap * 4;
+  // Ergo's folder against its cap. One that cannot be read is an alert of its own and leaves the near-cap one
+  // as it was.
+  const measureErgo = (): void => {
+    if (options.ergoData === undefined) return;
+    const { dir, maxBytes: cap } = options.ergoData;
+    let bytes: number | undefined;
+    try {
+      bytes = sizeOf(dir);
+    } catch {
+      // A folder that cannot be listed is unreadable, never empty.
     }
+    if (rises("unreadable", bytes === undefined)) log("alert", { error: "ergo_volume_unreadable" });
+    if (bytes !== undefined && rises("ergo", near(bytes, cap))) log("alert", { error: "ergo_volume_near_cap" });
   };
   return {
     tick() {
@@ -63,21 +77,10 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
         removed = Number(sql.oldest.run(Math.min(batch, budget, over)).changes);
         [over, budget] = [over - removed, budget - removed];
       }
-      watch("verdicts_near_cap", count(), maxVerdicts);
-      watch("database_near_cap", N.parse(sql.used.get()).n, maxBytes);
-      // A backlog's ticks follow at once: Ergo's folder is walked on the timed ones alone (3NB-8). A folder that
-      // cannot be read is an alert of its own and leaves the near-cap one as it was.
-      if (budget > 0 && options.ergoData !== undefined) {
-        const { dir, maxBytes: cap } = options.ergoData;
-        let bytes: number | undefined;
-        try {
-          bytes = sizeOf(dir);
-        } catch {
-          // A folder that cannot be listed is unreadable, never empty.
-        }
-        watch("ergo_volume_unreadable", bytes === undefined ? 1 : 0, 1);
-        if (bytes !== undefined) watch("ergo_volume_near_cap", bytes, cap);
-      }
+      if (rises("verdicts", near(count(), maxVerdicts))) log("alert", { error: "verdicts_near_cap" });
+      if (rises("database", near(N.parse(sql.used.get()).n, maxBytes))) log("alert", { error: "database_near_cap" });
+      // A backlog's ticks follow at once: Ergo's folder is walked on the timed ones alone (3NB-8).
+      if (budget > 0) measureErgo();
       return budget <= 0;
     },
   };
