@@ -77,7 +77,7 @@ peak() {
 		cpu = $NF; sub(/%/, "", cpu)
 		if (mib + 0 > m[$1] + 0) m[$1] = mib
 		if (cpu + 0 > c[$1] + 0) c[$1] = cpu }
-		END { for (n in m) printf "peak  %s %.0f MiB, %s%% CPU\n", n, m[n], c[n] }' "$tmp/stats"
+		END { for (n in m) printf "peak  %s %.0f MiB, %s%% CPU\n", n, m[n], c[n] }' "$1"
 }
 # Ergo's files' bytes as the server sums them (retention.ts, sizeOf): all but folders, a link as itself.
 volume() { docker exec "$ergo" sh -c 'find /data ! -type d -exec ls -ldn {} \; | awk "{ s += \$5 } END { print s + 0 }"'; }
@@ -283,16 +283,18 @@ k6() {
 		-e HOLD="$HOLD" -e RATE="$RATE" -e CROWD="$CROWD" "$K6" run --quiet /k6/load.js
 }
 # A scenario, the containers sampled all through it; its own exit code.
+# A file each: a docker stats under way when its sampler stops still writes, into its own scenario's file (F647).
 during() {
+	runs=$((${runs:-0} + 1))
 	while :; do
 		docker stats --no-stream --format '{{.Name}} {{.MemUsage}} {{.CPUPerc}}' "$ergo" "$server"
 		sleep 2
-	done >"$tmp/stats" 2>/dev/null &
+	done >"$tmp/stats.$runs" 2>/dev/null &
 	sampler=$!
 	code=0
 	"$@" || code=$?
 	kill "$sampler"
-	peak
+	peak "$tmp/stats.$runs"
 	return "$code"
 }
 missed=0
