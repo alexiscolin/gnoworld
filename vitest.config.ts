@@ -1,5 +1,7 @@
 import { configDefaults, defineConfig } from "vitest/config";
 
+const SLOW = ["server/src/testing/ergo*.test.ts", "server/src/testing/soak.test.ts"];
+
 export default defineConfig({
   test: {
     // A test that asserts nothing passes whatever the code does.
@@ -10,8 +12,13 @@ export default defineConfig({
         test: {
           name: "node",
           include: ["packages/*/src/**/*.test.ts", "app/src/**/*.test.{ts,tsx}", "server/src/**/*.test.ts"],
-          exclude: [...configDefaults.exclude, "packages/ui/**"],
+          exclude: [...configDefaults.exclude, "packages/ui/**", ...SLOW],
         },
+      },
+      {
+        // The real Ergo's tests and the check's soak: the full gate runs them, the fast gate leaves them.
+        extends: true,
+        test: { name: "slow", include: SLOW },
       },
       {
         // The design system's components, rendered in jsdom through their stories.
