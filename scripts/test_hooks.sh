@@ -376,6 +376,21 @@ row "| F001 | 2026-10-17 | a | x.py:1 | a bug | intended | — |" && fail "check
 row "| F001 | 2026-10-17 | a | x.py:1 | a bug | moot | — |" && fail "check_docs accepted a moot finding with no reason"
 row "| F001 | 2026-10-17 | a | x.py:1 | a | claimed | — |
 | F001 | 2026-10-17 | b | y.py:1 | b | claimed | — |" && fail "check_docs accepted an id used twice"
+# Every commit a row cites is one, whatever its status (slice 3 read a fix's first only); outside a repository,
+# pre-commit's staged copy, none can be checked.
+blob=$(git -C "$d" rev-parse --short HEAD:scripts/real.sh) && full=$(git -C "$d" rev-parse HEAD)
+row "| F001 | 2026-10-17 | a | x.py:1 | a bug | rejected | as \`$sha\` shows |" || fail "check_docs refused a rejected finding citing a commit of the repo"
+row "| F001 | 2026-10-17 | a | x.py:1 | a bug | moot | as \`$full\` shows |" || fail "check_docs refused a full hash of a commit of the repo"
+for status in claimed reproduced rejected intended moot asked; do
+	row "| F001 | 2026-10-17 | a | x.py:1 | a bug | $status | as \`0badc0de\` shows |" && fail "check_docs accepted a $status finding citing no commit of the repo"
+done
+row "| F001 | 2026-10-17 | a | x.py:1 | a bug | moot | as \`0badc0de0badc0de0badc0de0badc0de0badc0de\` shows |" && fail "check_docs accepted a full hash the repo lacks"
+row "| F001 | 2026-10-17 | a | x.py:1 | a bug | fixed | \`$sha\`, then \`0badc0de\` |" && fail "check_docs accepted a fix citing a second commit the repo lacks"
+row "| F001 | 2026-10-17 | a | x.py:1 | a bug | claimed | as \`$blob\` holds |" && fail "check_docs accepted a cited blob as a commit"
+row "| F001 | 2026-10-17 | a | x.py:1 | a bug | fixed | its test |" && fail "check_docs accepted a fixed finding citing no commit"
+o="$t/docs-copy" && mkdir -p "$o/docs/review"
+printf '| Id | Found | By | Where | Claim | Status | Evidence |\n|---|---|---|---|---|---|---|\n| F001 | 2026-10-17 | a | x.py:1 | a bug | fixed | `0badc0de` |\n| F002 | 2026-10-17 | a | x.py:1 | a bug | moot | as `0badc0de` shows |\n' >"$o/docs/review/findings.md"
+python3 -I "$docs" "$o" >/dev/null 2>&1 || fail "check_docs refused cited commits outside a repository, where none can be read"
 rm -r "$d/docs/review"
 # A test sits beside the file it tests, under its name (docs/ARCHITECTURE.md, "Naming").
 mkdir -p "$d/app/src/routes" "$d/packages/core/src"
@@ -395,11 +410,39 @@ rm -r "$d/app" "$d/packages"
 # The alerts the server logs are the runbook's list of alerts, which ops matches, both ways (slice 3's plan, 3n;
 # F646): a test's ignored, each quoted in the list's own bullet, a name quoted elsewhere not counting.
 mkdir -p "$d/server/src"
-list() { printf 'Prose quoting `%s` elsewhere.\n\n- **Every alert**: %s.\n- **Next**: none.\n' "${2:-other_name}" "$1" >"$d/docs/OPERATIONS.md"; }
+# The known limits slice 3's plan has the runbook say (its section 8; 3M-19), each by a phrase of its line; list
+# leaves out the one its third argument names.
+known="evaded with a new address
+a connection already open lasts until it drops
+A mistaken hide stays
+left unchecked by a provider outage
+Restricted, not encrypted
+never sent to OpenAI
+100 accounts a members room
+Nobody is invited at login
+no age: decision 154's 14 days
+Ergo deletes history by age alone
+the erasure path (slice 12) are blockers"
+list() {
+	printf 'Prose quoting `%s` elsewhere.\n\n- **Every alert**: %s.\n- **Next**: none.\n\n%s\n' "${2:-other_name}" "$1" \
+		"$(printf '%s\n' "$known" | grep -vxF -- "${3:-}" | sed 's/$/./')" >"$d/docs/OPERATIONS.md"
+}
 printf 'log("alert", { error: "disk_full" });\nlog("alert", { error: "rows_near_cap" });\n' >"$d/server/src/job.ts"
 printf 'log("alert", { error: "only_in_a_test" });\n' >"$d/server/src/job.test.ts"
 list '`disk_full` (the disk is full), `rows_near_cap` (rows near their cap)'
 python3 -I "$docs" "$d" >/dev/null 2>&1 || fail "check_docs refused a list naming every alert, with its prose"
+printf '%s\n' "$known" | while IFS= read -r limit; do
+	out=$(list '`disk_full`, `rows_near_cap`' "" "$limit" && python3 -I "$docs" "$d" 2>&1) && fail "check_docs accepted a runbook without its known limit: $limit"
+	printf '%s' "$out" | grep -qF -- "$limit" || fail "check_docs did not name the known limit missing: $limit"
+	printf '%s\n' "$known" | while IFS= read -r other; do
+		[ "$other" = "$limit" ] || ! printf '%s' "$out" | grep -qF -- "$other" || fail "check_docs named a known limit the runbook holds: $other"
+	done
+done
+list '`disk_full`, `rows_near_cap`' "" "Restricted, not encrypted" && printf 'restricted, not encrypted.\n' >>"$d/docs/OPERATIONS.md"
+python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted a known limit in other letters"
+list '`disk_full`, `rows_near_cap`'
+python3 -I -c 'import sys; p = sys.argv[1]; s = open(p).read(); open(p, "w").write(s.replace("Restricted, not", "Restricted,\t\n\n  not"))' "$d/docs/OPERATIONS.md"
+python3 -I "$docs" "$d" >/dev/null 2>&1 || fail "check_docs refused a known limit wrapped across lines"
 list '`disk_full`'
 python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted an alert the list leaves out"
 list '`disk_full`' rows_near_cap
