@@ -130,8 +130,11 @@ Alexis, 2026-10-19: written here, each with its backlog row, not fixed in 1c.
 - **DNS through the router.** On a host whose resolver is its router or a LAN server, the guard
   lets that server's port 53 out, for Tailscale's name lookups: an exception to "every private
   address refused" (F205).
-- **Open connections.** The limit counts requests per visitor, not open connections, and a team
-  behind one address shares one limit (F208).
+- **Open connections.** A visitor holds 32 requests at once, a WebSocket and a stream counting while
+  they last, and a team behind one address shares them; `web` holds 4,096 connections, two for each
+  held request (the visitor's and its upstream's): about 64 visitors at their 32 at once. A connection
+  that sends nothing more is closed, 10 s into its headers or its body, 15 s idle between requests
+  (F208, sized before the first k6 run: 3n-b).
 
 Slice 3, the login (3c; `docs/decisions.md`, 2026-10-22):
 
@@ -272,8 +275,32 @@ Slice 3, the server's retention (3n):
   alert (put to Alexis: an alert of its own).
 - **The other stores** purge themselves (nonces, tokens, tickets, mutes) or hold a row a room or an
   account; the accounts' addresses are kept for the new-account rule, until slice 12's erasure path.
-- **Not yet:** the k6 runs, `web`'s per-visitor limits and Ergo's volume measure wait for 3e's stack
-  (3n-b); the sizes above are a careful start for the demo's 2 GB until those runs.
+- **Ergo's volume** is measured by the server, read-only (`ERGO_DATA`, the volume mounted at `/ergo`
+  with `:ro`), against `ERGO_DATA_MB` (1024, `deploy/.env`): the alert `ergo_volume_near_cap` fires once
+  at 80% and again only after a fall below, and `ergo_volume_unreadable` once while the folder cannot be
+  read. It is measured every five minutes, never during a backlog's runs. Ergo deletes history by age
+  alone (its one `expire-time`, 90 days), not by size: at the alert, give the disk room and raise
+  `ERGO_DATA_MB`, or shorten `expire-time` in `deploy/ergo/ircd.yaml.tmpl` and restart Ergo; whether
+  Ergo then frees the space at once is not verified.
+- **The load runs** are the operator's: `sh deploy/k6/run.sh` (Docker) builds a stack of its own, in the
+  project `gnoworld-load`, and refuses to start while the demo runs on the host. From inside its network,
+  each scenario's numbers: every account logging in at once (`ACCOUNTS`, 200), guests in a world's room
+  (`CROWD`, 2,000), the rooms' streams (`STREAMS`, 1,000), the accounts' lines every 5 s (with
+  `OPENAI_API_KEY_FILE`, OpenAI's checks of them); the containers' peak memory and CPU, Ergo's volume
+  before and after, the verdicts and the backlog alerts. The first run's numbers go in slice 3's plan
+  (3n's As built); the sizes above and `web`'s limits are a careful start for the demo's 2 GB until
+  then.
+- **Logs** have a size and a count (3 × 10 MB a container), no age: decision 154's 14 days hold only
+  where ops' log backend sets them.
+- **The alerts**, each a log line `{"event":"alert","error":"<name>"}` that ops matches:
+  `verdicts_near_cap`, `database_near_cap`, `ergo_volume_near_cap` and `ergo_volume_unreadable` (above);
+  `moderation_off` (no key: every message unchecked), `moderation_refused` (OpenAI refused the key or the
+  call), `moderation_shape` (an answer of an unknown shape), `moderation_breaker` (checks paused 30 s
+  after five failures), `moderation_backlog` (a check waits two minutes or more), `moderation_queue_full` (a
+  message left unchecked, the queue full); `redact_refused`, `unknown_room` and `room_opened` (the
+  rooms, below). `scripts/check_docs.py` keeps this list whole.
+- **Before a public launch** (decision 154): the privacy policy, which says what reaches OpenAI and what
+  is kept and how long, and the erasure path (slice 12) are blockers.
 
 Slice 3, the stack (3e):
 
