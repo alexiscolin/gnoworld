@@ -37,6 +37,9 @@ services:
     cpus: 0.5
     mem_limit: 128m
     pids_limit: 64
+    # Two files for each of nginx's 4,096 connections, set here: nginx, no root, cannot raise a hard limit (F645).
+    ulimits:
+      nofile: { soft: 8192, hard: 8192 }
     healthcheck:
       test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8081/health]
       interval: 30s

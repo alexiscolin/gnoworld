@@ -353,6 +353,7 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "the limit answered 503" "the 33rd refused" nginx sed '/limit_conn_status/d'
 	mutant "web's room for 1,024 connections" "sixteen visitors at their 32 WebSockets each, and another is served" \
 		nginx sed 's#worker_connections [0-9]*;#worker_connections 1024;#'
+	mutant "web's files left to Docker's default" "web may hold 8,192 files" compose 'services: { web: { ulimits: !reset {} } }'
 	mutant "the server may write Ergo's volume" "the server holds Ergo's volume read-only" \
 		compose 'services: { server: { volumes: !override [ "server:/data", "auth:/run/gnoworld", "ergo:/ergo" ] } }'
 	mutant "the server measures another volume" "and it is Ergo's own volume" \
@@ -469,6 +470,8 @@ FAKE
 	guard=$(docker compose -p "$project" $files ps -q guard)
 
 	hardened "$web" web
+	# nginx's 4,096 connections take two files each, a limit Docker sets: nginx, no root, cannot raise it (F645).
+	expect "web may hold 8,192 files" "$(docker inspect --format '{{range .HostConfig.Ulimits}}{{.Name}}={{.Soft}}/{{.Hard}} {{end}}' "$web")" "nofile=8192/8192 "
 	expect "web sits on the internal network only" "$(networks_of "$web")" "$inside "
 	expect "that network has no way out" "$(docker network inspect --format '{{.Internal}}' "$inside")" true
 	case $(docker network inspect --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}' "$inside") in
