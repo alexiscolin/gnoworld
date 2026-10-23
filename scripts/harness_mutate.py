@@ -125,6 +125,17 @@ def mutants():
     yield from each(SERVER, '"server/src/net.ts", ', "", "probe", "eslint net.ts calls fetch")
     yield from each(SERVER, "...TESTS", "", "probe", "eslint a server test calls the server it started")
     yield from each(SERVER, '"server/**/*.ts"', '"server/**/*.nothing"', "probe", "eslint reaches the server's files")
+    # No state at a module's top (F412): the block for every workspace's source, core's and ui's own lists, the selector's parts.
+    both = '"server/src/**/*.ts", "packages/*/src/**/*.{ts,tsx}"'
+    yield from each("eslint.config.ts", both, '"packages/*/src/**/*.{ts,tsx}"', "probe", "eslint keeps no state at a server module's top")
+    yield from each("eslint.config.ts", both, '"server/src/**/*.ts"', "probe", "eslint keeps no state at a workspace module's top")
+    yield from each("eslint.config.ts", '"error", ...SWALLOWED, MODULE_STATE]', '"error", ...SWALLOWED]', "probe", "eslint's workspace block refuses state at a module's top")
+    yield from each("eslint.config.ts", '"error", ...SWALLOWED, MODULE_STATE]', '"error", MODULE_STATE]', "probe", "eslint's workspace block keeps the swallowed errors refused")
+    yield from each("lint/core.config.ts", "...IMPURE, MODULE_STATE]", "...IMPURE]", "probe", "eslint core keeps no state at a module's top")
+    yield from each(REACT, "RAW_ANCHOR, MODULE_STATE]", "RAW_ANCHOR]", "probe", "eslint ui's components keep no state at a module's top")
+    yield from each("lint/shared.config.ts", "/^(${KEPT})$/", "/${KEPT}/", "probe", "eslint keeps a module's state by whole names")
+    yield from each("lint/shared.config.ts", ":not(:function NewExpression)", "", "probe", "eslint lets a function make a Map")
+    yield from each("lint/shared.config.ts", "/^(Weak)?(Map|Set)$/", "/^(Map|Set)$/", "probe", "eslint refuses a WeakMap at a module's top")
     yield from each("server/tsconfig.json", '"types": ["node"]', '"types": []', "probe", "the server compiles with Node's types")
     # The Ergo the tests start (slice 3b): each refusal of the pin, each check of the cache, each refusal of a build.
     yield from lines("scripts/ergo.sh", r"^case .*refuse .*$", ":", "hooks", "ergo.sh checks the pin")

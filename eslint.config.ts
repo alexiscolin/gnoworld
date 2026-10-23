@@ -10,7 +10,7 @@ import app from "./lint/app.config.ts";
 import core from "./lint/core.config.ts";
 import react from "./lint/react.config.ts";
 import server from "./lint/server.config.ts";
-import { SWALLOWED, SWITCHED_OFF, TESTS } from "./lint/shared.config.ts";
+import { MODULE_STATE, SWALLOWED, SWITCHED_OFF, TESTS } from "./lint/shared.config.ts";
 
 const BASELINE_ALSO = { allowAtRules: ["starting-style"], allowSelectors: ["popover-open"] };
 const FACE = { ...BASELINE_ALSO, allowProperties: ["forced-color-adjust"] };
@@ -60,6 +60,12 @@ export default defineConfig(
   },
   // Config files run on Node, whose types core must not see: lint them without types.
   { files: ["*.config.ts", "app/*.config.ts", "lint/*.config.ts"], extends: [tseslint.configs.disableTypeChecked] },
+  // No state at a module's top in a workspace's source; core's and ui's own lists, below, hold it too, and the
+  // tests' lists replace it.
+  {
+    files: ["server/src/**/*.ts", "packages/*/src/**/*.{ts,tsx}"],
+    rules: { "no-restricted-syntax": ["error", ...SWALLOWED, MODULE_STATE] },
+  },
   react,
   app,
   server,

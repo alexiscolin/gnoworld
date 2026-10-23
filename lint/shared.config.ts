@@ -35,5 +35,16 @@ export const SWITCHED_OFF = {
     "MemberExpression[property.name=/^(only|skip|todo|skipIf|runIf|fixme)$/], MemberExpression[property.name='fail']:not([object.name=/^(expect|assert)$/])",
   message: "A test is never switched off or focused: fix it, or remove it with `Removed-test:` in the commit.",
 };
+// No Map, WeakMap or Set made at a module's top in a workspace's source, nor inside what a top-level name holds:
+// it lives as long as the process, every test shares it, and StrykerJS ignores the code that builds it (F412).
+// Kept by name: two constant tables, FORMS and DIRECTIONAL, and lookups, one entry per database.
+const KEPT = "FORMS|DIRECTIONAL|lookups";
+const NAMED = `VariableDeclaration > VariableDeclarator[id.name!=/^(${KEPT})$/]`;
+const MADE = "NewExpression[callee.name=/^(Weak)?(Map|Set)$/]:not(:function NewExpression)";
+export const MODULE_STATE = {
+  selector: `Program > ${NAMED} ${MADE}, Program > ExportNamedDeclaration > ${NAMED} ${MADE}`,
+  message:
+    "A Map, WeakMap or Set at a module's top lives as long as the process, shared by every test: make it in a function (F412).",
+};
 // Vitest's tests and Playwright's journeys.
 export const TESTS = ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts"];

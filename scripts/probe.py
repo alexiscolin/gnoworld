@@ -22,6 +22,8 @@ with open("package.json") as f:
     SCRIPTS = json.load(f)["scripts"]  # the gate's own commands, so a case proves what the gate runs
 BLOCK = "".join(f"  total += values[{i}] * {i + 1};\n" for i in range(14))
 # The network and the device's storage, which the app reaches only from lib and the worker (F378).
+# No state at a module's top in a workspace's source (F412): every test shares it, and StrykerJS ignores what builds it.
+MODULE = "no-restricted-syntax: A Map, WeakMap or Set at a module's top"
 REACHES = ["fetch", "XMLHttpRequest", "WebSocket", "EventSource", "localStorage", "sessionStorage", "indexedDB", "caches", "cookieStore"]
 
 # File name, content, and what ESLint must report: a rule, or "rule: the start of its message" when
@@ -75,6 +77,19 @@ LINT = [
     ("dynamic_import.ts", "export async function load(): Promise<unknown> {\n  return import(\"./clean.ts\");\n}\n", "no-restricted-syntax: core imports only core"),
     ("escape.ts", "import config from \"../../../../vitest.config.ts\";\n\nexport const c: unknown = config;\n", "import-x/no-restricted-paths"),
     ("dom_lib.ts", "/// <reference lib=\"dom\" />\nexport const n = 1;\n", "@typescript-eslint/triple-slash-reference"),
+    ("module_map.ts", "const seen = new Map<string, number>();\n\nexport function count(key: string): number {\n  seen.set(key, 1);\n  return seen.size;\n}\n", MODULE),
+    ("module_set.ts", "export const SEEN = new Set<string>();\n", MODULE),
+    ("local_set.ts", "export function count(keys: string[]): number {\n  return new Set(keys).size;\n}\n", None),
+    ("module_table.ts", 'const LIMITS = new Map([["a", 1]]);\n\nexport function limit(k: string): number | undefined {\n  return LIMITS.get(k);\n}\n', MODULE),
+    ("module_frozen.ts", 'export const KINDS = Object.freeze(new Set(["a"]));\n', MODULE),
+    ("module_object.ts", "export const STATE = { seen: new Set<string>() };\n", MODULE),
+    ("module_arrow.ts", "export const make = (): Set<string> => new Set<string>();\n", None),
+    ("module_function.ts", "export const make = function (): Map<string, number> {\n  return new Map<string, number>();\n};\n", None),
+    # The named exceptions are by name, whole: a Map beside one, or a name that only holds one, is refused.
+    ("module_named.ts", "const FORMS = new Map<string, number>();\n\nexport const size = (): number => FORMS.size;\n", None),
+    ("module_beside.ts", "const FORMS = new Map<string, number>();\nconst other = new Set<string>();\n\nexport const sizes = (): number => FORMS.size + other.size;\n", MODULE),
+    ("module_longer.ts", "const lookupsByRoom = new Map<string, number>();\n\nexport const size = (): number => lookupsByRoom.size;\n", MODULE),
+    ("module_map.test.ts", 'import { expect, test } from "vitest";\n\nconst seen = new Set<string>();\n\ntest("x", () => {\n  expect(seen.size).toBe(0);\n});\n', None),
     ("token_elsewhere.css", "@layer components {\n  .a {\n    color: var(--color-text);\n  }\n}\n", None),
     ("invalid.css", "@layer components {\n  .a {\n    color: 12px;\n  }\n}\n", "css/no-invalid-properties"),
     ("important.css", ".a {\n  color: var(--color-text) !important;\n}\n", "css/no-important"),
@@ -197,8 +212,12 @@ try:
 
     if part("outside_core"):
         # Outside core: `fails` is refused (pairing happens only in core), and a swallowed error too.
+        lint = dict((n, c) for n, c, _ in LINT)
         lint_cases([("pending.test.ts", 'import { expect, test } from "vitest";\n\ntest.fails("x", () => {\n  expect(1).toBe(2);\n});\n', "no-restricted-syntax: `fails` is for pairing"),
-                    ("log_catch.ts", dict((n, c) for n, c, _ in LINT)["log_catch.ts"], "no-restricted-syntax: A catch that only logs")],
+                    ("log_catch.ts", lint["log_catch.ts"], "no-restricted-syntax: A catch that only logs"),
+                    # Every workspace's source, not core's, ui's and the server's alone: schemas too.
+                    ("module_map.ts", lint["module_map.ts"], MODULE),
+                    ("module_map.test.ts", lint["module_map.test.ts"], None)],
                    "packages/probe/src", "outside core")
         shutil.rmtree("packages/probe")
 
@@ -282,6 +301,9 @@ try:
             ("Go.test.tsx", 'import { render } from "@testing-library/react";\nimport { expect, it } from "vitest";\n\nit("draws a link", () => {\n  const { container } = render(<a href="/x">Go</a>);\n  expect(container.querySelector("a")).not.toBeNull();\n});\n', None),
             ("inner_html.tsx", 'import { useEffect, useRef } from "react";\n\nexport function Card({ n }: { n: string }) {\n  const boxRef = useRef<HTMLDivElement>(null);\n  useEffect(() => {\n    if (boxRef.current) boxRef.current.innerHTML = n;\n  });\n  return <div ref={boxRef} />;\n}\n',
              restricted("'innerHTML'")),
+            ("module_map.tsx", "const seen = new WeakMap<object, string>();\n\nexport function Card({ n }: { n: object }) {\n  return <p>{seen.get(n)}</p>;\n}\n", MODULE),
+            ("module_set.ts", "export const SEEN = new Set<string>();\n", MODULE),
+            ("module_set.test.tsx", 'import { expect, it } from "vitest";\n\nconst seen = new Set<string>();\n\nit("x", () => {\n  expect(seen.size).toBe(0);\n});\n', None),
             # A control keeps the system's colours under forced colours: only the avatar's face may not (F319, F349).
             ("forced.css", FORCED, "css/use-baseline"),
         ]
@@ -369,6 +391,8 @@ try:
             ("console.ts", 'export function say(): void {\n  console.log("x");\n}\n', "no-console"),
             ("floating.ts", lint["floating.ts"], "@typescript-eslint/no-floating-promises"),
             ("log_catch.ts", lint["log_catch.ts"], "no-restricted-syntax: A catch that only logs"),
+            ("module_map.ts", lint["module_map.ts"], MODULE),
+            ("module_map.test.ts", 'import { expect, test } from "vitest";\n\nconst seen = new Map<string, number>();\n\ntest("x", () => {\n  expect(seen.size).toBe(0);\n});\n', None),
         ]
         lint_cases(server, src, "server")
         shutil.rmtree(src)
