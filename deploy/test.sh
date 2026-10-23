@@ -301,6 +301,7 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "the password logged" "no log holds the password" nginx sed 's#$status $body_bytes_sent#$status $body_bytes_sent $http_authorization#'
 	mutant "noindex only on success" "the 401 is not indexed" nginx sed 's#X-Robots-Tag "noindex" always#X-Robots-Tag "noindex"#'
 	mutant "sniffing allowed" "is never sniffed" nginx sed '/X-Content-Type-Options/d'
+	mutant "the referrer sent along" "names no referrer to another site" nginx sed '/Referrer-Policy/d'
 	mutant "no content security policy" "carries the policy" nginx sed '/include \/etc\/nginx\/csp.conf;/d'
 	mutant "hashed files not kept" "is kept a year" nginx sed 's#public, max-age=31536000, immutable#no-cache#'
 	mutant "an error on a hashed file kept a year" "a 401 on a hashed file revalidates" \
@@ -578,6 +579,7 @@ FAKE
 	for path in $pages /nowhere /sw.js /manifest.webmanifest /icon-192.png $assets; do
 		expect "$path is not indexed" "$(header x-robots-tag "$path" 203.0.113.1 -u "$auth")" noindex
 		expect "$path is never sniffed" "$(header x-content-type-options "$path" 203.0.113.1 -u "$auth")" nosniff
+		expect "$path names no referrer to another site" "$(header referrer-policy "$path" 203.0.113.1 -u "$auth")" no-referrer
 	done
 	for path in $pages /nowhere /sw.js /manifest.webmanifest /icon-192.png; do
 		expect "$path revalidates" "$(header cache-control "$path" 203.0.113.1 -u "$auth")" no-cache
