@@ -68,15 +68,16 @@ inside=${project}_inside
 of() { docker compose -p "$project" $files ps -q "$1"; }
 ergo=$(of ergo) server=$(of server)
 server_image=$(docker inspect --format '{{.Image}}' "$server")
-# Ergo's and the server's memory and CPU at their most during a run, sampled every 2 s (web stands aside: the load
-# goes to them straight).
+# Ergo's and the server's memory, processes (their pids_limit counts threads) and CPU at their most during a run,
+# sampled every 2 s (web stands aside: the load goes to them straight).
 peak() {
 	awk '{ mem = $2; unit = mem; sub(/^[0-9.]+/, "", unit); sub(/[A-Za-z]+$/, "", mem)
 		mib = unit == "GiB" ? mem * 1024 : unit == "KiB" ? mem / 1024 : unit == "B" ? mem / 1048576 : mem
 		cpu = $NF; sub(/%/, "", cpu)
 		if (mib + 0 > m[$1] + 0) m[$1] = mib
+		if ($(NF - 1) + 0 > p[$1] + 0) p[$1] = $(NF - 1)
 		if (cpu + 0 > c[$1] + 0) c[$1] = cpu }
-		END { for (n in m) printf "peak  %s %.0f MiB, %s%% CPU\n", n, m[n], c[n] }' "$1"
+		END { for (n in m) printf "peak  %s %.0f MiB, %d processes, %s%% CPU\n", n, m[n], p[n], c[n] }' "$1"
 }
 # Ergo's files' bytes as the server sums them (retention.ts, sizeOf): all but folders, a link as itself.
 volume() { docker exec "$ergo" sh -c 'find /data ! -type d -exec ls -ldn {} \; | awk "{ s += \$5 } END { print s + 0 }"'; }
@@ -295,8 +296,9 @@ k6() {
 # A file each: a docker stats under way when its sampler stops still writes, into its own scenario's file (F647).
 during() {
 	runs=$((${runs:-0} + 1))
+	since=$(date +%s)
 	while :; do
-		docker stats --no-stream --format '{{.Name}} {{.MemUsage}} {{.CPUPerc}}' "$ergo" "$server"
+		docker stats --no-stream --format '{{.Name}} {{.MemUsage}} {{.PIDs}} {{.CPUPerc}}' "$ergo" "$server"
 		sleep 2
 	done >"$tmp/stats.$runs" 2>/dev/null &
 	sampler=$!
@@ -306,6 +308,8 @@ during() {
 	peak "$tmp/stats.$runs"
 	# One the kernel killed for its memory comes back by its restart policy, its sessions gone: said, not guessed.
 	docker inspect --format 'restarts {{.Name}} {{.RestartCount}}, killed for memory: {{.State.OOMKilled}}' "$ergo" "$server"
+	# And why one died, in its own words: Go's and Ergo's last fatal lines since the scenario began.
+	docker logs --since "$since" "$ergo" 2>&1 | grep -iE 'panic|fatal|runtime:|newosproc|out of memory|sendq' | tail -n 8 | sed 's/^/ergo  /'
 	return "$code"
 }
 missed=0
@@ -332,6 +336,8 @@ elif scenario messages; then
 	after=$(volume)
 	echo "ergo's volume: ${before} bytes before, ${after} after"
 	echo "moderation backlog alerts: $(docker logs "$server" 2>&1 | grep -c '"moderation_backlog"' || true)"
+	# Every error the server logged, by name: an unchecked line's reason (OpenAI's refusals, the breaker, the queue).
+	docker logs "$server" 2>&1 | grep -o '"error":"[a-z_]*"' | sort | uniq -c | sed 's/^ */errors  /'
 	# The server holds its database alone (server/src/db.ts, EXCLUSIVE): read once it has stopped.
 	docker stop "$server" >/dev/null
 	docker run --rm --volumes-from "$server" --entrypoint /nodejs/bin/node "$server_image" -e '
