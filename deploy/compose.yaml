@@ -71,10 +71,10 @@ services:
       - ergo:/data
       - auth:/run/gnoworld
     cpus: 0.4
-    # 2,000 guests joining one room filled 256 MiB, and Ergo was killed (3n's first load run): each reader's
-    # sendq may hold 96 KiB (ircd.yaml.tmpl): 187.5 MiB for 2,000, Go's own heap aside.
+    # 2,000 guests joining one room took Ergo to 344 MiB, and Go past 128 threads, which a pids_limit counts:
+    # "failed to create new OS thread (have 129 already)", Ergo dead (3n's load runs). It starts no process of its own.
     mem_limit: 512m
-    pids_limit: 128
+    pids_limit: 1024
     healthcheck:
       test: [CMD, /ircd-bin/probe, "127.0.0.1:6667"]
       interval: 30s
