@@ -823,7 +823,10 @@ server at 186 MiB and 19% of a core. Messages, 200 accounts, a line each every 5
 2,400 of 2,400, the ticket request 32 ms on average and 58 ms at p95, the server at 210 MiB, Ergo at 50 MiB and
 17%; Ergo's volume grew 1.3 MB (7,377,326 to 8,708,526 bytes); the verdicts were not read (F690). The scenarios go
 straight to the server and Ergo: they size neither `web`'s 32 a visitor nor its 4,096 connections, which stay as
-set, `deploy/test.sh` holding them.
+set, `deploy/test.sh` holding them. A second run, Ergo at 512 MiB: logins as before (26 ms at p95, an IRC login in
+347 ms on average); the crowd, 0 of 2,000 stayed, every session ended near 6.7 s, Ergo at 344 MiB restarted once and
+not for its memory (F691, its cause not known); streams 1,000 of 1,000; messages, every line echoed, but 1,797 of
+2,200 verdicts unchecked and one backlog alert (F692).
 
 **Tests by level.** Unit with the clock, property, operator's load runs. **Cost and scale.** One indexed query a
 tick. **Files.** New: `server/src/retention/`, `deploy/k6/`; changed: `deploy/web/nginx.conf`, `deploy/test.sh`,
