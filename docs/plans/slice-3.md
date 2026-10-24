@@ -828,7 +828,12 @@ set, `deploy/test.sh` holding them. A second run, Ergo at 512 MiB: logins as bef
 not for its memory (F691, its cause not known); streams 1,000 of 1,000; messages, every line echoed, but 1,797 of
 2,200 verdicts unchecked and one backlog alert (F692). A third run named both: Ergo died of its pids_limit, Go past 128 threads
 ("failed to create new OS thread (have 129 already)"; F691, now 1,024), and the lines went unchecked past OpenAI's
-rate limit, 12 refusals then the breaker (1,810 of 2,200; F692, slice 4's).
+rate limit, 12 refusals then the breaker (1,810 of 2,200; F692, slice 4's). A fourth, Ergo at 1,024 processes: every scenario
+passed. Logins: 200 of 200, an IRC login in 394 ms on average. Crowd: 2,000 of 2,000 joined and stayed, Ergo at
+341 MiB, 311 threads and 40% (its whole 0.4 core), no restart; a guest's session lasted 1 to 2 minutes for a
+60 s hold, the joins slowed by that core; the crowd's joins grew Ergo's volume by about 28 MB. Streams: 1,000
+of 1,000. Messages: every line back in 5 ms on average, the verdicts as before (391 checked, 1,809 unchecked;
+F692). The sizes: Ergo 512 MiB and 1,024 processes, the rest as set.
 
 **Tests by level.** Unit with the clock, property, operator's load runs. **Cost and scale.** One indexed query a
 tick. **Files.** New: `server/src/retention/`, `deploy/k6/`; changed: `deploy/web/nginx.conf`, `deploy/test.sh`,

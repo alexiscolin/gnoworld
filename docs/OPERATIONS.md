@@ -297,10 +297,11 @@ Slice 3, the server's retention (3n):
   project `gnoworld-load`, and refuses to start while the demo runs on the host. From inside its network,
   each scenario's numbers: every account logging in at once (`ACCOUNTS`, 200), guests in a world's room
   (`CROWD`, 2,000), the rooms' streams (`STREAMS`, 1,000), the accounts' lines every 5 s (with
-  `OPENAI_API_KEY_FILE`, OpenAI's checks of them); the containers' peak memory and CPU, Ergo's volume
-  before and after, the verdicts and the backlog alerts. The first run's numbers go in slice 3's plan
-  (3n's As built); the sizes above and `web`'s limits are a careful start for the demo's 2 GB until
-  then.
+  `OPENAI_API_KEY_FILE`, OpenAI's checks of them); the containers' peak memory, processes and CPU, their
+  restarts and Ergo's last fatal lines, Ergo's volume before and after, the verdicts and the server's errors.
+  The numbers are in slice 3's plan (3n's As built): Ergo holds 2,000 guests joining one room at 341 MiB and
+  311 threads, under its 512 MiB and 1,024, but at its 0.4 core, so the last of them waits up to a minute to
+  be in; the runs go straight to the server and Ergo, so `web`'s limits are not theirs to size.
 - **Logs** have a size and a count (3 × 10 MB a container), no age: decision 154's 14 days hold only
   where ops' log backend sets them.
 - **Every alert**, each a log line `{"event":"alert","error":"<name>"}` that ops matches:
