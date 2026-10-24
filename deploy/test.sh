@@ -226,6 +226,8 @@ if [ "${1:-}" = --mutants ]; then
 	mutant() {
 		label=$1 wanted=$2
 		shift 2
+		# ONLY_MUTANTS, an extended regular expression: the mutants whose label it matches, alone.
+		[ -z "${ONLY_MUTANTS:-}" ] || printf '%s\n' "$label" | grep -qE -- "$ONLY_MUTANTS" || return 0
 		"$@" >"$tmp/override.yaml"
 		code=0
 		TEST_PROJECT=gnoworld-demo-mutant-$$ TEST_OVERRIDE=$tmp/override.yaml sh "$0" >"$tmp/run.log" 2>&1 || code=$?
@@ -337,20 +339,20 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "anyone makes a room" "a guest makes no room" template sed 's#operator-only-creation: true#operator-only-creation: false#'
 	mutant "registration open" "a hand-made account is refused" \
 		template awk '/^  registration:/ { r = 1 } r && /enabled: false/ { sub(/false/, "true"); r = 0 } { print }'
-	mutant "a short oper password taken" "Ergo's start refuses a short oper password" render_sh sed '/32 characters or more/d'
+	mutant "a short oper password taken" "Ergo starts with a short oper password" render_sh sed '/32 characters or more/d'
 	mutant "a login by PASS" "login-via-pass-command: false" template sed 's#login-via-pass-command: false#login-via-pass-command: true#'
 	mutant "every address believed as a proxy" "never a forged X-Forwarded-For" template sed 's#proxy-allowed-from: {{PROXY_FROM}}#proxy-allowed-from: ["0.0.0.0/0"]#'
 	mutant "the auth script's socket lost" "the refusal came from the server" compose 'services: { server: { environment: { AUTH_SOCKET: /tmp/elsewhere.sock } } }'
 	mutant "the server believes no proxy" "is its own visitor" compose 'services: { server: { environment: { TRUSTED_PROXY: 192.0.2.1 } } }'
 	mutant "a forged X-Forwarded-For handed on" "never a forged X-Forwarded-For" \
 		nginx sed 's#proxy_set_header X-Forwarded-For $proxy_protocol_addr;#proxy_set_header X-Forwarded-For $http_x_forwarded_for;#'
-	mutant "a forged X-Real-IP handed on" "is its own visitor" nginx sed 's#proxy_set_header X-Real-IP $proxy_protocol_addr;#proxy_set_header X-Real-IP $http_x_real_ip;#'
+	mutant "a forged X-Real-IP handed on" "and the first naming another stays limited, by the server" nginx sed 's#proxy_set_header X-Real-IP $proxy_protocol_addr;#proxy_set_header X-Real-IP $http_x_real_ip;#'
 	mutant "the password handed to the upstreams" "and never the demo's password" nginx sed '/proxy_set_header Authorization "";/d'
 	mutant "the WebSocket open without the password" "no password, no WebSocket" \
 		nginx awk '{ print } /location = \/ws \{/ { print "            auth_basic off;" }'
 	mutant "the API open without the password" "no password, no API" \
 		nginx awk '{ print } /location \/api\/ \{/ { print "            auth_basic off;" }'
-	mutant "the stream buffered" "the stream comes through web unbuffered" nginx sed '/proxy_buffering off;/d'
+	mutant "the stream buffered" "web's settings say proxy_buffering off" nginx sed '/proxy_buffering off;/d'
 	mutant "no limit of web's own on the login" "a longer burst meets web's own limit" nginx sed '/limit_req zone=login/d'
 	mutant "a backslash in a path handed on" "a backslash in a path is refused" nginx sed '/return 400;/d'
 	mutant "no visitor's connection limit" "a visitor holds 32 requests at once" nginx sed '/limit_conn /d'
@@ -375,7 +377,7 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "a quiet tunnel kept for good" "the way out's settings say idle_timeout: 60s" proxy_config sed '/^idle_timeout:/d'
 	mutant "the server's requests straight out" "the server does not reach OpenAI's API" compose 'services: { server: { environment: { NODE_USE_ENV_PROXY: "0" } } }'
 	mutant "the guard drops the way out's replies" "does not answer through the way out" guard sed '/--sport 4750/d'
-	mutant "the way out open to the guard's other network" "the way out answers nothing from the guard's other network" guard sed '/--dport 4750 -j REJECT/d'
+	mutant "the way out open to the guard's other network" "the guard's rules refuse 4750 but from the inside" guard sed '/--dport 4750 -j REJECT/d'
 	mutant "the stack past the ceiling" "the demo's caps pass" compose 'services: { ergo: { mem_limit: 1g }, server: { mem_limit: 1g } }'
 	mutant "Ergo's root writable" "ergo: read-only root" compose 'services: { ergo: { read_only: false } }'
 	mutant "the server's capabilities kept" "server: every capability dropped" compose 'services: { server: { cap_drop: !reset [] } }'
@@ -900,7 +902,9 @@ CLIENT
 		"$(challenge 203.0.113.33 'http://web:8080/api/login/challenge?[1-40]' | grep -c '^html 429$' || true)" 1
 	stream=$(docker run --rm --network "$inside" "$CURL" -s -N --max-time 20 --haproxy-protocol --haproxy-clientip 203.0.113.41 -u "$auth" \
 		'http://web:8080/api/stream?rooms=%23earth' || true)
-	holds "the stream comes through web unbuffered: its heartbeat within 20 s" "$stream" '^:'
+	holds "the stream comes through web: its heartbeat within 20 s" "$stream" '^:'
+	# Buffered, nginx still passed the heartbeat on (the stream-buffered mutant, 2026-10-24): its setting, read back.
+	expect "web's settings say proxy_buffering off" "$(docker exec "$web" cat /etc/nginx/nginx.conf | grep -c 'proxy_buffering off;')" 1
 	# Connections that send nothing more are closed (F208): headers never ended, a body never sent, a kept-alive
 	# connection left idle; each one's seconds until web closed it, printed as it closes (F639);
 	# in the background while the holds below run (F651).
@@ -1065,6 +1069,8 @@ setTimeout(() => {
 	# A known limit (OPERATIONS.md): smokescreen has no port rule, so port 80 reaches OpenAI's redirect alone.
 	expect "the way out answers nothing from the guard's other network" "$(answering "$outside" "$(docker inspect --format \
 		"{{(index .NetworkSettings.Networks \"$outside\").IPAddress}}" "$guard"):4750")" ""
+	# Its replies to a private address are refused too, so the door's own rule shows in no answer: read back.
+	expect "the guard's rules refuse 4750 but from the inside" "$(docker exec "$guard" iptables-nft -S INPUT | grep -c -- '--dport 4750 -j REJECT')" 1
 	# The server's own requests take the way out: Node's proxy from its settings (NODE_USE_ENV_PROXY, Node 24).
 	fetched() { docker exec "$server" /nodejs/bin/node -e "fetch('$1').then((r) => console.log(r.status), (e) => console.log('refused'))" 2>&1 || true; }
 	case $(fetched https://api.openai.com/v1/models) in [1-5][0-9][0-9]) pass "the server reaches OpenAI's API through the way out" ;; *) fail "the server does not reach OpenAI's API" ;; esac
