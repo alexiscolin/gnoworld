@@ -826,7 +826,9 @@ straight to the server and Ergo: they size neither `web`'s 32 a visitor nor its 
 set, `deploy/test.sh` holding them. A second run, Ergo at 512 MiB: logins as before (26 ms at p95, an IRC login in
 347 ms on average); the crowd, 0 of 2,000 stayed, every session ended near 6.7 s, Ergo at 344 MiB restarted once and
 not for its memory (F691, its cause not known); streams 1,000 of 1,000; messages, every line echoed, but 1,797 of
-2,200 verdicts unchecked and one backlog alert (F692).
+2,200 verdicts unchecked and one backlog alert (F692). A third run named both: Ergo died of its pids_limit, Go past 128 threads
+("failed to create new OS thread (have 129 already)"; F691, now 1,024), and the lines went unchecked past OpenAI's
+rate limit, 12 refusals then the breaker (1,810 of 2,200; F692, slice 4's).
 
 **Tests by level.** Unit with the clock, property, operator's load runs. **Cost and scale.** One indexed query a
 tick. **Files.** New: `server/src/retention/`, `deploy/k6/`; changed: `deploy/web/nginx.conf`, `deploy/test.sh`,
