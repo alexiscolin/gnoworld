@@ -199,6 +199,11 @@ describe("addLines: a room's lines, in time order, each once, the newest kept", 
     expect(addLines(frozen([a, b]), frozen([b, c, a]), 100)).toStrictEqual([a, b, c]);
   });
 
+  test("keeps a line once though it comes again with a later time, as a live line", () => {
+    const lines = frozen([a, b]);
+    expect(addLines(lines, [{ ...a, time: "2026-10-25T11:00:00.000Z" }], 100)).toBe(lines);
+  });
+
   test("orders lines of one time by their id in code-unit order, so two clients agree", () => {
     const upper = line("B", T0, "upper");
     const lower = line("a", T0, "lower");
@@ -325,6 +330,11 @@ describe("membersAfter: who is here", () => {
   test("adds a JOIN, an extended one too", () => {
     expect(after(["alice"], ":bob!u@h JOIN #bubble")).toStrictEqual(["alice", "bob"]);
     expect(after(["alice"], ":bob!u@h JOIN #bubble bobacct :Bob Real")).toStrictEqual(["alice", "bob"]);
+  });
+
+  test("puts a JOIN in its place among the people here", () => {
+    expect(after(["alice", "carl"], ":bob!u@h JOIN #bubble")).toStrictEqual(["alice", "bob", "carl"]);
+    expect(after(["bob", "carl"], ":alice!u@h JOIN #bubble")).toStrictEqual(["alice", "bob", "carl"]);
   });
 
   test("removes a PART", () => {
