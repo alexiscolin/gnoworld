@@ -351,6 +351,7 @@ if [ "${1:-}" = --mutants ]; then
 		nginx sed 's#proxy_set_header X-Forwarded-For $proxy_protocol_addr;#proxy_set_header X-Forwarded-For $http_x_forwarded_for;#'
 	mutant "a forged X-Real-IP handed on" "and the first naming another stays limited, by the server" nginx sed 's#proxy_set_header X-Real-IP $proxy_protocol_addr;#proxy_set_header X-Real-IP $http_x_real_ip;#'
 	mutant "the password handed to the upstreams" "and never the demo's password" nginx sed '/proxy_set_header Authorization "";/d'
+	mutant "the session's cookie handed to Ergo" "and the session's cookie to the API alone, never to Ergo" nginx sed '/proxy_set_header Cookie "";/d'
 	mutant "the WebSocket open without the password" "no password, no WebSocket" \
 		nginx awk '{ print } /location = \/ws \{/ { print "            auth_basic off;" }'
 	mutant "the API open without the password" "no password, no API" \
@@ -1083,7 +1084,7 @@ setTimeout(() => {
 	net=$(printf '%s' "$WEB_ADDRESS" | sed 's/\.[0-9]*$//')
 	docker cp "$web:/etc/nginx/nginx.conf" - | tar -xO >"$tmp/nginx.live.conf"
 	printf '%s\n' 'const { createServer } = require("node:http");' \
-		'for (const port of [8080, 8097]) createServer((q, r) => { console.log(JSON.stringify(q.headers)); r.end("ok"); }).listen(port);' >"$tmp/echo.cjs"
+		'for (const port of [8080, 8097]) createServer((q, r) => { console.log(JSON.stringify({ port, ...q.headers })); r.end("ok"); }).listen(port);' >"$tmp/echo.cjs"
 	chmod 644 "$tmp/nginx.live.conf" "$tmp/echo.cjs"
 	echo_box=$(docker run -d --rm --network "$inside" --ip "$net.250" -v "$tmp/echo.cjs:/echo.cjs:ro" --entrypoint /nodejs/bin/node "$server_image" /echo.cjs)
 	mirror=$(docker run -d --rm --network "$inside" --ip "$net.251" --add-host "server:$net.250" --add-host "ergo:$net.250" \
@@ -1091,12 +1092,15 @@ setTimeout(() => {
 	sleep 2
 	for path in '/api/activity?worlds=earth' /ws; do
 		docker run --rm --network "$inside" "$CURL" -s -o /dev/null --max-time 5 --haproxy-protocol --haproxy-clientip 203.0.113.51 -u "$auth" \
-			-H 'X-Real-IP: 192.0.2.67' -H 'X-Forwarded-For: 192.0.2.67' "http://$net.251:8080$path" || true
+			-H 'X-Real-IP: 192.0.2.67' -H 'X-Forwarded-For: 192.0.2.67' -H 'Cookie: __Host-session=sekret' "http://$net.251:8080$path" || true
 	done
 	heard=$(docker logs "$echo_box" 2>&1)
 	docker stop "$echo_box" "$mirror" >/dev/null
 	expect "web hands its upstreams both requests" "$(printf '%s\n' "$heard" | grep -c '^{' || true)" 2
 	expect "and never the demo's password" "$(printf '%s\n' "$heard" | grep -ci '"authorization"' || true)" 0
+	# The session's cookie goes to the server (8080), never to Ergo (8097), which needs only a ticket (decision 143, F711).
+	cookie() { printf '%s\n' "$heard" | grep "\"port\":$1" | grep -c '__Host-session=sekret' || true; }
+	expect "and the session's cookie to the API alone, never to Ergo" "$(cookie 8080) $(cookie 8097)" "1 0"
 	expect "but the visitor's own address, X-Real-IP and X-Forwarded-For alike" \
 		"$(printf '%s\n' "$heard" | grep '"x-real-ip":"203.0.113.51"' | grep -c '"x-forwarded-for":"203.0.113.51"' || true) $(printf '%s\n' "$heard" | grep -c '192.0.2.67' || true)" "2 0"
 
