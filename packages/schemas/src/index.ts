@@ -3,10 +3,10 @@
 import { z } from "zod";
 
 export { ActivityRooms } from "./activity.ts";
-export { Address, toAddress } from "./address.ts";
+export { Address, ADDRESS_PROBLEMS, toAddress, type AddressProblem } from "./address.ts";
 export { CreateRoom, MadeRoom, RoomName } from "./rooms.ts";
 export { StreamEvent } from "./stream.ts";
-export { Challenge, ChallengeRequest, Me, Proof, Ticket, TicketRequest, VerifyRequest } from "./login.ts";
+export { Challenge, ChallengeRequest, Me, Nonce, Proof, Ticket, TicketRequest, VerifyRequest } from "./login.ts";
 
 // Every refusal and failure the server answers: a code a client can act on, never a stack or what it sent.
 export const ApiError = z.object({

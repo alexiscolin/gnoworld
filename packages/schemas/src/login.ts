@@ -5,7 +5,10 @@ import { Address } from "./address.ts";
 
 export const ChallengeRequest = z.strictObject({ chainId: z.string().min(1).max(50) });
 
-export const Challenge = z.object({ nonce: z.string(), text: z.string(), expiresAt: z.iso.datetime() });
+// The nonce as the server writes it, 128 random bits in base64url: one schema for the challenge and the proof (F673).
+export const Nonce = z.string().regex(/^[\w-]{22}$/);
+
+export const Challenge = z.object({ nonce: Nonce, text: z.string(), expiresAt: z.iso.datetime() });
 export type Challenge = z.infer<typeof Challenge>;
 
 // Adena's answer to signArbitrary (the SDK's SignedArbitraryData): a key it does not know is dropped, msgs'
@@ -30,8 +33,7 @@ export const Proof = z.object({
 });
 export type Proof = z.infer<typeof Proof>;
 
-// The nonce as the server writes it: 128 random bits in base64url.
-export const VerifyRequest = z.strictObject({ nonce: z.string().regex(/^[\w-]{22}$/), address: Address, proof: Proof });
+export const VerifyRequest = z.strictObject({ nonce: Nonce, address: Address, proof: Proof });
 export type VerifyRequest = z.infer<typeof VerifyRequest>;
 
 export const Me = z.object({ address: Address });

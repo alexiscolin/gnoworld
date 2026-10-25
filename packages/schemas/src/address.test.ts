@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { Address, toAddress } from "./address.ts";
+import { Address, ADDRESS_PROBLEMS, toAddress } from "./address.ts";
 
 // test1 of gno's own docs, and four made by BIP-173's reference code (a checksum over 20 random bytes).
 const VALID = [
@@ -50,6 +50,94 @@ describe("Address", () => {
     ["nothing", ""],
   ])("refuses %s", (_, address) => {
     expect(Address.safeParse(address).success).toBe(false);
+  });
+
+  // F674: the login form says why an address is refused, from the reason the schema gives.
+  it.each([
+    ["", "empty"],
+    ["G1JG8MTUTU9KHHFWC4NXMUHCPFTF0PAJDHFVSQF5", "case"],
+    ["g1Jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5", "case"],
+    ["cosmos1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5", "prefix"],
+    [" g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5", "prefix"],
+    ["g1jg8mtutu9khhfwc4nxmuhcpftfopajdhfvsqf5", "characters"],
+    ["g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5\n", "characters"],
+    ["g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsq", "length"],
+    ["g1pvc9275lcn5suv6c0k3v0mq3xedcpfw2au4a9yvw", "length"],
+    ["g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf6", "checksum"],
+    ["g1pvc9275lcn5suv6c0k3v0mq3xedcpfw2p2yrfa", "checksum"],
+    // The boundaries of each reason.
+    ["g", "prefix"],
+    ["g1", "length"],
+    ["g2jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5", "prefix"],
+    ["g0jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5", "prefix"],
+    ["g1pvc9275lcn5suv6c0k3v0mq3xedcpfgya3cgu", "length"],
+    ["g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5q", "length"],
+    ["g1jg8mtutu9khhfwc4nxmuhcpftfbpajdhfvsqf5", "characters"],
+    ["g1jg8mtutu9khhfwc4nxmuhcpftfipajdhfvsqf5", "characters"],
+    ["g1jg8mtutu9khhfwc4nxmuhcpftf1pajdhfvsqf5", "characters"],
+    ["g1jg8mtutu9khhfwc4nxmuhcpftféajdhfvsqf5", "characters"],
+    ["g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqfb", "characters"],
+    // Two faults: the earlier reason of the list, alone.
+    ["COSMOS1JG8MTUTU9KHHFWC4NXMUHCPFTF0PAJDHFVSQF5", "case"],
+    ["cosmos1jg8mtutu9khhfwc4nxmuhcpftfopajdhfvsqf5", "prefix"],
+    ["g1jg8mtutu9khhfwc4nxmuhcpftfopajdhfvsq", "characters"],
+    ["g1pvc9275lcn5suv6c0k3v0mq3xedcpfw2au4a9yvq", "length"],
+  ])("refuses %j for its %s, and says so", (address, reason) => {
+    const parsed = Address.safeParse(address);
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues.map((issue) => issue.message)).toEqual([reason]);
+  });
+
+  it("lists its reasons in the order it checks them", () => {
+    expect(ADDRESS_PROBLEMS).toEqual(["empty", "case", "prefix", "characters", "length", "checksum"]);
+  });
+
+  // The reason as the list's order gives it, written apart from the schema: the first rule a string breaks.
+  const reasonOf = (text: string): string => {
+    if (text === "") return "empty";
+    if (text !== text.toLowerCase()) return "case";
+    if (!text.startsWith("g1")) return "prefix";
+    if (Array.from(text.slice(2)).some((c) => !CHARSET.includes(c))) return "characters";
+    return text.length === 40 ? "checksum" : "length";
+  };
+  // An address one edit away: a letter put in, taken out or changed, the case or the prefix changed.
+  const nearAddress = fc
+    .tuple(
+      fc.constantFrom(...VALID),
+      fc.integer({ min: 0, max: 39 }),
+      fc.string({ minLength: 1, maxLength: 1 }),
+      fc.nat(4),
+    )
+    .map(
+      ([address, at, letter, edit]) =>
+        [
+          address.slice(0, at) + letter + address.slice(at),
+          address.slice(0, at) + address.slice(at + 1),
+          address.slice(0, at) + letter + address.slice(at + 1),
+          address.toUpperCase(),
+          `c${address.slice(1)}`,
+        ][edit] ?? address,
+    );
+
+  it("gives the first reason a near address breaks", () => {
+    fc.assert(
+      fc.property(nearAddress, (text) => {
+        const parsed = Address.safeParse(text);
+        if (parsed.success) return;
+        expect(parsed.error.issues.map((issue) => issue.message)).toEqual([reasonOf(text)]);
+      }),
+    );
+  });
+
+  it("gives one reason of its list for any string it refuses", () => {
+    fc.assert(
+      fc.property(fc.string(), (text) => {
+        const parsed = Address.safeParse(text);
+        if (parsed.success) return;
+        expect(parsed.error.issues).toHaveLength(1);
+        expect(ADDRESS_PROBLEMS).toContain(parsed.error.issues[0]?.message);
+      }),
+    );
   });
 
   it("refuses any one letter changed, which the checksum catches", () => {

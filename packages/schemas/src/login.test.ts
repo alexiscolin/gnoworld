@@ -1,5 +1,6 @@
+import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { ChallengeRequest, VerifyRequest } from "./login.ts";
+import { Challenge, ChallengeRequest, Nonce, VerifyRequest } from "./login.ts";
 
 const ADDRESS = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 // Adena's answer to signArbitrary, in the shape the SDK types it (SignedArbitraryData); the values are
@@ -88,5 +89,52 @@ describe("VerifyRequest", () => {
   it.each(bounds)("takes %s at %i characters or items, and refuses one more", (_, max, body) => {
     expect(VerifyRequest.safeParse(body(max)).success).toBe(true);
     expect(VerifyRequest.safeParse(body(max + 1)).success).toBe(false);
+  });
+});
+
+// F673: one nonce schema, the server's challenge and the browser's proof read alike.
+describe("Nonce", () => {
+  const CHALLENGE = { nonce: "_-09azAZxxxxxxxxxxxxxx", text: "Sign in", expiresAt: "2026-10-25T10:00:00.000Z" };
+
+  it("is a challenge's nonce", () => {
+    expect(Challenge.parse(CHALLENGE).nonce).toBe(Nonce.parse(CHALLENGE.nonce));
+  });
+
+  it("is a proof's nonce", () => {
+    expect(VerifyRequest.parse({ ...VERIFY, nonce: CHALLENGE.nonce }).nonce).toBe(CHALLENGE.nonce);
+  });
+
+  // The server writes 16 random bytes in base64url (server/src/login/login.ts).
+  const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+  const base64url = (bytes: Uint8Array) => {
+    let [held, bits, out] = [0, 0, ""];
+    for (const byte of bytes) {
+      held = ((held << 8) | byte) & 0xffff;
+      bits += 8;
+      for (; bits >= 6; bits -= 6) out += ALPHABET.charAt((held >> (bits - 6)) & 63);
+    }
+    return bits > 0 ? out + ALPHABET.charAt((held << (6 - bits)) & 63) : out;
+  };
+
+  it("takes any nonce the server writes", () => {
+    fc.assert(
+      fc.property(fc.uint8Array({ minLength: 16, maxLength: 16 }), (bytes) => {
+        expect(Nonce.safeParse(base64url(bytes)).success).toBe(true);
+      }),
+    );
+  });
+
+  it.each([
+    "A".repeat(21),
+    "A".repeat(23),
+    `${"A".repeat(21)}%`,
+    "",
+    `${"A".repeat(22)}\n`,
+    null,
+    22,
+    ["A".repeat(22)],
+  ])("refuses a nonce %j in a challenge and in a proof", (nonce) => {
+    expect(Challenge.safeParse({ ...CHALLENGE, nonce }).success).toBe(false);
+    expect(VerifyRequest.safeParse({ ...VERIFY, nonce }).success).toBe(false);
   });
 });

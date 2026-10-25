@@ -3,7 +3,6 @@
 import { z } from "zod";
 
 const CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
-const SHAPE = new RegExp(`^g1[${CHARSET}]{38}$`);
 const GENERATOR = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
 // The prefix "g" expanded as BIP-173 does: each character's high bits, a zero, its low bits.
 const PREFIX = [3, 0, 7];
@@ -18,10 +17,27 @@ function polymod(values: readonly number[]): number {
   return check;
 }
 
-const isAddress = (text: string): boolean =>
-  SHAPE.test(text) && polymod([...PREFIX, ...Array.from(text.slice(2), (c) => CHARSET.indexOf(c))]) === 1;
+// Why a string is no address, the first rule it breaks in this order: the login form says it (F674).
+export const ADDRESS_PROBLEMS = ["empty", "case", "prefix", "characters", "length", "checksum"] as const;
+export type AddressProblem = (typeof ADDRESS_PROBLEMS)[number];
 
-export const Address = z.string().refine(isAddress).brand<"Address">();
+function problemOf(text: string): AddressProblem | undefined {
+  if (text === "") return "empty";
+  if (text !== text.toLowerCase()) return "case";
+  if (!text.startsWith("g1")) return "prefix";
+  if (Array.from(text.slice(2)).some((c) => !CHARSET.includes(c))) return "characters";
+  if (text.length !== 40) return "length";
+  return polymod([...PREFIX, ...Array.from(text.slice(2), (c) => CHARSET.indexOf(c))]) === 1 ? undefined : "checksum";
+}
+
+// One issue, its message the reason.
+export const Address = z
+  .string()
+  .superRefine((text, context) => {
+    const problem = problemOf(text);
+    if (problem !== undefined) context.addIssue({ code: "custom", message: problem });
+  })
+  .brand<"Address">();
 export type Address = z.infer<typeof Address>;
 
 // The address a key's 20-byte hash spells: the inverse of the check above, so the tests' wallet
