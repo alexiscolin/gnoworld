@@ -12,6 +12,7 @@ import { drawGuestNick } from "../../lib/ergo/ergo.ts";
 import { pageErgo } from "../../lib/ergo/page.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
 import { chatLink } from "./link.ts";
+import { shownRoom } from "./names.ts";
 import { RoomsView } from "./RoomsView.tsx";
 import { RoomView } from "./RoomView.tsx";
 
@@ -21,13 +22,6 @@ interface Asked {
   session: string;
   attempt: number;
   sections: RoomList["sections"] | "failed";
-}
-
-// The room the address names when the world lists it; else its main room when listed; else the first listed.
-function shownRoom(world: string, sections: RoomList["sections"], asked: string | null): string | undefined {
-  const listed = sections.flatMap(({ rooms }) => rooms.map(({ room }) => room));
-  const named = asked === null ? `#${world}` : `#${world}/${asked}`;
-  return [named, `#${world}`].find((room) => listed.includes(room)) ?? listed[0];
 }
 
 export function ChatPanel({ world }: { world: string }) {
