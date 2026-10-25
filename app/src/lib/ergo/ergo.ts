@@ -5,11 +5,12 @@
 // after a minute connected (as the bot's link: F495), then reconnects with a fresh ticket; a session the
 // server no longer knows stops it.
 import { parseLine, type IrcMessage } from "@gnoworld/core";
-import type { Address } from "@gnoworld/schemas";
+import { advance, CAPS, GUEST_TRIES, guestNick, oneLine, REFUSALS, type Step } from "./handshake.ts";
 import type { Result } from "../api/login.ts";
-import { advance, CAPS, oneLine, REFUSALS, type Step } from "./handshake.ts";
+import type { Ergo, ErgoOptions, ErgoState, Socket } from "./types.ts";
 
-export { CAPS } from "./handshake.ts";
+export { CAPS, drawGuestNick } from "./handshake.ts";
+export type { ErgoState, Socket } from "./types.ts";
 
 export const BACKOFF = { firstMs: 1000, ceilingMs: 60_000 } as const;
 /** The handshake's whole time: past Ergo's 9 s for its auth script. */
@@ -19,35 +20,6 @@ export const PING_MS = 30_000;
 /** Time connected after which the backoff starts over. */
 export const STABLE_MS = 60_000;
 
-export type ErgoState = "connecting" | "connected" | "waiting" | "logged-out" | "stopped";
-
-/** The part of a WebSocket this uses: the browser's, or a test's. */
-export interface Socket {
-  onopen: (() => void) | null;
-  onmessage: ((event: { data: unknown }) => void) | null;
-  onclose: (() => void) | null;
-  send: (data: string) => void;
-  close: () => void;
-}
-
-export interface ErgoOptions {
-  url: string;
-  address: Address;
-  ticket: () => Promise<Result<{ ticket: string }>>;
-  open: (url: string) => Socket;
-  onState: (state: ErgoState) => void;
-  onLine: (line: IrcMessage) => void;
-  random: () => number;
-  /** Runs `run` after `ms`; the function it gives cancels it. */
-  after: (ms: number, run: () => void) => () => void;
-}
-
-export interface Ergo {
-  /** Sends one line once connected; false when it is not one line, or not connected. */
-  send: (line: string) => boolean;
-  stop: () => void;
-}
-
 // A connection's life: its sockets one after another, its timers by name, its handshake one step at a time.
 class Connection {
   readonly #options: ErgoOptions;
@@ -55,7 +27,9 @@ class Connection {
   #attempt = 0;
   #generation = 0;
   #socket: Socket | undefined;
-  #ticket = "";
+  #nick = "";
+  #ticket: string | undefined;
+  #refusals = 0;
   #step: Step = "caps";
   readonly #timers = new Map<string, () => void>();
   constructor(options: ErgoOptions) {
@@ -132,20 +106,27 @@ class Connection {
     if (!parsed.ok) return;
     const { command, params } = parsed.message;
     if (this.#step === "connected") this.#silent();
-    if (command === "PING") {
-      this.#write(params.length === 0 ? "PONG" : `PONG :${params[0] ?? ""}`);
-    } else if (command === "ERROR" || (this.#step !== "connected" && REFUSALS.has(command))) {
-      this.#fail();
-    } else if (this.#step === "connected") {
-      this.#options.onLine(parsed.message);
-    } else {
-      this.#shake(this.#step, parsed.message);
-    }
+    if (command === "PING") this.#write(params.length === 0 ? "PONG" : `PONG :${params[0] ?? ""}`);
+    else if (this.#refused(command)) this.#refuse(command);
+    else if (this.#step === "connected") this.#options.onLine(parsed.message);
+    else this.#shake(this.#step, parsed.message);
+  }
+
+  // ERROR ends a connection at any step; a refusal (SASL's, a nick taken) only its handshake.
+  #refused(command: string): boolean {
+    return command === "ERROR" || (this.#step !== "connected" && REFUSALS.has(command));
+  }
+
+  // A guest's nick taken while it registers: another drawn; anything else refused ends the connection.
+  #refuse(command: string): void {
+    const { who } = this.#options;
+    if (command === "433" && this.#step === "registering" && "guest" in who) this.#renick(who.guest);
+    else this.#fail();
   }
 
   // The move a line makes at a step of the handshake: lines sent and the next step, a failure, or connected.
   #shake(step: Exclude<Step, "connected">, message: IrcMessage): void {
-    const move = advance(step, message, { address: this.#options.address, ticket: this.#ticket });
+    const move = advance(step, message, { nick: this.#nick, ticket: this.#ticket });
     if (move === undefined) return;
     if ("next" in move) {
       this.#step = move.next;
@@ -155,6 +136,15 @@ class Connection {
     } else {
       this.#connected();
     }
+  }
+
+  // A guest's nick taken: another one drawn, GUEST_TRIES in all, then this connection fails; so does a draw
+  // that gives no nick.
+  #renick(draw: () => string): void {
+    this.#refusals += 1;
+    const nick = this.#refusals < GUEST_TRIES ? guestNick(draw) : undefined;
+    if (nick === undefined) this.#fail();
+    else this.#write(`NICK ${nick}`);
   }
 
   #connected(): void {
@@ -189,20 +179,29 @@ class Connection {
     if (this.#state === "stopped") return;
     const mine = (this.#generation += 1);
     this.#set("connecting");
+    const { who } = this.#options;
+    if ("guest" in who) {
+      const nick = guestNick(who.guest);
+      if (nick === undefined) this.#fail();
+      else this.#open(nick, undefined);
+      return;
+    }
     let got: Result<{ ticket: string }>;
     try {
-      got = await this.#options.ticket();
+      got = await who.ticket();
     } catch {
       got = { ok: false, reason: "network" };
     }
     if (mine !== this.#generation) return; // stopped, or ended, meanwhile
     if (!got.ok && got.reason === "unauthenticated") this.#set("logged-out");
     else if (!got.ok || got.value.ticket === "") this.#wait();
-    else this.#open(got.value.ticket);
+    else this.#open(who.account, got.value.ticket);
   }
 
-  #open(ticket: string): void {
+  #open(nick: string, ticket: string | undefined): void {
+    this.#nick = nick;
     this.#ticket = ticket;
+    this.#refusals = 0;
     this.#step = "caps";
     const opened = this.#options.open(this.#options.url);
     this.#socket = opened;

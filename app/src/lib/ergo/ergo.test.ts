@@ -1,8 +1,18 @@
 import { Address } from "@gnoworld/schemas";
 import type { IrcMessage } from "@gnoworld/core";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Result } from "../api/login.ts";
-import { BACKOFF, CAPS, connectErgo, HANDSHAKE_MS, PING_MS, STABLE_MS, type ErgoState, type Socket } from "./ergo.ts";
+import {
+  BACKOFF,
+  CAPS,
+  connectErgo,
+  drawGuestNick,
+  HANDSHAKE_MS,
+  PING_MS,
+  STABLE_MS,
+  type ErgoState,
+  type Socket,
+} from "./ergo.ts";
 
 const ADDRESS = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const ERGO = "wss://gnoworld.example/ws";
@@ -50,20 +60,45 @@ const granted =
     Promise.resolve({ ok: true, value: { ticket } });
 
 // One client, its sockets, its states, the lines it handed on, its waits on a clock the test runs.
-const setup = (options: { tickets?: TicketAnswer[]; random?: () => number } = {}) => {
+interface Options {
+  tickets?: TicketAnswer[];
+  random?: () => number;
+  guests?: (string | Error)[];
+  refusedOpens?: number;
+}
+const setup = (options: Options = {}) => {
   const sockets: FakeSocket[] = [];
   const states: ErgoState[] = [];
   const lines: IrcMessage[] = [];
   const waits: { ms: number; run: () => void; cancelled: boolean }[] = [];
   let mints = 0;
+  let opensRefused = 0;
   const client = connectErgo({
     url: ERGO,
-    address: ADDRESS,
-    ticket: () => {
-      mints += 1;
-      return (options.tickets?.[mints - 1] ?? granted(`ticket-${String(mints)}`))();
-    },
+    // A guest draws its nicks from the test's list, an Error thrown; an account asks a ticket for each connection.
+    who:
+      options.guests === undefined
+        ? {
+            account: ADDRESS,
+            ticket: () => {
+              mints += 1;
+              return (options.tickets?.[mints - 1] ?? granted(`ticket-${String(mints)}`))();
+            },
+          }
+        : {
+            guest: () => {
+              mints += 1;
+              const nick = options.guests?.[mints - 1] ?? `guest-${String(mints)}`;
+              if (nick instanceof Error) throw nick;
+              return nick;
+            },
+          },
+    // The first refusedOpens sockets throw, as the browser's constructor does on a URL or a CSP it refuses.
     open: (url) => {
+      if (sockets.length + opensRefused < (options.refusedOpens ?? 0)) {
+        opensRefused += 1;
+        throw new DOMException("refused", "SecurityError");
+      }
       const socket = new FakeSocket(url);
       sockets.push(socket);
       return socket;
@@ -297,6 +332,20 @@ describe("connectErgo's handshake", () => {
     expect(t.states.at(-1)).toBe("waiting");
   });
 
+  it("waits once when Ergo finds its nick erroneous (432), not at the deadline", async () => {
+    const t = setup();
+    await t.settle();
+    const s = t.last();
+    s.open();
+    ack(s);
+    plus(s);
+    saslOk(s);
+    s.say(`:ergo 432 * ${ADDRESS} :Erroneous nickname`);
+    expect(s.closed).toBe(true);
+    expect(t.states.at(-1)).toBe("waiting");
+    expect(t.backoffs()).toHaveLength(1);
+  });
+
   // Each step that stalls past the handshake's deadline closes the socket and waits.
   it.each([
     ["the socket never opens", () => undefined],
@@ -341,6 +390,16 @@ describe("connectErgo's handshake", () => {
     expect(s.closed).toBe(true);
     expect(t.states.at(-1)).toBe("waiting");
     expect(t.backoffs()).toHaveLength(1);
+  });
+
+  it("waits when the browser refuses to open the socket, and opens one on its next try", async () => {
+    const t = setup({ refusedOpens: 1 });
+    await t.settle();
+    expect(t.sockets).toHaveLength(0);
+    expect(t.states).toEqual(["connecting", "waiting"]);
+    expect(t.backoffs()).toHaveLength(1);
+    await t.run(t.backoffs()[0]);
+    expect(t.sockets).toHaveLength(1);
   });
 
   it("drops the handshake's deadline once connected", async () => {
@@ -398,6 +457,19 @@ describe("connectErgo, connected", () => {
     t.s.say(data);
     t.s.say(":a!b@h PRIVMSG #bubble :still here");
     expect(t.lines.map((l) => l.params.at(-1))).toEqual(["still here"]);
+    expect(t.states.at(-1)).toBe("connected");
+  });
+
+  // A refusal ends a handshake alone: once connected, Ergo's 433 answers a NICK, its 904 a later SASL.
+  it.each([
+    ["433", `:ergo 433 ${ADDRESS} other :Nickname is already in use`],
+    ["432", `:ergo 432 ${ADDRESS} "bad :Erroneous nickname`],
+    ["904", `:ergo 904 ${ADDRESS} :SASL authentication failed`],
+  ])("hands on a %s once connected, as any line, and stays connected", async (command, line) => {
+    const t = await connected();
+    t.s.say(line);
+    expect(t.lines.map((l) => l.command)).toEqual([command]);
+    expect(t.s.closed).toBe(false);
     expect(t.states.at(-1)).toBe("connected");
   });
 
@@ -677,5 +749,254 @@ describe("connectErgo's stop", () => {
     expect(t.states.at(-1)).toBe("stopped");
     expect(t.states.filter((state) => state === "stopped")).toHaveLength(1);
     expect(t.pending()).toHaveLength(0);
+  });
+});
+
+// A visitor not logged in reads the public rooms as a guest (Alexis, 2026-10-25): no ticket, no SASL, a nick of
+// its own drawn at random, another drawn when Ergo says one is taken.
+describe("connectErgo as a guest", () => {
+  const guest = async (nicks?: (string | Error)[]) => {
+    const t = setup({ guests: nicks ?? ["guest-ab12cd"] });
+    await t.settle();
+    return { ...t, s: t.last() };
+  };
+
+  it("asks no ticket, and registers with its nick, no SASL: every line it sends, in order", async () => {
+    const t = await guest();
+    t.s.open();
+    ack(t.s);
+    expect(t.s.sent).toEqual([
+      "CAP LS 302",
+      `CAP REQ :${CAPS}`,
+      "CAP END",
+      "NICK guest-ab12cd",
+      "USER u 0 * :guest-ab12cd",
+    ]);
+    t.s.say(":ergo 001 guest-ab12cd :Welcome");
+    motd(t.s);
+    expect(t.states).toEqual(["connecting", "connected"]);
+    expect(t.s.sent.some((line) => line.startsWith("AUTHENTICATE"))).toBe(false);
+  });
+
+  const nicks = (s: FakeSocket) => s.sent.filter((line) => line.startsWith("NICK "));
+  const taken = (s: FakeSocket) => {
+    s.say(":ergo 433 * guest :Nickname is already in use");
+  };
+
+  it("draws another nick when Ergo says one is taken (433): one NICK more, nothing else, in the same deadline", async () => {
+    const t = await guest(["guest-one", "guest-two"]);
+    t.s.open();
+    ack(t.s);
+    const deadline = t.pending().filter((w) => w.ms === HANDSHAKE_MS);
+    taken(t.s);
+    expect(t.s.sent).toEqual([
+      "CAP LS 302",
+      `CAP REQ :${CAPS}`,
+      "CAP END",
+      "NICK guest-one",
+      "USER u 0 * :guest-one",
+      "NICK guest-two",
+    ]);
+    const after = t.pending().filter((w) => w.ms === HANDSHAKE_MS);
+    expect(deadline).toHaveLength(1);
+    expect(after).toHaveLength(1);
+    expect(after[0]).toBe(deadline[0]);
+    expect(t.states).toEqual(["connecting"]);
+    motd(t.s);
+    expect(t.states).toEqual(["connecting", "connected"]);
+  });
+
+  it("keeps its handshake through seven taken nicks, and gives up on the eighth, drawing no ninth", async () => {
+    const t = await guest(Array.from({ length: 9 }, (_, n) => `guest-${String(n)}`));
+    t.s.open();
+    ack(t.s);
+    for (let n = 0; n < 7; n += 1) taken(t.s);
+    expect(t.s.closed).toBe(false);
+    expect(t.states).toEqual(["connecting"]);
+    expect(nicks(t.s)).toHaveLength(8);
+    taken(t.s);
+    expect(t.s.closed).toBe(true);
+    expect(nicks(t.s)).toHaveLength(8);
+    expect(t.states.at(-1)).toBe("waiting");
+  });
+
+  it("counts its taken nicks per connection: after a drop, seven more keep the handshake", async () => {
+    const t = await guest(Array.from({ length: 20 }, (_, n) => `guest-${String(n)}`));
+    t.s.open();
+    ack(t.s);
+    for (let n = 0; n < 4; n += 1) taken(t.s);
+    t.s.closeEvent();
+    await t.run(t.backoffs()[0]);
+    const again = t.last();
+    again.open();
+    ack(again);
+    for (let n = 0; n < 7; n += 1) taken(again);
+    expect(again.closed).toBe(false);
+    expect(t.states.at(-1)).toBe("connecting");
+  });
+
+  it.each([
+    ["Ergo's ERROR", "ERROR :Closing Link: throttled"],
+    ["SASL's 905", ":ergo 905 * :Message too long"],
+    ["SASL's 906", ":ergo 906 * :Aborted"],
+    ["an erroneous nick (432)", ":ergo 432 * guest-one :Erroneous nickname"],
+  ])("fails at once on %s while it registers, drawing no other nick", async (_, line) => {
+    const t = await guest(["guest-one", "guest-two"]);
+    t.s.open();
+    ack(t.s);
+    t.s.say(line);
+    expect(t.s.closed).toBe(true);
+    expect(t.states.at(-1)).toBe("waiting");
+    expect(nicks(t.s)).toEqual(["NICK guest-one"]);
+  });
+
+  it("fails on a 433 before it registers, having sent no nick", async () => {
+    const t = await guest(["guest-one", "guest-two"]);
+    t.s.open();
+    taken(t.s);
+    expect(t.s.closed).toBe(true);
+    expect(t.s.sent).toEqual(["CAP LS 302", `CAP REQ :${CAPS}`]);
+  });
+
+  it("hands on a 433 once connected, as any line, drawing no nick", async () => {
+    const t = await guest(["guest-one", "guest-two"]);
+    welcomeGuest(t.s, "guest-one");
+    taken(t.s);
+    expect(t.lines.map((l) => l.command)).toEqual(["433"]);
+    expect(nicks(t.s)).toEqual(["NICK guest-one"]);
+    expect(t.states.at(-1)).toBe("connected");
+  });
+
+  // A nick is one word of letters, digits and hyphens, a letter first, 32 at most (Ergo's NICKLEN for a guest,
+  // server/src/testing/ergo.test.ts:314): anything else would break the line, or be refused.
+  it.each(["", "a b", "x\r\nJOIN #r", "x\0y", "guest-é", "g".repeat(33), "-guest", "1guest", ADDRESS])(
+    "opens no socket for a nick it cannot send (%j), and draws again on its next try",
+    async (bad) => {
+      const t = setup({ guests: [bad, "guest-ok"] });
+      await t.settle();
+      expect(t.sockets).toHaveLength(0);
+      expect(t.states).toEqual(["connecting", "waiting"]);
+      await t.run(t.backoffs()[0]);
+      t.last().open();
+      ack(t.last());
+      expect(nicks(t.last())).toEqual(["NICK guest-ok"]);
+    },
+  );
+
+  it("takes a nick of 32 characters", async () => {
+    const t = await guest(["g".repeat(32)]);
+    t.s.open();
+    ack(t.s);
+    expect(nicks(t.s)).toEqual([`NICK ${"g".repeat(32)}`]);
+  });
+
+  it.each([
+    ["a nick it cannot send", "x\r\nJOIN #r"],
+    ["a throw", new Error("no randomness")],
+  ])("fails, sending nothing more, when the nick drawn after a 433 is %s", async (_, bad) => {
+    const t = await guest(["guest-one", bad, "guest-three"]);
+    t.s.open();
+    ack(t.s);
+    expect(() => {
+      taken(t.s);
+    }).not.toThrow();
+    expect(t.s.closed).toBe(true);
+    expect(t.states.at(-1)).toBe("waiting");
+    expect(nicks(t.s)).toEqual(["NICK guest-one"]);
+  });
+
+  it("gives up when its registration stalls, at its one deadline", async () => {
+    const t = await guest();
+    t.s.open();
+    ack(t.s);
+    await t.run(t.pending().find((w) => w.ms === HANDSHAKE_MS));
+    expect(t.s.closed).toBe(true);
+    expect(t.states.at(-1)).toBe("waiting");
+  });
+
+  it("sends nothing once stopped, though a 433 comes late", async () => {
+    const t = await guest(["guest-one", "guest-two"]);
+    t.s.open();
+    ack(t.s);
+    t.client.stop();
+    taken(t.s);
+    expect(nicks(t.s)).toEqual(["NICK guest-one"]);
+    expect(t.states.at(-1)).toBe("stopped");
+  });
+
+  it("waits on Ergo's ERROR once connected", async () => {
+    const t = await guest();
+    welcomeGuest(t.s, "guest-ab12cd");
+    t.s.say("ERROR :Closing Link");
+    expect(t.s.closed).toBe(true);
+    expect(t.states.at(-1)).toBe("waiting");
+  });
+
+  it("is never logged out: a drop waits and comes back as a guest, with a fresh nick", async () => {
+    const t = await guest(["guest-one", "guest-two"]);
+    welcomeGuest(t.s, "guest-one");
+    t.s.closeEvent();
+    expect(t.states.at(-1)).toBe("waiting");
+    await t.run(t.backoffs()[0]);
+    const again = t.last();
+    again.open();
+    ack(again);
+    expect(again.sent).toContain("NICK guest-two");
+  });
+
+  it("takes an ACK without sasl, which a guest needs not", async () => {
+    const t = await guest();
+    t.s.open();
+    t.s.say(":ergo CAP * ACK :message-tags server-time batch draft/chathistory");
+    expect(t.s.sent.at(-1)).toBe("USER u 0 * :guest-ab12cd");
+  });
+
+  it("still fails on a NAK: without the capabilities, no history and no tags", async () => {
+    const t = await guest();
+    t.s.open();
+    t.s.say(`:ergo CAP * NAK :${CAPS}`);
+    expect(t.s.closed).toBe(true);
+  });
+
+  it.each(["904", "902", "907"])("fails on SASL's %s, which a guest never asked", async (code) => {
+    const t = await guest();
+    t.s.open();
+    ack(t.s);
+    t.s.say(`:ergo ${code} * :no`);
+    expect(t.s.closed).toBe(true);
+  });
+});
+
+const welcomeGuest = (s: FakeSocket, nick: string) => {
+  s.open();
+  ack(s);
+  s.say(`:ergo 001 ${nick} :Welcome`);
+  motd(s);
+};
+
+describe("drawGuestNick", () => {
+  it("draws guest- and six letters or digits", () => {
+    for (let n = 0; n < 200; n += 1) expect(drawGuestNick()).toMatch(/^guest-[a-z0-9]{6}$/);
+  });
+
+  // 252 is 7 times 36: a byte past 251 would make a to d likelier, so it is drawn again.
+  it("draws each from the browser's randomness alone, a byte to a letter or digit, one past 251 drawn again", () => {
+    const bytes = [252, 255, 0, 25, 26, 35, 36, 251];
+    vi.stubGlobal("crypto", {
+      getRandomValues: (array: Uint8Array) => {
+        array.set([bytes.shift() ?? 0]);
+        return array;
+      },
+    });
+    const random = vi.spyOn(Math, "random").mockImplementation(() => {
+      throw new Error("Math.random is not the browser's randomness");
+    });
+    try {
+      expect(drawGuestNick()).toBe("guest-az09a9");
+      expect(bytes).toEqual([]);
+    } finally {
+      random.mockRestore();
+      vi.unstubAllGlobals();
+    }
   });
 });
