@@ -96,6 +96,9 @@ export const chatSlice: StateCreator<ChatSlice> = (set, get) => {
       heard: (message) => {
         const { me = "", rooms } = get().chat;
         const id = concerns(message);
+        // ponytail: a QUIT or a NICK reads every room's people, 100 rooms of M each, though Ergo sends it for the
+        // rooms shared alone (1,000 QUITs at 100 rooms of 2,500: 155 ms, the complexity-reviewer); a nick's rooms
+        // indexed in the store is the next step.
         if (id === "*") {
           change({ rooms: eachRoom(rooms, (room, each) => roomAfter(room, message, { room: each, me })) });
           return;
