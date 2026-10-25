@@ -102,6 +102,7 @@ describe("BatchReader: Ergo's batches, each handed on whole at its end", () => {
     ["the end of a batch never opened", "BATCH -h2"],
     ["a BATCH with nothing", "BATCH"],
     ["a BATCH with no sign", "BATCH h2 chathistory"],
+    ["a BATCH whose sign is no sign", "BATCH xh2 chathistory #a"],
     ["a BATCH + with no reference", "BATCH + chathistory"],
     ["a BATCH - with no reference", "BATCH -"],
     ["a BATCH + with no type", "BATCH +h2"],

@@ -134,6 +134,20 @@ describe("lineOf: a room's line from Ergo's message", () => {
     expect(lineOf(read(text), "#bubble")).toBeUndefined();
   });
 
+  // A replayed event (draft/event-playback) carries its id and time too: only a PRIVMSG or a NOTICE is a line.
+  test.each([
+    ["a PART", `@msgid=a1;time=${T0} :${ALICE}!u@h PART #bubble :bye`],
+    ["a TOPIC", `@msgid=a1;time=${T0} :${ALICE}!u@h TOPIC #bubble :new`],
+    ["a KICK", `@msgid=a1;time=${T0} :${ALICE}!u@h KICK #bubble bob`],
+    ["a NOTICE that is a CTCP's /me", `@msgid=a1;time=${T0} :${ALICE}!u@h NOTICE #bubble :\u0001ACTION hi\u0001`],
+    [
+      "a CTCP that holds ACTION later",
+      `@msgid=a1;time=${T0} :${ALICE}!u@h PRIVMSG #bubble :\u0001VERSION ACTION hi\u0001`,
+    ],
+  ])("takes no line from %s, though it has an id and a time", (_, text) => {
+    expect(lineOf(read(text), "#bubble")).toBeUndefined();
+  });
+
   test("leaves a leap year's 29 February in", () => {
     expect(lineOf(said("a1", "2028-02-29T10:00:00.000Z", "x"), "#bubble")).toBeDefined();
   });
@@ -369,6 +383,9 @@ describe("topicAfter: the room's description", () => {
   });
 
   test.each([
+    ["the topic's setter (333)", `:ergo 333 ${ME} #bubble ${ALICE}!u@h 1700000000`],
+    ["the end of NAMES (366)", `:ergo 366 ${ME} #bubble :End of /NAMES list.`],
+    ["a MODE", `:${ALICE}!u@h MODE #bubble +o bob`],
     ["another room's TOPIC", `:${ALICE}!u@h TOPIC #garden :theirs`],
     ["another room's 332", `:ergo 332 ${ME} #garden :theirs`],
     ["another room's 331", `:ergo 331 ${ME} #garden :No topic`],
