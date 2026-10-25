@@ -19,6 +19,23 @@ import { wallet } from "../../../server/src/testing/signer.ts";
 const ENTRY = fileURLToPath(new URL("../../../server/src/main.ts", import.meta.url));
 const AUTH_PORT = fileURLToPath(new URL("authPort.mjs", import.meta.url));
 const ROLES = fileURLToPath(new URL("../../../server/roles.json", import.meta.url));
+// The journeys' rooms (4b), added to the shipped roles file's Bubble: a section, Talk, of #games then the main
+// room, and #news outside it; so the first room listed is not the main one.
+const BUBBLE = {
+  rooms: [
+    { room: "#bubble/games", type: "open" },
+    { room: "#bubble/news", type: "announcement" },
+  ],
+  sections: [{ name: "Talk", rooms: ["#bubble/games", "#bubble"] }],
+};
+
+// The shipped roles file with the journeys' rooms, written where the server reads it; its worlds.
+function writeRoles(path) {
+  const roles = JSON.parse(readFileSync(ROLES, "utf8"));
+  roles.worlds = roles.worlds.map((world) => (world.slug === "bubble" ? { ...world, ...BUBBLE } : world));
+  writeFileSync(path, JSON.stringify(roles));
+  return roles.worlds;
+}
 const LISTENING = /"event":"listening".*"port":(\d+)/;
 const LINKED = /"event":"irc_ready"/;
 
@@ -35,6 +52,7 @@ export async function startBackend(origins) {
   writeFileSync(join(dir, "oper"), operPassword);
   // The ticket logins reach the server's auth handler through a port (authPort.mjs), on which Ergo's script dials.
   const authPort = await freePort();
+  const worlds = writeRoles(join(dir, "roles.json"));
   const ergo = await startErgo({ origins, operPassword, authScript: { forward: authPort } }).catch((error) => {
     rmSync(dir, { recursive: true, force: true });
     throw new Error("serve.mjs: Ergo did not start; sh scripts/ergo.sh builds the binary the journeys need", {
@@ -53,6 +71,7 @@ export async function startBackend(origins) {
       E2E_AUTH_PORT: String(authPort),
       ERGO_PORT: String(ergo.port),
       ERGO_OPER_PASSWORD_FILE: join(dir, "oper"),
+      ROLES_FILE: join(dir, "roles.json"),
     },
     stdio: ["ignore", "pipe", "inherit"],
   });
@@ -104,7 +123,7 @@ export async function startBackend(origins) {
     });
     await joinable(
       ergo.port,
-      JSON.parse(readFileSync(ROLES, "utf8")).worlds.map(({ slug }) => `#${slug}`),
+      worlds.flatMap(({ slug, rooms = [] }) => [`#${slug}`, ...rooms.map(({ room }) => room)]),
     );
     return { api, ws: ergo.wsPort };
   } catch (error) {
@@ -134,6 +153,15 @@ async function joinable(port, rooms) {
   } finally {
     await guest.close();
   }
+}
+
+// The WebSockets relayed and still open, by the e2e-tag cookie their page's context set, which dropSockets ends at
+// once, as a network gone would: a test drops its own pages' alone, never another worker's.
+const open = new Map();
+const tagOf = (incoming) => /(?:^|;\s*)e2e-tag=([\w-]+)/.exec(incoming.headers.cookie ?? "")?.[1];
+/** Ends every WebSocket relayed to Ergo from the pages that carry this tag. */
+export function dropSockets(tag) {
+  for (const socket of open.get(tag) ?? []) socket.destroy();
 }
 
 let visitors = 0;
@@ -174,6 +202,12 @@ const SET_BY_HOST = new Set(["x-forwarded-for", "x-real-ip", "authorization"]);
  * Ergo's answer and the frames, byte for byte.
  */
 export function relayUpgrade(port, incoming, socket, head) {
+  const tag = tagOf(incoming);
+  if (tag !== undefined) {
+    const tagged = open.get(tag) ?? new Set();
+    open.set(tag, tagged.add(socket));
+    socket.on("close", () => tagged.delete(socket));
+  }
   const visitor = nextVisitor();
   const lines = [`GET ${incoming.url} HTTP/1.1`];
   for (let n = 0; n < incoming.rawHeaders.length; n += 2) {
@@ -194,13 +228,21 @@ export function relayUpgrade(port, incoming, socket, head) {
   }
 }
 
-const testWallet = wallet();
+// A wallet for each name a journey gives (?as=), the unnamed one the login journeys'; each an account of its own,
+// so the server's ten tickets a minute an account, and Ergo's making of an account at its first login, are each
+// test's alone.
+const wallets = new Map();
+const walletOf = (incoming) => {
+  const name = new URL(incoming.url ?? "/", "http://host").searchParams.get("as") ?? "";
+  if (!wallets.has(name)) wallets.set(name, wallet());
+  return wallets.get(name);
+};
 /** The stand-in for Adena's account and signature: GET /__wallet, POST /__sign { chainId, signer, data }. */
 export function walletAnswer(incoming, outgoing, pathname) {
   if (pathname === "/__wallet") {
     outgoing
       .writeHead(200, { "content-type": "application/json" })
-      .end(JSON.stringify({ address: testWallet.address }));
+      .end(JSON.stringify({ address: walletOf(incoming).address }));
     return;
   }
   let body = "";
@@ -209,6 +251,6 @@ export function walletAnswer(incoming, outgoing, pathname) {
     const { chainId, signer, data } = JSON.parse(body);
     outgoing
       .writeHead(200, { "content-type": "application/json" })
-      .end(JSON.stringify(testWallet.sign(chainId, data, signer)));
+      .end(JSON.stringify(walletOf(incoming).sign(chainId, data, signer)));
   });
 }

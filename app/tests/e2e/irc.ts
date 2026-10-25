@@ -52,14 +52,20 @@ export const login = (account: string, passphrase: string): Step[] => [
   ["AUTHENTICATE \\+", `AUTHENTICATE ${btoa(`\0${account}\0${passphrase}`)}`],
 ];
 
-// An account in a page that logged in with Adena's stand-in: its address, and a ticket the server minted for it.
-export async function loggedIn(page: Page): Promise<{ address: string; ticket: string }> {
-  await adena(page);
+// An account in a page that logged in with Adena's stand-in, the test wallet of that name: its address.
+async function logIn(page: Page, as = ""): Promise<string> {
+  await adena(page, "signs", as);
   await page.goto("/");
   await hydrated(page);
   await page.getByRole("button", { name: "Log in with Adena" }).click();
   await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
-  const wallet = z.object({ address: Address }).parse(await (await page.request.get("/__wallet")).json());
+  const named = `/__wallet?as=${encodeURIComponent(as)}`;
+  const wallet = z.object({ address: Address }).parse(await (await page.request.get(named)).json());
+  return wallet.address;
+}
+
+/** A ticket for one connection to Ergo, from a page whose session is logged in. */
+async function ticketOf(page: Page): Promise<string> {
   const minted: unknown = await page.evaluate(async () => {
     const answer = await fetch("/api/login/ticket", {
       method: "POST",
@@ -69,5 +75,11 @@ export async function loggedIn(page: Page): Promise<{ address: string; ticket: s
     const body: unknown = await answer.json();
     return body;
   });
-  return { address: wallet.address, ticket: Ticket.parse(minted).ticket };
+  return Ticket.parse(minted).ticket;
+}
+
+// An account in a page that logged in with Adena's stand-in: its address, and a ticket the server minted for it.
+export async function loggedIn(page: Page, as = ""): Promise<{ address: string; ticket: string }> {
+  const address = await logIn(page, as);
+  return { address, ticket: await ticketOf(page) };
 }

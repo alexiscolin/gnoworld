@@ -347,7 +347,7 @@ and the harness is frozen until a real bug crosses it.
 | `scripts/install_hooks.sh` | puts `main`'s hooks and the scripts they run in `.git/hooks`; `--check` for `pre-push` (F129) |
 | `scripts/check.sh` | the gate |
 | `.github/workflows/gate.yml` | the full gate on GitHub's machines, for every branch pushed |
-| `app/playwright.config.ts`, `app/tests/e2e/` | the app's journeys: a build per run, served as a static host serves it (`serve.mjs`), the real server behind its `/api` and a real Ergo behind its `/ws` (`api.mjs`), both ended and their folders removed when the run ends |
+| `app/playwright.config.ts`, `app/tests/e2e/` | the app's journeys: a build per run, served as a static host serves it (`serve.mjs`), the real server behind its `/api` and a real Ergo behind its `/ws` (`api.mjs`), both ended and their folders removed when the run ends; the shipped roles file with the journeys' rooms added (Bubble's sections), a test wallet for each name a journey gives (`/__wallet?as=`), and `POST /__drop?tag=`, which ends the WebSockets of the pages whose `e2e-tag` cookie names it, as a network gone would |
 | `scripts/guard.py`, `scripts/stop_gate.sh` | Claude Code's hooks |
 | `scripts/scan_secrets.sh`, `scripts/gitleaks.toml`, `scripts/gitleaks-private.toml`, `scripts/.gitleaksignore`, `scripts/audit.py` | the secret scan and the dependency audit |
 | `scripts/code_changed.sh`, `scripts/borrow_node_modules.sh`, `scripts/repo_files.py` | what the hooks and scripts share |

@@ -1,14 +1,14 @@
-// The built site as a static host serves it (ADR-0002 §2): the file for a path where one exists, spelled
-// exactly, else the SPA fallback with a 404. On E2E_PORT's base (sites.ts) and the next two ports: the second
-// serves the same build for the PWA's update journey (a POST to /__bump makes its sw.js a new version, as a
-// deploy would; /__tamper turns a changed route file on and off; /__down answers 503 for sw.js, as an update
-// check offline finds no host); the third does the same behind the demo's shared password. /api goes to the
-// real server, /ws to a real Ergo, and /__wallet and /__sign answer for Adena's stand-in (api.mjs).
+// The built site as a static host serves it (ADR-0002 §2): the file for a path where one exists, spelled exactly,
+// else the SPA fallback with a 404. On E2E_PORT's base (sites.ts) and the next two ports: the second serves the same
+// build for the PWA's update journey (POST /__bump makes its sw.js a new version; /__tamper turns a changed route file
+// on and off; /__down answers 503 for sw.js), the third the same behind the demo's password. /api goes to the real
+// server, /ws to a real Ergo, /__drop?tag= ends the tagged pages' WebSockets, /__wallet and /__sign answer for
+// Adena's stand-in (api.mjs).
 import { createReadStream, readFileSync, realpathSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { relay, relayUpgrade, startBackend, walletAnswer } from "./api.mjs";
+import { dropSockets, relay, relayUpgrade, startBackend, walletAnswer } from "./api.mjs";
 
 const root = fileURLToPath(new URL("../../build/client/", import.meta.url));
 // The policy the build wrote for every answer (src/csp.ts), as a host that reads _headers sends it.
@@ -75,6 +75,12 @@ function host({ bumping = false, password = false }) {
     // A request to /ws that is no upgrade goes to Ergo too, which refuses it, as nginx's exact /ws location does.
     if (pathname === "/ws") {
       relay(backend.ws, request, response);
+      return;
+    }
+    // A network gone for every page's chat at once (4b's reconnect journey).
+    if (request.method === "POST" && pathname === "/__drop") {
+      dropSockets(new URL(request.url ?? "/", "http://host").searchParams.get("tag") ?? "");
+      response.writeHead(204).end();
       return;
     }
     if (pathname === "/__wallet" || (pathname === "/__sign" && request.method === "POST")) {
