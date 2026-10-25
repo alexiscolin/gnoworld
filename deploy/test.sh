@@ -352,6 +352,7 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "a forged X-Real-IP handed on" "and the first naming another stays limited, by the server" nginx sed 's#proxy_set_header X-Real-IP $proxy_protocol_addr;#proxy_set_header X-Real-IP $http_x_real_ip;#'
 	mutant "the password handed to the upstreams" "and never the demo's password" nginx sed '/proxy_set_header Authorization "";/d'
 	mutant "the session's cookie handed to Ergo" "and the session's cookie to the API alone, never to Ergo" nginx sed '/proxy_set_header Cookie "";/d'
+	mutant "a large body passed to the server" "web refuses a body past 16 KiB itself, on the login and on a room's route" nginx sed '/client_max_body_size 16k;/d'
 	mutant "the WebSocket open without the password" "no password, no WebSocket" \
 		nginx awk '{ print } /location = \/ws \{/ { print "            auth_basic off;" }'
 	mutant "the API open without the password" "no password, no API" \
@@ -918,6 +919,15 @@ CLIENT
 	# The server through web's /api: the password first, the visitor's address from web alone.
 	expect "no password, no API" "$(status '/api/activity?worlds=earth' 203.0.113.1)" 401
 	expect "the API answers with the password" "$(status '/api/activity?worlds=earth' 203.0.113.1 -u "$auth")" 200
+	# A body past the server's 16 KiB (its BODY_LIMIT) stops at web, before it is buffered in memory (F711's neighbour).
+	post() { # <bytes> <path>: the status and type of a JSON POST of that size through web
+		docker run --rm --network "$inside" "$CURL" -s -o /dev/null -w '%{http_code} %{content_type}' --haproxy-protocol \
+			--haproxy-clientip 203.0.113.36 -u "$auth" -H 'Content-Type: application/json' -H "Origin: $ORIGINS" \
+			-d "$(head -c "$1" /dev/zero | tr '\0' x)" "http://web:8080$2" || true
+	}
+	expect "web refuses a body past 16 KiB itself, on the login and on a room's route" \
+		"$(post 16385 /api/login/challenge) $(post 16385 /api/rooms)" "413 text/html 413 text/html"
+	expect "and hands one of 16 KiB to the server, whose own answer is no 413" "$(post 16384 /api/login/challenge | grep -c '^413' || true)" 0
 	# A backslash is a separator to the server's URL parser alone: refused, or web's login limit is skipped (F617).
 	for path in '/api/x/..\login/challenge' '/api/x/..%5Clogin/challenge'; do
 		expect "a backslash in a path is refused: $path" "$(status "$path" 203.0.113.34 -u "$auth" --path-as-is)" 400
