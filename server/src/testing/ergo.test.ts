@@ -3,12 +3,19 @@ import { once } from "node:events";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import type { AddressInfo } from "node:net";
+import type { DatabaseSync } from "node:sqlite";
 import { join as joinPath } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Address } from "@gnoworld/schemas";
 import { z } from "zod";
 import { authServer } from "../ergo/auth.ts";
+import { startChat } from "../chat.ts";
 import { ircLink, type Said } from "../irc/link.ts";
+import { PROGRESS_TABLES } from "../moderation/catchup.ts";
+import { MUTE_TABLES } from "../moderation/mute.ts";
+import { VERDICT_TABLES } from "../moderation/check.ts";
+import { CATEGORIES, type Answer } from "../moderation/provider.ts";
+import { ROOM_TABLES } from "../rooms/rooms.ts";
 import { openDatabase } from "../db.ts";
 import { logger } from "../log.ts";
 import { LOGIN_TABLES, makeLogin, NONCE_HOST } from "../login/login.ts";
@@ -1171,5 +1178,170 @@ describe("the server's IRC link (3h)", { timeout: 40_000 }, () => {
     const again = await start({ dir, ports: [first.port, first.wsPort], operPassword: first.operPassword });
     // An operator holds its rooms as their op: Ergo shows it with an @.
     expect(await inRoom(await guest(again, "gus2"), "#bubble")).toMatch(/ :(.* )?@gnoworld\b/);
+  });
+});
+
+describe("the bot acts (3j)", { timeout: 40_000 }, () => {
+  const RULES = { bannedWords: [], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
+  const nothing = Object.fromEntries(CATEGORIES.map((c) => [c, 0]));
+  const unflagged = Object.fromEntries(CATEGORIES.map((c) => [c, false]));
+  // A provider that flags violence in any text saying "hurt", and records what it was asked.
+  const provider =
+    (asked: string[]) =>
+    (text: string): Promise<Answer> => {
+      asked.push(text);
+      const hurt = text.includes("hurt");
+      return Promise.resolve({
+        flagged: { ...unflagged, violence: hurt } as Answer["flagged"],
+        scores: { ...nothing, violence: hurt ? 0.99 : 0 } as Answer["scores"],
+      });
+    };
+  let watchers = 0;
+  const TABLES = [LOGIN_TABLES, TICKET_TABLES, ROOM_TABLES, VERDICT_TABLES, PROGRESS_TABLES, MUTE_TABLES];
+  const MUTE = { strikes: 3, windowMinutes: 10, minutes: 5, max: 50 };
+  // The chat as main starts it, on its own database or one a restart shares.
+  const chatFor = async (
+    e: Ergo,
+    asked: string[],
+    more: { db?: DatabaseSync; now?: () => number; tickMs?: number } = {},
+  ) => {
+    const db = more.db ?? openDatabase(":memory:", TABLES);
+    const chat = startChat(
+      db,
+      {
+        worlds: new Map([["bubble", { rules: RULES }]]),
+        ergo: { host: "127.0.0.1", port: e.port, password: e.operPassword },
+        moderation: { openaiKey: undefined, thresholds: {}, newAccountHours: 24, mute: MUTE },
+      },
+      {
+        log: logger("a-pepper-of-forty-characters-0123456789", () => true),
+        pepper: "a-pepper-of-forty-characters-0123456789",
+        provider: provider(asked),
+        ...(more.now === undefined ? {} : { now: more.now }),
+        ...(more.tickMs === undefined ? {} : { tickMs: more.tickMs }),
+      },
+    );
+    stops.push(async () => {
+      await chat.stop();
+      if (more.db === undefined) db.close();
+    });
+    // A nick of its own each time: a restart's chat watches beside the last one's.
+    watchers += 1;
+    const watcher = await guest(e, `watcher${String(watchers)}`);
+    for (;;) {
+      watcher.send("NAMES #bubble");
+      const names = await watcher.expect(/ (353|366) \S+ (= )?#bubble /);
+      if (names.includes(" 353 ") && names.includes("gnoworld")) break;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    const ids = z.array(z.object({ msgid: z.string() }));
+    const verdicts = () =>
+      ids.parse(db.prepare("SELECT msgid FROM verdicts ORDER BY msgid").all()).map(({ msgid }) => msgid);
+    return { db, verdicts, stop: chat.stop };
+  };
+
+  it("hides the flagged message by its own id for everyone in the room, its author an address, a clean one kept", async () => {
+    const e = await start();
+    const { verdicts } = await chatFor(e, []);
+    const author = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+    const alice = await login(e, author);
+    await join(alice, "#bubble");
+    const bob = await login(e, "bob");
+    await join(bob, "#bubble");
+    const clean = await say(alice, "#bubble", "hello");
+    const flagged = await say(alice, "#bubble", "I will hurt you");
+    await bob.expect(new RegExp(` REDACT #bubble ${flagged} violence`));
+    await alice.expect(
+      new RegExp(
+        `NOTICE ${author} :Your message in #bubble was hidden: violence\\. The rules: https://gno\\.world/rules`,
+      ),
+    );
+    await expect.poll(() => verdicts().length).toBe(2);
+    await sync(bob);
+    expect(bob.lines().filter((line) => line.includes(` REDACT #bubble ${clean}`))).toEqual([]);
+  });
+
+  it("checks what it missed while its link was down, each message once, after a mark Ergo has erased", async () => {
+    const e = await start();
+    const asked: string[] = [];
+    const { verdicts } = await chatFor(e, asked);
+    const alice = await login(e, "alice");
+    await join(alice, "#bubble");
+    // The mark is a hidden line, which the REDACT takes out of Ergo's history.
+    const hidden = await say(alice, "#bubble", "I will hurt you");
+    await alice.expect(new RegExp(` REDACT #bubble ${hidden} `));
+    await expect.poll(() => verdicts().length).toBe(1);
+    const chief = await oper(e, "chief");
+    chief.send("KILL gnoworld :a test outage");
+    await alice.expect(/:gnoworld!\S+ QUIT /);
+    for (const text of ["one", "two", "three"]) alice.send(`PRIVMSG #bubble :${text}`);
+    await sync(alice);
+    await expect.poll(() => asked.toSorted(), { timeout: 15_000 }).toEqual(["I will hurt you", "one", "three", "two"]);
+    expect(verdicts()).toHaveLength(4);
+    await sync(alice);
+    expect(asked).toHaveLength(4);
+  });
+
+  it("mutes an account hidden three times, others still speaking; a restart keeps, puts back or lifts it (3k)", async () => {
+    const e = await start();
+    const clock = { now: Date.now() };
+    const db = openDatabase(":memory:", TABLES);
+    const restart = (): ReturnType<typeof chatFor> => chatFor(e, [], { db, now: () => clock.now, tickMs: 50 });
+    const first = await restart();
+    const bob = await login(e, "bob");
+    const alice = await login(e, "alice");
+    const bobby = await login(e, "bobby");
+    for (const c of [bob, alice, bobby]) await join(c, "#bubble");
+    for (const n of [1, 2]) await say(bob, "#bubble", `I will hurt you ${String(n)}`);
+    // Its echo not awaited: Ergo may send bob the mute before it, and expect reads on past what it matched.
+    bob.send("PRIVMSG #bubble :I will hurt you 3");
+    await bob.expect(/ MODE #bubble \+b m:bob/);
+    bob.send("PRIVMSG #bubble :muted now");
+    await bob.expect(/ 404 bob #bubble :Cannot send to channel/);
+    bob.send("@+draft/react=x TAGMSG #bubble");
+    await bob.expect(/ 404 bob #bubble :Cannot send to channel/);
+    await say(alice, "#bubble", "alice speaks");
+    await say(bobby, "#bubble", "bobby speaks");
+    // A restart with the ban still in Ergo's list: put on again, bob stays muted.
+    await first.stop();
+    const second = await restart();
+    bob.send("PRIVMSG #bubble :still muted");
+    await bob.expect(/ 404 bob #bubble :Cannot send to channel/);
+    // As if Ergo lost its list: the next start puts the live mute back.
+    await second.stop();
+    const chief = await oper(e, "chief");
+    chief.send("SAMODE #bubble -b m:bob");
+    await bob.expect(/ MODE #bubble -b m:bob/);
+    const third = await restart();
+    await bob.expect(/ MODE #bubble \+b m:bob/);
+    // A start after the mute's end lifts it.
+    await third.stop();
+    clock.now += 5 * 60_000;
+    await restart();
+    // Closed once every chat has stopped: the cleanups run in turn.
+    stops.push(() => {
+      db.close();
+      return Promise.resolve();
+    });
+    await bob.expect(/ MODE #bubble -b m:bob/);
+    await say(bob, "#bubble", "speaking again");
+  });
+
+  it("hides an edit of another's line in Ergo, and keeps an own edit (3k)", async () => {
+    const e = await start();
+    const { verdicts } = await chatFor(e, []);
+    const alice = await login(e, "alice");
+    await join(alice, "#bubble");
+    const bob = await login(e, "bob");
+    await join(bob, "#bubble");
+    const original = await say(alice, "#bubble", "hello");
+    bob.send(`@+gnoworld/edit=${original} PRIVMSG #bubble :forged`);
+    const forged = msgid(await bob.expect(/PRIVMSG #bubble :forged$/));
+    await alice.expect(new RegExp(` REDACT #bubble ${forged} :an edit of a message that is not yours`));
+    alice.send(`@+gnoworld/edit=${original} PRIVMSG #bubble :hello, fixed`);
+    const fixed = msgid(await alice.expect(/PRIVMSG #bubble :hello, fixed$/));
+    await expect.poll(() => verdicts().length).toBe(3);
+    await sync(alice);
+    expect(alice.lines().filter((line) => line.includes(` REDACT #bubble ${fixed}`))).toEqual([]);
   });
 });

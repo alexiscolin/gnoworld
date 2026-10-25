@@ -71,7 +71,7 @@ export const fakeErgo = async (at = 0) => {
 // Registered, an operator, in its rooms: the conversation Ergo holds with a new client (3b).
 export const welcome = async (peer: Peer): Promise<void> => {
   await peer.next(/^CAP REQ /);
-  peer.say(":ergo.test CAP * ACK :message-tags account-tag");
+  peer.say(":ergo.test CAP * ACK :message-tags account-tag batch draft/chathistory server-time");
   await peer.next(/^CAP END$/);
   peer.say(":ergo.test 001 gnoworld :Welcome");
   await peer.next(new RegExp(`^OPER admin ${PASSWORD}$`));

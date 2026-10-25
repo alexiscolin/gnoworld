@@ -8,6 +8,7 @@ import type { Said } from "../irc/link.ts";
 import type { Log } from "../log.ts";
 import type { Rules } from "../roles/roles.ts";
 import { decide, type Thresholds } from "./decide.ts";
+import { editsOwn, lineKnown } from "./edits.ts";
 import type { Answer, Category } from "./provider.ts";
 import { ruleVerdict, type RuleReason } from "./rules.ts";
 
@@ -70,7 +71,25 @@ function withBreaker(
   };
 }
 
-export function makeChecker(options: Options): (said: Said) => Promise<Verdict | "seen"> {
+/** An account as the verdicts keep it: its HMAC under the pepper, never the address. */
+export const accountKey = (pepper: string, account: string): string =>
+  createHmac("sha256", pepper).update(account).digest("hex");
+
+/** A line's time: Ergo's server-time when it set one, so a caught-up backlog keeps its own pace (3k). */
+export const lineTime = (said: Said, now: () => number): number =>
+  said.time === undefined ? now() : Date.parse(said.time);
+
+// More lines than this in a minute of Ergo's time are too fast (3k): twice 3h's activity cap, which
+// counts a room's heat, not a fault.
+const RATE = { lines: 20, ms: 60_000 };
+
+/** A hide that could not be done: the line is checked again when it comes back (3j). */
+export function checkAgain(db: DatabaseSync, msgid: string): void {
+  db.prepare("UPDATE verdicts SET action = 'unchecked' WHERE msgid = ?").run(msgid);
+}
+
+/** "seen": the line has its verdict; "busy": another run is checking it now, and settles it. */
+export function makeChecker(options: Options): (said: Said) => Promise<Verdict | "seen" | "busy"> {
   const { db, rulesOf, provider, thresholds, pepper, log, now = Date.now, newAccountMs = 24 * 60 * 60_000 } = options;
   const sql = {
     claim: db.prepare(
@@ -81,14 +100,31 @@ export function makeChecker(options: Options): (said: Said) => Promise<Verdict |
       "UPDATE verdicts SET action = ?, reason = ?, flags = ?, scores = ?, thresholds = ? WHERE msgid = ?",
     ),
     firstSeen: db.prepare("SELECT first_seen FROM accounts WHERE address = ?"),
+    // Counted up to one past the limit: an account's flood costs no more than the limit to measure.
+    recent: db.prepare(
+      "SELECT count(*) AS n FROM (SELECT 1 FROM verdicts WHERE account = ? AND at > ? AND at <= ? LIMIT ?)",
+    ),
+    pending: db.prepare("SELECT 1 FROM verdicts WHERE msgid = ? AND action = 'pending'"),
   };
+  const Count = z.object({ n: z.number() });
+  const owns = editsOwn(db);
+  // A line counts itself in its rate: it is claimed before the rules run.
+  const tooFast = (key: string, at: number): boolean =>
+    Count.parse(sql.recent.get(key, at - RATE.ms, at, RATE.lines + 1)).n > RATE.lines;
+  const known = lineKnown(db);
+  // An edit's line: none, its author's, another's, or one it never checked (F549).
+  const editOf = ({ edits }: Said, key: string): "none" | "own" | "other" | "unknown" =>
+    edits === undefined ? "none" : !known(edits) ? "unknown" : owns(edits, key) ? "own" : "other";
   const FirstSeen = z.object({ first_seen: z.number() }).optional();
+  // A line a stopped process left pending is checked again when it comes back (one process: 3a's lock).
+  db.prepare("UPDATE verdicts SET action = 'unchecked' WHERE action = 'pending'").run();
   const ask = provider === undefined ? undefined : withBreaker(provider, { now, log });
-  return async ({ room, account, msgid, text }) => {
-    const at = now();
-    const hashed = createHmac("sha256", pepper).update(account).digest("hex");
+  return async (said) => {
+    const { room, account, msgid, text } = said;
+    const at = lineTime(said, now);
+    const hashed = accountKey(pepper, account);
     const claimed = sql.claim.run(msgid, room, hashed, at).changes > 0 || sql.retry.run(at, msgid).changes > 0;
-    if (!claimed) return "seen";
+    if (!claimed) return sql.pending.get(msgid) === undefined ? "seen" : "busy";
     const settle = (verdict: Verdict, { why, answer }: { why?: string; answer?: Answer } = {}): Verdict => {
       const reason = verdict.action === "hide" ? verdict.reason : (why ?? null);
       const used = answer === undefined ? [null, null, null] : [answer.flagged, answer.scores, thresholds];
@@ -104,7 +140,13 @@ export function makeChecker(options: Options): (said: Said) => Promise<Verdict |
     // A room no world of the file names sends nothing anywhere.
     if (rules === undefined) return settle({ action: "unchecked" }, { why: "unknown_room" });
     const firstSeen = FirstSeen.parse(sql.firstSeen.get(account))?.first_seen;
-    const reason = ruleVerdict(text, rules, { newAccount: firstSeen === undefined || at - firstSeen < newAccountMs });
+    const edit = editOf(said, hashed);
+    const reason = ruleVerdict(text, rules, {
+      newAccount: firstSeen === undefined || at - firstSeen < newAccountMs,
+      tooFast: tooFast(hashed, at),
+      foreignEdit: edit === "other",
+      unknownEdit: edit === "unknown",
+    });
     if (reason !== undefined) return settle({ action: "hide", reason });
     if (ask === undefined) return settle({ action: "unchecked" }, { why: "no_key" });
     const answer = await ask(text);

@@ -20,7 +20,13 @@ export interface Config {
   authSocket: string | undefined;
   // Ergo's internal listener and its operator's password; no IRC link without the password's file.
   ergo: { host: string; port: number; password: string } | undefined;
-  moderation: { openaiKey: Secret | undefined; thresholds: Thresholds; newAccountHours: number };
+  moderation: {
+    openaiKey: Secret | undefined;
+    thresholds: Thresholds;
+    newAccountHours: number;
+    // An account hidden `strikes` times in `windowMinutes` is muted for `minutes`, `max` at once a world.
+    mute: { strikes: number; windowMinutes: number; minutes: number; max: number };
+  };
 }
 
 // A secret that never prints: inspect, JSON and a template string show [redacted]; reveal() reads it.
@@ -48,6 +54,15 @@ function isOrigin(text: string): boolean {
   const url = URL.parse(text);
   return url !== null && ["http:", "https:"].includes(url.protocol) && url.origin === text;
 }
+
+// A whole number from 1 to `max`, written plainly: no sign, no leading zero, no point.
+const whole = (max: number, otherwise: number) =>
+  z
+    .string()
+    .regex(/^[1-9]\d*$/)
+    .transform(Number)
+    .pipe(z.number().max(max))
+    .default(otherwise);
 
 const Env = z.object({
   HOST: z.string().min(1).max(253).default("127.0.0.1"),
@@ -116,12 +131,12 @@ const Env = z.object({
       z.strictObject(Object.fromEntries(CATEGORIES.map((category) => [category, z.number().min(0).max(1).optional()]))),
     )
     .default({}),
-  NEW_ACCOUNT_HOURS: z
-    .string()
-    .regex(/^[1-9]\d{0,2}$/)
-    .transform(Number)
-    .pipe(z.number().max(720))
-    .default(24),
+  NEW_ACCOUNT_HOURS: whole(720, 24),
+  MUTE_STRIKES: whole(99, 3),
+  MUTE_WINDOW_MINUTES: whole(1440, 10),
+  MUTE_MINUTES: whole(10_080, 5),
+  // Ergo's ban list holds 100 a room (3b's table): the mutes leave the moderators their share of it.
+  MUTE_MAX: whole(100, 50),
 });
 
 export function loadConfig(env: Record<string, string | undefined>): Config {
@@ -138,6 +153,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     parsed.data;
   const { AUTH_SOCKET, ERGO_HOST, ERGO_PORT, ERGO_OPER_PASSWORD_FILE } = parsed.data;
   const { OPENAI_API_KEY_FILE, MODERATION_THRESHOLDS, NEW_ACCOUNT_HOURS } = parsed.data;
+  const { MUTE_STRIKES, MUTE_WINDOW_MINUTES, MUTE_MINUTES, MUTE_MAX } = parsed.data;
   return {
     host: HOST,
     port: PORT,
@@ -155,6 +171,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
         OPENAI_API_KEY_FILE === undefined ? undefined : new Secret(word("OPENAI_API_KEY_FILE", OPENAI_API_KEY_FILE)),
       thresholds: MODERATION_THRESHOLDS,
       newAccountHours: NEW_ACCOUNT_HOURS,
+      mute: { strikes: MUTE_STRIKES, windowMinutes: MUTE_WINDOW_MINUTES, minutes: MUTE_MINUTES, max: MUTE_MAX },
     },
   };
 }

@@ -1,19 +1,17 @@
-// The server's IRC link (slice 3's plan, 3h): one TCP connection to Ergo's internal listener, as its
+// The server's IRC link (slice 3's plan, 3h, 3j, 3k): one TCP connection to Ergo's internal listener, as its
 // operator, in every room. It reads the rooms' messages, never a direct one, and sends only the commands
-// written here, each through formatLine. It comes back after a close, and after three unanswered pings.
+// lines.ts lists, each through formatLine. It comes back after a close, and after three unanswered pings,
+// then asks each room's history from the time of the last line checked there, a page at a time.
 import { connect, type Socket } from "node:net";
-import { formatLine, parseLine, toIrcCommand, type IrcMessage } from "@gnoworld/core";
+import { parseLine, type IrcMessage } from "@gnoworld/core";
 import type { Log } from "../log.ts";
+import { allowed, joins, line, NICK, said, type Command, type Said } from "./lines.ts";
 
-/** A room's message, as Ergo marked it: the account it set, and the message's id. */
-export interface Said {
-  room: string;
-  account: string;
-  msgid: string;
-  text: string;
-}
+export type { Said } from "./lines.ts";
 
 export interface Link {
+  // The commands of lines.ts alone, in their forms, once it is in its rooms; false when not sent.
+  send: (command: Command, params: readonly string[]) => boolean;
   stop: () => Promise<void>;
 }
 
@@ -26,9 +24,29 @@ interface Options {
   log: Log;
   retryMs?: (attempt: number) => number;
   pingMs?: number;
+  // The time of the last line checked in a room, which the catch-up starts from.
+  lastChecked?: (room: string) => string | undefined;
+  // Settles once what the link handed on is taken in: the next page waits for it.
+  drained?: () => Promise<void>;
+  // Each time it is in its rooms again (3k: the mutes put back).
+  onReady?: () => void;
 }
 
-const NICK = "gnoworld";
+// Half of a check's per-account queue, so a page never fills it with a live line waiting (3j).
+const PAGE = 50;
+
+interface State {
+  attempt: number;
+  // When the link last came in: the backoff starts again only after a minute up.
+  upSince?: number | undefined;
+  joined: Set<string>;
+  ready: boolean;
+  // Each chathistory batch open, by its reference: its room, its lines and the last one's time.
+  batches: Map<string, { room: string; lines: number; last: string }>;
+  // The time each room's history was last asked after, so a page that makes no progress is passed.
+  after: Map<string, string>;
+}
+
 // A server's longest line: 8191 bytes of tags with the @ and the space, 510 more, then CR LF.
 const LINE_MAX = 8191 + 512;
 
@@ -37,40 +55,17 @@ export function retryDelay(attempt: number, random: () => number = Math.random):
   return Math.floor(Math.min(1000 * 2 ** attempt, 60_000) * (0.5 + random()));
 }
 
-function line(name: string, params: readonly string[]): string {
-  const command = toIrcCommand(name);
-  if (command === undefined) throw new RangeError(`link: ${name} is no command`);
-  return `${formatLine({ tags: new Map(), command, params })}\r\n`;
-}
-
-// The JOIN lines for these rooms, 510 bytes each at most; a name that would break a line, or fill one
-// alone, is left out.
-function joins(rooms: readonly string[]): string[] {
-  const lines: string[][] = [];
-  const fits = (name: string): boolean => /^#[^\s,\0-\x1f]+$/.test(name) && Buffer.byteLength(`JOIN ${name}`) <= 510;
-  for (const room of rooms.filter(fits)) {
-    const last = lines.at(-1);
-    if (last !== undefined && Buffer.byteLength(`JOIN ${[...last, room].join(",")}`) <= 510) last.push(room);
-    else lines.push([room]);
-  }
-  return lines.map((names) => line("JOIN", [names.join(",")]));
-}
-
-// A room's message as the link hands it on, or nothing: a channel line of one of its rooms, with the
-// account and the id Ergo set, from someone else, with text.
-function said(
-  { tags, source, params: [room = "", text = ""] }: IrcMessage,
-  joined: ReadonlySet<string>,
-): Said | undefined {
-  const [account = "", msgid = ""] = [tags.get("account"), tags.get("msgid")];
-  const fields = [text, account, msgid];
-  if (fields.includes("") || source?.split("!")[0] === NICK || !joined.has(room)) return undefined;
-  return { room, account, msgid, text };
-}
-
 // The lines Ergo sends that ask for an answer, as 3b's table found them.
-function reader(options: Options, state: { attempt: number; joined: Set<string>; upSince?: number | undefined }) {
-  const { password, rooms, onMessage, log } = options;
+function reader(options: Options, state: State) {
+  const { password, rooms, onMessage, log, lastChecked = () => undefined, onReady = () => undefined } = options;
+  const { drained = () => Promise.resolve() } = options;
+  // Ergo answers AFTER a msgid it no longer holds (a line hidden by REDACT) with nothing, and AFTER a
+  // time from the next millisecond on (irc/history/history.go:171-175, irc/handlers.go:940, v2.19.1).
+  const history = (s: Socket, room: string, after: string): void => {
+    state.after.set(room, after);
+    s.write(line("CHATHISTORY", ["AFTER", room, `timestamp=${after}`, String(PAGE)]));
+  };
+  const earlier = (time: string): string => new Date(Date.parse(time) - 1).toISOString();
   // A refusal Ergo will not change by itself: log it, and try again later and later.
   const refused = (s: Socket, error: string): void => {
     log("irc_refused", { error });
@@ -87,7 +82,30 @@ function reader(options: Options, state: { attempt: number; joined: Set<string>;
       const names = rooms();
       state.joined = new Set(names);
       for (const join of joins(names)) s.write(join);
+      state.ready = true;
+      // A millisecond before the mark: the mark's own line comes again, seen, and none beside it is lost.
+      for (const room of state.joined) {
+        const last = lastChecked(room);
+        if (last !== undefined) history(s, room, earlier(last));
+      }
+      onReady();
       log("irc_ready");
+    },
+    BATCH: (s, { params: [ref = "", kind, room = ""] }) => {
+      if (ref.startsWith("+") && kind === "chathistory") state.batches.set(ref.slice(1), { room, lines: 0, last: "" });
+      if (!ref.startsWith("-")) return;
+      const done = state.batches.get(ref.slice(1));
+      state.batches.delete(ref.slice(1));
+      // A full page may have more after it, asked once the last page is taken in, from its last line's
+      // millisecond, which may hold more (F542). A page all in that one millisecond goes past it.
+      // ponytail: more than a page of lines in one millisecond loses the rest; pages by msgid lose a hidden one.
+      if (done === undefined || done.lines < PAGE || done.last === "") return;
+      const back = earlier(done.last);
+      const from = back === state.after.get(done.room) ? done.last : back;
+      const next = (): void => {
+        if (!s.destroyed) history(s, done.room, from);
+      };
+      drained().then(next, next);
     },
     "433": (s) => {
       refused(s, "nick");
@@ -98,8 +116,19 @@ function reader(options: Options, state: { attempt: number; joined: Set<string>;
     "491": (s) => {
       refused(s, "oper");
     },
+    // A hide Ergo refused (F544): the verdict says hidden, the line stays; ops hears of it.
+    FAIL: (_, { params: [command] }) => {
+      if (command === "REDACT") log("alert", { error: "redact_refused" });
+    },
     PING: (s, { params }) => s.write(line("PONG", params)),
     PRIVMSG: (_, message) => {
+      const batch = state.batches.get(message.tags.get("batch") ?? "");
+      // A time Date cannot read is no page's end (F552): the next page starts from the last one read.
+      const time = message.tags.get("time") ?? "";
+      if (batch !== undefined) {
+        batch.lines += 1;
+        if (!Number.isNaN(Date.parse(time))) batch.last = time;
+      }
       const heard = said(message, state.joined);
       if (heard !== undefined) onMessage(heard);
     },
@@ -116,10 +145,7 @@ export function ircLink(options: Options): Link {
   let retry: ReturnType<typeof setTimeout> | undefined;
   // The backoff starts again from a second only after a minute up: Ergo taking the link in, then
   // dropping it at once, keeps it waiting longer.
-  const state: { attempt: number; joined: Set<string>; upSince?: number | undefined } = {
-    attempt: 0,
-    joined: new Set<string>(),
-  };
+  const state: State = { attempt: 0, joined: new Set(), ready: false, batches: new Map(), after: new Map() };
   const read = reader(options, state);
   const open = (): void => {
     const s = connect(port, host);
@@ -132,7 +158,7 @@ export function ircLink(options: Options): Link {
       silent += 1;
     }, pingMs);
     s.on("connect", () => {
-      s.write(line("CAP", ["REQ", "message-tags account-tag"]));
+      s.write(line("CAP", ["REQ", "message-tags account-tag batch draft/chathistory server-time"]));
       s.write(line("NICK", [NICK]));
       s.write(line("USER", [NICK, "0", "*", "gno.world"]));
     });
@@ -164,6 +190,8 @@ export function ircLink(options: Options): Link {
     });
     s.on("close", () => {
       clearInterval(watchdog);
+      state.ready = false;
+      state.batches.clear();
       if (stopped) return;
       log("irc_closed");
       if (state.upSince !== undefined && Date.now() - state.upSince >= 60_000) state.attempt = 0;
@@ -175,6 +203,18 @@ export function ircLink(options: Options): Link {
   open();
 
   return {
+    send: (command, params) => {
+      const s = socket;
+      // A command or a form lines.ts does not list, whatever its type says, is refused.
+      if (!state.ready || s === undefined || !allowed(command, params)) return false;
+      // formatLine refuses a line that would break in two; nothing of it is sent.
+      try {
+        s.write(line(command, params));
+        return true;
+      } catch {
+        return false;
+      }
+    },
     stop: async () => {
       stopped = true;
       clearTimeout(retry);

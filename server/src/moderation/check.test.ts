@@ -7,7 +7,7 @@ import { openDatabase } from "../db.ts";
 import { logger } from "../log.ts";
 import { LOGIN_TABLES } from "../login/login.ts";
 import type { Rules } from "../roles/roles.ts";
-import { makeChecker, VERDICT_TABLES } from "./check.ts";
+import { accountKey, checkAgain, makeChecker, VERDICT_TABLES } from "./check.ts";
 import { answer } from "../testing/answers.ts";
 import type { Answer } from "./provider.ts";
 
@@ -107,7 +107,8 @@ describe("checking a message", () => {
     const first = check(said("hi"));
     const second = check(said("hi"));
     release();
-    expect(await Promise.all([first, second])).toEqual([{ action: "pass" }, "seen"]);
+    // The second arrives while the first is checked: busy, the first settles it.
+    expect(await Promise.all([first, second])).toEqual([{ action: "pass" }, "busy"]);
     expect(asked).toHaveLength(1);
     expect(await check(said("hi"))).toBe("seen");
   });
@@ -153,6 +154,109 @@ describe("checking a message", () => {
     expect(await check(said("hit"))).toEqual({ action: "hide", reason: "violence" });
     expect(await check(said("hit"))).toBe("seen");
     expect(asked).toEqual(["hit", "hit"]);
+  });
+
+  it("checks again a message a stopped process left pending, as the next start finds it", async () => {
+    const { db, check, asked, rows } = setup(() => new Promise<Answer>(() => undefined));
+    const stuck = check(said("hi"));
+    await expect.poll(() => rows().map(({ action }) => action)).toEqual(["pending"]);
+    expect(asked).toEqual(["hi"]);
+    const restarted = makeChecker({
+      db,
+      rulesOf: () => RULES,
+      provider: (text) => {
+        asked.push(text);
+        return Promise.resolve(answer());
+      },
+      thresholds: {},
+      pepper: PEPPER,
+      log: logger(PEPPER, () => true),
+    });
+    expect(await restarted(said("hi"))).toEqual({ action: "pass" });
+    expect(asked).toEqual(["hi", "hi"]);
+    expect(await Promise.race([stuck, Promise.resolve("waiting")])).toBe("waiting");
+  });
+
+  it("checks again only the message whose hide could not be done, none beside it", async () => {
+    const { db, check, rows } = setup(() => Promise.resolve(answer()));
+    await check(said("buy spam", "m1"));
+    await check(said("buy spam", "m2"));
+    checkAgain(db, "m1");
+    expect(rows().map(({ msgid, action }) => [msgid, action])).toEqual([
+      ["m1", "unchecked"],
+      ["m2", "hide"],
+    ]);
+  });
+
+  it("checks again a hidden message whose hide could not be done, when it comes back", async () => {
+    const { db, check, rows } = setup(() => Promise.resolve(answer()));
+    expect(await check(said("buy spam"))).toEqual({ action: "hide", reason: "banned_word" });
+    checkAgain(db, "m1");
+    expect(rows().map(({ action }) => action)).toEqual(["unchecked"]);
+    expect(await check(said("buy spam"))).toEqual({ action: "hide", reason: "banned_word" });
+    expect(await check(said("buy spam"))).toBe("seen");
+  });
+
+  // A line as Ergo stamps it: its server-time, which the rate reads, not the moment it reaches the check.
+  const stamped = (n: number, ms: number, account = OLD) => ({
+    ...said("hi", `m${String(n)}`, account),
+    time: new Date(T0 + ms).toISOString(),
+  });
+
+  it("hides an account's 21st line within a minute of Ergo's time as too fast, asking no provider (3k)", async () => {
+    const { check, asked } = setup(() => Promise.resolve(answer()));
+    for (let n = 0; n < 20; n += 1) expect(await check(stamped(n, n * 1000))).toEqual({ action: "pass" });
+    expect(await check(stamped(20, 59_999))).toEqual({ action: "hide", reason: "too_fast" });
+    expect(asked).toHaveLength(20);
+  });
+
+  it("counts a minute back from the line, the line a minute before it out, a seen line once (3k)", async () => {
+    const { check } = setup(() => Promise.resolve(answer()));
+    for (let n = 0; n < 20; n += 1) await check(stamped(n, n * 1000));
+    expect(await check(stamped(0, 0))).toBe("seen");
+    expect(await check(stamped(20, 60_000))).toEqual({ action: "pass" });
+  });
+
+  it("never finds a backlog spread over ten minutes too fast, however fast it arrives (3k)", async () => {
+    const { check } = setup(() => Promise.resolve(answer()));
+    const verdicts = await Promise.all(Array.from({ length: 25 }, (_, n) => check(stamped(n, n * 24_000))));
+    expect(verdicts.filter((verdict) => typeof verdict !== "string" && verdict.action === "hide")).toEqual([]);
+  });
+
+  it("counts each account's rate apart (3k)", async () => {
+    const OTHER = toAddress(new Uint8Array(20).fill(9));
+    const { check } = setup(() => Promise.resolve(answer()));
+    for (let n = 0; n < 20; n += 1) await check(stamped(n, n));
+    expect(await check(stamped(20, 20, OTHER))).toEqual({ action: "pass" });
+  });
+
+  it("hides an edit of another's line, and checks an edit of one's own as any line (3k)", async () => {
+    const OTHER = toAddress(new Uint8Array(20).fill(7));
+    const { db, check, asked } = setup(() => Promise.resolve(answer()));
+    db.prepare("INSERT INTO accounts (address, first_seen) VALUES (?, ?)").run(OTHER, T0 - 30 * 24 * HOUR);
+    expect(await check(said("hello", "m1"))).toEqual({ action: "pass" });
+    expect(await check({ ...said("hello, fixed", "m2", OTHER), edits: "m1" })).toEqual({
+      action: "hide",
+      reason: "not_their_edit",
+    });
+    expect(await check({ ...said("hello, fixed", "m3"), edits: "m1" })).toEqual({ action: "pass" });
+    // A line it never checked: no owner to tell, hidden as an edit it cannot place (F549).
+    expect(await check({ ...said("an edit of nothing", "m4"), edits: "m9" })).toEqual({
+      action: "hide",
+      reason: "unknown_edit",
+    });
+    expect(asked).toEqual(["hello", "hello, fixed"]);
+  });
+
+  it("checks an own edit by the rules and the provider like any line: an edit evades nothing (3k)", async () => {
+    const { check } = setup((text) => Promise.resolve(text.includes("hit") ? answer({ violence: true }) : answer()));
+    await check(said("hello", "m1"));
+    expect(await check({ ...said("buy spam", "m2"), edits: "m1" })).toEqual({ action: "hide", reason: "banned_word" });
+    expect(await check({ ...said("I hit you", "m3"), edits: "m1" })).toEqual({ action: "hide", reason: "violence" });
+  });
+
+  it("keys an account with the pepper, never in clear (3k)", () => {
+    expect(accountKey(PEPPER, OLD)).toBe(createHmac("sha256", PEPPER).update(OLD).digest("hex"));
   });
 
   it("gives a new account fewer links, 24 hours from its first login, not a minute more", async () => {

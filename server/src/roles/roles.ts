@@ -85,6 +85,15 @@ export const isTeam = (roles: Roles, who: Address): boolean => roles.team.has(wh
 
 export const isTrusted = (roles: Roles, who: Address): boolean => isTeam(roles, who) || roles.trusted.has(who);
 
+/** Who the automatic mute spares (decision 146): the team and the trusted, by the account Ergo names; a
+ * world's moderator by that role alone is not (decision 149). Their lines are still checked and hidden. */
+export const spared =
+  (roles: Roles) =>
+  (account: string): boolean => {
+    const who = Address.safeParse(account);
+    return who.success && isTrusted(roles, who.data);
+  };
+
 // A world the file does not name has no moderator, the team's included: the server knows no rooms of it.
 export function moderates(roles: Roles, who: Address, slug: string): boolean {
   const world = roles.worlds.get(slug);

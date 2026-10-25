@@ -176,6 +176,37 @@ Slice 3, the check (3i):
   Japanese, Thai, Lao, Khmer, Myanmar) matches anywhere in a line.
 - **A message caught in a restart** stays `pending` in the verdicts; 3j's catch-up checks it again.
 
+Slice 3, the bot acts and the stream (3j):
+
+- **A mistaken hide stays.** Nothing restores a hidden line until slice 12's console (decision 146);
+  the verdict's row holds its scores and thresholds, and its author got the reason.
+- **The catch-up.** After a reconnect or a restart the bot asks each room's history from the time of
+  the last line it settled in a row, 50 at a time, each page once the check's queue is empty. Not
+  caught up: a line the full queue drops (the log says so), a line left unchecked by a provider
+  outage (its previews wait), a room's first lines said while the link was down, and, past a full
+  page of 50 lines all in one millisecond, the rest of that millisecond (each next page starts in its
+  last line's millisecond, F542).
+- **A hide Ergo refuses** raises the alert `redact_refused`; its verdict still says hidden, the line
+  stays shown, and the author's notice and strike stand: the alert is for ops to look.
+- **`GET /api/stream`** is public: 25 rooms a stream, 4 streams a visitor, 1,000 in all, a beat every
+  15 s, a client 64 events behind dropped; each room's last 64 events are kept, which a new client gets
+  and a client coming back gets after its `Last-Event-ID`. nginx must not buffer it (3e).
+
+Slice 3, the mute and the edits (3k):
+
+- **Its settings.** `MUTE_STRIKES` (3) hides in `MUTE_WINDOW_MINUTES` (10) mute an account in that
+  world's rooms for `MUTE_MINUTES` (5); `MUTE_MAX` (50) mutes at once a world, the one ending first
+  lifted early to make room (Ergo's list holds 100: 3b). The roles file's team and trusted are never
+  muted, their lines still hidden.
+- **A line too fast** is the 21st of an account in a minute of Ergo's time: hidden, and a strike.
+- **What the mutes table keeps:** a muted account's address in clear, its world and its end, while
+  the mute lasts; the extban names it.
+- **Known limits.** A mute is evaded with a new address (decision 144). A mute lifts within 10 s of its
+  end (the timer). An edit of a line the bot never checked (one the full queue dropped, one said
+  before the bot, one the catch-up missed) is hidden as `unknown_edit`, its owner unknown, and counts
+  no strike (F549). The hides that brought a mute still count after it lifts: one more hide within
+  the window mutes again.
+
 ## Secrets: rotation and revocation
 
 - **The password:** write a new file with `htpasswd -cB`, then `docker compose ... restart web`.

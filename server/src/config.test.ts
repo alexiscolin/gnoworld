@@ -28,6 +28,8 @@ const failure = (env: Record<string, string | undefined>): string => {
   throw new Error("loadConfig accepted the settings");
 };
 
+const MUTE = { strikes: 3, windowMinutes: 10, minutes: 5, max: 50 };
+
 describe("loadConfig", () => {
   it("reads the settings, with the defaults, and the pepper from its file without its newline", () => {
     expect(loadConfig(ENV)).toEqual({
@@ -40,7 +42,7 @@ describe("loadConfig", () => {
       chains: ["onyx-1", "gnoland-1"],
       origins: [],
       newAccountsPerHour: 5,
-      moderation: { openaiKey: undefined, thresholds: {}, newAccountHours: 24 },
+      moderation: { openaiKey: undefined, thresholds: {}, newAccountHours: 24, mute: MUTE },
     });
   });
 
@@ -135,7 +137,12 @@ describe("loadConfig", () => {
   });
 
   it("reads the moderation's settings: OpenAI's key from a file, thresholds by category, a new account's hours", () => {
-    expect(loadConfig(ENV).moderation).toEqual({ openaiKey: undefined, thresholds: {}, newAccountHours: 24 });
+    expect(loadConfig(ENV).moderation).toEqual({
+      openaiKey: undefined,
+      thresholds: {},
+      newAccountHours: 24,
+      mute: MUTE,
+    });
     const key = `sk-${"k".repeat(40)}`;
     const env = {
       ...ENV,
@@ -146,7 +153,7 @@ describe("loadConfig", () => {
     const { openaiKey, ...rest } = loadConfig(env).moderation;
     expect([openaiKey?.reveal(), rest]).toEqual([
       key,
-      { thresholds: { harassment: 0.9, "sexual/minors": 0 }, newAccountHours: 720 },
+      { thresholds: { harassment: 0.9, "sexual/minors": 0 }, newAccountHours: 720, mute: MUTE },
     ]);
   });
 
@@ -163,10 +170,38 @@ describe("loadConfig", () => {
     ["NEW_ACCOUNT_HOURS", { NEW_ACCOUNT_HOURS: "0" }],
     ["NEW_ACCOUNT_HOURS", { NEW_ACCOUNT_HOURS: "721" }],
     ["NEW_ACCOUNT_HOURS", { NEW_ACCOUNT_HOURS: "1.5" }],
+    ["MUTE_STRIKES", { MUTE_STRIKES: "0" }],
+    ["MUTE_STRIKES", { MUTE_STRIKES: "100" }],
+    ["MUTE_WINDOW_MINUTES", { MUTE_WINDOW_MINUTES: "0" }],
+    ["MUTE_WINDOW_MINUTES", { MUTE_WINDOW_MINUTES: "1441" }],
+    ["MUTE_MINUTES", { MUTE_MINUTES: "0" }],
+    ["MUTE_MINUTES", { MUTE_MINUTES: "10081" }],
+    ["MUTE_MINUTES", { MUTE_MINUTES: "5m" }],
+    ["MUTE_MAX", { MUTE_MAX: "0" }],
+    ["MUTE_MAX", { MUTE_MAX: "101" }],
+    ["MUTE_STRIKES", { MUTE_STRIKES: "1.5" }],
+    ["MUTE_STRIKES", { MUTE_STRIKES: "" }],
+    ["MUTE_STRIKES", { MUTE_STRIKES: "03" }],
+    ["MUTE_WINDOW_MINUTES", { MUTE_WINDOW_MINUTES: "1.5" }],
+    ["MUTE_WINDOW_MINUTES", { MUTE_WINDOW_MINUTES: "" }],
+    ["MUTE_WINDOW_MINUTES", { MUTE_WINDOW_MINUTES: "03" }],
+    ["MUTE_MINUTES", { MUTE_MINUTES: "1.5" }],
+    ["MUTE_MINUTES", { MUTE_MINUTES: "" }],
+    ["MUTE_MINUTES", { MUTE_MINUTES: "03" }],
+    ["MUTE_MAX", { MUTE_MAX: "1.5" }],
+    ["MUTE_MAX", { MUTE_MAX: "" }],
+    ["MUTE_MAX", { MUTE_MAX: "03" }],
   ])("stops on a bad %s, naming it and never its content", (setting, env) => {
     const error = failure({ ...ENV, ...env });
     expect(error).toMatch(new RegExp(`setting ${setting}: `));
     expect(error).not.toMatch(/sk-|tiny-secret|X-Evil|harassment=/);
+  });
+
+  it("reads the mute's settings: strikes, their window, the mute's minutes and the most at once (3k)", () => {
+    const env = { ...ENV, MUTE_STRIKES: "99", MUTE_WINDOW_MINUTES: "1440", MUTE_MINUTES: "10080", MUTE_MAX: "100" };
+    expect(loadConfig(env).moderation.mute).toEqual({ strikes: 99, windowMinutes: 1440, minutes: 10080, max: 100 });
+    const low = { ...ENV, MUTE_STRIKES: "1", MUTE_WINDOW_MINUTES: "1", MUTE_MINUTES: "1", MUTE_MAX: "1" };
+    expect(loadConfig(low).moderation.mute).toEqual({ strikes: 1, windowMinutes: 1, minutes: 1, max: 1 });
   });
 
   it("takes a new account's hours from 1, and thresholds of exactly 0 and 1", () => {

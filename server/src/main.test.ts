@@ -4,11 +4,12 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { Challenge, Ticket } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it } from "vitest";
-import { fakeErgo, PASSWORD, welcome } from "./testing/fakeErgo.ts";
+import { fakeErgo, message, PASSWORD, welcome } from "./testing/fakeErgo.ts";
 import { wallet } from "./testing/signer.ts";
 
 interface Server {
@@ -187,6 +188,41 @@ describe("the server's process", () => {
     await left;
   });
 
+  it("never mutes the roles file's team, mutes another hidden three times, and keeps the strikes' index (3k)", async () => {
+    const ergo = await fakeErgo();
+    const env = settings();
+    const oper = join(folder("gnoworld-oper-"), "oper");
+    writeFileSync(oper, `${PASSWORD}\n`);
+    const team = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+    const other = "g1uauvt7txunf9zeu2qyrzv0pa5uvwjlq90r3qpa";
+    const roles = join(folder("gnoworld-roles-"), "roles.json");
+    const rules = { bannedWords: ["spam"], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
+    writeFileSync(
+      roles,
+      JSON.stringify({ team: [team], trusted: [], worlds: [{ slug: "bubble", moderators: [], rules }] }),
+    );
+    const server = start({ ...env, ROLES_FILE: roles, ERGO_PORT: String(ergo.port), ERGO_OPER_PASSWORD_FILE: oper });
+    await listening(server);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    for (let n = 0; n < 5; n += 1) {
+      peer.say(message(`account=${team};msgid=t${String(n)}`, `${team}!u@h`, ["#bubble", "buy spam"]));
+      peer.say(message(`account=${other};msgid=o${String(n)}`, `${other}!u@h`, ["#bubble", "buy spam"]));
+    }
+    expect(await peer.next(/^SAMODE /)).toBe(`SAMODE #bubble +b m:${other}`);
+    peer.say("PING :settled");
+    await peer.next(/^PONG settled$/);
+    expect(peer.lines.filter((line) => line.includes(`m:${team}`))).toEqual([]);
+    server.child.kill("SIGTERM");
+    expect(await exited(server)).toBe(0);
+    const db = new DatabaseSync(env["DATABASE"] ?? "");
+    const index = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'verdicts_by_account'")
+      .all();
+    db.close();
+    expect(index).toEqual([{ name: "verdicts_by_account" }]);
+  });
+
   it("answers the rooms of the roles file's worlds, made at boot, with no Ergo set", async () => {
     const port = await listening(start(settings()));
     const answer = await fetch(`http://127.0.0.1:${String(port)}/api/activity?worlds=earth,bubble`);
@@ -251,6 +287,24 @@ describe("the server's process", () => {
     expect(await exited(second)).not.toBe(0);
     expect(second.out.stderr).toMatch(/database is locked/);
     expect((await fetch(`http://127.0.0.1:${String(port)}/health`)).status).toBe(200);
+  });
+
+  it("serves the verdicts' stream, counting visitors by the trusted proxy, and ends it on SIGTERM (3j)", async () => {
+    const server = start({ ...settings(), TRUSTED_PROXY: "127.0.0.1" });
+    const port = await listening(server);
+    const follow = (visitor: string) =>
+      fetch(`http://127.0.0.1:${String(port)}/api/stream?rooms=%23bubble`, { headers: { "x-real-ip": visitor } });
+    const open = [];
+    for (let i = 0; i < 4; i++) open.push(await follow("192.0.2.1"));
+    expect(open.map(({ status, headers }) => [status, headers.get("content-type")])).toEqual(
+      Array.from({ length: 4 }, () => [200, "text/event-stream"]),
+    );
+    expect((await follow("192.0.2.1")).status).toBe(429);
+    const other = await follow("192.0.2.2");
+    expect(other.status).toBe(200);
+    server.child.kill("SIGTERM");
+    expect(await exited(server)).toBe(0);
+    expect((await other.body?.getReader().read())?.done).toBe(true);
   });
 
   it("drains on SIGTERM: a request already begun is answered, then the process exits 0", async () => {

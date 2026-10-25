@@ -6,7 +6,7 @@ import { freePort } from "../testing/ergo.ts";
 import { fakeErgo, message, PASSWORD, welcome, type Peer } from "../testing/fakeErgo.ts";
 import { ircLink, retryDelay, type Link, type Said } from "./link.ts";
 
-const CAPS = "CAP REQ :message-tags account-tag";
+const CAPS = "CAP REQ :message-tags account-tag batch draft/chathistory server-time";
 // Stopped before the fake Ergo closes, so no link reconnects to a server that is gone.
 const links: Link[] = [];
 afterEach(async () => {
@@ -27,7 +27,7 @@ const start = (port: number, more: Partial<Parameters<typeof ircLink>[0]> = {}) 
     ...more,
   });
   links.push(link);
-  return { said, lines };
+  return { said, lines, link };
 };
 
 describe("the IRC link", () => {
@@ -38,7 +38,7 @@ describe("the IRC link", () => {
     expect(await peer.next(/^CAP /)).toBe(CAPS);
     expect(await peer.next(/^NICK /)).toBe("NICK gnoworld");
     expect(await peer.next(/^USER /)).toBe("USER gnoworld 0 * gno.world");
-    peer.say(":ergo.test CAP * ACK :message-tags account-tag");
+    peer.say(":ergo.test CAP * ACK :message-tags account-tag batch draft/chathistory server-time");
     expect(await peer.next(/^CAP END$/)).toBe("CAP END");
     peer.say(":ergo.test 001 gnoworld :Welcome");
     expect(await peer.next(/^OPER /)).toBe(`OPER admin ${PASSWORD}`);
@@ -546,6 +546,286 @@ describe("the IRC link, its green pass (3h)", () => {
     await welcome(peer);
     peer.socket.write("PING :abc\n");
     expect(await peer.next(/^PONG /)).toBe("PONG abc");
+  });
+});
+
+describe("the IRC link's own commands (3j)", () => {
+  it("sends REDACT and NOTICE once it is in its rooms, and nothing before", async () => {
+    const ergo = await fakeErgo();
+    const { link } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    expect(link.send("REDACT", ["#bubble", "m1", "harassment"])).toBe(false);
+    await welcome(peer);
+    expect(link.send("REDACT", ["#bubble", "m1", "harassment"])).toBe(true);
+    expect(link.send("NOTICE", ["g1abc", "Your message in #bubble was hidden: harassment."])).toBe(true);
+    expect(await peer.next(/^REDACT /)).toBe("REDACT #bubble m1 harassment");
+    expect(await peer.next(/^NOTICE /)).toBe("NOTICE g1abc :Your message in #bubble was hidden: harassment.");
+  });
+
+  it("sends nothing once its connection is gone, until it is in its rooms again", async () => {
+    const ergo = await fakeErgo();
+    const { link } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    peer.socket.destroy();
+    await expect.poll(() => link.send("REDACT", ["#bubble", "m1", "x"])).toBe(false);
+    const again = await ergo.peer(1);
+    await welcome(again);
+    expect(link.send("REDACT", ["#bubble", "m1", "x"])).toBe(true);
+    expect(await again.next(/^REDACT /)).toBe("REDACT #bubble m1 x");
+  });
+
+  it.each([
+    ["a command off its list", "KILL", ["someone", "bye"]],
+    ["a line formatLine would refuse", "NOTICE", ["g1abc", "a\r\nQUIT :gone"]],
+    ["an id with a space", "REDACT", ["#bubble", "m 1", "x"]],
+    ["a NOTICE to a room", "NOTICE", ["#bubble", "x"]],
+    ["a NOTICE to two targets", "NOTICE", ["g1a,g1b", "x"]],
+    ["a NOTICE to nobody", "NOTICE", ["", "x"]],
+    ["a REDACT outside a room", "REDACT", ["g1abc", "m1", "x"]],
+    ["a REDACT in two rooms", "REDACT", ["#bubble,#earth", "m1", "x"]],
+    ["a SAMODE outside a room (3k)", "SAMODE", ["g1abc", "+b", "m:g1abc"]],
+    ["a SAMODE that is no ban (3k)", "SAMODE", ["#bubble", "+o", "g1abc"]],
+    ["a ban that mutes no one by name (3k)", "SAMODE", ["#bubble", "+b", "g1abc"]],
+    ["a ban after another mode in one word (3j's green pass)", "SAMODE", ["#bubble", "+o+b", "m:g1abc"]],
+    ["a mute's mask behind another (3j's green pass)", "SAMODE", ["#bubble", "+b", "x:m:g1abc"]],
+    ["a mute of everyone (3k)", "SAMODE", ["#bubble", "+b", "m:*"]],
+    ["a mute by mask (3k)", "SAMODE", ["#bubble", "+b", "m:g1abc!*@*"]],
+    ["a mute of two (3k)", "SAMODE", ["#bubble", "+b", "m:g1a,g1b"]],
+    ["a SAMODE with a fourth word (3k)", "SAMODE", ["#bubble", "+b", "m:g1a", "x"]],
+    ["a mute of nobody (3k)", "SAMODE", ["#bubble", "+b", "m:"]],
+    ["a mute ending in a wildcard (3k)", "SAMODE", ["#bubble", "+b", "m:g1a*"]],
+    ["a mute with a ? wildcard (3k)", "SAMODE", ["#bubble", "+b", "m:g1a?"]],
+    ["a SAMODE in two rooms (3k)", "SAMODE", ["#bubble,#earth", "+b", "m:g1a"]],
+    ["a mode of two letters (3k)", "SAMODE", ["#bubble", "+bb", "m:g1a"]],
+    ["a ban and an op at once (3k)", "SAMODE", ["#bubble", "+bo", "m:g1a"]],
+    ["a capital B (3k)", "SAMODE", ["#bubble", "+B", "m:g1a"]],
+    ["an unmute of everyone (3k)", "SAMODE", ["#bubble", "-b", "m:*"]],
+    ["a line break in the account (3k)", "SAMODE", ["#bubble", "+b", "m:g1a\r\nQUIT"]],
+    ["an account of 600 bytes (3k)", "SAMODE", ["#bubble", "+b", `m:${"a".repeat(600)}`]],
+  ])("refuses %s, sending nothing", async (_, command, params) => {
+    const ergo = await fakeErgo();
+    const { link } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    const mark = peer.lines.length;
+    expect(link.send(command as "NOTICE", params)).toBe(false);
+    await sync(peer);
+    expect(since(peer, mark)).toEqual(["PONG sync"]);
+  });
+});
+
+describe("the IRC link's mute and edits (3k)", () => {
+  it("puts a mute on and takes it off with SAMODE, once in its rooms", async () => {
+    const ergo = await fakeErgo();
+    const { link } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    expect(link.send("SAMODE", ["#bubble", "+b", "m:g1abc"])).toBe(false);
+    await welcome(peer);
+    const address = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+    expect(link.send("SAMODE", ["#bubble", "+b", `m:${address}`])).toBe(true);
+    expect(link.send("SAMODE", ["#bubble", "-b", `m:${address}`])).toBe(true);
+    expect(await peer.next(/^SAMODE /)).toBe(`SAMODE #bubble +b m:${address}`);
+    expect(await peer.next(/^SAMODE /)).toBe(`SAMODE #bubble -b m:${address}`);
+  });
+
+  it("says when it is in its rooms, each time it comes back", async () => {
+    const ergo = await fakeErgo();
+    let ready = 0;
+    start(ergo.port, {
+      onReady: () => {
+        ready += 1;
+      },
+    });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    await expect.poll(() => ready).toBe(1);
+    peer.socket.destroy();
+    await welcome(await ergo.peer(1));
+    await expect.poll(() => ready).toBe(2);
+  });
+
+  it("hands on the id a line says it corrects, and none empty or past 128 characters", async () => {
+    const ergo = await fakeErgo();
+    const { said } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    peer.say(message("account=g1a;msgid=m2;+gnoworld/edit=m1", "a!u@h", ["#bubble", "fixed"]));
+    peer.say(message("account=g1a;msgid=m3;+gnoworld/edit=", "a!u@h", ["#bubble", "plain"]));
+    peer.say(message(`account=g1a;msgid=m4;+gnoworld/edit=${"x".repeat(129)}`, "a!u@h", ["#bubble", "long"]));
+    await expect.poll(() => said.length).toBe(3);
+    expect(said).toEqual([
+      { room: "#bubble", account: "g1a", msgid: "m2", text: "fixed", edits: "m1" },
+      { room: "#bubble", account: "g1a", msgid: "m3", text: "plain" },
+      { room: "#bubble", account: "g1a", msgid: "m4", text: "long" },
+    ]);
+  });
+});
+
+describe("the IRC link's catch-up (3j)", () => {
+  const T = (n: number) => `2026-10-22T08:00:${String(n).padStart(2, "0")}.000Z`;
+  // A page of the room's history as Ergo sends it: a chathistory batch of PRIVMSGs, each tagged with it.
+  const page = (peer: Peer, ref: string, lines: { id: string; time: string; account?: string }[]): void => {
+    peer.say(`:ergo.test BATCH +${ref} chathistory #bubble`);
+    for (const { id, time, account = "g1a" } of lines) {
+      const tags = `batch=${ref};${account === "" ? "" : `account=${account};`}msgid=${id};time=${time}`;
+      peer.say(message(tags, "a!u@h", ["#bubble", `line ${id}`]));
+    }
+    peer.say(`:ergo.test BATCH -${ref}`);
+  };
+  const full = (from: number) => Array.from({ length: 50 }, (_, n) => ({ id: `p${String(from + n)}`, time: T(n) }));
+  const asked = (peer: Peer) => peer.lines.filter((line) => line.startsWith("CHATHISTORY"));
+  // A millisecond before a time: the next page starts in the millisecond of the last line it read.
+  const before = (time: string) => new Date(Date.parse(time) - 1).toISOString();
+  // Twice: a page's end asks its next page a microtask after it is read, which one PONG may beat.
+  const settled = async (peer: Peer) => {
+    await sync(peer, "a");
+    await sync(peer, "b");
+  };
+
+  it("asks each room's history from just before its mark's time, page by page, and hands each on with its time", async () => {
+    const ergo = await fakeErgo();
+    const { said } = start(ergo.port, { lastChecked: (room) => (room === "#bubble" ? T(5) : undefined) });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    expect(await peer.next(/^CHATHISTORY /)).toBe("CHATHISTORY AFTER #bubble timestamp=2026-10-22T08:00:04.999Z 50");
+    page(peer, "a", full(0));
+    expect(await peer.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(T(49))} 50`);
+    page(peer, "b", [
+      { id: "q1", time: T(50) },
+      { id: "q2", time: T(51) },
+    ]);
+    await settled(peer);
+    expect(asked(peer)).toHaveLength(2);
+    await expect.poll(() => said.length).toBe(52);
+    expect(said[51]).toEqual({ room: "#bubble", account: "g1a", msgid: "q2", text: "line q2", time: T(51) });
+  });
+
+  it("asks nothing of a room it has never checked", async () => {
+    const ergo = await fakeErgo();
+    start(ergo.port, { lastChecked: () => undefined });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    await sync(peer);
+    expect(asked(peer)).toEqual([]);
+  });
+
+  it("stops after a full page followed by an empty one, and after an empty first page", async () => {
+    const ergo = await fakeErgo();
+    start(ergo.port, { lastChecked: (room) => (room === "#bubble" ? T(0) : undefined) });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    await peer.next(/^CHATHISTORY /);
+    page(peer, "a", full(0));
+    await peer.next(/^CHATHISTORY /);
+    page(peer, "b", []);
+    await settled(peer);
+    expect(asked(peer)).toHaveLength(2);
+    const other = await fakeErgo();
+    start(other.port, { lastChecked: (room) => (room === "#bubble" ? T(0) : undefined) });
+    const lone = await other.peer(0);
+    await welcome(lone);
+    await lone.next(/^CHATHISTORY /);
+    page(lone, "c", []);
+    await settled(lone);
+    expect(asked(lone)).toHaveLength(1);
+  });
+
+  it("takes the next page from a full page's last line, even one it does not hand on", async () => {
+    const ergo = await fakeErgo();
+    const { said } = start(ergo.port, { lastChecked: (room) => (room === "#bubble" ? T(0) : undefined) });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    await peer.next(/^CHATHISTORY /);
+    page(peer, "a", [...full(0).slice(0, 49), { id: "anon", time: T(59), account: "" }]);
+    expect(await peer.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(T(59))} 50`);
+    await expect.poll(() => said.length).toBe(49);
+  });
+
+  it("asks the next page only once what it handed on is taken in", async () => {
+    let drain = (): void => undefined;
+    const ergo = await fakeErgo();
+    start(ergo.port, {
+      lastChecked: (room) => (room === "#bubble" ? T(0) : undefined),
+      drained: () =>
+        new Promise<void>((resolve) => {
+          drain = resolve;
+        }),
+    });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    await peer.next(/^CHATHISTORY /);
+    page(peer, "a", full(0));
+    await settled(peer);
+    expect(asked(peer)).toHaveLength(1);
+    drain();
+    expect(await peer.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(T(49))} 50`);
+  });
+
+  it("asks again from a full page's last millisecond, so a line beside its last one is not lost", async () => {
+    const ergo = await fakeErgo();
+    start(ergo.port, { lastChecked: (room) => (room === "#bubble" ? T(0) : undefined) });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    await peer.next(/^CHATHISTORY /);
+    // Its last two lines in one millisecond: Ergo's next page from that millisecond holds the third.
+    page(peer, "a", [...full(0).slice(0, 48), { id: "x1", time: T(48) }, { id: "x2", time: T(48) }]);
+    expect(await peer.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(T(48))} 50`);
+  });
+
+  it("goes on past a full page in one millisecond, rather than ask it again forever", async () => {
+    const ergo = await fakeErgo();
+    start(ergo.port, { lastChecked: (room) => (room === "#bubble" ? T(5) : undefined) });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    expect(await peer.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(T(5))} 50`);
+    page(
+      peer,
+      "a",
+      Array.from({ length: 50 }, (_, n) => ({ id: `s${String(n)}`, time: T(5) })),
+    );
+    expect(await peer.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${T(5)} 50`);
+  });
+
+  it("pages on from the last time it can read when a line's time is not one, and stays up", async () => {
+    const ergo = await fakeErgo();
+    start(ergo.port, { lastChecked: (room) => (room === "#bubble" ? T(0) : undefined) });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    await peer.next(/^CHATHISTORY /);
+    page(peer, "a", [...full(0).slice(0, 49), { id: "odd", time: "not-a-time" }]);
+    expect(await peer.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(T(48))} 50`);
+    expect(ergo.peers).toHaveLength(1);
+  });
+
+  it("asks no further page after a full page whose lines carry no time", async () => {
+    const ergo = await fakeErgo();
+    start(ergo.port, { lastChecked: (room) => (room === "#bubble" ? T(0) : undefined) });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    await peer.next(/^CHATHISTORY /);
+    peer.say(":ergo.test BATCH +a chathistory #bubble");
+    for (let n = 0; n < 50; n += 1)
+      peer.say(message(`batch=a;account=g1a;msgid=t${String(n)}`, "a!u@h", ["#bubble", "x"]));
+    peer.say(":ergo.test BATCH -a");
+    await settled(peer);
+    expect(asked(peer)).toHaveLength(1);
+  });
+});
+
+describe("the IRC link's refused hides (3j's green pass)", () => {
+  it("raises the alert when Ergo refuses a REDACT, and not for another command's FAIL", async () => {
+    const ergo = await fakeErgo();
+    const { lines } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    const alerts = () => lines.filter((line) => line.includes('"event":"alert"'));
+    peer.say(":ergo.test FAIL CHATHISTORY INVALID_PARAMS AFTER :Invalid parameters");
+    await sync(peer, "other");
+    expect(alerts()).toEqual([]);
+    peer.say(":ergo.test FAIL REDACT REDACT_FORBIDDEN #bubble m1 :You are not authorized to delete this message");
+    await sync(peer, "redact");
+    expect(alerts()).toEqual([expect.stringContaining('"error":"redact_refused"')]);
   });
 });
 
