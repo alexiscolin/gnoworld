@@ -181,7 +181,8 @@ Slice 3, the bot's link and the rooms (3h):
 
 - **The link's settings.** `ERGO_HOST` and `ERGO_PORT` name Ergo's internal listener (127.0.0.1:6667
   by default); `ERGO_OPER_PASSWORD_FILE` holds the operator's password, one word of printable ASCII,
-  32 characters at least. Unset, the server keeps no link: rooms exist, nobody's activity counts.
+  32 to 72 characters (bcrypt keeps 72 bytes, so Ergo's start refuses more; the server alone takes 256); Ergo's
+  start refuses any other shape, a blank line before the word included (F706). Unset, the server keeps no link: rooms exist, nobody's activity counts.
 - **Rooms stay.** A world removed from the roles file keeps its room and history; removing one is a
   moderator's act (3l).
 - **The bot's account.** The bot logs in by SASL as the account `gnoworld`, whose nick Ergo keeps for

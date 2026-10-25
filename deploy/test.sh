@@ -339,7 +339,10 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "anyone makes a room" "a guest makes no room" template sed 's#operator-only-creation: true#operator-only-creation: false#'
 	mutant "registration open" "a hand-made account is refused" \
 		template awk '/^  registration:/ { r = 1 } r && /enabled: false/ { sub(/false/, "true"); r = 0 } { print }'
-	mutant "a short oper password taken" "Ergo starts with a short oper password" render_sh sed '/32 characters or more/d'
+	mutant "a short oper password taken" "Ergo starts with a short oper password" render_sh sed '/32 to 72 characters/d'
+	mutant "an oper password's blanks dropped before its check" "Ergo starts with an oper password with a blank first line" \
+		render_sh sed 's#password=$(cat /run/secrets/ergo_oper_password)#password=$(tr -d " \\t\\r\\n" </run/secrets/ergo_oper_password)#'
+	mutant "an oper password of any shape" "Ergo starts with an oper password with a space inside" render_sh sed '/one word of printable characters/d'
 	mutant "a login by PASS" "login-via-pass-command: false" template sed 's#login-via-pass-command: false#login-via-pass-command: true#'
 	mutant "every address believed as a proxy" "never a forged X-Forwarded-For" template sed 's#proxy-allowed-from: {{PROXY_FROM}}#proxy-allowed-from: ["0.0.0.0/0"]#'
 	mutant "the auth script's socket lost" "the refusal came from the server" compose 'services: { server: { environment: { AUTH_SOCKET: /tmp/elsewhere.sock } } }'
@@ -715,6 +718,37 @@ print("%.2f %d" % (sum(float(s.get("cpus", 0)) for s in services), sum(size(s.ge
 	*"render: the oper's password"*) pass "Ergo's start refuses a short oper password" ;;
 	*) fail "Ergo starts with a short oper password" ;;
 	esac
+	# genpasswd hashes the first line alone: a blank or short one before a long one is refused too, and any shape
+	# but one word of 32 to 72 printable characters, 72 being what bcrypt keeps (F706). Each case is the file's text.
+	oper_render() { # printf's arguments: the file's text
+		printf "$@" >"$tmp/shaped_oper_password"
+		chmod 644 "$tmp/shaped_oper_password"
+		ERGO_OPER_PASSWORD_FILE=$tmp/shaped_oper_password docker compose -p "$project" $files run --rm --no-deps -e RENDER_ONLY=1 ergo 2>&1
+	}
+	oper_refused() { # what it is, then printf's arguments
+		what=$1
+		shift
+		case $(oper_render "$@") in
+		*"render: the oper's password"*) pass "Ergo's start refuses an oper password with $what" ;;
+		*) fail "Ergo starts with an oper password with $what" ;;
+		esac
+	}
+	word=$(openssl rand -hex 24)
+	half=$(openssl rand -hex 10)
+	oper_refused "a blank first line" '\n%s\n' "$word"
+	oper_refused "a short first line" 'x\n%s\n' "$word"
+	oper_refused "a space inside" '%s %s\n' "$half" "$half"
+	oper_refused "a tab after it" '%s\t\n' "$word"
+	oper_refused "a carriage return after it" '%s\r\n' "$word"
+	oper_refused "a control character" '%s\001\n' "$word"
+	oper_refused "a delete character" '%s\177\n' "$word"
+	oper_refused "a letter past ASCII" '%s\303\251\n' "$word"
+	oper_refused "nothing at all" ''
+	for length in 73 31; do oper_refused "$length characters" '%s' "$(head -c "$length" /dev/zero | tr '\0' a)"; done
+	for length in 32 72; do
+		expect "Ergo's start takes an oper password of $length characters" \
+			"$(oper_render '%s' "$(head -c "$length" /dev/zero | tr '\0' a)" | tail -n 1)" "render: the settings are whole"
+	done
 
 	# No secret of the stack's in Docker's records, a log or an image.
 	oper=$(cat "$tmp/ergo_oper_password")
