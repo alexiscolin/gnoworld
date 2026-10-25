@@ -143,6 +143,12 @@ describe("RoomView", () => {
     expect(html).not.toContain("data-mention");
   });
 
+  it('tells a sender\'s own words "Mentions you" from the mark: they come after the author, the mark before the time', () => {
+    const html = part(view({ me: BOB, state: { ...ROOM, lines: [line({ text: "Mentions you, look" })] } }), "Messages");
+    expect(items(html)).toEqual([expect.stringMatching(/^\d{2}:\d{2} g10gh7…3y5tv Mentions you, look$/)]);
+    expect(html).not.toContain("data-about-me");
+  });
+
   it("marks a line its own author wrote that mentions them", () => {
     const html = part(
       view({ me: ALICE, state: { ...ROOM, lines: [line({ text: `note to @${ALICE}` })] } }),
