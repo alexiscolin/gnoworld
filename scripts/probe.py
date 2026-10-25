@@ -386,8 +386,9 @@ try:
             ("store/__probe__/store_route.ts", uses(name="globe", path="../../routes/__probe__/route_clean.ts"), "import-x/no-restricted-paths"),
             ("store/__probe__/store_fetch.ts", reach('fetch("/x")'), f"no-restricted-globals: Unexpected use of 'fetch'. {net}"),
             ("routes/__probe__/route_clean.ts", "export const globe = 1;\n", None),
-            # A test of lib may render what it checks: the rules hold its code, not its tests.
+            # A test of lib or the store may render what it checks: the rules hold their code, not their tests.
             ("lib/__probe__/lib_react.test.ts", 'import { useState } from "react";\nimport { expect, test } from "vitest";\n\ntest("x", () => {\n  expect(useState).toBeDefined();\n});\n', None),
+            ("store/__probe__/store_react.test.ts", 'import { useState } from "react";\nimport { expect, test } from "vitest";\n\ntest("x", () => {\n  expect(useState).toBeDefined();\n});\n', None),
             ("routes/__probe__/route_log.ts", 'export function load(): void {\n  console.log("loaded");\n}\n', "no-console"),
             ("routes/__probe__/route_scene.ts", uses(name="globe", path="../../scene/__probe__/globe.ts"), "import-x/no-restricted-paths"),
             ("scene/__probe__/globe.ts", "export const globe = 1;\n", None),
