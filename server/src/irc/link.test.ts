@@ -1384,3 +1384,22 @@ describe("the IRC link's account (the max review)", () => {
     expect(alerts()).toHaveLength(2);
   });
 });
+
+describe("the IRC link, kicked (the max review)", () => {
+  it("comes back by SAJOIN to a room of its own an operator kicked it from, and logs it", async () => {
+    const ergo = await fakeErgo();
+    const { lines } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    peer.say(":chief!u@h KICK #bubble alice :not the bot");
+    peer.say(":chief!u@h KICK #bubble alice :gnoworld");
+    peer.say(":chief!u@h KICK #elsewhere gnoworld :not its room");
+    peer.say(":chief!u@h KICK #bubble gnoworld :out");
+    expect(await peer.next(/^SAJOIN /)).toBe("SAJOIN #bubble");
+    await sync(peer);
+    expect(peer.lines.filter((line) => line.startsWith("SAJOIN"))).toEqual(["SAJOIN #bubble"]);
+    expect(lines.filter((line) => line.includes('"event":"irc_kicked"'))).toEqual([
+      expect.stringContaining('"room":"#bubble"'),
+    ]);
+  });
+});

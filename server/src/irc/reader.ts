@@ -4,7 +4,7 @@
 import type { Socket } from "node:net";
 import type { IrcMessage } from "@gnoworld/core";
 import type { Log } from "../log.ts";
-import { joined, listing, refusals, rejoins, sasl } from "./handlers.ts";
+import { joined, kicked, listing, refusals, rejoins, sasl } from "./handlers.ts";
 import { joins, line, said, type Said } from "./lines.ts";
 import type { State } from "./session.ts";
 
@@ -82,6 +82,7 @@ export function reader(options: Options, state: State) {
     ...listing(state, onChannels),
     JOIN: joined(state, onJoin),
     ...rejoins(state),
+    KICK: kicked(state, log),
     BATCH: (s, { params: [ref = "", kind, room = ""] }) => {
       if (ref.startsWith("+") && kind === "chathistory") state.batches.set(ref.slice(1), { room, lines: 0, last: "" });
       if (!ref.startsWith("-")) return;

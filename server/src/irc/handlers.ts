@@ -82,6 +82,15 @@ export function joined(state: State, onJoin: (room: string) => void): (s: Socket
   };
 }
 
+// The bot kicked out of a room of its own, by an operator: back by SAJOIN at once, and logged.
+export function kicked(state: State, log: Log): (s: Socket, message: IrcMessage) => void {
+  return (s, { params: [room = "", who = ""] }) => {
+    if (who !== NICK || !state.joined.has(room)) return;
+    log("irc_kicked", { room });
+    s.write(line("SAJOIN", [room]));
+  };
+}
+
 // A room of its own that refuses the bot (3m: +i, +R, or an operator's +l, +k or +b) is joined by
 // SAJOIN, which Ergo grants an operator whatever the room's modes (irc/channel.go:786-792, v2.19.1).
 export function rejoins(state: State): Record<string, (s: Socket, message: IrcMessage) => void> {

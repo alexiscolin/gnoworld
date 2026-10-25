@@ -399,6 +399,30 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
       });
     });
 
+    it("comes back by SAJOIN to a room an operator kicked it out of, and checks its lines again (the max review)", async () => {
+      const e = await start();
+      const lines: string[] = [];
+      const bot = await chatFor(e, [], { worlds: typed({ ...RULES, bannedWords: ["spam"] }), lines });
+      const member = await login(e, "member");
+      for (let n = 0; !(await joins(member, "member", "#bubble/crew")); n += 1) {
+        if (n === 100) throw new Error("the member never got in");
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      const checked = await say(member, "#bubble/crew", "hello");
+      await expect.poll(bot.verdicts).toContain(checked);
+      const chief = await oper(e, "chief");
+      chief.send("SAJOIN chief #bubble/crew");
+      await chief.expect(/ 366 chief #bubble\/crew /);
+      chief.send("SAMODE #bubble/crew +o chief");
+      await chief.expect(/ MODE #bubble\/crew \+o chief/);
+      chief.send("KICK #bubble/crew gnoworld :out");
+      await member.expect(/ KICK #bubble\/crew gnoworld /, 10_000);
+      await member.expect(/:gnoworld!\S+ JOIN #bubble\/crew/, 15_000);
+      expect(lines.filter((line) => line.includes('"event":"irc_kicked"'))).toHaveLength(1);
+      const after = await say(member, "#bubble/crew", "buy spam");
+      await member.expect(new RegExp(` REDACT #bubble/crew ${after} `), 15_000);
+    });
+
     it("undoes an operator's drift, a wildcard invite included, and asks nothing more once the rooms are so", async () => {
       const lines: string[] = [];
       const { e, people } = await typedRooms({ reconcileMs: 150, lines });
