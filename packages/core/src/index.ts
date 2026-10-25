@@ -5,4 +5,4 @@ export { addLines, concerns, lineOf, membersAfter, nickOf, redactAfter, topicAft
 export type { Line, Where } from "./chat/room.ts";
 export { markdown } from "./markdown/markdown.ts";
 export type { Block, Inline } from "./markdown/markdown.ts";
-export { compose, LINE_BYTES, relayOf, type Composed } from "./chat/compose.ts";
+export { COMMANDS, compose, LINE_BYTES, relayOf, type Composed } from "./chat/compose.ts";

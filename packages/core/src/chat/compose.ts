@@ -18,6 +18,9 @@ export function relayOf(nick: string): number {
   return bytes(`:${nick}!~u@${CLOAK} `);
 }
 
+/** The commands a draft may lead with: `/me` sends an action. */
+export const COMMANDS: readonly string[] = ["/me"];
+
 /** A draft, composed: the line to send and the bytes it leaves, or why there is none. */
 export type Composed =
   | { kind: "line"; line: string; left: number }
@@ -28,16 +31,16 @@ export type Composed =
 /** The line `nick`'s draft sends to `room`, a room id the caller checked. */
 export function compose(room: string, draft: string, nick: string): Composed {
   const text = draft.replaceAll(/\p{Cc}/gu, " ").trim();
-  const command = /^\/(\S*)/u.exec(text)?.[1];
-  const to = { room, nick };
-  if (command === undefined) return said(to, text);
-  if (command.startsWith("/")) return said(to, text.slice(1));
-  if (command.toLowerCase() !== "me") return { kind: "unknown", command: `/${command.toLowerCase()}` };
-  const action = text.slice("/me".length).trim();
-  return action === "" ? { kind: "empty" } : said(to, `\u0001ACTION ${action}\u0001`);
+  const word = /^\/\S*/u.exec(text)?.[0];
+  if (word === undefined) return said(room, nick, text);
+  if (word.startsWith("//")) return said(room, nick, text.slice(1));
+  const command = word.toLowerCase();
+  if (command !== "/me") return { kind: "unknown", command };
+  const action = text.slice(command.length).trim();
+  return action === "" ? { kind: "empty" } : said(room, nick, `\u0001ACTION ${action}\u0001`);
 }
 
-function said({ room, nick }: { room: string; nick: string }, text: string): Composed {
+function said(room: string, nick: string, text: string): Composed {
   if (text === "") return { kind: "empty" };
   const line = `PRIVMSG ${room} :${text}`;
   const left = LINE_BYTES - relayOf(nick) - bytes(line);

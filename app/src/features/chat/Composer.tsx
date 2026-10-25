@@ -3,7 +3,7 @@
 // says what keeps it from going (too long for IRC's 510 bytes, a command it does not know, the chat away) or the
 // bytes left near the end, or what Tab completes the word being typed to (a command, a room, an account). A format
 // bar wraps the selection in Markdown's marks; the line shows below as it reads.
-import { compose, type Composed } from "@gnoworld/core";
+import { COMMANDS, compose, type Composed } from "@gnoworld/core";
 import { Button, Cluster, Field, IconButton, Sidebar, Stack, type FieldProps, type IconName } from "@gnoworld/ui";
 import { useLayoutEffect, useRef, useState, type KeyboardEvent, type SubmitEvent } from "react";
 import { completed, completions, type Completion } from "./complete.ts";
@@ -14,7 +14,6 @@ import styles from "./Composer.module.css";
 
 /** The bytes left from which the composer counts them. */
 export const NEAR = 50;
-const COMMANDS = ["/me"];
 
 const BAR: readonly { format: Format; icon: IconName; label: string }[] = [
   { format: "bold", icon: "bold", label: "Bold" },

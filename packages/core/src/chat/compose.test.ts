@@ -1,7 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, test } from "vitest";
 import { parseLine } from "../irc/irc.ts";
-import { compose, LINE_BYTES, relayOf } from "./compose.ts";
+import { COMMANDS, compose, LINE_BYTES, relayOf } from "./compose.ts";
 
 const ROOM = "#bubble/games";
 // An account's nick: its address, 40 characters (Ergo's force-nick-equals-account).
@@ -35,6 +35,11 @@ describe("compose", () => {
 
   test.each(["/me waves", "/ME waves", "/me   waves  "])("sends %j as an action", (draft) => {
     expect(compose(ROOM, draft, NICK)).toStrictEqual(sent("PRIVMSG #bubble/games :\u0001ACTION waves\u0001"));
+  });
+
+  test("composes a line of each command it offers: the list completion reads is the one it knows", () => {
+    expect(COMMANDS.length).toBeGreaterThan(0);
+    for (const command of COMMANDS) expect(compose(ROOM, `${command} x`, NICK).kind).toBe("line");
   });
 
   test("sends a draft led by two slashes as text, one slash less", () => {
