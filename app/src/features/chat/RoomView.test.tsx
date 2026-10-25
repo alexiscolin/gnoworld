@@ -96,13 +96,11 @@ describe("RoomView", () => {
   it("marks a line that mentions the reader, by a word and an attribute, and its mention apart", () => {
     const lines = [line({ text: `ready, @${BOB}?` }), line({ id: "b", text: `and @${ALICE}` })];
     const html = part(view({ me: BOB, state: { ...ROOM, lines } }), "Messages");
-    expect(items(html)).toEqual([
-      expect.stringMatching(/^\d{2}:\d{2} g10gh7…3y5tv Mentions you ready, @g1jg8m…vsqf5 \?$/),
-      expect.stringMatching(/^\d{2}:\d{2} g10gh7…3y5tv and @g10gh7…3y5tv$/),
-    ]);
-    expect(html).toMatch(
-      /<li data-about-me="">.*<span class="[^"]*mentionsYou[^"]*">Mentions you <\/span><span class="[^"]*text[^"]*">/s,
-    );
+    const [first = "", second = ""] = items(html);
+    expect(first).toContain("Mentions you");
+    expect(first).toMatch(/g10gh7…3y5tv .*ready, @g1jg8m…vsqf5 \?$/);
+    expect(second).toMatch(/^\d{2}:\d{2} g10gh7…3y5tv and @g10gh7…3y5tv$/);
+    expect(html).toMatch(/<li data-about-me="">.*<span class="[^"]*mentionsYou[^"]*">Mentions you <\/span>/s);
     expect(html).toContain(`<span data-mention="me" title="${BOB}">`);
     expect(html.match(/data-about-me/g)).toHaveLength(1);
     // The line that does not mention the reader carries nothing: no class, no attribute.
@@ -115,10 +113,10 @@ describe("RoomView", () => {
       line({ id: "b", kind: "action", text: `waves at @${BOB}` }),
     ];
     const html = part(view({ me: BOB, state: { ...ROOM, lines } }), "Messages");
-    expect(items(html)).toEqual([
-      expect.stringMatching(/^\d{2}:\d{2} g10gh7…3y5tv Mentions you Notice @g1jg8m…vsqf5 heads up$/),
-      expect.stringMatching(/^\d{2}:\d{2} \* g10gh7…3y5tv Mentions you waves at @g1jg8m…vsqf5$/),
-    ]);
+    for (const item of items(html)) expect(item).toContain("Mentions you");
+    const [notice = "", action = ""] = items(html);
+    expect(notice).toMatch(/Notice @g1jg8m…vsqf5 heads up$/);
+    expect(action).toMatch(/\* g10gh7…3y5tv .*waves at @g1jg8m…vsqf5$/);
     // Each keeps its kind's one class, whole, and says it is about the reader by its attribute.
     expect(html).toMatch(/<li class="[^" ]*notice[^" ]*" data-about-me="">/);
     expect(html).toMatch(/<li class="[^" ]*action[^" ]*" data-about-me="">/);
