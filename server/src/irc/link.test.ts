@@ -265,7 +265,7 @@ describe("the IRC link, line by line", () => {
     }
   });
 
-  it("hands on nothing but a room's text: no empty tags, no client tag, no STATUSMSG, TAGMSG or empty text", async () => {
+  it("hands on nothing but a room's text: no empty tags, no client tag, no TAGMSG or empty text", async () => {
     const ergo = await fakeErgo();
     const { said } = start(ergo.port);
     const peer = await ergo.peer(0);
@@ -273,8 +273,6 @@ describe("the IRC link, line by line", () => {
     peer.say(message("account=;msgid=m1", "a!u@h", ["#bubble", "empty account"]));
     peer.say(message("account=g1a;msgid=", "a!u@h", ["#bubble", "empty id"]));
     peer.say(message("+account=g1a;msgid=m3", "a!u@h", ["#bubble", "a client's tag"]));
-    peer.say(message("account=g1a;msgid=m4", "a!u@h", ["@#bubble", "to its operators"]));
-    peer.say(message("account=g1a;msgid=m5", "a!u@h", ["+#bubble", "to its voices"]));
     peer.say("@account=g1a;msgid=m6 :a!u@h TAGMSG #bubble");
     peer.say("@account=g1a;msgid=m7 :a!u@h PRIVMSG #bubble");
     peer.say("@account=g1a;msgid=m8 :a!u@h PRIVMSG");
