@@ -262,9 +262,13 @@ fi
 
 if $full; then
 	base=$(git merge-base HEAD origin/main) || { echo "check.sh --full: needs origin/main to compare with (git fetch)" >&2; exit 1; }
-	lane_stories() {
+	# probe.py plants its faults in the source tree, so it runs alone: a lane beside it (the coverage's Vitest,
+	# check_regressions' list, StrykerJS, the stories' build) would read its files as they come and go.
+	lane_probe() {
 		step probe # the harness keeps its promises
 		python3 -I scripts/probe.py
+	}
+	lane_stories() {
 		step stories # the design system's stories in a browser: axe, the invariants and the CSS jsdom cannot see
 		node app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts --reporter=dot
 	}
@@ -297,6 +301,8 @@ if $full; then
 		fi
 		python3 -I scripts/harness_mutate.py
 	}
+	start probe
+	finish probe
 	start stories
 	start coverage
 	start history
