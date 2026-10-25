@@ -5,7 +5,7 @@
 // bar wraps the selection in Markdown's marks; the line shows below as it reads.
 import { COMMANDS, compose, type Composed } from "@gnoworld/core";
 import { Button, Cluster, Field, IconButton, Sidebar, Stack, type FieldProps, type IconName } from "@gnoworld/ui";
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type SubmitEvent } from "react";
+import { useLayoutEffect, useRef, useState, type KeyboardEvent, type SubmitEvent } from "react";
 import { completed, completions, type Completion } from "./complete.ts";
 import { formatted, type Edit, type Format } from "./format.ts";
 import { Message } from "./Message.tsx";
@@ -96,9 +96,11 @@ export interface ComposerProps {
 
 export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", onDraft }: ComposerProps) {
   const [draft, setDraft] = useState(kept);
-  useEffect(() => {
-    onDraft?.(draft);
-  }, [draft, onDraft]);
+  // Each change of the draft, the device told at once: a render alone (a line arriving) writes nothing.
+  const change = (next: string) => {
+    setDraft(next);
+    onDraft?.(next);
+  };
   const [failed, setFailed] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   // The selection an edit leaves, put back in the box once it shows the new draft.
@@ -121,7 +123,7 @@ export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", 
   // An edit of the format bar or of a completion: the new draft, its selection, and no line not sent any more.
   const apply = (next: Edit) => {
     selectionRef.current = next;
-    setDraft(next.text);
+    change(next.text);
     setFailed(false);
   };
   const format = (kind: Format) => {
@@ -142,7 +144,7 @@ export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", 
     if (composed.kind !== "line") return;
     const went = onSay(draft);
     setFailed(!went);
-    if (went) setDraft("");
+    if (went) change("");
   };
   return (
     <form ref={formRef} aria-label={`Write in ${label}`} onSubmit={send} onKeyDown={complete}>
@@ -153,7 +155,7 @@ export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", 
             label={`Message ${label}`}
             value={draft}
             onChange={(value) => {
-              setDraft(value);
+              change(value);
               setFailed(false);
             }}
             {...said(composed, failed, completion)}
