@@ -1,10 +1,11 @@
 // A room (slice 4's 4b): its name, its description (its IRC topic), its newest lines as the store holds them
-// (the window), who is here, and the state of the link. Everything from Ergo is text: Markdown comes with 4c.
+// (the window), held at the newest while the reader is there, who is here, and the state of the link. Everything from Ergo is text: Markdown comes with 4c.
 // A line's author is its account tag alone, a nick being only a nick; a member's nick is an account's when it is
 // an address, which a guest's cannot be (Ergo gives a guest 32 characters, server/src/testing/ergo.test.ts:314).
 import type { Line } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
 import { Sidebar, Stack } from "@gnoworld/ui";
+import { useLayoutEffect, useRef } from "react";
 import type { ErgoState } from "../../lib/ergo/ergo.ts";
 import { roomLabel, shortAddress } from "./names.ts";
 import shared from "./lists.module.css";
@@ -75,8 +76,26 @@ function People({ members, connected }: { members: readonly string[]; connected:
   );
 }
 
+// How near the end, in pixels, the reader still reads the newest line.
+const AT_END = 32;
+
+// The lines held at their newest while the reader is there; once scrolled up, left where the reader is.
+function useNewestInView(lines: readonly Line[]) {
+  const listRef = useRef<HTMLOListElement>(null);
+  const atEndRef = useRef(true);
+  useLayoutEffect(() => {
+    if (listRef.current !== null && atEndRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
+  }, [lines]);
+  const onScroll = () => {
+    const box = listRef.current;
+    if (box !== null) atEndRef.current = box.scrollHeight - box.scrollTop - box.clientHeight < AT_END;
+  };
+  return { listRef, onScroll };
+}
+
 export function RoomView({ room, state, chat }: RoomViewProps) {
   const { lines = [], members = [], topic } = state ?? {};
+  const { listRef, onScroll } = useNewestInView(lines);
   const connected = chat === "connected";
   return (
     <Stack as="section" space="s">
@@ -89,7 +108,15 @@ export function RoomView({ room, state, chat }: RoomViewProps) {
       </p>
       <Sidebar side="end" space="m">
         <div>
-          <ol aria-label="Messages" aria-live="polite" aria-relevant="additions" className={LINES} tabIndex={0}>
+          <ol
+            ref={listRef}
+            onScroll={onScroll}
+            aria-label="Messages"
+            aria-live="polite"
+            aria-relevant="additions"
+            className={LINES}
+            tabIndex={0}
+          >
             {lines.map((line) => (
               <LineView key={line.id} line={line} />
             ))}

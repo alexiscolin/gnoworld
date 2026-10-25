@@ -12,7 +12,7 @@ const LINES = [
 ] as const;
 
 // Ergo's half of a guest's connection: the ACK, the welcome, each JOIN with its topic and names, the history.
-function scriptedErgo(ergo: WebSocketRoute): void {
+function scriptedErgo(ergo: WebSocketRoute, history: readonly (readonly [string, string, string])[] = LINES): void {
   const say = (line: string) => {
     ergo.send(line);
   };
@@ -29,7 +29,7 @@ function scriptedErgo(ergo: WebSocketRoute): void {
       }
     } else if (line.startsWith("CHATHISTORY LATEST #bubble/games ")) {
       say("BATCH +h1 chathistory #bubble/games");
-      for (const [id, time, text] of LINES) {
+      for (const [id, time, text] of history) {
         say(`@batch=h1;msgid=${id};time=${time};account=${MEMBER} :${MEMBER}!u@h PRIVMSG #bubble/games :${text}`);
       }
       say("BATCH -h1");
@@ -46,7 +46,9 @@ test.describe("a world's rooms, as they look", () => {
   ] as const) {
     test(`on a ${screen}'s screen`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
-      await page.routeWebSocket(/\/ws$/, scriptedErgo);
+      await page.routeWebSocket(/\/ws$/, (ergo) => {
+        scriptedErgo(ergo);
+      });
       await page.goto("/w/bubble?room=games");
       await hydrated(page);
       await expect(page.getByText("Who is up for a round of gnogolf?")).toBeVisible();
@@ -54,4 +56,24 @@ test.describe("a world's rooms, as they look", () => {
       await expect(page).toHaveScreenshot(`rooms-${screen}.png`);
     });
   }
+});
+
+// 4b's pre-merge (/code-review): a room opens on its newest line, and keeps the newest in view as lines come.
+test("opens a room on its newest line, and keeps the newest in view as lines come", async ({ page }) => {
+  const history = Array.from({ length: 60 }, (_, n) => {
+    const time = new Date(Date.parse("2026-10-25T10:00:00.000Z") + n * 60_000).toISOString();
+    return [`h${String(n)}`, time, `Line ${String(n)} of the room's history`] as const;
+  });
+  let ergo: WebSocketRoute | undefined;
+  await page.routeWebSocket(/\/ws$/, (route) => {
+    ergo = route;
+    scriptedErgo(route, history);
+  });
+  await page.goto("/w/bubble?room=games");
+  await hydrated(page);
+  await expect(page.getByText("Line 59 of the room's history")).toBeInViewport();
+  ergo?.send(
+    `@msgid=live;time=2026-10-25T12:00:00.000Z;account=${MEMBER} :${MEMBER}!u@h PRIVMSG #bubble/games :A live line`,
+  );
+  await expect(page.getByText("A live line")).toBeInViewport();
 });
