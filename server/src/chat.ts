@@ -174,13 +174,11 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
           },
           log,
         });
+  // Whom a room is listed to: an archived room is a hidden one.
+  const visible = (room: string, who: string | undefined): boolean =>
+    keeper.archived(room) ? staffOf(settings, room, who) : listed(settings, room, who);
   return {
-    activity: activityRoutes(activity, {
-      db,
-      now,
-      visible: (room, who) => (keeper.archived(room) ? staffOf(settings, room, who) : listed(settings, room, who)),
-      session: options.session,
-    }),
+    activity: activityRoutes(activity, { db, now, visible, session: options.session }),
     stream: stream.routes({
       proxy: settings.trustedProxy,
       visible: (room, who) => mayRead(settings, room, who),

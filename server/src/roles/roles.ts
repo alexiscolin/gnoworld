@@ -34,6 +34,14 @@ function room() {
   ]);
 }
 
+// A room of the world: its main room, or #<slug>/<a room's name>, within Ergo's channellen of 64.
+function ownRoom(slug: string, name: string): boolean {
+  return (
+    name === `#${slug}` ||
+    (name.startsWith(`#${slug}/`) && RoomName.safeParse(name.slice(slug.length + 2)).success && name.length <= 64)
+  );
+}
+
 function world(Addresses: z.ZodType<Address[]>) {
   // A __proto__ key would vanish in the record (zod 4.6.5, $ZodRecord skips it): refused by name instead.
   const Groups = z
@@ -52,13 +60,8 @@ function world(Addresses: z.ZodType<Address[]>) {
     .superRefine(({ slug, groups, rooms }, ctx) => {
       const seen = new Set<string>();
       for (const [at, { room: name, readers, writers }] of rooms.entries()) {
-        // Its main room, or #<slug>/<a room's name>, once.
-        const own =
-          name === `#${slug}` ||
-          (name.startsWith(`#${slug}/`) &&
-            RoomName.safeParse(name.slice(slug.length + 2)).success &&
-            name.length <= 64);
-        if (!own || seen.has(name)) ctx.addIssue({ code: "custom", path: ["rooms", at, "room"], message: "room" });
+        if (!ownRoom(slug, name) || seen.has(name))
+          ctx.addIssue({ code: "custom", path: ["rooms", at, "room"], message: "room" });
         seen.add(name);
         for (const [key, group] of Object.entries({ readers, writers }))
           if (group !== undefined && !Object.hasOwn(groups, group))
