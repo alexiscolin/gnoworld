@@ -2,6 +2,7 @@
 // (docs/ARCHITECTURE.md, "Outside data has one schema").
 import { z } from "zod";
 
+export { ActivityRooms } from "./activity.ts";
 export { Address, toAddress } from "./address.ts";
 export { Challenge, ChallengeRequest, Me, Proof, Ticket, TicketRequest, VerifyRequest } from "./login.ts";
 

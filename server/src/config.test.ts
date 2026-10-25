@@ -81,6 +81,58 @@ describe("loadConfig", () => {
     expect(error).not.toContain("bad.test");
   });
 
+  it("reads Ergo's internal listener and its operator password from a file; no link without the file", () => {
+    expect(loadConfig(ENV).ergo).toBeUndefined();
+    const password = "an-operator-password-of-32-chars";
+    const oper = file("oper", `${password}\n`);
+    expect(loadConfig({ ...ENV, ERGO_OPER_PASSWORD_FILE: oper }).ergo).toEqual({
+      host: "127.0.0.1",
+      port: 6667,
+      password,
+    });
+    expect(loadConfig({ ...ENV, ERGO_OPER_PASSWORD_FILE: oper, ERGO_HOST: "ergo", ERGO_PORT: "6668" }).ergo).toEqual({
+      host: "ergo",
+      port: 6668,
+      password,
+    });
+  });
+
+  it("takes an operator password of 256 characters, the longest", () => {
+    const oper = file("oper-long", `${"p".repeat(256)}\n`);
+    expect(loadConfig({ ...ENV, ERGO_OPER_PASSWORD_FILE: oper }).ergo?.password).toHaveLength(256);
+  });
+
+  it("takes Ergo's highest port and a host of 253 characters", () => {
+    const oper = file("oper-edges", `${"p".repeat(32)}\n`);
+    expect(
+      loadConfig({ ...ENV, ERGO_OPER_PASSWORD_FILE: oper, ERGO_PORT: "65535", ERGO_HOST: "h".repeat(253) }).ergo,
+    ).toEqual({ host: "h".repeat(253), port: 65_535, password: "p".repeat(32) });
+  });
+
+  it.each([
+    ["ERGO_OPER_PASSWORD_FILE", { ERGO_OPER_PASSWORD_FILE: "/nonexistent/gnoworld-oper" }],
+    ["ERGO_OPER_PASSWORD_FILE", { ERGO_OPER_PASSWORD_FILE: file("short-oper", "tiny-secret\n") }],
+    [
+      "ERGO_OPER_PASSWORD_FILE",
+      { ERGO_OPER_PASSWORD_FILE: file("two-lines", `${"a".repeat(32)}\n${"b".repeat(32)}\n`) },
+    ],
+    ["ERGO_OPER_PASSWORD_FILE", { ERGO_OPER_PASSWORD_FILE: file("a-space", `${"a".repeat(16)} ${"b".repeat(16)}\n`) }],
+    ["ERGO_OPER_PASSWORD_FILE", { ERGO_OPER_PASSWORD_FILE: file("long-oper", `${"p".repeat(257)}\n`) }],
+    ["ERGO_OPER_PASSWORD_FILE", { ERGO_HOST: "ergo" }],
+    ["ERGO_OPER_PASSWORD_FILE", { ERGO_PORT: "6668" }],
+    ["ERGO_PORT", { ERGO_PORT: "65536" }],
+    ["ERGO_PORT", { ERGO_PORT: "0" }],
+    ["ERGO_PORT", { ERGO_PORT: "06667" }],
+    ["ERGO_PORT", { ERGO_PORT: "6667x" }],
+    ["ERGO_PORT", { ERGO_PORT: "-1" }],
+    ["ERGO_HOST", { ERGO_HOST: "" }],
+    ["ERGO_HOST", { ERGO_HOST: "h".repeat(254) }],
+  ])("stops on a bad %s, naming it and never its value", (setting, env) => {
+    const error = failure({ ...ENV, ...env });
+    expect(error).toMatch(new RegExp(`setting ${setting}: `));
+    expect(error).not.toContain("tiny-secret");
+  });
+
   it("reads every setting it is given", () => {
     expect(
       loadConfig({ ...ENV, HOST: "0.0.0.0", PORT: "9000", TRUSTED_PROXY: "10.0.0.2", ROLES_FILE: "/etc/roles.json" }),

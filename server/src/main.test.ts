@@ -8,6 +8,7 @@ import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { Challenge, Ticket } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it } from "vitest";
+import { fakeErgo, PASSWORD, welcome } from "./testing/fakeErgo.ts";
 import { wallet } from "./testing/signer.ts";
 
 interface Server {
@@ -168,6 +169,36 @@ describe("the server's process", () => {
       expect(server.out.stderr).toContain("AUTH_SOCKET");
     }
     expect(readFileSync(taken, "utf8")).toBe("not a socket");
+  });
+
+  it("links to Ergo as its operator, joins the roles file's rooms, and leaves Ergo when it stops", async () => {
+    const ergo = await fakeErgo();
+    const env = settings();
+    const oper = join(folder("gnoworld-oper-"), "oper");
+    writeFileSync(oper, `${PASSWORD}\n`);
+    const server = start({ ...env, ERGO_PORT: String(ergo.port), ERGO_OPER_PASSWORD_FILE: oper });
+    await listening(server);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    expect(peer.lines.filter((line) => line.startsWith("JOIN "))).toEqual(["JOIN #bubble,#earth"]);
+    const left = once(peer.socket, "close");
+    server.child.kill("SIGTERM");
+    expect(await exited(server)).toBe(0);
+    await left;
+  });
+
+  it("answers the rooms of the roles file's worlds, made at boot, with no Ergo set", async () => {
+    const port = await listening(start(settings()));
+    const answer = await fetch(`http://127.0.0.1:${String(port)}/api/activity?worlds=earth,bubble`);
+    expect([answer.status, await answer.text()]).toEqual([
+      200,
+      JSON.stringify({
+        rooms: [
+          { world: "earth", room: "#earth", perMinute: 0 },
+          { world: "bubble", room: "#bubble", perMinute: 0 },
+        ],
+      }),
+    ]);
   });
 
   it("takes the login's chains and its new accounts an hour from its settings", async () => {

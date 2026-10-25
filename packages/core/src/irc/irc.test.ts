@@ -1,4 +1,4 @@
-// Every case is marked `fails` until Alexis's code makes it pass (pairing, .claude/rules/core.md).
+// The contract of core/irc, written for the pairing; the code is Claude's (docs/decisions.md, 2026-10-22).
 import fc from "fast-check";
 import { describe, expect, test } from "vitest";
 import {
@@ -28,7 +28,7 @@ const message = (
 });
 
 describe("tag values", () => {
-  test.fails.each([
+  test.each([
     ["a;b", String.raw`a\:b`],
     ["a b", String.raw`a\sb`],
     ["a\\b", String.raw`a\\b`],
@@ -40,7 +40,7 @@ describe("tag values", () => {
     expect(unescapeTagValue(escaped)).toBe(raw);
   });
 
-  test.fails.each([
+  test.each([
     [String.raw`a\bc`, "abc", "an unknown escape keeps its character"],
     ["test\\", "test", "a trailing backslash is dropped"],
     [String.raw`a\\`, "a\\", "an escaped backslash at the end is kept"],
@@ -52,7 +52,7 @@ describe("tag values", () => {
     expect(unescapeTagValue(escaped)).toBe(raw);
   });
 
-  test.fails("unescape undoes escape, for any value without NUL", () => {
+  test("unescape undoes escape, for any value without NUL", () => {
     fc.assert(
       fc.property(
         fc.string({ unit: "binary" }).filter((v) => !v.includes("\0")),
@@ -66,7 +66,7 @@ describe("tag values", () => {
 });
 
 describe("toIrcCommand", () => {
-  test.fails.each([
+  test.each([
     ["PRIVMSG", "PRIVMSG"],
     ["privmsg", "PRIVMSG"],
     ["PiNg", "PING"],
@@ -75,16 +75,13 @@ describe("toIrcCommand", () => {
     expect(toIrcCommand(raw)).toBe(command);
   });
 
-  test.fails.each(["", "PRIV MSG", "PRIV.MSG", "12", "1234", "ß", "ſ", "ı", "PING\n"])(
-    "names nothing with %j",
-    (raw) => {
-      expect(toIrcCommand(raw)).toBeUndefined();
-    },
-  );
+  test.each(["", "PRIV MSG", "PRIV.MSG", "12", "1234", "ß", "ſ", "ı", "PING\n"])("names nothing with %j", (raw) => {
+    expect(toIrcCommand(raw)).toBeUndefined();
+  });
 });
 
 describe("parseLine reads", () => {
-  test.fails.each<[string, IrcMessage]>([
+  test.each<[string, IrcMessage]>([
     ["PING :irc.example.org", message("PING", ["irc.example.org"])],
     ["QUIT", message("QUIT", [])],
     [
@@ -137,7 +134,7 @@ describe("parseLine reads", () => {
 });
 
 describe("parseLine refuses", () => {
-  test.fails.each([
+  test.each([
     ["", "empty"],
     ["   ", "empty"],
     [":", "no-command"],
@@ -177,7 +174,7 @@ describe("parseLine refuses", () => {
 
 describe("parseLine's limits, in UTF-8 bytes", () => {
   const body = (bytes: number) => "PRIVMSG #gno :" + "é".repeat((bytes - 14) / 2);
-  test.fails.each([
+  test.each([
     ["a body of 510 bytes", body(510), true],
     ["a body of 511 bytes", body(510) + "a", false],
     ["510 bytes, then CR LF, which do not count", body(510) + "\r\n", true],
@@ -191,7 +188,7 @@ describe("parseLine's limits, in UTF-8 bytes", () => {
     );
   });
 
-  test.fails.each([
+  test.each([
     ["\u007f", 1],
     ["\u0080", 2],
     ["߿", 2],
@@ -205,7 +202,7 @@ describe("parseLine's limits, in UTF-8 bytes", () => {
     expect(parseLine(line + "a")).toStrictEqual({ ok: false, error: "body-too-long" });
   });
 
-  test.fails.each([
+  test.each([
     ["8191 bytes of tags with the @ and the space", "@k=" + "a".repeat(8187) + " PING x", true],
     ["8192 bytes of tags", "@k=" + "a".repeat(8188) + " PING x", false],
     ["8192 bytes of tags with no command after them", "@k=" + "a".repeat(8189), false],
@@ -248,7 +245,7 @@ describe("parseLine, whatever the relay sends", () => {
     )
     .map((parts) => parts.join(""));
 
-  test.fails("never throws, and answers with a known error or a clean message", () => {
+  test("never throws, and answers with a known error or a clean message", () => {
     fc.assert(
       fc.property(fc.oneof(hostile, fc.string({ unit: "binary", maxLength: 700 })), (line) => {
         const parsed = parseLine(line);
@@ -266,7 +263,7 @@ describe("parseLine, whatever the relay sends", () => {
 });
 
 describe("formatLine", () => {
-  test.fails.each<[string, IrcMessage, string]>([
+  test.each<[string, IrcMessage, string]>([
     [
       "escapes tag values",
       message("PING", ["x"], { tags: [["+draft/reply", "a;b"]] }),
@@ -290,7 +287,7 @@ describe("formatLine", () => {
     expect(formatLine(m)).toBe(line);
   });
 
-  test.fails.each([
+  test.each([
     ["a CR LF that would start a second line", message("PRIVMSG", ["#gno", "hi\r\nQUIT"])],
     ["a LF in a middle parameter", message("PRIVMSG", ["#g\nQUIT", "hi"])],
     ["a NUL in a parameter", message("PRIVMSG", ["#gno", "a\0b"])],
@@ -328,7 +325,20 @@ describe("formatLine", () => {
     expect(() => formatLine(bad)).toThrow(RangeError);
   });
 
-  test.fails.each<[string, IrcMessage]>([
+  test.each<[string, IrcMessage, RegExp]>([
+    ["a command", message("privmsg", ["x"]), /command/],
+    ["a tag key", message("PING", ["x"], { tags: [["a_b", "1"]] }), /tag key/],
+    ["a tag value", message("PING", ["x"], { tags: [["k", "a\0"]] }), /tag value/],
+    ["tag data", message("PING", ["x"], { tags: [["k", "a".repeat(4093)]] }), /4094 bytes/],
+    ["a source", message("PING", ["x"], { source: "" }), /source/],
+    ["a parameter", message("PING", ["a\0"]), /parameter holds/],
+    ["a middle parameter", message("PING", [":x", "y"]), /middle parameter/],
+    ["a body", message("PRIVMSG", ["#gno", "a".repeat(498)]), /510 bytes/],
+  ])("says which rule %s broke", (_, bad, rule) => {
+    expect(() => formatLine(bad)).toThrow(rule);
+  });
+
+  test.each<[string, IrcMessage]>([
     ["a body of 510 bytes", message("PRIVMSG", ["#gno", "a".repeat(497)])],
     ["4094 bytes of tag data, the most a client may send", message("PING", ["x"], { tags: [["k", "a".repeat(4092)]] })],
     ["a tab inside a middle parameter, which IRC does not split on", message("PRIVMSG", ["#g\tno", "hi"])],
@@ -336,7 +346,7 @@ describe("formatLine", () => {
     expect(parseLine(formatLine(m))).toStrictEqual({ ok: true, message: m });
   });
 
-  test.fails("parseLine reads back what formatLine writes", () => {
+  test("parseLine reads back what formatLine writes", () => {
     const key = fc.stringMatching(/^\+?([a-z0-9]+(\.[a-z0-9]+)*\/)?[A-Za-z0-9-]+$/);
     const value = fc.string({ unit: "binary", maxLength: 20 }).filter((v) => !v.includes("\0"));
     const middle = fc.stringMatching(/^[^ :\0\r\n][^ \0\r\n]{0,10}$/);

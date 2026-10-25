@@ -19,6 +19,9 @@ export interface ErgoOptions {
   dir?: string;
   env?: Record<string, string>;
   logTypes?: string;
+  // The ports of an Ergo started again, which its clients reconnect to.
+  ports?: readonly [number, number];
+  operPassword?: string;
 }
 
 export interface Ergo {
@@ -37,7 +40,7 @@ const [TAG = ""] = readFileSync(new URL("deploy/ergo/VERSION", ROOT), "utf8").sp
 const BINARY = join(process.env["GNOWORLD_TOOLS"] ?? join(homedir(), ".cache/gnoworld-tools"), `ergo-${TAG}`, "ergo");
 
 export async function startErgo(options: ErgoOptions = {}): Promise<Ergo> {
-  const [port, wsPort] = [await freePort(), await freePort()];
+  const [port, wsPort] = options.ports ?? [await freePort(), await freePort()];
   const owned = options.dir === undefined;
   const dir = options.dir ?? mkdtempSync(join(tmpdir(), "gnoworld-ergo-"));
   let operPassword: string;
@@ -97,7 +100,7 @@ export async function startErgo(options: ErgoOptions = {}): Promise<Ergo> {
 
 // Writes the auth script and the rendered ircd.yaml into the folder; returns the oper's password.
 function configure(dir: string, [port, wsPort]: readonly [number, number], options: ErgoOptions): string {
-  const operPassword = randomBytes(12).toString("hex");
+  const operPassword = options.operPassword ?? randomBytes(12).toString("hex");
   const logTypes = options.logTypes ?? "* -userinput -useroutput";
   const values = {
     PLAIN: `127.0.0.1:${String(port)}`,
@@ -137,7 +140,7 @@ function hash(password: string): string {
   return line;
 }
 
-async function freePort(): Promise<number> {
+export async function freePort(): Promise<number> {
   const server = createServer();
   server.listen(0, "127.0.0.1");
   await once(server, "listening");

@@ -16,6 +16,8 @@ export interface Config {
   origins: string[];
   newAccountsPerHour: number;
   authSocket: string | undefined;
+  // Ergo's internal listener and its operator's password; no IRC link without the password's file.
+  ergo: { host: string; port: number; password: string } | undefined;
 }
 
 // An origin as a browser sends it: scheme, host and port, nothing else (an Origin header compares to it).
@@ -67,6 +69,14 @@ const Env = z.object({
     .regex(/^\/./)
     .refine((path) => Buffer.byteLength(path) <= 100)
     .optional(),
+  ERGO_HOST: z.string().min(1).max(253).default("127.0.0.1"),
+  ERGO_PORT: z
+    .string()
+    .regex(/^[1-9]\d{0,4}$/)
+    .transform(Number)
+    .pipe(z.number().max(65_535))
+    .default(6667),
+  ERGO_OPER_PASSWORD_FILE: z.string().min(1).optional(),
 });
 
 export function loadConfig(env: Record<string, string | undefined>): Config {
@@ -81,7 +91,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
   }
   const { HOST, PORT, DATABASE, TRUSTED_PROXY, LOG_PEPPER_FILE, ROLES_FILE, CHAINS, ORIGINS, NEW_ACCOUNTS_PER_HOUR } =
     parsed.data;
-  const { AUTH_SOCKET } = parsed.data;
+  const { AUTH_SOCKET, ERGO_HOST, ERGO_PORT, ERGO_OPER_PASSWORD_FILE } = parsed.data;
   return {
     host: HOST,
     port: PORT,
@@ -93,7 +103,29 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     origins: ORIGINS,
     newAccountsPerHour: NEW_ACCOUNTS_PER_HOUR,
     authSocket: AUTH_SOCKET,
+    ergo: ergoOf(env, { host: ERGO_HOST, port: ERGO_PORT, passwordFile: ERGO_OPER_PASSWORD_FILE }),
   };
+}
+
+// The link to Ergo, or none without the password's file. Ergo's listener named with no password is a link
+// meant that would not come: the server stops rather than run silent.
+function ergoOf(
+  env: Record<string, string | undefined>,
+  { host, port, passwordFile }: { host: string; port: number; passwordFile: string | undefined },
+): Config["ergo"] {
+  if (passwordFile !== undefined) return { host, port, password: operPassword(passwordFile) };
+  if (env["ERGO_HOST"] !== undefined || env["ERGO_PORT"] !== undefined) {
+    throw new Error("setting ERGO_OPER_PASSWORD_FILE: required");
+  }
+  return undefined;
+}
+
+// One word of printable ASCII, 256 at most: it goes on the OPER line as it is, which holds 510 bytes.
+function operPassword(path: string): string {
+  const password = secret("ERGO_OPER_PASSWORD_FILE", path);
+  if (!/^[\x21-\x7e]+$/.test(password)) throw new Error("setting ERGO_OPER_PASSWORD_FILE: invalid_characters");
+  if (password.length > 256) throw new Error("setting ERGO_OPER_PASSWORD_FILE: too_long");
+  return password;
 }
 
 function secret(setting: string, path: string): string {
