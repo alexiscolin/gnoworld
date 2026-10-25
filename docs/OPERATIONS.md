@@ -215,7 +215,11 @@ Slice 3, the check (3i):
   (`omni-moderation-latest`: 250 on Free, 500 on Build, 2,000 on Launch, 5,000 on Grow; its model page, read
   2026-10-24): past it, its refusals count as down (logged `moderation_unchecked` with `rate_limited`, an outage's
   `down`), five open the breaker for 30 s, and lines pass unchecked meanwhile. The load run's 200 accounts, a line each every 5 s (2,400 a minute), left 1,810 of 2,200 unchecked
-  (F692). Several lines a request is slice 4's (`docs/plans/backlog.md`).
+  (F692). Several lines a request is slice 4's (`docs/plans/backlog.md`), once OpenAI's rules for an array
+  input are read from a live answer (its reference states no maximum and no order of the results). The
+  checks run four at a time, so the ceiling is 4 over OpenAI's latency a second (about 13 lines a second
+  at 300 ms, measured): a faster crowd waits in the queue, and past a full queue its lines pass unchecked,
+  with the alert.
 
 Slice 3, the bot acts and the stream (3j):
 
