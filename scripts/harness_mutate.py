@@ -578,6 +578,7 @@ def mutants():
         ('harness --quiet "$base" && return 0', 'true && return 0', "--full mutates a changed harness"),
         ("finish stories coverage history harness", ":", "--full fails when a full lane did"),
         ("\t! $merge || full=false", "\t:", "--merge records no full gate"),
+        ("\texport E2E_PORT\n", "\n", "the journeys get a free port of their own"),
         ('[ "${1:-}" = "--merge" ] && full=true merge=true', '[ "${1:-}" = "--merge" ] && full=true', "--merge judges the merge's own harness mutants"),
         ('[ "${1:-}" = "--merge" ] && full=true merge=true', '[ "${1:-}" = "--merge" ] && merge=true', "--merge runs the full gate's steps"),
         ("python3 -I scripts/harness_mutate.py\n", "python3 -I scripts/harness_mutate.py --changed \"$base\"\n", "--full judges every harness mutant"),

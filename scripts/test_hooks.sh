@@ -1429,7 +1429,7 @@ for py in check_css check_docs mutate probe patch_coverage prove_fix check_regre
 done
 for sh in ergo test_hooks scan_secrets; do printf 'exec sh "%s" sh:%s "$@"\n' "$step" "$sh" >"$g/scripts/$sh.sh"; done
 # The journeys' stub; with PW_EDIT, it edits a package file, as a build that installs would.
-printf 'const { spawnSync } = require("node:child_process");\nconst { appendFileSync } = require("node:fs");\nconst name = process.argv.some((a) => a.includes("stories")) ? "stories" : "playwright";\nif (process.env.PW_EDIT) appendFileSync("app/package.json", "\\n");\nprocess.exit(spawnSync("sh", [%s, name, ...process.argv.slice(2)], { stdio: "inherit" }).status);\n' "'$step'" >"$g/app/node_modules/@playwright/test/cli.js"
+printf 'const { spawnSync } = require("node:child_process");\nconst { appendFileSync } = require("node:fs");\nconst name = process.argv.some((a) => a.includes("stories")) ? "stories" : "playwright";\nif (process.env.PW_EDIT) appendFileSync("app/package.json", "\\n");\nprocess.exit(spawnSync("sh", [%s, name, "port=" + process.env.E2E_PORT, ...process.argv.slice(2)], { stdio: "inherit" }).status);\n' "'$step'" >"$g/app/node_modules/@playwright/test/cli.js"
 python3 -I - "$g/package.json" "$step" <<'PY'
 import json, sys
 names = ["format:check", "typecheck", "lint", "test", "unused", "copies", "comments", "coverage", "mutate"]
@@ -1475,6 +1475,10 @@ for lane in ts types tests gno docs; do
 	printf '%s\n' "$out" | grep -qE "^lane $lane [0-9]+\.[0-9] s:" || fail "check.sh did not print lane $lane's time: $out"
 done
 [ -z "$(git -C "$g" status --porcelain)" ] || fail "check.sh left files git sees: $(git -C "$g" status --porcelain)"
+# The journeys get a base port of their own, three free ports from it, so gates of several worktrees
+# run at once; never the fixed 4173 another gate may hold.
+port=$(sed -n 's/^playwright port=\([0-9]*\) .*/\1/p' "$log")
+[ -n "$port" ] && [ "$port" -ge 1024 ] && [ "$port" -le 65533 ] && [ "$port" != 4173 ] || fail "check.sh gave the journeys no free port of their own: $(grep '^playwright' "$log")"
 grep -qxF "$(record)" "$g/.claude/tmp/green-fast" || fail "check.sh did not record the code it passed"
 # Prose alone is no change of code: everything runs.
 printf 'x\n' >>"$g/README.md"

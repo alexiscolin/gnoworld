@@ -1,4 +1,5 @@
 import { cacheContents, controlled, expect, hydrated, PAGES, test, type Page } from "./fixtures.ts";
+import { GUARDED, UPDATING } from "./sites.ts";
 
 // The PWA as ADR-0001 §12 asks: a manifest Chromium reads, the build's hashed files answered
 // from the worker's cache and nothing else cached, updates that wait for a click, and `?nosw`.
@@ -88,7 +89,7 @@ for (const path of PAGES) {
 test.describe("behind the demo's password", () => {
   test.describe.configure({ mode: "serial" });
   test.use({ contextOptions: { httpCredentials: { username: "team", password: "a test password" } } });
-  const site = "http://127.0.0.1:4175";
+  const site = GUARDED;
   const password = { authorization: `Basic ${btoa("team:a test password")}` };
 
   // Node's own fetch: Playwright's request client would answer the challenge with the test's password.
@@ -293,7 +294,7 @@ test("the worker answers the build's hashed files from its cache, and caches no 
 // bump at a time, so these run in turn.
 test.describe("updates", () => {
   test.describe.configure({ mode: "serial" });
-  const site = "http://127.0.0.1:4174";
+  const site = UPDATING;
 
   async function open(page: Page): Promise<void> {
     await page.goto(`${site}/`);

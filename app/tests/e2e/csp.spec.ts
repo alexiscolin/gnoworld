@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, hydrated, PAGES, test, type Page } from "./fixtures.ts";
+import { GUARDED, SITE } from "./sites.ts";
 
 // The policy's shape: the unit test pins its words, this the page's every answer (slice 3's plan, 3f).
 const SHAPE = new RegExp(
@@ -19,8 +20,8 @@ test.describe("the content security policy", () => {
     // A path that is no URL, and the build's own _headers file, whose type no host serves.
     answers.push(await request.get("/%E0%A4%A"), await request.get("/_headers"));
     answers.push(await request.post("/nowhere"));
-    answers.push(await request.get("http://127.0.0.1:4175/"));
-    answers.push(await request.get("http://127.0.0.1:4175/", { headers: { authorization: PASSWORD } }));
+    answers.push(await request.get(`${GUARDED}/`));
+    answers.push(await request.get(`${GUARDED}/`, { headers: { authorization: PASSWORD } }));
     expect(answers.map((answer) => answer.status()).toSorted()).toEqual(
       [200, 200, 200, 200, 200, 200, 400, 401, 404, 404, 404, 500].toSorted(),
     );
@@ -125,7 +126,7 @@ test.describe("a planted violation", () => {
     await expect.poll(() => violations.toSorted()).toEqual([...kinds, "script-src-elem"].toSorted());
     expect(await page.evaluate(() => "ran" in window)).toBe(false);
     // The form and the base element took the page nowhere.
-    expect(page.url()).toBe("http://127.0.0.1:4173/");
+    expect(page.url()).toBe(`${SITE}/`);
   });
 
   test("is reported from a second tab of the same context too", async ({ page, violations }) => {
@@ -137,7 +138,7 @@ test.describe("a planted violation", () => {
   });
 
   test("keeps the page out of another site's frame", async ({ page }) => {
-    await page.setContent('<iframe src="http://127.0.0.1:4173/"></iframe>');
+    await page.setContent(`<iframe src="${SITE}/"></iframe>`);
     // Chromium shows its own error page in place of a document its frame-ancestors refuse.
     await expect.poll(() => page.frames()[1]?.url()).toMatch(/^chrome-error:/);
   });

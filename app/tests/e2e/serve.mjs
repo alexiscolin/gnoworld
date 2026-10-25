@@ -1,9 +1,8 @@
-// The built site as a static host serves it (ADR-0002 §2): the file for a path where one exists,
-// spelled exactly, otherwise the SPA fallback with a 404, never a page that is not the place asked for.
-// Port 4174 serves the same build for the PWA's update journey: a POST to /__bump makes its sw.js
-// a new version, as a deploy would; one to /__tamper turns on and off a changed route file, one to
-// /__down a host that answers 503 for sw.js, as an update check offline finds no host. Port
-// 4175 does the same behind the demo's shared password, as the demo's host asks for one.
+// The built site as a static host serves it (ADR-0002 §2): the file for a path where one exists, spelled
+// exactly, else the SPA fallback with a 404. On E2E_PORT's base (sites.ts) and the next two ports: the second
+// serves the same build for the PWA's update journey (a POST to /__bump makes its sw.js a new version, as a
+// deploy would; /__tamper turns a changed route file on and off; /__down answers 503 for sw.js, as an update
+// check offline finds no host); the third does the same behind the demo's shared password.
 import { createReadStream, readFileSync, realpathSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, join } from "node:path";
@@ -101,6 +100,9 @@ function host({ bumping = false, password = false }) {
   };
 }
 
-createServer(host({})).listen(4173, "127.0.0.1");
-createServer(host({ bumping: true })).listen(4174, "127.0.0.1");
-createServer(host({ bumping: true, password: true })).listen(4175, "127.0.0.1");
+const port = Number(process.env.E2E_PORT ?? 4173);
+if (!Number.isInteger(port) || port < 1024 || port > 65533)
+  throw new Error(`serve.mjs: E2E_PORT is no port base: ${process.env.E2E_PORT}`);
+createServer(host({})).listen(port, "127.0.0.1");
+createServer(host({ bumping: true })).listen(port + 1, "127.0.0.1");
+createServer(host({ bumping: true, password: true })).listen(port + 2, "127.0.0.1");

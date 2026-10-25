@@ -177,6 +177,23 @@ lane_ts() {
 	# A build never installs: React Router's default server entry adds isbot and runs the package
 	# manager, with whatever access the build has (finding F080).
 	step app
+	# Three free ports from a base of this run's own (the journeys' hosts), so gates of several
+	# worktrees run at once; a port taken between this and the build fails the run, never another's.
+	E2E_PORT=$(python3 -Ic 'import random, socket
+for _ in range(200):
+    base, held = random.randrange(20000, 60000), []
+    try:
+        for p in range(base, base + 3):
+            s = socket.socket()
+            s.bind(("127.0.0.1", p))
+            held.append(s)
+    except OSError:
+        continue
+    finally:
+        [s.close() for s in held]
+    print(base)
+    break')
+	export E2E_PORT
 	packages() { cat package.json app/package.json pnpm-lock.yaml | cksum; }
 	installed=$(packages)
 	node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot # node: see check_regressions.py
