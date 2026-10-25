@@ -17,6 +17,14 @@ const FENCE = /^(`{3,})[^`]*$/;
 // A list's item: `-`, `*`, `+` or a number and a dot, then a space.
 const ITEM = /^(?:[-*+]|(\d{1,9})\.) (.*)$/s;
 
+// A list's item, its number if any and its text; none for an item with nothing in it, which stays text, as an empty
+// quote does (F782).
+function itemOf(body: string): { number: string | undefined; text: string } | undefined {
+  const item = ITEM.exec(body);
+  const text = (item?.[2] ?? "").trim();
+  return item === null || text === "" ? undefined : { number: item[1], text };
+}
+
 // A block read from a line: the line after it, and the block, unless it held nothing.
 interface Read {
   next: number;
@@ -75,7 +83,7 @@ class Blocks {
     if (body === "") return "blank";
     if (FENCE.test(body)) return "fence";
     if (this.#quoted(body)) return "quote";
-    return ITEM.test(body) ? "item" : "text";
+    return itemOf(body) === undefined ? "text" : "item";
   }
 
   #block(at: number): Read {
@@ -119,14 +127,14 @@ class Blocks {
   // line that is not ends it.
   #list(at: number): Read {
     // An ordered list counts from its first number, the sender's own (F780).
-    const first = ITEM.exec(this.#body(at))?.[1];
+    const first = itemOf(this.#body(at))?.number;
     const ordered = first !== undefined;
     const items: Inline[][] = [];
     let end = at;
     for (; end < this.#lines.length; end += 1) {
-      const item = ITEM.exec(this.#body(end));
-      if (item === null || (item[1] !== undefined) !== ordered) break;
-      items.push(inline((item[2] ?? "").trim()));
+      const item = itemOf(this.#body(end));
+      if (item === undefined || (item.number !== undefined) !== ordered) break;
+      items.push(inline(item.text));
     }
     const block: Block =
       first === undefined

@@ -403,8 +403,11 @@ describe("markdown: blocks", () => {
     reads("2024. was a good year", { type: "list", ordered: true, start: 2024, items: [[text("was a good year")]] });
   });
 
-  test("reads marks in a list's items, and an empty item", () => {
-    reads("- **a**\n- ", { type: "list", ordered: false, items: [[strong(text("a"))], []] });
+  test("reads marks in a list's items; an item with nothing in it stays text (F782)", () => {
+    reads("- **a**\n- ", { type: "list", ordered: false, items: [[strong(text("a"))]] }, paragraph(text("-")));
+    plain("1.");
+    reads("- ", paragraph(text("-")));
+    reads("1. ", paragraph(text("1.")));
   });
 
   test("ends a paragraph before a list, and a list before what follows", () => {
@@ -796,6 +799,11 @@ describe("markdown: whatever comes", () => {
   ])("reads a line of %j in linear time, a backslash and a ) closing it", (piece) => {
     expect(linear(repeated(piece, "\\)"))).toBe(true);
     expect(allowed(markdown(repeated(piece, "\\)")(16_000)))).toBe(true);
+  });
+
+  test("reads an item's mark before a long blank in linear time", () => {
+    expect(linear((size) => `- ${" ".repeat(size)}`)).toBe(true);
+    expect(linear((size) => `1. ${"\t ".repeat(size / 2)}`)).toBe(true);
   });
 
   test("reads nested addresses closed by a backslash in linear time", () => {
