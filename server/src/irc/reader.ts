@@ -93,6 +93,11 @@ export function reader(options: Options, state: State) {
       }
       log("irc_ready");
     },
+    // A second session of its account, the last one not yet timed out (multiclient): Ergo says it is an
+    // operator already, and the session is ready as on a 381.
+    "400": (s, message) => {
+      if (message.params[1] === "OPER") handlers["381"]?.(s, message);
+    },
     ...listing(state, onChannels),
     JOIN: joined(state, onJoin),
     ...rejoins(state),

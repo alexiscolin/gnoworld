@@ -1049,6 +1049,29 @@ describe("the server's IRC link (3h)", { timeout: 40_000 }, () => {
     await finish(squatter, "gnoworld", / 433 /);
   });
 
+  it("gets ready as a second session of its account while its last one lingers (the max review)", async () => {
+    const e = await start();
+    const session = (): string[] => {
+      const lines: string[] = [];
+      const link = ircLink({
+        host: "127.0.0.1",
+        port: e.port,
+        password: e.operPassword,
+        rooms: () => ["#bubble"],
+        onMessage: () => undefined,
+        log: logger("a-pepper-of-forty-characters-0123456789", (line) => lines.push(line)),
+        retryMs: () => 60_000,
+      });
+      stops.push(() => link.stop());
+      return lines;
+    };
+    const ready = (lines: string[]) => () => lines.filter((line) => line.includes('"event":"irc_ready"')).length;
+    await expect.poll(ready(session()), { timeout: 10_000 }).toBe(1);
+    const second = session();
+    await expect.poll(ready(second), { timeout: 10_000 }).toBe(1);
+    expect(second.join("\n")).not.toContain("irc_refused");
+  });
+
   it("comes back to its rooms when Ergo restarts", async () => {
     const dir = mkdtempSync(joinPath(tmpdir(), "gnoworld-ergo-again-"));
     kept.push(dir);

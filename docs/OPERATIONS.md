@@ -184,11 +184,14 @@ Slice 3, the bot's link and the rooms (3h):
   32 characters at least. Unset, the server keeps no link: rooms exist, nobody's activity counts.
 - **Rooms stay.** A world removed from the roles file keeps its room and history; removing one is a
   moderator's act (3l).
-- **A nick held by a ghost.** After a link drops silently, Ergo may hold `gnoworld` until its own
-  ping timeout: the link logs `irc_refused` (`nick`) and tries again later. The bot logs in by SASL as
-  the account `gnoworld`, whose nick Ergo keeps for it (the server's auth takes the operator's password
-  for that one name); a third refusal of the nick in a row is no ghost's and raises the alert
-  `irc_nick_taken`. A refused login logs `irc_refused` (`sasl`).
+- **The bot's account.** The bot logs in by SASL as the account `gnoworld`, whose nick Ergo keeps for
+  it (the server's auth takes the operator's password for that one name). After a link drops silently,
+  its next connection joins the old session, which Ergo holds until its own ping timeout, as a second
+  session of the account (multiclient). A refusal of the nick comes from a guest who took it before the
+  account first logged in (a new Ergo database): the link logs `irc_refused` (`nick`), tries again, and
+  raises the alert `irc_nick_taken` at the third in a row. A refused login logs `irc_refused` (`sasl`).
+- **Ergo logs no address** (`-connect-ip`, slice 3's max review): its refusals by ip-limits go unlogged
+  with it, so a visitor behind a shared address who meets the limit leaves no trace (slice 4).
 
 Slice 3, the check (3i):
 

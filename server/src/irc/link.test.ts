@@ -1319,6 +1319,20 @@ describe("the IRC link's account (the max review)", () => {
     expect(peer.lines.filter((line) => /^(CAP END|AUTHENTICATE|OPER)/.test(line))).toEqual([]);
   });
 
+  it("gets ready as a second session of its account, Ergo saying it is an operator already", async () => {
+    const ergo = await fakeErgo();
+    const { lines } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await register(peer);
+    await peer.next(/^OPER /);
+    peer.say(":ergo.test 400 gnoworld PRIVMSG :not about OPER");
+    await sync(peer);
+    expect(peer.lines.filter((line) => line.startsWith("JOIN"))).toEqual([]);
+    peer.say(":ergo.test 400 gnoworld OPER :You're already opered-up!");
+    expect(await peer.next(/^JOIN /)).toBe("JOIN #bubble,#earth");
+    await expect.poll(() => lines.filter((line) => line.includes('"event":"irc_ready"'))).toHaveLength(1);
+  });
+
   it("raises the alert once its nick stays taken: a third refusal in a row, and not again for the fourth", async () => {
     const ergo = await fakeErgo();
     const { lines } = start(ergo.port);
