@@ -108,13 +108,13 @@ class Reader {
     const size = runOf(this.#source, at, "`");
     this.#runs ??= new Runs(this.#source);
     const close = this.#runs.after(size, at + size);
-    const code = close === undefined ? "" : this.#source.slice(at + size, close);
-    if (close === undefined || code.trim() === "") {
-      this.#add(this.#source.slice(at, at + size));
-      this.#at = at + size;
-    } else {
+    const code = close === undefined ? undefined : this.#source.slice(at + size, close);
+    if (close !== undefined && code?.trim()) {
       this.#push({ type: "code", text: code });
       this.#at = close + size;
+    } else {
+      this.#add("`".repeat(size));
+      this.#at = at + size;
     }
   }
 
@@ -128,9 +128,13 @@ class Reader {
     const at = this.#at;
     this.#at += 1;
     const label = this.#frames.findLast((frame) => frame.mark === "[");
-    const end = label?.active === true ? this.#addresses.destination(at + 1) : -1;
-    if (label === undefined || end === -1 || (this.#frames.at(-1) === label && invisible(label.children))) {
-      if (label !== undefined) this.#splice(label);
+    if (label === undefined) {
+      this.#add("]");
+      return;
+    }
+    const end = label.active ? this.#addresses.destination(at + 1) : -1;
+    if (end === -1 || (this.#frames.at(-1) === label && invisible(label.children))) {
+      this.#splice(label);
       this.#add("]");
       return;
     }
@@ -163,20 +167,21 @@ class Reader {
     const behind = before(this.#source, at);
     const ahead = after(this.#source, at + size);
     this.#at = at + size;
-    const fits = mark === "~" ? size === 2 : size <= 3;
-    const left = fits && closes(behind, ahead) ? this.#closeRun(mark, size) : size;
-    if (left === size && fits && opens(behind, ahead) && this.#open(mark, size)) return;
+    if (mark === "~" ? size !== 2 : size > 3) {
+      this.#add(mark.repeat(size));
+      return;
+    }
+    const left = closes(behind, ahead) ? this.#closeRun(mark, size) : size;
+    if (left === size && opens(behind, ahead) && this.#open(mark, size)) return;
     this.#add(mark.repeat(left));
   }
 
   // A closing run: the nearest marks it fits close, innermost first; it gives back what it did not use.
   #closeRun(mark: string, size: number): number {
     let left = size;
-    for (
-      let frame = this.#find(mark, left);
-      frame !== undefined;
-      frame = left > 0 ? this.#find(mark, left) : undefined
-    ) {
+    while (left > 0) {
+      const frame = this.#find(mark, left);
+      if (frame === undefined) break;
       left -= this.#closeAt(frame, left);
     }
     return left;
@@ -184,11 +189,9 @@ class Reader {
 
   // The nearest open mark a closing run of `size` fits (the same length, or three stars split), never past a label.
   #find(mark: string, size: number): Frame | undefined {
-    for (const frame of this.#frames.toReversed()) {
-      if (frame.mark === "[") return undefined;
-      if (frame.mark === mark && (frame.size === size || frame.size === 3 || size === 3)) return frame;
-    }
-    return undefined;
+    const fits = (frame: Frame) => frame.mark === mark && (frame.size === size || frame.size === 3 || size === 3);
+    const found = this.#frames.findLast((frame) => frame.mark === "[" || fits(frame));
+    return found?.mark === "[" ? undefined : found;
   }
 
   // The mark `frame` closes with `size` of its run, those above it text again; of three stars, what stays open wraps
