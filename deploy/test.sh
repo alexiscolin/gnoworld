@@ -946,7 +946,7 @@ setTimeout(() => {
 	# Each visitor holds 32 requests at once (F208; a request counts while it is served): $1 WebSockets (Ergo takes
 	# 16 of one address), $2 streams (the server takes 4) and $7 POSTs whose body never comes, which web holds, of
 	# visitor $3, held 12 s; then $3's next request and visitor $4's, how many of $3's were held to the end (a
-	# WebSocket's 101, a stream's 200, a POST still waiting, 000), and $3's request once they ended. Two at once (F651).
+	# WebSocket's 101, a stream's 200, a POST still waiting: web's 100 Continue, or 000), and $3's request once they ended. Two at once (F651).
 	hold() {
 		docker run --rm --network "$inside" --entrypoint sh "$CURL" -c '
 			ws=$1 streams=$2 auth=$3 origin=$4 other=$6 posts=$7
@@ -973,7 +973,7 @@ setTimeout(() => {
 			curl -s -o /dev/null -w "%{http_code} " $me "$api"
 			curl -s -o /dev/null -w "%{http_code} " --haproxy-protocol --haproxy-clientip "$other" -u "$auth" "$api"
 			wait
-			printf "%s " "$(grep -cE "^(101|200|000)$" /tmp/held)"
+			printf "%s " "$(grep -cE "^(101|200|100|000)$" /tmp/held)"
 			curl -s -o /dev/null -w "%{http_code}" $me "$api"' sh "$1" "$2" "$auth" "$ORIGINS" "$3" "$4" "$5" || true
 	}
 	hold 16 4 203.0.113.61 203.0.113.62 11 >"$tmp/hold.31" &
