@@ -43,6 +43,13 @@ describe("Message", () => {
     );
   });
 
+  it("gives its box the class asked, a span or a div", () => {
+    const boxed = (text: string) => renderToStaticMarkup(<Message text={text} className="x" />);
+    expect(boxed("")).toBe('<span class="x"></span>');
+    expect(boxed("a")).toBe('<span class="x">a</span>');
+    expect(boxed("a\n\nb")).toBe('<div class="x"><p>a</p><p>b</p></div>');
+  });
+
   it("shows nothing for a blank message", () => {
     expect(html("  ")).toBe("<span></span>");
   });

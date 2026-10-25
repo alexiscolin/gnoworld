@@ -735,6 +735,24 @@ describe("the chat's link: what it says", () => {
     expect(said(t.fake.sent)).toEqual(["PRIVMSG #bubble :hi", "PRIVMSG #bubble :again"]);
   });
 
+  it("takes no line of another for a KICK of it, though the line names it", () => {
+    const t = memberIn(["#bubble/games"]);
+    t.fake.line(`:troll!u@h PRIVMSG #bubble/games :${ADDRESS}`);
+    t.fake.line(`:troll!u@h NOTICE #bubble/games ${ADDRESS}`);
+    expect(t.link.say("#bubble/games", "still here")).toBe(true);
+  });
+
+  it("forgets, as a connection drops, the rooms it had joined: the next one parts none of them", () => {
+    const t = guestIn(["#a", "#b"]);
+    t.fake.state("waiting");
+    t.link.follow(["#a"]);
+    const again = t.connected();
+    const before = again.sent.length;
+    t.link.follow(["#a"]);
+    expect(again.sent.slice(before).filter((line) => line.startsWith("PART"))).toEqual([]);
+    expect(joinedBy(again.sent, "PART")).toEqual([]);
+  });
+
   it("says nothing while away, nothing again before Ergo says it is in the room, and nothing once stopped", () => {
     const t = memberIn(["#bubble/games"]);
     t.fake.state("waiting");

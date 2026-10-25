@@ -37,8 +37,9 @@ describe("what the word being typed completes to", () => {
     );
   });
 
-  it("offers a command after spaces alone, as compose reads it", () => {
+  it("offers a command after spaces alone, as compose reads it, and none after a word", () => {
     expect(completions("  /", CHOICES)?.options).toStrictEqual(["/me"]);
+    expect(completions("say /", CHOICES)).toBeUndefined();
   });
 
   it("offers nothing that is already whole, in any case: the word is the only match", () => {

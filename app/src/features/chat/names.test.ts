@@ -59,6 +59,13 @@ describe("what a world's room list is asked for", () => {
     ).toBe(4);
     expect(roomsQuery("bubble", { kind: "out" }, 0)).toBe(guest);
   });
+
+  it("differs from one account to another: a reader's rooms are its own", () => {
+    const other = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
+    expect(roomsQuery("bubble", { kind: "in", address: ADDRESS }, 0)).not.toBe(
+      roomsQuery("bubble", { kind: "in", address: other }, 0),
+    );
+  });
 });
 
 describe("the room Alt+Up and Alt+Down go to", () => {

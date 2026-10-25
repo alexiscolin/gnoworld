@@ -129,3 +129,24 @@ describe("formatted", () => {
     expect(markdown(formatted({ text: "hello", start: 0, end: 0 }, format).text)).toStrictEqual([block]);
   });
 });
+
+// The green pass's cases (4c's pre-merge): a mark half in the selection, or one character of a longer run, is wrapped,
+// never taken off, and no character is lost.
+describe("formatted, at the edges StrykerJS found", () => {
+  it.each<{ text: string; start: number; end: number; format: Format; result: Edit }>([
+    { text: "hi **", start: 0, end: 5, format: "bold", result: { text: "**hi ****", start: 2, end: 7 } },
+    { text: "** hi", start: 0, end: 5, format: "bold", result: { text: "**** hi**", start: 2, end: 7 } },
+    { text: "**hi there", start: 2, end: 4, format: "bold", result: { text: "****hi** there", start: 4, end: 6 } },
+    { text: "there hi**", start: 6, end: 8, format: "bold", result: { text: "there **hi****", start: 8, end: 10 } },
+    { text: "**hi*", start: 0, end: 5, format: "italic", result: { text: "***hi**", start: 1, end: 6 } },
+    { text: "*hi**", start: 0, end: 5, format: "italic", result: { text: "**hi***", start: 1, end: 6 } },
+    { text: "**hi*", start: 2, end: 4, format: "italic", result: { text: "***hi**", start: 3, end: 5 } },
+    { text: "*hi**", start: 1, end: 3, format: "italic", result: { text: "**hi***", start: 2, end: 4 } },
+    { text: "**", start: 0, end: 2, format: "bold", result: { text: "******", start: 2, end: 4 } },
+    { text: "x  hi", start: 1, end: 5, format: "bold", result: { text: "x  **hi**", start: 5, end: 7 } },
+    { text: "x hi  ", start: 2, end: 6, format: "bold", result: { text: "x **hi**  ", start: 4, end: 6 } },
+    { text: "a > b", start: 0, end: 0, format: "quote", result: { text: "> a > b", start: 2, end: 2 } },
+  ])("makes, of $text from $start to $end in $format, $result.text", ({ text, start, end, format, result }) => {
+    expect(formatted({ text, start, end }, format)).toStrictEqual(result);
+  });
+});

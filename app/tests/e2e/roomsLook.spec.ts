@@ -1,5 +1,5 @@
 import type { WebSocketRoute } from "@playwright/test";
-import { expect, hydrated, test } from "./fixtures.ts";
+import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { MEMBER, scriptedErgo } from "./scripted.ts";
 
@@ -49,22 +49,47 @@ test.describe("a world's rooms, as they look", () => {
   });
 });
 
-// 4b's pre-merge (/code-review): a room opens on its newest line, and keeps the newest in view as lines come.
-test("opens a room on its newest line, and keeps the newest in view as lines come", async ({ page }) => {
+// #games with 60 lines of history, scripted, opened on its newest; the socket, to say a live line on it.
+async function sixtyLines(page: Page): Promise<() => WebSocketRoute> {
   const history = Array.from({ length: 60 }, (_, n) => {
     const time = new Date(Date.parse("2026-10-25T10:00:00.000Z") + n * 60_000).toISOString();
     return [`h${String(n)}`, time, `Line ${String(n)} of the room's history`] as const;
   });
-  let ergo: WebSocketRoute | undefined;
+  let socket: WebSocketRoute | undefined;
   await page.routeWebSocket(/\/ws$/, (route) => {
-    ergo = route;
+    socket = route;
     scriptedErgo(route, GUEST, history);
   });
   await page.goto("/w/bubble?room=games");
   await hydrated(page);
   await expect(page.getByText("Line 59 of the room's history")).toBeInViewport();
-  ergo?.send(
+  return () => {
+    if (socket === undefined) throw new Error("the page opened no socket");
+    return socket;
+  };
+}
+
+// 4b's pre-merge (/code-review): a room opens on its newest line, and keeps the newest in view as lines come.
+test("opens a room on its newest line, and keeps the newest in view as lines come", async ({ page }) => {
+  const ergo = await sixtyLines(page);
+  ergo().send(
     `@msgid=live;time=2026-10-25T12:00:00.000Z;account=${MEMBER} :${MEMBER}!u@h PRIVMSG #bubble/games :A live line`,
   );
   await expect(page.getByText("A live line")).toBeInViewport();
+});
+
+// 4c's green pass: a reader who scrolled up is left where they are as lines come (4b's useNewestInView).
+test("leaves a reader who scrolled up where they are as a line comes", async ({ page }) => {
+  const ergo = await sixtyLines(page);
+  await page.getByRole("list", { name: "Messages" }).evaluate((list) => {
+    list.scrollTop = 0;
+    list.dispatchEvent(new Event("scroll"));
+  });
+  await expect(page.getByText("Line 0 of the room's history")).toBeInViewport();
+  ergo().send(
+    `@msgid=live;time=2026-10-25T12:00:00.000Z;account=${MEMBER} :${MEMBER}!u@h PRIVMSG #bubble/games :A live line`,
+  );
+  await expect(page.getByText("A live line")).toHaveCount(1);
+  await expect(page.getByText("Line 0 of the room's history")).toBeInViewport();
+  await expect(page.getByText("A live line")).not.toBeInViewport();
 });

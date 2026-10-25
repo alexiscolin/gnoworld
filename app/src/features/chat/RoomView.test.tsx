@@ -86,6 +86,10 @@ describe("RoomView", () => {
     expect(notice).toContain("Notice");
     expect(notice).toContain("heads up");
     expect(notice).not.toContain("*");
+    // Muted, its mark apart: the classes the sheet reads (`.notice .text`, `.mark`).
+    expect(html).toMatch(
+      /<li class="[^"]*notice[^"]*">.*<span class="[^"]*mark[^"]*">Notice <\/span><span class="[^"]*text[^"]*">heads up<\/span>/s,
+    );
   });
 
   it("shows a line, a topic, a nick, a member and an account as text, never as markup or a link", () => {

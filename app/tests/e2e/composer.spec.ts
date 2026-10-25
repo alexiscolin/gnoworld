@@ -41,6 +41,27 @@ test.describe("the composer", () => {
     await expect(lineOf(page, slash)).not.toContainText(`//${slash}`);
   });
 
+  test("applies each format of the bar to the selection, as its name says", async ({ page }) => {
+    await inGames(page);
+    for (const [name, result] of [
+      ["Bold", "make this **word**"],
+      ["Italic", "make this *word*"],
+      ["Strikethrough", "make this ~~word~~"],
+      ["Code", "make this `word`"],
+      ["Link", "make this [word](https://)"],
+      ["Quote", "> make this word"],
+      ["Bulleted list", "- make this word"],
+      ["Numbered list", "1. make this word"],
+    ] as const) {
+      await field(page).fill("make this word");
+      await field(page).evaluate((box: HTMLInputElement) => {
+        box.setSelectionRange(10, 14);
+      });
+      await page.getByRole("group", { name: "Format" }).getByRole("button", { name, exact: true }).click();
+      await expect(field(page)).toHaveValue(result);
+    }
+  });
+
   test("wraps the selection in a mark from the format bar, the selection kept", async ({ page }) => {
     await inGames(page);
     await field(page).fill("make this bold");
@@ -108,6 +129,8 @@ test.describe("the composer", () => {
   }) => {
     await inGames(page);
     const heading = (name: string) => page.getByRole("heading", { level: 2, name, exact: true });
+    // A draft stays with its room no further than the room (drafts kept a room are 4d's).
+    await field(page).fill("a draft");
     await field(page).press("ArrowDown");
     for (const keys of [
       "ArrowDown",
@@ -129,6 +152,9 @@ test.describe("the composer", () => {
     await expect(page).toHaveURL(/\/w\/bubble\?room=news$/);
     await page.keyboard.press("Alt+ArrowUp");
     await expect(heading("#bubble")).toBeVisible();
+    await page.keyboard.press("Alt+ArrowUp");
+    await expect(heading("#games")).toBeVisible();
+    await expect(field(page)).toHaveValue("");
     await page.getByRole("link", { name: "gno.world" }).click();
     await expect(page).toHaveURL(/\/$/);
     await page.keyboard.press("Alt+ArrowDown");
@@ -207,5 +233,8 @@ test.describe("the composer", () => {
       "Not sent: the chat is not in this room yet. Try again in a moment.",
     );
     await expect(field(page)).toHaveValue("are you there?");
+    await field(page).press("End");
+    await field(page).press("!");
+    await expect(field(page)).not.toHaveAccessibleDescription(/Not sent/);
   });
 });

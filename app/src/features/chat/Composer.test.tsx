@@ -30,6 +30,10 @@ describe("Composer", () => {
     expect(markup).not.toContain("aria-hidden");
   });
 
+  it("says nothing of a line not sent before any was", () => {
+    expect(html()).not.toMatch(/Not sent|aria-invalid/);
+  });
+
   it("offers each format, by its name, in a group", () => {
     expect(names(html())).toEqual(
       expect.arrayContaining([
@@ -71,6 +75,7 @@ describe("what the composer's field says of a completion", () => {
     ["/m", { help: "Tab completes /me." }],
     ["#g", { help: "Tab completes #games; also #gnogolf." }],
     ["say #n", { help: "Tab completes #news." }],
+    ["#n", { help: "Tab completes #news." }],
     ["hi @g10", { help: "Tab completes @g10gh7…3y5tv." }],
     [`${"x".repeat(419)} #g`, { error: "Too long by 3 bytes." }],
     [`${"x".repeat(412)} #g`, { help: "Tab completes #games; also #gnogolf." }],
@@ -82,6 +87,15 @@ describe("what the composer's field says of a completion", () => {
   it("says a line not sent before any completion", () => {
     expect(said(compose(ROOM, "#g", NICK), true, completions("#g", CHOICES))).toStrictEqual({
       error: "Not sent: the chat is not in this room yet. Try again in a moment.",
+    });
+  });
+});
+
+describe("what the composer's field says of three completions", () => {
+  it("names the first, then the others, a comma apart", () => {
+    const choices = { commands: [], rooms: ["#a1", "#a2", "#a3"], people: [] };
+    expect(said(compose(ROOM, "#a", NICK), false, completions("#a", choices))).toStrictEqual({
+      help: "Tab completes #a1; also #a2, #a3.",
     });
   });
 });
