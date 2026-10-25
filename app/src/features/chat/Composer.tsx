@@ -76,8 +76,10 @@ export function Composer({ room, nick, rooms, members, onSay }: ComposerProps) {
   const selectionRef = useRef<Edit>(undefined);
   const label = roomLabel(room);
   const composed = compose(room, draft, nick);
-  // The room's accounts are sorted out of its members only while a word after `@` is typed.
-  const people = /(^|\s)@\S*$/u.test(draft) ? peopleOf(members, nick) : [];
+  // The room's accounts are sorted out of its members only while a word after `@` is typed; read apart, the mention
+  // alone, not each key, is what the compiler recomputes them on (F793).
+  const mentioning = /(^|\s)@\S*$/u.test(draft);
+  const people = mentioning ? peopleOf(members, nick) : [];
   const completion = completions(draft, { commands: COMMANDS, rooms, people });
   const box = () => formRef.current?.querySelector("input") ?? undefined;
   useLayoutEffect(() => {
