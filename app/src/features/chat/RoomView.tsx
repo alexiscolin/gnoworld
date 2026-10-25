@@ -4,7 +4,7 @@
 // (4d); the composer, given, goes below.
 // A line's author is its account tag alone, a nick being only a nick; a member's nick is an account's when it is
 // an address, which a guest's cannot be (Ergo gives a guest 32 characters, server/src/testing/ergo.test.ts:314).
-import { markdown, mentions, type Line } from "@gnoworld/core";
+import { markdown, mentions, type Block, type Line } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
 import { Sidebar, Stack } from "@gnoworld/ui";
 import { useLayoutEffect, useRef, type ReactNode } from "react";
@@ -51,11 +51,31 @@ function Person({ name, guest }: { name: string; guest: boolean }) {
   return Address.safeParse(name).success ? <span title={name}>{shortAddress(name)}</span> : <span>{name}</span>;
 }
 
+// A line's mentions, space-separated, read apart from its drawing so the compiler keeps the drawing's tree out of
+// what a change of members recomputes.
+const namesOf = (text: string): string => mentions(markdown(text)).join(" ");
+
+// The addresses of `names` (a line's mentions, space-separated) that are members, as one string.
+const knownOf = (names: string, members: ReadonlySet<string>): string =>
+  names
+    .split(" ")
+    .filter((address) => members.has(address))
+    .join(" ");
+
+// A line's text drawn, its mentions of `known` (space-separated) shortened. A component of its own, with a string the
+// compiler compares by value: the line keeps its drawing while others join and leave (F812's cost).
+function LineText({ blocks, me, known }: { blocks: readonly Block[]; me: string | undefined; known: string }) {
+  return <Markdown blocks={blocks} className={styles["text"]} me={me} members={new Set(known.split(" "))} />;
+}
+
 // A line, read once: drawn, and asked whether it mentions the reader, which a word says as well as its colour; a
-// mention shortened for the reader and the room's members alone (F812).
+// mention shortened for the reader and the room's members alone (F812). A change of members reads its mentions
+// again, never its drawing.
 function LineView({ line, me, members }: { line: Line; me: string | undefined; members: ReadonlySet<string> }) {
   const blocks = markdown(line.text);
-  const mentioned = me !== undefined && mentions(blocks).includes(me);
+  const names = namesOf(line.text);
+  const mentioned = me !== undefined && names.split(" ").includes(me);
+  const known = knownOf(names, members);
   return (
     <li className={KINDS[line.kind]} data-about-me={mentioned ? "" : undefined}>
       {/* The line's marks first, before the time: where no sender's words stand (F808). */}
@@ -66,7 +86,7 @@ function LineView({ line, me, members }: { line: Line; me: string | undefined; m
       </time>{" "}
       {line.kind === "action" ? "* " : null}
       <Person name={line.account ?? line.from} guest={line.account === undefined} />{" "}
-      <Markdown blocks={blocks} className={styles["text"]} me={me} members={members} />
+      <LineText blocks={blocks} me={me} known={known} />
     </li>
   );
 }
