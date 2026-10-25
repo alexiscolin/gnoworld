@@ -978,7 +978,7 @@ describe("the server's IRC link (3h)", { timeout: 40_000 }, () => {
     }
   };
 
-  it("logs a wrong operator password as refused, Ergo answering 491, and joins nothing", async () => {
+  it("logs a wrong operator password as refused at its login, before any OPER, and joins nothing", async () => {
     const e = await start();
     const lines: string[] = [];
     const link = ircLink({
@@ -992,7 +992,7 @@ describe("the server's IRC link (3h)", { timeout: 40_000 }, () => {
     });
     stops.push(() => link.stop());
     await expect
-      .poll(() => lines.filter((line) => line.includes('"event":"irc_refused"') && line.includes('"error":"oper"')), {
+      .poll(() => lines.filter((line) => line.includes('"event":"irc_refused"') && line.includes('"error":"sasl"')), {
         timeout: 10_000,
       })
       .toHaveLength(1);
@@ -1028,6 +1028,25 @@ describe("the server's IRC link (3h)", { timeout: 40_000 }, () => {
     gus.send("LIST");
     await gus.expect(/ 323 /);
     expect(logged(gus).match(/ 322 gus #room-\d+ 1 /g)).toHaveLength(101);
+  });
+
+  it("keeps its nick: once it has logged in, a guest cannot take gnoworld, even while the bot is away", async () => {
+    const e = await start();
+    const link = ircLink({
+      host: "127.0.0.1",
+      port: e.port,
+      password: e.operPassword,
+      rooms: () => ["#bubble"],
+      onMessage: () => undefined,
+      log: logger("a-pepper-of-forty-characters-0123456789", () => true),
+      retryMs: () => 60_000,
+    });
+    stops.push(() => link.stop());
+    await inRoom(await oper(e, "gus"), "#bubble");
+    await link.stop();
+    const squatter = await open(e);
+    await hello(squatter);
+    await finish(squatter, "gnoworld", / 433 /);
   });
 
   it("comes back to its rooms when Ergo restarts", async () => {

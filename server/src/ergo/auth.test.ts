@@ -381,3 +381,35 @@ describe("listenAt", () => {
     }
   });
 });
+
+describe("Ergo's auth script, the bot's own account (the max review)", () => {
+  const BOT = "an-operator-password-of-32-chars";
+  const botSetup = async (bot: string | undefined) => {
+    const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES]);
+    db.prepare("INSERT INTO accounts (address, first_seen) VALUES (?, ?)").run(ME, T0);
+    const tickets = makeTickets(db, { now: () => T0 });
+    return { tickets, ...(await start(db, { now: () => T0, ...(bot === undefined ? {} : { bot }) })) };
+  };
+  const as = (accountName: string, passphrase: string, ip = IP) => line({ accountName, passphrase, ip });
+
+  it("logs the bot in as gnoworld with the operator's password alone: no other passphrase, no other account", async () => {
+    const { ask, tickets } = await botSetup(BOT);
+    expect(await ask(as("gnoworld", BOT, "127.0.0.1"))).toBe(YES("gnoworld"));
+    expect(await ask(as(ME, tickets.mint(ME)))).toBe(YES(ME));
+    for (const passphrase of [`${BOT}x`, BOT.slice(1), "", tickets.mint(ME)])
+      expect(await ask(as("gnoworld", passphrase))).toBe(NO);
+    expect(await ask(as(ME, BOT))).toBe(NO);
+    for (const none of ["", undefined]) {
+      const { ask: other } = await botSetup(none);
+      expect([await other(as("gnoworld", "")), await other(as("gnoworld", BOT))]).toEqual([NO, NO]);
+    }
+  });
+
+  it("counts a wrong password for gnoworld in its visitor's failures: past ten, the right one is refused too", async () => {
+    const { ask } = await botSetup(BOT);
+    expect(await ask(as("gnoworld", BOT))).toBe(YES("gnoworld"));
+    for (let n = 0; n < 10; n += 1) expect(await ask(as("gnoworld", "wrong"))).toBe(NO);
+    expect(await ask(as("gnoworld", BOT))).toBe(NO);
+    expect(await ask(as("gnoworld", BOT, "127.0.0.1"))).toBe(YES("gnoworld"));
+  });
+});

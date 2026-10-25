@@ -1,6 +1,8 @@
 // Ergo's auth script, answered by the server (ADR-0002 §7; slice 3's plan, 3d). Ergo writes one JSON line,
 // the SASL account and a ticket as its passphrase, and reads one line back (irc/authscript.go). A ticket is
 // spent whatever the answer; failures count per visitor, never per account, so nobody locks another out.
+// The bot's own account, gnoworld, logs in with the operator's password alone (slice 3's max review).
+import { createHash, timingSafeEqual } from "node:crypto";
 import { once } from "node:events";
 import { lstatSync, unlinkSync } from "node:fs";
 import { createServer, isIP, type Server } from "node:net";
@@ -9,24 +11,36 @@ import { Address } from "@gnoworld/schemas";
 import { z } from "zod";
 import { limiter } from "../limit.ts";
 import type { Log } from "../log.ts";
+import { NICK } from "../irc/lines.ts";
 import { makeTickets } from "../login/ticket.ts";
 import { visitor } from "../visitor.ts";
 
-type Outcome = { address: Address } | { error: "frame" | "limit" | "account" | "ticket" | "failed" };
+type Outcome = { account: string } | { error: "frame" | "limit" | "account" | "ticket" | "failed" };
 
 interface Options {
   log: Log;
   now?: () => number;
   // From the connection on, whatever arrives: Ergo writes its line at once.
   deadlineMs?: number;
+  // The operator's password, which logs the bot in as gnoworld; without it, nobody is gnoworld.
+  bot?: string;
 }
 
-export function authServer(db: DatabaseSync, { log, now = Date.now, deadlineMs = 5000 }: Options): Server {
+export function authServer(db: DatabaseSync, { log, now = Date.now, deadlineMs = 5000, bot = "" }: Options): Server {
   const tickets = makeTickets(db, { now });
   const failures = limiter({ max: 10, windowMs: 60_000, keys: 100_000 });
   // Ergo adds fields the server never reads: a certificate, the WebSocket upgrade's cookies.
   const Input = z.object({ accountName: z.string(), passphrase: z.string(), ip: z.string().optional() });
   const lineMax = 16 * 1024;
+  // The bot's password compared in constant time, by hashes of one length.
+  const digest = (text: string) => createHash("sha256").update(text).digest();
+  const named = (accountName: string, passphrase: string): Outcome => {
+    if (accountName === NICK)
+      return bot !== "" && timingSafeEqual(digest(passphrase), digest(bot)) ? { account: NICK } : { error: "ticket" };
+    if (!Address.safeParse(accountName).success) return { error: "account" };
+    const address = tickets.redeem(passphrase, accountName);
+    return address === undefined ? { error: "ticket" } : { account: address };
+  };
 
   const check = (line: string): Outcome => {
     let json: unknown;
@@ -43,11 +57,7 @@ export function authServer(db: DatabaseSync, { log, now = Date.now, deadlineMs =
     const who = ip === undefined || isIP(ip) === 0 ? "" : visitor(ip, undefined, undefined);
     const at = now();
     if (failures.full(who, at)) return { error: "limit" };
-    let outcome: Outcome = { error: "account" };
-    if (Address.safeParse(accountName).success) {
-      const address = tickets.redeem(passphrase, accountName);
-      outcome = address === undefined ? { error: "ticket" } : { address };
-    }
+    const outcome = named(accountName, passphrase);
     if ("error" in outcome) failures.take(who, at);
     return outcome;
   };
@@ -69,8 +79,8 @@ export function authServer(db: DatabaseSync, { log, now = Date.now, deadlineMs =
     const answer = (outcome: Outcome): void => {
       answered = true;
       if ("error" in outcome) log("irc_login_refused", outcome);
-      else log("irc_login", { account: outcome.address });
-      const output = "error" in outcome ? { success: false } : { success: true, accountName: outcome.address };
+      else log("irc_login", { account: outcome.account });
+      const output = "error" in outcome ? { success: false } : { success: true, accountName: outcome.account };
       socket.end(`${JSON.stringify(output)}\n`);
     };
     socket.on("data", (chunk: Buffer) => {

@@ -6,7 +6,7 @@ import { freePort } from "../testing/ergo.ts";
 import { fakeErgo, message, PASSWORD, register, welcome, type Peer } from "../testing/fakeErgo.ts";
 import { ircLink, retryDelay, type Link, type Said } from "./link.ts";
 
-const CAPS = "CAP REQ :message-tags account-tag batch draft/chathistory server-time multi-prefix";
+const CAPS = "CAP REQ :message-tags account-tag batch draft/chathistory server-time multi-prefix sasl";
 // Stopped before the fake Ergo closes, so no link reconnects to a server that is gone.
 const links: Link[] = [];
 afterEach(async () => {
@@ -31,14 +31,20 @@ const start = (port: number, more: Partial<Parameters<typeof ircLink>[0]> = {}) 
 };
 
 describe("the IRC link", () => {
-  it("asks its capabilities, registers, logs in as an operator, then joins its rooms", async () => {
+  it("asks its capabilities, logs in as its account by SASL, as an operator, then joins its rooms", async () => {
     const ergo = await fakeErgo();
     start(ergo.port);
     const peer = await ergo.peer(0);
     expect(await peer.next(/^CAP /)).toBe(CAPS);
     expect(await peer.next(/^NICK /)).toBe("NICK gnoworld");
     expect(await peer.next(/^USER /)).toBe("USER gnoworld 0 * gno.world");
-    peer.say(":ergo.test CAP * ACK :message-tags account-tag batch draft/chathistory server-time");
+    peer.say(":ergo.test CAP * ACK :message-tags account-tag batch draft/chathistory server-time multi-prefix sasl");
+    expect(await peer.next(/^AUTHENTICATE /)).toBe("AUTHENTICATE PLAIN");
+    peer.say("AUTHENTICATE +");
+    expect(await peer.next(/^AUTHENTICATE /)).toBe(
+      `AUTHENTICATE ${Buffer.from(`\0gnoworld\0${PASSWORD}`).toString("base64")}`,
+    );
+    peer.say(":ergo.test 903 gnoworld :SASL authentication successful");
     expect(await peer.next(/^CAP END$/)).toBe("CAP END");
     peer.say(":ergo.test 001 gnoworld :Welcome");
     expect(await peer.next(/^OPER /)).toBe(`OPER admin ${PASSWORD}`);
@@ -1272,5 +1278,85 @@ describe("retryDelay", () => {
     ]);
     expect([retryDelay(0, () => 0), retryDelay(0, () => 0.999)]).toEqual([500, 1499]);
     expect(retryDelay(9, () => 0)).toBe(30_000);
+  });
+});
+
+describe("the IRC link's account (the max review)", () => {
+  const SASL = Buffer.from(`\0gnoworld\0${PASSWORD}`).toString("base64");
+
+  it.each(["904", "902", "905", "906"])(
+    "ends its login on %s as a refused account, its password in no log, and tries again later",
+    async (code) => {
+      const ergo = await fakeErgo();
+      const { lines } = start(ergo.port);
+      const peer = await ergo.peer(0);
+      await peer.next(/^CAP REQ /);
+      peer.say(":ergo.test CAP * ACK :message-tags account-tag batch draft/chathistory server-time multi-prefix sasl");
+      await peer.next(/^AUTHENTICATE PLAIN$/);
+      peer.say("AUTHENTICATE +");
+      expect(await peer.next(/^AUTHENTICATE /)).toBe(`AUTHENTICATE ${SASL}`);
+      peer.say(`:ergo.test ${code} gnoworld :SASL authentication failed`);
+      await ergo.peer(1);
+      expect(lines.filter((line) => line.includes('"event":"irc_refused"'))).toEqual([
+        expect.stringContaining('"error":"sasl"'),
+      ]);
+      expect(peer.lines.filter((line) => /^(CAP END|OPER)/.test(line))).toEqual([]);
+      expect(lines.join("\n")).not.toContain(PASSWORD);
+      expect(lines.join("\n")).not.toContain(SASL);
+    },
+  );
+
+  it("ends its login when Ergo acknowledges its capabilities without sasl, before any password goes out", async () => {
+    const ergo = await fakeErgo();
+    const { lines } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await peer.next(/^CAP REQ /);
+    peer.say(":ergo.test CAP * ACK :message-tags account-tag batch draft/chathistory server-time multi-prefix");
+    await ergo.peer(1);
+    expect(lines.filter((line) => line.includes('"event":"irc_refused"'))).toEqual([
+      expect.stringContaining('"error":"cap"'),
+    ]);
+    expect(peer.lines.filter((line) => /^(CAP END|AUTHENTICATE|OPER)/.test(line))).toEqual([]);
+  });
+
+  it("raises the alert once its nick stays taken: a third refusal in a row, and not again for the fourth", async () => {
+    const ergo = await fakeErgo();
+    const { lines } = start(ergo.port);
+    for (let n = 0; n < 4; n++) {
+      const peer = await ergo.peer(n);
+      await peer.next(/^NICK /);
+      peer.say(":ergo.test 433 * gnoworld :Nickname is already in use");
+    }
+    await ergo.peer(4);
+    expect(lines.filter((line) => line.includes('"event":"alert"'))).toEqual([
+      expect.stringContaining('"error":"irc_nick_taken"'),
+    ]);
+  });
+
+  it("counts its nick's refusals in a row alone: a welcome starts the count again, and the alert comes again", async () => {
+    const ergo = await fakeErgo();
+    const { lines } = start(ergo.port);
+    const taken = async (n: number) => {
+      const peer = await ergo.peer(n);
+      await peer.next(/^NICK /);
+      peer.say(":ergo.test 433 * gnoworld :Nickname is already in use");
+    };
+    const back = async (n: number) => {
+      const peer = await ergo.peer(n);
+      await welcome(peer);
+      peer.socket.destroy();
+    };
+    const alerts = () => lines.filter((line) => line.includes('"error":"irc_nick_taken"'));
+    for (const n of [0, 1]) await taken(n);
+    await back(2);
+    for (const n of [3, 4]) await taken(n);
+    await ergo.peer(5);
+    expect(alerts()).toEqual([]);
+    await taken(5);
+    await back(6);
+    expect(alerts()).toHaveLength(1);
+    for (const n of [7, 8, 9]) await taken(n);
+    await ergo.peer(10);
+    expect(alerts()).toHaveLength(2);
   });
 });

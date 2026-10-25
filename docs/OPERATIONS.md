@@ -185,7 +185,10 @@ Slice 3, the bot's link and the rooms (3h):
 - **Rooms stay.** A world removed from the roles file keeps its room and history; removing one is a
   moderator's act (3l).
 - **A nick held by a ghost.** After a link drops silently, Ergo may hold `gnoworld` until its own
-  ping timeout: the link logs `irc_refused` (`nick`) and tries again later.
+  ping timeout: the link logs `irc_refused` (`nick`) and tries again later. The bot logs in by SASL as
+  the account `gnoworld`, whose nick Ergo keeps for it (the server's auth takes the operator's password
+  for that one name); a third refusal of the nick in a row is no ghost's and raises the alert
+  `irc_nick_taken`. A refused login logs `irc_refused` (`sasl`).
 
 Slice 3, the check (3i):
 
@@ -309,8 +312,8 @@ Slice 3, the server's retention (3n):
   `moderation_off` (no key: every message unchecked), `moderation_refused` (OpenAI refused the key or the
   call), `moderation_shape` (an answer of an unknown shape), `moderation_breaker` (checks paused 30 s
   after five failures), `moderation_backlog` (a check waits two minutes or more), `moderation_queue_full` (a
-  message left unchecked, the queue full); `redact_refused`, `unknown_room` and `room_opened` (the
-  rooms, below). `scripts/check_docs.py` keeps this list whole.
+  message left unchecked, the queue full); `irc_nick_taken` (above); `redact_refused`, `unknown_room`
+  and `room_opened` (the rooms, below). `scripts/check_docs.py` keeps this list whole.
 - **Before a public launch** (decision 154): the privacy policy, which says what reaches OpenAI and what
   is kept and how long, and the erasure path (slice 12) are blockers.
 
