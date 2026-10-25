@@ -1,5 +1,6 @@
+import { Address } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
-import { roomHref, roomLabel, shortAddress, shownRoom } from "./names.ts";
+import { roomHref, roomLabel, roomsQuery, shortAddress, shownRoom } from "./names.ts";
 
 const open = (...rooms: string[]) => rooms.map((room) => ({ room, type: "open" as const }));
 const SECTIONS = [
@@ -38,5 +39,24 @@ describe("the chat's names", () => {
     ["#bubble/games", "#games", "/w/bubble?room=games"],
   ])("names %s %s, at %s", (room, label, href) => {
     expect([roomLabel(room), roomHref(room)]).toEqual([label, href]);
+  });
+});
+
+// The list depends on who reads it: asked once the session is known, so a page whose chat loads before its /me
+// answers asks it once (4b's pre-merge).
+describe("what a world's room list is asked for", () => {
+  const ADDRESS = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
+
+  it("is nothing while the session is unknown", () => {
+    expect(roomsQuery("bubble", { kind: "unknown" }, 0)).toBeUndefined();
+  });
+
+  it("names the world, who reads and the try", () => {
+    const guest = roomsQuery("bubble", { kind: "out" }, 0);
+    const account = roomsQuery("bubble", { kind: "in", address: ADDRESS }, 0);
+    expect(
+      new Set([guest, account, roomsQuery("bubble", { kind: "out" }, 1), roomsQuery("earth", { kind: "out" }, 0)]).size,
+    ).toBe(4);
+    expect(roomsQuery("bubble", { kind: "out" }, 0)).toBe(guest);
   });
 });

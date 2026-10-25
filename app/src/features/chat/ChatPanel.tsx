@@ -1,5 +1,5 @@
-// A world's chat on its page (slice 4's 4b): its rooms from the server, asked again when the session changes
-// (a member's rooms are not a guest's), the page's link to Ergo in them, and the room the address names
+// A world's chat on its page (slice 4's 4b): its rooms from the server, asked once the session is known and again
+// when it changes (a member's rooms are not a guest's), the page's link to Ergo in them, and the room the address names
 // (?room=<name>), else the world's main room, else the first listed, the one whose history the link asks. The
 // link lives as long as the page: leaving the world leaves Ergo.
 import type { RoomList } from "@gnoworld/schemas";
@@ -12,16 +12,15 @@ import { drawGuestNick } from "../../lib/ergo/ergo.ts";
 import { pageErgo } from "../../lib/ergo/page.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
 import { chatLink } from "./link.ts";
-import { shownRoom } from "./names.ts";
+import { LOADING } from "./Loading.tsx";
+import { roomIds, roomsQuery, shownRoom } from "./names.ts";
 import { RoomsView } from "./RoomsView.tsx";
 import { RoomView } from "./RoomView.tsx";
 
-// The rooms as last asked: for which world, session and try, and what came.
+// The rooms as last asked, and what came: undefined when the list could not load.
 interface Asked {
-  world: string;
-  session: string;
-  attempt: number;
-  sections: RoomList["sections"] | "failed";
+  query: string;
+  sections: RoomList["sections"] | undefined;
 }
 
 export function ChatPanel({ world }: { world: string }) {
@@ -31,47 +30,51 @@ export function ChatPanel({ world }: { world: string }) {
   const [asked, setAsked] = useState<Asked>();
   const [attempt, setAttempt] = useState(0);
   const [params] = useSearchParams();
-  // Who reads: the rooms listed are the session's.
-  const session = useApp(({ login }) => (login.session.kind === "in" ? login.session.address : login.session.kind));
+  const query = roomsQuery(
+    world,
+    useApp(({ login }) => login.session),
+    attempt,
+  );
   useEffect(() => {
     const made = chatLink({ store, connect: pageErgo, ticket: pageLoginApi().ticket, guest: drawGuestNick });
     linkRef.current = made;
     return () => {
       made.stop();
-      linkRef.current = undefined;
     };
   }, [store]);
   useEffect(() => {
+    if (query === undefined) return;
     let live = true;
+    const settle = (sections: Asked["sections"]) => {
+      if (live) setAsked({ query, sections });
+    };
     pageRoomsApi()
       .rooms(world)
       .then(
         (got) => {
-          if (live) setAsked({ world, session, attempt, sections: got.ok ? got.value.sections : "failed" });
+          settle(got.ok ? got.value.sections : undefined);
         },
         () => {
-          if (live) setAsked({ world, session, attempt, sections: "failed" });
+          settle(undefined);
         },
       );
     return () => {
       live = false;
     };
-  }, [world, session, attempt]);
-  const fresh = asked?.world === world && asked.session === session && asked.attempt === attempt;
-  const sections = fresh ? asked.sections : undefined;
+  }, [world, query]);
+  const loaded = query !== undefined && asked?.query === query;
+  const sections = loaded ? asked.sections : undefined;
   useEffect(() => {
-    if (sections !== undefined && sections !== "failed") {
-      linkRef.current?.follow(sections.flatMap(({ rooms }) => rooms.map(({ room }) => room)));
-    }
+    if (sections !== undefined) linkRef.current?.follow(roomIds(sections));
   }, [sections]);
-  const current = Array.isArray(sections) ? shownRoom(world, sections, params.get("room")) : undefined;
+  const current = sections === undefined ? undefined : shownRoom(world, sections, params.get("room"));
   useEffect(() => {
     linkRef.current?.show(current);
   }, [current]);
   const state = useApp((app) => (current === undefined ? undefined : app.chat.rooms[current]));
   const chat = useApp((app) => app.login.chat);
-  if (sections === undefined) return <p role="status">Loading the rooms…</p>;
-  if (sections === "failed") {
+  if (!loaded) return LOADING;
+  if (sections === undefined) {
     return (
       <Stack space="s">
         <p role="alert">The rooms could not load.</p>

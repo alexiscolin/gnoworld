@@ -1,5 +1,6 @@
 // How the chat names a room and an address, and which room a world's page shows.
 import type { RoomList } from "@gnoworld/schemas";
+import type { AppState } from "../../store/index.ts";
 
 /** An address's first six and last five characters, as the login shows one's own. */
 export const shortAddress = (address: string): string => `${address.slice(0, 6)}…${address.slice(-5)}`;
@@ -16,7 +17,18 @@ export function roomHref(room: string): string {
 /** The room the address names (?room=<name>) when the world lists it; else its main room when listed; else the
  * first listed. */
 export function shownRoom(world: string, sections: RoomList["sections"], asked: string | null): string | undefined {
-  const listed = sections.flatMap(({ rooms }) => rooms.map(({ room }) => room));
+  const listed = roomIds(sections);
   const named = asked === null ? `#${world}` : `#${world}/${asked}`;
   return [named, `#${world}`].find((room) => listed.includes(room)) ?? listed[0];
+}
+
+/** Every room a world lists, in its order. */
+export const roomIds = (sections: RoomList["sections"]): string[] =>
+  sections.flatMap(({ rooms }) => rooms.map(({ room }) => room));
+
+/** What a world's room list is asked for: the world, who reads it, the try; nothing while the session is unknown,
+ * since the list is the reader's. */
+export function roomsQuery(world: string, session: AppState["login"]["session"], attempt: number): string | undefined {
+  if (session.kind === "unknown") return undefined;
+  return `${world}|${session.kind === "in" ? session.address : "guest"}|${String(attempt)}`;
 }
