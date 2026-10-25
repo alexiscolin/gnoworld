@@ -32,6 +32,17 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     expect(bob.lines().filter((line) => line.includes(` REDACT #bubble ${clean}`))).toEqual([]);
   });
 
+  it("checks what was said to a room's voices alone as it checks the room's own (F723)", async () => {
+    const e = await start();
+    const { verdicts } = await chatFor(e, []);
+    const alice = await login(e, "alice");
+    await join(alice, "#bubble");
+    // STATUSMSG: Ergo relays it to the room's voices and operators and keeps no history of it.
+    alice.send("PRIVMSG +#bubble :I will hurt you");
+    const echoed = await alice.expect(/PRIVMSG \+#bubble :I will hurt you$/);
+    await expect.poll(verdicts, { timeout: 10_000 }).toContain(msgid(echoed));
+  });
+
   it("checks what it missed while its link was down, each message once, after a mark Ergo has erased", async () => {
     const e = await start();
     const asked: string[] = [];

@@ -131,6 +131,31 @@ describe("the IRC link", () => {
       ]);
   });
 
+  it("hands on a line to a room's voices or operators as the room's own, its prefixes off, and no other target (F723)", async () => {
+    const ergo = await fakeErgo();
+    const { said } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    peer.say(message("account=g1a;msgid=s1", "a!u@h", ["+#bubble", "to its voices"]));
+    peer.say(message("account=g1a;msgid=s2", "a!u@h", ["@#bubble", "to its operators"]));
+    peer.say(message("account=g1a;msgid=s3", "a!u@h", ["%+#earth", "to half-ops and up, twice prefixed"]));
+    peer.say("@account=g1a;msgid=s4 :a!u@h NOTICE +#bubble :a notice to its voices");
+    peer.say(message("account=g1a;msgid=s5", "a!u@h", ["+#elsewhere", "not its room"]));
+    peer.say(message("account=g1a;msgid=s6", "a!u@h", ["+bubble", "no room"]));
+    peer.say(message("account=g1a;msgid=s7", "a!u@h", ["+", "nothing"]));
+    peer.say(message("account=g1a;msgid=s8", "a!u@h", ["#+bubble", "a plus inside"]));
+    // The five prefixes ISUPPORT lists (STATUSMSG=~&@%+), and nothing else before the #.
+    peer.say(message("account=g1a;msgid=p1", "a!u@h", ["~#bubble", "to its founders"]));
+    peer.say(message("account=g1a;msgid=p2", "a!u@h", ["&#bubble", "to its admins"]));
+    for (const [n, target] of ["x#bubble", "$#bubble", "*#bubble", "!#bubble"].entries())
+      peer.say(message(`account=g1a;msgid=q${String(n)}`, "a!u@h", [target, "not a prefix"]));
+    // The bot's own line, to its voices too, is no line to check.
+    peer.say(message("account=g1bot;msgid=own", "gnoworld!u@h", ["+#bubble", "its own"]));
+    peer.say(message("account=g1b;msgid=s9", "b!u@h", ["#bubble", "last"]));
+    await expect.poll(() => said.map(({ msgid }) => msgid)).toEqual(["s1", "s2", "s3", "s4", "p1", "p2", "s9"]);
+    expect(said.map(({ room }) => room)).toEqual(Array<string>(7).fill("#bubble").fill("#earth", 2, 3));
+  });
+
   it("reads past hostile lines and stays up: a NUL, a line over its limit, no command, garbage", async () => {
     const ergo = await fakeErgo();
     const { said } = start(ergo.port);

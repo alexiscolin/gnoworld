@@ -189,6 +189,16 @@ describe("the chat, as the server starts it", () => {
     ]);
   });
 
+  it("checks a line to a room's voices like the room's own: hidden for a banned word, struck (F723)", async () => {
+    const { peer, verdicts } = await linked(
+      { worlds: worlds("bubble"), moderation: OFF },
+      { provider: () => Promise.resolve("unchecked") },
+    );
+    peer.say(message("account=g1a;msgid=m1", "a!u@h", ["+#bubble", "buy spam"]));
+    await expect.poll(verdicts).toEqual([{ msgid: "m1", action: "hide", reason: "banned_word" }]);
+    expect(await peer.next(/^REDACT /)).toMatch(/^REDACT #bubble m1 /);
+  });
+
   it("passes the moderation's settings on: a new account's hours, and the thresholds", async () => {
     const fresh = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
     const scored: Answer = {
@@ -748,6 +758,13 @@ describe("the chat, as the server starts it", () => {
         await settle(peer);
         expect(mutes(peer)).toEqual([]);
         peer.say(line("m4", 4, ["g1a", "hurt"]));
+        expect(await peer.next(MUTE_LINE)).toBe("SAMODE #bubble +b m:g1a");
+      });
+
+      it("mutes an account whose lines to a room's voices were hidden three times, as for its own lines (F723)", async () => {
+        const { peer } = await linked({ worlds: worlds("bubble"), moderation: OFF }, hurt());
+        for (const id of ["m1", "m2", "m3"])
+          peer.say(message(`account=g1a;msgid=${id}`, "a!u@h", ["+#bubble", "hurt"]));
         expect(await peer.next(MUTE_LINE)).toBe("SAMODE #bubble +b m:g1a");
       });
 

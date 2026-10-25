@@ -223,6 +223,11 @@ Slice 3, the bot acts and the stream (3j):
   outage (its previews wait), a room's first lines said while the link was down, and, past a full
   page of 50 lines all in one millisecond, the rest of that millisecond (each next page starts in its
   last line's millisecond, F542).
+- **A line to a room's voices or operators** (`+#room`, STATUSMSG) is read as the room's line: checked,
+  counted, struck, and its author muted as for any line. Ergo keeps no history of it (#959), so its REDACT is
+  refused and the line stays on the screens it reached (F723). Ergo relays such a line by rank, so the bot reads
+  it only where it holds the prefix's power: in the rooms it made (it is their operator), not yet in a members
+  room it re-entered by SAJOIN after a restart, where it is a plain member (put to Alexis).
 - **A hide Ergo refuses** raises the alert `redact_refused`; its verdict still says hidden, the line
   stays shown, and the author's notice and strike stand: the alert is for ops to look.
 - **`GET /api/stream`** is public: 25 rooms a stream, 4 streams a visitor, 1,000 in all, a beat every
