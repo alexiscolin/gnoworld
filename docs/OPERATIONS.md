@@ -282,8 +282,9 @@ Slice 3, the server's retention (3n):
 
 - **The verdicts** (ids, rooms, hashed accounts, categories and scores, never a text) are kept 180 days
   and 150,000 at most (about 1.2 KB each with their indexes, 176 MB), the oldest going first; a verdict
-  still waiting on OpenAI stays. A job runs at start and every five minutes, removing 10,000 rows at
-  most a run (about 7 ms measured), and runs again at once while a backlog is left, the server free
+  still waiting on OpenAI stays. A job runs at start and every five minutes, removing 500 rows at
+  most a run (6 to 29 ms measured on a 190,000-row file on disk; 10,000 rows in one run held the server's
+  event loop about 400 ms, F710), and runs again at once while a backlog is left, the server free
   between runs. A verdict removed by the cap before its 180 days makes an edit of its line unknown:
   the edit is hidden (`unknown_edit`), with no strike.
 - **The alerts** `verdicts_near_cap` and `database_near_cap` fire once when the verdicts reach 80% of
