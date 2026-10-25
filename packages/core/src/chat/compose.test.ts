@@ -10,8 +10,13 @@ const NICK = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const PROPERTY = { seed: 20261017, numRuns: 300 };
 // What an account's line may hold: 510 less the 68 bytes Ergo puts before it as it relays it.
 const BUDGET = LINE_BYTES - relayOf(NICK);
-// An ASCII line's bytes are its length; any other line says its own.
-const sent = (line: string, left = BUDGET - line.length) => ({ kind: "line", line, left });
+// An ASCII line's bytes are its length; any other line says its own. Its text is what the room reads: an action's
+// words, without the CTCP around them.
+const sent = (line: string, left = BUDGET - line.length) => {
+  const said = line.slice(line.indexOf(" :") + 2);
+  const action = /^\u0001ACTION (.*)\u0001$/su.exec(said)?.[1];
+  return { kind: "line", line, left, text: action ?? said, action: action !== undefined };
+};
 // The line as Ergo relays it, its cloak 13 characters and the network's name (deploy/ergo/ircd.yaml.tmpl).
 const relayed = (nick: string, line: string) => `:${nick}!~u@${"a".repeat(13)}.gnoworld ${line}`;
 

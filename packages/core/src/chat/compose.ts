@@ -21,9 +21,10 @@ export function relayOf(nick: string): number {
 /** The commands a draft may lead with: `/me` sends an action. */
 export const COMMANDS: readonly string[] = ["/me"];
 
-/** A draft, composed: the line to send and the bytes it leaves, or why there is none. */
+/** A draft, composed: the line to send, the bytes it leaves and its text as the room reads it (an action's words,
+ * the action said apart), or why there is none. */
 export type Composed =
-  | { kind: "line"; line: string; left: number }
+  | { kind: "line"; line: string; left: number; text: string; action: boolean }
   | { kind: "empty" }
   | { kind: "unknown"; command: string }
   | { kind: "long"; over: number };
@@ -32,17 +33,16 @@ export type Composed =
 export function compose(room: string, draft: string, nick: string): Composed {
   const text = draft.replaceAll(/\p{Cc}/gu, " ").trim();
   const word = /^\/\S*/u.exec(text)?.[0];
-  if (word === undefined) return said(room, nick, text);
-  if (word.startsWith("//")) return said(room, nick, text.slice(1));
+  if (word === undefined) return said(room, nick, { text, action: false });
+  if (word.startsWith("//")) return said(room, nick, { text: text.slice(1), action: false });
   const command = word.toLowerCase();
   if (command !== "/me") return { kind: "unknown", command };
-  const action = text.slice(command.length).trim();
-  return action === "" ? { kind: "empty" } : said(room, nick, `\u0001ACTION ${action}\u0001`);
+  return said(room, nick, { text: text.slice(command.length).trim(), action: true });
 }
 
-function said(room: string, nick: string, text: string): Composed {
+function said(room: string, nick: string, { text, action }: { text: string; action: boolean }): Composed {
   if (text === "") return { kind: "empty" };
-  const line = `PRIVMSG ${room} :${text}`;
+  const line = `PRIVMSG ${room} :${action ? `\u0001ACTION ${text}\u0001` : text}`;
   const left = LINE_BYTES - relayOf(nick) - bytes(line);
-  return left < 0 ? { kind: "long", over: -left } : { kind: "line", line, left };
+  return left < 0 ? { kind: "long", over: -left } : { kind: "line", line, left, text, action };
 }
