@@ -7,7 +7,7 @@ import { COMMANDS, compose, type Composed } from "@gnoworld/core";
 import { Button, Cluster, Field, IconButton, Sidebar, Stack, type FieldProps, type IconName } from "@gnoworld/ui";
 import { useLayoutEffect, useRef, useState, type KeyboardEvent, type SubmitEvent } from "react";
 import { completed, completions, type Completion } from "./complete.ts";
-import { formatted, type Format } from "./format.ts";
+import { formatted, type Edit, type Format } from "./format.ts";
 import { Message } from "./Message.tsx";
 import { roomLabel, shortAddress } from "./names.ts";
 import styles from "./Composer.module.css";
@@ -69,36 +69,37 @@ export function Composer({ room, nick, rooms, people, onSay }: ComposerProps) {
   const [draft, setDraft] = useState("");
   const [failed, setFailed] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
-  // The selection a format leaves, put back in the box once it shows the new draft.
-  const selectionRef = useRef<{ start: number; end: number }>(undefined);
+  // The selection an edit leaves, put back in the box once it shows the new draft.
+  const selectionRef = useRef<Edit>(undefined);
   const label = roomLabel(room);
   const composed = compose(room, draft, nick);
   const completion = completions(draft, { commands: COMMANDS, rooms, people });
+  const box = () => formRef.current?.querySelector("input") ?? undefined;
   useLayoutEffect(() => {
     const selection = selectionRef.current;
+    if (selection === undefined) return;
     selectionRef.current = undefined;
-    const box = formRef.current?.querySelector("input");
-    if (selection === undefined || box === null || box === undefined) return;
-    box.focus();
-    box.setSelectionRange(selection.start, selection.end);
+    box()?.focus();
+    box()?.setSelectionRange(selection.start, selection.end);
   }, [draft]);
-  const format = (kind: Format) => {
-    const box = formRef.current?.querySelector("input");
-    const start = box?.selectionStart ?? draft.length;
-    const next = formatted({ text: draft, start, end: box?.selectionEnd ?? start }, kind);
-    selectionRef.current = { start: next.start, end: next.end };
+  // An edit of the format bar or of a completion: the new draft, its selection, and no line not sent any more.
+  const apply = (next: Edit) => {
+    selectionRef.current = next;
     setDraft(next.text);
+    setFailed(false);
+  };
+  const format = (kind: Format) => {
+    const start = box()?.selectionStart ?? draft.length;
+    apply(formatted({ text: draft, start, end: box()?.selectionEnd ?? start }, kind));
   };
   // Tab in the box takes the first completion while the caret ends the draft; else, and anywhere else in the form,
   // it moves on, as it always does.
   const complete = (event: KeyboardEvent<HTMLFormElement>) => {
-    const box = formRef.current?.querySelector("input");
-    if (event.key !== "Tab" || event.shiftKey || event.target !== box || completion === undefined) return;
-    if (box.selectionStart !== draft.length) return;
+    if (event.key !== "Tab" || event.shiftKey || completion === undefined) return;
+    const input = box();
+    if (event.target !== input || input.selectionStart !== draft.length) return;
     event.preventDefault();
-    const next = completed(draft, completion);
-    selectionRef.current = { start: next.start, end: next.end };
-    setDraft(next.text);
+    apply(completed(draft, completion));
   };
   const send = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
