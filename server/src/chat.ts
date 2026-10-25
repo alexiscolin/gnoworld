@@ -166,8 +166,9 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
           },
           onJoin: reconciler.joined,
           onChannels: unknownChannels(db, log),
-          onMessage: (said) => {
-            activity.count(said.room, said.account, now());
+          onMessage: (said, replayed) => {
+            // A line of a history page is no activity now, whatever its time.
+            if (!replayed) activity.count(said.room, said.account, now());
             progress.heard(said);
             // A line the full queue drops is left unchecked, with the alert.
             if (!queue.push(said)) progress.settled(said);

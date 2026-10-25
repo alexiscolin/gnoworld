@@ -111,6 +111,26 @@ describe("the IRC link", () => {
     ]);
   });
 
+  it("says which lines a history page brought: none live, none of a batch it never opened", async () => {
+    const ergo = await fakeErgo();
+    const seen: [string, boolean][] = [];
+    start(ergo.port, { onMessage: ({ msgid }, replayed) => seen.push([msgid, replayed]) });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    peer.say(":ergo.test BATCH +h chathistory #bubble");
+    peer.say(message("batch=h;account=g1a;msgid=m1", "a!u@h", ["#bubble", "said before"]));
+    peer.say(":ergo.test BATCH -h");
+    peer.say(message("batch=zz;account=g1a;msgid=m2", "a!u@h", ["#bubble", "no such batch"]));
+    peer.say(message("account=g1a;msgid=m3", "a!u@h", ["#bubble", "live"]));
+    await expect
+      .poll(() => seen)
+      .toEqual([
+        ["m1", true],
+        ["m2", false],
+        ["m3", false],
+      ]);
+  });
+
   it("reads past hostile lines and stays up: a NUL, a line over its limit, no command, garbage", async () => {
     const ergo = await fakeErgo();
     const { said } = start(ergo.port);

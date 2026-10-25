@@ -13,7 +13,8 @@ export interface Options {
   port: number;
   password: string;
   rooms: () => readonly string[];
-  onMessage: (said: Said) => void;
+  // `replayed`: the line came in a history page, so it counts as no activity now.
+  onMessage: (said: Said, replayed: boolean) => void;
   log: Log;
   retryMs?: (attempt: number) => number;
   pingMs?: number;
@@ -117,7 +118,7 @@ export function reader(options: Options, state: State) {
         if (!Number.isNaN(Date.parse(time))) batch.last = time;
       }
       const heard = said(message, state.joined);
-      if (heard !== undefined) onMessage(heard);
+      if (heard !== undefined) onMessage(heard, batch !== undefined);
     },
   };
   return (s: Socket, message: IrcMessage): void => {

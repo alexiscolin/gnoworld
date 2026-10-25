@@ -100,6 +100,10 @@ describe("the chat, as the server starts it", () => {
     const { rooms } = setup({ worlds: worlds("bubble"), ergo: ergoAt, moderation: OFF }, { now: () => clock.now });
     const peer = await ergo.peer(0);
     await welcome(peer);
+    // A line of a history page counts nothing now, however recent its time (the max review).
+    peer.say(":ergo.test BATCH +h chathistory #bubble");
+    peer.say(message("batch=h;account=g1a;msgid=m0", "a!u@h", ["#bubble", "said before"]));
+    peer.say(":ergo.test BATCH -h");
     peer.say(message("account=g1a;msgid=m1", "a!u@h", ["#bubble", "hi"]));
     const rate = (perMinute: number) => JSON.stringify({ rooms: [{ world: "bubble", room: "#bubble", perMinute }] });
     await expect.poll(() => rooms("bubble")).toBe(rate(0.2));
