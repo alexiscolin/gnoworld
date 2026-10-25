@@ -242,6 +242,12 @@ costs context in every session: `chrome-devtools-mcp` (1b), `frontend-design` (2
 
 ## Speed and cost
 
+Measured on this machine (16 cores), 2026-10-25, at slice 4's harness merge, the same tree
+before and after: the fast gate went from 59 s, its steps one after another, to 26 to 31 s for
+everything in five lanes (Vitest's 26 s the longest, `chat.test.ts` alone 22 s of it); a change of
+the app or the design system 11 to 12 s, of a realm 4 s, of the server 25 s (every test). The
+harness mutation: 596 mutants in 793 s on four shards. Earlier measures:
+
 Measured on this machine, 2026-10-18: the fast gate 19 to 24 s (budget 60 s), the app's
 build and its 18 journeys included; the full gate 263 s, with the harness mutation proving
 255 guards, then 343 s for 308 guards once F076 was built, and 1079 s for 388 once F129 was;
