@@ -296,7 +296,7 @@ describe("the reconciler's pass", () => {
     for (const bot of ["@", "~", "&", "~@+"]) expect(out(bot)).toEqual(rest);
   });
 
-  it("puts each room's flags on at once, before any state is read, an open room's -i too: Ergo makes a room +i", () => {
+  it("puts each room's flags on at once, before any state is read: a room Ergo lost is closed from its JOIN", () => {
     const sent: string[] = [];
     let asked = 0;
     const reconciler = makeReconciler({
@@ -310,10 +310,43 @@ describe("the reconciler's pass", () => {
       log: quiet,
     });
     reconciler.flags();
-    expect([sent, asked]).toEqual([
-      ["SAMODE #a +M", "SAMODE #a +i", "SAMODE #a +s", "SAMODE #b +M", "SAMODE #b -i"],
-      0,
+    expect([sent, asked]).toEqual([["SAMODE #a +M", "SAMODE #a +i", "SAMODE #a +s", "SAMODE #b +M"], 0]);
+  });
+
+  it("raises the alert for a members room the roles file made open, its flags put on first (the max review)", async () => {
+    const lines: string[] = [];
+    // Ergo's room, as the bot's commands change it.
+    const room = state({ flags: "Mint", invites: ["g1a"] });
+    const reconciler = makeReconciler({
+      rooms: () => ["#crew"],
+      desired: () => OPEN,
+      state: () => Promise.resolve({ ...room }),
+      send: (command, [, mode]) => {
+        if (command === "SAMODE" && mode === "-i") room.flags = room.flags.replace("i", "");
+        return true;
+      },
+      log: logger("a-pepper-of-forty-characters-0123456789", (line) => lines.push(line)),
+    });
+    reconciler.flags();
+    await reconciler.pass();
+    expect(lines.filter((line) => line.includes('"event":"alert"'))).toEqual([
+      expect.stringContaining('"error":"room_opened","room":"#crew"'),
     ]);
+  });
+
+  it("opens with no alert an open room Ergo has just made invite-only, with no invite list (the max review)", async () => {
+    const lines: string[] = [];
+    const sent: string[] = [];
+    const reconciler = makeReconciler({
+      rooms: () => ["#earth"],
+      desired: () => OPEN,
+      state: () => Promise.resolve(state({ flags: "CMint" })),
+      send: (command, params) => sent.push([command, ...params].join(" ")) > 0,
+      log: logger("a-pepper-of-forty-characters-0123456789", (line) => lines.push(line)),
+    });
+    await reconciler.pass();
+    expect(sent).toEqual(["SAMODE #earth -i"]);
+    expect(lines.filter((line) => line.includes('"event":"alert"'))).toEqual([]);
   });
 
   it("runs a pass after one that found no room", async () => {

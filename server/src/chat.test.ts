@@ -942,9 +942,7 @@ describe("the chat, as the server starts it", () => {
       peer.say(":ergo.test 324 gnoworld #bubble +nt");
       peer.say(":ergo.test 347 gnoworld #bubble :End");
       peer.say(":ergo.test 366 gnoworld #bubble :End");
-      await expect
-        .poll(() => flags(peer.lines))
-        .toEqual(["SAMODE #bubble +M", "SAMODE #bubble -i", "SAMODE #bubble +M"]);
+      await expect.poll(() => flags(peer.lines)).toEqual(["SAMODE #bubble +M", "SAMODE #bubble +M"]);
       chat.rooms.create("bubble", "old");
       chat.rooms.archive("bubble", "old");
       peer.socket.destroy();
@@ -957,10 +955,8 @@ describe("the chat, as the server starts it", () => {
         again.say(`:ergo.test 366 gnoworld ${room} :End`);
       }
       const each = ["SAMODE #bubble +M", "SAMODE #bubble/old +M", "SAMODE #bubble/old +m", "SAMODE #bubble/old +s"];
-      // With the JOINs, before any state is read, an open room's -i too; then the same but -i, since Ergo said
-      // none was on.
-      const first = ["SAMODE #bubble +M", "SAMODE #bubble -i", ...each.slice(1), "SAMODE #bubble/old -i"];
-      await expect.poll(() => flags(again.lines)).toEqual([...first, ...each]);
+      // With the JOINs, before any state is read; then the same, since Ergo said none was on.
+      await expect.poll(() => flags(again.lines)).toEqual([...each, ...each]);
       expect(again.lines.indexOf("SAMODE #bubble/old +s")).toBeLessThan(again.lines.indexOf("MODE #bubble"));
     });
 
@@ -1109,7 +1105,6 @@ describe("the chat, as the server starts it", () => {
         ]);
       expect(peer.lines.filter((l) => /^SAMODE #bubble [+-][^b]/.test(l))).toEqual([
         "SAMODE #bubble +M",
-        "SAMODE #bubble -i",
         "SAMODE #bubble +M",
       ]);
     });

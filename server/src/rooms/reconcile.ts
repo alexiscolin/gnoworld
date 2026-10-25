@@ -72,8 +72,8 @@ export interface Reconciler {
   // Someone else joined a room: only a room whose type voices someone has a change to make (F582).
   joined: (room: string) => void;
   // Each room's flags put on at once, before any state is read: sent with the link's JOINs, a room Ergo
-  // lost and the bot makes again is closed from its first line (Ergo keeps a channel's history). Ergo makes
-  // every room invite-only (+i, default-modes): an open one is opened here, so no room_opened alert follows.
+  // lost and the bot makes again is closed from its first line (Ergo keeps a channel's history). An open
+  // room, which Ergo makes invite-only too (+i, default-modes), is opened by the pass, which then sees it.
   flags: () => void;
 }
 
@@ -88,8 +88,9 @@ export function makeReconciler({ rooms, desired, state, send, log }: Options): R
     const sent = changes(room, now, desired(room)).filter(([command, ...params]) => send(command, params));
     if (sent.length === 0) return;
     log("room_reconciled", { room });
-    // A room the file made open, or no longer names, loses its invite-only flag: its history opens with it.
-    if (sent.some(([command, , flag]) => command === "SAMODE" && flag === "-i")) {
+    // A room the file made open, or no longer names, loses its invite-only flag: its history opens with it. One
+    // Ergo just made holds no invite list (+i is its default): opening it is no news.
+    if (now.invites.length > 0 && sent.some(([command, , flag]) => command === "SAMODE" && flag === "-i")) {
       log("alert", { error: "room_opened", room });
     }
   };
@@ -115,11 +116,7 @@ export function makeReconciler({ rooms, desired, state, send, log }: Options): R
   return {
     ask,
     flags: () => {
-      for (const room of rooms()) {
-        const { modes } = desired(room);
-        for (const flag of modes) send("SAMODE", [room, `+${flag}`]);
-        if (!modes.includes("i")) send("SAMODE", [room, "-i"]);
-      }
+      for (const room of rooms()) for (const flag of desired(room).modes) send("SAMODE", [room, `+${flag}`]);
     },
     // ponytail: a JOIN reads the whole room again (10,000 people at most, a few ms); voice the joiner alone
     // if busy rooms that voice grow.
