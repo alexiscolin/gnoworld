@@ -48,6 +48,14 @@ describe("the store's chat slice", () => {
     expect(Object.keys(store.getState().chat.rooms)).toEqual(["#bubble"]);
   });
 
+  it("follows a new set of rooms of the same size and first room", () => {
+    const store = createAppStore();
+    const { follow } = store.getState().chatActions;
+    follow(["#bubble", "#bubble/games"]);
+    follow(["#bubble", "#bubble/news"]);
+    expect(Object.keys(store.getState().chat.rooms)).toEqual(["#bubble", "#bubble/news"]);
+  });
+
   it("keeps what it holds of a room it still follows", () => {
     const t = following();
     t.heard(said("#bubble", "a", "hello"));

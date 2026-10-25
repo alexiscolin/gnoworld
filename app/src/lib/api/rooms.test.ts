@@ -97,6 +97,15 @@ describe("a world's rooms, from the server", () => {
     expect(await server(json(200, answer)).api.rooms("bubble")).toEqual({ ok: false, reason: "malformed" });
   });
 
+  // http.ts's: a server's failure with no code of its own is the server unavailable; a client's, malformed.
+  it.each([
+    [500, "unavailable"],
+    [499, "malformed"],
+  ])("reads a %i with no JSON as %s", async (status, reason) => {
+    const fetcher: Fetcher = () => Promise.resolve(new Response("oops", { status }));
+    expect(await roomsApi(fetcher).rooms("bubble")).toEqual({ ok: false, reason });
+  });
+
   it.each([
     [json(404, { error: "not_found" }), "not_found"],
     [json(429, { error: "too_many" }), "too_many"],

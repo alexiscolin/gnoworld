@@ -153,6 +153,30 @@ describe("RoomView", () => {
   });
 
   it.each([
+    [2, ""],
+    [100, ""],
+    [101, "and 1 more"],
+  ])("names %i people, and says how many more only past the hundredth", (count, more) => {
+    const members = Array.from({ length: count }, (_, n) => `guest-${String(n).padStart(6, "0")}`);
+    const html = part(view({ state: { ...ROOM, members } }), "Who's here");
+    expect(/and \d+ more/.exec(said(html))?.[0] ?? "").toBe(more);
+  });
+
+  it("says no empty room when it holds lines", () => {
+    expect(said(view())).not.toContain("No messages yet.");
+  });
+
+  it("names who is here as such while it is not connected", () => {
+    expect(view({ chat: "waiting" })).toMatch(/<h3[^>]*>Who&#x27;s here<\/h3>/);
+  });
+
+  // The words a reader gets, the markup taken off with nothing in its place.
+  it("puts a space between a line's time, author and text", () => {
+    const [item = ""] = [...part(view(), "Messages").matchAll(/<li[^>]*>(.*?)<\/li>/gs)].map((m) => m[1] ?? "");
+    expect(item.replaceAll(/<[^>]+>/g, "")).toMatch(/^\d{2}:\d{2} g10gh7…3y5tv hello$/);
+  });
+
+  it.each([
     ["connecting", "Connecting to the chat…"],
     ["waiting", "The chat is out of reach. Trying again…"],
     ["off", "Connecting to the chat…"],

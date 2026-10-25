@@ -319,6 +319,33 @@ describe("connectErgo's handshake", () => {
     expect(t.backoffs()).toHaveLength(1);
   });
 
+  // Each step moves on its own line alone: a line of another step, or none, sends nothing (pre-merge 4b).
+  it("sends its ticket on Ergo's AUTHENTICATE + alone, never on another line after the ACK", async () => {
+    const t = setup();
+    await t.settle();
+    const s = t.last();
+    s.open();
+    ack(s);
+    const before = [...s.sent];
+    s.say(":ergo NOTICE * :x");
+    s.say("AUTHENTICATE abc");
+    s.say(":ergo 900 + :x");
+    expect(s.sent).toEqual(before);
+  });
+
+  it("registers on Ergo's 903 alone, never on another line after the ticket", async () => {
+    const t = setup();
+    await t.settle();
+    const s = t.last();
+    s.open();
+    ack(s);
+    plus(s);
+    const before = [...s.sent];
+    s.say(":ergo NOTICE * :x");
+    s.say(":ergo 900 x :ok");
+    expect(s.sent).toEqual(before);
+  });
+
   it("waits once when the nick, its address, is taken by another client of the account (433)", async () => {
     const t = setup();
     await t.settle();

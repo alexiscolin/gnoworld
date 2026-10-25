@@ -438,6 +438,23 @@ describe("the chat's link: the history of the room in view", () => {
   });
 });
 
+describe("the chat's link: lines of mine that are no JOIN", () => {
+  it.each([
+    ["a line of mine", `@msgid=a;time=${T0} :${GUEST}!u@h PRIVMSG #a :hi`],
+    ["a MODE of mine", `:${GUEST}!u@h MODE #a +i`],
+  ])("asks no history for %s in a room it sent a JOIN for", (_, text) => {
+    const t = guestIn(["#a"]);
+    t.fake.line(text);
+    expect(t.fake.sent).toEqual(["JOIN #a"]);
+  });
+
+  it("joins nothing when it connects following no room", () => {
+    const t = setup();
+    t.signedOut();
+    expect(t.connected().sent).toEqual([]);
+  });
+});
+
 describe("the chat's link: what Ergo says", () => {
   it(`asks a room's newest ${String(HISTORY_LINES)} lines when Ergo says I joined it`, () => {
     expect(HISTORY_LINES).toBe(200);
