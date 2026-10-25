@@ -4,7 +4,7 @@ import { z } from "zod";
 
 export { ActivityRooms } from "./activity.ts";
 export { Address, ADDRESS_PROBLEMS, toAddress, type AddressProblem } from "./address.ts";
-export { CreateRoom, MadeRoom, RoomName } from "./rooms.ts";
+export { CreateRoom, MadeRoom, RoomId, RoomList, RoomName, RoomType } from "./rooms.ts";
 export { StreamEvent } from "./stream.ts";
 export { Challenge, ChallengeRequest, Me, Nonce, Proof, Ticket, TicketRequest, VerifyRequest } from "./login.ts";
 

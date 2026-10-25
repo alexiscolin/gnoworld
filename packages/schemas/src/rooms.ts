@@ -9,5 +9,28 @@ export const RoomName = Slug.max(32);
 export const CreateRoom = z.strictObject({ world: Slug, name: RoomName });
 export type CreateRoom = z.infer<typeof CreateRoom>;
 
-export const MadeRoom = z.strictObject({ room: z.string() });
+/** A room as the server and Ergo name it: #<world>, a world's main room, or #<world>/<name>; 64 characters at most. */
+export const RoomId = z
+  .string()
+  .max(64)
+  .regex(/^#[a-z0-9]+(-[a-z0-9]+)*(\/[a-z0-9]+(-[a-z0-9]+)*)?$/);
+
+// F671: the room made, read by the client as a room's id.
+export const MadeRoom = z.strictObject({ room: RoomId });
 export type MadeRoom = z.infer<typeof MadeRoom>;
+
+export const RoomType = z.enum(["open", "announcement", "accounts", "members", "members-write"]);
+
+/** A world's rooms a reader may see, in the sections its moderators set (roles file), null naming the rest. */
+export const RoomList = z.object({
+  world: Slug,
+  sections: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(64).nullable(),
+        rooms: z.array(z.object({ room: RoomId, type: RoomType })).max(500),
+      }),
+    )
+    .max(50),
+});
+export type RoomList = z.infer<typeof RoomList>;
