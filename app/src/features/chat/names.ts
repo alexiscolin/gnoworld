@@ -17,6 +17,12 @@ export function roomHref(room: string): string {
   return name === undefined ? `/w/${world}` : `/w/${world}?room=${name}`;
 }
 
+/** A room's search on its world's page: ?room=<name>, or none for the main room. */
+export function roomParams(room: string): URLSearchParams {
+  const { name } = partsOf(room);
+  return new URLSearchParams(name === undefined ? {} : { room: name });
+}
+
 // A room id's world and name: #<world>, or #<world>/<name>.
 function partsOf(room: string): { world: string; name: string | undefined } {
   const [world = "", name] = room.slice(1).split("/");

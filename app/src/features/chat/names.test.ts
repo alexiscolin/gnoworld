@@ -1,6 +1,6 @@
 import { Address } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
-import { neighbour, peopleOf, roomHref, roomLabel, roomsQuery, shortAddress, shownRoom } from "./names.ts";
+import { neighbour, peopleOf, roomHref, roomLabel, roomParams, roomsQuery, shortAddress, shownRoom } from "./names.ts";
 
 const open = (...rooms: string[]) => rooms.map((room) => ({ room, type: "open" as const }));
 const SECTIONS = [
@@ -87,5 +87,12 @@ describe("the people a mention completes to", () => {
   const OTHER = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
   it("are the room's other accounts, each once: not oneself, a guest's nick or the bot", () => {
     expect(peopleOf([SELF, "guest-abcdef", OTHER, "gnoworld", OTHER], SELF)).toStrictEqual([OTHER]);
+  });
+});
+
+describe("a room's search on its world's page", () => {
+  it("names a room by ?room=<name>, and the main room by none", () => {
+    expect(roomParams("#bubble/games").toString()).toBe("room=games");
+    expect(roomParams("#bubble").toString()).toBe("");
   });
 });

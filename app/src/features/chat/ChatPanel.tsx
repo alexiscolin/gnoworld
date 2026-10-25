@@ -15,7 +15,7 @@ import type { AppState } from "../../store/index.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
 import { chatLink } from "./link.ts";
 import { LOADING } from "./Loading.tsx";
-import { neighbour, roomHref, roomIds, roomLabel, roomsQuery, shownRoom } from "./names.ts";
+import { neighbour, roomIds, roomLabel, roomParams, roomsQuery, shownRoom } from "./names.ts";
 import { RoomsView } from "./RoomsView.tsx";
 import { RoomView, type RoomViewProps } from "./RoomView.tsx";
 
@@ -46,8 +46,7 @@ function useRoomKeys(rooms: readonly string[], current: string | undefined) {
       if (next === undefined) return;
       event.preventDefault();
       fromRef.current = next;
-      // The same world's page: its room alone changes, as ?room=<name>, or none for the main room.
-      setParams(new URLSearchParams(roomHref(next).split("?")[1] ?? ""));
+      setParams(roomParams(next));
     };
     window.addEventListener("keydown", go);
     return () => {

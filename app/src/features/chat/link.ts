@@ -3,7 +3,7 @@
 // (Ergo's max-channels-per-client); the newest lines of the room in view alone, once Ergo says I joined it, since
 // Ergo paces a client to 2 lines a second (plan §4); Ergo's lines read into the store through one BatchReader a
 // connection. Its parts come in, so the tests give their own.
-import { BatchReader, compose, nickOf, type IrcMessage } from "@gnoworld/core";
+import { BatchReader, compose, LINE_BYTES, nickOf, type IrcMessage } from "@gnoworld/core";
 import { RoomId } from "@gnoworld/schemas";
 import type { Result } from "../../lib/api/http.ts";
 import type { Ergo, ErgoOptions, Who } from "../../lib/ergo/ergo.ts";
@@ -14,7 +14,6 @@ import type { AppState, createAppStore } from "../../store/index.ts";
 export const ROOMS_JOINED = 100;
 /** The lines a room's history asks: the store's window. */
 export const HISTORY_LINES = LINES_KEPT;
-const LINE_BYTES = 510;
 
 export interface LinkDeps {
   store: ReturnType<typeof createAppStore>;
