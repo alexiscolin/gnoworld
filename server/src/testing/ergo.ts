@@ -181,9 +181,9 @@ function writeAuthScript(dir: string, script: ErgoOptions["authScript"], operPas
   const body =
     typeof script === "object"
       ? FORWARD.replace("PORT", String(script.forward))
-      : AUTH_SCRIPT.replace("LOG", JSON.stringify(join(dir, "auth-in.log"))).replace(
-          "OPER",
-          JSON.stringify(operPassword),
+      : // The password first, then the folder, which might spell OPER; each as it is, no $ pattern read.
+        AUTH_SCRIPT.replace("OPER", () => JSON.stringify(operPassword)).replace("LOG", () =>
+          JSON.stringify(join(dir, "auth-in.log")),
         );
   writeFileSync(path, `#!${process.execPath}\n${body}`);
   chmodSync(path, 0o755);
