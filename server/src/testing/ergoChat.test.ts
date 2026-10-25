@@ -20,7 +20,8 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     await join(bob, "#bubble");
     const clean = await say(alice, "#bubble", "hello");
     const flagged = await say(alice, "#bubble", "I will hurt you");
-    await bob.expect(new RegExp(` REDACT #bubble ${flagged} violence`));
+    // The bot's verdict, which the full gate's load slows past the 2 s a line's echo takes.
+    await bob.expect(new RegExp(` REDACT #bubble ${flagged} violence`), 10_000);
     await alice.expect(
       new RegExp(
         `NOTICE ${author} :Your message in #bubble was hidden: violence\\. The rules: https://gno\\.world/rules`,
