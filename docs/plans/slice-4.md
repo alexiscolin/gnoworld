@@ -66,10 +66,7 @@ renderer, embeds, `csp.ts`, `sw/*`, `server/src/login`, `deploy/`.
   than `minimumReleaseAge`, so an older 3.x, or our own window of a fixed line height.
 - `emojibase-data` 18.0.0 (2026-10-16, no dependency): the emoji picker's data, 4c.
 
-## 10. Questions for Alexis
-1. Three chains side by side, B and C from the start: yes? (the 5x needs it)
-2. `core/markdown` in core, written by you, before 4c: yes, and which Markdown subset (bold, italic, code, quote,
-   lists, links; no headings, no images)?
-3. A virtual list package, or our own window?
-4. Docker in the CI now, for 4s's `deploy/` changes and its 82 mutants, or on your host again?
-5. Is the row too large for one slice? I propose 4a-4c as slice 4, 4d-4g as slice 4' (same chains).
+## 10. Answered (docs/decisions.md, 2026-10-25)
+No pairing: Claude writes `core/markdown` and F667, F669. The three chains run side by side. `window.adena` alone;
+our own history window; the Markdown subset of §3; Docker on Alexis's host; the emoji data asked in 4c; the row kept
+whole.
