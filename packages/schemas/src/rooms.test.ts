@@ -111,7 +111,7 @@ describe("a world's rooms", () => {
     ["an empty section name", { world: "bubble", sections: [{ name: "", rooms: [] }] }],
     ["a section name past 64", { world: "bubble", sections: [{ name: "s".repeat(65), rooms: [] }] }],
     ["a world that is no slug", { world: "Bubble", sections: [] }],
-    ["51 sections", { world: "bubble", sections: Array.from({ length: 51 }, () => ({ name: null, rooms: [] })) }],
+    ["52 sections", { world: "bubble", sections: Array.from({ length: 52 }, () => ({ name: null, rooms: [] })) }],
     [
       "501 rooms in a section",
       {
