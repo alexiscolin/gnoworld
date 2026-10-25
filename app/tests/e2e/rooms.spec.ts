@@ -63,6 +63,18 @@ function nextHistory(page: Page): Promise<void> {
   });
 }
 
+// The guest nicks the page's chat sends, the last its own (a 433 draws another).
+function guestNicks(page: Page): string[] {
+  const nicks: string[] = [];
+  page.on("websocket", (socket) => {
+    socket.on("framesent", ({ payload }) => {
+      const nick = /^NICK (guest-[a-z0-9]{6})$/.exec(String(payload))?.[1];
+      if (nick !== undefined) nicks.push(nick);
+    });
+  });
+  return nicks;
+}
+
 const roomsNav = (page: Page) => page.getByRole("navigation", { name: "Rooms" });
 const messages = (page: Page) => page.getByRole("list", { name: "Messages" });
 const lineOf = (page: Page, text: string) => messages(page).getByRole("listitem").filter({ hasText: text });
@@ -86,6 +98,7 @@ test.describe("a world's rooms", () => {
     await say(page, { address, room: "#bubble/games" }, [history]);
     await page.getByRole("button", { name: "Log out" }).click();
     await expect(page.getByRole("button", { name: "Log in with Adena" })).toBeVisible();
+    const nicks = guestNicks(page);
     await page.goto("/w/bubble?room=games");
     await hydrated(page);
     await expect(roomsNav(page).getByRole("heading")).toHaveText(["Talk", "Other rooms"]);
@@ -95,7 +108,9 @@ test.describe("a world's rooms", () => {
     await expect(lineOf(page, history)).toHaveCount(1);
     await expect(lineOf(page, history)).toContainText(`${address.slice(0, 6)}…${address.slice(-5)}`);
     await expect(whoIsHere(page)).toContainText(/\b[1-9]\d* here/);
-    await expect(whoIsHere(page)).toContainText(/guest-[a-z0-9]{6} \(guest\)/);
+    await expect.poll(() => nicks.length).toBeGreaterThan(0);
+    await expect(whoIsHere(page).getByText(`${nicks.at(-1) ?? ""} (guest)`, { exact: true })).toBeVisible();
+    await expect(whoIsHere(page).getByTitle(address)).toHaveCount(0);
     await expect(whoIsHere(page)).not.toContainText("gnoworld");
   });
 
@@ -182,9 +197,46 @@ test.describe("a world's rooms", () => {
 
   test("connects again as a guest when its account logs out on the world's page", async ({ page }) => {
     const address = await inGames(page);
+    const nicks = guestNicks(page);
     await page.getByRole("button", { name: "Log out" }).click();
-    await expect(whoIsHere(page)).toContainText(/guest-[a-z0-9]{6} \(guest\)/);
+    await expect(page.getByRole("button", { name: "Log in with Adena" })).toBeVisible();
+    await expect(roomsNav(page).getByRole("link")).toHaveText(["#games", "#bubble", "#news"]);
+    await expect(heading(page, "#games")).toBeVisible();
+    await expect.poll(() => nicks.length).toBeGreaterThan(0);
+    await expect(whoIsHere(page).getByText(`${nicks.at(-1) ?? ""} (guest)`, { exact: true })).toBeVisible();
     await expect(whoIsHere(page).getByTitle(address)).toHaveCount(0);
+  });
+
+  test("leaves Ergo when the page leaves the world", async ({ page }) => {
+    let closed = false;
+    page.on("websocket", (socket) => {
+      socket.on("close", () => (closed = true));
+    });
+    await page.goto("/w/bubble?room=games");
+    await hydrated(page);
+    await expect(whoIsHere(page)).toContainText(/\b[1-9]\d* here/);
+    await page.getByRole("link", { name: "gno.world" }).click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect.poll(() => closed).toBe(true);
+  });
+
+  test("says the rooms could not load, and tries again on asking", async ({ page }) => {
+    await page.route("**/api/rooms*", (route) => route.abort());
+    await page.goto("/w/bubble");
+    await hydrated(page);
+    await expect(page.getByRole("alert").filter({ hasText: "The rooms could not load." })).toBeVisible();
+    await page.unroute("**/api/rooms*");
+    await page.getByRole("button", { name: "Try again" }).click();
+    await expect(roomsNav(page).getByRole("link")).toHaveCount(3);
+  });
+
+  test("asks the chat's code once the page runs: the built page names none of it", async ({ page }) => {
+    const built = await (await page.request.get("/w/bubble")).text();
+    expect(built).not.toMatch(/ChatPanel-[\w-]+\.js/);
+    const asked = page.waitForRequest(/\/assets\/ChatPanel-[\w-]+\.js$/);
+    await page.goto("/w/bubble");
+    await asked;
+    await expect(roomsNav(page)).toBeVisible();
   });
 
   test("has no accessibility violation once its rooms, lines and people are shown (axe)", async ({ page }) => {
