@@ -1,0 +1,156 @@
+// A room as Ergo's lines make it (slice 4's 4b): its lines, in time order, each once and the newest kept;
+// who is here; its description, which is its IRC topic (docs/decisions.md, 2026-10-25). Each function
+// gives back what it was given when a line changes nothing, so a view need not draw again.
+import type { IrcMessage } from "../irc/irc.ts";
+
+/** One line of a room, as Ergo marked it. */
+export interface Line {
+  /** Ergo's msgid: what a reconnect's history dedupes on, and what a REDACT names. */
+  readonly id: string;
+  /** Ergo's server-time, in its one form: 2026-10-25T10:00:00.000Z. */
+  readonly time: string;
+  /** The author's nick, from the line's source. */
+  readonly from: string;
+  /** The account Ergo vouches for, from its account tag; a guest has none. */
+  readonly account?: string;
+  readonly text: string;
+  readonly kind: "message" | "notice" | "action";
+}
+
+// Ergo folds A to Z alone (casemapping ascii, deploy/ergo/ircd.yaml.tmpl).
+const fold = (name: string): string => name.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
+const sameRoom = (name: string, room: string): boolean => fold(name) === fold(room);
+// The nick of a source: nick!user@host, nick@host, or a nick alone.
+const nickOf = (source: string): string => source.replace(/[!@].*$/s, "");
+const compare = (one: string, other: string): number => (one < other ? -1 : one > other ? 1 : 0);
+
+// A time Ergo writes, on a day that exists: the string reads back as itself.
+function isTime(text: string): boolean {
+  if (!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(text)) return false;
+  const date = new Date(text);
+  return !Number.isNaN(date.getTime()) && date.toISOString() === text;
+}
+
+// A PRIVMSG's text as a line: an /me (CTCP ACTION, its closing mark optional) is an action; any other
+// CTCP is no line. A NOTICE that starts as a CTCP is a CTCP's answer: no line either.
+function said(command: string, text: string): Pick<Line, "kind" | "text"> | undefined {
+  if (!text.startsWith("\u0001")) return { kind: command === "NOTICE" ? "notice" : "message", text };
+  const action = /^ACTION (.+)$/s.exec(text.slice(1).replace(/\u0001$/, ""))?.[1];
+  return command === "PRIVMSG" && action !== undefined ? { kind: "action", text: action } : undefined;
+}
+
+// The id and the time Ergo set, each in its one form, or none.
+function stamp(tags: IrcMessage["tags"]): Pick<Line, "id" | "time"> | undefined {
+  const [id = "", time = ""] = [tags.get("msgid"), tags.get("time")];
+  return /^[^\s,]+$/.test(id) && isTime(time) ? { id, time } : undefined;
+}
+
+// The text a PRIVMSG or a NOTICE sends to this room, or none.
+function textTo({ command, params }: IrcMessage, room: string): string | undefined {
+  const [target = "", text = ""] = params;
+  const sent = (command === "PRIVMSG" || command === "NOTICE") && params.length === 2;
+  return sent && sameRoom(target, room) && text !== "" ? text : undefined;
+}
+
+/** The room's line a message carries, or none: a PRIVMSG or NOTICE to this room with an id, a time and a
+ * text; a private message, another room's line or a malformed one is none. */
+export function lineOf(message: IrcMessage, room: string): Line | undefined {
+  const [text, marks, from] = [textTo(message, room), stamp(message.tags), nickOf(message.source ?? "")];
+  const body = text === undefined ? undefined : said(message.command, text);
+  if (marks === undefined || body === undefined || from === "") return undefined;
+  const account = message.tags.get("account") ?? "";
+  return { ...marks, from, ...(account === "" ? {} : { account }), ...body };
+}
+
+const byTimeThenId = (one: Line, other: Line): number => compare(one.time, other.time) || compare(one.id, other.id);
+
+/** The room's lines with these added: in time order, then by id, each id once, the newest `cap` kept. */
+export function addLines(lines: readonly Line[], incoming: readonly Line[], cap: number): readonly Line[] {
+  if (!Number.isInteger(cap) || cap < 1) throw new RangeError("addLines: the cap is a whole number, 1 or more");
+  const held = new Set(lines.map((line) => line.id));
+  const added = new Map<string, Line>();
+  for (const line of incoming) if (!held.has(line.id) && !added.has(line.id)) added.set(line.id, line);
+  if (added.size === 0) return lines;
+  const kept = [...lines, ...added.values()].sort(byTimeThenId).slice(-cap);
+  return kept.some((line) => !held.has(line.id)) ? kept : lines;
+}
+
+/** The room's lines without the one Ergo's REDACT hides (draft/message-redaction). */
+export function redactAfter(lines: readonly Line[], message: IrcMessage, room: string): readonly Line[] {
+  const [target = "", id = ""] = message.params;
+  if (message.command !== "REDACT" || !sameRoom(target, room)) return lines;
+  const kept = lines.filter((line) => line.id !== id);
+  return kept.length === lines.length ? lines : kept;
+}
+
+/** The room I look at, and my nick in it. */
+export interface Where {
+  readonly room: string;
+  readonly me: string;
+}
+
+const sorted = (nicks: Iterable<string>): readonly string[] => [...nicks].sort(compare);
+const without = (members: readonly string[], nick: string): readonly string[] =>
+  members.includes(nick) ? members.filter((member) => member !== nick) : members;
+
+type Change = (members: readonly string[], message: IrcMessage, at: Where) => readonly string[];
+
+// RPL_NAMREPLY: my nick, the room's symbol, the room, its names; multi-prefix gives each name every mode
+// prefix it holds.
+const named: Change = (members, { params: [, , room = "", list] }, at) => {
+  if (!sameRoom(room, at.room) || list === undefined) return members;
+  const names = list.split(" ").map((name) => name.replace(/^[~&@%+]+/, ""));
+  const added = names.filter((name) => name !== "" && !members.includes(name));
+  return added.length === 0 ? members : sorted(new Set([...members, ...added]));
+};
+
+const joined: Change = (members, { source = "", params: [room = ""] }, at) => {
+  const nick = nickOf(source);
+  if (!sameRoom(room, at.room) || nick === "") return members;
+  if (nick === at.me) return [at.me];
+  return members.includes(nick) ? members : sorted([...members, nick]);
+};
+
+const parted: Change = (members, { source = "", params: [room = ""] }, at) => {
+  if (!sameRoom(room, at.room)) return members;
+  return nickOf(source) === at.me ? [] : without(members, nickOf(source));
+};
+
+const kicked: Change = (members, { params: [room = "", nick = ""] }, at) => {
+  if (!sameRoom(room, at.room)) return members;
+  return nick === at.me ? [] : without(members, nick);
+};
+
+const renamed: Change = (members, { source = "", params: [next = ""] }) => {
+  const nick = nickOf(source);
+  return next === "" || !members.includes(nick) ? members : sorted(new Set([...without(members, nick), next]));
+};
+
+const CHANGES: Readonly<Record<string, Change>> = {
+  "353": named,
+  JOIN: joined,
+  PART: parted,
+  KICK: kicked,
+  QUIT: (members, { source = "" }) => without(members, nickOf(source)),
+  NICK: renamed,
+};
+
+/** Who is here once this message is read, by nick, sorted in code-unit order. My own JOIN starts the list
+ * again, NAMES fills it, my PART or my KICK empties it; a replayed line (in a history batch) changes nothing. */
+export function membersAfter(members: readonly string[], message: IrcMessage, at: Where): readonly string[] {
+  if (message.tags.has("batch")) return members;
+  const change = Object.hasOwn(CHANGES, message.command) ? CHANGES[message.command] : undefined;
+  return change?.(members, message, at) ?? members;
+}
+
+/** The room's description once this message is read: RPL_TOPIC (332) or a TOPIC sets it, an empty one or
+ * RPL_NOTOPIC (331) clears it. */
+export function topicAfter(topic: string | undefined, message: IrcMessage, room: string): string | undefined {
+  const { command, params } = message;
+  // 331 and 332 name the room after my nick, TOPIC first.
+  const [named = "", text] = params.slice(command === "TOPIC" ? 0 : 1);
+  if (!sameRoom(named, room)) return topic;
+  if (command === "331") return undefined;
+  if ((command === "332" || command === "TOPIC") && text !== undefined) return text || undefined;
+  return topic;
+}
