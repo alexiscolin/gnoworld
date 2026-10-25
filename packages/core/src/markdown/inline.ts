@@ -24,12 +24,11 @@ const closes = (behind: string | undefined, ahead: string | undefined) =>
 // The nodes a run of `size` makes: three stars make two.
 const weight = (size: number) => (size === 3 ? 2 : 1);
 
-// A mark or label open: its character, how much of its run is open, that run's text, what it holds so far, and,
-// for a label, whether it may still be a link (not once a link closed inside it).
+// A mark or label open: its character, how much of its run is open (its text, that character so many times), what
+// it holds so far, and, for a label, whether it may still be a link (not once a link closed inside it).
 interface Frame {
   readonly mark: string;
   size: number;
-  open: string;
   children: Inline[];
   active: boolean;
 }
@@ -65,7 +64,6 @@ class Reader {
   readonly #root: Inline[] = [];
   readonly #frames: Frame[] = [];
   #runs: Runs | undefined;
-  #depth = 0;
   #at = 0;
 
   constructor(source: string) {
@@ -122,7 +120,7 @@ class Reader {
 
   #bracket(): void {
     this.#at += 1;
-    if (!this.#open("[", 1, "[")) this.#add("[");
+    if (!this.#open("[", 1)) this.#add("[");
   }
 
   // `]`: a link, if a label is open and `(`, an https address and `)` follow; else text, its label's `[` too.
@@ -138,7 +136,6 @@ class Reader {
     }
     this.#dropAbove(label);
     this.#frames.pop();
-    this.#depth -= weight(label.size);
     this.#push({ type: "link", href: this.#source.slice(at + 2, end), children: label.children });
     // No link inside a link: the labels around this one stay text.
     for (const frame of this.#frames) frame.active &&= frame.mark !== "[";
@@ -163,14 +160,13 @@ class Reader {
   #mark(mark: string): void {
     const at = this.#at;
     const size = runOf(this.#source, at, mark);
-    const run = this.#source.slice(at, at + size);
     const behind = before(this.#source, at);
     const ahead = after(this.#source, at + size);
     this.#at = at + size;
     const fits = mark === "~" ? size === 2 : size <= 3;
     const left = fits && closes(behind, ahead) ? this.#closeRun(mark, size) : size;
-    if (left === size && fits && opens(behind, ahead) && this.#open(mark, size, run)) return;
-    this.#add(run.slice(size - left));
+    if (left === size && fits && opens(behind, ahead) && this.#open(mark, size)) return;
+    this.#add(mark.repeat(left));
   }
 
   // A closing run: the nearest marks it fits close, innermost first; it gives back what it did not use.
@@ -201,24 +197,25 @@ class Reader {
     this.#dropAbove(frame);
     const used = Math.min(frame.size, size);
     const node = wrap(frame.mark, used, frame.children);
-    this.#depth -= weight(frame.size);
     frame.size -= used;
     if (frame.size === 0) {
       this.#frames.pop();
       this.#push(node);
     } else {
-      this.#depth += weight(frame.size);
       frame.children = [node];
-      frame.open = frame.open.slice(used);
     }
     return used;
   }
 
-  #open(mark: string, size: number, run: string): boolean {
-    if (this.#depth + weight(size) > MAX_INLINE_DEPTH) return false;
-    this.#frames.push({ mark, size, open: run, children: [], active: true });
-    this.#depth += weight(size);
+  #open(mark: string, size: number): boolean {
+    if (this.#depth() + weight(size) > MAX_INLINE_DEPTH) return false;
+    this.#frames.push({ mark, size, children: [], active: true });
     return true;
+  }
+
+  // How deep the open marks and labels nest: what they would make, 8 frames at most to count.
+  #depth(): number {
+    return this.#frames.reduce((depth, frame) => depth + weight(frame.size), 0);
   }
 
   // Each mark open above `frame` (all of them, for none) gives its run back as text.
@@ -232,9 +229,8 @@ class Reader {
   #splice(frame: Frame): void {
     const index = this.#frames.indexOf(frame);
     this.#frames.splice(index, 1);
-    this.#depth -= weight(frame.size);
     const into = this.#frames[index - 1]?.children ?? this.#root;
-    append(into, { type: "text", text: frame.open });
+    append(into, { type: "text", text: frame.mark.repeat(frame.size) });
     for (const child of frame.children) append(into, child);
   }
 
