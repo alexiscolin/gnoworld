@@ -79,7 +79,7 @@ describe("the IRC link", () => {
     expect(await peer.next(/^PONG /)).toBe("PONG ergo.test");
   });
 
-  it("hands on a message of its rooms with the account and id Ergo set, and nothing else", async () => {
+  it("hands on a message of its rooms with the account and id Ergo set, a NOTICE too, and nothing else", async () => {
     const ergo = await fakeErgo();
     const { said } = start(ergo.port);
     const peer = await ergo.peer(0);
@@ -92,10 +92,15 @@ describe("the IRC link", () => {
     peer.say(message("account=g1bot;msgid=m4", "gnoworld!u@h", ["#bubble", "its own"]));
     peer.say(message("account=g1alice;msgid=m5", "alice!u@h", ["#elsewhere", "not its room"]));
     peer.say("@account=g1alice;msgid=m6 :alice!u@h NOTICE #bubble :a notice");
+    peer.say("@msgid=n1 :guest!u@h NOTICE #bubble :no account");
+    peer.say("@account=g1alice;msgid=n2 :alice!u@h NOTICE gnoworld :to the bot");
+    peer.say("@account=gnoworld;msgid=n3 :gnoworld!u@h NOTICE #bubble :its own");
+    peer.say("@account=g1alice;msgid=n4 :alice!u@h NOTICE #elsewhere :not its room");
     peer.say(message("account=g1bob;msgid=m7", "bob!u@h", ["#earth", "last"]));
-    await expect.poll(() => said.length).toBe(2);
+    await expect.poll(() => said.length).toBe(3);
     expect(said).toEqual([
       { room: "#bubble", account: "g1alice", msgid: "m1", text: "hello world" },
+      { room: "#bubble", account: "g1alice", msgid: "m6", text: "a notice" },
       { room: "#earth", account: "g1bob", msgid: "m7", text: "last" },
     ]);
   });
@@ -1203,6 +1208,21 @@ describe("the IRC link's catch-up (3j)", () => {
     peer.say(":ergo.test BATCH -a");
     await settled(peer);
     expect(asked(peer)).toHaveLength(1);
+  });
+
+  it("counts a NOTICE of a page as one of its lines: a full page with one asks the next (the max review)", async () => {
+    const ergo = await fakeErgo();
+    const { said } = start(ergo.port, { lastChecked: (room) => (room === "#bubble" ? T(0) : undefined) });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    await peer.next(/^CHATHISTORY /);
+    peer.say(":ergo.test BATCH +a chathistory #bubble");
+    for (const { id, time } of full(0).slice(0, 49))
+      peer.say(message(`batch=a;account=g1a;msgid=${id};time=${time}`, "a!u@h", ["#bubble", "x"]));
+    peer.say(`@batch=a;account=g1a;msgid=n1;time=${T(49)} :a!u@h NOTICE #bubble :a notice`);
+    peer.say(":ergo.test BATCH -a");
+    expect(await peer.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(T(49))} 50`);
+    await expect.poll(() => said.length).toBe(50);
   });
 
   it("ends a page once: its end said twice asks the next page once (F573)", async () => {

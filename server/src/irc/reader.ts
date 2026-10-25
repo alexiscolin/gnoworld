@@ -116,6 +116,8 @@ export function reader(options: Options, state: State) {
       if (command === "REDACT") log("alert", { error: "redact_refused" });
     },
     PING: (s, { params }) => s.write(line("PONG", params)),
+    // A NOTICE too (slice 3's max review): Ergo relays and keeps it as any line, so it is checked and counted.
+    NOTICE: (s, message) => handlers["PRIVMSG"]?.(s, message),
     PRIVMSG: (_, message) => {
       const batch = state.batches.get(message.tags.get("batch") ?? "");
       // A time Date cannot read is no page's end (F552): the next page starts from the last one read.
