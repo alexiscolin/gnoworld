@@ -103,12 +103,15 @@ function configure(dir: string, [port, wsPort]: readonly [number, number], optio
   const operPassword = options.operPassword ?? randomBytes(12).toString("hex");
   const logTypes = options.logTypes ?? "* -userinput -useroutput";
   const values = {
+    NAME: "irc.gnoworld.test",
     PLAIN: `127.0.0.1:${String(port)}`,
     WEBSOCKET: `127.0.0.1:${String(wsPort)}`,
     PROXY_FROM: options.proxyFrom ?? ["localhost"],
     ORIGINS: options.origins ?? [],
     AUTH_SCRIPT: options.authScript === "absent" ? join(dir, "absent-auth") : writeAuthScript(dir, options.authScript),
     AUTH_TIMEOUT: options.authTimeout ?? "9s",
+    // The stack dials the server's socket instead; the sandbox refuses Unix sockets.
+    SOCKET: "",
     OPER_HASH: hash(operPassword),
     DATABASE: join(dir, "ircd.db"),
     HISTORY: join(dir, "history.db"),

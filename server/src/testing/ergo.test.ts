@@ -30,6 +30,7 @@ import {
   lobby,
   logged,
   login,
+  moderated,
   open,
   oper,
   ORIGIN,
@@ -52,8 +53,7 @@ describe("guests and rooms", { timeout: 20_000 }, () => {
   it("refuses a guest speaking in a +M room, and lets an account speak", async () => {
     const e = await start();
     const chief = await lobby(e);
-    chief.send("MODE #lobby +M");
-    await chief.expect(/MODE #lobby \+M/);
+    await moderated(chief, "#lobby", true);
     const alice = await login(e, "alice");
     await join(alice, "#lobby");
     const gus = await guest(e, "gus");
@@ -64,6 +64,14 @@ describe("guests and rooms", { timeout: 20_000 }, () => {
     await gus.expect(/account=alice.* PRIVMSG #lobby :hello from alice/);
     await sync(alice);
     expect(logged(alice)).not.toContain("hello from guest");
+  });
+
+  it("makes a new room +CMnt and lets a client join 1000 rooms, as the template says (3e)", async () => {
+    const e = await start();
+    const chief = await lobby(e);
+    expect(logged(chief)).toMatch(/ 005 .* CHANLIMIT=#:1000 /);
+    chief.send("MODE #lobby");
+    await chief.expect(/ 324 chief #lobby \+CMnt(\s|$)/);
   });
 
   it("lets a guest read the history of a room it joined, not of one it did not", async () => {
@@ -82,18 +90,15 @@ describe("guests and rooms", { timeout: 20_000 }, () => {
     await outsider.expect(/FAIL CHATHISTORY INVALID_TARGET LATEST #lobby :Messages could not be retrieved/);
   });
 
-  it("keeps a room's history and a direct message across a restart", { timeout: 40_000 }, async () => {
+  it("keeps a room's history across a restart", { timeout: 40_000 }, async () => {
     const e = await start({ dir: keptFolder() });
     const chief = await lobby(e);
     chief.send("CS REGISTER #lobby");
     await chief.expect(/successfully registered/);
     const alice = await login(e, "alice");
     await join(alice, "#lobby");
-    const bob = await login(e, "bob");
     await say(alice, "#lobby", "persist-marker-1");
-    alice.send("PRIVMSG bob :dm-marker-1");
     await sync(alice);
-    await sync(bob);
     const { dir } = e;
     await e.stop();
 
@@ -102,12 +107,30 @@ describe("guests and rooms", { timeout: 20_000 }, () => {
     await join(reader, "#lobby");
     history(reader, "#lobby");
     await reader.expect(replayed("PRIVMSG #lobby :persist-marker-1$"));
-    history(reader, "alice");
-    await reader.expect(replayed("PRIVMSG bob :dm-marker-1$"));
     const gus = await guest(again, "gus");
     await join(gus, "#lobby");
     history(gus, "#lobby");
     await gus.expect(replayed("PRIVMSG #lobby :persist-marker-1$"));
+  });
+
+  it("keeps no direct message across a restart: none is stored until slice 4 (3e)", { timeout: 40_000 }, async () => {
+    const e = await start({ dir: keptFolder() });
+    const alice = await login(e, "alice");
+    const bob = await login(e, "bob");
+    alice.send("PRIVMSG bob :dm-marker-2");
+    await bob.expect(/PRIVMSG bob :dm-marker-2$/);
+    await sync(alice);
+    await sync(bob);
+    const { dir } = e;
+    await e.stop();
+
+    const again = await start({ dir });
+    const reader = await login(again, "bob");
+    history(reader, "alice");
+    const [, batch = ""] =
+      /BATCH \+(\S+) chathistory alice/.exec(await reader.expect(/BATCH \+\S+ chathistory alice/)) ?? [];
+    await reader.expect(new RegExp(`BATCH -${batch}$`));
+    expect(logged(reader)).not.toContain("dm-marker-2");
   });
 });
 
@@ -406,6 +429,8 @@ describe("history and tags", { timeout: 30_000 }, () => {
       expect(line).toContain("account=alice");
       expect(line).not.toContain(tag);
     }
+    // A guest may speak here: the room opened by an operator, whatever Ergo's default.
+    await moderated(await oper(e, "op"), "#lobby", false);
     const gus = await guest(e, "gus");
     await join(gus, "#lobby");
     gus.send("@account=alice PRIVMSG #lobby :guest forging");
@@ -871,8 +896,7 @@ describe("logging in through the server (3d)", { timeout: 30_000 }, () => {
     op.send(`OPER admin ${e.operPassword}`);
     await op.expect(/ 381 /);
     await join(op, "#lobby");
-    op.send("MODE #lobby +M");
-    await op.expect(/MODE #lobby \+M/);
+    await moderated(op, "#lobby", true);
     const me = await s.signIn();
     const c = await enter(e, me.address, s.ticketOf(me.token));
     await join(c, "#lobby");

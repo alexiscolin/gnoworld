@@ -19,5 +19,22 @@ app/tests
 app/**/*.test.ts
 app/**/*.test.tsx
 !deploy/web/nginx.conf
+# The server's image (deploy/server/Dockerfile): its workspace and the two it imports, without their tests.
+!server/package.json
+!server/roles.json
+!server/src
+server/src/**/*.test.ts
+server/src/testing
+!packages/core/src
+!packages/schemas/src
+packages/core/src/**/*.test.ts
+packages/schemas/src/**/*.test.ts
+# Ergo's image and the way out's (deploy/ergo/Dockerfile, deploy/egress/Dockerfile), and their probe.
+!deploy/ergo/ircd.yaml.tmpl
+!deploy/ergo/render.sh
+!deploy/probe
+deploy/probe/*_test.go
+!deploy/egress/config.yaml
+!deploy/egress/acl.yaml
 # Named as well, should the list above ever open: the demo's secrets never reach a build.
 deploy/secrets

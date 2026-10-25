@@ -5,8 +5,8 @@
 network:
   name: gnoworld
 server:
-  # A hostname, as Ergo asks; .test is reserved for tests (RFC 2606), the stack's image names its own.
-  name: irc.gnoworld.test
+  # A hostname, as Ergo asks: the tests' ends in .test (RFC 2606), the stack's is SERVER_NAME (render.sh).
+  name: {{NAME}}
   listeners:
     {{PLAIN}}: {}
     {{WEBSOCKET}}:
@@ -34,13 +34,20 @@ accounts:
     auto-away: opt-in
   auth-script:
     enabled: true
+    # One of the two (irc/config.go): the stack's is the server's socket (deploy/compose.yaml), the tests' a
+    # command, the sandbox refusing Unix sockets.
     command: {{AUTH_SCRIPT}}
+    socket: {{SOCKET}}
     args: []
     autocreate: true
     timeout: {{AUTH_TIMEOUT}}
     kill-timeout: 1s
     max-concurrency: 64
 channels:
+  # +M: only accounts speak, from a room's first line, before the server's reconciler reads it (3m).
+  default-modes: +ntCM
+  # The bot is in every room of every world (3h, 3l): 25 worlds of 21 rooms and the typed ones.
+  max-channels-per-client: 1000
   operator-only-creation: true
   registration:
     enabled: true
@@ -74,15 +81,19 @@ history:
   channel-length: 2048
   client-length: 256
   chathistory-maxmessages: 1000
+  # One time for every room and message (decision 154's 90 days; Ergo v2.19.1 has no time for messages alone).
   restrictions:
-    expire-time: 1w
+    expire-time: 90d
   persistent:
     enabled: true
     unregistered-channels: true
     registered-channels: opt-out
-    direct-messages: opt-out
+    # Not kept until slice 4 makes them a product: decision 154's 30 days cannot be set apart from rooms'.
+    direct-messages: disabled
   retention:
     allow-individual-delete: true
+    # An account's messages found by it, for an export or an erasure (ADR-0002).
+    enable-account-indexing: true
   tagmsg-storage:
     default: false
     whitelist: ["+draft/react", "+react"]

@@ -1,0 +1,16 @@
+# smokescreen's settings in the stack (deploy/egress/Dockerfile): the keys of v0.1.0's YAML loader
+# (pkg/smokescreen/config_loader.go). It listens in the guard's network, whose rules let its replies reach
+# the internal network alone (deploy/guard/guard.sh).
+ip: 0.0.0.0
+port: 4750
+acl_file: /etc/smokescreen/acl.yaml
+# No client certificate in the stack: the list's default rule applies to every request.
+allow_missing_role: true
+# Private, local and reserved addresses refused after resolution: smokescreen's default, written out.
+unsafe_allow_private_ranges: false
+connect_timeout: 10s
+# A tunnel quiet for a minute closes (by default none does: v0.1.0's release kept a quiet one open until its
+# far end closed); 32 tunnels and requests at once, the server calling 4 at a time (moderation/queue.ts).
+idle_timeout: 60s
+max_concurrent_connect_tunnels: 32
+max_concurrent_requests: 32
