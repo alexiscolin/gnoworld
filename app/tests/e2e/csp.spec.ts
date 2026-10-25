@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { expect, hydrated, PAGES, test, type Page } from "./fixtures.ts";
+import { controlled, expect, hydrated, PAGES, test, type Page } from "./fixtures.ts";
 import { GUARDED, SITE } from "./sites.ts";
 
 // The policy's shape: the unit test pins its words, this the page's every answer (slice 3's plan, 3f).
@@ -135,6 +135,25 @@ test.describe("a planted violation", () => {
     await hydrated(other);
     await plant(other, "setTimeout('window.ran = true', 0)");
     await expect.poll(() => violations).toEqual(["script-src"]);
+  });
+
+  // F468: the worker has a global scope of its own, where the page's listener never runs.
+  test("is reported from inside the service worker too: a fetch the worker makes to another site", async ({
+    page,
+    violations,
+  }) => {
+    await page.goto("/");
+    await controlled(page);
+    const context = page.context();
+    const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
+    const result = await worker.evaluate(() =>
+      fetch("https://evil.test/x").then(
+        () => "reached",
+        () => "refused",
+      ),
+    );
+    expect(result).toBe("refused");
+    await expect.poll(() => violations).toEqual(["connect-src"]);
   });
 
   test("keeps the page out of another site's frame", async ({ page }) => {
