@@ -32,6 +32,23 @@ describe("Composer", () => {
     expect(markup).not.toContain("aria-hidden");
   });
 
+  // 4d: the preview reads the line as the room will, the account's own mention apart as it will be.
+  it("previews a mention of the account itself apart, as the room will show it, and another's plain", () => {
+    const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+    const markup = renderToStaticMarkup(
+      <Composer
+        room={ROOM}
+        nick={NICK}
+        rooms={[]}
+        members={[]}
+        draft={`note to @${NICK} and @${ALICE}`}
+        onSay={() => true}
+      />,
+    );
+    expect(markup).toContain(`<span data-mention="me" title="${NICK}">`);
+    expect(markup).toContain(`<span data-mention="" title="${ALICE}">`);
+  });
+
   it("starts from the room's draft, its preview with it", () => {
     const markup = renderToStaticMarkup(
       <Composer

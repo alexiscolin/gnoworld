@@ -45,14 +45,14 @@ export function said(composed: Composed, failed: boolean, completion?: Completio
   return {};
 }
 
-/** The line as the room will read it, an action as one, out of reach of the keyboard and of a screen reader (the
- * field says it already); nothing of a line that cannot go. */
-export function Preview({ composed }: { composed: Composed }) {
+/** The line as the room will read it, an action as one, the account's own mention apart, out of reach of the keyboard
+ * and of a screen reader (the field says it already); nothing of a line that cannot go. */
+export function Preview({ composed, me }: { composed: Composed; me?: string | undefined }) {
   if (composed.kind !== "line") return null;
   return (
     <div className={styles["preview"]} inert>
       {composed.action ? "* " : null}
-      <Message text={composed.text} />
+      <Message text={composed.text} me={me} />
     </div>
   );
 }
@@ -164,7 +164,7 @@ export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", 
             Send
           </Button>
         </Sidebar>
-        <Preview composed={composed} />
+        <Preview composed={composed} me={nick} />
       </Stack>
     </form>
   );
