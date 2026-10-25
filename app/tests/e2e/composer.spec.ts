@@ -2,13 +2,21 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { inGames, lineOf, messages, roomsNav, whoIsHere, word } from "./chat.ts";
 import { logIn } from "./irc.ts";
-import { scriptedErgo } from "./scripted.ts";
+import { MEMBER, scriptedErgo } from "./scripted.ts";
+import type { WebSocketRoute } from "@playwright/test";
 
 // The composer (slice 4's 4c) on the real server and Ergo: an account writes in #games, its line shown once Ergo
 // echoes it, its Markdown as marks; a guest is told to log in. Each test logs in a wallet of its own (?as=).
 
 const field = (page: Page) => page.getByRole("textbox", { name: "Message #games" });
 const send = (page: Page) => page.getByRole("button", { name: "Send" });
+// The drafts the page's device holds, by key, sorted.
+const draftKeys = (page: Page) =>
+  page.evaluate(() =>
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith("gnoworld:draft:"))
+      .sort(),
+  );
 
 test.describe("the composer", () => {
   test("sends a line with Enter, shown once Ergo echoes it, its Markdown as marks and its link https", async ({
@@ -171,7 +179,7 @@ test.describe("the composer", () => {
   test("keeps each room's draft on the device, typed, formatted or completed, through changes of room and a reload, until sent", async ({
     page,
   }) => {
-    await inGames(page);
+    const address = await inGames(page);
     const games = word("games");
     const bubble = word("bubble");
     await field(page).fill(`${games} bold`);
@@ -184,6 +192,12 @@ test.describe("the composer", () => {
     await expect(bubbleField).toHaveValue("");
     await bubbleField.fill("/m");
     await bubbleField.press("Tab");
+    // What Tab completed is kept as it is, before any more is typed.
+    await page.keyboard.press("Alt+ArrowUp");
+    await expect(field(page)).toHaveValue(`${games} **bold**`);
+    await page.keyboard.press("Alt+ArrowDown");
+    await expect(bubbleField).toHaveValue("/me ");
+    await bubbleField.press("End");
     await bubbleField.pressSequentially(bubble);
     await expect(bubbleField).toHaveValue(`/me ${bubble}`);
     await roomsNav(page).getByRole("link", { name: "#games" }).click();
@@ -196,6 +210,7 @@ test.describe("the composer", () => {
     await page.keyboard.press("Alt+ArrowUp");
     await field(page).press("Enter");
     await expect(lineOf(page, games)).toHaveCount(1);
+    await expect.poll(() => draftKeys(page)).toEqual([`gnoworld:draft:${address}:#bubble`]);
     await page.reload();
     await hydrated(page);
     await expect(field(page)).toHaveValue("");
@@ -206,7 +221,7 @@ test.describe("the composer", () => {
   // A shared device: each account finds its own drafts, the next account none of them, a guest nothing.
   test("shows an account's drafts to it alone: not to the next account, nor to a guest", async ({ page }) => {
     const alice = word("alice");
-    await logIn(page, alice);
+    const kept = [`gnoworld:draft:${await logIn(page, alice)}:#bubble/games`];
     await page.goto("/w/bubble?room=games");
     await hydrated(page);
     const draft = word("draft");
@@ -214,11 +229,12 @@ test.describe("the composer", () => {
     await page.getByRole("button", { name: "Log out" }).click();
     await expect(page.getByText("Log in to write in this room.")).toBeVisible();
     await expect(page.getByRole("textbox", { name: /^Message/ })).toHaveCount(0);
-    await expect(page.getByText(draft)).toHaveCount(0);
+    expect(await draftKeys(page)).toEqual(kept);
     await logIn(page, word("bob"));
     await page.goto("/w/bubble?room=games");
     await hydrated(page);
     await expect(field(page)).toHaveValue("");
+    expect(await draftKeys(page)).toEqual(kept);
     await page.getByRole("button", { name: "Log out" }).click();
     await logIn(page, alice);
     await page.goto("/w/bubble?room=games");
@@ -327,5 +343,82 @@ test.describe("the composer", () => {
     await page.reload();
     await hydrated(page);
     await expect(field(page)).toHaveValue("are you there?!");
+  });
+
+  // A draft is written as it changes, never as the room changes around it: lines arriving write nothing, so an idle
+  // tab never puts its old draft over another tab's newer one.
+  test("writes a draft as it is typed, and not again as lines arrive", async ({ page }) => {
+    const address = await logIn(page, word("as"));
+    let ergo: WebSocketRoute | undefined;
+    await page.routeWebSocket(/\/ws$/, (socket) => {
+      scriptedErgo(socket, address);
+      ergo = socket;
+    });
+    // The page's storage, each write of a draft counted on the document.
+    await page.addInitScript(() => {
+      const device = window.localStorage;
+      let writes = 0;
+      const wrote = () => {
+        writes += 1;
+        document.documentElement.dataset["draftWrites"] = String(writes);
+      };
+      Object.defineProperty(window, "localStorage", {
+        configurable: true,
+        get: () => ({
+          getItem: (key: string) => device.getItem(key),
+          setItem: (key: string, value: string) => {
+            wrote();
+            device.setItem(key, value);
+          },
+          removeItem: (key: string) => {
+            wrote();
+            device.removeItem(key);
+          },
+        }),
+      });
+    });
+    await page.goto("/w/bubble?room=games");
+    await hydrated(page);
+    await expect(whoIsHere(page)).toContainText("2 here");
+    await field(page).fill("half a thought");
+    const writes = page.locator("html");
+    await expect(writes).toHaveAttribute("data-draft-writes", /^\d+$/);
+    const before = Number(await writes.getAttribute("data-draft-writes"));
+    for (const [id, text] of [
+      ["n1", "one"],
+      ["n2", "two"],
+    ] as const) {
+      ergo?.send(
+        `@msgid=${id};time=2026-10-25T10:05:00.000Z;account=${MEMBER} :${MEMBER}!u@h PRIVMSG #bubble/games :${text}`,
+      );
+      await expect(lineOf(page, text)).toHaveCount(1);
+    }
+    // A key typed after them: what they wrote, if anything, is written by then.
+    await field(page).press("End");
+    await field(page).press("!");
+    await expect(writes).toHaveAttribute("data-draft-writes", String(before + 1));
+  });
+
+  // A device whose storage is blocked: the composer writes and sends all the same, keeping no draft and saying nothing.
+  test("writes and sends with the device's storage blocked, keeping no draft", async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(window, "localStorage", {
+        configurable: true,
+        get: () => {
+          throw new DOMException("The storage is blocked.", "SecurityError");
+        },
+      });
+    });
+    await inGames(page);
+    const line = word("blocked");
+    await field(page).fill(line);
+    await expect(field(page)).not.toHaveAccessibleDescription(/\S/);
+    await field(page).press("Enter");
+    await expect(lineOf(page, line)).toHaveCount(1);
+    await expect(field(page)).toHaveValue("");
+    await field(page).fill("kept nowhere");
+    await page.reload();
+    await hydrated(page);
+    await expect(field(page)).toHaveValue("");
   });
 });
