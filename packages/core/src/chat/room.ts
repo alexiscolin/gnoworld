@@ -88,9 +88,20 @@ export function lineOf(message: IrcMessage, room: string): Line | undefined {
 
 const byTimeThenId = (one: Line, other: Line): number => compare(one.time, other.time) || compare(one.id, other.id);
 
+// A live line, the usual case: one line after every line held, and not one of them, is only appended.
+function newest(lines: readonly Line[], incoming: readonly Line[], cap: number): readonly Line[] | undefined {
+  const [line] = incoming;
+  const last = lines.at(-1);
+  if (incoming.length !== 1 || line === undefined || (last !== undefined && byTimeThenId(last, line) >= 0)) return;
+  if (lines.some((each) => each.id === line.id)) return;
+  return [...lines.slice(Math.max(0, lines.length - cap + 1)), line];
+}
+
 /** The room's lines with these added: in time order, then by id, each id once, the newest `cap` kept. */
 export function addLines(lines: readonly Line[], incoming: readonly Line[], cap: number): readonly Line[] {
   if (!Number.isInteger(cap) || cap < 1) throw new RangeError("addLines: the cap is a whole number, 1 or more");
+  const appended = newest(lines, incoming, cap);
+  if (appended !== undefined) return appended;
   const held = new Set(lines.map((line) => line.id));
   const added = new Map<string, Line>();
   for (const line of incoming) if (!held.has(line.id) && !added.has(line.id)) added.set(line.id, line);
@@ -114,6 +125,11 @@ export interface Where {
 }
 
 const sorted = (nicks: Iterable<string>): readonly string[] => [...nicks].sort(compare);
+// A nick put in its place in a sorted list: a JOIN costs one pass, no sort.
+function inserted(members: readonly string[], nick: string): readonly string[] {
+  const at = members.findIndex((member) => compare(member, nick) > 0);
+  return at === -1 ? [...members, nick] : [...members.slice(0, at), nick, ...members.slice(at)];
+}
 const without = (members: readonly string[], nick: string): readonly string[] =>
   members.includes(nick) ? members.filter((member) => member !== nick) : members;
 
@@ -124,7 +140,8 @@ type Change = (members: readonly string[], message: IrcMessage, at: Where) => re
 const named: Change = (members, { params: [, , room = "", list] }, at) => {
   if (!sameRoom(room, at.room) || list === undefined) return members;
   const names = list.split(" ").map((name) => name.replace(/^[~&@%+]+/, ""));
-  const added = names.filter((name) => name !== "" && !members.includes(name));
+  const held = new Set(members);
+  const added = names.filter((name) => name !== "" && !held.has(name));
   return added.length === 0 ? members : sorted(new Set([...members, ...added]));
 };
 
@@ -132,7 +149,7 @@ const joined: Change = (members, { source = "", params: [room = ""] }, at) => {
   const nick = nickOf(source);
   if (!sameRoom(room, at.room) || nick === "") return members;
   if (nick === at.me) return [at.me];
-  return members.includes(nick) ? members : sorted([...members, nick]);
+  return members.includes(nick) ? members : inserted(members, nick);
 };
 
 const parted: Change = (members, { source = "", params: [room = ""] }, at) => {
