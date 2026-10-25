@@ -3,12 +3,12 @@
 // serves the same build for the PWA's update journey (a POST to /__bump makes its sw.js a new version, as a
 // deploy would; /__tamper turns a changed route file on and off; /__down answers 503 for sw.js, as an update
 // check offline finds no host); the third does the same behind the demo's shared password. /api goes to the
-// real server, and /__wallet and /__sign answer for Adena's stand-in (api.mjs).
+// real server, /ws to a real Ergo, and /__wallet and /__sign answer for Adena's stand-in (api.mjs).
 import { createReadStream, readFileSync, realpathSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { relay, startApi, walletAnswer } from "./api.mjs";
+import { relay, relayUpgrade, startBackend, walletAnswer } from "./api.mjs";
 
 const root = fileURLToPath(new URL("../../build/client/", import.meta.url));
 // The policy the build wrote for every answer (src/csp.ts), as a host that reads _headers sends it.
@@ -41,6 +41,15 @@ function find(pathname) {
   return path.startsWith(root) ? [path, join(path, "index.html")].find(isFile) : undefined;
 }
 
+// The decoded path of a request, or none when its URL is malformed.
+function pathOf(request) {
+  try {
+    return decodeURIComponent(new URL(request.url ?? "/", "http://host").pathname);
+  } catch {
+    return undefined;
+  }
+}
+
 // The test's own password, never the demo's.
 const PASSWORD = `Basic ${Buffer.from("team:a test password").toString("base64")}`;
 
@@ -54,15 +63,18 @@ function host({ bumping = false, password = false }) {
       response.writeHead(401, { "www-authenticate": 'Basic realm="gno.world demo"' }).end();
       return;
     }
-    let pathname;
-    try {
-      pathname = decodeURIComponent(new URL(request.url ?? "/", "http://host").pathname);
-    } catch {
+    const pathname = pathOf(request);
+    if (pathname === undefined) {
       response.writeHead(400).end();
       return;
     }
     if (pathname.startsWith("/api/")) {
-      relay(api, request, response);
+      relay(backend.api, request, response);
+      return;
+    }
+    // A request to /ws that is no upgrade goes to Ergo too, which refuses it, as nginx's exact /ws location does.
+    if (pathname === "/ws") {
+      relay(backend.ws, request, response);
       return;
     }
     if (pathname === "/__wallet" || (pathname === "/__sign" && request.method === "POST")) {
@@ -110,11 +122,22 @@ function host({ bumping = false, password = false }) {
   };
 }
 
+// An upgrade to /ws goes to Ergo's listener; any other upgrade finds nothing, as on a static host.
+function upgrade(request, socket, head) {
+  if (pathOf(request) === "/ws") relayUpgrade(backend.ws, request, socket, head);
+  else socket.end("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n");
+}
+
 const port = Number(process.env.E2E_PORT ?? 4173);
 if (!Number.isInteger(port) || port < 1024 || port > 65533)
   throw new Error(`serve.mjs: E2E_PORT is no port base: ${process.env.E2E_PORT}`);
-// The server first: a journey starts once the site answers, and the site's /api must answer by then.
-const api = await startApi([port, port + 1, port + 2].map((each) => `http://127.0.0.1:${String(each)}`));
-createServer(host({})).listen(port, "127.0.0.1");
-createServer(host({ bumping: true })).listen(port + 1, "127.0.0.1");
-createServer(host({ bumping: true, password: true })).listen(port + 2, "127.0.0.1");
+// Ergo and the server first: a journey starts once the site answers, and the site's /api and /ws must answer by then.
+const origins = [port, port + 1, port + 2].map((each) => `http://127.0.0.1:${String(each)}`);
+const backend = await startBackend(origins);
+createServer(host({})).on("upgrade", upgrade).listen(port, "127.0.0.1");
+createServer(host({ bumping: true }))
+  .on("upgrade", upgrade)
+  .listen(port + 1, "127.0.0.1");
+createServer(host({ bumping: true, password: true }))
+  .on("upgrade", upgrade)
+  .listen(port + 2, "127.0.0.1");
