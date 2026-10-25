@@ -6,10 +6,14 @@ WORKDIR /src
 COPY deploy/probe/ ./
 RUN CGO_ENABLED=0 go build -trimpath -ldflags=-s -o /out/probe . && \
 	CGO_ENABLED=0 GOBIN=/out go install -trimpath -ldflags=-s github.com/stripe/smokescreen@v0.1.0
+# Its settings get their mode here, where a shell is: a COPY --chmod=644 into the final image would make their
+# folder 644 too, closed to its user (moby/buildkit#5943).
+COPY deploy/egress/config.yaml deploy/egress/acl.yaml /out/etc/
+RUN chmod 644 /out/etc/*
 
 FROM gcr.io/distroless/static-debian13:nonroot@sha256:d62067879de890a1def9da0e7766b7d20810a5e5555cef8506b752437d7a3e88
 COPY --from=build /out/smokescreen /smokescreen
 COPY --from=build /out/probe /probe
-COPY --chmod=644 deploy/egress/config.yaml deploy/egress/acl.yaml /etc/smokescreen/
+COPY --from=build /out/etc/ /etc/smokescreen/
 USER 65532:65532
 ENTRYPOINT ["/smokescreen", "--config-file", "/etc/smokescreen/config.yaml"]

@@ -226,6 +226,8 @@ if [ "${1:-}" = --mutants ]; then
 	mutant() {
 		label=$1 wanted=$2
 		shift 2
+		# ONLY_MUTANTS, an extended regular expression: the mutants whose label it matches, alone.
+		[ -z "${ONLY_MUTANTS:-}" ] || printf '%s\n' "$label" | grep -qE -- "$ONLY_MUTANTS" || return 0
 		"$@" >"$tmp/override.yaml"
 		code=0
 		TEST_PROJECT=gnoworld-demo-mutant-$$ TEST_OVERRIDE=$tmp/override.yaml sh "$0" >"$tmp/run.log" 2>&1 || code=$?
@@ -248,6 +250,13 @@ if [ "${1:-}" = --mutants ]; then
 		n=$((n + 1))
 		"$@" "$here/web/nginx.conf" >"$tmp/nginx.$n.conf"
 		printf 'services:\n  web:\n    volumes:\n      - %s:/etc/nginx/nginx.conf:ro\n' "$tmp/nginx.$n.conf"
+	}
+	dockerfile() { # a service's Dockerfile through one edit (a sed or awk command), built in its place: $1 the service
+		n=$((n + 1))
+		service=$1
+		shift
+		"$@" "$here/$service/Dockerfile" >"$tmp/Dockerfile.$n"
+		printf 'services:\n  %s:\n    build:\n      dockerfile: %s\n' "$service" "$tmp/Dockerfile.$n"
 	}
 	guard() { # the guard's script through one edit (a sed or awk command), mounted over deploy/guard
 		n=$((n + 1))
@@ -301,6 +310,7 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "the password logged" "no log holds the password" nginx sed 's#$status $body_bytes_sent#$status $body_bytes_sent $http_authorization#'
 	mutant "noindex only on success" "the 401 is not indexed" nginx sed 's#X-Robots-Tag "noindex" always#X-Robots-Tag "noindex"#'
 	mutant "sniffing allowed" "is never sniffed" nginx sed '/X-Content-Type-Options/d'
+	mutant "the referrer sent along" "names no referrer to another site" nginx sed '/Referrer-Policy/d'
 	mutant "no content security policy" "carries the policy" nginx sed '/include \/etc\/nginx\/csp.conf;/d'
 	mutant "hashed files not kept" "is kept a year" nginx sed 's#public, max-age=31536000, immutable#no-cache#'
 	mutant "an error on a hashed file kept a year" "a 401 on a hashed file revalidates" \
@@ -329,33 +339,52 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "anyone makes a room" "a guest makes no room" template sed 's#operator-only-creation: true#operator-only-creation: false#'
 	mutant "registration open" "a hand-made account is refused" \
 		template awk '/^  registration:/ { r = 1 } r && /enabled: false/ { sub(/false/, "true"); r = 0 } { print }'
-	mutant "a short oper password taken" "Ergo's start refuses a short oper password" render_sh sed '/32 characters or more/d'
+	mutant "a short oper password taken" "Ergo starts with a short oper password" render_sh sed '/32 characters or more/d'
 	mutant "a login by PASS" "login-via-pass-command: false" template sed 's#login-via-pass-command: false#login-via-pass-command: true#'
 	mutant "every address believed as a proxy" "never a forged X-Forwarded-For" template sed 's#proxy-allowed-from: {{PROXY_FROM}}#proxy-allowed-from: ["0.0.0.0/0"]#'
 	mutant "the auth script's socket lost" "the refusal came from the server" compose 'services: { server: { environment: { AUTH_SOCKET: /tmp/elsewhere.sock } } }'
 	mutant "the server believes no proxy" "is its own visitor" compose 'services: { server: { environment: { TRUSTED_PROXY: 192.0.2.1 } } }'
 	mutant "a forged X-Forwarded-For handed on" "never a forged X-Forwarded-For" \
 		nginx sed 's#proxy_set_header X-Forwarded-For $proxy_protocol_addr;#proxy_set_header X-Forwarded-For $http_x_forwarded_for;#'
-	mutant "a forged X-Real-IP handed on" "is its own visitor" nginx sed 's#proxy_set_header X-Real-IP $proxy_protocol_addr;#proxy_set_header X-Real-IP $http_x_real_ip;#'
+	mutant "a forged X-Real-IP handed on" "and the first naming another stays limited, by the server" nginx sed 's#proxy_set_header X-Real-IP $proxy_protocol_addr;#proxy_set_header X-Real-IP $http_x_real_ip;#'
 	mutant "the password handed to the upstreams" "and never the demo's password" nginx sed '/proxy_set_header Authorization "";/d'
 	mutant "the WebSocket open without the password" "no password, no WebSocket" \
 		nginx awk '{ print } /location = \/ws \{/ { print "            auth_basic off;" }'
 	mutant "the API open without the password" "no password, no API" \
 		nginx awk '{ print } /location \/api\/ \{/ { print "            auth_basic off;" }'
-	mutant "the stream buffered" "the stream comes through web unbuffered" nginx sed '/proxy_buffering off;/d'
+	mutant "the stream buffered" "web's settings say proxy_buffering off" nginx sed '/proxy_buffering off;/d'
 	mutant "no limit of web's own on the login" "a longer burst meets web's own limit" nginx sed '/limit_req zone=login/d'
 	mutant "a backslash in a path handed on" "a backslash in a path is refused" nginx sed '/return 400;/d'
+	mutant "no visitor's connection limit" "a visitor holds 32 requests at once" nginx sed '/limit_conn /d'
+	mutant "a visitor's connections limited at 31" "a visitor holding 31 requests, streams among them, is served a 32nd" \
+		nginx sed 's#limit_conn open 32;#limit_conn open 31;#'
+	mutant "every visitor one connection key" "the 33rd refused, another visitor served" \
+		nginx sed 's#limit_conn_zone $proxy_protocol_addr#limit_conn_zone $remote_addr#'
+	mutant "the limit answered 503" "the 33rd refused" nginx sed '/limit_conn_status/d'
+	mutant "web's room for 1,024 connections" "sixteen visitors at their 32 WebSockets each, and another is served" \
+		nginx sed 's#worker_connections [0-9]*;#worker_connections 1024;#'
+	mutant "web's files left to Docker's default" "web may hold 8,192 files" compose 'services: { web: { ulimits: !reset {} } }'
+	mutant "the server may write Ergo's volume" "the server holds Ergo's volume read-only" \
+		compose 'services: { server: { volumes: !override [ "server:/data", "auth:/run/gnoworld", "ergo:/ergo" ] } }'
+	mutant "the server measures another volume" "and it is Ergo's own volume" \
+		compose 'services: { server: { volumes: !override [ "server:/data", "auth:/run/gnoworld", "auth:/ergo:ro" ] } }'
+	mutant "headers waited for a minute" "web closes a connection that never ends its headers" nginx sed '/client_header_timeout/d'
+	mutant "a body waited for a minute" "web closes a connection that never sends its body" nginx sed '/client_body_timeout/d'
+	mutant "an idle connection kept 75 s" "web closes a connection that stays idle between requests" nginx sed '/keepalive_timeout/d'
 	mutant "a host added to the way out" "the way out lets one host out" acl awk '{ print } /- api.openai.com/ { print "    - example.com" }'
 	mutant "the way out lets private addresses through" "the way out lets http://10.0.0.1.nip.io/ through" \
 		proxy_config sed 's#^unsafe_allow_private_ranges:.*#unsafe_allow_private_ranges: true#'
 	mutant "a quiet tunnel kept for good" "the way out's settings say idle_timeout: 60s" proxy_config sed '/^idle_timeout:/d'
 	mutant "the server's requests straight out" "the server does not reach OpenAI's API" compose 'services: { server: { environment: { NODE_USE_ENV_PROXY: "0" } } }'
 	mutant "the guard drops the way out's replies" "does not answer through the way out" guard sed '/--sport 4750/d'
-	mutant "the way out open to the guard's other network" "the way out answers nothing from the guard's other network" guard sed '/--dport 4750 -j REJECT/d'
+	mutant "the way out open to the guard's other network" "the guard's rules refuse 4750 but from the inside" guard sed '/--dport 4750 -j REJECT/d'
 	mutant "the stack past the ceiling" "the demo's caps pass" compose 'services: { ergo: { mem_limit: 1g }, server: { mem_limit: 1g } }'
 	mutant "Ergo's root writable" "ergo: read-only root" compose 'services: { ergo: { read_only: false } }'
 	mutant "the server's capabilities kept" "server: every capability dropped" compose 'services: { server: { cap_drop: !reset [] } }'
 	mutant "the way out's process cap off" "egress: no process cap" compose 'services: { egress: { pids_limit: -1 } }'
+	mutant "Ergo's folder closed to its user" "ergo's user may enter /ergo" dockerfile ergo sed 's#chmod 755 /ergo \&\& ##'
+	mutant "the way out's folder closed to its user" "egress's user may enter /etc/smokescreen" dockerfile egress \
+		sed 's#^COPY --from=build /out/etc/ /etc/smokescreen/$#COPY --chmod=644 deploy/egress/config.yaml deploy/egress/acl.yaml /etc/smokescreen/#'
 elif [ "${1:-}" != --demo ]; then
 	# The static server and the guard, with a password of their own; no Tailscale key is needed.
 	inside=${project}_inside
@@ -370,6 +399,65 @@ elif [ "${1:-}" != --demo ]; then
 	expect "git tracks nothing in deploy/secrets" "$(git -C "$repo" ls-files deploy/secrets)" ""
 	if grep -qx 'deploy/secrets' "$repo/.dockerignore"; then pass "the build leaves deploy/secrets out"; else fail "the build would send deploy/secrets"; fi
 	if grep -qF 'Read(/deploy/secrets/**)' "$repo/.claude/settings.json"; then pass "Claude Code may not read the secrets"; else fail "Claude Code may read the secrets"; fi
+	# deploy/k6/run.sh against a Docker that answers as a stack would and logs each call (3n-b): it never starts
+	# on the demo's host, even with the demo stopped (F643), and a run stopped in a scenario leaves nothing behind
+	# (F642).
+	mkdir "$tmp/fake"
+	cat >"$tmp/fake/docker" <<'FAKE'
+#!/bin/sh
+printf '%s\n' "$*" >>"$FAKE_LOG"
+case "$*" in
+"ps -aq --filter label=com.docker.compose.project=gnoworld-demo") [ -z "${FAKE_DEMO:-}" ] || echo d3m0 ;;
+"compose "*" ps -q "*) echo c0ntainer ;;
+"inspect "*) echo 1mage ;;
+*" /k6/load.js") sleep 4 ;;
+esac
+FAKE
+	chmod 755 "$tmp/fake/docker"
+	# exec: the run is the process its caller signals, not a shell around it.
+	load() { exec env FAKE_LOG="$tmp/fake.log" PATH="$tmp/fake:$PATH" FAKE_DEMO="$1" OPENAI_API_KEY_FILE= sh "$here/k6/run.sh" "$2"; }
+	: >"$tmp/fake.log"
+	code=0
+	(load yes all) >"$tmp/load.log" 2>&1 || code=$?
+	if [ "$code" = 2 ] && grep -q "the demo's containers are on this host" "$tmp/load.log" && ! grep -q '^compose ' "$tmp/fake.log"; then
+		pass "the load runs refuse the demo's host, its containers stopped, before making anything"
+	else
+		fail "the load runs start on the demo's host (exit $code)"
+	fi
+	# Stopped by TERM (a shell in the background ignores INT), it removes its project, its folder, which holds the
+	# operator's key, and its sampler.
+	: >"$tmp/fake.log"
+	(load "" logins) >"$tmp/load.log" 2>&1 &
+	running=$!
+	for _ in 1 2 3 4 5 6 7 8 9 10; do grep -q '/k6/load.js$' "$tmp/fake.log" && break || sleep 1; done
+	kill -TERM "$running"
+	wait "$running" || true
+	sleep 3
+	sampled=$(grep -c '^stats ' "$tmp/fake.log" || true)
+	sleep 3
+	folder=$(sed -n 's#.* -v \([^ ]*\)/out:/k6:ro .*#\1#p' "$tmp/fake.log" | head -n 1)
+	expect "a stopped load run removes its project" "$(sed -n '/\/k6\/load.js$/,$p' "$tmp/fake.log" | grep -c '^compose .* down -v$' || true)" 1
+	expect "and its folder, the operator's key with it" "$([ -n "$folder" ] && [ ! -e "$folder" ] && echo gone)" gone
+	expect "and stops its sampler" "$(grep -c '^stats ' "$tmp/fake.log" || true)" "$sampled"
+	# Sizes that are no whole number, or past the visitors' addresses, stop it before it makes anything (F650).
+	for size in ACCOUNTS=abc CROWD=0 HOLD=1.5 RATE=-1 STREAMS=250001 ACCOUNTS=62501; do
+		: >"$tmp/fake.log"
+		code=0
+		(export "$size" && load "" all) >"$tmp/load.log" 2>&1 || code=$?
+		if [ "$code" = 2 ] && ! grep -q '^compose ' "$tmp/fake.log"; then
+			pass "the load runs refuse $size before making anything"
+		else
+			fail "the load runs take $size (exit $code)"
+		fi
+	done
+	# Without OpenAI's key the lines measure no check (F644): the messages alone are refused, among the rest skipped.
+	: >"$tmp/fake.log"
+	code=0
+	(load "" messages) >"$tmp/load.log" 2>&1 || code=$?
+	expect "the messages alone, with no key, are refused before anything is made" "$code $(grep -c '^compose ' "$tmp/fake.log" || true)" "2 0"
+	(load "" all) >"$tmp/load.log" 2>&1 || true
+	expect "and skipped among the rest, no line sent" \
+		"$(grep -c 'messages: skipped' "$tmp/load.log" || true) $(grep -c 'SCENARIO=messages' "$tmp/fake.log" || true)" "1 0"
 
 	password=$(openssl rand -hex 16)
 	htpasswd -nbB team "$password" | grep . >"$tmp/htpasswd"
@@ -385,6 +473,17 @@ elif [ "${1:-}" != --demo ]; then
 	export ERGO_OPER_PASSWORD_FILE="$tmp/ergo_oper_password" LOG_PEPPER_FILE="$tmp/log_pepper" OPENAI_API_KEY_FILE="$tmp/openai_api_key"
 	export ORIGINS=http://gnoworld.test SERVER_NAME=irc.gnoworld.test
 	export INSIDE_SUBNET="${TEST_SUBNET:-172.30.90.0/24}" WEB_ADDRESS="${TEST_WEB_ADDRESS:-172.30.90.10}"
+	# Each folder a service reads in its image lets every user in: a COPY --chmod with no execute bit gives the
+	# folder it makes that mode (moby/buildkit#5943), which kept Ergo's user out of /ergo. Checked before the
+	# start, which would only call the service unhealthy.
+	docker compose -p "$project" $files build ergo egress >/dev/null || { echo "test.sh: Ergo's or the way out's image did not build" >&2; exit 3; }
+	before=$failed
+	for pair in ergo:ergo egress:etc/smokescreen; do
+		box=$(docker create "$project-${pair%%:*}")
+		expect "${pair%%:*}'s user may enter /${pair#*:}" "$(docker export "$box" | tar -tvf - "${pair#*:}" 2>/dev/null | awk 'NR == 1 { print substr($1, 8, 3) }')" r-x
+		docker rm "$box" >/dev/null
+	done
+	[ "$failed" = "$before" ] || exit 1
 	started=yes
 	docker compose -p "$project" $files down -v >/dev/null 2>&1 || true # what an interrupted run left
 	if ! docker compose -p "$project" $files up -d --build --wait web guard ergo server egress; then
@@ -395,6 +494,8 @@ elif [ "${1:-}" != --demo ]; then
 	guard=$(docker compose -p "$project" $files ps -q guard)
 
 	hardened "$web" web
+	# nginx's 4,096 connections take two files each, a limit Docker sets: nginx, no root, cannot raise it (F645).
+	expect "web may hold 8,192 files" "$(docker inspect --format '{{range .HostConfig.Ulimits}}{{.Name}}={{.Soft}}/{{.Hard}} {{end}}' "$web")" "nofile=8192/8192 "
 	expect "web sits on the internal network only" "$(networks_of "$web")" "$inside "
 	expect "that network has no way out" "$(docker network inspect --format '{{.Internal}}' "$inside")" true
 	case $(docker network inspect --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}' "$inside") in
@@ -501,6 +602,7 @@ elif [ "${1:-}" != --demo ]; then
 	for path in $pages /nowhere /sw.js /manifest.webmanifest /icon-192.png $assets; do
 		expect "$path is not indexed" "$(header x-robots-tag "$path" 203.0.113.1 -u "$auth")" noindex
 		expect "$path is never sniffed" "$(header x-content-type-options "$path" 203.0.113.1 -u "$auth")" nosniff
+		expect "$path names no referrer to another site" "$(header referrer-policy "$path" 203.0.113.1 -u "$auth")" no-referrer
 	done
 	for path in $pages /nowhere /sw.js /manifest.webmanifest /icon-192.png; do
 		expect "$path revalidates" "$(header cache-control "$path" 203.0.113.1 -u "$auth")" no-cache
@@ -775,11 +877,12 @@ CLIENT
 	for path in '/api/x/..\login/challenge' '/api/x/..%5Clogin/challenge'; do
 		expect "a backslash in a path is refused: $path" "$(status "$path" 203.0.113.34 -u "$auth" --path-as-is)" 400
 	done
-	# A login challenge's code, and its body's error when it has one (the server's JSON, or web's own page).
+	# A login challenge's code, and its body's error when it has one (the server's JSON, or web's own page). curl reads
+	# a format that starts with @ as a file's name: the code's mark follows a newline.
 	challenge() {
 		client=$1
 		shift
-		docker run --rm --network "$inside" "$CURL" -s -w '@@%{http_code}\n' --haproxy-protocol --haproxy-clientip "$client" -u "$auth" \
+		docker run --rm --network "$inside" "$CURL" -s -w '\n@@%{http_code}\n' --haproxy-protocol --haproxy-clientip "$client" -u "$auth" \
 			-H "Origin: $ORIGINS" -H 'Content-Type: application/json' -d '{"chainId":"onyx-1"}' "$@" | awk '{ body = body $0 }
 			/@@[0-9]+$/ { kind = body ~ /"error":"too_many"/ ? "too_many" : body ~ /<html/ ? "html" : body ~ /"error":/ ? "error" : "ok"
 				print kind, substr($0, index($0, "@@") + 2); body = "" }' || true
@@ -799,7 +902,132 @@ CLIENT
 		"$(challenge 203.0.113.33 'http://web:8080/api/login/challenge?[1-40]' | grep -c '^html 429$' || true)" 1
 	stream=$(docker run --rm --network "$inside" "$CURL" -s -N --max-time 20 --haproxy-protocol --haproxy-clientip 203.0.113.41 -u "$auth" \
 		'http://web:8080/api/stream?rooms=%23earth' || true)
-	holds "the stream comes through web unbuffered: its heartbeat within 20 s" "$stream" '^:'
+	holds "the stream comes through web: its heartbeat within 20 s" "$stream" '^:'
+	# Buffered, nginx still passed the heartbeat on (the stream-buffered mutant, 2026-10-24): its setting, read back.
+	expect "web's settings say proxy_buffering off" "$(docker exec "$web" cat /etc/nginx/nginx.conf | grep -c 'proxy_buffering off;')" 1
+	# Connections that send nothing more are closed (F208): headers never ended, a body never sent, a kept-alive
+	# connection left idle; each one's seconds until web closed it, printed as it closes (F639);
+	# in the background while the holds below run (F651).
+	docker run --rm --network "$inside" --entrypoint /nodejs/bin/node "$server_image" -e '
+const net = require("node:net");
+const started = Date.now();
+const proxy = (ip) => `PROXY TCP4 ${ip} 192.0.2.1 40000 8080\r\n`;
+const auth = `Basic ${Buffer.from(process.argv[1]).toString("base64")}`;
+const probe = (name, text) =>
+  new Promise((resolve) => {
+    const socket = net.connect(8080, "web", () => socket.write(text));
+    socket.on("data", () => {});
+    socket.on("error", () => {});
+    socket.on("close", () => {
+      console.log(`${name}=${String(Math.round((Date.now() - started) / 1000))}`);
+      resolve();
+    });
+  });
+Promise.all([
+  probe("headers", `${proxy("203.0.113.63")}GET / HTTP/1.1\r\nHost: web\r\n`),
+  probe("body", `${proxy("203.0.113.64")}POST /api/login/challenge HTTP/1.1\r\nHost: web\r\nAuthorization: ${auth}\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{`),
+  probe("idle", `${proxy("203.0.113.65")}GET / HTTP/1.1\r\nHost: web\r\nAuthorization: ${auth}\r\n\r\n`),
+]).then(() => process.exit(0));
+setTimeout(() => {
+  console.log("still open after 40 s");
+  process.exit(0);
+}, 40_000).unref();' "$auth" >"$tmp/timed.out" 2>&1 &
+	timing=$!
+	# Each visitor holds 32 requests at once (F208; a request counts while it is served): $1 WebSockets and $2
+	# streams of visitor $3 held 12 s; then $3's next request and visitor $4's, how many of $3's were held to the
+	# end (a WebSocket's 101, a stream's 200), and $3's request once they ended. Two at once (F651).
+	hold() {
+		docker run --rm --network "$inside" --entrypoint sh "$CURL" -c '
+			ws=$1 streams=$2 auth=$3 origin=$4 other=$6
+			me="--haproxy-protocol --haproxy-clientip $5 -u $auth"
+			api=http://web:8080/api/activity?worlds=earth
+			key=$(head -c 16 /dev/urandom | base64)
+			{
+				while [ "$ws" -gt 0 ]; do
+					curl -s -o /dev/null -w "%{http_code}\n" --max-time 12 --http1.1 $me -H "Connection: Upgrade" -H "Upgrade: websocket" \
+						-H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: $key" -H "Origin: $origin" http://web:8080/ws &
+					ws=$((ws - 1))
+				done
+				while [ "$streams" -gt 0 ]; do
+					curl -s -N -o /dev/null -w "%{http_code}\n" --max-time 12 $me "http://web:8080/api/stream?rooms=%23earth" &
+					streams=$((streams - 1))
+				done
+				wait
+			} >/tmp/held &
+			sleep 5
+			curl -s -o /dev/null -w "%{http_code} " $me "$api"
+			curl -s -o /dev/null -w "%{http_code} " --haproxy-protocol --haproxy-clientip "$other" -u "$auth" "$api"
+			wait
+			printf "%s " "$(grep -cE "^(101|200)$" /tmp/held)"
+			curl -s -o /dev/null -w "%{http_code}" $me "$api"' sh "$1" "$2" "$auth" "$ORIGINS" "$3" "$4" || true
+	}
+	hold 27 4 203.0.113.61 203.0.113.62 >"$tmp/hold.31" &
+	first=$!
+	hold 28 4 203.0.113.66 203.0.113.67 >"$tmp/hold.32" &
+	wait "$first" "$!" || true
+	expect "a visitor holding 31 requests, streams among them, is served a 32nd" "$(cat "$tmp/hold.31")" "200 200 31 200"
+	expect "a visitor holds 32 requests at once: the 33rd refused, another visitor served, the slots freed after" \
+		"$(cat "$tmp/hold.32")" "429 200 32 200"
+	# Sixteen visitors each at their 32 WebSockets leave room for another (3NB-1, F638): a held request takes two
+	# of web's connections, the visitor's and Ergo's, which nginx never reclaims (a silent one it closes when
+	# short, which 256 already survived), so these need more than 1,024. How many were upgraded, then the other's
+	# code, within 4 s.
+	crowded=$(docker run --rm --network "$inside" --entrypoint /nodejs/bin/node "$server_image" -e '
+const net = require("node:net");
+const { randomBytes } = require("node:crypto");
+const [user, origin] = process.argv.slice(1);
+const auth = `Basic ${Buffer.from(user).toString("base64")}`;
+const proxy = (ip) => `PROXY TCP4 ${ip} 192.0.2.1 40000 8080\r\n`;
+const upgrade = `GET /ws HTTP/1.1\r\nHost: web\r\nAuthorization: ${auth}\r\nOrigin: ${origin}\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: ${randomBytes(16).toString("base64")}\r\n\r\n`;
+let upgraded = 0;
+for (let visitor = 0; visitor < 16; visitor += 1) {
+  for (let i = 0; i < 32; i += 1) {
+    const socket = net.connect(8080, "web", () => socket.write(`${proxy(`203.0.113.${String(70 + visitor)}`)}${upgrade}`));
+    socket.once("data", (chunk) => {
+      if (chunk.toString().startsWith("HTTP/1.1 101")) upgraded += 1;
+    });
+    socket.on("error", () => {});
+  }
+}
+setTimeout(() => {
+  const other = net.connect(8080, "web", () =>
+    other.write(`${proxy("203.0.113.99")}GET / HTTP/1.1\r\nHost: web\r\nAuthorization: ${auth}\r\nConnection: close\r\n\r\n`),
+  );
+  let answer = "";
+  other.on("data", (chunk) => (answer += chunk));
+  other.on("error", () => {});
+  other.on("close", () => {
+    console.log(`${String(upgraded)} ${answer.split(" ")[1] ?? "none"}`);
+    process.exit(0);
+  });
+}, 3000);
+setTimeout(() => {
+  console.log(`${String(upgraded)} not served within 4 s`);
+  process.exit(0);
+}, 7000);' "$auth" "$ORIGINS" 2>&1 || true)
+	expect "sixteen visitors at their 32 WebSockets each, and another is served" "$crowded" "512 200"
+	# The server reads Ergo's volume and never writes it (3n-b): mounted read-only, named, and read with no fault.
+	expect "the server holds Ergo's volume read-only" \
+		"$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/ergo"}}{{.RW}}{{end}}{{end}}' "$server")" false
+	expect "and measures it, ERGO_DATA naming it" \
+		"$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$server" | grep -cx 'ERGO_DATA=/ergo' || true)" 1
+	expect "and reads it: no unreadable alert" "$(docker logs "$server" 2>&1 | grep -c '"ergo_volume_unreadable"' || true)" 0
+	# The volume itself, not only a read-only one: the server's /ergo and Ergo's /data are one (F633).
+	mounted() { docker inspect --format "{{range .Mounts}}{{if eq .Destination \"$2\"}}{{.Name}}{{end}}{{end}}" "$1"; }
+	expect "and it is Ergo's own volume" "$(mounted "$server" /ergo) $(mounted "$ergo" /data)" "${project}_ergo ${project}_ergo"
+	wait "$timing" || true
+	timed=$(cat "$tmp/timed.out")
+	closes() { # $1 the probe, $2 the seconds web waits, $3 what the connection did
+		seconds=$(printf '%s\n' "$timed" | sed -n "s/^$1=//p")
+		if [ -n "$seconds" ] && [ "$seconds" -ge "$2" ] && [ "$seconds" -le $(($2 + 1)) ]; then
+			pass "web closes a connection that $3 after $2 s"
+		else
+			fail "web closes a connection that $3 after $2 s: [$timed]"
+		fi
+	}
+	closes headers 10 "never ends its headers"
+	closes body 10 "never sends its body"
+	closes idle 15 "stays idle between requests"
 	# What web hands its upstreams, seen in their place by an echo: no password, the visitor's own address. A
 	# second web of the same image and live settings, whose upstreams' names lead to the echo; high addresses of
 	# the internal network, which Docker hands out from its low end.
@@ -841,6 +1069,8 @@ CLIENT
 	# A known limit (OPERATIONS.md): smokescreen has no port rule, so port 80 reaches OpenAI's redirect alone.
 	expect "the way out answers nothing from the guard's other network" "$(answering "$outside" "$(docker inspect --format \
 		"{{(index .NetworkSettings.Networks \"$outside\").IPAddress}}" "$guard"):4750")" ""
+	# Its replies to a private address are refused too, so the door's own rule shows in no answer: read back.
+	expect "the guard's rules refuse 4750 but from the inside" "$(docker exec "$guard" iptables-nft -S INPUT | grep -c -- '--dport 4750 -j REJECT')" 1
 	# The server's own requests take the way out: Node's proxy from its settings (NODE_USE_ENV_PROXY, Node 24).
 	fetched() { docker exec "$server" /nodejs/bin/node -e "fetch('$1').then((r) => console.log(r.status), (e) => console.log('refused'))" 2>&1 || true; }
 	case $(fetched https://api.openai.com/v1/models) in [1-5][0-9][0-9]) pass "the server reaches OpenAI's API through the way out" ;; *) fail "the server does not reach OpenAI's API" ;; esac
@@ -857,8 +1087,9 @@ CLIENT
 	printf 'version: v1\nservices: []\ndefault:\n  project: test\n  action: enforce\n  allowed_domains:\n    - api.openai.com\n    - localtest.me\n    - 10.0.0.1.nip.io\n' >"$tmp/egress/acl.yaml"
 	chmod 755 "$tmp/egress" && chmod 644 "$tmp/egress"/*
 	for name in localtest.me:127.0.0.1 10.0.0.1.nip.io:10.0.0.1; do
-		resolved=$(docker run --rm --network bridge --entrypoint nslookup "$CURL" "${name%%:*}" 2>/dev/null | sed -n 's/^Address: //p' | tail -n 1)
-		[ "$resolved" = "${name#*:}" ] || missing "${name%%:*} resolves to [$resolved], not ${name#*:}: the resolution check is blind"
+		# Every answer, the DNS server's own line among them: localtest.me's A and AAAA come in either order.
+		resolved=$(docker run --rm --network bridge --entrypoint nslookup "$CURL" "${name%%:*}" 2>/dev/null | sed -n 's/^Address: //p' | tr '\n' ' ')
+		case " $resolved" in *" ${name#*:} "*) ;; *) missing "${name%%:*} resolves to [$resolved], not ${name#*:}: the resolution check is blind" ;; esac
 	done
 	box=$(docker run -d --rm --network "container:$guard" -v "$tmp/egress:/test:ro" --entrypoint /smokescreen \
 		"$(docker inspect --format '{{.Image}}' "$egress")" --config-file /test/config.yaml --listen-port 4751 --egress-acl-file /test/acl.yaml)

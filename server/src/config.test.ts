@@ -78,6 +78,48 @@ describe("loadConfig", () => {
     }
   });
 
+  it("reads Ergo's data folder, read-only, and its cap in MB, 1024 by default; none by default (3n-b)", () => {
+    const MB = 1024 * 1024;
+    expect(loadConfig(ENV).ergoData).toBeUndefined();
+    expect(loadConfig({ ...ENV, ERGO_DATA: "/ergo" }).ergoData).toEqual({ dir: "/ergo", maxBytes: 1024 * MB });
+    expect(loadConfig({ ...ENV, ERGO_DATA: "/ergo", ERGO_DATA_MB: "1" }).ergoData).toEqual({
+      dir: "/ergo",
+      maxBytes: MB,
+    });
+    expect(loadConfig({ ...ENV, ERGO_DATA: "/var/lib/ergo.d" }).ergoData).toMatchObject({ dir: "/var/lib/ergo.d" });
+    expect(loadConfig({ ...ENV, ERGO_DATA: "/e", ERGO_DATA_MB: "1048576" }).ergoData).toEqual({
+      dir: "/e",
+      maxBytes: 1024 * 1024 * MB,
+    });
+    for (const [key, value] of [
+      ["ERGO_DATA", ""],
+      ["ERGO_DATA", "ergo"],
+      ["ERGO_DATA", "ergo/data"],
+      // The whole disk, /proc included, walked at each tick (3NB-6).
+      ["ERGO_DATA", "/"],
+      ["ERGO_DATA", "/ergo/.."],
+      ["ERGO_DATA", "/../"],
+      // The root again, spelled otherwise: empty and "." segments (F636).
+      ["ERGO_DATA", "//"],
+      ["ERGO_DATA", "///"],
+      ["ERGO_DATA", "/."],
+      ["ERGO_DATA", "/./"],
+      ["ERGO_DATA", "/ergo/"],
+      ["ERGO_DATA", "/ergo/./data"],
+      ["ERGO_DATA_MB", "0"],
+      ["ERGO_DATA_MB", "1048577"],
+      ["ERGO_DATA_MB", "1.5"],
+      ["ERGO_DATA_MB", "1e3"],
+      ["ERGO_DATA_MB", " 5"],
+      ["ERGO_DATA_MB", "05"],
+      ["ERGO_DATA_MB", ""],
+    ] as const) {
+      expect(failure({ ...ENV, ERGO_DATA: "/ergo", [key]: value })).toMatch(new RegExp(`setting ${key}: `));
+    }
+    // A cap with no folder is a measure meant that would not come: the server stops rather than run blind.
+    expect(failure({ ...ENV, ERGO_DATA_MB: "100" })).toMatch(/setting ERGO_DATA: required/);
+  });
+
   it("names the entry of a list setting it refuses, never its value (F434)", () => {
     const error = failure({ ...ENV, ORIGINS: "https://gnoworld.test,https://bad.test/path" });
     expect(error).toMatch(/setting ORIGINS: \w+ \(at 1\)/);
@@ -147,13 +189,13 @@ describe("loadConfig", () => {
     const env = {
       ...ENV,
       OPENAI_API_KEY_FILE: file("openai", `${key}\n`),
-      MODERATION_THRESHOLDS: '{"harassment":0.9,"sexual/minors":0}',
+      MODERATION_THRESHOLDS: '{"harassment":0.9,"sexual/minors":0.01}',
       NEW_ACCOUNT_HOURS: "720",
     };
     const { openaiKey, ...rest } = loadConfig(env).moderation;
     expect([openaiKey?.reveal(), rest]).toEqual([
       key,
-      { thresholds: { harassment: 0.9, "sexual/minors": 0 }, newAccountHours: 720, mute: MUTE },
+      { thresholds: { harassment: 0.9, "sexual/minors": 0.01 }, newAccountHours: 720, mute: MUTE },
     ]);
   });
 
@@ -166,6 +208,8 @@ describe("loadConfig", () => {
     ["MODERATION_THRESHOLDS", { MODERATION_THRESHOLDS: '{"new/kind":0.5}' }],
     ["MODERATION_THRESHOLDS", { MODERATION_THRESHOLDS: '{"harassment":1.01}' }],
     ["MODERATION_THRESHOLDS", { MODERATION_THRESHOLDS: '{"harassment":-0.1}' }],
+    // A threshold of 0 hides every line of its category: a typo would silence the chat (F525).
+    ["MODERATION_THRESHOLDS", { MODERATION_THRESHOLDS: '{"harassment":0}' }],
     ["MODERATION_THRESHOLDS", { MODERATION_THRESHOLDS: '{"harassment":"0.9"}' }],
     ["NEW_ACCOUNT_HOURS", { NEW_ACCOUNT_HOURS: "0" }],
     ["NEW_ACCOUNT_HOURS", { NEW_ACCOUNT_HOURS: "721" }],
@@ -204,12 +248,11 @@ describe("loadConfig", () => {
     expect(loadConfig(low).moderation.mute).toEqual({ strikes: 1, windowMinutes: 1, minutes: 1, max: 1 });
   });
 
-  it("takes a new account's hours from 1, and thresholds of exactly 0 and 1", () => {
+  it("takes a new account's hours from 1, and thresholds just above 0 and of exactly 1", () => {
     expect(loadConfig({ ...ENV, NEW_ACCOUNT_HOURS: "1" }).moderation.newAccountHours).toBe(1);
-    expect(loadConfig({ ...ENV, MODERATION_THRESHOLDS: '{"hate":0,"violence":1}' }).moderation.thresholds).toEqual({
-      hate: 0,
-      violence: 1,
-    });
+    expect(
+      loadConfig({ ...ENV, MODERATION_THRESHOLDS: '{"hate":0.000001,"violence":1}' }).moderation.thresholds,
+    ).toEqual({ hate: 0.000001, violence: 1 });
   });
 
   it("never shows OpenAI's key when the settings are printed", () => {

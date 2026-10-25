@@ -10,6 +10,7 @@ FROM ghcr.io/ergochat/ergo:v2.19.1@sha256:ef885e44f7fa19101bbbc41baef11dc280dc81
 COPY --from=probe /probe /ircd-bin/probe
 COPY --chmod=644 deploy/ergo/ircd.yaml.tmpl /ergo/ircd.yaml.tmpl
 COPY --chmod=755 deploy/ergo/render.sh /ergo/render.sh
-RUN mkdir -p /data /run/gnoworld && chown 65532:65532 /data /run/gnoworld
+# A COPY --chmod=644 makes /ergo 644 too, closed to Ergo's user (moby/buildkit#5943): it is opened here.
+RUN chmod 755 /ergo && mkdir -p /data /run/gnoworld && chown 65532:65532 /data /run/gnoworld
 USER 65532:65532
 ENTRYPOINT ["/bin/sh", "/ergo/render.sh"]

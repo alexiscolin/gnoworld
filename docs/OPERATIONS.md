@@ -13,7 +13,7 @@ later, Docker Desktop, or OrbStack.
 | `web` | built from `deploy/web/Dockerfile`: the client, on `nginx-unprivileged` 1.30.6, by digest | 8080, PROXY protocol, on `inside` only | `127.0.0.1:8081/health`, inside the container | 0.5 core, 128 MB, 64 processes | none | `demo_htpasswd` |
 | `guard` (profile `demo`) | `tailscale/tailscale` v1.104.1, by digest, running `deploy/guard/guard.sh` | nothing | its rules loaded | 0.1 core, 32 MB, 16 processes | none | none |
 | `tailscale` (profile `demo`) | the same image | Funnel on 443, forwarded to `web:8080` | `127.0.0.1:9002/healthz`, inside its network | 0.5 core, 256 MB, 128 processes | the `tailscale` volume (its node key) | `ts_authkey` |
-| `ergo` | built from `deploy/ergo/Dockerfile`: Ergo's own image v2.19.1, by digest, with `render.sh` and a probe for its health; its auth script is the server's socket | 6667 (the bot) and 8097 (WebSocket, web's `/ws`), on `inside` only | its 6667 answers | 0.4 core, 256 MB, 128 processes | the `ergo` volume (accounts, history) | `ergo_oper_password` |
+| `ergo` | built from `deploy/ergo/Dockerfile`: Ergo's own image v2.19.1, by digest, with `render.sh` and a probe for its health; its auth script is the server's socket | 6667 (the bot) and 8097 (WebSocket, web's `/ws`), on `inside` only | its 6667 answers | 0.4 core, 512 MB, 1,024 processes (Go's threads count) | the `ergo` volume (accounts, history) | `ergo_oper_password` |
 | `server` | built from `deploy/server/Dockerfile`: distroless Node 24, by digest | 8080 (web's `/api/`), on `inside` only; the `auth` volume's socket | `127.0.0.1:8080/health` | 0.4 core, 512 MB, 128 processes | the `server` volume (its SQLite) | `log_pepper`, `ergo_oper_password`, `openai_api_key` |
 | `egress` (profile `demo`) | built from `deploy/egress/Dockerfile`: smokescreen v0.1.0 from its source, on distroless static | 4750 in `guard`'s network, reached from `inside` alone | its 4750 answers | 0.1 core, 64 MB, 64 processes | none | none |
 
@@ -130,8 +130,16 @@ Alexis, 2026-10-19: written here, each with its backlog row, not fixed in 1c.
 - **DNS through the router.** On a host whose resolver is its router or a LAN server, the guard
   lets that server's port 53 out, for Tailscale's name lookups: an exception to "every private
   address refused" (F205).
-- **Open connections.** The limit counts requests per visitor, not open connections, and a team
-  behind one address shares one limit (F208).
+- **Open connections.** A visitor holds 32 requests at once, a WebSocket and a stream counting while
+  they last, and a team behind one address shares them; `web` holds 4,096 connections, two for each
+  held request (the visitor's and its upstream's): about 64 visitors at their 32 at once, by division;
+  `deploy/test.sh` proves 16 at once (more than 1,024), the rest is a margin, and `web`'s 128 MB is not
+  measured past those 512 held requests (F645). A connection
+  that sends nothing more is closed, 10 s into its headers or its body, 15 s idle between requests
+  (F208, sized before the first k6 run: 3n-b). Still a limit: a connection is counted for its visitor
+  only once its headers are whole, and nginx takes back a silent or idle one when short, never one
+  half-way through its headers; so one address opening about 410 such connections a second holds all
+  4,096 and nobody else is served (F641, measured on nginx 1.30.6 at 64).
 
 Slice 3, the login (3c; `docs/decisions.md`, 2026-10-22):
 
@@ -183,7 +191,8 @@ Slice 3, the check (3i):
 
 - **Its settings.** `OPENAI_API_KEY_FILE` holds OpenAI's key (one word, 32 characters at least);
   unset, nothing leaves the server, every message is unchecked and the alert says so at the start.
-  `MODERATION_THRESHOLDS` (JSON, a score by category) replaces OpenAI's own flag where set;
+  `MODERATION_THRESHOLDS` (JSON, a score above 0 and at most 1 by category; 0 would hide every line of its
+  category, so the server refuses it, F525) replaces OpenAI's own flag where set;
   `NEW_ACCOUNT_HOURS` (24) is how long an account counts as new.
 - **What reaches OpenAI.** A message's text alone, with the model's name: no account, no room.
   The privacy policy must say so before a public launch (decision 154).
@@ -192,6 +201,11 @@ Slice 3, the check (3i):
 - **Banned words** match as whole words, but a word of a script written without spaces (Chinese,
   Japanese, Thai, Lao, Khmer, Myanmar) matches anywhere in a line.
 - **A message caught in a restart** stays `pending` in the verdicts; 3j's catch-up checks it again.
+- **OpenAI's rate limit.** One line a request, and OpenAI caps a key's requests a minute by its account's tier
+  (`omni-moderation-latest`: 250 on Free, 500 on Build, 2,000 on Launch, 5,000 on Grow; its model page, read
+  2026-10-24): past it, its refusals count as down, five open the breaker for 30 s, and lines pass unchecked
+  meanwhile. The load run's 200 accounts, a line each every 5 s (2,400 a minute), left 1,810 of 2,200 unchecked
+  (F692). Several lines a request is slice 4's (`docs/plans/backlog.md`).
 
 Slice 3, the bot acts and the stream (3j):
 
@@ -272,8 +286,33 @@ Slice 3, the server's retention (3n):
   alert (put to Alexis: an alert of its own).
 - **The other stores** purge themselves (nonces, tokens, tickets, mutes) or hold a row a room or an
   account; the accounts' addresses are kept for the new-account rule, until slice 12's erasure path.
-- **Not yet:** the k6 runs, `web`'s per-visitor limits and Ergo's volume measure wait for 3e's stack
-  (3n-b); the sizes above are a careful start for the demo's 2 GB until those runs.
+- **Ergo's volume** is measured by the server, read-only (`ERGO_DATA`, the volume mounted at `/ergo`
+  with `:ro`), against `ERGO_DATA_MB` (1024, `deploy/.env`): the alert `ergo_volume_near_cap` fires once
+  at 80% and again only after a fall below, and `ergo_volume_unreadable` once while the folder cannot be
+  read. It is measured every five minutes, never during a backlog's runs. Ergo deletes history by age
+  alone (its one `expire-time`, 90 days), not by size: at the alert, give the disk room and raise
+  `ERGO_DATA_MB`, or shorten `expire-time` in `deploy/ergo/ircd.yaml.tmpl` and restart Ergo; whether
+  Ergo then frees the space at once is not verified.
+- **The load runs** are the operator's: `sh deploy/k6/run.sh` (Docker) builds a stack of its own, in the
+  project `gnoworld-load`, and refuses to start while the demo runs on the host. From inside its network,
+  each scenario's numbers: every account logging in at once (`ACCOUNTS`, 200), guests in a world's room
+  (`CROWD`, 2,000), the rooms' streams (`STREAMS`, 1,000), the accounts' lines every 5 s (with
+  `OPENAI_API_KEY_FILE`, OpenAI's checks of them); the containers' peak memory, processes and CPU, their
+  restarts and Ergo's last fatal lines, Ergo's volume before and after, the verdicts and the server's errors.
+  The numbers are in slice 3's plan (3n's As built): Ergo holds 2,000 guests joining one room at 341 MiB and
+  311 threads, under its 512 MiB and 1,024, but at its 0.4 core, so the last of them waits up to a minute to
+  be in; the runs go straight to the server and Ergo, so `web`'s limits are not theirs to size.
+- **Logs** have a size and a count (3 × 10 MB a container), no age: decision 154's 14 days hold only
+  where ops' log backend sets them.
+- **Every alert**, each a log line `{"event":"alert","error":"<name>"}` that ops matches:
+  `verdicts_near_cap`, `database_near_cap`, `ergo_volume_near_cap` and `ergo_volume_unreadable` (above);
+  `moderation_off` (no key: every message unchecked), `moderation_refused` (OpenAI refused the key or the
+  call), `moderation_shape` (an answer of an unknown shape), `moderation_breaker` (checks paused 30 s
+  after five failures), `moderation_backlog` (a check waits two minutes or more), `moderation_queue_full` (a
+  message left unchecked, the queue full); `redact_refused`, `unknown_room` and `room_opened` (the
+  rooms, below). `scripts/check_docs.py` keeps this list whole.
+- **Before a public launch** (decision 154): the privacy policy, which says what reaches OpenAI and what
+  is kept and how long, and the erasure path (slice 12) are blockers.
 
 Slice 3, the stack (3e):
 
@@ -285,6 +324,9 @@ Slice 3, the stack (3e):
   (`history.restrictions.expire-time`); decision 154's 30 days for direct messages cannot be set
   apart, so direct messages are not stored at all (`persistent.direct-messages: disabled`) until
   slice 4 makes them a product. History fills the `ergo` volume, which has no quota.
+- **A thousand rooms a client, guests too.** Ergo has one `max-channels-per-client` for every client
+  (its config.go:1937), and the bot needs 1,000: a guest may join every world's room and receive each one's
+  names. Load, not a hole; k6's crowd measures it (F631).
 - **The way out has no port rule.** smokescreen v0.1.0 matches a host, not a port: plain HTTP to
   `api.openai.com` on port 80 is let out too, and meets OpenAI's redirect alone.
 - **A restart of `ergo` or `server` by Compose restarts `web`**, which reads its upstreams' addresses

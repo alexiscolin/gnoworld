@@ -330,6 +330,18 @@ describe("the server's process", () => {
     expect(kept).toEqual([{ msgid: "new" }]);
   });
 
+  it("measures Ergo's folder when it starts, alerting at 80% of ERGO_DATA_MB, not below (3n-b)", async () => {
+    const data = folder("gnoworld-ergo-");
+    writeFileSync(join(data, "history.db"), Buffer.alloc(900 * 1024));
+    const full = start({ ...settings(), ERGO_DATA: data, ERGO_DATA_MB: "1" });
+    await listening(full);
+    expect(full.out.stdout).toContain('"event":"alert","error":"ergo_volume_near_cap"');
+    // The measure runs before the server listens: a roomier cap has said nothing by then.
+    const roomy = start({ ...settings(), ERGO_DATA: data, ERGO_DATA_MB: "2" });
+    await listening(roomy);
+    expect(roomy.out.stdout).not.toContain("ergo_volume");
+  });
+
   it("answers the rooms of the roles file's worlds, made at boot, with no Ergo set", async () => {
     const port = await listening(start(settings()));
     const answer = await fetch(`http://127.0.0.1:${String(port)}/api/activity?worlds=earth,bubble`);

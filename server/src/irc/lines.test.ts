@@ -46,6 +46,21 @@ describe("the link's own lines (3j's green pass)", () => {
     );
   });
 
+  it("sends a NOTICE to an account's shape alone, never a server mask nor a room's prefix (F655)", () => {
+    const to = (target: string): boolean => allowed("NOTICE", [target, "x"]);
+    // $ reaches every user, @# + # and %# a room's operators, voices or half-ops; then a dot, a space, a letter
+    // past ASCII, and one character too many.
+    expect(
+      ["$*", "$$*", "$#*", "@#bubble", "+#bubble", "%#bubble", "g1a.b", "a b", "é", "x".repeat(65)].map(to),
+    ).toEqual(Array<boolean>(10).fill(false));
+    expect(["g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5", "alice", "a-b_c", "x".repeat(64)].map(to)).toEqual([
+      true,
+      true,
+      true,
+      true,
+    ]);
+  });
+
   it("allows a room flag alone, never inside a longer mode, and a KICK with its reason and nothing after (F570)", () => {
     expect(["+M", "-i", "+o+M", "x+M", "+M+o", "+MM"].map((mode) => allowed("SAMODE", ["#bubble", mode]))).toEqual([
       true,

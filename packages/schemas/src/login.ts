@@ -1,5 +1,5 @@
-// The login's bodies (slice 3's plan, 3c): what the browser sends, what the server answers. A request
-// takes no field it does not know; Adena's proof comes as the SDK types it, each part bounded.
+// The login's bodies (slice 3's plan, 3c): what the browser sends, what the server answers. A request's own
+// fields are strict; Adena's proof comes as the SDK types it.
 import { z } from "zod";
 import { Address } from "./address.ts";
 
@@ -8,8 +8,9 @@ export const ChallengeRequest = z.strictObject({ chainId: z.string().min(1).max(
 export const Challenge = z.object({ nonce: z.string(), text: z.string(), expiresAt: z.iso.datetime() });
 export type Challenge = z.infer<typeof Challenge>;
 
-// Adena's answer to signArbitrary (the SDK's SignedArbitraryData). The verifier reads it whole and
-// refuses any document but the canonical one, so these bounds only cap its size.
+// Adena's answer to signArbitrary (the SDK's SignedArbitraryData): a key it does not know is dropped, msgs'
+// items bounded by the body's 16 KiB alone. The SDK checks the signature over the canonical document it rebuilds
+// from signer, chain and text, so nothing dropped was ever signed (F672).
 export const Proof = z.object({
   signed: z.object({
     chain_id: z.string().max(50),

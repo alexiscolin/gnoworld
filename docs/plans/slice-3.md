@@ -811,6 +811,29 @@ go out with the JOINs, before any read.
 **As built** (`docs/decisions.md`, 2026-10-22, 3n's split): 3n-a is the server's retention, the verdicts
 by days and a row cap, the database's used pages, the alerts; 3n-b, the k6 scripts, `web`'s limits, Ergo's
 volume and the sizes from the runs, waits for 3e's stack, since 3e goes last.
+3n-b (`docs/decisions.md`, 2026-10-23, 3n-b's shapes): Ergo's folder measured read-only against
+`ERGO_DATA_MB` (1024), its two alerts; `web`'s 32 held requests a visitor, 4,096 connections, waits of 10 s and
+15 s idle; `deploy/k6/run.sh` for the operator; `check_docs.py` keeps the runbook's alerts whole. **The first
+numbers** (Alexis's run, 2026-10-24, the load's own stack on his host): logins, 200 accounts at once: every
+ticket logged in, the ticket request 17 ms on average and 32 ms at p95, the server at 80 MiB. Crowd, 2,000 guests
+joining #earth at once, straight to Ergo: Ergo reached its 256 MiB cap and by every sign was killed (every session
+ended near 15.5 s of 60, Ergo back at 24 MiB in the next scenario; F691), so its cap is now 512 MiB, the next run
+to say whether 2,000 hold. Streams, 1,000 readers of #earth's stream, four a visitor: 1,000 of 1,000 beat, the
+server at 186 MiB and 19% of a core. Messages, 200 accounts, a line each every 5 s for 60 s, checked by OpenAI:
+2,400 of 2,400, the ticket request 32 ms on average and 58 ms at p95, the server at 210 MiB, Ergo at 50 MiB and
+17%; Ergo's volume grew 1.3 MB (7,377,326 to 8,708,526 bytes); the verdicts were not read (F690). The scenarios go
+straight to the server and Ergo: they size neither `web`'s 32 a visitor nor its 4,096 connections, which stay as
+set, `deploy/test.sh` holding them. A second run, Ergo at 512 MiB: logins as before (26 ms at p95, an IRC login in
+347 ms on average); the crowd, 0 of 2,000 stayed, every session ended near 6.7 s, Ergo at 344 MiB restarted once and
+not for its memory (F691, its cause not known); streams 1,000 of 1,000; messages, every line echoed, but 1,797 of
+2,200 verdicts unchecked and one backlog alert (F692). A third run named both: Ergo died of its pids_limit, Go past 128 threads
+("failed to create new OS thread (have 129 already)"; F691, now 1,024), and the lines went unchecked past OpenAI's
+rate limit, 12 refusals then the breaker (1,810 of 2,200; F692, slice 4's). A fourth, Ergo at 1,024 processes: every scenario
+passed. Logins: 200 of 200, an IRC login in 394 ms on average. Crowd: 2,000 of 2,000 joined and stayed, Ergo at
+341 MiB, 311 threads and 40% (its whole 0.4 core), no restart; a guest's session lasted 1 to 2 minutes for a
+60 s hold, the joins slowed by that core; the crowd's joins grew Ergo's volume by about 28 MB. Streams: 1,000
+of 1,000. Messages: every line back in 5 ms on average, the verdicts as before (391 checked, 1,809 unchecked;
+F692). The sizes: Ergo 512 MiB and 1,024 processes, the rest as set.
 
 **Tests by level.** Unit with the clock, property, operator's load runs. **Cost and scale.** One indexed query a
 tick. **Files.** New: `server/src/retention/`, `deploy/k6/`; changed: `deploy/web/nginx.conf`, `deploy/test.sh`,

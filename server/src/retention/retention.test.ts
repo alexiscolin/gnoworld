@@ -1,3 +1,17 @@
+import {
+  chmodSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  truncateSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 import fc from "fast-check";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -12,7 +26,7 @@ import { MUTE_TABLES } from "../moderation/mute.ts";
 import { STRIKE_TABLES } from "../moderation/strikes.ts";
 import { ROOM_STATE } from "../rooms/create.ts";
 import { ROOM_TABLES } from "../rooms/rooms.ts";
-import { makeRetention, startRetention } from "./retention.ts";
+import { makeRetention, sizeOf, startRetention } from "./retention.ts";
 
 const DAY = 24 * 60 * 60_000;
 const T0 = Date.parse("2026-10-22T12:00:00.000Z");
@@ -30,16 +44,24 @@ const TABLES = [
   ROOM_STATE,
 ];
 const opened: DatabaseSync[] = [];
+const folders: string[] = [];
 afterEach(() => {
   vi.useRealTimers();
   for (const db of opened.splice(0)) if (db.isOpen) db.close();
+  for (const dir of folders.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
+const folder = (): string => {
+  const dir = mkdtempSync(join(tmpdir(), "gnoworld-ergo-data-"));
+  folders.push(dir);
+  return dir;
+};
 
 interface Limits {
   maxVerdicts?: number;
   maxBytes?: number;
   batch?: number;
   batches?: number;
+  ergoData?: { dir: string; maxBytes: number };
 }
 
 const setup = (limits: Limits = {}) => {
@@ -319,6 +341,178 @@ describe("the retention's alerts (3n)", () => {
     verdicts(2, T0 + 100, { prefix: "back" });
     both.tick();
     expect(names()).toEqual(["verdicts_near_cap", "database_near_cap", "verdicts_near_cap"]);
+  });
+});
+
+describe("Ergo's volume, measured read-only (3n-b)", () => {
+  it("raises Ergo's volume alert at 80% of its cap to the byte, none a byte below, again after a fall", () => {
+    const dir = folder();
+    const file = join(dir, "history.db");
+    writeFileSync(file, "x".repeat(800));
+    const below = setup({ ergoData: { dir, maxBytes: 1001 } });
+    below.retention.tick();
+    expect(below.lines).toEqual([]);
+    const at = setup({ ergoData: { dir, maxBytes: 1000 } });
+    at.retention.tick();
+    at.retention.tick();
+    expect(at.lines.map((line) => line.replace(/^\{"time":"[^"]+",/, "{").trim())).toEqual([
+      '{"event":"alert","error":"ergo_volume_near_cap"}',
+    ]);
+    truncateSync(file, 799);
+    at.retention.tick();
+    truncateSync(file, 800);
+    at.retention.tick();
+    expect(at.alerts("ergo_volume_near_cap")).toBe(2);
+  });
+
+  it("counts every file under the folder, in its sub-folders too, and no folder itself (3NB-5)", () => {
+    const dir = folder();
+    mkdirSync(join(dir, "history", "old"), { recursive: true });
+    writeFileSync(join(dir, "ircd.db"), "x".repeat(300));
+    writeFileSync(join(dir, "history", "a"), "x".repeat(200));
+    writeFileSync(join(dir, "history", "old", "b"), "x".repeat(299));
+    // 799 bytes of files under a cap of 1000: a folder's own size counted would pass 800.
+    const { retention, alerts } = setup({ ergoData: { dir, maxBytes: 1000 } });
+    retention.tick();
+    expect(alerts("ergo_volume_near_cap")).toBe(0);
+    writeFileSync(join(dir, "history", "old", "b"), "x".repeat(300));
+    retention.tick();
+    expect(alerts("ergo_volume_near_cap")).toBe(1);
+  });
+
+  it("measures the folder a link names, as the stack's mount would be", () => {
+    const real = folder();
+    writeFileSync(join(real, "ircd.db"), "x".repeat(800));
+    const link = join(folder(), "ergo");
+    symlinkSync(real, link);
+    const { retention, alerts } = setup({ ergoData: { dir: link, maxBytes: 1000 } });
+    retention.tick();
+    expect(alerts("ergo_volume_near_cap")).toBe(1);
+  });
+
+  it("counts a link as itself, never the file or the folder it leads to", () => {
+    const elsewhere = folder();
+    writeFileSync(join(elsewhere, "big"), "x".repeat(100_000));
+    const dir = folder();
+    symlinkSync(join(elsewhere, "big"), join(dir, "file-link"));
+    symlinkSync(elsewhere, join(dir, "folder-link"));
+    const links = lstatSync(join(dir, "file-link")).size + lstatSync(join(dir, "folder-link")).size;
+    // At 80% of a cap the links alone fill, past it with anything they lead to.
+    const { retention, alerts } = setup({ ergoData: { dir, maxBytes: Math.floor((links * 5) / 4) } });
+    retention.tick();
+    expect(alerts("ergo_volume_near_cap")).toBe(1);
+    const looser = setup({ ergoData: { dir, maxBytes: Math.floor((links * 5) / 4) + 1 } });
+    looser.retention.tick();
+    expect(looser.alerts("ergo_volume_near_cap")).toBe(0);
+  });
+
+  it("raises one alert while the folder cannot be read, again only after it could", () => {
+    const dir = join(folder(), "ergo");
+    const { retention, alerts, lines } = setup({ ergoData: { dir, maxBytes: 1000 } });
+    retention.tick();
+    retention.tick();
+    expect(alerts("ergo_volume_unreadable")).toBe(1);
+    mkdirSync(dir);
+    retention.tick();
+    expect(alerts("ergo_volume_unreadable")).toBe(1);
+    rmSync(dir, { recursive: true });
+    retention.tick();
+    expect(alerts("ergo_volume_unreadable")).toBe(2);
+    // An unreadable folder measures as nothing, never as full.
+    expect(alerts("ergo_volume_near_cap")).toBe(0);
+    expect(lines).toHaveLength(2);
+  });
+
+  it("finds a folder unreadable when it is a file, or holds a sub-folder it may not list (3NB-3)", () => {
+    const parent = folder();
+    writeFileSync(join(parent, "a-file"), "x".repeat(900));
+    const file = setup({ ergoData: { dir: join(parent, "a-file"), maxBytes: 1000 } });
+    file.retention.tick();
+    expect([file.alerts("ergo_volume_unreadable"), file.alerts("ergo_volume_near_cap")]).toEqual([1, 0]);
+    const dir = folder();
+    mkdirSync(join(dir, "locked"));
+    writeFileSync(join(dir, "locked", "big"), "x".repeat(900));
+    chmodSync(join(dir, "locked"), 0o000);
+    try {
+      const locked = setup({ ergoData: { dir, maxBytes: 1000 } });
+      locked.retention.tick();
+      // A sum without the locked part would be a silent undercount.
+      expect([locked.alerts("ergo_volume_unreadable"), locked.alerts("ergo_volume_near_cap")]).toEqual([1, 0]);
+    } finally {
+      chmodSync(join(dir, "locked"), 0o700);
+    }
+  });
+
+  it("keeps the near-cap alert's state while the folder cannot be read: no second alert when it is back (3NB-3)", () => {
+    const real = folder();
+    writeFileSync(join(real, "ircd.db"), "x".repeat(900));
+    const link = join(folder(), "ergo");
+    symlinkSync(real, link);
+    const { retention, alerts } = setup({ ergoData: { dir: link, maxBytes: 1000 } });
+    retention.tick();
+    unlinkSync(link);
+    retention.tick();
+    symlinkSync(real, link);
+    retention.tick();
+    expect([alerts("ergo_volume_near_cap"), alerts("ergo_volume_unreadable")]).toEqual([1, 1]);
+  });
+
+  it("skips a file gone between the listing and its measure, as Ergo's rewrites do (3NB-3)", () => {
+    const dir = folder();
+    writeFileSync(join(dir, "ircd.db"), "x".repeat(500));
+    writeFileSync(join(dir, "ircd.db.tmp"), "x".repeat(400));
+    const gone = (path: string) => {
+      if (path.endsWith(".tmp")) throw Object.assign(new Error("gone"), { code: "ENOENT" });
+      return lstatSync(path);
+    };
+    expect(sizeOf(dir, gone)).toBe(500);
+    expect(sizeOf(dir)).toBe(900);
+  });
+
+  it("measures Ergo's folder only on a tick that left no backlog of verdicts (3NB-8)", () => {
+    const dir = folder();
+    writeFileSync(join(dir, "ircd.db"), "x".repeat(900));
+    const { retention, verdicts, alerts } = setup({
+      maxVerdicts: 100,
+      batch: 5,
+      batches: 1,
+      ergoData: { dir, maxBytes: 1000 },
+    });
+    verdicts(110, T0);
+    expect(retention.tick()).toBe(true);
+    expect(alerts("ergo_volume_near_cap")).toBe(0);
+    while (retention.tick());
+    expect(alerts("ergo_volume_near_cap")).toBe(1);
+  });
+
+  it("still prunes the verdicts and measures the database when Ergo's folder cannot be read", () => {
+    const { retention, verdicts, times, alerts } = setup({
+      maxVerdicts: 5,
+      ergoData: { dir: join(folder(), "gone"), maxBytes: 1000 },
+    });
+    verdicts(8, T0);
+    retention.tick();
+    expect(times()).toHaveLength(5);
+    expect(alerts("verdicts_near_cap")).toBe(1);
+  });
+
+  it("writes nothing in Ergo's folder: its names, sizes and times stay as they were", () => {
+    const dir = folder();
+    mkdirSync(join(dir, "history"));
+    writeFileSync(join(dir, "ircd.db"), "x".repeat(900));
+    writeFileSync(join(dir, "history", "a"), "x".repeat(10));
+    const seen = (): string[] =>
+      readdirSync(dir, { recursive: true, encoding: "utf8" })
+        .sort()
+        .map((name) => {
+          const { size, mtimeMs } = lstatSync(join(dir, name));
+          return `${name} ${String(size)} ${String(mtimeMs)}`;
+        });
+    const before = [...seen(), String(lstatSync(dir).mtimeMs)];
+    const { retention } = setup({ ergoData: { dir, maxBytes: 1000 } });
+    retention.tick();
+    retention.tick();
+    expect([...seen(), String(lstatSync(dir).mtimeMs)]).toEqual(before);
   });
 });
 

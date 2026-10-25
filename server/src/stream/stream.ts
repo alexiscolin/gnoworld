@@ -111,6 +111,9 @@ export function makeStream(options: Options = {}): Stream {
         const who = visitor(getConnInfo(c).remote.address ?? "", c.req.header("x-real-ip"), proxy);
         const held = byVisitor.get(who) ?? 0;
         if (held >= perVisitor || admitted >= total) return c.json({ error: "too_many" } satisfies ApiError, 429);
+        // Read before a slot is taken: a session that fails (its renewal writes) is the app's 500, and inside
+        // the stream it would end the stream with its slot held for good (F653).
+        const seen = seenBy(c, rooms.data, { visible, session });
         byVisitor.set(who, held + 1);
         admitted += 1;
         return streamSSE(c, async (stream) => {
@@ -118,7 +121,7 @@ export function makeStream(options: Options = {}): Stream {
           const ended = new Promise<void>((resolve) => {
             stream.onAbort(resolve);
           });
-          const client: Client = { rooms: seenBy(c, rooms.data, { visible, session }), stream, unread: 0 };
+          const client: Client = { rooms: seen, stream, unread: 0 };
           clients.add(client);
           // The newest it missed, or the rooms' last events for a new client, as many as it may leave unread:
           // a client further behind loses the rest. An id past the last is none of ours (a clock set back).

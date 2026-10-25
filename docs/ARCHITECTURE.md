@@ -127,7 +127,8 @@ option compares syntax trees). **One way to
 do each thing,** enforced per folder by `no-restricted-globals` and `no-restricted-syntax`:
 `fetch` and storage only in `lib`, and in `sw` only `fetch` and the cache (the worker fetches and caches;
 its page side asks whether the host answers, F351), `Intl` formatting only in `core`'s formatters, no clock
-in `core`, `console` only through the logger. **A map for agents:** the gate regenerates
+in `core`, `console` only through the logger, no `Map`, `WeakMap` or `Set` at a module's top in `server/src` or a
+package's `src` (F412). **A map for agents:** the gate regenerates
 `docs/generated/exports.md`, every exported function and type with its signature, from the
 TypeScript compiler; a reviewer reads the map to see the whole repo without reading it all. **Dead code:** knip, at zero.
 

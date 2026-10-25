@@ -130,6 +130,8 @@ if $full; then
 	run mutate
 	echo "== no regression: no test gone, no floor lower, no approved screenshot changed, unless a commit says why"
 	python3 -I scripts/check_regressions.py "$base"
+	echo "== a migration main has keeps its text and its place (F466)"
+	python3 -I scripts/check_migrations.py "$base"
 	echo "== no secret anywhere in the history, no known vulnerability in a dependency"
 	sh scripts/scan_secrets.sh
 	python3 -I scripts/audit.py

@@ -1,7 +1,10 @@
 // The server's retention (slice 3's plan, 3n; decision 154): the bot's verdict records kept 180 days and
 // below a row cap, the oldest going first, a budget of small batches a tick so a backlog never holds the
-// event loop; the verdicts and the database's used pages measured after, with one alert a crossing of 80%.
-// The other stores purge themselves (nonces, tokens, tickets, mutes) or hold one row a room or an account.
+// event loop; the verdicts and the database's used pages measured after, with one alert a crossing of 80%,
+// and Ergo's data folder too, read-only (3n-b). The other stores purge themselves (nonces, tokens, tickets,
+// mutes) or hold one row a room or an account.
+import { lstatSync, readdirSync, type Stats } from "node:fs";
+import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import type { Log } from "../log.ts";
@@ -15,6 +18,8 @@ interface Options {
   // Rows a batch and batches a tick: 10,000 rows at most a tick.
   batch?: number;
   batches?: number;
+  // Ergo's data folder and its cap; none, no measure.
+  ergoData?: { dir: string; maxBytes: number } | undefined;
 }
 
 export interface Retention {
@@ -40,14 +45,28 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
     ),
   };
   const count = (): number => N.parse(sql.count.get()).n;
-  // Each measure's alert, raised at 80% of its cap and armed again below it.
-  const raised = new Set<string>();
-  const watch = (name: string, value: number, cap: number): void => {
-    if (value * 5 < cap * 4) raised.delete(name);
-    else if (!raised.has(name)) {
-      raised.add(name);
-      log("alert", { error: name });
+  // Whether an alert's condition holds now and did not at the last tick: one alert a crossing, armed again once
+  // it no longer holds. Each alert is logged by its name written out, which scripts/check_docs.py reads.
+  const raised = { verdicts: false, database: false, unreadable: false, ergo: false };
+  const rises = (which: keyof typeof raised, holds: boolean): boolean => {
+    const was = raised[which];
+    raised[which] = holds;
+    return holds && !was;
+  };
+  const near = (value: number, cap: number): boolean => value * 5 >= cap * 4;
+  // Ergo's folder against its cap. One that cannot be read is an alert of its own and leaves the near-cap one
+  // as it was.
+  const measureErgo = (): void => {
+    if (options.ergoData === undefined) return;
+    const { dir, maxBytes: cap } = options.ergoData;
+    let bytes: number | undefined;
+    try {
+      bytes = sizeOf(dir);
+    } catch {
+      // A folder that cannot be listed is unreadable, never empty.
     }
+    if (rises("unreadable", bytes === undefined)) log("alert", { error: "ergo_volume_unreadable" });
+    if (bytes !== undefined && rises("ergo", near(bytes, cap))) log("alert", { error: "ergo_volume_near_cap" });
   };
   return {
     tick() {
@@ -58,11 +77,29 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
         removed = Number(sql.oldest.run(Math.min(batch, budget, over)).changes);
         [over, budget] = [over - removed, budget - removed];
       }
-      watch("verdicts_near_cap", count(), maxVerdicts);
-      watch("database_near_cap", N.parse(sql.used.get()).n, maxBytes);
+      if (rises("verdicts", near(count(), maxVerdicts))) log("alert", { error: "verdicts_near_cap" });
+      if (rises("database", near(N.parse(sql.used.get()).n, maxBytes))) log("alert", { error: "database_near_cap" });
+      // A backlog's ticks follow at once: Ergo's folder is walked on the timed ones alone (3NB-8).
+      if (budget > 0) measureErgo();
       return budget <= 0;
     },
   };
+}
+
+/** The bytes of the files under `dir`, its sub-folders' included, a link as itself: Node's recursive readdir
+ * would follow a link to a folder. A file gone between the listing and its measure, as a rewrite leaves, counts as
+ * none; a folder that cannot be listed throws. */
+export function sizeOf(dir: string, lstat: (path: string) => Stats = lstatSync): number {
+  let bytes = 0;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    try {
+      bytes += entry.isDirectory() ? sizeOf(path, lstat) : lstat(path).size;
+    } catch (error) {
+      if (!z.object({ code: z.literal("ENOENT") }).safeParse(error).success) throw error;
+    }
+  }
+  return bytes;
 }
 
 /** The retention at start, then every five minutes, until its stop; a tick that left a backlog is followed

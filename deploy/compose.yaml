@@ -37,6 +37,9 @@ services:
     cpus: 0.5
     mem_limit: 128m
     pids_limit: 64
+    # Two files for each of nginx's 4,096 connections, set here: nginx, no root, cannot raise a hard limit (F645).
+    ulimits:
+      nofile: { soft: 8192, hard: 8192 }
     healthcheck:
       test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8081/health]
       interval: 30s
@@ -68,8 +71,10 @@ services:
       - ergo:/data
       - auth:/run/gnoworld
     cpus: 0.4
-    mem_limit: 256m
-    pids_limit: 128
+    # 2,000 guests joining one room took Ergo to 344 MiB, and Go past 128 threads, which a pids_limit counts:
+    # "failed to create new OS thread (have 129 already)", Ergo dead (3n's load runs). It starts no process of its own.
+    mem_limit: 512m
+    pids_limit: 1024
     healthcheck:
       test: [CMD, /ircd-bin/probe, "127.0.0.1:6667"]
       interval: 30s
@@ -98,6 +103,9 @@ services:
       ERGO_PORT: "6667"
       ERGO_OPER_PASSWORD_FILE: /run/secrets/ergo_oper_password
       OPENAI_API_KEY_FILE: /run/secrets/openai_api_key
+      # Ergo's volume, read-only, measured against its cap at each retention tick (3n-b).
+      ERGO_DATA: /ergo
+      ERGO_DATA_MB: ${ERGO_DATA_MB:-1024}
       # The demo's way out; ops names its own proxy.
       HTTPS_PROXY: ${EGRESS_PROXY:-http://guard:4750}
       NO_PROXY: ergo,localhost,127.0.0.1
@@ -106,6 +114,7 @@ services:
     volumes:
       - server:/data
       - auth:/run/gnoworld
+      - ergo:/ergo:ro
     cpus: 0.4
     mem_limit: 512m
     pids_limit: 128
