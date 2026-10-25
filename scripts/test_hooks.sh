@@ -1758,6 +1758,13 @@ grep -qxF "$(record)" "$g/.claude/tmp/green-full" || fail "check.sh --full did n
 for s in stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
 	before "done py:probe" "$s" || fail "check.sh --full ran $s while probe.py was planting its faults"
 done
+# The stories' journeys run beside the history lane alone, before the coverage's Vitest and StrykerJS and
+# the harness's worktrees, whose load outlasted a Dialog's teardown in the browser (F815).
+(SLOW_STEP=stories gate --full) >/dev/null || fail "check.sh --full failed with slow stories"
+for s in coverage py:patch_coverage mutate; do
+	before "done stories" "$s" || fail "check.sh --full ran $s beside the stories' journeys (F815)"
+done
+(MEET="stories py:prove_fix" gate --full) >/dev/null || fail "check.sh --full ran the stories and the history lane one after the other"
 # A dirty tree of one area: --full still checks everything, and records it.
 printf 'y\n' >>"$g/server/src/a.ts"
 gate --full >/dev/null || fail "check.sh --full failed on a server change"
@@ -1766,11 +1773,19 @@ nocache "--full with a server change"
 grep -qxF "$(record)" "$g/.claude/tmp/green-full" || fail "check.sh --full did not record a dirty tree it passed"
 reset
 printf '\n' >>"$g/scripts/check_css.py" && git -C "$g" commit -qam y
-gate --full >/dev/null || fail "check.sh --full failed on a harness change"
+(SLOW_STEP=stories gate --full) >/dev/null || fail "check.sh --full failed on a harness change"
 ran py:harness_mutate || fail "check.sh --full did not mutate a changed harness"
+before "done stories" py:harness_mutate || fail "check.sh --full mutated the harness beside the stories' journeys (F815)"
 rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/green-full"
 out=$(FAIL=coverage,py:audit gate --full) && fail "check.sh --full passed with two failing steps"
 for s in coverage py:audit; do printf '%s\n' "$out" | grep -q "^$s failed here" || fail "check.sh --full hid $s's failure: $out"; done
+# Each lane's failure alone fails the gate and shows; one before the coverage leaves the two after it to run.
+for s in stories py:prove_fix coverage py:harness_mutate; do
+	out=$(FAIL=$s gate --full) && fail "check.sh --full passed with $s failing alone"
+	printf '%s\n' "$out" | grep -q "^$s failed here" || fail "check.sh --full hid $s's failure: $out"
+	case $s in coverage | py:harness_mutate) continue ;; esac
+	ran mutate && ran py:harness_mutate || fail "check.sh --full stopped at $s's failure, before StrykerJS or harness_mutate"
+done
 [ ! -e "$g/.claude/tmp/green-full" ] || fail "check.sh --full recorded a gate that failed"
 # --merge, a merge's own review: the full gate's steps, the harness mutants of the merge's guard files
 # alone, and no full record, which only --full writes (pre-push wants it for main).
