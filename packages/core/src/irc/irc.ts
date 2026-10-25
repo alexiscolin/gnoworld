@@ -15,7 +15,7 @@ export interface IrcMessage {
 }
 
 export type IrcParseError =
-  "empty" | "bad-character" | "no-command" | "bad-command" | "tags-too-long" | "body-too-long";
+  "empty" | "bad-character" | "empty-source" | "no-command" | "bad-command" | "tags-too-long" | "body-too-long";
 
 export type IrcParsed =
   { readonly ok: true; readonly message: IrcMessage } | { readonly ok: false; readonly error: IrcParseError };
@@ -95,10 +95,13 @@ function readParams(text: string): string[] {
   return params;
 }
 
-// The rest of a line once its tags are read: source, command, parameters.
-function readBody(body: string, tags: Map<string, string>): IrcParsed {
-  if (bytes(body) > BODY_MAX) return { ok: false, error: "body-too-long" };
+// The rest of a line once its tags and their one space are read: source, command, parameters. It counts
+// whole, the spaces before its command too (F667); a source is never empty, as formatLine writes none (F669).
+function readBody(whole: string, tags: Map<string, string>): IrcParsed {
+  if (bytes(whole) > BODY_MAX) return { ok: false, error: "body-too-long" };
+  const body = whole.replace(/^ +/, "");
   const [source, afterSource] = body.startsWith(":") ? split(body.slice(1)) : ["", body];
+  if (body.startsWith(":") && source === "") return { ok: false, error: "empty-source" };
   const [word, rest] = split(afterSource);
   if (word === "") return { ok: false, error: "no-command" };
   const command = toIrcCommand(word);
@@ -116,13 +119,13 @@ export function parseLine(line: string): IrcParsed {
   if (!clean(text)) return { ok: false, error: "bad-character" };
   // IRC splits on spaces alone: a tab is part of a word.
   if (/^ *$/.test(text)) return { ok: false, error: "empty" };
-  if (!text.startsWith("@")) return readBody(text.replace(/^ +/, ""), new Map<string, string>());
+  if (!text.startsWith("@")) return readBody(text, new Map<string, string>());
   const space = text.indexOf(" ");
   const tags = space === -1 ? text : text.slice(0, space);
   // The @ and one space: IRCv3 counts one, and the spaces after it are not tags.
   if (bytes(tags) + 1 > TAGS_MAX) return { ok: false, error: "tags-too-long" };
   if (space === -1) return { ok: false, error: "no-command" };
-  return readBody(text.slice(space + 1).replace(/^ +/, ""), readTags(tags.slice(1)));
+  return readBody(text.slice(space + 1), readTags(tags.slice(1)));
 }
 
 function refuse(what: string): never {

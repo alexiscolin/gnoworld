@@ -38,20 +38,23 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
    (`check.sh` records it). The hook itself runs nothing from the repository.
 5. **Each commit.** The git hooks run from `.git/hooks`, installed from `main` with the scripts
    they run, where no merge, checkout or sandboxed command writes: no branch brings its own
-   (F129). `commit-msg` holds the subject's form, refuses attribution lines, and
+   (F129). `commit-msg` holds the subject's form, refuses attribution lines, refuses a `fix` of
+   the product with no test and no `No-test:` line (as `prove_fix.py` would, later), and
    scans the message with both secret rule sets, `gitleaks:allow` ignored (F090, F113).
    `pre-commit` scans what is staged for secrets, then, in Claude Code's sandbox, runs the fast
-   gate on a copy of what is staged, not on the working tree, and records the code it passed.
+   gate on a copy of what is staged, not on the working tree, scoped to the commit's paths
+   (`GATE_CHANGED`), and records the code it passed.
    In Alexis's shell it runs no gate: the staged code must be code the sandboxed gate recorded
    green (`.githooks/records.sh`, F076); prose alone needs none.
 6. **A push of a work branch.** `pre-push` wants the checked-out commit with nothing
    uncommitted, a gate that passed on its code (in the sandbox it runs it; in Alexis's shell it
    reads the record), and scans the history for secrets.
-7. **Before a merge.** `/pre-merge` runs the fast gate and StrykerJS, the `test-auditor`'s green pass
-   on the mutation survivors, `/simplify` and the fast gate again, then `/code-review` and the
-   `complexity-reviewer` together, with `/security-review` for a tier-1 or harness change and
-   the `security-reviewer` for a tier-1 one, and the full gate once, on the final code (Alexis,
-   2026-10-23); each merge in its own session (`docs/REVIEW.md`).
+7. **Before a merge.** `/pre-merge` runs `check.sh --merge` (the full gate's lanes, the harness
+   mutants of the merge's own guard files), then one round of agents at once: the
+   `test-auditor`'s green pass on the mutation survivors, `/simplify`'s angles, `/code-review`
+   and the `complexity-reviewer`, with `/security-review` for a tier-1 or harness change and
+   the `security-reviewer` for a tier-1 one; the full gate runs once a slice, on the tip pushed to
+   `main` (Alexis, 2026-10-25); each merge in its own session (`docs/REVIEW.md`).
    The `finding-verifier` tries to refute each tier-1 finding, then to reproduce it; each is
    then fixed or put to Alexis, and written to `docs/review/findings.md`. Three review rounds at most per branch. Then it records a review
    pass (`scripts/review_pass.py`).

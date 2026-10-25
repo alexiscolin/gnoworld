@@ -62,8 +62,9 @@ renderer, embeds, `csp.ts`, `sw/*`, `server/src/login`, `deploy/`.
 
 ## 9. Dependencies to ask for (npm, read 2026-10-25)
 - `@adena-wallet/sdk` in `app` (already approved for `server`, dec:152), or `window.adena` alone: 4a decides.
-- `@tanstack/react-virtual` 3.14.22 (2026-10-22, one dependency, no install script): the window of 4b; younger
-  than `minimumReleaseAge`, so an older 3.x, or our own window of a fixed line height.
+- `@tanstack/react-virtual` 3.14.22 (2026-10-22, one dependency, no install script): the window of 4b, or our own
+  window (taken: no new dependency; `minimumReleaseAge` is one day, so its age was no obstacle).
+- `zustand` 5.0.16 (2026-10-22, no dependency), the store ARCHITECTURE.md names: approved, 4a.
 - `emojibase-data` 18.0.0 (2026-10-16, no dependency): the emoji picker's data, 4c.
 
 ## 10. Answered (docs/decisions.md, 2026-10-25)

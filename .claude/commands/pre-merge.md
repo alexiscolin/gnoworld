@@ -11,27 +11,28 @@ A branch that changes `deploy/` also runs semgrep's Dockerfile and Compose rules
 (`deploy/test.sh`, then its `--mutants`). Those are asked for once, after every fix of steps 4
 to 6 is committed, never in between: each run costs him its whole length.
 
-1. **No tokens first.** Run the fast gate (`scripts/check.sh`) and StrykerJS on the range's
-   changes (`pnpm run mutate`, incremental); the full gate runs once a merge, at step 8, on the
-   final code (Alexis, 2026-10-23). If either fails, stop and report its output. Write the diff to
+1. **No tokens first.** Run the merge's own gate, `scripts/check.sh --merge`: the full gate's
+   lanes with the harness mutants of the guard files the merge changed (`harness_mutate.py
+   --changed`). The full gate runs once a slice, on the tip pushed to `main` (step 8; Alexis,
+   2026-10-25). If it fails, stop and report its output. Write the diff to
    `.claude/tmp/diff.patch` and pass agents its path, never its content. Past the size
    `docs/REVIEW.md` allows (about 400 lines of product code with a tier-1 file, 600 otherwise),
    say so and propose a split before reviewing.
 2. **The plan.** List the files changed that the slice plan does not name; each gets its
    reason in the review card, or leaves the merge.
-3. **The test audit.** Launch the `test-auditor` agent for its green pass, with the diff
-   path and the surviving mutants. If it reports findings, stop: list them and wait.
+3. **One round, every agent at once.** Launch in one message the `test-auditor`'s green pass (the
+   diff path and the surviving mutants), `/simplify`'s angles (step 4, report only) and every lens
+   of step 5; the `finding-verifier` takes each tier-1 finding as it arrives (step 6). The
+   round's findings are fixed in one batch, after it.
 4. **Simplify.** Run `/simplify`'s altitude and simplification angles on the range, two agents
    in parallel with its own briefs; add its efficiency angle for a slice with a hot path (the 3D,
    the chat); its reuse angle no more (docs/decisions.md, 2026-10-21). A follow-up merge of fixes
-   (2f, 2g) runs the altitude angle alone. Apply their fixes (each in
-   its own commit, a refactor apart), note what they skip and why, then the fast gate and StrykerJS on the files they changed (the full gate runs once, at
-   step 8; Alexis, 2026-10-22, docs/decisions.md).
-   The reviews below read the code as it will merge.
+   (2f, 2g) runs the altitude angle alone. Apply their fixes in the round's one batch (each in
+   its own commit, a refactor apart), note what they skip and why; the fast gate checks them.
 5. **Every review lens, sized up by risk.** Count the branch's review rounds first (its rows in
    `docs/review-passes.txt` and `docs/review-log.md`). The first round reads the range; any later
    one reads only the diff since the last round. A fourth round does not run: stop, report, and
-   reconsider the approach with Alexis before any more code. Launch these together:
+   reconsider the approach with Alexis before any more code. These run in step 3's round:
    - always: Claude Code's `/code-review`; tell it the ledger's open and fixed findings for the
      files it reads, so none is raised again;
    - a tier-1 file or the harness (`scripts/`, `.githooks/`, `.claude/`, `.github/`, the tools'
@@ -68,9 +69,10 @@ to 6 is committed, never in between: each run costs him its whole length.
    - the findings, most severe first, each with its scenario;
    - what was dropped as a false positive, in one line each.
 8. **Record the pass.** Once every finding is fixed or put to Alexis, run `scripts/check.sh
-   --full` once more on the final, committed code: pushing `main` wants that code's full-gate
-   record (F076). Then run `python3 -I scripts/review_pass.py record HEAD "<the lenses that ran>"`.
-   Without both, the pre-push hook refuses `main`.
+   --merge` on the final, committed code; on the slice's last merge, the tip pushed to `main`, run
+   `scripts/check.sh --full` instead: pushing `main` wants that code's full-gate record (F076).
+   Then run `python3 -I scripts/review_pass.py record HEAD "<the lenses that ran>"`. Without both,
+   the pre-push hook refuses `main`.
 9. **Log.** Append to `docs/review-log.md`: the date, the branch, the rounds it took to pass,
    each finding with its lens and outcome (fixed, wrong, intended, moot, put to Alexis), and what Alexis caught that the
    agents missed. A miss seen twice becomes a proposed rule, lint or test; a lens whose
