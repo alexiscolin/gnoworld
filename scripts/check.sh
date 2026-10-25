@@ -63,36 +63,42 @@ if [ ! -x "$GNO" ]; then
 	exit 1
 fi
 
-# What a fast run checks: the areas its change touches, against HEAD, untracked files included.
-# Everything when nothing changed, outside a repository (pre-commit's staged copy), or once any
+# What a fast run checks: the areas its change touches, against HEAD, untracked files included; in
+# pre-commit's staged copy, no repository, those GATE_CHANGED lists, one path a line, which the hook
+# reads from git. Everything when nothing changed, or once any
 # path outside these areas changed: a config, the lockfile, the harness, the schemas both sides
 # read, the deployment. What a commit leaves out, the full gate runs before main takes it (pre-push).
 # The tests are Vitest's related ones only for a change of the app's or the design system's
 # TypeScript: main.test.ts runs the server, which imports core, as a child process, outside Vitest's
 # module graph, and a fixture read from disk is outside it too. ESLint reads no cache: one is keyed
 # on a file's own text, so a type changed elsewhere would hide the error it brings there.
-all=true ts=false app=false gno=false related=true
-if ! $full && [ -n "$tested" ]; then
+all=true ts=false app=false gno=false related=true changed=
+if ! $full && [ -z "$tested" ]; then
+	changed=${GATE_CHANGED:-} related=false # Vitest finds the related tests through git, which a copy has not
+elif ! $full; then
 	# The borrowed node_modules of a worktree is a link, which .gitignore's folder rule misses.
 	changed=$(
 		set -- . ':!docs' ':!adr' ':!*.md' ':!node_modules'
 		git -c core.quotePath=false diff --no-renames --name-only HEAD -- "$@" &&
 			git -c core.quotePath=false ls-files --others --exclude-standard -- "$@"
 	)
-	if [ -n "$changed" ]; then
-		all=false
-		while IFS= read -r path; do
-			case $path in
-			server/src/*) ts=true related=false ;;
-			app/src/*.ts | app/src/*.tsx | app/tests/*.ts | packages/ui/src/*.ts | packages/ui/src/*.tsx) ts=true app=true ;;
-			app/src/* | app/tests/* | packages/core/src/* | packages/ui/src/*) ts=true app=true related=false ;;
-			gno/*) gno=true ;;
-			*) all=true ;;
-			esac
-		done <<EOF
+fi
+if [ -n "$changed" ]; then
+	all=false code=false
+	while IFS= read -r path; do
+		case $path in docs/* | adr/* | *.md) continue ;; esac # prose, which pre-commit's list may hold
+		code=true
+		case $path in
+		server/src/*) ts=true related=false ;;
+		app/src/*.ts | app/src/*.tsx | app/tests/*.ts | packages/ui/src/*.ts | packages/ui/src/*.tsx) ts=true app=true ;;
+		app/src/* | app/tests/* | packages/core/src/* | packages/ui/src/*) ts=true app=true related=false ;;
+		gno/*) gno=true ;;
+		*) all=true ;;
+		esac
+	done <<EOF
 $changed
 EOF
-	fi
+	$code || all=true # prose alone is no change of code, as in a repository
 fi
 $all && ts=true app=true gno=true related=false
 budget=60 # s, for everything; for a run scoped to a change, 30

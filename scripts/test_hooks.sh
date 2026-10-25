@@ -1540,6 +1540,54 @@ cp -R "$g" "$g-copy" && rm -rf "$g-copy/.git"
 : >"$log" && (cd "$g-copy" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" sh scripts/check.sh >/dev/null 2>&1) ||
 	fail "check.sh failed outside a repository"
 everything "a copy outside a repository"
+# There, pre-commit lists what the commit changes in GATE_CHANGED: the run checks those areas, every
+# test (Vitest finds the related ones through git), and prose alone is no change.
+outside() { : >"$log" && (cd "$g-copy" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" GATE_CHANGED="$1" sh scripts/check.sh 2>&1); }
+out=$(outside "server/src/a.ts
+docs/x.md") || fail "check.sh failed outside a repository on pre-commit's list: $out"
+scoped "pre-commit's list of a server change" $cheap typecheck lint test - playwright gno sh:test_hooks
+grep -q '^test .*--changed' "$log" && fail "check.sh asked Vitest for the related tests outside a repository"
+outside "app/src/a.tsx" >/dev/null || fail "check.sh failed outside a repository on an app change"
+scoped "pre-commit's list of an app change" typecheck playwright test - gno
+grep -q '^test .*--changed' "$log" && fail "check.sh asked Vitest for the related tests outside a repository"
+outside "gno/r/a.gno" >/dev/null || fail "check.sh failed outside a repository on a gno change"
+scoped "pre-commit's list of a gno change" gno - typecheck playwright
+# Prose is prose anywhere, and nothing else is: beside a server change, the run stays the server's.
+for prose in adr/0001.txt docs/x.ts server/src/x.md; do
+	outside "server/src/a.ts
+$prose" >/dev/null || fail "check.sh failed outside a repository on $prose"
+	scoped "pre-commit's list of a server change and $prose" typecheck - playwright sh:test_hooks
+done
+# Prose alone, an empty list, an unknown path, a line git quoted or that reads otherwise (an empty
+# line, a space, a backslash): everything, as in a repository.
+for list in "" "docs/x.md" "adr/x.md
+README.md" "deploy/a.conf" "server/src/a.ts
+package.json" "server/src/a.ts
+
+deploy/a.conf" '"deploy/a\nb"
+server/src/a.ts' " deploy/a.conf
+server/src/a.ts" 'server/src/a.ts\
+deploy/a.conf' 'docs-x/a.ts
+server/src/a.ts'; do
+	outside "$list" >/dev/null || fail "check.sh failed outside a repository on the list: $list"
+	everything "pre-commit's list: $list"
+done
+# A scoped run there records nothing: no record of a copy's code.
+cp "$g-copy/.claude/tmp/green-fast" "$t/green-before" 2>/dev/null || : >"$t/green-before"
+outside "server/src/a.ts" >/dev/null || fail "check.sh failed outside a repository on a server change"
+cmp -s "$t/green-before" "$g-copy/.claude/tmp/green-fast" 2>/dev/null || [ ! -e "$g-copy/.claude/tmp/green-fast" ] || fail "check.sh recorded a copy's scoped run"
+# --full there is never scoped.
+: >"$log" && (cd "$g-copy" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" GATE_CHANGED=gno/r/a.gno sh scripts/check.sh --full >/dev/null 2>&1) || : # it fails at merge-base, with no repository
+for s in $fast_steps; do [ "$s" = test ] || ran "$s" || fail "check.sh --full took GATE_CHANGED's scope and skipped $s"; done
+# In a repository, the run reads its change from git, never from GATE_CHANGED.
+: >"$log" && (cd "$g" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" GATE_CHANGED=gno/r/a.gno sh scripts/check.sh >/dev/null 2>&1) ||
+	fail "check.sh failed in a repository with GATE_CHANGED set"
+everything "a repository with no change and GATE_CHANGED naming a realm"
+printf 'y\n' >>"$g/server/src/a.ts"
+: >"$log" && (cd "$g" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" GATE_CHANGED=deploy/a.conf sh scripts/check.sh >/dev/null 2>&1) ||
+	fail "check.sh failed in a repository with a change and GATE_CHANGED set"
+scoped "a server change in a repository and GATE_CHANGED naming the deployment" typecheck - playwright sh:test_hooks
+reset
 fi
 
 if part gate_triggers; then
