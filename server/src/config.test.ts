@@ -37,6 +37,31 @@ describe("loadConfig", () => {
       trustedProxy: undefined,
       pepper: PEPPER,
       roles: fileURLToPath(new URL("../roles.json", import.meta.url)),
+      chains: ["onyx-1", "gnoland-1"],
+      origins: [],
+      newAccountsPerHour: 5,
+    });
+  });
+
+  it("reads the login's lists, each item as it is sent", () => {
+    expect(
+      loadConfig({
+        ...ENV,
+        CHAINS: "test5",
+        ORIGINS: "https://gnoworld.test,http://localhost:5173",
+        NEW_ACCOUNTS_PER_HOUR: "1000",
+      }),
+    ).toMatchObject({
+      chains: ["test5"],
+      origins: ["https://gnoworld.test", "http://localhost:5173"],
+      newAccountsPerHour: 1000,
+    });
+    expect(
+      loadConfig({ ...ENV, CHAINS: "c".repeat(50), ORIGINS: "http://[::1]:5173", NEW_ACCOUNTS_PER_HOUR: "1" }),
+    ).toMatchObject({
+      chains: ["c".repeat(50)],
+      origins: ["http://[::1]:5173"],
+      newAccountsPerHour: 1,
     });
   });
 
@@ -78,6 +103,35 @@ describe("loadConfig", () => {
     ["TRUSTED_PROXY", "proxy.local"],
     ["TRUSTED_PROXY", "999.1.1.1"],
     ["ROLES_FILE", ""],
+    // The login refuses every chain with an empty list: it must not boot so (decision 142).
+    ["CHAINS", ""],
+    ["CHAINS", "onyx-1,"],
+    ["CHAINS", "onyx 1"],
+    ["CHAINS", "Onyx-1"],
+    ["CHAINS", "c".repeat(51)],
+    // An origin is written as a browser sends it: scheme, host and port, nothing more.
+    ["ORIGINS", "*"],
+    ["ORIGINS", "null"],
+    ["ORIGINS", "gnoworld.test"],
+    ["ORIGINS", "https://gnoworld.test/"],
+    ["ORIGINS", "https://gnoworld.test/login"],
+    ["ORIGINS", "https://GNOWORLD.test"],
+    ["ORIGINS", "https://user@gnoworld.test"],
+    ["ORIGINS", "ftp://gnoworld.test"],
+    ["ORIGINS", "https://gnoworld.test,"],
+    ["CHAINS", "onyx-1, gnoland-1"],
+    ["ORIGINS", "https://gnoworld.test?x"],
+    ["ORIGINS", "https://gnoworld.test#x"],
+    ["ORIGINS", "https://gnoworld.test:443"],
+    ["NEW_ACCOUNTS_PER_HOUR", "0"],
+    ["NEW_ACCOUNTS_PER_HOUR", "1001"],
+    ["NEW_ACCOUNTS_PER_HOUR", "five"],
+    ["NEW_ACCOUNTS_PER_HOUR", "5.5"],
+    ["NEW_ACCOUNTS_PER_HOUR", "1e2"],
+    ["NEW_ACCOUNTS_PER_HOUR", "0x10"],
+    ["NEW_ACCOUNTS_PER_HOUR", ""],
+    ["NEW_ACCOUNTS_PER_HOUR", " 5"],
+    ["NEW_ACCOUNTS_PER_HOUR", "05"],
   ])("stops on %s set to %j, naming the setting", (key, value) => {
     expect(() => loadConfig({ ...ENV, [key]: value })).toThrow(new RegExp(`^setting ${key}: `));
   });

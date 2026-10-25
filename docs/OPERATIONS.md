@@ -116,6 +116,26 @@ Alexis, 2026-10-19: written here, each with its backlog row, not fixed in 1c.
 - **Open connections.** The limit counts requests per visitor, not open connections, and a team
   behind one address shares one limit (F208).
 
+Slice 3, the login (3c; `docs/decisions.md`, 2026-10-22):
+
+- **The login's settings.** `ORIGINS` names the site's origins (`https://host`, no path): unset,
+  every login is refused. `TRUSTED_PROXY` names `web`, whose `X-Real-IP` gives the visitor
+  (3e): unset behind `web`, every visitor shares one limit of 10 login calls a minute.
+- **A flood of challenges.** At most 100,000 nonces wait at once; a visitor holds 50 at most, so
+  2,000 addresses (IPv6 /64s, which one provider's /48 holds by thousands) can fill it, and then
+  every new login is refused until theirs expire, 5 minutes after each. Logins already made
+  keep working.
+- **New accounts are free.** An address costs nothing, so a banned person comes back with a
+  new one; the limit of new accounts per visitor (`NEW_ACCOUNTS_PER_HOUR`) only slows a farm
+  (decision 144).
+- **Ten tokens an account.** An account keeps its 10 newest logins; an eleventh logs the oldest
+  device out. Accounts are free, so the tokens are bounded by the accounts, ten each, not by a
+  fixed number (F435).
+- **A relayed login.** Another site, or its server, can ask for our text, show it to a person
+  and send the signature itself, so the cookie lands with it. The server cannot tell; only a
+  wallet that shows the requesting site and refuses another domain's text can, which slice
+  4's first merge checks against the real Adena. The 90-day cap and logout bound it.
+
 ## Secrets: rotation and revocation
 
 - **The password:** write a new file with `htpasswd -cB`, then `docker compose ... restart web`.

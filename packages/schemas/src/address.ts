@@ -23,3 +23,19 @@ const isAddress = (text: string): boolean =>
 
 export const Address = z.string().refine(isAddress).brand<"Address">();
 export type Address = z.infer<typeof Address>;
+
+// The address a key's 20-byte hash spells: the inverse of the check above, so the tests' wallet
+// names its account as the chain would. A string: only the schema makes an Address.
+export function toAddress(hash: Uint8Array): string {
+  if (hash.length !== 20) throw new RangeError(`an address holds 20 bytes, not ${String(hash.length)}`);
+  const groups: number[] = [];
+  let [held, bits] = [0, 0];
+  for (const byte of hash) {
+    held = ((held << 8) | byte) & 0xfff;
+    bits += 8;
+    for (; bits >= 5; bits -= 5) groups.push((held >> (bits - 5)) & 31);
+  }
+  const check = polymod([...PREFIX, ...groups, 0, 0, 0, 0, 0, 0]) ^ 1;
+  const tail = Array.from({ length: 6 }, (_, i) => (check >> (5 * (5 - i))) & 31);
+  return `g1${[...groups, ...tail].map((group) => CHARSET.charAt(group)).join("")}`;
+}

@@ -12,6 +12,15 @@ export interface Config {
   trustedProxy: string | undefined;
   pepper: string;
   roles: string;
+  chains: string[];
+  origins: string[];
+  newAccountsPerHour: number;
+}
+
+// An origin as a browser sends it: scheme, host and port, nothing else (an Origin header compares to it).
+function isOrigin(text: string): boolean {
+  const url = URL.parse(text);
+  return url !== null && ["http:", "https:"].includes(url.protocol) && url.origin === text;
 }
 
 const Env = z.object({
@@ -33,6 +42,24 @@ const Env = z.object({
     .string()
     .min(1)
     .default(fileURLToPath(new URL("../roles.json", import.meta.url))),
+  // The chains a login may name (decision 142), the demo's by default; never none.
+  CHAINS: z
+    .string()
+    .default("onyx-1,gnoland-1")
+    .transform((list) => list.split(","))
+    .pipe(z.array(z.string().regex(/^[a-z0-9][a-z0-9.-]{0,49}$/))),
+  // The sites a POST may come from (CSRF); none by default, so every POST is refused until set.
+  ORIGINS: z
+    .string()
+    .default("")
+    .transform((list) => (list === "" ? [] : list.split(",")))
+    .pipe(z.array(z.string().refine(isOrigin))),
+  NEW_ACCOUNTS_PER_HOUR: z
+    .string()
+    .regex(/^[1-9]\d{0,3}$/)
+    .transform(Number)
+    .pipe(z.number().max(1000))
+    .default(5),
 });
 
 export function loadConfig(env: Record<string, string | undefined>): Config {
@@ -42,7 +69,8 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     const issue = parsed.error.issues[0];
     throw new Error(`setting ${String(issue?.path[0])}: ${issue?.code ?? "invalid"}`);
   }
-  const { HOST, PORT, DATABASE, TRUSTED_PROXY, LOG_PEPPER_FILE, ROLES_FILE } = parsed.data;
+  const { HOST, PORT, DATABASE, TRUSTED_PROXY, LOG_PEPPER_FILE, ROLES_FILE, CHAINS, ORIGINS, NEW_ACCOUNTS_PER_HOUR } =
+    parsed.data;
   return {
     host: HOST,
     port: PORT,
@@ -50,6 +78,9 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     trustedProxy: TRUSTED_PROXY,
     pepper: secret("LOG_PEPPER_FILE", LOG_PEPPER_FILE),
     roles: ROLES_FILE,
+    chains: CHAINS,
+    origins: ORIGINS,
+    newAccountsPerHour: NEW_ACCOUNTS_PER_HOUR,
   };
 }
 

@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { Address } from "./address.ts";
+import { Address, toAddress } from "./address.ts";
 
 // test1 of gno's own docs, and four made by BIP-173's reference code (a checksum over 20 random bytes).
 const VALID = [
@@ -11,6 +11,21 @@ const VALID = [
   "g1uauvt7txunf9zeu2qyrzv0pa5uvwjlq90r3qpa",
 ];
 const CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+
+// The 20 bytes an address holds: its 32 letters between the prefix and the checksum, five bits each.
+const bytesOf = (address: string): Uint8Array => {
+  const out: number[] = [];
+  let [held, bits] = [0, 0];
+  for (const letter of address.slice(2, -6)) {
+    held = ((held << 5) | CHARSET.indexOf(letter)) & 0xfff;
+    bits += 5;
+    if (bits >= 8) {
+      bits -= 8;
+      out.push((held >> bits) & 0xff);
+    }
+  }
+  return Uint8Array.from(out);
+};
 
 describe("Address", () => {
   it.each(VALID)("takes the canonical address %s as it is", (address) => {
@@ -48,6 +63,26 @@ describe("Address", () => {
           expect(Address.safeParse(changed).success).toBe(changed === address);
         },
       ),
+    );
+  });
+
+  it.each(VALID)("writes %s from its 20 bytes", (address) => {
+    expect(toAddress(bytesOf(address))).toBe(address);
+  });
+
+  it("writes any 20 bytes as an address that parses and reads back as those bytes", () => {
+    fc.assert(
+      fc.property(fc.uint8Array({ minLength: 20, maxLength: 20 }), (bytes) => {
+        const address = toAddress(bytes);
+        expect(Address.parse(address)).toBe(address);
+        expect(bytesOf(address)).toEqual(bytes);
+      }),
+    );
+  });
+
+  it.each([0, 19, 21, 32])("refuses to write %i bytes", (length) => {
+    expect(() => toAddress(new Uint8Array(length))).toThrow(
+      new RangeError(`an address holds 20 bytes, not ${String(length)}`),
     );
   });
 
