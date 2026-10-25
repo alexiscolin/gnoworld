@@ -51,7 +51,8 @@ app/                         the web client
     worlds.ts                the worlds slice 1 pre-renders, until data/ holds them (slice 5)
     lib/                     the boundaries: Ergo client, chain reads, indexer, Adena (`lib/adena`), IndexedDB;
                              they parse with `@gnoworld/schemas` and apply `@gnoworld/core`
-    store/                   the one Zustand store, one slice per feature
+    store/                   the one Zustand store, one slice per feature, kept here: the store imports
+                             no feature (`store/login.ts`); React reads it through `storeContext.tsx`
     scene/                   three.js only: renderer, loop, flights, bodies, level of detail, labels
     sw/                      the service worker, and the page's side of it (ADR-0001 §12)
     features/                one folder per feature: chat, universe, world, realms, jarvis,
@@ -80,15 +81,14 @@ features/chat/
   ChatDock.tsx               components, one per file, named exports
   ChatDock.module.css        its styles, next to it
   useRoom.ts                 hooks
-  chatSlice.ts               its store slice
   *.test.ts                  Vitest, next to what it tests
 ```
 
 ## Which way dependencies point
 
 Lint enforces it per folder, one part of `eslint.config.ts` per area in `lint/`: `core` and `ui`
-since slice 1, `app`'s folders since 2g (F378: `sw`, `features`, `routes`); `lib`, `store` and
-`scene` get theirs with the slice that makes the folder.
+since slice 1, `app`'s folders since 2g (F378: `sw`, `features`, `routes`), `lib` and `store` since
+slice 4 (4a); `scene` gets its own with the slice that makes the folder.
 
 | Folder | May import | Never imports |
 |---|---|---|
