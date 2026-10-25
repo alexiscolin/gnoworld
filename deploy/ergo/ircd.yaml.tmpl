@@ -18,7 +18,7 @@ server:
   websockets:
     allowed-origins: {{ORIGINS}}
   # Ergo's defaults (slice 3's max review): a visitor's address, as web passes it, has 16 connections at once
-  # and 32 in 10 minutes, an IPv6 one counted by its /64; the server's link comes from no visitor's address.
+  # and 32 in 10 minutes, an IPv6 one counted by its /64. The server's link counts under its own address.
   ip-limits:
     count: true
     max-concurrent-connections: 16
@@ -129,7 +129,8 @@ history:
   tagmsg-storage:
     default: false
     whitelist: ["+draft/react", "+react", "+draft/unreact"]
-# On, as in Ergo's defaults, but set by opers alone (the server), not by any channel member.
+# On, as in Ergo's defaults, but set by an oper with the metadata capability alone, which none holds (the
+# bot's class): nobody sets metadata until a slice needs it.
 metadata:
   enabled: true
   operator-only-modification: true
