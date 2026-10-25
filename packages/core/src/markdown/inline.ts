@@ -41,8 +41,9 @@ interface Frame {
 class Reader {
   readonly #source: string;
   readonly #addresses: Addresses;
-  // Where the reader stops to look: an escape, a mark, a label's bracket or an address.
-  readonly #special = /[\\`*_~[\]@]|https:\/\//g;
+  // Where the reader stops to look: an escape, a mark, a label's bracket, an address or a mention's `@g1` (any other
+  // `@` stays in the text it is in).
+  readonly #special = /[\\`*_~[\]]|https:\/\/|@g1/g;
   readonly #root: Inline[] = [];
   readonly #frames: Frame[] = [];
   #runs: Runs | undefined;
