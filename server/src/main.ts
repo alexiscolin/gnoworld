@@ -17,6 +17,7 @@ import { ROOM_TABLES } from "./rooms/rooms.ts";
 import { loginFrom } from "./login/routes.ts";
 import { loadRoles, spared } from "./roles/roles.ts";
 import { ROOM_STATE } from "./rooms/create.ts";
+import { startRetention } from "./retention/retention.ts";
 import { roomsRoutes } from "./rooms/routes.ts";
 
 const FLAG = "--disallow-code-generation-from-strings";
@@ -37,6 +38,8 @@ const db = openDatabase(config.database, [
   STRIKE_TABLES,
   ROOM_STATE,
 ]);
+// The verdicts kept 180 days and below their cap, now and every five minutes (3n).
+const retention = startRetention(db, { log });
 let draining = false;
 const app = makeApp(log, () => !draining);
 app.route("/api/login", loginFrom(db, config, { log }));
@@ -70,6 +73,7 @@ const drain = (): void => {
   if (draining) return;
   draining = true;
   log("stopping");
+  retention.stop();
   // The IRC link first. The database last, once the HTTP server and Ergo's socket have both let their
   // connections go: a line Ergo sent before the stop still meets an open database (the socket's deadline
   // bounds the wait).

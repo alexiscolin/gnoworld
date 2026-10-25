@@ -800,6 +800,10 @@ go out with the JOINs, before any read.
 | An alert storm | One line per crossing | The re-arm case |
 | A load test hurts the demo | A separate local stack | The script's own check |
 
+**As built** (`docs/decisions.md`, 2026-10-22, 3n's split): 3n-a is the server's retention, the verdicts
+by days and a row cap, the database's used pages, the alerts; 3n-b, the k6 scripts, `web`'s limits, Ergo's
+volume and the sizes from the runs, waits for 3e's stack, since 3e goes last.
+
 **Tests by level.** Unit with the clock, property, operator's load runs. **Cost and scale.** One indexed query a
 tick. **Files.** New: `server/src/retention/`, `deploy/k6/`; changed: `deploy/web/nginx.conf`, `deploy/test.sh`,
 `deploy/.env.example`, `docs/OPERATIONS.md`. Tier 2, `deploy/` security-sensitive. The last merge: the workspace

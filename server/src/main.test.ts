@@ -306,6 +306,30 @@ describe("the server's process", () => {
     expect(await rooms({ cookie: await session(lead) })).toContain("#bubble/crew");
   });
 
+  it("removes the verdicts older than 180 days when it starts, and keeps the others (3n)", async () => {
+    const env = settings();
+    const first = start(env);
+    await listening(first);
+    first.child.kill("SIGTERM");
+    expect(await exited(first)).toBe(0);
+    const day = 24 * 60 * 60_000;
+    const db = new DatabaseSync(env["DATABASE"] ?? "");
+    const add = db.prepare(
+      "INSERT INTO verdicts (msgid, room, account, action, at) VALUES (?, '#bubble', 'h', 'pass', ?)",
+    );
+    add.run("old", Date.now() - 181 * day);
+    add.run("new", Date.now() - day);
+    db.close();
+    const second = start(env);
+    await listening(second);
+    second.child.kill("SIGTERM");
+    expect(await exited(second)).toBe(0);
+    const after = new DatabaseSync(env["DATABASE"] ?? "");
+    const kept = after.prepare("SELECT msgid FROM verdicts ORDER BY msgid").all();
+    after.close();
+    expect(kept).toEqual([{ msgid: "new" }]);
+  });
+
   it("answers the rooms of the roles file's worlds, made at boot, with no Ergo set", async () => {
     const port = await listening(start(settings()));
     const answer = await fetch(`http://127.0.0.1:${String(port)}/api/activity?worlds=earth,bubble`);
