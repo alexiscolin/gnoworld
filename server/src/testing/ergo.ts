@@ -101,7 +101,7 @@ export async function startErgo(options: ErgoOptions = {}): Promise<Ergo> {
 // Writes the auth script and the rendered ircd.yaml into the folder; returns the oper's password.
 function configure(dir: string, [port, wsPort]: readonly [number, number], options: ErgoOptions): string {
   const operPassword = options.operPassword ?? randomBytes(12).toString("hex");
-  const logTypes = options.logTypes ?? "* -userinput -useroutput";
+  const logTypes = options.logTypes ?? "* -userinput -useroutput -connect-ip";
   const values = {
     NAME: "irc.gnoworld.test",
     PLAIN: `127.0.0.1:${String(port)}`,

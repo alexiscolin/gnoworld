@@ -693,10 +693,14 @@ print("%.2f %d" % (sum(float(s.get("cpus", 0)) for s in services), sum(size(s.ge
 	docker exec "$ergo" cat /tmp/ircd.yaml >"$tmp/ircd.yaml"
 	for line in "name: \"$SERVER_NAME\"" '":6667": {}' '":8097":' "proxy-allowed-from: [\"$WEB_ADDRESS\"]" \
 		"allowed-origins: [\"$ORIGINS\"]" 'login-via-pass-command: false' 'operator-only-creation: true' \
-		'default-modes: +ntCM' 'max-channels-per-client: 1000' 'expire-time: 90d' 'direct-messages: disabled' \
+		'default-modes: +ntCMi' 'expire-time: 90d' 'direct-messages: disabled' 'default-user-modes: +i' \
+		'allow-truncation: false' 'max-concurrent-connections: 16' 'max-connections-per-window: 32' \
+		'netname: gnoworld' 'messages-per-window: 2' 'max-attempts: 3' '"+draft/unreact"' \
+		'capabilities: [sajoin, samode, chanreg, history, nofakelag]' \
 		'allow-individual-delete: true' 'enable-account-indexing: true' 'command: ""' 'socket: "/run/gnoworld/auth.sock"'; do
 		expect "Ergo's settings say $line" "$(grep -cF -- "$line" "$tmp/ircd.yaml")" 1
 	done
+	expect "Ergo's settings hold 100 channels a client" "$(grep -cE '^ +max-channels-per-client: 100$' "$tmp/ircd.yaml")" 1
 	expect "Ergo's settings close registration" "$(awk '/^  registration:/ { r = 1 } r && /enabled:/ { print $2; exit }' "$tmp/ircd.yaml")" false
 	# Its start refuses an origin list that would let every site in (F422): checked by the service's own render.
 	render() { docker compose -p "$project" $files run --rm --no-deps -e RENDER_ONLY=1 -e ORIGINS="$1" ergo 2>&1; }

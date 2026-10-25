@@ -43,6 +43,7 @@ import {
   sync,
   wsConnect,
   wsRaw,
+  type Ws,
 } from "./ergoKit.ts";
 
 // Every expectation comes from .claude/tmp/ergo-spike/RESULTS.md, section 3 (Ergo v2.19.1, run for real).
@@ -66,10 +67,13 @@ describe("guests and rooms", { timeout: 20_000 }, () => {
     expect(logged(alice)).not.toContain("hello from guest");
   });
 
-  it("makes a new room +CMnt and lets a client join 1000 rooms, as the template says (3e)", async () => {
+  it("makes a new room +CMint, closed until the server opens it, and lets a client join 100 rooms", async () => {
     const e = await start();
     const chief = await lobby(e);
-    expect(logged(chief)).toMatch(/ 005 .* CHANLIMIT=#:1000 /);
+    expect(logged(chief)).toMatch(/ 005 .* CHANLIMIT=#:100 /);
+    await join(chief, "#fresh");
+    chief.send("MODE #fresh");
+    await chief.expect(/ 324 chief #fresh \+CMint(\s|$)/);
     chief.send("MODE #lobby");
     await chief.expect(/ 324 chief #lobby \+CMnt(\s|$)/);
   });
@@ -544,8 +548,8 @@ describe("moderation", { timeout: 40_000 }, () => {
     const e = await start();
     const chief = await oper(e, "chief");
     await join(chief, "#inv");
-    chief.send("MODE #inv +i");
-    await chief.expect(/MODE #inv \+i/);
+    chief.send("MODE #inv");
+    await chief.expect(/ 324 chief #inv \+\S*i/);
     const bob = await login(e, "bob");
     const address = await login(e, ADDRESS);
     for (const [c, account] of [
@@ -620,6 +624,8 @@ describe("moderation", { timeout: 40_000 }, () => {
     for (let i = 0; i < 16; i++) {
       const channel = `#a${String(i)}`;
       await join(chief, channel);
+      chief.send(`MODE ${channel} -i`);
+      await chief.expect(new RegExp(`MODE ${channel} -i`));
       await join(owner, channel);
       chief.send(`MODE ${channel} +o owner`);
       await owner.expect(new RegExp(`MODE ${channel} \\+o owner`));
@@ -891,6 +897,8 @@ describe("logging in through the server (3d)", { timeout: 30_000 }, () => {
     op.send(`OPER admin ${e.operPassword}`);
     await op.expect(/ 381 /);
     await join(op, "#lobby");
+    op.send("SAMODE #lobby -i");
+    await op.expect(/ MODE #lobby -i/);
     await moderated(op, "#lobby", true);
     const me = await s.signIn();
     const c = await enter(e, me.address, s.ticketOf(me.token));
@@ -930,6 +938,8 @@ describe("logging in through the server (3d)", { timeout: 30_000 }, () => {
     op.send(`OPER admin ${e.operPassword}`);
     await op.expect(/ 381 /);
     await join(op, "#lobby");
+    op.send("SAMODE #lobby -i");
+    await op.expect(/ MODE #lobby -i/);
     const me = await s.signIn();
     const ticket = s.ticketOf(me.token);
     await s.stop();
@@ -995,7 +1005,11 @@ describe("the server's IRC link (3h)", { timeout: 40_000 }, () => {
     const e = await start();
     const said = linked(e, ["#earth", "#bubble"]);
     const alice = await login(e, "alice");
-    await inRoom(await oper(e, "watcher"), "#bubble");
+    const watcher = await oper(e, "watcher");
+    await inRoom(watcher, "#bubble");
+    // Opened as the server opens an open room: Ergo makes it invite-only.
+    watcher.send("SAMODE #bubble -i");
+    await watcher.expect(/ MODE #bubble -i/);
     await join(alice, "#bubble");
     alice.send("PRIVMSG gnoworld :a direct message");
     alice.send("PRIVMSG #bubble :hello from alice");
@@ -1027,5 +1041,156 @@ describe("the server's IRC link (3h)", { timeout: 40_000 }, () => {
     const again = await start({ dir, ports: [first.port, first.wsPort], operPassword: first.operPassword });
     // An operator holds its rooms as their op: Ergo shows it with an @.
     expect(await inRoom(await oper(again, "gus2"), "#bubble")).toMatch(/ :(.* )?@gnoworld\b/);
+  });
+});
+
+describe("the template's limits and privacy (slice 3's max review)", { timeout: 30_000 }, () => {
+  // A visitor reaching Ergo through web: its address in X-Forwarded-For, from a trusted peer (loopback).
+  const visitor = (e: Ergo, address: string): Promise<Ws | undefined> =>
+    wsConnect(e.wsPort, { protocols: ["text.ircv3.net"], headers: { "X-Forwarded-For": address } });
+  const registered = async (e: Ergo, address: string, nick: string): Promise<Raw> => {
+    const ws = await visitor(e, address);
+    if (ws === undefined) throw new Error(`the WebSocket from ${address} did not open`);
+    const c = wsRaw(ws);
+    c.send(`NICK ${nick}`);
+    c.send(`USER u 0 * :${nick}`);
+    await c.expect(/ 001 /);
+    return c;
+  };
+
+  it("paces an account's burst past its first lines: fakelag", async () => {
+    const e = await start();
+    const chief = await lobby(e);
+    const alice = await login(e, "alice");
+    await join(alice, "#lobby");
+    for (let n = 0; n < 30; n++) alice.send(`PRIVMSG #lobby :burst ${String(n)}`);
+    await chief.expect(/PRIVMSG #lobby :burst 0$/);
+    // Unpaced, all 30 arrive within milliseconds; paced, five and then two a second.
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    expect((logged(chief).match(/PRIVMSG #lobby :burst \d+$/gm) ?? []).length).toBeLessThan(15);
+  });
+
+  it("paces not the bot's operator class: its 30 lines all arrive at once (nofakelag)", async () => {
+    const e = await start();
+    const chief = await lobby(e);
+    const alice = await login(e, "alice");
+    await join(alice, "#lobby");
+    for (let n = 0; n < 30; n++) chief.send(`PRIVMSG #lobby :unpaced ${String(n)}`);
+    await alice.expect(/PRIVMSG #lobby :unpaced 29$/, 1000);
+  });
+
+  it("refuses a 17th connection from one visitor's address, not another's: ip-limits", async () => {
+    const e = await start();
+    for (let n = 0; n < 16; n++) await registered(e, "203.0.113.7", `crowd${String(n)}`);
+    const last = await visitor(e, "203.0.113.7");
+    if (last === undefined) throw new Error("the 17th WebSocket did not open");
+    const c = wsRaw(last);
+    c.send("NICK crowd16");
+    c.send("USER u 0 * :crowd16");
+    expect(await c.expect(/^ERROR /)).toContain("Too many clients from your network");
+    await registered(e, "203.0.113.8", "elsewhere");
+  });
+
+  it("answers a fourth SASL try on one connection within a minute with a wait: login-throttling", async () => {
+    const e = await start();
+    const c = await open(e);
+    await hello(c);
+    for (let n = 0; n < 3; n++) expect(await sasl(c, "alice", "wrong")).toContain(" 904 ");
+    // The right password too: the throttle is read before the password.
+    expect(await sasl(c, "alice", "pw")).toMatch(/ 904 .*Please wait/);
+  });
+
+  it("shows a visitor's address to no other client, in no line, and not in Ergo's log: ip-cloaking", async () => {
+    const e = await start();
+    await lobby(e);
+    const ws = await visitor(e, "198.51.100.23");
+    if (ws === undefined) throw new Error("the WebSocket did not open");
+    const alice = wsRaw(ws);
+    await hello(alice);
+    expect(await sasl(alice, "alice", "pw")).toContain(" 903 ");
+    await finish(alice, "alice");
+    await join(alice, "#lobby");
+    await say(alice, "#lobby", "hello from afar");
+    const gus = await guest(e, "gus");
+    await join(gus, "#lobby");
+    gus.send("WHOIS alice");
+    gus.send("WHO #lobby");
+    history(gus, "#lobby");
+    await gus.expect(/BATCH -/);
+    await sync(gus);
+    expect(logged(gus)).toContain("hello from afar");
+    expect(logged(gus)).not.toContain("198.51.100.23");
+    expect(e.log()).not.toContain("198.51.100.23");
+  });
+
+  it("names no member of a room a guest cannot join, to that guest: default-user-modes +i", async () => {
+    const e = await start();
+    const chief = await lobby(e);
+    await join(chief, "#club");
+    chief.send("SAMODE #club +i");
+    const carol = await login(e, "carol");
+    chief.send("SAJOIN carol #club");
+    await carol.expect(/ 366 carol #club /);
+    const gus = await guest(e, "gus");
+    gus.send("NAMES #club");
+    gus.send("WHOIS carol");
+    gus.send("WHO *");
+    await sync(gus);
+    expect(logged(gus)).not.toMatch(/ 353 .*carol/);
+    expect(logged(gus)).not.toMatch(/ 319 gus carol /);
+    expect(logged(gus)).not.toMatch(/ 352 gus \S+ \S+ \S+ \S+ carol /);
+    chief.send("NAMES #club");
+    await chief.expect(/ 353 .*carol/);
+  });
+
+  it("gives the bot's operator class no power over accounts: NickServ PASSWD refused", async () => {
+    const e = await start();
+    await login(e, "victim");
+    const chief = await oper(e, "chief");
+    chief.send("PRIVMSG NickServ :PASSWD victim ownedpass1234");
+    await chief.expect(/NickServ.* NOTICE chief :Insufficient privileges/);
+    chief.send("KILL victim :no power");
+    await chief.expect(/ 481 chief /);
+  });
+
+  it("lets an account join 100 rooms, and refuses the 101st (405): max-channels-per-client", async () => {
+    const e = await start();
+    const chief = await oper(e, "chief");
+    const rooms = Array.from({ length: 101 }, (_, n) => `#r${String(n)}`);
+    for (const part of [rooms.slice(0, 50), rooms.slice(50)]) chief.send(`JOIN ${part.join(",")}`);
+    await chief.expect(/ 366 chief #r100 /);
+    for (const room of rooms) chief.send(`MODE ${room} -i`);
+    await chief.expect(/ MODE #r100 -i/);
+    const alice = await login(e, "alice");
+    for (const part of [rooms.slice(0, 50), rooms.slice(50)]) alice.send(`JOIN ${part.join(",")}`);
+    await alice.expect(/ 366 alice #r99 /);
+    expect(await alice.expect(/ 405 alice /)).toContain(" #r100 ");
+  });
+
+  it("refuses a line past Ergo's length rather than cutting it: allow-truncation false", async () => {
+    const e = await start();
+    await lobby(e);
+    const alice = await login(e, "alice");
+    await join(alice, "#lobby");
+    alice.send(`PRIVMSG #lobby :${"x".repeat(480)}`);
+    await alice.expect(/ 417 alice /);
+  });
+
+  it("stores a removed reaction beside the reaction, so a replay takes it back: +draft/unreact", async () => {
+    const e = await start();
+    await lobby(e);
+    const alice = await login(e, "alice");
+    await join(alice, "#lobby");
+    const id = await say(alice, "#lobby", "original message");
+    alice.send(`@+draft/react=x;+draft/reply=${id} TAGMSG #lobby`);
+    alice.send(`@+draft/unreact=x;+draft/reply=${id} TAGMSG #lobby`);
+    await sync(alice);
+    const late = await login(e, "late");
+    await join(late, "#lobby");
+    history(late, "#lobby");
+    await late.expect(/BATCH -/);
+    const stored = late.lines().filter((l) => replayed(" TAGMSG #lobby").test(l));
+    expect(stored.join("\n")).toContain("+draft/react=x");
+    expect(stored.join("\n")).toContain("+draft/unreact=x");
   });
 });

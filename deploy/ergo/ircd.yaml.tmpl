@@ -17,11 +17,40 @@ server:
   proxy-allowed-from: {{PROXY_FROM}}
   websockets:
     allowed-origins: {{ORIGINS}}
+  # Ergo's defaults (slice 3's max review): a visitor's address, as web passes it, has 16 connections at once
+  # and 32 in 10 minutes, an IPv6 one counted by its /64; the server's link comes from no visitor's address.
+  ip-limits:
+    count: true
+    max-concurrent-connections: 16
+    throttle: true
+    window: 10m
+    max-connections-per-window: 32
+    cidr-len-ipv4: 32
+    cidr-len-ipv6: 64
+    exempted: ["localhost"]
+  # A visitor's address shown to nobody: WHOIS, WHO and every line carry a hash of it instead.
+  ip-cloaking:
+    enabled: true
+    enabled-for-always-on: true
+    netname: gnoworld
+    cidr-len-ipv4: 32
+    cidr-len-ipv6: 64
+    num-bits: 64
+  # A line past the limits is refused (417), never cut short to a meaning its author did not send.
+  compatibility:
+    allow-truncation: false
 accounts:
   authentication-enabled: true
   registration:
     enabled: false
   login-via-pass-command: false
+  # Three wrong logins a minute on one connection; ip-limits' throttle bounds the reconnections.
+  login-throttling:
+    enabled: true
+    duration: 1m
+    max-attempts: 3
+  # Invisible by default: a room's members are listed to its members alone (slice 3's max review).
+  default-user-modes: +i
   nick-reservation:
     enabled: true
     method: strict
@@ -44,10 +73,11 @@ accounts:
     kill-timeout: 1s
     max-concurrency: 64
 channels:
-  # +M: only accounts speak, from a room's first line, before the server's reconciler reads it (3m).
-  default-modes: +ntCM
-  # The bot is in every room of every world (3h, 3l): 25 worlds of 21 rooms and the typed ones.
-  max-channels-per-client: 1000
+  # +M: only accounts speak, and +i: none joins, from a room's first line, before the server's reconciler
+  # opens the open ones (3m, slice 3's max review).
+  default-modes: +ntCMi
+  # A visitor's rooms (ADR-0001); the bot, an operator, is in every room of every world past it (client.go).
+  max-channels-per-client: 100
   operator-only-creation: true
   registration:
     enabled: true
@@ -56,7 +86,9 @@ channels:
 oper-classes:
   server-admin:
     title: Server Admin
-    capabilities: [kill, ban, nofakelag, relaymsg, vhosts, sajoin, samode, snomasks, rehash, accreg, chanreg, history, metadata]
+    # The bot's needs alone (slice 3's max review): rooms made (chanreg, with operator-only-creation), joined and
+    # set whatever their modes, their history read, unpaced.
+    capabilities: [sajoin, samode, chanreg, history, nofakelag]
 opers:
   admin:
     class: server-admin
@@ -96,7 +128,7 @@ history:
     enable-account-indexing: true
   tagmsg-storage:
     default: false
-    whitelist: ["+draft/react", "+react"]
+    whitelist: ["+draft/react", "+react", "+draft/unreact"]
 # On, as in Ergo's defaults, but set by opers alone (the server), not by any channel member.
 metadata:
   enabled: true
@@ -107,6 +139,19 @@ metadata:
     enabled: true
     duration: 2m
     max-attempts: 10
+# Ergo's defaults: a client paced past a burst of 5 lines, 2 a second; the bot's class is not (nofakelag).
+fakelag:
+  enabled: true
+  window: 1s
+  burst-limit: 5
+  messages-per-window: 2
+  cooldown: 2s
+  command-budgets:
+    CHATHISTORY: 16
+    MARKREAD: 16
+    MONITOR: 1
+    WHO: 4
+    WEBPUSH: 1
 lock-file: {{LOCK}}
 # The oper's password hash may come from the environment (ERGO__OPERS__ADMIN__PASSWORD), not the file.
 allow-environment-overrides: true
