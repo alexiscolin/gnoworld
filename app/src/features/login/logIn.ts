@@ -1,0 +1,58 @@
+// The login's course in the page (slice 4's 4a): Adena read, the server's challenge for its chain, its text
+// signed unchanged, the proof posted; each step in the store, each stop with its reason. Its parts come in,
+// so the tests give their own: lib's in the page.
+import type { connect, signLogin } from "../../lib/adena/adena.ts";
+import type { loginApi } from "../../lib/api/login.ts";
+import type { createAppStore } from "../../store/index.ts";
+
+export interface LoginDeps {
+  connect: typeof connect;
+  sign: typeof signLogin;
+  api: Pick<ReturnType<typeof loginApi>, "challenge" | "verify" | "me" | "logout">;
+  store: ReturnType<typeof createAppStore>;
+}
+
+/** Logs in with Adena (window.adena, read as it is): one login at a time, the page's store following it. */
+export async function logIn(adena: unknown, { connect, sign, api, store }: LoginDeps): Promise<void> {
+  const { begin, stopped, signedIn } = store.getState().loginActions;
+  if (store.getState().login.step !== "idle") return;
+  begin("wallet");
+  const wallet = await connect(adena);
+  if (!wallet.ok) {
+    stopped(wallet);
+    return;
+  }
+  const challenge = await api.challenge(wallet.chainId);
+  if (!challenge.ok) {
+    stopped(challenge);
+    return;
+  }
+  begin("signing");
+  const signed = await sign(adena, { address: wallet.address, chainId: wallet.chainId, text: challenge.value.text });
+  if (!signed.ok) {
+    stopped(signed);
+    return;
+  }
+  begin("verifying");
+  const verified = await api.verify({ nonce: challenge.value.nonce, address: wallet.address, proof: signed.proof });
+  if (verified.ok)
+    signedIn(wallet.address); // the api checked the server names this account
+  else stopped(verified);
+}
+
+/** The session the server's cookie holds, read once as the page starts; unknown while it cannot say. */
+export async function readSession({ api, store }: LoginDeps): Promise<void> {
+  const { signedIn, signedOut } = store.getState().loginActions;
+  const me = await api.me();
+  if (!me.ok) return;
+  if (me.value.address === null) signedOut();
+  else signedIn(me.value.address);
+}
+
+/** Ends the session on the server, which alone can clear its cookie; kept, with its reason, when it cannot. */
+export async function logOut({ api, store }: LoginDeps): Promise<void> {
+  const { signedOut, stopped } = store.getState().loginActions;
+  const done = await api.logout();
+  if (done.ok) signedOut();
+  else stopped(done);
+}

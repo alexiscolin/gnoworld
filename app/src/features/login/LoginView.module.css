@@ -1,0 +1,20 @@
+/* A phone reads only (docs/plans/backlog.md, row 4): a coarse pointer gets the words, a computer the button. */
+@layer components {
+  .phone {
+    display: none;
+  }
+
+  .problem:empty {
+    display: none;
+  }
+
+  @media (pointer: coarse) {
+    .phone {
+      display: inline;
+    }
+
+    .computer {
+      display: none;
+    }
+  }
+}
