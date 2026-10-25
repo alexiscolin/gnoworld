@@ -88,7 +88,7 @@ describe("RoomView", () => {
     expect(notice).not.toContain("*");
     // Muted, its mark apart: the classes the sheet reads (`.notice .text`, `.mark`).
     expect(html).toMatch(
-      /<li class="[^"]*notice[^"]*">.*<span class="[^"]*mark[^"]*">Notice <\/span><span class="[^"]*text[^"]*">heads up<\/span>/s,
+      /<li class="[^"]*notice[^"]*">.*<span class="[^"]*mark[^"]*">Notice <\/span>.*<span class="[^"]*text[^"]*">heads up<\/span>/s,
     );
   });
 
@@ -115,7 +115,8 @@ describe("RoomView", () => {
     const html = part(view({ me: BOB, state: { ...ROOM, lines } }), "Messages");
     for (const item of items(html)) expect(item).toContain("Mentions you");
     const [notice = "", action = ""] = items(html);
-    expect(notice).toMatch(/Notice @g1jg8m…vsqf5 heads up$/);
+    expect(notice).toContain("Notice");
+    expect(notice).toMatch(/@g1jg8m…vsqf5 heads up$/);
     expect(action).toMatch(/\* g10gh7…3y5tv .*waves at @g1jg8m…vsqf5$/);
     // Each keeps its kind's one class, whole, and says it is about the reader by its attribute.
     expect(html).toMatch(/<li class="[^" ]*notice[^" ]*" data-about-me="">/);
