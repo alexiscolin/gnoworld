@@ -909,6 +909,14 @@ git -C "$c2" checkout -q -- a.ts && printf 'exit 2\n' >"$c2/scripts/code_changed
 echo broken >>"$c2/a.ts" && git -C "$c2" add a.ts
 precommit && fail "pre-commit took a failing code_changed.sh for prose alone (F133)"
 git -C "$c2" checkout -q HEAD -- scripts/code_changed.sh a.ts
+# It hands the staged gate what the commit changes, one path a line: a rename's two paths, what is
+# staged only, so check.sh checks those areas alone.
+printf '#!/bin/sh\nprintf "%%s" "$GATE_CHANGED" >"%s/gate-changed"\n' "$t" >"$c2/scripts/check.sh" && echo x >"$c2/c.ts" && echo x >"$c2/g.ts"
+git -C "$c2" add -A && git -C "$c2" commit -qm listing
+echo listed >>"$c2/a.ts" && git -C "$c2" add a.ts && git -C "$c2" mv c.ts d.ts && echo unstaged >>"$c2/g.ts" && echo untracked >"$c2/u.ts"
+precommit || fail "pre-commit failed with a gate that passes"
+[ "$(sort "$t/gate-changed" | paste -sd' ' -)" = "a.ts c.ts d.ts" ] || fail "pre-commit handed the gate another list than the commit's: $(cat "$t/gate-changed")"
+git -C "$c2" reset -q --hard && rm -f "$c2/u.ts"
 fi
 
 if part outside; then

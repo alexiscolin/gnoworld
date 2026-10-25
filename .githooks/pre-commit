@@ -58,7 +58,10 @@ if [ -n "$differ" ]; then
 	exit 1
 fi
 sh "$s/borrow_node_modules.sh" "$staged" # the staged copy has no installed packages
+# What the commit changes, one path a line, so check.sh checks those areas alone: the copy has no
+# repository to ask. A list git cannot give is empty, and check.sh then checks everything.
+changed=$(git -c core.quotePath=false diff --cached --no-renames --name-only HEAD 2>/dev/null) || changed=
 # A `commit -a` hands the hook its own index; the gate's git calls must not touch it.
-env -u GIT_INDEX_FILE -u GIT_DIR -u GIT_WORK_TREE sh "$s/check.sh"
+env -u GIT_INDEX_FILE -u GIT_DIR -u GIT_WORK_TREE GATE_CHANGED="$changed" sh "$s/check.sh"
 put "$(code_print "$(git write-tree)")" fast # for the hooks outside the sandbox
 finished=1
