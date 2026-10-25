@@ -110,6 +110,13 @@ describe("RoomView", () => {
     );
   });
 
+  // 4b's pre-merge (/code-review): lines that come while the room is open reach a screen reader.
+  it("announces the lines that come, politely, and them alone", () => {
+    const html = view();
+    expect(html).toMatch(/<ol [^>]*aria-live="polite"/);
+    expect(html).toMatch(/<ol [^>]*aria-relevant="additions"/);
+  });
+
   it("shows the lines in the order the store holds them, oldest first", () => {
     const lines = [line({ id: "a", text: "first" }), line({ id: "b", text: "second" })];
     expect(said(part(view({ state: { ...ROOM, lines } }), "Messages"))).toMatch(/first.*second/);
