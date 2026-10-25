@@ -71,10 +71,11 @@ describe("formatted", () => {
     ["- hello", "bulleted", "hello"],
     ["1. hello", "numbered", "hello"],
     ["- hello", "quote", "> - hello"],
-    ["2. hello", "numbered", "hello"],
+    ["2. hello", "numbered", "1. 2. hello"],
     ["* hello", "bulleted", "hello"],
     ["- hello", "numbered", "1. hello"],
-    ["12. hello", "bulleted", "- hello"],
+    ["12. hello", "bulleted", "- 12. hello"],
+    ["1986. was a good year", "numbered", "1. 1986. was a good year"],
   ] as const)("starts %j as a %s, or ends it", (text, format, result) => {
     expect(formatted({ text, start: 2, end: 2 }, format).text).toBe(result);
   });

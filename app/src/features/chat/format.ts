@@ -14,8 +14,9 @@ export interface Edit {
 
 const MARKS = { bold: "**", italic: "*", strike: "~~", code: "`" } as const;
 const STARTS = { quote: "> ", bulleted: "- ", numbered: "1. " } as const;
-const LIST = /^(?:[-*+]|\d{1,9}\.) /;
-const SAME = { quote: /^> /, bulleted: /^[-*+] /, numbered: /^\d/ } as const;
+// The starts the bar puts on a line, which it takes off or turns: a number other than 1 is the writer's own text.
+const LIST = /^(?:[-*+]|1\.) /;
+const SAME = { quote: /^> /, bulleted: /^[-*+] /, numbered: /^1\. / } as const;
 const ADDRESS = "https://";
 
 /** The draft once `format` is applied to its selection, and the selection after. */
