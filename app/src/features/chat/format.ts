@@ -15,6 +15,7 @@ export interface Edit {
 const MARKS = { bold: "**", italic: "*", strike: "~~", code: "`" } as const;
 const STARTS = { quote: "> ", bulleted: "- ", numbered: "1. " } as const;
 const LIST = /^(?:[-*+]|\d{1,9}\.) /;
+const SAME = { quote: /^> /, bulleted: /^[-*+] /, numbered: /^\d/ } as const;
 const ADDRESS = "https://";
 
 /** The draft once `format` is applied to its selection, and the selection after. */
@@ -86,8 +87,8 @@ function linked({ text, start, end }: Edit): Edit {
 // The line's start, put on or taken off, or a list's turned to the other kind; the selection on the same letters.
 function started({ text, start, end }: Edit, format: keyof typeof STARTS): Edit {
   const existing = (format === "quote" ? /^> / : LIST).exec(text)?.[0] ?? "";
-  const same = existing !== "" && (format === "quote" || /^\d/.test(existing) === (format === "numbered"));
-  const prefix = same ? "" : STARTS[format];
-  const moved = (at: number) => (at < existing.length ? prefix.length : at - existing.length + prefix.length);
+  // The line already starts as asked: the start comes off; another list's is turned to this one's.
+  const prefix = SAME[format].test(existing) ? "" : STARTS[format];
+  const moved = (at: number) => Math.max(at - existing.length, 0) + prefix.length;
   return { text: prefix + text.slice(existing.length), start: moved(start), end: moved(end) };
 }
