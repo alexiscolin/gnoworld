@@ -93,10 +93,11 @@ const setup = (before?: (store: ReturnType<typeof createAppStore>) => void) => {
   return { store, link, links, asked, last, connected, signedIn, signedOut, room, chat: () => store.getState().chat };
 };
 type Setup = ReturnType<typeof setup>;
-// A guest's link following these rooms, connected.
+// A guest's link following these rooms, the first shown, connected.
 const guestIn = (rooms: readonly string[]): Setup & { fake: Fake } => {
   const t = setup();
   t.link.follow(rooms);
+  t.link.show(rooms[0]);
   t.signedOut();
   return { ...t, fake: t.connected() };
 };
@@ -329,6 +330,111 @@ describe("the chat's link: the rooms it joins", () => {
     const t = guestIn(["#ok", "#a b", "#c,#d", "#e\r\nQUIT", "nohash", "#UPPER"]);
     expect(t.fake.sent).toEqual(["JOIN #ok"]);
     expect(Object.keys(t.chat().rooms)).toEqual(["#ok"]);
+  });
+});
+
+// The history of the room in view alone: Ergo paces a client to 2 lines a second past a burst of 5
+// (deploy/ergo/ircd.yaml.tmpl), so a page per room joined would keep the one in view waiting (plan §4).
+describe("the chat's link: the history of the room in view", () => {
+  const history = (fake: Fake) => fake.sent.filter((line) => line.startsWith("CHATHISTORY "));
+
+  it("asks the history of the room shown when Ergo says I joined it, and of no other", () => {
+    const t = guestIn(["#a", "#b"]);
+    t.fake.line(`:${GUEST}!u@h JOIN #a`);
+    t.fake.line(`:${GUEST}!u@h JOIN #b`);
+    expect(history(t.fake)).toEqual(["CHATHISTORY LATEST #a * 200"]);
+  });
+
+  it("asks a joined room's history once it is shown, once a connection", () => {
+    const t = guestIn(["#a", "#b"]);
+    t.fake.line(`:${GUEST}!u@h JOIN #a`);
+    t.fake.line(`:${GUEST}!u@h JOIN #b`);
+    t.link.show("#b");
+    t.link.show("#a");
+    t.link.show("#b");
+    expect(history(t.fake)).toEqual(["CHATHISTORY LATEST #a * 200", "CHATHISTORY LATEST #b * 200"]);
+  });
+
+  it("waits for Ergo's JOIN of a room shown before it is joined", () => {
+    const t = guestIn(["#a", "#b"]);
+    t.link.show("#b");
+    t.fake.line(`:${GUEST}!u@h JOIN #a`);
+    expect(history(t.fake)).toEqual([]);
+    t.fake.line(`:${GUEST}!u@h JOIN #b`);
+    expect(history(t.fake)).toEqual(["CHATHISTORY LATEST #b * 200"]);
+  });
+
+  it.each([
+    ["a room it does not follow", "#garden"],
+    ["no room", undefined],
+  ])("asks nothing when shown %s", (_, room) => {
+    const t = guestIn(["#a"]);
+    t.fake.line(`:${GUEST}!u@h JOIN #a`);
+    t.fake.sent.length = 0;
+    t.link.show(room);
+    t.link.show(room);
+    expect(t.fake.sent).toEqual([]);
+  });
+
+  it("asks nothing while it waits, and asks the room shown again on the next connection's JOIN", () => {
+    const t = guestIn(["#a"]);
+    t.fake.line(`:${GUEST}!u@h JOIN #a`);
+    t.fake.state("waiting");
+    t.link.show("#a");
+    expect(history(t.fake)).toHaveLength(1);
+    t.connected();
+    t.fake.line(`:${GUEST}!u@h JOIN #a`);
+    expect(history(t.fake)).toHaveLength(2);
+  });
+
+  it("asks a room's history again once it was parted and joined again", () => {
+    const t = guestIn(["#a"]);
+    t.fake.line(`:${GUEST}!u@h JOIN #a`);
+    t.link.follow([]);
+    t.link.follow(["#a"]);
+    t.fake.line(`:${GUEST}!u@h JOIN #a`);
+    expect(history(t.fake)).toHaveLength(2);
+  });
+
+  it("shows nothing more once stopped, though its connection would still send", () => {
+    const t = guestIn(["#a", "#b"]);
+    t.fake.line(`:${GUEST}!u@h JOIN #b`);
+    t.link.stop();
+    t.fake.connected = true;
+    t.link.show("#b");
+    expect(history(t.fake)).toEqual([]);
+  });
+
+  it("asks once though Ergo says twice I joined the room shown", () => {
+    const t = guestIn(["#a"]);
+    t.fake.line(`:${GUEST}!u@h JOIN #a`);
+    t.fake.line(`:${GUEST}!u@h JOIN #a`);
+    expect(history(t.fake)).toHaveLength(1);
+  });
+
+  it("forgets the room shown when shown none", () => {
+    const t = guestIn(["#a"]);
+    t.link.show(undefined);
+    t.fake.line(`:${GUEST}!u@h JOIN #a`);
+    expect(history(t.fake)).toEqual([]);
+  });
+
+  it("takes my JOIN replayed in a batch of another type for no join, and asks nothing when the room is shown", () => {
+    const t = guestIn(["#a", "#b"]);
+    t.fake.line("BATCH +n1 netjoin");
+    t.fake.line(`@batch=n1 :${GUEST}!u@h JOIN #b`);
+    t.fake.line("BATCH -n1");
+    t.link.show("#b");
+    expect(history(t.fake)).toEqual([]);
+  });
+
+  it("asks nothing for a room it stopped following, though Ergo had said I joined it", () => {
+    const t = guestIn(["#a", "#b"]);
+    t.fake.line(`:${GUEST}!u@h JOIN #b`);
+    t.link.follow(["#a"]);
+    t.fake.sent.length = 0;
+    t.link.show("#b");
+    expect(t.fake.sent).toEqual([]);
   });
 });
 

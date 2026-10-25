@@ -1,7 +1,8 @@
 // The chat's link to Ergo (slice 4's merge 4b): one connection for the page, as the session says (a guest
 // when nobody is logged in, the account when one is), in the rooms the world page follows, 100 at most
-// (Ergo's max-channels-per-client); each room's newest lines asked when Ergo says I joined it; Ergo's lines
-// read into the store through one BatchReader a connection. Its parts come in, so the tests give their own.
+// (Ergo's max-channels-per-client); the newest lines of the room in view alone, once Ergo says I joined it, since
+// Ergo paces a client to 2 lines a second (plan §4); Ergo's lines read into the store through one BatchReader a
+// connection. Its parts come in, so the tests give their own.
 import { BatchReader, type IrcMessage } from "@gnoworld/core";
 import { RoomId } from "@gnoworld/schemas";
 import type { Result } from "../../lib/api/http.ts";
@@ -55,7 +56,11 @@ class Link {
   #connected = false;
   #stopped = false;
   #rooms: readonly string[] = [];
+  // The rooms a JOIN went for; those Ergo said I joined, live; those whose history went: each this connection's.
   readonly #joined = new Set<string>();
+  readonly #inside = new Set<string>();
+  readonly #asked = new Set<string>();
+  #shown: string | undefined;
   #reader = new BatchReader();
 
   constructor(deps: LinkDeps) {
@@ -80,6 +85,13 @@ class Link {
       "JOIN",
       wanted.filter((room) => !this.#joined.has(room)),
     );
+  }
+
+  /** The room in view: its history is asked once Ergo says I joined it, once a connection. */
+  show(room: string | undefined): void {
+    if (this.#stopped) return;
+    this.#shown = room;
+    if (room !== undefined && this.#inside.has(room)) this.#history(room);
   }
 
   stop(): void {
@@ -107,7 +119,7 @@ class Link {
     this.#generation += 1;
     this.#ergo = undefined;
     this.#connected = false;
-    this.#joined.clear();
+    this.#forget();
     ending?.stop();
     this.#deps.store.getState().chatActions.disconnected();
   }
@@ -135,7 +147,7 @@ class Link {
     }
     loginActions.chat(state);
     this.#connected = state === "connected";
-    this.#joined.clear();
+    this.#forget();
     if (!this.#connected) {
       chatActions.disconnected();
       return;
@@ -145,14 +157,27 @@ class Link {
     this.#send("JOIN", this.#rooms);
   }
 
+  #forget(): void {
+    for (const rooms of [this.#joined, this.#inside, this.#asked]) rooms.clear();
+  }
+
+  #history(room: string): void {
+    if (this.#asked.has(room)) return;
+    this.#asked.add(room);
+    this.#ergo?.send(`CHATHISTORY LATEST ${room} * ${String(HISTORY_LINES)}`);
+  }
+
   #send(command: "JOIN" | "PART", rooms: readonly string[]): void {
     for (const line of linesOf(command, rooms)) {
       if (this.#ergo?.send(line) !== true) return;
-      for (const room of line.slice(command.length + 1).split(",")) {
-        if (command === "JOIN") this.#joined.add(room);
-        else this.#joined.delete(room);
-      }
+      for (const room of line.slice(command.length + 1).split(",")) this.#sent(command, room);
     }
+  }
+
+  // A JOIN sent; a PART sent, after which the room is neither joined, nor inside, nor asked.
+  #sent(command: "JOIN" | "PART", room: string): void {
+    if (command === "JOIN") this.#joined.add(room);
+    else for (const rooms of [this.#joined, this.#inside, this.#asked]) rooms.delete(room);
   }
 
   // A live line to the store; a history page to it at once at its end; another batch's lines one by one.
@@ -165,24 +190,31 @@ class Link {
     else for (const each of messages) this.#heard(each);
   }
 
-  // Ergo's JOIN of me to a room joined, not replayed: its newest lines asked.
+  // Ergo's JOIN of me to a room joined, not replayed: I am inside, and the room in view's lines are asked.
   #heard(message: IrcMessage): void {
     this.#deps.store.getState().chatActions.heard(message);
     const { tags, source = "", command, params } = message;
     const [room = ""] = params;
     const mine = nickOf(source) === this.#ergo?.nick();
-    if (command === "JOIN" && mine && !tags.has("batch") && this.#joined.has(room)) {
-      this.#ergo?.send(`CHATHISTORY LATEST ${room} * ${String(HISTORY_LINES)}`);
-    }
+    if (command !== "JOIN" || !mine || tags.has("batch") || !this.#joined.has(room)) return;
+    this.#inside.add(room);
+    if (room === this.#shown) this.#history(room);
   }
 }
 
 /** Links the page to Ergo, following the store's session, until stopped. */
-export function chatLink(deps: LinkDeps): { follow: (ids: readonly string[]) => void; stop: () => void } {
+export function chatLink(deps: LinkDeps): {
+  follow: (ids: readonly string[]) => void;
+  show: (room: string | undefined) => void;
+  stop: () => void;
+} {
   const link = new Link(deps);
   return {
     follow: (ids) => {
       link.follow(ids);
+    },
+    show: (room) => {
+      link.show(room);
     },
     stop: () => {
       link.stop();
