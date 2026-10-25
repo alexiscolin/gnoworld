@@ -1,0 +1,7 @@
+/* The rooms' sections: each named as a label is. */
+@layer components {
+  .section {
+    font: var(--font-label);
+    color: var(--color-text-muted);
+  }
+}

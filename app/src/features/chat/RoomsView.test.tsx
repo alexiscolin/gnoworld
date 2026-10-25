@@ -1,0 +1,82 @@
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
+import { RoomsView, type RoomsViewProps } from "./RoomsView.tsx";
+
+const SECTIONS: RoomsViewProps["sections"] = [
+  {
+    name: "Talk",
+    rooms: [
+      { room: "#bubble", type: "open" },
+      { room: "#bubble/games", type: "open" },
+    ],
+  },
+  { name: null, rooms: [{ room: "#bubble/news", type: "announcement" }] },
+];
+const view = (over: Partial<RoomsViewProps> = {}) =>
+  renderToStaticMarkup(<RoomsView sections={SECTIONS} current="#bubble/games" {...over} />);
+const said = (html: string) =>
+  html
+    .replaceAll(/<[^>]+>/g, " ")
+    .replaceAll(/\s+/g, " ")
+    .trim();
+const links = (html: string) => [...html.matchAll(/<a [^>]*>(.*?)<\/a>/gs)].map((m) => said(m[1] ?? ""));
+const hrefs = (html: string) => [...html.matchAll(/<a [^>]*href="([^"]*)"/g)].map((m) => m[1]);
+
+describe("RoomsView", () => {
+  it("lists the rooms by section, in the server's order, under a navigation named Rooms", () => {
+    const html = view();
+    expect(html).toMatch(/^<nav[^>]*aria-label="Rooms"/);
+    expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual(["Talk", "Other rooms"]);
+    expect(links(html)).toEqual(["#bubble", "#games", "#news"]);
+    expect(hrefs(html)).toEqual(["/w/bubble", "/w/bubble?room=games", "/w/bubble?room=news"]);
+  });
+
+  it("names the section of the others Rooms when there is no other section", () => {
+    const html = view({ sections: [{ name: null, rooms: [{ room: "#bubble", type: "open" }] }] });
+    expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual(["Rooms"]);
+  });
+
+  it.each([
+    ["#bubble/games", "#games"],
+    ["#bubble", "#bubble"],
+  ])("marks the room shown (%s), and it alone", (current, label) => {
+    const html = view({ current });
+    expect(html.match(/aria-current="true"/g)).toHaveLength(1);
+    expect(html).toMatch(new RegExp(`<a [^>]*aria-current="true"[^>]*>.*?${label}.*?</a>`, "s"));
+  });
+
+  it.each([undefined, "#bubble/gone"])("marks no room when the one shown (%s) is not listed", (current) => {
+    expect(view({ current })).not.toContain("aria-current");
+  });
+
+  it("shows a section's name as text, never as markup", () => {
+    const html = view({
+      sections: [{ name: "<img src=x onerror=alert(1)>", rooms: [{ room: "#bubble", type: "open" }] }],
+    });
+    expect(html).not.toContain("<img");
+    expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
+  });
+
+  it.each([
+    ["no section", []],
+    [
+      "only empty sections",
+      [
+        { name: null, rooms: [] },
+        { name: "Talk", rooms: [] },
+      ],
+    ],
+  ])("says so when the world has no room a reader may see: %s", (_, sections) => {
+    expect(said(view({ sections }))).toBe("No room here yet.");
+  });
+
+  it("leaves out a section with no room", () => {
+    const html = view({ sections: [{ name: "Empty", rooms: [] }, ...SECTIONS] });
+    expect(html).not.toContain("Empty");
+  });
+
+  it("lists 100 rooms, each a link of its own", () => {
+    const rooms = Array.from({ length: 100 }, (_, n) => ({ room: `#bubble/r${String(n)}`, type: "open" as const }));
+    expect(links(view({ sections: [{ name: null, rooms }] }))).toHaveLength(100);
+  });
+});
