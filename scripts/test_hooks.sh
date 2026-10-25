@@ -168,6 +168,8 @@ guarded = next(ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast
 missed = [p for p in guarded if not any(fnmatch.fnmatch(p, s) or p.startswith(s + "/") for s in listed)]
 assert not missed, missed
 PY
+# The full gate judges every harness mutant: an argument (--changed) would judge a part of them.
+grep -qxE '[[:space:]]*python3 -I scripts/harness_mutate\.py' "$gate_file" || fail "check.sh's full gate runs harness_mutate with arguments, so maybe not every mutant"
 # check.sh prints the code it tests before its first step, and records it after its last one,
 # through records.sh, whose own cases are in the section `outside` (F076, F133).
 at() { grep -nF -- "$1" "$gate_file" | head -1 | cut -d: -f1; }
@@ -485,7 +487,7 @@ dry() { # $1: a mutant planted at the end of its list, $2: an entry planted in S
 import sys
 p, mark, mutant, entry = sys.argv[1:]
 s = open(p).read()
-for a, b in (('def run(test, only=""):\n', f'def run(test, only=""):\n    open({mark!r}, "w").close()\n'),
+for a, b in (('def run(tree, test, only=""):\n', f'def run(tree, test, only=""):\n    open({mark!r}, "w").close()\n'),
              ("\n\n\ndef sections(", "\n    " + mutant + "\n\n\ndef sections("), ("SECTIONS = {\n", "SECTIONS = {\n    " + entry + "\n")):
     assert s.count(a) == 1, f"harness_mutate.py no longer holds {a!r}: update test_hooks.sh's dry()"
     s = s.replace(a, b)
@@ -506,6 +508,137 @@ printf '%s' "$out" | grep -qF "no_such_section" || fail "harness_mutate --dry di
 out=$(dry 'yield from each("docs/REVIEW.md", "#", "", "probe", "planted misnamed")' '"docs/REVIEW.md": "no_such_block",') && fail "harness_mutate --dry accepted a block probe.py lacks"
 printf '%s' "$out" | grep -qF "no_such_block" || fail "harness_mutate --dry did not name the unknown block: $out"
 [ ! -e "$m/ran" ] || fail "harness_mutate --dry ran a test, which takes minutes"
+fi
+
+if part harness_shards; then
+# harness_mutate judges its mutants over HARNESS_SHARDS worktrees side by side, each mutant once and in
+# a tree put back after each one, after a control run of each suite in every tree; with --changed
+# <base>, only the mutants of the guard files committed since base (a merge's own), all of them when a
+# suite or harness_mutate itself changed; a survivor fails the run either way, and the worktrees go.
+# On a copy whose worktrees are copies of a small tree, and whose mutants are planted.
+hs="$t/shards" && mkdir -p "$hs/src/scripts" "$hs/repo/scripts"
+# The suite: its section opens at the line's start, as harness_mutate reads it, which this file's
+# runner must not; with SHARDS_MEET, a mutant's run waits for that many trees to run at once.
+printf '%s\n' 'part() { case ",$ONLY," in *",$1,"*) return 0 ;; *) return 1 ;; esac; }' \
+	'[ -n "$ONLY" ] || { [ ! -e BROKEN_hooks ]; exit; }' \
+	'if part x; then' \
+	'	pwd >>"$SHARD_ROOT/ran"' \
+	'	if [ -n "${SHARDS_MEET:-}" ]; then' \
+	'		: >"$SHARD_ROOT/met.${PWD##*/}" && n=0' \
+	'		until [ "$(ls "$SHARD_ROOT" | grep -c "^met\.")" -ge "$SHARDS_MEET" ]; do n=$((n + 1)); [ "$n" -lt 100 ] || { : >"$SHARD_ROOT/lonely"; break; }; sleep 0.1; done' \
+	'	fi' \
+	'	grep -q KEEP1 g.txt && grep -q KEEP2 g.txt && grep -q KEEP3 g.txt && grep -q KEEP4 h.txt && grep -q KEEP5 i.txt' \
+	'fi' >"$hs/src/scripts/test_hooks.sh"
+printf 'import os, sys\n\n\ndef part(name):\n    return False\n\n\nif part("y"):\n    pass\nsys.exit(os.path.exists("BROKEN_probe"))\n' >"$hs/src/scripts/probe.py"
+printf 'KEEP1 KEEP2 KEEP3 SPARE\n' >"$hs/src/g.txt" && printf 'KEEP4 SPARE2\n' >"$hs/src/h.txt" && printf 'KEEP5\n' >"$hs/src/i.txt"
+cp "$here/harness_mutate.py" "$hs/repo/"
+# The worktrees: copies, logged when made and when removed; BREAK_SECOND=<suite> breaks the second one.
+cat >"$hs/repo/repo_files.py" <<'PY'
+import contextlib, os, shutil, tempfile
+
+made = []
+
+
+@contextlib.contextmanager
+def worktree(rev):
+    root = os.environ["SHARD_ROOT"]
+    tree = tempfile.mkdtemp(dir=root)
+    shutil.copytree(os.environ["SHARD_SRC"], tree, dirs_exist_ok=True)
+    made.append(tree)
+    if len(made) == 2 and os.environ.get("BREAK_SECOND"):
+        open(os.path.join(tree, "BROKEN_" + os.environ["BREAK_SECOND"]), "w").close()
+    with open(os.path.join(root, "made"), "a") as f:
+        f.write(tree + "\n")
+    try:
+        yield tree
+    finally:
+        shutil.rmtree(tree)
+        with open(os.path.join(root, "removed"), "a") as f:
+            f.write(tree + "\n")
+PY
+python3 -I - "$hs/repo/harness_mutate.py" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p).read()
+planted = '''def mutants():
+    for n in "123":
+        yield from each("g.txt", f"KEEP{n}", "", "hooks", f"planted keep{n}")
+    yield from each("g.txt", " SPARE", "", "hooks", "planted spare")
+    yield from each("h.txt", "KEEP4", "", "hooks", "planted keep4")
+    yield from each("h.txt", " SPARE2", "", "hooks", "planted spare2")
+    yield from each("i.txt", "KEEP5", "", "hooks", "planted keep5")
+    if os.environ.get("STALE"):
+        yield from each("g.txt", "NOWHERE", "", "hooks", "planted stale")
+
+
+def every_mutant():'''
+for a, b in (("def mutants():", planted), ("SECTIONS = {\n", 'SECTIONS = {\n    "g.txt": "x", "h.txt": "x", "i.txt": "x",\n')):
+    assert s.count(a) == 1, f"harness_mutate.py no longer holds {a!r}: update test_hooks.sh's harness_shards"
+    s = s.replace(a, b)
+open(p, "w").write(s)
+PY
+cp "$hs/src/g.txt" "$hs/src/h.txt" "$hs/src/i.txt" "$hs/repo/" && cp "$hs/src/scripts/test_hooks.sh" "$hs/repo/scripts/"
+git -C "$hs/repo" init -q && git -C "$hs/repo" add -A && git -C "$hs/repo" commit -qm x
+shards() { # $1: the shards; then harness_mutate's arguments
+	n=$1 && shift
+	rm -f "$hs/made" "$hs/removed" "$hs/ran" "$hs/lonely" "$hs"/met.*
+	(cd "$hs/repo" && SHARD_ROOT="$hs" SHARD_SRC="$hs/src" HARNESS_SHARDS=$n python3 -I harness_mutate.py "$@" 2>&1)
+}
+count() { [ -e "$hs/$1" ] && wc -l <"$hs/$1" | tr -d ' ' || echo 0; }
+verdicts() { printf '%s\n' "$1" | grep -c "killed: \|survives: " || :; }
+# Three shards at once: every mutant judged once, in its order; the survivor behind another file's
+# killed mutant in its shard still survives (its tree put back); every worktree removed.
+out=$(SHARDS_MEET=3 shards 3) && fail "harness_mutate passed with surviving mutants: $out"
+for k in keep1 keep2 keep3 keep4 keep5; do
+	[ "$(printf '%s\n' "$out" | grep -c "killed: planted $k #1$")" = 1 ] || fail "harness_mutate did not judge planted $k once: $out"
+done
+for k in spare spare2; do printf '%s\n' "$out" | grep -q "^FAIL  survives: planted $k #1$" || fail "harness_mutate hid the survivor $k among its shards: $out"; done
+[ "$(printf '%s\n' "$out" | grep -E "planted [a-z0-9]+ #1" | sed 's/.*planted \([a-z0-9]*\) #1.*/\1/' | paste -sd' ' -)" = "keep1 keep2 keep3 spare keep4 spare2 keep5" ] ||
+	fail "harness_mutate printed its verdicts out of the mutants' order: $out"
+[ "$(count made)" = 3 ] || fail "harness_mutate made $(count made) worktrees for 3 shards"
+[ "$(sort -u "$hs/ran" | wc -l | tr -d ' ')" = 3 ] || fail "harness_mutate did not spread its mutants over its 3 shards"
+[ ! -e "$hs/lonely" ] || fail "harness_mutate's shards did not run side by side"
+[ "$(count removed)" = 3 ] || fail "harness_mutate left worktrees behind"
+# No shard asked for: one.
+out=$(shards 0) && fail "harness_mutate passed with surviving mutants on one shard"
+[ "$(count made)" = 1 ] || fail "harness_mutate made $(count made) worktrees for HARNESS_SHARDS=0"
+# The control: a suite failing on any untouched tree stops the run before any verdict, its trees removed.
+for suite in hooks probe; do
+	out=$(BREAK_SECOND=$suite shards 3) && fail "harness_mutate passed with $suite failing on an untouched tree"
+	printf '%s\n' "$out" | grep -q "fails on the untouched copy" || fail "harness_mutate did not stop on $suite failing on an untouched tree: $out"
+	[ "$(verdicts "$out")" = 0 ] || fail "harness_mutate judged mutants after a failed control: $out"
+	[ "$(count removed)" = "$(count made)" ] || fail "harness_mutate left worktrees behind after a failed control"
+done
+# --changed: the committed changes since base; only i.txt changed, so only its mutant runs, and passes.
+base=$(git -C "$hs/repo" rev-parse HEAD)
+printf 'KEEP5 changed\n' >"$hs/repo/i.txt" && git -C "$hs/repo" commit -qam i
+out=$(shards 2 --changed "$base") || fail "harness_mutate --changed failed on the mutant of the one changed file: $out"
+printf '%s\n' "$out" | grep -q "killed: planted keep5 #1$" || fail "harness_mutate --changed skipped the changed file's mutant: $out"
+[ "$(verdicts "$out")" = 1 ] || fail "harness_mutate --changed judged a mutant of a file that did not change: $out"
+printf '%s\n' "$out" | grep -q "1 of 7 mutants" || fail "harness_mutate --changed did not say how many it kept: $out"
+# A survivor among the changed files fails the run.
+printf 'KEEP4 SPARE2 changed\n' >"$hs/repo/h.txt" && git -C "$hs/repo" commit -qam h
+out=$(shards 2 --changed "$base") && fail "harness_mutate --changed passed with a survivor: $out"
+printf '%s\n' "$out" | grep -q "^FAIL  survives: planted spare2 #1$" || fail "harness_mutate --changed hid its survivor: $out"
+# Every mutant is still built: a stale one of a file that did not change stops the run.
+out=$(STALE=1 shards 2 --changed "$base") && fail "harness_mutate --changed passed with a stale mutant: $out"
+printf '%s\n' "$out" | grep -q "planted stale: nothing to mutate" || fail "harness_mutate --changed did not check every mutant: $out"
+[ "$(verdicts "$out")" = 0 ] || fail "harness_mutate --changed judged mutants beside a stale one: $out"
+# A suite changed: its cases may have weakened any guard's, so every mutant runs.
+base=$(git -C "$hs/repo" rev-parse HEAD)
+printf '\n' >>"$hs/repo/scripts/test_hooks.sh" && git -C "$hs/repo" commit -qam suite
+out=$(shards 2 --changed "$base") && fail "harness_mutate --changed passed with survivors after a suite changed: $out"
+[ "$(verdicts "$out")" = 7 ] || fail "harness_mutate --changed did not judge every mutant after a suite changed: $out"
+# What it refuses, before any worktree: a base git cannot compare with, one read as an option, any
+# other argument.
+out=$(shards 2 --changed no-such-base) && fail "harness_mutate --changed took a base that is no commit: $out"
+out=$(shards 2 --changed "--output=$hs/written") && fail "harness_mutate --changed took an option for its base: $out"
+[ ! -e "$hs/written" ] || fail "harness_mutate --changed let git write a file"
+for args in "--changed" "--changed a b" "--dry --changed x" "--bogus"; do
+	out=$(shards 2 $args) && fail "harness_mutate took the arguments $args"
+	printf '%s\n' "$out" | grep -q "usage\|--changed" || fail "harness_mutate did not say why it refused $args: $out"
+	[ ! -e "$hs/made" ] || fail "harness_mutate made a worktree for the arguments $args"
+done
 fi
 
 if part migrations; then

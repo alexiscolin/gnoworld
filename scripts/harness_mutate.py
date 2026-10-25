@@ -7,7 +7,12 @@ not notice is a guard nobody checks: the run prints the test to add. GAPS lists 
 with their reason; a gap that gets killed must leave the list. Usage: scripts/harness_mutate.py,
 from the repository root; it takes minutes, so the full gate runs it when the harness changes.
 `--dry` builds every mutant on the working tree and checks its text and sections, no test run: the fast
-gate's check, through test_hooks.sh."""
+gate's check, through test_hooks.sh. The mutants are judged over HARNESS_SHARDS worktrees side by side
+(4 by default); `--changed <base>` judges only those of the guard files committed since base, a merge's
+own, or all of them when a suite or this script changed (its cases may have weakened any guard's); the
+full gate judges them all."""
+import concurrent.futures
+import contextlib
 import os
 import re
 import subprocess
@@ -43,7 +48,7 @@ SECTIONS = {
     ".jscpd.json": "jscpd", "tsconfig.base.json": "tsc", "vitest.config.ts": "vitest,vitest_ui,server",
     "scripts/guard.py": "guard", "scripts/review_pass.py": "review_pass", "scripts/patch_coverage.py": "patch_coverage",
     "scripts/check_docs.py": "check_docs", "scripts/check_regressions.py": "regressions", "scripts/check_migrations.py": "migrations",
-    "scripts/harness_mutate.py": "harness_mutate", ".githooks/commit-msg": "commit_msg,installed",
+    "scripts/harness_mutate.py": "harness_mutate,harness_shards", ".githooks/commit-msg": "commit_msg,installed",
     ".githooks/pre-push": "pre_push,wiring,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed",
     ".githooks/records.sh": "outside,installed,wiring", ".githooks/pre-merge-commit": "outside,installed", ".githooks/merge.sh": "installed",
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix",
@@ -214,6 +219,20 @@ def mutants():
     yield from each("scripts/harness_mutate.py", "        if mutated is None:\n", "        if False:\n", "hooks", "harness_mutate --dry sees a stale mutant")
     yield from each("scripts/harness_mutate.py", "        if unknown:\n", "        if False:\n", "hooks", "harness_mutate --dry sees a section its suite lacks")
     yield from each("scripts/harness_mutate.py", '    WORKTREE = "."\n    checked()\n', '    WORKTREE = "."\n', "hooks", "harness_mutate --dry checks the mutants")
+    hm = "scripts/harness_mutate.py"
+    yield from each(hm, "        found = [m for m in found if m[1] in changed]\n", "", "hooks", "harness_mutate --changed judges only the changed guard files")
+    yield from each(hm, "    if diff.returncode != 0:\n", "    if False:\n", "hooks", "harness_mutate --changed wants a base git can compare with")
+    yield from each(hm, "killed = verdicts[i % " "shards][i // shards]", "killed = verdicts[0][0]", "hooks", "harness_mutate reads each mutant's own verdict")
+    yield from each(hm, "worktree(\"HEAD\")) for _ in range(shards)]", "worktree(\"HEAD\")) for _ in range(1)]", "hooks", "harness_mutate makes a worktree a shard")
+    yield from each(hm, "ThreadPoolExecutor(" "shards) as pool", "ThreadPoolExecutor(1) as pool", "hooks", "harness_mutate's shards run side by side")
+    yield from each(hm, "    finally:\n        with open(target, \"w\") as f:\n            f.write(original)\n", "    finally:\n        pass\n", "hooks", "harness_mutate puts each mutant's file back")
+    yield from each(hm, "            if code " "!= 0:\n", "            if False:\n", "hooks", "harness_mutate stops on a failed control")
+    yield from each(hm, "lambda c: run(*c), [(tr, te) for tr in " "trees ", "lambda c: run(*c), [(tr, te) for tr in trees[:1] ", "hooks", "harness_mutate's control runs in every tree")
+    yield from each(hm, "elif sys.argv[1:]" ":\n", "elif False:\n", "hooks", "harness_mutate refuses an unknown argument")
+    yield from each(hm, "    if sys.argv[2].startswith" "(\"-\"):", "    if False:", "hooks", "harness_mutate --changed takes no option for its base")
+    yield from each(hm, "if changed is not None and changed " "& SUITES:", "if False:", "hooks", "harness_mutate --changed judges every mutant when a suite changed")
+    yield from each(hm, "if failures" ":\n    sys.exit", "if failures and changed is None:\n    sys.exit", "hooks", "a survivor fails harness_mutate --changed")
+    yield from each(hm, "    found = " "checked()\n", "    found = list(mutants())\n", "hooks", "harness_mutate --changed still checks every mutant")
     # The hooks and their scripts.
     yield from each("scripts/guard.py", ' refuse("', " " + OFF + '"', "hooks", "guard refusal")
     yield from each("scripts/guard.py", " refuse(UNREAD)", " " + OFF + "UNREAD)", "hooks", "guard unread .gno")
@@ -554,6 +573,7 @@ def mutants():
         ("\t$all || return 0 # the hooks'", "\t: # the hooks'", "the hooks' tests only for everything"),
         ('harness --quiet "$base" && return 0', 'true && return 0', "--full mutates a changed harness"),
         ("finish stories coverage history harness", ":", "--full fails when a full lane did"),
+        ("python3 -I scripts/harness_mutate.py\n", "python3 -I scripts/harness_mutate.py --changed \"$base\"\n", "--full judges every harness mutant"),
     ):
         yield from each("scripts/check.sh", find, replace, "hooks", f"check.sh: {label}")
     # The gate: each step dropped.
@@ -566,10 +586,24 @@ def sections(path, test):
     return only[test] if isinstance(only, dict) else only
 
 
-def run(test, only=""):
-    """A test's exit code in the worktree; `only` names its sections, empty for all of them."""
+def run(tree, test, only=""):
+    """A test's exit code in the worktree `tree`; `only` names its sections, empty for all of them."""
     env = {**os.environ, "ONLY": only}
-    return subprocess.run(TESTS[test], cwd=WORKTREE, env=env, capture_output=True, text=True, timeout=600).returncode
+    return subprocess.run(TESTS[test], cwd=tree, env=env, capture_output=True, text=True, timeout=600).returncode
+
+
+def judged(tree, label, path, mutated, test):
+    """Whether a test of `tree` fails with this mutant written in it; the file is put back after."""
+    target = os.path.join(tree, path)
+    with open(target) as f:
+        original = f.read()
+    with open(target, "w") as f:
+        f.write(mutated)
+    try:
+        return run(tree, test, sections(path, test)) != 0
+    finally:
+        with open(target, "w") as f:
+            f.write(original)
 
 
 def proposal(test, path):
@@ -603,22 +637,38 @@ if sys.argv[1:] == ["--dry"]:
     WORKTREE = "."
     checked()
     sys.exit(0)
+SUITES = {"scripts/test_hooks.sh", "scripts/probe.py", "scripts/harness_mutate.py"}
+changed = None
+if sys.argv[1:2] == ["--changed"] and len(sys.argv) == 3:
+    if sys.argv[2].startswith("-"):  # git would read it as an option
+        sys.exit(f"harness_mutate: --changed {sys.argv[2]}: a base is a commit, not an option")
+    diff = subprocess.run(["git", "diff", "--name-only", sys.argv[2], "HEAD", "--"], capture_output=True, text=True)
+    if diff.returncode != 0:
+        sys.exit(f"harness_mutate: --changed {sys.argv[2]}: git cannot compare with it: {diff.stderr.strip()}")
+    changed = set(diff.stdout.splitlines())
+elif sys.argv[1:]:
+    sys.exit("usage: harness_mutate.py [--dry | --changed <base>]")
+shards = max(1, int(os.environ.get("HARNESS_SHARDS", "4")))
 failures = []
-with worktree("HEAD") as WORKTREE:
+with contextlib.ExitStack() as stack:
+    trees = [stack.enter_context(worktree("HEAD")) for _ in range(shards)]
+    WORKTREE = trees[0]
     found = checked()
-    for test in TESTS:  # the control: an untouched copy passes, so a failure means the mutant
-        if run(test) != 0:
-            sys.exit(f"harness_mutate: {test} fails on the untouched copy; fix that first")
-    for label, path, mutated, test in found:
-        target = os.path.join(WORKTREE, path)
-        original = read(path)
-        with open(target, "w") as f:
-            f.write(mutated)
-        try:
-            killed = run(test, sections(path, test)) != 0
-        finally:
-            with open(target, "w") as f:
-                f.write(original)
+    if changed is not None and changed & SUITES:
+        print(f"harness_mutate: {', '.join(sorted(changed & SUITES))} changed since {sys.argv[2]}: every mutant")
+    elif changed is not None:
+        print(f"harness_mutate: the guard files changed since {sys.argv[2]}: {len([m for m in found if m[1] in changed])} of {len(found)} mutants")
+        found = [m for m in found if m[1] in changed]
+    with concurrent.futures.ThreadPoolExecutor(shards * len(TESTS)) as pool:
+        # The control: an untouched copy passes, so a failure means the mutant.
+        for (tree, test), code in zip([(tr, te) for tr in trees for te in TESTS], pool.map(lambda c: run(*c), [(tr, te) for tr in trees for te in TESTS])):
+            if code != 0:
+                sys.exit(f"harness_mutate: {test} fails on the untouched copy {tree}; fix that first")
+    # Each shard judges every shards-th mutant, one at a time in its own worktree; the verdicts come back in order.
+    with concurrent.futures.ThreadPoolExecutor(shards) as pool:
+        verdicts = list(pool.map(lambda n: [judged(trees[n], *m) for m in found[n::shards]], range(shards)))
+    for i, (label, path, mutated, test) in enumerate(found):
+        killed = verdicts[i % shards][i // shards]
         if killed and label in GAPS:
             print(f"FAIL  killed, yet listed in GAPS: {label}\n      → delete its line from GAPS")
             failures.append(label)

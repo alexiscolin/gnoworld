@@ -82,7 +82,7 @@ fast gate                                              full gate (--full), after
   types  tsc ─▶ ESLint                                   coverage  coverage ─▶ patch coverage ─▶ StrykerJS
   tests  Ergo's build ─▶ Vitest                          history   prove_fix ─▶ regressions ─▶ migrations
   gno    gno lint, test ─▶ mutate.py ─▶ Go                          ─▶ gitleaks ─▶ pnpm audit
-  docs   check_docs, parse ─▶ test_hooks.sh              harness   harness_mutate
+  docs   check_docs, parse ─▶ test_hooks.sh              harness   harness_mutate, in 4 worktrees
      (the five lanes at once)                               (the four lanes at once)
 ```
 
@@ -131,7 +131,7 @@ in one file would hide the lint error it brings to another (the red pass reprodu
 | `scripts/check_migrations.py` | a migration `main` has, edited, moved or removed (F466), or one it cannot read |
 | gitleaks | a secret anywhere in the history; a path into a home folder or a service of the demo's host (`gitleaks-private.toml`: the repository will be public); both rule sets always run (F120); every change reaches it as text, on every branch, whatever an attribute, a NUL byte, a diff driver or a replace ref would show (F132) |
 | `pnpm audit` | a dependency with a known advisory, moderate or worse |
-| `scripts/harness_mutate.py` | when a file of the harness list changed (one list, word for word `pre-push`'s, F124): a guard of the harness that no test notices switched off |
+| `scripts/harness_mutate.py` | when a file of the harness list changed (one list, word for word `pre-push`'s, F124): a guard of the harness that no test notices switched off; every mutant judged, over `HARNESS_SHARDS` worktrees side by side (4 by default), each tree first passing both suites untouched; `--changed <base>`, for a merge's own review, judges the mutants of the guard files committed since base, or all of them when `test_hooks.sh`, `probe.py` or `harness_mutate.py` changed. A test killed by a signal (a lack of memory under four shards) counts its mutant killed |
 
 ## The safety net never shrinks quietly
 
