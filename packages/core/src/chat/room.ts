@@ -124,7 +124,22 @@ export interface Where {
   readonly me: string;
 }
 
-const sorted = (nicks: Iterable<string>): readonly string[] => [...nicks].sort(compare);
+// Names in code-unit order merged into the sorted list, in one pass: a NAMES line costs no sort of the room.
+function merged(members: readonly string[], added: readonly string[]): readonly string[] {
+  const out: string[] = [];
+  let at = 0;
+  for (const name of added) {
+    let member = members[at];
+    while (member !== undefined && compare(member, name) < 0) {
+      out.push(member);
+      at += 1;
+      member = members[at];
+    }
+    out.push(name);
+  }
+  return [...out, ...members.slice(at)];
+}
+
 // A nick put in its place in a sorted list: a JOIN costs one pass, no sort.
 function inserted(members: readonly string[], nick: string): readonly string[] {
   const at = members.findIndex((member) => compare(member, nick) > 0);
@@ -141,8 +156,8 @@ const named: Change = (members, { params: [, , room = "", list] }, at) => {
   if (!sameRoom(room, at.room) || list === undefined) return members;
   const names = list.split(" ").map((name) => name.replace(/^[~&@%+]+/, ""));
   const held = new Set(members);
-  const added = names.filter((name) => name !== "" && !held.has(name));
-  return added.length === 0 ? members : sorted(new Set([...members, ...added]));
+  const added = [...new Set(names.filter((name) => name !== "" && !held.has(name)))].sort(compare);
+  return added.length === 0 ? members : merged(members, added);
 };
 
 const joined: Change = (members, { source = "", params: [room = ""] }, at) => {
@@ -164,7 +179,9 @@ const kicked: Change = (members, { params: [room = "", nick = ""] }, at) => {
 
 const renamed: Change = (members, { source = "", params: [next = ""] }) => {
   const nick = nickOf(source);
-  return next === "" || !members.includes(nick) ? members : sorted(new Set([...without(members, nick), next]));
+  if (next === "" || !members.includes(nick)) return members;
+  const rest = without(members, nick);
+  return rest.includes(next) ? rest : inserted(rest, next);
 };
 
 const CHANGES: Readonly<Record<string, Change>> = {
