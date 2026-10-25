@@ -512,6 +512,14 @@ describe("sections of a world's rooms (4b)", () => {
 
   it("names the kind of the limits it holds, and never a section's name or a room it was given", () => {
     expect(failure(typed({ sections: [{ name: "n".repeat(65), rooms: [] }] }))).toContain(": too_big");
+    const twice = [
+      { name: "A", rooms: ["#earth"] },
+      { name: "A", rooms: ["#earth"] },
+    ];
+    expect(failure(typed({ sections: twice }))).toMatch(/: worlds\.0\.sections\.1\.name: custom\b/);
+    expect(failure(typed({ sections: [twice[0], { name: "B", rooms: ["#earth"] }] }))).toMatch(
+      /: worlds\.0\.sections\.1\.rooms\.0: custom\b/,
+    );
     expect(failure(typed({ sections: [{ name: "planted-value", rooms: ["#bubble/planted-value"] }] }))).not.toContain(
       "planted-value",
     );

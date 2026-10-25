@@ -54,11 +54,11 @@ function checkSections(slug: string, sections: readonly Section[], ctx: z.Refine
   const names = new Set<string>();
   const placed = new Set<string>();
   for (const [at, { name, rooms }] of sections.entries()) {
-    if (names.has(name)) ctx.addIssue({ code: "custom", path: ["sections", at, "name"], message: "name" });
+    if (names.has(name)) ctx.addIssue({ code: "custom", path: ["sections", at, "name"] });
     names.add(name);
     for (const [index, id] of rooms.entries()) {
       if (!ownRoom(slug, id) || placed.has(id))
-        ctx.addIssue({ code: "custom", path: ["sections", at, "rooms", index], message: "room" });
+        ctx.addIssue({ code: "custom", path: ["sections", at, "rooms", index] });
       placed.add(id);
     }
   }
