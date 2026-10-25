@@ -828,7 +828,8 @@ CLIENT
 	# The bot makes the worlds' rooms once it is in Ergo (3h): a guest can join none before.
 	bot=""
 	for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
-		bot=$(ws 203.0.113.20 "$auth" "$ORIGINS" "NICK watch20" "USER w 0 * :w" + "NAMES #earth" | grep ' 353 .*gnoworld' || true)
+		# In the room: Ergo lists an invisible (+i) member to the room's members alone.
+		bot=$(ws 203.0.113.20 "$auth" "$ORIGINS" "NICK watch20" "USER w 0 * :w" + "JOIN #earth" "NAMES #earth" | grep ' 353 .*gnoworld' || true)
 		[ -z "$bot" ] || break
 		sleep 2
 	done
@@ -836,7 +837,8 @@ CLIENT
 	room="#made$(od -An -N2 -tu2 /dev/urandom | tr -d ' ')"
 	marker="marker-$(openssl rand -hex 4)"
 	# An operator makes a room and speaks in it, and stays while a guest comes: its history, its default modes.
-	ws 203.0.113.25 "$auth" "$ORIGINS" "NICK chief25" "USER c 0 * :c" + "OPER admin $oper" "JOIN $room" "PRIVMSG $room :$marker" \
+	# Ergo makes a room invite-only (+i): the operator opens it, as the server opens an open room.
+	ws 203.0.113.25 "$auth" "$ORIGINS" "NICK chief25" "USER c 0 * :c" + "OPER admin $oper" "JOIN $room" "MODE $room -i" "PRIVMSG $room :$marker" \
 		+ + + + + + + + + + + + + + + >"$tmp/chief.txt" &
 	chief=$!
 	# The guest comes once the room is made and the marker said.
@@ -871,8 +873,13 @@ CLIENT
 	expect "no password, no WebSocket" "$(first "$(ws 203.0.113.24 - "$ORIGINS" "NICK z")")" "HTTP/1.1 401 Unauthorized"
 	# Straight to Ergo from another container of the internal network: its forged X-Forwarded-For is not believed.
 	WS_TARGET=ergo:8097 WS_PROXY=0 ws 203.0.113.26 - "$ORIGINS" "NICK direct26" "USER d 0 * :d" + >/dev/null
-	at_least "Ergo sees the visitor's own address, through web" "$(docker logs "$ergo" 2>&1 | grep -c 'proxied IP 203.0.113.21$' || true)" 1
-	expect "and never a forged X-Forwarded-For, through web or straight" "$(docker logs "$ergo" 2>&1 | grep -c '192.0.2.66' || true)" 0
+	# Its log holds no address (connect-ip off, F702): the cloak, a hash of the address Ergo sees, tells instead.
+	cloak() { ws "$1" "$2" "$ORIGINS" "NICK $3" "USER c 0 * :c" + "WHOIS $3" | sed -n "s/.* 311 $3 $3 [^ ]* \\([^ ]*\\) .*/\\1/p"; }
+	same=$(cloak 203.0.113.27 "$auth" cloak27) again=$(cloak 203.0.113.27 "$auth" cloak27b) other=$(cloak 203.0.113.28 "$auth" cloak28)
+	straight=$(WS_TARGET=ergo:8097 WS_PROXY=0 cloak 203.0.113.27 - cloak27c)
+	if [ -n "$same" ] && [ "$same" = "$again" ] && [ "$same" != "$other" ]; then pass "Ergo sees the visitor's own address through web, never a forged X-Forwarded-For: one cloak an address"; else fail "never a forged X-Forwarded-For, through web: [$same] [$again] [$other]"; fi
+	if [ -n "$straight" ] && [ "$straight" != "$same" ]; then pass "and never a forged X-Forwarded-For, straight"; else fail "never a forged X-Forwarded-For, straight: [$straight] [$same]"; fi
+	expect "and no address in Ergo's log" "$(docker logs "$ergo" 2>&1 | grep -cE '203\.0\.113\.|192\.0\.2\.66' || true)" 0
 
 	# The server through web's /api: the password first, the visitor's address from web alone.
 	expect "no password, no API" "$(status '/api/activity?worlds=earth' 203.0.113.1)" 401
