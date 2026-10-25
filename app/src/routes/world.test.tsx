@@ -35,6 +35,12 @@ describe("a world's page", () => {
     expect(html).toContain("the BUBBLE token, its governance");
   });
 
+  // The chat's rooms come from the server once the page runs: the build writes the page waiting for them.
+  test("holds the world's chat, its rooms still to load", async () => {
+    const html = await render(route(), "/w/bubble");
+    expect(html).toMatch(/<p role="status">Loading the rooms…<\/p>/);
+  });
+
   test("shows not found, as an alert, for a world that does not exist", async () => {
     const html = await render(route(), "/w/nowhere");
     expect(html).toContain('role="alert"');

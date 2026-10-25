@@ -21,3 +21,6 @@ export function roomsApi(fetcher: Fetcher, timeoutMs = TIMEOUT_MS) {
     },
   };
 }
+
+/** The rooms' client of this page, on its own fetch. */
+export const pageRoomsApi = () => roomsApi((url, init) => fetch(url, init));

@@ -53,7 +53,7 @@ export const login = (account: string, passphrase: string): Step[] => [
 ];
 
 // An account in a page that logged in with Adena's stand-in, the test wallet of that name: its address.
-async function logIn(page: Page, as = ""): Promise<string> {
+export async function logIn(page: Page, as = ""): Promise<string> {
   await adena(page, "signs", as);
   await page.goto("/");
   await hydrated(page);
@@ -65,7 +65,7 @@ async function logIn(page: Page, as = ""): Promise<string> {
 }
 
 /** A ticket for one connection to Ergo, from a page whose session is logged in. */
-async function ticketOf(page: Page): Promise<string> {
+export async function ticketOf(page: Page): Promise<string> {
   const minted: unknown = await page.evaluate(async () => {
     const answer = await fetch("/api/login/ticket", {
       method: "POST",

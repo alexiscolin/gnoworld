@@ -9,6 +9,7 @@ import {
 } from "react-router";
 import { failedWorldMeta, worldMeta } from "../meta.ts";
 import { findWorld } from "../worlds.ts";
+import { Chat } from "../features/chat/index.ts";
 import { PageError } from "../features/errors/index.ts";
 
 export function loader({ params }: LoaderFunctionArgs) {
@@ -35,6 +36,7 @@ export default function World() {
     <>
       <h1>{world.name}</h1>
       <p>{world.description}</p>
+      <Chat world={world.slug} />
     </>
   );
 }
