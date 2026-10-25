@@ -115,9 +115,12 @@ class Blocks {
     return children.length === 0 ? this.#paragraph(at, end) : { next: end, block: { type: "quote", children } };
   }
 
-  // A list's items, one a line, each led by a mark of the first one's kind; a line that is not ends it.
+  // A list's items, one a line, each led by a mark of the first one's kind (a bullet, any of three, or a number); a
+  // line that is not ends it.
   #list(at: number): Read {
-    const ordered = ITEM.exec(this.#body(at))?.[1] !== undefined;
+    // An ordered list counts from its first number, the sender's own (F780).
+    const first = ITEM.exec(this.#body(at))?.[1];
+    const ordered = first !== undefined;
     const items: Inline[][] = [];
     let end = at;
     for (; end < this.#lines.length; end += 1) {
@@ -125,7 +128,11 @@ class Blocks {
       if (item === null || (item[1] !== undefined) !== ordered) break;
       items.push(inline((item[2] ?? "").trim()));
     }
-    return { next: end, block: { type: "list", ordered, items } };
+    const block: Block =
+      first === undefined
+        ? { type: "list", ordered: false, items }
+        : { type: "list", ordered: true, start: Number(first), items };
+    return { next: end, block };
   }
 
   // Where a paragraph from `at` ends: at a blank line or a block's start.

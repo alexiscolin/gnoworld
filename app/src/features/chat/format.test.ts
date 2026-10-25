@@ -143,7 +143,7 @@ describe("formatted", () => {
   it.each([
     ["quote", { type: "quote", children: [{ type: "paragraph", children: [{ type: "text", text: "hello" }] }] }],
     ["bulleted", { type: "list", ordered: false, items: [[{ type: "text", text: "hello" }]] }],
-    ["numbered", { type: "list", ordered: true, items: [[{ type: "text", text: "hello" }]] }],
+    ["numbered", { type: "list", ordered: true, start: 1, items: [[{ type: "text", text: "hello" }]] }],
   ] as const)("starts a line Markdown reads as a %s", (format, block) => {
     expect(markdown(formatted({ text: "hello", start: 0, end: 0 }, format).text)).toStrictEqual([block]);
   });

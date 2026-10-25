@@ -14,4 +14,5 @@ export type Block =
   | { type: "paragraph"; children: Inline[] }
   | { type: "codeBlock"; text: string }
   | { type: "quote"; children: Block[] }
-  | { type: "list"; ordered: boolean; items: Inline[][] };
+  | { type: "list"; ordered: false; items: Inline[][] }
+  | { type: "list"; ordered: true; start: number; items: Inline[][] };

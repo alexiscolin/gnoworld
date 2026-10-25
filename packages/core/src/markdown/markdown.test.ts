@@ -384,14 +384,23 @@ describe("markdown: blocks", () => {
   });
 
   test.each([
-    ["- a\n- b", false],
-    ["* a\n* b", false],
-    ["+ a\n+ b", false],
-    ["1. a\n2. b", true],
-    ["10. a\n11. b", true],
-    ["123456789. a\n2. b", true],
-  ])("reads a list (%j)", (source, ordered) => {
-    reads(source, { type: "list", ordered, items: [[text("a")], [text("b")]] });
+    ["- a\n- b", undefined],
+    ["* a\n* b", undefined],
+    ["+ a\n+ b", undefined],
+    ["1. a\n2. b", 1],
+    ["10. a\n11. b", 10],
+    ["123456789. a\n2. b", 123456789],
+  ] as const)("reads a list (%j), an ordered one from its first number", (source, start) => {
+    const items = [[text("a")], [text("b")]];
+    reads(
+      source,
+      start === undefined ? { type: "list", ordered: false, items } : { type: "list", ordered: true, start, items },
+    );
+  });
+
+  // /code-review (F780): a number the sender typed is the list's own, not lost to a 1.
+  test("keeps an ordered list's first number", () => {
+    reads("2024. was a good year", { type: "list", ordered: true, start: 2024, items: [[text("was a good year")]] });
   });
 
   test("reads marks in a list's items, and an empty item", () => {
@@ -409,7 +418,7 @@ describe("markdown: blocks", () => {
     reads(
       "- a\n1. b",
       { type: "list", ordered: false, items: [[text("a")]] },
-      { type: "list", ordered: true, items: [[text("b")]] },
+      { type: "list", ordered: true, start: 1, items: [[text("b")]] },
     );
   });
 
@@ -539,7 +548,7 @@ describe("markdown: the edges StrykerJS found", () => {
   test("takes one space after a quote's `>`, the others kept, and trims a list item", () => {
     reads(">a b", { type: "quote", children: [paragraph(text("a b"))] });
     reads("-   a  ", { type: "list", ordered: false, items: [[text("a")]] });
-    reads("1.   a  ", { type: "list", ordered: true, items: [[text("a")]] });
+    reads("1.   a  ", { type: "list", ordered: true, start: 1, items: [[text("a")]] });
   });
 
   test("reads a struck address", () => {
@@ -592,7 +601,8 @@ function linesOf(children: readonly Inline[]): Inline[][] {
 }
 function allowed(blocks: readonly Block[]): boolean {
   return blocks.every((block) => {
-    if (KEYS[block.type] !== keysOf(block)) return false;
+    const keys = block.type === "list" && block.ordered ? "items,ordered,start,type" : KEYS[block.type];
+    if (keys !== keysOf(block)) return false;
     if (block.type === "paragraph") return linesOf(block.children).every((line) => line.length > 0 && run(line, false));
     if (block.type === "quote") return block.children.length > 0 && allowed(block.children);
     if (block.type === "list") return block.items.length > 0 && block.items.every((item) => run(item, false));

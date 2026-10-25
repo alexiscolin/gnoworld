@@ -38,7 +38,7 @@ function block(node: Block): ReactNode {
     case "list":
       return createElement(
         node.ordered ? "ol" : "ul",
-        null,
+        node.ordered && node.start !== 1 ? { start: node.start } : null,
         ...node.items.map((item) => createElement("li", null, ...item.map(inline))),
       );
   }

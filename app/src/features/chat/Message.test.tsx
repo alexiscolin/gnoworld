@@ -50,6 +50,10 @@ describe("Message", () => {
     expect(boxed("a\n\nb")).toBe('<div class="x"><p>a</p><p>b</p></div>');
   });
 
+  it("numbers an ordered list from its first number", () => {
+    expect(html("3. third point")).toBe('<div><ol start="3"><li>third point</li></ol></div>');
+  });
+
   it("shows nothing for a blank message", () => {
     expect(html("  ")).toBe("<span></span>");
   });
