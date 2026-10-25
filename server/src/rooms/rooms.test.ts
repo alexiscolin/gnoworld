@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import { openDatabase } from "../db.ts";
-import { ensureRooms, listRooms, mainRoom, ROOM_TABLES } from "./rooms.ts";
+import { ensureRooms, listRooms, mainRoom, ROOM_TABLES, roomWorld } from "./rooms.ts";
 
 const T0 = Date.parse("2026-10-22T12:00:00.000Z");
 const opened: DatabaseSync[] = [];
@@ -17,6 +17,12 @@ const setup = () => {
 describe("rooms", () => {
   it("names a world's main room after its slug", () => {
     expect([mainRoom("earth"), mainRoom("bubble"), mainRoom("a-b-1")]).toEqual(["#earth", "#bubble", "#a-b-1"]);
+  });
+
+  it("names a room's world, and none for a room it never made", () => {
+    const db = setup();
+    ensureRooms(db, ["earth"], T0);
+    expect([roomWorld(db, "#earth"), roomWorld(db, "#nope")]).toEqual(["earth", undefined]);
   });
 
   it("makes each world's main room and no other, and lists them by name", () => {

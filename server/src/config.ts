@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 import { isIP } from "node:net";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
+import type { Thresholds } from "./moderation/decide.ts";
+import { CATEGORIES } from "./moderation/provider.ts";
 
 export interface Config {
   host: string;
@@ -18,6 +20,27 @@ export interface Config {
   authSocket: string | undefined;
   // Ergo's internal listener and its operator's password; no IRC link without the password's file.
   ergo: { host: string; port: number; password: string } | undefined;
+  moderation: { openaiKey: Secret | undefined; thresholds: Thresholds; newAccountHours: number };
+}
+
+// A secret that never prints: inspect, JSON and a template string show [redacted]; reveal() reads it.
+class Secret {
+  readonly #value: string;
+  constructor(value: string) {
+    this.#value = value;
+  }
+  reveal(): string {
+    return this.#value;
+  }
+  toJSON(): string {
+    return "[redacted]";
+  }
+  toString(): string {
+    return "[redacted]";
+  }
+  [Symbol.for("nodejs.util.inspect.custom")](): string {
+    return "[redacted]";
+  }
 }
 
 // An origin as a browser sends it: scheme, host and port, nothing else (an Origin header compares to it).
@@ -77,6 +100,28 @@ const Env = z.object({
     .pipe(z.number().max(65_535))
     .default(6667),
   ERGO_OPER_PASSWORD_FILE: z.string().min(1).optional(),
+  OPENAI_API_KEY_FILE: z.string().min(1).optional(),
+  // A score that hides a category in place of OpenAI's own flag, by category: {"harassment": 0.9}.
+  MODERATION_THRESHOLDS: z
+    .string()
+    .transform((text, ctx) => {
+      try {
+        return JSON.parse(text) as unknown;
+      } catch {
+        ctx.addIssue({ code: "custom", message: "json" });
+        return z.NEVER;
+      }
+    })
+    .pipe(
+      z.strictObject(Object.fromEntries(CATEGORIES.map((category) => [category, z.number().min(0).max(1).optional()]))),
+    )
+    .default({}),
+  NEW_ACCOUNT_HOURS: z
+    .string()
+    .regex(/^[1-9]\d{0,2}$/)
+    .transform(Number)
+    .pipe(z.number().max(720))
+    .default(24),
 });
 
 export function loadConfig(env: Record<string, string | undefined>): Config {
@@ -92,6 +137,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
   const { HOST, PORT, DATABASE, TRUSTED_PROXY, LOG_PEPPER_FILE, ROLES_FILE, CHAINS, ORIGINS, NEW_ACCOUNTS_PER_HOUR } =
     parsed.data;
   const { AUTH_SOCKET, ERGO_HOST, ERGO_PORT, ERGO_OPER_PASSWORD_FILE } = parsed.data;
+  const { OPENAI_API_KEY_FILE, MODERATION_THRESHOLDS, NEW_ACCOUNT_HOURS } = parsed.data;
   return {
     host: HOST,
     port: PORT,
@@ -104,6 +150,12 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     newAccountsPerHour: NEW_ACCOUNTS_PER_HOUR,
     authSocket: AUTH_SOCKET,
     ergo: ergoOf(env, { host: ERGO_HOST, port: ERGO_PORT, passwordFile: ERGO_OPER_PASSWORD_FILE }),
+    moderation: {
+      openaiKey:
+        OPENAI_API_KEY_FILE === undefined ? undefined : new Secret(word("OPENAI_API_KEY_FILE", OPENAI_API_KEY_FILE)),
+      thresholds: MODERATION_THRESHOLDS,
+      newAccountHours: NEW_ACCOUNT_HOURS,
+    },
   };
 }
 
@@ -113,19 +165,20 @@ function ergoOf(
   env: Record<string, string | undefined>,
   { host, port, passwordFile }: { host: string; port: number; passwordFile: string | undefined },
 ): Config["ergo"] {
-  if (passwordFile !== undefined) return { host, port, password: operPassword(passwordFile) };
+  if (passwordFile !== undefined) return { host, port, password: word("ERGO_OPER_PASSWORD_FILE", passwordFile) };
   if (env["ERGO_HOST"] !== undefined || env["ERGO_PORT"] !== undefined) {
     throw new Error("setting ERGO_OPER_PASSWORD_FILE: required");
   }
   return undefined;
 }
 
-// One word of printable ASCII, 256 at most: it goes on the OPER line as it is, which holds 510 bytes.
-function operPassword(path: string): string {
-  const password = secret("ERGO_OPER_PASSWORD_FILE", path);
-  if (!/^[\x21-\x7e]+$/.test(password)) throw new Error("setting ERGO_OPER_PASSWORD_FILE: invalid_characters");
-  if (password.length > 256) throw new Error("setting ERGO_OPER_PASSWORD_FILE: too_long");
-  return password;
+// A secret that goes on a line as it is (the OPER line, an Authorization header): one word of printable
+// ASCII, 256 at most, which the OPER line's 510 bytes hold.
+function word(setting: string, path: string): string {
+  const text = secret(setting, path);
+  if (!/^[\x21-\x7e]+$/.test(text)) throw new Error(`setting ${setting}: invalid_characters`);
+  if (text.length > 256) throw new Error(`setting ${setting}: too_long`);
+  return text;
 }
 
 function secret(setting: string, path: string): string {

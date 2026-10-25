@@ -162,6 +162,20 @@ Slice 3, the bot's link and the rooms (3h):
 - **A nick held by a ghost.** After a link drops silently, Ergo may hold `gnoworld` until its own
   ping timeout: the link logs `irc_refused` (`nick`) and tries again later.
 
+Slice 3, the check (3i):
+
+- **Its settings.** `OPENAI_API_KEY_FILE` holds OpenAI's key (one word, 32 characters at least);
+  unset, nothing leaves the server, every message is unchecked and the alert says so at the start.
+  `MODERATION_THRESHOLDS` (JSON, a score by category) replaces OpenAI's own flag where set;
+  `NEW_ACCOUNT_HOURS` (24) is how long an account counts as new.
+- **What reaches OpenAI.** A message's text alone, with the model's name: no account, no room.
+  The privacy policy must say so before a public launch (decision 154).
+- **Bare links pass the link rule.** A link counts with its scheme or `www.`; `bit.ly/x` does not.
+  Each scheme counts, however the links are joined: a link inside another's address is one more.
+- **Banned words** match as whole words, but a word of a script written without spaces (Chinese,
+  Japanese, Thai, Lao, Khmer, Myanmar) matches anywhere in a line.
+- **A message caught in a restart** stays `pending` in the verdicts; 3j's catch-up checks it again.
+
 ## Secrets: rotation and revocation
 
 - **The password:** write a new file with `htpasswd -cB`, then `docker compose ... restart web`.

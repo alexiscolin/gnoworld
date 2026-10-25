@@ -9,13 +9,14 @@ interface Fields {
   status?: number;
   port?: number;
   error?: string;
+  ms?: number;
 }
 export type Log = (event: string, fields?: Fields) => void;
 
 export function logger(pepper: string, write: (line: string) => void): Log {
-  return (event, { account, method, route, status, port, error } = {}) => {
+  return (event, { account, method, route, status, port, error, ms } = {}) => {
     const hashed = account === undefined ? undefined : createHmac("sha256", pepper).update(account).digest("hex");
-    const line = { time: new Date().toISOString(), event, method, route, status, port, error, account: hashed };
+    const line = { time: new Date().toISOString(), event, method, route, status, port, error, ms, account: hashed };
     write(`${JSON.stringify(line)}\n`);
   };
 }

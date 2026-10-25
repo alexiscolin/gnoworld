@@ -9,6 +9,7 @@ import { startChat } from "./chat.ts";
 import { authServer, listenAt } from "./ergo/auth.ts";
 import { LOGIN_TABLES, NONCE_HOST } from "./login/login.ts";
 import { TICKET_TABLES } from "./login/ticket.ts";
+import { VERDICT_TABLES } from "./moderation/check.ts";
 import { ROOM_TABLES } from "./rooms/rooms.ts";
 import { loginFrom } from "./login/routes.ts";
 import { loadRoles } from "./roles/roles.ts";
@@ -20,11 +21,15 @@ const config = loadConfig(process.env);
 // Checked at boot, so a bad roles file never starts a server; the bot's link (3h) reads it.
 const roles = loadRoles(config.roles);
 const log = logger(config.pepper, (line) => process.stdout.write(line));
-const db = openDatabase(config.database, [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST, ROOM_TABLES]);
+const db = openDatabase(config.database, [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST, ROOM_TABLES, VERDICT_TABLES]);
 let draining = false;
 const app = makeApp(log, () => !draining);
 app.route("/api/login", loginFrom(db, config, { log }));
-const chat = startChat(db, { worlds: [...roles.worlds.keys()], ergo: config.ergo }, { log });
+const chat = startChat(
+  db,
+  { worlds: roles.worlds, ergo: config.ergo, moderation: config.moderation },
+  { log, pepper: config.pepper },
+);
 app.route("/api/activity", chat.routes);
 // Ergo's logins go through the socket; without it, Ergo lets nobody in (fails closed).
 const auth = authServer(db, { log });

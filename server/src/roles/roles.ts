@@ -41,7 +41,7 @@ function schema() {
     });
 }
 
-type Rules = z.infer<ReturnType<typeof rules>>;
+export type Rules = z.infer<ReturnType<typeof rules>>;
 
 export interface Roles {
   team: ReadonlySet<Address>;
