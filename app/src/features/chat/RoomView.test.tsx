@@ -30,7 +30,8 @@ const part = (html: string, label: string) => {
   const found = new RegExp(`<(ol|aside)[^>]*aria-label="${name}"[^>]*>(.*?)</\\1>`, "s").exec(html);
   return found?.[2] ?? "";
 };
-// Each list item's words.
+// Each list item's words: a line that is a list holds items of its own, so a test of one counts the Messages
+// list's own children instead (F814's class).
 const items = (html: string) => [...html.matchAll(/<li[^>]*>(.*?)<\/li>/gs)].map((m) => said(m[1] ?? ""));
 const paragraphs = (html: string) => (html.match(/<p[ >]/g) ?? []).length;
 
