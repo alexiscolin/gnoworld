@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
+import { RoomList } from "@gnoworld/schemas";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { makeApp } from "./app.ts";
@@ -1253,6 +1254,54 @@ describe("the chat, as the server starts it", () => {
         ["#bubble/garden"],
         ["#bubble/garden", "#bubble/old"],
       ]);
+    });
+
+    it("lists a world's rooms by section to whom may see them: a members room, a hidden one, an archived one (4b)", async () => {
+      const TEAM = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+      const sectioned = new Map(
+        [...roled()].map(
+          ([slug, world]) =>
+            [
+              slug,
+              {
+                ...world,
+                rooms: new Map<string, Room>([...world.rooms, ["#bubble/attic", { type: "open", hidden: true }]]),
+                sections: [
+                  { name: "Crew", rooms: ["#bubble/crew", "#bubble/desk", "#bubble/attic"] },
+                  { name: "Past", rooms: ["#bubble/old"] },
+                ],
+              },
+            ] as const,
+        ),
+      );
+      const tokens = new Map([
+        ["mod", MOD],
+        ["member", MEMBER],
+        ["team", TEAM],
+        ["stranger", "g1uauvt7txunf9zeu2qyrzv0pa5uvwjlq90r3qpa"],
+      ]);
+      const { app, chat } = setup(
+        { worlds: sectioned, moderation: OFF, ergo: undefined, team: new Set([TEAM]) },
+        { session: (token) => tokens.get(token ?? "") },
+      );
+      app.route("/api/rooms", chat.roomList);
+      chat.rooms.create("bubble", "old");
+      chat.rooms.create("bubble", "garden");
+      chat.rooms.archive("bubble", "old");
+      const lists = async (who?: string) => {
+        const headers = who === undefined ? {} : { cookie: `__Host-session=${who}` };
+        const text = await (await app.request("/api/rooms?world=bubble", { headers })).text();
+        const body = RoomList.parse(JSON.parse(text));
+        return body.sections.map(({ name, rooms }) => [name, rooms.map(({ room, type }) => `${room} ${type}`)]);
+      };
+      const others = [null, ["#bubble open", "#bubble/garden open"]];
+      const crew = ["#bubble/crew members", "#bubble/desk members-write"];
+      const staff = [["Crew", [...crew, "#bubble/attic open"]], ["Past", ["#bubble/old open"]], others];
+      expect(await lists()).toEqual([others]);
+      expect(await lists("stranger")).toEqual([others]);
+      expect(await lists("member")).toEqual([["Crew", crew], others]);
+      expect(await lists("mod")).toEqual(staff);
+      expect(await lists("team")).toEqual(staff);
     });
 
     it("voices no one else on a JOIN: a reader who is no writer, a guest, the bot itself, anyone in an open room", async () => {

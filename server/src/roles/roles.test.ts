@@ -343,6 +343,275 @@ describe("groups and rooms by role (3m)", () => {
   });
 });
 
+describe("sections of a world's rooms (4b)", () => {
+  const typed = (patch: object) =>
+    JSON.stringify({ ...FILE, worlds: [{ ...FILE.worlds[0], ...patch }, FILE.worlds[1]] });
+  const sectionsOf = (patch: object) => loadRoles(written(typed(patch))).worlds.get("earth")?.sections;
+  // n valid room ids of the Earth: #earth/r1, #earth/r2, ...
+  const rooms = (n: number) => Array.from({ length: n }, (_, i) => `#earth/r${String(i + 1)}`);
+
+  it("reads each world's sections in the file's order, their rooms in theirs, a world with none having none", () => {
+    const roles = loadRoles(
+      written(
+        typed({
+          rooms: [{ room: "#earth/news", type: "announcement" }],
+          sections: [
+            { name: "Talk", rooms: ["#earth/news", "#earth", "#earth/garden"] },
+            { name: "Quiet", rooms: ["#earth/attic"] },
+            { name: "Nobody yet", rooms: [] },
+          ],
+        }),
+      ),
+    );
+    expect(roles.worlds.get("earth")?.sections).toEqual([
+      { name: "Talk", rooms: ["#earth/news", "#earth", "#earth/garden"] },
+      { name: "Quiet", rooms: ["#earth/attic"] },
+      { name: "Nobody yet", rooms: [] },
+    ]);
+    expect(roles.worlds.get("bubble")?.sections).toEqual([]);
+  });
+
+  it("keeps the file the server ships, with no section, loading as it did", () => {
+    const shipped = loadRoles(fileURLToPath(new URL("../../roles.json", import.meta.url)));
+    expect([...shipped.worlds.values()].map(({ sections }) => sections)).toEqual([[], []]);
+  });
+
+  it("takes a section of 1 and of 64 characters, 50 sections, 500 rooms a section and a room that no list types", () => {
+    const names = Array.from({ length: 50 }, (_, i) => `section ${String(i)}`);
+    expect(sectionsOf({ sections: names.map((name) => ({ name, rooms: [] })) })?.length).toBe(50);
+    expect(sectionsOf({ sections: [{ name: "a", rooms: [] }] })?.[0]?.name).toBe("a");
+    expect(sectionsOf({ sections: [{ name: "n".repeat(64), rooms: [] }] })?.[0]?.name).toBe("n".repeat(64));
+    expect(sectionsOf({ sections: [{ name: "All", rooms: rooms(500) }] })?.[0]?.rooms.length).toBe(500);
+    // A moderator's room, made through the API, is in no list of the file.
+    expect(sectionsOf({ sections: [{ name: "Made", rooms: ["#earth/made-later"] }] })?.[0]?.rooms).toEqual([
+      "#earth/made-later",
+    ]);
+  });
+
+  it("takes the same section name in two worlds, a name only twice in one world being refused", () => {
+    const both = JSON.stringify({
+      ...FILE,
+      worlds: FILE.worlds.map((w) => ({ ...w, sections: [{ name: "General", rooms: [] }] })),
+    });
+    expect([...loadRoles(written(both)).worlds.values()].map((w) => w.sections?.[0]?.name)).toEqual([
+      "General",
+      "General",
+    ]);
+  });
+
+  it.each([
+    ["a room of another world", { sections: [{ name: "A", rooms: ["#bubble/x"] }] }, "worlds.0.sections.0.rooms.0"],
+    [
+      "the main room of another world",
+      { sections: [{ name: "A", rooms: ["#bubble"] }] },
+      "worlds.0.sections.0.rooms.0",
+    ],
+    [
+      "a room of a world whose slug only starts it",
+      { sections: [{ name: "A", rooms: ["#earthling"] }] },
+      "worlds.0.sections.0.rooms.0",
+    ],
+    [
+      "a room of a world whose slug it ends",
+      { sections: [{ name: "A", rooms: ["#planet-earth"] }] },
+      "worlds.0.sections.0.rooms.0",
+    ],
+    [
+      "the second room of two being foreign",
+      { sections: [{ name: "A", rooms: ["#earth", "#bubble/x"] }] },
+      "worlds.0.sections.0.rooms.1",
+    ],
+    [
+      "a room of another world in the second section",
+      {
+        sections: [
+          { name: "A", rooms: ["#earth"] },
+          { name: "B", rooms: ["#bubble"] },
+        ],
+      },
+      "worlds.0.sections.1.rooms.0",
+    ],
+    ["a room with no #", { sections: [{ name: "A", rooms: ["earth/x"] }] }, "worlds.0.sections.0.rooms.0"],
+    ["an empty room id", { sections: [{ name: "A", rooms: [""] }] }, "worlds.0.sections.0.rooms.0"],
+    ["a room name in upper case", { sections: [{ name: "A", rooms: ["#earth/Crew"] }] }, "worlds.0.sections.0.rooms.0"],
+    ["an empty room name", { sections: [{ name: "A", rooms: ["#earth/"] }] }, "worlds.0.sections.0.rooms.0"],
+    ["a room name with a space", { sections: [{ name: "A", rooms: ["#earth/a b"] }] }, "worlds.0.sections.0.rooms.0"],
+    ["a room name with a comma", { sections: [{ name: "A", rooms: ["#earth/a,#x"] }] }, "worlds.0.sections.0.rooms.0"],
+    ["a room id with CR LF", { sections: [{ name: "A", rooms: ["#earth/a\r\nQUIT"] }] }, "worlds.0.sections.0.rooms.0"],
+    ["a second slash", { sections: [{ name: "A", rooms: ["#earth/a/b"] }] }, "worlds.0.sections.0.rooms.0"],
+    [
+      "a room name of 33 characters",
+      { sections: [{ name: "A", rooms: [`#earth/${"a".repeat(33)}`] }] },
+      "worlds.0.sections.0.rooms.0",
+    ],
+    ["a room that is not text", { sections: [{ name: "A", rooms: [7] }] }, "worlds.0.sections.0.rooms.0"],
+    [
+      "a room in two sections",
+      {
+        sections: [
+          { name: "A", rooms: ["#earth/x"] },
+          { name: "B", rooms: ["#earth/y", "#earth/x"] },
+        ],
+      },
+      "worlds.0.sections.1.rooms.1",
+    ],
+    [
+      "the main room in two sections",
+      {
+        sections: [
+          { name: "A", rooms: ["#earth"] },
+          { name: "B", rooms: ["#earth"] },
+        ],
+      },
+      "worlds.0.sections.1.rooms.0",
+    ],
+    [
+      "a room twice in one section",
+      { sections: [{ name: "A", rooms: ["#earth/x", "#earth/x"] }] },
+      "worlds.0.sections.0.rooms.1",
+    ],
+    [
+      "a section name twice",
+      {
+        sections: [
+          { name: "Talk", rooms: [] },
+          { name: "Quiet", rooms: [] },
+          { name: "Talk", rooms: [] },
+        ],
+      },
+      "worlds.0.sections.2.name",
+    ],
+    ["an empty section name", { sections: [{ name: "", rooms: [] }] }, "worlds.0.sections.0.name"],
+    [
+      "a section name of 65 characters",
+      { sections: [{ name: "n".repeat(65), rooms: [] }] },
+      "worlds.0.sections.0.name",
+    ],
+    ["a section name that is null", { sections: [{ name: null, rooms: [] }] }, "worlds.0.sections.0.name"],
+    ["a section name that is a number", { sections: [{ name: 7, rooms: [] }] }, "worlds.0.sections.0.name"],
+    ["a section with no name", { sections: [{ rooms: [] }] }, "worlds.0.sections.0.name"],
+    ["a section with no rooms", { sections: [{ name: "A" }] }, "worlds.0.sections.0.rooms"],
+    [
+      "a section with rooms that are no list",
+      { sections: [{ name: "A", rooms: "#earth" }] },
+      "worlds.0.sections.0.rooms",
+    ],
+    ["an unknown key in a section", { sections: [{ name: "A", rooms: [], hidden: true }] }, "worlds.0.sections.0"],
+    ["sections that are no list", { sections: { A: [] } }, "worlds.0.sections"],
+    ["sections that are null", { sections: null }, "worlds.0.sections"],
+    ["a section that is no object", { sections: ["A"] }, "worlds.0.sections.0"],
+    [
+      "51 sections",
+      { sections: Array.from({ length: 51 }, (_, i) => ({ name: `s${String(i)}`, rooms: [] })) },
+      "worlds.0.sections",
+    ],
+    ["501 rooms in a section", { sections: [{ name: "A", rooms: rooms(501) }] }, "worlds.0.sections.0.rooms"],
+  ])("stops on %s, naming its place", (_, patch, place) => {
+    expect(failure(typed(patch))).toContain(`: ${place}: `);
+  });
+
+  it("names the kind of the limits it holds, and never a section's name or a room it was given", () => {
+    expect(failure(typed({ sections: [{ name: "n".repeat(65), rooms: [] }] }))).toContain(": too_big");
+    const twice = [
+      { name: "A", rooms: ["#earth"] },
+      { name: "A", rooms: ["#earth"] },
+    ];
+    expect(failure(typed({ sections: twice }))).toMatch(/: worlds\.0\.sections\.1\.name: custom\b/);
+    expect(failure(typed({ sections: [twice[0], { name: "B", rooms: ["#earth"] }] }))).toMatch(
+      /: worlds\.0\.sections\.1\.rooms\.0: custom\b/,
+    );
+    expect(failure(typed({ sections: [{ name: "planted-value", rooms: ["#bubble/planted-value"] }] }))).not.toContain(
+      "planted-value",
+    );
+    expect(
+      failure(
+        typed({
+          sections: [
+            { name: "planted-value", rooms: [] },
+            { name: "planted-value", rooms: [] },
+          ],
+        }),
+      ),
+    ).not.toContain("planted-value");
+  });
+
+  it("holds a section's room to Ergo's 64 characters and to a room name of 32, as the file's own rooms are (F590)", () => {
+    const at = (slug: string, name: string) =>
+      JSON.stringify({
+        ...FILE,
+        worlds: [{ ...FILE.worlds[0], slug, sections: [{ name: "A", rooms: [`#${slug}/${name}`] }] }, FILE.worlds[1]],
+      });
+    const name = "a".repeat(32);
+    expect(loadRoles(written(at("w".repeat(30), name))).worlds.get("w".repeat(30))?.sections?.[0]?.rooms.length).toBe(
+      1,
+    );
+    expect(failure(at("w".repeat(31), name))).toContain(": worlds.0.sections.0.rooms.0: ");
+    expect(sectionsOf({ sections: [{ name: "A", rooms: [`#earth/${name}`] }] })?.[0]?.rooms).toEqual([
+      `#earth/${name}`,
+    ]);
+    // The main room of a world at the longest slug the file takes.
+    const long = "w".repeat(63);
+    const main = JSON.stringify({
+      ...FILE,
+      worlds: [{ ...FILE.worlds[0], slug: long, sections: [{ name: "A", rooms: [`#${long}`] }] }],
+    });
+    expect(loadRoles(written(main)).worlds.get(long)?.sections?.[0]?.rooms).toEqual([`#${long}`]);
+  });
+
+  it("takes a section's name as it is written: its case, its spaces, and one of 1 character", () => {
+    const names = ["Talk", "talk", " Talk ", "a b", "é"];
+    expect(sectionsOf({ sections: names.map((name) => ({ name, rooms: [] })) })?.map(({ name }) => name)).toEqual(
+      names,
+    );
+  });
+
+  it("loads the sections of any structured file as an independent check of the rules says, or refuses it by place", () => {
+    const ids = [
+      "#earth",
+      "#earth/a",
+      "#earth/b",
+      "#earth/a-b",
+      `#earth/${"a".repeat(32)}`,
+      `#earth/${"a".repeat(33)}`,
+      "#earth/a--b",
+      "#earth/-a",
+      "#earth/",
+      "#earth/A",
+      "#bubble",
+      "#bubble/a",
+      "#earthling",
+      "earth",
+      "",
+    ];
+    // An id of the Earth in the form the file allows, written apart from the loader's own check.
+    const mine = /^#earth(\/(?=.{1,32}$)[a-z0-9]+(-[a-z0-9]+)*)?$/;
+    const room = fc.oneof(fc.constantFrom(...ids), fc.constant(7));
+    const section = fc.record({
+      name: fc.constantFrom("", "x", "y", "n".repeat(64), "n".repeat(65)),
+      rooms: fc.array(room, { maxLength: 4 }),
+    });
+    fc.assert(
+      fc.property(fc.array(section, { maxLength: 5 }), (sections) => {
+        const names = sections.map(({ name }) => name);
+        const all = sections.flatMap(({ rooms: list }) => list);
+        const valid =
+          names.every((name) => name.length >= 1 && name.length <= 64) &&
+          new Set(names).size === names.length &&
+          all.every((id) => typeof id === "string" && mine.test(id)) &&
+          new Set(all).size === all.length;
+        let loaded = true;
+        try {
+          loadRoles(written(typed({ sections })));
+        } catch {
+          loaded = false;
+        }
+        expect(loaded).toBe(valid);
+      }),
+      { numRuns: 300 },
+    );
+  });
+});
+
 describe("who may do what", () => {
   const everyone = [TEAM, TRUSTED, EARTH_MOD, BUBBLE_MOD, STRANGER];
   const answers = (ask: (who: Address) => boolean): boolean[] => everyone.map(ask);

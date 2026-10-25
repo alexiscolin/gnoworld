@@ -260,6 +260,12 @@ Slice 3, rooms by role (3m):
   `accounts` (no guest joins), `members` (its `readers` group joins and speaks) or `members-write` (its
   `readers` join, its `writers` speak), and `hidden` to keep it out of the lists. A change waits for a
   restart. The server makes the file's rooms at start.
+- **The roles file's sections (4b).** Each world may list `sections`, an ordered list of a `name` (1 to
+  64 characters, once in the world) and the `rooms` it holds (the world's own room ids, each in one
+  section at most, a moderator's room included; 50 sections and 500 rooms a section at most). `GET
+  /api/rooms?world=<slug>` answers a reader the rooms it may see in that order, then the world's other
+  rooms in a section named `null`: a reader sees no section it sees no room of. A change waits for a
+  restart.
 - **Restricted, not encrypted.** A members room keeps guests and strangers out in Ergo, for every
   client, but its lines are read by the server, the bot and Ergo's operators, and stored in Ergo's
   history like any other. Its lines are never sent to OpenAI: the world's rules alone check them.
