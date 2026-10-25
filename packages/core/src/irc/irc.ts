@@ -33,8 +33,8 @@ function isTagKey(key: string): boolean {
   return new RegExp(`^\\+?(?:${label}(?:\\.${label})*/)?[A-Za-z0-9-]+$`).test(key);
 }
 
-// The UTF-8 length of a well-formed string, without encoding it.
-function bytes(text: string): number {
+/** The UTF-8 length of a string, without encoding it; a lone surrogate counts three, as the character replacing it. */
+export function bytes(text: string): number {
   let size = 0;
   for (const char of text) {
     const point = char.codePointAt(0) ?? 0;

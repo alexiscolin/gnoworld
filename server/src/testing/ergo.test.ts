@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import type { AddressInfo } from "node:net";
 import { join as joinPath } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { compose, LINE_BYTES, relayOf } from "@gnoworld/core";
 import type { Address } from "@gnoworld/schemas";
 import { z } from "zod";
 import { authServer } from "../ergo/auth.ts";
@@ -1087,6 +1088,29 @@ describe("the server's IRC link (3h)", { timeout: 40_000 }, () => {
 });
 
 describe("the template's limits and privacy (slice 3's max review)", { timeout: 30_000 }, () => {
+  // The composer's budget (core's compose, 4c): Ergo relays an account's line of exactly it, under its nick, user
+  // and cloak, and refuses one byte more rather than cut it (allow-truncation off).
+  it("relays an account's line of the composer's whole budget, 510 bytes relayed, and refuses one byte more", async () => {
+    const e = await start();
+    const chief = await lobby(e);
+    const member = await login(e, ADDRESS);
+    await join(member, "#lobby");
+    const head = "PRIVMSG #lobby :";
+    const budget = LINE_BYTES - relayOf(ADDRESS);
+    const text = (bytes: number) => "a".repeat(bytes - head.length);
+    expect(compose("#lobby", text(budget), ADDRESS)).toMatchObject({
+      kind: "line",
+      line: head + text(budget),
+      left: 0,
+    });
+    member.send(head + text(budget));
+    const seen = await chief.expect(/PRIVMSG #lobby :a+$/);
+    expect(Buffer.byteLength(seen.replace(/^@\S+ /, ""))).toBe(LINE_BYTES);
+    expect(compose("#lobby", text(budget + 1), ADDRESS)).toStrictEqual({ kind: "long", over: 1 });
+    member.send(head + text(budget + 1));
+    await member.expect(/ 417 /);
+  });
+
   // A visitor reaching Ergo through web: its address in X-Forwarded-For, from a trusted peer (loopback).
   const visitor = (e: Ergo, address: string): Promise<Ws | undefined> =>
     wsConnect(e.wsPort, { protocols: ["text.ircv3.net"], headers: { "X-Forwarded-For": address } });
