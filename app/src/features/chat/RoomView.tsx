@@ -1,5 +1,6 @@
 // A room (slice 4's 4b): its name, its description (its IRC topic), its newest lines as the store holds them
-// (the window), held at the newest while the reader is there, who is here, and the state of the link. Everything from Ergo is text: Markdown comes with 4c.
+// (the window), held at the newest while the reader is there, who is here, and the state of the link. A line's
+// text is Markdown (4c), built into elements from an allowlist (Message.tsx).
 // A line's author is its account tag alone, a nick being only a nick; a member's nick is an account's when it is
 // an address, which a guest's cannot be (Ergo gives a guest 32 characters, server/src/testing/ergo.test.ts:314).
 import type { Line } from "@gnoworld/core";
@@ -7,6 +8,7 @@ import { Address } from "@gnoworld/schemas";
 import { Sidebar, Stack } from "@gnoworld/ui";
 import { useLayoutEffect, useRef } from "react";
 import type { ErgoState } from "../../lib/ergo/ergo.ts";
+import { Message } from "./Message.tsx";
 import { roomLabel, shortAddress } from "./names.ts";
 import shared from "./lists.module.css";
 import styles from "./RoomView.module.css";
@@ -53,7 +55,7 @@ function LineView({ line }: { line: Line }) {
       {line.kind === "action" ? "* " : null}
       <Person name={line.account ?? line.from} guest={line.account === undefined} />{" "}
       {line.kind === "notice" ? <span className={styles["mark"]}>Notice </span> : null}
-      <span className={styles["text"]}>{line.text}</span>
+      <Message text={line.text} className={styles["text"]} />
     </li>
   );
 }

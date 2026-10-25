@@ -255,14 +255,18 @@ test.describe("a world's rooms", () => {
 
 // A phone's width: the lines come from this page while it is a computer's, then it narrows to read them. (In Claude
 // Code's sandbox Chromium runs as one process, where a second context of the test's own cannot open.)
-test("reads the rooms and a long unbroken line at a phone's width, nothing wider than the screen", async ({ page }) => {
+test("reads the rooms, a long unbroken line and a long link at a phone's width, nothing wider than the screen", async ({
+  page,
+}) => {
   const address = await logIn(page, word("as"));
   const long = `${"x".repeat(400)}${word("long")}`;
-  await say(page, { address, room: "#bubble/games" }, [long]);
+  const url = `https://a.example/${"y".repeat(350)}${word("link")}`;
+  await say(page, { address, room: "#bubble/games" }, [long, url]);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/w/bubble?room=games");
   await hydrated(page);
   for (const link of await roomsNav(page).getByRole("link").all()) await expect(link).toBeVisible();
   await expect(lineOf(page, long)).toBeVisible();
+  await expect(lineOf(page, url).getByRole("link")).toHaveAttribute("href", url);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });

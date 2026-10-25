@@ -205,6 +205,20 @@ describe("RoomView", () => {
     expect(said(html)).not.toContain("No messages yet.");
   });
 
+  it("reads a line's Markdown into elements, and keeps a hostile line as its text", () => {
+    const lines = [
+      line({ text: "a **b** [x](https://a.example)" }),
+      line({ id: "h", text: "<script>alert(1)</script> [y](javascript:alert(1))" }),
+    ];
+    const html = view({ state: { ...ROOM, lines } });
+    expect(html).toContain("<strong>b</strong>");
+    expect(html).toContain(
+      '<a href="https://a.example" title="https://a.example" target="_blank" rel="noopener noreferrer">x</a>',
+    );
+    expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt; [y](javascript:alert(1))");
+    expect(html).not.toMatch(/<script|href="javascript/);
+  });
+
   it("shows a room it holds nothing of yet as empty, once connected", () => {
     const html = view({ state: undefined });
     expect(said(html)).toContain("No messages yet.");
