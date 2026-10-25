@@ -4,8 +4,11 @@
 # - Fast, by default: every commit (the pre-commit hook) and every turn of Claude Code (the Stop
 #   hook) run it. In a repository it checks only the areas its change touches (below); it prints
 #   each lane's and each step's time, and fails past its budget.
-# - `--full` adds what /pre-merge and CI run: the harness's own probe, coverage and patch
-#   coverage, mutations, and the scan of the whole history for secrets. It checks everything.
+# - `--full` adds what the slice's last /pre-merge and CI run: the harness's own probe, coverage
+#   and patch coverage, mutations, and the scan of the whole history for secrets. It checks
+#   everything, and its record lets main take the code (pre-push).
+# - `--merge`, a merge's own /pre-merge: the same, but the harness mutants of the guard files the
+#   merge changed alone (Alexis, 2026-10-25); it records the fast gate only.
 #
 # GNO_TOOLCHAIN is the folder holding a gno that matches the chain, and its gnohome
 # (docs/DEVELOPMENT.md, "Toolchain"). Node comes from .node-version, through nvm when the
@@ -14,8 +17,9 @@ set -eu
 cd "$(realpath "$(dirname "$0")/..")" # the folder's own case: a $PWD spelled otherwise loads a tool twice (F081)
 unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a hook's git environment must not steer the gate's git calls
 unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO # the scripts' test switches, which would fake a pass
-full=false
+full=false merge=false
 [ "${1:-}" = "--full" ] && full=true
+[ "${1:-}" = "--merge" ] && full=true merge=true
 started=$(date +%s)
 logs=$(mktemp -d "${TMPDIR:-/tmp}/check.XXXXXX")
 # bash 3.2, macOS's sh, exits 0 through an EXIT trap after an unbound variable: `finished`, set
@@ -270,6 +274,10 @@ if $full; then
 	lane_harness() {
 		harness --quiet "$base" && return 0 # records.sh's list
 		step harness_mutate # each guard switched off must fail a test (several minutes)
+		if $merge; then
+			python3 -I scripts/harness_mutate.py --changed "$base"
+			return 0
+		fi
 		python3 -I scripts/harness_mutate.py
 	}
 	start stories
@@ -281,6 +289,7 @@ fi
 
 if [ -n "$tested" ]; then
 	mkdir -p .claude/tmp && sh scripts/code_changed.sh --state >.claude/tmp/gate-green # what stop_gate.sh compares
+	! $merge || full=false # --merge records the fast gate only: main wants --full's record
 	gate_passed "$tested" "$full" # for the hooks outside the sandbox, which run no gate (F076)
 fi
 echo "all checks passed in $(($(date +%s) - started)) s (budget $budget s)"

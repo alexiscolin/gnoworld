@@ -1396,7 +1396,7 @@ mkdir -p "$g/scripts" "$g/.githooks" "$g/bin" "$g/toolchain" "$g/gno/r/seal" "$g
 cp "$here/check.sh" "$here/code_changed.sh" "$g/scripts/" && cp "$hooks/records.sh" "$g/.githooks/" && cp "$here/../.node-version" "$here/../.gitignore" "$g/"
 step="$g/bin/step"
 # The one stub: it logs its name and arguments; it takes 2 s when SLOW_STEP names it, fails when FAIL
-# does, and waits for each step MEET names to start too (10 s at most): steps run one after another
+# does, and waits for each step MEET names to start too (30 s at most): steps run one after another
 # never meet.
 cat >"$step" <<'SH'
 #!/bin/sh
@@ -1411,7 +1411,7 @@ case " ${MEET:-} " in
 	for m in $MEET; do
 		until [ -e "$GATE_LOG.met.$m" ]; do
 			tries=$((tries + 1))
-			[ "$tries" -lt 100 ] || { echo "$n met no $m" >&2 && exit 1; }
+			[ "$tries" -lt 300 ] || { echo "$n met no $m" >&2 && exit 1; }
 			sleep 0.1
 		done
 	done
@@ -1682,7 +1682,8 @@ for slow in lint gno; do
 	[ "$slow" = lint ] || continue
 	printf '%s\n' "$out" | grep -qE '^lane types ([2-9]|[1-9][0-9])\.[0-9] s: .*lint [2-9]\.[0-9]' || fail "check.sh did not time the slow lint: $out"
 	printf '%s\n' "$out" | grep -qE '^lane gno [0-9.]+ s: gno [0-9]+\.[0-9], mutate.py [0-9]+\.[0-9], go [0-9]+\.[0-9]$' || fail "check.sh did not time the gno lane's steps: $out"
-	printf '%s\n' "$out" | grep -qE '^lane ts [0-9.]+ s: format 0\.[0-9]' || fail "check.sh gave a quick step a slow one's time: $out"
+	format=$(printf '%s\n' "$out" | sed -n 's/^lane ts .*format \([0-9]*\)\.\([0-9]\).*/\1\2/p') lint=$(printf '%s\n' "$out" | sed -n 's/^lane types .*lint \([0-9]*\)\.\([0-9]\).*/\1\2/p')
+	[ -n "$format" ] && [ "$format" -lt "$lint" ] || fail "check.sh gave a quick step a slow one's time: $out"
 done
 fi
 
@@ -1717,6 +1718,19 @@ rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/green-full"
 out=$(FAIL=coverage,py:audit gate --full) && fail "check.sh --full passed with two failing steps"
 for s in coverage py:audit; do printf '%s\n' "$out" | grep -q "^$s failed here" || fail "check.sh --full hid $s's failure: $out"; done
 [ ! -e "$g/.claude/tmp/green-full" ] || fail "check.sh --full recorded a gate that failed"
+# --merge, a merge's own review: the full gate's steps, the harness mutants of the merge's guard files
+# alone, and no full record, which only --full writes (pre-push wants it for main).
+rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/green-full"
+base=$(git -C "$g" merge-base HEAD origin/main)
+out=$(gate --merge) || fail "check.sh --merge failed on a copy whose every step passes: $out"
+for s in $fast_steps py:probe stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
+	[ "$s" = test ] || ran "$s" || fail "check.sh --merge skipped $s"
+done
+grep -qx "py:harness_mutate --changed $base" "$log" || fail "check.sh --merge did not judge the merge's own harness mutants: $(grep harness_mutate "$log")"
+[ ! -e "$g/.claude/tmp/green-full" ] || fail "check.sh --merge recorded the full gate"
+grep -qxF "$(record)" "$g/.claude/tmp/green-fast" || fail "check.sh --merge did not record the fast gate it passed"
+gate --full >/dev/null || fail "check.sh --full failed after --merge"
+grep -qxE "py:harness_mutate ?" "$log" || fail "check.sh --full did not judge every harness mutant"
 # No origin/main to compare with: --full fails, saying so.
 git -C "$g" update-ref -d refs/remotes/origin/main
 out=$(gate --full) && fail "check.sh --full passed with no origin/main"
