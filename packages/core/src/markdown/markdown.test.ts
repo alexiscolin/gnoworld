@@ -14,6 +14,10 @@ const mention = (address: string): Inline => ({ type: "mention", address });
 // Two accounts' addresses, as Ergo names an account: g1 and 38 characters of bech32's alphabet.
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+// An address holding `l` and `6`, the alphabet's letters the two above lack.
+const CAROL = "g1l6m6l6carqlqqqqqqqqqqqqqqqqqqqqqnkkanc";
+// The 32 letters an address is written in, after its g1.
+const BECH32 = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 const reads = (source: string, ...blocks: Block[]) => {
   expect(markdown(source)).toStrictEqual(blocks);
 };
@@ -501,6 +505,27 @@ describe("markdown: mentions", () => {
     plain(`_@${ALICE}_x`);
   });
 
+  // 4d's green pass (G1): each of bech32's 32 letters, anywhere in the address; none of the four it leaves out.
+  test.each(Array.from(BECH32))("reads an address ending in %s as a mention", (letter) => {
+    const address = `g1${"q".repeat(37)}${letter}`;
+    reads(`@${address}`, paragraph(mention(address)));
+  });
+
+  test("reads an address holding bech32's letters anywhere as a mention, and none holding another", () => {
+    reads(`hi @${CAROL}`, paragraph(text("hi "), mention(CAROL)));
+    fc.assert(
+      fc.property(fc.array(fc.constantFrom(...Array.from(BECH32)), { minLength: 38, maxLength: 38 }), (letters) => {
+        const address = `g1${letters.join("")}`;
+        reads(`@${address}`, paragraph(mention(address)));
+      }),
+      PROPERTY,
+    );
+    for (const other of ["i", "o", "b", "1", "Q"]) {
+      plain(`@g1${"q".repeat(18)}${other}${"q".repeat(19)}`);
+      plain(`@g1${other}${"q".repeat(37)}`);
+    }
+  });
+
   // A mention's address is checked for its form alone, as the server counts it: a checksum is the account's to prove
   // (the page marks only the reader's own address, whole).
   test("reads an address of the right form as a mention, its checksum unchecked", () => {
@@ -574,7 +599,6 @@ describe("markdown: mentions", () => {
 });
 
 // Accounts of the right form, as many as asked: g1, 37 q and one more of bech32's alphabet.
-const BECH32 = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 const accounts = (count: number) => Array.from(BECH32.slice(0, count), (last) => `g1${"q".repeat(37)}${last}`);
 // The mentions of a tree, in order, repeats kept: a walk of its own, apart from the one under test.
 function walk(blocks: readonly Block[]): string[] {
