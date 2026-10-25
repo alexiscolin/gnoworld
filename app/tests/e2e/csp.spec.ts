@@ -80,10 +80,14 @@ test.describe("the content security policy", () => {
     await page.evaluate(
       () =>
         new Promise<void>((resolve) => {
+          // Ended by whichever comes first: a host with Ergo behind /ws keeps the socket open, and none closes it.
           const socket = new WebSocket(`ws://${location.host}/ws`);
-          socket.addEventListener("close", () => {
-            resolve();
-          });
+          for (const type of ["open", "error", "close"]) {
+            socket.addEventListener(type, () => {
+              socket.close();
+              resolve();
+            });
+          }
         }),
     );
     // The fixture flushes what the page reported, and fails the test on any violation.
