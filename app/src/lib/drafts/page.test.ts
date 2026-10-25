@@ -1,7 +1,8 @@
+import { Address } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { pageDrafts } from "./page.ts";
 
-const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 
 afterEach(() => {
   vi.unstubAllGlobals();

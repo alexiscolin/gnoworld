@@ -1,8 +1,9 @@
+import { Address } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
 import { DRAFT_LIMIT, drafts } from "./drafts.ts";
 
-const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
-const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
+const BOB = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 
 // A device's storage, as the page's localStorage behaves: strings by key, any of its calls refused when it is.
 function storage({ refuses = false } = {}) {
@@ -26,7 +27,7 @@ function storage({ refuses = false } = {}) {
     },
   };
 }
-const on = (device: ReturnType<typeof storage>, account: string) => drafts(() => device, account);
+const on = (device: ReturnType<typeof storage>, account: Address) => drafts(() => device, account);
 
 describe("an account's drafts on the device", () => {
   it("keeps a draft for its room, as typed, and gives nothing for a room with none", () => {
@@ -98,16 +99,5 @@ describe("an account's drafts on the device", () => {
     const device = storage();
     on(device, ALICE).set("#bubble/games", "x");
     expect([...device.kept.keys()]).toEqual([`gnoworld:draft:${ALICE}:#bubble/games`]);
-  });
-
-  it("keeps nothing for no account, and reads nothing for it, whatever the device holds: a guest's would be every guest's", () => {
-    const device = storage();
-    device.kept.set("gnoworld:draft::#bubble", "left by another tool");
-    expect(on(device, "").get("#bubble")).toBe("");
-    device.kept.clear();
-    const nobody = on(device, "");
-    expect(nobody.set("#bubble", "a draft")).toBe(false);
-    expect(nobody.get("#bubble")).toBe("");
-    expect(device.kept.size).toBe(0);
   });
 });
