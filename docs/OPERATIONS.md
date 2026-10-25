@@ -227,7 +227,8 @@ Slice 3, the bot acts and the stream (3j):
   stays shown, and the author's notice and strike stand: the alert is for ops to look.
 - **`GET /api/stream`** is public: 25 rooms a stream, 4 streams a visitor, 1,000 in all, a beat every
   15 s, a client 64 events behind dropped; each room's last 64 events are kept, which a new client gets
-  and a client coming back gets after its `Last-Event-ID`. nginx must not buffer it (3e).
+  and a client coming back gets after its `Last-Event-ID`. nginx must not buffer it (3e). A HEAD is
+  refused with 405 and takes no place (F709).
 
 Slice 3, the mute and the edits (3k):
 

@@ -412,3 +412,44 @@ describe("StreamEvent", () => {
     }
   });
 });
+
+describe("the verdicts' stream, the max review", () => {
+  it("answers a HEAD with 405 before it takes a place, so the visitor's stream after it is served", async () => {
+    const { stream, rooms } = setup();
+    const app = makeApp(
+      logger("a-pepper-of-forty-characters-0123456789", () => true),
+      () => true,
+    );
+    app.route("/api/stream", stream.routes({ proxy: undefined, visible: () => true }));
+    for (let n = 0; n < 4; n++) {
+      const head = await app.request(
+        "/api/stream?rooms=%23bubble",
+        { method: "HEAD" },
+        { incoming: { socket: { remoteAddress: PEER } } },
+      );
+      expect([head.status, head.headers.get("allow")]).toEqual([405, "GET"]);
+    }
+    expect(stream.size()).toMatchObject({ clients: 0, visitors: 0 });
+    expect((await rooms("#bubble")).response.status).toBe(200);
+  });
+
+  it("takes no global place for a HEAD, whatever its rooms: a stream of another visitor is served", async () => {
+    const { stream, open, rooms } = setup({ total: 1 });
+    const app = makeApp(
+      logger("a-pepper-of-forty-characters-0123456789", () => true),
+      () => true,
+    );
+    app.route("/api/stream", stream.routes({ proxy: undefined, visible: () => true }));
+    for (const query of ["rooms=%23bubble", "", "rooms=%23a%20b"]) {
+      const head = await app.request(
+        `/api/stream?${query}`,
+        { method: "HEAD" },
+        { incoming: { socket: { remoteAddress: PEER } } },
+      );
+      expect([head.status, head.headers.get("allow")]).toEqual([405, "GET"]);
+    }
+    expect(stream.size()).toMatchObject({ clients: 0, visitors: 0 });
+    expect((await rooms("#bubble", { peer: "203.0.113.8" })).response.status).toBe(200);
+    expect((await open("rooms=%23bubble", { peer: "203.0.113.9" })).response.status).toBe(429);
+  });
+});
