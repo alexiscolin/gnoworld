@@ -5,7 +5,7 @@
 // (4c); a guest reads, a room letting accounts alone speak.
 import type { RoomList } from "@gnoworld/schemas";
 import { Button, Sidebar, Stack } from "@gnoworld/ui";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { pageLoginApi } from "../../lib/api/login.ts";
 import { pageRoomsApi } from "../../lib/api/rooms.ts";
@@ -28,17 +28,24 @@ interface Asked {
 // The composer, an account's alone: a visitor's page never loads its code (the first screen's budget, ADR-0001 §12).
 const Composer = lazy(async () => ({ default: (await import("./Composer.tsx")).Composer }));
 
-// Alt+Up and Alt+Down: the room before or after the one in view, anywhere on the page (ADR-0002's chat rows).
+// Alt+Up and Alt+Down: the room before or after the one in view, anywhere on the page (ADR-0002's chat rows). A key
+// pressed before the page draws the room the last one went to starts from that room: the hook keeps it, and the room
+// in view, once drawn or chosen otherwise, sets it again.
 function useRoomKeys(rooms: readonly string[], current: string | undefined) {
   const [, setParams] = useSearchParams();
+  const fromRef = useRef(current);
+  useLayoutEffect(() => {
+    fromRef.current = current;
+  }, [current]);
   useEffect(() => {
-    if (current === undefined) return;
     const go = (event: globalThis.KeyboardEvent) => {
       const step = { ArrowUp: -1, ArrowDown: 1 }[event.key];
       const alone = event.altKey && !event.shiftKey && !event.ctrlKey && !event.metaKey;
-      const next = alone && step !== undefined ? neighbour(rooms, current, step) : undefined;
+      const from = fromRef.current;
+      const next = alone && step !== undefined && from !== undefined ? neighbour(rooms, from, step) : undefined;
       if (next === undefined) return;
       event.preventDefault();
+      fromRef.current = next;
       // The same world's page: its room alone changes, as ?room=<name>, or none for the main room.
       setParams(new URLSearchParams(roomHref(next).split("?")[1] ?? ""));
     };
@@ -46,7 +53,7 @@ function useRoomKeys(rooms: readonly string[], current: string | undefined) {
     return () => {
       window.removeEventListener("keydown", go);
     };
-  }, [rooms, current, setParams]);
+  }, [rooms, setParams]);
 }
 
 // Under a room's lines: the composer for an account, which writes through the link; a word for a guest.

@@ -124,6 +124,15 @@ test.describe("the composer", () => {
     await expect(field(page)).not.toHaveAccessibleDescription(/Tab completes/);
   });
 
+  // A key pressed before the page has drawn the room the last one went to starts from that room, not the one drawn.
+  test("goes two rooms down with Alt+Down pressed twice at once", async ({ page }) => {
+    await inGames(page);
+    await page.keyboard.press("Alt+ArrowDown");
+    await page.keyboard.press("Alt+ArrowDown");
+    await expect(page.getByRole("heading", { level: 2, name: "#news", exact: true })).toBeVisible();
+    await expect(page).toHaveURL(/\/w\/bubble\?room=news$/);
+  });
+
   test("goes from room to room with Alt+Down and Alt+Up alone, across sections, the ends stopping it", async ({
     page,
   }) => {
