@@ -25,8 +25,11 @@ function mentionOf(address: string, me: string | undefined): ReactNode {
   );
 }
 
+// Nodes as elements, the reader's address carried down to the mentions.
+const drawInlines = (nodes: readonly Inline[], me: string | undefined) => nodes.map((node) => inline(node, me));
+const drawBlocks = (nodes: readonly Block[], me: string | undefined) => nodes.map((node) => block(node, me));
+
 function inline(node: Inline, me: string | undefined): ReactNode {
-  const children = (nodes: readonly Inline[]) => nodes.map((child) => inline(child, me));
   switch (node.type) {
     case "text":
       return node.text;
@@ -35,29 +38,29 @@ function inline(node: Inline, me: string | undefined): ReactNode {
     case "break":
       return createElement("br");
     case "link":
-      return createElement("a", { href: node.href, title: node.href, ...LINK }, ...children(node.children));
+      return createElement("a", { href: node.href, title: node.href, ...LINK }, ...drawInlines(node.children, me));
     case "mention":
       return mentionOf(node.address, me);
     case "strong":
     case "em":
     case "strike":
-      return createElement(MARKS[node.type], null, ...children(node.children));
+      return createElement(MARKS[node.type], null, ...drawInlines(node.children, me));
   }
 }
 
 function block(node: Block, me: string | undefined): ReactNode {
   switch (node.type) {
     case "paragraph":
-      return createElement("p", null, ...node.children.map((child) => inline(child, me)));
+      return createElement("p", null, ...drawInlines(node.children, me));
     case "codeBlock":
       return createElement("pre", null, createElement("code", null, node.text));
     case "quote":
-      return createElement("blockquote", null, ...node.children.map((child) => block(child, me)));
+      return createElement("blockquote", null, ...drawBlocks(node.children, me));
     case "list":
       return createElement(
         node.ordered ? "ol" : "ul",
         node.ordered && node.start !== 1 ? { start: node.start } : null,
-        ...node.items.map((item) => createElement("li", null, ...item.map((child) => inline(child, me)))),
+        ...node.items.map((item) => createElement("li", null, ...drawInlines(item, me))),
       );
   }
 }
@@ -74,9 +77,9 @@ export function Markdown({ blocks, className, me }: MarkdownProps) {
   const [first] = blocks;
   if (first === undefined) return createElement("span", { className });
   if (blocks.length === 1 && first.type === "paragraph") {
-    return createElement("span", { className }, ...first.children.map((child) => inline(child, me)));
+    return createElement("span", { className }, ...drawInlines(first.children, me));
   }
-  return createElement("div", { className }, ...blocks.map((child) => block(child, me)));
+  return createElement("div", { className }, ...drawBlocks(blocks, me));
 }
 
 /** A message's text, its Markdown as elements. */
