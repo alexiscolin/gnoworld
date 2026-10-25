@@ -93,3 +93,20 @@ test("leaves a reader who scrolled up where they are as a line comes", async ({ 
   await expect(page.getByText("Line 0 of the room's history")).toBeInViewport();
   await expect(page.getByText("A live line")).not.toBeInViewport();
 });
+
+// /code-review (F783): a quote reads as one, set apart from the sender's own words.
+test("sets a quoted line apart from the sender's own words", async ({ page }) => {
+  await page.routeWebSocket(/\/ws$/, (ergo) => {
+    scriptedErgo(ergo, GUEST, [["q1", "2026-10-25T10:00:00.000Z", "> what was said before"]]);
+  });
+  await page.goto("/w/bubble?room=games");
+  await hydrated(page);
+  const quote = page.getByRole("list", { name: "Messages" }).locator("blockquote");
+  await expect(quote).toHaveText("what was said before");
+  const look = await quote.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { border: style.borderInlineStartWidth, padding: style.paddingInlineStart };
+  });
+  expect(look.border).not.toBe("0px");
+  expect(look.padding).not.toBe("0px");
+});

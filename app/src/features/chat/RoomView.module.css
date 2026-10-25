@@ -1,4 +1,5 @@
-/* A room: its description and the link's state muted, its lines wrapping anywhere, an /me and a notice apart. */
+/* A room: its description and the link's state muted, its lines wrapping anywhere, an /me, a notice and a quote
+   apart. */
 @layer components {
   .topic {
     color: var(--color-text-muted);
@@ -25,6 +26,18 @@
 
   .notice .text {
     color: var(--color-text-muted);
+  }
+
+  /* A quote set apart from the sender's own words, by a rule at its start and a muted colour (F783). */
+  .text blockquote {
+    padding-inline-start: var(--space-xs);
+    border-inline-start: var(--line-width) solid var(--color-line-strong);
+    color: var(--color-text-muted);
+  }
+
+  /* Code kept as written scrolls on its own, wider than the line (F783). */
+  .text pre {
+    overflow: auto;
   }
 
   .count {
