@@ -9,6 +9,7 @@ import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "re
 import { useSearchParams } from "react-router";
 import { pageLoginApi } from "../../lib/api/login.ts";
 import { pageRoomsApi } from "../../lib/api/rooms.ts";
+import { pageDrafts } from "../../lib/drafts/page.ts";
 import { drawGuestNick } from "../../lib/ergo/ergo.ts";
 import { pageErgo } from "../../lib/ergo/page.ts";
 import type { AppState } from "../../store/index.ts";
@@ -67,9 +68,15 @@ interface WriterProps {
 
 function Writer({ session, room, rooms, members, onSay }: WriterProps) {
   if (session.kind !== "in") return <p>Log in to write in this room.</p>;
+  // The account's drafts on this device: the room's, where the composer starts, and each change kept (4d).
+  const kept = pageDrafts(session.address);
   return (
     <Suspense fallback={null}>
       <Composer
+        draft={kept.get(room)}
+        onDraft={(draft) => {
+          kept.set(room, draft);
+        }}
         key={room}
         room={room}
         nick={session.address}

@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
-import { inGames, lineOf, whoIsHere, word } from "./chat.ts";
+import { inGames, lineOf, roomsNav, whoIsHere, word } from "./chat.ts";
 import { logIn, talk, ticketOf, type Step } from "./irc.ts";
 import { SITE } from "./sites.ts";
 
@@ -74,7 +74,6 @@ function guestNicks(page: Page): string[] {
   return nicks;
 }
 
-const roomsNav = (page: Page) => page.getByRole("navigation", { name: "Rooms" });
 const chatStatus = (page: Page) => page.getByRole("status").filter({ hasText: /chat/ });
 const heading = (page: Page, room: string) => page.getByRole("heading", { level: 2, name: room, exact: true });
 

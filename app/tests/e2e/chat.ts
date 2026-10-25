@@ -8,6 +8,7 @@ export const word = (what: string): string => `${what}-${crypto.randomUUID().sli
 export const messages = (page: Page) => page.getByRole("list", { name: "Messages" });
 export const lineOf = (page: Page, text: string) => messages(page).getByRole("listitem").filter({ hasText: text });
 export const whoIsHere = (page: Page) => page.getByRole("complementary", { name: "Who's here" });
+export const roomsNav = (page: Page) => page.getByRole("navigation", { name: "Rooms" });
 
 /** A test's own account, logged in, in #games, Ergo having said it is here. */
 export async function inGames(page: Page): Promise<string> {

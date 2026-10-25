@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
-import { inGames, lineOf, messages, whoIsHere, word } from "./chat.ts";
+import { inGames, lineOf, messages, roomsNav, whoIsHere, word } from "./chat.ts";
 import { logIn } from "./irc.ts";
 import { scriptedErgo } from "./scripted.ts";
 
@@ -167,6 +167,65 @@ test.describe("the composer", () => {
     await expect(page).toHaveURL(/\/$/);
   });
 
+  // 4d: drafts kept on the device (ADR-0002's "Saved messages and drafts: Device"; F787).
+  test("keeps each room's draft on the device, typed, formatted or completed, through changes of room and a reload, until sent", async ({
+    page,
+  }) => {
+    await inGames(page);
+    const games = word("games");
+    const bubble = word("bubble");
+    await field(page).fill(`${games} bold`);
+    await field(page).evaluate((box: HTMLInputElement) => {
+      box.setSelectionRange(box.value.length - 4, box.value.length);
+    });
+    await page.getByRole("group", { name: "Format" }).getByRole("button", { name: "Bold" }).click();
+    await page.keyboard.press("Alt+ArrowDown");
+    const bubbleField = page.getByRole("textbox", { name: "Message #bubble" });
+    await expect(bubbleField).toHaveValue("");
+    await bubbleField.fill("/m");
+    await bubbleField.press("Tab");
+    await bubbleField.pressSequentially(bubble);
+    await expect(bubbleField).toHaveValue(`/me ${bubble}`);
+    await roomsNav(page).getByRole("link", { name: "#games" }).click();
+    await expect(field(page)).toHaveValue(`${games} **bold**`);
+    await page.reload();
+    await hydrated(page);
+    await expect(field(page)).toHaveValue(`${games} **bold**`);
+    await roomsNav(page).getByRole("link", { name: "#bubble" }).click();
+    await expect(bubbleField).toHaveValue(`/me ${bubble}`);
+    await page.keyboard.press("Alt+ArrowUp");
+    await field(page).press("Enter");
+    await expect(lineOf(page, games)).toHaveCount(1);
+    await page.reload();
+    await hydrated(page);
+    await expect(field(page)).toHaveValue("");
+    await roomsNav(page).getByRole("link", { name: "#bubble" }).click();
+    await expect(bubbleField).toHaveValue(`/me ${bubble}`);
+  });
+
+  // A shared device: each account finds its own drafts, the next account none of them, a guest nothing.
+  test("shows an account's drafts to it alone: not to the next account, nor to a guest", async ({ page }) => {
+    const alice = word("alice");
+    await logIn(page, alice);
+    await page.goto("/w/bubble?room=games");
+    await hydrated(page);
+    const draft = word("draft");
+    await field(page).fill(draft);
+    await page.getByRole("button", { name: "Log out" }).click();
+    await expect(page.getByText("Log in to write in this room.")).toBeVisible();
+    await expect(page.getByRole("textbox", { name: /^Message/ })).toHaveCount(0);
+    await expect(page.getByText(draft)).toHaveCount(0);
+    await logIn(page, word("bob"));
+    await page.goto("/w/bubble?room=games");
+    await hydrated(page);
+    await expect(field(page)).toHaveValue("");
+    await page.getByRole("button", { name: "Log out" }).click();
+    await logIn(page, alice);
+    await page.goto("/w/bubble?room=games");
+    await hydrated(page);
+    await expect(field(page)).toHaveValue(draft);
+  });
+
   test("says why a line cannot go, and sends nothing", async ({ page }) => {
     await inGames(page);
     await field(page).fill("/nick bob");
@@ -264,5 +323,9 @@ test.describe("the composer", () => {
     await field(page).press("End");
     await field(page).press("!");
     await expect(field(page)).not.toHaveAccessibleDescription(/Not sent/);
+    // A line not sent stays the room's draft, on the device.
+    await page.reload();
+    await hydrated(page);
+    await expect(field(page)).toHaveValue("are you there?!");
   });
 });

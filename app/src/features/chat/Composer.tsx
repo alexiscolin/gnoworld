@@ -5,7 +5,7 @@
 // bar wraps the selection in Markdown's marks; the line shows below as it reads.
 import { COMMANDS, compose, type Composed } from "@gnoworld/core";
 import { Button, Cluster, Field, IconButton, Sidebar, Stack, type FieldProps, type IconName } from "@gnoworld/ui";
-import { useLayoutEffect, useRef, useState, type KeyboardEvent, type SubmitEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type SubmitEvent } from "react";
 import { completed, completions, type Completion } from "./complete.ts";
 import { formatted, type Edit, type Format } from "./format.ts";
 import { Message } from "./Message.tsx";
@@ -57,6 +57,28 @@ export function Preview({ composed }: { composed: Composed }) {
   );
 }
 
+// The format bar: each format of BAR, named, applied to the box's selection.
+function FormatBar({ onFormat }: { onFormat: (format: Format) => void }) {
+  return (
+    <div role="group" aria-label="Format">
+      <Cluster space="3xs">
+        {BAR.map((tool) => (
+          <IconButton
+            key={tool.format}
+            icon={tool.icon}
+            label={tool.label}
+            size="s"
+            emphasis="plain"
+            onClick={() => {
+              onFormat(tool.format);
+            }}
+          />
+        ))}
+      </Cluster>
+    </div>
+  );
+}
+
 export interface ComposerProps {
   room: string;
   /** The account's nick, which Ergo puts before each line it relays: the line's room is what it leaves. */
@@ -66,10 +88,17 @@ export interface ComposerProps {
   members: readonly string[];
   /** Sends the draft; whether it went. */
   onSay: (draft: string) => boolean;
+  /** Where the draft starts: the room's, kept on the device (4d). */
+  draft?: string | undefined;
+  /** Each change of the draft, for the device to keep; a line sent leaves it blank. */
+  onDraft?: ((draft: string) => void) | undefined;
 }
 
-export function Composer({ room, nick, rooms, members, onSay }: ComposerProps) {
-  const [draft, setDraft] = useState("");
+export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", onDraft }: ComposerProps) {
+  const [draft, setDraft] = useState(kept);
+  useEffect(() => {
+    onDraft?.(draft);
+  }, [draft, onDraft]);
   const [failed, setFailed] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   // The selection an edit leaves, put back in the box once it shows the new draft.
@@ -118,22 +147,7 @@ export function Composer({ room, nick, rooms, members, onSay }: ComposerProps) {
   return (
     <form ref={formRef} aria-label={`Write in ${label}`} onSubmit={send} onKeyDown={complete}>
       <Stack space="2xs">
-        <div role="group" aria-label="Format">
-          <Cluster space="3xs">
-            {BAR.map((tool) => (
-              <IconButton
-                key={tool.format}
-                icon={tool.icon}
-                label={tool.label}
-                size="s"
-                emphasis="plain"
-                onClick={() => {
-                  format(tool.format);
-                }}
-              />
-            ))}
-          </Cluster>
-        </div>
+        <FormatBar onFormat={format} />
         <Sidebar side="end" space="2xs">
           <Field
             label={`Message ${label}`}

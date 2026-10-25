@@ -32,6 +32,31 @@ describe("Composer", () => {
     expect(markup).not.toContain("aria-hidden");
   });
 
+  it("starts from the room's draft, its preview with it", () => {
+    const markup = renderToStaticMarkup(
+      <Composer
+        room={ROOM}
+        nick={NICK}
+        rooms={[]}
+        members={[]}
+        draft="kept **draft**"
+        onDraft={() => undefined}
+        onSay={() => true}
+      />,
+    );
+    expect(markup).toMatch(/<input[^>]* value="kept \*\*draft\*\*"/);
+    expect(markup).toContain("<strong>draft</strong>");
+  });
+
+  it("starts empty with no draft given, and writes a stored draft as a value, never as markup", () => {
+    expect(html()).toMatch(/<input[^>]* value=""/);
+    const markup = renderToStaticMarkup(
+      <Composer room={ROOM} nick={NICK} rooms={[]} members={[]} draft={'"><img src=x onerror=1>'} onSay={() => true} />,
+    );
+    expect(markup).toContain('value="&quot;&gt;&lt;img src=x onerror=1&gt;"');
+    expect(markup).not.toMatch(/<img/);
+  });
+
   it("says nothing of a line not sent before any was", () => {
     expect(html()).not.toMatch(/Not sent|aria-invalid/);
   });
