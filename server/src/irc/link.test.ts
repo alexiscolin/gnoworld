@@ -557,6 +557,17 @@ describe("the IRC link's own commands (3j)", () => {
     expect(await peer.next(/^NOTICE /)).toBe("NOTICE g1abc :Your message in #bubble was hidden: harassment.");
   });
 
+  it("gives itself a room's op back, and nobody else (the max review)", async () => {
+    const ergo = await fakeErgo();
+    const { link } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    expect(link.send("SAMODE", ["#bubble", "+o", "gnoworld"])).toBe(true);
+    expect(await peer.next(/^SAMODE /)).toBe("SAMODE #bubble +o gnoworld");
+    expect(link.send("SAMODE", ["#bubble", "+o", "g1abc"])).toBe(false);
+    expect(link.send("SAMODE", ["#bubble", "+q", "gnoworld"])).toBe(false);
+  });
+
   it("sends nothing once its connection is gone, until it is in its rooms again", async () => {
     const ergo = await fakeErgo();
     const { link } = start(ergo.port);

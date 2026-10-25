@@ -25,29 +25,35 @@ function listChanges(state: RoomState, want: Desired): string[][] {
 }
 
 // A person but the bot: any power above voice taken (founder, admin, op and half-op, by the prefixes NAMES
-// shows), and voiced as the type says.
-function powerChanges({ nick, powers }: RoomState["present"][number], voice: ReadonlySet<string>): string[][] {
+// shows), and voiced as the type says; one put out keeps their voice, which goes with them.
+function powerChanges({ nick, powers }: RoomState["present"][number], voice?: ReadonlySet<string>): string[][] {
   const out: string[][] = [];
   for (const [prefix, letter] of Object.entries({ "~": "q", "&": "a", "@": "o", "%": "h" }))
     if (powers.includes(prefix)) out.push([`-${letter}`, nick]);
   const voiced = powers.includes("+");
-  if (voice.has(nick) !== voiced) out.push([voiced ? "-v" : "+v", nick]);
+  if (voice !== undefined && voice.has(nick) !== voiced) out.push([voiced ? "-v" : "+v", nick]);
   return out;
 }
 
 /** What a room needs to be as its type says: the reconciler's own flags (M, m, i, s, R) put on or taken
- * off, its invites, then each person but the bot: put out of a closed room they are not invited to, else
- * stripped of any power above voice and voiced as the type says. */
+ * off, its invites, then each person but the bot stripped of any power above voice, and voiced as the type
+ * says, or put out of a closed room they are not invited to, the bot's own op taken first when it lacks it. */
 export function changes(room: string, state: RoomState, want: Desired): [Command, ...string[]][] {
   const out: [Command, ...string[]][] = listChanges(state, want).map((mode) => ["SAMODE", room, ...mode]);
   // Looked up for each of up to 10,000 people (F592).
   const [invited, voice] = [new Set(want.invites), new Set(want.voiced)];
+  const kicks: [Command, ...string[]][] = [];
   for (const person of state.present.filter(({ nick }) => nick !== NICK)) {
-    if (want.modes.includes("i") && !invited.has(person.nick))
-      out.push(["KICK", room, person.nick, "not on this room's list"]);
-    else out.push(...powerChanges(person, voice).map((mode): [Command, ...string[]] => ["SAMODE", room, ...mode]));
+    const outside = want.modes.includes("i") && !invited.has(person.nick);
+    // A KICK needs a channel operator above the person: their powers go first.
+    const powers = powerChanges(person, outside ? undefined : voice);
+    out.push(...powers.map((mode): [Command, ...string[]] => ["SAMODE", room, ...mode]));
+    if (outside) kicks.push(["KICK", room, person.nick, "not on this room's list"]);
   }
-  return out;
+  // Back by SAJOIN after a restart, the bot is no channel operator (slice 3's max review): its op first.
+  const bot = state.present.find(({ nick }) => nick === NICK)?.powers ?? "";
+  if (kicks.length > 0 && !/[~&@]/.test(bot)) out.unshift(["SAMODE", room, "+o", NICK]);
+  return [...out, ...kicks];
 }
 
 interface Options {

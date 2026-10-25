@@ -61,6 +61,20 @@ describe("the link's own lines (3j's green pass)", () => {
     ]);
   });
 
+  it("allows the bot's own op on a room, and no other power of its own (the max review)", () => {
+    expect(allowed("SAMODE", ["#bubble", "+o", "gnoworld"])).toBe(true);
+    expect(
+      [
+        ["#bubble", "-o", "gnoworld"],
+        ["#bubble", "+v", "gnoworld"],
+        ["#bubble", "+q", "gnoworld"],
+        ["#bubble", "+o", "gnoworld", "extra"],
+        ["bubble", "+o", "gnoworld"],
+        ["#bubble", "+o", "g1a"],
+      ].map((params) => allowed("SAMODE", params)),
+    ).toEqual(Array<boolean>(6).fill(false));
+  });
+
   it("allows a room flag alone, never inside a longer mode, and a KICK with its reason and nothing after (F570)", () => {
     expect(["+M", "-i", "+o+M", "x+M", "+M+o", "+MM"].map((mode) => allowed("SAMODE", ["#bubble", mode]))).toEqual([
       true,

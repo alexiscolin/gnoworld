@@ -251,6 +251,51 @@ describe("the reconciler's pass", () => {
     await expect.poll(() => asked).toBe(2);
   });
 
+  it("takes its op back before it puts someone out, as after a SAJOIN, and strips that person's powers first", () => {
+    const present = [
+      { nick: "gnoworld", powers: "" },
+      { nick: "g1a", powers: "" },
+      { nick: "g1gone", powers: "~@+" },
+    ];
+    expect(changes("#r", state({ flags: "Mimnt", invites: ["g1a", "g1b"], present }), { ...DESK, voiced: [] })).toEqual(
+      [
+        ["SAMODE", "#r", "+o", "gnoworld"],
+        ["SAMODE", "#r", "-q", "g1gone"],
+        ["SAMODE", "#r", "-o", "g1gone"],
+        ["KICK", "#r", "g1gone", "not on this room's list"],
+      ],
+    );
+    const kept = [
+      { nick: "gnoworld", powers: "" },
+      { nick: "g1a", powers: "" },
+    ];
+    expect(
+      changes("#r", state({ flags: "Mimnt", invites: ["g1a", "g1b"], present: kept }), { ...DESK, voiced: [] }),
+    ).toEqual([]);
+  });
+
+  it("gives itself op once for all its kicks, none when it holds op, admin or founder, and strips admin and half-op", () => {
+    const two = [
+      { nick: "g1x", powers: "&%" },
+      { nick: "g1y", powers: "" },
+    ];
+    const out = (bot: string) =>
+      changes("#r", state({ flags: "Mimnt", invites: ["g1a"], present: [{ nick: "gnoworld", powers: bot }, ...two] }), {
+        ...DESK,
+        invites: ["g1a"],
+        voiced: [],
+      });
+    const rest = [
+      ["SAMODE", "#r", "-a", "g1x"],
+      ["SAMODE", "#r", "-h", "g1x"],
+      ["KICK", "#r", "g1x", "not on this room's list"],
+      ["KICK", "#r", "g1y", "not on this room's list"],
+    ];
+    expect(out("")).toEqual([["SAMODE", "#r", "+o", "gnoworld"], ...rest]);
+    expect(out("+")).toEqual([["SAMODE", "#r", "+o", "gnoworld"], ...rest]);
+    for (const bot of ["@", "~", "&", "~@+"]) expect(out(bot)).toEqual(rest);
+  });
+
   it("puts each room's flags on at once, before any state is read, an open room's -i too: Ergo makes a room +i", () => {
     const sent: string[] = [];
     let asked = 0;

@@ -204,7 +204,7 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
   });
 
   describe("rooms by role on real Ergo (3m)", () => {
-    const typed = (rules: Rules = RULES) =>
+    const typed = (rules: Rules = RULES, crew: readonly string[] = ["member"]) =>
       new Map([
         [
           "bubble",
@@ -212,7 +212,7 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
             rules,
             moderators: new Set(["mod"]),
             groups: new Map([
-              ["crew", new Set(["member"])],
+              ["crew", new Set(crew)],
               ["pens", new Set(["writer"])],
             ]),
             rooms: new Map([
@@ -373,6 +373,25 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
       chief.send("SAMODE #bubble/crew +I *!*@*");
       await expect.poll(() => invitesOf(["chief", chief], "#bubble/crew"), { timeout: 5000 }).not.toContain("*!*@*");
       // Closed once every chat has stopped: the cleanups run in turn.
+      stops.push(() => {
+        db.close();
+        return Promise.resolve();
+      });
+    });
+
+    it("puts out a member the file no longer names after a restart, back in without its op (the max review)", async () => {
+      const e = await start();
+      const db = openDatabase(":memory:", TABLES);
+      const first = await chatFor(e, [], { worlds: typed(), db, reconcileMs: 300 });
+      const member = await login(e, "member");
+      for (let n = 0; !(await joins(member, "member", "#bubble/crew")); n += 1) {
+        if (n === 100) throw new Error("the member never got in");
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      await first.stop();
+      await member.expect(/:gnoworld!\S+ QUIT /);
+      await chatFor(e, [], { worlds: typed(RULES, []), db, reconcileMs: 300 });
+      expect(await member.expect(/ KICK #bubble\/crew member /, 10_000)).toContain("not on this room's list");
       stops.push(() => {
         db.close();
         return Promise.resolve();
