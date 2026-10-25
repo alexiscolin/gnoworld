@@ -13,7 +13,15 @@ import {
 
 // A fixed seed keeps the gate from flapping; the nightly fuzz runs the same properties unseeded.
 const PROPERTY = { seed: 20261017, numRuns: 300 };
-const ERRORS = ["empty", "bad-character", "no-command", "bad-command", "tags-too-long", "body-too-long"];
+const ERRORS = [
+  "empty",
+  "bad-character",
+  "empty-source",
+  "no-command",
+  "bad-command",
+  "tags-too-long",
+  "body-too-long",
+];
 
 const message = (
   command: string,
@@ -98,7 +106,6 @@ describe("parseLine reads", () => {
     ["PING x\r\n", message("PING", ["x"])],
     ["PING x\n", message("PING", ["x"])],
     ["PING x\r", message("PING", ["x"])],
-    [": PING x", message("PING", ["x"])],
     ["@ PING x", message("PING", ["x"])],
     [
       String.raw`@id=12;+example.com/note=a\sb;flag PRIVMSG #gno hi`,
@@ -137,7 +144,8 @@ describe("parseLine refuses", () => {
   test.each([
     ["", "empty"],
     ["   ", "empty"],
-    [":", "no-command"],
+    [":", "empty-source"],
+    [": PING x", "empty-source"],
     ["@a=b", "no-command"],
     ["@a=b :irc.example.org", "no-command"],
     ["PRIV.MSG x", "bad-command"],
@@ -367,26 +375,26 @@ describe("formatLine", () => {
   });
 });
 
-// Pairing (.claude/rules/core.md): failing tests for Alexis's code, decided 2026-10-23 (docs/decisions.md).
+// F667 and F669, decided by Alexis on 2026-10-23 (docs/decisions.md); written first, the code after.
 describe("parseLine counts a line whole, the spaces before its command too (F667)", () => {
   const body = (bytes: number) => "PRIVMSG #gno :" + "a".repeat(bytes - 14);
-  test.fails("refuses a tagless line led by a million spaces", () => {
+  test("refuses a tagless line led by a million spaces", () => {
     expect(parseLine(" ".repeat(1_000_000) + "PRIVMSG #gno :x")).toStrictEqual({ ok: false, error: "body-too-long" });
   });
-  test.fails("refuses a tagged line with a million spaces before its command", () => {
+  test("refuses a tagged line with a million spaces before its command", () => {
     expect(parseLine("@a=b" + " ".repeat(1_000_000) + "PRIVMSG #gno :x")).toStrictEqual({
       ok: false,
       error: "body-too-long",
     });
   });
-  test.fails("refuses a body of 510 bytes led by one space: 511 in all", () => {
+  test("refuses a body of 510 bytes led by one space: 511 in all", () => {
     expect(parseLine(" " + body(510))).toStrictEqual({ ok: false, error: "body-too-long" });
   });
-  test.fails("refuses 509 bytes led by two spaces: 511 in all", () => {
+  test("refuses 509 bytes led by two spaces: 511 in all", () => {
     expect(parseLine("  " + body(509))).toStrictEqual({ ok: false, error: "body-too-long" });
   });
   // The one space after the tags is theirs (IRCv3); a second one counts in the body.
-  test.fails("refuses tags, two spaces and a body of 510: the second space makes 511", () => {
+  test("refuses tags, two spaces and a body of 510: the second space makes 511", () => {
     expect(parseLine("@a=b  " + body(510))).toStrictEqual({ ok: false, error: "body-too-long" });
   });
   // The side a fix must keep, passing today: 510 in all, spaces included, and CR LF never counted.
@@ -402,15 +410,18 @@ describe("parseLine counts a line whole, the spaces before its command too (F667
 });
 
 describe("parseLine refuses an empty source, as formatLine does (F669)", () => {
-  // The error's name is Alexis's to choose: the test asks only for a refusal.
-  test.fails("refuses a line whose source is a colon alone", () => {
-    expect(parseLine(": NICK x").ok).toBe(false);
+  // Its own error, empty-source: neither a missing command nor a bad one.
+  test("refuses a line whose source is a colon alone", () => {
+    expect(parseLine(": NICK x")).toStrictEqual({ ok: false, error: "empty-source" });
   });
-  test.fails("and after its tags", () => {
-    expect(parseLine("@a=b : NICK x").ok).toBe(false);
+  test("and after its tags", () => {
+    expect(parseLine("@a=b : NICK x")).toStrictEqual({ ok: false, error: "empty-source" });
   });
-  test.fails("and with two spaces after the colon", () => {
-    expect(parseLine(":  NICK x").ok).toBe(false);
+  test("and with two spaces after the colon", () => {
+    expect(parseLine(":  NICK x")).toStrictEqual({ ok: false, error: "empty-source" });
+  });
+  test("and a colon at the end of a line, with nothing after", () => {
+    expect(parseLine(":")).toStrictEqual({ ok: false, error: "empty-source" });
   });
   // A tab is part of the word: the source is "\tNICK", a line a fix must not refuse (passing today).
   test("still takes a source that starts with a tab", () => {
