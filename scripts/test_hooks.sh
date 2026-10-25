@@ -2,6 +2,9 @@
 # test_hooks.sh: the git hooks do what docs/DEVELOPMENT.md says. check.sh runs it.
 set -eu
 unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a `commit -a` hands its own index down; the throwaway repos must not touch it
+# A `git merge` hands its hooks GIT_REFLOG_ACTION: left set, it renames every reflog entry, and `checkout -` finds no
+# branch before (pathspec '-').
+unset GIT_REFLOG_ACTION
 # check.sh exports it, through records.sh: left set, it would hide a hook that does not (F144).
 unset GIT_NO_REPLACE_OBJECTS
 # The hooks run the gate as they do in Claude Code's sandbox, the CI included; the sections
