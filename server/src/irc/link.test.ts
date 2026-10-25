@@ -1269,6 +1269,16 @@ describe("the IRC link's refused hides (3j's green pass)", () => {
     await sync(peer, "redact");
     expect(alerts()).toEqual([expect.stringContaining('"error":"redact_refused"')]);
   });
+
+  it("raises no alert for a line its author deleted before the hide: Ergo knows its id no more", async () => {
+    const ergo = await fakeErgo();
+    const { lines } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    peer.say(":ergo.test FAIL REDACT UNKNOWN_MSGID #bubble m1 :This message does not exist or is too old");
+    await sync(peer, "gone");
+    expect(lines.filter((line) => line.includes('"event":"alert"'))).toEqual([]);
+  });
 });
 
 describe("retryDelay", () => {

@@ -100,8 +100,9 @@ export function reader(options: Options, state: State) {
     },
     ...refusals(refused, state, log),
     // A hide Ergo refused (F544): the verdict says hidden, the line stays; ops hears of it.
-    FAIL: (_, { params: [command] }) => {
-      if (command === "REDACT") log("alert", { error: "redact_refused" });
+    // A line its author deleted first is not one: Ergo knows its id no more (UNKNOWN_MSGID).
+    FAIL: (_, { params: [command, code] }) => {
+      if (command === "REDACT" && code !== "UNKNOWN_MSGID") log("alert", { error: "redact_refused" });
     },
     PING: (s, { params }) => s.write(line("PONG", params)),
     // A NOTICE too (slice 3's max review): Ergo relays and keeps it as any line, so it is checked and counted.
