@@ -177,6 +177,18 @@ test("shows a mention of an account not in the room whole, a member's shortened"
   await expect(mentions.first()).toHaveAttribute("title", ground);
 });
 
+// F816: the browser's engine reads the mentions as the server counts them. Chromium 156's V8 (14.6) misreads a
+// character class just before `$` for a letter past the BMP, which made 𐐀@<address> a mention here alone.
+test("draws no mention after a letter past the BMP, in the browser's own engine", async ({ page }) => {
+  await page.routeWebSocket(/\/ws$/, (ergo) => {
+    scriptedErgo(ergo, GUEST, [["b1", "2026-10-25T10:00:00.000Z", `\u{10400}@${MEMBER} and @${MEMBER}`]]);
+  });
+  await page.goto("/w/bubble?room=games");
+  await hydrated(page);
+  await expect(lineOf(page, "and @")).toContainText(`\u{10400}@${MEMBER} and`);
+  await expect(lines(page).locator("[data-mention]")).toHaveCount(1);
+});
+
 // F814: a line that is a list holds list items of its own; a room's lines are the Messages list's own items.
 test("counts a line that is a list as one line of the room", async ({ page }) => {
   await page.routeWebSocket(/\/ws$/, (ergo) => {
