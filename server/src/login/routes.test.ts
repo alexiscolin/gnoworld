@@ -11,6 +11,7 @@ import { logger } from "../log.ts";
 import { wallet, type Wallet } from "../testing/signer.ts";
 import { LOGIN_TABLES, makeLogin } from "./login.ts";
 import { loginFrom, loginRoutes } from "./routes.ts";
+import { makeTickets, TICKET_TABLES } from "./ticket.ts";
 
 // Written out, not imported: a cookie that loses its __Host- prefix must fail here.
 const SESSION = "__Host-session";
@@ -31,7 +32,7 @@ afterEach(() => {
 });
 
 const setup = ({ newAccountsPerHour = 5, nonceCap = 100_000, origins = [ORIGIN] } = {}) => {
-  const db = openDatabase(":memory:", [LOGIN_TABLES]);
+  const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES]);
   opened.push(db);
   const clock = { now: T0 };
   const now = (): number => clock.now;
@@ -39,9 +40,10 @@ const setup = ({ newAccountsPerHour = 5, nonceCap = 100_000, origins = [ORIGIN] 
   const log = logger(PEPPER, (line) => lines.push(line));
   const app = makeApp(log, () => true);
   const login = makeLogin(db, { chains: ["onyx-1", "gnoland-1"], now, nonceCap });
-  app.route("/api/login", loginRoutes(login, { log, origins, proxy: PROXY, newAccountsPerHour, now }));
+  const tickets = makeTickets(db, { now });
+  app.route("/api/login", loginRoutes(login, { log, origins, proxy: PROXY, newAccountsPerHour, now, tickets }));
   const rows = (table: string): unknown => db.prepare(`SELECT count(*) AS n FROM ${table}`).get();
-  return { app, db, clock, lines, rows };
+  return { app, db, clock, lines, rows, tickets };
 };
 type App = ReturnType<typeof setup>["app"];
 
@@ -617,7 +619,7 @@ describe("the routes", () => {
 describe("the login from the settings", () => {
   const SETTINGS = { chains: ["onyx-1"], origins: [ORIGIN], trustedProxy: undefined, newAccountsPerHour: 5 };
   const mount = (settings: Partial<typeof SETTINGS> = {}, clock?: { now: number }) => {
-    const db = openDatabase(":memory:", [LOGIN_TABLES]);
+    const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES]);
     opened.push(db);
     const log = logger(PEPPER, () => true);
     const app = makeApp(log, () => true);
@@ -655,10 +657,120 @@ describe("the login from the settings", () => {
     await challenge(app);
   });
 
+  it("mints tickets by the clock it is given, and the system's by default", async () => {
+    const clock = { now: T0 };
+    const app = mount({}, clock);
+    const db = opened.at(-1);
+    const minted = await post(app, "ticket", { body: {}, headers: { cookie: session(tokenOf(await login(app))) } });
+    expect(minted.status).toBe(200);
+    expect(db?.prepare("SELECT expires_at AS at FROM tickets").get()).toEqual({ at: T0 + MINUTE });
+    const free = mount();
+    const before = Date.now();
+    await post(free, "ticket", { body: {}, headers: { cookie: session(tokenOf(await login(free))) } });
+    const { at } = z
+      .object({ at: z.number() })
+      .parse(opened.at(-1)?.prepare("SELECT expires_at AS at FROM tickets").get());
+    expect(at).toBeGreaterThanOrEqual(before + MINUTE);
+    expect(at).toBeLessThanOrEqual(Date.now() + MINUTE);
+  });
+
   it("keeps the system's time by default", async () => {
     const before = Date.now();
     const { expiresAt } = await challenge(mount());
     expect(Date.parse(expiresAt)).toBeGreaterThanOrEqual(before + 5 * MINUTE);
     expect(Date.parse(expiresAt)).toBeLessThanOrEqual(Date.now() + 5 * MINUTE);
+  });
+});
+
+describe("tickets", () => {
+  const TICKET = z.strictObject({ ticket: z.string().regex(/^[A-Za-z0-9_-]{43}$/) });
+  const mint = (app: App, cookie: string | undefined, sent: Sent = {}) =>
+    post(app, "ticket", { body: {}, ...(cookie === undefined ? {} : { headers: { cookie } }), ...sent });
+
+  it("mints a ticket for the cookie's account, not to be cached, which logs that account in once", async () => {
+    const { app, tickets } = setup();
+    const who = wallet();
+    const token = tokenOf(await login(app, who));
+    const response = await mint(app, session(token));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("set-cookie")).toBeNull();
+    const { ticket } = TICKET.parse(await response.json());
+    expect(tickets.redeem(ticket, who.address)).toBe(who.address);
+  });
+
+  it("answers 401 without a session: no cookie, an unknown one, one logged out", async () => {
+    const { app, rows } = setup();
+    const token = tokenOf(await login(app));
+    await post(app, "logout", { body: {}, headers: { cookie: session(token) } });
+    for (const cookie of [undefined, session("A".repeat(43)), session(token)]) {
+      expect(await answer(await mint(app, cookie))).toEqual([401, JSON.stringify({ error: "unauthenticated" })]);
+    }
+    expect(rows("tickets")).toEqual({ n: 0 });
+  });
+
+  it("refuses another site, a form and a body with a field, minting nothing", async () => {
+    const { app, rows } = setup();
+    const cookie = session(tokenOf(await login(app)));
+    expect((await mint(app, cookie, { origin: "https://evil.test" })).status).toBe(403);
+    expect((await mint(app, cookie, { type: "application/x-www-form-urlencoded" })).status).toBe(415);
+    expect(await answer(await mint(app, cookie, { body: { account: "x" } }))).toEqual([400, REFUSED]);
+    expect(rows("tickets")).toEqual({ n: 0 });
+  });
+
+  it("mints 10 a minute for an account, from any visitor, then refuses that account alone", async () => {
+    const { app, clock } = setup();
+    const mine = session(tokenOf(await login(app)));
+    const theirs = session(tokenOf(await login(app)));
+    for (let n = 0; n < 10; n += 1)
+      expect((await mint(app, mine, { peer: `198.51.100.${String(n)}` })).status).toBe(200);
+    expect(await answer(await mint(app, mine, { peer: "198.51.100.99" }))).toEqual([429, TOO_MANY]);
+    expect((await mint(app, theirs)).status).toBe(200);
+    clock.now += MINUTE;
+    expect((await mint(app, mine)).status).toBe(200);
+  });
+
+  it("renews the session it mints from", async () => {
+    const { app, clock } = setup();
+    const cookie = session(tokenOf(await login(app)));
+    clock.now = T0 + MINUTE;
+    expect((await mint(app, cookie)).status).toBe(200);
+    clock.now = T0 + 30 * 24 * 60 * MINUTE + 30_000;
+    expect((await me(app, cookie)).status).toBe(200);
+  });
+
+  it("leaves a ticket minted before a logout good until its minute ends", async () => {
+    const { app, tickets } = setup();
+    const who = wallet();
+    const cookie = session(tokenOf(await login(app, who)));
+    const { ticket } = TICKET.parse(await (await mint(app, cookie)).json());
+    await post(app, "logout", { body: {}, headers: { cookie } });
+    expect(tickets.redeem(ticket, who.address)).toBe(who.address);
+  });
+
+  it("answers any body with a ticket or a refusal, never a failure, and a body past 16 KiB with 413", async () => {
+    const { app } = setup();
+    const cookie = session(tokenOf(await login(app)));
+    await fc.assert(
+      fc.asyncProperty(fc.oneof(fc.json(), fc.string()), fc.ipV4(), async (body, peer) => {
+        const response = await post(app, "ticket", { body, peer, headers: { cookie } });
+        expect([200, 400]).toContain(response.status);
+        if (body !== "{}") expect(response.status).toBe(400);
+      }),
+      { numRuns: 60 },
+    );
+    const big = await post(app, "ticket", { body: `{"x":"${"x".repeat(BODY_LIMIT)}"}`, headers: { cookie } });
+    expect(big.status).toBe(413);
+  });
+
+  it("mints 30 a minute for a visitor, whatever the accounts, then refuses that visitor alone", async () => {
+    const { app } = setup();
+    const cookies: string[] = [];
+    for (let n = 0; n < 4; n += 1) cookies.push(session(tokenOf(await login(app))));
+    for (const cookie of cookies.slice(0, 3)) {
+      for (let n = 0; n < 10; n += 1) expect((await mint(app, cookie)).status).toBe(200);
+    }
+    expect(await answer(await mint(app, cookies[3]))).toEqual([429, TOO_MANY]);
+    expect((await mint(app, cookies[3], { peer: "198.51.100.9" })).status).toBe(200);
   });
 });

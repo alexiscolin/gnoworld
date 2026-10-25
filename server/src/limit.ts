@@ -2,6 +2,8 @@
 // per `windowMs`, and at most `keys` keys held.
 export interface Limiter {
   take: (key: string, now: number) => boolean;
+  // Whether a key's window already holds `max` calls; asking counts nothing.
+  full: (key: string, now: number) => boolean;
   size: () => number;
 }
 
@@ -22,6 +24,10 @@ export function limiter({ max, windowMs, keys }: { max: number; windowMs: number
       }
       window.count += 1;
       return window.count <= max;
+    },
+    full(key, now) {
+      const window = windows.get(key);
+      return window !== undefined && now - window.start < windowMs && window.count >= max;
     },
     size: () => windows.size,
   };

@@ -575,6 +575,36 @@ describe("the token", () => {
     },
   );
 
+  it("writes a renewal at most once a minute, so a stream of uses costs one write a minute", async () => {
+    const { db, clock, login } = setup();
+    const made = await token(login);
+    const expiry = (): unknown => db.prepare("SELECT expires_at AS at FROM tokens").get();
+    clock.now = T0 + MINUTE - 1;
+    expect(login.session(made.token)).toBe(made.address);
+    expect(expiry()).toEqual({ at: T0 + 30 * DAY });
+    clock.now = T0 + MINUTE;
+    expect(login.session(made.token)).toBe(made.address);
+    expect(expiry()).toEqual({ at: T0 + MINUTE + 30 * DAY });
+    clock.now = T0 + 2 * MINUTE - 1;
+    expect(login.session(made.token)).toBe(made.address);
+    expect(expiry()).toEqual({ at: T0 + MINUTE + 30 * DAY });
+  });
+
+  it("counts each token's minute apart: another token's write does not hold this one's back", async () => {
+    const { db, clock, login } = setup();
+    const [a, b] = [await token(login), await token(login)];
+    const expiry = (address: Address): unknown =>
+      db.prepare("SELECT expires_at AS at FROM tokens WHERE address = ?").get(address);
+    clock.now = T0 + MINUTE;
+    login.session(a.token);
+    clock.now = T0 + MINUTE + 1;
+    login.session(b.token);
+    expect([expiry(a.address), expiry(b.address)]).toEqual([
+      { at: T0 + MINUTE + 30 * DAY },
+      { at: T0 + MINUTE + 1 + 30 * DAY },
+    ]);
+  });
+
   it("purges the ended tokens at the next login, and only those", async () => {
     const { db, clock, login } = setup();
     const ended = await token(login);

@@ -13,7 +13,9 @@ export interface ErgoOptions {
   origins?: string[];
   proxyFrom?: string[];
   authTimeout?: string;
-  authScript?: "test" | "absent";
+  // "test" answers by passphrase; forward hands each line to the server's auth handler on a port, as the
+  // stack's socket does (a sandbox may not bind a Unix socket).
+  authScript?: "test" | "absent" | { forward: number };
   dir?: string;
   env?: Record<string, string>;
   logTypes?: string;
@@ -102,7 +104,7 @@ function configure(dir: string, [port, wsPort]: readonly [number, number], optio
     WEBSOCKET: `127.0.0.1:${String(wsPort)}`,
     PROXY_FROM: options.proxyFrom ?? ["localhost"],
     ORIGINS: options.origins ?? [],
-    AUTH_SCRIPT: options.authScript === "absent" ? join(dir, "absent-auth") : writeAuthScript(dir),
+    AUTH_SCRIPT: options.authScript === "absent" ? join(dir, "absent-auth") : writeAuthScript(dir, options.authScript),
     AUTH_TIMEOUT: options.authTimeout ?? "9s",
     OPER_HASH: hash(operPassword),
     DATABASE: join(dir, "ircd.db"),
@@ -165,9 +167,13 @@ async function listening(port: number): Promise<void> {
   }
 }
 
-function writeAuthScript(dir: string): string {
+function writeAuthScript(dir: string, script: ErgoOptions["authScript"]): string {
   const path = join(dir, "auth.mjs");
-  writeFileSync(path, `#!${process.execPath}\n${AUTH_SCRIPT.replace("LOG", JSON.stringify(join(dir, "auth-in.log")))}`);
+  const body =
+    typeof script === "object"
+      ? FORWARD.replace("PORT", String(script.forward))
+      : AUTH_SCRIPT.replace("LOG", JSON.stringify(join(dir, "auth-in.log")));
+  writeFileSync(path, `#!${process.execPath}\n${body}`);
   chmodSync(path, 0o755);
   return path;
 }
@@ -189,4 +195,18 @@ else if (passphrase === "garbage") process.stdout.write("not json\\n");
 else if (passphrase === "err") say({ success: false, error: "boom" });
 else if (passphrase === "crash") process.exit(3);
 else say({ success: false });
+`;
+
+// Ergo's line to the server's auth handler and its answer back; a server that is down fails the script.
+// Ergo writes one line and never closes the script's input (irc/script.go, RunScript).
+const FORWARD = `import { connect } from "node:net";
+import { createInterface } from "node:readline";
+const lines = createInterface({ input: process.stdin });
+const line = await new Promise((resolve) => lines.once("line", resolve));
+lines.close();
+process.stdin.destroy();
+const socket = connect(PORT, "127.0.0.1");
+socket.on("error", () => process.exit(2));
+socket.pipe(process.stdout);
+socket.write(line + "\\n");
 `;

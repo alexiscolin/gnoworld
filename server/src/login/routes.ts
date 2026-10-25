@@ -3,7 +3,7 @@
 // work, and a failed login gets one answer whatever failed, its cause going to the log alone.
 import type { DatabaseSync } from "node:sqlite";
 import { getConnInfo } from "@hono/node-server/conninfo";
-import { ChallengeRequest, VerifyRequest, type ApiError, type Me } from "@gnoworld/schemas";
+import { ChallengeRequest, TicketRequest, VerifyRequest, type ApiError, type Me, type Ticket } from "@gnoworld/schemas";
 import { Hono, type Context } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { routePath } from "hono/route";
@@ -12,6 +12,7 @@ import { limiter } from "../limit.ts";
 import type { Log } from "../log.ts";
 import { visitor } from "../visitor.ts";
 import { makeLogin, type Login } from "./login.ts";
+import { makeTickets, type Tickets } from "./ticket.ts";
 
 interface Options {
   log: Log;
@@ -19,6 +20,7 @@ interface Options {
   proxy: string | undefined;
   newAccountsPerHour: number;
   now: () => number;
+  tickets: Tickets;
 }
 
 type Status = 400 | 401 | 403 | 415 | 429;
@@ -39,13 +41,19 @@ interface Env {
   Variables: { host: string };
 }
 
-export function loginRoutes(login: Login, { log, origins, proxy, newAccountsPerHour, now }: Options): Hono<Env> {
+export function loginRoutes(
+  login: Login,
+  { log, origins, proxy, newAccountsPerHour, now, tickets }: Options,
+): Hono<Env> {
   // __Host-: sent only to the host that set it, over HTTPS, for every path, so no sibling site sets it.
   const session = "__Host-session";
   const cookie = { path: "/", httpOnly: true, secure: true, sameSite: "Strict" } as const;
   const hosts = new Map(origins.map((origin) => [origin, new URL(origin).host]));
   const calls = limiter({ max: 10, windowMs: 60_000, keys: 100_000 });
   const created = limiter({ max: newAccountsPerHour, windowMs: 60 * 60_000, keys: 100_000 });
+  // A ticket a reconnect: a household behind one address gets three accounts' worth.
+  const mintsByVisitor = limiter({ max: 30, windowMs: 60_000, keys: 100_000 });
+  const mintsByAccount = limiter({ max: 10, windowMs: 60_000, keys: 100_000 });
 
   // The visitor the web proxy names in X-Real-IP, believed only from that proxy (3e sets it).
   const visitorOf = (c: Context): string =>
@@ -103,6 +111,15 @@ export function loginRoutes(login: Login, { log, origins, proxy, newAccountsPerH
     return c.json({ address: body.data.address } satisfies Me);
   });
 
+  app.post("/ticket", async (c) => {
+    if (!mintsByVisitor.take(visitorOf(c), now())) return refuse(c, "limit");
+    if (!TicketRequest.safeParse(await json(c)).success) return refuse(c, "body");
+    const address = login.session(getCookie(c, session));
+    if (address === undefined) return answer(c, "unauthenticated", 401);
+    if (!mintsByAccount.take(address, now())) return refuse(c, "limit");
+    return c.json({ ticket: tickets.mint(address) } satisfies Ticket);
+  });
+
   app.get("/me", (c) => {
     const address = login.session(getCookie(c, session));
     return address === undefined ? answer(c, "unauthenticated", 401) : c.json({ address } satisfies Me);
@@ -125,5 +142,6 @@ export function loginFrom(
   { chains, origins, trustedProxy: proxy, newAccountsPerHour }: Settings,
   { log, now = Date.now }: { log: Log; now?: () => number },
 ): Hono<Env> {
-  return loginRoutes(makeLogin(db, { chains, now }), { log, origins, proxy, newAccountsPerHour, now });
+  const tickets = makeTickets(db, { now });
+  return loginRoutes(makeLogin(db, { chains, now }), { log, origins, proxy, newAccountsPerHour, now, tickets });
 }

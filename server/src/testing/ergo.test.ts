@@ -1,10 +1,19 @@
 import { spawnSync } from "node:child_process";
+import { once } from "node:events";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
+import type { AddressInfo } from "node:net";
 import { join as joinPath } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Address } from "@gnoworld/schemas";
 import { z } from "zod";
+import { authServer } from "../ergo/auth.ts";
+import { openDatabase } from "../db.ts";
+import { logger } from "../log.ts";
+import { LOGIN_TABLES, makeLogin } from "../login/login.ts";
+import { makeTickets, TICKET_TABLES } from "../login/ticket.ts";
 import { startErgo, type Ergo, type ErgoOptions } from "./ergo.ts";
+import { wallet } from "./signer.ts";
 import { rawClient, type Raw } from "./rawClient.ts";
 
 // Every expectation comes from .claude/tmp/ergo-spike/RESULTS.md, section 3 (Ergo v2.19.1, run for real).
@@ -47,7 +56,9 @@ const keptFolder = (): string => {
   return dir;
 };
 
+const stops: (() => Promise<void>)[] = [];
 afterEach(async () => {
+  for (const stop of stops.splice(0)) await stop();
   for (const ws of sockets.splice(0)) ws.close();
   await Promise.all(clients.splice(0).map((c) => c.close()));
   await Promise.all(ergos.splice(0).map((e) => e.stop()));
@@ -944,5 +955,131 @@ process.exit(0);`;
       expect(() => process.kill(pid, 0)).toThrow(/ESRCH/);
     });
     expect(existsSync(dir)).toBe(false);
+  });
+});
+
+describe("logging in through the server (3d)", { timeout: 30_000 }, () => {
+  // The server's half for real: the login, its tickets and the auth handler, which Ergo's script reaches.
+  const server = async () => {
+    const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES]);
+    const login = makeLogin(db, { chains: ["onyx-1"], now: Date.now });
+    const tickets = makeTickets(db, { now: Date.now });
+    const auth = authServer(db, { log: logger("a-pepper-of-forty-characters-0123456789", () => true) });
+    auth.listen(0, "127.0.0.1");
+    await once(auth, "listening");
+    const { port } = auth.address() as AddressInfo;
+    const stop = async (): Promise<void> => {
+      auth.close();
+      await once(auth, "close");
+    };
+    stops.push(async () => {
+      if (auth.listening) await stop();
+      db.close();
+    });
+    // One signature, then a session: what the browser holds after the login over HTTP.
+    const signIn = async (): Promise<{ address: Address; token: string }> => {
+      const who = wallet();
+      const made = login.challenge("onyx-1", "gnoworld.test");
+      if (typeof made === "string") throw new Error(made);
+      const done = await login.verify(
+        { nonce: made.nonce, address: who.address, proof: who.sign("onyx-1", made.text) },
+        () => true,
+      );
+      if (typeof done === "string") throw new Error(done);
+      return { address: who.address, token: done.token };
+    };
+    const ticketOf = (token: string): string => {
+      const address = login.session(token);
+      if (address === undefined) throw new Error("no session");
+      return tickets.mint(address);
+    };
+    return { port, stop, signIn, ticketOf, tickets };
+  };
+
+  const enter = async (e: Ergo, account: string, ticket: string): Promise<Raw> => {
+    const c = await open(e);
+    await hello(c);
+    expect(await sasl(c, account, ticket)).toContain(" 903 ");
+    await finish(c, account);
+    return c;
+  };
+
+  it("logs a person in with a ticket, their nick their address", async () => {
+    const s = await server();
+    const e = await start({ authScript: { forward: s.port } });
+    const me = await s.signIn();
+    const c = await enter(e, me.address, s.ticketOf(me.token));
+    c.send("WHOIS " + me.address);
+    await c.expect(new RegExp(` 330 \\S+ ${me.address} ${me.address} `));
+  });
+
+  it("reconnects three times with a fresh ticket each, and no new signature", async () => {
+    const s = await server();
+    const e = await start({ authScript: { forward: s.port } });
+    const me = await s.signIn();
+    for (let n = 0; n < 3; n += 1) {
+      const c = await enter(e, me.address, s.ticketOf(me.token));
+      await c.close();
+    }
+  });
+
+  it("lets a guest read and not speak in a +M room, and an account in by ticket speak", async () => {
+    const s = await server();
+    const e = await start({ authScript: { forward: s.port } });
+    const chief = await s.signIn();
+    const op = await enter(e, chief.address, s.ticketOf(chief.token));
+    op.send(`OPER admin ${e.operPassword}`);
+    await op.expect(/ 381 /);
+    await join(op, "#lobby");
+    op.send("MODE #lobby +M");
+    await op.expect(/MODE #lobby \+M/);
+    const me = await s.signIn();
+    const c = await enter(e, me.address, s.ticketOf(me.token));
+    await join(c, "#lobby");
+    const gus = await guest(e, "gus");
+    await join(gus, "#lobby");
+    gus.send("PRIVMSG #lobby :hello from guest");
+    await gus.expect(/ 404 gus #lobby :Cannot send to channel \(\+M\)/);
+    c.send("PRIVMSG #lobby :hello from an account");
+    await gus.expect(new RegExp(`account=${me.address}.* PRIVMSG #lobby :hello from an account`));
+  });
+
+  it("refuses a spent ticket and another account's, and one ticket twice at once logs in once", async () => {
+    const s = await server();
+    const e = await start({ authScript: { forward: s.port } });
+    const [me, other] = [await s.signIn(), await s.signIn()];
+    const ticket = s.ticketOf(me.token);
+    await enter(e, me.address, ticket);
+    const again = await open(e);
+    await hello(again);
+    expect(await sasl(again, me.address, ticket)).toContain(" 904 ");
+    const theirs = await open(e);
+    await hello(theirs);
+    expect(await sasl(theirs, me.address, s.ticketOf(other.token))).toContain(" 904 ");
+    const twice = s.ticketOf(other.token);
+    const both = await Promise.all([open(e), open(e)]);
+    await Promise.all(both.map((c) => hello(c)));
+    const answers = await Promise.all(both.map((c) => sasl(c, other.address, twice)));
+    expect(answers.map((line) => / 90(\d) /.exec(line)?.[1]).toSorted()).toEqual(["3", "4"]);
+  });
+
+  it("lets nobody in while the server is down, and a guest still reads", async () => {
+    const s = await server();
+    const e = await start({ authScript: { forward: s.port } });
+    const chief = await s.signIn();
+    const op = await enter(e, chief.address, s.ticketOf(chief.token));
+    op.send(`OPER admin ${e.operPassword}`);
+    await op.expect(/ 381 /);
+    await join(op, "#lobby");
+    const me = await s.signIn();
+    const ticket = s.ticketOf(me.token);
+    await s.stop();
+    const c = await open(e);
+    await hello(c);
+    expect(await sasl(c, me.address, ticket)).toContain(" 904 ");
+    const gus = await guest(e, "gus");
+    await join(gus, "#lobby");
+    op.send("PRIVMSG #lobby :still here");
+    await gus.expect(/PRIVMSG #lobby :still here/);
   });
 });
