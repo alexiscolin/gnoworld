@@ -201,6 +201,8 @@ test("counts a line that is a list as one line of the room", async ({ page }) =>
   });
   await page.goto("/w/bubble?room=games");
   await hydrated(page);
+  await expect(lineOf(page, "gnogolf at nine").locator("ul > li")).toHaveCount(1);
+  await expect(lineOf(page, "bring a putter").locator("ol > li")).toHaveCount(1);
   await expect(lines(page)).toHaveCount(2);
   await expect(lineOf(page, "gnogolf at nine")).toHaveCount(1);
   await expect(lineOf(page, "bring a putter")).toHaveCount(1);
