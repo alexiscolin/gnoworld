@@ -1,3 +1,4 @@
+import { markdown, mentions as shown } from "@gnoworld/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import type { Rules } from "../roles/roles.ts";
@@ -151,6 +152,63 @@ describe("the rules' links and mentions", () => {
     expect(ruleVerdict("spam", strict, OLD)).toBeUndefined();
     expect(ruleVerdict(links(1), strict, OLD)).toBe("links");
     expect(ruleVerdict("@someone", strict, OLD)).toBe("mentions");
+  });
+});
+
+// 4d: the page shows a mention (core/markdown) only where this count finds one, so the cap holds for every mention
+// a reader sees (F807): a mention the page draws and the count misses would pass any cap.
+describe("the rules' mention count, against the mentions the page shows", () => {
+  const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+  const CAROL = "g1l6m6l6carqlqqqqqqqqqqqqqqqqqqqqqnkkanc";
+  // Caps none but the mentions', one under what the page shows.
+  const under = (seen: number): Rules => ({
+    bannedWords: [],
+    linksPerMessage: 1000,
+    linksForNewAccount: 1000,
+    mentionsPerMessage: seen - 1,
+  });
+  // Whether the count refuses a cap one under the mentions the page shows: none shown, nothing to count.
+  const counted = (text: string): boolean => {
+    const seen = shown(markdown(text)).length;
+    return seen === 0 || ruleVerdict(text, under(seen), OLD) === "mentions";
+  };
+
+  it.each([
+    [`ⓐ@${ADDRESS}ⓐ`, "between letters a fold makes"],
+    [`x\u200b@${ADDRESS}\u0301y`, "between letters a fold joins to it"],
+    [`ｘ@${ADDRESS}`, "after a full-width letter"],
+  ])("counts every mention the page shows in %j: %s", (text) => {
+    expect(counted(text)).toBe(true);
+  });
+
+  it("counts every mention the page shows, whatever is written around it", () => {
+    const pieces = fc.constantFrom(
+      ...[ADDRESS, ALICE, CAROL].map((address) => `@${address}`),
+      ADDRESS,
+      "x",
+      "é",
+      "ⓐ",
+      "ｘ",
+      "\u200b",
+      "\u0301",
+      " ",
+      "(",
+      "_",
+      "*",
+      "**",
+      "`",
+      "[",
+      "](https://a.example)",
+      "\n",
+      "\\",
+      "@",
+    );
+    fc.assert(
+      fc.property(fc.array(pieces, { maxLength: 30 }), (parts) => {
+        expect(counted(parts.join(""))).toBe(true);
+      }),
+      { seed: 20261017, numRuns: 2000 },
+    );
   });
 });
 
