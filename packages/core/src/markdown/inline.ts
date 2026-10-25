@@ -3,6 +3,7 @@
 // is a frame on a stack, holding what it would wrap; one never closed gives its run back as text. Marks and labels
 // nest 8 deep at most, past which a mark is text: a hostile line costs no deeper stack and linear time.
 import { Addresses } from "./address.ts";
+import { append, invisible, wrap } from "./nodes.ts";
 import { after, before, Runs, runOf } from "./scan.ts";
 import type { Inline } from "./types.ts";
 
@@ -33,33 +34,6 @@ interface Frame {
   size: number;
   children: Inline[];
   active: boolean;
-}
-
-function wrap(mark: string, size: number, children: Inline[]): Inline {
-  if (mark === "~") return { type: "strike", children };
-  if (size === 1) return { type: "em", children };
-  if (size === 2) return { type: "strong", children };
-  return { type: "em", children: [{ type: "strong", children }] };
-}
-
-// What draws nothing: spaces, format characters, the code points a renderer ignores (Hangul fillers, joiners,
-// variation selectors) and the braille blank (F781).
-const BLANK = /^[\s\p{Cf}\p{Default_Ignorable_Code_Point}\u2800]*$/u;
-
-// Whether nodes show nothing: texts and code that draw nothing, in marks or not. A link's label must show
-// something, or its address is a link no one sees.
-function invisible(nodes: readonly Inline[]): boolean {
-  return nodes.every((node) => {
-    if (node.type === "text" || node.type === "code") return BLANK.test(node.text);
-    return "children" in node && invisible(node.children);
-  });
-}
-
-// A node after the last: a text joins the text before it, and an empty one adds nothing.
-function append(nodes: Inline[], node: Inline): void {
-  const last = nodes.at(-1);
-  if (node.type === "text" && last?.type === "text") last.text += node.text;
-  else if (node.type !== "text" || node.text !== "") nodes.push(node);
 }
 
 class Reader {
