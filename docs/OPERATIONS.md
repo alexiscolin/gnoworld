@@ -209,8 +209,8 @@ Slice 3, the check (3i):
 - **A message caught in a restart** stays `pending` in the verdicts; 3j's catch-up checks it again.
 - **OpenAI's rate limit.** One line a request, and OpenAI caps a key's requests a minute by its account's tier
   (`omni-moderation-latest`: 250 on Free, 500 on Build, 2,000 on Launch, 5,000 on Grow; its model page, read
-  2026-10-24): past it, its refusals count as down, five open the breaker for 30 s, and lines pass unchecked
-  meanwhile. The load run's 200 accounts, a line each every 5 s (2,400 a minute), left 1,810 of 2,200 unchecked
+  2026-10-24): past it, its refusals count as down (logged `moderation_unchecked` with `rate_limited`, an outage's
+  `down`), five open the breaker for 30 s, and lines pass unchecked meanwhile. The load run's 200 accounts, a line each every 5 s (2,400 a minute), left 1,810 of 2,200 unchecked
   (F692). Several lines a request is slice 4's (`docs/plans/backlog.md`).
 
 Slice 3, the bot acts and the stream (3j):

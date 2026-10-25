@@ -74,8 +74,9 @@ export function moderationClient({
     }
     if (!response.ok) {
       // Busy or down passes; anything else (a key refused, a request it reads as bad) needs a person.
-      const passing = response.status === 429 || response.status >= 500;
-      if (passing) log("moderation_unchecked", { error: "down" });
+      // The log tells OpenAI's limit (429) from an outage: the first asks for fewer requests or a higher tier.
+      if (response.status === 429) log("moderation_unchecked", { error: "rate_limited" });
+      else if (response.status >= 500) log("moderation_unchecked", { error: "down" });
       else log("alert", { error: "moderation_refused" });
       return "unchecked";
     }
