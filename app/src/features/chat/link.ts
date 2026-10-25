@@ -116,16 +116,27 @@ class Link implements ChatLink {
     );
   }
 
-  // A new session: the last connection ended, and one opened as the session says. The store never goes back
-  // to not knowing it.
+  // A new session: the last connection ended, its rooms forgotten, and one opened as the session says. The store
+  // never goes back to not knowing it.
   #follow(session: AppState["login"]["session"]): void {
     if (session.kind === "unknown") return;
     const key = session.kind === "out" ? "guest" : session.address;
     if (key === this.#key) return;
+    // Another session than a known one starts with no room: a reader's rooms are its own, which the page lists
+    // for it again.
+    const known = this.#key !== undefined;
+    // Noted first: the store's change below calls this again, which must find the session the same.
     this.#key = key;
+    if (known) this.#unfollow();
     this.#end();
     const { ticket, guest } = this.#deps;
     this.#open(session.kind === "out" ? { guest } : { account: session.address, ticket });
+  }
+
+  #unfollow(): void {
+    this.#listed = [];
+    this.#shown = undefined;
+    this.#deps.store.getState().chatActions.follow([]);
   }
 
   // The connection's end: its events ignored from now on, my nick and who is here forgotten.

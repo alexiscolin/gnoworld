@@ -215,6 +215,19 @@ describe("the chat's link: who connects", () => {
     expect(t.links).toHaveLength(1);
   });
 
+  // 4b's pre-merge, the security-reviewer: a member's rooms must not follow it into a guest's connection.
+  it("starts a new session with no room: the last one's rooms neither joined nor kept", () => {
+    const t = setup();
+    t.link.follow(["#bubble", "#bubble/members"]);
+    t.link.show("#bubble/members");
+    t.signedIn(ADDRESS);
+    t.connected(ADDRESS);
+    t.last().line(`@msgid=a;time=${T0} :alice!u@h PRIVMSG #bubble/members :members only`);
+    t.signedOut();
+    expect(t.chat().rooms).toEqual({});
+    expect(t.connected().sent).toEqual([]);
+  });
+
   it("connects as a guest when Ergo says the session is gone, the store logged out", () => {
     const t = setup();
     t.signedIn(ADDRESS);
