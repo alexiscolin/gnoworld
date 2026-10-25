@@ -51,8 +51,9 @@ function Person({ name, guest }: { name: string; guest: boolean }) {
   return Address.safeParse(name).success ? <span title={name}>{shortAddress(name)}</span> : <span>{name}</span>;
 }
 
-// A line, read once: drawn, and asked whether it mentions the reader, which a word says as well as its colour.
-function LineView({ line, me }: { line: Line; me: string | undefined }) {
+// A line, read once: drawn, and asked whether it mentions the reader, which a word says as well as its colour; a
+// mention shortened for the reader and the room's members alone (F812).
+function LineView({ line, me, members }: { line: Line; me: string | undefined; members: ReadonlySet<string> }) {
   const blocks = markdown(line.text);
   const mentioned = me !== undefined && mentions(blocks).includes(me);
   return (
@@ -65,7 +66,7 @@ function LineView({ line, me }: { line: Line; me: string | undefined }) {
       </time>{" "}
       {line.kind === "action" ? "* " : null}
       <Person name={line.account ?? line.from} guest={line.account === undefined} />{" "}
-      <Markdown blocks={blocks} className={styles["text"]} me={me} />
+      <Markdown blocks={blocks} className={styles["text"]} me={me} members={members} />
     </li>
   );
 }
@@ -109,6 +110,7 @@ export function RoomView({ room, state, chat, composer, me }: RoomViewProps) {
   const { lines = [], members = [], topic } = state ?? {};
   const { listRef, onScroll } = useNewestInView(lines);
   const connected = chat === "connected";
+  const known = new Set(members);
   return (
     <Stack as="section" space="s">
       <header>
@@ -130,7 +132,7 @@ export function RoomView({ room, state, chat, composer, me }: RoomViewProps) {
             tabIndex={0}
           >
             {lines.map((line) => (
-              <LineView key={line.id} line={line} me={me} />
+              <LineView key={line.id} line={line} me={me} members={known} />
             ))}
           </ol>
           {connected && lines.length === 0 ? <p>No messages yet.</p> : null}

@@ -45,14 +45,22 @@ export function said(composed: Composed, failed: boolean, completion?: Completio
   return {};
 }
 
-/** The line as the room will read it, an action as one, the account's own mention apart, out of reach of the keyboard
- * and of a screen reader (the field says it already); nothing of a line that cannot go. */
-export function Preview({ composed, me }: { composed: Composed; me?: string | undefined }) {
+/** The line as the room will read it, an action as one, the account's own mention apart, a member's shortened (F812),
+ * out of reach of the keyboard and of a screen reader (the field says it already); nothing of a line that cannot go. */
+export function Preview({
+  composed,
+  me,
+  members,
+}: {
+  composed: Composed;
+  me?: string | undefined;
+  members?: ReadonlySet<string> | undefined;
+}) {
   if (composed.kind !== "line") return null;
   return (
     <div className={styles["preview"]} inert>
       {composed.action ? "* " : null}
-      <Message text={composed.text} me={me} />
+      <Message text={composed.text} me={me} members={members} />
     </div>
   );
 }
@@ -112,6 +120,7 @@ export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", 
   const mentioning = /(^|\s)@\S*$/u.test(draft);
   const people = mentioning ? peopleOf(members, nick) : [];
   const completion = completions(draft, { commands: COMMANDS, rooms, people });
+  const known = new Set(members);
   const box = () => formRef.current?.querySelector("input") ?? undefined;
   useLayoutEffect(() => {
     const selection = selectionRef.current;
@@ -164,7 +173,7 @@ export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", 
             Send
           </Button>
         </Sidebar>
-        <Preview composed={composed} me={nick} />
+        <Preview composed={composed} me={nick} members={known} />
       </Stack>
     </form>
   );

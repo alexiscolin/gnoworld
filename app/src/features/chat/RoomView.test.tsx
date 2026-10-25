@@ -143,6 +143,15 @@ describe("RoomView", () => {
     expect(html.match(/data-about-me/g)).toHaveLength(1);
   });
 
+  // F812: a checksum-valid address ground to shorten as BOB's does; it holds no key, so it is in no room.
+  it("shows a mention of a member or of the reader shortened, of anyone else whole (F812)", () => {
+    const ground = "g1jg8m2vtwlmmyz8swgu76ug4tklwnays8yvsqf5";
+    const lines = [line({ text: `@${ground} @${ALICE} @${BOB}` })];
+    const html = part(view({ me: BOB, state: { ...ROOM, lines } }), "Messages");
+    expect(said(html)).toMatch(new RegExp(`g10gh7…3y5tv @${ground} @g10gh7…3y5tv @g1jg8m…vsqf5$`));
+    expect(html).toContain(`<span data-mention="" title="${ground}">@${ground}</span>`);
+  });
+
   it("marks no line for a lookalike of the reader's address, shown whole", () => {
     const lookalike = `g1jg8m${"q".repeat(29)}vsqf5`;
     const html = part(view({ me: BOB, state: { ...ROOM, lines: [line({ text: `hey @${lookalike}` })] } }), "Messages");

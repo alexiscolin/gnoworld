@@ -161,3 +161,17 @@ test("sets a quoted line apart from the sender's own words", async ({ page }) =>
   expect(look.border).not.toBe("0px");
   expect(look.padding).not.toBe("0px");
 });
+
+// F812: an address of the right checksum ground to shorten as a member's does holds no key, so joins no room: a
+// mention of it shows whole, through the store and the page; a member's shortened.
+test("shows a mention of an account not in the room whole, a member's shortened", async ({ page }) => {
+  const ground = "g1jg8m2vtwlmmyz8swgu76ug4tklwnays8yvsqf5";
+  await page.routeWebSocket(/\/ws$/, (ergo) => {
+    scriptedErgo(ergo, GUEST, [["g1", "2026-10-25T10:00:00.000Z", `ask @${ground} or @${MEMBER}`]]);
+  });
+  await page.goto("/w/bubble?room=games");
+  await hydrated(page);
+  const mentions = page.getByRole("list", { name: "Messages" }).locator("[data-mention]");
+  await expect(mentions).toHaveText([`@${ground}`, `@${MEMBER.slice(0, 6)}…${MEMBER.slice(-5)}`]);
+  await expect(mentions.first()).toHaveAttribute("title", ground);
+});
