@@ -368,14 +368,31 @@ describe("the IRC link, when Ergo refuses it", () => {
   });
 });
 
+// A peer's connection is over once its close comes, and every line it sent was read before that: a count taken
+// as the link's next connection arrives can miss the last ones of the first, on a loaded machine.
+const closed = (peer: Peer): Promise<void> =>
+  peer.socket.closed ? Promise.resolve() : once(peer.socket, "close").then(() => undefined);
+const pings = (lines: string[]): number => lines.filter((line) => line.startsWith("PING ")).length;
+
 describe("the IRC link's watchdog", () => {
   it("pings three times into silence, then connects again", async () => {
     const ergo = await fakeErgo();
     start(ergo.port, { pingMs: 20 });
     const first = await ergo.peer(0);
-    await welcome(first);
+    await register(first);
+    // A welcome slower than a ping's interval, as on a loaded machine: the pings sent meanwhile are no silence's.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await first.next(new RegExp(`^OPER admin ${PASSWORD}$`));
+    first.say(":ergo.test 381 gnoworld :You are now an IRC operator");
+    await first.next(/^JOIN /);
+    // Each line Ergo sends ends the silence, and a line of ours does too: the PONG that answers it follows every
+    // ping sent before it on the same stream, so the pings after it are the three of the silence that follows.
+    first.say("PING :silence");
+    await first.next(/^PONG silence$/);
+    const after = first.lines.indexOf("PONG silence") + 1;
+    await closed(first);
     await ergo.peer(1);
-    expect(first.lines.filter((line) => line.startsWith("PING "))).toHaveLength(3);
+    expect(pings(first.lines.slice(after))).toBe(3);
   });
 
   it("keeps a connection whose pings are answered", async () => {
@@ -394,8 +411,9 @@ describe("the IRC link's watchdog", () => {
     const ergo = await fakeErgo();
     start(ergo.port, { pingMs: 20 });
     const first = await ergo.peer(0);
+    await closed(first);
     await ergo.peer(1);
-    expect(first.lines.filter((line) => line.startsWith("PING "))).toHaveLength(3);
+    expect(pings(first.lines)).toBe(3);
   });
 });
 
