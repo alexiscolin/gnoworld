@@ -792,13 +792,8 @@ await startErgo().then(() => process.exit(2), () => process.exit(0));`;
 
   it("fails what waits on an Ergo that crashes, at once, and still stops cleanly", async () => {
     const e = await start();
-    const chief = await oper(e, "chief");
     const waiting = (await guest(e, "waiter")).expect(/never sent/, 20_000);
-    chief.send("DEBUG CRASHSERVER");
-    const confirm = /To confirm, run this command: \/DEBUG CRASHSERVER (\S+)/.exec(
-      await chief.expect(/To confirm/),
-    )?.[1];
-    chief.send(`DEBUG CRASHSERVER ${confirm ?? ""}`);
+    process.kill(e.pid, "SIGKILL");
     const started = Date.now();
     await expect(waiting).rejects.toThrow(/closed/);
     expect(Date.now() - started).toBeLessThan(5000);
@@ -1000,7 +995,7 @@ describe("the server's IRC link (3h)", { timeout: 40_000 }, () => {
     const e = await start();
     const said = linked(e, ["#earth", "#bubble"]);
     const alice = await login(e, "alice");
-    await inRoom(alice, "#bubble");
+    await inRoom(await oper(e, "watcher"), "#bubble");
     await join(alice, "#bubble");
     alice.send("PRIVMSG gnoworld :a direct message");
     alice.send("PRIVMSG #bubble :hello from alice");
@@ -1014,7 +1009,7 @@ describe("the server's IRC link (3h)", { timeout: 40_000 }, () => {
     const e = await start();
     const rooms = Array.from({ length: 101 }, (_, n) => `#room-${String(n)}`);
     linked(e, rooms);
-    const gus = await guest(e, "gus");
+    const gus = await oper(e, "gus");
     await inRoom(gus, "#room-100");
     gus.send("LIST");
     await gus.expect(/ 323 /);
@@ -1026,11 +1021,11 @@ describe("the server's IRC link (3h)", { timeout: 40_000 }, () => {
     kept.push(dir);
     const first = await start({ dir });
     linked(first, ["#bubble"]);
-    const gus = await guest(first, "gus");
+    const gus = await oper(first, "gus");
     await inRoom(gus, "#bubble");
     await first.stop();
     const again = await start({ dir, ports: [first.port, first.wsPort], operPassword: first.operPassword });
     // An operator holds its rooms as their op: Ergo shows it with an @.
-    expect(await inRoom(await guest(again, "gus2"), "#bubble")).toMatch(/ :(.* )?@gnoworld\b/);
+    expect(await inRoom(await oper(again, "gus2"), "#bubble")).toMatch(/ :(.* )?@gnoworld\b/);
   });
 });

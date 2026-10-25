@@ -34,18 +34,25 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
   it("checks what it missed while its link was down, each message once, after a mark Ergo has erased", async () => {
     const e = await start();
     const asked: string[] = [];
-    const { verdicts } = await chatFor(e, asked);
+    const db = openDatabase(":memory:", TABLES);
+    const first = await chatFor(e, asked, { db });
+    const verdicts = first.verdicts;
+    stops.push(() => {
+      db.close();
+      return Promise.resolve();
+    });
     const alice = await login(e, "alice");
     await join(alice, "#bubble");
     // The mark is a hidden line, which the REDACT takes out of Ergo's history.
     const hidden = await say(alice, "#bubble", "I will hurt you");
     await alice.expect(new RegExp(` REDACT #bubble ${hidden} `));
     await expect.poll(() => verdicts().length).toBe(1);
-    const chief = await oper(e, "chief");
-    chief.send("KILL gnoworld :a test outage");
+    // Its link down: the chat stopped, then started again on its database.
+    await first.stop();
     await alice.expect(/:gnoworld!\S+ QUIT /);
     for (const text of ["one", "two", "three"]) alice.send(`PRIVMSG #bubble :${text}`);
     await sync(alice);
+    await chatFor(e, asked, { db });
     await expect.poll(() => asked.toSorted(), { timeout: 15_000 }).toEqual(["I will hurt you", "one", "three", "two"]);
     expect(verdicts()).toHaveLength(4);
     await sync(alice);
@@ -120,9 +127,10 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     const { chat } = await chatFor(e, []);
     expect(chat.rooms.create("bubble", "garden")).toEqual({ made: "#bubble/garden" });
     const alice = await login(e, "alice");
+    const watcher = await oper(e, "watcher");
     for (;;) {
-      alice.send("NAMES #bubble/garden");
-      const names = await alice.expect(/ (353|366) \S+ (= )?#bubble\/garden /);
+      watcher.send("NAMES #bubble/garden");
+      const names = await watcher.expect(/ (353|366) \S+ (= )?#bubble\/garden /);
       if (names.includes(" 353 ") && names.includes("gnoworld")) break;
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
@@ -161,9 +169,10 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     const first = await chatFor(e, [], { db });
     first.chat.rooms.create("bubble", "garden");
     const alice = await login(e, "alice");
+    const watcher = await oper(e, "watcher");
     for (;;) {
-      alice.send("NAMES #bubble/garden");
-      const names = await alice.expect(/ (353|366) \S+ (= )?#bubble\/garden /);
+      watcher.send("NAMES #bubble/garden");
+      const names = await watcher.expect(/ (353|366) \S+ (= )?#bubble\/garden /);
       if (names.includes(" 353 ") && names.includes("gnoworld")) break;
       await new Promise((resolve) => setTimeout(resolve, 50));
     }

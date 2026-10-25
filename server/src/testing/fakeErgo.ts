@@ -68,15 +68,28 @@ export const fakeErgo = async (at = 0) => {
   return { port, peer, peers };
 };
 
-// Registered, an operator, in its rooms: the conversation Ergo holds with a new client (3b).
-export const welcome = async (peer: Peer): Promise<void> => {
-  await peer.next(/^CAP REQ /);
-  peer.say(":ergo.test CAP * ACK :message-tags account-tag batch draft/chathistory server-time");
-  await peer.next(/^CAP END$/);
+// Registered, up to Ergo's welcome, the capabilities asked acknowledged (3b); its account by SASL when the
+// link asks one (the max review), which the operator's password logs in.
+export const register = async (peer: Peer): Promise<void> => {
+  const asked = await peer.next(/^CAP REQ /);
+  peer.say(`:ergo.test CAP * ACK :${asked.replace(/^CAP REQ :?/, "")}`);
+  if ((await peer.next(/^(CAP END|AUTHENTICATE PLAIN)$/)) !== "CAP END") {
+    peer.say("AUTHENTICATE +");
+    await peer.next(/^AUTHENTICATE /);
+    peer.say(":ergo.test 903 gnoworld :SASL authentication successful");
+    await peer.next(/^CAP END$/);
+  }
   peer.say(":ergo.test 001 gnoworld :Welcome");
+};
+
+// Registered, an operator, in its rooms: the conversation Ergo holds with a new client (3b). Ergo answers a
+// JOIN with the bot's own JOIN of each room it is in; echo false holds that back.
+export const welcome = async (peer: Peer, { echo = true } = {}): Promise<void> => {
+  await register(peer);
   await peer.next(new RegExp(`^OPER admin ${PASSWORD}$`));
   peer.say(":ergo.test 381 gnoworld :You are now an IRC operator");
-  await peer.next(/^JOIN /);
+  const join = await peer.next(/^JOIN /);
+  if (echo) for (const room of join.slice("JOIN ".length).split(",")) peer.say(`:gnoworld!u@h JOIN ${room}`);
 };
 
 // A PRIVMSG as Ergo relays it: "tags" without the @, the source as nick!user@host.

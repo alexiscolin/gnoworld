@@ -108,7 +108,10 @@ function configure(dir: string, [port, wsPort]: readonly [number, number], optio
     WEBSOCKET: `127.0.0.1:${String(wsPort)}`,
     PROXY_FROM: options.proxyFrom ?? ["localhost"],
     ORIGINS: options.origins ?? [],
-    AUTH_SCRIPT: options.authScript === "absent" ? join(dir, "absent-auth") : writeAuthScript(dir, options.authScript),
+    AUTH_SCRIPT:
+      options.authScript === "absent"
+        ? join(dir, "absent-auth")
+        : writeAuthScript(dir, options.authScript, operPassword),
     AUTH_TIMEOUT: options.authTimeout ?? "9s",
     // The stack dials the server's socket instead; the sandbox refuses Unix sockets.
     SOCKET: "",
@@ -173,12 +176,15 @@ async function listening(port: number): Promise<void> {
   }
 }
 
-function writeAuthScript(dir: string, script: ErgoOptions["authScript"]): string {
+function writeAuthScript(dir: string, script: ErgoOptions["authScript"], operPassword: string): string {
   const path = join(dir, "auth.mjs");
   const body =
     typeof script === "object"
       ? FORWARD.replace("PORT", String(script.forward))
-      : AUTH_SCRIPT.replace("LOG", JSON.stringify(join(dir, "auth-in.log")));
+      : AUTH_SCRIPT.replace("LOG", JSON.stringify(join(dir, "auth-in.log"))).replace(
+          "OPER",
+          JSON.stringify(operPassword),
+        );
   writeFileSync(path, `#!${process.execPath}\n${body}`);
   chmodSync(path, 0o755);
   return path;
@@ -194,6 +200,7 @@ appendFileSync(LOG, line + "\\n");
 const { accountName = "", passphrase = "" } = JSON.parse(line);
 const say = (answer) => process.stdout.write(JSON.stringify(answer) + "\\n");
 if (passphrase === "pw") say({ success: true, accountName });
+else if (accountName === "gnoworld" && passphrase === OPER) say({ success: true, accountName });
 else if (passphrase === "rename") say({ success: true, accountName: "renamed-" + accountName });
 else if (passphrase === "empty") say({ success: true });
 else if (passphrase === "slow") setTimeout(() => say({ success: true }), 30000);

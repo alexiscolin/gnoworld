@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { logger } from "../log.ts";
 import fc from "fast-check";
 import { freePort } from "../testing/ergo.ts";
-import { fakeErgo, message, PASSWORD, welcome, type Peer } from "../testing/fakeErgo.ts";
+import { fakeErgo, message, PASSWORD, register, welcome, type Peer } from "../testing/fakeErgo.ts";
 import { ircLink, retryDelay, type Link, type Said } from "./link.ts";
 
 const CAPS = "CAP REQ :message-tags account-tag batch draft/chathistory server-time multi-prefix";
@@ -148,7 +148,7 @@ describe("the IRC link", () => {
     const ergo = await fakeErgo();
     start(ergo.port);
     const first = await ergo.peer(0);
-    await welcome(first);
+    await welcome(first, { echo: false });
     const closed = once(first.socket, "close");
     await links.splice(0)[0]?.stop();
     await closed;
@@ -258,9 +258,7 @@ describe("the IRC link, when Ergo refuses it", () => {
     const ergo = await fakeErgo();
     start(ergo.port);
     const peer = await ergo.peer(0);
-    await peer.next(/^CAP REQ /);
-    peer.say(":ergo.test CAP * ACK :message-tags account-tag");
-    peer.say(":ergo.test 001 gnoworld :Welcome");
+    await register(peer);
     await peer.next(/^OPER /);
     await sync(peer);
     expect(peer.lines.filter((line) => line.startsWith("JOIN"))).toEqual([]);
@@ -292,9 +290,7 @@ describe("the IRC link, when Ergo refuses it", () => {
     });
     for (const nth of [0, 1, 2]) {
       const peer = await ergo.peer(nth);
-      await peer.next(/^CAP REQ /);
-      peer.say(":ergo.test CAP * ACK :message-tags account-tag");
-      peer.say(":ergo.test 001 gnoworld :Welcome");
+      await register(peer);
       await peer.next(/^OPER /);
       peer.say(":ergo.test 464 gnoworld :Password incorrect");
     }
@@ -414,9 +410,7 @@ describe("the IRC link, its green pass (3h)", () => {
     const ergo = await fakeErgo();
     const { lines } = start(ergo.port);
     const peer = await ergo.peer(0);
-    await peer.next(/^CAP REQ /);
-    peer.say(":ergo.test CAP * ACK :message-tags account-tag");
-    peer.say(":ergo.test 001 gnoworld :Welcome");
+    await register(peer);
     await peer.next(/^OPER /);
     peer.say(":ergo.test 491 gnoworld :OPER failed");
     await ergo.peer(1);
@@ -471,10 +465,8 @@ describe("the IRC link, its green pass (3h)", () => {
     const ergo = await fakeErgo();
     const { lines } = start(ergo.port);
     const peer = await ergo.peer(0);
-    await peer.next(/^CAP REQ /);
     peer.say(":ergo.test CAP gnoworld NEW :sasl");
-    peer.say(":ergo.test CAP * ACK :message-tags account-tag");
-    expect(await peer.next(/^CAP END$/)).toBe("CAP END");
+    await register(peer);
     expect([ergo.peers.length, lines.filter((line) => line.includes("irc_refused"))]).toEqual([1, []]);
   });
 
@@ -482,9 +474,7 @@ describe("the IRC link, its green pass (3h)", () => {
     const ergo = await fakeErgo();
     const { lines } = start(ergo.port);
     const peer = await ergo.peer(0);
-    await peer.next(/^CAP REQ /);
-    peer.say(":ergo.test CAP * ACK :message-tags account-tag");
-    peer.say(":ergo.test 001 gnoworld :Welcome");
+    await register(peer);
     await peer.next(/^OPER /);
     const ready = () => lines.filter((line) => line.includes('"event":"irc_ready"'));
     expect(ready()).toEqual([]);

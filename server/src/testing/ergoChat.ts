@@ -15,7 +15,7 @@ import { ROOM_STATE } from "../rooms/create.ts";
 import { ROOM_TABLES } from "../rooms/rooms.ts";
 import { answer } from "./answers.ts";
 import type { Ergo } from "./ergo.ts";
-import { guest, stops } from "./ergoKit.ts";
+import { oper, stops } from "./ergoKit.ts";
 
 export const RULES = { bannedWords: [], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
 // A provider that flags violence in any text saying "hurt", and records what it was asked.
@@ -76,7 +76,7 @@ export const chatFor = async (
   });
   // A nick of its own each time: a restart's chat watches beside the last one's.
   watchers += 1;
-  const watcher = await guest(e, `watcher${String(watchers)}`);
+  const watcher = await oper(e, `watcher${String(watchers)}`);
   for (;;) {
     watcher.send("NAMES #bubble");
     const names = await watcher.expect(/ (353|366) \S+ (= )?#bubble /);

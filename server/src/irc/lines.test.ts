@@ -31,7 +31,7 @@ describe("the link's own lines (3j's green pass)", () => {
           expect(text.endsWith("\r\n")).toBe(true);
           const forms: Record<string, RegExp> = {
             SAMODE:
-              /^SAMODE #[^\s,]+ (?:[+-][MmisR]|[+-]b m:[A-Za-z0-9_-]{1,64}|-I [^\s,]+|(?:[+-][Iv]|-[qaoh]) [^\s,*?!@#:][^\s,*?!@]*)\r\n$/,
+              /^SAMODE #[^\s,]+ (?:[+-][MmisR]|[+-]b m:[A-Za-z0-9_-]{1,64}|-I [^\s,]+|\+o gnoworld|(?:[+-][Iv]|-[qaoh]) [^\s,*?!@#:][^\s,*?!@]*)\r\n$/,
             REDACT: /^REDACT #[^\s,]+[ \r]/,
             NOTICE: /^NOTICE [^#,\s:][^\s,]*[ \r]/,
             JOIN: /^JOIN #[^\s,]+\r\n$/,
