@@ -1,11 +1,16 @@
 import { compose } from "@gnoworld/core";
+import { completions } from "./complete.ts";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { Composer, NEAR, Preview, said } from "./Composer.tsx";
 
 const ROOM = "#bubble/games";
 const NICK = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
-const html = () => renderToStaticMarkup(<Composer room={ROOM} nick={NICK} onSay={() => true} />);
+const html = () =>
+  renderToStaticMarkup(
+    <Composer room={ROOM} nick={NICK} rooms={["#games", "#gnogolf"]} people={[]} onSay={() => true} />,
+  );
+const CHOICES = { commands: ["/me"], rooms: ["#games", "#gnogolf", "#news"], people: [] };
 const names = (markup: string) => [...markup.matchAll(/aria-label="([^"]+)"/g)].map((found) => found[1]);
 
 describe("Composer", () => {
@@ -56,5 +61,27 @@ describe("what the composer's field says", () => {
     ["a".repeat(419), false, { help: "0 bytes left." }],
   ])("says, of %j (failed: %s), %j", (draft, failed, shown) => {
     expect(said(compose(ROOM, draft, NICK), failed)).toStrictEqual(shown);
+  });
+});
+
+describe("what the composer's field says of a completion", () => {
+  const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+  it.each([
+    ["/", { help: "Tab completes /me." }],
+    ["/m", { help: "Tab completes /me." }],
+    ["#g", { help: "Tab completes #games; also #gnogolf." }],
+    ["say #n", { help: "Tab completes #news." }],
+    ["hi @g10", { help: "Tab completes @g10gh7…3y5tv." }],
+    [`${"x".repeat(419)} #g`, { error: "Too long by 3 bytes." }],
+    [`${"x".repeat(412)} #g`, { help: "Tab completes #games; also #gnogolf." }],
+  ])("says, of %j, %j: an unknown command waits, a line too long does not", (draft, shown) => {
+    const choices = { ...CHOICES, people: [ALICE] };
+    expect(said(compose(ROOM, draft, NICK), false, completions(draft, choices))).toStrictEqual(shown);
+  });
+
+  it("says a line not sent before any completion", () => {
+    expect(said(compose(ROOM, "#g", NICK), true, completions("#g", CHOICES))).toStrictEqual({
+      error: "Not sent: the chat is not in this room yet. Try again in a moment.",
+    });
   });
 });

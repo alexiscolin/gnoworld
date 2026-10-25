@@ -1,5 +1,5 @@
 // How the chat names a room and an address, and which room a world's page shows.
-import type { RoomList } from "@gnoworld/schemas";
+import { Address, type RoomList } from "@gnoworld/schemas";
 import type { AppState } from "../../store/index.ts";
 
 /** An address's first six and last five characters, as the login shows one's own. */
@@ -30,6 +30,17 @@ export function shownRoom(world: string, sections: RoomList["sections"], asked: 
   const named = asked === null ? `#${world}` : `#${world}/${asked}`;
   return [named, `#${world}`].find((room) => listed.includes(room)) ?? listed[0];
 }
+
+/** The room `step` rooms from `room` in the list, Alt+Up and Alt+Down's; none past an end, or for a room not in it. */
+export function neighbour(rooms: readonly string[], room: string, step: number): string | undefined {
+  const at = rooms.indexOf(room);
+  return at === -1 ? undefined : rooms[at + step];
+}
+
+/** The accounts a mention completes to: the room's members that are addresses, each once, oneself left out. */
+export const peopleOf = (members: readonly string[], self: string): string[] => [
+  ...new Set(members.filter((member) => member !== self && Address.safeParse(member).success)),
+];
 
 /** Every room a world lists, in its order. */
 export const roomIds = (sections: RoomList["sections"]): string[] =>

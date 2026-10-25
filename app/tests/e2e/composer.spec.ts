@@ -64,6 +64,77 @@ test.describe("the composer", () => {
     await expect(field(page)).toHaveValue("");
   });
 
+  // A person's completion is the unit tests': who is in #games besides the test's account changes from run to run.
+  test("completes a command and a room with Tab, from the field alone and at the draft's end", async ({ page }) => {
+    await inGames(page);
+    await field(page).fill("/");
+    await expect(field(page)).toHaveAccessibleDescription("Tab completes /me.");
+    await field(page).press("Tab");
+    await expect(field(page)).toHaveValue("/me ");
+    await expect(field(page)).toBeFocused();
+    expect(await field(page).evaluate((box: HTMLInputElement) => [box.selectionStart, box.selectionEnd])).toEqual([
+      4, 4,
+    ]);
+    // Nothing to complete: Tab moves on (past Send, off for an empty action).
+    await field(page).press("Tab");
+    await expect(field(page)).not.toBeFocused();
+    await expect(field(page)).toHaveValue("/me ");
+    await field(page).fill("see #ne");
+    await expect(field(page)).toHaveAccessibleDescription("Tab completes #news.");
+    // The caret elsewhere than the end: Tab moves on, the draft as it was; and Tab on Send completes nothing.
+    await field(page).press("Home");
+    await field(page).press("Tab");
+    await expect(send(page)).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(field(page)).toHaveValue("see #ne");
+    // Shift+Tab leaves for the format bar; Tab from its last button comes back to the field, completing nothing.
+    await field(page).press("End");
+    await field(page).press("Shift+Tab");
+    await expect(
+      page.getByRole("group", { name: "Format" }).getByRole("button", { name: "Numbered list" }),
+    ).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(field(page)).toBeFocused();
+    await expect(field(page)).toHaveValue("see #ne");
+    // Come back by Tab, the box's text is selected: the caret at its end again, Tab completes.
+    await field(page).press("End");
+    await field(page).press("Tab");
+    await expect(field(page)).toHaveValue("see #news ");
+    await expect(field(page)).not.toHaveAccessibleDescription(/Tab completes/);
+  });
+
+  test("goes from room to room with Alt+Down and Alt+Up alone, across sections, the ends stopping it", async ({
+    page,
+  }) => {
+    await inGames(page);
+    const heading = (name: string) => page.getByRole("heading", { level: 2, name, exact: true });
+    await field(page).press("ArrowDown");
+    for (const keys of [
+      "ArrowDown",
+      "Shift+Alt+ArrowDown",
+      "Control+Alt+ArrowDown",
+      "Meta+Alt+ArrowDown",
+      "Alt+ArrowUp",
+    ]) {
+      await page.keyboard.press(keys);
+    }
+    await expect(page).toHaveURL(/\/w\/bubble\?room=games$/);
+    await expect(heading("#games")).toBeVisible();
+    await page.keyboard.press("Alt+ArrowDown");
+    await expect(heading("#bubble")).toBeVisible();
+    await expect(page).toHaveURL(/\/w\/bubble$/);
+    await page.keyboard.press("Alt+ArrowDown");
+    await expect(heading("#news")).toBeVisible();
+    await page.keyboard.press("Alt+ArrowDown");
+    await expect(page).toHaveURL(/\/w\/bubble\?room=news$/);
+    await page.keyboard.press("Alt+ArrowUp");
+    await expect(heading("#bubble")).toBeVisible();
+    await page.getByRole("link", { name: "gno.world" }).click();
+    await expect(page).toHaveURL(/\/$/);
+    await page.keyboard.press("Alt+ArrowDown");
+    await expect(page).toHaveURL(/\/$/);
+  });
+
   test("says why a line cannot go, and sends nothing", async ({ page }) => {
     await inGames(page);
     await field(page).fill("/nick bob");

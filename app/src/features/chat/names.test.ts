@@ -1,6 +1,6 @@
 import { Address } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
-import { roomHref, roomLabel, roomsQuery, shortAddress, shownRoom } from "./names.ts";
+import { neighbour, peopleOf, roomHref, roomLabel, roomsQuery, shortAddress, shownRoom } from "./names.ts";
 
 const open = (...rooms: string[]) => rooms.map((room) => ({ room, type: "open" as const }));
 const SECTIONS = [
@@ -58,5 +58,27 @@ describe("what a world's room list is asked for", () => {
       new Set([guest, account, roomsQuery("bubble", { kind: "out" }, 1), roomsQuery("earth", { kind: "out" }, 0)]).size,
     ).toBe(4);
     expect(roomsQuery("bubble", { kind: "out" }, 0)).toBe(guest);
+  });
+});
+
+describe("the room Alt+Up and Alt+Down go to", () => {
+  const ROOMS = ["#bubble/games", "#bubble", "#bubble/news"];
+  it.each([
+    ["#bubble/games", 1, "#bubble"],
+    ["#bubble", 1, "#bubble/news"],
+    ["#bubble", -1, "#bubble/games"],
+    ["#bubble/news", 1, undefined],
+    ["#bubble/games", -1, undefined],
+    ["#elsewhere", 1, undefined],
+  ] as const)("from %s, a step of %d, is %s: the list's ends stop it", (from, step, to) => {
+    expect(neighbour(ROOMS, from, step)).toBe(to);
+  });
+});
+
+describe("the people a mention completes to", () => {
+  const SELF = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+  const OTHER = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+  it("are the room's other accounts, each once: not oneself, a guest's nick or the bot", () => {
+    expect(peopleOf([SELF, "guest-abcdef", OTHER, "gnoworld", OTHER], SELF)).toStrictEqual([OTHER]);
   });
 });

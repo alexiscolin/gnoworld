@@ -15,9 +15,9 @@ import type { AppState } from "../../store/index.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
 import { chatLink } from "./link.ts";
 import { LOADING } from "./Loading.tsx";
-import { roomIds, roomsQuery, shownRoom } from "./names.ts";
+import { neighbour, peopleOf, roomHref, roomIds, roomLabel, roomsQuery, shownRoom } from "./names.ts";
 import { RoomsView } from "./RoomsView.tsx";
-import { RoomView } from "./RoomView.tsx";
+import { RoomView, type RoomViewProps } from "./RoomView.tsx";
 
 // The rooms as last asked, and what came: undefined when the list could not load.
 interface Asked {
@@ -28,21 +28,87 @@ interface Asked {
 // The composer, an account's alone: a visitor's page never loads its code (the first screen's budget, ADR-0001 §12).
 const Composer = lazy(async () => ({ default: (await import("./Composer.tsx")).Composer }));
 
+// Alt+Up and Alt+Down: the room before or after the one in view, anywhere on the page (ADR-0002's chat rows).
+function useRoomKeys(rooms: readonly string[], current: string | undefined) {
+  const [, setParams] = useSearchParams();
+  useEffect(() => {
+    if (current === undefined) return;
+    const go = (event: globalThis.KeyboardEvent) => {
+      const step = { ArrowUp: -1, ArrowDown: 1 }[event.key];
+      const alone = event.altKey && !event.shiftKey && !event.ctrlKey && !event.metaKey;
+      const next = alone && step !== undefined ? neighbour(rooms, current, step) : undefined;
+      if (next === undefined) return;
+      event.preventDefault();
+      // The same world's page: its room alone changes, as ?room=<name>, or none for the main room.
+      setParams(new URLSearchParams(roomHref(next).split("?")[1] ?? ""));
+    };
+    window.addEventListener("keydown", go);
+    return () => {
+      window.removeEventListener("keydown", go);
+    };
+  }, [rooms, current, setParams]);
+}
+
 // Under a room's lines: the composer for an account, which writes through the link; a word for a guest.
-function Writer({
-  session,
-  room,
-  onSay,
-}: {
+// The word being typed completes to a room of the world's, by its label, or to another account in the room.
+interface WriterProps {
   session: AppState["login"]["session"];
   room: string;
+  rooms: readonly string[];
+  members: readonly string[];
   onSay: (draft: string) => boolean;
-}) {
+}
+
+function Writer({ session, room, rooms, members, onSay }: WriterProps) {
   if (session.kind !== "in") return <p>Log in to write in this room.</p>;
+  const people = peopleOf(members, session.address);
   return (
     <Suspense fallback={null}>
-      <Composer key={room} room={room} nick={session.address} onSay={onSay} />
+      <Composer
+        key={room}
+        room={room}
+        nick={session.address}
+        rooms={rooms.map(roomLabel)}
+        people={people}
+        onSay={onSay}
+      />
     </Suspense>
+  );
+}
+
+// The world's rooms once listed: the switcher, the room in view and what writes in it.
+interface LoadedProps {
+  sections: RoomList["sections"];
+  current: string | undefined;
+  state: RoomViewProps["state"];
+  chat: RoomViewProps["chat"];
+  session: AppState["login"]["session"];
+  say: (room: string, draft: string) => boolean;
+}
+
+function Loaded({ sections, current, state, chat, session, say }: LoadedProps) {
+  const ids = roomIds(sections);
+  useRoomKeys(ids, current);
+  return (
+    <Sidebar space="l">
+      <RoomsView sections={sections} current={current} />
+      {current === undefined ? null : (
+        <RoomView
+          room={current}
+          state={state}
+          chat={chat}
+          composer={
+            <Writer
+              session={session}
+              room={current}
+              rooms={ids}
+              members={state?.members ?? []}
+              onSay={(draft) => say(current, draft)}
+            />
+          }
+        />
+      )}
+    </Sidebar>
   );
 }
 
@@ -109,18 +175,13 @@ export function ChatPanel({ world }: { world: string }) {
     );
   }
   return (
-    <Sidebar space="l">
-      <RoomsView sections={sections} current={current} />
-      {current === undefined ? null : (
-        <RoomView
-          room={current}
-          state={state}
-          chat={chat}
-          composer={
-            <Writer session={session} room={current} onSay={(draft) => linkRef.current?.say(current, draft) ?? false} />
-          }
-        />
-      )}
-    </Sidebar>
+    <Loaded
+      sections={sections}
+      current={current}
+      state={state}
+      chat={chat}
+      session={session}
+      say={(room, draft) => linkRef.current?.say(room, draft) ?? false}
+    />
   );
 }
