@@ -6,7 +6,7 @@ import { loadConfig } from "./config.ts";
 import { openDatabase } from "./db.ts";
 import { logger } from "./log.ts";
 import { authServer, listenAt } from "./ergo/auth.ts";
-import { LOGIN_TABLES } from "./login/login.ts";
+import { LOGIN_TABLES, NONCE_HOST } from "./login/login.ts";
 import { TICKET_TABLES } from "./login/ticket.ts";
 import { loginFrom } from "./login/routes.ts";
 import { loadRoles } from "./roles/roles.ts";
@@ -18,7 +18,7 @@ const config = loadConfig(process.env);
 // Checked at boot, so a bad roles file never starts a server; the bot's link (3h) reads it.
 loadRoles(config.roles);
 const log = logger(config.pepper, (line) => process.stdout.write(line));
-const db = openDatabase(config.database, [LOGIN_TABLES, TICKET_TABLES]);
+const db = openDatabase(config.database, [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST]);
 let draining = false;
 const app = makeApp(log, () => !draining);
 app.route("/api/login", loginFrom(db, config, { log }));

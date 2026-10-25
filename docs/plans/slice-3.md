@@ -478,6 +478,9 @@ source are the repository's.
 | Planted violations are refused and reported: an inline script, `eval`, an image from another host (bl:53), a frame, a `connect` and a form to another host | Playwright listens for `securitypolicyviolation`; no journey sees one unplanted |
 | F341's shape is built: the inline scripts move out of the page if React Router allows it (**unverified**), else each page carries their hashes, written at build | The build fails if a page's inline script is not covered |
 
+**As built** (`docs/decisions.md`, 2026-10-22): the inline scripts stay, each allowed by its hash,
+written at build time into one policy; `frame-src` and `object-src` are left to `default-src 'none'`.
+
 **Out of scope.** Third-party hosts (PostHog, slice 12; embeds, slice 4); a report-only mode (ADR1:87-88 and
 :955-957 call the old site's a flaw); a thumb's picture from data (F336); Adena's injected `window.adena` under
 the policy, which only the real extension can show: slice 4's first merge, Alexis by hand.

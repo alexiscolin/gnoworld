@@ -9,7 +9,7 @@ import { BODY_LIMIT, makeApp } from "../app.ts";
 import { openDatabase } from "../db.ts";
 import { logger } from "../log.ts";
 import { wallet, type Wallet } from "../testing/signer.ts";
-import { LOGIN_TABLES, makeLogin } from "./login.ts";
+import { LOGIN_TABLES, makeLogin, NONCE_HOST } from "./login.ts";
 import { loginFrom, loginRoutes } from "./routes.ts";
 import { makeTickets, TICKET_TABLES } from "./ticket.ts";
 
@@ -32,7 +32,7 @@ afterEach(() => {
 });
 
 const setup = ({ newAccountsPerHour = 5, nonceCap = 100_000, origins = [ORIGIN] } = {}) => {
-  const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES]);
+  const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST]);
   opened.push(db);
   const clock = { now: T0 };
   const now = (): number => clock.now;
@@ -125,15 +125,25 @@ describe("logging in", () => {
     expect(await answer(response)).toEqual([200, JSON.stringify({ address: who.address })]);
   });
 
+  it("refuses a proof sent from another listed site than its challenge's, which stays good at home (F427)", async () => {
+    const other = "http://localhost:5173";
+    const { app } = setup({ origins: [other, ORIGIN] });
+    const who = wallet();
+    const made = await challenge(app, { origin: other });
+    expect(await answer(await verify(app, made, { who, origin: ORIGIN }))).toEqual([400, REFUSED]);
+    expect((await verify(app, made, { who, origin: other })).status).toBe(200);
+  });
+
   it("writes the domain of the Origin the challenge came from, port included", async () => {
     const { app } = setup({ origins: ["http://localhost:5173", ORIGIN] });
     expect((await challenge(app, { origin: "http://localhost:5173" })).text).toContain("Domain: localhost:5173\n");
   });
 
-  it("takes any origin of the list, and a proof sent from another listed origin than its challenge's", async () => {
-    const { app } = setup({ origins: ["http://localhost:5173", ORIGIN] });
-    const made = await challenge(app, { origin: "http://localhost:5173" });
-    expect((await verify(app, made, { who: wallet(), origin: ORIGIN })).status).toBe(200);
+  it("takes any origin of the list", async () => {
+    const other = "http://localhost:5173";
+    const { app } = setup({ origins: [other, ORIGIN] });
+    const made = await challenge(app, { origin: other });
+    expect((await verify(app, made, { who: wallet(), origin: other })).status).toBe(200);
   });
 
   it("sets a fresh token whatever cookie the request brings, and the brought one stays unknown", async () => {
@@ -619,7 +629,7 @@ describe("the routes", () => {
 describe("the login from the settings", () => {
   const SETTINGS = { chains: ["onyx-1"], origins: [ORIGIN], trustedProxy: undefined, newAccountsPerHour: 5 };
   const mount = (settings: Partial<typeof SETTINGS> = {}, clock?: { now: number }) => {
-    const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES]);
+    const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST]);
     opened.push(db);
     const log = logger(PEPPER, () => true);
     const app = makeApp(log, () => true);

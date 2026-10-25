@@ -145,6 +145,13 @@ Slice 3, the login (3c; `docs/decisions.md`, 2026-10-22):
   wallet that shows the requesting site and refuses another domain's text can, which slice
   4's first merge checks against the real Adena. The 90-day cap and logout bound it.
 
+Slice 3, the content security policy (3f):
+
+- **One policy, built.** The build writes it from its pages' inline scripts, so a page changed by
+  hand on a host breaks until the next build; nginx serves `/_headers`, the policy itself, as a
+  file (it is public anyway). A browser that does not read CSP 3's `'self'` as the page's `wss:`
+  refuses the chat's WebSocket: slice 4's first one checks Firefox and Safari.
+
 ## Secrets: rotation and revocation
 
 - **The password:** write a new file with `htpasswd -cB`, then `docker compose ... restart web`.

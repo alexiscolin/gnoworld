@@ -10,7 +10,7 @@ import { z } from "zod";
 import { authServer } from "../ergo/auth.ts";
 import { openDatabase } from "../db.ts";
 import { logger } from "../log.ts";
-import { LOGIN_TABLES, makeLogin } from "../login/login.ts";
+import { LOGIN_TABLES, makeLogin, NONCE_HOST } from "../login/login.ts";
 import { makeTickets, TICKET_TABLES } from "../login/ticket.ts";
 import { startErgo, type Ergo, type ErgoOptions } from "./ergo.ts";
 import { wallet } from "./signer.ts";
@@ -139,7 +139,8 @@ const sasl = async (c: Raw, account: string, passphrase: string): Promise<string
   c.send("AUTHENTICATE PLAIN");
   await c.expect(/AUTHENTICATE \+/);
   c.send(`AUTHENTICATE ${Buffer.from(`\0${account}\0${passphrase}`).toString("base64")}`);
-  return c.expect(/ (903|904) /);
+  // Past the auth script's 9 s (AUTH_TIMEOUT): a slow script shows as Ergo's 904, never as a test's timeout.
+  return c.expect(/ (903|904) /, 10_000);
 };
 
 // Registered (the MOTD's end, or its absence), unless the test waits for a refusal.
@@ -961,7 +962,7 @@ process.exit(0);`;
 describe("logging in through the server (3d)", { timeout: 30_000 }, () => {
   // The server's half for real: the login, its tickets and the auth handler, which Ergo's script reaches.
   const server = async () => {
-    const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES]);
+    const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST]);
     const login = makeLogin(db, { chains: ["onyx-1"], now: Date.now });
     const tickets = makeTickets(db, { now: Date.now });
     const auth = authServer(db, { log: logger("a-pepper-of-forty-characters-0123456789", () => true) });
@@ -984,6 +985,7 @@ describe("logging in through the server (3d)", { timeout: 30_000 }, () => {
       const done = await login.verify(
         { nonce: made.nonce, address: who.address, proof: who.sign("onyx-1", made.text) },
         () => true,
+        "gnoworld.test",
       );
       if (typeof done === "string") throw new Error(done);
       return { address: who.address, token: done.token };

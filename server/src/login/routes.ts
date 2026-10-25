@@ -104,7 +104,7 @@ export function loginRoutes(
     if (!calls.take(who, now())) return refuse(c, "limit");
     const body = VerifyRequest.safeParse(await json(c));
     if (!body.success) return refuse(c, "body");
-    const result = await login.verify(body.data, () => created.take(who, now()));
+    const result = await login.verify(body.data, () => created.take(who, now()), c.get("host"));
     if (typeof result === "string") return refuse(c, result);
     setCookie(c, session, result.token, { ...cookie, maxAge: result.maxAge });
     log("login", { route: routePath(c, -1), account: body.data.address });

@@ -1,4 +1,7 @@
 import { createHash } from "node:crypto";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { MAX_ARBITRARY_MESSAGE_BYTES } from "@adena-wallet/sdk";
 import { Address, type Proof } from "@gnoworld/schemas";
@@ -6,7 +9,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { openDatabase } from "../db.ts";
 import { wallet, type Wallet } from "../testing/signer.ts";
-import { LOGIN_TABLES, makeLogin, verifyProof, type Login, type Verify } from "./login.ts";
+import { LOGIN_TABLES, makeLogin, NONCE_HOST, verifyProof, type Login, type Verify } from "./login.ts";
+import { TICKET_TABLES } from "./ticket.ts";
 
 const T0 = Date.parse("2026-10-22T12:00:00.000Z");
 const MINUTE = 60_000;
@@ -22,7 +26,7 @@ afterEach(() => {
 });
 
 const setup = (options: { verify?: Verify; nonceCap?: number } = {}) => {
-  const db = openDatabase(":memory:", [LOGIN_TABLES]);
+  const db = openDatabase(":memory:", [LOGIN_TABLES, NONCE_HOST]);
   opened.push(db);
   const clock = { now: T0 };
   const login = makeLogin(db, { chains: CHAINS, now: () => clock.now, ...options });
@@ -36,6 +40,31 @@ const challenge = (login: Login, chainId = "onyx-1") => {
 };
 
 const anyone = (): boolean => true;
+
+describe("the nonces' table", () => {
+  it("takes the host column at the next start of a file made before it, which the image before still writes", () => {
+    const folder = mkdtempSync(join(tmpdir(), "gnoworld-nonces-"));
+    try {
+      const file = join(folder, "gnoworld.sqlite");
+      // As 3c and 3d made it: their migrations, in their order.
+      openDatabase(file, [LOGIN_TABLES, TICKET_TABLES]).close();
+      const db = openDatabase(file, [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST]);
+      try {
+        const login = makeLogin(db, { chains: CHAINS, now: () => T0 });
+        expect(typeof login.challenge("onyx-1", DOMAIN)).toBe("object");
+        // The image before inserts without the host, and its nonce is no other host's.
+        db.prepare("INSERT INTO nonces (nonce, chain, text, expires_at) VALUES ('old', 'onyx-1', 't', ?)").run(
+          T0 + TTL,
+        );
+        expect(db.prepare("SELECT host FROM nonces WHERE nonce = 'old'").get()).toEqual({ host: "" });
+      } finally {
+        db.close();
+      }
+    } finally {
+      rmSync(folder, { recursive: true, force: true });
+    }
+  });
+});
 
 describe("challenge", () => {
   it("writes the whole text the wallet signs: the version, the domain, the nonce, issue and expiry", () => {
@@ -96,9 +125,11 @@ describe("challenge", () => {
 
   it("holds 100,000 unspent nonces at most, by default", () => {
     const { db, login } = setup();
-    const insert = db.prepare("INSERT INTO nonces (nonce, chain, text, expires_at) VALUES (?, 'onyx-1', '', ?)");
+    const insert = db.prepare(
+      "INSERT INTO nonces (nonce, chain, host, text, expires_at) VALUES (?, 'onyx-1', ?, '', ?)",
+    );
     db.exec("BEGIN");
-    for (let i = 0; i < 99_999; i++) insert.run(`n${String(i)}`, T0 + TTL);
+    for (let i = 0; i < 99_999; i++) insert.run(`n${String(i)}`, DOMAIN, T0 + TTL);
     db.exec("COMMIT");
     expect(typeof login.challenge("onyx-1", DOMAIN)).toBe("object");
     expect(login.challenge("onyx-1", DOMAIN)).toBe("full");
@@ -117,14 +148,15 @@ describe("challenge", () => {
       typeof (await login.verify(
         { nonce: live.nonce, address: me.address, proof: me.sign("onyx-1", live.text) },
         anyone,
+        DOMAIN,
       )),
     ).toBe("object");
   });
 
   it("refuses to start with no chain to log in on", () => {
-    expect(() => makeLogin(openDatabase(":memory:", [LOGIN_TABLES]), { chains: [], now: () => T0 })).toThrow(
-      /^the login needs at least one chain$/,
-    );
+    expect(() =>
+      makeLogin(openDatabase(":memory:", [LOGIN_TABLES, NONCE_HOST]), { chains: [], now: () => T0 }),
+    ).toThrow(/^the login needs at least one chain$/);
   });
 });
 
@@ -136,6 +168,7 @@ describe("verify, with the SDK's verifier", () => {
     const result = await login.verify(
       { nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) },
       anyone,
+      DOMAIN,
     );
     if (typeof result === "string") throw new Error(result);
     expect(result.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
@@ -157,7 +190,11 @@ describe("verify, with the SDK's verifier", () => {
     const me = wallet();
     const made = challenge(login, asked);
     expect(
-      await login.verify({ nonce: made.nonce, address: me.address, proof: me.sign(signedFor, made.text) }, anyone),
+      await login.verify(
+        { nonce: made.nonce, address: me.address, proof: me.sign(signedFor, made.text) },
+        anyone,
+        DOMAIN,
+      ),
     ).toBe("proof");
   });
 
@@ -216,9 +253,13 @@ describe("verify, with the SDK's verifier", () => {
     const me = wallet();
     const made = challenge(login);
     const [address, proof] = forge(made.text, me);
-    expect(await login.verify({ nonce: made.nonce, address: address, proof }, anyone)).toBe("proof");
+    expect(await login.verify({ nonce: made.nonce, address: address, proof }, anyone, DOMAIN)).toBe("proof");
     expect(
-      await login.verify({ nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) }, anyone),
+      await login.verify(
+        { nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) },
+        anyone,
+        DOMAIN,
+      ),
     ).toBe("nonce");
   });
 
@@ -227,7 +268,9 @@ describe("verify, with the SDK's verifier", () => {
     const me = wallet();
     const made = challenge(login);
     const proof = me.signDoc(me.sign("onyx-1", made.text).signed);
-    expect(await login.verify({ nonce: made.nonce, address: me.address, proof }, anyone)).toHaveProperty("token");
+    expect(await login.verify({ nonce: made.nonce, address: me.address, proof }, anyone, DOMAIN)).toHaveProperty(
+      "token",
+    );
   });
 
   it("refuses the same proof sent twice in a row", async () => {
@@ -235,8 +278,10 @@ describe("verify, with the SDK's verifier", () => {
     const me = wallet();
     const made = challenge(login);
     const proof = me.sign("onyx-1", made.text);
-    expect(typeof (await login.verify({ nonce: made.nonce, address: me.address, proof }, anyone))).toBe("object");
-    expect(await login.verify({ nonce: made.nonce, address: me.address, proof }, anyone)).toBe("nonce");
+    expect(typeof (await login.verify({ nonce: made.nonce, address: me.address, proof }, anyone, DOMAIN))).toBe(
+      "object",
+    );
+    expect(await login.verify({ nonce: made.nonce, address: me.address, proof }, anyone, DOMAIN)).toBe("nonce");
   });
 
   it("refuses an unknown nonce, one that only looks like a known one, and a nonce of another challenge", async () => {
@@ -253,10 +298,12 @@ describe("verify, with the SDK's verifier", () => {
       ` ${first.nonce}`,
     ]) {
       if (unknown !== first.nonce)
-        expect(await login.verify({ nonce: unknown, address: me.address, proof }, anyone)).toBe("nonce");
+        expect(await login.verify({ nonce: unknown, address: me.address, proof }, anyone, DOMAIN)).toBe("nonce");
     }
-    expect(await login.verify({ nonce: second.nonce, address: me.address, proof }, anyone)).toBe("proof");
-    expect(typeof (await login.verify({ nonce: first.nonce, address: me.address, proof }, anyone))).toBe("object");
+    expect(await login.verify({ nonce: second.nonce, address: me.address, proof }, anyone, DOMAIN)).toBe("proof");
+    expect(typeof (await login.verify({ nonce: first.nonce, address: me.address, proof }, anyone, DOMAIN))).toBe(
+      "object",
+    );
   });
 
   it("hands out a new token at each login, the same account at the same instant included", async () => {
@@ -268,6 +315,7 @@ describe("verify, with the SDK's verifier", () => {
       const result = await login.verify(
         { nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) },
         anyone,
+        DOMAIN,
       );
       if (typeof result !== "string") tokens.add(result.token);
     }
@@ -286,6 +334,7 @@ describe("verify, with the SDK's verifier", () => {
     const result = await login.verify(
       { nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) },
       anyone,
+      DOMAIN,
     );
     expect(typeof result === "string" ? result : typeof result).toBe(expected);
   });
@@ -302,7 +351,11 @@ describe("verify, with a verifier the test holds", () => {
     });
     const me = wallet();
     const made = challenge(login, "gnoland-1");
-    await login.verify({ nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", "another text") }, anyone);
+    await login.verify(
+      { nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", "another text") },
+      anyone,
+      DOMAIN,
+    );
     expect(seen).toEqual([{ signer: me.address, chainId: "gnoland-1", data: made.text }]);
   });
 
@@ -324,7 +377,9 @@ describe("verify, with a verifier the test holds", () => {
       const made = challenge(login);
       const proof = me.sign("onyx-1", made.text);
       const results = await Promise.all(
-        Array.from({ length: times }, () => login.verify({ nonce: made.nonce, address: me.address, proof }, anyone)),
+        Array.from({ length: times }, () =>
+          login.verify({ nonce: made.nonce, address: me.address, proof }, anyone, DOMAIN),
+        ),
       );
       expect(results.filter((result) => typeof result === "object")).toHaveLength(1);
       expect(results.filter((result) => result === "nonce")).toHaveLength(times - 1);
@@ -343,12 +398,28 @@ describe("verify, with a verifier the test holds", () => {
     });
     const me = wallet();
     const [spent, expired] = [challenge(login), challenge(login)];
-    await login.verify({ nonce: spent.nonce, address: me.address, proof: me.sign("onyx-1", spent.text) }, anyone);
+    await login.verify(
+      { nonce: spent.nonce, address: me.address, proof: me.sign("onyx-1", spent.text) },
+      anyone,
+      DOMAIN,
+    );
     calls = 0;
-    await login.verify({ nonce: spent.nonce, address: me.address, proof: me.sign("onyx-1", spent.text) }, anyone);
-    await login.verify({ nonce: "A".repeat(22), address: me.address, proof: me.sign("onyx-1", spent.text) }, anyone);
+    await login.verify(
+      { nonce: spent.nonce, address: me.address, proof: me.sign("onyx-1", spent.text) },
+      anyone,
+      DOMAIN,
+    );
+    await login.verify(
+      { nonce: "A".repeat(22), address: me.address, proof: me.sign("onyx-1", spent.text) },
+      anyone,
+      DOMAIN,
+    );
     clock.now += TTL;
-    await login.verify({ nonce: expired.nonce, address: me.address, proof: me.sign("onyx-1", expired.text) }, anyone);
+    await login.verify(
+      { nonce: expired.nonce, address: me.address, proof: me.sign("onyx-1", expired.text) },
+      anyone,
+      DOMAIN,
+    );
     expect(calls).toBe(0);
   });
 
@@ -365,7 +436,11 @@ describe("verify, with a verifier the test holds", () => {
     const me = wallet();
     const made = challenge(login);
     expect(
-      await login.verify({ nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) }, anyone),
+      await login.verify(
+        { nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) },
+        anyone,
+        DOMAIN,
+      ),
     ).toBe("proof");
     expect([
       db.prepare("SELECT count(*) AS n FROM accounts").get(),
@@ -379,11 +454,19 @@ describe("verify, with a verifier the test holds", () => {
     const me = wallet();
     const made = challenge(login);
     expect(
-      await login.verify({ nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) }, anyone),
+      await login.verify(
+        { nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) },
+        anyone,
+        DOMAIN,
+      ),
     ).toBe("proof");
     answer = true;
     expect(
-      await login.verify({ nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) }, anyone),
+      await login.verify(
+        { nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) },
+        anyone,
+        DOMAIN,
+      ),
     ).toBe("nonce");
   });
 });
@@ -396,6 +479,7 @@ describe("accounts", () => {
       result: await login.verify(
         { nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) },
         mayCreate,
+        DOMAIN,
       ),
     };
   };
@@ -435,7 +519,11 @@ describe("accounts", () => {
     };
     const results = await Promise.all(
       [first, second].map((made) =>
-        login.verify({ nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) }, mayCreate),
+        login.verify(
+          { nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) },
+          mayCreate,
+          DOMAIN,
+        ),
       ),
     );
     expect(results.map((result) => typeof result)).toEqual(["object", "object"]);
@@ -453,6 +541,7 @@ describe("accounts", () => {
         asked += 1;
         return true;
       },
+      DOMAIN,
     );
     expect([result, asked]).toEqual(["proof", 0]);
   });
@@ -476,6 +565,7 @@ describe("the token", () => {
     const result = await login.verify(
       { nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) },
       anyone,
+      DOMAIN,
     );
     if (typeof result === "string") throw new Error(result);
     return { token: result.token, address: me.address };
@@ -512,6 +602,7 @@ describe("the token", () => {
       const result = await login.verify(
         { nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) },
         anyone,
+        DOMAIN,
       );
       if (typeof result === "string") throw new Error(result);
       return result.token;
@@ -562,7 +653,7 @@ describe("the token", () => {
         clock.now += apart;
         const made = challenge(login);
         const proof = me.sign("onyx-1", made.text);
-        const result = await login.verify({ nonce: made.nonce, address: me.address, proof }, anyone);
+        const result = await login.verify({ nonce: made.nonce, address: me.address, proof }, anyone, DOMAIN);
         if (typeof result === "string") throw new Error(result);
         tokens.push(result.token);
       }
