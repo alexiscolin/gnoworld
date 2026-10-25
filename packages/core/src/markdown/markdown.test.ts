@@ -539,6 +539,8 @@ describe("markdown: mentions", () => {
     [`é@${ALICE}`, "after a letter not ASCII"],
     [`٣@${ALICE}`, "after a digit not ASCII"],
     [`𝐚@${ALICE}`, "after a letter past the BMP"],
+    [`ｘ@${ALICE}`, "after a full-width letter"],
+    [`𐐀@${ALICE}`, "after a letter past the BMP that folds to itself"],
     [`@${ALICE}x`, "a letter after it"],
     [`@${ALICE}é`, "a letter not ASCII after it"],
     [`@${ALICE}٣`, "a digit not ASCII after it"],
