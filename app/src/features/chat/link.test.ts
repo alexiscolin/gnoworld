@@ -414,6 +414,30 @@ describe("the chat's link: the history of the room in view", () => {
     expect(t.fake.sent).toEqual([]);
   });
 
+  // F768: with Ergo's multiclient, a second tab of an account already in a room gets no echo of its own JOIN
+  // (Ergo's channel.go answers nothing); Ergo told it of the room before, at its welcome or when the first joined.
+  it("asks a room's history though its own JOIN brings no echo, Ergo having said before that I am in it", () => {
+    const t = guestIn([]);
+    t.fake.line(`:${GUEST}!u@h JOIN #a`);
+    expect(history(t.fake)).toEqual([]);
+    t.link.follow(["#a"]);
+    t.link.show("#a");
+    expect(t.fake.sent).toEqual(["JOIN #a", "CHATHISTORY LATEST #a * 200", "NAMES #a"]);
+  });
+
+  it("asks who is here only when its own JOIN brought no one: Ergo's NAMES follow a JOIN it echoes", () => {
+    const t = guestIn(["#a"]);
+    t.fake.line(`:${GUEST}!u@h JOIN #a`);
+    expect(t.fake.sent).toEqual(["JOIN #a", "CHATHISTORY LATEST #a * 200"]);
+  });
+
+  it("parts no room Ergo says I am in that it never joined: another tab's", () => {
+    const t = guestIn(["#a"]);
+    t.fake.line(`:${GUEST}!u@h JOIN #b`);
+    t.link.follow([]);
+    expect(t.fake.sent).toEqual(["JOIN #a", "PART #a"]);
+  });
+
   it("asks nothing while it waits, and asks the room shown again on the next connection's JOIN", () => {
     const t = guestIn(["#a"]);
     t.fake.line(`:${GUEST}!u@h JOIN #a`);

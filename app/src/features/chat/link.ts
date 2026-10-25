@@ -48,8 +48,8 @@ function groupsOf(command: "JOIN" | "PART", rooms: readonly string[]): string[][
   return groups;
 }
 
-// Where a room stands on this connection: a JOIN went for it; Ergo said, live, I joined it; its history went.
-type Phase = "joined" | "inside" | "asked";
+// Where a room this page follows stands on this connection: a JOIN went for it; its history went.
+type Phase = "joined" | "asked";
 
 class Link implements ChatLink {
   readonly #deps: LinkDeps;
@@ -61,6 +61,9 @@ class Link implements ChatLink {
   #listed: readonly string[] = [];
   #shown: string | undefined;
   readonly #phases = new Map<string, Phase>();
+  // The rooms Ergo said, live, I am in on this connection, joined by this page or not: with Ergo's multiclient a
+  // second tab's own JOIN brings no echo, Ergo having told it of the room at its welcome or as the first joined.
+  readonly #inside = new Set<string>();
   #reader = new BatchReader();
 
   constructor(deps: LinkDeps) {
@@ -81,7 +84,6 @@ class Link implements ChatLink {
     if (this.#stopped) return;
     this.#shown = room;
     this.#keep();
-    if (room !== undefined) this.#history(room);
   }
 
   stop(): void {
@@ -114,6 +116,7 @@ class Link implements ChatLink {
       "JOIN",
       wanted.filter((room) => !this.#phases.has(room)),
     );
+    this.#history(this.#shown);
   }
 
   // A new session: the last connection ended, its rooms forgotten, and one opened as the session says. The store
@@ -144,7 +147,7 @@ class Link implements ChatLink {
     const ending = this.#ergo;
     this.#generation += 1;
     this.#ergo = undefined;
-    this.#phases.clear();
+    this.#forget();
     ending?.stop();
     this.#deps.store.getState().chatActions.disconnected();
   }
@@ -170,7 +173,7 @@ class Link implements ChatLink {
       return;
     }
     loginActions.chat(state);
-    this.#phases.clear();
+    this.#forget();
     if (state !== "connected") {
       chatActions.disconnected();
       return;
@@ -178,13 +181,22 @@ class Link implements ChatLink {
     this.#reader = new BatchReader();
     chatActions.connected(this.#ergo?.nick() ?? "");
     this.#send("JOIN", this.#wanted());
+    this.#history(this.#shown);
   }
 
-  // A room's newest lines, once Ergo said I joined it, once a connection.
-  #history(room: string): void {
-    if (this.#phases.get(room) !== "inside") return;
+  #forget(): void {
+    this.#phases.clear();
+    this.#inside.clear();
+  }
+
+  // The room in view's newest lines, once joined by this page and Ergo said I am in it, once a connection.
+  #history(room: string | undefined): void {
+    if (room === undefined || !this.#inside.has(room) || this.#phases.get(room) !== "joined") return;
     this.#phases.set(room, "asked");
     this.#ergo?.send(`CHATHISTORY LATEST ${room} * ${String(HISTORY_LINES)}`);
+    // An echoed JOIN brings Ergo's NAMES and puts me in the store's list; a second tab's brings neither.
+    const here = this.#deps.store.getState().chat.rooms[room]?.members.length ?? 0;
+    if (here === 0) this.#ergo?.send(`NAMES ${room}`);
   }
 
   // A JOIN sent marks its rooms joined; a PART sent forgets them.
@@ -192,8 +204,12 @@ class Link implements ChatLink {
     for (const group of groupsOf(command, rooms)) {
       if (this.#ergo?.send(`${command} ${group.join(",")}`) !== true) return;
       for (const room of group) {
-        if (command === "JOIN") this.#phases.set(room, "joined");
-        else this.#phases.delete(room);
+        if (command === "JOIN") {
+          this.#phases.set(room, "joined");
+        } else {
+          this.#phases.delete(room);
+          this.#inside.delete(room);
+        }
       }
     }
   }
@@ -208,15 +224,14 @@ class Link implements ChatLink {
     else for (const each of messages) this.#heard(each);
   }
 
-  // Ergo's JOIN of me to a room joined, not replayed: I am inside, and the room in view's lines are asked.
+  // Ergo's JOIN of me, not replayed: I am in that room, and the room in view's lines are asked.
   #heard(message: IrcMessage): void {
     this.#deps.store.getState().chatActions.heard(message);
     const { tags, source = "", command, params } = message;
     const [room = ""] = params;
-    if (command !== "JOIN" || tags.has("batch") || this.#phases.get(room) !== "joined") return;
-    if (nickOf(source) !== this.#ergo?.nick()) return;
-    this.#phases.set(room, "inside");
-    if (room === this.#shown) this.#history(room);
+    if (command !== "JOIN" || tags.has("batch") || nickOf(source) !== this.#ergo?.nick()) return;
+    this.#inside.add(room);
+    this.#history(this.#shown);
   }
 }
 
