@@ -16,24 +16,31 @@ export interface Completion {
 }
 
 const SHOWN = 5;
+const SPACE = /\s/u;
 
-// What a word led by its mark may become: a command leads the draft, spaces alone before it, as compose reads it.
-function candidates(word: string, leading: boolean, choices: Choices): readonly string[] {
-  if (word.startsWith("/")) return leading ? choices.commands : [];
-  if (word.startsWith("#")) return choices.rooms;
-  if (word.startsWith("@")) return choices.people.map((person) => `@${person}`);
-  return [];
+// What a word led by its mark may become, one by one: a command leads the draft, spaces alone before it, as compose
+// reads it.
+function* candidates(word: string, leading: boolean, choices: Choices): Generator<string> {
+  if (word.startsWith("/")) {
+    if (leading) yield* choices.commands;
+  } else if (word.startsWith("#")) {
+    yield* choices.rooms;
+  } else if (word.startsWith("@")) {
+    for (const person of choices.people) yield `@${person}`;
+  }
 }
 
 /** What the word at the draft's end completes to, unless nothing, or itself alone. */
 export function completions(text: string, choices: Choices): Completion | undefined {
-  const start = text.search(/\S*$/);
+  let start = text.length;
+  while (start > 0 && !SPACE.test(text.charAt(start - 1))) start -= 1;
   const word = text.slice(start).toLowerCase();
-  const options = candidates(word, text.slice(0, start).trim() === "", choices)
-    .filter((option) => option.toLowerCase().startsWith(word))
-    .slice(0, SHOWN);
-  if (word === "" || options.length === 0 || (options.length === 1 && options[0]?.toLowerCase() === word))
-    return undefined;
+  const options: string[] = [];
+  for (const option of candidates(word, text.slice(0, start).trim() === "", choices)) {
+    if (options.length === SHOWN) break;
+    if (option.toLowerCase().startsWith(word)) options.push(option);
+  }
+  if (options.length === 0 || (options.length === 1 && options[0]?.toLowerCase() === word)) return undefined;
   return { start, options };
 }
 

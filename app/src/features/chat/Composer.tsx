@@ -9,7 +9,7 @@ import { useLayoutEffect, useRef, useState, type KeyboardEvent, type SubmitEvent
 import { completed, completions, type Completion } from "./complete.ts";
 import { formatted, type Edit, type Format } from "./format.ts";
 import { Message } from "./Message.tsx";
-import { roomLabel, shortAddress } from "./names.ts";
+import { peopleOf, roomLabel, shortAddress } from "./names.ts";
 import styles from "./Composer.module.css";
 
 /** The bytes left from which the composer counts them. */
@@ -58,14 +58,14 @@ export interface ComposerProps {
   room: string;
   /** The account's nick, which Ergo puts before each line it relays: the line's room is what it leaves. */
   nick: string;
-  /** The world's rooms by label, and the room's other accounts by address, which the word being typed completes to. */
+  /** The world's rooms by label, and the room's members, whose other accounts a word after `@` completes to. */
   rooms: readonly string[];
-  people: readonly string[];
+  members: readonly string[];
   /** Sends the draft; whether it went. */
   onSay: (draft: string) => boolean;
 }
 
-export function Composer({ room, nick, rooms, people, onSay }: ComposerProps) {
+export function Composer({ room, nick, rooms, members, onSay }: ComposerProps) {
   const [draft, setDraft] = useState("");
   const [failed, setFailed] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
@@ -73,6 +73,8 @@ export function Composer({ room, nick, rooms, people, onSay }: ComposerProps) {
   const selectionRef = useRef<Edit>(undefined);
   const label = roomLabel(room);
   const composed = compose(room, draft, nick);
+  // The room's accounts are sorted out of its members only while a word after `@` is typed.
+  const people = /(^|\s)@\S*$/u.test(draft) ? peopleOf(members, nick) : [];
   const completion = completions(draft, { commands: COMMANDS, rooms, people });
   const box = () => formRef.current?.querySelector("input") ?? undefined;
   useLayoutEffect(() => {

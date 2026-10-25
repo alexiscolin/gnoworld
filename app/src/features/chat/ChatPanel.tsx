@@ -15,7 +15,7 @@ import type { AppState } from "../../store/index.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
 import { chatLink } from "./link.ts";
 import { LOADING } from "./Loading.tsx";
-import { neighbour, peopleOf, roomHref, roomIds, roomLabel, roomsQuery, shownRoom } from "./names.ts";
+import { neighbour, roomHref, roomIds, roomLabel, roomsQuery, shownRoom } from "./names.ts";
 import { RoomsView } from "./RoomsView.tsx";
 import { RoomView, type RoomViewProps } from "./RoomView.tsx";
 
@@ -68,7 +68,6 @@ interface WriterProps {
 
 function Writer({ session, room, rooms, members, onSay }: WriterProps) {
   if (session.kind !== "in") return <p>Log in to write in this room.</p>;
-  const people = peopleOf(members, session.address);
   return (
     <Suspense fallback={null}>
       <Composer
@@ -76,7 +75,7 @@ function Writer({ session, room, rooms, members, onSay }: WriterProps) {
         room={room}
         nick={session.address}
         rooms={rooms.map(roomLabel)}
-        people={people}
+        members={members}
         onSay={onSay}
       />
     </Suspense>

@@ -8,7 +8,7 @@ const ROOM = "#bubble/games";
 const NICK = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const html = () =>
   renderToStaticMarkup(
-    <Composer room={ROOM} nick={NICK} rooms={["#games", "#gnogolf"]} people={[]} onSay={() => true} />,
+    <Composer room={ROOM} nick={NICK} rooms={["#games", "#gnogolf"]} members={[]} onSay={() => true} />,
   );
 const CHOICES = { commands: ["/me"], rooms: ["#games", "#gnogolf", "#news"], people: [] };
 const names = (markup: string) => [...markup.matchAll(/aria-label="([^"]+)"/g)].map((found) => found[1]);
