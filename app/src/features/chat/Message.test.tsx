@@ -21,7 +21,7 @@ const TAGS = new Set([
   "ol",
   "li",
 ]);
-const LINK = /^<a href="https:\/\/[^"]+" title="https:\/\/[^"]+" target="_blank" rel="noopener noreferrer">$/;
+const LINK = /^<a href="https:\/\/[^"]+" title="https:\/\/[^"]+" dir="ltr" target="_blank" rel="noopener noreferrer">$/;
 const opening = (markup: string) =>
   [...markup.matchAll(/<([a-z]+)[^>]*>/g)].map((found) => ({ tag: found[1] ?? "", whole: found[0] }));
 
@@ -32,7 +32,7 @@ describe("Message", () => {
 
   it("links an https address in a new tab, with no opener or referrer, its whole address in its title", () => {
     expect(html("[docs](https://gno.land/docs)")).toBe(
-      '<span><a href="https://gno.land/docs" title="https://gno.land/docs" target="_blank" rel="noopener noreferrer">docs</a></span>',
+      '<span><a href="https://gno.land/docs" title="https://gno.land/docs" dir="ltr" target="_blank" rel="noopener noreferrer">docs</a></span>',
     );
   });
 

@@ -7,7 +7,8 @@ import { markdown, type Block, type Inline } from "@gnoworld/core";
 import { createElement, type ReactNode } from "react";
 
 const MARKS = { strong: "strong", em: "em", strike: "s" } as const;
-const LINK = { target: "_blank", rel: "noopener noreferrer" } as const;
+// A link isolates its text left to right: an override before it cannot draw its address backwards (F786).
+const LINK = { dir: "ltr", target: "_blank", rel: "noopener noreferrer" } as const;
 
 function inline(node: Inline): ReactNode {
   switch (node.type) {

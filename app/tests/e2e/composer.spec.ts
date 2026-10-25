@@ -197,6 +197,28 @@ test.describe("the composer", () => {
     expect(await page.evaluate(() => "__xss" in window)).toBe(false);
   });
 
+  // 4c's security review (F786): a right-to-left override before a bare link would draw its address backwards,
+  // evil.example's reading as another's; the link isolates itself, left to right.
+  test("draws a link's address left to right, an override before it notwithstanding", async ({ page }) => {
+    await inGames(page);
+    const tag = word("bidi");
+    await field(page).fill(`\u202E ${tag} https://evil.example/moc.elgoog//:sptth`);
+    await field(page).press("Enter");
+    const address = lineOf(page, tag).getByRole("link");
+    await expect(address).toHaveAttribute("href", "https://evil.example/moc.elgoog//:sptth");
+    const [first, last] = await address.evaluate((link) => {
+      const text = link.firstChild;
+      const at = (offset: number) => {
+        const range = document.createRange();
+        range.setStart(text ?? link, offset);
+        range.setEnd(text ?? link, offset + 1);
+        return range.getBoundingClientRect().x;
+      };
+      return [at(0), at((text?.textContent ?? "").length - 1)];
+    });
+    expect(first).toBeLessThan(last);
+  });
+
   test("tells a guest to log in to write, with no field, its page never asking the composer's code", async ({
     page,
   }) => {

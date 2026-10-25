@@ -217,7 +217,7 @@ describe("RoomView", () => {
     const html = view({ state: { ...ROOM, lines } });
     expect(html).toContain("<strong>b</strong>");
     expect(html).toContain(
-      '<a href="https://a.example" title="https://a.example" target="_blank" rel="noopener noreferrer">x</a>',
+      '<a href="https://a.example" title="https://a.example" dir="ltr" target="_blank" rel="noopener noreferrer">x</a>',
     );
     expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt; [y](javascript:alert(1))");
     expect(html).not.toMatch(/<script|href="javascript/);
