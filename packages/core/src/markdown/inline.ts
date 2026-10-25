@@ -42,11 +42,15 @@ function wrap(mark: string, size: number, children: Inline[]): Inline {
   return { type: "em", children: [{ type: "strong", children }] };
 }
 
-// Whether nodes show nothing: texts of spaces and format characters alone, in marks or not. A link's label must
-// show something, or its address is a link no one sees.
+// What draws nothing: spaces, format characters, the code points a renderer ignores (Hangul fillers, joiners,
+// variation selectors) and the braille blank (F781).
+const BLANK = /^[\s\p{Cf}\p{Default_Ignorable_Code_Point}\u2800]*$/u;
+
+// Whether nodes show nothing: texts and code that draw nothing, in marks or not. A link's label must show
+// something, or its address is a link no one sees.
 function invisible(nodes: readonly Inline[]): boolean {
   return nodes.every((node) => {
-    if (node.type === "text") return /^[\s\p{Cf}]*$/u.test(node.text);
+    if (node.type === "text" || node.type === "code") return BLANK.test(node.text);
     return "children" in node && invisible(node.children);
   });
 }

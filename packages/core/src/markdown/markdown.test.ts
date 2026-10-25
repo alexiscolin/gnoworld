@@ -491,6 +491,21 @@ describe("markdown: the edges StrykerJS found", () => {
     );
   });
 
+  // 4c's security review (F781): what draws nothing but is no space or format character, in text or in code.
+  test.each(["\u3164", "\u2800", "\u115f", "\u1160", "\u034f", "\ufe0f", "\u3164\u2800"])(
+    "makes no link of a label of %j, a character that draws nothing",
+    (blank) => {
+      reads(`[${blank}](https://a.example)`, paragraph(text(`[${blank}](`), link("https://a.example"), text(")")));
+    },
+  );
+
+  test("makes no link of a label of code that draws nothing", () => {
+    reads(
+      "[`\u200b`](https://a.example)",
+      paragraph(text("["), { type: "code", text: "\u200b" }, text("]("), link("https://a.example"), text(")")),
+    );
+  });
+
   test("links a label whose mark never closes, the mark text in it", () => {
     reads("[*a](https://a.example)", paragraph(link("https://a.example", "*a")));
   });
