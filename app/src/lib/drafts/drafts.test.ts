@@ -97,8 +97,11 @@ describe("an account's drafts on the device", () => {
     expect([...device.kept.keys()]).toEqual([`gnoworld:draft:${ALICE}:#bubble/games`]);
   });
 
-  it("keeps nothing for no account: a guest's drafts would be every guest's", () => {
+  it("keeps nothing for no account, and reads nothing for it, whatever the device holds: a guest's would be every guest's", () => {
     const device = storage();
+    device.kept.set("gnoworld:draft::#bubble", "left by another tool");
+    expect(on(device, "").get("#bubble")).toBe("");
+    device.kept.clear();
     const nobody = on(device, "");
     expect(nobody.set("#bubble", "a draft")).toBe(false);
     expect(nobody.get("#bubble")).toBe("");

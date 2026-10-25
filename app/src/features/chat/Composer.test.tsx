@@ -140,3 +140,32 @@ describe("the composer's preview", () => {
     expect(preview("   ")).toBe("");
   });
 });
+
+// 4d's pre-merge: a draft given lets a render show what the composer says of it.
+describe("the composer, from a draft", () => {
+  const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+  const from = (draft: string) =>
+    renderToStaticMarkup(
+      <Composer room={ROOM} nick={NICK} rooms={["#games"]} members={[ALICE, NICK]} draft={draft} onSay={() => true} />,
+    );
+  it.each([
+    ["hi @g10", "Tab completes @g10gh7…3y5tv."],
+    ["@g10", "Tab completes @g10gh7…3y5tv."],
+    ["hi @", "Tab completes @g10gh7…3y5tv."],
+    ["/m", "Tab completes /me."],
+  ])("says what Tab completes %j to", (draft, help) => {
+    expect(from(draft)).toContain(help);
+  });
+
+  it.each(["hi@g10", "hi @g10 there", "hi @ g10"])(
+    "offers no person for %j: no word after @ ends the draft",
+    (draft) => {
+      expect(from(draft)).not.toContain("Tab completes @");
+    },
+  );
+
+  it("leaves Send on for a line that can go, off for one that cannot", () => {
+    expect(from("hello")).not.toMatch(/<button(?=[^>]*type="submit")(?=[^>]*disabled)/);
+    expect(from("/nick bob")).toMatch(/<button(?=[^>]*type="submit")(?=[^>]*disabled="")[^>]*>/);
+  });
+});
