@@ -1,0 +1,73 @@
+// The journeys' talk with Ergo over a page's own WebSocket (slice 4's 4b): lines sent as the lines received
+// say, and an account of the host's test wallet logged in to Ergo with a ticket the server minted.
+import { Address, Ticket } from "@gnoworld/schemas";
+import { z } from "zod";
+import { adena } from "./adena.ts";
+import { expect, hydrated, type Page } from "./fixtures.ts";
+
+// Each step is a line sent once a received line matches its pattern ("" waits for none).
+export type Step = readonly [after: string, line: string];
+
+// One conversation over the page's own socket, until a received line matches `until`; every line it saw, then.
+export const talk = (page: Page, steps: readonly Step[], until: string): Promise<string[]> =>
+  page.evaluate(
+    ([script, done]) =>
+      new Promise<string[]>((resolve, reject) => {
+        const socket = new WebSocket(`ws://${location.host}/ws`, "text.ircv3.net");
+        const seen: string[] = [];
+        let sent = 0;
+        const timer = setTimeout(() => {
+          socket.close();
+          reject(new Error(`no line matched ${done} in 8 s:\n${seen.join("\n")}`));
+        }, 8000);
+        const advance = (): void => {
+          for (let step = script[sent]; step !== undefined; step = script[sent]) {
+            if (step[0] !== "" && !seen.some((line) => new RegExp(step[0]).test(line))) return;
+            socket.send(step[1]);
+            sent += 1;
+          }
+        };
+        socket.addEventListener("open", advance);
+        socket.addEventListener("message", (event) => {
+          seen.push(String(event.data));
+          if (seen.some((line) => new RegExp(done).test(line))) {
+            clearTimeout(timer);
+            socket.close();
+            resolve(seen);
+          } else advance();
+        });
+        socket.addEventListener("close", () => {
+          clearTimeout(timer);
+          reject(new Error(`the socket closed before a line matched ${done}:\n${seen.join("\n")}`));
+        });
+      }),
+    [steps, until] as const,
+  );
+
+// A SASL PLAIN login as the wire says it: the account, then the passphrase, after a NUL each.
+export const login = (account: string, passphrase: string): Step[] => [
+  ["", "CAP LS 302"],
+  ["", "CAP REQ :message-tags sasl"],
+  ["CAP \\S+ ACK", "AUTHENTICATE PLAIN"],
+  ["AUTHENTICATE \\+", `AUTHENTICATE ${btoa(`\0${account}\0${passphrase}`)}`],
+];
+
+// An account in a page that logged in with Adena's stand-in: its address, and a ticket the server minted for it.
+export async function loggedIn(page: Page): Promise<{ address: string; ticket: string }> {
+  await adena(page);
+  await page.goto("/");
+  await hydrated(page);
+  await page.getByRole("button", { name: "Log in with Adena" }).click();
+  await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
+  const wallet = z.object({ address: Address }).parse(await (await page.request.get("/__wallet")).json());
+  const minted: unknown = await page.evaluate(async () => {
+    const answer = await fetch("/api/login/ticket", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+    const body: unknown = await answer.json();
+    return body;
+  });
+  return { address: wallet.address, ticket: Ticket.parse(minted).ticket };
+}
