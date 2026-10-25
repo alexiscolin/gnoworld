@@ -1459,6 +1459,7 @@ case " ${MEET:-} " in
 esac
 [ "${SLOW_STEP:-}" != "$n" ] || sleep 2
 case ",${FAIL:-}," in *,"$n",*) echo "$n failed here" >&2 && exit 1 ;; esac
+echo "done $n" >>"$GATE_LOG"
 exit 0
 SH
 for tool in go gofmt; do printf '#!/bin/sh\nexec sh "%s" %s "$@"\n' "$step" "$tool" >"$g/bin/$tool"; done
@@ -1748,6 +1749,12 @@ done
 before coverage py:patch_coverage || fail "check.sh --full measured the patch's coverage before the coverage run"
 grep -qx "audit-answer unset" "$log" || fail "check.sh let AUDIT_ANSWER reach the audit"
 grep -qxF "$(record)" "$g/.claude/tmp/green-full" || fail "check.sh --full did not record the code it passed"
+# probe.py plants its faults in the source tree: it runs alone, before any full lane reads the tree (the
+# coverage's Vitest, check_regressions' list, StrykerJS, the stories' build), which saw its files come and go.
+(SLOW_STEP=py:probe gate --full) >/dev/null || fail "check.sh --full failed with a slow probe"
+for s in stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
+	before "done py:probe" "$s" || fail "check.sh --full ran $s while probe.py was planting its faults"
+done
 # A dirty tree of one area: --full still checks everything, and records it.
 printf 'y\n' >>"$g/server/src/a.ts"
 gate --full >/dev/null || fail "check.sh --full failed on a server change"

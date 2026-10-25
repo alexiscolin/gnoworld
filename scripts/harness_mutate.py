@@ -590,6 +590,7 @@ def mutants():
         ("\t$all || return 0 # the hooks'", "\t: # the hooks'", "the hooks' tests only for everything"),
         ('harness --quiet "$base" && return 0', 'true && return 0', "--full mutates a changed harness"),
         ("finish stories coverage history harness", ":", "--full fails when a full lane did"),
+        ("\tstart probe\n\tfinish probe\n", "\tstart probe\n", "probe.py runs alone, before the full lanes"),
         ("\t! $merge || full=false", "\t:", "--merge records no full gate"),
         ("\texport E2E_PORT\n", "\n", "the journeys get a free port of their own"),
         ('[ "${1:-}" = "--merge" ] && full=true merge=true', '[ "${1:-}" = "--merge" ] && full=true', "--merge judges the merge's own harness mutants"),
