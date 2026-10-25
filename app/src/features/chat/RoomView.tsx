@@ -91,7 +91,7 @@ export function RoomView({ room, state, chat }: RoomViewProps) {
       </p>
       <Sidebar side="end" space="m">
         <div>
-          <ol aria-label="Messages" className={LINES}>
+          <ol aria-label="Messages" className={LINES} tabIndex={0}>
             {lines.map((line) => (
               <LineView key={line.id} line={line} />
             ))}

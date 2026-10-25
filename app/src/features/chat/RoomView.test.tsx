@@ -102,6 +102,14 @@ describe("RoomView", () => {
     expect(html).toContain("&lt;b&gt;bold&lt;/b&gt;");
   });
 
+  // The lines scroll in a box of their own, which holds nothing focusable: the keyboard reaches it itself (axe's
+  // scrollable-region-focusable).
+  it("lets the keyboard reach the lines, to scroll them", () => {
+    expect(view()).toMatch(
+      /<ol [^>]*aria-label="Messages"[^>]*tabindex="0"|<ol [^>]*tabindex="0"[^>]*aria-label="Messages"/i,
+    );
+  });
+
   it("shows the lines in the order the store holds them, oldest first", () => {
     const lines = [line({ id: "a", text: "first" }), line({ id: "b", text: "second" })];
     expect(said(part(view({ state: { ...ROOM, lines } }), "Messages"))).toMatch(/first.*second/);
