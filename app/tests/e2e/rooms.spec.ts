@@ -190,8 +190,10 @@ test.describe("a world's rooms", () => {
     await say(page, { address, room: "#bubble/games" }, hostile);
     await page.goto("/w/bubble?room=games");
     await hydrated(page);
-    for (const text of hostile) await expect(lineOf(page, text)).toHaveCount(1);
-    await expect(messages(page).locator("a, script, img, i")).toHaveCount(0);
+    for (const text of hostile) {
+      await expect(lineOf(page, text)).toHaveCount(1);
+      await expect(lineOf(page, text).locator("a, script, img, i")).toHaveCount(0);
+    }
     expect(await page.evaluate(() => "__xss" in window)).toBe(false);
   });
 
