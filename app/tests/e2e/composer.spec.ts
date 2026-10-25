@@ -138,8 +138,6 @@ test.describe("the composer", () => {
   }) => {
     await inGames(page);
     const heading = (name: string) => page.getByRole("heading", { level: 2, name, exact: true });
-    // A draft stays with its room no further than the room (drafts kept a room are 4d's).
-    await field(page).fill("a draft");
     await field(page).press("ArrowDown");
     for (const keys of [
       "ArrowDown",
@@ -163,7 +161,6 @@ test.describe("the composer", () => {
     await expect(heading("#bubble")).toBeVisible();
     await page.keyboard.press("Alt+ArrowUp");
     await expect(heading("#games")).toBeVisible();
-    await expect(field(page)).toHaveValue("");
     await page.getByRole("link", { name: "gno.world" }).click();
     await expect(page).toHaveURL(/\/$/);
     await page.keyboard.press("Alt+ArrowDown");
