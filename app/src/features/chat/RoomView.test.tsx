@@ -137,6 +137,14 @@ describe("RoomView", () => {
     expect(html.match(/data-about-me/g)).toHaveLength(1);
   });
 
+  it("marks no line for a lookalike of the reader's address, shown whole", () => {
+    const lookalike = `g1jg8m${"q".repeat(29)}vsqf5`;
+    const html = part(view({ me: BOB, state: { ...ROOM, lines: [line({ text: `hey @${lookalike}` })] } }), "Messages");
+    expect(said(html)).not.toContain("Mentions you");
+    expect(said(html)).toContain(`hey @${lookalike}`);
+    expect(html).not.toContain("data-mention");
+  });
+
   it("marks a line its own author wrote that mentions them", () => {
     const html = part(
       view({ me: ALICE, state: { ...ROOM, lines: [line({ text: `note to @${ALICE}` })] } }),

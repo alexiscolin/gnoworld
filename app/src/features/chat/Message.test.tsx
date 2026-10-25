@@ -82,6 +82,15 @@ describe("Message", () => {
     expect(renderToStaticMarkup(<Message text={text} me={BOB} />)).not.toContain('data-mention="me"');
   });
 
+  // A lookalike: an address of the right form whose checksum fails, written to shorten as BOB's does (F805).
+  it("draws an address whose checksum fails whole, as text: no account's short form for it", () => {
+    const lookalike = `g1jg8m${"q".repeat(29)}vsqf5`;
+    const markup = renderToStaticMarkup(<Message text={`ask @${lookalike} or @${BOB}`} me={BOB} />);
+    expect(markup).toBe(
+      `<span>ask @${lookalike} or <span data-mention="me" title="${BOB}">@g1jg8m…vsqf5</span></span>`,
+    );
+  });
+
   it("sets no mention apart for a reader with no account, whatever its name", () => {
     for (const me of ["", "guest-ab12cd", undefined]) {
       expect(renderToStaticMarkup(<Message text={`@${BOB} and @ and @${ALICE}`} me={me} />)).not.toContain(

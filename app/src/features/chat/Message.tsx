@@ -5,12 +5,25 @@
 // whole in its title; the reader's own apart. Children go to createElement one by one: a tree that never changes
 // needs no keys.
 import { markdown, type Block, type Inline } from "@gnoworld/core";
+import { Address } from "@gnoworld/schemas";
 import { createElement, type ReactNode } from "react";
 import { shortAddress } from "./names.ts";
 
 const MARKS = { strong: "strong", em: "em", strike: "s" } as const;
 // A link isolates its text left to right: an override before it cannot draw its address backwards (F786).
 const LINK = { dir: "ltr", target: "_blank", rel: "noopener noreferrer" } as const;
+
+// A mention: the account's address shortened, whole in its title, its look the design system's base (data-mention),
+// the reader's own "me". An address whose checksum fails is no account's: whole, as text, so no lookalike borrows
+// an account's short form (F805).
+function mentionOf(address: string, me: string | undefined): ReactNode {
+  if (!Address.safeParse(address).success) return `@${address}`;
+  return createElement(
+    "span",
+    { "data-mention": address === me ? "me" : "", title: address },
+    `@${shortAddress(address)}`,
+  );
+}
 
 function inline(node: Inline, me: string | undefined): ReactNode {
   const children = (nodes: readonly Inline[]) => nodes.map((child) => inline(child, me));
@@ -24,12 +37,7 @@ function inline(node: Inline, me: string | undefined): ReactNode {
     case "link":
       return createElement("a", { href: node.href, title: node.href, ...LINK }, ...children(node.children));
     case "mention":
-      return createElement(
-        "span",
-        // Its look is the design system's base (data-mention), the reader's own "me", "about me".
-        { "data-mention": node.address === me ? "me" : "", title: node.address },
-        `@${shortAddress(node.address)}`,
-      );
+      return mentionOf(node.address, me);
     case "strong":
     case "em":
     case "strike":
