@@ -344,6 +344,38 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
       },
     );
 
+    // The client of slice 4's 4b reads the public rooms as a guest: it joins them and asks for their history.
+    it(
+      "lets a guest join and read the history of the open and announcement rooms, of no accounts or members room (4b)",
+      { timeout: 20_000 },
+      async () => {
+        const { people } = await typedRooms();
+        const [gus, stranger, member, writer, mod] = people;
+        if (!gus || !stranger || !member || !writer || !mod) throw new Error("five people expected");
+        // Each room holds a line from someone it lets in, so a guest's empty answer cannot be an empty room.
+        const seeded = [
+          ...(await matrix([stranger], "#bubble")),
+          ...(await matrix([mod], "#bubble/news", ["mod"])),
+          ...(await matrix([stranger], "#bubble/door")),
+          ...(await matrix([member], "#bubble/crew")),
+          ...(await matrix([writer], "#bubble/desk", ["writer"])),
+        ];
+        expect(seeded, "each room's first line said").toEqual(Array.from({ length: 5 }, () => [true, true]));
+        const seen: [string, boolean, boolean][] = [];
+        for (const room of ["#bubble", "#bubble/news", "#bubble/door", "#bubble/crew", "#bubble/desk"]) {
+          const joined = await joins(gus[1], "gus", room);
+          seen.push([room, joined, await reads(gus[1], "gus", room)]);
+        }
+        expect(seen).toEqual([
+          ["#bubble", true, true],
+          ["#bubble/news", true, true],
+          ["#bubble/door", false, false],
+          ["#bubble/crew", false, false],
+          ["#bubble/desk", false, false],
+        ]);
+      },
+    );
+
     it("joins its closed rooms again after a restart, a member still in one, and hides there", async () => {
       const e = await start();
       const db = openDatabase(":memory:", TABLES);
