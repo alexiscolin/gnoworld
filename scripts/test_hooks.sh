@@ -231,9 +231,11 @@ cm="$t/commit-msg"
 mkdir "$cm"
 cp "$hooks/commit-msg" "$cm/"
 secrets_into "$cm/"
+# It reads what is staged: it runs in a repository of its own, never the one under test.
+cmr="$t/commit-msg-repo" && git init -q "$cmr"
 refused() {
 	printf '%s\n' "$1" >"$t/msg"
-	! "$cm/commit-msg" "$t/msg" 2>/dev/null
+	! (cd "$cmr" && "$cm/commit-msg" "$t/msg") 2>"$t/err"
 }
 refused "fix: x
 
@@ -263,7 +265,7 @@ refused "fix: x
 
 aws = $key" || fail "a message holding a key was accepted"
 printf 'fix: x\n' >"$t/msg"
-PATH=/usr/bin:/bin "$cm/commit-msg" "$t/msg" 2>"$t/err" && fail "commit-msg passed with no gitleaks to scan the message"
+(cd "$cmr" && PATH=/usr/bin:/bin "$cm/commit-msg" "$t/msg") 2>"$t/err" && fail "commit-msg passed with no gitleaks to scan the message"
 grep -q "gitleaks is not installed" "$t/err" || fail "commit-msg did not say gitleaks is missing (F125)"
 grep -q "the message holds" "$t/err" && fail "commit-msg blamed the message for a missing gitleaks (F125)"
 refused "chore(seal): regenerate the vectors
@@ -283,7 +285,37 @@ refused "feat: $(printf 'a%.0s' $(seq 1 67))" || fail "a 73-character subject wa
 refused "feat: $(printf 'a%.0s' $(seq 1 66))" && fail "a 72-character subject was refused"
 # Characters, not bytes, whatever the locale: 66 characters, 78 bytes.
 printf '%s\n' "docs(review): café résumé naïve déjà vu — été, hiver, février, déc" >"$t/msg"
-LC_ALL=C "$cm/commit-msg" "$t/msg" 2>/dev/null || fail "commit-msg counted bytes, not characters, under the C locale"
+(cd "$cmr" && LC_ALL=C "$cm/commit-msg" "$t/msg") 2>/dev/null || fail "commit-msg counted bytes, not characters, under the C locale"
+# A fix of the product comes with its test, or a line No-test: <why>, as prove_fix.py wants, refused
+# at the commit rather than 30 minutes later by the full gate (9db841c, slice 3).
+mkdir -p "$cmr/server/src" "$cmr/scripts" && printf 'x\n' >"$cmr/server/src/a.ts" && git -C "$cmr" add server/src/a.ts
+refused "fix(server): x" || fail "a fix of the product with no test was accepted (9db841c)"
+grep -q "comes with the test that shows its bug" "$t/err" || fail "commit-msg did not say a fix wants its test: $(cat "$t/err")"
+refused "fix(server)!: x" || fail "a breaking fix of the product with no test was accepted"
+refused "fix(server): x
+
+No-test: only a log line changes" && fail "a fix with its No-test line was refused"
+refused "fix(server): x
+
+No-test: " || fail "a No-test line with no reason was accepted"
+refused "feat(server): x" && fail "a feat with no test was refused"
+printf 'x\n' >"$cmr/server/src/a.test.ts" && git -C "$cmr" add server/src/a.test.ts
+refused "fix(server): x" && fail "a fix with its test was refused"
+git -C "$cmr" rm -q --cached server/src/a.ts
+refused "fix(server): x" && fail "a fix of a test alone was refused"
+git -C "$cmr" rm -q --cached server/src/a.test.ts && printf 'x\n' >"$cmr/scripts/a.sh" && git -C "$cmr" add scripts/a.sh
+refused "fix(harness): x" && fail "a fix of the harness alone was refused"
+git -C "$cmr" add server/src/a.ts && git -C "$cmr" commit -qm "feat(server): x" && git -C "$cmr" rm -q server/src/a.ts
+refused "fix(server): x" || fail "a fix that deletes product code with no test was accepted"
+# A test it deletes proves nothing: prove_fix.py runs only the tests a fix leaves.
+printf 'x\n' >"$cmr/server/src/b.ts" && printf 'x\n' >"$cmr/server/src/b.test.ts" && git -C "$cmr" add server/src && git -C "$cmr" commit -qm "feat(server): b"
+printf 'y\n' >>"$cmr/server/src/b.ts" && git -C "$cmr" add server/src/b.ts && git -C "$cmr" rm -q server/src/b.test.ts
+refused "fix(server): x" || fail "a fix whose only test it deletes was accepted"
+git -C "$cmr" reset -q HEAD server/src/b.ts
+refused "fix(server): x" && fail "a fix that only deletes a test was refused, which changes no product code"
+mkdir -p "$t/no-repo" && printf 'fix(server): x\n' >"$t/msg"
+(cd "$t/no-repo" && GIT_CEILING_DIRECTORIES="$t" "$cm/commit-msg" "$t/msg") 2>"$t/err" && fail "commit-msg passed a fix it could not compare with what is staged"
+grep -q "git cannot list what is staged" "$t/err" || fail "commit-msg did not say git failed: $(cat "$t/err")"
 fi
 
 if part pre_commit; then
