@@ -101,14 +101,17 @@ export async function startErgo(options: ErgoOptions = {}): Promise<Ergo> {
 // Writes the auth script and the rendered ircd.yaml into the folder; returns the oper's password.
 function configure(dir: string, [port, wsPort]: readonly [number, number], options: ErgoOptions): string {
   const operPassword = options.operPassword ?? randomBytes(12).toString("hex");
-  const logTypes = options.logTypes ?? "* -userinput -useroutput";
+  const logTypes = options.logTypes ?? "* -userinput -useroutput -connect-ip";
   const values = {
     NAME: "irc.gnoworld.test",
     PLAIN: `127.0.0.1:${String(port)}`,
     WEBSOCKET: `127.0.0.1:${String(wsPort)}`,
     PROXY_FROM: options.proxyFrom ?? ["localhost"],
     ORIGINS: options.origins ?? [],
-    AUTH_SCRIPT: options.authScript === "absent" ? join(dir, "absent-auth") : writeAuthScript(dir, options.authScript),
+    AUTH_SCRIPT:
+      options.authScript === "absent"
+        ? join(dir, "absent-auth")
+        : writeAuthScript(dir, options.authScript, operPassword),
     AUTH_TIMEOUT: options.authTimeout ?? "9s",
     // The stack dials the server's socket instead; the sandbox refuses Unix sockets.
     SOCKET: "",
@@ -173,12 +176,15 @@ async function listening(port: number): Promise<void> {
   }
 }
 
-function writeAuthScript(dir: string, script: ErgoOptions["authScript"]): string {
+function writeAuthScript(dir: string, script: ErgoOptions["authScript"], operPassword: string): string {
   const path = join(dir, "auth.mjs");
   const body =
     typeof script === "object"
       ? FORWARD.replace("PORT", String(script.forward))
-      : AUTH_SCRIPT.replace("LOG", JSON.stringify(join(dir, "auth-in.log")));
+      : // The password first, then the folder, which might spell OPER; each as it is, no $ pattern read.
+        AUTH_SCRIPT.replace("OPER", () => JSON.stringify(operPassword)).replace("LOG", () =>
+          JSON.stringify(join(dir, "auth-in.log")),
+        );
   writeFileSync(path, `#!${process.execPath}\n${body}`);
   chmodSync(path, 0o755);
   return path;
@@ -194,6 +200,7 @@ appendFileSync(LOG, line + "\\n");
 const { accountName = "", passphrase = "" } = JSON.parse(line);
 const say = (answer) => process.stdout.write(JSON.stringify(answer) + "\\n");
 if (passphrase === "pw") say({ success: true, accountName });
+else if (accountName === "gnoworld" && passphrase === OPER) say({ success: true, accountName });
 else if (passphrase === "rename") say({ success: true, accountName: "renamed-" + accountName });
 else if (passphrase === "empty") say({ success: true });
 else if (passphrase === "slow") setTimeout(() => say({ success: true }), 30000);

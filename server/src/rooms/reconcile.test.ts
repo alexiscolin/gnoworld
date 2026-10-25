@@ -251,6 +251,51 @@ describe("the reconciler's pass", () => {
     await expect.poll(() => asked).toBe(2);
   });
 
+  it("takes its op back before it puts someone out, as after a SAJOIN, and strips that person's powers first", () => {
+    const present = [
+      { nick: "gnoworld", powers: "" },
+      { nick: "g1a", powers: "" },
+      { nick: "g1gone", powers: "~@+" },
+    ];
+    expect(changes("#r", state({ flags: "Mimnt", invites: ["g1a", "g1b"], present }), { ...DESK, voiced: [] })).toEqual(
+      [
+        ["SAMODE", "#r", "+o", "gnoworld"],
+        ["SAMODE", "#r", "-q", "g1gone"],
+        ["SAMODE", "#r", "-o", "g1gone"],
+        ["KICK", "#r", "g1gone", "not on this room's list"],
+      ],
+    );
+    const kept = [
+      { nick: "gnoworld", powers: "" },
+      { nick: "g1a", powers: "" },
+    ];
+    expect(
+      changes("#r", state({ flags: "Mimnt", invites: ["g1a", "g1b"], present: kept }), { ...DESK, voiced: [] }),
+    ).toEqual([]);
+  });
+
+  it("gives itself op once for all its kicks, none when it holds op, admin or founder, and strips admin and half-op", () => {
+    const two = [
+      { nick: "g1x", powers: "&%" },
+      { nick: "g1y", powers: "" },
+    ];
+    const out = (bot: string) =>
+      changes("#r", state({ flags: "Mimnt", invites: ["g1a"], present: [{ nick: "gnoworld", powers: bot }, ...two] }), {
+        ...DESK,
+        invites: ["g1a"],
+        voiced: [],
+      });
+    const rest = [
+      ["SAMODE", "#r", "-a", "g1x"],
+      ["SAMODE", "#r", "-h", "g1x"],
+      ["KICK", "#r", "g1x", "not on this room's list"],
+      ["KICK", "#r", "g1y", "not on this room's list"],
+    ];
+    expect(out("")).toEqual([["SAMODE", "#r", "+o", "gnoworld"], ...rest]);
+    expect(out("+")).toEqual([["SAMODE", "#r", "+o", "gnoworld"], ...rest]);
+    for (const bot of ["@", "~", "&", "~@+"]) expect(out(bot)).toEqual(rest);
+  });
+
   it("puts each room's flags on at once, before any state is read: a room Ergo lost is closed from its JOIN", () => {
     const sent: string[] = [];
     let asked = 0;
@@ -266,6 +311,42 @@ describe("the reconciler's pass", () => {
     });
     reconciler.flags();
     expect([sent, asked]).toEqual([["SAMODE #a +M", "SAMODE #a +i", "SAMODE #a +s", "SAMODE #b +M"], 0]);
+  });
+
+  it("raises the alert for a members room the roles file made open, its flags put on first (the max review)", async () => {
+    const lines: string[] = [];
+    // Ergo's room, as the bot's commands change it.
+    const room = state({ flags: "Mint", invites: ["g1a"] });
+    const reconciler = makeReconciler({
+      rooms: () => ["#crew"],
+      desired: () => OPEN,
+      state: () => Promise.resolve({ ...room }),
+      send: (command, [, mode]) => {
+        if (command === "SAMODE" && mode === "-i") room.flags = room.flags.replace("i", "");
+        return true;
+      },
+      log: logger("a-pepper-of-forty-characters-0123456789", (line) => lines.push(line)),
+    });
+    reconciler.flags();
+    await reconciler.pass();
+    expect(lines.filter((line) => line.includes('"event":"alert"'))).toEqual([
+      expect.stringContaining('"error":"room_opened","room":"#crew"'),
+    ]);
+  });
+
+  it("opens with no alert an open room Ergo has just made invite-only, with no invite list (the max review)", async () => {
+    const lines: string[] = [];
+    const sent: string[] = [];
+    const reconciler = makeReconciler({
+      rooms: () => ["#earth"],
+      desired: () => OPEN,
+      state: () => Promise.resolve(state({ flags: "CMint" })),
+      send: (command, params) => sent.push([command, ...params].join(" ")) > 0,
+      log: logger("a-pepper-of-forty-characters-0123456789", (line) => lines.push(line)),
+    });
+    await reconciler.pass();
+    expect(sent).toEqual(["SAMODE #earth -i"]);
+    expect(lines.filter((line) => line.includes('"event":"alert"'))).toEqual([]);
   });
 
   it("runs a pass after one that found no room", async () => {

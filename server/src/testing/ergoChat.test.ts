@@ -20,7 +20,8 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     await join(bob, "#bubble");
     const clean = await say(alice, "#bubble", "hello");
     const flagged = await say(alice, "#bubble", "I will hurt you");
-    await bob.expect(new RegExp(` REDACT #bubble ${flagged} violence`));
+    // The bot's verdict, which the full gate's load slows past the 2 s a line's echo takes.
+    await bob.expect(new RegExp(` REDACT #bubble ${flagged} violence`), 10_000);
     await alice.expect(
       new RegExp(
         `NOTICE ${author} :Your message in #bubble was hidden: violence\\. The rules: https://gno\\.world/rules`,
@@ -34,18 +35,25 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
   it("checks what it missed while its link was down, each message once, after a mark Ergo has erased", async () => {
     const e = await start();
     const asked: string[] = [];
-    const { verdicts } = await chatFor(e, asked);
+    const db = openDatabase(":memory:", TABLES);
+    const first = await chatFor(e, asked, { db });
+    const verdicts = first.verdicts;
+    stops.push(() => {
+      db.close();
+      return Promise.resolve();
+    });
     const alice = await login(e, "alice");
     await join(alice, "#bubble");
     // The mark is a hidden line, which the REDACT takes out of Ergo's history.
     const hidden = await say(alice, "#bubble", "I will hurt you");
     await alice.expect(new RegExp(` REDACT #bubble ${hidden} `));
     await expect.poll(() => verdicts().length).toBe(1);
-    const chief = await oper(e, "chief");
-    chief.send("KILL gnoworld :a test outage");
+    // Its link down: the chat stopped, then started again on its database.
+    await first.stop();
     await alice.expect(/:gnoworld!\S+ QUIT /);
     for (const text of ["one", "two", "three"]) alice.send(`PRIVMSG #bubble :${text}`);
     await sync(alice);
+    await chatFor(e, asked, { db });
     await expect.poll(() => asked.toSorted(), { timeout: 15_000 }).toEqual(["I will hurt you", "one", "three", "two"]);
     expect(verdicts()).toHaveLength(4);
     await sync(alice);
@@ -120,9 +128,10 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     const { chat } = await chatFor(e, []);
     expect(chat.rooms.create("bubble", "garden")).toEqual({ made: "#bubble/garden" });
     const alice = await login(e, "alice");
+    const watcher = await oper(e, "watcher");
     for (;;) {
-      alice.send("NAMES #bubble/garden");
-      const names = await alice.expect(/ (353|366) \S+ (= )?#bubble\/garden /);
+      watcher.send("NAMES #bubble/garden");
+      const names = await watcher.expect(/ (353|366) \S+ (= )?#bubble\/garden /);
       if (names.includes(" 353 ") && names.includes("gnoworld")) break;
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
@@ -161,9 +170,10 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     const first = await chatFor(e, [], { db });
     first.chat.rooms.create("bubble", "garden");
     const alice = await login(e, "alice");
+    const watcher = await oper(e, "watcher");
     for (;;) {
-      alice.send("NAMES #bubble/garden");
-      const names = await alice.expect(/ (353|366) \S+ (= )?#bubble\/garden /);
+      watcher.send("NAMES #bubble/garden");
+      const names = await watcher.expect(/ (353|366) \S+ (= )?#bubble\/garden /);
       if (names.includes(" 353 ") && names.includes("gnoworld")) break;
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
@@ -195,7 +205,7 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
   });
 
   describe("rooms by role on real Ergo (3m)", () => {
-    const typed = (rules: Rules = RULES) =>
+    const typed = (rules: Rules = RULES, crew: readonly string[] = ["member"]) =>
       new Map([
         [
           "bubble",
@@ -203,7 +213,7 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
             rules,
             moderators: new Set(["mod"]),
             groups: new Map([
-              ["crew", new Set(["member"])],
+              ["crew", new Set(crew)],
               ["pens", new Set(["writer"])],
             ]),
             rooms: new Map([
@@ -364,6 +374,25 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
       chief.send("SAMODE #bubble/crew +I *!*@*");
       await expect.poll(() => invitesOf(["chief", chief], "#bubble/crew"), { timeout: 5000 }).not.toContain("*!*@*");
       // Closed once every chat has stopped: the cleanups run in turn.
+      stops.push(() => {
+        db.close();
+        return Promise.resolve();
+      });
+    });
+
+    it("puts out a member the file no longer names after a restart, back in without its op (the max review)", async () => {
+      const e = await start();
+      const db = openDatabase(":memory:", TABLES);
+      const first = await chatFor(e, [], { worlds: typed(), db, reconcileMs: 300 });
+      const member = await login(e, "member");
+      for (let n = 0; !(await joins(member, "member", "#bubble/crew")); n += 1) {
+        if (n === 100) throw new Error("the member never got in");
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      await first.stop();
+      await member.expect(/:gnoworld!\S+ QUIT /);
+      await chatFor(e, [], { worlds: typed(RULES, []), db, reconcileMs: 300 });
+      expect(await member.expect(/ KICK #bubble\/crew member /, 10_000)).toContain("not on this room's list");
       stops.push(() => {
         db.close();
         return Promise.resolve();

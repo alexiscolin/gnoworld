@@ -23,14 +23,15 @@ const ROOM = /^#[^\s,\0-\x1f\x7f]{1,63}$/;
 const person = (who: string): boolean =>
   /^[^\s,*?!@#:\0-\x1f\x7f][^\s,*?!@\0-\x1f\x7f]{0,63}$/.test(who) && who !== NICK;
 
-// A room's mode in its only forms: a flag of the reconciler's (M, m, s, i, R) on or off; a mute on one
-// account by name (a wildcard would mute others); an invite of one account, taken off by any mask (an
-// operator's wildcard too); a voice given or taken; a power above it taken from one person, never the bot.
+// A room's mode in its only forms: a reconciler's flag (M, m, s, i, R) on or off; a mute on one account by
+// name (a wildcard would mute others); an invite of one account, taken off by any mask; a voice given or
+// taken; a power above it taken from one person, never the bot; the bot's own op, before a KICK.
 function roomMode([room = "", mode = "", arg, ...more]: readonly string[]): boolean {
   if (!ROOM.test(room) || more.length > 0) return false;
   if (arg === undefined) return /^[+-][MmisR]$/.test(mode);
   if (/^[+-]b$/.test(mode)) return /^m:[A-Za-z0-9_-]{1,64}$/.test(arg);
   if (mode === "-I") return /^[^\s,\0-\x1f\x7f]{1,128}$/.test(arg);
+  if (mode === "+o") return arg === NICK;
   return /^(?:[+-][Iv]|-[qaoh])$/.test(mode) && person(arg);
 }
 

@@ -183,6 +183,8 @@ export const moderated = async (c: Raw, room: string, on: boolean): Promise<void
 export const lobby = async (e: Ergo): Promise<Raw> => {
   const chief = await oper(e, "chief");
   await join(chief, "#lobby");
+  chief.send("SAMODE #lobby -i");
+  await chief.expect(/ MODE #lobby -i/);
   return chief;
 };
 

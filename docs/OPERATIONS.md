@@ -184,8 +184,14 @@ Slice 3, the bot's link and the rooms (3h):
   32 characters at least. Unset, the server keeps no link: rooms exist, nobody's activity counts.
 - **Rooms stay.** A world removed from the roles file keeps its room and history; removing one is a
   moderator's act (3l).
-- **A nick held by a ghost.** After a link drops silently, Ergo may hold `gnoworld` until its own
-  ping timeout: the link logs `irc_refused` (`nick`) and tries again later.
+- **The bot's account.** The bot logs in by SASL as the account `gnoworld`, whose nick Ergo keeps for
+  it (the server's auth takes the operator's password for that one name). After a link drops silently,
+  its next connection joins the old session, which Ergo holds until its own ping timeout, as a second
+  session of the account (multiclient). A refusal of the nick comes from a guest who took it before the
+  account first logged in (a new Ergo database): the link logs `irc_refused` (`nick`), tries again, and
+  raises the alert `irc_nick_taken` at the third in a row. A refused login logs `irc_refused` (`sasl`).
+- **Ergo logs no address** (`-connect-ip`, slice 3's max review): its refusals by ip-limits go unlogged
+  with it, so a visitor behind a shared address who meets the limit leaves no trace (slice 4).
 
 Slice 3, the check (3i):
 
@@ -309,8 +315,8 @@ Slice 3, the server's retention (3n):
   `moderation_off` (no key: every message unchecked), `moderation_refused` (OpenAI refused the key or the
   call), `moderation_shape` (an answer of an unknown shape), `moderation_breaker` (checks paused 30 s
   after five failures), `moderation_backlog` (a check waits two minutes or more), `moderation_queue_full` (a
-  message left unchecked, the queue full); `redact_refused`, `unknown_room` and `room_opened` (the
-  rooms, below). `scripts/check_docs.py` keeps this list whole.
+  message left unchecked, the queue full); `irc_nick_taken` (above); `redact_refused`, `unknown_room`
+  and `room_opened` (the rooms, below). `scripts/check_docs.py` keeps this list whole.
 - **Before a public launch** (decision 154): the privacy policy, which says what reaches OpenAI and what
   is kept and how long, and the erasure path (slice 12) are blockers.
 

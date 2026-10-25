@@ -47,7 +47,9 @@ export function makeRooms({ db, send, now, max }: Options): Rooms {
       if (Count.parse(sql.count.get(world, mainRoom(world))).n >= max) return "full";
       sql.add.run(room, world, now());
       send("JOIN", [room]);
+      // Open to accounts, and to all: Ergo makes a room invite-only (+i).
       send("SAMODE", [room, "+M"]);
+      send("SAMODE", [room, "-i"]);
       return { made: room };
     },
     archive(world, name) {

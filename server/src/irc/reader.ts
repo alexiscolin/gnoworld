@@ -49,6 +49,8 @@ export interface State {
   channels: string[] | undefined;
   // The rooms' states asked of Ergo (3m).
   states: States;
+  // Its nick refused in a row, connection after connection: the third raises the alert (slice 3's max review).
+  nickTaken: number;
 }
 
 // The lines Ergo sends that ask for an answer, as 3b's table found them.
@@ -68,11 +70,11 @@ export function reader(options: Options, state: State) {
     s.destroy();
   };
   const handlers: Readonly<Record<string, (s: Socket, message: IrcMessage) => void>> = {
-    CAP: (s, { params }) => {
-      if (params[1] === "ACK") s.write(line("CAP", ["END"]));
-      else if (params[1] === "NAK") refused(s, "cap");
+    ...sasl(password, refused),
+    "001": (s) => {
+      state.nickTaken = 0;
+      s.write(line("OPER", ["admin", password]));
     },
-    "001": (s) => s.write(line("OPER", ["admin", password])),
     "381": (s) => {
       state.upSince = Date.now();
       const names = rooms();
@@ -90,6 +92,11 @@ export function reader(options: Options, state: State) {
         s.write(line("LIST", []));
       }
       log("irc_ready");
+    },
+    // A second session of its account, the last one not yet timed out (multiclient): Ergo says it is an
+    // operator already, and the session is ready as on a 381.
+    "400": (s, message) => {
+      if (message.params[1] === "OPER") handlers["381"]?.(s, message);
     },
     ...listing(state, onChannels),
     JOIN: joined(state, onJoin),
@@ -110,12 +117,14 @@ export function reader(options: Options, state: State) {
       };
       drained().then(next, next);
     },
-    ...refusals(refused),
+    ...refusals(refused, state, log),
     // A hide Ergo refused (F544): the verdict says hidden, the line stays; ops hears of it.
     FAIL: (_, { params: [command] }) => {
       if (command === "REDACT") log("alert", { error: "redact_refused" });
     },
     PING: (s, { params }) => s.write(line("PONG", params)),
+    // A NOTICE too (slice 3's max review): Ergo relays and keeps it as any line, so it is checked and counted.
+    NOTICE: (s, message) => handlers["PRIVMSG"]?.(s, message),
     PRIVMSG: (_, message) => {
       const batch = state.batches.get(message.tags.get("batch") ?? "");
       // A time Date cannot read is no page's end (F552): the next page starts from the last one read.
@@ -152,10 +161,43 @@ function listing(
   };
 }
 
-// The refusals Ergo will not change by itself: a nick taken (433), a wrong oper password (464, 491).
-function refusals(refused: (s: Socket, error: string) => void): Record<string, (s: Socket) => void> {
+// Its account by SASL PLAIN, the operator's password as its passphrase, which the server's auth script takes
+// for gnoworld alone (slice 3's max review); an ACK without sasl sends no password, and a refusal closes.
+function sasl(
+  password: string,
+  refused: (s: Socket, error: string) => void,
+): Record<string, (s: Socket, message: IrcMessage) => void> {
+  const refuse = (s: Socket): void => {
+    refused(s, "sasl");
+  };
+  return {
+    CAP: (s, { params }) => {
+      if (params[1] === "ACK" && (params[2] ?? "").split(" ").includes("sasl"))
+        s.write(line("AUTHENTICATE", ["PLAIN"]));
+      else if (params[1] === "ACK" || params[1] === "NAK") refused(s, "cap");
+    },
+    AUTHENTICATE: (s, { params: [challenge] }) => {
+      if (challenge === "+") s.write(line("AUTHENTICATE", [Buffer.from(`\0${NICK}\0${password}`).toString("base64")]));
+    },
+    "903": (s) => s.write(line("CAP", ["END"])),
+    "902": refuse,
+    "904": refuse,
+    "905": refuse,
+    "906": refuse,
+  };
+}
+
+// The refusals Ergo will not change by itself: a nick taken (433), a wrong oper password (464, 491). A nick
+// taken three times in a row is no ghost's (OPERATIONS.md): ops hears of it, once until the bot is back.
+function refusals(
+  refused: (s: Socket, error: string) => void,
+  state: State,
+  log: Log,
+): Record<string, (s: Socket) => void> {
   return {
     "433": (s) => {
+      state.nickTaken += 1;
+      if (state.nickTaken === 3) log("alert", { error: "irc_nick_taken" });
       refused(s, "nick");
     },
     "464": (s) => {
@@ -195,4 +237,5 @@ export const fresh = (stateMs: number): State => ({
   asked: new Set(),
   channels: undefined,
   states: roomStates(stateMs),
+  nickTaken: 0,
 });

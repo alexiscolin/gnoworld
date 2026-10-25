@@ -693,10 +693,14 @@ print("%.2f %d" % (sum(float(s.get("cpus", 0)) for s in services), sum(size(s.ge
 	docker exec "$ergo" cat /tmp/ircd.yaml >"$tmp/ircd.yaml"
 	for line in "name: \"$SERVER_NAME\"" '":6667": {}' '":8097":' "proxy-allowed-from: [\"$WEB_ADDRESS\"]" \
 		"allowed-origins: [\"$ORIGINS\"]" 'login-via-pass-command: false' 'operator-only-creation: true' \
-		'default-modes: +ntCM' 'max-channels-per-client: 1000' 'expire-time: 90d' 'direct-messages: disabled' \
+		'default-modes: +ntCMi' 'expire-time: 90d' 'direct-messages: disabled' 'default-user-modes: +i' \
+		'allow-truncation: false' 'max-concurrent-connections: 16' 'max-connections-per-window: 32' \
+		'netname: gnoworld' 'messages-per-window: 2' 'max-attempts: 3' '"+draft/unreact"' \
+		'capabilities: [sajoin, samode, chanreg, history, nofakelag]' \
 		'allow-individual-delete: true' 'enable-account-indexing: true' 'command: ""' 'socket: "/run/gnoworld/auth.sock"'; do
 		expect "Ergo's settings say $line" "$(grep -cF -- "$line" "$tmp/ircd.yaml")" 1
 	done
+	expect "Ergo's settings hold 100 channels a client" "$(grep -cE '^ +max-channels-per-client: 100$' "$tmp/ircd.yaml")" 1
 	expect "Ergo's settings close registration" "$(awk '/^  registration:/ { r = 1 } r && /enabled:/ { print $2; exit }' "$tmp/ircd.yaml")" false
 	# Its start refuses an origin list that would let every site in (F422): checked by the service's own render.
 	render() { docker compose -p "$project" $files run --rm --no-deps -e RENDER_ONLY=1 -e ORIGINS="$1" ergo 2>&1; }
@@ -824,7 +828,8 @@ CLIENT
 	# The bot makes the worlds' rooms once it is in Ergo (3h): a guest can join none before.
 	bot=""
 	for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
-		bot=$(ws 203.0.113.20 "$auth" "$ORIGINS" "NICK watch20" "USER w 0 * :w" + "NAMES #earth" | grep ' 353 .*gnoworld' || true)
+		# In the room: Ergo lists an invisible (+i) member to the room's members alone.
+		bot=$(ws 203.0.113.20 "$auth" "$ORIGINS" "NICK watch20" "USER w 0 * :w" + "JOIN #earth" "NAMES #earth" | grep ' 353 .*gnoworld' || true)
 		[ -z "$bot" ] || break
 		sleep 2
 	done
@@ -832,7 +837,8 @@ CLIENT
 	room="#made$(od -An -N2 -tu2 /dev/urandom | tr -d ' ')"
 	marker="marker-$(openssl rand -hex 4)"
 	# An operator makes a room and speaks in it, and stays while a guest comes: its history, its default modes.
-	ws 203.0.113.25 "$auth" "$ORIGINS" "NICK chief25" "USER c 0 * :c" + "OPER admin $oper" "JOIN $room" "PRIVMSG $room :$marker" \
+	# Ergo makes a room invite-only (+i): the operator opens it, as the server opens an open room.
+	ws 203.0.113.25 "$auth" "$ORIGINS" "NICK chief25" "USER c 0 * :c" + "OPER admin $oper" "JOIN $room" "MODE $room -i" "PRIVMSG $room :$marker" \
 		+ + + + + + + + + + + + + + + >"$tmp/chief.txt" &
 	chief=$!
 	# The guest comes once the room is made and the marker said.
@@ -865,10 +871,14 @@ CLIENT
 		expect "and one from [$origin]" "$(first "$(ws 203.0.113.23 "$auth" "$origin" "NICK y")")" "HTTP/1.1 403 Forbidden"
 	done
 	expect "no password, no WebSocket" "$(first "$(ws 203.0.113.24 - "$ORIGINS" "NICK z")")" "HTTP/1.1 401 Unauthorized"
-	# Straight to Ergo from another container of the internal network: its forged X-Forwarded-For is not believed.
-	WS_TARGET=ergo:8097 WS_PROXY=0 ws 203.0.113.26 - "$ORIGINS" "NICK direct26" "USER d 0 * :d" + >/dev/null
-	at_least "Ergo sees the visitor's own address, through web" "$(docker logs "$ergo" 2>&1 | grep -c 'proxied IP 203.0.113.21$' || true)" 1
-	expect "and never a forged X-Forwarded-For, through web or straight" "$(docker logs "$ergo" 2>&1 | grep -c '192.0.2.66' || true)" 0
+	# The address Ergo sees, as a WHOIS of oneself shows it (338; its log holds none, connect-ip off: F702): the
+	# visitor's own through web, and straight from another container of the internal network, never the forged
+	# X-Forwarded-For. The variables are exported: docker run reads them from its environment.
+	seen=$(ws 203.0.113.27 "$auth" "$ORIGINS" "NICK seen27" "USER s 0 * :s" + "WHOIS seen27" | grep ' 338 seen27 ' || true)
+	if printf '%s\n' "$seen" | grep -qE ' 338 seen27 seen27 [^ ]+ 203\.0\.113\.27 '; then pass "Ergo sees the visitor's own address through web, never a forged X-Forwarded-For"; else fail "never a forged X-Forwarded-For, through web: [$seen]"; fi
+	direct=$(export WS_TARGET=ergo:8097 WS_PROXY=0; ws 203.0.113.26 - "$ORIGINS" "NICK direct26" "USER d 0 * :d" + "WHOIS direct26" | grep ' 338 direct26 ' || true)
+	if printf '%s\n' "$direct" | grep -qE ' 338 direct26 direct26 [^ ]+ [0-9.]+ ' && ! printf '%s\n' "$direct" | grep -qE '192\.0\.2\.66|203\.0\.113\.26'; then pass "and never a forged X-Forwarded-For, straight"; else fail "never a forged X-Forwarded-For, straight: [$direct]"; fi
+	expect "and no address in Ergo's log" "$(docker logs "$ergo" 2>&1 | grep -cE '203\.0\.113\.|192\.0\.2\.66' || true)" 0
 
 	# The server through web's /api: the password first, the visitor's address from web alone.
 	expect "no password, no API" "$(status '/api/activity?worlds=earth' 203.0.113.1)" 401
@@ -933,12 +943,13 @@ setTimeout(() => {
   process.exit(0);
 }, 40_000).unref();' "$auth" >"$tmp/timed.out" 2>&1 &
 	timing=$!
-	# Each visitor holds 32 requests at once (F208; a request counts while it is served): $1 WebSockets and $2
-	# streams of visitor $3 held 12 s; then $3's next request and visitor $4's, how many of $3's were held to the
-	# end (a WebSocket's 101, a stream's 200), and $3's request once they ended. Two at once (F651).
+	# Each visitor holds 32 requests at once (F208; a request counts while it is served): $1 WebSockets (Ergo takes
+	# 16 of one address), $2 streams (the server takes 4) and $7 POSTs whose body never comes, which web holds, of
+	# visitor $3, held 12 s; then $3's next request and visitor $4's, how many of $3's were held to the end (a
+	# WebSocket's 101, a stream's 200, a POST still waiting: web's 100 Continue, or 000), and $3's request once they ended. Two at once (F651).
 	hold() {
 		docker run --rm --network "$inside" --entrypoint sh "$CURL" -c '
-			ws=$1 streams=$2 auth=$3 origin=$4 other=$6
+			ws=$1 streams=$2 auth=$3 origin=$4 other=$6 posts=$7
 			me="--haproxy-protocol --haproxy-clientip $5 -u $auth"
 			api=http://web:8080/api/activity?worlds=earth
 			key=$(head -c 16 /dev/urandom | base64)
@@ -952,18 +963,22 @@ setTimeout(() => {
 					curl -s -N -o /dev/null -w "%{http_code}\n" --max-time 12 $me "http://web:8080/api/stream?rooms=%23earth" &
 					streams=$((streams - 1))
 				done
+				while [ "$posts" -gt 0 ]; do
+					sleep 13 | curl -s -o /dev/null -w "%{http_code}\n" --max-time 12 -X POST -T - $me "$api" &
+					posts=$((posts - 1))
+				done
 				wait
 			} >/tmp/held &
 			sleep 5
 			curl -s -o /dev/null -w "%{http_code} " $me "$api"
 			curl -s -o /dev/null -w "%{http_code} " --haproxy-protocol --haproxy-clientip "$other" -u "$auth" "$api"
 			wait
-			printf "%s " "$(grep -cE "^(101|200)$" /tmp/held)"
-			curl -s -o /dev/null -w "%{http_code}" $me "$api"' sh "$1" "$2" "$auth" "$ORIGINS" "$3" "$4" || true
+			printf "%s " "$(grep -cE "^(101|200|100|000)$" /tmp/held)"
+			curl -s -o /dev/null -w "%{http_code}" $me "$api"' sh "$1" "$2" "$auth" "$ORIGINS" "$3" "$4" "$5" || true
 	}
-	hold 27 4 203.0.113.61 203.0.113.62 >"$tmp/hold.31" &
+	hold 16 4 203.0.113.61 203.0.113.62 11 >"$tmp/hold.31" &
 	first=$!
-	hold 28 4 203.0.113.66 203.0.113.67 >"$tmp/hold.32" &
+	hold 16 4 203.0.113.66 203.0.113.67 12 >"$tmp/hold.32" &
 	wait "$first" "$!" || true
 	expect "a visitor holding 31 requests, streams among them, is served a 32nd" "$(cat "$tmp/hold.31")" "200 200 31 200"
 	expect "a visitor holds 32 requests at once: the 33rd refused, another visitor served, the slots freed after" \

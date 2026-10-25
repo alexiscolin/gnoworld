@@ -927,11 +927,12 @@ describe("the chat, as the server starts it", () => {
   });
 
   describe("the rooms (3l)", () => {
-    it("makes a moderator's room through the link: joined and open to accounts", async () => {
+    it("makes a moderator's room through the link: joined, open to accounts, and to all", async () => {
       const { peer, chat } = await linked({ worlds: worlds("bubble"), moderation: OFF });
       expect(chat.rooms.create("bubble", "garden")).toEqual({ made: "#bubble/garden" });
       expect(await peer.next(/^JOIN #bubble\/garden$/)).toBe("JOIN #bubble/garden");
       expect(await peer.next(/^SAMODE #bubble\/garden /)).toBe("SAMODE #bubble/garden +M");
+      expect(await peer.next(/^SAMODE #bubble\/garden /)).toBe("SAMODE #bubble/garden -i");
     });
 
     it("puts each room's flags on with its JOINs, then as Ergo says it stands, each time it is in its rooms (3m)", async () => {

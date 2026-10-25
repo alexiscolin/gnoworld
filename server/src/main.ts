@@ -64,7 +64,7 @@ app.route(
   roomsRoutes({ roles, rooms: chat.rooms, session, origins: config.origins, log, now: Date.now }),
 );
 // Ergo's logins go through the socket; without it, Ergo lets nobody in (fails closed).
-const auth = authServer(db, { log });
+const auth = authServer(db, { log, ...(config.ergo === undefined ? {} : { bot: config.ergo.password }) });
 if (config.authSocket !== undefined) await listenAt(auth, config.authSocket);
 const server = await listen(app, config);
 // SIGTERM from the container's runtime, SIGINT from a terminal: one drain, however many arrive. Set

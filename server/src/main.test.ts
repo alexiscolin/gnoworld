@@ -180,7 +180,7 @@ describe("the server's process", () => {
     const server = start({ ...env, ERGO_PORT: String(ergo.port), ERGO_OPER_PASSWORD_FILE: oper });
     await listening(server);
     const peer = await ergo.peer(0);
-    await welcome(peer);
+    await welcome(peer, { echo: false });
     expect(peer.lines.filter((line) => line.startsWith("JOIN "))).toEqual(["JOIN #bubble,#earth"]);
     const left = once(peer.socket, "close");
     server.child.kill("SIGTERM");
