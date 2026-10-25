@@ -49,6 +49,19 @@ export async function readSession({ api, store }: LoginDeps): Promise<void> {
   else signedIn(me.value.address);
 }
 
+const FIRST_WAIT_MS = 1000;
+const LONGEST_WAIT_MS = 30_000;
+
+/** Reads the session until the server says, a doubling second apart, 30 at most: until then the page offers no
+ * login and opens no chat. Stops once the session is known, by this or by a login meanwhile. */
+export async function knowSession(deps: LoginDeps, wait: (ms: number) => Promise<void>): Promise<void> {
+  const unknown = () => deps.store.getState().login.session.kind === "unknown";
+  for (let ms = FIRST_WAIT_MS; unknown(); ms = Math.min(ms * 2, LONGEST_WAIT_MS)) {
+    await readSession(deps);
+    if (unknown()) await wait(ms);
+  }
+}
+
 /** Ends the session on the server, which alone can clear its cookie; kept, with its reason, when it cannot. */
 export async function logOut({ api, store }: LoginDeps): Promise<void> {
   const { signedOut, stopped } = store.getState().loginActions;

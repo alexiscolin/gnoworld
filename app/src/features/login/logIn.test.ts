@@ -1,7 +1,7 @@
 import { Address, type Proof } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
 import { createAppStore } from "../../store/index.ts";
-import { logIn, logOut, readSession, type LoginDeps } from "./logIn.ts";
+import { knowSession, logIn, logOut, readSession, type LoginDeps } from "./logIn.ts";
 
 const ADDRESS = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const CHALLENGE = {
@@ -131,6 +131,59 @@ describe("logIn", () => {
     await logIn("x", parts);
     await logIn("x", parts);
     expect(asked.filter((line) => line.startsWith("connect"))).toHaveLength(2);
+  });
+});
+
+// F769: a failed /me left the page with no login and no chat until a reload; it is asked again until known.
+describe("knowSession", () => {
+  // A server that cannot say `failures` times, then names the account; and the waits asked of the page's clock.
+  const failing = (failures: number) => {
+    const base = deps();
+    let tries = 0;
+    const made = deps({
+      api: {
+        ...base.parts.api,
+        me: () => {
+          tries += 1;
+          return Promise.resolve(
+            tries <= failures ? { ok: false, reason: "network" } : { ok: true, value: { address: ADDRESS } },
+          );
+        },
+      },
+    });
+    const waits: number[] = [];
+    const wait = (ms: number) => {
+      waits.push(ms);
+      return Promise.resolve();
+    };
+    return { ...made, waits, wait, tries: () => tries };
+  };
+
+  it("asks once when the server says at once", async () => {
+    const t = failing(0);
+    await knowSession(t.parts, t.wait);
+    expect(t.waits).toEqual([]);
+    expect(t.store.getState().login.session).toEqual({ kind: "in", address: ADDRESS });
+  });
+
+  it("asks again after each failure, a doubling second apart, 30 at most, until the server says", async () => {
+    const t = failing(7);
+    await knowSession(t.parts, t.wait);
+    expect(t.waits).toEqual([1000, 2000, 4000, 8000, 16_000, 30_000, 30_000]);
+    expect(t.tries()).toBe(8);
+    expect(t.store.getState().login.session).toEqual({ kind: "in", address: ADDRESS });
+  });
+
+  it("stops asking once a login knew the session meanwhile", async () => {
+    const t = failing(5);
+    const wait = (ms: number) => {
+      t.waits.push(ms);
+      t.store.getState().loginActions.signedOut();
+      return Promise.resolve();
+    };
+    await knowSession(t.parts, wait);
+    expect(t.tries()).toBe(1);
+    expect(t.store.getState().login.session).toEqual({ kind: "out" });
   });
 });
 
