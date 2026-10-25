@@ -410,6 +410,31 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
       });
     });
 
+    it("checks a closed room's lines said while it was away, once Ergo has it back in (the max review)", async () => {
+      const e = await start();
+      const db = openDatabase(":memory:", TABLES);
+      const restart = () =>
+        chatFor(e, [], { worlds: typed({ ...RULES, bannedWords: ["spam"] }), db, reconcileMs: 300 });
+      const first = await restart();
+      const member = await login(e, "member");
+      for (let n = 0; !(await joins(member, "member", "#bubble/crew")); n += 1) {
+        if (n === 100) throw new Error("the member never got in");
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      // A line checked there first: the room's mark, from which the next catch-up asks.
+      const checked = await say(member, "#bubble/crew", "hello");
+      await expect.poll(first.verdicts).toContain(checked);
+      await first.stop();
+      await member.expect(/:gnoworld!\S+ QUIT /);
+      const missed = await say(member, "#bubble/crew", "buy spam");
+      await restart();
+      await member.expect(new RegExp(` REDACT #bubble/crew ${missed} `), 15_000);
+      stops.push(() => {
+        db.close();
+        return Promise.resolve();
+      });
+    });
+
     it("comes back by SAJOIN to a room an operator kicked it out of, and checks its lines again (the max review)", async () => {
       const e = await start();
       const lines: string[] = [];

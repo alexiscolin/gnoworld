@@ -158,6 +158,7 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
           ...ergo,
           rooms: () => listRooms(db).map(({ name }) => name),
           lastChecked: progress.last,
+          hold: progress.hold,
           drained: () => queue.idle(),
           onReady: () => {
             reconciler.flags();

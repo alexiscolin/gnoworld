@@ -1,5 +1,6 @@
 // The lines Ergo sends that the link answers or keeps in its state: its LIST, its login by SASL, the refusals that
-// close it, who joins its rooms and the rooms that refuse it (slice 3's plan, 3h, 3l, 3m and its max review).
+// close it, who joins its rooms, the rooms that refuse it and the kick that puts it out (slice 3's plan, 3h, 3l,
+// 3m and its max review).
 import type { Socket } from "node:net";
 import type { IrcMessage } from "@gnoworld/core";
 import type { Log } from "../log.ts";
@@ -74,11 +75,18 @@ export function refusals(
 
 // Ergo's JOIN: the bot's own takes a room it asked as joined (3l); another's, in one of its rooms, is
 // handed on (3m).
-export function joined(state: State, onJoin: (room: string) => void): (s: Socket, message: IrcMessage) => void {
-  return (_, { source, params: [room = ""] }) => {
+export function joined(
+  state: State,
+  onJoin: (room: string) => void,
+  catchUp: (s: Socket, room: string) => void,
+): (s: Socket, message: IrcMessage) => void {
+  return (s, { source, params: [room = ""] }) => {
     if (source?.split("!")[0] !== NICK) {
       if (state.joined.has(room)) onJoin(room);
-    } else if (state.asked.has(room)) state.joined.add(room);
+      return;
+    }
+    if (state.asked.has(room)) state.joined.add(room);
+    if (state.joined.has(room)) catchUp(s, room);
   };
 }
 

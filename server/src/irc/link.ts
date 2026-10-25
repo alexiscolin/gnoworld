@@ -92,6 +92,8 @@ export function ircLink(options: Options): Link {
       clearInterval(watchdog);
       state.ready = false;
       state.batches.clear();
+      state.turns = [];
+      state.page = undefined;
       state.asked.clear();
       state.channels = undefined;
       state.states.drop();

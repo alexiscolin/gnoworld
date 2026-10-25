@@ -5,6 +5,7 @@ import type { Socket } from "node:net";
 import type { IrcMessage } from "@gnoworld/core";
 import type { Log } from "../log.ts";
 import { joined, kicked, listing, refusals, rejoins, sasl } from "./handlers.ts";
+import { histories, replayed } from "./history.ts";
 import { joins, line, said, type Said } from "./lines.ts";
 import type { State } from "./session.ts";
 
@@ -20,6 +21,9 @@ export interface Options {
   pingMs?: number;
   // The time of the last line checked in a room, which the catch-up starts from.
   lastChecked?: (room: string) => string | undefined;
+  // A room's mark held at the time its catch-up's next page starts from, or let go (undefined) once the room is
+  // done: a live line settling meanwhile moves it no further (F707).
+  hold?: (room: string, time: string | undefined) => void;
   // Settles once what the link handed on is taken in: the next page waits for it.
   drained?: () => Promise<void>;
   // Each time it is in its rooms again (3k: the mutes put back).
@@ -32,20 +36,12 @@ export interface Options {
   stateMs?: number;
 }
 
-// Half of a check's per-account queue, so a page never fills it with a live line waiting (3j).
-const PAGE = 50;
-
 // The lines Ergo sends that ask for an answer, as 3b's table found them.
 export function reader(options: Options, state: State) {
   const { password, rooms, onMessage, log, lastChecked = () => undefined, onReady = () => undefined } = options;
   const { drained = () => Promise.resolve(), onChannels, onJoin = () => undefined } = options;
-  // Ergo answers AFTER a msgid it no longer holds (a line hidden by REDACT) with nothing, and AFTER a
-  // time from the next millisecond on (irc/history/history.go:171-175, irc/handlers.go:940, v2.19.1).
-  const history = (s: Socket, room: string, after: string): void => {
-    state.after.set(room, after);
-    s.write(line("CHATHISTORY", ["AFTER", room, `timestamp=${after}`, String(PAGE)]));
-  };
-  const earlier = (time: string): string => new Date(Date.parse(time) - 1).toISOString();
+  const { hold = () => undefined } = options;
+  const pages = histories({ lastChecked, hold, drained }, state);
   // A refusal Ergo will not change by itself: log it, and try again later and later.
   const refused = (s: Socket, error: string): void => {
     log("irc_refused", { error });
@@ -63,11 +59,6 @@ export function reader(options: Options, state: State) {
       state.joined = new Set(names);
       for (const join of joins(names)) s.write(join);
       state.ready = true;
-      // A millisecond before the mark: the mark's own line comes again, seen, and none beside it is lost.
-      for (const room of state.joined) {
-        const last = lastChecked(room);
-        if (last !== undefined) history(s, room, earlier(last));
-      }
       onReady();
       if (onChannels !== undefined) {
         state.channels = [];
@@ -81,44 +72,25 @@ export function reader(options: Options, state: State) {
       if (message.params[1] === "OPER") handlers["381"]?.(s, message);
     },
     ...listing(state, onChannels),
-    JOIN: joined(state, onJoin),
+    JOIN: joined(state, onJoin, pages.catchUp),
     ...rejoins(state),
     KICK: kicked(state, log),
-    BATCH: (s, { params: [ref = "", kind, room = ""] }) => {
-      if (ref.startsWith("+") && kind === "chathistory") state.batches.set(ref.slice(1), { room, lines: 0, last: "" });
-      if (!ref.startsWith("-")) return;
-      const done = state.batches.get(ref.slice(1));
-      state.batches.delete(ref.slice(1));
-      // A full page may have more after it, asked once the last page is taken in, from its last line's
-      // millisecond, which may hold more (F542). A page all in that one millisecond goes past it.
-      // ponytail: more than a page of lines in one millisecond loses the rest; pages by msgid lose a hidden one.
-      if (done === undefined || done.lines < PAGE || done.last === "") return;
-      const back = earlier(done.last);
-      const from = back === state.after.get(done.room) ? done.last : back;
-      const next = (): void => {
-        if (!s.destroyed) history(s, done.room, from);
-      };
-      drained().then(next, next);
-    },
+    ...pages.handlers,
     ...refusals(refused, state, log),
-    // A hide Ergo refused (F544): the verdict says hidden, the line stays; ops hears of it.
-    // A line its author deleted first is not one: Ergo knows its id no more (UNKNOWN_MSGID).
-    FAIL: (_, { params: [command, code] }) => {
-      if (command === "REDACT" && code !== "UNKNOWN_MSGID") log("alert", { error: "redact_refused" });
+    // A hide Ergo refused (F544): the verdict says hidden, the line stays; ops hears of it. A line its author
+    // deleted first is not one: Ergo knows its id no more. A refused page of history is history.ts's.
+    FAIL: (s, message) => {
+      if (message.params[0] === "REDACT" && message.params[1] !== "UNKNOWN_MSGID")
+        log("alert", { error: "redact_refused" });
+      pages.handlers["FAIL"]?.(s, message);
     },
     PING: (s, { params }) => s.write(line("PONG", params)),
     // A NOTICE too (slice 3's max review): Ergo relays and keeps it as any line, so it is checked and counted.
     NOTICE: (s, message) => handlers["PRIVMSG"]?.(s, message),
     PRIVMSG: (_, message) => {
-      const batch = state.batches.get(message.tags.get("batch") ?? "");
-      // A time Date cannot read is no page's end (F552): the next page starts from the last one read.
-      const time = message.tags.get("time") ?? "";
-      if (batch !== undefined) {
-        batch.lines += 1;
-        if (!Number.isNaN(Date.parse(time))) batch.last = time;
-      }
+      const batched = replayed(state, message);
       const heard = said(message, state.joined);
-      if (heard !== undefined) onMessage(heard, batch !== undefined);
+      if (heard !== undefined) onMessage(heard, batched);
     },
   };
   return (s: Socket, message: IrcMessage): void => {

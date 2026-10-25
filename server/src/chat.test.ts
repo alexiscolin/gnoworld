@@ -676,6 +676,83 @@ describe("the chat, as the server starts it", () => {
       slow.open();
     });
 
+    it("keeps its mark where a catch-up starts while its page is pending, though a live line passed", async () => {
+      const { peer, verdicts, ergo } = await linked(
+        { worlds: worlds("bubble"), moderation: OFF },
+        { provider: () => Promise.resolve(OFF_ANSWER) },
+      );
+      peer.say(line("m1", 1, ["g1a", "hello"]));
+      await expect.poll(verdicts).toEqual([{ msgid: "m1", action: "pass", reason: null }]);
+      const again = await reconnect(peer, ergo);
+      expect(await again.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(1)} 50`);
+      again.say(line("m9", 9, ["g1b", "live"]));
+      await expect.poll(() => verdicts().length).toBe(2);
+      await settle(again);
+      again.socket.destroy();
+      const third = await ergo.peer(2);
+      await welcome(third);
+      expect(await third.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(1)} 50`);
+    });
+
+    it("keeps a queued room's mark where its catch-up will start, though a live line of it passed", async () => {
+      const { db, peer, verdicts, ergo } = await linked(
+        { worlds: worlds("bubble", "earth"), moderation: OFF },
+        { provider: () => Promise.resolve(OFF_ANSWER) },
+      );
+      for (const room of ["#bubble", "#earth"])
+        peer.say(message(`account=g1a;msgid=old${room};time=${T(1)}`, "g1a!u@h", [room, "before"]));
+      await expect.poll(() => verdicts().length).toBe(2);
+      const again = await reconnect(peer, ergo);
+      const first = (await again.next(/^CHATHISTORY /)).split(" ")[2] ?? "";
+      const queued = first === "#bubble" ? "#earth" : "#bubble";
+      again.say(message(`account=g1b;msgid=live;time=${T(9)}`, "g1b!u@h", [queued, "live"]));
+      await expect.poll(() => verdicts().length).toBe(3);
+      await settle(again);
+      const marks = z
+        .array(z.object({ room: z.string(), time: z.string() }))
+        .parse(db.prepare("SELECT room, time FROM progress ORDER BY room").all());
+      expect(marks).toEqual([
+        { room: "#bubble", time: T(1) },
+        { room: "#earth", time: T(1) },
+      ]);
+    });
+
+    it("asks the next room's page only once the lines of the last are checked, so one account's queue never overflows", async () => {
+      const wait = gate();
+      const { peer, verdicts, ergo } = await linked(
+        { worlds: worlds("bubble", "earth", "moon"), moderation: OFF },
+        {
+          provider: async (text) => {
+            if (text === "flood") await wait.opened;
+            return OFF_ANSWER;
+          },
+        },
+      );
+      for (const room of ["#bubble", "#earth", "#moon"])
+        peer.say(message(`account=g1a;msgid=old${room};time=${T(1)}`, "g1a!u@h", [room, "before"]));
+      await expect.poll(() => verdicts().length).toBe(3);
+      const again = await reconnect(peer, ergo);
+      const asked = () => again.lines.filter((l) => l.startsWith("CHATHISTORY"));
+      for (let round = 0; round < 3; round += 1) {
+        await expect.poll(() => asked().length).toBeGreaterThan(round);
+        const room = asked()[round]?.split(" ")[2] ?? "";
+        again.say(`:ergo.test BATCH +r${String(round)} chathistory ${room}`);
+        for (let n = 0; n < 40; n += 1) {
+          const tags = `batch=r${String(round)};account=g1a;msgid=f${String(round)}-${String(n)};time=${T(10 + n)}`;
+          again.say(message(tags, "g1a!u@h", [room, "flood"]));
+        }
+        again.say(`:ergo.test BATCH -r${String(round)}`);
+        await settle(again);
+        await settle(again);
+        // The first room's 40 lines wait on the provider: no other room is asked until they are checked.
+        if (round === 0) expect(asked()).toHaveLength(1);
+        wait.open();
+      }
+      await expect.poll(() => verdicts().length, { timeout: 10_000 }).toBe(123);
+      expect(asked()).toHaveLength(3);
+      expect(logged.filter((l) => l.includes("moderation_account_full"))).toEqual([]);
+    });
+
     it("checks 300 missed lines of one account page by page, none dropped", async () => {
       const { peer, verdicts, ergo } = await linked(
         { worlds: worlds("bubble"), moderation: OFF },

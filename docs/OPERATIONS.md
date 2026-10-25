@@ -222,7 +222,10 @@ Slice 3, the bot acts and the stream (3j):
   caught up: a line the full queue drops (the log says so), a line left unchecked by a provider
   outage (its previews wait), a room's first lines said while the link was down, and, past a full
   page of 50 lines all in one millisecond, the rest of that millisecond (each next page starts in its
-  last line's millisecond, F542).
+  last line's millisecond, F542). A room's history is asked once Ergo says the bot is in it, one page at
+  a time across the rooms, and a room's mark stays where its catch-up starts while it runs, so a live line
+  checked meanwhile loses no older line (F707, F708). A room Ergo refuses the history of keeps its mark
+  until the next start.
 - **A line to a room's voices or operators** (`+#room`, STATUSMSG) is read as the room's line: checked,
   counted, struck, and its author muted as for any line. Ergo keeps no history of it (#959), so its REDACT is
   refused and the line stays on the screens it reached (F723). Ergo relays such a line by rank, so the bot reads
