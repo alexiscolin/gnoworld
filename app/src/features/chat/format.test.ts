@@ -58,6 +58,19 @@ describe("formatted", () => {
     expect(apply("|", "code")).toStrictEqual(draft("`|`"));
   });
 
+  it("escapes a label's brackets and backslashes and leaves its spaces outside: the reader reads the label chosen", () => {
+    expect(apply("see «a] b» now", "link")).toStrictEqual(draft("see [a\\] b](«https://») now"));
+    expect(apply("x« word »y", "link")).toStrictEqual(draft("x [word](«https://») y"));
+    expect(apply("x«  »y", "link")).toStrictEqual(draft("x  [|](https://)y"));
+    const { text } = apply("«a] [b\\»", "link");
+    expect(markdown(text.replace("https://", "https://a.example"))).toStrictEqual([
+      {
+        type: "paragraph",
+        children: [{ type: "link", href: "https://a.example", children: [{ type: "text", text: "a] [b\\" }] }],
+      },
+    ]);
+  });
+
   it("makes a link of the selection, its address selected to be typed", () => {
     expect(apply("see «the docs»", "link")).toStrictEqual(draft("see [the docs](«https://»)"));
     expect(apply("see |", "link")).toStrictEqual(draft("see [|](https://)"));

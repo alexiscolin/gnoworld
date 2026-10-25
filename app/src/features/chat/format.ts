@@ -26,16 +26,27 @@ export function formatted(edit: Edit, format: Format): Edit {
   return marked(words(edit), MARKS[format]);
 }
 
-// The words a mark goes round: the selection less its spaces, widened to whole words (a caret, to the word it
-// touches); a selection of spaces alone, a caret at its end.
-function words({ text, start, end }: Edit): Edit {
+// The selection less its spaces; a selection of spaces alone, a caret at its end.
+function trimmed({ text, start, end }: Edit): Edit {
   const selected = text.slice(start, end);
   if (selected !== "" && selected.trim() === "") return { text, start: end, end };
-  let from = start + selected.length - selected.trimStart().length;
-  let to = end - (selected.length - selected.trimEnd().length);
-  while (inWord(text[from - 1])) from -= 1;
-  while (inWord(text[to])) to += 1;
-  return { text, start: from, end: to };
+  return {
+    text,
+    start: start + selected.length - selected.trimStart().length,
+    end: end - (selected.length - selected.trimEnd().length),
+  };
+}
+
+// The words a mark goes round: the selection less its spaces, widened to whole words (a caret, to the word it
+// touches); a selection of spaces alone stays a caret at its end.
+function words(edit: Edit): Edit {
+  const selected = edit.text.slice(edit.start, edit.end);
+  let { start: from, end: to } = trimmed(edit);
+  if (selected === "" || selected.trim() !== "") {
+    while (inWord(edit.text[from - 1])) from -= 1;
+    while (inWord(edit.text[to])) to += 1;
+  }
+  return { text: edit.text, start: from, end: to };
 }
 
 // The selection begins and ends with `mark`, and no more of its character inside: `*` is not in `**a**`.
@@ -76,9 +87,12 @@ function marked(words: Edit, mark: string): Edit {
   };
 }
 
-// The selection as a link's label, the address after it selected to be typed; at a caret, the label to be typed.
-function linked({ text, start, end }: Edit): Edit {
-  const label = text.slice(start, end);
+// The selection, less its spaces, as a link's label, the address after it selected to be typed; at a caret, the label
+// to be typed.
+function linked(edit: Edit): Edit {
+  const { text, start, end } = trimmed(edit);
+  // Escaped, its brackets and backslashes are the label's own: the reader closes it at the bar's `]` alone.
+  const label = text.slice(start, end).replaceAll(/[[\]\\]/g, (char) => `\\${char}`);
   const result = `${text.slice(0, start)}[${label}](${ADDRESS})${text.slice(end)}`;
   if (label === "") return { text: result, start: start + 1, end: start + 1 };
   const address = start + label.length + "[](".length;
