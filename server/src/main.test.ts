@@ -77,7 +77,9 @@ const listening = (server: Server): Promise<number> =>
     });
   });
 
-describe("the server's process", () => {
+// Each test boots a Node process, which takes seconds when the machine is busy (three gates at once): 30 s, not
+// Vitest's 5, the assertions unchanged.
+describe("the server's process", { timeout: 30_000 }, () => {
   it("starts as the image starts it, and answers /health", async () => {
     const port = await listening(start(settings()));
     expect((await fetch(`http://127.0.0.1:${String(port)}/health`)).status).toBe(200);
