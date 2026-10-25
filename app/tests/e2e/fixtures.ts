@@ -1,10 +1,10 @@
 // In Claude Code's sandbox Chromium runs as one process (playwright.config.ts), where closing a
 // context ends the browser, so each test gets a browser of its own; elsewhere, Playwright's own.
-import { expect, test as base, type Page, type Worker } from "@playwright/test";
+import { expect, test as base, type Page, type Response as Answer, type Worker } from "@playwright/test";
 import { VIOLATION } from "../../src/sw/report.ts";
 import { WORLDS, worldPath } from "../../src/worlds.ts";
 
-export { expect, type Page };
+export { expect, type Answer, type Page };
 
 declare const process: { env: Record<string, string | undefined> };
 // Playwright hands a screenshot as Node's Buffer, whose types this folder leaves out, as process's.
