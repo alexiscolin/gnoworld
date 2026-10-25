@@ -7,13 +7,10 @@
 import { markdown, type Block, type Inline } from "@gnoworld/core";
 import { createElement, type ReactNode } from "react";
 import { shortAddress } from "./names.ts";
-import styles from "./Message.module.css";
 
 const MARKS = { strong: "strong", em: "em", strike: "s" } as const;
 // A link isolates its text left to right: an override before it cannot draw its address backwards (F786).
 const LINK = { dir: "ltr", target: "_blank", rel: "noopener noreferrer" } as const;
-const MENTION = styles["mention"];
-const MENTION_OF_ME = [styles["mention"], styles["aboutMe"]].join(" ");
 
 function inline(node: Inline, me: string | undefined): ReactNode {
   const children = (nodes: readonly Inline[]) => nodes.map((child) => inline(child, me));
@@ -29,7 +26,8 @@ function inline(node: Inline, me: string | undefined): ReactNode {
     case "mention":
       return createElement(
         "span",
-        { className: node.address === me ? MENTION_OF_ME : MENTION, title: node.address },
+        // Its look is the design system's base (data-mention), the reader's own "me", "about me".
+        { "data-mention": node.address === me ? "me" : "", title: node.address },
         `@${shortAddress(node.address)}`,
       );
     case "strong":

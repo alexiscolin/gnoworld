@@ -51,24 +51,18 @@ function Person({ name, guest }: { name: string; guest: boolean }) {
   return Address.safeParse(name).success ? <span title={name}>{shortAddress(name)}</span> : <span>{name}</span>;
 }
 
-// A line's classes: its kind's, and whether it mentions the reader.
-function classesOf(kind: Line["kind"], mentioned: boolean): string | undefined {
-  const names = [KINDS[kind], mentioned ? styles["mentioned"] : undefined].filter((name) => name !== undefined);
-  return names.length === 0 ? undefined : names.join(" ");
-}
-
 // A line, read once: drawn, and asked whether it mentions the reader, which a word says as well as its colour.
 function LineView({ line, me }: { line: Line; me: string | undefined }) {
   const blocks = markdown(line.text);
   const mentioned = me !== undefined && mentions(blocks).includes(me);
   return (
-    <li className={classesOf(line.kind, mentioned)}>
+    <li className={KINDS[line.kind]} data-about-me={mentioned ? "" : undefined}>
       <time dateTime={line.time} className={styles["time"]}>
         {CLOCK.format(new Date(line.time))}
       </time>{" "}
       {line.kind === "action" ? "* " : null}
       <Person name={line.account ?? line.from} guest={line.account === undefined} />{" "}
-      {mentioned ? <span className={styles["aboutMe"]}>Mentions you </span> : null}
+      {mentioned ? <span className={styles["mentionsYou"]}>Mentions you </span> : null}
       {line.kind === "notice" ? <span className={styles["mark"]}>Notice </span> : null}
       <Markdown blocks={blocks} className={styles["text"]} me={me} />
     </li>

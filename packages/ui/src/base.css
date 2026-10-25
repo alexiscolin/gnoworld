@@ -30,11 +30,21 @@
     color: inherit;
   }
 
-  code {
+  /* Code and a mention sit on a fill; a mention of the reader in amber, "about me" (slice 4's 4d). */
+  code,
+  [data-mention] {
     padding-inline: var(--space-3xs);
     border-radius: var(--radius-s);
     background: var(--color-fill);
+  }
+
+  code {
     font: var(--font-data);
+  }
+
+  [data-mention="me"] {
+    background: var(--color-warm-soft);
+    color: var(--color-warm);
   }
 
   hr {

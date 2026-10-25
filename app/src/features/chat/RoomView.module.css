@@ -15,9 +15,14 @@
   }
 
   .time,
+  .mark,
+  .mentionsYou {
+    font: var(--font-meta);
+  }
+
+  .time,
   .mark {
     color: var(--color-text-muted);
-    font: var(--font-meta);
   }
 
   .action {
@@ -29,15 +34,14 @@
   }
 
   /* A line that mentions the reader: amber, the design system's "about me", at its start and in its word (4d). */
-  .mentioned {
+  .lines > li[data-about-me] {
     padding-inline-start: var(--space-2xs);
     border-inline-start: var(--line-width) solid var(--color-warm);
     background: var(--color-warm-soft);
   }
 
-  .aboutMe {
+  .mentionsYou {
     color: var(--color-warm);
-    font: var(--font-meta);
   }
 
   /* A quote set apart from the sender's own words, by a rule at its start and a muted colour (F783). */

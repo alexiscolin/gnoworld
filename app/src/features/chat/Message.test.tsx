@@ -22,10 +22,8 @@ const TAGS = new Set([
   "li",
 ]);
 const LINK = /^<a href="https:\/\/[^"]+" title="https:\/\/[^"]+" dir="ltr" target="_blank" rel="noopener noreferrer">$/;
-// A mention: its class, the account's whole address in its title, and nothing else.
-const MENTION = /^<span class="([^"]*)" title="(g1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{38})">$/;
-// A class attribute's value holding each of `names`, in any order.
-const classes = (...names: string[]) => `${names.map((name) => `(?=[^"]*${name})`).join("")}[^"]*`;
+// A mention: the account's whole address in its title, "me" when it is the reader's, and nothing else.
+const MENTION = /^<span data-mention="(me)?" title="(g1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{38})">$/;
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const opening = (markup: string) =>
@@ -58,19 +56,18 @@ describe("Message", () => {
 
   it("shows a mention as the account's address shortened, its whole address in its title, in a list and a quote too", () => {
     const mention = (address: string, short: string) =>
-      new RegExp(`<span class="${classes("mention")}" title="${address}">@${short}</span>`);
+      new RegExp(`<span data-mention="" title="${address}">@${short}</span>`);
     expect(html(`hi @${ALICE}!`)).toMatch(new RegExp(`^<span>hi ${mention(ALICE, "g10gh7…3y5tv").source}!</span>$`));
     expect(html(`> @${BOB}\n- @${ALICE}`)).toMatch(mention(BOB, "g1jg8m…vsqf5"));
     expect(html(`> @${BOB}\n- @${ALICE}`)).toMatch(mention(ALICE, "g10gh7…3y5tv"));
-    expect(html(`hi @${ALICE}`)).not.toContain("aboutMe");
+    expect(html(`hi @${ALICE}`)).not.toContain('data-mention="me"');
   });
 
   it("sets a mention of the reader apart, and no other", () => {
     const markup = renderToStaticMarkup(<Message text={`@${ALICE} and @${BOB}`} me={BOB} />);
-    expect(markup).toMatch(new RegExp(`<span class="${classes("mention", "aboutMe")}" title="${BOB}">`));
-    expect(markup).toMatch(new RegExp(`<span class="${classes("mention")}" title="${ALICE}">`));
-    expect(markup).not.toMatch(new RegExp(`aboutMe[^"]*" title="${ALICE}"`));
-    expect(markup.match(/aboutMe/g)).toHaveLength(1);
+    expect(markup).toContain(`<span data-mention="me" title="${BOB}">`);
+    expect(markup).toContain(`<span data-mention="" title="${ALICE}">`);
+    expect(markup.match(/data-mention="me"/g)).toHaveLength(1);
   });
 
   // The threat model's lookalike: the reader's address where it is no mention, or an address one character off.
@@ -82,12 +79,14 @@ describe("Message", () => {
     [`@${BOB.slice(0, -1)}q`, "one character off"],
     [`x@${BOB}`, "inside a word"],
   ])("sets no mention of the reader apart where %j names it: %s", (text) => {
-    expect(renderToStaticMarkup(<Message text={text} me={BOB} />)).not.toContain("aboutMe");
+    expect(renderToStaticMarkup(<Message text={text} me={BOB} />)).not.toContain('data-mention="me"');
   });
 
   it("sets no mention apart for a reader with no account, whatever its name", () => {
     for (const me of ["", "guest-ab12cd", undefined]) {
-      expect(renderToStaticMarkup(<Message text={`@${BOB} and @ and @${ALICE}`} me={me} />)).not.toContain("aboutMe");
+      expect(renderToStaticMarkup(<Message text={`@${BOB} and @ and @${ALICE}`} me={me} />)).not.toContain(
+        'data-mention="me"',
+      );
     }
   });
 
@@ -151,11 +150,9 @@ describe("Message", () => {
             if (tag === "a") expect(whole).toMatch(LINK);
             else if (whole.startsWith("<span ")) {
               // A mention names an account the message names, and is the reader's own only when it is.
-              const [, names = "", title = ""] = MENTION.exec(whole) ?? [];
+              const [, mine, title = ""] = MENTION.exec(whole) ?? [];
               expect(source).toContain(`@${title}`);
-              expect(names.split(" ").filter((name) => /mention|aboutMe/.test(name))).toHaveLength(
-                title === me ? 2 : 1,
-              );
+              expect(mine === "me").toBe(title === me);
             } else expect(whole).toMatch(/^<[a-z]+\/?>$/);
           }
         },
