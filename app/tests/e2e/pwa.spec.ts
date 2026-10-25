@@ -444,6 +444,36 @@ test.describe("updates", () => {
     await expect(other.locator("body[data-before]")).toHaveCount(0);
   });
 
+  // F679: a message to the worker may be lost; the page cannot tell, so the next click sends it again.
+  test("a Reload click whose message was lost works at the next click", async ({ page, request }) => {
+    await open(page);
+    await page.evaluate(() => {
+      const post: (this: ServiceWorker, message: unknown) => void = Reflect.get(ServiceWorker.prototype, "postMessage");
+      let lost = true;
+      Object.defineProperty(ServiceWorker.prototype, "postMessage", {
+        value(this: ServiceWorker, message: unknown) {
+          if (lost) {
+            lost = false;
+            document.documentElement.dataset["lost"] = "yes";
+            return;
+          }
+          post.call(this, message);
+        },
+      });
+    });
+    await bump(page, request, { site });
+    await expect(noticeOf(page)).toBeVisible();
+    await promptOf(page).getByRole("button", { name: "Reload" }).click();
+    await expect(page.locator("html")).toHaveAttribute("data-lost", "yes");
+    // The notice closes on its click and the page stays: the worker was told nothing.
+    await expect(promptOf(page)).toHaveCount(0);
+    expect(await untouched(page)).toEqual({ same: true, waiting: true, marked: true });
+    // Shown again, the page offers the update again, and that click reaches the worker.
+    await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+    await expect(noticeOf(page)).toBeVisible();
+    await clickedThrough(page);
+  });
+
   test("a file whose bytes are not the build's fails the install: no worker keeps it", async ({ page, request }) => {
     // Each first worker's last state, kept on the page: installing ends activated or redundant.
     await page.addInitScript(() => {
