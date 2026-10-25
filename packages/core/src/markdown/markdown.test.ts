@@ -128,6 +128,9 @@ describe("markdown: marks within a line", () => {
     expect(MAX_INLINE_DEPTH).toBe(8);
     const nested = "*a ".repeat(9) + "x" + " a*".repeat(9);
     expect(depthOf(markdown(nested))).toBe(MAX_INLINE_DEPTH);
+    // Eight runs open and eight close: the ninth pair's two stars stay text.
+    expect(flat(markdown(nested)).join("").split("*").length - 1).toBe(2);
+    expect(depthOf(markdown("***a** b* ".repeat(4) + "*a ".repeat(9) + "x"))).toBeLessThanOrEqual(MAX_INLINE_DEPTH);
     expect(words(markdown(nested))).toStrictEqual(words([paragraph(text(nested.replace(/\*/g, "")))]));
     expect(depthOf(markdown("***a ".repeat(5) + "x" + " a***".repeat(5)))).toBeLessThanOrEqual(MAX_INLINE_DEPTH);
   });
@@ -446,6 +449,86 @@ describe("markdown: blocks", () => {
   test("gives nothing for an empty message, or one of blank lines", () => {
     reads("");
     reads("\n\n  \n");
+  });
+});
+
+// The green pass's cases (4c's pre-merge): each kills a StrykerJS survivor the tests above let live.
+describe("markdown: the edges StrykerJS found", () => {
+  const strike = (...children: Inline[]): Inline => ({ type: "strike", children });
+  test.each([
+    ": https://.",
+    "a/[x](https://@@)",
+    'see https://a.example/x"y',
+    "see https://a.example/x`y",
+    "see https://a.example/x\u200by",
+  ])("keeps %j as text: an address no host or character allows", plain);
+
+  test("ends a bare address at an angle, the angle text", () => {
+    reads("https://a.example<", paragraph(link("https://a.example"), text("<")));
+  });
+
+  test("reads the character before a mark whole, an astral one included", () => {
+    plain("𝐀**b**");
+    plain("a 𠀀**b**");
+    plain("!\uE000**b**");
+    reads("🐀**b**", paragraph(text("🐀"), strong(text("b"))));
+  });
+
+  test.each(["** a**", "~~ a~~", "**a **", "*a *", "~~a ~~"])(
+    "opens no mark before a space nor closes one after it (%j)",
+    plain,
+  );
+
+  test("makes no link of a label of spaces or invisible characters, in a mark or not", () => {
+    reads(
+      "[\u200b\u200b](https://a.example)",
+      paragraph(text("[\u200b\u200b]("), link("https://a.example"), text(")")),
+    );
+    reads("[  ](https://a.example)", paragraph(text("[  ]("), link("https://a.example"), text(")")));
+    reads(
+      "[**\u200b**](https://a.example)",
+      paragraph(text("["), strong(text("\u200b")), text("]("), link("https://a.example"), text(")")),
+    );
+  });
+
+  test("links a label whose mark never closes, the mark text in it", () => {
+    reads("[*a](https://a.example)", paragraph(link("https://a.example", "*a")));
+  });
+
+  test("reads a `]` with no label open as text inside a mark", () => {
+    reads("*a] b*", paragraph(em(text("a] b"))));
+    reads("**x]y**", paragraph(strong(text("x]y"))));
+  });
+
+  test("gives back the depth of each link and mark closed: many in a row nest nothing", () => {
+    const links = Array.from({ length: 5 }, () => [link("https://x.example", "a"), text(" ")]).flat();
+    reads("[a](https://x.example) ".repeat(5) + "**b**", paragraph(...links, strong(text("b"))));
+    const bold = (word: string) => [strong(text(word)), text(" ")];
+    reads("**a** **b** **c** **d** **e**", paragraph(...["a", "b", "c", "d"].flatMap(bold), strong(text("e"))));
+    reads(
+      "**a *b** ".repeat(5) + "**c**",
+      paragraph(...Array.from({ length: 5 }, () => bold("a *b")).flat(), strong(text("c"))),
+    );
+  });
+
+  test("keeps the rest of three stars that closed two", () => {
+    reads("***a** b", paragraph(text("*"), strong(text("a")), text(" b")));
+  });
+
+  test("closes a fence on backticks alone, spaces around them, and on nothing else", () => {
+    reads("```\na\n  ```  ", { type: "codeBlock", text: "a" });
+    reads("```\nrun ```\n```", { type: "codeBlock", text: "run ```" });
+    reads("```\n`x` is code\n```", { type: "codeBlock", text: "`x` is code" });
+  });
+
+  test("takes one space after a quote's `>`, the others kept, and trims a list item", () => {
+    reads(">a b", { type: "quote", children: [paragraph(text("a b"))] });
+    reads("-   a  ", { type: "list", ordered: false, items: [[text("a")]] });
+    reads("1.   a  ", { type: "list", ordered: true, items: [[text("a")]] });
+  });
+
+  test("reads a struck address", () => {
+    reads("~~https://a.example~~", paragraph(strike(link("https://a.example"))));
   });
 });
 

@@ -43,6 +43,13 @@ describe("compose", () => {
     expect(compose(ROOM, "//", NICK)).toStrictEqual(sent("PRIVMSG #bubble/games :/"));
   });
 
+  test.each(["see https://a.example/x", "a/b", "hi /me waves", "  x /nick"])(
+    "reads a slash past the draft's start as text (%j)",
+    (draft) => {
+      expect(compose(ROOM, draft, NICK)).toStrictEqual(sent(`PRIVMSG #bubble/games :${draft.trim()}`));
+    },
+  );
+
   test.each(["", "   ", "/me", "/me   ", "\u0001"])("sends nothing for %j", (draft) => {
     expect(compose(ROOM, draft, NICK)).toStrictEqual({ kind: "empty" });
   });
