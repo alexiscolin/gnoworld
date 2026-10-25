@@ -19,7 +19,9 @@ from repo_files import worktree
 
 WORKTREE = ""  # the throwaway worktree of HEAD, set by the run below
 OFF = "(lambda *a: None)("
-GAPS = {}  # label -> why no test can notice it yet
+GAPS = {  # label -> why no test can notice it yet
+    "check.sh: a git that cannot list the change fails the gate #1": "equivalent: under sh, set -e already holds inside the command substitution, so the && only says it",
+}
 
 TESTS = {"probe": [sys.executable, "-I", "scripts/probe.py"], "hooks": ["sh", "scripts/test_hooks.sh"]}
 # The lint config and its parts: each rule, selector and restricted name lives in one of them.
@@ -46,7 +48,7 @@ SECTIONS = {
     ".githooks/records.sh": "outside,installed,wiring", ".githooks/pre-merge-commit": "outside,installed", ".githooks/merge.sh": "installed",
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
-    "scripts/check.sh": "wiring,check_hooks", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
+    "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
     "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
 }
 
@@ -525,6 +527,35 @@ def mutants():
     yield from each("scripts/check.sh", " app/package.json pnpm-lock.yaml | cksum", " | cksum", "hooks", "check.sh's package guard reads every package file")
     yield from each("scripts/check.sh", "node app/node_modules/@playwright/test/cli.js test -c", ": node app/node_modules/@playwright/test/cli.js test -c", "hooks", "check.sh walks the app's journeys")
     yield from each("scripts/check.sh", "playwright.stories.config.ts --reporter=dot\n", "playwright.stories.config.ts --reporter=dot || true\n", "hooks", "check.sh lets the stories fail it")
+    # The lanes and the scope of a fast run (Alexis, 2026-10-25: a check's cost follows the change).
+    for find, replace, label in (
+        ("\t\t\t*) all=true ;;", "\t\t\t*) ;;", "a path of no known area runs everything"),
+        ("$all && ts=true app=true gno=true related=false", ":", "no change runs everything"),
+        ("server/src/*) ts=true related=false ;;", "server/src/*) ts=true ;;", "a server change runs every test"),
+        ('"$@" &&\n\t\t\tgit -c core.quotePath=false ls-files', '"$@"\n\t\t\tgit -c core.quotePath=false ls-files', "a git that cannot list the change fails the gate"),
+        ("--no-renames --name-only HEAD", "--name-only HEAD", "a rename keeps where it came from"),
+        ("--no-renames --name-only HEAD --", "--no-renames --name-only --", "what is staged counts"),
+        ("\t\t\tgno/*) gno=true ;;", "\t\t\tgno/*) gno=true; break ;;", "two areas at once run both"),
+        ('if ! $full && [ -n "$tested" ]', 'if [ -n "$tested" ]', "--full is never scoped"),
+        ("':!node_modules'", "':!nothing'", "a linked node_modules is no change"),
+        ("packages/ui/src/*) ts=true app=true related=false ;;", "packages/ui/src/*) ts=true app=true ;;", "a change outside Vitest's graph runs every test"),
+        ('if ! $full && [ -n "$tested" ]; then', "if ! $full; then", "outside a repository, everything"),
+        ("$all || budget=30", ":", "a scoped run has the lower budget"),
+        ('[ "${GATE_BUDGET:-$budget}" -lt "$budget" ] 2>/dev/null &&', '[ -n "${GATE_BUDGET:-}" ] &&', "GATE_BUDGET never raises the budget"),
+        ('[ "$took" -gt "$budget" ]', '[ "$took" -gt 99999 ]', "the fast gate fails past its budget"),
+        ("$related && tests_scope=", ": && tests_scope=", "a scoped run runs the related tests"),
+        ('|| failed="$failed $l"', "|| :", "a failed lane fails the gate"),
+        ('\t\tcat "$logs/$l.log" >&2\n', "\n", "a failed lane's output is shown"),
+        ('\t[ -z "$failed" ]\n}', "\t:\n}", "finish fails when a lane did"),
+        ("\t$ts || return 0\n\tstep typecheck", "\tstep typecheck", "types only for a TypeScript change"),
+        ("\t$ts || return 0\n\tstep ergo", "\tstep ergo", "tests only for a TypeScript change"),
+        ("\t$gno || return 0", "\t:", "gno only for a gno change"),
+        ("\t$app || return 0", "\t:", "the journeys only for an app change"),
+        ("\t$all || return 0 # the hooks'", "\t: # the hooks'", "the hooks' tests only for everything"),
+        ('harness --quiet "$base" && return 0', 'true && return 0', "--full mutates a changed harness"),
+        ("finish stories coverage history harness", ":", "--full fails when a full lane did"),
+    ):
+        yield from each("scripts/check.sh", find, replace, "hooks", f"check.sh: {label}")
     # The gate: each step dropped.
     yield from lines("scripts/check.sh", r"^(\s*)((?:run |python3 -I |sh scripts/|gitleaks |go vet |go run |\(cd gno |\$full \|\| run ).*)$", r"\1:", "hooks", "check.sh drops")
 

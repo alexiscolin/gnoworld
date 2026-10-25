@@ -70,9 +70,36 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
 
 ## The gate
 
-`scripts/check.sh` stops at the first failure and prints its time.
+`scripts/check.sh` runs its steps in lanes side by side. A lane stops at its first failure;
+every lane runs to its end; the gate fails when one did and shows the output of each that did.
+It prints each lane's time and each step's (F696). A check's cost follows the change, not the
+codebase (Alexis, 2026-10-25): in a repository, a fast run checks only the areas its change
+touches against `HEAD`, untracked files included.
 
-**Fast** (every turn, every commit, a work branch's push; it fails past 60 s):
+```
+fast gate                                              full gate (--full), after it
+  ts     format, knip, jscpd, CSS, comments ─▶ app       stories   probe.py ─▶ stories' journeys
+  types  tsc ─▶ ESLint                                   coverage  coverage ─▶ patch coverage ─▶ StrykerJS
+  tests  Ergo's build ─▶ Vitest                          history   prove_fix ─▶ regressions ─▶ migrations
+  gno    gno lint, test ─▶ mutate.py ─▶ Go                          ─▶ gitleaks ─▶ pnpm audit
+  docs   check_docs, parse ─▶ test_hooks.sh              harness   harness_mutate
+     (the five lanes at once)                               (the four lanes at once)
+```
+
+| A fast run's change | What runs beside the cheap checks (format, knip, jscpd, CSS, comments, check_docs) | Budget |
+|---|---|---|
+| `server/src` | tsc, ESLint, every Vitest test (`main.test.ts` runs the server as a child process, outside Vitest's module graph) | 30 s |
+| the TypeScript of `app/src`, `app/tests`, `packages/ui/src` | tsc, ESLint, Vitest's tests related to the change (`--changed`), the app's journeys | 30 s |
+| `packages/core/src`, which the server imports, or any other file of those folders (a fixture, a stylesheet) | tsc, ESLint, every Vitest test (a file read from disk is outside the module graph too), the app's journeys | 30 s |
+| `gno/` | the gno lane | 30 s |
+| anything else (a config, the lockfile, the harness, `packages/schemas`, `deploy/`), no change at all, or no repository (pre-commit's staged copy) | everything | 60 s |
+
+What a commit leaves out, the full gate runs on the exact tip before `main` takes it (`pre-push`
+wants its record). ESLint reads no cache: a cache is keyed on a file's own text, so a type changed
+in one file would hide the lint error it brings to another (the red pass reproduced it with
+`no-floating-promises`). `GATE_BUDGET` may lower the budget, never raise it.
+
+**Fast** (every turn, every commit, a work branch's push; it fails past its budget), its steps:
 
 | Step | What it catches |
 |---|---|
@@ -244,6 +271,13 @@ kept one repository (2026-10-18), so the boundary is `main` protected with the C
 and the harness is frozen until a real bug crosses it.
 
 ## Known limits
+
+- **A fast run trusts Vitest's module graph** for a change of the app's or the design
+  system's TypeScript: a test that reaches the changed code otherwise (a child process, a file
+  read from disk) is left out until the full gate; the server, core and every file that is not
+  TypeScript run every test for that reason. And a TERM sent to `check.sh` alone leaves its lanes
+  running: they share its process group, which a terminal's Ctrl-C reaches, but `sh` has no
+  portable way to end a background lane's own children (dash refuses `set -m` without a terminal).
 
 - **The server reports, it does not block.** The CI (`.github/workflows/gate.yml`) runs the
   full gate on every branch pushed, but GitHub cannot protect a branch on this

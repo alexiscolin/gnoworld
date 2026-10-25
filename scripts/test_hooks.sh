@@ -136,7 +136,7 @@ for step in "run format:check" "run typecheck" "run lint" "run test" "run unused
 	"python3 -I ../scripts/mutate.py" "go vet ./tools/..." "go run ./tools/sealvec | cmp" "python3 -I scripts/check_docs.py" \
 	"sh scripts/test_hooks.sh" "python3 -I scripts/probe.py" "run coverage" "python3 -I scripts/patch_coverage.py" "sh scripts/ergo.sh" \
 	"run mutate" "sh scripts/scan_secrets.sh" "python3 -I scripts/harness_mutate.py" "python3 -I scripts/check_regressions.py" "python3 -I scripts/check_migrations.py" \
-	'unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO' '[ "$took" -gt 60 ]' "python3 -I scripts/prove_fix.py" "python3 -I scripts/audit.py"; do
+	'unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO' '[ "$took" -gt "$budget" ]' "python3 -I scripts/prove_fix.py" "python3 -I scripts/audit.py"; do
 	grep -v '^[[:space:]]*#' "$gate_file" | grep -qF -- "$step" || fail "check.sh no longer runs: $step"
 done
 # The app's step comes after the copy and dead-code checks (F082), and its guard (F080) snapshots
@@ -1248,6 +1248,298 @@ git -C "$ck" worktree add -q "$t/ckwt"
 mkdir -p "$t/ckwt/scripts"
 cp "$here/check.sh" "$t/ckwt/scripts/"
 outer "$t/ckwt" | refused_any && fail "check.sh refused a linked worktree, whose hooks are the common folder's"
+fi
+
+# check.sh runs its steps in lanes side by side, prints each step's time and every lane that failed,
+# and a fast run checks only the areas its change touches: everything when a config, the harness, a
+# schema or any path outside the known areas changed, or outside a repository (Alexis, 2026-10-25:
+# a check's cost follows the change). On a copy whose every step is a stub that logs its name.
+# gate_fixture builds it in $g; gate runs its check.sh; ran tells whether a step ran.
+gate_fixture() { # $1: its folder's name, one a section: the sections run side by side
+g="$t/$1"
+log="$g.log"
+mkdir -p "$g/scripts" "$g/.githooks" "$g/bin" "$g/toolchain" "$g/gno/r/seal" "$g/app/src" "$g/app/tests" "$g/app/node_modules/@playwright/test" \
+	"$g/server/src" "$g/packages/core/src" "$g/packages/ui/src" "$g/packages/schemas/src" "$g/deploy" "$g/lint"
+cp "$here/check.sh" "$here/code_changed.sh" "$g/scripts/" && cp "$hooks/records.sh" "$g/.githooks/" && cp "$here/../.node-version" "$here/../.gitignore" "$g/"
+step="$g/bin/step"
+# The one stub: it logs its name and arguments; it takes 2 s when SLOW_STEP names it, fails when FAIL
+# does, and waits for each step MEET names to start too (10 s at most): steps run one after another
+# never meet.
+cat >"$step" <<'SH'
+#!/bin/sh
+n=$1
+shift
+echo "$n $*" >>"$GATE_LOG"
+[ "$n" != py:audit ] || echo "audit-answer ${AUDIT_ANSWER-unset}" >>"$GATE_LOG"
+case " ${MEET:-} " in
+*" $n "*)
+	: >"$GATE_LOG.met.$n"
+	tries=0
+	for m in $MEET; do
+		until [ -e "$GATE_LOG.met.$m" ]; do
+			tries=$((tries + 1))
+			[ "$tries" -lt 100 ] || { echo "$n met no $m" >&2 && exit 1; }
+			sleep 0.1
+		done
+	done
+	;;
+esac
+[ "${SLOW_STEP:-}" != "$n" ] || sleep 2
+case ",${FAIL:-}," in *,"$n",*) echo "$n failed here" >&2 && exit 1 ;; esac
+exit 0
+SH
+for tool in go gofmt; do printf '#!/bin/sh\nexec sh "%s" %s "$@"\n' "$step" "$tool" >"$g/bin/$tool"; done
+printf '#!/bin/sh\nexec sh "%s" gno "$@"\n' "$step" >"$g/toolchain/gno"
+chmod +x "$g/bin/go" "$g/bin/gofmt" "$g/toolchain/gno"
+for py in check_css check_docs mutate probe patch_coverage prove_fix check_regressions check_migrations audit harness_mutate; do
+	printf 'import os, sys\nos.execvp("sh", ["sh", %s, "py:%s", *sys.argv[1:]])\n' "'$step'" "$py" >"$g/scripts/$py.py"
+done
+for sh in ergo test_hooks scan_secrets; do printf 'exec sh "%s" sh:%s "$@"\n' "$step" "$sh" >"$g/scripts/$sh.sh"; done
+# The journeys' stub; with PW_EDIT, it edits a package file, as a build that installs would.
+printf 'const { spawnSync } = require("node:child_process");\nconst { appendFileSync } = require("node:fs");\nconst name = process.argv.some((a) => a.includes("stories")) ? "stories" : "playwright";\nif (process.env.PW_EDIT) appendFileSync("app/package.json", "\\n");\nprocess.exit(spawnSync("sh", [%s, name, ...process.argv.slice(2)], { stdio: "inherit" }).status);\n' "'$step'" >"$g/app/node_modules/@playwright/test/cli.js"
+python3 -I - "$g/package.json" "$step" <<'PY'
+import json, sys
+names = ["format:check", "typecheck", "lint", "test", "unused", "copies", "comments", "coverage", "mutate"]
+json.dump({"scripts": {n: f"sh {sys.argv[2]} {n}" for n in names}}, open(sys.argv[1], "w"))
+PY
+printf '{}\n' >"$g/app/package.json" && printf '{}\n' >"$g/server/package.json" && : >"$g/pnpm-lock.yaml" && : >"$g/gno/r/seal/vectors_test.gno"
+for f in server/src/a.ts server/src/b.ts server/roles.json app/src/a.tsx app/tests/a.spec.ts packages/core/src/a.ts packages/ui/src/a.ts \
+	packages/schemas/src/a.ts gno/r/a.gno deploy/a.conf lint/a.ts vitest.config.ts; do
+	printf 'x\n' >"$g/$f"
+done
+git -C "$g" init -q && git -C "$g" add -A && git -C "$g" commit -qm x && git -C "$g" update-ref refs/remotes/origin/main HEAD
+}
+gate() { : >"$log" && rm -f "$log".met.* && (cd "$g" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" sh scripts/check.sh "$@" 2>&1); }
+ran() { grep -q "^$1\( \|$\)" "$log"; }
+before() { [ "$(grep -n "^$1\( \|$\)" "$log" | head -1 | cut -d: -f1)" -lt "$(grep -n "^$2\( \|$\)" "$log" | head -1 | cut -d: -f1)" ]; }
+reset() { git -C "$g" reset -q --hard && git -C "$g" clean -qfd; }
+fast_steps="format:check typecheck lint test unused copies comments py:check_css sh:ergo playwright gno py:mutate gofmt go py:check_docs sh:test_hooks"
+cheap="format:check unused copies comments py:check_css py:check_docs"
+everything() { # $1: what the run was given
+	for s in $fast_steps; do ran "$s" || fail "check.sh skipped $s on $1, which must run everything"; done
+	grep -q '^test .*--changed' "$log" && fail "check.sh ran only the changed tests on $1, which must run every test"
+	:
+}
+scoped() { # $1: what the run was given; then the steps it must run, "-", the steps it must not
+	what=$1 && shift
+	must=true
+	for s in "$@"; do
+		if [ "$s" = - ]; then must=false; elif $must; then ran "$s" || fail "check.sh skipped $s on $what"; else ran "$s" && fail "check.sh ran $s on $what"; fi
+	done
+	:
+}
+record() { (cd "$g" && . .githooks/records.sh && worktree_print); }
+# ESLint never reads a cache: one is keyed on a file's own text, so a type changed elsewhere would
+# hide the error it brings (the red pass reproduced it with no-floating-promises).
+nocache() { if grep -q '^lint .*--cache' "$log"; then fail "check.sh linted from a cache on $1"; fi; }
+
+if part gate_scope; then
+gate_fixture gate_scope
+# Nothing changed: everything runs, the lanes at once; each lane prints its time and each step's.
+out=$(MEET="lint gno sh:test_hooks playwright test" gate) || fail "check.sh's lanes did not run side by side: $out"
+everything "a tree with no change" && nocache "a tree with no change"
+for lane in ts types tests gno docs; do
+	printf '%s\n' "$out" | grep -qE "^lane $lane [0-9]+\.[0-9] s:" || fail "check.sh did not print lane $lane's time: $out"
+done
+[ -z "$(git -C "$g" status --porcelain)" ] || fail "check.sh left files git sees: $(git -C "$g" status --porcelain)"
+grep -qxF "$(record)" "$g/.claude/tmp/green-fast" || fail "check.sh did not record the code it passed"
+# Prose alone is no change of code: everything runs.
+printf 'x\n' >>"$g/README.md"
+gate >/dev/null || fail "check.sh failed on a prose change"
+everything "a prose change"
+reset
+# The server: its types and lint, every test (main.test.ts runs the server as a child, outside
+# Vitest's graph), the cheap checks; never the app's journeys, gno or the hooks' tests. Budget 30 s.
+rm -f "$g/.claude/tmp/green-full"
+printf 'y\n' >>"$g/server/src/a.ts"
+out=$(gate) || fail "check.sh failed on a server change: $out"
+scoped "a server change" $cheap typecheck lint test - playwright gno py:mutate go sh:test_hooks
+nocache "a server change"
+grep -q '^test .*--changed' "$log" && fail "check.sh ran only Vitest's related tests on a server change"
+printf '%s\n' "$out" | grep -q "(budget 30 s)$" || fail "check.sh gave a scoped run another budget than 30 s: $out"
+[ ! -e "$g/.claude/tmp/green-full" ] || fail "a fast run recorded the full gate"
+reset
+# A server file deleted: its types still checked, which see what imported it.
+git -C "$g" rm -q server/src/b.ts
+gate >/dev/null || fail "check.sh failed on a deleted server file"
+scoped "a deleted server file" typecheck lint test - playwright
+reset
+# A new TypeScript file of the app, untracked: the app's journeys and the related tests; the journeys
+# after every reader of the build's output (F082); gno still not.
+printf 'x\n' >"$g/app/src/b.tsx"
+gate >/dev/null || fail "check.sh failed on a new app file"
+scoped "a new app file" $cheap typecheck lint test playwright - gno sh:test_hooks
+grep -q '^test .*--changed' "$log" || fail "check.sh did not run only the tests an app change touches"
+for s in unused copies comments py:check_css; do before "$s" playwright || fail "check.sh built the app before $s read the tree (F082)"; done
+reset
+# The design system's TypeScript, and a journey: the same.
+for f in packages/ui/src/a.ts app/tests/a.spec.ts; do
+	printf 'y\n' >>"$g/$f"
+	gate >/dev/null || fail "check.sh failed on a change of $f"
+	scoped "a change of $f" typecheck lint test playwright - gno sh:test_hooks
+	grep -q '^test .*--changed' "$log" || fail "check.sh did not run only the related tests on a change of $f"
+	reset
+done
+# Core: the server imports it, and main.test.ts runs the server as a child: every test, and the journeys.
+printf 'y\n' >>"$g/packages/core/src/a.ts"
+gate >/dev/null || fail "check.sh failed on a core change"
+scoped "a core change" typecheck lint test playwright - gno sh:test_hooks
+grep -q '^test .*--changed' "$log" && fail "check.sh ran only Vitest's related tests on a core change"
+reset
+# A file of the app that is not TypeScript (a fixture, a stylesheet) sits outside Vitest's graph: every test.
+printf 'x\n' >"$g/app/src/b.json"
+gate >/dev/null || fail "check.sh failed on an app fixture"
+scoped "an app fixture" test playwright
+grep -q '^test .*--changed' "$log" && fail "check.sh ran only Vitest's related tests on a change outside its graph"
+reset
+# A name with a space is one path, of its area.
+printf 'x\n' >"$g/server/src/a b.ts"
+gate >/dev/null || fail "check.sh failed on a path with a space"
+scoped "a server path with a space" typecheck - sh:test_hooks playwright
+reset
+# A realm: gno, its mutations and the Go tools, the cheap checks, no other TypeScript step.
+printf 'y\n' >>"$g/gno/r/a.gno"
+gate >/dev/null || fail "check.sh failed on a gno change"
+scoped "a gno change" $cheap gno py:mutate gofmt go - typecheck lint test playwright sh:test_hooks
+reset
+# Outside a repository (pre-commit's staged copy): everything.
+cp -R "$g" "$g-copy" && rm -rf "$g-copy/.git"
+: >"$log" && (cd "$g-copy" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" sh scripts/check.sh >/dev/null 2>&1) ||
+	fail "check.sh failed outside a repository"
+everything "a copy outside a repository"
+fi
+
+if part gate_triggers; then
+gate_fixture gate_triggers
+# A config, the lockfile, the harness, a schema both sides read, a package file, or a path of no
+# known area: everything.
+for f in package.json pnpm-lock.yaml vitest.config.ts lint/a.ts scripts/check_css.py packages/schemas/src/a.ts deploy/a.conf .gitignore \
+	server/roles.json server/package.json app/package.json; do
+	printf '\n' >>"$g/$f"
+	gate >/dev/null || fail "check.sh failed on a change of $f"
+	everything "a change of $f"
+	reset
+done
+# Two areas at once run both: what is staged counts with what is not.
+printf 'y\n' >>"$g/gno/r/a.gno" && git -C "$g" add gno && printf 'y\n' >>"$g/server/src/a.ts"
+gate >/dev/null || fail "check.sh failed on a staged gno change beside a server one"
+scoped "a staged gno change beside an unstaged server one" gno typecheck test - playwright sh:test_hooks
+reset
+# A rename keeps where it came from: a schema moved into the server runs everything.
+git -C "$g" mv packages/schemas/src/a.ts server/src/moved.ts
+gate >/dev/null || fail "check.sh failed on a schema moved into the server"
+everything "a schema moved into the server"
+reset
+# A deletion counts: a schema deleted beside a server change runs everything.
+git -C "$g" rm -q packages/schemas/src/a.ts && printf 'y\n' >>"$g/server/src/a.ts"
+gate >/dev/null || fail "check.sh failed on a deleted schema"
+everything "a deleted schema beside a server change"
+reset
+# A worktree's borrowed node_modules is a link, which .gitignore's folder rule misses: no change of code.
+ln -s "$t" "$g/node_modules" && printf 'y\n' >>"$g/server/src/a.ts"
+gate >/dev/null || fail "check.sh failed beside a linked node_modules"
+scoped "a server change beside a linked node_modules" typecheck - playwright sh:test_hooks
+rm "$g/node_modules" && reset
+# A git that cannot list the change fails the gate, rather than scoping it to nothing.
+real_git=$(command -v git)
+mkdir -p "$t/badgit" && printf '#!/bin/sh\ncase " $* " in *" diff --no-renames "*) exit 3 ;; esac\nexec "%s" "$@"\n' "$real_git" >"$t/badgit/git" && chmod +x "$t/badgit/git"
+printf 'y\n' >>"$g/server/src/a.ts"
+: >"$log" && (cd "$g" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$t/badgit:$g/bin:$PATH" sh scripts/check.sh >/dev/null 2>&1) &&
+	fail "check.sh passed when git could not list the change"
+reset
+# A harness script that does not parse fails the gate, even when the change is the server's alone.
+printf 'def (\n' >"$g/scripts/broken.py" && git -C "$g" add scripts/broken.py && git -C "$g" commit -qm broken && printf 'y\n' >>"$g/server/src/a.ts"
+out=$(gate) && fail "check.sh passed a harness script that does not parse"
+printf '%s\n' "$out" | grep -q "^check.sh: lane docs failed at parse" || fail "check.sh did not name the parse that failed: $out"
+fi
+
+if part gate_lanes; then
+gate_fixture gate_lanes
+# Two lanes fail: the gate fails, names both and shows what each printed; the others run to their end.
+rm -f "$g/.claude/tmp/green-fast"
+out=$(FAIL=lint,gno gate) && fail "check.sh passed with two failing steps"
+for s in lint gno; do printf '%s\n' "$out" | grep -q "^$s failed here" || fail "check.sh hid $s's failure: $out"; done
+printf '%s\n' "$out" | grep -q "^check.sh: lane types failed at lint" || fail "check.sh did not name the failed lane types and its step: $out"
+printf '%s\n' "$out" | grep -q "^check.sh: lane gno failed at gno" || fail "check.sh did not name the failed lane gno: $out"
+ran py:mutate && fail "a lane went on past its failed step"
+[ ! -e "$g/.claude/tmp/green-fast" ] || fail "check.sh recorded a gate that failed"
+# A lane that fails at once leaves a slow one to finish.
+(SLOW_STEP=py:check_docs FAIL=lint gate) >/dev/null && fail "check.sh passed with a failing lint"
+ran sh:test_hooks || fail "a lane's failure stopped another lane before its end"
+# Each lane's first and last step fail the gate, name their lane, and stop it.
+for case in format:check:ts playwright:ts typecheck:types lint:types sh:ergo:tests test:tests gno:gno go:gno py:check_docs:docs sh:test_hooks:docs; do
+	s=${case%:*} lane=${case##*:}
+	out=$(FAIL=$s gate) && fail "check.sh passed with $s failing"
+	printf '%s\n' "$out" | grep -q "^check.sh: lane $lane failed" || fail "check.sh did not name lane $lane when $s failed: $out"
+done
+(FAIL=sh:ergo gate) >/dev/null && fail "check.sh passed with Ergo's build failing"
+ran test && fail "check.sh ran the tests without the Ergo they start"
+# A build that edits a package file fails the gate (F080).
+out=$(PW_EDIT=1 gate) && fail "check.sh passed a build that edited app/package.json"
+printf '%s\n' "$out" | grep -q "building the app changed package.json" || fail "check.sh did not say the build changed a package file: $out"
+reset
+# GATE_BUDGET lowers the budget, never raises it, and a value that is no number leaves it.
+GATE_BUDGET=999 gate | grep -q "(budget 60 s)$" || fail "check.sh let GATE_BUDGET raise its budget"
+GATE_BUDGET=abc gate | grep -q "(budget 60 s)$" || fail "check.sh took a GATE_BUDGET that is no number"
+GATE_BUDGET= gate | grep -q "(budget 60 s)$" || fail "check.sh took an empty GATE_BUDGET"
+(GATE_BUDGET=-5 gate) >/dev/null && fail "check.sh took a negative GATE_BUDGET as no budget"
+printf 'y\n' >>"$g/server/src/a.ts"
+GATE_BUDGET=999 gate | grep -q "(budget 30 s)$" || fail "check.sh let GATE_BUDGET raise a scoped run's budget"
+reset
+fi
+
+if part gate_times; then
+gate_fixture gate_times
+# Past its budget, the fast gate fails, names its slowest step as printed, and records nothing; each
+# step's time is its own: a 2 s step prints 2 s, a quick one less than 1 s, its lane at least 2 s.
+for slow in lint gno; do
+	rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/gate-green"
+	out=$(SLOW_STEP=$slow GATE_BUDGET=0 gate) && fail "check.sh passed over its budget"
+	slowest=$(printf '%s\n' "$out" | sed -n 's/^lane [a-z]* [0-9.]* s: //p' | tr ',' '\n' | awk '{print $2, $1}' | sort -n | tail -1 | cut -d' ' -f2)
+	printf '%s\n' "$out" | grep -q "over its 0 s budget: its slowest step, $slowest," || fail "check.sh did not name its slowest step, $slowest: $out"
+	[ ! -e "$g/.claude/tmp/green-fast" ] && [ ! -e "$g/.claude/tmp/gate-green" ] || fail "check.sh recorded a gate past its budget"
+	[ "$slow" = lint ] || continue
+	printf '%s\n' "$out" | grep -qE '^lane types ([2-9]|[1-9][0-9])\.[0-9] s: .*lint [2-9]\.[0-9]' || fail "check.sh did not time the slow lint: $out"
+	printf '%s\n' "$out" | grep -qE '^lane gno [0-9.]+ s: gno [0-9]+\.[0-9], mutate.py [0-9]+\.[0-9], go [0-9]+\.[0-9]$' || fail "check.sh did not time the gno lane's steps: $out"
+	printf '%s\n' "$out" | grep -qE '^lane ts [0-9.]+ s: format 0\.[0-9]' || fail "check.sh gave a quick step a slow one's time: $out"
+done
+fi
+
+if part gate_full; then
+gate_fixture gate_full
+# The full gate: every fast step but the plain tests, then the full ones in lanes, each told where the
+# branch left main; harness_mutate only when the harness changed since main.
+base=$(git -C "$g" rev-parse HEAD)
+out=$(AUDIT_ANSWER=x gate --full) || fail "check.sh --full failed on a copy whose every step passes: $out"
+for s in $fast_steps py:probe stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
+	[ "$s" = test ] || ran "$s" || fail "check.sh --full skipped $s"
+done
+ran test && fail "check.sh --full ran the tests twice, with and without coverage"
+ran py:harness_mutate && fail "check.sh --full mutated a harness main already has"
+for s in py:prove_fix py:patch_coverage py:check_regressions py:check_migrations; do
+	grep -q "^$s $base$" "$log" || fail "check.sh --full did not give $s the base $base"
+done
+before coverage py:patch_coverage || fail "check.sh --full measured the patch's coverage before the coverage run"
+grep -qx "audit-answer unset" "$log" || fail "check.sh let AUDIT_ANSWER reach the audit"
+grep -qxF "$(record)" "$g/.claude/tmp/green-full" || fail "check.sh --full did not record the code it passed"
+# A dirty tree of one area: --full still checks everything, and records it.
+printf 'y\n' >>"$g/server/src/a.ts"
+gate --full >/dev/null || fail "check.sh --full failed on a server change"
+for s in $fast_steps; do [ "$s" = test ] || ran "$s" || fail "check.sh --full with a server change skipped $s"; done
+nocache "--full with a server change"
+grep -qxF "$(record)" "$g/.claude/tmp/green-full" || fail "check.sh --full did not record a dirty tree it passed"
+reset
+printf '\n' >>"$g/scripts/check_css.py" && git -C "$g" commit -qam y
+gate --full >/dev/null || fail "check.sh --full failed on a harness change"
+ran py:harness_mutate || fail "check.sh --full did not mutate a changed harness"
+rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/green-full"
+out=$(FAIL=coverage,py:audit gate --full) && fail "check.sh --full passed with two failing steps"
+for s in coverage py:audit; do printf '%s\n' "$out" | grep -q "^$s failed here" || fail "check.sh --full hid $s's failure: $out"; done
+[ ! -e "$g/.claude/tmp/green-full" ] || fail "check.sh --full recorded a gate that failed"
+# No origin/main to compare with: --full fails, saying so.
+git -C "$g" update-ref -d refs/remotes/origin/main
+out=$(gate --full) && fail "check.sh --full passed with no origin/main"
+printf '%s\n' "$out" | grep -q "needs origin/main" || fail "check.sh --full did not say it needs origin/main: $out"
 fi
 
 if part guard; then
