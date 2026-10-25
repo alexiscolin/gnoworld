@@ -22,7 +22,7 @@ it at once (`git merge --abort`). Pushing `main` wants the hooks installed from 
 has another; in a shell, `nvm use` picks it, since `.nvmrc` links to `.node-version`; nvm must be loaded
 first, by `source ~/.nvm/nvm.sh` or the shell's profile), pnpm, Go 1.26, Python 3, gitleaks, and a gno toolchain that matches the chain.
 The app's journeys need Playwright's Chromium, once per Playwright version: `node app/node_modules/@playwright/test/cli.js install chromium`
-(the CI adds `--with-deps` for Linux's libraries).
+(the CI adds `--with-deps` for Linux's libraries), and Ergo's binary, which `sh scripts/ergo.sh` builds from the pin (the gate does).
 
 Start Claude Code in this folder, so it reads the project's settings, hooks and sandbox, and
 accept the folder's trust prompt. The project's plugins are enabled for everyone but each

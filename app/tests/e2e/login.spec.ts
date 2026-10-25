@@ -1,37 +1,8 @@
+import { adena } from "./adena.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 
-// The login, end to end (slice 4's 4a): the page, a stand-in for Adena, the static host and the real server
-// behind its /api. The stand-in answers as Adena's SDK types it and signs through the host's test wallet
-// (serve.mjs, /__sign), as signer.ts does for the server's tests; it keeps what it was asked to sign.
-type Mode = "signs" | "declines" | "locked";
-async function adena(page: Page, mode: Mode = "signs"): Promise<void> {
-  await page.addInitScript((how: Mode) => {
-    const answer = (status: string, type: string, data: unknown) => ({ code: 0, status, type, message: "", data });
-    const wallet = async (): Promise<{ address: string }> =>
-      (await fetch("/__wallet")).json() as Promise<{ address: string }>;
-    const asked: unknown[] = [];
-    Object.assign(window, {
-      __asked: asked,
-      adena: {
-        AddEstablish: () => Promise.resolve(answer("success", "CONNECTION_SUCCESS", {})),
-        GetAccount: async () =>
-          how === "locked"
-            ? answer("failure", "WALLET_LOCKED", {})
-            : answer("success", "GET_ACCOUNT", { ...(await wallet()), chainId: "onyx-1", status: "ACTIVE" }),
-        GetNetwork: () => Promise.resolve(answer("success", "GET_NETWORK", { chainId: "onyx-1", networkName: "Onyx" })),
-        SignArbitrary: async (params: { signer: string; data: string }) => {
-          asked.push(params);
-          if (how === "declines") return answer("failure", "SIGN_REJECTED", {});
-          const signed: unknown = await (
-            await fetch("/__sign", { method: "POST", body: JSON.stringify({ chainId: "onyx-1", ...params }) })
-          ).json();
-          return answer("success", "SIGN_ARBITRARY", signed);
-        },
-      },
-    });
-  }, mode);
-}
-
+// The login, end to end (slice 4's 4a): the page, a stand-in for Adena (adena.ts), the static host and the real
+// server behind its /api.
 const logInButton = (page: Page) => page.getByRole("button", { name: "Log in with Adena" });
 
 test.describe("the login with Adena", () => {
