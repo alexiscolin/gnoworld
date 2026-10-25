@@ -57,13 +57,14 @@ function LineView({ line, me }: { line: Line; me: string | undefined }) {
   const mentioned = me !== undefined && mentions(blocks).includes(me);
   return (
     <li className={KINDS[line.kind]} data-about-me={mentioned ? "" : undefined}>
+      {/* The line's marks first, before the time: where no sender's words stand (F808). */}
+      {mentioned ? <span className={styles["mentionsYou"]}>Mentions you </span> : null}
+      {line.kind === "notice" ? <span className={styles["mark"]}>Notice </span> : null}
       <time dateTime={line.time} className={styles["time"]}>
         {CLOCK.format(new Date(line.time))}
       </time>{" "}
       {line.kind === "action" ? "* " : null}
       <Person name={line.account ?? line.from} guest={line.account === undefined} />{" "}
-      {mentioned ? <span className={styles["mentionsYou"]}>Mentions you </span> : null}
-      {line.kind === "notice" ? <span className={styles["mark"]}>Notice </span> : null}
       <Markdown blocks={blocks} className={styles["text"]} me={me} />
     </li>
   );

@@ -86,6 +86,8 @@ describe("RoomView", () => {
     expect(notice).toContain("Notice");
     expect(notice).toContain("heads up");
     expect(notice).not.toContain("*");
+    // Its mark first, before the time: where no sender's words stand (F808).
+    expect(notice).toMatch(/^Notice \d{2}:\d{2} g10gh7…3y5tv heads up$/);
     // Muted, its mark apart: the classes the sheet reads (`.notice .text`, `.mark`).
     expect(html).toMatch(
       /<li class="[^"]*notice[^"]*">.*<span class="[^"]*mark[^"]*">Notice <\/span>.*<span class="[^"]*text[^"]*">heads up<\/span>/s,
@@ -101,6 +103,9 @@ describe("RoomView", () => {
     expect(first).toMatch(/g10gh7…3y5tv .*ready, @g1jg8m…vsqf5 \?$/);
     expect(second).toMatch(/^\d{2}:\d{2} g10gh7…3y5tv and @g10gh7…3y5tv$/);
     expect(html).toMatch(/<li data-about-me="">.*<span class="[^"]*mentionsYou[^"]*">Mentions you <\/span>/s);
+    // The mark comes first, before the time: where no sender's words stand (F808).
+    expect(first).toMatch(/^Mentions you \d{2}:\d{2} g10gh7…3y5tv ready, @g1jg8m…vsqf5 \?$/);
+    expect(html).toMatch(/<li data-about-me=""><span class="[^"]*mentionsYou[^"]*">Mentions you <\/span><time /);
     expect(html).toContain(`<span data-mention="me" title="${BOB}">`);
     expect(html.match(/data-about-me/g)).toHaveLength(1);
     // The line that does not mention the reader carries nothing: no class, no attribute.
@@ -118,6 +123,8 @@ describe("RoomView", () => {
     expect(notice).toContain("Notice");
     expect(notice).toMatch(/@g1jg8m…vsqf5 heads up$/);
     expect(action).toMatch(/\* g10gh7…3y5tv .*waves at @g1jg8m…vsqf5$/);
+    expect(notice).toMatch(/^Mentions you Notice \d{2}:\d{2} g10gh7…3y5tv @g1jg8m…vsqf5 heads up$/);
+    expect(action).toMatch(/^Mentions you \d{2}:\d{2} \* g10gh7…3y5tv waves at @g1jg8m…vsqf5$/);
     // Each keeps its kind's one class, whole, and says it is about the reader by its attribute.
     expect(html).toMatch(/<li class="[^" ]*notice[^" ]*" data-about-me="">/);
     expect(html).toMatch(/<li class="[^" ]*action[^" ]*" data-about-me="">/);
