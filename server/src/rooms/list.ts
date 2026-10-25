@@ -9,6 +9,8 @@ import { getCookie } from "hono/cookie";
 import { worldRooms } from "./rooms.ts";
 import { roomType, type Typed } from "./types.ts";
 
+const SECTION_ROOMS = 500;
+
 interface Options {
   db: DatabaseSync;
   roles: Typed;
@@ -18,8 +20,9 @@ interface Options {
   session?: ((token: string | undefined) => string | undefined) | undefined;
 }
 
-// The rooms a reader sees, in sections: the file's, each in its own order, then the others by name. The
-// world's main room is the first of the others: #<world> is a prefix of every #<world>/<name>.
+// The rooms a reader sees, in sections: the file's, each in its own order, then the others by name, 500 a
+// section as RoomList takes. The world's main room is the first of the others: #<world> is a prefix of
+// every #<world>/<name>.
 function sectionsOf(roles: Typed, world: string, seen: readonly string[]): RoomList["sections"] {
   const shown = new Set(seen);
   const named = roles.worlds.get(world)?.sections ?? [];
@@ -29,7 +32,10 @@ function sectionsOf(roles: Typed, world: string, seen: readonly string[]): RoomL
     { name: null, rooms: seen.filter((room) => !placed.has(room)) },
   ]
     .filter(({ rooms }) => rooms.length > 0)
-    .map(({ name, rooms }) => ({ name, rooms: rooms.map((room) => ({ room, type: roomType(roles, room) })) }));
+    .map(({ name, rooms }) => ({
+      name,
+      rooms: rooms.slice(0, SECTION_ROOMS).map((room) => ({ room, type: roomType(roles, room) })),
+    }));
 }
 
 export function listRoutes({ db, roles, visible, session = () => undefined }: Options): Hono {

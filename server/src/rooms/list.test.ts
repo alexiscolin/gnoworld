@@ -105,6 +105,44 @@ describe("GET /api/rooms?world=", () => {
     });
   });
 
+  // What the client's RoomList takes: the file's 50 sections and the others, 500 rooms a section.
+  // 50 named sections, then `count` rooms a guest sees after 100 it does not (#big/r0000 to r0099), all made
+  // in reverse: the answer's order is the route's, and its cap counts the rooms a reader sees.
+  const big = (count: number) => {
+    const named = Array.from({ length: 50 }, (_, n) => ({
+      name: `s${String(n)}`,
+      rooms: [`#big/s${String(n).padStart(2, "0")}`],
+    }));
+    const roles: Typed = { worlds: new Map([["big", { rules: RULES, rooms: new Map(), sections: named }]]) };
+    const others = Array.from({ length: count + 100 }, (_, n) => `#big/r${String(n).padStart(4, "0")}`);
+    const hidden = new Set(others.slice(0, 100));
+    const t = setup(roles, (room, who) => who !== undefined || !hidden.has(room));
+    ensureRooms(t.db, ["big"], T0);
+    const made = [...named.flatMap(({ rooms }) => rooms), ...others].reverse();
+    ensureNamed(
+      t.db,
+      made.map((name) => ({ name, world: "big" })),
+      T0,
+    );
+    return { ...t, seen: others.slice(100) };
+  };
+
+  it("answers 51 sections at most, and 500 rooms a reader sees in the others, the main room first, then by name", async () => {
+    const { sectionsFor, seen } = big(600);
+    const { list } = await sectionsFor(undefined, "big");
+    expect(list.sections).toHaveLength(51);
+    expect(list.sections.at(-1)?.name).toBeNull();
+    expect(list.sections.at(-1)?.rooms.map(({ room }) => room)).toEqual(["#big", ...seen.slice(0, 499)]);
+  });
+
+  it.each([
+    [499, 500],
+    [500, 500],
+  ])("lists %i rooms seen and the main room in the others as %i", async (count, listed) => {
+    const { sectionsFor } = big(count);
+    expect((await sectionsFor(undefined, "big")).list.sections.at(-1)?.rooms).toHaveLength(listed);
+  });
+
   it("leaves out a section the reader sees no room of, and never says its name", async () => {
     const { sectionsFor } = setup();
     const { list, text } = await sectionsFor();

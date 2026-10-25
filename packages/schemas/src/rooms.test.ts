@@ -96,6 +96,16 @@ describe("a world's rooms", () => {
     expect(RoomList.parse(LIST)).toEqual(LIST);
   });
 
+  // The roles file names 50 sections at most (server/src/roles/roles.ts), and the server adds the others.
+  it("takes 51 sections, the file's 50 and the others, and 500 rooms in a section", () => {
+    const rooms = Array.from({ length: 500 }, () => ({ room: "#bubble", type: "open" as const }));
+    const sections = [
+      ...Array.from({ length: 50 }, (_, n) => ({ name: `s${String(n)}`, rooms: [] })),
+      { name: null, rooms },
+    ];
+    expect(RoomList.safeParse({ world: "bubble", sections }).success).toBe(true);
+  });
+
   it.each(["open", "announcement", "accounts", "members", "members-write"])("takes a room of type %s", (type) => {
     expect(
       RoomList.parse({ world: "bubble", sections: [{ name: null, rooms: [{ room: "#bubble", type }] }] }),

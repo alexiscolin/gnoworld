@@ -21,7 +21,8 @@ export type MadeRoom = z.infer<typeof MadeRoom>;
 
 export const RoomType = z.enum(["open", "announcement", "accounts", "members", "members-write"]);
 
-/** A world's rooms a reader may see, in the sections its moderators set (roles file), null naming the rest. */
+/** A world's rooms a reader may see, in the sections its moderators set (roles file, 50 at most), then a
+ * section named null for the rest: 51 sections, 500 rooms each. */
 export const RoomList = z.object({
   world: Slug,
   sections: z
@@ -31,6 +32,6 @@ export const RoomList = z.object({
         rooms: z.array(z.object({ room: RoomId, type: RoomType })).max(500),
       }),
     )
-    .max(50),
+    .max(51),
 });
 export type RoomList = z.infer<typeof RoomList>;
