@@ -6,12 +6,21 @@ import type { AppState } from "../../store/index.ts";
 export const shortAddress = (address: string): string => `${address.slice(0, 6)}…${address.slice(-5)}`;
 
 /** A room by its own name: #games for #bubble/games, the world's main room by the world. */
-export const roomLabel = (room: string): string => `#${room.slice(room.indexOf("/") + 1).replace(/^#/, "")}`;
+export const roomLabel = (room: string): string => {
+  const { world, name } = partsOf(room);
+  return `#${name ?? world}`;
+};
 
 /** A room's address on the site: its world's page, and ?room=<name> for one that is not the main room. */
 export function roomHref(room: string): string {
-  const [world = "", name] = room.slice(1).split("/");
+  const { world, name } = partsOf(room);
   return name === undefined ? `/w/${world}` : `/w/${world}?room=${name}`;
+}
+
+// A room id's world and name: #<world>, or #<world>/<name>.
+function partsOf(room: string): { world: string; name: string | undefined } {
+  const [world = "", name] = room.slice(1).split("/");
+  return { world, name };
 }
 
 /** The room the address names (?room=<name>) when the world lists it; else its main room when listed; else the

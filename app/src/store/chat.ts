@@ -11,6 +11,7 @@ import {
   topicAfter,
   type IrcMessage,
   type Line,
+  type Where,
 } from "@gnoworld/core";
 import type { StateCreator } from "zustand/vanilla";
 
@@ -50,7 +51,7 @@ export interface ChatSlice {
 const EMPTY: RoomState = { lines: [], members: [], topic: undefined };
 
 // A room once a live line is read: the same object when the line changes nothing of it.
-function roomAfter(room: RoomState, message: IrcMessage, at: { room: string; me: string }): RoomState {
+function roomAfter(room: RoomState, message: IrcMessage, at: Where): RoomState {
   const line = lineOf(message, at.room);
   const added = line === undefined ? room.lines : addLines(room.lines, [line], LINES_KEPT);
   const lines = redactAfter(added, message, at.room);
@@ -58,6 +59,10 @@ function roomAfter(room: RoomState, message: IrcMessage, at: { room: string; me:
   const topic = topicAfter(room.topic, message, at.room);
   return lines === room.lines && members === room.members && topic === room.topic ? room : { lines, members, topic };
 }
+
+// A room followed, by its id: an own key alone, the ids being the relay's.
+const roomOf = (rooms: ChatState["rooms"], id: string): RoomState | undefined =>
+  Object.hasOwn(rooms, id) ? rooms[id] : undefined;
 
 // Each room changed by `change`, or the same record when none was.
 function eachRoom(rooms: ChatState["rooms"], change: (room: RoomState, id: string) => RoomState): ChatState["rooms"] {
@@ -82,8 +87,7 @@ export const chatSlice: StateCreator<ChatSlice> = (set, get) => {
         const { rooms } = get().chat;
         const wanted = [...new Set(ids)];
         if (sameKeys(Object.keys(rooms), wanted)) return;
-        const held = (id: string) => (Object.hasOwn(rooms, id) ? rooms[id] : undefined) ?? EMPTY;
-        change({ rooms: Object.fromEntries(wanted.map((id) => [id, held(id)])) });
+        change({ rooms: Object.fromEntries(wanted.map((id) => [id, roomOf(rooms, id) ?? EMPTY])) });
       },
       connected: (me) => {
         change({ me });
@@ -96,14 +100,14 @@ export const chatSlice: StateCreator<ChatSlice> = (set, get) => {
           change({ rooms: eachRoom(rooms, (room, each) => roomAfter(room, message, { room: each, me })) });
           return;
         }
-        const room = id === undefined || !Object.hasOwn(rooms, id) ? undefined : rooms[id];
+        const room = id === undefined ? undefined : roomOf(rooms, id);
         if (id === undefined || room === undefined) return;
         const next = roomAfter(room, message, { room: id, me });
         if (next !== room) change({ rooms: { ...rooms, [id]: next } });
       },
       page: (id, messages) => {
         const { rooms } = get().chat;
-        const room = Object.hasOwn(rooms, id) ? rooms[id] : undefined;
+        const room = roomOf(rooms, id);
         if (room === undefined) return;
         const read = messages.flatMap((message) => lineOf(message, id) ?? []);
         const lines = addLines(room.lines, read, LINES_KEPT);

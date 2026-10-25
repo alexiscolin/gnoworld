@@ -36,13 +36,11 @@ export interface RoomViewProps {
   chat: ErgoState | "off";
 }
 
-// An account: an address shortened, its whole in its title; another name whole.
-function Account({ name }: { name: string }) {
+// A person: a guest by its nick, said so; an account's address shortened, its whole in its title; another name
+// whole (the moderation bot's).
+function Person({ name, guest }: { name: string; guest: boolean }) {
+  if (guest) return <span>{name} (guest)</span>;
   return Address.safeParse(name).success ? <span title={name}>{shortAddress(name)}</span> : <span>{name}</span>;
-}
-
-function Member({ nick }: { nick: string }) {
-  return Address.safeParse(nick).success ? <Account name={nick} /> : <span>{nick} (guest)</span>;
 }
 
 function LineView({ line }: { line: Line }) {
@@ -52,7 +50,7 @@ function LineView({ line }: { line: Line }) {
         {CLOCK.format(new Date(line.time))}
       </time>{" "}
       {line.kind === "action" ? "* " : null}
-      {line.account === undefined ? <span>{line.from} (guest)</span> : <Account name={line.account} />}{" "}
+      <Person name={line.account ?? line.from} guest={line.account === undefined} />{" "}
       {line.kind === "notice" ? <span className={styles["mark"]}>Notice </span> : null}
       <span className={styles["text"]}>{line.text}</span>
     </li>
@@ -68,7 +66,7 @@ function People({ members, connected }: { members: readonly string[]; connected:
       <ul className={shared["plain"]}>
         {people.slice(0, MEMBERS_SHOWN).map((nick) => (
           <li key={nick}>
-            <Member nick={nick} />
+            <Person name={nick} guest={!Address.safeParse(nick).success} />
           </li>
         ))}
       </ul>
