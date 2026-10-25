@@ -20,8 +20,8 @@ export interface Line {
 // Ergo folds A to Z alone (casemapping ascii, deploy/ergo/ircd.yaml.tmpl).
 const fold = (name: string): string => name.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
 const sameRoom = (name: string, room: string): boolean => fold(name) === fold(room);
-// The nick of a source: nick!user@host, nick@host, or a nick alone.
-const nickOf = (source: string): string => source.replace(/[!@].*$/s, "");
+/** The nick of a source: nick!user@host, nick@host, or a nick alone. */
+export const nickOf = (source: string): string => source.replace(/[!@].*$/s, "");
 const compare = (one: string, other: string): number => (one < other ? -1 : one > other ? 1 : 0);
 
 // Where each command names its room; a QUIT and a NICK name none, every room hearing them.

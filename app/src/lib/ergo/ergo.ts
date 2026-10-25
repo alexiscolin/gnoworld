@@ -10,7 +10,7 @@ import type { Result } from "../api/login.ts";
 import type { Ergo, ErgoOptions, ErgoState, Socket } from "./types.ts";
 
 export { CAPS, drawGuestNick } from "./handshake.ts";
-export type { Ergo, ErgoState, Socket, Who } from "./types.ts";
+export type { Ergo, ErgoOptions, ErgoState, Socket, Who } from "./types.ts";
 
 export const BACKOFF = { firstMs: 1000, ceilingMs: 60_000 } as const;
 /** The handshake's whole time: past Ergo's 9 s for its auth script. */
