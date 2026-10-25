@@ -359,13 +359,42 @@ try:
             # A test may read another feature's parts, by a path inside the repository wherever node_modules sits.
             ("features/__probe__/peeks.test.ts", 'import { expect, test } from "vitest";\nimport { UpdatePrompt } from "../update/UpdatePrompt.tsx";\n\ntest("x", () => {\n  expect(UpdatePrompt).toBeDefined();\n});\n', None),
             ("lib/__probe__/lib_fetch.ts", reach('fetch("/x")'), None),
+            # lib is the boundaries: core, Zod, the schemas; never React, the design system, a feature, the scene,
+            # a route or the store (docs/ARCHITECTURE.md, slice 4's 4a).
+            ("lib/__probe__/lib_core.ts", uses(name="parseLine", path="@gnoworld/core"), None),
+            ("lib/__probe__/lib_zod.ts", 'import { z } from "zod";\n\nexport const used: unknown = z;\n', None),
+            ("lib/__probe__/lib_react.ts", uses(name="useState", path="react"), "no-restricted-imports"),
+            ("lib/__probe__/lib_router.ts", uses(name="Link", path="react-router"), "no-restricted-imports"),
+            ("lib/__probe__/lib_ui.ts", uses(name="Button", path="@gnoworld/ui"), "no-restricted-imports"),
+            ("lib/__probe__/lib_zustand.ts", uses(name="createStore", path="zustand/vanilla"), "no-restricted-imports"),
+            ("lib/__probe__/lib_feature.ts", uses(name="UpdatePrompt", path="../../features/update/index.ts"), "import-x/no-restricted-paths"),
+            ("lib/__probe__/lib_store.ts", uses(name="globe", path="../../store/__probe__/store_clean.ts"), "import-x/no-restricted-paths"),
+            ("lib/__probe__/lib_scene.ts", uses(name="globe", path="../../scene/__probe__/globe.ts"), "import-x/no-restricted-paths"),
+            ("lib/__probe__/lib_route.ts", uses(name="globe", path="../../routes/__probe__/route_clean.ts"), "import-x/no-restricted-paths"),
+            ("lib/__probe__/lib_ui_path.ts", uses(name="Button", path="../../../../packages/ui/src/index.ts"), "import-x/no-restricted-paths"),
+            # store holds the state: zustand's vanilla store, core, lib; never React (zustand's own hooks
+            # included), the design system, a feature, the scene or a route; nor the network.
+            ("store/__probe__/store_clean.ts", 'import { createStore } from "zustand/vanilla";\n\nexport const globe = createStore(() => ({ n: 1 }));\n', None),
+            ("store/__probe__/store_lib.ts", uses(name="connect", path="../../lib/adena/adena.ts"), None),
+            ("store/__probe__/store_core.ts", uses(name="parseLine", path="@gnoworld/core"), None),
+            ("store/__probe__/store_react.ts", uses(name="useState", path="react"), "no-restricted-imports"),
+            ("store/__probe__/store_zustand_react.ts", uses(name="create", path="zustand"), "no-restricted-imports"),
+            ("store/__probe__/store_zustand_hook.ts", uses(name="useStore", path="zustand/react"), "no-restricted-imports"),
+            ("store/__probe__/store_ui.ts", uses(name="Button", path="@gnoworld/ui"), "no-restricted-imports"),
+            ("store/__probe__/store_feature.ts", uses(name="UpdatePrompt", path="../../features/update/index.ts"), "import-x/no-restricted-paths"),
+            ("store/__probe__/store_scene.ts", uses(name="globe", path="../../scene/__probe__/globe.ts"), "import-x/no-restricted-paths"),
+            ("store/__probe__/store_route.ts", uses(name="globe", path="../../routes/__probe__/route_clean.ts"), "import-x/no-restricted-paths"),
+            ("store/__probe__/store_fetch.ts", reach('fetch("/x")'), f"no-restricted-globals: Unexpected use of 'fetch'. {net}"),
+            ("routes/__probe__/route_clean.ts", "export const globe = 1;\n", None),
+            # A test of lib may render what it checks: the rules hold its code, not its tests.
+            ("lib/__probe__/lib_react.test.ts", 'import { useState } from "react";\nimport { expect, test } from "vitest";\n\ntest("x", () => {\n  expect(useState).toBeDefined();\n});\n', None),
             ("routes/__probe__/route_log.ts", 'export function load(): void {\n  console.log("loaded");\n}\n', "no-console"),
             ("routes/__probe__/route_scene.ts", uses(name="globe", path="../../scene/__probe__/globe.ts"), "import-x/no-restricted-paths"),
             ("scene/__probe__/globe.ts", "export const globe = 1;\n", None),
         ]
         lint_cases(app, src, "app folders")
         os.remove(f"{src}/probe_root_fetch.ts")
-        for folder in ("sw", "features", "lib", "routes", "scene"):
+        for folder in ("sw", "features", "lib", "store", "routes", "scene"):
             shutil.rmtree(f"{src}/{folder}/__probe__")
             if not os.listdir(f"{src}/{folder}"):
                 os.rmdir(f"{src}/{folder}")
