@@ -6,3 +6,4 @@ export type { Line, Where } from "./chat/room.ts";
 export { inWord, markdown, mentions } from "./markdown/markdown.ts";
 export type { Block, Inline } from "./markdown/markdown.ts";
 export { COMMANDS, compose, LINE_BYTES, relayOf, type Composed } from "./chat/compose.ts";
+export { fold } from "./chat/fold.ts";

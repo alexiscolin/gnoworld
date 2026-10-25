@@ -1,17 +1,13 @@
 // A world's own rules, run before any provider (decision 159): banned words, links and mentions per
 // message, and fewer links for a new account. Words compare as people read them, so a full-width or an
 // accented spelling is the same word; a banned word matches whole, never inside a longer one.
+// Compatibility forms to their plain letters, accents and invisible format characters dropped, lower case: core's
+// fold, the one the page reads mentions with (F809).
+import { fold } from "@gnoworld/core";
 import type { Rules } from "../roles/roles.ts";
 
 export type RuleReason =
   "too_fast" | "not_their_edit" | "unknown_edit" | "banned_word" | "new_account_links" | "links" | "mentions";
-
-// Compatibility forms to their plain letters, accents and invisible format characters dropped, lower case.
-const fold = (text: string): string =>
-  text
-    .normalize("NFKD")
-    .replace(/[\p{M}\p{Cf}]/gu, "")
-    .toLowerCase();
 
 // All the words in one pass over the line: a pass a word grew with both (the complexity review, F530). A
 // word of a script written without spaces has no edge to find: it matches anywhere (F521).
