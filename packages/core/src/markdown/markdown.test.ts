@@ -737,54 +737,61 @@ describe("markdown: whatever comes", () => {
     );
   });
 
-  // Linear time: a quadratic reader takes minutes on these, a linear one milliseconds.
-  test.each([
-    ["*a ", 66_667],
-    ["_a ", 66_667],
-    ["~~a ", 50_000],
-    ["[", 200_000],
-    ["[a](", 50_000],
-    ["[a](https://x/", 14_286],
-    ["`a ", 66_667],
-    ["`` ` ", 40_000],
-    ["https:// ", 22_222],
-    ["https://a(", 20_000],
-    ["(https://a/", 18_182],
-    ["> ", 100_000],
-  ])("reads 200,000 characters of %j in under a second", (piece, times) => {
-    const source = piece.repeat(times) + "\\)";
-    const start = Date.now();
-    const tree = markdown(source);
-    expect(Date.now() - start).toBeLessThan(1000);
-    expect(allowed(tree)).toBe(true);
-  });
-
-  test("reads 200,000 characters of nested addresses closed by a backslash in under a second", () => {
-    const source = "[a](https://x/".repeat(14_286) + "\\" + ")".repeat(14_286);
-    const start = Date.now();
-    markdown(source);
-    expect(Date.now() - start).toBeLessThan(1000);
-  });
+  // Linear time, as ADR-0002 §9 measures an algorithm: a family read at n and 4n characters takes about four times as
+  // long, where a quadratic reader takes sixteen. The fastest of three reads each, so a pause of the machine or
+  // StrykerJS's instrumentation, which slow both alike, change nothing; no growth is read under 20 ms.
+  const fastest = (source: string) =>
+    Math.min(
+      ...[1, 2, 3].map(() => {
+        const start = Date.now();
+        markdown(source);
+        return Date.now() - start;
+      }),
+    );
+  const linear = (family: (size: number) => string) =>
+    fastest(family(16_000)) < Math.max(8 * fastest(family(4_000)), 20);
+  const repeated =
+    (piece: string, end = "") =>
+    (size: number) =>
+      piece.repeat(Math.ceil(size / piece.length)) + end;
 
   test.each([
-    ["```\n", 50_000],
-    ["```\n````\n", 25_000],
-    [">\n", 100_000],
-    ["> \n>> \n", 33_333],
-    ["- \n1. \n", 25_000],
-  ])("reads 200,000 characters of lines of %j in under a second", (piece, times) => {
-    const source = piece.repeat(times);
-    const start = Date.now();
-    const tree = markdown(source);
-    expect(Date.now() - start).toBeLessThan(1000);
-    expect(allowed(tree)).toBe(true);
+    "*a ",
+    "_a ",
+    "~~a ",
+    "[",
+    "[a](",
+    "[a](https://x/",
+    "`a ",
+    "`` ` ",
+    "https:// ",
+    "https://a(",
+    "(https://a/",
+    "> ",
+  ])("reads a line of %j in linear time, a backslash and a ) closing it", (piece) => {
+    expect(linear(repeated(piece, "\\)"))).toBe(true);
+    expect(allowed(markdown(repeated(piece, "\\)")(16_000)))).toBe(true);
   });
 
-  test("reads a deep pile of closed marks in under a second, its depth capped", () => {
-    const source = "**a _b ~~c ".repeat(300) + "x" + " c~~ b_ a**".repeat(300);
-    const start = Date.now();
-    const tree = markdown(source);
-    expect(Date.now() - start).toBeLessThan(1000);
-    expect(depthOf(tree)).toBeLessThanOrEqual(MAX_INLINE_DEPTH);
+  test("reads nested addresses closed by a backslash in linear time", () => {
+    const nested = (size: number) => {
+      const count = Math.ceil(size / 15);
+      return "[a](https://x/".repeat(count) + "\\" + ")".repeat(count);
+    };
+    expect(linear(nested)).toBe(true);
+  });
+
+  test.each(["```\n", "```\n````\n", ">\n", "> \n>> \n", "- \n1. \n"])("reads lines of %j in linear time", (piece) => {
+    expect(linear(repeated(piece))).toBe(true);
+    expect(allowed(markdown(repeated(piece)(16_000)))).toBe(true);
+  });
+
+  test("reads a deep pile of closed marks in linear time, its depth capped", () => {
+    const pile = (size: number) => {
+      const count = Math.ceil(size / 22);
+      return "**a _b ~~c ".repeat(count) + "x" + " c~~ b_ a**".repeat(count);
+    };
+    expect(linear(pile)).toBe(true);
+    expect(depthOf(markdown(pile(16_000)))).toBeLessThanOrEqual(MAX_INLINE_DEPTH);
   });
 });
