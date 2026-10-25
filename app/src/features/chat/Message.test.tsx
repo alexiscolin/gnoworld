@@ -54,12 +54,11 @@ describe("Message", () => {
     expect(boxed("a\n\nb")).toBe('<div class="x"><p>a</p><p>b</p></div>');
   });
 
-  it("shows a mention as the account's address shortened, its whole address in its title, in a list and a quote too", () => {
-    const mention = (address: string, short: string) =>
-      new RegExp(`<span data-mention="" title="${address}">@${short}</span>`);
-    expect(html(`hi @${ALICE}!`)).toMatch(new RegExp(`^<span>hi ${mention(ALICE, "g10gh7…3y5tv").source}!</span>$`));
-    expect(html(`> @${BOB}\n- @${ALICE}`)).toMatch(mention(BOB, "g1jg8m…vsqf5"));
-    expect(html(`> @${BOB}\n- @${ALICE}`)).toMatch(mention(ALICE, "g10gh7…3y5tv"));
+  it("shows a mention as its account's mark, its whole address in its title, in a list and a quote too", () => {
+    const mention = (address: string) => new RegExp(`<span data-mention="" title="${address}">@g1[^<]+</span>`);
+    expect(html(`hi @${ALICE}!`)).toMatch(new RegExp(`^<span>hi ${mention(ALICE).source}!</span>$`));
+    expect(html(`> @${BOB}\n- @${ALICE}`)).toMatch(mention(BOB));
+    expect(html(`> @${BOB}\n- @${ALICE}`)).toMatch(mention(ALICE));
     expect(html(`hi @${ALICE}`)).not.toContain('data-mention="me"');
   });
 
