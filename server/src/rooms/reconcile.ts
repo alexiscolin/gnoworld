@@ -66,7 +66,8 @@ export interface Reconciler {
   // Someone else joined a room: only a room whose type voices someone has a change to make (F582).
   joined: (room: string) => void;
   // Each room's flags put on at once, before any state is read: sent with the link's JOINs, a room Ergo
-  // lost and the bot makes again is closed from its first line (Ergo keeps a channel's history).
+  // lost and the bot makes again is closed from its first line (Ergo keeps a channel's history). Ergo makes
+  // every room invite-only (+i, default-modes): an open one is opened here, so no room_opened alert follows.
   flags: () => void;
 }
 
@@ -108,7 +109,11 @@ export function makeReconciler({ rooms, desired, state, send, log }: Options): R
   return {
     ask,
     flags: () => {
-      for (const room of rooms()) for (const flag of desired(room).modes) send("SAMODE", [room, `+${flag}`]);
+      for (const room of rooms()) {
+        const { modes } = desired(room);
+        for (const flag of modes) send("SAMODE", [room, `+${flag}`]);
+        if (!modes.includes("i")) send("SAMODE", [room, "-i"]);
+      }
     },
     // ponytail: a JOIN reads the whole room again (10,000 people at most, a few ms); voice the joiner alone
     // if busy rooms that voice grow.

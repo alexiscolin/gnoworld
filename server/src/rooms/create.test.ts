@@ -38,11 +38,11 @@ const setup = ({ max = 20 }: { max?: number } = {}) => {
 };
 
 describe("a moderator's room", () => {
-  it("is made as #world/name: recorded in its world, joined, and open to accounts (+M)", () => {
+  it("is made as #world/name: recorded in its world, joined, open to accounts (+M) and to all (-i)", () => {
     const { db, sent, rooms } = setup();
     expect(rooms.create("bubble", "garden")).toEqual({ made: "#bubble/garden" });
     expect(listRooms(db)).toContainEqual({ name: "#bubble/garden", world: "bubble" });
-    expect(sent).toEqual(["JOIN #bubble/garden", "SAMODE #bubble/garden +M"]);
+    expect(sent).toEqual(["JOIN #bubble/garden", "SAMODE #bubble/garden +M", "SAMODE #bubble/garden -i"]);
   });
 
   it("is made once: a name its world has already is refused", () => {
@@ -76,10 +76,10 @@ describe("a moderator's room", () => {
     const { sent, rooms, archived } = setup();
     rooms.create("bubble", "garden");
     expect(rooms.archive("bubble", "garden")).toBe("archived");
-    expect(sent.slice(2)).toEqual(["SAMODE #bubble/garden +m", "SAMODE #bubble/garden +s"]);
+    expect(sent.slice(3)).toEqual(["SAMODE #bubble/garden +m", "SAMODE #bubble/garden +s"]);
     expect(archived()).toContainEqual({ name: "#bubble/garden", archived: 1 });
     expect(rooms.archive("bubble", "garden")).toBe("archived");
-    expect(sent).toHaveLength(4);
+    expect(sent).toHaveLength(5);
   });
 
   it("keeps an archived room's name and its place in the world's cap: no spam by making and archiving", () => {

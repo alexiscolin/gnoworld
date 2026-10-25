@@ -251,7 +251,7 @@ describe("the reconciler's pass", () => {
     await expect.poll(() => asked).toBe(2);
   });
 
-  it("puts each room's flags on at once, before any state is read: a room Ergo lost is closed from its JOIN", () => {
+  it("puts each room's flags on at once, before any state is read, an open room's -i too: Ergo makes a room +i", () => {
     const sent: string[] = [];
     let asked = 0;
     const reconciler = makeReconciler({
@@ -265,7 +265,10 @@ describe("the reconciler's pass", () => {
       log: quiet,
     });
     reconciler.flags();
-    expect([sent, asked]).toEqual([["SAMODE #a +M", "SAMODE #a +i", "SAMODE #a +s", "SAMODE #b +M"], 0]);
+    expect([sent, asked]).toEqual([
+      ["SAMODE #a +M", "SAMODE #a +i", "SAMODE #a +s", "SAMODE #b +M", "SAMODE #b -i"],
+      0,
+    ]);
   });
 
   it("runs a pass after one that found no room", async () => {
