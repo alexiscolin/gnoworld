@@ -10,7 +10,7 @@ import type { Result } from "../api/login.ts";
 import type { Ergo, ErgoOptions, ErgoState, Socket } from "./types.ts";
 
 export { CAPS, drawGuestNick } from "./handshake.ts";
-export type { ErgoState, Socket } from "./types.ts";
+export type { Ergo, ErgoState, Socket } from "./types.ts";
 
 export const BACKOFF = { firstMs: 1000, ceilingMs: 60_000 } as const;
 /** The handshake's whole time: past Ergo's 9 s for its auth script. */
@@ -28,6 +28,7 @@ class Connection {
   #generation = 0;
   #socket: Socket | undefined;
   #nick = "";
+  #welcomed: string | undefined;
   #ticket: string | undefined;
   #refusals = 0;
   #step: Step = "caps";
@@ -42,6 +43,10 @@ class Connection {
 
   send(line: string): boolean {
     return this.#step === "connected" && this.#state === "connected" && oneLine(line) && this.#write(line);
+  }
+
+  nick(): string | undefined {
+    return this.#step === "connected" && this.#state === "connected" ? (this.#welcomed ?? this.#nick) : undefined;
   }
 
   stop(): void {
@@ -126,6 +131,9 @@ class Connection {
 
   // The move a line makes at a step of the handshake: lines sent and the next step, a failure, or connected.
   #shake(step: Exclude<Step, "connected">, message: IrcMessage): void {
+    // Ergo's welcome names the nick it took; none, or *, leaves the one sent.
+    const [named = ""] = message.params;
+    if (message.command === "001" && named !== "" && named !== "*") this.#welcomed = named;
     const move = advance(step, message, { nick: this.#nick, ticket: this.#ticket });
     if (move === undefined) return;
     if ("next" in move) {
@@ -143,6 +151,7 @@ class Connection {
   #renick(draw: () => string): void {
     this.#refusals += 1;
     const nick = this.#refusals < GUEST_TRIES ? guestNick(draw) : undefined;
+    this.#nick = nick ?? this.#nick;
     if (nick === undefined) this.#fail();
     else this.#write(`NICK ${nick}`);
   }
@@ -200,6 +209,7 @@ class Connection {
 
   #open(nick: string, ticket: string | undefined): void {
     this.#nick = nick;
+    this.#welcomed = undefined;
     this.#ticket = ticket;
     this.#refusals = 0;
     this.#step = "caps";
@@ -230,5 +240,6 @@ export function connectErgo(options: ErgoOptions): Ergo {
     stop: () => {
       connection.stop();
     },
+    nick: () => connection.nick(),
   };
 }

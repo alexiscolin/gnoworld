@@ -402,6 +402,36 @@ describe("connectErgo's handshake", () => {
     expect(t.sockets).toHaveLength(1);
   });
 
+  it("names an account by the nick Ergo welcomed it with, though it sent its address", async () => {
+    const t = setup();
+    await t.settle();
+    const s = t.last();
+    s.open();
+    ack(s);
+    plus(s);
+    saslOk(s);
+    s.say(":ergo 001 G1JG8MTUTU9KHHFWC4NXMUHCPFTF0PAJDHFVSQF5 :Welcome");
+    motd(s);
+    expect(t.client.nick()).toBe("G1JG8MTUTU9KHHFWC4NXMUHCPFTF0PAJDHFVSQF5");
+  });
+
+  it("names the nick Ergo welcomed it with (001) once connected, and none before or after", async () => {
+    const t = setup();
+    await t.settle();
+    const s = t.last();
+    expect(t.client.nick()).toBeUndefined();
+    s.open();
+    ack(s);
+    plus(s);
+    saslOk(s);
+    s.say(`:ergo 001 ${ADDRESS} :Welcome`);
+    expect(t.client.nick()).toBeUndefined();
+    motd(s);
+    expect(t.client.nick()).toBe(ADDRESS);
+    s.closeEvent();
+    expect(t.client.nick()).toBeUndefined();
+  });
+
   it("drops the handshake's deadline once connected", async () => {
     const t = await connected();
     expect(t.pending().filter((w) => w.ms === HANDSHAKE_MS)).toHaveLength(0);
@@ -922,6 +952,93 @@ describe("connectErgo as a guest", () => {
     taken(t.s);
     expect(nicks(t.s)).toEqual(["NICK guest-one"]);
     expect(t.states.at(-1)).toBe("stopped");
+  });
+
+  it("names itself by the nick Ergo took, the one drawn after a 433", async () => {
+    const t = await guest(["guest-one", "guest-two"]);
+    t.s.open();
+    ack(t.s);
+    taken(t.s);
+    t.s.say(":ergo 001 guest-two :Welcome");
+    motd(t.s);
+    expect(t.client.nick()).toBe("guest-two");
+  });
+
+  it.each([
+    ["names none", ":ergo 001"],
+    ["names an empty nick", ":ergo 001 :"],
+    ["names *", ":ergo 001 * :Welcome"],
+  ])("names itself by the nick it last sent when Ergo's welcome %s", async (_, welcome) => {
+    const t = await guest(["guest-one", "guest-two"]);
+    t.s.open();
+    ack(t.s);
+    taken(t.s);
+    t.s.say(welcome);
+    motd(t.s);
+    expect(t.client.nick()).toBe("guest-two");
+  });
+
+  it("names itself by the nick Ergo's welcome gives, though it sent another", async () => {
+    const t = await guest(["guest-one"]);
+    t.s.open();
+    ack(t.s);
+    t.s.say(":ergo 001 other-name :Welcome");
+    motd(t.s);
+    expect(t.client.nick()).toBe("other-name");
+  });
+
+  it("takes a reconnect's welcome alone: one that names none gives the nick sent, not the last welcome's", async () => {
+    const t = await guest(["guest-one", "guest-two"]);
+    t.s.open();
+    ack(t.s);
+    t.s.say(":ergo 001 other-name :Welcome");
+    motd(t.s);
+    t.s.closeEvent();
+    await t.run(t.backoffs()[0]);
+    const again = t.last();
+    again.open();
+    ack(again);
+    again.say(":ergo 001");
+    motd(again);
+    expect(t.client.nick()).toBe("guest-two");
+  });
+
+  it("changes its nick on no 001 once connected: the line is handed on", async () => {
+    const t = await guest(["guest-one"]);
+    welcomeGuest(t.s, "guest-one");
+    t.s.say(":ergo 001 someone-else :Welcome");
+    expect(t.client.nick()).toBe("guest-one");
+    expect(t.lines.map((l) => l.command)).toEqual(["001"]);
+  });
+
+  it.each([
+    [
+      "stopped",
+      async (t: Setup & { s: FakeSocket }) => {
+        t.client.stop();
+        await t.settle();
+      },
+    ],
+    [
+      "given an ERROR",
+      async (t: Setup & { s: FakeSocket }) => {
+        t.s.say("ERROR :Closing Link");
+        await t.settle();
+      },
+    ],
+    [
+      "silent past its ping",
+      async (t: Setup & { s: FakeSocket }) => {
+        await t.run(t.pending().find((w) => w.ms === PING_MS));
+        await t.run(t.pending().find((w) => w.ms === PING_MS));
+      },
+    ],
+  ])("names no nick once %s", async (_, end) => {
+    const t = await guest(["guest-one"]);
+    welcomeGuest(t.s, "guest-one");
+    expect(t.client.nick()).toBe("guest-one");
+    await end(t);
+    expect(t.client.nick()).toBeUndefined();
   });
 
   it("waits on Ergo's ERROR once connected", async () => {
