@@ -38,9 +38,10 @@ function sectionsOf(roles: Typed, world: string, seen: readonly string[]): RoomL
     }));
 }
 
+// A world's slug, 64 characters at most, as the activity route asks.
+const World = RoomList.shape.world.max(64);
+
 export function listRoutes({ db, roles, visible, session = () => undefined }: Options): Hono {
-  // A world's slug, 64 characters at most, as the activity route asks.
-  const World = RoomList.shape.world.max(64);
   const app = new Hono();
   app.get("/", (c) => {
     const asked = c.req.queries("world");

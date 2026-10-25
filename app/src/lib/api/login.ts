@@ -2,14 +2,13 @@
 // one JSON call of lib/api/http.ts. The session is the server's HttpOnly cookie, which the page never reads.
 import { Challenge, Me, Ticket, type Address, type Proof } from "@gnoworld/schemas";
 import { z } from "../jitless.ts";
-import { jsonCall, TIMEOUT_MS, type Fetcher, type Result } from "./http.ts";
+import { jsonCall, TIMEOUT_MS, type Call, type Fetcher, type Result } from "./http.ts";
 
 export { TIMEOUT_MS, type Fetcher, type Result } from "./http.ts";
 
 export function loginApi(fetcher: Fetcher, timeoutMs = TIMEOUT_MS) {
   const call = jsonCall(fetcher, timeoutMs);
-  const send = <T>(sent: { path: string; body?: unknown; schema: z.ZodType<T> }) =>
-    call({ ...sent, path: `/api/login/${sent.path}` });
+  const send = <T>(sent: Call<T>) => call({ ...sent, path: `/api/login/${sent.path}` });
 
   return {
     /** A challenge to sign, for the chain Adena is on. */
