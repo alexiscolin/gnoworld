@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import type { WebSocketRoute } from "@playwright/test";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
@@ -46,6 +47,56 @@ test.describe("a world's rooms, as they look", () => {
     await expect(page).toHaveScreenshot("composer-computer.png", {
       mask: [page.getByRole("banner")],
     });
+  });
+
+  // 4d: a line that mentions the account, set apart by a word and amber (docs/DESIGN-SYSTEM.md, "about me"); another
+  // account's mention shown plain, as its short address. The account's own address is drawn at the server's start.
+  test("sets a line that mentions the account apart, its mention too, on a computer's screen", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    const address = await logIn(page, "mention-look");
+    await page.routeWebSocket(/\/ws$/, (ergo) => {
+      scriptedErgo(ergo, ACCOUNT, [
+        ["m1", "2026-10-25T10:00:00.000Z", `Who is up for a round of **gnogolf**? @${MEMBER} is in.`],
+        ["m2", "2026-10-25T10:01:00.000Z", `@${address} are you in too?`],
+        ["m3", "2026-10-25T10:02:00.000Z", `Write \`@${address}\` to call them.`],
+      ]);
+    });
+    await page.goto("/w/bubble?room=games");
+    await hydrated(page);
+    const lines = page.getByRole("list", { name: "Messages" }).getByRole("listitem");
+    await expect(lines).toHaveCount(3);
+    await expect(lines.nth(0)).toContainText(`@${MEMBER.slice(0, 6)}…${MEMBER.slice(-5)} is in.`);
+    await expect(lines.filter({ hasText: "Mentions you" })).toHaveCount(1);
+    await expect(lines.nth(1)).toContainText("Mentions you");
+    const mine = lines.nth(1).getByTitle(address);
+    await expect(mine).toHaveText(`@${address.slice(0, 6)}…${address.slice(-5)}`);
+    // Amber, the design system's "about me": the reader's mention and the line's word; another's mention not.
+    const amber = await page.evaluate(() => {
+      const probe = document.createElement("span");
+      probe.style.color = "var(--color-warm)";
+      document.body.append(probe);
+      const color = getComputedStyle(probe).color;
+      probe.remove();
+      return color;
+    });
+    const color = (element: HTMLElement) => getComputedStyle(element).color;
+    expect(await mine.evaluate(color)).toBe(amber);
+    expect(await lines.nth(1).getByText("Mentions you").evaluate(color)).toBe(amber);
+    expect(await lines.nth(0).getByTitle(MEMBER).last().evaluate(color)).not.toBe(amber);
+    await expect(lines.nth(1)).toHaveCSS("border-inline-start-color", amber);
+    expect((await new AxeBuilder({ page }).include("ol").analyze()).violations).toEqual([]);
+    // For the picture, the drawn address reads the same each run (its own text was checked above), so the amber
+    // mention shows in it; the header, which names the wallet, masked.
+    await mine.evaluate((element) => {
+      element.textContent = "@g1aaaa…aaaaa";
+    });
+    await lines
+      .nth(2)
+      .locator("code")
+      .evaluate((element) => {
+        element.textContent = `@g1${"a".repeat(38)}`;
+      });
+    await expect(page).toHaveScreenshot("mention-computer.png", { mask: [page.getByRole("banner")] });
   });
 });
 

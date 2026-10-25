@@ -92,6 +92,77 @@ describe("RoomView", () => {
     );
   });
 
+  // 4d: a line that mentions the reader, by a word as well as its colour (docs/DESIGN-SYSTEM.md, "about me").
+  it("marks a line that mentions the reader, by a word and its class, and its mention apart", () => {
+    const lines = [line({ text: `ready, @${BOB}?` }), line({ id: "b", text: `and @${ALICE}` })];
+    const html = part(view({ me: BOB, state: { ...ROOM, lines } }), "Messages");
+    expect(items(html)).toEqual([
+      expect.stringMatching(/^\d{2}:\d{2} g10gh7…3y5tv Mentions you ready, @g1jg8m…vsqf5 \?$/),
+      expect.stringMatching(/^\d{2}:\d{2} g10gh7…3y5tv and @g10gh7…3y5tv$/),
+    ]);
+    expect(html).toMatch(
+      /<li class="[^"]*mentioned[^"]*">.*<span class="[^"]*aboutMe[^"]*">Mentions you <\/span><span class="[^"]*text[^"]*">/s,
+    );
+    expect(html).toMatch(new RegExp(`<span class="(?=[^"]*mention)(?=[^"]*aboutMe)[^"]*" title="${BOB}">`));
+    expect(html.match(/mentioned/g)).toHaveLength(1);
+  });
+
+  it("marks a notice and an /me that mention the reader, their own marks kept", () => {
+    const lines = [
+      line({ kind: "notice", text: `@${BOB} heads up` }),
+      line({ id: "b", kind: "action", text: `waves at @${BOB}` }),
+    ];
+    const html = part(view({ me: BOB, state: { ...ROOM, lines } }), "Messages");
+    expect(items(html)).toEqual([
+      expect.stringMatching(/^\d{2}:\d{2} g10gh7…3y5tv Mentions you Notice @g1jg8m…vsqf5 heads up$/),
+      expect.stringMatching(/^\d{2}:\d{2} \* g10gh7…3y5tv Mentions you waves at @g1jg8m…vsqf5$/),
+    ]);
+    expect(html).toMatch(/<li class="(?=[^"]*notice)(?=[^"]*mentioned)[^"]*">/);
+    expect(html).toMatch(/<li class="(?=[^"]*action)(?=[^"]*mentioned)[^"]*">/);
+  });
+
+  // Wherever the line names the reader: in a quote, a list, a mark, a second paragraph; by its own author too.
+  it.each([
+    [`> @${BOB}`, "in a quote"],
+    [`- @${BOB}`, "in a list"],
+    [`**@${BOB}**`, "in a mark"],
+    [`first\n\nthen @${BOB}`, "in a second paragraph"],
+    [`@${BOB} @${BOB}`, "twice"],
+  ])("marks a line that mentions the reader %j once: %s", (text) => {
+    const html = part(view({ me: BOB, state: { ...ROOM, lines: [line({ text })] } }), "Messages");
+    expect(said(html).match(/Mentions you/g)).toHaveLength(1);
+    expect(html.match(/mentioned/g)).toHaveLength(1);
+  });
+
+  it("marks a line its own author wrote that mentions them", () => {
+    const html = part(
+      view({ me: ALICE, state: { ...ROOM, lines: [line({ text: `note to @${ALICE}` })] } }),
+      "Messages",
+    );
+    expect(said(html)).toContain("Mentions you");
+  });
+
+  it.each([
+    [`[@${BOB}](https://a.example)`, "in a link's label"],
+    [`\\@${BOB}`, "escaped"],
+    ["```\n@" + BOB + "\n```", "in a code block"],
+    [`@${BOB.slice(0, -1)}q`, "one character off"],
+  ])("marks no line where %j names the reader: %s", (text) => {
+    const html = part(view({ me: BOB, state: { ...ROOM, lines: [line({ text })] } }), "Messages");
+    expect(said(html)).not.toContain("Mentions you");
+    expect(html).not.toContain("mentioned");
+  });
+
+  it("marks no line for a guest, nor one that mentions another account, nor one whose mention is code", () => {
+    const lines = [line({ text: `hi @${BOB}` }), line({ id: "b", text: `\`@${ALICE}\`` })];
+    for (const me of [undefined, ALICE]) {
+      const html = part(view({ me, state: { ...ROOM, lines } }), "Messages");
+      expect(said(html)).not.toContain("Mentions you");
+      expect(html).not.toContain("mentioned");
+      expect(html).not.toContain("aboutMe");
+    }
+  });
+
   it("shows a line, a topic, a nick, a member and an account as text, never as markup or a link", () => {
     const hostile = "<img src=x onerror=alert(1)>";
     const lines = [

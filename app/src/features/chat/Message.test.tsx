@@ -22,6 +22,12 @@ const TAGS = new Set([
   "li",
 ]);
 const LINK = /^<a href="https:\/\/[^"]+" title="https:\/\/[^"]+" dir="ltr" target="_blank" rel="noopener noreferrer">$/;
+// A mention: its class, the account's whole address in its title, and nothing else.
+const MENTION = /^<span class="([^"]*)" title="(g1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{38})">$/;
+// A class attribute's value holding each of `names`, in any order.
+const classes = (...names: string[]) => `${names.map((name) => `(?=[^"]*${name})`).join("")}[^"]*`;
+const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const opening = (markup: string) =>
   [...markup.matchAll(/<([a-z]+)[^>]*>/g)].map((found) => ({ tag: found[1] ?? "", whole: found[0] }));
 
@@ -48,6 +54,41 @@ describe("Message", () => {
     expect(boxed("")).toBe('<span class="x"></span>');
     expect(boxed("a")).toBe('<span class="x">a</span>');
     expect(boxed("a\n\nb")).toBe('<div class="x"><p>a</p><p>b</p></div>');
+  });
+
+  it("shows a mention as the account's address shortened, its whole address in its title, in a list and a quote too", () => {
+    const mention = (address: string, short: string) =>
+      new RegExp(`<span class="${classes("mention")}" title="${address}">@${short}</span>`);
+    expect(html(`hi @${ALICE}!`)).toMatch(new RegExp(`^<span>hi ${mention(ALICE, "g10gh7…3y5tv").source}!</span>$`));
+    expect(html(`> @${BOB}\n- @${ALICE}`)).toMatch(mention(BOB, "g1jg8m…vsqf5"));
+    expect(html(`> @${BOB}\n- @${ALICE}`)).toMatch(mention(ALICE, "g10gh7…3y5tv"));
+    expect(html(`hi @${ALICE}`)).not.toContain("aboutMe");
+  });
+
+  it("sets a mention of the reader apart, and no other", () => {
+    const markup = renderToStaticMarkup(<Message text={`@${ALICE} and @${BOB}`} me={BOB} />);
+    expect(markup).toMatch(new RegExp(`<span class="${classes("mention", "aboutMe")}" title="${BOB}">`));
+    expect(markup).toMatch(new RegExp(`<span class="${classes("mention")}" title="${ALICE}">`));
+    expect(markup).not.toMatch(new RegExp(`aboutMe[^"]*" title="${ALICE}"`));
+    expect(markup.match(/aboutMe/g)).toHaveLength(1);
+  });
+
+  // The threat model's lookalike: the reader's address where it is no mention, or an address one character off.
+  it.each([
+    [`[@${BOB}](https://a.example)`, "in a link's label"],
+    [`\`@${BOB}\``, "in code"],
+    [`\\@${BOB}`, "escaped"],
+    ["```\n@" + BOB + "\n```", "in a code block"],
+    [`@${BOB.slice(0, -1)}q`, "one character off"],
+    [`x@${BOB}`, "inside a word"],
+  ])("sets no mention of the reader apart where %j names it: %s", (text) => {
+    expect(renderToStaticMarkup(<Message text={text} me={BOB} />)).not.toContain("aboutMe");
+  });
+
+  it("sets no mention apart for a reader with no account, whatever its name", () => {
+    for (const me of ["", "guest-ab12cd", undefined]) {
+      expect(renderToStaticMarkup(<Message text={`@${BOB} and @ and @${ALICE}`} me={me} />)).not.toContain("aboutMe");
+    }
   });
 
   it("numbers an ordered list from its first number", () => {
@@ -77,7 +118,7 @@ describe("Message", () => {
     ).toBe(text);
   });
 
-  it("makes, of anything, the allowed elements alone, each link https with no opener and no other attribute", () => {
+  it("makes, of anything, the allowed elements alone, each link https with no opener, each mention an account's, and no other attribute", () => {
     const pieces = fc.constantFrom(
       "**",
       "*",
@@ -93,15 +134,29 @@ describe("Message", () => {
       "<b>",
       '" onclick="x',
       "https://a.example",
+      `@${ALICE}`,
+      `x@${BOB}`,
+      `[@${BOB}](https://a.example)`,
+      `@${ALICE}" onclick="x`,
+      `@${BOB}`,
     );
     fc.assert(
       fc.property(
         fc.array(fc.oneof(pieces, fc.string({ unit: "binary", maxLength: 6 })), { maxLength: 40 }),
-        (parts) => {
-          for (const { tag, whole } of opening(html(parts.join("")))) {
+        fc.constantFrom(BOB, undefined),
+        (parts, me) => {
+          const source = parts.join("");
+          for (const { tag, whole } of opening(renderToStaticMarkup(<Message text={source} me={me} />))) {
             expect(TAGS.has(tag)).toBe(true);
             if (tag === "a") expect(whole).toMatch(LINK);
-            else expect(whole).toMatch(/^<[a-z]+\/?>$/);
+            else if (whole.startsWith("<span ")) {
+              // A mention names an account the message names, and is the reader's own only when it is.
+              const [, names = "", title = ""] = MENTION.exec(whole) ?? [];
+              expect(source).toContain(`@${title}`);
+              expect(names.split(" ").filter((name) => /mention|aboutMe/.test(name))).toHaveLength(
+                title === me ? 2 : 1,
+              );
+            } else expect(whole).toMatch(/^<[a-z]+\/?>$/);
           }
         },
       ),

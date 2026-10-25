@@ -1,5 +1,5 @@
-/* A room: its description and the link's state muted, its lines wrapping anywhere, an /me, a notice and a quote
-   apart. */
+/* A room: its description and the link's state muted, its lines wrapping anywhere, an /me, a notice, a quote and a
+   line that mentions the reader apart. */
 @layer components {
   .topic {
     color: var(--color-text-muted);
@@ -26,6 +26,18 @@
 
   .notice .text {
     color: var(--color-text-muted);
+  }
+
+  /* A line that mentions the reader: amber, the design system's "about me", at its start and in its word (4d). */
+  .mentioned {
+    padding-inline-start: var(--space-2xs);
+    border-inline-start: var(--line-width) solid var(--color-warm);
+    background: var(--color-warm-soft);
+  }
+
+  .aboutMe {
+    color: var(--color-warm);
+    font: var(--font-meta);
   }
 
   /* A quote set apart from the sender's own words, by a rule at its start and a muted colour (F783). */

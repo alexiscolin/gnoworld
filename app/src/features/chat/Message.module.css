@@ -1,0 +1,14 @@
+/* A mention in a message (slice 4's 4d): the account it names, on a fill as code is; the reader's own in amber,
+   the design system's "about me" (docs/DESIGN-SYSTEM.md), the line saying so in words (RoomView). */
+@layer components {
+  .mention {
+    padding-inline: var(--space-3xs);
+    border-radius: var(--radius-s);
+    background: var(--color-fill);
+  }
+
+  .aboutMe {
+    background: var(--color-warm-soft);
+    color: var(--color-warm);
+  }
+}

@@ -3,6 +3,6 @@ export type { IrcCommand, IrcMessage, IrcParsed, IrcParseError } from "./irc/irc
 export { BATCH_LINES, BatchReader, OPEN_BATCHES, type Batch, type Batched } from "./irc/batch.ts";
 export { addLines, concerns, lineOf, membersAfter, nickOf, redactAfter, topicAfter } from "./chat/room.ts";
 export type { Line, Where } from "./chat/room.ts";
-export { inWord, markdown } from "./markdown/markdown.ts";
+export { inWord, markdown, mentions } from "./markdown/markdown.ts";
 export type { Block, Inline } from "./markdown/markdown.ts";
 export { COMMANDS, compose, LINE_BYTES, relayOf, type Composed } from "./chat/compose.ts";

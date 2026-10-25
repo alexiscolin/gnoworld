@@ -109,6 +109,7 @@ function Loaded({ sections, current, state, chat, session, say }: LoadedProps) {
           room={current}
           state={state}
           chat={chat}
+          me={session.kind === "in" ? session.address : undefined}
           composer={
             <Writer
               session={session}

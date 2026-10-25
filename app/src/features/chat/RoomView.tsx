@@ -1,14 +1,15 @@
 // A room (slice 4's 4b): its name, its description (its IRC topic), its newest lines as the store holds them
 // (the window), held at the newest while the reader is there, who is here, and the state of the link. A line's
-// text is Markdown (4c), built into elements from an allowlist (Message.tsx); the composer, given, goes below.
+// text is Markdown (4c), built into elements from an allowlist (Message.tsx); one that mentions the reader says so
+// (4d); the composer, given, goes below.
 // A line's author is its account tag alone, a nick being only a nick; a member's nick is an account's when it is
 // an address, which a guest's cannot be (Ergo gives a guest 32 characters, server/src/testing/ergo.test.ts:314).
-import type { Line } from "@gnoworld/core";
+import { markdown, mentions, type Line } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
 import { Sidebar, Stack } from "@gnoworld/ui";
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 import type { ErgoState } from "../../lib/ergo/ergo.ts";
-import { Message } from "./Message.tsx";
+import { Markdown } from "./Message.tsx";
 import { roomLabel, shortAddress } from "./names.ts";
 import shared from "./lists.module.css";
 import styles from "./RoomView.module.css";
@@ -39,6 +40,8 @@ export interface RoomViewProps {
   chat: ErgoState | "off";
   /** What goes under the lines: the composer for an account, a word for a guest. */
   composer?: ReactNode;
+  /** The reader's address, the lines that mention it marked; none for a guest. */
+  me?: string | undefined;
 }
 
 // A person: a guest by its nick, said so; an account's address shortened, its whole in its title; another name
@@ -48,16 +51,26 @@ function Person({ name, guest }: { name: string; guest: boolean }) {
   return Address.safeParse(name).success ? <span title={name}>{shortAddress(name)}</span> : <span>{name}</span>;
 }
 
-function LineView({ line }: { line: Line }) {
+// A line's classes: its kind's, and whether it mentions the reader.
+function classesOf(kind: Line["kind"], mentioned: boolean): string | undefined {
+  const names = [KINDS[kind], mentioned ? styles["mentioned"] : undefined].filter((name) => name !== undefined);
+  return names.length === 0 ? undefined : names.join(" ");
+}
+
+// A line, read once: drawn, and asked whether it mentions the reader, which a word says as well as its colour.
+function LineView({ line, me }: { line: Line; me: string | undefined }) {
+  const blocks = markdown(line.text);
+  const mentioned = me !== undefined && mentions(blocks).includes(me);
   return (
-    <li className={KINDS[line.kind]}>
+    <li className={classesOf(line.kind, mentioned)}>
       <time dateTime={line.time} className={styles["time"]}>
         {CLOCK.format(new Date(line.time))}
       </time>{" "}
       {line.kind === "action" ? "* " : null}
       <Person name={line.account ?? line.from} guest={line.account === undefined} />{" "}
+      {mentioned ? <span className={styles["aboutMe"]}>Mentions you </span> : null}
       {line.kind === "notice" ? <span className={styles["mark"]}>Notice </span> : null}
-      <Message text={line.text} className={styles["text"]} />
+      <Markdown blocks={blocks} className={styles["text"]} me={me} />
     </li>
   );
 }
@@ -97,7 +110,7 @@ function useNewestInView(lines: readonly Line[]) {
   return { listRef, onScroll };
 }
 
-export function RoomView({ room, state, chat, composer }: RoomViewProps) {
+export function RoomView({ room, state, chat, composer, me }: RoomViewProps) {
   const { lines = [], members = [], topic } = state ?? {};
   const { listRef, onScroll } = useNewestInView(lines);
   const connected = chat === "connected";
@@ -122,7 +135,7 @@ export function RoomView({ room, state, chat, composer }: RoomViewProps) {
             tabIndex={0}
           >
             {lines.map((line) => (
-              <LineView key={line.id} line={line} />
+              <LineView key={line.id} line={line} me={me} />
             ))}
           </ol>
           {connected && lines.length === 0 ? <p>No messages yet.</p> : null}

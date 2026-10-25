@@ -1,8 +1,10 @@
 // A line's marks (slice 4's 4c), read left to right once: escapes, code, bare https addresses, links
-// `[label](https://…)`, and runs of one, two or three `*` or `_`, or two `~`, at word bounds. A mark or label open
-// is a frame on a stack, holding what it would wrap; one never closed gives its run back as text. Marks and labels
-// nest 8 deep at most, past which a mark is text: a hostile line costs no deeper stack and linear time.
+// `[label](https://…)`, mentions `@g1…` (4d), and runs of one, two or three `*` or `_`, or two `~`, at word bounds.
+// A mark or label open is a frame on a stack, holding what it would wrap; one never closed gives its run back as
+// text. Marks and labels nest 8 deep at most, past which a mark is text: a hostile line costs no deeper stack and
+// linear time.
 import { Addresses } from "./address.ts";
+import { mentionAt } from "./mentions.ts";
 import { append, invisible, wrap } from "./nodes.ts";
 import { after, before, Runs, runOf } from "./scan.ts";
 import type { Inline } from "./types.ts";
@@ -40,7 +42,7 @@ class Reader {
   readonly #source: string;
   readonly #addresses: Addresses;
   // Where the reader stops to look: an escape, a mark, a label's bracket or an address.
-  readonly #special = /[\\`*_~[\]]|https:\/\//g;
+  readonly #special = /[\\`*_~[\]@]|https:\/\//g;
   readonly #root: Inline[] = [];
   readonly #frames: Frame[] = [];
   #runs: Runs | undefined;
@@ -71,6 +73,7 @@ class Reader {
     else if (char === "[") this.#bracket();
     else if (char === "]") this.#close();
     else if (char === "h") this.#bare();
+    else if (char === "@") this.#mention();
     else this.#mark(char);
   }
 
@@ -129,7 +132,7 @@ class Reader {
   // An https address at a word's start, outside a label: a link to itself; else the letter.
   #bare(): void {
     const at = this.#at;
-    const end = this.#frames.some((frame) => frame.mark === "[") ? -1 : this.#addresses.bare(at);
+    const end = this.#inLabel() ? -1 : this.#addresses.bare(at);
     if (end === -1) {
       this.#add("h");
       this.#at = at + 1;
@@ -138,6 +141,19 @@ class Reader {
     const href = this.#source.slice(at, end);
     this.#push({ type: "link", href, children: [{ type: "text", text: href }] });
     this.#at = end;
+  }
+
+  // `@` and an account's address, outside a label: a mention; else the `@`.
+  #mention(): void {
+    const address = this.#inLabel() ? undefined : mentionAt(this.#source, this.#at);
+    if (address === undefined) this.#add("@");
+    else this.#push({ type: "mention", address });
+    this.#at += 1 + (address?.length ?? 0);
+  }
+
+  // Whether a label is open: what a label holds is its words, no address or mention of its own.
+  #inLabel(): boolean {
+    return this.#frames.some((frame) => frame.mark === "[");
   }
 
   // A run of `*`, `_` or `~`: it closes what it can, else opens, else is text.

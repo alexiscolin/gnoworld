@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, test } from "vitest";
-import { MAX_INLINE_DEPTH, MAX_QUOTE_DEPTH, markdown, type Block, type Inline } from "./markdown.ts";
+import { MAX_INLINE_DEPTH, MAX_QUOTE_DEPTH, markdown, mentions, type Block, type Inline } from "./markdown.ts";
 
 // The same seed as core's other properties, so the gate never flaps on one.
 const PROPERTY = { seed: 20261017, numRuns: 300 };
@@ -10,6 +10,10 @@ const strong = (...children: Inline[]): Inline => ({ type: "strong", children })
 const link = (href: string, label = href): Inline => ({ type: "link", href, children: [text(label)] });
 const paragraph = (...children: Inline[]): Block => ({ type: "paragraph", children });
 const br: Inline = { type: "break" };
+const mention = (address: string): Inline => ({ type: "mention", address });
+// Two accounts' addresses, as Ergo names an account: g1 and 38 characters of bech32's alphabet.
+const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const reads = (source: string, ...blocks: Block[]) => {
   expect(markdown(source)).toStrictEqual(blocks);
 };
@@ -464,6 +468,169 @@ describe("markdown: blocks", () => {
   });
 });
 
+describe("markdown: mentions", () => {
+  test("reads `@` and an account's address as a mention, wherever a word may start", () => {
+    reads(`@${ALICE}`, paragraph(mention(ALICE)));
+    reads(
+      `hi @${ALICE}, and @${BOB}!`,
+      paragraph(text("hi "), mention(ALICE), text(", and "), mention(BOB), text("!")),
+    );
+    reads(`(@${ALICE})`, paragraph(text("("), mention(ALICE), text(")")));
+    reads(`@@${ALICE}`, paragraph(text("@"), mention(ALICE)));
+    reads(`> @${ALICE}`, { type: "quote", children: [paragraph(mention(ALICE))] });
+    reads(`- @${ALICE}`, { type: "list", ordered: false, items: [[mention(ALICE)]] });
+    reads(`**a**@${ALICE}`, paragraph(strong(text("a")), mention(ALICE)));
+    reads(`@${ALICE}@${BOB}`, paragraph(mention(ALICE), text(`@${BOB}`)));
+    reads(`🙂@${ALICE}`, paragraph(text("🙂"), mention(ALICE)));
+  });
+
+  test("reads a mention at a line's start and end, a line of a paragraph each", () => {
+    reads(`x\n@${ALICE}`, paragraph(text("x"), br, mention(ALICE)));
+    reads(`@${ALICE}\nx`, paragraph(mention(ALICE), br, text("x")));
+    reads(`@${ALICE}\n@${BOB}`, paragraph(mention(ALICE), br, mention(BOB)));
+  });
+
+  // The server counts a mention after anything but a letter, a digit or `_` (server/src/moderation/rules.ts): the page
+  // shows none it would not count, so `_` marks make no mention, where `*` and `~~` do.
+  test("reads a mention in `*` and `~~` marks, and none in `_` ones", () => {
+    reads(`*@${ALICE}*`, paragraph(em(mention(ALICE))));
+    reads(`**@${ALICE}**`, paragraph(strong(mention(ALICE))));
+    reads(`~~@${ALICE}~~`, paragraph({ type: "strike", children: [mention(ALICE)] }));
+    reads(`_@${ALICE}_`, paragraph(em(text(`@${ALICE}`))));
+    reads(`__@${ALICE}__`, paragraph(strong(text(`@${ALICE}`))));
+    plain(`_@${ALICE}_x`);
+  });
+
+  // A mention's address is checked for its form alone, as the server counts it: a checksum is the account's to prove
+  // (the page marks only the reader's own address, whole).
+  test("reads an address of the right form as a mention, its checksum unchecked", () => {
+    reads(`@${ALICE.slice(0, -1)}q`, paragraph(mention(`${ALICE.slice(0, -1)}q`)));
+  });
+
+  test.each([
+    [`mail@${ALICE}`, "after a letter"],
+    [`1@${ALICE}`, "after a digit"],
+    [`x_@${ALICE}`, "after an underscore"],
+    [`é@${ALICE}`, "after a letter not ASCII"],
+    [`٣@${ALICE}`, "after a digit not ASCII"],
+    [`𝐚@${ALICE}`, "after a letter past the BMP"],
+    [`@${ALICE}x`, "a letter after it"],
+    [`@${ALICE}é`, "a letter not ASCII after it"],
+    [`@${ALICE}٣`, "a digit not ASCII after it"],
+    [`@${ALICE}_x`, "an underscore after it"],
+    [`@${ALICE}9`, "a digit after it"],
+    [`@${ALICE.slice(0, -1)}`, "one character short"],
+    [`@${ALICE.slice(0, -1)}b`, "a letter bech32 has not (b)"],
+    [`@${ALICE.slice(0, -1)}1`, "a letter bech32 has not (1)"],
+    [`@${ALICE.toUpperCase()}`, "in capitals"],
+    [`@g2${ALICE.slice(2)}`, "another prefix"],
+    [`@ ${ALICE}`, "a space after the @"],
+    [`@`, "the @ alone"],
+  ])("reads %s as text: %s", (source) => {
+    plain(source);
+  });
+
+  test("reads no mention in code, nor after a backslash", () => {
+    reads(`\`@${ALICE}\``, paragraph({ type: "code", text: `@${ALICE}` }));
+    reads(`\\@${ALICE}`, paragraph(text(`@${ALICE}`)));
+    reads(`\\\\@${ALICE}`, paragraph(text("\\"), mention(ALICE)));
+    reads("```\n@" + ALICE + "\n```", { type: "codeBlock", text: `@${ALICE}` });
+  });
+
+  // As a bare address: inside a label, closed or not, a mention is text; a label might still close on the line.
+  test("reads no mention in a link's label, nor after a `[` left open, and one after a label closed", () => {
+    reads(
+      `[@${ALICE}](https://a.example) @${ALICE}`,
+      paragraph(link("https://a.example", `@${ALICE}`), text(" "), mention(ALICE)),
+    );
+    reads(
+      `[**@${ALICE}**](https://a.example)`,
+      paragraph({ type: "link", href: "https://a.example", children: [strong(text(`@${ALICE}`))] }),
+    );
+    reads(`[a [@${ALICE}] b](https://a.example)`, paragraph(link("https://a.example", `a [@${ALICE}] b`)));
+    plain(`[@${ALICE}`);
+    plain(`[@${ALICE}]`);
+    plain(`[@${ALICE}](http://a.example)`);
+    reads(`[a] @${ALICE}`, paragraph(text("[a] "), mention(ALICE)));
+    reads(
+      `[x](https://a.example) **@${ALICE}**`,
+      paragraph(link("https://a.example", "x"), text(" "), strong(mention(ALICE))),
+    );
+  });
+
+  test("keeps an address's own `@` inside it, a link's or a bare one: a link, not a mention", () => {
+    reads(`https://a.example/@${ALICE}`, paragraph(link(`https://a.example/@${ALICE}`)));
+    reads(`(https://a.example/@${ALICE})`, paragraph(text("("), link(`https://a.example/@${ALICE}`), text(")")));
+    reads(`[x](https://a.example/@${ALICE})`, paragraph(link(`https://a.example/@${ALICE}`, "x")));
+    reads(`http://a.example/@${ALICE}`, paragraph(text("http://a.example/"), mention(ALICE)));
+  });
+});
+
+// Accounts of the right form, as many as asked: g1, 37 q and one more of bech32's alphabet.
+const BECH32 = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+const accounts = (count: number) => Array.from(BECH32.slice(0, count), (last) => `g1${"q".repeat(37)}${last}`);
+// The mentions of a tree, in order, repeats kept: a walk of its own, apart from the one under test.
+function walk(blocks: readonly Block[]): string[] {
+  const inline = (node: Inline): string[] =>
+    node.type === "mention" ? [node.address] : "children" in node ? node.children.flatMap(inline) : [];
+  return blocks.flatMap((block): string[] => {
+    if (block.type === "quote") return walk(block.children);
+    if (block.type === "list") return block.items.flatMap((item) => item.flatMap(inline));
+    return block.type === "paragraph" ? block.children.flatMap(inline) : [];
+  });
+}
+
+describe("mentions: the accounts a message names", () => {
+  test("gives each account mentioned once, in the order first named, from marks, quotes and lists", () => {
+    expect(mentions(markdown(`@${BOB} **@${ALICE}** @${BOB}`))).toEqual([BOB, ALICE]);
+    expect(mentions(markdown(`> *@${ALICE}*\n\n- @${BOB}\n- [x](https://a.example)`))).toEqual([ALICE, BOB]);
+    expect(mentions(markdown(`1. @${BOB}\n\n> > @${ALICE}`))).toEqual([BOB, ALICE]);
+    expect(mentions(markdown(`> - ~~@${BOB}~~\n\n- **@${ALICE}**\n\nlast @${BOB}`))).toEqual([BOB, ALICE]);
+  });
+
+  test("gives a dozen accounts, each once, in order, however often each is named", () => {
+    const twelve = accounts(12);
+    const named = [...twelve, ...[...twelve].reverse()].map((account) => `@${account}`).join(" ");
+    expect(mentions(markdown(named))).toEqual(twelve);
+  });
+
+  test("gives none for a message with no mention, its code and labels included", () => {
+    expect(mentions(markdown(`hi \`@${ALICE}\` [@${BOB}](https://a.example)\n\n\`\`\`\n@${ALICE}\n\`\`\``))).toEqual(
+      [],
+    );
+    expect(mentions(markdown(""))).toEqual([]);
+  });
+
+  test("gives, of anything, the accounts its tree names, each once, in order", () => {
+    const pieces = fc.constantFrom(
+      ...accounts(4).map((account) => `@${account}`),
+      "**",
+      "*",
+      "_",
+      "~~",
+      "`",
+      "\n",
+      "\n\n",
+      "> ",
+      "\n> ",
+      "- ",
+      "\n- ",
+      "[",
+      "](https://a.example)",
+      "\\",
+      " ",
+      "x",
+    );
+    fc.assert(
+      fc.property(fc.array(pieces, { maxLength: 40 }), (parts) => {
+        const tree = markdown(parts.join(""));
+        expect(mentions(tree)).toEqual([...new Set(walk(tree))]);
+      }),
+      PROPERTY,
+    );
+  });
+});
+
 // The green pass's cases (4c's pre-merge): each kills a StrykerJS survivor the tests above let live.
 describe("markdown: the edges StrykerJS found", () => {
   const strike = (...children: Inline[]): Inline => ({ type: "strike", children });
@@ -580,6 +747,7 @@ const KEYS: Readonly<Record<string, string>> = {
   strike: "children,type",
   code: "text,type",
   link: "children,href,type",
+  mention: "address,type",
   break: "type",
   paragraph: "children,type",
   codeBlock: "text,type",
@@ -591,12 +759,20 @@ const KEYS: Readonly<Record<string, string>> = {
 const HREF = /^https:\/\/[A-Za-z0-9][A-Za-z0-9.-]*(:\d{1,5})?([/?#][^\s\\<>"`\p{C}]*)?$/u;
 const keysOf = (node: object) => Object.keys(node).sort().join(",");
 
+// An account a mention may name: g1 and 38 characters of bech32's alphabet.
+const ACCOUNT = /^g1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{38}$/;
+
+// A leaf, allowed: a text or code never empty, a mention an account's address and never inside a link; a break sits
+// between a paragraph's lines alone.
+function leafAllowed(node: Inline, inLink: boolean): boolean {
+  if (node.type === "text" || node.type === "code") return node.text !== "";
+  return node.type === "mention" && !inLink && ACCOUNT.test(node.address);
+}
+
 // A node the renderer knows, with its own keys alone, never empty; a link's address https, never inside a link.
 function inlineAllowed(node: Inline, inLink: boolean): boolean {
   if (KEYS[node.type] !== keysOf(node)) return false;
-  if (node.type === "text" || node.type === "code") return node.text !== "";
-  // A break sits between a paragraph's lines alone.
-  if (node.type === "break") return false;
+  if (!("children" in node)) return leafAllowed(node, inLink);
   if (node.type === "link" && (inLink || !HREF.test(node.href))) return false;
   return node.children.length > 0 && run(node.children, inLink || node.type === "link");
 }
@@ -701,6 +877,13 @@ describe("markdown: whatever comes", () => {
     "word",
     "café",
     "😀",
+    `@${ALICE}`,
+    `x@${ALICE}`,
+    `[@${BOB}](https://a.example)`,
+    `[**@${BOB}**](https://a.example)`,
+    "](https://a.example)",
+    `@${BOB.toUpperCase()}`,
+    "@",
   );
   const message = fc
     .array(fc.oneof(fragments, fc.string({ unit: "binary", maxLength: 8 })), { maxLength: 60 })
@@ -715,11 +898,12 @@ describe("markdown: whatever comes", () => {
     );
   });
 
-  test("names no address the message does not hold, and is the same each time", () => {
+  test("names no address or account the message does not hold, and is the same each time", () => {
     fc.assert(
       fc.property(message, (source) => {
         const tree = markdown(source);
         for (const href of hrefs(tree)) expect(source).toContain(href);
+        for (const account of mentions(tree)) expect(source).toContain(`@${account}`);
         expect(markdown(source)).toStrictEqual(tree);
       }),
       PROPERTY,
@@ -738,7 +922,7 @@ describe("markdown: whatever comes", () => {
     );
   });
 
-  test("loses no word of a line: each run of letters and digits is in a text, a code or an address", () => {
+  test("loses no word of a line: each run of letters and digits is in a text, a code, an address or a mention", () => {
     const inline = fc.constantFrom(
       "*",
       "**",
@@ -757,6 +941,8 @@ describe("markdown: whatever comes", () => {
       "word",
       "x1",
       "café",
+      "@",
+      `@${ALICE}`,
     );
     fc.assert(
       fc.property(fc.array(inline, { maxLength: 40 }), (parts) => {
@@ -809,6 +995,12 @@ describe("markdown: whatever comes", () => {
     "https://a(",
     "(https://a/",
     "> ",
+    "@",
+    `@${ALICE} `,
+    `@g1${"q".repeat(37)}`,
+    "x@",
+    "_@",
+    `[@${ALICE} `,
   ])("reads a line of %j in linear time, a backslash and a ) closing it", (piece) => {
     expect(linear(repeated(piece, "\\)"))).toBe(true);
     expect(allowed(markdown(repeated(piece, "\\)")(16_000)))).toBe(true);
