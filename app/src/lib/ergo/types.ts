@@ -2,6 +2,8 @@
 import type { IrcMessage } from "@gnoworld/core";
 import type { Who } from "./handshake.ts";
 
+export type { Who };
+
 export type ErgoState = "connecting" | "connected" | "waiting" | "logged-out" | "stopped";
 
 /** The part of a WebSocket this uses: the browser's, or a test's. */
