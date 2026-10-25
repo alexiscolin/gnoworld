@@ -10,7 +10,6 @@ const TRAIL = /[.,:;!?*_~']/;
 const WORD_START = /[\s*_~(]/u;
 // What ends a bare address; any other character no address may hold makes it none.
 const ENDS = /[\s<]/u;
-const SPACE = /\s/u;
 // What opens an address's path, after its host.
 const PATH = /[/?#]/;
 
@@ -34,20 +33,15 @@ function stops(source: string): Int32Array {
   return stop;
 }
 
-// For each `(` of the line, the `)` that closes it within the same word, or -1.
+// For each `(` of the line, the `)` that closes it, or -1 (an address between them holds no space: #stop says so).
 function parens(source: string): Int32Array {
   const match = new Int32Array(source.length).fill(-1);
   const open: number[] = [];
   for (let at = 0; at < source.length; at += 1) {
-    const char = source[at] ?? "";
-    if (char === "(") {
-      open.push(at);
-    } else if (char === ")") {
-      const opened = open.pop();
-      if (opened !== undefined) match[opened] = at;
-    } else if (SPACE.test(char)) {
-      open.length = 0;
-    }
+    const char = source[at];
+    if (char === "(") open.push(at);
+    const opened = char === ")" ? open.pop() : undefined;
+    if (opened !== undefined) match[opened] = at;
   }
   return match;
 }
@@ -64,15 +58,13 @@ export class Addresses {
     this.#source = source;
   }
 
-  /** The `)` that ends a link's address opening at `at` with `(`, the address a plain https one; or -1. */
+  /** The `)` that ends a link's address opening at `at` with `(`, the address a plain https one; or -1 (any place but
+   * a `(` has none). */
   destination(at: number): number {
-    if (this.#source[at] !== "(") return -1;
     this.#parens ??= parens(this.#source);
     const end = this.#parens[at] ?? -1;
-    if (end === -1) return -1;
     const path = authority(this.#source, at + 1);
-    if (path === end) return end;
-    return path !== -1 && PATH.test(this.#source.charAt(path)) && this.#stop(path) >= end ? end : -1;
+    return path === end || (PATH.test(this.#source.charAt(path)) && this.#stop(path) >= end) ? end : -1;
   }
 
   /**
@@ -100,8 +92,8 @@ export class Addresses {
     const address = this.#source.slice(at, stop);
     let unopened = count(address, ")") - count(address, "(");
     let end = stop;
-    // One character of the host stays: it is a letter or a digit.
-    while (end > at + "https://".length + 1) {
+    // The host's first character, a letter or a digit, ends the trimming at the latest.
+    while (end > at) {
       const last = this.#source.charAt(end - 1);
       if (last === ")" ? unopened <= 0 : !TRAIL.test(last)) break;
       if (last === ")") unopened -= 1;
@@ -111,10 +103,11 @@ export class Addresses {
   }
 }
 
-// Whether the line from `from` to `to` is closing punctuation alone.
+// Whether the line from `from` to `to` is closing punctuation alone, a `)` among it.
 function trailing(source: string, from: number, to: number): boolean {
-  const punctuation = /[.,:;!?*_~')]*/y;
-  punctuation.lastIndex = from;
-  punctuation.test(source);
-  return punctuation.lastIndex >= to;
+  for (let at = from; at < to; at += 1) {
+    const char = source.charAt(at);
+    if (char !== ")" && !TRAIL.test(char)) return false;
+  }
+  return true;
 }
