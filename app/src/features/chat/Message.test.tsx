@@ -62,6 +62,11 @@ describe("Message", () => {
     expect(html(`hi @${ALICE}`)).not.toContain('data-mention="me"');
   });
 
+  // F812's review: a line may type an account's short form itself; it reads as the words they are.
+  it("draws a short form typed as text as text: no mark, no title", () => {
+    expect(renderToStaticMarkup(<Message text="ask @g1jg8m…vsqf5" me={BOB} />)).toBe("<span>ask @g1jg8m…vsqf5</span>");
+  });
+
   it("sets a mention of the reader apart, and no other", () => {
     const markup = renderToStaticMarkup(<Message text={`@${ALICE} and @${BOB}`} me={BOB} />);
     expect(markup).toContain(`<span data-mention="me" title="${BOB}">`);
