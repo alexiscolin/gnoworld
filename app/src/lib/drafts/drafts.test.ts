@@ -60,11 +60,14 @@ describe("an account's drafts on the device", () => {
     expect(device.kept.size).toBe(0);
   });
 
-  it(`keeps a draft of ${String(DRAFT_LIMIT)} UTF-16 units at most`, () => {
+  it(`keeps a draft of ${String(DRAFT_LIMIT)} UTF-16 units at most; a longer one forgets the last, no older text to come back`, () => {
     expect(DRAFT_LIMIT).toBe(4000);
-    const mine = on(storage(), ALICE);
+    const device = storage();
+    const mine = on(device, ALICE);
     expect(mine.set("#bubble", "😀".repeat(DRAFT_LIMIT / 2))).toBe(true);
     expect(mine.set("#bubble", "😀".repeat(DRAFT_LIMIT / 2 + 1))).toBe(false);
+    expect(mine.get("#bubble")).toBe("");
+    expect(device.kept.size).toBe(0);
   });
 
   it("reads what the device holds as no draft unless it is one: past the limit, it is none", () => {
@@ -73,6 +76,7 @@ describe("an account's drafts on the device", () => {
     const [key = ""] = device.kept.keys();
     device.kept.set(key, "x".repeat(DRAFT_LIMIT + 1));
     expect(on(device, ALICE).get("#bubble")).toBe("");
+    expect(device.kept.size).toBe(0);
   });
 
   it("says a draft was not kept when the device refuses it, reads none, and throws nothing", () => {
