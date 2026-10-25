@@ -442,6 +442,9 @@ FAKE
 	sleep 3
 	folder=$(sed -n 's#.* -v \([^ ]*\)/out:/k6:ro .*#\1#p' "$tmp/fake.log" | head -n 1)
 	expect "a stopped load run removes its project" "$(sed -n '/\/k6\/load.js$/,$p' "$tmp/fake.log" | grep -c '^compose .* down -v$' || true)" 1
+	# Both of its down calls (the one before the stack starts too) take its profiled services, the guard and the way out.
+	expect "it removes the project twice, at its start and at its end" "$(grep -c '^compose .* down -v$' "$tmp/fake.log" || true)" 2
+	expect "and each takes its profiled services too" "$(grep '^compose .* down -v$' "$tmp/fake.log" | grep -c -e '--profile demo' || true)" 2
 	expect "and its folder, the operator's key with it" "$([ -n "$folder" ] && [ ! -e "$folder" ] && echo gone)" gone
 	expect "and stops its sampler" "$(grep -c '^stats ' "$tmp/fake.log" || true)" "$sampled"
 	# Sizes that are no whole number, or past the visitors' addresses, stop it before it makes anything (F650).
