@@ -25,26 +25,25 @@ export function after(source: string, at: number): string | undefined {
  * a pointer a length that only moves forward, so a line of runs reads in linear time.
  */
 export class Runs {
-  readonly #starts = new Map<number, number[]>();
-  readonly #next = new Map<number, number>();
+  // For each length, its runs' starts in order, and the first one a code span may still close on.
+  readonly #runs = new Map<number, { starts: number[]; next: number }>();
 
   constructor(source: string) {
     let at = source.indexOf("`");
     while (at !== -1) {
       const size = runOf(source, at, "`");
-      const starts = this.#starts.get(size) ?? [];
-      starts.push(at);
-      this.#starts.set(size, starts);
+      const runs = this.#runs.get(size) ?? { starts: [], next: 0 };
+      runs.starts.push(at);
+      this.#runs.set(size, runs);
       at = source.indexOf("`", at + size);
     }
   }
 
   /** Where the first run of `size` starting at `from` or later starts; asked with `from` never going back. */
   after(size: number, from: number): number | undefined {
-    const starts = this.#starts.get(size) ?? [];
-    let next = this.#next.get(size) ?? 0;
-    while (next < starts.length && (starts[next] ?? from) < from) next += 1;
-    this.#next.set(size, next);
-    return starts[next];
+    const runs = this.#runs.get(size);
+    if (runs === undefined) return undefined;
+    while ((runs.starts[runs.next] ?? Infinity) < from) runs.next += 1;
+    return runs.starts[runs.next];
   }
 }
