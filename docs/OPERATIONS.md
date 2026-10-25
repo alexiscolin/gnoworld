@@ -191,6 +191,9 @@ Slice 3, the bot's link and the rooms (3h):
   session of the account (multiclient). A refusal of the nick comes from a guest who took it before the
   account first logged in (a new Ergo database): the link logs `irc_refused` (`nick`), tries again, and
   raises the alert `irc_nick_taken` at the third in a row. A refused login logs `irc_refused` (`sasl`).
+- **The inside network is exempt from Ergo's connection limits** (`INSIDE_SUBNET`, F720): the server's link
+  and web's own connections never meet the 16-at-once or the 32-in-10-minutes limit, so a crash loop of the
+  server cannot lock the bot out. A visitor is limited by the address web passes, never one of that network.
 - **Ergo logs no address** (`-connect-ip`, slice 3's max review): its refusals by ip-limits go unlogged
   with it, so a visitor behind a shared address who meets the limit leaves no trace (slice 4).
 

@@ -343,6 +343,9 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "an oper password's blanks dropped before its check" "Ergo starts with an oper password with a blank first line" \
 		render_sh sed 's#password=$(cat /run/secrets/ergo_oper_password)#password=$(tr -d " \\t\\r\\n" </run/secrets/ergo_oper_password)#'
 	mutant "an oper password of any shape" "Ergo starts with an oper password with a space inside" render_sh sed '/one word of printable characters/d'
+	mutant "the inside network not left alone" "40 connections at once from the inside network are not refused for their number" \
+		template sed 's#exempted: {{EXEMPT}}#exempted: ["localhost"]#'
+	mutant "any INSIDE_SUBNET taken" "Ergo starts with INSIDE_SUBNET [0.0.0.0/0]" render_sh sed '/INSIDE_SUBNET: required/d'
 	mutant "a login by PASS" "login-via-pass-command: false" template sed 's#login-via-pass-command: false#login-via-pass-command: true#'
 	mutant "every address believed as a proxy" "never a forged X-Forwarded-For" template sed 's#proxy-allowed-from: {{PROXY_FROM}}#proxy-allowed-from: ["0.0.0.0/0"]#'
 	mutant "the auth script's socket lost" "the refusal came from the server" compose 'services: { server: { environment: { AUTH_SOCKET: /tmp/elsewhere.sock } } }'
@@ -754,6 +757,42 @@ print("%.2f %d" % (sum(float(s.get("cpus", 0)) for s in services), sum(size(s.ge
 		expect "Ergo's start takes an oper password of $length characters" \
 			"$(oper_render '%s' "$(head -c "$length" /dev/zero | tr '\0' a)" | tail -n 1)" "render: the settings are whole"
 	done
+	# The inside network is the one the connection limits leave alone, with the loopback (F720).
+	expect "Ergo's settings leave the inside network's connections unlimited" \
+		"$(grep -cF -- "exempted: [\"localhost\",\"$INSIDE_SUBNET\"]" "$tmp/ircd.yaml")" 1
+	# Nothing, a word, every address (v4 and v6) or a value that breaks out of the JSON list it is put in.
+	for subnet in "" everything 0.0.0.0/0 ::/0 '10.0.0.0/24"]'; do
+		case $(docker compose -p "$project" $files run --rm --no-deps -e RENDER_ONLY=1 -e INSIDE_SUBNET="$subnet" ergo 2>&1) in
+		*"render: INSIDE_SUBNET"*) pass "Ergo's start refuses INSIDE_SUBNET [$subnet]" ;;
+		*) fail "Ergo starts with INSIDE_SUBNET [$subnet]" ;;
+		esac
+	done
+	# Measured, from the server's image on the inside network: 40 connections at once, past the 16 a visitor's address
+	# holds, none refused for their number.
+	crowd=$(docker run --rm --network "$inside" --entrypoint /nodejs/bin/node "$server_image" -e '
+const net = require("node:net");
+let refused = 0;
+let left = 40;
+for (let n = 0; n < 40; n++) {
+  const s = net.connect(6667, "ergo");
+  let text = "";
+  let over = false;
+  const done = () => {
+    if (over) return;
+    over = true;
+    s.destroy();
+    if (--left === 0) console.log(refused);
+  };
+  s.on("connect", () => s.write(`NICK crowd${n}\r\nUSER c 0 * :c\r\n`));
+  s.on("data", (chunk) => {
+    text += chunk;
+    if (/^ERROR/m.test(text)) refused++;
+    if (/ 001 /.test(text) || /^ERROR/m.test(text)) done();
+  });
+  s.on("error", done);
+}
+setTimeout(() => process.exit(2), 20000);' 2>&1 || true)
+	expect "40 connections at once from the inside network are not refused for their number" "$crowd" 0
 
 	# No secret of the stack's in Docker's records, a log or an image.
 	oper=$(cat "$tmp/ergo_oper_password")
