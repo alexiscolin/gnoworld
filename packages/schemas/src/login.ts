@@ -1,6 +1,6 @@
 // The login's bodies (slice 3's plan, 3c): what the browser sends, what the server answers. A request's own
 // fields are strict; Adena's proof comes as the SDK types it.
-import { z } from "zod";
+import { z } from "./zod.ts";
 import { Address } from "./address.ts";
 
 export const ChallengeRequest = z.strictObject({ chainId: z.string().min(1).max(50) });

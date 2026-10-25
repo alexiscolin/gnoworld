@@ -1,6 +1,6 @@
 // What the verdicts' stream tells a page (slice 3's plan, 3j): a message's id, its room and its state,
 // never its text. Slice 4 adds the preview's own states (decision 158).
-import { z } from "zod";
+import { z } from "./zod.ts";
 
 export const StreamEvent = z.strictObject({
   msgid: z.string().min(1).max(128),

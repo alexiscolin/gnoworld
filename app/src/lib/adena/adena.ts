@@ -4,7 +4,7 @@
 // status alone, since "already connected" comes as a failure. Whatever the extension does, a call here
 // resolves to a result: a getter or a proxy that throws included.
 import { Address, ADDRESS_PROBLEMS, ChallengeRequest, Proof, type AddressProblem } from "@gnoworld/schemas";
-import { z } from "zod";
+import { z } from "../jitless.ts";
 
 /** The most Adena signs, in UTF-8 bytes: it carries the text in its popup's URL (the SDK's MAX_ARBITRARY_MESSAGE_BYTES). */
 export const MAX_TEXT_BYTES = 4096;

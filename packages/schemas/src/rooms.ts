@@ -1,6 +1,6 @@
 // A room a world's moderator makes (slice 3's plan, 3l): its name a slug of [a-z0-9] and single hyphens,
 // 32 characters at most; the server makes it as #<world>/<name>, so it is never a world's main room.
-import { z } from "zod";
+import { z } from "./zod.ts";
 
 const Slug = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/);
 

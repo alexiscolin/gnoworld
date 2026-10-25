@@ -1,7 +1,7 @@
 // The browser's client of the server's login (server/src/login/routes.ts, mounted at /api/login), through the
 // one JSON call of lib/api/http.ts. The session is the server's HttpOnly cookie, which the page never reads.
 import { Challenge, Me, Ticket, type Address, type Proof } from "@gnoworld/schemas";
-import { z } from "zod";
+import { z } from "../jitless.ts";
 import { jsonCall, TIMEOUT_MS, type Fetcher, type Result } from "./http.ts";
 
 export { TIMEOUT_MS, type Fetcher, type Result } from "./http.ts";

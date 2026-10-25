@@ -1,6 +1,6 @@
 // The bodies that cross a boundary, one Zod schema each, read by the server and its clients alike
 // (docs/ARCHITECTURE.md, "Outside data has one schema").
-import { z } from "zod";
+import { z } from "./zod.ts";
 
 export { ActivityRooms } from "./activity.ts";
 export { Address, ADDRESS_PROBLEMS, toAddress, type AddressProblem } from "./address.ts";

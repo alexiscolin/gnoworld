@@ -1,6 +1,6 @@
 // A gno address as the chain writes it, in BIP-173's bech32: the prefix g, 20 bytes and a checksum,
 // lower case only, so one account has one spelling. Made only by this schema (docs/ARCHITECTURE.md).
-import { z } from "zod";
+import { z } from "./zod.ts";
 
 const CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 const GENERATOR = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
