@@ -55,6 +55,7 @@ class Link {
   #generation = 0;
   #connected = false;
   #stopped = false;
+  #listed: readonly string[] = [];
   #rooms: readonly string[] = [];
   // The rooms a JOIN went for; those Ergo said I joined, live; those whose history went: each this connection's.
   readonly #joined = new Set<string>();
@@ -73,7 +74,25 @@ class Link {
 
   follow(ids: readonly string[]): void {
     if (this.#stopped) return;
-    const wanted = [...new Set(ids.filter((id) => RoomId.safeParse(id).success))].slice(0, ROOMS_JOINED);
+    this.#listed = [...new Set(ids.filter((id) => RoomId.safeParse(id).success))];
+    this.#keep();
+  }
+
+  /** The room in view: its history is asked once Ergo says I joined it, once a connection. */
+  show(room: string | undefined): void {
+    if (this.#stopped) return;
+    this.#shown = room;
+    this.#keep();
+    if (room !== undefined && this.#inside.has(room)) this.#history(room);
+  }
+
+  // The rooms followed: the first 100 listed, the room in view among them though listed past them (in place of
+  // the 100th); the store told, and while connected, the dropped ones parted before the new ones are joined.
+  #keep(): void {
+    const shown = this.#shown;
+    const first = this.#listed.slice(0, ROOMS_JOINED);
+    const late = shown !== undefined && this.#listed.includes(shown) && !first.includes(shown);
+    const wanted = late ? [...first.slice(0, ROOMS_JOINED - 1), shown] : first;
     this.#rooms = wanted;
     this.#deps.store.getState().chatActions.follow(wanted);
     if (!this.#connected) return;
@@ -85,13 +104,6 @@ class Link {
       "JOIN",
       wanted.filter((room) => !this.#joined.has(room)),
     );
-  }
-
-  /** The room in view: its history is asked once Ergo says I joined it, once a connection. */
-  show(room: string | undefined): void {
-    if (this.#stopped) return;
-    this.#shown = room;
-    if (room !== undefined && this.#inside.has(room)) this.#history(room);
   }
 
   stop(): void {

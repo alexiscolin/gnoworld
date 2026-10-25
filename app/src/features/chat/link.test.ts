@@ -300,6 +300,31 @@ describe("the chat's link: the rooms it joins", () => {
     expect(Object.keys(t.chat().rooms)).toEqual(rooms.slice(0, 100));
   });
 
+  // Found by 4b's pre-merge: ?room= may name any room listed, the 101st too, which nothing joined.
+  it("joins the room shown though it is listed past the hundredth, leaving the hundredth, and asks its history", () => {
+    const rooms = Array.from({ length: 120 }, (_, n) => `#bubble/r${String(n).padStart(3, "0")}`);
+    const t = guestIn(rooms);
+    t.fake.sent.length = 0;
+    t.link.show("#bubble/r110");
+    expect(t.fake.sent).toEqual(["PART #bubble/r099", "JOIN #bubble/r110"]);
+    t.fake.line(`:${GUEST}!u@h JOIN #bubble/r110`);
+    expect(t.fake.sent.at(-1)).toBe("CHATHISTORY LATEST #bubble/r110 * 200");
+    expect(Object.keys(t.chat().rooms)).toHaveLength(100);
+    expect(Object.keys(t.chat().rooms)).toContain("#bubble/r110");
+  });
+
+  it("follows the room shown before it connects, though listed past the hundredth", () => {
+    const rooms = Array.from({ length: 120 }, (_, n) => `#bubble/r${String(n).padStart(3, "0")}`);
+    const t = setup();
+    t.link.follow(rooms);
+    t.link.show("#bubble/r110");
+    t.signedOut();
+    const joined = joinedBy(t.connected().sent, "JOIN");
+    expect(joined).toHaveLength(100);
+    expect(joined).toContain("#bubble/r110");
+    expect(joined).not.toContain("#bubble/r099");
+  });
+
   // "JOIN " and 60 rooms of 7 characters with 59 commas: 5 + 420 + 59 = 484; a room of 26 more and its
   // comma make 511.
   it.each([
