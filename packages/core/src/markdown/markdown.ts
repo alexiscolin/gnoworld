@@ -69,23 +69,31 @@ class Blocks {
     return (this.#lines[at] ?? "").trimStart();
   }
 
-  #block(at: number): Read {
+  // What a line starts: nothing, a fence, a quote, a list's item, or else a paragraph's text.
+  #start(at: number): "blank" | "fence" | "quote" | "item" | "text" {
     const body = this.#body(at);
-    if (body === "") return { next: at + 1 };
-    const fence = FENCE.exec(body)?.[1];
-    if (fence !== undefined) return this.#code(at, fence.length) ?? this.#paragraph(at);
-    if (this.#quoted(body)) return this.#quote(at);
-    const item = ITEM.exec(body);
-    if (item !== null) return this.#list(at, item[1] !== undefined);
-    return this.#paragraph(at);
+    if (body === "") return "blank";
+    if (FENCE.test(body)) return "fence";
+    if (this.#quoted(body)) return "quote";
+    return ITEM.test(body) ? "item" : "text";
+  }
+
+  #block(at: number): Read {
+    const start = this.#start(at);
+    if (start === "blank") return { next: at + 1 };
+    if (start === "quote") return this.#quote(at);
+    if (start === "item") return this.#list(at);
+    const code = start === "fence" ? this.#code(at) : undefined;
+    return code ?? this.#paragraph(at, this.#paragraphEnd(at));
   }
 
   #quoted(body: string): boolean {
     return this.#depth < MAX_QUOTE_DEPTH && body.startsWith(">");
   }
 
-  // Fenced code, to a line of backticks alone as many or more; none if no such line comes.
-  #code(at: number, size: number): Read | undefined {
+  // Fenced code, to a line of backticks alone as many as the fence's or more; none if no such line comes.
+  #code(at: number): Read | undefined {
+    const size = FENCE.exec(this.#body(at))?.[1]?.length ?? 0;
     this.#closers ??= closers(this.#lines);
     if ((this.#closers[at + 1] ?? 0) < size) return undefined;
     let end = at + 1;
@@ -98,16 +106,18 @@ class Blocks {
   #quote(at: number): Read {
     const inner: string[] = [];
     let end = at;
-    while (end < this.#lines.length && this.#quoted(this.#body(end))) {
-      inner.push(this.#body(end).slice(1).replace(/^ /, ""));
-      end += 1;
+    for (; end < this.#lines.length; end += 1) {
+      const body = this.#body(end);
+      if (!this.#quoted(body)) break;
+      inner.push(body.slice(1).replace(/^ /, ""));
     }
     const children = new Blocks(inner, this.#depth + 1).read();
     return children.length === 0 ? this.#paragraph(at, end) : { next: end, block: { type: "quote", children } };
   }
 
-  // A list's items, one a line, each led by a mark of the same kind; a line that is not ends it.
-  #list(at: number, ordered: boolean): Read {
+  // A list's items, one a line, each led by a mark of the first one's kind; a line that is not ends it.
+  #list(at: number): Read {
+    const ordered = ITEM.exec(this.#body(at))?.[1] !== undefined;
     const items: Inline[][] = [];
     let end = at;
     for (; end < this.#lines.length; end += 1) {
@@ -118,21 +128,20 @@ class Blocks {
     return { next: end, block: { type: "list", ordered, items } };
   }
 
-  // A paragraph's lines, to `end`, or else to a blank line or a block's start; each line's marks read apart, a
-  // break between two.
-  #paragraph(at: number, end?: number): Read {
-    const children: Inline[] = [];
-    let next = at;
-    do {
-      if (next > at) children.push({ type: "break" });
-      for (const node of inline((this.#lines[next] ?? "").trim())) children.push(node);
-      next += 1;
-    } while (end === undefined ? next < this.#lines.length && this.#continues(next) : next < end);
-    return { next, block: { type: "paragraph", children } };
+  // Where a paragraph from `at` ends: at a blank line or a block's start.
+  #paragraphEnd(at: number): number {
+    let end = at + 1;
+    while (end < this.#lines.length && this.#start(end) === "text") end += 1;
+    return end;
   }
 
-  #continues(at: number): boolean {
-    const body = this.#body(at);
-    return body !== "" && !FENCE.test(body) && !this.#quoted(body) && !ITEM.test(body);
+  // A paragraph's lines from `at` to `end`, each line's marks read apart, a break between two.
+  #paragraph(at: number, end: number): Read {
+    const children: Inline[] = [];
+    for (const [n, line] of this.#lines.slice(at, end).entries()) {
+      if (n > 0) children.push({ type: "break" });
+      for (const node of inline(line.trim())) children.push(node);
+    }
+    return { next: end, block: { type: "paragraph", children } };
   }
 }
