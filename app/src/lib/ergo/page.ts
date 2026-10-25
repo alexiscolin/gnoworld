@@ -1,7 +1,6 @@
 // The page's connection to Ergo (slice 4's 4b): connectErgo on the browser's WebSocket at /ws on the page's own
 // host (nginx's location = /ws, deploy/web), on the page's clock and its randomness.
-import type { IrcMessage } from "@gnoworld/core";
-import { connectErgo, type Ergo, type ErgoState, type Socket, type Who } from "./ergo.ts";
+import { connectErgo, type Ergo, type ErgoOptions, type Socket, type Who } from "./ergo.ts";
 
 /** Ergo's WebSocket on the page's host: wss when the page is https. */
 export const ergoUrl = ({ protocol, host }: { protocol: string; host: string }): string =>
@@ -35,16 +34,12 @@ function browserSocket(url: string): Socket {
 }
 
 /** The page's connection to Ergo, as `who`, until stopped. */
-export function pageErgo(
-  who: Who,
-  on: { onState: (state: ErgoState) => void; onLine: (line: IrcMessage) => void },
-): Ergo {
+export function pageErgo(who: Who, on: Pick<ErgoOptions, "onState" | "onLine">): Ergo {
   return connectErgo({
     url: ergoUrl(location),
     who,
     open: browserSocket,
-    onState: on.onState,
-    onLine: on.onLine,
+    ...on,
     random: () => Math.random(),
     after: (ms, run) => {
       const timer = setTimeout(run, ms);

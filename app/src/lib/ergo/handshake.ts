@@ -1,8 +1,6 @@
 // The handshake with Ergo, apart from the connection's life (ergo.ts): what each step of a login by SASL
 // takes from Ergo and sends back, the capabilities asked, and what one line a client sends may hold.
 import type { IrcMessage } from "@gnoworld/core";
-import type { Address } from "@gnoworld/schemas";
-import type { Result } from "../api/login.ts";
 
 /** The capabilities the real Ergo grants the server's tests (server/src/testing/ergoKit.ts). */
 export const CAPS =
@@ -68,8 +66,6 @@ const STEPS: Record<Exclude<Step, "connected">, (message: IrcMessage, login: Log
 export const advance = (step: Exclude<Step, "connected">, message: IrcMessage, login: Login): Move | undefined =>
   STEPS[step](message, login);
 
-/** An account, logging in with a ticket a connection; or a guest, drawing a nick a try. */
-export type Who = { account: Address; ticket: () => Promise<Result<{ ticket: string }>> } | { guest: () => string };
 /** A guest's nicks Ergo may refuse as taken before it gives up for this connection. */
 export const GUEST_TRIES = 8;
 

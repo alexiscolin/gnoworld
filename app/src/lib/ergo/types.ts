@@ -1,8 +1,10 @@
 // The shapes of the connection to Ergo (ergo.ts): its states, the socket it drives, what it is given and gives.
 import type { IrcMessage } from "@gnoworld/core";
-import type { Who } from "./handshake.ts";
+import type { Address } from "@gnoworld/schemas";
+import type { Result } from "../api/http.ts";
 
-export type { Who };
+/** An account, logging in with a ticket a connection; or a guest, drawing a nick a try. */
+export type Who = { account: Address; ticket: () => Promise<Result<{ ticket: string }>> } | { guest: () => string };
 
 export type ErgoState = "connecting" | "connected" | "waiting" | "logged-out" | "stopped";
 
