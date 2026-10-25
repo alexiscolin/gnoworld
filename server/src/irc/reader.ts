@@ -4,8 +4,9 @@
 import type { Socket } from "node:net";
 import type { IrcMessage } from "@gnoworld/core";
 import type { Log } from "../log.ts";
-import { joins, line, NICK, said, type Said } from "./lines.ts";
-import { roomStates, type States } from "./state.ts";
+import { joined, listing, refusals, rejoins, sasl } from "./handlers.ts";
+import { joins, line, said, type Said } from "./lines.ts";
+import type { State } from "./session.ts";
 
 export interface Options {
   host: string;
@@ -32,26 +33,6 @@ export interface Options {
 
 // Half of a check's per-account queue, so a page never fills it with a live line waiting (3j).
 const PAGE = 50;
-
-export interface State {
-  attempt: number;
-  // When the link last came in: the backoff starts again only after a minute up.
-  upSince?: number | undefined;
-  joined: Set<string>;
-  ready: boolean;
-  // Each chathistory batch open, by its reference: its room, its lines and the last one's time.
-  batches: Map<string, { room: string; lines: number; last: string }>;
-  // The time each room's history was last asked after, so a page that makes no progress is passed.
-  after: Map<string, string>;
-  // The rooms joined by send since this connection began, taken as joined once Ergo says so (3l).
-  asked: Set<string>;
-  // The channels of a LIST under way, 10,000 at most.
-  channels: string[] | undefined;
-  // The rooms' states asked of Ergo (3m).
-  states: States;
-  // Its nick refused in a row, connection after connection: the third raises the alert (slice 3's max review).
-  nickTaken: number;
-}
 
 // The lines Ergo sends that ask for an answer, as 3b's table found them.
 export function reader(options: Options, state: State) {
@@ -142,100 +123,3 @@ export function reader(options: Options, state: State) {
     state.states.read(message);
   };
 }
-
-// Ergo's LIST, its channels kept to 10,000, handed on at its end (3l).
-function listing(
-  state: State,
-  onChannels: Options["onChannels"],
-): Record<string, (s: Socket, message: IrcMessage) => void> {
-  return {
-    "322": (_, { params: [, name] }) => {
-      if (name?.startsWith("#") === true && state.channels !== undefined && state.channels.length < 10_000) {
-        state.channels.push(name);
-      }
-    },
-    "323": () => {
-      if (state.channels !== undefined) onChannels?.(state.channels);
-      state.channels = undefined;
-    },
-  };
-}
-
-// Its account by SASL PLAIN, the operator's password as its passphrase, which the server's auth script takes
-// for gnoworld alone (slice 3's max review); an ACK without sasl sends no password, and a refusal closes.
-function sasl(
-  password: string,
-  refused: (s: Socket, error: string) => void,
-): Record<string, (s: Socket, message: IrcMessage) => void> {
-  const refuse = (s: Socket): void => {
-    refused(s, "sasl");
-  };
-  return {
-    CAP: (s, { params }) => {
-      if (params[1] === "ACK" && (params[2] ?? "").split(" ").includes("sasl"))
-        s.write(line("AUTHENTICATE", ["PLAIN"]));
-      else if (params[1] === "ACK" || params[1] === "NAK") refused(s, "cap");
-    },
-    AUTHENTICATE: (s, { params: [challenge] }) => {
-      if (challenge === "+") s.write(line("AUTHENTICATE", [Buffer.from(`\0${NICK}\0${password}`).toString("base64")]));
-    },
-    "903": (s) => s.write(line("CAP", ["END"])),
-    "902": refuse,
-    "904": refuse,
-    "905": refuse,
-    "906": refuse,
-  };
-}
-
-// The refusals Ergo will not change by itself: a nick taken (433), a wrong oper password (464, 491). A nick
-// taken three times in a row is no ghost's (OPERATIONS.md): ops hears of it, once until the bot is back.
-function refusals(
-  refused: (s: Socket, error: string) => void,
-  state: State,
-  log: Log,
-): Record<string, (s: Socket) => void> {
-  return {
-    "433": (s) => {
-      state.nickTaken += 1;
-      if (state.nickTaken === 3) log("alert", { error: "irc_nick_taken" });
-      refused(s, "nick");
-    },
-    "464": (s) => {
-      refused(s, "oper");
-    },
-    "491": (s) => {
-      refused(s, "oper");
-    },
-  };
-}
-
-// Ergo's JOIN: the bot's own takes a room it asked as joined (3l); another's, in one of its rooms, is
-// handed on (3m).
-function joined(state: State, onJoin: (room: string) => void): (s: Socket, message: IrcMessage) => void {
-  return (_, { source, params: [room = ""] }) => {
-    if (source?.split("!")[0] !== NICK) {
-      if (state.joined.has(room)) onJoin(room);
-    } else if (state.asked.has(room)) state.joined.add(room);
-  };
-}
-
-// A room of its own that refuses the bot (3m: +i, +R, or an operator's +l, +k or +b) is joined by
-// SAJOIN, which Ergo grants an operator whatever the room's modes (irc/channel.go:786-792, v2.19.1).
-function rejoins(state: State): Record<string, (s: Socket, message: IrcMessage) => void> {
-  const rejoin = (s: Socket, { params: [, room = ""] }: IrcMessage): void => {
-    if (state.joined.has(room) || state.asked.has(room)) s.write(line("SAJOIN", [room]));
-  };
-  return Object.fromEntries(["471", "473", "474", "475", "477"].map((code) => [code, rejoin]));
-}
-
-export const fresh = (stateMs: number): State => ({
-  attempt: 0,
-  joined: new Set(),
-  ready: false,
-  batches: new Map(),
-  after: new Map(),
-  asked: new Set(),
-  channels: undefined,
-  states: roomStates(stateMs),
-  nickTaken: 0,
-});

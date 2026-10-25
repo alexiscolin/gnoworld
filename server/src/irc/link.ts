@@ -8,7 +8,8 @@ import { parseLine, type IrcMessage } from "@gnoworld/core";
 import type { Log } from "../log.ts";
 import type { RoomState } from "../rooms/reconcile.ts";
 import { allowed, line, NICK, type Command } from "./lines.ts";
-import { fresh, reader, type Options } from "./reader.ts";
+import { reader, type Options } from "./reader.ts";
+import { fresh } from "./session.ts";
 
 export type { Said } from "./lines.ts";
 
