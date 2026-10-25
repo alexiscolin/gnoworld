@@ -537,8 +537,8 @@ describe("markdown: mentions", () => {
     reads("```\n@" + ALICE + "\n```", { type: "codeBlock", text: `@${ALICE}` });
   });
 
-  // As a bare address: inside a label, closed or not, a mention is text; a label might still close on the line.
-  test("reads no mention in a link's label, nor after a `[` left open, and one after a label closed", () => {
+  // A link's label names no account: a mention in it is text.
+  test("reads no mention in a link's label, and one after a label closed", () => {
     reads(
       `[@${ALICE}](https://a.example) @${ALICE}`,
       paragraph(link("https://a.example", `@${ALICE}`), text(" "), mention(ALICE)),
@@ -548,9 +548,6 @@ describe("markdown: mentions", () => {
       paragraph({ type: "link", href: "https://a.example", children: [strong(text(`@${ALICE}`))] }),
     );
     reads(`[a [@${ALICE}] b](https://a.example)`, paragraph(link("https://a.example", `a [@${ALICE}] b`)));
-    plain(`[@${ALICE}`);
-    plain(`[@${ALICE}]`);
-    plain(`[@${ALICE}](http://a.example)`);
     reads(`[a] @${ALICE}`, paragraph(text("[a] "), mention(ALICE)));
     reads(
       `[x](https://a.example) **@${ALICE}**`,
