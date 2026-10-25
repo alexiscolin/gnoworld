@@ -48,6 +48,11 @@ describe("formatted", () => {
     expect(apply("café« au »lait", "bold")).toStrictEqual(draft("café **«au»** lait"));
   });
 
+  it("takes a word as Markdown reads one: a combining accent is part of it", () => {
+    expect(apply("cafe\u0301|", "bold")).toStrictEqual(draft("**«cafe\u0301»**"));
+    expect(apply("x «cafe\u0301» y", "italic")).toStrictEqual(draft("x *«cafe\u0301»* y"));
+  });
+
   it("puts an empty pair at the caret, the caret between", () => {
     expect(apply("say |", "bold")).toStrictEqual(draft("say **|**"));
     expect(apply("|", "code")).toStrictEqual(draft("`|`"));

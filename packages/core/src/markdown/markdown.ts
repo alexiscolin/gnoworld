@@ -6,7 +6,7 @@
 import { inline } from "./inline.ts";
 import type { Block, Inline } from "./types.ts";
 
-export { MAX_INLINE_DEPTH } from "./inline.ts";
+export { inWord, MAX_INLINE_DEPTH } from "./inline.ts";
 export type { Block, Inline } from "./types.ts";
 
 /** The quotes a quote nests, at most: past them, a `>` is text. */

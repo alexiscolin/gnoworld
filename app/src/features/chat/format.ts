@@ -1,6 +1,7 @@
 // The format bar's edits (slice 4's 4c): a draft's selection wrapped in a Markdown mark, or unwrapped when it already
 // is; a link made of it; a quote's or a list's start on the line, taken off, or one list's turned to the other's. A
 // mark goes round whole words, the selection's spaces outside: Markdown reads a mark at a word's bounds alone.
+import { inWord } from "@gnoworld/core";
 
 export type Format = "bold" | "italic" | "strike" | "code" | "link" | "quote" | "bulleted" | "numbered";
 
@@ -14,7 +15,6 @@ export interface Edit {
 const MARKS = { bold: "**", italic: "*", strike: "~~", code: "`" } as const;
 const STARTS = { quote: "> ", bulleted: "- ", numbered: "1. " } as const;
 const LIST = /^(?:[-*+]|\d{1,9}\.) /;
-const WORD = /[\p{L}\p{N}]/u;
 const ADDRESS = "https://";
 
 /** The draft once `format` is applied to its selection, and the selection after. */
@@ -23,8 +23,6 @@ export function formatted(edit: Edit, format: Format): Edit {
   if (format === "quote" || format === "bulleted" || format === "numbered") return started(edit, format);
   return marked(words(edit), MARKS[format]);
 }
-
-const inWord = (char: string | undefined) => char !== undefined && WORD.test(char);
 
 // The words a mark goes round: the selection less its spaces, widened to whole words (a caret, to the word it
 // touches); a selection of spaces alone, a caret at its end.
