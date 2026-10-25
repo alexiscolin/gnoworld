@@ -13,19 +13,38 @@ export interface Said {
   edits?: string;
 }
 
-export type Command = "REDACT" | "NOTICE" | "SAMODE";
+export type Command = "REDACT" | "NOTICE" | "SAMODE" | "JOIN" | "KICK";
 
 export const NICK = "gnoworld";
 
-const ROOM = /^#[^\s,]+$/;
-// A REDACT in one room; a NOTICE to one account, never a room, a list or words; a mute put on or taken
-// off one account, by name, in one room: no wildcard, which would mute others. Another command has no form.
+// One room, 64 characters at most (Ergo's channellen), no space, comma or control character.
+const ROOM = /^#[^\s,\0-\x1f\x7f]{1,63}$/;
+// One nick or account by name, never the bot: no wildcard, list, space or control character.
+const person = (who: string): boolean =>
+  /^[^\s,*?!@#:\0-\x1f\x7f][^\s,*?!@\0-\x1f\x7f]{0,63}$/.test(who) && who !== NICK;
+
+// A room's mode in its only forms: a flag of the reconciler's (M, m, s, i, R) on or off; a mute on one
+// account by name (a wildcard would mute others); an invite of one account, taken off by any mask (an
+// operator's wildcard too); a voice given or taken; a power above it taken from one person, never the bot.
+function roomMode([room = "", mode = "", arg, ...more]: readonly string[]): boolean {
+  if (!ROOM.test(room) || more.length > 0) return false;
+  if (arg === undefined) return /^[+-][MmisR]$/.test(mode);
+  if (/^[+-]b$/.test(mode)) return /^m:[A-Za-z0-9_-]{1,64}$/.test(arg);
+  if (mode === "-I") return /^[^\s,\0-\x1f\x7f]{1,128}$/.test(arg);
+  return /^(?:[+-][Iv]|-[qaoh])$/.test(mode) && person(arg);
+}
+
+// A REDACT in one room; a NOTICE to one account, never a room, a list or words; a room's mode (roomMode);
+// a JOIN of one room; a KICK of one person, never the bot, from one room, with its reason (3m). Another
+// command has no form.
 const FORMS = new Map<string, (params: readonly string[]) => boolean>(
   Object.entries({
     REDACT: ([room = ""]: readonly string[]) => ROOM.test(room),
     NOTICE: ([to = ""]: readonly string[]) => /^[^#,:\s\0-\x1f][^,\s\0-\x1f]*$/.test(to),
-    SAMODE: ([room = "", mode = "", mask = "", ...more]: readonly string[]) =>
-      ROOM.test(room) && /^[+-]b$/.test(mode) && /^m:[A-Za-z0-9_-]{1,64}$/.test(mask) && more.length === 0,
+    SAMODE: roomMode,
+    JOIN: ([room = "", ...more]: readonly string[]) => ROOM.test(room) && more.length === 0,
+    KICK: ([room = "", who = "", reason = "", ...more]: readonly string[]) =>
+      ROOM.test(room) && person(who) && reason !== "" && more.length === 0,
   }),
 );
 

@@ -1,222 +1,52 @@
 import { spawnSync } from "node:child_process";
 import { once } from "node:events";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import type { AddressInfo } from "node:net";
-import type { DatabaseSync } from "node:sqlite";
 import { join as joinPath } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Address } from "@gnoworld/schemas";
 import { z } from "zod";
 import { authServer } from "../ergo/auth.ts";
-import { startChat } from "../chat.ts";
 import { ircLink, type Said } from "../irc/link.ts";
-import { PROGRESS_TABLES } from "../moderation/catchup.ts";
-import { MUTE_TABLES } from "../moderation/mute.ts";
-import { VERDICT_TABLES } from "../moderation/check.ts";
-import { CATEGORIES, type Answer } from "../moderation/provider.ts";
-import { ROOM_TABLES } from "../rooms/rooms.ts";
 import { openDatabase } from "../db.ts";
 import { logger } from "../log.ts";
 import { LOGIN_TABLES, makeLogin, NONCE_HOST } from "../login/login.ts";
 import { makeTickets, TICKET_TABLES } from "../login/ticket.ts";
-import { startErgo, type Ergo, type ErgoOptions } from "./ergo.ts";
+import { startErgo, type Ergo } from "./ergo.ts";
 import { wallet } from "./signer.ts";
 import { rawClient, type Raw } from "./rawClient.ts";
 
+import {
+  ADDRESS,
+  cleanUp,
+  finish,
+  guest,
+  hello,
+  history,
+  join,
+  kept,
+  keptFolder,
+  lobby,
+  logged,
+  login,
+  open,
+  oper,
+  ORIGIN,
+  OTHERPW_HASH,
+  replayed,
+  sasl,
+  say,
+  start,
+  stops,
+  sync,
+  wsConnect,
+  wsRaw,
+} from "./ergoKit.ts";
+
 // Every expectation comes from .claude/tmp/ergo-spike/RESULTS.md, section 3 (Ergo v2.19.1, run for real).
 
-const CAPS =
-  "message-tags server-time account-tag echo-message batch labeled-response sasl draft/chathistory " +
-  "draft/event-playback draft/message-redaction account-notify extended-join multi-prefix draft/metadata-2 standard-replies";
-const ORIGIN = "http://localhost:3000";
-const ADDRESS = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
-// The bcrypt hash `ergo genpasswd` printed for the passphrase "otherpw".
-const OTHERPW_HASH = "$2a$04$ETom.QBtLC14tZ.OOsG0..gz5atMe0Y3vJRPjCNYAMRwXQVTZtyxq";
-
-// Node's WebSocket takes a second argument the standard does not have: headers (so an Origin) and protocols.
-interface WsEvent {
-  data?: unknown;
-}
-interface Ws {
-  protocol: string;
-  send: (data: string) => void;
-  close: () => void;
-  addEventListener: (type: string, listener: (event: WsEvent) => void) => void;
-}
-interface WsOptions {
-  headers?: Record<string, string>;
-  protocols?: string[];
-}
-type WsConstructor = new (url: string, options?: WsOptions) => Ws;
-const NodeWebSocket = (globalThis as unknown as { WebSocket: WsConstructor }).WebSocket;
-
-const ergos: Ergo[] = [];
-const clients: Raw[] = [];
-const sockets: Ws[] = [];
-let pings = 0;
-
-const kept: string[] = [];
-// A folder of the test's own, which Ergo keeps across a stop; the test removes it.
-const keptFolder = (): string => {
-  const dir = mkdtempSync(joinPath(tmpdir(), "gnoworld-ergo-kept-"));
-  kept.push(dir);
-  return dir;
-};
-
-const stops: (() => Promise<void>)[] = [];
-afterEach(async () => {
-  for (const stop of stops.splice(0)) await stop();
-  for (const ws of sockets.splice(0)) ws.close();
-  await Promise.all(clients.splice(0).map((c) => c.close()));
-  await Promise.all(ergos.splice(0).map((e) => e.stop()));
-  for (const dir of kept.splice(0)) rmSync(dir, { recursive: true, force: true });
-});
-
-const start = async (options?: ErgoOptions): Promise<Ergo> => {
-  const e = await startErgo(options);
-  ergos.push(e);
-  return e;
-};
-
-const open = async (e: Ergo): Promise<Raw> => {
-  const c = await rawClient(e.port);
-  clients.push(c);
-  return c;
-};
-
-const wsConnect = (port: number, options?: WsOptions): Promise<Ws | undefined> =>
-  new Promise((resolve) => {
-    const ws = new NodeWebSocket(`ws://127.0.0.1:${String(port)}/`, options);
-    sockets.push(ws);
-    ws.addEventListener("open", () => {
-      resolve(ws);
-    });
-    ws.addEventListener("close", () => {
-      resolve(undefined);
-    });
-    ws.addEventListener("error", () => {
-      resolve(undefined);
-    });
-  });
-
-// The same interface as rawClient, over a WebSocket: one IRC line per message.
-const wsRaw = (ws: Ws): Raw => {
-  const all: string[] = [];
-  let next = 0;
-  ws.addEventListener("message", (event) => {
-    if (typeof event.data === "string") all.push(event.data);
-  });
-  return {
-    send: (line) => {
-      ws.send(line);
-    },
-    expect: async (pattern, ms = 2000) => {
-      const end = Date.now() + ms;
-      for (;;) {
-        while (next < all.length) {
-          const line = all[next++];
-          if (line !== undefined && pattern.test(line)) return line;
-        }
-        if (Date.now() > end) throw new Error(`no line matched ${String(pattern)}: ${all.join("\n")}`);
-        await new Promise((resolve) => setTimeout(resolve, 20));
-      }
-    },
-    lines: () => [...all],
-    close: () => {
-      ws.close();
-      return Promise.resolve();
-    },
-  };
-};
-
-// A line sent and answered proves the server handled everything sent before it on this connection.
-const sync = async (c: Raw): Promise<void> => {
-  const token = `sync${String(++pings)}`;
-  c.send(`PING ${token}`);
-  await c.expect(new RegExp(`PONG .*${token}`));
-};
-
-const hello = async (c: Raw, caps = CAPS): Promise<void> => {
-  c.send("CAP LS 302");
-  c.send(`CAP REQ :${caps}`);
-  await c.expect(/CAP \S+ ACK /);
-};
-
-const sasl = async (c: Raw, account: string, passphrase: string): Promise<string> => {
-  c.send("AUTHENTICATE PLAIN");
-  await c.expect(/AUTHENTICATE \+/);
-  c.send(`AUTHENTICATE ${Buffer.from(`\0${account}\0${passphrase}`).toString("base64")}`);
-  // Past the auth script's 9 s (AUTH_TIMEOUT): a slow script shows as Ergo's 904, never as a test's timeout.
-  return c.expect(/ (903|904) /, 10_000);
-};
-
-// Registered (the MOTD's end, or its absence), unless the test waits for a refusal.
-const finish = (c: Raw, nick: string, done = / 376 | 422 /): Promise<string> => {
-  c.send("CAP END");
-  c.send(`NICK ${nick}`);
-  c.send(`USER u 0 * :${nick}`);
-  return c.expect(done);
-};
-
-const login = async (
-  e: Ergo,
-  account: string,
-  { pass = "pw", nick = account, caps = CAPS }: { pass?: string; nick?: string; caps?: string } = {},
-): Promise<Raw> => {
-  const c = await open(e);
-  await hello(c, caps);
-  expect(await sasl(c, account, pass)).toContain(" 903 ");
-  await finish(c, nick);
-  return c;
-};
-
-const guest = async (e: Ergo, nick: string, caps = CAPS): Promise<Raw> => {
-  const c = await open(e);
-  await hello(c, caps);
-  await finish(c, nick);
-  return c;
-};
-
-const oper = async (e: Ergo, name: string): Promise<Raw> => {
-  const c = await login(e, name);
-  c.send(`OPER admin ${e.operPassword}`);
-  await c.expect(/ 381 /);
-  return c;
-};
-
-const join = async (c: Raw, channel: string): Promise<void> => {
-  c.send(`JOIN ${channel}`);
-  await c.expect(new RegExp(` 366 \\S+ ${channel} `));
-};
-
-// An oper (who may create a channel) sits in #lobby.
-const lobby = async (e: Ergo): Promise<Raw> => {
-  const chief = await oper(e, "chief");
-  await join(chief, "#lobby");
-  return chief;
-};
-
-const msgid = (line: string): string => {
-  const found = /msgid=(\w+)/.exec(line);
-  if (found?.[1] === undefined) throw new Error(`no msgid in ${line}`);
-  return found[1];
-};
-
-// Sends a PRIVMSG and returns its msgid, read from the echo.
-const say = async (c: Raw, target: string, text: string): Promise<string> => {
-  c.send(`PRIVMSG ${target} :${text}`);
-  return msgid(await c.expect(new RegExp(`PRIVMSG ${target} :${text}$`)));
-};
-
-const history = (c: Raw, target: string): void => {
-  c.send(`CHATHISTORY LATEST ${target} * 50`);
-};
-
-// A line replayed from history carries a batch tag; the live one does not.
-const replayed = (what: string): RegExp => new RegExp(`^@\\S*batch=\\S* .*${what}`);
-
-const logged = (c: Raw): string => c.lines().join("\n");
+afterEach(cleanUp);
 
 describe("guests and rooms", { timeout: 20_000 }, () => {
   it("refuses a guest speaking in a +M room, and lets an account speak", async () => {
@@ -1178,170 +1008,5 @@ describe("the server's IRC link (3h)", { timeout: 40_000 }, () => {
     const again = await start({ dir, ports: [first.port, first.wsPort], operPassword: first.operPassword });
     // An operator holds its rooms as their op: Ergo shows it with an @.
     expect(await inRoom(await guest(again, "gus2"), "#bubble")).toMatch(/ :(.* )?@gnoworld\b/);
-  });
-});
-
-describe("the bot acts (3j)", { timeout: 40_000 }, () => {
-  const RULES = { bannedWords: [], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
-  const nothing = Object.fromEntries(CATEGORIES.map((c) => [c, 0]));
-  const unflagged = Object.fromEntries(CATEGORIES.map((c) => [c, false]));
-  // A provider that flags violence in any text saying "hurt", and records what it was asked.
-  const provider =
-    (asked: string[]) =>
-    (text: string): Promise<Answer> => {
-      asked.push(text);
-      const hurt = text.includes("hurt");
-      return Promise.resolve({
-        flagged: { ...unflagged, violence: hurt } as Answer["flagged"],
-        scores: { ...nothing, violence: hurt ? 0.99 : 0 } as Answer["scores"],
-      });
-    };
-  let watchers = 0;
-  const TABLES = [LOGIN_TABLES, TICKET_TABLES, ROOM_TABLES, VERDICT_TABLES, PROGRESS_TABLES, MUTE_TABLES];
-  const MUTE = { strikes: 3, windowMinutes: 10, minutes: 5, max: 50 };
-  // The chat as main starts it, on its own database or one a restart shares.
-  const chatFor = async (
-    e: Ergo,
-    asked: string[],
-    more: { db?: DatabaseSync; now?: () => number; tickMs?: number } = {},
-  ) => {
-    const db = more.db ?? openDatabase(":memory:", TABLES);
-    const chat = startChat(
-      db,
-      {
-        worlds: new Map([["bubble", { rules: RULES }]]),
-        ergo: { host: "127.0.0.1", port: e.port, password: e.operPassword },
-        moderation: { openaiKey: undefined, thresholds: {}, newAccountHours: 24, mute: MUTE },
-      },
-      {
-        log: logger("a-pepper-of-forty-characters-0123456789", () => true),
-        pepper: "a-pepper-of-forty-characters-0123456789",
-        provider: provider(asked),
-        ...(more.now === undefined ? {} : { now: more.now }),
-        ...(more.tickMs === undefined ? {} : { tickMs: more.tickMs }),
-      },
-    );
-    stops.push(async () => {
-      await chat.stop();
-      if (more.db === undefined) db.close();
-    });
-    // A nick of its own each time: a restart's chat watches beside the last one's.
-    watchers += 1;
-    const watcher = await guest(e, `watcher${String(watchers)}`);
-    for (;;) {
-      watcher.send("NAMES #bubble");
-      const names = await watcher.expect(/ (353|366) \S+ (= )?#bubble /);
-      if (names.includes(" 353 ") && names.includes("gnoworld")) break;
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    }
-    const ids = z.array(z.object({ msgid: z.string() }));
-    const verdicts = () =>
-      ids.parse(db.prepare("SELECT msgid FROM verdicts ORDER BY msgid").all()).map(({ msgid }) => msgid);
-    return { db, verdicts, stop: chat.stop };
-  };
-
-  it("hides the flagged message by its own id for everyone in the room, its author an address, a clean one kept", async () => {
-    const e = await start();
-    const { verdicts } = await chatFor(e, []);
-    const author = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
-    const alice = await login(e, author);
-    await join(alice, "#bubble");
-    const bob = await login(e, "bob");
-    await join(bob, "#bubble");
-    const clean = await say(alice, "#bubble", "hello");
-    const flagged = await say(alice, "#bubble", "I will hurt you");
-    await bob.expect(new RegExp(` REDACT #bubble ${flagged} violence`));
-    await alice.expect(
-      new RegExp(
-        `NOTICE ${author} :Your message in #bubble was hidden: violence\\. The rules: https://gno\\.world/rules`,
-      ),
-    );
-    await expect.poll(() => verdicts().length).toBe(2);
-    await sync(bob);
-    expect(bob.lines().filter((line) => line.includes(` REDACT #bubble ${clean}`))).toEqual([]);
-  });
-
-  it("checks what it missed while its link was down, each message once, after a mark Ergo has erased", async () => {
-    const e = await start();
-    const asked: string[] = [];
-    const { verdicts } = await chatFor(e, asked);
-    const alice = await login(e, "alice");
-    await join(alice, "#bubble");
-    // The mark is a hidden line, which the REDACT takes out of Ergo's history.
-    const hidden = await say(alice, "#bubble", "I will hurt you");
-    await alice.expect(new RegExp(` REDACT #bubble ${hidden} `));
-    await expect.poll(() => verdicts().length).toBe(1);
-    const chief = await oper(e, "chief");
-    chief.send("KILL gnoworld :a test outage");
-    await alice.expect(/:gnoworld!\S+ QUIT /);
-    for (const text of ["one", "two", "three"]) alice.send(`PRIVMSG #bubble :${text}`);
-    await sync(alice);
-    await expect.poll(() => asked.toSorted(), { timeout: 15_000 }).toEqual(["I will hurt you", "one", "three", "two"]);
-    expect(verdicts()).toHaveLength(4);
-    await sync(alice);
-    expect(asked).toHaveLength(4);
-  });
-
-  it("mutes an account hidden three times, others still speaking; a restart keeps, puts back or lifts it (3k)", async () => {
-    const e = await start();
-    const clock = { now: Date.now() };
-    const db = openDatabase(":memory:", TABLES);
-    const restart = (): ReturnType<typeof chatFor> => chatFor(e, [], { db, now: () => clock.now, tickMs: 50 });
-    const first = await restart();
-    const bob = await login(e, "bob");
-    const alice = await login(e, "alice");
-    const bobby = await login(e, "bobby");
-    for (const c of [bob, alice, bobby]) await join(c, "#bubble");
-    for (const n of [1, 2]) await say(bob, "#bubble", `I will hurt you ${String(n)}`);
-    // Its echo not awaited: Ergo may send bob the mute before it, and expect reads on past what it matched.
-    bob.send("PRIVMSG #bubble :I will hurt you 3");
-    await bob.expect(/ MODE #bubble \+b m:bob/);
-    bob.send("PRIVMSG #bubble :muted now");
-    await bob.expect(/ 404 bob #bubble :Cannot send to channel/);
-    bob.send("@+draft/react=x TAGMSG #bubble");
-    await bob.expect(/ 404 bob #bubble :Cannot send to channel/);
-    await say(alice, "#bubble", "alice speaks");
-    await say(bobby, "#bubble", "bobby speaks");
-    // A restart with the ban still in Ergo's list: put on again, bob stays muted.
-    await first.stop();
-    const second = await restart();
-    bob.send("PRIVMSG #bubble :still muted");
-    await bob.expect(/ 404 bob #bubble :Cannot send to channel/);
-    // As if Ergo lost its list: the next start puts the live mute back.
-    await second.stop();
-    const chief = await oper(e, "chief");
-    chief.send("SAMODE #bubble -b m:bob");
-    await bob.expect(/ MODE #bubble -b m:bob/);
-    const third = await restart();
-    await bob.expect(/ MODE #bubble \+b m:bob/);
-    // A start after the mute's end lifts it.
-    await third.stop();
-    clock.now += 5 * 60_000;
-    await restart();
-    // Closed once every chat has stopped: the cleanups run in turn.
-    stops.push(() => {
-      db.close();
-      return Promise.resolve();
-    });
-    await bob.expect(/ MODE #bubble -b m:bob/);
-    await say(bob, "#bubble", "speaking again");
-  });
-
-  it("hides an edit of another's line in Ergo, and keeps an own edit (3k)", async () => {
-    const e = await start();
-    const { verdicts } = await chatFor(e, []);
-    const alice = await login(e, "alice");
-    await join(alice, "#bubble");
-    const bob = await login(e, "bob");
-    await join(bob, "#bubble");
-    const original = await say(alice, "#bubble", "hello");
-    bob.send(`@+gnoworld/edit=${original} PRIVMSG #bubble :forged`);
-    const forged = msgid(await bob.expect(/PRIVMSG #bubble :forged$/));
-    await alice.expect(new RegExp(` REDACT #bubble ${forged} :an edit of a message that is not yours`));
-    alice.send(`@+gnoworld/edit=${original} PRIVMSG #bubble :hello, fixed`);
-    const fixed = msgid(await alice.expect(/PRIVMSG #bubble :hello, fixed$/));
-    await expect.poll(() => verdicts().length).toBe(3);
-    await sync(alice);
-    expect(alice.lines().filter((line) => line.includes(` REDACT #bubble ${fixed}`))).toEqual([]);
   });
 });

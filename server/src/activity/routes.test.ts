@@ -24,7 +24,7 @@ const setup = () => {
     logger("a-pepper-of-forty-characters-0123456789", () => true),
     () => true,
   );
-  app.route("/api/activity", activityRoutes(activity, { db, now: () => T0 }));
+  app.route("/api/activity", activityRoutes(activity, { db, now: () => T0, visible: () => true }));
   const ask = async (query: string) => {
     const response = await app.request(`/api/activity${query}`);
     return [response.status, await response.text(), response.headers.get("cache-control")];
@@ -114,5 +114,56 @@ describe("GET /api/activity", () => {
     expect((await ask("?worlds=bubble,bubble"))[1]).toBe(
       JSON.stringify({ rooms: [{ world: "bubble", room: "#bubble", perMinute: 0 }] }),
     );
+  });
+});
+
+describe("GET /api/activity, rooms by role (3m)", () => {
+  // The crew's room is its members'; the attic is hidden, listed to its world's moderators alone.
+  const visible = (room: string, who: string | undefined) =>
+    room === "#bubble/crew" ? who === "member" || who === "mod" : room === "#bubble/attic" ? who === "mod" : true;
+  const roleSetup = () => {
+    const db = openDatabase(":memory:", [ROOM_TABLES]);
+    opened.push(db);
+    ensureRooms(db, ["bubble"], T0);
+    for (const name of ["#bubble/crew", "#bubble/attic"]) {
+      db.prepare("INSERT INTO rooms (name, world, created_at) VALUES (?, 'bubble', 0)").run(name);
+    }
+    const app = makeApp(
+      logger("a-pepper-of-forty-characters-0123456789", () => true),
+      () => true,
+    );
+    const session = (token: string | undefined) => (token === "" ? undefined : token);
+    app.route("/api/activity", activityRoutes(makeActivity(), { db, now: () => T0, visible, session }));
+    const ask = async (who?: string) => {
+      const response = await app.request("/api/activity?worlds=bubble", {
+        headers: who === undefined ? {} : { cookie: `__Host-session=${who}` },
+      });
+      const body = JSON.parse(await response.text()) as { rooms: { room: string }[] };
+      return [body.rooms.map(({ room }) => room), response.headers.get("cache-control")];
+    };
+    return { ask };
+  };
+
+  it("says its answer varies with the cookie, so no cache hands a guest's answer to an account (F585)", async () => {
+    const db = openDatabase(":memory:", [ROOM_TABLES]);
+    opened.push(db);
+    ensureRooms(db, ["bubble"], T0);
+    const app = makeApp(
+      logger("a-pepper-of-forty-characters-0123456789", () => true),
+      () => true,
+    );
+    const session = (token: string | undefined) => token;
+    app.route("/api/activity", activityRoutes(makeActivity(), { db, now: () => T0, visible: () => true, session }));
+    const vary = async (headers: Record<string, string>) =>
+      (await app.request("/api/activity?worlds=bubble", { headers })).headers.get("vary");
+    expect([await vary({}), await vary({ cookie: "__Host-session=g1a" })]).toEqual(["cookie", "cookie"]);
+  });
+
+  it("answers a members room to whom may read it, a hidden one to its moderators, each privately", async () => {
+    const { ask } = roleSetup();
+    expect(await ask()).toEqual([["#bubble"], "public, max-age=5"]);
+    expect(await ask("stranger")).toEqual([["#bubble"], "private, max-age=5"]);
+    expect(await ask("member")).toEqual([["#bubble", "#bubble/crew"], "private, max-age=5"]);
+    expect(await ask("mod")).toEqual([["#bubble", "#bubble/attic", "#bubble/crew"], "private, max-age=5"]);
   });
 });

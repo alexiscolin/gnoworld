@@ -723,6 +723,10 @@ groups (3m); a console (slice 12).
 creation; the cap per world bounds the rooms. **Files.** New: `server/src/rooms/{create, archive}.ts`,
 `packages/schemas/src/rooms.ts`. Tier 2; the check is read whole, by my proposal. No human part.
 
+**As built** (`docs/decisions.md`, 2026-10-22, 3l's shapes): create and archive in one keeper,
+`server/src/rooms/create.ts`, its routes in `routes.ts` (no `archive.ts`); the POST guard moved to
+`server/src/guard.ts`; each ready puts every room's modes back and lists Ergo's channels.
+
 ---
 
 ## 3m. Rooms by role
@@ -762,6 +766,13 @@ levels computed from activity, encrypted private rooms (phase 2).
 diff per room per pass; **scale** the number of rooms and the group sizes. **Files.** New:
 `server/src/rooms/{types, reconcile}.ts`, schema changes to the roles file. Tier 2; `types.ts` is read whole, by my
 proposal. No human part.
+
+**As built** (`docs/decisions.md`, 2026-10-22, 3m's shapes): no AMODE (Ergo keeps it for a registered
+channel) and no invites at login (Ergo invites a connected client alone: `irc/channel.go:1612`), so a members
+room holds 100 accounts and the file refuses more; voice by `SAMODE +v` on a JOIN and each pass; a stranger,
+a writer and a moderator join the guest and the member in the matrix; the bot rejoins a room that refuses it
+by `SAJOIN` and lists its invites by `SAMODE`, since it is no channel operator after a `SAJOIN`; a room's flags
+go out with the JOINs, before any read.
 
 ---
 

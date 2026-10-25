@@ -34,6 +34,8 @@ interface Options {
   rulesOf: (room: string) => Rules | undefined;
   // None without a key: every message is then unchecked, and nothing leaves.
   provider: ((text: string) => Promise<Answer | "unchecked">) | undefined;
+  // A room whose lines may go to the provider (3m: a members room's never leave), all by default.
+  publicRoom?: (room: string) => boolean;
   thresholds: Thresholds;
   pepper: string;
   log: Log;
@@ -91,6 +93,7 @@ export function checkAgain(db: DatabaseSync, msgid: string): void {
 /** "seen": the line has its verdict; "busy": another run is checking it now, and settles it. */
 export function makeChecker(options: Options): (said: Said) => Promise<Verdict | "seen" | "busy"> {
   const { db, rulesOf, provider, thresholds, pepper, log, now = Date.now, newAccountMs = 24 * 60 * 60_000 } = options;
+  const { publicRoom = () => true } = options;
   const sql = {
     claim: db.prepare(
       "INSERT OR IGNORE INTO verdicts (msgid, room, account, action, at) VALUES (?, ?, ?, 'pending', ?)",
@@ -119,6 +122,17 @@ export function makeChecker(options: Options): (said: Said) => Promise<Verdict |
   // A line a stopped process left pending is checked again when it comes back (one process: 3a's lock).
   db.prepare("UPDATE verdicts SET action = 'unchecked' WHERE action = 'pending'").run();
   const ask = provider === undefined ? undefined : withBreaker(provider, { now, log });
+  // The world's rules, which a new account, a line too fast or another's edit may break.
+  const byRules = (said: Said, rules: Rules, { hashed, at }: { hashed: string; at: number }) => {
+    const firstSeen = FirstSeen.parse(sql.firstSeen.get(said.account))?.first_seen;
+    const edit = editOf(said, hashed);
+    return ruleVerdict(said.text, rules, {
+      newAccount: firstSeen === undefined || at - firstSeen < newAccountMs,
+      tooFast: tooFast(hashed, at),
+      foreignEdit: edit === "other",
+      unknownEdit: edit === "unknown",
+    });
+  };
   return async (said) => {
     const { room, account, msgid, text } = said;
     const at = lineTime(said, now);
@@ -139,15 +153,10 @@ export function makeChecker(options: Options): (said: Said) => Promise<Verdict |
     const rules = rulesOf(room);
     // A room no world of the file names sends nothing anywhere.
     if (rules === undefined) return settle({ action: "unchecked" }, { why: "unknown_room" });
-    const firstSeen = FirstSeen.parse(sql.firstSeen.get(account))?.first_seen;
-    const edit = editOf(said, hashed);
-    const reason = ruleVerdict(text, rules, {
-      newAccount: firstSeen === undefined || at - firstSeen < newAccountMs,
-      tooFast: tooFast(hashed, at),
-      foreignEdit: edit === "other",
-      unknownEdit: edit === "unknown",
-    });
+    const reason = byRules(said, rules, { hashed, at });
     if (reason !== undefined) return settle({ action: "hide", reason });
+    // Checked by its rules alone: the provider never reads it.
+    if (!publicRoom(room)) return settle({ action: "pass" }, { why: "members_room" });
     if (ask === undefined) return settle({ action: "unchecked" }, { why: "no_key" });
     const answer = await ask(text);
     if (answer === "unchecked") return settle({ action: "unchecked" });

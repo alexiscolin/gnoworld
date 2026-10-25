@@ -259,6 +259,51 @@ describe("checking a message", () => {
     expect(accountKey(PEPPER, OLD)).toBe(createHmac("sha256", PEPPER).update(OLD).digest("hex"));
   });
 
+  it("sends no line of a room that is not public to the provider: its rules still hide, else it passes (3m)", async () => {
+    const db = openDatabase(":memory:", [LOGIN_TABLES, VERDICT_TABLES]);
+    opened.push(db);
+    db.prepare("INSERT INTO accounts (address, first_seen) VALUES (?, ?)").run(OLD, T0 - 30 * 24 * HOUR);
+    const asked: string[] = [];
+    const check = makeChecker({
+      db,
+      rulesOf: () => RULES,
+      provider: (text) => {
+        asked.push(text);
+        return Promise.resolve(answer({ violence: true }, { violence: 0.9 }));
+      },
+      publicRoom: (room) => room !== "#bubble/crew",
+      thresholds: {},
+      pepper: PEPPER,
+      log: logger(PEPPER, () => true),
+      now: () => T0,
+    });
+    const inCrew = (text: string, msgid: string) => ({ ...said(text, msgid), room: "#bubble/crew" });
+    expect(await check(inCrew("I hit you", "m1"))).toEqual({ action: "pass" });
+    expect(await check(inCrew("buy spam", "m2"))).toEqual({ action: "hide", reason: "banned_word" });
+    expect(await check(said("I hit you", "m3"))).toEqual({ action: "hide", reason: "violence" });
+    expect(asked).toEqual(["I hit you"]);
+  });
+
+  it("records why a members room's line passed unasked: members_room, with no answer (F574)", async () => {
+    const db = openDatabase(":memory:", [LOGIN_TABLES, VERDICT_TABLES]);
+    opened.push(db);
+    db.prepare("INSERT INTO accounts (address, first_seen) VALUES (?, ?)").run(OLD, T0 - 30 * 24 * HOUR);
+    const check = makeChecker({
+      db,
+      rulesOf: () => RULES,
+      provider: () => Promise.resolve(answer()),
+      publicRoom: () => false,
+      thresholds: {},
+      pepper: PEPPER,
+      log: logger(PEPPER, () => true),
+      now: () => T0,
+    });
+    await check({ ...said("between us", "m1"), room: "#bubble/crew" });
+    expect(db.prepare("SELECT action, reason, flags, scores FROM verdicts").all()).toEqual([
+      { action: "pass", reason: "members_room", flags: null, scores: null },
+    ]);
+  });
+
   it("gives a new account fewer links, 24 hours from its first login, not a minute more", async () => {
     const { db, clock, check } = setup(() => Promise.resolve(answer()));
     const fresh = toAddress(new Uint8Array(20).fill(7));

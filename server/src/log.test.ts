@@ -30,6 +30,14 @@ describe("logger", () => {
     });
   });
 
+  it("writes a room as it is, before the account: a room's name is public (3l)", () => {
+    const { log, lines } = capture();
+    log("room_made", { room: "#bubble/garden", account: ADDRESS });
+    expect(lines[0]?.replace(/^\{"time":"[^"]+",/, "{")).toBe(
+      `{"event":"room_made","room":"#bubble/garden","account":"${createHmac("sha256", PEPPER).update(ADDRESS).digest("hex")}"}\n`,
+    );
+  });
+
   it("writes an account only as its HMAC with the pepper", () => {
     const { log, lines } = capture();
     log("login", { account: ADDRESS });

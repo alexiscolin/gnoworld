@@ -1,8 +1,8 @@
 // The roles file (decisions 147 and 149): the team, the trusted, and each world's moderators and
-// anti-spam rules. Who may do what is answered from it alone. Read whole in review: a wrong line here
-// hands out power.
+// anti-spam rules; since 3m, each world's groups of accounts and the type of its rooms. Who may do what is
+// answered from it alone. Read whole in review: a wrong line here hands out power.
 import { readFileSync } from "node:fs";
-import { Address } from "@gnoworld/schemas";
+import { Address, RoomName } from "@gnoworld/schemas";
 import { z } from "zod";
 
 // Built at each read, not at import: StrykerJS can only mutate what runs inside a test.
@@ -16,19 +16,65 @@ function rules() {
   });
 }
 
+// A world's slug and a group's name: lower-case letters and digits, single hyphens between.
+function slug() {
+  return z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/);
+}
+
+// A room's type (3m): who joins it, who reads it and who speaks in it (rooms/types.ts). Only a members
+// room names its readers, and a members-write room its writers too; hidden leaves it out of the lists.
+function room() {
+  const Group = slug();
+  const none = z.never().optional();
+  const base = { room: z.string(), hidden: z.boolean().default(false) };
+  return z.discriminatedUnion("type", [
+    z.strictObject({ ...base, type: z.enum(["open", "announcement", "accounts"]), readers: none, writers: none }),
+    z.strictObject({ ...base, type: z.literal("members"), readers: Group, writers: none }),
+    z.strictObject({ ...base, type: z.literal("members-write"), readers: Group, writers: Group }),
+  ]);
+}
+
+function world(Addresses: z.ZodType<Address[]>) {
+  // A __proto__ key would vanish in the record (zod 4.6.5, $ZodRecord skips it): refused by name instead.
+  const Groups = z
+    .unknown()
+    .refine((value) => typeof value !== "object" || value === null || !Object.hasOwn(value, "__proto__"))
+    .pipe(z.record(slug(), Addresses));
+  return z
+    .strictObject({
+      // Its main room, #<slug>, within Ergo's channellen of 64 (deploy/ergo/ircd.yaml.tmpl).
+      slug: slug().max(63),
+      moderators: Addresses,
+      rules: rules(),
+      groups: Groups.default({}),
+      rooms: z.array(room()).default([]),
+    })
+    .superRefine(({ slug, groups, rooms }, ctx) => {
+      const seen = new Set<string>();
+      for (const [at, { room: name, readers, writers }] of rooms.entries()) {
+        // Its main room, or #<slug>/<a room's name>, once.
+        const own =
+          name === `#${slug}` ||
+          (name.startsWith(`#${slug}/`) &&
+            RoomName.safeParse(name.slice(slug.length + 2)).success &&
+            name.length <= 64);
+        if (!own || seen.has(name)) ctx.addIssue({ code: "custom", path: ["rooms", at, "room"], message: "room" });
+        seen.add(name);
+        for (const [key, group] of Object.entries({ readers, writers }))
+          if (group !== undefined && !Object.hasOwn(groups, group))
+            ctx.addIssue({ code: "custom", path: ["rooms", at, key], message: "group" });
+      }
+    });
+}
+
 function schema() {
   const unique = (list: readonly string[]): boolean => new Set(list).size === list.length;
   const Addresses = z.array(Address).refine(unique);
-  const World = z.strictObject({
-    slug: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/),
-    moderators: Addresses,
-    rules: rules(),
-  });
   return z
     .strictObject({
       team: Addresses,
       trusted: Addresses,
-      worlds: z.array(World).refine((worlds) => unique(worlds.map(({ slug }) => slug))),
+      worlds: z.array(world(Addresses)).refine((worlds) => unique(worlds.map(({ slug }) => slug))),
     })
     .superRefine(({ team, trusted, worlds }, ctx) => {
       // The team is trusted and moderates every world by itself: listing it again is a mistake.
@@ -37,16 +83,40 @@ function schema() {
           if (team.includes(who)) ctx.addIssue({ code: "custom", path: [...path, at], message: "team" });
       };
       again(trusted, ["trusted"]);
-      for (const [at, world] of worlds.entries()) again(world.moderators, ["worlds", at, "moderators"]);
+      for (const [at, world] of worlds.entries()) {
+        again(world.moderators, ["worlds", at, "moderators"]);
+        // Ergo's invite list holds 100 entries (chan-list-modes): a members room's readers, its writers,
+        // the world's moderators and the team, each account once.
+        for (const [index, { readers, writers }] of world.rooms.entries()) {
+          if (readers === undefined) continue;
+          const groups = [readers, writers ?? readers].flatMap((name) => world.groups[name] ?? []);
+          if (new Set([...groups, ...world.moderators, ...team]).size > 100)
+            ctx.addIssue({ code: "custom", path: ["worlds", at, "rooms", index, "readers"], message: "full" });
+        }
+      }
     });
 }
 
 export type Rules = z.infer<ReturnType<typeof rules>>;
 
+export type Room =
+  | { type: "open" | "announcement" | "accounts"; hidden: boolean }
+  | { type: "members"; readers: string; hidden: boolean }
+  | { type: "members-write"; readers: string; writers: string; hidden: boolean };
+
 export interface Roles {
   team: ReadonlySet<Address>;
   trusted: ReadonlySet<Address>;
-  worlds: ReadonlyMap<string, { moderators: ReadonlySet<Address>; rules: Rules }>;
+  worlds: ReadonlyMap<
+    string,
+    {
+      moderators: ReadonlySet<Address>;
+      rules: Rules;
+      // Both filled by loadRoles; a world without them has none.
+      groups?: ReadonlyMap<string, ReadonlySet<Address>>;
+      rooms?: ReadonlyMap<string, Room>;
+    }
+  >;
 }
 
 // ponytail: read at start, so a change waits for a restart; slice 12's console will watch the file.
@@ -68,7 +138,17 @@ export function loadRoles(path: string): Roles {
   return {
     team: new Set(team),
     trusted: new Set(trusted),
-    worlds: new Map(worlds.map(({ slug, moderators, rules }) => [slug, { moderators: new Set(moderators), rules }])),
+    worlds: new Map(
+      worlds.map(({ slug, moderators, rules, groups, rooms }) => [
+        slug,
+        {
+          moderators: new Set(moderators),
+          rules,
+          groups: new Map(Object.entries(groups).map(([name, members]) => [name, new Set(members)])),
+          rooms: new Map(rooms.map(({ room: name, ...type }) => [name, type])),
+        },
+      ]),
+    ),
   };
 }
 
@@ -99,3 +179,7 @@ export function moderates(roles: Roles, who: Address, slug: string): boolean {
   const world = roles.worlds.get(slug);
   return world !== undefined && (isTeam(roles, who) || world.moderators.has(who));
 }
+
+/** Who may make and archive a world's rooms (3l): its moderators and the team, as `moderates`; rights
+ * earned by activity are a later slice's (decision 162). */
+export const mayCreateRoom = (roles: Roles, who: Address, slug: string): boolean => moderates(roles, who, slug);

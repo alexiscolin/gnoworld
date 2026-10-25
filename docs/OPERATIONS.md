@@ -207,6 +207,39 @@ Slice 3, the mute and the edits (3k):
   no strike (F549). The hides that brought a mute still count after it lifts: one more hide within
   the window mutes again.
 
+Slice 3, the moderators' rooms (3l):
+
+- **Who makes rooms.** A world's moderators and the team, through `POST /api/rooms`; 20 rooms a world
+  besides its main one, archived rooms counted; 10 an hour per account. Ergo lets no one else create a
+  channel (`operator-only-creation`).
+- **Archiving** makes a room read-only (`+m`) and unlisted (`+s`); its history keeps its retention.
+  Nothing removes a room: an operator does it by hand in Ergo, then in the `rooms` table.
+- **The alert `unknown_room`** names a channel in Ergo the server did not make: an operator made it.
+
+Slice 3, rooms by role (3m):
+
+- **The roles file's rooms.** Each world may list `groups` of accounts and `rooms`, each `#<world>` or
+  `#<world>/<name>` with a `type`: `open`, `announcement` (its moderators and the team speak),
+  `accounts` (no guest joins), `members` (its `readers` group joins and speaks) or `members-write` (its
+  `readers` join, its `writers` speak), and `hidden` to keep it out of the lists. A change waits for a
+  restart. The server makes the file's rooms at start.
+- **Restricted, not encrypted.** A members room keeps guests and strangers out in Ergo, for every
+  client, but its lines are read by the server, the bot and Ergo's operators, and stored in Ergo's
+  history like any other. Its lines are never sent to OpenAI: the world's rules alone check them.
+- **100 accounts a members room.** Its readers, its writers, the world's moderators and the team,
+  each once, are Ergo's invite list, which holds 100 (`chan-list-modes`): a file past it stops the
+  server. Nobody is invited at login: Ergo invites only a connected client.
+- **The reconciler.** At each connection, every minute and when someone joins, the bot reads each
+  room from Ergo (its flags, its invite list, who is in it) and sends only what differs: an
+  operator's change is undone, anyone on a members room no longer on its list is put out (`KICK`),
+  every power above voice is taken from anyone but the bot. Its flags go with its JOINs, before any
+  read, since Ergo keeps a channel's history across its own restart. It logs `room_reconciled` for
+  each room it changed.
+- **The alert `room_opened`** names a room the reconciler took out of invite-only: the roles file made
+  a members room open, or no longer names it. Its history is then open to whoever joins.
+- **A room that refuses the bot** (invite-only, accounts only, or an operator's limit, key or ban) is
+  joined by `SAJOIN`; Ergo's oper log then names it.
+
 ## Secrets: rotation and revocation
 
 - **The password:** write a new file with `htpasswd -cB`, then `docker compose ... restart web`.

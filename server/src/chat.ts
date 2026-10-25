@@ -1,7 +1,8 @@
-// The chat's server side as main starts it (slice 3's plan, 3h to 3k): each world's main room made, the
-// IRC link in them when Ergo is set, their activity counted, and each message checked by its world's rules
-// and OpenAI, through a fair queue, then acted on, streamed, and struck toward a mute; the routes that
-// tell the activity and the verdicts.
+// The chat's server side as main starts it (slice 3's plan, 3h to 3m): each world's main room and the
+// roles file's typed rooms made, the IRC link in them when Ergo is set, each room kept as its type says,
+// their activity counted, and each message checked by its world's rules and OpenAI (a members room's by
+// its rules alone), through a fair queue, then acted on, streamed, and struck toward a mute; the routes
+// that tell the activity and the verdicts, each room's to whom may see it.
 import type { DatabaseSync } from "node:sqlite";
 import type { Hono } from "hono";
 import { makeActivity } from "./activity/activity.ts";
@@ -17,18 +18,24 @@ import { makeMutes } from "./moderation/mute.ts";
 import { moderationClient, type Answer } from "./moderation/provider.ts";
 import { makeQueue } from "./moderation/queue.ts";
 import { makeStrike } from "./moderation/strikes.ts";
-import type { Rules } from "./roles/roles.ts";
-import { ensureRooms, listRooms, roomWorld, worldRooms } from "./rooms/rooms.ts";
+import { ensureNamed, ensureRooms, listRooms, roomWorld, worldRooms } from "./rooms/rooms.ts";
+import { makeRooms, type Rooms } from "./rooms/create.ts";
+import { listed, mayRead, publicRoom, staffOf, type World } from "./rooms/types.ts";
 import { makeStream, type Stream } from "./stream/stream.ts";
+import { keeping, reconcilerFor, typedRooms } from "./rooms/wire.ts";
 
 export interface Chat {
   activity: Hono;
   stream: Hono;
+  // The moderators' rooms (3l), made and archived through the link.
+  rooms: Rooms;
   stop: () => Promise<void>;
 }
 
 interface Settings {
-  worlds: ReadonlyMap<string, { rules: Rules }>;
+  // Each world's rules, and since 3m its moderators, groups and typed rooms (rooms/types.ts).
+  worlds: ReadonlyMap<string, World>;
+  team?: ReadonlySet<string> | undefined;
   ergo: Config["ergo"];
   moderation: Config["moderation"];
   trustedProxy?: string | undefined;
@@ -44,6 +51,10 @@ interface Options {
   provider?: (text: string) => Promise<Answer | "unchecked">;
   // How often ended mutes are lifted.
   tickMs?: number;
+  // How often every room is read from Ergo and put back as its type says (3m).
+  reconcileMs?: number;
+  // The account of a session's token (login.ts's session), for the rooms a reader may see.
+  session?: (token: string | undefined) => string | undefined;
 }
 
 interface Steps {
@@ -81,15 +92,18 @@ function moderate({ db, check, send, stream, progress, strike }: Steps): (said: 
   };
 }
 
-export function startChat(db: DatabaseSync, settings: Settings, options: Options): Chat {
-  const { worlds, ergo, moderation } = settings;
+// A world's rooms at most, its main room aside (3l).
+const ROOMS_PER_WORLD = 20;
+
+// The check of each line: its world's rules, then OpenAI when a key is set, or the alert that none is.
+function checkerFor(db: DatabaseSync, { worlds, moderation }: Settings, options: Options): Steps["check"] {
   const { log, pepper, now = Date.now } = options;
-  ensureRooms(db, [...worlds.keys()], now());
   const key = moderation.openaiKey;
   if (key === undefined && options.provider === undefined) log("alert", { error: "moderation_off" });
-  const check = makeChecker({
+  return makeChecker({
     db,
     rulesOf: (room) => worlds.get(roomWorld(db, room) ?? "")?.rules,
+    publicRoom: (room) => publicRoom({ worlds }, room),
     provider: options.provider ?? (key === undefined ? undefined : moderationClient({ key: key.reveal(), log })),
     thresholds: moderation.thresholds,
     pepper,
@@ -97,6 +111,22 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
     now,
     newAccountMs: moderation.newAccountHours * 60 * 60_000,
   });
+}
+
+// A channel in Ergo the server did not make: with operator-only-creation, an operator made it (3l).
+const unknownChannels =
+  (db: DatabaseSync, log: Log) =>
+  (names: readonly string[]): void => {
+    const known = new Set(listRooms(db).map(({ name }) => name));
+    for (const room of names) if (!known.has(room)) log("alert", { error: "unknown_room", room });
+  };
+
+export function startChat(db: DatabaseSync, settings: Settings, options: Options): Chat {
+  const { worlds, ergo, moderation } = settings;
+  const { log, pepper, now = Date.now } = options;
+  ensureRooms(db, [...worlds.keys()], now());
+  ensureNamed(db, typedRooms(worlds), now());
+  const check = checkerFor(db, settings, options);
   const stream = makeStream();
   const progress = makeProgress(db);
   const send = (command: Command, params: readonly string[]): boolean => link?.send(command, params) ?? false;
@@ -111,7 +141,15 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
   });
   const strike = makeStrike(db, { pepper, now, mute, mutes, spared: settings.spared ?? (() => false) });
   const queue = makeQueue<Said>({ run: moderate({ db, check, send, stream, progress, strike }), log, now });
+  const keeper = makeRooms({ db, send, now, max: ROOMS_PER_WORLD });
   const lifts = setInterval(mutes.tick, options.tickMs ?? 10_000);
+  const reconciler = reconcilerFor(db, settings, {
+    keeper,
+    send,
+    state: (room) => link?.state(room) ?? Promise.resolve(undefined),
+    log,
+  });
+  const passes = setInterval(reconciler.ask, options.reconcileMs ?? 60_000);
   const activity = makeActivity();
   const link: Link | undefined =
     ergo === undefined
@@ -121,7 +159,13 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
           rooms: () => listRooms(db).map(({ name }) => name),
           lastChecked: progress.last,
           drained: () => queue.idle(),
-          onReady: mutes.reapply,
+          onReady: () => {
+            reconciler.flags();
+            mutes.reapply();
+            reconciler.ask();
+          },
+          onJoin: reconciler.joined,
+          onChannels: unknownChannels(db, log),
           onMessage: (said) => {
             activity.count(said.room, said.account, now());
             progress.heard(said);
@@ -131,10 +175,21 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
           log,
         });
   return {
-    activity: activityRoutes(activity, { db, now }),
-    stream: stream.routes({ proxy: settings.trustedProxy }),
+    activity: activityRoutes(activity, {
+      db,
+      now,
+      visible: (room, who) => (keeper.archived(room) ? staffOf(settings, room, who) : listed(settings, room, who)),
+      session: options.session,
+    }),
+    stream: stream.routes({
+      proxy: settings.trustedProxy,
+      visible: (room, who) => mayRead(settings, room, who),
+      session: options.session,
+    }),
+    rooms: keeping(keeper, { mutes, reconciler }),
     stop: async () => {
       clearInterval(lifts);
+      clearInterval(passes);
       // Nothing more starts once stopping: a line left waiting is caught up at the next start.
       queue.stop();
       await link?.stop();
