@@ -13,12 +13,14 @@ const ENDS = /[\s<]/u;
 // What opens an address's path, after its host.
 const PATH = /[/?#]/;
 
-/** Where `https://host[:port]` starting at `at` ends, or -1. */
+/** Where `https://host[:port]` starting at `at` ends, or -1; a port from 1 to 65535, or none a browser opens (F785). */
 function authority(source: string, at: number): number {
   if (!source.startsWith("https://", at)) return -1;
-  const host = /[A-Za-z0-9][A-Za-z0-9.-]*(?::\d{1,5}(?!\d))?/y;
+  const host = /[A-Za-z0-9][A-Za-z0-9.-]*(?::(\d{1,5})(?!\d))?/y;
   host.lastIndex = at + "https://".length;
-  return host.test(source) ? host.lastIndex : -1;
+  const found = host.exec(source);
+  const port = Number(found?.[1] ?? "1");
+  return found !== null && port >= 1 && port <= 65535 ? host.lastIndex : -1;
 }
 
 // For each place of the line, the first one from it no address may hold (a space and `<` among them; an emoji is

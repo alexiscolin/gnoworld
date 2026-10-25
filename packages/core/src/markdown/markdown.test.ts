@@ -475,6 +475,19 @@ describe("markdown: the edges StrykerJS found", () => {
     "see https://a.example/x\u200by",
   ])("keeps %j as text: an address no host or character allows", plain);
 
+  // /code-review (F785): a port past 65535, or 0, makes an address no browser opens.
+  test.each([
+    "https://a.example:99999/x",
+    "https://a.example:0/x",
+    "[x](https://a.example:70000)",
+    "see https://a.example:65536",
+  ])("links no address whose port is out of range (%j)", plain);
+
+  test("links an address whose port is in range", () => {
+    reads("https://a.example:65535/x", paragraph(link("https://a.example:65535/x")));
+    reads("[x](https://a.example:1)", paragraph(link("https://a.example:1", "x")));
+  });
+
   test("ends a bare address at an angle, the angle text", () => {
     reads("https://a.example<", paragraph(link("https://a.example"), text("<")));
   });
