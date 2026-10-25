@@ -131,8 +131,8 @@ export type Room =
   | { type: "members"; readers: string; hidden: boolean }
   | { type: "members-write"; readers: string; writers: string; hidden: boolean };
 
-// A named list of a world's rooms, in the order a reader sees them (4b).
-interface Section {
+/** A named list of a world's rooms, in the order a reader sees them (4b). */
+export interface Section {
   name: string;
   rooms: readonly string[];
 }

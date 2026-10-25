@@ -2,7 +2,7 @@
 // roles file's typed rooms made, the IRC link in them when Ergo is set, each room kept as its type says,
 // their activity counted, and each message checked by its world's rules and OpenAI (a members room's by
 // its rules alone), through a fair queue, then acted on, streamed, and struck toward a mute; the routes
-// that tell the activity and the verdicts, each room's to whom may see it.
+// that tell the activity, the rooms by section and the verdicts, each room's to whom may see it.
 import type { DatabaseSync } from "node:sqlite";
 import type { Hono } from "hono";
 import { makeActivity } from "./activity/activity.ts";
@@ -20,12 +20,15 @@ import { makeQueue } from "./moderation/queue.ts";
 import { makeStrike } from "./moderation/strikes.ts";
 import { ensureNamed, ensureRooms, listRooms, roomWorld, worldRooms } from "./rooms/rooms.ts";
 import { makeRooms, type Rooms } from "./rooms/create.ts";
+import { listRoutes } from "./rooms/list.ts";
 import { listed, mayRead, publicRoom, staffOf, type World } from "./rooms/types.ts";
 import { makeStream, type Stream } from "./stream/stream.ts";
 import { keeping, reconcilerFor, typedRooms } from "./rooms/wire.ts";
 
 export interface Chat {
   activity: Hono;
+  // A world's rooms by section, to whom may see them (4b).
+  roomList: Hono;
   stream: Hono;
   // The moderators' rooms (3l), made and archived through the link.
   rooms: Rooms;
@@ -179,6 +182,7 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
     keeper.archived(room) ? staffOf(settings, room, who) : listed(settings, room, who);
   return {
     activity: activityRoutes(activity, { db, now, visible, session: options.session }),
+    roomList: listRoutes({ db, roles: settings, visible, session: options.session }),
     stream: stream.routes({
       proxy: settings.trustedProxy,
       visible: (room, who) => mayRead(settings, room, who),

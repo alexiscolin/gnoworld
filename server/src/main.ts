@@ -58,6 +58,7 @@ const chat = startChat(
   { log, pepper: config.pepper, session },
 );
 app.route("/api/activity", chat.activity);
+app.route("/api/rooms", chat.roomList);
 app.route("/api/stream", chat.stream);
 app.route(
   "/api/rooms",

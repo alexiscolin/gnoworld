@@ -2,7 +2,7 @@
 // voiced, from the roles file; who reads it and who sees it listed. Ergo holds the line (+i, +R, +m): the
 // server only asks for it. A room the file does not type is open; an archived one is read-only and
 // unlisted whatever its type. Read whole in review: a wrong answer here opens a room.
-import type { Room, Rules } from "../roles/roles.ts";
+import type { Room, Rules, Section } from "../roles/roles.ts";
 import { worldOf } from "./rooms.ts";
 
 /** The roles file's part the rooms read: an account by its address, a world as the file lists it. */
@@ -16,6 +16,7 @@ export interface World {
   moderators?: ReadonlySet<string>;
   groups?: ReadonlyMap<string, ReadonlySet<string>>;
   rooms?: ReadonlyMap<string, Room>;
+  sections?: readonly Section[];
 }
 
 /** What a room is to be in Ergo: its flags among M, m, i, s and R, its invites and its voiced, sorted. */
@@ -27,6 +28,9 @@ export interface Desired {
 
 const typeOf = (roles: Typed, room: string): Room =>
   roles.worlds.get(worldOf(room))?.rooms?.get(room) ?? { type: "open", hidden: false };
+
+/** A room's type: the file's, open for a room it does not type. */
+export const roomType = (roles: Typed, room: string): Room["type"] => typeOf(roles, room).type;
 
 // The world's moderators and the team: they moderate, so they enter and speak everywhere.
 const staff = (roles: Typed, world: string): string[] => [

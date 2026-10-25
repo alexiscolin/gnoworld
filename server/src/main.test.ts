@@ -308,6 +308,35 @@ describe("the server's process", { timeout: 30_000 }, () => {
     expect(await rooms({ cookie: await session(lead) })).toContain("#bubble/crew");
   });
 
+  it("lists a world's rooms by section from the roles file, to a guest only the rooms it may see (4b)", async () => {
+    const rules = { bannedWords: [], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
+    const roles = join(folder("gnoworld-roles-"), "roles.json");
+    const crew = { room: "#bubble/crew", type: "members", readers: "crew" };
+    const sections = [
+      { name: "Crew", rooms: ["#bubble/crew"] },
+      { name: "Lobby", rooms: ["#bubble"] },
+    ];
+    writeFileSync(
+      roles,
+      JSON.stringify({
+        team: [],
+        trusted: [],
+        worlds: [{ slug: "bubble", moderators: [], rules, groups: { crew: [] }, rooms: [crew], sections }],
+      }),
+    );
+    const port = await listening(start({ ...settings(), ROLES_FILE: roles }));
+    const ask = (query: string) => fetch(`http://127.0.0.1:${String(port)}/api/rooms${query}`);
+    const answer = await ask("?world=bubble");
+    expect([answer.status, await answer.text(), answer.headers.get("cache-control")]).toEqual([
+      200,
+      JSON.stringify({ world: "bubble", sections: [{ name: "Lobby", rooms: [{ room: "#bubble", type: "open" }] }] }),
+      "public, max-age=5",
+    ]);
+    expect((await ask("?world=nowhere")).status).toBe(200);
+    expect((await ask("?world=Bubble")).status).toBe(400);
+    expect((await ask("")).status).toBe(400);
+  });
+
   it("removes the verdicts older than 180 days when it starts, and keeps the others (3n)", async () => {
     const env = settings();
     const first = start(env);
