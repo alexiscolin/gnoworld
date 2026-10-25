@@ -1,7 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, test } from "vitest";
 import { parseLine, type IrcMessage } from "../irc/irc.ts";
-import { addLines, lineOf, membersAfter, redactAfter, topicAfter, type Line } from "./room.ts";
+import { addLines, concerns, lineOf, membersAfter, redactAfter, topicAfter, type Line } from "./room.ts";
 
 const ME = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -30,6 +30,39 @@ const AT = { room: "#bubble", me: ME };
 const byTimeThenId = (p: Line, q: Line) =>
   p.time === q.time ? (p.id < q.id ? -1 : p.id > q.id ? 1 : 0) : p.time < q.time ? -1 : 1;
 const frozen = <T>(list: T[]): readonly T[] => Object.freeze([...list]);
+
+// Which room a line is about, so a client with 100 rooms reads it in one: each command names it at its own place.
+describe("concerns: the room a message is about", () => {
+  test.each([
+    ["a PRIVMSG", `:a!u@h PRIVMSG #Bubble :x`, "#bubble"],
+    ["a NOTICE", `:a!u@h NOTICE #bubble :x`, "#bubble"],
+    ["a TOPIC", `:a!u@h TOPIC #bubble :x`, "#bubble"],
+    ["a JOIN", `:a!u@h JOIN #bubble`, "#bubble"],
+    ["a PART", `:a!u@h PART #bubble`, "#bubble"],
+    ["a KICK", `:a!u@h KICK #bubble b`, "#bubble"],
+    ["a REDACT", `:gnoworld!u@h REDACT #bubble a`, "#bubble"],
+    ["a 331", `:ergo 331 ${ME} #bubble :No topic`, "#bubble"],
+    ["a 332", `:ergo 332 ${ME} #bubble :x`, "#bubble"],
+    ["a 353", `:ergo 353 ${ME} = #bubble :a b`, "#bubble"],
+    ["a QUIT, which every room hears", `:a!u@h QUIT :gone`, "*"],
+    ["a NICK, which every room hears", `:a!u@h NICK b`, "*"],
+  ])("names the room of %s", (_, text, room) => {
+    expect(concerns(read(text))).toBe(room);
+  });
+
+  test.each([
+    ["a 366", `:ergo 366 ${ME} #bubble :End`],
+    ["a PING", "PING x"],
+    ["a PRIVMSG with no target", ":a!u@h PRIVMSG"],
+    ["a 353 with no room", `:ergo 353 ${ME} =`],
+  ])("names no room for %s", (_, text) => {
+    expect(concerns(read(text))).toBeUndefined();
+  });
+
+  test("folds A to Z alone, as Ergo's casemapping does", () => {
+    expect(concerns(read(":a!u@h PRIVMSG #BUBBLÉ :x"))).toBe("#bubblÉ");
+  });
+});
 
 describe("lineOf: a room's line from Ergo's message", () => {
   test("takes a PRIVMSG to the room, with its id, time, author and account", () => {

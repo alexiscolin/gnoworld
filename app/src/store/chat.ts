@@ -2,7 +2,16 @@
 // (its window), who is here and its description, and my nick on Ergo while connected. Ergo's lines change it
 // through core/chat's rules; each action sets the state only when something changed, so a subscriber hears a
 // change once and nothing else.
-import { addLines, lineOf, membersAfter, redactAfter, topicAfter, type IrcMessage, type Line } from "@gnoworld/core";
+import {
+  addLines,
+  concerns,
+  lineOf,
+  membersAfter,
+  redactAfter,
+  topicAfter,
+  type IrcMessage,
+  type Line,
+} from "@gnoworld/core";
 import type { StateCreator } from "zustand/vanilla";
 
 /** The lines a room keeps: its history's window (docs/plans/slice-4.md, §4). */
@@ -79,9 +88,18 @@ export const chatSlice: StateCreator<ChatSlice> = (set, get) => {
       connected: (me) => {
         change({ me });
       },
+      // A line goes to the room it names; a QUIT or a NICK to every room.
       heard: (message) => {
         const { me = "", rooms } = get().chat;
-        change({ rooms: eachRoom(rooms, (room, id) => roomAfter(room, message, { room: id, me })) });
+        const id = concerns(message);
+        if (id === "*") {
+          change({ rooms: eachRoom(rooms, (room, each) => roomAfter(room, message, { room: each, me })) });
+          return;
+        }
+        const room = id === undefined || !Object.hasOwn(rooms, id) ? undefined : rooms[id];
+        if (id === undefined || room === undefined) return;
+        const next = roomAfter(room, message, { room: id, me });
+        if (next !== room) change({ rooms: { ...rooms, [id]: next } });
       },
       page: (id, messages) => {
         const { rooms } = get().chat;

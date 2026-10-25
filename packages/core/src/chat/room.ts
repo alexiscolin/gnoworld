@@ -24,6 +24,30 @@ const sameRoom = (name: string, room: string): boolean => fold(name) === fold(ro
 const nickOf = (source: string): string => source.replace(/[!@].*$/s, "");
 const compare = (one: string, other: string): number => (one < other ? -1 : one > other ? 1 : 0);
 
+// Where each command names its room; a QUIT and a NICK name none, every room hearing them.
+const PLACES: Readonly<Record<string, number>> = {
+  PRIVMSG: 0,
+  NOTICE: 0,
+  TOPIC: 0,
+  JOIN: 0,
+  PART: 0,
+  KICK: 0,
+  REDACT: 0,
+  "331": 1,
+  "332": 1,
+  "353": 2,
+};
+const EVERYWHERE = ["QUIT", "NICK"];
+
+/** The room a message is about, folded as Ergo folds it; "*" for a QUIT or a NICK, which every room hears; none
+ * for the rest. A client reads a line in that room alone. */
+export function concerns({ command, params }: IrcMessage): string | undefined {
+  if (EVERYWHERE.includes(command)) return "*";
+  const place = Object.hasOwn(PLACES, command) ? PLACES[command] : undefined;
+  const room = place === undefined ? undefined : params[place];
+  return room === undefined ? undefined : fold(room);
+}
+
 // A time Ergo writes, on a day that exists: the string reads back as itself.
 function isTime(text: string): boolean {
   if (!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(text)) return false;
