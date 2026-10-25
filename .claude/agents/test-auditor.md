@@ -31,7 +31,8 @@ assume:
    signatures, injection, a caller without the right, oversized input, a hostile realm or
    message.
 6. **Sound.** Expected values stated independently, no mock of the thing under test, no
-   empty assertion, no timing guess, every test seen failing for the right reason (run them).
+   empty assertion, no timing guess, every test seen failing for the right reason (run them: the
+   new or changed test files alone, never the whole suite, which the gate runs).
 
 ## Green pass: first in /pre-merge
 

@@ -23,7 +23,7 @@ gnoworld: a social, on-chain, graphical hub for gno.land. The design is
 - Strict TypeScript: no `any`, no `@ts-ignore`, no `!`. Data from the relay, the indexer or a realm goes through Zod first.
 - Never change a test to make code pass without saying so in the review card.
 - Each area's rules are in `.claude/rules/`, loaded when its files are touched. Every review, `/code-review` included, also reads the tiers in `docs/REVIEW.md`.
-- Pairing: in `packages/core/**` (`.claude/rules/core.md`), and wherever a slice plan says "human", write the failing test, commit it marked `test.fails` (the gate and the Stop hook accept it), and stop. Alexis writes the code and removes the mark; then review it.
+- No pairing since slice 4 (Alexis, 2026-10-25, docs/decisions.md): Claude writes `packages/core` too, test first and red-passed like any code; the `test.fails` marks already there are removed by the code that makes them pass.
 - Claude writes the realms, the server and any Go (who reviews what: docs/REVIEW.md).
 - Everything about gno (realms, pure packages, chain reads and writes) goes through gnomcp, never memory, `gnokey` or raw RPC; `scripts/guard.py` refuses the rest (`.claude/rules/gno.md`).
 - Read a file before changing it; before changing an exported symbol, find every reference through the language server (`typescript-lsp`), not by text search.
