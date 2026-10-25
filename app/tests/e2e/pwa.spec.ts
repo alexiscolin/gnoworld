@@ -318,6 +318,32 @@ test.describe("updates", () => {
       };
     });
 
+  // The click on Reload, once the new worker has taken the page: no worker waits, the old page's mark is gone.
+  async function clickedThrough(page: Page): Promise<void> {
+    await reload(page);
+    await controlled(page);
+    await hydrated(page);
+    expect((await untouched(page)).waiting).toBe(false);
+    await expect(page.locator("body[data-before]")).toHaveCount(0);
+  }
+
+  // Both tabs are offered the update, the first clicks and reloads, and the other stays on its page.
+  async function firstTabClicks(page: Page, other: Page): Promise<void> {
+    await expect(noticeOf(page)).toBeVisible();
+    await expect(noticeOf(other)).toBeVisible();
+    await reload(page);
+    await hydrated(page);
+    await expect(other.locator("body[data-before]")).toHaveCount(1);
+  }
+
+  // Two tabs on the version running, the second made first so that the test's own page opens last.
+  async function twoTabs(page: Page): Promise<Page> {
+    const other = await page.context().newPage();
+    await open(page);
+    await open(other);
+    return other;
+  }
+
   // Offline, the check an installed page makes when shown again fails, as expected: nothing is
   // reported (F343). Chromium's own check escapes the page's offline mode, so the host goes down too.
   test("a check that fails offline reports nothing", async ({ page, request, context }) => {
@@ -387,11 +413,7 @@ test.describe("updates", () => {
     await expect(noticeOf(page)).toBeVisible();
     await expect(promptOf(page)).toHaveAttribute("id", "there-before");
     expect(await untouched(page)).toEqual({ same: true, waiting: true, marked: true });
-    await reload(page);
-    await controlled(page);
-    await hydrated(page);
-    expect((await untouched(page)).waiting).toBe(false);
-    await expect(page.locator("body[data-before]")).toHaveCount(0);
+    await clickedThrough(page);
     await expect(promptOf(page)).toHaveCount(0);
     await expect.poll(async () => cacheContents(page)).toEqual(installed);
     const held = await page.evaluate(async (url) => (await caches.match(url))?.text(), changed);
@@ -414,15 +436,9 @@ test.describe("updates", () => {
   });
 
   test("two tabs: the one clicked reloads; the other keeps its page until its own click", async ({ page, request }) => {
-    const other = await page.context().newPage();
-    await open(page);
-    await open(other);
+    const other = await twoTabs(page);
     await bump(page, request, { site });
-    await expect(noticeOf(page)).toBeVisible();
-    await expect(noticeOf(other)).toBeVisible();
-    await reload(page);
-    await hydrated(page);
-    await expect(other.locator("body[data-before]")).toHaveCount(1);
+    await firstTabClicks(page, other);
     await reload(other);
     await hydrated(other);
     await expect(other.locator("body[data-before]")).toHaveCount(0);
