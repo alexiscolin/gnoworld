@@ -1,0 +1,7 @@
+/* The composer's line as it will read: muted, wrapping anywhere. */
+@layer components {
+  .preview {
+    color: var(--color-text-muted);
+    overflow-wrap: anywhere;
+  }
+}

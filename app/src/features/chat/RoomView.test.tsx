@@ -219,6 +219,11 @@ describe("RoomView", () => {
     expect(html).not.toMatch(/<script|href="javascript/);
   });
 
+  it("shows what it is given under the lines, before who is here: the composer, or a word for a guest", () => {
+    const html = view({ composer: <p>Log in to write in this room.</p> });
+    expect(html).toMatch(/aria-label="Messages".*<\/ol><p>Log in to write in this room.<\/p><\/div><aside/s);
+  });
+
   it("shows a room it holds nothing of yet as empty, once connected", () => {
     const html = view({ state: undefined });
     expect(said(html)).toContain("No messages yet.");

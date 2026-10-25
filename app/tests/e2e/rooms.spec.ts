@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
+import { inGames, lineOf, whoIsHere, word } from "./chat.ts";
 import { logIn, talk, ticketOf, type Step } from "./irc.ts";
 import { SITE } from "./sites.ts";
 
@@ -7,8 +8,6 @@ import { SITE } from "./sites.ts";
 // main room) and #news outside it. Each test logs in a wallet of its own (?as=), its tickets its own, and its account
 // says the lines over a socket of the page's: a guest cannot, open rooms being +M.
 
-// A word of its own for each test, so none reads another's lines, or its own retry's.
-const word = (what: string): string => `${what}-${crypto.randomUUID().slice(0, 8)}`;
 const escaped = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // The account logs in to Ergo with the ticket, joins the room, says each text, and waits for Ergo's echo of the last.
@@ -76,20 +75,8 @@ function guestNicks(page: Page): string[] {
 }
 
 const roomsNav = (page: Page) => page.getByRole("navigation", { name: "Rooms" });
-const messages = (page: Page) => page.getByRole("list", { name: "Messages" });
-const lineOf = (page: Page, text: string) => messages(page).getByRole("listitem").filter({ hasText: text });
-const whoIsHere = (page: Page) => page.getByRole("complementary", { name: "Who's here" });
 const chatStatus = (page: Page) => page.getByRole("status").filter({ hasText: /chat/ });
 const heading = (page: Page, room: string) => page.getByRole("heading", { level: 2, name: room, exact: true });
-
-// A test's own account, logged in, in #games, Ergo having said it is here.
-async function inGames(page: Page): Promise<string> {
-  const address = await logIn(page, word("as"));
-  await page.goto("/w/bubble?room=games");
-  await hydrated(page);
-  await expect(whoIsHere(page).getByTitle(address)).toBeVisible();
-  return address;
-}
 
 test.describe("a world's rooms", () => {
   test("shows a visitor the rooms by section, a room's history and who is here, as a guest", async ({ page }) => {

@@ -3,7 +3,7 @@
 // (Ergo's max-channels-per-client); the newest lines of the room in view alone, once Ergo says I joined it, since
 // Ergo paces a client to 2 lines a second (plan §4); Ergo's lines read into the store through one BatchReader a
 // connection. Its parts come in, so the tests give their own.
-import { BatchReader, nickOf, type IrcMessage } from "@gnoworld/core";
+import { BatchReader, compose, nickOf, type IrcMessage } from "@gnoworld/core";
 import { RoomId } from "@gnoworld/schemas";
 import type { Result } from "../../lib/api/http.ts";
 import type { Ergo, ErgoOptions, Who } from "../../lib/ergo/ergo.ts";
@@ -28,6 +28,8 @@ export interface ChatLink {
   follow: (ids: readonly string[]) => void;
   /** The room in view: its history is asked once Ergo says I joined it, once a connection. */
   show: (room: string | undefined) => void;
+  /** Sends a draft, as the composer composes it, to a room Ergo says it is in; an account's alone. Whether it went. */
+  say: (room: string, draft: string) => boolean;
   stop: () => void;
 }
 
@@ -84,6 +86,13 @@ class Link implements ChatLink {
     if (this.#stopped) return;
     this.#shown = room;
     this.#keep();
+  }
+
+  say(room: string, draft: string): boolean {
+    const me = this.#ergo?.nick();
+    if (this.#key === "guest" || me === undefined || !this.#inside.has(room)) return false;
+    const composed = compose(room, draft, me);
+    return composed.kind === "line" && this.#ergo?.send(composed.line) === true;
   }
 
   stop(): void {
@@ -224,12 +233,16 @@ class Link implements ChatLink {
     else for (const each of messages) this.#heard(each);
   }
 
-  // Ergo's JOIN of me, not replayed: I am in that room, and the room in view's lines are asked.
+  // Ergo's JOIN of me, not replayed: I am in that room, and the room in view's lines are asked. Its KICK of me: I
+  // am in it no more, and say nothing there.
   #heard(message: IrcMessage): void {
     this.#deps.store.getState().chatActions.heard(message);
     const { tags, source = "", command, params } = message;
-    const [room = ""] = params;
-    if (command !== "JOIN" || tags.has("batch") || nickOf(source) !== this.#ergo?.nick()) return;
+    const [room = "", kicked] = params;
+    const me = this.#ergo?.nick();
+    if (tags.has("batch") || me === undefined) return;
+    if (command === "KICK" && kicked === me) this.#inside.delete(room);
+    if (command !== "JOIN" || nickOf(source) !== me) return;
     this.#inside.add(room);
     this.#history(this.#shown);
   }
