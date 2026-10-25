@@ -555,6 +555,16 @@ describe("markdown: mentions", () => {
     );
   });
 
+  // A `[` left open is no label: what follows it is read as anywhere, a mention too (it is no link's).
+  test("reads a mention after a `[` that never becomes a link", () => {
+    reads(`[@${ALICE}`, paragraph(text("["), mention(ALICE)));
+    reads(`[note @${ALICE}`, paragraph(text("[note "), mention(ALICE)));
+    reads(`[@${ALICE}]`, paragraph(text("["), mention(ALICE), text("]")));
+    reads(`[@${ALICE}](http://a.example)`, paragraph(text("["), mention(ALICE), text("](http://a.example)")));
+    reads(`[*@${ALICE}*`, paragraph(text("["), em(mention(ALICE))));
+    expect(mentions(markdown(`[see @${BOB} and [@${ALICE}](https://a.example)`))).toEqual([BOB]);
+  });
+
   test("keeps an address's own `@` inside it, a link's or a bare one: a link, not a mention", () => {
     reads(`https://a.example/@${ALICE}`, paragraph(link(`https://a.example/@${ALICE}`)));
     reads(`(https://a.example/@${ALICE})`, paragraph(text("("), link(`https://a.example/@${ALICE}`), text(")")));

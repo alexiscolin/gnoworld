@@ -1,5 +1,5 @@
-// The nodes the line reader makes (slice 4's 4c): a mark's, whether a label's show anything, and a node added to
-// those before it.
+// The nodes the line reader makes (slice 4's 4c): a mark's, whether a label's show anything, a label's mentions made
+// text (4d), and a node added to those before it.
 import type { Inline } from "./types.ts";
 
 /** The node a mark of `mark`, `size` long, makes of what it holds: three stars make two. */
@@ -21,6 +21,16 @@ export function invisible(nodes: readonly Inline[]): boolean {
     if (node.type === "text" || node.type === "code") return BLANK.test(node.text);
     return "children" in node && invisible(node.children);
   });
+}
+
+/** Nodes with each mention in them, however deep, made text again: `@` and the address. */
+export function unmentioned(nodes: readonly Inline[]): Inline[] {
+  const plain: Inline[] = [];
+  for (const node of nodes) {
+    if (node.type === "mention") append(plain, { type: "text", text: `@${node.address}` });
+    else append(plain, "children" in node ? { ...node, children: unmentioned(node.children) } : node);
+  }
+  return plain;
 }
 
 /** A node after the last: a text joins the text before it, and an empty one adds nothing. */

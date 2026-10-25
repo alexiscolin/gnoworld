@@ -5,7 +5,7 @@
 // linear time.
 import { Addresses } from "./address.ts";
 import { mentionAt } from "./mentions.ts";
-import { append, invisible, wrap } from "./nodes.ts";
+import { append, invisible, unmentioned, wrap } from "./nodes.ts";
 import { after, before, Runs, runOf } from "./scan.ts";
 import type { Inline } from "./types.ts";
 
@@ -123,7 +123,8 @@ class Reader {
     }
     this.#dropAbove(label);
     this.#frames.pop();
-    this.#push({ type: "link", href: this.#source.slice(at + 2, end), children: label.children });
+    // A link's label names no account: its mentions are text again.
+    this.#push({ type: "link", href: this.#source.slice(at + 2, end), children: unmentioned(label.children) });
     // No link inside a link: the labels around this one stay text.
     for (const frame of this.#frames) frame.active &&= frame.mark !== "[";
     this.#at = end + 1;
@@ -143,15 +144,15 @@ class Reader {
     this.#at = end;
   }
 
-  // `@` and an account's address, outside a label: a mention; else the `@`.
+  // `@` and an account's address: a mention (text again if a link's label closes around it); else the `@`.
   #mention(): void {
-    const address = this.#inLabel() ? undefined : mentionAt(this.#source, this.#at);
+    const address = mentionAt(this.#source, this.#at);
     if (address === undefined) this.#add("@");
     else this.#push({ type: "mention", address });
     this.#at += 1 + (address?.length ?? 0);
   }
 
-  // Whether a label is open: what a label holds is its words, no address or mention of its own.
+  // Whether a label is open: what a label holds is its words, no address of its own.
   #inLabel(): boolean {
     return this.#frames.some((frame) => frame.mark === "[");
   }
