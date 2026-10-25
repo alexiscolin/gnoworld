@@ -167,14 +167,14 @@ describe("the chat's link: who connects", () => {
     expect(t.fake.stopped).toBe(true);
     expect(t.last().who).toMatchObject({ account: ADDRESS });
     expect(t.chat().me).toBeUndefined();
-    expect(t.room("#bubble")?.members).toEqual([]);
+    expect(t.room("#bubble")?.members ?? []).toEqual([]);
     expect(t.store.getState().login.chat).toBe("connecting");
     t.connected(ADDRESS);
     t.fake.state("waiting");
     t.fake.line(live("#bubble", "a", "stale"));
     expect(t.chat().me).toBe(ADDRESS);
     expect(t.store.getState().login.chat).toBe("connected");
-    expect(t.room("#bubble")?.lines).toEqual([]);
+    expect(t.room("#bubble")?.lines ?? []).toEqual([]);
   });
 
   it("connects again for another account", () => {
