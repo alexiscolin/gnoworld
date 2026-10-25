@@ -36,7 +36,8 @@ export type Proof = z.infer<typeof Proof>;
 export const VerifyRequest = z.strictObject({ nonce: Nonce, address: Address, proof: Proof });
 export type VerifyRequest = z.infer<typeof VerifyRequest>;
 
-export const Me = z.object({ address: Address });
+// The account logged in, or null: nobody is an answer, not a refusal, so a visitor's page logs no error.
+export const Me = z.object({ address: Address.nullable() });
 export type Me = z.infer<typeof Me>;
 
 // A ticket for Ergo is asked with an empty JSON object, {}: the cookie names the account.

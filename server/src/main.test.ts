@@ -126,7 +126,7 @@ describe("the server's process", () => {
     const known = await call("me", { headers: { cookie } });
     expect([known.status, await known.json()]).toEqual([200, { address: who.address }]);
     expect((await posted("logout", {}, cookie)).status).toBe(204);
-    expect((await call("me", { headers: { cookie } })).status).toBe(401);
+    expect(await (await call("me", { headers: { cookie } })).json()).toEqual({ address: null });
     const foreign = await call("challenge", {
       method: "POST",
       headers: { origin: "https://evil.test", "content-type": "application/json" },

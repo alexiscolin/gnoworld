@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { Challenge, ChallengeRequest, Nonce, VerifyRequest } from "./login.ts";
+import { Challenge, ChallengeRequest, Me, Nonce, VerifyRequest } from "./login.ts";
 
 const ADDRESS = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 // Adena's answer to signArbitrary, in the shape the SDK types it (SignedArbitraryData); the values are
@@ -89,6 +89,17 @@ describe("VerifyRequest", () => {
   it.each(bounds)("takes %s at %i characters or items, and refuses one more", (_, max, body) => {
     expect(VerifyRequest.safeParse(body(max)).success).toBe(true);
     expect(VerifyRequest.safeParse(body(max + 1)).success).toBe(false);
+  });
+});
+
+describe("Me", () => {
+  it("names the account logged in, or nobody", () => {
+    expect(Me.parse({ address: ADDRESS })).toEqual({ address: ADDRESS });
+    expect(Me.parse({ address: null })).toEqual({ address: null });
+  });
+
+  it.each([{}, { address: undefined }, { address: "cosmos1x" }, { address: "" }])("refuses %j", (body) => {
+    expect(Me.safeParse(body).success).toBe(false);
   });
 });
 

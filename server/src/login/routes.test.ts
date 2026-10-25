@@ -74,6 +74,8 @@ const post = (app: App, path: string, sent: Sent = {}) => {
 const me = (app: App, cookie: string | undefined, peer = PEER) =>
   app.request("/api/login/me", { headers: cookie === undefined ? {} : { cookie } }, connection(peer));
 const session = (token: string): string => `${SESSION}=${token}`;
+// /me's answer when no session holds: nobody, a 200, so a visitor's page logs no error (Alexis, 2026-10-25).
+const NOBODY = JSON.stringify({ address: null });
 
 const challenge = async (app: App, sent: Sent = {}) => {
   const response = await post(app, "challenge", { body: { chainId: "onyx-1" }, ...sent });
@@ -151,7 +153,7 @@ describe("logging in", () => {
     const planted = "P".repeat(43);
     const response = await login(app, wallet(), { headers: { cookie: session(planted) } });
     expect(tokenOf(response)).not.toBe(planted);
-    expect((await me(app, session(planted))).status).toBe(401);
+    expect(await answer(await me(app, session(planted)))).toEqual([200, NOBODY]);
   });
 });
 
@@ -167,7 +169,7 @@ describe("the session", () => {
     }
   });
 
-  it("answers 401 to no cookie, an unknown or malformed one, and the token under another name", async () => {
+  it("answers nobody to no cookie, an unknown or malformed one, and the token under another name", async () => {
     const { app } = setup();
     const token = tokenOf(await login(app));
     for (const cookie of [
@@ -178,7 +180,9 @@ describe("the session", () => {
       `session=${token}`,
       `__host-session=${token}`,
     ]) {
-      expect(await answer(await me(app, cookie))).toEqual([401, JSON.stringify({ error: "unauthenticated" })]);
+      const response = await me(app, cookie);
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      expect(await answer(response)).toEqual([200, NOBODY]);
     }
   });
 
@@ -193,7 +197,7 @@ describe("the session", () => {
       });
       expect([...(await answer(response)), response.headers.get("set-cookie")]).toEqual([204, "", cleared]);
     }
-    expect((await me(app, session(token))).status).toBe(401);
+    expect(await answer(await me(app, session(token)))).toEqual([200, NOBODY]);
   });
 
   it("never limits /me or a logout", async () => {
@@ -284,7 +288,7 @@ describe("cross-site requests", () => {
         { method: "HEAD", headers: { cookie, origin: "https://evil.test" } },
         connection(PEER),
       );
-    expect([(await head(session(token))).status, (await head(session("A".repeat(43)))).status]).toEqual([200, 401]);
+    expect([(await head(session(token))).status, (await head(session("A".repeat(43)))).status]).toEqual([200, 200]);
   });
 
   it("gives no CORS grant, and a GET to a POST route or a POST to /me does nothing", async () => {
@@ -475,11 +479,11 @@ describe("refusals", () => {
     );
   });
 
-  it("answers any cookie with a session or a 401, and any logout with 204", async () => {
+  it("answers any cookie it never set with nobody, and any logout with 204", async () => {
     const { app } = setup();
     await fc.assert(
       fc.asyncProperty(fc.stringMatching(PRINTABLE), async (cookie) => {
-        expect([200, 401]).toContain((await me(app, cookie)).status);
+        expect(await answer(await me(app, cookie))).toEqual([200, NOBODY]);
         expect((await post(app, "logout", { body: {}, headers: { cookie } })).status).toBe(204);
       }),
     );
