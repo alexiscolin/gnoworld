@@ -186,6 +186,7 @@ describe("Menu", () => {
     expect(remove?.dataset["tone"]).toBe("danger");
     expect(copy?.dataset["tone"]).toBeUndefined();
     expect(remove?.querySelector("svg[data-icon='alert']")).not.toBeNull();
+    expect(copy?.querySelector("svg")).toBeNull();
     expect(remove?.textContent).toBe("Delete");
     const separators = screen.getAllByRole("separator");
     expect(separators).toHaveLength(1);

@@ -38,6 +38,8 @@ describe("a line's actions", () => {
     expect(markup).toMatch(tagWith("button", 'aria-label="More actions"', 'aria-haspopup="menu"', 'data-size="s"'));
     expect(markup).toMatch(tagWith("div", 'role="menu"', 'aria-label="Message actions"'));
     expect(markup).toContain('data-icon="more"');
+    // U10: rising astride its line until its place is measured.
+    expect(markup).not.toContain("data-inside");
   });
 
   it("offer Copy text and Copy room link on another's line, no Delete and no Report", () => {
@@ -80,6 +82,7 @@ describe("a line's actions", () => {
   // 4c's UX review (U5, U6): the dialog says which line it means, its button the act.
   it.each([
     ["a short line whole", "hi", "hi"],
+    ["a line of 80 characters whole", "a".repeat(80), "a".repeat(80)],
     ["a long line's first 80 characters", `${"a".repeat(79)}éz and more`, `${"a".repeat(79)}é…`],
     ["no emoji cut in two", `${"a".repeat(79)}👍🏽 and more`, `${"a".repeat(79)}👍🏽…`],
   ])("quote %s in the delete's dialog, which names the act", (_, text, quoted) => {

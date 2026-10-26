@@ -69,6 +69,7 @@ describe("Dialog", () => {
     const id = described?.getAttribute("aria-describedby") ?? "";
     expect(document.getElementById(id)?.textContent).toBe("the first line");
     expect(plain?.hasAttribute("aria-describedby")).toBe(false);
+    expect(plain?.querySelectorAll("p")).toHaveLength(1);
   });
 
   it("is standard unless asked to be wide", () => {
