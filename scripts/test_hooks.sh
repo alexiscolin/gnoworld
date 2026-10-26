@@ -2252,6 +2252,33 @@ with worktree("HEAD") as tree: print(tree)' "$here" >"$w/out" 2>&1) || fail "rep
 [ "$(ls "$tmp" | grep -vc '^\(live\|other\)$')" = 0 ] || fail "repo_files.worktree left its own copy: $(ls "$tmp")"
 fi
 
+if part worktree_script; then
+# worktree.sh: a worktree of a new branch, ready for the gate, from the tree it runs in: the packages linked one by
+# one (a whole-folder link hides them from borrow_node_modules.sh), a workspace's @gnoworld links leading into the
+# new tree, Vite's caches its own, StrykerJS's incremental file seeded.
+ws="$t/ws"
+mkdir -p "$ws/src/node_modules/pkg" "$ws/src/node_modules/.vite/deps" "$ws/src/app/node_modules/@gnoworld" "$ws/src/packages/core" "$ws/src/reports"
+git -C "$ws/src" init -q
+printf 'node_modules/\nreports/\n' >"$ws/src/.gitignore" && echo x >"$ws/src/packages/core/a.ts"
+git -C "$ws/src" add -A && git -C "$ws/src" commit -qm x
+echo pkg >"$ws/src/node_modules/pkg/index.js" && echo stale >"$ws/src/node_modules/.vite/deps/x"
+ln -s ../../../packages/core "$ws/src/app/node_modules/@gnoworld/core"
+echo '{"files":{}}' >"$ws/src/reports/stryker-incremental.json"
+(cd "$ws/src" && sh "$here/worktree.sh" "$ws/new" feature HEAD) >"$ws/out" 2>&1 || fail "worktree.sh failed: $(cat "$ws/out")"
+[ "$(git -C "$ws/new" rev-parse --abbrev-ref HEAD)" = feature ] || fail "worktree.sh made no branch feature"
+[ -d "$ws/new/node_modules" ] && [ ! -L "$ws/new/node_modules" ] || fail "worktree.sh linked node_modules whole, which borrow_node_modules.sh cannot see into"
+[ -L "$ws/new/node_modules/pkg" ] && [ "$(cat "$ws/new/node_modules/pkg/index.js")" = pkg ] || fail "worktree.sh did not link the packages"
+[ -d "$ws/new/node_modules/.vite" ] && [ ! -L "$ws/new/node_modules/.vite" ] && [ -z "$(ls -A "$ws/new/node_modules/.vite")" ] || fail "worktree.sh shared Vite's cache, which each tree writes"
+[ -d "$ws/new/node_modules/.vite-temp" ] || fail "worktree.sh gave Vite no temp folder of its own"
+[ "$(cd "$ws/new/app/node_modules/@gnoworld/core" && pwd -P)" = "$(cd "$ws/new/packages/core" && pwd -P)" ] || fail "worktree.sh's @gnoworld/core leads out of the new tree"
+cmp -s "$ws/src/reports/stryker-incremental.json" "$ws/new/reports/stryker-incremental.json" || fail "worktree.sh left StrykerJS without its incremental file"
+[ -z "$(git -C "$ws/new" status --porcelain)" ] || fail "worktree.sh left the new tree dirty: $(git -C "$ws/new" status --porcelain)"
+(cd "$ws/src" && sh "$here/worktree.sh" "$ws/new" other HEAD) >/dev/null 2>&1 && fail "worktree.sh wrote over a folder that exists"
+mkdir "$ws/empty" && (cd "$ws/src" && sh "$here/worktree.sh" "$ws/empty" another HEAD) >/dev/null 2>&1 && fail "worktree.sh took an empty folder that exists, which git would fill"
+(cd "$ws/src" && sh "$here/worktree.sh" "$ws/x") >/dev/null 2>&1 && fail "worktree.sh ran with no branch named"
+[ ! -e "$ws/x" ] || fail "worktree.sh made a folder for a call it refused"
+fi
+
 [ -z "${ONLY:-}" ] || [ "${ran:-}" = 1 ] || fail "ONLY=$ONLY names no section"
 echo "hooks: ok"
 finished=1
