@@ -216,7 +216,7 @@ describe("addReactions: a room's reactions, the newest of each, in time order, t
     const kept = addReactions(
       [],
       [reaction({ id: "a" }), reaction({ id: "b", to: "m2" }), reaction({ id: "c", emoji: "😂" })],
-      10,
+      15,
     );
     expect(kept.map(({ id }) => id)).toEqual(["a", "b", "c"]);
   });
