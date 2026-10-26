@@ -14,10 +14,7 @@ const line = (id: string, time = OLD): Line => ({
   text: `${id}: https://youtu.be/dQw4w9WgXcQ`,
   kind: "message",
 });
-const NONE: Result<LineVerdicts> = {
-  ok: true,
-  value: { room: "#bubble", verdicts: [] },
-};
+const NONE: Result<LineVerdicts> = { ok: true, value: { room: "#bubble", verdicts: [] } };
 
 // A server that answers each request as told, keeping the ids each asked; and the verdicts handed to the store.
 function server(answer: (ids: readonly string[]) => Promise<Result<LineVerdicts>> = () => Promise.resolve(NONE)) {
@@ -85,11 +82,17 @@ describe("verdictAsker: the server's verdicts of the lines in view", () => {
     expect(t.sent).toEqual([["a"], ["b"]]);
   });
 
+  // F892 (CR4): Ergo may carry a msgid the route refuses, which made it refuse the whole request, its 99 others too.
+  it("asks nothing of a line whose id the route would refuse, and the others of its request still", () => {
+    const t = server();
+    const long = "m".repeat(129);
+    t.ask([line("a"), line(long), line("b,c"), line("d")]);
+    expect(t.sent).toEqual([["a", "d"]]);
+  });
+
   it("asks nothing of a line whose verdict the page holds, or that has no player", () => {
     const t = server();
-    t.ask([line("a"), { ...line("b"), text: "no link here" }, line("c")], {
-      a: "checked",
-    });
+    t.ask([line("a"), { ...line("b"), text: "no link here" }, line("c")], { a: "checked" });
     expect(t.sent).toEqual([["c"]]);
   });
 

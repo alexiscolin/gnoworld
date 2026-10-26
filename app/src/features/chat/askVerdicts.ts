@@ -3,7 +3,7 @@
 // once each while in view, VERDICTS_ASKED a request. After a failure that may pass, nothing is asked for a rest, then the view last
 // given is asked again (F874).
 import type { Line } from "@gnoworld/core";
-import { type LineVerdicts, type StreamEvent, VERDICTS_ASKED } from "@gnoworld/schemas";
+import { type LineVerdicts, type StreamEvent, VerdictId, VERDICTS_ASKED } from "@gnoworld/schemas";
 import type { Result } from "../../lib/api/http.ts";
 import { unjudged } from "./embeds.ts";
 
@@ -95,7 +95,8 @@ function serverAsker({ verdicts, judged }: Pick<Asking, "verdicts" | "judged">) 
     const shown = new Set(lines.map(({ id }) => id));
     for (const id of mine) if (!shown.has(id)) mine.delete(id);
     const before = lines.filter(({ time }) => Date.parse(time) < since);
-    const wanted = unjudged(before, view.held, mine);
+    // An id the route refuses (over 128 characters, a comma) would have it refuse the whole request, for good (F892).
+    const wanted = unjudged(before, view.held, mine).filter((id) => VerdictId.safeParse(id).success);
     for (const id of wanted) mine.add(id);
     for (let start = 0; start < wanted.length; start += VERDICTS_ASKED) {
       send(room, wanted.slice(start, start + VERDICTS_ASKED), mine);
@@ -120,11 +121,7 @@ export function verdictAsker({ verdicts, judged, held, follow }: Asking) {
   // The shown lines said before the stream's word are the server's to answer; before its word, nothing is asked.
   const askShown = () => {
     if (following?.lines === undefined || following.since === undefined) return;
-    server.ask(following.room, {
-      lines: following.lines,
-      held: held(following.room),
-      since: following.since,
-    });
+    server.ask(following.room, { lines: following.lines, held: held(following.room), since: following.since });
   };
   const unfollow = () => {
     following?.stop();
@@ -132,14 +129,7 @@ export function verdictAsker({ verdicts, judged, held, follow }: Asking) {
     following = undefined;
   };
   const start = (room: string, reader: string | undefined, lines?: readonly Line[]): void => {
-    const mine: Following = {
-      room,
-      reader,
-      lines,
-      since: undefined,
-      stop: () => undefined,
-      again: undefined,
-    };
+    const mine: Following = { room, reader, lines, since: undefined, stop: () => undefined, again: undefined };
     // The stream's word after its replay, on the server's clock, which Ergo's server-time shares (F890): never the
     // page's, which may run ahead or behind. A reconnection's later word moves it, the replay having given the rest;
     // after a gap, what was asked before is asked again, a line the server had no verdict of yet among it (F891).
