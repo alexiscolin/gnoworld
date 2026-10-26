@@ -1012,8 +1012,11 @@ describe("markdown: whatever comes", () => {
         return Date.now() - start;
       }),
     );
+  // StrykerJS's instrumented code (its `__stryker__` global) times nothing of the algorithm: there the comparison
+  // gives way, and runs in the gate and the coverage run, on the code itself (F831).
+  const instrumented = "__stryker__" in globalThis;
   const linear = (family: (size: number) => string) =>
-    fastest(family(16_000)) < Math.max(8 * fastest(family(4_000)), 100);
+    instrumented || fastest(family(16_000)) < Math.max(8 * fastest(family(4_000)), 100);
   const repeated =
     (piece: string, end = "") =>
     (size: number) =>
