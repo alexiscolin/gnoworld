@@ -20,8 +20,8 @@ export const dmSlice: StateCreator<ChatSlice & DmSlice, [], [], DmSlice> = (set,
   dmActions: {
     heard: (message) => {
       const { chat, dms } = get();
-      const me = chat.me ?? "";
-      const dm = Address.safeParse(me).success ? dmOf(message, me) : undefined;
+      const me = Address.safeParse(chat.me);
+      const dm = me.success ? dmOf(message, me.data) : undefined;
       if (dm === undefined || !Address.safeParse(dm.partner).success) return;
       const held = dms[dm.partner] ?? [];
       const lines = addLines(held, [dm.line], LINES_KEPT);
