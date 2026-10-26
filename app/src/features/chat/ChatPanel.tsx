@@ -57,6 +57,20 @@ function useRoomKeys(rooms: readonly string[], current: string | undefined) {
   }, [rooms, setParams]);
 }
 
+// The conversation opened from who is here, whose composer takes the focus as its button goes (U12): asked while it is
+// in view, `partner` the one in view, never again once the reader left it (CR6).
+function useOpened(partner: string | undefined) {
+  const [opened, setOpened] = useState<{ partner: string; seen: boolean }>();
+  if (opened?.seen === false && partner === opened.partner) setOpened({ ...opened, seen: true });
+  if (opened?.seen === true && partner !== opened.partner) setOpened(undefined);
+  return {
+    focus: opened !== undefined && opened.partner === partner,
+    open: (other: string) => {
+      setOpened({ partner: other, seen: false });
+    },
+  };
+}
+
 // The world's rooms once listed: the switcher, the room in view and what writes in it.
 interface LoadedProps {
   sections: RoomList["sections"];
@@ -80,18 +94,17 @@ function Loaded({ sections, current, state, chat, session, say, sayTo, dms, fail
   useRoomKeys(ids, room);
   const [, setParams] = useSearchParams();
   const me = session.kind === "in" ? session.address : undefined;
-  // The conversation opened from who is here, whose composer takes the focus as its button goes (U12).
-  const [opened, setOpened] = useState<string>();
+  const opened = useOpened(dms.partner);
   const noteId = useId();
   // Apart from the room's element, which each line draws again: who is here keeps its drawing (the compiler).
   const onMessage = (other: string) => {
-    setOpened(other);
+    opened.open(other);
     setParams(dmParams(other));
   };
   const people = (
     <People members={state?.members ?? []} connected={chat === "connected"} me={me} onMessage={onMessage} />
   );
-  const shown = shownOf(dms, { id: room, state, say }, { sayTo, focus: opened === dms.partner, noteId });
+  const shown = shownOf(dms, { id: room, state, say }, { sayTo, focus: opened.focus, noteId });
   return (
     <Sidebar space="l">
       <RoomsView sections={sections} current={room} dms={dms.nav} failed={failed} />

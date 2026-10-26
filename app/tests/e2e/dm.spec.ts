@@ -90,6 +90,14 @@ test.describe("direct messages", () => {
     // Mine, and delivered: Bob's page lists the conversation with me (T10: the journey compared two setup values).
     await expect(lines(page).filter({ hasText: text }).getByTitle(me)).toBeVisible();
     await expect(dmsNav(bob.page).getByRole("link", { name: short(me) })).toBeVisible();
+    // /code-review (CR6): the focus asked once, not each time the conversation comes back in view.
+    await dmsNav(page).getByRole("link", { name: "#games" }).click();
+    await expect(page.getByRole("heading", { name: "#games" })).toBeVisible();
+    const row = dmsNav(page).getByRole("link", { name: new RegExp(short(bob.address)) });
+    await row.click();
+    await expect(field).toBeVisible();
+    await expect(row).toBeFocused();
+    await expect(field).not.toBeFocused();
     await bob.close();
   });
 
