@@ -121,8 +121,8 @@ class Link implements ChatLink {
     this.#history(this.#shown);
   }
 
-  // A new session: the last connection ended, its rooms forgotten, and one opened as the session says. The store
-  // never goes back to not knowing it.
+  // A new session: the last connection ended, its rooms and direct messages forgotten, and one opened as the session
+  // says. The store never goes back to not knowing it.
   #follow(session: AppState["login"]["session"]): void {
     if (session.kind === "unknown") return;
     const key = session.kind === "out" ? "guest" : session.address;
@@ -133,6 +133,7 @@ class Link implements ChatLink {
     // Noted first: the store's change below calls this again, which must find the session the same.
     this.#key = key;
     if (known) this.#unfollow();
+    this.#deps.store.getState().dmActions.begin();
     this.#end();
     const { ticket, guest } = this.#deps;
     this.#open(session.kind === "out" ? { guest } : { account: session.address, ticket });

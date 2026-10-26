@@ -12,6 +12,8 @@ export interface DmSlice {
   dmActions: {
     /** One live line from Ergo: a direct message is kept with its partner; any other changes nothing. */
     heard: (message: IrcMessage) => void;
+    /** A new session: the last one's conversations forgotten, an account's being its own. */
+    begin: () => void;
   };
 }
 
@@ -26,6 +28,9 @@ export const dmSlice: StateCreator<ChatSlice & DmSlice, [], [], DmSlice> = (set,
       const held = dms[dm.partner] ?? [];
       const lines = addLines(held, [dm.line], LINES_KEPT);
       if (lines !== held) set({ dms: { ...dms, [dm.partner]: lines } });
+    },
+    begin: () => {
+      if (Object.keys(get().dms).length > 0) set({ dms: {} });
     },
   },
 });

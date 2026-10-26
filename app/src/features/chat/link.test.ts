@@ -228,6 +228,30 @@ describe("the chat's link: who connects", () => {
     expect(t.connected().sent).toEqual([]);
   });
 
+  // 4e's late test audit (T1): an account's conversations must not follow it into the next session's page.
+  it.each([
+    [
+      "nobody logged in",
+      (t: Setup) => {
+        t.signedOut();
+      },
+    ],
+    [
+      "another account",
+      (t: Setup) => {
+        t.signedIn(OTHER);
+      },
+    ],
+  ])("starts a new session, %s, with no direct message: the last account's not kept", (_, next) => {
+    const t = setup();
+    t.signedIn(ADDRESS);
+    t.connected(ADDRESS);
+    t.last().line(`@msgid=d;time=${T0};account=${OTHER} :${OTHER}!u@h PRIVMSG ${ADDRESS} :for you alone`);
+    expect(Object.keys(t.store.getState().dms)).toEqual([OTHER]);
+    next(t);
+    expect(t.store.getState().dms).toEqual({});
+  });
+
   it("connects as a guest when Ergo says the session is gone, the store logged out", () => {
     const t = setup();
     t.signedIn(ADDRESS);

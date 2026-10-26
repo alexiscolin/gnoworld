@@ -61,6 +61,19 @@ describe("the store's chat slice: direct messages", () => {
     expect(t.dms()).toEqual({});
   });
 
+  it("forgets every conversation at a new session, notifying no one when it held none", () => {
+    const t = as(ACCOUNT);
+    t.heard(dm("a", { from: ALICE, to: ACCOUNT, text: "hi" }));
+    t.store.getState().dmActions.begin();
+    expect(t.dms()).toEqual({});
+    let heard = 0;
+    t.store.subscribe(() => {
+      heard += 1;
+    });
+    t.store.getState().dmActions.begin();
+    expect(heard).toBe(0);
+  });
+
   it("notifies no one of a line that is no direct message", () => {
     const t = as(ACCOUNT);
     let heard = 0;
