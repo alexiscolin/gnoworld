@@ -17,17 +17,19 @@ const attribute = (html: string, name: string) => new RegExp(` ${name}="([^"]*)"
 
 // 4g: a link's player waits for the moderation's "checked", then for a click: no third party is reached before.
 describe("Embed", () => {
-  it("waits for the moderation's check, its button off, and loads nothing", () => {
+  // F897 (U2): a disabled button said the wait, dim and passed over by Tab; now words do, and Play comes once checked.
+  it("says it waits for the moderation's check, in words a reader hears, offers no Play, and loads nothing", () => {
     const html = renderToStaticMarkup(<Embed embed={YOUTUBE} verdict={undefined} />);
     expect(said(html)).toContain("YouTube");
-    expect(said(html)).toContain("Waiting for the moderation check");
-    expect(html).toMatch(/<button(?=[^>]*disabled="")[^>]*>/);
+    expect(html).toMatch(/<p role="status"[^>]*>Waiting for the moderation check…<\/p>/);
+    expect(html).not.toContain("<button");
     expect(html).not.toContain("<iframe");
     expect(html).not.toContain("youtube-nocookie");
   });
 
   it("offers the player once checked, still loading nothing before the click", () => {
     const html = renderToStaticMarkup(<Embed embed={YOUTUBE} verdict="checked" />);
+    expect(html).toMatch(/<p role="status"[^>]*>Ready to play<\/p>/);
     expect(html).toMatch(/<button(?![^>]*disabled)[^>]*>[^<]*Play the YouTube video/);
     expect(html).not.toContain("<iframe");
     expect(html).not.toContain("youtube-nocookie");

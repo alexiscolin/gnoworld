@@ -1,7 +1,8 @@
-// A link's player (slice 4's 4g; ADR-0002 §6): a card naming the service, its button waiting on the moderation's
-// "checked"; the service's own frame on a click alone, so no third party is reached before. A hidden line's, none.
+// A link's player (slice 4's 4g; ADR-0002 §6): a card naming the player and saying its state, Play once the
+// moderation's "checked"; the service's own frame on a click alone, so no third party is reached before. A hidden
+// line's, none.
 import type { StreamEvent } from "@gnoworld/schemas";
-import { Button, Cluster } from "@gnoworld/ui";
+import { Button, Card } from "@gnoworld/ui";
 import { useEffect, useRef, useState } from "react";
 import type { Embed as Player } from "./embeds.ts";
 import styles from "./Embed.module.css";
@@ -61,25 +62,25 @@ export function Embed({ embed, verdict }: EmbedProps) {
   if (verdict === "hidden") return null;
   if (playing) return <PlayerFrame embed={embed} />;
   const checked = verdict === "checked";
+  // Its state in words, which a reader hears as it changes; Play alone once checked (F897).
+  const word = checked ? "Ready to play" : late ? "Couldn't check this link" : "Waiting for the moderation check…";
   return (
-    <div className={styles["card"]}>
-      <Cluster space="2xs">
-        <span>{embed.service}</span>
-        <Button
-          size="s"
-          emphasis="outline"
-          disabled={!checked}
-          onClick={() => {
-            setPlaying(true);
-          }}
-        >
-          {checked
-            ? `Play the ${embed.title}`
-            : late
-              ? "Couldn't check this link"
-              : "Waiting for the moderation check…"}
-        </Button>
-      </Cluster>
-    </div>
+    <Card compact>
+      <Card.Header icon="play" title={embed.title} />
+      <p role="status" className={styles["status"]}>
+        {word}
+      </p>
+      {checked ? (
+        <Card.Actions>
+          <Button
+            onClick={() => {
+              setPlaying(true);
+            }}
+          >
+            {`Play the ${embed.title}`}
+          </Button>
+        </Card.Actions>
+      ) : null}
+    </Card>
   );
 }

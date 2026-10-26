@@ -1,7 +1,6 @@
-/* A link's player (4g): its card under the line's words, then the service's frame, as wide as the line allows. */
+/* A link's player (4g): its card's state in words, then the service's frame, as wide as the line allows. */
 @layer components {
-  .card {
-    padding-block: var(--space-3xs);
+  .status {
     color: var(--color-text-muted);
   }
 

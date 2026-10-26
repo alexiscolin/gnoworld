@@ -85,8 +85,8 @@ test.describe("a link's player", () => {
   }) => {
     let said = "";
     const { away, asked } = await room(page, () => said);
-    await expect(lineOf(page, "watch")).toContainText("Waiting for the moderation check");
-    await expect(lineOf(page, "watch").getByRole("button")).toBeDisabled();
+    await expect(lineOf(page, "watch").getByRole("status")).toHaveText("Waiting for the moderation check…");
+    await expect(lineOf(page, "watch").getByRole("button")).toHaveCount(0);
     expect(asked[0]).toBe(`${SITE}/api/stream?rooms=%23bubble%2Fgames`);
     said = event("v1", "checked");
     await expect(play(page)).toBeEnabled();
