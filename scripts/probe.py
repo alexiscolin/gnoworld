@@ -185,6 +185,24 @@ try:
         expect(out.returncode != 0 and "assertion" in (out.stdout + out.stderr).lower(), "vitest refuses a test with no assertion")
         shutil.rmtree(HERE)
 
+    if part("pinned_node"):
+        # Every test run on the Node .node-version pins, StrykerJS's dry run too: another V8 reads some regexes
+        # otherwise (F816 came from StrykerJS on Homebrew's Node 26). The toolchain test passes on the pin, and fails
+        # once the pin names another.
+        test = "server/src/testing/toolchain.test.ts"
+        out = run(["node_modules/.bin/vitest", "run", test])
+        expect(out.returncode == 0 and "1 passed" in out.stdout, "vitest's toolchain test passes on the pinned Node")
+        with open(".node-version") as f:
+            pinned = f.read()
+        try:
+            with open(".node-version", "w") as f:
+                f.write("0.0.1\n")
+            out = run(["node_modules/.bin/vitest", "run", test])
+            expect(out.returncode != 0 and "v0.0.1" in out.stdout + out.stderr, "vitest refuses a Node .node-version does not pin")
+        finally:
+            with open(".node-version", "w") as f:
+                f.write(pinned)
+
     if part("vitest_ui"):
         # The design system's tests run in jsdom, each on an empty page: none is left out by the
         # project's globs, and the setup's cleanup holds (the second test sees one paragraph).
