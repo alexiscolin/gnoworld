@@ -105,9 +105,10 @@ function roomShown(room: string, state: LoadedProps["state"], say: LoadedProps["
 
 function Loaded({ sections, current, state, chat, session, say, sayTo, dms }: LoadedProps) {
   const ids = roomIds(sections);
-  // One conversation in view: the direct message ?dm= names, else the room.
+  // One conversation in view: the direct message ?dm= names, else the room. Alt+Up and Alt+Down move between rooms,
+  // none while a direct message is in view (U15).
   const room = dms.partner === undefined ? current : undefined;
-  useRoomKeys(ids, current);
+  useRoomKeys(ids, room);
   const [, setParams] = useSearchParams();
   const me = session.kind === "in" ? session.address : undefined;
   // Apart from the room's element, which each line draws again: who is here keeps its drawing (the compiler).

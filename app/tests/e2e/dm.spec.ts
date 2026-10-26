@@ -144,6 +144,28 @@ test.describe("direct messages", () => {
     await Promise.all([bob.close(), carol.close()]);
   });
 
+  // 4e's UX review (U15): Alt+Down in a conversation went to the room after the one hidden behind it.
+  test("stay in a conversation on Alt+Up and Alt+Down, which move between rooms", async ({ page }) => {
+    await inGames(page);
+    const partner = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+    await page.goto(`/w/bubble?dm=${partner}`);
+    await hydrated(page);
+    await expect(page.getByRole("heading", { name: short(partner) })).toBeVisible();
+    await page.keyboard.press("Alt+ArrowDown");
+    await page.keyboard.press("Alt+ArrowUp");
+    // Two frames: the router has drawn whatever the keys asked.
+    await page.evaluate(
+      () =>
+        new Promise((done) => {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(done);
+          });
+        }),
+    );
+    await expect(page).toHaveURL(new RegExp(`dm=${partner}`));
+    await expect(page.getByRole("heading", { name: short(partner) })).toBeVisible();
+  });
+
   test("never reach the page's account from a guest: Ergo refuses it", async ({ page }) => {
     const me = await inGames(page);
     const guest = `guest-${crypto.randomUUID().slice(0, 6)}`;
