@@ -3,7 +3,7 @@
 // (Ergo's max-channels-per-client); the newest lines of the room in view alone, once Ergo says I joined it, since
 // Ergo paces a client to 2 lines a second (plan §4); Ergo's lines read into the store through one BatchReader a
 // connection. Its parts come in, so the tests give their own.
-import { BatchReader, compose, nickOf, type IrcMessage } from "@gnoworld/core";
+import { BatchReader, compose, nickOf, type Composed, type IrcMessage } from "@gnoworld/core";
 import { Address, RoomId } from "@gnoworld/schemas";
 import type { Result } from "../../lib/api/http.ts";
 import type { Ergo, ErgoOptions, Who } from "../../lib/ergo/ergo.ts";
@@ -40,6 +40,8 @@ export interface ChatLink {
 
 // Where a room this page follows stands on this connection: a JOIN went for it; its history went.
 type Phase = "joined" | "asked";
+// A line a draft was composed to, and sent.
+type Sent = Extract<Composed, { kind: "line" }>;
 
 class Link implements ChatLink {
   readonly #deps: LinkDeps;
@@ -77,18 +79,20 @@ class Link implements ChatLink {
   }
 
   say(room: string, draft: string): boolean {
-    const me = this.#ergo?.nick();
-    if (this.#key === "guest" || me === undefined || !this.#inside.has(room)) return false;
-    const composed = compose(room, draft, me);
-    return composed.kind === "line" && this.#ergo?.send(composed.line) === true;
+    return this.#write(room, draft, () => this.#inside.has(room)) !== undefined;
   }
 
   sayTo(partner: string, draft: string): boolean {
+    return this.#write(partner, draft, (me) => me !== partner && Address.safeParse(partner).success) !== undefined;
+  }
+
+  // A draft to `target`, composed and sent on an account's connection when `allowed` lets it, given my nick: the
+  // line sent, or none.
+  #write(target: string, draft: string, allowed: (me: string) => boolean): Sent | undefined {
     const me = this.#ergo?.nick();
-    if (this.#key === "guest" || me === undefined || me === partner || !Address.safeParse(partner).success)
-      return false;
-    const composed = compose(partner, draft, me);
-    return composed.kind === "line" && this.#ergo?.send(composed.line) === true;
+    if (this.#key === "guest" || me === undefined || !allowed(me)) return undefined;
+    const composed = compose(target, draft, me);
+    return composed.kind === "line" && this.#ergo?.send(composed.line) === true ? composed : undefined;
   }
 
   stop(): void {
