@@ -30,7 +30,11 @@ function server(answer: (ids: readonly string[]) => Promise<Result<LineVerdicts>
       heard.push(event);
     },
     held: () => holding,
-    follow: () => () => undefined,
+    // The stream says it began following when the page did.
+    follow: (_room, on) => {
+      on.since(OPENED);
+      return () => undefined;
+    },
     now: () => OPENED,
   });
   const ask = (lines: readonly Line[], held?: Record<string, unknown>) => {

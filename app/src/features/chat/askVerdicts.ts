@@ -14,8 +14,9 @@ export interface Asking {
   judged: (event: StreamEvent) => void;
   /** The verdicts the page holds of a room's lines. */
   held: (room: string) => Readonly<Record<string, unknown>> | undefined;
-  /** Follows a room's stream (lib/stream/verdicts.ts), handing on its verdicts; stops when called. */
-  follow: (room: string, on: { verdict: (event: StreamEvent) => void }) => () => void;
+  /** Follows a room's stream (lib/stream/verdicts.ts), handing on its verdicts and its word of when it began
+   * following, in ms; stops when called. */
+  follow: (room: string, on: { verdict: (event: StreamEvent) => void; since: (time: number) => void }) => () => void;
   /** The page's clock, in ms. */
   now: () => number;
 }
@@ -91,7 +92,9 @@ export function verdictAsker({ verdicts, judged, held, follow, now }: Asking) {
     show: (room: string | undefined, lines: readonly Line[] | undefined): void => {
       if (following?.room !== room) {
         unfollow();
-        if (room !== undefined) following = { room, since: now(), stop: follow(room, { verdict: judged }) };
+        // The stream's own word of when it began is not read yet: the page's clock dates it.
+        const since = () => undefined;
+        if (room !== undefined) following = { room, since: now(), stop: follow(room, { verdict: judged, since }) };
       }
       if (following === undefined || lines === undefined) return;
       ask(following.room, { lines, held: held(following.room), since: following.since });
