@@ -81,7 +81,8 @@ describe("activity", () => {
     expect(activity.rates(["#earth"], T0)).toEqual(new Map([["#earth", 0]]));
   });
 
-  it("stays bounded: 100,000 accounts, then 20,000 rooms, hold at most their caps", () => {
+  // Its bound is memory's, not time's: 170,000 counts get 30 s, which a machine busy with merge checks needs (F833).
+  it("stays bounded: 100,000 accounts, then 20,000 rooms, hold at most their caps", { timeout: 30_000 }, () => {
     const activity = makeActivity();
     for (let n = 0; n < 150_000; n += 1) activity.count("#bubble", `account-${String(n)}`, T0);
     for (let n = 0; n < 20_000; n += 1) activity.count(`#room-${String(n)}`, `r${String(n)}`, T0 + MINUTE);
