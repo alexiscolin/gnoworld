@@ -2,7 +2,7 @@ import { compose } from "@gnoworld/core";
 import { completions } from "./complete.ts";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { Composer, NEAR, Preview, said } from "./Composer.tsx";
+import { Composer, NEAR, Preview, refusalAfter, said } from "./Composer.tsx";
 
 const ROOM = "#bubble/games";
 const NICK = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
@@ -14,6 +14,19 @@ const CHOICES = { commands: ["/me"], rooms: ["#games", "#gnogolf", "#news"], peo
 const names = (markup: string) => [...markup.matchAll(/aria-label="([^"]+)"/g)].map((found) => found[1]);
 
 describe("Composer", () => {
+  // /code-review on 4e (CR7): a refusal put its draft back over what the reader had typed since.
+  it("puts a refused draft back into an empty box alone; a box holding words keeps them, the unsent ones quoted", () => {
+    const refused = { draft: "hi **you**", why: "Not sent: g10gh7…3y5tv is not online." };
+    expect(refusalAfter("", refused)).toEqual(refused);
+    expect(refusalAfter("typed since", refused)).toEqual({
+      draft: "typed since",
+      why: "Not sent: g10gh7…3y5tv is not online. Unsent: “hi **you**”",
+    });
+    // Cut at 80 characters as a reader counts them: a thumb and its skin tone stay one.
+    const long = `${"a".repeat(79)}👍🏽tail`;
+    expect(refusalAfter("x", { draft: long, why: "W." }).why).toBe(`W. Unsent: “${"a".repeat(79)}👍🏽…”`);
+  });
+
   it("is a form named for the room, its field labelled, Send off while the line is empty", () => {
     const markup = html();
     expect(markup).toMatch(/<form[^>]*aria-label="Write in #games"/);

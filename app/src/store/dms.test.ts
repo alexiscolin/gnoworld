@@ -262,6 +262,26 @@ describe("the store's chat slice: direct messages", () => {
     expect(t.store.getState().dmRefused).toEqual({});
   });
 
+  // /code-review on 4e (CR7): a refusal put its draft back on the device over a draft typed since.
+  it("puts a refused line's draft back on the device only where no draft waits", () => {
+    const t = as(ACCOUNT);
+    const kept = new Map([[ALICE, "typed since"]]);
+    const drafts = {
+      get: (room: string) => kept.get(room) ?? "",
+      set: (room: string, draft: string) => {
+        kept.set(room, draft);
+        return true;
+      },
+    };
+    t.store.getState().dmActions.begin({ prefs: prefs().device, drafts });
+    t.store.getState().dmActions.refused(ALICE, "hi");
+    expect(kept.get(ALICE)).toBe("typed since");
+    kept.set(ALICE, "");
+    t.store.getState().dmActions.refused(ALICE, "again");
+    expect(kept.get(ALICE)).toBe("again");
+    expect(t.store.getState().dmRefused).toEqual({ [ALICE]: { count: 2, draft: "again" } });
+  });
+
   // 4e's decision B (T5, U3): "refused" means discarded. A stranger's message was kept, hidden, and shown once the
   // account heard everyone again; a flood of strangers grew the store all the while.
   it("keeps no message from an account never written to while it hears those alone, nor shows it once it hears everyone", () => {

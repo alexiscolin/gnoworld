@@ -119,15 +119,29 @@ export interface ComposerProps {
   describedBy?: string | undefined;
 }
 
+// The unsent words quoted, at most 80 characters as a reader counts them.
+const quoted = (words: string) => {
+  const kept = [...new Intl.Segmenter().segment(words)].map(({ segment }) => segment);
+  return kept.length > 80 ? `${kept.slice(0, 80).join("")}…` : words;
+};
+
+/** What a refusal leaves in the box `draft` holds: its draft back into an empty box; else the box as typed since,
+ * the unsent words quoted after why (CR7). */
+export function refusalAfter(draft: string, refused: { draft: string; why: string }): { draft: string; why: string } {
+  if (draft === "") return refused;
+  return { draft, why: `${refused.why} Unsent: “${quoted(refused.draft)}”` };
+}
+
 // Why Ergo refused the last line, said until the draft changes or a line goes: one more refusal while in view puts
-// its draft back in the box (the store put it back on the device too, for the next time the composer starts).
-function useRefusal(refused: ComposerProps["refused"], setDraft: (draft: string) => void) {
+// its draft back in an empty box (the store put it back on the device too, where no draft waited).
+function useRefusal(refused: ComposerProps["refused"], draft: string, setDraft: (draft: string) => void) {
   const [why, setWhy] = useState<string>();
   const [answered, setAnswered] = useState(refused?.count);
   if (refused !== undefined && refused.count !== answered) {
     setAnswered(refused.count);
-    setDraft(refused.draft);
-    setWhy(refused.why);
+    const after = refusalAfter(draft, refused);
+    setDraft(after.draft);
+    setWhy(after.why);
   }
   return {
     why,
@@ -148,7 +162,7 @@ function useFocusAtStart(formRef: RefObject<HTMLFormElement | null>, focus: bool
 export function Composer(props: ComposerProps) {
   const { room, nick, rooms, members, onSay, draft: kept = "", onDraft, label: to, refused } = props;
   const [draft, setDraft] = useState(kept);
-  const refusal = useRefusal(refused, setDraft);
+  const refusal = useRefusal(refused, draft, setDraft);
   // Each change of the draft, the device told at once: a render alone (a line arriving) writes nothing.
   const change = (next: string) => {
     setDraft(next);

@@ -116,7 +116,8 @@ export const dmSlice: StateCreator<ChatSlice & DmSlice, [], [], DmSlice> = (set,
         if (writable && device?.prefs.setKnown(written) === false) set({ dmNotKept: true });
       },
       refused: (partner, draft, offline = true) => {
-        device?.drafts.set(partner, draft);
+        // Back on the device where no draft waits: one typed since stays (CR7).
+        if (device?.drafts.get(partner) === "") device.drafts.set(partner, draft);
         const { dmRefused } = get();
         const count = (dmRefused[partner]?.count ?? 0) + 1;
         set({ dmRefused: { ...dmRefused, [partner]: offline ? { count, draft } : { count, draft, offline } } });
