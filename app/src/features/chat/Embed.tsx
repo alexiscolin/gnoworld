@@ -13,7 +13,7 @@ export interface EmbedProps {
 }
 
 /** A service's player, framed. */
-function PlayerFrame({ embed }: { embed: Player }) {
+export function PlayerFrame({ embed }: { embed: Player }) {
   return (
     <iframe
       src={embed.src}
