@@ -8,6 +8,7 @@ import {
   lineOf,
   membersAfter,
   redactAfter,
+  refusedOf,
   topicAfter,
   type IrcMessage,
   type Line,
@@ -24,6 +25,8 @@ interface RoomState {
   readonly members: readonly string[];
   /** The room's description, its IRC topic. */
   readonly topic: string | undefined;
+  /** The msgid of a line Ergo refused to delete, until the page has said so (4c's message menu). */
+  readonly refused: string | undefined;
 }
 
 interface ChatState {
@@ -45,10 +48,12 @@ export interface ChatSlice {
     page: (room: string, messages: readonly IrcMessage[]) => void;
     /** The link gone: my nick and who is here forgotten; the lines and topics kept to show meanwhile. */
     disconnected: () => void;
+    /** The page said a room's refused delete: it is forgotten. */
+    dismissed: (room: string) => void;
   };
 }
 
-const EMPTY: RoomState = { lines: [], members: [], topic: undefined };
+const EMPTY: RoomState = { lines: [], members: [], topic: undefined, refused: undefined };
 
 // A room once a live line is read: the same object when the line changes nothing of it.
 function roomAfter(room: RoomState, message: IrcMessage, at: Where): RoomState {
@@ -57,7 +62,9 @@ function roomAfter(room: RoomState, message: IrcMessage, at: Where): RoomState {
   const lines = redactAfter(added, message, at.room);
   const members = membersAfter(room.members, message, at);
   const topic = topicAfter(room.topic, message, at.room);
-  return lines === room.lines && members === room.members && topic === room.topic ? room : { lines, members, topic };
+  return lines === room.lines && members === room.members && topic === room.topic
+    ? room
+    : { ...room, lines, members, topic };
 }
 
 // A room followed, by its id: an own key alone, the ids being the relay's.
@@ -95,6 +102,13 @@ export const chatSlice: StateCreator<ChatSlice> = (set, get) => {
       // A line goes to the room it names; a QUIT or a NICK to every room.
       heard: (message) => {
         const { me = "", rooms } = get().chat;
+        // Ergo's refusal of a delete names its room and line at its own places (FAIL REDACT).
+        const refusal = refusedOf(message);
+        const refusing = refusal === undefined ? undefined : roomOf(rooms, refusal.room);
+        if (refusal !== undefined && refusing !== undefined) {
+          change({ rooms: { ...rooms, [refusal.room]: { ...refusing, refused: refusal.id } } });
+          return;
+        }
         const id = concerns(message);
         // ponytail: a QUIT or a NICK reads every room's people, 100 rooms of M each, though Ergo sends it for the
         // rooms shared alone (1,000 QUITs at 100 rooms of 2,500: 155 ms, the complexity-reviewer); a nick's rooms
@@ -115,6 +129,11 @@ export const chatSlice: StateCreator<ChatSlice> = (set, get) => {
         const read = messages.flatMap((message) => lineOf(message, id) ?? []);
         const lines = addLines(room.lines, read, LINES_KEPT);
         if (lines !== room.lines) change({ rooms: { ...rooms, [id]: { ...room, lines } } });
+      },
+      dismissed: (id) => {
+        const { rooms } = get().chat;
+        const room = roomOf(rooms, id);
+        if (room?.refused !== undefined) change({ rooms: { ...rooms, [id]: { ...room, refused: undefined } } });
       },
       disconnected: () => {
         const { rooms } = get().chat;

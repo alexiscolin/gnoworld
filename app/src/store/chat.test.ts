@@ -273,3 +273,32 @@ describe("the store's chat slice", () => {
     expect(t.room("#bubble")?.lines.map((line) => line.id)).toEqual(["m00001", "m00002"]);
   });
 });
+
+// 4c's message menu: Ergo's refusal of a delete stays with its room until the page has said it.
+describe("the store's chat slice: a delete Ergo refused", () => {
+  const refusal = (room: string, id: string) =>
+    read(`:ergo FAIL REDACT REDACT_FORBIDDEN ${room} ${id} :You are not authorised to delete this message`);
+
+  it("keeps the msgid Ergo refused to delete with its room, until it is dismissed", () => {
+    const t = following();
+    t.heard(said("#bubble", "a", "hello"));
+    t.heard(refusal("#bubble", "a"));
+    expect(t.room("#bubble")?.refused).toBe("a");
+    expect(t.room("#bubble/games")?.refused).toBeUndefined();
+    t.heard(said("#bubble", "b", "again"));
+    expect(t.room("#bubble")?.refused).toBe("a");
+    t.dismissed("#bubble");
+    expect(t.room("#bubble")?.refused).toBeUndefined();
+    expect(t.room("#bubble")?.lines.map((line) => line.id)).toEqual(["a", "b"]);
+  });
+
+  it("keeps nothing of a refusal in a room not followed, and notifies no one of it, nor of a dismissal of nothing", () => {
+    const t = following();
+    const before = t.notified();
+    t.heard(refusal("#garden", "a"));
+    t.dismissed("#bubble");
+    t.dismissed("#garden");
+    expect(t.notified()).toBe(before);
+    expect(t.store.getState().chat.rooms["#garden"]).toBeUndefined();
+  });
+});
