@@ -94,11 +94,16 @@ test.describe("telling the room the account is typing", () => {
     page,
   }) => {
     const address = await logIn(page, word("typing"));
+    await page.clock.install({ time: new Date(T(30)) });
     const { sent } = await room(page, { me: address });
+    await page.clock.pauseAt(new Date(Date.parse(T(30)) + 120_000));
     await field(page).fill("hello");
     await expect.poll(() => tags(sent)).toEqual([`@+typing=active TAGMSG ${ROOM}`]);
     await field(page).fill("");
+    // A room's TAGMSGs may wait their 3 s turn: the clock run past each.
+    await page.clock.runFor(3_000);
     await expect.poll(() => tags(sent)).toHaveLength(2);
+    await page.clock.runFor(3_000);
     await field(page).fill("/me waves");
     await field(page).fill("again");
     await expect.poll(() => tags(sent)).toHaveLength(3);
