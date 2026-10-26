@@ -9,6 +9,11 @@ export const StreamEvent = z.strictObject({
 });
 export type StreamEvent = z.infer<typeof StreamEvent>;
 
+/** The stream's word to each connection after its replay (4g, F890): the server's time as it began following, the
+ * clock Ergo's server-time shares (one host), so a page reads which lines the stream answers without its own. */
+export const StreamSince = z.strictObject({ time: z.iso.datetime() });
+export type StreamSince = z.infer<typeof StreamSince>;
+
 /** The lines a page asks GET /api/verdicts about at most, one request's worth. */
 export const VERDICTS_ASKED = 100;
 

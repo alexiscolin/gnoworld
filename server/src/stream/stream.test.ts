@@ -85,6 +85,25 @@ describe("the verdicts' stream", () => {
     ]);
   });
 
+  // F890: the page reads which lines the stream will answer from the server's clock, which Ergo's server-time
+  // shares, never from its own.
+  it("tells each connection the time it began following, after the events it replays", async () => {
+    let clock = Date.parse("2026-10-26T12:00:00.000Z");
+    const { stream, rooms } = setup({ now: () => clock });
+    stream.publish(event(1));
+    const since = async (client: Awaited<ReturnType<typeof rooms>>) => {
+      while (!client.raw().includes("event: since")) expect(await client.more()).toBe(true);
+      return client.raw();
+    };
+    const first = await rooms("#bubble");
+    expect(await since(first)).toMatch(
+      /^id: \d+\nevent: verdict\ndata: [^\n]+\n\nevent: since\ndata: \{"time":"2026-10-26T12:00:00\.000Z"\}\n\n$/,
+    );
+    clock += 60_000;
+    const again = await rooms("#bubble", { last: (await first.read(1))[0]?.id ?? "" });
+    expect(await since(again)).toBe('event: since\ndata: {"time":"2026-10-26T12:01:00.000Z"}\n\n');
+  });
+
   it("gives a late client each room's last events, then what it missed after its Last-Event-ID", async () => {
     const { stream, rooms } = setup({ pending: 3 });
     for (let n = 1; n <= 5; n += 1) stream.publish(event(n));
