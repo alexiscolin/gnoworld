@@ -3,6 +3,7 @@
 // (?room=<name>), else the world's main room, else the first listed, the one whose history the link asks. The
 // link lives as long as the page: leaving the world leaves Ergo. An account writes in the room through the link
 // (4c); a guest reads, a room letting accounts alone speak.
+import { shownLines } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";
 import { Button, Sidebar, Stack } from "@gnoworld/ui";
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
@@ -70,7 +71,8 @@ interface LoadedProps {
 // while the room holds it, a line deleted or gone out of the window answering no more; a line sent answers none after.
 function Room({ room, rooms, state, chat, session, link, dismissed }: RoomProps) {
   const [reply, setReply] = useState<string>();
-  const replying = reply === undefined ? undefined : state?.lines.find((line) => line.id === reply);
+  // As the room shows it, its author's edit folded in (the green pass's G7).
+  const replying = reply === undefined ? undefined : shownLines(state?.lines ?? []).find((line) => line.id === reply);
   return (
     <RoomView
       room={room}

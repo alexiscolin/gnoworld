@@ -52,6 +52,16 @@ test.describe("replies", () => {
     expect(said()).toEqual([`@+reply=m2 PRIVMSG ${ROOM} :this one`]);
   });
 
+  // The green pass (G7): the composer quotes a line as the room shows it, its author's edit folded in.
+  test("quote an edited line by its edited words", async ({ page }) => {
+    await asAccount(page, () => ({
+      replayed: [tagged("e1", "the first line, fixed", { at: 2, tags: "+gnoworld/edit=m1" })],
+    }));
+    await expect(lines(page).nth(0)).toContainText("the first line, fixed (edited)");
+    await replyTo(page, 0);
+    await expect(form(page)).toContainText("Replying to g10gh7…3y5tv: the first line, fixed");
+  });
+
   // R4: the line being answered is the room's: another room's line goes out answering none, and the reply is gone on
   // coming back.
   test("leave the reply behind on a room switch: the other room's line answers none", async ({ page }) => {
