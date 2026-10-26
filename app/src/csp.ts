@@ -13,6 +13,9 @@ const DIRECTIVES = [
   "connect-src 'self'",
   "worker-src 'self'",
   "manifest-src 'self'",
+  // The accepted services' players, each loaded on a click (slice 4's 4g; docs/decisions.md, 2026-10-26); Imgur's
+  // form is not read yet.
+  "frame-src https://www.youtube-nocookie.com https://player.vimeo.com https://giphy.com",
   // These three fall back to nothing, not to default-src.
   "base-uri 'none'",
   "form-action 'self'",

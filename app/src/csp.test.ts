@@ -11,6 +11,8 @@ const BASE = [
   "connect-src 'self'",
   "worker-src 'self'",
   "manifest-src 'self'",
+  // 4g: the accepted services' players, each on a click (docs/decisions.md, 2026-10-26); Imgur's not read yet.
+  "frame-src https://www.youtube-nocookie.com https://player.vimeo.com https://giphy.com",
   "base-uri 'none'",
   "form-action 'self'",
   "frame-ancestors 'none'",
@@ -19,6 +21,13 @@ const BASE = [
 describe("policy", () => {
   it("names each directive, none unsafe, and adds no hash when there is no inline script", () => {
     expect(policy([])).toBe(BASE.join("; "));
+  });
+
+  it("frames the accepted services' players alone: no wildcard, no scheme, no other host", () => {
+    const frames = policy([])
+      .split("; ")
+      .filter((directive) => directive.startsWith("frame-src"));
+    expect(frames).toEqual(["frame-src https://www.youtube-nocookie.com https://player.vimeo.com https://giphy.com"]);
   });
 
   it("allows each inline script by its hash, once, in code-unit order whatever order the pages gave", () => {
