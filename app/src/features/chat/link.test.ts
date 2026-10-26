@@ -894,17 +894,32 @@ describe("the chat's link: what it says", () => {
       ]);
     });
 
-    // The red pass (R23): a field cleared and written again shows the typing again at once.
-    it("tells the typing again at once after a done, within the 3 s", () => {
+    // The code review (CR5), in place of the red pass's R23 (the throttle reset on a done): a field cleared and written
+    // again within the 3 s keeps the typing shown, its readers' 6 s running, and tells nothing more; clearing it and
+    // writing again over and over sends one TAGMSG each 3 s, never two a cycle.
+    it("keeps the typing shown with nothing more told when a field cleared is written again within the 3 s", () => {
       vi.useFakeTimers({ now: Date.parse(T0) });
       const t = memberIn(["#bubble/games"]);
       t.link.typing("#bubble/games", "active");
       t.link.typing("#bubble/games", "done");
       t.link.typing("#bubble/games", "active");
+      vi.advanceTimersByTime(3_000);
+      expect(tagged(t.fake.sent)).toEqual(["@+typing=active TAGMSG #bubble/games"]);
+    });
+
+    it("tells a room one TAGMSG each 3 s however fast its field is cleared and written, the done last", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const t = memberIn(["#bubble/games"]);
+      for (let cycle = 0; cycle < 10; cycle += 1) {
+        t.link.typing("#bubble/games", "active");
+        t.link.typing("#bubble/games", "done");
+        vi.advanceTimersByTime(100);
+      }
+      expect(tagged(t.fake.sent)).toEqual(["@+typing=active TAGMSG #bubble/games"]);
+      vi.advanceTimersByTime(2_000);
       expect(tagged(t.fake.sent)).toEqual([
         "@+typing=active TAGMSG #bubble/games",
         "@+typing=done TAGMSG #bubble/games",
-        "@+typing=active TAGMSG #bubble/games",
       ]);
     });
 
