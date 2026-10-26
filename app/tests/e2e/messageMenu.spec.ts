@@ -503,6 +503,8 @@ test.describe("deleting a line", () => {
     await lineOf(page, "my own line").hover();
     await moreOf(page, 1).click();
     await expect(page.getByRole("menu").getByRole("menuitem")).toHaveText(["Copy text", "Copy room link", "Delete"]);
+    // The green pass (G11): the dialog closed until Delete is chosen.
+    await expect(page.getByRole("dialog", { name: "Delete this message?" })).toBeHidden();
   });
 
   // The red pass (M8): Esc keeps the line and gives the focus back to More.

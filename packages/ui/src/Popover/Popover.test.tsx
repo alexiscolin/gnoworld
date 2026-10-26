@@ -285,7 +285,10 @@ describe("Menu", () => {
     };
     expect(look("More")).toEqual(look("Alike"));
     expect(look("Plain")).toEqual(look("Plain alike"));
-    expect(look("Plain")[1]).toBe("plain");
+    // The green pass (G16): the look stated apart from iconLook, which both sides above call.
+    expect(look("More").slice(1)).toEqual(["outline", "neutral", "m"]);
+    expect(look("Plain").slice(1)).toEqual(["plain", "neutral", "m"]);
+    expect(screen.getByRole("button", { name: "More" }).querySelector("svg")?.dataset["size"]).toBe("m");
   });
 
   // The red pass (M13): the words name the trigger, as text, and the trigger draws none of them.
