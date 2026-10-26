@@ -64,6 +64,16 @@ function said(command: string, text: string): Pick<Line, "kind" | "text"> | unde
   return command === "PRIVMSG" && action !== undefined ? { kind: "action", text: action } : undefined;
 }
 
+/** A msgid a tag carries back: one word of 64 characters at most, no leading colon, nothing a tag escapes. */
+export const MSGID = /^[^\s,:;\\][^\s,;\\]{0,63}$/u;
+/** The line a message answers: +reply, ratified in 2026, before its draft name. */
+export const REPLY = ["+reply", "+draft/reply"];
+
+/** The first of these tags whose value holds what `fits` wants, or none. */
+export function first(tags: IrcMessage["tags"], names: readonly string[], fits: RegExp): string | undefined {
+  return names.map((name) => tags.get(name) ?? "").find((value) => fits.test(value));
+}
+
 /** The id and the time Ergo set, each in its one form, or none. */
 export function stamp(tags: IrcMessage["tags"]): Pick<Line, "id" | "time"> | undefined {
   const [id = "", time = ""] = [tags.get("msgid"), tags.get("time")];

@@ -3,7 +3,7 @@
 // checked here by hand (docs/decisions.md, 2026-10-26): one emoji of Unicode's RGI set, a msgid of one word, an
 // account Ergo vouches for.
 import type { IrcMessage } from "../irc/irc.ts";
-import { redactAfter, sameRoom, stamp } from "./room.ts";
+import { first, MSGID, redactAfter, REPLY, sameRoom, stamp } from "./room.ts";
 
 /** One account's reaction to a line, added or taken back, as Ergo marked it. */
 export interface Reaction {
@@ -28,15 +28,6 @@ export interface Shown {
 
 // One emoji of RGI's set, whole: a sequence (a skin tone, a ZWJ family, a flag, a keycap) is one.
 const EMOJI = /^\p{RGI_Emoji}$/v;
-// A msgid a tag carries back: one word of 64 characters at most, no leading colon, nothing a tag escapes.
-const MSGID = /^[^\s,:;\\][^\s,;\\]{0,63}$/u;
-// The line a reaction answers: +reply, ratified, before its draft name.
-const REPLY = ["+reply", "+draft/reply"];
-
-// The first of these tags whose value holds what `fits` wants, or none.
-function first(tags: IrcMessage["tags"], names: readonly string[], fits: RegExp): string | undefined {
-  return names.map((name) => tags.get(name) ?? "").find((value) => fits.test(value));
-}
 
 /** A reaction the page asks for: on a line, by its msgid, one emoji, added or taken back. */
 export type Reacting = Pick<Reaction, "to" | "emoji" | "on">;
