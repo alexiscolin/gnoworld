@@ -68,17 +68,8 @@ export interface Scripted {
 }
 
 /** Answers the page's socket as Ergo would, the page being `me`: with #games' history, or with what `script` says. */
-export function scriptedErgo(
-  ergo: WebSocketRoute,
-  me: string,
-  script: readonly HistoryLine[] | Scripted = LINES,
-): void {
-  const {
-    history = LINES,
-    heard,
-    refuseRedact = false,
-    room = "#bubble/games",
-  } = Array.isArray(script) ? { history: script } : (script as Scripted);
+export function scriptedErgo(ergo: WebSocketRoute, me: string, script: Scripted = {}): void {
+  const { history = LINES, heard, refuseRedact = false, room = "#bubble/games" } = script;
   ergo.onMessage((data) => {
     const line = String(data);
     heard?.(line);
