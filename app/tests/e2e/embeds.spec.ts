@@ -164,6 +164,16 @@ test.describe("a link's player", () => {
     expect(asked.some((url) => url.endsWith("ids=v3"))).toBe(true);
   });
 
+  // F889: no verdict from the stream or the server, the card waited for good; now it says it could not check.
+  test("says it could not check a link whose verdict never comes", async ({ page }) => {
+    await page.clock.install();
+    await page.route("**/api/verdicts?**", (route) => route.fulfill({ json: { room: "#bubble/games", verdicts: [] } }));
+    await room(page, () => "");
+    await expect(lineOf(page, "watch")).toContainText("Waiting for the moderation check");
+    await page.clock.fastForward(15_000);
+    await expect(lineOf(page, "watch")).toContainText("Couldn't check this link");
+  });
+
   // ADR-0002 §8: Data saver (a 2G link) shows no embed; and a verdict serves a player alone, so none is asked (F879).
   test("shows none to a reader who saves data, and asks no verdict", async ({ page }) => {
     await page.addInitScript(() => {

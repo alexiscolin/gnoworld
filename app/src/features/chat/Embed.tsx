@@ -2,7 +2,7 @@
 // "checked"; the service's own frame on a click alone, so no third party is reached before. A hidden line's, none.
 import type { StreamEvent } from "@gnoworld/schemas";
 import { Button, Cluster } from "@gnoworld/ui";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Embed as Player } from "./embeds.ts";
 import styles from "./Embed.module.css";
 
@@ -30,8 +30,27 @@ export function PlayerFrame({ embed }: { embed: Player }) {
   );
 }
 
+/** How long a card waits on its line's verdict before saying it could not check it (F889). */
+const CHECK_WAIT_MS = 15_000;
+
+// Whether a verdict has been awaited past CHECK_WAIT_MS: the stream down and the server silent leave a line unchecked.
+function useLate(waiting: boolean): boolean {
+  const [late, setLate] = useState(false);
+  useEffect(() => {
+    if (!waiting) return;
+    const timer = setTimeout(() => {
+      setLate(true);
+    }, CHECK_WAIT_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [waiting]);
+  return late && waiting;
+}
+
 export function Embed({ embed, verdict }: EmbedProps) {
   const [playing, setPlaying] = useState(false);
+  const late = useLate(verdict === undefined);
   if (verdict === "hidden") return null;
   if (playing) return <PlayerFrame embed={embed} />;
   const checked = verdict === "checked";
@@ -47,7 +66,11 @@ export function Embed({ embed, verdict }: EmbedProps) {
             setPlaying(true);
           }}
         >
-          {checked ? `Play the ${embed.title}` : "Waiting for the moderation check…"}
+          {checked
+            ? `Play the ${embed.title}`
+            : late
+              ? "Couldn't check this link"
+              : "Waiting for the moderation check…"}
         </Button>
       </Cluster>
     </div>
