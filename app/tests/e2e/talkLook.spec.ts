@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { inGames, lineOf, lines, word } from "./chat.ts";
-import { expect, hydrated, test } from "./fixtures.ts";
+import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import type { Scripted } from "./scripted.ts";
 import { asAccount, barOf, field, OTHER, tagged, tagmsg } from "./talk.ts";
 
@@ -15,6 +15,21 @@ const LOOK = (address: string): Scripted => ({
   ],
 });
 
+// Who's here holds the account's address, a new one each run (the test wallet draws its key): its width set here,
+// through the element's style, which the CSP allows, so the room's width is the same each run.
+const steady = (page: Page) =>
+  page.getByRole("complementary", { name: "Who's here" }).evaluate((aside) => {
+    aside.style.flex = "0 0 8rem";
+  });
+// The look's room on a computer's screen, the pointer on its first line, whose bar shows.
+async function pointedFirst(page: Page) {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await asAccount(page, LOOK, 3);
+  await steady(page);
+  await lines(page).first().hover();
+  await expect(barOf(page, 0)).toBeVisible();
+}
+
 test.describe("reactions, replies and edits, as they look", () => {
   test.use({ timezoneId: "UTC", locale: "en-GB" });
 
@@ -26,17 +41,50 @@ test.describe("reactions, replies and edits, as they look", () => {
   });
 
   test("look as the prototype's on a computer's screen", async ({ page }) => {
-    await page.setViewportSize({ width: 1280, height: 900 });
-    await asAccount(page, LOOK, 3);
-    // Who's here holds the account's address, a new one each run (the test wallet draws its key): its width set here,
-    // through the element's style, which the CSP allows, so the list's width is the same each run.
-    await page.getByRole("complementary", { name: "Who's here" }).evaluate((aside) => {
-      aside.style.flex = "0 0 8rem";
-    });
     // The first line by its place: the reply quotes its words too.
-    await lines(page).first().hover();
-    await expect(barOf(page, 0)).toBeVisible();
+    await pointedFirst(page);
     await expect(page.getByRole("list", { name: "Messages" })).toHaveScreenshot("talk-computer.png");
+  });
+
+  // The green pass: the composer's reply bar pictured and checked, as the lines are.
+  test("pass axe and look as the prototype's with the reply bar over the field, on a computer's screen", async ({
+    page,
+  }) => {
+    await pointedFirst(page);
+    await barOf(page, 0).getByRole("button", { name: "Reply" }).click();
+    const form = page.getByRole("form", { name: "Write in #games" });
+    await expect(form).toContainText("Replying to g10gh7…3y5tv: the first line");
+    expect((await new AxeBuilder({ page }).include("form").analyze()).violations).toEqual([]);
+    await expect(form).toHaveScreenshot("reply-bar-computer.png");
+  });
+
+  // The green pass: a line's 20 chips and a quote wrap within a phone's width, nothing scrolling sideways.
+  test("fit a line of 20 reactions and a reply's quote on a phone's screen, and pass axe", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const emoji = [...new Intl.Segmenter().segment("😀😁😂🤣😃😄😅😆😉😊😋😎😍😘🥰😗😙🥲😚🙂")].map(
+      ({ segment }) => segment,
+    );
+    await asAccount(
+      page,
+      () => ({
+        replayed: [
+          ...emoji.map((each, at) => tagmsg(`r${String(at)}`, `+draft/react=${each};+reply=m1`, { at: 2, who: OTHER })),
+          tagged("m3", "count me in, and bring the long putter for the last hole", {
+            at: 6,
+            tags: "+reply=m1",
+            who: OTHER,
+          }),
+        ],
+      }),
+      3,
+    );
+    const list = page.getByRole("list", { name: "Messages" });
+    await expect(lines(page).first().getByRole("button")).toHaveCount(20);
+    expect(await list.evaluate((box) => box.scrollWidth <= box.clientWidth)).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    expect((await new AxeBuilder({ page }).include("main").analyze()).violations).toEqual([]);
+    await steady(page);
+    await expect(list).toHaveScreenshot("talk-phone.png");
   });
 });
 
