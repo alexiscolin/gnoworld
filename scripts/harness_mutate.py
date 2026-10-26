@@ -46,7 +46,8 @@ SECTIONS = {
     # fail the run as unknown, and count a mutant killed that no test saw.
     "package.json": {"probe": "react_warn,react_tsc,ui_tsc", "hooks": "wiring"}, "pnpm-workspace.yaml": {"hooks": "wiring,regressions"},
     "scripts/check_css.py": "css", "scripts/check_comments.mjs": "comments",
-    ".jscpd.json": "jscpd", "tsconfig.base.json": "tsc", "vitest.config.ts": "vitest,vitest_ui,server",
+    ".jscpd.json": "jscpd", "tsconfig.base.json": "tsc", "vitest.config.ts": "vitest,vitest_ui,server,core_chromium",
+    "server/src/testing/toolchain.test.ts": "pinned_node", "server/src/testing/toolchain.ts": "pinned_node",
     "scripts/guard.py": "guard", "scripts/review_pass.py": "review_pass", "scripts/patch_coverage.py": "patch_coverage",
     "scripts/check_docs.py": "check_docs", "scripts/check_regressions.py": "regressions", "scripts/check_migrations.py": "migrations",
     "scripts/harness_mutate.py": "harness_mutate,harness_shards", ".githooks/commit-msg": "commit_msg,installed",
@@ -157,6 +158,21 @@ def mutants():
     yield from each("scripts/ergo.sh", "CGO_ENABLED=0 go build -trimpath", "go build", "hooks", "ergo.sh builds static, its paths trimmed")
     yield from each("scripts/ergo.sh", " sqlite\"", "\"", "hooks", "ergo.sh builds with sqlite")
     yield from each("vitest.config.ts", ', "server/src/**/*.test.ts"', "", "probe", "the server's tests are found")
+    # Core's tests again in Chromium (F816), only when asked, so no other Vitest run opens a browser.
+    yield from each("vitest.config.ts", '...(process.env["CORE_CHROMIUM"] ? [CORE_CHROMIUM] : []),', "CORE_CHROMIUM,", "probe", "core_chromium exists only when CORE_CHROMIUM asks")
+    yield from each("vitest.config.ts", 'include: ["packages/core/src/**/*.test.ts"],', 'include: ["packages/core/sr/**/*.test.ts"],', "probe", "core_chromium finds core's tests")
+    yield from each("vitest.config.ts", "enabled: true,\n      headless: true,", "enabled: false,\n      headless: true,", "probe", "core_chromium runs in a browser")
+    yield from each("vitest.config.ts", "fileParallelism: false,", "", "probe", "core_chromium runs its files one after another")
+    yield from each("vitest.config.ts", 'persistentContext: process.env["CORE_CHROMIUM"] ?? false,', "", "probe", "core_chromium keeps one browser context")
+    yield from each("vitest.config.ts", "screenshotFailures: false,", "", "probe", "core_chromium writes no screenshot beside the code")
+    yield from each("vitest.config.ts", 'args: process.env["SANDBOX_RUNTIME"] ? ["--single-process"] : []', "args: []", "probe", "core_chromium's Chromium runs in one process in the sandbox")
+    yield from each("scripts/check.sh", "CORE_CHROMIUM=$profile node node_modules/vitest/vitest.mjs run --project core_chromium", ":", "hooks", "check.sh runs core's tests in Chromium")
+    yield from each("scripts/check.sh", " run --project core_chromium ||", " run ||", "hooks", "check.sh's Chromium run names core's project")
+    yield from each("scripts/check.sh", 'rm -r "${profile:?}"\n', "", "hooks", "check.sh removes core_chromium's profile folder")
+    yield from each("scripts/check.sh", '[ "$status" = 0 ]\n', "", "hooks", "check.sh lets core's Chromium tests fail it")
+    # Every test run on the pinned Node (F816 came from StrykerJS on Homebrew's Node 26).
+    yield from each("server/src/testing/toolchain.test.ts", "expect(process.version).toBe(pinnedNode());", "expect(process.version).toBeTruthy();", "probe", "the toolchain test holds a run to the pinned Node")
+    yield from each("server/src/testing/toolchain.ts", ".trim()", "", "probe", "the pinned Node is read without its newline")
     # The app's folders (F378): each name of the network and storage, each owner, each folder's path,
     # each exception, and React's bans kept there, alone.
     for name in ("fetch", "XMLHttpRequest", "WebSocket", "EventSource", "localStorage", "sessionStorage", "indexedDB", "caches", "cookieStore", "window", "globalThis", "self"):
