@@ -153,6 +153,14 @@ describe("RoomView", () => {
     expect(html).toContain(`<span data-mention="" title="${ground}">@${ground}</span>`);
   });
 
+  // F818's StrykerJS: a line's members travel as one string; each of two keeps its short form.
+  it("shortens each member a line mentions, two of them in one line", () => {
+    const carol = "g1l6m6l6carqlqqqqqqqqqqqqqqqqqqqqqnkkanc";
+    const lines = [line({ text: `@${ALICE} and @${carol}` })];
+    const html = part(view({ state: { ...ROOM, members: [ALICE, carol], lines } }), "Messages");
+    expect(said(html)).toMatch(/ @g10gh7…3y5tv and @g1l6m6…kkanc$/);
+  });
+
   it("marks no line for a lookalike of the reader's address, shown whole", () => {
     const lookalike = `g1jg8m${"q".repeat(29)}vsqf5`;
     const html = part(view({ me: BOB, state: { ...ROOM, lines: [line({ text: `hey @${lookalike}` })] } }), "Messages");
