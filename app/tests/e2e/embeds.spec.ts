@@ -24,7 +24,8 @@ interface Room {
   say: (id: string, text: string, time?: string) => void;
 }
 
-async function room(page: Page, verdicts: () => string): Promise<Room> {
+// #games opened, its stream answering `verdicts()`, or `status` when not 200.
+async function room(page: Page, verdicts: () => string, status = 200): Promise<Room> {
   const away: string[] = [];
   const asked: string[] = [];
   const site = new URL(SITE).host;
@@ -39,6 +40,7 @@ async function room(page: Page, verdicts: () => string): Promise<Room> {
   );
   await page.route("**/api/stream?**", (route) => {
     asked.push(route.request().url());
+    if (status !== 200) return route.fulfill({ status });
     // A short retry, so the page asks again soon and reads the verdicts given since.
     return route.fulfill({
       status: 200,
@@ -142,6 +144,24 @@ test.describe("a link's player", () => {
   }) => {
     await page.clock.install({ time: Date.now() + 5 * 60_000 });
     await asksNothingSaidSince(page);
+  });
+
+  // F888: the stream given up (a 429: a fifth tab, a shared address), a line said since waited for good.
+  test("asks the server of a line said after the stream began once the browser gave the stream up", async ({
+    page,
+  }) => {
+    const asked: string[] = [];
+    await page.route("**/api/verdicts?**", (route) => {
+      asked.push(route.request().url());
+      const ids = new URL(route.request().url()).searchParams.get("ids")?.split(",") ?? [];
+      return route.fulfill({
+        json: { room: "#bubble/games", verdicts: ids.map((msgid) => ({ msgid, state: "checked" })) },
+      });
+    });
+    const { say } = await room(page, () => "", 429);
+    say("v3", "now https://vimeo.com/76979871");
+    await expect(lineOf(page, "now").getByRole("button", { name: "Play the Vimeo video" })).toBeEnabled();
+    expect(asked.some((url) => url.endsWith("ids=v3"))).toBe(true);
   });
 
   // ADR-0002 §8: Data saver (a 2G link) shows no embed; and a verdict serves a player alone, so none is asked (F879).

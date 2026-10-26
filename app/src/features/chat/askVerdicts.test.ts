@@ -14,10 +14,7 @@ const line = (id: string, time = OLD): Line => ({
   text: `${id}: https://youtu.be/dQw4w9WgXcQ`,
   kind: "message",
 });
-const NONE: Result<LineVerdicts> = {
-  ok: true,
-  value: { room: "#bubble", verdicts: [] },
-};
+const NONE: Result<LineVerdicts> = { ok: true, value: { room: "#bubble", verdicts: [] } };
 
 // A server that answers each request as told, keeping the ids each asked; and the verdicts handed to the store.
 function server(answer: (ids: readonly string[]) => Promise<Result<LineVerdicts>> = () => Promise.resolve(NONE)) {
@@ -87,9 +84,7 @@ describe("verdictAsker: the server's verdicts of the lines in view", () => {
 
   it("asks nothing of a line whose verdict the page holds, or that has no player", () => {
     const t = server();
-    t.ask([line("a"), { ...line("b"), text: "no link here" }, line("c")], {
-      a: "checked",
-    });
+    t.ask([line("a"), { ...line("b"), text: "no link here" }, line("c")], { a: "checked" });
     expect(t.sent).toEqual([["c"]]);
   });
 
@@ -133,6 +128,8 @@ const LINES = [line("a"), line("b", "2026-10-26T12:00:00.000Z"), line("c", "2026
 function told(clock = OPENED) {
   const sent: string[][] = [];
   let said: ((time: number) => void) | undefined;
+  let ended: (() => void) | undefined;
+  let follows = 0;
   // Not a literal, so a part the asker no longer takes (its clock) is still handed, as the page's was.
   const parts = {
     verdicts: (_room: string, ids: readonly string[]) => {
@@ -141,8 +138,10 @@ function told(clock = OPENED) {
     },
     judged: () => undefined,
     held: () => undefined,
-    follow: (_room: string, on: { since: (time: number) => void }) => {
+    follow: (_room: string, on: { since: (time: number) => void; dead: () => void }) => {
+      follows += 1;
       said = on.since;
+      ended = on.dead;
       return () => undefined;
     },
     now: () => clock,
@@ -151,7 +150,10 @@ function told(clock = OPENED) {
   const say = (time: number) => {
     said?.(time);
   };
-  return { asker, sent, say };
+  const end = () => {
+    ended?.();
+  };
+  return { asker, sent, say, end, follows: () => follows };
 }
 const HOUR = 3_600_000;
 
@@ -195,6 +197,65 @@ describe("verdictAsker: when the stream began, by the stream's word", () => {
     t.asker.show("#news", undefined);
     t.say(OPENED);
     expect(t.sent).toEqual([]);
+  });
+});
+
+// F888: the stream given up (a 429 for a fifth tab, a restart's 502), a line said since waited for good, asked of no
+// one; now every line in view is the server's, and the stream is followed again after the route's minute.
+describe("verdictAsker, when the stream ends for good", () => {
+  const LINES = [line("a"), line("c", "2026-10-26T12:05:00.000Z")];
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("asks of every line in view once the stream ends, a line said after its word too", () => {
+    const t = told();
+    t.asker.show("#bubble", LINES);
+    t.say(OPENED);
+    t.end();
+    expect(t.sent).toEqual([["a"], ["c"]]);
+  });
+
+  it("asks of every line in view though the stream ended before its word", () => {
+    const t = told();
+    t.asker.show("#bubble", LINES);
+    t.end();
+    expect(t.sent).toEqual([["a", "c"]]);
+  });
+
+  it("follows the room's stream again after the route's minute, and takes its new word", () => {
+    vi.useFakeTimers();
+    const t = told();
+    t.asker.show("#bubble", LINES);
+    t.end();
+    vi.advanceTimersByTime(BUSY_REST_MS - 1);
+    expect(t.follows()).toBe(1);
+    vi.advanceTimersByTime(1);
+    expect(t.follows()).toBe(2);
+  });
+
+  it.each([
+    [
+      "stopped",
+      (t: ReturnType<typeof told>) => {
+        t.asker.stop();
+      },
+    ],
+    [
+      "showing another room",
+      (t: ReturnType<typeof told>) => {
+        t.asker.show("#news", undefined);
+      },
+    ],
+  ])("follows no ended stream again once %s", (_, leave) => {
+    vi.useFakeTimers();
+    const t = told();
+    t.asker.show("#bubble", LINES);
+    t.end();
+    leave(t);
+    const before = t.follows();
+    vi.advanceTimersByTime(BUSY_REST_MS * 2);
+    expect(t.follows()).toBe(before);
   });
 });
 

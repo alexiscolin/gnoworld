@@ -14,9 +14,9 @@ export interface Asking {
   judged: (event: StreamEvent) => void;
   /** The verdicts the page holds of a room's lines. */
   held: (room: string) => Readonly<Record<string, unknown>> | undefined;
-  /** Follows a room's stream (lib/stream/verdicts.ts), handing on its verdicts and its word of when it began
-   * following, in ms; stops when called. */
-  follow: (room: string, on: { verdict: (event: StreamEvent) => void; since: (time: number) => void }) => () => void;
+  /** Follows a room's stream (lib/stream/verdicts.ts), handing on its verdicts, its word of when it began following
+   * (in ms), and its end for good; stops when called. */
+  follow: (room: string, on: Told) => () => void;
 }
 
 // A room's lines in view, the verdicts the page holds of them, and when it began following the room's stream.
@@ -33,13 +33,22 @@ export const BUSY_REST_MS = 60_000;
 // The failures that may pass: the others (refused, forbidden, malformed) the server would give again.
 const PASSING: ReadonlySet<string> = new Set(["network", "unavailable", "internal", "not_ready", "too_many"]);
 
+/** What the room's stream tells the asker. */
+interface Told {
+  verdict: (event: StreamEvent) => void;
+  since: (time: number) => void;
+  dead: () => void;
+}
+
 interface Following {
   room: string;
   /** The room's lines last shown, none before they load. */
   lines: readonly Line[] | undefined;
-  /** When its stream began following, by the stream's own word (F890); none before it. */
+  /** When its stream began following, by the stream's own word (F890); none before it; after its end, all time. */
   since: number | undefined;
   stop: () => void;
+  /** The stream followed again, after its end. */
+  again: ReturnType<typeof setTimeout> | undefined;
 }
 
 // Asks the server of the lines in view said before the stream began (F884), once each while in view, VERDICTS_ASKED
@@ -109,10 +118,11 @@ export function verdictAsker({ verdicts, judged, held, follow }: Asking) {
   };
   const unfollow = () => {
     following?.stop();
+    clearTimeout(following?.again);
     following = undefined;
   };
-  const start = (room: string): void => {
-    const mine: Following = { room, lines: undefined, since: undefined, stop: () => undefined };
+  const start = (room: string, lines?: readonly Line[]): void => {
+    const mine: Following = { room, lines, since: undefined, stop: () => undefined, again: undefined };
     // The stream's word after its replay, on the server's clock, which Ergo's server-time shares (F890): never the
     // page's, which may run ahead or behind. A reconnection's later word moves it, the replay having given the rest.
     const since = (time: number) => {
@@ -120,8 +130,20 @@ export function verdictAsker({ verdicts, judged, held, follow }: Asking) {
       mine.since = time;
       askShown();
     };
+    // The browser gave the stream up (a 429, a restart's 502), and no verdict comes from it (F888): every line in
+    // view is the server's to answer, and the stream is followed again after the route's minute.
+    const dead = () => {
+      if (following !== mine) return;
+      mine.since = Number.POSITIVE_INFINITY;
+      askShown();
+      mine.again = setTimeout(() => {
+        if (following !== mine) return;
+        mine.stop();
+        start(room, mine.lines);
+      }, BUSY_REST_MS);
+    };
     following = mine;
-    mine.stop = follow(room, { verdict: judged, since });
+    mine.stop = follow(room, { verdict: judged, since, dead });
   };
   return {
     /** Follows the room's stream, the room shown before stopped; then asks of its lines in view, once loaded and

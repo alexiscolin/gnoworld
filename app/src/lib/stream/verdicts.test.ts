@@ -7,6 +7,8 @@ function fakeSource() {
   const opened: string[] = [];
   const listeners = new Map<string, (event: { data: unknown }) => void>();
   let closed = 0;
+  // EventSource's: 0 while it reconnects, 2 once it gives up.
+  let readyState = 1;
   const open = (url: string): VerdictSource => {
     opened.push(url);
     return {
@@ -16,12 +18,20 @@ function fakeSource() {
       close: () => {
         closed += 1;
       },
+      get readyState() {
+        return readyState;
+      },
     };
+  };
+  // The browser's error, as it reconnects or once it gave up.
+  const error = (state: 0 | 2) => {
+    readyState = state;
+    listeners.get("error")?.({ data: undefined });
   };
   const say = (data: unknown, type = "verdict") => {
     listeners.get(type)?.({ data });
   };
-  return { open, opened, say, closed: () => closed };
+  return { open, opened, say, error, closed: () => closed };
 }
 
 const CHECKED: StreamEvent = { msgid: "m1", room: "#bubble/games", state: "checked" };
@@ -76,6 +86,23 @@ describe("followVerdicts: the room's verdicts, as the server streams them", () =
     source.say(JSON.stringify({ time: "2026-10-26T12:10:00.000Z" }), "since");
     expect(times).toEqual([Date.parse("2026-10-26T12:00:00.000Z"), Date.parse("2026-10-26T12:10:00.000Z")]);
     expect(said).toEqual(["since_unknown"]);
+  });
+
+  // F888: EventSource gives up on an answer not 200 (a 429, a restart's 502), and no verdict comes after it.
+  it("says once the stream ended for good, never while the browser reconnects it, nor once the page stopped", () => {
+    const source = fakeSource();
+    let ends = 0;
+    const options = { open: source.open, log: () => undefined, dead: () => (ends += 1) };
+    followVerdicts(["#bubble"], () => undefined, options);
+    source.error(0);
+    expect(ends).toBe(0);
+    source.error(2);
+    source.error(2);
+    expect(ends).toBe(1);
+    const other = fakeSource();
+    followVerdicts(["#bubble"], () => undefined, { ...options, open: other.open })();
+    other.error(2);
+    expect(ends).toBe(1);
   });
 
   it("closes the stream when the page stops following", () => {
