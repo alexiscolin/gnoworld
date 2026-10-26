@@ -3,11 +3,12 @@
 // (Ergo's max-channels-per-client); the newest lines of the room in view alone, once Ergo says I joined it, since
 // Ergo paces a client to 2 lines a second (plan §4); Ergo's lines read into the store through one BatchReader a
 // connection. Its parts come in, so the tests give their own.
-import { BatchReader, compose, LINE_BYTES, nickOf, type IrcMessage } from "@gnoworld/core";
+import { BatchReader, compose, nickOf, type IrcMessage } from "@gnoworld/core";
 import { RoomId } from "@gnoworld/schemas";
 import type { Result } from "../../lib/api/http.ts";
 import type { Ergo, ErgoOptions, Who } from "../../lib/ergo/ergo.ts";
 import { LINES_KEPT } from "../../store/chat.ts";
+import { groupsOf } from "./groups.ts";
 import type { AppState, createAppStore } from "../../store/index.ts";
 
 /** The rooms a connection joins: Ergo's max-channels-per-client (deploy/ergo/ircd.yaml.tmpl). */
@@ -30,23 +31,6 @@ export interface ChatLink {
   /** Sends a draft, as the composer composes it, to a room Ergo says it is in; an account's alone. Whether it went. */
   say: (room: string, draft: string) => boolean;
   stop: () => void;
-}
-
-// Rooms in groups whose command line holds 510 bytes at most; a room id is ASCII, a character a byte.
-function groupsOf(command: "JOIN" | "PART", rooms: readonly string[]): string[][] {
-  const groups: string[][] = [];
-  let size = 0;
-  for (const room of rooms) {
-    const last = groups.at(-1);
-    if (last === undefined || size + 1 + room.length > LINE_BYTES) {
-      groups.push([room]);
-      size = command.length + 1 + room.length;
-    } else {
-      last.push(room);
-      size += 1 + room.length;
-    }
-  }
-  return groups;
 }
 
 // Where a room this page follows stands on this connection: a JOIN went for it; its history went.
