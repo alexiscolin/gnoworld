@@ -34,6 +34,7 @@ export function verdictAsker({ verdicts, judged }: Asking) {
   let latest: { room: string; view: InView } | undefined;
   let resting: ReturnType<typeof setTimeout> | undefined;
   const rest = (ms: number) => {
+    // One rest at a time: a request failing later in it would otherwise ask again in the middle of the next one.
     if (resting !== undefined) return;
     resting = setTimeout(() => {
       resting = undefined;
@@ -41,18 +42,18 @@ export function verdictAsker({ verdicts, judged }: Asking) {
     }, ms);
   };
   const send = (room: string, ids: readonly string[], mine: Set<string>) => {
-    const failed = (reason: string) => {
+    const failed = (ms: number) => {
       for (const id of ids) mine.delete(id);
-      rest(reason === "too_many" ? BUSY_REST_MS : REST_MS);
+      rest(ms);
     };
     verdicts(room, ids).then(
       (got) => {
         if (got.ok) {
           for (const { msgid, state } of got.value.verdicts) judged({ msgid, room, state });
-        } else if (PASSING.has(got.reason)) failed(got.reason);
+        } else if (PASSING.has(got.reason)) failed(got.reason === "too_many" ? BUSY_REST_MS : REST_MS);
       },
       () => {
-        failed("network");
+        failed(REST_MS);
       },
     );
   };
