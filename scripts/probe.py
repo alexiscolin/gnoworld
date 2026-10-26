@@ -42,6 +42,9 @@ LINT = [
     ("chance.ts", "export function roll(): number {\n  return Math.random();\n}\n", "no-restricted-properties: 'Math.random'"),
     ("perf.ts", "export function tick(): number {\n  return performance.now();\n}\n", "no-restricted-properties: 'performance.now'"),
     ("long.ts", LONG, "max-lines-per-function"),
+    # A u regex's class right before `$`: V8 14.6 misreads a character past the BMP there (F816, F821).
+    ("class_at_end.ts", "export const wordy = (s: string): boolean => /[\\p{L}_]$/u.test(s);\n", "no-restricted-syntax: A character class right before `$`"),
+    ("alternation_at_end.ts", "export const wordy = (s: string): boolean => /(?:\\p{L}|_)$/u.test(s);\n", None),
     ("eval.ts", "export function run(code: string): unknown {\n  return eval(code);\n}\n", "no-eval"),
     ("useless_catch.ts", "export function run(g: () => void): void {\n  try {\n    g();\n  } catch (e) {\n    throw e;\n  }\n}\n", "no-useless-catch"),
     ("new_function.ts", 'export function make(): unknown {\n  return new Function("return 1");\n}\n', "@typescript-eslint/no-implied-eval"),

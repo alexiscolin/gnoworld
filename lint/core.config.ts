@@ -1,7 +1,7 @@
 // core's pure rules (docs/ARCHITECTURE.md): it imports only itself, and time and chance come in as
 // parameters. A part of the lint config, which eslint.config.ts composes.
 import { defineConfig } from "eslint/config";
-import { MODULE_STATE, SWALLOWED } from "./shared.config.ts";
+import { CLASS_AT_END, MODULE_STATE, SWALLOWED } from "./shared.config.ts";
 
 // core reaches no clock, network or global of its own: time and chance come in as parameters.
 const IMPURE = [
@@ -39,7 +39,7 @@ export default defineConfig({
       { object: "performance", property: "now", message: "core takes the time as a parameter." },
     ],
     "no-restricted-globals": ["error", "globalThis", "window", "document", "self", "fetch", "process"],
-    "no-restricted-syntax": ["error", ...SWALLOWED, ...IMPURE, MODULE_STATE],
+    "no-restricted-syntax": ["error", ...SWALLOWED, CLASS_AT_END, ...IMPURE, MODULE_STATE],
     "@typescript-eslint/triple-slash-reference": ["error", { lib: "never", path: "never", types: "never" }],
   },
 });

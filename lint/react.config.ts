@@ -4,7 +4,7 @@
 import eslintReact from "@eslint-react/eslint-plugin";
 import { defineConfig } from "eslint/config";
 import reactHooks from "eslint-plugin-react-hooks";
-import { MODULE_STATE, SWALLOWED, TESTS } from "./shared.config.ts";
+import { CLASS_AT_END, MODULE_STATE, SWALLOWED, TESTS } from "./shared.config.ts";
 
 const MEMOS = ["memo", "useMemo", "useCallback"];
 const MEMO = "The React Compiler memoizes: no hand-written memo, useMemo or useCallback (docs/ARCHITECTURE.md).";
@@ -63,6 +63,6 @@ export default defineConfig(
     // never reload the app (F259, F317). Its stories, its tests and the overview's prose draw plain ones.
     files: ["packages/ui/src/**/*.tsx"],
     ignores: ["packages/ui/src/link.tsx", "packages/ui/src/Overview/**", "**/*.stories.tsx", ...TESTS],
-    rules: { "no-restricted-syntax": ["error", ...SWALLOWED, RAW_ANCHOR, MODULE_STATE] },
+    rules: { "no-restricted-syntax": ["error", ...SWALLOWED, CLASS_AT_END, RAW_ANCHOR, MODULE_STATE] },
   },
 );
