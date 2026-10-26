@@ -27,6 +27,52 @@ export interface LineActionsProps {
   deleting?: boolean;
 }
 
+// The dialog that asks before a delete: which line, where, and that it cannot come back; `close` says whether to delete.
+function AskDelete({
+  line,
+  room,
+  open,
+  close,
+}: {
+  line: Line;
+  room: string;
+  open: boolean;
+  close: (go: boolean) => void;
+}) {
+  return (
+    <Dialog
+      title="Delete message?"
+      description={quoted(line.text)}
+      open={open}
+      onClose={() => {
+        close(false);
+      }}
+    >
+      <Stack space="s">
+        <p>It leaves {roomLabel(room)} for everyone, and cannot come back.</p>
+        <Cluster justify="end">
+          <Button
+            emphasis="outline"
+            onClick={() => {
+              close(false);
+            }}
+          >
+            Keep it
+          </Button>
+          <Button
+            tone="danger"
+            onClick={() => {
+              close(true);
+            }}
+          >
+            Delete message
+          </Button>
+        </Cluster>
+      </Stack>
+    </Dialog>
+  );
+}
+
 /** The bar of a line pointed at or focused, out of the list's live announcements: its More menu, and the dialog
  * that asks before a delete, which gives the focus back to More when it closes. */
 export function LineActions({ line, room, me, onCopy, onDelete, deleting = false }: LineActionsProps) {
@@ -74,38 +120,7 @@ export function LineActions({ line, room, me, onCopy, onDelete, deleting = false
   return (
     <div role="toolbar" aria-label="Actions on this message" aria-live="off" className={styles["bar"]}>
       <Menu trigger="More actions" icon="more" emphasis="plain" size="s" label="Message actions" items={items} />
-      {own ? (
-        <Dialog
-          title="Delete message?"
-          description={quoted(line.text)}
-          open={asking}
-          onClose={() => {
-            close(false);
-          }}
-        >
-          <Stack space="s">
-            <p>It leaves {roomLabel(room)} for everyone, and cannot come back.</p>
-            <Cluster justify="end">
-              <Button
-                emphasis="outline"
-                onClick={() => {
-                  close(false);
-                }}
-              >
-                Keep it
-              </Button>
-              <Button
-                tone="danger"
-                onClick={() => {
-                  close(true);
-                }}
-              >
-                Delete message
-              </Button>
-            </Cluster>
-          </Stack>
-        </Dialog>
-      ) : null}
+      {own ? <AskDelete line={line} room={room} open={asking} close={close} /> : null}
     </div>
   );
 }
