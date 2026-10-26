@@ -5,10 +5,9 @@
 // A line's author is its account tag alone, a nick being only a nick; a member's nick is an account's when it is
 // an address, which a guest's cannot be (Ergo gives a guest 32 characters, server/src/testing/ergo.test.ts:314).
 import { markdown, mentions, type Block, type Line } from "@gnoworld/core";
-import { Address } from "@gnoworld/schemas";
+import { Address, type StreamEvent } from "@gnoworld/schemas";
 import { Sidebar, Stack } from "@gnoworld/ui";
 import { useLayoutEffect, useRef, type ReactNode } from "react";
-import type { StreamEvent } from "@gnoworld/schemas";
 import type { ErgoState } from "../../lib/ergo/ergo.ts";
 import { Embed } from "./Embed.tsx";
 import { embedIn } from "./embeds.ts";
