@@ -21,6 +21,8 @@ import {
 } from "./scriptedRoom.ts";
 
 const ACCOUNT = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+// The history with two lines said while the page was away.
+const GAP: readonly HistoryLine[] = [...HISTORY, ["g1", T(5), "gap one"], ["g2", T(6), "gap two"]];
 
 // #games opened as `address` on a scripted Ergo, each connection's script from `scripts` (its number, from 1, and
 // the history it may hold back): the lines the page sent, its sockets, and the release of the held history.
@@ -84,6 +86,25 @@ test.describe("the reading place", () => {
     await expect(lineOf(page, "the second line")).toContainText(/^New /);
     await expect(page.locator("[data-new]")).toHaveCount(1);
     await expect.poll(() => marks(sent)).toEqual([`MARKREAD ${ROOM} timestamp=${T(5)}`]);
+  });
+
+  // The code review (CR3): each connection's history waited on, not the first's alone.
+  test("marks nothing read on a reconnect before that connection's history came", async ({ page }) => {
+    const address = await logIn(page, word("read"));
+    const { sent, sockets, release } = await heldHistory(page, address, (connection, held) =>
+      connection === 1 ? { history: HISTORY, read: T(0) } : { history: GAP, read: T(2), historyAfter: held },
+    );
+    await expect.poll(() => marks(sent)).toEqual([`MARKREAD ${ROOM} timestamp=${T(2)}`]);
+    await sockets[0]?.close();
+    const asked = () => sent.filter((line) => line.startsWith("CHATHISTORY ")).length;
+    await expect.poll(asked, { timeout: 15_000 }).toBe(2);
+    sockets.at(-1)?.send(live("live", T(9), { text: "a live line" }));
+    await expect(lineOf(page, "a live line")).toBeVisible();
+    // Read before this connection's history came, the live line would mark the gap under it read unseen.
+    expect(marks(await sentBefore(page, sent))).toEqual([`MARKREAD ${ROOM} timestamp=${T(2)}`]);
+    release();
+    await expect(lineOf(page, "gap two")).toBeVisible();
+    await expect.poll(() => marks(sent).at(-1)).toBe(`MARKREAD ${ROOM} timestamp=${T(9)}`);
   });
 
   test("marks no line New for a room read to its end", async ({ page }) => {

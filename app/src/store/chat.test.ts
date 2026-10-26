@@ -131,6 +131,14 @@ describe("the store's chat slice", () => {
     expect(t.room("#bubble")?.paged).toBe(true);
   });
 
+  // The code review (CR3): each connection's page waited on, not the first's alone.
+  it("forgets that a room's history came when the link drops", () => {
+    const t = following();
+    t.page("#bubble", []);
+    t.disconnected();
+    expect(t.room("#bubble")?.paged).toBeUndefined();
+  });
+
   it("takes from a page only the lines of its room", () => {
     const t = following();
     t.page("#bubble", [said("#bubble", "a", "mine"), said("#garden", "b", "theirs"), read("PING :x")]);

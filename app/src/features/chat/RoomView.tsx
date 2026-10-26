@@ -40,8 +40,8 @@ export interface RoomViewProps {
         typing?: Typing;
         /** The time of the last line the account read here, Ergo's (4f). */
         read?: string | undefined;
-        /** Its history's page came (4f's G1). */
-        paged?: true;
+        /** This connection's history page came (4f's G1, CR3). */
+        paged?: true | undefined;
       }
     | undefined;
   chat: ErgoState | "off";

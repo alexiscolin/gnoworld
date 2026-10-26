@@ -34,8 +34,9 @@ interface RoomState {
   readonly typing: Typing;
   /** The time of the last line the account read here, as Ergo keeps it for the account (4f); none while unknown. */
   readonly read: string | undefined;
-  /** Its history's page came, an empty one too: the New mark waits on it (4f's G1); none before. */
-  readonly paged?: true;
+  /** This connection's history page came, an empty one too: the New mark and the read mark wait on it (4f's G1,
+   * CR3); none before, and none again once the link drops. */
+  readonly paged?: true | undefined;
 }
 
 interface ChatState {
@@ -156,13 +157,16 @@ export const chatSlice: StateCreator<ChatSlice> = (set, get) => {
         const room = roomOf(rooms, id);
         if (room?.refused !== undefined) change({ rooms: { ...rooms, [id]: { ...room, refused: undefined } } });
       },
-      // Who is here and who is typing go with the link; the reading place is the account's, kept.
+      // Who is here, who is typing and the history page go with the link; the reading place is the account's, kept.
       disconnected: () => {
         const { rooms } = get().chat;
-        const gone = (room: RoomState) => room.members.length === 0 && room.typing === undefined;
+        const gone = (room: RoomState) =>
+          room.members.length === 0 && room.typing === undefined && room.paged === undefined;
         change({
           me: undefined,
-          rooms: eachRoom(rooms, (room) => (gone(room) ? room : { ...room, members: [], typing: undefined })),
+          rooms: eachRoom(rooms, (room) =>
+            gone(room) ? room : { ...room, members: [], typing: undefined, paged: undefined },
+          ),
         });
       },
     },
