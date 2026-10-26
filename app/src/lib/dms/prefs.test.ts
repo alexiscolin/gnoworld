@@ -9,21 +9,26 @@ const CAROL = "g1l6m6l6carqlqqqqqqqqqqqqqqqqqqqqqnkkanc";
 // A device's storage, as the page's localStorage behaves: strings by key, any call refused when it is.
 function storage({ refuses = false } = {}) {
   const kept = new Map<string, string>();
+  // Each write and removal, by key: what the account's reads must leave alone.
+  const touched: string[] = [];
   const refuse = () => {
     if (refuses) throw new DOMException("The storage is blocked.", "SecurityError");
   };
   return {
     kept,
+    touched,
     getItem: (key: string) => {
       refuse();
       return kept.get(key) ?? null;
     },
     setItem: (key: string, value: string) => {
       refuse();
+      touched.push(key);
       kept.set(key, value);
     },
     removeItem: (key: string) => {
       refuse();
+      touched.push(key);
       kept.delete(key);
     },
   };
@@ -74,6 +79,14 @@ describe("an account's direct-message preferences on the device", () => {
       expect(on(device, ALICE).known()).toEqual([]);
       expect(device.kept.has(key)).toBe(false);
     }
+  });
+
+  // StrykerJS on 4e: a device holding nothing is read, never written.
+  it("reads no account from a device that holds none, and writes nothing to it", () => {
+    const device = storage();
+    expect(on(device, ALICE).known()).toEqual([]);
+    expect(on(device, ALICE).onlyKnown()).toBe(false);
+    expect(device.touched).toEqual([]);
   });
 
   it("keeps nothing, reads the defaults and throws nothing when the device refuses", () => {

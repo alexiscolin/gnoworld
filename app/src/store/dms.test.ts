@@ -39,10 +39,15 @@ describe("the store's chat slice: direct messages", () => {
     expect(Object.keys(t.dms())).toEqual([ALICE]);
   });
 
-  it("keeps a message once though Ergo sends it twice, and the conversations through a disconnect", () => {
+  it("keeps a message once though Ergo sends it twice, notifying no one of the second, and the conversations through a disconnect", () => {
     const t = as(ACCOUNT);
     t.heard(dm("a", { from: ALICE, to: ACCOUNT, text: "hi" }));
+    let heard = 0;
+    t.store.subscribe(() => {
+      heard += 1;
+    });
     t.heard(dm("a", { from: ALICE, to: ACCOUNT, text: "hi" }));
+    expect(heard).toBe(0);
     t.disconnected();
     expect(t.dms()[ALICE]).toHaveLength(1);
   });
