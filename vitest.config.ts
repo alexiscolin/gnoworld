@@ -1,7 +1,32 @@
 import { playwright } from "@vitest/browser-playwright";
-import { configDefaults, defineConfig } from "vitest/config";
+import { configDefaults, defineConfig, type TestProjectInlineConfiguration } from "vitest/config";
 
 const SLOW = ["server/src/testing/ergo*.test.ts", "server/src/testing/soak.test.ts"];
+
+// core's tests a second time, in Playwright's Chromium: the browser's engine reads some regexes and Unicode otherwise
+// than Node's (F816, F817). The project exists only when CORE_CHROMIUM names a profile folder, so the coverage,
+// StrykerJS, `vitest list` and a file run alone never open a browser.
+const CORE_CHROMIUM: TestProjectInlineConfiguration = {
+  extends: true,
+  test: {
+    name: "core_chromium",
+    include: ["packages/core/src/**/*.test.ts"],
+    // One browser context, the files one after another: Chromium in one process (Claude Code's sandbox, as
+    // app/playwright.config.ts) dies on a second context.
+    fileParallelism: false,
+    browser: {
+      enabled: true,
+      headless: true,
+      // A failure writes no screenshot beside the code: the probe fails a planted test on purpose.
+      screenshotFailures: false,
+      provider: playwright({
+        persistentContext: process.env["CORE_CHROMIUM"] ?? false,
+        launchOptions: { args: process.env["SANDBOX_RUNTIME"] ? ["--single-process"] : [] },
+      }),
+      instances: [{ browser: "chromium" }],
+    },
+  },
+};
 
 export default defineConfig({
   test: {
@@ -33,24 +58,8 @@ export default defineConfig({
           css: { include: [/tokens\.css/] },
         },
       },
-      {
-        // core's tests a second time, in Playwright's Chromium: the browser's engine reads some regexes and Unicode
-        // otherwise than Node's (F816, F817). The full gate runs it; the fast gate's `test` script leaves it out.
-        extends: true,
-        test: {
-          name: "core_chromium",
-          include: ["packages/core/src/**/*.test.ts"],
-          browser: {
-            enabled: true,
-            headless: true,
-            // One process in Claude Code's sandbox, as the journeys' config (app/playwright.config.ts).
-            provider: playwright({
-              launchOptions: { args: process.env["SANDBOX_RUNTIME"] ? ["--single-process"] : [] },
-            }),
-            instances: [{ browser: "chromium" }],
-          },
-        },
-      },
+      // Only when CORE_CHROMIUM names a profile folder, as the full gate's step does.
+      ...(process.env["CORE_CHROMIUM"] ? [CORE_CHROMIUM] : []),
     ],
     coverage: {
       // Every source file counts, tested or not, so an untested file shows as 0%.
