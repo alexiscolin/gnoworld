@@ -42,9 +42,10 @@ interface Following {
   stop: () => void;
 }
 
-export function verdictAsker({ verdicts, judged, held, follow }: Asking) {
+// Asks the server of the lines in view said before the stream began (F884), once each while in view, VERDICTS_ASKED
+// a request; after a failure that may pass, rests, then asks the view last given again (F874).
+function serverAsker({ verdicts, judged }: Pick<Asking, "verdicts" | "judged">) {
   const asked = new Map<string, Set<string>>();
-  let following: Following | undefined;
   // The view last given, asked again when a rest ends; the rest under way, during which nothing is asked.
   let latest: { room: string; view: InView } | undefined;
   let resting: ReturnType<typeof setTimeout> | undefined;
@@ -89,10 +90,22 @@ export function verdictAsker({ verdicts, judged, held, follow }: Asking) {
       send(room, wanted.slice(start, start + VERDICTS_ASKED), mine);
     }
   };
+  return {
+    ask,
+    /** Asks nothing more: a rest under way, or one an answer still to come starts, ends with nothing asked. */
+    stop: (): void => {
+      latest = undefined;
+    },
+  };
+}
+
+export function verdictAsker({ verdicts, judged, held, follow }: Asking) {
+  const server = serverAsker({ verdicts, judged });
+  let following: Following | undefined;
   // The shown lines said before the stream's word are the server's to answer; before its word, nothing is asked.
   const askShown = () => {
     if (following?.lines === undefined || following.since === undefined) return;
-    ask(following.room, { lines: following.lines, held: held(following.room), since: following.since });
+    server.ask(following.room, { lines: following.lines, held: held(following.room), since: following.since });
   };
   const unfollow = () => {
     following?.stop();
@@ -125,7 +138,7 @@ export function verdictAsker({ verdicts, judged, held, follow }: Asking) {
     /** Follows and asks nothing more: a rest under way, or one an answer still to come starts, ends with nothing
      * asked. */
     stop: (): void => {
-      latest = undefined;
+      server.stop();
       unfollow();
     },
   };
