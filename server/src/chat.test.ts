@@ -377,7 +377,9 @@ describe("the chat, as the server starts it", () => {
       let text = "";
       const read = async (count: number): Promise<unknown[]> => {
         for (;;) {
-          const data = [...text.matchAll(/data: (.*)\n/g)].map(([, json = ""]) => JSON.parse(json) as unknown);
+          const data = [...text.matchAll(/event: verdict\ndata: (.*)\n/g)].map(
+            ([, json = ""]) => JSON.parse(json) as unknown,
+          );
           if (data.length >= count) return data;
           const chunk = await reader?.read();
           if (chunk === undefined || chunk.done) return data;
