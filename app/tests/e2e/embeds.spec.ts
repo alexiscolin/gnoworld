@@ -28,6 +28,8 @@ async function room(page: Page, verdicts: () => string): Promise<Room> {
   const away: string[] = [];
   const asked: string[] = [];
   const site = new URL(SITE).host;
+  // When the stream began following, as the server tells after its replay (F890): the test's start, on its own clock.
+  const since = `event: since\ndata: ${JSON.stringify({ time: new Date().toISOString() })}\n\n`;
   await page.route(
     (url) => url.host !== site && url.hostname !== "flush.invalid",
     (route) => {
@@ -41,7 +43,7 @@ async function room(page: Page, verdicts: () => string): Promise<Room> {
     return route.fulfill({
       status: 200,
       headers: { "content-type": "text/event-stream", "cache-control": "no-store" },
-      body: `retry: 100\n\n${verdicts()}`,
+      body: `retry: 100\n\n${verdicts()}${since}`,
     });
   });
   let socket: WebSocketRoute | undefined;
@@ -56,6 +58,22 @@ async function room(page: Page, verdicts: () => string): Promise<Room> {
     socket?.send(`@msgid=${id};time=${time};account=${MEMBER} :${MEMBER}!u@h PRIVMSG #bubble/games :${text}`);
   };
   return { away, asked, say };
+}
+// A line said once the stream follows the room has its verdict from it, the server asked of none (F884); one dated
+// before, said after it, marks when a request for the first would have gone.
+async function asksNothingSaidSince(page: Page) {
+  const asked: string[] = [];
+  await page.route("**/api/verdicts?**", (route) => {
+    asked.push(route.request().url());
+    return route.fulfill({ json: { room: "#bubble/games", verdicts: [] } });
+  });
+  const { say } = await room(page, () => "");
+  await expect.poll(() => asked).toHaveLength(1);
+  say("v3", "now https://vimeo.com/76979871");
+  await expect(lineOf(page, "now")).toContainText("Waiting for the moderation check");
+  say("v4", "then https://giphy.com/gifs/4548k01F5Ej28", "2026-10-25T10:02:00.000Z");
+  await expect.poll(() => asked).toHaveLength(2);
+  expect(asked[1]).toBe(`${SITE}/api/verdicts?room=%23bubble%2Fgames&ids=v4`);
 }
 const play = (page: Page) => lineOf(page, "watch").getByRole("button", { name: "Play the YouTube video" });
 
@@ -113,22 +131,9 @@ test.describe("a link's player", () => {
     expect(away).toEqual([]);
   });
 
-  // F884: a line said once the page follows the room has its verdict from the stream; asking the server too made
-  // every reader ask for every new link at once. A line dated before, asked after it, marks when a request for the
-  // first would have gone.
+  // F884: asking the server too made every reader ask for every new link at once.
   test("asks the server nothing of a line said after the page began following the room", async ({ page }) => {
-    const asked: string[] = [];
-    await page.route("**/api/verdicts?**", (route) => {
-      asked.push(route.request().url());
-      return route.fulfill({ json: { room: "#bubble/games", verdicts: [] } });
-    });
-    const { say } = await room(page, () => "");
-    await expect.poll(() => asked).toHaveLength(1);
-    say("v3", "now https://vimeo.com/76979871");
-    await expect(lineOf(page, "now")).toContainText("Waiting for the moderation check");
-    say("v4", "then https://giphy.com/gifs/4548k01F5Ej28", "2026-10-25T10:02:00.000Z");
-    await expect.poll(() => asked).toHaveLength(2);
-    expect(asked[1]).toBe(`${SITE}/api/verdicts?room=%23bubble%2Fgames&ids=v4`);
+    await asksNothingSaidSince(page);
   });
 
   // ADR-0002 §8: Data saver (a 2G link) shows no embed; and a verdict serves a player alone, so none is asked (F879).
