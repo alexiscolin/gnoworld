@@ -190,6 +190,18 @@ test.describe("direct messages", () => {
     await expect(page.getByRole("heading", { name: "#bubble" })).toHaveCount(0);
   });
 
+  // 4e's UX review (U10): a direct message waited on the rooms' list, and showed only its failure.
+  test("show a conversation though the rooms could not load", async ({ page }) => {
+    await inGames(page);
+    const partner = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+    await page.route("**/api/rooms*", (route) => route.abort());
+    await page.goto(`/w/bubble?dm=${partner}`);
+    await hydrated(page);
+    await expect(page.getByRole("alert").filter({ hasText: "The rooms could not load." })).toBeVisible();
+    await expect(page.getByRole("heading", { name: `Direct message with ${short(partner)}` })).toBeVisible();
+    await expect(page.getByRole("textbox", { name: `Message ${short(partner)}` })).toBeVisible();
+  });
+
   test("never reach the page's account from a guest: Ergo refuses it", async ({ page }) => {
     const me = await inGames(page);
     const guest = `guest-${crypto.randomUUID().slice(0, 6)}`;

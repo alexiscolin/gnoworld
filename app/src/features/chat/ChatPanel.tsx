@@ -168,8 +168,8 @@ export function ChatPanel({ world }: { world: string }) {
   const dms = useDms(world, session, params.get("dm"));
   const chat = useApp((app) => app.login.chat);
   if (!loaded) return LOADING;
-  if (sections === undefined) {
-    return (
+  const failed =
+    sections === undefined ? (
       <Stack space="s">
         <p role="alert">The rooms could not load.</p>
         <Button
@@ -180,18 +180,22 @@ export function ChatPanel({ world }: { world: string }) {
           Try again
         </Button>
       </Stack>
-    );
-  }
+    ) : undefined;
+  // A direct message waits on no room: it shows though the rooms could not load (U10).
+  if (failed !== undefined && dms.partner === undefined) return failed;
   return (
-    <Loaded
-      sections={sections}
-      current={current}
-      state={state}
-      chat={chat}
-      session={session}
-      say={(room, draft) => linkRef.current?.say(room, draft) ?? false}
-      sayTo={(partner, draft) => linkRef.current?.sayTo(partner, draft) ?? false}
-      dms={dms}
-    />
+    <>
+      {failed}
+      <Loaded
+        sections={sections ?? []}
+        current={current}
+        state={state}
+        chat={chat}
+        session={session}
+        say={(room, draft) => linkRef.current?.say(room, draft) ?? false}
+        sayTo={(partner, draft) => linkRef.current?.sayTo(partner, draft) ?? false}
+        dms={dms}
+      />
+    </>
   );
 }
