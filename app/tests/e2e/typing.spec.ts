@@ -21,15 +21,15 @@ test.describe("who is typing", () => {
     ergo().send(typingOf("active"));
     await page.clock.runFor(4_000);
     ergo().send(typingOf("active", OTHER));
-    await expect(page.getByText("g10gh7…3y5tv and g1f6dc…fsksl are typing…")).toBeVisible();
+    await expect(page.getByText("g10gh7…3y5tv and g1f6dc…fsksl are typing")).toBeVisible();
     await page.clock.runFor(2_500);
-    await expect(page.getByText("g1f6dc…fsksl is typing…")).toBeVisible();
+    await expect(page.getByText("g1f6dc…fsksl is typing")).toBeVisible();
   }
 
   test("shows who is typing under the lines, and stops at their line", async ({ page }) => {
     const { ergo } = await room(page);
     ergo().send(typingOf("active"));
-    await expect(page.getByText("g10gh7…3y5tv is typing…")).toBeVisible();
+    await expect(page.getByText("g10gh7…3y5tv is typing")).toBeVisible();
     ergo().send(live("live", T(31), { text: "done typing" }));
     await expect(lineOf(page, "done typing")).toBeVisible();
     await expect(typist(page)).toHaveCount(0);

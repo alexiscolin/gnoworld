@@ -37,7 +37,7 @@ export const typingOf = (state: string, nick = MEMBER, room = ROOM) =>
   `@+typing=${state};time=${T(30)};account=${nick} :${nick}!u@h TAGMSG ${room}`;
 export const live = (id: string, time: string, { room = ROOM, text = id }: { room?: string; text?: string } = {}) =>
   `@msgid=${id};time=${time};account=${MEMBER} :${MEMBER}!u@h PRIVMSG ${room} :${text}`;
-export const typist = (page: Page) => page.getByText(/is typing…|are typing…/);
+export const typist = (page: Page) => page.getByText(/(is|are) typing/);
 export const tags = (sent: readonly string[]) => sent.filter((line) => line.includes(" TAGMSG "));
 export const field = (page: Page) => page.getByRole("textbox", { name: "Message #games" });
 // The places the page set: a MARKREAD with its time, not its ask of Ergo's place (CR7).

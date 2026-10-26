@@ -398,25 +398,25 @@ describe("RoomView: who is typing", () => {
   const words = (html: string) => said(html);
 
   it("says who is typing, by account shortened, under the lines", () => {
-    expect(words(view({ state: { ...ROOM, typing: typing(ALICE) } }))).toContain("g10gh7…3y5tv is typing…");
+    expect(words(view({ state: { ...ROOM, typing: typing(ALICE) } }))).toContain("g10gh7…3y5tv is typing");
   });
 
   it("says two typists by name, a guest as a guest", () => {
     expect(words(view({ state: { ...ROOM, typing: typing(ALICE, "guest-ab12cd") } }))).toContain(
-      "g10gh7…3y5tv and guest-ab12cd (guest) are typing…",
+      "g10gh7…3y5tv and guest-ab12cd (guest) are typing",
     );
   });
 
-  it("says several are typing past two, naming none", () => {
-    const html = words(view({ state: { ...ROOM, typing: typing(ALICE, BOB, CAROL) } }));
-    expect(html).toContain("Several people are typing…");
+  it("says several are typing past three, naming none", () => {
+    const html = words(view({ state: { ...ROOM, typing: typing(ALICE, BOB, CAROL, "guest-ab12cd") } }));
+    expect(html).toContain("Several people are typing");
     expect(html).not.toContain("3y5tv is typing");
   });
 
   // The red pass (R16): a live typist beside the past one, so the test fails while nothing is said at all.
   it("says nothing of a typist whose time is past, nor with no one typing", () => {
     const html = words(view({ state: { ...ROOM, typing: { ...typing(BOB), [ALICE]: Date.now() - 1 } } }));
-    expect(html).toContain("g1jg8m…vsqf5 is typing…");
+    expect(html).toContain("g1jg8m…vsqf5 is typing");
     expect(html).not.toMatch(/3y5tv (and|is typing)/);
     expect(words(view())).not.toContain("typing");
   });
@@ -425,7 +425,7 @@ describe("RoomView: who is typing", () => {
   // element open around the words has a role or aria-live.
   it("keeps who is typing out of the room's live announcements", () => {
     const html = view({ chat: "waiting", state: { ...ROOM, typing: typing(ALICE) } });
-    const at = html.indexOf("is typing…");
+    const at = html.indexOf("is typing");
     expect(at).toBeGreaterThan(-1);
     const open: { name: string; attributes: string }[] = [];
     for (const [, closing, name = "", attributes = ""] of html.slice(0, at).matchAll(/<(\/?)([a-z0-9]+)([^>]*)>/g)) {
