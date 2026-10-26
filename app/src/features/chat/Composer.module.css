@@ -4,4 +4,10 @@
     color: var(--color-text-muted);
     overflow-wrap: anywhere;
   }
+
+  /* The line the next one answers, over the field: muted, in one line (4d). */
+  .replying {
+    font: var(--font-meta);
+    color: var(--color-text-muted);
+  }
 }

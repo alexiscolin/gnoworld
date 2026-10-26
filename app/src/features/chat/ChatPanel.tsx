@@ -66,34 +66,53 @@ interface LoadedProps {
   dismissed: (room: string) => void;
 }
 
-function Loaded({ sections, current, state, chat, session, link, dismissed }: LoadedProps) {
+// The room in view, drawn again for each room: the line its next one answers is that room's alone (4d's replies),
+// while the room holds it, a line deleted or gone out of the window answering no more; a line sent answers none after.
+function Room({ room, rooms, state, chat, session, link, dismissed }: RoomProps) {
+  const [reply, setReply] = useState<string>();
+  const replying = reply === undefined ? undefined : state?.lines.find((line) => line.id === reply);
+  return (
+    <RoomView
+      room={room}
+      state={state}
+      chat={chat}
+      me={session.kind === "in" ? session.address : undefined}
+      onDelete={(id) => link.current?.redact(room, id) ?? false}
+      onDismiss={() => {
+        dismissed(room);
+      }}
+      onReact={(reaction) => link.current?.react(room, reaction) ?? false}
+      onReply={setReply}
+      composer={
+        <Writer
+          session={session}
+          room={room}
+          rooms={rooms}
+          members={state?.members ?? []}
+          onSay={(draft) => {
+            const went = link.current?.say(room, draft, replying?.id) ?? false;
+            if (went) setReply(undefined);
+            return went;
+          }}
+          replying={replying}
+          onCancelReply={() => {
+            setReply(undefined);
+          }}
+        />
+      }
+    />
+  );
+}
+
+type RoomProps = Omit<LoadedProps, "sections" | "current"> & { room: string; rooms: readonly string[] };
+
+function Loaded({ sections, current, ...rest }: LoadedProps) {
   const ids = roomIds(sections);
   useRoomKeys(ids, current);
   return (
     <Sidebar space="l">
       <RoomsView sections={sections} current={current} />
-      {current === undefined ? null : (
-        <RoomView
-          room={current}
-          state={state}
-          chat={chat}
-          me={session.kind === "in" ? session.address : undefined}
-          onDelete={(id) => link.current?.redact(current, id) ?? false}
-          onDismiss={() => {
-            dismissed(current);
-          }}
-          onReact={(reaction) => link.current?.react(current, reaction) ?? false}
-          composer={
-            <Writer
-              session={session}
-              room={current}
-              rooms={ids}
-              members={state?.members ?? []}
-              onSay={(draft) => link.current?.say(current, draft) ?? false}
-            />
-          }
-        />
-      )}
+      {current === undefined ? null : <Room key={current} room={current} rooms={ids} {...rest} />}
     </Sidebar>
   );
 }

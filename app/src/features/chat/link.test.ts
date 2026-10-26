@@ -1042,3 +1042,51 @@ describe("the chat's link: the history read past reactions", () => {
     expect(before(again.sent).slice(asks)).toEqual([`CHATHISTORY BEFORE ${ROOM} msgid=i9000 ${String(HISTORY_LINES)}`]);
   });
 });
+
+// 4d: a reply is a PRIVMSG tagged +reply with the msgid it answers (ratified in 2026: docs/plans/chat-features.md, M2),
+// the draft composed as the composer composes it; a msgid a tag cannot carry sends nothing, the draft included.
+describe("the chat's link: replies", () => {
+  const MSGID = "rmq4xvjw9ys5pwtqqjxbqwvhjc";
+  const memberIn = (rooms: readonly string[]) => {
+    const t = setup();
+    t.link.follow(rooms);
+    t.link.show(rooms[0]);
+    t.signedIn(ADDRESS);
+    const fake = t.connected(ADDRESS);
+    fake.line(`:${ADDRESS}!u@h JOIN ${rooms[0] ?? ""}`);
+    return { ...t, fake };
+  };
+
+  it("sends a reply as the composer composes the draft, tagged with the msgid it answers", () => {
+    const t = memberIn(["#bubble/games"]);
+    expect(t.link.say("#bubble/games", "  hi **all**  ", MSGID)).toBe(true);
+    expect(t.link.say("#bubble/games", "/me waves", MSGID)).toBe(true);
+    expect(t.fake.sent.filter((line) => line.startsWith("@"))).toEqual([
+      `@+reply=${MSGID} PRIVMSG #bubble/games :hi **all**`,
+      `@+reply=${MSGID} PRIVMSG #bubble/games :\u0001ACTION waves\u0001`,
+    ]);
+  });
+
+  it.each([
+    ["a space", "a b"],
+    ["a CR LF and a second command", "a\r\nQUIT"],
+    ["a semicolon and a second tag", "a;+typing=active"],
+    ["a backslash", "a\\b"],
+    ["nothing", ""],
+    ["65 characters", "a".repeat(65)],
+  ])("sends no reply to a msgid holding %s, nor the draft without it", (_, id) => {
+    const t = memberIn(["#bubble/games"]);
+    const before = t.fake.sent.length;
+    expect(t.link.say("#bubble/games", "hi", id)).toBe(false);
+    expect(t.fake.sent.slice(before)).toEqual([]);
+  });
+
+  it("sends no reply as a guest, nor in a room Ergo has not said it is in", () => {
+    const g = guestIn(["#bubble/games"]);
+    g.fake.line(`:${GUEST}!u@h JOIN #bubble/games`);
+    const t = memberIn(["#bubble/games", "#bubble"]);
+    expect(g.link.say("#bubble/games", "hi", MSGID)).toBe(false);
+    expect(t.link.say("#bubble", "hi", MSGID)).toBe(false);
+    expect([...g.fake.sent, ...t.fake.sent].filter((line) => line.includes("PRIVMSG"))).toEqual([]);
+  });
+});

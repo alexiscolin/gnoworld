@@ -469,3 +469,52 @@ describe("RoomView: reactions", () => {
     expect(part(html, "Messages")).not.toContain("👍");
   });
 });
+
+// 4d: above a reply, the line it answers, its author and its words in one line, 70 characters at most, cut between
+// graphemes (R6); markup in those words stays text (R5); a line not in this room, another room's of that msgid
+// included, is an earlier message (R8).
+describe("RoomView: replies", () => {
+  const replying = (target: Partial<Line>, reply: Partial<Line> = {}) => [
+    line({ id: "a", ...target }),
+    line({ id: "b", from: BOB, account: BOB, text: "yes", reply: "a", ...reply }),
+  ];
+
+  it("quotes above a reply the line it answers, its author and its words in one line", () => {
+    const html = view({ state: { ...ROOM, lines: replying({ text: "the **first** line" }) } });
+    expect(linesOf(html)[1]).toMatch(/^Replying to g10gh7…3y5tv: the first line\d{2}:\d{2} g1jg8m…vsqf5 yes$/);
+  });
+
+  it("names a guest's line in the quote by its nick, said a guest's", () => {
+    const lines = [
+      { ...GUEST_LINE, id: "a", text: "hi" },
+      line({ id: "b", from: BOB, account: BOB, text: "yes", reply: "a" }),
+    ];
+    const html = view({ state: { ...ROOM, lines } });
+    expect(linesOf(html)[1]).toMatch(/^Replying to guest-ab12cd \(guest\): hi/);
+  });
+
+  it("cuts the quote at 70 characters, between two graphemes", () => {
+    const long = view({ state: { ...ROOM, lines: replying({ text: "a".repeat(80) }) } });
+    expect(linesOf(long)[1]).toContain(`: ${"a".repeat(69)}…`);
+    const emoji = view({ state: { ...ROOM, lines: replying({ text: `${"a".repeat(68)}👍🏽${"a".repeat(5)}` }) } });
+    expect(linesOf(emoji)[1]).toContain(`: ${"a".repeat(68)}👍🏽…`);
+  });
+
+  it("keeps markup and a link of another scheme in the quote as text", () => {
+    const hostile = "<img src=x onerror=alert(1)> <script>alert(1)</script> [x](javascript:alert(1))";
+    const html = view({ state: { ...ROOM, lines: replying({ text: hostile }) } });
+    const quoted = [...part(html, "Messages").matchAll(/<li[^>]*>(.*?)<\/li>/gs)][1]?.[1] ?? "";
+    expect(quoted).toContain("&lt;img src=x onerror=alert(1)&gt;");
+    expect(quoted).not.toMatch(/<img|<script|href=/);
+  });
+
+  it("says a reply answers an earlier message when the line it answers is not in the room", () => {
+    const html = view({ state: { ...ROOM, lines: [line({ id: "b", text: "yes", reply: "gone" })] } });
+    expect(linesOf(html)[0]).toMatch(/^Replying to an earlier message\d{2}:\d{2} g10gh7…3y5tv yes$/);
+  });
+
+  it("quotes no line from the reply itself: a reply naming its own msgid answers an earlier message", () => {
+    const html = view({ state: { ...ROOM, lines: [line({ id: "b", text: "yes", reply: "b" })] } });
+    expect(linesOf(html)[0]).toMatch(/^Replying to an earlier message/);
+  });
+});

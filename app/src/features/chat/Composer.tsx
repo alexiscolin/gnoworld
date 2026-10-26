@@ -10,6 +10,7 @@ import { completed, completions, type Completion } from "./complete.ts";
 import { formatted, type Edit, type Format } from "./format.ts";
 import { Message } from "./Message.tsx";
 import { peopleOf, roomLabel, shortAddress } from "./names.ts";
+import { Replying, type Answered } from "./Replying.tsx";
 import styles from "./Composer.module.css";
 
 /** The bytes left from which the composer counts them. */
@@ -100,9 +101,36 @@ export interface ComposerProps {
   draft?: string | undefined;
   /** Each change of the draft, for the device to keep; a line sent leaves it blank. */
   onDraft?: ((draft: string) => void) | undefined;
+  /** The line the next one answers (4d's replies), said over the field, and how to answer none. */
+  replying?: Answered | undefined;
+  onCancelReply?: (() => void) | undefined;
 }
 
-export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", onDraft }: ComposerProps) {
+// The graphemes the reply bar shows of the line answered (docs/decisions.md, 2026-10-26).
+const SHOWN = 60;
+
+// Over the field, the line the next one answers, and a way to answer none.
+function ReplyBar({ to, onCancel }: { to: Answered; onCancel: (() => void) | undefined }) {
+  return (
+    <Cluster space="2xs">
+      <p className={styles["replying"]}>
+        <Replying to={to} length={SHOWN} />
+      </p>
+      <IconButton
+        icon="close"
+        label="Cancel the reply"
+        size="s"
+        emphasis="plain"
+        onClick={() => {
+          onCancel?.();
+        }}
+      />
+    </Cluster>
+  );
+}
+
+export function Composer(props: ComposerProps) {
+  const { room, nick, rooms, members, onSay, draft: kept = "", onDraft, replying, onCancelReply } = props;
   const [draft, setDraft] = useState(kept);
   // Each change of the draft, the device told at once: a render alone (a line arriving) writes nothing.
   const change = (next: string) => {
@@ -122,6 +150,11 @@ export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", 
   const completion = completions(draft, { commands: COMMANDS, rooms, people });
   const known = new Set(members);
   const box = () => formRef.current?.querySelector("input") ?? undefined;
+  // A line chosen to answer: the field takes the focus, to write the reply.
+  const answering = replying === undefined ? undefined : `${replying.who}\n${replying.text}`;
+  useLayoutEffect(() => {
+    if (answering !== undefined) box()?.focus();
+  }, [answering]);
   useLayoutEffect(() => {
     const selection = selectionRef.current;
     if (selection === undefined) return;
@@ -158,6 +191,7 @@ export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", 
   return (
     <form ref={formRef} aria-label={`Write in ${label}`} onSubmit={send} onKeyDown={complete}>
       <Stack space="2xs">
+        {replying === undefined ? null : <ReplyBar to={replying} onCancel={onCancelReply} />}
         <FormatBar onFormat={format} />
         <Sidebar side="end" space="2xs">
           <Field

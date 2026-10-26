@@ -23,6 +23,7 @@ const draw = (over: Partial<Parameters<typeof LineActions>[0]> = {}) =>
       onCopy={() => undefined}
       onDelete={() => true}
       onReact={() => true}
+      onReply={() => undefined}
       {...over}
     />,
   );
@@ -103,5 +104,20 @@ describe("a line's actions: quick reactions", () => {
 
   it("offer a guest no reaction", () => {
     expect(controls(draw({ me: undefined }))).toEqual(["More"]);
+  });
+});
+
+// 4d: Reply sits on the bar right before More, an account's alone.
+describe("a line's actions: Reply", () => {
+  const names = (markup: string) => [...markup.matchAll(/<button[^>]*\saria-label="([^"]+)"/g)].map(([, name]) => name);
+
+  it("offer Reply right before More, with its icon, to an account", () => {
+    const markup = draw();
+    expect(names(markup).slice(-2)).toEqual(["Reply", "More"]);
+    expect(markup).toContain('data-icon="reply"');
+  });
+
+  it("offer a guest no Reply", () => {
+    expect(names(draw({ me: undefined }))).not.toContain("Reply");
   });
 });

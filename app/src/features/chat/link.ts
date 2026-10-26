@@ -3,7 +3,7 @@
 // (Ergo's max-channels-per-client); the newest lines of the room in view alone, once Ergo says I joined it, since
 // Ergo paces a client to 2 lines a second (plan §4); Ergo's lines read into the store through one BatchReader a
 // connection. Its parts come in, so the tests give their own.
-import { BatchReader, compose, nickOf, reactionLine, type IrcMessage, type Reacting } from "@gnoworld/core";
+import { BatchReader, compose, nickOf, reactionLine, TAG_MSGID, type IrcMessage, type Reacting } from "@gnoworld/core";
 import { RoomId } from "@gnoworld/schemas";
 import type { Result } from "../../lib/api/http.ts";
 import type { Ergo, ErgoOptions, Who } from "../../lib/ergo/ergo.ts";
@@ -28,8 +28,9 @@ export interface ChatLink {
   follow: (ids: readonly string[]) => void;
   /** The room in view: its history is asked once Ergo says I joined it, once a connection. */
   show: (room: string | undefined) => void;
-  /** Sends a draft, as the composer composes it, to a room Ergo says it is in; an account's alone. Whether it went. */
-  say: (room: string, draft: string) => boolean;
+  /** Sends a draft, as the composer composes it, to a room Ergo says it is in; an account's alone; tagged +reply with
+   * the msgid it answers, one a tag carries (4d). Whether it went. */
+  say: (room: string, draft: string, reply?: string) => boolean;
   /** Deletes a line, by its msgid, in a room Ergo says it is in, as Ergo's REDACT (4c's message menu); an
    * account's alone, Ergo refusing another's line. Whether it went. */
   redact: (room: string, id: string) => boolean;
@@ -79,11 +80,13 @@ class Link implements ChatLink {
     this.#keep();
   }
 
-  say(room: string, draft: string): boolean {
+  say(room: string, draft: string, reply?: string): boolean {
     const me = this.#ergo?.nick();
     if (this.#key === "guest" || me === undefined || !this.#inside.has(room)) return false;
+    if (reply !== undefined && !TAG_MSGID.test(reply)) return false;
     const composed = compose(room, draft, me);
-    return composed.kind === "line" && this.#ergo?.send(composed.line) === true;
+    const tags = reply === undefined ? "" : `@+reply=${reply} `;
+    return composed.kind === "line" && this.#ergo?.send(`${tags}${composed.line}`) === true;
   }
 
   redact(room: string, id: string): boolean {

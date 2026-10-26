@@ -2,8 +2,10 @@
 // link, a word for a guest; the account's drafts kept on the device (4d).
 import { lazy, Suspense } from "react";
 import { pageDrafts } from "../../lib/drafts/page.ts";
+import type { Line } from "@gnoworld/core";
 import type { AppState } from "../../store/index.ts";
 import { roomLabel } from "./names.ts";
+import { answeredOf } from "./Replying.tsx";
 
 // The composer, an account's alone: a visitor's page never loads its code (the first screen's budget, ADR-0001 §12).
 const Composer = lazy(async () => ({ default: (await import("./Composer.tsx")).Composer }));
@@ -15,9 +17,12 @@ interface WriterProps {
   rooms: readonly string[];
   members: readonly string[];
   onSay: (draft: string) => boolean;
+  /** The line the next one answers (4d's replies), and how to answer none. */
+  replying: Line | undefined;
+  onCancelReply: () => void;
 }
 
-export function Writer({ session, room, rooms, members, onSay }: WriterProps) {
+export function Writer({ session, room, rooms, members, onSay, replying, onCancelReply }: WriterProps) {
   if (session.kind !== "in") return <p>Log in to write in this room.</p>;
   // The account's drafts on this device: the room's, where the composer starts, and each change kept (4d).
   const kept = pageDrafts(session.address);
@@ -34,6 +39,8 @@ export function Writer({ session, room, rooms, members, onSay }: WriterProps) {
         rooms={rooms.map(roomLabel)}
         members={members}
         onSay={onSay}
+        replying={replying === undefined ? undefined : answeredOf(replying)}
+        onCancelReply={onCancelReply}
       />
     </Suspense>
   );

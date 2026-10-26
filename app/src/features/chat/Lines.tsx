@@ -20,6 +20,7 @@ import { Markdown } from "./Message.tsx";
 import { roomHref } from "./names.ts";
 import { Person } from "./Person.tsx";
 import { Reactions } from "./Reactions.tsx";
+import { answeredOf, Replying } from "./Replying.tsx";
 import shared from "./lists.module.css";
 import styles from "./RoomView.module.css";
 
@@ -63,15 +64,22 @@ interface LineViewProps {
   /** Its reactions as shown (4d), and how an account reacts; none for a guest. */
   reactions: readonly Shown[] | undefined;
   react: ((reaction: Reacting) => boolean) | undefined;
+  /** The line it answers, when the room holds it (4d's replies). */
+  answers: Line | undefined;
 }
 
-function LineView({ line, me, members, stop, actions, reactions, react }: LineViewProps) {
+function LineView({ line, me, members, stop, actions, reactions, react, answers }: LineViewProps) {
   const blocks = markdown(line.text);
   const names = namesOf(line.text);
   const mentioned = names.split(" ").some((address) => address === me);
   const known = knownOf(names, members);
   return (
     <li className={KINDS[line.kind]} data-about-me={mentioned ? "" : undefined} tabIndex={stop ? 0 : -1}>
+      {line.reply === undefined ? null : (
+        <p className={styles["replying"]}>
+          <Replying to={answers === undefined ? undefined : answeredOf(answers)} length={QUOTED} />
+        </p>
+      )}
       {/* The line's marks first, before the time: where no sender's words stand (F808). */}
       {mentioned ? <span className={styles["mentionsYou"]}>Mentions you </span> : null}
       {line.kind === "notice" ? <span className={styles["mark"]}>Notice </span> : null}
@@ -86,6 +94,9 @@ function LineView({ line, me, members, stop, actions, reactions, react }: LineVi
     </li>
   );
 }
+
+// The graphemes a reply quotes of the line it answers (docs/decisions.md, 2026-10-26).
+const QUOTED = 70;
 
 // How near the end, in pixels, the reader still reads the newest line.
 const AT_END = 32;
@@ -143,6 +154,8 @@ export interface LinesProps {
   onReact: (reaction: Reacting) => boolean;
   /** Ergo refused a reaction the page sent here, said until dismissed (4d). */
   cannotReact?: true | undefined;
+  /** Makes a line, by its msgid, the one the composer's next answers (4d). */
+  onReply: (id: string) => void;
 }
 
 // What Ergo refused, said until the page dismisses it: a delete first, then a reaction; none, the page's own word.
@@ -153,11 +166,13 @@ const toldOf = (refused: string | undefined, cannotReact: true | undefined): Fla
 
 /** The room's flash, then its lines, oldest first, as a list a screen reader hears grow. */
 export function Lines(props: LinesProps) {
-  const { room, lines, members, me, refused, onDelete, onDismiss, reactions, onReact, cannotReact } = props;
+  const { room, lines, members, me, refused, onDelete, onDismiss, reactions, onReact, cannotReact, onReply } = props;
   const { listRef, onScroll } = useNewestInView(lines);
   const { stop, mounted, on, leave } = useLineFocus(lines, listRef);
   const { said, setSaid, copy } = useCopy(room);
   const shown = reactionsOn(reactions ?? [], me);
+  // A reply's line by its msgid, this room's alone: a reply naming its own msgid or another room's answers none here.
+  const byId = new Map(lines.map((line) => [line.id, line]));
   // Who a mention may shorten (F812): the members, and the authors in view by their account tag, who proved their
   // key as a member did (F819).
   const known = new Set([...members, ...lines.flatMap(({ account }) => (account === undefined ? [] : [account]))]);
@@ -188,6 +203,9 @@ export function Lines(props: LinesProps) {
       onDelete={remove}
       reactions={shown.get(line.id)}
       onReact={(emoji, on) => react({ to: line.id, emoji, on })}
+      onReply={() => {
+        onReply(line.id);
+      }}
     />
   );
   return (
@@ -218,6 +236,7 @@ export function Lines(props: LinesProps) {
             actions={mounted(line.id) ? actionsOf(line) : null}
             reactions={shown.get(line.id)}
             react={me === undefined ? undefined : react}
+            answers={line.reply === line.id ? undefined : byId.get(line.reply ?? "")}
           />
         ))}
       </ol>

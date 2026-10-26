@@ -1,0 +1,115 @@
+import { lineOf, lines, roomsNav } from "./chat.ts";
+import { expect, test, type Page } from "./fixtures.ts";
+import { opened } from "./scripted.ts";
+import { asAccount, barOf, field, GUEST, HISTORY, ROOM, tagged } from "./talk.ts";
+
+// 4d's replies (docs/decisions.md, 2026-10-26): Reply on a line's bar; the composer says which line the next answers,
+// sends it tagged +reply, and the reply quotes its line; the target is the room's, gone with a room switch, with its
+// line deleted, or once the line went out. A scripted Ergo (scripted.ts).
+const form = (page: Page) => page.getByRole("form", { name: "Write in #games" });
+const cancel = (page: Page) => page.getByRole("button", { name: "Cancel the reply" });
+const replyTo = async (page: Page, at: number) => {
+  await lines(page).nth(at).hover();
+  await barOf(page, at).getByRole("button", { name: "Reply" }).click();
+};
+
+test.describe("replies", () => {
+  test.use({ timezoneId: "UTC", locale: "en-GB" });
+
+  test("reply from the bar: the composer says to which line, sends it tagged, and the reply quotes its line", async ({
+    page,
+  }) => {
+    const { said } = await asAccount(page);
+    await replyTo(page, 0);
+    await expect(form(page)).toContainText("Replying to g10gh7…3y5tv: the first line");
+    await expect(field(page)).toBeFocused();
+    await field(page).fill("count me in");
+    await field(page).press("Enter");
+    await expect(lineOf(page, "count me in")).toContainText("Replying to g10gh7…3y5tv: the first line");
+    await expect(cancel(page)).toHaveCount(0);
+    expect(said()).toEqual([`@+reply=m1 PRIVMSG ${ROOM} :count me in`]);
+  });
+
+  test("cancel a reply: the next line answers none", async ({ page }) => {
+    const { said } = await asAccount(page);
+    await replyTo(page, 1);
+    await cancel(page).click();
+    await expect(cancel(page)).toHaveCount(0);
+    await field(page).fill("plain");
+    await field(page).press("Enter");
+    await expect(lineOf(page, "plain")).toBeVisible();
+    expect(said()).toEqual([`PRIVMSG ${ROOM} :plain`]);
+  });
+
+  test("answer the line of the second Reply, not the first's", async ({ page }) => {
+    const { said } = await asAccount(page);
+    await replyTo(page, 0);
+    await replyTo(page, 1);
+    await expect(form(page)).toContainText("Replying to g10gh7…3y5tv: the second line");
+    await field(page).fill("this one");
+    await field(page).press("Enter");
+    await expect(lineOf(page, "this one")).toBeVisible();
+    expect(said()).toEqual([`@+reply=m2 PRIVMSG ${ROOM} :this one`]);
+  });
+
+  // R4: the line being answered is the room's: another room's line goes out answering none, and the reply is gone on
+  // coming back.
+  test("leave the reply behind on a room switch: the other room's line answers none", async ({ page }) => {
+    const { said } = await asAccount(page);
+    await replyTo(page, 0);
+    await page.keyboard.press("Alt+ArrowDown");
+    const there = page.getByRole("textbox", { name: "Message #bubble" });
+    await expect(there).toBeVisible();
+    await expect(cancel(page)).toHaveCount(0);
+    await there.fill("elsewhere");
+    await there.press("Enter");
+    await expect(lineOf(page, "elsewhere")).toBeVisible();
+    await roomsNav(page).getByRole("link", { name: "#games" }).click();
+    await expect(field(page)).toBeVisible();
+    await expect(cancel(page)).toHaveCount(0);
+    expect(said()).toEqual(["PRIVMSG #bubble :elsewhere"]);
+  });
+
+  test("drop the reply when its line is deleted: the next line answers none", async ({ page }) => {
+    const { ergo, said } = await asAccount(page);
+    await replyTo(page, 0);
+    ergo().send(`:gnoworld!u@h REDACT ${ROOM} m1`);
+    await expect(lines(page)).toHaveCount(1);
+    await expect(cancel(page)).toHaveCount(0);
+    await field(page).fill("after");
+    await field(page).press("Enter");
+    await expect(lineOf(page, "after")).toBeVisible();
+    expect(said()).toEqual([`PRIVMSG ${ROOM} :after`]);
+  });
+
+  test("keep the reply when the line could not go out", async ({ page }) => {
+    const { ergo, address, said } = await asAccount(page);
+    await replyTo(page, 0);
+    ergo().send(`:op!u@h KICK ${ROOM} ${address} :out`);
+    await field(page).fill("not now");
+    await field(page).press("Enter");
+    await expect(form(page)).toContainText("Not sent");
+    await expect(form(page)).toContainText("Replying to g10gh7…3y5tv: the first line");
+    await expect(field(page)).toHaveValue("not now");
+    expect(said()).toEqual([]);
+  });
+
+  test("say a reply answers an earlier message when its line is not in the room's window", async ({ page }) => {
+    await opened(page, GUEST, {
+      history: HISTORY,
+      replayed: [tagged("m3", "late answer", { at: 2, tags: "+reply=long-gone" })],
+    });
+    await expect(lineOf(page, "late answer")).toContainText("Replying to an earlier message");
+  });
+
+  test("reach the bar's quick reactions, Reply and More by Tab from a focused line, for an account", async ({
+    page,
+  }) => {
+    await asAccount(page);
+    await lines(page).nth(1).focus();
+    for (const name of ["React with 👍", "React with ❤️", "React with 😂", "Reply", "More"]) {
+      await page.keyboard.press("Tab");
+      await expect(barOf(page, 1).getByRole("button", { name })).toBeFocused();
+    }
+  });
+});

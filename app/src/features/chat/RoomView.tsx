@@ -24,13 +24,24 @@ const LINES = [shared["plain"], shared["scrolls"], styles["lines"]].join(" ");
 // acts on the page as it stands, nothing queued for the lines.
 const waiting = (busy: boolean) => <ol aria-label="Messages" aria-busy={busy || undefined} className={LINES} />;
 
+// What the lines do on a line's actions, each a room's view may leave out: nothing then, and a delete or a reaction
+// never goes out.
+type Handlers = "onDelete" | "onDismiss" | "onReact" | "onReply";
+type RoomLinesProps = Omit<LinesProps, Handlers> & { [Name in Handlers]?: LinesProps[Name] | undefined };
+
 // The room's lines: the list's place while it holds none or their code comes, then the lines view.
-function RoomLines(props: LinesProps) {
+function RoomLines({ onDelete, onDismiss, onReact, onReply, ...props }: RoomLinesProps) {
   return props.lines.length === 0 ? (
     waiting(false)
   ) : (
     <Suspense fallback={waiting(true)}>
-      <Lines {...props} />
+      <Lines
+        {...props}
+        onDelete={onDelete ?? (() => false)}
+        onDismiss={onDismiss ?? (() => undefined)}
+        onReact={onReact ?? (() => false)}
+        onReply={onReply ?? (() => undefined)}
+      />
     </Suspense>
   );
 }
@@ -73,6 +84,8 @@ export interface RoomViewProps {
   onDismiss?: (() => void) | undefined;
   /** Reacts to a line, or takes the reaction back (4d's reactions); whether it went out. */
   onReact?: ((reaction: Reacting) => boolean) | undefined;
+  /** Makes a line, by its msgid, the one the composer's next answers (4d's replies). */
+  onReply?: ((id: string) => void) | undefined;
 }
 
 // Who is here: counted once connected, the bot left out, the first MEMBERS_SHOWN named.
@@ -103,7 +116,7 @@ function Heading({ room, topic }: { room: string; topic: string | undefined }) {
   );
 }
 
-export function RoomView({ room, state, chat, composer, me, onDelete, onDismiss, onReact }: RoomViewProps) {
+export function RoomView({ room, state, chat, composer, me, onDelete, onDismiss, onReact, onReply }: RoomViewProps) {
   const { lines = [], members = [], topic, refused, reactions, cannotReact } = state ?? {};
   const connected = chat === "connected";
   return (
@@ -121,11 +134,12 @@ export function RoomView({ room, state, chat, composer, me, onDelete, onDismiss,
             members={members}
             me={me}
             refused={refused}
-            onDelete={onDelete ?? (() => false)}
-            onDismiss={onDismiss ?? (() => undefined)}
+            onDelete={onDelete}
+            onDismiss={onDismiss}
             reactions={reactions}
-            onReact={onReact ?? (() => false)}
+            onReact={onReact}
             cannotReact={cannotReact}
+            onReply={onReply}
           />
           {connected && lines.length === 0 ? <p>No messages yet.</p> : null}
           {composer}

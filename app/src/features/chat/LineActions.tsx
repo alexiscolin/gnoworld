@@ -2,7 +2,7 @@
 // reactions first (4d), its More menu holding Copy text, Copy link and, on the reader's own line, Delete, asked first.
 // More reactions, reply, thread, pin, save, edit and mark unread come with their merges; Report waits for slice 12.
 import type { Line, Shown } from "@gnoworld/core";
-import { Button, Chip, Cluster, Dialog, Menu, Stack } from "@gnoworld/ui";
+import { Button, Chip, Cluster, Dialog, IconButton, Menu, Stack } from "@gnoworld/ui";
 import { useEffect, useRef, useState } from "react";
 import styles from "./LineActions.module.css";
 import { roomLabel } from "./names.ts";
@@ -23,6 +23,8 @@ export interface LineActionsProps {
   reactions?: readonly Shown[] | undefined;
   /** Reacts to the line with an emoji, or takes the reaction back; whether it went out. */
   onReact: (emoji: string, on: boolean) => boolean;
+  /** Makes the line the one the composer's next answers (4d). */
+  onReply: () => void;
 }
 
 // An account's quick reactions, each pressed when the reader gave it, pressed again to take it back.
@@ -43,7 +45,7 @@ function QuickReactions({ given, onReact }: { given: ReadonlySet<string>; onReac
 
 /** The bar of a line pointed at or focused, out of the list's live announcements: its More menu, and the dialog
  * that asks before a delete, which gives the focus back to More when it closes. */
-export function LineActions({ line, room, me, onCopy, onDelete, reactions, onReact }: LineActionsProps) {
+export function LineActions({ line, room, me, onCopy, onDelete, reactions, onReact, onReply }: LineActionsProps) {
   const [asking, setAsking] = useState(false);
   // What follows the dialog's close: More takes the focus back, or the line goes.
   const afterRef = useRef<"back" | "delete">(undefined);
@@ -91,6 +93,7 @@ export function LineActions({ line, room, me, onCopy, onDelete, reactions, onRea
   return (
     <div ref={barRef} role="toolbar" aria-label="Message actions" aria-live="off" className={styles["bar"]}>
       {me === undefined ? null : <QuickReactions given={given} onReact={onReact} />}
+      {me === undefined ? null : <IconButton icon="reply" label="Reply" size="s" emphasis="plain" onClick={onReply} />}
       <Menu trigger="More" icon="more" emphasis="plain" label="Message actions" items={items} />
       {own ? (
         <Dialog

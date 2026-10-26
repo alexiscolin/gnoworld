@@ -23,8 +23,14 @@
 
   .time,
   .mark,
-  .mentionsYou {
+  .mentionsYou,
+  .replying {
     font: var(--font-meta);
+  }
+
+  /* Above a reply, the line it answers, in one line and muted (4d). */
+  .replying {
+    color: var(--color-text-muted);
   }
 
   .time,
