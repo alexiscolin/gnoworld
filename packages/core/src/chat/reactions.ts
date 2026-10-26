@@ -3,7 +3,7 @@
 // checked here by hand (docs/decisions.md, 2026-10-26): one emoji of Unicode's RGI set, a msgid of one word, an
 // account Ergo vouches for.
 import type { IrcMessage } from "../irc/irc.ts";
-import { first, MSGID, redactAfter, REPLY, sameRoom, stamp } from "./room.ts";
+import { first, isTagMsgid, redactAfter, REPLY, sameRoom, stamp } from "./room.ts";
 
 /** One account's reaction to a line, added or taken back, as Ergo marked it. */
 export interface Reaction {
@@ -27,7 +27,7 @@ export interface Shown {
 }
 
 // One emoji of RGI's set, whole: a sequence (a skin tone, a ZWJ family, a flag, a keycap) is one.
-const EMOJI = /^\p{RGI_Emoji}$/v;
+const isEmoji = (value: string): boolean => /^\p{RGI_Emoji}$/v.test(value);
 
 /** A reaction the page asks for: on a line, by its msgid, one emoji, added or taken back. */
 export type Reacting = Pick<Reaction, "to" | "emoji" | "on">;
@@ -35,13 +35,13 @@ export type Reacting = Pick<Reaction, "to" | "emoji" | "on">;
 /** The labelled TAGMSG that adds or takes back a reaction in a room; none for an emoji not one of RGI's set or a msgid
  * a tag cannot carry, whatever else they hold (a tag's separator, a space, a CR LF). */
 export function reactionLine({ to, emoji, on }: Reacting, room: string, label: string): string | undefined {
-  if (!EMOJI.test(emoji) || !MSGID.test(to)) return undefined;
+  if (!isEmoji(emoji) || !isTagMsgid(to)) return undefined;
   return `@label=${label};+draft/${on ? "react" : "unreact"}=${emoji};+reply=${to} TAGMSG ${room}`;
 }
 
 // The emoji added (+draft/react, else +react) or taken back (+draft/unreact), not both, or none.
 function changeOf(tags: IrcMessage["tags"]): Pick<Reaction, "emoji" | "on"> | undefined {
-  const [added, taken] = [first(tags, ["+draft/react", "+react"], EMOJI), first(tags, ["+draft/unreact"], EMOJI)];
+  const [added, taken] = [first(tags, ["+draft/react", "+react"], isEmoji), first(tags, ["+draft/unreact"], isEmoji)];
   if (added !== undefined && taken !== undefined) return undefined;
   if (added !== undefined) return { emoji: added, on: true };
   return taken === undefined ? undefined : { emoji: taken, on: false };
@@ -52,7 +52,12 @@ function changeOf(tags: IrcMessage["tags"]): Pick<Reaction, "emoji" | "on"> | un
 export function reactionOf(message: IrcMessage, room: string): Reaction | undefined {
   const { command, params, tags } = message;
   if (command !== "TAGMSG" || !sameRoom(params[0] ?? "", room)) return undefined;
-  const [marks, change, to, who] = [stamp(tags), changeOf(tags), first(tags, REPLY, MSGID), tags.get("account") ?? ""];
+  const [marks, change, to, who] = [
+    stamp(tags),
+    changeOf(tags),
+    first(tags, REPLY, isTagMsgid),
+    tags.get("account") ?? "",
+  ];
   if (marks === undefined || change === undefined || to === undefined || who === "") return undefined;
   return { ...marks, to, who, ...change };
 }

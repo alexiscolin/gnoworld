@@ -3,12 +3,12 @@
 // (Ergo's max-channels-per-client); the newest lines of the room in view alone, once Ergo says I joined it, since
 // Ergo paces a client to 2 lines a second (plan §4); Ergo's lines read into the store through one BatchReader a
 // connection. Its parts come in, so the tests give their own.
-import { BatchReader, compose, nickOf, reactionLine, TAG_MSGID, type IrcMessage, type Reacting } from "@gnoworld/core";
+import { BatchReader, compose, isTagMsgid, nickOf, reactionLine, type IrcMessage, type Reacting } from "@gnoworld/core";
 import { RoomId } from "@gnoworld/schemas";
 import type { Result } from "../../lib/api/http.ts";
 import type { Ergo, ErgoOptions, Who } from "../../lib/ergo/ergo.ts";
 import { followed, groupsOf } from "./groups.ts";
-import { Earlier, HISTORY_LINES, MSGID } from "./history.ts";
+import { Earlier, HISTORY_LINES, isCommandMsgid } from "./history.ts";
 import { Labels } from "./labels.ts";
 import type { AppState, createAppStore } from "../../store/index.ts";
 
@@ -83,14 +83,14 @@ class Link implements ChatLink {
   say(room: string, draft: string, reply?: string): boolean {
     const me = this.#ergo?.nick();
     if (this.#key === "guest" || me === undefined || !this.#inside.has(room)) return false;
-    if (reply !== undefined && !TAG_MSGID.test(reply)) return false;
+    if (reply !== undefined && !isTagMsgid(reply)) return false;
     const composed = compose(room, draft, me);
     const tags = reply === undefined ? "" : `@+reply=${reply} `;
     return composed.kind === "line" && this.#ergo?.send(`${tags}${composed.line}`) === true;
   }
 
   redact(room: string, id: string): boolean {
-    const allowed = this.#key !== "guest" && this.#inside.has(room) && MSGID.test(id);
+    const allowed = this.#key !== "guest" && this.#inside.has(room) && isCommandMsgid(id);
     return allowed && this.#ergo?.nick() !== undefined && this.#ergo.send(`REDACT ${room} ${id}`);
   }
 

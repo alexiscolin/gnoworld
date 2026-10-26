@@ -6,8 +6,11 @@ import { LINES_KEPT } from "../../store/chat.ts";
 
 /** The items a room's history page asks: the store's window. */
 export const HISTORY_LINES = LINES_KEPT;
-/** A msgid a command carries: one word of 64 characters at most (Ergo's are 26), no space, comma, NUL or leading colon. */
-export const MSGID = /^[^\s,:\0][^\s,\0]{0,63}$/;
+/** Whether `value` is a msgid a command carries: one word of 64 characters at most (Ergo's are 26), no space, comma,
+ * NUL or leading colon. */
+export function isCommandMsgid(value: string): boolean {
+  return /^[^\s,:\0][^\s,\0]{0,63}$/.test(value);
+}
 // The asks before a page's oldest, a room and a connection: a reaction flood's pages read past, then the room shown.
 const EARLIER = 3;
 
@@ -19,7 +22,7 @@ export class Earlier {
    * while the page came full and left the window short of lines; or none. */
   after(room: string, items: readonly IrcMessage[], held: number): string | undefined {
     const [oldest = "", asked = 0] = [items[0]?.tags.get("msgid"), this.#asked.get(room)];
-    if (items.length < HISTORY_LINES || held >= HISTORY_LINES || asked >= EARLIER || !MSGID.test(oldest)) return;
+    if (items.length < HISTORY_LINES || held >= HISTORY_LINES || asked >= EARLIER || !isCommandMsgid(oldest)) return;
     this.#asked.set(room, asked + 1);
     return `CHATHISTORY BEFORE ${room} msgid=${oldest} ${String(HISTORY_LINES)}`;
   }

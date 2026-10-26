@@ -6,7 +6,7 @@ export {
   concerns,
   lineOf,
   membersAfter,
-  MSGID as TAG_MSGID,
+  isTagMsgid,
   nickOf,
   redactAfter,
   refusedOf,

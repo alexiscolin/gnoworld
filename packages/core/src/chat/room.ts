@@ -68,16 +68,23 @@ function said(command: string, text: string): Pick<Line, "kind" | "text"> | unde
   return command === "PRIVMSG" && action !== undefined ? { kind: "action", text: action } : undefined;
 }
 
-/** A msgid a tag carries back: one word of 64 characters at most, no leading colon, nothing a tag escapes. */
-export const MSGID = /^[^\s,:;\\][^\s,;\\]{0,63}$/u;
+/** Whether `value` is a msgid a tag carries back: one word of 64 characters at most, no leading colon, nothing a tag
+ * escapes. */
+export function isTagMsgid(value: string): boolean {
+  return /^[^\s,:;\\][^\s,;\\]{0,63}$/u.test(value);
+}
 /** The line a message answers: +reply, ratified in 2026, before its draft name. */
 export const REPLY = ["+reply", "+draft/reply"];
 // The line a message corrects: our own tag, no IRCv3 one existing (docs/decisions.md, 2026-10-21).
 const EDIT = ["+gnoworld/edit"];
 
-/** The first of these tags whose value holds what `fits` wants, or none. */
-export function first(tags: IrcMessage["tags"], names: readonly string[], fits: RegExp): string | undefined {
-  return names.map((name) => tags.get(name) ?? "").find((value) => fits.test(value));
+/** The first of these tags whose value `fits`, or none. */
+export function first(
+  tags: IrcMessage["tags"],
+  names: readonly string[],
+  fits: (value: string) => boolean,
+): string | undefined {
+  return names.map((name) => tags.get(name) ?? "").find(fits);
 }
 
 /** The id and the time Ergo set, each in its one form, or none. */
@@ -100,7 +107,11 @@ export function lineOf(message: IrcMessage, room: string): Line | undefined {
   const body = text === undefined ? undefined : said(message.command, text);
   if (marks === undefined || body === undefined || from === "") return undefined;
   const { tags } = message;
-  const [account = "", reply, edits] = [tags.get("account"), first(tags, REPLY, MSGID), first(tags, EDIT, MSGID)];
+  const [account = "", reply, edits] = [
+    tags.get("account"),
+    first(tags, REPLY, isTagMsgid),
+    first(tags, EDIT, isTagMsgid),
+  ];
   const marked = { ...(reply === undefined ? {} : { reply }), ...(edits === undefined ? {} : { edits }) };
   return { ...marks, from, ...(account === "" ? {} : { account }), ...body, ...marked };
 }
