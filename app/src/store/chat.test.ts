@@ -122,6 +122,15 @@ describe("the store's chat slice", () => {
     expect(t.notified()).toBe(before + 1);
   });
 
+  // The green pass (G1): the New mark waits on a room's history, which a live line before it must not stand for.
+  it("keeps that a room's history came, an empty page too, and not before", () => {
+    const t = following();
+    t.heard(said("#bubble", "a", "live"));
+    expect(t.room("#bubble")?.paged).toBeUndefined();
+    t.page("#bubble", []);
+    expect(t.room("#bubble")?.paged).toBe(true);
+  });
+
   it("takes from a page only the lines of its room", () => {
     const t = following();
     t.page("#bubble", [said("#bubble", "a", "mine"), said("#garden", "b", "theirs"), read("PING :x")]);

@@ -14,7 +14,8 @@ export function useNewMark(lines: readonly Line[], read: string | undefined, me:
 }
 
 /** Marks the room read to its newest line while the reader is at the end and the page shows: as a line comes, as the
- * tab shows again, and through the look it gives back, which the list calls as it scrolls. */
+ * tab shows again, as `onRead` comes (none until the room's history came: 4f's G1), and through the look it gives back,
+ * which the list calls as it scrolls. */
 export function useReadAtEnd(
   lines: readonly Line[],
   atEndRef: RefObject<boolean>,
@@ -25,6 +26,7 @@ export function useReadAtEnd(
     if (newest !== undefined && atEndRef.current && document.visibilityState === "visible") onRead?.(newest);
   };
   const seen = useEffectEvent(look);
+  const reading = onRead !== undefined;
   useEffect(() => {
     const shows = () => {
       seen();
@@ -34,6 +36,6 @@ export function useReadAtEnd(
     return () => {
       document.removeEventListener("visibilitychange", shows);
     };
-  }, [newest]);
+  }, [newest, reading]);
   return look;
 }

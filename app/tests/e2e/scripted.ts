@@ -92,6 +92,8 @@ export interface Scripted {
   quietMarks?: boolean;
   /** Ergo echoes the page's lines, at this time; none unless named. */
   echo?: string;
+  /** Ergo answers the page's CHATHISTORY once this settles, so a live line may come before the page (4f's G1). */
+  historyAfter?: Promise<void>;
 }
 
 /** Answers the page's socket as Ergo would, the page being `me`: with #games' history, or with what `script` says. */
@@ -108,6 +110,7 @@ export function scriptedErgo(
     read,
     quietMarks = false,
     echo,
+    historyAfter,
   } = Array.isArray(script) ? { history: script } : (script as Scripted);
   const places = new Map<string, string>(read === undefined ? [] : [[room, read]]);
   let echoes = 0;
@@ -121,6 +124,10 @@ export function scriptedErgo(
       ...marking(line, places, quietMarks),
       ...echoed(line, me, { time: echo, next: () => (echoes += 1) }),
     ];
-    for (const answer of answers) ergo.send(answer);
+    const reply = () => {
+      for (const answer of answers) ergo.send(answer);
+    };
+    if (historyAfter !== undefined && line.startsWith("CHATHISTORY ")) historyAfter.then(reply, () => undefined);
+    else reply();
   });
 }

@@ -34,6 +34,8 @@ interface RoomState {
   readonly typing: Typing;
   /** The time of the last line the account read here, as Ergo keeps it for the account (4f); none while unknown. */
   readonly read: string | undefined;
+  /** Its history's page came, an empty one too: the New mark waits on it (4f's G1); none before. */
+  readonly paged?: true;
 }
 
 interface ChatState {
@@ -146,7 +148,8 @@ export const chatSlice: StateCreator<ChatSlice> = (set, get) => {
         if (room === undefined) return;
         const read = messages.flatMap((message) => lineOf(message, id) ?? []);
         const lines = addLines(room.lines, read, LINES_KEPT);
-        if (lines !== room.lines) change({ rooms: { ...rooms, [id]: { ...room, lines } } });
+        if (lines !== room.lines || room.paged !== true)
+          change({ rooms: { ...rooms, [id]: { ...room, lines, paged: true } } });
       },
       dismissed: (id) => {
         const { rooms } = get().chat;

@@ -9,7 +9,7 @@ const GUEST = "guest-zzzzzz";
 export const ROOM = "#bubble/games";
 export const OTHER = "g1f6dcp6he2vq9gymrm4yrnyx66n0578vf7fsksl";
 export const T = (minute: number) => `2026-10-25T10:${String(minute).padStart(2, "0")}:00.000Z`;
-const HISTORY: readonly HistoryLine[] = [
+export const HISTORY: readonly HistoryLine[] = [
   ["m1", T(0), "the first line"],
   ["m2", T(1), "the second line"],
   ["m3", T(2), "the third line"],

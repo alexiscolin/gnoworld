@@ -40,6 +40,8 @@ export interface RoomViewProps {
         typing?: Typing;
         /** The time of the last line the account read here, Ergo's (4f). */
         read?: string | undefined;
+        /** Its history's page came (4f's G1). */
+        paged?: true;
       }
     | undefined;
   chat: ErgoState | "off";
@@ -106,7 +108,7 @@ function Typists({ typing }: { typing: Typing }) {
 }
 
 export function RoomView({ room, state, chat, composer, me, onDelete, onDismiss, onRead }: RoomViewProps) {
-  const { lines = [], members = [], topic, refused, typing, read } = state ?? {};
+  const { lines = [], members = [], topic, refused, typing, read, paged } = state ?? {};
   const connected = chat === "connected";
   return (
     <Stack as="section" space="s">
@@ -129,6 +131,7 @@ export function RoomView({ room, state, chat, composer, me, onDelete, onDismiss,
             onDelete={onDelete ?? (() => false)}
             onDismiss={onDismiss ?? (() => undefined)}
             read={read}
+            paged={paged === true}
             onRead={onRead}
           />
           {connected && lines.length === 0 ? <p>No messages yet.</p> : null}

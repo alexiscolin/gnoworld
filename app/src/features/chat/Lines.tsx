@@ -134,15 +134,28 @@ export interface LinesProps {
   onDismiss: () => void;
   /** The time of the last line the account read here, Ergo's (4f); none while unknown. */
   read?: string | undefined;
+  /** The room's history page came: the New mark waits on it, as a live line may come before it (4f's G1). */
+  paged?: boolean;
   /** The room read to its line `id`, the newest, while the reader is at the end and the page shows. */
   onRead?: ((id: string) => void) | undefined;
 }
 
 /** The room's flash, then its lines, oldest first, as a list a screen reader hears grow. */
-export function Lines({ room, lines, members, me, refused, onDelete, onDismiss, read, onRead }: LinesProps) {
+export function Lines({
+  room,
+  lines,
+  members,
+  me,
+  refused,
+  onDelete,
+  onDismiss,
+  read,
+  paged = false,
+  onRead,
+}: LinesProps) {
   const { listRef, atEndRef, onScroll } = useNewestInView(lines);
-  const fresh = useNewMark(lines, read, me);
-  const look = useReadAtEnd(lines, atEndRef, onRead);
+  const fresh = useNewMark(lines, paged ? read : undefined, me);
+  const look = useReadAtEnd(lines, atEndRef, paged ? onRead : undefined);
   const { stop, mounted, on, leave } = useLineFocus(lines, listRef);
   const { said, setSaid, copy } = useCopy(room);
   // Who a mention may shorten (F812): the members, and the authors in view by their account tag, who proved their

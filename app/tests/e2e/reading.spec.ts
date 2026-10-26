@@ -1,9 +1,23 @@
 import AxeBuilder from "@axe-core/playwright";
-import { lineOf, word } from "./chat.ts";
-import { expect, test } from "./fixtures.ts";
+import type { WebSocketRoute } from "@playwright/test";
+import { lineOf, lines, word } from "./chat.ts";
+import { expect, hydrated, test } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
-import type { HistoryLine } from "./scripted.ts";
-import { field, hiddenTab, live, marks, room, ROOM, sentBefore, T, tab, typingOf, typist } from "./scriptedRoom.ts";
+import { scriptedErgo, type HistoryLine } from "./scripted.ts";
+import {
+  field,
+  hiddenTab,
+  HISTORY,
+  live,
+  marks,
+  room,
+  ROOM,
+  sentBefore,
+  T,
+  tab,
+  typingOf,
+  typist,
+} from "./scriptedRoom.ts";
 
 const ACCOUNT = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 
@@ -25,6 +39,35 @@ test.describe("the reading place", () => {
     await expect(typist(page)).toBeVisible();
     await expect(lineOf(page, "the second line")).toContainText(/^New /);
     await expect(page.locator("[data-new]")).toHaveCount(1);
+  });
+
+  // The green pass (G1): a live line before the room's history page takes no mark; the first past the place does.
+  test("marks the first history line past the place New though a live line came before the history", async ({
+    page,
+  }) => {
+    const address = await logIn(page, word("read"));
+    let release: () => void = () => undefined;
+    const historyAfter = new Promise<void>((done) => {
+      release = done;
+    });
+    const sent: string[] = [];
+    const sockets: WebSocketRoute[] = [];
+    await page.routeWebSocket(/\/ws$/, (ergo) => {
+      sockets.push(ergo);
+      scriptedErgo(ergo, address, { history: HISTORY, read: T(0), heard: (line) => sent.push(line), historyAfter });
+    });
+    await page.goto("/w/bubble?room=games");
+    await hydrated(page);
+    await expect.poll(() => sent.some((line) => line.startsWith("CHATHISTORY "))).toBe(true);
+    sockets.at(-1)?.send(live("live", T(5), { text: "a live line" }));
+    await expect(lineOf(page, "a live line")).toBeVisible();
+    // Read before the history came, the live line would mark the lines under it read unseen.
+    expect(marks(await sentBefore(page, sent))).toEqual([]);
+    release();
+    await expect(lines(page)).toHaveCount(HISTORY.length + 1);
+    await expect(lineOf(page, "the second line")).toContainText(/^New /);
+    await expect(page.locator("[data-new]")).toHaveCount(1);
+    await expect.poll(() => marks(sent)).toEqual([`MARKREAD ${ROOM} timestamp=${T(5)}`]);
   });
 
   test("marks no line New for a room read to its end", async ({ page }) => {
