@@ -79,6 +79,7 @@ comes with the slice that brings what it needs.
 
 | Item | Delivers | Why |
 |---|---|---|
+| A control's description (F898) | ui's Button takes an optional description wired to aria-describedby, as Dialog does; each player card's Play named by its line (sender, time) | Every card of one service names its button alike today (4g's UX review, U6); decided for the design system's next merge (docs/decisions.md, 2026-10-26) |
 | `/index.html` as a page | The host redirects or refuses a path that names an `index.html`, nginx and the test host together, with the operator's tests | It serves a page the router has no route for, which fails to hydrate (React #418) and ends noindexed (F340) |
 | A link to a file of the site | The app hands ui's link slot its route test, so a path that names a file (the sitemap, a download) stays a plain anchor; with the sitemap (slice 5) | Every path from the root goes to the router today, whose catch-all shows "No page here" (F326) |
 | A thumb's picture from data | `PlanetThumb` takes only the site's own paths and data URIs, with no referrer; with the first picture from data | A picture from another host tells it each visitor's address (F336) |
