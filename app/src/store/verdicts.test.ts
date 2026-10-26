@@ -59,4 +59,14 @@ describe("the store's verdicts", () => {
     for (let n = 0; n < VERDICTS_KEPT; n += 1) t.judged({ msgid: `n${String(n)}`, room: "#bubble", state: "checked" });
     expect(t.of("#bubble")).not.toHaveProperty("7");
   });
+
+  // F880: the server's answer, asked before the hide, can come after the stream's "hidden"; a hide is for good.
+  it("keeps a hidden line hidden: a later checked changes nothing and notifies no one", () => {
+    const t = store();
+    t.judged({ msgid: "a", room: "#bubble", state: "hidden" });
+    const before = t.notified();
+    t.judged({ msgid: "a", room: "#bubble", state: "checked" });
+    expect(t.of("#bubble")).toEqual({ a: "hidden" });
+    expect(t.notified()).toBe(before);
+  });
 });

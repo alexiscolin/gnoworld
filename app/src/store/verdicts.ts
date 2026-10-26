@@ -15,7 +15,7 @@ export interface VerdictsSlice {
   /** Each room's msgids with a verdict, oldest first: an object puts a key of digits before the others (F880). */
   verdictsOrder: Readonly<Record<string, readonly string[]>>;
   verdictActions: {
-    /** A verdict from the stream, over an earlier one of the same line. */
+    /** A verdict from the stream or the server, over an earlier one of the same line; a hidden line stays hidden. */
     judged: (event: StreamEvent) => void;
   };
 }
@@ -27,7 +27,8 @@ export const verdictsSlice: StateCreator<VerdictsSlice> = (set, get) => ({
     judged: ({ msgid, room, state }) => {
       const { verdicts, verdictsOrder } = get();
       const held = Object.hasOwn(verdicts, room) ? verdicts[room] : undefined;
-      if (held?.[msgid] === state) return;
+      // A checked asked of the server before the hide can come after it (F880).
+      if (held?.[msgid] === state || held?.[msgid] === "hidden") return;
       const order = (Object.hasOwn(verdictsOrder, room) ? verdictsOrder[room] : undefined) ?? [];
       const known = held !== undefined && Object.hasOwn(held, msgid);
       const all = known ? order : [...order, msgid];
