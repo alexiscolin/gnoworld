@@ -321,9 +321,8 @@ and the harness is frozen until a real bug crosses it.
 
 - **Core's tests alone run on both engines,** Node 24's V8 and Chromium's, whose reads of some
   regexes and of Unicode differ (F816, F817): the full gate's `core_chromium` step runs them in a
-  page, one browser context and one file after another, as Chromium in one process (the sandbox)
-  allows. The app's and the server's unit tests run on Node alone; the app's code meets Chromium
-  through its journeys. The project exists only when `CORE_CHROMIUM` names a profile folder, so
+  page, one file after another, as Chromium in one process (the sandbox) allows. The app's and the server's unit tests run on Node alone; the app's code meets Chromium
+  through its journeys. The project exists only when `CORE_CHROMIUM` is set, so
   the coverage, StrykerJS and `vitest list` never open a browser: StrykerJS mutates core's code
   against Node's engine alone.
 - **The fast gate's budget, judged on the load, lets a slow change through on a busy machine:**

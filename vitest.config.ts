@@ -4,15 +4,15 @@ import { configDefaults, defineConfig, type TestProjectInlineConfiguration } fro
 const SLOW = ["server/src/testing/ergo*.test.ts", "server/src/testing/soak.test.ts"];
 
 // core's tests a second time, in Playwright's Chromium: the browser's engine reads some regexes and Unicode otherwise
-// than Node's (F816, F817). The project exists only when CORE_CHROMIUM names a profile folder, so the coverage,
+// than Node's (F816, F817). The project exists only when CORE_CHROMIUM is set, so the coverage,
 // StrykerJS, `vitest list` and a file run alone never open a browser.
 const CORE_CHROMIUM: TestProjectInlineConfiguration = {
   extends: true,
   test: {
     name: "core_chromium",
     include: ["packages/core/src/**/*.test.ts"],
-    // One browser context, the files one after another: Chromium in one process (Claude Code's sandbox, as
-    // app/playwright.config.ts) dies on a second context.
+    // The files one after another: Chromium in one process (Claude Code's sandbox, as app/playwright.config.ts)
+    // dies on a second browser context.
     fileParallelism: false,
     browser: {
       enabled: true,
@@ -20,7 +20,6 @@ const CORE_CHROMIUM: TestProjectInlineConfiguration = {
       // A failure writes no screenshot beside the code: the probe fails a planted test on purpose.
       screenshotFailures: false,
       provider: playwright({
-        persistentContext: process.env["CORE_CHROMIUM"] ?? false,
         launchOptions: { args: process.env["SANDBOX_RUNTIME"] ? ["--single-process"] : [] },
       }),
       instances: [{ browser: "chromium" }],
@@ -58,7 +57,7 @@ export default defineConfig({
           css: { include: [/tokens\.css/] },
         },
       },
-      // Only when CORE_CHROMIUM names a profile folder, as the full gate's step does.
+      // Only when CORE_CHROMIUM is set, as the full gate's step does.
       ...(process.env["CORE_CHROMIUM"] ? [CORE_CHROMIUM] : []),
     ],
     coverage: {

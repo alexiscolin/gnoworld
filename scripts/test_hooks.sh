@@ -1781,9 +1781,9 @@ fi
 
 if part gate_full; then
 gate_fixture gate_full
-# Core's Chromium run's stub, here alone: a fixture's node_modules folder would hide gate_scope's linked one.
+# Core's Chromium run's stub, here alone: a fixture's node_modules folder would hide gate_triggers' linked one.
 mkdir -p "$g/node_modules/vitest"
-printf 'import { spawnSync } from "node:child_process";\nimport { existsSync } from "node:fs";\nconst dir = process.env.CORE_CHROMIUM ?? "";\nconst made = dir !== "" && existsSync(dir) ? "made" : "none";\nprocess.exit(spawnSync("sh", [%s, "core_chromium", "profile=" + dir + ":" + made, ...process.argv.slice(2)], { stdio: "inherit" }).status ?? 1);\n' "'$step'" >"$g/node_modules/vitest/vitest.mjs"
+printf 'import { spawnSync } from "node:child_process";\nprocess.exit(spawnSync("sh", [%s, "core_chromium", "switch=" + (process.env.CORE_CHROMIUM ?? ""), ...process.argv.slice(2)], { stdio: "inherit" }).status ?? 1);\n' "'$step'" >"$g/node_modules/vitest/vitest.mjs"
 # The full gate: every fast step but the plain tests, then the full ones in lanes, each told where the
 # branch left main; harness_mutate only when the harness changed since main.
 base=$(git -C "$g" rev-parse HEAD)
@@ -1792,12 +1792,10 @@ for s in $fast_steps py:probe py:bench core_chromium stories coverage py:patch_c
 	[ "$s" = test ] || ran "$s" || fail "check.sh --full skipped $s"
 done
 ran test && fail "check.sh --full ran the tests twice, with and without coverage"
-# Core's tests run again in Chromium, whose engine reads some regexes and Unicode otherwise than Node's (F816), in a
-# profile folder of their own that exists while they run and is gone afterwards.
-line=$(grep '^core_chromium ' "$log") || fail "check.sh --full did not run core's tests in Chromium"
-case $line in "core_chromium profile=$TMPDIR/"*":made run --project core_chromium") ;; *) fail "check.sh --full ran core's Chromium tests without their project or a profile folder: $line" ;; esac
-profile=${line#core_chromium profile=} && profile=${profile%%:*}
-[ -n "$profile" ] && [ ! -e "$profile" ] || fail "check.sh --full left core_chromium's profile folder behind: $profile"
+# Core's tests run again in Chromium, whose engine reads some regexes and Unicode otherwise than Node's (F816): their
+# project, which vitest.config.ts opens only when CORE_CHROMIUM is set.
+grep -qx "core_chromium switch=1 run --project core_chromium" "$log" ||
+	fail "check.sh --full did not run core's tests in Chromium, with their switch and project: $(grep '^core_chromium' "$log")"
 # The coverage lane's tools take half the machine each, the harness lane beside them the rest: none starves the
 # timing-bound tests of the other (F777).
 half=$(($(node -p "require('os').availableParallelism()") / 2))
@@ -1861,8 +1859,6 @@ for s in core_chromium stories py:prove_fix; do
 		fail "check.sh --full did not say which lanes did not run after $s's failure: $out"
 done
 (FAIL=core_chromium gate --full) >/dev/null && fail "check.sh --full passed with core's Chromium tests failing"
-profile=$(sed -n 's/^core_chromium profile=\([^:]*\):.*/\1/p' "$log")
-[ -n "$profile" ] && [ ! -e "$profile" ] || fail "check.sh --full left core_chromium's profile folder behind when they failed: $profile"
 (FAIL=stories gate --full) >/dev/null && fail "check.sh --full passed with the stories failing"
 ran py:audit || fail "check.sh --full stopped the history lane at the stories' failure: a phase's lanes run to their end"
 [ ! -e "$g/.claude/tmp/green-full" ] || fail "check.sh --full recorded a gate that failed"

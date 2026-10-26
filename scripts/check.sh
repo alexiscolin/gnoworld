@@ -286,11 +286,7 @@ if $full; then
 	}
 	lane_stories() {
 		step core_chromium # core's tests again in Chromium, whose engine reads some regexes and Unicode otherwise (F816)
-		# vitest.config.ts opens the project only when CORE_CHROMIUM names a profile folder: one of its own, gone after.
-		profile=$(mktemp -d "${TMPDIR:-/tmp}/core-chromium.XXXXXX") status=0
-		CORE_CHROMIUM=$profile node node_modules/vitest/vitest.mjs run --project core_chromium || status=$?
-		rm -r "${profile:?}"
-		[ "$status" = 0 ]
+		CORE_CHROMIUM=1 node node_modules/vitest/vitest.mjs run --project core_chromium # vitest.config.ts opens it then alone
 		step stories # the design system's stories in a browser: axe, the invariants and the CSS jsdom cannot see
 		node app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts --reporter=dot
 	}

@@ -221,7 +221,7 @@ try:
 
     if part("core_chromium"):
         # Core's tests run a second time in Chromium, whose engine reads some regexes and Unicode otherwise than
-        # Node's (F816, F817), and only when CORE_CHROMIUM names a profile folder: a planted test that passes on
+        # Node's (F816, F817), and only when CORE_CHROMIUM is set: a planted test that passes on
         # Node fails there while a clean one passes beside it, a failure writes nothing beside the code, and with no
         # CORE_CHROMIUM, `vitest list` (check_regressions.py) lists core's tests on Node alone, opening no browser.
         tests = {"engine.test.ts": ("outside a page", 'expect(typeof document).toBe("undefined")'), "clean.test.ts": ("anywhere", "expect(1 + 1).toBe(2)")}
@@ -229,11 +229,7 @@ try:
         paths = [f"{HERE}/{name}" for name in tests]
         out = run(["node_modules/.bin/vitest", "run", "--project", "node", *paths])
         expect(out.returncode == 0, "core's planted tests pass on Node")
-        profile = tempfile.mkdtemp(prefix="core-chromium-")
-        try:
-            out, states = verdicts(["node_modules/.bin/vitest", "run", "--project", "core_chromium", *paths], env={"CORE_CHROMIUM": profile})
-        finally:
-            shutil.rmtree(profile, ignore_errors=True)
+        out, states = verdicts(["node_modules/.bin/vitest", "run", "--project", "core_chromium", *paths], env={"CORE_CHROMIUM": "1"})
         expect(states == {"outside a page": "failed", "anywhere": "passed"}, f"core_chromium runs core's tests in a page: {states or (out.stderr or out.stdout)[-300:]}")
         expect(not os.path.exists(f"{HERE}/__screenshots__") and not os.path.exists(".vitest-attachments"), "core_chromium writes nothing beside the code on a failure")
         # Plain lines, `[project] file > title`: `--json` would take the next path for its output file.
