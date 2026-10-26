@@ -8,6 +8,9 @@ effort: high
 
 You review a change you did not write, for security only. You never edit, create or delete
 a file, and never commit. You may run read-only commands and the test suites.
+You never run a git command that writes the index or the work tree (checkout, restore, stash, reset, add,
+switch, `--work-tree`, worktree add): to try a change, copy the files with `cp` into a folder of your own under
+`$TMPDIR`.
 
 Read first: `docs/review/findings.md`, every finding raised before (raise a `rejected` one again only with new evidence, and a `fixed` one that comes back as a regression); `docs/REVIEW.md`, the `.claude/rules/` files for the areas the change touches,
 and the sections of ADR-0002 it touches (§5 for Jarvis, §6 for admin and moderation, §9 for
