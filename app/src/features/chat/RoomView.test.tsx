@@ -570,6 +570,20 @@ describe("RoomView: edits", () => {
     );
   });
 
+  // The code review (CR5): a plain client replies or reacts to the edit's own msgid; both reach the line it corrects.
+  it("reads a reply and a reaction to an edit's own msgid as its line's", () => {
+    const lines = [
+      line({ id: "a", text: "helo" }),
+      line({ id: "e", text: "hello", edits: "a" }),
+      line({ id: "b", from: BOB, account: BOB, text: "hi", reply: "e" }),
+    ];
+    const reactions = [{ id: "r1", time: T0, to: "e", emoji: "👍", who: BOB, on: true }];
+    const shown = linesOf(view({ state: { ...ROOM, lines, reactions } }));
+    expect(shown).toHaveLength(2);
+    expect(shown[0]).toMatch(/👍 1$/);
+    expect(shown[1]).toMatch(/^Replying to g10gh7…3y5tv: hello\d/);
+  });
+
   it("keeps another account's edit a line of its own, the line it names as written", () => {
     const lines = [
       line({ id: "a", text: "mine" }),

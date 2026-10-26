@@ -313,6 +313,13 @@ describe("reactionsOn: what each line shows of its reactions", () => {
     ).toEqual(["👍3", "😀1", "😁1", "😂1"]);
   });
 
+  // The code review (CR5): an account's reactions to a line and to its folded edit count once on the line.
+  test("counts an account once on a line whatever msgid of it each reaction names", () => {
+    expect(reactionsOn([on("m1", "👍", ALICE), on("m1", "👍", ALICE)], ME).get("m1")).toEqual([
+      { emoji: "👍", count: 1, mine: false },
+    ]);
+  });
+
   // The green pass (G1): mine whoever reacted after me with it.
   test("keeps an emoji mine when another account reacts with it after me", () => {
     expect(reactionsOn([on("m1", "👍", ME), on("m1", "👍", ALICE)], ME).get("m1")).toEqual([

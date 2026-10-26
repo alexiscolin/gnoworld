@@ -7,20 +7,30 @@ import type { Line } from "./room.ts";
 /** A line as shown: corrected by an edit, said so. */
 export type ShownLine = Line & { readonly edited?: true };
 
-/** The room's lines, in their order, each corrected by its newest edit and the edits gone; the same array when no line
- * is corrected. */
-export function shownLines(lines: readonly Line[]): readonly ShownLine[] {
+// Each corrected line's newest edit, by the line's msgid; each folded edit's line, by the edit's msgid.
+function folding(lines: readonly Line[]) {
   const places = new Map(lines.map((line, at) => [line.id, at]));
   const newest = new Map<string, Line>();
-  const folded = new Set<string>();
+  const folded = new Map<string, string>();
   for (const [at, edit] of lines.entries()) {
     const target = places.get(edit.edits ?? "");
     const line = target === undefined || target >= at ? undefined : lines[target];
     if (line === undefined || line.edits !== undefined || edit.account === undefined || edit.account !== line.account)
       continue;
     newest.set(line.id, edit);
-    folded.add(edit.id);
+    folded.set(edit.id, line.id);
   }
+  return { newest, folded };
+}
+
+/** The line each folded edit corrects, by the edit's own msgid: what a plain client answers or reacts to by that
+ * msgid reaches the line (the code review's CR5). */
+export const editsFolded = (lines: readonly Line[]): ReadonlyMap<string, string> => folding(lines).folded;
+
+/** The room's lines, in their order, each corrected by its newest edit and the edits gone; the same array when no line
+ * is corrected. */
+export function shownLines(lines: readonly Line[]): readonly ShownLine[] {
+  const { newest, folded } = folding(lines);
   if (folded.size === 0) return lines;
   return lines.flatMap((line): ShownLine[] => {
     const edit = newest.get(line.id);

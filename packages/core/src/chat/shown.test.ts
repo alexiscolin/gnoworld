@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { Line } from "./room.ts";
-import { shownLines } from "./shown.ts";
+import { editsFolded, shownLines } from "./shown.ts";
 
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
@@ -108,6 +108,20 @@ describe("shownLines: a room's lines as shown, each edit in its line's place", (
       { ...line("e3", 4, "tres"), ...{ edits: "toString" } },
     ];
     expect(texts(shownLines(lines))).toEqual(["__proto__:uno", "constructor:dos", "e3:tres"]);
+  });
+
+  // The code review (CR5): what a plain client answers or reacts to by the edit's own msgid reaches the line.
+  test("names each folded edit's line by the edit's msgid, and no edit kept a line of its own", () => {
+    const lines = [
+      line("a", 0, "helo"),
+      { ...line("e", 1, "hello"), ...{ edits: "a" } },
+      { ...line("f", 2, "hello!"), ...{ edits: "a" } },
+      { ...line("x", 3, "theirs"), ...{ edits: "a", account: BOB, from: BOB } },
+    ];
+    expect([...editsFolded(lines)]).toEqual([
+      ["e", "a"],
+      ["f", "a"],
+    ]);
   });
 
   test("gives back the room's lines themselves when no line is corrected", () => {

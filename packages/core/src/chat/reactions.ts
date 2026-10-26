@@ -123,8 +123,12 @@ export function reactionsOn(
   me: string | undefined,
 ): ReadonlyMap<string, readonly Shown[]> {
   const lines = new Map<string, Map<string, Shown>>();
+  // Once an account on a line with an emoji, whichever msgid of the line it named (a folded edit's, CR5).
+  const counted = new Set<string>();
   for (const { to, emoji, who, on } of reactions) {
-    if (!on) continue;
+    const key = `${to}\n${emoji}\n${who}`;
+    if (!on || counted.has(key)) continue;
+    counted.add(key);
     const line = lines.get(to) ?? new Map<string, Shown>();
     const was = line.get(emoji);
     line.set(emoji, { emoji, count: (was?.count ?? 0) + 1, mine: (was?.mine ?? false) || who === me });
