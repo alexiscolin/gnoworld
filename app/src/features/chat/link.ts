@@ -4,7 +4,7 @@
 // Ergo paces a client to 2 lines a second (plan §4); Ergo's lines read into the store through one BatchReader a
 // connection. Its parts come in, so the tests give their own.
 import { BatchReader, compose, nickOf, type IrcMessage } from "@gnoworld/core";
-import { RoomId } from "@gnoworld/schemas";
+import { Address, RoomId } from "@gnoworld/schemas";
 import type { Result } from "../../lib/api/http.ts";
 import type { Ergo, ErgoOptions, Who } from "../../lib/ergo/ergo.ts";
 import { LINES_KEPT } from "../../store/chat.ts";
@@ -30,6 +30,8 @@ export interface ChatLink {
   show: (room: string | undefined) => void;
   /** Sends a draft, as the composer composes it, to a room Ergo says it is in; an account's alone. Whether it went. */
   say: (room: string, draft: string) => boolean;
+  /** Sends a draft to another account, a direct message (4e); an account's alone. Whether it went. */
+  sayTo: (partner: string, draft: string) => boolean;
   stop: () => void;
 }
 
@@ -75,6 +77,14 @@ class Link implements ChatLink {
     const me = this.#ergo?.nick();
     if (this.#key === "guest" || me === undefined || !this.#inside.has(room)) return false;
     const composed = compose(room, draft, me);
+    return composed.kind === "line" && this.#ergo?.send(composed.line) === true;
+  }
+
+  sayTo(partner: string, draft: string): boolean {
+    const me = this.#ergo?.nick();
+    if (this.#key === "guest" || me === undefined || me === partner || !Address.safeParse(partner).success)
+      return false;
+    const composed = compose(partner, draft, me);
     return composed.kind === "line" && this.#ergo?.send(composed.line) === true;
   }
 
@@ -171,7 +181,10 @@ class Link implements ChatLink {
       return;
     }
     this.#reader = new BatchReader();
-    chatActions.connected(this.#ergo?.nick() ?? "");
+    const me = this.#ergo?.nick() ?? "";
+    chatActions.connected(me);
+    // An account hears from accounts alone: Ergo refuses a guest's direct message to it (+R, irc/handlers.go).
+    if (this.#key !== "guest") this.#ergo?.send(`MODE ${me} +R`);
     this.#send("JOIN", this.#wanted());
     this.#history(this.#shown);
   }
@@ -219,7 +232,9 @@ class Link implements ChatLink {
   // Ergo's JOIN of me, not replayed: I am in that room, and the room in view's lines are asked. Its KICK of me: I
   // am in it no more, and say nothing there.
   #heard(message: IrcMessage): void {
-    this.#deps.store.getState().chatActions.heard(message);
+    const { chatActions, dmActions } = this.#deps.store.getState();
+    chatActions.heard(message);
+    dmActions.heard(message);
     const { tags, source = "", command, params } = message;
     const [room = "", kicked] = params;
     const me = this.#ergo?.nick();

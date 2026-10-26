@@ -766,3 +766,64 @@ describe("the chat's link: what it says", () => {
     expect(said(again.sent)).toEqual(["PRIVMSG #bubble/games :back"]);
   });
 });
+
+// 4e: direct messages, an account's alone; Ergo refuses a guest's to an account that set +R (irc/handlers.go, v2.19.1).
+describe("the chat's link: direct messages", () => {
+  const account = () => {
+    const t = setup();
+    t.link.follow(["#bubble"]);
+    t.signedIn(ADDRESS);
+    return { ...t, fake: t.connected(ADDRESS) };
+  };
+  const dms = (sent: readonly string[]) => sent.filter((line) => line.startsWith(`PRIVMSG ${OTHER}`));
+
+  it("asks Ergo to refuse guests' direct messages, once an account is connected", () => {
+    expect(account().fake.sent).toContain(`MODE ${ADDRESS} +R`);
+    const g = guestIn(["#bubble"]);
+    expect(g.fake.sent.filter((line) => line.startsWith("MODE"))).toEqual([]);
+  });
+
+  it("sends an account's draft to another account, as the composer composes it", () => {
+    const t = account();
+    expect(t.link.sayTo(OTHER, "  hi **you**  ")).toBe(true);
+    expect(t.link.sayTo(OTHER, "/me waves")).toBe(true);
+    expect(dms(t.fake.sent)).toEqual([`PRIVMSG ${OTHER} :hi **you**`, `PRIVMSG ${OTHER} :\u0001ACTION waves\u0001`]);
+  });
+
+  it.each([
+    ["a guest's", () => guestIn(["#bubble"])],
+    [
+      "an account's, while away",
+      () => {
+        const t = account();
+        t.fake.state("waiting");
+        return t;
+      },
+    ],
+  ])("sends nothing of %s", (_, made) => {
+    const t = made();
+    expect(t.link.sayTo(OTHER, "hi")).toBe(false);
+    expect(dms(t.fake.sent)).toEqual([]);
+  });
+
+  it.each([
+    ["no address", "alice"],
+    ["a room", "#bubble"],
+    ["its own address", ADDRESS],
+    ["an address with a wrong checksum", `${OTHER.slice(0, -1)}q`],
+  ])("sends nothing to %s", (_, partner) => {
+    const t = account();
+    const before = t.fake.sent.length;
+    expect(t.link.sayTo(partner, "hi")).toBe(false);
+    expect(t.fake.sent.slice(before)).toEqual([]);
+  });
+
+  it.each(["", "  ", "/nick bob", "a".repeat(600)])(
+    "sends nothing of a draft the composer would not send (%j)",
+    (draft) => {
+      const t = account();
+      expect(t.link.sayTo(OTHER, draft)).toBe(false);
+      expect(dms(t.fake.sent)).toEqual([]);
+    },
+  );
+});
