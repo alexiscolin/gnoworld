@@ -7,13 +7,33 @@
 import type { Line } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
 import { Sidebar, Stack } from "@gnoworld/ui";
-import type { ReactNode } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import type { ErgoState } from "../../lib/ergo/ergo.ts";
-import { Lines } from "./Lines.tsx";
+import type { LinesProps } from "./Lines.tsx";
 import { roomLabel } from "./names.ts";
 import { Person } from "./Person.tsx";
 import shared from "./lists.module.css";
 import styles from "./RoomView.module.css";
+
+// The lines view (the lines, what is under them, a line's bar) is asked once the room holds a line: lines come over the
+// WebSocket after the page is drawn, so its code is never the first screen's (ADR-0001 §12; docs/decisions.md,
+// 2026-10-26). One boundary for every feature of a line.
+const Lines = lazy(async () => ({ default: (await import("./Lines.tsx")).Lines }));
+const LINES = [shared["plain"], shared["scrolls"], styles["lines"]].join(" ");
+// The list's place while its code comes, or while the room holds no line: no line, no tab stop; a key pressed meanwhile
+// acts on the page as it stands, nothing queued for the lines.
+const waiting = (busy: boolean) => <ol aria-label="Messages" aria-busy={busy || undefined} className={LINES} />;
+
+// The room's lines: the list's place while it holds none or their code comes, then the lines view.
+function RoomLines(props: LinesProps) {
+  return props.lines.length === 0 ? (
+    waiting(false)
+  ) : (
+    <Suspense fallback={waiting(true)}>
+      <Lines {...props} />
+    </Suspense>
+  );
+}
 
 /** The people a room lists by name; the others are counted. */
 export const MEMBERS_SHOWN = 100;
@@ -81,7 +101,7 @@ export function RoomView({ room, state, chat, composer, me, onDelete, onDismiss 
       </p>
       <Sidebar side="end" space="m">
         <div>
-          <Lines
+          <RoomLines
             key={room}
             room={room}
             lines={lines}
