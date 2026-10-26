@@ -76,7 +76,9 @@ test.describe("direct messages", () => {
     await field.press("Enter");
     await expect(lines(page).filter({ hasText: text })).toHaveCount(1);
     await expect(page).toHaveURL(new RegExp(`dm=${bob.address}`));
-    expect(me).not.toBe(bob.address);
+    // Mine, and delivered: Bob's page lists the conversation with me (T10: the journey compared two setup values).
+    await expect(lines(page).filter({ hasText: text }).getByTitle(me)).toBeVisible();
+    await expect(dmsNav(bob.page).getByRole("link", { name: short(me) })).toBeVisible();
     await bob.close();
   });
 
