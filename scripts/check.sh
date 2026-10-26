@@ -16,7 +16,7 @@
 set -eu
 cd "$(realpath "$(dirname "$0")/..")" # the folder's own case: a $PWD spelled otherwise loads a tool twice (F081)
 unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a hook's git environment must not steer the gate's git calls
-unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO # the scripts' test switches, which would fake a pass
+unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO BENCH_VITEST # the scripts' test switches, which would fake a pass
 full=false merge=false
 [ "${1:-}" = "--full" ] && full=true
 [ "${1:-}" = "--merge" ] && full=true merge=true
@@ -267,6 +267,8 @@ if $full; then
 	lane_probe() {
 		step probe # the harness keeps its promises
 		python3 -I scripts/probe.py
+		step bench # the budgets of docs/plans/, after probe.py and alone: beside other work a bench measures the load
+		python3 -I scripts/bench.py
 	}
 	lane_stories() {
 		step stories # the design system's stories in a browser: axe, the invariants and the CSS jsdom cannot see

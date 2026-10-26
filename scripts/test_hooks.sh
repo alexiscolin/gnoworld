@@ -138,7 +138,7 @@ for step in "run format:check" "run typecheck" "run lint" "run test" "run unused
 	"ast.parse(open(f).read(), f) for f in sys.argv[1:]]' scripts/*.py" \
 	"python3 -I ../scripts/mutate.py" "go vet ./tools/..." "go run ./tools/sealvec | cmp" "python3 -I scripts/check_docs.py" \
 	"sh scripts/test_hooks.sh" "python3 -I scripts/probe.py" "run coverage" "python3 -I scripts/patch_coverage.py" "sh scripts/ergo.sh" \
-	"run mutate" "sh scripts/scan_secrets.sh" "python3 -I scripts/harness_mutate.py" "python3 -I scripts/check_regressions.py" "python3 -I scripts/check_migrations.py" \
+	"run mutate" "sh scripts/scan_secrets.sh" "python3 -I scripts/harness_mutate.py" "python3 -I scripts/check_regressions.py" "python3 -I scripts/check_migrations.py" "python3 -I scripts/bench.py" \
 	'unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO' '[ "$took" -gt "$budget" ]' "python3 -I scripts/prove_fix.py" "python3 -I scripts/audit.py"; do
 	grep -v '^[[:space:]]*#' "$gate_file" | grep -qF -- "$step" || fail "check.sh no longer runs: $step"
 done
@@ -1447,6 +1447,7 @@ n=$1
 shift
 echo "$n $*" >>"$GATE_LOG"
 [ "$n" != py:audit ] || echo "audit-answer ${AUDIT_ANSWER-unset}" >>"$GATE_LOG"
+[ "$n" != py:bench ] || echo "bench-vitest ${BENCH_VITEST-unset}" >>"$GATE_LOG"
 case " ${MEET:-} " in
 *" $n "*)
 	: >"$GATE_LOG.met.$n"
@@ -1468,7 +1469,7 @@ SH
 for tool in go gofmt; do printf '#!/bin/sh\nexec sh "%s" %s "$@"\n' "$step" "$tool" >"$g/bin/$tool"; done
 printf '#!/bin/sh\nexec sh "%s" gno "$@"\n' "$step" >"$g/toolchain/gno"
 chmod +x "$g/bin/go" "$g/bin/gofmt" "$g/toolchain/gno"
-for py in check_css check_docs mutate probe patch_coverage prove_fix check_regressions check_migrations audit harness_mutate; do
+for py in check_css check_docs mutate probe bench patch_coverage prove_fix check_regressions check_migrations audit harness_mutate; do
 	printf 'import os, sys\nos.execvp("sh", ["sh", %s, "py:%s", *sys.argv[1:]])\n' "'$step'" "$py" >"$g/scripts/$py.py"
 done
 for sh in ergo test_hooks scan_secrets; do printf 'exec sh "%s" sh:%s "$@"\n' "$step" "$sh" >"$g/scripts/$sh.sh"; done
@@ -1740,8 +1741,8 @@ gate_fixture gate_full
 # The full gate: every fast step but the plain tests, then the full ones in lanes, each told where the
 # branch left main; harness_mutate only when the harness changed since main.
 base=$(git -C "$g" rev-parse HEAD)
-out=$(AUDIT_ANSWER=x gate --full) || fail "check.sh --full failed on a copy whose every step passes: $out"
-for s in $fast_steps py:probe stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
+out=$(AUDIT_ANSWER=x BENCH_VITEST=x gate --full) || fail "check.sh --full failed on a copy whose every step passes: $out"
+for s in $fast_steps py:probe py:bench stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
 	[ "$s" = test ] || ran "$s" || fail "check.sh --full skipped $s"
 done
 ran test && fail "check.sh --full ran the tests twice, with and without coverage"
@@ -1757,10 +1758,17 @@ for s in py:prove_fix py:patch_coverage py:check_regressions py:check_migrations
 done
 before coverage py:patch_coverage || fail "check.sh --full measured the patch's coverage before the coverage run"
 grep -qx "audit-answer unset" "$log" || fail "check.sh let AUDIT_ANSWER reach the audit"
+grep -qx "bench-vitest unset" "$log" || fail "check.sh let BENCH_VITEST choose the benches' Vitest"
 grep -qxF "$(record)" "$g/.claude/tmp/green-full" || fail "check.sh --full did not record the code it passed"
 # probe.py plants its faults in the source tree: it runs alone, before any full lane reads the tree (the
 # coverage's Vitest, check_regressions' list, StrykerJS, the stories' build), which saw its files come and go.
 (SLOW_STEP=py:probe gate --full) >/dev/null || fail "check.sh --full failed with a slow probe"
+before "done py:probe" py:bench || fail "check.sh --full ran the benches while probe.py was planting its faults"
+# The benches run alone, before any full lane: a bench beside other work measures the machine's load.
+(SLOW_STEP=py:bench gate --full) >/dev/null || fail "check.sh --full failed with slow benches"
+for s in stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions; do
+	before "done py:bench" "$s" || fail "check.sh --full ran $s beside the benches"
+done
 for s in stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
 	before "done py:probe" "$s" || fail "check.sh --full ran $s while probe.py was planting its faults"
 done
@@ -1798,7 +1806,7 @@ done
 rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/green-full"
 base=$(git -C "$g" merge-base HEAD origin/main)
 out=$(gate --merge) || fail "check.sh --merge failed on a copy whose every step passes: $out"
-for s in $fast_steps py:probe stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
+for s in $fast_steps py:probe py:bench stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
 	[ "$s" = test ] || ran "$s" || fail "check.sh --merge skipped $s"
 done
 grep -qx "py:harness_mutate --changed $base" "$log" || fail "check.sh --merge did not judge the merge's own harness mutants: $(grep harness_mutate "$log")"
@@ -2277,6 +2285,31 @@ cmp -s "$ws/src/reports/stryker-incremental.json" "$ws/new/reports/stryker-incre
 mkdir "$ws/empty" && (cd "$ws/src" && sh "$here/worktree.sh" "$ws/empty" another HEAD) >/dev/null 2>&1 && fail "worktree.sh took an empty folder that exists, which git would fill"
 (cd "$ws/src" && sh "$here/worktree.sh" "$ws/x") >/dev/null 2>&1 && fail "worktree.sh ran with no branch named"
 [ ! -e "$ws/x" ] || fail "worktree.sh made a folder for a call it refused"
+fi
+
+if part bench; then
+# bench.py: each bench names its budget in brackets and the mean of its runs stays under it; one past it, one with no
+# budget, none at all, or a run that fails, fails the gate. A fake Vitest writes the report it is given.
+b="$t/bench"
+mkdir -p "$b"
+printf '#!/bin/sh\nwhile [ $# -gt 0 ]; do [ "$1" = --outputJson ] && cp "$BENCH_FIXTURE" "$2"; shift; done\nexit "${BENCH_EXIT:-0}"\n' >"$b/vitest" && chmod +x "$b/vitest"
+report() { python3 -I -c 'import json, sys
+pairs = zip(sys.argv[2::2], sys.argv[3::2])
+json.dump({"files": [{"filepath": "a.bench.ts", "groups": [{"fullName": "g", "benchmarks": [{"name": n, "mean": float(m)} for n, m in pairs]}]}]}, open(sys.argv[1], "w"))' "$b/report.json" "$@"; }
+bench() { (cd "$b" && BENCH_VITEST="$b/vitest" BENCH_FIXTURE="$b/report.json" python3 -I "$here/bench.py" 2>&1); }
+report "a line [0.2 ms]" 0.05 "a room [100 ms]" 14.5
+out=$(bench) || fail "bench.py refused benches within their budgets: $out"
+printf '%s\n' "$out" | grep -q "0.0500 ms of 0.2 ms: a line" || fail "bench.py did not print a measure and its budget: $out"
+report "a line [0.2 ms]" 0.25 "a room [100 ms]" 14.5
+out=$(bench) && fail "bench.py passed a bench over its budget"
+printf '%s\n' "$out" | grep -q "a line \[0.2 ms\]: 0.2500 ms, over its 0.2 ms" || fail "bench.py did not name the bench over its budget: $out"
+report "a line" 0.05
+out=$(bench) && fail "bench.py passed a bench with no budget"
+printf '%s\n' "$out" | grep -q "names no budget" || fail "bench.py did not say a bench names no budget: $out"
+report
+(bench) >/dev/null && fail "bench.py passed a run with no bench"
+report "a line [0.2 ms]" 0.05
+(BENCH_EXIT=1 bench) >/dev/null && fail "bench.py passed a Vitest run that failed"
 fi
 
 [ -z "${ONLY:-}" ] || [ "${ran:-}" = 1 ] || fail "ONLY=$ONLY names no section"

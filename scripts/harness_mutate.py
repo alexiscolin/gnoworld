@@ -54,7 +54,7 @@ SECTIONS = {
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
     "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
-    "scripts/repo_files.py": "worktrees", "scripts/worktree.sh": "worktree_script", "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
+    "scripts/repo_files.py": "worktrees", "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench", "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
 }
 
 
@@ -537,6 +537,11 @@ def mutants():
     yield from each("scripts/worktree.sh", 'else ln -s "$entry"', 'else cp -R "$entry"', "hooks", "worktree.sh links each package, never copies it")
     yield from each("scripts/worktree.sh", '\tcp -RP "$m" "$dir/$m"', '\tcp -RL "$m" "$dir/$m"', "hooks", "worktree.sh keeps a workspace's @gnoworld links in the new tree")
     yield from each("scripts/worktree.sh", '\tcp reports/stryker-incremental.json "$dir/reports/"', "\t:", "hooks", "worktree.sh seeds StrykerJS's incremental file")
+    yield from each("scripts/bench.py", "    if mean > budget:", "    if False:", "hooks", "bench.py fails a bench over its budget")
+    yield from each("scripts/bench.py", "    if found is None:", "    if False:", "hooks", "bench.py fails a bench with no budget")
+    yield from each("scripts/bench.py", "if not measures:", "if False:", "hooks", "bench.py fails a run with no bench")
+    yield from each("scripts/bench.py", "if run.returncode != 0 or not", "if not", "hooks", "bench.py fails a Vitest run that failed")
+    yield from each("scripts/check.sh", " PROVE_FIX_GO BENCH_VITEST", " PROVE_FIX_GO", "hooks", "check.sh: the benches' Vitest is never the environment's")
     yield from each("scripts/prove_fix.py", "return all(subprocess.run(cmd", "return True or all(subprocess.run(cmd", "hooks", "prove_fix runs the tests on the parent")
     yield from each("scripts/prove_fix.py", 're.search(r"^No-test: \\S", message, re.M)', "True", "hooks", "prove_fix wants a reason for no test")
     yield from each("scripts/prove_fix.py", r"|\.spec\.ts", "", "hooks", "prove_fix takes a journey for a fix's test (F126)")
