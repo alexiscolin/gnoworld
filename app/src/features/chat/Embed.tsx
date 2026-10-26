@@ -12,14 +12,6 @@ export interface EmbedProps {
   verdict: StreamEvent["state"] | undefined;
 }
 
-// The site sends no referrer (F682). YouTube's player asks for the embedding site's identity in it, this policy the
-// one it recommends (developers.google.com/youtube/terms/required-minimum-functionality): the origin, nothing more.
-const REFERRER = {
-  YouTube: "strict-origin-when-cross-origin",
-  Vimeo: "no-referrer",
-  Giphy: "no-referrer",
-} as const satisfies Record<Player["service"], string>;
-
 /** A service's player, framed. */
 export function PlayerFrame({ embed }: { embed: Player }) {
   return (
@@ -29,7 +21,9 @@ export function PlayerFrame({ embed }: { embed: Player }) {
       className={styles["frame"]}
       allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
       allowFullScreen
-      referrerPolicy={REFERRER[embed.service]}
+      // No referrer, as the site sends none (F682; Alexis, 2026-10-26): YouTube's terms ask for one, so a player that
+      // refuses to play brings the question back.
+      referrerPolicy="no-referrer"
       // The player's own scripts, full screen and its links out, in an origin of its own: never this page's.
       sandbox="allow-scripts allow-presentation allow-popups"
     />

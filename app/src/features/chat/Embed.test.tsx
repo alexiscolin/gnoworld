@@ -48,8 +48,10 @@ describe("Embed", () => {
     expect(attribute(html, "allowFullScreen")).toBe("");
   });
 
-  // F886: the site sends no referrer (F682).
+  // F886 (Alexis, 2026-10-26): the site sends no referrer (F682), and its players none either: YouTube's terms ask
+  // for one, so a player that refuses to play in the demo brings the question back.
   it.each([
+    YOUTUBE,
     { service: "Vimeo", src: "https://player.vimeo.com/video/76979871?dnt=1", title: "Vimeo video" },
     { service: "Giphy", src: "https://giphy.com/embed/4548k01F5Ej28", title: "Giphy animation" },
   ] as const)("sends $service's player no referrer", (embed) => {
