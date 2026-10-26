@@ -99,12 +99,14 @@ describe("the store's chat slice: direct messages", () => {
     };
     return { device, calls };
   }
+  // A device's drafts, for the choices' tests: none kept.
+  const NO_DRAFTS = { get: () => "", set: () => true };
 
   // 4e's complexity and efficiency reviews: the page read the device again, JSON and schema, for each line.
   it("reads an account's choices from its device once, at its session's start, whatever it hears after", () => {
     const t = as(ACCOUNT);
     const { device, calls } = prefs({ onlyKnown: true, known: [ALICE] });
-    t.store.getState().dmActions.begin({ prefs: device });
+    t.store.getState().dmActions.begin({ prefs: device, drafts: NO_DRAFTS });
     for (const id of ["a", "b", "c"]) t.heard(dm(id, { from: ALICE, to: ACCOUNT, text: "hi" }));
     expect(t.store.getState().dmChoices).toEqual({ onlyKnown: true, known: new Set([ALICE]) });
     expect([calls.onlyKnown, calls.known]).toEqual([1, 1]);
@@ -112,7 +114,7 @@ describe("the store's chat slice: direct messages", () => {
 
   it("chooses nothing for a session with no device, a guest's: everyone's messages heard", () => {
     const t = as(ACCOUNT);
-    t.store.getState().dmActions.begin({ prefs: prefs({ onlyKnown: true, known: [ALICE] }).device });
+    t.store.getState().dmActions.begin({ prefs: prefs({ onlyKnown: true, known: [ALICE] }).device, drafts: NO_DRAFTS });
     t.store.getState().dmActions.begin();
     expect(t.store.getState().dmChoices).toEqual({ onlyKnown: false, known: new Set() });
     t.store.getState().dmActions.setOnlyKnown(true);
@@ -122,7 +124,7 @@ describe("the store's chat slice: direct messages", () => {
   it("keeps a new choice on the device, and writes nor notifies anything for the same one", () => {
     const t = as(ACCOUNT);
     const { device, calls } = prefs();
-    t.store.getState().dmActions.begin({ prefs: device });
+    t.store.getState().dmActions.begin({ prefs: device, drafts: NO_DRAFTS });
     t.store.getState().dmActions.setOnlyKnown(true);
     expect(t.store.getState().dmChoices.onlyKnown).toBe(true);
     let heard = 0;
@@ -137,7 +139,7 @@ describe("the store's chat slice: direct messages", () => {
   it("notes an account written to in the choices and on the device, notifying no one of one known", () => {
     const t = as(ACCOUNT);
     const { device, calls } = prefs();
-    t.store.getState().dmActions.begin({ prefs: device });
+    t.store.getState().dmActions.begin({ prefs: device, drafts: NO_DRAFTS });
     t.store.getState().dmActions.know(ALICE);
     expect(t.store.getState().dmChoices.known).toEqual(new Set([ALICE]));
     let heard = 0;
@@ -154,12 +156,35 @@ describe("the store's chat slice: direct messages", () => {
   it("notes an account written to once Ergo echoes my line to it, never for its line to me", () => {
     const t = as(ACCOUNT);
     const { device, calls } = prefs();
-    t.store.getState().dmActions.begin({ prefs: device });
+    t.store.getState().dmActions.begin({ prefs: device, drafts: NO_DRAFTS });
     t.heard(dm("a", { from: ALICE, to: ACCOUNT, text: "hi" }));
     expect(t.store.getState().dmChoices.known).toEqual(new Set());
     t.heard(dm("b", { from: ACCOUNT, to: ALICE, text: "hello", second: 1 }));
     expect(t.store.getState().dmChoices.known).toEqual(new Set([ALICE]));
     expect(calls.know).toEqual([ALICE]);
+  });
+
+  // 4e's UX review (U1): a line Ergo refused, its partner not connected, has its draft back in the composer.
+  it("puts a refused line's draft back on the device, counting the partner's refusals until a new session", () => {
+    const t = as(ACCOUNT);
+    const written: [string, string][] = [];
+    const drafts = {
+      get: () => "",
+      set: (room: string, draft: string) => {
+        written.push([room, draft]);
+        return true;
+      },
+    };
+    t.store.getState().dmActions.begin({ prefs: prefs().device, drafts });
+    t.store.getState().dmActions.refused(ALICE, "hi");
+    t.store.getState().dmActions.refused(ALICE, "again");
+    expect(written).toEqual([
+      [ALICE, "hi"],
+      [ALICE, "again"],
+    ]);
+    expect(t.store.getState().dmRefused).toEqual({ [ALICE]: { count: 2, draft: "again" } });
+    t.store.getState().dmActions.begin();
+    expect(t.store.getState().dmRefused).toEqual({});
   });
 
   it.each([

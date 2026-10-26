@@ -9,6 +9,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { pageLoginApi } from "../../lib/api/login.ts";
 import { pageDmPrefs } from "../../lib/dms/page.ts";
+import { pageDrafts } from "../../lib/drafts/page.ts";
 import { pageRoomsApi } from "../../lib/api/rooms.ts";
 import { drawGuestNick } from "../../lib/ergo/ergo.ts";
 import { pageErgo } from "../../lib/ergo/page.ts";
@@ -93,6 +94,11 @@ function Loaded({ sections, current, state, chat, session, say, sayTo, dms }: Lo
               rooms={ids}
               members={[]}
               onSay={(draft) => sayTo(partner, draft)}
+              refused={
+                dms.refused === undefined
+                  ? undefined
+                  : { ...dms.refused, why: `Not sent: ${shortAddress(partner)} is not online.` }
+              }
             />
           }
         />
@@ -128,7 +134,7 @@ const pageLink = (store: ReturnType<typeof useAppStore>) =>
     connect: pageErgo,
     ticket: pageLoginApi().ticket,
     guest: drawGuestNick,
-    device: (account) => ({ prefs: pageDmPrefs(account) }),
+    device: (account) => ({ prefs: pageDmPrefs(account), drafts: pageDrafts(account) }),
   });
 
 export function ChatPanel({ world }: { world: string }) {

@@ -102,10 +102,33 @@ export interface ComposerProps {
   onDraft?: ((draft: string) => void) | undefined;
   /** The name of whom it writes to, in place of the room's: a direct message's partner (4e). */
   label?: string | undefined;
+  /** The lines Ergo refused so far, the last one's draft, and why it did not go (4e: a direct message to an account
+   * not connected). One more while the composer is in view puts its draft back in the box. */
+  refused?: { count: number; draft: string; why: string } | undefined;
 }
 
-export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", onDraft, label: to }: ComposerProps) {
+// Why Ergo refused the last line, said until the draft changes or a line goes: one more refusal while in view puts
+// its draft back in the box (the store put it back on the device too, for the next time the composer starts).
+function useRefusal(refused: ComposerProps["refused"], setDraft: (draft: string) => void) {
+  const [why, setWhy] = useState<string>();
+  const [answered, setAnswered] = useState(refused?.count);
+  if (refused !== undefined && refused.count !== answered) {
+    setAnswered(refused.count);
+    setDraft(refused.draft);
+    setWhy(refused.why);
+  }
+  return {
+    why,
+    said: () => {
+      setWhy(undefined);
+    },
+  };
+}
+
+export function Composer(props: ComposerProps) {
+  const { room, nick, rooms, members, onSay, draft: kept = "", onDraft, label: to, refused } = props;
   const [draft, setDraft] = useState(kept);
+  const refusal = useRefusal(refused, setDraft);
   // Each change of the draft, the device told at once: a render alone (a line arriving) writes nothing.
   const change = (next: string) => {
     setDraft(next);
@@ -136,6 +159,7 @@ export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", 
     selectionRef.current = next;
     change(next.text);
     setFailed(false);
+    refusal.said();
   };
   const format = (kind: Format) => {
     const start = box()?.selectionStart ?? draft.length;
@@ -155,6 +179,7 @@ export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", 
     if (composed.kind !== "line") return;
     const went = onSay(draft);
     setFailed(!went);
+    refusal.said();
     if (went) change("");
   };
   return (
@@ -173,8 +198,9 @@ export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", 
             onChange={(value) => {
               change(value);
               setFailed(false);
+              refusal.said();
             }}
-            {...said(composed, failed, completion)}
+            {...(refusal.why === undefined ? said(composed, failed, completion) : { error: refusal.why })}
           />
           <Button type="submit" disabled={composed.kind !== "line"}>
             Send

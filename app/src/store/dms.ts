@@ -6,6 +6,7 @@ import { addLines, dmOf, type IrcMessage, type Line } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
 import type { StateCreator } from "zustand/vanilla";
 import type { DmPrefs } from "../lib/dms/prefs.ts";
+import type { Drafts } from "../lib/drafts/drafts.ts";
 import { LINES_KEPT, type ChatSlice } from "./chat.ts";
 
 /** An account's choices for its direct messages. */
@@ -19,6 +20,8 @@ export interface DmChoices {
 /** What the slice reads and writes on an account's device. */
 export interface DmDevice {
   prefs: DmPrefs;
+  /** The account's drafts, where a line Ergo refused goes back. */
+  drafts: Drafts;
 }
 
 export interface DmSlice {
@@ -26,6 +29,9 @@ export interface DmSlice {
   dms: Readonly<Record<string, readonly Line[]>>;
   /** The session's account's choices: a guest's, or one with no device, hear everyone. */
   dmChoices: DmChoices;
+  /** The lines Ergo refused this session, their partner not connected, by partner: how many, and the last one's
+   * draft, which the composer takes back. */
+  dmRefused: Readonly<Record<string, { count: number; draft: string }>>;
   dmActions: {
     /** One live line from Ergo: a direct message is kept with its partner; any other changes nothing. */
     heard: (message: IrcMessage) => void;
@@ -36,6 +42,8 @@ export interface DmSlice {
     setOnlyKnown: (only: boolean) => void;
     /** Notes an account written to, once Ergo delivered my line to it; kept on the device. */
     know: (partner: string) => void;
+    /** A line Ergo refused, its partner not connected: its draft back on the device, the refusal counted. */
+    refused: (partner: string, draft: string) => void;
   };
 }
 
@@ -51,6 +59,7 @@ export const dmSlice: StateCreator<ChatSlice & DmSlice, [], [], DmSlice> = (set,
   return {
     dms: {},
     dmChoices: NO_CHOICE,
+    dmRefused: {},
     dmActions: {
       heard: (message) => {
         const { chat, dms } = get();
@@ -69,8 +78,9 @@ export const dmSlice: StateCreator<ChatSlice & DmSlice, [], [], DmSlice> = (set,
         const prefs = next?.prefs;
         const dmChoices =
           prefs === undefined ? NO_CHOICE : { onlyKnown: prefs.onlyKnown(), known: new Set(prefs.known()) };
-        const { dms, dmChoices: before } = get();
-        if (Object.keys(dms).length > 0 || dmChoices !== before) set({ dms: {}, dmChoices });
+        const { dms, dmChoices: before, dmRefused } = get();
+        const held = Object.keys(dms).length + Object.keys(dmRefused).length;
+        if (held > 0 || dmChoices !== before) set({ dms: {}, dmChoices, dmRefused: {} });
       },
       setOnlyKnown: (only) => {
         const { dmChoices } = get();
@@ -83,6 +93,11 @@ export const dmSlice: StateCreator<ChatSlice & DmSlice, [], [], DmSlice> = (set,
         if (!dmChoices.known.has(partner))
           set({ dmChoices: { ...dmChoices, known: new Set([...dmChoices.known, partner]) } });
         device?.prefs.know(partner);
+      },
+      refused: (partner, draft) => {
+        device?.drafts.set(partner, draft);
+        const { dmRefused } = get();
+        set({ dmRefused: { ...dmRefused, [partner]: { count: (dmRefused[partner]?.count ?? 0) + 1, draft } } });
       },
     },
   };

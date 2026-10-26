@@ -3,12 +3,13 @@
 // (Ergo's max-channels-per-client); the newest lines of the room in view alone, once Ergo says I joined it, since
 // Ergo paces a client to 2 lines a second (plan §4); Ergo's lines read into the store through one BatchReader a
 // connection. Its parts come in, so the tests give their own.
-import { BatchReader, compose, nickOf, type Composed, type IrcMessage } from "@gnoworld/core";
+import { BatchReader, compose, nickOf, type IrcMessage } from "@gnoworld/core";
 import { Address, RoomId } from "@gnoworld/schemas";
 import type { Result } from "../../lib/api/http.ts";
 import type { Ergo, ErgoOptions, Who } from "../../lib/ergo/ergo.ts";
 import { LINES_KEPT } from "../../store/chat.ts";
 import { groupsOf } from "./groups.ts";
+import { outbox, type Outbox, type Sent } from "./outbox.ts";
 import type { DmDevice } from "../../store/dms.ts";
 import type { AppState, createAppStore } from "../../store/index.ts";
 
@@ -40,8 +41,6 @@ export interface ChatLink {
 
 // Where a room this page follows stands on this connection: a JOIN went for it; its history went.
 type Phase = "joined" | "asked";
-// A line a draft was composed to, and sent.
-type Sent = Extract<Composed, { kind: "line" }>;
 
 class Link implements ChatLink {
   readonly #deps: LinkDeps;
@@ -56,10 +55,12 @@ class Link implements ChatLink {
   // The rooms Ergo said, live, I am in on this connection, joined by this page or not: with Ergo's multiclient a
   // second tab's own JOIN brings no echo, Ergo having told it of the room at its welcome or as the first joined.
   readonly #inside = new Set<string>();
+  readonly #outbox: Outbox;
   #reader = new BatchReader();
 
   constructor(deps: LinkDeps) {
     this.#deps = deps;
+    this.#outbox = outbox(deps.store);
     this.#unsubscribe = deps.store.subscribe((state) => {
       this.#follow(state.login.session);
     });
@@ -83,7 +84,9 @@ class Link implements ChatLink {
   }
 
   sayTo(partner: string, draft: string): boolean {
-    return this.#write(partner, draft, (me) => me !== partner && Address.safeParse(partner).success) !== undefined;
+    const sent = this.#write(partner, draft, (me) => me !== partner && Address.safeParse(partner).success);
+    if (sent !== undefined) this.#outbox.sent(partner, draft, sent);
+    return sent !== undefined;
   }
 
   // A draft to `target`, composed and sent on an account's connection when `allowed` lets it, given my nick: the
@@ -140,11 +143,9 @@ class Link implements ChatLink {
     // Noted first: the store's change below calls this again, which must find the session the same.
     this.#key = key;
     if (known) this.#unfollow();
-    this.#deps.store
-      .getState()
-      .dmActions.begin(session.kind === "in" ? this.#deps.device?.(session.address) : undefined);
+    const { store, device, ticket, guest } = this.#deps;
+    store.getState().dmActions.begin(session.kind === "in" ? device?.(session.address) : undefined);
     this.#end();
-    const { ticket, guest } = this.#deps;
     this.#open(session.kind === "out" ? { guest } : { account: session.address, ticket });
   }
 
@@ -200,6 +201,7 @@ class Link implements ChatLink {
   #forget(): void {
     this.#phases.clear();
     this.#inside.clear();
+    this.#outbox.clear();
   }
 
   // The room in view's newest lines, once joined by this page and Ergo said I am in it, once a connection.
@@ -247,6 +249,7 @@ class Link implements ChatLink {
     const [room = "", kicked] = params;
     const me = this.#ergo?.nick();
     if (tags.has("batch") || me === undefined) return;
+    this.#outbox.heard(message, me);
     if (command === "KICK" && kicked === me) this.#inside.delete(room);
     if (command !== "JOIN" || nickOf(source) !== me) return;
     this.#inside.add(room);

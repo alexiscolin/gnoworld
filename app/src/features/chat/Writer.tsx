@@ -3,6 +3,7 @@
 import { lazy, Suspense } from "react";
 import { pageDrafts } from "../../lib/drafts/page.ts";
 import type { AppState } from "../../store/index.ts";
+import type { ComposerProps } from "./Composer.tsx";
 import { roomLabel } from "./names.ts";
 
 // The composer, an account's alone: a visitor's page never loads its code (the first screen's budget, ADR-0001 §12).
@@ -18,9 +19,11 @@ export interface WriterProps {
   rooms: readonly string[];
   members: readonly string[];
   onSay: (draft: string) => boolean;
+  /** The lines Ergo refused, and why the last did not go: a direct message's (4e). */
+  refused?: ComposerProps["refused"];
 }
 
-export function Writer({ session, room, label, rooms, members, onSay }: WriterProps) {
+export function Writer({ session, room, label, rooms, members, onSay, refused }: WriterProps) {
   if (session.kind !== "in") return <p>Log in to write in this room.</p>;
   // The account's drafts on this device: the room's, where the composer starts, and each change kept (4d).
   const kept = pageDrafts(session.address);
@@ -38,6 +41,7 @@ export function Writer({ session, room, label, rooms, members, onSay }: WriterPr
         rooms={rooms.map(roomLabel)}
         members={members}
         onSay={onSay}
+        refused={refused}
       />
     </Suspense>
   );

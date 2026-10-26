@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { inGames, lines, whoIsHere, word } from "./chat.ts";
 import type { PlaywrightWorkerArgs, PlaywrightWorkerOptions } from "@playwright/test";
-import { expect, test, type Page } from "./fixtures.ts";
+import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn, login, talk, ticketOf, type Step } from "./irc.ts";
 
 // 4e (docs/plans/slice-4.md §1, §7): direct messages between accounts, through the real Ergo. The page's account
@@ -77,6 +77,29 @@ test.describe("direct messages", () => {
     await expect(lines(page).filter({ hasText: text })).toHaveCount(1);
     await expect(page).toHaveURL(new RegExp(`dm=${bob.address}`));
     expect(me).not.toBe(bob.address);
+    await bob.close();
+  });
+
+  // 4e's UX review (U1): Ergo refuses a line to an account not connected (401); the page emptied the box all the same.
+  test("keep the draft of a message to an account not connected, and say it was not sent", async ({
+    page,
+    playwright,
+    launchOptions,
+  }) => {
+    await inGames(page);
+    // Bob logged in, his page on no world: not connected to Ergo.
+    const bob = await another({ playwright, launchOptions }, word("bob"));
+    await page.goto(`/w/bubble?dm=${bob.address}`);
+    await hydrated(page);
+    const field = page.getByRole("textbox", { name: `Message ${short(bob.address)}` });
+    await expect(field).toBeVisible();
+    await expect(page.getByText("Connecting to the chat…")).toHaveCount(0);
+    const text = word("lost");
+    await field.fill(text);
+    await field.press("Enter");
+    await expect(field).toHaveAccessibleDescription(`Not sent: ${short(bob.address)} is not online.`);
+    await expect(field).toHaveValue(text);
+    await expect(lines(page)).toHaveCount(0);
     await bob.close();
   });
 
