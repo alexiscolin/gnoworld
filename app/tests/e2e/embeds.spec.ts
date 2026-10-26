@@ -194,6 +194,25 @@ test.describe("a link's player", () => {
     expect(told).toEqual([]);
   });
 
+  // F893 (CR6): Data saver was read once by the asker, at every render by the lines: switched off after the page
+  // opened, a new line offered a card that waited for good on a stream never opened.
+  test("offers no player while the page runs once it opened saving data, whatever the browser says later", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      Reflect.set(window, "saving", true);
+      Object.defineProperty(Navigator.prototype, "connection", {
+        configurable: true,
+        get: () => ({ saveData: Reflect.get(window, "saving") === true }),
+      });
+    });
+    const { say } = await room(page, () => event("v3", "checked"));
+    await page.evaluate(() => Reflect.set(window, "saving", false));
+    say("v3", "then https://vimeo.com/76979871");
+    await expect(lineOf(page, "then").getByRole("link")).toBeVisible();
+    await expect(lineOf(page, "then").getByRole("button")).toHaveCount(0);
+  });
+
   test("passes axe with a player waiting and one playing, on a computer's and a phone's screen", async ({ page }) => {
     let said = "";
     await room(page, () => said);

@@ -19,6 +19,7 @@ import { LOADING } from "./Loading.tsx";
 import { neighbour, roomIds, roomLabel, roomParams, roomsQuery, shownRoom } from "./names.ts";
 import { RoomsView } from "./RoomsView.tsx";
 import { RoomView, type RoomViewProps } from "./RoomView.tsx";
+import { savesData } from "./embeds.ts";
 import { useVerdicts } from "./useVerdicts.ts";
 
 // The rooms as last asked, and what came: undefined when the list could not load.
@@ -95,12 +96,13 @@ interface LoadedProps {
   current: string | undefined;
   state: RoomViewProps["state"];
   verdicts: RoomViewProps["verdicts"];
+  saving: boolean;
   chat: RoomViewProps["chat"];
   session: AppState["login"]["session"];
   say: (room: string, draft: string) => boolean;
 }
 
-function Loaded({ sections, current, state, verdicts, chat, session, say }: LoadedProps) {
+function Loaded({ sections, current, state, verdicts, saving, chat, session, say }: LoadedProps) {
   const ids = roomIds(sections);
   useRoomKeys(ids, current);
   return (
@@ -111,6 +113,7 @@ function Loaded({ sections, current, state, verdicts, chat, session, say }: Load
           room={current}
           state={state}
           verdicts={verdicts}
+          saving={saving}
           chat={chat}
           me={session.kind === "in" ? session.address : undefined}
           composer={
@@ -174,11 +177,10 @@ export function ChatPanel({ world }: { world: string }) {
     linkRef.current?.show(current);
   }, [current]);
   const state = useApp((app) => (current === undefined ? undefined : app.chat.rooms[current]));
-  useVerdicts(store, {
-    room: current,
-    lines: state?.lines,
-    reader: session.kind === "in" ? session.address : undefined,
-  });
+  // Data saver, read once the page runs: the players and the verdicts they wait on agree, whatever it says later.
+  const [saving] = useState(savesData);
+  const reader = session.kind === "in" ? session.address : undefined;
+  useVerdicts(store, { room: current, lines: state?.lines, reader, saving });
   const verdicts = useApp((app) => (current === undefined ? undefined : app.verdicts[current]));
   const chat = useApp((app) => app.login.chat);
   if (!loaded) return LOADING;
@@ -202,6 +204,7 @@ export function ChatPanel({ world }: { world: string }) {
       current={current}
       state={state}
       verdicts={verdicts}
+      saving={saving}
       chat={chat}
       session={session}
       say={(room, draft) => linkRef.current?.say(room, draft) ?? false}

@@ -7,7 +7,6 @@ import { pageVerdictsApi } from "../../lib/api/verdicts.ts";
 import { pageVerdicts } from "../../lib/stream/verdicts.ts";
 import type { createAppStore } from "../../store/index.ts";
 import { verdictAsker } from "./askVerdicts.ts";
-import { savesData } from "./embeds.ts";
 
 type Store = ReturnType<typeof createAppStore>;
 
@@ -16,14 +15,16 @@ export interface Shown {
   room: string | undefined;
   lines: readonly Line[] | undefined;
   reader: string | undefined;
+  /** Whether the reader saves data, read once: then the page follows and asks nothing (F879, F893). */
+  saving: boolean;
 }
 
 /** Follows and asks of the shown room's verdicts for its reader. */
-export function useVerdicts(store: Store, { room, lines, reader }: Shown): void {
+export function useVerdicts(store: Store, { room, lines, reader, saving }: Shown): void {
   // The asker, made once the page runs, as the panel's link is; none for a reader who saves data (F879).
   const askerRef = useRef<ReturnType<typeof verdictAsker>>(undefined);
   useEffect(() => {
-    if (savesData()) return;
+    if (saving) return;
     const api = pageVerdictsApi();
     const asker = verdictAsker({
       verdicts: (room, ids) => api.verdicts(room, ids),
@@ -35,7 +36,7 @@ export function useVerdicts(store: Store, { room, lines, reader }: Shown): void 
     });
     askerRef.current = asker;
     return asker.stop;
-  }, [store]);
+  }, [store, saving]);
   useEffect(() => {
     askerRef.current?.show(room, lines, reader);
   }, [room, lines, reader]);

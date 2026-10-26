@@ -11,7 +11,7 @@ import { useLayoutEffect, useRef, type ReactNode } from "react";
 import type { StreamEvent } from "@gnoworld/schemas";
 import type { ErgoState } from "../../lib/ergo/ergo.ts";
 import { Embed } from "./Embed.tsx";
-import { embedIn, savesData } from "./embeds.ts";
+import { embedIn } from "./embeds.ts";
 import { Markdown } from "./Message.tsx";
 import { roomLabel, shortAddress } from "./names.ts";
 import shared from "./lists.module.css";
@@ -47,6 +47,8 @@ export interface RoomViewProps {
   me?: string | undefined;
   /** The room's lines' verdicts, by msgid, from the server's stream (4g). */
   verdicts?: Readonly<Record<string, StreamEvent["state"]>> | undefined;
+  /** Whether the reader saves data (ADR-0002 §8): then no player is offered, nor any verdict asked (4g, F893). */
+  saving?: boolean;
 }
 
 // A person: a guest by its nick, said so; an account's address shortened, its whole in its title; another name
@@ -82,12 +84,14 @@ interface LineViewProps {
   members: ReadonlySet<string>;
   /** Its verdict from the server's stream, which a link's player waits on (4g). */
   verdict: StreamEvent["state"] | undefined;
+  /** Whether a link's player is offered: not to a reader who saves data. */
+  players: boolean;
 }
 
-function LineView({ line, me, members, verdict }: LineViewProps) {
+function LineView({ line, me, members, verdict, players }: LineViewProps) {
   const blocks = markdown(line.text);
   // Its first link to an accepted service gets a player, but for a reader who saves data (4g).
-  const embed = savesData() ? undefined : embedIn(blocks);
+  const embed = players ? embedIn(blocks) : undefined;
   const names = namesOf(line.text);
   const mentioned = names.split(" ").some((address) => address === me);
   const known = knownOf(names, members);
@@ -142,7 +146,7 @@ function useNewestInView(lines: readonly Line[]) {
   return { listRef, onScroll };
 }
 
-export function RoomView({ room, state, chat, composer, me, verdicts }: RoomViewProps) {
+export function RoomView({ room, state, chat, composer, me, verdicts, saving = false }: RoomViewProps) {
   const { lines = [], members = [], topic } = state ?? {};
   const { listRef, onScroll } = useNewestInView(lines);
   const connected = chat === "connected";
@@ -170,7 +174,14 @@ export function RoomView({ room, state, chat, composer, me, verdicts }: RoomView
             tabIndex={0}
           >
             {lines.map((line) => (
-              <LineView key={line.id} line={line} me={me} members={known} verdict={verdicts?.[line.id]} />
+              <LineView
+                key={line.id}
+                line={line}
+                me={me}
+                members={known}
+                verdict={verdicts?.[line.id]}
+                players={!saving}
+              />
             ))}
           </ol>
           {connected && lines.length === 0 ? <p>No messages yet.</p> : null}
