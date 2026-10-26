@@ -7,6 +7,13 @@ import { useEffect, useRef, useState } from "react";
 import styles from "./LineActions.module.css";
 import { roomLabel } from "./names.ts";
 
+// What the delete's dialog quotes of its line: its first 80 characters, never one cut in two (an emoji's parts).
+const QUOTED = 80;
+function quoted(text: string): string {
+  const characters = Array.from(new Intl.Segmenter().segment(text), ({ segment }) => segment);
+  return characters.length > QUOTED ? `${characters.slice(0, QUOTED).join("")}…` : text;
+}
+
 export interface LineActionsProps {
   line: Line;
   room: string;
@@ -54,6 +61,7 @@ export function LineActions({ line, room, me, onCopy, onDelete }: LineActionsPro
       ? [
           {
             label: "Delete",
+            tone: "danger" as const,
             onSelect: () => {
               setAsking(true);
             },
@@ -62,11 +70,12 @@ export function LineActions({ line, room, me, onCopy, onDelete }: LineActionsPro
       : []),
   ];
   return (
-    <div role="toolbar" aria-label="Message actions" aria-live="off" className={styles["bar"]}>
-      <Menu trigger="More" icon="more" emphasis="plain" label="Message actions" items={items} />
+    <div role="toolbar" aria-label="Actions on this message" aria-live="off" className={styles["bar"]}>
+      <Menu trigger="More actions" icon="more" emphasis="plain" size="s" label="Message actions" items={items} />
       {own ? (
         <Dialog
-          title="Delete this message?"
+          title="Delete message?"
+          description={quoted(line.text)}
           open={asking}
           onClose={() => {
             close(false);
@@ -89,7 +98,7 @@ export function LineActions({ line, room, me, onCopy, onDelete }: LineActionsPro
                   close(true);
                 }}
               >
-                Delete
+                Delete message
               </Button>
             </Cluster>
           </Stack>

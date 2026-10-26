@@ -15,6 +15,9 @@
     /* layout: room for the focus ring, drawn outside the line, which the list that scrolls would clip */
     margin-inline: calc(var(--focus-width) + var(--focus-offset));
     padding-block: var(--space-3xs);
+    /* room at the line's end for its bar (LineActions: a small control, its padding and border, its inset), so the
+       bar covers no word, shown or not: the text never reflows under the pointer (U2) */
+    padding-inline-end: calc(var(--control-s) + 2 * (var(--space-3xs) + var(--line-width)) + var(--space-2xs));
     overflow-wrap: anywhere;
     scroll-margin-block: calc(var(--focus-width) + var(--focus-offset));
   }

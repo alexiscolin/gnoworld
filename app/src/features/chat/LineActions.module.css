@@ -6,6 +6,8 @@
     inset-block-start: calc(-1 * var(--space-s));
     inset-inline-end: var(--space-2xs);
     border: var(--line-width) solid var(--color-line-strong);
+    /* room for More's focus ring inside the frame, which it would paint over (U16) */
+    padding: var(--space-3xs);
     border-radius: var(--radius-m);
     background: var(--color-surface);
     box-shadow: var(--shadow-popover);

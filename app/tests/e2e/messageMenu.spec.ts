@@ -36,9 +36,9 @@ async function room(
     return socket;
   };
 }
-const bars = (page: Page) => page.getByRole("toolbar", { name: "Message actions" });
-const barOf = (page: Page, at: number) => lines(page).nth(at).getByRole("toolbar", { name: "Message actions" });
-const moreOf = (page: Page, at: number) => barOf(page, at).getByRole("button", { name: "More" });
+const bars = (page: Page) => page.getByRole("toolbar", { name: "Actions on this message" });
+const barOf = (page: Page, at: number) => lines(page).nth(at).getByRole("toolbar", { name: "Actions on this message" });
+const moreOf = (page: Page, at: number) => barOf(page, at).getByRole("button", { name: "More actions" });
 const focusedLines = (page: Page) => lines(page).and(page.locator(":focus"));
 const stops = (page: Page) => lines(page).and(page.locator("[tabindex='0']"));
 // The focused element's ring: its style, at least 2 px wide, and whether it lies whole inside its list's box.
@@ -441,6 +441,70 @@ test.describe("a line's actions", () => {
     await expect(flash(page, "Text copied.")).toHaveCount(0, { timeout: 1000 });
   });
 
+  // 4c's UX review (U2): the line keeps room at its end for the bar, so the bar covers no word, of its line or of the
+  // line above, at a computer's width and a phone's.
+  for (const width of [1280, 390]) {
+    test(`cover no word of a long line or of the line above with the bar, at ${String(width)} px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      const long = "the quick brown fox jumps over the lazy dog ".repeat(6).trim();
+      await room(page, {
+        history: [
+          ["l1", T(0), long],
+          ["l2", T(1), long],
+        ],
+      });
+      await lines(page).nth(1).hover();
+      const bar = await barOf(page, 1).boundingBox();
+      if (bar === null) throw new Error("no bar");
+      // Every word's box in the list, the bar's own left out.
+      const words = await page.getByRole("list", { name: "Messages" }).evaluate((list) =>
+        [...list.querySelectorAll(":scope > li")].flatMap((line) => {
+          const walk = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+          const found: { x: number; y: number; width: number; height: number }[] = [];
+          for (let text = walk.nextNode(); text !== null; text = walk.nextNode()) {
+            if (text.parentElement?.closest("[role='toolbar']") != null) continue;
+            const range = document.createRange();
+            range.selectNodeContents(text);
+            for (const { x, y, width: w, height } of range.getClientRects()) found.push({ x, y, width: w, height });
+          }
+          return found;
+        }),
+      );
+      expect(words.length).toBeGreaterThan(4);
+      const overlaps = words.filter(
+        (word) =>
+          word.x < bar.x + bar.width &&
+          bar.x < word.x + word.width &&
+          word.y < bar.y + bar.height &&
+          bar.y < word.y + word.height,
+      );
+      expect(overlaps).toEqual([]);
+    });
+  }
+
+  // 4c's UX review (U16): More's focus ring inside the bar's frame, which it would otherwise paint over.
+  test("draw More's focus ring inside its bar", async ({ page }) => {
+    await room(page);
+    await lines(page).nth(2).focus();
+    await page.keyboard.press("Tab");
+    await expect(moreOf(page, 2)).toBeFocused();
+    const inside = await barOf(page, 2).evaluate((bar) => {
+      const more = bar.querySelector("button");
+      if (more === null) return false;
+      const style = getComputedStyle(more);
+      const reach = parseFloat(style.outlineWidth) + parseFloat(style.outlineOffset);
+      const [ring, frame] = [more.getBoundingClientRect(), bar.getBoundingClientRect()];
+      const edge = parseFloat(getComputedStyle(bar).borderTopWidth);
+      return (
+        ring.left - reach >= frame.left + edge &&
+        ring.right + reach <= frame.right - edge &&
+        ring.top - reach >= frame.top + edge &&
+        ring.bottom + reach <= frame.bottom - edge
+      );
+    });
+    expect(inside).toBe(true);
+  });
+
   test("look as the prototype's bar on a computer's screen", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await room(page);
@@ -476,7 +540,7 @@ test.describe("deleting a line", () => {
     await page.keyboard.press("End");
     await expect(page.getByRole("menuitem", { name: "Delete" })).toBeFocused();
     await page.keyboard.press("Enter");
-    return page.getByRole("dialog", { name: "Delete this message?" });
+    return page.getByRole("dialog", { name: "Delete message?" });
   };
   // The second line's delete asked and refused, by the page or by Ergo: said, the line kept.
   const refused = async (page: Page) => {
@@ -504,7 +568,7 @@ test.describe("deleting a line", () => {
     await moreOf(page, 1).click();
     await expect(page.getByRole("menu").getByRole("menuitem")).toHaveText(["Copy text", "Copy room link", "Delete"]);
     // The green pass (G11): the dialog closed until Delete is chosen.
-    await expect(page.getByRole("dialog", { name: "Delete this message?" })).toBeHidden();
+    await expect(page.getByRole("dialog", { name: "Delete message?" })).toBeHidden();
   });
 
   // The red pass (M8): Esc keeps the line and gives the focus back to More.
@@ -607,9 +671,9 @@ test("deletes the account's own line once asked, in Ergo too", async ({ page }) 
   await field.press("Enter");
   await expect(lineOf(page, text)).toHaveCount(1);
   await lineOf(page, text).hover();
-  await lineOf(page, text).getByRole("button", { name: "More" }).click();
+  await lineOf(page, text).getByRole("button", { name: "More actions" }).click();
   await page.getByRole("menuitem", { name: "Delete" }).click();
-  const dialog = page.getByRole("dialog", { name: "Delete this message?" });
+  const dialog = page.getByRole("dialog", { name: "Delete message?" });
   await dialog.getByRole("button", { name: "Delete" }).click();
   await expect(lineOf(page, text)).toHaveCount(0);
   await page.reload();

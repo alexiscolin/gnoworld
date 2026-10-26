@@ -18,8 +18,10 @@ const draw = (over: Partial<Parameters<typeof LineActions>[0]> = {}) =>
   renderToStaticMarkup(
     <LineActions line={LINE} room="#bubble/games" me={BOB} onCopy={() => undefined} onDelete={() => true} {...over} />,
   );
-// Every item, its words empty too: an item that reads nothing is an item all the same (G11).
-const items = (markup: string) => [...markup.matchAll(/role="menuitem"[^>]*>([^<]*)</g)].map((found) => found[1]);
+// Every item's words, its icon's markup left out, its words empty too: an item that reads nothing is an item all the
+// same (G11).
+const items = (markup: string) =>
+  [...markup.matchAll(/role="menuitem"[^>]*>(.*?)<\/button>/g)].map((found) => found[1]?.replace(/<[^>]*>/g, ""));
 // An element's opening tag holding each of these attributes, in any order.
 const tagWith = (tag: string, ...attributes: string[]) =>
   new RegExp(
@@ -30,8 +32,11 @@ const tagWith = (tag: string, ...attributes: string[]) =>
 describe("a line's actions", () => {
   it("are a toolbar named for what they act on, out of the list's live announcements, its More menu an icon", () => {
     const markup = draw();
-    expect(markup).toMatch(tagWith("div", 'role="toolbar"', 'aria-label="Message actions"', 'aria-live="off"'));
-    expect(markup).toMatch(tagWith("button", 'aria-label="More"', 'aria-haspopup="menu"'));
+    // 4c's UX review (U15, U3): the toolbar and its button named apart from the menu, "Message actions"; the button
+    // a toolbar's small control.
+    expect(markup).toMatch(tagWith("div", 'role="toolbar"', 'aria-label="Actions on this message"', 'aria-live="off"'));
+    expect(markup).toMatch(tagWith("button", 'aria-label="More actions"', 'aria-haspopup="menu"', 'data-size="s"'));
+    expect(markup).toMatch(tagWith("div", 'role="menu"', 'aria-label="Message actions"'));
     expect(markup).toContain('data-icon="more"');
   });
 
@@ -58,5 +63,27 @@ describe("a line's actions", () => {
 
   it("ask before a delete in a dialog", () => {
     expect(draw({ me: ALICE })).toMatch(/<dialog[^>]*>/);
+  });
+
+  // 4c's UX review (U7): Delete apart, in danger's tone.
+  it("mark Delete as an act of danger, apart", () => {
+    const markup = draw({ me: ALICE });
+    expect(markup).toMatch(tagWith("button", 'role="menuitem"', 'data-tone="danger"'));
+    expect(markup).toMatch(/role="separator"[^>]*><\/div><button[^>]*data-tone="danger"/);
+  });
+
+  // 4c's UX review (U5, U6): the dialog says which line it means, its button the act.
+  it.each([
+    ["a short line whole", "hi", "hi"],
+    ["a long line's first 80 characters", `${"a".repeat(79)}éz and more`, `${"a".repeat(79)}é…`],
+    ["no emoji cut in two", `${"a".repeat(79)}👍🏽 and more`, `${"a".repeat(79)}👍🏽…`],
+  ])("quote %s in the delete's dialog, which names the act", (_, text, quoted) => {
+    const markup = draw({ me: ALICE, line: { ...LINE, text } });
+    const described = /<dialog[^>]*aria-describedby="([^"]+)"/.exec(markup)?.[1] ?? "";
+    expect(described).not.toBe("");
+    expect(markup).toContain(`<p id="${described}"`);
+    expect(new RegExp(`<p id="${described}"[^>]*>([^<]*)</p>`).exec(markup)?.[1]).toBe(quoted);
+    expect(markup).toContain(">Delete message?</h2>");
+    expect(markup).toMatch(/>Delete message<\/button>/);
   });
 });
