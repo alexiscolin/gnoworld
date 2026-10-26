@@ -90,6 +90,46 @@ test.describe("a line's actions", () => {
     await expect(lines(page).nth(2)).toBeFocused();
   });
 
+  // The green pass (G5): a move held with a modifier is the browser's or the page's (Alt+arrows switch rooms).
+  test("leave a move held with a modifier where it is, its default the browser's, and take the plain ones", async ({
+    page,
+  }) => {
+    await room(page, { history: SIXTY });
+    await page.evaluate(() => {
+      const seen: string[] = [];
+      Object.assign(window, { seen });
+      window.addEventListener("keydown", (event) => seen.push(`${event.key} ${String(event.defaultPrevented)}`));
+    });
+    await lines(page).nth(30).focus();
+    for (const key of ["Shift+ArrowDown", "Control+End", "Meta+ArrowUp", "Alt+Home"]) {
+      await page.keyboard.press(key);
+      await expect(lines(page).nth(30)).toBeFocused();
+    }
+    await page.keyboard.press("ArrowDown");
+    await expect(lines(page).nth(31)).toBeFocused();
+    const seen = await page.evaluate(() => Reflect.get(window, "seen") as string[]);
+    expect(seen.filter((pressed) => !/^(Shift|Control|Meta|Alt) /.test(pressed))).toEqual([
+      "ArrowDown false",
+      "End false",
+      "ArrowUp false",
+      "Home false",
+      "ArrowDown true",
+    ]);
+  });
+
+  // The green pass (G7): the line holding the tab stop deleted by its author, the newest takes it.
+  test("keep one tab stop, the newest, when the chosen line is deleted by another", async ({ page }) => {
+    const ergo = await room(page);
+    await lines(page).nth(1).focus();
+    ergo().send(`@msgid=r1;time=${T(30)};account=${MEMBER} :${MEMBER}!u@h REDACT #bubble/games m2`);
+    await expect(lines(page)).toHaveCount(2);
+    await expect(stops(page)).toHaveCount(1);
+    await expect(lineOf(page, "the third line")).toHaveAttribute("tabindex", "0");
+    await roomsNav(page).getByRole("link").last().focus();
+    await page.keyboard.press("Tab");
+    await expect(lineOf(page, "the third line")).toBeFocused();
+  });
+
   test("keep the line last focused as the one tab stop; Tab enters its bar, then leaves the list; Shift+Tab comes back", async ({
     page,
   }) => {
@@ -251,6 +291,7 @@ test.describe("a line's actions", () => {
     await expect(lines(page)).toHaveCount(4);
     await expect(lines(page).nth(1)).toBeFocused();
     await expect(stops(page)).toHaveCount(1);
+    await expect(lines(page).nth(1)).toHaveAttribute("tabindex", "0");
     await page.keyboard.press("Alt+ArrowDown");
     await page.keyboard.press("Alt+ArrowUp");
     await expect(lineOf(page, "the first line")).toBeVisible();
