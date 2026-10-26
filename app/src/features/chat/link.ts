@@ -8,7 +8,7 @@ import { RoomId } from "@gnoworld/schemas";
 import type { Result } from "../../lib/api/http.ts";
 import type { Ergo, ErgoOptions, Who } from "../../lib/ergo/ergo.ts";
 import { LINES_KEPT } from "../../store/chat.ts";
-import { followed, groupsOf } from "./groups.ts";
+import { asksAfterJoin, followed, groupsOf } from "./groups.ts";
 import type { AppState, createAppStore } from "../../store/index.ts";
 import { Places, TypingOut } from "./telling.ts";
 
@@ -213,8 +213,8 @@ class Link implements ChatLink {
     if (room === undefined || !this.#inside.has(room) || this.#phases.get(room) !== "joined") return;
     this.#phases.set(room, "asked");
     this.#ergo?.send(`CHATHISTORY LATEST ${room} * ${String(HISTORY_LINES)}`);
-    // An echoed JOIN brings Ergo's NAMES and puts me in the store's list; a second tab's brings neither.
-    if ((this.#deps.store.getState().chat.rooms[room]?.members.length ?? 0) === 0) this.#ergo?.send(`NAMES ${room}`);
+    const held = this.#deps.store.getState().chat.rooms[room];
+    for (const ask of asksAfterJoin(room, held, this.#key !== "guest")) this.#ergo?.send(ask);
   }
 
   // A JOIN sent marks its rooms joined; a PART sent forgets them.

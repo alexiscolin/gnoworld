@@ -26,3 +26,14 @@ export function followed(listed: readonly string[], shown: string | undefined, m
   const late = shown !== undefined && listed.includes(shown) && !first.includes(shown);
   return late ? [...first.slice(0, max - 1), shown] : first;
 }
+
+/** What a JOIN of `room` leaves to ask Ergo: an echoed JOIN brings its NAMES and its MARKREAD, a second tab's neither
+ * (CR7); who is here while none is known, and an account's place while the store holds none. */
+export function asksAfterJoin(
+  room: string,
+  held: { readonly members: readonly string[]; readonly read: string | undefined } | undefined,
+  account: boolean,
+): string[] {
+  const unknown = { NAMES: (held?.members.length ?? 0) === 0, MARKREAD: account && held?.read === undefined };
+  return Object.entries(unknown).flatMap(([command, ask]) => (ask ? [`${command} ${room}`] : []));
+}

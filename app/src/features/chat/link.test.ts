@@ -1090,6 +1090,25 @@ describe("the chat's link: what it says", () => {
       expect(marked(again.sent.slice(before))).toEqual([]);
     });
 
+    // The code review (CR7): Ergo's place lost to a race (its JOIN and MARKREAD played as a second tab attached, before
+    // the page followed the room) is asked of Ergo as the history is: an account's, the store holding none.
+    it("asks Ergo the room's place as its history is asked, an account's, when the store holds none", () => {
+      const asks = (sent: readonly string[]) => sent.filter((line) => /^MARKREAD \S+$/.test(line));
+      const t = memberIn(["#bubble/games"]);
+      expect(asks(t.fake.sent)).toEqual(["MARKREAD #bubble/games"]);
+      const known = setup();
+      known.link.follow(["#bubble/games"]);
+      known.link.show("#bubble/games");
+      known.signedIn(ADDRESS);
+      const fake = known.connected(ADDRESS);
+      fake.line(`:ergo MARKREAD #bubble/games timestamp=${T(1)}`);
+      fake.line(`:${ADDRESS}!u@h JOIN #bubble/games`);
+      expect(asks(fake.sent)).toEqual([]);
+      const guest = guestIn(["#bubble/games"]);
+      guest.fake.line(`:${GUEST}!u@h JOIN #bubble/games`);
+      expect(asks(guest.fake.sent)).toEqual([]);
+    });
+
     // The red pass (R20): an account's places are its own; another session starts with none.
     it("forgets an account's places when another session starts", () => {
       const t = memberIn(["#bubble/games"]);
