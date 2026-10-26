@@ -516,7 +516,7 @@ if part harness_mutate; then
 # whose run() leaves a mark, since a fall-through to the real run takes hours.
 m="$t/mutate" && mkdir -p "$m"
 dry() { # $1: a mutant planted at the end of its list, $2: an entry planted in SECTIONS
-	cp "$here/harness_mutate.py" "$m/"
+	cp "$here/harness_mutate.py" "$here/suite_parts.py" "$m/"
 	printf 'def worktree(rev):\n    raise SystemExit("harness_mutate --dry made a worktree")\n' >"$m/repo_files.py"
 	python3 -I - "$m/harness_mutate.py" "$m/ran" "${1:-}" "${2:-}" <<'PY'
 import sys
@@ -566,7 +566,7 @@ printf '%s\n' 'part() { case ",$ONLY," in *",$1,"*) return 0 ;; *) return 1 ;; e
 	'fi' >"$hs/src/scripts/test_hooks.sh"
 printf 'import os, sys\n\n\ndef part(name):\n    return False\n\n\nif part("y"):\n    pass\nsys.exit(os.path.exists("BROKEN_probe"))\n' >"$hs/src/scripts/probe.py"
 printf 'KEEP1 KEEP2 KEEP3 SPARE\n' >"$hs/src/g.txt" && printf 'KEEP4 SPARE2\n' >"$hs/src/h.txt" && printf 'KEEP5\n' >"$hs/src/i.txt"
-cp "$here/harness_mutate.py" "$hs/repo/"
+cp "$here/harness_mutate.py" "$here/suite_parts.py" "$hs/repo/"
 # The worktrees: copies, logged when made and when removed; BREAK_SECOND=<suite> breaks the second one.
 cat >"$hs/repo/repo_files.py" <<'PY'
 import contextlib, os, shutil, tempfile
@@ -604,10 +604,12 @@ planted = '''def mutants():
     yield from each("i.txt", "KEEP5", "", "hooks", "planted keep5")
     if os.environ.get("STALE"):
         yield from each("g.txt", "NOWHERE", "", "hooks", "planted stale")
+    if os.environ.get("SCOPED"):
+        yield from each("j.txt", "KEEP6", "", "hooks", "planted keep6")
 
 
 def every_mutant():'''
-for a, b in (("def mutants():", planted), ("SECTIONS = {\n", 'SECTIONS = {\n    "g.txt": "x", "h.txt": "x", "i.txt": "x",\n')):
+for a, b in (("def mutants():", planted), ("SECTIONS = {\n", 'SECTIONS = {\n    "g.txt": "x", "h.txt": "x", "i.txt": "x", "j.txt": "z",\n')):
     assert s.count(a) == 1, f"harness_mutate.py no longer holds {a!r}: update test_hooks.sh's harness_shards"
     s = s.replace(a, b)
 open(p, "w").write(s)
@@ -664,6 +666,25 @@ base=$(git -C "$hs/repo" rev-parse HEAD)
 printf '\n' >>"$hs/repo/scripts/test_hooks.sh" && git -C "$hs/repo" commit -qam suite
 out=$(shards 2 --changed "$base") && fail "harness_mutate --changed passed with survivors after a suite changed: $out"
 [ "$(verdicts "$out")" = 7 ] || fail "harness_mutate --changed did not judge every mutant after a suite changed: $out"
+# A change inside one section of a suite judges that section's mutants alone, with those of the files it changed.
+printf '%s\n' 'if part z; then' '	grep -q KEEP6 j.txt' 'fi' >"$hs/z"
+cat "$hs/z" >>"$hs/src/scripts/test_hooks.sh" && cat "$hs/z" >>"$hs/repo/scripts/test_hooks.sh"
+printf 'KEEP6\n' >"$hs/src/j.txt" && printf 'KEEP6\n' >"$hs/repo/j.txt"
+git -C "$hs/repo" add -A && git -C "$hs/repo" commit -qm z
+base=$(git -C "$hs/repo" rev-parse HEAD)
+for f in "$hs/src/scripts/test_hooks.sh" "$hs/repo/scripts/test_hooks.sh"; do
+	sed 's|^	grep -q KEEP6 j.txt$|	grep -q KEEP6 j.txt \&\& :|' "$f" >"$f.new" && mv "$f.new" "$f"
+done
+git -C "$hs/repo" commit -qam "z's line"
+out=$(SCOPED=1 shards 2 --changed "$base") || fail "harness_mutate --changed failed on the mutant of the one section changed: $out"
+printf '%s\n' "$out" | grep -q "killed: planted keep6 #1$" || fail "harness_mutate --changed skipped the changed section's mutant: $out"
+[ "$(verdicts "$out")" = 1 ] || fail "harness_mutate --changed judged the mutants of sections a change did not touch: $out"
+printf '%s\n' "$out" | grep -q "1 of 8 mutants" || fail "harness_mutate --changed did not say how many it kept: $out"
+# harness_mutate.py itself changed: its selection may be what changed, so every mutant runs.
+base=$(git -C "$hs/repo" rev-parse HEAD)
+printf '\n# a change of its own\n' >>"$hs/repo/harness_mutate.py" && git -C "$hs/repo" commit -qam itself
+out=$(shards 2 --changed "$base") && fail "harness_mutate --changed passed with survivors after it changed itself: $out"
+[ "$(verdicts "$out")" = 7 ] || fail "harness_mutate --changed did not judge every mutant after it changed itself: $out"
 # What it refuses, before any worktree: a base git cannot compare with, one read as an option, any
 # other argument.
 out=$(shards 2 --changed no-such-base) && fail "harness_mutate --changed took a base that is no commit: $out"
@@ -2310,6 +2331,50 @@ report
 (bench) >/dev/null && fail "bench.py passed a run with no bench"
 report "a line [0.2 ms]" 0.05
 (BENCH_EXIT=1 bench) >/dev/null && fail "bench.py passed a Vitest run that failed"
+fi
+
+if part mutant_scope; then
+# suite_parts.py: harness_mutate --changed judges the mutants of the sections a change touched, not all ~660 (twenty
+# minutes) whenever a suite changed. A section of test_hooks.sh ends at the fi that closes it, nested ifs at the
+# margin counted; one of probe.py at the next line as little indented; a change outside every section touches all.
+python3 -I - "$here" <<'PY' || fail "suite_parts.py misread which sections a change touched (above)"
+import sys
+sys.dont_write_bytecode = True  # a mutant of the same size, written in the same second, would be read from its .pyc
+sys.path.insert(0, sys.argv[1])
+from suite_parts import select, touched
+sh = "pre\nif part a; then\nx\nif y; then\nz\nfi\nafter\nfi\nhelper() { :; }\nif part b; then\nw\nfi\n\nif part a; then\nv\nfi\ntrailer\n"
+cases = [
+    (sh, set(), "no change"),
+    (sh.replace("w\n", "w2\n"), {"b"}, "a line of b"),
+    (sh.replace("z\n", "z2\n"), {"a"}, "a line inside a's nested if"),
+    (sh.replace("after\n", "after2\n"), {"a"}, "a line after a's nested if"),
+    (sh.replace("v\n", "v2\n"), {"a"}, "a's second block"),
+    (sh.replace("helper", "helper2"), None, "a helper between sections"),
+    (sh.replace("pre", "pre2"), None, "the preamble"),
+    (sh.replace("trailer", "trailer2"), None, "the trailer"),
+    (sh.replace("helper() { :; }\n", "helper() { :; }\nif part c; then\nq\nfi\n"), {"c"}, "a new section"),
+]
+for new, want, what in cases:
+    got = touched("scripts/test_hooks.sh", sh, new)
+    assert got == want, f"test_hooks.sh, {what}: {got} for {want}"
+py = 'def f():\n    pass\n\n\ntry:\n    if part("a"):\n        x\n        if y:\n            z\n\n    if part("b"):\n        w\nfinally:\n    pass\n'
+for new, want, what in [
+    (py.replace("        w", "        w2"), {"b"}, "a line of b"),
+    (py.replace("            z", "            z2"), {"a"}, "a's nested line"),
+    (py.replace("    pass\n\n\ntry", "    pass2\n\n\ntry"), None, "a helper"),
+    (py.replace("finally:\n    pass", "finally:\n    pass2"), None, "the end"),
+]:
+    got = touched("scripts/probe.py", py, new)
+    assert got == want, f"probe.py, {what}: {got} for {want}"
+found = [("g1", "a.sh", "x", "hooks"), ("g2", "b.sh", "x", "hooks"), ("g3", "c.py", "x", "probe"), ("g4", "d.sh", "x", "hooks")]
+names = {"a.sh": "a", "b.sh": "b,c", "c.py": "p", "d.sh": "d"}
+labels = lambda chosen: [m[0] for m in chosen]
+sections = lambda path, test: names[path]
+assert labels(select(found, {"d.sh"}, {"hooks": {"c"}}, sections)) == ["g2", "g4"], "a changed guard file and a touched section"
+assert labels(select(found, set(), {"hooks": None}, sections)) == ["g1", "g2", "g4"], "a suite changed outside its sections"
+assert labels(select(found, set(), {}, sections)) == [], "nothing changed"
+assert labels(select(found, set(), {"probe": {"p"}}, sections)) == ["g3"], "a probe block"
+PY
 fi
 
 [ -z "${ONLY:-}" ] || [ "${ran:-}" = 1 ] || fail "ONLY=$ONLY names no section"
