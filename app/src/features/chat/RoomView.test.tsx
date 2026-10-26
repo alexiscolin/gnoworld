@@ -380,7 +380,9 @@ describe("RoomView", () => {
 
   it("shows what it is given under the lines, before who is here: the composer, or a word for a guest", () => {
     const html = view({ composer: <p>Log in to write in this room.</p> });
-    expect(html).toMatch(/aria-label="Messages".*<\/ol><p>Log in to write in this room.<\/p><\/div><aside/s);
+    expect(html).toMatch(
+      /aria-label="Messages".*<\/ol>(<p class="[^"]*typing[^"]*"[^>]*>.*?<\/p>)?<p>Log in to write in this room.<\/p><\/div><aside/s,
+    );
   });
 
   it("shows a room it holds nothing of yet as empty, once connected", () => {
@@ -425,7 +427,7 @@ describe("RoomView: who is typing", () => {
   // element open around the words has a role or aria-live.
   it("keeps who is typing out of the room's live announcements", () => {
     const html = view({ chat: "waiting", state: { ...ROOM, typing: typing(ALICE) } });
-    const at = html.indexOf("is typing");
+    const at = /is typing…?<\/p>/.exec(html)?.index ?? -1;
     expect(at).toBeGreaterThan(-1);
     const open: { name: string; attributes: string }[] = [];
     for (const [, closing, name = "", attributes = ""] of html.slice(0, at).matchAll(/<(\/?)([a-z0-9]+)([^>]*)>/g)) {
