@@ -1,9 +1,14 @@
 // A room's lines (slice 4's 4b, moved out of RoomView.tsx): the newest the store holds (the window), held at the
 // newest while the reader is there; a line's text is Markdown (4c), built into elements from an allowlist
-// (Message.tsx); one that mentions the reader says so (4d).
+// (Message.tsx); one that mentions the reader says so (4d). The message menu (4c, docs/decisions.md 2026-10-26): the
+// list is one tab stop, a line, the arrows moving among them; a line pointed at or focused shows its bar.
 import { markdown, mentions, type Block, type Line } from "@gnoworld/core";
-import { useLayoutEffect, useRef } from "react";
+import { Flash, type FlashMessage } from "@gnoworld/ui";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { LineActions } from "./LineActions.tsx";
+import { useLineFocus } from "./lineFocus.ts";
 import { Markdown } from "./Message.tsx";
+import { roomHref } from "./names.ts";
 import { Person } from "./Person.tsx";
 import shared from "./lists.module.css";
 import styles from "./RoomView.module.css";
@@ -37,13 +42,23 @@ function LineText({ blocks, me, known }: { blocks: readonly Block[]; me: string 
 // A line, read once: drawn, and asked whether it mentions the reader, which a word says as well as its colour; a
 // mention shortened for the reader and the room's members alone (F812). A change of members reads its mentions
 // again, never its drawing.
-function LineView({ line, me, members }: { line: Line; me: string | undefined; members: ReadonlySet<string> }) {
+interface LineViewProps {
+  line: Line;
+  me: string | undefined;
+  members: ReadonlySet<string>;
+  /** Whether it is the list's one tab stop. */
+  stop: boolean;
+  /** Its bar, while pointed at or focused. */
+  actions: ReactNode;
+}
+
+function LineView({ line, me, members, stop, actions }: LineViewProps) {
   const blocks = markdown(line.text);
   const names = namesOf(line.text);
   const mentioned = names.split(" ").some((address) => address === me);
   const known = knownOf(names, members);
   return (
-    <li className={KINDS[line.kind]} data-about-me={mentioned ? "" : undefined}>
+    <li className={KINDS[line.kind]} data-about-me={mentioned ? "" : undefined} tabIndex={stop ? 0 : -1}>
       {/* The line's marks first, before the time: where no sender's words stand (F808). */}
       {mentioned ? <span className={styles["mentionsYou"]}>Mentions you </span> : null}
       {line.kind === "notice" ? <span className={styles["mark"]}>Notice </span> : null}
@@ -53,6 +68,7 @@ function LineView({ line, me, members }: { line: Line; me: string | undefined; m
       {line.kind === "action" ? "* " : null}
       <Person name={line.account ?? line.from} guest={line.account === undefined} />{" "}
       <LineText blocks={blocks} me={me} known={known} />
+      {actions}
     </li>
   );
 }
@@ -74,32 +90,98 @@ function useNewestInView(lines: readonly Line[]) {
   return { listRef, onScroll };
 }
 
+// What a copy says, in the room's flash: done, or not, a page with no clipboard (a plain http origin) included.
+function useCopy(room: string) {
+  const [said, setSaid] = useState<FlashMessage | null>(null);
+  const copy = (line: Line, what: "text" | "link") => {
+    setSaid(null);
+    const text = what === "text" ? line.text : new URL(roomHref(room), location.href).href;
+    // A page with no clipboard throws at once: inside a then, it fails as a refusal does.
+    Promise.resolve()
+      .then(() => navigator.clipboard.writeText(text))
+      .then(
+        () => {
+          setSaid({ title: what === "text" ? "Text copied." : "Link copied." });
+        },
+        () => {
+          setSaid({ title: "Could not copy." });
+        },
+      );
+  };
+  return { said, setSaid, copy };
+}
+
 export interface LinesProps {
+  room: string;
   lines: readonly Line[];
   members: readonly string[];
   /** The reader's address, the lines that mention it marked; none for a guest. */
   me: string | undefined;
+  /** The msgid of a line Ergo refused to delete, said until dismissed. */
+  refused?: string | undefined;
+  /** Deletes a line, the reader's own; whether it went out. */
+  onDelete: (id: string) => boolean;
+  /** The room's flash said Ergo's refusal of a delete. */
+  onDismiss: () => void;
 }
 
-/** The room's lines, oldest first, as a list a screen reader hears grow. */
-export function Lines({ lines, members, me }: LinesProps) {
+/** The room's flash, then its lines, oldest first, as a list a screen reader hears grow. */
+export function Lines({ room, lines, members, me, refused, onDelete, onDismiss }: LinesProps) {
   const { listRef, onScroll } = useNewestInView(lines);
+  const { stop, mounted, on, leave } = useLineFocus(lines, listRef);
+  const { said, setSaid, copy } = useCopy(room);
   // Who a mention may shorten (F812): the members, and the authors in view by their account tag, who proved their
   // key as a member did (F819).
   const known = new Set([...members, ...lines.flatMap(({ account }) => (account === undefined ? [] : [account]))]);
+  // A delete that went out hands the focus to a neighbour; one that could not (the link down, a msgid no command
+  // carries) says so, the line kept (/code-review).
+  const remove = (id: string) => {
+    const went = onDelete(id);
+    if (went) leave(id);
+    else setSaid({ title: "Could not delete the message." });
+    return went;
+  };
+  const actionsOf = (line: Line) => (
+    <LineActions
+      line={line}
+      room={room}
+      me={me}
+      onCopy={(what) => {
+        onDismiss();
+        copy(line, what);
+      }}
+      onDelete={remove}
+    />
+  );
   return (
-    <ol
-      ref={listRef}
-      onScroll={onScroll}
-      aria-label="Messages"
-      aria-live="polite"
-      aria-relevant="additions"
-      className={LINES}
-      tabIndex={0}
-    >
-      {lines.map((line) => (
-        <LineView key={line.id} line={line} me={me} members={known} />
-      ))}
-    </ol>
+    <>
+      <Flash
+        message={refused === undefined ? said : { title: "Could not delete the message." }}
+        onClose={() => {
+          if (refused === undefined) setSaid(null);
+          else onDismiss();
+        }}
+      />
+      <ol
+        ref={listRef}
+        onScroll={onScroll}
+        {...on}
+        aria-label="Messages"
+        aria-live="polite"
+        aria-relevant="additions"
+        className={LINES}
+      >
+        {lines.map((line) => (
+          <LineView
+            key={line.id}
+            line={line}
+            me={me}
+            members={known}
+            stop={line.id === stop}
+            actions={mounted(line.id) ? actionsOf(line) : null}
+          />
+        ))}
+      </ol>
+    </>
   );
 }

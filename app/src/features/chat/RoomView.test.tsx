@@ -237,12 +237,29 @@ describe("RoomView", () => {
     expect(html).toContain("&lt;b&gt;bold&lt;/b&gt;");
   });
 
-  // The lines scroll in a box of their own, which holds nothing focusable: the keyboard reaches it itself (axe's
-  // scrollable-region-focusable).
-  it("lets the keyboard reach the lines, to scroll them", () => {
-    expect(view()).toMatch(
-      /<ol [^>]*aria-label="Messages"[^>]*tabindex="0"|<ol [^>]*tabindex="0"[^>]*aria-label="Messages"/i,
-    );
+  // 4c's message menu (docs/decisions.md, 2026-10-26): the Messages list is one stop of the tab order, its newest
+  // line; the arrows reach the others, and the line focused scrolls into view.
+  it("puts the newest line alone in the tab order, the others reached by the arrows", () => {
+    const lines = ["a", "b", "c"].map((id) => line({ id, text: `line ${id}` }));
+    const html = view({ state: { ...ROOM, lines } });
+    expect([...part(html, "Messages").matchAll(/<li[^>]*tabindex="(-?\d+)"/g)].map((found) => found[1])).toEqual([
+      "-1",
+      "-1",
+      "0",
+    ]);
+    expect(html).not.toMatch(/<ol [^>]*tabindex=/);
+  });
+
+  // The red pass (M12): a line that is a Markdown list holds list items of its own; the tab stop is the line's alone.
+  it("gives a line that is a list one tab stop, its own items none", () => {
+    const html = part(view({ state: { ...ROOM, lines: [line({ text: "- one\n- two" })] } }), "Messages");
+    expect(html.match(/tabindex=/g)).toHaveLength(1);
+  });
+
+  // 4c's message menu: Ergo's refusal of a delete, said in the room's flash.
+  it("says in the room's flash that Ergo refused to delete a line", () => {
+    expect(said(view({ state: { ...ROOM, refused: "a" } }))).toContain("Could not delete the message.");
+    expect(said(view())).not.toContain("Could not delete");
   });
 
   // 4b's pre-merge (/code-review): lines that come while the room is open reach a screen reader.

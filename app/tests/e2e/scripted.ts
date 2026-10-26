@@ -3,7 +3,8 @@
 import type { WebSocketRoute } from "@playwright/test";
 
 export const MEMBER = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
-export type HistoryLine = readonly [id: string, time: string, text: string];
+/** A line of #games' history; its author MEMBER unless named. */
+export type HistoryLine = readonly [id: string, time: string, text: string, author?: string];
 const LINES: readonly HistoryLine[] = [
   ["a1", "2026-10-25T10:00:00.000Z", "Welcome to the games room."],
   ["a2", "2026-10-25T10:01:00.000Z", "Who is up for a round of **gnogolf**? Rules: https://gno.land/r/demo"],
@@ -18,8 +19,12 @@ function welcome(line: string, me: string): string[] {
   return [];
 }
 
-// Each room joined, with #games' topic and names; #games' history.
-function rooms(line: string, me: string, history: readonly HistoryLine[]): string[] {
+// Each room joined, with #games' topic and names; the history of `told`, #games unless named.
+function rooms(
+  line: string,
+  me: string,
+  { history, told }: { history: readonly HistoryLine[]; told: string },
+): string[] {
   if (line.startsWith("JOIN ")) {
     return line
       .slice("JOIN ".length)
@@ -31,21 +36,57 @@ function rooms(line: string, me: string, history: readonly HistoryLine[]): strin
         `:ergo 366 ${me} ${room} :End of /NAMES list.`,
       ]);
   }
-  if (!line.startsWith("CHATHISTORY LATEST #bubble/games ")) return [];
+  if (!line.startsWith(`CHATHISTORY LATEST ${told} `)) return [];
   return [
-    "BATCH +h1 chathistory #bubble/games",
+    `BATCH +h1 chathistory ${told}`,
     ...history.map(
-      ([id, time, text]) =>
-        `@batch=h1;msgid=${id};time=${time};account=${MEMBER} :${MEMBER}!u@h PRIVMSG #bubble/games :${text}`,
+      ([id, time, text, author = MEMBER]) =>
+        `@batch=h1;msgid=${id};time=${time};account=${author} :${author}!u@h PRIVMSG ${told} :${text}`,
     ),
     "BATCH -h1",
   ];
 }
 
-/** Answers the page's socket as Ergo would, the page being `me`. */
-export function scriptedErgo(ergo: WebSocketRoute, me: string, history: readonly HistoryLine[] = LINES): void {
+// A REDACT of the page's: Ergo's echo, which takes the line from every reader, or its refusal.
+function redaction(line: string, me: string, refuse: boolean): string[] {
+  const [command, room = "", id = ""] = line.split(" ");
+  if (command !== "REDACT") return [];
+  if (refuse)
+    return [`:ergo FAIL REDACT REDACT_FORBIDDEN ${room} ${id} :You are not authorised to delete this message`];
+  return [`:${me}!u@h REDACT ${room} ${id}`];
+}
+
+export interface Scripted {
+  /** #games' history, or the named room's. */
+  history?: readonly HistoryLine[];
+  /** Each line the page sends, as it sends it. */
+  heard?: (line: string) => void;
+  /** Ergo refuses every REDACT. */
+  refuseRedact?: boolean;
+  /** The room whose history it holds, #games unless named. */
+  room?: string;
+}
+
+/** Answers the page's socket as Ergo would, the page being `me`: with #games' history, or with what `script` says. */
+export function scriptedErgo(
+  ergo: WebSocketRoute,
+  me: string,
+  script: readonly HistoryLine[] | Scripted = LINES,
+): void {
+  const {
+    history = LINES,
+    heard,
+    refuseRedact = false,
+    room = "#bubble/games",
+  } = Array.isArray(script) ? { history: script } : (script as Scripted);
   ergo.onMessage((data) => {
     const line = String(data);
-    for (const answer of [...welcome(line, me), ...rooms(line, me, history)]) ergo.send(answer);
+    heard?.(line);
+    const answers = [
+      ...welcome(line, me),
+      ...rooms(line, me, { history, told: room }),
+      ...redaction(line, me, refuseRedact),
+    ];
+    for (const answer of answers) ergo.send(answer);
   });
 }

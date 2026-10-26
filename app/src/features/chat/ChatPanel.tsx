@@ -96,9 +96,13 @@ interface LoadedProps {
   chat: RoomViewProps["chat"];
   session: AppState["login"]["session"];
   say: (room: string, draft: string) => boolean;
+  /** Deletes a line of a room, through Ergo's REDACT (4c's message menu); whether it went out. */
+  redact: (room: string, id: string) => boolean;
+  /** The room's refused delete, said. */
+  dismissed: (room: string) => void;
 }
 
-function Loaded({ sections, current, state, chat, session, say }: LoadedProps) {
+function Loaded({ sections, current, state, chat, session, say, redact, dismissed }: LoadedProps) {
   const ids = roomIds(sections);
   useRoomKeys(ids, current);
   return (
@@ -110,6 +114,10 @@ function Loaded({ sections, current, state, chat, session, say }: LoadedProps) {
           state={state}
           chat={chat}
           me={session.kind === "in" ? session.address : undefined}
+          onDelete={(id) => redact(current, id)}
+          onDismiss={() => {
+            dismissed(current);
+          }}
           composer={
             <Writer
               session={session}
@@ -195,6 +203,10 @@ export function ChatPanel({ world }: { world: string }) {
       chat={chat}
       session={session}
       say={(room, draft) => linkRef.current?.say(room, draft) ?? false}
+      redact={(room, id) => linkRef.current?.redact(room, id) ?? false}
+      dismissed={(room) => {
+        store.getState().chatActions.dismissed(room);
+      }}
     />
   );
 }

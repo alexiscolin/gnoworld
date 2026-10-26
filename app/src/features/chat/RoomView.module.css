@@ -10,8 +10,15 @@
   }
 
   .lines > li {
+    /* layout: the line holds its bar (LineActions), placed over its end */
+    position: relative;
     padding-block: var(--space-3xs);
     overflow-wrap: anywhere;
+  }
+
+  .lines > li:first-child {
+    /* layout: room above the oldest line for its bar, which rises above a line (LineActions) */
+    margin-block-start: var(--space-s);
   }
 
   .time,

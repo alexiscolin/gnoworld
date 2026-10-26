@@ -1,0 +1,13 @@
+/* A line's bar (4c's message menu): over the line's end, astride its top edge as the prototype's is, so the newest
+   line's bar stays inside the list; a floating surface's look. */
+@layer components {
+  .bar {
+    position: absolute;
+    inset-block-start: calc(-1 * var(--space-s));
+    inset-inline-end: var(--space-2xs);
+    border: var(--line-width) solid var(--color-line-strong);
+    border-radius: var(--radius-m);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-popover);
+  }
+}

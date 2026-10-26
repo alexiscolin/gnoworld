@@ -29,12 +29,24 @@ const NOTICES: Record<Exclude<ErgoState | "off", "connected">, string> = {
 
 export interface RoomViewProps {
   room: string;
-  state: { lines: readonly Line[]; members: readonly string[]; topic: string | undefined } | undefined;
+  state:
+    | {
+        lines: readonly Line[];
+        members: readonly string[];
+        topic: string | undefined;
+        /** The msgid of a line Ergo refused to delete (4c). */
+        refused?: string | undefined;
+      }
+    | undefined;
   chat: ErgoState | "off";
   /** What goes under the lines: the composer for an account, a word for a guest. */
   composer?: ReactNode;
   /** The reader's address, the lines that mention it marked; none for a guest. */
   me?: string | undefined;
+  /** Deletes a line, the reader's own (4c's message menu); whether it went out. */
+  onDelete?: ((id: string) => boolean) | undefined;
+  /** The room's flash said Ergo's refusal of a delete. */
+  onDismiss?: (() => void) | undefined;
 }
 
 // Who is here: counted once connected, the bot left out, the first MEMBERS_SHOWN named.
@@ -55,8 +67,8 @@ function People({ members, connected }: { members: readonly string[]; connected:
   );
 }
 
-export function RoomView({ room, state, chat, composer, me }: RoomViewProps) {
-  const { lines = [], members = [], topic } = state ?? {};
+export function RoomView({ room, state, chat, composer, me, onDelete, onDismiss }: RoomViewProps) {
+  const { lines = [], members = [], topic, refused } = state ?? {};
   const connected = chat === "connected";
   return (
     <Stack as="section" space="s">
@@ -69,7 +81,16 @@ export function RoomView({ room, state, chat, composer, me }: RoomViewProps) {
       </p>
       <Sidebar side="end" space="m">
         <div>
-          <Lines lines={lines} members={members} me={me} />
+          <Lines
+            key={room}
+            room={room}
+            lines={lines}
+            members={members}
+            me={me}
+            refused={refused}
+            onDelete={onDelete ?? (() => false)}
+            onDismiss={onDismiss ?? (() => undefined)}
+          />
           {connected && lines.length === 0 ? <p>No messages yet.</p> : null}
           {composer}
         </div>
