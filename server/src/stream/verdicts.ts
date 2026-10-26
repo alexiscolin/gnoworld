@@ -7,7 +7,7 @@ import { Hono, type Context } from "hono";
 import { getCookie } from "hono/cookie";
 import { z } from "zod";
 import { limiter } from "../limit.ts";
-import { RoomName, stateOf } from "./stream.ts";
+import { once, RoomName, stateOf } from "./stream.ts";
 
 /** A visitor's requests a minute. */
 export const VERDICTS_PER_MINUTE = 60;
@@ -34,9 +34,8 @@ export function verdictRoutes({ db, readable, session, visitor, now }: Options):
   const app = new Hono();
   app.get("/", (c) => {
     if (!limit.take(visitor(c), now())) return c.json({ error: "too_many" } satisfies ApiError, 429);
-    const [rooms = [], lists = []] = [c.req.queries("room"), c.req.queries("ids")];
-    const room = RoomName.safeParse(rooms.length === 1 ? rooms[0] : undefined);
-    const ids = Ids.safeParse(lists.length === 1 ? lists[0] : undefined);
+    const room = RoomName.safeParse(once(c.req.queries("room")));
+    const ids = Ids.safeParse(once(c.req.queries("ids")));
     if (!room.success || !ids.success) return c.json({ error: "refused" } satisfies ApiError, 400);
     if (!readable(room.data, session(getCookie(c, "__Host-session")))) {
       return c.json({ error: "forbidden" } satisfies ApiError, 403);

@@ -15,6 +15,10 @@ const ROOM = String.raw`#[^\s,#\0-\x1f\x7f]{1,63}`;
 /** One room's name, as GET /api/verdicts takes it. */
 export const RoomName = z.string().regex(new RegExp(`^${ROOM}$`));
 
+/** A query parameter given exactly once, else none: one given twice is refused as one missing. */
+export const once = (values: readonly string[] | undefined): string | undefined =>
+  values?.length === 1 ? values[0] : undefined;
+
 /** A line's state on the stream from the bot's action on it: an unchecked or pending line has none. */
 export function stateOf(action: string): StreamEvent["state"] | undefined {
   if (action === "pass") return "checked";
@@ -125,8 +129,7 @@ export function makeStream(options: Options = {}): Stream {
     routes: ({ proxy, visible, session = () => undefined }) => {
       const app = new Hono();
       app.get("/", (c) => {
-        const asked = c.req.queries("rooms") ?? [];
-        const rooms = Rooms.safeParse(asked.length === 1 ? asked[0] : undefined);
+        const rooms = Rooms.safeParse(once(c.req.queries("rooms")));
         const last = LastId.safeParse(c.req.header("last-event-id"));
         if (!rooms.success || !last.success) return c.json({ error: "refused" } satisfies ApiError, 400);
         const who = visitor(getConnInfo(c).remote.address ?? "", c.req.header("x-real-ip"), proxy);
