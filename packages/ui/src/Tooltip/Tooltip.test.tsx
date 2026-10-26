@@ -108,6 +108,34 @@ describe("Tooltip", () => {
     vi.restoreAllMocks();
   });
 
+  it("waits out a later refusal as well, the frames counted again from a toggle that went (F832)", () => {
+    draw();
+    const words = tip();
+    let refusing = true;
+    vi.spyOn(words, "togglePopover").mockImplementation(function (this: HTMLElement, force) {
+      if (force === true && refusing) throw new DOMException("Invalid to show", "InvalidStateError");
+      this.style.display = force === true ? "block" : "";
+      return force === true;
+    });
+    for (let round = 0; round < 3; round += 1) {
+      refusing = true;
+      keyboardFocus();
+      act(() => {
+        vi.advanceTimersToNextFrame();
+      });
+      refusing = false;
+      act(() => {
+        vi.advanceTimersToNextFrame();
+      });
+      expect(words.style.display).toBe("block");
+      act(() => {
+        button().blur();
+      });
+      expect(words.style.display).toBe("");
+    }
+    vi.restoreAllMocks();
+  });
+
   it("lets any other refusal of its words rise (F832)", () => {
     draw();
     refusing(new TypeError("not a popover"));
