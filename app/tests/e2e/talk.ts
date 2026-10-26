@@ -31,14 +31,9 @@ export const barOf = (page: Page, at: number) => lines(page).nth(at).getByRole("
 export const field = (page: Page) => page.getByRole("textbox", { name: "Message #games" });
 
 /** The test's account on a scripted Ergo that echoes what the page says, its script made with the account's address,
- * the room showing `shown` lines; its wallet named `as`, a new one unless named (a picture wants the same address each
- * run); what the page says in a room, as it sends it. */
-export async function asAccount(
-  page: Page,
-  script: (address: string) => Scripted = () => ({}),
-  { shown = 2, as = word("talk") }: { shown?: number; as?: string } = {},
-) {
-  const address = await logIn(page, as);
+ * the room showing `shown` lines; what the page says in a room, as it sends it. */
+export async function asAccount(page: Page, script: (address: string) => Scripted = () => ({}), shown = 2) {
+  const address = await logIn(page, word("talk"));
   const sent: string[] = [];
   const ergo = await opened(page, address, {
     history: HISTORY,

@@ -19,7 +19,7 @@ test.describe("reactions, replies and edits, as they look", () => {
   test.use({ timezoneId: "UTC", locale: "en-GB" });
 
   test("pass axe with reactions, a reply, an edit and a line's bar shown", async ({ page }) => {
-    await asAccount(page, LOOK, { shown: 3 });
+    await asAccount(page, LOOK, 3);
     await lineOf(page, "count me in").hover();
     await expect(barOf(page, 2)).toBeVisible();
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
@@ -27,8 +27,12 @@ test.describe("reactions, replies and edits, as they look", () => {
 
   test("look as the prototype's on a computer's screen", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
-    // The same account each run: its address, in Who's here, sets the list's width.
-    await asAccount(page, LOOK, { shown: 3, as: "talk-look" });
+    await asAccount(page, LOOK, 3);
+    // Who's here holds the account's address, a new one each run (the test wallet draws its key): its width set here,
+    // through the element's style, which the CSP allows, so the list's width is the same each run.
+    await page.getByRole("complementary", { name: "Who's here" }).evaluate((aside) => {
+      aside.style.flex = "0 0 8rem";
+    });
     // The first line by its place: the reply quotes its words too.
     await lines(page).first().hover();
     await expect(barOf(page, 0)).toBeVisible();
