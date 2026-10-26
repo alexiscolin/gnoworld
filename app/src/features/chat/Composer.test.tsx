@@ -224,6 +224,15 @@ describe("Composer: a reply", () => {
     expect(names(markup)).toContain("Cancel the reply");
   });
 
+  // The code review (CR7): the field, which Reply focuses, is described by the bar that says which line it answers.
+  it("describes its field by the line it answers", () => {
+    const markup = draw(to("the first line"));
+    const described = /<input[^>]*aria-describedby="([^"]+)"/.exec(markup)?.[1] ?? "";
+    const ids = described.split(" ");
+    const bar = ids.map((id) => new RegExp(`<p[^>]*id="${id}"[^>]*>(.*?)</p>`, "s").exec(markup)?.[1]).find(Boolean);
+    expect(words(bar ?? "")).toBe("Replying to g10gh7…3y5tv: the first line");
+  });
+
   it("names a guest's line by its nick, said a guest's", () => {
     const markup = draw({ replying: { who: "guest-ab12cd", guest: true, text: "hi" }, onCancelReply: () => undefined });
     expect(words(markup)).toContain("Replying to guest-ab12cd (guest): hi");

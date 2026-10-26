@@ -5,7 +5,7 @@
 // bar wraps the selection in Markdown's marks; the line shows below as it reads.
 import { COMMANDS, compose, type Composed } from "@gnoworld/core";
 import { Button, Cluster, Field, IconButton, Sidebar, Stack, type FieldProps, type IconName } from "@gnoworld/ui";
-import { useLayoutEffect, useRef, useState, type KeyboardEvent, type SubmitEvent } from "react";
+import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type SubmitEvent } from "react";
 import { completed, completions, type Completion } from "./complete.ts";
 import { formatted, type Edit, type Format } from "./format.ts";
 import { Message } from "./Message.tsx";
@@ -113,15 +113,17 @@ const SHOWN = 60;
 // Over the field, the line the next one answers, and a way to answer none, which hands the focus to the field as the
 // bar and its button go, never to the page (the code review's CR4).
 interface ReplyBarProps {
+  /** The bar's words' id, which describes the field (the code review's CR7). */
+  id: string;
   to: Answered;
   onCancel: (() => void) | undefined;
   field: () => HTMLInputElement | undefined;
 }
 
-function ReplyBar({ to, onCancel, field }: ReplyBarProps) {
+function ReplyBar({ id, to, onCancel, field }: ReplyBarProps) {
   return (
     <Cluster space="2xs">
-      <p className={styles["replying"]}>
+      <p id={id} className={styles["replying"]}>
         <Replying to={to} length={SHOWN} />
       </p>
       <IconButton
@@ -148,6 +150,7 @@ export function Composer(props: ComposerProps) {
   };
   const [failed, setFailed] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
+  const replyId = useId();
   // The selection an edit leaves, put back in the box once it shows the new draft.
   const selectionRef = useRef<Edit>(undefined);
   const label = roomLabel(room);
@@ -201,11 +204,12 @@ export function Composer(props: ComposerProps) {
   return (
     <form ref={formRef} aria-label={`Write in ${label}`} onSubmit={send} onKeyDown={complete}>
       <Stack space="2xs">
-        {replying === undefined ? null : <ReplyBar to={replying} onCancel={onCancelReply} field={box} />}
+        {replying === undefined ? null : <ReplyBar id={replyId} to={replying} onCancel={onCancelReply} field={box} />}
         <FormatBar onFormat={format} />
         <Sidebar side="end" space="2xs">
           <Field
             label={`Message ${label}`}
+            describedBy={replying === undefined ? undefined : replyId}
             value={draft}
             onChange={(value) => {
               change(value);
