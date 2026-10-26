@@ -51,6 +51,14 @@ describe("Embed", () => {
     expect(attribute(html, "referrerPolicy")).toBe("strict-origin-when-cross-origin");
   });
 
+  // F886: the site sends no referrer (F682); YouTube alone asks for one, above.
+  it.each([
+    { service: "Vimeo", src: "https://player.vimeo.com/video/76979871?dnt=1", title: "Vimeo video" },
+    { service: "Giphy", src: "https://giphy.com/embed/4548k01F5Ej28", title: "Giphy animation" },
+  ] as const)("sends $service's player no referrer", (embed) => {
+    expect(attribute(renderToStaticMarkup(<PlayerFrame embed={embed} />), "referrerPolicy")).toBe("no-referrer");
+  });
+
   it("shows nothing of a link whose message was hidden", () => {
     expect(renderToStaticMarkup(<Embed embed={YOUTUBE} verdict="hidden" />)).toBe("");
   });
