@@ -5,7 +5,7 @@
 // (4c); a guest reads, a room letting accounts alone speak.
 import type { RoomList } from "@gnoworld/schemas";
 import { Button, Sidebar, Stack } from "@gnoworld/ui";
-import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { useSearchParams } from "react-router";
 import { pageLoginApi } from "../../lib/api/login.ts";
 import { pageRoomsApi } from "../../lib/api/rooms.ts";
@@ -14,7 +14,7 @@ import { drawGuestNick } from "../../lib/ergo/ergo.ts";
 import { pageErgo } from "../../lib/ergo/page.ts";
 import type { AppState } from "../../store/index.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
-import { chatLink } from "./link.ts";
+import { chatLink, type ChatLink } from "./link.ts";
 import { LOADING } from "./Loading.tsx";
 import { neighbour, roomIds, roomLabel, roomParams, roomsQuery, shownRoom } from "./names.ts";
 import { RoomsView } from "./RoomsView.tsx";
@@ -95,14 +95,13 @@ interface LoadedProps {
   state: RoomViewProps["state"];
   chat: RoomViewProps["chat"];
   session: AppState["login"]["session"];
-  say: (room: string, draft: string) => boolean;
-  /** Deletes a line of a room, through Ergo's REDACT (4c's message menu); whether it went out. */
-  redact: (room: string, id: string) => boolean;
+  /** The page's link to Ergo, which says and deletes the room in view's lines (4c). */
+  link: RefObject<ChatLink | undefined>;
   /** The room's refused delete, said. */
   dismissed: (room: string) => void;
 }
 
-function Loaded({ sections, current, state, chat, session, say, redact, dismissed }: LoadedProps) {
+function Loaded({ sections, current, state, chat, session, link, dismissed }: LoadedProps) {
   const ids = roomIds(sections);
   useRoomKeys(ids, current);
   return (
@@ -114,7 +113,7 @@ function Loaded({ sections, current, state, chat, session, say, redact, dismisse
           state={state}
           chat={chat}
           me={session.kind === "in" ? session.address : undefined}
-          onDelete={(id) => redact(current, id)}
+          onDelete={(id) => link.current?.redact(current, id) ?? false}
           onDismiss={() => {
             dismissed(current);
           }}
@@ -124,7 +123,7 @@ function Loaded({ sections, current, state, chat, session, say, redact, dismisse
               room={current}
               rooms={ids}
               members={state?.members ?? []}
-              onSay={(draft) => say(current, draft)}
+              onSay={(draft) => link.current?.say(current, draft) ?? false}
             />
           }
         />
@@ -136,7 +135,7 @@ function Loaded({ sections, current, state, chat, session, say, redact, dismisse
 export function ChatPanel({ world }: { world: string }) {
   const store = useAppStore();
   // The page's link to Ergo, made once the page runs: never in the build's pre-render.
-  const linkRef = useRef<ReturnType<typeof chatLink>>(undefined);
+  const linkRef = useRef<ChatLink>(undefined);
   const [asked, setAsked] = useState<Asked>();
   const [attempt, setAttempt] = useState(0);
   const [params] = useSearchParams();
@@ -202,8 +201,7 @@ export function ChatPanel({ world }: { world: string }) {
       state={state}
       chat={chat}
       session={session}
-      say={(room, draft) => linkRef.current?.say(room, draft) ?? false}
-      redact={(room, id) => linkRef.current?.redact(room, id) ?? false}
+      link={linkRef}
       dismissed={(room) => {
         store.getState().chatActions.dismissed(room);
       }}
