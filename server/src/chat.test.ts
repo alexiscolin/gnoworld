@@ -1338,18 +1338,30 @@ describe("the chat's verdicts route", () => {
     ergo: undefined,
     moderation: OFF,
   };
-  const ready = () => {
-    const t = setup(settings, { session: (token) => (token === "crew-token" ? CREW : undefined) });
+  const ready = (proxy?: string) => {
+    const t = setup(
+      { ...settings, trustedProxy: proxy },
+      { session: (token) => (token === "crew-token" ? CREW : undefined) },
+    );
     t.app.route("/api/verdicts", t.chat.verdicts);
     const insert = t.db.prepare(
       "INSERT INTO verdicts (msgid, room, account, action, at) VALUES (?, ?, 'g1a', 'pass', 0)",
     );
     insert.run("m1", "#bubble");
     insert.run("m2", "#bubble/crew");
-    const ask = (room: string, id: string, { token, peer = "203.0.113.7" }: { token?: string; peer?: string } = {}) =>
+    const ask = (
+      room: string,
+      id: string,
+      { token, peer = "203.0.113.7", realIp }: { token?: string; peer?: string; realIp?: string } = {},
+    ) =>
       t.app.request(
         `/api/verdicts?room=${encodeURIComponent(room)}&ids=${id}`,
-        { headers: token === undefined ? {} : { cookie: `__Host-session=${token}` } },
+        {
+          headers: {
+            ...(token === undefined ? {} : { cookie: `__Host-session=${token}` }),
+            ...(realIp === undefined ? {} : { "x-real-ip": realIp }),
+          },
+        },
         { incoming: { socket: { remoteAddress: peer } } },
       );
     return ask;
@@ -1374,5 +1386,18 @@ describe("the chat's verdicts route", () => {
     for (let n = 0; n < 60; n += 1) expect((await ask("#bubble", "m1")).status).toBe(200);
     expect((await ask("#bubble", "m1")).status).toBe(429);
     expect((await ask("#bubble", "m1", { peer: "203.0.113.8" })).status).toBe(200);
+  });
+
+  // F872: behind the proxy every reader shares its address; the one it sets (x-real-ip) is each reader's, believed
+  // from the proxy alone.
+  it("counts each reader behind the trusted proxy by the address the proxy sets, and believes no other peer's", async () => {
+    const ask = ready("10.0.0.2");
+    const proxied = (realIp: string) => ask("#bubble", "m1", { peer: "10.0.0.2", realIp });
+    for (let n = 0; n < 60; n += 1) expect((await proxied("203.0.113.7")).status).toBe(200);
+    expect((await proxied("203.0.113.7")).status).toBe(429);
+    expect((await proxied("203.0.113.8")).status).toBe(200);
+    const spoofed = (n: number) => ask("#bubble", "m1", { peer: "198.51.100.9", realIp: `192.0.2.${String(n)}` });
+    for (let n = 0; n < 60; n += 1) expect((await spoofed(n)).status).toBe(200);
+    expect((await spoofed(60)).status).toBe(429);
   });
 });
