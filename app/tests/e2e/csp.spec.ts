@@ -6,7 +6,8 @@ import { GUARDED, SITE } from "./sites.ts";
 const SHAPE = new RegExp(
   "^default-src 'none'; script-src 'self'( 'sha256-[A-Za-z0-9+/]{43}=')+; style-src 'self'; img-src 'self' data:; " +
     "font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; " +
-    "frame-src https://www.youtube-nocookie.com https://player.vimeo.com https://giphy.com; base-uri 'none'; " +
+    "frame-src https://www.youtube-nocookie.com/embed/ https://player.vimeo.com/video/ https://giphy.com/embed/; " +
+    "base-uri 'none'; " +
     "form-action 'self'; frame-ancestors 'none'$",
 );
 const PASSWORD = `Basic ${btoa("team:a test password")}`;
@@ -143,6 +144,24 @@ test.describe("a planted violation", () => {
       "const f = document.createElement('iframe'); f.src = 'https://www.youtube.com/embed/dQw4w9WgXcQ'; document.body.append(f)",
     );
     await expect.poll(() => violations).toEqual(["frame-src"]);
+  });
+
+  // F885: frame-src names each service's player by its path, so its host's other pages are refused; any such page
+  // let through is answered here, the test reaching no one.
+  test("refuses a frame of an accepted host outside its player's path", async ({ page, violations }) => {
+    await page.route(/^https:\/\/(?:www\.youtube-nocookie\.com|player\.vimeo\.com|giphy\.com)\//, (route) =>
+      route.fulfill({ status: 200, contentType: "text/html", body: "<!doctype html><title>page</title>" }),
+    );
+    await page.goto("/");
+    await hydrated(page);
+    for (const src of [
+      "https://www.youtube-nocookie.com/watch?v=dQw4w9WgXcQ",
+      "https://player.vimeo.com/76979871",
+      "https://giphy.com/gifs/4548k01F5Ej28",
+    ]) {
+      await plant(page, `const f = document.createElement('iframe'); f.src = '${src}'; document.body.append(f)`);
+    }
+    await expect.poll(() => violations).toEqual(["frame-src", "frame-src", "frame-src"]);
   });
 
   test("is reported from a second tab of the same context too", async ({ page, violations }) => {
