@@ -88,6 +88,10 @@ test.describe("direct messages", () => {
     const me = await inGames(page);
     const bob = await another({ playwright, launchOptions }, word("bob"));
     const carol = await another({ playwright, launchOptions }, word("carol"));
+    // Bob connected, so Ergo delivers my line to him (it answers 401 to one for an account not connected): his own
+    // page joins #games.
+    await bob.page.goto("/w/bubble?room=games");
+    await expect(whoIsHere(page).getByTitle(bob.address)).toBeVisible();
     await dmFrom(bob, me, word("first"));
     await dmsNav(page)
       .getByRole("link", { name: short(bob.address) })
@@ -95,6 +99,7 @@ test.describe("direct messages", () => {
     const field = page.getByRole("textbox", { name: `Message ${short(bob.address)}` });
     await field.fill("hi bob");
     await field.press("Enter");
+    await expect(lines(page).filter({ hasText: "hi bob" })).toHaveCount(1);
     await dmsNav(page).getByRole("button", { name: "Only people I wrote to" }).click();
     await expect(dmsNav(page).getByRole("button", { name: "Only people I wrote to" })).toHaveAttribute(
       "aria-pressed",
