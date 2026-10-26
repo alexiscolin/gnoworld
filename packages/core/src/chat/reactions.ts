@@ -94,8 +94,9 @@ export function addReactions(
 export const redactReactions = (held: readonly Reaction[], message: IrcMessage, room: string): readonly Reaction[] =>
   redactAfter(held, message, room);
 
-/** What each line shows, by its msgid: each emoji added and not taken back, in the order first reacted, counted once
- * an account, mine said. */
+/** What each line shows, by its msgid: each emoji added and not taken back, counted once an account, mine said; the
+ * most reacted first, then in the order first reacted (the security review's S4: one account's lone emoji put no
+ * shared one out of sight). */
 export function reactionsOn(
   reactions: readonly Reaction[],
   me: string | undefined,
@@ -108,5 +109,7 @@ export function reactionsOn(
     line.set(emoji, { emoji, count: (was?.count ?? 0) + 1, mine: (was?.mine ?? false) || who === me });
     lines.set(to, line);
   }
-  return new Map([...lines].map(([to, line]) => [to, [...line.values()]]));
+  return new Map(
+    [...lines].map(([to, line]) => [to, [...line.values()].sort((one, other) => other.count - one.count)]),
+  );
 }

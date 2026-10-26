@@ -289,6 +289,17 @@ describe("reactionsOn: what each line shows of its reactions", () => {
     ]);
   });
 
+  // The security review (S4): one account's 20 lone emoji put no shared one behind "+N more".
+  test("shows the emoji most accounts reacted with first, then each in the order first reacted", () => {
+    const lone = ["😀", "😁", "😂"].map((emoji) => on("m1", emoji, "mallory"));
+    const shared = ["a", "b", "c"].map((who) => on("m1", "👍", who));
+    expect(
+      reactionsOn([...lone, ...shared], ME)
+        .get("m1")
+        ?.map(({ emoji, count }) => `${emoji}${String(count)}`),
+    ).toEqual(["👍3", "😀1", "😁1", "😂1"]);
+  });
+
   // The green pass (G1): mine whoever reacted after me with it.
   test("keeps an emoji mine when another account reacts with it after me", () => {
     expect(reactionsOn([on("m1", "👍", ME), on("m1", "👍", ALICE)], ME).get("m1")).toEqual([
