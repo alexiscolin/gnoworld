@@ -11,6 +11,10 @@ export interface TooltipProps {
 // docs/DESIGN-SYSTEM.md, "Tooltip": a moment under the pointer before it shows, none for the keyboard.
 const DELAY = 500;
 
+// The frames a refused show waits at most: Chrome's refusal lasts one popover's toggle; one that lasts longer leaves
+// the words hidden until the next change (/code-review on F832).
+const FRAMES_WAITED = 3;
+
 // The words shown or hidden; false when Chrome refuses it during another popover's toggle.
 function toggled(words: HTMLElement, shown: boolean): boolean {
   try {
@@ -27,9 +31,17 @@ function toggled(words: HTMLElement, shown: boolean): boolean {
 // words wait for the next frame. The frames waited, which place them again (F832).
 function useToggled(tipRef: RefObject<HTMLSpanElement | null>, shown: boolean): number {
   const [frames, setFrames] = useState(0);
+  // The frames waited since the last toggle that went: each refusal its own few, never one every frame for good.
+  const waitedRef = useRef(0);
   useLayoutEffect(() => {
     const words = tipRef.current;
-    if (words === null || toggled(words, shown)) return;
+    if (words === null) return;
+    if (toggled(words, shown)) {
+      waitedRef.current = 0;
+      return;
+    }
+    if (waitedRef.current >= FRAMES_WAITED) return;
+    waitedRef.current += 1;
     const later = requestAnimationFrame(() => {
       setFrames((count) => count + 1);
     });

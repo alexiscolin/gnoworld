@@ -108,6 +108,26 @@ describe("Tooltip", () => {
     vi.restoreAllMocks();
   });
 
+  // /code-review on F832: a refusal that lasts is waited out a few frames, never one every frame for good.
+  it("stops asking after three frames of refusals, its words left hidden (F832)", () => {
+    draw();
+    const words = tip();
+    const toggle = vi.spyOn(words, "togglePopover").mockImplementation((force) => {
+      if (force === true)
+        throw new DOMException("Invalid to show a popover during another show operation", "InvalidStateError");
+      return false;
+    });
+    keyboardFocus();
+    for (let frame = 0; frame < 10; frame += 1) {
+      act(() => {
+        vi.advanceTimersToNextFrame();
+      });
+    }
+    expect(toggle.mock.calls.filter(([force]) => force === true)).toHaveLength(4);
+    expect(words.style.display).not.toBe("block");
+    vi.restoreAllMocks();
+  });
+
   it("waits out a later refusal as well, the frames counted again from a toggle that went (F832)", () => {
     draw();
     const words = tip();
