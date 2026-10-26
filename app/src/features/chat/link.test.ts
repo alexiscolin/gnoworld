@@ -865,22 +865,24 @@ describe("the chat's link: reactions", () => {
     fake.line(`:${ADDRESS}!u@h JOIN ${rooms[0] ?? ""}`);
     return { ...t, fake };
   };
-  const tagged = (sent: readonly string[]) => sent.filter((line) => line.startsWith("@"));
+  // The tagged lines sent, each label as a star: what a label says is the link's own (F1170).
+  const tagged = (sent: readonly string[]) =>
+    sent.filter((line) => line.startsWith("@")).map((line) => line.replace(/^@label=[^;]+;/u, "@label=*;"));
 
-  it("reacts to a line by its msgid with one emoji, takes the reaction back, each labelled apart", () => {
+  it("reacts to a line by its msgid with one emoji, takes the reaction back, each labelled", () => {
     const t = memberIn(["#bubble/games"]);
     expect(t.link.react("#bubble/games", { to: MSGID, emoji: "👍", on: true })).toBe(true);
     expect(t.link.react("#bubble/games", { to: MSGID, emoji: "👩🏻‍❤️‍💋‍👨🏿", on: false })).toBe(true);
     expect(tagged(t.fake.sent)).toEqual([
-      `@label=r1;+draft/react=👍;+reply=${MSGID} TAGMSG #bubble/games`,
-      `@label=r2;+draft/unreact=👩🏻‍❤️‍💋‍👨🏿;+reply=${MSGID} TAGMSG #bubble/games`,
+      `@label=*;+draft/react=👍;+reply=${MSGID} TAGMSG #bubble/games`,
+      `@label=*;+draft/unreact=👩🏻‍❤️‍💋‍👨🏿;+reply=${MSGID} TAGMSG #bubble/games`,
     ]);
   });
 
   it.each(["🏴󠁧󠁢󠁥󠁮󠁧󠁿", "🧑‍🦰", "1️⃣"])("reacts with the emoji %s whole", (emoji) => {
     const t = memberIn(["#bubble/games"]);
     expect(t.link.react("#bubble/games", { to: MSGID, emoji: emoji, on: true })).toBe(true);
-    expect(tagged(t.fake.sent)).toEqual([`@label=r1;+draft/react=${emoji};+reply=${MSGID} TAGMSG #bubble/games`]);
+    expect(tagged(t.fake.sent)).toEqual([`@label=*;+draft/react=${emoji};+reply=${MSGID} TAGMSG #bubble/games`]);
   });
 
   it.each([
@@ -942,6 +944,9 @@ describe("the chat's link: a reaction Ergo refused", () => {
     fake.line(`:${ADDRESS}!u@h JOIN ${rooms[0] ?? ""}`);
     return { ...t, fake };
   };
+  // The label of the last reaction sent, which Ergo answers by (the link's own word, F1170).
+  const labelOf = (sent: readonly string[]) =>
+    /^@label=([^;]+);/u.exec(sent.filter((line) => line.startsWith("@")).at(-1) ?? "")?.[1] ?? "";
   const refusal = (label: string) => `@label=${label} :ergo 404 ${ADDRESS} #bubble/games :Cannot send to channel (+m)`;
 
   it("tells the store Ergo refused the reaction its label names, in that reaction's room", () => {
@@ -949,7 +954,7 @@ describe("the chat's link: a reaction Ergo refused", () => {
     t.fake.line(`:${ADDRESS}!u@h JOIN #bubble`);
     t.link.react("#bubble", { to: MSGID, emoji: "😂", on: true });
     t.link.react("#bubble/games", { to: MSGID, emoji: "👍", on: true });
-    t.fake.line(refusal("r2"));
+    t.fake.line(refusal(labelOf(t.fake.sent)));
     expect(t.room("#bubble/games")?.cannotReact).toBe(true);
     expect(t.room("#bubble")?.cannotReact).toBeUndefined();
   });
@@ -959,12 +964,13 @@ describe("the chat's link: a reaction Ergo refused", () => {
     ["a 404 with a label it never sent", refusal("r9")],
     [
       "its reaction's echo, which is no refusal",
-      `@label=r1;msgid=x;time=2026-10-25T10:00:00.000Z;account=${ADDRESS};+draft/react=👍;+reply=${MSGID} :${ADDRESS}!u@h TAGMSG #bubble/games`,
+      (label: string) =>
+        `@label=${label};msgid=x;time=2026-10-25T10:00:00.000Z;account=${ADDRESS};+draft/react=👍;+reply=${MSGID} :${ADDRESS}!u@h TAGMSG #bubble/games`,
     ],
   ])("tells the store nothing of %s", (_, line) => {
     const t = memberIn(["#bubble/games"]);
     t.link.react("#bubble/games", { to: MSGID, emoji: "👍", on: true });
-    t.fake.line(line);
+    t.fake.line(typeof line === "string" ? line : line(labelOf(t.fake.sent)));
     expect(t.room("#bubble/games")?.cannotReact).toBeUndefined();
   });
 
