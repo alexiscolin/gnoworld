@@ -421,3 +421,25 @@ describe("the store's chat slice: reactions", () => {
     expect(kept.at(-1)?.id).toBe(`r${String(flood - 1)}`);
   });
 });
+
+// R10: a room's reaction Ergo refused is said until the page has said it.
+describe("the store's chat slice: a reaction Ergo refused", () => {
+  it("keeps a refused reaction with its room until it is dismissed, a refused delete's dismissal with it", () => {
+    const t = following();
+    t.reactionRefused("#bubble");
+    expect(t.room("#bubble")?.cannotReact).toBe(true);
+    expect(t.room("#bubble/games")?.cannotReact).toBeUndefined();
+    t.dismissed("#bubble");
+    expect(t.room("#bubble")?.cannotReact).toBeUndefined();
+  });
+
+  it("notifies once of a refusal said twice, and no one of one in a room not followed", () => {
+    const t = following();
+    const before = t.notified();
+    t.reactionRefused("#bubble");
+    t.reactionRefused("#bubble");
+    t.reactionRefused("#garden");
+    expect(t.notified()).toBe(before + 1);
+    expect(t.store.getState().chat.rooms["#garden"]).toBeUndefined();
+  });
+});

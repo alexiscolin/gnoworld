@@ -141,10 +141,19 @@ export interface LinesProps {
   reactions?: readonly Reaction[] | undefined;
   /** Reacts to a line, or takes the reaction back, an account's; whether it went out. */
   onReact: (reaction: Reacting) => boolean;
+  /** Ergo refused a reaction the page sent here, said until dismissed (4d). */
+  cannotReact?: true | undefined;
 }
 
+// What Ergo refused, said until the page dismisses it: a delete first, then a reaction; none, the page's own word.
+const toldOf = (refused: string | undefined, cannotReact: true | undefined): FlashMessage | undefined => {
+  if (refused !== undefined) return { title: "Could not delete the message." };
+  return cannotReact === undefined ? undefined : { title: "Could not react." };
+};
+
 /** The room's flash, then its lines, oldest first, as a list a screen reader hears grow. */
-export function Lines({ room, lines, members, me, refused, onDelete, onDismiss, reactions, onReact }: LinesProps) {
+export function Lines(props: LinesProps) {
+  const { room, lines, members, me, refused, onDelete, onDismiss, reactions, onReact, cannotReact } = props;
   const { listRef, onScroll } = useNewestInView(lines);
   const { stop, mounted, on, leave } = useLineFocus(lines, listRef);
   const { said, setSaid, copy } = useCopy(room);
@@ -160,6 +169,13 @@ export function Lines({ room, lines, members, me, refused, onDelete, onDismiss, 
     else setSaid({ title: "Could not delete the message." });
     return went;
   };
+  // A reaction that could not go out says so at once; one Ergo refuses, when it answers (cannotReact).
+  const react = (reaction: Reacting) => {
+    const went = onReact(reaction);
+    if (!went) setSaid({ title: "Could not react." });
+    return went;
+  };
+  const told = toldOf(refused, cannotReact);
   const actionsOf = (line: Line) => (
     <LineActions
       line={line}
@@ -171,15 +187,15 @@ export function Lines({ room, lines, members, me, refused, onDelete, onDismiss, 
       }}
       onDelete={remove}
       reactions={shown.get(line.id)}
-      onReact={(emoji, on) => onReact({ to: line.id, emoji, on })}
+      onReact={(emoji, on) => react({ to: line.id, emoji, on })}
     />
   );
   return (
     <>
       <Flash
-        message={refused === undefined ? said : { title: "Could not delete the message." }}
+        message={told ?? said}
         onClose={() => {
-          if (refused === undefined) setSaid(null);
+          if (told === undefined) setSaid(null);
           else onDismiss();
         }}
       />
@@ -201,7 +217,7 @@ export function Lines({ room, lines, members, me, refused, onDelete, onDismiss, 
             stop={line.id === stop}
             actions={mounted(line.id) ? actionsOf(line) : null}
             reactions={shown.get(line.id)}
-            react={me === undefined ? undefined : onReact}
+            react={me === undefined ? undefined : react}
           />
         ))}
       </ol>

@@ -97,7 +97,7 @@ class Link implements ChatLink {
     const line = reactionLine(reaction, room, this.#labels.next());
     if (line === undefined || this.#key === "guest" || !this.#inside.has(room)) return false;
     if (this.#ergo?.nick() === undefined || !this.#ergo.send(line)) return false;
-    this.#labels.sent();
+    this.#labels.sent(room);
     return true;
   }
 
@@ -202,6 +202,7 @@ class Link implements ChatLink {
   #forget(): void {
     this.#phases.clear();
     this.#inside.clear();
+    this.#labels.clear();
   }
 
   // The room in view's newest lines, once joined by this page and Ergo said I am in it, once a connection.
@@ -244,6 +245,7 @@ class Link implements ChatLink {
   #heard(message: IrcMessage): void {
     this.#deps.store.getState().chatActions.heard(message);
     const { tags, source = "", command, params } = message;
+    this.#labels.answered(tags.get("label"), command, this.#deps.store.getState().chatActions.reactionRefused);
     const [room = "", kicked] = params;
     const me = this.#ergo?.nick();
     if (tags.has("batch") || me === undefined) return;

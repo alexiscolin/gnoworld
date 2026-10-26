@@ -108,3 +108,22 @@ test.describe("reactions", () => {
     await expect(barOf(page, 0).getByRole("button", { name: "More" })).toBeVisible();
   });
 });
+
+// R10: Ergo refuses a reaction where the account may not speak; the page shows none it did not echo, and says so.
+test.describe("a reaction Ergo refused", () => {
+  test.use({ timezoneId: "UTC", locale: "en-GB" });
+
+  test("shows no chip and no pressed reaction, and says it could not react", async ({ page }) => {
+    const { said } = await asAccount(page, () => ({ refuseReact: true }));
+    await lineOf(page, "the second").hover();
+    await barOf(page, 1).getByRole("button", { name: "React with 👍" }).click();
+    await expect(page.getByRole("status").getByText("Could not react.", { exact: true })).toBeVisible();
+    await expect(lineOf(page, "the second").getByRole("button", { name: /👍,/ })).toHaveCount(0);
+    await lineOf(page, "the second").hover();
+    await expect(barOf(page, 1).getByRole("button", { name: "React with 👍" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    expect(said()).toEqual([`@label=r1;+draft/react=👍;+reply=m2 TAGMSG ${ROOM}`]);
+  });
+});

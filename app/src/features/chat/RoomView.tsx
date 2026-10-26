@@ -58,6 +58,8 @@ export interface RoomViewProps {
         refused?: string | undefined;
         /** Its reactions (4d). */
         reactions?: readonly Reaction[] | undefined;
+        /** Ergo refused one of the page's reactions here (4d). */
+        cannotReact?: true | undefined;
       }
     | undefined;
   chat: ErgoState | "off";
@@ -102,7 +104,7 @@ function Heading({ room, topic }: { room: string; topic: string | undefined }) {
 }
 
 export function RoomView({ room, state, chat, composer, me, onDelete, onDismiss, onReact }: RoomViewProps) {
-  const { lines = [], members = [], topic, refused, reactions } = state ?? {};
+  const { lines = [], members = [], topic, refused, reactions, cannotReact } = state ?? {};
   const connected = chat === "connected";
   return (
     <Stack as="section" space="s">
@@ -123,6 +125,7 @@ export function RoomView({ room, state, chat, composer, me, onDelete, onDismiss,
             onDismiss={onDismiss ?? (() => undefined)}
             reactions={reactions}
             onReact={onReact ?? (() => false)}
+            cannotReact={cannotReact}
           />
           {connected && lines.length === 0 ? <p>No messages yet.</p> : null}
           {composer}

@@ -35,6 +35,8 @@ interface RoomState {
   readonly refused: string | undefined;
   /** The reactions Ergo relayed and replayed (4d), in time order; none until the first. */
   readonly reactions?: readonly Reaction[];
+  /** Ergo refused one of the page's reactions here (4d), until the page has said so. */
+  readonly cannotReact?: true | undefined;
 }
 
 interface ChatState {
@@ -56,8 +58,10 @@ export interface ChatSlice {
     page: (room: string, messages: readonly IrcMessage[]) => void;
     /** The link gone: my nick and who is here forgotten; the lines and topics kept to show meanwhile. */
     disconnected: () => void;
-    /** The page said a room's refused delete: it is forgotten. */
+    /** The page said a room's refused delete or reaction: they are forgotten. */
     dismissed: (room: string) => void;
+    /** Ergo refused a reaction the page sent in a room. */
+    reactionRefused: (room: string) => void;
   };
 }
 
@@ -153,7 +157,14 @@ export const chatSlice: StateCreator<ChatSlice> = (set, get) => {
       dismissed: (id) => {
         const { rooms } = get().chat;
         const room = roomOf(rooms, id);
-        if (room?.refused !== undefined) change({ rooms: { ...rooms, [id]: { ...room, refused: undefined } } });
+        if (room === undefined || (room.refused === undefined && room.cannotReact === undefined)) return;
+        change({ rooms: { ...rooms, [id]: { ...room, refused: undefined, cannotReact: undefined } } });
+      },
+      reactionRefused: (id) => {
+        const { rooms } = get().chat;
+        const room = roomOf(rooms, id);
+        if (room !== undefined && room.cannotReact === undefined)
+          change({ rooms: { ...rooms, [id]: { ...room, cannotReact: true } } });
       },
       disconnected: () => {
         const { rooms } = get().chat;

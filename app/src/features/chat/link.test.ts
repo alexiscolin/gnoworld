@@ -911,3 +911,52 @@ describe("the chat's link: reactions", () => {
     expect(tagged([...g.fake.sent, ...t.fake.sent])).toEqual([]);
   });
 });
+
+// R10: Ergo refuses a reaction in a room the account may not speak in (+m, a mute), answering its label with a 404; the
+// page shows no reaction Ergo did not echo, and says it could not react.
+describe("the chat's link: a reaction Ergo refused", () => {
+  const MSGID = "rmq4xvjw9ys5pwtqqjxbqwvhjc";
+  const memberIn = (rooms: readonly string[]) => {
+    const t = setup();
+    t.link.follow(rooms);
+    t.link.show(rooms[0]);
+    t.signedIn(ADDRESS);
+    const fake = t.connected(ADDRESS);
+    fake.line(`:${ADDRESS}!u@h JOIN ${rooms[0] ?? ""}`);
+    return { ...t, fake };
+  };
+  const refusal = (label: string) => `@label=${label} :ergo 404 ${ADDRESS} #bubble/games :Cannot send to channel (+m)`;
+
+  it("tells the store Ergo refused the reaction its label names, in that reaction's room", () => {
+    const t = memberIn(["#bubble/games", "#bubble"]);
+    t.fake.line(`:${ADDRESS}!u@h JOIN #bubble`);
+    t.link.react("#bubble", { to: MSGID, emoji: "😂", on: true });
+    t.link.react("#bubble/games", { to: MSGID, emoji: "👍", on: true });
+    t.fake.line(refusal("r2"));
+    expect(t.room("#bubble/games")?.cannotReact).toBe(true);
+    expect(t.room("#bubble")?.cannotReact).toBeUndefined();
+  });
+
+  it.each([
+    ["a 404 with no label", `:ergo 404 ${ADDRESS} #bubble/games :Cannot send to channel (+m)`],
+    ["a 404 with a label it never sent", refusal("r9")],
+    [
+      "its reaction's echo, which is no refusal",
+      `@label=r1;msgid=x;time=2026-10-25T10:00:00.000Z;account=${ADDRESS};+draft/react=👍;+reply=${MSGID} :${ADDRESS}!u@h TAGMSG #bubble/games`,
+    ],
+  ])("tells the store nothing of %s", (_, line) => {
+    const t = memberIn(["#bubble/games"]);
+    t.link.react("#bubble/games", { to: MSGID, emoji: "👍", on: true });
+    t.fake.line(line);
+    expect(t.room("#bubble/games")?.cannotReact).toBeUndefined();
+  });
+
+  it("forgets its labels with the connection: a refusal heard after a reconnect names nothing", () => {
+    const t = memberIn(["#bubble/games"]);
+    t.link.react("#bubble/games", { to: MSGID, emoji: "👍", on: true });
+    t.fake.state("waiting");
+    const again = t.connected(ADDRESS);
+    again.line(refusal("r1"));
+    expect(t.room("#bubble/games")?.cannotReact).toBeUndefined();
+  });
+});

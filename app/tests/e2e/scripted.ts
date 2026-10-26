@@ -68,6 +68,15 @@ function split(line: string): { tags: string; rest: string } {
   return { tags: line.slice(1, space), rest: line.slice(space + 1) };
 }
 
+// Ergo's refusal of a TAGMSG in a room the account may not speak in: a 404, labelled as the TAGMSG was.
+function refusedReaction(line: string, me: string): string[] {
+  const { tags, rest } = split(line);
+  const [command, room = ""] = rest.split(" ");
+  if (command !== "TAGMSG") return [];
+  const label = /(?:^|;)label=([^;]*)/.exec(tags)?.[1];
+  return [`${label === undefined ? "" : `@label=${label} `}:ergo 404 ${me} ${room} :Cannot send to channel (+m)`];
+}
+
 // Ergo's echo of a PRIVMSG or a TAGMSG the page sends (echo-message): under `me`, with a msgid and a time after the
 // history's, the page's own tags kept.
 function echoed(line: string, me: string, count: number): string[] {
@@ -90,6 +99,8 @@ export interface Scripted {
   replayed?: readonly string[];
   /** Ergo echoes what the page says (echo-message). */
   echo?: boolean;
+  /** Ergo refuses each reaction, as in a room the account may not speak in: a 404 to its label, no echo. */
+  refuseReact?: boolean;
 }
 
 /** Answers the page's socket as Ergo would, the page being `me`: with #games' history, or with what `script` says. */
@@ -105,6 +116,7 @@ export function scriptedErgo(
     room = "#bubble/games",
     replayed = [],
     echo = false,
+    refuseReact = false,
   } = Array.isArray(script) ? { history: script } : (script as Scripted);
   let echoes = 0;
   ergo.onMessage((data) => {
@@ -114,7 +126,8 @@ export function scriptedErgo(
       ...welcome(line, me),
       ...rooms(line, me, { history, replayed, told: room }),
       ...redaction(line, me, refuseRedact),
-      ...(echo ? echoed(line, me, (echoes += 1)) : []),
+      ...(refuseReact ? refusedReaction(line, me) : []),
+      ...(echo && !(refuseReact && line.includes(" TAGMSG ")) ? echoed(line, me, (echoes += 1)) : []),
     ];
     for (const answer of answers) ergo.send(answer);
   });
