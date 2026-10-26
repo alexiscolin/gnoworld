@@ -64,5 +64,6 @@ gnoworld: a social, on-chain, graphical hub for gno.land. The design is
 5. Do not trust me on: what I did not run, verify or understand.
 6. Changed: every file, by category (`git diff --stat`); dependencies, tests, deviations from the plan.
 7. For each changed realm function, its card: who may call it, what it checks in order, what it changes, its cost, the tests that prove it.
+8. Risk and undo: what could go wrong once it runs, for whom, and the one step that undoes the change.
 
-In the first slices, give items 1–3 and 7 only, and wait for Alexis's review before sharing findings. While he reviews, answer only the question asked, with no hint of other problems (docs/REVIEW.md, "Blind first").
+In the first slices, give items 1–3, 7 and 8 only, and wait for Alexis's review before sharing findings. While he reviews, answer only the question asked, with no hint of other problems (docs/REVIEW.md, "Blind first").

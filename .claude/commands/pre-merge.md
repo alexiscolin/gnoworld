@@ -64,9 +64,10 @@ to 6 is committed, never in between: each run costs him its whole length.
    its finding (`Finding: F012`). Fixes are re-checked by the gate and the mutation tester, not by a new pass. A
    second pass runs only for a high finding fixed in a tier-1 file, and only that lens.
 7. **Report** to Alexis, in French:
-   - the review card of `CLAUDE.md` (in the first slices, only its items 1–3 and 7, and the
+   - the review card of `CLAUDE.md` (in the first slices, only its items 1–3, 7 and 8, and the
      findings held back until Alexis has reviewed, per "Blind first");
-   - the findings, most severe first, each with its scenario;
+   - the findings, most severe first, each with its scenario and its tag: important, nit, or
+     pre-existing (in the code before the branch: never read as its author's);
    - what was dropped as a false positive, in one line each.
 8. **Record the pass.** Once every finding is fixed or put to Alexis, run `scripts/check.sh
    --merge` on the final, committed code; on the slice's last merge, the tip pushed to `main`, run
