@@ -228,6 +228,19 @@ describe("addReactions: a room's reactions, the newest of each, in time order, t
     expect(kept.map(({ id }) => id)).toEqual(["other", "f9999"]);
   });
 
+  // The security review (S3): one account's reactions to lines no one sees fill no one else's place.
+  test("keeps an account's newest fifth of the window, its flood evicting no one else's", () => {
+    const alice = reaction({ id: "alice", who: ALICE, to: "m1", time: T0 });
+    const flood = Array.from({ length: 1000 }, (_, n) =>
+      reaction({ id: `j${String(n)}`, who: ME, to: `nope${String(n)}`, time: second(n + 1) }),
+    );
+    const kept = addReactions(addReactions([], [alice], 1000), flood, 1000);
+    expect(kept).toHaveLength(201);
+    expect(kept[0]?.id).toBe("alice");
+    expect(kept[1]?.id).toBe("j800");
+    expect(kept.at(-1)?.id).toBe("j999");
+  });
+
   test("keeps the newest `cap` distinct reactions, the newest run of them", () => {
     const many = Array.from({ length: 1200 }, (_, n) =>
       reaction({ id: `r${String(n)}`, time: second(n), who: `a${String(n)}` }),

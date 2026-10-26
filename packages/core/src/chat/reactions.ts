@@ -67,8 +67,29 @@ const byTimeThenId = (one: Reaction, other: Reaction): number =>
   compare(one.time, other.time) || compare(one.id, other.id);
 const keyOf = ({ who, to, emoji }: Reaction): string => `${who}\n${to}\n${emoji}`;
 
+// The newest `share` of each account's reactions, in time order: one account's flood keeps its own place alone.
+function sharesOf(reactions: readonly Reaction[], share: number): readonly Reaction[] {
+  const counts = new Map<string, number>();
+  const kept: Reaction[] = [];
+  for (let at = reactions.length - 1; at >= 0; at -= 1) {
+    const reaction = reactions[at];
+    if (reaction === undefined) continue;
+    const count = counts.get(reaction.who) ?? 0;
+    if (count >= share) continue;
+    counts.set(reaction.who, count + 1);
+    kept.push(reaction);
+  }
+  return kept.reverse();
+}
+
+/** How much of a room's window one account's reactions fill at most: a fifth, so five accounts each reacting to all of
+ * a window's 200 lines are kept (R2), and one account's reactions to lines no one sees fill no one else's place (the
+ * security review's S3). */
+const SHARE = 5;
+
 /** The room's reactions with these added: the newest of an account to a line with an emoji, a take-back included, so
- * an account repeating itself evicts no one else's; then in time order, then by id, the newest `cap` kept. */
+ * an account repeating itself evicts no one else's; each account's newest fifth of `cap` (SHARE); then in time order,
+ * then by id, the newest `cap` kept. */
 export function addReactions(
   held: readonly Reaction[],
   incoming: readonly Reaction[],
@@ -86,7 +107,7 @@ export function addReactions(
     changed = true;
   }
   if (!changed) return held;
-  const kept = [...newest.values()].sort(byTimeThenId).slice(-cap);
+  const kept = sharesOf([...newest.values()].sort(byTimeThenId), Math.ceil(cap / SHARE)).slice(-cap);
   return kept.length === held.length && kept.every((reaction, at) => reaction === held[at]) ? held : kept;
 }
 
