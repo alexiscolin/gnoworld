@@ -9,9 +9,10 @@ const store = () => {
   made.subscribe(() => {
     heard += 1;
   });
-  const { judged } = made.getState().verdictActions;
+  const { judged, judgedAll } = made.getState().verdictActions;
   return {
     judged,
+    judgedAll,
     of: (room: string) => made.getState().verdicts[room],
     order: (room: string) => made.getState().verdictsOrder[room],
     notified: () => heard,
@@ -86,6 +87,23 @@ describe("the store's verdicts", () => {
   });
 
   // F880: the order that picks the verdict to drop holds no more than the verdicts it orders.
+  // F1057 (C2): a server's answer of 100 verdicts went in one by one, the room copied and the store set 100 times.
+  it("takes a server's answer in one update, its room kept to its newest", () => {
+    const t = store();
+    const events = Array.from({ length: VERDICTS_KEPT + 5 }, (_, n) => ({
+      msgid: `m${String(n)}`,
+      room: "#bubble",
+      state: "checked" as const,
+    }));
+    t.judgedAll(events);
+    expect(t.notified()).toBe(1);
+    expect(t.order("#bubble")).toEqual(events.slice(5).map(({ msgid }) => msgid));
+    expect(Object.keys(t.of("#bubble") ?? {})).toHaveLength(VERDICTS_KEPT);
+    t.judgedAll(events.slice(-3));
+    t.judgedAll([]);
+    expect(t.notified()).toBe(1);
+  });
+
   it("keeps a room's order no longer than its verdicts, oldest first", () => {
     const t = store();
     const ids = Array.from({ length: VERDICTS_KEPT + 50 }, (_, n) => `m${String(n)}`);

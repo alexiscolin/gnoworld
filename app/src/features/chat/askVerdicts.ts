@@ -10,8 +10,10 @@ import { unjudged } from "./embeds.ts";
 export interface Asking {
   /** The server's verdicts of these lines of a room (lib/api/verdicts.ts). */
   verdicts: (room: string, ids: readonly string[]) => Promise<Result<LineVerdicts>>;
-  /** A verdict the stream or the server gave, into the store. */
+  /** A verdict the stream gave, into the store. */
   judged: (event: StreamEvent) => void;
+  /** The verdicts one answer of the server gave, into the store at once (F1057). */
+  judgedAll: (events: readonly StreamEvent[]) => void;
   /** The verdicts the page holds of a room's lines. */
   held: (room: string) => Readonly<Record<string, unknown>> | undefined;
   /** Follows a room's stream (lib/stream/verdicts.ts), handing on its verdicts, its word of when it began following
@@ -55,7 +57,7 @@ interface Following {
 
 // Asks the server of the lines in view said before the stream began (F884), once each while in view, VERDICTS_ASKED
 // a request; after a failure that may pass, rests, then asks the view last given again (F874).
-function serverAsker({ verdicts, judged }: Pick<Asking, "verdicts" | "judged">) {
+function serverAsker({ verdicts, judgedAll }: Pick<Asking, "verdicts" | "judgedAll">) {
   const asked = new Map<string, Set<string>>();
   // The view last given, asked again when a rest ends; the rest under way, during which nothing is asked.
   let latest: { room: string; view: InView } | undefined;
@@ -75,9 +77,8 @@ function serverAsker({ verdicts, judged }: Pick<Asking, "verdicts" | "judged">) 
     };
     verdicts(room, ids).then(
       (got) => {
-        if (got.ok) {
-          for (const { msgid, state } of got.value.verdicts) judged({ msgid, room, state });
-        } else if (PASSING.has(got.reason)) failed(got.reason === "too_many" ? BUSY_REST_MS : REST_MS);
+        if (got.ok) judgedAll(got.value.verdicts.map(({ msgid, state }) => ({ msgid, room, state })));
+        else if (PASSING.has(got.reason)) failed(got.reason === "too_many" ? BUSY_REST_MS : REST_MS);
       },
       () => {
         failed(REST_MS);
@@ -116,8 +117,8 @@ function serverAsker({ verdicts, judged }: Pick<Asking, "verdicts" | "judged">) 
   };
 }
 
-export function verdictAsker({ verdicts, judged, held, follow }: Asking) {
-  const server = serverAsker({ verdicts, judged });
+export function verdictAsker({ verdicts, judged, judgedAll, held, follow }: Asking) {
+  const server = serverAsker({ verdicts, judgedAll });
   let following: Following | undefined;
   // The shown lines said before the stream's word are the server's to answer; before its word, nothing is asked.
   const askShown = () => {

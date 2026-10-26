@@ -20,6 +20,7 @@ const NONE: Result<LineVerdicts> = { ok: true, value: { room: "#bubble", verdict
 function server(answer: (ids: readonly string[]) => Promise<Result<LineVerdicts>> = () => Promise.resolve(NONE)) {
   const sent: string[][] = [];
   const heard: StreamEvent[] = [];
+  let answers = 0;
   let holding: Record<string, unknown> | undefined;
   const asker = verdictAsker({
     verdicts: (_room, ids) => {
@@ -28,6 +29,10 @@ function server(answer: (ids: readonly string[]) => Promise<Result<LineVerdicts>
     },
     judged: (event) => {
       heard.push(event);
+    },
+    judgedAll: (events) => {
+      answers += 1;
+      heard.push(...events);
     },
     held: () => holding,
     // The stream says it began following when the page did.
@@ -40,7 +45,7 @@ function server(answer: (ids: readonly string[]) => Promise<Result<LineVerdicts>
     holding = held;
     asker.show("#bubble", lines);
   };
-  return { ask, sent, heard, stop: asker.stop };
+  return { ask, sent, heard, answers: () => answers, stop: asker.stop };
 }
 // The answers' turn: each request's promise settled, and what it does after.
 const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -133,6 +138,8 @@ describe("verdictAsker: the server's verdicts of the lines in view", () => {
       { msgid: "a", room: "#bubble", state: "hidden" },
       { msgid: "b", room: "#bubble", state: "checked" },
     ]);
+    // In one call, so the store updates once for the answer (F1057).
+    expect(t.answers()).toBe(1);
   });
 
   // The server would answer the same again: a request it refuses, a room the reader may not read, an answer not
@@ -163,6 +170,7 @@ function told(clock = OPENED) {
       return Promise.resolve(NONE);
     },
     judged: () => undefined,
+    judgedAll: () => undefined,
     held: () => undefined,
     follow: (_room: string, on: { since: (time: number) => void; dead: () => void }) => {
       follows += 1;

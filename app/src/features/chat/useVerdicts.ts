@@ -31,6 +31,9 @@ export function useVerdicts(store: Store, { room, lines, reader, saving }: Shown
       judged: (event) => {
         store.getState().verdictActions.judged(event);
       },
+      judgedAll: (events) => {
+        store.getState().verdictActions.judgedAll(events);
+      },
       held: (room) => store.getState().verdicts[room],
       follow: (room, on) => pageVerdicts([room], on),
     });
