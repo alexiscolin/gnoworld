@@ -165,6 +165,48 @@ describe("Tooltip", () => {
     vi.restoreAllMocks();
   });
 
+  // The green pass (G4): only Chrome's refusal during another popover's toggle waits; any other DOMException, or an
+  // error that merely shares its name, rises.
+  it.each([
+    ["a DOMException of another name", new DOMException("not allowed", "NotAllowedError")],
+    [
+      "an error named as the refusal, not a DOMException",
+      Object.assign(new Error("look-alike"), { name: "InvalidStateError" }),
+    ],
+  ])("lets %s rise (F832)", (_, error) => {
+    draw();
+    refusing(error);
+    expect(() => {
+      keyboardFocus();
+    }).toThrow(error.message);
+    vi.restoreAllMocks();
+  });
+
+  // The green pass (G3): words shown after a refusal are placed then, by their size once they have one.
+  it("places its words by their size once shown, after a refused show (F832)", () => {
+    Object.defineProperty(document.documentElement, "clientWidth", { value: 1000, configurable: true });
+    Object.defineProperty(document.documentElement, "clientHeight", { value: 800, configurable: true });
+    draw();
+    const words = tip();
+    const anchor = button().parentElement;
+    if (anchor === null) throw new Error("no anchor");
+    vi.spyOn(anchor, "getBoundingClientRect").mockReturnValue(
+      DOMRect.fromRect({ x: 200, y: 300, width: 40, height: 40 }),
+    );
+    // A box out of the top layer has no size, as a browser draws it.
+    vi.spyOn(words, "getBoundingClientRect").mockImplementation(() =>
+      DOMRect.fromRect(words.style.display === "block" ? { width: 80, height: 20 } : {}),
+    );
+    refusing(new DOMException("Invalid to show a popover during another show operation", "InvalidStateError"));
+    keyboardFocus();
+    act(() => {
+      vi.advanceTimersToNextFrame();
+    });
+    expect(words.style.display).toBe("block");
+    expect([words.style.left, words.style.top]).toEqual(["180px", "280px"]);
+    vi.restoreAllMocks();
+  });
+
   // A focused control removed may fire no blur (jsdom fires none): the words go with it all the same (F353).
   it("hides the words the keyboard showed when their control leaves the page", async () => {
     const tipped = (control: boolean) => (
