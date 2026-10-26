@@ -282,7 +282,7 @@ test.describe("a line's actions", () => {
     await expect(barOf(page, 0)).toBeVisible();
   });
 
-  // The red pass (M4): the pointer resting on one line, the keyboard on another, which has its bar.
+  // The red pass (M4): the pointer resting on one line, the keyboard on another, which has its bar, alone (U11).
   test("let the keyboard reach its line's bar while the pointer rests on another, and keep a bar whose menu is open", async ({
     page,
   }) => {
@@ -290,6 +290,7 @@ test.describe("a line's actions", () => {
     await lineOf(page, "the first line").hover();
     await lines(page).nth(2).focus();
     await expect(barOf(page, 2)).toBeVisible();
+    await expect(bars(page)).toHaveCount(1);
     await page.keyboard.press("Tab");
     await expect(moreOf(page, 2)).toBeFocused();
     await page.keyboard.press("Enter");
@@ -404,6 +405,24 @@ test.describe("a line's actions", () => {
     expect(await rise(30)).toBeGreaterThanOrEqual(0);
     expect(await barInside(page, 30)).toBe(true);
     expect(await rise(33)).toBeLessThan(0);
+  });
+
+  // 4c's UX review (U11): one bar at a time, the pointed line's while the pointer is on the lines, the focused line's
+  // again once it leaves them; a bar holding the focus stays, so its menu is never pulled from under the keyboard.
+  test("show the pointed line's bar alone, and the focused line's once the pointer leaves", async ({ page }) => {
+    await room(page);
+    await lines(page).nth(2).focus();
+    await lines(page).nth(0).hover();
+    await expect(bars(page)).toHaveCount(1);
+    await expect(barOf(page, 0)).toBeVisible();
+    await roomsNav(page).hover();
+    await expect(bars(page)).toHaveCount(1);
+    await expect(barOf(page, 2)).toBeVisible();
+    // More holding the focus: its bar stays as the pointer comes to another line.
+    await moreOf(page, 2).focus();
+    await lines(page).nth(0).hover();
+    await expect(bars(page)).toHaveCount(2);
+    await expect(moreOf(page, 2)).toBeFocused();
   });
 
   test("pass axe with a line's bar and its menu open", async ({ page }) => {

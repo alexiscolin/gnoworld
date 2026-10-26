@@ -58,6 +58,8 @@ export function useLineFocus(lines: readonly Line[], listRef: RefObject<HTMLOLis
   const [chosen, setChosen] = useState<string>();
   const [focused, setFocused] = useState<string>();
   const [pointed, setPointed] = useState<string>();
+  // Whether the focus is in the focused line's bar (its More, its menu): that bar stays whatever the pointer does.
+  const [held, setHeld] = useState(false);
   const stop = stopOf(lines, chosen);
   // A focused line's bar, taller than a line, comes into the list's view as the focus comes to it, the same line
   // again after the focus left the list too (G8): never as a line arrives (/code-review) or under the pointer.
@@ -68,6 +70,9 @@ export function useLineFocus(lines: readonly Line[], listRef: RefObject<HTMLOLis
     onFocus: (event: { currentTarget: HTMLOListElement; target: EventTarget }) => {
       const line = lineAt(lines, event.currentTarget, event.target);
       setFocused(line?.id);
+      setHeld(event.target instanceof Element && event.target.closest("[role='toolbar']") !== null);
+      // The focus moved: its line's bar shows until the pointer moves again (U11).
+      setPointed(undefined);
       if (line !== undefined) setChosen(line.id);
     },
     // Focus gone elsewhere in the page ends the line's. Gone to none, it may come back within the frame, as a menu or
@@ -103,5 +108,8 @@ export function useLineFocus(lines: readonly Line[], listRef: RefObject<HTMLOLis
     const item = listRef.current?.children[next];
     if (item instanceof HTMLElement) item.focus();
   };
-  return { stop, mounted: (id: string) => id === focused || id === pointed, on, leave };
+  // One bar at a time: the pointed line's while the pointer is on the lines, else the focused line's; a bar holding
+  // the focus stays beside it (U11).
+  const mounted = (id: string) => (held && id === focused) || id === (pointed ?? focused);
+  return { stop, mounted, on, leave };
 }
