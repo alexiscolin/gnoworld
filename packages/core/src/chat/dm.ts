@@ -3,10 +3,8 @@
 // keys the conversation. A guest has none: a line with no account tag naming its nick (force-nick-equals-account) is
 // no account's, and the page never shows it.
 import type { IrcMessage } from "../irc/irc.ts";
-import { lineOf, nickOf, type Line } from "./room.ts";
+import { lineOf, nickOf, sameName as sameNick, type Line } from "./room.ts";
 
-// Ergo folds A to Z alone (casemapping ascii, deploy/ergo/ircd.yaml.tmpl).
-const sameNick = (one: string, other: string): boolean => one.toLowerCase() === other.toLowerCase();
 // A room's address, its ranks' prefixes before it (STATUSMSG, irc/modes/modes.go:162, v2.19.1): @#bubble is a room's.
 const ROOM = /^[~&@%+]*#/u;
 

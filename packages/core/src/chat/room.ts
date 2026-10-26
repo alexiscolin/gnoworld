@@ -17,9 +17,11 @@ export interface Line {
   readonly kind: "message" | "notice" | "action";
 }
 
-// Ergo folds A to Z alone (casemapping ascii, deploy/ergo/ircd.yaml.tmpl).
+// Ergo folds A to Z alone (casemapping ascii, deploy/ergo/ircd.yaml.tmpl), its names being ASCII alone
+// (irc/i18n/common.go:74, v2.19.1).
 const fold = (name: string): string => name.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
-const sameRoom = (name: string, room: string): boolean => fold(name) === fold(room);
+/** Whether two names, of rooms or nicks, are one name to Ergo. */
+export const sameName = (one: string, other: string): boolean => fold(one) === fold(other);
 /** The nick of a source: nick!user@host, nick@host, or a nick alone. */
 export const nickOf = (source: string): string => source.replace(/[!@].*$/s, "");
 const compare = (one: string, other: string): number => (one < other ? -1 : one > other ? 1 : 0);
@@ -73,7 +75,7 @@ function stamp(tags: IrcMessage["tags"]): Pick<Line, "id" | "time"> | undefined 
 function textTo({ command, params }: IrcMessage, room: string): string | undefined {
   const [target = "", text = ""] = params;
   const sent = (command === "PRIVMSG" || command === "NOTICE") && params.length === 2;
-  return sent && sameRoom(target, room) && text !== "" ? text : undefined;
+  return sent && sameName(target, room) && text !== "" ? text : undefined;
 }
 
 /** The room's line a message carries, or none: a PRIVMSG or NOTICE to this room with an id, a time and a
@@ -113,7 +115,7 @@ export function addLines(lines: readonly Line[], incoming: readonly Line[], cap:
 /** The room's lines without the one Ergo's REDACT hides (draft/message-redaction). */
 export function redactAfter(lines: readonly Line[], message: IrcMessage, room: string): readonly Line[] {
   const [target = "", id = ""] = message.params;
-  if (message.command !== "REDACT" || !sameRoom(target, room)) return lines;
+  if (message.command !== "REDACT" || !sameName(target, room)) return lines;
   const kept = lines.filter((line) => line.id !== id);
   return kept.length === lines.length ? lines : kept;
 }
@@ -153,7 +155,7 @@ type Change = (members: readonly string[], message: IrcMessage, at: Where) => re
 // RPL_NAMREPLY: my nick, the room's symbol, the room, its names; multi-prefix gives each name every mode
 // prefix it holds.
 const named: Change = (members, { params: [, , room = "", list] }, at) => {
-  if (!sameRoom(room, at.room) || list === undefined) return members;
+  if (!sameName(room, at.room) || list === undefined) return members;
   const names = list.split(" ").map((name) => name.replace(/^[~&@%+]+/, ""));
   const held = new Set(members);
   const added = [...new Set(names.filter((name) => name !== "" && !held.has(name)))].sort(compare);
@@ -162,18 +164,18 @@ const named: Change = (members, { params: [, , room = "", list] }, at) => {
 
 const joined: Change = (members, { source = "", params: [room = ""] }, at) => {
   const nick = nickOf(source);
-  if (!sameRoom(room, at.room) || nick === "") return members;
+  if (!sameName(room, at.room) || nick === "") return members;
   if (nick === at.me) return [at.me];
   return members.includes(nick) ? members : inserted(members, nick);
 };
 
 const parted: Change = (members, { source = "", params: [room = ""] }, at) => {
-  if (!sameRoom(room, at.room)) return members;
+  if (!sameName(room, at.room)) return members;
   return nickOf(source) === at.me ? [] : without(members, nickOf(source));
 };
 
 const kicked: Change = (members, { params: [room = "", nick = ""] }, at) => {
-  if (!sameRoom(room, at.room)) return members;
+  if (!sameName(room, at.room)) return members;
   return nick === at.me ? [] : without(members, nick);
 };
 
@@ -207,7 +209,7 @@ export function topicAfter(topic: string | undefined, message: IrcMessage, room:
   const { command, params } = message;
   // 331 and 332 name the room after my nick, TOPIC first.
   const [named = "", text] = params.slice(command === "TOPIC" ? 0 : 1);
-  if (!sameRoom(named, room)) return topic;
+  if (!sameName(named, room)) return topic;
   if (command === "331") return undefined;
   if ((command === "332" || command === "TOPIC") && text !== undefined) return text || undefined;
   return topic;
