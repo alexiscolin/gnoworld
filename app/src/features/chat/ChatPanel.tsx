@@ -18,6 +18,7 @@ import { chatLink, type ChatLink } from "./link.ts";
 import { LOADING } from "./Loading.tsx";
 import { neighbour, roomIds, roomLabel, roomParams, roomsQuery, shownRoom } from "./names.ts";
 import { useOnHide } from "./reading.ts";
+import { roomActs } from "./roomActs.ts";
 import { RoomsView } from "./RoomsView.tsx";
 import { RoomView, type RoomViewProps } from "./RoomView.tsx";
 
@@ -108,6 +109,7 @@ interface LoadedProps {
 function Loaded({ sections, current, state, chat, session, link, dismissed }: LoadedProps) {
   const ids = roomIds(sections);
   useRoomKeys(ids, current);
+  const acts = roomActs(link, current ?? "", dismissed);
   return (
     <Sidebar space="l">
       <RoomsView sections={sections} current={current} />
@@ -117,23 +119,17 @@ function Loaded({ sections, current, state, chat, session, link, dismissed }: Lo
           state={state}
           chat={chat}
           me={session.kind === "in" ? session.address : undefined}
-          onDelete={(id) => link.current?.redact(current, id) ?? false}
-          onDismiss={() => {
-            dismissed(current);
-          }}
-          onRead={(id) => {
-            link.current?.read(current, id);
-          }}
+          onDelete={acts.onDelete}
+          onDismiss={acts.onDismiss}
+          onRead={acts.onRead}
           composer={
             <Writer
               session={session}
               room={current}
               rooms={ids}
               members={state?.members ?? []}
-              onSay={(draft) => link.current?.say(current, draft) ?? false}
-              onTyping={(told) => {
-                link.current?.typing(current, told);
-              }}
+              onSay={acts.onSay}
+              onTyping={acts.onTyping}
             />
           }
         />
