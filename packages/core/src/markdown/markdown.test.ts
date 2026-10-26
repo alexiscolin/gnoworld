@@ -1001,19 +1001,19 @@ describe("markdown: whatever comes", () => {
     );
   });
 
-  // Linear time, as ADR-0002 §9 measures an algorithm: a family read at n and 4n characters takes about four times as
-  // long, where a quadratic reader takes sixteen. The fastest of three reads each, so a pause of the machine or
-  // StrykerJS's instrumentation, which slow both alike, change nothing; no growth is read under 20 ms.
+  // Linear time (ADR-0002 §9): read at n and 4n characters, about four times as long, where a quadratic reader takes
+  // sixteen, seconds at 16,000. The fastest of five reads each, so a pause or StrykerJS's instrumentation change
+  // nothing; no growth is read under 100 ms (20 ms failed under a merge check's load, F831).
   const fastest = (source: string) =>
     Math.min(
-      ...[1, 2, 3].map(() => {
+      ...[1, 2, 3, 4, 5].map(() => {
         const start = Date.now();
         markdown(source);
         return Date.now() - start;
       }),
     );
   const linear = (family: (size: number) => string) =>
-    fastest(family(16_000)) < Math.max(8 * fastest(family(4_000)), 20);
+    fastest(family(16_000)) < Math.max(8 * fastest(family(4_000)), 100);
   const repeated =
     (piece: string, end = "") =>
     (size: number) =>
