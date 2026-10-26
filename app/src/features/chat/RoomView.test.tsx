@@ -366,6 +366,13 @@ describe("RoomView", () => {
     expect(said(html)).not.toContain("No messages yet.");
   });
 
+  // 4c's UX review (U14): the list says how the keyboard moves in it, which nothing else would tell a screen reader.
+  it("names the keys that move among its lines and reach a line's actions", () => {
+    expect(view()).toMatch(
+      /<ol aria-label="Messages" aria-description="Up and down arrows move between messages; Tab reaches a message&#x27;s actions\."/,
+    );
+  });
+
   it("reads a line's Markdown into elements, and keeps a hostile line as its text", () => {
     const lines = [
       line({ text: "a **b** [x](https://a.example)" }),

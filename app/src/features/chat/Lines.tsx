@@ -207,6 +207,8 @@ export function Lines({ room, lines, members, me, refused, connected, onDelete, 
         onScroll={onScroll}
         {...on}
         aria-label="Messages"
+        // How the keyboard moves among the lines, which nothing else tells a screen reader (U14).
+        aria-description="Up and down arrows move between messages; Tab reaches a message's actions."
         aria-live="polite"
         aria-relevant="additions"
         className={LINES}
