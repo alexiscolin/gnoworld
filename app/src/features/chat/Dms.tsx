@@ -1,11 +1,9 @@
 // Direct messages on a world's page (slice 4's 4e): the conversation the address names (?dm=<address>), an
 // account's with another account; the list the rooms' navigation shows; and, when the account asks so, none from an
-// account it never wrote to (ADR-0002's "only from people I have talked with"), kept on the device.
+// account it never wrote to (ADR-0002's "only from people I have talked with"), as the store keeps the choice.
 import type { Line } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
-import { useReducer } from "react";
-import { pageDmPrefs } from "../../lib/dms/page.ts";
-import type { DmPrefs } from "../../lib/dms/prefs.ts";
+import { heardFrom } from "../../store/dms.ts";
 import type { AppState } from "../../store/index.ts";
 import { useApp } from "../../storeContext.tsx";
 import type { DmsProps } from "./RoomsView.tsx";
@@ -34,41 +32,27 @@ function partnerOf(account: string | undefined, asked: string | null): string | 
 const listOf = (heard: readonly string[], partner: string | undefined): string[] =>
   partner === undefined || heard.includes(partner) ? [...heard] : [...heard, partner];
 
-// What the account chose on the device as it stands at a change's `version`: the compiler keeps a call's result until
-// its arguments change, and sees no write to the device, so each one counts a version. A guest chose nothing.
-const choicesAt = (version: number, prefs: DmPrefs | undefined) => ({
-  version,
-  onlyKnown: prefs?.onlyKnown() ?? false,
-  known: prefs?.known() ?? [],
-});
-
 /** An account's direct messages on a world's page, `asked` the address's ?dm=. */
 export function useDms(world: string, session: AppState["login"]["session"], asked: string | null): Dms {
-  // Each change of the device's choices: a version, which they are read at.
-  const [version, reread] = useReducer((count: number) => count + 1, 0);
   const all = useApp((app) => app.dms);
+  const choices = useApp((app) => app.dmChoices);
+  const { setOnlyKnown, know } = useApp((app) => app.dmActions);
   const account = session.kind === "in" ? session.address : undefined;
-  const prefs = account === undefined ? undefined : pageDmPrefs(account);
   const partner = partnerOf(account, asked);
-  const { onlyKnown, known } = choicesAt(version, prefs);
-  const heard = (other: string) => !onlyKnown || known.includes(other);
-  const nav = (written: DmPrefs): DmsProps => ({
-    world,
-    partners: listOf(Object.keys(all).filter(heard), partner),
-    current: partner,
-    onlyKnown,
-    onOnlyKnown: (only) => {
-      written.setOnlyKnown(only);
-      reread();
-    },
-  });
+  const heard = (other: string) => heardFrom(choices, other);
   return {
     partner,
-    nav: prefs === undefined ? undefined : nav(prefs),
+    nav:
+      account === undefined
+        ? undefined
+        : {
+            world,
+            partners: listOf(Object.keys(all).filter(heard), partner),
+            current: partner,
+            onlyKnown: choices.onlyKnown,
+            onOnlyKnown: setOnlyKnown,
+          },
     lines: partner !== undefined && heard(partner) ? (all[partner] ?? []) : [],
-    know: (other) => {
-      prefs?.know(other);
-      reread();
-    },
+    know,
   };
 }

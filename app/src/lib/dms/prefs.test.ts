@@ -57,6 +57,15 @@ describe("an account's direct-message preferences on the device", () => {
     expect(on(device, BOB).known()).toEqual([]);
   });
 
+  // 4e's efficiency review (7): writing again to the account written to last changes nothing on the device.
+  it("writes nothing for the account written to last already", () => {
+    const device = storage();
+    on(device, ALICE).know(BOB);
+    const before = device.touched.length;
+    expect(on(device, ALICE).know(BOB)).toBe(true);
+    expect(device.touched).toHaveLength(before);
+  });
+
   it(`keeps the ${String(KNOWN_KEPT)} accounts last written to`, () => {
     const device = storage();
     const mine = on(device, ALICE);

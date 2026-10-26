@@ -8,6 +8,7 @@ import { Button, Sidebar, Stack } from "@gnoworld/ui";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { pageLoginApi } from "../../lib/api/login.ts";
+import { pageDmPrefs } from "../../lib/dms/page.ts";
 import { pageRoomsApi } from "../../lib/api/rooms.ts";
 import { drawGuestNick } from "../../lib/ergo/ergo.ts";
 import { pageErgo } from "../../lib/ergo/page.ts";
@@ -124,6 +125,16 @@ function Loaded({ sections, current, state, chat, session, say, sayTo, dms }: Lo
   );
 }
 
+// The page's link to Ergo: the page's socket, the login's tickets, a guest's drawn nick, an account's device.
+const pageLink = (store: ReturnType<typeof useAppStore>) =>
+  chatLink({
+    store,
+    connect: pageErgo,
+    ticket: pageLoginApi().ticket,
+    guest: drawGuestNick,
+    device: (account) => ({ prefs: pageDmPrefs(account) }),
+  });
+
 export function ChatPanel({ world }: { world: string }) {
   const store = useAppStore();
   // The page's link to Ergo, made once the page runs: never in the build's pre-render.
@@ -134,7 +145,7 @@ export function ChatPanel({ world }: { world: string }) {
   const session = useApp(({ login }) => login.session);
   const query = roomsQuery(world, session, attempt);
   useEffect(() => {
-    const made = chatLink({ store, connect: pageErgo, ticket: pageLoginApi().ticket, guest: drawGuestNick });
+    const made = pageLink(store);
     linkRef.current = made;
     return () => {
       made.stop();

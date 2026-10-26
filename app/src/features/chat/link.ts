@@ -9,6 +9,7 @@ import type { Result } from "../../lib/api/http.ts";
 import type { Ergo, ErgoOptions, Who } from "../../lib/ergo/ergo.ts";
 import { LINES_KEPT } from "../../store/chat.ts";
 import { groupsOf } from "./groups.ts";
+import type { DmDevice } from "../../store/dms.ts";
 import type { AppState, createAppStore } from "../../store/index.ts";
 
 /** The rooms a connection joins: Ergo's max-channels-per-client (deploy/ergo/ircd.yaml.tmpl). */
@@ -21,6 +22,8 @@ export interface LinkDeps {
   connect: (who: Who, on: Pick<ErgoOptions, "onState" | "onLine">) => Ergo;
   ticket: () => Promise<Result<{ ticket: string }>>;
   guest: () => string;
+  /** An account's device, whose direct-message choices the store reads at its session's start; none in a test. */
+  device?: ((account: Address) => DmDevice) | undefined;
 }
 
 export interface ChatLink {
@@ -133,7 +136,9 @@ class Link implements ChatLink {
     // Noted first: the store's change below calls this again, which must find the session the same.
     this.#key = key;
     if (known) this.#unfollow();
-    this.#deps.store.getState().dmActions.begin();
+    this.#deps.store
+      .getState()
+      .dmActions.begin(session.kind === "in" ? this.#deps.device?.(session.address) : undefined);
     this.#end();
     const { ticket, guest } = this.#deps;
     this.#open(session.kind === "out" ? { guest } : { account: session.address, ticket });

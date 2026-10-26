@@ -54,8 +54,14 @@ export function dmPrefs(storage: () => DraftStorage, account: Address): DmPrefs 
     },
     setOnlyKnown: (only) => write(keys.only, String(only)),
     known,
-    know: (partner) =>
-      write(keys.known, JSON.stringify([...known().filter((each) => each !== partner), partner].slice(-KNOWN_KEPT))),
+    // The account written to last already: nothing to change.
+    know: (partner) => {
+      const held = known();
+      return (
+        held.at(-1) === partner ||
+        write(keys.known, JSON.stringify([...held.filter((each) => each !== partner), partner].slice(-KNOWN_KEPT)))
+      );
+    },
   };
 }
 

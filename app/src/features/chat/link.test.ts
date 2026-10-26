@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { Result } from "../../lib/api/http.ts";
 import type { Ergo, ErgoState, Who } from "../../lib/ergo/ergo.ts";
 import { createAppStore } from "../../store/index.ts";
-import { chatLink, HISTORY_LINES, ROOMS_JOINED } from "./link.ts";
+import { chatLink, HISTORY_LINES, ROOMS_JOINED, type LinkDeps } from "./link.ts";
 
 const ADDRESS = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const OTHER = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
@@ -31,13 +31,14 @@ interface Fake extends Ergo {
   line: (text: string) => void;
 }
 
-const setup = (before?: (store: ReturnType<typeof createAppStore>) => void) => {
+const setup = (before?: (store: ReturnType<typeof createAppStore>) => void, device?: LinkDeps["device"]) => {
   const store = createAppStore();
   before?.(store);
   const links: Fake[] = [];
   const asked = { tickets: 0, guests: 0 };
   const link = chatLink({
     store,
+    device,
     ticket: (): Promise<Result<{ ticket: string }>> => {
       asked.tickets += 1;
       return Promise.resolve({ ok: true, value: { ticket: `t${String(asked.tickets)}` } });
@@ -250,6 +251,22 @@ describe("the chat's link: who connects", () => {
     expect(Object.keys(t.store.getState().dms)).toEqual([OTHER]);
     next(t);
     expect(t.store.getState().dms).toEqual({});
+  });
+
+  // 4e's complexity review: the account's direct-message choices, read from its device by the store at its start.
+  it("hands the store the device of each account's session, and none of a guest's", () => {
+    const asked: string[] = [];
+    const t = setup(undefined, (account) => {
+      asked.push(account);
+      return {
+        prefs: { onlyKnown: () => true, setOnlyKnown: () => true, known: () => [OTHER], know: () => true },
+      };
+    });
+    t.signedIn(ADDRESS);
+    expect(t.store.getState().dmChoices).toEqual({ onlyKnown: true, known: new Set([OTHER]) });
+    t.signedOut();
+    expect(t.store.getState().dmChoices).toEqual({ onlyKnown: false, known: new Set() });
+    expect(asked).toEqual([ADDRESS]);
   });
 
   it("connects as a guest when Ergo says the session is gone, the store logged out", () => {

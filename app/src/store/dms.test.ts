@@ -1,5 +1,7 @@
 import { parseLine, type IrcMessage } from "@gnoworld/core";
 import { describe, expect, it } from "vitest";
+import type { DmPrefs } from "../lib/dms/prefs.ts";
+import { heardFrom } from "./dms.ts";
 import { createAppStore } from "./index.ts";
 
 const T0 = "2026-10-25T10:00:00.000Z";
@@ -72,6 +74,87 @@ describe("the store's chat slice: direct messages", () => {
     });
     t.store.getState().dmActions.begin();
     expect(heard).toBe(0);
+  });
+
+  // A device's choices for the account, each read and write counted.
+  function prefs({ onlyKnown = false, known = [] as string[] } = {}) {
+    const calls = { onlyKnown: 0, known: 0, setOnlyKnown: [] as boolean[], know: [] as string[] };
+    const device: DmPrefs = {
+      onlyKnown: () => {
+        calls.onlyKnown += 1;
+        return onlyKnown;
+      },
+      setOnlyKnown: (only) => {
+        calls.setOnlyKnown.push(only);
+        return true;
+      },
+      known: () => {
+        calls.known += 1;
+        return known;
+      },
+      know: (partner) => {
+        calls.know.push(partner);
+        return true;
+      },
+    };
+    return { device, calls };
+  }
+
+  // 4e's complexity and efficiency reviews: the page read the device again, JSON and schema, for each line.
+  it("reads an account's choices from its device once, at its session's start, whatever it hears after", () => {
+    const t = as(ACCOUNT);
+    const { device, calls } = prefs({ onlyKnown: true, known: [ALICE] });
+    t.store.getState().dmActions.begin({ prefs: device });
+    for (const id of ["a", "b", "c"]) t.heard(dm(id, { from: ALICE, to: ACCOUNT, text: "hi" }));
+    expect(t.store.getState().dmChoices).toEqual({ onlyKnown: true, known: new Set([ALICE]) });
+    expect([calls.onlyKnown, calls.known]).toEqual([1, 1]);
+  });
+
+  it("chooses nothing for a session with no device, a guest's: everyone's messages heard", () => {
+    const t = as(ACCOUNT);
+    t.store.getState().dmActions.begin({ prefs: prefs({ onlyKnown: true, known: [ALICE] }).device });
+    t.store.getState().dmActions.begin();
+    expect(t.store.getState().dmChoices).toEqual({ onlyKnown: false, known: new Set() });
+    t.store.getState().dmActions.setOnlyKnown(true);
+    expect(t.store.getState().dmChoices.onlyKnown).toBe(true);
+  });
+
+  it("keeps a new choice on the device, and writes nor notifies anything for the same one", () => {
+    const t = as(ACCOUNT);
+    const { device, calls } = prefs();
+    t.store.getState().dmActions.begin({ prefs: device });
+    t.store.getState().dmActions.setOnlyKnown(true);
+    expect(t.store.getState().dmChoices.onlyKnown).toBe(true);
+    let heard = 0;
+    t.store.subscribe(() => {
+      heard += 1;
+    });
+    t.store.getState().dmActions.setOnlyKnown(true);
+    expect(heard).toBe(0);
+    expect(calls.setOnlyKnown).toEqual([true]);
+  });
+
+  it("notes an account written to in the choices and on the device, notifying no one of one known", () => {
+    const t = as(ACCOUNT);
+    const { device, calls } = prefs();
+    t.store.getState().dmActions.begin({ prefs: device });
+    t.store.getState().dmActions.know(ALICE);
+    expect(t.store.getState().dmChoices.known).toEqual(new Set([ALICE]));
+    let heard = 0;
+    t.store.subscribe(() => {
+      heard += 1;
+    });
+    t.store.getState().dmActions.know(ALICE);
+    expect(heard).toBe(0);
+    expect(calls.know).toEqual([ALICE, ALICE]);
+  });
+
+  it.each([
+    ["anyone, while the account hears everyone", { onlyKnown: false, known: [] }, true],
+    ["an account it wrote to, while it hears those alone", { onlyKnown: true, known: [ALICE] }, true],
+    ["an account it never wrote to, while it hears those alone", { onlyKnown: true, known: [] }, false],
+  ])("hears %s", (_, { onlyKnown, known }, heard) => {
+    expect(heardFrom({ onlyKnown, known: new Set(known) }, ALICE)).toBe(heard);
   });
 
   it("notifies no one of a line that is no direct message", () => {
