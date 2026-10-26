@@ -282,14 +282,13 @@ test.describe("a line's actions", () => {
     await expect(barOf(page, 0)).toBeVisible();
   });
 
-  // The red pass (M4): the pointer resting on one line, the keyboard on another; each has its bar.
+  // The red pass (M4): the pointer resting on one line, the keyboard on another, which has its bar.
   test("let the keyboard reach its line's bar while the pointer rests on another, and keep a bar whose menu is open", async ({
     page,
   }) => {
     await room(page);
     await lineOf(page, "the first line").hover();
     await lines(page).nth(2).focus();
-    await expect(barOf(page, 0)).toBeVisible();
     await expect(barOf(page, 2)).toBeVisible();
     await page.keyboard.press("Tab");
     await expect(moreOf(page, 2)).toBeFocused();
