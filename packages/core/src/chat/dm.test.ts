@@ -55,6 +55,10 @@ describe("dmOf: a direct message and who it is with", () => {
     ["a CTCP other than ACTION", `${tags("k", ALICE)} :${ALICE}!u@h PRIVMSG ${ME} :\u0001VERSION\u0001`],
     ["a TAGMSG", `${tags("l", ALICE)} :${ALICE}!u@h TAGMSG ${ME}`],
     ["a message to me from me", `${tags("m", ME)} :${ME}!u@h PRIVMSG ${ME} :note to self`],
+    // StrykerJS on 4e: my own line in a room is the room's, never a direct message to it.
+    ["my own message to a room", `${tags("n", ME)} :${ME}!u@h PRIVMSG #bubble :hi all`],
+    ["a message with no source", `${tags("o", ALICE)} PRIVMSG ${ME} :hi`],
+    ["a PRIVMSG with nothing after it", `${tags("p", ALICE)} :${ALICE}!u@h PRIVMSG`],
   ])("reads none of %s", (_, line) => {
     expect(dmOf(read(line), ME)).toBeUndefined();
   });
