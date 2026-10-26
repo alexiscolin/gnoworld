@@ -255,6 +255,23 @@ test.describe("a line's actions", () => {
     await expect(lines(page).first()).not.toBeInViewport();
   });
 
+  // A bar rises above its line, as the prototype's: the focus coming to the newest or the oldest line scrolls nothing,
+  // and the line under a resting pointer stays the one pointed at.
+  test("scroll nothing as the focus comes to the newest line or the oldest: their bars stay inside the list", async ({
+    page,
+  }) => {
+    await room(page);
+    const overflow = () =>
+      page
+        .getByRole("list", { name: "Messages" })
+        .evaluate((list) => [list.scrollTop, list.scrollHeight - list.clientHeight]);
+    for (const at of [2, 0]) {
+      await lines(page).nth(at).focus();
+      await expect(barOf(page, at)).toBeVisible();
+      expect(await overflow()).toEqual([0, 0]);
+    }
+  });
+
   // /code-review: a click outside the list ends a line's focus, and its bar goes with it.
   test("hide a line's bar once a click lands outside the list", async ({ page }) => {
     await room(page);
