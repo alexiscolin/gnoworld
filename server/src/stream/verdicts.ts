@@ -2,7 +2,7 @@
 // each line asked, for the lines a page shows older than the stream's replay. Answered for a room the reader may
 // read alone, as the stream and GET /api/rooms are (3m); a visitor's requests limited, refused ones counted.
 import type { DatabaseSync } from "node:sqlite";
-import { type ApiError, LineVerdicts, StreamEvent, VERDICTS_ASKED } from "@gnoworld/schemas";
+import { type ApiError, LineVerdicts, type StreamEvent, VerdictId, VERDICTS_ASKED } from "@gnoworld/schemas";
 import { Hono, type Context } from "hono";
 import { getCookie } from "hono/cookie";
 import { z } from "zod";
@@ -27,12 +27,7 @@ const Room = z.string().regex(/^#[^\s,#\0-\x1f\x7f]{1,63}$/);
 const Ids = z
   .string()
   .transform((list) => list.split(","))
-  .pipe(
-    z
-      .array(StreamEvent.shape.msgid.regex(/^[^\s,\0]+$/))
-      .min(1)
-      .max(VERDICTS_ASKED),
-  );
+  .pipe(z.array(VerdictId).min(1).max(VERDICTS_ASKED));
 // The stream's states, from the bot's actions: an unchecked or pending line has none (chat.ts's moderate).
 const STATES: Readonly<Record<string, StreamEvent["state"]>> = { pass: "checked", hide: "hidden" };
 
