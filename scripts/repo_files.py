@@ -11,6 +11,18 @@ def git(*args):
     return subprocess.run(["git", *args], capture_output=True, text=True, check=True).stdout
 
 
+# /pre-merge's records (review_pass.py), and the files of the review itself, which a record leaves out.
+PASSES = "docs/review-passes.txt"
+OWN = {"docs/review-log.md", PASSES}
+
+
+def fingerprint(commit):
+    """A commit's tree without the review's own files: committing the record after a /pre-merge pass keeps it valid,
+    and any other change voids it."""
+    kept = [line for line in git("ls-tree", "-r", commit).splitlines() if line.split("\t", 1)[1] not in OWN]
+    return subprocess.run(["git", "hash-object", "--stdin"], input="\n".join(kept), capture_output=True, text=True, check=True).stdout.strip()
+
+
 def alive(pid):
     """Whether the process pid runs; one this user may not signal counts as alive, never removed."""
     try:
