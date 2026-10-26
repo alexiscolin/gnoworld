@@ -9,6 +9,7 @@ import type { Result } from "../../lib/api/http.ts";
 import type { Ergo, ErgoOptions, Who } from "../../lib/ergo/ergo.ts";
 import { LINES_KEPT } from "../../store/chat.ts";
 import { groupsOf } from "./groups.ts";
+import { Labels } from "./labels.ts";
 import type { AppState, createAppStore } from "../../store/index.ts";
 
 /** The rooms a connection joins: Ergo's max-channels-per-client (deploy/ergo/ircd.yaml.tmpl). */
@@ -58,8 +59,7 @@ class Link implements ChatLink {
   // second tab's own JOIN brings no echo, Ergo having told it of the room at its welcome or as the first joined.
   readonly #inside = new Set<string>();
   #reader = new BatchReader();
-  // The labels the page's reactions took: each once.
-  #labels = 0;
+  readonly #labels = new Labels();
 
   constructor(deps: LinkDeps) {
     this.#deps = deps;
@@ -94,10 +94,10 @@ class Link implements ChatLink {
   }
 
   react(room: string, reaction: Reacting): boolean {
-    const line = reactionLine(reaction, room, `r${String(this.#labels + 1)}`);
+    const line = reactionLine(reaction, room, this.#labels.next());
     if (line === undefined || this.#key === "guest" || !this.#inside.has(room)) return false;
     if (this.#ergo?.nick() === undefined || !this.#ergo.send(line)) return false;
-    this.#labels += 1;
+    this.#labels.sent();
     return true;
   }
 
