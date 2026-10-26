@@ -22,7 +22,10 @@ import { ensureNamed, ensureRooms, listRooms, roomWorld, worldRooms } from "./ro
 import { makeRooms, type Rooms } from "./rooms/create.ts";
 import { listRoutes } from "./rooms/list.ts";
 import { listed, mayRead, publicRoom, staffOf, type World } from "./rooms/types.ts";
+import { getConnInfo } from "@hono/node-server/conninfo";
 import { makeStream, type Stream } from "./stream/stream.ts";
+import { verdictRoutes } from "./stream/verdicts.ts";
+import { visitor } from "./visitor.ts";
 import { keeping, reconcilerFor, typedRooms } from "./rooms/wire.ts";
 
 export interface Chat {
@@ -30,6 +33,8 @@ export interface Chat {
   // A world's rooms by section, to whom may see them (4b).
   roomList: Hono;
   stream: Hono;
+  // The verdicts of lines older than the stream's replay (4g).
+  verdicts: Hono;
   // The moderators' rooms (3l), made and archived through the link.
   rooms: Rooms;
   stop: () => Promise<void>;
@@ -187,6 +192,14 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
       proxy: settings.trustedProxy,
       visible: (room, who) => mayRead(settings, room, who),
       session: options.session,
+    }),
+    // The verdicts of lines older than the stream's replay, by the stream's own rule of who reads (4g).
+    verdicts: verdictRoutes({
+      db,
+      readable: (room, who) => mayRead(settings, room, who),
+      session: options.session ?? (() => undefined),
+      visitor: (c) => visitor(getConnInfo(c).remote.address ?? "", c.req.header("x-real-ip"), settings.trustedProxy),
+      now,
     }),
     rooms: keeping(keeper, { mutes, reconciler }),
     stop: async () => {
