@@ -19,7 +19,7 @@ describe("the page's direct-message choices", () => {
       setItem: (key: string, value: string) => kept.set(key, value),
       removeItem: (key: string) => kept.delete(key),
     });
-    expect(pageDmPrefs(ALICE).know(BOB)).toBe(true);
+    expect(pageDmPrefs(ALICE).setKnown([BOB])).toBe(true);
     expect([...kept.keys()]).toEqual([`gnoworld:dm:${ALICE}:known`]);
     expect(pageDmPrefs(ALICE).known()).toEqual([BOB]);
   });
@@ -31,7 +31,7 @@ describe("the page's direct-message choices", () => {
         throw new DOMException("The storage is blocked.", "SecurityError");
       },
     });
-    expect(pageDmPrefs(ALICE).known()).toEqual([]);
-    expect(pageDmPrefs(ALICE).know(BOB)).toBe(false);
+    expect(pageDmPrefs(ALICE).known()).toBeUndefined();
+    expect(pageDmPrefs(ALICE).setKnown([BOB])).toBe(false);
   });
 });

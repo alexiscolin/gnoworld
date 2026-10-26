@@ -1,6 +1,7 @@
 import { parseLine, type IrcMessage } from "@gnoworld/core";
 import { describe, expect, it } from "vitest";
 import type { DmPrefs } from "../lib/dms/prefs.ts";
+import { KNOWN_KEPT } from "../lib/dms/prefs.ts";
 import { DMS_KEPT, heardFrom } from "./dms.ts";
 import { LINES_KEPT } from "./chat.ts";
 import { toAddress } from "@gnoworld/schemas";
@@ -83,8 +84,8 @@ describe("the store's chat slice: direct messages", () => {
   });
 
   // A device's choices for the account, each read and write counted.
-  function prefs({ onlyKnown = false, known = [] as string[] } = {}) {
-    const calls = { onlyKnown: 0, known: 0, setOnlyKnown: [] as boolean[], know: [] as string[] };
+  function prefs({ onlyKnown = false, known = [] as string[], unreadable = false } = {}) {
+    const calls = { onlyKnown: 0, known: 0, setOnlyKnown: [] as boolean[], setKnown: [] as string[][] };
     const device: DmPrefs = {
       onlyKnown: () => {
         calls.onlyKnown += 1;
@@ -96,10 +97,10 @@ describe("the store's chat slice: direct messages", () => {
       },
       known: () => {
         calls.known += 1;
-        return known;
+        return unreadable ? undefined : known;
       },
-      know: (partner) => {
-        calls.know.push(partner);
+      setKnown: (partners) => {
+        calls.setKnown.push([...partners]);
         return true;
       },
     };
@@ -154,7 +155,47 @@ describe("the store's chat slice: direct messages", () => {
     });
     t.store.getState().dmActions.know(ALICE);
     expect(heard).toBe(0);
-    expect(calls.know).toEqual([ALICE, ALICE]);
+    expect(calls.setKnown).toEqual([[ALICE]]);
+  });
+
+  // /code-review on 4e (CR3): each echo of my line read the device again, JSON and schema over up to 500 addresses,
+  // and wrote 21 KB back whenever the partner changed.
+  it("reads the accounts written to once a session, and writes them only when the last one changes", () => {
+    const BOB = toAddress(new Uint8Array(20).fill(9));
+    const t = as(ACCOUNT);
+    const { device, calls } = prefs({ known: [BOB] });
+    t.store.getState().dmActions.begin({ prefs: device, drafts: NO_DRAFTS });
+    for (const partner of [ALICE, ALICE, BOB, BOB, ALICE]) t.store.getState().dmActions.know(partner);
+    expect(calls.known).toBe(1);
+    expect(calls.setKnown).toEqual([
+      [BOB, ALICE],
+      [ALICE, BOB],
+      [BOB, ALICE],
+    ]);
+    expect(t.store.getState().dmChoices.known).toEqual(new Set([BOB, ALICE]));
+  });
+
+  it(`keeps the ${String(KNOWN_KEPT)} accounts written to last, on the device and in the choices`, () => {
+    const t = as(ACCOUNT);
+    const { device, calls } = prefs();
+    t.store.getState().dmActions.begin({ prefs: device, drafts: NO_DRAFTS });
+    const many = Array.from({ length: KNOWN_KEPT + 1 }, (_, n) =>
+      toAddress(new Uint8Array(20).fill(n % 256).fill(n >> 8, 0, 1)),
+    );
+    for (const partner of many) t.store.getState().dmActions.know(partner);
+    expect(calls.setKnown.at(-1)).toEqual(many.slice(1));
+    expect(t.store.getState().dmChoices.known.size).toBe(KNOWN_KEPT);
+    expect(t.store.getState().dmChoices.known.has(many[0] ?? "")).toBe(false);
+  });
+
+  // /code-review on 4e (CR4): a device that could not be read is never written over.
+  it("writes no account written to on a device it could not read", () => {
+    const t = as(ACCOUNT);
+    const { device, calls } = prefs({ unreadable: true });
+    t.store.getState().dmActions.begin({ prefs: device, drafts: NO_DRAFTS });
+    t.store.getState().dmActions.know(ALICE);
+    expect(t.store.getState().dmChoices.known).toEqual(new Set([ALICE]));
+    expect(calls.setKnown).toEqual([]);
   });
 
   // 4e's late test audit (T7) and UX review (U1): the page noted an account written to as it sent, before Ergo
@@ -167,7 +208,7 @@ describe("the store's chat slice: direct messages", () => {
     expect(t.store.getState().dmChoices.known).toEqual(new Set());
     t.heard(dm("b", { from: ACCOUNT, to: ALICE, text: "hello", second: 1 }));
     expect(t.store.getState().dmChoices.known).toEqual(new Set([ALICE]));
-    expect(calls.know).toEqual([ALICE]);
+    expect(calls.setKnown).toEqual([[ALICE]]);
   });
 
   // 4e's UX review (U1): a line Ergo refused, its partner not connected, has its draft back in the composer.

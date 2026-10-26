@@ -5,7 +5,7 @@
 import { addLines, dmOf, type IrcMessage, type Line } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
 import type { StateCreator } from "zustand/vanilla";
-import type { DmPrefs } from "../lib/dms/prefs.ts";
+import { KNOWN_KEPT, type DmPrefs } from "../lib/dms/prefs.ts";
 import type { Drafts } from "../lib/drafts/drafts.ts";
 import { LINES_KEPT, type ChatSlice } from "./chat.ts";
 
@@ -60,6 +60,10 @@ export const heardFrom = ({ onlyKnown, known }: DmChoices, partner: string): boo
 export const dmSlice: StateCreator<ChatSlice & DmSlice, [], [], DmSlice> = (set, get) => {
   // The session's device: the store's alone, read at the start and written on change.
   let device: DmDevice | undefined;
+  // The accounts written to, the last one last, as the device keeps them: read once a session, written when the last
+  // one changes (CR3); never written over a device that could not be read (CR4).
+  let written: string[] = [];
+  let writable = false;
   return {
     dms: {},
     dmChoices: NO_CHOICE,
@@ -84,8 +88,10 @@ export const dmSlice: StateCreator<ChatSlice & DmSlice, [], [], DmSlice> = (set,
       begin: (next) => {
         device = next;
         const prefs = next?.prefs;
-        const dmChoices =
-          prefs === undefined ? NO_CHOICE : { onlyKnown: prefs.onlyKnown(), known: new Set(prefs.known()) };
+        const read = prefs?.known();
+        written = read ?? [];
+        writable = read !== undefined;
+        const dmChoices = prefs === undefined ? NO_CHOICE : { onlyKnown: prefs.onlyKnown(), known: new Set(written) };
         const { dms, dmChoices: before, dmRefused } = get();
         const held = Object.keys(dms).length + Object.keys(dmRefused).length;
         if (held > 0 || dmChoices !== before) set({ dms: {}, dmChoices, dmRefused: {} });
@@ -97,10 +103,11 @@ export const dmSlice: StateCreator<ChatSlice & DmSlice, [], [], DmSlice> = (set,
         device?.prefs.setOnlyKnown(only);
       },
       know: (partner) => {
+        if (written.at(-1) === partner) return;
+        written = [...written.filter((each) => each !== partner), partner].slice(-KNOWN_KEPT);
         const { dmChoices } = get();
-        if (!dmChoices.known.has(partner))
-          set({ dmChoices: { ...dmChoices, known: new Set([...dmChoices.known, partner]) } });
-        device?.prefs.know(partner);
+        if (!dmChoices.known.has(partner)) set({ dmChoices: { ...dmChoices, known: new Set(written) } });
+        if (writable) device?.prefs.setKnown(written);
       },
       refused: (partner, draft) => {
         device?.drafts.set(partner, draft);

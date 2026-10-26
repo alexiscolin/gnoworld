@@ -259,7 +259,7 @@ describe("the chat's link: who connects", () => {
     const t = setup(undefined, (account) => {
       asked.push(account);
       return {
-        prefs: { onlyKnown: () => true, setOnlyKnown: () => true, known: () => [OTHER], know: () => true },
+        prefs: { onlyKnown: () => true, setOnlyKnown: () => true, known: () => [OTHER], setKnown: () => true },
         drafts: { get: () => "", set: () => true },
       };
     });
@@ -838,7 +838,7 @@ describe("the chat's link: direct messages", () => {
   const withDrafts = () => {
     const kept = new Map<string, string>();
     const t = setup(undefined, () => ({
-      prefs: { onlyKnown: () => false, setOnlyKnown: () => true, known: () => [], know: () => true },
+      prefs: { onlyKnown: () => false, setOnlyKnown: () => true, known: () => [], setKnown: () => true },
       drafts: {
         get: (room) => kept.get(room) ?? "",
         set: (room, draft) => {
