@@ -27,13 +27,8 @@ export function useVerdicts(store: Store, { room, lines, reader, saving }: Shown
     if (saving) return;
     const api = pageVerdictsApi();
     const asker = verdictAsker({
-      verdicts: (room, ids) => api.verdicts(room, ids),
-      judged: (event) => {
-        store.getState().verdictActions.judged(event);
-      },
-      judgedAll: (events) => {
-        store.getState().verdictActions.judgedAll(events);
-      },
+      verdicts: api.verdicts,
+      ...store.getState().verdictActions,
       held: (room) => store.getState().verdicts[room],
       follow: (room, on) => pageVerdicts([room], on),
     });
