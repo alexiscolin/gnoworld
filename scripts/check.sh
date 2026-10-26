@@ -16,7 +16,7 @@
 set -eu
 cd "$(realpath "$(dirname "$0")/..")" # the folder's own case: a $PWD spelled otherwise loads a tool twice (F081)
 unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a hook's git environment must not steer the gate's git calls
-unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO # the scripts' test switches, which would fake a pass
+unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO BENCH_VITEST # the scripts' test switches, which would fake a pass
 full=false merge=false
 [ "${1:-}" = "--full" ] && full=true
 [ "${1:-}" = "--merge" ] && full=true merge=true
@@ -246,6 +246,8 @@ lane_docs() {
 	sh scripts/test_hooks.sh
 }
 
+# The machine's 1-minute load and its cores, in tenths (scripts/load.py), as the lanes start; read again at their end.
+load_start=$(python3 -I scripts/load.py)
 start ts
 start types
 start tests
@@ -253,11 +255,23 @@ start gno
 start docs
 finish ts types tests gno docs
 
+# busy <load at the start> <cores> <load at the end> <cores>: the higher load and the cores, when it passed them.
+busy() {
+	high=$1
+	[ "$3" -le "$high" ] || high=$3
+	[ "$high" -gt "$2" ] && echo "$((high / 10)).$((high % 10)) on $(($2 / 10))"
+}
 took=$(($(date +%s) - started))
 if ! $full && [ "$took" -gt "$budget" ]; then
 	slowest=$(cat "$logs"/*.times | sort -k2 -n | tail -1)
-	echo "check.sh: the fast gate took ${took} s, over its ${budget} s budget: its slowest step, ${slowest%% *}, took $(seconds "${slowest##* }") s; find what grew" >&2
-	exit 1
+	# Past its budget on a machine busier than its cores, the gate measured the machine: it says so and passes (C.8).
+	# shellcheck disable=SC2086 # the loads split into their words on purpose
+	if machine=$(busy $load_start $(python3 -I scripts/load.py)); then
+		echo "check.sh: the fast gate took ${took} s, over its ${budget} s budget on a busy machine (load $machine cores): passed; its slowest step, ${slowest%% *}, took $(seconds "${slowest##* }") s" >&2
+	else
+		echo "check.sh: the fast gate took ${took} s, over its ${budget} s budget: its slowest step, ${slowest%% *}, took $(seconds "${slowest##* }") s; find what grew" >&2
+		exit 1
+	fi
 fi
 
 if $full; then
@@ -267,6 +281,8 @@ if $full; then
 	lane_probe() {
 		step probe # the harness keeps its promises
 		python3 -I scripts/probe.py
+		step bench # the budgets of docs/plans/, after probe.py and alone: beside other work a bench measures the load
+		python3 -I scripts/bench.py
 	}
 	lane_stories() {
 		step stories # the design system's stories in a browser: axe, the invariants and the CSS jsdom cannot see
@@ -285,6 +301,10 @@ if $full; then
 		run mutate "--concurrency $half"
 	}
 	lane_history() {
+		if $merge; then
+			step batch_size # a merge's own product code is a small batch (DORA; docs/REVIEW.md)
+			python3 -I scripts/batch_size.py "$base"
+		fi
 		step prove_fix # every fix of the product comes with a test that failed before it
 		python3 -I scripts/prove_fix.py "$base"
 		step regressions # no test gone, no floor lower, no approved screenshot changed, unless a commit says why
@@ -308,16 +328,17 @@ if $full; then
 	start probe
 	finish probe
 	# The stories' journeys run beside the history lane alone: under the coverage's Vitest and StrykerJS and
-	# the harness's worktrees, a Dialog's teardown in the browser outlasted its test (F815). The two after
-	# them run even when one failed, so one run shows every failure.
+	# the harness's worktrees, a Dialog's teardown in the browser outlasted its test (F815). A failure there stops
+	# the gate before the two after them, whose fifteen to twenty minutes would fix nothing of it (C.5, F823).
 	start stories
 	start history
-	early=0
-	finish stories history || early=1
+	finish stories history || {
+		echo "check.sh: the coverage and harness lanes did not run: the stories' or the history lane failed first" >&2
+		exit 1
+	}
 	start coverage
 	start harness
 	finish coverage harness
-	[ "$early" = 0 ]
 fi
 
 if [ -n "$tested" ]; then
