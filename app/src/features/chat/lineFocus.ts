@@ -3,13 +3,17 @@
 import type { Line } from "@gnoworld/core";
 import { useEffect, useState, type FocusEvent, type KeyboardEvent, type RefObject } from "react";
 
-// The line a list's event happened in; none outside a line.
-function lineAt(lines: readonly Line[], list: HTMLElement, target: EventTarget | null): Line | undefined {
+// The place of the line a list's event happened in, a link in its words included; -1 outside a line.
+function itemAt(list: HTMLElement, target: EventTarget | null): number {
   // Up to the list's own item: a line that is a Markdown list holds items of its own (F814's class).
   let item = target instanceof Element ? target : null;
   while (item !== null && item.parentElement !== list) item = item.parentElement;
-  return item === null ? undefined : lines[Array.prototype.indexOf.call(list.children, item)];
+  return item === null ? -1 : Array.prototype.indexOf.call(list.children, item);
 }
+
+// The line a list's event happened in; none outside a line.
+const lineAt = (lines: readonly Line[], list: HTMLElement, target: EventTarget | null): Line | undefined =>
+  lines[itemAt(list, target)];
 
 // The arrows, Home and End on a line move the focus among the lines, round the ends (WAI-ARIA's roving focus, as
 // the design system's tabs and menu do); a key on a line's bar or its menu, or held with a modifier, is theirs.
@@ -34,8 +38,14 @@ export function stopOf(lines: readonly Line[], chosen: string | undefined): stri
 }
 
 function moveAmong(event: KeyboardEvent<HTMLOListElement>) {
-  const items = event.currentTarget.children;
-  const to = nextLine(event, items.length, () => Array.prototype.indexOf.call(items, event.target));
+  const list = event.currentTarget;
+  const items = list.children;
+  // From a line or a link in its words (U1); a key on its bar, its menu or its dialog is theirs.
+  const to = nextLine(event, items.length, () =>
+    event.target instanceof Element && event.target.closest("[role='toolbar']") !== null
+      ? -1
+      : itemAt(list, event.target),
+  );
   if (to === undefined) return;
   event.preventDefault();
   const item = items[to];

@@ -13,10 +13,11 @@ const MARKS = { strong: "strong", em: "em", strike: "s" } as const;
 // A link isolates its text left to right: an override before it cannot draw its address backwards (F786).
 const LINK = { dir: "ltr", target: "_blank", rel: "noopener noreferrer" } as const;
 
-// Who reads: the reader's address, none for a guest, and the room's members.
+// Who reads: the reader's address, none for a guest, and the room's members; whether the links take the Tab key.
 interface Reader {
   me: string | undefined;
   members: ReadonlySet<string> | undefined;
+  tabbable: boolean;
 }
 
 // A mention: its address whole in its title, the design system's look (data-mention), the reader's own "me";
@@ -45,7 +46,11 @@ function inline(node: Inline, reader: Reader): ReactNode {
     case "break":
       return createElement("br");
     case "link":
-      return createElement("a", { href: node.href, title: node.href, ...LINK }, ...drawInlines(node.children, reader));
+      return createElement(
+        "a",
+        { href: node.href, title: node.href, ...LINK, tabIndex: reader.tabbable ? undefined : -1 },
+        ...drawInlines(node.children, reader),
+      );
     case "mention":
       return mentionOf(node.address, reader);
     case "strong":
@@ -79,11 +84,13 @@ export interface MarkdownProps {
   me?: string | undefined;
   /** The room's members, whose mentions show shortened as the reader's do; anyone else's whole (F812). */
   members?: ReadonlySet<string> | undefined;
+  /** Whether its links are Tab stops: a line not the list's stop keeps them out (U1). */
+  tabbable?: boolean;
 }
 
 /** A message's tree as elements: one paragraph on its line, in a span; other blocks below it, in a div. */
-export function Markdown({ blocks, className, me, members }: MarkdownProps) {
-  const reader = { me, members };
+export function Markdown({ blocks, className, me, members, tabbable = true }: MarkdownProps) {
+  const reader = { me, members, tabbable };
   const [first] = blocks;
   if (first === undefined) return createElement("span", { className });
   if (blocks.length === 1 && first.type === "paragraph") {

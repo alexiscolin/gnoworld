@@ -106,6 +106,31 @@ test.describe("a line's actions", () => {
     await expect(lines(page).nth(2)).toBeFocused();
   });
 
+  // 4c's UX review (U1): a link in a line is no Tab stop of its own unless its line is the list's; the arrows move
+  // from a link as from its line.
+  test("keep the links of other lines out of the Tab order, and move by the arrows from a link", async ({ page }) => {
+    await room(page, {
+      history: [
+        ["k1", T(0), "the rules at https://gno.land/r/demo"],
+        ["k2", T(1), "a plain line"],
+        ["k3", T(2), "and https://gno.land/r/other too"],
+      ],
+    });
+    await roomsNav(page).getByRole("link").last().focus();
+    await page.keyboard.press("Tab");
+    await expect(lines(page).nth(2)).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(lines(page).nth(2).getByRole("link")).toBeFocused();
+    await page.keyboard.press("ArrowUp");
+    await expect(lines(page).nth(1)).toBeFocused();
+    await expect(lines(page).nth(0).getByRole("link")).toHaveAttribute("tabindex", "-1");
+    await page.keyboard.press("ArrowUp");
+    await expect(lines(page).nth(0)).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(lines(page).nth(0).getByRole("link")).toBeFocused();
+    await expect(lines(page).nth(2).getByRole("link")).toHaveAttribute("tabindex", "-1");
+  });
+
   // The green pass (G5): a move held with a modifier is the browser's or the page's (Alt+arrows switch rooms).
   test("leave a move held with a modifier where it is, its default the browser's, and take the plain ones", async ({
     page,

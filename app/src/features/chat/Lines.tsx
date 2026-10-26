@@ -35,8 +35,18 @@ const knownOf = (names: string, members: ReadonlySet<string>): string =>
 
 // A line's text drawn, its mentions of `known` (space-separated) shortened. A component of its own, with a string the
 // compiler compares by value: the line keeps its drawing while others join and leave (F812's cost).
-function LineText({ blocks, me, known }: { blocks: readonly Block[]; me: string | undefined; known: string }) {
-  return <Markdown blocks={blocks} className={styles["text"]} me={me} members={new Set(known.split(" "))} />;
+// Its links are Tab stops on the list's stop alone (U1).
+interface LineTextProps {
+  blocks: readonly Block[];
+  me: string | undefined;
+  known: string;
+  stop: boolean;
+}
+
+function LineText({ blocks, me, known, stop }: LineTextProps) {
+  return (
+    <Markdown blocks={blocks} className={styles["text"]} me={me} members={new Set(known.split(" "))} tabbable={stop} />
+  );
 }
 
 // A line, read once: drawn, and asked whether it mentions the reader, which a word says as well as its colour; a
@@ -67,7 +77,7 @@ function LineView({ line, me, members, stop, actions }: LineViewProps) {
       </time>{" "}
       {line.kind === "action" ? "* " : null}
       <Person name={line.account ?? line.from} guest={line.account === undefined} />{" "}
-      <LineText blocks={blocks} me={me} known={known} />
+      <LineText blocks={blocks} me={me} known={known} stop={stop} />
       {actions}
     </li>
   );

@@ -42,6 +42,14 @@ describe("Message", () => {
     );
   });
 
+  // 4c's UX review (U1): a line not the list's stop keeps its links out of the Tab order, in every block.
+  it("keeps every link out of the Tab order when asked, and in it otherwise", () => {
+    const text = "[a](https://gno.land/a)\n\n> [b](https://gno.land/b)\n\n- [c](https://gno.land/c)";
+    const out = renderToStaticMarkup(<Message text={text} tabbable={false} />);
+    expect([...out.matchAll(/<a [^>]*>/g)].map(([tag]) => tag.includes('tabindex="-1"'))).toEqual([true, true, true]);
+    expect(html(text)).not.toContain("tabindex");
+  });
+
   it("shows blocks below the line: paragraphs, code, a quote and lists", () => {
     expect(html("a\nb\n\n```\n<i>x</i>\n```\n> q\n- l\n1. n")).toBe(
       "<div><p>a<br/>b</p><pre><code>&lt;i&gt;x&lt;/i&gt;</code></pre><blockquote><p>q</p></blockquote>" +
