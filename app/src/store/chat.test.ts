@@ -400,7 +400,8 @@ describe("the store's chat slice: reactions", () => {
           }),
         );
     expect(t.room("#bubble")?.reactions).toHaveLength(1000);
-    expect(REACTIONS_KEPT).toBeGreaterThanOrEqual(1000);
+    // The green pass (G12): the window's size itself, not a bound of it.
+    expect(REACTIONS_KEPT).toBe(1000);
   });
 
   it("holds 10,000 reactions of one account to one line with one emoji to one, evicting no other account's", () => {
@@ -412,11 +413,11 @@ describe("the store's chat slice: reactions", () => {
 
   it("holds a flood of distinct reactions to the newest REACTIONS_KEPT, the newest run of them", () => {
     const t = following();
-    const flood = REACTIONS_KEPT + 500;
+    const flood = 1500;
     for (let n = 0; n < flood; n += 1)
       t.heard(reacted("#bubble", `r${String(n)}`, { who: `a${String(n)}`, time: at(n) }));
     const kept = t.room("#bubble")?.reactions ?? [];
-    expect(kept).toHaveLength(REACTIONS_KEPT);
+    expect(kept).toHaveLength(1000);
     expect(kept[0]?.id).toBe("r500");
     expect(kept.at(-1)?.id).toBe(`r${String(flood - 1)}`);
   });

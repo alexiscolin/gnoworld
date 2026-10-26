@@ -452,6 +452,20 @@ describe("RoomView: reactions", () => {
     expect(linesOf(html)[0]).toMatch(/\+5 more$/);
   });
 
+  // The green pass (G9): the word comes past the 20th emoji, never at it.
+  it.each([
+    [20, 20, ""],
+    [21, 20, "+1 more"],
+  ])("shows %i distinct emoji as %i chips, and says %j", (count, chips, word) => {
+    const html = view({
+      me: BOB,
+      onReact: () => true,
+      state: { ...ROOM, lines: TWO, reactions: MANY.slice(0, count) },
+    });
+    expect(pressables(part(html, "Messages"))).toHaveLength(chips);
+    expect(/\+\d+ more/.exec(linesOf(html)[0] ?? "")?.[0] ?? "").toBe(word);
+  });
+
   it("adds 20 Tab stops a line at most: three lines of 25 emoji hold 60 chips", () => {
     const lines = ["a", "b", "c"].map((id) => line({ id, text: id }));
     const reactions = lines.flatMap(({ id }) => MANY.map((each) => ({ ...each, id: `${each.id}${id}`, to: id })));

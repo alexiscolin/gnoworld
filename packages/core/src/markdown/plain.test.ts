@@ -6,6 +6,15 @@ const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 // 4d: a reply quotes the line it answers in one line of words, as the room reads it: its marks gone, its parts joined
 // by a space; what the room shows as text stays text (R5).
 describe("plain: a message's words in one line", () => {
+  // The green pass (G10): a quote's lines joined by a space, and nothing left at the ends.
+  test("joins a quote's lines by a space, an empty one between them", () => {
+    expect(plain("> a\n>\n> b")).toBe("a b");
+  });
+
+  test("leaves no space at the end, an empty code block after the words", () => {
+    expect(plain("a\n\n```\n```")).toBe("a");
+  });
+
   test.each([
     ["marks", "**bold**, _em_, ~~gone~~ and `code`", "bold, em, gone and code"],
     ["a link, by its words", "see [the docs](https://gno.land/docs)", "see the docs"],
@@ -56,6 +65,11 @@ describe("excerpt: a message's words cut to a length", () => {
   ])("keeps %s whole on the cut, by grapheme", (_, grapheme) => {
     expect(excerpt(`${a(68)}${grapheme}${a(5)}`, 70)).toBe(`${a(68)}${grapheme}…`);
     expect(excerpt(`${a(68)}${grapheme}a`, 70)).toBe(`${a(68)}${grapheme}a`);
+  });
+
+  // The green pass (G10): the shortest length a cut takes.
+  test("cuts to two graphemes, the first and the ellipsis", () => {
+    expect(excerpt("abc", 2)).toBe("a…");
   });
 
   test.each([0, 1, 1.5, Number.NaN])("refuses a length of %s", (length) => {
