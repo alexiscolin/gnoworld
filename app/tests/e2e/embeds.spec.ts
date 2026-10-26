@@ -119,14 +119,24 @@ test.describe("a link's player", () => {
     expect(asked[1]).toBe(`${SITE}/api/verdicts?room=%23bubble%2Fgames&ids=v4`);
   });
 
-  // ADR-0002 §8: Data saver (a 2G link) shows no embed.
-  test("shows none to a reader who saves data", async ({ page }) => {
+  // ADR-0002 §8: Data saver (a 2G link) shows no embed; and a verdict serves a player alone, so none is asked (F879).
+  test("shows none to a reader who saves data, and asks no verdict", async ({ page }) => {
     await page.addInitScript(() => {
       Object.defineProperty(Navigator.prototype, "connection", { configurable: true, get: () => ({ saveData: true }) });
     });
-    await room(page, () => event("v1", "checked"));
+    const told: string[] = [];
+    await page.route("**/api/verdicts?**", (route) => {
+      told.push(route.request().url());
+      return route.fulfill({ json: { room: "#bubble/games", verdicts: [] } });
+    });
+    const { asked, say } = await room(page, () => event("v1", "checked"));
     await expect(lineOf(page, "watch").getByRole("link")).toBeVisible();
     await expect(lineOf(page, "watch").getByRole("button")).toHaveCount(0);
+    // A line said after, by when the page would have asked of the first ones.
+    say("v3", "then https://vimeo.com/76979871", "2026-10-25T10:02:00.000Z");
+    await expect(lineOf(page, "then")).toBeVisible();
+    expect(asked).toEqual([]);
+    expect(told).toEqual([]);
   });
 
   test("passes axe with a player waiting and one playing, on a computer's and a phone's screen", async ({ page }) => {

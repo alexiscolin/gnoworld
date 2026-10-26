@@ -1,11 +1,13 @@
 // The shown room's verdicts, which a link's player waits on (slice 4's 4g): the stream's, for the room in view; and
-// the server's (askVerdicts.ts) for the lines in view the stream did not give.
+// the server's (askVerdicts.ts) for the lines in view the stream did not give. A reader who saves data is shown no
+// player, so opens no stream, and with none opened no line is older than it: nothing is asked either (F879).
 import type { Line } from "@gnoworld/core";
 import { useEffect, useRef } from "react";
 import { pageVerdictsApi } from "../../lib/api/verdicts.ts";
 import { pageVerdicts } from "../../lib/stream/verdicts.ts";
 import type { createAppStore } from "../../store/index.ts";
 import { verdictAsker } from "./askVerdicts.ts";
+import { savesData } from "./embeds.ts";
 
 type Store = ReturnType<typeof createAppStore>;
 
@@ -13,7 +15,7 @@ export function useVerdicts(store: Store, current: string | undefined, lines: re
   // When the shown room's stream opened: the lines said before it are the server's to answer (F884).
   const sinceRef = useRef(0);
   useEffect(() => {
-    if (current === undefined) return;
+    if (current === undefined || savesData()) return;
     sinceRef.current = Date.now();
     return pageVerdicts([current], store.getState().verdictActions.judged);
   }, [store, current]);
