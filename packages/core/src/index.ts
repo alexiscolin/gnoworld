@@ -1,6 +1,7 @@
 export { escapeTagValue, formatLine, parseLine, toIrcCommand, unescapeTagValue } from "./irc/irc.ts";
 export type { IrcCommand, IrcMessage, IrcParsed, IrcParseError } from "./irc/irc.ts";
 export { BATCH_LINES, BatchReader, OPEN_BATCHES, type Batch, type Batched } from "./irc/batch.ts";
+export { foldMultiline, MULTILINE, MULTILINE_BYTES, MULTILINE_LINES } from "./irc/multiline.ts";
 export { addLines, concerns, lineOf, membersAfter, nickOf, redactAfter, refusedOf, topicAfter } from "./chat/room.ts";
 export type { Line, Where } from "./chat/room.ts";
 export { inWord, markdown, mentions } from "./markdown/markdown.ts";
