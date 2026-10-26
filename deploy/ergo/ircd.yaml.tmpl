@@ -108,6 +108,12 @@ limits:
   kicklen: 390
   topiclen: 390
   chan-list-modes: 100
+  # draft/multiline (slice 4, docs/decisions.md row 255): a message of several lines, its breaks counted, 4096 bytes
+  # (Ergo's own default) and 40 lines (its default 100 would let one message fill half the 200 lines a page keeps).
+  # core's MULTILINE_BYTES and MULTILINE_LINES say the same, as the composer's caps (deploy/test.sh checks both).
+  multiline:
+    max-bytes: 4096
+    max-lines: 40
 history:
   enabled: true
   channel-length: 2048

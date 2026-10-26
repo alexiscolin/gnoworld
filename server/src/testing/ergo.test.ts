@@ -5,7 +5,18 @@ import { tmpdir } from "node:os";
 import type { AddressInfo } from "node:net";
 import { join as joinPath } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { compose, LINE_BYTES, parseLine, refusedOf, relayOf } from "@gnoworld/core";
+import {
+  BatchReader,
+  compose,
+  foldMultiline,
+  LINE_BYTES,
+  MULTILINE_BYTES,
+  MULTILINE_LINES,
+  parseLine,
+  refusedOf,
+  relayOf,
+  type IrcMessage,
+} from "@gnoworld/core";
 import type { Address } from "@gnoworld/schemas";
 import { z } from "zod";
 import { authServer } from "../ergo/auth.ts";
@@ -1281,5 +1292,141 @@ describe("the template's limits and privacy (slice 3's max review)", { timeout: 
     const stored = late.lines().filter((l) => replayed(" TAGMSG #lobby").test(l));
     expect(stored.join("\n")).toContain("+draft/react=x");
     expect(stored.join("\n")).toContain("+draft/unreact=x");
+  });
+});
+
+// draft/multiline (slice 4, docs/decisions.md row 255): the template turns it on with the composer's caps (core's
+// compose); Ergo relays a message of several lines to a reader with the capability as one batch, its id on the
+// opening line, replays it so inside a history page, and refuses one past its caps (irc/handlers.go, v2.19.1).
+describe("messages of several lines (draft/multiline)", { timeout: 30_000 }, () => {
+  // A message of several lines as the page sends it: its composed lines, each a PRIVMSG of one batch.
+  const sendLines = (c: Raw, room: string, text: string) => {
+    const composed = compose(room, text, ADDRESS);
+    if (composed.kind !== "lines") throw new Error(`the test's text is no message of several lines: ${composed.kind}`);
+    c.send(`BATCH +m1 draft/multiline ${room}`);
+    for (const line of composed.lines) c.send(`@batch=m1 ${line}`);
+    c.send("BATCH -m1");
+  };
+  // What a connection heard, read as the page reads it: batches held, a multiline one folded into one message.
+  const heard = (c: Raw): IrcMessage[] => {
+    const reader = new BatchReader();
+    return c.lines().flatMap((line) => {
+      const parsed = parseLine(line);
+      if (!parsed.ok) return [];
+      const read = reader.read(parsed.message);
+      if (read.kind === "pass") return [parsed.message];
+      if (read.kind !== "done") return [];
+      if (read.batch.type === "draft/multiline") return [foldMultiline(read.batch) ?? []].flat();
+      return read.batch.messages;
+    });
+  };
+  const said = (messages: readonly IrcMessage[]) =>
+    messages.filter((m) => m.command === "PRIVMSG").map((m) => m.params[1]);
+
+  it("advertises draft/multiline with the composer's caps", async () => {
+    const e = await start();
+    const c = await open(e);
+    c.send("CAP LS 302");
+    const ls = await c.expect(/ CAP \S+ LS .*draft\/multiline=/);
+    expect(/draft\/multiline=max-bytes=(\d+),max-lines=(\d+)/.exec(ls)?.slice(1)).toEqual([
+      String(MULTILINE_BYTES),
+      String(MULTILINE_LINES),
+    ]);
+  });
+
+  it("relays an account's message of several lines as one batch, its id, time and account on its opening line", async () => {
+    const e = await start();
+    const chief = await lobby(e);
+    const member = await login(e, ADDRESS);
+    await join(member, "#lobby");
+    sendLines(member, "#lobby", "- one\n- two\n\n> quoted");
+    const opening = await chief.expect(/ BATCH :?\+\S+ draft\/multiline :?#lobby$/);
+    expect(opening).toMatch(/^@\S*msgid=\S+/);
+    expect(opening).toMatch(/[@;]time=\S+/);
+    expect(opening).toMatch(new RegExp(`[@;]account=${ADDRESS}[; ]`));
+    await chief.expect(/ BATCH :?-\S+$/);
+    expect(said(heard(chief))).toEqual(["- one\n- two\n\n> quoted"]);
+  });
+
+  it("replays a message of several lines as one batch inside the history page, read as one line", async () => {
+    const e = await start();
+    await lobby(e);
+    const member = await login(e, ADDRESS);
+    await join(member, "#lobby");
+    sendLines(member, "#lobby", "first\nsecond");
+    await member.expect(/ BATCH :?-\S+$/);
+    const late = await login(e, "alice");
+    await join(late, "#lobby");
+    history(late, "#lobby");
+    await late.expect(/ BATCH :?-\S+$/);
+    await sync(late);
+    expect(said(heard(late))).toContain("first\nsecond");
+  });
+
+  it(`refuses a message of ${String(MULTILINE_LINES + 1)} lines, saying so, and relays none of it`, async () => {
+    const e = await start();
+    const chief = await lobby(e);
+    const member = await login(e, ADDRESS);
+    await join(member, "#lobby");
+    member.send("BATCH +big draft/multiline #lobby");
+    for (let n = 0; n <= MULTILINE_LINES; n++) member.send(`@batch=big PRIVMSG #lobby :line ${String(n)}`);
+    member.send("BATCH -big");
+    await member.expect(/ FAIL BATCH MULTILINE_MAX_LINES /);
+    await sync(chief);
+    expect(logged(chief)).not.toMatch(/PRIVMSG #lobby :line 0/);
+  });
+
+  it(`refuses a message past ${String(MULTILINE_BYTES)} bytes, breaks counted, saying so`, async () => {
+    const e = await start();
+    const chief = await lobby(e);
+    const member = await login(e, ADDRESS);
+    await join(member, "#lobby");
+    member.send("BATCH +big draft/multiline #lobby");
+    for (let n = 0; n < 10; n++) member.send(`@batch=big PRIVMSG #lobby :${"a".repeat(400)}`);
+    member.send(`@batch=big PRIVMSG #lobby :${"a".repeat(MULTILINE_BYTES - 4010 + 1)}`);
+    member.send("BATCH -big");
+    await member.expect(/ FAIL BATCH MULTILINE_MAX_BYTES /);
+    await sync(chief);
+    expect(logged(chief)).not.toMatch(/PRIVMSG #lobby :a{10}/);
+  });
+
+  // The red pass's R10: the caps counted as Ergo counts them (every break billed one byte, a blank line a line),
+  // so the composer's last byte and last line go, and its part budget is Ergo's (a part over it: 417, none relayed).
+  it(`relays a message at exactly ${String(MULTILINE_LINES)} lines and ${String(MULTILINE_BYTES)} bytes, blank lines inside, whole`, async () => {
+    const e = await start();
+    const chief = await lobby(e);
+    const member = await login(e, ADDRESS);
+    await join(member, "#lobby");
+    // 40 lines, 4 of them blank inside (the draft is trimmed, so the last is not): 4057 bytes of text, 39 breaks.
+    const full = Array.from({ length: 40 }, (_, n) => {
+      if (n % 8 === 7 && n < 39) return "";
+      return "a".repeat(n === 0 ? 110 : n === 39 ? 10 : n < 32 ? 116 : 115);
+    }).join("\n");
+    const composed = compose("#lobby", full, ADDRESS);
+    expect(composed).toMatchObject({ kind: "lines", left: 0 });
+    sendLines(member, "#lobby", full);
+    await chief.expect(/ BATCH :?-\S+$/);
+    expect(said(heard(chief))).toEqual([full]);
+  });
+
+  it("relays a part of exactly the composer's budget, and refuses one byte more with a 417, relaying none", async () => {
+    const e = await start();
+    const chief = await lobby(e);
+    const member = await login(e, ADDRESS);
+    await join(member, "#lobby");
+    const head = "PRIVMSG #lobby :";
+    const budget = LINE_BYTES - relayOf(ADDRESS) - head.length;
+    expect(compose("#lobby", `a\n${"b".repeat(budget)}`, ADDRESS)).toMatchObject({ kind: "lines" });
+    expect(compose("#lobby", `a\n${"b".repeat(budget + 1)}`, ADDRESS)).toMatchObject({ kind: "long", line: 2 });
+    sendLines(member, "#lobby", `a\n${"b".repeat(budget)}`);
+    await chief.expect(/ BATCH :?-\S+$/);
+    expect(said(heard(chief))).toEqual([`a\n${"b".repeat(budget)}`]);
+    member.send("BATCH +long draft/multiline #lobby");
+    member.send("@batch=long PRIVMSG #lobby :a");
+    member.send(`@batch=long PRIVMSG #lobby :${"b".repeat(budget + 1)}`);
+    member.send("BATCH -long");
+    await member.expect(/ 417 /);
+    await sync(chief);
+    expect(said(heard(chief))).toHaveLength(1);
   });
 });
