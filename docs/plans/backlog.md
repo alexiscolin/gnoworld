@@ -64,6 +64,13 @@ Alexis, 2026-10-23: slice 3's reviews found these; none bites today, each comes 
 | Banned words compiled once | The pattern kept per word list, if the k6 messages run shows the cost | Folded and compiled again for each message (F662) |
 | Archived rooms at once | The activity route asks a world's archived rooms in one query; sized from the k6 run | One query a room, up to about 500 a request (F663) |
 
+## Slice 4, its leftovers
+
+| Item | Delivers | Why |
+|---|---|---|
+| Imgur's player | Imgur's links open its own player on a click once checked, as YouTube's, Vimeo's and Giphy's do (4g); `frame-src` gains its host | Its embed form could not be read on 2026-10-26, its pages refusing crawlers; a form read from its documentation first (Alexis, 2026-10-26) |
+| The gallery and the lightbox | A message's pictures from the accepted services seen together, and one large over the page, as ADR-0002's "Photos and videos, gallery and lightbox" row names | Beyond 4g's players; pictures need `img-src` for the services' hosts, a CSP change of its own (Alexis, 2026-10-26) |
+
 ## The design system, after slice 2
 
 Alexis, 2026-10-21: 2e's and 2f's reviews found these; each is true and none bites today, so each
