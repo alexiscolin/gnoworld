@@ -92,8 +92,9 @@ fast gate                                              full gate (--full, --merg
 
 The stories' journeys share the machine with the history lane alone: beside the coverage's
 Vitest, StrykerJS and the harness's worktrees, a Dialog's teardown outlasted its test and lost
-two merge checks of 23 minutes (F815). The coverage and the harness lanes run even when one
-before them failed, so one run shows every failure. In the coverage lane, Vitest's workers and
+two merge checks of 23 minutes (F815). A failure there stops the gate before the coverage and the
+harness lanes, which would take fifteen to twenty minutes to say nothing the fix will not change;
+the gate says they did not run (Alexis, C.5, F823). In the coverage lane, Vitest's workers and
 StrykerJS's concurrency take half the machine each, the harness lane beside them the rest: at
 the machine's width, their load outlasted Ergo's 9 s auth script in the real-Ergo tests (F777).
 
@@ -118,7 +119,11 @@ otherwise.
 What a commit leaves out, the full gate runs on the exact tip before `main` takes it (`pre-push`
 wants its record). ESLint reads no cache: a cache is keyed on a file's own text, so a type changed
 in one file would hide the lint error it brings to another (the red pass reproduced it with
-`no-floating-promises`). `GATE_BUDGET` may lower the budget, never raise it.
+`no-floating-promises`). `GATE_BUDGET` may lower the budget, never raise it. Past its budget,
+the fast gate fails only on a machine at or under its cores, its 1-minute load read as the lanes
+start and as they end (`scripts/load.py`, 0.02 s a read); busier, it says the machine was busy,
+names its slowest step and passes (Alexis, C.8): beside another worktree's merge check, commits
+whose code had not grown took 61 to 98 s at a load of 65 to 76 on 16 cores.
 
 **Fast** (every turn, every commit, a work branch's push; it fails past its budget), its steps:
 
@@ -316,11 +321,11 @@ and the harness is frozen until a real bug crosses it.
 
 - **The unit tests run on one engine,** Node 24's V8; the browser's reads some regexes and
   Unicode otherwise (F816, F817). Core's code meets Chromium's engine only through the app's
-  journeys, until core's Vitest runs in Chromium too (asked of Alexis: a new dependency).
-- **The fast gate's budget is wall-clock:** beside another worktree's merge check, commits whose
-  code did not grow pass 60 s and are refused (asked of Alexis: judge it on the machine's load).
-- **A full gate whose first phase failed still runs its second,** the coverage and the harness
-  lanes, fifteen to twenty minutes (F823; asked of Alexis: fail fast, saying what did not run).
+  journeys, until core's Vitest runs in Chromium too: Alexis approved it (2026-10-26), and its
+  dependency waits for his script (`@vitest/browser-playwright`, a closed `package.json`).
+- **The fast gate's budget, judged on the load, lets a slow change through on a busy machine:**
+  it passes past its budget whenever the load passed the cores, whatever grew; an idle run
+  catches it, and the overrun is printed every time.
 - **The benches measure what runs outside React's runtime:** the React Compiler's caches (F818,
   F819) hold only in a rendered app, which no bench drives.
 - **A copy made before 2026-10-26 names no run,** so repo_files leaves it: remove it by hand

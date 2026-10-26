@@ -366,7 +366,7 @@
       <h2>The gate · scripts/check.sh, and the net that never shrinks</h2>
       <div class="grid" style="grid-template-columns: 1.55fr 1fr 1fr">
         <div class="card">
-          <h3>Fast: each turn, commit and branch push (60 s at most; about 25 s)</h3>
+          <h3>Fast: each turn, commit and branch push (60 s at most on an idle machine; about 25 s)</h3>
           <ul class="cols">
             <li>Prettier; <code>tsc</code>, where core sees no DOM and no Node</li>
             <li>ESLint: floating promises, swallowed errors, <code>any</code>, an import across a boundary (core imports only core), cycles, size, an impure core, switched-off tests, CSS</li>
@@ -393,7 +393,7 @@
             <li><code>check_regressions.py</code>: the net, at the right</li>
             <li>gitleaks over the history; <code>pnpm audit</code></li>
             <li><code>harness_mutate.py</code>, when a harness file changed: in a merge, the guards and test sections it changed</li>
-            <li>The design system's stories in Chromium: axe, the CSS invariants, every picture to the pixel; beside the history checks alone, Vitest and StrykerJS at half the machine</li>
+            <li>The design system's stories in Chromium: axe, the CSS invariants, every picture to the pixel; beside the history checks alone, Vitest and StrykerJS at half the machine; a failure there stops the gate before them</li>
           </ul>
         </div>
         <div class="card">
@@ -568,8 +568,8 @@
             <li>The review pass is recorded by the agent that ran it; the round limit is a written rule</li>
             <li><code>prove_fix.py</code> takes any failure before the fix as proof, a crash included</li>
             <li>The reviewers' exam builds its set; scoring a reviewer on it is an agent's run, by hand</li>
-            <li>The unit tests run on Node's engine alone; the browser reads some regexes and Unicode otherwise (F816, F817)</li>
-            <li>The fast gate's budget is wall-clock: another worktree's merge check pushes commits past it</li>
+            <li>The unit tests run on Node's engine alone until core's tests run in Chromium too (approved; its dependency waits for Alexis's script)</li>
+            <li>On a machine busier than its cores, the fast gate passes past its budget, saying so: a slow change waits for an idle run to be caught</li>
           </ul>
         </div>
       </div>
