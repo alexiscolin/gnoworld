@@ -1,8 +1,8 @@
 import type { Line } from "@gnoworld/core";
 import type { LineVerdicts, StreamEvent } from "@gnoworld/schemas";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Result } from "../../lib/api/http.ts";
-import { verdictAsker } from "./askVerdicts.ts";
+import { BUSY_REST_MS, REST_MS, verdictAsker } from "./askVerdicts.ts";
 
 // When the page began following the room's stream; a line before it is the room's history.
 const OPENED = Date.parse("2026-10-26T12:00:00.000Z");
@@ -32,7 +32,7 @@ function server(answer: (ids: readonly string[]) => Promise<Result<LineVerdicts>
   const ask = (lines: readonly Line[], held?: Record<string, unknown>) => {
     asker.ask("#bubble", { lines, held, since: OPENED });
   };
-  return { ask, sent, heard };
+  return { ask, sent, heard, stop: asker.stop };
 }
 // The answers' turn: each request's promise settled, and what it does after.
 const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -110,5 +110,64 @@ describe("verdictAsker: the server's verdicts of the lines in view", () => {
     t.ask([line("a"), line("b")]);
     expect(t.sent).toEqual([["a"], ["b"]]);
     expect(t.heard).toEqual([]);
+  });
+});
+
+// F874: a failure that may pass left its lines waiting forever (a server's 500, a 429), or asked them again at each
+// new line (the network); now they are asked again once, after a rest, and nothing is asked during it.
+describe("verdictAsker, when the server cannot answer yet", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+  const failing = (reason: "too_many" | "internal" | "unavailable" | "network"): Promise<Result<LineVerdicts>> =>
+    Promise.resolve({ ok: false, reason });
+
+  it("asks nothing for the route's minute after too many, then the view last given, once", async () => {
+    const t = server(() => failing("too_many"));
+    t.ask([line("a")]);
+    await vi.advanceTimersByTimeAsync(0);
+    t.ask([line("a"), line("b")]);
+    await vi.advanceTimersByTimeAsync(BUSY_REST_MS - 1);
+    expect(t.sent).toEqual([["a"]]);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(t.sent).toEqual([["a"], ["a", "b"]]);
+    await vi.advanceTimersByTimeAsync(BUSY_REST_MS);
+    expect(t.sent).toHaveLength(3);
+  });
+
+  it.each(["internal", "unavailable", "network"] as const)(
+    "asks a line again after a short rest when the server answers %s, not at once",
+    async (reason) => {
+      const t = server(() => failing(reason));
+      t.ask([line("a")]);
+      await vi.advanceTimersByTimeAsync(0);
+      t.ask([line("a")]);
+      await vi.advanceTimersByTimeAsync(REST_MS - 1);
+      expect(t.sent).toEqual([["a"]]);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(t.sent).toEqual([["a"], ["a"]]);
+    },
+  );
+
+  it("takes a request that throws as the network's failure", async () => {
+    const t = server(() => Promise.reject(new Error("gone")));
+    t.ask([line("a")]);
+    await vi.advanceTimersByTimeAsync(REST_MS);
+    expect(t.sent).toEqual([["a"], ["a"]]);
+  });
+
+  it.each([
+    ["its answer still to come", false],
+    ["a rest under way", true],
+  ])("asks nothing more once stopped, %s", async (_, answered) => {
+    const t = server(() => failing("network"));
+    t.ask([line("a")]);
+    if (answered) await vi.advanceTimersByTimeAsync(0);
+    t.stop();
+    await vi.advanceTimersByTimeAsync(BUSY_REST_MS * 2);
+    expect(t.sent).toEqual([["a"]]);
   });
 });

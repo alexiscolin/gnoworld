@@ -21,12 +21,14 @@ export function useVerdicts(store: Store, current: string | undefined, lines: re
   const askerRef = useRef<ReturnType<typeof verdictAsker>>(undefined);
   useEffect(() => {
     const api = pageVerdictsApi();
-    askerRef.current = verdictAsker({
+    const asker = verdictAsker({
       verdicts: (room, ids) => api.verdicts(room, ids),
       judged: (event) => {
         store.getState().verdictActions.judged(event);
       },
     });
+    askerRef.current = asker;
+    return asker.stop;
   }, [store]);
   useEffect(() => {
     if (current === undefined || lines === undefined) return;
