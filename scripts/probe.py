@@ -148,12 +148,20 @@ def carries(got, rule):
     return rule in got if ": " not in rule else any(str(g).startswith(rule) for g in got)
 
 
-def verdicts(out):
-    """Each test's title and status in a Vitest run's JSON report; none when the run wrote no report."""
+def verdicts(cmd, env=None):
+    """A Vitest run, and each test's title and status in its JSON report, none when it wrote none. The report goes
+    to a file: the run also prints on stdout (another run's port taken, Vite's dependencies), which no parser reads."""
+    fd, report = tempfile.mkstemp(suffix=".json")
+    os.close(fd)
     try:
-        return {t["title"]: t["status"] for f in json.loads(out.stdout)["testResults"] for t in f["assertionResults"]}
-    except (ValueError, KeyError):
-        return {}
+        out = run([*cmd, "--reporter=json", f"--outputFile={report}"], env=env)
+        try:
+            with open(report) as f:
+                return out, {t["title"]: t["status"] for r in json.load(f)["testResults"] for t in r["assertionResults"]}
+        except (ValueError, KeyError):
+            return out, {}
+    finally:
+        os.remove(report)
 
 
 def expect(ok, what):
@@ -223,10 +231,9 @@ try:
         expect(out.returncode == 0, "core's planted tests pass on Node")
         profile = tempfile.mkdtemp(prefix="core-chromium-")
         try:
-            out = run(["node_modules/.bin/vitest", "run", "--reporter=json", "--project", "core_chromium", *paths], env={"CORE_CHROMIUM": profile})
+            out, states = verdicts(["node_modules/.bin/vitest", "run", "--project", "core_chromium", *paths], env={"CORE_CHROMIUM": profile})
         finally:
             shutil.rmtree(profile, ignore_errors=True)
-        states = verdicts(out)
         expect(states == {"outside a page": "failed", "anywhere": "passed"}, f"core_chromium runs core's tests in a page: {states or (out.stderr or out.stdout)[-300:]}")
         expect(not os.path.exists(f"{HERE}/__screenshots__") and not os.path.exists(".vitest-attachments"), "core_chromium writes nothing beside the code on a failure")
         # Plain lines, `[project] file > title`: `--json` would take the next path for its output file.
@@ -241,8 +248,7 @@ try:
         page = 'test("ui probe {}", () => {{\n  render(<p>once</p>);\n  expect(screen.getAllByText("once")).toHaveLength(1);\n}});\n'.format
         plant({"probe.test.tsx": 'import { render, screen } from "@testing-library/react";\nimport { expect, test } from "vitest";\n\n' + page("one") + page("two")
                + 'test("ui probe fails", () => {\n  expect(document.title).toBe("never this title");\n});\n'}, where=UI)
-        out = run(["node_modules/.bin/vitest", "run", "--reporter=json", f"{UI}/probe.test.tsx"])
-        states = verdicts(out)
+        out, states = verdicts(["node_modules/.bin/vitest", "run", f"{UI}/probe.test.tsx"])
         expect(states == {"ui probe one": "passed", "ui probe two": "passed", "ui probe fails": "failed"}, f"vitest runs ui's tests in jsdom, each on an empty page: {states}")
         shutil.rmtree(UI)
 
