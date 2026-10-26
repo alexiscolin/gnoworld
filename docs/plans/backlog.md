@@ -64,6 +64,12 @@ Alexis, 2026-10-23: slice 3's reviews found these; none bites today, each comes 
 | Banned words compiled once | The pattern kept per word list, if the k6 messages run shows the cost | Folded and compiled again for each message (F662) |
 | Archived rooms at once | The activity route asks a world's archived rooms in one query; sized from the k6 run | One query a room, up to about 500 a request (F663) |
 
+## Slice 4, after its reviews
+
+| Item | Delivers | Why |
+|---|---|---|
+| A phone's way to a line's actions | A quiet "⋯" at each line's end under `(hover: none)`, or a first-use hint, once a phone writes (slice 4's plan: a phone reads only) | Nothing hints that a line can be tapped for its bar, and a tap on a line with a link opens the link (the menu's UX review, U12) |
+
 ## The design system, after slice 2
 
 Alexis, 2026-10-21: 2e's and 2f's reviews found these; each is true and none bites today, so each
