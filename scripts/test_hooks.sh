@@ -2015,6 +2015,11 @@ prove "$base" || fail "prove_fix refused a harness fix, which harness_mutate pro
 base=$(git -C "$pf" rev-parse HEAD)
 printf '// expects: export\n' >"$pf/packages/x/src/d.test.ts" && fix "fix(x): a test's own fault, and no product code"
 prove "$base" || fail "prove_fix refused a fix of tests alone, which changes no product code"
+# The journeys' folder holds their helpers, which are tests too: a fix of them alone changes no product code.
+base=$(git -C "$pf" rev-parse HEAD)
+mkdir -p "$pf/app/tests/e2e" && printf 'export const lines = 1;\n' >"$pf/app/tests/e2e/chat.ts" && printf '// expects: export\n' >"$pf/app/tests/e2e/d.spec.ts"
+fix "fix(app): a journey's helper and its journey, no product code"
+prove "$base" || fail "prove_fix took a journeys' helper for product code"
 # Deleted code is product code too: a fix that drops a module needs a test that failed, or a reason.
 printf 'export const gone = 1;\n' >"$pf/packages/x/src/gone.ts" && fix "feat(x): a module to drop"
 base=$(git -C "$pf" rev-parse HEAD)
