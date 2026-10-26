@@ -1842,6 +1842,17 @@ for s in stories py:prove_fix coverage py:harness_mutate; do
 	out=$(FAIL=$s gate --full) && fail "check.sh --full passed with $s failing alone"
 	printf '%s\n' "$out" | grep -q "^$s failed here" || fail "check.sh --full hid $s's failure: $out"
 done
+# A failure in the first phase stops the gate there, saying which lanes did not run: the coverage and the harness
+# lanes never start; the first phase's other lane runs to its end (Alexis, 2026-10-26, C.5).
+for s in stories py:prove_fix; do
+	out=$(FAIL=$s gate --full) && fail "check.sh --full passed with $s failing"
+	ran mutate && fail "check.sh --full started StrykerJS after $s's failure"
+	ran py:harness_mutate && fail "check.sh --full started harness_mutate after $s's failure"
+	printf '%s\n' "$out" | grep -q "^check.sh: the coverage and harness lanes did not run" ||
+		fail "check.sh --full did not say which lanes did not run after $s's failure: $out"
+done
+(FAIL=stories gate --full) >/dev/null && fail "check.sh --full passed with the stories failing"
+ran py:audit || fail "check.sh --full stopped the history lane at the stories' failure: a phase's lanes run to their end"
 [ ! -e "$g/.claude/tmp/green-full" ] || fail "check.sh --full recorded a gate that failed"
 # --merge, a merge's own review: the full gate's steps, the harness mutants of the merge's guard files
 # alone, and no full record, which only --full writes (pre-push wants it for main).

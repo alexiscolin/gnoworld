@@ -328,16 +328,17 @@ if $full; then
 	start probe
 	finish probe
 	# The stories' journeys run beside the history lane alone: under the coverage's Vitest and StrykerJS and
-	# the harness's worktrees, a Dialog's teardown in the browser outlasted its test (F815). The two after
-	# them run even when one failed, so one run shows every failure.
+	# the harness's worktrees, a Dialog's teardown in the browser outlasted its test (F815). A failure there stops
+	# the gate before the two after them, whose fifteen to twenty minutes would fix nothing of it (C.5, F823).
 	start stories
 	start history
-	early=0
-	finish stories history || early=1
+	finish stories history || {
+		echo "check.sh: the coverage and harness lanes did not run: the stories' or the history lane failed first" >&2
+		exit 1
+	}
 	start coverage
 	start harness
 	finish coverage harness
-	[ "$early" = 0 ]
 fi
 
 if [ -n "$tested" ]; then
