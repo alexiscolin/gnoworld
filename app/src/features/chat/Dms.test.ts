@@ -79,6 +79,13 @@ describe("what a page says of a ?dm= it cannot show", () => {
       asked: BOB,
       said: undefined,
     },
+    // StrykerJS on 4e: the unknown session's rule, apart from the address's.
+    {
+      name: "nothing of an address that is none while the session is unknown",
+      session: { kind: "unknown" } as const,
+      asked: "g1nope",
+      said: undefined,
+    },
     { name: "nothing at another account's address", session: ME, asked: BOB, said: undefined },
     {
       name: "that a guest logs in first",

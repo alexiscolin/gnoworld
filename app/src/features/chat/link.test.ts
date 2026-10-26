@@ -911,6 +911,40 @@ describe("the chat's link: direct messages", () => {
     expect([...t.kept.keys()]).toEqual([]);
   });
 
+  // StrykerJS on 4e: what answers a line waiting on Ergo, and what does not.
+  const to = (id: string, text: string) =>
+    `@msgid=${id};time=${T0};account=${OTHER} :${OTHER}!u@h PRIVMSG ${ADDRESS} :${text}`;
+  it.each([
+    [
+      "the partner's own line of the same words",
+      (t: WithDrafts) => {
+        t.fake.line(to("b", "hi"));
+      },
+    ],
+    [
+      "my action's echo, for a line of the same words",
+      (t: WithDrafts) => {
+        t.fake.line(echo("b", "\u0001ACTION hi\u0001"));
+      },
+    ],
+  ])("answers no waiting line by %s: Ergo's refusal still puts it back", (_, heard) => {
+    const t = withDrafts();
+    t.link.sayTo(OTHER, "hi");
+    heard(t);
+    t.fake.line(refusal(OTHER));
+    expect(t.kept.get(OTHER)).toBe("hi");
+  });
+
+  it("answers a waiting action by its echo alone, and refuses nothing on a line naming the partner", () => {
+    const t = withDrafts();
+    t.link.sayTo(OTHER, "/me waves");
+    t.fake.line(to("b", OTHER));
+    expect(t.store.getState().dmRefused).toEqual({});
+    t.fake.line(echo("c", "\u0001ACTION waves\u0001"));
+    t.fake.line(refusal(OTHER));
+    expect(t.store.getState().dmRefused).toEqual({});
+  });
+
   it("sends an account's draft to another account, as the composer composes it", () => {
     const t = account();
     expect(t.link.sayTo(OTHER, "  hi **you**  ")).toBe(true);

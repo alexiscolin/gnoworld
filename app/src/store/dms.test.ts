@@ -68,8 +68,12 @@ describe("the store's chat slice: direct messages", () => {
   it("forgets every conversation at a new session, notifying no one when it held none", () => {
     const t = as(ACCOUNT);
     t.heard(dm("a", { from: ALICE, to: ACCOUNT, text: "hi" }));
+    // StrykerJS on 4e: a refusal held with a conversation, both forgotten; one with no device counted all the same.
+    t.store.getState().dmActions.refused(ALICE, "lost");
+    expect(t.store.getState().dmRefused).toEqual({ [ALICE]: { count: 1, draft: "lost" } });
     t.store.getState().dmActions.begin();
     expect(t.dms()).toEqual({});
+    expect(t.store.getState().dmRefused).toEqual({});
     let heard = 0;
     t.store.subscribe(() => {
       heard += 1;
