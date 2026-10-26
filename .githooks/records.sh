@@ -40,7 +40,7 @@ reviewed() ( git show "$1:docs/review-passes.txt" 2>/dev/null | cut -d' ' -f2 | 
 # options and commits.
 harness() ( GIT_ICASE_PATHSPECS=1 git -c core.quotePath=false diff "$@" -- scripts .githooks .github .claude .mcp.json package.json app/package.json server/package.json server/tsconfig.json \
 	'packages/*/package.json' pnpm-workspace.yaml pnpm-lock.yaml .pnpmfile.cjs .pnpmfile.mjs .node-version .nvmrc .npmrc '*.config.ts' tsconfig.json \
-	tsconfig.base.json app/tsconfig.json stryker.config.json knip.json .jscpd.json .prettierrc.json .prettierignore .gitignore )
+	tsconfig.base.json app/tsconfig.json stryker.config.json knip.json .jscpd.json .prettierrc.json .prettierignore .gitignore server/src/testing/toolchain.test.ts server/src/testing/toolchain.ts )
 # Whether the change $@ (git diff's options and commits) holds a path with a non-ASCII byte: the
 # disk folds more letters than git can match (ſ is s on APFS), so no list names them (F164).
 # A git that fails answers yes.
