@@ -3,7 +3,7 @@
 // line's, none.
 import type { StreamEvent } from "@gnoworld/schemas";
 import { Button, Card, Cluster, Stack } from "@gnoworld/ui";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FocusEvent } from "react";
 import type { Embed as Player } from "./embeds.ts";
 import styles from "./Embed.module.css";
 
@@ -56,9 +56,32 @@ function useLate(waiting: boolean): boolean {
   return late && waiting;
 }
 
+// The focus held in the player's box, card or frame: when a hide takes the box away, it goes back to the Messages list,
+// not to the page (F896). Gone elsewhere, it is the reader's.
+function useFocusKept(hidden: boolean) {
+  const heldRef = useRef(false);
+  const listRef = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (!hidden || !heldRef.current) return;
+    heldRef.current = false;
+    if (document.activeElement === document.body) listRef.current?.focus();
+  }, [hidden]);
+  return {
+    onFocus: (event: FocusEvent<HTMLDivElement>) => {
+      heldRef.current = true;
+      listRef.current = event.currentTarget.closest("ol");
+    },
+    onBlur: (event: FocusEvent<HTMLDivElement>) => {
+      const to = event.relatedTarget;
+      if (to !== null && !event.currentTarget.contains(to)) heldRef.current = false;
+    },
+  };
+}
+
 export function Embed({ embed, verdict }: EmbedProps) {
   const [playing, setPlaying] = useState(false);
   const late = useLate(verdict === undefined);
+  const kept = useFocusKept(verdict === "hidden");
   // The card's own box, and whether its Play takes the focus back as the player closes.
   const cardRef = useRef<HTMLDivElement>(null);
   const backRef = useRef(false);
@@ -71,28 +94,30 @@ export function Embed({ embed, verdict }: EmbedProps) {
   if (playing) {
     // A player stops on its reader's word: an animation loops for good, a video plays on (WCAG 2.2.2, F1053).
     return (
-      <Stack space="2xs">
-        <PlayerFrame embed={embed} />
-        <Cluster>
-          <Button
-            emphasis="quiet"
-            icon="close"
-            onClick={() => {
-              backRef.current = true;
-              setPlaying(false);
-            }}
-          >
-            Close the player
-          </Button>
-        </Cluster>
-      </Stack>
+      <div {...kept}>
+        <Stack space="2xs">
+          <PlayerFrame embed={embed} />
+          <Cluster>
+            <Button
+              emphasis="quiet"
+              icon="close"
+              onClick={() => {
+                backRef.current = true;
+                setPlaying(false);
+              }}
+            >
+              Close the player
+            </Button>
+          </Cluster>
+        </Stack>
+      </div>
     );
   }
   const checked = verdict === "checked";
   // Its state in words, which a reader hears as it changes; Play alone once checked (F897).
   const word = checked ? "Ready to play" : late ? "Couldn't check this link" : "Waiting for the moderation check…";
   return (
-    <div ref={cardRef}>
+    <div ref={cardRef} {...kept}>
       <Card compact>
         <Card.Header icon="play" title={embed.title} />
         <p role="status" className={styles["status"]}>

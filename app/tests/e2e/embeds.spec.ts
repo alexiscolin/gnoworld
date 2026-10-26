@@ -178,6 +178,17 @@ test.describe("a link's player", () => {
     expect(away).toEqual([PLAYER]);
   });
 
+  // U5 (F896): a hide that took away the player holding the focus left it on the page, where the reader lost it.
+  test("gives the focus back to the Messages list when a hide takes away the player holding it", async ({ page }) => {
+    let said = event("v1", "checked");
+    await room(page, () => said);
+    await play(page).press("Enter");
+    await expect(lineOf(page, "watch").locator("iframe")).toBeFocused();
+    said = event("v1", "hidden");
+    await expect(lineOf(page, "watch").locator("iframe")).toHaveCount(0);
+    await expect(page.getByRole("list", { name: "Messages" })).toBeFocused();
+  });
+
   // F888: the stream given up (a 429: a fifth tab, a shared address), a line said since waited for good.
   test("asks the server of a line said after the stream began once the browser gave the stream up", async ({
     page,
