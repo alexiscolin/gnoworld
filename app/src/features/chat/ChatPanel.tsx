@@ -9,6 +9,7 @@ import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "re
 import { useSearchParams } from "react-router";
 import { pageLoginApi } from "../../lib/api/login.ts";
 import { pageRoomsApi } from "../../lib/api/rooms.ts";
+import { pageVerdicts } from "../../lib/stream/verdicts.ts";
 import { pageDrafts } from "../../lib/drafts/page.ts";
 import { drawGuestNick } from "../../lib/ergo/ergo.ts";
 import { pageErgo } from "../../lib/ergo/page.ts";
@@ -170,6 +171,11 @@ export function ChatPanel({ world }: { world: string }) {
   useEffect(() => {
     linkRef.current?.show(current);
   }, [current]);
+  // The shown room's verdicts, which a link's player waits on (4g); the stream follows the room in view.
+  useEffect(() => {
+    if (current === undefined) return;
+    return pageVerdicts([current], store.getState().verdictActions.judged);
+  }, [store, current]);
   const state = useApp((app) => (current === undefined ? undefined : app.chat.rooms[current]));
   const chat = useApp((app) => app.login.chat);
   if (!loaded) return LOADING;
