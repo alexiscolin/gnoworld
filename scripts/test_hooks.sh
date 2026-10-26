@@ -138,7 +138,7 @@ for step in "run format:check" "run typecheck" "run lint" "run test" "run unused
 	"ast.parse(open(f).read(), f) for f in sys.argv[1:]]' scripts/*.py" \
 	"python3 -I ../scripts/mutate.py" "go vet ./tools/..." "go run ./tools/sealvec | cmp" "python3 -I scripts/check_docs.py" \
 	"sh scripts/test_hooks.sh" "python3 -I scripts/probe.py" "run coverage" "python3 -I scripts/patch_coverage.py" "sh scripts/ergo.sh" \
-	"run mutate" "sh scripts/scan_secrets.sh" "python3 -I scripts/harness_mutate.py" "python3 -I scripts/check_regressions.py" "python3 -I scripts/check_migrations.py" "python3 -I scripts/bench.py" "python3 -I scripts/batch_size.py" \
+	"run mutate" "sh scripts/scan_secrets.sh" "python3 -I scripts/harness_mutate.py" "python3 -I scripts/check_regressions.py" "python3 -I scripts/check_migrations.py" "python3 -I scripts/bench.py" "python3 -I scripts/batch_size.py" "python3 -I scripts/load.py" \
 	'unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO' '[ "$took" -gt "$budget" ]' "python3 -I scripts/prove_fix.py" "python3 -I scripts/audit.py"; do
 	grep -v '^[[:space:]]*#' "$gate_file" | grep -qF -- "$step" || fail "check.sh no longer runs: $step"
 done
@@ -1469,6 +1469,11 @@ shift
 echo "$n $*" >>"$GATE_LOG"
 [ "$n" != py:audit ] || echo "audit-answer ${AUDIT_ANSWER-unset}" >>"$GATE_LOG"
 [ "$n" != py:bench ] || echo "bench-vitest ${BENCH_VITEST-unset}" >>"$GATE_LOG"
+if [ "$n" = py:load ]; then
+	at=$(($(cat "$GATE_LOG.load" 2>/dev/null || echo 0) + 1)) && echo "$at" >"$GATE_LOG.load"
+	eval "echo \"\${LOAD_$at:-0 160}\""
+	exit 0
+fi
 case " ${MEET:-} " in
 *" $n "*)
 	: >"$GATE_LOG.met.$n"
@@ -1490,7 +1495,7 @@ SH
 for tool in go gofmt; do printf '#!/bin/sh\nexec sh "%s" %s "$@"\n' "$step" "$tool" >"$g/bin/$tool"; done
 printf '#!/bin/sh\nexec sh "%s" gno "$@"\n' "$step" >"$g/toolchain/gno"
 chmod +x "$g/bin/go" "$g/bin/gofmt" "$g/toolchain/gno"
-for py in check_css check_docs mutate probe bench batch_size patch_coverage prove_fix check_regressions check_migrations audit harness_mutate; do
+for py in check_css check_docs mutate probe bench batch_size load patch_coverage prove_fix check_regressions check_migrations audit harness_mutate; do
 	printf 'import os, sys\nos.execvp("sh", ["sh", %s, "py:%s", *sys.argv[1:]])\n' "'$step'" "$py" >"$g/scripts/$py.py"
 done
 for sh in ergo test_hooks scan_secrets; do printf 'exec sh "%s" sh:%s "$@"\n' "$step" "$sh" >"$g/scripts/$sh.sh"; done
@@ -1508,7 +1513,7 @@ for f in server/src/a.ts server/src/b.ts server/roles.json app/src/a.tsx app/tes
 done
 git -C "$g" init -q && git -C "$g" add -A && git -C "$g" commit -qm x && git -C "$g" update-ref refs/remotes/origin/main HEAD
 }
-gate() { : >"$log" && rm -f "$log".met.* && (cd "$g" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" sh scripts/check.sh "$@" 2>&1); }
+gate() { : >"$log" && rm -f "$log".met.* "$log.load" && (cd "$g" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" sh scripts/check.sh "$@" 2>&1); }
 ran() { grep -q "^$1\( \|$\)" "$log"; }
 before() { [ "$(grep -n "^$1\( \|$\)" "$log" | head -1 | cut -d: -f1)" -lt "$(grep -n "^$2\( \|$\)" "$log" | head -1 | cut -d: -f1)" ]; }
 reset() { git -C "$g" reset -q --hard && git -C "$g" clean -qfd; }
@@ -1755,6 +1760,23 @@ for slow in lint gno; do
 	format=$(printf '%s\n' "$out" | sed -n 's/^lane ts .*format \([0-9]*\)\.\([0-9]\).*/\1\2/p') lint=$(printf '%s\n' "$out" | sed -n 's/^lane types .*lint \([0-9]*\)\.\([0-9]\).*/\1\2/p')
 	[ -n "$format" ] && [ "$format" -lt "$lint" ] || fail "check.sh gave a quick step a slow one's time: $out"
 done
+# Past its budget on a busy machine, its 1-minute load above its cores at the run's start or end, the fast gate
+# says so and passes (Alexis, 2026-10-26, C.8): it measured the machine, not the code. At its cores, not above, it
+# still fails.
+busy() { # $1, $2: the load at the run's start and end, in tenths; $3: when the machine was busy
+	rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/gate-green"
+	out=$(LOAD_1="$1 160" LOAD_2="$2 160" SLOW_STEP=lint GATE_BUDGET=0 gate) || fail "check.sh failed past its budget on a machine busy at $3: $out"
+	printf '%s\n' "$out" | grep -q "over its 0 s budget on a busy machine (load 17.0 on 16 cores): passed" ||
+		fail "check.sh did not say it passed past its budget, the machine busy at $3: $out"
+	grep -qxF "$(record)" "$g/.claude/tmp/green-fast" || fail "check.sh did not record the gate it passed on a busy machine"
+}
+busy 170 10 "the run's start"
+busy 10 170 "the run's end"
+out=$(LOAD_1="160 160" LOAD_2="160 160" SLOW_STEP=lint GATE_BUDGET=0 gate) && fail "check.sh passed past its budget on a machine at its cores, not above"
+printf '%s\n' "$out" | grep -q "find what grew" || fail "check.sh did not fail past its budget at the machine's cores: $out"
+# load.py reads the machine itself: its 1-minute load and its cores, in tenths.
+python3 -I "$here/load.py" | python3 -I -c 'import os, sys; load, cores = map(int, sys.stdin.read().split()); assert cores == (os.cpu_count() or 1) * 10 and load >= 0, (load, cores)' ||
+	fail "load.py did not print the machine's load and cores in tenths"
 fi
 
 if part gate_full; then

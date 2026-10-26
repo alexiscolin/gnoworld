@@ -55,7 +55,7 @@ SECTIONS = {
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
     "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
-    "scripts/repo_files.py": "worktrees", "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench", "scripts/suite_parts.py": "mutant_scope,harness_shards", "scripts/batch_size.py": "batch_size", "scripts/exam.py": "exam", "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
+    "scripts/repo_files.py": "worktrees", "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench", "scripts/suite_parts.py": "mutant_scope,harness_shards", "scripts/batch_size.py": "batch_size", "scripts/exam.py": "exam", "scripts/load.py": "gate_times", "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
 }
 
 
@@ -559,6 +559,7 @@ def mutants():
     yield from each("scripts/exam.py", "if path is None or fix is None or", "if path is None or", "hooks", "exam keeps a finding whose fix the repository holds")
     yield from each("scripts/exam.py", "(severe and not SEVERE.search(", "(False and not SEVERE.search(", "hooks", "exam --severe keeps the high and medium")
     yield from each("scripts/exam.py", "chosen = cases[::-1][:cap]", "chosen = cases[:cap]", "hooks", "exam takes the newest first")
+    yield from each("scripts/load.py", "print(round(os.getloadavg()[0] * 10), (os.cpu_count() or 1) * 10)", "print((os.cpu_count() or 1) * 10, round(os.getloadavg()[0] * 10))", "hooks", "load.py prints the load, then the cores")
     yield from each("scripts/prove_fix.py", "return all(subprocess.run(cmd", "return True or all(subprocess.run(cmd", "hooks", "prove_fix runs the tests on the parent")
     yield from each("scripts/prove_fix.py", 're.search(r"^No-test: \\S", message, re.M)', "True", "hooks", "prove_fix wants a reason for no test")
     yield from each("scripts/prove_fix.py", r"|\.spec\.ts", "", "hooks", "prove_fix takes a journey for a fix's test (F126)")
@@ -638,6 +639,10 @@ def mutants():
             "the stories run beside the history lane",
         ),
         ("\tfinish coverage harness\n", "\tfinish coverage harness || true\n", "--full fails when the coverage or the harness lane alone did"),
+        ('\t[ "$high" -gt "$2" ] && echo', "\tfalse && echo", "the fast gate passes past its budget on a busy machine (C.8)"),
+        ('\t[ "$3" -le "$high" ] || high=$3', "\t:", "a machine busy at the run's end counts (C.8)"),
+        ("\thigh=$1\n", "\thigh=0\n", "a machine busy at the run's start counts (C.8)"),
+        ("; find what grew\" >&2\n\t\texit 1\n", "; find what grew\" >&2\n\t\t:\n", "the fast gate fails past its budget on an idle machine (C.8)"),
         ('run coverage "--maxWorkers=$half"', "run coverage", "--full caps Vitest's coverage at half the machine (F777)"),
         ('run mutate "--concurrency $half"', "run mutate", "--full caps StrykerJS at half the machine (F777)"),
         ("\tstart probe\n\tfinish probe\n", "\tstart probe\n", "probe.py runs alone, before the full lanes"),

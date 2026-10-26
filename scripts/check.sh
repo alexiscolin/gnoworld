@@ -246,6 +246,8 @@ lane_docs() {
 	sh scripts/test_hooks.sh
 }
 
+# The machine's 1-minute load and its cores, in tenths (scripts/load.py), as the lanes start; read again at their end.
+load_start=$(python3 -I scripts/load.py)
 start ts
 start types
 start tests
@@ -253,11 +255,23 @@ start gno
 start docs
 finish ts types tests gno docs
 
+# busy <load at the start> <cores> <load at the end> <cores>: the higher load and the cores, when it passed them.
+busy() {
+	high=$1
+	[ "$3" -le "$high" ] || high=$3
+	[ "$high" -gt "$2" ] && echo "$((high / 10)).$((high % 10)) on $(($2 / 10))"
+}
 took=$(($(date +%s) - started))
 if ! $full && [ "$took" -gt "$budget" ]; then
 	slowest=$(cat "$logs"/*.times | sort -k2 -n | tail -1)
-	echo "check.sh: the fast gate took ${took} s, over its ${budget} s budget: its slowest step, ${slowest%% *}, took $(seconds "${slowest##* }") s; find what grew" >&2
-	exit 1
+	# Past its budget on a machine busier than its cores, the gate measured the machine: it says so and passes (C.8).
+	# shellcheck disable=SC2086 # the loads split into their words on purpose
+	if machine=$(busy $load_start $(python3 -I scripts/load.py)); then
+		echo "check.sh: the fast gate took ${took} s, over its ${budget} s budget on a busy machine (load $machine cores): passed; its slowest step, ${slowest%% *}, took $(seconds "${slowest##* }") s" >&2
+	else
+		echo "check.sh: the fast gate took ${took} s, over its ${budget} s budget: its slowest step, ${slowest%% *}, took $(seconds "${slowest##* }") s; find what grew" >&2
+		exit 1
+	fi
 fi
 
 if $full; then
