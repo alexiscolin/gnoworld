@@ -449,7 +449,7 @@ describe("RoomView: what is new", () => {
     const html = part(view({ state: { ...OPENED, lines: LINES, read: T(0) } }), "Messages");
     expect(items(html)).toEqual([
       expect.stringMatching(/^\d{2}:\d{2} /),
-      expect.stringMatching(/^New \d{2}:\d{2} /),
+      expect.stringMatching(/^New( from here)? \d{2}:\d{2} /),
       expect.stringMatching(/^\d{2}:\d{2} /),
     ]);
     expect(html.match(/data-new=""/g)).toHaveLength(1);
