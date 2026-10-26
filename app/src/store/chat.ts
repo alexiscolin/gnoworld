@@ -76,15 +76,18 @@ const EMPTY: RoomState = {
 function roomAfter(room: RoomState, message: IrcMessage, at: Where & { now: number }): RoomState {
   const line = lineOf(message, at.room);
   const added = line === undefined ? room.lines : addLines(room.lines, [line], LINES_KEPT);
-  const next = {
-    lines: redactAfter(added, message, at.room),
-    members: membersAfter(room.members, message, at),
-    topic: topicAfter(room.topic, message, at.room),
-    typing: typingAfter(room.typing, message, at),
-    read: readAfter(room.read, message, at),
-  };
-  const same = (Object.keys(next) as (keyof typeof next)[]).every((key) => next[key] === room[key]);
-  return same ? room : { ...room, ...next };
+  const lines = redactAfter(added, message, at.room);
+  const members = membersAfter(room.members, message, at);
+  const topic = topicAfter(room.topic, message, at.room);
+  const typing = typingAfter(room.typing, message, at);
+  const read = readAfter(room.read, message, at);
+  const same =
+    lines === room.lines &&
+    members === room.members &&
+    topic === room.topic &&
+    typing === room.typing &&
+    read === room.read;
+  return same ? room : { ...room, lines, members, topic, typing, read };
 }
 
 // A room followed, by its id: an own key alone, the ids being the relay's.
@@ -131,8 +134,8 @@ export const chatSlice: StateCreator<ChatSlice> = (set, get) => {
         }
         const id = concerns(message);
         // ponytail: a QUIT or a NICK reads every room's people, 100 rooms of M each, though Ergo sends it for the
-        // rooms shared alone (1,000 QUITs at 100 rooms of 2,500: 155 ms, the complexity-reviewer); a nick's rooms
-        // indexed in the store is the next step.
+        // rooms shared alone (one QUIT at 100 rooms of 2,500: about 0.22 ms, 4f's E3, so 1,000 about 0.22 s); a
+        // nick's rooms indexed in the store is the next step.
         const now = Date.now();
         if (id === "*") {
           change({ rooms: eachRoom(rooms, (room, each) => roomAfter(room, message, { room: each, me, now })) });

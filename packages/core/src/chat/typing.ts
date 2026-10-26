@@ -55,7 +55,8 @@ function told(typing: Typing, message: IrcMessage, at: TypingAt): Typing {
  * line, PART, KICK, QUIT or NICK ends it; my PART or KICK ends all. A replay changes nothing; the same value comes back
  * when nothing changed, and the nicks whose time is past are dropped whenever it is written. */
 export function typingAfter(typing: Typing, message: IrcMessage, at: TypingAt): Typing {
-  if (message.tags.has("batch")) return typing;
+  // No one typing: a TAGMSG alone changes that, a QUIT over every room asking nothing more (E3).
+  if (message.tags.has("batch") || (typing === undefined && message.command !== "TAGMSG")) return typing;
   if (message.command === "TAGMSG") return told(typing, message, at);
   const gone = ended(message, at.room);
   if (gone === undefined) return typing;

@@ -13,8 +13,9 @@ const fromServer = (source: string | undefined): boolean => source === undefined
 // The time Ergo's MARKREAD for the room gives, in its one form, at most 5 minutes past `now`; none for `*`, for
 // another message, a replayed one or a person's.
 function placeOf({ command, params, tags, source }: IrcMessage, room: string, now: number): string | undefined {
+  if (command !== "MARKREAD") return undefined;
   const [target = "", stamp = ""] = params;
-  const ergo = command === "MARKREAD" && sameRoom(target, room) && !tags.has("batch") && fromServer(source);
+  const ergo = sameRoom(target, room) && !tags.has("batch") && fromServer(source);
   const time = ergo && stamp.startsWith("timestamp=") ? stamp.slice("timestamp=".length) : "";
   return isTime(time) && Date.parse(time) <= now + PLACE_AHEAD_MS ? time : undefined;
 }
