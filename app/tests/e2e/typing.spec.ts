@@ -60,6 +60,19 @@ test.describe("who is typing", () => {
     expect(errors).toEqual([]);
   });
 
+  // The code review (CR4) and /simplify (A1): a typist whose time passed while the room was out of view is not drawn
+  // as the room comes back, not for one commit (the clock paused: no timer would correct it).
+  test("draws no typist whose time passed while the room was out of view", async ({ page }) => {
+    const ergo = await paused(page);
+    await page.keyboard.press("Alt+ArrowDown");
+    await expect(page.getByRole("heading", { name: "#bubble", level: 2 })).toBeVisible();
+    ergo().send(typingOf("active"));
+    await page.clock.runFor(7_500);
+    await page.keyboard.press("Alt+ArrowUp");
+    await expect(page.getByRole("heading", { name: "#games", level: 2 })).toBeVisible();
+    await expect(typist(page)).toHaveCount(0);
+  });
+
   // The green pass (G2): the second typist's end is told too, the first's time past, the room left open.
   test("shows no one typing once the second of two typists' times is past as well", async ({ page }) => {
     await twoTypists(page, await paused(page));
