@@ -154,6 +154,16 @@ function useNewestInView(lines: readonly Line[]) {
   return { listRef, onScroll };
 }
 
+// A room's name and its description, its IRC topic; a conversation's partner and what it says of itself (4e).
+function Header({ title, topic }: { title: string; topic: string | undefined }) {
+  return (
+    <header>
+      <h2>{title}</h2>
+      {topic === undefined ? null : <p className={styles["topic"]}>{topic}</p>}
+    </header>
+  );
+}
+
 export function RoomView({ room, state, chat, composer, me, label, onMessage }: RoomViewProps) {
   const { lines = [], members = [], topic } = state ?? {};
   const { listRef, onScroll } = useNewestInView(lines);
@@ -163,10 +173,7 @@ export function RoomView({ room, state, chat, composer, me, label, onMessage }: 
   const known = new Set([...members, ...lines.flatMap(({ account }) => (account === undefined ? [] : [account]))]);
   return (
     <Stack as="section" space="s">
-      <header>
-        <h2>{label ?? roomLabel(room)}</h2>
-        {topic === undefined ? null : <p className={styles["topic"]}>{topic}</p>}
-      </header>
+      <Header title={label ?? roomLabel(room)} topic={topic} />
       <p role="status" className={styles["status"]}>
         {connected ? null : NOTICES[chat]}
       </p>
