@@ -113,6 +113,7 @@ describe("GET /api/verdicts", () => {
     ["two rooms", `${room("#bubble")}&${room("#garden")}&${ids("passed")}`],
     ["two lists of ids", `${room("#bubble")}&${ids("passed")}&${ids("hidden")}`],
     ["a room with no #", `room=bubble&${ids("passed")}`],
+    ["a room of its # alone", `${room("#")}&${ids("passed")}`],
     ["a room of 65 characters", `${room("#".padEnd(65, "b"))}&${ids("passed")}`],
     ["a room with a comma", `${room("#a,#b")}&${ids("passed")}`],
     ["an empty id", `${room("#bubble")}&ids=${encodeURIComponent("passed,,hidden")}`],
@@ -126,6 +127,13 @@ describe("GET /api/verdicts", () => {
     const answer = await setup().ask(query);
     expect(answer.status).toBe(400);
     expect(await answer.json()).toEqual({ error: "refused" });
+  });
+
+  // F876: each length at its bound.
+  it("takes a room of 64 characters, and ids of one and of 128 characters", async () => {
+    const t = setup();
+    expect((await t.ask(`${room("#".padEnd(64, "b"))}&${ids("passed")}`)).status).toBe(200);
+    expect((await t.ask(`${room("#bubble")}&${ids("p", "m".repeat(128))}`)).status).toBe(200);
   });
 
   it(`takes ${String(VERDICTS_ASKED)} ids`, async () => {
