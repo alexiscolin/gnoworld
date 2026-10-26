@@ -20,6 +20,16 @@ function welcome(line: string, me: string): string[] {
   return [];
 }
 
+// A history batch of `lines` in `room`, Ergo's.
+const page = (id: string, lines: readonly HistoryLine[], room: string): string[] => [
+  `BATCH +${id} chathistory ${room}`,
+  ...lines.map(
+    ([msgid, time, text, author = MEMBER]) =>
+      `@batch=${id};msgid=${msgid};time=${time};account=${author} :${author}!u@h PRIVMSG ${room} :${text}`,
+  ),
+  `BATCH -${id}`,
+];
+
 // A raw line in the history batch: its batch tag first among its own.
 const batched = (raw: string): string => (raw.startsWith("@") ? `@batch=h1;${raw.slice(1)}` : `@batch=h1 ${raw}`);
 
@@ -27,7 +37,12 @@ const batched = (raw: string): string => (raw.startsWith("@") ? `@batch=h1;${raw
 function rooms(
   line: string,
   me: string,
-  { history, replayed, told }: { history: readonly HistoryLine[]; replayed: readonly string[]; told: string },
+  {
+    history,
+    replayed,
+    older,
+    told,
+  }: { history: readonly HistoryLine[]; replayed: readonly string[]; older: readonly HistoryLine[]; told: string },
 ): string[] {
   if (line.startsWith("JOIN ")) {
     return line
@@ -40,6 +55,7 @@ function rooms(
         `:ergo 366 ${me} ${room} :End of /NAMES list.`,
       ]);
   }
+  if (line.startsWith(`CHATHISTORY BEFORE ${told} `)) return page("h2", older, told);
   if (!line.startsWith(`CHATHISTORY LATEST ${told} `)) return [];
   return [
     `BATCH +h1 chathistory ${told}`,
@@ -101,6 +117,8 @@ export interface Scripted {
   echo?: boolean;
   /** Ergo refuses each reaction, as in a room the account may not speak in: a 404 to its label, no echo. */
   refuseReact?: boolean;
+  /** The lines before the history's, which Ergo gives to CHATHISTORY BEFORE. */
+  older?: readonly HistoryLine[];
 }
 
 /** Answers the page's socket as Ergo would, the page being `me`: with #games' history, or with what `script` says. */
@@ -117,6 +135,7 @@ export function scriptedErgo(
     replayed = [],
     echo = false,
     refuseReact = false,
+    older = [],
   } = Array.isArray(script) ? { history: script } : (script as Scripted);
   let echoes = 0;
   ergo.onMessage((data) => {
@@ -124,7 +143,7 @@ export function scriptedErgo(
     heard?.(line);
     const answers = [
       ...welcome(line, me),
-      ...rooms(line, me, { history, replayed, told: room }),
+      ...rooms(line, me, { history, replayed, older, told: room }),
       ...redaction(line, me, refuseRedact),
       ...(refuseReact ? refusedReaction(line, me) : []),
       ...(echo && !(refuseReact && line.includes(" TAGMSG ")) ? echoed(line, me, (echoes += 1)) : []),

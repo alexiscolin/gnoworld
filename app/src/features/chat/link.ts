@@ -7,17 +7,14 @@ import { BatchReader, compose, nickOf, reactionLine, type IrcMessage, type React
 import { RoomId } from "@gnoworld/schemas";
 import type { Result } from "../../lib/api/http.ts";
 import type { Ergo, ErgoOptions, Who } from "../../lib/ergo/ergo.ts";
-import { LINES_KEPT } from "../../store/chat.ts";
 import { followed, groupsOf } from "./groups.ts";
+import { Earlier, HISTORY_LINES, MSGID } from "./history.ts";
 import { Labels } from "./labels.ts";
 import type { AppState, createAppStore } from "../../store/index.ts";
 
 /** The rooms a connection joins: Ergo's max-channels-per-client (deploy/ergo/ircd.yaml.tmpl). */
 export const ROOMS_JOINED = 100;
-/** The lines a room's history asks: the store's window. */
-export const HISTORY_LINES = LINES_KEPT;
-// A msgid: one word of 64 characters at most (Ergo's are 26), no space, comma, NUL or leading colon.
-const MSGID = /^[^\s,:\0][^\s,\0]{0,63}$/;
+export { HISTORY_LINES } from "./history.ts";
 
 export interface LinkDeps {
   store: ReturnType<typeof createAppStore>;
@@ -60,6 +57,7 @@ class Link implements ChatLink {
   readonly #inside = new Set<string>();
   #reader = new BatchReader();
   readonly #labels = new Labels();
+  readonly #earlier = new Earlier();
 
   constructor(deps: LinkDeps) {
     this.#deps = deps;
@@ -95,10 +93,10 @@ class Link implements ChatLink {
 
   react(room: string, reaction: Reacting): boolean {
     const line = reactionLine(reaction, room, this.#labels.next());
-    if (line === undefined || this.#key === "guest" || !this.#inside.has(room)) return false;
-    if (this.#ergo?.nick() === undefined || !this.#ergo.send(line)) return false;
-    this.#labels.sent(room);
-    return true;
+    const allowed = line !== undefined && this.#key !== "guest" && this.#inside.has(room);
+    const went = allowed && this.#ergo?.nick() !== undefined && this.#ergo.send(line);
+    if (went) this.#labels.sent(room);
+    return went;
   }
 
   stop(): void {
@@ -190,6 +188,7 @@ class Link implements ChatLink {
     this.#phases.clear();
     this.#inside.clear();
     this.#labels.clear();
+    this.#earlier.clear();
   }
 
   // The room in view's newest lines, once joined by this page and Ergo said I am in it, once a connection.
@@ -223,8 +222,18 @@ class Link implements ChatLink {
     if (read.kind === "pass") this.#heard(message);
     if (read.kind !== "done") return;
     const { type, params, messages } = read.batch;
-    if (type === "chathistory") this.#deps.store.getState().chatActions.page(params[0] ?? "", messages);
+    if (type === "chathistory") this.#page(params[0] ?? "", messages);
     else for (const each of messages) this.#heard(each);
+  }
+
+  // A history page to the store at once; then, in a room this page asked, the items before its oldest when the page
+  // leaves the window short of lines (history.ts).
+  #page(room: string, messages: readonly IrcMessage[]): void {
+    const store = this.#deps.store;
+    store.getState().chatActions.page(room, messages);
+    if (this.#phases.get(room) !== "asked") return;
+    const earlier = this.#earlier.after(room, messages, store.getState().chat.rooms[room]?.lines.length ?? 0);
+    if (earlier !== undefined) this.#ergo?.send(earlier);
   }
 
   // Ergo's JOIN of me, not replayed: I am in that room, and the room in view's lines are asked. Its KICK of me: I

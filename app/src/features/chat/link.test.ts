@@ -960,3 +960,85 @@ describe("the chat's link: a reaction Ergo refused", () => {
     expect(t.room("#bubble/games")?.cannotReact).toBeUndefined();
   });
 });
+
+// R1: Ergo counts a stored reaction as a history item, so a page of 200 may hold few lines or none; while a full page
+// leaves the room's window short of lines, the link asks for the items before its oldest, three times at most a room and
+// a connection (docs/decisions.md, 2026-10-26).
+describe("the chat's link: the history read past reactions", () => {
+  const ROOM = "#bubble/games";
+  const T = (n: number) => new Date(Date.parse(T0) + n * 1000).toISOString();
+  // A member's link in ROOM, its history asked.
+  const asked = () => {
+    const t = setup();
+    t.link.follow([ROOM]);
+    t.link.show(ROOM);
+    t.signedIn(ADDRESS);
+    const fake = t.connected(ADDRESS);
+    fake.line(`:${ADDRESS}!u@h JOIN ${ROOM}`);
+    return { ...t, fake };
+  };
+  // A history page of `count` items from the `from`th second, `lines` of them lines, the rest reactions; `first`, the
+  // oldest's msgid.
+  const page = (fake: Fake, { count = HISTORY_LINES, lines = 0, from = 1000, first = `i${String(from)}` } = {}) => {
+    const id = `h${String(from)}`;
+    fake.line(`BATCH +${id} chathistory ${ROOM}`);
+    for (let n = 0; n < count; n += 1) {
+      const msgid = n === 0 ? first : `i${String(from + n)}`;
+      const tags = `@batch=${id};msgid=${msgid};time=${T(from + n)};account=alice`;
+      fake.line(
+        n < lines
+          ? `${tags} :alice!u@h PRIVMSG ${ROOM} :line ${String(n)}`
+          : `${tags};+draft/react=👍;+reply=m1 :alice!u@h TAGMSG ${ROOM}`,
+      );
+    }
+    fake.line(`BATCH -${id}`);
+  };
+  const before = (sent: readonly string[]) => sent.filter((line) => line.startsWith("CHATHISTORY BEFORE "));
+
+  it("asks for the items before the oldest of a full page that holds no line", () => {
+    const t = asked();
+    page(t.fake, { first: "oldest" });
+    expect(before(t.fake.sent)).toEqual([`CHATHISTORY BEFORE ${ROOM} msgid=oldest ${String(HISTORY_LINES)}`]);
+  });
+
+  it("asks again for a full page that leaves the window short of lines, its lines kept", () => {
+    const t = asked();
+    page(t.fake, { lines: 50, first: "oldest" });
+    expect(t.room(ROOM)?.lines).toHaveLength(50);
+    expect(before(t.fake.sent)).toEqual([`CHATHISTORY BEFORE ${ROOM} msgid=oldest ${String(HISTORY_LINES)}`]);
+  });
+
+  it("asks three times at most, from each page's oldest, then stops", () => {
+    const t = asked();
+    for (const from of [4000, 3000, 2000, 1000]) page(t.fake, { from });
+    expect(before(t.fake.sent)).toEqual(
+      ["i4000", "i3000", "i2000"].map((id) => `CHATHISTORY BEFORE ${ROOM} msgid=${id} ${String(HISTORY_LINES)}`),
+    );
+  });
+
+  it("asks no more when a page came short, at the history's start, or the window holds its lines", () => {
+    const short = asked();
+    page(short.fake, { count: HISTORY_LINES - 1 });
+    const full = asked();
+    page(full.fake, { lines: HISTORY_LINES });
+    expect(before([...short.fake.sent, ...full.fake.sent])).toEqual([]);
+  });
+
+  it("asks nothing before an oldest item whose msgid a command cannot carry", () => {
+    const t = asked();
+    page(t.fake, { first: String.raw`a\sb` });
+    expect(before(t.fake.sent)).toEqual([]);
+  });
+
+  it("counts its asks again on a new connection", () => {
+    const t = asked();
+    for (const from of [4000, 3000, 2000]) page(t.fake, { from });
+    // Ergo's client reconnects as itself: what it sent before stays in its list.
+    const asks = before(t.fake.sent).length;
+    t.fake.state("waiting");
+    const again = t.connected(ADDRESS);
+    again.line(`:${ADDRESS}!u@h JOIN ${ROOM}`);
+    page(again, { from: 9000 });
+    expect(before(again.sent).slice(asks)).toEqual([`CHATHISTORY BEFORE ${ROOM} msgid=i9000 ${String(HISTORY_LINES)}`]);
+  });
+});
