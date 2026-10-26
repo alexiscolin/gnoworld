@@ -107,6 +107,21 @@ test.describe("the reading place", () => {
     await expect.poll(() => marks(sent).at(-1)).toBe(`MARKREAD ${ROOM} timestamp=${T(9)}`);
   });
 
+  // The code review (CR1): the room shown to the link before its lines read it, so a room come back to is read.
+  test("marks a room come back to read to a line that came while it was away", async ({ page }) => {
+    const address = await logIn(page, word("read"));
+    const { sent, ergo } = await room(page, { me: address, read: T(0) });
+    await expect.poll(() => marks(sent)).toEqual([`MARKREAD ${ROOM} timestamp=${T(2)}`]);
+    await page.keyboard.press("Alt+ArrowDown");
+    await expect(page.getByRole("heading", { name: "#bubble", level: 2 })).toBeVisible();
+    ergo().send(live("away", T(3), { text: "while away" }));
+    await page.keyboard.press("Alt+ArrowUp");
+    await expect(lineOf(page, "while away")).toBeVisible();
+    await expect
+      .poll(() => marks(sent))
+      .toEqual([`MARKREAD ${ROOM} timestamp=${T(2)}`, `MARKREAD ${ROOM} timestamp=${T(3)}`]);
+  });
+
   test("marks no line New for a room read to its end", async ({ page }) => {
     const address = await logIn(page, word("read"));
     const { ergo } = await room(page, { me: address, read: T(2) });

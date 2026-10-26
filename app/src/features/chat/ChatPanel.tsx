@@ -183,7 +183,8 @@ export function ChatPanel({ world }: { world: string }) {
     if (sections !== undefined) linkRef.current?.follow(roomIds(sections));
   }, [sections]);
   const current = sections === undefined ? undefined : shownRoom(world, sections, params.get("room"));
-  useEffect(() => {
+  // Before the room's lines' own effects, which read it to the link: a child's effects run before its parent's (CR1).
+  useLayoutEffect(() => {
     linkRef.current?.show(current);
   }, [current]);
   const state = useApp((app) => (current === undefined ? undefined : app.chat.rooms[current]));
