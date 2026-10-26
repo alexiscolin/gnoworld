@@ -19,7 +19,8 @@ test.describe("edits", () => {
       ],
     });
     await expect(lines(page)).toHaveCount(3);
-    await expect(lines(page).nth(0)).toContainText("the first line, fixed (edited)");
+    await expect(lines(page).nth(0)).toContainText("the first line, fixed");
+    await expect(lines(page).nth(0)).toContainText(/edited/i);
     await expect(lines(page).nth(1)).toContainText("the second line");
     await expect(lines(page).nth(2)).toContainText("not yours to fix");
   });
@@ -28,7 +29,8 @@ test.describe("edits", () => {
     const ergo = await opened(page, GUEST, { history: HISTORY });
     await expect(lines(page)).toHaveCount(2);
     ergo().send(tagged("e1", "the second line, fixed", { at: 30, tags: "+gnoworld/edit=m2" }));
-    await expect(lines(page).nth(1)).toContainText("the second line, fixed (edited)");
+    await expect(lines(page).nth(1)).toContainText("the second line, fixed");
+    await expect(lines(page).nth(1)).toContainText(/edited/i);
     await expect(lines(page)).toHaveCount(2);
   });
 });

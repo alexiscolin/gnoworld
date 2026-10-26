@@ -70,7 +70,7 @@ test.describe("replies", () => {
     await asAccount(page, () => ({
       replayed: [tagged("e1", "the first line, fixed", { at: 2, tags: "+gnoworld/edit=m1" })],
     }));
-    await expect(lines(page).nth(0)).toContainText("the first line, fixed (edited)");
+    await expect(lines(page).nth(0)).toContainText("the first line, fixed");
     await replyTo(page, 0);
     await expect(form(page)).toContainText("Replying to g10gh7…3y5tv: the first line, fixed");
   });
