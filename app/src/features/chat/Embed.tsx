@@ -12,23 +12,26 @@ export interface EmbedProps {
   verdict: StreamEvent["state"] | undefined;
 }
 
+/** A service's player, framed. */
+function PlayerFrame({ embed }: { embed: Player }) {
+  return (
+    <iframe
+      src={embed.src}
+      title={embed.title}
+      className={styles["frame"]}
+      allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+      allowFullScreen
+      referrerPolicy="strict-origin-when-cross-origin"
+      // The player's own scripts, full screen and its links out, in an origin of its own: never this page's.
+      sandbox="allow-scripts allow-presentation allow-popups"
+    />
+  );
+}
+
 export function Embed({ embed, verdict }: EmbedProps) {
   const [playing, setPlaying] = useState(false);
   if (verdict === "hidden") return null;
-  if (playing) {
-    return (
-      <iframe
-        src={embed.src}
-        title={embed.title}
-        className={styles["frame"]}
-        allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-        allowFullScreen
-        referrerPolicy="strict-origin-when-cross-origin"
-        // The player's own scripts, full screen and its links out, in an origin of its own: never this page's.
-        sandbox="allow-scripts allow-presentation allow-popups"
-      />
-    );
-  }
+  if (playing) return <PlayerFrame embed={embed} />;
   const checked = verdict === "checked";
   return (
     <div className={styles["card"]}>
