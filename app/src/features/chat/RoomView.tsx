@@ -74,7 +74,7 @@ function LineText({ blocks, me, known }: { blocks: readonly Block[]; me: string 
 function LineView({ line, me, members }: { line: Line; me: string | undefined; members: ReadonlySet<string> }) {
   const blocks = markdown(line.text);
   const names = namesOf(line.text);
-  const mentioned = me !== undefined && names.split(" ").includes(me);
+  const mentioned = names.split(" ").some((address) => address === me);
   const known = knownOf(names, members);
   return (
     <li className={KINDS[line.kind]} data-about-me={mentioned ? "" : undefined}>
