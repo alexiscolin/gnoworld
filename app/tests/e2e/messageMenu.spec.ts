@@ -193,6 +193,30 @@ test.describe("a line's actions", () => {
     await expect(moreOf(page, 1)).toBeFocused();
   });
 
+  // The green pass (G2): Esc's hide hands the focus back to More while the list checks, a frame later, whether the
+  // focus left it; two frames on, More holds it still, and its bar is there, the pointer away.
+  test("keep More focused and its bar shown two frames after Esc closes its menu", async ({ page }) => {
+    await room(page);
+    await page.mouse.move(0, 0);
+    await lines(page).nth(1).focus();
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("menu", { name: "Message actions" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await page.evaluate(
+      () =>
+        new Promise<void>((done) => {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              done();
+            });
+          });
+        }),
+    );
+    expect(await moreOf(page, 1).evaluate((more) => more === document.activeElement)).toBe(true);
+    await expect(barOf(page, 1)).toBeVisible();
+  });
+
   test("show a line's bar while the pointer is on it, and no other line's", async ({ page }) => {
     await room(page);
     await lineOf(page, "the first line").hover();
