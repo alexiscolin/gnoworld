@@ -605,6 +605,8 @@ def mutants():
             "the stories run beside the history lane",
         ),
         ("\tfinish coverage harness\n", "\tfinish coverage harness || true\n", "--full fails when the coverage or the harness lane alone did"),
+        ('run coverage "--maxWorkers=$half"', "run coverage", "--full caps Vitest's coverage at half the machine (F777)"),
+        ('run mutate "--concurrency $half"', "run mutate", "--full caps StrykerJS at half the machine (F777)"),
         ("\tstart probe\n\tfinish probe\n", "\tstart probe\n", "probe.py runs alone, before the full lanes"),
         ("\t! $merge || full=false", "\t:", "--merge records no full gate"),
         ("\texport E2E_PORT\n", "\n", "the journeys get a free port of their own"),

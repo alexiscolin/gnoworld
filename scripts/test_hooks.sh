@@ -1745,6 +1745,12 @@ for s in $fast_steps py:probe stories coverage py:patch_coverage py:prove_fix mu
 	[ "$s" = test ] || ran "$s" || fail "check.sh --full skipped $s"
 done
 ran test && fail "check.sh --full ran the tests twice, with and without coverage"
+# The coverage lane's tools take half the machine each, the harness lane beside them the rest: none starves the
+# timing-bound tests of the other (F777).
+half=$(($(node -p "require('os').availableParallelism()") / 2))
+[ "$half" -ge 1 ] || half=1
+grep -qx "coverage --maxWorkers=$half" "$log" || fail "check.sh --full let Vitest's coverage take the whole machine (F777): $(grep '^coverage' "$log")"
+grep -qx "mutate --concurrency $half" "$log" || fail "check.sh --full let StrykerJS take the whole machine (F777): $(grep '^mutate' "$log")"
 ran py:harness_mutate && fail "check.sh --full mutated a harness main already has"
 for s in py:prove_fix py:patch_coverage py:check_regressions py:check_migrations; do
 	grep -q "^$s $base$" "$log" || fail "check.sh --full did not give $s the base $base"

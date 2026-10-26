@@ -93,7 +93,9 @@ fast gate                                              full gate (--full), after
 The stories' journeys share the machine with the history lane alone: beside the coverage's
 Vitest, StrykerJS and the harness's worktrees, a Dialog's teardown outlasted its test and lost
 two merge checks of 23 minutes (F815). The coverage and the harness lanes run even when one
-before them failed, so one run shows every failure.
+before them failed, so one run shows every failure. In the coverage lane, Vitest's workers and
+StrykerJS's concurrency take half the machine each, the harness lane beside them the rest: at
+the machine's width, their load outlasted Ergo's 9 s auth script in the real-Ergo tests (F777).
 
 | A fast run's change | What runs beside the cheap checks (format, knip, jscpd, CSS, comments, check_docs) | Budget |
 |---|---|---|

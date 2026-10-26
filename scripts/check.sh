@@ -272,13 +272,17 @@ if $full; then
 		step stories # the design system's stories in a browser: axe, the invariants and the CSS jsdom cannot see
 		node app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts --reporter=dot
 	}
+	# The coverage lane's tools take half the machine each, the harness lane beside them the rest: at the machine's
+	# width, their load outlasted Ergo's 9 s auth script (F777).
+	half=$(($(node -p "require('os').availableParallelism()") / 2))
+	[ "$half" -ge 1 ] || half=1
 	lane_coverage() {
 		step coverage # 85% everywhere, core 100%
-		run coverage
+		run coverage "--maxWorkers=$half"
 		step patch_coverage # 85% of the lines this branch changed
 		python3 -I scripts/patch_coverage.py "$base"
 		step stryker # mutations, incremental
-		run mutate
+		run mutate "--concurrency $half"
 	}
 	lane_history() {
 		step prove_fix # every fix of the product comes with a test that failed before it
