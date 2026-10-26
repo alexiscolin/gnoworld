@@ -118,6 +118,13 @@ export function redactAfter(lines: readonly Line[], message: IrcMessage, room: s
   return kept.length === lines.length ? lines : kept;
 }
 
+/** The line Ergo refused to delete, from its FAIL REDACT <code> <target> <msgid> :text (irc/handlers.go, v2.19.1): its
+ * room, folded, and its msgid; none for any other reply, an INVALID_TARGET, which names no line, among them. */
+export function refusedOf({ command, params }: IrcMessage): { room: string; id: string } | undefined {
+  const [about, , target = "", id = ""] = params;
+  return command === "FAIL" && about === "REDACT" && params.length === 5 ? { room: fold(target), id } : undefined;
+}
+
 /** The room I look at, and my nick in it. */
 export interface Where {
   readonly room: string;

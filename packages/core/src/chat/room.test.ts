@@ -1,7 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, test } from "vitest";
 import { parseLine, type IrcMessage } from "../irc/irc.ts";
-import { addLines, concerns, lineOf, membersAfter, redactAfter, topicAfter, type Line } from "./room.ts";
+import { addLines, concerns, lineOf, membersAfter, redactAfter, refusedOf, topicAfter, type Line } from "./room.ts";
 
 const ME = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -262,6 +262,28 @@ describe("addLines: a room's lines, in time order, each once, the newest kept", 
       ),
       PROPERTY,
     );
+  });
+});
+
+// 4c's message menu: Ergo's refusal of a delete (irc/handlers.go, v2.19.1: FAIL REDACT <code> <target> <msgid> :text),
+// which the page says.
+describe("refusedOf: the line Ergo refused to delete", () => {
+  test.each([
+    ["REDACT_FORBIDDEN", ":ergo FAIL REDACT REDACT_FORBIDDEN #bubble a :You are not authorised to delete this message"],
+    ["UNKNOWN_MSGID", ":ergo FAIL REDACT UNKNOWN_MSGID #bubble a :This message does not exist or is too old"],
+  ])("reads the room, folded, and the msgid of a %s", (_, line) => {
+    expect(refusedOf(read(line))).toStrictEqual({ room: "#bubble", id: "a" });
+    expect(refusedOf(read(line.replace("#bubble", "#BUBBLE")))).toStrictEqual({ room: "#bubble", id: "a" });
+  });
+
+  test.each([
+    ["a refusal of no room (INVALID_TARGET has no msgid)", ":ergo FAIL REDACT INVALID_TARGET #bubble :No such channel"],
+    ["another command's FAIL", ":ergo FAIL CHATHISTORY MESSAGE_ERROR #bubble a :error"],
+    ["a WARN of a REDACT", ":ergo WARN REDACT REDACT_FORBIDDEN #bubble a :careful"],
+    ["a FAIL REDACT cut short", ":ergo FAIL REDACT REDACT_FORBIDDEN #bubble"],
+    ["a REDACT itself", ":gnoworld!u@h REDACT #bubble a"],
+  ])("reads none of %s", (_, line) => {
+    expect(refusedOf(read(line))).toBeUndefined();
   });
 });
 
