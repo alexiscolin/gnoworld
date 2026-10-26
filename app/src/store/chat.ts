@@ -4,20 +4,26 @@
 // change once and nothing else.
 import {
   addLines,
+  addReactions,
   concerns,
   lineOf,
   membersAfter,
+  reactionOf,
   redactAfter,
+  redactReactions,
   refusedOf,
   topicAfter,
   type IrcMessage,
   type Line,
+  type Reaction,
   type Where,
 } from "@gnoworld/core";
 import type { StateCreator } from "zustand/vanilla";
 
 /** The lines a room keeps: its history's window (docs/plans/slice-4.md, §4). */
 export const LINES_KEPT = 200;
+/** The reactions a room keeps, after one an account, a line and an emoji: five on each line of a window. */
+export const REACTIONS_KEPT = 1000;
 
 interface RoomState {
   readonly lines: readonly Line[];
@@ -27,6 +33,8 @@ interface RoomState {
   readonly topic: string | undefined;
   /** The msgid of a line Ergo refused to delete, until the page has said so (4c's message menu). */
   readonly refused: string | undefined;
+  /** The reactions Ergo relayed and replayed (4d), in time order; none until the first. */
+  readonly reactions?: readonly Reaction[];
 }
 
 interface ChatState {
@@ -44,7 +52,7 @@ export interface ChatSlice {
     connected: (me: string) => void;
     /** One live line from Ergo, read by every room it concerns. */
     heard: (message: IrcMessage) => void;
-    /** A history page of a room: its lines added at once; its replayed events change nothing. */
+    /** A history page of a room: its lines and reactions added at once; its other replayed events change nothing. */
     page: (room: string, messages: readonly IrcMessage[]) => void;
     /** The link gone: my nick and who is here forgotten; the lines and topics kept to show meanwhile. */
     disconnected: () => void;
@@ -55,6 +63,13 @@ export interface ChatSlice {
 
 const EMPTY: RoomState = { lines: [], members: [], topic: undefined, refused: undefined };
 
+// A room's reactions once a live line is read: the same array, or none, when it changes nothing of them.
+function reactionsAfter(held: RoomState["reactions"], message: IrcMessage, room: string): RoomState["reactions"] {
+  const reaction = reactionOf(message, room);
+  const added = reaction === undefined ? held : addReactions(held ?? [], [reaction], REACTIONS_KEPT);
+  return added === undefined ? undefined : redactReactions(added, message, room);
+}
+
 // A room once a live line is read: the same object when the line changes nothing of it.
 function roomAfter(room: RoomState, message: IrcMessage, at: Where): RoomState {
   const line = lineOf(message, at.room);
@@ -62,9 +77,10 @@ function roomAfter(room: RoomState, message: IrcMessage, at: Where): RoomState {
   const lines = redactAfter(added, message, at.room);
   const members = membersAfter(room.members, message, at);
   const topic = topicAfter(room.topic, message, at.room);
-  return lines === room.lines && members === room.members && topic === room.topic
-    ? room
-    : { ...room, lines, members, topic };
+  const reactions = reactionsAfter(room.reactions, message, at.room);
+  if (lines === room.lines && members === room.members && topic === room.topic && reactions === room.reactions)
+    return room;
+  return { ...room, lines, members, topic, ...(reactions === undefined ? {} : { reactions }) };
 }
 
 // A room followed, by its id: an own key alone, the ids being the relay's.
@@ -127,8 +143,12 @@ export const chatSlice: StateCreator<ChatSlice> = (set, get) => {
         const room = roomOf(rooms, id);
         if (room === undefined) return;
         const read = messages.flatMap((message) => lineOf(message, id) ?? []);
+        const reacted = messages.flatMap((message) => reactionOf(message, id) ?? []);
         const lines = addLines(room.lines, read, LINES_KEPT);
-        if (lines !== room.lines) change({ rooms: { ...rooms, [id]: { ...room, lines } } });
+        const reactions =
+          reacted.length === 0 ? room.reactions : addReactions(room.reactions ?? [], reacted, REACTIONS_KEPT);
+        if (lines === room.lines && reactions === room.reactions) return;
+        change({ rooms: { ...rooms, [id]: { ...room, lines, ...(reactions === undefined ? {} : { reactions }) } } });
       },
       dismissed: (id) => {
         const { rooms } = get().chat;
