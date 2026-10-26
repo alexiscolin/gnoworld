@@ -2216,6 +2216,42 @@ for bad in "" "v9.9.9" "v9.9.9 $pin extra" "v9.9.9 0123" "v9.9.9 ${pin%?}G" "v9/
 done
 fi
 
+if part worktrees; then
+# repo_files.worktree, which harness_mutate and prove_fix make their copies with: a run killed before its cleanup
+# leaves its copy; the next run removes it, its owner's pid gone, and never a live run's (two merge checks may run
+# at once), nor a copy no run marked.
+w="$t/wt"
+mkdir -p "$w/repo" "$w/tmp" && git -C "$w/repo" init -q && echo x >"$w/repo/a" && git -C "$w/repo" add a && git -C "$w/repo" commit -qm x
+tmp="$w/tmp"
+sh -c 'exit 0' &
+dead=$!
+wait "$dead"
+mkdir -p "$tmp/dead" "$tmp/live" "$tmp/other"
+git -C "$w/repo" worktree add -q --detach "$tmp/dead/tree" && echo "$dead" >"$tmp/dead/owner"
+git -C "$w/repo" worktree add -q --detach "$tmp/live/tree" && echo "$$" >"$tmp/live/owner"
+git -C "$w/repo" worktree add -q --detach "$tmp/other/tree"
+# A run killed while it holds its copy: the next run clears it, by the pid it wrote.
+(cd "$w/repo" && TMPDIR="$tmp" exec python3 -I -c 'import sys, time; sys.path.insert(0, sys.argv[1]); from repo_files import worktree
+with worktree("HEAD"): print("in", flush=True); time.sleep(60)' "$here" >"$w/killed" 2>&1) &
+victim=$!
+tries=0
+until grep -q '^in$' "$w/killed" 2>/dev/null; do
+	tries=$((tries + 1))
+	[ "$tries" -lt 300 ] || fail "repo_files.worktree never held its copy: $(cat "$w/killed")"
+	sleep 0.1
+done
+kill -9 "$victim"
+wait "$victim" 2>/dev/null || :
+[ "$(ls "$tmp" | grep -vc '^\(dead\|live\|other\)$')" = 1 ] || fail "the killed run left no copy to clear: $(ls "$tmp")"
+(cd "$w/repo" && TMPDIR="$tmp" python3 -I -c 'import sys; sys.path.insert(0, sys.argv[1]); from repo_files import worktree
+with worktree("HEAD") as tree: print(tree)' "$here" >"$w/out" 2>&1) || fail "repo_files.worktree failed beside a dead run's copy: $(cat "$w/out")"
+[ ! -e "$tmp/dead" ] || fail "a killed run's copy was left: $(ls "$tmp")"
+[ "$(git -C "$w/repo" worktree list --porcelain | grep -c 'dead/tree')" = 0 ] || fail "a killed run's worktree stayed registered"
+[ -d "$tmp/live/tree" ] || fail "a live run's copy was removed"
+[ -d "$tmp/other/tree" ] || fail "a copy no run marked was removed"
+[ "$(ls "$tmp" | grep -vc '^\(live\|other\)$')" = 0 ] || fail "repo_files.worktree left its own copy: $(ls "$tmp")"
+fi
+
 [ -z "${ONLY:-}" ] || [ "${ran:-}" = 1 ] || fail "ONLY=$ONLY names no section"
 echo "hooks: ok"
 finished=1
