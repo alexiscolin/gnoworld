@@ -157,12 +157,34 @@ describe("typingAfter: who is typing in a room, from IRCv3's +typing", () => {
     for (let n = 0; n < 1_000; n += 1) held = after(held, typing(ALICE, "active"), NOW + n);
     expect(held).toEqual({ [ALICE]: NOW + 999 + TYPING_ACTIVE_MS });
   });
+
+  test("keeps each other typist as one comes, ends and comes again", () => {
+    const both = after(after(undefined, typing(ALICE, "active")), typing(BOB, "active"), NOW + 1_000);
+    expect(typingAt(both, NOW + 1_000)).toEqual([ALICE, BOB]);
+    const bob = after(both, typing(ALICE, "done"), NOW + 2_000);
+    expect(typingAt(bob, NOW + 2_000)).toEqual([BOB]);
+    expect(typingAt(after(bob, typing(ALICE, "active"), NOW + 3_000), NOW + 3_000)).toEqual([ALICE, BOB]);
+  });
+
+  test.each([
+    ["a TAGMSG with no source", "@+typing=active TAGMSG #bubble"],
+    ["a TAGMSG with no target", `@+typing=active :${BOB}!u@h TAGMSG`],
+    ["a QUIT with no source", "QUIT :gone"],
+  ])("changes nothing on %s", (_, line) => {
+    const held = after(undefined, typing(ALICE, "active"));
+    expect(after(held, read(line))).toBe(held);
+  });
 });
 
 describe("typingAt: who is typing at a moment", () => {
   test("lists the nicks in code-unit order, the past ones left out", () => {
     const held: Typing = { [BOB]: NOW + 10, [ALICE]: NOW + 10, carol: NOW };
     expect(typingAt(held, NOW)).toEqual([ALICE, BOB]);
+  });
+
+  test("lists the nicks in code-unit order whatever order they came in", () => {
+    const held: Typing = { amy: NOW + 10, zoe: NOW + 10, kim: NOW + 10 };
+    expect(typingAt(held, NOW)).toEqual(["amy", "kim", "zoe"]);
   });
 
   test("lists no one for no one", () => {

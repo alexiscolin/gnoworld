@@ -926,5 +926,17 @@ describe("the chat's link: what it says", () => {
       t.link.typing("#bubble/games", "active");
       expect(tagged(again.sent)).toEqual(["@+typing=active TAGMSG #bubble/games"]);
     });
+
+    it("tells the typing again at once on a new connection, whose readers never heard it there", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const t = memberIn(["#bubble/games"]);
+      t.link.typing("#bubble/games", "active");
+      t.fake.state("waiting");
+      const again = t.connected(ADDRESS);
+      again.line(`:${ADDRESS}!u@h JOIN #bubble/games`);
+      const before = again.sent.length;
+      t.link.typing("#bubble/games", "active");
+      expect(tagged(again.sent.slice(before))).toEqual(["@+typing=active TAGMSG #bubble/games"]);
+    });
   });
 });
