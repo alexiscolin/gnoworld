@@ -15,6 +15,8 @@ export interface Line {
   readonly account?: string;
   readonly text: string;
   readonly kind: "message" | "notice" | "action";
+  /** The msgid of the line it answers (4d's replies), a msgid a tag carries; none for a line that answers none. */
+  readonly reply?: string;
 }
 
 // Ergo folds A to Z alone (casemapping ascii, deploy/ergo/ircd.yaml.tmpl).
@@ -93,8 +95,8 @@ export function lineOf(message: IrcMessage, room: string): Line | undefined {
   const [text, marks, from] = [textTo(message, room), stamp(message.tags), nickOf(message.source ?? "")];
   const body = text === undefined ? undefined : said(message.command, text);
   if (marks === undefined || body === undefined || from === "") return undefined;
-  const account = message.tags.get("account") ?? "";
-  return { ...marks, from, ...(account === "" ? {} : { account }), ...body };
+  const [account = "", reply] = [message.tags.get("account"), first(message.tags, REPLY, MSGID)];
+  return { ...marks, from, ...(account === "" ? {} : { account }), ...body, ...(reply === undefined ? {} : { reply }) };
 }
 
 const byTimeThenId = (one: Line, other: Line): number => compare(one.time, other.time) || compare(one.id, other.id);

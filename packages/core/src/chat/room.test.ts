@@ -468,3 +468,43 @@ describe("concerns: a reaction's room", () => {
     expect(concerns(read(`@+draft/react=x;+reply=a :${ALICE}!u@h TAGMSG #Bubble`))).toBe("#bubble");
   });
 });
+
+// 4d: a line answers another by its msgid (+reply, ratified in 2026; +draft/reply, its draft name, read too:
+// docs/plans/chat-features.md, M2). A value is a msgid a tag may carry back, of 64 characters at most, or no mark.
+describe("lineOf: the line a line answers", () => {
+  const tagged = (tags: string) =>
+    read(`@msgid=b;time=${T0};account=${ALICE};${tags} :${ALICE}!u@h PRIVMSG #bubble :x`);
+
+  test("keeps the msgid a reply answers, from +reply or its draft name, +reply first", () => {
+    expect(lineOf(tagged("+reply=a"), "#bubble")?.reply).toBe("a");
+    expect(lineOf(tagged("+draft/reply=a"), "#bubble")?.reply).toBe("a");
+    expect(lineOf(tagged("+reply=a;+draft/reply=z"), "#bubble")?.reply).toBe("a");
+  });
+
+  test("reads the draft name when +reply holds no msgid", () => {
+    expect(lineOf(tagged("+reply=a,b;+draft/reply=z"), "#bubble")?.reply).toBe("z");
+  });
+
+  test("adds no reply key to a line that answers none", () => {
+    expect(Object.keys(lineOf(said("b", T0, "x"), "#bubble") ?? {})).not.toContain("reply");
+  });
+
+  // A tag's value is escaped on the wire (\s a space, \: a semicolon, \\ a backslash): the parser hands it back whole.
+  test.each([
+    ["nothing", ""],
+    ["a space", String.raw`a\sb`],
+    ["a semicolon", String.raw`a\:b`],
+    ["a backslash", String.raw`a\\b`],
+    ["a comma", "a,b"],
+    ["a leading colon", ":a"],
+    ["65 characters", "a".repeat(65)],
+  ])("takes no reply of a value holding %s", (_, value) => {
+    const answering = lineOf(tagged(`+reply=${value};+draft/reply=${value}`), "#bubble");
+    expect(answering).toBeDefined();
+    expect(Object.keys(answering ?? {})).not.toContain("reply");
+  });
+
+  test("keeps a msgid of 64 characters, the longest the link sends", () => {
+    expect(lineOf(tagged(`+reply=${"a".repeat(64)}`), "#bubble")?.reply).toBe("a".repeat(64));
+  });
+});
