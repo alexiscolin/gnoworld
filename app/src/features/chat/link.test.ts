@@ -1064,6 +1064,65 @@ describe("the chat's link: what it says", () => {
       expect(t.room("#bubble/games")?.read).toBeUndefined();
     });
 
+    // The code review (CR2) and /simplify (E1): each MARKREAD spends Ergo's fakelag once its budget of 16 is gone, so a
+    // busy room read at its end must not queue the account's own lines behind them.
+    describe("paced", () => {
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+      const reading = () => {
+        vi.useFakeTimers();
+        const t = memberIn(["#bubble/games", "#bubble"]);
+        for (const minute of [0, 1, 2, 3]) heard(t.fake, "#bubble/games", minute);
+        return t;
+      };
+
+      it("sends a room's MARKREAD at most once each 2 s, the newest place asked following", () => {
+        const t = reading();
+        t.link.read("#bubble/games", "m0");
+        t.link.read("#bubble/games", "m1");
+        t.link.read("#bubble/games", "m2");
+        expect(marked(t.fake.sent)).toEqual([`MARKREAD #bubble/games timestamp=${T(0)}`]);
+        vi.advanceTimersByTime(1_999);
+        expect(marked(t.fake.sent)).toHaveLength(1);
+        vi.advanceTimersByTime(1);
+        expect(marked(t.fake.sent)).toEqual([
+          `MARKREAD #bubble/games timestamp=${T(0)}`,
+          `MARKREAD #bubble/games timestamp=${T(2)}`,
+        ]);
+        vi.advanceTimersByTime(10_000);
+        expect(marked(t.fake.sent)).toHaveLength(2);
+      });
+
+      it("sends the place waiting at once as the room in view changes, or as the page asks", () => {
+        const t = reading();
+        t.link.read("#bubble/games", "m0");
+        t.link.read("#bubble/games", "m1");
+        t.link.show("#bubble");
+        expect(marked(t.fake.sent).at(-1)).toBe(`MARKREAD #bubble/games timestamp=${T(1)}`);
+        t.link.show("#bubble/games");
+        t.link.read("#bubble/games", "m3");
+        expect(marked(t.fake.sent)).toHaveLength(2);
+        t.link.flush();
+        expect(marked(t.fake.sent).at(-1)).toBe(`MARKREAD #bubble/games timestamp=${T(3)}`);
+        vi.advanceTimersByTime(10_000);
+        expect(marked(t.fake.sent)).toHaveLength(3);
+      });
+
+      it("sends nothing waiting once the link drops, and the place at once on the next connection's JOIN", () => {
+        const t = reading();
+        t.link.read("#bubble/games", "m0");
+        t.link.read("#bubble/games", "m2");
+        t.fake.state("waiting");
+        vi.advanceTimersByTime(10_000);
+        expect(marked(t.fake.sent)).toEqual([`MARKREAD #bubble/games timestamp=${T(0)}`]);
+        const again = t.connected(ADDRESS);
+        const before = again.sent.length;
+        again.line(`:${ADDRESS}!u@h JOIN #bubble/games`);
+        expect(marked(again.sent.slice(before))).toEqual([`MARKREAD #bubble/games timestamp=${T(2)}`]);
+      });
+    });
+
     it("sends another session nothing the last one asked while away", () => {
       const t = memberIn(["#bubble/games"]);
       heard(t.fake, "#bubble/games", 1);

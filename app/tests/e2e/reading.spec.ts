@@ -122,6 +122,17 @@ test.describe("the reading place", () => {
       .toEqual([`MARKREAD ${ROOM} timestamp=${T(2)}`, `MARKREAD ${ROOM} timestamp=${T(3)}`]);
   });
 
+  // The code review (CR2): a busy room read at its end tells Ergo its place a few times, not once a line.
+  test("tells Ergo a busy room's place at most once each 2 s, its newest last", async ({ page }) => {
+    const address = await logIn(page, word("read"));
+    const { sent, ergo } = await room(page, { me: address, read: T(0) });
+    await expect.poll(() => marks(sent)).toEqual([`MARKREAD ${ROOM} timestamp=${T(2)}`]);
+    for (let minute = 10; minute < 30; minute += 1) ergo().send(live(`b${String(minute)}`, T(minute)));
+    await expect(lineOf(page, "b29")).toBeVisible();
+    await expect.poll(() => marks(sent).at(-1)).toBe(`MARKREAD ${ROOM} timestamp=${T(29)}`);
+    expect(marks(sent).length).toBeLessThanOrEqual(3);
+  });
+
   test("marks no line New for a room read to its end", async ({ page }) => {
     const address = await logIn(page, word("read"));
     const { ergo } = await room(page, { me: address, read: T(2) });

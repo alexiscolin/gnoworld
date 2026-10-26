@@ -17,6 +17,7 @@ import { useApp, useAppStore } from "../../storeContext.tsx";
 import { chatLink, type ChatLink } from "./link.ts";
 import { LOADING } from "./Loading.tsx";
 import { neighbour, roomIds, roomLabel, roomParams, roomsQuery, shownRoom } from "./names.ts";
+import { useOnHide } from "./reading.ts";
 import { RoomsView } from "./RoomsView.tsx";
 import { RoomView, type RoomViewProps } from "./RoomView.tsx";
 
@@ -183,6 +184,10 @@ export function ChatPanel({ world }: { world: string }) {
     if (sections !== undefined) linkRef.current?.follow(roomIds(sections));
   }, [sections]);
   const current = sections === undefined ? undefined : shownRoom(world, sections, params.get("room"));
+  // The page hidden: the reading places waiting their 2 s go at once (F940).
+  useOnHide(() => {
+    linkRef.current?.flush();
+  });
   // Before the room's lines' own effects, which read it to the link: a child's effects run before its parent's (CR1).
   useLayoutEffect(() => {
     linkRef.current?.show(current);

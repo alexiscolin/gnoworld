@@ -29,19 +29,19 @@ export interface LinkDeps {
 export interface ChatLink {
   /** The rooms the world lists, in its order. */
   follow: (ids: readonly string[]) => void;
-  /** The room in view: its history is asked once Ergo says I joined it, once a connection. */
+  /** The room in view: its history asked once Ergo says I joined it, once a connection; the last one's place told. */
   show: (room: string | undefined) => void;
   /** Sends a draft, as the composer composes it, to a room Ergo says it is in; an account's alone. Whether it went. */
   say: (room: string, draft: string) => boolean;
-  /** Deletes a line, by its msgid, in a room Ergo says it is in, as Ergo's REDACT (4c's message menu); an
-   * account's alone, Ergo refusing another's line. Whether it went. */
+  /** Deletes a line by its msgid in a room Ergo says it is in (Ergo's REDACT, 4c); an account's alone. Whether it went. */
   redact: (room: string, id: string) => boolean;
-  /** Tells a room Ergo says it is in that the account is typing, at most once every 3 s, or done after it was;
-   * an account's alone (IRCv3's +typing). */
+  /** Tells a room Ergo says it is in the account is typing, at most each 3 s, or done after (+typing); an account's. */
   typing: (room: string, state: "active" | "done") => void;
   /** Marks the room in view read to its line `id`, which the store holds, as Ergo's MARKREAD (draft/read-marker): an
    * account's alone, a line past the place Ergo gave; asked while away, it goes once Ergo says I am in the room. */
   read: (room: string, id: string) => void;
+  /** Sends at once the reading places waiting their 2 s, as the page hides (F940). */
+  flush: () => void;
   stop: () => void;
 }
 
@@ -64,7 +64,7 @@ class Link implements ChatLink {
   #reader = new BatchReader();
   readonly #typing = new TypingOut();
   readonly #out = (line: string): boolean => this.#ergo?.send(line) === true;
-  readonly #places = new Places();
+  readonly #places = new Places((room) => this.#deps.store.getState().chat.rooms[room]?.read, this.#out);
 
   constructor(deps: LinkDeps) {
     this.#deps = deps;
@@ -82,6 +82,7 @@ class Link implements ChatLink {
 
   show(room: string | undefined): void {
     if (this.#stopped) return;
+    if (this.#shown !== undefined && room !== this.#shown) this.#places.flush(this.#shown);
     this.#shown = room;
     this.#keep();
   }
@@ -107,12 +108,11 @@ class Link implements ChatLink {
   read(room: string, id: string): void {
     const line = this.#deps.store.getState().chat.rooms[room]?.lines.find((each) => each.id === id);
     if (this.#key !== "guest" && room === this.#shown && line !== undefined) this.#places.ask(room, line.time);
-    this.#mark(room);
+    if (this.#inside.has(room)) this.#places.tell(room);
   }
 
-  // The place asked for a room sent, once Ergo says I am in it.
-  #mark(room: string): void {
-    if (this.#inside.has(room)) this.#places.tell(room, this.#deps.store.getState().chat.rooms[room]?.read, this.#out);
+  flush(): void {
+    this.#places.flush();
   }
 
   stop(): void {
@@ -239,8 +239,7 @@ class Link implements ChatLink {
     else for (const each of messages) this.#heard(each);
   }
 
-  // Ergo's JOIN of me, not replayed: I am in that room, and the room in view's lines are asked. Its KICK of me: I
-  // am in it no more, and say nothing there.
+  // Ergo's JOIN of me, not replayed: I am in that room, its lines asked, its place told; its KICK of me: out of it.
   #heard(message: IrcMessage): void {
     this.#deps.store.getState().chatActions.heard(message);
     const { tags, source = "", command, params } = message;
@@ -251,7 +250,7 @@ class Link implements ChatLink {
     if (command !== "JOIN" || nickOf(source) !== me) return;
     this.#inside.add(room);
     this.#history(this.#shown);
-    this.#mark(room);
+    this.#places.tell(room, true);
   }
 }
 

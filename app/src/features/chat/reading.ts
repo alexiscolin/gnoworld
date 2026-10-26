@@ -13,6 +13,20 @@ export function useNewMark(lines: readonly Line[], read: string | undefined, me:
   return shown?.id;
 }
 
+/** Calls `onHide` each time the page hides. */
+export function useOnHide(onHide: () => void) {
+  const hidden = useEffectEvent(onHide);
+  useEffect(() => {
+    const hides = () => {
+      if (document.visibilityState === "hidden") hidden();
+    };
+    document.addEventListener("visibilitychange", hides);
+    return () => {
+      document.removeEventListener("visibilitychange", hides);
+    };
+  }, []);
+}
+
 /** Marks the room read to its newest line while the reader is at the end and the page shows: as a line comes, as the
  * tab shows again, as `onRead` comes (none until the room's history came: 4f's G1), and through the look it gives back,
  * which the list calls as it scrolls. */

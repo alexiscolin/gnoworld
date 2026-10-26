@@ -29,12 +29,28 @@ export class TypingOut {
   }
 }
 
-/** The reading places it asks Ergo to keep (draft/read-marker): the time the page last asked each room read to, one
- * session's, and the time sent on this connection; a place goes once past both Ergo's and what was sent, so a
- * MARKREAD lost with a connection goes again on the next, and one answered never twice. */
+/** The least time between two MARKREADs of one room: each spends Ergo's fakelag once its budget of 16 is gone
+ * (deploy/ergo/ircd.yaml.tmpl), so a busy room read at its end would queue the account's own lines behind them (F940). */
+const MARK_EVERY_MS = 2_000;
+
+/** The reading places it asks Ergo to keep (draft/read-marker), one session's: a place goes once past Ergo's and what
+ * was sent on this connection, so a MARKREAD lost with a connection goes again on the next and one answered never
+ * twice; at most one a room each 2 s, the newest place following. */
 export class Places {
   readonly #asked = new Map<string, string>();
   readonly #sent = new Map<string, string>();
+  // When each room's last MARKREAD went on this connection (the page's clock), and the send waiting to follow it.
+  readonly #at = new Map<string, number>();
+  readonly #waiting = new Map<string, ReturnType<typeof setTimeout>>();
+
+  readonly #held: (room: string) => string | undefined;
+  readonly #send: (line: string) => boolean;
+
+  /** `held`: Ergo's place for a room as the store holds it now; `send`: the way out to Ergo. */
+  constructor(held: (room: string) => string | undefined, send: (line: string) => boolean) {
+    this.#held = held;
+    this.#send = send;
+  }
 
   /** The page read `room` to the line of this time. */
   ask(room: string, time: string): void {
@@ -42,22 +58,48 @@ export class Places {
     if (asked === undefined || time > asked) this.#asked.set(room, time);
   }
 
-  /** Sends `room`'s MARKREAD through `send` when the place asked is past Ergo's, `held`, and what was sent. */
-  tell(room: string, held: string | undefined, send: (line: string) => boolean): void {
+  /** Sends `room`'s MARKREAD when the place asked is past Ergo's and what was sent: at once when `now` or 2 s after
+   * the last, else once they are. */
+  tell(room: string, now = false): void {
     const time = this.#asked.get(room);
     const sent = this.#sent.get(room);
-    if (time === undefined || [held, sent].some((each) => each !== undefined && each >= time)) return;
-    if (send(`MARKREAD ${room} timestamp=${time}`)) this.#sent.set(room, time);
+    if (time === undefined || [this.#held(room), sent].some((each) => each !== undefined && each >= time)) return;
+    const wait = (this.#at.get(room) ?? -Infinity) + MARK_EVERY_MS - Date.now();
+    if (!now && wait > 0) {
+      if (!this.#waiting.has(room)) {
+        const later = () => {
+          this.tell(room, true);
+        };
+        this.#waiting.set(room, setTimeout(later, wait));
+      }
+      return;
+    }
+    this.#stop(room);
+    if (!this.#send(`MARKREAD ${room} timestamp=${time}`)) return;
+    this.#sent.set(room, time);
+    this.#at.set(room, Date.now());
   }
 
-  /** A new connection: nothing sent on it yet. */
+  /** Sends at once the places waiting: `room`'s, or every room's. */
+  flush(room?: string): void {
+    for (const each of [...this.#waiting.keys()]) if (room === undefined || each === room) this.tell(each, true);
+  }
+
+  #stop(room: string): void {
+    clearTimeout(this.#waiting.get(room));
+    this.#waiting.delete(room);
+  }
+
+  /** A new connection: nothing sent on it yet, nothing waiting. */
   reconnected(): void {
+    for (const room of [...this.#waiting.keys()]) this.#stop(room);
     this.#sent.clear();
+    this.#at.clear();
   }
 
   /** Another session: nothing asked for it. */
   forget(): void {
+    this.reconnected();
     this.#asked.clear();
-    this.#sent.clear();
   }
 }
