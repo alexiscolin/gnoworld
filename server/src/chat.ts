@@ -23,7 +23,7 @@ import { makeRooms, type Rooms } from "./rooms/create.ts";
 import { listRoutes } from "./rooms/list.ts";
 import { listed, mayRead, publicRoom, staffOf, type World } from "./rooms/types.ts";
 import { getConnInfo } from "@hono/node-server/conninfo";
-import { makeStream, type Stream } from "./stream/stream.ts";
+import { makeStream, stateOf, type Stream } from "./stream/stream.ts";
 import { verdictRoutes } from "./stream/verdicts.ts";
 import { visitor } from "./visitor.ts";
 import { keeping, reconcilerFor, typedRooms } from "./rooms/wire.ts";
@@ -90,8 +90,9 @@ function moderate({ db, check, send, stream, progress, strike }: Steps): (said: 
       done = act(said, verdict, { send });
       if (!done) checkAgain(db, said.msgid);
       // An unchecked line has no event: its previews wait.
-      else if (verdict.action !== "unchecked") {
-        stream.publish({ msgid: said.msgid, room: said.room, state: verdict.action === "hide" ? "hidden" : "checked" });
+      else {
+        const state = stateOf(verdict.action);
+        if (state !== undefined) stream.publish({ msgid: said.msgid, room: said.room, state });
         if (verdict.action === "hide") strike(said);
       }
     } finally {

@@ -10,6 +10,17 @@ import { streamSSE, type SSEStreamingApi } from "hono/streaming";
 import { z } from "zod";
 import { visitor } from "../visitor.ts";
 
+// A room's name as the stream and GET /api/verdicts take it: # and one word with no comma, 64 characters at most.
+const ROOM = String.raw`#[^\s,#\0-\x1f\x7f]{1,63}`;
+/** One room's name, as GET /api/verdicts takes it. */
+export const RoomName = z.string().regex(new RegExp(`^${ROOM}$`));
+
+/** A line's state on the stream from the bot's action on it: an unchecked or pending line has none. */
+export function stateOf(action: string): StreamEvent["state"] | undefined {
+  if (action === "pass") return "checked";
+  return action === "hide" ? "hidden" : undefined;
+}
+
 export interface Stream {
   publish: (event: StreamEvent) => void;
   // visible and session as activity/routes.ts's (3m): a room the reader may not see sends it nothing.
@@ -77,7 +88,7 @@ export function makeStream(options: Options = {}): Stream {
   const { perVisitor = 4, total = 1000, heartbeatMs = 15_000, pending = 64, now = Date.now } = options;
   const Rooms = z
     .string()
-    .regex(/^#[^\s,#\0-\x1f\x7f]{1,63}(?:,#[^\s,#\0-\x1f\x7f]{1,63}){0,24}$/)
+    .regex(new RegExp(`^${ROOM}(?:,${ROOM}){0,24}$`))
     .transform((list) => new Set(list.split(",")));
   const LastId = z
     .string()
