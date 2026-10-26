@@ -63,7 +63,11 @@ function redaction(line: string, me: string, refuse: boolean): string[] {
 function marking(line: string, places: Map<string, string>, quiet: boolean): string[] {
   const [command, room = "", stamp = ""] = line.split(" ");
   const time = stamp.replace(/^timestamp=/, "");
-  if (command !== "MARKREAD" || quiet || time === stamp) return [];
+  if (command !== "MARKREAD" || quiet) return [];
+  // The ask of the place it holds (handlers.go:3229-3233, v2.19.1): `*` for none.
+  const asked = places.get(room);
+  if (stamp === "") return [`:ergo.test MARKREAD ${room} ${asked === undefined ? "*" : `timestamp=${asked}`}`];
+  if (time === stamp) return [];
   const held = places.get(room);
   const kept = held !== undefined && held > time ? held : time;
   places.set(room, kept);

@@ -40,7 +40,8 @@ export const live = (id: string, time: string, { room = ROOM, text = id }: { roo
 export const typist = (page: Page) => page.getByText(/is typing…|are typing…/);
 export const tags = (sent: readonly string[]) => sent.filter((line) => line.includes(" TAGMSG "));
 export const field = (page: Page) => page.getByRole("textbox", { name: "Message #games" });
-export const marks = (sent: readonly string[]) => sent.filter((line) => line.startsWith("MARKREAD "));
+// The places the page set: a MARKREAD with its time, not its ask of Ergo's place (CR7).
+export const marks = (sent: readonly string[]) => sent.filter((line) => /^MARKREAD \S+ timestamp=/.test(line));
 // What the page sent before a word of its own written now: that word's TAGMSG goes out behind all of it, on the same
 // socket, so what is missing before it was never sent.
 export async function sentBefore(page: Page, sent: readonly string[]): Promise<readonly string[]> {

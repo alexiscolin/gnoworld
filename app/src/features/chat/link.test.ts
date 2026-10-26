@@ -817,7 +817,9 @@ describe("the chat's link: what it says", () => {
     t.link.typing("#bubble/games", "active");
     t.link.read("#bubble/games", "m1");
     expect(t.link.say("#bubble/games", "still here?")).toBe(false);
-    expect(t.fake.sent.filter((line) => / TAGMSG |^MARKREAD |^PRIVMSG #bubble\/games/.test(line))).toEqual([]);
+    expect(
+      t.fake.sent.filter((line) => / TAGMSG |^MARKREAD \S+ timestamp=|^PRIVMSG #bubble\/games/.test(line)),
+    ).toEqual([]);
   });
 
   it("takes no line of another for a KICK of it, though the line names it", () => {
@@ -978,7 +980,8 @@ describe("the chat's link: what it says", () => {
 
   // 4f: the reading place (Ergo's draft/read-marker, ircv3.net/specs/extensions/read-marker).
   describe("the reading place", () => {
-    const marked = (sent: readonly string[]) => sent.filter((line) => line.startsWith("MARKREAD "));
+    // The places set: a MARKREAD with its time, not the ask of Ergo's (CR7).
+    const marked = (sent: readonly string[]) => sent.filter((line) => /^MARKREAD \S+ timestamp=/.test(line));
     const T = (minute: number) => `2026-10-25T10:${String(minute).padStart(2, "0")}:00.000Z`;
     // A line of the room in the store, said at T(minute), its msgid m<minute>.
     const heard = (fake: Fake, room: string, minute: number) => {
@@ -1196,7 +1199,7 @@ describe("the chat's link: what it says", () => {
       expect(() => {
         t.link.read("#garden", "m1");
       }).not.toThrow();
-      expect(t.fake.sent.filter((line) => line.startsWith("MARKREAD "))).toEqual([]);
+      expect(t.fake.sent.filter((line) => /^MARKREAD \S+ timestamp=/.test(line))).toEqual([]);
     });
     it("keeps the newer place asked when an older line is read after it, through a reconnect", () => {
       const t = memberIn([ROOM]);
@@ -1208,7 +1211,7 @@ describe("the chat's link: what it says", () => {
       const again = t.connected(ADDRESS);
       const before = again.sent.length;
       again.line(`:${ADDRESS}!u@h JOIN ${ROOM}`);
-      expect(again.sent.slice(before).filter((line) => line.startsWith("MARKREAD "))).toEqual([
+      expect(again.sent.slice(before).filter((line) => /^MARKREAD \S+ timestamp=/.test(line))).toEqual([
         `MARKREAD ${ROOM} timestamp=${TT(1)}`,
       ]);
     });
