@@ -67,6 +67,8 @@ test.describe("a direct message, as it looks", () => {
     const only = page.getByRole("button", { name: "Only people I wrote to" });
     await only.click();
     await expect(only).toHaveAttribute("aria-pressed", "true");
+    // Its colours ease to the pressed ones (Chip.module.css): axe read one mid-way under a gate's load (2.84:1).
+    await only.evaluate((chip) => Promise.all(chip.getAnimations().map((animation) => animation.finished)));
     ergo.send(dm("s1", { from: STRANGER, to: ACCOUNT, minute: 0, text: "Buy my token." }));
     await expect(page.getByText(/^Not kept: messages from accounts you never wrote to/)).toBeVisible();
     await expect(lines(page)).toHaveCount(0);
