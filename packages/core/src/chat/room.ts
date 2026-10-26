@@ -17,6 +17,8 @@ export interface Line {
   readonly kind: "message" | "notice" | "action";
   /** The msgid of the line it answers (4d's replies), a msgid a tag carries; none for a line that answers none. */
   readonly reply?: string;
+  /** The msgid of the line it corrects (4d's edits shown, +gnoworld/edit), a msgid a tag carries; none for the rest. */
+  readonly edits?: string;
 }
 
 // Ergo folds A to Z alone (casemapping ascii, deploy/ergo/ircd.yaml.tmpl).
@@ -70,6 +72,8 @@ function said(command: string, text: string): Pick<Line, "kind" | "text"> | unde
 export const MSGID = /^[^\s,:;\\][^\s,;\\]{0,63}$/u;
 /** The line a message answers: +reply, ratified in 2026, before its draft name. */
 export const REPLY = ["+reply", "+draft/reply"];
+// The line a message corrects: our own tag, no IRCv3 one existing (docs/decisions.md, 2026-10-21).
+const EDIT = ["+gnoworld/edit"];
 
 /** The first of these tags whose value holds what `fits` wants, or none. */
 export function first(tags: IrcMessage["tags"], names: readonly string[], fits: RegExp): string | undefined {
@@ -95,8 +99,10 @@ export function lineOf(message: IrcMessage, room: string): Line | undefined {
   const [text, marks, from] = [textTo(message, room), stamp(message.tags), nickOf(message.source ?? "")];
   const body = text === undefined ? undefined : said(message.command, text);
   if (marks === undefined || body === undefined || from === "") return undefined;
-  const [account = "", reply] = [message.tags.get("account"), first(message.tags, REPLY, MSGID)];
-  return { ...marks, from, ...(account === "" ? {} : { account }), ...body, ...(reply === undefined ? {} : { reply }) };
+  const { tags } = message;
+  const [account = "", reply, edits] = [tags.get("account"), first(tags, REPLY, MSGID), first(tags, EDIT, MSGID)];
+  const marked = { ...(reply === undefined ? {} : { reply }), ...(edits === undefined ? {} : { edits }) };
+  return { ...marks, from, ...(account === "" ? {} : { account }), ...body, ...marked };
 }
 
 const byTimeThenId = (one: Line, other: Line): number => compare(one.time, other.time) || compare(one.id, other.id);

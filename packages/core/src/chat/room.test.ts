@@ -508,3 +508,49 @@ describe("lineOf: the line a line answers", () => {
     expect(lineOf(tagged(`+reply=${"a".repeat(64)}`), "#bubble")?.reply).toBe("a".repeat(64));
   });
 });
+
+// 4d: a line corrects one of its author's by our own tag (+gnoworld/edit, docs/decisions.md 2026-10-21), whose value is
+// a msgid a tag may carry back, of 64 characters at most, or no mark.
+describe("lineOf: the line a line corrects", () => {
+  const tagged = (tags: string) =>
+    read(`@msgid=b;time=${T0};account=${ALICE};${tags} :${ALICE}!u@h PRIVMSG #bubble :x`);
+
+  test("keeps the msgid an edit corrects", () => {
+    expect(lineOf(tagged("+gnoworld/edit=a"), "#bubble")?.edits).toBe("a");
+  });
+
+  test("keeps both marks of a line that answers one line and corrects another", () => {
+    expect(lineOf(tagged("+reply=a;+gnoworld/edit=c"), "#bubble")).toEqual({
+      id: "b",
+      time: T0,
+      from: ALICE,
+      account: ALICE,
+      text: "x",
+      kind: "message",
+      reply: "a",
+      edits: "c",
+    });
+  });
+
+  test("adds no edits key to a line that corrects none", () => {
+    expect(Object.keys(lineOf(said("b", T0, "x"), "#bubble") ?? {})).not.toContain("edits");
+  });
+
+  test.each([
+    ["nothing", ""],
+    ["a space", String.raw`a\sb`],
+    ["a semicolon", String.raw`a\:b`],
+    ["a backslash", String.raw`a\\b`],
+    ["a comma", "a,b"],
+    ["a leading colon", ":a"],
+    ["65 characters", "a".repeat(65)],
+  ])("takes no edit of a value holding %s", (_, value) => {
+    const correcting = lineOf(tagged(`+gnoworld/edit=${value}`), "#bubble");
+    expect(correcting).toBeDefined();
+    expect(Object.keys(correcting ?? {})).not.toContain("edits");
+  });
+
+  test("keeps a msgid of 64 characters", () => {
+    expect(lineOf(tagged(`+gnoworld/edit=${"a".repeat(64)}`), "#bubble")?.edits).toBe("a".repeat(64));
+  });
+});
