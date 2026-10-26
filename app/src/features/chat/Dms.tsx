@@ -32,9 +32,10 @@ function partnerOf(account: string | undefined, asked: string | null): string | 
   return Address.safeParse(asked).success ? asked : undefined;
 }
 
-// The navigation's list: every conversation heard, and the one in view though none was yet.
-const listOf = (heard: readonly string[], partner: string | undefined): string[] =>
-  partner === undefined || heard.includes(partner) ? [...heard] : [...heard, partner];
+/** The navigation's list: every conversation heard, `heard` oldest first, listed heard last first; and the one in view
+ * first though none was yet. */
+export const listOf = (heard: readonly string[], partner: string | undefined): string[] =>
+  partner === undefined || heard.includes(partner) ? heard.toReversed() : [partner, ...heard.toReversed()];
 
 /** An account's direct messages on a world's page, `asked` the address's ?dm=. */
 export function useDms(world: string, session: AppState["login"]["session"], asked: string | null): Dms {

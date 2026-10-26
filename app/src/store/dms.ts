@@ -25,7 +25,8 @@ export interface DmDevice {
 }
 
 export interface DmSlice {
-  /** Direct messages by the account they are with, each its newest lines (the store's window). */
+  /** Direct messages by the account they are with, each its newest lines (the store's window), the conversation
+   * heard last last. */
   dms: Readonly<Record<string, readonly Line[]>>;
   /** The session's account's choices: a guest's, or one with no device, hear everyone. */
   dmChoices: DmChoices;
@@ -49,6 +50,9 @@ export interface DmSlice {
 
 const NO_CHOICE: DmChoices = { onlyKnown: false, known: new Set() };
 
+/** The conversations kept at most, those heard last: a room's bound (max-channels-per-client). */
+export const DMS_KEPT = 100;
+
 /** Whether the account hears from `partner` as it chose: from everyone, or from those it wrote to alone. */
 export const heardFrom = ({ onlyKnown, known }: DmChoices, partner: string): boolean =>
   !onlyKnown || known.has(partner);
@@ -71,9 +75,11 @@ export const dmSlice: StateCreator<ChatSlice & DmSlice, [], [], DmSlice> = (set,
         if (dm.partner !== dm.line.from) get().dmActions.know(dm.partner);
         // Refused means discarded (decision B): a stranger's line, while the account hears those it wrote to alone.
         if (!heardFrom(get().dmChoices, dm.partner)) return;
-        const held = dms[dm.partner] ?? [];
+        const { [dm.partner]: held = [], ...others } = dms;
         const lines = addLines(held, [dm.line], LINES_KEPT);
-        if (lines !== held) set({ dms: { ...dms, [dm.partner]: lines } });
+        if (lines === held) return;
+        // Heard last goes last; the oldest heard goes first past the bound.
+        set({ dms: { ...Object.fromEntries(Object.entries(others).slice(1 - DMS_KEPT)), [dm.partner]: lines } });
       },
       begin: (next) => {
         device = next;

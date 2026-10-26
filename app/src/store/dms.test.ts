@@ -1,7 +1,9 @@
 import { parseLine, type IrcMessage } from "@gnoworld/core";
 import { describe, expect, it } from "vitest";
 import type { DmPrefs } from "../lib/dms/prefs.ts";
-import { heardFrom } from "./dms.ts";
+import { DMS_KEPT, heardFrom } from "./dms.ts";
+import { LINES_KEPT } from "./chat.ts";
+import { toAddress } from "@gnoworld/schemas";
 import { createAppStore } from "./index.ts";
 
 const T0 = "2026-10-25T10:00:00.000Z";
@@ -209,6 +211,23 @@ describe("the store's chat slice: direct messages", () => {
     t.heard(dm("a", { from: ACCOUNT, to: ALICE, text: "hello" }));
     t.heard(dm("b", { from: ALICE, to: ACCOUNT, text: "hi", second: 1 }));
     expect(t.dms()[ALICE]?.map(({ id }) => id)).toEqual(["a", "b"]);
+  });
+
+  // 4e's complexity review (2-3), efficiency review (6) and test audit (T4): conversations were kept without end, a
+  // spammer with an account a message growing the store and the navigation.
+  it(`keeps the ${String(DMS_KEPT)} conversations heard last, the oldest heard going first, each its newest ${String(LINES_KEPT)} lines`, () => {
+    expect(DMS_KEPT).toBe(100);
+    const t = as(ACCOUNT);
+    const partners = Array.from({ length: DMS_KEPT + 1 }, (_, n) => toAddress(new Uint8Array(20).fill(n + 1)));
+    const [first = "", second = "", ...rest] = partners;
+    t.heard(dm("a", { from: first, to: ACCOUNT, text: "hi" }));
+    t.heard(dm("b", { from: second, to: ACCOUNT, text: "hi" }));
+    for (const [n, partner] of rest.entries()) t.heard(dm(`c${String(n)}`, { from: partner, to: ACCOUNT, text: "hi" }));
+    t.heard(dm("d", { from: first, to: ACCOUNT, text: "again", second: 1 }));
+    expect(Object.keys(t.dms())).toEqual([...rest, first]);
+    for (let n = 0; n <= LINES_KEPT; n += 1)
+      t.heard(dm(`e${String(n)}`, { from: first, to: ACCOUNT, text: "x", second: n + 2 }));
+    expect(t.dms()[first]).toHaveLength(LINES_KEPT);
   });
 
   it.each([
