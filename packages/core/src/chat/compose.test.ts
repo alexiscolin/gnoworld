@@ -74,8 +74,10 @@ describe("compose", () => {
     expect(compose(ROOM, draft, NICK)).toStrictEqual({ kind: "unknown", command });
   });
 
-  test("reads each control character as a space: IRC's line holds no break, and a draft forges no CTCP", () => {
-    expect(compose(ROOM, "a\nb\r\nc\u0000d\re\tf", NICK)).toStrictEqual(sent("PRIVMSG #bubble/games :a b  c d e f"));
+  test("reads each control character but a line break as a space: a draft forges no CTCP", () => {
+    expect(compose(ROOM, "a\u000bb\u000cc\u0000d\u001be\tf", NICK)).toStrictEqual(
+      sent("PRIVMSG #bubble/games :a b c d e f"),
+    );
     expect(compose(ROOM, "\u0001VERSION\u0001", NICK)).toStrictEqual(sent("PRIVMSG #bubble/games :VERSION"));
     expect(compose(ROOM, "/me \u0001x", NICK)).toStrictEqual(sent("PRIVMSG #bubble/games :\u0001ACTION x\u0001"));
     expect(compose(ROOM, "a\u007fb\u0085c\u009bd", NICK)).toStrictEqual(sent("PRIVMSG #bubble/games :a b c d"));

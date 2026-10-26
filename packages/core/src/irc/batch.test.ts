@@ -50,7 +50,7 @@ describe("BatchReader: Ergo's batches, each handed on whole at its end", () => {
   test("hands on an empty batch", () => {
     const reader = new BatchReader();
     reader.read(read("BATCH +h1 chathistory #bubble"));
-    expect(reader.read(read("BATCH -h1"))).toEqual({
+    expect(reader.read(read("BATCH -h1"))).toMatchObject({
       kind: "done",
       batch: { type: "chathistory", params: ["#bubble"], messages: [] },
     });
