@@ -337,6 +337,8 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "an origin of * taken" "Ergo starts with ORIGINS [*]" render_sh sed "s#'https?://\[A-Za-z0-9.-\]+(:\[0-9\]{1,5})?'#'.+'#"
 	mutant "rooms without +M by default" "in a room Ergo made with its default modes" template sed 's#default-modes: .*#default-modes: +nt#'
 	mutant "anyone makes a room" "a guest makes no room" template sed 's#operator-only-creation: true#operator-only-creation: false#'
+	mutant "guests' DMs let in, +R gone from the user modes" "Ergo's settings set +i and +R at each connection" \
+		template sed 's#default-user-modes: +iR#default-user-modes: +i#'
 	mutant "registration open" "a hand-made account is refused" \
 		template awk '/^  registration:/ { r = 1 } r && /enabled: false/ { sub(/false/, "true"); r = 0 } { print }'
 	mutant "a short oper password taken" "Ergo starts with a short oper password" render_sh sed '/32 characters or more/d'
@@ -693,7 +695,7 @@ print("%.2f %d" % (sum(float(s.get("cpus", 0)) for s in services), sum(size(s.ge
 	docker exec "$ergo" cat /tmp/ircd.yaml >"$tmp/ircd.yaml"
 	for line in "name: \"$SERVER_NAME\"" '":6667": {}' '":8097":' "proxy-allowed-from: [\"$WEB_ADDRESS\"]" \
 		"allowed-origins: [\"$ORIGINS\"]" 'login-via-pass-command: false' 'operator-only-creation: true' \
-		'default-modes: +ntCMi' 'expire-time: 90d' 'direct-messages: disabled' 'default-user-modes: +i' \
+		'default-modes: +ntCMi' 'expire-time: 90d' 'direct-messages: disabled' \
 		'allow-truncation: false' 'max-concurrent-connections: 16' 'max-connections-per-window: 32' \
 		'netname: gnoworld' 'messages-per-window: 2' 'max-attempts: 3' '"+draft/unreact"' \
 		'capabilities: [sajoin, samode, chanreg, history, nofakelag]' \
@@ -701,6 +703,8 @@ print("%.2f %d" % (sum(float(s.get("cpus", 0)) for s in services), sum(size(s.ge
 		expect "Ergo's settings say $line" "$(grep -cF -- "$line" "$tmp/ircd.yaml")" 1
 	done
 	expect "Ergo's settings hold 100 channels a client" "$(grep -cE '^ +max-channels-per-client: 100$' "$tmp/ircd.yaml")" 1
+	# The whole line: +i alone holds the words '+i' too (F1091).
+	expect "Ergo's settings set +i and +R at each connection" "$(grep -cE '^ +default-user-modes: \+iR$' "$tmp/ircd.yaml")" 1
 	expect "Ergo's settings close registration" "$(awk '/^  registration:/ { r = 1 } r && /enabled:/ { print $2; exit }' "$tmp/ircd.yaml")" false
 	# Its start refuses an origin list that would let every site in (F422): checked by the service's own render.
 	render() { docker compose -p "$project" $files run --rm --no-deps -e RENDER_ONLY=1 -e ORIGINS="$1" ergo 2>&1; }
