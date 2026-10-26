@@ -463,13 +463,14 @@ describe("history and tags", { timeout: 30_000 }, () => {
     const { e } = await room([]);
     const one = await login(e, "alice");
     await join(one, "#lobby");
-    expect(one.lines().join("\n")).toMatch(/ MARKREAD #lobby \*/);
+    // From the server's own name, no user source, as core's fromServer reads it (the green pass's G8).
+    expect(one.lines().join("\n")).toMatch(/^(@\S+ )?:[^!@\s]+ MARKREAD #lobby \*$/m);
     const id = await say(one, "#lobby", "read me");
     const time = /time=([^;\s]+)/.exec(one.lines().find((l) => l.includes(id)) ?? "")?.[1] ?? "";
     const two = await login(e, "alice");
     await join(two, "#lobby");
     one.send(`MARKREAD #lobby timestamp=${time}`);
-    await one.expect(new RegExp(` MARKREAD #lobby timestamp=${time.replaceAll(".", "\\.")}`));
+    await one.expect(new RegExp(`^(@\\S+ )?:[^!@\\s]+ MARKREAD #lobby timestamp=${time.replaceAll(".", "\\.")}`));
     await two.expect(new RegExp(` MARKREAD #lobby timestamp=${time.replaceAll(".", "\\.")}`));
     one.send("MARKREAD #lobby timestamp=2001-01-01T00:00:00.000Z");
     await one.expect(new RegExp(` MARKREAD #lobby timestamp=${time.replaceAll(".", "\\.")}$`));

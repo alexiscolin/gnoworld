@@ -17,6 +17,7 @@ import {
   tab,
   typingOf,
   typist,
+  visibilityListeners,
 } from "./scriptedRoom.ts";
 
 const ACCOUNT = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
@@ -129,6 +130,18 @@ test.describe("the reading place", () => {
       box.dispatchEvent(new Event("scroll"));
     });
     await expect.poll(() => marks(sent)).toEqual([`MARKREAD ${ROOM} timestamp=2026-10-25T11:00:00.000Z`]);
+  });
+
+  // The green pass (G3): each newest line's look at the tab lets the last one go.
+  test("holds one look at the tab however many lines come", async ({ page }) => {
+    await hiddenTab(page, false);
+    const address = await logIn(page, word("read"));
+    const { sent, ergo } = await room(page, { me: address, read: T(0) });
+    await expect.poll(() => marks(sent)).toEqual([`MARKREAD ${ROOM} timestamp=${T(2)}`]);
+    const held = await visibilityListeners(page);
+    for (const minute of [5, 6, 7]) ergo().send(live(`l${String(minute)}`, T(minute)));
+    await expect(lineOf(page, "l7")).toBeVisible();
+    expect(await visibilityListeners(page)).toBe(held);
   });
 
   test("marks nothing read while the page is hidden, the newest once it shows", async ({ page }) => {

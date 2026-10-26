@@ -1,5 +1,6 @@
 import { lineOf, word } from "./chat.ts";
-import { expect, test } from "./fixtures.ts";
+import type { WebSocketRoute } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { field, live, OTHER, room, ROOM, T, tags, typingOf, typist } from "./scriptedRoom.ts";
 
@@ -7,6 +8,23 @@ import { field, live, OTHER, room, ROOM, T, tags, typingOf, typist } from "./scr
 // a room's lines and told by the account's composer, on a scripted Ergo.
 test.describe("who is typing", () => {
   test.use({ timezoneId: "UTC", locale: "en-GB" });
+
+  // The room opened on the page's clock, paused: each step run by the test.
+  async function paused(page: Page) {
+    await page.clock.install({ time: new Date(T(30)) });
+    const { ergo } = await room(page);
+    await page.clock.pauseAt(new Date(Date.parse(T(30)) + 120_000));
+    return ergo;
+  }
+  // Two typists 4 s apart: both shown, then the second alone once the first's 6 s are past.
+  async function twoTypists(page: Page, ergo: () => WebSocketRoute) {
+    ergo().send(typingOf("active"));
+    await page.clock.runFor(4_000);
+    ergo().send(typingOf("active", OTHER));
+    await expect(page.getByText("g10gh7…3y5tv and g1f6dc…fsksl are typing…")).toBeVisible();
+    await page.clock.runFor(2_500);
+    await expect(page.getByText("g1f6dc…fsksl is typing…")).toBeVisible();
+  }
 
   test("shows who is typing under the lines, and stops at their line", async ({ page }) => {
     const { ergo } = await room(page);
@@ -26,9 +44,7 @@ test.describe("who is typing", () => {
     page.on("console", (message) => {
       if (message.type() === "error") errors.push(message.text());
     });
-    await page.clock.install({ time: new Date(T(30)) });
-    const { ergo } = await room(page);
-    await page.clock.pauseAt(new Date(Date.parse(T(30)) + 120_000));
+    const ergo = await paused(page);
     ergo().send(typingOf("active"));
     await expect(typist(page)).toBeVisible();
     await page.clock.runFor(4_000);
@@ -37,16 +53,18 @@ test.describe("who is typing", () => {
     await expect(typist(page)).toBeVisible();
     await page.clock.runFor(2_500);
     await expect(typist(page)).toHaveCount(0);
-    ergo().send(typingOf("active"));
-    await page.clock.runFor(4_000);
-    ergo().send(typingOf("active", OTHER));
-    await expect(page.getByText("g10gh7…3y5tv and g1f6dc…fsksl are typing…")).toBeVisible();
-    await page.clock.runFor(2_500);
-    await expect(page.getByText("g1f6dc…fsksl is typing…")).toBeVisible();
+    await twoTypists(page, ergo);
     await page.keyboard.press("Alt+ArrowDown");
     await expect(page.getByRole("heading", { name: "#bubble", level: 2 })).toBeVisible();
     await page.clock.runFor(30_000);
     expect(errors).toEqual([]);
+  });
+
+  // The green pass (G2): the second typist's end is told too, the first's time past, the room left open.
+  test("shows no one typing once the second of two typists' times is past as well", async ({ page }) => {
+    await twoTypists(page, await paused(page));
+    await page.clock.runFor(4_000);
+    await expect(typist(page)).toHaveCount(0);
   });
 
   test("stops showing a typist at its done", async ({ page }) => {

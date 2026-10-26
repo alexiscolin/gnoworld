@@ -67,6 +67,32 @@ export const hiddenTab = (page: Page, hidden: boolean) =>
         document.dispatchEvent(new Event("visibilitychange"));
       });
     }
+    // The page's visibilitychange listeners, counted as they come and go (the green pass's G3).
+    const listeners = new Set<unknown>();
+    const add = EventTarget.prototype.addEventListener.bind(document);
+    const remove = EventTarget.prototype.removeEventListener.bind(document);
+    Object.assign(document, {
+      addEventListener(
+        type: string,
+        listener: EventListenerOrEventListenerObject | null,
+        options?: AddEventListenerOptions,
+      ) {
+        if (type === "visibilitychange") listeners.add(listener);
+        add(type, listener, options);
+      },
+      removeEventListener(
+        type: string,
+        listener: EventListenerOrEventListenerObject | null,
+        options?: EventListenerOptions,
+      ) {
+        if (type === "visibilitychange") listeners.delete(listener);
+        remove(type, listener, options);
+      },
+    });
+    Object.defineProperty(window, "visibilityListeners", { get: () => listeners.size });
   }, hidden);
+/** How many visibilitychange listeners the page holds, under hiddenTab. */
+export const visibilityListeners = (page: Page) =>
+  page.evaluate(() => Number(Reflect.get(window, "visibilityListeners")));
 export const tab = (page: Page, word: "show" | "hide") =>
   page.evaluate((name) => document.dispatchEvent(new Event(name)), `test:${word}`);
