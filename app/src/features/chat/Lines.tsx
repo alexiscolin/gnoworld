@@ -67,7 +67,11 @@ function LineView({ line, me, members, stop, actions, fresh }: LineViewProps) {
       data-new={fresh ? "" : undefined}
       tabIndex={stop ? 0 : -1}
     >
-      {fresh ? <span className={styles["fresh"]}>New </span> : null}
+      {fresh ? (
+        <span className={styles["fresh"]}>
+          New<span className="visually-hidden"> from here</span>{" "}
+        </span>
+      ) : null}
       {/* The line's marks first, before the time: where no sender's words stand (F808). */}
       {mentioned ? <span className={styles["mentionsYou"]}>Mentions you </span> : null}
       {line.kind === "notice" ? <span className={styles["mark"]}>Notice </span> : null}
@@ -85,16 +89,27 @@ function LineView({ line, me, members, stop, actions, fresh }: LineViewProps) {
 // How near the end, in pixels, the reader still reads the newest line.
 const AT_END = 32;
 
-// The lines held at their newest while the reader is there; once scrolled up, left where the reader is.
-function useNewestInView(lines: readonly Line[]) {
+// Whether a list is scrolled to its end, or within AT_END of it.
+const atEnd = (box: HTMLElement) => box.scrollHeight - box.scrollTop - box.clientHeight < AT_END;
+
+// The lines held at their newest while the reader is there; once scrolled up, left where the reader is. A room with
+// news opens on its New line, `fresh`, once (UX review's U1), and the reader is at the end only if that shows it.
+function useNewestInView(lines: readonly Line[], fresh: string | undefined) {
   const listRef = useRef<HTMLOListElement>(null);
   const atEndRef = useRef(true);
+  const placedRef = useRef(false);
   useLayoutEffect(() => {
-    if (listRef.current !== null && atEndRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
-  }, [lines]);
-  const onScroll = () => {
     const box = listRef.current;
-    if (box !== null) atEndRef.current = box.scrollHeight - box.scrollTop - box.clientHeight < AT_END;
+    if (box === null) return;
+    const item = fresh === undefined || placedRef.current ? null : box.querySelector(":scope > li[data-new]");
+    if (item !== null) {
+      placedRef.current = true;
+      box.scrollTop += item.getBoundingClientRect().top - box.getBoundingClientRect().top;
+      atEndRef.current = atEnd(box);
+    } else if (atEndRef.current) box.scrollTop = box.scrollHeight;
+  }, [lines, fresh]);
+  const onScroll = () => {
+    if (listRef.current !== null) atEndRef.current = atEnd(listRef.current);
   };
   return { listRef, atEndRef, onScroll };
 }
@@ -153,10 +168,10 @@ export function Lines({
   paged = false,
   onRead,
 }: LinesProps) {
-  const { listRef, atEndRef, onScroll } = useNewestInView(lines);
   const fresh = useNewMark(lines, paged ? read : undefined, me);
+  const { listRef, atEndRef, onScroll } = useNewestInView(lines, fresh);
   const look = useReadAtEnd(lines, atEndRef, paged ? onRead : undefined);
-  const { stop, mounted, on, leave } = useLineFocus(lines, listRef);
+  const { stop, mounted, on, leave } = useLineFocus(lines, listRef, fresh);
   const { said, setSaid, copy } = useCopy(room);
   // Who a mention may shorten (F812): the members, and the authors in view by their account tag, who proved their
   // key as a member did (F819).

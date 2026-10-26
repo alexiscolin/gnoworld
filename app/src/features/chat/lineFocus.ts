@@ -27,13 +27,15 @@ function moveAmong(event: KeyboardEvent<HTMLOListElement>) {
   if (to instanceof HTMLElement) to.focus();
 }
 
-/** The list's one tab stop, the line last focused while it is there, else the newest; the lines whose bars are
+/** The list's one tab stop, the line last focused while it is there, else the one marked New (`fresh`, the keyboard's
+ * way to the first news), else the newest; the lines whose bars are
  * mounted; the focus handed to a neighbour when a line goes. */
-export function useLineFocus(lines: readonly Line[], listRef: RefObject<HTMLOListElement | null>) {
+export function useLineFocus(lines: readonly Line[], listRef: RefObject<HTMLOListElement | null>, fresh?: string) {
   const [chosen, setChosen] = useState<string>();
   const [focused, setFocused] = useState<string>();
   const [pointed, setPointed] = useState<string>();
-  const stop = lines.some((line) => line.id === chosen) ? chosen : lines.at(-1)?.id;
+  const has = (id: string | undefined) => lines.some((line) => line.id === id);
+  const stop = has(chosen) ? chosen : has(fresh) ? fresh : lines.at(-1)?.id;
   // A focused line's bar, taller than a line, comes into the list's view as the focus comes to it: never as a line
   // arrives (/code-review) or under the pointer.
   useEffect(() => {

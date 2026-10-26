@@ -194,6 +194,27 @@ test.describe("the reading place", () => {
     await expect.poll(() => marks(sent)).toEqual([`MARKREAD ${ROOM} timestamp=2026-10-25T11:00:00.000Z`]);
   });
 
+  // The UX review (U1, U7): a room with news opens on its first, and is read only as the reader reaches its end.
+  test("opens a long backlog on its New line, and marks it read only once the reader scrolls to the end", async ({
+    page,
+  }) => {
+    const address = await logIn(page, word("read"));
+    const history = Array.from({ length: 60 }, (_, n): HistoryLine => [`h${String(n)}`, T(n), `Line ${String(n)}`]);
+    const { sent } = await room(page, { me: address, history, read: T(10) });
+    const fresh = page.locator("[data-new]");
+    await expect(fresh).toContainText("Line 11");
+    await expect(fresh).toBeInViewport();
+    await expect(lineOf(page, "Line 59")).not.toBeInViewport();
+    // A word for a screen reader, and the first new line the list's tab stop: the keyboard's way to it.
+    await expect(fresh).toContainText("New from here");
+    await expect(fresh).toHaveAttribute("tabindex", "0");
+    expect(marks(await sentBefore(page, sent))).toEqual([]);
+    await page.getByRole("list", { name: "Messages" }).evaluate((box) => {
+      box.scrollTop = box.scrollHeight;
+    });
+    await expect.poll(() => marks(sent)).toEqual([`MARKREAD ${ROOM} timestamp=${T(59)}`]);
+  });
+
   // The green pass (G3): each newest line's look at the tab lets the last one go.
   test("holds one look at the tab however many lines come", async ({ page }) => {
     await hiddenTab(page, false);
