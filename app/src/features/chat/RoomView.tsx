@@ -4,13 +4,14 @@
 // (4d); the composer, given, goes below.
 // A line's author is its account tag alone, a nick being only a nick; a member's nick is an account's when it is
 // an address, which a guest's cannot be (Ergo gives a guest 32 characters, server/src/testing/ergo.test.ts:314).
-import { markdown, mentions, type Block, type Line } from "@gnoworld/core";
+import type { Line } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
 import { Sidebar, Stack } from "@gnoworld/ui";
-import { useLayoutEffect, useRef, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { ErgoState } from "../../lib/ergo/ergo.ts";
-import { Markdown } from "./Message.tsx";
-import { roomLabel, shortAddress } from "./names.ts";
+import { Lines } from "./Lines.tsx";
+import { roomLabel } from "./names.ts";
+import { Person } from "./Person.tsx";
 import shared from "./lists.module.css";
 import styles from "./RoomView.module.css";
 
@@ -25,14 +26,6 @@ const NOTICES: Record<Exclude<ErgoState | "off", "connected">, string> = {
   waiting: "The chat is out of reach. Trying again…",
   stopped: "The chat is off.",
 };
-// A line's look by its kind: a message plain, a notice and an /me apart.
-const KINDS: Record<Line["kind"], string | undefined> = {
-  message: undefined,
-  notice: styles["notice"],
-  action: styles["action"],
-};
-const LINES = [shared["plain"], shared["scrolls"], styles["lines"]].join(" ");
-const CLOCK = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 
 export interface RoomViewProps {
   room: string;
@@ -42,53 +35,6 @@ export interface RoomViewProps {
   composer?: ReactNode;
   /** The reader's address, the lines that mention it marked; none for a guest. */
   me?: string | undefined;
-}
-
-// A person: a guest by its nick, said so; an account's address shortened, its whole in its title; another name
-// whole (the moderation bot's).
-function Person({ name, guest }: { name: string; guest: boolean }) {
-  if (guest) return <span>{name} (guest)</span>;
-  return Address.safeParse(name).success ? <span title={name}>{shortAddress(name)}</span> : <span>{name}</span>;
-}
-
-// A line's mentions, space-separated, read apart from its drawing so the compiler keeps the drawing's tree out of
-// what a change of members recomputes.
-const namesOf = (text: string): string => mentions(markdown(text)).join(" ");
-
-// The addresses of `names` (a line's mentions, space-separated) that are members, as one string.
-const knownOf = (names: string, members: ReadonlySet<string>): string =>
-  names
-    .split(" ")
-    .filter((address) => members.has(address))
-    .join(" ");
-
-// A line's text drawn, its mentions of `known` (space-separated) shortened. A component of its own, with a string the
-// compiler compares by value: the line keeps its drawing while others join and leave (F812's cost).
-function LineText({ blocks, me, known }: { blocks: readonly Block[]; me: string | undefined; known: string }) {
-  return <Markdown blocks={blocks} className={styles["text"]} me={me} members={new Set(known.split(" "))} />;
-}
-
-// A line, read once: drawn, and asked whether it mentions the reader, which a word says as well as its colour; a
-// mention shortened for the reader and the room's members alone (F812). A change of members reads its mentions
-// again, never its drawing.
-function LineView({ line, me, members }: { line: Line; me: string | undefined; members: ReadonlySet<string> }) {
-  const blocks = markdown(line.text);
-  const names = namesOf(line.text);
-  const mentioned = names.split(" ").some((address) => address === me);
-  const known = knownOf(names, members);
-  return (
-    <li className={KINDS[line.kind]} data-about-me={mentioned ? "" : undefined}>
-      {/* The line's marks first, before the time: where no sender's words stand (F808). */}
-      {mentioned ? <span className={styles["mentionsYou"]}>Mentions you </span> : null}
-      {line.kind === "notice" ? <span className={styles["mark"]}>Notice </span> : null}
-      <time dateTime={line.time} className={styles["time"]}>
-        {CLOCK.format(new Date(line.time))}
-      </time>{" "}
-      {line.kind === "action" ? "* " : null}
-      <Person name={line.account ?? line.from} guest={line.account === undefined} />{" "}
-      <LineText blocks={blocks} me={me} known={known} />
-    </li>
-  );
 }
 
 // Who is here: counted once connected, the bot left out, the first MEMBERS_SHOWN named.
@@ -109,30 +55,9 @@ function People({ members, connected }: { members: readonly string[]; connected:
   );
 }
 
-// How near the end, in pixels, the reader still reads the newest line.
-const AT_END = 32;
-
-// The lines held at their newest while the reader is there; once scrolled up, left where the reader is.
-function useNewestInView(lines: readonly Line[]) {
-  const listRef = useRef<HTMLOListElement>(null);
-  const atEndRef = useRef(true);
-  useLayoutEffect(() => {
-    if (listRef.current !== null && atEndRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
-  }, [lines]);
-  const onScroll = () => {
-    const box = listRef.current;
-    if (box !== null) atEndRef.current = box.scrollHeight - box.scrollTop - box.clientHeight < AT_END;
-  };
-  return { listRef, onScroll };
-}
-
 export function RoomView({ room, state, chat, composer, me }: RoomViewProps) {
   const { lines = [], members = [], topic } = state ?? {};
-  const { listRef, onScroll } = useNewestInView(lines);
   const connected = chat === "connected";
-  // Who a mention may shorten (F812): the members, and the authors in view by their account tag, who proved their
-  // key as a member did (F819).
-  const known = new Set([...members, ...lines.flatMap(({ account }) => (account === undefined ? [] : [account]))]);
   return (
     <Stack as="section" space="s">
       <header>
@@ -144,19 +69,7 @@ export function RoomView({ room, state, chat, composer, me }: RoomViewProps) {
       </p>
       <Sidebar side="end" space="m">
         <div>
-          <ol
-            ref={listRef}
-            onScroll={onScroll}
-            aria-label="Messages"
-            aria-live="polite"
-            aria-relevant="additions"
-            className={LINES}
-            tabIndex={0}
-          >
-            {lines.map((line) => (
-              <LineView key={line.id} line={line} me={me} members={known} />
-            ))}
-          </ol>
+          <Lines lines={lines} members={members} me={me} />
           {connected && lines.length === 0 ? <p>No messages yet.</p> : null}
           {composer}
         </div>
