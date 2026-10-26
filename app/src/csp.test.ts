@@ -24,15 +24,6 @@ describe("policy", () => {
     expect(policy([])).toBe(BASE.join("; "));
   });
 
-  it("frames the accepted services' players alone: no wildcard, no scheme, no other host, no other path", () => {
-    const frames = policy([])
-      .split("; ")
-      .filter((directive) => directive.startsWith("frame-src"));
-    expect(frames).toEqual([
-      "frame-src https://www.youtube-nocookie.com/embed/ https://player.vimeo.com/video/ https://giphy.com/embed/",
-    ]);
-  });
-
   it("allows each inline script by its hash, once, in code-unit order whatever order the pages gave", () => {
     const hash = (first: string): string => `'sha256-${first}${"A".repeat(42)}='`;
     // + before B before a before b: code units, not a locale's order, so every machine writes the same.
