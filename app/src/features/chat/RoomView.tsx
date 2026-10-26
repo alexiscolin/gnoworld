@@ -46,6 +46,8 @@ export interface RoomViewProps {
   label?: string | undefined;
   /** Opens a direct message with another account here, offered to an account (4e). */
   onMessage?: ((partner: string) => void) | undefined;
+  /** Whether it says who is here: a room does, a conversation, of two, does not (4e). */
+  people?: boolean | undefined;
 }
 
 // A person: a guest by its nick, said so; an account's address shortened, its whole in its title; another name
@@ -164,7 +166,7 @@ function Header({ title, topic }: { title: string; topic: string | undefined }) 
   );
 }
 
-export function RoomView({ room, state, chat, composer, me, label, onMessage }: RoomViewProps) {
+export function RoomView({ room, state, chat, composer, me, label, onMessage, people = true }: RoomViewProps) {
   const { lines = [], members = [], topic } = state ?? {};
   const { listRef, onScroll } = useNewestInView(lines);
   const connected = chat === "connected";
@@ -195,7 +197,7 @@ export function RoomView({ room, state, chat, composer, me, label, onMessage }: 
           {connected && lines.length === 0 ? <p>No messages yet.</p> : null}
           {composer}
         </div>
-        <People members={members} connected={connected} me={me} onMessage={onMessage} />
+        {people ? <People members={members} connected={connected} me={me} onMessage={onMessage} /> : null}
       </Sidebar>
     </Stack>
   );

@@ -300,6 +300,13 @@ describe("RoomView", () => {
     expect(html).toMatch(/<h2[^>]*>g10gh7…3y5tv<\/h2>\s*<p[^>]*>Not encrypted: the server can read these.<\/p>/);
   });
 
+  // 4e's own review: a conversation has its two people, never a room's "who is here".
+  it("leaves who is here out of a conversation", () => {
+    const html = view({ room: ALICE, label: "g10gh7…3y5tv", people: false });
+    expect(html).not.toContain("Who&#x27;s here");
+    expect(said(html)).not.toMatch(/\d+ here/);
+  });
+
   it("leaves the moderation bot out of who is here, and out of the count", () => {
     const html = part(view({ state: { ...ROOM, members: ["gnoworld", ALICE] } }), "Who's here");
     expect(said(html)).toContain("1 here");
