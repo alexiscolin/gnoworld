@@ -69,6 +69,7 @@ Alexis, 2026-10-23: slice 3's reviews found these; none bites today, each comes 
 | Item | Delivers | Why |
 |---|---|---|
 | Imgur's player | Imgur's links open its own player on a click once checked, as YouTube's, Vimeo's and Giphy's do (4g); `frame-src` gains its host | Its embed form could not be read on 2026-10-26, its pages refusing crawlers; a form read from its documentation first (Alexis, 2026-10-26) |
+| The verdict's pill and the "why" | A pill by a link's player naming its verdict, and on a hidden message a "why" button with the reason and a way to contest, as the decision of 2026-10-21 ("Verdicts reach clients two ways") names | Not built in 4g; it goes with slice 12's moderation queue, which holds the reasons (Alexis, 2026-10-26, F882) |
 | The gallery and the lightbox | A message's pictures from the accepted services seen together, and one large over the page, as ADR-0002's "Photos and videos, gallery and lightbox" row names | Beyond 4g's players; pictures need `img-src` for the services' hosts, a CSP change of its own (Alexis, 2026-10-26) |
 
 ## The design system, after slice 2
