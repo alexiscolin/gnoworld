@@ -84,7 +84,7 @@ describe("the store's chat slice: direct messages", () => {
   });
 
   // A device's choices for the account, each read and write counted.
-  function prefs({ onlyKnown = false, known = [] as string[], unreadable = false } = {}) {
+  function prefs({ onlyKnown = false, known = [] as string[], unreadable = false, refusing = false } = {}) {
     const calls = { onlyKnown: 0, known: 0, setOnlyKnown: [] as boolean[], setKnown: [] as string[][] };
     const device: DmPrefs = {
       onlyKnown: () => {
@@ -93,7 +93,7 @@ describe("the store's chat slice: direct messages", () => {
       },
       setOnlyKnown: (only) => {
         calls.setOnlyKnown.push(only);
-        return true;
+        return !refusing;
       },
       known: () => {
         calls.known += 1;
@@ -101,7 +101,7 @@ describe("the store's chat slice: direct messages", () => {
       },
       setKnown: (partners) => {
         calls.setKnown.push([...partners]);
-        return true;
+        return !refusing;
       },
     };
     return { device, calls };
@@ -186,6 +186,34 @@ describe("the store's chat slice: direct messages", () => {
     expect(calls.setKnown.at(-1)).toEqual(many.slice(1));
     expect(t.store.getState().dmChoices.known.size).toBe(KNOWN_KEPT);
     expect(t.store.getState().dmChoices.known.has(many[0] ?? "")).toBe(false);
+  });
+
+  // /code-review on 4e (CR5): a device that refused a write said so to nobody, though DmPrefs answers whether it kept it.
+  it("says the choices are not kept on a device that refused one, or that it could not read, until a new session", () => {
+    const kept = as(ACCOUNT);
+    kept.store.getState().dmActions.begin({ prefs: prefs().device, drafts: NO_DRAFTS });
+    kept.store.getState().dmActions.setOnlyKnown(true);
+    kept.store.getState().dmActions.know(ALICE);
+    expect(kept.store.getState().dmNotKept).toBe(false);
+    for (const refused of [
+      (t: ReturnType<typeof as>) => {
+        t.store.getState().dmActions.setOnlyKnown(true);
+      },
+      (t: ReturnType<typeof as>) => {
+        t.store.getState().dmActions.know(ALICE);
+      },
+    ]) {
+      const t = as(ACCOUNT);
+      t.store.getState().dmActions.begin({ prefs: prefs({ refusing: true }).device, drafts: NO_DRAFTS });
+      expect(t.store.getState().dmNotKept).toBe(false);
+      refused(t);
+      expect(t.store.getState().dmNotKept).toBe(true);
+      t.store.getState().dmActions.begin({ prefs: prefs().device, drafts: NO_DRAFTS });
+      expect(t.store.getState().dmNotKept).toBe(false);
+    }
+    const unread = as(ACCOUNT);
+    unread.store.getState().dmActions.begin({ prefs: prefs({ unreadable: true }).device, drafts: NO_DRAFTS });
+    expect(unread.store.getState().dmNotKept).toBe(true);
   });
 
   // /code-review on 4e (CR4): a device that could not be read is never written over.

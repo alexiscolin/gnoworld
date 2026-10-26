@@ -98,6 +98,7 @@ describe("RoomsView: direct messages", () => {
     current: undefined,
     onlyKnown: false,
     onOnlyKnown: () => undefined,
+    notKept: false,
     ...over,
   });
 
@@ -123,6 +124,12 @@ describe("RoomsView: direct messages", () => {
       "No direct message yet. Start one in Who's here.",
     );
     expect(view()).not.toContain("Direct messages");
+  });
+
+  // /code-review on 4e (CR5): a device that refused the choices said so to nobody.
+  it("says beside the choice when the device does not keep it, and only then", () => {
+    expect(said(view({ dms: dms({ notKept: true }) }))).toContain("Only people I wrote to Not kept on this device");
+    expect(view({ dms: dms() })).not.toContain("Not kept on this device");
   });
 
   it("offers to hear from those the account talked with alone, a pressed toggle", () => {

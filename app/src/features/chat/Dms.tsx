@@ -66,6 +66,7 @@ export function useDms(world: string, session: AppState["login"]["session"], ask
   const all = useApp((app) => app.dms);
   const choices = useApp((app) => app.dmChoices);
   const refusals = useApp((app) => app.dmRefused);
+  const notKept = useApp((app) => app.dmNotKept);
   const { setOnlyKnown } = useApp((app) => app.dmActions);
   const account = session.kind === "in" ? session.address : undefined;
   const partner = partnerOf(account, asked);
@@ -81,6 +82,7 @@ export function useDms(world: string, session: AppState["login"]["session"], ask
             current: partner,
             onlyKnown: choices.onlyKnown,
             onOnlyKnown: setOnlyKnown,
+            notKept,
           },
     ...conversationOf(all, choices, partner),
     refused: partner === undefined ? undefined : refusals[partner],

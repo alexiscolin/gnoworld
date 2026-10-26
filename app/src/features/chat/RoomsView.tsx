@@ -23,9 +23,11 @@ export interface DmsProps {
   /** Whether it hears from those it wrote to alone. */
   onlyKnown: boolean;
   onOnlyKnown: (only: boolean) => void;
+  /** Whether the device failed to keep that choice and those written to (CR5). */
+  notKept?: boolean | undefined;
 }
 
-function Dms({ world, partners, current, onlyKnown, onOnlyKnown }: DmsProps) {
+function Dms({ world, partners, current, onlyKnown, onOnlyKnown, notKept }: DmsProps) {
   return (
     <Stack space="2xs" as="section">
       <h2 className={styles["section"]}>Direct messages</h2>
@@ -59,6 +61,7 @@ function Dms({ world, partners, current, onlyKnown, onOnlyKnown }: DmsProps) {
       >
         Only people I wrote to
       </Chip>
+      {notKept === true ? <p>Not kept on this device</p> : null}
     </Stack>
   );
 }

@@ -33,6 +33,8 @@ export interface DmSlice {
   /** The lines Ergo refused this session, by partner: how many, the last one's draft, which the composer takes
    * back, and `offline: false` when Ergo refused that one for another reason than its partner not connected. */
   dmRefused: Readonly<Record<string, { count: number; draft: string; offline?: false }>>;
+  /** Whether the session's device failed to keep the choices: it refused a write, or could not be read (CR5). */
+  dmNotKept: boolean;
   dmActions: {
     /** One live line from Ergo: a direct message is kept with its partner; any other changes nothing. */
     heard: (message: IrcMessage) => void;
@@ -69,6 +71,7 @@ export const dmSlice: StateCreator<ChatSlice & DmSlice, [], [], DmSlice> = (set,
     dms: {},
     dmChoices: NO_CHOICE,
     dmRefused: {},
+    dmNotKept: false,
     dmActions: {
       heard: (message) => {
         const { chat, dms } = get();
@@ -93,22 +96,24 @@ export const dmSlice: StateCreator<ChatSlice & DmSlice, [], [], DmSlice> = (set,
         written = read ?? [];
         writable = read !== undefined;
         const dmChoices = prefs === undefined ? NO_CHOICE : { onlyKnown: prefs.onlyKnown(), known: new Set(written) };
-        const { dms, dmChoices: before, dmRefused } = get();
+        const dmNotKept = prefs !== undefined && !writable;
+        const { dms, dmChoices: before, dmRefused, dmNotKept: was } = get();
         const held = Object.keys(dms).length + Object.keys(dmRefused).length;
-        if (held > 0 || dmChoices !== before) set({ dms: {}, dmChoices, dmRefused: {} });
+        if (held > 0 || dmChoices !== before || dmNotKept !== was)
+          set({ dms: {}, dmChoices, dmRefused: {}, dmNotKept });
       },
       setOnlyKnown: (only) => {
         const { dmChoices } = get();
         if (dmChoices.onlyKnown === only) return;
         set({ dmChoices: { ...dmChoices, onlyKnown: only } });
-        device?.prefs.setOnlyKnown(only);
+        if (device?.prefs.setOnlyKnown(only) === false) set({ dmNotKept: true });
       },
       know: (partner) => {
         if (written.at(-1) === partner) return;
         written = [...written.filter((each) => each !== partner), partner].slice(-KNOWN_KEPT);
         const { dmChoices } = get();
         if (!dmChoices.known.has(partner)) set({ dmChoices: { ...dmChoices, known: new Set(written) } });
-        if (writable) device?.prefs.setKnown(written);
+        if (writable && device?.prefs.setKnown(written) === false) set({ dmNotKept: true });
       },
       refused: (partner, draft, offline = true) => {
         device?.drafts.set(partner, draft);
