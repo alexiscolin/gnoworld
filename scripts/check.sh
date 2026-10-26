@@ -287,6 +287,10 @@ if $full; then
 		run mutate "--concurrency $half"
 	}
 	lane_history() {
+		if $merge; then
+			step batch_size # a merge's own product code is a small batch (DORA; docs/REVIEW.md)
+			python3 -I scripts/batch_size.py "$base"
+		fi
 		step prove_fix # every fix of the product comes with a test that failed before it
 		python3 -I scripts/prove_fix.py "$base"
 		step regressions # no test gone, no floor lower, no approved screenshot changed, unless a commit says why

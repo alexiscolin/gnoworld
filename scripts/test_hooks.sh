@@ -138,7 +138,7 @@ for step in "run format:check" "run typecheck" "run lint" "run test" "run unused
 	"ast.parse(open(f).read(), f) for f in sys.argv[1:]]' scripts/*.py" \
 	"python3 -I ../scripts/mutate.py" "go vet ./tools/..." "go run ./tools/sealvec | cmp" "python3 -I scripts/check_docs.py" \
 	"sh scripts/test_hooks.sh" "python3 -I scripts/probe.py" "run coverage" "python3 -I scripts/patch_coverage.py" "sh scripts/ergo.sh" \
-	"run mutate" "sh scripts/scan_secrets.sh" "python3 -I scripts/harness_mutate.py" "python3 -I scripts/check_regressions.py" "python3 -I scripts/check_migrations.py" "python3 -I scripts/bench.py" \
+	"run mutate" "sh scripts/scan_secrets.sh" "python3 -I scripts/harness_mutate.py" "python3 -I scripts/check_regressions.py" "python3 -I scripts/check_migrations.py" "python3 -I scripts/bench.py" "python3 -I scripts/batch_size.py" \
 	'unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO' '[ "$took" -gt "$budget" ]' "python3 -I scripts/prove_fix.py" "python3 -I scripts/audit.py"; do
 	grep -v '^[[:space:]]*#' "$gate_file" | grep -qF -- "$step" || fail "check.sh no longer runs: $step"
 done
@@ -1490,7 +1490,7 @@ SH
 for tool in go gofmt; do printf '#!/bin/sh\nexec sh "%s" %s "$@"\n' "$step" "$tool" >"$g/bin/$tool"; done
 printf '#!/bin/sh\nexec sh "%s" gno "$@"\n' "$step" >"$g/toolchain/gno"
 chmod +x "$g/bin/go" "$g/bin/gofmt" "$g/toolchain/gno"
-for py in check_css check_docs mutate probe bench patch_coverage prove_fix check_regressions check_migrations audit harness_mutate; do
+for py in check_css check_docs mutate probe bench batch_size patch_coverage prove_fix check_regressions check_migrations audit harness_mutate; do
 	printf 'import os, sys\nos.execvp("sh", ["sh", %s, "py:%s", *sys.argv[1:]])\n' "'$step'" "$py" >"$g/scripts/$py.py"
 done
 for sh in ergo test_hooks scan_secrets; do printf 'exec sh "%s" sh:%s "$@"\n' "$step" "$sh" >"$g/scripts/$sh.sh"; done
@@ -1774,6 +1774,7 @@ half=$(($(node -p "require('os').availableParallelism()") / 2))
 grep -qx "coverage --maxWorkers=$half" "$log" || fail "check.sh --full let Vitest's coverage take the whole machine (F777): $(grep '^coverage' "$log")"
 grep -qx "mutate --concurrency $half" "$log" || fail "check.sh --full let StrykerJS take the whole machine (F777): $(grep '^mutate' "$log")"
 ran py:harness_mutate && fail "check.sh --full mutated a harness main already has"
+ran py:batch_size && fail "check.sh --full measured a merge's batch, which --merge alone does: --full reads a whole slice"
 for s in py:prove_fix py:patch_coverage py:check_regressions py:check_migrations; do
 	grep -q "^$s $base$" "$log" || fail "check.sh --full did not give $s the base $base"
 done
@@ -1831,6 +1832,7 @@ for s in $fast_steps py:probe py:bench stories coverage py:patch_coverage py:pro
 	[ "$s" = test ] || ran "$s" || fail "check.sh --merge skipped $s"
 done
 grep -qx "py:harness_mutate --changed $base" "$log" || fail "check.sh --merge did not judge the merge's own harness mutants: $(grep harness_mutate "$log")"
+grep -qx "py:batch_size $base" "$log" || fail "check.sh --merge did not measure the merge's batch from its base: $(grep batch_size "$log")"
 [ ! -e "$g/.claude/tmp/green-full" ] || fail "check.sh --merge recorded the full gate"
 grep -qxF "$(record)" "$g/.claude/tmp/green-fast" || fail "check.sh --merge did not record the fast gate it passed"
 gate --full >/dev/null || fail "check.sh --full failed after --merge"
@@ -2375,6 +2377,42 @@ assert labels(select(found, set(), {"hooks": None}, sections)) == ["g1", "g2", "
 assert labels(select(found, set(), {}, sections)) == [], "nothing changed"
 assert labels(select(found, set(), {"probe": {"p"}}, sections)) == ["g3"], "a probe block"
 PY
+fi
+
+if part batch_size; then
+# batch_size.py: a merge carries a small batch of product code (DORA; docs/REVIEW.md, about 400 lines with a tier-1
+# file, 600 otherwise): the lines it adds since the newest commit /pre-merge reviewed, or since base. Past 600 it
+# fails unless a commit says why (`Batch-size: <n> - why`); past 400 it says the tier-1 limit. Tests, stories and
+# journeys are not product code.
+bs="$t/batch"
+mkdir -p "$bs/app/src" "$bs/docs" "$bs/server/src"
+git -C "$bs" init -q
+lines() { python3 -I -c 'import sys; print("\n".join(f"export const v{i} = {i};" for i in range(int(sys.argv[1]))))' "$1"; }
+commit() { git -C "$bs" add -A && git -C "$bs" commit -qm "$1"; }
+size() { (cd "$bs" && python3 -I "$here/batch_size.py" "$1" 2>&1); }
+printf '# passes\n' >"$bs/docs/review-passes.txt" && commit "base"
+base=$(git -C "$bs" rev-parse HEAD)
+lines 700 >"$bs/app/src/old.ts" && commit "the last merge's code"
+(cd "$bs" && python3 -I -c 'import sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); from repo_files import fingerprint
+print("2026-10-26", fingerprint("HEAD"), "lenses")' "$here") >>"$bs/docs/review-passes.txt" && commit "its review's record"
+lines 10 >"$bs/app/src/new.ts" && commit "this merge's code"
+out=$(size "$base") || fail "batch_size.py refused 10 lines since the last reviewed commit: $out"
+printf '%s\n' "$out" | grep -q "^batch_size: 10 lines of product code" || fail "batch_size.py counted code before the last reviewed commit: $out"
+lines 700 >"$bs/server/src/a.test.ts" && lines 700 >"$bs/app/src/b.stories.tsx" && mkdir -p "$bs/app/tests" && lines 700 >"$bs/app/tests/c.spec.ts" && lines 700 >"$bs/app/tests/helper.ts" && commit "tests"
+out=$(size "$base") || fail "batch_size.py counted tests, stories or journeys as product code: $out"
+lines 450 >"$bs/server/src/more.ts" && commit "more code"
+out=$(size "$base") || fail "batch_size.py refused 460 lines: $out"
+printf '%s\n' "$out" | grep -q "past 400" || fail "batch_size.py did not say the tier-1 limit past 400: $out"
+lines 200 >"$bs/server/src/much.ts" && commit "too much"
+out=$(size "$base") && fail "batch_size.py passed 660 lines with no reason given"
+printf '%s\n' "$out" | grep -q "660 lines" || fail "batch_size.py did not say how many lines: $out"
+echo x >>"$bs/server/src/much.ts" && git -C "$bs" add -A && git -C "$bs" commit -qm "a reason" -m "Batch-size: 661 - one feature, cut no smaller"
+out=$(size "$base") || fail "batch_size.py refused a merge whose commit says why it is large: $out"
+git -C "$bs" checkout -q -b no-reason HEAD~1 && echo x >>"$bs/server/src/much.ts" && git -C "$bs" add -A && git -C "$bs" commit -qm "no reason" -m "Batch-size: 661 - "
+out=$(size "$base") && fail "batch_size.py took a Batch-size line with no reason"
+# No reviewed commit since base: everything since base counts.
+git -C "$bs" checkout -q -b fresh "$base" && mkdir -p "$bs/app/src" && lines 610 >"$bs/app/src/first.ts" && commit "a first merge"
+out=$(size "$base") && fail "batch_size.py passed 610 lines of a merge with no reviewed commit since base"
 fi
 
 [ -z "${ONLY:-}" ] || [ "${ran:-}" = 1 ] || fail "ONLY=$ONLY names no section"
