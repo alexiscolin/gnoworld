@@ -880,11 +880,14 @@ describe("the chat's link: what it says", () => {
     });
 
     it("tells the room the account is done once, and only after it said it was typing", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
       const t = memberIn(["#bubble/games"]);
       t.link.typing("#bubble/games", "done");
       t.link.typing("#bubble/games", "active");
       t.link.typing("#bubble/games", "done");
       t.link.typing("#bubble/games", "done");
+      // Typed on: a done may wait its turn.
+      vi.advanceTimersByTime(3_000);
       expect(tagged(t.fake.sent)).toEqual([
         "@+typing=active TAGMSG #bubble/games",
         "@+typing=done TAGMSG #bubble/games",
