@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { floating, usePlaced } from "../Popover/floating.ts";
 import styles from "./Tooltip.module.css";
 
@@ -10,6 +10,35 @@ export interface TooltipProps {
 
 // docs/DESIGN-SYSTEM.md, "Tooltip": a moment under the pointer before it shows, none for the keyboard.
 const DELAY = 500;
+
+// The words shown or hidden; false when Chrome refuses it during another popover's toggle.
+function toggled(words: HTMLElement, shown: boolean): boolean {
+  try {
+    words.togglePopover(shown);
+    return true;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "InvalidStateError") return false;
+    throw error;
+  }
+}
+
+// Shown before it is placed: a box out of the top layer has no size to place by. Chrome refuses a show inside another
+// popover's show or hide (a menu closed by Esc hands the focus back to its trigger, this control, in its hide): the
+// words wait for the next frame. The frames waited, which place them again (F832).
+function useToggled(tipRef: RefObject<HTMLSpanElement | null>, shown: boolean): number {
+  const [frames, setFrames] = useState(0);
+  useLayoutEffect(() => {
+    const words = tipRef.current;
+    if (words === null || toggled(words, shown)) return;
+    const later = requestAnimationFrame(() => {
+      setFrames((count) => count + 1);
+    });
+    return () => {
+      cancelAnimationFrame(later);
+    };
+  }, [tipRef, shown, frames]);
+  return frames;
+}
 
 /** An icon-only control's name above it: under the pointer after a moment, at once with the keyboard's
  * focus; it stays while the pointer is on it, and Esc hides it (WCAG 1.4.13). */
@@ -66,11 +95,8 @@ export function Tooltip({ label, children }: TooltipProps) {
       watch.disconnect();
     };
   }, [focused]);
-  // Shown before it is placed: a box out of the top layer has no size to place by.
-  useLayoutEffect(() => {
-    tipRef.current?.togglePopover(shown);
-  }, [shown]);
-  usePlaced(anchorRef, tipRef, { open: shown, side: "above", align: "center" });
+  const frames = useToggled(tipRef, shown);
+  usePlaced(anchorRef, tipRef, { open: shown, side: "above", align: "center", again: frames });
   return (
     <span
       ref={anchorRef}

@@ -79,7 +79,8 @@ describe("Tooltip", () => {
     expect(shown()).toBe("false");
   });
 
-  // F832: a refusal of its words other than Chrome's during another popover's toggle is no state it waits out.
+  // F832: Chrome refuses to show a popover inside another popover's show or hide: a menu closed by Esc hands the focus
+  // back to its trigger, this tooltip's control, during its hide. The words show on the next frame, placed then.
   const refusing = (error: Error) => {
     const words = tip();
     const toggle = words.togglePopover.bind(words);
@@ -91,6 +92,21 @@ describe("Tooltip", () => {
     });
     return () => refused;
   };
+
+  it("shows its words on the next frame when the browser refuses them during another popover's toggle (F832)", () => {
+    draw();
+    const refused = refusing(
+      new DOMException("Invalid to show a popover during another show operation", "InvalidStateError"),
+    );
+    keyboardFocus();
+    expect(refused()).toBe(1);
+    expect(tip().style.display).not.toBe("block");
+    act(() => {
+      vi.advanceTimersToNextFrame();
+    });
+    expect(tip().style.display).toBe("block");
+    vi.restoreAllMocks();
+  });
 
   it("lets any other refusal of its words rise (F832)", () => {
     draw();

@@ -38,11 +38,12 @@ function place(anchor: Element, box: HTMLElement, { side, align }: Placing) {
   box.style.removeProperty("visibility");
 }
 
-/** Keeps an open box placed by its anchor while the page scrolls or the window resizes. */
+/** Keeps an open box placed by its anchor while the page scrolls or the window resizes; placed again whenever
+ * `again` changes, a box shown late among them. */
 export function usePlaced(
   anchor: RefObject<Element | null>,
   box: RefObject<HTMLElement | null>,
-  { open, side, align }: Placing & { open: boolean },
+  { open, side, align, again = 0 }: Placing & { open: boolean; again?: number },
 ) {
   useLayoutEffect(() => {
     if (!open) return;
@@ -56,5 +57,5 @@ export function usePlaced(
     return () => {
       stop.abort();
     };
-  }, [anchor, box, open, side, align]);
+  }, [anchor, box, open, side, align, again]);
 }
