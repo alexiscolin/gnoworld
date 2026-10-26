@@ -74,6 +74,20 @@ test.describe("a link's player", () => {
     expect(away).toEqual([]);
   });
 
+  // Alexis, 2026-10-26: a line older than the stream's replay gets its verdict from GET /api/verdicts, asked for the
+  // lines in view with a player and no verdict, and answered for a room the reader may read.
+  test("asks the server the verdict of a line the stream never told, and plays it once checked", async ({ page }) => {
+    const asked: string[] = [];
+    await page.route("**/api/verdicts?**", (route) => {
+      asked.push(route.request().url());
+      return route.fulfill({ json: { room: "#bubble/games", verdicts: [{ msgid: "v1", state: "checked" }] } });
+    });
+    const { away } = await room(page, () => "");
+    await expect(play(page)).toBeEnabled();
+    expect(asked).toEqual([`${SITE}/api/verdicts?room=%23bubble%2Fgames&ids=v1`]);
+    expect(away).toEqual([]);
+  });
+
   // ADR-0002 §8: Data saver (a 2G link) shows no embed.
   test("shows none to a reader who saves data", async ({ page }) => {
     await page.addInitScript(() => {

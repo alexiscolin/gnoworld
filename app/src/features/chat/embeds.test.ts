@@ -1,6 +1,6 @@
-import { markdown } from "@gnoworld/core";
+import { markdown, type Line } from "@gnoworld/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { embedIn, embedOf, savesData } from "./embeds.ts";
+import { embedIn, embedOf, savesData, unjudged } from "./embeds.ts";
 
 // 4g (docs/decisions.md, 2026-10-26): each service's player as its own documentation gives it (embeds.ts); Imgur's
 // form could not be read, so its links stay links until it is.
@@ -115,5 +115,31 @@ describe("savesData: whether the reader saves data", () => {
   it("reads no navigator, the build's pre-render, as saving nothing", () => {
     vi.stubGlobal("navigator", undefined);
     expect(savesData()).toBe(false);
+  });
+});
+
+// Alexis, 2026-10-26: the page asks the server the verdicts of the lines in view it does not hold, a line older
+// than the stream's replay among them; a line with no player needs none, and one asked is not asked again.
+describe("unjudged: the lines in view whose player waits on a verdict the page does not hold", () => {
+  const line = (id: string, text: string): Line => ({
+    id,
+    time: "2026-10-26T10:00:00.000Z",
+    from: "a",
+    text,
+    kind: "message",
+  });
+
+  it("names each line with a player, no verdict and not asked yet, in the lines' order", () => {
+    const lines = [
+      line("a", "https://youtu.be/dQw4w9WgXcQ"),
+      line("b", "no link"),
+      line("c", "https://vimeo.com/76979871"),
+      line("d", "https://giphy.com/gifs/4548k01F5Ej28"),
+      line("e", "see https://gno.land"),
+      line("f", "> https://youtu.be/dQw4w9WgXcQ"),
+    ];
+    expect(unjudged(lines, { c: "checked" }, new Set(["d"]))).toEqual(["a", "f"]);
+    expect(unjudged(lines, undefined, new Set())).toEqual(["a", "c", "d", "f"]);
+    expect(unjudged([], undefined, new Set())).toEqual([]);
   });
 });
