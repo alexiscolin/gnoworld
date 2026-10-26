@@ -7,6 +7,8 @@ import { lineOf, nickOf, type Line } from "./room.ts";
 
 // Ergo folds A to Z alone (casemapping ascii, deploy/ergo/ircd.yaml.tmpl).
 const sameNick = (one: string, other: string): boolean => one.toLowerCase() === other.toLowerCase();
+// A room's address, its ranks' prefixes before it (STATUSMSG, irc/modes/modes.go:162, v2.19.1): @#bubble is a room's.
+const ROOM = /^[~&@%+]*#/u;
 
 /** A direct message and the account it is with, or none: a room's line, a guest's, one between two others, or one
  * to oneself. */
@@ -14,7 +16,7 @@ export function dmOf(message: IrcMessage, me: string): { partner: string; line: 
   const [target = ""] = message.params;
   const from = nickOf(message.source ?? "");
   const mine = sameNick(from, me);
-  if (target.startsWith("#") || mine === sameNick(target, me)) return undefined;
+  if (ROOM.test(target) || mine === sameNick(target, me)) return undefined;
   const line = lineOf(message, target);
   if (line?.account === undefined || !sameNick(line.account, from)) return undefined;
   return { partner: mine ? target : from, line };

@@ -57,6 +57,12 @@ describe("dmOf: a direct message and who it is with", () => {
     ["a message to me from me", `${tags("m", ME)} :${ME}!u@h PRIVMSG ${ME} :note to self`],
     // StrykerJS on 4e: my own line in a room is the room's, never a direct message to it.
     ["my own message to a room", `${tags("n", ME)} :${ME}!u@h PRIVMSG #bubble :hi all`],
+    // 4e's late test audit (T8): Ergo's echo of a line to a room's ranks (STATUSMSG) keeps their prefix.
+    ["my own message to a room's operators", `${tags("q", ME)} :${ME}!u@h PRIVMSG @#bubble :ops only`],
+    [
+      "my own message to a room's ranks, prefixes stacked",
+      `${tags("r", ME)} :${ME}!u@h PRIVMSG ~&@%+#bubble :all ranks`,
+    ],
     ["a message with no source", `${tags("o", ALICE)} PRIVMSG ${ME} :hi`],
     ["a PRIVMSG with nothing after it", `${tags("p", ALICE)} :${ALICE}!u@h PRIVMSG`],
   ])("reads none of %s", (_, line) => {
