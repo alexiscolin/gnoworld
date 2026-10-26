@@ -13,7 +13,7 @@ const HISTORY: readonly HistoryLine[] = [
   ["v1", "2026-10-25T10:00:00.000Z", "watch https://youtu.be/dQw4w9WgXcQ"],
   ["v2", "2026-10-25T10:01:00.000Z", "and https://imgur.com/gallery/abcdefg"],
 ];
-const PLAYER = "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ";
+const PLAYER = "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?autoplay=1";
 const event = (msgid: string, state: "checked" | "hidden") =>
   `id: 1\nevent: verdict\ndata: ${JSON.stringify({ msgid, room: "#bubble/games", state })}\n\n`;
 

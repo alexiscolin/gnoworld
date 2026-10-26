@@ -4,8 +4,9 @@ import { embedIn, embedOf, savesData, unjudged } from "./embeds.ts";
 
 // 4g (docs/decisions.md, 2026-10-26): each service's player as its own documentation gives it (embeds.ts); Imgur's
 // form could not be read, so its links stay links until it is.
-const YOUTUBE = "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ";
-const VIMEO = "https://player.vimeo.com/video/76979871?dnt=1";
+// The players play on the reader's one Play (F1054).
+const YOUTUBE = "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?autoplay=1";
+const VIMEO = "https://player.vimeo.com/video/76979871?dnt=1&autoplay=1";
 const GIPHY = "https://giphy.com/embed/4548k01F5Ej28";
 
 describe("embedOf: the player a link opens", () => {

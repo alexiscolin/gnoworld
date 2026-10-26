@@ -45,11 +45,13 @@ export function embedOf(href: string): Embed | undefined {
   if (url.protocol !== "https:" || url.port !== "" || url.username !== "" || url.password !== "") return undefined;
   const youtube = youtubeId(url);
   if (youtube !== undefined && YOUTUBE_ID.test(youtube)) {
-    return { service: "YouTube", src: `https://www.youtube-nocookie.com/embed/${youtube}`, title: "YouTube video" };
+    // autoplay=1: the frame loads on the reader's Play, which a second click on the service's own button repeated (F1054).
+    const src = `https://www.youtube-nocookie.com/embed/${youtube}?autoplay=1`;
+    return { service: "YouTube", src, title: "YouTube video" };
   }
   const vimeo = vimeoId(url);
   if (vimeo !== undefined) {
-    return { service: "Vimeo", src: `https://player.vimeo.com/video/${vimeo}?dnt=1`, title: "Vimeo video" };
+    return { service: "Vimeo", src: `https://player.vimeo.com/video/${vimeo}?dnt=1&autoplay=1`, title: "Vimeo video" };
   }
   const giphy = giphyId(url);
   return giphy === undefined
