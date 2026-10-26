@@ -71,6 +71,18 @@ test.describe("reactions", () => {
   });
 
   // The green pass (G1): mine stays pressed, on the chip and on the bar, when another account reacts after me.
+  // The code review (CR4): taking back the last of an emoji from its chip, which goes, hands the focus to its line.
+  test("hand the focus to the line when its chip goes with the reaction taken back", async ({ page }) => {
+    await asAccount(page, (address) => ({
+      replayed: [tagmsg("r1", "+draft/react=🎉;+reply=m1", { at: 2, who: address })],
+    }));
+    const line = lineOf(page, "the first line");
+    await line.getByRole("button", { name: "🎉, 1, including you" }).focus();
+    await page.keyboard.press("Enter");
+    await expect(line.getByRole("button", { name: /🎉/ })).toHaveCount(0);
+    await expect(lines(page).nth(0)).toBeFocused();
+  });
+
   test("keep one's reaction pressed, on its chip and its quick reaction, when another account's comes after it", async ({
     page,
   }) => {

@@ -3,6 +3,7 @@
 // emoji a line at most, the rest said in a word (docs/decisions.md, 2026-10-26).
 import type { Reacting, Shown } from "@gnoworld/core";
 import { Chip, Cluster } from "@gnoworld/ui";
+import { useRef } from "react";
 
 /** The emoji a line shows at most: its Tab stops bounded (R3). */
 const CHIPS_SHOWN = 20;
@@ -20,8 +21,9 @@ const nameOf = ({ emoji, count, mine }: Shown): string => `${emoji}, ${String(co
 
 export function Reactions({ to, shown, react }: ReactionsProps) {
   const more = shown.length - CHIPS_SHOWN;
+  const boxRef = useRef<HTMLDivElement>(null);
   return (
-    <div aria-live="off">
+    <div ref={boxRef} aria-live="off">
       <Cluster space="3xs">
         {shown.slice(0, CHIPS_SHOWN).map((each) =>
           react === undefined ? (
@@ -34,6 +36,8 @@ export function Reactions({ to, shown, react }: ReactionsProps) {
               selected={each.mine}
               onClick={() => {
                 react({ to, emoji: each.emoji, on: !each.mine });
+                // The last of an emoji taken back: its chip goes with Ergo's echo, the focus to its line (CR4).
+                if (each.mine && each.count === 1) boxRef.current?.closest("li")?.focus();
               }}
             >
               {each.emoji}

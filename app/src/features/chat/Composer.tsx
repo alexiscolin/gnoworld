@@ -110,8 +110,15 @@ export interface ComposerProps {
 // The graphemes the reply bar shows of the line answered (docs/decisions.md, 2026-10-26).
 const SHOWN = 60;
 
-// Over the field, the line the next one answers, and a way to answer none.
-function ReplyBar({ to, onCancel }: { to: Answered; onCancel: (() => void) | undefined }) {
+// Over the field, the line the next one answers, and a way to answer none, which hands the focus to the field as the
+// bar and its button go, never to the page (the code review's CR4).
+interface ReplyBarProps {
+  to: Answered;
+  onCancel: (() => void) | undefined;
+  field: () => HTMLInputElement | undefined;
+}
+
+function ReplyBar({ to, onCancel, field }: ReplyBarProps) {
   return (
     <Cluster space="2xs">
       <p className={styles["replying"]}>
@@ -124,6 +131,7 @@ function ReplyBar({ to, onCancel }: { to: Answered; onCancel: (() => void) | und
         emphasis="plain"
         onClick={() => {
           onCancel?.();
+          field()?.focus();
         }}
       />
     </Cluster>
@@ -193,7 +201,7 @@ export function Composer(props: ComposerProps) {
   return (
     <form ref={formRef} aria-label={`Write in ${label}`} onSubmit={send} onKeyDown={complete}>
       <Stack space="2xs">
-        {replying === undefined ? null : <ReplyBar to={replying} onCancel={onCancelReply} />}
+        {replying === undefined ? null : <ReplyBar to={replying} onCancel={onCancelReply} field={box} />}
         <FormatBar onFormat={format} />
         <Sidebar side="end" space="2xs">
           <Field

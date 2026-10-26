@@ -77,6 +77,16 @@ test.describe("replies", () => {
     await expect(rooms).toBeFocused();
   });
 
+  // The code review (CR4): the reply cancelled, the focus goes to the field, never to the page.
+  test("give the field the focus once the reply is cancelled", async ({ page }) => {
+    await asAccount(page);
+    await replyTo(page, 1);
+    await cancel(page).focus();
+    await page.keyboard.press("Enter");
+    await expect(cancel(page)).toHaveCount(0);
+    await expect(field(page)).toBeFocused();
+  });
+
   // The green pass (G7): the composer quotes a line as the room shows it, its author's edit folded in.
   test("quote an edited line by its edited words", async ({ page }) => {
     await asAccount(page, () => ({
