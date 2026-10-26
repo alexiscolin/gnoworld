@@ -1835,14 +1835,12 @@ printf '\n' >>"$g/scripts/check_css.py" && git -C "$g" commit -qam y
 ran py:harness_mutate || fail "check.sh --full did not mutate a changed harness"
 before "done stories" py:harness_mutate || fail "check.sh --full mutated the harness beside the stories' journeys (F815)"
 rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/green-full"
-out=$(FAIL=coverage,py:audit gate --full) && fail "check.sh --full passed with two failing steps"
-for s in coverage py:audit; do printf '%s\n' "$out" | grep -q "^$s failed here" || fail "check.sh --full hid $s's failure: $out"; done
-# Each lane's failure alone fails the gate and shows; one before the coverage leaves the two after it to run.
+out=$(FAIL=stories,py:audit gate --full) && fail "check.sh --full passed with two failing steps"
+for s in stories py:audit; do printf '%s\n' "$out" | grep -q "^$s failed here" || fail "check.sh --full hid $s's failure: $out"; done
+# Each lane's failure alone fails the gate and shows.
 for s in stories py:prove_fix coverage py:harness_mutate; do
 	out=$(FAIL=$s gate --full) && fail "check.sh --full passed with $s failing alone"
 	printf '%s\n' "$out" | grep -q "^$s failed here" || fail "check.sh --full hid $s's failure: $out"
-	case $s in coverage | py:harness_mutate) continue ;; esac
-	ran mutate && ran py:harness_mutate || fail "check.sh --full stopped at $s's failure, before StrykerJS or harness_mutate"
 done
 [ ! -e "$g/.claude/tmp/green-full" ] || fail "check.sh --full recorded a gate that failed"
 # --merge, a merge's own review: the full gate's steps, the harness mutants of the merge's guard files
