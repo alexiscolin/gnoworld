@@ -106,7 +106,7 @@ class Link implements ChatLink {
   }
 
   read(room: string, id: string): void {
-    const line = this.#deps.store.getState().chat.rooms[room]?.lines.find((each) => each.id === id);
+    const line = this.#deps.store.getState().chat.rooms[room]?.lines.findLast((each) => each.id === id);
     if (this.#key !== "guest" && room === this.#shown && line !== undefined) this.#places.ask(room, line.time);
     if (this.#inside.has(room)) this.#places.tell(room);
   }
