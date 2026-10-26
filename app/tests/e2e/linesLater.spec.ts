@@ -1,7 +1,7 @@
 import { lines, roomsNav, word } from "./chat.ts";
 import { expect, test } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
-import { opened } from "./scripted.ts";
+import { MEMBER, opened } from "./scripted.ts";
 
 // The lines view (the lines, what is under them, a line's bar) loads after the page is drawn, behind RoomView's one lazy
 // boundary (docs/decisions.md, 2026-10-26). Its code held back here, as a slow network would.
@@ -50,5 +50,25 @@ test.describe("the lines view, loaded after the page", () => {
     // An account's bar leads with its quick reactions (4d), in the view's code: none missing once it is in.
     await expect(bar.getByRole("button").first()).toBeFocused();
     await expect(bar.getByRole("button", { name: "React with 👍" })).toBeFocused();
+  });
+
+  // The green pass (G5): a room with no line asks no code for its lines, its list not busy; a line that comes asks it.
+  test("asks no lines code for a room with no line, its list not busy, then asks it as a line comes", async ({
+    page,
+  }) => {
+    const asked: string[] = [];
+    page.on("request", (request) => {
+      if (CODE.test(request.url())) asked.push(request.url());
+    });
+    const address = await logIn(page, word("later"));
+    const ergo = await opened(page, address, { history: [] });
+    await expect(page.getByText("No messages yet.")).toBeVisible();
+    await expect(page.getByRole("list", { name: "Messages" })).not.toHaveAttribute("aria-busy");
+    expect(asked).toEqual([]);
+    ergo().send(
+      `@msgid=l1;time=2026-10-25T10:05:00.000Z;account=${MEMBER} :${MEMBER}!u@h PRIVMSG #bubble/games :a line`,
+    );
+    await expect(lines(page)).toHaveCount(1);
+    expect(asked).toHaveLength(1);
   });
 });
