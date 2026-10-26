@@ -10,7 +10,12 @@ const store = () => {
     heard += 1;
   });
   const { judged } = made.getState().verdictActions;
-  return { judged, of: (room: string) => made.getState().verdicts[room], notified: () => heard };
+  return {
+    judged,
+    of: (room: string) => made.getState().verdicts[room],
+    order: (room: string) => made.getState().verdictsOrder[room],
+    notified: () => heard,
+  };
 };
 
 // 4g: the verdicts' stream tells which line a link's player may open on: "checked", or "hidden" for good.
@@ -68,5 +73,23 @@ describe("the store's verdicts", () => {
     t.judged({ msgid: "a", room: "#bubble", state: "checked" });
     expect(t.of("#bubble")).toEqual({ a: "hidden" });
     expect(t.notified()).toBe(before);
+  });
+
+  // F880: a line whose verdict changes is one line, not two, in the count the cap reads.
+  it("counts a line once though its verdict changed, keeping every line up to the cap", () => {
+    const t = store();
+    t.judged({ msgid: "m0", room: "#bubble", state: "checked" });
+    t.judged({ msgid: "m0", room: "#bubble", state: "hidden" });
+    for (let n = 1; n < VERDICTS_KEPT; n += 1) t.judged({ msgid: `m${String(n)}`, room: "#bubble", state: "checked" });
+    expect(t.of("#bubble")?.["m0"]).toBe("hidden");
+    expect(Object.keys(t.of("#bubble") ?? {})).toHaveLength(VERDICTS_KEPT);
+  });
+
+  // F880: the order that picks the verdict to drop holds no more than the verdicts it orders.
+  it("keeps a room's order no longer than its verdicts, oldest first", () => {
+    const t = store();
+    const ids = Array.from({ length: VERDICTS_KEPT + 50 }, (_, n) => `m${String(n)}`);
+    for (const msgid of ids) t.judged({ msgid, room: "#bubble", state: "checked" });
+    expect(t.order("#bubble")).toEqual(ids.slice(50));
   });
 });
