@@ -108,8 +108,7 @@ interface PeopleProps {
 
 function People({ members, connected, me, onMessage }: PeopleProps) {
   const people = members.filter((nick) => nick !== BOT);
-  const writes = (nick: string) =>
-    me !== undefined && onMessage !== undefined && nick !== me && Address.safeParse(nick).success;
+  const writes = (nick: string) => me !== undefined && nick !== me && Address.safeParse(nick).success;
   return (
     <aside aria-label="Who's here">
       <h3 className={styles["count"]}>{connected ? `${String(people.length)} here` : "Who's here"}</h3>
@@ -117,7 +116,7 @@ function People({ members, connected, me, onMessage }: PeopleProps) {
         {people.slice(0, MEMBERS_SHOWN).map((nick) => (
           <li key={nick}>
             <Person name={nick} guest={!Address.safeParse(nick).success} />
-            {writes(nick) ? (
+            {onMessage !== undefined && writes(nick) ? (
               <>
                 {" "}
                 <IconButton
@@ -126,7 +125,7 @@ function People({ members, connected, me, onMessage }: PeopleProps) {
                   emphasis="plain"
                   label={`Write to ${shortAddress(nick)}`}
                   onClick={() => {
-                    onMessage?.(nick);
+                    onMessage(nick);
                   }}
                 />
               </>
