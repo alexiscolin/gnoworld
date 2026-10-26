@@ -1,7 +1,7 @@
 // The conversation in view on a world's page (slice 4's 4e), one RoomView and one Writer whatever it is: a room's or
 // a direct message's, what each is told.
 import type { AppState } from "../../store/index.ts";
-import { NOT_ENCRYPTED, type Dms } from "./Dms.tsx";
+import { NOT_ENCRYPTED, PAGE_ONLY, type Dms } from "./Dms.tsx";
 import { roomLabel, shortAddress } from "./names.ts";
 import type { RoomViewProps } from "./RoomView.tsx";
 import type { WriterProps } from "./Writer.tsx";
@@ -20,7 +20,7 @@ export function dmShown(partner: string, dms: Dms, sayTo: (partner: string, draf
   const { refused } = dms;
   return {
     key: "dm",
-    view: { title, note: NOT_ENCRYPTED, state: { lines: dms.lines, members: [] }, empty: dms.empty },
+    view: { title, note: `${NOT_ENCRYPTED} ${PAGE_ONLY}`, state: { lines: dms.lines, members: [] }, empty: dms.empty },
     writer: {
       room: partner,
       label: title,

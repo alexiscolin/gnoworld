@@ -10,6 +10,8 @@ import type { DmsProps } from "./RoomsView.tsx";
 
 /** What every direct message says of itself (ADR-0002, Chat). */
 export const NOT_ENCRYPTED = "Not encrypted: the server can read these.";
+/** And that it lives in the page alone: Ergo keeps no direct message (decision 154; decision C). */
+export const PAGE_ONLY = "Kept only while this page is open.";
 /** What a stranger's conversation says while the account hears those it wrote to alone (decision B). */
 const NOT_KEPT = 'Not kept: messages from accounts you never wrote to, while "Only people I wrote to" is on.';
 
@@ -45,7 +47,7 @@ export function conversationOf(
   partner: string | undefined,
 ): Pick<Dms, "lines" | "empty"> {
   if (partner !== undefined && !heardFrom(choices, partner)) return { lines: [], empty: NOT_KEPT };
-  return { lines: partner === undefined ? [] : (all[partner] ?? []), empty: "No messages yet." };
+  return { lines: partner === undefined ? [] : (all[partner] ?? []), empty: "No messages since this page opened." };
 }
 
 /** An account's direct messages on a world's page, `asked` the address's ?dm=. */

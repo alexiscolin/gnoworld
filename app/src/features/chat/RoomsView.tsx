@@ -30,7 +30,11 @@ function Dms({ world, partners, current, onlyKnown, onOnlyKnown }: DmsProps) {
     <Stack space="2xs" as="section">
       <h2 className={styles["section"]}>Direct messages</h2>
       {partners.length === 0 ? (
-        <p>No direct message yet.</p>
+        // How to start one, in lines as short as the list's own (U4).
+        <div>
+          <p>No direct message yet.</p>
+          <p>Start one in Who&apos;s here.</p>
+        </div>
       ) : (
         <ul className={shared["plain"]}>
           {partners.map((partner) => (

@@ -51,6 +51,8 @@ test.describe("direct messages", () => {
     await link.click();
     await expect(page.getByRole("heading", { name: short(bob.address) })).toBeVisible();
     await expect(page.getByText(NOT_ENCRYPTED)).toBeVisible();
+    // Decision C (U2): Ergo keeps no direct message; the page says so beside "Not encrypted".
+    await expect(page.getByText("Kept only while this page is open.")).toBeVisible();
     await expect(lines(page).filter({ hasText: text })).toHaveCount(1);
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     await bob.close();

@@ -110,7 +110,10 @@ describe("RoomsView: direct messages", () => {
   });
 
   it("says when there is none yet, and has no section for a guest", () => {
-    expect(said(view({ dms: dms({ partners: [] }) }))).toContain("No direct message yet.");
+    // 4e's UX review (U4): the empty list says how to start one.
+    expect(said(view({ dms: dms({ partners: [] }) })).replaceAll("&#x27;", "'")).toContain(
+      "No direct message yet. Start one in Who's here.",
+    );
     expect(view()).not.toContain("Direct messages");
   });
 

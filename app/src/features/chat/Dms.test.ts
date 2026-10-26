@@ -57,11 +57,12 @@ describe("the conversation a page shows", () => {
     expect(shown.empty).toMatch(/^Not kept: /);
   });
 
-  it("shows nothing with no partner, and a conversation never heard as empty", () => {
+  // Decision C (U2): Ergo keeps no direct message, so "No messages yet." was false after a reload.
+  it("shows nothing with no partner, and a conversation never heard as empty since the page opened", () => {
     expect(conversationOf(ALL, { onlyKnown: false, known: new Set() }, undefined).lines).toEqual([]);
     expect(conversationOf(ALL, { onlyKnown: false, known: new Set() }, CAROL)).toEqual({
       lines: [],
-      empty: "No messages yet.",
+      empty: "No messages since this page opened.",
     });
   });
 });
