@@ -8,7 +8,7 @@ import { RoomId } from "@gnoworld/schemas";
 import type { Result } from "../../lib/api/http.ts";
 import type { Ergo, ErgoOptions, Who } from "../../lib/ergo/ergo.ts";
 import { LINES_KEPT } from "../../store/chat.ts";
-import { groupsOf } from "./groups.ts";
+import { followed, groupsOf } from "./groups.ts";
 import type { AppState, createAppStore } from "../../store/index.ts";
 
 /** The rooms a connection joins: Ergo's max-channels-per-client (deploy/ergo/ircd.yaml.tmpl). */
@@ -96,28 +96,15 @@ class Link implements ChatLink {
     this.#deps.store.getState().loginActions.chat("off");
   }
 
-  // The rooms followed: the first 100 listed, the room in view among them though listed past them (in place of
-  // the 100th).
-  #wanted(): readonly string[] {
-    const shown = this.#shown;
-    const first = this.#listed.slice(0, ROOMS_JOINED);
-    const late = shown !== undefined && this.#listed.includes(shown) && !first.includes(shown);
-    return late ? [...first.slice(0, ROOMS_JOINED - 1), shown] : first;
-  }
-
   // The store told the rooms followed; the dropped ones parted before the new ones are joined (none while not
   // connected: Ergo's send then refuses).
   #keep(): void {
-    const wanted = this.#wanted();
+    const wanted = followed(this.#listed, this.#shown, ROOMS_JOINED);
+    const parted = [...this.#phases.keys()].filter((room) => !wanted.includes(room));
+    const joined = wanted.filter((room) => !this.#phases.has(room));
     this.#deps.store.getState().chatActions.follow(wanted);
-    this.#send(
-      "PART",
-      [...this.#phases.keys()].filter((room) => !wanted.includes(room)),
-    );
-    this.#send(
-      "JOIN",
-      wanted.filter((room) => !this.#phases.has(room)),
-    );
+    this.#send("PART", parted);
+    this.#send("JOIN", joined);
     this.#history(this.#shown);
   }
 
@@ -182,7 +169,7 @@ class Link implements ChatLink {
     }
     this.#reader = new BatchReader();
     chatActions.connected(this.#ergo?.nick() ?? "");
-    this.#send("JOIN", this.#wanted());
+    this.#send("JOIN", followed(this.#listed, this.#shown, ROOMS_JOINED));
     this.#history(this.#shown);
   }
 
