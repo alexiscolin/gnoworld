@@ -64,6 +64,14 @@ Alexis, 2026-10-23: slice 3's reviews found these; none bites today, each comes 
 | Banned words compiled once | The pattern kept per word list, if the k6 messages run shows the cost | Folded and compiled again for each message (F662) |
 | Archived rooms at once | The activity route asks a world's archived rooms in one query; sized from the k6 run | One query a room, up to about 500 a request (F663) |
 
+## Slice 4, after its reviews
+
+| Item | Delivers | Why |
+|---|---|---|
+| A phone's own layout for the chat | At a phone's width the navigation above the conversation, not beside it, and no composer (a phone reads only); rooms and direct messages alike, with slice 5's page layout | At 390 px the 160 px navigation takes 41% of the width and a line wraps at about 22 characters; the approved rooms-phone picture holds it too (4e's UX review U14) |
+| A navigation row's whole box a link | Row's padding on its link, so what a row shows is what a pointer reaches, in every list | A row shows 160×37 px and its link is 136×21 px, passing WCAG 2.5.8 by the spacing exception alone (4e's UX review U17) |
+| A conversation's face and last line | Each direct message's row with its partner's Avatar and its last line; a new conversation announced, with 4f's notifications | A row shows a short address alone (4e's UX review U19; its order, heard last first, is done: F852) |
+
 ## The design system, after slice 2
 
 Alexis, 2026-10-21: 2e's and 2f's reviews found these; each is true and none bites today, so each
