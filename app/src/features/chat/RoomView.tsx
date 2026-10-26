@@ -7,7 +7,7 @@
 import { typingAt, type Line, type Typing } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
 import { Sidebar, Stack } from "@gnoworld/ui";
-import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
+import { Fragment, lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import type { ErgoState } from "../../lib/ergo/ergo.ts";
 import type { LinesProps } from "./Lines.tsx";
 import { roomLabel } from "./names.ts";
@@ -110,18 +110,25 @@ function Typists({ typing }: { typing: Typing }) {
       clearTimeout(timer);
     };
   }, [next]);
-  const [first, second, ...more] = typingAt(typing, now);
-  const name = (nick: string) => <Person name={nick} guest={!Address.safeParse(nick).success} />;
-  if (first === undefined) return null;
+  const nicks = typingAt(typing, now);
+  const verb = nicks.length === 1 ? "is" : "are";
+  // Up to three by name, which a wide screen holds; the line is cut to one (U2), its whole in its title: the names in
+  // full, a guest said so.
+  const named = nicks.map((nick, at) => (
+    <Fragment key={nick}>
+      {at === 0 ? "" : at === nicks.length - 1 ? " and " : ", "}
+      <Person name={nick} guest={!Address.safeParse(nick).success} />
+    </Fragment>
+  ));
+  const whole = nicks.map((nick) => (Address.safeParse(nick).success ? nick : `${nick} (guest)`));
+  const title = `${whole.length > 1 ? `${whole.slice(0, -1).join(", ")} and ` : ""}${whole.at(-1) ?? ""} ${verb} typing`;
   return (
-    <p className={styles["typing"]}>
-      {more.length > 0 ? (
-        "Several people are typing…"
-      ) : second === undefined ? (
-        <>{name(first)} is typing…</>
+    <p className={styles["typing"]} title={nicks.length === 0 ? undefined : title}>
+      {nicks.length === 0 ? null : nicks.length > 3 ? (
+        "Several people are typing"
       ) : (
         <>
-          {name(first)} and {name(second)} are typing…
+          {named} {verb} typing
         </>
       )}
     </p>

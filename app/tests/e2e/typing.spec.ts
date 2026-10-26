@@ -89,6 +89,31 @@ test.describe("who is typing", () => {
   });
 });
 
+// The UX review (U2, U8, U10): the line's place is always drawn, so the composer never moves as typists come and go,
+// whatever their names' length, on a computer's screen and a phone's.
+for (const [screen, size] of [
+  ["a computer's", { width: 1280, height: 900 }],
+  ["a phone's", { width: 390, height: 844 }],
+] as const) {
+  test(`keeps the composer where it is as typists come and go, on ${screen} screen`, async ({ page }) => {
+    await page.setViewportSize(size);
+    const address = await logIn(page, word("typing"));
+    const { ergo } = await room(page, { me: address });
+    const top = async () => (await field(page).boundingBox())?.y;
+    const before = await top();
+    const guest = "guest-abcdefghijklmnopqrstuvwxyz0";
+    ergo().send(typingOf("active", guest));
+    await expect(typist(page)).toBeVisible();
+    expect(await top()).toBe(before);
+    // One line, cut: its whole in its title.
+    expect((await typist(page).boundingBox())?.height).toBeLessThan(24);
+    await expect(typist(page)).toHaveAttribute("title", `${guest} (guest) is typing`);
+    ergo().send(typingOf("done", guest));
+    await expect(typist(page)).toHaveCount(0);
+    expect(await top()).toBe(before);
+  });
+}
+
 test.describe("telling the room the account is typing", () => {
   test("tells the room while the account writes, done once the field is cleared, nothing of a command", async ({
     page,

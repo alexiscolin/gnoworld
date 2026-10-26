@@ -415,6 +415,15 @@ describe("RoomView: who is typing", () => {
     expect(html).not.toContain("3y5tv is typing");
   });
 
+  // The UX review (U2, U8, U10): the line's place is always drawn, so the composer below never moves; the names, in
+  // full, are its title, as the line is cut to one.
+  it("draws the typing line's place with no one typing, and names three typists", () => {
+    expect(view()).toMatch(/<p class="[^"]*typing[^"]*"><\/p>/);
+    const html = view({ state: { ...ROOM, typing: typing(ALICE, BOB, CAROL) } });
+    expect(words(html)).toContain("g1f6dc…fsksl and g1jg8m…vsqf5 are typing");
+    expect(html).toMatch(new RegExp(`<p class="[^"]*typing[^"]*" title="${ALICE}, ${CAROL} and ${BOB} are typing">`));
+  });
+
   // The red pass (R16): a live typist beside the past one, so the test fails while nothing is said at all.
   it("says nothing of a typist whose time is past, nor with no one typing", () => {
     const html = words(view({ state: { ...ROOM, typing: { ...typing(BOB), [ALICE]: Date.now() - 1 } } }));

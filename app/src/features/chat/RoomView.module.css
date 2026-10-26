@@ -68,9 +68,18 @@
     color: var(--color-text-muted);
   }
 
+  /* Always drawn, one line high, so the composer below never moves as typists come and go; cut to one line, its
+     whole in its title (UX review U2, U8). */
   .typing {
     font: var(--font-meta);
     color: var(--color-text-muted);
+    /* layout: one line of this font, which no token names */
+    min-block-size: 1lh;
+    /* layout: a step above and below, parting the line from the last message and the format bar */
+    margin-block: var(--space-2xs);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   /* The first line past the reading place as the room opened: coral, the prototype's "New", by a rule and a word. */
