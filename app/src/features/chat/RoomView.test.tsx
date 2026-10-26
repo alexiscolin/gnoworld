@@ -1,6 +1,7 @@
 import type { Line } from "@gnoworld/core";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { prerender } from "react-dom/static";
+import { beforeAll, describe, expect, it } from "vitest";
 import { MEMBERS_SHOWN, RoomView, type RoomViewProps } from "./RoomView.tsx";
 
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -34,6 +35,12 @@ const part = (html: string, label: string) => {
 // list's own children instead (F814's class).
 const items = (html: string) => [...html.matchAll(/<li[^>]*>(.*?)<\/li>/gs)].map((m) => said(m[1] ?? ""));
 const paragraphs = (html: string) => (html.match(/<p[ >]/g) ?? []).length;
+
+// The lines view loads lazily, after the page is drawn (docs/decisions.md, 2026-10-26): drawn once and waited for, it
+// is held, and every view below draws it at once, as a room switch does once the page has it.
+beforeAll(async () => {
+  await prerender(<RoomView room="#bubble/games" state={ROOM} chat="connected" />);
+});
 
 describe("RoomView", () => {
   it("names the room, its description right after, from its topic", () => {
