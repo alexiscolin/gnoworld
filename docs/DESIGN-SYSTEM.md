@@ -72,7 +72,7 @@ The theme is dark only (`color-scheme: dark`). Nine base colours:
 | mint | `#5CF2C8` | `--color-mine`: what is mine, the focus ring, unread counts. Nothing else |
 | amber | `#FFC46B` | Heat, the sun, live moments, what is about me; caution |
 | violet | `#B79CFF` | What a machine says: uncharted signals, and the assistant (Jarvis's orb and the card of its answers) |
-| coral | `#FF8A7A` | Errors, danger, a falling trend |
+| coral | `#FF8A7A` | Errors, danger, a falling trend; what is new (`--color-new`) |
 
 Semantic roles, all computed from them:
 
@@ -85,6 +85,7 @@ Semantic roles, all computed from them:
 | `--color-surface` | night | What floats over the page: popovers, menus, tooltips, dialogs |
 | `--color-scrim` | space at 70% | Behind a dialog |
 | `--color-<accent>-soft`, `--color-<accent>-line` | the accent at 12% and 50% | Tinted fills and borders of mint, amber, violet, coral |
+| `--color-new`, `--color-new-line` | coral; coral at 60% | What is new in a list: the "New" divider's word and its rule, the 60% holding 3:1 against the page (WCAG 1.4.11). Its own token, so what is new can change hue without touching danger |
 | `--world` | a world's own colour, set from its data | The plate over a world is `color-mix(in oklab, var(--world) 12%, var(--color-panel))`; the dock keeps the plain panel colour |
 | `--texture-grid` | text at 6%, a 14 px dot grid | The plate's surface, from the prototype |
 
