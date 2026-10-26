@@ -101,7 +101,7 @@ class Link implements ChatLink {
 
   redact(room: string, id: string): boolean {
     const allowed = this.#key !== "guest" && this.#inside.has(room) && MSGID.test(id);
-    return allowed && this.#ergo?.nick() !== undefined && this.#ergo.send(`REDACT ${room} ${id}`);
+    return allowed && this.#ergo?.send(`REDACT ${room} ${id}`) === true;
   }
 
   stop(): void {
