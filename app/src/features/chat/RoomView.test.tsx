@@ -1,7 +1,7 @@
 import type { Line } from "@gnoworld/core";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { MEMBERS_SHOWN, RoomView, type RoomViewProps } from "./RoomView.tsx";
+import { MEMBERS_SHOWN, People, RoomView, type PeopleProps, type RoomViewProps } from "./RoomView.tsx";
 
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
@@ -17,8 +17,19 @@ const line = (over: Partial<Line> = {}): Line => ({
 });
 const GUEST_LINE: Line = { id: "g", time: T0, from: "guest-ab12cd", text: "hello", kind: "message" };
 const ROOM = { lines: [line()], members: [ALICE, "guest-ab12cd"], topic: "Bubbles here" };
-const view = (over: Partial<RoomViewProps> = {}) =>
-  renderToStaticMarkup(<RoomView room="#bubble/games" state={ROOM} chat="connected" {...over} />);
+// A room as ChatPanel draws one: #games, its topic under its name, who is here beside it.
+type Room = { lines: readonly Line[]; members: readonly string[]; topic: string | undefined } | undefined;
+type Over = Omit<Partial<RoomViewProps>, "state"> & { state?: Room; onMessage?: PeopleProps["onMessage"] };
+const view = ({ onMessage, ...over }: Over = {}) => {
+  const state = "state" in over ? over.state : ROOM;
+  const { chat = "connected", me } = over;
+  const aside = (
+    <People members={state?.members ?? []} connected={chat === "connected"} me={me} onMessage={onMessage} />
+  );
+  return renderToStaticMarkup(
+    <RoomView title="#games" note={state?.topic} aside={aside} chat="connected" {...over} state={state} />,
+  );
+};
 const said = (html: string) =>
   html
     .replaceAll(/<[^>]+>/g, " ")
@@ -38,10 +49,6 @@ const paragraphs = (html: string) => (html.match(/<p[ >]/g) ?? []).length;
 describe("RoomView", () => {
   it("names the room, its description right after, from its topic", () => {
     expect(view()).toMatch(/<h2[^>]*>#games<\/h2>\s*<p[^>]*>Bubbles here<\/p>/);
-  });
-
-  it("names the world's main room by the world", () => {
-    expect(view({ room: "#bubble" })).toMatch(/<h2[^>]*>#bubble<\/h2>/);
   });
 
   it("gives no description when the room has none", () => {
@@ -291,18 +298,14 @@ describe("RoomView", () => {
   });
 
   // 4e: a direct message's page names its partner, and says it is not encrypted, as every DM does.
-  it("names a conversation by the label it is given, in place of a room's", () => {
-    const html = view({
-      room: ALICE,
-      label: "g10gh7…3y5tv",
-      state: { ...ROOM, topic: "Not encrypted: the server can read these." },
-    });
+  it("names a conversation by the title it is given, its note under it", () => {
+    const html = view({ title: "g10gh7…3y5tv", note: "Not encrypted: the server can read these." });
     expect(html).toMatch(/<h2[^>]*>g10gh7…3y5tv<\/h2>\s*<p[^>]*>Not encrypted: the server can read these.<\/p>/);
   });
 
   // 4e's own review: a conversation has its two people, never a room's "who is here".
   it("leaves who is here out of a conversation", () => {
-    const html = view({ room: ALICE, label: "g10gh7…3y5tv", people: false });
+    const html = view({ title: "g10gh7…3y5tv", aside: undefined });
     expect(html).not.toContain("Who&#x27;s here");
     expect(said(html)).not.toMatch(/\d+ here/);
   });

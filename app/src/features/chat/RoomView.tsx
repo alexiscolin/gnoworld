@@ -10,7 +10,7 @@ import { IconButton, Sidebar, Stack } from "@gnoworld/ui";
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 import type { ErgoState } from "../../lib/ergo/ergo.ts";
 import { Markdown } from "./Message.tsx";
-import { roomLabel, shortAddress } from "./names.ts";
+import { shortAddress } from "./names.ts";
 import shared from "./lists.module.css";
 import styles from "./RoomView.module.css";
 
@@ -35,21 +35,20 @@ const LINES = [shared["plain"], shared["scrolls"], styles["lines"]].join(" ");
 const CLOCK = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 
 export interface RoomViewProps {
-  room: string;
-  state: { lines: readonly Line[]; members: readonly string[]; topic: string | undefined } | undefined;
+  /** Its name: a room's label; a direct message's partner (4e). */
+  title: string;
+  /** What it says of itself under its name: a room's description, its IRC topic; a conversation's "not encrypted". */
+  note?: string | undefined;
+  state: { lines: readonly Line[]; members: readonly string[] } | undefined;
   chat: ErgoState | "off";
   /** What goes under the lines: the composer for an account, a word for a guest. */
   composer?: ReactNode;
   /** The reader's address, the lines that mention it marked; none for a guest. */
   me?: string | undefined;
-  /** The page's name for it in place of the room's: a direct message's partner (4e). */
-  label?: string | undefined;
-  /** Opens a direct message with another account here, offered to an account (4e). */
-  onMessage?: ((partner: string) => void) | undefined;
-  /** Whether it says who is here: a room does, a conversation, of two, does not (4e). */
-  people?: boolean | undefined;
   /** What it says while it holds no line, once connected: a conversation's own words (4e). */
   empty?: string | undefined;
+  /** Beside the lines: a room's who is here; a conversation, of two, has none (4e). */
+  aside?: ReactNode;
 }
 
 // A person: a guest by its nick, said so; an account's address shortened, its whole in its title; another name
@@ -109,8 +108,8 @@ function LineView({ line, me, members }: { line: Line; me: string | undefined; m
   );
 }
 
-// Who is here: counted once connected, the bot left out, the first MEMBERS_SHOWN named.
-interface PeopleProps {
+/** Who is here: counted once connected, the bot left out, the first MEMBERS_SHOWN named. */
+export interface PeopleProps {
   members: readonly string[];
   connected: boolean;
   /** The reader's address, and how it opens a direct message with another account: each offered beside it. */
@@ -118,7 +117,7 @@ interface PeopleProps {
   onMessage: ((partner: string) => void) | undefined;
 }
 
-function People({ members, connected, me, onMessage }: PeopleProps) {
+export function People({ members, connected, me, onMessage }: PeopleProps) {
   const people = members.filter((nick) => nick !== BOT);
   return (
     <aside aria-label="Who's here">
@@ -153,7 +152,7 @@ function People({ members, connected, me, onMessage }: PeopleProps) {
 }
 
 // A room the store holds nothing of yet.
-const NO_ROOM: NonNullable<RoomViewProps["state"]> = { lines: [], members: [], topic: undefined };
+const NO_ROOM: NonNullable<RoomViewProps["state"]> = { lines: [], members: [] };
 
 // How near the end, in pixels, the reader still reads the newest line.
 const AT_END = 32;
@@ -183,8 +182,8 @@ function Header({ title, topic }: { title: string; topic: string | undefined }) 
 }
 
 export function RoomView(props: RoomViewProps) {
-  const { room, state, chat, composer, me, label, onMessage, people = true, empty = "No messages yet." } = props;
-  const { lines, members, topic } = state ?? NO_ROOM;
+  const { title, note, state, chat, composer, me, empty = "No messages yet.", aside } = props;
+  const { lines, members } = state ?? NO_ROOM;
   const { listRef, onScroll } = useNewestInView(lines);
   const connected = chat === "connected";
   // Who a mention may shorten (F812): the members, and the authors in view by their account tag, who proved their
@@ -192,7 +191,7 @@ export function RoomView(props: RoomViewProps) {
   const known = new Set([...members, ...lines.flatMap(({ account }) => (account === undefined ? [] : [account]))]);
   return (
     <Stack as="section" space="s">
-      <Header title={label ?? roomLabel(room)} topic={topic} />
+      <Header title={title} topic={note} />
       <p role="status" className={styles["status"]}>
         {connected ? null : NOTICES[chat]}
       </p>
@@ -214,7 +213,7 @@ export function RoomView(props: RoomViewProps) {
           {connected && lines.length === 0 ? <p>{empty}</p> : null}
           {composer}
         </div>
-        {people ? <People members={members} connected={connected} me={me} onMessage={onMessage} /> : null}
+        {aside}
       </Sidebar>
     </Stack>
   );

@@ -18,10 +18,10 @@ import { useApp, useAppStore } from "../../storeContext.tsx";
 import { NOT_ENCRYPTED, useDms, type Dms } from "./Dms.tsx";
 import { chatLink } from "./link.ts";
 import { LOADING } from "./Loading.tsx";
-import { neighbour, roomIds, roomParams, roomsQuery, shortAddress, shownRoom } from "./names.ts";
+import { neighbour, roomIds, roomLabel, roomParams, roomsQuery, shortAddress, shownRoom } from "./names.ts";
 import { RoomsView } from "./RoomsView.tsx";
-import { RoomView, type RoomViewProps } from "./RoomView.tsx";
-import { Writer } from "./Writer.tsx";
+import { People, RoomView, type RoomViewProps } from "./RoomView.tsx";
+import { Writer, type WriterProps } from "./Writer.tsx";
 
 // The rooms as last asked, and what came: undefined when the list could not load.
 interface Asked {
@@ -60,7 +60,7 @@ function useRoomKeys(rooms: readonly string[], current: string | undefined) {
 interface LoadedProps {
   sections: RoomList["sections"];
   current: string | undefined;
-  state: RoomViewProps["state"];
+  state: AppState["chat"]["rooms"][string] | undefined;
   chat: RoomViewProps["chat"];
   session: AppState["login"]["session"];
   say: (room: string, draft: string) => boolean;
@@ -69,61 +69,71 @@ interface LoadedProps {
   dms: Dms;
 }
 
+// The conversation in view, one RoomView and one Writer whatever it is: what each is told. Its key keeps a room's
+// drawing apart from a direct message's.
+interface Shown {
+  key: "room" | "dm";
+  view: Pick<RoomViewProps, "title" | "note" | "state" | "empty">;
+  writer: Pick<WriterProps, "room" | "label" | "members" | "onSay" | "refused">;
+}
+
+// A direct message's (4e): its partner named, not encrypted, no one beside it; a line Ergo refused said so.
+function dmShown(partner: string, dms: Dms, sayTo: LoadedProps["sayTo"]): Shown {
+  const title = shortAddress(partner);
+  const { refused } = dms;
+  return {
+    key: "dm",
+    view: { title, note: NOT_ENCRYPTED, state: { lines: dms.lines, members: [] }, empty: dms.empty },
+    writer: {
+      room: partner,
+      label: title,
+      members: [],
+      onSay: (draft) => sayTo(partner, draft),
+      refused: refused === undefined ? undefined : { ...refused, why: `Not sent: ${title} is not online.` },
+    },
+  };
+}
+
+// A room's: its label, its description; who is here goes beside it.
+function roomShown(room: string, state: LoadedProps["state"], say: LoadedProps["say"]): Shown {
+  return {
+    key: "room",
+    view: { title: roomLabel(room), note: state?.topic, state },
+    writer: { room, members: state?.members ?? [], onSay: (draft) => say(room, draft) },
+  };
+}
+
 function Loaded({ sections, current, state, chat, session, say, sayTo, dms }: LoadedProps) {
   const ids = roomIds(sections);
+  // One conversation in view: the direct message ?dm= names, else the room.
+  const room = dms.partner === undefined ? current : undefined;
   useRoomKeys(ids, current);
   const [, setParams] = useSearchParams();
   const me = session.kind === "in" ? session.address : undefined;
-  const { partner } = dms;
   // Apart from the room's element, which each line draws again: who is here keeps its drawing (the compiler).
   const onMessage = (other: string) => {
     setParams({ dm: other });
   };
+  const people = (
+    <People members={state?.members ?? []} connected={chat === "connected"} me={me} onMessage={onMessage} />
+  );
+  const shown =
+    dms.partner === undefined
+      ? room === undefined
+        ? undefined
+        : roomShown(room, state, say)
+      : dmShown(dms.partner, dms, sayTo);
   return (
     <Sidebar space="l">
-      <RoomsView sections={sections} current={partner === undefined ? current : undefined} dms={dms.nav} />
-      {partner === undefined ? null : (
+      <RoomsView sections={sections} current={room} dms={dms.nav} />
+      {shown === undefined ? null : (
         <RoomView
-          room={partner}
-          label={shortAddress(partner)}
-          people={false}
-          empty={dms.empty}
-          state={{ lines: dms.lines, members: [], topic: NOT_ENCRYPTED }}
+          key={shown.key}
+          {...shown.view}
+          aside={shown.key === "room" ? people : undefined}
           chat={chat}
           me={me}
-          composer={
-            <Writer
-              session={session}
-              room={partner}
-              label={shortAddress(partner)}
-              rooms={ids}
-              members={[]}
-              onSay={(draft) => sayTo(partner, draft)}
-              refused={
-                dms.refused === undefined
-                  ? undefined
-                  : { ...dms.refused, why: `Not sent: ${shortAddress(partner)} is not online.` }
-              }
-            />
-          }
-        />
-      )}
-      {current === undefined || partner !== undefined ? null : (
-        <RoomView
-          room={current}
-          state={state}
-          chat={chat}
-          me={me}
-          onMessage={onMessage}
-          composer={
-            <Writer
-              session={session}
-              room={current}
-              rooms={ids}
-              members={state?.members ?? []}
-              onSay={(draft) => say(current, draft)}
-            />
-          }
+          composer={<Writer session={session} rooms={ids} {...shown.writer} />}
         />
       )}
     </Sidebar>
