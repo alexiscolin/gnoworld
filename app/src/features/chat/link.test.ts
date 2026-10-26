@@ -938,6 +938,24 @@ describe("the chat's link: what it says", () => {
       ]);
     });
 
+    // StrykerJS's survivors on the pace: a timer for a done waiting its turn, none left once a line or a drop ends it.
+    it("holds one timer for a done waiting its turn, and none once a line ends the typing or the link drops", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const t = memberIn(["#bubble/games"]);
+      const base = vi.getTimerCount();
+      t.link.typing("#bubble/games", "active");
+      t.link.typing("#bubble/games", "done");
+      t.link.typing("#bubble/games", "done");
+      expect(vi.getTimerCount()).toBe(base + 1);
+      expect(t.link.say("#bubble/games", "hi")).toBe(true);
+      expect(vi.getTimerCount()).toBe(base);
+      t.link.typing("#bubble/games", "active");
+      t.link.typing("#bubble/games", "done");
+      expect(vi.getTimerCount()).toBe(base + 1);
+      t.fake.state("waiting");
+      expect(vi.getTimerCount()).toBe(base);
+    });
+
     it("tells no typing as a guest, nor in a room Ergo has not said it is in, nor after my KICK", () => {
       vi.useFakeTimers({ now: Date.parse(T0) });
       const guest = guestIn(["#bubble/games"]);
@@ -1165,6 +1183,29 @@ describe("the chat's link: what it says", () => {
         expect(marked(t.fake.sent).at(-1)).toBe(`MARKREAD #bubble/games timestamp=${T(3)}`);
         vi.advanceTimersByTime(10_000);
         expect(marked(t.fake.sent)).toHaveLength(3);
+      });
+
+      // StrykerJS's survivors on the pace: a timer a room while its place waits, none left once sent, flushed or dropped.
+      it("holds one timer a room while its place waits, and none once it is sent, flushed or the link drops", () => {
+        const t = reading();
+        const base = vi.getTimerCount();
+        t.link.read("#bubble/games", "m0");
+        t.link.read("#bubble/games", "m1");
+        t.link.read("#bubble/games", "m2");
+        expect(vi.getTimerCount()).toBe(base + 1);
+        vi.advanceTimersByTime(2_000);
+        expect(vi.getTimerCount()).toBe(base);
+        t.link.read("#bubble/games", "m3");
+        expect(vi.getTimerCount()).toBe(base + 1);
+        t.link.flush();
+        expect(vi.getTimerCount()).toBe(base);
+        heard(t.fake, "#bubble/games", 4);
+        heard(t.fake, "#bubble/games", 5);
+        t.link.read("#bubble/games", "m4");
+        t.link.read("#bubble/games", "m5");
+        expect(vi.getTimerCount()).toBe(base + 1);
+        t.fake.state("waiting");
+        expect(vi.getTimerCount()).toBe(base);
       });
 
       it("sends nothing waiting once the link drops, and the place at once on the next connection's JOIN", () => {
