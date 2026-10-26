@@ -1322,6 +1322,7 @@ describe("the chat, as the server starts it", () => {
 // reads (mayRead, by the session), each visitor counted by its address.
 describe("the chat's verdicts route", () => {
   const CREW = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+  const ACCOUNT = "g1us8428u2a5satrlxzagqqa5m6vmuze025anjlj";
   const settings = {
     worlds: new Map([
       [
@@ -1331,6 +1332,7 @@ describe("the chat's verdicts route", () => {
           groups: new Map([["crew", new Set([CREW])]]),
           rooms: new Map<string, Room>([
             ["#bubble/crew", { type: "members" as const, readers: "crew", hidden: false }],
+            ["#bubble/club", { type: "accounts" as const, hidden: false }],
           ]),
         },
       ],
@@ -1341,7 +1343,13 @@ describe("the chat's verdicts route", () => {
   const ready = (proxy?: string) => {
     const t = setup(
       { ...settings, trustedProxy: proxy },
-      { session: (token) => (token === "crew-token" ? CREW : undefined) },
+      {
+        session: (token) =>
+          new Map([
+            ["crew-token", CREW],
+            ["account-token", ACCOUNT],
+          ]).get(token ?? ""),
+      },
     );
     t.app.route("/api/verdicts", t.chat.verdicts);
     const insert = t.db.prepare(
@@ -1349,6 +1357,7 @@ describe("the chat's verdicts route", () => {
     );
     insert.run("m1", "#bubble");
     insert.run("m2", "#bubble/crew");
+    insert.run("m3", "#bubble/club");
     const ask = (
       room: string,
       id: string,
@@ -1386,6 +1395,20 @@ describe("the chat's verdicts route", () => {
     for (let n = 0; n < 60; n += 1) expect((await ask("#bubble", "m1")).status).toBe(200);
     expect((await ask("#bubble", "m1")).status).toBe(429);
     expect((await ask("#bubble", "m1", { peer: "203.0.113.8" })).status).toBe(200);
+  });
+
+  // F877: an accounts room's lines go to any account and to no guest; a room's name in other letters is no room the
+  // verdicts hold, so a members room's are never answered under it.
+  it("answers an accounts room to an account alone, and a members room's lines under no other spelling", async () => {
+    const ask = ready();
+    expect((await ask("#bubble/club", "m3")).status).toBe(403);
+    expect(await (await ask("#bubble/club", "m3", { token: "account-token" })).json()).toEqual({
+      room: "#bubble/club",
+      verdicts: [{ msgid: "m3", state: "checked" }],
+    });
+    for (const spelling of ["#BUBBLE/crew", "#Bubble/Crew", "#bubble/CREW"]) {
+      expect(await (await ask(spelling, "m2")).json()).toEqual({ room: spelling, verdicts: [] });
+    }
   });
 
   // F872: behind the proxy every reader shares its address; the one it sets (x-real-ip) is each reader's, believed
