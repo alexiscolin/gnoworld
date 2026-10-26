@@ -88,6 +88,7 @@ export function RoomView({ room, state, chat, composer, me, onDelete, onDismiss 
             members={members}
             me={me}
             refused={refused}
+            connected={connected}
             onDelete={onDelete}
             onDismiss={onDismiss}
           />

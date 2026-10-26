@@ -100,7 +100,7 @@ function useNewestInView(lines: readonly Line[]) {
   return { listRef, onScroll };
 }
 
-// What a copy says, in the room's flash: done, or not, a page with no clipboard (a plain http origin) included.
+// What a copy says, in the room's flash: done, or not and why, a page with no clipboard (a plain http origin) included.
 function useCopy(room: string) {
   const [said, setSaid] = useState<FlashMessage | null>(null);
   const copy = (line: Line, what: "text" | "link") => {
@@ -114,7 +114,10 @@ function useCopy(room: string) {
           setSaid({ title: what === "text" ? "Text copied." : "Link copied." });
         },
         () => {
-          setSaid({ title: "Could not copy." });
+          setSaid({
+            title: what === "text" ? "Could not copy the text." : "Could not copy the link.",
+            line: "Your browser blocked the clipboard.",
+          });
         },
       );
   };
@@ -129,6 +132,8 @@ export interface LinesProps {
   me: string | undefined;
   /** The msgid of a line Ergo refused to delete, said until dismissed. */
   refused?: string | undefined;
+  /** Whether the chat is connected: a delete that cannot go out says why (U8). */
+  connected: boolean;
   /** Deletes a line, the reader's own; whether it went out. */
   onDelete: (id: string) => boolean;
   /** The room's flash said Ergo's refusal of a delete. */
@@ -136,7 +141,7 @@ export interface LinesProps {
 }
 
 /** The room's flash, then its lines, oldest first, as a list a screen reader hears grow. */
-export function Lines({ room, lines, members, me, refused, onDelete, onDismiss }: LinesProps) {
+export function Lines({ room, lines, members, me, refused, connected, onDelete, onDismiss }: LinesProps) {
   const { listRef, onScroll } = useNewestInView(lines);
   const { stop, mounted, on, leave } = useLineFocus(lines, listRef);
   const { said, setSaid, copy } = useCopy(room);
@@ -151,14 +156,26 @@ export function Lines({ room, lines, members, me, refused, onDelete, onDismiss }
   // Who a mention may shorten (F812): the members, and the authors in view by their account tag, who proved their
   // key as a member did (F819).
   const known = new Set([...members, ...lines.flatMap(({ account }) => (account === undefined ? [] : [account]))]);
-  // A delete that went out hands the focus to a neighbour; one that could not (the link down, a msgid no command
-  // carries) says so, the line kept (/code-review).
-  const remove = (id: string) => {
+  // A delete that went out hands the focus to a neighbour; one that could not says so and why, the line kept
+  // (/code-review, U8): the chat out of reach, to try again once back, or a msgid no command carries.
+  const remove = (id: string): boolean => {
     const went = onDelete(id);
     if (went) {
       setDeleting(id);
       leave(id);
-    } else setSaid({ title: "Could not delete the message." });
+    } else if (connected) setSaid({ title: "Could not delete the message.", line: "This message cannot be deleted." });
+    else {
+      setSaid({
+        title: "Could not delete the message.",
+        line: "The chat is out of reach.",
+        action: {
+          label: "Try again",
+          onAction: () => {
+            remove(id);
+          },
+        },
+      });
+    }
     return went;
   };
   const actionsOf = (line: Line) => (
@@ -177,7 +194,9 @@ export function Lines({ room, lines, members, me, refused, onDelete, onDismiss }
   return (
     <>
       <Flash
-        message={refused === undefined ? said : { title: "Could not delete the message." }}
+        message={
+          refused === undefined ? said : { title: "Could not delete the message.", line: "The chat refused it." }
+        }
         onClose={() => {
           if (refused === undefined) setSaid(null);
           else onDismiss();

@@ -18,13 +18,22 @@ const HISTORY: readonly HistoryLine[] = [
 // Sixty lines, more than the list shows at once.
 const SIXTY = Array.from({ length: 60 }, (_, n): HistoryLine => [`h${String(n)}`, T(n % 60), `Line ${String(n)}`]);
 
-// #games opened on a scripted Ergo, as `me`, with `history`; the socket, to say a live line on it.
+// #games opened on a scripted Ergo, as `me`, with `history`, out of reach while `down` says so (a new connection
+// closed at once); the socket, to say a live line on it.
+interface Opened extends Scripted {
+  me?: string;
+  down?: () => boolean;
+}
 async function room(
   page: Page,
-  { me = GUEST, history = HISTORY, ...options }: Scripted & { me?: string } = {},
+  { me = GUEST, history = HISTORY, down, ...options }: Opened = {},
 ): Promise<() => WebSocketRoute> {
   let socket: WebSocketRoute | undefined;
-  await page.routeWebSocket(/\/ws$/, (ergo) => {
+  await page.routeWebSocket(/\/ws$/, async (ergo) => {
+    if (down?.() === true) {
+      await ergo.close();
+      return;
+    }
     socket = ergo;
     scriptedErgo(ergo, me, { history, ...options });
   });
@@ -330,8 +339,12 @@ test.describe("a line's actions", () => {
       await page.addInitScript(plant);
       await room(page);
       await choose(page, 1, "Copy text");
-      await expect(flash(page, "Could not copy.")).toBeVisible();
+      // 4c's UX review (U8): what could not be copied, and why.
+      await expect(flash(page, "Could not copy the text.")).toBeVisible();
+      await expect(flash(page, "Your browser blocked the clipboard.")).toBeVisible();
       await expect(flash(page, "Text copied.")).toHaveCount(0);
+      await choose(page, 1, "Copy room link");
+      await expect(flash(page, "Could not copy the link.")).toBeVisible();
     });
   }
 
@@ -544,7 +557,7 @@ test.describe("deleting a line", () => {
   // The test's account on a scripted Ergo, its own line among another's.
   async function mine(
     page: Page,
-    options: Scripted = {},
+    options: Opened = {},
   ): Promise<{ address: string; sent: string[]; socket: () => WebSocketRoute }> {
     const address = await logIn(page, word("menu"));
     const sent: string[] = [];
@@ -570,11 +583,12 @@ test.describe("deleting a line", () => {
     await page.keyboard.press("Enter");
     return page.getByRole("dialog", { name: "Delete message?" });
   };
-  // The second line's delete asked and refused, by the page or by Ergo: said, the line kept.
-  const refused = async (page: Page) => {
+  // The second line's delete asked and refused, by the page or by Ergo: said with `why` (U8), the line kept.
+  const refused = async (page: Page, why: string) => {
     const dialog = await deleteFrom(page, 1);
     await dialog.getByRole("button", { name: "Delete" }).press("Enter");
     await expect(flash(page, "Could not delete the message.")).toBeVisible();
+    await expect(flash(page, why)).toBeVisible();
     await expect(lineOf(page, "my own line")).toHaveCount(1);
   };
   // The items of the `at`th line's menu, opened by the pointer on its words.
@@ -673,24 +687,43 @@ test.describe("deleting a line", () => {
         [long, T(1), "my own line", address],
       ],
     });
-    await refused(page);
+    await refused(page, "This message cannot be deleted.");
     await expect(moreOf(page, 1)).toBeFocused();
+    await expect(page.getByRole("status").getByRole("button", { name: "Try again" })).toHaveCount(0);
   });
 
   // /code-review: a copy after Ergo's refusal is said, the refusal dismissed.
   test("says a copy made while Ergo's refusal is on show", async ({ page, context }) => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await mine(page, { refuseRedact: true });
-    await refused(page);
+    await refused(page, "The chat refused it.");
     await choose(page, 0, "Copy text");
     await expect(flash(page, "Text copied.")).toBeVisible();
   });
 
   test("says when Ergo refuses the delete, the line kept", async ({ page }) => {
     await mine(page, { refuseRedact: true });
-    await refused(page);
+    await refused(page, "The chat refused it.");
     // 4c's UX review (U4): refused, the line offers its Delete again.
     await expect(await itemsOf(page, 1, "my own line")).toHaveText(["Copy text", "Copy room link", "Delete"]);
+  });
+
+  // 4c's UX review (U8): a delete the page cannot send while the chat is out of reach says so, and offers to try again
+  // once it is back.
+  test("says a delete the chat is out of reach for, and tries again once asked", async ({ page }) => {
+    let down = false;
+    const { sent, socket } = await mine(page, { down: () => down });
+    down = true;
+    await socket().close();
+    await expect(page.getByText("The chat is out of reach. Trying again…")).toBeVisible();
+    await refused(page, "The chat is out of reach.");
+    expect(sent.filter((line) => line.startsWith("REDACT "))).toEqual([]);
+    down = false;
+    await expect(page.getByText("The chat is out of reach. Trying again…")).toHaveCount(0, { timeout: 15_000 });
+    await page.getByRole("status").getByRole("button", { name: "Try again" }).click();
+    await expect(lineOf(page, "my own line")).toHaveCount(0);
+    expect(sent.filter((line) => line.startsWith("REDACT "))).toEqual(["REDACT #bubble/games o2"]);
+    await expect(flash(page, "Message deleted.")).toBeVisible();
   });
 
   // 4c's UX review (U4): a delete that worked is said, once Ergo's echo takes the line; until then the line offers no
