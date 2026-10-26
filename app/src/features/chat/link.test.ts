@@ -764,12 +764,27 @@ describe("the chat's link: what it says", () => {
     ["a NUL", "a\u0000b"],
     ["a comma", "a,b"],
     ["a leading colon", ":a"],
+    // The green pass (G2): what a command splits on, leading too, and one character past 64.
+    ["a leading space", " a"],
+    ["a leading comma", ",a"],
+    ["a tab", "a\tb"],
+    ["a leading tab", "\ta"],
+    ["a leading CR", "\ra"],
+    ["a leading LF", "\na"],
+    ["a leading NUL", "\u0000a"],
+    ["65 characters", "a".repeat(65)],
     ["600 characters", "a".repeat(600)],
   ])("sends no REDACT for a msgid holding %s", (_, id) => {
     const t = memberIn(["#bubble/games"]);
     const before = t.fake.sent.length;
     expect(t.link.redact("#bubble/games", id)).toBe(false);
     expect(t.fake.sent.slice(before)).toEqual([]);
+  });
+
+  it("deletes by a msgid of 64 characters, the longest a line's tags give", () => {
+    const t = memberIn(["#bubble/games"]);
+    expect(t.link.redact("#bubble/games", "a".repeat(64))).toBe(true);
+    expect(redacted(t.fake.sent)).toEqual([`REDACT #bubble/games ${"a".repeat(64)}`]);
   });
 
   it("says nothing as a guest: a room lets accounts alone speak", () => {
@@ -1030,6 +1045,39 @@ describe("the chat's link: the history read past reactions", () => {
     expect(before(t.fake.sent)).toEqual([]);
   });
 
+  // The green pass (G2): the oldest item's msgid as its tag carries it, what a command splits on leading too.
+  it.each([
+    ["a leading space", String.raw`\sa`],
+    ["a leading comma", ",a"],
+    ["a comma", "a,b"],
+    ["a leading colon", ":a"],
+    ["a tab", "a\tb"],
+    ["a leading CR", String.raw`\ra`],
+    ["a leading LF", String.raw`\na`],
+    ["65 characters", "a".repeat(65)],
+  ])("asks nothing before an oldest item whose msgid holds %s", (_, first) => {
+    const t = asked();
+    page(t.fake, { first });
+    expect(before(t.fake.sent)).toEqual([]);
+  });
+
+  it("asks before an oldest item whose msgid has 64 characters", () => {
+    const t = asked();
+    page(t.fake, { first: "a".repeat(64) });
+    expect(before(t.fake.sent)).toEqual([
+      `CHATHISTORY BEFORE ${ROOM} msgid=${"a".repeat(64)} ${String(HISTORY_LINES)}`,
+    ]);
+  });
+
+  // The green pass (G11): a page of nothing asks nothing, and throws nothing.
+  it("asks nothing for an empty page, and throws nothing", () => {
+    const t = asked();
+    expect(() => {
+      page(t.fake, { count: 0 });
+    }).not.toThrow();
+    expect(before(t.fake.sent)).toEqual([]);
+  });
+
   it("counts its asks again on a new connection", () => {
     const t = asked();
     for (const from of [4000, 3000, 2000]) page(t.fake, { from });
@@ -1074,11 +1122,29 @@ describe("the chat's link: replies", () => {
     ["a backslash", "a\\b"],
     ["nothing", ""],
     ["65 characters", "a".repeat(65)],
+    // The green pass (G2): what a tag escapes, leading too.
+    ["a leading semicolon", ";a"],
+    ["a leading backslash", "\\a"],
+    ["a leading space", " a"],
+    ["a leading comma", ",a"],
+    ["a comma", "a,b"],
+    ["a leading colon", ":a"],
+    ["a tab", "a\tb"],
+    ["a leading CR", "\ra"],
+    ["a leading LF", "\na"],
   ])("sends no reply to a msgid holding %s, nor the draft without it", (_, id) => {
     const t = memberIn(["#bubble/games"]);
     const before = t.fake.sent.length;
     expect(t.link.say("#bubble/games", "hi", id)).toBe(false);
     expect(t.fake.sent.slice(before)).toEqual([]);
+  });
+
+  it("sends a reply to a msgid of 64 characters", () => {
+    const t = memberIn(["#bubble/games"]);
+    expect(t.link.say("#bubble/games", "hi", "a".repeat(64))).toBe(true);
+    expect(t.fake.sent.filter((line) => line.startsWith("@"))).toEqual([
+      `@+reply=${"a".repeat(64)} PRIVMSG #bubble/games :hi`,
+    ]);
   });
 
   it("sends no reply as a guest, nor in a room Ergo has not said it is in", () => {

@@ -1,7 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, test } from "vitest";
 import { escapeTagValue, parseLine, type IrcMessage } from "../irc/irc.ts";
-import { addReactions, reactionOf, reactionsOn, redactReactions, type Reaction } from "./reactions.ts";
+import { addReactions, reactionLine, reactionOf, reactionsOn, redactReactions, type Reaction } from "./reactions.ts";
 
 const ME = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -90,6 +90,16 @@ describe("reactionOf: a reaction from Ergo's TAGMSG", () => {
     ["a leading colon", ":m1"],
     ["a semicolon", "m;1"],
     ["a backslash", "m\\1"],
+    ["a leading space", " m1"],
+    ["a leading semicolon", ";m1"],
+    ["a leading backslash", "\\m1"],
+    ["a leading comma", ",m1"],
+    ["a tab", "m\t1"],
+    ["a leading tab", "\tm1"],
+    ["a CR", "m\r1"],
+    ["a leading CR", "\rm1"],
+    ["an LF", "m\n1"],
+    ["a leading LF", "\nm1"],
     ["a comma", "m1,m2"],
     ["65 characters", "m".repeat(65)],
   ])("reads no reaction to a msgid holding %s", (_, to) => {
@@ -135,6 +145,46 @@ describe("reactionOf: a reaction from Ergo's TAGMSG", () => {
 
 // A room keeps one reaction an account, a line and an emoji: the newest, added or taken back (R2), so an account
 // repeating itself evicts no one else's; then the newest `cap` of those, in time order.
+// The green pass (G2, G3): what the page sends, built in core: one RGI emoji, a msgid a tag carries back, or nothing.
+describe("reactionLine: the TAGMSG that adds or takes back a reaction", () => {
+  test("adds a reaction, and takes one back, labelled, to the msgid it answers", () => {
+    expect(reactionLine({ to: "m1", emoji: "👍", on: true }, "#bubble", "r1")).toBe(
+      "@label=r1;+draft/react=👍;+reply=m1 TAGMSG #bubble",
+    );
+    expect(reactionLine({ to: "m".repeat(64), emoji: "😂", on: false }, "#bubble", "r2")).toBe(
+      `@label=r2;+draft/unreact=😂;+reply=${"m".repeat(64)} TAGMSG #bubble`,
+    );
+  });
+
+  test.each([
+    ["a second tag", "👍;+typing=active"],
+    ["a space", "👍 "],
+    ["a CR LF and a command", "👍\r\nQUIT"],
+    ["words", "nice"],
+  ])("sends nothing for an emoji holding %s", (_, emoji) => {
+    expect(reactionLine({ to: "m1", emoji, on: true }, "#bubble", "r1")).toBeUndefined();
+  });
+
+  test.each([
+    ["nothing", ""],
+    ["a space", "m 1"],
+    ["a leading space", " m1"],
+    ["a semicolon and a second tag", "m;+typing=active"],
+    ["a leading semicolon", ";m1"],
+    ["a backslash", "m\\1"],
+    ["a leading backslash", "\\m1"],
+    ["a comma", "m,1"],
+    ["a leading comma", ",m1"],
+    ["a leading colon", ":m1"],
+    ["a tab", "m\t1"],
+    ["a CR LF and a command", "m\r\nQUIT"],
+    ["an LF", "m\n1"],
+    ["65 characters", "m".repeat(65)],
+  ])("sends nothing for a msgid holding %s", (_, to) => {
+    expect(reactionLine({ to, emoji: "👍", on: true }, "#bubble", "r1")).toBeUndefined();
+  });
+});
+
 describe("addReactions: a room's reactions, the newest of each, in time order, the newest kept", () => {
   test("keeps reactions in time order, then by msgid, whatever order they come in", () => {
     const [late, early, tie] = [
@@ -184,6 +234,17 @@ describe("addReactions: a room's reactions, the newest of each, in time order, t
     expect(kept).toHaveLength(1000);
     expect(kept[0]?.id).toBe("r200");
     expect(kept.at(-1)?.id).toBe("r1199");
+  });
+
+  // The green pass (G3): a full window still takes a newer reaction, its oldest let go.
+  test("takes a newer reaction into a full window, letting its oldest go", () => {
+    const held = frozen([
+      reaction({ id: "a", time: second(1), who: "a" }),
+      reaction({ id: "b", time: second(2), who: "b" }),
+    ]);
+    const kept = addReactions(held, [reaction({ id: "c", time: second(3), who: "c" })], 2);
+    expect(kept).not.toBe(held);
+    expect(kept.map(({ id }) => id)).toEqual(["b", "c"]);
   });
 
   test("gives back the same array when nothing new came, or what came is older than all it keeps", () => {
