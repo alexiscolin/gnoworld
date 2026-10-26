@@ -7,9 +7,10 @@ import { inlines } from "./nodes.ts";
 import { before } from "./scan.ts";
 import type { Block } from "./types.ts";
 
-// What ends in a letter, a digit or `_`, its last character whole. No character class before `$`: V8 14.6 (Chromium
+// What ends in a letter, a digit or `_`, its last character whole, or in one this engine's Unicode has not assigned,
+// which the server's newer tables may know as a letter (F817). No character class before `$`: V8 14.6 (Chromium
 // 156, Node 26) misses a letter past the BMP there (F816).
-const WORDLY_END = /(?:\p{L}|\p{N}|_)$/u;
+const WORDLY_END = /(?:\p{L}|\p{N}|_|\p{Cn})$/u;
 const MENTION = /@(g1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{38})(?![\p{L}\p{N}_])/uy;
 
 /** The account a mention at `at` (an `@`) names, or none: none after what folds to a letter, a digit, `_` or nothing
