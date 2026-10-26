@@ -2,7 +2,7 @@
 // "checked"; the service's own frame on a click alone, so no third party is reached before. A hidden line's, none.
 import type { StreamEvent } from "@gnoworld/schemas";
 import { Button, Cluster } from "@gnoworld/ui";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Embed as Player } from "./embeds.ts";
 import styles from "./Embed.module.css";
 
@@ -12,10 +12,17 @@ export interface EmbedProps {
   verdict: StreamEvent["state"] | undefined;
 }
 
-/** A service's player, framed. */
+/** A service's player, framed; it takes the focus as it opens, on the reader's click, its whole frame in view (F895,
+ * F899): the card it replaces held the focus, which would otherwise fall to the page. */
 export function PlayerFrame({ embed }: { embed: Player }) {
+  const frameRef = useRef<HTMLIFrameElement>(null);
+  useEffect(() => {
+    frameRef.current?.focus({ preventScroll: true });
+    frameRef.current?.scrollIntoView({ block: "nearest" });
+  }, []);
   return (
     <iframe
+      ref={frameRef}
       src={embed.src}
       title={embed.title}
       className={styles["frame"]}

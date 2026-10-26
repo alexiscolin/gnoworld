@@ -146,6 +146,27 @@ test.describe("a link's player", () => {
     await asksNothingSaidSince(page);
   });
 
+  // U1, U10 (F895, F899): Play swapped the card for the frame, the focus fell to the page, and the frame of a line near
+  // the list's end opened below the list's view.
+  test("gives the player the focus and its whole frame in the list's view on Play", async ({ page }) => {
+    let said = "";
+    const { say } = await room(page, () => said);
+    for (let n = 0; n < 12; n += 1) say(`f${String(n)}`, `line ${String(n)}`);
+    said = event("v9", "checked");
+    say("v9", "last https://youtu.be/dQw4w9WgXcQ");
+    const button = lineOf(page, "last").getByRole("button", { name: "Play the YouTube video" });
+    await expect(button).toBeEnabled();
+    await button.press("Enter");
+    const frame = lineOf(page, "last").locator("iframe");
+    await expect(frame).toBeFocused();
+    await expect(async () => {
+      const [box, list] = [await frame.boundingBox(), await page.getByRole("list", { name: "Messages" }).boundingBox()];
+      if (box === null || list === null) throw new Error("the frame or the list has no box");
+      expect(box.y).toBeGreaterThanOrEqual(list.y);
+      expect(box.y + box.height).toBeLessThanOrEqual(list.y + list.height + 1);
+    }).toPass();
+  });
+
   // F888: the stream given up (a 429: a fifth tab, a shared address), a line said since waited for good.
   test("asks the server of a line said after the stream began once the browser gave the stream up", async ({
     page,
