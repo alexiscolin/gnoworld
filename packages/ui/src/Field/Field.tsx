@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, type KeyboardEvent } from "react";
 import { Sidebar, Stack } from "../compositions/index.ts";
 import styles from "./Field.module.css";
 
@@ -6,8 +6,9 @@ export interface FieldProps {
   label: string;
   value: string;
   onChange: (value: string) => void;
-  /** Text unless asked; a date is the browser's date and time. */
-  kind?: "text" | "search" | "date";
+  /** Text unless asked; a date is the browser's date and time; lines is a box of several lines, in which Enter
+   * submits the form and Shift+Enter adds a line, a chat's box. */
+  kind?: "text" | "search" | "date" | "lines";
   help?: string;
   error?: string;
   /** Words before the box, outside its value: "@" before a name. */
@@ -16,6 +17,49 @@ export interface FieldProps {
 
 const TYPES = { text: "text", search: "search", date: "datetime-local" } as const;
 
+// Enter sends the form, but not the Enter that ends an input method's composition, which only picks the word.
+function submitOnEnter(event: KeyboardEvent<HTMLTextAreaElement>): void {
+  if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+  event.preventDefault();
+  event.currentTarget.form?.requestSubmit();
+}
+
+interface BoxProps extends Pick<FieldProps, "value" | "onChange"> {
+  kind: NonNullable<FieldProps["kind"]>;
+  id: string;
+  invalid: boolean;
+  described: string | undefined;
+}
+
+// The box itself: a line of text, or the lines of a message.
+function Box({ kind, id, value, invalid, described, onChange }: BoxProps) {
+  const shared = {
+    id,
+    className: styles["box"],
+    value,
+    "aria-invalid": invalid ? true : undefined,
+    "aria-describedby": described,
+  };
+  return kind === "lines" ? (
+    <textarea
+      {...shared}
+      rows={2}
+      onKeyDown={submitOnEnter}
+      onChange={(event) => {
+        onChange(event.target.value);
+      }}
+    />
+  ) : (
+    <input
+      {...shared}
+      type={TYPES[kind]}
+      onChange={(event) => {
+        onChange(event.target.value);
+      }}
+    />
+  );
+}
+
 /** A labelled box, described by its help and its error, which also marks it invalid. */
 export function Field({ label, value, onChange, kind = "text", help, error, prefix }: FieldProps) {
   const id = useId();
@@ -23,16 +67,13 @@ export function Field({ label, value, onChange, kind = "text", help, error, pref
   const errorId = `${id}-error`;
   const described = [help === undefined ? null : helpId, error === undefined ? null : errorId].filter(Boolean);
   const box = (
-    <input
+    <Box
+      kind={kind}
       id={id}
-      type={TYPES[kind]}
-      className={styles["box"]}
       value={value}
-      aria-invalid={error === undefined ? undefined : true}
-      aria-describedby={described.join(" ") || undefined}
-      onChange={(event) => {
-        onChange(event.target.value);
-      }}
+      invalid={error !== undefined}
+      described={described.join(" ") || undefined}
+      onChange={onChange}
     />
   );
   return (

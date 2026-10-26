@@ -1,4 +1,4 @@
-/* The field: a box on the resting fill, one line at the default control's height; invalid, coral. */
+/* The field: a box on the resting fill, one line at the default control's height, or two for a box of several lines; invalid, coral. */
 @layer components {
   .label {
     font: var(--font-ui);

@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { eachStory, staysText } from "../testing.tsx";
@@ -58,6 +59,61 @@ describe("Field", () => {
     expect(screen.getByRole("searchbox", { name: "Search" })).toBeTruthy();
     rerender(<Field kind="date" label="Starts" value="2026-10-21T18:00" onChange={vi.fn()} />);
     expect(screen.getByLabelText("Starts").getAttribute("type")).toBe("datetime-local");
+  });
+
+  // A box of several lines (slice 4's multiline, docs/decisions.md row 255): Enter submits its form, Shift+Enter
+  // adds a line, as a chat's box does; an Enter that ends a composition (an input method's) submits nothing.
+  it("is a box of several lines when asked, named by its label and described by its help", () => {
+    render(<Field kind="lines" label="Message" help="Shift+Enter adds a line" value="" onChange={vi.fn()} />);
+    const box = screen.getByRole("textbox", { name: "Message" });
+    expect(box.tagName).toBe("TEXTAREA");
+    expect(box.getAttribute("aria-describedby")).toBe(screen.getByText("Shift+Enter adds a line").id);
+  });
+
+  it("submits its form on Enter, and adds a line on Shift+Enter", async () => {
+    const submitted = vi.fn((event: SubmitEvent) => {
+      event.preventDefault();
+    });
+    function Form() {
+      const [value, setValue] = useState("");
+      return (
+        <form
+          onSubmit={(event) => {
+            submitted(event.nativeEvent);
+          }}
+        >
+          <Field kind="lines" label="Message" value={value} onChange={setValue} />
+        </form>
+      );
+    }
+    render(<Form />);
+    const box = screen.getByRole("textbox", { name: "Message" });
+    await userEvent.type(box, "one{Shift>}{Enter}{/Shift}two");
+    expect(box).toHaveProperty("value", "one\ntwo");
+    expect(submitted).not.toHaveBeenCalled();
+    await userEvent.type(box, "{Enter}");
+    expect(submitted).toHaveBeenCalledTimes(1);
+    expect(box).toHaveProperty("value", "one\ntwo");
+  });
+
+  it("submits nothing on the Enter that ends an input method's composition", () => {
+    const submitted = vi.fn((event: SubmitEvent) => {
+      event.preventDefault();
+    });
+    render(
+      <form
+        onSubmit={(event) => {
+          submitted(event.nativeEvent);
+        }}
+      >
+        <Field kind="lines" label="Message" value="か" onChange={vi.fn()} />
+      </form>,
+    );
+    // Not prevented either: the input method still takes the key.
+    expect(
+      fireEvent.keyDown(screen.getByRole("textbox", { name: "Message" }), { key: "Enter", isComposing: true }),
+    ).toBe(true);
+    expect(submitted).not.toHaveBeenCalled();
   });
 
   it("shows its prefix before the box, outside its value", () => {

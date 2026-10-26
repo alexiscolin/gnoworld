@@ -14,3 +14,9 @@ export const WithPrefix: Story = { args: { label: "Name", prefix: "@", value: "a
 export const WithError: Story = {
   args: { label: "Name", prefix: "@", value: "ab", help: "Six letters at least", error: "Too short" },
 };
+export const Lines: Story = {
+  args: { kind: "lines", label: "Message", help: "Shift+Enter adds a line", value: "- one\n- two\n- three" },
+};
+export const LinesWithError: Story = {
+  args: { kind: "lines", label: "Message", value: "one\ntwo", error: "Line 2 is too long by 12 bytes." },
+};
