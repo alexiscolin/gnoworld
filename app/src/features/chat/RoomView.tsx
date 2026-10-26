@@ -53,10 +53,20 @@ export interface RoomViewProps {
 }
 
 // A person: a guest by its nick, said so; an account's address shortened, its whole in its title; another name
-// whole (the moderation bot's).
-function Person({ name, guest }: { name: string; guest: boolean }) {
+// whole (the moderation bot's). Whether the name is an address, read once by a caller that knows it.
+function Person({ name, guest, account }: PersonProps) {
   if (guest) return <span>{name} (guest)</span>;
-  return Address.safeParse(name).success ? <span title={name}>{shortAddress(name)}</span> : <span>{name}</span>;
+  return (account ?? Address.safeParse(name).success) ? (
+    <span title={name}>{shortAddress(name)}</span>
+  ) : (
+    <span>{name}</span>
+  );
+}
+
+interface PersonProps {
+  name: string;
+  guest: boolean;
+  account?: boolean;
 }
 
 // A line's mentions, space-separated, read apart from its drawing so the compiler keeps the drawing's tree out of
@@ -110,30 +120,32 @@ interface PeopleProps {
 
 function People({ members, connected, me, onMessage }: PeopleProps) {
   const people = members.filter((nick) => nick !== BOT);
-  const writes = (nick: string) => me !== undefined && nick !== me && Address.safeParse(nick).success;
   return (
     <aside aria-label="Who's here">
       <h3 className={styles["count"]}>{connected ? `${String(people.length)} here` : "Who's here"}</h3>
       <ul className={shared["plain"]}>
-        {people.slice(0, MEMBERS_SHOWN).map((nick) => (
-          <li key={nick}>
-            <Person name={nick} guest={!Address.safeParse(nick).success} />
-            {onMessage !== undefined && writes(nick) ? (
-              <>
-                {" "}
-                <IconButton
-                  icon="chat"
-                  size="s"
-                  emphasis="plain"
-                  label={`Write to ${shortAddress(nick)}`}
-                  onClick={() => {
-                    onMessage(nick);
-                  }}
-                />
-              </>
-            ) : null}
-          </li>
-        ))}
+        {people.slice(0, MEMBERS_SHOWN).map((nick) => {
+          const account = Address.safeParse(nick).success;
+          return (
+            <li key={nick}>
+              <Person name={nick} guest={!account} account={account} />
+              {onMessage !== undefined && account && me !== undefined && nick !== me ? (
+                <>
+                  {" "}
+                  <IconButton
+                    icon="chat"
+                    size="s"
+                    emphasis="plain"
+                    label={`Write to ${shortAddress(nick)}`}
+                    onClick={() => {
+                      onMessage(nick);
+                    }}
+                  />
+                </>
+              ) : null}
+            </li>
+          );
+        })}
       </ul>
       {people.length > MEMBERS_SHOWN ? <p>and {String(people.length - MEMBERS_SHOWN)} more</p> : null}
     </aside>

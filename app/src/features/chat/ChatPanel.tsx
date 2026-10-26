@@ -75,6 +75,10 @@ function Loaded({ sections, current, state, chat, session, say, sayTo, dms }: Lo
   const [, setParams] = useSearchParams();
   const me = session.kind === "in" ? session.address : undefined;
   const { partner } = dms;
+  // Apart from the room's element, which each line draws again: who is here keeps its drawing (the compiler).
+  const onMessage = (other: string) => {
+    setParams({ dm: other });
+  };
   return (
     <Sidebar space="l">
       <RoomsView sections={sections} current={partner === undefined ? current : undefined} dms={dms.nav} />
@@ -110,9 +114,7 @@ function Loaded({ sections, current, state, chat, session, say, sayTo, dms }: Lo
           state={state}
           chat={chat}
           me={me}
-          onMessage={(other) => {
-            setParams({ dm: other });
-          }}
+          onMessage={onMessage}
           composer={
             <Writer
               session={session}
