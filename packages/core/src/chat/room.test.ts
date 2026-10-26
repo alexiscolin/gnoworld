@@ -461,3 +461,10 @@ describe("topicAfter: the room's description", () => {
     expect(topicAfter("mine", read(text), "#bubble")).toBe("mine");
   });
 });
+
+// 4d: a reaction travels as a TAGMSG to its room (draft/react), which a client with 100 rooms reads in that one.
+describe("concerns: a reaction's room", () => {
+  test("names the room of a TAGMSG, whatever its case", () => {
+    expect(concerns(read(`@+draft/react=x;+reply=a :${ALICE}!u@h TAGMSG #Bubble`))).toBe("#bubble");
+  });
+});
