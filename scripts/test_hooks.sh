@@ -2260,7 +2260,7 @@ git -C "$w/repo" worktree add -q --detach "$tmp/dead/tree" && echo "$dead" >"$tm
 git -C "$w/repo" worktree add -q --detach "$tmp/live/tree" && echo "$$" >"$tmp/live/owner"
 git -C "$w/repo" worktree add -q --detach "$tmp/other/tree"
 # A run killed while it holds its copy: the next run clears it, by the pid it wrote.
-(cd "$w/repo" && TMPDIR="$tmp" exec python3 -I -c 'import sys, time; sys.path.insert(0, sys.argv[1]); from repo_files import worktree
+(cd "$w/repo" && TMPDIR="$tmp" exec python3 -I -c 'import sys, time; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); from repo_files import worktree
 with worktree("HEAD"): print("in", flush=True); time.sleep(60)' "$here" >"$w/killed" 2>&1) &
 victim=$!
 tries=0
@@ -2272,7 +2272,7 @@ done
 kill -9 "$victim"
 wait "$victim" 2>/dev/null || :
 [ "$(ls "$tmp" | grep -vc '^\(dead\|live\|other\)$')" = 1 ] || fail "the killed run left no copy to clear: $(ls "$tmp")"
-(cd "$w/repo" && TMPDIR="$tmp" python3 -I -c 'import sys; sys.path.insert(0, sys.argv[1]); from repo_files import worktree
+(cd "$w/repo" && TMPDIR="$tmp" python3 -I -c 'import sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); from repo_files import worktree
 with worktree("HEAD") as tree: print(tree)' "$here" >"$w/out" 2>&1) || fail "repo_files.worktree failed beside a dead run's copy: $(cat "$w/out")"
 [ ! -e "$tmp/dead" ] || fail "a killed run's copy was left: $(ls "$tmp")"
 [ "$(git -C "$w/repo" worktree list --porcelain | grep -c 'dead/tree')" = 0 ] || fail "a killed run's worktree stayed registered"
