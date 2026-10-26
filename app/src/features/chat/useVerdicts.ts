@@ -1,6 +1,6 @@
-// The shown room's verdicts, which a link's player waits on (slice 4's 4g): the stream's, for the room in view; and
-// the server's (askVerdicts.ts) for the lines in view the stream did not give. A reader who saves data is shown no
-// player, so opens no stream, and with none opened no line is older than it: nothing is asked either (F879).
+// The shown room's verdicts, which a link's player waits on (slice 4's 4g): its stream's and the server's, which the
+// asker (askVerdicts.ts) follows and asks. A reader who saves data is shown no player, so follows and asks nothing
+// (F879).
 import type { Line } from "@gnoworld/core";
 import { useEffect, useRef } from "react";
 import { pageVerdictsApi } from "../../lib/api/verdicts.ts";
@@ -12,28 +12,24 @@ import { savesData } from "./embeds.ts";
 type Store = ReturnType<typeof createAppStore>;
 
 export function useVerdicts(store: Store, current: string | undefined, lines: readonly Line[] | undefined): void {
-  // When the shown room's stream opened: the lines said before it are the server's to answer (F884).
-  const sinceRef = useRef(0);
-  useEffect(() => {
-    if (current === undefined || savesData()) return;
-    sinceRef.current = Date.now();
-    return pageVerdicts([current], store.getState().verdictActions.judged);
-  }, [store, current]);
-  // The asker, made once the page runs, as the panel's link is.
+  // The asker, made once the page runs, as the panel's link is; none for a reader who saves data (F879).
   const askerRef = useRef<ReturnType<typeof verdictAsker>>(undefined);
   useEffect(() => {
+    if (savesData()) return;
     const api = pageVerdictsApi();
     const asker = verdictAsker({
       verdicts: (room, ids) => api.verdicts(room, ids),
       judged: (event) => {
         store.getState().verdictActions.judged(event);
       },
+      held: (room) => store.getState().verdicts[room],
+      follow: (room, on) => pageVerdicts([room], on.verdict),
+      now: Date.now,
     });
     askerRef.current = asker;
     return asker.stop;
   }, [store]);
   useEffect(() => {
-    if (current === undefined || lines === undefined) return;
-    askerRef.current?.ask(current, { lines, held: store.getState().verdicts[current], since: sinceRef.current });
-  }, [store, current, lines]);
+    askerRef.current?.show(current, lines);
+  }, [current, lines]);
 }

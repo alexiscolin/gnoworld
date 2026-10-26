@@ -20,6 +20,7 @@ const NONE: Result<LineVerdicts> = { ok: true, value: { room: "#bubble", verdict
 function server(answer: (ids: readonly string[]) => Promise<Result<LineVerdicts>> = () => Promise.resolve(NONE)) {
   const sent: string[][] = [];
   const heard: StreamEvent[] = [];
+  let holding: Record<string, unknown> | undefined;
   const asker = verdictAsker({
     verdicts: (_room, ids) => {
       sent.push([...ids]);
@@ -28,9 +29,13 @@ function server(answer: (ids: readonly string[]) => Promise<Result<LineVerdicts>
     judged: (event) => {
       heard.push(event);
     },
+    held: () => holding,
+    follow: () => () => undefined,
+    now: () => OPENED,
   });
   const ask = (lines: readonly Line[], held?: Record<string, unknown>) => {
-    asker.ask("#bubble", { lines, held, since: OPENED });
+    holding = held;
+    asker.show("#bubble", lines);
   };
   return { ask, sent, heard, stop: asker.stop };
 }
