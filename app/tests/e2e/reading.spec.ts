@@ -1,9 +1,9 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { WebSocketRoute } from "@playwright/test";
 import { lineOf, lines, word } from "./chat.ts";
-import { expect, hydrated, test } from "./fixtures.ts";
+import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
-import { scriptedErgo, type HistoryLine } from "./scripted.ts";
+import { scriptedErgo, type HistoryLine, type Scripted } from "./scripted.ts";
 import {
   field,
   hiddenTab,
@@ -21,6 +21,28 @@ import {
 } from "./scriptedRoom.ts";
 
 const ACCOUNT = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+
+// #games opened as `address` on a scripted Ergo, each connection's script from `scripts` (its number, from 1, and
+// the history it may hold back): the lines the page sent, its sockets, and the release of the held history.
+async function heldHistory(
+  page: Page,
+  address: string,
+  scripts: (connection: number, held: Promise<void>) => Scripted,
+) {
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((done) => {
+    release = done;
+  });
+  const sent: string[] = [];
+  const sockets: WebSocketRoute[] = [];
+  await page.routeWebSocket(/\/ws$/, (ergo) => {
+    sockets.push(ergo);
+    scriptedErgo(ergo, address, { heard: (line) => sent.push(line), ...scripts(sockets.length, held) });
+  });
+  await page.goto("/w/bubble?room=games");
+  await hydrated(page);
+  return { sent, sockets, release };
+}
 
 // 4f (docs/decisions.md, 2026-10-21): the reading place Ergo keeps for the account (draft/read-marker): the first line
 // past it marked New, and the room in view marked read, on a scripted Ergo. No test sleeps: what the page did not send
@@ -47,18 +69,11 @@ test.describe("the reading place", () => {
     page,
   }) => {
     const address = await logIn(page, word("read"));
-    let release: () => void = () => undefined;
-    const historyAfter = new Promise<void>((done) => {
-      release = done;
-    });
-    const sent: string[] = [];
-    const sockets: WebSocketRoute[] = [];
-    await page.routeWebSocket(/\/ws$/, (ergo) => {
-      sockets.push(ergo);
-      scriptedErgo(ergo, address, { history: HISTORY, read: T(0), heard: (line) => sent.push(line), historyAfter });
-    });
-    await page.goto("/w/bubble?room=games");
-    await hydrated(page);
+    const { sent, sockets, release } = await heldHistory(page, address, (_, held) => ({
+      history: HISTORY,
+      read: T(0),
+      historyAfter: held,
+    }));
     await expect.poll(() => sent.some((line) => line.startsWith("CHATHISTORY "))).toBe(true);
     sockets.at(-1)?.send(live("live", T(5), { text: "a live line" }));
     await expect(lineOf(page, "a live line")).toBeVisible();
