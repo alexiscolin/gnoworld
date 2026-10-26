@@ -79,6 +79,28 @@ describe("Tooltip", () => {
     expect(shown()).toBe("false");
   });
 
+  // F832: a refusal of its words other than Chrome's during another popover's toggle is no state it waits out.
+  const refusing = (error: Error) => {
+    const words = tip();
+    const toggle = words.togglePopover.bind(words);
+    let refused = 0;
+    vi.spyOn(words, "togglePopover").mockImplementation((force) => {
+      if (force !== true || refused > 0) return toggle(force);
+      refused += 1;
+      throw error;
+    });
+    return () => refused;
+  };
+
+  it("lets any other refusal of its words rise (F832)", () => {
+    draw();
+    refusing(new TypeError("not a popover"));
+    expect(() => {
+      keyboardFocus();
+    }).toThrow("not a popover");
+    vi.restoreAllMocks();
+  });
+
   // A focused control removed may fire no blur (jsdom fires none): the words go with it all the same (F353).
   it("hides the words the keyboard showed when their control leaves the page", async () => {
     const tipped = (control: boolean) => (
