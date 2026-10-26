@@ -3,6 +3,7 @@
 // (?room=<name>), else the world's main room, else the first listed, the one whose history the link asks. The
 // link lives as long as the page: leaving the world leaves Ergo. An account writes in the room through the link
 // (4c); a guest reads, a room letting accounts alone speak.
+import type { Reacting } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";
 import { Button, Sidebar, Stack } from "@gnoworld/ui";
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -100,9 +101,11 @@ interface LoadedProps {
   redact: (room: string, id: string) => boolean;
   /** The room's refused delete, said. */
   dismissed: (room: string) => void;
+  /** Reacts to a line of a room, or takes the reaction back (4d); whether it went out. */
+  react: (room: string, reaction: Reacting) => boolean;
 }
 
-function Loaded({ sections, current, state, chat, session, say, redact, dismissed }: LoadedProps) {
+function Loaded({ sections, current, state, chat, session, say, redact, dismissed, react }: LoadedProps) {
   const ids = roomIds(sections);
   useRoomKeys(ids, current);
   return (
@@ -118,6 +121,7 @@ function Loaded({ sections, current, state, chat, session, say, redact, dismisse
           onDismiss={() => {
             dismissed(current);
           }}
+          onReact={(reaction) => react(current, reaction)}
           composer={
             <Writer
               session={session}
@@ -204,6 +208,7 @@ export function ChatPanel({ world }: { world: string }) {
       session={session}
       say={(room, draft) => linkRef.current?.say(room, draft) ?? false}
       redact={(room, id) => linkRef.current?.redact(room, id) ?? false}
+      react={(room, reaction) => linkRef.current?.react(room, reaction) ?? false}
       dismissed={(room) => {
         store.getState().chatActions.dismissed(room);
       }}

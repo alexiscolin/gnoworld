@@ -16,7 +16,15 @@ const LINE: Line = {
 const GUEST_LINE: Line = { id: "g1", time: LINE.time, from: "guest-ab12cd", text: "hi", kind: "message" };
 const draw = (over: Partial<Parameters<typeof LineActions>[0]> = {}) =>
   renderToStaticMarkup(
-    <LineActions line={LINE} room="#bubble/games" me={BOB} onCopy={() => undefined} onDelete={() => true} {...over} />,
+    <LineActions
+      line={LINE}
+      room="#bubble/games"
+      me={BOB}
+      onCopy={() => undefined}
+      onDelete={() => true}
+      onReact={() => true}
+      {...over}
+    />,
   );
 const items = (markup: string) => [...markup.matchAll(/role="menuitem"[^>]*>([^<]+)</g)].map((found) => found[1]);
 // An element's opening tag holding each of these attributes, in any order.
@@ -59,5 +67,41 @@ describe("a line's actions", () => {
     const markup = draw({ me: ALICE });
     expect(markup).toMatch(/<dialog[^>]*>/);
     expect(markup).not.toMatch(/<dialog[^>]*\sopen/);
+  });
+});
+
+// 4d (docs/decisions.md, 2026-10-26): the prototype's bar leads with three quick reactions, each pressed when the
+// reader gave it; "More reactions" waits for the emoji data. An account's alone: a room lets accounts alone speak.
+describe("a line's actions: quick reactions", () => {
+  // The bar's controls, in order, its menu's items left out: a button's name, and whether it is pressed.
+  const controls = (markup: string) =>
+    [...markup.matchAll(/<button(?![^>]*role="menuitem")[^>]*>/g)].map(([tag]) => {
+      const name = /\saria-label="([^"]+)"/.exec(tag)?.[1] ?? "";
+      const pressed = /\saria-pressed="(true|false)"/.exec(tag)?.[1];
+      return pressed === undefined ? name : `${name} (${pressed})`;
+    });
+
+  it("lead with three quick reactions, More last, for an account", () => {
+    const shown = controls(draw());
+    expect(shown.slice(0, 3)).toEqual(["React with 👍 (false)", "React with ❤️ (false)", "React with 😂 (false)"]);
+    expect(shown.at(-1)).toBe("More");
+  });
+
+  it("show a quick reaction the reader already gave as pressed, another's as not", () => {
+    const markup = draw({
+      reactions: [
+        { emoji: "❤️", count: 2, mine: true },
+        { emoji: "👍", count: 1, mine: false },
+      ],
+    });
+    expect(controls(markup).slice(0, 3)).toEqual([
+      "React with 👍 (false)",
+      "React with ❤️ (true)",
+      "React with 😂 (false)",
+    ]);
+  });
+
+  it("offer a guest no reaction", () => {
+    expect(controls(draw({ me: undefined }))).toEqual(["More"]);
   });
 });

@@ -4,7 +4,7 @@
 // (4d); the composer, given, goes below.
 // A line's author is its account tag alone, a nick being only a nick; a member's nick is an account's when it is
 // an address, which a guest's cannot be (Ergo gives a guest 32 characters, server/src/testing/ergo.test.ts:314).
-import type { Line } from "@gnoworld/core";
+import type { Line, Reacting, Reaction } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
 import { Sidebar, Stack } from "@gnoworld/ui";
 import { lazy, Suspense, type ReactNode } from "react";
@@ -56,6 +56,8 @@ export interface RoomViewProps {
         topic: string | undefined;
         /** The msgid of a line Ergo refused to delete (4c). */
         refused?: string | undefined;
+        /** Its reactions (4d). */
+        reactions?: readonly Reaction[] | undefined;
       }
     | undefined;
   chat: ErgoState | "off";
@@ -67,6 +69,8 @@ export interface RoomViewProps {
   onDelete?: ((id: string) => boolean) | undefined;
   /** The room's flash said Ergo's refusal of a delete. */
   onDismiss?: (() => void) | undefined;
+  /** Reacts to a line, or takes the reaction back (4d's reactions); whether it went out. */
+  onReact?: ((reaction: Reacting) => boolean) | undefined;
 }
 
 // Who is here: counted once connected, the bot left out, the first MEMBERS_SHOWN named.
@@ -87,15 +91,22 @@ function People({ members, connected }: { members: readonly string[]; connected:
   );
 }
 
-export function RoomView({ room, state, chat, composer, me, onDelete, onDismiss }: RoomViewProps) {
-  const { lines = [], members = [], topic, refused } = state ?? {};
+// The room's name, its description right after.
+function Heading({ room, topic }: { room: string; topic: string | undefined }) {
+  return (
+    <header>
+      <h2>{roomLabel(room)}</h2>
+      {topic === undefined ? null : <p className={styles["topic"]}>{topic}</p>}
+    </header>
+  );
+}
+
+export function RoomView({ room, state, chat, composer, me, onDelete, onDismiss, onReact }: RoomViewProps) {
+  const { lines = [], members = [], topic, refused, reactions } = state ?? {};
   const connected = chat === "connected";
   return (
     <Stack as="section" space="s">
-      <header>
-        <h2>{roomLabel(room)}</h2>
-        {topic === undefined ? null : <p className={styles["topic"]}>{topic}</p>}
-      </header>
+      <Heading room={room} topic={topic} />
       <p role="status" className={styles["status"]}>
         {connected ? null : NOTICES[chat]}
       </p>
@@ -110,6 +121,8 @@ export function RoomView({ room, state, chat, composer, me, onDelete, onDismiss 
             refused={refused}
             onDelete={onDelete ?? (() => false)}
             onDismiss={onDismiss ?? (() => undefined)}
+            reactions={reactions}
+            onReact={onReact ?? (() => false)}
           />
           {connected && lines.length === 0 ? <p>No messages yet.</p> : null}
           {composer}

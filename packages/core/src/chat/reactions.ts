@@ -38,6 +38,16 @@ function first(tags: IrcMessage["tags"], names: readonly string[], fits: RegExp)
   return names.map((name) => tags.get(name) ?? "").find((value) => fits.test(value));
 }
 
+/** A reaction the page asks for: on a line, by its msgid, one emoji, added or taken back. */
+export type Reacting = Pick<Reaction, "to" | "emoji" | "on">;
+
+/** The labelled TAGMSG that adds or takes back a reaction in a room; none for an emoji not one of RGI's set or a msgid
+ * a tag cannot carry, whatever else they hold (a tag's separator, a space, a CR LF). */
+export function reactionLine({ to, emoji, on }: Reacting, room: string, label: string): string | undefined {
+  if (!EMOJI.test(emoji) || !MSGID.test(to)) return undefined;
+  return `@label=${label};+draft/${on ? "react" : "unreact"}=${emoji};+reply=${to} TAGMSG ${room}`;
+}
+
 // The emoji added (+draft/react, else +react) or taken back (+draft/unreact), not both, or none.
 function changeOf(tags: IrcMessage["tags"]): Pick<Reaction, "emoji" | "on"> | undefined {
   const [added, taken] = [first(tags, ["+draft/react", "+react"], EMOJI), first(tags, ["+draft/unreact"], EMOJI)];

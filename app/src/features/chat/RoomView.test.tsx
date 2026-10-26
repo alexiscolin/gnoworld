@@ -389,3 +389,83 @@ describe("RoomView", () => {
     expect(said(part(html, "Who's here"))).toContain("0 here");
   });
 });
+
+// A part's words as a reader hears them: its tags gone, no space added where none was (R12).
+const wordsOf = (html: string) =>
+  html
+    .replaceAll(/<[^>]+>/g, "")
+    .replaceAll("&#x27;", "'")
+    .replaceAll("&amp;", "&")
+    .trim();
+// The Messages list's own lines, each one's words.
+const linesOf = (html: string) =>
+  [...part(html, "Messages").matchAll(/<li[^>]*>(.*?)<\/li>/gs)].map((m) => wordsOf(m[1] ?? ""));
+// Each button's name and pressed state, its attributes in any order (R12).
+const pressables = (html: string) =>
+  [...html.matchAll(/<button[^>]*>/g)].flatMap(([tag]) => {
+    const name = /\saria-label="([^"]+)"/.exec(tag)?.[1];
+    const pressed = /\saria-pressed="(true|false)"/.exec(tag)?.[1];
+    return name === undefined || pressed === undefined ? [] : [`${name} (${pressed})`];
+  });
+
+// 4d: under a line, its reactions as the design system's chips, an emoji and its count, the reader's own pressed, each
+// named for a screen reader (its emoji, its count, "including you": docs/DESIGN-SYSTEM.md), out of the list's live
+// announcements; 20 distinct emoji a line at most, the rest said in a word (docs/decisions.md, 2026-10-26).
+describe("RoomView: reactions", () => {
+  // The view reads no msgid of a reaction: each keeps the same.
+  const reaction = (to: string, emoji: string, who: string) => ({ id: "r", time: T0, to, emoji, who, on: true });
+  const REACTIONS = [
+    reaction("a", "👍", ALICE),
+    reaction("a", "👍", BOB),
+    reaction("a", "😂", ALICE),
+    { ...reaction("b", "❤️", ALICE), on: false },
+  ];
+  const TWO = [line({ id: "a", text: "first" }), line({ id: "b", text: "second" })];
+  // 25 distinct emoji on a line, by one account.
+  const MANY = [...new Intl.Segmenter().segment("😀😁😂🤣😃😄😅😆😉😊😋😎😍😘🥰😗😙🥲😚🙂🤗🤩🤔🫡🤨")].map(
+    ({ segment }) => reaction("a", segment, ALICE),
+  );
+
+  it("shows a line's reactions under it to an account, as chips it may press, its own pressed", () => {
+    const html = view({ me: BOB, onReact: () => true, state: { ...ROOM, lines: TWO, reactions: REACTIONS } });
+    expect(pressables(part(html, "Messages"))).toEqual(["👍, 2, including you (true)", "😂, 1 (false)"]);
+    expect(linesOf(html)).toEqual([expect.stringMatching(/first👍 2😂 1$/), expect.stringMatching(/second$/)]);
+  });
+
+  it("shows a line's reactions to a guest as words it cannot press", () => {
+    const html = view({ state: { ...ROOM, lines: TWO, reactions: REACTIONS } });
+    expect(part(html, "Messages")).not.toContain("<button");
+    expect(linesOf(html)[0]).toMatch(/first👍 2😂 1$/);
+  });
+
+  it("keeps a line's reactions out of the list's live announcements", () => {
+    const html = part(
+      view({ me: BOB, onReact: () => true, state: { ...ROOM, lines: TWO, reactions: REACTIONS } }),
+      "Messages",
+    );
+    expect(html).toMatch(/<div[^>]*\saria-live="off"[^>]*>(?:(?!<\/div>).)*👍/s);
+  });
+
+  it("shows 20 distinct emoji a line at most, and says how many more", () => {
+    const html = view({ me: BOB, onReact: () => true, state: { ...ROOM, lines: TWO, reactions: MANY } });
+    expect(pressables(part(html, "Messages"))).toHaveLength(20);
+    expect(linesOf(html)[0]).toMatch(/\+5 more$/);
+  });
+
+  it("adds 20 Tab stops a line at most: three lines of 25 emoji hold 60 chips", () => {
+    const lines = ["a", "b", "c"].map((id) => line({ id, text: id }));
+    const reactions = lines.flatMap(({ id }) => MANY.map((each) => ({ ...each, id: `${each.id}${id}`, to: id })));
+    const html = part(view({ me: BOB, onReact: () => true, state: { ...ROOM, lines, reactions } }), "Messages");
+    expect(html.match(/<button/g)).toHaveLength(60);
+  });
+
+  // R8: a reaction names a msgid; another room's line of that msgid is not its line.
+  it("shows no reaction whose line is not in the room", () => {
+    const html = view({
+      me: BOB,
+      onReact: () => true,
+      state: { ...ROOM, lines: TWO, reactions: [reaction("zz", "👍", ALICE)] },
+    });
+    expect(part(html, "Messages")).not.toContain("👍");
+  });
+});

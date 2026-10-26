@@ -2,7 +2,16 @@
 // newest while the reader is there; a line's text is Markdown (4c), built into elements from an allowlist
 // (Message.tsx); one that mentions the reader says so (4d). The message menu (4c, docs/decisions.md 2026-10-26): the
 // list is one tab stop, a line, the arrows moving among them; a line pointed at or focused shows its bar.
-import { markdown, mentions, type Block, type Line } from "@gnoworld/core";
+import {
+  markdown,
+  mentions,
+  reactionsOn,
+  type Block,
+  type Line,
+  type Reacting,
+  type Reaction,
+  type Shown,
+} from "@gnoworld/core";
 import { Flash, type FlashMessage } from "@gnoworld/ui";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { LineActions } from "./LineActions.tsx";
@@ -10,6 +19,7 @@ import { useLineFocus } from "./lineFocus.ts";
 import { Markdown } from "./Message.tsx";
 import { roomHref } from "./names.ts";
 import { Person } from "./Person.tsx";
+import { Reactions } from "./Reactions.tsx";
 import shared from "./lists.module.css";
 import styles from "./RoomView.module.css";
 
@@ -50,9 +60,12 @@ interface LineViewProps {
   stop: boolean;
   /** Its bar, while pointed at or focused. */
   actions: ReactNode;
+  /** Its reactions as shown (4d), and how an account reacts; none for a guest. */
+  reactions: readonly Shown[] | undefined;
+  react: ((reaction: Reacting) => boolean) | undefined;
 }
 
-function LineView({ line, me, members, stop, actions }: LineViewProps) {
+function LineView({ line, me, members, stop, actions, reactions, react }: LineViewProps) {
   const blocks = markdown(line.text);
   const names = namesOf(line.text);
   const mentioned = names.split(" ").some((address) => address === me);
@@ -68,6 +81,7 @@ function LineView({ line, me, members, stop, actions }: LineViewProps) {
       {line.kind === "action" ? "* " : null}
       <Person name={line.account ?? line.from} guest={line.account === undefined} />{" "}
       <LineText blocks={blocks} me={me} known={known} />
+      {reactions === undefined ? null : <Reactions to={line.id} shown={reactions} react={react} />}
       {actions}
     </li>
   );
@@ -123,13 +137,18 @@ export interface LinesProps {
   onDelete: (id: string) => boolean;
   /** The room's flash said Ergo's refusal of a delete. */
   onDismiss: () => void;
+  /** The room's reactions (4d), shown under their lines. */
+  reactions?: readonly Reaction[] | undefined;
+  /** Reacts to a line, or takes the reaction back, an account's; whether it went out. */
+  onReact: (reaction: Reacting) => boolean;
 }
 
 /** The room's flash, then its lines, oldest first, as a list a screen reader hears grow. */
-export function Lines({ room, lines, members, me, refused, onDelete, onDismiss }: LinesProps) {
+export function Lines({ room, lines, members, me, refused, onDelete, onDismiss, reactions, onReact }: LinesProps) {
   const { listRef, onScroll } = useNewestInView(lines);
   const { stop, mounted, on, leave } = useLineFocus(lines, listRef);
   const { said, setSaid, copy } = useCopy(room);
+  const shown = reactionsOn(reactions ?? [], me);
   // Who a mention may shorten (F812): the members, and the authors in view by their account tag, who proved their
   // key as a member did (F819).
   const known = new Set([...members, ...lines.flatMap(({ account }) => (account === undefined ? [] : [account]))]);
@@ -151,6 +170,8 @@ export function Lines({ room, lines, members, me, refused, onDelete, onDismiss }
         copy(line, what);
       }}
       onDelete={remove}
+      reactions={shown.get(line.id)}
+      onReact={(emoji, on) => onReact({ to: line.id, emoji, on })}
     />
   );
   return (
@@ -179,6 +200,8 @@ export function Lines({ room, lines, members, me, refused, onDelete, onDismiss }
             members={known}
             stop={line.id === stop}
             actions={mounted(line.id) ? actionsOf(line) : null}
+            reactions={shown.get(line.id)}
+            react={me === undefined ? undefined : onReact}
           />
         ))}
       </ol>

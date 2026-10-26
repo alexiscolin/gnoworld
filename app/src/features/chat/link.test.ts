@@ -833,3 +833,81 @@ describe("the chat's link: what it says", () => {
     expect(said(again.sent)).toEqual(["PRIVMSG #bubble/games :back"]);
   });
 });
+
+// 4d: a reaction is a TAGMSG naming the line it answers (+draft/react to add, +draft/unreact to take back, Ergo storing
+// both), labelled so Ergo's answer to it is known (labeled-response). What holds say and redact holds it: an account's,
+// in a room Ergo says it is in; one emoji of RGI's set, a msgid a tag may carry.
+describe("the chat's link: reactions", () => {
+  const MSGID = "rmq4xvjw9ys5pwtqqjxbqwvhjc";
+  const memberIn = (rooms: readonly string[]) => {
+    const t = setup();
+    t.link.follow(rooms);
+    t.link.show(rooms[0]);
+    t.signedIn(ADDRESS);
+    const fake = t.connected(ADDRESS);
+    fake.line(`:${ADDRESS}!u@h JOIN ${rooms[0] ?? ""}`);
+    return { ...t, fake };
+  };
+  const tagged = (sent: readonly string[]) => sent.filter((line) => line.startsWith("@"));
+
+  it("reacts to a line by its msgid with one emoji, takes the reaction back, each labelled apart", () => {
+    const t = memberIn(["#bubble/games"]);
+    expect(t.link.react("#bubble/games", { to: MSGID, emoji: "👍", on: true })).toBe(true);
+    expect(t.link.react("#bubble/games", { to: MSGID, emoji: "👩🏻‍❤️‍💋‍👨🏿", on: false })).toBe(true);
+    expect(tagged(t.fake.sent)).toEqual([
+      `@label=r1;+draft/react=👍;+reply=${MSGID} TAGMSG #bubble/games`,
+      `@label=r2;+draft/unreact=👩🏻‍❤️‍💋‍👨🏿;+reply=${MSGID} TAGMSG #bubble/games`,
+    ]);
+  });
+
+  it.each(["🏴󠁧󠁢󠁥󠁮󠁧󠁿", "🧑‍🦰", "1️⃣"])("reacts with the emoji %s whole", (emoji) => {
+    const t = memberIn(["#bubble/games"]);
+    expect(t.link.react("#bubble/games", { to: MSGID, emoji: emoji, on: true })).toBe(true);
+    expect(tagged(t.fake.sent)).toEqual([`@label=r1;+draft/react=${emoji};+reply=${MSGID} TAGMSG #bubble/games`]);
+  });
+
+  it.each([
+    ["words", "nice"],
+    ["two emoji", "👍👍"],
+    ["two emoji joined by a ZWJ into no sequence of RGI's", "👍‍😂"],
+    ["a skin tone on an emoji that takes none", "🙂🏽"],
+    ["an emoji under a combining accent", "👍́"],
+    ["a smile in its text form", "☺︎"],
+    ["a tag's separator and a second tag", "👍;+typing=active"],
+    ["a space and a second command", "👍 TAGMSG #bubble :x"],
+    ["a CR LF and a second command", "👍\r\nQUIT"],
+    ["nothing", ""],
+  ])("sends no reaction of %s", (_, emoji) => {
+    const t = memberIn(["#bubble/games"]);
+    const before = t.fake.sent.length;
+    expect(t.link.react("#bubble/games", { to: MSGID, emoji: emoji, on: true })).toBe(false);
+    expect(t.fake.sent.slice(before)).toEqual([]);
+  });
+
+  it.each([
+    ["a space", "a b"],
+    ["a CR LF and a second command", "a\r\nQUIT"],
+    ["a semicolon and a second tag", "a;+typing=active"],
+    ["a backslash", "a\\b"],
+    ["a comma", "a,b"],
+    ["a leading colon", ":a"],
+    ["nothing", ""],
+    ["65 characters", "a".repeat(65)],
+  ])("sends no reaction to a msgid holding %s", (_, id) => {
+    const t = memberIn(["#bubble/games"]);
+    const before = t.fake.sent.length;
+    expect(t.link.react("#bubble/games", { to: id, emoji: "👍", on: true })).toBe(false);
+    expect(t.fake.sent.slice(before)).toEqual([]);
+  });
+
+  it("reacts nowhere as a guest, nor in a room Ergo has not said it is in, nor while away", () => {
+    const g = guestIn(["#bubble/games"]);
+    g.fake.line(`:${GUEST}!u@h JOIN #bubble/games`);
+    expect(g.link.react("#bubble/games", { to: MSGID, emoji: "👍", on: true })).toBe(false);
+    const t = memberIn(["#bubble/games", "#bubble"]);
+    expect(t.link.react("#bubble", { to: MSGID, emoji: "👍", on: true })).toBe(false);
+    t.fake.state("waiting");
+    expect(t.link.react("#bubble/games", { to: MSGID, emoji: "👍", on: true })).toBe(false);
+    expect(tagged([...g.fake.sent, ...t.fake.sent])).toEqual([]);
+  });
+});

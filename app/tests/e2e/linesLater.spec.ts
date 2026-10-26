@@ -47,6 +47,8 @@ test.describe("the lines view, loaded after the page", () => {
     await lines(page).nth(1).focus();
     await page.keyboard.press("Tab");
     const bar = lines(page).nth(1).getByRole("toolbar", { name: "Message actions" });
+    // An account's bar leads with its quick reactions (4d), in the view's code: none missing once it is in.
     await expect(bar.getByRole("button").first()).toBeFocused();
+    await expect(bar.getByRole("button", { name: "React with 👍" })).toBeFocused();
   });
 });

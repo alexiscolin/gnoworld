@@ -3,7 +3,7 @@
 // (Ergo's max-channels-per-client); the newest lines of the room in view alone, once Ergo says I joined it, since
 // Ergo paces a client to 2 lines a second (plan §4); Ergo's lines read into the store through one BatchReader a
 // connection. Its parts come in, so the tests give their own.
-import { BatchReader, compose, nickOf, type IrcMessage } from "@gnoworld/core";
+import { BatchReader, compose, nickOf, reactionLine, type IrcMessage, type Reacting } from "@gnoworld/core";
 import { RoomId } from "@gnoworld/schemas";
 import type { Result } from "../../lib/api/http.ts";
 import type { Ergo, ErgoOptions, Who } from "../../lib/ergo/ergo.ts";
@@ -35,6 +35,9 @@ export interface ChatLink {
   /** Deletes a line, by its msgid, in a room Ergo says it is in, as Ergo's REDACT (4c's message menu); an
    * account's alone, Ergo refusing another's line. Whether it went. */
   redact: (room: string, id: string) => boolean;
+  /** Reacts to a line of a room Ergo says it is in, by its msgid, with one emoji of RGI's set, or takes the reaction
+   * back (4d); an account's alone. Each is labelled, so Ergo's answer to it is known. Whether it went. */
+  react: (room: string, reaction: Reacting) => boolean;
   stop: () => void;
 }
 
@@ -55,6 +58,8 @@ class Link implements ChatLink {
   // second tab's own JOIN brings no echo, Ergo having told it of the room at its welcome or as the first joined.
   readonly #inside = new Set<string>();
   #reader = new BatchReader();
+  // The labels the page's reactions took: each once.
+  #labels = 0;
 
   constructor(deps: LinkDeps) {
     this.#deps = deps;
@@ -86,6 +91,14 @@ class Link implements ChatLink {
   redact(room: string, id: string): boolean {
     const allowed = this.#key !== "guest" && this.#inside.has(room) && MSGID.test(id);
     return allowed && this.#ergo?.nick() !== undefined && this.#ergo.send(`REDACT ${room} ${id}`);
+  }
+
+  react(room: string, reaction: Reacting): boolean {
+    const line = reactionLine(reaction, room, `r${String(this.#labels + 1)}`);
+    if (line === undefined || this.#key === "guest" || !this.#inside.has(room)) return false;
+    if (this.#ergo?.nick() === undefined || !this.#ergo.send(line)) return false;
+    this.#labels += 1;
+    return true;
   }
 
   stop(): void {

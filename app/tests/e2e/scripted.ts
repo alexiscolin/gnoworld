@@ -20,11 +20,14 @@ function welcome(line: string, me: string): string[] {
   return [];
 }
 
-// Each room joined, with #games' topic and names; the history of `told`, #games unless named.
+// A raw line in the history batch: its batch tag first among its own.
+const batched = (raw: string): string => (raw.startsWith("@") ? `@batch=h1;${raw.slice(1)}` : `@batch=h1 ${raw}`);
+
+// Each room joined, with #games' topic and names; the history of `told`, #games unless named, its raw lines last.
 function rooms(
   line: string,
   me: string,
-  { history, told }: { history: readonly HistoryLine[]; told: string },
+  { history, replayed, told }: { history: readonly HistoryLine[]; replayed: readonly string[]; told: string },
 ): string[] {
   if (line.startsWith("JOIN ")) {
     return line
@@ -44,6 +47,7 @@ function rooms(
       ([id, time, text, author = MEMBER]) =>
         `@batch=h1;msgid=${id};time=${time};account=${author} :${author}!u@h PRIVMSG ${told} :${text}`,
     ),
+    ...replayed.map(batched),
     "BATCH -h1",
   ];
 }
@@ -57,6 +61,22 @@ function redaction(line: string, me: string, refuse: boolean): string[] {
   return [`:${me}!u@h REDACT ${room} ${id}`];
 }
 
+// The page's line: its tags, then the rest.
+function split(line: string): { tags: string; rest: string } {
+  if (!line.startsWith("@")) return { tags: "", rest: line };
+  const space = line.indexOf(" ");
+  return { tags: line.slice(1, space), rest: line.slice(space + 1) };
+}
+
+// Ergo's echo of a PRIVMSG or a TAGMSG the page sends (echo-message): under `me`, with a msgid and a time after the
+// history's, the page's own tags kept.
+function echoed(line: string, me: string, count: number): string[] {
+  const { tags, rest } = split(line);
+  if (!/^(PRIVMSG|TAGMSG) /.test(rest)) return [];
+  const time = new Date(Date.parse("2026-10-25T11:00:00.000Z") + count * 1000).toISOString();
+  return [`@msgid=echo${String(count)};time=${time};account=${me}${tags === "" ? "" : `;${tags}`} :${me}!u@h ${rest}`];
+}
+
 export interface Scripted {
   /** #games' history, or the named room's. */
   history?: readonly HistoryLine[];
@@ -66,6 +86,10 @@ export interface Scripted {
   refuseRedact?: boolean;
   /** The room whose history it holds, #games unless named. */
   room?: string;
+  /** Lines Ergo replays after the history's, as it sends them: a reaction's TAGMSG, a reply or an edit. */
+  replayed?: readonly string[];
+  /** Ergo echoes what the page says (echo-message). */
+  echo?: boolean;
 }
 
 /** Answers the page's socket as Ergo would, the page being `me`: with #games' history, or with what `script` says. */
@@ -79,14 +103,18 @@ export function scriptedErgo(
     heard,
     refuseRedact = false,
     room = "#bubble/games",
+    replayed = [],
+    echo = false,
   } = Array.isArray(script) ? { history: script } : (script as Scripted);
+  let echoes = 0;
   ergo.onMessage((data) => {
     const line = String(data);
     heard?.(line);
     const answers = [
       ...welcome(line, me),
-      ...rooms(line, me, { history, told: room }),
+      ...rooms(line, me, { history, replayed, told: room }),
       ...redaction(line, me, refuseRedact),
+      ...(echo ? echoed(line, me, (echoes += 1)) : []),
     ];
     for (const answer of answers) ergo.send(answer);
   });

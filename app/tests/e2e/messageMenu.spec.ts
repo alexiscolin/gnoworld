@@ -314,7 +314,13 @@ test.describe("deleting a line", () => {
   }
   const deleteFrom = async (page: Page, at: number) => {
     await lines(page).nth(at).focus();
+    // Tab enters the bar at its first control: an account's three quick reactions come before More (4d).
     await page.keyboard.press("Tab");
+    await expect(barOf(page, at).getByRole("button", { name: "React with 👍" })).toBeFocused();
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Tab");
+    await expect(moreOf(page, at)).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(page.getByRole("menuitem", { name: "Copy text" })).toBeFocused();
     await page.keyboard.press("End");
