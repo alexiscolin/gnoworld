@@ -131,6 +131,8 @@ describe("the store's chat slice", () => {
   it("changes nothing for a page of a room it does not follow, or a page with nothing new", () => {
     const t = following();
     t.heard(said("#bubble", "a", "one"));
+    // Its first page came: a page after it brings what is new, or nothing.
+    t.page("#bubble", []);
     const chat = t.store.getState().chat;
     t.page("#garden", [said("#garden", "x", "theirs")]);
     t.page("#bubble", [said("#bubble", "a", "one")]);
