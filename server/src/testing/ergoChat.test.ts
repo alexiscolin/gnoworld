@@ -32,6 +32,26 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     expect(bob.lines().filter((line) => line.includes(` REDACT #bubble ${clean}`))).toEqual([]);
   });
 
+  // The red pass's R1: Ergo gives a reader without draft/multiline each part as a line of its own, the id on the
+  // first alone, so a line past the first would go unchecked; the link asks for the capability.
+  it("checks a message of several lines whole, its last line the flagged one, and hides it by the id of its batch", async () => {
+    const e = await start();
+    const asked: string[] = [];
+    const { verdicts } = await chatFor(e, asked);
+    const alice = await login(e, "alice");
+    await join(alice, "#bubble");
+    const bob = await login(e, "bob");
+    await join(bob, "#bubble");
+    alice.send("BATCH +m1 draft/multiline #bubble");
+    for (const text of ["hello", "", "I will hurt you"]) alice.send(`@batch=m1 PRIVMSG #bubble :${text}`);
+    alice.send("BATCH -m1");
+    const opening = await bob.expect(/ BATCH :?\+\S+ draft\/multiline :?#bubble$/);
+    const id = /(?:^@|;)msgid=([^;\s]+)/.exec(opening)?.[1] ?? "?";
+    await bob.expect(new RegExp(` REDACT #bubble ${id} violence`), 10_000);
+    expect(asked).toEqual(["hello\n\nI will hurt you"]);
+    expect(verdicts()).toHaveLength(1);
+  });
+
   it("checks what it missed while its link was down, each message once, after a mark Ergo has erased", async () => {
     const e = await start();
     const asked: string[] = [];

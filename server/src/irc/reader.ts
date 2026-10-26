@@ -5,6 +5,7 @@ import type { Socket } from "node:net";
 import type { IrcMessage } from "@gnoworld/core";
 import type { Log } from "../log.ts";
 import { joins, line, NICK, said, type Said } from "./lines.ts";
+import { several, type Several } from "./several.ts";
 import { roomStates, type States } from "./state.ts";
 
 export interface Options {
@@ -41,6 +42,8 @@ export interface State {
   ready: boolean;
   // Each chathistory batch open, by its reference: its room, its lines and the last one's time.
   batches: Map<string, { room: string; lines: number; last: string }>;
+  // Each message of several lines open (draft/multiline), by its reference: held until its end, then read as one.
+  several: Several;
   // The time each room's history was last asked after, so a page that makes no progress is passed.
   after: Map<string, string>;
   // The rooms joined by send since this connection began, taken as joined once Ergo says so (3l).
@@ -68,6 +71,22 @@ export function reader(options: Options, state: State) {
   const refused = (s: Socket, error: string): void => {
     log("irc_refused", { error });
     s.destroy();
+  };
+  const page = (s: Socket, { params: [ref = "", kind, room = ""] }: IrcMessage): void => {
+    if (ref.startsWith("+") && kind === "chathistory") state.batches.set(ref.slice(1), { room, lines: 0, last: "" });
+    if (!ref.startsWith("-")) return;
+    const done = state.batches.get(ref.slice(1));
+    state.batches.delete(ref.slice(1));
+    // A full page may have more after it, asked once the last page is taken in, from its last line's
+    // millisecond, which may hold more (F542). A page all in that one millisecond goes past it.
+    // ponytail: more than a page of lines in one millisecond loses the rest; pages by msgid lose a hidden one.
+    if (done === undefined || done.lines < PAGE || done.last === "") return;
+    const back = earlier(done.last);
+    const from = back === state.after.get(done.room) ? done.last : back;
+    const next = (): void => {
+      if (!s.destroyed) history(s, done.room, from);
+    };
+    drained().then(next, next);
   };
   const handlers: Readonly<Record<string, (s: Socket, message: IrcMessage) => void>> = {
     ...sasl(password, refused),
@@ -101,21 +120,9 @@ export function reader(options: Options, state: State) {
     ...listing(state, onChannels),
     JOIN: joined(state, onJoin),
     ...rejoins(state),
-    BATCH: (s, { params: [ref = "", kind, room = ""] }) => {
-      if (ref.startsWith("+") && kind === "chathistory") state.batches.set(ref.slice(1), { room, lines: 0, last: "" });
-      if (!ref.startsWith("-")) return;
-      const done = state.batches.get(ref.slice(1));
-      state.batches.delete(ref.slice(1));
-      // A full page may have more after it, asked once the last page is taken in, from its last line's
-      // millisecond, which may hold more (F542). A page all in that one millisecond goes past it.
-      // ponytail: more than a page of lines in one millisecond loses the rest; pages by msgid lose a hidden one.
-      if (done === undefined || done.lines < PAGE || done.last === "") return;
-      const back = earlier(done.last);
-      const from = back === state.after.get(done.room) ? done.last : back;
-      const next = (): void => {
-        if (!s.destroyed) history(s, done.room, from);
-      };
-      drained().then(next, next);
+    BATCH: (s, message) => {
+      // A message of several lines is read as one at its end; any other batch is a history page.
+      if (!state.several.batch(message, (folded) => handlers["PRIVMSG"]?.(s, folded))) page(s, message);
     },
     ...refusals(refused, state, log),
     // A hide Ergo refused (F544): the verdict says hidden, the line stays; ops hears of it.
@@ -126,6 +133,7 @@ export function reader(options: Options, state: State) {
     // A NOTICE too (slice 3's max review): Ergo relays and keeps it as any line, so it is checked and counted.
     NOTICE: (s, message) => handlers["PRIVMSG"]?.(s, message),
     PRIVMSG: (_, message) => {
+      if (state.several.hold(message)) return;
       const batch = state.batches.get(message.tags.get("batch") ?? "");
       // A time Date cannot read is no page's end (F552): the next page starts from the last one read.
       const time = message.tags.get("time") ?? "";
@@ -233,6 +241,7 @@ export const fresh = (stateMs: number): State => ({
   joined: new Set(),
   ready: false,
   batches: new Map(),
+  several: several(),
   after: new Map(),
   asked: new Set(),
   channels: undefined,

@@ -6,7 +6,7 @@ import { freePort } from "../testing/ergo.ts";
 import { fakeErgo, message, PASSWORD, register, welcome, type Peer } from "../testing/fakeErgo.ts";
 import { ircLink, retryDelay, type Link, type Said } from "./link.ts";
 
-const CAPS = "CAP REQ :message-tags account-tag batch draft/chathistory server-time multi-prefix sasl";
+const CAPS = "CAP REQ :message-tags account-tag batch draft/chathistory server-time multi-prefix sasl draft/multiline";
 // Stopped before the fake Ergo closes, so no link reconnects to a server that is gone.
 const links: Link[] = [];
 afterEach(async () => {
@@ -1390,5 +1390,66 @@ describe("the IRC link's account (the max review)", () => {
     for (const n of [7, 8, 9]) await taken(n);
     await ergo.peer(10);
     expect(alerts()).toHaveLength(2);
+  });
+});
+
+// draft/multiline (slice 4, R1 of the red pass): Ergo gives a reader without the capability the parts of a message
+// as lines of their own, the id on the first alone (irc/client.go, v2.19.1), so the link asks for it and reads the
+// batch as the one message it is: its text whole to the checks, its id and time from the opening line.
+describe("the IRC link, a message of several lines (draft/multiline)", () => {
+  const T = (n: number) => `2026-10-22T08:00:${String(n).padStart(2, "0")}.000Z`;
+  // A message as Ergo relays it to a reader with the capability: the opening line holds its tags, the parts the batch's.
+  const several = (
+    peer: Peer,
+    ref: string,
+    { tags, parts, source = "a!u@h" }: { tags: string; parts: readonly string[]; source?: string },
+  ) => {
+    peer.say(`@${tags} :${source} BATCH +${ref} draft/multiline :#bubble`);
+    for (const part of parts) peer.say(`@batch=${ref} :${source} PRIVMSG #bubble :${part}`);
+    peer.say(`:${source} BATCH :-${ref}`);
+  };
+
+  it("hands a message of several lines on once, its whole text, its id and time those of its opening line", async () => {
+    const ergo = await fakeErgo();
+    const { said } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    several(peer, "x", { tags: `account=g1a;msgid=ml1;time=${T(1)}`, parts: ["one", "two", "a banned word"] });
+    await expect
+      .poll(() => said)
+      .toEqual([{ room: "#bubble", account: "g1a", msgid: "ml1", text: "one\ntwo\na banned word", time: T(1) }]);
+  });
+
+  it("hands nothing on of its parts before its end, nor of a batch whose parts are another's", async () => {
+    const ergo = await fakeErgo();
+    const { said } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    peer.say(`@account=g1a;msgid=ml1;time=${T(1)} :a!u@h BATCH +x draft/multiline :#bubble`);
+    peer.say("@batch=x :a!u@h PRIVMSG #bubble :one");
+    await sync(peer);
+    expect(said).toEqual([]);
+    peer.say("@batch=x :mallory!u@h PRIVMSG #bubble :two");
+    peer.say(":a!u@h BATCH :-x");
+    await sync(peer);
+    expect(said).toEqual([]);
+  });
+
+  it("counts a message of several lines inside a history page as one line, and asks the next page after a full one", async () => {
+    const ergo = await fakeErgo();
+    const { said } = start(ergo.port, { lastChecked: (room) => (room === "#bubble" ? T(0) : undefined) });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    await peer.next(/^CHATHISTORY /);
+    peer.say(":ergo.test BATCH +a chathistory #bubble");
+    for (let n = 0; n < 49; n += 1)
+      peer.say(message(`batch=a;account=g1a;msgid=p${String(n)};time=${T(n)}`, "a!u@h", ["#bubble", "x"]));
+    several(peer, "m", { tags: `batch=a;account=g1a;msgid=ml2;time=${T(49)}`, parts: ["> quoted", "answer"] });
+    peer.say(":ergo.test BATCH -a");
+    expect(await peer.next(/^CHATHISTORY /)).toBe(
+      `CHATHISTORY AFTER #bubble timestamp=${new Date(Date.parse(T(49)) - 1).toISOString()} 50`,
+    );
+    await expect.poll(() => said.length).toBe(50);
+    expect(said[49]).toMatchObject({ msgid: "ml2", text: "> quoted\nanswer" });
   });
 });

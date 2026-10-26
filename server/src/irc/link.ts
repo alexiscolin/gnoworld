@@ -73,8 +73,14 @@ export function ircLink(options: Options): Link {
     }, pingMs);
     s.on("connect", () => {
       // multi-prefix: NAMES gives each person every power, so the reconciler reads a voiced operator whole;
-      // sasl: the bot logs in as its account, which holds its nick (slice 3's max review).
-      s.write(line("CAP", ["REQ", "message-tags account-tag batch draft/chathistory server-time multi-prefix sasl"]));
+      // sasl: the bot logs in as its account, which holds its nick (slice 3's max review); draft/multiline: a
+      // message of several lines comes whole, not its parts as lines with no id past the first (several.ts).
+      s.write(
+        line("CAP", [
+          "REQ",
+          "message-tags account-tag batch draft/chathistory server-time multi-prefix sasl draft/multiline",
+        ]),
+      );
       s.write(line("NICK", [NICK]));
       s.write(line("USER", [NICK, "0", "*", "gno.world"]));
     });
@@ -91,6 +97,7 @@ export function ircLink(options: Options): Link {
       clearInterval(watchdog);
       state.ready = false;
       state.batches.clear();
+      state.several.clear();
       state.asked.clear();
       state.channels = undefined;
       state.states.drop();
