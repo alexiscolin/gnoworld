@@ -314,12 +314,12 @@ describe("the verdicts' stream, rooms by role (3m)", () => {
       const reader: ReadableStreamDefaultReader<Uint8Array> | undefined = response.body?.getReader();
       let text = "";
       return async (count: number) => {
-        while ((text.match(/data: /g) ?? []).length < count) {
+        while ((text.match(/event: verdict\ndata: /g) ?? []).length < count) {
           const chunk = await reader?.read();
           if (chunk === undefined || chunk.done) break;
           text += new TextDecoder().decode(chunk.value);
         }
-        return [...text.matchAll(/data: (.*)\n/g)].map(
+        return [...text.matchAll(/event: verdict\ndata: (.*)\n/g)].map(
           ([, json = ""]) => (JSON.parse(json) as { msgid: string }).msgid,
         );
       };
@@ -389,7 +389,9 @@ describe("the verdicts' stream's replay, rooms by role (3m)", () => {
         if (chunk === undefined || chunk.done) break;
         text += new TextDecoder().decode(chunk.value);
       }
-      return [...text.matchAll(/data: (.*)\n/g)].map(([, json = ""]) => (JSON.parse(json) as { msgid: string }).msgid);
+      return [...text.matchAll(/event: verdict\ndata: (.*)\n/g)].map(
+        ([, json = ""]) => (JSON.parse(json) as { msgid: string }).msgid,
+      );
     };
     expect(await replayed(undefined, undefined, "198.51.100.1")).toEqual(["open1"]);
     expect(await replayed(undefined, "0", "198.51.100.2")).toEqual(["open1"]);
