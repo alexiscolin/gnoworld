@@ -1317,3 +1317,62 @@ describe("the chat, as the server starts it", () => {
     });
   });
 });
+
+// 4g (docs/decisions.md, 2026-10-26): GET /api/verdicts through the chat's own wiring: the stream's rule of who
+// reads (mayRead, by the session), each visitor counted by its address.
+describe("the chat's verdicts route", () => {
+  const CREW = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+  const settings = {
+    worlds: new Map([
+      [
+        "bubble",
+        {
+          rules: RULES,
+          groups: new Map([["crew", new Set([CREW])]]),
+          rooms: new Map<string, Room>([
+            ["#bubble/crew", { type: "members" as const, readers: "crew", hidden: false }],
+          ]),
+        },
+      ],
+    ]),
+    ergo: undefined,
+    moderation: OFF,
+  };
+  const ready = () => {
+    const t = setup(settings, { session: (token) => (token === "crew-token" ? CREW : undefined) });
+    t.app.route("/api/verdicts", t.chat.verdicts);
+    const insert = t.db.prepare(
+      "INSERT INTO verdicts (msgid, room, account, action, at) VALUES (?, ?, 'g1a', 'pass', 0)",
+    );
+    insert.run("m1", "#bubble");
+    insert.run("m2", "#bubble/crew");
+    const ask = (room: string, id: string, { token, peer = "203.0.113.7" }: { token?: string; peer?: string } = {}) =>
+      t.app.request(
+        `/api/verdicts?room=${encodeURIComponent(room)}&ids=${id}`,
+        { headers: token === undefined ? {} : { cookie: `__Host-session=${token}` } },
+        { incoming: { socket: { remoteAddress: peer } } },
+      );
+    return ask;
+  };
+
+  it("answers the world's main room to anyone, and its members room to its member alone", async () => {
+    const ask = ready();
+    expect(await (await ask("#bubble", "m1")).json()).toEqual({
+      room: "#bubble",
+      verdicts: [{ msgid: "m1", state: "checked" }],
+    });
+    expect((await ask("#bubble/crew", "m2")).status).toBe(403);
+    expect((await ask("#bubble/crew", "m2", { token: "stranger-token" })).status).toBe(403);
+    expect(await (await ask("#bubble/crew", "m2", { token: "crew-token" })).json()).toEqual({
+      room: "#bubble/crew",
+      verdicts: [{ msgid: "m2", state: "checked" }],
+    });
+  });
+
+  it("counts each visitor by its address: one past its minute refused, another answered", async () => {
+    const ask = ready();
+    for (let n = 0; n < 60; n += 1) expect((await ask("#bubble", "m1")).status).toBe(200);
+    expect((await ask("#bubble", "m1")).status).toBe(429);
+    expect((await ask("#bubble", "m1", { peer: "203.0.113.8" })).status).toBe(200);
+  });
+});

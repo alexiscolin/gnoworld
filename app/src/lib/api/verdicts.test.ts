@@ -37,10 +37,27 @@ describe("the lines' verdicts, from the server", () => {
     expect(sent).toEqual([]);
   });
 
+  it(`asks for ${String(VERDICTS_ASKED)} lines at once`, async () => {
+    const { api, sent } = server(json(200, { room: "#bubble", verdicts: [] }));
+    const all = Array.from({ length: VERDICTS_ASKED }, (_, n) => `m${String(n)}`);
+    expect(await api.verdicts("#bubble", all)).toEqual({ ok: true, value: { room: "#bubble", verdicts: [] } });
+    expect(sent).toHaveLength(1);
+  });
+
   // Data from the server goes through Zod; and it must answer what was asked.
   it.each([
     ["another room", { ...ANSWER, room: "#garden" }],
     ["a line not asked", { ...ANSWER, verdicts: [{ msgid: "m9", state: "checked" }] }],
+    [
+      "a line asked beside one not",
+      {
+        ...ANSWER,
+        verdicts: [
+          { msgid: "m1", state: "checked" },
+          { msgid: "m9", state: "hidden" },
+        ],
+      },
+    ],
     ["a state it does not know", { ...ANSWER, verdicts: [{ msgid: "m1", state: "pending" }] }],
     ["a field more", { ...ANSWER, extra: 1 }],
     ["no list", { room: "#bubble/games" }],
