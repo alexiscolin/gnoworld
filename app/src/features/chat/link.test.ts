@@ -1,9 +1,11 @@
+import { readFileSync } from "node:fs";
 import { parseLine, type IrcMessage } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
 import type { Result } from "../../lib/api/http.ts";
 import type { Ergo, ErgoState, Who } from "../../lib/ergo/ergo.ts";
 import { createAppStore } from "../../store/index.ts";
+import { HISTORY_RING } from "./history.ts";
 import { chatLink, HISTORY_LINES, ROOMS_JOINED } from "./link.ts";
 
 const ADDRESS = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
@@ -1021,6 +1023,22 @@ describe("the chat's link: the history read past reactions", () => {
     page(t.fake, { lines: 50, first: "oldest" });
     expect(t.room(ROOM)?.lines).toHaveLength(50);
     expect(before(t.fake.sent)).toEqual([`CHATHISTORY BEFORE ${ROOM} msgid=oldest ${String(HISTORY_LINES)}`]);
+  });
+
+  // The code review (CR1): JOIN and QUIT events fill pages too; the link reads on while Ergo's ring holds pages.
+  it("asks from each full page's oldest while Ergo's ring of the room holds pages, ten more at most, then stops", () => {
+    const t = asked();
+    const pages = Array.from({ length: 12 }, (_, n) => 12_000 - n * 1000);
+    for (const from of pages) page(t.fake, { from });
+    expect(before(t.fake.sent)).toEqual(
+      pages.slice(0, 10).map((from) => `CHATHISTORY BEFORE ${ROOM} msgid=i${String(from)} ${String(HISTORY_LINES)}`),
+    );
+  });
+
+  // Ergo's ring, as the deploy's template sets it (deploy/ergo/ircd.yaml.tmpl): the bound read from the same number.
+  it("bounds its asks by the ring the deploy's Ergo keeps a room", () => {
+    const template = readFileSync(new URL("../../../../deploy/ergo/ircd.yaml.tmpl", import.meta.url), "utf8");
+    expect(/^ {2}channel-length: (\d+)$/m.exec(template)?.[1]).toBe(String(HISTORY_RING));
   });
 
   it("asks no more when a page came short, at the history's start, or the window holds its lines", () => {
