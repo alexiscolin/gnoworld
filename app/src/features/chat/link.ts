@@ -214,8 +214,7 @@ class Link implements ChatLink {
     this.#phases.set(room, "asked");
     this.#ergo?.send(`CHATHISTORY LATEST ${room} * ${String(HISTORY_LINES)}`);
     // An echoed JOIN brings Ergo's NAMES and puts me in the store's list; a second tab's brings neither.
-    const here = this.#deps.store.getState().chat.rooms[room]?.members.length ?? 0;
-    if (here === 0) this.#ergo?.send(`NAMES ${room}`);
+    if ((this.#deps.store.getState().chat.rooms[room]?.members.length ?? 0) === 0) this.#ergo?.send(`NAMES ${room}`);
   }
 
   // A JOIN sent marks its rooms joined; a PART sent forgets them.
@@ -223,12 +222,9 @@ class Link implements ChatLink {
     for (const group of groupsOf(command, rooms)) {
       if (this.#ergo?.send(`${command} ${group.join(",")}`) !== true) return;
       for (const room of group) {
-        if (command === "JOIN") {
-          this.#phases.set(room, "joined");
-        } else {
-          this.#phases.delete(room);
-          this.#inside.delete(room);
-        }
+        if (command === "PART") this.#inside.delete(room);
+        if (command === "JOIN") this.#phases.set(room, "joined");
+        else this.#phases.delete(room);
       }
     }
   }
