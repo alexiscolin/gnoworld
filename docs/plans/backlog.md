@@ -69,6 +69,7 @@ Alexis, 2026-10-23: slice 3's reviews found these; none bites today, each comes 
 | Item | Delivers | Why |
 |---|---|---|
 | Reactions held to a rate an account | The moderation bot counts each account's reactions a room and mutes one past a rate, as its rules do for lines (slice 12's queue) | Ergo keeps 2,048 items a room, a reaction one of them: one account's reactions at fakelag's 2 a second rotate a room's lines out in about 17 minutes (the red pass's R1, 4d; docs/decisions.md 2026-10-26) |
+| A capacity test before ops sizes the machines (slice 12) | How many readers at once one machine holds for Ergo and for `server`, and the memory each connection takes, at 256 MB and at 1 GB; its load tool asked for first, as a new dependency | Each reader keeps two long-lived connections (a WebSocket to Ergo, a stream to `server`); `server` (SQLite, a singleton) and Ergo grow only by a bigger machine, and no number yet says how big: hosting is ops's choice (ADR-0002), and this sets it (Alexis, 2026-10-26, after Fly.io's prices) |
 
 ## The design system, after slice 2
 
