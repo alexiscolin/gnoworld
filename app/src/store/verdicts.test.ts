@@ -47,4 +47,16 @@ describe("the store's verdicts", () => {
     expect(kept[0]).toBe("m1");
     expect(kept.at(-1)).toBe(`m${String(VERDICTS_KEPT)}`);
   });
+
+  // F880: JavaScript orders a key of digits before the others, so an object's order is not the verdicts' order.
+  it("drops a room's oldest verdict, not its newest, when the newest msgid is digits", () => {
+    const t = store();
+    for (let n = 0; n < VERDICTS_KEPT; n += 1) t.judged({ msgid: `m${String(n)}`, room: "#bubble", state: "checked" });
+    t.judged({ msgid: "7", room: "#bubble", state: "hidden" });
+    expect(t.of("#bubble")?.["7"]).toBe("hidden");
+    expect(t.of("#bubble")).not.toHaveProperty("m0");
+    expect(Object.keys(t.of("#bubble") ?? {})).toHaveLength(VERDICTS_KEPT);
+    for (let n = 0; n < VERDICTS_KEPT; n += 1) t.judged({ msgid: `n${String(n)}`, room: "#bubble", state: "checked" });
+    expect(t.of("#bubble")).not.toHaveProperty("7");
+  });
 });
