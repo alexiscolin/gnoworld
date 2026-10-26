@@ -1,5 +1,6 @@
 import { markdown } from "@gnoworld/core";
 import { describe, expect, it } from "vitest";
+import { policy } from "../../csp.ts";
 import { embedIn, embedOf } from "./embeds.ts";
 
 // 4g (docs/decisions.md, 2026-10-26): each service's player as its own documentation gives it (embeds.ts); Imgur's
@@ -96,6 +97,28 @@ describe("embedOf: the player a link opens", () => {
     ["Giphy's media with a path after its file", "https://media.giphy.com/media/4548k01F5Ej28/giphy.gif/x"],
   ])("opens none for %s", (_, href) => {
     expect(embedOf(href)).toBeUndefined();
+  });
+});
+
+// A7 (F1065): a player's address and the page's frame-src were tied by nothing: a player moved off its source's path
+// would be refused by the browser while every test passed.
+describe("embedOf, against the page's policy", () => {
+  const sources =
+    policy([])
+      .split("; ")
+      .find((directive) => directive.startsWith("frame-src "))
+      ?.split(" ")
+      .slice(1) ?? [];
+
+  it.each([
+    "https://youtu.be/dQw4w9WgXcQ",
+    "https://vimeo.com/76979871",
+    "https://giphy.com/gifs/4548k01F5Ej28",
+    "https://media.giphy.com/media/4548k01F5Ej28/giphy.gif",
+  ])("frames %s under one of the page's frame sources", (href) => {
+    const src = embedOf(href)?.src;
+    expect(sources.length).toBeGreaterThan(0);
+    expect(sources.some((source) => src?.startsWith(source) === true)).toBe(true);
   });
 });
 
