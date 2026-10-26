@@ -875,6 +875,8 @@ describe("the chat's link: direct messages", () => {
     t.fake.line(echo("a", "one", labelOf(t.fake.sent, 0)));
     t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 1)));
     expect(t.kept.get(OTHER)).toBe("/me two");
+    // The composer sent it again, or the reader emptied the box: no draft waits.
+    t.kept.set(OTHER, "");
     t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 2)));
     expect(t.kept.get(OTHER)).toBe("three");
     expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 2, draft: "three" } });
@@ -899,6 +901,7 @@ describe("the chat's link: direct messages", () => {
     t.fake.line(`@label=${labelOf(t.fake.sent, 0) ?? ""} :ergo.test 417 ${ADDRESS} :Line too long to be relayed`);
     expect(t.kept.get(OTHER)).toBe("a");
     expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 1, draft: "a", offline: false } });
+    t.kept.set(OTHER, "");
     t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 1)));
     expect(t.kept.get(OTHER)).toBe("b");
     expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 2, draft: "b" } });
