@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { IconButton } from "../Button/IconButton.tsx";
-import { eachStory, staysText } from "../testing.tsx";
+import { eachStory, staysText, toggled } from "../testing.tsx";
 import { Menu, Popover } from "./Popover.tsx";
 import * as stories from "./Popover.stories.tsx";
 
@@ -21,7 +21,7 @@ async function focusedInside() {
 }
 
 describe("Popover", () => {
-  it("is opened by its trigger, a button that names it and says it pops up", () => {
+  it("is opened by its trigger, a button that names it and says it pops up", async () => {
     render(
       <Popover trigger="Network" label="Choose the network">
         <p>Onyx</p>
@@ -33,11 +33,13 @@ describe("Popover", () => {
     expect(trigger.getAttribute("popovertarget")).toBe(panel?.id);
     expect(trigger.getAttribute("aria-haspopup")).toBe("dialog");
     fireEvent.click(trigger);
+    await toggled();
     expect(screen.getByRole("dialog", { name: "Choose the network" }).contains(screen.getByText("Onyx"))).toBe(true);
   });
 
   it("gives the focus back to its trigger when it closes with the focus inside it", async () => {
     (await focusedInside()).hidePopover();
+    await toggled();
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Network" }));
   });
 
@@ -53,6 +55,7 @@ describe("Popover", () => {
     await userEvent.click(screen.getByRole("button", { name: "Network" }));
     screen.getByRole("button", { name: "Search" }).focus();
     screen.getByRole("dialog").hidePopover();
+    await toggled();
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Search" }));
   });
 
@@ -63,6 +66,7 @@ describe("Popover", () => {
       screen.getByRole("button", { name: "Switch to Onyx" }).blur();
     });
     panel.hidePopover();
+    await toggled();
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Network" }));
   });
 
@@ -75,6 +79,7 @@ describe("Popover", () => {
     await userEvent.click(screen.getByRole("button", { name: "Network" }));
     screen.getByRole("button", { name: "Network" }).blur();
     screen.getByRole("dialog").hidePopover();
+    await toggled();
     expect(document.activeElement).toBe(document.body);
   });
 
@@ -95,6 +100,7 @@ describe("Popover", () => {
     act(() => {
       screen.getByRole("dialog").hidePopover();
     });
+    await toggled();
     expect(signals.every((signal) => signal.aborted)).toBe(true);
     listened.mockRestore();
   });
@@ -212,6 +218,18 @@ describe("Menu", () => {
     await userEvent.click(item(all, 2));
     expect(onSelect).toHaveBeenCalledOnce();
     expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  // An item that opens a dialog: the dialog gives the focus back, as it closes, to what held it as it opened (F905).
+  it("acts with the focus on its trigger, never on its hidden item", async () => {
+    let focused: Element | null = null;
+    await opened(
+      vi.fn(() => {
+        focused = document.activeElement;
+      }),
+    );
+    await userEvent.keyboard("{Enter}");
+    expect(focused).toBe(screen.getByRole("button", { name: "More" }));
   });
 
   it("opens again after it closed, placed and its first item focused", async () => {

@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { expect, it } from "vitest";
+import { toggled } from "./testing.tsx";
 
 // In this order on purpose: the second test sees what the first drew, unless the setup cleans up.
 it("draws a paragraph on the page", () => {
@@ -12,7 +13,7 @@ it("starts the next test on an empty page", () => {
 });
 
 // The stand-ins for what jsdom lacks behave as the browser does, or the tests that lean on them lie.
-it("opens a popover from its trigger, and closes it from there again, saying so as the browser does", () => {
+it("opens a popover from its trigger, and closes it from there again, saying so as the browser does", async () => {
   const states: string[] = [];
   render(
     <>
@@ -27,27 +28,55 @@ it("opens a popover from its trigger, and closes it from there again, saying so 
   expect(screen.queryByRole("button", { name: "Inside" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Open" }));
   expect(screen.getByRole("button", { name: "Inside" })).toBeTruthy();
+  expect(states).toEqual([]);
+  await toggled();
   fireEvent.click(screen.getByRole("button", { name: "Open" }));
   expect(screen.queryByRole("button", { name: "Inside" })).toBeNull();
+  await toggled();
   expect(states).toEqual(["open", "closed"]);
 });
 
-it("says nothing of a popover asked to be what it is already, as the browser does", () => {
-  const states: string[] = [];
+// A popover that writes each toggle's new state to `states`.
+function toggling(states: string[]) {
   render(
     <div data-testid="p" popover="auto" onToggle={(event) => states.push(event.newState)}>
       <p>Inside</p>
     </div>,
   );
-  const panel = screen.getByTestId("p");
+  return screen.getByTestId("p");
+}
+
+it("says nothing of a popover asked to be what it is already, as the browser does", async () => {
+  const states: string[] = [];
+  const panel = toggling(states);
   act(() => {
     panel.showPopover();
     panel.showPopover();
     panel.togglePopover(true);
+  });
+  await toggled();
+  act(() => {
     panel.hidePopover();
     panel.hidePopover();
   });
+  await toggled();
   expect(states).toEqual(["open", "closed"]);
+});
+
+// Chromium 156 fires toggle as a later task, once for changes made in a row (F924): code that reads
+// the focus or the state there runs after the page's own handlers, not inside them.
+it("tells of a popover's toggle after the change, once for changes in a row", async () => {
+  const states: string[] = [];
+  const panel = toggling(states);
+  act(() => {
+    panel.showPopover();
+  });
+  expect(states).toEqual([]);
+  act(() => {
+    panel.hidePopover();
+  });
+  await toggled();
+  expect(states).toEqual(["closed"]);
 });
 
 it("closes an open dialog once, saying so with its close event, and a closed one not again", () => {
