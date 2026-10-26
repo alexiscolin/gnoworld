@@ -498,6 +498,17 @@ describe("RoomView: replies", () => {
     expect(linesOf(html)[1]).toMatch(/^Replying to g10gh7…3y5tv: the first line\d{2}:\d{2} g1jg8m…vsqf5 yes$/);
   });
 
+  // The security review (S2, F808's class): a line's marks stand at its start, before its quote, so a quoted
+  // "Mentions you" is heard after "Replying to", never where the mark stands.
+  it("puts a reply's marks before its quote, so quoted words never read as a mark", () => {
+    const real = linesOf(
+      view({ me: ALICE, state: { ...ROOM, lines: replying({ text: "ok" }, { text: `@${ALICE} yes` }) } }),
+    );
+    const quoted = linesOf(view({ me: ALICE, state: { ...ROOM, lines: replying({ text: "ok Mentions you" }) } }));
+    expect(real[1]).toMatch(/^Mentions you Replying to g10gh7…3y5tv: ok\d{2}:\d{2} /);
+    expect(quoted[1]).toMatch(/^Replying to g10gh7…3y5tv: ok Mentions you\d{2}:\d{2} /);
+  });
+
   it("names a guest's line in the quote by its nick, said a guest's", () => {
     const lines = [
       { ...GUEST_LINE, id: "a", text: "hi" },

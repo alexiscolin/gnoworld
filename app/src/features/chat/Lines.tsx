@@ -77,11 +77,12 @@ function LineView({ line, me, members, stop, actions, reactions, react, answers 
   const known = knownOf(names, members);
   return (
     <li className={KINDS[line.kind]} data-about-me={mentioned ? "" : undefined} tabIndex={stop ? 0 : -1}>
-      <Quote line={line} answers={answers} />
-      {/* The line's marks first, before the time: where no sender's words stand (F808). */}
+      {/* The line's marks first, at its start, before a reply's quote and the time: where no sender's words stand
+          (F808, the security review's S2). */}
       {mentioned ? <span className={styles["mentionsYou"]}>Mentions you </span> : null}
       {line.kind === "notice" ? <span className={styles["mark"]}>Notice </span> : null}
       {line.edited === true ? <span className={styles["mark"]}>Edited </span> : null}
+      <Quote line={line} answers={answers} />
       <time dateTime={line.time} className={styles["time"]}>
         {CLOCK.format(new Date(line.time))}
       </time>{" "}
