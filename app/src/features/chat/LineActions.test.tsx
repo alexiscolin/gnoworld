@@ -61,6 +61,11 @@ describe("a line's actions", () => {
     expect(items(draw(over))).toEqual(["Copy text", "Copy room link"]);
   });
 
+  // 4c's UX review (U4): a delete gone out and not answered yet offers no second one.
+  it("offer no Delete while the line's delete waits for Ergo", () => {
+    expect(items(draw({ me: ALICE, deleting: true }))).toEqual(["Copy text", "Copy room link"]);
+  });
+
   it("ask before a delete in a dialog", () => {
     expect(draw({ me: ALICE })).toMatch(/<dialog[^>]*>/);
   });

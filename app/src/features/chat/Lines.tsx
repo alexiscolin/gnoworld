@@ -140,6 +140,14 @@ export function Lines({ room, lines, members, me, refused, onDelete, onDismiss }
   const { listRef, onScroll } = useNewestInView(lines);
   const { stop, mounted, on, leave } = useLineFocus(lines, listRef);
   const { said, setSaid, copy } = useCopy(room);
+  // A delete gone out and not answered yet: its line offers no second one; Ergo's echo, taking the line, is said, and
+  // its refusal ends it too (U4). ponytail: a line trimmed out of the window meanwhile reads as deleted, in the
+  // milliseconds a REDACT waits for its echo.
+  const [deleting, setDeleting] = useState<string>();
+  if (deleting !== undefined && (refused === deleting || !lines.some((line) => line.id === deleting))) {
+    setDeleting(undefined);
+    if (refused !== deleting) setSaid({ title: "Message deleted." });
+  }
   // Who a mention may shorten (F812): the members, and the authors in view by their account tag, who proved their
   // key as a member did (F819).
   const known = new Set([...members, ...lines.flatMap(({ account }) => (account === undefined ? [] : [account]))]);
@@ -147,8 +155,10 @@ export function Lines({ room, lines, members, me, refused, onDelete, onDismiss }
   // carries) says so, the line kept (/code-review).
   const remove = (id: string) => {
     const went = onDelete(id);
-    if (went) leave(id);
-    else setSaid({ title: "Could not delete the message." });
+    if (went) {
+      setDeleting(id);
+      leave(id);
+    } else setSaid({ title: "Could not delete the message." });
     return went;
   };
   const actionsOf = (line: Line) => (
@@ -156,6 +166,7 @@ export function Lines({ room, lines, members, me, refused, onDelete, onDismiss }
       line={line}
       room={room}
       me={me}
+      deleting={line.id === deleting}
       onCopy={(what) => {
         onDismiss();
         copy(line, what);

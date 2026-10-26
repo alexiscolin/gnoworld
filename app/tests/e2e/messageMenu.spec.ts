@@ -542,10 +542,13 @@ test.describe("a line's actions", () => {
 // Delete, on the account's own line alone: asked first, then Ergo's REDACT; the keyboard all the way.
 test.describe("deleting a line", () => {
   // The test's account on a scripted Ergo, its own line among another's.
-  async function mine(page: Page, options: Scripted = {}): Promise<{ address: string; sent: string[] }> {
+  async function mine(
+    page: Page,
+    options: Scripted = {},
+  ): Promise<{ address: string; sent: string[]; socket: () => WebSocketRoute }> {
     const address = await logIn(page, word("menu"));
     const sent: string[] = [];
-    await room(page, {
+    const socket = await room(page, {
       ...options,
       me: address,
       history: [
@@ -555,7 +558,7 @@ test.describe("deleting a line", () => {
       ],
       heard: (line) => sent.push(line),
     });
-    return { address, sent };
+    return { address, sent, socket };
   }
   const deleteFrom = async (page: Page, at: number) => {
     await lines(page).nth(at).focus();
@@ -574,6 +577,12 @@ test.describe("deleting a line", () => {
     await expect(flash(page, "Could not delete the message.")).toBeVisible();
     await expect(lineOf(page, "my own line")).toHaveCount(1);
   };
+  // The items of the `at`th line's menu, opened by the pointer on its words.
+  const itemsOf = async (page: Page, at: number, text: string) => {
+    await lineOf(page, text).hover();
+    await moreOf(page, at).click();
+    return page.getByRole("menu").getByRole("menuitem");
+  };
   // The second line kept as its dialog closes: nothing sent, More holding the focus again.
   const kept = async (page: Page, dialog: Locator, sent: readonly string[]) => {
     await expect(dialog).toBeHidden();
@@ -585,13 +594,9 @@ test.describe("deleting a line", () => {
   // The red pass (M2): another's line offers no Delete, through the page as wired.
   test("offers Delete on the account's own line, never on another's", async ({ page }) => {
     await mine(page);
-    await lineOf(page, "another's line").hover();
-    await moreOf(page, 0).click();
-    await expect(page.getByRole("menu").getByRole("menuitem")).toHaveText(["Copy text", "Copy room link"]);
+    await expect(await itemsOf(page, 0, "another's line")).toHaveText(["Copy text", "Copy room link"]);
     await page.keyboard.press("Escape");
-    await lineOf(page, "my own line").hover();
-    await moreOf(page, 1).click();
-    await expect(page.getByRole("menu").getByRole("menuitem")).toHaveText(["Copy text", "Copy room link", "Delete"]);
+    await expect(await itemsOf(page, 1, "my own line")).toHaveText(["Copy text", "Copy room link", "Delete"]);
     // The green pass (G11): the dialog closed until Delete is chosen.
     await expect(page.getByRole("dialog", { name: "Delete message?" })).toBeHidden();
   });
@@ -684,6 +689,23 @@ test.describe("deleting a line", () => {
   test("says when Ergo refuses the delete, the line kept", async ({ page }) => {
     await mine(page, { refuseRedact: true });
     await refused(page);
+    // 4c's UX review (U4): refused, the line offers its Delete again.
+    await expect(await itemsOf(page, 1, "my own line")).toHaveText(["Copy text", "Copy room link", "Delete"]);
+  });
+
+  // 4c's UX review (U4): a delete that worked is said, once Ergo's echo takes the line; until then the line offers no
+  // second Delete.
+  test("says the delete once Ergo takes the line, and offers no second one before", async ({ page }) => {
+    const { address, sent, socket } = await mine(page, { holdRedact: true });
+    const dialog = await deleteFrom(page, 1);
+    await dialog.getByRole("button", { name: "Delete" }).press("Enter");
+    expect(sent.filter((line) => line.startsWith("REDACT "))).toEqual(["REDACT #bubble/games o2"]);
+    await expect(await itemsOf(page, 1, "my own line")).toHaveText(["Copy text", "Copy room link"]);
+    await page.keyboard.press("Escape");
+    await expect(flash(page, "Message deleted.")).toHaveCount(0);
+    socket().send(`:${address}!u@h REDACT #bubble/games o2`);
+    await expect(lineOf(page, "my own line")).toHaveCount(0);
+    await expect(flash(page, "Message deleted.")).toBeVisible();
   });
 });
 

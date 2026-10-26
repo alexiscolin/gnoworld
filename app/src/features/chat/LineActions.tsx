@@ -23,11 +23,13 @@ export interface LineActionsProps {
   onCopy: (what: "text" | "link") => void;
   /** Deletes the line, the reader's own; whether it went out. */
   onDelete: (id: string) => boolean;
+  /** Its delete went out, not answered yet: no second one (U4). */
+  deleting?: boolean;
 }
 
 /** The bar of a line pointed at or focused, out of the list's live announcements: its More menu, and the dialog
  * that asks before a delete, which gives the focus back to More when it closes. */
-export function LineActions({ line, room, me, onCopy, onDelete }: LineActionsProps) {
+export function LineActions({ line, room, me, onCopy, onDelete, deleting = false }: LineActionsProps) {
   const [asking, setAsking] = useState(false);
   // A delete asked, sent after the dialog's close, which gives the focus back to More (Menu hands it there first).
   const deletingRef = useRef(false);
@@ -57,7 +59,7 @@ export function LineActions({ line, room, me, onCopy, onDelete }: LineActionsPro
         onCopy("link");
       },
     },
-    ...(own
+    ...(own && !deleting
       ? [
           {
             label: "Delete",

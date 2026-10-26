@@ -47,10 +47,10 @@ function rooms(
   ];
 }
 
-// A REDACT of the page's: Ergo's echo, which takes the line from every reader, or its refusal.
-function redaction(line: string, me: string, refuse: boolean): string[] {
+// A REDACT of the page's: Ergo's echo, which takes the line from every reader, or its refusal; none while held.
+function redaction(line: string, me: string, { refuse, hold }: { refuse: boolean; hold: boolean }): string[] {
   const [command, room = "", id = ""] = line.split(" ");
-  if (command !== "REDACT") return [];
+  if (command !== "REDACT" || hold) return [];
   if (refuse)
     return [`:ergo FAIL REDACT REDACT_FORBIDDEN ${room} ${id} :You are not authorised to delete this message`];
   return [`:${me}!u@h REDACT ${room} ${id}`];
@@ -63,20 +63,22 @@ export interface Scripted {
   heard?: (line: string) => void;
   /** Ergo refuses every REDACT. */
   refuseRedact?: boolean;
+  /** Ergo answers no REDACT: the test says its echo on the socket, when it chooses. */
+  holdRedact?: boolean;
   /** The room whose history it holds, #games unless named. */
   room?: string;
 }
 
 /** Answers the page's socket as Ergo would, the page being `me`: with #games' history, or with what `script` says. */
 export function scriptedErgo(ergo: WebSocketRoute, me: string, script: Scripted = {}): void {
-  const { history = LINES, heard, refuseRedact = false, room = "#bubble/games" } = script;
+  const { history = LINES, heard, refuseRedact = false, holdRedact = false, room = "#bubble/games" } = script;
   ergo.onMessage((data) => {
     const line = String(data);
     heard?.(line);
     const answers = [
       ...welcome(line, me),
       ...rooms(line, me, { history, told: room }),
-      ...redaction(line, me, refuseRedact),
+      ...redaction(line, me, { refuse: refuseRedact, hold: holdRedact }),
     ];
     for (const answer of answers) ergo.send(answer);
   });
