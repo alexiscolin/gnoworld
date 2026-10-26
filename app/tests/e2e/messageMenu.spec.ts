@@ -41,6 +41,22 @@ const barOf = (page: Page, at: number) => lines(page).nth(at).getByRole("toolbar
 const moreOf = (page: Page, at: number) => barOf(page, at).getByRole("button", { name: "More" });
 const focusedLines = (page: Page) => lines(page).and(page.locator(":focus"));
 const stops = (page: Page) => lines(page).and(page.locator("[tabindex='0']"));
+// The focused element's ring: its style, at least 2 px wide, and whether it lies whole inside its list's box.
+const ringOf = (page: Page) =>
+  page.evaluate(() => {
+    const line = document.activeElement;
+    const list = line?.parentElement;
+    if (!(line instanceof HTMLElement) || list == null) return null;
+    const style = getComputedStyle(line);
+    const reach = parseFloat(style.outlineWidth) + parseFloat(style.outlineOffset);
+    const [box, port] = [line.getBoundingClientRect(), list.getBoundingClientRect()];
+    const inside =
+      box.left - reach >= port.left &&
+      box.right + reach <= port.right &&
+      box.top - reach >= port.top &&
+      box.bottom + reach <= port.bottom;
+    return { style: style.outlineStyle, wide: parseFloat(style.outlineWidth) >= 2, inside };
+  });
 // The flash's words, in its pill: the pill sits in the top layer, its region holding no box of its own.
 const flash = (page: Page, text: string) => page.getByRole("status").getByText(text, { exact: true });
 // The pointer on the `at`th line, its More menu opened and `item` chosen.
@@ -269,6 +285,24 @@ test.describe("a line's actions", () => {
       await lines(page).nth(at).focus();
       await expect(barOf(page, at)).toBeVisible();
       expect(await overflow()).toEqual([0, 0]);
+    }
+  });
+
+  // The green pass (G17): the focused line's ring, drawn outside it, whole inside the list that scrolls and clips it.
+  test("draw the focused line's ring whole inside the list, on the newest, a middle and the oldest line", async ({
+    page,
+  }) => {
+    await room(page);
+    await roomsNav(page).getByRole("link").last().focus();
+    await page.keyboard.press("Tab");
+    for (const [at, key] of [
+      [2, undefined],
+      [1, "ArrowUp"],
+      [0, "ArrowUp"],
+    ] as const) {
+      if (key !== undefined) await page.keyboard.press(key);
+      await expect(lines(page).nth(at)).toBeFocused();
+      expect(await ringOf(page)).toEqual({ style: "solid", wide: true, inside: true });
     }
   });
 

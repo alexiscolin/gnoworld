@@ -12,13 +12,21 @@
   .lines > li {
     /* layout: the line holds its bar (LineActions), placed over its end */
     position: relative;
+    /* layout: room for the focus ring, drawn outside the line, which the list that scrolls would clip */
+    margin-inline: calc(var(--focus-width) + var(--focus-offset));
     padding-block: var(--space-3xs);
     overflow-wrap: anywhere;
+    scroll-margin-block: calc(var(--focus-width) + var(--focus-offset));
   }
 
   .lines > li:first-child {
     /* layout: room above the oldest line for its bar, which rises above a line (LineActions) */
     margin-block-start: var(--space-s);
+  }
+
+  .lines > li:last-child {
+    /* layout: room below the newest line for its focus ring */
+    margin-block-end: calc(var(--focus-width) + var(--focus-offset));
   }
 
   .time,
