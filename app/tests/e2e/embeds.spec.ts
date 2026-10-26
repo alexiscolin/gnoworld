@@ -87,6 +87,18 @@ test.describe("a link's player", () => {
     expect(away).toEqual([]);
   });
 
+  // F871: a hide that comes once the player plays takes the player away, the third party's frame with it.
+  test("takes a playing player away when the moderation hides its line later", async ({ page }) => {
+    let said = event("v1", "checked");
+    await room(page, () => said);
+    await play(page).click();
+    const player = lineOf(page, "watch").locator("iframe");
+    await expect(player).toBeVisible();
+    said = event("v1", "hidden");
+    await expect(player).toHaveCount(0);
+    await expect(lineOf(page, "watch").getByRole("button")).toHaveCount(0);
+  });
+
   // Alexis, 2026-10-26: a line older than the stream's replay gets its verdict from GET /api/verdicts, asked for the
   // lines in view with a player and no verdict, and answered for a room the reader may read.
   test("asks the server the verdict of a line the stream never told, and plays it once checked", async ({ page }) => {
