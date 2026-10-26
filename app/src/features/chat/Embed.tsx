@@ -4,7 +4,7 @@
 import type { StreamEvent } from "@gnoworld/schemas";
 import { Button, Card, Cluster, Stack } from "@gnoworld/ui";
 import { useEffect, useLayoutEffect, useRef, useState, type FocusEvent } from "react";
-import type { Embed as Player } from "./embeds.ts";
+import type { Player } from "./embeds.ts";
 import styles from "./Embed.module.css";
 
 export interface EmbedProps {

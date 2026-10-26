@@ -5,7 +5,7 @@
 // alphabet, a host that only looks like one, a port or plain http gets none.
 import { inlines, type Block } from "@gnoworld/core";
 
-export interface Embed {
+export interface Player {
   service: "YouTube" | "Vimeo" | "Giphy";
   /** The player's address, on the service's own host. */
   src: string;
@@ -39,7 +39,7 @@ function giphyId({ hostname, pathname }: URL): string | undefined {
 }
 
 /** The player a link opens, or none: an accepted service's, over https, on its own host. */
-export function embedOf(href: string): Embed | undefined {
+export function embedOf(href: string): Player | undefined {
   if (!URL.canParse(href)) return undefined;
   const url = new URL(href);
   if (url.protocol !== "https:" || url.port !== "" || url.username !== "" || url.password !== "") return undefined;
@@ -60,7 +60,7 @@ export function embedOf(href: string): Embed | undefined {
 }
 
 /** The player of a line's first link to an accepted service, or none. */
-export function embedIn(blocks: readonly Block[]): Embed | undefined {
+export function embedIn(blocks: readonly Block[]): Player | undefined {
   for (const node of inlines(blocks)) {
     if (node.type !== "link") continue;
     const embed = embedOf(node.href);
