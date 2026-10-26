@@ -1,6 +1,7 @@
 // A scripted Ergo for the screenshots (slice 4): the page's socket answered line by line, so a room's lines, topic
 // and people are the same each run, the page being a guest or an account; the rooms come from the real server.
 import type { WebSocketRoute } from "@playwright/test";
+import { hydrated, type Page } from "./fixtures.ts";
 
 export const MEMBER = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 /** A line of #games' history; its author MEMBER unless named. */
@@ -89,4 +90,19 @@ export function scriptedErgo(
     ];
     for (const answer of answers) ergo.send(answer);
   });
+}
+
+/** #games, or the room `script` names, opened on a scripted Ergo as `me`; the socket, to say a live line on it. */
+export async function opened(page: Page, me: string, script: Scripted = {}): Promise<() => WebSocketRoute> {
+  let socket: WebSocketRoute | undefined;
+  await page.routeWebSocket(/\/ws$/, (ergo) => {
+    socket = ergo;
+    scriptedErgo(ergo, me, script);
+  });
+  await page.goto(`/w/bubble${script.room === "#bubble" ? "" : "?room=games"}`);
+  await hydrated(page);
+  return () => {
+    if (socket === undefined) throw new Error("the page opened no socket");
+    return socket;
+  };
 }

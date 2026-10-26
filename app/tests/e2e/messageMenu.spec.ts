@@ -3,7 +3,7 @@ import type { WebSocketRoute } from "@playwright/test";
 import { inGames, lineOf, lines, roomsNav, whoIsHere, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
-import { MEMBER, scriptedErgo, type HistoryLine, type Scripted } from "./scripted.ts";
+import { MEMBER, opened, scriptedErgo, type HistoryLine, type Scripted } from "./scripted.ts";
 
 // 4c's message menu (docs/decisions.md, 2026-10-26): a line's bar and its More menu, the Messages list one tab stop
 // whose lines the arrows move among. A scripted Ergo (scripted.ts), as a guest or as the test's account; a real Ergo
@@ -23,18 +23,9 @@ async function room(
   page: Page,
   { me = GUEST, history = HISTORY, ...options }: Scripted & { me?: string } = {},
 ): Promise<() => WebSocketRoute> {
-  let socket: WebSocketRoute | undefined;
-  await page.routeWebSocket(/\/ws$/, (ergo) => {
-    socket = ergo;
-    scriptedErgo(ergo, me, { history, ...options });
-  });
-  await page.goto(`/w/bubble${options.room === "#bubble" ? "" : "?room=games"}`);
-  await hydrated(page);
+  const socket = await opened(page, me, { history, ...options });
   await expect(lines(page)).toHaveCount(history.length);
-  return () => {
-    if (socket === undefined) throw new Error("the page opened no socket");
-    return socket;
-  };
+  return socket;
 }
 const bars = (page: Page) => page.getByRole("toolbar", { name: "Message actions" });
 const barOf = (page: Page, at: number) => lines(page).nth(at).getByRole("toolbar", { name: "Message actions" });
