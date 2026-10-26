@@ -134,6 +134,17 @@ test.describe("a planted violation", () => {
     expect(page.url()).toBe(`${SITE}/`);
   });
 
+  // F883: a service's own site is no player: a frame of youtube.com, not youtube-nocookie.com, is refused.
+  test("refuses a frame of a host the players' list does not name", async ({ page, violations }) => {
+    await page.goto("/");
+    await hydrated(page);
+    await plant(
+      page,
+      "const f = document.createElement('iframe'); f.src = 'https://www.youtube.com/embed/dQw4w9WgXcQ'; document.body.append(f)",
+    );
+    await expect.poll(() => violations).toEqual(["frame-src"]);
+  });
+
   test("is reported from a second tab of the same context too", async ({ page, violations }) => {
     const other = await page.context().newPage();
     await other.goto("/");
