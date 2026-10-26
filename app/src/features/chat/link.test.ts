@@ -802,6 +802,15 @@ describe("the chat's link: direct messages", () => {
   };
   const dms = (sent: readonly string[]) => sent.filter((line) => line.startsWith(`PRIVMSG ${OTHER}`));
 
+  // 4e's late test audit (T2): no test said the link hands Ergo's lines to the direct messages' store.
+  it("hands Ergo's lines to the direct messages' store: an account's to me kept, a room's line not", () => {
+    const t = account();
+    t.fake.line(`@msgid=r;time=${T0};account=${OTHER} :${OTHER}!u@h PRIVMSG #bubble :to the room`);
+    expect(t.store.getState().dms).toEqual({});
+    t.fake.line(`@msgid=d;time=${T0};account=${OTHER} :${OTHER}!u@h PRIVMSG ${ADDRESS} :to you`);
+    expect(t.store.getState().dms[OTHER]?.map(({ text }) => text)).toEqual(["to you"]);
+  });
+
   it("sends an account's draft to another account, as the composer composes it", () => {
     const t = account();
     expect(t.link.sayTo(OTHER, "  hi **you**  ")).toBe(true);
