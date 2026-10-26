@@ -2415,6 +2415,37 @@ git -C "$bs" checkout -q -b fresh "$base" && mkdir -p "$bs/app/src" && lines 610
 out=$(size "$base") && fail "batch_size.py passed 610 lines of a merge with no reviewed commit since base"
 fi
 
+if part exam; then
+# exam.py: the reviewers' exam's set, from the ledger's fixed findings whose fix commit the repository holds: each the
+# fix's parent, the file the finding names, its bug; the newest first, capped; --severe keeps the high and medium.
+ex="$t/exam"
+mkdir -p "$ex/docs/review" "$ex/app/src"
+git -C "$ex" init -q
+echo bug >"$ex/app/src/a.ts" && git -C "$ex" add -A && git -C "$ex" commit -qm bug
+before=$(git -C "$ex" rev-parse HEAD)
+echo fixed >"$ex/app/src/a.ts" && git -C "$ex" commit -qam fix
+fix=$(git -C "$ex" rev-parse HEAD)
+short=$(git -C "$ex" rev-parse --short HEAD)
+{
+	echo '| Id | Found | By | Where | Claim | Status | Evidence |'
+	echo '|---|---|---|---|---|---|---|'
+	echo "| F001 | 2026-10-26 | a | \`app/src/a.ts\` | the first bug | fixed | \`$short\`: a test |"
+	echo "| F002 | 2026-10-26 | a | \`app/src/a.ts\` | a claim refuted | rejected | \`$short\`: no |"
+	echo "| F003 | 2026-10-26 | a | \`app/src/a.ts\` | a fix gone | fixed | \`0000000\`: lost |"
+	echo "| F004 | 2026-10-26 | a | \`app/src/b.ts\` | the second bug | fixed | \`$short\`: Medium, a test |"
+} >"$ex/docs/review/findings.md"
+exam() { (cd "$ex" && python3 -I "$here/exam.py" "$@" 2>/dev/null); }
+python3 -I - "$(exam)" "$(exam --severe)" "$(exam --cap 1)" "$before" "$fix" <<'PY' || fail "exam.py built a wrong set (above)"
+import json, sys
+every, severe, capped = (json.loads(a) for a in sys.argv[1:4])
+before, fix = sys.argv[4:6]
+assert [c["id"] for c in every] == ["F004", "F001"], f"the fixed findings with a commit, the newest first: {every}"
+assert every[1] == {"id": "F001", "commit": before, "fix": fix, "file": "app/src/a.ts", "bug": "the first bug"}, every[1]
+assert [c["id"] for c in severe] == ["F004"], f"--severe keeps the medium one: {severe}"
+assert [c["id"] for c in capped] == ["F004"], f"--cap 1 keeps the newest: {capped}"
+PY
+fi
+
 [ -z "${ONLY:-}" ] || [ "${ran:-}" = 1 ] || fail "ONLY=$ONLY names no section"
 echo "hooks: ok"
 finished=1

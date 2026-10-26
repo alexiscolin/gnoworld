@@ -55,7 +55,7 @@ SECTIONS = {
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
     "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
-    "scripts/repo_files.py": "worktrees", "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench", "scripts/suite_parts.py": "mutant_scope,harness_shards", "scripts/batch_size.py": "batch_size", "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
+    "scripts/repo_files.py": "worktrees", "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench", "scripts/suite_parts.py": "mutant_scope,harness_shards", "scripts/batch_size.py": "batch_size", "scripts/exam.py": "exam", "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
 }
 
 
@@ -555,6 +555,10 @@ def mutants():
     yield from each("scripts/batch_size.py", r"(\.test\.tsx?|", "(", "hooks", "batch_size leaves the tests out")
     yield from each("scripts/batch_size.py", "if added > TIER_ONE:", "if False:", "hooks", "batch_size says the tier-1 limit")
     yield from each("scripts/check.sh", "\t\tif $merge; then\n\t\t\tstep batch_size", "\t\tif true; then\n\t\t\tstep batch_size", "hooks", "check.sh: only --merge measures a merge's batch")
+    yield from each("scripts/exam.py", 'or cells[5] != "fixed":', "or False:", "hooks", "exam keeps the fixed findings alone")
+    yield from each("scripts/exam.py", "if path is None or fix is None or", "if path is None or", "hooks", "exam keeps a finding whose fix the repository holds")
+    yield from each("scripts/exam.py", "(severe and not SEVERE.search(", "(False and not SEVERE.search(", "hooks", "exam --severe keeps the high and medium")
+    yield from each("scripts/exam.py", "chosen = cases[::-1][:cap]", "chosen = cases[:cap]", "hooks", "exam takes the newest first")
     yield from each("scripts/prove_fix.py", "return all(subprocess.run(cmd", "return True or all(subprocess.run(cmd", "hooks", "prove_fix runs the tests on the parent")
     yield from each("scripts/prove_fix.py", 're.search(r"^No-test: \\S", message, re.M)', "True", "hooks", "prove_fix wants a reason for no test")
     yield from each("scripts/prove_fix.py", r"|\.spec\.ts", "", "hooks", "prove_fix takes a journey for a fix's test (F126)")
