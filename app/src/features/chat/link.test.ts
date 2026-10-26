@@ -754,6 +754,14 @@ describe("the chat's link: what it says", () => {
     expect(redacted(again.sent)).toEqual([`REDACT #bubble/games ${MSGID}`]);
   });
 
+  // The green pass (G13): the rule's bound itself, 64 characters, goes out.
+  it("deletes by a msgid of 64 characters, the rule's longest", () => {
+    const t = memberIn(["#bubble/games"]);
+    const id = "a".repeat(64);
+    expect(t.link.redact("#bubble/games", id)).toBe(true);
+    expect(redacted(t.fake.sent)).toEqual([`REDACT #bubble/games ${id}`]);
+  });
+
   // The red pass (M10): a msgid comes from a line's tags; one that is no single word never reaches the wire.
   it.each([
     ["nothing", ""],
@@ -765,6 +773,8 @@ describe("the chat's link: what it says", () => {
     ["a comma", "a,b"],
     ["a leading colon", ":a"],
     ["600 characters", "a".repeat(600)],
+    // The green pass (G13): one past the rule's bound.
+    ["65 characters", "a".repeat(65)],
   ])("sends no REDACT for a msgid holding %s", (_, id) => {
     const t = memberIn(["#bubble/games"]);
     const before = t.fake.sent.length;

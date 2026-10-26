@@ -281,6 +281,8 @@ describe("refusedOf: the line Ergo refused to delete", () => {
     ["another command's FAIL", ":ergo FAIL CHATHISTORY MESSAGE_ERROR #bubble a :error"],
     ["a WARN of a REDACT", ":ergo WARN REDACT REDACT_FORBIDDEN #bubble a :careful"],
     ["a FAIL REDACT cut short", ":ergo FAIL REDACT REDACT_FORBIDDEN #bubble"],
+    // The green pass (G13): a reply of another shape than Ergo's five parameters is no refusal read.
+    ["a FAIL REDACT with a parameter more", ":ergo FAIL REDACT REDACT_FORBIDDEN #bubble a b :You are not"],
     ["a REDACT itself", ":gnoworld!u@h REDACT #bubble a"],
   ])("reads none of %s", (_, line) => {
     expect(refusedOf(read(line))).toBeUndefined();
