@@ -32,7 +32,9 @@ async function conversation(page: Page, width: number, partner: string): Promise
   await page.goto(`/w/bubble?dm=${partner}`);
   await hydrated(page);
   const ergo = await socket;
-  await expect(page.getByRole("status").filter({ hasText: "Connecting" })).toHaveCount(0);
+  // Said once Ergo welcomed the page (RoomView's empty words wait on "connected"): no "Connecting" holds before it
+  // starts too, and a line sent then, before the page knows its nick, is no DM of its own.
+  await expect(page.getByText("No messages since this page opened.")).toBeVisible();
   return ergo;
 }
 
