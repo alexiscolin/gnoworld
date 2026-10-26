@@ -36,7 +36,10 @@ function dmShown(partner: string, dms: Dms, { sayTo, focus, noteId }: DmPage): S
   );
   const note = (
     <>
-      <Icon name="lock" /> <span className={styles["caution"]}>{NOT_ENCRYPTED}</span> {PAGE_ONLY}
+      <span className={styles["caution"]}>
+        <Icon name="lock" /> {NOT_ENCRYPTED}
+      </span>{" "}
+      {PAGE_ONLY}
     </>
   );
   return {
