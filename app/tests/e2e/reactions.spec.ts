@@ -4,6 +4,9 @@ import { logIn } from "./irc.ts";
 import { MEMBER, opened, scriptedErgo, type HistoryLine } from "./scripted.ts";
 import { asAccount, barOf, GUEST, HISTORY, OTHER, ROOM, T, tagmsg } from "./talk.ts";
 
+// The lines sent, each label as a star: what a label says is the link's own (F1170).
+const unlabelled = (sent: readonly string[]) => sent.map((line) => line.replace(/^@label=[^;]+;/u, "@label=*;"));
+
 // 4d's reactions (docs/decisions.md, 2026-10-26): three quick reactions on a line's bar, a line's reactions under it as
 // chips, counted once an account, an account's own pressed, sent and shown only through Ergo, whose echo says it took
 // one. A scripted Ergo (scripted.ts).
@@ -46,9 +49,9 @@ test.describe("reactions", () => {
     await expect(quick).toHaveAttribute("aria-pressed", "true");
     await quick.click();
     await expect(chip).toHaveCount(0);
-    expect(said()).toEqual([
-      `@label=r1;+draft/react=👍;+reply=m2 TAGMSG ${ROOM}`,
-      `@label=r2;+draft/unreact=👍;+reply=m2 TAGMSG ${ROOM}`,
+    expect(unlabelled(said())).toEqual([
+      `@label=*;+draft/react=👍;+reply=m2 TAGMSG ${ROOM}`,
+      `@label=*;+draft/unreact=👍;+reply=m2 TAGMSG ${ROOM}`,
     ]);
   });
 
@@ -64,9 +67,9 @@ test.describe("reactions", () => {
     await expect(line.getByRole("button", { name: "🔥, 2, including you" })).toHaveAttribute("aria-pressed", "true");
     await line.getByRole("button", { name: "🎉, 1, including you" }).click();
     await expect(line.getByRole("button", { name: /🎉/ })).toHaveCount(0);
-    expect(said()).toEqual([
-      `@label=r1;+draft/react=🔥;+reply=m1 TAGMSG ${ROOM}`,
-      `@label=r2;+draft/unreact=🎉;+reply=m1 TAGMSG ${ROOM}`,
+    expect(unlabelled(said())).toEqual([
+      `@label=*;+draft/react=🔥;+reply=m1 TAGMSG ${ROOM}`,
+      `@label=*;+draft/unreact=🎉;+reply=m1 TAGMSG ${ROOM}`,
     ]);
   });
 
@@ -144,9 +147,9 @@ test.describe("reactions", () => {
     await mine.focus();
     await page.keyboard.press("Space");
     await expect(lineOf(page, "the first line").getByRole("button", { name: "🔥, 1" })).toBeVisible();
-    expect(said()).toEqual([
-      `@label=r1;+draft/react=🔥;+reply=m1 TAGMSG ${ROOM}`,
-      `@label=r2;+draft/unreact=🔥;+reply=m1 TAGMSG ${ROOM}`,
+    expect(unlabelled(said())).toEqual([
+      `@label=*;+draft/react=🔥;+reply=m1 TAGMSG ${ROOM}`,
+      `@label=*;+draft/unreact=🔥;+reply=m1 TAGMSG ${ROOM}`,
     ]);
   });
 
@@ -185,6 +188,6 @@ test.describe("a reaction Ergo refused", () => {
       "aria-pressed",
       "false",
     );
-    expect(said()).toEqual([`@label=r1;+draft/react=👍;+reply=m2 TAGMSG ${ROOM}`]);
+    expect(unlabelled(said())).toEqual([`@label=*;+draft/react=👍;+reply=m2 TAGMSG ${ROOM}`]);
   });
 });
