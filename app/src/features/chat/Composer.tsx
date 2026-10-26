@@ -94,8 +94,8 @@ export interface ComposerProps {
   /** The world's rooms by label, and the room's members, whose other accounts a word after `@` completes to. */
   rooms: readonly string[];
   members: readonly string[];
-  /** Sends the draft; whether it went. */
-  onSay: (draft: string) => boolean;
+  /** Sends the draft as composed; whether it went. */
+  onSay: (composed: Composed) => boolean;
   /** Where the draft starts: the room's, kept on the device (4d). */
   draft?: string | undefined;
   /** Each change of the draft, for the device to keep; a line sent leaves it blank. */
@@ -151,7 +151,7 @@ export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", 
   const send = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (composed.kind !== "line") return;
-    const went = onSay(draft);
+    const went = onSay(composed);
     setFailed(!went);
     if (went) change("");
   };

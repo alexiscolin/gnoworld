@@ -3,6 +3,7 @@
 // (?room=<name>), else the world's main room, else the first listed, the one whose history the link asks. The
 // link lives as long as the page: leaving the world leaves Ergo. An account writes in the room through the link
 // (4c); a guest reads, a room letting accounts alone speak.
+import type { Composed } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";
 import { Button, Sidebar, Stack } from "@gnoworld/ui";
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -63,7 +64,7 @@ interface WriterProps {
   room: string;
   rooms: readonly string[];
   members: readonly string[];
-  onSay: (draft: string) => boolean;
+  onSay: (composed: Composed) => boolean;
 }
 
 function Writer({ session, room, rooms, members, onSay }: WriterProps) {
@@ -95,7 +96,7 @@ interface LoadedProps {
   state: RoomViewProps["state"];
   chat: RoomViewProps["chat"];
   session: AppState["login"]["session"];
-  say: (room: string, draft: string) => boolean;
+  say: (room: string, composed: Composed) => boolean;
   /** Deletes a line of a room, through Ergo's REDACT (4c's message menu); whether it went out. */
   redact: (room: string, id: string) => boolean;
   /** The room's refused delete, said. */
@@ -124,7 +125,7 @@ function Loaded({ sections, current, state, chat, session, say, redact, dismisse
               room={current}
               rooms={ids}
               members={state?.members ?? []}
-              onSay={(draft) => say(current, draft)}
+              onSay={(composed) => say(current, composed)}
             />
           }
         />
@@ -202,7 +203,7 @@ export function ChatPanel({ world }: { world: string }) {
       state={state}
       chat={chat}
       session={session}
-      say={(room, draft) => linkRef.current?.say(room, draft) ?? false}
+      say={(room, composed) => linkRef.current?.say(room, composed) ?? false}
       redact={(room, id) => linkRef.current?.redact(room, id) ?? false}
       dismissed={(room) => {
         store.getState().chatActions.dismissed(room);

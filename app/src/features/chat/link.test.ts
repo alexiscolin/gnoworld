@@ -1,4 +1,4 @@
-import { parseLine, type IrcMessage } from "@gnoworld/core";
+import { compose, parseLine, type IrcMessage } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
 import type { Result } from "../../lib/api/http.ts";
@@ -685,22 +685,31 @@ describe("the chat's link: what it says", () => {
     return { ...t, fake };
   };
   const said = (sent: readonly string[]) => sent.filter((line) => line.startsWith("PRIVMSG "));
+  // A draft as the account's composer composes it for a room: the link sends what it is given.
+  const composed = (room: string, draft: string) => compose(room, draft, ADDRESS);
 
   it("sends a draft to a room it is in, as the composer composes it", () => {
     const t = memberIn(["#bubble/games"]);
-    expect(t.link.say("#bubble/games", "  hi **all**  ")).toBe(true);
-    expect(t.link.say("#bubble/games", "/me waves")).toBe(true);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "  hi **all**  "))).toBe(true);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "/me waves"))).toBe(true);
     expect(said(t.fake.sent)).toEqual([
       "PRIVMSG #bubble/games :hi **all**",
       "PRIVMSG #bubble/games :\u0001ACTION waves\u0001",
     ]);
   });
 
+  it("sends nothing composed for another room than the one it is told, though it is in both", () => {
+    const t = memberIn(["#bubble/games", "#bubble"]);
+    t.fake.line(`:${ADDRESS}!u@h JOIN #bubble`);
+    expect(t.link.say("#bubble", composed("#bubble/games", "hi"))).toBe(false);
+    expect(said(t.fake.sent)).toEqual([]);
+  });
+
   it.each(["", "  ", "/nick bob", "a".repeat(600)])(
     "sends nothing of a draft the composer would not send (%j)",
     (draft) => {
       const t = memberIn(["#bubble/games"]);
-      expect(t.link.say("#bubble/games", draft)).toBe(false);
+      expect(t.link.say("#bubble/games", composed("#bubble/games", draft))).toBe(false);
       expect(said(t.fake.sent)).toEqual([]);
     },
   );
@@ -785,16 +794,16 @@ describe("the chat's link: what it says", () => {
   it("says nothing as a guest: a room lets accounts alone speak", () => {
     const t = guestIn(["#bubble/games"]);
     t.fake.line(`:${GUEST}!u@h JOIN #bubble/games`);
-    expect(t.link.say("#bubble/games", "hi")).toBe(false);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "hi"))).toBe(false);
     expect(said(t.fake.sent)).toEqual([]);
   });
 
   it("says nothing in a room Ergo has not said it is in, nor in one it left", () => {
     const t = memberIn(["#bubble/games", "#bubble"]);
-    expect(t.link.say("#bubble", "hi")).toBe(false);
-    expect(t.link.say("#garden", "hi")).toBe(false);
+    expect(t.link.say("#bubble", composed("#bubble", "hi"))).toBe(false);
+    expect(t.link.say("#garden", composed("#garden", "hi"))).toBe(false);
     t.link.follow(["#bubble"]);
-    expect(t.link.say("#bubble/games", "hi")).toBe(false);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "hi"))).toBe(false);
     expect(said(t.fake.sent)).toEqual([]);
   });
 
@@ -804,11 +813,11 @@ describe("the chat's link: what it says", () => {
     t.fake.line("BATCH +n1 example.com/replay");
     t.fake.line(`@batch=n1 :op!u@h KICK #bubble ${ADDRESS} :long ago`);
     t.fake.line("BATCH -n1");
-    expect(t.link.say("#bubble", "hi")).toBe(true);
+    expect(t.link.say("#bubble", composed("#bubble", "hi"))).toBe(true);
     t.fake.line(`:op!u@h KICK #bubble/games ${ADDRESS} :bye`);
     t.fake.line(`:op!u@h KICK #bubble ${OTHER} :not me`);
-    expect(t.link.say("#bubble/games", "hi")).toBe(false);
-    expect(t.link.say("#bubble", "again")).toBe(true);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "hi"))).toBe(false);
+    expect(t.link.say("#bubble", composed("#bubble", "again"))).toBe(true);
     expect(said(t.fake.sent)).toEqual(["PRIVMSG #bubble :hi", "PRIVMSG #bubble :again"]);
   });
 
@@ -816,7 +825,7 @@ describe("the chat's link: what it says", () => {
     const t = memberIn(["#bubble/games"]);
     t.fake.line(`:troll!u@h PRIVMSG #bubble/games :${ADDRESS}`);
     t.fake.line(`:troll!u@h NOTICE #bubble/games ${ADDRESS}`);
-    expect(t.link.say("#bubble/games", "still here")).toBe(true);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "still here"))).toBe(true);
   });
 
   it("forgets, as a connection drops, the rooms it had joined: the next one parts none of them", () => {
@@ -833,13 +842,13 @@ describe("the chat's link: what it says", () => {
   it("says nothing while away, nothing again before Ergo says it is in the room, and nothing once stopped", () => {
     const t = memberIn(["#bubble/games"]);
     t.fake.state("waiting");
-    expect(t.link.say("#bubble/games", "away")).toBe(false);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "away"))).toBe(false);
     const again = t.connected(ADDRESS);
-    expect(t.link.say("#bubble/games", "early")).toBe(false);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "early"))).toBe(false);
     again.line(`:${ADDRESS}!u@h JOIN #bubble/games`);
-    expect(t.link.say("#bubble/games", "back")).toBe(true);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "back"))).toBe(true);
     t.link.stop();
-    expect(t.link.say("#bubble/games", "late")).toBe(false);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "late"))).toBe(false);
     expect(said(again.sent)).toEqual(["PRIVMSG #bubble/games :back"]);
   });
 });

@@ -3,7 +3,7 @@
 // (Ergo's max-channels-per-client); the newest lines of the room in view alone, once Ergo says I joined it, since
 // Ergo paces a client to 2 lines a second (plan §4); Ergo's lines read into the store through one BatchReader a
 // connection. Its parts come in, so the tests give their own.
-import { BatchReader, compose, LINE_BYTES, nickOf, type IrcMessage } from "@gnoworld/core";
+import { BatchReader, LINE_BYTES, nickOf, type Composed, type IrcMessage } from "@gnoworld/core";
 import { RoomId } from "@gnoworld/schemas";
 import type { Result } from "../../lib/api/http.ts";
 import type { Ergo, ErgoOptions, Who } from "../../lib/ergo/ergo.ts";
@@ -29,8 +29,9 @@ export interface ChatLink {
   follow: (ids: readonly string[]) => void;
   /** The room in view: its history is asked once Ergo says I joined it, once a connection. */
   show: (room: string | undefined) => void;
-  /** Sends a draft, as the composer composes it, to a room Ergo says it is in; an account's alone. Whether it went. */
-  say: (room: string, draft: string) => boolean;
+  /** Sends what the composer composed for a room Ergo says it is in; an account's alone. Whether it went. The
+   * composer, an account's alone, composes, so a visitor's page never loads it (budgets.spec.ts). */
+  say: (room: string, composed: Composed) => boolean;
   /** Deletes a line, by its msgid, in a room Ergo says it is in, as Ergo's REDACT (4c's message menu); an
    * account's alone, Ergo refusing another's line. Whether it went. */
   redact: (room: string, id: string) => boolean;
@@ -92,11 +93,10 @@ class Link implements ChatLink {
     this.#keep();
   }
 
-  say(room: string, draft: string): boolean {
-    const me = this.#ergo?.nick();
-    if (this.#key === "guest" || me === undefined || !this.#inside.has(room)) return false;
-    const composed = compose(room, draft, me);
-    return composed.kind === "line" && this.#ergo?.send(composed.line) === true;
+  say(room: string, composed: Composed): boolean {
+    const allowed = this.#key !== "guest" && this.#ergo?.nick() !== undefined && this.#inside.has(room);
+    if (!allowed || composed.kind !== "line" || !composed.line.startsWith(`PRIVMSG ${room} :`)) return false;
+    return this.#ergo?.send(composed.line) === true;
   }
 
   redact(room: string, id: string): boolean {
