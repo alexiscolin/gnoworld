@@ -69,6 +69,22 @@ test.describe("reactions", () => {
     ]);
   });
 
+  // The green pass (G1): mine stays pressed, on the chip and on the bar, when another account reacts after me.
+  test("keep one's reaction pressed, on its chip and its quick reaction, when another account's comes after it", async ({
+    page,
+  }) => {
+    await asAccount(page, (address) => ({
+      replayed: [
+        tagmsg("r1", "+draft/react=👍;+reply=m1", { at: 2, who: address }),
+        tagmsg("r2", "+draft/react=👍;+reply=m1", { at: 3, who: OTHER }),
+      ],
+    }));
+    const line = lineOf(page, "the first line");
+    await expect(line.getByRole("button", { name: "👍, 2, including you" })).toHaveAttribute("aria-pressed", "true");
+    await line.hover();
+    await expect(barOf(page, 0).getByRole("button", { name: "React with 👍" })).toHaveAttribute("aria-pressed", "true");
+  });
+
   // R3: a chip the keyboard reaches by Tab acts on Enter and on Space, as a button does.
   test("reach a line's chip by Tab from the line, and press it with Enter, then with Space", async ({ page }) => {
     const { said } = await asAccount(page, () => ({

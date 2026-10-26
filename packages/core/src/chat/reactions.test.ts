@@ -226,6 +226,13 @@ describe("reactionsOn: what each line shows of its reactions", () => {
     ]);
   });
 
+  // The green pass (G1): mine whoever reacted after me with it.
+  test("keeps an emoji mine when another account reacts with it after me", () => {
+    expect(reactionsOn([on("m1", "👍", ME), on("m1", "👍", ALICE)], ME).get("m1")).toEqual([
+      { emoji: "👍", count: 2, mine: true },
+    ]);
+  });
+
   test("counts no take-back, and keeps no emoji whose every reaction was taken back", () => {
     const shown = reactionsOn([on("m1", "👍", ALICE), off("m1", "😂", ME), on("m1", "😂", ALICE)], ME);
     expect(shown.get("m1")).toEqual([
