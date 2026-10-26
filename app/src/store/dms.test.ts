@@ -216,6 +216,29 @@ describe("the store's chat slice: direct messages", () => {
     expect(unread.store.getState().dmNotKept).toBe(true);
   });
 
+  // StrykerJS on CR5: a store, or a session with no device, a guest's, says nothing of a device.
+  it("says nothing of a device before a session, nor for a session with none", () => {
+    const t = as(ACCOUNT);
+    expect(t.store.getState().dmNotKept).toBe(false);
+    t.store.getState().dmActions.begin();
+    expect(t.store.getState().dmNotKept).toBe(false);
+  });
+
+  // StrykerJS on CR3's fix: an account written to before, though not last, changes no choice.
+  it("notifies no one of an account written to before, though another came since", () => {
+    const BOB = toAddress(new Uint8Array(20).fill(9));
+    const t = as(ACCOUNT);
+    t.store.getState().dmActions.begin({ prefs: prefs().device, drafts: NO_DRAFTS });
+    t.store.getState().dmActions.know(ALICE);
+    t.store.getState().dmActions.know(BOB);
+    let heard = 0;
+    t.store.subscribe(() => {
+      heard += 1;
+    });
+    t.store.getState().dmActions.know(ALICE);
+    expect(heard).toBe(0);
+  });
+
   // /code-review on 4e (CR4): a device that could not be read is never written over.
   it("writes no account written to on a device it could not read", () => {
     const t = as(ACCOUNT);

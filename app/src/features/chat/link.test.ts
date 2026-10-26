@@ -929,6 +929,22 @@ describe("the chat's link: direct messages", () => {
     expect(t.kept.get(OTHER)).toBe(`line ${String(WAITING)}`);
   });
 
+  // StrykerJS on CR1's fix: a standard reply's FAIL refuses too, and the bound drops a line past 50 waiting, not at 50.
+  it("puts back a line Ergo answers with a FAIL, said refused, not offline", () => {
+    const t = withDrafts();
+    t.link.sayTo(OTHER, "hi");
+    t.fake.line(`@label=${labelOf(t.fake.sent, 0) ?? ""} :ergo.test FAIL PRIVMSG INVALID_TARGET ${OTHER} :No`);
+    expect(t.kept.get(OTHER)).toBe("hi");
+    expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 1, draft: "hi", offline: false } });
+  });
+
+  it(`keeps exactly ${String(WAITING)} lines waiting: the first one's refusal still puts it back`, () => {
+    const t = withDrafts();
+    for (let n = 0; n < WAITING; n += 1) t.link.sayTo(OTHER, `line ${String(n)}`);
+    t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 0)));
+    expect(t.kept.get(OTHER)).toBe("line 0");
+  });
+
   // With Ergo's multiclient, another tab's line reaches this one as an echo does: it answers none of this one's.
   it("takes another tab's line to the same account for no answer to its own", () => {
     const t = withDrafts();
