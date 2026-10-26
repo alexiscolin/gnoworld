@@ -26,8 +26,8 @@ export interface Dms {
   refused: { count: number; draft: string } | undefined;
 }
 
-// The account the address's ?dm= names: another account's, never the reader's own nor an address that is none.
-function partnerOf(account: string | undefined, asked: string | null): string | undefined {
+/** The account the address's ?dm= names: another account's, never the reader's own nor an address that is none. */
+export function partnerOf(account: string | undefined, asked: string | null): string | undefined {
   if (account === undefined || asked === null || asked === account) return undefined;
   return Address.safeParse(asked).success ? asked : undefined;
 }
@@ -36,6 +36,17 @@ function partnerOf(account: string | undefined, asked: string | null): string | 
  * first though none was yet. */
 export const listOf = (heard: readonly string[], partner: string | undefined): string[] =>
   partner === undefined || heard.includes(partner) ? heard.toReversed() : [partner, ...heard.toReversed()];
+
+/** The conversation with `partner`: its lines, none while the account does not hear from it, and what it says with
+ * none. */
+export function conversationOf(
+  all: AppState["dms"],
+  choices: AppState["dmChoices"],
+  partner: string | undefined,
+): Pick<Dms, "lines" | "empty"> {
+  if (partner !== undefined && !heardFrom(choices, partner)) return { lines: [], empty: NOT_KEPT };
+  return { lines: partner === undefined ? [] : (all[partner] ?? []), empty: "No messages yet." };
+}
 
 /** An account's direct messages on a world's page, `asked` the address's ?dm=. */
 export function useDms(world: string, session: AppState["login"]["session"], asked: string | null): Dms {
@@ -58,8 +69,7 @@ export function useDms(world: string, session: AppState["login"]["session"], ask
             onlyKnown: choices.onlyKnown,
             onOnlyKnown: setOnlyKnown,
           },
-    lines: partner !== undefined && heard(partner) ? (all[partner] ?? []) : [],
-    empty: partner === undefined || heard(partner) ? "No messages yet." : NOT_KEPT,
+    ...conversationOf(all, choices, partner),
     refused: partner === undefined ? undefined : refusals[partner],
   };
 }
