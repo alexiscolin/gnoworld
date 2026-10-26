@@ -1455,7 +1455,7 @@ fi
 gate_fixture() { # $1: its folder's name, one a section: the sections run side by side
 g="$t/$1"
 log="$g.log"
-mkdir -p "$g/scripts" "$g/.githooks" "$g/bin" "$g/toolchain" "$g/gno/r/seal" "$g/app/src" "$g/app/tests" "$g/app/node_modules/@playwright/test" "$g/node_modules/vitest" \
+mkdir -p "$g/scripts" "$g/.githooks" "$g/bin" "$g/toolchain" "$g/gno/r/seal" "$g/app/src" "$g/app/tests" "$g/app/node_modules/@playwright/test" \
 	"$g/server/src" "$g/packages/core/src" "$g/packages/ui/src" "$g/packages/schemas/src" "$g/deploy" "$g/lint"
 cp "$here/check.sh" "$here/code_changed.sh" "$g/scripts/" && cp "$hooks/records.sh" "$g/.githooks/" && cp "$here/../.node-version" "$here/../.gitignore" "$g/"
 step="$g/bin/step"
@@ -1501,8 +1501,6 @@ done
 for sh in ergo test_hooks scan_secrets; do printf 'exec sh "%s" sh:%s "$@"\n' "$step" "$sh" >"$g/scripts/$sh.sh"; done
 # The journeys' stub; with PW_EDIT, it edits a package file, as a build that installs would.
 printf 'const { spawnSync } = require("node:child_process");\nconst { appendFileSync } = require("node:fs");\nconst name = process.argv.some((a) => a.includes("stories")) ? "stories" : "playwright";\nif (process.env.PW_EDIT) appendFileSync("app/package.json", "\\n");\nprocess.exit(spawnSync("sh", [%s, name, "port=" + process.env.E2E_PORT, ...process.argv.slice(2)], { stdio: "inherit" }).status);\n' "'$step'" >"$g/app/node_modules/@playwright/test/cli.js"
-# Core's Chromium run's stub: it logs the profile folder CORE_CHROMIUM names, and whether it exists while it runs.
-printf 'import { spawnSync } from "node:child_process";\nimport { existsSync } from "node:fs";\nconst dir = process.env.CORE_CHROMIUM ?? "";\nconst made = dir !== "" && existsSync(dir) ? "made" : "none";\nprocess.exit(spawnSync("sh", [%s, "core_chromium", "profile=" + dir + ":" + made, ...process.argv.slice(2)], { stdio: "inherit" }).status ?? 1);\n' "'$step'" >"$g/node_modules/vitest/vitest.mjs"
 python3 -I - "$g/package.json" "$step" <<'PY'
 import json, sys
 names = ["format:check", "typecheck", "lint", "test", "unused", "copies", "comments", "coverage", "mutate"]
@@ -1783,6 +1781,9 @@ fi
 
 if part gate_full; then
 gate_fixture gate_full
+# Core's Chromium run's stub, here alone: a fixture's node_modules folder would hide gate_scope's linked one.
+mkdir -p "$g/node_modules/vitest"
+printf 'import { spawnSync } from "node:child_process";\nimport { existsSync } from "node:fs";\nconst dir = process.env.CORE_CHROMIUM ?? "";\nconst made = dir !== "" && existsSync(dir) ? "made" : "none";\nprocess.exit(spawnSync("sh", [%s, "core_chromium", "profile=" + dir + ":" + made, ...process.argv.slice(2)], { stdio: "inherit" }).status ?? 1);\n' "'$step'" >"$g/node_modules/vitest/vitest.mjs"
 # The full gate: every fast step but the plain tests, then the full ones in lanes, each told where the
 # branch left main; harness_mutate only when the harness changed since main.
 base=$(git -C "$g" rev-parse HEAD)
