@@ -136,6 +136,14 @@ test.describe("a link's player", () => {
     await asksNothingSaidSince(page);
   });
 
+  // F890: the page dated the stream's opening by its own clock; five minutes ahead, it asked of a line said since.
+  test("asks the server nothing of a line said after the stream began, the page's clock five minutes ahead", async ({
+    page,
+  }) => {
+    await page.clock.install({ time: Date.now() + 5 * 60_000 });
+    await asksNothingSaidSince(page);
+  });
+
   // ADR-0002 §8: Data saver (a 2G link) shows no embed; and a verdict serves a player alone, so none is asked (F879).
   test("shows none to a reader who saves data, and asks no verdict", async ({ page }) => {
     await page.addInitScript(() => {

@@ -23,8 +23,7 @@ export function useVerdicts(store: Store, current: string | undefined, lines: re
         store.getState().verdictActions.judged(event);
       },
       held: (room) => store.getState().verdicts[room],
-      follow: (room, on) => pageVerdicts([room], on.verdict),
-      now: Date.now,
+      follow: (room, on) => pageVerdicts([room], on),
     });
     askerRef.current = asker;
     return asker.stop;

@@ -18,8 +18,8 @@ function fakeSource() {
       },
     };
   };
-  const say = (data: unknown) => {
-    listeners.get("verdict")?.({ data });
+  const say = (data: unknown, type = "verdict") => {
+    listeners.get(type)?.({ data });
   };
   return { open, opened, say, closed: () => closed };
 }
@@ -57,6 +57,25 @@ describe("followVerdicts: the room's verdicts, as the server streams them", () =
     source.say(JSON.stringify(CHECKED));
     expect(heard).toEqual([CHECKED]);
     expect(said).toEqual(["verdict_unknown"]);
+  });
+
+  // F890: after its replay, the stream says when it began following, on the server's clock.
+  it("hands on the stream's word of when it began following, in ms, and drops a word of another shape once", () => {
+    const source = fakeSource();
+    const times: number[] = [];
+    const said: string[] = [];
+    followVerdicts(["#bubble"], () => undefined, {
+      open: source.open,
+      log: (what) => said.push(what),
+      since: (time) => times.push(time),
+    });
+    source.say(JSON.stringify({ time: "2026-10-26T12:00:00.000Z" }), "since");
+    source.say(JSON.stringify({ time: "noon" }), "since");
+    source.say("{not json", "since");
+    source.say(JSON.stringify({ time: "2026-10-26T12:00:00.000Z", extra: 1 }), "since");
+    source.say(JSON.stringify({ time: "2026-10-26T12:10:00.000Z" }), "since");
+    expect(times).toEqual([Date.parse("2026-10-26T12:00:00.000Z"), Date.parse("2026-10-26T12:10:00.000Z")]);
+    expect(said).toEqual(["since_unknown"]);
   });
 
   it("closes the stream when the page stops following", () => {

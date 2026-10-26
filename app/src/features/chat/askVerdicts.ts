@@ -1,6 +1,6 @@
 // The verdicts of the shown room's lines (slice 4's 4g; docs/decisions.md, 2026-10-26): the room's stream, which the
-// asker follows, gives them from its opening on; GET /api/verdicts the lines said before (F884), asked once each while
-// in view, VERDICTS_ASKED a request. After a failure that may pass, nothing is asked for a rest, then the view last
+// asker follows, gives them from when it says it began (F890); GET /api/verdicts the lines said before (F884), asked
+// once each while in view, VERDICTS_ASKED a request. After a failure that may pass, nothing is asked for a rest, then the view last
 // given is asked again (F874).
 import type { Line } from "@gnoworld/core";
 import { type LineVerdicts, type StreamEvent, VERDICTS_ASKED } from "@gnoworld/schemas";
@@ -17,8 +17,6 @@ export interface Asking {
   /** Follows a room's stream (lib/stream/verdicts.ts), handing on its verdicts and its word of when it began
    * following, in ms; stops when called. */
   follow: (room: string, on: { verdict: (event: StreamEvent) => void; since: (time: number) => void }) => () => void;
-  /** The page's clock, in ms. */
-  now: () => number;
 }
 
 // A room's lines in view, the verdicts the page holds of them, and when it began following the room's stream.
@@ -35,10 +33,18 @@ export const BUSY_REST_MS = 60_000;
 // The failures that may pass: the others (refused, forbidden, malformed) the server would give again.
 const PASSING: ReadonlySet<string> = new Set(["network", "unavailable", "internal", "not_ready", "too_many"]);
 
-export function verdictAsker({ verdicts, judged, held, follow, now }: Asking) {
+interface Following {
+  room: string;
+  /** The room's lines last shown, none before they load. */
+  lines: readonly Line[] | undefined;
+  /** When its stream began following, by the stream's own word (F890); none before it. */
+  since: number | undefined;
+  stop: () => void;
+}
+
+export function verdictAsker({ verdicts, judged, held, follow }: Asking) {
   const asked = new Map<string, Set<string>>();
-  // The room whose stream the asker follows, when it began, and how to stop it.
-  let following: { room: string; since: number; stop: () => void } | undefined;
+  let following: Following | undefined;
   // The view last given, asked again when a rest ends; the rest under way, during which nothing is asked.
   let latest: { room: string; view: InView } | undefined;
   let resting: ReturnType<typeof setTimeout> | undefined;
@@ -83,21 +89,38 @@ export function verdictAsker({ verdicts, judged, held, follow, now }: Asking) {
       send(room, wanted.slice(start, start + VERDICTS_ASKED), mine);
     }
   };
+  // The shown lines said before the stream's word are the server's to answer; before its word, nothing is asked.
+  const askShown = () => {
+    if (following?.lines === undefined || following.since === undefined) return;
+    ask(following.room, { lines: following.lines, held: held(following.room), since: following.since });
+  };
   const unfollow = () => {
     following?.stop();
     following = undefined;
   };
+  const start = (room: string): void => {
+    const mine: Following = { room, lines: undefined, since: undefined, stop: () => undefined };
+    // The stream's word after its replay, on the server's clock, which Ergo's server-time shares (F890): never the
+    // page's, which may run ahead or behind. A reconnection's later word moves it, the replay having given the rest.
+    const since = (time: number) => {
+      if (following !== mine) return;
+      mine.since = time;
+      askShown();
+    };
+    following = mine;
+    mine.stop = follow(room, { verdict: judged, since });
+  };
   return {
-    /** Follows the room's stream, the room shown before stopped; then asks of its lines in view, once loaded. */
+    /** Follows the room's stream, the room shown before stopped; then asks of its lines in view, once loaded and
+     * once the stream has said when it began. */
     show: (room: string | undefined, lines: readonly Line[] | undefined): void => {
       if (following?.room !== room) {
         unfollow();
-        // The stream's own word of when it began is not read yet: the page's clock dates it.
-        const since = () => undefined;
-        if (room !== undefined) following = { room, since: now(), stop: follow(room, { verdict: judged, since }) };
+        if (room !== undefined) start(room);
       }
-      if (following === undefined || lines === undefined) return;
-      ask(following.room, { lines, held: held(following.room), since: following.since });
+      if (following === undefined) return;
+      following.lines = lines;
+      askShown();
     },
     /** Follows and asks nothing more: a rest under way, or one an answer still to come starts, ends with nothing
      * asked. */

@@ -14,7 +14,10 @@ const line = (id: string, time = OLD): Line => ({
   text: `${id}: https://youtu.be/dQw4w9WgXcQ`,
   kind: "message",
 });
-const NONE: Result<LineVerdicts> = { ok: true, value: { room: "#bubble", verdicts: [] } };
+const NONE: Result<LineVerdicts> = {
+  ok: true,
+  value: { room: "#bubble", verdicts: [] },
+};
 
 // A server that answers each request as told, keeping the ids each asked; and the verdicts handed to the store.
 function server(answer: (ids: readonly string[]) => Promise<Result<LineVerdicts>> = () => Promise.resolve(NONE)) {
@@ -35,7 +38,6 @@ function server(answer: (ids: readonly string[]) => Promise<Result<LineVerdicts>
       on.since(OPENED);
       return () => undefined;
     },
-    now: () => OPENED,
   });
   const ask = (lines: readonly Line[], held?: Record<string, unknown>) => {
     holding = held;
@@ -85,7 +87,9 @@ describe("verdictAsker: the server's verdicts of the lines in view", () => {
 
   it("asks nothing of a line whose verdict the page holds, or that has no player", () => {
     const t = server();
-    t.ask([line("a"), { ...line("b"), text: "no link here" }, line("c")], { a: "checked" });
+    t.ask([line("a"), { ...line("b"), text: "no link here" }, line("c")], {
+      a: "checked",
+    });
     expect(t.sent).toEqual([["c"]]);
   });
 
@@ -119,6 +123,78 @@ describe("verdictAsker: the server's verdicts of the lines in view", () => {
     t.ask([line("a"), line("b")]);
     expect(t.sent).toEqual([["a"], ["b"]]);
     expect(t.heard).toEqual([]);
+  });
+});
+
+// F890: the page dated the stream's opening by its own clock, against Ergo's server-time: ahead, it asked the server
+// of every line said in the gap, one request each; behind, it left lines to nobody. The stream says when it began.
+const LINES = [line("a"), line("b", "2026-10-26T12:00:00.000Z"), line("c", "2026-10-26T12:05:00.000Z")];
+// An asker whose stream says when it began only when told to; the page's clock as given.
+function told(clock = OPENED) {
+  const sent: string[][] = [];
+  let said: ((time: number) => void) | undefined;
+  // Not a literal, so a part the asker no longer takes (its clock) is still handed, as the page's was.
+  const parts = {
+    verdicts: (_room: string, ids: readonly string[]) => {
+      sent.push([...ids]);
+      return Promise.resolve(NONE);
+    },
+    judged: () => undefined,
+    held: () => undefined,
+    follow: (_room: string, on: { since: (time: number) => void }) => {
+      said = on.since;
+      return () => undefined;
+    },
+    now: () => clock,
+  };
+  const asker = verdictAsker(parts);
+  const say = (time: number) => {
+    said?.(time);
+  };
+  return { asker, sent, say };
+}
+const HOUR = 3_600_000;
+
+describe("verdictAsker: when the stream began, by the stream's word", () => {
+  it("asks nothing before the stream says when it began, then the lines said before", () => {
+    const t = told();
+    t.asker.show("#bubble", LINES);
+    expect(t.sent).toEqual([]);
+    t.say(OPENED);
+    expect(t.sent).toEqual([["a"]]);
+  });
+
+  it.each([
+    ["an hour ahead", HOUR],
+    ["an hour behind", -HOUR],
+  ])("asks the same with the page's clock %s", (_, skew) => {
+    vi.useFakeTimers({ now: OPENED + skew });
+    try {
+      const t = told(OPENED + skew);
+      t.asker.show("#bubble", LINES);
+      t.say(OPENED);
+      expect(t.sent).toEqual([["a"]]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // A reconnection's word comes later: the replay gave what was missed, and the lines before the word it did not
+  // give are the server's.
+  it("takes a later word, a reconnection's, and asks of the lines said before it", () => {
+    const t = told();
+    t.asker.show("#bubble", LINES.slice(1));
+    t.say(OPENED);
+    t.say(Date.parse("2026-10-26T12:10:00.000Z"));
+    expect(t.sent).toEqual([["b", "c"]]);
+  });
+
+  it("takes no word of a room it no longer follows", () => {
+    const t = told();
+    t.asker.show("#bubble", LINES);
+    t.asker.show("#news", undefined);
+    t.say(OPENED);
+    expect(t.sent).toEqual([]);
   });
 });
 
