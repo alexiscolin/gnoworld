@@ -14,6 +14,8 @@ import type { AppState, createAppStore } from "../../store/index.ts";
 export const ROOMS_JOINED = 100;
 /** The lines a room's history asks: the store's window. */
 export const HISTORY_LINES = LINES_KEPT;
+// A msgid: one word of 64 characters at most (Ergo's are 26), no space, comma, NUL or leading colon.
+const MSGID = /^[^\s,:\0][^\s,\0]{0,63}$/;
 
 export interface LinkDeps {
   store: ReturnType<typeof createAppStore>;
@@ -29,6 +31,9 @@ export interface ChatLink {
   show: (room: string | undefined) => void;
   /** Sends a draft, as the composer composes it, to a room Ergo says it is in; an account's alone. Whether it went. */
   say: (room: string, draft: string) => boolean;
+  /** Deletes a line, by its msgid, in a room Ergo says it is in, as Ergo's REDACT (4c's message menu); an
+   * account's alone, Ergo refusing another's line. Whether it went. */
+  redact: (room: string, id: string) => boolean;
   stop: () => void;
 }
 
@@ -92,6 +97,11 @@ class Link implements ChatLink {
     if (this.#key === "guest" || me === undefined || !this.#inside.has(room)) return false;
     const composed = compose(room, draft, me);
     return composed.kind === "line" && this.#ergo?.send(composed.line) === true;
+  }
+
+  redact(room: string, id: string): boolean {
+    const allowed = this.#key !== "guest" && this.#inside.has(room) && MSGID.test(id);
+    return allowed && this.#ergo?.nick() !== undefined && this.#ergo.send(`REDACT ${room} ${id}`);
   }
 
   stop(): void {

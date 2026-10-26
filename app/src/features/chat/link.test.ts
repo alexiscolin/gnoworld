@@ -705,6 +705,73 @@ describe("the chat's link: what it says", () => {
     },
   );
 
+  // 4c's message menu (docs/decisions.md, 2026-10-26): Delete on one's own line, Ergo's REDACT (draft/message-
+  // redaction, allow-individual-delete), which Ergo refuses for another's line.
+  const redacted = (sent: readonly string[]) => sent.filter((line) => line.startsWith("REDACT "));
+
+  // Ergo's msgid: 26 characters of base32 (irc/utils/crypto.go's GenerateSecretToken).
+  const MSGID = "rmq4xvjw9ys5pwtqqjxbqwvhjc";
+
+  it("deletes a line of a room it is in by its msgid, as Ergo's REDACT", () => {
+    const t = memberIn(["#bubble/games"]);
+    expect(t.link.redact("#bubble/games", MSGID)).toBe(true);
+    expect(redacted(t.fake.sent)).toEqual([`REDACT #bubble/games ${MSGID}`]);
+  });
+
+  it("deletes nothing in a room Ergo has not said it is in, nor in one it left", () => {
+    const t = memberIn(["#bubble/games", "#bubble"]);
+    expect(t.link.redact("#bubble", MSGID)).toBe(false);
+    t.link.follow(["#bubble"]);
+    expect(t.link.redact("#bubble/games", MSGID)).toBe(false);
+    expect(redacted(t.fake.sent)).toEqual([]);
+  });
+
+  it("deletes nothing as a guest, whose lines no account wrote", () => {
+    const g = guestIn(["#bubble/games"]);
+    g.fake.line(`:${GUEST}!u@h JOIN #bubble/games`);
+    expect(g.link.redact("#bubble/games", MSGID)).toBe(false);
+    expect(redacted(g.fake.sent)).toEqual([]);
+  });
+
+  // The red pass (M9): what holds say holds redact.
+  it("deletes nothing in a room Ergo kicked it from", () => {
+    const t = memberIn(["#bubble/games"]);
+    t.fake.line(`:op!u@h KICK #bubble/games ${ADDRESS} :bye`);
+    expect(t.link.redact("#bubble/games", MSGID)).toBe(false);
+    expect(redacted(t.fake.sent)).toEqual([]);
+  });
+
+  it("deletes nothing while away, nothing again before Ergo says it is in the room, and nothing once stopped", () => {
+    const t = memberIn(["#bubble/games"]);
+    t.fake.state("waiting");
+    expect(t.link.redact("#bubble/games", MSGID)).toBe(false);
+    const again = t.connected(ADDRESS);
+    expect(t.link.redact("#bubble/games", MSGID)).toBe(false);
+    again.line(`:${ADDRESS}!u@h JOIN #bubble/games`);
+    expect(t.link.redact("#bubble/games", MSGID)).toBe(true);
+    t.link.stop();
+    expect(t.link.redact("#bubble/games", MSGID)).toBe(false);
+    expect(redacted(again.sent)).toEqual([`REDACT #bubble/games ${MSGID}`]);
+  });
+
+  // The red pass (M10): a msgid comes from a line's tags; one that is no single word never reaches the wire.
+  it.each([
+    ["nothing", ""],
+    ["a space", "a b"],
+    ["a CR LF and a second command", "a\r\nPRIVMSG #bubble/games :x"],
+    ["an LF", "a\nQUIT"],
+    ["a CR", "a\rQUIT"],
+    ["a NUL", "a\u0000b"],
+    ["a comma", "a,b"],
+    ["a leading colon", ":a"],
+    ["600 characters", "a".repeat(600)],
+  ])("sends no REDACT for a msgid holding %s", (_, id) => {
+    const t = memberIn(["#bubble/games"]);
+    const before = t.fake.sent.length;
+    expect(t.link.redact("#bubble/games", id)).toBe(false);
+    expect(t.fake.sent.slice(before)).toEqual([]);
+  });
+
   it("says nothing as a guest: a room lets accounts alone speak", () => {
     const t = guestIn(["#bubble/games"]);
     t.fake.line(`:${GUEST}!u@h JOIN #bubble/games`);
