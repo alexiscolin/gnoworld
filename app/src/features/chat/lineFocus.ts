@@ -15,16 +15,31 @@ function lineAt(lines: readonly Line[], list: HTMLElement, target: EventTarget |
 // the design system's tabs and menu do); a key on a line's bar or its menu, or held with a modifier, is theirs.
 const MOVES = ["ArrowUp", "ArrowDown", "Home", "End"];
 
+/** A key pressed, with its modifiers. */
+type Press = Pick<KeyboardEvent, "key" | "altKey" | "ctrlKey" | "metaKey" | "shiftKey">;
+
+/** The line `press` moves the focus to among `count`, from the one `at` reads (-1: none, a key on a bar or a menu);
+ * none for any other key. Every key the list, a bar, a menu or a dialog hears comes here: the key is read first. */
+export function nextLine(press: Press, count: number, at: () => number): number | undefined {
+  if (!MOVES.includes(press.key) || press.altKey || press.ctrlKey || press.metaKey || press.shiftKey) return undefined;
+  const from = at();
+  if (from === -1) return undefined;
+  const steps: Record<string, number> = { ArrowUp: from - 1, ArrowDown: from + 1, Home: 0, End: count - 1 };
+  return ((steps[press.key] ?? from) + count) % count;
+}
+
+/** The list's one tab stop: the line last chosen while the list holds it, else the newest; none in an empty list. */
+export function stopOf(lines: readonly Line[], chosen: string | undefined): string | undefined {
+  return lines.some((line) => line.id === chosen) ? chosen : lines.at(-1)?.id;
+}
+
 function moveAmong(event: KeyboardEvent<HTMLOListElement>) {
-  // Every key the list, a bar, a menu or a dialog hears comes here: the key first, before any line is looked at.
-  if (!MOVES.includes(event.key) || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
-  const items = [...event.currentTarget.children];
-  const at = items.findIndex((item) => item === event.target);
-  const steps: Record<string, number> = { ArrowUp: at - 1, ArrowDown: at + 1, Home: 0, End: items.length - 1 };
-  if (at === -1) return;
+  const items = event.currentTarget.children;
+  const to = nextLine(event, items.length, () => Array.prototype.indexOf.call(items, event.target));
+  if (to === undefined) return;
   event.preventDefault();
-  const to = items[((steps[event.key] ?? at) + items.length) % items.length];
-  if (to instanceof HTMLElement) to.focus();
+  const item = items[to];
+  if (item instanceof HTMLElement) item.focus();
 }
 
 /** The list's one tab stop, the line last focused while it is there, else the newest; the lines whose bars are
@@ -33,7 +48,7 @@ export function useLineFocus(lines: readonly Line[], listRef: RefObject<HTMLOLis
   const [chosen, setChosen] = useState<string>();
   const [focused, setFocused] = useState<string>();
   const [pointed, setPointed] = useState<string>();
-  const stop = lines.some((line) => line.id === chosen) ? chosen : lines.at(-1)?.id;
+  const stop = stopOf(lines, chosen);
   // A focused line's bar, taller than a line, comes into the list's view as the focus comes to it: never as a line
   // arrives (/code-review) or under the pointer.
   useEffect(() => {
