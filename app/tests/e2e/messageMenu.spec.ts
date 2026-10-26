@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import type { Locator, WebSocketRoute } from "@playwright/test";
+import type { BrowserContext, Locator, WebSocketRoute } from "@playwright/test";
 import { inGames, lineOf, lines, roomsNav, whoIsHere, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
@@ -68,6 +68,13 @@ async function barInside(page: Page, at: number) {
 }
 // The flash's words, in its pill: the pill sits in the top layer, its region holding no box of its own.
 const flash = (page: Page, text: string) => page.getByRole("status").getByText(text, { exact: true });
+// #games open, its second line's text copied and said so.
+async function copied(page: Page, context: BrowserContext) {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await room(page);
+  await choose(page, 1, "Copy text");
+  await expect(flash(page, "Text copied.")).toBeVisible();
+}
 // The pointer on the `at`th line, its More menu opened and `item` chosen.
 async function choose(page: Page, at: number, item: string) {
   await lines(page).nth(at).hover();
@@ -227,10 +234,7 @@ test.describe("a line's actions", () => {
   });
 
   test("copy a line's text as written, and the room's link, each said done", async ({ page, context }) => {
-    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-    await room(page);
-    await choose(page, 1, "Copy text");
-    await expect(flash(page, "Text copied.")).toBeVisible();
+    await copied(page, context);
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("the second **line**");
     await choose(page, 1, "Copy room link");
     await expect(flash(page, "Link copied.")).toBeVisible();
@@ -252,16 +256,35 @@ test.describe("a line's actions", () => {
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(new URL("/w/bubble", page.url()).href);
   });
 
-  // The red pass (M6): a page with no clipboard (a plain http origin, a browser that refuses) says so.
-  test("say a copy failed when the page has no clipboard", async ({ page }) => {
-    await page.addInitScript(() => {
-      Reflect.deleteProperty(Navigator.prototype, "clipboard");
+  // The red pass (M6) and the green pass (G9): a page with no clipboard (a plain http origin) and a clipboard that
+  // refuses the write (a permission denied) each say the copy failed.
+  const NO_COPY: [string, () => void][] = [
+    [
+      "the page has no clipboard",
+      () => {
+        Reflect.deleteProperty(Navigator.prototype, "clipboard");
+      },
+    ],
+    [
+      "the clipboard refuses it",
+      () => {
+        Object.defineProperty(Navigator.prototype, "clipboard", {
+          get: () => ({
+            writeText: () => Promise.reject(new DOMException("Write permission denied.", "NotAllowedError")),
+          }),
+        });
+      },
+    ],
+  ];
+  for (const [how, plant] of NO_COPY) {
+    test(`say a copy failed when ${how}`, async ({ page }) => {
+      await page.addInitScript(plant);
+      await room(page);
+      await choose(page, 1, "Copy text");
+      await expect(flash(page, "Could not copy.")).toBeVisible();
+      await expect(flash(page, "Text copied.")).toHaveCount(0);
     });
-    await room(page);
-    await choose(page, 1, "Copy text");
-    await expect(flash(page, "Could not copy.")).toBeVisible();
-    await expect(flash(page, "Text copied.")).toHaveCount(0);
-  });
+  }
 
   // The red pass (M11): a window that scrolls keeps the focused line and its bar in sight.
   test("keep the focused line and its bar inside a list that scrolls, and pass axe", async ({ page }) => {
@@ -387,17 +410,11 @@ test.describe("a line's actions", () => {
     await expect(bars(page).filter({ visible: true })).toHaveCount(0);
   });
 
-  // /code-review: a copy is said though a refused delete was on show, and a room's flash stays in its room.
-  test("say a copy after a refused delete, and leave a room's flash behind when the room changes", async ({
-    page,
-    context,
-  }) => {
-    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-    await room(page);
-    await choose(page, 1, "Copy text");
-    await expect(flash(page, "Text copied.")).toBeVisible();
+  // /code-review: a room's flash stays in its room; gone at once, well before its own five seconds end it (G10).
+  test("leave a room's flash behind when the room changes", async ({ page, context }) => {
+    await copied(page, context);
     await page.keyboard.press("Alt+ArrowDown");
-    await expect(flash(page, "Text copied.")).toHaveCount(0);
+    await expect(flash(page, "Text copied.")).toHaveCount(0, { timeout: 1000 });
   });
 
   test("look as the prototype's bar on a computer's screen", async ({ page }) => {
