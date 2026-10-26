@@ -160,8 +160,15 @@ test.describe("a link's player", () => {
     await expect(lineOf(page, "watch").locator("iframe")).toBeVisible();
     // The frame's own document is the service's (here a stand-in): axe reads the page around it.
     expect((await new AxeBuilder({ page }).include("ol").exclude("iframe").analyze()).violations).toEqual([]);
+    // F881: on a phone's screen too, the frame whole inside its line, at a video's 16/9.
     await page.setViewportSize({ width: 390, height: 800 });
-    const box = await lineOf(page, "watch").locator("iframe").boundingBox();
-    expect(box !== null && box.width <= 390).toBe(true);
+    expect((await new AxeBuilder({ page }).include("ol").exclude("iframe").analyze()).violations).toEqual([]);
+    const frame = await lineOf(page, "watch").locator("iframe").boundingBox();
+    const line = await lineOf(page, "watch").boundingBox();
+    if (frame === null || line === null) throw new Error("the frame or its line has no box");
+    expect(frame.x).toBeGreaterThanOrEqual(line.x);
+    expect(frame.x + frame.width).toBeLessThanOrEqual(line.x + line.width);
+    expect(frame.y + frame.height).toBeLessThanOrEqual(line.y + line.height);
+    expect(frame.width / frame.height).toBeCloseTo(16 / 9, 1);
   });
 });
