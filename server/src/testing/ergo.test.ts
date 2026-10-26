@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import type { AddressInfo } from "node:net";
 import { join as joinPath } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { compose, LINE_BYTES, relayOf } from "@gnoworld/core";
+import { compose, LINE_BYTES, parseLine, refusedOf, relayOf } from "@gnoworld/core";
 import type { Address } from "@gnoworld/schemas";
 import { z } from "zod";
 import { authServer } from "../ergo/auth.ts";
@@ -501,6 +501,29 @@ describe("moderation", { timeout: 40_000 }, () => {
     await allowed(opr, "opr", "by an oper in the room");
     await allowed(outsider, "outsider", "by an oper outside the room");
     await forbidden(alice, bob, "another author");
+  });
+
+  // The menu's green pass (G14): the page reads Ergo's own refusal (core's refusedOf), not the scripted Ergo's copy.
+  it("refuses another's line and an unknown msgid as the page reads them, and names no line for no room", async () => {
+    const e = await start();
+    await lobby(e);
+    const [alice, bob] = await Promise.all([login(e, "alice"), login(e, "bob")]);
+    await join(alice, "#lobby");
+    await join(bob, "#lobby");
+    const refusal = async (redact: string, code: string) => {
+      bob.send(redact);
+      const parsed = parseLine(await bob.expect(new RegExp(` FAIL REDACT ${code} `)));
+      if (!parsed.ok) throw new Error(`Ergo's refusal does not parse: ${parsed.error}`);
+      return refusedOf(parsed.message);
+    };
+    const id = await say(alice, "#lobby", "alice's own");
+    const unknown = "z".repeat(26);
+    expect(await refusal(`REDACT #lobby ${id} :x`, "REDACT_FORBIDDEN")).toStrictEqual({ room: "#lobby", id });
+    expect(await refusal(`REDACT #LOBBY ${unknown} :x`, "UNKNOWN_MSGID")).toStrictEqual({
+      room: "#lobby",
+      id: unknown,
+    });
+    expect(await refusal(`REDACT #nowhere ${id} :x`, "INVALID_TARGET")).toBeUndefined();
   });
 
   it("tells members who redacted, tells a client without the cap nothing, and drops it from history", async () => {
