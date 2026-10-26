@@ -1,7 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, test } from "vitest";
-import { parseLine } from "../irc/irc.ts";
-import { COMMANDS, compose, LINE_BYTES, relayOf } from "./compose.ts";
+import { bytes, parseLine } from "../irc/irc.ts";
+import { COMMANDS, compose, LINE_BYTES, MULTILINE_BYTES, MULTILINE_LINES, relayOf } from "./compose.ts";
 
 const ROOM = "#bubble/games";
 // An account's nick: its address, 40 characters (Ergo's force-nick-equals-account).
@@ -116,6 +116,168 @@ describe("compose", () => {
         const text = read.ok ? (read.message.params[1] ?? "") : "";
         expect(text).not.toMatch(/^\s|\s$/u);
         expect(text.replace(/^\u0001ACTION |\u0001$/gu, "")).not.toMatch(/\p{Cc}/u);
+      }),
+      PROPERTY,
+    );
+  });
+});
+
+// draft/multiline (docs/decisions.md row 255): a draft of several lines is one message, each line a PRIVMSG within
+// one IRC line, the message within Ergo's caps (deploy/ergo/ircd.yaml.tmpl, held to by server/src/testing/
+// ergo.test.ts). A line over its budget is long, as one line alone is, and named.
+describe("compose: a draft of several lines", () => {
+  const to = (text: string) => `PRIVMSG #bubble/games :${text}`;
+  const lines = (count: number) => Array.from({ length: count }, (_, at) => String(at)).join("\n");
+
+  test("caps a message at Ergo's template's bytes and lines", () => {
+    expect(MULTILINE_BYTES).toBe(4096);
+    expect(MULTILINE_LINES).toBe(40);
+  });
+
+  test("sends a draft holding a line break as one message of lines, each a PRIVMSG, its text the lines as typed", () => {
+    expect(compose(ROOM, "- one\n- two", NICK)).toStrictEqual({
+      kind: "lines",
+      lines: [to("- one"), to("- two")],
+      text: "- one\n- two",
+      left: MULTILINE_BYTES - bytes("- one\n- two"),
+    });
+  });
+
+  test("reads CR LF and a lone CR as a break, as LF is", () => {
+    expect(compose(ROOM, "a\r\nb\rc", NICK)).toMatchObject({
+      kind: "lines",
+      lines: [to("a"), to("b"), to("c")],
+      text: "a\nb\nc",
+    });
+  });
+
+  test("keeps a blank line inside, a paragraph's break, and the draft's ends trimmed", () => {
+    expect(compose(ROOM, "\n\n one\n\ntwo  \n\n", NICK)).toMatchObject({
+      kind: "lines",
+      lines: [to("one"), to(""), to("two")],
+      text: "one\n\ntwo",
+    });
+  });
+
+  test("keeps a line's leading spaces, a nested list's or a code block's", () => {
+    expect(compose(ROOM, "- one\n  - nested\n\n    code", NICK)).toMatchObject({
+      kind: "lines",
+      text: "- one\n  - nested\n\n    code",
+    });
+  });
+
+  test("still reads every other control character as a space", () => {
+    expect(compose(ROOM, "a\u0001b\nc\td\u0000e", NICK)).toMatchObject({
+      kind: "lines",
+      lines: [to("a b"), to("c d e")],
+    });
+  });
+
+  test("sends a draft that is one line once its ends are trimmed as one PRIVMSG, as before", () => {
+    expect(compose(ROOM, "one\n\n", NICK)).toStrictEqual(sent(to("one")));
+  });
+
+  test("keeps an action on one line: its breaks are spaces, a CTCP being one line", () => {
+    expect(compose(ROOM, "/me waves\nhello", NICK)).toStrictEqual(
+      sent("PRIVMSG #bubble/games :\u0001ACTION waves hello\u0001"),
+    );
+  });
+
+  test("refuses a line past one IRC line's budget, saying which line and by how many bytes", () => {
+    const head = to("").length;
+    expect(compose(ROOM, `ok\n${"a".repeat(442 - head)}`, NICK)).toMatchObject({ kind: "lines" });
+    expect(compose(ROOM, `ok\n${"a".repeat(443 - head)}`, NICK)).toStrictEqual({ kind: "long", over: 1, line: 2 });
+    expect(compose(ROOM, `${"é".repeat(300)}\nok`, NICK)).toStrictEqual({
+      kind: "long",
+      over: 600 + head - 442,
+      line: 1,
+    });
+  });
+
+  test(`takes ${String(MULTILINE_LINES)} lines, and refuses one more, saying it is one line too many`, () => {
+    expect(compose(ROOM, lines(MULTILINE_LINES), NICK)).toMatchObject({ kind: "lines" });
+    expect(compose(ROOM, lines(MULTILINE_LINES + 1), NICK)).toStrictEqual({ kind: "tooBig", unit: "lines", over: 1 });
+  });
+
+  test(`takes ${String(MULTILINE_BYTES)} bytes, breaks counted, and refuses one more, saying by how many`, () => {
+    // Ten lines of 400 bytes, then one made up to the cap, ten breaks between them; then one byte past it.
+    const full = [...Array.from({ length: 10 }, () => "a".repeat(400)), "a".repeat(MULTILINE_BYTES - 4010)].join("\n");
+    expect(bytes(full)).toBe(MULTILINE_BYTES);
+    expect(compose(ROOM, full, NICK)).toMatchObject({ kind: "lines", left: 0 });
+    expect(compose(ROOM, `${full}a`, NICK)).toStrictEqual({ kind: "tooBig", unit: "bytes", over: 1 });
+  });
+
+  // The red pass (R9): compose's boundaries.
+  test("reads a command on the first line alone: an unknown one sends nothing, // a slash, a later one is text", () => {
+    expect(compose(ROOM, "/nick bob\nhello", NICK)).toStrictEqual({ kind: "unknown", command: "/nick" });
+    expect(compose(ROOM, "//etc\nhello", NICK)).toMatchObject({ kind: "lines", lines: [to("/etc"), to("hello")] });
+    expect(compose(ROOM, "hello\n/me waves", NICK)).toMatchObject({ kind: "lines", text: "hello\n/me waves" });
+  });
+
+  test(`counts a blank line inside among the ${String(MULTILINE_LINES)}, as Ergo does, and no trimmed end`, () => {
+    const blanks = (count: number) => `a${"\n".repeat(count + 1)}b`;
+    expect(compose(ROOM, blanks(MULTILINE_LINES - 2), NICK)).toMatchObject({ kind: "lines", text: blanks(38) });
+    expect(compose(ROOM, blanks(MULTILINE_LINES - 1), NICK)).toStrictEqual({ kind: "tooBig", unit: "lines", over: 1 });
+    expect(compose(ROOM, `\n \n${lines(MULTILINE_LINES)}\n\n \n`, NICK)).toMatchObject({ kind: "lines" });
+  });
+
+  test("bills a CR LF one byte, a break once sent, as Ergo counts it", () => {
+    const full = [...Array.from({ length: 10 }, () => "a".repeat(400)), "a".repeat(MULTILINE_BYTES - 4010)];
+    expect(compose(ROOM, full.join("\r\n"), NICK)).toMatchObject({ kind: "lines", left: 0 });
+    expect(compose(ROOM, `${full.join("\r\n")}a`, NICK)).toStrictEqual({ kind: "tooBig", unit: "bytes", over: 1 });
+  });
+
+  test("says a message past its caps before a line past its budget: the message is what is cut first", () => {
+    const long = "a".repeat(450);
+    const many = [long, ...Array.from({ length: MULTILINE_LINES }, () => "b")].join("\n");
+    expect(compose(ROOM, many, NICK)).toStrictEqual({ kind: "tooBig", unit: "lines", over: 1 });
+    const heavy = Array.from({ length: 10 }, () => long).join("\n");
+    expect(compose(ROOM, heavy, NICK)).toStrictEqual({ kind: "tooBig", unit: "bytes", over: 4509 - MULTILINE_BYTES });
+  });
+
+  test("trims each line's end, and reads a line of spaces alone as a blank one", () => {
+    expect(compose(ROOM, "one   \n   \n  two", NICK)).toStrictEqual({
+      kind: "lines",
+      lines: [to("one"), to(""), to("  two")],
+      text: "one\n\n  two",
+      left: MULTILINE_BYTES - 10,
+    });
+  });
+
+  test("never throws, and a message it sends is lines each one IRC line, within the caps, its text their join", () => {
+    const nicks = fc.constantFrom(NICK, "guest-abcdef", "gnoworld");
+    // Any lines; or about 40 short ones, at the lines' cap; or 2 to 16 of 60 to 600 bytes, at a line's budget and the
+    // bytes' cap (an emoji is 4 bytes), drawn from sizes to shrink fast.
+    const sized = (wide: number, lines: number) =>
+      fc.array(
+        fc
+          .tuple(fc.integer({ min: 15, max: wide }), fc.integer({ min: 0, max: 40 }))
+          .map(([emoji, letters]) => "😀".repeat(emoji) + "a".repeat(letters)),
+        { minLength: lines - 4, maxLength: lines },
+      );
+    const draft = fc
+      .oneof(
+        fc.array(fc.string({ unit: "binary", maxLength: 120 }), { maxLength: 50 }),
+        fc.array(fc.string({ unit: "binary", maxLength: 3 }), { minLength: 35, maxLength: 45 }),
+        sized(140, 6),
+        sized(90, 16),
+      )
+      .map((lines) => lines.join("\n"));
+    fc.assert(
+      fc.property(draft, nicks, (text, nick) => {
+        const composed = compose(ROOM, text, nick);
+        expect(["line", "lines", "long", "tooBig", "empty", "unknown"]).toContain(composed.kind);
+        if (composed.kind !== "lines") return;
+        expect(composed.lines.length).toBeGreaterThan(1);
+        expect(composed.lines.length).toBeLessThanOrEqual(MULTILINE_LINES);
+        expect(composed.left).toBeGreaterThanOrEqual(0);
+        for (const line of composed.lines) {
+          const read = parseLine(relayed(nick, line));
+          expect(read.ok && read.message.command === "PRIVMSG" && read.message.params[0] === ROOM).toBe(true);
+          expect(bytes(relayed(nick, line))).toBeLessThanOrEqual(LINE_BYTES);
+        }
+        expect(composed.lines.map((line) => line.slice(to("").length)).join("\n")).toBe(composed.text);
+        expect(composed.text).not.toMatch(/[\p{Cc}--[\n]]/v);
       }),
       PROPERTY,
     );
