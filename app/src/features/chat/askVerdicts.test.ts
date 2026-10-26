@@ -138,6 +138,25 @@ describe("verdictAsker, when the server cannot answer yet", () => {
     expect(t.sent).toHaveLength(3);
   });
 
+  it("rests once though its requests fail at different times: nothing is asked in the rest that follows", async () => {
+    let calls = 0;
+    const t = server(() => {
+      calls += 1;
+      // The first view's second request fails half a rest after its first.
+      if (calls !== 2) return failing("too_many");
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve({ ok: false, reason: "too_many" });
+        }, BUSY_REST_MS / 2);
+      });
+    });
+    t.ask(Array.from({ length: 150 }, (_, n) => line(`m${String(n)}`)));
+    await vi.advanceTimersByTimeAsync(BUSY_REST_MS);
+    expect(t.sent).toHaveLength(4);
+    await vi.advanceTimersByTimeAsync(BUSY_REST_MS - 1);
+    expect(t.sent).toHaveLength(4);
+  });
+
   it.each(["internal", "unavailable", "network"] as const)(
     "asks a line again after a short rest when the server answers %s, not at once",
     async (reason) => {
