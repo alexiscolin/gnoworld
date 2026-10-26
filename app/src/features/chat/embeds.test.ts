@@ -1,6 +1,6 @@
 import { markdown } from "@gnoworld/core";
-import { describe, expect, it } from "vitest";
-import { embedIn, embedOf } from "./embeds.ts";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { embedIn, embedOf, savesData } from "./embeds.ts";
 
 // 4g (docs/decisions.md, 2026-10-26): each service's player as its own documentation gives it (embeds.ts); Imgur's
 // form could not be read, so its links stay links until it is.
@@ -57,6 +57,20 @@ describe("embedOf: the player a link opens", () => {
     ["a Giphy search", "https://giphy.com/search/gno"],
     ["a Giphy id with a dot", "https://giphy.com/embed/4548k01F.Ej28"],
     ["Imgur, whose player is not read yet", "https://imgur.com/gallery/abcdefg"],
+    // StrykerJS: each form anchored at the path's start, and each read on its own host alone.
+    ["a short under another path", "https://www.youtube.com/x/shorts/dQw4w9WgXcQ"],
+    ["a Vimeo id under another path", "https://vimeo.com/x/76979871"],
+    ["a Vimeo player under another path", "https://player.vimeo.com/x/video/76979871"],
+    ["a Vimeo player's path on another host", "https://evil.example/video/76979871"],
+    ["a Vimeo player's id of letters", "https://player.vimeo.com/video/7697a871"],
+    ["a Vimeo id of 13 digits", "https://vimeo.com/7697987176979"],
+    ["a Giphy page's path on another host", "https://evil.example/gifs/4548k01F5Ej28"],
+    ["a Giphy page under another path", "https://giphy.com/x/gifs/4548k01F5Ej28"],
+    ["Giphy's media under another path", "https://media.giphy.com/x/media/4548k01F5Ej28/giphy.gif"],
+    ["Giphy's media with no file", "https://media.giphy.com/media/4548k01F5Ej28"],
+    ["a user on the right host", "https://user@www.youtube.com/watch?v=dQw4w9WgXcQ"],
+    ["a password on the right host", "https://:pw@www.youtube.com/watch?v=dQw4w9WgXcQ"],
+    ["a port on Giphy", "https://giphy.com:444/embed/4548k01F5Ej28"],
     ["no URL", "not a url"],
   ])("opens none for %s", (_, href) => {
     expect(embedOf(href)).toBeUndefined();
@@ -77,5 +91,29 @@ describe("embedIn: the player a line's first such link opens", () => {
     expect(embedIn(markdown("https://gno.land and [docs](https://docs.gno.land)"))).toBeUndefined();
     expect(embedIn(markdown("`https://youtu.be/dQw4w9WgXcQ`"))).toBeUndefined();
     expect(embedIn(markdown("no link at all"))).toBeUndefined();
+  });
+});
+
+// ADR-0002 §8: a reader on Data saver (a 2G link) gets no player; a browser that says nothing saves nothing.
+describe("savesData: whether the reader saves data", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it.each([
+    [{ connection: { saveData: true } }, true],
+    [{ connection: { saveData: false } }, false],
+    [{ connection: { saveData: "true" } }, false],
+    [{ connection: null }, false],
+    [{ connection: "fast" }, false],
+    [{}, false],
+  ])("reads a navigator of %j as %s", (navigator, saves) => {
+    vi.stubGlobal("navigator", navigator);
+    expect(savesData()).toBe(saves);
+  });
+
+  it("reads no navigator, the build's pre-render, as saving nothing", () => {
+    vi.stubGlobal("navigator", undefined);
+    expect(savesData()).toBe(false);
   });
 });

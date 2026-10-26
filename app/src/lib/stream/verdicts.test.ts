@@ -39,6 +39,12 @@ describe("followVerdicts: the room's verdicts, as the server streams them", () =
     expect(heard).toEqual([CHECKED, { ...CHECKED, msgid: "m2", state: "hidden" }]);
   });
 
+  it("opens one stream for several rooms, their names joined by a comma, encoded", () => {
+    const source = fakeSource();
+    followVerdicts(["#a", "#b/c"], () => undefined, { open: source.open, log: () => undefined });
+    expect(source.opened).toEqual(["/api/stream?rooms=%23a%2C%23b%2Fc"]);
+  });
+
   it("drops what is no verdict it knows, saying so once, and goes on", () => {
     const source = fakeSource();
     const heard: StreamEvent[] = [];
