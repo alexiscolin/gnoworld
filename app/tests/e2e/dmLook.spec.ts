@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { WebSocketRoute } from "@playwright/test";
-import { lines } from "./chat.ts";
+import { lines, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { MEMBER, scriptedErgo } from "./scripted.ts";
@@ -19,7 +19,8 @@ const SCREENS = [
 // The page, an account's, at ?dm=<partner>, once Ergo welcomed it: the socket, for the test to speak as Ergo.
 async function conversation(page: Page, width: number, partner: string): Promise<WebSocketRoute> {
   await page.setViewportSize({ width, height: 900 });
-  await logIn(page, "dm-look");
+  // A wallet a test, as every journey logs in: the same one in parallel tests timed out logging in.
+  await logIn(page, word("dm-look"));
   let opened: (ergo: WebSocketRoute) => void = () => undefined;
   const socket = new Promise<WebSocketRoute>((resolve) => {
     opened = resolve;
