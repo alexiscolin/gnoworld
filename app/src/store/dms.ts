@@ -30,9 +30,9 @@ export interface DmSlice {
   dms: Readonly<Record<string, readonly Line[]>>;
   /** The session's account's choices: a guest's, or one with no device, hear everyone. */
   dmChoices: DmChoices;
-  /** The lines Ergo refused this session, their partner not connected, by partner: how many, and the last one's
-   * draft, which the composer takes back. */
-  dmRefused: Readonly<Record<string, { count: number; draft: string }>>;
+  /** The lines Ergo refused this session, by partner: how many, the last one's draft, which the composer takes
+   * back, and `offline: false` when Ergo refused that one for another reason than its partner not connected. */
+  dmRefused: Readonly<Record<string, { count: number; draft: string; offline?: false }>>;
   dmActions: {
     /** One live line from Ergo: a direct message is kept with its partner; any other changes nothing. */
     heard: (message: IrcMessage) => void;
@@ -43,8 +43,9 @@ export interface DmSlice {
     setOnlyKnown: (only: boolean) => void;
     /** Notes an account written to, once Ergo delivered my line to it; kept on the device. */
     know: (partner: string) => void;
-    /** A line Ergo refused, its partner not connected: its draft back on the device, the refusal counted. */
-    refused: (partner: string, draft: string) => void;
+    /** A line Ergo refused, its partner not connected unless `offline` is false: its draft back on the device, the
+     * refusal counted. */
+    refused: (partner: string, draft: string, offline?: boolean) => void;
   };
 }
 
@@ -109,10 +110,11 @@ export const dmSlice: StateCreator<ChatSlice & DmSlice, [], [], DmSlice> = (set,
         if (!dmChoices.known.has(partner)) set({ dmChoices: { ...dmChoices, known: new Set(written) } });
         if (writable) device?.prefs.setKnown(written);
       },
-      refused: (partner, draft) => {
+      refused: (partner, draft, offline = true) => {
         device?.drafts.set(partner, draft);
         const { dmRefused } = get();
-        set({ dmRefused: { ...dmRefused, [partner]: { count: (dmRefused[partner]?.count ?? 0) + 1, draft } } });
+        const count = (dmRefused[partner]?.count ?? 0) + 1;
+        set({ dmRefused: { ...dmRefused, [partner]: offline ? { count, draft } : { count, draft, offline } } });
       },
     },
   };

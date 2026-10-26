@@ -9,7 +9,7 @@ import type { Ergo, ErgoOptions, Who } from "../../lib/ergo/ergo.ts";
 import { LINES_KEPT } from "../../store/chat.ts";
 import { groupsOf } from "./groups.ts";
 import type { ChatLink, LinkDeps } from "./linkTypes.ts";
-import { outbox, type Outbox, type Sent } from "./outbox.ts";
+import { outbox, type Outbox } from "./outbox.ts";
 import type { AppState } from "../../store/index.ts";
 
 /** The rooms a connection joins: Ergo's max-channels-per-client (deploy/ergo/ircd.yaml.tmpl). */
@@ -60,22 +60,23 @@ class Link implements ChatLink {
   }
 
   say(room: string, draft: string): boolean {
-    return this.#write(room, draft, () => this.#inside.has(room)) !== undefined;
+    const line = this.#lineTo(room, draft, () => this.#inside.has(room));
+    return line !== undefined && this.#ergo?.send(line) === true;
   }
 
+  // Labeled, so Ergo's answer names it (CR1); the label rides within the bytes compose leaves for Ergo's relay.
   sayTo(partner: string, draft: string): boolean {
-    const sent = this.#write(partner, draft, (me) => me !== partner && Address.safeParse(partner).success);
-    if (sent !== undefined) this.#outbox.sent(partner, draft, sent);
-    return sent !== undefined;
+    const line = this.#lineTo(partner, draft, (me) => me !== partner && Address.safeParse(partner).success);
+    if (line === undefined) return false;
+    return this.#outbox.send(partner, draft, (label) => this.#ergo?.send(`@label=${label} ${line}`) === true);
   }
 
-  // A draft to `target`, composed and sent on an account's connection when `allowed` lets it, given my nick: the
-  // line sent, or none.
-  #write(target: string, draft: string, allowed: (me: string) => boolean): Sent | undefined {
+  // The line a draft to `target` composes to, on an account's connection when `allowed` lets it, given my nick.
+  #lineTo(target: string, draft: string, allowed: (me: string) => boolean): string | undefined {
     const me = this.#ergo?.nick();
     if (this.#key === "guest" || me === undefined || !allowed(me)) return undefined;
     const composed = compose(target, draft, me);
-    return composed.kind === "line" && this.#ergo?.send(composed.line) === true ? composed : undefined;
+    return composed.kind === "line" ? composed.line : undefined;
   }
 
   stop(): void {
@@ -214,9 +215,10 @@ class Link implements ChatLink {
     const read = this.#reader.read(message);
     if (read.kind === "pass") this.#heard(message);
     if (read.kind !== "done") return;
-    const { type, params, messages } = read.batch;
+    const { type, params, tags, messages } = read.batch;
     if (type === "chathistory") this.#deps.store.getState().chatActions.page(params[0] ?? "", messages);
     else for (const each of messages) this.#heard(each);
+    if (type === "labeled-response") this.#outbox.answered(tags, messages);
   }
 
   // Ergo's JOIN of me, not replayed: I am in that room, and the room in view's lines are asked. Its KICK of me: I
@@ -225,11 +227,12 @@ class Link implements ChatLink {
     const { chatActions, dmActions } = this.#deps.store.getState();
     chatActions.heard(message);
     dmActions.heard(message);
+    // A labeled-response batch's lines carry no label: the batch's own line does, read at its end (#line).
+    this.#outbox.answered(message.tags, [message]);
     const { tags, source = "", command, params } = message;
     const [room = "", kicked] = params;
     const me = this.#ergo?.nick();
     if (tags.has("batch") || me === undefined) return;
-    this.#outbox.heard(message, me);
     if (command === "KICK" && kicked === me) this.#inside.delete(room);
     if (command !== "JOIN" || nickOf(source) !== me) return;
     this.#inside.add(room);

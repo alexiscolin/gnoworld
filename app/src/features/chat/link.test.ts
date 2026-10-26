@@ -5,6 +5,7 @@ import type { Result } from "../../lib/api/http.ts";
 import type { Ergo, ErgoState, Who } from "../../lib/ergo/ergo.ts";
 import { createAppStore } from "../../store/index.ts";
 import { chatLink, HISTORY_LINES, ROOMS_JOINED, type LinkDeps } from "./link.ts";
+import { WAITING } from "./outbox.ts";
 
 const ADDRESS = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const OTHER = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
@@ -877,6 +878,52 @@ describe("the chat's link: direct messages", () => {
     t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 2)));
     expect(t.kept.get(OTHER)).toBe("three");
     expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 2, draft: "three" } });
+  });
+
+  // /code-review (CR1): Ergo answers a labeled line by its label, one line or a labeled-response batch
+  // (irc/commands.go:41, responsebuffer.go:264-281, v2.19.1); the outbox matched answers by order, so a line
+  // refused otherwise (a 417, a 477) stayed waiting and a later 401 put back its draft, not the 401's line's.
+  it("sends each direct message with a label of its own", () => {
+    const t = account();
+    t.link.sayTo(OTHER, "one");
+    t.link.sayTo(OTHER, "two");
+    const labels = [labelOf(t.fake.sent, 0), labelOf(t.fake.sent, 1)];
+    expect(labels.every((label) => label !== undefined)).toBe(true);
+    expect(new Set(labels).size).toBe(2);
+  });
+
+  it("puts back the draft of the line each refusal answers, by its label, a line refused otherwise too", () => {
+    const t = withDrafts();
+    t.link.sayTo(OTHER, "a");
+    t.link.sayTo(OTHER, "b");
+    t.fake.line(`@label=${labelOf(t.fake.sent, 0) ?? ""} :ergo.test 417 ${ADDRESS} :Line too long to be relayed`);
+    expect(t.kept.get(OTHER)).toBe("a");
+    expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 1, draft: "a", offline: false } });
+    t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 1)));
+    expect(t.kept.get(OTHER)).toBe("b");
+    expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 2, draft: "b" } });
+  });
+
+  it("takes a labeled-response batch for its line's answer: its echo and Ergo's away line deliver it", () => {
+    const t = withDrafts();
+    t.link.sayTo(OTHER, "hi");
+    const label = labelOf(t.fake.sent, 0) ?? "";
+    t.fake.line(`@label=${label} BATCH +r1 labeled-response`);
+    t.fake.line(`@batch=r1;msgid=e;time=${T0};account=${ADDRESS} :${ADDRESS}!u@h PRIVMSG ${OTHER} :hi`);
+    t.fake.line(`@batch=r1 :ergo.test 301 ${ADDRESS} ${OTHER} :back soon`);
+    t.fake.line("BATCH -r1");
+    expect(t.store.getState().dms[OTHER]?.map(({ text }) => text)).toEqual(["hi"]);
+    t.fake.line(refusal(OTHER, label));
+    expect(t.store.getState().dmRefused).toEqual({});
+  });
+
+  it(`keeps ${String(WAITING)} lines waiting at most: the oldest's late answer puts nothing back`, () => {
+    const t = withDrafts();
+    for (let n = 0; n <= WAITING; n += 1) t.link.sayTo(OTHER, `line ${String(n)}`);
+    t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 0)));
+    expect(t.store.getState().dmRefused).toEqual({});
+    t.fake.line(refusal(OTHER, labelOf(t.fake.sent, WAITING)));
+    expect(t.kept.get(OTHER)).toBe(`line ${String(WAITING)}`);
   });
 
   // With Ergo's multiclient, another tab's line reaches this one as an echo does: it answers none of this one's.

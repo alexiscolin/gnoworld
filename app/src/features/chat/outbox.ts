@@ -1,46 +1,53 @@
-// The direct messages a connection sent that Ergo has not answered yet (slice 4's 4e), by partner, oldest first.
-// Ergo answers each in turn: an echo of one it delivered (echo-message), a 401 for one whose partner is not
-// connected (irc/handlers.go:2533, v2.19.1). With its multiclient, another tab's line reaches this one as an echo
-// does: an echo answers the line of its own text and kind alone.
-import { dmOf, type Composed, type IrcMessage } from "@gnoworld/core";
+// The direct messages a connection sent that Ergo has not answered yet (slice 4's 4e), each by the label it went with.
+// Ergo answers a labeled line with that label (labeled-response, irc/commands.go:41, v2.19.1): its echo when it
+// delivered it, a numeric when it refused it (401 its partner not connected, irc/handlers.go:2533; 477; 417), or a
+// labeled-response batch of several lines (irc/responsebuffer.go:264-281). Another tab's line carries no label of ours.
+import type { IrcMessage } from "@gnoworld/core";
 import type { createAppStore } from "../../store/index.ts";
 
-/** A line a draft was composed to, and sent. */
-export type Sent = Extract<Composed, { kind: "line" }>;
+/** The lines waiting at once: one more drops the oldest, whose answer then puts nothing back. */
+export const WAITING = 50;
 
 interface Waiting {
+  partner: string;
   draft: string;
-  text: string;
-  action: boolean;
 }
 
 export interface Outbox {
-  /** A line sent to `partner`, composed from `draft`. */
-  sent: (partner: string, draft: string, line: Sent) => void;
-  /** One of Ergo's lines on the connection, `me` my nick: my line to a partner, echoed, is answered; a 401 for a
-   * partner refuses its oldest line, whose draft the store puts back. */
-  heard: (message: IrcMessage, me: string) => void;
+  /** A line to `partner`, composed from `draft`, sent by `send` with the label it gives, the connection's own count:
+   * whether it went, and then waits for Ergo's answer. */
+  send: (partner: string, draft: string, send: (label: string) => boolean) => boolean;
+  /** Ergo's answer to the line its `tags`' label names, its lines: a refusal among them puts its draft back. */
+  answered: (tags: IrcMessage["tags"], messages: readonly IrcMessage[]) => void;
   /** A connection's end: nothing it sent is answered any more. */
   clear: () => void;
 }
 
+// A refusal: an error numeric, or a standard reply's FAIL.
+const refusing = ({ command }: IrcMessage) => command === "FAIL" || /^[45]\d\d$/.test(command);
+
 /** An empty outbox, a connection's, telling `store` of each line Ergo refuses. */
 export function outbox(store: ReturnType<typeof createAppStore>): Outbox {
-  const waiting = new Map<string, Waiting[]>();
+  const waiting = new Map<string, Waiting>();
+  let count = 0;
   return {
-    sent: (partner, draft, { text, action }) => {
-      waiting.set(partner, [...(waiting.get(partner) ?? []), { draft, text, action }]);
+    send: (partner, draft, send) => {
+      count += 1;
+      const label = String(count);
+      if (!send(label)) return false;
+      waiting.set(label, { partner, draft });
+      const [oldest] = waiting.keys();
+      if (waiting.size > WAITING && oldest !== undefined) waiting.delete(oldest);
+      return true;
     },
-    heard: (message, me) => {
-      const [, partner = ""] = message.params;
-      const draft = message.command === "401" ? waiting.get(partner)?.shift()?.draft : undefined;
-      if (draft !== undefined) store.getState().dmActions.refused(partner, draft);
-      // My own line's echo: its partner is not its nick's (dmOf).
-      const dm = dmOf(message, me);
-      if (dm === undefined || dm.partner === dm.line.from) return;
-      const queue = waiting.get(dm.partner) ?? [];
-      const at = queue.findIndex(({ text, action }) => text === dm.line.text && action === (dm.line.kind === "action"));
-      if (at !== -1) queue.splice(at, 1);
+    answered: (tags, messages) => {
+      const label = tags.get("label") ?? "";
+      const line = waiting.get(label);
+      if (line === undefined) return;
+      waiting.delete(label);
+      const refusal = messages.find(refusing);
+      if (refusal !== undefined)
+        store.getState().dmActions.refused(line.partner, line.draft, refusal.command === "401");
     },
     clear: () => {
       waiting.clear();

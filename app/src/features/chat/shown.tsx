@@ -50,7 +50,16 @@ function dmShown(partner: string, dms: Dms, { sayTo, focus, noteId }: DmPage): S
       label: short,
       members: [],
       onSay: (draft) => sayTo(partner, draft),
-      refused: refused === undefined ? undefined : { ...refused, why: `Not sent: ${short} is not online.` },
+      refused:
+        refused === undefined
+          ? undefined
+          : {
+              ...refused,
+              why:
+                refused.offline === false
+                  ? "Not sent: the chat refused this line."
+                  : `Not sent: ${short} is not online.`,
+            },
       focus,
       describedBy: noteId,
     },

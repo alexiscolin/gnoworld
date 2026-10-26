@@ -24,8 +24,8 @@ export interface Dms {
   lines: readonly Line[];
   /** What the conversation in view says while it holds no line. */
   empty: string;
-  /** The lines to it Ergo refused this session, its partner not connected: how many, and the last one's draft. */
-  refused: { count: number; draft: string } | undefined;
+  /** The lines to it Ergo refused this session: how many, the last one's draft, and whether its partner was offline. */
+  refused: AppState["dmRefused"][string] | undefined;
   /** Why the ?dm= asked shows no conversation, said in its place (U9). */
   problem: string | undefined;
 }
