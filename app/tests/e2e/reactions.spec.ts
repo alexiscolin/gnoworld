@@ -1,6 +1,7 @@
-import { lineOf, lines } from "./chat.ts";
-import { expect, test } from "./fixtures.ts";
-import { MEMBER, opened } from "./scripted.ts";
+import { lineOf, lines, word } from "./chat.ts";
+import { expect, hydrated, test } from "./fixtures.ts";
+import { logIn } from "./irc.ts";
+import { MEMBER, opened, scriptedErgo } from "./scripted.ts";
 import { asAccount, barOf, GUEST, HISTORY, OTHER, ROOM, tagmsg } from "./talk.ts";
 
 // 4d's reactions (docs/decisions.md, 2026-10-26): three quick reactions on a line's bar, a line's reactions under it as
@@ -83,6 +84,26 @@ test.describe("reactions", () => {
     await expect(line.getByRole("button", { name: "👍, 2, including you" })).toHaveAttribute("aria-pressed", "true");
     await line.hover();
     await expect(barOf(page, 0).getByRole("button", { name: "React with 👍" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  // The green pass (G4): a reaction that cannot go out, the chat away, is said at once and sends nothing. Ergo
+  // scripted: its first socket answers, then closes; the next ones never answer.
+  test("say a reaction could not go while the chat is away, and send nothing", async ({ page }) => {
+    const address = await logIn(page, word("talk"));
+    const sent: string[] = [];
+    const sockets: { close: () => Promise<void> }[] = [];
+    await page.routeWebSocket(/\/ws$/, (ergo) => {
+      if (sockets.length === 0) scriptedErgo(ergo, address, { history: HISTORY, heard: (line) => sent.push(line) });
+      sockets.push(ergo);
+    });
+    await page.goto("/w/bubble?room=games");
+    await hydrated(page);
+    await expect(lines(page)).toHaveCount(2);
+    await sockets[0]?.close();
+    await lineOf(page, "the second").hover();
+    await barOf(page, 1).getByRole("button", { name: "React with 👍" }).click();
+    await expect(page.getByRole("status").getByText("Could not react.", { exact: true })).toBeVisible();
+    expect(sent.filter((line) => line.includes(" TAGMSG "))).toEqual([]);
   });
 
   // R3: a chip the keyboard reaches by Tab acts on Enter and on Space, as a button does.
