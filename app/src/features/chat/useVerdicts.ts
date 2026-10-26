@@ -11,7 +11,15 @@ import { savesData } from "./embeds.ts";
 
 type Store = ReturnType<typeof createAppStore>;
 
-export function useVerdicts(store: Store, current: string | undefined, lines: readonly Line[] | undefined): void {
+/** The room shown, its lines once loaded, and who reads it: an account's address, or none for a guest. */
+export interface Shown {
+  room: string | undefined;
+  lines: readonly Line[] | undefined;
+  reader: string | undefined;
+}
+
+/** Follows and asks of the shown room's verdicts for its reader. */
+export function useVerdicts(store: Store, { room, lines, reader }: Shown): void {
   // The asker, made once the page runs, as the panel's link is; none for a reader who saves data (F879).
   const askerRef = useRef<ReturnType<typeof verdictAsker>>(undefined);
   useEffect(() => {
@@ -29,6 +37,6 @@ export function useVerdicts(store: Store, current: string | undefined, lines: re
     return asker.stop;
   }, [store]);
   useEffect(() => {
-    askerRef.current?.show(current, lines);
-  }, [current, lines]);
+    askerRef.current?.show(room, lines, reader);
+  }, [room, lines, reader]);
 }

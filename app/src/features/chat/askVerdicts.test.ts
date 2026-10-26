@@ -14,7 +14,10 @@ const line = (id: string, time = OLD): Line => ({
   text: `${id}: https://youtu.be/dQw4w9WgXcQ`,
   kind: "message",
 });
-const NONE: Result<LineVerdicts> = { ok: true, value: { room: "#bubble", verdicts: [] } };
+const NONE: Result<LineVerdicts> = {
+  ok: true,
+  value: { room: "#bubble", verdicts: [] },
+};
 
 // A server that answers each request as told, keeping the ids each asked; and the verdicts handed to the store.
 function server(answer: (ids: readonly string[]) => Promise<Result<LineVerdicts>> = () => Promise.resolve(NONE)) {
@@ -84,7 +87,9 @@ describe("verdictAsker: the server's verdicts of the lines in view", () => {
 
   it("asks nothing of a line whose verdict the page holds, or that has no player", () => {
     const t = server();
-    t.ask([line("a"), { ...line("b"), text: "no link here" }, line("c")], { a: "checked" });
+    t.ask([line("a"), { ...line("b"), text: "no link here" }, line("c")], {
+      a: "checked",
+    });
     expect(t.sent).toEqual([["c"]]);
   });
 
@@ -197,6 +202,47 @@ describe("verdictAsker: when the stream began, by the stream's word", () => {
     t.asker.show("#news", undefined);
     t.say(OPENED);
     expect(t.sent).toEqual([]);
+  });
+});
+
+// F891 (CR3): a line the server had no verdict of yet stayed asked for good, though a later stream's replay could no
+// longer give it; and a guest's refused room stayed refused after a login, the stream still the guest's.
+describe("verdictAsker, asking anew", () => {
+  it("asks again, at the stream's next word, a line the server had no verdict of", () => {
+    const t = told();
+    t.asker.show("#bubble", LINES.slice(0, 1));
+    t.say(OPENED);
+    t.say(OPENED + 60_000);
+    expect(t.sent).toEqual([["a"], ["a"]]);
+  });
+
+  // The journeys' stream stand-in reconnects every 100 ms with the same word: asking anew each time flooded the route.
+  it("asks nothing again at a word that does not move, a reconnection with no gap", () => {
+    const t = told();
+    t.asker.show("#bubble", LINES.slice(0, 1));
+    t.say(OPENED);
+    t.say(OPENED);
+    expect(t.sent).toEqual([["a"]]);
+  });
+
+  it("asks anew when the page shows the room again, its stream followed again", () => {
+    const t = told();
+    t.asker.show("#bubble", LINES.slice(0, 1));
+    t.say(OPENED);
+    t.asker.show("#news", undefined);
+    t.asker.show("#bubble", LINES.slice(0, 1));
+    t.say(OPENED);
+    expect(t.sent).toEqual([["a"], ["a"]]);
+  });
+
+  it("follows the room's stream again for a new reader, and asks anew at its word", () => {
+    const t = told();
+    t.asker.show("#bubble", LINES.slice(0, 1));
+    t.say(OPENED);
+    t.asker.show("#bubble", LINES.slice(0, 1), "g1alice");
+    expect(t.follows()).toBe(2);
+    t.say(OPENED);
+    expect(t.sent).toEqual([["a"], ["a"]]);
   });
 });
 

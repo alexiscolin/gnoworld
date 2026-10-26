@@ -42,6 +42,8 @@ interface Told {
 
 interface Following {
   room: string;
+  /** Whose stream: an account's, or a guest's (none), for the rooms the server lets it read. */
+  reader: string | undefined;
   /** The room's lines last shown, none before they load. */
   lines: readonly Line[] | undefined;
   /** When its stream began following, by the stream's own word (F890); none before it; after its end, all time. */
@@ -101,6 +103,10 @@ function serverAsker({ verdicts, judged }: Pick<Asking, "verdicts" | "judged">) 
   };
   return {
     ask,
+    /** Forgets what it asked of the room: each line not held is asked again when shown. */
+    forget: (room: string): void => {
+      asked.delete(room);
+    },
     /** Asks nothing more: a rest under way, or one an answer still to come starts, ends with nothing asked. */
     stop: (): void => {
       latest = undefined;
@@ -114,19 +120,32 @@ export function verdictAsker({ verdicts, judged, held, follow }: Asking) {
   // The shown lines said before the stream's word are the server's to answer; before its word, nothing is asked.
   const askShown = () => {
     if (following?.lines === undefined || following.since === undefined) return;
-    server.ask(following.room, { lines: following.lines, held: held(following.room), since: following.since });
+    server.ask(following.room, {
+      lines: following.lines,
+      held: held(following.room),
+      since: following.since,
+    });
   };
   const unfollow = () => {
     following?.stop();
     clearTimeout(following?.again);
     following = undefined;
   };
-  const start = (room: string, lines?: readonly Line[]): void => {
-    const mine: Following = { room, lines, since: undefined, stop: () => undefined, again: undefined };
+  const start = (room: string, reader: string | undefined, lines?: readonly Line[]): void => {
+    const mine: Following = {
+      room,
+      reader,
+      lines,
+      since: undefined,
+      stop: () => undefined,
+      again: undefined,
+    };
     // The stream's word after its replay, on the server's clock, which Ergo's server-time shares (F890): never the
-    // page's, which may run ahead or behind. A reconnection's later word moves it, the replay having given the rest.
+    // page's, which may run ahead or behind. A reconnection's later word moves it, the replay having given the rest;
+    // after a gap, what was asked before is asked again, a line the server had no verdict of yet among it (F891).
     const since = (time: number) => {
       if (following !== mine) return;
+      if (mine.since !== undefined && time > mine.since) server.forget(room);
       mine.since = time;
       askShown();
     };
@@ -139,19 +158,22 @@ export function verdictAsker({ verdicts, judged, held, follow }: Asking) {
       mine.again = setTimeout(() => {
         if (following !== mine) return;
         mine.stop();
-        start(room, mine.lines);
+        start(room, reader, mine.lines);
       }, BUSY_REST_MS);
     };
+    // A new stream (a room, a reader, one followed again) asks of what it shows afresh (F891).
+    server.forget(room);
     following = mine;
     mine.stop = follow(room, { verdict: judged, since, dead });
   };
   return {
-    /** Follows the room's stream, the room shown before stopped; then asks of its lines in view, once loaded and
-     * once the stream has said when it began. */
-    show: (room: string | undefined, lines: readonly Line[] | undefined): void => {
-      if (following?.room !== room) {
+    /** Follows the room's stream for its reader, the stream before stopped; then asks of its lines in view, once
+     * loaded and once the stream has said when it began. A new reader (a login) follows again: the server lets each
+     * read its own rooms. */
+    show: (room: string | undefined, lines: readonly Line[] | undefined, reader?: string): void => {
+      if (following === undefined ? room !== undefined : following.room !== room || following.reader !== reader) {
         unfollow();
-        if (room !== undefined) start(room);
+        if (room !== undefined) start(room, reader);
       }
       if (following === undefined) return;
       following.lines = lines;

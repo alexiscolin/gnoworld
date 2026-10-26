@@ -174,7 +174,11 @@ export function ChatPanel({ world }: { world: string }) {
     linkRef.current?.show(current);
   }, [current]);
   const state = useApp((app) => (current === undefined ? undefined : app.chat.rooms[current]));
-  useVerdicts(store, current, state?.lines);
+  useVerdicts(store, {
+    room: current,
+    lines: state?.lines,
+    reader: session.kind === "in" ? session.address : undefined,
+  });
   const verdicts = useApp((app) => (current === undefined ? undefined : app.verdicts[current]));
   const chat = useApp((app) => app.login.chat);
   if (!loaded) return LOADING;
