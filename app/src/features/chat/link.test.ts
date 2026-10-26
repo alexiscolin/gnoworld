@@ -802,6 +802,24 @@ describe("the chat's link: what it says", () => {
     expect(said(t.fake.sent)).toEqual(["PRIVMSG #bubble :hi", "PRIVMSG #bubble :again"]);
   });
 
+  // The security review (4f's S1): Ergo's PART of the account, another session leaving the room (channel.go:1078-1082,
+  // v2.19.1), takes every session out of it, as a KICK does; a PART of the past or of another is no such thing.
+  it("says nothing, tells no typing and marks nothing in a room another session of the account left", () => {
+    const t = memberIn(["#bubble/games", "#bubble"]);
+    t.fake.line(`:${ADDRESS}!u@h JOIN #bubble`);
+    t.fake.line(`@msgid=m1;time=2026-10-25T10:01:00.000Z :alice!u@h PRIVMSG #bubble/games :one`);
+    t.fake.line("BATCH +p1 example.com/replay");
+    t.fake.line(`@batch=p1 :${ADDRESS}!u@h PART #bubble :long ago`);
+    t.fake.line("BATCH -p1");
+    t.fake.line(`:${OTHER}!u@h PART #bubble`);
+    expect(t.link.say("#bubble", "still in")).toBe(true);
+    t.fake.line(`:${ADDRESS}!u@h PART #bubble/games`);
+    t.link.typing("#bubble/games", "active");
+    t.link.read("#bubble/games", "m1");
+    expect(t.link.say("#bubble/games", "still here?")).toBe(false);
+    expect(t.fake.sent.filter((line) => / TAGMSG |^MARKREAD |^PRIVMSG #bubble\/games/.test(line))).toEqual([]);
+  });
+
   it("takes no line of another for a KICK of it, though the line names it", () => {
     const t = memberIn(["#bubble/games"]);
     t.fake.line(`:troll!u@h PRIVMSG #bubble/games :${ADDRESS}`);

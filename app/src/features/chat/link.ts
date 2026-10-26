@@ -239,20 +239,25 @@ class Link implements ChatLink {
     else for (const each of messages) this.#heard(each);
   }
 
-  // Ergo's JOIN of me, not replayed: I am in that room, its lines asked, its place told; its KICK of me: out of it.
+  // Ergo's JOIN of me, not replayed: I am in that room, its lines asked, its place told; a line taking me out: out of it.
   #heard(message: IrcMessage): void {
     this.#deps.store.getState().chatActions.heard(message);
     const { tags, source = "", command, params } = message;
-    const [room = "", kicked] = params;
+    const [room = ""] = params;
     const me = this.#ergo?.nick();
     if (tags.has("batch") || me === undefined) return;
-    if (command === "KICK" && kicked === me) this.#inside.delete(room);
+    if (outOf(message, me)) this.#inside.delete(room);
     if (command !== "JOIN" || nickOf(source) !== me) return;
     this.#inside.add(room);
     this.#history(this.#shown);
     this.#places.tell(room, true);
   }
 }
+
+// Whether Ergo's line takes me out of its room: its KICK of me, or its PART of me, another session's PART taking every
+// session out (channel.go:1078-1082, v2.19.1).
+const outOf = ({ source = "", command, params }: IrcMessage, me: string): boolean =>
+  (command === "KICK" && params[1] === me) || (command === "PART" && nickOf(source) === me);
 
 /** Links the page to Ergo, following the store's session, until stopped. */
 export const chatLink = (deps: LinkDeps): ChatLink => new Link(deps);
