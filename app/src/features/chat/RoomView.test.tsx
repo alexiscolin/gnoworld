@@ -373,8 +373,9 @@ describe("RoomView", () => {
     ];
     const html = view({ state: { ...ROOM, lines } });
     expect(html).toContain("<strong>b</strong>");
-    expect(html).toContain(
-      '<a href="https://a.example" title="https://a.example" dir="ltr" target="_blank" rel="noopener noreferrer">x</a>',
+    // Its tab index is the list's (U1): a line not the list's stop keeps its links out of the Tab order.
+    expect(html).toMatch(
+      /<a href="https:\/\/a\.example" title="https:\/\/a\.example" dir="ltr" target="_blank" rel="noopener noreferrer"( tabindex="-1")?>x<\/a>/,
     );
     expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt; [y](javascript:alert(1))");
     expect(html).not.toMatch(/<script|href="javascript/);
