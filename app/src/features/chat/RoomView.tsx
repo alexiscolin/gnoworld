@@ -44,9 +44,9 @@ export interface RoomViewProps {
   /** The reader's address, the lines that mention it marked; none for a guest. */
   me?: string | undefined;
   /** Deletes a line, the reader's own (4c's message menu); whether it went out. */
-  onDelete?: ((id: string) => boolean) | undefined;
+  onDelete: (id: string) => boolean;
   /** The room's flash said Ergo's refusal of a delete. */
-  onDismiss?: (() => void) | undefined;
+  onDismiss: () => void;
 }
 
 // Who is here: counted once connected, the bot left out, the first MEMBERS_SHOWN named.
@@ -88,8 +88,8 @@ export function RoomView({ room, state, chat, composer, me, onDelete, onDismiss 
             members={members}
             me={me}
             refused={refused}
-            onDelete={onDelete ?? (() => false)}
-            onDismiss={onDismiss ?? (() => undefined)}
+            onDelete={onDelete}
+            onDismiss={onDismiss}
           />
           {connected && lines.length === 0 ? <p>No messages yet.</p> : null}
           {composer}

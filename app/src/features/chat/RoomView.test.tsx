@@ -18,7 +18,16 @@ const line = (over: Partial<Line> = {}): Line => ({
 const GUEST_LINE: Line = { id: "g", time: T0, from: "guest-ab12cd", text: "hello", kind: "message" };
 const ROOM = { lines: [line()], members: [ALICE, "guest-ab12cd"], topic: "Bubbles here" };
 const view = (over: Partial<RoomViewProps> = {}) =>
-  renderToStaticMarkup(<RoomView room="#bubble/games" state={ROOM} chat="connected" {...over} />);
+  renderToStaticMarkup(
+    <RoomView
+      room="#bubble/games"
+      state={ROOM}
+      chat="connected"
+      onDelete={() => false}
+      onDismiss={() => undefined}
+      {...over}
+    />,
+  );
 const said = (html: string) =>
   html
     .replaceAll(/<[^>]+>/g, " ")

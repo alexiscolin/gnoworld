@@ -31,7 +31,14 @@ describe("a room", () => {
   const members = [ALICE, BOB, ...Array.from({ length: 98 }, (_, n) => `guest-${String(n).padStart(6, "0")}`)];
   bench("a room of 200 lines and 100 people drawn whole, a room switch's render [100 ms]", () => {
     renderToStaticMarkup(
-      <RoomView room="#bubble/games" state={{ lines, members, topic: "Games" }} chat="connected" me={BOB} />,
+      <RoomView
+        room="#bubble/games"
+        state={{ lines, members, topic: "Games" }}
+        chat="connected"
+        me={BOB}
+        onDelete={() => false}
+        onDismiss={() => undefined}
+      />,
     );
   });
 });
