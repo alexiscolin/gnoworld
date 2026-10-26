@@ -1,7 +1,8 @@
 import AxeBuilder from "@axe-core/playwright";
 import { lineOf, lines } from "./chat.ts";
+import type { WebSocketRoute } from "@playwright/test";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
-import { scriptedErgo, type HistoryLine } from "./scripted.ts";
+import { MEMBER, scriptedErgo, type HistoryLine } from "./scripted.ts";
 import { SITE } from "./sites.ts";
 
 // 4g (docs/decisions.md, 2026-10-26; slice 4's plan §1, §3): a link's player loads on a click, once "checked"; no
@@ -16,7 +17,14 @@ const PLAYER = "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ";
 const event = (msgid: string, state: "checked" | "hidden") =>
   `id: 1\nevent: verdict\ndata: ${JSON.stringify({ msgid, room: "#bubble/games", state })}\n\n`;
 
-async function room(page: Page, verdicts: () => string): Promise<{ away: string[]; asked: string[] }> {
+interface Room {
+  away: string[];
+  asked: string[];
+  /** A line said in #games now, as Ergo sends it live; at `time` if given. */
+  say: (id: string, text: string, time?: string) => void;
+}
+
+async function room(page: Page, verdicts: () => string): Promise<Room> {
   const away: string[] = [];
   const asked: string[] = [];
   const site = new URL(SITE).host;
@@ -36,13 +44,18 @@ async function room(page: Page, verdicts: () => string): Promise<{ away: string[
       body: `retry: 100\n\n${verdicts()}`,
     });
   });
+  let socket: WebSocketRoute | undefined;
   await page.routeWebSocket(/\/ws$/, (ergo) => {
+    socket = ergo;
     scriptedErgo(ergo, GUEST, HISTORY);
   });
   await page.goto("/w/bubble?room=games");
   await hydrated(page);
   await expect(lines(page)).toHaveCount(2);
-  return { away, asked };
+  const say = (id: string, text: string, time = new Date().toISOString()) => {
+    socket?.send(`@msgid=${id};time=${time};account=${MEMBER} :${MEMBER}!u@h PRIVMSG #bubble/games :${text}`);
+  };
+  return { away, asked, say };
 }
 const play = (page: Page) => lineOf(page, "watch").getByRole("button", { name: "Play the YouTube video" });
 
@@ -86,6 +99,24 @@ test.describe("a link's player", () => {
     await expect(play(page)).toBeEnabled();
     expect(asked).toEqual([`${SITE}/api/verdicts?room=%23bubble%2Fgames&ids=v1`]);
     expect(away).toEqual([]);
+  });
+
+  // F884: a line said once the page follows the room has its verdict from the stream; asking the server too made
+  // every reader ask for every new link at once. A line dated before, asked after it, marks when a request for the
+  // first would have gone.
+  test("asks the server nothing of a line said after the page began following the room", async ({ page }) => {
+    const asked: string[] = [];
+    await page.route("**/api/verdicts?**", (route) => {
+      asked.push(route.request().url());
+      return route.fulfill({ json: { room: "#bubble/games", verdicts: [] } });
+    });
+    const { say } = await room(page, () => "");
+    await expect.poll(() => asked).toHaveLength(1);
+    say("v3", "now https://vimeo.com/76979871");
+    await expect(lineOf(page, "now")).toContainText("Waiting for the moderation check");
+    say("v4", "then https://giphy.com/gifs/4548k01F5Ej28", "2026-10-25T10:02:00.000Z");
+    await expect.poll(() => asked).toHaveLength(2);
+    expect(asked[1]).toBe(`${SITE}/api/verdicts?room=%23bubble%2Fgames&ids=v4`);
   });
 
   // ADR-0002 §8: Data saver (a 2G link) shows no embed.
