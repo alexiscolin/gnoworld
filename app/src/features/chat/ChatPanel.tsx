@@ -5,29 +5,26 @@
 // (4c); a guest reads, a room letting accounts alone speak.
 import type { RoomList } from "@gnoworld/schemas";
 import { Button, Sidebar, Stack } from "@gnoworld/ui";
-import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { pageLoginApi } from "../../lib/api/login.ts";
 import { pageRoomsApi } from "../../lib/api/rooms.ts";
-import { pageDrafts } from "../../lib/drafts/page.ts";
 import { drawGuestNick } from "../../lib/ergo/ergo.ts";
 import { pageErgo } from "../../lib/ergo/page.ts";
 import type { AppState } from "../../store/index.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
 import { chatLink } from "./link.ts";
 import { LOADING } from "./Loading.tsx";
-import { neighbour, roomIds, roomLabel, roomParams, roomsQuery, shownRoom } from "./names.ts";
+import { neighbour, roomIds, roomParams, roomsQuery, shownRoom } from "./names.ts";
 import { RoomsView } from "./RoomsView.tsx";
 import { RoomView, type RoomViewProps } from "./RoomView.tsx";
+import { Writer } from "./Writer.tsx";
 
 // The rooms as last asked, and what came: undefined when the list could not load.
 interface Asked {
   query: string;
   sections: RoomList["sections"] | undefined;
 }
-
-// The composer, an account's alone: a visitor's page never loads its code (the first screen's budget, ADR-0001 §12).
-const Composer = lazy(async () => ({ default: (await import("./Composer.tsx")).Composer }));
 
 // Alt+Up and Alt+Down: the room before or after the one in view, anywhere on the page (ADR-0002's chat rows). A key
 // pressed before the page draws the room the last one went to starts from that room: the hook keeps it, and the room
@@ -54,38 +51,6 @@ function useRoomKeys(rooms: readonly string[], current: string | undefined) {
       window.removeEventListener("keydown", go);
     };
   }, [rooms, setParams]);
-}
-
-// Under a room's lines: the composer for an account, which writes through the link; a word for a guest.
-// The word being typed completes to a room of the world's, by its label, or to another account in the room.
-interface WriterProps {
-  session: AppState["login"]["session"];
-  room: string;
-  rooms: readonly string[];
-  members: readonly string[];
-  onSay: (draft: string) => boolean;
-}
-
-function Writer({ session, room, rooms, members, onSay }: WriterProps) {
-  if (session.kind !== "in") return <p>Log in to write in this room.</p>;
-  // The account's drafts on this device: the room's, where the composer starts, and each change kept (4d).
-  const kept = pageDrafts(session.address);
-  return (
-    <Suspense fallback={null}>
-      <Composer
-        draft={kept.get(room)}
-        onDraft={(draft) => {
-          kept.set(room, draft);
-        }}
-        key={room}
-        room={room}
-        nick={session.address}
-        rooms={rooms.map(roomLabel)}
-        members={members}
-        onSay={onSay}
-      />
-    </Suspense>
-  );
 }
 
 // The world's rooms once listed: the switcher, the room in view and what writes in it.
