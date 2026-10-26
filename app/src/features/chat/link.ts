@@ -184,8 +184,6 @@ class Link implements ChatLink {
     this.#reader = new BatchReader();
     const me = this.#ergo?.nick() ?? "";
     chatActions.connected(me);
-    // An account hears from accounts alone: Ergo refuses a guest's direct message to it (+R, irc/handlers.go).
-    if (this.#key !== "guest") this.#ergo?.send(`MODE ${me} +R`);
     this.#send("JOIN", this.#wanted());
     this.#history(this.#shown);
   }

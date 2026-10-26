@@ -791,7 +791,8 @@ describe("the chat's link: what it says", () => {
   });
 });
 
-// 4e: direct messages, an account's alone; Ergo refuses a guest's to an account that set +R (irc/handlers.go, v2.19.1).
+// 4e: direct messages, an account's alone; Ergo refuses a guest's to any account, which its default-user-modes set +R
+// (deploy/ergo/ircd.yaml.tmpl).
 describe("the chat's link: direct messages", () => {
   const account = () => {
     const t = setup();
@@ -800,12 +801,6 @@ describe("the chat's link: direct messages", () => {
     return { ...t, fake: t.connected(ADDRESS) };
   };
   const dms = (sent: readonly string[]) => sent.filter((line) => line.startsWith(`PRIVMSG ${OTHER}`));
-
-  it("asks Ergo to refuse guests' direct messages, once an account is connected", () => {
-    expect(account().fake.sent).toContain(`MODE ${ADDRESS} +R`);
-    const g = guestIn(["#bubble"]);
-    expect(g.fake.sent.filter((line) => line.startsWith("MODE"))).toEqual([]);
-  });
 
   it("sends an account's draft to another account, as the composer composes it", () => {
     const t = account();
