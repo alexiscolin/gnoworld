@@ -23,7 +23,8 @@ export type IrcParsed =
 // Lines from a server: 8191 bytes of tags with the @ and the space, 510 of the rest. A client sends at
 // most 4094 bytes of tag data, without them (IRCv3 message-tags).
 const TAGS_MAX = 8191;
-const BODY_MAX = 510;
+/** The bytes of an IRC line after its tags: RFC 1459's 512, less CR LF. */
+export const LINE_BYTES = 510;
 const CLIENT_TAGS_MAX = 4094;
 
 // A key is [+][vendor/]name: name is letters, digits and hyphens; vendor a DNS host name (IRCv3 says a
@@ -98,7 +99,7 @@ function readParams(text: string): string[] {
 // The rest of a line once its tags and their one space are read: source, command, parameters. It counts
 // whole, the spaces before its command too (F667); a source is never empty, as formatLine writes none (F669).
 function readBody(whole: string, tags: Map<string, string>): IrcParsed {
-  if (bytes(whole) > BODY_MAX) return { ok: false, error: "body-too-long" };
+  if (bytes(whole) > LINE_BYTES) return { ok: false, error: "body-too-long" };
   const body = whole.replace(/^ +/, "");
   const [source, afterSource] = body.startsWith(":") ? split(body.slice(1)) : ["", body];
   if (body.startsWith(":") && source === "") return { ok: false, error: "empty-source" };
@@ -164,6 +165,6 @@ export function formatLine(message: IrcMessage): string {
     refuse("a source is a word with no NUL, CR or LF");
   }
   const body = [...(source === undefined ? [] : [`:${source}`]), command, ...formatParams(params)].join(" ");
-  if (bytes(body) > BODY_MAX) refuse("a line holds 510 bytes after its tags");
+  if (bytes(body) > LINE_BYTES) refuse("a line holds 510 bytes after its tags");
   return data === "" ? body : `@${data} ${body}`;
 }

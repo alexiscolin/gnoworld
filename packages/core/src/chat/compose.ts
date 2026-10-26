@@ -4,13 +4,12 @@
 // a draft forges no CTCP of its own. A draft of several lines is one message of lines (draft/multiline, docs/
 // decisions.md row 255), each line a PRIVMSG within that budget, the message within Ergo's caps; an action stays one
 // line, its breaks spaces.
-import { bytes } from "../irc/irc.ts";
+import { bytes, LINE_BYTES } from "../irc/irc.ts";
 import { MULTILINE_BYTES, MULTILINE_LINES } from "../irc/multiline.ts";
 
+export { LINE_BYTES } from "../irc/irc.ts";
 export { MULTILINE_BYTES, MULTILINE_LINES } from "../irc/multiline.ts";
 
-/** The bytes of an IRC line after its tags: RFC 1459's 512, less CR LF. */
-export const LINE_BYTES = 510;
 // Ergo's cloak of a host: 64 bits in base32, then the network's name (deploy/ergo/ircd.yaml.tmpl, ip-cloaking).
 const CLOAK = "x".repeat(13) + ".gnoworld";
 
