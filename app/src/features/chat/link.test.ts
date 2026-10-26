@@ -950,6 +950,7 @@ describe("the chat's link: what it says", () => {
     };
 
     it("marks the room in view read at a held line's time, as Ergo's MARKREAD, once a later line", () => {
+      vi.useFakeTimers();
       const t = memberIn(["#bubble/games"]);
       heard(t.fake, "#bubble/games", 0);
       heard(t.fake, "#bubble/games", 1);
@@ -958,6 +959,9 @@ describe("the chat's link: what it says", () => {
       t.link.read("#bubble/games", "m1");
       t.link.read("#bubble/games", "m0");
       t.link.read("#bubble/games", "m2");
+      // Read on: a later place may wait its turn.
+      vi.advanceTimersByTime(2_000);
+      vi.useRealTimers();
       expect(marked(t.fake.sent)).toEqual([
         `MARKREAD #bubble/games timestamp=${T(1)}`,
         `MARKREAD #bubble/games timestamp=${T(2)}`,
