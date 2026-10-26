@@ -81,13 +81,13 @@ function LineView({ line, me, members, stop, actions, reactions, react, answers 
       {/* The line's marks first, before the time: where no sender's words stand (F808). */}
       {mentioned ? <span className={styles["mentionsYou"]}>Mentions you </span> : null}
       {line.kind === "notice" ? <span className={styles["mark"]}>Notice </span> : null}
+      {line.edited === true ? <span className={styles["mark"]}>Edited </span> : null}
       <time dateTime={line.time} className={styles["time"]}>
         {CLOCK.format(new Date(line.time))}
       </time>{" "}
       {line.kind === "action" ? "* " : null}
       <Person name={line.account ?? line.from} guest={line.account === undefined} />{" "}
       <LineText blocks={blocks} me={me} known={known} />
-      {line.edited === true ? <span className={styles["mark"]}> (edited)</span> : null}
       {reactions === undefined ? null : <Reactions to={line.id} shown={reactions} react={react} />}
       {actions}
     </li>

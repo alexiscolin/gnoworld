@@ -549,6 +549,16 @@ describe("RoomView: edits", () => {
     expect(shown[1]).toMatch(/^Replying to g10gh7…3y5tv: hello\d/);
   });
 
+  // The green pass: the mark stands with the line's marks, before its time (F808), so a sender's "(edited)" reads as
+  // their words, never as the mark.
+  it("marks an edited line before its time, and a line that says (edited) not at all", () => {
+    const lines = [line({ id: "a", text: "helo" }), line({ id: "e", text: "hello", edits: "a" })];
+    expect(linesOf(view({ state: { ...ROOM, lines } }))[0]).toMatch(/^Edited \d{2}:\d{2} g10gh7…3y5tv hello$/);
+    expect(linesOf(view({ state: { ...ROOM, lines: [line({ id: "s", text: "(edited)" })] } }))[0]).toMatch(
+      /^\d{2}:\d{2} g10gh7…3y5tv \(edited\)$/,
+    );
+  });
+
   it("keeps another account's edit a line of its own, the line it names as written", () => {
     const lines = [
       line({ id: "a", text: "mine" }),
