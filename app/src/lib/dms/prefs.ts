@@ -23,16 +23,17 @@ export interface DmPrefs {
 /** An account's direct-message preferences on the device `storage` reaches. */
 export function dmPrefs(storage: () => DraftStorage, account: Address): DmPrefs {
   const keys = { only: `gnoworld:dm:${account}:only-known`, known: `gnoworld:dm:${account}:known` };
-  const known = (): string[] => {
+  // The accounts written to, or none when the device could not be read: then nothing is written over them (CR4).
+  const read = (): string[] | undefined => {
     try {
       const held = storage().getItem(keys.known);
       if (held === null) return [];
-      const read = Known.safeParse(parsed(held));
-      if (read.success) return read.data;
+      const known = Known.safeParse(parsed(held));
+      if (known.success) return known.data;
       storage().removeItem(keys.known);
       return [];
     } catch {
-      return [];
+      return undefined;
     }
   };
   // Each write: whether the device took it.
@@ -53,10 +54,11 @@ export function dmPrefs(storage: () => DraftStorage, account: Address): DmPrefs 
       }
     },
     setOnlyKnown: (only) => write(keys.only, String(only)),
-    known,
+    known: () => read() ?? [],
     // The account written to last already: nothing to change.
     know: (partner) => {
-      const held = known();
+      const held = read();
+      if (held === undefined) return false;
       return (
         held.at(-1) === partner ||
         write(keys.known, JSON.stringify([...held.filter((each) => each !== partner), partner].slice(-KNOWN_KEPT)))

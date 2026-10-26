@@ -6,7 +6,8 @@ const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 const BOB = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const CAROL = "g1l6m6l6carqlqqqqqqqqqqqqqqqqqqqqqnkkanc";
 
-// A device's storage, as the page's localStorage behaves: strings by key, any call refused when it is.
+// A device's storage, as the page's localStorage behaves: strings by key, any call refused when it is; `failRead`
+// makes the next read alone throw.
 function storage({ refuses = false } = {}) {
   const kept = new Map<string, string>();
   // Each write and removal, by key: what the account's reads must leave alone.
@@ -14,11 +15,19 @@ function storage({ refuses = false } = {}) {
   const refuse = () => {
     if (refuses) throw new DOMException("The storage is blocked.", "SecurityError");
   };
+  let failing = false;
   return {
     kept,
     touched,
+    failRead: () => {
+      failing = true;
+    },
     getItem: (key: string) => {
       refuse();
+      if (failing) {
+        failing = false;
+        throw new DOMException("The storage failed.", "UnknownError");
+      }
       return kept.get(key) ?? null;
     },
     setItem: (key: string, value: string) => {
@@ -77,6 +86,19 @@ describe("an account's direct-message preferences on the device", () => {
     expect(mine.known()).toHaveLength(KNOWN_KEPT);
     expect(mine.known()).not.toContain(many[0]);
     expect(mine.known().at(-1)).toBe(many.at(-1));
+  });
+
+  // /code-review on 4e (CR4): a read that threw read as no account, and the write after it put one over the 500 kept.
+  it("writes nothing after a read of the accounts that failed: those kept stay", () => {
+    const device = storage();
+    const mine = on(device, ALICE);
+    mine.know(BOB);
+    mine.know(CAROL);
+    const [key = ""] = [...device.kept.keys()].filter((k) => k.endsWith(":known"));
+    const held = device.kept.get(key);
+    device.failRead();
+    expect(mine.know(ALICE)).toBe(false);
+    expect(device.kept.get(key)).toBe(held);
   });
 
   it("reads what the device holds as nothing unless it is a list of addresses, and forgets it", () => {
