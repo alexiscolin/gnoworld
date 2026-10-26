@@ -41,15 +41,18 @@ export function useReadAtEnd(
   };
   const seen = useEffectEvent(look);
   const reading = onRead !== undefined;
+  // The tab shown again: one listener a page, not one a line (E5).
   useEffect(() => {
     const shows = () => {
       seen();
     };
-    shows();
     document.addEventListener("visibilitychange", shows);
     return () => {
       document.removeEventListener("visibilitychange", shows);
     };
+  }, []);
+  useEffect(() => {
+    seen();
   }, [newest, reading]);
   return look;
 }
