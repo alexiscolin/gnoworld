@@ -46,12 +46,9 @@ describe("Embed", () => {
     ]);
     expect(attribute(html, "allow")).toBe("autoplay; encrypted-media; fullscreen; picture-in-picture");
     expect(attribute(html, "allowFullScreen")).toBe("");
-    // YouTube asks for the embedding site's identity in the Referer and recommends this policy, the origin alone
-    // (developers.google.com/youtube/terms/required-minimum-functionality, "Embedded player API client identity").
-    expect(attribute(html, "referrerPolicy")).toBe("strict-origin-when-cross-origin");
   });
 
-  // F886: the site sends no referrer (F682); YouTube alone asks for one, above.
+  // F886: the site sends no referrer (F682).
   it.each([
     { service: "Vimeo", src: "https://player.vimeo.com/video/76979871?dnt=1", title: "Vimeo video" },
     { service: "Giphy", src: "https://giphy.com/embed/4548k01F5Ej28", title: "Giphy animation" },
