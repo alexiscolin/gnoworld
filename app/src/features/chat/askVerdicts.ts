@@ -94,10 +94,11 @@ function serverAsker({ verdicts, judged }: Pick<Asking, "verdicts" | "judged">) 
     // What was asked of a line gone from view is forgotten, so a long session holds no more than its view.
     const shown = new Set(lines.map(({ id }) => id));
     for (const id of mine) if (!shown.has(id)) mine.delete(id);
-    const before = lines.filter(({ time }) => Date.parse(time) < since);
+    // A line already looked at is not read again while in view: only the new ones' Markdown (F1055).
+    const before = lines.filter(({ id, time }) => !mine.has(id) && Date.parse(time) < since);
     // An id the route refuses (over 128 characters, a comma) would have it refuse the whole request, for good (F892).
     const wanted = unjudged(before, view.held, mine).filter((id) => VerdictId.safeParse(id).success);
-    for (const id of wanted) mine.add(id);
+    for (const { id } of before) mine.add(id);
     for (let start = 0; start < wanted.length; start += VERDICTS_ASKED) {
       send(room, wanted.slice(start, start + VERDICTS_ASKED), mine);
     }

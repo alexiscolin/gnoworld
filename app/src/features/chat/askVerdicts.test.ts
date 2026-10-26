@@ -82,6 +82,24 @@ describe("verdictAsker: the server's verdicts of the lines in view", () => {
     expect(t.sent).toEqual([["a"], ["b"]]);
   });
 
+  // F1055 (C1): every line older than the stream with no player was read again at each new line, 0.4 ms at 200.
+  it("reads a line once while it stays in view, a line with no player too", () => {
+    const t = server();
+    let reads = 0;
+    const plain = {
+      ...line("p"),
+      get text() {
+        reads += 1;
+        return "no link here";
+      },
+    };
+    t.ask([plain, line("a")]);
+    t.ask([plain, line("a"), line("b")]);
+    t.ask([plain, line("a"), line("b")]);
+    expect(reads).toBe(1);
+    expect(t.sent).toEqual([["a"], ["b"]]);
+  });
+
   // F892 (CR4): Ergo may carry a msgid the route refuses, which made it refuse the whole request, its 99 others too.
   it("asks nothing of a line whose id the route would refuse, and the others of its request still", () => {
     const t = server();
