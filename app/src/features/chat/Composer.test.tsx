@@ -49,6 +49,25 @@ describe("Composer", () => {
     expect(markup).toContain(`<span data-mention="" title="${ALICE}">`);
   });
 
+  // F812: the preview shortens as the room will, a ground lookalike (BOB's short form) whole.
+  it("previews a member's mention shortened and anyone else's whole, as the room will show them (F812)", () => {
+    const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+    const ground = "g1jg8m2vtwlmmyz8swgu76ug4tklwnays8yvsqf5";
+    const markup = renderToStaticMarkup(
+      <Composer
+        room={ROOM}
+        nick={NICK}
+        rooms={[]}
+        members={[ALICE, NICK]}
+        draft={`@${ALICE} @${ground} @${NICK}`}
+        onSay={() => true}
+      />,
+    );
+    expect(markup).toContain(`<span data-mention="" title="${ALICE}">@g10gh7…3y5tv</span>`);
+    expect(markup).toContain(`<span data-mention="" title="${ground}">@${ground}</span>`);
+    expect(markup).toContain(`<span data-mention="me" title="${NICK}">@g1jg8m…vsqf5</span>`);
+  });
+
   it("starts from the room's draft, its preview with it", () => {
     const markup = renderToStaticMarkup(
       <Composer

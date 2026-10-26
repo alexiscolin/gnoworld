@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { WebSocketRoute } from "@playwright/test";
+import { lineOf, lines } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { MEMBER, scriptedErgo } from "./scripted.ts";
@@ -63,12 +64,12 @@ test.describe("a world's rooms, as they look", () => {
     });
     await page.goto("/w/bubble?room=games");
     await hydrated(page);
-    const lines = page.getByRole("list", { name: "Messages" }).getByRole("listitem");
-    await expect(lines).toHaveCount(3);
-    await expect(lines.nth(0)).toContainText(`@${MEMBER.slice(0, 6)}…${MEMBER.slice(-5)} is in.`);
-    await expect(lines.filter({ hasText: "Mentions you" })).toHaveCount(1);
-    await expect(lines.nth(1)).toContainText("Mentions you");
-    const mine = lines.nth(1).getByTitle(address);
+    const shown = lines(page);
+    await expect(shown).toHaveCount(3);
+    await expect(shown.nth(0)).toContainText(`@${MEMBER.slice(0, 6)}…${MEMBER.slice(-5)} is in.`);
+    await expect(shown.filter({ hasText: "Mentions you" })).toHaveCount(1);
+    await expect(shown.nth(1)).toContainText("Mentions you");
+    const mine = shown.nth(1).getByTitle(address);
     await expect(mine).toHaveText(`@${address.slice(0, 6)}…${address.slice(-5)}`);
     // Amber, the design system's "about me": the reader's mention and the line's word; another's mention not.
     const amber = await page.evaluate(() => {
@@ -81,16 +82,16 @@ test.describe("a world's rooms, as they look", () => {
     });
     const color = (element: HTMLElement) => getComputedStyle(element).color;
     expect(await mine.evaluate(color)).toBe(amber);
-    expect(await lines.nth(1).getByText("Mentions you").evaluate(color)).toBe(amber);
-    expect(await lines.nth(0).getByTitle(MEMBER).last().evaluate(color)).not.toBe(amber);
-    await expect(lines.nth(1)).toHaveCSS("border-inline-start-color", amber);
+    expect(await shown.nth(1).getByText("Mentions you").evaluate(color)).toBe(amber);
+    expect(await shown.nth(0).getByTitle(MEMBER).last().evaluate(color)).not.toBe(amber);
+    await expect(shown.nth(1)).toHaveCSS("border-inline-start-color", amber);
     expect((await new AxeBuilder({ page }).include("ol").analyze()).violations).toEqual([]);
     // For the picture, the drawn address reads the same each run (its own text was checked above), so the amber
     // mention shows in it; the header, which names the wallet, masked.
     await mine.evaluate((element) => {
       element.textContent = "@g1aaaa…aaaaa";
     });
-    await lines
+    await shown
       .nth(2)
       .locator("code")
       .evaluate((element) => {
@@ -160,4 +161,49 @@ test("sets a quoted line apart from the sender's own words", async ({ page }) =>
   });
   expect(look.border).not.toBe("0px");
   expect(look.padding).not.toBe("0px");
+});
+
+// F812: an address of the right checksum ground to shorten as a member's does holds no key, so joins no room: a
+// mention of it shows whole, through the store and the page, beside the member it copies, shortened. Ergo's
+// scripted welcome names the page ACCOUNT, whose short form the ground address copies; NAMES lists it.
+test("shows a mention of an account not in the room whole, beside the member it copies shortened", async ({ page }) => {
+  const ground = "g1jg8m2vtwlmmyz8swgu76ug4tklwnays8yvsqf5";
+  await page.routeWebSocket(/\/ws$/, (ergo) => {
+    scriptedErgo(ergo, ACCOUNT, [["g1", "2026-10-25T10:00:00.000Z", `ask @${ground} or @${ACCOUNT} or @${MEMBER}`]]);
+  });
+  await page.goto("/w/bubble?room=games");
+  await hydrated(page);
+  const mentions = page.getByRole("list", { name: "Messages" }).locator("[data-mention]");
+  await expect(mentions).toHaveText([`@${ground}`, "@g1jg8m…vsqf5", `@${MEMBER.slice(0, 6)}…${MEMBER.slice(-5)}`]);
+  await expect(mentions.first()).toHaveAttribute("title", ground);
+  await expect(mentions.nth(1)).toHaveAttribute("title", ACCOUNT);
+});
+
+// F816: the browser's engine reads the mentions as the server counts them. Chromium 156's V8 (14.6) misreads a
+// character class just before `$` for a letter past the BMP, which made 𐐀@<address> a mention here alone.
+test("draws no mention after a letter past the BMP, in the browser's own engine", async ({ page }) => {
+  await page.routeWebSocket(/\/ws$/, (ergo) => {
+    scriptedErgo(ergo, GUEST, [["b1", "2026-10-25T10:00:00.000Z", `\u{10400}@${MEMBER} and @${MEMBER}`]]);
+  });
+  await page.goto("/w/bubble?room=games");
+  await hydrated(page);
+  await expect(lineOf(page, "and @")).toContainText(`\u{10400}@${MEMBER} and`);
+  await expect(lines(page).locator("[data-mention]")).toHaveCount(1);
+});
+
+// F814: a line that is a list holds list items of its own; a room's lines are the Messages list's own items.
+test("counts a line that is a list as one line of the room", async ({ page }) => {
+  await page.routeWebSocket(/\/ws$/, (ergo) => {
+    scriptedErgo(ergo, GUEST, [
+      ["l1", "2026-10-25T10:00:00.000Z", "- gnogolf at nine"],
+      ["l2", "2026-10-25T10:01:00.000Z", "1. bring a putter"],
+    ]);
+  });
+  await page.goto("/w/bubble?room=games");
+  await hydrated(page);
+  await expect(lineOf(page, "gnogolf at nine").locator("ul > li")).toHaveCount(1);
+  await expect(lineOf(page, "bring a putter").locator("ol > li")).toHaveCount(1);
+  await expect(lines(page)).toHaveCount(2);
+  await expect(lineOf(page, "gnogolf at nine")).toHaveCount(1);
+  await expect(lineOf(page, "bring a putter")).toHaveCount(1);
 });

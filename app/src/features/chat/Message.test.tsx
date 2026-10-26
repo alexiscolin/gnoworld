@@ -26,6 +26,8 @@ const LINK = /^<a href="https:\/\/[^"]+" title="https:\/\/[^"]+" dir="ltr" targe
 const MENTION = /^<span data-mention="(me)?" title="(g1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{38})">$/;
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+// A checksum-valid address ground to shorten as BOB's: g1jg8m…vsqf5 (F812's verifier, seven seconds).
+const GROUND = "g1jg8m2vtwlmmyz8swgu76ug4tklwnays8yvsqf5";
 const opening = (markup: string) =>
   [...markup.matchAll(/<([a-z]+)[^>]*>/g)].map((found) => ({ tag: found[1] ?? "", whole: found[0] }));
 
@@ -54,13 +56,65 @@ describe("Message", () => {
     expect(boxed("a\n\nb")).toBe('<div class="x"><p>a</p><p>b</p></div>');
   });
 
-  it("shows a mention as the account's address shortened, its whole address in its title, in a list and a quote too", () => {
-    const mention = (address: string, short: string) =>
-      new RegExp(`<span data-mention="" title="${address}">@${short}</span>`);
-    expect(html(`hi @${ALICE}!`)).toMatch(new RegExp(`^<span>hi ${mention(ALICE, "g10gh7…3y5tv").source}!</span>$`));
-    expect(html(`> @${BOB}\n- @${ALICE}`)).toMatch(mention(BOB, "g1jg8m…vsqf5"));
-    expect(html(`> @${BOB}\n- @${ALICE}`)).toMatch(mention(ALICE, "g10gh7…3y5tv"));
+  it("shows a mention as its account's mark, its whole address in its title, in a list and a quote too", () => {
+    const mention = (address: string) => new RegExp(`<span data-mention="" title="${address}">@g1[^<]+</span>`);
+    expect(html(`hi @${ALICE}!`)).toMatch(new RegExp(`^<span>hi ${mention(ALICE).source}!</span>$`));
+    expect(html(`> @${BOB}\n- @${ALICE}`)).toMatch(mention(BOB));
+    expect(html(`> @${BOB}\n- @${ALICE}`)).toMatch(mention(ALICE));
     expect(html(`hi @${ALICE}`)).not.toContain('data-mention="me"');
+  });
+
+  // F812: an address of the right checksum can be ground to shorten as another's does (seven seconds found GROUND,
+  // drawn as BOB's), but holds no key, so never joins a room: the short form is the reader's and the members' alone.
+  it("shows a mention shortened only for the reader and the room's members, anyone else's address whole (F812)", () => {
+    const markup = renderToStaticMarkup(
+      <Message text={`@${ALICE} @${BOB} @${GROUND}`} me={BOB} members={new Set([ALICE, "guest-ab12cd"])} />,
+    );
+    expect(markup).toBe(
+      `<span><span data-mention="" title="${ALICE}">@g10gh7…3y5tv</span> ` +
+        `<span data-mention="me" title="${BOB}">@g1jg8m…vsqf5</span> ` +
+        `<span data-mention="" title="${GROUND}">@${GROUND}</span></span>`,
+    );
+  });
+
+  it("shows the same forms in a quote, a list, a mark and a message of several blocks (F812)", () => {
+    const pair = `@${ALICE} @${GROUND}`;
+    const markup = renderToStaticMarkup(
+      <Message
+        text={`> ${pair}\n- ${pair}\n\n**${pair}** ~~${pair}~~ *${pair}*`}
+        me={BOB}
+        members={new Set([ALICE])}
+      />,
+    );
+    const shown = [...markup.matchAll(/<span data-mention="" title="(g1[^"]+)">@([^<]+)<\/span>/g)].map(
+      ([, title = "", text = ""]) => [title === ALICE ? "ALICE" : "GROUND", text],
+    );
+    expect(shown).toEqual(
+      Array.from({ length: 5 }, () => [
+        ["ALICE", "g10gh7…3y5tv"],
+        ["GROUND", GROUND],
+      ]).flat(),
+    );
+  });
+
+  it("shows a member's mention shortened to a guest too, who has no address of its own (F812)", () => {
+    expect(renderToStaticMarkup(<Message text={`@${ALICE} @${GROUND}`} members={new Set([ALICE])} />)).toBe(
+      `<span><span data-mention="" title="${ALICE}">@g10gh7…3y5tv</span> ` +
+        `<span data-mention="" title="${GROUND}">@${GROUND}</span></span>`,
+    );
+  });
+
+  it("shows every mention whole but the reader's when it is given no members, a guest's whole too (F812)", () => {
+    expect(html(`@${ALICE}`)).toBe(`<span><span data-mention="" title="${ALICE}">@${ALICE}</span></span>`);
+    expect(renderToStaticMarkup(<Message text={`@${ALICE} @${BOB}`} me={BOB} />)).toBe(
+      `<span><span data-mention="" title="${ALICE}">@${ALICE}</span> ` +
+        `<span data-mention="me" title="${BOB}">@g1jg8m…vsqf5</span></span>`,
+    );
+  });
+
+  // F812's review: a line may type an account's short form itself; it reads as the words they are.
+  it("draws a short form typed as text as text: no mark, no title", () => {
+    expect(renderToStaticMarkup(<Message text="ask @g1jg8m…vsqf5" me={BOB} />)).toBe("<span>ask @g1jg8m…vsqf5</span>");
   });
 
   it("sets a mention of the reader apart, and no other", () => {

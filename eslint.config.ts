@@ -10,7 +10,7 @@ import app from "./lint/app.config.ts";
 import core from "./lint/core.config.ts";
 import react from "./lint/react.config.ts";
 import server from "./lint/server.config.ts";
-import { MODULE_STATE, SWALLOWED, SWITCHED_OFF, TESTS } from "./lint/shared.config.ts";
+import { CLASS_AT_END, MODULE_STATE, SWALLOWED, SWITCHED_OFF, TESTS } from "./lint/shared.config.ts";
 
 const BASELINE_ALSO = { allowAtRules: ["starting-style"], allowSelectors: ["popover-open"] };
 const FACE = { ...BASELINE_ALSO, allowProperties: ["forced-color-adjust"] };
@@ -39,7 +39,7 @@ export default defineConfig(
       "no-useless-catch": "error",
       "no-unsafe-finally": "error",
       "preserve-caught-error": ["error", { requireCatchParameter: true }],
-      "no-restricted-syntax": ["error", ...SWALLOWED],
+      "no-restricted-syntax": ["error", ...SWALLOWED, CLASS_AT_END],
       "@typescript-eslint/no-floating-promises": ["error", { ignoreVoid: false }],
       "@typescript-eslint/switch-exhaustiveness-check": "error",
       // The type checker is never silenced, not even with a reason.
@@ -64,7 +64,7 @@ export default defineConfig(
   // tests' lists replace it.
   {
     files: ["server/src/**/*.ts", "packages/*/src/**/*.{ts,tsx}"],
-    rules: { "no-restricted-syntax": ["error", ...SWALLOWED, MODULE_STATE] },
+    rules: { "no-restricted-syntax": ["error", ...SWALLOWED, CLASS_AT_END, MODULE_STATE] },
   },
   react,
   app,
@@ -75,7 +75,7 @@ export default defineConfig(
     rules: {
       "max-lines": "off",
       "max-lines-per-function": "off",
-      "no-restricted-syntax": ["error", ...SWALLOWED, SWITCHED_OFF],
+      "no-restricted-syntax": ["error", ...SWALLOWED, CLASS_AT_END, SWITCHED_OFF],
     },
   },
   {
@@ -86,6 +86,7 @@ export default defineConfig(
       "no-restricted-syntax": [
         "error",
         ...SWALLOWED,
+        CLASS_AT_END,
         SWITCHED_OFF,
         { selector: "MemberExpression[property.name='fails']", message: "`fails` is for pairing in core only." },
       ],

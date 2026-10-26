@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
-import { inGames, lineOf, messages, roomsNav, whoIsHere, word } from "./chat.ts";
+import { inGames, lineOf, roomsNav, whoIsHere, word } from "./chat.ts";
 import { logIn } from "./irc.ts";
 import { MEMBER, scriptedErgo } from "./scripted.ts";
 import type { WebSocketRoute } from "@playwright/test";
@@ -252,11 +252,7 @@ test.describe("the composer", () => {
     await expect(field(page)).toHaveAccessibleDescription("Too long by 1 byte.");
     await expect(send(page)).toBeDisabled();
     await field(page).press("Enter");
-    await expect(
-      messages(page)
-        .getByRole("listitem")
-        .filter({ hasText: "a".repeat(420) }),
-    ).toHaveCount(0);
+    await expect(lineOf(page, "a".repeat(420))).toHaveCount(0);
   });
 
   test("shows a hostile line it sends as text: no markup, no script run", async ({ page }) => {

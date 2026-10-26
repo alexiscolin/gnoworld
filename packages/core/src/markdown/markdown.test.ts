@@ -544,6 +544,7 @@ describe("markdown: mentions", () => {
     [`x\u200b@${ALICE}`, "after a format character, which the server drops (F807)"],
     [`x\u0301@${ALICE}`, "after a mark, which the server drops (F807)"],
     [`𐐀@${ALICE}`, "after a letter past the BMP that folds to itself"],
+    [`\u0378@${ALICE}`, "after a character Unicode has not assigned, which a newer engine may know as a letter (F817)"],
     [`@${ALICE}x`, "a letter after it"],
     [`@${ALICE}é`, "a letter not ASCII after it"],
     [`@${ALICE}٣`, "a digit not ASCII after it"],

@@ -136,8 +136,9 @@ def mutants():
     both = '"server/src/**/*.ts", "packages/*/src/**/*.{ts,tsx}"'
     yield from each("eslint.config.ts", both, '"packages/*/src/**/*.{ts,tsx}"', "probe", "eslint keeps no state at a server module's top")
     yield from each("eslint.config.ts", both, '"server/src/**/*.ts"', "probe", "eslint keeps no state at a workspace module's top")
-    yield from each("eslint.config.ts", '"error", ...SWALLOWED, MODULE_STATE]', '"error", ...SWALLOWED]', "probe", "eslint's workspace block refuses state at a module's top")
-    yield from each("eslint.config.ts", '"error", ...SWALLOWED, MODULE_STATE]', '"error", MODULE_STATE]', "probe", "eslint's workspace block keeps the swallowed errors refused")
+    yield from each("eslint.config.ts", '"error", ...SWALLOWED, CLASS_AT_END, MODULE_STATE]', '"error", ...SWALLOWED, CLASS_AT_END]', "probe", "eslint's workspace block refuses state at a module's top")
+    yield from each("eslint.config.ts", '"error", ...SWALLOWED, CLASS_AT_END, MODULE_STATE]', '"error", CLASS_AT_END, MODULE_STATE]', "probe", "eslint's workspace block keeps the swallowed errors refused")
+    yield from each("lint/core.config.ts", "...SWALLOWED, CLASS_AT_END, ", "...SWALLOWED, ", "probe", "eslint core refuses a u class right before $ (F821)")
     yield from each("lint/core.config.ts", "...IMPURE, MODULE_STATE]", "...IMPURE]", "probe", "eslint core keeps no state at a module's top")
     yield from each(REACT, "RAW_ANCHOR, MODULE_STATE]", "RAW_ANCHOR]", "probe", "eslint ui's components keep no state at a module's top")
     yield from each("lint/shared.config.ts", "/^(${KEPT})$/", "/${KEPT}/", "probe", "eslint keeps a module's state by whole names")
@@ -530,11 +531,12 @@ def mutants():
     yield from each("scripts/prove_fix.py", 're.search(r"^No-test: \\S", message, re.M)', "True", "hooks", "prove_fix wants a reason for no test")
     yield from each("scripts/prove_fix.py", r"|\.spec\.ts", "", "hooks", "prove_fix takes a journey for a fix's test (F126)")
     yield from each("scripts/prove_fix.py", """    out += [(".", f"{PLAYWRIGHT} --pass-with-no-tests -c {config} {' '.join(files)}") for config, files in journeys.items()]\n""", "", "hooks", "prove_fix runs a fix's journeys before it (F126)")
+    yield from each("scripts/prove_fix.py", "TEST.search(f) or f.startswith(JOURNEYS) for f in product", "TEST.search(f) for f in product", "hooks", "prove_fix counts the journeys' helpers as tests")
     yield from each("scripts/prove_fix.py", "--pass-with-no-tests ", "", "hooks", "prove_fix counts no journey found as passing")
     yield from each("scripts/prove_fix.py", "--passWithNoTests ", "", "hooks", "prove_fix counts no Vitest test found as passing")
     yield from each("scripts/prove_fix.py", '"app/tests/stories/": "app/playwright.stories.config.ts", ', "", "hooks", "prove_fix runs a stories journey under its config")
-    yield from each("scripts/prove_fix.py", "    if all(TEST.search(f) for f in product):", "    if True:", "hooks", "prove_fix checks product fixes")
-    yield from each("scripts/prove_fix.py", "    if all(TEST.search(f) for f in product):", "    if not product:", "hooks", "prove_fix leaves a fix of tests alone")
+    yield from each("scripts/prove_fix.py", "    if all(TEST.search(f) or f.startswith(JOURNEYS) for f in product):", "    if True:", "hooks", "prove_fix checks product fixes")
+    yield from each("scripts/prove_fix.py", "    if all(TEST.search(f) or f.startswith(JOURNEYS) for f in product):", "    if not product:", "hooks", "prove_fix leaves a fix of tests alone")
     yield from each("scripts/prove_fix.py", '"--diff-filter=AMDT"', '"--diff-filter=AM"', "hooks", "prove_fix counts deleted code (F253)")
     yield from each("scripts/prove_fix.py", " and f in left]", "]", "hooks", "prove_fix runs only the tests a fix leaves (F253)")
     yield from each("scripts/audit.py", 'if a.get("severity") in SEVERE]', "if False]", "hooks", "audit fails on an advisory")
@@ -589,7 +591,23 @@ def mutants():
         ("\t$app || return 0", "\t:", "the journeys only for an app change"),
         ("\t$all || return 0 # the hooks'", "\t: # the hooks'", "the hooks' tests only for everything"),
         ('harness --quiet "$base" && return 0', 'true && return 0', "--full mutates a changed harness"),
-        ("finish stories coverage history harness", ":", "--full fails when a full lane did"),
+        ("finish stories history || early=1", ": || early=1", "--full fails when the stories or the history lane did"),
+        ("\tfinish coverage harness\n", "\t:\n", "--full fails when the coverage or the harness lane did"),
+        ('\t[ "$early" = 0 ]\n', "\t:\n", "--full fails when a lane before the coverage did"),
+        ("finish stories history || early=1", "finish stories history", "--full runs the coverage and the harness after an early failure"),
+        (
+            "\tfinish stories history || early=1\n\tstart coverage\n\tstart harness\n",
+            "\tstart coverage\n\tstart harness\n\tfinish stories history || early=1\n",
+            "the stories run before the coverage and the harness lanes (F815)",
+        ),
+        (
+            "\tstart stories\n\tstart history\n\tearly=0\n\tfinish stories history || early=1\n",
+            "\tearly=0\n\tstart stories\n\tfinish stories || early=1\n\tstart history\n\tfinish history || early=1\n",
+            "the stories run beside the history lane",
+        ),
+        ("\tfinish coverage harness\n", "\tfinish coverage harness || true\n", "--full fails when the coverage or the harness lane alone did"),
+        ('run coverage "--maxWorkers=$half"', "run coverage", "--full caps Vitest's coverage at half the machine (F777)"),
+        ('run mutate "--concurrency $half"', "run mutate", "--full caps StrykerJS at half the machine (F777)"),
         ("\tstart probe\n\tfinish probe\n", "\tstart probe\n", "probe.py runs alone, before the full lanes"),
         ("\t! $merge || full=false", "\t:", "--merge records no full gate"),
         ("\texport E2E_PORT\n", "\n", "the journeys get a free port of their own"),

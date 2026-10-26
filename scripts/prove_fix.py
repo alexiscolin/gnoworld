@@ -19,6 +19,8 @@ from repo_files import git, worktree
 
 PRODUCT = ("packages/", "gno/", "app/", "admin/", "server/")
 TEST = re.compile(r"(\.test\.tsx?|\.spec\.ts|_test\.gno|_filetest\.gno|_test\.go)$")
+# The journeys' folder: their helpers are tests too, so a fix of them alone changes no product code.
+JOURNEYS = "app/tests/"
 # The command per kind of test, run from the worktree's root; tests override them (test_hooks.sh).
 VITEST = os.environ.get("PROVE_FIX_VITEST", "node_modules/.bin/vitest run")
 PLAYWRIGHT = os.environ.get("PROVE_FIX_PLAYWRIGHT", "node app/node_modules/@playwright/test/cli.js test")
@@ -63,7 +65,7 @@ def verdict(commit):
     left = set(git("diff-tree", "--no-commit-id", "--name-only", "-r", "--diff-filter=AM", commit).splitlines())
     product = [f for f in changed if f.startswith(PRODUCT)]
     tests = [f for f in product if TEST.search(f) and f in left]
-    if all(TEST.search(f) for f in product):  # the harness alone, or tests alone: no product code to prove
+    if all(TEST.search(f) or f.startswith(JOURNEYS) for f in product):  # the harness or tests alone: nothing to prove
         return None
     if not tests:
         return None if re.search(r"^No-test: \S", message, re.M) else "a fix with no test that reproduces the bug (or a `No-test: <why>` line)"

@@ -81,13 +81,21 @@ touches against `HEAD`, untracked files included.
 
 ```
 fast gate                                              full gate (--full), after it
-  ts     format, knip, jscpd, CSS, comments ─▶ app       stories   probe.py ─▶ stories' journeys
-  types  tsc ─▶ ESLint                                   coverage  coverage ─▶ patch coverage ─▶ StrykerJS
-  tests  Ergo's build ─▶ Vitest                          history   prove_fix ─▶ regressions ─▶ migrations
-  gno    gno lint, test ─▶ mutate.py ─▶ Go                          ─▶ gitleaks ─▶ pnpm audit
-  docs   check_docs, parse ─▶ test_hooks.sh              harness   harness_mutate, in 4 worktrees
-     (the five lanes at once)                               (the four lanes at once)
+  ts     format, knip, jscpd, CSS, comments ─▶ app       probe     probe.py, alone
+  types  tsc ─▶ ESLint                                   ─▶ stories   the stories' journeys
+  tests  Ergo's build ─▶ Vitest                             history   prove_fix ─▶ regressions ─▶ migrations
+  gno    gno lint, test ─▶ mutate.py ─▶ Go                            ─▶ gitleaks ─▶ pnpm audit
+  docs   check_docs, parse ─▶ test_hooks.sh              ─▶ coverage  coverage ─▶ patch coverage ─▶ StrykerJS
+     (the five lanes at once)                               harness   harness_mutate, in 4 worktrees
+                                                         (two lanes at once, then two)
 ```
+
+The stories' journeys share the machine with the history lane alone: beside the coverage's
+Vitest, StrykerJS and the harness's worktrees, a Dialog's teardown outlasted its test and lost
+two merge checks of 23 minutes (F815). The coverage and the harness lanes run even when one
+before them failed, so one run shows every failure. In the coverage lane, Vitest's workers and
+StrykerJS's concurrency take half the machine each, the harness lane beside them the rest: at
+the machine's width, their load outlasted Ergo's 9 s auth script in the real-Ergo tests (F777).
 
 | A fast run's change | What runs beside the cheap checks (format, knip, jscpd, CSS, comments, check_docs) | Budget |
 |---|---|---|

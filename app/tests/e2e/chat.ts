@@ -5,8 +5,10 @@ import { logIn } from "./irc.ts";
 
 /** A word of its own for each test, so none reads another's lines, or its own retry's. */
 export const word = (what: string): string => `${what}-${crypto.randomUUID().slice(0, 8)}`;
-export const messages = (page: Page) => page.getByRole("list", { name: "Messages" });
-export const lineOf = (page: Page, text: string) => messages(page).getByRole("listitem").filter({ hasText: text });
+const messages = (page: Page) => page.getByRole("list", { name: "Messages" });
+/** A room's lines: the Messages list's own items, never those of a line that is a list (F814). */
+export const lines = (page: Page) => messages(page).locator(":scope > li");
+export const lineOf = (page: Page, text: string) => lines(page).filter({ hasText: text });
 export const whoIsHere = (page: Page) => page.getByRole("complementary", { name: "Who's here" });
 export const roomsNav = (page: Page) => page.getByRole("navigation", { name: "Rooms" });
 

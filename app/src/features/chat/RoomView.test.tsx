@@ -30,7 +30,8 @@ const part = (html: string, label: string) => {
   const found = new RegExp(`<(ol|aside)[^>]*aria-label="${name}"[^>]*>(.*?)</\\1>`, "s").exec(html);
   return found?.[2] ?? "";
 };
-// Each list item's words.
+// Each list item's words: a line that is a list holds items of its own, so a test of one counts the Messages
+// list's own children instead (F814's class).
 const items = (html: string) => [...html.matchAll(/<li[^>]*>(.*?)<\/li>/gs)].map((m) => said(m[1] ?? ""));
 const paragraphs = (html: string) => (html.match(/<p[ >]/g) ?? []).length;
 
@@ -141,6 +142,38 @@ describe("RoomView", () => {
     const html = part(view({ me: BOB, state: { ...ROOM, lines: [line({ text })] } }), "Messages");
     expect(said(html).match(/Mentions you/g)).toHaveLength(1);
     expect(html.match(/data-about-me/g)).toHaveLength(1);
+  });
+
+  // F812: a checksum-valid address ground to shorten as BOB's does; it holds no key, so it is in no room.
+  it("shows a mention of a member or of the reader shortened, of anyone else whole (F812)", () => {
+    const ground = "g1jg8m2vtwlmmyz8swgu76ug4tklwnays8yvsqf5";
+    const lines = [line({ text: `@${ground} @${ALICE} @${BOB}` })];
+    const html = part(view({ me: BOB, state: { ...ROOM, lines } }), "Messages");
+    expect(said(html)).toMatch(new RegExp(`g10gh7…3y5tv @${ground} @g10gh7…3y5tv @g1jg8m…vsqf5$`));
+    expect(html).toContain(`<span data-mention="" title="${ground}">@${ground}</span>`);
+  });
+
+  // F818's StrykerJS: a line's members travel as one string; each of two keeps its short form.
+  it("shortens each member a line mentions, two of them in one line", () => {
+    const carol = "g1l6m6l6carqlqqqqqqqqqqqqqqqqqqqqqnkkanc";
+    const lines = [line({ text: `@${ALICE} and @${carol}` })];
+    const html = part(view({ state: { ...ROOM, members: [ALICE, carol], lines } }), "Messages");
+    expect(said(html)).toMatch(/ @g10gh7…3y5tv and @g1l6m6…kkanc$/);
+  });
+
+  // F819 (docs/decisions.md, 2026-10-26): an author of a line in view proved its key as a member did, by Ergo's
+  // account tag; a nick alone proves nothing.
+  it("shortens a mention of an author of a line in view, by its account tag, though it left the room", () => {
+    const carol = "g1l6m6l6carqlqqqqqqqqqqqqqqqqqqqqqnkkanc";
+    const lines = [
+      line({ id: "a", from: carol, account: carol, text: "bye all" }),
+      line({ id: "b", text: `@${carol} left` }),
+      line({ id: "c", from: BOB, text: `@${BOB} has no tag` }),
+    ];
+    const html = part(view({ state: { ...ROOM, members: [ALICE], lines } }), "Messages");
+    const [, second = "", third = ""] = items(html);
+    expect(second).toMatch(/ @g1l6m6…kkanc left$/);
+    expect(third).toContain(`@${BOB} has no tag`);
   });
 
   it("marks no line for a lookalike of the reader's address, shown whole", () => {

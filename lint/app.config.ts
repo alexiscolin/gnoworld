@@ -7,7 +7,7 @@ import { readdirSync } from "node:fs";
 import type { Linter } from "eslint";
 import { defineConfig } from "eslint/config";
 import { REACT_PROPERTIES } from "./react.config.ts";
-import { SWALLOWED, TESTS } from "./shared.config.ts";
+import { CLASS_AT_END, SWALLOWED, TESTS } from "./shared.config.ts";
 
 const SRC = "./app/src";
 // Each feature's folder, read as the lint starts: a new feature gets its zone at once.
@@ -103,7 +103,7 @@ export default defineConfig(
     ignores: TESTS,
     rules: {
       "no-restricted-imports": ["error", { patterns: [{ regex: "^[^.]", message: SW }] }],
-      "no-restricted-syntax": ["error", ...SWALLOWED, { selector: "ImportExpression", message: SW }],
+      "no-restricted-syntax": ["error", ...SWALLOWED, CLASS_AT_END, { selector: "ImportExpression", message: SW }],
       // The worker fetches and caches; its page side asks whether the host answers: nothing else.
       ...reaching(REACHES.filter((name) => name !== "fetch" && name !== "caches")),
     },
