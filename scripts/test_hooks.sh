@@ -1455,7 +1455,7 @@ fi
 gate_fixture() { # $1: its folder's name, one a section: the sections run side by side
 g="$t/$1"
 log="$g.log"
-mkdir -p "$g/scripts" "$g/.githooks" "$g/bin" "$g/toolchain" "$g/gno/r/seal" "$g/app/src" "$g/app/tests" "$g/app/node_modules/@playwright/test" \
+mkdir -p "$g/scripts" "$g/.githooks" "$g/bin" "$g/toolchain" "$g/gno/r/seal" "$g/app/src" "$g/app/tests" "$g/app/node_modules/@playwright/test" "$g/node_modules/vitest" \
 	"$g/server/src" "$g/packages/core/src" "$g/packages/ui/src" "$g/packages/schemas/src" "$g/deploy" "$g/lint"
 cp "$here/check.sh" "$here/code_changed.sh" "$g/scripts/" && cp "$hooks/records.sh" "$g/.githooks/" && cp "$here/../.node-version" "$here/../.gitignore" "$g/"
 step="$g/bin/step"
@@ -1501,6 +1501,8 @@ done
 for sh in ergo test_hooks scan_secrets; do printf 'exec sh "%s" sh:%s "$@"\n' "$step" "$sh" >"$g/scripts/$sh.sh"; done
 # The journeys' stub; with PW_EDIT, it edits a package file, as a build that installs would.
 printf 'const { spawnSync } = require("node:child_process");\nconst { appendFileSync } = require("node:fs");\nconst name = process.argv.some((a) => a.includes("stories")) ? "stories" : "playwright";\nif (process.env.PW_EDIT) appendFileSync("app/package.json", "\\n");\nprocess.exit(spawnSync("sh", [%s, name, "port=" + process.env.E2E_PORT, ...process.argv.slice(2)], { stdio: "inherit" }).status);\n' "'$step'" >"$g/app/node_modules/@playwright/test/cli.js"
+# Core's Chromium run's stub: it logs the profile folder CORE_CHROMIUM names, and whether it exists while it runs.
+printf 'import { spawnSync } from "node:child_process";\nimport { existsSync } from "node:fs";\nconst dir = process.env.CORE_CHROMIUM ?? "";\nconst made = dir !== "" && existsSync(dir) ? "made" : "none";\nprocess.exit(spawnSync("sh", [%s, "core_chromium", "profile=" + dir + ":" + made, ...process.argv.slice(2)], { stdio: "inherit" }).status ?? 1);\n' "'$step'" >"$g/node_modules/vitest/vitest.mjs"
 python3 -I - "$g/package.json" "$step" <<'PY'
 import json, sys
 names = ["format:check", "typecheck", "lint", "test", "unused", "copies", "comments", "coverage", "mutate"]
@@ -1785,10 +1787,16 @@ gate_fixture gate_full
 # branch left main; harness_mutate only when the harness changed since main.
 base=$(git -C "$g" rev-parse HEAD)
 out=$(AUDIT_ANSWER=x BENCH_VITEST=x gate --full) || fail "check.sh --full failed on a copy whose every step passes: $out"
-for s in $fast_steps py:probe py:bench stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
+for s in $fast_steps py:probe py:bench core_chromium stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
 	[ "$s" = test ] || ran "$s" || fail "check.sh --full skipped $s"
 done
 ran test && fail "check.sh --full ran the tests twice, with and without coverage"
+# Core's tests run again in Chromium, whose engine reads some regexes and Unicode otherwise than Node's (F816), in a
+# profile folder of their own that exists while they run and is gone afterwards.
+line=$(grep '^core_chromium ' "$log") || fail "check.sh --full did not run core's tests in Chromium"
+case $line in "core_chromium profile=$TMPDIR/"*":made run --project core_chromium") ;; *) fail "check.sh --full ran core's Chromium tests without their project or a profile folder: $line" ;; esac
+profile=${line#core_chromium profile=} && profile=${profile%%:*}
+[ -n "$profile" ] && [ ! -e "$profile" ] || fail "check.sh --full left core_chromium's profile folder behind: $profile"
 # The coverage lane's tools take half the machine each, the harness lane beside them the rest: none starves the
 # timing-bound tests of the other (F777).
 half=$(($(node -p "require('os').availableParallelism()") / 2))
@@ -1810,10 +1818,10 @@ grep -qxF "$(record)" "$g/.claude/tmp/green-full" || fail "check.sh --full did n
 before "done py:probe" py:bench || fail "check.sh --full ran the benches while probe.py was planting its faults"
 # The benches run alone, before any full lane: a bench beside other work measures the machine's load.
 (SLOW_STEP=py:bench gate --full) >/dev/null || fail "check.sh --full failed with slow benches"
-for s in stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions; do
+for s in core_chromium stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions; do
 	before "done py:bench" "$s" || fail "check.sh --full ran $s beside the benches"
 done
-for s in stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
+for s in core_chromium stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
 	before "done py:probe" "$s" || fail "check.sh --full ran $s while probe.py was planting its faults"
 done
 # The stories' journeys run beside the history lane alone, before the coverage's Vitest and StrykerJS and
@@ -1838,19 +1846,22 @@ rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/green-full"
 out=$(FAIL=stories,py:audit gate --full) && fail "check.sh --full passed with two failing steps"
 for s in stories py:audit; do printf '%s\n' "$out" | grep -q "^$s failed here" || fail "check.sh --full hid $s's failure: $out"; done
 # Each lane's failure alone fails the gate and shows.
-for s in stories py:prove_fix coverage py:harness_mutate; do
+for s in core_chromium stories py:prove_fix coverage py:harness_mutate; do
 	out=$(FAIL=$s gate --full) && fail "check.sh --full passed with $s failing alone"
 	printf '%s\n' "$out" | grep -q "^$s failed here" || fail "check.sh --full hid $s's failure: $out"
 done
 # A failure in the first phase stops the gate there, saying which lanes did not run: the coverage and the harness
 # lanes never start; the first phase's other lane runs to its end (Alexis, 2026-10-26, C.5).
-for s in stories py:prove_fix; do
+for s in core_chromium stories py:prove_fix; do
 	out=$(FAIL=$s gate --full) && fail "check.sh --full passed with $s failing"
 	ran mutate && fail "check.sh --full started StrykerJS after $s's failure"
 	ran py:harness_mutate && fail "check.sh --full started harness_mutate after $s's failure"
 	printf '%s\n' "$out" | grep -q "^check.sh: the coverage and harness lanes did not run" ||
 		fail "check.sh --full did not say which lanes did not run after $s's failure: $out"
 done
+(FAIL=core_chromium gate --full) >/dev/null && fail "check.sh --full passed with core's Chromium tests failing"
+profile=$(sed -n 's/^core_chromium profile=\([^:]*\):.*/\1/p' "$log")
+[ -n "$profile" ] && [ ! -e "$profile" ] || fail "check.sh --full left core_chromium's profile folder behind when they failed: $profile"
 (FAIL=stories gate --full) >/dev/null && fail "check.sh --full passed with the stories failing"
 ran py:audit || fail "check.sh --full stopped the history lane at the stories' failure: a phase's lanes run to their end"
 [ ! -e "$g/.claude/tmp/green-full" ] || fail "check.sh --full recorded a gate that failed"
@@ -1859,7 +1870,7 @@ ran py:audit || fail "check.sh --full stopped the history lane at the stories' f
 rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/green-full"
 base=$(git -C "$g" merge-base HEAD origin/main)
 out=$(gate --merge) || fail "check.sh --merge failed on a copy whose every step passes: $out"
-for s in $fast_steps py:probe py:bench stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
+for s in $fast_steps py:probe py:bench core_chromium stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
 	[ "$s" = test ] || ran "$s" || fail "check.sh --merge skipped $s"
 done
 grep -qx "py:harness_mutate --changed $base" "$log" || fail "check.sh --merge did not judge the merge's own harness mutants: $(grep harness_mutate "$log")"

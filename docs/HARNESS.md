@@ -82,7 +82,7 @@ touches against `HEAD`, untracked files included.
 ```
 fast gate                                              full gate (--full, --merge), after it
   ts     format, knip, jscpd, CSS, comments ─▶ app       probe     probe.py ─▶ the benches, alone
-  types  tsc ─▶ ESLint                                   ─▶ stories   the stories' journeys
+  types  tsc ─▶ ESLint                                   ─▶ stories   core in Chromium ─▶ the stories' journeys
   tests  Ergo's build ─▶ Vitest                             history   the batch's size (--merge) ─▶ prove_fix
   gno    gno lint, test ─▶ mutate.py ─▶ Go                            ─▶ regressions ─▶ migrations ─▶ gitleaks ─▶ audit
   docs   check_docs, parse ─▶ test_hooks.sh              ─▶ coverage  coverage ─▶ patch coverage ─▶ StrykerJS
@@ -319,10 +319,13 @@ and the harness is frozen until a real bug crosses it.
 
 ## Known limits
 
-- **The unit tests run on one engine,** Node 24's V8; the browser's reads some regexes and
-  Unicode otherwise (F816, F817). Core's code meets Chromium's engine only through the app's
-  journeys, until core's Vitest runs in Chromium too: Alexis approved it (2026-10-26), and its
-  dependency waits for his script (`@vitest/browser-playwright`, a closed `package.json`).
+- **Core's tests alone run on both engines,** Node 24's V8 and Chromium's, whose reads of some
+  regexes and of Unicode differ (F816, F817): the full gate's `core_chromium` step runs them in a
+  page, one browser context and one file after another, as Chromium in one process (the sandbox)
+  allows. The app's and the server's unit tests run on Node alone; the app's code meets Chromium
+  through its journeys. The project exists only when `CORE_CHROMIUM` names a profile folder, so
+  the coverage, StrykerJS and `vitest list` never open a browser: StrykerJS mutates core's code
+  against Node's engine alone.
 - **The fast gate's budget, judged on the load, lets a slow change through on a busy machine:**
   it passes past its budget whenever the load passed the cores, whatever grew; an idle run
   catches it, and the overrun is printed every time.
