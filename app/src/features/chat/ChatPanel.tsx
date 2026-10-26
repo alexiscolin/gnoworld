@@ -98,7 +98,7 @@ function Loaded({ sections, current, state, chat, session, say, sayTo, dms }: Lo
         <RoomView
           key={shown.key}
           {...shown.view}
-          aside={shown.key === "room" ? people : undefined}
+          aside={shown.kind === "room" ? people : undefined}
           chat={chat}
           me={me}
           noteId={noteId}

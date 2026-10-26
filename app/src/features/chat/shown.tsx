@@ -8,10 +8,11 @@ import type { RoomViewProps } from "./RoomView.tsx";
 import type { WriterProps } from "./Writer.tsx";
 import styles from "./shown.module.css";
 
-// The conversation in view, one RoomView and one Writer whatever it is: what each is told. Its key keeps a room's
-// drawing apart from a direct message's.
+// The conversation in view, one RoomView and one Writer whatever it is: what each is told. Its key, one a
+// conversation, keeps each one's drawing, its scroll and whether its reader is at the end, apart (CR10).
 export interface Shown {
-  key: "room" | "dm";
+  kind: "room" | "dm";
+  key: string;
   view: Pick<RoomViewProps, "title" | "note" | "state" | "empty">;
   writer: Pick<WriterProps, "room" | "label" | "members" | "onSay" | "refused" | "focus" | "describedBy">;
 }
@@ -43,7 +44,8 @@ function dmShown(partner: string, dms: Dms, { sayTo, focus, noteId }: DmPage): S
     </>
   );
   return {
-    key: "dm",
+    kind: "dm",
+    key: `dm:${partner}`,
     view: { title, note, state: { lines: dms.lines, members: [] }, empty: dms.empty },
     writer: {
       room: partner,
@@ -82,7 +84,8 @@ export interface Room {
 // A room's: its label, its description; who is here goes beside it.
 function roomShown(room: string, state: Room["state"], say: Room["say"]): Shown {
   return {
-    key: "room",
+    kind: "room",
+    key: `room:${room}`,
     view: { title: roomLabel(room), note: state?.topic, state },
     writer: { room, members: state?.members ?? [], onSay: (draft) => say(room, draft) },
   };
