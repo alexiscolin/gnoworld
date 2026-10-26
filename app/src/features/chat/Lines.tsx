@@ -98,13 +98,14 @@ function LineView({ line, me, members, stop, actions, reactions, react, answers 
 // How near the end, in pixels, the reader still reads the newest line.
 const AT_END = 32;
 
-// The lines held at their newest while the reader is there; once scrolled up, left where the reader is.
-function useNewestInView(lines: readonly Line[]) {
+// The lines held at their newest while the reader is there, as a line comes or a reaction grows one (the code
+// review's CR3); once scrolled up, left where the reader is.
+function useNewestInView(lines: readonly Line[], reactions: readonly Reaction[] | undefined) {
   const listRef = useRef<HTMLOListElement>(null);
   const atEndRef = useRef(true);
   useLayoutEffect(() => {
     if (listRef.current !== null && atEndRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
-  }, [lines]);
+  }, [lines, reactions]);
   const onScroll = () => {
     const box = listRef.current;
     if (box !== null) atEndRef.current = box.scrollHeight - box.scrollTop - box.clientHeight < AT_END;
@@ -166,7 +167,7 @@ export function Lines(props: LinesProps) {
   const { room, members, me, refused, onDelete, onDismiss, reactions, onReact, cannotReact, onReply } = props;
   // The room's lines as shown: each corrected by its author's newest edit, the edits gone (4d, F664).
   const lines = shownLines(props.lines);
-  const { listRef, onScroll } = useNewestInView(lines);
+  const { listRef, onScroll } = useNewestInView(lines, reactions);
   const { stop, mounted, on, leave } = useLineFocus(lines, listRef);
   const { said, setSaid, copy } = useCopy(room);
   const shown = reactionsOn(reactions ?? [], me);

@@ -1,8 +1,8 @@
 import { lineOf, lines, word } from "./chat.ts";
 import { expect, hydrated, test } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
-import { MEMBER, opened, scriptedErgo } from "./scripted.ts";
-import { asAccount, barOf, GUEST, HISTORY, OTHER, ROOM, tagmsg } from "./talk.ts";
+import { MEMBER, opened, scriptedErgo, type HistoryLine } from "./scripted.ts";
+import { asAccount, barOf, GUEST, HISTORY, OTHER, ROOM, T, tagmsg } from "./talk.ts";
 
 // 4d's reactions (docs/decisions.md, 2026-10-26): three quick reactions on a line's bar, a line's reactions under it as
 // chips, counted once an account, an account's own pressed, sent and shown only through Ergo, whose echo says it took
@@ -81,6 +81,18 @@ test.describe("reactions", () => {
     await page.keyboard.press("Enter");
     await expect(line.getByRole("button", { name: /🎉/ })).toHaveCount(0);
     await expect(lines(page).nth(0)).toBeFocused();
+  });
+
+  // The code review (CR3): a reaction that grows the newest line, read at the end, keeps the list at its end.
+  test("keep the list at its end as a reaction grows the newest line", async ({ page }) => {
+    const history = Array.from({ length: 40 }, (_, n): HistoryLine => [`h${String(n)}`, T(n), `line ${String(n)}`]);
+    const { ergo } = await asAccount(page, () => ({ history }), 40);
+    const list = page.getByRole("list", { name: "Messages" });
+    const left = () => list.evaluate((box) => box.scrollHeight - box.scrollTop - box.clientHeight);
+    await expect.poll(left).toBeLessThan(2);
+    ergo().send(tagmsg("r1", "+draft/react=👍;+reply=h39", { at: 50, who: OTHER }));
+    await expect(lines(page).nth(39).getByRole("button", { name: "👍, 1" })).toBeVisible();
+    await expect.poll(left).toBeLessThan(2);
   });
 
   test("keep one's reaction pressed, on its chip and its quick reaction, when another account's comes after it", async ({
