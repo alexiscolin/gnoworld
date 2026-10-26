@@ -121,6 +121,9 @@ export function Menu({ trigger: words, label, items, icon, emphasis = "outline" 
             className={styles["item"]}
             onClick={() => {
               panelRef.current?.hidePopover();
+              // The trigger holds the focus as the item acts, which a browser that never focused it does not give back
+              // on hiding: a dialog the item opens returns the focus there as it closes, never to the page.
+              trigger.ref.current?.focus();
               item.onSelect();
             }}
           >

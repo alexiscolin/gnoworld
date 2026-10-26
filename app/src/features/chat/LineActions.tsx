@@ -22,22 +22,19 @@ export interface LineActionsProps {
  * that asks before a delete, which gives the focus back to More when it closes. */
 export function LineActions({ line, room, me, onCopy, onDelete }: LineActionsProps) {
   const [asking, setAsking] = useState(false);
-  // What follows the dialog's close: More takes the focus back, or the line goes.
-  const afterRef = useRef<"back" | "delete">(undefined);
-  const barRef = useRef<HTMLDivElement>(null);
+  // A delete asked, sent after the dialog's close, which gives the focus back to More (Menu hands it there first).
+  const deletingRef = useRef(false);
   // Two missing values are no match: a guest's line has no account tag, a guest no address (M1).
   const own = me !== undefined && line.account === me;
-  // After the dialog's own close, which hands the focus to the menu's hidden item: the line goes, which hands it to a
-  // neighbour, or More takes it back, the dialog closed or the delete unsent. This effect runs after the dialog's.
+  // After the dialog's own close, as this effect runs after its: the line goes, handing the focus to a neighbour, or
+  // stays, the delete unsent, the focus on More.
   useEffect(() => {
-    const after = afterRef.current;
-    if (asking || after === undefined) return;
-    afterRef.current = undefined;
-    if (after === "delete" && onDelete(line.id)) return;
-    barRef.current?.querySelector<HTMLElement>("[aria-haspopup='menu']")?.focus();
+    if (asking || !deletingRef.current) return;
+    deletingRef.current = false;
+    onDelete(line.id);
   }, [asking, onDelete, line.id]);
-  const close = (after: "back" | "delete") => {
-    afterRef.current = after;
+  const close = (deleting: boolean) => {
+    deletingRef.current = deleting;
     setAsking(false);
   };
   const items = [
@@ -65,14 +62,14 @@ export function LineActions({ line, room, me, onCopy, onDelete }: LineActionsPro
       : []),
   ];
   return (
-    <div ref={barRef} role="toolbar" aria-label="Message actions" aria-live="off" className={styles["bar"]}>
+    <div role="toolbar" aria-label="Message actions" aria-live="off" className={styles["bar"]}>
       <Menu trigger="More" icon="more" emphasis="plain" label="Message actions" items={items} />
       {own ? (
         <Dialog
           title="Delete this message?"
           open={asking}
           onClose={() => {
-            close("back");
+            close(false);
           }}
         >
           <Stack space="s">
@@ -81,7 +78,7 @@ export function LineActions({ line, room, me, onCopy, onDelete }: LineActionsPro
               <Button
                 emphasis="outline"
                 onClick={() => {
-                  close("back");
+                  close(false);
                 }}
               >
                 Keep it
@@ -89,7 +86,7 @@ export function LineActions({ line, room, me, onCopy, onDelete }: LineActionsPro
               <Button
                 tone="danger"
                 onClick={() => {
-                  close("delete");
+                  close(true);
                 }}
               >
                 Delete
