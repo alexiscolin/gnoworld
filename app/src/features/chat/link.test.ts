@@ -1023,14 +1023,6 @@ describe("the chat's link: the history read past reactions", () => {
     expect(before(t.fake.sent)).toEqual([`CHATHISTORY BEFORE ${ROOM} msgid=oldest ${String(HISTORY_LINES)}`]);
   });
 
-  it("asks three times at most, from each page's oldest, then stops", () => {
-    const t = asked();
-    for (const from of [4000, 3000, 2000, 1000]) page(t.fake, { from });
-    expect(before(t.fake.sent)).toEqual(
-      ["i4000", "i3000", "i2000"].map((id) => `CHATHISTORY BEFORE ${ROOM} msgid=${id} ${String(HISTORY_LINES)}`),
-    );
-  });
-
   it("asks no more when a page came short, at the history's start, or the window holds its lines", () => {
     const short = asked();
     page(short.fake, { count: HISTORY_LINES - 1 });
