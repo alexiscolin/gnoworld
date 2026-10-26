@@ -72,6 +72,27 @@ describe("embedOf: the player a link opens", () => {
     ["a password on the right host", "https://:pw@www.youtube.com/watch?v=dQw4w9WgXcQ"],
     ["a port on Giphy", "https://giphy.com:444/embed/4548k01F5Ej28"],
     ["no URL", "not a url"],
+    // F873: each accepted host's lookalikes: a longer name, a subdomain, the name before another host.
+    ["a host ending in Vimeo's name", "https://notvimeo.com/76979871"],
+    ["a subdomain of Vimeo", "https://evil.vimeo.com/76979871"],
+    ["Vimeo's name before another host", "https://vimeo.com.evil.example/76979871"],
+    ["Vimeo's player's name before another host", "https://player.vimeo.com.evil.example/video/76979871"],
+    ["a host ending in Giphy's name", "https://notgiphy.com/embed/4548k01F5Ej28"],
+    ["Giphy's name before another host", "https://giphy.com.evil.example/embed/4548k01F5Ej28"],
+    ["Giphy's media's name before another host", "https://media.giphy.com.evil.example/media/4548k01F5Ej28/giphy.gif"],
+    ["a subdomain of Giphy", "https://evil.giphy.com/embed/4548k01F5Ej28"],
+    ["a subdomain of www.youtube.com", "https://evil.www.youtube.com/watch?v=dQw4w9WgXcQ"],
+    ["a subdomain of youtu.be", "https://evil.youtu.be/dQw4w9WgXcQ"],
+    ["a subdomain of YouTube's privacy-enhanced host", "https://evil.www.youtube-nocookie.com/embed/dQw4w9WgXcQ"],
+    ["a subdomain of www.vimeo.com", "https://evil.www.vimeo.com/76979871"],
+    ["a subdomain of Vimeo's player", "https://evil.player.vimeo.com/video/76979871"],
+    ["a subdomain of Giphy's media", "https://evil.media.giphy.com/media/4548k01F5Ej28/giphy.gif"],
+    // F878: a path one segment past the player's.
+    ["a short with a path after its id", "https://www.youtube.com/shorts/dQw4w9WgXcQ/x"],
+    ["an embed with a path after its id", "https://www.youtube.com/embed/dQw4w9WgXcQ/x"],
+    ["youtu.be with a path after its id", "https://youtu.be/dQw4w9WgXcQ/x"],
+    ["a Giphy embed with a path after its id", "https://giphy.com/embed/4548k01F5Ej28/x"],
+    ["Giphy's media with a path after its file", "https://media.giphy.com/media/4548k01F5Ej28/giphy.gif/x"],
   ])("opens none for %s", (_, href) => {
     expect(embedOf(href)).toBeUndefined();
   });
