@@ -75,6 +75,14 @@ async function barInside(page: Page, at: number) {
   if (outer === null || bar === null) throw new Error("no box");
   return bar.y >= outer.y && bar.y + bar.height <= outer.y + outer.height;
 }
+// The list scrolled so its `at`th line's top is the list's top edge.
+async function toTop(page: Page, at: number) {
+  await page.getByRole("list", { name: "Messages" }).evaluate((box, line) => {
+    const item = box.children[line];
+    if (item instanceof HTMLElement)
+      box.scrollTop += item.getBoundingClientRect().top - box.getBoundingClientRect().top;
+  }, at);
+}
 // The flash's words, in its pill: the pill sits in the top layer, its region holding no box of its own.
 const flash = (page: Page, text: string) => page.getByRole("status").getByText(text, { exact: true });
 // #games open, its second line's text copied and said so.
@@ -368,23 +376,15 @@ test.describe("a line's actions", () => {
     page,
   }) => {
     await room(page, { history: SIXTY });
-    const list = page.getByRole("list", { name: "Messages" });
-    const top = async (at: number) => {
-      await list.evaluate((box, line) => {
-        const item = box.children[line];
-        if (item instanceof HTMLElement)
-          box.scrollTop += item.getBoundingClientRect().top - box.getBoundingClientRect().top;
-      }, at);
-    };
-    await top(30);
+    await toTop(page, 30);
     await lines(page).nth(31).focus();
-    await top(30);
+    await toTop(page, 30);
     await page.keyboard.press("ArrowUp");
     await expect(lines(page).nth(30)).toBeFocused();
     expect(await barInside(page, 30)).toBe(true);
     await roomsNav(page).getByRole("link").last().focus();
     await expect(focusedLines(page)).toHaveCount(0);
-    await top(30);
+    await toTop(page, 30);
     await page.keyboard.press("Tab");
     await expect(lines(page).nth(30)).toBeFocused();
     expect(await barInside(page, 30)).toBe(true);
