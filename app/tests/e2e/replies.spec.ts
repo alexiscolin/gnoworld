@@ -65,6 +65,18 @@ test.describe("replies", () => {
     await expect(field(page)).toBeFocused();
   });
 
+  // The code review (CR2): an edit of the line being answered changes the words the composer quotes, never the focus.
+  test("leave the focus where the reader put it when the line being answered is edited", async ({ page }) => {
+    const { ergo } = await asAccount(page);
+    await replyTo(page, 1);
+    await expect(field(page)).toBeFocused();
+    const rooms = roomsNav(page).getByRole("link").first();
+    await rooms.focus();
+    ergo().send(tagged("e1", "the second line, fixed", { at: 30, tags: "+gnoworld/edit=m2" }));
+    await expect(form(page)).toContainText("the second line, fixed");
+    await expect(rooms).toBeFocused();
+  });
+
   // The green pass (G7): the composer quotes a line as the room shows it, its author's edit folded in.
   test("quote an edited line by its edited words", async ({ page }) => {
     await asAccount(page, () => ({

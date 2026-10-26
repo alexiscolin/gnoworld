@@ -151,9 +151,9 @@ export function Composer(props: ComposerProps) {
   const completion = completions(draft, { commands: COMMANDS, rooms, people });
   const known = new Set(members);
   const box = () => formRef.current?.querySelector("input") ?? undefined;
-  // A line chosen to answer, each time Reply is asked, the same line's again included: the field takes the focus.
-  const answering =
-    replying === undefined ? undefined : `${String(replying.asked ?? 0)}\n${replying.who}\n${replying.text}`;
+  // A line chosen to answer, each time Reply is asked, the same line's again included: the field takes the focus; an
+  // edit of that line's words changes what the bar quotes, never where the focus is (the code review's CR2).
+  const answering = replying === undefined ? undefined : String(replying.asked ?? 0);
   useLayoutEffect(() => {
     if (answering !== undefined) box()?.focus();
   }, [answering]);
