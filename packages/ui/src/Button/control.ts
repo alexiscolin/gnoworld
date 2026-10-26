@@ -19,3 +19,13 @@ export function pill(...own: (string | undefined)[]) {
 export function buttonLook(emphasis: "solid" | "outline" | "quiet", tone: "neutral" | "danger", size: ControlSize) {
   return { className: pill(styles["button"]), "data-emphasis": emphasis, "data-tone": tone, "data-size": size };
 }
+
+/** An icon-only control's look, square, as the attributes its module reads: what IconButton and an icon trigger wear. */
+export function iconLook(emphasis: "outline" | "plain", size: ControlSize) {
+  return {
+    className: pill(styles["button"], styles["square"]),
+    "data-emphasis": emphasis,
+    "data-tone": "neutral",
+    "data-size": size,
+  };
+}

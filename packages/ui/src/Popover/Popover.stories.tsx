@@ -44,3 +44,14 @@ export const MessageMenuOpen: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "More" }));
   },
 };
+// 4c's message bar: the More menu's trigger, an icon, outline and plain.
+export const MessageMenuIcon: Story = {
+  render: () => <Menu trigger="More" icon="more" label="Message actions" items={actions} />,
+};
+export const MessageMenuIconPlainOpen: Story = {
+  tags: ["viewport"],
+  render: () => <Menu trigger="More" icon="more" emphasis="plain" label="Message actions" items={actions} />,
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole("button", { name: "More" }));
+  },
+};

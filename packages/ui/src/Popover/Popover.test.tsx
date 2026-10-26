@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { IconButton } from "../Button/IconButton.tsx";
 import { eachStory, staysText } from "../testing.tsx";
 import { Menu, Popover } from "./Popover.tsx";
 import * as stories from "./Popover.stories.tsx";
@@ -235,5 +236,48 @@ describe("Menu", () => {
 
   it("shows its trigger, label and items made of markup, or very long, as text", () => {
     staysText((text) => <Menu trigger={text} label={text} items={[{ label: text, onSelect: vi.fn() }]} />);
+  });
+
+  // 4c's message menu (docs/decisions.md, 2026-10-26): a trigger of an icon alone, its words its name and tooltip.
+  it("draws an icon for its trigger when given one, named by its words, which its tooltip shows", async () => {
+    render(<Menu trigger="More" icon="more" label="Message actions" items={items} />);
+    const trigger = screen.getByRole("button", { name: "More" });
+    expect(trigger.querySelector("svg")?.dataset["icon"]).toBe("more");
+    expect(trigger.textContent).toBe("");
+    expect(trigger.getAttribute("aria-haspopup")).toBe("menu");
+    const tip = screen.getByText("More");
+    expect(tip.closest("[aria-hidden='true']")).not.toBeNull();
+    expect(trigger.contains(tip)).toBe(false);
+    await userEvent.click(trigger);
+    expect(document.activeElement).toBe(screen.getAllByRole("menuitem")[0]);
+  });
+
+  it("wears an icon trigger as an IconButton does: square, outline unless asked plain", () => {
+    render(
+      <>
+        <Menu trigger="More" icon="more" label="Message actions" items={items} />
+        <Menu trigger="Plain" icon="more" emphasis="plain" label="Message actions" items={items} />
+        <IconButton icon="more" label="Alike" />
+        <IconButton icon="more" label="Plain alike" emphasis="plain" />
+      </>,
+    );
+    const look = (name: string) => {
+      const { className, dataset } = screen.getByRole("button", { name });
+      return [className, dataset["emphasis"], dataset["tone"], dataset["size"]];
+    };
+    expect(look("More")).toEqual(look("Alike"));
+    expect(look("Plain")).toEqual(look("Plain alike"));
+    expect(look("Plain")[1]).toBe("plain");
+  });
+
+  // The red pass (M13): the words name the trigger, as text, and the trigger draws none of them.
+  it("names an icon trigger by its words, made of markup or very long, as text, drawing none of them", () => {
+    for (const text of ["<b>More</b>", `More ${"x".repeat(400)}`]) {
+      const { unmount } = render(<Menu trigger={text} icon="more" label="Message actions" items={items} />);
+      const trigger = screen.getByRole("button", { name: text });
+      expect(trigger.textContent).toBe("");
+      expect(trigger.querySelector("b")).toBeNull();
+      unmount();
+    }
   });
 });
