@@ -26,6 +26,8 @@ export interface Dms {
   empty: string;
   /** The lines to it Ergo refused this session, its partner not connected: how many, and the last one's draft. */
   refused: { count: number; draft: string } | undefined;
+  /** Why the ?dm= asked shows no conversation, said in its place (U9). */
+  problem: string | undefined;
 }
 
 /** The account the address's ?dm= names: another account's, never the reader's own nor an address that is none. */
@@ -38,6 +40,15 @@ export function partnerOf(account: string | undefined, asked: string | null): st
  * first though none was yet. */
 export const listOf = (heard: readonly string[], partner: string | undefined): string[] =>
   partner === undefined || heard.includes(partner) ? heard.toReversed() : [partner, ...heard.toReversed()];
+
+/** Why the address's ?dm= shows no conversation: a guest's, one's own address, an address that is none (U9); nothing
+ * while the session is unknown. */
+export function problemOf(session: AppState["login"]["session"], asked: string | null): string | undefined {
+  if (asked === null || session.kind === "unknown") return undefined;
+  if (session.kind === "out") return "Log in to read direct messages.";
+  if (asked === session.address) return "That is your own address.";
+  return isAccount(asked) ? undefined : "That is not an account's address.";
+}
 
 /** The conversation with `partner`: its lines, none while the account does not hear from it, and what it says with
  * none. */
@@ -73,5 +84,6 @@ export function useDms(world: string, session: AppState["login"]["session"], ask
           },
     ...conversationOf(all, choices, partner),
     refused: partner === undefined ? undefined : refusals[partner],
+    problem: problemOf(session, asked),
   };
 }

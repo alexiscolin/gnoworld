@@ -177,6 +177,19 @@ test.describe("direct messages", () => {
     await expect(page.getByRole("heading", { name: short(partner) })).toBeVisible();
   });
 
+  // 4e's UX review (U9): ?dm= a page cannot show said nothing, the main room in its place.
+  test("say why a ?dm= shows no conversation: a guest's, or an address that is none", async ({ page }) => {
+    const partner = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+    await page.goto(`/w/bubble?dm=${partner}`);
+    await hydrated(page);
+    await expect(page.getByRole("status").filter({ hasText: "Log in to read direct messages." })).toBeVisible();
+    await inGames(page);
+    await page.goto("/w/bubble?dm=g1nope");
+    await hydrated(page);
+    await expect(page.getByRole("status").filter({ hasText: "That is not an account's address." })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "#bubble" })).toHaveCount(0);
+  });
+
   test("never reach the page's account from a guest: Ergo refuses it", async ({ page }) => {
     const me = await inGames(page);
     const guest = `guest-${crypto.randomUUID().slice(0, 6)}`;

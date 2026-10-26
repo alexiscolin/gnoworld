@@ -26,7 +26,7 @@ export interface DmPage {
 
 // A direct message's (4e): said to be one, its partner named, the address whole in its title (U7); not encrypted, by a
 // lock and a word in amber, caution's colour (U6); no one beside it; a line Ergo refused said so.
-export function dmShown(partner: string, dms: Dms, { sayTo, focus, noteId }: DmPage): Shown {
+function dmShown(partner: string, dms: Dms, { sayTo, focus, noteId }: DmPage): Shown {
   const short = shortAddress(partner);
   const { refused } = dms;
   const title = (
@@ -54,12 +54,21 @@ export function dmShown(partner: string, dms: Dms, { sayTo, focus, noteId }: DmP
   };
 }
 
+/** What is in view: the direct message ?dm= names; else none when ?dm= names none it can show (U9); else the room. */
+export function shownOf(dms: Dms, room: Room, page: DmPage): Shown | undefined {
+  if (dms.partner !== undefined) return dmShown(dms.partner, dms, page);
+  return dms.problem !== undefined || room.id === undefined ? undefined : roomShown(room.id, room.state, room.say);
+}
+
+/** The room in view, if any: its id, its state in the store, and how the page writes in it. */
+export interface Room {
+  id: string | undefined;
+  state: AppState["chat"]["rooms"][string] | undefined;
+  say: (room: string, draft: string) => boolean;
+}
+
 // A room's: its label, its description; who is here goes beside it.
-export function roomShown(
-  room: string,
-  state: AppState["chat"]["rooms"][string] | undefined,
-  say: (room: string, draft: string) => boolean,
-): Shown {
+function roomShown(room: string, state: Room["state"], say: Room["say"]): Shown {
   return {
     key: "room",
     view: { title: roomLabel(room), note: state?.topic, state },

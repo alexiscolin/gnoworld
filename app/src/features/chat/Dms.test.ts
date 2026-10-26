@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Line } from "@gnoworld/core";
-import { conversationOf, listOf, partnerOf } from "./Dms.tsx";
+import { Address } from "@gnoworld/schemas";
+import { conversationOf, listOf, partnerOf, problemOf } from "./Dms.tsx";
 
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
@@ -64,5 +65,30 @@ describe("the conversation a page shows", () => {
       lines: [],
       empty: "No messages since this page opened.",
     });
+  });
+});
+
+// 4e's UX review (U9): ?dm= as a guest, at one's own address or at one that is none showed the main room, silently.
+describe("what a page says of a ?dm= it cannot show", () => {
+  const ME = { kind: "in", address: Address.parse(ALICE) } as const;
+  it.each([
+    { name: "nothing when none is asked", session: ME, asked: null, said: undefined },
+    {
+      name: "nothing while the session is unknown",
+      session: { kind: "unknown" } as const,
+      asked: BOB,
+      said: undefined,
+    },
+    { name: "nothing at another account's address", session: ME, asked: BOB, said: undefined },
+    {
+      name: "that a guest logs in first",
+      session: { kind: "out" } as const,
+      asked: BOB,
+      said: "Log in to read direct messages.",
+    },
+    { name: "that it is one's own", session: ME, asked: ALICE, said: "That is your own address." },
+    { name: "that it is none", session: ME, asked: "g1nope", said: "That is not an account's address." },
+  ])("says $name", ({ session, asked, said }) => {
+    expect(problemOf(session, asked)).toBe(said);
   });
 });

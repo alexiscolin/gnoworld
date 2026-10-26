@@ -21,7 +21,7 @@ import { LOADING } from "./Loading.tsx";
 import { dmParams, neighbour, roomIds, roomParams, roomsQuery, shownRoom } from "./names.ts";
 import { RoomsView } from "./RoomsView.tsx";
 import { People, RoomView, type RoomViewProps } from "./RoomView.tsx";
-import { dmShown, roomShown } from "./shown.tsx";
+import { shownOf } from "./shown.tsx";
 import { Writer } from "./Writer.tsx";
 
 // The rooms as last asked, and what came: undefined when the list could not load.
@@ -74,7 +74,7 @@ function Loaded({ sections, current, state, chat, session, say, sayTo, dms }: Lo
   const ids = roomIds(sections);
   // One conversation in view: the direct message ?dm= names, else the room. Alt+Up and Alt+Down move between rooms,
   // none while a direct message is in view (U15).
-  const room = dms.partner === undefined ? current : undefined;
+  const room = dms.partner === undefined && dms.problem === undefined ? current : undefined;
   useRoomKeys(ids, room);
   const [, setParams] = useSearchParams();
   const me = session.kind === "in" ? session.address : undefined;
@@ -89,15 +89,11 @@ function Loaded({ sections, current, state, chat, session, say, sayTo, dms }: Lo
   const people = (
     <People members={state?.members ?? []} connected={chat === "connected"} me={me} onMessage={onMessage} />
   );
-  const shown =
-    dms.partner === undefined
-      ? room === undefined
-        ? undefined
-        : roomShown(room, state, say)
-      : dmShown(dms.partner, dms, { sayTo, focus: opened === dms.partner, noteId });
+  const shown = shownOf(dms, { id: room, state, say }, { sayTo, focus: opened === dms.partner, noteId });
   return (
     <Sidebar space="l">
       <RoomsView sections={sections} current={room} dms={dms.nav} />
+      {dms.problem === undefined ? null : <p role="status">{dms.problem}</p>}
       {shown === undefined ? null : (
         <RoomView
           key={shown.key}
