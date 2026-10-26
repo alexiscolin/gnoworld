@@ -1073,4 +1073,45 @@ describe("the chat's link: what it says", () => {
       expect(marked(again.sent.slice(before))).toEqual([]);
     });
   });
+
+  // The green pass (G5-G7): the edges of what the page tells Ergo as it types and reads.
+  describe("the typing and the reading place, at their edges", () => {
+    const ROOM = "#bubble/games";
+    const TT = (minute: number) => `2026-10-25T10:${String(minute).padStart(2, "0")}:00.000Z`;
+    const spoken = (fake: Fake, minute: number) => {
+      fake.line(`@msgid=m${String(minute)};time=${TT(minute)} :alice!u@h PRIVMSG ${ROOM} :at ${String(minute)}`);
+    };
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+    it("keeps the 3 s between two actives when a line between them could not go", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const t = memberIn([ROOM]);
+      t.link.typing(ROOM, "active");
+      expect(t.link.say(ROOM, "")).toBe(false);
+      t.link.typing(ROOM, "active");
+      expect(t.fake.sent.filter((line) => line.includes(" TAGMSG "))).toEqual([`@+typing=active TAGMSG ${ROOM}`]);
+    });
+    it("reads a room the store does not hold without a throw, and tells Ergo nothing", () => {
+      const t = memberIn([ROOM]);
+      expect(() => {
+        t.link.read("#garden", "m1");
+      }).not.toThrow();
+      expect(t.fake.sent.filter((line) => line.startsWith("MARKREAD "))).toEqual([]);
+    });
+    it("keeps the newer place asked when an older line is read after it, through a reconnect", () => {
+      const t = memberIn([ROOM]);
+      spoken(t.fake, 0);
+      spoken(t.fake, 1);
+      t.link.read(ROOM, "m1");
+      t.link.read(ROOM, "m0");
+      t.fake.state("waiting");
+      const again = t.connected(ADDRESS);
+      const before = again.sent.length;
+      again.line(`:${ADDRESS}!u@h JOIN ${ROOM}`);
+      expect(again.sent.slice(before).filter((line) => line.startsWith("MARKREAD "))).toEqual([
+        `MARKREAD ${ROOM} timestamp=${TT(1)}`,
+      ]);
+    });
+  });
 });

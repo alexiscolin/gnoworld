@@ -221,6 +221,7 @@ describe("typingOf: what an edit of the draft tells the room", () => {
     ["a slash command after a tab", "\t/nick bob", undefined],
     ["a slash command after a control character", "\u0001/me hi", undefined],
     ["a slash alone", "/", undefined],
+    ["a slash, a control character, then a slash", "/\u0001/shrug", undefined],
     ["control characters alone", "\u0001\u0002", "done"],
   ] as const)("tells %s as %s", (_, draft, told) => {
     expect(typingOf(draft)).toBe(told);
