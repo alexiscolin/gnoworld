@@ -115,6 +115,8 @@ export interface ComposerProps {
   refused?: { count: number; draft: string; why: string } | undefined;
   /** Takes the focus as it starts: a direct message just opened from who is here, whose button went (4e's U12). */
   focus?: boolean | undefined;
+  /** The id of what describes whom it writes to: a direct message's "not encrypted" (4e's U6). */
+  describedBy?: string | undefined;
 }
 
 // Why Ergo refused the last line, said until the draft changes or a line goes: one more refusal while in view puts
@@ -144,7 +146,7 @@ function useFocusAtStart(formRef: RefObject<HTMLFormElement | null>, focus: bool
 }
 
 export function Composer(props: ComposerProps) {
-  const { room, nick, rooms, members, onSay, draft: kept = "", onDraft, label: to, refused, focus } = props;
+  const { room, nick, rooms, members, onSay, draft: kept = "", onDraft, label: to, refused } = props;
   const [draft, setDraft] = useState(kept);
   const refusal = useRefusal(refused, setDraft);
   // Each change of the draft, the device told at once: a render alone (a line arriving) writes nothing.
@@ -163,9 +165,8 @@ export function Composer(props: ComposerProps) {
   const mentioning = /(^|\s)@\S*$/u.test(draft);
   const people = mentioning ? peopleOf(members, nick) : [];
   const completion = completions(draft, { commands: COMMANDS, rooms, people });
-  const known = new Set(members);
   const box = () => formRef.current?.querySelector("input") ?? undefined;
-  useFocusAtStart(formRef, focus);
+  useFocusAtStart(formRef, props.focus);
   useLayoutEffect(() => {
     const selection = selectionRef.current;
     if (selection === undefined) return;
@@ -205,6 +206,7 @@ export function Composer(props: ComposerProps) {
     <form
       ref={formRef}
       aria-label={`Write ${to === undefined ? "in" : "to"} ${label}`}
+      aria-describedby={props.describedBy}
       onSubmit={send}
       onKeyDown={complete}
     >
@@ -225,7 +227,7 @@ export function Composer(props: ComposerProps) {
             Send
           </Button>
         </Sidebar>
-        <Preview composed={composed} me={nick} members={known} />
+        <Preview composed={composed} me={nick} members={new Set(members)} />
       </Stack>
     </form>
   );

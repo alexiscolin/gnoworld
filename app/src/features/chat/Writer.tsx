@@ -23,9 +23,12 @@ export interface WriterProps {
   refused?: ComposerProps["refused"];
   /** Takes the focus as it starts (4e's U12). */
   focus?: boolean | undefined;
+  /** The id of what describes the conversation: a direct message's "not encrypted" (4e's U6). */
+  describedBy?: string | undefined;
 }
 
-export function Writer({ session, room, label, rooms, members, onSay, refused, focus }: WriterProps) {
+export function Writer(props: WriterProps) {
+  const { session, room, label, rooms, members, onSay, refused, focus, describedBy } = props;
   if (session.kind !== "in") return <p>Log in to write in this room.</p>;
   // The account's drafts on this device: the room's, where the composer starts, and each change kept (4d).
   const kept = pageDrafts(session.address);
@@ -45,6 +48,7 @@ export function Writer({ session, room, label, rooms, members, onSay, refused, f
         onSay={onSay}
         refused={refused}
         focus={focus}
+        describedBy={describedBy}
       />
     </Suspense>
   );

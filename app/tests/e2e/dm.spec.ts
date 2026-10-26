@@ -48,8 +48,15 @@ test.describe("direct messages", () => {
     await dmFrom(bob, me, text);
     const link = dmsNav(page).getByRole("link", { name: short(bob.address) });
     await expect(link).toBeVisible();
+    // U6: the row says it is not encrypted; U7: the page says it is a direct message, the address whole in its title.
+    await expect(link).toHaveAccessibleName(`${short(bob.address)} Not encrypted`);
     await link.click();
-    await expect(page.getByRole("heading", { name: short(bob.address) })).toBeVisible();
+    const heading = page.getByRole("heading", { name: `Direct message with ${short(bob.address)}` });
+    await expect(heading).toBeVisible();
+    await expect(heading.getByTitle(bob.address)).toHaveText(short(bob.address));
+    await expect(page.getByRole("form", { name: `Write to ${short(bob.address)}` })).toHaveAccessibleDescription(
+      `${NOT_ENCRYPTED} Kept only while this page is open.`,
+    );
     await expect(page.getByText(NOT_ENCRYPTED)).toBeVisible();
     // Decision C (U2): Ergo keeps no direct message; the page says so beside "Not encrypted".
     await expect(page.getByText("Kept only while this page is open.")).toBeVisible();

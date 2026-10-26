@@ -5,7 +5,7 @@
 // (4c); a guest reads, a room letting accounts alone speak.
 import type { RoomList } from "@gnoworld/schemas";
 import { Button, Sidebar, Stack } from "@gnoworld/ui";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { pageLoginApi } from "../../lib/api/login.ts";
 import { pageDmPrefs } from "../../lib/dms/page.ts";
@@ -21,7 +21,7 @@ import { LOADING } from "./Loading.tsx";
 import { dmParams, neighbour, roomIds, roomParams, roomsQuery, shownRoom } from "./names.ts";
 import { RoomsView } from "./RoomsView.tsx";
 import { People, RoomView, type RoomViewProps } from "./RoomView.tsx";
-import { dmShown, roomShown } from "./shown.ts";
+import { dmShown, roomShown } from "./shown.tsx";
 import { Writer } from "./Writer.tsx";
 
 // The rooms as last asked, and what came: undefined when the list could not load.
@@ -80,6 +80,7 @@ function Loaded({ sections, current, state, chat, session, say, sayTo, dms }: Lo
   const me = session.kind === "in" ? session.address : undefined;
   // The conversation opened from who is here, whose composer takes the focus as its button goes (U12).
   const [opened, setOpened] = useState<string>();
+  const noteId = useId();
   // Apart from the room's element, which each line draws again: who is here keeps its drawing (the compiler).
   const onMessage = (other: string) => {
     setOpened(other);
@@ -93,7 +94,7 @@ function Loaded({ sections, current, state, chat, session, say, sayTo, dms }: Lo
       ? room === undefined
         ? undefined
         : roomShown(room, state, say)
-      : dmShown(dms.partner, dms, sayTo);
+      : dmShown(dms.partner, dms, { sayTo, focus: opened === dms.partner, noteId });
   return (
     <Sidebar space="l">
       <RoomsView sections={sections} current={room} dms={dms.nav} />
@@ -104,14 +105,8 @@ function Loaded({ sections, current, state, chat, session, say, sayTo, dms }: Lo
           aside={shown.key === "room" ? people : undefined}
           chat={chat}
           me={me}
-          composer={
-            <Writer
-              session={session}
-              rooms={ids}
-              {...shown.writer}
-              focus={opened !== undefined && opened === dms.partner}
-            />
-          }
+          noteId={noteId}
+          composer={<Writer session={session} rooms={ids} {...shown.writer} />}
         />
       )}
     </Sidebar>

@@ -35,9 +35,11 @@ const CLOCK = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-d
 
 export interface RoomViewProps {
   /** Its name: a room's label; a direct message's partner (4e). */
-  title: string;
+  title: ReactNode;
   /** What it says of itself under its name: a room's description, its IRC topic; a conversation's "not encrypted". */
-  note?: string | undefined;
+  note?: ReactNode;
+  /** The note's id, which the composer points at (4e's U6). */
+  noteId?: string | undefined;
   state: { lines: readonly Line[]; members: readonly string[] } | undefined;
   chat: ErgoState | "off";
   /** What goes under the lines: the composer for an account, a word for a guest. */
@@ -88,8 +90,10 @@ function LineView({ line, me, members }: { line: Line; me: string | undefined; m
   const names = namesOf(line.text);
   const mentioned = names.split(" ").some((address) => address === me);
   const known = knownOf(names, members);
+  // Mine: my name in mint and the word "you" (DESIGN-SYSTEM.md, Avatar; U5).
+  const mine = me !== undefined && line.account === me;
   return (
-    <li className={KINDS[line.kind]} data-about-me={mentioned ? "" : undefined}>
+    <li className={KINDS[line.kind]} data-about-me={mentioned ? "" : undefined} data-mine={mine ? "" : undefined}>
       {/* The line's marks first, before the time: where no sender's words stand (F808). */}
       {mentioned ? <span className={styles["mentionsYou"]}>Mentions you </span> : null}
       {line.kind === "notice" ? <span className={styles["mark"]}>Notice </span> : null}
@@ -97,7 +101,10 @@ function LineView({ line, me, members }: { line: Line; me: string | undefined; m
         {CLOCK.format(new Date(line.time))}
       </time>{" "}
       {line.kind === "action" ? "* " : null}
-      <Person name={line.account ?? line.from} guest={line.account === undefined} />{" "}
+      <span className={styles["author"]}>
+        <Person name={line.account ?? line.from} guest={line.account === undefined} />
+        {mine ? " you" : null}
+      </span>{" "}
       <LineText blocks={blocks} me={me} known={known} />
     </li>
   );
@@ -169,17 +176,21 @@ function useNewestInView(lines: readonly Line[]) {
 }
 
 // A room's name and its description, its IRC topic; a conversation's partner and what it says of itself (4e).
-function Header({ title, topic }: { title: string; topic: string | undefined }) {
+function Header({ title, topic, id }: { title: ReactNode; topic: ReactNode; id: string | undefined }) {
   return (
     <header>
       <h2>{title}</h2>
-      {topic === undefined ? null : <p className={styles["topic"]}>{topic}</p>}
+      {topic === undefined ? null : (
+        <p id={id} className={styles["topic"]}>
+          {topic}
+        </p>
+      )}
     </header>
   );
 }
 
 export function RoomView(props: RoomViewProps) {
-  const { title, note, state, chat, composer, me, empty = "No messages yet.", aside } = props;
+  const { title, note, noteId, state, chat, composer, me, empty = "No messages yet.", aside } = props;
   const { lines, members } = state ?? NO_ROOM;
   const { listRef, onScroll } = useNewestInView(lines);
   const connected = chat === "connected";
@@ -188,7 +199,7 @@ export function RoomView(props: RoomViewProps) {
   const known = new Set([...members, ...lines.flatMap(({ account }) => (account === undefined ? [] : [account]))]);
   return (
     <Stack as="section" space="s">
-      <Header title={title} topic={note} />
+      <Header title={title} topic={note} id={noteId} />
       <p role="status" className={styles["status"]}>
         {connected ? null : NOTICES[chat]}
       </p>

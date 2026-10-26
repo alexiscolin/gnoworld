@@ -2,7 +2,7 @@
 // room left out; each room a link to its address on the site, the one shown marked. An account's direct messages
 // follow (4e), each conversation a link to its page, with the choice to hear from those it wrote to alone.
 import type { RoomList } from "@gnoworld/schemas";
-import { Chip, Row, Stack } from "@gnoworld/ui";
+import { Chip, Icon, Row, Stack } from "@gnoworld/ui";
 import { dmHref, roomHref, roomLabel, shortAddress } from "./names.ts";
 import shared from "./lists.module.css";
 import styles from "./RoomsView.module.css";
@@ -39,7 +39,14 @@ function Dms({ world, partners, current, onlyKnown, onOnlyKnown }: DmsProps) {
         <ul className={shared["plain"]}>
           {partners.map((partner) => (
             <li key={partner}>
-              <Row title={shortAddress(partner)} href={dmHref(world, partner)} current={partner === current} />
+              {/* Its trust in a lock and a word, as a conversation's header says it (DESIGN-SYSTEM.md; U6). */}
+              <Row
+                title={shortAddress(partner)}
+                subtitle="Not encrypted"
+                lead={<Icon name="lock" />}
+                href={dmHref(world, partner)}
+                current={partner === current}
+              />
             </li>
           ))}
         </ul>

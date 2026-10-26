@@ -397,6 +397,23 @@ describe("RoomView", () => {
     expect(html).toMatch(/aria-label="Messages".*<\/ol><p>Log in to write in this room.<\/p><\/div><aside/s);
   });
 
+  // 4e's UX review (U5): my own lines read as mine, my name in mint and the word "you" (DESIGN-SYSTEM.md, Avatar).
+  it("marks the reader's own lines as theirs, by the word you, and no one else's", () => {
+    const lines = [line({ id: "a", text: "mine" }), line({ id: "b", from: BOB, account: BOB, text: "theirs" })];
+    const html = part(view({ me: ALICE, state: { ...ROOM, lines } }), "Messages");
+    expect(items(html).map((words) => words.replace(/^\d\d:\d\d /, ""))).toEqual([
+      "g10gh7…3y5tv you mine",
+      "g1jg8m…vsqf5 theirs",
+    ]);
+    expect(html.match(/data-mine=""/g)).toHaveLength(1);
+    expect(items(part(view({ state: { ...ROOM, lines } }), "Messages")).join(" ")).not.toMatch(/\byou\b/);
+  });
+
+  // 4e's UX review (U6): the composer reads the note, a direct message's "not encrypted", as its description.
+  it("gives its note the id it is given, for the composer to point at", () => {
+    expect(view({ note: "Not encrypted.", noteId: "n1" })).toMatch(/<p id="n1"[^>]*>Not encrypted.<\/p>/);
+  });
+
   // 4e: a conversation says why it is empty in words of its own (decisions B, C).
   it("says the words it is given when it holds no line, once connected", () => {
     const html = view({ state: { ...ROOM, lines: [] }, empty: "Nothing kept." });

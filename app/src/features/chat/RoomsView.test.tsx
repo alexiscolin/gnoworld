@@ -103,7 +103,9 @@ describe("RoomsView: direct messages", () => {
       "Other rooms",
       "Direct messages",
     ]);
-    expect(links(html).slice(-2)).toEqual(["g10gh7…3y5tv", "g1l6m6…kkanc"]);
+    // 4e's UX review (U6): a conversation's row says it is not encrypted, by a lock and a word (DESIGN-SYSTEM.md).
+    expect(links(html).slice(-2)).toEqual(["g10gh7…3y5tv Not encrypted", "g1l6m6…kkanc Not encrypted"]);
+    expect(html.match(/data-icon="lock"/g)).toHaveLength(2);
     expect(hrefs(html).slice(-2)).toEqual([`/w/bubble?dm=${ALICE}`, `/w/bubble?dm=${CAROL}`]);
     expect(html).toMatch(new RegExp(`<a [^>]*href="/w/bubble\\?dm=${CAROL}"[^>]*aria-current="true"`));
     expect(html.match(/aria-current="true"/g)).toHaveLength(1);
