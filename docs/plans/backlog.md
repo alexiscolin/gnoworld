@@ -64,6 +64,12 @@ Alexis, 2026-10-23: slice 3's reviews found these; none bites today, each comes 
 | Banned words compiled once | The pattern kept per word list, if the k6 messages run shows the cost | Folded and compiled again for each message (F662) |
 | Archived rooms at once | The activity route asks a world's archived rooms in one query; sized from the k6 run | One query a room, up to about 500 a request (F663) |
 
+## Slice 4, its leftovers
+
+| Item | Delivers | Why |
+|---|---|---|
+| Reactions held to a rate an account | The moderation bot counts each account's reactions a room and mutes one past a rate, as its rules do for lines (slice 12's queue) | Ergo keeps 2,048 items a room, a reaction one of them: one account's reactions at fakelag's 2 a second rotate a room's lines out in about 17 minutes (the red pass's R1, 4d; docs/decisions.md 2026-10-26) |
+
 ## The design system, after slice 2
 
 Alexis, 2026-10-21: 2e's and 2f's reviews found these; each is true and none bites today, so each
