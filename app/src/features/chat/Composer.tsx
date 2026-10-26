@@ -5,7 +5,15 @@
 // bar wraps the selection in Markdown's marks; the line shows below as it reads.
 import { COMMANDS, compose, type Composed } from "@gnoworld/core";
 import { Button, Cluster, Field, IconButton, Sidebar, Stack, type FieldProps, type IconName } from "@gnoworld/ui";
-import { useLayoutEffect, useRef, useState, type KeyboardEvent, type SubmitEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type RefObject,
+  type SubmitEvent,
+} from "react";
 import { completed, completions, type Completion } from "./complete.ts";
 import { formatted, type Edit, type Format } from "./format.ts";
 import { Message } from "./Message.tsx";
@@ -105,6 +113,8 @@ export interface ComposerProps {
   /** The lines Ergo refused so far, the last one's draft, and why it did not go (4e: a direct message to an account
    * not connected). One more while the composer is in view puts its draft back in the box. */
   refused?: { count: number; draft: string; why: string } | undefined;
+  /** Takes the focus as it starts: a direct message just opened from who is here, whose button went (4e's U12). */
+  focus?: boolean | undefined;
 }
 
 // Why Ergo refused the last line, said until the draft changes or a line goes: one more refusal while in view puts
@@ -125,8 +135,16 @@ function useRefusal(refused: ComposerProps["refused"], setDraft: (draft: string)
   };
 }
 
+// The box takes the focus as the composer starts, when asked, never again: it is the reader's after.
+function useFocusAtStart(formRef: RefObject<HTMLFormElement | null>, focus: boolean | undefined) {
+  const [asked] = useState(focus === true);
+  useEffect(() => {
+    if (asked) formRef.current?.querySelector("input")?.focus();
+  }, [asked, formRef]);
+}
+
 export function Composer(props: ComposerProps) {
-  const { room, nick, rooms, members, onSay, draft: kept = "", onDraft, label: to, refused } = props;
+  const { room, nick, rooms, members, onSay, draft: kept = "", onDraft, label: to, refused, focus } = props;
   const [draft, setDraft] = useState(kept);
   const refusal = useRefusal(refused, setDraft);
   // Each change of the draft, the device told at once: a render alone (a line arriving) writes nothing.
@@ -147,6 +165,7 @@ export function Composer(props: ComposerProps) {
   const completion = completions(draft, { commands: COMMANDS, rooms, people });
   const known = new Set(members);
   const box = () => formRef.current?.querySelector("input") ?? undefined;
+  useFocusAtStart(formRef, focus);
   useLayoutEffect(() => {
     const selection = selectionRef.current;
     if (selection === undefined) return;

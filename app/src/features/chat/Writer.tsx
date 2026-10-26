@@ -21,9 +21,11 @@ export interface WriterProps {
   onSay: (draft: string) => boolean;
   /** The lines Ergo refused, and why the last did not go: a direct message's (4e). */
   refused?: ComposerProps["refused"];
+  /** Takes the focus as it starts (4e's U12). */
+  focus?: boolean | undefined;
 }
 
-export function Writer({ session, room, label, rooms, members, onSay, refused }: WriterProps) {
+export function Writer({ session, room, label, rooms, members, onSay, refused, focus }: WriterProps) {
   if (session.kind !== "in") return <p>Log in to write in this room.</p>;
   // The account's drafts on this device: the room's, where the composer starts, and each change kept (4d).
   const kept = pageDrafts(session.address);
@@ -42,6 +44,7 @@ export function Writer({ session, room, label, rooms, members, onSay, refused }:
         members={members}
         onSay={onSay}
         refused={refused}
+        focus={focus}
       />
     </Suspense>
   );

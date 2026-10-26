@@ -15,13 +15,14 @@ import { drawGuestNick } from "../../lib/ergo/ergo.ts";
 import { pageErgo } from "../../lib/ergo/page.ts";
 import type { AppState } from "../../store/index.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
-import { NOT_ENCRYPTED, useDms, type Dms } from "./Dms.tsx";
+import { useDms, type Dms } from "./Dms.tsx";
 import { chatLink } from "./link.ts";
 import { LOADING } from "./Loading.tsx";
-import { dmParams, neighbour, roomIds, roomLabel, roomParams, roomsQuery, shortAddress, shownRoom } from "./names.ts";
+import { dmParams, neighbour, roomIds, roomParams, roomsQuery, shownRoom } from "./names.ts";
 import { RoomsView } from "./RoomsView.tsx";
 import { People, RoomView, type RoomViewProps } from "./RoomView.tsx";
-import { Writer, type WriterProps } from "./Writer.tsx";
+import { dmShown, roomShown } from "./shown.ts";
+import { Writer } from "./Writer.tsx";
 
 // The rooms as last asked, and what came: undefined when the list could not load.
 interface Asked {
@@ -69,40 +70,6 @@ interface LoadedProps {
   dms: Dms;
 }
 
-// The conversation in view, one RoomView and one Writer whatever it is: what each is told. Its key keeps a room's
-// drawing apart from a direct message's.
-interface Shown {
-  key: "room" | "dm";
-  view: Pick<RoomViewProps, "title" | "note" | "state" | "empty">;
-  writer: Pick<WriterProps, "room" | "label" | "members" | "onSay" | "refused">;
-}
-
-// A direct message's (4e): its partner named, not encrypted, no one beside it; a line Ergo refused said so.
-function dmShown(partner: string, dms: Dms, sayTo: LoadedProps["sayTo"]): Shown {
-  const title = shortAddress(partner);
-  const { refused } = dms;
-  return {
-    key: "dm",
-    view: { title, note: NOT_ENCRYPTED, state: { lines: dms.lines, members: [] }, empty: dms.empty },
-    writer: {
-      room: partner,
-      label: title,
-      members: [],
-      onSay: (draft) => sayTo(partner, draft),
-      refused: refused === undefined ? undefined : { ...refused, why: `Not sent: ${title} is not online.` },
-    },
-  };
-}
-
-// A room's: its label, its description; who is here goes beside it.
-function roomShown(room: string, state: LoadedProps["state"], say: LoadedProps["say"]): Shown {
-  return {
-    key: "room",
-    view: { title: roomLabel(room), note: state?.topic, state },
-    writer: { room, members: state?.members ?? [], onSay: (draft) => say(room, draft) },
-  };
-}
-
 function Loaded({ sections, current, state, chat, session, say, sayTo, dms }: LoadedProps) {
   const ids = roomIds(sections);
   // One conversation in view: the direct message ?dm= names, else the room. Alt+Up and Alt+Down move between rooms,
@@ -111,8 +78,11 @@ function Loaded({ sections, current, state, chat, session, say, sayTo, dms }: Lo
   useRoomKeys(ids, room);
   const [, setParams] = useSearchParams();
   const me = session.kind === "in" ? session.address : undefined;
+  // The conversation opened from who is here, whose composer takes the focus as its button goes (U12).
+  const [opened, setOpened] = useState<string>();
   // Apart from the room's element, which each line draws again: who is here keeps its drawing (the compiler).
   const onMessage = (other: string) => {
+    setOpened(other);
     setParams(dmParams(other));
   };
   const people = (
@@ -134,7 +104,14 @@ function Loaded({ sections, current, state, chat, session, say, sayTo, dms }: Lo
           aside={shown.key === "room" ? people : undefined}
           chat={chat}
           me={me}
-          composer={<Writer session={session} rooms={ids} {...shown.writer} />}
+          composer={
+            <Writer
+              session={session}
+              rooms={ids}
+              {...shown.writer}
+              focus={opened !== undefined && opened === dms.partner}
+            />
+          }
         />
       )}
     </Sidebar>

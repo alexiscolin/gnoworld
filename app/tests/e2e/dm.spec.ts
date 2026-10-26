@@ -67,10 +67,12 @@ test.describe("direct messages", () => {
     await bob.page.goto("/w/bubble?room=games");
     await expect(whoIsHere(page).getByTitle(bob.address)).toBeVisible();
     await whoIsHere(page)
-      .getByRole("button", { name: `Write to ${short(bob.address)}` })
+      .getByRole("button", { name: `Message ${short(bob.address)}` })
       .click();
     await expect(page.getByText(NOT_ENCRYPTED)).toBeVisible();
     const field = page.getByRole("textbox", { name: `Message ${short(bob.address)}` });
+    // U12: the button goes with who is here; the field takes the focus, not the page.
+    await expect(field).toBeFocused();
     const text = word("reply");
     await field.fill(text);
     await field.press("Enter");

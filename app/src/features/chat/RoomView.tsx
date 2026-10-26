@@ -5,7 +5,7 @@
 // A line's author is its account tag alone, a nick being only a nick; a member's nick is an account's when it is
 // an address, which a guest's cannot be (Ergo gives a guest 32 characters, server/src/testing/ergo.test.ts:314).
 import { markdown, mentions, type Block, type Line } from "@gnoworld/core";
-import { IconButton, Sidebar, Stack } from "@gnoworld/ui";
+import { Button, Cluster, Sidebar, Stack } from "@gnoworld/ui";
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 import type { ErgoState } from "../../lib/ergo/ergo.ts";
 import { Markdown } from "./Message.tsx";
@@ -122,21 +122,23 @@ export function People({ members, connected, me, onMessage }: PeopleProps) {
           const account = isAccount(nick);
           return (
             <li key={nick}>
-              <Person name={nick} guest={!account} account={account} />
-              {onMessage !== undefined && account && me !== undefined && nick !== me ? (
-                <>
-                  {" "}
-                  <IconButton
+              {/* The name at the start, its Message at the end: one column whatever the name's width (U18). */}
+              <Cluster space="3xs" justify="between">
+                <Person name={nick} guest={!account} account={account} />
+                {onMessage !== undefined && account && me !== undefined && nick !== me ? (
+                  // A visible word, not an icon alone (decision D); the address for a screen reader's list.
+                  <Button
                     icon="chat"
                     size="s"
-                    emphasis="plain"
-                    label={`Write to ${shortAddress(nick)}`}
+                    emphasis="quiet"
                     onClick={() => {
                       onMessage(nick);
                     }}
-                  />
-                </>
-              ) : null}
+                  >
+                    Message<span className="visually-hidden"> {shortAddress(nick)}</span>
+                  </Button>
+                ) : null}
+              </Cluster>
             </li>
           );
         })}

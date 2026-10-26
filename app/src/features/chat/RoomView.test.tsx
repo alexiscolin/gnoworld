@@ -288,12 +288,19 @@ describe("RoomView", () => {
     const opened: string[] = [];
     const members = [ALICE, BOB, "guest-ab12cd", "gnoworld"];
     const html = part(view({ me: BOB, state: { ...ROOM, members }, onMessage: (a) => opened.push(a) }), "Who's here");
-    expect([...html.matchAll(/<button[^>]*aria-label="([^"]+)"/g)].map((m) => m[1])).toEqual(["Write to g10gh7…3y5tv"]);
+    // Decision D (U8): a visible "Message", the address after it for a screen reader, which lists many.
+    expect([...html.matchAll(/<button[^>]*>(.*?)<\/button>/gs)].map((m) => said(m[1] ?? ""))).toEqual([
+      "Message g10gh7…3y5tv",
+    ]);
+    expect(html).toMatch(/<button[^>]*>.*Message<span class="visually-hidden"> g10gh7…3y5tv<\/span><\/button>/s);
     expect(items(part(view({ state: { ...ROOM, members }, onMessage: () => undefined }), "Who's here"))).toEqual([
       "g10gh7…3y5tv",
       "g1jg8m…vsqf5",
       "guest-ab12cd (guest)",
     ]);
+    expect(
+      items(part(view({ me: BOB, state: { ...ROOM, members: [ALICE] }, onMessage: () => undefined }), "Who's here")),
+    ).toEqual(["g10gh7…3y5tv Message g10gh7…3y5tv"]);
     expect(part(view({ me: BOB, state: { ...ROOM, members } }), "Who's here")).not.toContain("<button");
   });
 
