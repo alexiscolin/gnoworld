@@ -49,11 +49,11 @@ export function useLineFocus(lines: readonly Line[], listRef: RefObject<HTMLOLis
   const [focused, setFocused] = useState<string>();
   const [pointed, setPointed] = useState<string>();
   const stop = stopOf(lines, chosen);
-  // A focused line's bar, taller than a line, comes into the list's view as the focus comes to it: never as a line
-  // arrives (/code-review) or under the pointer.
+  // A focused line's bar, taller than a line, comes into the list's view as the focus comes to it, the same line
+  // again after the focus left the list too (G8): never as a line arrives (/code-review) or under the pointer.
   useEffect(() => {
     listRef.current?.querySelector(":scope > li:focus-within [role='toolbar']")?.scrollIntoView({ block: "nearest" });
-  }, [chosen, listRef]);
+  }, [focused, listRef]);
   const on = {
     onFocus: (event: { currentTarget: HTMLOListElement; target: EventTarget }) => {
       const line = lineAt(lines, event.currentTarget, event.target);

@@ -57,6 +57,15 @@ const ringOf = (page: Page) =>
       box.bottom + reach <= port.bottom;
     return { style: style.outlineStyle, wide: parseFloat(style.outlineWidth) >= 2, inside };
   });
+// Whether the `at`th line's bar lies whole inside the list's box.
+async function barInside(page: Page, at: number) {
+  const [outer, bar] = [
+    await page.getByRole("list", { name: "Messages" }).boundingBox(),
+    await barOf(page, at).boundingBox(),
+  ];
+  if (outer === null || bar === null) throw new Error("no box");
+  return bar.y >= outer.y && bar.y + bar.height <= outer.y + outer.height;
+}
 // The flash's words, in its pill: the pill sits in the top layer, its region holding no box of its own.
 const flash = (page: Page, text: string) => page.getByRole("status").getByText(text, { exact: true });
 // The pointer on the `at`th line, its More menu opened and `item` chosen.
@@ -257,21 +266,43 @@ test.describe("a line's actions", () => {
   // The red pass (M11): a window that scrolls keeps the focused line and its bar in sight.
   test("keep the focused line and its bar inside a list that scrolls, and pass axe", async ({ page }) => {
     await room(page, { history: SIXTY });
-    const list = page.getByRole("list", { name: "Messages" });
     await lines(page).last().focus();
     await page.keyboard.press("Home");
     await expect(lines(page).first()).toBeFocused();
     await expect(lines(page).first()).toBeInViewport();
-    const inside = async (at: number) => {
-      const [outer, bar] = [await list.boundingBox(), await barOf(page, at).boundingBox()];
-      if (outer === null || bar === null) throw new Error("no box");
-      return bar.y >= outer.y && bar.y + bar.height <= outer.y + outer.height;
-    };
-    expect(await inside(0)).toBe(true);
+    expect(await barInside(page, 0)).toBe(true);
     await page.keyboard.press("End");
     await expect(lines(page).last()).toBeInViewport();
-    expect(await inside(59)).toBe(true);
+    expect(await barInside(page, 59)).toBe(true);
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  });
+
+  // The green pass (G8): a line the arrows reach at the list's top edge, its bar rising past it; and the same
+  // line focused again by Tab, after the focus left the list.
+  test("bring a bar rising past the list's top edge into the list, as the arrows or Tab come to its line", async ({
+    page,
+  }) => {
+    await room(page, { history: SIXTY });
+    const list = page.getByRole("list", { name: "Messages" });
+    const top = async (at: number) => {
+      await list.evaluate((box, line) => {
+        const item = box.children[line];
+        if (item instanceof HTMLElement)
+          box.scrollTop += item.getBoundingClientRect().top - box.getBoundingClientRect().top;
+      }, at);
+    };
+    await top(30);
+    await lines(page).nth(31).focus();
+    await top(30);
+    await page.keyboard.press("ArrowUp");
+    await expect(lines(page).nth(30)).toBeFocused();
+    expect(await barInside(page, 30)).toBe(true);
+    await roomsNav(page).getByRole("link").last().focus();
+    await expect(focusedLines(page)).toHaveCount(0);
+    await top(30);
+    await page.keyboard.press("Tab");
+    await expect(lines(page).nth(30)).toBeFocused();
+    expect(await barInside(page, 30)).toBe(true);
   });
 
   test("pass axe with a line's bar and its menu open", async ({ page }) => {
