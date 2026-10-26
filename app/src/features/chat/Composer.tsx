@@ -42,7 +42,7 @@ const named = (option: string) => (option.startsWith("@") ? `@${shortAddress(opt
 /** What the field says of the line: that it was not sent or is too long, what Tab completes (a command not yet
  * typed whole being no error), an unknown command, or help near the end; or nothing. */
 export function said(composed: Composed, failed: boolean, completion?: Completion): Pick<FieldProps, "error" | "help"> {
-  if (failed) return { error: "Not sent: the chat is not in this room yet. Try again in a moment." };
+  if (failed) return { error: "Not sent: the chat is not ready yet. Try again in a moment." };
   if (composed.kind === "long") return { error: `Too long by ${bytes(composed.over)}.` };
   if (completion !== undefined) {
     const [first = "", ...rest] = completion.options.map(named);

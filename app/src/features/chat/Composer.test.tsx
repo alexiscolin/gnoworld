@@ -128,7 +128,7 @@ describe("what the composer's field says", () => {
   it.each([
     ["", false, {}],
     ["hello", false, {}],
-    ["hello", true, { error: "Not sent: the chat is not in this room yet. Try again in a moment." }],
+    ["hello", true, { error: "Not sent: the chat is not ready yet. Try again in a moment." }],
     ["/nick bob", false, { error: "/nick is not a command. /me sends an action." }],
     ["a".repeat(422), false, { error: "Too long by 3 bytes." }],
     ["a".repeat(420), false, { error: "Too long by 1 byte." }],
@@ -159,7 +159,7 @@ describe("what the composer's field says of a completion", () => {
 
   it("says a line not sent before any completion", () => {
     expect(said(compose(ROOM, "#g", NICK), true, completions("#g", CHOICES))).toStrictEqual({
-      error: "Not sent: the chat is not in this room yet. Try again in a moment.",
+      error: "Not sent: the chat is not ready yet. Try again in a moment.",
     });
   });
 });
