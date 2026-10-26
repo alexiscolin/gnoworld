@@ -26,6 +26,12 @@ describe("RoomsView", () => {
   it("lists the rooms by section, in the server's order, under a navigation named Rooms", () => {
     const html = view();
     expect(html).toMatch(/^<nav[^>]*aria-label="Rooms"/);
+    // 4e's UX review (U16): an account's navigation holds its direct messages too, and says so.
+    expect(
+      view({
+        dms: { world: "bubble", partners: [], current: undefined, onlyKnown: false, onOnlyKnown: () => undefined },
+      }),
+    ).toMatch(/^<nav[^>]*aria-label="Rooms and direct messages"/);
     expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual(["Talk", "Other rooms"]);
     expect(links(html)).toEqual(["#bubble", "#games", "#news"]);
     expect(hrefs(html)).toEqual(["/w/bubble", "/w/bubble?room=games", "/w/bubble?room=news"]);

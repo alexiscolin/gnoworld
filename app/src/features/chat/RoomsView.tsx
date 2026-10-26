@@ -85,7 +85,7 @@ export function RoomsView({ sections, current, dms }: RoomsViewProps) {
       </Stack>
     );
   return (
-    <nav aria-label="Rooms" className={shared["scrolls"]}>
+    <nav aria-label={dms === undefined ? "Rooms" : "Rooms and direct messages"} className={shared["scrolls"]}>
       {dms === undefined ? (
         listed
       ) : (
