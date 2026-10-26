@@ -1132,6 +1132,8 @@ describe("the chat's link: replies", () => {
     ["a tab", "a\tb"],
     ["a leading CR", "\ra"],
     ["a leading LF", "\na"],
+    ["a NUL", "a\u0000b"],
+    ["a leading NUL", "\u0000a"],
   ])("sends no reply to a msgid holding %s, nor the draft without it", (_, id) => {
     const t = memberIn(["#bubble/games"]);
     const before = t.fake.sent.length;

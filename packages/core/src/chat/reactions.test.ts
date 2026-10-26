@@ -179,6 +179,8 @@ describe("reactionLine: the TAGMSG that adds or takes back a reaction", () => {
     ["a tab", "m\t1"],
     ["a CR LF and a command", "m\r\nQUIT"],
     ["an LF", "m\n1"],
+    ["a NUL", "m\u00001"],
+    ["a leading NUL", "\u0000m1"],
     ["65 characters", "m".repeat(65)],
   ])("sends nothing for a msgid holding %s", (_, to) => {
     expect(reactionLine({ to, emoji: "👍", on: true }, "#bubble", "r1")).toBeUndefined();
