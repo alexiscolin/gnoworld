@@ -248,6 +248,11 @@ describe("RoomView", () => {
     );
   });
 
+  // 4e's UX review (U13): an empty list was a Tab stop of no size, a screen reader saying "Messages, list" of nothing.
+  it("is no Tab stop while it holds no line", () => {
+    expect(view({ state: { ...ROOM, lines: [] } })).not.toMatch(/<ol [^>]*tabindex/i);
+  });
+
   // 4b's pre-merge (/code-review): lines that come while the room is open reach a screen reader.
   it("announces the lines that come, politely, and them alone", () => {
     const html = view();

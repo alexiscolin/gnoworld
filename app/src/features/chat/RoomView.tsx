@@ -212,7 +212,7 @@ export function RoomView(props: RoomViewProps) {
             aria-live="polite"
             aria-relevant="additions"
             className={LINES}
-            tabIndex={0}
+            tabIndex={lines.length > 0 ? 0 : undefined}
           >
             {lines.map((line) => (
               <LineView key={line.id} line={line} me={me} members={known} />
