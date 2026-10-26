@@ -466,7 +466,32 @@ test.describe("deleting a line", () => {
     await expect(lineOf(page, "my own line")).toHaveCount(0);
     expect(sent.filter((line) => line.startsWith("REDACT "))).toEqual(["REDACT #bubble/games o2"]);
     await expect(focusedLines(page)).toHaveCount(1);
+    await expect(lineOf(page, "another's line")).toBeFocused();
     await expect(stops(page)).toHaveCount(1);
+  });
+
+  // The green pass (G6): the newest goes to the one before it, the oldest to the one after; the last line alone
+  // gone, no line is left to take the focus, which falls to the page as when any focused element goes.
+  test("hands the focus to the line before the one deleted, else the one after, each end in turn", async ({ page }) => {
+    const address = await logIn(page, word("menu"));
+    const own = (id: string, minute: number, text: string): HistoryLine => [id, T(minute), text, address];
+    await room(page, {
+      me: address,
+      history: [own("a1", 0, "own one"), own("a2", 1, "own two"), own("a3", 2, "own three")],
+    });
+    for (const [at, gone, focused] of [
+      [2, "own three", "own two"],
+      [0, "own one", "own two"],
+    ] as const) {
+      const dialog = await deleteFrom(page, at);
+      await dialog.getByRole("button", { name: "Delete" }).press("Enter");
+      await expect(lineOf(page, gone)).toHaveCount(0);
+      await expect(lineOf(page, focused)).toBeFocused();
+    }
+    const dialog = await deleteFrom(page, 0);
+    await dialog.getByRole("button", { name: "Delete" }).press("Enter");
+    await expect(lines(page)).toHaveCount(0);
+    await expect(page.locator("body")).toBeFocused();
   });
 
   // /code-review: a delete that cannot go out (a msgid no command carries) is said, the line and the focus kept.
