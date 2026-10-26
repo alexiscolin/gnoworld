@@ -13,6 +13,7 @@ export {
   topicAfter,
 } from "./chat/room.ts";
 export type { Line, Where } from "./chat/room.ts";
+export { shownLines, type ShownLine } from "./chat/shown.ts";
 export {
   addReactions,
   reactionLine,

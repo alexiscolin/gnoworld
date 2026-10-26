@@ -3,14 +3,16 @@
 // (Message.tsx); one that mentions the reader says so (4d). The message menu (4c, docs/decisions.md 2026-10-26): the
 // list is one tab stop, a line, the arrows moving among them; a line pointed at or focused shows its bar.
 import {
-  markdown,
-  mentions,
-  reactionsOn,
   type Block,
   type Line,
+  markdown,
+  mentions,
   type Reacting,
   type Reaction,
+  reactionsOn,
   type Shown,
+  type ShownLine,
+  shownLines,
 } from "@gnoworld/core";
 import { Flash, type FlashMessage } from "@gnoworld/ui";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
@@ -20,7 +22,7 @@ import { Markdown } from "./Message.tsx";
 import { roomHref } from "./names.ts";
 import { Person } from "./Person.tsx";
 import { Reactions } from "./Reactions.tsx";
-import { answeredOf, Replying } from "./Replying.tsx";
+import { Quote } from "./Replying.tsx";
 import shared from "./lists.module.css";
 import styles from "./RoomView.module.css";
 
@@ -54,7 +56,7 @@ function LineText({ blocks, me, known }: { blocks: readonly Block[]; me: string 
 // mention shortened for the reader and the room's members alone (F812). A change of members reads its mentions
 // again, never its drawing.
 interface LineViewProps {
-  line: Line;
+  line: ShownLine;
   me: string | undefined;
   members: ReadonlySet<string>;
   /** Whether it is the list's one tab stop. */
@@ -75,11 +77,7 @@ function LineView({ line, me, members, stop, actions, reactions, react, answers 
   const known = knownOf(names, members);
   return (
     <li className={KINDS[line.kind]} data-about-me={mentioned ? "" : undefined} tabIndex={stop ? 0 : -1}>
-      {line.reply === undefined ? null : (
-        <p className={styles["replying"]}>
-          <Replying to={answers === undefined ? undefined : answeredOf(answers)} length={QUOTED} />
-        </p>
-      )}
+      <Quote line={line} answers={answers} />
       {/* The line's marks first, before the time: where no sender's words stand (F808). */}
       {mentioned ? <span className={styles["mentionsYou"]}>Mentions you </span> : null}
       {line.kind === "notice" ? <span className={styles["mark"]}>Notice </span> : null}
@@ -89,14 +87,12 @@ function LineView({ line, me, members, stop, actions, reactions, react, answers 
       {line.kind === "action" ? "* " : null}
       <Person name={line.account ?? line.from} guest={line.account === undefined} />{" "}
       <LineText blocks={blocks} me={me} known={known} />
+      {line.edited === true ? <span className={styles["mark"]}> (edited)</span> : null}
       {reactions === undefined ? null : <Reactions to={line.id} shown={reactions} react={react} />}
       {actions}
     </li>
   );
 }
-
-// The graphemes a reply quotes of the line it answers (docs/decisions.md, 2026-10-26).
-const QUOTED = 70;
 
 // How near the end, in pixels, the reader still reads the newest line.
 const AT_END = 32;
@@ -166,7 +162,9 @@ const toldOf = (refused: string | undefined, cannotReact: true | undefined): Fla
 
 /** The room's flash, then its lines, oldest first, as a list a screen reader hears grow. */
 export function Lines(props: LinesProps) {
-  const { room, lines, members, me, refused, onDelete, onDismiss, reactions, onReact, cannotReact, onReply } = props;
+  const { room, members, me, refused, onDelete, onDismiss, reactions, onReact, cannotReact, onReply } = props;
+  // The room's lines as shown: each corrected by its author's newest edit, the edits gone (4d, F664).
+  const lines = shownLines(props.lines);
   const { listRef, onScroll } = useNewestInView(lines);
   const { stop, mounted, on, leave } = useLineFocus(lines, listRef);
   const { said, setSaid, copy } = useCopy(room);

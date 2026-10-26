@@ -518,3 +518,38 @@ describe("RoomView: replies", () => {
     expect(linesOf(html)[0]).toMatch(/^Replying to an earlier message/);
   });
 });
+
+// 4d: an edit by the line's own account shown in the line's place, marked edited, its quote reading the edited words;
+// another account's edit, or one naming a line not in this room (R8), a line of its own.
+describe("RoomView: edits", () => {
+  it("shows an edit by the line's own account in its place, marked edited, and quotes the edited words", () => {
+    const lines = [
+      line({ id: "a", text: "helo" }),
+      line({ id: "b", from: BOB, account: BOB, text: "hi", reply: "a" }),
+      line({ id: "e", text: "hello", edits: "a" }),
+    ];
+    const shown = linesOf(view({ state: { ...ROOM, lines } }));
+    expect(shown).toHaveLength(2);
+    expect(shown[0]).toMatch(/^\d{2}:\d{2} g10gh7…3y5tv hello \(edited\)$/);
+    expect(shown[1]).toMatch(/^Replying to g10gh7…3y5tv: hello\d/);
+  });
+
+  it("keeps another account's edit a line of its own, the line it names as written", () => {
+    const lines = [
+      line({ id: "a", text: "mine" }),
+      line({ id: "e", from: BOB, account: BOB, text: "theirs", edits: "a" }),
+    ];
+    expect(linesOf(view({ state: { ...ROOM, lines } }))).toEqual([
+      expect.stringMatching(/ mine$/),
+      expect.stringMatching(/ theirs$/),
+    ]);
+  });
+
+  it("keeps an edit naming a line not in this room, another room's of that msgid included, a line of its own", () => {
+    const lines = [line({ id: "b", text: "here" }), line({ id: "e", text: "fixed", edits: "a" })];
+    expect(linesOf(view({ state: { ...ROOM, lines } }))).toEqual([
+      expect.stringMatching(/ here$/),
+      expect.stringMatching(/ fixed$/),
+    ]);
+  });
+});
