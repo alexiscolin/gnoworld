@@ -19,7 +19,8 @@ const ERGO = "wss://gnoworld.example/ws";
 // The capabilities the server's own tests ask of the real Ergo (server/src/testing/ergoKit.ts), word for word.
 const KIT_CAPS =
   "message-tags server-time account-tag echo-message batch labeled-response sasl draft/chathistory " +
-  "draft/event-playback draft/message-redaction account-notify extended-join multi-prefix draft/metadata-2 standard-replies";
+  "draft/event-playback draft/message-redaction account-notify extended-join multi-prefix draft/metadata-2 standard-replies " +
+  "draft/read-marker";
 // The SASL PLAIN payload of an address and a ticket: base64 of their UTF-8, NUL before each.
 const plain = (ticket: string) => btoa(String.fromCharCode(...new TextEncoder().encode(`\0${ADDRESS}\0${ticket}`)));
 

@@ -28,3 +28,36 @@ export class TypingOut {
     this.#typed.clear();
   }
 }
+
+/** The reading places it asks Ergo to keep (draft/read-marker): the time the page last asked each room read to, one
+ * session's, and the time sent on this connection; a place goes once past both Ergo's and what was sent, so a
+ * MARKREAD lost with a connection goes again on the next, and one answered never twice. */
+export class Places {
+  readonly #asked = new Map<string, string>();
+  readonly #sent = new Map<string, string>();
+
+  /** The page read `room` to the line of this time. */
+  ask(room: string, time: string): void {
+    const asked = this.#asked.get(room);
+    if (asked === undefined || time > asked) this.#asked.set(room, time);
+  }
+
+  /** Sends `room`'s MARKREAD through `send` when the place asked is past Ergo's, `held`, and what was sent. */
+  tell(room: string, held: string | undefined, send: (line: string) => boolean): void {
+    const time = this.#asked.get(room);
+    const sent = this.#sent.get(room);
+    if (time === undefined || [held, sent].some((each) => each !== undefined && each >= time)) return;
+    if (send(`MARKREAD ${room} timestamp=${time}`)) this.#sent.set(room, time);
+  }
+
+  /** A new connection: nothing sent on it yet. */
+  reconnected(): void {
+    this.#sent.clear();
+  }
+
+  /** Another session: nothing asked for it. */
+  forget(): void {
+    this.#asked.clear();
+    this.#sent.clear();
+  }
+}

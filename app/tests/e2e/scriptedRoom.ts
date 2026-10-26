@@ -40,3 +40,33 @@ export const live = (id: string, time: string, { room = ROOM, text = id }: { roo
 export const typist = (page: Page) => page.getByText(/is typing…|are typing…/);
 export const tags = (sent: readonly string[]) => sent.filter((line) => line.includes(" TAGMSG "));
 export const field = (page: Page) => page.getByRole("textbox", { name: "Message #games" });
+export const marks = (sent: readonly string[]) => sent.filter((line) => line.startsWith("MARKREAD "));
+// What the page sent before a word of its own written now: that word's TAGMSG goes out behind all of it, on the same
+// socket, so what is missing before it was never sent.
+export async function sentBefore(page: Page, sent: readonly string[]): Promise<readonly string[]> {
+  const told = tags(sent).length;
+  await field(page).fill(`barrier ${String(told)}`);
+  await expect.poll(() => tags(sent).length).toBeGreaterThan(told);
+  return sent.slice(
+    0,
+    sent.findLastIndex((line) => line.includes(" TAGMSG ")),
+  );
+}
+// A tab hidden from the start, which the test shows or hides again as a browser does when the tab changes.
+export const hiddenTab = (page: Page, hidden: boolean) =>
+  page.addInitScript((start) => {
+    let now = start;
+    Object.defineProperty(document, "visibilityState", { get: () => (now ? "hidden" : "visible") });
+    Object.defineProperty(document, "hidden", { get: () => now });
+    for (const [name, value] of [
+      ["test:show", false],
+      ["test:hide", true],
+    ] as const) {
+      document.addEventListener(name, () => {
+        now = value;
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+    }
+  }, hidden);
+export const tab = (page: Page, word: "show" | "hide") =>
+  page.evaluate((name) => document.dispatchEvent(new Event(name)), `test:${word}`);

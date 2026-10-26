@@ -939,4 +939,138 @@ describe("the chat's link: what it says", () => {
       expect(tagged(again.sent.slice(before))).toEqual(["@+typing=active TAGMSG #bubble/games"]);
     });
   });
+
+  // 4f: the reading place (Ergo's draft/read-marker, ircv3.net/specs/extensions/read-marker).
+  describe("the reading place", () => {
+    const marked = (sent: readonly string[]) => sent.filter((line) => line.startsWith("MARKREAD "));
+    const T = (minute: number) => `2026-10-25T10:${String(minute).padStart(2, "0")}:00.000Z`;
+    // A line of the room in the store, said at T(minute), its msgid m<minute>.
+    const heard = (fake: Fake, room: string, minute: number) => {
+      fake.line(`@msgid=m${String(minute)};time=${T(minute)} :alice!u@h PRIVMSG ${room} :at ${String(minute)}`);
+    };
+
+    it("marks the room in view read at a held line's time, as Ergo's MARKREAD, once a later line", () => {
+      const t = memberIn(["#bubble/games"]);
+      heard(t.fake, "#bubble/games", 0);
+      heard(t.fake, "#bubble/games", 1);
+      heard(t.fake, "#bubble/games", 2);
+      t.link.read("#bubble/games", "m1");
+      t.link.read("#bubble/games", "m1");
+      t.link.read("#bubble/games", "m0");
+      t.link.read("#bubble/games", "m2");
+      expect(marked(t.fake.sent)).toEqual([
+        `MARKREAD #bubble/games timestamp=${T(1)}`,
+        `MARKREAD #bubble/games timestamp=${T(2)}`,
+      ]);
+    });
+
+    it("marks nothing at or before the reading place Ergo gave, and nothing for a guest", () => {
+      const t = memberIn(["#bubble/games"]);
+      heard(t.fake, "#bubble/games", 0);
+      heard(t.fake, "#bubble/games", 1);
+      t.fake.line(`:ergo MARKREAD #bubble/games timestamp=${T(1)}`);
+      t.link.read("#bubble/games", "m1");
+      t.link.read("#bubble/games", "m0");
+      expect(marked(t.fake.sent)).toEqual([]);
+      const guest = guestIn(["#bubble/games"]);
+      guest.fake.line(`:${GUEST}!u@h JOIN #bubble/games`);
+      heard(guest.fake, "#bubble/games", 1);
+      guest.link.read("#bubble/games", "m1");
+      expect(marked(guest.fake.sent)).toEqual([]);
+    });
+
+    // The red pass (R4): the room in view alone, and one Ergo said I am in; never another room's newest.
+    it("marks no room read but the one in view, and none Ergo has not said I am in, nor after my PART or KICK", () => {
+      const t = memberIn(["#bubble/games", "#bubble", "#bubble/news"]);
+      heard(t.fake, "#bubble/games", 0);
+      t.link.read("#bubble/games", "m0");
+      t.fake.line(`:${ADDRESS}!u@h JOIN #bubble`);
+      heard(t.fake, "#bubble", 1);
+      t.link.read("#bubble", "m1");
+      heard(t.fake, "#bubble/news", 1);
+      t.link.show("#bubble/news");
+      t.link.read("#bubble/news", "m1");
+      t.link.show("#bubble/games");
+      heard(t.fake, "#bubble/games", 1);
+      t.fake.line(`:gnoworld!u@h KICK #bubble/games ${ADDRESS} :out`);
+      t.link.read("#bubble/games", "m1");
+      expect(marked(t.fake.sent)).toEqual([`MARKREAD #bubble/games timestamp=${T(0)}`]);
+    });
+
+    // The red pass (R5): a time Ergo would keep for good is a held line's own, never a word the caller makes.
+    it.each([
+      ["a line the room does not hold", "nope"],
+      ["a time in place of a msgid", T(1)],
+      ["a CR LF", "m1\r\nQUIT :x"],
+      ["a space", "m1 extra"],
+    ])("marks nothing for %s", (_, id) => {
+      const t = memberIn(["#bubble/games"]);
+      heard(t.fake, "#bubble/games", 1);
+      t.link.read("#bubble/games", id);
+      t.link.read("#bubble/games", "m1");
+      expect(marked(t.fake.sent)).toEqual([`MARKREAD #bubble/games timestamp=${T(1)}`]);
+    });
+
+    // The red pass (R10): a place asked while away, or sent and never answered, goes once the room is joined again.
+    it("marks the room read once back in it, what was asked while away", () => {
+      const t = memberIn(["#bubble/games"]);
+      heard(t.fake, "#bubble/games", 1);
+      t.fake.state("waiting");
+      t.link.read("#bubble/games", "m1");
+      expect(marked(t.fake.sent)).toEqual([]);
+      const again = t.connected(ADDRESS);
+      const before = again.sent.length;
+      again.line(`:${ADDRESS}!u@h JOIN #bubble/games`);
+      expect(marked(again.sent.slice(before))).toEqual([`MARKREAD #bubble/games timestamp=${T(1)}`]);
+    });
+
+    it("marks the room read again on a new connection, what went on the last one unanswered", () => {
+      const t = memberIn(["#bubble/games"]);
+      heard(t.fake, "#bubble/games", 1);
+      t.link.read("#bubble/games", "m1");
+      t.fake.state("waiting");
+      const again = t.connected(ADDRESS);
+      const before = again.sent.length;
+      again.line(`:${ADDRESS}!u@h JOIN #bubble/games`);
+      expect(marked(again.sent.slice(before))).toEqual([`MARKREAD #bubble/games timestamp=${T(1)}`]);
+    });
+
+    it("marks nothing again on a new connection once Ergo answered the place", () => {
+      const t = memberIn(["#bubble/games"]);
+      heard(t.fake, "#bubble/games", 1);
+      t.link.read("#bubble/games", "m1");
+      t.fake.line(`:ergo MARKREAD #bubble/games timestamp=${T(1)}`);
+      t.fake.state("waiting");
+      const again = t.connected(ADDRESS);
+      const before = again.sent.length;
+      again.line(`:${ADDRESS}!u@h JOIN #bubble/games`);
+      expect(marked(again.sent.slice(before))).toEqual([]);
+    });
+
+    // The red pass (R20): an account's places are its own; another session starts with none.
+    it("forgets an account's places when another session starts", () => {
+      const t = memberIn(["#bubble/games"]);
+      t.fake.line(`:ergo MARKREAD #bubble/games timestamp=${T(1)}`);
+      expect(t.room("#bubble/games")?.read).toBe(T(1));
+      t.signedIn(OTHER);
+      t.link.follow(["#bubble/games"]);
+      expect(t.room("#bubble/games")?.read).toBeUndefined();
+      t.signedOut();
+      t.link.follow(["#bubble/games"]);
+      expect(t.room("#bubble/games")?.read).toBeUndefined();
+    });
+
+    it("sends another session nothing the last one asked while away", () => {
+      const t = memberIn(["#bubble/games"]);
+      heard(t.fake, "#bubble/games", 1);
+      t.fake.state("waiting");
+      t.link.read("#bubble/games", "m1");
+      t.signedIn(OTHER);
+      t.link.follow(["#bubble/games"]);
+      const again = t.connected(OTHER);
+      const before = again.sent.length;
+      again.line(`:${OTHER}!u@h JOIN #bubble/games`);
+      expect(marked(again.sent.slice(before))).toEqual([]);
+    });
+  });
 });

@@ -1,0 +1,147 @@
+import AxeBuilder from "@axe-core/playwright";
+import { lineOf, word } from "./chat.ts";
+import { expect, test } from "./fixtures.ts";
+import { logIn } from "./irc.ts";
+import type { HistoryLine } from "./scripted.ts";
+import { field, hiddenTab, live, marks, room, ROOM, sentBefore, T, tab, typingOf, typist } from "./scriptedRoom.ts";
+
+const ACCOUNT = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+
+// 4f (docs/decisions.md, 2026-10-21): the reading place Ergo keeps for the account (draft/read-marker): the first line
+// past it marked New, and the room in view marked read, on a scripted Ergo. No test sleeps: what the page did not send
+// is read before a later word of its own (sentBefore).
+test.describe("the reading place", () => {
+  test.use({ timezoneId: "UTC", locale: "en-GB" });
+
+  // The red pass (R1): Ergo answers the page's MARKREAD, and another session moves the place on; the mark stays.
+  test("marks the first line past the reading place New, and keeps it there as the room is read", async ({ page }) => {
+    const address = await logIn(page, word("read"));
+    const { sent, ergo } = await room(page, { me: address, read: T(0) });
+    await expect(lineOf(page, "the second line")).toContainText(/^New /);
+    await expect(page.locator("[data-new]")).toHaveCount(1);
+    await expect.poll(() => marks(sent)).toEqual([`MARKREAD ${ROOM} timestamp=${T(2)}`]);
+    ergo().send(`:ergo.test MARKREAD ${ROOM} timestamp=${T(5)}`);
+    ergo().send(typingOf("active"));
+    await expect(typist(page)).toBeVisible();
+    await expect(lineOf(page, "the second line")).toContainText(/^New /);
+    await expect(page.locator("[data-new]")).toHaveCount(1);
+  });
+
+  test("marks no line New for a room read to its end", async ({ page }) => {
+    const address = await logIn(page, word("read"));
+    const { ergo } = await room(page, { me: address, read: T(2) });
+    ergo().send(typingOf("active"));
+    await expect(typist(page)).toBeVisible();
+    await expect(page.locator("[data-new]")).toHaveCount(0);
+  });
+
+  // The red pass (R1b): a line seen coming in a room read to its end is no news.
+  test("marks a live line read as it comes while the reader is at the end, and not New", async ({ page }) => {
+    const address = await logIn(page, word("read"));
+    const { sent, ergo } = await room(page, { me: address, read: T(2) });
+    ergo().send(live("live", T(3), { text: "a live line" }));
+    await expect(lineOf(page, "a live line")).toBeVisible();
+    await expect.poll(() => marks(sent)).toEqual([`MARKREAD ${ROOM} timestamp=${T(3)}`]);
+    await expect(page.locator("[data-new]")).toHaveCount(0);
+  });
+
+  // The red pass (R4): the room in view alone; another room's line moves no place.
+  test("marks no other room read as its lines come", async ({ page }) => {
+    const address = await logIn(page, word("read"));
+    const { sent, ergo } = await room(page, { me: address, read: T(2) });
+    ergo().send(live("elsewhere", T(3), { room: "#bubble" }));
+    ergo().send(live("here", T(4)));
+    await expect(lineOf(page, "here")).toBeVisible();
+    await expect.poll(() => marks(sent)).toEqual([`MARKREAD ${ROOM} timestamp=${T(4)}`]);
+  });
+
+  // The red pass (R22): the account's own line, echoed by Ergo, is read on its other devices too.
+  test("marks the room read at the account's own line, as Ergo echoes it", async ({ page }) => {
+    const address = await logIn(page, word("read"));
+    const { sent } = await room(page, { me: address, read: T(2), echo: T(5) });
+    await field(page).fill("my own line");
+    await field(page).press("Enter");
+    await expect(lineOf(page, "my own line")).toBeVisible();
+    await expect.poll(() => marks(sent)).toEqual([`MARKREAD ${ROOM} timestamp=${T(5)}`]);
+  });
+
+  test("marks nothing read while the reader is scrolled up, then the newest once back at the end", async ({ page }) => {
+    const address = await logIn(page, word("read"));
+    const history = Array.from({ length: 60 }, (_, n): HistoryLine => [
+      `h${String(n)}`,
+      T(n % 60),
+      `Line ${String(n)}`,
+    ]);
+    const { sent, ergo } = await room(page, { me: address, history, read: T(59) });
+    const list = page.getByRole("list", { name: "Messages" });
+    await list.evaluate((box) => {
+      box.scrollTop = 0;
+      box.dispatchEvent(new Event("scroll"));
+    });
+    ergo().send(live("late", "2026-10-25T11:00:00.000Z"));
+    await expect(lineOf(page, "late")).toHaveCount(1);
+    expect(marks(await sentBefore(page, sent))).toEqual([]);
+    await list.evaluate((box) => {
+      box.scrollTop = box.scrollHeight;
+      box.dispatchEvent(new Event("scroll"));
+    });
+    await expect.poll(() => marks(sent)).toEqual([`MARKREAD ${ROOM} timestamp=2026-10-25T11:00:00.000Z`]);
+  });
+
+  test("marks nothing read while the page is hidden, the newest once it shows", async ({ page }) => {
+    await hiddenTab(page, true);
+    const address = await logIn(page, word("read"));
+    const { sent } = await room(page, { me: address, read: T(0) });
+    expect(marks(await sentBefore(page, sent))).toEqual([]);
+    await tab(page, "show");
+    await expect.poll(() => marks(sent)).toEqual([`MARKREAD ${ROOM} timestamp=${T(2)}`]);
+  });
+
+  // The red pass (R11): hidden after the room opened, a line that comes is read once the tab shows again.
+  test("marks a line that came while the tab was away read once it shows, and once", async ({ page }) => {
+    await hiddenTab(page, false);
+    const address = await logIn(page, word("read"));
+    const { sent, ergo } = await room(page, { me: address, read: T(2) });
+    await tab(page, "hide");
+    ergo().send(live("away", T(3), { text: "while away" }));
+    await expect(lineOf(page, "while away")).toHaveCount(1);
+    expect(marks(await sentBefore(page, sent))).toEqual([]);
+    await tab(page, "show");
+    await expect.poll(() => marks(sent)).toEqual([`MARKREAD ${ROOM} timestamp=${T(3)}`]);
+  });
+
+  // The red pass (R10): a MARKREAD the link lost before Ergo answered goes again once the page is back in the room.
+  test("marks the room read again after the link drops before Ergo's answer", async ({ page }) => {
+    const address = await logIn(page, word("read"));
+    const { sent, sockets } = await room(page, { me: address, read: T(0), quietMarks: true });
+    await expect.poll(() => marks(sent)).toEqual([`MARKREAD ${ROOM} timestamp=${T(2)}`]);
+    await sockets[0]?.close();
+    await expect
+      .poll(() => marks(sent), { timeout: 10_000 })
+      .toEqual([`MARKREAD ${ROOM} timestamp=${T(2)}`, `MARKREAD ${ROOM} timestamp=${T(2)}`]);
+    expect(sockets).toHaveLength(2);
+  });
+
+  test("marks nothing read for a guest, whose place Ergo keeps for no account", async ({ page }) => {
+    const { sent } = await room(page, { read: T(0) });
+    await page.keyboard.press("Alt+ArrowDown");
+    await expect.poll(() => sent.some((line) => line.startsWith("CHATHISTORY LATEST #bubble "))).toBe(true);
+    expect(marks(sent)).toEqual([]);
+  });
+
+  test("passes axe, and looks as the room with a New line and a typist on a computer's screen", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await logIn(page, word("read"));
+    // The nick Ergo gives the account, whatever the test wallet drawn: who is here, beside the picture, stays as wide.
+    const { ergo } = await room(page, { me: ACCOUNT, read: T(0) });
+    ergo().send(typingOf("active"));
+    await expect(typist(page)).toBeVisible();
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    await expect(page.getByRole("list", { name: "Messages" }).locator("..")).toHaveScreenshot(
+      "typing-new-computer.png",
+      {
+        mask: [field(page)],
+      },
+    );
+  });
+});

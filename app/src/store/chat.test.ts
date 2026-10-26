@@ -363,3 +363,46 @@ describe("the store's chat slice: who is typing", () => {
     expect(t.room("#bubble")?.typing).toBeUndefined();
   });
 });
+
+// 4f: each room's reading place (Ergo's draft/read-marker), forward alone, on the store's clock.
+describe("the store's chat slice: the reading place", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("keeps the reading place Ergo gives each room, forward alone", () => {
+    const t = following();
+    const later = "2026-10-25T10:05:00.000Z";
+    t.heard(read(`:ergo MARKREAD #bubble timestamp=${later}`));
+    t.heard(read(`:ergo MARKREAD #bubble timestamp=${T0}`));
+    t.heard(read(`:ergo MARKREAD #bubble/games *`));
+    expect(t.room("#bubble")?.read).toBe(later);
+    expect(t.room("#bubble/games")?.read).toBeUndefined();
+  });
+
+  // The red pass (R17): a place for a room not followed makes no room and tells no one.
+  it("keeps no place for a room it does not follow, and tells no one", () => {
+    const t = following();
+    const before = t.notified();
+    t.heard(read(`:ergo MARKREAD #garden timestamp=${T0}`));
+    expect(t.notified()).toBe(before);
+    expect(t.store.getState().chat.rooms["#garden"]).toBeUndefined();
+  });
+
+  // The red pass (R13): the store reads a place against its own clock.
+  it("reads a place more than 5 minutes past its clock as none", () => {
+    vi.useFakeTimers({ now: Date.parse(T0) });
+    const t = following();
+    t.heard(read(":ergo MARKREAD #bubble timestamp=2026-10-25T10:05:00.001Z"));
+    t.heard(read(":ergo MARKREAD #bubble/games timestamp=2026-10-25T10:05:00.000Z"));
+    expect(t.room("#bubble")?.read).toBeUndefined();
+    expect(t.room("#bubble/games")?.read).toBe("2026-10-25T10:05:00.000Z");
+  });
+
+  it("keeps the reading place through a drop of the link, Ergo's being the account's", () => {
+    const t = following();
+    t.heard(read(`:ergo MARKREAD #bubble timestamp=${T0}`));
+    t.disconnected();
+    expect(t.room("#bubble")?.read).toBe(T0);
+  });
+});

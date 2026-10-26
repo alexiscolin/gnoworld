@@ -10,7 +10,7 @@ import type { Ergo, ErgoOptions, Who } from "../../lib/ergo/ergo.ts";
 import { LINES_KEPT } from "../../store/chat.ts";
 import { followed, groupsOf } from "./groups.ts";
 import type { AppState, createAppStore } from "../../store/index.ts";
-import { TypingOut } from "./telling.ts";
+import { Places, TypingOut } from "./telling.ts";
 
 /** The rooms a connection joins: Ergo's max-channels-per-client (deploy/ergo/ircd.yaml.tmpl). */
 export const ROOMS_JOINED = 100;
@@ -39,6 +39,9 @@ export interface ChatLink {
   /** Tells a room Ergo says it is in that the account is typing, at most once every 3 s, or done after it was;
    * an account's alone (IRCv3's +typing). */
   typing: (room: string, state: "active" | "done") => void;
+  /** Marks the room in view read to its line `id`, which the store holds, as Ergo's MARKREAD (draft/read-marker): an
+   * account's alone, a line past the place Ergo gave; asked while away, it goes once Ergo says I am in the room. */
+  read: (room: string, id: string) => void;
   stop: () => void;
 }
 
@@ -61,6 +64,7 @@ class Link implements ChatLink {
   #reader = new BatchReader();
   readonly #typing = new TypingOut();
   readonly #out = (line: string): boolean => this.#ergo?.send(line) === true;
+  readonly #places = new Places();
 
   constructor(deps: LinkDeps) {
     this.#deps = deps;
@@ -98,6 +102,17 @@ class Link implements ChatLink {
 
   typing(room: string, state: "active" | "done"): void {
     if (this.#key !== "guest" && this.#inside.has(room)) this.#typing.tell(room, state, this.#out);
+  }
+
+  read(room: string, id: string): void {
+    const line = this.#deps.store.getState().chat.rooms[room]?.lines.find((each) => each.id === id);
+    if (this.#key !== "guest" && room === this.#shown && line !== undefined) this.#places.ask(room, line.time);
+    this.#mark(room);
+  }
+
+  // The place asked for a room sent, once Ergo says I am in it.
+  #mark(room: string): void {
+    if (this.#inside.has(room)) this.#places.tell(room, this.#deps.store.getState().chat.rooms[room]?.read, this.#out);
   }
 
   stop(): void {
@@ -140,6 +155,7 @@ class Link implements ChatLink {
   #unfollow(): void {
     this.#listed = [];
     this.#shown = undefined;
+    this.#places.forget();
     this.#deps.store.getState().chatActions.follow([]);
   }
 
@@ -189,6 +205,7 @@ class Link implements ChatLink {
     this.#phases.clear();
     this.#inside.clear();
     this.#typing.forget();
+    this.#places.reconnected();
   }
 
   // The room in view's newest lines, once joined by this page and Ergo said I am in it, once a connection.
@@ -238,6 +255,7 @@ class Link implements ChatLink {
     if (command !== "JOIN" || nickOf(source) !== me) return;
     this.#inside.add(room);
     this.#history(this.#shown);
+    this.#mark(room);
   }
 }
 

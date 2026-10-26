@@ -97,8 +97,8 @@ interface LoadedProps {
   state: RoomViewProps["state"];
   chat: RoomViewProps["chat"];
   session: AppState["login"]["session"];
-  /** The page's link to Ergo, which says and deletes the room in view's lines (4c) and tells the account's typing
-   * (4f). */
+  /** The page's link to Ergo, which says and deletes the room in view's lines (4c), tells the account's typing and
+   * marks the room read (4f). */
   link: RefObject<ChatLink | undefined>;
   /** The room's refused delete, said. */
   dismissed: (room: string) => void;
@@ -119,6 +119,9 @@ function Loaded({ sections, current, state, chat, session, link, dismissed }: Lo
           onDelete={(id) => link.current?.redact(current, id) ?? false}
           onDismiss={() => {
             dismissed(current);
+          }}
+          onRead={(id) => {
+            link.current?.read(current, id);
           }}
           composer={
             <Writer

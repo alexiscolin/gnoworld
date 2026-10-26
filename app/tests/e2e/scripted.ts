@@ -23,7 +23,7 @@ function welcome(line: string, me: string): string[] {
 function rooms(
   line: string,
   me: string,
-  { history, told }: { history: readonly HistoryLine[]; told: string },
+  { history, told, read }: { history: readonly HistoryLine[]; told: string; read: string | undefined },
 ): string[] {
   if (line.startsWith("JOIN ")) {
     return line
@@ -33,6 +33,8 @@ function rooms(
         `:${me}!u@h JOIN ${room}`,
         ...(room === "#bubble/games" ? [`:ergo 332 ${me} ${room} :Games played on chain, and their players.`] : []),
         `:ergo 353 ${me} = ${room} :@gnoworld ${MEMBER} ${me}`,
+        // Ergo tells the reading place before the end of NAMES (draft/read-marker).
+        ...(room === told && read !== undefined ? [`:ergo MARKREAD ${room} timestamp=${read}`] : []),
         `:ergo 366 ${me} ${room} :End of /NAMES list.`,
       ]);
   }
@@ -56,6 +58,25 @@ function redaction(line: string, me: string, refuse: boolean): string[] {
   return [`:${me}!u@h REDACT ${room} ${id}`];
 }
 
+// The page's MARKREAD: Ergo's answer, the later of the place it holds and the one asked (irc/handlers.go:3247,
+// v2.19.1); the page's PRIVMSG: Ergo's echo (echo-message), at the time given.
+function marking(line: string, places: Map<string, string>, quiet: boolean): string[] {
+  const [command, room = "", stamp = ""] = line.split(" ");
+  const time = stamp.replace(/^timestamp=/, "");
+  if (command !== "MARKREAD" || quiet || time === stamp) return [];
+  const held = places.get(room);
+  const kept = held !== undefined && held > time ? held : time;
+  places.set(room, kept);
+  return [`:ergo.test MARKREAD ${room} timestamp=${kept}`];
+}
+
+function echoed(line: string, me: string, echo: { time: string | undefined; next: () => number }): string[] {
+  const said = /^PRIVMSG (\S+) :(.*)$/s.exec(line);
+  if (said === null || echo.time === undefined) return [];
+  const [, target = "", text = ""] = said;
+  return [`@msgid=echo${String(echo.next())};time=${echo.time};account=${me} :${me}!u@h PRIVMSG ${target} :${text}`];
+}
+
 export interface Scripted {
   /** #games' history, or the named room's. */
   history?: readonly HistoryLine[];
@@ -65,6 +86,12 @@ export interface Scripted {
   refuseRedact?: boolean;
   /** The room whose history it holds, #games unless named. */
   room?: string;
+  /** The reading place Ergo gives that room as the page joins it (4f), none unless named. */
+  read?: string;
+  /** Ergo answers no MARKREAD of the page's, as when the link drops before its answer. */
+  quietMarks?: boolean;
+  /** Ergo echoes the page's lines, at this time; none unless named. */
+  echo?: string;
 }
 
 /** Answers the page's socket as Ergo would, the page being `me`: with #games' history, or with what `script` says. */
@@ -78,14 +105,21 @@ export function scriptedErgo(
     heard,
     refuseRedact = false,
     room = "#bubble/games",
+    read,
+    quietMarks = false,
+    echo,
   } = Array.isArray(script) ? { history: script } : (script as Scripted);
+  const places = new Map<string, string>(read === undefined ? [] : [[room, read]]);
+  let echoes = 0;
   ergo.onMessage((data) => {
     const line = String(data);
     heard?.(line);
     const answers = [
       ...welcome(line, me),
-      ...rooms(line, me, { history, told: room }),
+      ...rooms(line, me, { history, told: room, read }),
       ...redaction(line, me, refuseRedact),
+      ...marking(line, places, quietMarks),
+      ...echoed(line, me, { time: echo, next: () => (echoes += 1) }),
     ];
     for (const answer of answers) ergo.send(answer);
   });

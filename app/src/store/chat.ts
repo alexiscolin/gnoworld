@@ -11,6 +11,7 @@ import {
   refusedOf,
   topicAfter,
   typingAfter,
+  readAfter,
   type IrcMessage,
   type Line,
   type Typing,
@@ -31,6 +32,8 @@ interface RoomState {
   readonly refused: string | undefined;
   /** Who is typing, each nick with the time its typing ends on the page's clock (4f); none while nobody is. */
   readonly typing: Typing;
+  /** The time of the last line the account read here, as Ergo keeps it for the account (4f); none while unknown. */
+  readonly read: string | undefined;
 }
 
 interface ChatState {
@@ -57,7 +60,14 @@ export interface ChatSlice {
   };
 }
 
-const EMPTY: RoomState = { lines: [], members: [], topic: undefined, refused: undefined, typing: undefined };
+const EMPTY: RoomState = {
+  lines: [],
+  members: [],
+  topic: undefined,
+  refused: undefined,
+  typing: undefined,
+  read: undefined,
+};
 
 // A room once a live line is read at `now`, the page's clock: the same object when the line changes nothing of it.
 function roomAfter(room: RoomState, message: IrcMessage, at: Where & { now: number }): RoomState {
@@ -68,6 +78,7 @@ function roomAfter(room: RoomState, message: IrcMessage, at: Where & { now: numb
     members: membersAfter(room.members, message, at),
     topic: topicAfter(room.topic, message, at.room),
     typing: typingAfter(room.typing, message, at),
+    read: readAfter(room.read, message, at),
   };
   const same = (Object.keys(next) as (keyof typeof next)[]).every((key) => next[key] === room[key]);
   return same ? room : { ...room, ...next };

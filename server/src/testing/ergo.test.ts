@@ -457,6 +457,35 @@ describe("history and tags", { timeout: 30_000 }, () => {
     alice.send("@+typing=active TAGMSG #lobby");
     expect(await obs.expect(/ TAGMSG #lobby$/)).toMatch(/^@(\S*;)?\+typing=active[;\s].*:alice!/);
   });
+
+  // 4f: the reading place Ergo keeps for an account and tells each of its sessions (draft/read-marker).
+  it("tells each session of an account the room's place as it joins, then every other one a later place set", async () => {
+    const { e } = await room([]);
+    const one = await login(e, "alice");
+    await join(one, "#lobby");
+    expect(one.lines().join("\n")).toMatch(/ MARKREAD #lobby \*/);
+    const id = await say(one, "#lobby", "read me");
+    const time = /time=([^;\s]+)/.exec(one.lines().find((l) => l.includes(id)) ?? "")?.[1] ?? "";
+    const two = await login(e, "alice");
+    await join(two, "#lobby");
+    one.send(`MARKREAD #lobby timestamp=${time}`);
+    await one.expect(new RegExp(` MARKREAD #lobby timestamp=${time.replaceAll(".", "\\.")}`));
+    await two.expect(new RegExp(` MARKREAD #lobby timestamp=${time.replaceAll(".", "\\.")}`));
+    one.send("MARKREAD #lobby timestamp=2001-01-01T00:00:00.000Z");
+    await one.expect(new RegExp(` MARKREAD #lobby timestamp=${time.replaceAll(".", "\\.")}$`));
+    await sync(two);
+    expect(two.lines().filter((l) => l.includes(" MARKREAD "))).toHaveLength(2);
+    const three = await login(e, "alice");
+    await join(three, "#lobby");
+    expect(three.lines().join("\n")).toContain(` MARKREAD #lobby timestamp=${time}`);
+  });
+
+  it("tells no place to a session that did not ask draft/read-marker", async () => {
+    const { e } = await room([]);
+    const plain = await login(e, "alice", { caps: "sasl message-tags server-time batch" });
+    await join(plain, "#lobby");
+    expect(plain.lines().join("\n")).not.toContain("MARKREAD");
+  });
 });
 
 describe("moderation", { timeout: 40_000 }, () => {

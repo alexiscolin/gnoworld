@@ -38,6 +38,8 @@ export interface RoomViewProps {
         refused?: string | undefined;
         /** Who is typing, each nick with the time its typing ends (4f). */
         typing?: Typing;
+        /** The time of the last line the account read here, Ergo's (4f). */
+        read?: string | undefined;
       }
     | undefined;
   chat: ErgoState | "off";
@@ -49,6 +51,8 @@ export interface RoomViewProps {
   onDelete?: ((id: string) => boolean) | undefined;
   /** The room's flash said Ergo's refusal of a delete. */
   onDismiss?: (() => void) | undefined;
+  /** The room read to its newest line, as the reader reaches it (4f). */
+  onRead?: ((id: string) => void) | undefined;
 }
 
 // Who is here: counted once connected, the bot left out, the first MEMBERS_SHOWN named.
@@ -101,8 +105,8 @@ function Typists({ typing }: { typing: Typing }) {
   );
 }
 
-export function RoomView({ room, state, chat, composer, me, onDelete, onDismiss }: RoomViewProps) {
-  const { lines = [], members = [], topic, refused, typing } = state ?? {};
+export function RoomView({ room, state, chat, composer, me, onDelete, onDismiss, onRead }: RoomViewProps) {
+  const { lines = [], members = [], topic, refused, typing, read } = state ?? {};
   const connected = chat === "connected";
   return (
     <Stack as="section" space="s">
@@ -124,6 +128,8 @@ export function RoomView({ room, state, chat, composer, me, onDelete, onDismiss 
             refused={refused}
             onDelete={onDelete ?? (() => false)}
             onDismiss={onDismiss ?? (() => undefined)}
+            read={read}
+            onRead={onRead}
           />
           {connected && lines.length === 0 ? <p>No messages yet.</p> : null}
           <Typists typing={typing} />

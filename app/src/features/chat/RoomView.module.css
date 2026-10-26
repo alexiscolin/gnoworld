@@ -72,4 +72,14 @@
     font: var(--font-meta);
     color: var(--color-text-muted);
   }
+
+  /* The first line past the reading place as the room opened: coral, the prototype's "New", by a rule and a word. */
+  .lines > li[data-new] {
+    border-block-start: var(--line-width) solid var(--color-danger-line);
+  }
+
+  .fresh {
+    font: var(--font-label);
+    color: var(--color-danger);
+  }
 }

@@ -35,6 +35,7 @@ const PLACES: Readonly<Record<string, number>> = {
   KICK: 0,
   REDACT: 0,
   TAGMSG: 0,
+  MARKREAD: 0,
   "331": 1,
   "332": 1,
   "353": 2,
@@ -51,7 +52,7 @@ export function concerns({ command, params }: IrcMessage): string | undefined {
 }
 
 // A time Ergo writes, on a day that exists: the string reads back as itself.
-function isTime(text: string): boolean {
+export function isTime(text: string): boolean {
   if (!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(text)) return false;
   const date = new Date(text);
   return !Number.isNaN(date.getTime()) && date.toISOString() === text;

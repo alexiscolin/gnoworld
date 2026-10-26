@@ -429,3 +429,37 @@ describe("RoomView: who is typing", () => {
     expect(open.map(({ name }) => name)).toContain("p");
   });
 });
+
+// 4f: the first line past the reading place marked New (Ergo's draft/read-marker).
+describe("RoomView: what is new", () => {
+  const T = (minute: number) => `2026-10-25T10:${String(minute).padStart(2, "0")}:00.000Z`;
+
+  const LINES = [line({ id: "a", time: T(0) }), line({ id: "b", time: T(1) }), line({ id: "c", time: T(2) })];
+
+  it("marks the first line past the reading place New, before its time, and that line alone", () => {
+    const html = part(view({ state: { ...ROOM, lines: LINES, read: T(0) } }), "Messages");
+    expect(items(html)).toEqual([
+      expect.stringMatching(/^\d{2}:\d{2} /),
+      expect.stringMatching(/^New \d{2}:\d{2} /),
+      expect.stringMatching(/^\d{2}:\d{2} /),
+    ]);
+    expect(html.match(/data-new=""/g)).toHaveLength(1);
+  });
+
+  it("marks no line New with no reading place known, or every line read", () => {
+    expect(view({ state: { ...ROOM, lines: LINES, read: T(1) } })).toContain("data-new");
+    expect(view({ state: { ...ROOM, lines: LINES } })).not.toContain("data-new");
+    expect(view({ state: { ...ROOM, lines: LINES, read: T(2) } })).not.toContain("data-new");
+  });
+
+  it("passes the reader's own lines, read in the writing", () => {
+    const mine = [
+      line({ id: "a", time: T(0) }),
+      line({ id: "b", time: T(1), account: BOB }),
+      line({ id: "c", time: T(2) }),
+    ];
+    const html = part(view({ me: BOB, state: { ...ROOM, lines: mine, read: T(0) } }), "Messages");
+    expect(items(html)[2]).toMatch(/^New /);
+    expect(html.match(/data-new=""/g)).toHaveLength(1);
+  });
+});

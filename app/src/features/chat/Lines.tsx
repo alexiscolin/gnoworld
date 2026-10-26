@@ -10,6 +10,7 @@ import { useLineFocus } from "./lineFocus.ts";
 import { Markdown } from "./Message.tsx";
 import { roomHref } from "./names.ts";
 import { Person } from "./Person.tsx";
+import { useNewMark, useReadAtEnd } from "./reading.ts";
 import shared from "./lists.module.css";
 import styles from "./RoomView.module.css";
 
@@ -50,15 +51,23 @@ interface LineViewProps {
   stop: boolean;
   /** Its bar, while pointed at or focused. */
   actions: ReactNode;
+  /** Whether it is the first line past the reading place as the room opened (4f). */
+  fresh: boolean;
 }
 
-function LineView({ line, me, members, stop, actions }: LineViewProps) {
+function LineView({ line, me, members, stop, actions, fresh }: LineViewProps) {
   const blocks = markdown(line.text);
   const names = namesOf(line.text);
   const mentioned = names.split(" ").some((address) => address === me);
   const known = knownOf(names, members);
   return (
-    <li className={KINDS[line.kind]} data-about-me={mentioned ? "" : undefined} tabIndex={stop ? 0 : -1}>
+    <li
+      className={KINDS[line.kind]}
+      data-about-me={mentioned ? "" : undefined}
+      data-new={fresh ? "" : undefined}
+      tabIndex={stop ? 0 : -1}
+    >
+      {fresh ? <span className={styles["fresh"]}>New </span> : null}
       {/* The line's marks first, before the time: where no sender's words stand (F808). */}
       {mentioned ? <span className={styles["mentionsYou"]}>Mentions you </span> : null}
       {line.kind === "notice" ? <span className={styles["mark"]}>Notice </span> : null}
@@ -87,7 +96,7 @@ function useNewestInView(lines: readonly Line[]) {
     const box = listRef.current;
     if (box !== null) atEndRef.current = box.scrollHeight - box.scrollTop - box.clientHeight < AT_END;
   };
-  return { listRef, onScroll };
+  return { listRef, atEndRef, onScroll };
 }
 
 // What a copy says, in the room's flash: done, or not, a page with no clipboard (a plain http origin) included.
@@ -123,11 +132,17 @@ export interface LinesProps {
   onDelete: (id: string) => boolean;
   /** The room's flash said Ergo's refusal of a delete. */
   onDismiss: () => void;
+  /** The time of the last line the account read here, Ergo's (4f); none while unknown. */
+  read?: string | undefined;
+  /** The room read to its line `id`, the newest, while the reader is at the end and the page shows. */
+  onRead?: ((id: string) => void) | undefined;
 }
 
 /** The room's flash, then its lines, oldest first, as a list a screen reader hears grow. */
-export function Lines({ room, lines, members, me, refused, onDelete, onDismiss }: LinesProps) {
-  const { listRef, onScroll } = useNewestInView(lines);
+export function Lines({ room, lines, members, me, refused, onDelete, onDismiss, read, onRead }: LinesProps) {
+  const { listRef, atEndRef, onScroll } = useNewestInView(lines);
+  const fresh = useNewMark(lines, read, me);
+  const look = useReadAtEnd(lines, atEndRef, onRead);
   const { stop, mounted, on, leave } = useLineFocus(lines, listRef);
   const { said, setSaid, copy } = useCopy(room);
   // Who a mention may shorten (F812): the members, and the authors in view by their account tag, who proved their
@@ -164,7 +179,10 @@ export function Lines({ room, lines, members, me, refused, onDelete, onDismiss }
       />
       <ol
         ref={listRef}
-        onScroll={onScroll}
+        onScroll={() => {
+          onScroll();
+          look();
+        }}
         {...on}
         aria-label="Messages"
         aria-live="polite"
@@ -179,6 +197,7 @@ export function Lines({ room, lines, members, me, refused, onDelete, onDismiss }
             members={known}
             stop={line.id === stop}
             actions={mounted(line.id) ? actionsOf(line) : null}
+            fresh={line.id === fresh}
           />
         ))}
       </ol>
