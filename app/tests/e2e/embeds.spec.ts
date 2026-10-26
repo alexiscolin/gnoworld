@@ -167,6 +167,17 @@ test.describe("a link's player", () => {
     }).toPass();
   });
 
+  // U7 (F1053): an animation looped for good, a video played on, and nothing on the page stopped them.
+  test("stops a player on its reader's word, the frame gone and the focus back on Play", async ({ page }) => {
+    const { away } = await room(page, () => event("v1", "checked"));
+    await play(page).click();
+    await expect(lineOf(page, "watch").locator("iframe")).toBeVisible();
+    await lineOf(page, "watch").getByRole("button", { name: "Close the player" }).click();
+    await expect(lineOf(page, "watch").locator("iframe")).toHaveCount(0);
+    await expect(play(page)).toBeFocused();
+    expect(away).toEqual([PLAYER]);
+  });
+
   // F888: the stream given up (a 429: a fifth tab, a shared address), a line said since waited for good.
   test("asks the server of a line said after the stream began once the browser gave the stream up", async ({
     page,

@@ -2,7 +2,7 @@
 // moderation's "checked"; the service's own frame on a click alone, so no third party is reached before. A hidden
 // line's, none.
 import type { StreamEvent } from "@gnoworld/schemas";
-import { Button, Card } from "@gnoworld/ui";
+import { Button, Card, Cluster, Stack } from "@gnoworld/ui";
 import { useEffect, useRef, useState } from "react";
 import type { Embed as Player } from "./embeds.ts";
 import styles from "./Embed.module.css";
@@ -59,28 +59,57 @@ function useLate(waiting: boolean): boolean {
 export function Embed({ embed, verdict }: EmbedProps) {
   const [playing, setPlaying] = useState(false);
   const late = useLate(verdict === undefined);
+  // The card's own box, and whether its Play takes the focus back as the player closes.
+  const cardRef = useRef<HTMLDivElement>(null);
+  const backRef = useRef(false);
+  useEffect(() => {
+    if (playing || !backRef.current) return;
+    backRef.current = false;
+    cardRef.current?.querySelector("button")?.focus();
+  }, [playing]);
   if (verdict === "hidden") return null;
-  if (playing) return <PlayerFrame embed={embed} />;
+  if (playing) {
+    // A player stops on its reader's word: an animation loops for good, a video plays on (WCAG 2.2.2, F1053).
+    return (
+      <Stack space="2xs">
+        <PlayerFrame embed={embed} />
+        <Cluster>
+          <Button
+            emphasis="quiet"
+            icon="close"
+            onClick={() => {
+              backRef.current = true;
+              setPlaying(false);
+            }}
+          >
+            Close the player
+          </Button>
+        </Cluster>
+      </Stack>
+    );
+  }
   const checked = verdict === "checked";
   // Its state in words, which a reader hears as it changes; Play alone once checked (F897).
   const word = checked ? "Ready to play" : late ? "Couldn't check this link" : "Waiting for the moderation check…";
   return (
-    <Card compact>
-      <Card.Header icon="play" title={embed.title} />
-      <p role="status" className={styles["status"]}>
-        {word}
-      </p>
-      {checked ? (
-        <Card.Actions>
-          <Button
-            onClick={() => {
-              setPlaying(true);
-            }}
-          >
-            {`Play the ${embed.title}`}
-          </Button>
-        </Card.Actions>
-      ) : null}
-    </Card>
+    <div ref={cardRef}>
+      <Card compact>
+        <Card.Header icon="play" title={embed.title} />
+        <p role="status" className={styles["status"]}>
+          {word}
+        </p>
+        {checked ? (
+          <Card.Actions>
+            <Button
+              onClick={() => {
+                setPlaying(true);
+              }}
+            >
+              {`Play the ${embed.title}`}
+            </Button>
+          </Card.Actions>
+        ) : null}
+      </Card>
+    </div>
   );
 }
