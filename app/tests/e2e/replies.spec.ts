@@ -52,6 +52,19 @@ test.describe("replies", () => {
     expect(said()).toEqual([`@+reply=m2 PRIVMSG ${ROOM} :this one`]);
   });
 
+  // The green pass (G8): each Reply puts the focus in the field, the same line's again included.
+  test("put the focus in the field at each Reply, the same line's a second time too", async ({ page }) => {
+    await asAccount(page);
+    await replyTo(page, 0);
+    await expect(field(page)).toBeFocused();
+    await lines(page).nth(1).focus();
+    await replyTo(page, 0);
+    await expect(field(page)).toBeFocused();
+    await replyTo(page, 1);
+    await expect(form(page)).toContainText("Replying to g10gh7…3y5tv: the second line");
+    await expect(field(page)).toBeFocused();
+  });
+
   // The green pass (G7): the composer quotes a line as the room shows it, its author's edit folded in.
   test("quote an edited line by its edited words", async ({ page }) => {
     await asAccount(page, () => ({

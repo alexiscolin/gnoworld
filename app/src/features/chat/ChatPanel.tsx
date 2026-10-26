@@ -70,9 +70,11 @@ interface LoadedProps {
 // The room in view, drawn again for each room: the line its next one answers is that room's alone (4d's replies),
 // while the room holds it, a line deleted or gone out of the window answering no more; a line sent answers none after.
 function Room({ room, rooms, state, chat, session, link, dismissed }: RoomProps) {
-  const [reply, setReply] = useState<string>();
+  // The line answered, and how many times Reply was asked: each asking puts the focus in the field (G8).
+  const [reply, setReply] = useState<{ id: string; asked: number }>();
   // As the room shows it, its author's edit folded in (the green pass's G7).
-  const replying = reply === undefined ? undefined : shownLines(state?.lines ?? []).find((line) => line.id === reply);
+  const replying =
+    reply === undefined ? undefined : shownLines(state?.lines ?? []).find((line) => line.id === reply.id);
   return (
     <RoomView
       room={room}
@@ -84,7 +86,9 @@ function Room({ room, rooms, state, chat, session, link, dismissed }: RoomProps)
         dismissed(room);
       }}
       onReact={(reaction) => link.current?.react(room, reaction) ?? false}
-      onReply={setReply}
+      onReply={(id) => {
+        setReply((was) => ({ id, asked: (was?.asked ?? 0) + 1 }));
+      }}
       composer={
         <Writer
           session={session}
@@ -97,6 +101,7 @@ function Room({ room, rooms, state, chat, session, link, dismissed }: RoomProps)
             return went;
           }}
           replying={replying}
+          asked={reply?.asked}
           onCancelReply={() => {
             setReply(undefined);
           }}

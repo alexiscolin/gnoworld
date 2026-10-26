@@ -101,8 +101,9 @@ export interface ComposerProps {
   draft?: string | undefined;
   /** Each change of the draft, for the device to keep; a line sent leaves it blank. */
   onDraft?: ((draft: string) => void) | undefined;
-  /** The line the next one answers (4d's replies), said over the field, and how to answer none. */
-  replying?: Answered | undefined;
+  /** The line the next one answers (4d's replies), said over the field, with how many times Reply was asked; and how
+   * to answer none. */
+  replying?: (Answered & { readonly asked?: number | undefined }) | undefined;
   onCancelReply?: (() => void) | undefined;
 }
 
@@ -150,8 +151,9 @@ export function Composer(props: ComposerProps) {
   const completion = completions(draft, { commands: COMMANDS, rooms, people });
   const known = new Set(members);
   const box = () => formRef.current?.querySelector("input") ?? undefined;
-  // A line chosen to answer: the field takes the focus, to write the reply.
-  const answering = replying === undefined ? undefined : `${replying.who}\n${replying.text}`;
+  // A line chosen to answer, each time Reply is asked, the same line's again included: the field takes the focus.
+  const answering =
+    replying === undefined ? undefined : `${String(replying.asked ?? 0)}\n${replying.who}\n${replying.text}`;
   useLayoutEffect(() => {
     if (answering !== undefined) box()?.focus();
   }, [answering]);

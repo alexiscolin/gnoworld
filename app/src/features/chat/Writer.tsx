@@ -19,10 +19,12 @@ interface WriterProps {
   onSay: (draft: string) => boolean;
   /** The line the next one answers (4d's replies), and how to answer none. */
   replying: Line | undefined;
+  /** How many times Reply was asked: each asking puts the focus in the field. */
+  asked?: number | undefined;
   onCancelReply: () => void;
 }
 
-export function Writer({ session, room, rooms, members, onSay, replying, onCancelReply }: WriterProps) {
+export function Writer({ session, room, rooms, members, onSay, replying, asked, onCancelReply }: WriterProps) {
   if (session.kind !== "in") return <p>Log in to write in this room.</p>;
   // The account's drafts on this device: the room's, where the composer starts, and each change kept (4d).
   const kept = pageDrafts(session.address);
@@ -39,7 +41,7 @@ export function Writer({ session, room, rooms, members, onSay, replying, onCance
         rooms={rooms.map(roomLabel)}
         members={members}
         onSay={onSay}
-        replying={replying === undefined ? undefined : answeredOf(replying)}
+        replying={replying === undefined ? undefined : { ...answeredOf(replying), asked }}
         onCancelReply={onCancelReply}
       />
     </Suspense>
