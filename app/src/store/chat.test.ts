@@ -1,5 +1,5 @@
 import { parseLine, type IrcMessage } from "@gnoworld/core";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { LINES_KEPT } from "./chat.ts";
 import { createAppStore } from "./index.ts";
 
@@ -300,5 +300,66 @@ describe("the store's chat slice: a delete Ergo refused", () => {
     t.dismissed("#garden");
     expect(t.notified()).toBe(before);
     expect(t.store.getState().chat.rooms["#garden"]).toBeUndefined();
+  });
+});
+
+// 4f: who is typing in each room (IRCv3's +typing), on the store's clock.
+describe("the store's chat slice: who is typing", () => {
+  const typing = (room: string, nick: string, state: string) =>
+    read(`@+typing=${state};time=${T0};account=${nick} :${nick}!u@h TAGMSG ${room}`);
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("keeps who is typing in each room, until their 6 s are past, as the store's clock reads it", () => {
+    vi.useFakeTimers({ now: Date.parse(T0) });
+    const t = following();
+    t.heard(typing("#bubble", "alice", "active"));
+    expect(t.room("#bubble")?.typing).toEqual({ alice: Date.parse(T0) + 6_000 });
+    expect(t.room("#bubble/games")?.typing).toBeUndefined();
+    t.heard(said("#bubble", "a", "hello"));
+    expect(t.room("#bubble")?.typing).toBeUndefined();
+  });
+
+  // The red pass (R6): the page's clock, the line's time an hour off.
+  it("counts a typist's 6 s from its own clock, never the line's time", () => {
+    vi.useFakeTimers({ now: Date.parse(T0) });
+    const t = following();
+    t.heard(read("@+typing=active;time=2026-10-25T09:00:00.000Z :alice!u@h TAGMSG #bubble"));
+    expect(t.room("#bubble")?.typing).toEqual({ alice: Date.parse(T0) + 6_000 });
+  });
+
+  it("ignores my own typing, which Ergo echoes, and tells no one of it, another's kept", () => {
+    const t = following();
+    t.heard(typing("#bubble", "alice", "active"));
+    const before = t.notified();
+    t.heard(typing("#bubble", ME, "active"));
+    expect(Object.keys(t.room("#bubble")?.typing ?? {})).toEqual(["alice"]);
+    expect(t.notified()).toBe(before);
+  });
+
+  // The red pass (R17): noise makes no room and tells no one; a flood of one nick is one typist.
+  it("stays quiet on typing in a room it does not follow, to a nick, and a done from nobody", () => {
+    const t = following();
+    const before = t.notified();
+    t.heard(typing("#garden", "alice", "active"));
+    t.heard(typing(ME, "alice", "active"));
+    t.heard(typing("#bubble", "stranger", "done"));
+    expect(t.notified()).toBe(before);
+    expect(t.store.getState().chat.rooms["#garden"]).toBeUndefined();
+  });
+
+  it("holds one typist for a thousand actives of one nick", () => {
+    const t = following();
+    for (let n = 0; n < 1_000; n += 1) t.heard(typing("#bubble", "alice", "active"));
+    expect(Object.keys(t.room("#bubble")?.typing ?? {})).toEqual(["alice"]);
+  });
+
+  it("forgets who is typing when the link drops", () => {
+    const t = following();
+    t.heard(typing("#bubble", "alice", "active"));
+    expect(t.room("#bubble")?.typing).toBeDefined();
+    t.disconnected();
+    expect(t.room("#bubble")?.typing).toBeUndefined();
   });
 });

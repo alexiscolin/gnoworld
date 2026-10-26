@@ -64,9 +64,10 @@ interface WriterProps {
   rooms: readonly string[];
   members: readonly string[];
   onSay: (draft: string) => boolean;
+  onTyping: (state: "active" | "done") => void;
 }
 
-function Writer({ session, room, rooms, members, onSay }: WriterProps) {
+function Writer({ session, room, rooms, members, onSay, onTyping }: WriterProps) {
   if (session.kind !== "in") return <p>Log in to write in this room.</p>;
   // The account's drafts on this device: the room's, where the composer starts, and each change kept (4d).
   const kept = pageDrafts(session.address);
@@ -83,6 +84,7 @@ function Writer({ session, room, rooms, members, onSay }: WriterProps) {
         rooms={rooms.map(roomLabel)}
         members={members}
         onSay={onSay}
+        onTyping={onTyping}
       />
     </Suspense>
   );
@@ -95,7 +97,8 @@ interface LoadedProps {
   state: RoomViewProps["state"];
   chat: RoomViewProps["chat"];
   session: AppState["login"]["session"];
-  /** The page's link to Ergo, which says and deletes the room in view's lines (4c). */
+  /** The page's link to Ergo, which says and deletes the room in view's lines (4c) and tells the account's typing
+   * (4f). */
   link: RefObject<ChatLink | undefined>;
   /** The room's refused delete, said. */
   dismissed: (room: string) => void;
@@ -124,6 +127,9 @@ function Loaded({ sections, current, state, chat, session, link, dismissed }: Lo
               rooms={ids}
               members={state?.members ?? []}
               onSay={(draft) => link.current?.say(current, draft) ?? false}
+              onTyping={(told) => {
+                link.current?.typing(current, told);
+              }}
             />
           }
         />

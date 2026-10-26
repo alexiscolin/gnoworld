@@ -10,6 +10,7 @@ import type { Ergo, ErgoOptions, Who } from "../../lib/ergo/ergo.ts";
 import { LINES_KEPT } from "../../store/chat.ts";
 import { followed, groupsOf } from "./groups.ts";
 import type { AppState, createAppStore } from "../../store/index.ts";
+import { TypingOut } from "./telling.ts";
 
 /** The rooms a connection joins: Ergo's max-channels-per-client (deploy/ergo/ircd.yaml.tmpl). */
 export const ROOMS_JOINED = 100;
@@ -35,6 +36,9 @@ export interface ChatLink {
   /** Deletes a line, by its msgid, in a room Ergo says it is in, as Ergo's REDACT (4c's message menu); an
    * account's alone, Ergo refusing another's line. Whether it went. */
   redact: (room: string, id: string) => boolean;
+  /** Tells a room Ergo says it is in that the account is typing, at most once every 3 s, or done after it was;
+   * an account's alone (IRCv3's +typing). */
+  typing: (room: string, state: "active" | "done") => void;
   stop: () => void;
 }
 
@@ -55,6 +59,8 @@ class Link implements ChatLink {
   // second tab's own JOIN brings no echo, Ergo having told it of the room at its welcome or as the first joined.
   readonly #inside = new Set<string>();
   #reader = new BatchReader();
+  readonly #typing = new TypingOut();
+  readonly #out = (line: string): boolean => this.#ergo?.send(line) === true;
 
   constructor(deps: LinkDeps) {
     this.#deps = deps;
@@ -80,12 +86,18 @@ class Link implements ChatLink {
     const me = this.#ergo?.nick();
     if (this.#key === "guest" || me === undefined || !this.#inside.has(room)) return false;
     const composed = compose(room, draft, me);
-    return composed.kind === "line" && this.#ergo?.send(composed.line) === true;
+    const went = composed.kind === "line" && this.#ergo?.send(composed.line) === true;
+    if (went) this.#typing.ended(room);
+    return went;
   }
 
   redact(room: string, id: string): boolean {
     const allowed = this.#key !== "guest" && this.#inside.has(room) && MSGID.test(id);
     return allowed && this.#ergo?.nick() !== undefined && this.#ergo.send(`REDACT ${room} ${id}`);
+  }
+
+  typing(room: string, state: "active" | "done"): void {
+    if (this.#key !== "guest" && this.#inside.has(room)) this.#typing.tell(room, state, this.#out);
   }
 
   stop(): void {
@@ -176,6 +188,7 @@ class Link implements ChatLink {
   #forget(): void {
     this.#phases.clear();
     this.#inside.clear();
+    this.#typing.forget();
   }
 
   // The room in view's newest lines, once joined by this page and Ergo said I am in it, once a connection.

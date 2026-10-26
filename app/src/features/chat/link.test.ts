@@ -1,6 +1,6 @@
 import { parseLine, type IrcMessage } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Result } from "../../lib/api/http.ts";
 import type { Ergo, ErgoState, Who } from "../../lib/ergo/ergo.ts";
 import { createAppStore } from "../../store/index.ts";
@@ -831,5 +831,100 @@ describe("the chat's link: what it says", () => {
     t.link.stop();
     expect(t.link.say("#bubble/games", "late")).toBe(false);
     expect(said(again.sent)).toEqual(["PRIVMSG #bubble/games :back"]);
+  });
+
+  // 4f: who is typing (IRCv3's +typing, ircv3.net/specs/client-tags/typing).
+  describe("typing", () => {
+    const tagged = (sent: readonly string[]) => sent.filter((line) => line.includes(" TAGMSG "));
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("tells the room the account is typing, at most once every 3 s, as the spec throttles it", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const t = memberIn(["#bubble/games"]);
+      t.link.typing("#bubble/games", "active");
+      vi.advanceTimersByTime(2_999);
+      t.link.typing("#bubble/games", "active");
+      expect(tagged(t.fake.sent)).toEqual(["@+typing=active TAGMSG #bubble/games"]);
+      vi.advanceTimersByTime(1);
+      t.link.typing("#bubble/games", "active");
+      expect(tagged(t.fake.sent)).toHaveLength(2);
+    });
+
+    it("throttles each room apart", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const t = memberIn(["#bubble/games", "#bubble"]);
+      t.fake.line(`:${ADDRESS}!u@h JOIN #bubble`);
+      t.link.typing("#bubble/games", "active");
+      t.link.typing("#bubble", "active");
+      expect(tagged(t.fake.sent)).toEqual(["@+typing=active TAGMSG #bubble/games", "@+typing=active TAGMSG #bubble"]);
+    });
+
+    it("tells the room the account is done once, and only after it said it was typing", () => {
+      const t = memberIn(["#bubble/games"]);
+      t.link.typing("#bubble/games", "done");
+      t.link.typing("#bubble/games", "active");
+      t.link.typing("#bubble/games", "done");
+      t.link.typing("#bubble/games", "done");
+      expect(tagged(t.fake.sent)).toEqual([
+        "@+typing=active TAGMSG #bubble/games",
+        "@+typing=done TAGMSG #bubble/games",
+      ]);
+    });
+
+    // The red pass (R23): a field cleared and written again shows the typing again at once.
+    it("tells the typing again at once after a done, within the 3 s", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const t = memberIn(["#bubble/games"]);
+      t.link.typing("#bubble/games", "active");
+      t.link.typing("#bubble/games", "done");
+      t.link.typing("#bubble/games", "active");
+      expect(tagged(t.fake.sent)).toEqual([
+        "@+typing=active TAGMSG #bubble/games",
+        "@+typing=done TAGMSG #bubble/games",
+        "@+typing=active TAGMSG #bubble/games",
+      ]);
+    });
+
+    it("tells the typing again at once after a line said, which ends it at every reader, and owes no done", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const t = memberIn(["#bubble/games"]);
+      t.link.typing("#bubble/games", "active");
+      expect(t.link.say("#bubble/games", "hi")).toBe(true);
+      t.link.typing("#bubble/games", "done");
+      t.link.typing("#bubble/games", "active");
+      expect(tagged(t.fake.sent)).toEqual([
+        "@+typing=active TAGMSG #bubble/games",
+        "@+typing=active TAGMSG #bubble/games",
+      ]);
+    });
+
+    it("tells no typing as a guest, nor in a room Ergo has not said it is in, nor after my KICK", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const guest = guestIn(["#bubble/games"]);
+      guest.fake.line(`:${GUEST}!u@h JOIN #bubble/games`);
+      guest.link.typing("#bubble/games", "active");
+      expect(tagged(guest.fake.sent)).toEqual([]);
+      const t = memberIn(["#bubble/games", "#bubble"]);
+      t.link.typing("#bubble", "active");
+      t.link.typing("#bubble/games", "active");
+      t.fake.line(`:gnoworld!u@h KICK #bubble/games ${ADDRESS} :out`);
+      vi.advanceTimersByTime(3_000);
+      t.link.typing("#bubble/games", "active");
+      expect(tagged(t.fake.sent)).toEqual(["@+typing=active TAGMSG #bubble/games"]);
+    });
+
+    // The red pass (R10): nothing counted as sent while the link is away; the first word after the JOIN goes.
+    it("tells no typing while away, and tells it at once once back in the room", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const t = memberIn(["#bubble/games"]);
+      t.fake.state("waiting");
+      t.link.typing("#bubble/games", "active");
+      const again = t.connected(ADDRESS);
+      again.line(`:${ADDRESS}!u@h JOIN #bubble/games`);
+      t.link.typing("#bubble/games", "active");
+      expect(tagged(again.sent)).toEqual(["@+typing=active TAGMSG #bubble/games"]);
+    });
   });
 });

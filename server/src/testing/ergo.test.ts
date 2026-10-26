@@ -448,6 +448,15 @@ describe("history and tags", { timeout: 30_000 }, () => {
     await sync(obs);
     expect(obs.lines().slice(seen).join("\n")).not.toContain("TAGMSG");
   });
+
+  // 4f: who is typing, relayed live to the room's members (IRCv3's +typing), as the page shows it.
+  it("relays an account's +typing to the room's members live", async () => {
+    const { members } = await room(["alice", "obs"]);
+    const [alice, obs] = members;
+    if (alice === undefined || obs === undefined) throw new Error("missing members");
+    alice.send("@+typing=active TAGMSG #lobby");
+    expect(await obs.expect(/ TAGMSG #lobby$/)).toMatch(/^@(\S*;)?\+typing=active[;\s].*:alice!/);
+  });
 });
 
 describe("moderation", { timeout: 40_000 }, () => {

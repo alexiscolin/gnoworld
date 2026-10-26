@@ -31,6 +31,14 @@ const bytes = (count: number) => `${String(count)} ${count === 1 ? "byte" : "byt
 // An option as the help names it: an account by its short address.
 const named = (option: string) => (option.startsWith("@") ? `@${shortAddress(option.slice(1))}` : option);
 
+/** What an edit leaving `draft` tells the room of the account's typing (IRCv3's +typing), read as compose reads a
+ * draft: text is active, an empty field done, a slash command nothing (the spec's), `//` text. */
+export function typingOf(draft: string): "active" | "done" | undefined {
+  const text = draft.replaceAll(/\p{Cc}/gu, " ").trim();
+  if (text === "") return "done";
+  return text.startsWith("/") && !text.startsWith("//") ? undefined : "active";
+}
+
 /** What the field says of the line: that it was not sent or is too long, what Tab completes (a command not yet
  * typed whole being no error), an unknown command, or help near the end; or nothing. */
 export function said(composed: Composed, failed: boolean, completion?: Completion): Pick<FieldProps, "error" | "help"> {
@@ -100,14 +108,19 @@ export interface ComposerProps {
   draft?: string | undefined;
   /** Each change of the draft, for the device to keep; a line sent leaves it blank. */
   onDraft?: ((draft: string) => void) | undefined;
+  /** What each change of the draft tells the room of the account's typing (4f). */
+  onTyping?: ((state: "active" | "done") => void) | undefined;
 }
 
-export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", onDraft }: ComposerProps) {
+export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", onDraft, onTyping }: ComposerProps) {
   const [draft, setDraft] = useState(kept);
-  // Each change of the draft, the device told at once: a render alone (a line arriving) writes nothing.
+  // Each change of the draft, the device and the room told at once: a render alone (a line arriving, a room opened
+  // on a kept draft) writes nothing and tells no one (R3).
   const change = (next: string) => {
     setDraft(next);
     onDraft?.(next);
+    const told = typingOf(next);
+    if (told !== undefined) onTyping?.(told);
   };
   const [failed, setFailed] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);

@@ -67,4 +67,9 @@
     font: var(--font-label);
     color: var(--color-text-muted);
   }
+
+  .typing {
+    font: var(--font-meta);
+    color: var(--color-text-muted);
+  }
 }

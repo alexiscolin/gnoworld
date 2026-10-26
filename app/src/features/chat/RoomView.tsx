@@ -4,10 +4,10 @@
 // (4d); the composer, given, goes below.
 // A line's author is its account tag alone, a nick being only a nick; a member's nick is an account's when it is
 // an address, which a guest's cannot be (Ergo gives a guest 32 characters, server/src/testing/ergo.test.ts:314).
-import type { Line } from "@gnoworld/core";
+import { typingAt, type Line, type Typing } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
 import { Sidebar, Stack } from "@gnoworld/ui";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { ErgoState } from "../../lib/ergo/ergo.ts";
 import { Lines } from "./Lines.tsx";
 import { roomLabel } from "./names.ts";
@@ -36,6 +36,8 @@ export interface RoomViewProps {
         topic: string | undefined;
         /** The msgid of a line Ergo refused to delete (4c). */
         refused?: string | undefined;
+        /** Who is typing, each nick with the time its typing ends (4f). */
+        typing?: Typing;
       }
     | undefined;
   chat: ErgoState | "off";
@@ -67,8 +69,40 @@ function People({ members, connected }: { members: readonly string[]; connected:
   );
 }
 
+// Who is typing, by name, on the page's clock, drawn again as the next one's time ends; under the lines and out of
+// every live region, so a screen reader hears the lines and not each pause of another's.
+function Typists({ typing }: { typing: Typing }) {
+  const [now, setNow] = useState(() => Date.now());
+  const next = Math.min(...Object.values(typing ?? {}).filter((until) => until > now));
+  useEffect(() => {
+    if (next === Infinity) return;
+    const timer = setTimeout(() => {
+      setNow(Date.now());
+    }, next - Date.now());
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [next]);
+  const [first, second, ...more] = typingAt(typing, now);
+  const name = (nick: string) => <Person name={nick} guest={!Address.safeParse(nick).success} />;
+  if (first === undefined) return null;
+  return (
+    <p className={styles["typing"]}>
+      {more.length > 0 ? (
+        "Several people are typing…"
+      ) : second === undefined ? (
+        <>{name(first)} is typing…</>
+      ) : (
+        <>
+          {name(first)} and {name(second)} are typing…
+        </>
+      )}
+    </p>
+  );
+}
+
 export function RoomView({ room, state, chat, composer, me, onDelete, onDismiss }: RoomViewProps) {
-  const { lines = [], members = [], topic, refused } = state ?? {};
+  const { lines = [], members = [], topic, refused, typing } = state ?? {};
   const connected = chat === "connected";
   return (
     <Stack as="section" space="s">
@@ -92,6 +126,7 @@ export function RoomView({ room, state, chat, composer, me, onDelete, onDismiss 
             onDismiss={onDismiss ?? (() => undefined)}
           />
           {connected && lines.length === 0 ? <p>No messages yet.</p> : null}
+          <Typists typing={typing} />
           {composer}
         </div>
         <People members={members} connected={connected} />

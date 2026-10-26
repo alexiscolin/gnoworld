@@ -382,3 +382,50 @@ describe("RoomView", () => {
     expect(said(part(html, "Who's here"))).toContain("0 here");
   });
 });
+
+// 4f: who is typing, under the lines (IRCv3's +typing).
+describe("RoomView: who is typing", () => {
+  const CAROL = "g1f6dcp6he2vq9gymrm4yrnyx66n0578vf7fsksl";
+  // Typing until a minute from now, so the render's clock reads it live.
+  const typing = (...nicks: string[]) => Object.fromEntries(nicks.map((nick) => [nick, Date.now() + 60_000]));
+  const words = (html: string) => said(html);
+
+  it("says who is typing, by account shortened, under the lines", () => {
+    expect(words(view({ state: { ...ROOM, typing: typing(ALICE) } }))).toContain("g10gh7…3y5tv is typing…");
+  });
+
+  it("says two typists by name, a guest as a guest", () => {
+    expect(words(view({ state: { ...ROOM, typing: typing(ALICE, "guest-ab12cd") } }))).toContain(
+      "g10gh7…3y5tv and guest-ab12cd (guest) are typing…",
+    );
+  });
+
+  it("says several are typing past two, naming none", () => {
+    const html = words(view({ state: { ...ROOM, typing: typing(ALICE, BOB, CAROL) } }));
+    expect(html).toContain("Several people are typing…");
+    expect(html).not.toContain("3y5tv is typing");
+  });
+
+  // The red pass (R16): a live typist beside the past one, so the test fails while nothing is said at all.
+  it("says nothing of a typist whose time is past, nor with no one typing", () => {
+    const html = words(view({ state: { ...ROOM, typing: { ...typing(BOB), [ALICE]: Date.now() - 1 } } }));
+    expect(html).toContain("g1jg8m…vsqf5 is typing…");
+    expect(html).not.toMatch(/3y5tv (and|is typing)/);
+    expect(words(view())).not.toContain("typing");
+  });
+
+  // The red pass (R24): out of every live region of the room, the Messages list and the link's status among them: no
+  // element open around the words has a role or aria-live.
+  it("keeps who is typing out of the room's live announcements", () => {
+    const html = view({ chat: "waiting", state: { ...ROOM, typing: typing(ALICE) } });
+    const at = html.indexOf("is typing…");
+    expect(at).toBeGreaterThan(-1);
+    const open: { name: string; attributes: string }[] = [];
+    for (const [, closing, name = "", attributes = ""] of html.slice(0, at).matchAll(/<(\/?)([a-z0-9]+)([^>]*)>/g)) {
+      if (closing === "/") open.splice(open.map((element) => element.name).lastIndexOf(name), 1);
+      else if (!["br", "img", "input", "hr"].includes(name)) open.push({ name, attributes });
+    }
+    expect(open.filter(({ attributes }) => /role=|aria-live/.test(attributes))).toEqual([]);
+    expect(open.map(({ name }) => name)).toContain("p");
+  });
+});

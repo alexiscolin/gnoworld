@@ -10,8 +10,10 @@ import {
   redactAfter,
   refusedOf,
   topicAfter,
+  typingAfter,
   type IrcMessage,
   type Line,
+  type Typing,
   type Where,
 } from "@gnoworld/core";
 import type { StateCreator } from "zustand/vanilla";
@@ -27,6 +29,8 @@ interface RoomState {
   readonly topic: string | undefined;
   /** The msgid of a line Ergo refused to delete, until the page has said so (4c's message menu). */
   readonly refused: string | undefined;
+  /** Who is typing, each nick with the time its typing ends on the page's clock (4f); none while nobody is. */
+  readonly typing: Typing;
 }
 
 interface ChatState {
@@ -53,18 +57,20 @@ export interface ChatSlice {
   };
 }
 
-const EMPTY: RoomState = { lines: [], members: [], topic: undefined, refused: undefined };
+const EMPTY: RoomState = { lines: [], members: [], topic: undefined, refused: undefined, typing: undefined };
 
-// A room once a live line is read: the same object when the line changes nothing of it.
-function roomAfter(room: RoomState, message: IrcMessage, at: Where): RoomState {
+// A room once a live line is read at `now`, the page's clock: the same object when the line changes nothing of it.
+function roomAfter(room: RoomState, message: IrcMessage, at: Where & { now: number }): RoomState {
   const line = lineOf(message, at.room);
   const added = line === undefined ? room.lines : addLines(room.lines, [line], LINES_KEPT);
-  const lines = redactAfter(added, message, at.room);
-  const members = membersAfter(room.members, message, at);
-  const topic = topicAfter(room.topic, message, at.room);
-  return lines === room.lines && members === room.members && topic === room.topic
-    ? room
-    : { ...room, lines, members, topic };
+  const next = {
+    lines: redactAfter(added, message, at.room),
+    members: membersAfter(room.members, message, at),
+    topic: topicAfter(room.topic, message, at.room),
+    typing: typingAfter(room.typing, message, at),
+  };
+  const same = (Object.keys(next) as (keyof typeof next)[]).every((key) => next[key] === room[key]);
+  return same ? room : { ...room, ...next };
 }
 
 // A room followed, by its id: an own key alone, the ids being the relay's.
@@ -113,13 +119,14 @@ export const chatSlice: StateCreator<ChatSlice> = (set, get) => {
         // ponytail: a QUIT or a NICK reads every room's people, 100 rooms of M each, though Ergo sends it for the
         // rooms shared alone (1,000 QUITs at 100 rooms of 2,500: 155 ms, the complexity-reviewer); a nick's rooms
         // indexed in the store is the next step.
+        const now = Date.now();
         if (id === "*") {
-          change({ rooms: eachRoom(rooms, (room, each) => roomAfter(room, message, { room: each, me })) });
+          change({ rooms: eachRoom(rooms, (room, each) => roomAfter(room, message, { room: each, me, now })) });
           return;
         }
         const room = id === undefined ? undefined : roomOf(rooms, id);
         if (id === undefined || room === undefined) return;
-        const next = roomAfter(room, message, { room: id, me });
+        const next = roomAfter(room, message, { room: id, me, now });
         if (next !== room) change({ rooms: { ...rooms, [id]: next } });
       },
       page: (id, messages) => {
@@ -135,11 +142,13 @@ export const chatSlice: StateCreator<ChatSlice> = (set, get) => {
         const room = roomOf(rooms, id);
         if (room?.refused !== undefined) change({ rooms: { ...rooms, [id]: { ...room, refused: undefined } } });
       },
+      // Who is here and who is typing go with the link; the reading place is the account's, kept.
       disconnected: () => {
         const { rooms } = get().chat;
+        const gone = (room: RoomState) => room.members.length === 0 && room.typing === undefined;
         change({
           me: undefined,
-          rooms: eachRoom(rooms, (room) => (room.members.length === 0 ? room : { ...room, members: [] })),
+          rooms: eachRoom(rooms, (room) => (gone(room) ? room : { ...room, members: [], typing: undefined })),
         });
       },
     },

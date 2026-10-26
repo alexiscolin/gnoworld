@@ -19,7 +19,8 @@ export interface Line {
 
 // Ergo folds A to Z alone (casemapping ascii, deploy/ergo/ircd.yaml.tmpl).
 const fold = (name: string): string => name.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
-const sameRoom = (name: string, room: string): boolean => fold(name) === fold(room);
+/** Whether two room names are one, folded as Ergo folds them. */
+export const sameRoom = (name: string, room: string): boolean => fold(name) === fold(room);
 /** The nick of a source: nick!user@host, nick@host, or a nick alone. */
 export const nickOf = (source: string): string => source.replace(/[!@].*$/s, "");
 const compare = (one: string, other: string): number => (one < other ? -1 : one > other ? 1 : 0);
@@ -33,6 +34,7 @@ const PLACES: Readonly<Record<string, number>> = {
   PART: 0,
   KICK: 0,
   REDACT: 0,
+  TAGMSG: 0,
   "331": 1,
   "332": 1,
   "353": 2,
