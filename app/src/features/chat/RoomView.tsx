@@ -5,12 +5,11 @@
 // A line's author is its account tag alone, a nick being only a nick; a member's nick is an account's when it is
 // an address, which a guest's cannot be (Ergo gives a guest 32 characters, server/src/testing/ergo.test.ts:314).
 import { markdown, mentions, type Block, type Line } from "@gnoworld/core";
-import { Address } from "@gnoworld/schemas";
 import { IconButton, Sidebar, Stack } from "@gnoworld/ui";
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 import type { ErgoState } from "../../lib/ergo/ergo.ts";
 import { Markdown } from "./Message.tsx";
-import { shortAddress } from "./names.ts";
+import { isAccount, shortAddress } from "./names.ts";
 import shared from "./lists.module.css";
 import styles from "./RoomView.module.css";
 
@@ -55,11 +54,7 @@ export interface RoomViewProps {
 // whole (the moderation bot's). Whether the name is an address, read once by a caller that knows it.
 function Person({ name, guest, account }: PersonProps) {
   if (guest) return <span>{name} (guest)</span>;
-  return (account ?? Address.safeParse(name).success) ? (
-    <span title={name}>{shortAddress(name)}</span>
-  ) : (
-    <span>{name}</span>
-  );
+  return (account ?? isAccount(name)) ? <span title={name}>{shortAddress(name)}</span> : <span>{name}</span>;
 }
 
 interface PersonProps {
@@ -124,7 +119,7 @@ export function People({ members, connected, me, onMessage }: PeopleProps) {
       <h3 className={styles["count"]}>{connected ? `${String(people.length)} here` : "Who's here"}</h3>
       <ul className={shared["plain"]}>
         {people.slice(0, MEMBERS_SHOWN).map((nick) => {
-          const account = Address.safeParse(nick).success;
+          const account = isAccount(nick);
           return (
             <li key={nick}>
               <Person name={nick} guest={!account} account={account} />

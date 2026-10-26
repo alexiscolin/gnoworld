@@ -18,7 +18,7 @@ import { useApp, useAppStore } from "../../storeContext.tsx";
 import { NOT_ENCRYPTED, useDms, type Dms } from "./Dms.tsx";
 import { chatLink } from "./link.ts";
 import { LOADING } from "./Loading.tsx";
-import { neighbour, roomIds, roomLabel, roomParams, roomsQuery, shortAddress, shownRoom } from "./names.ts";
+import { dmParams, neighbour, roomIds, roomLabel, roomParams, roomsQuery, shortAddress, shownRoom } from "./names.ts";
 import { RoomsView } from "./RoomsView.tsx";
 import { People, RoomView, type RoomViewProps } from "./RoomView.tsx";
 import { Writer, type WriterProps } from "./Writer.tsx";
@@ -113,7 +113,7 @@ function Loaded({ sections, current, state, chat, session, say, sayTo, dms }: Lo
   const me = session.kind === "in" ? session.address : undefined;
   // Apart from the room's element, which each line draws again: who is here keeps its drawing (the compiler).
   const onMessage = (other: string) => {
-    setParams({ dm: other });
+    setParams(dmParams(other));
   };
   const people = (
     <People members={state?.members ?? []} connected={chat === "connected"} me={me} onMessage={onMessage} />
