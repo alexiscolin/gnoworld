@@ -13,12 +13,14 @@ const Composer = lazy(async () => ({ default: (await import("./Composer.tsx")).C
 export interface WriterProps {
   session: AppState["login"]["session"];
   room: string;
+  /** The name of whom it writes to, in place of the room's: a direct message's partner. */
+  label?: string | undefined;
   rooms: readonly string[];
   members: readonly string[];
   onSay: (draft: string) => boolean;
 }
 
-export function Writer({ session, room, rooms, members, onSay }: WriterProps) {
+export function Writer({ session, room, label, rooms, members, onSay }: WriterProps) {
   if (session.kind !== "in") return <p>Log in to write in this room.</p>;
   // The account's drafts on this device: the room's, where the composer starts, and each change kept (4d).
   const kept = pageDrafts(session.address);
@@ -31,6 +33,7 @@ export function Writer({ session, room, rooms, members, onSay }: WriterProps) {
         }}
         key={room}
         room={room}
+        label={label}
         nick={session.address}
         rooms={rooms.map(roomLabel)}
         members={members}

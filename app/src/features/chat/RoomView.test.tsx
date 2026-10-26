@@ -275,6 +275,31 @@ describe("RoomView", () => {
     expect(items(part(view({ state: { ...ROOM, members: [nick] } }), "Who's here"))).toEqual([shown]);
   });
 
+  // 4e: an account opens a direct message with another from who is here; a guest has none, nor does one write to
+  // itself or to the bot.
+  it("offers an account a direct message with each other account here, and nothing else", () => {
+    const opened: string[] = [];
+    const members = [ALICE, BOB, "guest-ab12cd", "gnoworld"];
+    const html = part(view({ me: BOB, state: { ...ROOM, members }, onMessage: (a) => opened.push(a) }), "Who's here");
+    expect([...html.matchAll(/<button[^>]*aria-label="([^"]+)"/g)].map((m) => m[1])).toEqual(["Write to g10gh7…3y5tv"]);
+    expect(items(part(view({ state: { ...ROOM, members }, onMessage: () => undefined }), "Who's here"))).toEqual([
+      "g10gh7…3y5tv",
+      "g1jg8m…vsqf5",
+      "guest-ab12cd (guest)",
+    ]);
+    expect(part(view({ me: BOB, state: { ...ROOM, members } }), "Who's here")).not.toContain("<button");
+  });
+
+  // 4e: a direct message's page names its partner, and says it is not encrypted, as every DM does.
+  it("names a conversation by the label it is given, in place of a room's", () => {
+    const html = view({
+      room: ALICE,
+      label: "g10gh7…3y5tv",
+      state: { ...ROOM, topic: "Not encrypted: the server can read these." },
+    });
+    expect(html).toMatch(/<h2[^>]*>g10gh7…3y5tv<\/h2>\s*<p[^>]*>Not encrypted: the server can read these.<\/p>/);
+  });
+
   it("leaves the moderation bot out of who is here, and out of the count", () => {
     const html = part(view({ state: { ...ROOM, members: ["gnoworld", ALICE] } }), "Who's here");
     expect(said(html)).toContain("1 here");

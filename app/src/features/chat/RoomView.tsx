@@ -6,7 +6,7 @@
 // an address, which a guest's cannot be (Ergo gives a guest 32 characters, server/src/testing/ergo.test.ts:314).
 import { markdown, mentions, type Block, type Line } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
-import { Sidebar, Stack } from "@gnoworld/ui";
+import { IconButton, Sidebar, Stack } from "@gnoworld/ui";
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 import type { ErgoState } from "../../lib/ergo/ergo.ts";
 import { Markdown } from "./Message.tsx";
@@ -42,6 +42,10 @@ export interface RoomViewProps {
   composer?: ReactNode;
   /** The reader's address, the lines that mention it marked; none for a guest. */
   me?: string | undefined;
+  /** The page's name for it in place of the room's: a direct message's partner (4e). */
+  label?: string | undefined;
+  /** Opens a direct message with another account here, offered to an account (4e). */
+  onMessage?: ((partner: string) => void) | undefined;
 }
 
 // A person: a guest by its nick, said so; an account's address shortened, its whole in its title; another name
@@ -92,8 +96,18 @@ function LineView({ line, me, members }: { line: Line; me: string | undefined; m
 }
 
 // Who is here: counted once connected, the bot left out, the first MEMBERS_SHOWN named.
-function People({ members, connected }: { members: readonly string[]; connected: boolean }) {
+interface PeopleProps {
+  members: readonly string[];
+  connected: boolean;
+  /** The reader's address, and how it opens a direct message with another account: each offered beside it. */
+  me: string | undefined;
+  onMessage: ((partner: string) => void) | undefined;
+}
+
+function People({ members, connected, me, onMessage }: PeopleProps) {
   const people = members.filter((nick) => nick !== BOT);
+  const writes = (nick: string) =>
+    me !== undefined && onMessage !== undefined && nick !== me && Address.safeParse(nick).success;
   return (
     <aside aria-label="Who's here">
       <h3 className={styles["count"]}>{connected ? `${String(people.length)} here` : "Who's here"}</h3>
@@ -101,6 +115,20 @@ function People({ members, connected }: { members: readonly string[]; connected:
         {people.slice(0, MEMBERS_SHOWN).map((nick) => (
           <li key={nick}>
             <Person name={nick} guest={!Address.safeParse(nick).success} />
+            {writes(nick) ? (
+              <>
+                {" "}
+                <IconButton
+                  icon="chat"
+                  size="s"
+                  emphasis="plain"
+                  label={`Write to ${shortAddress(nick)}`}
+                  onClick={() => {
+                    onMessage?.(nick);
+                  }}
+                />
+              </>
+            ) : null}
           </li>
         ))}
       </ul>
@@ -126,7 +154,7 @@ function useNewestInView(lines: readonly Line[]) {
   return { listRef, onScroll };
 }
 
-export function RoomView({ room, state, chat, composer, me }: RoomViewProps) {
+export function RoomView({ room, state, chat, composer, me, label, onMessage }: RoomViewProps) {
   const { lines = [], members = [], topic } = state ?? {};
   const { listRef, onScroll } = useNewestInView(lines);
   const connected = chat === "connected";
@@ -136,7 +164,7 @@ export function RoomView({ room, state, chat, composer, me }: RoomViewProps) {
   return (
     <Stack as="section" space="s">
       <header>
-        <h2>{roomLabel(room)}</h2>
+        <h2>{label ?? roomLabel(room)}</h2>
         {topic === undefined ? null : <p className={styles["topic"]}>{topic}</p>}
       </header>
       <p role="status" className={styles["status"]}>
@@ -160,7 +188,7 @@ export function RoomView({ room, state, chat, composer, me }: RoomViewProps) {
           {connected && lines.length === 0 ? <p>No messages yet.</p> : null}
           {composer}
         </div>
-        <People members={members} connected={connected} />
+        <People members={members} connected={connected} me={me} onMessage={onMessage} />
       </Sidebar>
     </Stack>
   );

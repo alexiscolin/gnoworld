@@ -22,6 +22,16 @@ describe("Composer", () => {
     expect(markup).not.toContain("inert");
   });
 
+  // 4e: a direct message's composer is named for its partner, as the page names the conversation.
+  it("names its form and its field by the label it is given, in place of the room's", () => {
+    const partner = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+    const markup = renderToStaticMarkup(
+      <Composer room={partner} label="g10gh7…3y5tv" nick={NICK} rooms={[]} members={[]} onSay={() => true} />,
+    );
+    expect(markup).toMatch(/<form[^>]*aria-label="Write to g10gh7…3y5tv"/);
+    expect(markup).toMatch(/<label[^>]*>Message g10gh7…3y5tv<\/label>/);
+  });
+
   it("previews the line out of the keyboard's and the screen reader's reach, its links too", () => {
     const markup = renderToStaticMarkup(
       <Preview composed={compose(ROOM, "**see** [docs](https://gno.land/docs)", NICK)} />,

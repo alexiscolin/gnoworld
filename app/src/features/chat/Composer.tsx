@@ -100,9 +100,11 @@ export interface ComposerProps {
   draft?: string | undefined;
   /** Each change of the draft, for the device to keep; a line sent leaves it blank. */
   onDraft?: ((draft: string) => void) | undefined;
+  /** The name of whom it writes to, in place of the room's: a direct message's partner (4e). */
+  label?: string | undefined;
 }
 
-export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", onDraft }: ComposerProps) {
+export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", onDraft, label: to }: ComposerProps) {
   const [draft, setDraft] = useState(kept);
   // Each change of the draft, the device told at once: a render alone (a line arriving) writes nothing.
   const change = (next: string) => {
@@ -113,7 +115,7 @@ export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", 
   const formRef = useRef<HTMLFormElement>(null);
   // The selection an edit leaves, put back in the box once it shows the new draft.
   const selectionRef = useRef<Edit>(undefined);
-  const label = roomLabel(room);
+  const label = to ?? roomLabel(room);
   const composed = compose(room, draft, nick);
   // The room's accounts are sorted out of its members only while a word after `@` is typed; read apart, the mention
   // alone, not each key, is what the compiler recomputes them on (F793).
@@ -156,7 +158,12 @@ export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", 
     if (went) change("");
   };
   return (
-    <form ref={formRef} aria-label={`Write in ${label}`} onSubmit={send} onKeyDown={complete}>
+    <form
+      ref={formRef}
+      aria-label={`Write ${to === undefined ? "in" : "to"} ${label}`}
+      onSubmit={send}
+      onKeyDown={complete}
+    >
       <Stack space="2xs">
         <FormatBar onFormat={format} />
         <Sidebar side="end" space="2xs">

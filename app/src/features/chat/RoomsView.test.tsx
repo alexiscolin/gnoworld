@@ -80,3 +80,44 @@ describe("RoomsView", () => {
     expect(links(view({ sections: [{ name: null, rooms }] }))).toHaveLength(100);
   });
 });
+
+// 4e: an account's direct messages, under the rooms: each conversation a link to its page, the one shown marked;
+// a choice to hear from those it talked with alone.
+describe("RoomsView: direct messages", () => {
+  const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+  const CAROL = "g1l6m6l6carqlqqqqqqqqqqqqqqqqqqqqqnkkanc";
+  const dms = (over: Partial<NonNullable<RoomsViewProps["dms"]>> = {}) => ({
+    world: "bubble",
+    partners: [ALICE, CAROL],
+    current: undefined,
+    onlyKnown: false,
+    onOnlyKnown: () => undefined,
+    ...over,
+  });
+
+  it("lists each conversation by its partner's short address, a link to its page, after the rooms", () => {
+    // A conversation in view: no room is.
+    const html = view({ current: undefined, dms: dms({ current: CAROL }) });
+    expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual([
+      "Talk",
+      "Other rooms",
+      "Direct messages",
+    ]);
+    expect(links(html).slice(-2)).toEqual(["g10gh7…3y5tv", "g1l6m6…kkanc"]);
+    expect(hrefs(html).slice(-2)).toEqual([`/w/bubble?dm=${ALICE}`, `/w/bubble?dm=${CAROL}`]);
+    expect(html).toMatch(new RegExp(`<a [^>]*href="/w/bubble\\?dm=${CAROL}"[^>]*aria-current="true"`));
+    expect(html.match(/aria-current="true"/g)).toHaveLength(1);
+  });
+
+  it("says when there is none yet, and has no section for a guest", () => {
+    expect(said(view({ dms: dms({ partners: [] }) }))).toContain("No direct message yet.");
+    expect(view()).not.toContain("Direct messages");
+  });
+
+  it("offers to hear from those the account talked with alone, a pressed toggle", () => {
+    expect(view({ dms: dms() })).toMatch(/<button[^>]*aria-pressed="false"[^>]*>Only people I wrote to<\/button>/);
+    expect(view({ dms: dms({ onlyKnown: true }) })).toMatch(
+      /<button[^>]*aria-pressed="true"[^>]*>Only people I wrote to<\/button>/,
+    );
+  });
+});

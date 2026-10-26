@@ -17,6 +17,9 @@ export function roomHref(room: string): string {
   return name === undefined ? `/w/${world}` : `/w/${world}?room=${name}`;
 }
 
+/** A direct message's address on the site: its world's page, and ?dm=<the partner's address> (4e). */
+export const dmHref = (world: string, partner: string): string => `/w/${world}?dm=${partner}`;
+
 /** A room's search on its world's page: ?room=<name>, or none for the main room. */
 export function roomParams(room: string): URLSearchParams {
   const { name } = partsOf(room);

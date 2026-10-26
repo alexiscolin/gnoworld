@@ -13,9 +13,10 @@ import { drawGuestNick } from "../../lib/ergo/ergo.ts";
 import { pageErgo } from "../../lib/ergo/page.ts";
 import type { AppState } from "../../store/index.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
+import { NOT_ENCRYPTED, useDms, type Dms } from "./Dms.tsx";
 import { chatLink } from "./link.ts";
 import { LOADING } from "./Loading.tsx";
-import { neighbour, roomIds, roomParams, roomsQuery, shownRoom } from "./names.ts";
+import { neighbour, roomIds, roomParams, roomsQuery, shortAddress, shownRoom } from "./names.ts";
 import { RoomsView } from "./RoomsView.tsx";
 import { RoomView, type RoomViewProps } from "./RoomView.tsx";
 import { Writer } from "./Writer.tsx";
@@ -61,20 +62,52 @@ interface LoadedProps {
   chat: RoomViewProps["chat"];
   session: AppState["login"]["session"];
   say: (room: string, draft: string) => boolean;
+  /** Sends a draft to another account (4e). */
+  sayTo: (partner: string, draft: string) => boolean;
+  dms: Dms;
 }
 
-function Loaded({ sections, current, state, chat, session, say }: LoadedProps) {
+function Loaded({ sections, current, state, chat, session, say, sayTo, dms }: LoadedProps) {
   const ids = roomIds(sections);
   useRoomKeys(ids, current);
+  const [, setParams] = useSearchParams();
+  const me = session.kind === "in" ? session.address : undefined;
+  const { partner } = dms;
   return (
     <Sidebar space="l">
-      <RoomsView sections={sections} current={current} />
-      {current === undefined ? null : (
+      <RoomsView sections={sections} current={partner === undefined ? current : undefined} dms={dms.nav} />
+      {partner === undefined ? null : (
+        <RoomView
+          room={partner}
+          label={shortAddress(partner)}
+          state={{ lines: dms.lines, members: [], topic: NOT_ENCRYPTED }}
+          chat={chat}
+          me={me}
+          composer={
+            <Writer
+              session={session}
+              room={partner}
+              label={shortAddress(partner)}
+              rooms={ids}
+              members={[]}
+              onSay={(draft) => {
+                const sent = sayTo(partner, draft);
+                if (sent) dms.know(partner);
+                return sent;
+              }}
+            />
+          }
+        />
+      )}
+      {current === undefined || partner !== undefined ? null : (
         <RoomView
           room={current}
           state={state}
           chat={chat}
-          me={session.kind === "in" ? session.address : undefined}
+          me={me}
+          onMessage={(other) => {
+            setParams({ dm: other });
+          }}
           composer={
             <Writer
               session={session}
@@ -136,6 +169,7 @@ export function ChatPanel({ world }: { world: string }) {
     linkRef.current?.show(current);
   }, [current]);
   const state = useApp((app) => (current === undefined ? undefined : app.chat.rooms[current]));
+  const dms = useDms(world, session, params.get("dm"));
   const chat = useApp((app) => app.login.chat);
   if (!loaded) return LOADING;
   if (sections === undefined) {
@@ -160,6 +194,8 @@ export function ChatPanel({ world }: { world: string }) {
       chat={chat}
       session={session}
       say={(room, draft) => linkRef.current?.say(room, draft) ?? false}
+      sayTo={(partner, draft) => linkRef.current?.sayTo(partner, draft) ?? false}
+      dms={dms}
     />
   );
 }
