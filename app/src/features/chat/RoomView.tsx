@@ -130,7 +130,9 @@ export function RoomView({ room, state, chat, composer, me }: RoomViewProps) {
   const { lines = [], members = [], topic } = state ?? {};
   const { listRef, onScroll } = useNewestInView(lines);
   const connected = chat === "connected";
-  const known = new Set(members);
+  // Who a mention may shorten (F812): the members, and the authors in view by their account tag, who proved their
+  // key as a member did (F819).
+  const known = new Set([...members, ...lines.flatMap(({ account }) => (account === undefined ? [] : [account]))]);
   return (
     <Stack as="section" space="s">
       <header>

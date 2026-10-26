@@ -161,6 +161,21 @@ describe("RoomView", () => {
     expect(said(html)).toMatch(/ @g10gh7…3y5tv and @g1l6m6…kkanc$/);
   });
 
+  // F819 (docs/decisions.md, 2026-10-26): an author of a line in view proved its key as a member did, by Ergo's
+  // account tag; a nick alone proves nothing.
+  it("shortens a mention of an author of a line in view, by its account tag, though it left the room", () => {
+    const carol = "g1l6m6l6carqlqqqqqqqqqqqqqqqqqqqqqnkkanc";
+    const lines = [
+      line({ id: "a", from: carol, account: carol, text: "bye all" }),
+      line({ id: "b", text: `@${carol} left` }),
+      line({ id: "c", from: BOB, text: `@${BOB} has no tag` }),
+    ];
+    const html = part(view({ state: { ...ROOM, members: [ALICE], lines } }), "Messages");
+    const [, second = "", third = ""] = items(html);
+    expect(second).toMatch(/ @g1l6m6…kkanc left$/);
+    expect(third).toContain(`@${BOB} has no tag`);
+  });
+
   it("marks no line for a lookalike of the reader's address, shown whole", () => {
     const lookalike = `g1jg8m${"q".repeat(29)}vsqf5`;
     const html = part(view({ me: BOB, state: { ...ROOM, lines: [line({ text: `hey @${lookalike}` })] } }), "Messages");
