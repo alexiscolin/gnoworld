@@ -10,6 +10,8 @@ import type { DmsProps } from "./RoomsView.tsx";
 
 /** What every direct message says of itself (ADR-0002, Chat). */
 export const NOT_ENCRYPTED = "Not encrypted: the server can read these.";
+/** What a stranger's conversation says while the account hears those it wrote to alone (decision B). */
+const NOT_KEPT = 'Not kept: messages from accounts you never wrote to, while "Only people I wrote to" is on.';
 
 export interface Dms {
   /** The account the conversation in view is with; none for a guest or an address that is none. */
@@ -18,6 +20,8 @@ export interface Dms {
   nav: DmsProps | undefined;
   /** The lines of the conversation in view; none from an account never written to, while the account asks so. */
   lines: readonly Line[];
+  /** What the conversation in view says while it holds no line. */
+  empty: string;
   /** The lines to it Ergo refused this session, its partner not connected: how many, and the last one's draft. */
   refused: { count: number; draft: string } | undefined;
 }
@@ -54,6 +58,7 @@ export function useDms(world: string, session: AppState["login"]["session"], ask
             onOnlyKnown: setOnlyKnown,
           },
     lines: partner !== undefined && heard(partner) ? (all[partner] ?? []) : [],
+    empty: partner === undefined || heard(partner) ? "No messages yet." : NOT_KEPT,
     refused: partner === undefined ? undefined : refusals[partner],
   };
 }

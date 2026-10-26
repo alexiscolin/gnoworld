@@ -48,6 +48,8 @@ export interface RoomViewProps {
   onMessage?: ((partner: string) => void) | undefined;
   /** Whether it says who is here: a room does, a conversation, of two, does not (4e). */
   people?: boolean | undefined;
+  /** What it says while it holds no line, once connected: a conversation's own words (4e). */
+  empty?: string | undefined;
 }
 
 // A person: a guest by its nick, said so; an account's address shortened, its whole in its title; another name
@@ -138,6 +140,9 @@ function People({ members, connected, me, onMessage }: PeopleProps) {
   );
 }
 
+// A room the store holds nothing of yet.
+const NO_ROOM: NonNullable<RoomViewProps["state"]> = { lines: [], members: [], topic: undefined };
+
 // How near the end, in pixels, the reader still reads the newest line.
 const AT_END = 32;
 
@@ -165,8 +170,9 @@ function Header({ title, topic }: { title: string; topic: string | undefined }) 
   );
 }
 
-export function RoomView({ room, state, chat, composer, me, label, onMessage, people = true }: RoomViewProps) {
-  const { lines = [], members = [], topic } = state ?? {};
+export function RoomView(props: RoomViewProps) {
+  const { room, state, chat, composer, me, label, onMessage, people = true, empty = "No messages yet." } = props;
+  const { lines, members, topic } = state ?? NO_ROOM;
   const { listRef, onScroll } = useNewestInView(lines);
   const connected = chat === "connected";
   // Who a mention may shorten (F812): the members, and the authors in view by their account tag, who proved their
@@ -193,7 +199,7 @@ export function RoomView({ room, state, chat, composer, me, label, onMessage, pe
               <LineView key={line.id} line={line} me={me} members={known} />
             ))}
           </ol>
-          {connected && lines.length === 0 ? <p>No messages yet.</p> : null}
+          {connected && lines.length === 0 ? <p>{empty}</p> : null}
           {composer}
         </div>
         {people ? <People members={members} connected={connected} me={me} onMessage={onMessage} /> : null}

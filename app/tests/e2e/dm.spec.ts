@@ -132,6 +132,13 @@ test.describe("direct messages", () => {
     await dmFrom(bob, me, word("known"));
     await expect(lines(page).filter({ hasText: "known" })).toHaveCount(1);
     await expect(dmsNav(page).getByRole("link", { name: short(carol.address) })).toHaveCount(0);
+    // Refused means discarded (decision B): hearing everyone again shows nothing that came while it was on.
+    await dmsNav(page).getByRole("button", { name: "Only people I wrote to" }).click();
+    await expect(dmsNav(page).getByRole("button", { name: "Only people I wrote to" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    await expect(dmsNav(page).getByRole("link", { name: short(carol.address) })).toHaveCount(0);
     await Promise.all([bob.close(), carol.close()]);
   });
 

@@ -83,6 +83,7 @@ function Loaded({ sections, current, state, chat, session, say, sayTo, dms }: Lo
           room={partner}
           label={shortAddress(partner)}
           people={false}
+          empty={dms.empty}
           state={{ lines: dms.lines, members: [], topic: NOT_ENCRYPTED }}
           chat={chat}
           me={me}

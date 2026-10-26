@@ -69,6 +69,8 @@ export const dmSlice: StateCreator<ChatSlice & DmSlice, [], [], DmSlice> = (set,
         // My line, as Ergo echoes it once it delivered it: its partner is one I wrote to. Its line to me has its
         // nick as the partner.
         if (dm.partner !== dm.line.from) get().dmActions.know(dm.partner);
+        // Refused means discarded (decision B): a stranger's line, while the account hears those it wrote to alone.
+        if (!heardFrom(get().dmChoices, dm.partner)) return;
         const held = dms[dm.partner] ?? [];
         const lines = addLines(held, [dm.line], LINES_KEPT);
         if (lines !== held) set({ dms: { ...dms, [dm.partner]: lines } });

@@ -187,6 +187,30 @@ describe("the store's chat slice: direct messages", () => {
     expect(t.store.getState().dmRefused).toEqual({});
   });
 
+  // 4e's decision B (T5, U3): "refused" means discarded. A stranger's message was kept, hidden, and shown once the
+  // account heard everyone again; a flood of strangers grew the store all the while.
+  it("keeps no message from an account never written to while it hears those alone, nor shows it once it hears everyone", () => {
+    const t = as(ACCOUNT);
+    t.store.getState().dmActions.begin({ prefs: prefs({ onlyKnown: true }).device, drafts: NO_DRAFTS });
+    let heard = 0;
+    t.store.subscribe(() => {
+      heard += 1;
+    });
+    t.heard(dm("a", { from: ALICE, to: ACCOUNT, text: "spam" }));
+    expect(t.dms()).toEqual({});
+    expect(heard).toBe(0);
+    t.store.getState().dmActions.setOnlyKnown(false);
+    expect(t.dms()).toEqual({});
+  });
+
+  it("keeps my line to a stranger and its answer while the account hears those it wrote to alone", () => {
+    const t = as(ACCOUNT);
+    t.store.getState().dmActions.begin({ prefs: prefs({ onlyKnown: true }).device, drafts: NO_DRAFTS });
+    t.heard(dm("a", { from: ACCOUNT, to: ALICE, text: "hello" }));
+    t.heard(dm("b", { from: ALICE, to: ACCOUNT, text: "hi", second: 1 }));
+    expect(t.dms()[ALICE]?.map(({ id }) => id)).toEqual(["a", "b"]);
+  });
+
   it.each([
     ["anyone, while the account hears everyone", { onlyKnown: false, known: [] }, true],
     ["an account it wrote to, while it hears those alone", { onlyKnown: true, known: [ALICE] }, true],

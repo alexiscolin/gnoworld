@@ -387,6 +387,13 @@ describe("RoomView", () => {
     expect(html).toMatch(/aria-label="Messages".*<\/ol><p>Log in to write in this room.<\/p><\/div><aside/s);
   });
 
+  // 4e: a conversation says why it is empty in words of its own (decisions B, C).
+  it("says the words it is given when it holds no line, once connected", () => {
+    const html = view({ state: { ...ROOM, lines: [] }, empty: "Nothing kept." });
+    expect(said(html)).toContain("Nothing kept.");
+    expect(said(html)).not.toContain("No messages yet.");
+  });
+
   it("shows a room it holds nothing of yet as empty, once connected", () => {
     const html = view({ state: undefined });
     expect(said(html)).toContain("No messages yet.");
