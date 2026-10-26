@@ -973,15 +973,6 @@ describe("the chat's link: a reaction Ergo refused", () => {
     t.fake.line(typeof line === "string" ? line : line(labelOf(t.fake.sent)));
     expect(t.room("#bubble/games")?.cannotReact).toBeUndefined();
   });
-
-  it("forgets its labels with the connection: a refusal heard after a reconnect names nothing", () => {
-    const t = memberIn(["#bubble/games"]);
-    t.link.react("#bubble/games", { to: MSGID, emoji: "👍", on: true });
-    t.fake.state("waiting");
-    const again = t.connected(ADDRESS);
-    again.line(refusal("r1"));
-    expect(t.room("#bubble/games")?.cannotReact).toBeUndefined();
-  });
 });
 
 // R1: Ergo counts a stored reaction as a history item, so a page of 200 may hold few lines or none; while a full page

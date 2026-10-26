@@ -9,7 +9,6 @@ import type { Result } from "../../lib/api/http.ts";
 import type { Ergo, ErgoOptions, Who } from "../../lib/ergo/ergo.ts";
 import { followed, groupsOf } from "./groups.ts";
 import { Earlier, HISTORY_LINES, isCommandMsgid } from "./history.ts";
-import { Labels } from "./labels.ts";
 import type { AppState, createAppStore } from "../../store/index.ts";
 
 /** The rooms a connection joins: Ergo's max-channels-per-client (deploy/ergo/ircd.yaml.tmpl). */
@@ -40,6 +39,9 @@ export interface ChatLink {
   stop: () => void;
 }
 
+// A reaction's label, the room after it: Ergo answers a labelled command by its label, a refusal included.
+const REACTED = "react:";
+
 // Where a room this page follows stands on this connection: a JOIN went for it; its history went.
 type Phase = "joined" | "asked";
 
@@ -57,7 +59,6 @@ class Link implements ChatLink {
   // second tab's own JOIN brings no echo, Ergo having told it of the room at its welcome or as the first joined.
   readonly #inside = new Set<string>();
   #reader = new BatchReader();
-  readonly #labels = new Labels();
   readonly #earlier = new Earlier();
 
   constructor(deps: LinkDeps) {
@@ -95,11 +96,9 @@ class Link implements ChatLink {
   }
 
   react(room: string, reaction: Reacting): boolean {
-    const line = reactionLine(reaction, room, this.#labels.next());
+    const line = reactionLine(reaction, room, `${REACTED}${room}`);
     const allowed = line !== undefined && this.#key !== "guest" && this.#inside.has(room);
-    const went = allowed && this.#ergo?.nick() !== undefined && this.#ergo.send(line);
-    if (went) this.#labels.sent(room);
-    return went;
+    return allowed && this.#ergo?.nick() !== undefined && this.#ergo.send(line);
   }
 
   stop(): void {
@@ -190,7 +189,6 @@ class Link implements ChatLink {
   #forget(): void {
     this.#phases.clear();
     this.#inside.clear();
-    this.#labels.clear();
     this.#earlier.clear();
   }
 
@@ -239,12 +237,20 @@ class Link implements ChatLink {
     if (earlier !== undefined) this.#ergo?.send(earlier);
   }
 
+  // Ergo's 404 on a reaction's label (a +m room, a mute) is told in the room the label names; the label is Ergo's to
+  // echo, its tag value bounded at 4,094 bytes, a room id at 64.
+  #refused({ tags, command }: IrcMessage): void {
+    const label = tags.get("label");
+    if (command === "404" && label?.startsWith(REACTED) === true)
+      this.#deps.store.getState().chatActions.reactionRefused(label.slice(REACTED.length));
+  }
+
   // Ergo's JOIN of me, not replayed: I am in that room, and the room in view's lines are asked. Its KICK of me: I
   // am in it no more, and say nothing there.
   #heard(message: IrcMessage): void {
     this.#deps.store.getState().chatActions.heard(message);
     const { tags, source = "", command, params } = message;
-    this.#labels.answered(tags.get("label"), command, this.#deps.store.getState().chatActions.reactionRefused);
+    this.#refused(message);
     const [room = "", kicked] = params;
     const me = this.#ergo?.nick();
     if (tags.has("batch") || me === undefined) return;
