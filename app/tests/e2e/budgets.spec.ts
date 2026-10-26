@@ -22,11 +22,17 @@ for (const path of PAGES) {
     const scripts = new Set<string>();
     const all = new Set<string>();
     page.on("response", (response) => {
+      // A world page's verdicts stream (an EventSource) has no end to count: what the page downloads to run is.
+      if (response.request().resourceType() === "eventsource") return;
       all.add(response.url());
       if (response.request().resourceType() === "script") scripts.add(response.url());
     });
+    // A world page opens its verdicts stream: measured once it has, every run, not as the timing falls.
+    const stream =
+      path === "/" ? undefined : page.waitForResponse((response) => response.url().includes("/api/stream"));
     await page.goto(path);
     await hydrated(page);
+    await stream;
     const firstScreen = [...scripts];
     expect(firstScreen.length, "the page loads no script: the measure is empty").toBeGreaterThan(0);
     await controlled(page);
