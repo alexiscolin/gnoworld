@@ -18,8 +18,6 @@ export interface Dms {
   nav: DmsProps | undefined;
   /** The lines of the conversation in view; none from an account never written to, while the account asks so. */
   lines: readonly Line[];
-  /** Notes an account written to. */
-  know: (partner: string) => void;
 }
 
 // The account the address's ?dm= names: another account's, never the reader's own nor an address that is none.
@@ -36,7 +34,7 @@ const listOf = (heard: readonly string[], partner: string | undefined): string[]
 export function useDms(world: string, session: AppState["login"]["session"], asked: string | null): Dms {
   const all = useApp((app) => app.dms);
   const choices = useApp((app) => app.dmChoices);
-  const { setOnlyKnown, know } = useApp((app) => app.dmActions);
+  const { setOnlyKnown } = useApp((app) => app.dmActions);
   const account = session.kind === "in" ? session.address : undefined;
   const partner = partnerOf(account, asked);
   const heard = (other: string) => heardFrom(choices, other);
@@ -53,6 +51,5 @@ export function useDms(world: string, session: AppState["login"]["session"], ask
             onOnlyKnown: setOnlyKnown,
           },
     lines: partner !== undefined && heard(partner) ? (all[partner] ?? []) : [],
-    know,
   };
 }

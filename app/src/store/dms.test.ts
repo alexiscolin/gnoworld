@@ -149,6 +149,19 @@ describe("the store's chat slice: direct messages", () => {
     expect(calls.know).toEqual([ALICE, ALICE]);
   });
 
+  // 4e's late test audit (T7) and UX review (U1): the page noted an account written to as it sent, before Ergo
+  // delivered the line, which Ergo refuses when that account is not connected.
+  it("notes an account written to once Ergo echoes my line to it, never for its line to me", () => {
+    const t = as(ACCOUNT);
+    const { device, calls } = prefs();
+    t.store.getState().dmActions.begin({ prefs: device });
+    t.heard(dm("a", { from: ALICE, to: ACCOUNT, text: "hi" }));
+    expect(t.store.getState().dmChoices.known).toEqual(new Set());
+    t.heard(dm("b", { from: ACCOUNT, to: ALICE, text: "hello", second: 1 }));
+    expect(t.store.getState().dmChoices.known).toEqual(new Set([ALICE]));
+    expect(calls.know).toEqual([ALICE]);
+  });
+
   it.each([
     ["anyone, while the account hears everyone", { onlyKnown: false, known: [] }, true],
     ["an account it wrote to, while it hears those alone", { onlyKnown: true, known: [ALICE] }, true],

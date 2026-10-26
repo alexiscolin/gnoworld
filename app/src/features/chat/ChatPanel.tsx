@@ -92,11 +92,7 @@ function Loaded({ sections, current, state, chat, session, say, sayTo, dms }: Lo
               label={shortAddress(partner)}
               rooms={ids}
               members={[]}
-              onSay={(draft) => {
-                const sent = sayTo(partner, draft);
-                if (sent) dms.know(partner);
-                return sent;
-              }}
+              onSay={(draft) => sayTo(partner, draft)}
             />
           }
         />

@@ -34,7 +34,7 @@ export interface DmSlice {
     begin: (device?: DmDevice) => void;
     /** Hears from the accounts written to alone, or from everyone; kept on the device. */
     setOnlyKnown: (only: boolean) => void;
-    /** Notes an account written to; kept on the device. */
+    /** Notes an account written to, once Ergo delivered my line to it; kept on the device. */
     know: (partner: string) => void;
   };
 }
@@ -57,6 +57,9 @@ export const dmSlice: StateCreator<ChatSlice & DmSlice, [], [], DmSlice> = (set,
         // The account read for a direct message alone, not for each of a room's lines.
         const dm = dmOf(message, chat.me ?? "");
         if (dm === undefined || !Address.safeParse(chat.me).success || !Address.safeParse(dm.partner).success) return;
+        // My line, as Ergo echoes it once it delivered it: its partner is one I wrote to. Its line to me has its
+        // nick as the partner.
+        if (dm.partner !== dm.line.from) get().dmActions.know(dm.partner);
         const held = dms[dm.partner] ?? [];
         const lines = addLines(held, [dm.line], LINES_KEPT);
         if (lines !== held) set({ dms: { ...dms, [dm.partner]: lines } });
