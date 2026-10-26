@@ -390,6 +390,23 @@ test.describe("a line's actions", () => {
     expect(await barInside(page, 30)).toBe(true);
   });
 
+  // 4c's UX review (U10): under the pointer, a bar whose line sits at the list's top edge comes down inside the line
+  // rather than rising past the edge, the list never scrolled under the pointer; elsewhere it rises astride its line.
+  test("draw a pointed line's bar inside the list when its line sits at the top edge", async ({ page }) => {
+    await room(page, { history: SIXTY });
+    await toTop(page, 30);
+    // Where the `at`th line's bar's top is, against its line's top.
+    const rise = async (at: number) => {
+      await lines(page).nth(at).hover();
+      const [line, bar] = [await lines(page).nth(at).boundingBox(), await barOf(page, at).boundingBox()];
+      if (line === null || bar === null) throw new Error("no box");
+      return bar.y - line.y;
+    };
+    expect(await rise(30)).toBeGreaterThanOrEqual(0);
+    expect(await barInside(page, 30)).toBe(true);
+    expect(await rise(33)).toBeLessThan(0);
+  });
+
   test("pass axe with a line's bar and its menu open", async ({ page }) => {
     await room(page);
     await lines(page).nth(1).focus();

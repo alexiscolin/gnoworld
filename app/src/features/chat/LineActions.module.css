@@ -12,4 +12,9 @@
     background: var(--color-surface);
     box-shadow: var(--shadow-popover);
   }
+
+  /* Its line at the top of the list that scrolls: inside the line, never past the list's edge (U10). */
+  .bar[data-inside] {
+    inset-block-start: var(--space-3xs);
+  }
 }
