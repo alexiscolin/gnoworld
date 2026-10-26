@@ -2,6 +2,7 @@
 // room left out; each room a link to its address on the site, the one shown marked. An account's direct messages
 // follow (4e), each conversation a link to its page, with the choice to hear from those it wrote to alone.
 import type { RoomList } from "@gnoworld/schemas";
+import type { ReactNode } from "react";
 import { Chip, Icon, Row, Stack } from "@gnoworld/ui";
 import { dmHref, roomHref, roomLabel, shortAddress } from "./names.ts";
 import shared from "./lists.module.css";
@@ -12,6 +13,8 @@ export interface RoomsViewProps {
   current: string | undefined;
   /** An account's direct messages: none for a guest. */
   dms?: DmsProps | undefined;
+  /** What says the rooms could not load, in their place (CR8). */
+  failed?: ReactNode;
 }
 
 export interface DmsProps {
@@ -66,10 +69,12 @@ function Dms({ world, partners, current, onlyKnown, onOnlyKnown, notKept }: DmsP
   );
 }
 
-export function RoomsView({ sections, current, dms }: RoomsViewProps) {
+export function RoomsView({ sections, current, dms, failed }: RoomsViewProps) {
   const shown = sections.filter(({ rooms }) => rooms.length > 0);
   const listed =
-    shown.length === 0 ? (
+    failed !== undefined ? (
+      failed
+    ) : shown.length === 0 ? (
       <p>No room here yet.</p>
     ) : (
       <Stack space="m">

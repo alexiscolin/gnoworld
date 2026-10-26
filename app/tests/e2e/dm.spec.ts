@@ -197,7 +197,10 @@ test.describe("direct messages", () => {
     await page.route("**/api/rooms*", (route) => route.abort());
     await page.goto(`/w/bubble?dm=${partner}`);
     await hydrated(page);
-    await expect(page.getByRole("alert").filter({ hasText: "The rooms could not load." })).toBeVisible();
+    await expect(dmsNav(page).getByRole("alert").filter({ hasText: "The rooms could not load." })).toBeVisible();
+    // /code-review (CR8): the failure stands in the rooms' place, never beside "No room here yet.".
+    await expect(page.getByText("No room here yet.")).toHaveCount(0);
+    await expect(page.getByRole("alert").filter({ hasText: "The rooms could not load." })).toHaveCount(1);
     await expect(page.getByRole("heading", { name: `Direct message with ${short(partner)}` })).toBeVisible();
     await expect(page.getByRole("textbox", { name: `Message ${short(partner)}` })).toBeVisible();
   });

@@ -76,6 +76,14 @@ describe("RoomsView", () => {
     expect(said(view({ sections }))).toBe("No room here yet.");
   });
 
+  // /code-review on 4e (CR8): with the rooms failed and a direct message in view, the navigation said "No room here
+  // yet." beside "The rooms could not load.".
+  it("says the rooms' failure in their place, never that there is no room", () => {
+    const html = view({ sections: [], failed: <p role="alert">The rooms could not load.</p> });
+    expect(said(html)).toBe("The rooms could not load.");
+    expect(html).toMatch(/^<nav [^>]*><p role="alert">/);
+  });
+
   it("leaves out a section with no room", () => {
     const html = view({ sections: [{ name: "Empty", rooms: [] }, ...SECTIONS] });
     expect(html).not.toContain("Empty");

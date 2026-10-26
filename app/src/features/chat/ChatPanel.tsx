@@ -5,7 +5,7 @@
 // (4c); a guest reads, a room letting accounts alone speak.
 import type { RoomList } from "@gnoworld/schemas";
 import { Button, Sidebar, Stack } from "@gnoworld/ui";
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router";
 import { pageLoginApi } from "../../lib/api/login.ts";
 import { pageDmPrefs } from "../../lib/dms/page.ts";
@@ -68,9 +68,11 @@ interface LoadedProps {
   /** Sends a draft to another account (4e). */
   sayTo: (partner: string, draft: string) => boolean;
   dms: Dms;
+  /** What says the rooms could not load, in their place, while a direct message shows (CR8). */
+  failed?: ReactNode;
 }
 
-function Loaded({ sections, current, state, chat, session, say, sayTo, dms }: LoadedProps) {
+function Loaded({ sections, current, state, chat, session, say, sayTo, dms, failed }: LoadedProps) {
   const ids = roomIds(sections);
   // One conversation in view: the direct message ?dm= names, else the room. Alt+Up and Alt+Down move between rooms,
   // none while a direct message is in view (U15).
@@ -92,7 +94,7 @@ function Loaded({ sections, current, state, chat, session, say, sayTo, dms }: Lo
   const shown = shownOf(dms, { id: room, state, say }, { sayTo, focus: opened === dms.partner, noteId });
   return (
     <Sidebar space="l">
-      <RoomsView sections={sections} current={room} dms={dms.nav} />
+      <RoomsView sections={sections} current={room} dms={dms.nav} failed={failed} />
       {dms.problem === undefined ? null : <p role="status">{dms.problem}</p>}
       {shown === undefined ? null : (
         <RoomView
@@ -184,18 +186,16 @@ export function ChatPanel({ world }: { world: string }) {
   // A direct message waits on no room: it shows though the rooms could not load (U10).
   if (failed !== undefined && dms.partner === undefined) return failed;
   return (
-    <>
-      {failed}
-      <Loaded
-        sections={sections ?? []}
-        current={current}
-        state={state}
-        chat={chat}
-        session={session}
-        say={(room, draft) => linkRef.current?.say(room, draft) ?? false}
-        sayTo={(partner, draft) => linkRef.current?.sayTo(partner, draft) ?? false}
-        dms={dms}
-      />
-    </>
+    <Loaded
+      sections={sections ?? []}
+      current={current}
+      state={state}
+      chat={chat}
+      session={session}
+      say={(room, draft) => linkRef.current?.say(room, draft) ?? false}
+      sayTo={(partner, draft) => linkRef.current?.sayTo(partner, draft) ?? false}
+      dms={dms}
+      failed={failed}
+    />
   );
 }
