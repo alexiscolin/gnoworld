@@ -17,13 +17,13 @@ const line = (id: string, time = OLD): Line => ({
 const NONE: Result<LineVerdicts> = { ok: true, value: { room: "#bubble", verdicts: [] } };
 
 // A server that answers each request as told, keeping the ids each asked; and the verdicts handed to the store.
-function server(answer: (ids: readonly string[]) => Result<LineVerdicts> = () => NONE) {
+function server(answer: (ids: readonly string[]) => Promise<Result<LineVerdicts>> = () => Promise.resolve(NONE)) {
   const sent: string[][] = [];
   const heard: StreamEvent[] = [];
   const asker = verdictAsker({
     verdicts: (_room, ids) => {
       sent.push([...ids]);
-      return Promise.resolve(answer(ids));
+      return answer(ids);
     },
     judged: (event) => {
       heard.push(event);
@@ -34,6 +34,10 @@ function server(answer: (ids: readonly string[]) => Result<LineVerdicts> = () =>
   };
   return { ask, sent, heard };
 }
+// The answers' turn: each request's promise settled, and what it does after.
+const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
+const refusal = (reason: "refused" | "forbidden" | "malformed"): Promise<Result<LineVerdicts>> =>
+  Promise.resolve({ ok: false, reason });
 
 describe("verdictAsker: the server's verdicts of the lines in view", () => {
   // F884: a line from the stream's opening on has its verdict from the stream; asking the server too made every
@@ -51,5 +55,60 @@ describe("verdictAsker: the server's verdicts of the lines in view", () => {
     t.ask([line("b")]);
     t.ask([line("a"), line("b")]);
     expect(t.sent).toEqual([["a", "b"], ["a"]]);
+  });
+
+  it("asks VERDICTS_ASKED lines a request at most, in their order", () => {
+    const t = server();
+    const ids = Array.from({ length: 250 }, (_, n) => `m${String(n)}`);
+    t.ask(ids.map((id) => line(id)));
+    expect(t.sent.map((asked) => asked.length)).toEqual([100, 100, 50]);
+    expect(t.sent.flat()).toEqual(ids);
+  });
+
+  it("asks a line once while it stays in view, whatever comes after", async () => {
+    const t = server();
+    t.ask([line("a")]);
+    await settled();
+    t.ask([line("a"), line("b")]);
+    t.ask([line("a"), line("b")]);
+    expect(t.sent).toEqual([["a"], ["b"]]);
+  });
+
+  it("asks nothing of a line whose verdict the page holds, or that has no player", () => {
+    const t = server();
+    t.ask([line("a"), { ...line("b"), text: "no link here" }, line("c")], { a: "checked" });
+    expect(t.sent).toEqual([["c"]]);
+  });
+
+  it("hands each verdict the server gives to the store, with the room it was asked of", async () => {
+    const t = server(() =>
+      Promise.resolve({
+        ok: true,
+        value: {
+          room: "#bubble",
+          verdicts: [
+            { msgid: "a", state: "hidden" },
+            { msgid: "b", state: "checked" },
+          ],
+        },
+      }),
+    );
+    t.ask([line("a"), line("b")]);
+    await settled();
+    expect(t.heard).toEqual([
+      { msgid: "a", room: "#bubble", state: "hidden" },
+      { msgid: "b", room: "#bubble", state: "checked" },
+    ]);
+  });
+
+  // The server would answer the same again: a request it refuses, a room the reader may not read, an answer not
+  // its own.
+  it.each(["refused", "forbidden", "malformed"] as const)("never asks again a line the server %s", async (reason) => {
+    const t = server(() => refusal(reason));
+    t.ask([line("a")]);
+    await settled();
+    t.ask([line("a"), line("b")]);
+    expect(t.sent).toEqual([["a"], ["b"]]);
+    expect(t.heard).toEqual([]);
   });
 });
