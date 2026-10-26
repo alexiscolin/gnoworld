@@ -108,8 +108,8 @@ def restricted(name):
     return f"no-restricted-properties: {name} is restricted from being used. Nothing reaches the DOM as HTML"
 
 
-def run(cmd, cwd="."):
-    return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+def run(cmd, cwd=".", env=None):
+    return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, env=None if env is None else {**os.environ, **env})
 
 
 def plant(files, where=HERE):
@@ -146,6 +146,14 @@ def reported(messages):
 def carries(got, rule):
     """A rule alone matches its name; "rule: words" matches a message that starts with them."""
     return rule in got if ": " not in rule else any(str(g).startswith(rule) for g in got)
+
+
+def verdicts(out):
+    """Each test's title and status in a Vitest run's JSON report; none when the run wrote no report."""
+    try:
+        return {t["title"]: t["status"] for f in json.loads(out.stdout)["testResults"] for t in f["assertionResults"]}
+    except (ValueError, KeyError):
+        return {}
 
 
 def expect(ok, what):
@@ -203,6 +211,30 @@ try:
             with open(".node-version", "w") as f:
                 f.write(pinned)
 
+    if part("core_chromium"):
+        # Core's tests run a second time in Chromium, whose engine reads some regexes and Unicode otherwise than
+        # Node's (F816, F817), and only when CORE_CHROMIUM names a profile folder: a planted test that passes on
+        # Node fails there while a clean one passes beside it, a failure writes nothing beside the code, and with no
+        # CORE_CHROMIUM, `vitest list` (check_regressions.py) lists core's tests on Node alone, opening no browser.
+        tests = {"engine.test.ts": ("outside a page", 'expect(typeof document).toBe("undefined")'), "clean.test.ts": ("anywhere", "expect(1 + 1).toBe(2)")}
+        plant({name: f'import {{ expect, test }} from "vitest";\n\ntest("{title}", () => {{\n  {check};\n}});\n' for name, (title, check) in tests.items()})
+        paths = [f"{HERE}/{name}" for name in tests]
+        out = run(["node_modules/.bin/vitest", "run", "--project", "node", *paths])
+        expect(out.returncode == 0, "core's planted tests pass on Node")
+        profile = tempfile.mkdtemp(prefix="core-chromium-")
+        try:
+            out = run(["node_modules/.bin/vitest", "run", "--reporter=json", "--project", "core_chromium", *paths], env={"CORE_CHROMIUM": profile})
+        finally:
+            shutil.rmtree(profile, ignore_errors=True)
+        states = verdicts(out)
+        expect(states == {"outside a page": "failed", "anywhere": "passed"}, f"core_chromium runs core's tests in a page: {states or (out.stderr or out.stdout)[-300:]}")
+        expect(not os.path.exists(f"{HERE}/__screenshots__") and not os.path.exists(".vitest-attachments"), "core_chromium writes nothing beside the code on a failure")
+        # Plain lines, `[project] file > title`: `--json` would take the next path for its output file.
+        out = run(["node_modules/.bin/vitest", "list", *paths])
+        projects = {line[1:line.index("]")] for line in out.stdout.splitlines() if line.startswith("[") and "]" in line}
+        expect(out.returncode == 0 and projects == {"node"}, f"with no CORE_CHROMIUM, vitest lists core's tests on Node alone: {projects or out.stderr[-300:]}")
+        shutil.rmtree(HERE)
+
     if part("vitest_ui"):
         # The design system's tests run in jsdom, each on an empty page: none is left out by the
         # project's globs, and the setup's cleanup holds (the second test sees one paragraph).
@@ -210,10 +242,7 @@ try:
         plant({"probe.test.tsx": 'import { render, screen } from "@testing-library/react";\nimport { expect, test } from "vitest";\n\n' + page("one") + page("two")
                + 'test("ui probe fails", () => {\n  expect(document.title).toBe("never this title");\n});\n'}, where=UI)
         out = run(["node_modules/.bin/vitest", "run", "--reporter=json", f"{UI}/probe.test.tsx"])
-        try:
-            states = {t["title"]: t["status"] for f in json.loads(out.stdout)["testResults"] for t in f["assertionResults"]}
-        except (ValueError, KeyError):
-            states = {}
+        states = verdicts(out)
         expect(states == {"ui probe one": "passed", "ui probe two": "passed", "ui probe fails": "failed"}, f"vitest runs ui's tests in jsdom, each on an empty page: {states}")
         shutil.rmtree(UI)
 
@@ -669,6 +698,7 @@ finally:
     shutil.rmtree(UI, ignore_errors=True)
     shutil.rmtree(AVATAR, ignore_errors=True)
     shutil.rmtree(APP, ignore_errors=True)
+    shutil.rmtree(".vitest-attachments", ignore_errors=True)  # a browser test's screenshots, should a guard fail
 
 if ONLY - ran:
     failures.append(f"ONLY names no block: {', '.join(sorted(ONLY - ran))}")
