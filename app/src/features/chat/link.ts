@@ -5,39 +5,19 @@
 // connection. Its parts come in, so the tests give their own.
 import { BatchReader, compose, nickOf, type IrcMessage } from "@gnoworld/core";
 import { Address, RoomId } from "@gnoworld/schemas";
-import type { Result } from "../../lib/api/http.ts";
 import type { Ergo, ErgoOptions, Who } from "../../lib/ergo/ergo.ts";
 import { LINES_KEPT } from "../../store/chat.ts";
 import { groupsOf } from "./groups.ts";
+import type { ChatLink, LinkDeps } from "./linkTypes.ts";
 import { outbox, type Outbox, type Sent } from "./outbox.ts";
-import type { DmDevice } from "../../store/dms.ts";
-import type { AppState, createAppStore } from "../../store/index.ts";
+import type { AppState } from "../../store/index.ts";
 
 /** The rooms a connection joins: Ergo's max-channels-per-client (deploy/ergo/ircd.yaml.tmpl). */
 export const ROOMS_JOINED = 100;
 /** The lines a room's history asks: the store's window. */
 export const HISTORY_LINES = LINES_KEPT;
 
-export interface LinkDeps {
-  store: ReturnType<typeof createAppStore>;
-  connect: (who: Who, on: Pick<ErgoOptions, "onState" | "onLine">) => Ergo;
-  ticket: () => Promise<Result<{ ticket: string }>>;
-  guest: () => string;
-  /** An account's device, whose direct-message choices the store reads at its session's start; none in a test. */
-  device?: ((account: Address) => DmDevice) | undefined;
-}
-
-export interface ChatLink {
-  /** The rooms the world lists, in its order. */
-  follow: (ids: readonly string[]) => void;
-  /** The room in view: its history is asked once Ergo says I joined it, once a connection. */
-  show: (room: string | undefined) => void;
-  /** Sends a draft, as the composer composes it, to a room Ergo says it is in; an account's alone. Whether it went. */
-  say: (room: string, draft: string) => boolean;
-  /** Sends a draft to another account, a direct message (4e); an account's alone. Whether it went. */
-  sayTo: (partner: string, draft: string) => boolean;
-  stop: () => void;
-}
+export type { ChatLink, LinkDeps };
 
 // Where a room this page follows stands on this connection: a JOIN went for it; its history went.
 type Phase = "joined" | "asked";
