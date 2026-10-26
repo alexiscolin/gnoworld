@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import type { WebSocketRoute } from "@playwright/test";
+import type { Locator, WebSocketRoute } from "@playwright/test";
 import { inGames, lineOf, lines, roomsNav, whoIsHere, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
@@ -338,6 +338,13 @@ test.describe("deleting a line", () => {
     await expect(flash(page, "Could not delete the message.")).toBeVisible();
     await expect(lineOf(page, "my own line")).toHaveCount(1);
   };
+  // The second line kept as its dialog closes: nothing sent, More holding the focus again.
+  const kept = async (page: Page, dialog: Locator, sent: readonly string[]) => {
+    await expect(dialog).toBeHidden();
+    await expect(moreOf(page, 1)).toBeFocused();
+    await expect(lineOf(page, "my own line")).toHaveCount(1);
+    expect(sent.filter((line) => line.startsWith("REDACT "))).toEqual([]);
+  };
 
   // The red pass (M2): another's line offers no Delete, through the page as wired.
   test("offers Delete on the account's own line, never on another's", async ({ page }) => {
@@ -357,11 +364,23 @@ test.describe("deleting a line", () => {
     const dialog = await deleteFrom(page, 1);
     await expect(dialog).toBeVisible();
     await page.keyboard.press("Escape");
-    await expect(dialog).toBeHidden();
-    await expect(moreOf(page, 1)).toBeFocused();
-    await expect(lineOf(page, "my own line")).toHaveCount(1);
-    expect(sent.filter((line) => line.startsWith("REDACT "))).toEqual([]);
+    await kept(page, dialog, sent);
   });
+
+  // The green pass (G1): the dialog's other ways to keep the line, each a path of its own.
+  const KEEPS: [string, (dialog: Locator) => Promise<void>][] = [
+    ["a click on Keep it", (dialog) => dialog.getByRole("button", { name: "Keep it" }).click()],
+    ["Enter on Keep it", (dialog) => dialog.getByRole("button", { name: "Keep it" }).press("Enter")],
+    ["a click on Close", (dialog) => dialog.getByRole("button", { name: "Close" }).click()],
+  ];
+  for (const [how, keep] of KEEPS) {
+    test(`keeps the line on ${how}, sending nothing, the focus back on More`, async ({ page }) => {
+      const { sent } = await mine(page);
+      const dialog = await deleteFrom(page, 1);
+      await keep(dialog);
+      await kept(page, dialog, sent);
+    });
+  }
 
   test("sends Ergo's REDACT for that line alone once asked; the line goes, the focus on its neighbour", async ({
     page,
