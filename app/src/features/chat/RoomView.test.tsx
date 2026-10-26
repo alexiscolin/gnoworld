@@ -36,6 +36,21 @@ const items = (html: string) => [...html.matchAll(/<li[^>]*>(.*?)<\/li>/gs)].map
 const paragraphs = (html: string) => (html.match(/<p[ >]/g) ?? []).length;
 
 describe("RoomView", () => {
+  // 4g: a line's first link to an accepted service gets its player, waiting on the line's verdict; another host none.
+  it("puts a player under a line linking an accepted service, waiting on its verdict, and none under another", () => {
+    const lines = [
+      line({ id: "y", text: "watch https://youtu.be/dQw4w9WgXcQ" }),
+      line({ id: "i", text: "see https://imgur.com/gallery/abcdefg" }),
+    ];
+    const [youtube = "", imgur = ""] = items(part(view({ state: { ...ROOM, lines } }), "Messages"));
+    expect(youtube).toContain("Waiting for the moderation check");
+    expect(imgur).not.toContain("moderation check");
+    const checked = view({ state: { ...ROOM, lines }, verdicts: { y: "checked" } });
+    expect(said(part(checked, "Messages"))).toContain("Play the YouTube video");
+    const hidden = view({ state: { ...ROOM, lines }, verdicts: { y: "hidden" } });
+    expect(said(part(hidden, "Messages"))).not.toContain("YouTube");
+  });
+
   it("names the room, its description right after, from its topic", () => {
     expect(view()).toMatch(/<h2[^>]*>#games<\/h2>\s*<p[^>]*>Bubbles here<\/p>/);
   });

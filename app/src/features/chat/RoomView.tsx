@@ -8,7 +8,10 @@ import { markdown, mentions, type Block, type Line } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
 import { Sidebar, Stack } from "@gnoworld/ui";
 import { useLayoutEffect, useRef, type ReactNode } from "react";
+import type { StreamEvent } from "@gnoworld/schemas";
 import type { ErgoState } from "../../lib/ergo/ergo.ts";
+import { Embed } from "./Embed.tsx";
+import { embedIn, savesData } from "./embeds.ts";
 import { Markdown } from "./Message.tsx";
 import { roomLabel, shortAddress } from "./names.ts";
 import shared from "./lists.module.css";
@@ -42,6 +45,8 @@ export interface RoomViewProps {
   composer?: ReactNode;
   /** The reader's address, the lines that mention it marked; none for a guest. */
   me?: string | undefined;
+  /** The room's lines' verdicts, by msgid, from the server's stream (4g). */
+  verdicts?: Readonly<Record<string, StreamEvent["state"]>> | undefined;
 }
 
 // A person: a guest by its nick, said so; an account's address shortened, its whole in its title; another name
@@ -71,8 +76,18 @@ function LineText({ blocks, me, known }: { blocks: readonly Block[]; me: string 
 // A line, read once: drawn, and asked whether it mentions the reader, which a word says as well as its colour; a
 // mention shortened for the reader and the room's members alone (F812). A change of members reads its mentions
 // again, never its drawing.
-function LineView({ line, me, members }: { line: Line; me: string | undefined; members: ReadonlySet<string> }) {
+interface LineViewProps {
+  line: Line;
+  me: string | undefined;
+  members: ReadonlySet<string>;
+  /** Its verdict from the server's stream, which a link's player waits on (4g). */
+  verdict: StreamEvent["state"] | undefined;
+}
+
+function LineView({ line, me, members, verdict }: LineViewProps) {
   const blocks = markdown(line.text);
+  // Its first link to an accepted service gets a player, but for a reader who saves data (4g).
+  const embed = savesData() ? undefined : embedIn(blocks);
   const names = namesOf(line.text);
   const mentioned = names.split(" ").some((address) => address === me);
   const known = knownOf(names, members);
@@ -87,6 +102,7 @@ function LineView({ line, me, members }: { line: Line; me: string | undefined; m
       {line.kind === "action" ? "* " : null}
       <Person name={line.account ?? line.from} guest={line.account === undefined} />{" "}
       <LineText blocks={blocks} me={me} known={known} />
+      {embed === undefined ? null : <Embed embed={embed} verdict={verdict} />}
     </li>
   );
 }
@@ -126,7 +142,7 @@ function useNewestInView(lines: readonly Line[]) {
   return { listRef, onScroll };
 }
 
-export function RoomView({ room, state, chat, composer, me }: RoomViewProps) {
+export function RoomView({ room, state, chat, composer, me, verdicts }: RoomViewProps) {
   const { lines = [], members = [], topic } = state ?? {};
   const { listRef, onScroll } = useNewestInView(lines);
   const connected = chat === "connected";
@@ -154,7 +170,7 @@ export function RoomView({ room, state, chat, composer, me }: RoomViewProps) {
             tabIndex={0}
           >
             {lines.map((line) => (
-              <LineView key={line.id} line={line} me={me} members={known} />
+              <LineView key={line.id} line={line} me={me} members={known} verdict={verdicts?.[line.id]} />
             ))}
           </ol>
           {connected && lines.length === 0 ? <p>No messages yet.</p> : null}

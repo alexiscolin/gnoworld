@@ -94,12 +94,13 @@ interface LoadedProps {
   sections: RoomList["sections"];
   current: string | undefined;
   state: RoomViewProps["state"];
+  verdicts: RoomViewProps["verdicts"];
   chat: RoomViewProps["chat"];
   session: AppState["login"]["session"];
   say: (room: string, draft: string) => boolean;
 }
 
-function Loaded({ sections, current, state, chat, session, say }: LoadedProps) {
+function Loaded({ sections, current, state, verdicts, chat, session, say }: LoadedProps) {
   const ids = roomIds(sections);
   useRoomKeys(ids, current);
   return (
@@ -109,6 +110,7 @@ function Loaded({ sections, current, state, chat, session, say }: LoadedProps) {
         <RoomView
           room={current}
           state={state}
+          verdicts={verdicts}
           chat={chat}
           me={session.kind === "in" ? session.address : undefined}
           composer={
@@ -177,6 +179,7 @@ export function ChatPanel({ world }: { world: string }) {
     return pageVerdicts([current], store.getState().verdictActions.judged);
   }, [store, current]);
   const state = useApp((app) => (current === undefined ? undefined : app.chat.rooms[current]));
+  const verdicts = useApp((app) => (current === undefined ? undefined : app.verdicts[current]));
   const chat = useApp((app) => app.login.chat);
   if (!loaded) return LOADING;
   if (sections === undefined) {
@@ -198,6 +201,7 @@ export function ChatPanel({ world }: { world: string }) {
       sections={sections}
       current={current}
       state={state}
+      verdicts={verdicts}
       chat={chat}
       session={session}
       say={(room, draft) => linkRef.current?.say(room, draft) ?? false}

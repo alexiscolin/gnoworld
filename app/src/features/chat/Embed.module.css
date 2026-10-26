@@ -1,0 +1,17 @@
+/* A link's player (4g): its card under the line's words, then the service's frame, as wide as the line allows. */
+@layer components {
+  .card {
+    padding-block: var(--space-3xs);
+    color: var(--color-text-muted);
+  }
+
+  .frame {
+    display: block;
+    inline-size: 100%;
+    /* raw: a player's own width, which no token names */
+    max-inline-size: 480px;
+    aspect-ratio: 16 / 9;
+    border: 0;
+    border-radius: var(--radius-m);
+  }
+}
