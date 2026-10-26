@@ -120,6 +120,6 @@ pushed, with the hooks installed from it.
 
 ## Blind first
 
-Alexis reads the diff in revdiff, beside the session: `revdiff origin/main -o .claude/tmp/review.txt`. His notes land in that file, which git ignores; "read the review" asks Claude to read them and answer each one.
+Alexis reads the diff in revdiff, beside the session, from the main checkout: `revdiff -o .claude/tmp/revdiff.md <base> <branch>` (the previous merge's branch, then this one). His notes land in that file, which git ignores; "read the review" asks Claude to read them and answer each one.
 
 In the first slices, the author gives only the review card's first three items: what to read, what to skim, what to try. Alexis reviews and writes findings, then compares them with the author's and with a fresh-context reviewer's. Each comparison goes into [review-log.md](review-log.md): what was caught, what was missed, and why.

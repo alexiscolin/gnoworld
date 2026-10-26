@@ -9,8 +9,8 @@ from the repository root; it takes minutes, so the full gate runs it when the ha
 `--dry` builds every mutant on the working tree and checks its text and sections, no test run: the fast
 gate's check, through test_hooks.sh. The mutants are judged over HARNESS_SHARDS worktrees side by side
 (4 by default); `--changed <base>` judges only those of the guard files committed since base, a merge's
-own, or all of them when a suite or this script changed (its cases may have weakened any guard's); the
-full gate judges them all."""
+own, and those whose sections of a suite it changed (suite_parts.py: a change outside every section reaches
+them all); all of them when this script changed; the full gate judges them all."""
 import concurrent.futures
 import contextlib
 import os
@@ -21,6 +21,7 @@ import sys
 sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no __pycache__
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # -I leaves this folder off the path
 from repo_files import worktree
+from suite_parts import select, touched
 
 WORKTREE = ""  # the throwaway worktree of HEAD, set by the run below
 OFF = "(lambda *a: None)("
@@ -54,7 +55,7 @@ SECTIONS = {
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
     "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
-    "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
+    "scripts/repo_files.py": "worktrees", "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench", "scripts/suite_parts.py": "mutant_scope,harness_shards", "scripts/batch_size.py": "batch_size", "scripts/exam.py": "exam", "scripts/load.py": "gate_times", "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
 }
 
 
@@ -221,7 +222,8 @@ def mutants():
     yield from each("scripts/harness_mutate.py", "        if unknown:\n", "        if False:\n", "hooks", "harness_mutate --dry sees a section its suite lacks")
     yield from each("scripts/harness_mutate.py", '    WORKTREE = "."\n    checked()\n', '    WORKTREE = "."\n', "hooks", "harness_mutate --dry checks the mutants")
     hm = "scripts/harness_mutate.py"
-    yield from each(hm, "        found = [m for m in found if m[1] in changed]\n", "", "hooks", "harness_mutate --changed judges only the changed guard files")
+    yield from each(hm, "        found = select" "(found, changed, touched_by, sections)\n", "", "hooks", "harness_mutate --changed judges only the changed guard files and sections")
+    yield from each(hm, "for test, suite in SUITE_OF" ".items() if suite in changed}", "for test, suite in SUITE_OF.items() if False}", "hooks", "harness_mutate --changed reads the suites' changed sections")
     yield from each(hm, "    if diff.returncode != 0:\n", "    if False:\n", "hooks", "harness_mutate --changed wants a base git can compare with")
     yield from each(hm, "killed = verdicts[i % " "shards][i // shards]", "killed = verdicts[0][0]", "hooks", "harness_mutate reads each mutant's own verdict")
     yield from each(hm, "worktree(\"HEAD\")) for _ in range(shards)]", "worktree(\"HEAD\")) for _ in range(1)]", "hooks", "harness_mutate makes a worktree a shard")
@@ -231,7 +233,7 @@ def mutants():
     yield from each(hm, "lambda c: run(*c), [(tr, te) for tr in " "trees ", "lambda c: run(*c), [(tr, te) for tr in trees[:1] ", "hooks", "harness_mutate's control runs in every tree")
     yield from each(hm, "elif sys.argv[1:]" ":\n", "elif False:\n", "hooks", "harness_mutate refuses an unknown argument")
     yield from each(hm, "    if sys.argv[2].startswith" "(\"-\"):", "    if False:", "hooks", "harness_mutate --changed takes no option for its base")
-    yield from each(hm, "if changed is not None and changed " "& SUITES:", "if False:", "hooks", "harness_mutate --changed judges every mutant when a suite changed")
+    yield from each(hm, "if changed is not None and SELF" " in changed:", "if False:", "hooks", "harness_mutate --changed judges every mutant when it changed itself")
     yield from each(hm, "if failures" ":\n    sys.exit", "if failures and changed is None:\n    sys.exit", "hooks", "a survivor fails harness_mutate --changed")
     yield from each(hm, "    found = " "checked()\n", "    found = list(mutants())\n", "hooks", "harness_mutate --changed still checks every mutant")
     # The hooks and their scripts.
@@ -527,6 +529,37 @@ def mutants():
     yield from each(".claude/settings.json", '"repo": "gnoverse/gno-mcp"', '"repo": "nowhere/nothing"', "hooks", "settings: gnomcp's marketplace")
     for path in ("scripts/test_hooks.sh", ".githooks/pre-commit"):
         yield from each(path, "|| status=1; exit \"$status\"' EXIT", "exit \"$status\"' EXIT", "hooks", f"{path} keeps a failure through its EXIT trap")
+    yield from each("scripts/repo_files.py", "    clear_dead()\n", "\n", "hooks", "a copy clears the ones dead runs left")
+    yield from each("scripts/repo_files.py", "if pid.isdigit() and not alive(int(pid)):", "if pid.isdigit():", "hooks", "a copy clears never a live run's")
+    yield from each("scripts/repo_files.py", "            f.write(str(os.getpid()))", "            f.write(\"x\")", "hooks", "a copy names its run's pid")
+    yield from each("scripts/repo_files.py", "        return False\n    except OSError:", "        return True\n    except OSError:", "hooks", "a gone pid is a dead run")
+    yield from each("scripts/worktree.sh", '[ ! -e "$dir" ] ||', "true ||", "hooks", "worktree.sh never writes into a folder that exists")
+    yield from each("scripts/worktree.sh", ' "$dir/node_modules/.vite" "$dir/node_modules/.vite-temp"', "", "hooks", "worktree.sh gives Vite caches of the tree's own")
+    yield from each("scripts/worktree.sh", "case $name in .vite | .vite-temp | ", "case $name in ", "hooks", "worktree.sh never shares Vite's caches")
+    yield from each("scripts/worktree.sh", 'else ln -s "$entry"', 'else cp -R "$entry"', "hooks", "worktree.sh links each package, never copies it")
+    yield from each("scripts/worktree.sh", '\tcp -RP "$m" "$dir/$m"', '\tcp -RL "$m" "$dir/$m"', "hooks", "worktree.sh keeps a workspace's @gnoworld links in the new tree")
+    yield from each("scripts/worktree.sh", '\tcp reports/stryker-incremental.json "$dir/reports/"', "\t:", "hooks", "worktree.sh seeds StrykerJS's incremental file")
+    yield from each("scripts/bench.py", "    if mean > budget:", "    if False:", "hooks", "bench.py fails a bench over its budget")
+    yield from each("scripts/bench.py", "    if found is None:", "    if False:", "hooks", "bench.py fails a bench with no budget")
+    yield from each("scripts/bench.py", "if not measures:", "if False:", "hooks", "bench.py fails a run with no bench")
+    yield from each("scripts/bench.py", "if run.returncode != 0 or not", "if not", "hooks", "bench.py fails a Vitest run that failed")
+    yield from each("scripts/check.sh", " PROVE_FIX_GO BENCH_VITEST", " PROVE_FIX_GO", "hooks", "check.sh: the benches' Vitest is never the environment's")
+    yield from each("scripts/suite_parts.py", "    if old_outside != new_outside:", "    if False:", "hooks", "suite_parts: a change outside every section touches them all")
+    yield from each("scripts/suite_parts.py", "            depth += 1", "            depth += 0", "hooks", "suite_parts: a nested if's fi does not end its section")
+    yield from each("scripts/suite_parts.py", "len(bare.lstrip()) <= depth", "len(bare.lstrip()) < depth", "hooks", "suite_parts: a probe block ends at the next as little indented")
+    yield from each("scripts/suite_parts.py", "        if path in changed:", "        if False:", "hooks", "suite_parts: a changed guard file's mutants are asked")
+    yield from each("scripts/suite_parts.py", "return touched_here is None or", "return False or", "hooks", "suite_parts: a suite touched outside its sections asks for all its mutants")
+    yield from each("scripts/batch_size.py", "if added > LIMIT and not", "if False and not", "hooks", "batch_size fails a merge past its limit")
+    yield from each("scripts/batch_size.py", r'"^Batch-size: \d+ - \S"', '"^Batch-size:"', "hooks", "batch_size wants a reason on the Batch-size line")
+    yield from each("scripts/batch_size.py", "if fingerprint(commit) in reviewed", "if False", "hooks", "batch_size counts from the last reviewed commit")
+    yield from each("scripts/batch_size.py", r"(\.test\.tsx?|", "(", "hooks", "batch_size leaves the tests out")
+    yield from each("scripts/batch_size.py", "if added > TIER_ONE:", "if False:", "hooks", "batch_size says the tier-1 limit")
+    yield from each("scripts/check.sh", "\t\tif $merge; then\n\t\t\tstep batch_size", "\t\tif true; then\n\t\t\tstep batch_size", "hooks", "check.sh: only --merge measures a merge's batch")
+    yield from each("scripts/exam.py", 'or cells[5] != "fixed":', "or False:", "hooks", "exam keeps the fixed findings alone")
+    yield from each("scripts/exam.py", "if path is None or fix is None or", "if path is None or", "hooks", "exam keeps a finding whose fix the repository holds")
+    yield from each("scripts/exam.py", "(severe and not SEVERE.search(", "(False and not SEVERE.search(", "hooks", "exam --severe keeps the high and medium")
+    yield from each("scripts/exam.py", "chosen = cases[::-1][:cap]", "chosen = cases[:cap]", "hooks", "exam takes the newest first")
+    yield from each("scripts/load.py", "print(round(os.getloadavg()[0] * 10), (os.cpu_count() or 1) * 10)", "print((os.cpu_count() or 1) * 10, round(os.getloadavg()[0] * 10))", "hooks", "load.py prints the load, then the cores")
     yield from each("scripts/prove_fix.py", "return all(subprocess.run(cmd", "return True or all(subprocess.run(cmd", "hooks", "prove_fix runs the tests on the parent")
     yield from each("scripts/prove_fix.py", 're.search(r"^No-test: \\S", message, re.M)', "True", "hooks", "prove_fix wants a reason for no test")
     yield from each("scripts/prove_fix.py", r"|\.spec\.ts", "", "hooks", "prove_fix takes a journey for a fix's test (F126)")
@@ -591,21 +624,25 @@ def mutants():
         ("\t$app || return 0", "\t:", "the journeys only for an app change"),
         ("\t$all || return 0 # the hooks'", "\t: # the hooks'", "the hooks' tests only for everything"),
         ('harness --quiet "$base" && return 0', 'true && return 0', "--full mutates a changed harness"),
-        ("finish stories history || early=1", ": || early=1", "--full fails when the stories or the history lane did"),
+        ("\tfinish stories history || {\n", "\t: || {\n", "--full fails when the stories or the history lane did"),
         ("\tfinish coverage harness\n", "\t:\n", "--full fails when the coverage or the harness lane did"),
-        ('\t[ "$early" = 0 ]\n', "\t:\n", "--full fails when a lane before the coverage did"),
-        ("finish stories history || early=1", "finish stories history", "--full runs the coverage and the harness after an early failure"),
+        ("\t\texit 1\n\t}\n\tstart coverage", "\t\t:\n\t}\n\tstart coverage", "--full stops before the coverage and the harness after a first-phase failure (C.5)"),
+        ('\t\techo "check.sh: the coverage and harness lanes did not run', '\t\t: "check.sh: the coverage and harness lanes did not run', "--full says which lanes did not run (C.5)"),
         (
-            "\tfinish stories history || early=1\n\tstart coverage\n\tstart harness\n",
-            "\tstart coverage\n\tstart harness\n\tfinish stories history || early=1\n",
+            "\tstart history\n\tfinish stories history || {\n",
+            "\tstart history\n\tstart coverage\n\tfinish stories history || {\n",
             "the stories run before the coverage and the harness lanes (F815)",
         ),
         (
-            "\tstart stories\n\tstart history\n\tearly=0\n\tfinish stories history || early=1\n",
-            "\tearly=0\n\tstart stories\n\tfinish stories || early=1\n\tstart history\n\tfinish history || early=1\n",
+            "\tstart stories\n\tstart history\n\tfinish stories history || {\n",
+            "\tstart stories\n\tfinish stories\n\tstart history\n\tfinish history || {\n",
             "the stories run beside the history lane",
         ),
         ("\tfinish coverage harness\n", "\tfinish coverage harness || true\n", "--full fails when the coverage or the harness lane alone did"),
+        ('\t[ "$high" -gt "$2" ] && echo', "\tfalse && echo", "the fast gate passes past its budget on a busy machine (C.8)"),
+        ('\t[ "$3" -le "$high" ] || high=$3', "\t:", "a machine busy at the run's end counts (C.8)"),
+        ("\thigh=$1\n", "\thigh=0\n", "a machine busy at the run's start counts (C.8)"),
+        ("; find what grew\" >&2\n\t\texit 1\n", "; find what grew\" >&2\n\t\t:\n", "the fast gate fails past its budget on an idle machine (C.8)"),
         ('run coverage "--maxWorkers=$half"', "run coverage", "--full caps Vitest's coverage at half the machine (F777)"),
         ('run mutate "--concurrency $half"', "run mutate", "--full caps StrykerJS at half the machine (F777)"),
         ("\tstart probe\n\tfinish probe\n", "\tstart probe\n", "probe.py runs alone, before the full lanes"),
@@ -677,7 +714,16 @@ if sys.argv[1:] == ["--dry"]:
     WORKTREE = "."
     checked()
     sys.exit(0)
-SUITES = {"scripts/test_hooks.sh", "scripts/probe.py", "scripts/harness_mutate.py"}
+SUITE_OF = {"hooks": "scripts/test_hooks.sh", "probe": "scripts/probe.py"}
+SELF = os.path.relpath(os.path.abspath(__file__))  # this script, from the repository's root, where it runs
+
+
+def suite_touched(base, suite):
+    """The sections of a suite committed since base that changed; None when either side cannot be read."""
+    old, new = (subprocess.run(["git", "show", f"{rev}:{suite}"], capture_output=True, text=True) for rev in (base, "HEAD"))
+    return None if old.returncode or new.returncode else touched(suite, old.stdout, new.stdout)
+
+
 changed = None
 if sys.argv[1:2] == ["--changed"] and len(sys.argv) == 3:
     if sys.argv[2].startswith("-"):  # git would read it as an option
@@ -694,11 +740,13 @@ with contextlib.ExitStack() as stack:
     trees = [stack.enter_context(worktree("HEAD")) for _ in range(shards)]
     WORKTREE = trees[0]
     found = checked()
-    if changed is not None and changed & SUITES:
-        print(f"harness_mutate: {', '.join(sorted(changed & SUITES))} changed since {sys.argv[2]}: every mutant")
+    if changed is not None and SELF in changed:
+        print(f"harness_mutate: {SELF} changed since {sys.argv[2]}: every mutant")
     elif changed is not None:
-        print(f"harness_mutate: the guard files changed since {sys.argv[2]}: {len([m for m in found if m[1] in changed])} of {len(found)} mutants")
-        found = [m for m in found if m[1] in changed]
+        total = len(found)
+        touched_by = {test: suite_touched(sys.argv[2], suite) for test, suite in SUITE_OF.items() if suite in changed}
+        found = select(found, changed, touched_by, sections)
+        print(f"harness_mutate: the guard files and the suites' sections changed since {sys.argv[2]}: {len(found)} of {total} mutants")
     with concurrent.futures.ThreadPoolExecutor(shards * len(TESTS)) as pool:
         # The control: an untouched copy passes, so a failure means the mutant.
         for (tree, test), code in zip([(tr, te) for tr in trees for te in TESTS], pool.map(lambda c: run(*c), [(tr, te) for tr in trees for te in TESTS])):

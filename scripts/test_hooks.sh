@@ -138,7 +138,7 @@ for step in "run format:check" "run typecheck" "run lint" "run test" "run unused
 	"ast.parse(open(f).read(), f) for f in sys.argv[1:]]' scripts/*.py" \
 	"python3 -I ../scripts/mutate.py" "go vet ./tools/..." "go run ./tools/sealvec | cmp" "python3 -I scripts/check_docs.py" \
 	"sh scripts/test_hooks.sh" "python3 -I scripts/probe.py" "run coverage" "python3 -I scripts/patch_coverage.py" "sh scripts/ergo.sh" \
-	"run mutate" "sh scripts/scan_secrets.sh" "python3 -I scripts/harness_mutate.py" "python3 -I scripts/check_regressions.py" "python3 -I scripts/check_migrations.py" \
+	"run mutate" "sh scripts/scan_secrets.sh" "python3 -I scripts/harness_mutate.py" "python3 -I scripts/check_regressions.py" "python3 -I scripts/check_migrations.py" "python3 -I scripts/bench.py" "python3 -I scripts/batch_size.py" "python3 -I scripts/load.py" \
 	'unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO' '[ "$took" -gt "$budget" ]' "python3 -I scripts/prove_fix.py" "python3 -I scripts/audit.py"; do
 	grep -v '^[[:space:]]*#' "$gate_file" | grep -qF -- "$step" || fail "check.sh no longer runs: $step"
 done
@@ -516,7 +516,7 @@ if part harness_mutate; then
 # whose run() leaves a mark, since a fall-through to the real run takes hours.
 m="$t/mutate" && mkdir -p "$m"
 dry() { # $1: a mutant planted at the end of its list, $2: an entry planted in SECTIONS
-	cp "$here/harness_mutate.py" "$m/"
+	cp "$here/harness_mutate.py" "$here/suite_parts.py" "$m/"
 	printf 'def worktree(rev):\n    raise SystemExit("harness_mutate --dry made a worktree")\n' >"$m/repo_files.py"
 	python3 -I - "$m/harness_mutate.py" "$m/ran" "${1:-}" "${2:-}" <<'PY'
 import sys
@@ -566,7 +566,7 @@ printf '%s\n' 'part() { case ",$ONLY," in *",$1,"*) return 0 ;; *) return 1 ;; e
 	'fi' >"$hs/src/scripts/test_hooks.sh"
 printf 'import os, sys\n\n\ndef part(name):\n    return False\n\n\nif part("y"):\n    pass\nsys.exit(os.path.exists("BROKEN_probe"))\n' >"$hs/src/scripts/probe.py"
 printf 'KEEP1 KEEP2 KEEP3 SPARE\n' >"$hs/src/g.txt" && printf 'KEEP4 SPARE2\n' >"$hs/src/h.txt" && printf 'KEEP5\n' >"$hs/src/i.txt"
-cp "$here/harness_mutate.py" "$hs/repo/"
+cp "$here/harness_mutate.py" "$here/suite_parts.py" "$hs/repo/"
 # The worktrees: copies, logged when made and when removed; BREAK_SECOND=<suite> breaks the second one.
 cat >"$hs/repo/repo_files.py" <<'PY'
 import contextlib, os, shutil, tempfile
@@ -604,10 +604,12 @@ planted = '''def mutants():
     yield from each("i.txt", "KEEP5", "", "hooks", "planted keep5")
     if os.environ.get("STALE"):
         yield from each("g.txt", "NOWHERE", "", "hooks", "planted stale")
+    if os.environ.get("SCOPED"):
+        yield from each("j.txt", "KEEP6", "", "hooks", "planted keep6")
 
 
 def every_mutant():'''
-for a, b in (("def mutants():", planted), ("SECTIONS = {\n", 'SECTIONS = {\n    "g.txt": "x", "h.txt": "x", "i.txt": "x",\n')):
+for a, b in (("def mutants():", planted), ("SECTIONS = {\n", 'SECTIONS = {\n    "g.txt": "x", "h.txt": "x", "i.txt": "x", "j.txt": "z",\n')):
     assert s.count(a) == 1, f"harness_mutate.py no longer holds {a!r}: update test_hooks.sh's harness_shards"
     s = s.replace(a, b)
 open(p, "w").write(s)
@@ -664,6 +666,25 @@ base=$(git -C "$hs/repo" rev-parse HEAD)
 printf '\n' >>"$hs/repo/scripts/test_hooks.sh" && git -C "$hs/repo" commit -qam suite
 out=$(shards 2 --changed "$base") && fail "harness_mutate --changed passed with survivors after a suite changed: $out"
 [ "$(verdicts "$out")" = 7 ] || fail "harness_mutate --changed did not judge every mutant after a suite changed: $out"
+# A change inside one section of a suite judges that section's mutants alone, with those of the files it changed.
+printf '%s\n' 'if part z; then' '	grep -q KEEP6 j.txt' 'fi' >"$hs/z"
+cat "$hs/z" >>"$hs/src/scripts/test_hooks.sh" && cat "$hs/z" >>"$hs/repo/scripts/test_hooks.sh"
+printf 'KEEP6\n' >"$hs/src/j.txt" && printf 'KEEP6\n' >"$hs/repo/j.txt"
+git -C "$hs/repo" add -A && git -C "$hs/repo" commit -qm z
+base=$(git -C "$hs/repo" rev-parse HEAD)
+for f in "$hs/src/scripts/test_hooks.sh" "$hs/repo/scripts/test_hooks.sh"; do
+	sed 's|^	grep -q KEEP6 j.txt$|	grep -q KEEP6 j.txt \&\& :|' "$f" >"$f.new" && mv "$f.new" "$f"
+done
+git -C "$hs/repo" commit -qam "z's line"
+out=$(SCOPED=1 shards 2 --changed "$base") || fail "harness_mutate --changed failed on the mutant of the one section changed: $out"
+printf '%s\n' "$out" | grep -q "killed: planted keep6 #1$" || fail "harness_mutate --changed skipped the changed section's mutant: $out"
+[ "$(verdicts "$out")" = 1 ] || fail "harness_mutate --changed judged the mutants of sections a change did not touch: $out"
+printf '%s\n' "$out" | grep -q "1 of 8 mutants" || fail "harness_mutate --changed did not say how many it kept: $out"
+# harness_mutate.py itself changed: its selection may be what changed, so every mutant runs.
+base=$(git -C "$hs/repo" rev-parse HEAD)
+printf '\n# a change of its own\n' >>"$hs/repo/harness_mutate.py" && git -C "$hs/repo" commit -qam itself
+out=$(shards 2 --changed "$base") && fail "harness_mutate --changed passed with survivors after it changed itself: $out"
+[ "$(verdicts "$out")" = 7 ] || fail "harness_mutate --changed did not judge every mutant after it changed itself: $out"
 # What it refuses, before any worktree: a base git cannot compare with, one read as an option, any
 # other argument.
 out=$(shards 2 --changed no-such-base) && fail "harness_mutate --changed took a base that is no commit: $out"
@@ -1447,6 +1468,12 @@ n=$1
 shift
 echo "$n $*" >>"$GATE_LOG"
 [ "$n" != py:audit ] || echo "audit-answer ${AUDIT_ANSWER-unset}" >>"$GATE_LOG"
+[ "$n" != py:bench ] || echo "bench-vitest ${BENCH_VITEST-unset}" >>"$GATE_LOG"
+if [ "$n" = py:load ]; then
+	at=$(($(cat "$GATE_LOG.load" 2>/dev/null || echo 0) + 1)) && echo "$at" >"$GATE_LOG.load"
+	eval "echo \"\${LOAD_$at:-0 160}\""
+	exit 0
+fi
 case " ${MEET:-} " in
 *" $n "*)
 	: >"$GATE_LOG.met.$n"
@@ -1468,7 +1495,7 @@ SH
 for tool in go gofmt; do printf '#!/bin/sh\nexec sh "%s" %s "$@"\n' "$step" "$tool" >"$g/bin/$tool"; done
 printf '#!/bin/sh\nexec sh "%s" gno "$@"\n' "$step" >"$g/toolchain/gno"
 chmod +x "$g/bin/go" "$g/bin/gofmt" "$g/toolchain/gno"
-for py in check_css check_docs mutate probe patch_coverage prove_fix check_regressions check_migrations audit harness_mutate; do
+for py in check_css check_docs mutate probe bench batch_size load patch_coverage prove_fix check_regressions check_migrations audit harness_mutate; do
 	printf 'import os, sys\nos.execvp("sh", ["sh", %s, "py:%s", *sys.argv[1:]])\n' "'$step'" "$py" >"$g/scripts/$py.py"
 done
 for sh in ergo test_hooks scan_secrets; do printf 'exec sh "%s" sh:%s "$@"\n' "$step" "$sh" >"$g/scripts/$sh.sh"; done
@@ -1486,7 +1513,7 @@ for f in server/src/a.ts server/src/b.ts server/roles.json app/src/a.tsx app/tes
 done
 git -C "$g" init -q && git -C "$g" add -A && git -C "$g" commit -qm x && git -C "$g" update-ref refs/remotes/origin/main HEAD
 }
-gate() { : >"$log" && rm -f "$log".met.* && (cd "$g" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" sh scripts/check.sh "$@" 2>&1); }
+gate() { : >"$log" && rm -f "$log".met.* "$log.load" && (cd "$g" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" sh scripts/check.sh "$@" 2>&1); }
 ran() { grep -q "^$1\( \|$\)" "$log"; }
 before() { [ "$(grep -n "^$1\( \|$\)" "$log" | head -1 | cut -d: -f1)" -lt "$(grep -n "^$2\( \|$\)" "$log" | head -1 | cut -d: -f1)" ]; }
 reset() { git -C "$g" reset -q --hard && git -C "$g" clean -qfd; }
@@ -1733,6 +1760,23 @@ for slow in lint gno; do
 	format=$(printf '%s\n' "$out" | sed -n 's/^lane ts .*format \([0-9]*\)\.\([0-9]\).*/\1\2/p') lint=$(printf '%s\n' "$out" | sed -n 's/^lane types .*lint \([0-9]*\)\.\([0-9]\).*/\1\2/p')
 	[ -n "$format" ] && [ "$format" -lt "$lint" ] || fail "check.sh gave a quick step a slow one's time: $out"
 done
+# Past its budget on a busy machine, its 1-minute load above its cores at the run's start or end, the fast gate
+# says so and passes (Alexis, 2026-10-26, C.8): it measured the machine, not the code. At its cores, not above, it
+# still fails.
+busy() { # $1, $2: the load at the run's start and end, in tenths; $3: when the machine was busy
+	rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/gate-green"
+	out=$(LOAD_1="$1 160" LOAD_2="$2 160" SLOW_STEP=lint GATE_BUDGET=0 gate) || fail "check.sh failed past its budget on a machine busy at $3: $out"
+	printf '%s\n' "$out" | grep -q "over its 0 s budget on a busy machine (load 17.0 on 16 cores): passed" ||
+		fail "check.sh did not say it passed past its budget, the machine busy at $3: $out"
+	grep -qxF "$(record)" "$g/.claude/tmp/green-fast" || fail "check.sh did not record the gate it passed on a busy machine"
+}
+busy 170 10 "the run's start"
+busy 10 170 "the run's end"
+out=$(LOAD_1="160 160" LOAD_2="160 160" SLOW_STEP=lint GATE_BUDGET=0 gate) && fail "check.sh passed past its budget on a machine at its cores, not above"
+printf '%s\n' "$out" | grep -q "find what grew" || fail "check.sh did not fail past its budget at the machine's cores: $out"
+# load.py reads the machine itself: its 1-minute load and its cores, in tenths.
+python3 -I "$here/load.py" | python3 -I -c 'import os, sys; load, cores = map(int, sys.stdin.read().split()); assert cores == (os.cpu_count() or 1) * 10 and load >= 0, (load, cores)' ||
+	fail "load.py did not print the machine's load and cores in tenths"
 fi
 
 if part gate_full; then
@@ -1740,8 +1784,8 @@ gate_fixture gate_full
 # The full gate: every fast step but the plain tests, then the full ones in lanes, each told where the
 # branch left main; harness_mutate only when the harness changed since main.
 base=$(git -C "$g" rev-parse HEAD)
-out=$(AUDIT_ANSWER=x gate --full) || fail "check.sh --full failed on a copy whose every step passes: $out"
-for s in $fast_steps py:probe stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
+out=$(AUDIT_ANSWER=x BENCH_VITEST=x gate --full) || fail "check.sh --full failed on a copy whose every step passes: $out"
+for s in $fast_steps py:probe py:bench stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
 	[ "$s" = test ] || ran "$s" || fail "check.sh --full skipped $s"
 done
 ran test && fail "check.sh --full ran the tests twice, with and without coverage"
@@ -1752,15 +1796,23 @@ half=$(($(node -p "require('os').availableParallelism()") / 2))
 grep -qx "coverage --maxWorkers=$half" "$log" || fail "check.sh --full let Vitest's coverage take the whole machine (F777): $(grep '^coverage' "$log")"
 grep -qx "mutate --concurrency $half" "$log" || fail "check.sh --full let StrykerJS take the whole machine (F777): $(grep '^mutate' "$log")"
 ran py:harness_mutate && fail "check.sh --full mutated a harness main already has"
+ran py:batch_size && fail "check.sh --full measured a merge's batch, which --merge alone does: --full reads a whole slice"
 for s in py:prove_fix py:patch_coverage py:check_regressions py:check_migrations; do
 	grep -q "^$s $base$" "$log" || fail "check.sh --full did not give $s the base $base"
 done
 before coverage py:patch_coverage || fail "check.sh --full measured the patch's coverage before the coverage run"
 grep -qx "audit-answer unset" "$log" || fail "check.sh let AUDIT_ANSWER reach the audit"
+grep -qx "bench-vitest unset" "$log" || fail "check.sh let BENCH_VITEST choose the benches' Vitest"
 grep -qxF "$(record)" "$g/.claude/tmp/green-full" || fail "check.sh --full did not record the code it passed"
 # probe.py plants its faults in the source tree: it runs alone, before any full lane reads the tree (the
 # coverage's Vitest, check_regressions' list, StrykerJS, the stories' build), which saw its files come and go.
 (SLOW_STEP=py:probe gate --full) >/dev/null || fail "check.sh --full failed with a slow probe"
+before "done py:probe" py:bench || fail "check.sh --full ran the benches while probe.py was planting its faults"
+# The benches run alone, before any full lane: a bench beside other work measures the machine's load.
+(SLOW_STEP=py:bench gate --full) >/dev/null || fail "check.sh --full failed with slow benches"
+for s in stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions; do
+	before "done py:bench" "$s" || fail "check.sh --full ran $s beside the benches"
+done
 for s in stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
 	before "done py:probe" "$s" || fail "check.sh --full ran $s while probe.py was planting its faults"
 done
@@ -1783,25 +1835,35 @@ printf '\n' >>"$g/scripts/check_css.py" && git -C "$g" commit -qam y
 ran py:harness_mutate || fail "check.sh --full did not mutate a changed harness"
 before "done stories" py:harness_mutate || fail "check.sh --full mutated the harness beside the stories' journeys (F815)"
 rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/green-full"
-out=$(FAIL=coverage,py:audit gate --full) && fail "check.sh --full passed with two failing steps"
-for s in coverage py:audit; do printf '%s\n' "$out" | grep -q "^$s failed here" || fail "check.sh --full hid $s's failure: $out"; done
-# Each lane's failure alone fails the gate and shows; one before the coverage leaves the two after it to run.
+out=$(FAIL=stories,py:audit gate --full) && fail "check.sh --full passed with two failing steps"
+for s in stories py:audit; do printf '%s\n' "$out" | grep -q "^$s failed here" || fail "check.sh --full hid $s's failure: $out"; done
+# Each lane's failure alone fails the gate and shows.
 for s in stories py:prove_fix coverage py:harness_mutate; do
 	out=$(FAIL=$s gate --full) && fail "check.sh --full passed with $s failing alone"
 	printf '%s\n' "$out" | grep -q "^$s failed here" || fail "check.sh --full hid $s's failure: $out"
-	case $s in coverage | py:harness_mutate) continue ;; esac
-	ran mutate && ran py:harness_mutate || fail "check.sh --full stopped at $s's failure, before StrykerJS or harness_mutate"
 done
+# A failure in the first phase stops the gate there, saying which lanes did not run: the coverage and the harness
+# lanes never start; the first phase's other lane runs to its end (Alexis, 2026-10-26, C.5).
+for s in stories py:prove_fix; do
+	out=$(FAIL=$s gate --full) && fail "check.sh --full passed with $s failing"
+	ran mutate && fail "check.sh --full started StrykerJS after $s's failure"
+	ran py:harness_mutate && fail "check.sh --full started harness_mutate after $s's failure"
+	printf '%s\n' "$out" | grep -q "^check.sh: the coverage and harness lanes did not run" ||
+		fail "check.sh --full did not say which lanes did not run after $s's failure: $out"
+done
+(FAIL=stories gate --full) >/dev/null && fail "check.sh --full passed with the stories failing"
+ran py:audit || fail "check.sh --full stopped the history lane at the stories' failure: a phase's lanes run to their end"
 [ ! -e "$g/.claude/tmp/green-full" ] || fail "check.sh --full recorded a gate that failed"
 # --merge, a merge's own review: the full gate's steps, the harness mutants of the merge's guard files
 # alone, and no full record, which only --full writes (pre-push wants it for main).
 rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/green-full"
 base=$(git -C "$g" merge-base HEAD origin/main)
 out=$(gate --merge) || fail "check.sh --merge failed on a copy whose every step passes: $out"
-for s in $fast_steps py:probe stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
+for s in $fast_steps py:probe py:bench stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
 	[ "$s" = test ] || ran "$s" || fail "check.sh --merge skipped $s"
 done
 grep -qx "py:harness_mutate --changed $base" "$log" || fail "check.sh --merge did not judge the merge's own harness mutants: $(grep harness_mutate "$log")"
+grep -qx "py:batch_size $base" "$log" || fail "check.sh --merge did not measure the merge's batch from its base: $(grep batch_size "$log")"
 [ ! -e "$g/.claude/tmp/green-full" ] || fail "check.sh --merge recorded the full gate"
 grep -qxF "$(record)" "$g/.claude/tmp/green-fast" || fail "check.sh --merge did not record the fast gate it passed"
 gate --full >/dev/null || fail "check.sh --full failed after --merge"
@@ -2214,6 +2276,205 @@ for bad in "" "v9.9.9" "v9.9.9 $pin extra" "v9.9.9 0123" "v9.9.9 ${pin%?}G" "v9/
 	ergo_sh >/dev/null && fail "ergo.sh took the pin '$bad'"
 	grep -q 'deploy/ergo/VERSION' "$e/err" && [ ! -s "$e/log" ] || fail "ergo.sh ran something on the pin '$bad', or did not name the file: $(cat "$e/err")"
 done
+fi
+
+if part worktrees; then
+# repo_files.worktree, which harness_mutate and prove_fix make their copies with: a run killed before its cleanup
+# leaves its copy; the next run removes it, its owner's pid gone, and never a live run's (two merge checks may run
+# at once), nor a copy no run marked.
+w="$t/wt"
+mkdir -p "$w/repo" "$w/tmp" && git -C "$w/repo" init -q && echo x >"$w/repo/a" && git -C "$w/repo" add a && git -C "$w/repo" commit -qm x
+tmp="$w/tmp"
+sh -c 'exit 0' &
+dead=$!
+wait "$dead"
+mkdir -p "$tmp/dead" "$tmp/live" "$tmp/other"
+git -C "$w/repo" worktree add -q --detach "$tmp/dead/tree" && echo "$dead" >"$tmp/dead/owner"
+git -C "$w/repo" worktree add -q --detach "$tmp/live/tree" && echo "$$" >"$tmp/live/owner"
+git -C "$w/repo" worktree add -q --detach "$tmp/other/tree"
+# A run killed while it holds its copy: the next run clears it, by the pid it wrote.
+(cd "$w/repo" && TMPDIR="$tmp" exec python3 -I -c 'import sys, time; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); from repo_files import worktree
+with worktree("HEAD"): print("in", flush=True); time.sleep(60)' "$here" >"$w/killed" 2>&1) &
+victim=$!
+tries=0
+until grep -q '^in$' "$w/killed" 2>/dev/null; do
+	tries=$((tries + 1))
+	[ "$tries" -lt 300 ] || fail "repo_files.worktree never held its copy: $(cat "$w/killed")"
+	sleep 0.1
+done
+kill -9 "$victim"
+wait "$victim" 2>/dev/null || :
+[ "$(ls "$tmp" | grep -vc '^\(dead\|live\|other\)$')" = 1 ] || fail "the killed run left no copy to clear: $(ls "$tmp")"
+(cd "$w/repo" && TMPDIR="$tmp" python3 -I -c 'import sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); from repo_files import worktree
+with worktree("HEAD") as tree: print(tree)' "$here" >"$w/out" 2>&1) || fail "repo_files.worktree failed beside a dead run's copy: $(cat "$w/out")"
+[ ! -e "$tmp/dead" ] || fail "a killed run's copy was left: $(ls "$tmp")"
+[ "$(git -C "$w/repo" worktree list --porcelain | grep -c 'dead/tree')" = 0 ] || fail "a killed run's worktree stayed registered"
+[ -d "$tmp/live/tree" ] || fail "a live run's copy was removed"
+[ -d "$tmp/other/tree" ] || fail "a copy no run marked was removed"
+[ "$(ls "$tmp" | grep -vc '^\(live\|other\)$')" = 0 ] || fail "repo_files.worktree left its own copy: $(ls "$tmp")"
+fi
+
+if part worktree_script; then
+# worktree.sh: a worktree of a new branch, ready for the gate, from the tree it runs in: the packages linked one by
+# one (a whole-folder link hides them from borrow_node_modules.sh), a workspace's @gnoworld links leading into the
+# new tree, Vite's caches its own, StrykerJS's incremental file seeded.
+ws="$t/ws"
+mkdir -p "$ws/src/node_modules/pkg" "$ws/src/node_modules/.vite/deps" "$ws/src/app/node_modules/@gnoworld" "$ws/src/packages/core" "$ws/src/reports"
+git -C "$ws/src" init -q
+printf 'node_modules/\nreports/\n' >"$ws/src/.gitignore" && echo x >"$ws/src/packages/core/a.ts"
+git -C "$ws/src" add -A && git -C "$ws/src" commit -qm x
+echo pkg >"$ws/src/node_modules/pkg/index.js" && echo stale >"$ws/src/node_modules/.vite/deps/x"
+ln -s ../../../packages/core "$ws/src/app/node_modules/@gnoworld/core"
+echo '{"files":{}}' >"$ws/src/reports/stryker-incremental.json"
+(cd "$ws/src" && sh "$here/worktree.sh" "$ws/new" feature HEAD) >"$ws/out" 2>&1 || fail "worktree.sh failed: $(cat "$ws/out")"
+[ "$(git -C "$ws/new" rev-parse --abbrev-ref HEAD)" = feature ] || fail "worktree.sh made no branch feature"
+[ -d "$ws/new/node_modules" ] && [ ! -L "$ws/new/node_modules" ] || fail "worktree.sh linked node_modules whole, which borrow_node_modules.sh cannot see into"
+[ -L "$ws/new/node_modules/pkg" ] && [ "$(cat "$ws/new/node_modules/pkg/index.js")" = pkg ] || fail "worktree.sh did not link the packages"
+[ -d "$ws/new/node_modules/.vite" ] && [ ! -L "$ws/new/node_modules/.vite" ] && [ -z "$(ls -A "$ws/new/node_modules/.vite")" ] || fail "worktree.sh shared Vite's cache, which each tree writes"
+[ -d "$ws/new/node_modules/.vite-temp" ] || fail "worktree.sh gave Vite no temp folder of its own"
+[ "$(cd "$ws/new/app/node_modules/@gnoworld/core" && pwd -P)" = "$(cd "$ws/new/packages/core" && pwd -P)" ] || fail "worktree.sh's @gnoworld/core leads out of the new tree"
+cmp -s "$ws/src/reports/stryker-incremental.json" "$ws/new/reports/stryker-incremental.json" || fail "worktree.sh left StrykerJS without its incremental file"
+[ -z "$(git -C "$ws/new" status --porcelain)" ] || fail "worktree.sh left the new tree dirty: $(git -C "$ws/new" status --porcelain)"
+(cd "$ws/src" && sh "$here/worktree.sh" "$ws/new" other HEAD) >/dev/null 2>&1 && fail "worktree.sh wrote over a folder that exists"
+mkdir "$ws/empty" && (cd "$ws/src" && sh "$here/worktree.sh" "$ws/empty" another HEAD) >/dev/null 2>&1 && fail "worktree.sh took an empty folder that exists, which git would fill"
+(cd "$ws/src" && sh "$here/worktree.sh" "$ws/x") >/dev/null 2>&1 && fail "worktree.sh ran with no branch named"
+[ ! -e "$ws/x" ] || fail "worktree.sh made a folder for a call it refused"
+fi
+
+if part bench; then
+# bench.py: each bench names its budget in brackets and the mean of its runs stays under it; one past it, one with no
+# budget, none at all, or a run that fails, fails the gate. A fake Vitest writes the report it is given.
+b="$t/bench"
+mkdir -p "$b"
+printf '#!/bin/sh\nwhile [ $# -gt 0 ]; do [ "$1" = --outputJson ] && cp "$BENCH_FIXTURE" "$2"; shift; done\nexit "${BENCH_EXIT:-0}"\n' >"$b/vitest" && chmod +x "$b/vitest"
+report() { python3 -I -c 'import json, sys
+pairs = zip(sys.argv[2::2], sys.argv[3::2])
+json.dump({"files": [{"filepath": "a.bench.ts", "groups": [{"fullName": "g", "benchmarks": [{"name": n, "mean": float(m)} for n, m in pairs]}]}]}, open(sys.argv[1], "w"))' "$b/report.json" "$@"; }
+bench() { (cd "$b" && BENCH_VITEST="$b/vitest" BENCH_FIXTURE="$b/report.json" python3 -I "$here/bench.py" 2>&1); }
+report "a line [0.2 ms]" 0.05 "a room [100 ms]" 14.5
+out=$(bench) || fail "bench.py refused benches within their budgets: $out"
+printf '%s\n' "$out" | grep -q "0.0500 ms of 0.2 ms: a line" || fail "bench.py did not print a measure and its budget: $out"
+report "a line [0.2 ms]" 0.25 "a room [100 ms]" 14.5
+out=$(bench) && fail "bench.py passed a bench over its budget"
+printf '%s\n' "$out" | grep -q "a line \[0.2 ms\]: 0.2500 ms, over its 0.2 ms" || fail "bench.py did not name the bench over its budget: $out"
+report "a line" 0.05
+out=$(bench) && fail "bench.py passed a bench with no budget"
+printf '%s\n' "$out" | grep -q "names no budget" || fail "bench.py did not say a bench names no budget: $out"
+report
+(bench) >/dev/null && fail "bench.py passed a run with no bench"
+report "a line [0.2 ms]" 0.05
+(BENCH_EXIT=1 bench) >/dev/null && fail "bench.py passed a Vitest run that failed"
+fi
+
+if part mutant_scope; then
+# suite_parts.py: harness_mutate --changed judges the mutants of the sections a change touched, not all ~660 (twenty
+# minutes) whenever a suite changed. A section of test_hooks.sh ends at the fi that closes it, nested ifs at the
+# margin counted; one of probe.py at the next line as little indented; a change outside every section touches all.
+python3 -I - "$here" <<'PY' || fail "suite_parts.py misread which sections a change touched (above)"
+import sys
+sys.dont_write_bytecode = True  # a mutant of the same size, written in the same second, would be read from its .pyc
+sys.path.insert(0, sys.argv[1])
+from suite_parts import select, touched
+sh = "pre\nif part a; then\nx\nif y; then\nz\nfi\nafter\nfi\nhelper() { :; }\nif part b; then\nw\nfi\n\nif part a; then\nv\nfi\ntrailer\n"
+cases = [
+    (sh, set(), "no change"),
+    (sh.replace("w\n", "w2\n"), {"b"}, "a line of b"),
+    (sh.replace("z\n", "z2\n"), {"a"}, "a line inside a's nested if"),
+    (sh.replace("after\n", "after2\n"), {"a"}, "a line after a's nested if"),
+    (sh.replace("v\n", "v2\n"), {"a"}, "a's second block"),
+    (sh.replace("helper", "helper2"), None, "a helper between sections"),
+    (sh.replace("pre", "pre2"), None, "the preamble"),
+    (sh.replace("trailer", "trailer2"), None, "the trailer"),
+    (sh.replace("helper() { :; }\n", "helper() { :; }\nif part c; then\nq\nfi\n"), {"c"}, "a new section"),
+]
+for new, want, what in cases:
+    got = touched("scripts/test_hooks.sh", sh, new)
+    assert got == want, f"test_hooks.sh, {what}: {got} for {want}"
+py = 'def f():\n    pass\n\n\ntry:\n    if part("a"):\n        x\n        if y:\n            z\n\n    if part("b"):\n        w\nfinally:\n    pass\n'
+for new, want, what in [
+    (py.replace("        w", "        w2"), {"b"}, "a line of b"),
+    (py.replace("            z", "            z2"), {"a"}, "a's nested line"),
+    (py.replace("    pass\n\n\ntry", "    pass2\n\n\ntry"), None, "a helper"),
+    (py.replace("finally:\n    pass", "finally:\n    pass2"), None, "the end"),
+]:
+    got = touched("scripts/probe.py", py, new)
+    assert got == want, f"probe.py, {what}: {got} for {want}"
+found = [("g1", "a.sh", "x", "hooks"), ("g2", "b.sh", "x", "hooks"), ("g3", "c.py", "x", "probe"), ("g4", "d.sh", "x", "hooks")]
+names = {"a.sh": "a", "b.sh": "b,c", "c.py": "p", "d.sh": "d"}
+labels = lambda chosen: [m[0] for m in chosen]
+sections = lambda path, test: names[path]
+assert labels(select(found, {"d.sh"}, {"hooks": {"c"}}, sections)) == ["g2", "g4"], "a changed guard file and a touched section"
+assert labels(select(found, set(), {"hooks": None}, sections)) == ["g1", "g2", "g4"], "a suite changed outside its sections"
+assert labels(select(found, set(), {}, sections)) == [], "nothing changed"
+assert labels(select(found, set(), {"probe": {"p"}}, sections)) == ["g3"], "a probe block"
+PY
+fi
+
+if part batch_size; then
+# batch_size.py: a merge carries a small batch of product code (DORA; docs/REVIEW.md, about 400 lines with a tier-1
+# file, 600 otherwise): the lines it adds since the newest commit /pre-merge reviewed, or since base. Past 600 it
+# fails unless a commit says why (`Batch-size: <n> - why`); past 400 it says the tier-1 limit. Tests, stories and
+# journeys are not product code.
+bs="$t/batch"
+mkdir -p "$bs/app/src" "$bs/docs" "$bs/server/src"
+git -C "$bs" init -q
+lines() { python3 -I -c 'import sys; print("\n".join(f"export const v{i} = {i};" for i in range(int(sys.argv[1]))))' "$1"; }
+commit() { git -C "$bs" add -A && git -C "$bs" commit -qm "$1"; }
+size() { (cd "$bs" && python3 -I "$here/batch_size.py" "$1" 2>&1); }
+printf '# passes\n' >"$bs/docs/review-passes.txt" && commit "base"
+base=$(git -C "$bs" rev-parse HEAD)
+lines 700 >"$bs/app/src/old.ts" && commit "the last merge's code"
+(cd "$bs" && python3 -I -c 'import sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); from repo_files import fingerprint
+print("2026-10-26", fingerprint("HEAD"), "lenses")' "$here") >>"$bs/docs/review-passes.txt" && commit "its review's record"
+lines 10 >"$bs/app/src/new.ts" && commit "this merge's code"
+out=$(size "$base") || fail "batch_size.py refused 10 lines since the last reviewed commit: $out"
+printf '%s\n' "$out" | grep -q "^batch_size: 10 lines of product code" || fail "batch_size.py counted code before the last reviewed commit: $out"
+lines 700 >"$bs/server/src/a.test.ts" && lines 700 >"$bs/app/src/b.stories.tsx" && mkdir -p "$bs/app/tests" && lines 700 >"$bs/app/tests/c.spec.ts" && lines 700 >"$bs/app/tests/helper.ts" && commit "tests"
+out=$(size "$base") || fail "batch_size.py counted tests, stories or journeys as product code: $out"
+lines 450 >"$bs/server/src/more.ts" && commit "more code"
+out=$(size "$base") || fail "batch_size.py refused 460 lines: $out"
+printf '%s\n' "$out" | grep -q "past 400" || fail "batch_size.py did not say the tier-1 limit past 400: $out"
+lines 200 >"$bs/server/src/much.ts" && commit "too much"
+out=$(size "$base") && fail "batch_size.py passed 660 lines with no reason given"
+printf '%s\n' "$out" | grep -q "660 lines" || fail "batch_size.py did not say how many lines: $out"
+echo x >>"$bs/server/src/much.ts" && git -C "$bs" add -A && git -C "$bs" commit -qm "a reason" -m "Batch-size: 661 - one feature, cut no smaller"
+out=$(size "$base") || fail "batch_size.py refused a merge whose commit says why it is large: $out"
+git -C "$bs" checkout -q -b no-reason HEAD~1 && echo x >>"$bs/server/src/much.ts" && git -C "$bs" add -A && git -C "$bs" commit -qm "no reason" -m "Batch-size: 661 - "
+out=$(size "$base") && fail "batch_size.py took a Batch-size line with no reason"
+# No reviewed commit since base: everything since base counts.
+git -C "$bs" checkout -q -b fresh "$base" && mkdir -p "$bs/app/src" && lines 610 >"$bs/app/src/first.ts" && commit "a first merge"
+out=$(size "$base") && fail "batch_size.py passed 610 lines of a merge with no reviewed commit since base"
+fi
+
+if part exam; then
+# exam.py: the reviewers' exam's set, from the ledger's fixed findings whose fix commit the repository holds: each the
+# fix's parent, the file the finding names, its bug; the newest first, capped; --severe keeps the high and medium.
+ex="$t/exam"
+mkdir -p "$ex/docs/review" "$ex/app/src"
+git -C "$ex" init -q
+echo bug >"$ex/app/src/a.ts" && git -C "$ex" add -A && git -C "$ex" commit -qm bug
+before=$(git -C "$ex" rev-parse HEAD)
+echo fixed >"$ex/app/src/a.ts" && git -C "$ex" commit -qam fix
+fix=$(git -C "$ex" rev-parse HEAD)
+short=$(git -C "$ex" rev-parse --short HEAD)
+{
+	echo '| Id | Found | By | Where | Claim | Status | Evidence |'
+	echo '|---|---|---|---|---|---|---|'
+	echo "| F001 | 2026-10-26 | a | \`app/src/a.ts\` | the first bug | fixed | \`$short\`: a test |"
+	echo "| F002 | 2026-10-26 | a | \`app/src/a.ts\` | a claim refuted | rejected | \`$short\`: no |"
+	echo "| F003 | 2026-10-26 | a | \`app/src/a.ts\` | a fix gone | fixed | \`0000000\`: lost |"
+	echo "| F004 | 2026-10-26 | a | \`app/src/b.ts\` | the second bug | fixed | \`$short\`: Medium, a test |"
+} >"$ex/docs/review/findings.md"
+exam() { (cd "$ex" && python3 -I "$here/exam.py" "$@" 2>/dev/null); }
+python3 -I - "$(exam)" "$(exam --severe)" "$(exam --cap 1)" "$before" "$fix" <<'PY' || fail "exam.py built a wrong set (above)"
+import json, sys
+every, severe, capped = (json.loads(a) for a in sys.argv[1:4])
+before, fix = sys.argv[4:6]
+assert [c["id"] for c in every] == ["F004", "F001"], f"the fixed findings with a commit, the newest first: {every}"
+assert every[1] == {"id": "F001", "commit": before, "fix": fix, "file": "app/src/a.ts", "bug": "the first bug"}, every[1]
+assert [c["id"] for c in severe] == ["F004"], f"--severe keeps the medium one: {severe}"
+assert [c["id"] for c in capped] == ["F004"], f"--cap 1 keeps the newest: {capped}"
+PY
 fi
 
 [ -z "${ONLY:-}" ] || [ "${ran:-}" = 1 ] || fail "ONLY=$ONLY names no section"
