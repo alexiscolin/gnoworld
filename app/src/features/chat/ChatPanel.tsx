@@ -12,6 +12,7 @@ import { pageRoomsApi } from "../../lib/api/rooms.ts";
 import { pageDrafts } from "../../lib/drafts/page.ts";
 import { drawGuestNick } from "../../lib/ergo/ergo.ts";
 import { pageErgo } from "../../lib/ergo/page.ts";
+import { savesData } from "../../lib/saveData.ts";
 import type { AppState } from "../../store/index.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
 import { chatLink } from "./link.ts";
@@ -19,7 +20,6 @@ import { LOADING } from "./Loading.tsx";
 import { neighbour, roomIds, roomLabel, roomParams, roomsQuery, shownRoom } from "./names.ts";
 import { RoomsView } from "./RoomsView.tsx";
 import { RoomView, type RoomViewProps } from "./RoomView.tsx";
-import { savesData } from "./embeds.ts";
 import { useVerdicts } from "./useVerdicts.ts";
 
 // The rooms as last asked, and what came: undefined when the list could not load.

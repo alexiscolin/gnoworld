@@ -3,7 +3,7 @@
 // Do Not Track (help.vimeo.com, "Player parameters overview"), Giphy's embed_url (developers.giphy.com/docs/api/
 // schema). Imgur's form could not be read, its pages refusing crawlers: its links stay links. An id outside its
 // alphabet, a host that only looks like one, a port or plain http gets none.
-import { inlines, markdown, type Block, type Line } from "@gnoworld/core";
+import { inlines, type Block } from "@gnoworld/core";
 
 export interface Embed {
   service: "YouTube" | "Vimeo" | "Giphy";
@@ -67,26 +67,4 @@ export function embedIn(blocks: readonly Block[]): Embed | undefined {
     if (embed !== undefined) return embed;
   }
   return undefined;
-}
-
-/** Whether the reader asks to save data (a 2G link, ADR-0002 §8): then no player is offered. */
-export function savesData(): boolean {
-  if (typeof navigator === "undefined") return false;
-  const connection: unknown = Reflect.get(navigator, "connection");
-  return typeof connection === "object" && connection !== null && Reflect.get(connection, "saveData") === true;
-}
-
-/** The lines in view whose player waits on a verdict the page does not hold and has not asked for, in their order:
- * the server answers them (GET /api/verdicts), a line older than the stream's replay among them. */
-export function unjudged(
-  lines: readonly Line[],
-  verdicts: Readonly<Record<string, unknown>> | undefined,
-  asked: ReadonlySet<string>,
-): string[] {
-  return lines
-    .filter(({ id, text }) => {
-      const held = verdicts !== undefined && Object.hasOwn(verdicts, id);
-      return !held && !asked.has(id) && embedIn(markdown(text)) !== undefined;
-    })
-    .map(({ id }) => id);
 }

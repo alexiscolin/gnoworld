@@ -2,10 +2,10 @@
 // asker follows, gives them from when it says it began (F890); GET /api/verdicts the lines said before (F884), asked
 // once each while in view, VERDICTS_ASKED a request. After a failure that may pass, nothing is asked for a rest, then the view last
 // given is asked again (F874).
-import type { Line } from "@gnoworld/core";
+import { markdown, type Line } from "@gnoworld/core";
 import { type LineVerdicts, type StreamEvent, VerdictId, VERDICTS_ASKED } from "@gnoworld/schemas";
 import type { Result } from "../../lib/api/http.ts";
-import { unjudged } from "./embeds.ts";
+import { embedIn } from "./embeds.ts";
 
 export interface Asking {
   /** The server's verdicts of these lines of a room (lib/api/verdicts.ts). */
@@ -27,6 +27,21 @@ interface InView {
   held: Readonly<Record<string, unknown>> | undefined;
   /** The time the page's stream of the room opened, in ms: a line said from then on has its verdict from it. */
   since: number;
+}
+
+/** The lines in view whose player waits on a verdict the page does not hold and has not asked for, in their order:
+ * the server answers them (GET /api/verdicts), a line older than the stream's replay among them. */
+export function unjudged(
+  lines: readonly Line[],
+  verdicts: Readonly<Record<string, unknown>> | undefined,
+  asked: ReadonlySet<string>,
+): string[] {
+  return lines
+    .filter(({ id, text }) => {
+      const held = verdicts !== undefined && Object.hasOwn(verdicts, id);
+      return !held && !asked.has(id) && embedIn(markdown(text)) !== undefined;
+    })
+    .map(({ id }) => id);
 }
 
 /** The rest after a failure that may pass; after "too many", the route's minute (server/src/stream/verdicts.ts). */

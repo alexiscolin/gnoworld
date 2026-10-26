@@ -2,7 +2,7 @@ import type { Line } from "@gnoworld/core";
 import type { LineVerdicts, StreamEvent } from "@gnoworld/schemas";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Result } from "../../lib/api/http.ts";
-import { BUSY_REST_MS, REST_MS, verdictAsker } from "./askVerdicts.ts";
+import { BUSY_REST_MS, REST_MS, unjudged, verdictAsker } from "./askVerdicts.ts";
 
 // When the page began following the room's stream; a line before it is the room's history.
 const OPENED = Date.parse("2026-10-26T12:00:00.000Z");
@@ -409,5 +409,31 @@ describe("verdictAsker, when the server cannot answer yet", () => {
     t.stop();
     await vi.advanceTimersByTimeAsync(BUSY_REST_MS * 2);
     expect(t.sent).toEqual([["a"]]);
+  });
+});
+
+// Alexis, 2026-10-26: the page asks the server the verdicts of the lines in view it does not hold, a line older
+// than the stream's replay among them; a line with no player needs none, and one asked is not asked again.
+describe("unjudged: the lines in view whose player waits on a verdict the page does not hold", () => {
+  const said = (id: string, text: string): Line => ({
+    id,
+    time: "2026-10-26T10:00:00.000Z",
+    from: "a",
+    text,
+    kind: "message",
+  });
+
+  it("names each line with a player, no verdict and not asked yet, in the lines' order", () => {
+    const lines = [
+      said("a", "https://youtu.be/dQw4w9WgXcQ"),
+      said("b", "no link"),
+      said("c", "https://vimeo.com/76979871"),
+      said("d", "https://giphy.com/gifs/4548k01F5Ej28"),
+      said("e", "see https://gno.land"),
+      said("f", "> https://youtu.be/dQw4w9WgXcQ"),
+    ];
+    expect(unjudged(lines, { c: "checked" }, new Set(["d"]))).toEqual(["a", "f"]);
+    expect(unjudged(lines, undefined, new Set())).toEqual(["a", "c", "d", "f"]);
+    expect(unjudged([], undefined, new Set())).toEqual([]);
   });
 });
