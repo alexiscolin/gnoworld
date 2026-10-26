@@ -155,6 +155,50 @@ describe("Menu", () => {
     return found;
   }
 
+  // 4c's UX review (U3): the message bar's trigger is a toolbar's small control (docs/DESIGN-SYSTEM.md: "a toolbar's
+  // small controls stay at 32").
+  it("takes a toolbar's small size for its icon trigger, medium unless asked", () => {
+    render(
+      <>
+        <Menu trigger="Small" icon="more" size="s" label="Message actions" items={items} />
+        <Menu trigger="Medium" icon="more" label="Message actions" items={items} />
+      </>,
+    );
+    expect(screen.getByRole("button", { name: "Small" }).dataset["size"]).toBe("s");
+    expect(screen.getByRole("button", { name: "Medium" }).dataset["size"]).toBe("m");
+  });
+
+  // 4c's UX review (U7): an irreversible act is coral with the alert icon and its word (docs/DESIGN-SYSTEM.md,
+  // "Severity"), apart from the others after a separator, which the arrows pass over.
+  it("draws a danger item apart: after one separator, its tone danger, the alert icon beside its words", async () => {
+    render(
+      <Menu
+        trigger="More"
+        label="Message actions"
+        items={[
+          { label: "Copy", onSelect: vi.fn() },
+          { label: "Delete", tone: "danger", onSelect: vi.fn() },
+        ]}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "More" }));
+    const [copy, remove] = screen.getAllByRole("menuitem");
+    expect(remove?.dataset["tone"]).toBe("danger");
+    expect(copy?.dataset["tone"]).toBeUndefined();
+    expect(remove?.querySelector("svg[data-icon='alert']")).not.toBeNull();
+    expect(remove?.textContent).toBe("Delete");
+    const separators = screen.getAllByRole("separator");
+    expect(separators).toHaveLength(1);
+    expect(separators[0]?.nextElementSibling).toBe(remove);
+    await userEvent.keyboard("{ArrowDown}");
+    expect(document.activeElement).toBe(remove);
+  });
+
+  it("draws no separator in a menu with no danger item", async () => {
+    await opened();
+    expect(screen.queryAllByRole("separator")).toEqual([]);
+  });
+
   it("is a menu of menu items, its trigger saying so", async () => {
     const all = await opened();
     expect(screen.getByRole("button", { name: "More" }).getAttribute("aria-haspopup")).toBe("menu");

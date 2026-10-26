@@ -35,4 +35,22 @@
   .item:is(:hover, :focus-visible) {
     background: var(--color-fill-hover);
   }
+
+  /* An irreversible act, coral, its alert icon before its words. */
+  .item[data-tone="danger"] {
+    /* layout: the icon and the words on one line, as in a button */
+    display: flex;
+    /* layout: the icon's distance from its words */
+    gap: var(--space-2xs);
+    /* layout: the icon centred on the words' line */
+    align-items: center;
+    color: var(--color-danger);
+  }
+
+  .separator {
+    block-size: var(--line-width);
+    /* layout: the rule apart from the rows on either side */
+    margin-block: var(--space-3xs);
+    background: var(--color-line);
+  }
 }
