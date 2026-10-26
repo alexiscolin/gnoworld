@@ -1,3 +1,4 @@
+import { playwright } from "@vitest/browser-playwright";
 import { configDefaults, defineConfig } from "vitest/config";
 
 const SLOW = ["server/src/testing/ergo*.test.ts", "server/src/testing/soak.test.ts"];
@@ -30,6 +31,24 @@ export default defineConfig({
           setupFiles: ["packages/ui/src/testSetup.ts"],
           // Vitest reads a stylesheet as empty unless named here: the token page reads the token file.
           css: { include: [/tokens\.css/] },
+        },
+      },
+      {
+        // core's tests a second time, in Playwright's Chromium: the browser's engine reads some regexes and Unicode
+        // otherwise than Node's (F816, F817). The full gate runs it; the fast gate's `test` script leaves it out.
+        extends: true,
+        test: {
+          name: "core_chromium",
+          include: ["packages/core/src/**/*.test.ts"],
+          browser: {
+            enabled: true,
+            headless: true,
+            // One process in Claude Code's sandbox, as the journeys' config (app/playwright.config.ts).
+            provider: playwright({
+              launchOptions: { args: process.env["SANDBOX_RUNTIME"] ? ["--single-process"] : [] },
+            }),
+            instances: [{ browser: "chromium" }],
+          },
         },
       },
     ],
