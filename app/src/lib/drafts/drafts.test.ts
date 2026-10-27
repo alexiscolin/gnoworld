@@ -66,6 +66,10 @@ describe("an account's drafts on the device", () => {
     const device = storage();
     const mine = on(device, ALICE);
     expect(mine.set("#bubble", "😀".repeat(DRAFT_LIMIT / 2))).toBe(true);
+    expect(mine.get("#bubble")).toBe("😀".repeat(DRAFT_LIMIT / 2));
+    // Zod counts a string in code points, so only a line of one-unit characters reads back at the limit's edge.
+    expect(mine.set("#bubble", "x".repeat(DRAFT_LIMIT))).toBe(true);
+    expect(mine.get("#bubble")).toBe("x".repeat(DRAFT_LIMIT));
     expect(mine.set("#bubble", "😀".repeat(DRAFT_LIMIT / 2 + 1))).toBe(false);
     expect(mine.get("#bubble")).toBe("");
     expect(device.kept.size).toBe(0);

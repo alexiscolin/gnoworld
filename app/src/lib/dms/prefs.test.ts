@@ -75,6 +75,20 @@ describe("an account's direct-message preferences on the device", () => {
     expect(mine.known()).toEqual(many.slice(1));
   });
 
+  it(`reads the ${String(KNOWN_KEPT)} accounts a device holds, and none from a list one longer`, () => {
+    const device = storage();
+    on(device, ALICE).setKnown([BOB]);
+    const [key = ""] = [...device.kept.keys()].filter((k) => k.endsWith(":known"));
+    const many = Array.from({ length: KNOWN_KEPT + 1 }, (_, n) =>
+      toAddress(Uint8Array.from([n >> 8, n & 255, ...new Array<number>(18).fill(0)])),
+    );
+    device.kept.set(key, JSON.stringify(many.slice(1)));
+    expect(on(device, ALICE).known()).toEqual(many.slice(1));
+    device.kept.set(key, JSON.stringify(many));
+    expect(on(device, ALICE).known()).toEqual([]);
+    expect(device.kept.has(key)).toBe(false);
+  });
+
   // /code-review on 4e (CR4): a read that threw read as no account, and the write after it put one over the 500 kept.
   it("tells a device it could not read from one that holds no account", () => {
     const device = storage();

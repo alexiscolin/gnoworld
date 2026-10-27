@@ -7,6 +7,10 @@ describe("StreamEvent", () => {
     expect(StreamEvent.parse(event)).toEqual(event);
   });
 
+  it.each(["#b", "#bubble"])("takes the room %s, 2 characters or more", (room) => {
+    expect(StreamEvent.parse({ msgid: "m1", room, state: "checked" }).room).toBe(room);
+  });
+
   it.each([
     ["an empty id", { msgid: "", room: "#bubble", state: "checked" }],
     ["an id of 129 characters", { msgid: "m".repeat(129), room: "#bubble", state: "checked" }],

@@ -19,10 +19,14 @@ async function choose(page: Page, at: number, item: string) {
   }).toPass({ timeout: 20_000 });
   await page.getByRole("menuitem", { name: item }).click();
 }
-// The menu opened from the keyboard on the `at`th line: the line, Tab to its bar, Enter.
+// The menu opened from the keyboard on the `at`th line: the line, Tab through its bar (the quick reactions and Reply
+// come before More, 4d), Enter on More.
 async function openByKeys(page: Page, at: number) {
   await lines(page).nth(at).focus();
-  await page.keyboard.press("Tab");
+  const more = moreOf(page, at);
+  for (let n = 0; n < 8 && !(await more.evaluate((button) => button === document.activeElement)); n += 1)
+    await page.keyboard.press("Tab");
+  await expect(more).toBeFocused();
   await page.keyboard.press("Enter");
   return page.getByRole("menu", { name: "Message actions" });
 }

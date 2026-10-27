@@ -28,7 +28,15 @@ const keeping = (
   onMarkUnread: none,
   ...over,
 });
-const BASE: LineActionsProps = { line: LINE, room: "#bubble/games", me: BOB, onCopy: none, onDelete: () => true };
+const BASE: LineActionsProps = {
+  line: LINE,
+  room: "#bubble/games",
+  me: BOB,
+  onCopy: none,
+  onDelete: () => true,
+  onReact: () => true,
+  onReply: none,
+};
 const draw = (over: Partial<LineActionsProps> = {}) => renderToStaticMarkup(<LineActions {...BASE} {...over} />);
 // The words of each menu item, its icon's markup left out.
 const items = (markup: string) =>
@@ -39,9 +47,12 @@ const items = (markup: string) =>
 // delete, never as the whole list (4d's R17).
 const own = (markup: string) =>
   items(markup).filter((item) => ["Save message", "Remove from saved", "Mark unread"].includes(item));
-// The toolbar's own buttons, apart from the menu's: each opening tag's aria-label.
+// The toolbar's own buttons, apart from the menu's: each opening tag's aria-label. The quick reactions and Reply are
+// 4d's other half, held by LineActions.test.tsx, not read here.
 const barButtons = (markup: string) =>
-  [...markup.matchAll(/<button(?![^>]*role="menuitem")[^>]*aria-label="([^"]*)"/g)].map((found) => found[1]);
+  [...markup.matchAll(/<button(?![^>]*role="menuitem")[^>]*aria-label="([^"]*)"/g)]
+    .map((found) => found[1])
+    .filter((label) => !/^(React|Reply)/.test(label ?? ""));
 
 describe("a line's actions for an account", () => {
   it("add Save message and Mark unread to Copy, on another's line, after the copies", () => {

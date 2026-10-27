@@ -1,7 +1,7 @@
 // A room's line (slice 4's 4b, moved out of Lines.tsx): its marks, its time, its author, its text drawn from Markdown
 // (4c), its link's player (4g) and its bar. One that mentions the reader says so (4d), one of the reader's own says
 // "you" (4e).
-import { markdown, mentions, type Block, type Line } from "@gnoworld/core";
+import { markdown, mentions, type Block, type Line, type Reacting, type ShownLine } from "@gnoworld/core";
 import type { StreamEvent } from "@gnoworld/schemas";
 import { Icon } from "@gnoworld/ui";
 import type { ReactNode } from "react";
@@ -9,6 +9,8 @@ import { Embed } from "./Embed.tsx";
 import { embedIn } from "./embeds.ts";
 import { Markdown } from "./Message.tsx";
 import { Person } from "./Person.tsx";
+import { Reactions } from "./Reactions.tsx";
+import { Quote } from "./Replying.tsx";
 import styles from "./RoomView.module.css";
 
 // A line's look by its kind: a message plain, a notice and an /me apart.
@@ -23,11 +25,11 @@ const CLOCK = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-d
 // what a change of members recomputes.
 const namesOf = (text: string): string => mentions(markdown(text)).join(" ");
 
-// The addresses of `names` (a line's mentions, space-separated) that are members, as one string.
-const knownOf = (names: string, members: ReadonlySet<string>): string =>
+// The addresses of `names` (a line's mentions, space-separated) that are members, or `me`, as one string.
+const knownOf = (names: string, members: ReadonlySet<string>, me?: string): string =>
   names
     .split(" ")
-    .filter((address) => members.has(address))
+    .filter((address) => address === me || members.has(address))
     .join(" ");
 
 // A line's text drawn, its mentions of `known` (space-separated) shortened. A component of its own, with a string the
@@ -71,6 +73,16 @@ function Author({ line, mine }: { line: Line; mine: boolean }) {
   );
 }
 
+// "Edited" on the time's row, before the sender, when the author's later edit is what the line shows (4d, U5).
+function Edited({ edited }: { edited: boolean | undefined }) {
+  return edited === true ? <span className={styles["mark"]}>Edited </span> : null;
+}
+
+// A line's reactions under it, when it has any (4d).
+function Chips({ to, chips, react }: { to: string; chips: string | undefined; react: LineViewProps["react"] }) {
+  return chips === undefined ? null : <Reactions to={to} chips={chips} react={react} />;
+}
+
 // The line's marks first, before the time: where no sender's words stand (F808). Pinned and Saved are a word and an
 // icon (4d): one reads the room's pins, the other what this device kept.
 function Marks({
@@ -99,11 +111,15 @@ function Marks({
   );
 }
 
+// What the quote of a reply shortens: the mentions of the line answered, as the line shortens its own.
+const quoteKnown = (answers: Line | undefined, members: ReadonlySet<string>, me: string | undefined): string =>
+  answers === undefined ? "" : knownOf(namesOf(answers.text), members, me);
+
 // A line, read once: drawn, and asked whether it mentions the reader, which a word says as well as its colour; a
 // mention shortened for the reader and the room's members alone (F812). A change of members reads its mentions
 // again, never its drawing.
 export interface LineViewProps {
-  line: Line;
+  line: ShownLine;
   me: string | undefined;
   members: ReadonlySet<string>;
   /** Whether it is the list's one tab stop. */
@@ -119,15 +135,24 @@ export interface LineViewProps {
   /** Whether it is saved on this device, and whether it is pinned in its room (4d). */
   saved: boolean;
   pinned: boolean;
+  /** Its reactions as shown (4d), as chipsOf writes them, and how an account reacts; none for a guest. */
+  chips: string | undefined;
+  react: ((reaction: Reacting) => boolean) | undefined;
+  /** The line it answers, when the room holds it (4d's replies). */
+  answers: Line | undefined;
 }
 
-export function LineView({ line, me, members, stop, actions, fresh, verdict, players, saved, pinned }: LineViewProps) {
+export function LineView(props: LineViewProps) {
+  const { line, me, members, stop, actions, fresh, verdict, players, saved, pinned, chips, react, answers } = props;
   const blocks = markdown(line.text);
   // Its first link to an accepted service gets a player, but for a reader who saves data (4g).
   const embed = players ? embedIn(blocks) : undefined;
   const names = namesOf(line.text);
   const mentioned = names.split(" ").some((address) => address === me);
   const known = knownOf(names, members);
+  // What the quote shortens, a string the compiler compares by value: the quote is cut again only when its own words or
+  // the people they mention change, never as other lines come (F1220).
+  const quoted = quoteKnown(answers, members, me);
   // Mine: my name in mint and the word "you" (DESIGN-SYSTEM.md, Avatar; U5).
   const mine = me !== undefined && line.account === me;
   return (
@@ -140,13 +165,17 @@ export function LineView({ line, me, members, stop, actions, fresh, verdict, pla
     >
       {fresh ? <NewDivider /> : null}
       <Marks mentioned={mentioned} notice={line.kind === "notice"} saved={saved} pinned={pinned} />
+      <Quote line={line} answers={answers} known={quoted} />
       <time dateTime={line.time} className={styles["time"]}>
         {CLOCK.format(new Date(line.time))}
       </time>{" "}
+      <Edited edited={line.edited} />
       {line.kind === "action" ? "* " : null}
       <Author line={line} mine={mine} /> <LineText blocks={blocks} me={me} known={known} stop={stop} />
       {embed === undefined ? null : <Embed embed={embed} verdict={verdict} />}
+      {/* Before the chips in the Tab order, so Reply is a few presses away; it floats, so its place shows nowhere (U2). */}
       {actions}
+      <Chips to={line.id} chips={chips} react={react} />
     </li>
   );
 }

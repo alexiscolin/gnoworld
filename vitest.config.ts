@@ -7,12 +7,14 @@ export default defineConfig({
     // A test that asserts nothing passes whatever the code does.
     expect: { requireAssertions: true },
     projects: [
+      // The app's components compiled, which count their renders (app/vitest.compiled.config.ts).
+      "app/vitest.compiled.config.ts",
       {
         extends: true,
         test: {
           name: "node",
           include: ["packages/*/src/**/*.test.ts", "app/src/**/*.test.{ts,tsx}", "server/src/**/*.test.ts"],
-          exclude: [...configDefaults.exclude, "packages/ui/**", ...SLOW],
+          exclude: [...configDefaults.exclude, "packages/ui/**", "app/src/features/chat/Lines.test.tsx", ...SLOW],
         },
       },
       {

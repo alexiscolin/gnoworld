@@ -22,7 +22,7 @@ const PROOF = {
 const VERIFY = { nonce: "A".repeat(22), address: ADDRESS, proof: PROOF };
 
 describe("ChallengeRequest", () => {
-  it.each(["onyx-1", "c".repeat(50)])("takes the chain %s", (chainId) => {
+  it.each(["onyx-1", "c", "c".repeat(50)])("takes the chain %s", (chainId) => {
     expect(ChallengeRequest.parse({ chainId })).toEqual({ chainId });
   });
 

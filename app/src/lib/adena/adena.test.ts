@@ -167,6 +167,30 @@ describe("connect", () => {
     ],
     ["a chain of blanks", { GetNetwork: () => ok("GET_NETWORK", { ...NETWORK, chainId: "   " }) }, "malformed"],
     [
+      "a chain of blanks that the account names too",
+      {
+        GetAccount: () => ok("GET_ACCOUNT", { ...ACCOUNT, chainId: "   " }),
+        GetNetwork: () => ok("GET_NETWORK", { ...NETWORK, chainId: "   " }),
+      },
+      "malformed",
+    ],
+    [
+      "an empty chain that the account names too",
+      {
+        GetAccount: () => ok("GET_ACCOUNT", { ...ACCOUNT, chainId: "" }),
+        GetNetwork: () => ok("GET_NETWORK", { ...NETWORK, chainId: "" }),
+      },
+      "malformed",
+    ],
+    [
+      "a chain past the server's limit that the account names too",
+      {
+        GetAccount: () => ok("GET_ACCOUNT", { ...ACCOUNT, chainId: "c".repeat(51) }),
+        GetNetwork: () => ok("GET_NETWORK", { ...NETWORK, chainId: "c".repeat(51) }),
+      },
+      "malformed",
+    ],
+    [
       "a chain longer than the server takes",
       { GetNetwork: () => ok("GET_NETWORK", { ...NETWORK, chainId: "c".repeat(51) }) },
       "malformed",

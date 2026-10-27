@@ -1,10 +1,12 @@
 // What writes under a room's lines (slice 4's 4c, moved out of ChatPanel.tsx): the composer for an account, loaded
 // lazily, which writes through the link; a word for a guest.
 import { lazy, Suspense } from "react";
+import type { Line } from "@gnoworld/core";
 import { pageDrafts } from "../../lib/drafts/page.ts";
 import type { AppState } from "../../store/index.ts";
 import type { ComposerProps } from "./Composer.tsx";
 import { roomLabel } from "./names.ts";
+import { answeredOf } from "./Replying.tsx";
 
 // The composer, an account's alone: a visitor's page never loads its code (the first screen's budget, ADR-0001 §12).
 const Composer = lazy(async () => ({ default: (await import("./Composer.tsx")).Composer }));
@@ -27,10 +29,16 @@ export interface WriterProps {
   focus?: boolean | undefined;
   /** The id of what describes the conversation: a direct message's "not encrypted" (4e's U6). */
   describedBy?: string | undefined;
+  /** The line the next one answers (4d's replies), how many times Reply was asked (each asking puts the focus in the
+   * field), and how to answer none; a direct message has none. */
+  replying?: Line | undefined;
+  asked?: number | undefined;
+  onCancelReply?: (() => void) | undefined;
 }
 
 export function Writer(props: WriterProps) {
   const { session, room, label, rooms, members, onSay, onTyping, refused, focus, describedBy } = props;
+  const { replying, asked, onCancelReply } = props;
   if (session.kind !== "in") return <p>Log in to write in this room.</p>;
   // The account's drafts on this device: the room's, where the composer starts, and each change kept (4d).
   const kept = pageDrafts(session.address);
@@ -52,6 +60,9 @@ export function Writer(props: WriterProps) {
         refused={refused}
         focus={focus}
         describedBy={describedBy}
+        replying={replying === undefined ? undefined : answeredOf(replying)}
+        asked={asked}
+        onCancelReply={onCancelReply}
       />
     </Suspense>
   );
