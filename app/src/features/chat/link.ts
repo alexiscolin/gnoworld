@@ -3,16 +3,17 @@
 // (Ergo's max-channels-per-client); the newest lines of the room in view alone, once Ergo says I joined it, since
 // Ergo paces a client to 2 lines a second (plan §4); Ergo's lines read into the store through one BatchReader a
 // connection. Its parts come in, so the tests give their own.
-import { BatchReader, compose, isTagMsgid, nickOf, reactionLine, type IrcMessage, type Reacting } from "@gnoworld/core";
-import { Address, RoomId } from "@gnoworld/schemas";
+import { BatchReader, nickOf, type IrcMessage, type Reacting } from "@gnoworld/core";
+import { RoomId } from "@gnoworld/schemas";
 import type { Ergo, ErgoOptions, Who } from "../../lib/ergo/ergo.ts";
 import type { AppState } from "../../store/index.ts";
 import { asksAfterJoin, followed, outOf } from "./groups.ts";
-import { HISTORY_LINES, isCommandMsgid } from "./history.ts";
+import { HISTORY_LINES } from "./history.ts";
 import { Joins } from "./joins.ts";
 import type { ChatLink, LinkDeps } from "./linkTypes.ts";
 import { outbox, type Outbox } from "./outbox.ts";
-import { reactLabel, refusedIn } from "./reacting.ts";
+import { refusedIn } from "./reacting.ts";
+import { Sending } from "./sending.ts";
 import { Places, TypingOut } from "./telling.ts";
 
 /** The rooms a connection joins: Ergo's max-channels-per-client (deploy/ergo/ircd.yaml.tmpl). */
@@ -36,11 +37,19 @@ class Link implements ChatLink {
   readonly #out = (line: string): boolean => this.#ergo?.send(line) === true;
   readonly #joins = new Joins(this.#out);
   readonly #inside = this.#joins.inside;
+  readonly #sending: Sending;
   readonly #places = new Places((room) => this.#deps.store.getState().chat.rooms[room]?.read, this.#out);
 
   constructor(deps: LinkDeps) {
     this.#deps = deps;
     this.#outbox = outbox(deps.store);
+    this.#sending = new Sending({
+      ergo: () => this.#ergo,
+      guest: () => this.#key === "guest",
+      inside: this.#inside,
+      outbox: this.#outbox,
+      typing: this.#typing,
+    });
     this.#unsubscribe = deps.store.subscribe((state) => {
       this.#follow(state.login.session);
     });
@@ -60,34 +69,9 @@ class Link implements ChatLink {
     this.#keep();
   }
 
-  say(room: string, draft: string, reply?: string): boolean {
-    if (reply !== undefined && !isTagMsgid(reply)) return false;
-    const line = this.#lineTo(room, draft, () => this.#inside.has(room));
-    const tags = reply === undefined ? "" : `@+reply=${reply} `;
-    const went = line !== undefined && this.#ergo?.send(`${tags}${line}`) === true;
-    if (went) this.#typing.ended(room);
-    return went;
-  }
-
-  // Labeled, so Ergo's answer names it (CR1); the label rides within the bytes compose leaves for Ergo's relay.
-  sayTo(partner: string, draft: string): boolean {
-    const line = this.#lineTo(partner, draft, (me) => me !== partner && Address.safeParse(partner).success);
-    if (line === undefined) return false;
-    return this.#outbox.send(partner, draft, (label) => this.#ergo?.send(`@label=${label} ${line}`) === true);
-  }
-
-  // The line a draft to `target` composes to, on an account's connection when `allowed` lets it, given my nick.
-  #lineTo(target: string, draft: string, allowed: (me: string) => boolean): string | undefined {
-    const me = this.#ergo?.nick();
-    if (this.#key === "guest" || me === undefined || !allowed(me)) return undefined;
-    const composed = compose(target, draft, me);
-    return composed.kind === "line" ? composed.line : undefined;
-  }
-
-  redact(room: string, id: string): boolean {
-    const allowed = this.#key !== "guest" && this.#inside.has(room) && isCommandMsgid(id);
-    return allowed && this.#ergo?.send(`REDACT ${room} ${id}`) === true;
-  }
+  say = (room: string, draft: string, reply?: string): boolean => this.#sending.say(room, draft, reply);
+  sayTo = (partner: string, draft: string): boolean => this.#sending.sayTo(partner, draft);
+  redact = (room: string, id: string): boolean => this.#sending.redact(room, id);
 
   typing(room: string, state: "active" | "done"): void {
     if (this.#key !== "guest" && this.#inside.has(room)) this.#typing.tell(room, state, this.#out);
@@ -103,10 +87,7 @@ class Link implements ChatLink {
     this.#places.flush();
   }
 
-  react(room: string, reaction: Reacting): boolean {
-    const line = reactionLine(reaction, room, reactLabel(room));
-    return line !== undefined && this.#key !== "guest" && this.#inside.has(room) && this.#out(line);
-  }
+  react = (room: string, reaction: Reacting): boolean => this.#sending.react(room, reaction);
 
   stop(): void {
     if (this.#stopped) return;
