@@ -7,6 +7,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Lines, type LinesProps } from "./Lines.tsx";
 import { Reactions } from "./Reactions.tsx";
+import type * as reactionsModule from "./Reactions.tsx";
 
 vi.mock("@gnoworld/core", async (importOriginal) => {
   const real = await importOriginal<typeof core>();
@@ -18,8 +19,8 @@ vi.mock("@gnoworld/core", async (importOriginal) => {
   };
 });
 vi.mock("./Reactions.tsx", async (importOriginal) => {
-  const real = await importOriginal<{ Reactions: typeof Reactions }>();
-  return { Reactions: vi.fn(real.Reactions) };
+  const real = await importOriginal<typeof reactionsModule>();
+  return { ...real, Reactions: vi.fn(real.Reactions) };
 });
 
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -151,5 +152,23 @@ describe("the lines view, compiled", () => {
     point(5);
     point(9);
     expect([vi.mocked(excerpt).mock.calls.length, vi.mocked(Reactions).mock.calls.length]).toEqual([0, 0]);
+  });
+
+  // Every line with chips drew its chips again for each reaction and each line that came: 200 lines, 1,000 chips (F1222).
+  it("draws again the chips of the line a reaction came to, and no other", () => {
+    draw();
+    vi.clearAllMocks();
+    draw({
+      reactions: [...REACTIONS, { id: "extra", time: at(LINES), to: "m5", emoji: "👏", who: "account9", on: true }],
+    });
+    expect(vi.mocked(Reactions)).toHaveBeenCalledTimes(1);
+    expect(host.querySelectorAll("ol > li")[5]?.querySelectorAll("[role='group'] button")).toHaveLength(6);
+  });
+
+  it("draws no chips again when a line comes", () => {
+    draw();
+    vi.clearAllMocks();
+    draw({ lines: [...ROOM, line(LINES + 1, { reply: `m${String(LINES - 1)}` })] });
+    expect(vi.mocked(Reactions)).not.toHaveBeenCalled();
   });
 });

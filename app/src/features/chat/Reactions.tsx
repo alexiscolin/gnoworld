@@ -11,7 +11,8 @@ const CHIPS_SHOWN = 20;
 export interface ReactionsProps {
   /** The line's msgid. */
   to: string;
-  shown: readonly Shown[];
+  /** What the line shows, as chipsOf writes it. */
+  chips: string;
   /** Reacts, or takes the reaction back; none for a guest, who reads them. */
   react: ((reaction: Reacting) => boolean) | undefined;
 }
@@ -19,7 +20,21 @@ export interface ReactionsProps {
 // A chip's name: its emoji, its count, and whether the reader is one of them (docs/DESIGN-SYSTEM.md).
 const nameOf = ({ emoji, count, mine }: Shown): string => `${emoji}, ${String(count)}${mine ? ", including you" : ""}`;
 
-export function Reactions({ to, shown, react }: ReactionsProps) {
+/** A line's chips as one string, which React compares by value: a line keeps its chips while the room's others change
+ * (F1222). A chip is its count, a star when it is mine or a space, and its emoji, one a line. */
+export const chipsOf = (shown: readonly Shown[]): string =>
+  shown.map(({ emoji, count, mine }) => `${String(count)}${mine ? "*" : " "}${emoji}`).join("\n");
+
+// The chips chipsOf wrote.
+function shownOf(chips: string): Shown[] {
+  return chips.split("\n").flatMap((chip) => {
+    const [, count, mine, emoji] = /^(\d+)([ *])(.+)$/su.exec(chip) ?? [];
+    return count === undefined || emoji === undefined ? [] : [{ emoji, count: Number(count), mine: mine === "*" }];
+  });
+}
+
+export function Reactions({ to, chips, react }: ReactionsProps) {
+  const shown = shownOf(chips);
   const more = shown.length - CHIPS_SHOWN;
   const boxRef = useRef<HTMLDivElement>(null);
   return (

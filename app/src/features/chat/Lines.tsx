@@ -21,7 +21,7 @@ import { useCopy } from "./copy.ts";
 import { useLineFocus } from "./lineFocus.ts";
 import { Markdown } from "./Message.tsx";
 import { Person } from "./Person.tsx";
-import { Reactions } from "./Reactions.tsx";
+import { chipsOf, Reactions } from "./Reactions.tsx";
 import { Quote } from "./Replying.tsx";
 import shared from "./lists.module.css";
 import styles from "./RoomView.module.css";
@@ -63,14 +63,14 @@ interface LineViewProps {
   stop: boolean;
   /** Its bar, while pointed at or focused. */
   actions: ReactNode;
-  /** Its reactions as shown (4d), and how an account reacts; none for a guest. */
-  reactions: readonly Shown[] | undefined;
+  /** Its reactions as shown (4d), as chipsOf writes them, and how an account reacts; none for a guest. */
+  chips: string | undefined;
   react: ((reaction: Reacting) => boolean) | undefined;
   /** The line it answers, when the room holds it (4d's replies). */
   answers: Line | undefined;
 }
 
-function LineView({ line, me, members, stop, actions, reactions, react, answers }: LineViewProps) {
+function LineView({ line, me, members, stop, actions, chips, react, answers }: LineViewProps) {
   const blocks = markdown(line.text);
   const names = namesOf(line.text);
   const mentioned = names.split(" ").some((address) => address === me);
@@ -94,7 +94,7 @@ function LineView({ line, me, members, stop, actions, reactions, react, answers 
       <LineText blocks={blocks} me={me} known={known} />
       {/* Before the chips in the Tab order, so Reply is a few presses away; it floats, so its place shows nowhere (U2). */}
       {actions}
-      {reactions === undefined ? null : <Reactions to={line.id} shown={reactions} react={react} />}
+      {chips === undefined ? null : <Reactions to={line.id} chips={chips} react={react} />}
     </li>
   );
 }
@@ -177,6 +177,8 @@ function List(props: ListProps) {
   const { listRef, onScroll } = useNewestInView(lines, reactions);
   const { stop, mounted, on, leave } = useLineFocus(lines, listRef);
   const { said, setSaid, copy } = useCopy(room);
+  // Each line's chips as a string a line compares by value (F1222).
+  const chips = new Map([...shown].map(([id, each]) => [id, chipsOf(each)]));
   // A reply's line by its msgid, this room's alone: a reply naming its own msgid or another room's answers none here.
   const byId = new Map(lines.map((line) => [line.id, line]));
   // Who a mention may shorten (F812): the members, and the authors in view by their account tag, who proved their
@@ -240,7 +242,7 @@ function List(props: ListProps) {
             members={known}
             stop={line.id === stop}
             actions={mounted(line.id) ? actionsOf(line) : null}
-            reactions={shown.get(line.id)}
+            chips={chips.get(line.id)}
             react={me === undefined || !shown.has(line.id) ? undefined : react}
             answers={line.reply === line.id ? undefined : byId.get(lineOf(line.reply ?? ""))}
           />
