@@ -135,6 +135,17 @@ ONLY = set(filter(None, os.environ.get("ONLY", "").split(",")))
 ran = set()
 
 
+# What vitest.config.ts reads to load, copied into a probe's copy: one list, so a file the config comes to read
+# (lint/shared.config.ts in b4a33fa, the compiled project in a633d92) breaks no copy for want of it (F1747).
+VITEST_CONFIG = ("vitest.config.ts", "lint/shared.config.ts", "app/vitest.compiled.config.ts")
+
+
+def vitest_config(copy):
+    for name in VITEST_CONFIG:
+        os.makedirs(os.path.dirname(f"{copy}/{name}"), exist_ok=True)
+        shutil.copy(name, f"{copy}/{name}")
+
+
 def part(name):
     """Whether this block runs: all of them, unless ONLY names some. With ONLY, the first failure
     ends the run: harness_mutate needs one failing block to count a mutant killed."""
@@ -264,9 +275,7 @@ try:
         refusal = "Vitest runs on Node"
         with tempfile.TemporaryDirectory() as copy:
             os.makedirs(f"{copy}/packages/probe/src")
-            shutil.copy("vitest.config.ts", f"{copy}/vitest.config.ts")
-            os.makedirs(f"{copy}/lint")
-            shutil.copy("lint/shared.config.ts", f"{copy}/lint/shared.config.ts")  # the config reads BENCHES there (b4a33fa)
+            vitest_config(copy)
             with open(f"{copy}/packages/probe/src/a.test.ts", "w") as f:
                 f.write('import { expect, test } from "vitest";\n\ntest("a", () => {\n  expect(1).toBe(1);\n});\n')
             os.symlink(os.path.realpath("node_modules"), f"{copy}/node_modules")
@@ -291,10 +300,9 @@ try:
         # (and the lint's shared names it imports), with one bench of each form.
         forms = {"a.bench.ts": True, "b.bench.tsx": True, "c.benchmark.ts": False, "d.bench.mts": False, "e.benchmark.tsx": False}
         with tempfile.TemporaryDirectory() as copy:
-            os.makedirs(f"{copy}/lint")
             os.makedirs(f"{copy}/packages/probe/src")
-            for name in ("vitest.config.ts", "lint/shared.config.ts", ".node-version"):
-                shutil.copy(name, f"{copy}/{name}")
+            vitest_config(copy)
+            shutil.copy(".node-version", f"{copy}/.node-version")
             os.symlink(os.path.realpath("node_modules"), f"{copy}/node_modules")
             for name in forms:
                 with open(f"{copy}/packages/probe/src/{name}", "w") as f:
