@@ -206,6 +206,8 @@ describe("useThreads: the open panel's focus and keys", () => {
     // A tooltip shown on Close takes the first Escape, as it does in the panel's own: the second closes.
     const standing = thread();
     if (standing === null) throw new Error("no stand-in");
+    press(standing, { key: "a" });
+    expect(thread()).not.toBeNull();
     press(standing, { key: "Escape" });
     press(standing, { key: "Escape" });
     expect(thread()).toBeNull();
@@ -279,6 +281,8 @@ describe("useThreads: the open panel's focus and keys", () => {
     const box = field();
     if (box === null) throw new Error("no field");
     press(box, { key: "Escape", isComposing: true });
+    expect(thread()).not.toBeNull();
+    press(box, { key: "a" });
     expect(thread()).not.toBeNull();
     // Safari's: isComposing false, keyCode 229 (R5).
     press(box, { key: "Escape", keyCode: 229 });
