@@ -1,8 +1,14 @@
+// @vitest-environment jsdom
 import type { Line } from "@gnoworld/core";
+import { Address } from "@gnoworld/schemas";
 import { renderToStaticMarkup } from "react-dom/server";
 import { prerender } from "react-dom/static";
 import { beforeAll, describe, expect, it } from "vitest";
-import { StoreProvider } from "../../storeContext.tsx";
+import { act, useEffect } from "react";
+import { createRoot } from "react-dom/client";
+import { z } from "zod";
+import { keep } from "../../lib/keep/keep.ts";
+import { StoreProvider, useAppStore } from "../../storeContext.tsx";
 import { useRoomKeeping } from "./RoomKeeping.ts";
 import { RoomView, type RoomViewProps } from "./RoomView.tsx";
 
@@ -148,7 +154,11 @@ const NO_PINNING = {
   pin: () => Promise.resolve({ ok: true as const }),
   unpin: () => Promise.resolve({ ok: true as const }),
 };
-function Probe({ room }: { room: string | undefined }) {
+function Probe({ room, seed }: { room: string | undefined; seed?: (store: ReturnType<typeof useAppStore>) => void }) {
+  const store = useAppStore();
+  useEffect(() => {
+    seed?.(store);
+  }, [seed, store]);
   const { keeping, pins } = useRoomKeeping(room, NO_PINNING);
   return (
     <p>
@@ -162,10 +172,10 @@ function Probe({ room }: { room: string | undefined }) {
     </p>
   );
 }
-const probed = (room: string | undefined) =>
+const probed = (room: string | undefined, seed?: (store: ReturnType<typeof useAppStore>) => void) =>
   renderToStaticMarkup(
     <StoreProvider>
-      <Probe room={room} />
+      <Probe room={room} {...(seed === undefined ? {} : { seed })} />
     </StoreProvider>,
   );
 
@@ -178,5 +188,42 @@ describe("the room in view's keeping, from the store", () => {
     expect(probed("#bubble")).toBe(
       "<p>{&quot;keeping&quot;:{&quot;saved&quot;:[],&quot;pinned&quot;:[],&quot;pin&quot;:false},&quot;pins&quot;:null}</p>",
     );
+  });
+
+  // A line's id is its room's: the same id saved in another room marks nothing here (G13).
+  it("marks a line saved only in the room it was saved in, though another room saved another line", () => {
+    const seed = (store: ReturnType<typeof useAppStore>) => {
+      const kept = new Map<string, string>();
+      const storage = {
+        getItem: (key: string) => kept.get(key) ?? null,
+        setItem: (key: string, value: string) => void kept.set(key, value),
+        removeItem: (key: string) => void kept.delete(key),
+      };
+      const { keepActions } = store.getState();
+      keepActions.begin(keep(() => storage, Address.parse(ALICE)));
+      keepActions.save("#bubble", line("same", 0));
+      keepActions.save("#bubble/games", line("other", 1));
+    };
+    // Rendered on the client: a pre-render reads the store's first state, which holds no seed.
+    const saved = (room: string) => {
+      const host = document.createElement("div");
+      const root = createRoot(host);
+      Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+      act(() => {
+        root.render(
+          <StoreProvider>
+            <Probe room={room} seed={seed} />
+          </StoreProvider>,
+        );
+      });
+      const held = z.object({ keeping: z.object({ saved: z.array(z.string()) }) }).parse(JSON.parse(host.textContent));
+      act(() => {
+        root.unmount();
+      });
+      return held.keeping.saved;
+    };
+    expect(saved("#bubble")).toEqual(["same"]);
+    expect(saved("#bubble/games")).toEqual(["other"]);
+    expect(saved("#world")).toEqual([]);
   });
 });

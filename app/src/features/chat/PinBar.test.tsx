@@ -1,7 +1,11 @@
+// @vitest-environment jsdom
 import { Address, type PinnedLine } from "@gnoworld/schemas";
+import { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
-import { PinStack, type PinStackProps } from "./PinBar.tsx";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { Done } from "./askPins.ts";
+import { PinBar, PinStack, type PinStackProps } from "./PinBar.tsx";
 
 // The room's pins above its lines (slice 4's 4d; the prototype's #pinBar): one line, the newest pin with a count, which
 // opens into the stack; each pin's author, its words drawn from Markdown as a line's are (nothing from Ergo reaches
@@ -102,5 +106,80 @@ describe("the pin bar, open", () => {
     expect(html).not.toContain("<img");
     expect(html).not.toContain("<script");
     expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
+  });
+});
+
+// The bar as a reader uses it: shut at first, a click opens it and a second shuts it; an Unpin the server refused, or that
+// never got there, is said in a sentence, and one it took says nothing (G13).
+describe("the pin bar, used", () => {
+  // Each test draws one bar in its own element, taken down after it.
+  const host = document.createElement("div");
+  const bars: Root[] = [];
+  beforeEach(() => {
+    Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+    // jsdom has no popover API, which the Flash and the buttons' names use: a stand-in that does nothing.
+    for (const method of ["showPopover", "hidePopover", "togglePopover"])
+      Object.defineProperty(HTMLElement.prototype, method, { configurable: true, value: () => undefined });
+  });
+  afterEach(() => {
+    act(() => {
+      for (const bar of bars.splice(0)) bar.unmount();
+    });
+    host.replaceChildren();
+  });
+  const draw = (onUnpin: (id: string) => Promise<Done>) => {
+    const bar = createRoot(host.appendChild(document.createElement("section")));
+    bars.push(bar);
+    act(() => {
+      bar.render(<PinBar pins={[pin("m1"), pin("m2")]} may onUnpin={onUnpin} />);
+    });
+  };
+  const click = (find: string) => {
+    const button = host.querySelector(find);
+    if (!(button instanceof HTMLElement)) throw new Error(`no ${find}`);
+    act(() => {
+      button.click();
+    });
+  };
+  const status = () => host.querySelector('[role="status"]')?.textContent ?? "";
+  const settle = () => act(() => Promise.resolve());
+
+  it("opens at a click on its button, and shuts at the next", () => {
+    draw(() => Promise.resolve({ ok: true }));
+    expect(host.querySelector("ul")).toBeNull();
+    click('button[aria-expanded="false"]');
+    expect(host.querySelectorAll("li")).toHaveLength(2);
+    click('button[aria-expanded="true"]');
+    expect(host.querySelector("ul")).toBeNull();
+  });
+
+  it.each([
+    ["a refusal", () => Promise.resolve<Done>({ ok: false, reason: "forbidden" }), "Only this world's moderators"],
+    [
+      "a line not pinned any more",
+      () => Promise.resolve<Done>({ ok: false, reason: "not_found" }),
+      "not pinned any more",
+    ],
+    ["a server out of reach", () => Promise.reject(new Error("down")), "could not be reached"],
+  ])("says why an Unpin failed, for %s", async (_, answer, said) => {
+    draw(answer);
+    click('button[aria-expanded="false"]');
+    click('button[aria-label^="Unpin"]');
+    await settle();
+    expect(status()).toContain("Could not unpin the message.");
+    expect(status()).toContain(said);
+  });
+
+  it("says nothing of an Unpin the server took, and gives the pin's id", async () => {
+    const asked: string[] = [];
+    draw((id) => {
+      asked.push(id);
+      return Promise.resolve({ ok: true });
+    });
+    click('button[aria-expanded="false"]');
+    click('button[aria-label^="Unpin"]');
+    await settle();
+    expect(asked).toEqual(["m1"]);
+    expect(status()).toBe("");
   });
 });

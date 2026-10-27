@@ -59,6 +59,12 @@ describe("the saved messages' list", () => {
     expect(said(html)).toContain("guest-ab12cd (guest)");
   });
 
+  it("says no account's line was a guest's, its address shortened and whole in a title", () => {
+    const html = view({ saved: [saved("m1")] });
+    expect(said(html)).not.toContain("(guest)");
+    expect(html).toContain(`title="${ALICE}"`);
+  });
+
   it("links each line to its room's page, in its world", () => {
     const html = view({ saved: [saved("m2", { room: "#bubble" }), saved("m1"), saved("e1", { room: "#earth/chat" })] });
     expect([...html.matchAll(/<a [^>]*href="([^"]*)"/g)].map((found) => found[1])).toEqual([
