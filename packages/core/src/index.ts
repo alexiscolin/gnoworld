@@ -16,6 +16,7 @@ export { dmOf } from "./chat/dm.ts";
 export {
   DEFAULT_MODE,
   dmNotice,
+  NOTICE_MODES,
   roomNotice,
   type Notice,
   type NoticeKind,

@@ -9,7 +9,8 @@ import type { Line } from "./room.ts";
 /** What a line is to its reader: a mention of them, a mention of the whole room, a reply to them, a direct message. */
 export type NoticeKind = "mention" | "group" | "reply" | "dm";
 /** What a room tells its reader of: every line, the mentions and replies, or nothing, mentions included. */
-export type NoticeMode = "all" | "mentions" | "none";
+export const NOTICE_MODES = ["all", "mentions", "none"] as const;
+export type NoticeMode = (typeof NOTICE_MODES)[number];
 export const DEFAULT_MODE: NoticeMode = "mentions";
 
 export interface Notice {
