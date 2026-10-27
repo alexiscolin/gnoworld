@@ -36,6 +36,9 @@ export interface KeepSlice {
   };
 }
 
+// The lines and places as the device holds them, and whether it could be read whole.
+type Held = Pick<Kept, "saved" | "unread"> & { readonly readable: boolean };
+
 const EMPTY: Kept = { saved: [], unread: {}, notKept: false };
 const sameLine = (room: string, id: string) => (line: SavedLine) => line.room !== room || line.id !== id;
 
@@ -63,20 +66,24 @@ export const keepSlice: StateCreator<KeepSlice> = (set, get) => {
       readable: read.saved !== undefined && read.unread !== undefined,
     };
   };
-  // Takes a change: the same object when nothing changed; the device written when it may be, `write` saying whether it took
-  // it; a device that refused, or could not be read, noted.
-  const commit = (next: Partial<Pick<Kept, "saved" | "unread">>, readable: boolean, write: () => boolean) => {
+  // Takes a change: the same object when nothing changed; the device written when it may be, `write` saying whether it
+  // took it (a device that refused, or could not be read, noted). The other field is the device's too (F1488); what the
+  // device holds and what the memory holds are judged apart, since another tab's change leaves them different.
+  const commit = (next: Partial<Pick<Kept, "saved" | "unread">>, held: Held, write: () => boolean) => {
     const now = get().keep;
-    const kept = { saved: next.saved ?? now.saved, unread: next.unread ?? now.unread };
-    if (JSON.stringify(kept) === JSON.stringify({ saved: now.saved, unread: now.unread })) return;
-    const refused = readable && writable && !write();
-    set({ keep: { ...kept, notKept: now.notKept || !readable || refused } });
+    const kept = { saved: next.saved ?? held.saved, unread: next.unread ?? held.unread };
+    const same = (than: Pick<Kept, "saved" | "unread">) =>
+      JSON.stringify(kept) === JSON.stringify({ saved: than.saved, unread: than.unread });
+    const onDevice = same(held);
+    if (onDevice && same(now)) return;
+    const refused = held.readable && writable && !onDevice && !write();
+    set({ keep: { ...kept, notKept: now.notKept || !held.readable || refused } });
   };
-  const commitSaved = (saved: readonly SavedLine[], readable: boolean) => {
-    commit({ saved }, readable, () => device?.setSaved(saved) === true);
+  const commitSaved = (saved: readonly SavedLine[], held: Held) => {
+    commit({ saved }, held, () => device?.setSaved(saved) === true);
   };
-  const commitUnread = (unread: Readonly<Record<string, string>>, readable: boolean) => {
-    commit({ unread }, readable, () => device?.setUnread(unread) === true);
+  const commitUnread = (unread: Readonly<Record<string, string>>, held: Held) => {
+    commit({ unread }, held, () => device?.setUnread(unread) === true);
   };
   return {
     keep: EMPTY,
@@ -97,36 +104,36 @@ export const keepSlice: StateCreator<KeepSlice> = (set, get) => {
       save: (room, line) => {
         const entry = asSaved(room, line);
         if (device === undefined || entry === undefined) return "none";
-        const { saved: base, readable } = fresh();
-        if (!base.every(sameLine(room, line.id))) commitSaved(base, readable);
-        else if (base.length >= SAVED_KEPT) return "full";
-        else commitSaved([entry, ...base], readable);
+        const held = fresh();
+        if (!held.saved.every(sameLine(room, line.id))) commitSaved(held.saved, held);
+        else if (held.saved.length >= SAVED_KEPT) return "full";
+        else commitSaved([entry, ...held.saved], held);
         return "saved";
       },
       unsave: (room, id) => {
-        const { saved, readable } = fresh();
-        commitSaved(saved.filter(sameLine(room, id)), readable);
+        const held = fresh();
+        commitSaved(held.saved.filter(sameLine(room, id)), held);
       },
       markUnread: (room, line) => {
         const place = placeBefore(line.time);
         if (device === undefined || place === undefined || !RoomId.safeParse(room).success) return;
         // The room marked longest ago goes first past the bound: its key goes to the end as it is marked again.
-        const { unread, readable } = fresh();
-        commitUnread(lastKept(unread, [room, place], UNREAD_KEPT), readable);
+        const held = fresh();
+        commitUnread(lastKept(held.unread, [room, place], UNREAD_KEPT), held);
       },
       readThrough: (room) => {
-        const { unread, readable } = fresh();
-        commitUnread(without(unread, room), readable);
+        const held = fresh();
+        commitUnread(without(held.unread, room), held);
       },
       heard: (message) => {
         const [room = "", id = ""] = message.params;
-        const { saved, readable } = fresh();
+        const held = fresh();
         if (message.command === "REDACT") {
-          commitSaved(saved.filter(sameLine(room, id)), readable);
+          commitSaved(held.saved.filter(sameLine(room, id)), held);
           return;
         }
         const edit = lineOf(message, room);
-        if (edit?.edits !== undefined) commitSaved(correctedBy(saved, room, edit), readable);
+        if (edit?.edits !== undefined) commitSaved(correctedBy(held.saved, room, edit), held);
       },
     },
   };

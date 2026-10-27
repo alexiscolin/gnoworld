@@ -459,6 +459,45 @@ describe("two sessions of one account on one device", () => {
   });
 });
 
+// The memory of a session can equal the lines it writes while the device holds others: a write skipped for "no change"
+// would leave the device without them (F1488, the code review's CR7).
+describe("a session whose memory is behind the device", () => {
+  const tabs = () => {
+    const kept = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => kept.get(key) ?? null,
+      setItem: (key: string, value: string) => void kept.set(key, value),
+      removeItem: (key: string) => void kept.delete(key),
+    };
+    const [a, b] = [createAppStore(), createAppStore()];
+    const device = () => keep(() => storage, ALICE);
+    a.getState().keepActions.begin(device());
+    // The second tab opens once the first has kept a line and a place, so it starts with them.
+    a.getState().keepActions.save("#bubble", line("m1"));
+    a.getState().keepActions.markUnread("#bubble", line("m1", { time: T(5) }));
+    b.getState().keepActions.begin(device());
+    return { a, b, device };
+  };
+
+  it("writes a line again that another tab removed, though its own memory still holds it", () => {
+    const { a, b, device } = tabs();
+    b.getState().keepActions.unsave("#bubble", "m1");
+    expect(a.getState().keepActions.save("#bubble", line("m1"))).toBe("saved");
+    expect(
+      device()
+        .saved()
+        ?.map(({ id }) => id),
+    ).toEqual(["m1"]);
+  });
+
+  it("takes a place another tab forgot from the device, though only a line was saved here", () => {
+    const { a, b } = tabs();
+    b.getState().keepActions.readThrough("#bubble");
+    a.getState().keepActions.save("#bubble", line("m2"));
+    expect(a.getState().keep.unread).toEqual({});
+  });
+});
+
 // A logout ends the session's memory, never the device's: the lines stay for the account's next login, which the list's own
 // words say ("Saved on this device only", 4d's R20).
 describe("a session's end", () => {
