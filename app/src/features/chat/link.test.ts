@@ -2005,6 +2005,17 @@ describe("the chat's link: a direct message's bar", () => {
     expect(toOther(t.fake.sent).map(without)).toEqual([`REDACT ${OTHER} p1`]);
   });
 
+  // R4 (redpass-dmb): a partner's PRIVMSG tagged as a correction of my line is not mine, so my delete leaves it alone.
+  it("deletes my line alone when the partner's line is tagged as a correction of it", () => {
+    const t = account();
+    t.fake.line(mine("m1", "", "mine"));
+    t.fake.line(
+      `@msgid=p2;time=${T0};account=${OTHER};+gnoworld/edit=m1 :${OTHER}!u@h PRIVMSG ${ADDRESS} :not my words`,
+    );
+    expect(t.link.redactIn(OTHER, "m1")).toBe(true);
+    expect(toOther(t.fake.sent).map(without)).toEqual([`REDACT ${OTHER} m1`]);
+  });
+
   it("sends no delete for a msgid no command carries, for oneself or a guest's connection, or while not connected", () => {
     const t = account();
     expect(t.link.redactIn(OTHER, "m 1")).toBe(false);
