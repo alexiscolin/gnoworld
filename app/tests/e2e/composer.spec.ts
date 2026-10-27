@@ -208,6 +208,9 @@ test.describe("the composer", () => {
     await roomsNav(page).getByRole("link", { name: "#bubble" }).click();
     await expect(bubbleField).toHaveValue(`/me ${bubble}`);
     await page.keyboard.press("Alt+ArrowUp");
+    // Ergo having said the account is here, as inGames waits: a line sent before it goes nowhere, which the page's
+    // few more requests (4d's pins) and a loaded machine made likely.
+    await expect(whoIsHere(page).getByTitle(address)).toBeVisible();
     await field(page).press("Enter");
     await expect(lineOf(page, games)).toHaveCount(1);
     await expect.poll(() => draftKeys(page)).toEqual([`gnoworld:draft:${address}:#bubble`]);

@@ -387,6 +387,19 @@ describe("the server's process", { timeout: 30_000 }, () => {
     ]);
   });
 
+  // 4d: the pins' table is among its migrations and its routes are mounted, with no Ergo set to read a line from.
+  it("serves a room's pins to a guest, none yet, saying it may not pin, and refuses a room that is no room's (4d)", async () => {
+    const port = await listening(start(settings()));
+    const ask = (query: string) => fetch(`http://127.0.0.1:${String(port)}/api/pins${query}`);
+    const answer = await ask("?room=%23bubble");
+    expect([answer.status, await answer.text(), answer.headers.get("cache-control")]).toEqual([
+      200,
+      JSON.stringify({ room: "#bubble", may: false, pins: [] }),
+      "no-store",
+    ]);
+    expect((await ask("?room=bubble")).status).toBe(400);
+  });
+
   it("takes the login's chains and its new accounts an hour from its settings", async () => {
     const origin = "http://gnoworld.test";
     const env = { ...settings(), ORIGINS: origin, CHAINS: "test-5", NEW_ACCOUNTS_PER_HOUR: "1" };

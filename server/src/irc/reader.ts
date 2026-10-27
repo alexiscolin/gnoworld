@@ -5,7 +5,7 @@ import type { Socket } from "node:net";
 import type { IrcMessage } from "@gnoworld/core";
 import type { Log } from "../log.ts";
 import { joined, kicked, listing, refusals, rejoins, sasl } from "./handlers.ts";
-import { histories, replayed } from "./history.ts";
+import { answered, histories, replayed } from "./history.ts";
 import { joins, line, said, type Said } from "./lines.ts";
 import type { State } from "./session.ts";
 
@@ -32,15 +32,21 @@ export interface Options {
   onChannels?: (names: readonly string[]) => void;
   // Someone else joined one of its rooms (3m: the reconciler voices a writer at once).
   onJoin?: (room: string) => void;
+  // The bot itself is in one of its rooms, Ergo having said so, at each connection (4d: the room's pins are read again).
+  onIn?: (room: string) => void;
   // How long a room's state may take to come (3m).
   stateMs?: number;
+  // A line was taken from one of its rooms, by its author's delete or a hide (4d: its pin goes with it).
+  onRedact?: (room: string, msgid: string) => void;
+  // How long a line asked for by its id may take to come (4d).
+  lineMs?: number;
 }
 
 // The lines Ergo sends that ask for an answer, as 3b's table found them.
 export function reader(options: Options, state: State) {
   const { password, rooms, onMessage, log, lastChecked = () => undefined, onReady = () => undefined } = options;
   const { drained = () => Promise.resolve(), onChannels, onJoin = () => undefined } = options;
-  const { hold = () => undefined } = options;
+  const { hold = () => undefined, onIn = () => undefined, onRedact = () => undefined } = options;
   const pages = histories({ lastChecked, hold, drained }, state);
   // A refusal Ergo will not change by itself: log it, and try again later and later.
   const refused = (s: Socket, error: string): void => {
@@ -72,7 +78,10 @@ export function reader(options: Options, state: State) {
       if (message.params[1] === "OPER") handlers["381"]?.(s, message);
     },
     ...listing(state, onChannels),
-    JOIN: joined(state, onJoin, pages.catchUp),
+    JOIN: joined(state, onJoin, (s, room) => {
+      onIn(room);
+      pages.catchUp(s, room);
+    }),
     ...rejoins(state),
     KICK: kicked(state, log),
     ...pages.handlers,
@@ -84,12 +93,17 @@ export function reader(options: Options, state: State) {
         log("alert", { error: "redact_refused" });
       pages.handlers["FAIL"]?.(s, message);
     },
+    // A line taken from one of its rooms, whoever took it, the bot's own hide included (draft/message-redaction).
+    REDACT: (_, { params: [room = "", msgid = ""] }) => {
+      if (state.joined.has(room) && msgid !== "") onRedact(room, msgid);
+    },
     PING: (s, { params }) => s.write(line("PONG", params)),
     // A NOTICE too (slice 3's max review): Ergo relays and keeps it as any line, so it is checked and counted.
     NOTICE: (s, message) => handlers["PRIVMSG"]?.(s, message),
     PRIVMSG: (_, message) => {
-      const batched = replayed(state, message);
       const heard = said(message, state.joined);
+      if (answered(state, message, heard)) return;
+      const batched = replayed(state, message);
       if (heard !== undefined) onMessage(heard, batched);
     },
   };

@@ -4,21 +4,25 @@
 // (4d); the composer, given, goes below.
 // A line's author is its account tag alone, a nick being only a nick; a member's nick is an account's when it is
 // an address, which a guest's cannot be (Ergo gives a guest 32 characters, server/src/testing/ergo.test.ts:314).
-import { typingAt, type Line, type Reacting, type Reaction, type Typing } from "@gnoworld/core";
+import type { Line, Reacting, Reaction, Typing } from "@gnoworld/core";
 import type { StreamEvent } from "@gnoworld/schemas";
 import { Button, Cluster, Sidebar, Stack } from "@gnoworld/ui";
-import { Fragment, lazy, Suspense, useEffect, useState, type ReactNode } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import type { ErgoState } from "../../lib/ergo/ergo.ts";
+import type { RoomKeeping, RoomPins } from "./RoomKeeping.ts";
 import type { LinesProps } from "./Lines.tsx";
 import { isAccount, shortAddress } from "./names.ts";
 import { Person } from "./Person.tsx";
 import shared from "./lists.module.css";
 import styles from "./RoomView.module.css";
+import { Typists } from "./Typists.tsx";
 
 // The lines view (the lines, what is under them, a line's bar) is asked once the room holds a line: lines come over the
 // WebSocket after the page is drawn, so its code is never the first screen's (ADR-0001 §12; docs/decisions.md,
 // 2026-10-26). One boundary for every feature of a line.
 const Lines = lazy(async () => ({ default: (await import("./Lines.tsx")).Lines }));
+// The room's pins above its lines come from the server after the page is drawn, and show once there is one (4d).
+const PinBar = lazy(async () => ({ default: (await import("./PinBar.tsx")).PinBar }));
 const LINES = [shared["plain"], shared["scrolls"], styles["lines"]].join(" ");
 // The list's place while its code comes, or while the room holds no line: no line, no tab stop; a key pressed meanwhile
 // acts on the page as it stands, nothing queued for the lines.
@@ -31,6 +35,15 @@ function RoomLines(props: LinesProps) {
   ) : (
     <Suspense fallback={waiting(true)}>
       <Lines {...props} />
+    </Suspense>
+  );
+}
+
+// The room's pins above its lines, once it has one: their code is asked then, never on the first screen.
+function PinsAbove({ pins }: { pins: RoomPins | undefined }) {
+  return pins === undefined ? null : (
+    <Suspense fallback={null}>
+      <PinBar pins={pins.list} may={pins.may} onUnpin={pins.onUnpin} />
     </Suspense>
   );
 }
@@ -93,6 +106,10 @@ export interface RoomViewProps {
   verdicts?: Readonly<Record<string, StreamEvent["state"]>> | undefined;
   /** Whether the reader saves data (ADR-0002 §8): then no player is offered, nor any verdict asked (4g, F893). */
   saving?: boolean;
+  /** What the reader keeps in this room and offers of it: none for a direct message's, which has none (4d). */
+  keeping?: RoomKeeping | undefined;
+  /** The room's pins, above its lines; none when it holds none (4d). */
+  pins?: RoomPins | undefined;
   /** Reacts to a line, or takes the reaction back (4d's reactions); whether it went out. */
   onReact?: ((reaction: Reacting) => boolean) | undefined;
   /** Makes a line, by its msgid, the one the composer's next answers (4d's replies). */
@@ -144,46 +161,6 @@ export function People({ members, connected, me, onMessage }: PeopleProps) {
   );
 }
 
-// Who is typing, by name, on the page's clock (its own a room: CR4), drawn again as the next one's time ends, a timer
-// firing early never seen as before it (CR6); under the lines and out of every live region, so a screen reader hears
-// the lines and not each pause of another's.
-function Typists({ typing }: { typing: Typing }) {
-  const [now, setNow] = useState(() => Date.now());
-  const next = Math.min(...Object.values(typing ?? {}).filter((until) => until > now));
-  useEffect(() => {
-    if (next === Infinity) return;
-    const timer = setTimeout(() => {
-      setNow(Math.max(Date.now(), next));
-    }, next - Date.now());
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [next]);
-  const nicks = typingAt(typing, now);
-  const verb = nicks.length === 1 ? "is" : "are";
-  // Up to three by name, which a wide screen holds; the line is cut to one (U2), its whole in its title: the names in
-  // full, a guest said so.
-  const named = nicks.map((nick, at) => (
-    <Fragment key={nick}>
-      {at === 0 ? "" : at === nicks.length - 1 ? " and " : ", "}
-      <Person name={nick} guest={!isAccount(nick)} />
-    </Fragment>
-  ));
-  const whole = nicks.map((nick) => (isAccount(nick) ? nick : `${nick} (guest)`));
-  const title = `${whole.length > 1 ? `${whole.slice(0, -1).join(", ")} and ` : ""}${whole.at(-1) ?? ""} ${verb} typing`;
-  return (
-    <p className={styles["typing"]} title={nicks.length === 0 ? undefined : title}>
-      {nicks.length === 0 ? null : nicks.length > 3 ? (
-        "Several people are typing"
-      ) : (
-        <>
-          {named} {verb} typing
-        </>
-      )}
-    </p>
-  );
-}
-
 // A room's name and its description, its IRC topic; a conversation's partner and what it says of itself (4e).
 function Header({ title, topic, id }: { title: ReactNode; topic: ReactNode; id: string | undefined }) {
   return (
@@ -201,7 +178,7 @@ function Header({ title, topic, id }: { title: ReactNode; topic: ReactNode; id: 
 export function RoomView(props: RoomViewProps) {
   const { room, title, note, noteId, state, chat, composer, me, onDelete, onDismiss, onRead, aside } = props;
   const { onReact, onReply } = props;
-  const { verdicts, saving = false } = props;
+  const { verdicts, saving = false, keeping, pins } = props;
   const { empty = "No messages yet." } = props;
   const { lines = [], members = [], refused, typing, read, paged, reactions, cannotReact } = state ?? {};
   const connected = chat === "connected";
@@ -213,6 +190,7 @@ export function RoomView(props: RoomViewProps) {
       </p>
       <Sidebar side="end" space="m">
         <div>
+          <PinsAbove key={`${String(room)} pins`} pins={pins} />
           <RoomLines
             key={room}
             room={room}
@@ -228,6 +206,7 @@ export function RoomView(props: RoomViewProps) {
             onRead={onRead}
             verdicts={verdicts}
             saving={saving}
+            keeping={keeping}
             reactions={reactions}
             onReact={onReact}
             cannotReact={cannotReact}

@@ -57,6 +57,15 @@
     color: var(--color-text-muted);
   }
 
+  /* The icon of a mark (Pinned, Saved), a step before its word and on its line. */
+  .mark > svg {
+    /* layout: the icon sits in the line of words, as a letter would, not on a row of its own */
+    display: inline-block;
+    /* layout: the step between the icon and the word */
+    margin-inline-end: var(--space-3xs);
+    vertical-align: text-bottom;
+  }
+
   .who {
     color: var(--color-text);
     font-weight: 500;

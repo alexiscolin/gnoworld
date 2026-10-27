@@ -1,4 +1,4 @@
-import { lines, roomsNav, word } from "./chat.ts";
+import { lines, word } from "./chat.ts";
 import { expect, test } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { MEMBER, opened } from "./scripted.ts";
@@ -36,9 +36,9 @@ test.describe("the lines view, loaded after the page", () => {
     await expect(list).toHaveAttribute("aria-busy", "true");
     await expect(form.getByRole("textbox", { name: "Message #games" })).toBeVisible();
     await expect(lines(page)).toHaveCount(0);
-    // Nothing waits for the lines: Tab from the navigation's last control (an account's direct messages end it, 4e) skips
+    // Nothing waits for the lines: Tab from the navigation's last control (an account's Saved button ends it, 4d) skips
     // the list's place for the composer.
-    await roomsNav(page).getByRole("button", { name: "Only people I wrote to" }).focus();
+    await page.getByRole("button", { name: "Saved" }).focus();
     await page.keyboard.press("Tab");
     await expect(form.locator(":focus")).toHaveCount(1);
     release();

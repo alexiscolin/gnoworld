@@ -5,6 +5,7 @@
 import { markdown, type Line } from "@gnoworld/core";
 import { type LineVerdicts, type StreamEvent, VerdictId, VERDICTS_ASKED } from "@gnoworld/schemas";
 import type { Result } from "../../lib/api/http.ts";
+import { own } from "../../store/record.ts";
 import { embedIn } from "./embeds.ts";
 
 export interface Asking {
@@ -38,7 +39,7 @@ export function unjudged(
 ): string[] {
   return lines
     .filter(({ id, text }) => {
-      const held = verdicts !== undefined && Object.hasOwn(verdicts, id);
+      const held = verdicts !== undefined && own(verdicts, id) !== undefined;
       return !held && !asked.has(id) && embedIn(markdown(text)) !== undefined;
     })
     .map(({ id }) => id);

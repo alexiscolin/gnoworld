@@ -2,11 +2,13 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
-import { RoomList } from "@gnoworld/schemas";
+import { Address, PinList, RoomList } from "@gnoworld/schemas";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { makeApp } from "./app.ts";
 import { startChat, type Chat } from "./chat.ts";
+import { PIN_TABLES } from "./pins/pins.ts";
+import { pinsRoutes } from "./pins/routes.ts";
 import { loadConfig } from "./config.ts";
 import { openDatabase } from "./db.ts";
 import { logger } from "./log.ts";
@@ -18,6 +20,7 @@ import { ROOM_STATE } from "./rooms/create.ts";
 import type { Answer } from "./moderation/provider.ts";
 import type { Room, Rules } from "./roles/roles.ts";
 import { listRooms, ROOM_TABLES } from "./rooms/rooms.ts";
+import type { World } from "./rooms/types.ts";
 import { answer } from "./testing/answers.ts";
 import { fakeErgo, message, PASSWORD, welcome } from "./testing/fakeErgo.ts";
 
@@ -63,6 +66,7 @@ const setup = (
     PROGRESS_TABLES,
     MUTE_TABLES,
     ROOM_STATE,
+    PIN_TABLES,
   ]);
   const options = {
     log,
@@ -174,7 +178,7 @@ describe("the chat, as the server starts it", () => {
 
   it("applies each world's own rules to its own room", async () => {
     const earth: Rules = { ...RULES, bannedWords: ["moon"] };
-    const both = new Map([
+    const both = new Map<string, World>([
       ["earth", { rules: earth }],
       ["bubble", { rules: RULES }],
     ]);
@@ -452,6 +456,30 @@ describe("the chat, as the server starts it", () => {
       );
       expect(await page.read(1)).toEqual([{ msgid: "m1", room: "#bubble", state: "hidden" }]);
       expect(asked).toEqual([]);
+    });
+
+    // The bot's hide comes back to it as a REDACT of its own (Ergo tells each member of the room, the sender too): the
+    // pin of a hidden line goes with it, as with an author's delete (4d's R1).
+    it("takes a line's pin away as Ergo tells it taken from the room, the bot's own hide as an author's delete", async () => {
+      const { peer, chat, db } = await linked({ worlds: worlds("bubble"), moderation: OFF });
+      const AUTHOR = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+      for (const id of ["m1", "m2", "m3"]) {
+        db.prepare(
+          "INSERT INTO pins (room, msgid, time, account, text, pinned_by, pinned_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        ).run("#bubble", id, "2026-10-25T10:00:00.000Z", AUTHOR, `text ${id}`, AUTHOR, T0);
+      }
+      const held = () => chat.pins.list("#bubble").map(({ id }) => id);
+      peer.say(line("m1", 1, ["g1a", "buy spam"]));
+      expect(await peer.next(/^REDACT /)).toBe("REDACT #bubble m1 :a word this world bans");
+      peer.say(":gnoworld!u@h REDACT #bubble m1 :a word this world bans");
+      await expect.poll(held).toEqual(["m3", "m2"]);
+      peer.say(":g1a!u@h REDACT #bubble m2");
+      await expect.poll(held).toEqual(["m3"]);
+      // A REDACT of a room that is not its own is no word on its pins.
+      peer.say(":g1a!u@h REDACT #elsewhere m3");
+      peer.say("PING :done");
+      await peer.next(/^PONG done$/);
+      expect(held()).toEqual(["m3"]);
     });
 
     it("streams nothing for an unchecked line, and nothing for a line before its verdict", async () => {
@@ -1249,6 +1277,96 @@ describe("the chat, as the server starts it", () => {
         ).text();
       expect(await rooms()).not.toContain("#bubble/crew");
       expect(await rooms("member")).toContain("#bubble/crew");
+    });
+
+    // Who reads and who pins, by the real rules of the roles file (4d's R2): a members room's pins are its members', and
+    // pinning is its world's moderators' and the team's alone, whoever they moderate elsewhere.
+    describe("the pins' right to read and to pin", () => {
+      const TEAM = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+      const both = new Map<string, World>([...roled(), ["other", { rules: RULES, moderators: new Set([WRITER]) }]]);
+      const tokens = new Map([
+        ["mod", MOD],
+        ["member", MEMBER],
+        ["writer", WRITER],
+        ["team", TEAM],
+      ]);
+      const here = () => {
+        const t = setup(
+          { worlds: both, moderation: OFF, ergo: undefined, team: new Set([TEAM]) },
+          { session: (token) => tokens.get(token ?? "") },
+        );
+        t.db
+          .prepare(
+            "INSERT INTO pins (room, msgid, time, account, text, pinned_by, pinned_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+          )
+          .run("#bubble/crew", "m1", "2026-10-25T10:00:00.000Z", MEMBER, "for the crew", MOD, T0);
+        t.app.route(
+          "/api/pins",
+          pinsRoutes({
+            pins: t.chat.pins,
+            mayPin: t.chat.mayPin,
+            readable: t.chat.mayRead,
+            session: (token) => {
+              const who = tokens.get(token ?? "");
+              return who === undefined ? undefined : Address.parse(who);
+            },
+            origins: ["https://gnoworld.test"],
+            log,
+            now: () => T0,
+          }),
+        );
+        return t;
+      };
+
+      it("lets a members room's members, its moderators and the team read, and no guest or stranger", () => {
+        const { chat } = here();
+        const reads = (room: string) => [undefined, WRITER, MEMBER, MOD, TEAM].map((who) => chat.mayRead(room, who));
+        // A writer of #bubble/desk is no reader of #bubble/crew, whom its group names; another world's moderator neither.
+        expect(reads("#bubble/crew")).toEqual([false, false, true, true, true]);
+        expect(reads("#bubble")).toEqual([true, true, true, true, true]);
+      });
+
+      it("lets its world's moderators and the team pin there, and no member, writer or other world's moderator", () => {
+        const { chat } = here();
+        for (const room of ["#bubble", "#bubble/crew", "#bubble/desk"])
+          expect([MOD, TEAM, MEMBER, WRITER].map((who) => chat.mayPin(room, who))).toEqual([true, true, false, false]);
+        expect(chat.mayPin("#other", WRITER)).toBe(true);
+        expect(chat.mayPin("#other", MOD)).toBe(false);
+      });
+
+      it("answers a members room's pins to its members alone, through the route, and says who may pin", async () => {
+        const { app } = here();
+        const get = (who?: string) =>
+          app.request("/api/pins?room=%23bubble%2Fcrew", {
+            headers: who === undefined ? {} : { cookie: `__Host-session=${who}` },
+          });
+        for (const who of [undefined, "writer"]) expect((await get(who)).status).toBe(403);
+        const member = PinList.parse(await (await get("member")).json());
+        expect([member.may, member.pins.map(({ id }) => id)]).toEqual([false, ["m1"]]);
+        expect(PinList.parse(await (await get("mod")).json()).may).toBe(true);
+        expect(PinList.parse(await (await get("team")).json()).may).toBe(true);
+      });
+
+      it("refuses a pin and an unpin in this world to another world's moderator, and to a member", async () => {
+        const { app, db } = here();
+        const post = (path: string, who: string) =>
+          app.request(`/api/pins${path}`, {
+            method: "POST",
+            headers: {
+              origin: "https://gnoworld.test",
+              "content-type": "application/json",
+              cookie: `__Host-session=${who}`,
+            },
+            body: JSON.stringify({ room: "#bubble/crew", msgid: "m1" }),
+          });
+        for (const who of ["writer", "member"]) {
+          expect((await post("", who)).status).toBe(403);
+          expect((await post("/unpin", who)).status).toBe(403);
+        }
+        expect(db.prepare("SELECT count(*) AS n FROM pins").get()).toEqual({ n: 1 });
+        expect((await post("/unpin", "team")).status).toBe(200);
+        expect(db.prepare("SELECT count(*) AS n FROM pins").get()).toEqual({ n: 0 });
+      });
     });
 
     it("leaves an archived room read-only and unlisted, sending it nothing once Ergo has it so", async () => {

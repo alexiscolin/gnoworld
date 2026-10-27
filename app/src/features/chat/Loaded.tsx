@@ -2,17 +2,21 @@
 // room, or a direct message, 4e) and what writes in it.
 import { foldEdits, type Line } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";
-import { Sidebar } from "@gnoworld/ui";
+import { Sidebar, Stack } from "@gnoworld/ui";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useSearchParams } from "react-router";
+import { useAppStore } from "../../storeContext.tsx";
 import type { AppState } from "../../store/index.ts";
 import type { Dms } from "./Dms.tsx";
 import type { ChatLink } from "./link.ts";
 import { dmParams, neighbour, roomIds, roomParams } from "./names.ts";
 import { roomActs, type RoomActs } from "./roomActs.ts";
+import { useRoomKeeping } from "./RoomKeeping.ts";
+import { Saved } from "./Saved.tsx";
 import { RoomsView } from "./RoomsView.tsx";
 import { People, RoomView, type RoomViewProps } from "./RoomView.tsx";
 import { shownOf, type Shown } from "./shown.tsx";
+import { usePins } from "./usePins.ts";
 import { Writer } from "./Writer.tsx";
 
 // Alt+Up and Alt+Down: the room before or after the one in view, anywhere on the page (ADR-0002's chat rows). A key
@@ -126,6 +130,16 @@ interface LoadedProps {
   failed?: ReactNode;
 }
 
+// The rooms' column: the rooms, and for an account its saved messages, a button under them until slice 8's menu (4d).
+function Rail({ signedIn, children }: { signedIn: boolean; children: ReactNode }) {
+  return (
+    <Stack space="s">
+      {children}
+      {signedIn ? <Saved /> : null}
+    </Stack>
+  );
+}
+
 export function Loaded({
   sections,
   current,
@@ -159,10 +173,14 @@ export function Loaded({
     <People members={state?.members ?? []} connected={chat === "connected"} me={me} onMessage={onMessage} />
   );
   const shown = shownOf(dms, { id: room, state, acts }, { sayTo, focus: opened.focus, noteId });
+  // What the reader keeps in the room in view and the room's pins, which are asked for it: none for a direct message.
+  const { keeping, pins } = useRoomKeeping(room, usePins(useAppStore(), room, me));
   const replies = useReplies(shown, state?.lines, acts);
   return (
     <Sidebar space="l">
-      <RoomsView sections={sections} current={room} dms={dms.nav} failed={failed} />
+      <Rail signedIn={me !== undefined}>
+        <RoomsView sections={sections} current={room} dms={dms.nav} failed={failed} />
+      </Rail>
       {dms.problem === undefined ? null : <p role="status">{dms.problem}</p>}
       {shown === undefined ? null : (
         <RoomView
@@ -170,6 +188,8 @@ export function Loaded({
           {...shown.view}
           verdicts={verdicts}
           saving={saving}
+          keeping={keeping}
+          pins={pins}
           aside={shown.kind === "room" ? people : undefined}
           chat={chat}
           me={me}

@@ -6,7 +6,8 @@ import { freePort } from "../testing/ergo.ts";
 import { fakeErgo, message, PASSWORD, register, welcome, type Peer } from "../testing/fakeErgo.ts";
 import { ircLink, retryDelay, type Link, type Said } from "./link.ts";
 
-const CAPS = "CAP REQ :message-tags account-tag batch draft/chathistory server-time multi-prefix sasl";
+const CAPS =
+  "CAP REQ :message-tags account-tag batch draft/chathistory server-time multi-prefix sasl draft/message-redaction";
 // Stopped before the fake Ergo closes, so no link reconnects to a server that is gone.
 const links: Link[] = [];
 afterEach(async () => {
@@ -38,7 +39,9 @@ describe("the IRC link", () => {
     expect(await peer.next(/^CAP /)).toBe(CAPS);
     expect(await peer.next(/^NICK /)).toBe("NICK gnoworld");
     expect(await peer.next(/^USER /)).toBe("USER gnoworld 0 * gno.world");
-    peer.say(":ergo.test CAP * ACK :message-tags account-tag batch draft/chathistory server-time multi-prefix sasl");
+    peer.say(
+      ":ergo.test CAP * ACK :message-tags account-tag batch draft/chathistory server-time multi-prefix sasl draft/message-redaction",
+    );
     expect(await peer.next(/^AUTHENTICATE /)).toBe("AUTHENTICATE PLAIN");
     peer.say("AUTHENTICATE +");
     expect(await peer.next(/^AUTHENTICATE /)).toBe(
@@ -1651,7 +1654,9 @@ describe("the IRC link's account (the max review)", () => {
       const { lines } = start(ergo.port);
       const peer = await ergo.peer(0);
       await peer.next(/^CAP REQ /);
-      peer.say(":ergo.test CAP * ACK :message-tags account-tag batch draft/chathistory server-time multi-prefix sasl");
+      peer.say(
+        ":ergo.test CAP * ACK :message-tags account-tag batch draft/chathistory server-time multi-prefix sasl draft/message-redaction",
+      );
       await peer.next(/^AUTHENTICATE PLAIN$/);
       peer.say("AUTHENTICATE +");
       expect(await peer.next(/^AUTHENTICATE /)).toBe(`AUTHENTICATE ${SASL}`);

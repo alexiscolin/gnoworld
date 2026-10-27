@@ -24,6 +24,7 @@ import { PROGRESS_TABLES } from "../moderation/catchup.ts";
 import { VERDICT_TABLES } from "../moderation/check.ts";
 import { MUTE_TABLES } from "../moderation/mute.ts";
 import { STRIKE_TABLES } from "../moderation/strikes.ts";
+import { PIN_TABLES } from "../pins/pins.ts";
 import { ROOM_STATE } from "../rooms/create.ts";
 import { ROOM_TABLES } from "../rooms/rooms.ts";
 import { makeRetention, sizeOf, startRetention } from "./retention.ts";
@@ -42,6 +43,7 @@ const TABLES = [
   MUTE_TABLES,
   STRIKE_TABLES,
   ROOM_STATE,
+  PIN_TABLES,
 ];
 const opened: DatabaseSync[] = [];
 const folders: string[] = [];
@@ -84,6 +86,27 @@ const setup = (limits: Limits = {}) => {
   const alerts = (name: string): number => lines.filter((line) => line.includes(`"error":"${name}"`)).length;
   return { db, clock, retention, verdicts, times, alerts, lines, options };
 };
+
+describe("the pins' retention: a pin ends with Ergo's 90 days (F1482)", () => {
+  it("removes a pin whose line is older than 90 days, and keeps one exactly 90 days old", () => {
+    const { db, retention } = setup();
+    const add = db.prepare(
+      "INSERT INTO pins (room, msgid, time, account, text, pinned_by, pinned_at) VALUES ('#bubble', ?, ?, 'a', 't', 'm', ?)",
+    );
+    for (const [id, at] of [
+      ["old", T0 - 90 * DAY - 1],
+      ["edge", T0 - 90 * DAY],
+      ["new", T0],
+    ] as const)
+      add.run(id, new Date(at).toISOString(), T0);
+    retention.tick();
+    const Ids = z.array(z.object({ msgid: z.string() }));
+    expect(Ids.parse(db.prepare("SELECT msgid FROM pins ORDER BY msgid").all())).toEqual([
+      { msgid: "edge" },
+      { msgid: "new" },
+    ]);
+  });
+});
 
 describe("the verdicts' retention by days and by cap (3n)", () => {
   it("removes the verdicts older than 180 days, and keeps one exactly 180 days old", () => {
@@ -214,7 +237,7 @@ describe("the retention's budget (3n)", () => {
         if (key !== "prepare") return Reflect.get(target, key);
         return (sql: string) => {
           const statement = target.prepare(sql);
-          if (!sql.startsWith("DELETE")) return statement;
+          if (!sql.startsWith("DELETE FROM verdicts")) return statement;
           return {
             run: (...params: SQLInputValue[]) => {
               const result = statement.run(...params);

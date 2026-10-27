@@ -19,13 +19,25 @@ export interface State extends HistoryState {
   nickTaken: number;
 }
 
-export const fresh = (stateMs: number): State => ({
+export const fresh = (stateMs: number, lineMs: number): State => ({
   attempt: 0,
   joined: new Set(),
   ready: false,
-  ...freshHistory(),
+  ...freshHistory(lineMs),
   asked: new Set(),
   channels: undefined,
   states: roomStates(stateMs),
   nickTaken: 0,
 });
+
+/** A connection's end: what it held is forgotten, each question still waiting answered with nothing. */
+export function forget(state: State): void {
+  state.ready = false;
+  state.batches.clear();
+  state.turns = [];
+  state.page = undefined;
+  state.asked.clear();
+  state.channels = undefined;
+  state.states.drop();
+  state.lines.drop();
+}

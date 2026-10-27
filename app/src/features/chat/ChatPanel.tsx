@@ -11,6 +11,7 @@ import { useSearchParams } from "react-router";
 import { pageLoginApi } from "../../lib/api/login.ts";
 import { pageDmPrefs } from "../../lib/dms/page.ts";
 import { pageDrafts } from "../../lib/drafts/page.ts";
+import { pageKeep } from "../../lib/keep/page.ts";
 import { pageRoomsApi } from "../../lib/api/rooms.ts";
 import { drawGuestNick } from "../../lib/ergo/ergo.ts";
 import { pageErgo } from "../../lib/ergo/page.ts";
@@ -40,7 +41,8 @@ function RoomsFailed({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-// The page's link to Ergo: the page's socket, the login's tickets, a guest's drawn nick, an account's device.
+// The page's link to Ergo: the page's socket, the login's tickets, a guest's drawn nick, an account's device (its direct
+// messages' choices and drafts, its saved lines and places).
 const pageLink = (store: ReturnType<typeof useAppStore>) =>
   chatLink({
     store,
@@ -48,6 +50,7 @@ const pageLink = (store: ReturnType<typeof useAppStore>) =>
     ticket: pageLoginApi().ticket,
     guest: drawGuestNick,
     device: (account) => ({ prefs: pageDmPrefs(account), drafts: pageDrafts(account) }),
+    keep: pageKeep,
   });
 
 // The rooms as the server lists them for `query`, asked again as it changes; none before the first answer.

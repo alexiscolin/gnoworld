@@ -1,6 +1,7 @@
 // What the chat's link takes and offers (link.ts), apart from how it does it.
 import type { Result } from "../../lib/api/http.ts";
 import type { Ergo, ErgoOptions, Who } from "../../lib/ergo/ergo.ts";
+import type { Keep } from "../../lib/keep/keep.ts";
 import type { DmDevice } from "../../store/dms.ts";
 import type { createAppStore } from "../../store/index.ts";
 import type { Reacting } from "@gnoworld/core";
@@ -13,6 +14,9 @@ export interface LinkDeps {
   guest: () => string;
   /** An account's device, whose direct-message choices the store reads at its session's start; none in a test. */
   device?: ((account: Address) => DmDevice) | undefined;
+  /** An account's saved lines and reading places on its device, which the store reads at its session's start; none in
+   * a test. */
+  keep?: ((account: Address) => Keep) | undefined;
 }
 
 export interface ChatLink {

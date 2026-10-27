@@ -14,12 +14,14 @@ import {
 import type { StreamEvent } from "@gnoworld/schemas";
 import { Flash, type FlashMessage } from "@gnoworld/ui";
 import { useLayoutEffect, useRef } from "react";
+import { lineKeeping } from "./LineKeeping.tsx";
+import type { RoomKeeping } from "./RoomKeeping.ts";
 import { LineActions } from "./LineActions.tsx";
 import { useCopy, useRemoval } from "./lineFlash.ts";
 import { useLineFocus } from "./lineFocus.ts";
 import { LineView } from "./LineView.tsx";
-import { useNewMark, useReadAtEnd } from "./reading.ts";
 import { chipsOf } from "./Reactions.tsx";
+import { useNewMark, useReading } from "./reading.ts";
 import shared from "./lists.module.css";
 import styles from "./RoomView.module.css";
 
@@ -92,6 +94,8 @@ export interface LinesProps {
   verdicts?: Readonly<Record<string, StreamEvent["state"]>> | undefined;
   /** Whether the reader saves data (ADR-0002 §8): then no player is offered (4g, F893). */
   saving?: boolean;
+  /** What the reader keeps in this room and the room's pins (4d); none for a direct message's lines. */
+  keeping?: RoomKeeping | undefined;
 }
 
 // What a line's actions do when a view gives none: nothing goes out.
@@ -111,7 +115,28 @@ type ListProps = Omit<LinesProps, "lines"> & {
   lines: readonly ShownLine[];
   shown: ReadonlyMap<string, readonly Shown[]>;
   lineOf: (id: string) => string;
+  /** Who a mention may shorten. */
+  known: ReadonlySet<string>;
 };
+
+// Where the reader left the room, once its history page came: Ergo's reading place, or the account's own mark (4f, 4d).
+const placeOf = (paged: boolean, read: string | undefined, keeping: RoomKeeping | undefined) =>
+  paged ? { read, unread: keeping?.unread } : { read: undefined, unread: undefined };
+
+// What the reader keeps of a line, on this device (saved) and in its room (pinned) (4d).
+const keptOf = (keeping: RoomKeeping | undefined, id: string) => ({
+  saved: keeping?.saved.has(id) === true,
+  pinned: keeping?.pinned.has(id) === true,
+});
+
+// Who a mention may shorten (F812): the members, and the authors in view by their account tag, who proved their key as
+// a member did (F819).
+const knownIn = (members: readonly string[], lines: readonly Line[]) =>
+  new Set([...members, ...lines.flatMap(({ account }) => (account === undefined ? [] : [account]))]);
+
+// The line a reply answers, when this room holds it: a reply naming its own msgid or another room's answers none here.
+const answeredBy = (line: ShownLine, byId: ReadonlyMap<string, Line>, lineOf: (id: string) => string) =>
+  line.reply === line.id ? undefined : byId.get(lineOf(line.reply ?? ""));
 
 /** The room's flash, then its lines, oldest first, as a list a screen reader hears grow. */
 export function Lines(props: LinesProps) {
@@ -122,16 +147,16 @@ export function Lines(props: LinesProps) {
   // What a plain client answers or reacts to by a folded edit's own msgid reaches the line it corrects (CR5).
   const lineOf = (id: string) => folded.get(id) ?? id;
   const shown = reactionsOn(props.reactions ?? [], props.me, lineOf);
-  return <List {...props} lines={lines} shown={shown} lineOf={lineOf} />;
+  return <List {...props} lines={lines} shown={shown} lineOf={lineOf} known={knownIn(props.members, lines)} />;
 }
 
 function List(props: ListProps) {
-  const { room, members, me, refused, connected, reactions, cannotReact, lines, shown, lineOf } = props;
+  const { room, known, me, refused, connected, reactions, cannotReact, lines, shown, lineOf } = props;
   const { onDelete = NO_DELETE, onDismiss = NO_DISMISS, onReact = NO_REACT, onReply = NO_REPLY } = props;
-  const { read, paged = false, onRead, verdicts, saving = false } = props;
-  const fresh = useNewMark(lines, paged ? read : undefined, me);
+  const { read, paged = false, onRead, verdicts, saving = false, keeping } = props;
+  const fresh = useNewMark(lines, placeOf(paged, read, keeping), me);
   const { listRef, atEndRef, onScroll } = useNewestInView(lines, fresh, reactions);
-  const look = useReadAtEnd(lines, atEndRef, paged ? onRead : undefined);
+  const look = useReading({ lines, atEndRef, paged, onRead, keeping });
   const { stop, mounted, on, leave } = useLineFocus(lines, listRef, fresh);
   const { said, setSaid, copy } = useCopy();
   const [deleting, remove] = useRemoval({ lines, refused, connected, onDelete, leave, setSaid });
@@ -139,9 +164,6 @@ function List(props: ListProps) {
   const chips = new Map([...shown].map(([id, each]) => [id, chipsOf(each)]));
   // A reply's line by its msgid, this room's alone: a reply naming its own msgid or another room's answers none here.
   const byId = new Map(lines.map((line) => [line.id, line]));
-  // Who a mention may shorten (F812): the members, and the authors in view by their account tag, who proved their
-  // key as a member did (F819).
-  const known = new Set([...members, ...lines.flatMap(({ account }) => (account === undefined ? [] : [account]))]);
   // A reaction that could not go out says so at once; one Ergo refuses, when it answers (cannotReact).
   const react = (reaction: Reacting) => {
     const went = onReact(reaction);
@@ -160,6 +182,7 @@ function List(props: ListProps) {
         copy(line, what, room);
       }}
       onDelete={remove}
+      keeping={lineKeeping(keeping, me, setSaid)(line)}
       reactions={shown.get(line.id)}
       onReact={(emoji, on) => react({ to: line.id, emoji, on })}
       onReply={() => {
@@ -201,9 +224,10 @@ function List(props: ListProps) {
             fresh={line.id === fresh}
             verdict={verdicts?.[line.id]}
             players={room !== undefined && !saving}
+            {...keptOf(keeping, line.id)}
             chips={chips.get(line.id)}
             react={me === undefined || !shown.has(line.id) ? undefined : react}
-            answers={line.reply === line.id ? undefined : byId.get(lineOf(line.reply ?? ""))}
+            answers={answeredBy(line, byId, lineOf)}
           />
         ))}
       </ol>
