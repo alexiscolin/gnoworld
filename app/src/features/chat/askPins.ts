@@ -18,16 +18,20 @@ export interface Asking {
   set: (list: PinList) => void;
   /** Whether the page shows: none is asked while it is hidden. */
   visible: () => boolean;
+  /** The session's reader now, an address, none for a guest: it changes before the room is shown again. */
+  reader: () => string | undefined;
 }
 
 /** A pin or an unpin: done, or why the server refused it. */
 export type Done = { ok: true } | Exclude<Result<never>, { ok: true }>;
 
-export function pinAsker({ pins, pin, unpin, set, visible }: Asking) {
+export function pinAsker({ pins, pin, unpin, set, visible, reader }: Asking) {
   // The room and the reader shown, none for a direct message's; `run` counts each change of either, so an answer
   // asked for the last is known.
   let shown: { room: string | undefined; reader: string | undefined } = { room: undefined, reader: undefined };
   let run = 0;
+  // An answer is the reader's it was asked for: the room and reader unchanged since, and the session still theirs.
+  const stale = (mine: number): boolean => mine !== run || reader() !== shown.reader;
   let waiting = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const arm = (): void => {
@@ -43,7 +47,7 @@ export function pinAsker({ pins, pin, unpin, set, visible }: Asking) {
     const mine = run;
     waiting = true;
     const done = (got?: Result<PinList>): void => {
-      if (mine !== run) return;
+      if (stale(mine)) return;
       waiting = false;
       if (got?.ok === true) set(got.value);
       arm();
@@ -59,7 +63,7 @@ export function pinAsker({ pins, pin, unpin, set, visible }: Asking) {
     const mine = run;
     const got = await call(room, msgid);
     if (!got.ok) return got;
-    if (mine === run) {
+    if (!stale(mine)) {
       set(got.value);
       arm();
     }

@@ -29,8 +29,10 @@ interface Wanted {
 function setup({ answer = (room) => Promise.resolve(ok(list(room, ["m1"]))), visible = () => true }: Wanted = {}) {
   const asked: string[] = [];
   const told: PinList[] = [];
-  const state = { visible: true };
+  // `reader`: who the session is now, which the page tells the asker as it shows the room (the effect after the render).
+  const state: { visible: boolean; reader: string | undefined } = { visible: true, reader: undefined };
   const asker = pinAsker({
+    reader: () => state.reader,
     pins: (room) => {
       asked.push(`pins ${room}`);
       return answer(room, "pins");
@@ -46,7 +48,11 @@ function setup({ answer = (room) => Promise.resolve(ok(list(room, ["m1"]))), vis
     set: (next) => told.push(next),
     visible: () => state.visible && visible(),
   });
-  return { asker, asked, told, state };
+  const show = (room: string | undefined, reader: string | undefined) => {
+    state.reader = reader;
+    asker.show(room, reader);
+  };
+  return { asker: { ...asker, show }, asked, told, state };
 }
 const settled = () => vi.advanceTimersByTimeAsync(0);
 
@@ -169,6 +175,33 @@ describe("the shown room's pins", () => {
     releases[1]?.(ok(list("#bubble", ["m1"])));
     await settled();
     expect(t.told).toEqual([list("#bubble", ["m1"])]);
+  });
+
+  // The session changes before the page's effect shows the room again: an answer asked for the last reader, given in
+  // between, is the last reader's (F1486, the code review's CR5).
+  it("drop an answer given after the session changed, before the room was shown again", async () => {
+    let release: (value: Result<PinList>) => void = () => undefined;
+    const t = setup({ answer: () => new Promise((resolve) => (release = resolve)) });
+    t.asker.show("#bubble", ALICE);
+    t.state.reader = undefined; // logged out: the room is not shown again yet
+    release(ok(list("#bubble", ["m1"], true)));
+    await settled();
+    expect(t.told).toEqual([]);
+  });
+
+  it("drop the answer of a pin given after the session changed, before the room was shown again", async () => {
+    let release: (value: Result<PinList>) => void = () => undefined;
+    const t = setup({
+      answer: (room, call) =>
+        call === "pin" ? new Promise((resolve) => (release = resolve)) : Promise.resolve(ok(list(room, []))),
+    });
+    t.asker.show("#bubble", ALICE);
+    await settled();
+    const pinned = t.asker.pin("m2");
+    t.state.reader = undefined;
+    release(ok(list("#bubble", ["m2"], true)));
+    await pinned;
+    expect(t.told).toEqual([list("#bubble", [])]);
   });
 
   it("ask again for a reader who changed, at once", async () => {

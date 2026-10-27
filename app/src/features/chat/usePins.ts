@@ -23,6 +23,10 @@ export function usePins(store: Store, room: string | undefined, reader: string |
       ...api,
       set: store.getState().pinsActions.set,
       visible: () => document.visibilityState === "visible",
+      reader: () => {
+        const { session } = store.getState().login;
+        return session.kind === "in" ? session.address : undefined;
+      },
     });
     const shows = () => {
       asker.refresh();
