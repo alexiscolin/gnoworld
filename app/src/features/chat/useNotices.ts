@@ -5,7 +5,7 @@ import type { Notice, NoticeMode } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";
 import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { badgeOf, modeOf, totalUnseen, unseenNotices } from "../../store/notices.ts";
+import { modeOf, placeCounts, totalUnseen, unseenNotices } from "../../store/notices.ts";
 import type { AppState } from "../../store/index.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
 import type { Dms } from "./Dms.tsx";
@@ -71,7 +71,10 @@ export function useNotices(on: {
   // Each a value that stays while no count and no mode moves, so a change of a room that moves none draws nothing again.
   const total = useApp((app) => (account ? totalUnseen(app) : 0));
   const badges = useApp(
-    useShallow((app) => Object.fromEntries(places.map((where) => [where, account ? badgeOf(app, where) : 0]))),
+    useShallow((app) => {
+      const counts = account ? placeCounts(app) : new Map<string, number>();
+      return Object.fromEntries(places.map((where) => [where, counts.get(where) ?? 0]));
+    }),
   );
   const list = useApp(unseenNotices);
   const held = useApp(

@@ -2,8 +2,8 @@ import { parseLine, type IrcMessage, type Notice, type NoticeMode } from "@gnowo
 import { Address } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
 import type { NoticePrefs } from "../lib/notices/prefs.ts";
-import { createAppStore } from "./index.ts";
-import { badgeOf, modeOf, NOTICES_KEPT, totalUnseen, unseenNotices } from "./notices.ts";
+import { createAppStore, type AppState } from "./index.ts";
+import { badgeOf, modeOf, NOTICES_KEPT, placeCounts, totalUnseen, unseenNotices } from "./notices.ts";
 
 const ME = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -523,6 +523,52 @@ describe("the store's notices slice", () => {
       const heard = t.heard();
       t.notices.clear();
       expect(heard()).toBe(0);
+    });
+  });
+
+  // F1682 (CR10, C1): the total and the badges each filtered every notice again for each place, at every store update:
+  // O(places x notices). One pass counts them all.
+  describe("the counts, in one pass", () => {
+    // The state as a reader that counts its reads of `notices`.
+    const counted = (state: AppState) => {
+      const reads = { notices: 0 };
+      const watched = new Proxy(state, {
+        get: (target, key, receiver) => {
+          if (key === "notices") reads.notices += 1;
+          return Reflect.get(target, key, receiver) as unknown;
+        },
+      });
+      return { watched, reads };
+    };
+    const crowded = () => {
+      const rooms = Array.from({ length: 60 }, (_, at) => `#room${String(at)}`);
+      const t = setup(rooms);
+      for (const [at, room] of rooms.entries()) t.notices.add(notice({ id: `n${String(at)}`, where: room }));
+      return t;
+    };
+
+    it("reads the notices a constant number of times whatever the places, for the total and for each count", () => {
+      const t = crowded();
+      const total = counted(t.state());
+      expect(totalUnseen(total.watched)).toBe(60);
+      expect(total.reads.notices).toBeLessThanOrEqual(3);
+      const each = counted(t.state());
+      expect(placeCounts(each.watched).size).toBe(60);
+      expect(each.reads.notices).toBeLessThanOrEqual(3);
+    });
+
+    it("counts each place as badgeOf does, a room in all mode by its lines and a conversation by its notices", () => {
+      const t = setup();
+      t.kept(ALICE);
+      t.marked(MAIN, 0);
+      t.notices.setMode(MAIN, "all");
+      t.said(MAIN, ["m1", 1]);
+      t.said(MAIN, ["m2", 2]);
+      t.notices.add(notice({ id: "g", where: GAMES }));
+      t.notices.add(notice({ id: "d", kind: "dm", where: ALICE }));
+      const counts = placeCounts(t.state());
+      expect(Object.fromEntries(counts)).toEqual({ [MAIN]: 2, [GAMES]: 1, [ALICE]: 1 });
+      for (const where of [MAIN, GAMES, ALICE, BOB]) expect(badgeOf(t.state(), where)).toBe(counts.get(where) ?? 0);
     });
   });
 

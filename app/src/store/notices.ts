@@ -95,21 +95,27 @@ function newLines(state: State, where: string) {
   );
 }
 
-/** What a room or a conversation counts: a room's unseen notices, or in all mode its new lines, which a notice is one of;
- * none in none; a conversation's unseen notices. */
-export function badgeOf(state: State, where: string): number {
-  if (roomOf(state, where) !== undefined && modeOf(state, where) === "all") return newLines(state, where).length;
-  return state.notices.filter((notice) => notice.where === where && unseen(state, notice)).length;
+/** What each place counts, in one pass: a room's unseen notices, or in all mode its new lines, which a notice is one of;
+ * none in none; a conversation's unseen notices. A place that counts nothing is not in it. */
+export function placeCounts(state: State): ReadonlyMap<string, number> {
+  const counts = new Map<string, number>();
+  // A room in all mode counts its lines, whatever its notices.
+  const byLines = (where: string) => roomOf(state, where) !== undefined && modeOf(state, where) === "all";
+  for (const notice of state.notices) {
+    if (!byLines(notice.where) && unseen(state, notice)) counts.set(notice.where, (counts.get(notice.where) ?? 0) + 1);
+  }
+  for (const where of Object.keys(state.chat.rooms)) {
+    const lines = byLines(where) ? newLines(state, where).length : 0;
+    if (lines > 0) counts.set(where, lines);
+  }
+  return counts;
 }
 
-const placesOf = (state: State): string[] => [
-  ...Object.keys(state.chat.rooms),
-  ...new Set(state.notices.filter(({ kind }) => kind === "dm").map(({ where }) => where)),
-];
+/** What a room or a conversation counts. */
+export const badgeOf = (state: State, where: string): number => placeCounts(state).get(where) ?? 0;
 
 /** What the page counts in all: every room followed and every conversation, each by its own count. */
-export const totalUnseen = (state: State): number =>
-  placesOf(state).reduce((sum, where) => sum + badgeOf(state, where), 0);
+export const totalUnseen = (state: State): number => [...placeCounts(state).values()].reduce((sum, n) => sum + n, 0);
 
 // The time a place has to be marked seen to count nothing: its newest unseen notice, and in all mode its newest line.
 function newest(state: State, where: string): string | undefined {
@@ -181,8 +187,8 @@ export const noticeSlice: StateCreator<State, [], [], NoticeSlice> = (set, get) 
       },
       clear: () => {
         const state = get();
-        const marks = placesOf(state).flatMap((where) => {
-          const time = badgeOf(state, where) > 0 ? newest(state, where) : undefined;
+        const marks = [...placeCounts(state).keys()].flatMap((where) => {
+          const time = newest(state, where);
           return time === undefined ? [] : [[where, time] as const];
         });
         if (marks.length > 0) set({ noticeSeen: { ...state.noticeSeen, ...Object.fromEntries(marks) } });
