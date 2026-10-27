@@ -106,6 +106,16 @@ describe("Thread", () => {
     expect(title).toContain(`@${other}`);
   });
 
+  // R4: the reader's own address is shortened too, though the reader is in no members' list.
+  it("shortens the reader's own address in the title, whether or not the members hold it", () => {
+    // Nobody in view but BOB wrote or is a member, so only `me` makes ALICE's address shortenable.
+    const by = { from: BOB, account: BOB };
+    const lines = [line("root", 0, { ...by, text: `@${ALICE} hello` }), line("r", 1, { ...by, reply: "root" })];
+    const [title = ""] = heading(panel({ members: [BOB], lines }));
+    expect(title).toContain("@g10gh7…3y5tv");
+    expect(title).not.toContain(ALICE);
+  });
+
   it("cuts a long root's words in the title, an ellipsis at the cut, the whole line in its row", () => {
     const text = `${"w".repeat(TITLE_LENGTH + 40)} the end`;
     const html = panel({ lines: [line("root", 0, { text }), line("r", 1, { reply: "root" })] });
