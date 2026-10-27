@@ -681,6 +681,36 @@ describe("the store's notices slice", () => {
       prefs.modes = base;
     });
 
+    // F1671 (S2): the link began a session, so with the chat closed through a sign-out and another sign-in the next
+    // account held the last one's notices, marks and conversations.
+    it("forgets the last account's notices, marks and conversations when the session changes, the chat closed", () => {
+      const t = setup();
+      const { loginActions } = t.store.getState();
+      loginActions.signedIn(Address.parse(ALICE));
+      const hold = () => {
+        t.kept(BOB);
+        t.notices.add(notice({ id: "d", kind: "dm", where: BOB }));
+        t.notices.add(notice({ id: "g", where: GAMES }));
+        t.notices.seen(MAIN, T(1));
+      };
+      hold();
+      expect(totalUnseen(t.state())).toBe(2);
+      loginActions.signedOut();
+      expect(t.state().notices).toEqual([]);
+      expect(t.state().noticeSeen).toEqual({});
+      expect(t.state().dms).toEqual({});
+      expect(totalUnseen(t.state())).toBe(0);
+      loginActions.signedIn(Address.parse(ME));
+      hold();
+      loginActions.signedIn(Address.parse(BOB));
+      expect(t.state().notices).toEqual([]);
+      expect(t.state().dms).toEqual({});
+      // The same account again is no new session.
+      hold();
+      loginActions.signedIn(Address.parse(BOB));
+      expect(totalUnseen(t.state())).toBe(2);
+    });
+
     it("says the device did not keep a mode it refused, the mode held for the page all the same", () => {
       const t = setup();
       t.notices.begin({ modes: () => ({}), setModes: () => false });
