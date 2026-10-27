@@ -2512,6 +2512,25 @@ printf '{"files": [{"groups": [{"benchmarks": [{"name": "a line [0.2 ms]", "samp
 out=$(bench) && fail "bench.py passed a bench that took no sample: $out"
 printf '%s\n' "$out" | grep -q "a line \[0.2 ms\]: took no sample" || fail "bench.py did not say which bench took no sample: $out"
 printf '%s\n' "$out" | grep -q "Traceback" && fail "bench.py crashed on a bench with no mean: $out"
+# A bench the sources name that the report lacks was switched off: `describe.skip(...)` around it, or `.only` on a
+# neighbour, leaves it out of Vitest's report and the run ends 0 (security-S1). Each bench a `*.bench.ts(x)` source
+# names must be in the report, whatever its folder; a file in node_modules is no source of the repository's.
+mkdir -p "$b/app/tests/bench" "$b/node_modules/pkg"
+printf 'bench("a line [0.2 ms]", f);\n' >"$b/app/tests/bench/a.bench.ts"
+printf 'describe.skip("rooms", () => {\n  bench(\n    "a room [100 ms]",\n    f,\n  );\n});\n' >"$b/app/tests/bench/b.bench.tsx"
+printf 'bench("a dependency [1 ms]", f);\n' >"$b/node_modules/pkg/c.bench.ts"
+printf 'bench("a helper that is no bench file [1 ms]", f);\n' >"$b/app/tests/bench/helper.ts"
+report "a line [0.2 ms]" 0.05 "a room [100 ms]" 14.5
+out=$(bench) || fail "bench.py refused a report holding every bench the sources name: $out"
+report "a line [0.2 ms]" 0.05
+out=$(bench) && fail "bench.py passed with a bench of the sources (a switched-off describe) missing from its report: $out"
+printf '%s\n' "$out" | grep -qF "a room [100 ms]: " || fail "bench.py did not name the bench missing from the report: $out"
+printf '%s\n' "$out" | grep -qF "a dependency" && fail "bench.py read a bench of node_modules as the repository's: $out"
+printf '%s\n' "$out" | grep -qF "a helper" && fail "bench.py read a file that is no bench file as one: $out"
+report "a room [100 ms]" 14.5
+out=$(bench) && fail "bench.py passed with a bench of the sources (the one a .only left out) missing from its report: $out"
+printf '%s\n' "$out" | grep -qF "a line [0.2 ms]: " || fail "bench.py did not name the bench a .only left out: $out"
+rm -r "${b:?}/app" "${b:?}/node_modules"
 fi
 
 if part mutant_scope; then
