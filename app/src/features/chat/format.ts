@@ -99,11 +99,30 @@ function linked(edit: Edit): Edit {
   return { text: result, start: address, end: address + ADDRESS.length };
 }
 
-// The line's start, put on or taken off, or a list's turned to the other kind; the selection on the same letters.
+// The start of each line the selection touches (the caret's line, for a caret; a selection ending at a line's very
+// start leaves that line out), put on or taken off, or another list's turned to this one's; the selection on the same
+// letters. It comes off only when every line has it.
 function started({ text, start, end }: Edit, format: keyof typeof STARTS): Edit {
-  const existing = (format === "quote" ? /^> / : LIST).exec(text)?.[0] ?? "";
-  // The line already starts as asked: the start comes off; another list's is turned to this one's.
-  const prefix = SAME[format].test(existing) ? "" : STARTS[format];
-  const moved = (at: number) => Math.max(at - existing.length, 0) + prefix.length;
-  return { text: prefix + text.slice(existing.length), start: moved(start), end: moved(end) };
+  const from = text.slice(0, start).lastIndexOf("\n") + 1;
+  const last = end > start && text[end - 1] === "\n" ? end - 1 : end;
+  const found = text.indexOf("\n", last);
+  const to = found === -1 ? text.length : found;
+  const lines = text.slice(from, to).split("\n");
+  const existing = lines.map((line) => (format === "quote" ? /^> / : LIST).exec(line)?.[0] ?? "");
+  const prefix = existing.every((mark) => SAME[format].test(mark)) ? "" : STARTS[format];
+  // A position stays on its letter: after the line's new start when it was within the old one, and past the lines above
+  // by what they gained or lost.
+  const moved = (at: number): number => {
+    let before = from;
+    let shift = 0;
+    for (const [n, line] of lines.entries()) {
+      const mark = existing[n]?.length ?? 0;
+      if (at <= before + line.length) return before + shift + Math.max(at - before - mark, 0) + prefix.length;
+      before += line.length + 1;
+      shift += prefix.length - mark;
+    }
+    return at + shift;
+  };
+  const changed = lines.map((line, n) => prefix + line.slice(existing[n]?.length ?? 0)).join("\n");
+  return { text: text.slice(0, from) + changed + text.slice(to), start: moved(start), end: moved(end) };
 }

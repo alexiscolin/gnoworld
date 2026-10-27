@@ -93,6 +93,21 @@ describe("formatted", () => {
     expect(formatted({ text, start: 2, end: 2 }, format).text).toBe(result);
   });
 
+  // A draft of several lines (slice 4's multiline): a quote or a list starts the lines the selection touches, the
+  // caret's line alone for a caret, never the draft's first.
+  it.each([
+    ["a\nb|", "bulleted", "a\n- b|"],
+    ["a\n|b\nc", "quote", "a\n> |b\nc"],
+    ["«a\nb»", "bulleted", "- «a\n- b»"],
+    ["«- a\n- b»", "bulleted", "«a\nb»"],
+    ["«- a\nb»", "bulleted", "- «a\n- b»"],
+    ["«- a\n- b»", "numbered", "1. «a\n1. b»"],
+    ["«a\n»b", "bulleted", "- «a\n»b"],
+    ["x\n«a\n\nb»\ny", "quote", "x\n> «a\n> \n> b»\ny"],
+  ] as const)("starts the lines %j touches as %s", (before, format, after) => {
+    expect(apply(before, format)).toStrictEqual(draft(after));
+  });
+
   it("keeps the caret on the same letter when a line's start changes", () => {
     expect(formatted({ text: "hello", start: 2, end: 4 }, "quote")).toStrictEqual({
       text: "> hello",
