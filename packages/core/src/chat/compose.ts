@@ -27,13 +27,14 @@ export const COMMANDS: readonly string[] = ["/me"];
 
 /** A draft, composed: the line to send, the bytes it leaves and its text as the room reads it (an action's words,
  * the action said apart), or a message's lines, the bytes it leaves and its text; or why there is none: a line long
- * by `over` bytes (the line of several named, from 1), or a message past a cap. */
+ * by `over` bytes (the line of several named, from 1), a message past a cap, or text holding half of an emoji. */
 export type Composed =
   | { kind: "line"; line: string; left: number; text: string; action: boolean }
   | { kind: "lines"; lines: string[]; left: number; text: string }
   | { kind: "empty" }
   | { kind: "unknown"; command: string }
   | { kind: "long"; over: number; line?: number }
+  | { kind: "malformed" }
   | { kind: "tooBig"; unit: "lines" | "bytes"; over: number };
 
 /** The line `nick`'s draft sends to `room`, a room id the caller checked. */
@@ -43,6 +44,8 @@ export function compose(room: string, draft: string, nick: string): Composed {
     .replaceAll("\t", "    ")
     .replaceAll(/(?!\n)\p{Cc}/gu, " ")
     .trim();
+  // Half of an emoji (a lone surrogate) is no text: the connection refuses any line holding it.
+  if (!text.isWellFormed()) return { kind: "malformed" };
   const word = /^\/\S*/u.exec(text)?.[0];
   if (word === undefined) return said(room, nick, { text, action: false });
   if (word.startsWith("//")) return said(room, nick, { text: text.slice(1), action: false });

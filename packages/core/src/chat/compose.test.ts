@@ -83,10 +83,16 @@ describe("compose", () => {
     expect(compose(ROOM, "a\u007fb\u0085c\u009bd", NICK)).toStrictEqual(sent("PRIVMSG #bubble/games :a b c d"));
   });
 
-  test("counts bytes, not characters: é is two, 😀 four, a lone surrogate three (the character replacing it)", () => {
+  test("counts bytes, not characters: é is two, 😀 four", () => {
     expect(compose(ROOM, "é", NICK)).toStrictEqual(sent("PRIVMSG #bubble/games :é", 442 - 25));
     expect(compose(ROOM, "😀", NICK)).toStrictEqual(sent("PRIVMSG #bubble/games :😀", 442 - 27));
-    expect(compose(ROOM, "\ud800", NICK)).toStrictEqual(sent("PRIVMSG #bubble/games :\ud800", 442 - 26));
+  });
+
+  // F1717: the connection refuses a line holding half of an emoji, which the box used to call "not ready yet".
+  test("refuses a draft holding a lone surrogate, one line or several, an action too", () => {
+    for (const draft of ["\ud800", "a\udc00b", "x\n\ud800", "/me \ud83d", "😀"]) {
+      expect(compose(ROOM, draft, NICK).kind).toBe(draft === "😀" ? "line" : "malformed");
+    }
   });
 
   test("takes a line whose relay holds exactly 510 bytes, and refuses one byte more, saying by how many", () => {
@@ -293,7 +299,7 @@ describe("compose: a draft of several lines", () => {
     fc.assert(
       fc.property(draft, nicks, (text, nick) => {
         const composed = compose(ROOM, text, nick);
-        expect(["line", "lines", "long", "tooBig", "empty", "unknown"]).toContain(composed.kind);
+        expect(["line", "lines", "long", "tooBig", "empty", "unknown", "malformed"]).toContain(composed.kind);
         if (composed.kind !== "lines") return;
         expect(composed.lines.length).toBeGreaterThan(1);
         expect(composed.lines.length).toBeLessThanOrEqual(MULTILINE_LINES);

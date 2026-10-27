@@ -1043,7 +1043,8 @@ describe("the chat's link: what it says", () => {
 
   it("sends nothing of a message a line of which Ergo's connection would refuse, a lone surrogate", () => {
     const t = memberIn(["#bubble/games"]);
-    expect(t.link.say("#bubble/games", composed("#bubble/games", "a\n\ud800"))).toBe(false);
+    const lines = ["PRIVMSG #bubble/games :a", "PRIVMSG #bubble/games :\ud800"];
+    expect(t.link.say("#bubble/games", { kind: "lines", lines, text: "a\n\ud800", left: 0 })).toBe(false);
     expect(batches(t.fake.sent)).toEqual([]);
   });
 

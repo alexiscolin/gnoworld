@@ -297,6 +297,13 @@ describe("the composer, a draft of several lines", () => {
     });
   });
 
+  it("says a draft holding half of an emoji cannot go, and Send off, not that the chat is not ready (F1717)", () => {
+    const message = "This text holds half of an emoji and cannot be sent. Delete it.";
+    expect(said(compose(ROOM, "a\ud800b", NICK), false)).toStrictEqual({ error: message });
+    expect(from("one\n\ud83d")).toContain(message);
+    expect(from("one\n\ud83d")).toMatch(/<button(?=[^>]*type="submit")(?=[^>]*disabled="")[^>]*>/);
+  });
+
   it("leaves Send on for a message of several lines that can go", () => {
     expect(from("- one\n- two")).not.toMatch(/<button(?=[^>]*type="submit")(?=[^>]*disabled)/);
   });

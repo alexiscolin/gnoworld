@@ -63,12 +63,19 @@ function tooLong(composed: Extract<Composed, { kind: "long" | "tooBig" }>): stri
     : `Line ${String(composed.line)} is ${by}.`;
 }
 
+// Why a draft cannot go whatever the field is completing: half of an emoji, or a line or message too long.
+function refusal(composed: Composed): string | undefined {
+  if (composed.kind === "malformed") return "This text holds half of an emoji and cannot be sent. Delete it.";
+  return composed.kind === "long" || composed.kind === "tooBig" ? tooLong(composed) : undefined;
+}
+
 /** What the field says of the draft: that it was not sent or is too long (a line of several named, a message past
  * its lines or bytes), what Tab completes (a command not yet typed whole being no error), an unknown command, or
  * help near the end; or nothing. */
 export function said(composed: Composed, failed: boolean, completion?: Completion): Pick<FieldProps, "error" | "help"> {
   if (failed) return { error: "Not sent: the chat is not ready yet. Try again in a moment." };
-  if (composed.kind === "long" || composed.kind === "tooBig") return { error: tooLong(composed) };
+  const refusing = refusal(composed);
+  if (refusing !== undefined) return { error: refusing };
   if (completion !== undefined) {
     const [first = "", ...rest] = completion.options.map(named);
     return { help: `Tab completes ${first}${rest.length === 0 ? "" : `; also ${rest.join(", ")}`}.` };
