@@ -7,9 +7,11 @@ import { connect, type Socket } from "node:net";
 import { parseLine, type IrcMessage } from "@gnoworld/core";
 import type { Log } from "../log.ts";
 import type { RoomState } from "../rooms/reconcile.ts";
+import type { Fetched } from "./fetch.ts";
 import { allowed, line, NICK, type Command } from "./lines.ts";
-import { fresh, reader, type Options } from "./reader.ts";
+import { forget, fresh, reader, type Options } from "./reader.ts";
 
+export type { Fetched } from "./fetch.ts";
 export type { Said } from "./lines.ts";
 
 export interface Link {
@@ -17,8 +19,14 @@ export interface Link {
   send: (command: Command, params: readonly string[]) => boolean;
   // A room's flags, invite list and people, once it is in its rooms; undefined otherwise or past stateMs.
   state: (room: string) => Promise<RoomState | undefined>;
+  // One line of a room by its id, as Ergo holds it now (4d, pins): "gone" when Ergo holds none, "unanswered" when it
+  // could not be asked or did not answer in time.
+  line: (room: string, msgid: string) => Promise<Fetched>;
   stop: () => Promise<void>;
 }
+
+// How long a line asked for by its id may take: under the 10 s a page waits on the server (lib/api/http.ts).
+const LINE_MS = 5000;
 
 // A server's longest line: 8191 bytes of tags with the @ and the space, 510 more, then CR LF.
 const LINE_MAX = 8191 + 512;
@@ -60,7 +68,7 @@ export function ircLink(options: Options): Link {
   let retry: ReturnType<typeof setTimeout> | undefined;
   // The backoff starts again from a second only after a minute up: Ergo taking the link in, then
   // dropping it at once, keeps it waiting longer.
-  const state = fresh(options.stateMs ?? 10_000);
+  const state = fresh(options.stateMs ?? 10_000, options.lineMs ?? LINE_MS);
   const read = reader(options, state);
   const open = (): void => {
     const s = connect(port, host);
@@ -95,11 +103,7 @@ export function ircLink(options: Options): Link {
     });
     s.on("close", () => {
       clearInterval(watchdog);
-      state.ready = false;
-      state.batches.clear();
-      state.asked.clear();
-      state.channels = undefined;
-      state.states.drop();
+      forget(state);
       if (stopped) return;
       log("irc_closed");
       if (state.upSince !== undefined && Date.now() - state.upSince >= 60_000) state.attempt = 0;
@@ -129,6 +133,13 @@ export function ircLink(options: Options): Link {
       // A room by the JOIN's form: one room, a name no line breaks.
       if (!state.ready || s === undefined || !allowed("JOIN", [room])) return Promise.resolve(undefined);
       return state.states.ask((command, params) => s.write(line(command, params)), room);
+    },
+    line: (room, msgid) => {
+      const s = socket;
+      // A room by the JOIN's form, one the link is in: a word that would break a line is never sent.
+      if (!state.ready || s === undefined || !allowed("JOIN", [room]) || !state.joined.has(room))
+        return Promise.resolve("unanswered");
+      return state.lines.ask((command, params) => s.write(line(command, params)), room, msgid);
     },
     stop: async () => {
       stopped = true;
