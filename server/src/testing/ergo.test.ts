@@ -32,6 +32,7 @@ import {
   logged,
   login,
   moderated,
+  msgid,
   open,
   oper,
   ORIGIN,
@@ -414,6 +415,48 @@ describe("history and tags", { timeout: 30_000 }, () => {
     history(noPlayback, "#lobby");
     await noPlayback.expect(/:HistServ!HistServ@localhost PRIVMSG #lobby :alice sent a TAGMSG/);
   });
+
+  // F1492: the room's history is Ergo's SQLite store (history.persistent, unregistered-channels), which holds no
+  // count of items, only expire-time: the 2,048 of channel-length is the in-memory ring of a room not persisted.
+  // The reader pages back from the latest item to the first line, 1,000 items a page (chathistory-maxmessages).
+  it(
+    "still reads a room's first line by CHATHISTORY after 3,000 events in it: reactions, joins and parts (F1492)",
+    { timeout: 120_000 },
+    async () => {
+      const e = await start();
+      const chief = await lobby(e);
+      const text = "the room's first line";
+      const first = await say(chief, "#lobby", text);
+      // Operators have no fakelag (the bot's class), so 3,000 events take a second or two.
+      const [reactor, visitor] = [await oper(e, "reactor"), await oper(e, "visitor")];
+      await join(reactor, "#lobby");
+      for (let n = 0; n < 1000; n++) {
+        reactor.send(`@+draft/react=%F0%9F%91%8D;+draft/reply=${first} TAGMSG #lobby`);
+        visitor.send("JOIN #lobby");
+        visitor.send("PART #lobby");
+      }
+      await sync(reactor);
+      await sync(visitor);
+      let items = 0;
+      let found = false;
+      let from = "CHATHISTORY LATEST #lobby * 1000";
+      for (let page = 0; page < 8 && !found; page++) {
+        const mark = chief.lines().length;
+        chief.send(from);
+        await chief.expect(/BATCH -/, 10_000);
+        const stored = chief
+          .lines()
+          .slice(mark)
+          .filter((l) => replayed(" ").test(l));
+        if (stored.length === 0) break;
+        items += stored.length;
+        found = stored.some((l) => l.endsWith(` PRIVMSG #lobby :${text}`));
+        from = `CHATHISTORY BEFORE #lobby msgid=${msgid(stored[0] ?? "")} 1000`;
+      }
+      expect(items, "the items paged through, the first line's among them").toBeGreaterThan(3000);
+      expect(found, "the room's first line, after 3,000 events").toBe(true);
+    },
+  );
 
   it("stops a non-voiced account and guest sending in a +m room, a reaction TAGMSG included, until +v", async () => {
     const { e, chief, members } = await room(["alice", "obs"]);
