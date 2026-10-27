@@ -2,7 +2,7 @@ import { compose } from "@gnoworld/core";
 import { completions } from "./complete.ts";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { Composer, NEAR, Preview, said, typingOf } from "./Composer.tsx";
+import { Composer, NEAR, Preview, ROOM_NOTIFIES, ROOM_SILENT, roomHint, said, typingOf } from "./Composer.tsx";
 import { refusalAfter } from "./composerHooks.ts";
 
 const ROOM = "#bubble/games";
@@ -170,6 +170,26 @@ describe("what the composer's field says", () => {
   });
 });
 
+// 4f-n (decisions, 2026-10-27, N3): as @room stands in the draft, the field says whether it notifies in this room, and why not.
+describe("what the composer's field says of @room", () => {
+  it.each([
+    ["@room the release is out", true, ROOM_NOTIFIES],
+    ["hello @ROOM.", true, ROOM_NOTIFIES],
+    ["@room the release is out", false, ROOM_SILENT],
+    ["mail@room", false, undefined],
+    ["@rooms", false, undefined],
+    ["`@room`", false, undefined],
+    ["no mention", false, undefined],
+    ["no mention", true, undefined],
+  ])("says, of %j in a room where it counts (%s), %j", (draft, groups, shown) => {
+    expect(roomHint(compose(ROOM, draft, NICK), groups)).toBe(shown);
+  });
+
+  it("says nothing of a line that cannot go", () => {
+    expect(roomHint(compose(ROOM, `@room ${"a".repeat(420)}`, NICK), true)).toBeUndefined();
+  });
+});
+
 describe("what the composer's field says of a completion", () => {
   const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
   it.each([
@@ -241,6 +261,50 @@ describe("the composer, from a draft", () => {
     expect(from("a".repeat(400))).not.toContain(told);
     // An error is the field's word alone: the line too long to go.
     expect(from("a".repeat(600))).not.toContain(told);
+  });
+
+  // N3: the hint is read from the draft as typed or completed, from the room's own rule, none in a direct message.
+  it.each([
+    [true, ROOM_NOTIFIES],
+    [false, ROOM_SILENT],
+  ])("says, as @room stands in the draft of a room where it counts (%s), %j", (groups, told) => {
+    const markup = renderToStaticMarkup(
+      <Composer
+        room={ROOM}
+        nick={NICK}
+        rooms={[]}
+        members={[]}
+        draft="@room hello"
+        groups={groups}
+        onSay={() => true}
+      />,
+    );
+    expect(markup).toContain(told);
+  });
+
+  it("leaves the bytes left and an error their place before the hint", () => {
+    const withGroups = (draft: string) =>
+      renderToStaticMarkup(
+        <Composer room={ROOM} nick={NICK} rooms={[]} members={[]} draft={draft} groups onSay={() => true} />,
+      );
+    expect(withGroups(`@room ${"a".repeat(400)}`)).toContain("bytes left");
+    expect(withGroups(`@room ${"a".repeat(400)}`)).not.toContain(ROOM_NOTIFIES);
+    expect(withGroups(`@room ${"a".repeat(600)}`)).not.toContain(ROOM_NOTIFIES);
+  });
+
+  it("says nothing of @room in a direct message's composer", () => {
+    const markup = renderToStaticMarkup(
+      <Composer
+        room={ALICE}
+        label="g10gh7…3y5tv"
+        nick={NICK}
+        rooms={[]}
+        members={[]}
+        draft="@room"
+        onSay={() => true}
+      />,
+    );
+    expect(markup).not.toContain("@room notifies");
   });
 
   it.each(["hi@g10", "hi @g10 there", "hi @ g10"])(

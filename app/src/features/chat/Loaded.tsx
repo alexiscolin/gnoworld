@@ -8,7 +8,7 @@ import { useSearchParams } from "react-router";
 import type { AppState } from "../../store/index.ts";
 import type { Dms } from "./Dms.tsx";
 import type { ChatLink } from "./link.ts";
-import { dmParams, neighbour, roomIds, roomParams } from "./names.ts";
+import { dmParams, groupsAt, neighbour, roomIds, roomParams } from "./names.ts";
 import { roomActs, type RoomActs } from "./roomActs.ts";
 import { RoomsView } from "./RoomsView.tsx";
 import { People, RoomView, type RoomViewProps } from "./RoomView.tsx";
@@ -175,7 +175,15 @@ export function Loaded({
           me={me}
           noteId={noteId}
           {...replies.view}
-          composer={<Writer session={session} rooms={ids} {...shown.writer} {...replies.writer} />}
+          composer={
+            <Writer
+              session={session}
+              rooms={ids}
+              groups={groupsAt(sections, room)}
+              {...shown.writer}
+              {...replies.writer}
+            />
+          }
         />
       )}
     </Sidebar>

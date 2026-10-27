@@ -2,6 +2,7 @@ import { Address } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
 import {
   groupRooms,
+  groupsAt,
   neighbour,
   peopleOf,
   roomHref,
@@ -129,5 +130,23 @@ describe("groupRooms: where a mention of the whole room counts", () => {
   it("lists none for a world of open rooms, or of none", () => {
     expect(groupRooms([{ name: null, rooms: [typed("#a", "open"), typed("#a/b", "accounts")] }])).toEqual([]);
     expect(groupRooms([])).toEqual([]);
+  });
+});
+
+describe("groupsAt: whether a mention of the whole room counts in a room", () => {
+  const sections = [
+    {
+      name: null,
+      rooms: [
+        { room: "#a", type: "open" as const },
+        { room: "#a/news", type: "announcement" as const },
+      ],
+    },
+  ];
+
+  it("is true for a room that is listed so, false for another, and for none", () => {
+    expect(groupsAt(sections, "#a/news")).toBe(true);
+    expect(groupsAt(sections, "#a")).toBe(false);
+    expect(groupsAt(sections, undefined)).toBe(false);
   });
 });

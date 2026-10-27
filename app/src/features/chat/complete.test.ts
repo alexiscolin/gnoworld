@@ -68,3 +68,30 @@ describe("a completed draft", () => {
     expect(completion === undefined ? undefined : completed("hi @g1jg", completion).text).toBe(`hi @${BOB} `);
   });
 });
+
+// 4f-n (N3): @room completes in a room's composer, which the draft then says whether it notifies (Composer.test.tsx).
+describe("@room as a completion", () => {
+  const WITH: Choices = { ...CHOICES, group: true };
+
+  it.each([
+    ["@r", ["@room"]],
+    ["hi @RO", ["@room"]],
+    ["@g1", [`@${ALICE}`, `@${BOB}`]],
+  ])("offers, for %j, %j", (text, options) => {
+    expect(completions(text, WITH)?.options).toStrictEqual(options);
+  });
+
+  it("offers it after a letter only: a bare @ lists the accounts", () => {
+    expect(completions("@", WITH)?.options).toStrictEqual([`@${ALICE}`, `@${BOB}`]);
+  });
+
+  it("offers it in no direct message, and none once typed whole", () => {
+    expect(completions("@r", CHOICES)).toBeUndefined();
+    expect(completions("@room", WITH)).toBeUndefined();
+  });
+
+  it("completes a draft to it and a space", () => {
+    const found = completions("hi @ro", WITH);
+    expect(found && completed("hi @ro", found).text).toBe("hi @room ");
+  });
+});

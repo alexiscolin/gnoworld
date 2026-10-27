@@ -82,3 +82,7 @@ export const groupRooms = (sections: RoomList["sections"]): string[] =>
   sections.flatMap(({ rooms }) =>
     rooms.filter(({ type }) => ["announcement", "members", "members-write"].includes(type)).map(({ room }) => room),
   );
+
+/** Whether a mention of the whole room counts in `room`, one of the world's. */
+export const groupsAt = (sections: RoomList["sections"], room: string | undefined): boolean =>
+  room !== undefined && groupRooms(sections).includes(room);
