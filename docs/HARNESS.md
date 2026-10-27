@@ -301,7 +301,11 @@ benches' step 4.7 s (a 510-byte line read in 0.0037 ms of its 0.2, a room of 200
 510-byte body holds: the real path read in 0.0138 ms on a machine at load 40, G1); `harness_mutate --changed` after a change of `check.sh` and of one test section
 judges 93 of its 678 mutants, about 125 s at the rate above instead of about 900 (estimated from
 that rate, not timed); a worktree made by `worktree.sh` starts StrykerJS from the main tree's
-incremental file, where one without it ran all 9,045 mutants. Earlier measures:
+incremental file, where one without it ran all 9,045 mutants. On 2026-10-27, StrykerJS on seven files (744 mutants, `--force`,
+`--concurrency 4`, the same incremental file, load 13 to 23): with the TypeScript checker 72 s, 108 mutants dropped as compile
+errors; without it 19 s, and of those 108, 99 killed and 9 survivors (`room.ts`), mutants that do not compile counted against the
+score (78.3% became 80.5% with 99 more kills and 9 false survivors). So `checkers: ["typescript"]` stays, at 53 s more on these
+files. Earlier measures:
 
 Measured on this machine, 2026-10-18: the fast gate 19 to 24 s (budget 60 s), the app's
 build and its 18 journeys included; the full gate 263 s, with the harness mutation proving

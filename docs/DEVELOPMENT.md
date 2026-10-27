@@ -54,6 +54,16 @@ GNO_TOOLCHAIN=$T GNOROOT=$T/src ./scripts/check.sh   # the first run downloads p
 What each step catches, the hooks, the permissions, the reviews and how the harness proves
 itself: [HARNESS.md](HARNESS.md).
 
+To mutate only your own files with StrykerJS, from the repository root and on the pinned Node (the
+`PATH` check.sh sets): `node_modules/.bin/stryker run --mutate 'a.ts,b.tsx'`, one comma-separated
+value. It replaces the config's `mutate` list (its log says `Found 2 of 935 file(s)`), keeps the
+incremental file whole and takes no `--`. Two forms fail: `pnpm run mutate -- --mutate a.ts` hands
+StrykerJS a literal `--` (`too many arguments for 'run'`, pnpm's own help: every later token reaches
+the script verbatim), and `--mutate a.ts b.ts` reads `b.ts` as its config file. Without `--mutate`
+the whole config runs: 9,062 mutants in 142 files, and its initial test run alone takes 2 min 22 s
+(2026-10-27, load 5 to 19); one file (`packages/core/src/chat/compose.ts`, 57 mutants) takes 19 s
+with `--force`, 4 s from the incremental file. Keep `checkers: ["typescript"]` (HARNESS.md).
+
 To regenerate the seal vectors after a change to `gno/tools/sealvec`, in `gno/`:
 `go run ./tools/sealvec > r/seal/vectors_test.gno`.
 
