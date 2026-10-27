@@ -25,11 +25,13 @@ const nameOf = ({ emoji, count, mine }: Shown): string => `${emoji}, ${String(co
 export const chipsOf = (shown: readonly Shown[]): string =>
   shown.map(({ emoji, count, mine }) => `${String(count)}${mine ? "*" : " "}${emoji}`).join("\n");
 
-// The chips chipsOf wrote.
+// The chips chipsOf wrote: the count's digits first, then the star or the space, then the emoji.
 function shownOf(chips: string): Shown[] {
-  return chips.split("\n").flatMap((chip) => {
-    const [, count, mine, emoji] = /^(\d+)([ *])(.+)$/su.exec(chip) ?? [];
-    return count === undefined || emoji === undefined ? [] : [{ emoji, count: Number(count), mine: mine === "*" }];
+  if (chips === "") return [];
+  return chips.split("\n").map((chip) => {
+    const count = Number.parseInt(chip, 10);
+    const at = String(count).length;
+    return { emoji: chip.slice(at + 1), count, mine: chip.charAt(at) === "*" };
   });
 }
 
