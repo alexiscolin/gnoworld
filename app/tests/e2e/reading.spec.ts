@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import type { WebSocketRoute } from "@playwright/test";
+import type { Locator, WebSocketRoute } from "@playwright/test";
 import { lineOf, lines, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
@@ -213,6 +213,25 @@ test.describe("the reading place", () => {
       box.scrollTop = box.scrollHeight;
     });
     await expect.poll(() => marks(sent)).toEqual([`MARKREAD ${ROOM} timestamp=${T(59)}`]);
+  });
+
+  // The UX review (U4): "New" is a divider row of its own, in caps with a rule running on, so the time column of the
+  // lines stays aligned.
+  test("sets New as a divider row above its line, the times in one column", async ({ page }) => {
+    const address = await logIn(page, word("read"));
+    await room(page, { me: address, read: T(0) });
+    const fresh = page.locator("[data-new]");
+    await expect(fresh).toContainText("New");
+    const time = (line: Locator) => line.locator("time").evaluate((node) => node.getBoundingClientRect().x);
+    expect(await time(fresh)).toBe(await time(lineOf(page, "the first line")));
+    const label = fresh.locator(".label");
+    await expect(label).toHaveCSS("text-transform", "uppercase");
+    const rule = await fresh.evaluate((item) => {
+      const row = item.firstElementChild?.getBoundingClientRect();
+      return { row: row?.width ?? 0, line: item.getBoundingClientRect().width };
+    });
+    // The row runs the line's width: its rule goes on past the word.
+    expect(rule.row).toBe(rule.line);
   });
 
   // The green pass (G3): each newest line's look at the tab lets the last one go.

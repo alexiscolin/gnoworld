@@ -68,9 +68,16 @@ function LineView({ line, me, members, stop, actions, fresh }: LineViewProps) {
       tabIndex={stop ? 0 : -1}
     >
       {fresh ? (
-        <span className={styles["fresh"]}>
-          New<span className="visually-hidden"> from here</span>{" "}
-        </span>
+        <>
+          {/* The prototype's divider: a row of its own, its word in the label style and a rule running on. */}
+          <span className={styles["divider"]}>
+            <span className="label">
+              <span className={styles["fresh"]}>
+                New<span className="visually-hidden"> from here</span>
+              </span>
+            </span>
+          </span>{" "}
+        </>
       ) : null}
       {/* The line's marks first, before the time: where no sender's words stand (F808). */}
       {mentioned ? <span className={styles["mentionsYou"]}>Mentions you </span> : null}

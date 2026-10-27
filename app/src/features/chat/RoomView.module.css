@@ -82,13 +82,25 @@
     white-space: nowrap;
   }
 
-  /* The first line past the reading place as the room opened: coral, the prototype's "New", by a rule and a word. */
-  .lines > li[data-new] {
+  /* The first line past the reading place as the room opened: the prototype's "New", a divider row at its head, the word
+     in the label style and a rule running on, so the times stay in one column (UX review U4). */
+  .divider {
+    /* layout: the word and its rule side by side, the rule taking what the word leaves */
+    display: flex;
+    /* layout: the word on the rule's line */
+    align-items: center;
+    /* layout: a step between the word and its rule */
+    gap: var(--space-2xs);
+  }
+
+  .divider::after {
+    content: "";
+    /* layout: the rule takes the row's rest */
+    flex: 1;
     border-block-start: var(--line-width) solid var(--color-new-line);
   }
 
   .fresh {
-    font: var(--font-label);
     color: var(--color-new);
   }
 }
