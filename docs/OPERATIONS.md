@@ -354,6 +354,19 @@ Slice 3, the stack (3e):
 - **`web`'s fixed address** is in `INSIDE_SUBNET`: a host with another network in that range refuses
   to start the stack (Compose names the overlap); set both in `deploy/.env`.
 
+Slice 4, pins and what an account keeps (4d):
+
+- **Pins live in the server's database** (the `pins` table), not in Ergo, which writes a channel's metadata back for
+  registered channels alone and ours are not (`unregistered-channels: true`). A world's moderators and the team pin,
+  10 a room, 30 pin or unpin requests a minute an account; the server reads the line from Ergo by its id
+  (`CHATHISTORY AROUND`), never from what the page sent, and keeps its text, author and time.
+- **A pin ends with its line.** An author's delete, the bot's hide (Ergo sends the bot each REDACT of its rooms,
+  `draft/message-redaction`) and the author's edit drop it. Each time the bot is back in a room, its pins there are
+  asked of Ergo again and those Ergo no longer holds are dropped, so a pin also ends with Ergo's history (90 days,
+  above). A question Ergo does not answer keeps its pin; a re-read that throws logs `pins_unchecked` (no alert).
+- **Saved messages and "Mark unread" are on the reader's device** (ADR-0002) and nowhere on the server: nothing
+  to back up, and a cleared browser loses them.
+
 ## Secrets: rotation and revocation
 
 - **The password:** write a new file with `htpasswd -cB`, then `docker compose ... restart web`.
