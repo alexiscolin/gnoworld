@@ -243,6 +243,40 @@ describe("a question and the catch-up pages of one connection", () => {
   });
 });
 
+// A room asked for by its id is read only once Ergo has the bot in it: a channel it does not hold answers an empty
+// batch, which would read as a line gone (irc/server.go:1165-1169, v2.19.1).
+describe("the link says when it is in a room", () => {
+  it("tells each of its rooms once Ergo echoes its own JOIN, at each connection", async () => {
+    const ergo = await fakeErgo();
+    const rooms: string[] = [];
+    start(ergo.port, { onIn: (room: string) => rooms.push(room) });
+    const first = await ergo.peer(0);
+    await welcome(first);
+    first.say("PING :sync11");
+    await first.next(/^PONG sync11$/);
+    expect(rooms).toEqual(["#bubble", "#bubble/games"]);
+    first.socket.destroy();
+    const second = await ergo.peer(1);
+    await welcome(second);
+    second.say("PING :sync12");
+    await second.next(/^PONG sync12$/);
+    expect(rooms).toHaveLength(4);
+  });
+
+  it("tells none for a room Ergo had it join that is not its own, nor for another's JOIN", async () => {
+    const ergo = await fakeErgo();
+    const rooms: string[] = [];
+    start(ergo.port, { onIn: (room: string) => rooms.push(room) });
+    const peer = await ergo.peer(0);
+    await welcome(peer, { echo: false });
+    peer.say(":gnoworld!u@h JOIN #elsewhere");
+    peer.say(`:${ALICE}!u@h JOIN #bubble`);
+    peer.say("PING :sync13");
+    await peer.next(/^PONG sync13$/);
+    expect(rooms).toEqual([]);
+  });
+});
+
 describe("the link hears a line taken from a room", () => {
   it("asks Ergo's redaction capability with the rest, so a REDACT reaches it", async () => {
     const ergo = await fakeErgo();

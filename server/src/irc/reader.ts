@@ -28,6 +28,8 @@ export interface Options {
   onChannels?: (names: readonly string[]) => void;
   // Someone else joined one of its rooms (3m: the reconciler voices a writer at once).
   onJoin?: (room: string) => void;
+  // The bot itself is in one of its rooms, Ergo having said so, at each connection (4d: the room's pins are read again).
+  onIn?: (room: string) => void;
   // How long a room's state may take to come (3m).
   stateMs?: number;
   // A line was taken from one of its rooms, by its author's delete or a hide (4d: its pin goes with it).
@@ -70,7 +72,7 @@ export interface State {
 // The lines Ergo sends that ask for an answer, as 3b's table found them.
 export function reader(options: Options, state: State) {
   const { password, rooms, log, lastChecked = () => undefined, onReady = () => undefined } = options;
-  const { onChannels, onJoin = () => undefined, onRedact = () => undefined } = options;
+  const { onChannels, onJoin = () => undefined, onIn = () => undefined, onRedact = () => undefined } = options;
   // A refusal Ergo will not change by itself: log it, and try again later and later.
   const refused = (s: Socket, error: string): void => {
     log("irc_refused", { error });
@@ -106,7 +108,7 @@ export function reader(options: Options, state: State) {
       if (message.params[1] === "OPER") handlers["381"]?.(s, message);
     },
     ...listing(state, onChannels),
-    JOIN: joined(state, onJoin),
+    JOIN: joined(state, { onJoin, onIn }),
     ...rejoins(state),
     ...refusals(refused, state, log),
     ...pages(options, state),
@@ -193,13 +195,19 @@ function refusals(
   };
 }
 
-// Ergo's JOIN: the bot's own takes a room it asked as joined (3l); another's, in one of its rooms, is
-// handed on (3m).
-function joined(state: State, onJoin: (room: string) => void): (s: Socket, message: IrcMessage) => void {
+// Ergo's JOIN: the bot's own takes a room it asked as joined (3l) and tells it is in it, a room of its own alone;
+// another's, in one of its rooms, is handed on (3m).
+function joined(
+  state: State,
+  { onJoin, onIn }: Record<"onJoin" | "onIn", (room: string) => void>,
+): (s: Socket, message: IrcMessage) => void {
   return (_, { source, params: [room = ""] }) => {
     if (source?.split("!")[0] !== NICK) {
       if (state.joined.has(room)) onJoin(room);
-    } else if (state.asked.has(room)) state.joined.add(room);
+      return;
+    }
+    if (state.asked.has(room)) state.joined.add(room);
+    if (state.joined.has(room)) onIn(room);
   };
 }
 
