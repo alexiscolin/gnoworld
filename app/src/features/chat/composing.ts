@@ -123,11 +123,12 @@ function editsOf(
   };
 }
 
-// A line Ergo refused, heard while its conversation is in view, takes its reply or its correction up again: its draft is
-// back in the box (the store put it on the device), so the next Send answers or corrects as the first did. Nothing is
-// taken up while a correction is open: the draft waits on the device, a plain one (CR2).
+// A line Ergo refused takes its reply or its correction up again as its conversation is in view or comes into view: its
+// draft is back in the box (the store put it on the device), so the next Send answers or corrects as the first did. Not
+// while a correction is open there: the draft waits on the device, a plain one (CR2); true then, for the refusal to say so.
 function takeUp(tags: RefusedTags | undefined, { reply, edit }: { reply: Here<Chosen>; edit: Here<Chosen> }) {
-  if (tags === undefined || edit.value !== undefined) return;
+  if (tags === undefined) return false;
+  if (edit.value !== undefined) return true;
   const { edit: corrected, reply: answered } = tags;
   if (corrected !== undefined) {
     reply.clear();
@@ -135,16 +136,37 @@ function takeUp(tags: RefusedTags | undefined, { reply, edit }: { reply: Here<Ch
   } else if (answered !== undefined) {
     reply.update((was) => asking(was, answered));
   }
+  return false;
 }
 
-// The refusals the conversation held as it came in view are not new ones: each later one is taken up.
+// The refusal told as one whose draft stayed a plain one, a correction or a reply open there having kept its place; none
+// for a refusal the draft of which went another way (`plain` counts the one left so).
+function toldPlain(refused: Shown["writer"]["refused"], plain: number | undefined) {
+  if (refused?.tags === undefined || plain !== refused.count) return undefined;
+  const kind = refused.tags.edit === undefined ? "reply" : "correction";
+  return { ...refused, why: `${refused.why} It will go as a new message, not as the ${kind} it was.` };
+}
+
+// Whether the refusals of the conversation `key` count `count` is news: each conversation's count is held as it is viewed,
+// the ones the page held as it opened being old (nothing is news on the first view of the page), and any other, heard in
+// view or while another conversation was (R7), new.
+function useNews(key: string | undefined, count: number) {
+  const [heard, setHeard] = useState<Readonly<Record<string, number>>>();
+  if (key === undefined || heard?.[key] === count) return false;
+  setHeard((was) => ({ ...was, [key]: count }));
+  return heard !== undefined;
+}
+
+// A new refusal is taken up as its conversation is in view; what was left plain is told as the refusal's own.
 function useRefusals(shown: Shown | undefined, held: { reply: Here<Chosen>; edit: Here<Chosen> }) {
-  const heard = useHere<number>(shown?.key);
+  const plain = useHere<number>(shown?.key);
   const refused = shown?.writer.refused;
   const count = refused?.count ?? 0;
-  if (shown === undefined || heard.value === count) return;
-  heard.update(() => count);
-  if (heard.value !== undefined) takeUp(refused?.tags, held);
+  const news = useNews(shown?.key, count);
+  if (news) {
+    if (takeUp(refused?.tags, held)) plain.update(() => count);
+  }
+  return toldPlain(refused, plain.value);
 }
 
 /** The conversation in view and what its composer is told of the line it answers or corrects. */
@@ -153,7 +175,7 @@ export function useComposing(shown: Shown | undefined) {
   const reply = useHere<Chosen>(shown?.key);
   const edit = useHere<Chosen>(shown?.key);
   const ended = useHere<true>(shown?.key);
-  useRefusals(shown, { reply, edit });
+  const refused = useRefusals(shown, { reply, edit });
   const end = () => {
     edit.clear();
     ended.update(() => true);
@@ -165,5 +187,8 @@ export function useComposing(shown: Shown | undefined) {
     },
   });
   const edits = editsOf(shown, lines, { edit, ended, end, dropReply: reply.clear });
-  return { view: { ...replies.view, ...edits.view }, writer: { ...replies.writer, ...edits.writer } };
+  return {
+    view: { ...replies.view, ...edits.view },
+    writer: { ...replies.writer, ...edits.writer, ...(refused === undefined ? {} : { refused }) },
+  };
 }

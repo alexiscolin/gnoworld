@@ -29,14 +29,22 @@ function Probe({
   kind,
   lines,
   refused,
+  who,
   seen,
 }: {
   kind: "dm" | "room";
+  who: string;
   lines: readonly Line[];
   refused: Refusal | undefined;
   seen: (result: Composed) => void;
 }) {
-  const shown = { kind, key: `${kind}:x`, view: { state: { lines } }, writer: { refused }, say } as unknown as Shown;
+  const shown = {
+    kind,
+    key: `${kind}:${who}`,
+    view: { state: { lines } },
+    writer: { refused },
+    say,
+  } as unknown as Shown;
   const result = useComposing(shown);
   useEffect(() => {
     seen(result);
@@ -55,19 +63,37 @@ const refusal = (count: number, tags?: Refusal["tags"]): Refusal => ({
   why: "Not sent.",
   ...(tags === undefined ? {} : { tags }),
 });
-const draw = (kind: "dm" | "room" = "dm", lines: readonly Line[] = LINES, refused?: Refusal) => {
+const render = ({
+  kind,
+  lines,
+  refused,
+  who,
+}: {
+  kind: "dm" | "room";
+  lines: readonly Line[];
+  refused?: Refusal;
+  who: string;
+}) => {
   act(() => {
     root.render(
       <Probe
         kind={kind}
         lines={lines}
         refused={refused}
+        who={who}
         seen={(result) => {
           latest = result;
         }}
       />,
     );
   });
+};
+const draw = (kind: "dm" | "room" = "dm", lines: readonly Line[] = LINES, refused?: Refusal) => {
+  render({ kind, lines, ...(refused === undefined ? {} : { refused }), who: "x" });
+};
+// A direct message with another account, to tell conversations apart.
+const drawWith = (who: string, refused?: Refusal) => {
+  render({ kind: "dm", lines: LINES, ...(refused === undefined ? {} : { refused }), who });
 };
 const now = () => {
   if (latest === undefined) throw new Error("nothing drawn");
@@ -248,6 +274,51 @@ describe("useComposing", () => {
     draw("dm", LINES, refusal(5, { reply: "m2" }));
     expect(now().writer.replying).toBeUndefined();
     expect(now().writer.editing).toEqual({ text: "my words", asked: 1 });
+  });
+
+  // The second red pass on the DM bar (R7): a refusal heard while another conversation was in view was dropped as its own
+  // came in view, and the next Send posted a new message. Decided: it is taken up as its conversation comes into view.
+  it("takes up a refusal heard while another conversation was in view, as its own comes into view", () => {
+    drawWith("a");
+    drawWith("b", refusal(1, { edit: "m1" }));
+    expect(now().writer.editing).toEqual({ text: "my words", asked: 1, back: true });
+    drawWith("c", refusal(1, { reply: "m2" }));
+    expect(now().writer.replying?.id).toBe("m2");
+  });
+
+  it("takes a refusal up once: a conversation left and come back to is not asked again", () => {
+    drawWith("a");
+    drawWith("b", refusal(1, { reply: "m2" }));
+    act(() => {
+      now().writer.onSay?.("answer");
+    });
+    expect(now().writer.replying).toBeUndefined();
+    drawWith("a");
+    drawWith("b", refusal(1, { reply: "m2" }));
+    expect(now().writer.replying).toBeUndefined();
+  });
+
+  it("says a refusal heard while a correction is open leaves its draft a new message, and tells no other", () => {
+    draw();
+    act(() => now().view.onEdit?.("m1"));
+    draw("dm", LINES, refusal(1, { edit: "m2" }));
+    expect(now().writer.editing).toEqual({ text: "my words", asked: 1 });
+    expect(now().writer.refused?.why).toBe("Not sent. It will go as a new message, not as the correction it was.");
+    draw("dm", LINES, refusal(2));
+    expect(now().writer.refused).toBeUndefined();
+  });
+
+  it("says it of a reply too, and of a refusal that keeps its place: no word to a refusal taken up", () => {
+    draw();
+    act(() => now().view.onEdit?.("m1"));
+    draw("dm", LINES, refusal(1, { reply: "m2" }));
+    expect(now().writer.refused?.why).toBe("Not sent. It will go as a new message, not as the reply it was.");
+    act(() => {
+      now().writer.onSay?.("my words");
+    });
+    draw("dm", LINES, refusal(2, { reply: "m2" }));
+    expect(now().writer.refused).toBeUndefined();
+    expect(now().writer.replying?.id).toBe("m2");
   });
 
   it("takes up a refusal heard in a room or of a line gone from the window by no line", () => {
