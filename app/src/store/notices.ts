@@ -134,9 +134,15 @@ export const noticeSlice: StateCreator<State, [], [], NoticeSlice> = (set, get) 
         if (notices.some((notice) => notice.id === id)) set({ notices: notices.filter((notice) => notice.id !== id) });
       },
       left: (room) => {
-        const { notices } = get();
-        const rest = notices.filter(({ where, kind }) => where !== room || kind === "dm");
-        if (rest.length !== notices.length) set({ notices: rest });
+        const state = get();
+        const rest = state.notices.filter(({ where, kind }) => where !== room || kind === "dm");
+        // In all mode the room's lines stay held and would go on counting: they are seen up to the newest.
+        const time = modeOf(state, room) === "all" && badgeOf(state, room) > 0 ? newest(state, room) : undefined;
+        if (rest.length === state.notices.length && time === undefined) return;
+        set({
+          notices: rest,
+          ...(time === undefined ? {} : { noticeSeen: { ...state.noticeSeen, [room]: time } }),
+        });
       },
       seen: (where, time) => {
         const { noticeSeen } = get();

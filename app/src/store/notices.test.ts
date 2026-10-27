@@ -350,6 +350,23 @@ describe("the store's notices slice", () => {
     });
   });
 
+  // G12 (F1509): in all mode the room's lines stay held, and the room it left must not keep counting them.
+  describe("left, in all mode", () => {
+    it("keeps counting no unread line of a room left in all mode, its lines still held, and counts again what comes once back", () => {
+      const t = setup();
+      t.notices.setMode(GAMES, "all");
+      t.said(GAMES, ["m1", 1]);
+      t.said(GAMES, ["m2", 2]);
+      t.notices.add(notice({ id: "a", time: T(3) }));
+      expect(badgeOf(t.state(), GAMES)).toBe(2);
+      t.notices.left(GAMES);
+      expect(badgeOf(t.state(), GAMES)).toBe(0);
+      expect(totalUnseen(t.state())).toBe(0);
+      t.said(GAMES, ["m3", 4]);
+      expect(badgeOf(t.state(), GAMES)).toBe(1);
+    });
+  });
+
   describe("clear", () => {
     it("sees every place up to its newest notice and its newest line, counting what comes after", () => {
       const t = setup();
