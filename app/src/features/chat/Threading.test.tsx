@@ -115,6 +115,7 @@ describe("useThreads: what a conversation's page opens", () => {
 // watched. The page here is a room's list (one stop), a button outside, and what stands beside.
 describe("useThreads: the open panel's focus and keys", () => {
   const OUT = { kind: "out" } as const;
+  const other = shownOf(dms(undefined), { id: "#bubble/other", state: STATE, acts }, PAGE);
   let root: Root;
   let opens: (id: string) => void = () => undefined;
   type Reader = typeof SESSION | typeof OUT;
@@ -208,6 +209,33 @@ describe("useThreads: the open panel's focus and keys", () => {
     outside();
     draw(room);
     await loaded();
+    await frame();
+    expect(active()).toBe("outside");
+  });
+
+  // CR5 (F1765): a room switch takes the panel away with the focus inside it; it goes to the new room's list, not the page.
+  it("gives the focus to the room's list when a move to another room takes the panel and its focus away", async () => {
+    draw(room);
+    act(() => {
+      opens("root");
+    });
+    await loaded();
+    field()?.focus();
+    expect(thread()?.contains(document.activeElement)).toBe(true);
+    draw(other);
+    await frame();
+    expect(thread()).toBeNull();
+    expect(active()).toBe("root");
+  });
+
+  it("takes no focus from outside the panel when a move to another room takes it away", async () => {
+    draw(room);
+    act(() => {
+      opens("root");
+    });
+    await loaded();
+    outside();
+    draw(other);
     await frame();
     expect(active()).toBe("outside");
   });

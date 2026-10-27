@@ -3,7 +3,17 @@
 // that opens no thread never loads its code (ADR-0001 §12).
 import { foldEdits, threadsOf, type Line } from "@gnoworld/core";
 import { IconButton, Sidebar } from "@gnoworld/ui";
-import { Component, lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  Component,
+  lazy,
+  Suspense,
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import type { AppState } from "../../store/index.ts";
 import type { RoomActs } from "./roomActs.ts";
 import type { Shown } from "./shown.tsx";
@@ -103,6 +113,17 @@ function Panel({
   const slot = `${session.kind === "in" ? session.address : ""} ${root}`;
   // The field takes the focus only if the reader was an account as the panel opened: a login later takes none (CR4).
   const [focus] = useState(session.kind === "in");
+  // A room switch takes the panel away with the focus in it: it goes back to the list, as a close gives it back (CR5).
+  const places = useEffectEvent(() => [open.from, root]);
+  useLayoutEffect(
+    () => () => {
+      if (document.activeElement?.closest("aside[aria-label='Thread']"))
+        requestAnimationFrame(() => {
+          focusLine(places());
+        });
+    },
+    [],
+  );
   return (
     <Failing close={close}>
       <Suspense fallback={<Standing word="Opening the thread…" close={close} />}>
