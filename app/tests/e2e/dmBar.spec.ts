@@ -309,9 +309,10 @@ test.describe("a direct message's bar", () => {
     await dialog.getByRole("button", { name: "Delete message" }).click();
     await expect(lines(page)).toHaveCount(1);
     await expect(flash(page, "Message deleted.")).toBeVisible();
+    // The correction's REDACT first, the line's last (F2001).
     expect(dm.says().filter((line) => line.startsWith("REDACT"))).toEqual([
-      `REDACT ${PARTNER} echo1`,
       `REDACT ${PARTNER} echo2`,
+      `REDACT ${PARTNER} echo1`,
     ]);
   });
 

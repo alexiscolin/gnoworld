@@ -56,6 +56,14 @@ function correctionsOf(lines: readonly Line[], me: string | undefined, id: strin
     .map((line) => line.id);
 }
 
+/** A delete's REDACTs, in the one order a room and a conversation share: each correction first, the line's last, so a
+ * REDACT of the line that is refused never leaves the words it was corrected from showing alone (the red pass's R1, CR2).
+ * Whether the line's went. */
+function redactAll(edits: readonly string[], id: string, redact: (target: string) => boolean): boolean {
+  for (const edit of edits) redact(edit);
+  return redact(id);
+}
+
 /** A draft to `partner`, tagged +reply with the msgid it answers or +gnoworld/edit with the one it corrects, a msgid a tag
  * carries. Whether it went. */
 export function sayTo(
@@ -87,14 +95,12 @@ export function speakIn(
 }
 
 /** A REDACT of each correction of mine to a line of a room the page is in (`inside`), which the line's does not take: a
- * deleted line would stay as its newest correction, for every reader; then the line's, last, so a REDACT of it that is
- * refused never leaves the words it was corrected from showing alone (the red pass's R1). Whether the line's went. */
+ * deleted line would stay as its newest correction, for every reader; then the line's (redactAll). Whether it went. */
 export function redactFrom(o: DmOut, to: { room: string; id: string; inside: boolean }): boolean {
   const { room, id } = to;
   if (o.key === "guest" || !to.inside || !isCommandMsgid(id)) return false;
   const held = o.store.getState().chat.rooms[room]?.lines ?? [];
-  for (const edit of correctionsOf(held, o.ergo?.nick(), id)) out(o, `REDACT ${room} ${edit}`);
-  return out(o, `REDACT ${room} ${id}`);
+  return redactAll(correctionsOf(held, o.ergo?.nick(), id), id, (target) => out(o, `REDACT ${room} ${target}`));
 }
 
 /** A reaction to a line of the conversation, or its take-back. Whether it went. */
@@ -107,8 +113,8 @@ export function reactTo(o: DmOut, partner: string, reaction: Reacting): boolean 
   return o.outbox.send({ partner, draft: "", act: { reacted: true } }, send);
 }
 
-/** A REDACT of the line and one for each correction of mine to it, the line's refusal said for the line. Whether the
- * line's went. */
+/** A REDACT of each correction of mine to the line and the line's (redactAll), the line's refusal said for the line.
+ * Whether the line's went. */
 export function redactIn(o: DmOut, partner: string, id: string): boolean {
   if (!mayAct(o, partner) || !isCommandMsgid(id)) return false;
   const edits = correctionsOf(o.store.getState().dms[partner] ?? [], o.ergo?.nick(), id);
@@ -116,7 +122,5 @@ export function redactIn(o: DmOut, partner: string, id: string): boolean {
     o.outbox.send({ partner, draft: "", act: { deleted: id } }, (label) =>
       out(o, `@label=${label} REDACT ${partner} ${target}`),
     );
-  const went = redact(id);
-  if (went) for (const edit of edits) redact(edit);
-  return went;
+  return redactAll(edits, id, redact);
 }

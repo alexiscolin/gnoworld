@@ -2148,7 +2148,9 @@ describe("the chat's link: a direct message's bar", () => {
     expect(t.fake.sent.filter((line) => line.includes("TAGMSG"))).toEqual([]);
   });
 
-  it("deletes a line by a labelled REDACT to the partner, and each correction of mine to it with it", () => {
+  // CR2 of the room edit: the room's order (F1950), the line's REDACT last, so a refused one never leaves the words it was
+  // corrected from showing alone.
+  it("deletes a line by a labelled REDACT to the partner, and each correction of mine to it before it", () => {
     const t = account();
     t.fake.line(mine("m1", "", "first"));
     t.fake.line(mine("e1", "+gnoworld/edit=m1", "second"));
@@ -2156,9 +2158,9 @@ describe("the chat's link: a direct message's bar", () => {
     t.fake.line(mine("o1", "", "another line"));
     expect(t.link.redactIn(OTHER, "m1")).toBe(true);
     expect(toOther(t.fake.sent).map(without)).toEqual([
-      `REDACT ${OTHER} m1`,
       `REDACT ${OTHER} e1`,
       `REDACT ${OTHER} e2`,
+      `REDACT ${OTHER} m1`,
     ]);
   });
 
