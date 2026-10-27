@@ -1,7 +1,10 @@
-import { compose } from "@gnoworld/core";
+// @vitest-environment jsdom
+import { compose, type Composed } from "@gnoworld/core";
 import { completions } from "./complete.ts";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Composer, Preview, typingOf } from "./Composer.tsx";
 import { NEAR, said, sendable, withHint } from "./said.ts";
 import { refusalAfter } from "./composerHooks.ts";
@@ -349,6 +352,19 @@ describe("the composer, a draft of several lines", () => {
     expect(said(compose(ROOM, "/me waves\n", NICK), false, { nick: NICK, draft: "/me waves\n" })).toStrictEqual({});
   });
 
+  it("says an action is one line for a lone CR in the draft too, as compose reads it as a break (R3)", () => {
+    const draft = "/me waves\rhello";
+    expect(said(compose(ROOM, draft, NICK), false, { nick: NICK, draft })).toStrictEqual({
+      help: "An action is one line: its line breaks become spaces.",
+    });
+  });
+
+  it("names no line when the message has as few bytes left as its tightest line (R3)", () => {
+    // Ten lines of 400 bytes leave 19 each of the line's budget; the message's 4096 less 4010 and 67 leaves 19 too.
+    const draft = [...Array.from({ length: 10 }, () => "a".repeat(400)), "a".repeat(67)].join("\n");
+    expect(said(compose(ROOM, draft, NICK), false, { nick: NICK })).toStrictEqual({ help: "19 bytes left." });
+  });
+
   // F1719 (CR7): without draft/multiline each line goes as a PRIVMSG, and the bot's 20 messages a minute hide the rest.
   it("refuses more than 20 lines when the connection has no draft/multiline, and Send is off", () => {
     const twentyOne = Array.from({ length: 21 }, (_, at) => `line ${String(at)}`).join("\n");
@@ -362,6 +378,15 @@ describe("the composer, a draft of several lines", () => {
     expect(sendable(compose(ROOM, twentyOne.split("\n").slice(0, 20).join("\n"), NICK), false)).toBe(true);
     expect(sendable(compose(ROOM, "/nick bob", NICK), true)).toBe(false);
     expect(sendable(compose(ROOM, "hi", NICK), false)).toBe(true);
+  });
+
+  // R2: undefined is "not known yet" (a story, the connection's start), which blocks nothing: only a false does.
+  it("lets 21 to 40 lines go while it is not known whether the connection has draft/multiline", () => {
+    const composed = compose(ROOM, Array.from({ length: 40 }, (_, at) => `line ${String(at)}`).join("\n"), NICK);
+    expect(said(composed, false, {})).toStrictEqual({});
+    expect(said(composed, false, { multiline: undefined })).toStrictEqual({});
+    expect(sendable(composed, undefined)).toBe(true);
+    expect(sendable(composed, false)).toBe(false);
   });
 
   it("leaves Send off for a draft past 20 lines in a box told there is no draft/multiline", () => {
@@ -465,5 +490,68 @@ describe("Composer: a reply", () => {
     const markup = draw();
     expect(words(markup)).not.toContain("Replying to");
     expect(names(markup)).not.toContain("Cancel the reply");
+  });
+});
+
+// What Enter does in the composer's box, which the markup tests above cannot say (they render, they press nothing): the
+// form's submit is the only gate on the Enter path, as requestSubmit() ignores the Send button's disabled (R5).
+describe("Enter in the composer's box", () => {
+  const lines = (count: number) => Array.from({ length: count }, (_, at) => `line ${String(at)}`).join("\n");
+
+  let root: Root | undefined;
+  let host: HTMLElement;
+  beforeEach(() => {
+    Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
+    // jsdom has no matchMedia: a computer's pointer, which is not coarse.
+    // ... nor the popover API, which the composer's live region uses; the pop-up itself is the journeys'.
+    Object.assign(HTMLElement.prototype, { togglePopover: vi.fn(), showPopover: vi.fn(), hidePopover: vi.fn() });
+    vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    host = document.body.appendChild(document.createElement("div"));
+  });
+  afterEach(() => {
+    act(() => {
+      root?.unmount();
+    });
+    host.remove();
+    vi.unstubAllGlobals();
+  });
+
+  // Presses Enter in the box of a composer holding `draft`; what onSay was given.
+  function enter(draft: string, multiline: boolean | undefined): Composed[] {
+    const went: Composed[] = [];
+    root = createRoot(host);
+    act(() => {
+      root?.render(
+        <Composer
+          room="#bubble/games"
+          nick={NICK}
+          rooms={["#games"]}
+          members={[]}
+          draft={draft}
+          multiline={multiline}
+          onSay={(composed) => {
+            went.push(composed);
+            return true;
+          }}
+        />,
+      );
+    });
+    const box = host.querySelector("textarea");
+    act(() => {
+      box?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    });
+    return went;
+  }
+
+  it("sends a draft of 21 lines on a connection with draft/multiline, once", () => {
+    expect(enter(lines(21), true)).toHaveLength(1);
+  });
+
+  it("sends a draft of 21 lines while it is not known whether the connection has it (R2)", () => {
+    expect(enter(lines(21), undefined)).toHaveLength(1);
+  });
+
+  it("sends nothing of 21 lines on a connection without draft/multiline, whatever the Send button says", () => {
+    expect(enter(lines(21), false)).toEqual([]);
   });
 });
