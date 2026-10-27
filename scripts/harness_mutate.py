@@ -682,6 +682,8 @@ def mutants():
     yield from each(un, 'if UNHANDLED.search(output) else', "if False else", "hooks", "unsteady: an unhandled error of Vitest refuses (R1)")
     yield from each(un, "if not names]", "if names]", "hooks", "unsteady: a Vitest file that failed with no failed test refuses (R1, R3)")
     yield from each(un, 'if report["errors"] else', "if False else", "hooks", "unsteady: Playwright's own errors refuse (R1)")
+    yield from each("scripts/check.sh", "E2E_PORT=$(free_ports 3)", "E2E_PORT=$(free_ports 3 || :)", "hooks", "check.sh fails the journeys' lane when free_ports fails (R2)")
+    yield from each("scripts/check.sh", "port=$(free_ports 1)", "port=$(free_ports 1 || :)", "hooks", "check.sh fails the pictures' lane when free_ports fails (R2)")
     # The real tools' reports and console (probe.py's unsteady_real): the stubs print the words these read as they were written.
     yield from each(un, 'r"Vitest caught', 'r"Vitest caugt', "probe", "unsteady: Vitest's unhandled error is read as Vitest prints it (R1)")
     yield from each(un, 'if not names]', 'if names]', "probe", "unsteady: a real Vitest file that did not load refuses (R3)")
@@ -787,9 +789,9 @@ def mutants():
         ("\t$tokens || return 0\n\tstep pictures", "\tstep pictures", "the tokens pictures only for a change of tokens.css (F1190)"),
         ("start docs\nstart pictures\n", "start docs\n", "the tokens pictures lane starts (F1190)"),
         ("finish ts types tests gno docs pictures\n", "finish ts types tests gno docs\n", "a failed tokens comparison fails the gate (F1190)"),
-        ("STORIES_PORT=$(free_ports 1) PICTURES_OF=tokens-- node", "PICTURES_OF=tokens-- node", "the tokens pictures get a free port of their own (F1190)"),
+        ("STORIES_PORT=$port PICTURES_OF=tokens-- node", "PICTURES_OF=tokens-- node", "the tokens pictures get a free port of their own (F1190)"),
         ("STORIES_OUT=\"$logs/storybook\" STORIES_PORT", "STORIES_PORT", "the tokens pictures build Storybook in the run's own folder (F1190)"),
-        ("STORIES_PORT=$(free_ports 1) PICTURES_OF=tokens-- node", "STORIES_PORT=$(free_ports 1) node", "the tokens pictures compare that story alone (F1190)"),
+        ("STORIES_PORT=$port PICTURES_OF=tokens-- node", "STORIES_PORT=$port node", "the tokens pictures compare that story alone (F1190)"),
         ("--reporter=dot pictures\n", "--reporter=dot pictures || :\n", "the tokens pictures failing fails the lane (F1190)"),
         (" PICTURES_OF STORIES_PORT STORIES_OUT #", " #", "the environment narrows no stories' walk (F1190)"),
         ("else:\n    sys.exit(f\"check.sh: no run of {sys.argv[1]} free ports in 200 tries\")' \"$1\"", "else:\n    pass' \"$1\"", "free_ports fails when it finds no free ports (CR8)"),

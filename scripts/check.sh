@@ -265,7 +265,8 @@ lane_gno() {
 lane_pictures() {
 	$tokens || return 0
 	step pictures
-	STORIES_OUT="$logs/storybook" STORIES_PORT=$(free_ports 1) PICTURES_OF=tokens-- node app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts --reporter=dot pictures
+	port=$(free_ports 1) # a line of its own: in a prefix assignment, its failure would be swallowed and the tool would start with no port (R2)
+	STORIES_OUT="$logs/storybook" STORIES_PORT=$port PICTURES_OF=tokens-- node app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts --reporter=dot pictures
 }
 
 lane_docs() {

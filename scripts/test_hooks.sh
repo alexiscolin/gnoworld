@@ -1700,6 +1700,9 @@ echo "done $n" >>"$GATE_LOG"
 exit 0
 SH
 for tool in go gofmt; do printf '#!/bin/sh\nexec sh "%s" %s "$@"\n' "$step" "$tool" >"$g/bin/$tool"; done
+# python3, which fails check.sh's free_ports (its one script that says "in 200 tries") when PORTS_FAIL is set, as a machine with no free port would.
+printf '#!/bin/sh\ncase "$*" in *"free ports in 200 tries"*) [ -z "${PORTS_FAIL:-}" ] || { echo "check.sh: no run of free ports (stub)" >&2; exit 1; } ;; esac\nexec "%s" "$@"\n' "$(command -v python3)" >"$g/bin/python3"
+chmod +x "$g/bin/python3"
 printf '#!/bin/sh\nexec sh "%s" gno "$@"\n' "$step" >"$g/toolchain/gno"
 chmod +x "$g/bin/go" "$g/bin/gofmt" "$g/toolchain/gno"
 for py in check_css check_docs mutate probe bench batch_size load patch_coverage prove_fix check_regressions check_migrations audit harness_mutate; do
@@ -2074,6 +2077,16 @@ gate >/dev/null || fail "check.sh failed a clean run"
 # The log keeps each run's files: two unsteady runs leave two lines.
 FLAKY=test gate >/dev/null && FLAKY=test gate >/dev/null && [ "$(grep -c "" "$unsteady")" = 2 ] || fail "check.sh did not append to the unsteady log"
 rm -rf "${unsteady:?}"
+# free_ports that fails fails each lane that asks it for ports, before its tool starts: the journeys' (E2E_PORT) and the pictures'
+# (STORIES_PORT, a prefix assignment that swallowed the failure once: the tool then started with no port). A change of tokens.css
+# runs both lanes (CR8, R2).
+printf '\n' >>"$g/packages/ui/src/tokens.css"
+out=$(PORTS_FAIL=1 gate) && fail "check.sh passed with no free port: $out"
+printf '%s\n' "$out" | grep -q "^check.sh: lane ts failed at app" || fail "check.sh did not fail the journeys' lane at its app step when free_ports failed: $out"
+printf '%s\n' "$out" | grep -q "^check.sh: lane pictures failed at pictures" || fail "check.sh did not fail the pictures' lane when free_ports failed: $out"
+ran playwright && fail "check.sh started the journeys with no free port"
+ran pictures && fail "check.sh started the pictures with no free port"
+reset
 fi
 
 if part gate_times; then
