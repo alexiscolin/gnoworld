@@ -57,7 +57,9 @@ function useNewestInView(
   const onScroll = () => {
     if (listRef.current !== null) atEndRef.current = atEnd(listRef.current);
   };
-  return { listRef, atEndRef, onScroll };
+  // A list with no height is hidden (a phone's open thread hides the room): nothing there is seen, at the end or not.
+  const seesEnd = () => atEndRef.current && (listRef.current?.clientHeight ?? 0) > 0;
+  return { listRef, seesEnd, onScroll };
 }
 
 export interface LinesProps {
@@ -158,8 +160,8 @@ function List(props: ListProps) {
   const { onDelete = NO_DELETE, onDismiss = NO_DISMISS, onReact = NO_REACT, onReply = NO_REPLY } = props;
   const { read, paged = false, onRead, verdicts, saving = false, byId, chips, repliesOf, onThread } = props;
   const fresh = useNewMark(lines, paged ? read : undefined, me);
-  const { listRef, atEndRef, onScroll } = useNewestInView(lines, fresh, reactions);
-  const look = useReadAtEnd(lines, atEndRef, paged ? onRead : undefined);
+  const { listRef, seesEnd, onScroll } = useNewestInView(lines, fresh, reactions);
+  const look = useReadAtEnd(lines, seesEnd, paged ? onRead : undefined);
   const { stop, mounted, on, leave } = useLineFocus(lines, listRef, fresh);
   const { said, setSaid, copy } = useCopy();
   const [deleting, remove] = useRemoval({ lines, refused, connected, onDelete, leave, setSaid });

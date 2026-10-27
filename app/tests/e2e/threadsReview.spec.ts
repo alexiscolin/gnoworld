@@ -1,4 +1,5 @@
 import { lineOf, lines, roomsNav } from "./chat.ts";
+import { live, marks } from "./scriptedRoom.ts";
 import { expect, test, type Page } from "./fixtures.ts";
 import type { HistoryLine } from "./scripted.ts";
 import { asAccount, ROOM, T, tagged } from "./talk.ts";
@@ -85,6 +86,24 @@ test.describe("threads, from the review", () => {
           const list = item.parentElement;
           return list !== null && list.scrollHeight - list.scrollTop - list.clientHeight < 32;
         });
+
+    // CR2 (F1762): a line that comes while the list is hidden is not one the reader saw: no reading place moves.
+    test("marks no line read that comes while the panel hides the list", async ({ page }) => {
+      const heard: string[] = [];
+      const { ergo } = await asAccount(
+        page,
+        () => ({ history: forty, replayed: [reply], read: T(41), heard: (line) => heard.push(line) }),
+        41,
+      );
+      await threadOf(lineOf(page, "the reply"));
+      await expect(panel(page)).toBeVisible();
+      await expect(lines(page).first()).toBeHidden();
+      ergo().send(live("m99", T(45), { text: "unseen" }));
+      // The panel's own word goes out behind everything the page sent before it, on the same socket.
+      await say(page, "barrier");
+      await expect.poll(() => heard.some((line) => line.includes(":barrier"))).toBe(true);
+      expect(marks(heard).join()).not.toContain(T(45));
+    });
 
     // CR2: the list comes back at the end it was left at, the reader being there when the panel opened.
     test("gives the list back at its end after a panel opened and closed", async ({ page }) => {

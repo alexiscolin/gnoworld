@@ -1,7 +1,7 @@
 // A room's reading place on its page (slice 4's 4f, Ergo's draft/read-marker): the line marked New while the room is
 // open, and the room marked read to its newest line while the reader is at the end and the page shows.
 import { newMarkAfter, type Line, type NewMark } from "@gnoworld/core";
-import { useEffect, useEffectEvent, useState, type RefObject } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 
 /** The msgid of the line marked New: the first past the place once the room holds lines and the place is known, kept
  * while the room is open, as the place moves on and lines come. */
@@ -32,12 +32,12 @@ export function useOnHide(onHide: () => void) {
  * which the list calls as it scrolls. */
 export function useReadAtEnd(
   lines: readonly Line[],
-  atEndRef: RefObject<boolean>,
+  seesEnd: () => boolean,
   onRead: ((id: string) => void) | undefined,
 ) {
   const newest = lines.at(-1)?.id;
   const look = () => {
-    if (newest !== undefined && atEndRef.current && document.visibilityState === "visible") onRead?.(newest);
+    if (newest !== undefined && seesEnd() && document.visibilityState === "visible") onRead?.(newest);
   };
   const seen = useEffectEvent(look);
   const reading = onRead !== undefined;
