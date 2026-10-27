@@ -53,6 +53,13 @@ async function write(page: Page, text: string) {
   await expect(lineOf(page, text)).toHaveCount(1);
 }
 
+// Edit chosen from a line's menu, the line at `at`.
+async function startEdit(page: Page, at: number) {
+  await lines(page).nth(at).hover();
+  await barOf(page, at).getByRole("button", { name: "More actions" }).click();
+  await page.getByRole("menuitem", { name: "Edit" }).click();
+}
+
 test.describe("a direct message's bar", () => {
   test.use({ timezoneId: "UTC", locale: "en-GB" });
 
@@ -134,23 +141,27 @@ test.describe("a direct message's bar", () => {
     ]);
   });
 
-  test("leaves an edit unsent on Escape or Cancel, the draft the reader had kept", async ({ page }) => {
+  // R2 and R7(a) (redpass-dmb): what is typed in the edit box never reaches the reader's kept draft, and the focus stays in
+  // the field when the edit goes.
+  test("leaves an edit unsent on Escape or Cancel, the draft the reader had kept, the focus in the field", async ({
+    page,
+  }) => {
     const dm = await inDm(page);
     await write(page, "keep me");
     await field(page).fill("a draft in progress");
-    await lines(page).nth(0).hover();
-    await barOf(page, 0).getByRole("button", { name: "More actions" }).click();
-    await page.getByRole("menuitem", { name: "Edit" }).click();
+    await startEdit(page, 0);
     await expect(field(page)).toHaveValue("keep me");
+    await field(page).fill("keep me, typed in the edit");
     await field(page).press("Escape");
     await expect(page.getByText("Editing a message")).toHaveCount(0);
     await expect(field(page)).toHaveValue("a draft in progress");
-    await lines(page).nth(0).hover();
-    await barOf(page, 0).getByRole("button", { name: "More actions" }).click();
-    await page.getByRole("menuitem", { name: "Edit" }).click();
+    await expect(field(page)).toBeFocused();
+    await startEdit(page, 0);
+    await field(page).fill("keep me, typed again");
     await page.getByRole("button", { name: "Cancel the edit" }).click();
     await expect(page.getByText("Editing a message")).toHaveCount(0);
     await expect(field(page)).toHaveValue("a draft in progress");
+    await expect(field(page)).toBeFocused();
     expect(dm.says()).toEqual([`PRIVMSG ${PARTNER} :keep me`]);
   });
 

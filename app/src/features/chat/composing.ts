@@ -66,9 +66,11 @@ function useReplies(shown: Shown | undefined, lines: readonly Line[] | undefined
 }
 
 // The line of the reader's own a direct message's next one corrects, its words put in the composer: one a conversation, as
-// a reply; none for a room. Sent as a correction tagged with the line's msgid, shown in its place.
+// a reply; none for a room. Sent as a correction tagged with the line's msgid, shown in its place. However an edit ends,
+// the composer is the reader's again, its box taking the focus.
 function useEdits(shown: Shown | undefined, lines: readonly Line[] | undefined): Composing {
   const { value: edit, update, clear } = useHere<Chosen>(shown?.key);
+  const ended = useHere<true>(shown?.key);
   const editing = shownAs(edit, lines);
   if (shown?.kind !== "dm") return { view: {}, writer: {} };
   const view = {
@@ -76,15 +78,19 @@ function useEdits(shown: Shown | undefined, lines: readonly Line[] | undefined):
       update((was) => asking(was, id));
     },
   };
-  if (edit === undefined || editing === undefined) return { view, writer: {} };
+  if (edit === undefined || editing === undefined) return { view, writer: ended.value === true ? { focus: true } : {} };
+  const end = () => {
+    clear();
+    ended.update(() => true);
+  };
   return {
     view,
     writer: {
       editing: { text: editing.text, asked: edit.asked },
-      onCancelEdit: clear,
+      onCancelEdit: end,
       onSay: (draft: string) => {
         const went = shown.say(draft, { edit: editing.id });
-        if (went) clear();
+        if (went) end();
         return went;
       },
     },
