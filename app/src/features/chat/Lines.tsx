@@ -90,8 +90,9 @@ function LineView({ line, me, members, stop, actions, reactions, react, answers 
       {line.kind === "action" ? "* " : null}
       <Person name={line.account ?? line.from} guest={line.account === undefined} />{" "}
       <LineText blocks={blocks} me={me} known={known} />
-      {reactions === undefined ? null : <Reactions to={line.id} shown={reactions} react={react} />}
+      {/* Before the chips in the Tab order, so Reply is a few presses away; it floats, so its place shows nowhere (U2). */}
       {actions}
+      {reactions === undefined ? null : <Reactions to={line.id} shown={reactions} react={react} />}
     </li>
   );
 }

@@ -152,6 +152,39 @@ test.describe("reactions", () => {
     ]);
   });
 
+  // F1171 (the UX review's U2): the bar stands before the chips in the Tab order, so Reply is 4 presses from the line
+  // whatever the line holds, and the chips follow More.
+  test("reach a line's bar by Tab before its 20 chips, then the chips", async ({ page }) => {
+    const emoji = [...new Intl.Segmenter().segment("😀😁😂🤣😃😄😅😆😉😊😋😎😍😘🥰😗😙🥲😚🙂")].map(
+      ({ segment }) => segment,
+    );
+    await asAccount(page, () => ({
+      replayed: emoji.map((each, at) =>
+        tagmsg(`r${String(at)}`, `+draft/react=${each};+reply=m1`, { at: 2, who: OTHER }),
+      ),
+    }));
+    const line = lineOf(page, "the first line");
+    await expect(line.getByRole("button")).toHaveCount(20);
+    await line.focus();
+    expect(await tabsTo(page, barOf(page, 0).getByRole("button", { name: "Reply" }), 24)).toBe(4);
+    expect(await tabsTo(page, line.getByRole("button", { name: "😀, 1" }), 3)).toBe(2);
+  });
+
+  // F1172 (U9): the chips are a group named for what they are.
+  test("name a line's chips as a group, Reactions, to a guest and to an account", async ({ page }) => {
+    const replayed = [tagmsg("r1", "+draft/react=🔥;+reply=m1", { at: 2, who: OTHER })];
+    await opened(page, GUEST, { history: HISTORY, replayed });
+    const group = lineOf(page, "the first line").getByRole("group", { name: "Reactions" });
+    await expect(group).toContainText("🔥 1");
+    await expect(lineOf(page, "the second").getByRole("group", { name: "Reactions" })).toHaveCount(0);
+  });
+
+  test("name an account's chips as a group, Reactions", async ({ page }) => {
+    await asAccount(page, () => ({ replayed: [tagmsg("r1", "+draft/react=🔥;+reply=m1", { at: 2, who: OTHER })] }));
+    const group = lineOf(page, "the first line").getByRole("group", { name: "Reactions" });
+    await expect(group.getByRole("button", { name: "🔥, 1" })).toBeVisible();
+  });
+
   test("count a live reaction, and drop one Ergo's REDACT names", async ({ page }) => {
     const ergo = await opened(page, GUEST, {
       history: HISTORY,

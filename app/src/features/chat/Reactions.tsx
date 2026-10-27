@@ -23,7 +23,7 @@ export function Reactions({ to, shown, react }: ReactionsProps) {
   const more = shown.length - CHIPS_SHOWN;
   const boxRef = useRef<HTMLDivElement>(null);
   return (
-    <div ref={boxRef} aria-live="off">
+    <div ref={boxRef} role="group" aria-label="Reactions" aria-live="off">
       <Cluster space="3xs">
         {shown.slice(0, CHIPS_SHOWN).map((each) =>
           react === undefined ? (
