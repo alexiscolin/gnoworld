@@ -92,6 +92,30 @@ describe("an account's drafts on the device", () => {
     expect(mine.get("#bubble")).toBe(Array.from({ length: 38 }, () => text).join("\n"));
   });
 
+  // F1716 (CR4): compose trims each line's end as JavaScript's trimEnd does, so a no-break space and an ideographic
+  // space at a line's end were no text either.
+  it("keeps a draft the composer lets go though the ends of its lines are no-break or ideographic spaces", () => {
+    const nick = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+    const draft = Array.from({ length: 38 }, (_, at) =>
+      `line ${String(at)}${at % 2 === 0 ? "\u3000" : "\u00a0"}`.padEnd(110, at % 2 === 0 ? "\u3000" : "\u00a0"),
+    ).join("\n");
+    expect(draft.length).toBeGreaterThan(DRAFT_LIMIT);
+    expect(compose("#bubble", draft, nick).kind).toBe("lines");
+    const mine = on(storage(), ALICE);
+    expect(mine.set("#bubble", draft)).toBe(true);
+    expect(mine.get("#bubble")).toBe(Array.from({ length: 38 }, (_, at) => `line ${String(at)}`).join("\n"));
+  });
+
+  // F1711 (S2): a run of spaces inside a line cost the square of its length each time the draft changed (20,000 spaces
+  // 2.9 s, 40,000 5 s); the draft is read once, a line at a time.
+  it("trims a draft of a long run of spaces inside a line at once, not by the square of its length", () => {
+    const mine = on(storage(), ALICE);
+    const draft = `a${" ".repeat(60_000)}b`;
+    const start = Date.now();
+    expect(mine.set("#bubble", draft)).toBe(false);
+    expect(Date.now() - start).toBeLessThan(1000);
+  });
+
   it("keeps a draft of exactly the limit as typed, its trailing space too: only a longer one is trimmed", () => {
     const mine = on(storage(), ALICE);
     const draft = `${"a".repeat(DRAFT_LIMIT - 1)} `;

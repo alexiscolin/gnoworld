@@ -12,9 +12,15 @@ import { z } from "../jitless.ts";
 export const DRAFT_LIMIT = 4096;
 const Draft = z.string().check(z.maxLength(DRAFT_LIMIT));
 
-// The draft as compose reads it, as far as its size goes: each line's spaces and tabs at the end, and the draft's
-// ends, trimmed. A control character at a line's end, which compose reads as a space, is not (it keeps the draft's size).
-const squeezed = (draft: string): string => draft.replaceAll(/[ \t]+$/gm, "").trim();
+// The draft as compose reads it, as far as its size goes: each line's end trimmed as compose trims it (trimEnd: a
+// no-break or ideographic space too), and the draft's ends. Line by line, so a long run of spaces costs its length.
+// A control character at a line's end, which compose reads as a space, is not (it keeps the draft's size).
+const squeezed = (draft: string): string =>
+  draft
+    .split(/\r\n?|\n/u)
+    .map((line) => line.trimEnd())
+    .join("\n")
+    .trim();
 
 /** The device's storage, as localStorage offers it. */
 export interface DraftStorage {
