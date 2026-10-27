@@ -116,4 +116,59 @@ test.describe("threads, from the review", () => {
       await expect.poll(() => atEnd(page)).toBe(true);
     });
   });
+
+  // CR3 (F1763): the panel's code is a lazy chunk. A chunk that cannot be fetched is the panel's failure alone, and the
+  // next thread opened asks for it again; one that is slow shows a panel with its Close, which a phone needs, as the
+  // room is hidden meanwhile.
+  test.describe("the panel's code", () => {
+    test.use({ serviceWorkers: "block" });
+    const chunk = /\/assets\/Thread-[\w-]+\.js$/;
+    const base: HistoryLine[] = [["m1", T(0), "the root line"]];
+    const answer = tagged("m2", "an answer", { at: 1, tags: "+reply=m1" });
+
+    test("says it could not open the thread when its code cannot be fetched, the room standing, and asks again", async ({
+      page,
+    }) => {
+      let fetched = 0;
+      let failing = true;
+      await page.route(chunk, (route) => {
+        fetched += 1;
+        return failing ? route.abort() : route.continue();
+      });
+      await asAccount(page, () => ({ history: base, replayed: [answer] }), 2);
+      await chipOf(lines(page).first()).click();
+      await expect(panel(page)).toContainText("Could not open the thread");
+      await expect(page.getByText("could not load")).toHaveCount(0);
+      await expect(lines(page)).toHaveCount(2);
+      await closeButton(page).click();
+      await expect(panel(page)).toHaveCount(0);
+      failing = false;
+      await chipOf(lines(page).first()).click();
+      await expect(inThread(page)).toHaveText([/the root line/, /an answer/]);
+      expect(fetched).toBe(2);
+    });
+
+    test.describe("on a phone's screen", () => {
+      test.use({ viewport: { width: 390, height: 844 } });
+      test("shows a Close while its code comes, which gives the room back", async ({ page }) => {
+        let release: () => void = () => undefined;
+        const held = new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        await page.route(chunk, async (route) => {
+          await held;
+          await route.continue();
+        });
+        await asAccount(page, () => ({ history: base, replayed: [answer] }), 2);
+        await lines(page).first().hover();
+        await chipOf(lines(page).first()).click();
+        await expect(lines(page).first()).toBeHidden();
+        await expect(closeButton(page)).toBeVisible();
+        await closeButton(page).click();
+        await expect(lines(page).first()).toBeVisible();
+        release();
+        await expect(panel(page)).toHaveCount(0);
+      });
+    });
+  });
 });

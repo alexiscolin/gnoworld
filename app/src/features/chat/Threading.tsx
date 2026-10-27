@@ -2,13 +2,52 @@
 // kept for the conversation in view alone, and the panel, a lazy chunk like the composer and the lines' view: a page
 // that opens no thread never loads its code (ADR-0001 §12).
 import { foldEdits, threadsOf, type Line } from "@gnoworld/core";
-import { lazy, Suspense, useState, type ReactNode } from "react";
+import { IconButton, Sidebar } from "@gnoworld/ui";
+import { Component, lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import type { AppState } from "../../store/index.ts";
 import type { RoomActs } from "./roomActs.ts";
 import type { Shown } from "./shown.tsx";
+import styles from "./Thread.module.css";
 import { Writer } from "./Writer.tsx";
 
-const Thread = lazy(async () => ({ default: (await import("./Thread.tsx")).Thread }));
+const load = async () => ({ default: (await import("./Thread.tsx")).Thread });
+// A lazy component keeps its failure for good: a chunk that could not be fetched is made anew (Failing).
+let Thread = lazy(load);
+
+// The panel's place while its code comes, or when it could not: a word and Close, which a narrow room needs, as the
+// room is hidden while a thread is open (CR3).
+function Standing({ word, close }: { word: string; close: () => void }) {
+  const boxRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    boxRef.current?.querySelector("button")?.focus();
+  }, []);
+  return (
+    <aside ref={boxRef} aria-label="Thread" className={styles["panel"]}>
+      <Sidebar side="end" space="2xs">
+        <p role="status">{word}</p>
+        <IconButton icon="close" label="Close the thread" size="s" emphasis="plain" onClick={close} />
+      </Sidebar>
+    </aside>
+  );
+}
+
+// The panel's failure alone, never the page's: its code could not be fetched.
+class Failing extends Component<{ close: () => void; children: ReactNode }, { failed: boolean }> {
+  override state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  override componentDidCatch() {
+    Thread = lazy(load);
+  }
+  override render() {
+    return this.state.failed ? (
+      <Standing word="Could not open the thread." close={this.props.close} />
+    ) : (
+      this.props.children
+    );
+  }
+}
 
 // A thread open: its conversation and the line that opened it, which the focus goes back to. Its root is read from
 // the lines each time they change: a chain grows while its panel is open (CR9).
@@ -63,33 +102,34 @@ function Panel({
   const root = rootOf(state?.lines ?? [], open.from);
   const slot = `${session.kind === "in" ? session.address : ""} ${root}`;
   return (
-    <Suspense fallback={null}>
-      <Thread
-        key={open.from}
-        root={root}
-        lines={state?.lines ?? []}
-        members={members}
-        me={session.kind === "in" ? session.address : undefined}
-        onClose={close}
-        composer={
-          <Writer
-            session={session}
-            room={shown.writer.room}
-            label="this thread"
-            rooms={rooms}
-            members={members}
-            onSay={(draft) => acts.onSay(draft, root)}
-            focus
-            keeps={false}
-            draft={typed.get(slot)}
-            onDraft={(text) => {
-              if (text === "") typed.delete(slot);
-              else typed.set(slot, text);
-            }}
-          />
-        }
-      />
-    </Suspense>
+    <Failing key={open.from} close={close}>
+      <Suspense fallback={<Standing word="Opening the thread…" close={close} />}>
+        <Thread
+          root={root}
+          lines={state?.lines ?? []}
+          members={members}
+          me={session.kind === "in" ? session.address : undefined}
+          onClose={close}
+          composer={
+            <Writer
+              session={session}
+              room={shown.writer.room}
+              label="this thread"
+              rooms={rooms}
+              members={members}
+              onSay={(draft) => acts.onSay(draft, root)}
+              focus
+              keeps={false}
+              draft={typed.get(slot)}
+              onDraft={(text) => {
+                if (text === "") typed.delete(slot);
+                else typed.set(slot, text);
+              }}
+            />
+          }
+        />
+      </Suspense>
+    </Failing>
   );
 }
 
