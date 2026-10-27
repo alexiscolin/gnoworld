@@ -5,9 +5,10 @@ lines unseen.
 A merge's own code: the lines it adds since the newest commit /pre-merge reviewed (docs/review-passes.txt, the
 previous merge's tip), or since base when none is between. Product code: app/src, packages/*/src, server/src and gno;
 tests, stories, journeys and the server's test helpers are not. Past 600 lines it fails, unless a commit of the
-merge says why on a line `Batch-size: <lines> - <why>` giving at least the count, which Alexis reads; past 400 it
+merge says why on a line `Batch-size: <lines> - <why>` giving the count, a tenth more at most, which Alexis reads
+(a far larger number would waive the lines added after it); past 400 it
 says the tier-1 limit, for the review card. A renamed file counts its added lines at its new path.
-check.sh --merge runs it. Usage: batch_size.py <base>, from the repository root."""
+check.sh --merge and --full run it. Usage: batch_size.py <base>, from the repository root."""
 import os
 import re
 import sys
@@ -33,9 +34,9 @@ while rows and rows[0]:
         added += int(plus)
 print(f"batch_size: {added} lines of product code since {own[:12]}, the last reviewed commit or the base")
 stated = [int(n) for n in re.findall(r"^Batch-size: (\d+) - \S", git("log", "--format=%B", f"{own}..HEAD"), re.M)]
-if added > LIMIT and not any(n >= added for n in stated):
+if added > LIMIT and not any(added <= n and n * 10 <= added * 11 for n in stated):
     sys.exit(f"batch_size: {added} lines, past a merge's {LIMIT} (docs/REVIEW.md, DORA's small batches): cut the "
-             "merge in two, or say why on a commit's line `Batch-size: <lines> - <why>` (at least that many lines), "
+             "merge in two, or say why on a commit's line `Batch-size: <lines> - <why>` (the count, a tenth more at most), "
              "which Alexis reads")
 if added > TIER_ONE:
     print(f"batch_size: past {TIER_ONE}: a merge that touches a tier-1 file carries {TIER_ONE} at most (docs/REVIEW.md); "

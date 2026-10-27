@@ -2637,6 +2637,16 @@ out=$(size "$base") && fail "batch_size.py took a Batch-size line of 1 for 700 l
 printf '%s\n' "$out" | grep -q "700 lines" || fail "batch_size.py did not say how many lines past a too small Batch-size line: $out"
 git -C "$bs" commit -q --amend -m "a number that fits" -m "Batch-size: 700 - one feature, cut no smaller"
 out=$(size "$base") || fail "batch_size.py refused a Batch-size line giving the count: $out"
+# ...and so is one far above it: `Batch-size: 99999` on an early commit would waive every line the merge adds after it, and
+# the count Alexis reads would say nothing of the real size. It gives the count, to a tenth more at most (security-S4).
+for n in 771 99999; do
+	git -C "$bs" commit -q --amend -m "a number too large" -m "Batch-size: $n - one feature, cut no smaller"
+	out=$(size "$base") && fail "batch_size.py took a Batch-size line of $n for 700 lines, which waives lines that come later: $out"
+	printf '%s\n' "$out" | grep -q "700 lines" || fail "batch_size.py did not say how many lines past a Batch-size line of $n: $out"
+done
+git -C "$bs" commit -q --amend -m "a number a tenth above" -m "Batch-size: 770 - one feature, cut no smaller"
+out=$(size "$base") || fail "batch_size.py refused a Batch-size line a tenth above the count: $out"
+git -C "$bs" commit -q --amend -m "a number that fits" -m "Batch-size: 700 - one feature, cut no smaller"
 # A file moved between folders keeps its new path's rule: a test moved into app/src is no product code, a helper
 # moved into it is, and git's rename line (`app/{tests => src}/h.ts`) names neither (G8).
 git -C "$bs" checkout -q -f -b moved "$base" && mkdir -p "$bs/app/src" "$bs/app/tests" && lines 1000 >"$bs/app/tests/h.ts" && lines 1000 >"$bs/app/src/was.test.ts" && commit "files to move"

@@ -104,7 +104,8 @@ must stay under it, and a bench a `*.bench.ts(x)` source names that Vitest's rep
 `.only` beside it, a comment) fails too, and ESLint refuses `.skip`, `.only` and `.todo` in a bench file as in a test (security-S1); a bench beside other work would measure the load. `--merge` and `--full` count
 the merge's own product code (a slice's last merge is checked by `--full`, and it is the one that reaches `main`) since the last reviewed commit (`scripts/batch_size.py`, DORA's
 small batches, `docs/REVIEW.md`): past 600 lines it fails unless a commit says why on a line
-`Batch-size: <lines> - <why>` giving at least the count, and past 400 it says the tier-1 limit (the
+`Batch-size: <lines> - <why>` giving the count, a tenth more at most (a far larger number would waive
+the lines added after it; security-S4), and past 400 it says the tier-1 limit (the
 server's test helpers, `server/src/testing/`, are not product code; a renamed file counts its added lines at
 its new path). `check.sh` puts the
 Node `.node-version` pins first on its PATH, and a test of Vitest's `node` project refuses another Node
