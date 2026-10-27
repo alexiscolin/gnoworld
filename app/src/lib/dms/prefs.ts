@@ -7,7 +7,7 @@ import type { DraftStorage } from "../drafts/drafts.ts";
 
 /** The accounts written to it keeps at most, the last ones. */
 export const KNOWN_KEPT = 500;
-const Known = z.array(Address).max(KNOWN_KEPT);
+const Known = z.array(Address).check(z.maxLength(KNOWN_KEPT));
 
 export interface DmPrefs {
   /** Whether it hears from the accounts it wrote to alone. */

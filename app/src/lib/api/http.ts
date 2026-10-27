@@ -2,7 +2,7 @@
 // failure a reason the page can act on; the cookie to this site alone; a redirect refused, never followed,
 // since it could carry what the call sent elsewhere; a time limit over the answer's body too.
 import { ApiError } from "@gnoworld/schemas";
-import type { z } from "zod";
+import type * as z from "zod/mini";
 
 /** The time a call has, its body read included: the server's own request timeout (server/src/app.ts). */
 export const TIMEOUT_MS = 10_000;
@@ -15,7 +15,7 @@ export interface Call<T> {
   /** The path on this site, from its root. */
   path: string;
   body?: unknown;
-  schema: z.ZodType<T>;
+  schema: z.ZodMiniType<T>;
 }
 
 // The answer read whole, or why not: a body that breaks off is the network's, a body that is no JSON malformed.

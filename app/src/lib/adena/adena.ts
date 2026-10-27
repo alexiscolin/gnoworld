@@ -30,7 +30,7 @@ export type SignResult =
 const Answer = z.object({ status: z.enum(["success", "failure"]), type: z.string(), data: z.unknown() });
 const Account = z.object({ address: z.string(), chainId: z.string() });
 // The chain as the server's challenge takes it, not blank.
-const Chain = ChallengeRequest.shape.chainId.refine((chain) => chain.trim() !== "");
+const Chain = ChallengeRequest.shape.chainId.check(z.refine((chain) => chain.trim() !== ""));
 const Network = z.object({ chainId: Chain });
 const MSG_TYPE = "sign/MsgSignData";
 

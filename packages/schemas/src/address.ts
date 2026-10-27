@@ -33,10 +33,12 @@ function problemOf(text: string): AddressProblem | undefined {
 // One issue, its message the reason.
 export const Address = z
   .string()
-  .superRefine((text, context) => {
-    const problem = problemOf(text);
-    if (problem !== undefined) context.addIssue({ code: "custom", message: problem });
-  })
+  .check(
+    z.superRefine((text, context) => {
+      const problem = problemOf(text);
+      if (problem !== undefined) context.addIssue({ code: "custom", message: problem });
+    }),
+  )
   .brand<"Address">();
 export type Address = z.infer<typeof Address>;
 

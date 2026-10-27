@@ -3,8 +3,8 @@
 import { z } from "./zod.ts";
 
 export const StreamEvent = z.strictObject({
-  msgid: z.string().min(1).max(128),
-  room: z.string().min(2).max(64),
+  msgid: z.string().check(z.minLength(1), z.maxLength(128)),
+  room: z.string().check(z.minLength(2), z.maxLength(64)),
   state: z.enum(["checked", "hidden"]),
 });
 export type StreamEvent = z.infer<typeof StreamEvent>;
@@ -15,7 +15,7 @@ export const StreamSince = z.strictObject({ time: z.iso.datetime() });
 export type StreamSince = z.infer<typeof StreamSince>;
 
 /** A line's msgid as GET /api/verdicts takes it: one word, no comma, at most 128 characters (CR4, F892). */
-export const VerdictId = StreamEvent.shape.msgid.regex(/^[^\s,\0]+$/);
+export const VerdictId = StreamEvent.shape.msgid.check(z.regex(/^[^\s,\0]+$/));
 
 /** The lines a page asks GET /api/verdicts about at most, one request's worth. */
 export const VERDICTS_ASKED = 100;
@@ -26,6 +26,6 @@ export const LineVerdicts = z.strictObject({
   room: StreamEvent.shape.room,
   verdicts: z
     .array(z.strictObject({ msgid: StreamEvent.shape.msgid, state: StreamEvent.shape.state }))
-    .max(VERDICTS_ASKED),
+    .check(z.maxLength(VERDICTS_ASKED)),
 });
 export type LineVerdicts = z.infer<typeof LineVerdicts>;

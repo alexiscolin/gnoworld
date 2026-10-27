@@ -8,7 +8,7 @@ import { z } from "../jitless.ts";
 
 /** The UTF-16 units a draft holds at most: past it, none is kept (a line goes out at 442 bytes). */
 export const DRAFT_LIMIT = 4000;
-const Draft = z.string().max(DRAFT_LIMIT);
+const Draft = z.string().check(z.maxLength(DRAFT_LIMIT));
 
 /** The device's storage, as localStorage offers it. */
 export interface DraftStorage {
