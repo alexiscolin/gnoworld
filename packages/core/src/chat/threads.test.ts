@@ -1,5 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, test } from "vitest";
+import { addLines, type Line } from "./room.ts";
 import { threadsOf, type Threaded } from "./threads.ts";
 
 // The same seed and runs as room.test.ts, so the gate never flaps on a property.
@@ -130,6 +131,23 @@ describe("threadsOf: the threads of a room's lines", () => {
     expect(asObject(rootOf)).toEqual({ b: "a" });
     expect(ids(repliesOf.get("a"))).toEqual(["b"]);
     expect(repliesOf.has("b")).toBe(false);
+  });
+
+  // CR8 (F1768): the room's order is time, then msgid. A reply stamped in the very millisecond of the line it answers,
+  // whose msgid sorts first, is held before it, so it answers a line "not come yet" and is no reply. A client sees the
+  // root before it can answer it, so only two writers in one millisecond can do it: the stated limit.
+  test("holds a reply stamped the same millisecond as its root, its msgid sorting first, for no reply", () => {
+    const at = (id: string, over: Partial<Line> = {}): Line => ({
+      id,
+      time: "2026-10-25T10:00:00.000Z",
+      from: "alice",
+      text: id,
+      kind: "message",
+      ...over,
+    });
+    const held = addLines([], [at("z-root"), at("a-reply", { reply: "z-root" })], 10);
+    expect(ids(held)).toEqual(["a-reply", "z-root"]);
+    expect(threadsOf(held).repliesOf.size).toBe(0);
   });
 
   test("answers a chain of 50,000 lines with no recursion", () => {

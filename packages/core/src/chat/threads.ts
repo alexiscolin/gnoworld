@@ -29,7 +29,8 @@ export function threadsOf<T extends Threaded>(
   const repliesOf = new Map<string, T[]>();
   for (const line of lines) {
     const target = line.reply === undefined ? undefined : resolve(line.reply);
-    // A line of the window that has not come yet, or this one, is no target; one the window lacks is a root gone.
+    // A line of the window that has not come yet, or this one, is no target; one the window lacks is a root gone. The
+    // window's order is time then msgid: a reply of the root's own millisecond, its msgid first, is held before it (CR8).
     if (target !== undefined && (before.has(target) || !every.has(target))) {
       const root = rootOf.get(target) ?? target;
       rootOf.set(line.id, root);
