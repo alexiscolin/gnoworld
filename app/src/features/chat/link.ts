@@ -3,12 +3,13 @@
 // (Ergo's max-channels-per-client); the newest lines of the room in view alone, once Ergo says I joined it, since
 // Ergo paces a client to 2 lines a second (plan §4); Ergo's lines read into the store through one BatchReader a
 // connection. Its parts come in, so the tests give their own.
-import { BatchReader, LINE_BYTES, nickOf, type Composed, type IrcMessage } from "@gnoworld/core";
+import { BatchReader, foldMultiline, MULTILINE, nickOf, type Composed, type IrcMessage } from "@gnoworld/core";
 import { RoomId } from "@gnoworld/schemas";
 import type { Result } from "../../lib/api/http.ts";
 import type { Ergo, ErgoOptions, Who } from "../../lib/ergo/ergo.ts";
 import { LINES_KEPT } from "../../store/chat.ts";
 import type { AppState, createAppStore } from "../../store/index.ts";
+import { groupsOf, outgoing } from "./outgoing.ts";
 
 /** The rooms a connection joins: Ergo's max-channels-per-client (deploy/ergo/ircd.yaml.tmpl). */
 export const ROOMS_JOINED = 100;
@@ -29,30 +30,14 @@ export interface ChatLink {
   follow: (ids: readonly string[]) => void;
   /** The room in view: its history is asked once Ergo says I joined it, once a connection. */
   show: (room: string | undefined) => void;
-  /** Sends what the composer composed for a room Ergo says it is in; an account's alone. Whether it went. The
+  /** Sends what the composer composed for a room Ergo says it is in; an account's alone. Whether it went. A message
+   * of several lines goes as one draft/multiline batch, or a line at a time to an Ergo with no such capability. The
    * composer, an account's alone, composes, so a visitor's page never loads it (budgets.spec.ts). */
   say: (room: string, composed: Composed) => boolean;
   /** Deletes a line, by its msgid, in a room Ergo says it is in, as Ergo's REDACT (4c's message menu); an
    * account's alone, Ergo refusing another's line. Whether it went. */
   redact: (room: string, id: string) => boolean;
   stop: () => void;
-}
-
-// Rooms in groups whose command line holds 510 bytes at most; a room id is ASCII, a character a byte.
-function groupsOf(command: "JOIN" | "PART", rooms: readonly string[]): string[][] {
-  const groups: string[][] = [];
-  let size = 0;
-  for (const room of rooms) {
-    const last = groups.at(-1);
-    if (last === undefined || size + 1 + room.length > LINE_BYTES) {
-      groups.push([room]);
-      size = command.length + 1 + room.length;
-    } else {
-      last.push(room);
-      size += 1 + room.length;
-    }
-  }
-  return groups;
 }
 
 // Where a room this page follows stands on this connection: a JOIN went for it; its history went.
@@ -72,6 +57,8 @@ class Link implements ChatLink {
   // second tab's own JOIN brings no echo, Ergo having told it of the room at its welcome or as the first joined.
   readonly #inside = new Set<string>();
   #reader = new BatchReader();
+  // The next batch's reference, one a connection's own: letters and digits, as Ergo takes them (irc/utils/args.go).
+  #batches = 0;
 
   constructor(deps: LinkDeps) {
     this.#deps = deps;
@@ -94,9 +81,11 @@ class Link implements ChatLink {
   }
 
   say(room: string, composed: Composed): boolean {
-    const allowed = this.#key !== "guest" && this.#ergo?.nick() !== undefined && this.#inside.has(room);
-    if (!allowed || composed.kind !== "line" || !composed.line.startsWith(`PRIVMSG ${room} :`)) return false;
-    return this.#ergo?.send(composed.line) === true;
+    const ergo = this.#ergo;
+    if (this.#key === "guest" || ergo?.nick() === undefined || !this.#inside.has(room)) return false;
+    const ref = `ml${(this.#batches++).toString(36)}`;
+    const out = outgoing(room, composed, { multiline: ergo.multiline(), ref });
+    return out?.every((line) => ergo.send(line)) === true;
   }
 
   redact(room: string, id: string): boolean {
@@ -239,7 +228,8 @@ class Link implements ChatLink {
     if (read.kind !== "done") return;
     const { type, params, messages } = read.batch;
     if (type === "chathistory") this.#deps.store.getState().chatActions.page(params[0] ?? "", messages);
-    else for (const each of messages) this.#heard(each);
+    // A message of several lines is one line of its room, none when its batch is not one.
+    else for (const each of type === MULTILINE ? [foldMultiline(read.batch) ?? []].flat() : messages) this.#heard(each);
   }
 
   // Ergo's JOIN of me, not replayed: I am in that room, and the room in view's lines are asked. Its KICK of me: I
