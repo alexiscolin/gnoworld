@@ -4,14 +4,14 @@
 // says what keeps it from going (too long for IRC's 510 bytes, a command it does not know, the chat away) or the
 // bytes left near the end, or what Tab completes the word being typed to (a command, a room, an account). A format
 // bar wraps the selection in Markdown's marks; the line shows below as it reads.
-import { COMMANDS, compose, type Composed } from "@gnoworld/core";
+import { compose, type Composed } from "@gnoworld/core";
 import { Button, Cluster, Field, IconButton, Sidebar, Stack, type IconName } from "@gnoworld/ui";
 import { useRef, useState, type KeyboardEvent, type SubmitEvent } from "react";
-import { completed, completions } from "./complete.ts";
-import { useFocusAtStart, useHelp, useRefusal, useSelection, type Refused } from "./composerHooks.ts";
+import { completed } from "./complete.ts";
+import { completionOf, useFocusAtStart, useHelp, useRefusal, useSelection, type Refused } from "./composerHooks.ts";
 import { formatted, type Edit, type Format } from "./format.ts";
 import { Message } from "./Message.tsx";
-import { peopleOf, roomLabel } from "./names.ts";
+import { roomLabel } from "./names.ts";
 import { useAnswering } from "./ReplyBar.tsx";
 import type { Answered } from "./Replying.tsx";
 import styles from "./Composer.module.css";
@@ -106,6 +106,8 @@ export interface ComposerProps {
   replying?: Answered | undefined;
   asked?: number | undefined;
   onCancelReply?: (() => void) | undefined;
+  /** Whether the connection sends a message of several lines whole; else a draft goes a line at a time, 20 at most (CR7). */
+  multiline?: boolean | undefined;
 }
 
 export function Composer(props: ComposerProps) {
@@ -124,12 +126,8 @@ export function Composer(props: ComposerProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const label = to ?? roomLabel(room);
   const composed = compose(room, draft, nick);
-  // The room's accounts are sorted out of its members only while a word after `@` is typed; read apart, the mention
-  // alone, not each key, is what the compiler recomputes them on (F793).
-  const mentioning = /(^|\s)@\S*$/u.test(draft);
-  const people = mentioning ? peopleOf(members, nick) : [];
-  const completion = completions(draft, { commands: COMMANDS, rooms, people });
-  const { coarse, shown } = useHelp(composed, { failed, completion, direct: to !== undefined, nick, draft });
+  const completion = completionOf(draft, { rooms, members, nick });
+  const { coarse, shown, goes } = useHelp(composed, props, { failed, completion, draft });
   // The selection an edit leaves is put back in the box once it shows the new draft.
   const { box, keep } = useSelection(formRef, draft);
   useFocusAtStart(formRef, props.focus);
@@ -156,7 +154,7 @@ export function Composer(props: ComposerProps) {
   const answering = useAnswering(props, { formRef, box, otherwise: complete });
   const send = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (composed.kind !== "line" && composed.kind !== "lines") return;
+    if (!goes) return;
     const went = onSay(composed, draft);
     setFailed(!went);
     refusal.said();
@@ -187,7 +185,7 @@ export function Composer(props: ComposerProps) {
             }}
             {...(refusal.why === undefined ? shown : { error: refusal.why })}
           />
-          <Button type="submit" disabled={composed.kind !== "line" && composed.kind !== "lines"}>
+          <Button type="submit" disabled={!goes}>
             Send
           </Button>
         </Sidebar>

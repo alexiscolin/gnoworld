@@ -11,11 +11,15 @@ const T = (minute: number) => `2026-10-25T10:${String(minute).padStart(2, "0")}:
 const field = (page: Page) => page.getByRole("textbox", { name: "Message #games" });
 
 // #games on the scripted Ergo as the test's account, its history `history`; what the page sends, as it sends it.
-async function opened(page: Page, history: readonly HistoryLine[] = [["a1", T(0), "the first line"]]) {
+async function opened(
+  page: Page,
+  history: readonly HistoryLine[] = [["a1", T(0), "the first line"]],
+  noMultiline = false,
+) {
   const address = await logIn(page, word("lines"));
   const sent: string[] = [];
   await page.routeWebSocket(/\/ws$/, (ergo) => {
-    scriptedErgo(ergo, address, { history, heard: (line) => sent.push(line) });
+    scriptedErgo(ergo, address, { history, noMultiline, heard: (line) => sent.push(line) });
   });
   await page.goto("/w/bubble?room=games");
   await hydrated(page);
@@ -91,6 +95,25 @@ test.describe("a message of several lines", () => {
     await page.getByRole("button", { name: "Send" }).click();
     await expect(field(page)).toHaveValue("");
     expect(sent.filter((line) => line.startsWith("BATCH +"))).toHaveLength(1);
+  });
+
+  test("to an Ergo without draft/multiline, sends up to 20 lines one at a time and refuses a 21st (F1719)", async ({
+    page,
+  }) => {
+    const sent = await opened(page, undefined, true);
+    const lines20 = Array.from({ length: 20 }, (_, at) => `line ${String(at)}`);
+    await field(page).fill([...lines20, "line 20"].join("\n"));
+    const why = "1 line too many: 20 at most, as this chat sends one line at a time.";
+    await expect(page.getByText(why, { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Send" })).toBeDisabled();
+    await field(page).press("Enter");
+    expect(sent.filter((line) => line.includes("PRIVMSG "))).toEqual([]);
+    await field(page).fill(lines20.join("\n"));
+    await expect(page.getByRole("button", { name: "Send" })).toBeEnabled();
+    await field(page).press("Enter");
+    await expect(field(page)).toHaveValue("");
+    expect(sent.filter((line) => line.startsWith("BATCH +"))).toEqual([]);
+    expect(sent.filter((line) => /PRIVMSG #bubble\/games :line \d+$/.test(line))).toHaveLength(20);
   });
 
   test("passes axe with a draft of several lines and a message of several lines shown", async ({ page }) => {

@@ -7,6 +7,9 @@ import type { ChatLink } from "./link.ts";
 
 export type RoomActs = ReturnType<typeof roomActs>;
 
+/** Whether the link sends a message of several lines whole: yes while there is no link yet (CR7). */
+export const multilineOf = (link: RefObject<ChatLink | undefined>): boolean => link.current?.multiline() ?? true;
+
 export function roomActs(link: RefObject<ChatLink | undefined>, room: string, dismissed: (room: string) => void) {
   return {
     onDelete: (id: string) => link.current?.redact(room, id) ?? false,

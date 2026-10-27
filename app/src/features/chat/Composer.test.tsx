@@ -3,7 +3,7 @@ import { completions } from "./complete.ts";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { Composer, Preview, typingOf } from "./Composer.tsx";
-import { NEAR, said, withHint } from "./said.ts";
+import { NEAR, said, sendable, withHint } from "./said.ts";
 import { refusalAfter } from "./composerHooks.ts";
 
 const ROOM = "#bubble/games";
@@ -347,6 +347,38 @@ describe("the composer, a draft of several lines", () => {
     expect(said(compose(ROOM, draft, NICK), false, { nick: NICK, draft })).toStrictEqual({ help: note });
     expect(said(compose(ROOM, "/me waves", NICK), false, { nick: NICK, draft: "/me waves" })).toStrictEqual({});
     expect(said(compose(ROOM, "/me waves\n", NICK), false, { nick: NICK, draft: "/me waves\n" })).toStrictEqual({});
+  });
+
+  // F1719 (CR7): without draft/multiline each line goes as a PRIVMSG, and the bot's 20 messages a minute hide the rest.
+  it("refuses more than 20 lines when the connection has no draft/multiline, and Send is off", () => {
+    const twentyOne = Array.from({ length: 21 }, (_, at) => `line ${String(at)}`).join("\n");
+    const composed = compose(ROOM, twentyOne, NICK);
+    expect(said(composed, false, { multiline: false })).toStrictEqual({
+      error: "1 line too many: 20 at most, as this chat sends one line at a time.",
+    });
+    expect(said(composed, false, { multiline: true })).toStrictEqual({});
+    expect(sendable(composed, false)).toBe(false);
+    expect(sendable(composed, true)).toBe(true);
+    expect(sendable(compose(ROOM, twentyOne.split("\n").slice(0, 20).join("\n"), NICK), false)).toBe(true);
+    expect(sendable(compose(ROOM, "/nick bob", NICK), true)).toBe(false);
+    expect(sendable(compose(ROOM, "hi", NICK), false)).toBe(true);
+  });
+
+  it("leaves Send off for a draft past 20 lines in a box told there is no draft/multiline", () => {
+    const twentyOne = Array.from({ length: 21 }, (_, at) => `line ${String(at)}`).join("\n");
+    const markup = renderToStaticMarkup(
+      <Composer
+        room={ROOM}
+        nick={NICK}
+        rooms={["#games"]}
+        members={[]}
+        draft={twentyOne}
+        multiline={false}
+        onSay={() => true}
+      />,
+    );
+    expect(markup).toContain("1 line too many: 20 at most, as this chat sends one line at a time.");
+    expect(markup).toMatch(/<button(?=[^>]*type="submit")(?=[^>]*disabled="")[^>]*>/);
   });
 
   it("says the bytes a message of several lines has left near its cap", () => {

@@ -1,10 +1,11 @@
 // What the composer keeps beside its draft (moved out of Composer.tsx, which the merge of 4e's refusals and 4f's typing
 // grew past the lint's sizes): why Ergo refused the last line, the focus at its start, the selection an edit leaves.
-import type { Composed } from "@gnoworld/core";
+import { COMMANDS, type Composed } from "@gnoworld/core";
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
-import type { Completion } from "./complete.ts";
+import { completions, type Completion } from "./complete.ts";
 import type { Edit } from "./format.ts";
-import { said, withHint, type Context } from "./said.ts";
+import { peopleOf } from "./names.ts";
+import { said, sendable, withHint } from "./said.ts";
 
 /** The lines Ergo refused so far, the last one's draft, and why it did not go. */
 export interface Refused {
@@ -91,17 +92,28 @@ function useCoarsePointer(): boolean {
   );
 }
 
-/** What the field says of the draft, its hint of how to add a line following the screen's pointer; and whether that
- * pointer is a finger. */
+/** What the field says of the draft, its hint of how to add a line following the screen's pointer; whether that pointer
+ * is a finger; and whether the draft may go. `to` names a direct message's partner, whom no typing is told to. */
 export function useHelp(
   composed: Composed,
-  {
-    failed,
-    completion,
-    direct,
-    ...context
-  }: { failed: boolean; completion?: Completion | undefined; direct: boolean } & Context,
+  { nick, label: to, multiline }: { nick: string; label?: string | undefined; multiline?: boolean | undefined },
+  { failed, completion, draft }: { failed: boolean; completion?: Completion | undefined; draft: string },
 ) {
   const coarse = useCoarsePointer();
-  return { coarse, shown: withHint(said(composed, failed, { ...context, completion }), direct, coarse) };
+  const context = { nick, draft, multiline, completion };
+  return {
+    coarse,
+    shown: withHint(said(composed, failed, context), to !== undefined, coarse),
+    goes: sendable(composed, multiline),
+  };
+}
+
+/** What Tab completes the draft's last word to. The room's accounts are sorted out of its members only while a word
+ * after `@` is typed: the mention alone, not each key, is what the compiler recomputes them on (F793). */
+export function completionOf(
+  draft: string,
+  { rooms, members, nick }: { rooms: readonly string[]; members: readonly string[]; nick: string },
+) {
+  const people = /(^|\s)@\S*$/u.test(draft) ? peopleOf(members, nick) : [];
+  return completions(draft, { commands: COMMANDS, rooms, people });
 }

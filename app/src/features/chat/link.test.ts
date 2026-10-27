@@ -1066,6 +1066,15 @@ describe("the chat's link: what it says", () => {
     expect([...batches(guest.fake.sent), ...batches(t.fake.sent)]).toEqual([]);
   });
 
+  it("says whether the connection takes a message of several lines whole: yes until Ergo refuses the capability (F1719)", () => {
+    const t = memberIn(["#bubble/games"]);
+    expect(t.link.multiline()).toBe(true);
+    t.fake.grants = false;
+    expect(t.link.multiline()).toBe(false);
+    t.link.stop();
+    expect(t.link.multiline()).toBe(true);
+  });
+
   it("sends the lines of a message one at a time to an Ergo with no draft/multiline, its blank lines left out", () => {
     const t = memberIn(["#bubble/games"]);
     t.fake.grants = false;

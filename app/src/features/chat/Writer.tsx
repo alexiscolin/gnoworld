@@ -34,11 +34,13 @@ export interface WriterProps {
   replying?: Line | undefined;
   asked?: number | undefined;
   onCancelReply?: (() => void) | undefined;
+  /** Whether the connection sends a message of several lines whole (draft/multiline). */
+  multiline?: boolean | undefined;
 }
 
 export function Writer(props: WriterProps) {
   const { session, room, label, rooms, members, onSay, onTyping, refused, focus, describedBy } = props;
-  const { replying, asked, onCancelReply } = props;
+  const { replying, asked, onCancelReply, multiline } = props;
   if (session.kind !== "in") return <p>Log in to write in this room.</p>;
   // The account's drafts on this device: the room's, where the composer starts, and each change kept (4d).
   const kept = pageDrafts(session.address);
@@ -63,6 +65,7 @@ export function Writer(props: WriterProps) {
         replying={replying === undefined ? undefined : answeredOf(replying)}
         asked={asked}
         onCancelReply={onCancelReply}
+        multiline={multiline}
       />
     </Suspense>
   );

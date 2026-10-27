@@ -64,6 +64,9 @@ class Link implements ChatLink {
     this.#keep();
   }
 
+  // ponytail: false too while Ergo has no nick yet, a moment of the connection's start; read at each render.
+  readonly multiline = (): boolean => this.#ergo?.multiline() ?? true;
+
   say(room: string, composed: Composed, reply?: string): boolean {
     if (reply !== undefined && !isTagMsgid(reply)) return false;
     const went = this.#inside.has(room) && this.#sendTo(room, composed, reply === undefined ? "" : `+reply=${reply}`);

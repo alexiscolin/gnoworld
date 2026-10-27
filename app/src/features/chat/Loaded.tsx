@@ -9,7 +9,7 @@ import type { AppState } from "../../store/index.ts";
 import type { Dms } from "./Dms.tsx";
 import type { ChatLink } from "./link.ts";
 import { dmParams, neighbour, roomIds, roomParams } from "./names.ts";
-import { roomActs, type RoomActs } from "./roomActs.ts";
+import { multilineOf, roomActs, type RoomActs } from "./roomActs.ts";
 import { RoomsView } from "./RoomsView.tsx";
 import { People, RoomView, type RoomViewProps } from "./RoomView.tsx";
 import { shownOf, type Shown } from "./shown.tsx";
@@ -175,7 +175,9 @@ export function Loaded({
           me={me}
           noteId={noteId}
           {...replies.view}
-          composer={<Writer session={session} rooms={ids} {...shown.writer} {...replies.writer} />}
+          composer={
+            <Writer session={session} rooms={ids} multiline={multilineOf(link)} {...shown.writer} {...replies.writer} />
+          }
         />
       )}
     </Sidebar>

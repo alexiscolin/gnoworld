@@ -13,8 +13,11 @@ const LINES: readonly HistoryLine[] = [
 ];
 
 // Ergo's half of the handshake, as `me`: the ACK, SASL's yes to an account, the welcome.
-function welcome(line: string, me: string): string[] {
-  if (line.startsWith("CAP REQ :")) return [`:ergo CAP * ACK :${line.slice("CAP REQ :".length)}`];
+function welcome(line: string, me: string, noMultiline: boolean): string[] {
+  if (line.startsWith("CAP REQ :")) {
+    const refused = noMultiline && line.includes("draft/multiline");
+    return [`:ergo CAP * ${refused ? "NAK" : "ACK"} :${line.slice("CAP REQ :".length)}`];
+  }
   if (line === "AUTHENTICATE PLAIN") return ["AUTHENTICATE +"];
   if (line.startsWith("AUTHENTICATE ")) return [`:ergo 903 * :SASL authentication successful`];
   if (line.startsWith("USER ")) return [`:ergo 001 ${me} :Welcome`, `:ergo 376 ${me} :End of MOTD`];
@@ -163,6 +166,8 @@ export interface Scripted {
   replayed?: readonly string[];
   /** Ergo refuses each reaction, as in a room the account may not speak in: a 404 to its label, no echo. */
   refuseReact?: boolean;
+  /** Ergo does not offer draft/multiline: it NAKs the request holding it, and ACKs the one without. */
+  noMultiline?: boolean;
   /** The lines before the history's, which Ergo gives to CHATHISTORY BEFORE. */
   older?: readonly HistoryLine[];
 }
@@ -194,7 +199,7 @@ export function scriptedErgo(ergo: WebSocketRoute, me: string, script: Scripted 
     const line = String(data);
     heard?.(line);
     const answers = [
-      ...welcome(line, me),
+      ...welcome(line, me, script.noMultiline === true),
       ...rooms(line, me, { history, replayed, older, told: room, read }),
       ...redaction(line, me, { refuse: refuseRedact, hold: holdRedact }),
       ...echoedLines(line, me, multiline),

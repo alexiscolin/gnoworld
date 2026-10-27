@@ -27,6 +27,9 @@ export interface ChatLink {
   /** Sends what the composer composed to another account, a direct message (4e); an account's alone; `draft` is what
    * its writer typed, which Ergo's refusal puts back. Whether it went. */
   sayTo: (partner: string, composed: Composed, draft: string) => boolean;
+  /** Whether a message of several lines goes whole as one batch, as far as the connection says: yes while there is none or
+   * Ergo granted draft/multiline, no once it refused it (a line at a time, the composer's 20 at most). */
+  multiline: () => boolean;
   /** Deletes a line by its msgid in a room Ergo says it is in (Ergo's REDACT, 4c); an account's alone. Whether it went. */
   redact: (room: string, id: string) => boolean;
   /** Reacts to a line of a room Ergo says it is in, by its msgid, with one emoji of RGI's set, or takes the reaction

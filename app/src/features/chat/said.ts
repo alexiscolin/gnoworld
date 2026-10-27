@@ -35,7 +35,10 @@ function tooLong(composed: Extract<Composed, { kind: "long" | "tooBig" }>): stri
 }
 
 // Why a draft cannot go whatever the field is completing: half of an emoji, or a line or message too long.
-function refusal(composed: Composed): string | undefined {
+function refusal(composed: Composed, multiline: boolean | undefined): string | undefined {
+  const over = tooMany(composed, multiline);
+  if (over > 0)
+    return `${plural(over, "line")} too many: ${String(ALONE_LINES)} at most, as this chat sends one line at a time.`;
   if (composed.kind === "malformed") return "This text holds half of an emoji and cannot be sent. Delete it.";
   return composed.kind === "long" || composed.kind === "tooBig" ? tooLong(composed) : undefined;
 }
@@ -46,7 +49,21 @@ export interface Context {
   draft?: string;
   /** What Tab completes the word being typed to. */
   completion?: Completion | undefined;
+  /** Whether the connection sends a message of several lines whole (draft/multiline); else each line goes alone. */
+  multiline?: boolean | undefined;
 }
+
+// A line at a time, the bot's 20 messages a minute hide the 21st (server/src/moderation/check.ts): so many lines at most.
+const ALONE_LINES = 20;
+const tooMany = (composed: Composed, multiline: boolean | undefined): number =>
+  multiline === false && composed.kind === "lines" ? composed.lines.length - ALONE_LINES : 0;
+
+/** Whether the draft may go: a line or a message of lines, not past what the connection sends (F1719). */
+export const sendable = (
+  composed: Composed,
+  multiline: boolean | undefined,
+): composed is Extract<Composed, { kind: "line" | "lines" }> =>
+  (composed.kind === "line" || composed.kind === "lines") && tooMany(composed, multiline) <= 0;
 
 // Of a message of lines, the one with the fewest bytes left in IRC's budget (named from 1) and what it has left.
 function tightest(lines: readonly string[], nick: string): { line: number; left: number } {
@@ -73,18 +90,21 @@ const actionOnly = (composed: Composed, { draft = "" }: Context): string | undef
     ? "An action is one line: its line breaks become spaces."
     : undefined;
 
+// What Tab completes the word to: the first option, and the others.
+function completes({ options }: Completion): string {
+  const [first = "", ...rest] = options.map(named);
+  return `Tab completes ${first}${rest.length === 0 ? "" : `; also ${rest.join(", ")}`}.`;
+}
+
 /** What the field says of the draft: that it was not sent or is too long (a line of several named, a message past
  * its lines or bytes), what Tab completes (a command not yet typed whole being no error), an unknown command, or
  * help near the end or on an action; or nothing. */
 export function said(composed: Composed, failed: boolean, context: Context = {}): Pick<FieldProps, "error" | "help"> {
-  const { completion } = context;
+  const { completion, multiline } = context;
   if (failed) return { error: "Not sent: the chat is not ready yet. Try again in a moment." };
-  const refusing = refusal(composed);
+  const refusing = refusal(composed, multiline);
   if (refusing !== undefined) return { error: refusing };
-  if (completion !== undefined) {
-    const [first = "", ...rest] = completion.options.map(named);
-    return { help: `Tab completes ${first}${rest.length === 0 ? "" : `; also ${rest.join(", ")}`}.` };
-  }
+  if (completion !== undefined) return { help: completes(completion) };
   if (composed.kind === "unknown") return { error: `${composed.command} is not a command. /me sends an action.` };
   const help = nearEnd(composed, context) ?? actionOnly(composed, context);
   return help === undefined ? {} : { help };
