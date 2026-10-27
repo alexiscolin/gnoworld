@@ -9,7 +9,7 @@ import { useAppStore } from "../../storeContext.tsx";
 import type { AppState } from "../../store/index.ts";
 import type { Dms } from "./Dms.tsx";
 import type { ChatLink } from "./link.ts";
-import { dmParams, neighbour, roomIds, roomParams } from "./names.ts";
+import { dmParams, groupsAt, neighbour, roomIds, roomParams } from "./names.ts";
 import { roomActs, type RoomActs } from "./roomActs.ts";
 import { useRoomKeeping } from "./RoomKeeping.ts";
 import { Saved } from "./Saved.tsx";
@@ -17,6 +17,7 @@ import { RoomsView } from "./RoomsView.tsx";
 import { People, RoomView, type RoomViewProps } from "./RoomView.tsx";
 import { shownOf, type Shown } from "./shown.tsx";
 import { usePins } from "./usePins.ts";
+import type { Noticing } from "./useNotices.ts";
 import { Writer } from "./Writer.tsx";
 
 // Alt+Up and Alt+Down: the room before or after the one in view, anywhere on the page (ADR-0002's chat rows). A key
@@ -126,6 +127,8 @@ interface LoadedProps {
   /** Sends a draft to another account (4e). */
   sayTo: (partner: string, draft: string) => boolean;
   dms: Dms;
+  /** What the account was told and has not seen (4f-n). */
+  noticing: Noticing;
   /** What says the rooms could not load, in their place, while a direct message shows (CR8). */
   failed?: ReactNode;
 }
@@ -152,6 +155,7 @@ export function Loaded({
   dismissed,
   sayTo,
   dms,
+  noticing,
   failed,
 }: LoadedProps) {
   const ids = roomIds(sections);
@@ -172,14 +176,21 @@ export function Loaded({
   const people = (
     <People members={state?.members ?? []} connected={chat === "connected"} me={me} onMessage={onMessage} />
   );
-  const shown = shownOf(dms, { id: room, state, acts }, { sayTo, focus: opened.focus, noteId });
+  const shown = shownOf(dms, { id: room, state, acts }, { sayTo, focus: opened.focus, noteId, seen: noticing.seen });
   // What the reader keeps in the room in view and the room's pins, which are asked for it: none for a direct message.
   const { keeping, pins } = useRoomKeeping(room, usePins(useAppStore(), room, me));
   const replies = useReplies(shown, state?.lines, acts);
   return (
     <Sidebar space="l">
       <Rail signedIn={me !== undefined}>
-        <RoomsView sections={sections} current={room} dms={dms.nav} failed={failed} />
+        <RoomsView
+          sections={sections}
+          current={room}
+          dms={dms.nav}
+          failed={failed}
+          badges={noticing.badges}
+          notices={noticing.list}
+        />
       </Rail>
       {dms.problem === undefined ? null : <p role="status">{dms.problem}</p>}
       {shown === undefined ? null : (
@@ -195,7 +206,16 @@ export function Loaded({
           me={me}
           noteId={noteId}
           {...replies.view}
-          composer={<Writer session={session} rooms={ids} {...shown.writer} {...replies.writer} />}
+          notify={noticing.notify}
+          composer={
+            <Writer
+              session={session}
+              rooms={ids}
+              groups={groupsAt(sections, room)}
+              {...shown.writer}
+              {...replies.writer}
+            />
+          }
         />
       )}
     </Sidebar>

@@ -7,6 +7,8 @@ export interface Choices {
   commands: readonly string[];
   rooms: readonly string[];
   people: readonly string[];
+  /** Whether `@room` is offered, first of the accounts: a room's composer, not a direct message's (4f-n). */
+  group?: boolean;
 }
 
 /** The word at the draft's end, from `start`, and what it may become, five at most. */
@@ -26,6 +28,8 @@ function* candidates(word: string, leading: boolean, choices: Choices): Generato
   } else if (word.startsWith("#")) {
     yield* choices.rooms;
   } else if (word.startsWith("@")) {
+    // After a letter: a bare @ lists the accounts alone.
+    if (choices.group === true && word.length > 1) yield "@room";
     for (const person of choices.people) yield `@${person}`;
   }
 }

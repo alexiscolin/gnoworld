@@ -6,8 +6,10 @@ import type { LinkDeps } from "./linkTypes.ts";
 
 export function beginSession({ store, device, keep }: LinkDeps, session: AppState["login"]["session"]): void {
   const account = session.kind === "in" ? session.address : undefined;
-  const { dmActions, keepActions, pinsActions } = store.getState();
-  dmActions.begin(account === undefined ? undefined : device?.(account));
+  const { dmActions, keepActions, noticeActions, pinsActions } = store.getState();
+  const kept = account === undefined ? undefined : device?.(account);
+  dmActions.begin(kept);
+  noticeActions.begin(kept?.notices);
   keepActions.begin(account === undefined ? undefined : keep?.(account));
   pinsActions.forget();
 }

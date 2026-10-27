@@ -12,6 +12,7 @@ import { pageLoginApi } from "../../lib/api/login.ts";
 import { pageDmPrefs } from "../../lib/dms/page.ts";
 import { pageDrafts } from "../../lib/drafts/page.ts";
 import { pageKeep } from "../../lib/keep/page.ts";
+import { pageNoticePrefs } from "../../lib/notices/page.ts";
 import { pageRoomsApi } from "../../lib/api/rooms.ts";
 import { drawGuestNick } from "../../lib/ergo/ergo.ts";
 import { pageErgo } from "../../lib/ergo/page.ts";
@@ -21,8 +22,9 @@ import { useDms } from "./Dms.tsx";
 import { chatLink, type ChatLink } from "./link.ts";
 import { Loaded } from "./Loaded.tsx";
 import { LOADING } from "./Loading.tsx";
-import { roomIds, roomsQuery, shownRoom } from "./names.ts";
+import { groupRooms, roomIds, roomsQuery, shownRoom } from "./names.ts";
 import { useOnHide } from "./reading.ts";
+import { useNotices } from "./useNotices.ts";
 import { useVerdicts } from "./useVerdicts.ts";
 
 // The rooms as last asked, and what came: undefined when the list could not load.
@@ -49,7 +51,11 @@ const pageLink = (store: ReturnType<typeof useAppStore>) =>
     connect: pageErgo,
     ticket: pageLoginApi().ticket,
     guest: drawGuestNick,
-    device: (account) => ({ prefs: pageDmPrefs(account), drafts: pageDrafts(account) }),
+    device: (account) => ({
+      prefs: pageDmPrefs(account),
+      drafts: pageDrafts(account),
+      notices: pageNoticePrefs(account),
+    }),
     keep: pageKeep,
   });
 
@@ -112,7 +118,7 @@ export function ChatPanel({ world }: { world: string }) {
   }, [store]);
   const { loaded, sections } = useRoomsAsked(world, query);
   useEffect(() => {
-    if (sections !== undefined) linkRef.current?.follow(roomIds(sections));
+    if (sections !== undefined) linkRef.current?.follow(roomIds(sections), groupRooms(sections));
   }, [sections]);
   const current = sections === undefined ? undefined : shownRoom(world, sections, params.get("room"));
   // The page hidden: the reading places waiting their 2 s go at once (F940).
@@ -127,6 +133,14 @@ export function ChatPanel({ world }: { world: string }) {
   const dms = useDms(world, session, params.get("dm"));
   const { saving, verdicts } = useRoomVerdicts(store, current, state?.lines);
   const chat = useApp((app) => app.login.chat);
+  const noticing = useNotices({
+    world,
+    session,
+    sections,
+    dms,
+    current,
+    read: (room, time) => linkRef.current?.markRead(room, time),
+  });
   if (!loaded) return LOADING;
   const failed =
     sections === undefined ? (
@@ -153,6 +167,7 @@ export function ChatPanel({ world }: { world: string }) {
       }}
       sayTo={(partner, draft) => linkRef.current?.sayTo(partner, draft) ?? false}
       dms={dms}
+      noticing={noticing}
       failed={failed}
     />
   );

@@ -3,14 +3,14 @@
 // says what keeps it from going (too long for IRC's 510 bytes, a command it does not know, the chat away) or the
 // bytes left near the end, or what Tab completes the word being typed to (a command, a room, an account). A format
 // bar wraps the selection in Markdown's marks; the line shows below as it reads.
-import { COMMANDS, compose, type Composed } from "@gnoworld/core";
+import { COMMANDS, compose, markdown, mentionsRoom, type Composed } from "@gnoworld/core";
 import { Button, Cluster, Field, IconButton, Sidebar, Stack, type FieldProps, type IconName } from "@gnoworld/ui";
 import { useRef, useState, type KeyboardEvent, type SubmitEvent } from "react";
 import { completed, completions, type Completion } from "./complete.ts";
 import { useFocusAtStart, useRefusal, useSelection, type Refused } from "./composerHooks.ts";
 import { formatted, type Edit, type Format } from "./format.ts";
 import { Message } from "./Message.tsx";
-import { peopleOf, roomLabel, shortAddress } from "./names.ts";
+import { isAccount, peopleOf, roomLabel, shortAddress } from "./names.ts";
 import { useAnswering } from "./ReplyBar.tsx";
 import type { Answered } from "./Replying.tsx";
 import styles from "./Composer.module.css";
@@ -18,6 +18,10 @@ import styles from "./Composer.module.css";
 // What the field says while it has nothing else to say: the room is told of the typing from the first key (4f; its
 // switch waits for slice 8's settings, docs/decisions.md 2026-10-26), which the writer reads here (UX review's U9).
 const TELLS = "People in this room see when you type.";
+
+/** What the field says as @room stands in the draft: whether it notifies in this room (4f-n, decisions 2026-10-27, N3). */
+export const ROOM_NOTIFIES = "@room notifies the members who keep notifications on for this room.";
+export const ROOM_SILENT = "@room notifies no one in this room: it counts only in announcement and members rooms.";
 
 /** The bytes left from which the composer counts them. */
 export const NEAR = 50;
@@ -36,7 +40,23 @@ const BAR: readonly { format: Format; icon: IconName; label: string }[] = [
 const bytes = (count: number) => `${String(count)} ${count === 1 ? "byte" : "bytes"}`;
 
 // An option as the help names it: an account by its short address.
-const named = (option: string) => (option.startsWith("@") ? `@${shortAddress(option.slice(1))}` : option);
+const named = (option: string) =>
+  option.startsWith("@") && isAccount(option.slice(1)) ? `@${shortAddress(option.slice(1))}` : option;
+
+/** What the field says of @room when the line holds it: whether it notifies in this room (`groups`), or nothing. */
+export const roomHint = (composed: Composed, groups: boolean): string | undefined =>
+  composed.kind === "line" && mentionsRoom(markdown(composed.text))
+    ? groups
+      ? ROOM_NOTIFIES
+      : ROOM_SILENT
+    : undefined;
+
+// What the field says in a room: an error; else the hint for @room, which a promise the sender could misread must not
+// hide behind another help; else what `said` has to; else that the room sees the typing.
+function fieldSays(says: ReturnType<typeof said>, composed: Composed, groups: boolean) {
+  if (says.error !== undefined) return says;
+  return { help: roomHint(composed, groups) ?? says.help ?? TELLS };
+}
 
 /** What an edit leaving `draft` tells the room of the account's typing (IRCv3's +typing), read as compose reads a
  * draft: text is active, an empty field done, a slash command nothing (the spec's), `//` text. */
@@ -109,6 +129,8 @@ export interface ComposerProps {
   /** The world's rooms by label, and the room's members, whose other accounts a word after `@` completes to. */
   rooms: readonly string[];
   members: readonly string[];
+  /** Whether a mention of the whole room counts in this room (4f-n); the field says so as `@room` stands in the draft. */
+  groups?: boolean | undefined;
   /** Sends the draft; whether it went. */
   onSay: (draft: string) => boolean;
   /** Where the draft starts: the room's, kept on the device (4d). */
@@ -153,10 +175,10 @@ export function Composer(props: ComposerProps) {
   // alone, not each key, is what the compiler recomputes them on (F793).
   const mentioning = /(^|\s)@\S*$/u.test(draft);
   const people = mentioning ? peopleOf(members, nick) : [];
-  const completion = completions(draft, { commands: COMMANDS, rooms, people });
+  const completion = completions(draft, { commands: COMMANDS, rooms, people, group: to === undefined });
   const says = said(composed, failed, completion);
-  // Nothing else to say, no error either: the disclosure, to a room's writer; a direct message tells no typing (4e).
-  const shown = says.error === undefined && says.help === undefined && to === undefined ? { help: TELLS } : says;
+  // A direct message tells no typing (4e).
+  const shown = to === undefined ? fieldSays(says, composed, props.groups ?? false) : says;
   // The selection an edit leaves is put back in the box once it shows the new draft.
   const { box, keep } = useSelection(formRef, draft);
   useFocusAtStart(formRef, props.focus);

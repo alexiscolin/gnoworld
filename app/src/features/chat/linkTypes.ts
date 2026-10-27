@@ -2,6 +2,7 @@
 import type { Result } from "../../lib/api/http.ts";
 import type { Ergo, ErgoOptions, Who } from "../../lib/ergo/ergo.ts";
 import type { Keep } from "../../lib/keep/keep.ts";
+import type { NoticePrefs } from "../../lib/notices/prefs.ts";
 import type { DmDevice } from "../../store/dms.ts";
 import type { createAppStore } from "../../store/index.ts";
 import type { Reacting } from "@gnoworld/core";
@@ -13,15 +14,15 @@ export interface LinkDeps {
   ticket: () => Promise<Result<{ ticket: string }>>;
   guest: () => string;
   /** An account's device, whose direct-message choices the store reads at its session's start; none in a test. */
-  device?: ((account: Address) => DmDevice) | undefined;
+  device?: ((account: Address) => DmDevice & { notices?: NoticePrefs }) | undefined;
   /** An account's saved lines and reading places on its device, which the store reads at its session's start; none in
    * a test. */
   keep?: ((account: Address) => Keep) | undefined;
 }
 
 export interface ChatLink {
-  /** The rooms the world lists, in its order. */
-  follow: (ids: readonly string[]) => void;
+  /** The rooms the world lists, in its order, and among them those where a mention of the whole room counts (4f-n). */
+  follow: (ids: readonly string[], groupRooms?: readonly string[]) => void;
   /** The room in view: its history asked once Ergo says I joined it, once a connection; the last one's place told. */
   show: (room: string | undefined) => void;
   /** Sends a draft, as the composer composes it, to a room Ergo says it is in; an account's alone; tagged +reply with
@@ -39,6 +40,9 @@ export interface ChatLink {
   /** Marks the room in view read to its line `id`, which the store holds, as Ergo's MARKREAD (draft/read-marker): an
    * account's alone, a line past the place Ergo gave; asked while away, it goes once Ergo says I am in the room. */
   read: (room: string, id: string) => void;
+  /** Marks a room read to a time the page set from outside the room (Clear's), as Ergo's MARKREAD: an account's alone, a
+   * room, not a conversation; asked while away, it goes once Ergo says I am in the room. */
+  markRead: (room: string, time: string) => void;
   /** Sends at once the reading places waiting their 2 s, as the page hides (F940). */
   flush: () => void;
   stop: () => void;

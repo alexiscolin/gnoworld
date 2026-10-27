@@ -5,3 +5,10 @@
     color: var(--color-text-muted);
   }
 }
+
+@layer components {
+  /* The place the keyboard goes to when what it was on is gone: no ring around the whole list. */
+  .nav:focus {
+    outline: none;
+  }
+}

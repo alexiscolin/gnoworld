@@ -33,6 +33,10 @@ const page = (id: string, lines: readonly HistoryLine[], room: string): string[]
 // A raw line in the history batch: its batch tag first among its own.
 const batched = (raw: string): string => (raw.startsWith("@") ? `@batch=h1;${raw.slice(1)}` : `@batch=h1 ${raw}`);
 
+// The history Ergo gives for a room asked, if the script holds one: `held` is by room.
+const historyOf = (held: Readonly<Record<string, readonly HistoryLine[]>>, asked: string) =>
+  Object.hasOwn(held, asked) ? held[asked] : undefined;
+
 // Each room joined, with #games' topic and names; the history of `told`, #games unless named, its raw lines last.
 function rooms(
   line: string,
@@ -43,12 +47,14 @@ function rooms(
     older,
     told,
     read,
+    others,
   }: {
     history: readonly HistoryLine[];
     replayed: readonly string[];
     older: readonly HistoryLine[];
     told: string;
     read: string | undefined;
+    others?: Readonly<Record<string, readonly HistoryLine[]>> | undefined;
   },
 ): string[] {
   if (line.startsWith("JOIN ")) {
@@ -65,12 +71,14 @@ function rooms(
       ]);
   }
   if (line.startsWith(`CHATHISTORY BEFORE ${told} `)) return page("h2", older, told);
-  if (!line.startsWith(`CHATHISTORY LATEST ${told} `)) return [];
+  const asked = /^CHATHISTORY LATEST (\S+) /.exec(line)?.[1] ?? "";
+  const held = historyOf({ ...others, [told]: history }, asked);
+  if (held === undefined) return [];
   return [
-    `BATCH +h1 chathistory ${told}`,
-    ...history.map(
+    `BATCH +h1 chathistory ${asked}`,
+    ...held.map(
       ([id, time, text, author = MEMBER]) =>
-        `@batch=h1;msgid=${id};time=${time};account=${author} :${author}!u@h PRIVMSG ${told} :${text}`,
+        `@batch=h1;msgid=${id};time=${time};account=${author} :${author}!u@h PRIVMSG ${asked} :${text}`,
     ),
     ...replayed.map(batched),
     "BATCH -h1",
@@ -146,6 +154,8 @@ export interface Scripted {
   holdRedact?: boolean;
   /** The room whose history it holds, #games unless named. */
   room?: string;
+  /** The history of other rooms, by room: the page asks it as it opens one (4f-n). */
+  others?: Readonly<Record<string, readonly HistoryLine[]>>;
   /** The reading place Ergo gives that room as the page joins it (4f), none unless named. */
   read?: string;
   /** Ergo answers no MARKREAD of the page's, as when the link drops before its answer. */
@@ -189,7 +199,7 @@ export function scriptedErgo(ergo: WebSocketRoute, me: string, script: Scripted 
     heard?.(line);
     const answers = [
       ...welcome(line, me),
-      ...rooms(line, me, { history, replayed, older, told: room, read }),
+      ...rooms(line, me, { history, replayed, older, told: room, read, others: script.others }),
       ...redaction(line, me, { refuse: refuseRedact, hold: holdRedact }),
       ...marking(line, places, quietMarks),
       ...refusedReaction(line, me, refuseReact),

@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Result } from "../../lib/api/http.ts";
 import type { Ergo, ErgoState, Who } from "../../lib/ergo/ergo.ts";
 import { createAppStore } from "../../store/index.ts";
+import { totalUnseen, unseenNotices } from "../../store/notices.ts";
 import { HISTORY_RING } from "./history.ts";
 import { chatLink, HISTORY_LINES, ROOMS_JOINED, type LinkDeps } from "./link.ts";
 import { WAITING } from "./outbox.ts";
@@ -1918,3 +1919,602 @@ describe("the chat's link: replies", () => {
     expect([...g.fake.sent, ...t.fake.sent].filter((line) => line.includes("PRIVMSG"))).toEqual([]);
   });
 });
+
+// 4f-n (docs/decisions.md, 2026-10-26): what the link makes a notice of, from Ergo's lines (the kinds themselves are
+// core/chat/notice.test.ts's).
+describe("the chat's link: notices", () => {
+  const GAMES = "#bubble/games";
+  const NEWS = "#bubble/news";
+  const T = (minute: number) => `2026-10-25T10:${String(minute).padStart(2, "0")}:00.000Z`;
+  // An account in three rooms of a world, #games in view, #news a room where a mention of the whole room counts.
+  const member = (device?: LinkDeps["device"]) => {
+    const t = setup(undefined, device);
+    t.link.follow([GAMES, "#bubble", NEWS], [NEWS]);
+    t.link.show(GAMES);
+    t.signedIn(ADDRESS);
+    const fake = t.connected(ADDRESS);
+    for (const room of [GAMES, "#bubble", NEWS]) fake.line(`:${ADDRESS}!u@h JOIN ${room}`);
+    return { ...t, fake, notices: () => t.store.getState().notices };
+  };
+  // A line of OTHER's, by default, in a room at T(minute), its msgid `id`.
+  const said = (
+    fake: Fake,
+    [room, id, text]: readonly [room: string, id: string, text: string],
+    { minute = 5, from = OTHER, command = "PRIVMSG" } = {},
+  ) => {
+    fake.line(`@msgid=${id};time=${T(minute)};account=${from} :${from}!u@h ${command} ${room} :${text}`);
+  };
+  const kinds = (t: { notices: () => readonly { id: string; kind: string; where: string }[] }) =>
+    t.notices().map(({ id, kind, where }) => [id, kind, where]);
+
+  it("makes a notice of a line that names the account, in a room followed though not in view", () => {
+    const t = member();
+    said(t.fake, ["#bubble", "m1", `look @${ADDRESS}`]);
+    expect(t.notices()).toEqual([{ id: "m1", kind: "mention", where: "#bubble", time: T(5), by: OTHER }]);
+  });
+
+  it("makes none of a plain line, a mention of someone else, the account's own line as Ergo echoes it, or a NOTICE", () => {
+    const t = member();
+    said(t.fake, [GAMES, "m1", "hello"]);
+    said(t.fake, [GAMES, "m2", `hello @${OTHER}`]);
+    said(t.fake, [GAMES, "m3", `note to @${ADDRESS}`], { from: ADDRESS });
+    said(t.fake, [GAMES, "m4", `@${ADDRESS} a verdict`], { command: "NOTICE" });
+    expect(t.notices()).toEqual([]);
+  });
+
+  it("makes one notice of a line Ergo sends twice", () => {
+    const t = member();
+    said(t.fake, ["#bubble", "m1", `@${ADDRESS}`]);
+    said(t.fake, ["#bubble", "m1", `@${ADDRESS}`]);
+    expect(t.notices()).toHaveLength(1);
+  });
+
+  it("makes a notice of a mention of the whole room in the rooms the page named, and in no other", () => {
+    const t = member();
+    said(t.fake, [NEWS, "n1", "@room the release is out"]);
+    said(t.fake, ["#bubble", "m1", "@room the release is out"]);
+    said(t.fake, [GAMES, "g1", "@room the release is out"]);
+    expect(kinds(t)).toEqual([["n1", "group", NEWS]]);
+  });
+
+  it("forgets the rooms where a mention of the whole room counts when the page lists others", () => {
+    const t = member();
+    t.link.follow([GAMES, "#bubble", NEWS], []);
+    said(t.fake, [NEWS, "n1", "@room the release is out"]);
+    expect(t.notices()).toEqual([]);
+  });
+
+  it("makes no notice in a room the reader set to none, and one again once it is not", () => {
+    const t = member();
+    t.store.getState().noticeActions.setMode("#bubble", "none");
+    said(t.fake, ["#bubble", "m1", `@${ADDRESS}`]);
+    expect(t.notices()).toEqual([]);
+    t.store.getState().noticeActions.setMode("#bubble", "all");
+    said(t.fake, ["#bubble", "m2", `@${ADDRESS}`]);
+    expect(kinds(t)).toEqual([["m2", "mention", "#bubble"]]);
+  });
+
+  it("reads the modes of the account's device when its session starts", () => {
+    const t = member(() => ({
+      prefs: { onlyKnown: () => false, setOnlyKnown: () => true, known: () => [], setKnown: () => true },
+      drafts: { get: () => "", set: () => true },
+      notices: { modes: () => ({ "#bubble": "none" }), setModes: () => true },
+    }));
+    said(t.fake, ["#bubble", "m1", `@${ADDRESS}`]);
+    said(t.fake, [GAMES, "g1", `@${ADDRESS}`]);
+    expect(kinds(t)).toEqual([["g1", "mention", GAMES]]);
+  });
+
+  describe("direct messages", () => {
+    const dm = (fake: Fake, [id, from, to]: readonly [string, string, string], text = "hi") => {
+      fake.line(`@msgid=${id};time=${T(5)};account=${from} :${from}!u@h PRIVMSG ${to} :${text}`);
+    };
+
+    it("makes a notice of an account's message to the reader, under its partner, and none of the reader's own", () => {
+      const t = member();
+      dm(t.fake, ["d1", OTHER, ADDRESS]);
+      dm(t.fake, ["d2", ADDRESS, OTHER], "hello");
+      expect(t.notices()).toEqual([{ id: "d1", kind: "dm", where: OTHER, time: T(5), by: OTHER }]);
+    });
+
+    it("makes none of a message the store discards while the account hears those it wrote to alone", () => {
+      const t = member(() => ({
+        prefs: { onlyKnown: () => true, setOnlyKnown: () => true, known: () => [], setKnown: () => true },
+        drafts: { get: () => "", set: () => true },
+      }));
+      dm(t.fake, ["d1", OTHER, ADDRESS]);
+      expect(t.store.getState().dms).toEqual({});
+      expect(t.notices()).toEqual([]);
+    });
+
+    it("makes none of a direct message to a guest, nor of a room's line naming an address, for a guest", () => {
+      const t = guestIn(["#bubble"]);
+      t.fake.line(`@msgid=d1;time=${T(5)};account=${OTHER} :${OTHER}!u@h PRIVMSG ${GUEST} :hi`);
+      t.fake.line(`@msgid=m1;time=${T(5)};account=${OTHER} :${OTHER}!u@h PRIVMSG #bubble :@${ADDRESS}`);
+      expect(t.store.getState().notices).toEqual([]);
+    });
+  });
+
+  // A hidden or a deleted line must not stay a notice that opens on nothing; the bot hides after posting (3j).
+  it("drops the notice of a line Ergo's REDACT takes away, the bot's hide included", () => {
+    const t = member();
+    said(t.fake, ["#bubble", "m1", `@${ADDRESS}`]);
+    said(t.fake, ["#bubble", "m2", `@${ADDRESS}`]);
+    t.fake.line(`:gnoworld!u@h REDACT #bubble m1`);
+    expect(kinds(t)).toEqual([["m2", "mention", "#bubble"]]);
+  });
+
+  // The room in view's history page: what came while the page was away, past the reading place Ergo keeps.
+  describe("the history page", () => {
+    const page = (fake: Fake, lines: readonly [id: string, minute: number, text: string][], room = GAMES) => {
+      fake.line(`BATCH +h1 chathistory ${room}`);
+      for (const [id, minute, text] of lines)
+        fake.line(`@batch=h1;msgid=${id};time=${T(minute)};account=${OTHER} :${OTHER}!u@h PRIVMSG ${room} :${text}`);
+      fake.line("BATCH -h1");
+    };
+
+    it("makes a notice of each line past the reading place Ergo gave that names the account, and of no other", () => {
+      const t = member();
+      t.fake.line(`:ergo MARKREAD ${GAMES} timestamp=${T(2)}`);
+      page(t.fake, [
+        ["h1", 1, `@${ADDRESS}`],
+        ["h2", 2, `@${ADDRESS}`],
+        ["h3", 3, `@${ADDRESS}`],
+        ["h4", 4, "plain"],
+      ]);
+      expect(kinds(t)).toEqual([["h3", "mention", GAMES]]);
+    });
+
+    // F1534: each notice of a page set the store on its own, a notification for each of up to 200 lines.
+    it("hands the notices of a page to the store in one change", () => {
+      const t = member();
+      t.fake.line(`:ergo MARKREAD ${GAMES} timestamp=${T(0)}`);
+      let changes = 0;
+      let held = t.store.getState().notices;
+      t.store.subscribe((state) => {
+        if (state.notices !== held) changes += 1;
+        held = state.notices;
+      });
+      page(t.fake, [
+        ["h1", 1, `@${ADDRESS}`],
+        ["h2", 2, `@${ADDRESS}`],
+        ["h3", 3, `@${ADDRESS}`],
+      ]);
+      expect(t.notices()).toHaveLength(3);
+      expect(changes).toBe(1);
+    });
+
+    it("makes none while Ergo gave no reading place, none being a place from which every line is unread", () => {
+      const t = member();
+      page(t.fake, [["h1", 1, `@${ADDRESS}`]]);
+      expect(t.notices()).toEqual([]);
+    });
+
+    it("makes a notice once though the page comes again on a reconnect", () => {
+      const t = member();
+      t.fake.line(`:ergo MARKREAD ${GAMES} timestamp=${T(0)}`);
+      page(t.fake, [["h1", 1, `@${ADDRESS}`]]);
+      page(t.fake, [["h1", 1, `@${ADDRESS}`]]);
+      expect(t.notices()).toHaveLength(1);
+    });
+
+    it("makes one notice of a line the history page repeats after a live message", () => {
+      const t = member();
+      t.fake.line(`:ergo MARKREAD ${GAMES} timestamp=${T(0)}`);
+      said(t.fake, [GAMES, "h1", `@${ADDRESS}`], { minute: 1 });
+      page(t.fake, [["h1", 1, `@${ADDRESS}`]]);
+      expect(t.notices()).toHaveLength(1);
+    });
+  });
+
+  describe("what the reader has seen", () => {
+    it("sees the room up to the line read, as the page marks it read, at once and not as Ergo answers", () => {
+      const t = member();
+      said(t.fake, [GAMES, "m1", `@${ADDRESS}`], { minute: 3 });
+      said(t.fake, [GAMES, "m2", "plain"], { minute: 4 });
+      t.link.read(GAMES, "m1");
+      expect(t.store.getState().noticeSeen[GAMES]).toBe(T(3));
+      t.link.read(GAMES, "m2");
+      expect(t.store.getState().noticeSeen[GAMES]).toBe(T(4));
+    });
+
+    it("sees nothing for a room that is not in view, nor for a line the store does not hold", () => {
+      const t = member();
+      said(t.fake, ["#bubble", "m1", `@${ADDRESS}`]);
+      t.link.read("#bubble", "m1");
+      t.link.read(GAMES, "nope");
+      expect(t.store.getState().noticeSeen).toEqual({});
+    });
+  });
+});
+
+// 4f-n, the red pass's cases (docs/review/findings.md, R2 to R16): what must not leak between sessions, outlive a room, or
+// slip through the history page's own path; a direct message's privacy and reading; replies and edits.
+describe("the chat's link: notices, the edges", () => {
+  const GAMES = "#bubble/games";
+  const NEWS = "#bubble/news";
+  const BOB = Address.parse("g1f6dcp6he2vq9gymrm4yrnyx66n0578vf7fsksl");
+  const T = (minute: number) => `2026-10-25T10:${String(minute).padStart(2, "0")}:00.000Z`;
+  const prefs = (known: string[] = [], onlyKnown = false) => ({
+    prefs: { onlyKnown: () => onlyKnown, setOnlyKnown: () => true, known: () => known, setKnown: () => true },
+    drafts: { get: () => "", set: () => true },
+  });
+  const member = (device?: LinkDeps["device"], account: string = ADDRESS) => {
+    const t = setup(undefined, device);
+    t.link.follow([GAMES, "#bubble", NEWS], [NEWS]);
+    t.link.show(GAMES);
+    t.signedIn(Address.parse(account));
+    const fake = t.connected(account);
+    for (const room of [GAMES, "#bubble", NEWS]) fake.line(`:${account}!u@h JOIN ${room}`);
+    return { ...t, fake, notices: () => t.store.getState().notices };
+  };
+  const say = (
+    fake: Fake,
+    [room, id, text]: readonly [string, string, string],
+    { minute = 5, from = OTHER, command = "PRIVMSG", tags = "" } = {},
+  ) => {
+    fake.line(`@msgid=${id};time=${T(minute)};account=${from}${tags} :${from}!u@h ${command} ${room} :${text}`);
+  };
+  const ids = (t: { notices: () => readonly { id: string }[] }) => t.notices().map(({ id }) => id);
+
+  describe("a session", () => {
+    it("forgets an account's notices, marks and modes as it signs out, and asks the device for each account alone", () => {
+      const asked: string[] = [];
+      const device = (account: string) => {
+        asked.push(account);
+        return { ...prefs(), notices: { modes: () => ({ [NEWS]: "none" as const }), setModes: () => true } };
+      };
+      const t = member(device);
+      const old = t.fake;
+      say(old, [GAMES, "m1", `@${ADDRESS}`], { minute: 3 });
+      say(old, ["#bubble", "m2", `@${ADDRESS}`]);
+      t.link.read(GAMES, "m1");
+      t.store.getState().noticeActions.setMode("#bubble", "all");
+      expect(t.store.getState().noticeSeen[GAMES]).toBe(T(3));
+      t.signedOut();
+      expect(t.store.getState().notices).toEqual([]);
+      expect(t.store.getState().noticeSeen).toEqual({});
+      expect(t.store.getState().noticeModes).toEqual({});
+      expect(asked).toEqual([ADDRESS]);
+      // A late line of the old connection reaches nothing.
+      say(old, [GAMES, "m3", `@${ADDRESS}`]);
+      expect(t.notices()).toEqual([]);
+      t.signedIn(BOB);
+      expect(asked).toEqual([ADDRESS, BOB]);
+      expect(t.store.getState().notices).toEqual([]);
+      expect(t.store.getState().noticeModes).toEqual({ [NEWS]: "none" });
+    });
+
+    // G1 (F1500): the account held no mode, so the guard in `begin` that skips a reset for an empty session saw its notices.
+    it("forgets an account's notices and marks at sign-out though it held no mode, for the next account of the device", () => {
+      const t = member(() => ({ ...prefs(), notices: { modes: () => ({}), setModes: () => true } }));
+      say(t.fake, [GAMES, "m1", `@${ADDRESS}`], { minute: 3 });
+      say(t.fake, ["#bubble", "m2", `@${ADDRESS}`]);
+      t.link.read(GAMES, "m1");
+      expect(t.store.getState().notices).toHaveLength(2);
+      expect(t.store.getState().noticeSeen[GAMES]).toBe(T(3));
+      t.signedOut();
+      expect(t.store.getState().notices).toEqual([]);
+      expect(t.store.getState().noticeSeen).toEqual({});
+      t.signedIn(BOB);
+      expect(t.store.getState().notices).toEqual([]);
+      expect(t.store.getState().noticeSeen).toEqual({});
+    });
+  });
+
+  // G2 (F1501): the connection of a guest has a nick, so `me` is defined; only the account check keeps it out.
+  describe("a guest", () => {
+    it("makes no notice of a live mention of the whole room, in a room where it counts", () => {
+      const t = guestIn([NEWS]);
+      t.link.follow([NEWS], [NEWS]);
+      t.fake.line(`:${GUEST}!u@h JOIN ${NEWS}`);
+      t.fake.line(`@msgid=g1;time=${T(5)};account=${OTHER} :${OTHER}!u@h PRIVMSG ${NEWS} :@room`);
+      expect(t.store.getState().notices).toEqual([]);
+      expect(totalOf(t)).toBe(0);
+    });
+  });
+
+  // G3 (F1502): lines that are no text line, or come for a room not followed, pass the notices by.
+  describe("a line of Ergo's that is no notice's", () => {
+    const tag = `@batch=h1;msgid=t1;time=${T(4)};account=${OTHER};+draft/react=:+1:;+draft/reply=m0`;
+    it("lets a reaction in a history page pass, and the mention after it still counts", () => {
+      const t = member();
+      t.fake.line(`:ergo MARKREAD ${GAMES} timestamp=${T(2)}`);
+      t.fake.line(`BATCH +h1 chathistory ${GAMES}`);
+      t.fake.line(`${tag} :${OTHER}!u@h TAGMSG ${GAMES}`);
+      t.fake.line(`@batch=h1;msgid=h5;time=${T(5)};account=${OTHER} :${OTHER}!u@h PRIVMSG ${GAMES} :@${ADDRESS}`);
+      t.fake.line("BATCH -h1");
+      expect(ids(t)).toEqual(["h5"]);
+    });
+
+    it("lets a live reaction in a joined room pass, and a line of a room not followed", () => {
+      const t = member();
+      t.fake.line(`@msgid=t2;time=${T(4)};account=${OTHER};+draft/react=:+1: :${OTHER}!u@h TAGMSG ${GAMES}`);
+      say(t.fake, ["#elsewhere", "x1", `@${ADDRESS}`]);
+      expect(t.notices()).toEqual([]);
+    });
+
+    it("lets a history page of a room not followed pass", () => {
+      const t = member();
+      t.fake.line("BATCH +h2 chathistory #elsewhere");
+      t.fake.line(`@batch=h2;msgid=x2;time=${T(5)};account=${OTHER} :${OTHER}!u@h PRIVMSG #elsewhere :@${ADDRESS}`);
+      t.fake.line("BATCH -h2");
+      expect(t.notices()).toEqual([]);
+    });
+  });
+
+  describe("a room the account is taken out of", () => {
+    it.each([
+      ["a KICK of it", `:ergo!u@h KICK ${NEWS} ${ADDRESS} :bye`],
+      ["its PART, from another session", `:${ADDRESS}!u@h PART ${NEWS}`],
+    ])("loses that room's notices at %s, and makes no more of its lines", (_, taken) => {
+      const t = member();
+      say(t.fake, [NEWS, "n1", `@${ADDRESS}`]);
+      say(t.fake, [GAMES, "g1", `@${ADDRESS}`]);
+      t.fake.line(taken);
+      expect(ids(t)).toEqual(["g1"]);
+      say(t.fake, [NEWS, "n2", `@${ADDRESS}`]);
+      expect(ids(t)).toEqual(["g1"]);
+    });
+  });
+
+  // F1693 (the simplify survivor): a live line of a room Ergo says the account joined (from another session, say) that
+  // the page does not follow.
+  describe("a room joined that the page does not follow", () => {
+    it("makes no notice of its live lines", () => {
+      const t = member();
+      const other = "#bubble/other";
+      t.fake.line(`:${ADDRESS}!u@h JOIN ${other}`);
+      say(t.fake, [other, "o1", `@${ADDRESS}`]);
+      say(t.fake, [GAMES, "g1", `@${ADDRESS}`]);
+      expect(ids(t)).toEqual(["g1"]);
+    });
+  });
+
+  // F1672 (S3): a page asked before a KICK and written after it made notices for a room the account is out of.
+  describe("a history page that comes after the account is taken out of its room", () => {
+    it("makes no notice of its lines", () => {
+      const t = member();
+      t.fake.line(`:ergo MARKREAD ${NEWS} timestamp=${T(2)}`);
+      t.fake.line(`:ergo!u@h KICK ${NEWS} ${ADDRESS} :bye`);
+      t.fake.line(`BATCH +h1 chathistory ${NEWS}`);
+      t.fake.line(`@batch=h1;msgid=h3;time=${T(3)};account=${OTHER} :${OTHER}!u@h PRIVMSG ${NEWS} :@${ADDRESS}`);
+      t.fake.line("BATCH -h1");
+      expect(t.notices()).toEqual([]);
+    });
+  });
+
+  // StrykerJS (F1681): the ids a REDACT took away are kept to a bound, the newest 100, so the memory of a long session
+  // does not grow.
+  describe("the lines REDACT took away", () => {
+    it("are remembered up to the newest 100, a page refusing those and no older one", () => {
+      const t = member();
+      t.fake.line(`:ergo MARKREAD ${GAMES} timestamp=${T(0)}`);
+      for (let at = 0; at <= 100; at += 1) t.fake.line(`:${OTHER}!u@h REDACT ${GAMES} r${String(at)}`);
+      t.fake.line(`BATCH +h1 chathistory ${GAMES}`);
+      for (const id of ["r0", "r1", "r100"])
+        t.fake.line(`@batch=h1;msgid=${id};time=${T(3)};account=${OTHER} :${OTHER}!u@h PRIVMSG ${GAMES} :@${ADDRESS}`);
+      t.fake.line("BATCH -h1");
+      expect(ids(t)).toEqual(["r0"]);
+    });
+  });
+
+  // F1673 (CR1): the page came before Ergo's MARKREAD reply, so it made no notice and none came for them afterwards.
+  describe("a history page that comes before the reading place", () => {
+    it("makes the notices of the lines past the place once it is known, and of no line before it", () => {
+      const t = member();
+      t.fake.line(`BATCH +h1 chathistory ${GAMES}`);
+      for (const [id, minute] of [
+        ["h1", 1],
+        ["h3", 3],
+        ["h4", 4],
+      ] as const)
+        t.fake.line(
+          `@batch=h1;msgid=${id};time=${T(minute)};account=${OTHER} :${OTHER}!u@h PRIVMSG ${GAMES} :@${ADDRESS}`,
+        );
+      t.fake.line("BATCH -h1");
+      expect(t.notices()).toEqual([]);
+      t.fake.line(`:ergo MARKREAD ${GAMES} timestamp=${T(2)}`);
+      expect(ids(t)).toEqual(["h3", "h4"]);
+      t.fake.line(`:ergo MARKREAD ${GAMES} timestamp=${T(2)}`);
+      expect(ids(t)).toEqual(["h3", "h4"]);
+    });
+  });
+
+  // F1676 (CR4): Clear marked the page only, so a reload or another device brought the cleared mentions back.
+  describe("a room marked read from outside it", () => {
+    it("tells Ergo the place for a room followed, though it is not in view, and for no conversation", () => {
+      const t = member();
+      t.fake.sent.length = 0;
+      t.link.markRead(NEWS, T(5));
+      t.link.markRead(OTHER, T(5));
+      expect(t.fake.sent).toEqual([`MARKREAD ${NEWS} timestamp=${T(5)}`]);
+    });
+
+    it("tells Ergo nothing for a guest", () => {
+      const guest = guestIn([GAMES]);
+      guest.fake.line(`:${GUEST}!u@h JOIN ${GAMES}`);
+      guest.fake.sent.length = 0;
+      guest.link.markRead(GAMES, T(5));
+      expect(guest.fake.sent).toEqual([]);
+    });
+  });
+
+  // F1681 (CR9): a REDACT that came while a page was open left no trace, so the page's end made the notice again.
+  describe("a history page open while a line of it is deleted", () => {
+    it("makes no notice of that line, and one of its neighbour", () => {
+      const t = member();
+      t.fake.line(`:ergo MARKREAD ${GAMES} timestamp=${T(2)}`);
+      t.fake.line(`BATCH +h1 chathistory ${GAMES}`);
+      for (const [id, minute] of [
+        ["h3", 3],
+        ["h4", 4],
+      ] as const)
+        t.fake.line(
+          `@batch=h1;msgid=${id};time=${T(minute)};account=${OTHER} :${OTHER}!u@h PRIVMSG ${GAMES} :@${ADDRESS}`,
+        );
+      t.fake.line(`:${OTHER}!u@h REDACT ${GAMES} h3`);
+      t.fake.line("BATCH -h1");
+      expect(ids(t)).toEqual(["h4"]);
+    });
+  });
+
+  describe("the history page, by the same rules as a live line", () => {
+    const page = (fake: Fake, lines: readonly (readonly [string, number, string, object?])[], room = GAMES) => {
+      fake.line(`BATCH +h1 chathistory ${room}`);
+      for (const [id, minute, text, over = {}] of lines) {
+        const { from = OTHER, command = "PRIVMSG" } = over as { from?: string; command?: string };
+        fake.line(`@batch=h1;msgid=${id};time=${T(minute)};account=${from} :${from}!u@h ${command} ${room} :${text}`);
+      }
+      fake.line("BATCH -h1");
+    };
+    const mention = `@${ADDRESS}`;
+
+    it.each([
+      ["the account's own line, from another device", { from: ADDRESS }],
+      ["a NOTICE", { command: "NOTICE", from: "gnoworld" }],
+    ])("makes none of %s", (_, over) => {
+      const t = member();
+      t.fake.line(`:ergo MARKREAD ${GAMES} timestamp=${T(2)}`);
+      page(t.fake, [["h3", 3, mention, over]]);
+      expect(t.notices()).toEqual([]);
+    });
+
+    it("makes none in a room set to none, nor of a line at the reading place, and one of a line past it", () => {
+      const t = member();
+      t.fake.line(`:ergo MARKREAD ${GAMES} timestamp=${T(2)}`);
+      t.store.getState().noticeActions.setMode(GAMES, "none");
+      page(t.fake, [["h3", 3, mention]]);
+      expect(t.notices()).toEqual([]);
+      t.store.getState().noticeActions.setMode(GAMES, "mentions");
+      page(t.fake, [
+        ["h2", 2, mention],
+        ["h4", 4, mention],
+      ]);
+      expect(ids(t)).toEqual(["h4"]);
+    });
+
+    it("makes a notice of a mention of the room in a room where it counts, and none for a guest", () => {
+      const t = member();
+      t.link.show(NEWS);
+      t.fake.line(`:ergo MARKREAD ${NEWS} timestamp=${T(2)}`);
+      page(t.fake, [["h3", 3, "@room"]], NEWS);
+      expect(t.store.getState().notices.map(({ kind }) => kind)).toEqual(["group"]);
+      const guest = guestIn([GAMES]);
+      guest.link.follow([GAMES], [GAMES]);
+      guest.fake.line(`:${GUEST}!u@h JOIN ${GAMES}`);
+      guest.fake.line(`:ergo MARKREAD ${GAMES} timestamp=${T(2)}`);
+      page(guest.fake, [["h3", 3, "@room"]]);
+      expect(guest.store.getState().notices).toEqual([]);
+    });
+  });
+
+  describe("direct messages", () => {
+    const dm = (fake: Fake, [id, from, to]: readonly [string, string, string], over: { command?: string } = {}) => {
+      const account = from === "gnoworld" ? "" : `;account=${from}`;
+      fake.line(`@msgid=${id};time=${T(5)}${account} :${from}!u@h ${over.command ?? "PRIVMSG"} ${to} :hi`);
+    };
+
+    // R7: the rule is "never a message the account discards", not "never a message".
+    it("makes a notice of a message from one the account wrote to, none of a stranger's, and one once it wrote to it", () => {
+      const t = member(() => prefs([OTHER], true));
+      dm(t.fake, ["d1", OTHER, ADDRESS]);
+      dm(t.fake, ["d2", BOB, ADDRESS]);
+      expect(ids(t)).toEqual(["d1"]);
+      dm(t.fake, ["d3", ADDRESS, BOB]);
+      dm(t.fake, ["d4", BOB, ADDRESS]);
+      expect(ids(t)).toEqual(["d1", "d4"]);
+    });
+
+    it("makes none of an account's NOTICE to the nick, nor of the bot's, which carries no account", () => {
+      const t = member();
+      dm(t.fake, ["d1", OTHER, ADDRESS], { command: "NOTICE" });
+      dm(t.fake, ["d2", "gnoworld", ADDRESS], { command: "NOTICE" });
+      expect(t.notices()).toEqual([]);
+    });
+
+    it("sees a conversation as Ergo's reading place of its partner passes it, a read on another device", () => {
+      const t = member();
+      dm(t.fake, ["d1", OTHER, ADDRESS]);
+      t.fake.line(`:ergo MARKREAD ${OTHER} timestamp=${T(4)}`);
+      expect(t.store.getState().noticeSeen[OTHER]).toBe(T(4));
+      expect(t.store.getState().noticeSeen).not.toHaveProperty(GAMES);
+      t.fake.line(`:ergo MARKREAD ${OTHER} timestamp=${T(5)}`);
+      expect(totalOf(t)).toBe(0);
+    });
+
+    it("keeps a mark for a partner that is no address, or the account itself, out of its marks", () => {
+      const t = member();
+      t.fake.line(`:ergo MARKREAD somebody timestamp=${T(4)}`);
+      t.fake.line(`:ergo MARKREAD ${ADDRESS} timestamp=${T(4)}`);
+      expect(t.store.getState().noticeSeen).toEqual({});
+    });
+  });
+
+  describe("a connection that drops and comes back", () => {
+    it("keeps what was unseen and seen, and makes no second notice of a page that comes again", () => {
+      const t = member();
+      say(t.fake, ["#bubble", "u1", `@${ADDRESS}`]);
+      say(t.fake, [GAMES, "m1", `@${ADDRESS}`], { minute: 3 });
+      t.link.read(GAMES, "m1");
+      t.fake.state("waiting");
+      t.fake.me = ADDRESS;
+      t.fake.state("connected");
+      t.fake.line(`:${ADDRESS}!u@h JOIN ${GAMES}`);
+      // Ergo's place is the older one, its throttled MARKREAD not yet echoed (F940), and the page repeats the line.
+      t.fake.line(`:ergo MARKREAD ${GAMES} timestamp=${T(2)}`);
+      t.fake.line(`BATCH +h1 chathistory ${GAMES}`);
+      t.fake.line(`@batch=h1;msgid=m1;time=${T(3)};account=${OTHER} :${OTHER}!u@h PRIVMSG ${GAMES} :@${ADDRESS}`);
+      t.fake.line("BATCH -h1");
+      expect(ids(t)).toEqual(["u1", "m1"]);
+      expect(t.store.getState().noticeSeen[GAMES]).toBe(T(3));
+      expect(unseen(t)).toEqual(["u1"]);
+    });
+  });
+
+  describe("replies and edits", () => {
+    const own = (t: ReturnType<typeof member>) => {
+      say(t.fake, [GAMES, "q1", "my question"], { minute: 1, from: ADDRESS });
+    };
+
+    it("makes a reply notice of a line that answers one of the account's lines the room holds", () => {
+      const t = member();
+      own(t);
+      say(t.fake, [GAMES, "r1", "an answer"], { tags: ";+reply=q1" });
+      expect(t.store.getState().notices).toEqual([{ id: "r1", kind: "reply", where: GAMES, time: T(5), by: OTHER }]);
+    });
+
+    it("makes none of a reply to a line the room does not hold (past the window), or to another's line", () => {
+      const t = member();
+      own(t);
+      say(t.fake, [GAMES, "o1", "their question"], { minute: 2, from: BOB });
+      say(t.fake, [GAMES, "r1", "an answer"], { tags: ";+reply=gone" });
+      say(t.fake, [GAMES, "r2", "an answer"], { tags: ";+reply=o1" });
+      expect(t.notices()).toEqual([]);
+    });
+
+    it("makes a reply notice from a history page, past the reading place", () => {
+      const t = member();
+      t.fake.line(`:ergo MARKREAD ${GAMES} timestamp=${T(0)}`);
+      t.fake.line(`BATCH +h1 chathistory ${GAMES}`);
+      t.fake.line(`@batch=h1;msgid=q1;time=${T(1)};account=${ADDRESS} :${ADDRESS}!u@h PRIVMSG ${GAMES} :mine`);
+      t.fake.line(`@batch=h1;msgid=r1;time=${T(2)};account=${OTHER};+reply=q1 :${OTHER}!u@h PRIVMSG ${GAMES} :yes`);
+      t.fake.line("BATCH -h1");
+      expect(t.store.getState().notices.map(({ id, kind }) => [id, kind])).toEqual([["r1", "reply"]]);
+    });
+
+    it("leaves one notice for a line and its edit, whoever the edit names", () => {
+      const t = member();
+      say(t.fake, [GAMES, "m1", `@${ADDRESS}`]);
+      say(t.fake, [GAMES, "e1", `@${ADDRESS} corrected`], { minute: 6, tags: ";+gnoworld/edit=m1" });
+      say(t.fake, [GAMES, "m2", "plain"], { minute: 7 });
+      say(t.fake, [GAMES, "e2", `@${ADDRESS} now`], { minute: 8, tags: ";+gnoworld/edit=m2" });
+      expect(ids(t)).toEqual(["m1"]);
+    });
+  });
+});
+
+// What the store holds unseen, by line id, and its total: read from the store the link wrote to.
+const unseen = (t: { store: ReturnType<typeof createAppStore> }) =>
+  unseenNotices(t.store.getState()).map(({ id }) => id);
+const totalOf = (t: { store: ReturnType<typeof createAppStore> }) => totalUnseen(t.store.getState());
