@@ -1,7 +1,8 @@
 import { parseLine, type IrcMessage, type Notice, type NoticeMode } from "@gnoworld/core";
-import { Address } from "@gnoworld/schemas";
+import { Address, toAddress } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
 import type { NoticePrefs } from "../lib/notices/prefs.ts";
+import { DMS_KEPT } from "./dms.ts";
 import { createAppStore, type AppState } from "./index.ts";
 import { badgeOf, modeOf, NOTICES_KEPT, placeCounts, totalUnseen, unseenNotices } from "./notices.ts";
 
@@ -265,6 +266,22 @@ describe("the store's notices slice", () => {
       expect(totalUnseen(t.state())).toBe(0);
       t.store.getState().dmActions.setOnlyKnown(false);
       expect(totalUnseen(t.state())).toBe(2);
+    });
+
+    // R2 (redpass2-4fn): the conversations are bounded, the notices of those that went were not.
+    it("keeps the notices of the conversations the store keeps alone, as many as it keeps of them", () => {
+      const t = setup();
+      const partners = Array.from({ length: DMS_KEPT + 50 }, (_, n) => toAddress(new Uint8Array(20).fill(n + 1)));
+      for (const [n, partner] of partners.entries()) {
+        t.kept(partner);
+        t.notices.add(notice({ id: `d${String(n)}`, kind: "dm", where: partner, time: T(2) }));
+      }
+      expect(Object.keys(t.state().dms)).toHaveLength(DMS_KEPT);
+      expect(t.state().notices).toHaveLength(DMS_KEPT);
+      expect(ids(t.state().notices)).toEqual(partners.slice(50).map((_, n) => `d${String(n + 50)}`));
+      // A room's notices are not a conversation's: they stay.
+      t.notices.add(notice({ id: "r" }));
+      expect(t.state().notices).toHaveLength(DMS_KEPT + 1);
     });
   });
 

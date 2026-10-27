@@ -128,11 +128,11 @@ function newest(state: State, where: string): string | undefined {
 const kept = (modes: Readonly<Record<string, NoticeMode>>) =>
   Object.fromEntries(Object.entries(modes).filter(([, mode]) => mode !== DEFAULT_MODE));
 
-// The notices held with `fresh` added, each once, a place's uncounted or else oldest going past its cap; none when
-// nothing is new.
+// The notices held with `fresh` added, each once, a place's uncounted or else oldest going past its cap, and those of a
+// conversation the store no longer keeps (it keeps DMS_KEPT, the oldest heard going first) gone; none when nothing changed.
 function withNotices(state: State, fresh: readonly Notice[]): Notice[] | undefined {
-  const list = [...state.notices];
-  let changed = false;
+  const list = state.notices.filter(({ kind, where }) => kind !== "dm" || Object.hasOwn(state.dms, where));
+  let changed = list.length !== state.notices.length;
   for (const notice of fresh) {
     if (list.some(({ id }) => id === notice.id)) continue;
     changed = true;
