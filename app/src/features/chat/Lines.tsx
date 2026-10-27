@@ -152,18 +152,31 @@ const toldOf = (refused: string | undefined, cannotReact: true | undefined): Fla
   return cannotReact === undefined ? undefined : { title: "Could not react." };
 };
 
+// What the list takes of the room: its lines as shown, what each shows of the reactions, and the line a msgid names.
+type ListProps = Omit<LinesProps, "lines"> & {
+  lines: readonly ShownLine[];
+  shown: ReadonlyMap<string, readonly Shown[]>;
+  lineOf: (id: string) => string;
+};
+
 /** The room's flash, then its lines, oldest first, as a list a screen reader hears grow. */
 export function Lines(props: LinesProps) {
-  const { room, members, me, refused, reactions, cannotReact } = props;
-  const { onDelete = NO_DELETE, onDismiss = NO_DISMISS, onReact = NO_REACT, onReply = NO_REPLY } = props;
-  // The room's lines as shown: each corrected by its author's newest edit, the edits gone (4d, F664).
+  // The room's lines as shown: each corrected by its author's newest edit, the edits gone (4d, F664). Folded here, in a
+  // component with no hook, as the compiler leaves a fold among hooks unmemoized: a pointer over a line folded the room
+  // again (F1221).
   const { shown: lines, folded } = foldEdits(props.lines);
+  // What a plain client answers or reacts to by a folded edit's own msgid reaches the line it corrects (CR5).
+  const lineOf = (id: string) => folded.get(id) ?? id;
+  const shown = reactionsOn(props.reactions ?? [], props.me, lineOf);
+  return <List {...props} lines={lines} shown={shown} lineOf={lineOf} />;
+}
+
+function List(props: ListProps) {
+  const { room, members, me, refused, reactions, cannotReact, lines, shown, lineOf } = props;
+  const { onDelete = NO_DELETE, onDismiss = NO_DISMISS, onReact = NO_REACT, onReply = NO_REPLY } = props;
   const { listRef, onScroll } = useNewestInView(lines, reactions);
   const { stop, mounted, on, leave } = useLineFocus(lines, listRef);
   const { said, setSaid, copy } = useCopy(room);
-  // What a plain client answers or reacts to by a folded edit's own msgid reaches the line it corrects (CR5).
-  const lineOf = (id: string) => folded.get(id) ?? id;
-  const shown = reactionsOn(reactions ?? [], me, lineOf);
   // A reply's line by its msgid, this room's alone: a reply naming its own msgid or another room's answers none here.
   const byId = new Map(lines.map((line) => [line.id, line]));
   // Who a mention may shorten (F812): the members, and the authors in view by their account tag, who proved their

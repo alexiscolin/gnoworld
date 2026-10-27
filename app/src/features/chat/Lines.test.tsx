@@ -129,4 +129,27 @@ describe("the lines view, compiled", () => {
     draw({ members: [ALICE, BOB, "guest-ab12cd"] });
     expect(vi.mocked(excerpt)).not.toHaveBeenCalled();
   });
+
+  // Each render ran the edit fold and the reactions' fold again, and with an edit folded the fold's new array moved the
+  // list to its end, forcing a layout, whatever the pointer had moved (F1221).
+  it("folds nothing again, and lays nothing out, when the pointer moves over lines", () => {
+    draw();
+    const layout = vi.spyOn(Element.prototype, "scrollHeight", "get");
+    vi.clearAllMocks();
+    point(5);
+    point(9);
+    expect([
+      vi.mocked(foldEdits).mock.calls.length,
+      vi.mocked(reactionsOn).mock.calls.length,
+      layout.mock.calls.length,
+    ]).toEqual([0, 0, 0]);
+  });
+
+  it("draws no line again when the pointer moves over lines", () => {
+    draw();
+    vi.clearAllMocks();
+    point(5);
+    point(9);
+    expect([vi.mocked(excerpt).mock.calls.length, vi.mocked(Reactions).mock.calls.length]).toEqual([0, 0]);
+  });
 });
