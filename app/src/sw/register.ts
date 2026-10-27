@@ -67,28 +67,16 @@ export async function startServiceWorker(start: Start): Promise<void> {
     return null;
   });
   if (registration === null || signal.aborted) return;
-  // The browser looks for a new worker when a page loads; one kept open for days moves in place,
-  // so it asks each time it is shown again.
-  start.document.addEventListener(
-    "visibilitychange",
-    () => {
-      if (start.document.visibilityState !== "visible") return;
-      registration.update().catch(async (error: unknown) => {
-        if (await start.reachable()) start.report(error);
-      });
-    },
-    { signal },
-  );
-  // One page reloads once, however many clicks and takeovers it sees. It remembers the worker it
-  // asked, not that it asked: a newer one waiting since is asked at the next click (F380).
-  let asked: PageWorker | null = null;
+  // One page reloads once, however many clicks and takeovers it sees.
+  let clicked = false;
   let reloaded = false;
   const reloadOnce = () => {
     if (reloaded) return;
     reloaded = true;
     start.reload();
   };
-  // The click goes to the worker waiting then: a newer one may have set aside the one offered.
+  // The click goes to the worker waiting then (a newer one may have set aside the one offered, F380), and every
+  // click sends the message: one may be lost, and the page cannot tell (F679).
   const apply = () => {
     const waiting = registration.waiting;
     // Another tab's click may have made it active already: there is nothing left to wait for.
@@ -96,10 +84,9 @@ export async function startServiceWorker(start: Start): Promise<void> {
       reloadOnce();
       return;
     }
-    if (waiting === asked) return;
     // Added at each click, the browser keeps it once; a first install's takeover, unasked, reloads nothing.
     container.addEventListener("controllerchange", reloadOnce, { signal });
-    asked = waiting;
+    clicked = true;
     waiting.postMessage(TAKE_OVER);
   };
   // The first worker replaces no version, so it needs no prompt.
@@ -115,6 +102,20 @@ export async function startServiceWorker(start: Start): Promise<void> {
       { signal },
     );
   };
+  // The browser looks for a new worker when a page loads; one kept open for days moves in place,
+  // so it asks each time it is shown again. The notice closes on its click: a page whose click took
+  // nothing over (the message lost) is offered the update again, for its next click to send it again.
+  start.document.addEventListener(
+    "visibilitychange",
+    () => {
+      if (start.document.visibilityState !== "visible") return;
+      if (clicked && registration.waiting !== null) offer();
+      registration.update().catch(async (error: unknown) => {
+        if (await start.reachable()) start.report(error);
+      });
+    },
+    { signal },
+  );
   if (registration.waiting !== null) offer();
   if (registration.installing !== null) watch(registration.installing);
   registration.addEventListener(

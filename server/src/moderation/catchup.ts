@@ -28,6 +28,9 @@ export interface Progress {
   heard: (line: Line) => void;
   // A line checked, seen before or dropped: the mark moves past each line settled in a row.
   settled: (line: Line) => void;
+  // The mark held at `time`, the time a catch-up's next page starts from, or let go (undefined): while held
+  // it moves no further, and a live line settled meanwhile takes it past nothing never fetched (F707).
+  hold: (room: string, time: string | undefined) => void;
   // The rooms and the lines it holds, for the tests of its bound.
   size: () => { rooms: number; lines: number };
 }
@@ -44,6 +47,21 @@ export function makeProgress(db: DatabaseSync): Progress {
   // ponytail: the order heard, not Ergo's: a live line heard before a page of older history moves the mark
   // past that page's lines while they wait, lost if the process dies then. Order by Ergo's time if it matters.
   const open = new Map<string, Map<string, Entry>>();
+  // The time each room is held at, and the mark a hold kept back, written once it lets go or moves on.
+  const holds = new Map<string, string>();
+  const kept = new Map<string, string>();
+  const write = (room: string, mark: string): void => {
+    const hold = holds.get(room);
+    if (hold === undefined) {
+      kept.delete(room);
+      sql.mark.run(room, mark);
+      return;
+    }
+    kept.set(room, mark);
+    const target = mark < hold ? mark : hold;
+    const stored = Row.parse(sql.last.get(room))?.time;
+    if (stored === undefined || target > stored) sql.mark.run(room, target);
+  };
   return {
     last: (room) =>
       Row.parse(sql.last.get(room))?.time ??
@@ -64,7 +82,13 @@ export function makeProgress(db: DatabaseSync): Progress {
         lines.delete(id);
       }
       if (lines.size === 0) open.delete(room);
-      if (mark !== undefined) sql.mark.run(room, mark);
+      if (mark !== undefined) write(room, mark);
+    },
+    hold: (room, time) => {
+      if (time === undefined) holds.delete(room);
+      else holds.set(room, time);
+      const mark = kept.get(room);
+      if (mark !== undefined) write(room, mark);
     },
     size: () => ({ rooms: open.size, lines: [...open.values()].reduce((sum, lines) => sum + lines.size, 0) }),
   };

@@ -96,3 +96,65 @@ describe("each room's mark, its bound (3j's green pass)", () => {
     expect(progress.size()).toEqual({ rooms: 0, lines: 0 });
   });
 });
+
+describe("each room's mark, held during a catch-up (the max review)", () => {
+  it("never passes the time a catch-up's next page starts from, and moves on once let go", () => {
+    const { progress } = setup();
+    progress.hold("#bubble", T(2));
+    progress.heard(line("live", 8));
+    progress.settled(line("live", 8));
+    expect(progress.last("#bubble")).toBe(T(2));
+    progress.hold("#bubble", T(5));
+    expect(progress.last("#bubble")).toBe(T(5));
+    progress.hold("#bubble", undefined);
+    expect(progress.last("#bubble")).toBe(T(8));
+  });
+
+  it("writes the earlier of its mark and the hold, as the lines before the hold settle", () => {
+    const { progress } = setup();
+    progress.hold("#bubble", T(5));
+    progress.heard(line("old", 3));
+    progress.heard(line("live", 8));
+    progress.settled(line("old", 3));
+    expect(progress.last("#bubble")).toBe(T(3));
+    progress.settled(line("live", 8));
+    expect(progress.last("#bubble")).toBe(T(5));
+    progress.hold("#bubble", T(9));
+    expect(progress.last("#bubble")).toBe(T(8));
+    progress.hold("#bubble", undefined);
+    expect(progress.last("#bubble")).toBe(T(8));
+    expect(progress.size()).toEqual({ rooms: 0, lines: 0 });
+  });
+
+  it("keeps an earlier mark under a hold, and holds no room it was not asked to", () => {
+    const { progress } = setup();
+    progress.heard(line("old", 1));
+    progress.settled(line("old", 1));
+    progress.hold("#bubble", T(4));
+    expect(progress.last("#bubble")).toBe(T(1));
+    progress.heard(line("e1", 9, "#earth"));
+    progress.settled(line("e1", 9, "#earth"));
+    expect(progress.last("#earth")).toBe(T(9));
+  });
+
+  it("never moves a mark back to a hold below it: a catch-up holds a millisecond before its mark", () => {
+    const { progress } = setup();
+    progress.heard(line("old", 5));
+    progress.settled(line("old", 5));
+    progress.hold("#bubble", T(2));
+    progress.heard(line("live", 8));
+    progress.settled(line("live", 8));
+    expect(progress.last("#bubble")).toBe(T(5));
+    progress.hold("#bubble", undefined);
+    expect(progress.last("#bubble")).toBe(T(8));
+  });
+
+  it("writes nothing for a hold, nor for its end, in a room where nothing settled", () => {
+    const { db, progress } = setup();
+    progress.hold("#bubble", T(2));
+    progress.hold("#bubble", undefined);
+    progress.hold("#earth", undefined);
+    expect(db.prepare("SELECT count(*) AS n FROM progress").get()).toEqual({ n: 0 });
+    expect(progress.last("#bubble")).toBeUndefined();
+  });
+});

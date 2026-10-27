@@ -38,7 +38,8 @@ for tool in docker openssl htpasswd; do command -v "$tool" >/dev/null || missing
 	missing "the demo's containers are on this host: run the load on another (ADR-0002: never on the demo's host)"
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/gnoworld-load.XXXXXX")
-files="-f $deploy/compose.yaml -f $tmp/load.yaml"
+# --profile demo: a plain down leaves a profile's services (the guard, the way out) up after the run.
+files="-f $deploy/compose.yaml -f $tmp/load.yaml --profile demo"
 cleanup() {
 	kill "${sampler:-}" 2>/dev/null || true
 	docker compose -p "$project" $files down -v >/dev/null 2>&1 || echo "run.sh: docker compose -p $project down -v" >&2
