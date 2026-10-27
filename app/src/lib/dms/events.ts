@@ -18,11 +18,11 @@ import { Address } from "@gnoworld/schemas";
 /** The account the other side of `message` is, or none: a room's, a guest's, one between two others or to oneself. */
 export function withOf(message: IrcMessage, me: string): string | undefined {
   const { command, params, source = "" } = message;
+  if (command !== "TAGMSG" && command !== "REDACT") return undefined;
   const [target = ""] = params;
   const from = nickOf(source);
   const mine = from === me;
   const partner = mine ? target : from;
-  if (command !== "TAGMSG" && command !== "REDACT") return undefined;
   if (mine === (target === me) || !Address.safeParse(me).success) return undefined;
   return Address.safeParse(partner).success ? partner : undefined;
 }
