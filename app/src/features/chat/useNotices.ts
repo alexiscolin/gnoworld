@@ -10,15 +10,15 @@ import type { AppState } from "../../store/index.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
 import type { Dms } from "./Dms.tsx";
 import { roomIds } from "./names.ts";
+import type { NoticeModesProps } from "./NoticeModes.tsx";
 import { noticeSaid, type RoomsViewProps } from "./RoomsView.tsx";
-import type { RoomViewProps } from "./RoomView.tsx";
 import { useTabTitle } from "./tabTitle.ts";
 
 /** What the page hands its views: each row's count, the list, and the mode of the room in view; none for a guest. */
 export interface Noticing {
   badges?: RoomsViewProps["badges"];
   list?: RoomsViewProps["notices"];
-  notify?: RoomViewProps["notify"];
+  notify?: Omit<NoticeModesProps, "room"> | undefined;
   /** A conversation seen up to a time. */
   seen: (partner: string, time: string) => void;
 }

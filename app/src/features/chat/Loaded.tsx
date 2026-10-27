@@ -10,6 +10,7 @@ import type { AppState } from "../../store/index.ts";
 import type { Dms } from "./Dms.tsx";
 import type { ChatLink } from "./link.ts";
 import { dmParams, groupsAt, roomIds } from "./names.ts";
+import { NoticeModes } from "./NoticeModes.tsx";
 import { roomActs, type RoomActs } from "./roomActs.ts";
 import { useRoomKeeping } from "./RoomKeeping.ts";
 import { Saved } from "./Saved.tsx";
@@ -34,6 +35,10 @@ function useOpened(partner: string | undefined) {
     },
   };
 }
+
+// A room's notification modes, an account's; a direct message has none of its own (4f-n).
+const modesOf = (room: string | undefined, notify: Noticing["notify"]) =>
+  room === undefined || notify === undefined ? undefined : <NoticeModes room={room} {...notify} />;
 
 const addressOf = (session: AppState["login"]["session"]) => (session.kind === "in" ? session.address : undefined);
 
@@ -180,7 +185,7 @@ export function Loaded({
           me={me}
           noteId={noteId}
           {...replies.view}
-          notify={noticing.notify}
+          modes={modesOf(room, noticing.notify)}
           composer={
             <Writer
               session={session}

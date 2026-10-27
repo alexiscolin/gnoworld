@@ -2,6 +2,7 @@ import type { Line } from "@gnoworld/core";
 import { renderToStaticMarkup } from "react-dom/server";
 import { prerender } from "react-dom/static";
 import { beforeAll, describe, expect, it } from "vitest";
+import { NoticeModes } from "./NoticeModes.tsx";
 import { MEMBERS_SHOWN, People, RoomView, type PeopleProps, type RoomViewProps } from "./RoomView.tsx";
 
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -851,27 +852,23 @@ describe("RoomView: edits", () => {
   });
 });
 
-// 4f-n: a room's notification mode is chosen in the room, by an account; a conversation has none of its own.
-describe("RoomView: the room's notification mode", () => {
-  const notify = { mode: "mentions" as const, onMode: () => undefined };
+// 4f-n: a room's notification modes are an account's, drawn by its code (NoticeModes) and given to the room's view,
+// which keeps their place under the room's name.
+describe("RoomView: the room's notification modes", () => {
+  const modes = <NoticeModes room="#bubble/games" mode="mentions" onMode={() => undefined} />;
   const group = (html: string) => /role="group"[^>]*aria-label="Notifications for #games"/.test(html);
 
-  it("offers the mode of a room to an account, under its name", () => {
-    expect(group(view({ me: ALICE, notify }))).toBe(true);
+  it("draws the modes it is given under the room's name, before its status", () => {
+    const html = view({ me: ALICE, modes });
+    expect(group(html)).toBe(true);
+    expect(html.indexOf("<h2")).toBeLessThan(html.indexOf('role="group"'));
+    expect(html.indexOf('role="group"')).toBeLessThan(html.indexOf('role="status"'));
   });
 
-  it("offers none to a guest, whom no one can mention", () => {
+  it("draws none when given none, a guest's whom no one can mention, or a direct message's", () => {
     expect(group(view({ me: undefined }))).toBe(false);
-  });
-
-  it("offers none in a direct message, whose notices no room's mode touches", () => {
-    expect(view({ me: ALICE, room: undefined, title: "Direct message with someone", notify })).not.toContain(
+    expect(view({ me: ALICE, room: undefined, title: "Direct message with someone" })).not.toContain(
       "Notifications for",
     );
-  });
-
-  it("says the device did not keep the choice, from what it was given", () => {
-    expect(said(view({ me: ALICE, notify: { ...notify, notKept: true } }))).toContain("Not kept on this device");
-    expect(said(view({ me: ALICE, notify }))).not.toContain("Not kept on this device");
   });
 });

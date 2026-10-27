@@ -10,6 +10,7 @@ const ACCOUNT_ONLY = [
   "Direct message with",
   "Only people I wrote to",
   "mentioned the room",
+  "Notifications for",
   // What an account keeps on its device: the room keeping's acts on a line.
   ".markUnread(",
 ];
