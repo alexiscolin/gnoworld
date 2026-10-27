@@ -233,6 +233,14 @@ describe("Composer: a reply", () => {
     expect(words(bar ?? "")).toBe("Replying to g10gh7…3y5tv: the first line");
   });
 
+  // F1176 (the UX review's U4): the bar shows a mention as the line does, a member's and the reader's shortened.
+  it("shortens a mention of a member or of the reader in the words, no other", () => {
+    const CAROL = "g1jt8gqa4fddp0w803ysa6la4epsdn0hd8wwqcdj";
+    const quoted = (text: string) => words(draw({ ...to(text), members: [ALICE] }));
+    expect(quoted(`@${ALICE} @${NICK}`)).toContain(": @g10gh7…3y5tv @g1jg8m…vsqf5");
+    expect(quoted(`@${CAROL}`)).toContain(`: @${CAROL}`);
+  });
+
   it("names a guest's line by its nick, said a guest's", () => {
     const markup = draw({ replying: { who: "guest-ab12cd", guest: true, text: "hi" }, onCancelReply: () => undefined });
     expect(words(markup)).toContain("Replying to guest-ab12cd (guest): hi");

@@ -10,7 +10,8 @@ import { completed, completions, type Completion } from "./complete.ts";
 import { formatted, type Edit, type Format } from "./format.ts";
 import { Message } from "./Message.tsx";
 import { peopleOf, roomLabel, shortAddress } from "./names.ts";
-import { Replying, type Answered } from "./Replying.tsx";
+import { ReplyBar } from "./ReplyBar.tsx";
+import type { Answered } from "./Replying.tsx";
 import styles from "./Composer.module.css";
 
 /** The bytes left from which the composer counts them. */
@@ -107,39 +108,6 @@ export interface ComposerProps {
   onCancelReply?: (() => void) | undefined;
 }
 
-// The graphemes the reply bar shows of the line answered (docs/decisions.md, 2026-10-26).
-const SHOWN = 60;
-
-// Over the field, the line the next one answers, and a way to answer none, which hands the focus to the field as the
-// bar and its button go, never to the page (the code review's CR4).
-interface ReplyBarProps {
-  /** The bar's words' id, which describes the field (the code review's CR7). */
-  id: string;
-  to: Answered;
-  onCancel: (() => void) | undefined;
-  field: () => HTMLInputElement | undefined;
-}
-
-function ReplyBar({ id, to, onCancel, field }: ReplyBarProps) {
-  return (
-    <Cluster space="2xs">
-      <p id={id} className={styles["replying"]}>
-        <Replying to={to} length={SHOWN} />
-      </p>
-      <IconButton
-        icon="close"
-        label="Cancel the reply"
-        size="s"
-        emphasis="plain"
-        onClick={() => {
-          onCancel?.();
-          field()?.focus();
-        }}
-      />
-    </Cluster>
-  );
-}
-
 // A line chosen to answer, each time Reply is asked, the same line's again included: the field takes the focus; an
 // edit of that line's words changes what the bar quotes, never where the focus is (the code review's CR2).
 function useFocusOnReply(replying: ComposerProps["replying"], formRef: RefObject<HTMLFormElement | null>) {
@@ -200,10 +168,8 @@ export function Composer(props: ComposerProps) {
   };
   // Escape in the box answers none, as the reply bar's cancel does; the draft stays (U3).
   const keys = (event: KeyboardEvent<HTMLFormElement>) => {
-    if (event.key === "Escape" && replying !== undefined && event.target === box()) {
-      event.preventDefault();
-      onCancelReply?.();
-    } else complete(event);
+    if (event.key === "Escape" && replying !== undefined && event.target === box()) onCancelReply?.();
+    else complete(event);
   };
   const send = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -215,7 +181,9 @@ export function Composer(props: ComposerProps) {
   return (
     <form ref={formRef} aria-label={`Write in ${label}`} onSubmit={send} onKeyDown={keys}>
       <Stack space="2xs">
-        {replying === undefined ? null : <ReplyBar id={replyId} to={replying} onCancel={onCancelReply} field={box} />}
+        {replying === undefined ? null : (
+          <ReplyBar id={replyId} to={replying} me={nick} members={known} onCancel={onCancelReply} />
+        )}
         <FormatBar onFormat={format} />
         <Sidebar side="end" space="2xs">
           <Field

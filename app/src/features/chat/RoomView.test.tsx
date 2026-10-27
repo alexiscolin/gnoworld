@@ -498,6 +498,17 @@ describe("RoomView: replies", () => {
     expect(linesOf(html)[1]).toMatch(/^Replying to g10gh7…3y5tv: the first line\d{2}:\d{2} g1jg8m…vsqf5 yes$/);
   });
 
+  // F1176 (the UX review's U4): a quote shows a mention as the line does: an author's, the reader's and a member's
+  // shortened, anyone else's whole (F812).
+  it("shortens a mention in a quote as the line does, never another's", () => {
+    const CAROL = "g1jt8gqa4fddp0w803ysa6la4epsdn0hd8wwqcdj";
+    const lines = replying({ text: `@${BOB} @${ALICE} @${CAROL}` });
+    const quoted = (over: Partial<RoomViewProps>) => linesOf(view({ state: { ...ROOM, lines }, ...over }))[1];
+    expect(quoted({})).toContain(`: @g1jg8m…vsqf5 @g10gh7…3y5tv @${CAROL}`);
+    expect(quoted({ me: CAROL })).toContain(": @g1jg8m…vsqf5 @g10gh7…3y5tv @g1jt8g…wqcdj");
+    expect(quoted({ state: { ...ROOM, lines, members: [CAROL] } })).toContain("@g1jt8g…wqcdj");
+  });
+
   // The security review (S2, F808's class): a line's marks stand at its start, before its quote, so a quoted
   // "Mentions you" is heard after "Replying to", never where the mark stands.
   it("puts a reply's marks before its quote, so quoted words never read as a mark", () => {

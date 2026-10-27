@@ -1,6 +1,7 @@
 // What a line answers (slice 4's 4d replies): its author and its words in one line, as the room reads them, cut between
 // graphemes, markup kept as text; or an earlier message, when the room no longer holds it.
 import { excerpt, type Line } from "@gnoworld/core";
+import { shortened } from "./names.ts";
 import { Person } from "./Person.tsx";
 import styles from "./RoomView.module.css";
 
@@ -17,11 +18,14 @@ export const answeredOf = (line: Line): Answered => ({
   text: line.text,
 });
 
-export function Replying({ to, length }: { to: Answered | undefined; length: number }) {
+/** Whether a mention in the words is shortened, as the line shows it: the reader's and the room's members'. */
+type Known = (address: string) => boolean;
+
+export function Replying({ to, length, known }: { to: Answered | undefined; length: number; known: Known }) {
   if (to === undefined) return <>Replying to an earlier message</>;
   return (
     <>
-      Replying to <Person name={to.who} guest={to.guest} />: {excerpt(to.text, length)}
+      Replying to <Person name={to.who} guest={to.guest} />: {excerpt(shortened(to.text, known), length)}
     </>
   );
 }
@@ -30,11 +34,11 @@ export function Replying({ to, length }: { to: Answered | undefined; length: num
 const QUOTED = 70;
 
 // Above a reply, the line it answers, or an earlier message when the room holds it no more; nothing above another line.
-export function Quote({ line, answers }: { line: Line; answers: Line | undefined }) {
+export function Quote({ line, answers, known }: { line: Line; answers: Line | undefined; known: Known }) {
   if (line.reply === undefined) return null;
   return (
     <p className={styles["replying"]}>
-      <Replying to={answers === undefined ? undefined : answeredOf(answers)} length={QUOTED} />
+      <Replying to={answers === undefined ? undefined : answeredOf(answers)} length={QUOTED} known={known} />
     </p>
   );
 }
