@@ -445,6 +445,40 @@ describe("the store's notices slice", () => {
       expect(modeOf(t.state(), MAIN)).toBe("all");
     });
 
+    // G1 (F1500): an account that held no mode, with a notice or a mark alone, leaves nothing for the next one.
+    it.each([
+      [
+        "a notice and no mark",
+        (t: ReturnType<typeof setup>) => {
+          t.notices.add(notice());
+        },
+      ],
+      [
+        "a mark and no notice",
+        (t: ReturnType<typeof setup>) => {
+          t.notices.seen(GAMES, T(1));
+        },
+      ],
+      [
+        "a notice and a mark",
+        (t: ReturnType<typeof setup>) => {
+          t.notices.add(notice());
+          t.notices.seen(GAMES, T(1));
+        },
+      ],
+    ])("starts empty for the next account, whatever the last held, no mode among it: %s", (_, held) => {
+      const t = setup();
+      held(t);
+      t.notices.begin(device({}).prefs);
+      expect(t.state().notices).toEqual([]);
+      expect(t.state().noticeSeen).toEqual({});
+      t.notices.add(notice({ id: "n2" }));
+      t.notices.seen(MAIN, T(2));
+      t.notices.begin(undefined);
+      expect(t.state().notices).toEqual([]);
+      expect(t.state().noticeSeen).toEqual({});
+    });
+
     it("starts a guest, or an account with no device, with the default for every room", () => {
       const t = setup();
       t.notices.setMode(GAMES, "all");
