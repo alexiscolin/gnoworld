@@ -24,10 +24,26 @@ def fingerprint(commit):
     return subprocess.run(["git", "hash-object", "--stdin"], input="\n".join(kept), capture_output=True, text=True, check=True).stdout.strip()
 
 
+def recorded():
+    """The fingerprints of the passes file (none when it does not exist). A file that exists and cannot be read, or
+    holds a line that is not `<date> <fingerprint> ...`, raises OSError or ValueError: never an answer that judges less."""
+    if not os.path.exists(PASSES):
+        return set()
+    out = set()
+    with open(PASSES, encoding="utf-8") as f:  # bytes that are no UTF-8 raise UnicodeDecodeError, a ValueError
+        for n, line in enumerate(f, 1):
+            if line.strip() and not line.startswith("#"):
+                fields = line.split()
+                if len(fields) < 2:
+                    raise ValueError(f"{PASSES} line {n} is not '<date> <fingerprint> ...'")
+                out.add(fields[1])
+    return out
+
+
 def last_reviewed(base):
     """The newest commit of base..HEAD that /pre-merge recorded a pass for, or base when none is in the range or no
-    passes file exists. A passes file that exists and cannot be read raises OSError: never an answer that judges less."""
-    reviewed = {line.split()[1] for line in open(PASSES) if line.strip() and not line.startswith("#")} if os.path.exists(PASSES) else set()
+    passes file exists (a passes file that cannot be read or parsed raises, see recorded)."""
+    reviewed = recorded()
     return next((commit for commit in git("rev-list", f"{base}..HEAD").split() if fingerprint(commit) in reviewed), base)
 
 

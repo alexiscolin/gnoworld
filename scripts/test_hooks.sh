@@ -582,11 +582,11 @@ printf '%s\n' 'part() { case ",$ONLY," in *",$1,"*) return 0 ;; *) return 1 ;; e
 	'		: >"$SHARD_ROOT/met.${PWD##*/}" && n=0' \
 	'		until [ "$(ls "$SHARD_ROOT" | grep -c "^met\.")" -ge "$SHARDS_MEET" ]; do n=$((n + 1)); [ "$n" -lt 100 ] || { : >"$SHARD_ROOT/lonely"; break; }; sleep 0.1; done' \
 	'	fi' \
-	'	grep -q KEEP1 g.txt && grep -q KEEP2 g.txt && grep -q KEEP3 g.txt && grep -q KEEP4 h.txt && grep -q KEEP5 i.txt' \
+	'	grep -q KEEP1 g.txt && grep -q KEEP2 g.txt && grep -q KEEP3 g.txt && grep -q KEEP4 h.txt && grep -q KEEP5 i.txt && grep -q KEEP8 "$(printf "\303\251").txt"' \
 	'fi' >"$hs/src/scripts/test_hooks.sh"
 # probe.py's block y reads k.txt (a mutant of k.txt is a probe block's, G5); ONLY names the blocks to run, none for all.
 printf 'import os, sys\n\n\ndef part(name):\n    return name in os.environ.get("ONLY", "").split(",")\n\n\nif part("y"):\n    if "KEEP7" not in open("k.txt").read():\n        sys.exit(1)\nsys.exit(os.path.exists("BROKEN_probe"))\n' >"$hs/src/scripts/probe.py"
-printf 'KEEP1 KEEP2 KEEP3 SPARE\n' >"$hs/src/g.txt" && printf 'KEEP4 SPARE2\n' >"$hs/src/h.txt" && printf 'KEEP5\n' >"$hs/src/i.txt" && printf 'KEEP7\n' >"$hs/src/k.txt"
+printf 'KEEP1 KEEP2 KEEP3 SPARE\n' >"$hs/src/g.txt" && printf 'KEEP4 SPARE2\n' >"$hs/src/h.txt" && printf 'KEEP5\n' >"$hs/src/i.txt" && printf 'KEEP7\n' >"$hs/src/k.txt" && ac=$(printf '\303\251').txt && printf 'KEEP8\n' >"$hs/src/$ac"
 cp "$here/harness_mutate.py" "$here/suite_parts.py" "$hs/repo/"
 # The worktrees: copies, logged when made and when removed; BREAK_SECOND=<suite> breaks the second one. Beside
 # the real repo_files.py, whose last_reviewed this run reads: the stub's worktree is the later definition.
@@ -619,6 +619,8 @@ import sys
 p = sys.argv[1]
 s = open(p).read()
 planted = '''def mutants():
+    if os.environ.get("NONE"):
+        return
     for n in "123":
         yield from each("g.txt", f"KEEP{n}", "", "hooks", f"planted keep{n}")
     yield from each("g.txt", " SPARE", "", "hooks", "planted spare")
@@ -629,22 +631,24 @@ planted = '''def mutants():
         yield from each("g.txt", "NOWHERE", "", "hooks", "planted stale")
     if os.environ.get("SCOPED"):
         yield from each("j.txt", "KEEP6", "", "hooks", "planted keep6")
+    if os.environ.get("SPACED"):
+        yield from each("\\u00e9.txt", "KEEP8", "", "hooks", "planted keep8")
     if os.environ.get("PROBED"):
         yield from each("k.txt", "KEEP7", "", "probe", "planted keep7")
 
 
 def every_mutant():'''
-for a, b in (("def mutants():", planted), ("SECTIONS = {\n", 'SECTIONS = {\n    "g.txt": "x", "h.txt": "x", "i.txt": "x", "j.txt": "z", "k.txt": "y",\n')):
+for a, b in (("def mutants():", planted), ("SECTIONS = {\n", 'SECTIONS = {\n    "g.txt": "x", "h.txt": "x", "i.txt": "x", "j.txt": "z", "k.txt": "y", "\\u00e9.txt": "x",\n')):
     assert s.count(a) == 1, f"harness_mutate.py no longer holds {a!r}: update test_hooks.sh's harness_shards"
     s = s.replace(a, b)
 open(p, "w").write(s)
 PY
-cp "$hs/src/g.txt" "$hs/src/h.txt" "$hs/src/i.txt" "$hs/src/k.txt" "$hs/repo/" && cp "$hs/src/scripts/test_hooks.sh" "$hs/src/scripts/probe.py" "$hs/repo/scripts/"
+cp "$hs/src/g.txt" "$hs/src/h.txt" "$hs/src/i.txt" "$hs/src/k.txt" "$hs/src/$ac" "$hs/repo/" && cp "$hs/src/scripts/test_hooks.sh" "$hs/src/scripts/probe.py" "$hs/repo/scripts/"
 git -C "$hs/repo" init -q && git -C "$hs/repo" add -A && git -C "$hs/repo" commit -qm x
 shards() { # $1: the shards; then harness_mutate's arguments
 	n=$1 && shift
 	rm -f "$hs/made" "$hs/removed" "$hs/ran" "$hs/controls" "$hs/lonely" "$hs"/met.*
-	(cd "$hs/repo" && SHARD_ROOT="$hs" SHARD_SRC="$hs/src" HARNESS_SHARDS=$n python3 -I harness_mutate.py "$@" 2>&1)
+	(cd "${HR:-$hs/repo}" && SHARD_ROOT="$hs" SHARD_SRC="$hs/src" HARNESS_SHARDS=$n python3 -I harness_mutate.py "$@" 2>&1)
 }
 count() { [ -e "$hs/$1" ] && wc -l <"$hs/$1" | tr -d ' ' || echo 0; }
 verdicts() { printf '%s\n' "$1" | grep -c "killed: \|survives: " || :; }
@@ -719,6 +723,84 @@ out=$(shards 2 --changed "$base") && fail "harness_mutate --changed passed with 
 out=$(shards 2 --changed "$(git -C "$hs/repo" rev-parse HEAD)") || fail "harness_mutate --changed failed with no mutant to judge: $out"
 printf '%s\n' "$out" | grep -q "0 of 7 mutants" || fail "harness_mutate --changed did not say it kept none: $out"
 [ ! -e "$hs/controls" ] || fail "harness_mutate --changed ran a control for no mutant: $out"
+# The pass's record, on scratch clones of the first commit (F1430 to F1434): a record names a tree, not a commit,
+# so the commit before it and its own both match; only the newest counts, and what changed after it is judged.
+HR=$hs/r2 && git clone -q "$hs/repo" "$HR" && C0=$(git -C "$HR" rev-list --max-parents=0 HEAD) && main_b=$(git -C "$HR" branch --show-current)
+fresh() { git -C "$HR" checkout -q "$main_b" && git -C "$HR" reset -q --hard "$C0" && git -C "$HR" branch -q -D side 2>/dev/null || :; }
+edit() { printf '%s\n' "$2" >"$HR/$1" && git -C "$HR" commit -qam "$1: $2"; }
+record() { # $1: the commit the pass was for (default HEAD); committed beside any other change in the tree
+	mkdir -p "$HR/docs" && (cd "$HR" && python3 -I -c 'import sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); from repo_files import fingerprint
+print("2026-10-27", fingerprint(sys.argv[2]), "lenses")' "$here" "${1:-HEAD}") >>"$HR/docs/review-passes.txt"
+	git -C "$HR" add docs && git -C "$HR" commit -qm "the pass's record"
+}
+judges() { # $1: the guard files' mutants it must judge, as "<verdicts> <of 7>"; the rest of $out is read by the caller
+	[ "$(verdicts "$out")" = "$1" ] || fail "harness_mutate --changed judged $(verdicts "$out") mutants, not $1: $out"
+	printf '%s\n' "$out" | grep -q " $2 of ${3:-7} mutants" || fail "harness_mutate --changed did not say $2 of ${3:-7}: $out"
+}
+# Two records: i.txt changed before the first, h.txt between them, g.txt after the second. The newest match counts,
+# not the oldest (the commit before a record and the record itself both match): only g.txt is judged (F1430, H1).
+fresh && edit i.txt "KEEP5 a" && record && edit h.txt "KEEP4 SPARE2 b" && record && edit g.txt "KEEP1 KEEP2 KEEP3 SPARE c"
+out=$(shards 2 --changed "$C0") && fail "harness_mutate --changed passed with a survivor changed after the newest record: $out"
+judges 4 4
+printf '%s\n' "$out" | grep -q "planted keep[45]\|spare2" && fail "harness_mutate --changed judged a file changed before the newest record: $out"
+# A record at HEAD, older base: nothing since the pass, so no mutant and no control; the same when harness_mutate.py
+# itself changed before the record (H3).
+record
+out=$(shards 2 --changed "$C0") || fail "harness_mutate --changed failed with a record at HEAD: $out"
+judges 0 0
+[ ! -e "$hs/controls" ] || fail "harness_mutate --changed ran a control for a record at HEAD: $out"
+printf '\n# a change of its own\n' >>"$HR/harness_mutate.py" && git -C "$HR" commit -qam "itself" && record
+out=$(shards 2 --changed "$C0") || fail "harness_mutate --changed failed with harness_mutate.py changed before the record: $out"
+judges 0 0
+[ ! -e "$hs/controls" ] || fail "harness_mutate --changed ran a control after the pass that saw harness_mutate.py change: $out"
+# A record of a commit before the base (the normal state: the passes file holds main's history) is no pass of the
+# range: since base, so i.txt, changed before the base, is left out and h.txt judged (H4).
+fresh && record "$C0" && edit i.txt "KEEP5 d" && base=$(git -C "$HR" rev-parse HEAD) && edit h.txt "KEEP4 SPARE2 e"
+out=$(shards 2 --changed "$base") && fail "harness_mutate --changed passed with a survivor after a base that follows an old record: $out"
+judges 2 2
+printf '%s\n' "$out" | grep -q "killed: planted keep5" && fail "harness_mutate --changed judged a file changed before its base: $out"
+# A record commit that also edits a guard file: its tree is not the one the pass saw, so it is no record of itself;
+# the pass is the commit before, and h.txt, changed in the record's commit, is judged (H5).
+fresh && edit i.txt "KEEP5 f" && printf 'KEEP4 SPARE2 f\n' >"$HR/h.txt" && git -C "$HR" add h.txt && record
+out=$(shards 2 --changed "$C0") && fail "harness_mutate --changed passed with a survivor changed in the record's own commit: $out"
+judges 2 2
+# A guard file renamed away counts as changed: git shows only the new name by default, and the old guard file's
+# mutants must still be judged (H5).
+fresh && git -C "$HR" mv i.txt i2.txt && git -C "$HR" commit -qm rename
+out=$(shards 2 --changed "$C0") || fail "harness_mutate --changed failed on a renamed guard file: $out"
+judges 1 1
+printf '%s\n' "$out" | grep -q "killed: planted keep5 #1$" || fail "harness_mutate --changed left out the guard file that was renamed: $out"
+# A guard file whose name git quotes (non-ASCII) is found: a line-split name-only is "\303\251.txt" with quotes (H9).
+fresh && edit "$ac" "KEEP8 z"
+out=$(SPACED=1 shards 2 --changed "$C0") || fail "harness_mutate --changed failed on a guard file with a quoted name: $out"
+judges 1 1 8
+printf '%s\n' "$out" | grep -q "killed: planted keep8 #1$" || fail "harness_mutate --changed missed a guard file whose name git quotes: $out"
+# Merge commits: the record on a merge commit; then the record on the side branch only, with h.txt changed on the
+# main side and never reviewed: it is judged (H6).
+fresh && edit h.txt "KEEP4 SPARE2 g" && git -C "$HR" checkout -q -b side "$C0" && edit i.txt "KEEP5 g" && git -C "$HR" checkout -q "$main_b" &&
+	git -C "$HR" merge -q --no-ff -m merge side && record && edit g.txt "KEEP1 KEEP2 KEEP3 SPARE g"
+out=$(shards 2 --changed "$C0") && fail "harness_mutate --changed passed with a survivor after a record on a merge commit: $out"
+judges 4 4
+fresh && git -C "$HR" checkout -q -b side "$C0" && edit i.txt "KEEP5 h" && record && git -C "$HR" checkout -q "$main_b" && edit h.txt "KEEP4 SPARE2 h" &&
+	git -C "$HR" merge -q --no-ff -m merge side
+out=$(shards 2 --changed "$C0") && fail "harness_mutate --changed passed with a survivor changed beside a record on a side branch: $out"
+judges 2 2
+printf '%s\n' "$out" | grep -q "^FAIL  survives: planted spare2 #1$" || fail "harness_mutate --changed excluded a file changed on the main side after a side branch's record: $out"
+# A passes file that is not one: a line with one field, or bytes that are no UTF-8, refuses with a message, before
+# any worktree (H7).
+fresh && mkdir -p "$HR/docs" && for bad in 'garbage\n' '2026-10-27 \377 lenses\n'; do
+	printf "$bad" >"$HR/docs/review-passes.txt" && git -C "$HR" add docs && git -C "$HR" commit -qm "a bad record"
+	out=$(shards 2 --changed "$C0") && fail "harness_mutate --changed went on with a passes file that is malformed ($bad): $out"
+	printf '%s\n' "$out" | grep -q "cannot read the passes file" || fail "harness_mutate --changed refused a malformed passes file ($bad) without a message: $out"
+	printf '%s\n' "$out" | grep -q "Traceback" && fail "harness_mutate --changed let a malformed passes file ($bad) raise: $out"
+	[ ! -e "$hs/made" ] || fail "harness_mutate --changed made a worktree for a malformed passes file ($bad)"
+done
+# The full run (no argument) judges every mutant: none to judge there is a harness that lost its mutants, not a
+# green run (F1431, H2). With --changed, none selected is the pass saying nothing changed.
+out=$(NONE=1 shards 2) && fail "harness_mutate passed with no mutant to judge and no --changed: $out"
+printf '%s\n' "$out" | grep -q "no mutant" || fail "harness_mutate did not say it had no mutant: $out"
+[ "$(count removed)" = "$(count made)" ] || fail "harness_mutate left worktrees behind with no mutant"
+unset HR
 # (Before the section z below: its if, last in the suite, would give every x mutant a passing exit.)
 # A change inside one section of a suite judges that section's mutants alone, with those of the files it changed.
 printf '%s\n' 'if part z; then' '	grep -q KEEP6 j.txt' 'fi' >"$hs/z"

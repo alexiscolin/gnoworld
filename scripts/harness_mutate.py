@@ -272,7 +272,11 @@ def mutants():
     yield from each(hm, "            if code " "!= 0:\n", "            if False:\n", "hooks", "harness_mutate stops on a failed control")
     yield from each(hm, "lambda c: run(*c), [(tr, te) for tr in " "trees ", "lambda c: run(*c), [(tr, te) for tr in trees[:1] ", "hooks", "harness_mutate's control runs in every tree")
     yield from each(hm, "        since = last_reviewed" "(base)\n", "        since = base\n", "hooks", "harness_mutate --changed judges the guard files changed since the last /pre-merge pass, not since base")
-    yield from each(hm, "    except OSError" " as e:", "    except ZeroDivisionError as e:", "hooks", "harness_mutate --changed refuses a passes file it cannot read, never judging fewer mutants")
+    yield from each(hm, "    except (OSError, ValueError)" " as e:", "    except ZeroDivisionError as e:", "hooks", "harness_mutate --changed refuses a passes file it cannot read, never judging fewer mutants")
+    yield from each(hm, "    except (OSError, ValueError)" " as e:", "    except OSError as e:", "hooks", "harness_mutate --changed refuses a passes file that is malformed or no UTF-8, with a message (F1432)")
+    yield from each(hm, "        if changed is None" ":  # a full run", "        if False:  # a full run", "hooks", "harness_mutate with no argument refuses to pass with no mutant to judge (F1431)")
+    yield from each(hm, '"--no-renames", ' '"--name-only"', '"--name-only"', "hooks", "harness_mutate --changed counts a renamed guard file under its old name too (F1434)")
+    yield from each(hm, '"--name-only", ' '"-z"', '"--name-only"', "hooks", "harness_mutate --changed reads a guard file's name git would quote (F1434)")
     yield from each(hm, "        base, changed = since, " "changed_since(since)\n", "        base = since\n", "hooks", "harness_mutate --changed reads the files changed since the pass, not since base")
     yield from each(hm, "    if not found" ":  # nothing to judge", "    if False:  # nothing to judge", "hooks", "harness_mutate --changed runs no control when it judges no mutant")
     yield from each(hm, "elif sys.argv[1:]" ":\n", "elif False:\n", "hooks", "harness_mutate refuses an unknown argument")
@@ -623,7 +627,10 @@ def mutants():
     yield from each("scripts/batch_size.py", "|^server/src/testing/", "", "hooks", "batch_size leaves the server's test helpers out (G8)")
     rf = "scripts/repo_files.py"
     yield from each(rf, "if fingerprint(commit) in reviewed", "if False", "hooks", "batch_size counts from the last reviewed commit, harness_mutate --changed from the last pass")
-    yield from each(rf, "if os.path.exists(PASSES) else set()", "if False else set()", "hooks", "last_reviewed reads the passes file")
+    yield from each(rf, "    if not os.path.exists(PASSES):", "    if False:", "hooks", "last_reviewed reads the passes file")
+    yield from each(rf, 'git("rev-list", f"{base}..HEAD")', 'git("rev-list", "--reverse", f"{base}..HEAD")', "hooks", "last_reviewed takes the newest record of the range, not the oldest (F1430)")
+    yield from each(rf, 'git("rev-list", f"{base}..HEAD")', 'git("rev-list", "HEAD")', "hooks", "last_reviewed looks only at base..HEAD, not at the history before the base (F1430)")
+    yield from each(rf, "                if len(fields) < 2:", "                if False:", "hooks", "last_reviewed refuses a record line with no fingerprint (F1432)")
     yield from each("scripts/batch_size.py", r"(\.test\.tsx?|", "(", "hooks", "batch_size leaves the tests out")
     yield from each("scripts/batch_size.py", "if added > TIER_ONE:", "if False:", "hooks", "batch_size says the tier-1 limit")
     sized = '\t\tstep batch_size # a merge\'s own product code is a small batch (DORA; docs/REVIEW.md)\n\t\tpython3 -I scripts/batch_size.py "$base"\n'
@@ -817,11 +824,12 @@ def suite_touched(base, suite):
 
 
 def changed_since(base):
-    """The files committed since base; a base git cannot compare with stops the run."""
-    diff = subprocess.run(["git", "diff", "--name-only", base, "HEAD", "--"], capture_output=True, text=True)
+    """The files committed since base, a renamed one under both names and a name git would quote as it is; a base git
+    cannot compare with stops the run."""
+    diff = subprocess.run(["git", "diff", "--no-renames", "--name-only", "-z", base, "HEAD", "--"], capture_output=True, text=True)
     if diff.returncode != 0:
         sys.exit(f"harness_mutate: --changed {base}: git cannot compare with it: {diff.stderr.strip()}")
-    return set(diff.stdout.splitlines())
+    return set(diff.stdout.split("\0")) - {""}
 
 
 changed = None
@@ -832,7 +840,7 @@ if sys.argv[1:2] == ["--changed"] and len(sys.argv) == 3:
     changed = changed_since(base)
     try:  # the last /pre-merge pass already judged what came before it, as batch_size.py's base is that pass
         since = last_reviewed(base)
-    except OSError as e:  # never fewer mutants than the pass allows: a file that cannot be read is no pass
+    except (OSError, ValueError) as e:  # never fewer mutants than the pass allows: a file that cannot be read or parsed is no pass
         sys.exit(f"harness_mutate: --changed {base}: cannot read the passes file ({e}); fix it first")
     if since != base:
         print(f"harness_mutate: the last /pre-merge pass is {since[:12]}: the guard files changed since it, not since {base}")
@@ -853,6 +861,8 @@ with contextlib.ExitStack() as stack:
         found = select(found, changed, touched_by, sections)
         print(f"harness_mutate: the guard files and the suites' sections changed since {base}: {len(found)} of {total} mutants")
     if not found:  # nothing to judge: the controls would only cost minutes (8 suite runs, 601 s at load 30 to 50)
+        if changed is None:  # a full run with no mutant is a harness that lost them, not a green run
+            sys.exit("harness_mutate: no mutant to judge: every mutant is gone from this script")
         print("harness_mutate: no mutant to judge")
         sys.exit(0)
     with concurrent.futures.ThreadPoolExecutor(shards * len(TESTS)) as pool:
