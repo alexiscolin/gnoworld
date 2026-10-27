@@ -28,14 +28,16 @@ export interface Noticing {
 const NONE: readonly Notice[] = [];
 
 // What a screen reader is told as a notice comes, one for a place outside the one in view: the newest of those that came
-// since the list last changed, said until the next. The first list is the one the page started with, told of nothing.
-function useAnnounced(list: readonly Notice[], inView: string | undefined): string {
-  const [last, setLast] = useState({ list, said: "" });
-  if (last.list === list) return last.said;
+// since the list last changed, said until the next, or until nothing is unseen. Its id keys the status, so the same words
+// said again are said anew. The first list is the one the page started with, told of nothing.
+function useAnnounced(list: readonly Notice[], inView: string | undefined): { said: string; id: string } {
+  const [last, setLast] = useState({ list, said: "", id: "" });
+  if (last.list === list) return last;
   const known = new Set(last.list.map(({ id }) => id));
   const fresh = list.findLast(({ id, where }) => !known.has(id) && where !== inView);
-  setLast({ list, said: fresh === undefined ? last.said : noticeSaid(fresh) });
-  return last.said;
+  const heard = fresh === undefined ? { said: last.said, id: last.id } : { said: noticeSaid(fresh), id: fresh.id };
+  setLast({ list, ...(list.length === 0 ? { said: "", id: "" } : heard) });
+  return last;
 }
 
 // The room in view's mode and how it changes, as the room's view takes them; none for a direct message.
@@ -83,7 +85,7 @@ export function useNotices(on: {
     useShallow((app) => (room === undefined ? undefined : { mode: modeOf(app, room), notKept: app.noticeNotKept })),
   );
   useTabTitle(total);
-  const said = useAnnounced(account ? list : NONE, inView);
+  const { said, id: saidId } = useAnnounced(account ? list : NONE, inView);
   // Clear sees every place on the page, and its marks go to the link, which tells Ergo those of the rooms, as a read does.
   const onClear = () => {
     for (const [place, time] of noticeActions.clear()) read?.(place, time);
@@ -91,7 +93,7 @@ export function useNotices(on: {
   if (!account) return { seen: noticeActions.seen };
   return {
     badges,
-    list: { list, world, said, onClear },
+    list: { list, world, said, saidId, onClear },
     notify: notifyOf(room, held, noticeActions),
     seen: noticeActions.seen,
   };

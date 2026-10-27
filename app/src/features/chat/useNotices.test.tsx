@@ -247,6 +247,29 @@ describe("useNotices", () => {
     expect(told().list?.said).toBe("g10gh7…3y5tv mentioned you in #bubble");
   });
 
+  // F1677 (CR5): a second notice of the same author and place said the same words, so the status stayed as it was and a
+  // screen reader said nothing; and what Clear had seen stayed said.
+  it("keys the status on the notice said, so the same words said again are new, and says nothing once cleared", () => {
+    draw(on());
+    follow();
+    tell(({ noticeActions }) => {
+      noticeActions.add(mention("a", MAIN));
+    });
+    const words = "g10gh7…3y5tv mentioned you in #bubble";
+    expect(told().list?.said).toBe(words);
+    expect(told().list?.saidId).toBe("a");
+    tell(({ noticeActions }) => {
+      noticeActions.add(mention("b", MAIN, 6));
+    });
+    expect(told().list?.said).toBe(words);
+    expect(told().list?.saidId).toBe("b");
+    act(() => {
+      told().list?.onClear();
+    });
+    expect(told().list?.said).toBe("");
+    expect(told().list?.saidId).toBe("");
+  });
+
   it("goes on saying the newest notice that came, not an older one still listed, as that one is seen", () => {
     draw(on());
     follow();

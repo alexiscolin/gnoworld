@@ -28,6 +28,8 @@ interface NoticesProps {
   world: string;
   /** What a screen reader is told as a notice comes, in a status of its place. */
   said: string;
+  /** The id of the notice said, which keys the status so the same words said again are said anew. */
+  saidId?: string;
   onClear: () => void;
 }
 
@@ -70,7 +72,7 @@ function Notices({
   world,
   onClear,
   navRef,
-}: Omit<NoticesProps, "said"> & { navRef: { current: HTMLElement | null } }) {
+}: Omit<NoticesProps, "said" | "saidId"> & { navRef: { current: HTMLElement | null } }) {
   return (
     <Stack space="2xs" as="section">
       <Cluster space="xs" justify="between">
@@ -208,7 +210,7 @@ export function RoomsView({ sections, current, dms, failed, badges, notices }: R
             {body}
           </Stack>
           {/* Its own place, so the list's absence leaves no gap: what comes is said even as the list is empty. */}
-          <p role="status" className="visually-hidden">
+          <p key={notices.saidId} role="status" className="visually-hidden">
             {notices.said}
           </p>
         </>
