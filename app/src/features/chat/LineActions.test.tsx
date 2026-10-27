@@ -47,6 +47,18 @@ describe("a line's actions", () => {
     expect(markup).toContain('data-icon="more"');
   });
 
+  // F989 (U1): narrow, the three quick reactions are one React menu: each item reacts, or takes the reaction back.
+  it('hold a React menu of the three quick reactions, "Take back" the one the reader gave', () => {
+    const markup = draw({ reactions: [{ emoji: "👍", count: 1, mine: true }] });
+    const react = markup.slice(0, markup.indexOf('aria-label="More"'));
+    expect([...react.matchAll(/role="menuitem"[^>]*>([^<]+)</g)].map((found) => found[1])).toEqual([
+      "Take back 👍",
+      "React with ❤️",
+      "React with 😂",
+    ]);
+    expect(react).toMatch(tagWith("button", 'aria-label="React"', 'aria-haspopup="menu"'));
+  });
+
   it("offer Copy text and Copy room link on another's line, no Delete and no Report", () => {
     expect(items(draw())).toEqual(["Copy text", "Copy room link"]);
   });
