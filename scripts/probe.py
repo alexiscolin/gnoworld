@@ -13,6 +13,10 @@ import subprocess
 import sys
 import tempfile
 
+sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no __pycache__
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # -I leaves this folder off the path
+from repo_files import BENCH_FILE
+
 HERE = "packages/core/src/__probe__"
 APP = "app/src/__probe__"
 UI = "packages/ui/src/__probe__"
@@ -234,6 +238,33 @@ try:
                         expect(out.returncode != 0 and f"{refusal} v0.0.1" in said, f"vitest {' '.join(args)} refuses a Node .node-version does not pin")
                     if passes and args == ["run"]:
                         expect(out.returncode == 0 and "1 passed" in out.stdout, "vitest passes a test in a copy with the real pin")
+
+    if part("bench_files"):
+        # Vitest runs the benches vitest.config.ts names, the form `*.bench.ts(x)` that ESLint's BENCHES and BENCH_FILE
+        # (bench.py, check_regressions.py) read, and no other: its own default, `*.{bench,benchmark}.?(c|m)[jt]s?(x)`, ran
+        # a `room.benchmark.tsx` or an `x.bench.mts` no guard named, switched off or not (CR3). On a copy of the config
+        # (and the lint's shared names it imports), with one bench of each form.
+        forms = {"a.bench.ts": True, "b.bench.tsx": True, "c.benchmark.ts": False, "d.bench.mts": False, "e.benchmark.tsx": False}
+        with tempfile.TemporaryDirectory() as copy:
+            os.makedirs(f"{copy}/lint")
+            os.makedirs(f"{copy}/packages/probe/src")
+            for name in ("vitest.config.ts", "lint/shared.config.ts", ".node-version"):
+                shutil.copy(name, f"{copy}/{name}")
+            os.symlink(os.path.realpath("node_modules"), f"{copy}/node_modules")
+            for name in forms:
+                with open(f"{copy}/packages/probe/src/{name}", "w") as f:
+                    f.write(f'import {{ bench }} from "vitest";\n\nbench("{name[0]} [1000 ms]", () => undefined);\n')
+            report = f"{copy}/bench.json"
+            out = run([os.path.realpath("node_modules/.bin/vitest"), "bench", "--run", "--project", "node", "--outputJson", report], cwd=copy)
+            ran_ok = out.returncode == 0 and os.path.exists(report)
+            expect(ran_ok, "vitest runs the benches of a copy" + ("" if ran_ok else f": {(out.stdout + out.stderr)[-300:]}"))
+            if os.path.exists(report):
+                with open(report) as f:
+                    ran_files = {os.path.basename(file["filepath"]) for file in json.load(f).get("files", [])}
+                ours_only = ran_files == {n for n, ours in forms.items() if ours}
+                expect(ours_only, "vitest runs the benches in the form the guards read, and no other" + ("" if ours_only else f": {sorted(ran_files)}"))
+            for name, ours in forms.items():
+                expect(bool(BENCH_FILE.search(name)) == ours, f"BENCH_FILE reads {name} as the guards' bench form does: {ours}")
 
     if part("core_chromium"):
         # Core's tests run a second time in Chromium, whose engine reads some regexes and Unicode otherwise than

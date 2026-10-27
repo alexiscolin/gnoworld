@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { playwright } from "@vitest/browser-playwright";
 import { configDefaults, defineConfig, type TestProjectInlineConfiguration } from "vitest/config";
+import { BENCHES } from "./lint/shared.config.ts";
 
 // Every Vitest run reads this file, so every run is on the Node .node-version pins: another V8 reads some regexes
 // otherwise (F816: StrykerJS on Homebrew's Node 26), and its results would be of a toolchain nobody ships. Probed in
@@ -39,6 +40,9 @@ export default defineConfig({
   test: {
     // A test that asserts nothing passes whatever the code does.
     expect: { requireAssertions: true },
+    // The benches are the files ESLint's BENCHES and scripts/repo_files.py's BENCH_FILE read, `*.bench.ts(x)`: Vitest's own
+    // default, `*.{bench,benchmark}.?(c|m)[jt]s?(x)`, ran files no guard names, switched off or not (CR3; probe bench_files).
+    benchmark: { include: BENCHES },
     projects: [
       {
         extends: true,
