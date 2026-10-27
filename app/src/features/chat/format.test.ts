@@ -104,6 +104,9 @@ describe("formatted", () => {
     ["«- a\n- b»", "numbered", "1. «a\n1. b»"],
     ["«a\n»b", "bulleted", "- «a\n»b"],
     ["a|\nb", "bulleted", "- a|\nb"],
+    // G6: a selection that starts at a line's end keeps its caret there, the lines after it started too.
+    ["a«\nb»", "bulleted", "- a«\n- b»"],
+    ["a«\nb»", "quote", "> a«\n> b»"],
     ["«a\nb\nc»", "bulleted", "- «a\n- b\n- c»"],
     ["x\n«a\n\nb»\ny", "quote", "x\n> «a\n> \n> b»\ny"],
   ] as const)("starts the lines %j touches as %s", (before, format, after) => {
