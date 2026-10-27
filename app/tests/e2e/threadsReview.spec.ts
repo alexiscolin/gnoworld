@@ -73,6 +73,26 @@ test.describe("threads, from the review", () => {
     await expect(threadField(page)).toHaveValue("");
   });
 
+  // R7: on a screen that shows both, the list beside the open panel is seen at its end: a live line is marked read.
+  test("marks a line read that comes while the panel is open beside a list that shows its end", async ({ page }) => {
+    const heard: string[] = [];
+    const { ergo } = await asAccount(
+      page,
+      () => ({
+        history: [["m1", T(0), "the root line"]],
+        replayed: [tagged("m2", "an answer", { at: 1, tags: "+reply=m1" })],
+        read: T(1),
+        heard: (line) => heard.push(line),
+      }),
+      2,
+    );
+    await chipOf(lines(page).first()).click();
+    await expect(lines(page).first()).toBeVisible();
+    ergo().send(live("m99", T(45), { text: "seen" }));
+    await expect(lineOf(page, "seen")).toBeVisible();
+    await expect.poll(() => marks(heard).join()).toContain(T(45));
+  });
+
   // On a phone the open panel hides the room's list (display: none), the composer with it.
   test.describe("on a phone's screen", () => {
     test.use({ viewport: { width: 390, height: 844 } });
