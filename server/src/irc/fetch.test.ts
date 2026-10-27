@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { logger } from "../log.ts";
 import { fakeErgo, PASSWORD, welcome, type Peer } from "../testing/fakeErgo.ts";
+import { lineFetches } from "./fetch.ts";
 import { ircLink, type Fetched, type Link, type Said } from "./link.ts";
 
 // Slice 4's 4d, pins: the link reads one line of a room by its id, as Ergo holds it (CHATHISTORY AROUND <room>
@@ -240,6 +241,99 @@ describe("a question and the catch-up pages of one connection", () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     await link.stop();
     expect(await answer).toBe("unanswered");
+  });
+});
+
+// Ergo's FAIL of another command, and a batch of another kind, are no history's: neither takes a question's place (G6).
+describe("what is no history request", () => {
+  it("keeps the order of two questions of one room through a refused REDACT", async () => {
+    const { link, peer } = await ready({ lineMs: 60_000 });
+    const first = link.line("#bubble", "m1");
+    const second = link.line("#bubble", "m2");
+    await peer.next(/^CHATHISTORY AROUND #bubble msgid=m1/);
+    await peer.next(/^CHATHISTORY AROUND #bubble msgid=m2/);
+    peer.say(":ergo.test FAIL REDACT REDACT_FORBIDDEN #bubble m1 :You may only redact your own messages");
+    batch(peer, "#bubble", [["m1", "first"]]);
+    batch(peer, "#bubble", [["m2", "second"]]);
+    expect(textOf(await first)).toBe("first");
+    expect(textOf(await second)).toBe("second");
+  });
+
+  it("keeps a question's place through a batch that is no chathistory", async () => {
+    const { link, peer } = await ready({ lineMs: 60_000 });
+    const answer = link.line("#bubble", "m1");
+    await peer.next(/^CHATHISTORY AROUND #bubble msgid=m1/);
+    peer.say(":ergo.test BATCH +n netsplit a.test b.test");
+    peer.say(":ergo.test BATCH -n");
+    batch(peer, "#bubble", [["m1", "first"]]);
+    expect(textOf(await answer)).toBe("first");
+  });
+
+  // A page's end asks the next page once the lines are taken in; a link closed meanwhile asks nothing on a socket that is
+  // gone, and writes no request into the order of the next connection.
+  it("asks no page once the socket is destroyed, and keeps the next connection's order", async () => {
+    let drain: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      drain = resolve;
+    });
+    const ergo = await fakeErgo();
+    const { link } = start(ergo.port, { lineMs: 60_000, drained: () => gate });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    peer.say("PING :sync");
+    await peer.next(/^PONG sync$/);
+    batch(
+      peer,
+      "#bubble",
+      Array.from({ length: 50 }, (_, n): [string, string] => [`p${String(n)}`, `line ${String(n)}`]),
+    );
+    peer.socket.destroy();
+    const next = await ergo.peer(1);
+    await welcome(next);
+    next.say("PING :sync2");
+    await next.next(/^PONG sync2$/);
+    drain();
+    await gate;
+    const answer = link.line("#bubble", "m1");
+    await next.next(/^CHATHISTORY AROUND #bubble msgid=m1/);
+    batch(next, "#bubble", [["m1", "after the drop"]]);
+    expect(textOf(await answer)).toBe("after the drop");
+    expect(next.lines.filter((line) => line.startsWith("CHATHISTORY AFTER "))).toEqual([]);
+  });
+});
+
+// The history requests unanswered are 1000 at most, so a link that is never answered holds a bounded queue (G4, G5).
+describe("the requests unanswered", () => {
+  const write = () => undefined;
+  it("answers nothing, and writes nothing, for the 1001st question", async () => {
+    const fetches = lineFetches(60_000);
+    const written: string[] = [];
+    const keep = (_: string, params: readonly string[]) => written.push(params.join(" "));
+    const waiting = Array.from({ length: 1000 }, (_, n) => fetches.ask(keep, "#bubble", `m${String(n)}`));
+    expect(written).toHaveLength(1000);
+    expect(await fetches.ask(keep, "#bubble", "m1000")).toBe("unanswered");
+    expect(written).toHaveLength(1000);
+    fetches.drop();
+    expect(new Set(await Promise.all(waiting))).toEqual(new Set(["unanswered"]));
+  });
+
+  it("holds no more than 1000 catch-up pages, so the question after them is the next batch's", async () => {
+    const fetches = lineFetches(60_000);
+    for (let n = 0; n < 1001; n += 1) fetches.paged("#bubble");
+    for (let n = 0; n < 1000; n += 1) expect(fetches.opened(`b${String(n)}`, "#bubble")).toBe(false);
+    const answer = fetches.ask(write, "#bubble", "m1");
+    expect(fetches.opened("q", "#bubble")).toBe(true);
+    fetches.drop();
+    expect(await answer).toBe("unanswered");
+  });
+
+  it("takes a chathistory batch for a page's when no request is waiting, and still asks after it", async () => {
+    const fetches = lineFetches(60_000);
+    expect(fetches.opened("x", "#bubble")).toBe(false);
+    const answer = fetches.ask(write, "#bubble", "m1");
+    expect(fetches.opened("q", "#bubble")).toBe(true);
+    fetches.closed("q");
+    expect(await answer).toBe("gone");
   });
 });
 
