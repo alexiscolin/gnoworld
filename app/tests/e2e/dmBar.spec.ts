@@ -53,6 +53,14 @@ async function write(page: Page, text: string) {
   await expect(lineOf(page, text)).toHaveCount(1);
 }
 
+// The partner says "are you coming?", and Reply is chosen on that line.
+async function startReply(page: Page, dm: { theirs: (id: string, text: string, more: { at: number }) => void }) {
+  dm.theirs("p1", "are you coming?", { at: 0 });
+  await expect(lines(page)).toHaveCount(1);
+  await lines(page).nth(0).hover();
+  await barOf(page, 0).getByRole("button", { name: "Reply" }).click();
+}
+
 // Edit chosen from a line's menu, the line at `at`.
 async function startEdit(page: Page, at: number) {
   await lines(page).nth(at).hover();
@@ -100,10 +108,7 @@ test.describe("a direct message's bar", () => {
 
   test("replies to a line, quoting it above the answer, tagged +reply", async ({ page }) => {
     const dm = await inDm(page);
-    dm.theirs("p1", "are you coming?", { at: 0 });
-    await expect(lines(page)).toHaveCount(1);
-    await lines(page).nth(0).hover();
-    await barOf(page, 0).getByRole("button", { name: "Reply" }).click();
+    await startReply(page, dm);
     await expect(page.getByText(`Replying to ${SHORT}: are you coming?`)).toBeVisible();
     await expect(field(page)).toBeFocused();
     await field(page).fill("yes");
@@ -165,6 +170,44 @@ test.describe("a direct message's bar", () => {
     expect(dm.says()).toEqual([`PRIVMSG ${PARTNER} :keep me`]);
   });
 
+  test("gives the reader's draft back in the box once an edit is saved", async ({ page }) => {
+    const dm = await inDm(page);
+    await write(page, "keep me");
+    await field(page).fill("a draft in progress");
+    await startEdit(page, 0);
+    await field(page).fill("keep me, fixed");
+    await field(page).press("Enter");
+    await expect(lines(page).nth(0)).toContainText("keep me, fixed");
+    await expect(field(page)).toHaveValue("a draft in progress");
+    expect(dm.says()).toEqual([
+      `PRIVMSG ${PARTNER} :keep me`,
+      `@+gnoworld/edit=echo1 PRIVMSG ${PARTNER} :keep me, fixed`,
+    ]);
+  });
+
+  // R5: the second edit of a line names the line, not the first edit, and starts from the edited words.
+  test("edits a line twice: each correction names the original line, the box starting from the last words", async ({
+    page,
+  }) => {
+    const dm = await inDm(page);
+    await write(page, "first words");
+    await startEdit(page, 0);
+    await field(page).fill("second words");
+    await field(page).press("Enter");
+    await expect(lines(page).nth(0)).toContainText("second words");
+    await startEdit(page, 0);
+    await expect(field(page)).toHaveValue("second words");
+    await field(page).fill("third words");
+    await field(page).press("Enter");
+    await expect(lines(page).nth(0)).toContainText("third words");
+    await expect(lines(page)).toHaveCount(1);
+    expect(dm.says()).toEqual([
+      `PRIVMSG ${PARTNER} :first words`,
+      `@+gnoworld/edit=echo1 PRIVMSG ${PARTNER} :second words`,
+      `@+gnoworld/edit=echo1 PRIVMSG ${PARTNER} :third words`,
+    ]);
+  });
+
   // R7(b), decided by Claude: an emptied box sends nothing and stays in edit mode; unchanged words close the edit, sending nothing.
   test("sends nothing for an edit emptied, which stays open, nor for one left as it was, which closes", async ({
     page,
@@ -207,6 +250,37 @@ test.describe("a direct message's bar", () => {
       `@+gnoworld/edit=echo1 PRIVMSG ${PARTNER} :mine, fixed`,
       `PRIVMSG ${PARTNER} :next`,
     ]);
+  });
+
+  // R8, F1562 answered by Claude (keep): a refused edit's words come back in the box, and why is said.
+  test("puts a refused edit's words back in the box, saying its partner is not online, the line unchanged", async ({
+    page,
+  }) => {
+    const dm = await inDm(page, { refuseTagged: true });
+    await write(page, "as written");
+    await startEdit(page, 0);
+    await field(page).fill("as written, fixed");
+    await field(page).press("Enter");
+    await expect(page.getByText("Editing a message")).toHaveCount(0);
+    await expect(page.getByText(`Not sent: ${SHORT} is not online.`, { exact: true })).toBeVisible();
+    await expect(field(page)).toHaveValue("as written, fixed");
+    await expect(lines(page)).toHaveCount(1);
+    await expect(lines(page).nth(0)).toContainText("as written");
+    await expect(lines(page).nth(0)).not.toContainText("as written, fixed");
+    expect(dm.says()).toEqual([
+      `PRIVMSG ${PARTNER} :as written`,
+      `@+gnoworld/edit=echo1 PRIVMSG ${PARTNER} :as written, fixed`,
+    ]);
+  });
+
+  test("puts a refused reply's words back in the box, saying its partner is not online", async ({ page }) => {
+    const dm = await inDm(page, { refuseTagged: true });
+    await startReply(page, dm);
+    await field(page).fill("yes");
+    await field(page).press("Enter");
+    await expect(page.getByText(`Not sent: ${SHORT} is not online.`, { exact: true })).toBeVisible();
+    await expect(field(page)).toHaveValue("yes");
+    await expect(lines(page)).toHaveCount(1);
   });
 
   test("deletes one's own line after asking, with its corrections, by a REDACT to the partner", async ({ page }) => {
@@ -287,6 +361,33 @@ test.describe("a direct message's bar", () => {
     expect((await bar.boundingBox())?.height ?? Infinity).toBeLessThan(56);
   });
 
+  // R10: the edit bar, its buttons and a long line fit a phone's width.
+  test("fits a phone's screen while a line is edited: the bar, the field and both buttons in view, no sideways scroll", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const dm = await inDm(page);
+    await write(page, `a long line ${"words ".repeat(40)}end`);
+    await lines(page).nth(0).focus();
+    await barOf(page, 0).getByRole("button", { name: "More actions" }).click();
+    await page.getByRole("menuitem", { name: "Edit" }).click();
+    await expect(page.getByText("Editing a message")).toBeVisible();
+    for (const target of [
+      field(page),
+      page.getByRole("button", { name: "Save" }),
+      page.getByRole("button", { name: "Cancel the edit" }),
+    ]) {
+      await expect(target).toBeVisible();
+      await expect(target).toBeInViewport();
+    }
+    const [scroll, client] = await page.evaluate(() => [
+      document.documentElement.scrollWidth,
+      document.documentElement.clientWidth,
+    ]);
+    expect(scroll).toBeLessThanOrEqual(client);
+    expect(dm.says()).toHaveLength(1);
+  });
+
   test("is a guest's none: its page asks to log in and shows no bar", async ({ page }) => {
     await page.goto(`/w/bubble?dm=${PARTNER}`);
     await hydrated(page);
@@ -295,17 +396,14 @@ test.describe("a direct message's bar", () => {
   });
 });
 
-// Two accounts on the real Ergo, each in its conversation with the other: what one does with a line the other sees.
+// Two accounts on the real Ergo, each in its conversation with the other: what one does with a line the other sees. Each
+// journey is its own, so its name says which act failed (R9).
 test.describe("a direct message's bar, between two accounts", () => {
-  test("shows each act to the partner: a reaction, a reply, an edit and a delete; and says a reaction to an account that left", async ({
-    page,
-    playwright,
-    launchOptions,
-  }) => {
-    const short = (address: string) => `${address.slice(0, 6)}…${address.slice(-5)}`;
-    const bob = await another({ playwright, launchOptions }, word("bob"));
+  const short = (address: string) => `${address.slice(0, 6)}…${address.slice(-5)}`;
+  // Bob's page first, connected to Ergo, which delivers a line to an account that is; then mine, and one line of mine.
+  async function twoAccounts(args: Parameters<typeof another>[0], page: Page) {
+    const bob = await another(args, word("bob"));
     const me = await logIn(page, word("as"));
-    // Bob's page first: connected to Ergo, which delivers a line to an account that is.
     await bob.page.goto(`/w/bubble?dm=${me}`);
     await hydrated(bob.page);
     await expect(bob.page.getByText("No messages since this page opened.")).toBeVisible();
@@ -319,19 +417,33 @@ test.describe("a direct message's bar, between two accounts", () => {
     await mine.fill(text);
     await mine.press("Enter");
     await expect(lineOf(bob.page, text)).toHaveCount(1);
-    // A reaction of his shows on my line, mine counted as his.
+    return { bob, me, mine, his, text };
+  }
+
+  test("shows a reaction of his on my line, and his reply quoting it, on both pages", async ({
+    page,
+    playwright,
+    launchOptions,
+  }) => {
+    const { bob, me, his, text } = await twoAccounts({ playwright, launchOptions }, page);
     await lineOf(bob.page, text).hover();
     await lineOf(bob.page, text).getByRole("toolbar").getByRole("button", { name: "React with 👍" }).click();
     await expect(lineOf(bob.page, text).getByRole("button", { name: "👍, 1, including you" })).toBeVisible();
     await expect(lineOf(page, text).getByRole("button", { name: "👍, 1" })).toBeVisible();
-    // His reply quotes my line on both pages.
     await lineOf(bob.page, text).hover();
     await lineOf(bob.page, text).getByRole("toolbar").getByRole("button", { name: "Reply" }).click();
     const answer = word("answer");
     await his.fill(answer);
     await his.press("Enter");
     await expect(lineOf(page, answer)).toContainText(`Replying to ${short(me)}: ${text}`);
-    // My edit shows as the line's words on his page, marked edited, the line still one.
+  });
+
+  test("shows my edit as the line's words on his page, marked edited, and my delete takes the line and its edit away", async ({
+    page,
+    playwright,
+    launchOptions,
+  }) => {
+    const { bob, mine, text } = await twoAccounts({ playwright, launchOptions }, page);
     await lineOf(page, text).first().hover();
     await lineOf(page, text).first().getByRole("button", { name: "More actions" }).click();
     await page.getByRole("menuitem", { name: "Edit" }).click();
@@ -340,19 +452,26 @@ test.describe("a direct message's bar, between two accounts", () => {
     await mine.press("Enter");
     await expect(lines(bob.page).first()).toContainText(fixed);
     await expect(lines(bob.page).first()).toContainText(/Edited/);
-    await expect(lines(bob.page)).toHaveCount(2);
-    // My delete takes it, its correction too, from his page.
+    await expect(lines(bob.page)).toHaveCount(1);
     await lineOf(page, fixed).first().hover();
     await lineOf(page, fixed).first().getByRole("button", { name: "More actions" }).click();
     await page.getByRole("menuitem", { name: "Delete" }).click();
     await page.getByRole("dialog", { name: "Delete message?" }).getByRole("button", { name: "Delete message" }).click();
     await expect(lineOf(bob.page, fixed)).toHaveCount(0);
     await expect(lineOf(bob.page, text)).toHaveCount(0);
-    // Bob gone, Ergo refuses a reaction to him (401): the page says so, no chip.
+    await expect(lines(bob.page)).toHaveCount(0);
+  });
+
+  // Ergo may not have noticed his page gone the moment it closes, so a reaction in that window is delivered: each try is
+  // taken back by the next, until Ergo refuses one (401), and the page says so with no chip left.
+  test("says a reaction to an account that left, with no chip", async ({ page, playwright, launchOptions }) => {
+    const { bob, text } = await twoAccounts({ playwright, launchOptions }, page);
     await bob.close();
-    await lineOf(page, answer).hover();
-    await lineOf(page, answer).getByRole("toolbar").getByRole("button", { name: "React with 👍" }).click();
-    await expect(flash(page, "Could not react.")).toBeVisible();
-    await expect(lineOf(page, answer).getByRole("button", { name: /^👍, / })).toHaveCount(0);
+    await expect(async () => {
+      await lineOf(page, text).hover();
+      await lineOf(page, text).getByRole("toolbar").getByRole("button", { name: "React with 👍" }).click();
+      await expect(flash(page, "Could not react.")).toBeVisible({ timeout: 3000 });
+    }).toPass({ timeout: 20_000 });
+    await expect(lineOf(page, text).getByRole("button", { name: /^👍, / })).toHaveCount(0);
   });
 });

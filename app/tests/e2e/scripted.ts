@@ -123,22 +123,35 @@ function refusedReaction(line: string, me: string, refuse: boolean): string[] {
   return [`${label === undefined ? "" : `@label=${label} `}:ergo 404 ${me} ${room} :Cannot send to channel (+m)`];
 }
 
+// Ergo's refusal of a PRIVMSG to a nick that is not connected: a 401, labelled as the PRIVMSG was, its partner named.
+function refusedSay(line: string, me: string, refuse: boolean): string[] {
+  const { tags, rest } = split(line);
+  const [command, to = ""] = rest.split(" ");
+  if (command !== "PRIVMSG" || !refuse) return [];
+  const label = /(?:^|;)label=([^;]*)/.exec(tags)?.[1];
+  return [`${label === undefined ? "" : `@label=${label} `}:ergo 401 ${me} ${to} :No such nick`];
+}
+
 // Ergo's echo (echo-message) of a PRIVMSG the page sends, or of a reaction's TAGMSG, under `me`, with a msgid and a
 // time: the one given, or one after the history's, the page's own tags kept. A typing TAGMSG is not echoed, nor a
 // reaction Ergo refused.
 function echoed(
   line: string,
   me: string,
-  echo: { time: string | true | undefined; refused: boolean; next: () => number },
+  echo: { time: string | true | undefined; refused: boolean; next: () => number; saying?: boolean },
 ): string[] {
   const { tags, rest } = split(line);
   const reaction = rest.startsWith("TAGMSG ") && !echo.refused && /\+draft\/(un)?react=/.test(tags);
-  if (echo.time === undefined || !(rest.startsWith("PRIVMSG ") || reaction)) return [];
+  if (echo.time === undefined || !((rest.startsWith("PRIVMSG ") && echo.saying !== false) || reaction)) return [];
   const count = echo.next();
   const time =
     echo.time === true ? new Date(Date.parse("2026-10-25T11:00:00.000Z") + count * 1000).toISOString() : echo.time;
   return [`@msgid=echo${String(count)};time=${time};account=${me}${tags === "" ? "" : `;${tags}`} :${me}!u@h ${rest}`];
 }
+
+// Whether `refuse` and the page's line carries a tag of ours, a reply or an edit.
+const tagged = (line: string, refuse: boolean | undefined) =>
+  refuse === true && /^@[^ ]*\+(reply|gnoworld\/edit)=/.test(line);
 
 export interface Scripted {
   /** #games' history, or the named room's. */
@@ -161,6 +174,9 @@ export interface Scripted {
   historyAfter?: Promise<void>;
   /** Lines Ergo replays after the history's, as it sends them: a reaction's TAGMSG, a reply or an edit. */
   replayed?: readonly string[];
+  /** Ergo refuses each PRIVMSG that carries a tag of the page's (a reply or an edit) as to a nick not connected: a 401 to
+   * its label, no echo; a line with no tag goes through. */
+  refuseTagged?: boolean;
   /** Ergo refuses each reaction, as in a room the account may not speak in: a 404 to its label, no echo. */
   refuseReact?: boolean;
   /** The lines before the history's, which Ergo gives to CHATHISTORY BEFORE. */
@@ -185,6 +201,7 @@ export function scriptedErgo(ergo: WebSocketRoute, me: string, script: Scripted 
     historyAfter,
     replayed = [],
     refuseReact = false,
+    refuseTagged,
     older = [],
   } = script;
   const places = placesOf(room, read);
@@ -198,7 +215,13 @@ export function scriptedErgo(ergo: WebSocketRoute, me: string, script: Scripted 
       ...redaction(line, me, { refuse: refuseRedact, hold: holdRedact }),
       ...marking(line, places, quietMarks),
       ...refusedReaction(line, me, refuseReact),
-      ...echoed(line, me, { time: echo, refused: refuseReact, next: () => (echoes += 1) }),
+      ...refusedSay(line, me, tagged(line, refuseTagged)),
+      ...echoed(line, me, {
+        time: echo,
+        refused: refuseReact,
+        saying: !tagged(line, refuseTagged),
+        next: () => (echoes += 1),
+      }),
     ];
     const reply = () => {
       for (const answer of answers) ergo.send(answer);
