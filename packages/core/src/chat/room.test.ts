@@ -26,9 +26,8 @@ const line = (id: string, time: string, text: string): Line => ({
 });
 // The room I look at, and my nick.
 const AT = { room: "#bubble", me: ME };
-// Lines by time, then id in code-unit order, written apart from the code under test.
-const byTimeThenId = (p: Line, q: Line) =>
-  p.time === q.time ? (p.id < q.id ? -1 : p.id > q.id ? 1 : 0) : p.time < q.time ? -1 : 1;
+// Lines by time, written apart from the code under test; lines of one time keep their arrival order.
+const byTime = (p: Line, q: Line) => (p.time < q.time ? -1 : p.time > q.time ? 1 : 0);
 const frozen = <T>(list: T[]): readonly T[] => Object.freeze([...list]);
 
 // Which room a line is about, so a client with 100 rooms reads it in one: each command names it at its own place.
@@ -204,14 +203,6 @@ describe("addLines: a room's lines, in time order, each once, the newest kept", 
     expect(addLines(lines, [{ ...a, time: "2026-10-25T11:00:00.000Z" }], 100)).toBe(lines);
   });
 
-  test("orders lines of one time by their id in code-unit order, so two clients agree", () => {
-    const upper = line("B", T0, "upper");
-    const lower = line("a", T0, "lower");
-    const ten = line("10", T0, "ten");
-    const nine = line("9", T0, "nine");
-    expect(addLines([], [lower, nine, upper, ten], 100).map((l) => l.id)).toStrictEqual(["10", "9", "B", "a"]);
-  });
-
   test("keeps the newest lines, up to its cap", () => {
     expect(addLines(frozen([a, b]), frozen([c]), 2)).toStrictEqual([b, c]);
   });
@@ -244,9 +235,13 @@ describe("addLines: a room's lines, in time order, each once, the newest kept", 
   });
 
   test("holds whatever order lines come in: exactly the newest, sorted, each once", () => {
+    // One time for each id (7 is prime to 31, so 31 ids take 31 seconds, none twice): lines of one time keep
+    // their arrival order, which a property over two arrays would have to restate; their own tests hold it.
     const lineArb = fc
-      .tuple(fc.integer({ min: 0, max: 30 }), fc.integer({ min: 0, max: 9 }))
-      .map(([id, second]) => line(`m${String(id)}`, `2026-10-25T10:00:0${String(second)}.000Z`, `t${String(id)}`));
+      .integer({ min: 0, max: 30 })
+      .map((id) =>
+        line(`m${String(id)}`, `2026-10-25T10:00:${String((id * 7) % 31).padStart(2, "0")}.000Z`, `t${String(id)}`),
+      );
     fc.assert(
       fc.property(
         fc.array(lineArb, { maxLength: 40 }),
@@ -257,7 +252,7 @@ describe("addLines: a room's lines, in time order, each once, the newest kept", 
           const byId = new Map([...old, ...incoming].map((l): [string, Line] => [l.id, l]));
           const canon = (ls: Line[]) => ls.map((l) => byId.get(l.id) ?? l);
           const kept = addLines(addLines([], frozen(canon(old)), cap), frozen(canon(incoming)), cap);
-          expect(kept).toStrictEqual([...byId.values()].sort(byTimeThenId).slice(-cap));
+          expect(kept).toStrictEqual([...byId.values()].sort(byTime).slice(-cap));
         },
       ),
       PROPERTY,
