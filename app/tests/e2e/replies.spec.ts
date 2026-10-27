@@ -86,9 +86,16 @@ test.describe("replies", () => {
     const bar = form(page).locator("p").first();
     await expect(bar).toContainText("a long line");
     expect(await oneRow(bar)).toBe(true);
-    const [words, cancelBox] = [await bar.boundingBox(), await cancel(page).boundingBox()];
-    expect(cancelBox?.y).toBeGreaterThanOrEqual((words?.y ?? 0) - 8);
-    expect(cancelBox?.y ?? 0).toBeLessThan((words?.y ?? 0) + (words?.height ?? 0));
+    // Both boxes read in one frame: the page may still be scrolling to the field, which moves them together.
+    const row = await bar.evaluate(
+      (words, button) => {
+        const [at, to] = [words.getBoundingClientRect(), button.getBoundingClientRect()];
+        return { offset: to.y - at.y, height: at.height };
+      },
+      await cancel(page).elementHandle(),
+    );
+    expect(row.offset).toBeGreaterThanOrEqual(-8);
+    expect(row.offset).toBeLessThan(row.height);
   });
 
   test("answer the line of the second Reply, not the first's", async ({ page }) => {
