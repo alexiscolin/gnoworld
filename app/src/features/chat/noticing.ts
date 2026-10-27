@@ -2,7 +2,7 @@
 // line addressed to the account, none for a guest; the notices of a line REDACT takes away or of a room the account is
 // out of; a conversation seen as Ergo's place for it passes. The classifier is core's (roomNotice, dmNotice); this reads
 // what it needs from the store.
-import { dmNotice, dmOf, lineOf, readAfter, roomNotice, type IrcMessage, type RoomAt } from "@gnoworld/core";
+import { dmNotice, dmOf, lineOf, readAfter, roomNotice, type IrcMessage, type Line, type RoomAt } from "@gnoworld/core";
 import type { createAppStore } from "../../store/index.ts";
 import { modeOf, roomOf } from "../../store/notices.ts";
 import type { AppState } from "../../store/index.ts";
@@ -36,14 +36,7 @@ export class Noticer {
     const { noticeActions, chat } = this.#store.getState();
     const { me } = chat;
     const [room = "", id = ""] = message.params;
-    if (message.command === "REDACT") {
-      noticeActions.drop(id);
-      this.#gone.add(id);
-      for (const old of this.#gone) {
-        if (this.#gone.size <= GONE_KEPT) break;
-        this.#gone.delete(old);
-      }
-    }
+    if (message.command === "REDACT") this.#redacted(id);
     if (me === undefined || !this.#account()) return;
     if (outOf(message, me)) noticeActions.left(room);
     this.#marked(message, me);
@@ -55,13 +48,21 @@ export class Noticer {
   /** A room's history page, read: a notice for each line past the reading place Ergo gave, none while it gave none, and
    * none for a room the account is out of (a page asked before a KICK can come after it). */
   page(room: string, messages: readonly IrcMessage[]): void {
+    this.#past(
+      room,
+      messages.map((message) => lineOf(message, room)),
+    );
+  }
+
+  // The notices of these lines of a room that are past its reading place; the page's lines or, once the place is
+  // known, the room's own (the page came first when Ergo's answer to MARKREAD came after it).
+  #past(room: string, lines: readonly (Line | undefined)[]): void {
     const state = this.#store.getState();
     const { me } = state.chat;
     const at = me === undefined ? undefined : this.#at(state, room, me);
     const read = roomOf(state, room)?.read;
     if (!this.#account() || !this.#inside.has(room) || at === undefined || read === undefined) return;
-    const made = messages.flatMap((message) => {
-      const line = lineOf(message, room);
+    const made = lines.flatMap((line) => {
       const notice =
         line === undefined || line.time <= read || this.#gone.has(line.id) ? undefined : roomNotice(line, room, at);
       return notice === undefined ? [] : [notice];
@@ -69,12 +70,27 @@ export class Noticer {
     state.noticeActions.addAll(made);
   }
 
-  // Ergo's reading place for a conversation, from another device: `MARKREAD <partner> timestamp=…` sees it up to there.
+  // A line REDACT took away: its notice goes, and the page open at it must not bring it back.
+  #redacted(id: string): void {
+    this.#store.getState().noticeActions.drop(id);
+    this.#gone.add(id);
+    for (const old of this.#gone) {
+      if (this.#gone.size <= GONE_KEPT) break;
+      this.#gone.delete(old);
+    }
+  }
+
+  // Ergo's reading place, `MARKREAD <place> timestamp=…`: for a conversation, from another device, it sees it up to there;
+  // for a room, the notices of the lines the room holds past it (a page that came before it made none).
   #marked(message: IrcMessage, me: string): void {
-    const [partner = ""] = message.params;
-    if (message.command !== "MARKREAD" || !isAccount(partner) || partner === me) return;
-    const time = readAfter(undefined, message, { room: partner, now: Date.now() });
-    if (time !== undefined) this.#store.getState().noticeActions.seen(partner, time);
+    const [place = ""] = message.params;
+    if (message.command !== "MARKREAD" || place === me) return;
+    if (!isAccount(place)) {
+      this.#past(place, roomOf(this.#store.getState(), place)?.lines ?? []);
+      return;
+    }
+    const time = readAfter(undefined, message, { room: place, now: Date.now() });
+    if (time !== undefined) this.#store.getState().noticeActions.seen(place, time);
   }
 
   // A direct message the store kept: none for one it discards (the account hears those it wrote to alone).

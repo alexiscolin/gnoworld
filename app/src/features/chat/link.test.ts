@@ -2271,6 +2271,28 @@ describe("the chat's link: notices, the edges", () => {
     });
   });
 
+  // F1673 (CR1): the page came before Ergo's MARKREAD reply, so it made no notice and none came for them afterwards.
+  describe("a history page that comes before the reading place", () => {
+    it("makes the notices of the lines past the place once it is known, and of no line before it", () => {
+      const t = member();
+      t.fake.line(`BATCH +h1 chathistory ${GAMES}`);
+      for (const [id, minute] of [
+        ["h1", 1],
+        ["h3", 3],
+        ["h4", 4],
+      ] as const)
+        t.fake.line(
+          `@batch=h1;msgid=${id};time=${T(minute)};account=${OTHER} :${OTHER}!u@h PRIVMSG ${GAMES} :@${ADDRESS}`,
+        );
+      t.fake.line("BATCH -h1");
+      expect(t.notices()).toEqual([]);
+      t.fake.line(`:ergo MARKREAD ${GAMES} timestamp=${T(2)}`);
+      expect(ids(t)).toEqual(["h3", "h4"]);
+      t.fake.line(`:ergo MARKREAD ${GAMES} timestamp=${T(2)}`);
+      expect(ids(t)).toEqual(["h3", "h4"]);
+    });
+  });
+
   // F1681 (CR9): a REDACT that came while a page was open left no trace, so the page's end made the notice again.
   describe("a history page open while a line of it is deleted", () => {
     it("makes no notice of that line, and one of its neighbour", () => {
