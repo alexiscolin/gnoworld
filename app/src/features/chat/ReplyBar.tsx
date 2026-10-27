@@ -1,7 +1,7 @@
 // The composer's reply bar (slice 4's 4d): over the field, the line the next one answers.
-import { Cluster, IconButton } from "@gnoworld/ui";
+import { IconButton, Sidebar } from "@gnoworld/ui";
 import { Replying, type Answered } from "./Replying.tsx";
-import styles from "./Composer.module.css";
+import styles from "./RoomView.module.css";
 
 // The graphemes the reply bar shows of the line answered (docs/decisions.md, 2026-10-26).
 const SHOWN = 60;
@@ -20,7 +20,7 @@ interface ReplyBarProps {
 
 export function ReplyBar({ id, to, me, members, onCancel }: ReplyBarProps) {
   return (
-    <Cluster space="2xs">
+    <Sidebar side="end" space="2xs">
       <p id={id} className={styles["replying"]}>
         <Replying to={to} length={SHOWN} known={(address) => address === me || members.has(address)} />
       </p>
@@ -35,6 +35,6 @@ export function ReplyBar({ id, to, me, members, onCancel }: ReplyBarProps) {
           form?.querySelector("input")?.focus();
         }}
       />
-    </Cluster>
+    </Sidebar>
   );
 }

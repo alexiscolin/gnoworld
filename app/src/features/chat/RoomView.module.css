@@ -31,6 +31,9 @@
   /* Above a reply, the line it answers, in one line and muted (4d). */
   .replying {
     color: var(--color-text-muted);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
 
   .time,

@@ -1,7 +1,8 @@
 import { lineOf, lines, roomsNav } from "./chat.ts";
+import type { Locator } from "@playwright/test";
 import { expect, test, type Page } from "./fixtures.ts";
 import { opened } from "./scripted.ts";
-import { asAccount, barOf, field, GUEST, HISTORY, ROOM, tagged } from "./talk.ts";
+import { asAccount, barOf, field, GUEST, HISTORY, OTHER, ROOM, T, tagged } from "./talk.ts";
 
 // 4d's replies (docs/decisions.md, 2026-10-26): Reply on a line's bar; the composer says which line the next answers,
 // sends it tagged +reply, and the reply quotes its line; the target is the room's, gone with a room switch, with its
@@ -54,6 +55,40 @@ test.describe("replies", () => {
     await field(page).press("Enter");
     await expect(lineOf(page, "half a thought")).toBeVisible();
     expect(said()).toEqual([`PRIVMSG ${ROOM} :half a thought`]);
+  });
+
+  // F1178 (the UX review's U6): a quote stays one line, cut by an ellipsis, wherever it is: over the field the cancel
+  // stands on its row, and on a phone's width too.
+  test("keep a reply's quote and the reply bar to one line on a phone's screen, the cancel on the bar's row", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const long = "a long line to answer, long enough to wrap twice in a narrow column, and then some more";
+    await asAccount(
+      page,
+      () => ({
+        history: [...HISTORY, ["m3", T(2), long]],
+        replayed: [tagged("m4", "agreed", { at: 3, tags: "+reply=m3", who: OTHER })],
+      }),
+      4,
+    );
+    // The words' boxes all start at one height: they are on one line.
+    const oneRow = (box: Locator) =>
+      box.evaluate((element) => {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        const tops = [...range.getClientRects()].map((rect) => rect.top);
+        return Math.max(...tops) - Math.min(...tops) < parseFloat(getComputedStyle(element).fontSize) / 2;
+      });
+    const quote = lineOf(page, "agreed").locator("p");
+    expect(await oneRow(quote)).toBe(true);
+    await replyTo(page, 2);
+    const bar = form(page).locator("p").first();
+    await expect(bar).toContainText("a long line");
+    expect(await oneRow(bar)).toBe(true);
+    const [words, cancelBox] = [await bar.boundingBox(), await cancel(page).boundingBox()];
+    expect(cancelBox?.y).toBeGreaterThanOrEqual((words?.y ?? 0) - 8);
+    expect(cancelBox?.y ?? 0).toBeLessThan((words?.y ?? 0) + (words?.height ?? 0));
   });
 
   test("answer the line of the second Reply, not the first's", async ({ page }) => {
