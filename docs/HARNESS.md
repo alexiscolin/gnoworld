@@ -168,7 +168,7 @@ tests CPU-bound raises (security-S3).
 | `scripts/check_migrations.py` | a migration `main` has, edited, moved or removed (F466), or one it cannot read |
 | gitleaks | a secret anywhere in the history; a path into a home folder or a service of the demo's host (`gitleaks-private.toml`: the repository will be public); both rule sets always run (F120); every change reaches it as text, on every branch, whatever an attribute, a NUL byte, a diff driver or a replace ref would show (F132) |
 | `pnpm audit` | a dependency with a known advisory, moderate or worse |
-| `scripts/harness_mutate.py` | when a file of the harness list changed (one list, word for word `pre-push`'s, F124): a guard of the harness that no test notices switched off; every mutant judged, over `HARNESS_SHARDS` worktrees side by side (4 by default), each tree first passing both suites untouched; `--changed <base>`, for a merge's own review, judges the mutants of the guard files committed since base, or all of them when `test_hooks.sh`, `probe.py` or `harness_mutate.py` changed. A test killed by a signal (a lack of memory under four shards) counts its mutant killed |
+| `scripts/harness_mutate.py` | when a file of the harness list changed (one list, word for word `pre-push`'s, F124): a guard of the harness that no test notices switched off; every mutant judged, over `HARNESS_SHARDS` worktrees side by side (4 by default), each tree first passing both suites untouched; `--changed <base>`, for a merge's own review, judges the mutants of the guard files committed since the last /pre-merge pass in `base..HEAD` (`docs/review-passes.txt`, found as `batch_size.py` finds its base; since base when none, and a passes file it cannot read refuses), or all of them when `test_hooks.sh`, `probe.py` or `harness_mutate.py` changed. A test killed by a signal (a lack of memory under four shards) counts its mutant killed |
 
 ## The safety net never shrinks quietly
 
@@ -276,7 +276,8 @@ costs context in every session: `chrome-devtools-mcp` (1b), `frontend-design` (2
   to add. With `ONLY` set, the probe stops at its first failing block. It runs in the full
   gate when the harness changed; its `--dry`, in the fast one, builds every mutant without a test.
   With `--changed <base>` (a merge's own) it judges the mutants of the guard files the branch
-  changed and of the test sections it changed (`scripts/suite_parts.py`), all of them when it
+  changed since its last /pre-merge pass (`repo_files.last_reviewed`: what the pass reviewed was
+  judged by that merge's own check; the full gate and CI still judge every mutant) and of the test sections it changed (`scripts/suite_parts.py`), all of them when it
   changed text outside every section, or `harness_mutate.py` itself. Its copies, and
   `prove_fix.py`'s, name their run's pid: the next run removes those of a run killed before its
   cleanup, never a live run's (`scripts/repo_files.py`). A copy's folder is never named `tree`:

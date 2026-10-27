@@ -15,15 +15,14 @@ import sys
 
 sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no __pycache__
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # -I leaves this folder off the path
-from repo_files import PASSES, fingerprint, git
+from repo_files import git, last_reviewed
 
 LIMIT, TIER_ONE = 600, 400
 PRODUCT = re.compile(r"^(app/src|packages/[^/]+/src|server/src|gno)/")
 NOT_PRODUCT = re.compile(r"(\.test\.tsx?|\.spec\.ts|\.stories\.tsx|_test\.gno|_filetest\.gno|_test\.go)$|^server/src/testing/")  # the server's test helpers
 
 base = sys.argv[1]
-reviewed = {line.split()[1] for line in open(PASSES) if line.strip() and not line.startswith("#")} if os.path.exists(PASSES) else set()
-own = next((commit for commit in git("rev-list", f"{base}..HEAD").split() if fingerprint(commit) in reviewed), base)
+own = last_reviewed(base)
 added = 0
 rows = git("diff", "-z", "--numstat", own, "HEAD").split("\0")  # a rename is "<+>\t<->\t", the old path, the new
 while rows and rows[0]:

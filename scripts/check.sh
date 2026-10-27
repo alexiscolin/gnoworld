@@ -8,7 +8,7 @@
 #   and patch coverage, mutations, and the scan of the whole history for secrets. It checks
 #   everything, and its record lets main take the code (pre-push).
 # - `--merge`, a merge's own /pre-merge: the same, but the harness mutants of the guard files the
-#   merge changed alone (Alexis, 2026-10-25); it records the fast gate only.
+#   merge changed alone, since its last recorded pass (Alexis, 2026-10-25, 2026-10-27); it records the fast gate only.
 #
 # GNO_TOOLCHAIN is the folder holding a gno that matches the chain, and its gnohome
 # (docs/DEVELOPMENT.md, "Toolchain"). Node comes from .node-version, through nvm when the

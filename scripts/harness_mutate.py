@@ -20,7 +20,7 @@ import sys
 
 sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no __pycache__
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # -I leaves this folder off the path
-from repo_files import worktree
+from repo_files import last_reviewed, worktree
 from suite_parts import select, touched
 
 WORKTREE = ""  # the throwaway worktree of HEAD, set by the run below
@@ -56,7 +56,7 @@ SECTIONS = {
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix,worktree_script",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
     "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
-    "scripts/repo_files.py": "worktrees,regressions", "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench", "scripts/suite_parts.py": "mutant_scope,harness_shards", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
+    "scripts/repo_files.py": "worktrees,regressions,batch_size,harness_shards", "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench", "scripts/suite_parts.py": "mutant_scope,harness_shards", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
 }
 
 
@@ -271,8 +271,11 @@ def mutants():
     yield from each(hm, "    finally:\n        with open(target, \"w\") as f:\n            f.write(original)\n", "    finally:\n        pass\n", "hooks", "harness_mutate puts each mutant's file back")
     yield from each(hm, "            if code " "!= 0:\n", "            if False:\n", "hooks", "harness_mutate stops on a failed control")
     yield from each(hm, "lambda c: run(*c), [(tr, te) for tr in " "trees ", "lambda c: run(*c), [(tr, te) for tr in trees[:1] ", "hooks", "harness_mutate's control runs in every tree")
+    yield from each(hm, "        since = last_reviewed" "(base)\n", "        since = base\n", "hooks", "harness_mutate --changed judges the guard files changed since the last /pre-merge pass, not since base")
+    yield from each(hm, "    except OSError" " as e:", "    except ZeroDivisionError as e:", "hooks", "harness_mutate --changed refuses a passes file it cannot read, never judging fewer mutants")
+    yield from each(hm, "        base, changed = since, " "changed_since(since)\n", "        base = since\n", "hooks", "harness_mutate --changed reads the files changed since the pass, not since base")
     yield from each(hm, "elif sys.argv[1:]" ":\n", "elif False:\n", "hooks", "harness_mutate refuses an unknown argument")
-    yield from each(hm, "    if sys.argv[2].startswith" "(\"-\"):", "    if False:", "hooks", "harness_mutate --changed takes no option for its base")
+    yield from each(hm, "    if base.startswith" "(\"-\"):", "    if False:", "hooks", "harness_mutate --changed takes no option for its base")
     yield from each(hm, "if changed is not None and SELF" " in changed:", "if False:", "hooks", "harness_mutate --changed judges every mutant when it changed itself")
     yield from each(hm, "if failures" ":\n    sys.exit", "if failures and changed is None:\n    sys.exit", "hooks", "a survivor fails harness_mutate --changed")
     yield from each(hm, "    found = " "checked()\n", "    found = list(mutants())\n", "hooks", "harness_mutate --changed still checks every mutant")
@@ -617,7 +620,9 @@ def mutants():
     yield from each("scripts/batch_size.py", "if added > TIER_ONE:", "if added >= TIER_ONE:", "hooks", "batch_size says the tier-1 limit past 400, not at it (G8)")
     yield from each("scripts/batch_size.py", "    if not path:", "    if False:", "hooks", "batch_size reads a renamed file at its new path (G8)")
     yield from each("scripts/batch_size.py", "|^server/src/testing/", "", "hooks", "batch_size leaves the server's test helpers out (G8)")
-    yield from each("scripts/batch_size.py", "if fingerprint(commit) in reviewed", "if False", "hooks", "batch_size counts from the last reviewed commit")
+    rf = "scripts/repo_files.py"
+    yield from each(rf, "if fingerprint(commit) in reviewed", "if False", "hooks", "batch_size counts from the last reviewed commit, harness_mutate --changed from the last pass")
+    yield from each(rf, "if os.path.exists(PASSES) else set()", "if False else set()", "hooks", "last_reviewed reads the passes file")
     yield from each("scripts/batch_size.py", r"(\.test\.tsx?|", "(", "hooks", "batch_size leaves the tests out")
     yield from each("scripts/batch_size.py", "if added > TIER_ONE:", "if False:", "hooks", "batch_size says the tier-1 limit")
     sized = '\t\tstep batch_size # a merge\'s own product code is a small batch (DORA; docs/REVIEW.md)\n\t\tpython3 -I scripts/batch_size.py "$base"\n'
@@ -810,14 +815,27 @@ def suite_touched(base, suite):
     return None if old.returncode or new.returncode else touched(suite, old.stdout, new.stdout)
 
 
+def changed_since(base):
+    """The files committed since base; a base git cannot compare with stops the run."""
+    diff = subprocess.run(["git", "diff", "--name-only", base, "HEAD", "--"], capture_output=True, text=True)
+    if diff.returncode != 0:
+        sys.exit(f"harness_mutate: --changed {base}: git cannot compare with it: {diff.stderr.strip()}")
+    return set(diff.stdout.splitlines())
+
+
 changed = None
 if sys.argv[1:2] == ["--changed"] and len(sys.argv) == 3:
-    if sys.argv[2].startswith("-"):  # git would read it as an option
-        sys.exit(f"harness_mutate: --changed {sys.argv[2]}: a base is a commit, not an option")
-    diff = subprocess.run(["git", "diff", "--name-only", sys.argv[2], "HEAD", "--"], capture_output=True, text=True)
-    if diff.returncode != 0:
-        sys.exit(f"harness_mutate: --changed {sys.argv[2]}: git cannot compare with it: {diff.stderr.strip()}")
-    changed = set(diff.stdout.splitlines())
+    base = sys.argv[2]
+    if base.startswith("-"):  # git would read it as an option
+        sys.exit(f"harness_mutate: --changed {base}: a base is a commit, not an option")
+    changed = changed_since(base)
+    try:  # the last /pre-merge pass already judged what came before it, as batch_size.py's base is that pass
+        since = last_reviewed(base)
+    except OSError as e:  # never fewer mutants than the pass allows: a file that cannot be read is no pass
+        sys.exit(f"harness_mutate: --changed {base}: cannot read the passes file ({e}); fix it first")
+    if since != base:
+        print(f"harness_mutate: the last /pre-merge pass is {since[:12]}: the guard files changed since it, not since {base}")
+        base, changed = since, changed_since(since)
 elif sys.argv[1:]:
     sys.exit("usage: harness_mutate.py [--dry | --changed <base>]")
 shards = max(1, int(os.environ.get("HARNESS_SHARDS", "4")))
@@ -827,12 +845,12 @@ with contextlib.ExitStack() as stack:
     WORKTREE = trees[0]
     found = checked()
     if changed is not None and SELF in changed:
-        print(f"harness_mutate: {SELF} changed since {sys.argv[2]}: every mutant")
+        print(f"harness_mutate: {SELF} changed since {base}: every mutant")
     elif changed is not None:
         total = len(found)
-        touched_by = {test: suite_touched(sys.argv[2], suite) for test, suite in SUITE_OF.items() if suite in changed}
+        touched_by = {test: suite_touched(base, suite) for test, suite in SUITE_OF.items() if suite in changed}
         found = select(found, changed, touched_by, sections)
-        print(f"harness_mutate: the guard files and the suites' sections changed since {sys.argv[2]}: {len(found)} of {total} mutants")
+        print(f"harness_mutate: the guard files and the suites' sections changed since {base}: {len(found)} of {total} mutants")
     with concurrent.futures.ThreadPoolExecutor(shards * len(TESTS)) as pool:
         # The control: an untouched copy passes, so a failure means the mutant.
         for (tree, test), code in zip([(tr, te) for tr in trees for te in TESTS], pool.map(lambda c: run(*c), [(tr, te) for tr in trees for te in TESTS])):
