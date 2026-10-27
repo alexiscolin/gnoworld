@@ -237,6 +237,33 @@ describe("the store's notices slice", () => {
     });
   });
 
+  // F1674 (CR2): a notice of a partner the store no longer keeps, or the account no longer hears, had no row to open or
+  // to mark seen, yet counted in the tab title and the list.
+  describe("a conversation the store drops", () => {
+    it("counts a partner's notice only while the store keeps the partner and the account hears from it", () => {
+      const t = setup();
+      t.kept(ALICE);
+      t.notices.add(notice({ id: "d", kind: "dm", where: ALICE }));
+      expect(badgeOf(t.state(), ALICE)).toBe(1);
+      expect(totalUnseen(t.state())).toBe(1);
+      t.store.getState().dmActions.begin();
+      expect(badgeOf(t.state(), ALICE)).toBe(0);
+      expect(totalUnseen(t.state())).toBe(0);
+      expect(unseenNotices(t.state())).toEqual([]);
+    });
+
+    it("counts none of a stranger's once the account hears from those it wrote to alone", () => {
+      const t = setup();
+      t.kept(ALICE, BOB);
+      t.notices.add(notice({ id: "a", kind: "dm", where: ALICE }));
+      t.notices.add(notice({ id: "b", kind: "dm", where: BOB }));
+      t.store.getState().dmActions.setOnlyKnown(true);
+      expect(totalUnseen(t.state())).toBe(0);
+      t.store.getState().dmActions.setOnlyKnown(false);
+      expect(totalUnseen(t.state())).toBe(2);
+    });
+  });
+
   describe("a room's mode", () => {
     it("is mentions, the default, until the reader chooses another, and is read by its own key only", () => {
       const t = setup();
