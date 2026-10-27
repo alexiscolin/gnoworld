@@ -100,8 +100,8 @@ function linked(edit: Edit): Edit {
 }
 
 // The start of each line the selection touches (the caret's line, for a caret; a selection ending at a line's very
-// start leaves that line out), put on or taken off, or another list's turned to this one's; the selection on the same
-// letters. It comes off only when every line has it.
+// start leaves that line out), put on, taken off or turned to another list's; the selection on the same letters. It
+// comes off when every line with text has it. A blank line is bare in a list, marked in a quote, which a bare one ends.
 function started({ text, start, end }: Edit, format: keyof typeof STARTS): Edit {
   const from = text.slice(0, start).lastIndexOf("\n") + 1;
   const last = end > start && text[end - 1] === "\n" ? end - 1 : end;
@@ -109,7 +109,11 @@ function started({ text, start, end }: Edit, format: keyof typeof STARTS): Edit 
   const to = found === -1 ? text.length : found;
   const lines = text.slice(from, to).split("\n");
   const existing = lines.map((line) => (format === "quote" ? /^> / : LIST).exec(line)?.[0] ?? "");
-  const prefix = existing.every((mark) => SAME[format].test(mark)) ? "" : STARTS[format];
+  // A caret on a blank line alone starts it: it is the only line there is.
+  const hasText = lines.some((line) => line.trim() !== "");
+  const blank = (n: number) => hasText && lines[n]?.trim() === "";
+  const prefix = existing.every((mark, n) => blank(n) || SAME[format].test(mark)) ? "" : STARTS[format];
+  const given = (n: number) => (blank(n) && format !== "quote" ? "" : prefix);
   // A position stays on its letter: after the line's new start when it was within the old one, and past the lines above
   // by what they gained or lost.
   const moved = (at: number): number => {
@@ -117,12 +121,12 @@ function started({ text, start, end }: Edit, format: keyof typeof STARTS): Edit 
     let shift = 0;
     for (const [n, line] of lines.entries()) {
       const mark = existing[n]?.length ?? 0;
-      if (at <= before + line.length) return before + shift + Math.max(at - before - mark, 0) + prefix.length;
+      if (at <= before + line.length) return before + shift + Math.max(at - before - mark, 0) + given(n).length;
       before += line.length + 1;
-      shift += prefix.length - mark;
+      shift += given(n).length - mark;
     }
     return at + shift;
   };
-  const changed = lines.map((line, n) => prefix + line.slice(existing[n]?.length ?? 0)).join("\n");
+  const changed = lines.map((line, n) => given(n) + line.slice(existing[n]?.length ?? 0)).join("\n");
   return { text: text.slice(0, from) + changed + text.slice(to), start: moved(start), end: moved(end) };
 }

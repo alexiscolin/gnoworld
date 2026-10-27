@@ -113,6 +113,23 @@ describe("formatted", () => {
     expect(apply(before, format)).toStrictEqual(draft(after));
   });
 
+  // F1715 (CR3): a blank line between marked lines has no mark, so the toggle never turned off; a list leaves the blank
+  // line bare when it starts the lines (an empty item is no text), a quote goes on through it.
+  it.each([
+    ["«- a\n\n- b»", "bulleted", "«a\n\nb»"],
+    ["«1. a\n\n1. b»", "numbered", "«a\n\nb»"],
+    ["«> a\n\n> b»", "quote", "«a\n\nb»"],
+    ["«- a\n  \n- b»", "bulleted", "«a\n  \nb»"],
+    ["«a\n\nb»", "bulleted", "- «a\n\n- b»"],
+    ["«a\n\nb»", "numbered", "1. «a\n\n1. b»"],
+    ["«- a\n\nb»", "numbered", "1. «a\n\n1. b»"],
+    ["«- a\n\nb»", "bulleted", "- «a\n\n- b»"],
+    ["a\n|\nb", "bulleted", "a\n- |\nb"],
+    ["a\n|\nb", "quote", "a\n> |\nb"],
+  ] as const)("treats the blank line of %j as no line of a %s: %j", (before, format, after) => {
+    expect(apply(before, format)).toStrictEqual(draft(after));
+  });
+
   it("keeps the caret on the same letter when a line's start changes", () => {
     expect(formatted({ text: "hello", start: 2, end: 4 }, "quote")).toStrictEqual({
       text: "> hello",
