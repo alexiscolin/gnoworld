@@ -166,9 +166,14 @@ test.describe("notifications", () => {
   });
 
   test("counts nothing for a direct message arriving in the conversation in view", async ({ page }) => {
-    const { address, ergo } = await account(page);
+    const { address, ergo, sent } = await account(page);
+    const registered = () => sent.filter((line) => line.startsWith("USER ")).length;
+    const before = registered();
     await page.goto(`/w/bubble?dm=${OTHER}`);
     await expect(page.getByRole("heading", { name: `Direct message with ${OTHER_SHORT}` })).toBeVisible();
+    // The reload opens a socket of its own: a line said before its registration went to the old one, or came before
+    // the welcome that tells the page who it is (a load of 35 or more lost it in 4 runs of 7).
+    await expect.poll(registered).toBeGreaterThan(before);
     ergo().send(`@msgid=d1;time=${T(31)};account=${OTHER} :${OTHER}!u@h PRIVMSG ${address} :hello there`);
     ergo().send(`@msgid=d2;time=${T(32)};account=${OTHER} :${OTHER}!u@h PRIVMSG ${address} :a barrier`);
     await expect(page.getByText("a barrier")).toBeVisible();
