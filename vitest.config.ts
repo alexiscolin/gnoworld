@@ -19,6 +19,7 @@ export default defineConfig({
             "packages/ui/**",
             "app/src/features/chat/Lines.test.tsx",
             "app/src/features/chat/composing.test.tsx",
+            "app/src/features/chat/lineFlash.test.tsx",
             ...SLOW,
           ],
         },
