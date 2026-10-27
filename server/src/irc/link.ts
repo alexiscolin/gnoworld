@@ -73,8 +73,14 @@ export function ircLink(options: Options): Link {
     }, pingMs);
     s.on("connect", () => {
       // multi-prefix: NAMES gives each person every power, so the reconciler reads a voiced operator whole;
-      // sasl: the bot logs in as its account, which holds its nick (slice 3's max review).
-      s.write(line("CAP", ["REQ", "message-tags account-tag batch draft/chathistory server-time multi-prefix sasl"]));
+      // sasl: the bot logs in as its account, which holds its nick (slice 3's max review); message-redaction:
+      // Ergo tells a room's members each REDACT, the bot's own hide too (irc/handlers.go:3010), for the pins.
+      s.write(
+        line("CAP", [
+          "REQ",
+          "message-tags account-tag batch draft/chathistory server-time multi-prefix sasl draft/message-redaction",
+        ]),
+      );
       s.write(line("NICK", [NICK]));
       s.write(line("USER", [NICK, "0", "*", "gno.world"]));
     });
