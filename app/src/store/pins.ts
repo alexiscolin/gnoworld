@@ -38,7 +38,11 @@ export const pinsSlice: StateCreator<PinsSlice> = (set, get) => {
   const gone = new Set<string>();
   const redacted = (room: string, id: string): void => {
     gone.add(`${room} ${id}`);
-    for (const old of [...gone].slice(0, -GONE_KEPT)) gone.delete(old);
+    // A Set walks in insertion order: the first is the oldest, and at most one is past the bound.
+    for (const old of gone) {
+      if (gone.size <= GONE_KEPT) break;
+      gone.delete(old);
+    }
     const { pins } = get();
     const held = own(pins, room);
     if (held?.pins.some((pin) => pin.id === id) !== true) return;
