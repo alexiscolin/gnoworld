@@ -14,6 +14,20 @@ describe("Field", () => {
     expect(box.getAttribute("aria-describedby")).toBe(screen.getByText("Up to 32 letters").id);
   });
 
+  // What the box is about, said elsewhere on the page (a composer's reply bar), describes it after its help.
+  it("is described by the elements named, after its help", () => {
+    render(
+      <>
+        <p id="about">Replying to Alice</p>
+        <Field label="Message" help="Enter sends" describedBy="about" value="" onChange={vi.fn()} />
+      </>,
+    );
+    const said = (screen.getByRole("textbox", { name: "Message" }).getAttribute("aria-describedby") ?? "")
+      .split(" ")
+      .map((id) => document.getElementById(id)?.textContent);
+    expect(said).toEqual(["Enter sends", "Replying to Alice"]);
+  });
+
   it("says its error, as invalid and described by it, beside its help", () => {
     render(<Field label="Name" help="On gno.land" error="Taken already" value="x" onChange={vi.fn()} />);
     const box = screen.getByRole("textbox", { name: "Name" });

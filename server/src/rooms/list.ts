@@ -6,6 +6,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { RoomList, type ApiError } from "@gnoworld/schemas";
 import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
+import { z } from "zod";
 import { worldRooms } from "./rooms.ts";
 import { roomType, type Typed } from "./types.ts";
 
@@ -39,7 +40,7 @@ function sectionsOf(roles: Typed, world: string, seen: readonly string[]): RoomL
 }
 
 // A world's slug, 64 characters at most, as the activity route asks.
-const World = RoomList.shape.world.max(64);
+const World = RoomList.shape.world.check(z.maxLength(64));
 
 export function listRoutes({ db, roles, visible, session = () => undefined }: Options): Hono {
   const app = new Hono();

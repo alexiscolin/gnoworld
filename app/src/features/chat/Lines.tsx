@@ -2,130 +2,65 @@
 // newest while the reader is there; a line's text is Markdown (4c), built into elements from an allowlist
 // (Message.tsx); one that mentions the reader says so (4d). The message menu (4c, docs/decisions.md 2026-10-26): the
 // list is one tab stop, a line, the arrows moving among them; a line pointed at or focused shows its bar.
-import { markdown, mentions, type Block, type Line } from "@gnoworld/core";
+import {
+  foldEdits,
+  reactionsOn,
+  type Line,
+  type Reacting,
+  type Reaction,
+  type Shown,
+  type ShownLine,
+} from "@gnoworld/core";
+import type { StreamEvent } from "@gnoworld/schemas";
 import { Flash, type FlashMessage } from "@gnoworld/ui";
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { LineActions } from "./LineActions.tsx";
+import { useCopy, useRemoval } from "./lineFlash.ts";
 import { useLineFocus } from "./lineFocus.ts";
-import { Markdown } from "./Message.tsx";
-import { roomHref } from "./names.ts";
-import { Person } from "./Person.tsx";
+import { LineView } from "./LineView.tsx";
+import { useNewMark, useReadAtEnd } from "./reading.ts";
+import { chipsOf } from "./Reactions.tsx";
 import shared from "./lists.module.css";
 import styles from "./RoomView.module.css";
 
-// A line's look by its kind: a message plain, a notice and an /me apart.
-const KINDS: Record<Line["kind"], string | undefined> = {
-  message: undefined,
-  notice: styles["notice"],
-  action: styles["action"],
-};
 const LINES = [shared["plain"], shared["scrolls"], styles["lines"]].join(" ");
-const CLOCK = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
-
-// A line's mentions, space-separated, read apart from its drawing so the compiler keeps the drawing's tree out of
-// what a change of members recomputes.
-const namesOf = (text: string): string => mentions(markdown(text)).join(" ");
-
-// The addresses of `names` (a line's mentions, space-separated) that are members, as one string.
-const knownOf = (names: string, members: ReadonlySet<string>): string =>
-  names
-    .split(" ")
-    .filter((address) => members.has(address))
-    .join(" ");
-
-// A line's text drawn, its mentions of `known` (space-separated) shortened. A component of its own, with a string the
-// compiler compares by value: the line keeps its drawing while others join and leave (F812's cost).
-// Its links are Tab stops on the list's stop alone (U1).
-interface LineTextProps {
-  blocks: readonly Block[];
-  me: string | undefined;
-  known: string;
-  stop: boolean;
-}
-
-function LineText({ blocks, me, known, stop }: LineTextProps) {
-  return (
-    <Markdown blocks={blocks} className={styles["text"]} me={me} members={new Set(known.split(" "))} tabbable={stop} />
-  );
-}
-
-// A line, read once: drawn, and asked whether it mentions the reader, which a word says as well as its colour; a
-// mention shortened for the reader and the room's members alone (F812). A change of members reads its mentions
-// again, never its drawing.
-interface LineViewProps {
-  line: Line;
-  me: string | undefined;
-  members: ReadonlySet<string>;
-  /** Whether it is the list's one tab stop. */
-  stop: boolean;
-  /** Its bar, while pointed at or focused. */
-  actions: ReactNode;
-}
-
-function LineView({ line, me, members, stop, actions }: LineViewProps) {
-  const blocks = markdown(line.text);
-  const names = namesOf(line.text);
-  const mentioned = names.split(" ").some((address) => address === me);
-  const known = knownOf(names, members);
-  return (
-    <li className={KINDS[line.kind]} data-about-me={mentioned ? "" : undefined} tabIndex={stop ? 0 : -1}>
-      {/* The line's marks first, before the time: where no sender's words stand (F808). */}
-      {mentioned ? <span className={styles["mentionsYou"]}>Mentions you </span> : null}
-      {line.kind === "notice" ? <span className={styles["mark"]}>Notice </span> : null}
-      <time dateTime={line.time} className={styles["time"]}>
-        {CLOCK.format(new Date(line.time))}
-      </time>{" "}
-      {line.kind === "action" ? "* " : null}
-      <Person name={line.account ?? line.from} guest={line.account === undefined} />{" "}
-      <LineText blocks={blocks} me={me} known={known} stop={stop} />
-      {actions}
-    </li>
-  );
-}
 
 // How near the end, in pixels, the reader still reads the newest line.
 const AT_END = 32;
 
-// The lines held at their newest while the reader is there; once scrolled up, left where the reader is.
-function useNewestInView(lines: readonly Line[]) {
+// Whether a list is scrolled to its end, or within AT_END of it.
+const atEnd = (box: HTMLElement) => box.scrollHeight - box.scrollTop - box.clientHeight < AT_END;
+
+// The lines held at their newest while the reader is there, as a line comes or a reaction grows one (the code review's
+// CR3); once scrolled up, left where the reader is. A room with news opens on its New line, `fresh`, once (UX review's
+// U1), and the reader is at the end only if that shows it.
+function useNewestInView(
+  lines: readonly Line[],
+  fresh: string | undefined,
+  reactions: readonly Reaction[] | undefined,
+) {
   const listRef = useRef<HTMLOListElement>(null);
   const atEndRef = useRef(true);
+  const placedRef = useRef(false);
   useLayoutEffect(() => {
-    if (listRef.current !== null && atEndRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
-  }, [lines]);
-  const onScroll = () => {
     const box = listRef.current;
-    if (box !== null) atEndRef.current = box.scrollHeight - box.scrollTop - box.clientHeight < AT_END;
+    if (box === null) return;
+    const item = fresh === undefined || placedRef.current ? null : box.querySelector(":scope > li[data-new]");
+    if (item !== null) {
+      placedRef.current = true;
+      box.scrollTop += item.getBoundingClientRect().top - box.getBoundingClientRect().top;
+      atEndRef.current = atEnd(box);
+    } else if (atEndRef.current) box.scrollTop = box.scrollHeight;
+  }, [lines, fresh, reactions]);
+  const onScroll = () => {
+    if (listRef.current !== null) atEndRef.current = atEnd(listRef.current);
   };
-  return { listRef, onScroll };
-}
-
-// What a copy says, in the room's flash: done, or not and why, a page with no clipboard (a plain http origin) included.
-function useCopy(room: string) {
-  const [said, setSaid] = useState<FlashMessage | null>(null);
-  const copy = (line: Line, what: "text" | "link") => {
-    setSaid(null);
-    const text = what === "text" ? line.text : new URL(roomHref(room), location.href).href;
-    // A page with no clipboard throws at once: inside a then, it fails as a refusal does.
-    Promise.resolve()
-      .then(() => navigator.clipboard.writeText(text))
-      .then(
-        () => {
-          setSaid({ title: what === "text" ? "Text copied." : "Link copied." });
-        },
-        () => {
-          setSaid({
-            title: what === "text" ? "Could not copy the text." : "Could not copy the link.",
-            line: "Your browser blocked the clipboard.",
-          });
-        },
-      );
-  };
-  return { said, setSaid, copy };
+  return { listRef, atEndRef, onScroll };
 }
 
 export interface LinesProps {
-  room: string;
+  /** The room, whose lines have bars; none for a direct message's, which have none. */
+  room: string | undefined;
   lines: readonly Line[];
   members: readonly string[];
   /** The reader's address, the lines that mention it marked; none for a guest. */
@@ -134,51 +69,87 @@ export interface LinesProps {
   refused?: string | undefined;
   /** Whether the chat is connected: a delete that cannot go out says why (U8). */
   connected: boolean;
-  /** Deletes a line, the reader's own; whether it went out. */
-  onDelete: (id: string) => boolean;
+  /** Deletes a line, the reader's own; whether it went out. A room's view may leave out what a line's actions do:
+   * nothing then, and a delete or a reaction never goes out. */
+  onDelete?: ((id: string) => boolean) | undefined;
   /** The room's flash said Ergo's refusal of a delete. */
-  onDismiss: () => void;
+  onDismiss?: (() => void) | undefined;
+  /** The room's reactions (4d), shown under their lines. */
+  reactions?: readonly Reaction[] | undefined;
+  /** Reacts to a line, or takes the reaction back, an account's; whether it went out. */
+  onReact?: ((reaction: Reacting) => boolean) | undefined;
+  /** Ergo refused a reaction the page sent here, said until dismissed (4d). */
+  cannotReact?: true | undefined;
+  /** Makes a line, by its msgid, the one the composer's next answers (4d). */
+  onReply?: ((id: string) => void) | undefined;
+  /** The time of the last line the account read here, Ergo's (4f); none while unknown. */
+  read?: string | undefined;
+  /** The room's history page came: the New mark waits on it, as a live line may come before it (4f's G1). */
+  paged?: boolean;
+  /** The room read to its line `id`, the newest, while the reader is at the end and the page shows. */
+  onRead?: ((id: string) => void) | undefined;
+  /** The room's lines' verdicts, by msgid, from the server's stream (4g). */
+  verdicts?: Readonly<Record<string, StreamEvent["state"]>> | undefined;
+  /** Whether the reader saves data (ADR-0002 §8): then no player is offered (4g, F893). */
+  saving?: boolean;
 }
 
+// What a line's actions do when a view gives none: nothing goes out.
+const NO_DELETE = () => false;
+const NO_DISMISS = () => undefined;
+const NO_REACT = () => false;
+const NO_REPLY = () => undefined;
+
+// What Ergo refused, said until the page dismisses it: a delete first, then a reaction; none, the page's own word.
+const toldOf = (refused: string | undefined, cannotReact: true | undefined): FlashMessage | undefined => {
+  if (refused !== undefined) return { title: "Could not delete the message.", line: "The chat refused it." };
+  return cannotReact === undefined ? undefined : { title: "Could not react." };
+};
+
+// What the list takes of the room: its lines as shown, what each shows of the reactions, and the line a msgid names.
+type ListProps = Omit<LinesProps, "lines"> & {
+  lines: readonly ShownLine[];
+  shown: ReadonlyMap<string, readonly Shown[]>;
+  lineOf: (id: string) => string;
+};
+
 /** The room's flash, then its lines, oldest first, as a list a screen reader hears grow. */
-export function Lines({ room, lines, members, me, refused, connected, onDelete, onDismiss }: LinesProps) {
-  const { listRef, onScroll } = useNewestInView(lines);
-  const { stop, mounted, on, leave } = useLineFocus(lines, listRef);
-  const { said, setSaid, copy } = useCopy(room);
-  // A delete gone out and not answered yet: its line offers no second one; Ergo's echo, taking the line, is said, and
-  // its refusal ends it too (U4). ponytail: a line trimmed out of the window meanwhile reads as deleted, in the
-  // milliseconds a REDACT waits for its echo.
-  const [deleting, setDeleting] = useState<string>();
-  if (deleting !== undefined && (refused === deleting || !lines.some((line) => line.id === deleting))) {
-    setDeleting(undefined);
-    if (refused !== deleting) setSaid({ title: "Message deleted." });
-  }
+export function Lines(props: LinesProps) {
+  // The room's lines as shown: each corrected by its author's newest edit, the edits gone (4d, F664). Folded here, in a
+  // component with no hook, as the compiler leaves a fold among hooks unmemoized: a pointer over a line folded the room
+  // again (F1221).
+  const { shown: lines, folded } = foldEdits(props.lines);
+  // What a plain client answers or reacts to by a folded edit's own msgid reaches the line it corrects (CR5).
+  const lineOf = (id: string) => folded.get(id) ?? id;
+  const shown = reactionsOn(props.reactions ?? [], props.me, lineOf);
+  return <List {...props} lines={lines} shown={shown} lineOf={lineOf} />;
+}
+
+function List(props: ListProps) {
+  const { room, members, me, refused, connected, reactions, cannotReact, lines, shown, lineOf } = props;
+  const { onDelete = NO_DELETE, onDismiss = NO_DISMISS, onReact = NO_REACT, onReply = NO_REPLY } = props;
+  const { read, paged = false, onRead, verdicts, saving = false } = props;
+  const fresh = useNewMark(lines, paged ? read : undefined, me);
+  const { listRef, atEndRef, onScroll } = useNewestInView(lines, fresh, reactions);
+  const look = useReadAtEnd(lines, atEndRef, paged ? onRead : undefined);
+  const { stop, mounted, on, leave } = useLineFocus(lines, listRef, fresh);
+  const { said, setSaid, copy } = useCopy();
+  const [deleting, remove] = useRemoval({ lines, refused, connected, onDelete, leave, setSaid });
+  // Each line's chips as a string a line compares by value (F1222).
+  const chips = new Map([...shown].map(([id, each]) => [id, chipsOf(each)]));
+  // A reply's line by its msgid, this room's alone: a reply naming its own msgid or another room's answers none here.
+  const byId = new Map(lines.map((line) => [line.id, line]));
   // Who a mention may shorten (F812): the members, and the authors in view by their account tag, who proved their
   // key as a member did (F819).
   const known = new Set([...members, ...lines.flatMap(({ account }) => (account === undefined ? [] : [account]))]);
-  // A delete that went out hands the focus to a neighbour; one that could not says so and why, the line kept
-  // (/code-review, U8): the chat out of reach, to try again once back, or a msgid no command carries.
-  const remove = (id: string): boolean => {
-    const went = onDelete(id);
-    if (went) {
-      setDeleting(id);
-      leave(id);
-    } else if (connected) setSaid({ title: "Could not delete the message.", line: "This message cannot be deleted." });
-    else {
-      setSaid({
-        title: "Could not delete the message.",
-        line: "The chat is out of reach.",
-        action: {
-          label: "Try again",
-          onAction: () => {
-            remove(id);
-          },
-        },
-      });
-    }
+  // A reaction that could not go out says so at once; one Ergo refuses, when it answers (cannotReact).
+  const react = (reaction: Reacting) => {
+    const went = onReact(reaction);
+    if (!went) setSaid({ title: "Could not react." });
     return went;
   };
-  const actionsOf = (line: Line) => (
+  const told = toldOf(refused, cannotReact);
+  const actionsOf = (line: Line, room: string) => (
     <LineActions
       line={line}
       room={room}
@@ -186,25 +157,31 @@ export function Lines({ room, lines, members, me, refused, connected, onDelete, 
       deleting={line.id === deleting}
       onCopy={(what) => {
         onDismiss();
-        copy(line, what);
+        copy(line, what, room);
       }}
       onDelete={remove}
+      reactions={shown.get(line.id)}
+      onReact={(emoji, on) => react({ to: line.id, emoji, on })}
+      onReply={() => {
+        onReply(line.id);
+      }}
     />
   );
   return (
     <>
       <Flash
-        message={
-          refused === undefined ? said : { title: "Could not delete the message.", line: "The chat refused it." }
-        }
+        message={told ?? said}
         onClose={() => {
-          if (refused === undefined) setSaid(null);
+          if (told === undefined) setSaid(null);
           else onDismiss();
         }}
       />
       <ol
         ref={listRef}
-        onScroll={onScroll}
+        onScroll={() => {
+          onScroll();
+          look();
+        }}
         {...on}
         aria-label="Messages"
         // How the keyboard moves among the lines, which nothing else tells a screen reader (U14).
@@ -220,7 +197,13 @@ export function Lines({ room, lines, members, me, refused, connected, onDelete, 
             me={me}
             members={known}
             stop={line.id === stop}
-            actions={mounted(line.id) ? actionsOf(line) : null}
+            actions={room !== undefined && mounted(line.id) ? actionsOf(line, room) : null}
+            fresh={line.id === fresh}
+            verdict={verdicts?.[line.id]}
+            players={room !== undefined && !saving}
+            chips={chips.get(line.id)}
+            react={me === undefined || !shown.has(line.id) ? undefined : react}
+            answers={line.reply === line.id ? undefined : byId.get(lineOf(line.reply ?? ""))}
           />
         ))}
       </ol>

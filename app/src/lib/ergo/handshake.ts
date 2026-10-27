@@ -6,7 +6,7 @@ import type { IrcMessage } from "@gnoworld/core";
 export const CAPS =
   "message-tags server-time account-tag echo-message batch labeled-response sasl draft/chathistory " +
   "draft/event-playback draft/message-redaction account-notify extended-join multi-prefix draft/metadata-2 standard-replies " +
-  "draft/multiline";
+  "draft/read-marker draft/multiline";
 /** The capability a message of several lines needs; an Ergo without it NAKs the whole request. */
 const MULTILINE_CAP = "draft/multiline";
 /** The same, asked again of an Ergo that offers no draft/multiline: its drafts go a line at a time. */

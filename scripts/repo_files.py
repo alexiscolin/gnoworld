@@ -61,7 +61,9 @@ def worktree(rev):
     with tempfile.TemporaryDirectory() as where:
         with open(os.path.join(where, "owner"), "w") as f:
             f.write(str(os.getpid()))
-        tree = os.path.join(where, "tree")
+        # A name of its own: git registers the copy as .git/worktrees/<basename>, and the sandbox refuses to create
+        # exactly `tree` there (F1191); two runs at once never share a name either.
+        tree = os.path.join(where, "tree-" + os.path.basename(where))
         git("worktree", "add", "-q", "--detach", tree, rev)
         try:
             subprocess.run(["sh", os.path.join(os.path.dirname(os.path.abspath(__file__)), "borrow_node_modules.sh"), tree], check=True)

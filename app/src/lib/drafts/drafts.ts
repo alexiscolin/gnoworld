@@ -10,7 +10,7 @@ import { z } from "../jitless.ts";
  * at most (core's MULTILINE_BYTES), one UTF-16 unit being a byte or more, so every draft the composer lets go is kept,
  * once its lines' ends are trimmed as compose trims them (a draft past the limit is kept so: those spaces were no text). */
 export const DRAFT_LIMIT = 4096;
-const Draft = z.string().max(DRAFT_LIMIT);
+const Draft = z.string().check(z.maxLength(DRAFT_LIMIT));
 
 // The draft as compose reads it, as far as its size goes: each line's spaces and tabs at the end, and the draft's
 // ends, trimmed. A control character at a line's end, which compose reads as a space, is not (it keeps the draft's size).

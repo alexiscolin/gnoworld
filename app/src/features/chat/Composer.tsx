@@ -6,12 +6,20 @@
 // bar wraps the selection in Markdown's marks; the line shows below as it reads.
 import { COMMANDS, compose, MULTILINE_BYTES, MULTILINE_LINES, type Composed } from "@gnoworld/core";
 import { Button, Cluster, Field, IconButton, Sidebar, Stack, type FieldProps, type IconName } from "@gnoworld/ui";
-import { useLayoutEffect, useRef, useState, type KeyboardEvent, type SubmitEvent } from "react";
+import { useRef, useState, type KeyboardEvent, type SubmitEvent } from "react";
 import { completed, completions, type Completion } from "./complete.ts";
+import { useFocusAtStart, useRefusal, useSelection, type Refused } from "./composerHooks.ts";
 import { formatted, type Edit, type Format } from "./format.ts";
 import { Message } from "./Message.tsx";
 import { peopleOf, roomLabel, shortAddress } from "./names.ts";
+import { useAnswering } from "./ReplyBar.tsx";
+import type { Answered } from "./Replying.tsx";
 import styles from "./Composer.module.css";
+
+// What the field says while it has nothing else to say: the room is told of the typing from the first key (4f; its
+// switch waits for slice 8's settings, docs/decisions.md 2026-10-26), which the writer reads here (UX review's U9).
+const TELLS = "People in this room see when you type.";
+const ADDS_LINE = "Shift+Enter adds a line.";
 
 /** The bytes left from which the composer counts them. */
 export const NEAR = 50;
@@ -32,6 +40,14 @@ const bytes = (count: number) => `${String(count)} ${count === 1 ? "byte" : "byt
 // An option as the help names it: an account by its short address.
 const named = (option: string) => (option.startsWith("@") ? `@${shortAddress(option.slice(1))}` : option);
 
+/** What an edit leaving `draft` tells the room of the account's typing (IRCv3's +typing), read as compose reads a
+ * draft: text is active, an empty field done, a slash command nothing (the spec's), `//` text. */
+export function typingOf(draft: string): "active" | "done" | undefined {
+  const text = draft.replaceAll(/\p{Cc}/gu, " ").trim();
+  if (text === "") return "done";
+  return text.startsWith("/") && !text.startsWith("//") ? undefined : "active";
+}
+
 const plural = (count: number, unit: string) => `${String(count)} ${unit}${count === 1 ? "" : "s"}`;
 
 // Why a draft is too long: the line of several (named, from 1), the line, or the message past its lines or its bytes.
@@ -49,9 +65,9 @@ function tooLong(composed: Extract<Composed, { kind: "long" | "tooBig" }>): stri
 
 /** What the field says of the draft: that it was not sent or is too long (a line of several named, a message past
  * its lines or bytes), what Tab completes (a command not yet typed whole being no error), an unknown command, or
- * help near the end; or, said of nothing else, that Shift+Enter adds a line. */
+ * help near the end; or nothing. */
 export function said(composed: Composed, failed: boolean, completion?: Completion): Pick<FieldProps, "error" | "help"> {
-  if (failed) return { error: "Not sent: the chat is not in this room yet. Try again in a moment." };
+  if (failed) return { error: "Not sent: the chat is not ready yet. Try again in a moment." };
   if (composed.kind === "long" || composed.kind === "tooBig") return { error: tooLong(composed) };
   if (completion !== undefined) {
     const [first = "", ...rest] = completion.options.map(named);
@@ -111,48 +127,66 @@ export interface ComposerProps {
   /** The world's rooms by label, and the room's members, whose other accounts a word after `@` completes to. */
   rooms: readonly string[];
   members: readonly string[];
-  /** Sends the draft as composed; whether it went. */
-  onSay: (composed: Composed) => boolean;
+  /** Sends the draft as composed (and as written, which a refused direct message puts back); whether it went. */
+  onSay: (composed: Composed, draft: string) => boolean;
   /** Where the draft starts: the room's, kept on the device (4d). */
   draft?: string | undefined;
   /** Each change of the draft, for the device to keep; a line sent leaves it blank. */
   onDraft?: ((draft: string) => void) | undefined;
+  /** What each change of the draft tells the room of the account's typing (4f). */
+  onTyping?: ((state: "active" | "done") => void) | undefined;
+  /** The name of whom it writes to, in place of the room's: a direct message's partner (4e). */
+  label?: string | undefined;
+  /** The lines Ergo refused so far, the last one's draft, and why it did not go (4e: a direct message to an account
+   * not connected). One more while the composer is in view puts its draft back in the box. */
+  refused?: Refused | undefined;
+  /** Takes the focus as it starts: a direct message just opened from who is here, whose button went (4e's U12). */
+  focus?: boolean | undefined;
+  /** The id of what describes whom it writes to: a direct message's "not encrypted" (4e's U6). */
+  describedBy?: string | undefined;
+  /** The line the next one answers (4d's replies), said over the field; how many times Reply was asked, each asking
+   * putting the focus in the field; and how to answer none. */
+  replying?: Answered | undefined;
+  asked?: number | undefined;
+  onCancelReply?: (() => void) | undefined;
 }
 
-export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", onDraft }: ComposerProps) {
+// Nothing else to say, no error either: how to add a line, and the disclosure to a room's writer; a direct message
+// tells no typing (4e).
+const withHint = (says: ReturnType<typeof said>, direct: boolean): ReturnType<typeof said> =>
+  says.error === undefined && says.help === undefined ? { help: direct ? ADDS_LINE : `${TELLS} ${ADDS_LINE}` } : says;
+
+export function Composer(props: ComposerProps) {
+  const { room, nick, rooms, members, onSay, draft: kept = "", onDraft, onTyping, label: to, refused } = props;
   const [draft, setDraft] = useState(kept);
-  // Each change of the draft, the device told at once: a render alone (a line arriving) writes nothing.
+  const refusal = useRefusal(refused, draft, setDraft);
+  // Each change of the draft, the device and the room told at once: a render alone (a line arriving, a room opened
+  // on a kept draft) writes nothing and tells no one (R3).
   const change = (next: string) => {
     setDraft(next);
     onDraft?.(next);
+    const told = typingOf(next);
+    if (told !== undefined) onTyping?.(told);
   };
   const [failed, setFailed] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
-  // The selection an edit leaves, put back in the box once it shows the new draft.
-  const selectionRef = useRef<Edit>(undefined);
-  const label = roomLabel(room);
+  const label = to ?? roomLabel(room);
   const composed = compose(room, draft, nick);
   // The room's accounts are sorted out of its members only while a word after `@` is typed; read apart, the mention
   // alone, not each key, is what the compiler recomputes them on (F793).
   const mentioning = /(^|\s)@\S*$/u.test(draft);
   const people = mentioning ? peopleOf(members, nick) : [];
   const completion = completions(draft, { commands: COMMANDS, rooms, people });
-  // Said of nothing else, the box says how to add a line.
-  const note = said(composed, failed, completion);
-  const known = new Set(members);
-  const box = () => formRef.current?.querySelector("textarea") ?? undefined;
-  useLayoutEffect(() => {
-    const selection = selectionRef.current;
-    if (selection === undefined) return;
-    selectionRef.current = undefined;
-    box()?.focus();
-    box()?.setSelectionRange(selection.start, selection.end);
-  }, [draft]);
+  const shown = withHint(said(composed, failed, completion), to !== undefined);
+  // The selection an edit leaves is put back in the box once it shows the new draft.
+  const { box, keep } = useSelection(formRef, draft);
+  useFocusAtStart(formRef, props.focus);
   // An edit of the format bar or of a completion: the new draft, its selection, and no line not sent any more.
   const apply = (next: Edit) => {
-    selectionRef.current = next;
+    keep(next);
     change(next.text);
     setFailed(false);
+    refusal.said();
   };
   const format = (kind: Format) => {
     const start = box()?.selectionStart ?? draft.length;
@@ -167,33 +201,44 @@ export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", 
     event.preventDefault();
     apply(completed(draft, completion));
   };
+  const answering = useAnswering(props, { formRef, box, otherwise: complete });
   const send = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (composed.kind !== "line" && composed.kind !== "lines") return;
-    const went = onSay(composed);
+    const went = onSay(composed, draft);
     setFailed(!went);
+    refusal.said();
     if (went) change("");
   };
   return (
-    <form ref={formRef} aria-label={`Write in ${label}`} onSubmit={send} onKeyDown={complete}>
+    <form
+      ref={formRef}
+      aria-label={`Write ${to === undefined ? "in" : "to"} ${label}`}
+      aria-describedby={props.describedBy}
+      onSubmit={send}
+      onKeyDown={answering.keys}
+    >
       <Stack space="2xs">
+        {answering.bar}
         <FormatBar onFormat={format} />
         <Sidebar side="end" space="2xs">
           <Field
             kind="lines"
             label={`Message ${label}`}
+            describedBy={answering.describedBy}
             value={draft}
             onChange={(value) => {
               change(value);
               setFailed(false);
+              refusal.said();
             }}
-            {...("error" in note || "help" in note ? note : { help: "Shift+Enter adds a line." })}
+            {...(refusal.why === undefined ? shown : { error: refusal.why })}
           />
           <Button type="submit" disabled={composed.kind !== "line" && composed.kind !== "lines"}>
             Send
           </Button>
         </Sidebar>
-        <Preview composed={composed} me={nick} members={known} />
+        <Preview composed={composed} me={nick} members={new Set(members)} />
       </Stack>
     </form>
   );

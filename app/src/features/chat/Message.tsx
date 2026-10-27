@@ -5,9 +5,8 @@
 // whole in its title; the reader's own apart; an address neither the reader's nor a member's whole (F812). Children go
 // to createElement one by one: a tree that never changes needs no keys.
 import { markdown, type Block, type Inline } from "@gnoworld/core";
-import { Address } from "@gnoworld/schemas";
 import { createElement, type ReactNode } from "react";
-import { shortAddress } from "./names.ts";
+import { isAccount, shortAddress } from "./names.ts";
 
 const MARKS = { strong: "strong", em: "em", strike: "s" } as const;
 // A link isolates its text left to right: an override before it cannot draw its address backwards (F786).
@@ -24,7 +23,7 @@ interface Reader {
 // shortened for the reader and members alone, since a ground lookalike holds no key so joins no room (F812). An
 // address whose checksum fails is no account's: whole, as text (F805).
 function mentionOf(address: string, { me, members }: Reader): ReactNode {
-  if (!Address.safeParse(address).success) return `@${address}`;
+  if (!isAccount(address)) return `@${address}`;
   const known = address === me || members?.has(address) === true;
   return createElement(
     "span",

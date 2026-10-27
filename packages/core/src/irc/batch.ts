@@ -14,8 +14,8 @@ export interface Batch {
   readonly type: string;
   readonly params: readonly string[];
   readonly messages: readonly IrcMessage[];
-  /** The opening line's tags: a multiline message's id, time and account. */
-  readonly tags: ReadonlyMap<string, string>;
+  /** The opening line's tags: a labeled-response's label, a multiline message's id, time and account. */
+  readonly tags: IrcMessage["tags"];
   /** The opening line's source: a multiline message's sender. */
   readonly source?: string;
 }

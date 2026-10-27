@@ -121,6 +121,17 @@ for p in [os.path.join(root, "package.json"), os.path.join(root, "app/package.js
     run = {"preinstall", "install", "postinstall", "preprepare", "prepare", "postprepare"} & set(scripts)
     assert not run, (p, run)
 PY
+# The coverage's Vitest runs the plain projects: the compiled one (React Compiler's memo cache checks) adds a branch
+# to every component it renders, never all taken, and drowned the app's branches under 85% (F1350). The compiled
+# project's own tests run in the full gate through `test:compiled`, and in the fast gate through `test`.
+python3 -I - "$here/.." <<'PY' || fail "the coverage's Vitest counts the compiled project's branches, or no gate runs the compiled project (F1350)"
+import json, os, sys
+scripts = json.load(open(os.path.join(sys.argv[1], "package.json")))["scripts"]
+words = scripts["coverage"].split()
+assert {w for n, w in enumerate(words) if words[n - 1] == "--project"} == {"node", "ui", "slow"}, scripts["coverage"]
+assert scripts["test:compiled"] == "vitest run --project compiled", scripts["test:compiled"]
+assert "--project compiled" in scripts["test"], scripts["test"]
+PY
 # Alexis's install command, wherever it is given, reads the script itself, whatever a replace ref
 # shows (F132's class).
 if grep -rn --exclude=test_hooks.sh --exclude-dir=review 'git show main:scripts/install_hooks' "$hooks" "$here" "$here/../docs"; then
@@ -132,7 +143,7 @@ mkdir -p "$t/form/scripts" "$t/form/.githooks"
 ONLY=wiring sh "$t/form/scripts/test_hooks.sh" 2>&1 | grep -q "opened in a form the runner does not list" || fail "a section opened in another form would never run, unnoticed (F160)"
 # check.sh runs every step it promises: removing one fails here.
 gate_file="$here/check.sh"
-for step in "run format:check" "run typecheck" "run lint" "run test" "run unused" "run copies" \
+for step in "run format:check" "run typecheck" "run lint" "run test" "run test:compiled" "run unused" "run copies" \
 	"python3 -I scripts/check_css.py" "run comments" '"$GNO" lint ./...' '"$GNO" test ./...' \
 	"node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts" '[ "$(packages)" = "$installed" ]' \
 	"ast.parse(open(f).read(), f) for f in sys.argv[1:]]' scripts/*.py" \
@@ -1503,7 +1514,7 @@ for sh in ergo test_hooks scan_secrets; do printf 'exec sh "%s" sh:%s "$@"\n' "$
 printf 'const { spawnSync } = require("node:child_process");\nconst { appendFileSync } = require("node:fs");\nconst name = process.argv.some((a) => a.includes("stories")) ? "stories" : "playwright";\nif (process.env.PW_EDIT) appendFileSync("app/package.json", "\\n");\nprocess.exit(spawnSync("sh", [%s, name, "port=" + process.env.E2E_PORT, ...process.argv.slice(2)], { stdio: "inherit" }).status);\n' "'$step'" >"$g/app/node_modules/@playwright/test/cli.js"
 python3 -I - "$g/package.json" "$step" <<'PY'
 import json, sys
-names = ["format:check", "typecheck", "lint", "test", "unused", "copies", "comments", "coverage", "mutate"]
+names = ["format:check", "typecheck", "lint", "test", "test:compiled", "unused", "copies", "comments", "coverage", "mutate"]
 json.dump({"scripts": {n: f"sh {sys.argv[2]} {n}" for n in names}}, open(sys.argv[1], "w"))
 PY
 printf '{}\n' >"$g/app/package.json" && printf '{}\n' >"$g/server/package.json" && : >"$g/pnpm-lock.yaml" && : >"$g/gno/r/seal/vectors_test.gno"
@@ -1735,9 +1746,9 @@ out=$(PW_EDIT=1 gate) && fail "check.sh passed a build that edited app/package.j
 printf '%s\n' "$out" | grep -q "building the app changed package.json" || fail "check.sh did not say the build changed a package file: $out"
 reset
 # GATE_BUDGET lowers the budget, never raises it, and a value that is no number leaves it.
-GATE_BUDGET=999 gate | grep -q "(budget 60 s)$" || fail "check.sh let GATE_BUDGET raise its budget"
-GATE_BUDGET=abc gate | grep -q "(budget 60 s)$" || fail "check.sh took a GATE_BUDGET that is no number"
-GATE_BUDGET= gate | grep -q "(budget 60 s)$" || fail "check.sh took an empty GATE_BUDGET"
+GATE_BUDGET=999 gate | grep -q "(budget 75 s)$" || fail "check.sh let GATE_BUDGET raise its budget"
+GATE_BUDGET=abc gate | grep -q "(budget 75 s)$" || fail "check.sh took a GATE_BUDGET that is no number"
+GATE_BUDGET= gate | grep -q "(budget 75 s)$" || fail "check.sh took an empty GATE_BUDGET"
 (GATE_BUDGET=-5 gate) >/dev/null && fail "check.sh took a negative GATE_BUDGET as no budget"
 printf 'y\n' >>"$g/server/src/a.ts"
 GATE_BUDGET=999 gate | grep -q "(budget 30 s)$" || fail "check.sh let GATE_BUDGET raise a scoped run's budget"
@@ -1789,6 +1800,7 @@ for s in $fast_steps py:probe py:bench stories coverage py:patch_coverage py:pro
 	[ "$s" = test ] || ran "$s" || fail "check.sh --full skipped $s"
 done
 ran test && fail "check.sh --full ran the tests twice, with and without coverage"
+ran test:compiled || fail "check.sh --full ran no render-count test: the coverage's Vitest leaves the compiled project out (F1350)"
 # The coverage lane's tools take half the machine each, the harness lane beside them the rest: none starves the
 # timing-bound tests of the other (F777).
 half=$(($(node -p "require('os').availableParallelism()") / 2))
@@ -2305,8 +2317,13 @@ done
 kill -9 "$victim"
 wait "$victim" 2>/dev/null || :
 [ "$(ls "$tmp" | grep -vc '^\(dead\|live\|other\)$')" = 1 ] || fail "the killed run left no copy to clear: $(ls "$tmp")"
-(cd "$w/repo" && TMPDIR="$tmp" python3 -I -c 'import sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); from repo_files import worktree
-with worktree("HEAD") as tree: print(tree)' "$here" >"$w/out" 2>&1) || fail "repo_files.worktree failed beside a dead run's copy: $(cat "$w/out")"
+# Two copies held at once, beside a dead run's `tree` entry: two names, and none is `tree` (F1191: from 2026-10-27
+# the sandbox refuses to create exactly `.git/worktrees/tree`, so a copy named so failed every prove_fix).
+(cd "$w/repo" && TMPDIR="$tmp" python3 -I -c 'import os, sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); from repo_files import worktree
+with worktree("HEAD") as a, worktree("HEAD") as b: print(a); print(b); print(*os.listdir(".git/worktrees"))' "$here" >"$w/out" 2>&1) || fail "repo_files.worktree failed beside a dead run's copy: $(cat "$w/out")"
+[ "$(basename "$(sed -n 1p "$w/out")")" != "$(basename "$(sed -n 2p "$w/out")")" ] || fail "two copies held at once got one name: $(cat "$w/out")"
+for n in 1 2; do [ "$(basename "$(sed -n "${n}p" "$w/out")")" != tree ] || fail "a copy is named tree, which the sandbox may refuse: $(cat "$w/out")"; done
+case " $(sed -n 3p "$w/out") " in *" tree "*) fail "a copy is registered as .git/worktrees/tree: $(cat "$w/out")" ;; esac
 [ ! -e "$tmp/dead" ] || fail "a killed run's copy was left: $(ls "$tmp")"
 [ "$(git -C "$w/repo" worktree list --porcelain | grep -c 'dead/tree')" = 0 ] || fail "a killed run's worktree stayed registered"
 [ -d "$tmp/live/tree" ] || fail "a live run's copy was removed"

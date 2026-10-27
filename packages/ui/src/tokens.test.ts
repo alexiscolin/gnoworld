@@ -214,3 +214,12 @@ describe("the tokens", () => {
     ]);
   });
 });
+
+// The UX review (U5, U11): what is new has a token of its own, coral as the prototype set it, not the danger token; its
+// rule holds WCAG 1.4.11's 3:1 against the page, being the one mark of the line's start.
+describe("the New mark's colours", () => {
+  it("names coral for what is new, and its rule above 3:1 on the page", () => {
+    expect(value("--color-new")).toBe("var(--p-coral)");
+    expect(contrast(over("--color-new-line", "space"), BASE["space"] ?? "")).toBeGreaterThanOrEqual(3);
+  });
+});

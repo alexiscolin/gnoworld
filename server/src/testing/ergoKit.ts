@@ -10,7 +10,7 @@ import { rawClient, type Raw } from "./rawClient.ts";
 const CAPS =
   "message-tags server-time account-tag echo-message batch labeled-response sasl draft/chathistory " +
   "draft/event-playback draft/message-redaction account-notify extended-join multi-prefix draft/metadata-2 standard-replies " +
-  "draft/multiline";
+  "draft/read-marker draft/multiline";
 export const ORIGIN = "http://localhost:3000";
 export const ADDRESS = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 // The bcrypt hash `ergo genpasswd` printed for the passphrase "otherpw".

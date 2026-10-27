@@ -129,6 +129,20 @@ describe("guests and rooms", { timeout: 20_000 }, () => {
     await gus.expect(replayed("PRIVMSG #lobby :persist-marker-1$"));
   });
 
+  // 4e, decided by Alexis (docs/decisions.md): Ergo sets +R on every connection at its registration
+  // (default-user-modes, irc/server.go:445, v2.19.1), so an account that asks nothing hears no guest.
+  it("refuses a guest's direct message to an account that sent no MODE, and lets an account's through", async () => {
+    const e = await start();
+    const alice = await login(e, "alice");
+    const gus = await guest(e, "gus");
+    gus.send("PRIVMSG alice :from a guest");
+    await gus.expect(/ 477 gus alice /);
+    const bob = await login(e, "bob");
+    bob.send("PRIVMSG alice :from an account");
+    await alice.expect(/PRIVMSG alice :from an account$/);
+    expect(logged(alice)).not.toContain("from a guest");
+  });
+
   it("keeps no direct message across a restart: none is stored until slice 4 (3e)", { timeout: 40_000 }, async () => {
     const e = await start({ dir: keptFolder() });
     const alice = await login(e, "alice");
@@ -458,6 +472,45 @@ describe("history and tags", { timeout: 30_000 }, () => {
     await sync(alice);
     await sync(obs);
     expect(obs.lines().slice(seen).join("\n")).not.toContain("TAGMSG");
+  });
+
+  // 4f: who is typing, relayed live to the room's members (IRCv3's +typing), as the page shows it.
+  it("relays an account's +typing to the room's members live", async () => {
+    const { members } = await room(["alice", "obs"]);
+    const [alice, obs] = members;
+    if (alice === undefined || obs === undefined) throw new Error("missing members");
+    alice.send("@+typing=active TAGMSG #lobby");
+    expect(await obs.expect(/ TAGMSG #lobby$/)).toMatch(/^@(\S*;)?\+typing=active[;\s].*:alice!/);
+  });
+
+  // 4f: the reading place Ergo keeps for an account and tells each of its sessions (draft/read-marker).
+  it("tells each session of an account the room's place as it joins, then every other one a later place set", async () => {
+    const { e } = await room([]);
+    const one = await login(e, "alice");
+    await join(one, "#lobby");
+    // From the server's own name, no user source, as core's fromServer reads it (the green pass's G8).
+    expect(one.lines().join("\n")).toMatch(/^(@\S+ )?:[^!@\s]+ MARKREAD #lobby \*$/m);
+    const id = await say(one, "#lobby", "read me");
+    const time = /time=([^;\s]+)/.exec(one.lines().find((l) => l.includes(id)) ?? "")?.[1] ?? "";
+    const two = await login(e, "alice");
+    await join(two, "#lobby");
+    one.send(`MARKREAD #lobby timestamp=${time}`);
+    await one.expect(new RegExp(`^(@\\S+ )?:[^!@\\s]+ MARKREAD #lobby timestamp=${time.replaceAll(".", "\\.")}`));
+    await two.expect(new RegExp(` MARKREAD #lobby timestamp=${time.replaceAll(".", "\\.")}`));
+    one.send("MARKREAD #lobby timestamp=2001-01-01T00:00:00.000Z");
+    await one.expect(new RegExp(` MARKREAD #lobby timestamp=${time.replaceAll(".", "\\.")}$`));
+    await sync(two);
+    expect(two.lines().filter((l) => l.includes(" MARKREAD "))).toHaveLength(2);
+    const three = await login(e, "alice");
+    await join(three, "#lobby");
+    expect(three.lines().join("\n")).toContain(` MARKREAD #lobby timestamp=${time}`);
+  });
+
+  it("tells no place to a session that did not ask draft/read-marker", async () => {
+    const { e } = await room([]);
+    const plain = await login(e, "alice", { caps: "sasl message-tags server-time batch" });
+    await join(plain, "#lobby");
+    expect(plain.lines().join("\n")).not.toContain("MARKREAD");
   });
 });
 

@@ -1,5 +1,7 @@
 /* A line's bar (4c's message menu): over the line's end, astride its top edge as the prototype's is, so the newest
-   line's bar stays inside the list; a floating surface's look. */
+   line's bar stays inside the list; a floating surface's look. In a narrow line (the column of a phone, which the
+   five controls would wrap in over the line's words) it stands in the flow under the line, on one row, the three
+   quick reactions behind one React menu (U1). */
 @layer components {
   .bar {
     position: absolute;
@@ -16,5 +18,25 @@
   /* Its line at the top of the list that scrolls: inside the line, never past the list's edge (U10). */
   .bar[data-inside] {
     inset-block-start: var(--space-3xs);
+  }
+
+  .react {
+    display: none;
+  }
+
+  /* raw: the width the bar's five controls and a few words of a line need side by side */
+  @container (inline-size < 24rem) {
+    .bar {
+      position: static;
+      inline-size: fit-content;
+    }
+
+    .quick {
+      display: none;
+    }
+
+    .react {
+      display: inline;
+    }
   }
 }

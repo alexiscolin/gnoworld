@@ -2,9 +2,9 @@
 // 32 characters at most; the server makes it as #<world>/<name>, so it is never a world's main room.
 import { z } from "./zod.ts";
 
-const Slug = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/);
+const Slug = z.string().check(z.regex(/^[a-z0-9]+(-[a-z0-9]+)*$/));
 
-export const RoomName = Slug.max(32);
+export const RoomName = Slug.check(z.maxLength(32));
 
 export const CreateRoom = z.strictObject({ world: Slug, name: RoomName });
 export type CreateRoom = z.infer<typeof CreateRoom>;
@@ -12,8 +12,7 @@ export type CreateRoom = z.infer<typeof CreateRoom>;
 /** A room as the server and Ergo name it: #<world>, a world's main room, or #<world>/<name>; 64 characters at most. */
 export const RoomId = z
   .string()
-  .max(64)
-  .regex(/^#[a-z0-9]+(-[a-z0-9]+)*(\/[a-z0-9]+(-[a-z0-9]+)*)?$/);
+  .check(z.maxLength(64), z.regex(/^#[a-z0-9]+(-[a-z0-9]+)*(\/[a-z0-9]+(-[a-z0-9]+)*)?$/));
 
 // F671: the room made, read by the client as a room's id.
 export const MadeRoom = z.strictObject({ room: RoomId });
@@ -28,10 +27,10 @@ export const RoomList = z.object({
   sections: z
     .array(
       z.object({
-        name: z.string().min(1).max(64).nullable(),
-        rooms: z.array(z.object({ room: RoomId, type: RoomType })).max(500),
+        name: z.nullable(z.string().check(z.minLength(1), z.maxLength(64))),
+        rooms: z.array(z.object({ room: RoomId, type: RoomType })).check(z.maxLength(500)),
       }),
     )
-    .max(51),
+    .check(z.maxLength(51)),
 });
 export type RoomList = z.infer<typeof RoomList>;

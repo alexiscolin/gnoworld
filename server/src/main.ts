@@ -60,6 +60,7 @@ const chat = startChat(
 app.route("/api/activity", chat.activity);
 app.route("/api/rooms", chat.roomList);
 app.route("/api/stream", chat.stream);
+app.route("/api/verdicts", chat.verdicts);
 app.route(
   "/api/rooms",
   roomsRoutes({ roles, rooms: chat.rooms, session, origins: config.origins, log, now: Date.now }),
