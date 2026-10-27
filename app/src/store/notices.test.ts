@@ -104,13 +104,15 @@ describe("the store's notices slice", () => {
     // counts is what the store holds, so no badge keeps a notice that is gone.
     it("drops a seen notice before an unseen one when it holds more than NOTICES_KEPT", () => {
       const t = setup();
+      t.notices.add(notice({ id: "oldest", where: GAMES, time: T(2) }));
       t.notices.add(notice({ id: "seen", where: GAMES, time: T(1) }));
       t.notices.seen(GAMES, T(1));
-      for (let at = 0; at < NOTICES_KEPT - 1; at += 1) t.notices.add(notice({ id: `n${String(at)}`, where: GAMES }));
+      for (let at = 0; at < NOTICES_KEPT - 2; at += 1) t.notices.add(notice({ id: `n${String(at)}`, where: GAMES }));
       expect(t.state().notices).toHaveLength(NOTICES_KEPT);
       t.notices.add(notice({ id: "last", where: GAMES }));
       expect(t.state().notices).toHaveLength(NOTICES_KEPT);
       expect(ids(t.state().notices)).not.toContain("seen");
+      expect(ids(t.state().notices)).toContain("oldest");
       expect(ids(t.state().notices).at(-1)).toBe("last");
     });
 

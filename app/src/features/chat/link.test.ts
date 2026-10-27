@@ -2284,6 +2284,21 @@ describe("the chat's link: notices, the edges", () => {
     });
   });
 
+  // StrykerJS (F1681): the ids a REDACT took away are kept to a bound, the newest 100, so the memory of a long session
+  // does not grow.
+  describe("the lines REDACT took away", () => {
+    it("are remembered up to the newest 100, a page refusing those and no older one", () => {
+      const t = member();
+      t.fake.line(`:ergo MARKREAD ${GAMES} timestamp=${T(0)}`);
+      for (let at = 0; at <= 100; at += 1) t.fake.line(`:${OTHER}!u@h REDACT ${GAMES} r${String(at)}`);
+      t.fake.line(`BATCH +h1 chathistory ${GAMES}`);
+      for (const id of ["r0", "r1", "r100"])
+        t.fake.line(`@batch=h1;msgid=${id};time=${T(3)};account=${OTHER} :${OTHER}!u@h PRIVMSG ${GAMES} :@${ADDRESS}`);
+      t.fake.line("BATCH -h1");
+      expect(ids(t)).toEqual(["r0"]);
+    });
+  });
+
   // F1673 (CR1): the page came before Ergo's MARKREAD reply, so it made no notice and none came for them afterwards.
   describe("a history page that comes before the reading place", () => {
     it("makes the notices of the lines past the place once it is known, and of no line before it", () => {
