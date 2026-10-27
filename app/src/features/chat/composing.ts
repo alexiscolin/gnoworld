@@ -83,11 +83,24 @@ const boxed = (text: string) => (text.startsWith("/") ? `/${text}` : text);
 interface Edits {
   edit: Here<Chosen>;
   ended: Here<true>;
+  /** That the line being corrected went from the conversation (CR3). */
+  gone: Here<true>;
   end: () => void;
   dropReply: () => void;
   /** The reader's address; none for a guest. */
   me: string | undefined;
 }
+
+// The line left the conversation (a bot's hide, a delete from another device): the edit ends, so its return does not reopen
+// it, and the field says it (CR3).
+function dropGone(edit: Here<Chosen>, gone: Here<true>, found: Line | undefined) {
+  if (edit.value === undefined || found !== undefined) return;
+  edit.clear();
+  gone.update(() => true);
+}
+
+// What the writer is told of an edit that ended for its line's going.
+const toldGone = (gone: Here<true>) => (gone.value === true ? { gone: true as const } : {});
 
 // The line of the reader's own the conversation's next one corrects, its words put in the composer, as a reply's: one a
 // conversation. Sent tagged with the line's msgid, shown in its place, unless unchanged. Asking for one drops a reply
@@ -95,10 +108,11 @@ interface Edits {
 function editsOf(
   shown: Shown | undefined,
   lines: readonly Line[] | undefined,
-  { edit: here, ended, end, dropReply, me }: Edits,
+  { edit: here, ended, gone, end, dropReply, me }: Edits,
 ): Composing {
   const { value: edit, update } = here;
   const found = shownAs(edit, lines);
+  dropGone(here, gone, found);
   // An orphan correction (its original left the window) is no line to correct: a new correction would name a line
   // nothing folds into (CR5).
   const editing = found?.edits === undefined ? found : undefined;
@@ -109,10 +123,13 @@ function editsOf(
       const line = lines?.find((one) => one.id === id);
       if (line === undefined || !canEdit(line, me)) return;
       dropReply();
+      gone.clear();
       update((was) => asking(was, id));
     },
   };
-  if (edit === undefined || editing === undefined) return { view, writer: ended.value === true ? { focus: true } : {} };
+  if (edit === undefined || editing === undefined) {
+    return { view, writer: { ...(ended.value === true ? { focus: true } : {}), ...toldGone(gone) } };
+  }
   const words = boxed(editing.text);
   return {
     view,
@@ -184,6 +201,7 @@ export function useComposing(shown: Shown | undefined, me: string | undefined) {
   const reply = useHere<Chosen>(shown?.key);
   const edit = useHere<Chosen>(shown?.key);
   const ended = useHere<true>(shown?.key);
+  const gone = useHere<true>(shown?.key);
   const refused = useRefusals(shown, { reply, edit });
   const end = () => {
     edit.clear();
@@ -195,7 +213,7 @@ export function useComposing(shown: Shown | undefined, me: string | undefined) {
       if (edit.value !== undefined) end();
     },
   });
-  const edits = editsOf(shown, lines, { edit, ended, end, dropReply: reply.clear, me });
+  const edits = editsOf(shown, lines, { edit, ended, gone, end, dropReply: reply.clear, me });
   return {
     view: { ...replies.view, ...edits.view },
     writer: { ...replies.writer, ...edits.writer, ...(refused === undefined ? {} : { refused }) },

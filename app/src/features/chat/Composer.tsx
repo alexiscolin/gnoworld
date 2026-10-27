@@ -147,12 +147,14 @@ export interface ComposerProps {
    * bar's Cancel drops (a direct message's, 4d). */
   editing?: boolean | undefined;
   onCancelEdit?: (() => void) | undefined;
+  /** The line it was correcting went from the conversation: the field says so until the draft changes (CR3). */
+  gone?: boolean | undefined;
 }
 
 export function Composer(props: ComposerProps) {
   const { room, nick, rooms, members, onSay, draft: kept = "", onDraft, onTyping, label: to, refused } = props;
   const [draft, setDraft] = useState(kept);
-  const refusal = useRefusal(refused, draft, { setDraft, fresh: props.fresh });
+  const refusal = useRefusal(refused, draft, { setDraft, fresh: props.fresh, gone: props.gone });
   // Each change of the draft, the device and the room told at once: a render alone (a line arriving, a room opened
   // on a kept draft) writes nothing and tells no one (R3).
   const change = (next: string) => {

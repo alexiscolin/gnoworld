@@ -8,8 +8,13 @@ const ME = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 // The device's draft of the conversation, and the composer's props as it is given them.
 vi.mock("../../lib/drafts/page.ts", () => ({ pageDrafts: () => ({ get: () => "fixed", set: () => true }) }));
 vi.mock("./Composer.tsx", () => ({
-  Composer: (props: { draft?: string; onDraft?: unknown; fresh?: boolean }) => (
-    <i data-draft={props.draft} data-keeps={String(props.onDraft !== undefined)} data-fresh={String(props.fresh)} />
+  Composer: (props: { draft?: string; onDraft?: unknown; fresh?: boolean; gone?: boolean }) => (
+    <i
+      data-draft={props.draft}
+      data-keeps={String(props.onDraft !== undefined)}
+      data-fresh={String(props.fresh)}
+      data-gone={String(props.gone)}
+    />
   ),
 }));
 
@@ -58,5 +63,13 @@ describe("Writer: the box of a correction", () => {
     expect(markup).toContain('data-draft="fixed"');
     expect(markup).toContain('data-keeps="true"');
     expect(markup).toContain('data-fresh="true"');
+  });
+});
+
+// CR3 of the room edit: the line being corrected went, and the box says so.
+describe("Writer: a correction whose line went", () => {
+  it("hands the composer the word that the line went, and nothing when it did not", () => {
+    expect(writer({ gone: true })).toContain('data-gone="true"');
+    expect(writer()).toContain('data-gone="undefined"');
   });
 });

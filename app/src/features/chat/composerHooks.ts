@@ -21,14 +21,18 @@ export function refusalAfter(draft: string, refused: { draft: string; why: strin
 }
 
 // Why Ergo refused the last line, said until the draft changes or a line goes: one more refusal while in view puts
-// its draft back in an empty box (the store put it back on the device too, where no draft waited). A composer that
-// starts on a refusal not told yet (`fresh`: a correction taken up again) tells it as it starts.
+// its draft back in an empty box (the store put it back on the device too, where no draft waited). A composer starts
+// telling a refusal not told yet (`fresh`: a correction taken up again), or that its edit's line went (`gone`, CR3).
 export function useRefusal(
   refused: Refused | undefined,
   draft: string,
-  { setDraft, fresh = false }: { setDraft: (draft: string) => void; fresh?: boolean | undefined },
+  {
+    setDraft,
+    fresh = false,
+    gone = false,
+  }: { setDraft: (draft: string) => void; fresh?: boolean | undefined; gone?: boolean | undefined },
 ) {
-  const [why, setWhy] = useState<string>();
+  const [why, setWhy] = useState<string | undefined>(gone ? "That message is gone." : undefined);
   const [answered, setAnswered] = useState(fresh ? undefined : refused?.count);
   if (refused !== undefined && refused.count !== answered) {
     setAnswered(refused.count);

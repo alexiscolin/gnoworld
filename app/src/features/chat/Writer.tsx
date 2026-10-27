@@ -39,11 +39,13 @@ export interface WriterProps {
    * again (`back`), starts from the device's draft, which the refusal put back, and tells the refusal (CR2). */
   editing?: { text: string; asked: number; back?: true } | undefined;
   onCancelEdit?: (() => void) | undefined;
+  /** The line being corrected went from the conversation: the box says so (CR3 of the room edit). */
+  gone?: true | undefined;
 }
 
 export function Writer(props: WriterProps) {
   const { session, room, label, rooms, members, onSay, onTyping, refused, focus, describedBy } = props;
-  const { replying, asked, onCancelReply, editing, onCancelEdit } = props;
+  const { replying, asked, onCancelReply, editing, onCancelEdit, gone } = props;
   if (session.kind !== "in") return <p>Log in to write in this room.</p>;
   // The account's drafts on this device: the room's, where the composer starts, and each change kept (4d).
   const kept = pageDrafts(session.address);
@@ -78,6 +80,7 @@ export function Writer(props: WriterProps) {
         onCancelReply={onCancelReply}
         editing={editing !== undefined}
         onCancelEdit={onCancelEdit}
+        gone={gone}
       />
     </Suspense>
   );

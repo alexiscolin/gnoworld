@@ -418,6 +418,13 @@ describe("Composer: an edit", () => {
     );
   });
 
+  // CR3 of the room edit: the line being corrected went, so the edit closed; the box, plain again, tells why its words went.
+  it("says the message is gone when the edit's line left, until the draft changes", () => {
+    const markup = draw({ gone: true, editing: undefined, onCancelEdit: undefined, draft: "" });
+    expect(words(markup)).toContain("That message is gone.");
+    expect(words(draw({ editing: undefined, onCancelEdit: undefined }))).not.toContain("That message is gone.");
+  });
+
   it("shows no edit bar, Send as it was, and no Cancel when nothing is edited", () => {
     const markup = draw({ editing: undefined, onCancelEdit: undefined });
     expect(words(markup)).not.toContain("Editing a message");

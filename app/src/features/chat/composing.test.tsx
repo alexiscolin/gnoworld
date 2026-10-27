@@ -22,7 +22,8 @@ const line = (id: string, text: string, account = ME): Line => ({
   text,
   kind: "message",
 });
-const LINES = [line("m1", "my words"), line("m2", "theirs", "g1other")];
+const THEIRS = line("m2", "theirs", "g1other");
+const LINES = [line("m1", "my words"), THEIRS];
 
 let root: Root;
 type Composed = ReturnType<typeof useComposing>;
@@ -245,6 +246,34 @@ describe("useComposing", () => {
     expect(now().writer.editing).toBeUndefined();
     edit("m4");
     expect(now().writer.editing).toBeUndefined();
+  });
+
+  // CR3 of the room edit: the edit was derived from the lines, never cleared: a line that went (a bot's hide, a delete
+  // from another device) took the bar and the typed words with it without a word, and its return reopened the bar.
+  it("closes an edit whose line went, says so, and does not reopen it when the line comes back", () => {
+    draw("room");
+    edit("m1");
+    expect(now().writer.editing?.text).toBe("my words");
+    draw("room", [THEIRS]);
+    expect(now().writer.editing).toBeUndefined();
+    expect(now().writer.gone).toBe(true);
+    draw("room");
+    expect(now().writer.editing).toBeUndefined();
+  });
+
+  it("tells a gone line until a new edit is asked or another conversation is in view", () => {
+    draw("room");
+    edit("m1");
+    draw("room", [THEIRS]);
+    expect(now().writer.gone).toBe(true);
+    draw("room");
+    edit("m1");
+    expect(now().writer.gone).toBeUndefined();
+    expect(now().writer.editing?.text).toBe("my words");
+    draw("room", [THEIRS]);
+    expect(now().writer.gone).toBe(true);
+    render({ kind: "room", lines: LINES, who: "y" });
+    expect(now().writer.gone).toBeUndefined();
   });
 
   it("drops a room's reply when an edit is asked, and ends the edit when a reply is asked", () => {
