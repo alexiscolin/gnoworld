@@ -1,7 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { lineRate } from "./rate.ts";
 
 const MINUTE = 60_000;
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("the lines an account sent in a minute", () => {
   it("forgets the account touched longest ago once 10,000 are held, never by time", () => {
@@ -35,6 +39,20 @@ describe("the lines an account sent in a minute", () => {
       sent.push(rate.add("flooder", { id: `m${String(n)}`, at, lines: 40 }));
     }
     expect(sent).toEqual([false, false, true]);
+  });
+
+  it("counts an account's lines whatever the server's own clock did between them, only Ergo's stamps counting (R1)", () => {
+    // S1 as reported forgot an account 60 s after the server last heard of it: the adds took no real time, so a test
+    // of them alone never saw it. Here the server's clock jumps 61 s before every add.
+    vi.useFakeTimers();
+    const rate = lineRate();
+    const sent = [];
+    for (const [n, at] of [0, 1000, 2000].entries()) {
+      vi.advanceTimersByTime(61_000);
+      sent.push(rate.add("flooder", { id: `m${String(n)}`, at, lines: 40 }));
+    }
+    expect(sent).toEqual([false, false, true]);
+    expect(rate.held()).toBe(3);
   });
 
   it("counts the lines of the minute before a message by Ergo's stamps, not by when they arrived", () => {

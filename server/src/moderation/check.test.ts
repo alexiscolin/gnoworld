@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { toAddress } from "@gnoworld/schemas";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { openDatabase } from "../db.ts";
 import { logger } from "../log.ts";
@@ -31,6 +31,7 @@ const Row = z.object({
 
 const opened: DatabaseSync[] = [];
 afterEach(() => {
+  vi.useRealTimers();
   for (const db of opened.splice(0)) db.close();
 });
 
@@ -292,6 +293,19 @@ describe("checking a message", () => {
     expect(await check(lines(40, { n: 2, ms: 1 }, OTHER))).toEqual({ action: "pass" });
     expect(await check(lines(21, { n: 3, ms: 59_999 }))).toEqual({ action: "hide", reason: "too_fast" });
     expect(await check(lines(40, { n: 4, ms: 60_000 }))).toEqual({ action: "pass" });
+  });
+
+  it("counts an account's lines whatever the server's clock did between them, Ergo's stamps alone counting (R1)", async () => {
+    // S1 as reported forgot an account 60 s after the server last heard of it; both clocks jump 61 s before each line.
+    vi.useFakeTimers();
+    const { check, clock } = setup(() => Promise.resolve(answer()));
+    const verdicts = [];
+    for (const [n, ms] of [0, 1000, 2000].entries()) {
+      clock.now += 61_000;
+      vi.advanceTimersByTime(61_000);
+      verdicts.push(await check(lines(40, { n, ms }, OLD)));
+    }
+    expect(verdicts).toEqual([{ action: "pass" }, { action: "pass" }, { action: "hide", reason: "too_fast" }]);
   });
 
   it("counts a message once when it is checked again (an unchecked one comes back)", async () => {
