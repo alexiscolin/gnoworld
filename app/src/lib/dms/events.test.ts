@@ -52,6 +52,14 @@ describe("withOf: the conversation a reaction or a delete belongs to", () => {
     ).toBe(ALICE);
   });
 
+  // The second red pass on the DM bar (R1): toLowerCase folds more than Ergo does (the Kelvin sign K is a k, and bech32
+  // addresses hold k), so a nick that is not mine was taken for mine. Ergo folds A to Z alone.
+  it("does not take a nick that only looks like mine under Unicode folding for mine", () => {
+    const kelvin = ME.replace("k", "\u212A");
+    expect(withOf(tagmsg(ALICE, kelvin), ME)).toBeUndefined();
+    expect(withOf(read(`@msgid=t;+draft/react=👍;+reply=m1 :${kelvin}!u@h TAGMSG ${ALICE}`), ME)).toBeUndefined();
+  });
+
   it("is none while my nick is unknown or no address", () => {
     expect(withOf(tagmsg(ALICE, ME), "")).toBeUndefined();
     expect(withOf(tagmsg("guest-ab12cd", "guest-zzzzzz"), "guest-zzzzzz")).toBeUndefined();
@@ -117,6 +125,13 @@ describe("afterAct: a delete takes the corrections of the line with it", () => {
     };
     const held = { lines: [lineOf("m1", ALICE), guest], reactions: undefined };
     expect(act(held, redactOf(ALICE, "m1")).lines).toEqual([guest]);
+  });
+
+  // R1: a REDACT from a nick that only Unicode folding makes mine must not take my correction of a line it names.
+  it("leaves my correction when the sender's nick only looks like my account's under Unicode folding", () => {
+    const held = { lines: [lineOf("m2", ME, "m1"), lineOf("m3", ME)], reactions: undefined };
+    const spoof = redactOf(ME.replace("k", "\u212A"), "m1");
+    expect(act(held, spoof).lines.map((line) => line.id)).toEqual(["m2", "m3"]);
   });
 
   // R4: my own echo, and a partner's delete of a line of mine that left the window.

@@ -9,14 +9,12 @@ import {
   reactionOf,
   redactAfter,
   redactReactions,
+  sameName,
   type IrcMessage,
   type Line,
   type Reaction,
 } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
-
-// Ergo folds A to Z alone, as core's sameName does (not exported there): a partner may write my nick in capitals (CR8).
-const same = (one: string, other: string) => one.toLowerCase() === other.toLowerCase();
 
 /** The account the other side of `message` is, or none: a room's, a guest's, one between two others or to oneself. */
 export function withOf(message: IrcMessage, me: string): string | undefined {
@@ -24,9 +22,9 @@ export function withOf(message: IrcMessage, me: string): string | undefined {
   if (command !== "TAGMSG" && command !== "REDACT") return undefined;
   const [target = ""] = params;
   const from = nickOf(source);
-  const mine = same(from, me);
+  const mine = sameName(from, me);
   const partner = mine ? target : from;
-  if (mine === same(target, me) || !Address.safeParse(me).success) return undefined;
+  if (mine === sameName(target, me) || !Address.safeParse(me).success) return undefined;
   return Address.safeParse(partner).success ? partner : undefined;
 }
 
@@ -55,7 +53,9 @@ function afterReaction(held: Held, message: IrcMessage, cap: number): Held {
 // The lines without the corrections of the line a REDACT names that its sender wrote: nobody else's goes with it.
 function withoutCorrections(lines: readonly Line[], { params: [, id = ""], source = "" }: IrcMessage): readonly Line[] {
   const sender = nickOf(source);
-  const kept = lines.filter((line) => line.edits !== id || line.account === undefined || !same(line.account, sender));
+  const kept = lines.filter(
+    (line) => line.edits !== id || line.account === undefined || !sameName(line.account, sender),
+  );
   return kept.length === lines.length ? lines : kept;
 }
 

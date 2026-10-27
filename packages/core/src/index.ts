@@ -10,6 +10,7 @@ export {
   nickOf,
   redactAfter,
   refusedOf,
+  sameName,
   topicAfter,
 } from "./chat/room.ts";
 export { dmOf } from "./chat/dm.ts";
