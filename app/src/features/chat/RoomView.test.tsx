@@ -828,6 +828,26 @@ describe("RoomView: edits", () => {
     ).toContain("Play the YouTube video");
   });
 
+  // R3 (redpass-red): a moderator hides the newest correction and the line falls back to the one before it, whose own
+  // verdict the player waits on, never the original's; another account's line naming it is no correction at all.
+  it("falls back to the older correction's verdict once the newest is hidden, never the original's", () => {
+    const link = "watch https://youtu.be/dQw4w9WgXcQ";
+    const lines = [line({ id: "a", text: link }), line({ id: "e1", text: `${link}?t=1`, edits: "a" })];
+    const at = (verdicts: RoomViewProps["verdicts"]) =>
+      items(part(view({ state: { ...ROOM, lines }, verdicts }), "Messages"))[0];
+    expect(at({ a: "checked" })).toContain("Waiting for the moderation check");
+    expect(at({ e1: "checked" })).toContain("Play the YouTube video");
+  });
+
+  it("keeps a line on its own verdict when another account's line names it", () => {
+    const text = "watch https://youtu.be/dQw4w9WgXcQ";
+    const other = { from: "guest-ab12cd", account: "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5" };
+    const lines = [line({ id: "a", text }), line({ id: "p", text, edits: "a", ...other })];
+    const first = items(part(view({ state: { ...ROOM, lines }, verdicts: { a: "checked" } }), "Messages"))[0];
+    expect(first).toContain("Play the YouTube video");
+    expect(first).not.toContain("Waiting");
+  });
+
   // F1177 (the UX review's U5): the mark stands on the time row, right after the time and before the sender, never
   // after the sender's words (F971), so a sender's "(edited)" reads as theirs; a reply's quote is above that row.
   it("marks an edited line on its time row, and a line that says (edited) not at all", () => {

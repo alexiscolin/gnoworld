@@ -436,4 +436,16 @@ describe("unjudged: the lines in view whose player waits on a verdict the page d
     expect(unjudged(lines, undefined, new Set())).toEqual(["a", "c", "d", "f"]);
     expect(unjudged([], undefined, new Set())).toEqual([]);
   });
+
+  // R4 (redpass-red): the player of a corrected line waits on its correction's verdict, so the correction's own id is
+  // asked, from the lines as the store holds them (the page's ChatPanel passes those, never the folded ones).
+  it("names a correction of a line, as a line of its own, whatever its line's verdict", () => {
+    const lines = [
+      { ...said("a", "no link yet"), account: "g1x" },
+      { ...said("e1", "https://youtu.be/dQw4w9WgXcQ"), account: "g1x", edits: "a" },
+    ];
+    expect(unjudged(lines, undefined, new Set())).toEqual(["e1"]);
+    expect(unjudged(lines, { a: "checked" }, new Set())).toEqual(["e1"]);
+    expect(unjudged(lines, { e1: "checked" }, new Set())).toEqual([]);
+  });
 });
