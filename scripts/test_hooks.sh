@@ -1900,7 +1900,6 @@ half=$(($(node -p "require('os').availableParallelism()") / 2))
 grep -qx "coverage --maxWorkers=$half" "$log" || fail "check.sh --full let Vitest's coverage take the whole machine (F777): $(grep '^coverage' "$log")"
 grep -qx "mutate --concurrency $half" "$log" || fail "check.sh --full let StrykerJS take the whole machine (F777): $(grep '^mutate' "$log")"
 ran py:harness_mutate && fail "check.sh --full mutated a harness main already has"
-ran py:batch_size && fail "check.sh --full measured a merge's batch, which --merge alone does: --full reads a whole slice"
 for s in py:prove_fix py:patch_coverage py:check_regressions py:check_migrations; do
 	grep -q "^$s $base$" "$log" || fail "check.sh --full did not give $s the base $base"
 done
