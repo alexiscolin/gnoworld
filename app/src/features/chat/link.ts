@@ -13,7 +13,7 @@ import { Joins } from "./joins.ts";
 import type { ChatLink, LinkDeps } from "./linkTypes.ts";
 import { outbox, type Outbox } from "./outbox.ts";
 import { refusedIn } from "./reacting.ts";
-import { Noticing } from "./noticing.ts";
+import { Noticer } from "./noticing.ts";
 import { Sending } from "./sending.ts";
 import { Places, TypingOut } from "./telling.ts";
 
@@ -39,12 +39,12 @@ class Link implements ChatLink {
   readonly #joins = new Joins(this.#out);
   readonly #inside = this.#joins.inside;
   readonly #sending: Sending;
-  readonly #notices: Noticing;
+  readonly #notices: Noticer;
   readonly #places = new Places((room) => this.#deps.store.getState().chat.rooms[room]?.read, this.#out);
 
   constructor(deps: LinkDeps) {
     this.#deps = deps;
-    this.#notices = new Noticing(deps.store, this.#inside, () => this.#key !== "guest");
+    this.#notices = new Noticer(deps.store, this.#inside, () => this.#key !== "guest");
     this.#outbox = outbox(deps.store);
     this.#sending = new Sending({
       ergo: () => this.#ergo,

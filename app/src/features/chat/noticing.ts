@@ -11,7 +11,7 @@ import { isAccount } from "./names.ts";
 
 type Store = ReturnType<typeof createAppStore>;
 
-export class Noticing {
+export class Noticer {
   /** The rooms where a mention of the whole room counts, as the page told. */
   groups: ReadonlySet<string> = new Set();
   readonly #store: Store;
