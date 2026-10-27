@@ -97,6 +97,7 @@ describe("a room's pins", () => {
     ["another line than the one asked", said("m2")[1], "not_found"],
     ["a line with no time", { room: "#bubble/games", account: ALICE, msgid: "m1", text: "x" }, "refused"],
     ["a CTCP, an /me among them", said("m1", { text: "\u0001ACTION waves\u0001" })[1], "refused"],
+    ["a CTCP with no closing mark", said("m1", { text: "\u0001ACTION waves" })[1], "refused"],
     ["a line of no text", said("m1", { text: "" })[1], "refused"],
     ["a line of over 510 characters", said("m1", { text: "x".repeat(511) })[1], "refused"],
     ["a line of an author that is no address", said("m1", { account: "alice" })[1], "refused"],
@@ -148,6 +149,7 @@ describe("a room's pins", () => {
     ]);
     expect(results.filter((each) => each === "pinned")).toHaveLength(2);
     expect(results.filter((each) => each === "full")).toHaveLength(1);
+    expect(results[3]).toBe("already");
     expect(db.prepare("SELECT count(*) AS n FROM pins").get()).toEqual({ n: 2 });
   });
 
