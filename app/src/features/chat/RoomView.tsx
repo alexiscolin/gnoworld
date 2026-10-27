@@ -24,24 +24,13 @@ const LINES = [shared["plain"], shared["scrolls"], styles["lines"]].join(" ");
 // acts on the page as it stands, nothing queued for the lines.
 const waiting = (busy: boolean) => <ol aria-label="Messages" aria-busy={busy || undefined} className={LINES} />;
 
-// What the lines do on a line's actions, each a room's view may leave out: nothing then, and a delete or a reaction
-// never goes out.
-type Handlers = "onDelete" | "onDismiss" | "onReact" | "onReply";
-type RoomLinesProps = Omit<LinesProps, Handlers> & { [Name in Handlers]?: LinesProps[Name] | undefined };
-
 // The room's lines: the list's place while it holds none or their code comes, then the lines view.
-function RoomLines({ onDelete, onDismiss, onReact, onReply, ...props }: RoomLinesProps) {
+function RoomLines(props: LinesProps) {
   return props.lines.length === 0 ? (
     waiting(false)
   ) : (
     <Suspense fallback={waiting(true)}>
-      <Lines
-        {...props}
-        onDelete={onDelete ?? (() => false)}
-        onDismiss={onDismiss ?? (() => undefined)}
-        onReact={onReact ?? (() => false)}
-        onReply={onReply ?? (() => undefined)}
-      />
+      <Lines {...props} />
     </Suspense>
   );
 }

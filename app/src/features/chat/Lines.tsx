@@ -123,19 +123,26 @@ export interface LinesProps {
   me: string | undefined;
   /** The msgid of a line Ergo refused to delete, said until dismissed. */
   refused?: string | undefined;
-  /** Deletes a line, the reader's own; whether it went out. */
-  onDelete: (id: string) => boolean;
+  /** Deletes a line, the reader's own; whether it went out. A room's view may leave out what a line's actions do:
+   * nothing then, and a delete or a reaction never goes out. */
+  onDelete?: ((id: string) => boolean) | undefined;
   /** The room's flash said Ergo's refusal of a delete. */
-  onDismiss: () => void;
+  onDismiss?: (() => void) | undefined;
   /** The room's reactions (4d), shown under their lines. */
   reactions?: readonly Reaction[] | undefined;
   /** Reacts to a line, or takes the reaction back, an account's; whether it went out. */
-  onReact: (reaction: Reacting) => boolean;
+  onReact?: ((reaction: Reacting) => boolean) | undefined;
   /** Ergo refused a reaction the page sent here, said until dismissed (4d). */
   cannotReact?: true | undefined;
   /** Makes a line, by its msgid, the one the composer's next answers (4d). */
-  onReply: (id: string) => void;
+  onReply?: ((id: string) => void) | undefined;
 }
+
+// What a line's actions do when a view gives none: nothing goes out.
+const NO_DELETE = () => false;
+const NO_DISMISS = () => undefined;
+const NO_REACT = () => false;
+const NO_REPLY = () => undefined;
 
 // What Ergo refused, said until the page dismisses it: a delete first, then a reaction; none, the page's own word.
 const toldOf = (refused: string | undefined, cannotReact: true | undefined): FlashMessage | undefined => {
@@ -145,7 +152,8 @@ const toldOf = (refused: string | undefined, cannotReact: true | undefined): Fla
 
 /** The room's flash, then its lines, oldest first, as a list a screen reader hears grow. */
 export function Lines(props: LinesProps) {
-  const { room, members, me, refused, onDelete, onDismiss, reactions, onReact, cannotReact, onReply } = props;
+  const { room, members, me, refused, reactions, cannotReact } = props;
+  const { onDelete = NO_DELETE, onDismiss = NO_DISMISS, onReact = NO_REACT, onReply = NO_REPLY } = props;
   // The room's lines as shown: each corrected by its author's newest edit, the edits gone (4d, F664).
   const lines = shownLines(props.lines);
   const { listRef, onScroll } = useNewestInView(lines, reactions);
