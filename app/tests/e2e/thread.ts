@@ -15,3 +15,9 @@ export async function threadOf(line: Locator) {
   await line.getByRole("toolbar").getByRole("button", { name: "More actions", exact: true }).click();
   await line.page().getByRole("menuitem", { name: "Open thread" }).click();
 }
+
+/** Says `text` from the panel's field, as a key press sends it. */
+export async function say(page: Page, text: string) {
+  await threadField(page).fill(text);
+  await threadField(page).press("Enter");
+}

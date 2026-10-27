@@ -10,10 +10,10 @@ import { Writer } from "./Writer.tsx";
 
 const Thread = lazy(async () => ({ default: (await import("./Thread.tsx")).Thread }));
 
-// A thread open: its conversation, its root's msgid, and the line that opened it, which the focus goes back to.
+// A thread open: its conversation and the line that opened it, which the focus goes back to. Its root is read from
+// the lines each time they change: a chain grows while its panel is open (CR9).
 interface Open {
   key: string;
-  root: string;
   from: string;
 }
 
@@ -55,11 +55,12 @@ function Panel({
   close,
 }: Omit<Page, "people"> & { open: Open; shown: Shown; close: () => void }) {
   const members = state?.members ?? [];
+  const root = rootOf(state?.lines ?? [], open.from);
   return (
     <Suspense fallback={null}>
       <Thread
-        key={open.root}
-        root={open.root}
+        key={open.from}
+        root={root}
         lines={state?.lines ?? []}
         members={members}
         me={session.kind === "in" ? session.address : undefined}
@@ -71,7 +72,7 @@ function Panel({
             label="this thread"
             rooms={rooms}
             members={members}
-            onSay={(draft) => acts.onSay(draft, open.root)}
+            onSay={(draft) => acts.onSay(draft, root)}
             focus
             keeps={false}
           />
@@ -89,16 +90,17 @@ export function useThreads(page: Page) {
   if (open !== undefined && open.key !== shown?.key) setOpen(undefined);
   if (shown?.kind !== "room") return { view: {}, aside: undefined };
   const close = () => {
+    const ids = open === undefined ? [] : [open.from, rootOf(state?.lines ?? [], open.from)];
     setOpen(undefined);
     // After React drew the room again, which a narrow room hid while the panel was open.
     requestAnimationFrame(() => {
-      focusLine(open === undefined ? [] : [open.from, open.root]);
+      focusLine(ids);
     });
   };
   return {
     view: {
       onThread: (id: string) => {
-        setOpen({ key: shown.key, root: rootOf(state?.lines ?? [], id), from: id });
+        setOpen({ key: shown.key, from: id });
       },
       threaded: open !== undefined,
     },
