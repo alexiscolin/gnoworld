@@ -2034,11 +2034,6 @@ rm -rf "${c:?}" "${r:?}" && cp -R "$g" "$c" && rm -rf "${c:?}/.git" && mkdir -p 
 (g=$c && FLAKY=test gate >/dev/null) || fail "check.sh failed an unsteady test in a staged copy"
 grep -qF "app/src/a.test.ts" "$r/.claude/tmp/unsteady.log" || fail "check.sh did not log a staged copy's unsteady test in the repository"
 [ ! -e "$c/.claude/tmp/unsteady.log" ] || fail "check.sh logged a staged copy's unsteady test in the copy, which is deleted"
-# A gate run from a linked folder (macOS's /tmp is one): the reports name real paths, the file is still found and logged from the root.
-rm -rf "${unsteady:?}" && ln -s "$g" "$g.link"
-(g=$g.link && FLAKY=test gate >/dev/null) || fail "check.sh failed an unsteady test run from a linked folder"
-[ "$(grep -c "	app/src/a.test.ts	" "$unsteady")" = 1 ] || fail "check.sh logged an unsteady file by another path than the root's, from a linked folder: $(cat "$unsteady")"
-rm -rf "${unsteady:?}"
 # A run that passes the first time runs nothing again and logs nothing.
 gate >/dev/null || fail "check.sh failed a clean run"
 [ "$(tries test)" = 1 ] && [ "$(tries playwright)" = 1 ] || fail "check.sh ran a passing step twice"

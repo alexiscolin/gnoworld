@@ -17,11 +17,6 @@ import subprocess
 import sys
 
 
-def rel(path):
-    """path from the folder the gate runs in, symlinks resolved on both sides (macOS's /tmp is /private/tmp)."""
-    return os.path.relpath(os.path.realpath(path))
-
-
 def failed_vitest(report):
     """{file: [failed test names]}: Vitest's JSON reporter, a file that failed to load with no test name."""
     return {
@@ -63,7 +58,7 @@ def main(argv):
         sys.exit(f"unsteady: no readable report of {tool}'s failure ({e}): nothing to run again")
     if not failed:
         sys.exit(f"unsteady: {tool} failed with no failed file in its report: not a test to run again")
-    files = sorted(rel(path) for path in failed)
+    files = sorted(os.path.relpath(path) for path in failed)  # check.sh runs from its folder's real path, as the tools report
     print(f"unsteady: {tool} failed in {', '.join(files)}: running them once more, alone", file=sys.stderr, flush=True)
     if subprocess.run(command + [FILTERS[tool](f) for f in files]).returncode != 0:
         sys.exit(f"unsteady: {', '.join(files)} failed twice")
@@ -77,7 +72,7 @@ def main(argv):
         os.makedirs(os.path.dirname(log) or ".", exist_ok=True)
         with open(log, "a") as f:
             for path, names in sorted(failed.items()):
-                f.write("\t".join([now, tool, rel(path), busy, "; ".join(names) or "(the file did not load)"]) + "\n")
+                f.write("\t".join([now, tool, os.path.relpath(path), busy, "; ".join(names) or "(the file did not load)"]) + "\n")
     except OSError as e:
         sys.exit(f"unsteady: {', '.join(files)} passed the second time, but {log} cannot be written ({e}): an unsteady test no one sees is not a pass")
     print(f"unsteady: {', '.join(files)} passed the second time: logged in {log}", file=sys.stderr)

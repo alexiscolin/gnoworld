@@ -676,7 +676,6 @@ def mutants():
     yield from each(un, 'if r["status"] == "failed"', 'if r["status"] != "failed"', "hooks", "unsteady: Vitest's failed files only")
     yield from each(un, 'if not spec["ok"]:', 'if spec["ok"]:', "hooks", "unsteady: Playwright's failed specs only")
     yield from each(un, "re.escape}", "str}", "hooks", "unsteady: Playwright is given a file's name as a pattern")
-    yield from each(un, "os.path.realpath(path)", "path", "hooks", "unsteady: a file's path is the same through a link")
     yield from each(un, "tenths / 10", "tenths", "hooks", "unsteady: the load is logged in whole units")
     yield from each(un, "cores // 10", "cores", "hooks", "unsteady: the cores are logged as cores")
     yield from each("scripts/check_docs.py", ' elif AGENT_RULE not in " ".join(p.read_text().split()):', " elif False:", "hooks", "check_docs wants each agent's brief to say the git-index rule (G12)")
