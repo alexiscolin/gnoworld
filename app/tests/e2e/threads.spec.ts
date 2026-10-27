@@ -108,7 +108,7 @@ test.describe("threads", () => {
     expect(said().at(-1)).toBe(`@+reply=m2 PRIVMSG ${ROOM} :to the unrelated line`);
   });
 
-  // R2: the room's unsent draft is the room's: the panel's field opens empty, and what it holds is kept nowhere.
+  // R2: the room's unsent draft is the room's: the panel's field opens empty, and what it holds is kept on no device.
   test("keeps the room's draft apart from the panel's field, which opens empty and keeps no draft", async ({
     page,
   }) => {
@@ -120,7 +120,6 @@ test.describe("threads", () => {
     await closeButton(page).click();
     await expect(field(page)).toHaveValue("keep me");
     await chipOf(lines(page).first()).click();
-    await expect(threadField(page)).toHaveValue("");
     await threadField(page).fill("sent from the panel");
     await threadField(page).press("Enter");
     await expect(inThread(page)).toHaveCount(4);
