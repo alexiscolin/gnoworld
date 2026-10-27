@@ -233,6 +233,11 @@ describe("dmNotice: a direct message", () => {
     expect(dmNotice(to(ALICE, ALICE, { kind: "notice" }), ME)).toBeUndefined();
   });
 
+  // F1524: a DM edit was a notice of its own, though the line it corrects was counted when it came, as a room's edit is not.
+  test("is none for an edit of a message, as for a room's", () => {
+    expect(dmNotice(to(ALICE, ALICE, { edits: "d0" }), ME)).toBeUndefined();
+  });
+
   test("is a notice whatever the text says, a mention or none", () => {
     expect(dmNotice(to(ALICE, ALICE, { text: `@${BOB}` }), ME)?.kind).toBe("dm");
   });

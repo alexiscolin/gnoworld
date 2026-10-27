@@ -62,8 +62,8 @@ export function roomNotice(line: NoticeLine, room: string, at: RoomAt): Notice |
   return groups && mentionsRoom(tree) ? made(line, "group", room) : undefined;
 }
 
-/** The notice a direct message is for its reader, or none: the partner's own, never a NOTICE. */
+/** The notice a direct message is for its reader, or none: the partner's own, never a NOTICE or an edit. */
 export function dmNotice(dm: { partner: string; line: Line }, me: string | undefined): Notice | undefined {
   const { partner, line } = dm;
-  return me === undefined || line.account === me || line.kind === "notice" ? undefined : made(line, "dm", partner);
+  return me === undefined || quiet(line, "all", me) ? undefined : made(line, "dm", partner);
 }
