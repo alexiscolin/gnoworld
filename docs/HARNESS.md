@@ -196,10 +196,9 @@ by) and its evidence; a fixed one names its commit, the others say why.
 Reviews read the ledger first, so a rejected claim is not raised again and a fixed one that
 comes back is a regression. The review agents (`.claude/agents/`) report rows for it.
 
-The reviewers' exam (Anthropic's incidents become evals): `scripts/exam.py` builds, from the
-ledger's fixed findings, a set of cases, each the code before its fix, the file and the bug, the
-newest 40 at most. A change to a reviewer (an agent's file, a prompt, a model) is scored on it,
-the cases whose bug it names, before it lands; never per merge, so no step of the gate.
+The reviewers' exam (Anthropic's incidents become evals) is a row of `docs/plans/backlog.md`: the ledger's fixed
+findings become a set, each the code before its fix, the file and the bug. Its builder (exam.py, 51 lines) was
+removed with its tests on 2026-10-27, since nothing ran a reviewer on the set (simplify-S3); it comes back with its scorer.
 
 | Who | When | Model |
 |---|---|---|
@@ -425,7 +424,6 @@ and the harness is frozen until a real bug crosses it.
 | `scripts/probe.py`, `scripts/test_hooks.sh`, `scripts/harness_mutate.py`, `scripts/suite_parts.py` | the harness's own tests, and the sections a change touched |
 | `scripts/bench.py`, `app/tests/bench/` | the benches and their budgets |
 | `scripts/batch_size.py` | a merge's own product code, a small batch |
-| `scripts/exam.py` | the reviewers' exam's set |
 | `scripts/worktree.sh` | a branch's worktree, ready for the gate: its packages linked (so a base whose lockfile or package files are not the source tree's is refused, and a `pnpm install` is made in the source tree, never in the worktree: the links lead there; security-S5), StrykerJS's incremental file seeded |
 | `server/src/testing/toolchain.ts` | the Node every test runs on |
 | `docs/review/findings.md`, `docs/review-log.md` | every finding; what Alexis caught and missed |
