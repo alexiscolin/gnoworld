@@ -265,6 +265,8 @@ try:
         with tempfile.TemporaryDirectory() as copy:
             os.makedirs(f"{copy}/packages/probe/src")
             shutil.copy("vitest.config.ts", f"{copy}/vitest.config.ts")
+            os.makedirs(f"{copy}/lint")
+            shutil.copy("lint/shared.config.ts", f"{copy}/lint/shared.config.ts")  # the config reads BENCHES there (b4a33fa)
             with open(f"{copy}/packages/probe/src/a.test.ts", "w") as f:
                 f.write('import { expect, test } from "vitest";\n\ntest("a", () => {\n  expect(1).toBe(1);\n});\n')
             os.symlink(os.path.realpath("node_modules"), f"{copy}/node_modules")
