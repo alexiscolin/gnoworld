@@ -101,8 +101,8 @@ the machine's width, their load outlasted Ergo's 9 s auth script in the real-Erg
 The benches (`scripts/bench.py`, `app/tests/bench/`) run alone, after `probe.py`: each names its
 budget in brackets, from the slice's plan (`docs/plans/slice-4.md`, section 4), and the mean of its runs
 must stay under it, and a bench a `*.bench.ts(x)` source names that Vitest's report lacks (a `describe.skip` around it, an
-`.only` beside it, a comment) fails too, and ESLint refuses `.skip`, `.only` and `.todo` in a bench file as in a test (security-S1); a bench beside other work would measure the load. `--merge` alone counts
-the merge's own product code since the last reviewed commit (`scripts/batch_size.py`, DORA's
+`.only` beside it, a comment) fails too, and ESLint refuses `.skip`, `.only` and `.todo` in a bench file as in a test (security-S1); a bench beside other work would measure the load. `--merge` and `--full` count
+the merge's own product code (a slice's last merge is checked by `--full`, and it is the one that reaches `main`) since the last reviewed commit (`scripts/batch_size.py`, DORA's
 small batches, `docs/REVIEW.md`): past 600 lines it fails unless a commit says why on a line
 `Batch-size: <lines> - <why>` giving at least the count, and past 400 it says the tier-1 limit (the
 server's test helpers, `server/src/testing/`, are not product code; a renamed file counts its added lines at

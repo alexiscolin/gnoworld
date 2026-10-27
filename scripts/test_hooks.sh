@@ -1903,10 +1903,17 @@ ran py:harness_mutate && fail "check.sh --full mutated a harness main already ha
 for s in py:prove_fix py:patch_coverage py:check_regressions py:check_migrations; do
 	grep -q "^$s $base$" "$log" || fail "check.sh --full did not give $s the base $base"
 done
+# A slice's last merge is checked by --full, not --merge (pre-merge.md, step 8), and it is the merge that reaches main: --full
+# sizes its batch too, from the same base, and a batch too large fails it (security-S2).
+grep -qx "py:batch_size $base" "$log" || fail "check.sh --full did not size the batch from its base $base: $(grep batch_size "$log")"
 before coverage py:patch_coverage || fail "check.sh --full measured the patch's coverage before the coverage run"
 grep -qx "audit-answer unset" "$log" || fail "check.sh let AUDIT_ANSWER reach the audit"
 grep -qx "bench-vitest unset" "$log" || fail "check.sh let BENCH_VITEST choose the benches' Vitest"
 grep -qxF "$(record)" "$g/.claude/tmp/green-full" || fail "check.sh --full did not record the code it passed"
+rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/green-full"
+out=$(FAIL=py:batch_size gate --full) && fail "check.sh --full passed with its batch size failing"
+printf '%s\n' "$out" | grep -q "^py:batch_size failed here" || fail "check.sh --full hid the batch size's failure: $out"
+[ ! -e "$g/.claude/tmp/green-full" ] || fail "check.sh --full recorded a gate whose batch was too large"
 # probe.py plants its faults in the source tree: it runs alone, before any full lane reads the tree (the
 # coverage's Vitest, check_regressions' list, StrykerJS, the stories' build), which saw its files come and go.
 (SLOW_STEP=py:probe gate --full) >/dev/null || fail "check.sh --full failed with a slow probe"

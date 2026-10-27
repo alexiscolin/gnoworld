@@ -600,7 +600,8 @@ def mutants():
     yield from each("scripts/batch_size.py", "if fingerprint(commit) in reviewed", "if False", "hooks", "batch_size counts from the last reviewed commit")
     yield from each("scripts/batch_size.py", r"(\.test\.tsx?|", "(", "hooks", "batch_size leaves the tests out")
     yield from each("scripts/batch_size.py", "if added > TIER_ONE:", "if False:", "hooks", "batch_size says the tier-1 limit")
-    yield from each("scripts/check.sh", "\t\tif $merge; then\n\t\t\tstep batch_size", "\t\tif true; then\n\t\t\tstep batch_size", "hooks", "check.sh: only --merge measures a merge's batch")
+    sized = '\t\tstep batch_size # a merge\'s own product code is a small batch (DORA; docs/REVIEW.md)\n\t\tpython3 -I scripts/batch_size.py "$base"\n'
+    yield from each("scripts/check.sh", sized, "\t\tif $merge; then\n" + sized.replace("\t\t", "\t\t\t") + "\t\tfi\n", "hooks", "check.sh: --full sizes the batch too, the last merge of a slice being checked by it (security-S2)")
     yield from each("scripts/exam.py", 'or cells[5] != "fixed":', "or False:", "hooks", "exam keeps the fixed findings alone")
     yield from each("scripts/exam.py", "if path is None or fix is None or", "if path is None or", "hooks", "exam keeps a finding whose fix the repository holds")
     yield from each("scripts/exam.py", "(severe and not SEVERE.search(", "(False and not SEVERE.search(", "hooks", "exam --severe keeps the high and medium")
@@ -697,7 +698,7 @@ def mutants():
         ),
         ("\t\tpython3 -I scripts/probe.py\n", "\t\tpython3 -I scripts/probe.py || :\n", "--full fails when the probe does (G2)"),
         ("\t\tpython3 -I scripts/bench.py\n", "\t\tpython3 -I scripts/bench.py || :\n", "--full fails when a bench passes its budget (G2)"),
-        ('\t\t\tpython3 -I scripts/batch_size.py "$base"\n', '\t\t\tpython3 -I scripts/batch_size.py "$base" || :\n', "--merge fails when its batch is too large (G2)"),
+        ('\t\tpython3 -I scripts/batch_size.py "$base"\n', '\t\tpython3 -I scripts/batch_size.py "$base" || :\n', "--merge and --full fail when the batch is too large (G2)"),
         ("ts=true app=true tokens=true related=false ;;", "ts=true app=true related=false ;;", "a change of tokens.css compares the tokens story's pictures (F1190)"),
         ("\t$tokens || return 0\n\tstep pictures", "\tstep pictures", "the tokens pictures only for a change of tokens.css (F1190)"),
         ("start docs\nstart pictures\n", "start docs\n", "the tokens pictures lane starts (F1190)"),
