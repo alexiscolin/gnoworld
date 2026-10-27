@@ -1,8 +1,8 @@
 """bench.py: the benches hold their budgets (docs/plans/slice-4.md §4; docs/HARNESS.md, "The gate").
 
 Runs Vitest's benches (`*.bench.ts(x)`, the node project) and reads its report: each bench names its budget in
-brackets, `[0.2 ms]`, and the mean of its runs must stay under it. A bench with no budget, or no bench at all, fails:
-a measure nobody bounds guards nothing. The full gate runs it alone, after probe.py: a bench beside other work
+brackets, `[0.2 ms]`, and the mean of its runs must stay under it. A bench with no budget, no sample (its function
+threw) or no bench at all fails: a measure nobody bounds guards nothing. The full gate runs it alone, after probe.py: a bench beside other work
 measures the machine's load. Usage: bench.py, from the repository root."""
 import json
 import os
@@ -26,7 +26,10 @@ if not measures:
     sys.exit("bench.py: no bench ran: each budget of docs/plans/ has a `*.bench.ts(x)`")
 problems = []
 for measure in measures:
-    name, mean = measure["name"], measure["mean"]
+    name, mean = measure["name"], measure.get("mean")
+    if mean is None:  # Vitest keeps a bench whose function threw, with no sample, and still exits 0
+        problems.append(f"{name}: took no sample: its function threw or never ran")
+        continue
     found = BUDGET.search(name)
     if found is None:
         problems.append(f"{name}: names no budget, `[<n> ms]` at its end")

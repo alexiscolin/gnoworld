@@ -2427,6 +2427,12 @@ report
 (bench) >/dev/null && fail "bench.py passed a run with no bench"
 report "a line [0.2 ms]" 0.05
 (BENCH_EXIT=1 bench) >/dev/null && fail "bench.py passed a Vitest run that failed"
+# A bench whose function throws stays in Vitest's report with no sample and no mean, and the run ends 0 (F1213): the
+# gate fails, saying so, not with a traceback.
+printf '{"files": [{"groups": [{"benchmarks": [{"name": "a line [0.2 ms]", "samples": []}, {"name": "a room [100 ms]", "mean": 14.5}]}]}]}\n' >"$b/report.json"
+out=$(bench) && fail "bench.py passed a bench that took no sample: $out"
+printf '%s\n' "$out" | grep -q "a line \[0.2 ms\]: took no sample" || fail "bench.py did not say which bench took no sample: $out"
+printf '%s\n' "$out" | grep -q "Traceback" && fail "bench.py crashed on a bench with no mean: $out"
 fi
 
 if part mutant_scope; then
