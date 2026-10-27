@@ -1,3 +1,4 @@
+import type { Line } from "@gnoworld/core";
 import { describe, expect, it } from "vitest";
 import type { Dms } from "./Dms.tsx";
 import { roomActs } from "./roomActs.ts";
@@ -54,5 +55,44 @@ describe("shownOf: the conversation in view", () => {
   it("keeps a conversation's key while it stays in view", () => {
     expect(shownOf(dms(ALICE), room("#bubble"), PAGE)?.key).toBe(shownOf(dms(ALICE), room("#garden"), PAGE)?.key);
     expect(shownOf(dms(), room("#bubble"), PAGE)?.key).toBe(shownOf(dms(), room("#bubble"), PAGE)?.key);
+  });
+});
+
+// 4f-n: a conversation is seen as its reader reaches its end, as a room is read: the same hook, given a way out.
+describe("shownOf: a direct message seen", () => {
+  const line = (id: string, time: string): Line => ({
+    id,
+    time,
+    from: ALICE,
+    account: ALICE,
+    text: id,
+    kind: "message",
+  });
+  const withLines = (partner: string): Dms => ({ ...dms(partner), lines: [line("d1", "2026-10-25T10:01:00.000Z")] });
+
+  it("tells the page the conversation seen up to the line read's time", () => {
+    const seen: [string, string][] = [];
+    const page: DmPage = { ...PAGE, seen: (partner, time) => seen.push([partner, time]) };
+    const shown = shownOf(withLines(ALICE), room("#bubble"), page);
+    shown?.view.onRead?.("d1");
+    expect(seen).toEqual([[ALICE, "2026-10-25T10:01:00.000Z"]]);
+  });
+
+  it("tells nothing of a line it does not hold", () => {
+    const seen: string[] = [];
+    const page: DmPage = { ...PAGE, seen: (partner) => seen.push(partner) };
+    shownOf(withLines(ALICE), room("#bubble"), page)?.view.onRead?.("nope");
+    expect(seen).toEqual([]);
+  });
+
+  it("holds the conversation's page as come, so its reader's reach of the end counts", () => {
+    expect(shownOf(withLines(ALICE), room("#bubble"), PAGE)?.view.state?.paged).toBe(true);
+  });
+
+  it("gives a room no way out of its own here: its reads go through the link", () => {
+    const seen: string[] = [];
+    const page: DmPage = { ...PAGE, seen: (partner) => seen.push(partner) };
+    shownOf(dms(), room("#bubble"), page)?.view.onRead?.("d1");
+    expect(seen).toEqual([]);
   });
 });

@@ -27,11 +27,13 @@ export interface DmPage {
   sayTo: (partner: string, draft: string) => boolean;
   focus: boolean;
   noteId: string;
+  /** The conversation seen up to a line's time, as its reader reaches its end (4f-n). */
+  seen?: ((partner: string, time: string) => void) | undefined;
 }
 
 // A direct message's (4e): said to be one, its partner named, the address whole in its title (U7); not encrypted, by a
 // lock and a word in amber, caution's colour (U6); no one beside it; a line Ergo refused said so.
-function dmShown(partner: string, dms: Dms, { sayTo, focus, noteId }: DmPage): Shown {
+function dmShown(partner: string, dms: Dms, { sayTo, focus, noteId, seen }: DmPage): Shown {
   const short = shortAddress(partner);
   const { refused } = dms;
   const title = (
@@ -55,10 +57,15 @@ function dmShown(partner: string, dms: Dms, { sayTo, focus, noteId }: DmPage): S
       room: undefined,
       title,
       note,
-      state: { lines: dms.lines, members: [] },
+      // Its page is the one it holds, so its reader's reach of the end counts as a read (4f-n).
+      state: { lines: dms.lines, members: [], paged: true },
       empty: dms.empty,
       onDelete: () => false,
       onDismiss: () => undefined,
+      onRead: (id) => {
+        const line = dms.lines.findLast((each) => each.id === id);
+        if (line !== undefined) seen?.(partner, line.time);
+      },
     },
     writer: {
       room: partner,
