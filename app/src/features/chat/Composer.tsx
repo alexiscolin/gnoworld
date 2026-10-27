@@ -5,7 +5,7 @@
 // bar wraps the selection in Markdown's marks; the line shows below as it reads.
 import { COMMANDS, compose, type Composed } from "@gnoworld/core";
 import { Button, Cluster, Field, IconButton, Sidebar, Stack, type FieldProps, type IconName } from "@gnoworld/ui";
-import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type SubmitEvent } from "react";
+import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type RefObject, type SubmitEvent } from "react";
 import { completed, completions, type Completion } from "./complete.ts";
 import { formatted, type Edit, type Format } from "./format.ts";
 import { Message } from "./Message.tsx";
@@ -140,6 +140,15 @@ function ReplyBar({ id, to, onCancel, field }: ReplyBarProps) {
   );
 }
 
+// A line chosen to answer, each time Reply is asked, the same line's again included: the field takes the focus; an
+// edit of that line's words changes what the bar quotes, never where the focus is (the code review's CR2).
+function useFocusOnReply(replying: ComposerProps["replying"], formRef: RefObject<HTMLFormElement | null>) {
+  const answering = replying === undefined ? undefined : String(replying.asked ?? 0);
+  useLayoutEffect(() => {
+    if (answering !== undefined) formRef.current?.querySelector("input")?.focus();
+  }, [answering, formRef]);
+}
+
 export function Composer(props: ComposerProps) {
   const { room, nick, rooms, members, onSay, draft: kept = "", onDraft, replying, onCancelReply } = props;
   const [draft, setDraft] = useState(kept);
@@ -162,12 +171,7 @@ export function Composer(props: ComposerProps) {
   const completion = completions(draft, { commands: COMMANDS, rooms, people });
   const known = new Set(members);
   const box = () => formRef.current?.querySelector("input") ?? undefined;
-  // A line chosen to answer, each time Reply is asked, the same line's again included: the field takes the focus; an
-  // edit of that line's words changes what the bar quotes, never where the focus is (the code review's CR2).
-  const answering = replying === undefined ? undefined : String(replying.asked ?? 0);
-  useLayoutEffect(() => {
-    if (answering !== undefined) box()?.focus();
-  }, [answering]);
+  useFocusOnReply(replying, formRef);
   useLayoutEffect(() => {
     const selection = selectionRef.current;
     if (selection === undefined) return;
@@ -194,6 +198,13 @@ export function Composer(props: ComposerProps) {
     event.preventDefault();
     apply(completed(draft, completion));
   };
+  // Escape in the box answers none, as the reply bar's cancel does; the draft stays (U3).
+  const keys = (event: KeyboardEvent<HTMLFormElement>) => {
+    if (event.key === "Escape" && replying !== undefined && event.target === box()) {
+      event.preventDefault();
+      onCancelReply?.();
+    } else complete(event);
+  };
   const send = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (composed.kind !== "line") return;
@@ -202,7 +213,7 @@ export function Composer(props: ComposerProps) {
     if (went) change("");
   };
   return (
-    <form ref={formRef} aria-label={`Write in ${label}`} onSubmit={send} onKeyDown={complete}>
+    <form ref={formRef} aria-label={`Write in ${label}`} onSubmit={send} onKeyDown={keys}>
       <Stack space="2xs">
         {replying === undefined ? null : <ReplyBar id={replyId} to={replying} onCancel={onCancelReply} field={box} />}
         <FormatBar onFormat={format} />

@@ -41,6 +41,21 @@ test.describe("replies", () => {
     expect(said()).toEqual([`PRIVMSG ${ROOM} :plain`]);
   });
 
+  // F1175 (the UX review's U3): Escape in the field cancels the reply, as the Cancel button does, and keeps the draft.
+  test("cancel a reply with Escape in the field, the draft and the focus kept", async ({ page }) => {
+    const { said } = await asAccount(page);
+    await replyTo(page, 1);
+    await field(page).fill("half a thought");
+    await field(page).press("Escape");
+    await expect(cancel(page)).toHaveCount(0);
+    await expect(form(page)).not.toContainText("Replying to");
+    await expect(field(page)).toBeFocused();
+    await expect(field(page)).toHaveValue("half a thought");
+    await field(page).press("Enter");
+    await expect(lineOf(page, "half a thought")).toBeVisible();
+    expect(said()).toEqual([`PRIVMSG ${ROOM} :half a thought`]);
+  });
+
   test("answer the line of the second Reply, not the first's", async ({ page }) => {
     const { said } = await asAccount(page);
     await replyTo(page, 0);
