@@ -369,6 +369,12 @@ try:
             for what, where, tmp in (("the temporary folder itself", fake, fake), ("the folder above the temporary one", f"{fake}/..", fake),
                                      ("a folder out of the temporary one by `..`", f"{fake}/../escaped", fake),
                                      ("a relative folder, which would sit inside it", "storybook-out", os.path.realpath(tree)),
+                                     # A run folder's storybook by every rule but the shape of the path itself: only that shape's
+                                     # check refuses these (a temporary folder with a space or a shell character in its own name,
+                                     # a relative path that resolves into one).
+                                     ("a relative run folder's storybook, which would sit inside it", "check.abc123/storybook", os.path.realpath(tree)),
+                                     ("a run folder's storybook under a temporary folder with a space", f"{fake}/a b/check.abc123/storybook", f"{fake}/a b"),
+                                     ("a run folder's storybook under a temporary folder with a shell character", f"{fake}/x;true/check.abc123/storybook", f"{fake}/x;true"),
                                      ("a folder out of the temporary one", "/elsewhere/storybook", fake),
                                      ("a folder with a space", f"{fake}/a b", fake), ("a folder with a shell character", f"{fake}/x;true", fake),
                                      # Inside the temporary folder, none of them check.sh's own `check.*/storybook` (CR7)
