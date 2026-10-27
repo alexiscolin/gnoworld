@@ -165,6 +165,18 @@ describe("useNotices", () => {
     expect(document.title).toBe(TITLE);
   });
 
+  // F1678 (CR6): a route change sets the title anew, which dropped the count while its number stood.
+  it("puts the count back before a title another writer set, with the count the same", async () => {
+    draw(on());
+    follow();
+    tell(({ noticeActions }) => {
+      noticeActions.add(mention("a", MAIN));
+    });
+    document.title = "Games · gno.world";
+    await Promise.resolve();
+    expect(document.title).toBe("(1) Games · gno.world");
+  });
+
   it("counts nothing for an account whose page holds no room list and no conversation yet", () => {
     draw(on({ sections: undefined }));
     follow();

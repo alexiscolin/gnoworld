@@ -12,11 +12,20 @@ export function titled(base: string, count: number): string {
   return `(${count > 99 ? "99+" : String(count)}) ${plain}`;
 }
 
-/** The page's title with the count of what is unseen, until the page leaves the chat. */
+/** The page's title with the count of what is unseen, until the page leaves the chat. Another writer's title (a route
+ * change sets it anew) gets the count put back before it. */
 export function useTabTitle(count: number): void {
   useEffect(() => {
-    document.title = titled(document.title, count);
+    const apply = () => {
+      const next = titled(document.title, count);
+      if (next !== document.title) document.title = next;
+    };
+    apply();
+    // The head's own changes: the title's text, or its element replaced.
+    const watch = new MutationObserver(apply);
+    watch.observe(document.head, { childList: true, characterData: true, subtree: true });
     return () => {
+      watch.disconnect();
       document.title = titled(document.title, 0);
     };
   }, [count]);
