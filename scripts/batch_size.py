@@ -4,8 +4,9 @@ lines unseen.
 
 A merge's own code: the lines it adds since the newest commit /pre-merge reviewed (docs/review-passes.txt, the
 previous merge's tip), or since base when none is between. Product code: app/src, packages/*/src, server/src and gno;
-tests, stories and journeys are not. Past 600 lines it fails, unless a commit of the merge says why on a line
-`Batch-size: <lines> - <why>`, which Alexis reads; past 400 it says the tier-1 limit, for the review card.
+tests, stories, journeys and the server's test helpers are not. Past 600 lines it fails, unless a commit of the
+merge says why on a line `Batch-size: <lines> - <why>` giving at least the count, which Alexis reads; past 400 it
+says the tier-1 limit, for the review card. A renamed file counts its added lines at its new path.
 check.sh --merge runs it. Usage: batch_size.py <base>, from the repository root."""
 import os
 import re
@@ -17,20 +18,25 @@ from repo_files import PASSES, fingerprint, git
 
 LIMIT, TIER_ONE = 600, 400
 PRODUCT = re.compile(r"^(app/src|packages/[^/]+/src|server/src|gno)/")
-NOT_PRODUCT = re.compile(r"(\.test\.tsx?|\.spec\.ts|\.stories\.tsx|_test\.gno|_filetest\.gno|_test\.go)$")
+NOT_PRODUCT = re.compile(r"(\.test\.tsx?|\.spec\.ts|\.stories\.tsx|_test\.gno|_filetest\.gno|_test\.go)$|^server/src/testing/")  # the server's test helpers
 
 base = sys.argv[1]
 reviewed = {line.split()[1] for line in open(PASSES) if line.strip() and not line.startswith("#")} if os.path.exists(PASSES) else set()
 own = next((commit for commit in git("rev-list", f"{base}..HEAD").split() if fingerprint(commit) in reviewed), base)
 added = 0
-for row in git("diff", "--numstat", own, "HEAD").splitlines():
-    plus, _, path = row.split("\t", 2)
+rows = git("diff", "-z", "--numstat", own, "HEAD").split("\0")  # a rename is "<+>\t<->\t", the old path, the new
+while rows and rows[0]:
+    plus, _, path = rows.pop(0).split("\t", 2)
+    if not path:  # a rename's lines are its new path's: git's own "app/{tests => src}/h.ts" matches no folder
+        path = (rows.pop(0), rows.pop(0))[1]
     if plus != "-" and PRODUCT.match(path) and not NOT_PRODUCT.search(path):
         added += int(plus)
 print(f"batch_size: {added} lines of product code since {own[:12]}, the last reviewed commit or the base")
-if added > LIMIT and not re.search(r"^Batch-size: \d+ - \S", git("log", "--format=%B", f"{own}..HEAD"), re.M):
+stated = [int(n) for n in re.findall(r"^Batch-size: (\d+) - \S", git("log", "--format=%B", f"{own}..HEAD"), re.M)]
+if added > LIMIT and not any(n >= added for n in stated):
     sys.exit(f"batch_size: {added} lines, past a merge's {LIMIT} (docs/REVIEW.md, DORA's small batches): cut the "
-             "merge in two, or say why on a commit's line `Batch-size: <lines> - <why>`, which Alexis reads")
+             "merge in two, or say why on a commit's line `Batch-size: <lines> - <why>` (at least that many lines), "
+             "which Alexis reads")
 if added > TIER_ONE:
     print(f"batch_size: past {TIER_ONE}: a merge that touches a tier-1 file carries {TIER_ONE} at most (docs/REVIEW.md); "
           "the review card says whether it does")

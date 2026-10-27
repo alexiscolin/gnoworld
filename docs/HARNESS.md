@@ -103,7 +103,9 @@ budget in brackets, from the slice's plan (`docs/plans/slice-4.md`, section 4), 
 must stay under it; a bench beside other work would measure the load. `--merge` alone counts
 the merge's own product code since the last reviewed commit (`scripts/batch_size.py`, DORA's
 small batches, `docs/REVIEW.md`): past 600 lines it fails unless a commit says why on a line
-`Batch-size: <lines> - <why>`, and past 400 it says the tier-1 limit. Every test run is on the
+`Batch-size: <lines> - <why>` giving at least the count, and past 400 it says the tier-1 limit (the
+server's test helpers, `server/src/testing/`, are not product code; a renamed file counts its added lines at
+its new path). Every test run is on the
 Node `.node-version` pins: a test refuses another (`server/src/testing/toolchain.test.ts`), since
 F816 surfaced only because StrykerJS ran once on Homebrew's Node 26, whose V8 reads some regexes
 otherwise.

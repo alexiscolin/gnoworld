@@ -2476,6 +2476,34 @@ out=$(size "$base") && fail "batch_size.py took a Batch-size line with no reason
 # No reviewed commit since base: everything since base counts.
 git -C "$bs" checkout -q -b fresh "$base" && mkdir -p "$bs/app/src" && lines 610 >"$bs/app/src/first.ts" && commit "a first merge"
 out=$(size "$base") && fail "batch_size.py passed 610 lines of a merge with no reviewed commit since base"
+# The limits are exact: 600 lines pass, 601 fail; 400 say nothing of the tier-1 limit, 401 do (G8).
+for n in 600 601 400 401; do
+	git -C "$bs" checkout -q -f -b "at$n" "$base" && mkdir -p "$bs/app/src" && lines "$n" >"$bs/app/src/at.ts" && commit "exactly $n"
+	out=$(size "$base") && ok=1 || ok=0
+	printf '%s\n' "$out" | grep -q "^batch_size: $n lines" || fail "batch_size.py did not count $n lines: $out"
+	case $n in 600 | 400) [ "$ok" = 1 ] || fail "batch_size.py refused $n lines: $out" ;; *) ;; esac
+	[ "$n" != 601 ] || [ "$ok" = 0 ] || fail "batch_size.py passed 601 lines with no reason given: $out"
+	case $n in 400) ! printf '%s\n' "$out" | grep -q "past 400" || fail "batch_size.py said the tier-1 limit at 400 lines, which is not past it: $out" ;; esac
+	[ "$n" != 401 ] || printf '%s\n' "$out" | grep -q "past 400" || fail "batch_size.py did not say the tier-1 limit at 401 lines: $out"
+done
+# The line says how large the batch is: a number below the count is a reason for another merge (G8).
+git -C "$bs" checkout -q -f -b stated "$base" && mkdir -p "$bs/app/src" && lines 700 >"$bs/app/src/big.ts" && git -C "$bs" add -A && git -C "$bs" commit -qm "a number too small" -m "Batch-size: 1 - one feature, cut no smaller"
+out=$(size "$base") && fail "batch_size.py took a Batch-size line of 1 for 700 lines: $out"
+printf '%s\n' "$out" | grep -q "700 lines" || fail "batch_size.py did not say how many lines past a too small Batch-size line: $out"
+git -C "$bs" commit -q --amend -m "a number that fits" -m "Batch-size: 700 - one feature, cut no smaller"
+out=$(size "$base") || fail "batch_size.py refused a Batch-size line giving the count: $out"
+# A file moved between folders keeps its new path's rule: a test moved into app/src is no product code, a helper
+# moved into it is, and git's rename line (`app/{tests => src}/h.ts`) names neither (G8).
+git -C "$bs" checkout -q -f -b moved "$base" && mkdir -p "$bs/app/src" "$bs/app/tests" && lines 1000 >"$bs/app/tests/h.ts" && lines 1000 >"$bs/app/src/was.test.ts" && commit "files to move"
+moved=$(git -C "$bs" rev-parse HEAD)
+git -C "$bs" mv app/tests/h.ts app/src/h.ts && lines 650 >>"$bs/app/src/h.ts"
+mkdir -p "$bs/app/src/sub" && git -C "$bs" mv app/src/was.test.ts app/src/sub/was.test.ts && lines 50 >>"$bs/app/src/sub/was.test.ts"
+commit "the moves"
+out=$(size "$moved") && fail "batch_size.py passed a helper moved into app/src with 650 lines added: $out"
+printf '%s\n' "$out" | grep -q "^batch_size: 650 lines" || fail "batch_size.py did not count what a moved file added, and only what a product path got: $out"
+# Helpers that only tests use are no product code (G8).
+git -C "$bs" checkout -q -f -b helpers "$base" && mkdir -p "$bs/server/src/testing" && lines 700 >"$bs/server/src/testing/kit.ts" && commit "a test helper"
+out=$(size "$base") || fail "batch_size.py counted server/src/testing, a test helper's folder, as product code: $out"
 fi
 
 if part exam; then
