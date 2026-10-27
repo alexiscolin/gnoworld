@@ -18,15 +18,16 @@ export interface LineRate {
   held: () => number;
 }
 
-/** The lines each account sent, `now` being the clock the accounts' last sight is read on. */
-export function lineRate(now: () => number): LineRate {
+/** The lines each account sent; an account is forgotten by Ergo's clock, as a backlog serves lines minutes apart (F1710). */
+export function lineRate(): LineRate {
   // The account touched longest ago first: a Map keeps insertion order, and a touched account goes to the back.
-  const accounts = new Map<string, { touched: number; seen: Seen[] }>();
+  const accounts = new Map<string, { newest: number; seen: Seen[] }>();
+  let ergo = 0;
   return {
     add: (account, { id, at, lines }) => {
-      const wall = now();
-      for (const [key, { touched }] of accounts) {
-        if (touched > wall - MS) break;
+      ergo = Math.max(ergo, at);
+      for (const [key, { newest }] of accounts) {
+        if (newest > ergo - MS) break;
         accounts.delete(key);
       }
       const seen = accounts.get(account)?.seen ?? [];
@@ -34,7 +35,7 @@ export function lineRate(now: () => number): LineRate {
       if (!seen.some((each) => each.id === id)) seen.push({ id, at, lines });
       // 101 messages hold more than the limit, so an older one is never needed to say a flood is one.
       if (seen.length > LIMIT + 1) seen.shift();
-      accounts.set(account, { touched: wall, seen });
+      accounts.set(account, { newest: Math.max(at, ...seen.map((each) => each.at)), seen });
       const inMinute = seen.filter((each) => each.at > at - MS && each.at <= at);
       return inMinute.reduce((sum, each) => sum + each.lines, 0) > LIMIT;
     },

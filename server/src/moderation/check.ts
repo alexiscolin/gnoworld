@@ -113,7 +113,7 @@ export function makeChecker(options: Options): (said: Said) => Promise<Verdict |
   const Count = z.object({ n: z.number() });
   const owns = editsOwn(db);
   // The lines an account sent in the last minute, a message of several lines counting each (rate.ts).
-  const lines = lineRate(now);
+  const lines = lineRate();
   // A line counts itself in its rate: it is claimed before the rules run.
   const tooFast = (key: string, at: number): boolean =>
     Count.parse(sql.recent.get(key, at - RATE.ms, at, RATE.lines + 1)).n > RATE.lines;
