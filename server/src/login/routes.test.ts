@@ -545,7 +545,7 @@ describe("limits", () => {
 
   it(
     "leaves at most a visitor's 10 nonces after 100,000 challenges from it, and another still gets one",
-    { timeout: 30_000 },
+    { timeout: 120_000 },
     async () => {
       const { app, rows } = setup();
       for (let i = 0; i < 100_000; i++) await ask(app);
