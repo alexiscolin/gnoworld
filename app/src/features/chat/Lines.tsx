@@ -230,7 +230,7 @@ export function Lines(props: LinesProps) {
             stop={line.id === stop}
             actions={mounted(line.id) ? actionsOf(line) : null}
             reactions={shown.get(line.id)}
-            react={me === undefined ? undefined : react}
+            react={me === undefined || !shown.has(line.id) ? undefined : react}
             answers={line.reply === line.id ? undefined : byId.get(lineOf(line.reply ?? ""))}
           />
         ))}
