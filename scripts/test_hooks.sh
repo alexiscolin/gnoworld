@@ -139,7 +139,8 @@ for step in "run format:check" "run typecheck" "run lint" "run test" "run unused
 	"python3 -I ../scripts/mutate.py" "go vet ./tools/..." "go run ./tools/sealvec | cmp" "python3 -I scripts/check_docs.py" \
 	"sh scripts/test_hooks.sh" "python3 -I scripts/probe.py" "run coverage" "python3 -I scripts/patch_coverage.py" "sh scripts/ergo.sh" \
 	"run mutate" "sh scripts/scan_secrets.sh" "python3 -I scripts/harness_mutate.py" "python3 -I scripts/check_regressions.py" "python3 -I scripts/check_migrations.py" "python3 -I scripts/bench.py" "python3 -I scripts/batch_size.py" "python3 -I scripts/load.py" \
-	'unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO' '[ "$took" -gt "$budget" ]' "python3 -I scripts/prove_fix.py" "python3 -I scripts/audit.py"; do
+	'unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO' '[ "$took" -gt "$budget" ]' "python3 -I scripts/prove_fix.py" "python3 -I scripts/audit.py" \
+	"PICTURES_OF=tokens-- node app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts"; do
 	grep -v '^[[:space:]]*#' "$gate_file" | grep -qF -- "$step" || fail "check.sh no longer runs: $step"
 done
 # The app's step comes after the copy and dead-code checks (F082), and its guard (F080) snapshots
@@ -1531,7 +1532,7 @@ for py in check_css check_docs mutate probe bench batch_size load patch_coverage
 done
 for sh in ergo test_hooks scan_secrets; do printf 'exec sh "%s" sh:%s "$@"\n' "$step" "$sh" >"$g/scripts/$sh.sh"; done
 # The journeys' stub; with PW_EDIT, it edits a package file, as a build that installs would.
-printf 'const { spawnSync } = require("node:child_process");\nconst { appendFileSync } = require("node:fs");\nconst name = process.argv.some((a) => a.includes("stories")) ? "stories" : "playwright";\nif (process.env.PW_EDIT) appendFileSync("app/package.json", "\\n");\nprocess.exit(spawnSync("sh", [%s, name, "port=" + process.env.E2E_PORT, ...process.argv.slice(2)], { stdio: "inherit" }).status);\n' "'$step'" >"$g/app/node_modules/@playwright/test/cli.js"
+printf 'const { spawnSync } = require("node:child_process");\nconst { appendFileSync } = require("node:fs");\nconst stories = process.argv.some((a) => a.includes("stories"));\nconst name = stories ? (process.env.PICTURES_OF ? "pictures" : "stories") : "playwright";\nif (process.env.PW_EDIT) appendFileSync("app/package.json", "\\n");\nprocess.exit(spawnSync("sh", [%s, name, "port=" + process.env.E2E_PORT, "of=" + (process.env.PICTURES_OF ?? ""), "on=" + (process.env.STORIES_PORT ?? ""), "out=" + (process.env.STORIES_OUT ?? ""), ...process.argv.slice(2)], { stdio: "inherit" }).status);\n' "'$step'" >"$g/app/node_modules/@playwright/test/cli.js"
 python3 -I - "$g/package.json" "$step" <<'PY'
 import json, sys
 names = ["format:check", "typecheck", "lint", "test", "unused", "copies", "comments", "coverage", "mutate"]
@@ -1539,7 +1540,7 @@ json.dump({"scripts": {n: f"sh {sys.argv[2]} {n}" for n in names}}, open(sys.arg
 PY
 printf '{}\n' >"$g/app/package.json" && printf '{}\n' >"$g/server/package.json" && : >"$g/pnpm-lock.yaml" && : >"$g/gno/r/seal/vectors_test.gno"
 for f in server/src/a.ts server/src/b.ts server/roles.json app/src/a.tsx app/tests/a.spec.ts packages/core/src/a.ts packages/ui/src/a.ts \
-	packages/schemas/src/a.ts gno/r/a.gno deploy/a.conf lint/a.ts vitest.config.ts; do
+	packages/schemas/src/a.ts gno/r/a.gno deploy/a.conf lint/a.ts vitest.config.ts packages/ui/src/tokens.css packages/ui/src/base.css; do
 	printf 'x\n' >"$g/$f"
 done
 git -C "$g" init -q && git -C "$g" add -A && git -C "$g" commit -qm x && git -C "$g" update-ref refs/remotes/origin/main HEAD
@@ -1619,6 +1620,51 @@ for f in packages/ui/src/a.ts app/tests/a.spec.ts; do
 	grep -q '^test .*--changed' "$log" || fail "check.sh did not run only the related tests on a change of $f"
 	reset
 done
+# tokens.css: the tokens story lists every token, so a token changed moves its pictures (F1190, Alexis, 2026-10-27, after
+# a95a764 added two and `check.sh --merge` found the pictures 30 minutes later). The fast gate also compares that story
+# alone, at its three widths, in a lane of its own on a port of its own; every test runs (a stylesheet is outside
+# Vitest's graph); another stylesheet of the design system, and no change, do not.
+printf 'y\n' >>"$g/packages/ui/src/tokens.css"
+gate >/dev/null || fail "check.sh failed on a change of tokens.css"
+scoped "a change of tokens.css" typecheck lint test playwright pictures - gno sh:test_hooks stories
+grep -q '^test .*--changed' "$log" && fail "check.sh ran only Vitest's related tests on a change of a stylesheet"
+grep -q '^pictures port=[^ ]* of=tokens-- on=[0-9]* out=[^ ]*/storybook test -c app/playwright.stories.config.ts --reporter=dot pictures$' "$log" ||
+	fail "check.sh did not compare the tokens story's pictures alone, on a port of its own: $(grep '^pictures' "$log")"
+pport=$(sed -n 's/^pictures .* on=\([0-9]*\) .*/\1/p' "$log")
+[ -n "$pport" ] && [ "$pport" -ge 1024 ] && [ "$pport" -le 65535 ] && [ "$pport" != 6007 ] || fail "check.sh gave the pictures no free port of their own (not 6007, another gate's): $pport"
+reset
+# Beside another area's change, and under any comment: the stylesheet's text decides nothing, its path does.
+printf '/* pictures: skip, gate: off */\n' >>"$g/packages/ui/src/tokens.css" && printf 'y\n' >>"$g/server/src/a.ts"
+gate >/dev/null || fail "check.sh failed on a change of tokens.css beside a server change"
+scoped "a change of tokens.css beside a server change, with a comment that asks to skip" typecheck lint test playwright pictures - gno
+reset
+printf 'y\n' >>"$g/packages/ui/src/base.css"
+gate >/dev/null || fail "check.sh failed on a change of another stylesheet"
+scoped "a change of base.css" typecheck test playwright - pictures gno
+reset
+# The tokens pictures failing fails the gate, which names the lane and shows what it printed; a gate recorded nothing.
+rm -f "$g/.claude/tmp/green-fast"
+printf 'y\n' >>"$g/packages/ui/src/tokens.css"
+out=$(FAIL=pictures gate) && fail "check.sh passed with the tokens story's pictures failing"
+printf '%s\n' "$out" | grep -q "^pictures failed here" || fail "check.sh hid the failure of the tokens story's pictures: $out"
+printf '%s\n' "$out" | grep -q "^check.sh: lane pictures failed at pictures" || fail "check.sh did not name the lane pictures: $out"
+[ ! -e "$g/.claude/tmp/green-fast" ] || fail "check.sh recorded a gate whose tokens pictures failed"
+# Playwright missing, as a browser or its package missing leaves it: the lane fails, never passes on nothing.
+mv "$g/app/node_modules/@playwright/test/cli.js" "$t/cli.away"
+gate >/dev/null && fail "check.sh passed a change of tokens.css with no Playwright to compare the pictures"
+mv "$t/cli.away" "$g/app/node_modules/@playwright/test/cli.js"
+# What the environment brings: a PICTURES_OF or a STORIES_PORT is the gate's to set, never inherited, so a stale one
+# neither narrows nor redirects any run (the full gate's whole walk included).
+out=$(PICTURES_OF=nothing STORIES_PORT=6007 STORIES_OUT=/elsewhere gate) || fail "check.sh failed with PICTURES_OF and STORIES_PORT in its environment: $out"
+grep -q '^pictures port=[^ ]* of=tokens-- on=[0-9]* out=[^ ]*/storybook ' "$log" && ! grep -q '^pictures .* on=6007 ' "$log" && ! grep -q '^pictures .* out=/elsewhere ' "$log" || fail "check.sh let its environment set the pictures' filter, port or folder: $(grep '^pictures' "$log")"
+reset
+# Nothing changed, a realm, the full gate: no tokens comparison; the full gate's stories walk them all, unfiltered.
+for what in "a tree with no change" "a gno change"; do
+	if [ "$what" = "a gno change" ]; then printf 'y\n' >>"$g/gno/r/a.gno"; fi
+	gate >/dev/null || fail "check.sh failed on $what"
+	ran pictures && fail "check.sh compared the tokens pictures on $what"
+	reset
+done
 # Core: the server imports it, and main.test.ts runs the server as a child: every test, and the journeys.
 printf 'y\n' >>"$g/packages/core/src/a.ts"
 gate >/dev/null || fail "check.sh failed on a core change"
@@ -1658,6 +1704,11 @@ scoped "pre-commit's list of an app change" typecheck playwright test - gno
 grep -q '^test .*--changed' "$log" && fail "check.sh asked Vitest for the related tests outside a repository"
 outside "gno/r/a.gno" >/dev/null || fail "check.sh failed outside a repository on a gno change"
 scoped "pre-commit's list of a gno change" gno - typecheck playwright
+# The tokens story's pictures there too: pre-commit's list names the change, which a staged copy holds no repository to read.
+outside "packages/ui/src/tokens.css" >/dev/null || fail "check.sh failed outside a repository on a change of tokens.css"
+scoped "pre-commit's list of a change of tokens.css" typecheck test playwright pictures - gno
+outside "packages/ui/src/base.css" >/dev/null || fail "check.sh failed outside a repository on a change of base.css"
+scoped "pre-commit's list of a change of base.css" typecheck test playwright - pictures
 # Prose is prose anywhere, and nothing else is: beside a server change, the run stays the server's.
 for prose in adr/0001.txt docs/x.ts server/src/x.md; do
 	outside "server/src/a.ts
@@ -1829,7 +1880,11 @@ printf 'import { spawnSync } from "node:child_process";\nprocess.exit(spawnSync(
 # The full gate: every fast step but the plain tests, then the full ones in lanes, each told where the
 # branch left main; harness_mutate only when the harness changed since main.
 base=$(git -C "$g" rev-parse HEAD)
-out=$(AUDIT_ANSWER=x BENCH_VITEST=x gate --full) || fail "check.sh --full failed on a copy whose every step passes: $out"
+out=$(AUDIT_ANSWER=x BENCH_VITEST=x PICTURES_OF=nothing STORIES_PORT=6007 STORIES_OUT=/elsewhere gate --full) || fail "check.sh --full failed on a copy whose every step passes: $out"
+# The stories' walk is every story's, whatever PICTURES_OF the environment carries, and the tokens comparison is the fast
+# gate's alone (F1190).
+grep -q '^stories port=[^ ]* of= on= out= test -c app/playwright.stories.config.ts' "$log" || fail "check.sh --full let its environment narrow or redirect the stories' walk: $(grep '^stories' "$log")"
+ran pictures && fail "check.sh --full compared the tokens story's pictures beside its whole walk"
 for s in $fast_steps py:probe py:bench core_chromium stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
 	[ "$s" = test ] || ran "$s" || fail "check.sh --full skipped $s"
 done

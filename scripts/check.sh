@@ -16,7 +16,7 @@
 set -eu
 cd "$(realpath "$(dirname "$0")/..")" # the folder's own case: a $PWD spelled otherwise loads a tool twice (F081)
 unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a hook's git environment must not steer the gate's git calls
-unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO BENCH_VITEST # the scripts' test switches, which would fake a pass
+unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO BENCH_VITEST PICTURES_OF STORIES_PORT STORIES_OUT # the scripts' test switches, which would fake a pass
 full=false merge=false
 [ "${1:-}" = "--full" ] && full=true
 [ "${1:-}" = "--merge" ] && full=true merge=true
@@ -76,7 +76,7 @@ fi
 # TypeScript: main.test.ts runs the server, which imports core, as a child process, outside Vitest's
 # module graph, and a fixture read from disk is outside it too. ESLint reads no cache: one is keyed
 # on a file's own text, so a type changed elsewhere would hide the error it brings there.
-all=true ts=false app=false gno=false related=true changed=
+all=true ts=false app=false gno=false tokens=false related=true changed=
 if ! $full && [ -z "$tested" ]; then
 	changed=${GATE_CHANGED:-} related=false # Vitest finds the related tests through git, which a copy has not
 elif ! $full; then
@@ -95,6 +95,7 @@ if [ -n "$changed" ]; then
 		case $path in
 		server/src/*) ts=true related=false ;;
 		app/src/*.ts | app/src/*.tsx | app/tests/*.ts | packages/ui/src/*.ts | packages/ui/src/*.tsx) ts=true app=true ;;
+		packages/ui/src/tokens.css) ts=true app=true tokens=true related=false ;; # the tokens story lists every token (F1190)
 		app/src/* | app/tests/* | packages/core/src/* | packages/ui/src/*) ts=true app=true related=false ;;
 		gno/*) gno=true ;;
 		*) all=true ;;
@@ -240,6 +241,16 @@ lane_gno() {
 	)
 }
 
+# The design system's tokens story lists every token, so a token added or changed moves its pictures: a change of
+# tokens.css compares them, that story alone at its three widths, which the full gate walks with every other (F1190:
+# a95a764 added two tokens, every commit's fast gate passed, and --merge failed 30 minutes later). Storybook is built
+# in this run's own folder: a copy outside a repository would have jscpd and knip read a build left in the tree.
+lane_pictures() {
+	$tokens || return 0
+	step pictures
+	STORIES_OUT="$logs/storybook" STORIES_PORT=$(free_ports 1) PICTURES_OF=tokens-- node app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts --reporter=dot pictures
+}
+
 lane_docs() {
 	step check_docs # harness docs name only files that exist
 	python3 -I scripts/check_docs.py
@@ -258,7 +269,8 @@ start types
 start tests
 start gno
 start docs
-finish ts types tests gno docs
+start pictures
+finish ts types tests gno docs pictures
 
 # busy <load at the start> <cores> <load at the end> <cores>: the higher load and the cores, when it passed them.
 busy() {
