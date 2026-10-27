@@ -6,7 +6,7 @@ import { RoomId } from "@gnoworld/schemas";
 import type { Address } from "@gnoworld/schemas";
 import { z } from "../jitless.ts";
 import type { DraftStorage } from "../drafts/drafts.ts";
-import { parsed } from "../dms/prefs.ts";
+import { readKept, writeKept } from "../dms/prefs.ts";
 
 /** The rooms' modes it keeps at most. */
 export const MODES_KEPT = 500;
@@ -25,29 +25,16 @@ export interface NoticePrefs {
 export function noticePrefs(storage: () => DraftStorage, account: Address): NoticePrefs {
   const key = `gnoworld:notices:${account}:modes`;
   return {
-    modes: () => {
-      try {
-        const held = storage().getItem(key);
-        if (held === null) return {};
-        const raw = parsed(held);
-        // zod's record leaves a `__proto__` key out unread: a device that holds one is not ours.
-        const read =
-          typeof raw === "object" && raw !== null && Object.hasOwn(raw, "__proto__") ? undefined : Modes.safeParse(raw);
-        if (read?.success === true) return read.data;
-        storage().removeItem(key);
-        return {};
-      } catch {
-        return undefined;
-      }
-    },
-    setModes: (modes) => {
-      if (Object.keys(modes).length > MODES_KEPT) return false;
-      try {
-        storage().setItem(key, JSON.stringify(modes));
-        return true;
-      } catch {
-        return false;
-      }
-    },
+    modes: () =>
+      readKept(storage, key, {
+        empty: {},
+        check: (raw) => {
+          // zod's record leaves a `__proto__` key out unread: a device that holds one is not ours.
+          if (typeof raw === "object" && raw !== null && Object.hasOwn(raw, "__proto__")) return undefined;
+          const read = Modes.safeParse(raw);
+          return read.success ? read.data : undefined;
+        },
+      }),
+    setModes: (modes) => Object.keys(modes).length <= MODES_KEPT && writeKept(storage, key, JSON.stringify(modes)),
   };
 }

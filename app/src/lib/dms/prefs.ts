@@ -24,27 +24,14 @@ export interface DmPrefs {
 /** An account's direct-message preferences on the device `storage` reaches. */
 export function dmPrefs(storage: () => DraftStorage, account: Address): DmPrefs {
   const keys = { only: `gnoworld:dm:${account}:only-known`, known: `gnoworld:dm:${account}:known` };
-  const known = (): string[] | undefined => {
-    try {
-      const held = storage().getItem(keys.known);
-      if (held === null) return [];
-      const read = Known.safeParse(parsed(held));
-      if (read.success) return read.data;
-      storage().removeItem(keys.known);
-      return [];
-    } catch {
-      return undefined;
-    }
-  };
-  // Each write: whether the device took it.
-  const write = (key: string, value: string): boolean => {
-    try {
-      storage().setItem(key, value);
-      return true;
-    } catch {
-      return false;
-    }
-  };
+  const known = (): string[] | undefined =>
+    readKept(storage, keys.known, {
+      empty: [],
+      check: (raw) => {
+        const read = Known.safeParse(raw);
+        return read.success ? read.data : undefined;
+      },
+    });
   return {
     onlyKnown: () => {
       try {
@@ -53,14 +40,43 @@ export function dmPrefs(storage: () => DraftStorage, account: Address): DmPrefs 
         return false;
       }
     },
-    setOnlyKnown: (only) => write(keys.only, String(only)),
+    setOnlyKnown: (only) => writeKept(storage, keys.only, String(only)),
     known,
-    setKnown: (partners) => write(keys.known, JSON.stringify(partners.slice(-KNOWN_KEPT))),
+    setKnown: (partners) => writeKept(storage, keys.known, JSON.stringify(partners.slice(-KNOWN_KEPT))),
   };
 }
 
+/** What the device holds at `key`, as `check` takes it (none for what it refuses): `empty` when nothing is held, and when
+ * what is held is refused, which is then forgotten; none when the device could not be read, which is left as it is. */
+export function readKept<T>(
+  storage: () => DraftStorage,
+  key: string,
+  { empty, check }: { empty: T; check: (raw: unknown) => T | undefined },
+): T | undefined {
+  try {
+    const held = storage().getItem(key);
+    if (held === null) return empty;
+    const read = check(parsed(held));
+    if (read !== undefined) return read;
+    storage().removeItem(key);
+    return empty;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Keeps `text` at `key`; whether the device took it. */
+export function writeKept(storage: () => DraftStorage, key: string, text: string): boolean {
+  try {
+    storage().setItem(key, text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** The device's text as JSON, or nothing. */
-export function parsed(text: string): unknown {
+function parsed(text: string): unknown {
   try {
     return JSON.parse(text);
   } catch {
