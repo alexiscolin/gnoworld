@@ -14,7 +14,13 @@ export default defineConfig({
         test: {
           name: "node",
           include: ["packages/*/src/**/*.test.ts", "app/src/**/*.test.{ts,tsx}", "server/src/**/*.test.ts"],
-          exclude: [...configDefaults.exclude, "packages/ui/**", "app/src/features/chat/Lines.test.tsx", ...SLOW],
+          exclude: [
+            ...configDefaults.exclude,
+            "packages/ui/**",
+            "app/src/features/chat/Lines.test.tsx",
+            "app/src/features/chat/composing.test.tsx",
+            ...SLOW,
+          ],
         },
       },
       {

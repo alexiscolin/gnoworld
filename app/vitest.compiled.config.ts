@@ -9,7 +9,7 @@ export default defineConfig({
   plugins: [babel({ presets: [reactCompilerPreset({ panicThreshold: "all_errors" })] })],
   test: {
     name: "compiled",
-    include: ["src/features/chat/Lines.test.tsx"],
+    include: ["src/features/chat/Lines.test.tsx", "src/features/chat/composing.test.tsx"],
     environment: "jsdom",
     expect: { requireAssertions: true },
   },
