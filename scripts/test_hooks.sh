@@ -1746,9 +1746,9 @@ out=$(PW_EDIT=1 gate) && fail "check.sh passed a build that edited app/package.j
 printf '%s\n' "$out" | grep -q "building the app changed package.json" || fail "check.sh did not say the build changed a package file: $out"
 reset
 # GATE_BUDGET lowers the budget, never raises it, and a value that is no number leaves it.
-GATE_BUDGET=999 gate | grep -q "(budget 60 s)$" || fail "check.sh let GATE_BUDGET raise its budget"
-GATE_BUDGET=abc gate | grep -q "(budget 60 s)$" || fail "check.sh took a GATE_BUDGET that is no number"
-GATE_BUDGET= gate | grep -q "(budget 60 s)$" || fail "check.sh took an empty GATE_BUDGET"
+GATE_BUDGET=999 gate | grep -q "(budget 75 s)$" || fail "check.sh let GATE_BUDGET raise its budget"
+GATE_BUDGET=abc gate | grep -q "(budget 75 s)$" || fail "check.sh took a GATE_BUDGET that is no number"
+GATE_BUDGET= gate | grep -q "(budget 75 s)$" || fail "check.sh took an empty GATE_BUDGET"
 (GATE_BUDGET=-5 gate) >/dev/null && fail "check.sh took a negative GATE_BUDGET as no budget"
 printf 'y\n' >>"$g/server/src/a.ts"
 GATE_BUDGET=999 gate | grep -q "(budget 30 s)$" || fail "check.sh let GATE_BUDGET raise a scoped run's budget"
