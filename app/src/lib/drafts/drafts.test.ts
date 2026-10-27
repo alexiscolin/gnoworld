@@ -1,5 +1,5 @@
 import { Address } from "@gnoworld/schemas";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { compose, MULTILINE_BYTES } from "@gnoworld/core";
 import { DRAFT_LIMIT, drafts } from "./drafts.ts";
 
@@ -31,6 +31,10 @@ function storage({ refuses = false } = {}) {
 const on = (device: ReturnType<typeof storage>, account: Address) => drafts(() => device, account);
 
 describe("an account's drafts on the device", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("keeps a draft for its room, as typed, and gives nothing for a room with none", () => {
     const device = storage();
     const mine = on(device, ALICE);
@@ -111,9 +115,12 @@ describe("an account's drafts on the device", () => {
   it("trims a draft of a long run of spaces inside a line at once, not by the square of its length", () => {
     const mine = on(storage(), ALICE);
     const draft = `a${" ".repeat(60_000)}b`;
-    const start = Date.now();
+    // Structural, not timed (R4): the square came from a regex replace over the run, so none may be called.
+    const replace = vi.spyOn(String.prototype, "replace");
+    const replaceAll = vi.spyOn(String.prototype, "replaceAll");
     expect(mine.set("#bubble", draft)).toBe(false);
-    expect(Date.now() - start).toBeLessThan(1000);
+    expect(replace).not.toHaveBeenCalled();
+    expect(replaceAll).not.toHaveBeenCalled();
   });
 
   // Survivor of StrykerJS: a lone CR is a break to compose, so the spaces before it are a line's end too.
