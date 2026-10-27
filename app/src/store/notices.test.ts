@@ -112,6 +112,21 @@ describe("the store's notices slice", () => {
       expect(totalUnseen(t.state())).toBe(unseenNotices(t.state()).length);
     });
 
+    // F1670 (S1): a stranger who floods one room must not push out what another place told the account.
+    it("keeps the cap for each place, so a flood of one room drops that room's own oldest alone", () => {
+      const t = setup();
+      t.notices.add(notice({ id: "dm", kind: "dm", where: ALICE, time: T(1) }));
+      t.notices.add(notice({ id: "games", where: GAMES, time: T(1) }));
+      for (let at = 0; at < NOTICES_KEPT + 20; at += 1) t.notices.add(notice({ id: `n${String(at)}`, where: MAIN }));
+      const held = ids(t.state().notices);
+      expect(held).toContain("dm");
+      expect(held).toContain("games");
+      expect(held).not.toContain("n0");
+      expect(held).toContain("n20");
+      expect(badgeOf(t.state(), MAIN)).toBe(NOTICES_KEPT);
+      expect(badgeOf(t.state(), GAMES)).toBe(1);
+    });
+
     it("drops a notice by its line's id, as a deleted or a hidden line goes, and notifies no one of an unknown id", () => {
       const t = setup();
       t.notices.add(notice({ id: "a" }));

@@ -8,7 +8,7 @@ import type { StateCreator } from "zustand/vanilla";
 import type { NoticePrefs } from "../lib/notices/prefs.ts";
 import type { ChatSlice } from "./chat.ts";
 
-/** The notices kept at most, the newest. */
+/** The notices kept at most for each place (a room, a conversation), the newest: a flood in one drops its own oldest. */
 export const NOTICES_KEPT = 100;
 
 export interface NoticeSlice {
@@ -21,7 +21,8 @@ export interface NoticeSlice {
   /** Whether the session's device failed to keep the modes: it refused a write, or could not be read. */
   noticeNotKept: boolean;
   noticeActions: {
-    /** A notice, once: the same line twice, or more than NOTICES_KEPT, changes nothing of what was held but its oldest. */
+    /** A notice, once: the same line twice, or more than NOTICES_KEPT of a place, changes nothing of what was held but
+     * that place's oldest. */
     add: (notice: Notice) => void;
     /** A page's notices, as `add` takes each, in one change. */
     addAll: (notices: readonly Notice[]) => void;
@@ -122,10 +123,11 @@ export const noticeSlice: StateCreator<State, [], [], NoticeSlice> = (set, get) 
       if (list.some(({ id }) => id === notice.id)) continue;
       changed = true;
       list.push(notice);
-      if (list.length > NOTICES_KEPT) {
-        // A notice no one counts goes first, else the oldest.
-        const gone = list.findIndex((each) => !unseen(get(), each));
-        list.splice(gone === -1 ? 0 : gone, 1);
+      const place = list.filter(({ where }) => where === notice.where);
+      if (place.length > NOTICES_KEPT) {
+        // A notice no one counts goes first, else the place's oldest.
+        const [oldest = notice] = place;
+        list.splice(list.indexOf(place.find((each) => !unseen(get(), each)) ?? oldest), 1);
       }
     }
     if (changed) set({ notices: list });
