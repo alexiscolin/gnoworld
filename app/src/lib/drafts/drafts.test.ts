@@ -77,14 +77,22 @@ describe("an account's drafts on the device", () => {
   // one the composer lets go; it is kept as compose reads it.
   it("keeps a draft the composer lets go though its trailing spaces pass the limit, as compose reads it", () => {
     const nick = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
-    const lines = Array.from({ length: 38 }, () => `${"a".repeat(100)}${" ".repeat(110)}`);
-    const draft = lines.join("\n");
+    const text = `${"a".repeat(50)} ${"a".repeat(49)}`;
+    const draft = Array.from({ length: 38 }, () => `${text}${" ".repeat(110)}`).join("\n");
     expect(draft.length).toBeGreaterThan(DRAFT_LIMIT);
     expect(compose("#bubble", draft, nick).kind).toBe("lines");
     const mine = on(storage(), ALICE);
     expect(mine.set("#bubble", "an older one")).toBe(true);
     expect(mine.set("#bubble", draft)).toBe(true);
-    expect(mine.get("#bubble")).toBe(Array.from({ length: 38 }, () => "a".repeat(100)).join("\n"));
+    // The spaces inside a line stay: only those at its end were no text.
+    expect(mine.get("#bubble")).toBe(Array.from({ length: 38 }, () => text).join("\n"));
+  });
+
+  it("keeps a draft of exactly the limit as typed, its trailing space too: only a longer one is trimmed", () => {
+    const mine = on(storage(), ALICE);
+    const draft = `${"a".repeat(DRAFT_LIMIT - 1)} `;
+    expect(mine.set("#bubble", draft)).toBe(true);
+    expect(mine.get("#bubble")).toBe(draft);
   });
 
   it("keeps a draft of blank lines and tabs only as none, kept or not: nothing to come back", () => {
