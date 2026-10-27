@@ -351,6 +351,11 @@ describe("the version of an edited line that the room acts on", () => {
     expect(keeping()?.onSave("m1")).toBe("none");
   });
 
+  it("lists no pins above the lines for a room whose pins are none, a visitor's or an account's", () => {
+    expect(mounted(EDITED, [], useGuestKeeping).pins()).toBeUndefined();
+    expect(mounted(EDITED, []).pins()).toBeUndefined();
+  });
+
   const by = (account: string, message: IrcMessage): IrcMessage => ({
     ...message,
     tags: new Map(message.tags).set("account", account),
