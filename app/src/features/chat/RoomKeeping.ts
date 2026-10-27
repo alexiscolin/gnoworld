@@ -3,6 +3,7 @@
 // that change them, built from the store and the shown room alone.
 import type { Line } from "@gnoworld/core";
 import type { PinnedLine } from "@gnoworld/schemas";
+import { own } from "../../store/record.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
 import type { Done } from "./askPins.ts";
 import type { Pinning } from "./usePins.ts";
@@ -29,9 +30,6 @@ export interface RoomPins {
   may: boolean;
   onUnpin: (id: string) => Promise<Done>;
 }
-
-const own = <T>(record: Readonly<Record<string, T>>, key: string): T | undefined =>
-  Object.hasOwn(record, key) ? record[key] : undefined;
 
 /** The shown room's keeping and pins: none for no room, a direct message's, which has neither. */
 export function useRoomKeeping(room: string | undefined, pinning: Pinning) {

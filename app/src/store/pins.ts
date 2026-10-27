@@ -3,6 +3,7 @@
 import type { IrcMessage } from "@gnoworld/core";
 import { RoomId, type PinList } from "@gnoworld/schemas";
 import type { StateCreator } from "zustand/vanilla";
+import { own } from "./record.ts";
 
 /** The rooms whose pins are held at most: a session joins 100 (Ergo's max-channels-per-client). */
 export const PINS_ROOMS = 100;
@@ -39,7 +40,7 @@ export const pinsSlice: StateCreator<PinsSlice> = (set, get) => {
     gone.add(`${room} ${id}`);
     for (const old of [...gone].slice(0, -GONE_KEPT)) gone.delete(old);
     const { pins } = get();
-    const held = Object.hasOwn(pins, room) ? pins[room] : undefined;
+    const held = own(pins, room);
     if (held?.pins.some((pin) => pin.id === id) !== true) return;
     set({ pins: { ...pins, [room]: { ...held, pins: held.pins.filter((pin) => pin.id !== id) } } });
   };

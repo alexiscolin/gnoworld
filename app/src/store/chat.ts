@@ -22,6 +22,7 @@ import {
   type Where,
 } from "@gnoworld/core";
 import type { StateCreator } from "zustand/vanilla";
+import { own } from "./record.ts";
 
 /** The lines a room keeps: its history's window (docs/plans/slice-4.md, §4). */
 export const LINES_KEPT = 200;
@@ -113,10 +114,6 @@ function roomAfter(room: RoomState, message: IrcMessage, at: Where & { now: numb
     : { ...room, lines, members, topic, typing, read, ...(reactions === undefined ? {} : { reactions }) };
 }
 
-// A room followed, by its id: an own key alone, the ids being the relay's.
-const roomOf = (rooms: ChatState["rooms"], id: string): RoomState | undefined =>
-  Object.hasOwn(rooms, id) ? rooms[id] : undefined;
-
 // Each room changed by `change`, or the same record when none was.
 function eachRoom(rooms: ChatState["rooms"], change: (room: RoomState, id: string) => RoomState): ChatState["rooms"] {
   const next = Object.fromEntries(Object.entries(rooms).map(([id, room]) => [id, change(room, id)]));
@@ -140,7 +137,7 @@ export const chatSlice: StateCreator<ChatSlice> = (set, get) => {
         const { rooms } = get().chat;
         const wanted = [...new Set(ids)];
         if (sameKeys(Object.keys(rooms), wanted)) return;
-        change({ rooms: Object.fromEntries(wanted.map((id) => [id, roomOf(rooms, id) ?? EMPTY])) });
+        change({ rooms: Object.fromEntries(wanted.map((id) => [id, own(rooms, id) ?? EMPTY])) });
       },
       connected: (me) => {
         change({ me });
@@ -150,7 +147,7 @@ export const chatSlice: StateCreator<ChatSlice> = (set, get) => {
         const { me = "", rooms } = get().chat;
         // Ergo's refusal of a delete names its room and line at its own places (FAIL REDACT).
         const refusal = refusedOf(message);
-        const refusing = refusal === undefined ? undefined : roomOf(rooms, refusal.room);
+        const refusing = refusal === undefined ? undefined : own(rooms, refusal.room);
         if (refusal !== undefined && refusing !== undefined) {
           change({ rooms: { ...rooms, [refusal.room]: { ...refusing, refused: refusal.id } } });
           return;
@@ -164,14 +161,14 @@ export const chatSlice: StateCreator<ChatSlice> = (set, get) => {
           change({ rooms: eachRoom(rooms, (room, each) => roomAfter(room, message, { room: each, me, now })) });
           return;
         }
-        const room = id === undefined ? undefined : roomOf(rooms, id);
+        const room = id === undefined ? undefined : own(rooms, id);
         if (id === undefined || room === undefined) return;
         const next = roomAfter(room, message, { room: id, me, now });
         if (next !== room) change({ rooms: { ...rooms, [id]: next } });
       },
       page: (id, messages) => {
         const { rooms } = get().chat;
-        const room = roomOf(rooms, id);
+        const room = own(rooms, id);
         if (room === undefined) return;
         const read = messages.flatMap((message) => lineOf(message, id) ?? []);
         const reacted = messages.flatMap((message) => reactionOf(message, id) ?? []);
@@ -185,13 +182,13 @@ export const chatSlice: StateCreator<ChatSlice> = (set, get) => {
       },
       dismissed: (id) => {
         const { rooms } = get().chat;
-        const room = roomOf(rooms, id);
+        const room = own(rooms, id);
         if (room === undefined || (room.refused === undefined && room.cannotReact === undefined)) return;
         change({ rooms: { ...rooms, [id]: { ...room, refused: undefined, cannotReact: undefined } } });
       },
       reactionRefused: (id) => {
         const { rooms } = get().chat;
-        const room = roomOf(rooms, id);
+        const room = own(rooms, id);
         if (room !== undefined && room.cannotReact === undefined)
           change({ rooms: { ...rooms, [id]: { ...room, cannotReact: true } } });
       },

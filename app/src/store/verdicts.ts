@@ -3,6 +3,7 @@
 import type { StreamEvent } from "@gnoworld/schemas";
 import type { StateCreator } from "zustand/vanilla";
 import { LINES_KEPT } from "./chat.ts";
+import { own } from "./record.ts";
 
 /** A room's newest verdicts kept, its window's lines twice over, so a long session holds no more. */
 export const VERDICTS_KEPT = 2 * LINES_KEPT;
@@ -21,10 +22,6 @@ export interface VerdictsSlice {
     judgedAll: (events: readonly StreamEvent[]) => void;
   };
 }
-
-// Own entries alone: a msgid or a room may be any word, `__proto__` among them.
-const own = <T>(record: Readonly<Record<string, T>>, key: string): T | undefined =>
-  Object.hasOwn(record, key) ? record[key] : undefined;
 
 // A room's verdicts and their order, copied once for the verdicts an update takes.
 interface Taken {
