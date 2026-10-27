@@ -6,9 +6,8 @@ import type { Shown } from "./shown.tsx";
 import type { RoomViewProps } from "./RoomView.tsx";
 import type { WriterProps } from "./Writer.tsx";
 
-// A line chosen to answer or to correct, in the conversation `key`, and how many times it was asked.
+// A line chosen to answer or to correct, and how many times it was asked.
 interface Chosen {
-  key: string;
   id: string;
   asked: number;
 }
@@ -17,12 +16,24 @@ interface Chosen {
 const shownAs = (chosen: Chosen | undefined, lines: readonly Line[] | undefined) =>
   foldEdits(lines ?? []).shown.find((line) => line.id === chosen?.id);
 
-// Asked again, or for another line: the count goes up for the same conversation.
-const asking = (was: Chosen | undefined, key: string, id: string): Chosen => ({
-  key,
-  id,
-  asked: was?.key === key ? was.asked + 1 : 1,
-});
+// Asked again, or for another line: the count goes up.
+const asking = (was: Chosen | undefined, id: string): Chosen => ({ id, asked: (was?.asked ?? 0) + 1 });
+
+// What the conversation `key` alone holds: dropped as another comes in view.
+function useHere<T>(key: string | undefined) {
+  const [held, setHeld] = useState<{ key: string | undefined; value: T }>();
+  if (held !== undefined && held.key !== key) setHeld(undefined);
+  const value = held === undefined || held.key !== key ? undefined : held.value;
+  return {
+    value,
+    update: (change: (was: T | undefined) => T) => {
+      setHeld((was) => ({ key, value: change(was === undefined || was.key !== key ? undefined : was.value) }));
+    },
+    clear: () => {
+      setHeld(undefined);
+    },
+  };
+}
 
 interface Composing {
   view: Pick<RoomViewProps, "onReply" | "onEdit">;
@@ -32,27 +43,22 @@ interface Composing {
 // The line the next one answers (4d's replies), and how many times Reply was asked: each asking puts the focus in the
 // field (G8). Its conversation's alone: another in view drops it, as does a line sent.
 function useReplies(shown: Shown | undefined, lines: readonly Line[] | undefined): Composing {
-  const [reply, setReply] = useState<Chosen>();
-  const key = shown?.key;
-  if (reply !== undefined && reply.key !== key) setReply(undefined);
-  const current = reply?.key === key ? reply : undefined;
-  const replying = shownAs(current, lines);
+  const { value: reply, update, clear } = useHere<Chosen>(shown?.key);
+  const replying = shownAs(reply, lines);
   if (shown === undefined) return { view: {}, writer: {} };
   return {
     view: {
       onReply: (id: string) => {
-        setReply((was) => asking(was, shown.key, id));
+        update((was) => asking(was, id));
       },
     },
     writer: {
       replying,
-      asked: current?.asked,
-      onCancelReply: () => {
-        setReply(undefined);
-      },
+      asked: reply?.asked,
+      onCancelReply: clear,
       onSay: (draft: string) => {
         const went = shown.say(draft, replying === undefined ? undefined : { reply: replying.id });
-        if (went) setReply(undefined);
+        if (went) clear();
         return went;
       },
     },
@@ -62,36 +68,23 @@ function useReplies(shown: Shown | undefined, lines: readonly Line[] | undefined
 // The line of the reader's own a direct message's next one corrects, its words put in the composer: one a conversation, as
 // a reply; none for a room. Sent as a correction tagged with the line's msgid, shown in its place.
 function useEdits(shown: Shown | undefined, lines: readonly Line[] | undefined): Composing {
-  const [edit, setEdit] = useState<Chosen>();
-  const key = shown?.key;
-  if (edit !== undefined && edit.key !== key) setEdit(undefined);
-  const current = edit?.key === key ? edit : undefined;
-  const editing = shownAs(current, lines);
+  const { value: edit, update, clear } = useHere<Chosen>(shown?.key);
+  const editing = shownAs(edit, lines);
   if (shown?.kind !== "dm") return { view: {}, writer: {} };
-  if (current === undefined || editing === undefined) {
-    return {
-      view: {
-        onEdit: (id: string) => {
-          setEdit((was) => asking(was, shown.key, id));
-        },
-      },
-      writer: {},
-    };
-  }
-  return {
-    view: {
-      onEdit: (id: string) => {
-        setEdit((was) => asking(was, shown.key, id));
-      },
+  const view = {
+    onEdit: (id: string) => {
+      update((was) => asking(was, id));
     },
+  };
+  if (edit === undefined || editing === undefined) return { view, writer: {} };
+  return {
+    view,
     writer: {
-      editing: { text: editing.text, asked: current.asked },
-      onCancelEdit: () => {
-        setEdit(undefined);
-      },
+      editing: { text: editing.text, asked: edit.asked },
+      onCancelEdit: clear,
       onSay: (draft: string) => {
         const went = shown.say(draft, { edit: editing.id });
-        if (went) setEdit(undefined);
+        if (went) clear();
         return went;
       },
     },
