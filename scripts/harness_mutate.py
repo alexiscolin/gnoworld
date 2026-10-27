@@ -657,6 +657,11 @@ def mutants():
             "the stories run beside the history lane",
         ),
         ("\tfinish coverage harness\n", "\tfinish coverage harness || true\n", "--full fails when the coverage or the harness lane alone did"),
+        (
+            "load_start=$(python3 -I scripts/load.py)\nstart ts\nstart types\nstart tests\nstart gno\nstart docs\nfinish ts types tests gno docs\n",
+            "start ts\nstart types\nstart tests\nstart gno\nstart docs\nfinish ts types tests gno docs\nload_start=$(python3 -I scripts/load.py)\n",
+            "the load is read as the lanes start (G3)",
+        ),
         ('\t[ "$high" -gt "$2" ] && echo', "\tfalse && echo", "the fast gate passes past its budget on a busy machine (C.8)"),
         ('\t[ "$3" -le "$high" ] || high=$3', "\t:", "a machine busy at the run's end counts (C.8)"),
         ("\thigh=$1\n", "\thigh=0\n", "a machine busy at the run's start counts (C.8)"),
