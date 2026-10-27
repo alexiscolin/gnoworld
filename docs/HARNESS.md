@@ -114,7 +114,7 @@ otherwise.
 | the TypeScript of `app/src`, `app/tests`, `packages/ui/src` | tsc, ESLint, Vitest's tests related to the change (`--changed`), the app's journeys | 30 s |
 | `packages/core/src`, which the server imports, or any other file of those folders (a fixture, a stylesheet) | tsc, ESLint, every Vitest test (a file read from disk is outside the module graph too), the app's journeys | 30 s |
 | `gno/` | the gno lane | 30 s |
-| anything else (a config, the lockfile, the harness, `packages/schemas`, `deploy/`), no change at all, or no repository (pre-commit's staged copy) | everything | 60 s |
+| anything else (a config, the lockfile, the harness, `packages/schemas`, `deploy/`), no change at all, or no repository (pre-commit's staged copy) | everything | 75 s |
 
 What a commit leaves out, the full gate runs on the exact tip before `main` takes it (`pre-push`
 wants its record). ESLint reads no cache: a cache is keyed on a file's own text, so a type changed

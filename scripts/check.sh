@@ -105,7 +105,7 @@ EOF
 	$code || all=true # prose alone is no change of code, as in a repository
 fi
 $all && ts=true app=true gno=true related=false
-budget=60 # s, for everything; for a run scoped to a change, 30
+budget=75 # s, for everything (Alexis, 2026-10-27: 60 until the journeys grew past it); for a run scoped to a change, 30
 $all || budget=30
 [ "${GATE_BUDGET:-$budget}" -lt "$budget" ] 2>/dev/null && budget=$GATE_BUDGET # a test lowers it; nothing raises it
 tests_scope=
