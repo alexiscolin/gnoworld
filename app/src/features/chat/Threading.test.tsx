@@ -349,4 +349,22 @@ describe("useThreads: the open panel's focus and keys", () => {
     await loaded();
     expect(field()?.value).toBe("half a thought");
   });
+
+  it("keeps each account's words apart when the reader changes with no logout between", async () => {
+    draw(room);
+    act(() => {
+      opens("root");
+    });
+    await loaded();
+    typeIn("alice's");
+    const box = field();
+    if (box === null) throw new Error("no field");
+    press(box, { key: "Escape" });
+    draw(room, OTHER);
+    act(() => {
+      opens("root");
+    });
+    await loaded();
+    expect(field()?.value).toBe("");
+  });
 });
