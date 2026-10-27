@@ -2422,6 +2422,10 @@ cases = [
 for new, want, what in cases:
     got = touched("scripts/test_hooks.sh", sh, new)
     assert got == want, f"test_hooks.sh, {what}: {got} for {want}"
+# A one-line `if ...; fi` at the margin opens nothing: the sections after it still end where they do (G9).
+oneline = sh.replace("x\n", "x\nif q; then r; fi\n")
+assert touched("scripts/test_hooks.sh", sh, oneline) == {"a"}, "a one-line if added to a"
+assert touched("scripts/test_hooks.sh", oneline, oneline.replace("w\n", "w2\n")) == {"b"}, "a one-line if swallowed the sections after it"
 py = 'def f():\n    pass\n\n\ntry:\n    if part("a"):\n        x\n        if y:\n            z\n\n    if part("b"):\n        w\nfinally:\n    pass\n'
 for new, want, what in [
     (py.replace("        w", "        w2"), {"b"}, "a line of b"),
