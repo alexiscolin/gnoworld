@@ -122,25 +122,31 @@ function newest(state: State, where: string): string | undefined {
 const kept = (modes: Readonly<Record<string, NoticeMode>>) =>
   Object.fromEntries(Object.entries(modes).filter(([, mode]) => mode !== DEFAULT_MODE));
 
+// The notices held with `fresh` added, each once, a place's uncounted or else oldest going past its cap; none when
+// nothing is new.
+function withNotices(state: State, fresh: readonly Notice[]): Notice[] | undefined {
+  const list = [...state.notices];
+  let changed = false;
+  for (const notice of fresh) {
+    if (list.some(({ id }) => id === notice.id)) continue;
+    changed = true;
+    list.push(notice);
+    const place = list.filter(({ where }) => where === notice.where);
+    if (place.length > NOTICES_KEPT) {
+      const [oldest = notice] = place;
+      list.splice(list.indexOf(place.find((each) => !unseen(state, each)) ?? oldest), 1);
+    }
+  }
+  return changed ? list : undefined;
+}
+
 export const noticeSlice: StateCreator<State, [], [], NoticeSlice> = (set, get) => {
   // The session's device, and whether it could be read: never written over one that could not (like the DMs').
   let device: NoticePrefs | undefined;
   let writable = false;
   const add = (fresh: readonly Notice[]) => {
-    const list = [...get().notices];
-    let changed = false;
-    for (const notice of fresh) {
-      if (list.some(({ id }) => id === notice.id)) continue;
-      changed = true;
-      list.push(notice);
-      const place = list.filter(({ where }) => where === notice.where);
-      if (place.length > NOTICES_KEPT) {
-        // A notice no one counts goes first, else the place's oldest.
-        const [oldest = notice] = place;
-        list.splice(list.indexOf(place.find((each) => !unseen(get(), each)) ?? oldest), 1);
-      }
-    }
-    if (changed) set({ notices: list });
+    const list = withNotices(get(), fresh);
+    if (list !== undefined) set({ notices: list });
   };
   return {
     notices: [],
