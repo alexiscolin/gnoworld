@@ -5,6 +5,7 @@ import { z } from "./zod.ts";
 export { ActivityRooms } from "./activity.ts";
 export { Address, ADDRESS_PROBLEMS, toAddress, type AddressProblem } from "./address.ts";
 export { CreateRoom, MadeRoom, RoomId, RoomList, RoomName, RoomType } from "./rooms.ts";
+export { PinId, PinList, PinnedLine, PinRequest, PINS_MAX } from "./pins.ts";
 export { LineVerdicts, StreamEvent, StreamSince, VerdictId, VERDICTS_ASKED } from "./stream.ts";
 export { Challenge, ChallengeRequest, Me, Nonce, Proof, Ticket, TicketRequest, VerifyRequest } from "./login.ts";
 
@@ -20,6 +21,7 @@ export const ApiError = z.object({
     "forbidden",
     "unsupported",
     "too_many",
+    "full",
   ]),
 });
 export type ApiError = z.infer<typeof ApiError>;

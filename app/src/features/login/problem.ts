@@ -36,6 +36,7 @@ const SAID: Record<Exclude<LoginProblem["reason"], "address">, string> = {
   not_found: UNEXPECTED,
   too_large: UNEXPECTED,
   unsupported: UNEXPECTED,
+  full: UNEXPECTED,
 };
 
 /** The sentence a stopped login shows. */
