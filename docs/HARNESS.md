@@ -189,6 +189,12 @@ Each is allowed only when a commit of the branch says why, on a line of its own:
 in review. A sentence that merely mentions a floor excuses nothing. On `main`, `pre-push`
 also wants each harness file changed on a line `Harness-changed: <path> - why`.
 
+The comparison is with where the branch left `main`, so what a slice itself creates has no baseline there: a bench
+or a test born in the slice can have its budget raised, or be renamed, with no excuse line, and the excuse key
+`bench <name>` carries no old or new value, so one excuse covers every later raise of that bench. Review alone holds
+those until the slice reaches `main` (CR1, intended: counting from `last_reviewed`, as `batch_size.py` does, would
+count from a commit another branch reviewed).
+
 ## Reviews and findings
 
 A finding is a claim until it is reproduced: a command, or a test seen failing. Every finding
