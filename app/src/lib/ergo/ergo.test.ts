@@ -1177,6 +1177,7 @@ describe("connectErgo, an Ergo that offers no draft/multiline", () => {
     expect(full.client.multiline()).toBe(true);
     const basic = await guest();
     basic.s.say(`:ergo CAP * NAK :${CAPS}`);
+    expect(basic.client.multiline()).toBeUndefined();
     basic.s.say(`:ergo CAP * ACK :${BASIC_CAPS}`);
     expect(basic.client.multiline()).toBeUndefined();
     basic.s.say(":ergo 001 guest-ab12cd :Welcome");
@@ -1215,11 +1216,13 @@ describe("connectErgo, an Ergo that offers no draft/multiline", () => {
     motd(t.s);
     expect(t.client.multiline()).toBe(false);
     t.s.closeEvent();
+    expect(t.client.multiline()).toBeUndefined();
     await t.run(t.backoffs()[0]);
     const next = t.last();
     expect(next).not.toBe(t.s);
     next.open();
     next.say(`:ergo CAP * NAK :${CAPS}`);
+    expect(t.client.multiline()).toBeUndefined();
     expect(next.closed).toBe(false);
     expect(next.sent).toEqual(["CAP LS 302", `CAP REQ :${CAPS}`, `CAP REQ :${BASIC_CAPS}`]);
   });
