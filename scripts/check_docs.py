@@ -70,7 +70,7 @@ def ledger_problems(root):
     rows = []
     for line in ledger.read_text().splitlines():
         cells = [c.strip() for c in re.split(r"(?<!\\)\|", line.strip().strip("|"))]
-        if len(cells) == 7 and re.fullmatch(r"F\d{3}", cells[0]):
+        if len(cells) == 7 and re.fullmatch(r"F\d{3,}", cells[0]):
             rows.append((cells[0], cells[5], cells[6], re.findall(r"`([0-9a-f]{7,40})`", cells[6])))
     real = commits(root, [sha for *_, shas in rows for sha in shas])
     for fid, status, evidence, shas in rows:

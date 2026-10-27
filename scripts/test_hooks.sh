@@ -431,6 +431,11 @@ row "| F001 | 2026-10-17 | a | x.py:1 | a bug | intended | — |" && fail "check
 row "| F001 | 2026-10-17 | a | x.py:1 | a bug | moot | — |" && fail "check_docs accepted a moot finding with no reason"
 row "| F001 | 2026-10-17 | a | x.py:1 | a | claimed | — |
 | F001 | 2026-10-17 | b | y.py:1 | b | claimed | — |" && fail "check_docs accepted an id used twice"
+# A four-digit id is a row too: the ledger passed F1000 on, unread (F1212).
+row "| F1001 | 2026-10-27 | a | x.py:1 | a bug | fixed | \`0badc0de\` |" && fail "check_docs did not read a row whose id has four digits"
+row "| F1001 | 2026-10-27 | a | x.py:1 | a | claimed | — |
+| F1001 | 2026-10-27 | b | y.py:1 | b | claimed | — |" && fail "check_docs accepted a four-digit id used twice"
+row "| F1001 | 2026-10-27 | a | x.py:1 | a bug | fixed | \`$sha\`, its test |" || fail "check_docs refused a fixed finding of four digits naming its commit"
 # Every commit a row cites is one, whatever its status (slice 3 read a fix's first only); outside a repository,
 # pre-commit's staged copy, none can be checked.
 blob=$(git -C "$d" rev-parse --short HEAD:scripts/real.sh) && full=$(git -C "$d" rev-parse HEAD)
