@@ -2165,6 +2165,63 @@ describe("the chat's link: notices, the edges", () => {
       expect(t.store.getState().notices).toEqual([]);
       expect(t.store.getState().noticeModes).toEqual({ [NEWS]: "none" });
     });
+
+    // G1 (F1500): the account held no mode, so the guard in `begin` that skips a reset for an empty session saw its notices.
+    it("forgets an account's notices and marks at sign-out though it held no mode, for the next account of the device", () => {
+      const t = member(() => ({ ...prefs(), notices: { modes: () => ({}), setModes: () => true } }));
+      say(t.fake, [GAMES, "m1", `@${ADDRESS}`], { minute: 3 });
+      say(t.fake, ["#bubble", "m2", `@${ADDRESS}`]);
+      t.link.read(GAMES, "m1");
+      expect(t.store.getState().notices).toHaveLength(2);
+      expect(t.store.getState().noticeSeen[GAMES]).toBe(T(3));
+      t.signedOut();
+      expect(t.store.getState().notices).toEqual([]);
+      expect(t.store.getState().noticeSeen).toEqual({});
+      t.signedIn(BOB);
+      expect(t.store.getState().notices).toEqual([]);
+      expect(t.store.getState().noticeSeen).toEqual({});
+    });
+  });
+
+  // G2 (F1501): the connection of a guest has a nick, so `me` is defined; only the account check keeps it out.
+  describe("a guest", () => {
+    it("makes no notice of a live mention of the whole room, in a room where it counts", () => {
+      const t = guestIn([NEWS]);
+      t.link.follow([NEWS], [NEWS]);
+      t.fake.line(`:${GUEST}!u@h JOIN ${NEWS}`);
+      t.fake.line(`@msgid=g1;time=${T(5)};account=${OTHER} :${OTHER}!u@h PRIVMSG ${NEWS} :@room`);
+      expect(t.store.getState().notices).toEqual([]);
+      expect(totalOf(t)).toBe(0);
+    });
+  });
+
+  // G3 (F1502): lines that are no text line, or come for a room not followed, pass the notices by.
+  describe("a line of Ergo's that is no notice's", () => {
+    const tag = `@batch=h1;msgid=t1;time=${T(4)};account=${OTHER};+draft/react=:+1:;+draft/reply=m0`;
+    it("lets a reaction in a history page pass, and the mention after it still counts", () => {
+      const t = member();
+      t.fake.line(`:ergo MARKREAD ${GAMES} timestamp=${T(2)}`);
+      t.fake.line(`BATCH +h1 chathistory ${GAMES}`);
+      t.fake.line(`${tag} :${OTHER}!u@h TAGMSG ${GAMES}`);
+      t.fake.line(`@batch=h1;msgid=h5;time=${T(5)};account=${OTHER} :${OTHER}!u@h PRIVMSG ${GAMES} :@${ADDRESS}`);
+      t.fake.line("BATCH -h1");
+      expect(ids(t)).toEqual(["h5"]);
+    });
+
+    it("lets a live reaction in a joined room pass, and a line of a room not followed", () => {
+      const t = member();
+      t.fake.line(`@msgid=t2;time=${T(4)};account=${OTHER};+draft/react=:+1: :${OTHER}!u@h TAGMSG ${GAMES}`);
+      say(t.fake, ["#elsewhere", "x1", `@${ADDRESS}`]);
+      expect(t.notices()).toEqual([]);
+    });
+
+    it("lets a history page of a room not followed pass", () => {
+      const t = member();
+      t.fake.line("BATCH +h2 chathistory #elsewhere");
+      t.fake.line(`@batch=h2;msgid=x2;time=${T(5)};account=${OTHER} :${OTHER}!u@h PRIVMSG #elsewhere :@${ADDRESS}`);
+      t.fake.line("BATCH -h2");
+      expect(t.notices()).toEqual([]);
+    });
   });
 
   describe("a room the account is taken out of", () => {
