@@ -10,6 +10,7 @@ import type { Rules } from "../roles/roles.ts";
 import { decide, type Thresholds } from "./decide.ts";
 import { editsOwn, lineKnown } from "./edits.ts";
 import type { Answer, Category } from "./provider.ts";
+import { lineRate } from "./rate.ts";
 import { ruleVerdict, type RuleReason } from "./rules.ts";
 
 export const VERDICT_TABLES = `
@@ -111,6 +112,8 @@ export function makeChecker(options: Options): (said: Said) => Promise<Verdict |
   };
   const Count = z.object({ n: z.number() });
   const owns = editsOwn(db);
+  // The lines an account sent in the last minute, a message of several lines counting each (rate.ts).
+  const lines = lineRate(now);
   // A line counts itself in its rate: it is claimed before the rules run.
   const tooFast = (key: string, at: number): boolean =>
     Count.parse(sql.recent.get(key, at - RATE.ms, at, RATE.lines + 1)).n > RATE.lines;
@@ -124,11 +127,12 @@ export function makeChecker(options: Options): (said: Said) => Promise<Verdict |
   const ask = provider === undefined ? undefined : withBreaker(provider, { now, log });
   // The world's rules, which a new account, a line too fast or another's edit may break.
   const byRules = (said: Said, rules: Rules, { hashed, at }: { hashed: string; at: number }) => {
+    const manyLines = lines.add(hashed, { id: said.msgid, at, lines: said.text.split("\n").length });
     const firstSeen = FirstSeen.parse(sql.firstSeen.get(said.account))?.first_seen;
     const edit = editOf(said, hashed);
     return ruleVerdict(said.text, rules, {
       newAccount: firstSeen === undefined || at - firstSeen < newAccountMs,
-      tooFast: tooFast(hashed, at),
+      tooFast: tooFast(hashed, at) || manyLines,
       foreignEdit: edit === "other",
       unknownEdit: edit === "unknown",
     });

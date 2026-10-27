@@ -52,6 +52,31 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     expect(verdicts()).toHaveLength(1);
   });
 
+  // G4 (F1123): a message of 40 lines is 40 of an account's 100 lines a minute, as Ergo relays and stamps it, so
+  // the third of them within the minute is hidden as too fast, the first two kept and judged.
+  it(
+    "hides as too fast the third message of 40 lines in a minute, the first two checked and kept",
+    { timeout: 80_000 },
+    async () => {
+      const e = await start();
+      const asked: string[] = [];
+      await chatFor(e, asked);
+      const alice = await login(e, "alice");
+      await join(alice, "#bubble");
+      const bob = await login(e, "bob");
+      await join(bob, "#bubble");
+      for (const ref of ["m1", "m2", "m3"]) {
+        alice.send(`BATCH +${ref} draft/multiline #bubble`);
+        for (let n = 0; n < 40; n++) alice.send(`@batch=${ref} PRIVMSG #bubble :line ${String(n)}`);
+        alice.send(`BATCH -${ref}`);
+      }
+      let third = "?";
+      for (let n = 0; n < 3; n++) third = msgid(await bob.expect(/ BATCH :?\+\S+ draft\/multiline :?#bubble$/, 30_000));
+      await bob.expect(new RegExp(` REDACT #bubble ${third} :too many messages too fast`), 30_000);
+      expect(asked).toHaveLength(2);
+    },
+  );
+
   // G5 of the green pass: Ergo's +C refuses a part that STARTS with a CTCP's mark (not ACTION) and no other, so these
   // batches are relayed and kept, to readers with the capability, to plain clients line by line, and to history.
   // The page folds none of them, so the bot must hide each by the id of its opening line, unjudged.

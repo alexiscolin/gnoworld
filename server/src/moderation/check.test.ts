@@ -248,6 +248,61 @@ describe("checking a message", () => {
     expect(await check(stamped(20, 20, OTHER))).toEqual({ action: "pass" });
   });
 
+  // A second rate rule (docs/decisions.md f0c19ce, F1123): 100 lines a minute an account, a message of several lines
+  // counting each of its lines, beside the 20 messages; counted in memory, so a restart forgets it.
+  const lines = (count: number, { n, ms }: { n: number; ms: number }, account = OLD) => {
+    const text = Array.from({ length: count }, (_, at) => `line ${String(at)}`).join("\n");
+    return { ...said(text, `m${String(n)}`, account), time: new Date(T0 + ms).toISOString() };
+  };
+
+  it("hides a message that takes an account past 100 lines in a minute as too fast, each line of it counted (G4)", async () => {
+    const { check, asked } = setup(() => Promise.resolve(answer()));
+    expect(await check(lines(40, { n: 0, ms: 0 }))).toEqual({ action: "pass" });
+    expect(await check(lines(40, { n: 1, ms: 1000 }))).toEqual({ action: "pass" });
+    expect(await check(lines(40, { n: 2, ms: 2000 }))).toEqual({ action: "hide", reason: "too_fast" });
+    expect(asked).toHaveLength(2);
+  });
+
+  it("lets an account send exactly 100 lines in a minute, and hides the next line", async () => {
+    const { check } = setup(() => Promise.resolve(answer()));
+    for (const [n, count] of [40, 40, 20].entries())
+      expect(await check(lines(count, { n, ms: n }))).toEqual({ action: "pass" });
+    expect(await check(stamped(9, 3))).toEqual({ action: "hide", reason: "too_fast" });
+  });
+
+  it("counts a blank line of a message as a line, and a line it hid still counts", async () => {
+    const { check } = setup(() => Promise.resolve(answer()));
+    const blanks = (n: number, ms: number) => ({
+      ...said(`a${"\n".repeat(39)}`, `b${String(n)}`),
+      time: new Date(T0 + ms).toISOString(),
+    });
+    expect(await check(blanks(0, 0))).toEqual({ action: "pass" });
+    expect(await check(blanks(1, 1))).toEqual({ action: "pass" });
+    expect(await check(blanks(2, 2))).toEqual({ action: "hide", reason: "too_fast" });
+    // The hidden message's 40 lines stay in the minute: 120 of them, and one line more is too many.
+    expect(await check(stamped(9, 3))).toEqual({ action: "hide", reason: "too_fast" });
+  });
+
+  it("counts the lines of the minute before a message, not the minute before it out, apart for each account", async () => {
+    const OTHER = toAddress(new Uint8Array(20).fill(9));
+    const { db, check } = setup(() => Promise.resolve(answer()));
+    db.prepare("INSERT INTO accounts (address, first_seen) VALUES (?, ?)").run(OTHER, T0 - 30 * 24 * HOUR);
+    await check(lines(40, { n: 0, ms: 0 }));
+    await check(lines(40, { n: 1, ms: 0 }));
+    expect(await check(lines(40, { n: 2, ms: 1 }, OTHER))).toEqual({ action: "pass" });
+    expect(await check(lines(21, { n: 3, ms: 59_999 }))).toEqual({ action: "hide", reason: "too_fast" });
+    expect(await check(lines(40, { n: 4, ms: 60_000 }))).toEqual({ action: "pass" });
+  });
+
+  it("counts a message once when it is checked again (an unchecked one comes back)", async () => {
+    const { check, db } = setup(() => Promise.resolve("unchecked"));
+    expect(await check(lines(40, { n: 0, ms: 0 }))).toEqual({ action: "unchecked" });
+    db.prepare("UPDATE verdicts SET action = 'unchecked'").run();
+    expect(await check(lines(40, { n: 0, ms: 0 }))).toEqual({ action: "unchecked" });
+    expect(await check(lines(40, { n: 1, ms: 1 }))).toEqual({ action: "unchecked" });
+    expect(await check(lines(21, { n: 2, ms: 2 }))).toEqual({ action: "hide", reason: "too_fast" });
+  });
+
   it("hides an edit of another's line, and checks an edit of one's own as any line (3k)", async () => {
     const OTHER = toAddress(new Uint8Array(20).fill(7));
     const { db, check, asked } = setup(() => Promise.resolve(answer()));
