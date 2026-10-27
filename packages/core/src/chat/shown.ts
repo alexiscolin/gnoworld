@@ -23,18 +23,29 @@ function folding(lines: readonly Line[]) {
   return { newest, folded };
 }
 
-/** The line each folded edit corrects, by the edit's own msgid: what a plain client answers or reacts to by that
- * msgid reaches the line (the code review's CR5). */
-export const editsFolded = (lines: readonly Line[]): ReadonlyMap<string, string> => folding(lines).folded;
-
-/** The room's lines, in their order, each corrected by its newest edit and the edits gone; the same array when no line
- * is corrected. */
-export function shownLines(lines: readonly Line[]): readonly ShownLine[] {
-  const { newest, folded } = folding(lines);
-  if (folded.size === 0) return lines;
-  return lines.flatMap((line): ShownLine[] => {
-    const edit = newest.get(line.id);
-    if (edit !== undefined) return [{ ...line, text: edit.text, kind: edit.kind, edited: true }];
-    return folded.has(line.id) ? [] : [line];
-  });
+interface Folded {
+  readonly shown: readonly ShownLine[];
+  readonly folded: ReadonlyMap<string, string>;
 }
+
+/** The room's lines, in their order, each corrected by its newest edit and the edits gone (the same array when no
+ * line is corrected), and the line each folded edit corrects by the edit's own msgid, which a plain client answers or
+ * reacts to (the code review's CR5): one fold for both. */
+export function foldEdits(lines: readonly Line[]): Folded {
+  const { newest, folded } = folding(lines);
+  const shown =
+    folded.size === 0
+      ? lines
+      : lines.flatMap((line): ShownLine[] => {
+          const edit = newest.get(line.id);
+          if (edit !== undefined) return [{ ...line, text: edit.text, kind: edit.kind, edited: true }];
+          return folded.has(line.id) ? [] : [line];
+        });
+  return { shown, folded };
+}
+
+/** The room's lines as shown: see foldEdits. */
+export const shownLines = (lines: readonly Line[]): readonly ShownLine[] => foldEdits(lines).shown;
+
+/** The line each folded edit corrects, by the edit's own msgid: see foldEdits. */
+export const editsFolded = (lines: readonly Line[]): ReadonlyMap<string, string> => foldEdits(lines).folded;

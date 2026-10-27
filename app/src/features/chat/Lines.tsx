@@ -12,8 +12,7 @@ import {
   reactionsOn,
   type Shown,
   type ShownLine,
-  shownLines,
-  editsFolded,
+  foldEdits,
 } from "@gnoworld/core";
 import { Flash, type FlashMessage } from "@gnoworld/ui";
 import { useLayoutEffect, useRef, type ReactNode } from "react";
@@ -155,12 +154,11 @@ export function Lines(props: LinesProps) {
   const { room, members, me, refused, reactions, cannotReact } = props;
   const { onDelete = NO_DELETE, onDismiss = NO_DISMISS, onReact = NO_REACT, onReply = NO_REPLY } = props;
   // The room's lines as shown: each corrected by its author's newest edit, the edits gone (4d, F664).
-  const lines = shownLines(props.lines);
+  const { shown: lines, folded } = foldEdits(props.lines);
   const { listRef, onScroll } = useNewestInView(lines, reactions);
   const { stop, mounted, on, leave } = useLineFocus(lines, listRef);
   const { said, setSaid, copy } = useCopy(room);
   // What a plain client answers or reacts to by a folded edit's own msgid reaches the line it corrects (CR5).
-  const folded = editsFolded(props.lines);
   const lineOf = (id: string) => folded.get(id) ?? id;
   const shown = reactionsOn(reactions ?? [], me, lineOf);
   // A reply's line by its msgid, this room's alone: a reply naming its own msgid or another room's answers none here.

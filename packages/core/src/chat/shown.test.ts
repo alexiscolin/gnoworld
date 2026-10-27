@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { Line } from "./room.ts";
-import { editsFolded, shownLines } from "./shown.ts";
+import { editsFolded, foldEdits, shownLines } from "./shown.ts";
 
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
@@ -127,5 +127,25 @@ describe("shownLines: a room's lines as shown, each edit in its line's place", (
   test("gives back the room's lines themselves when no line is corrected", () => {
     const lines = [line("a", 0, "one"), line("b", 1, "two")];
     expect(shownLines(lines)).toBe(lines);
+  });
+});
+
+// F1181 (the simplify pass's A2): the room's lines as shown and each folded edit's line come from one fold, which the
+// room's lines view and its reply lookup each ask once.
+describe("foldEdits: the shown lines and the folded edits together", () => {
+  const lines = [line("a", 0, "helo"), line("b", 1, "next"), { ...line("e", 2, "hello"), ...{ edits: "a" } }];
+
+  test("gives what shownLines and editsFolded give", () => {
+    const { shown, folded } = foldEdits(lines);
+    expect(shown).toEqual(shownLines(lines));
+    expect(folded).toEqual(editsFolded(lines));
+    expect(texts(shown)).toEqual(["a:hello", "b:next"]);
+    expect(folded.get("e")).toBe("a");
+  });
+
+  test("gives the lines themselves, folded nothing, when no edit folds", () => {
+    const plain = [line("a", 0, "one"), line("b", 1, "two")];
+    expect(foldEdits(plain).shown).toBe(plain);
+    expect(foldEdits(plain).folded.size).toBe(0);
   });
 });
