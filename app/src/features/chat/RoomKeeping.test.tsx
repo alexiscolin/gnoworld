@@ -10,6 +10,7 @@ import { z } from "zod";
 import { keep } from "../../lib/keep/keep.ts";
 import { StoreProvider, useAppStore } from "../../storeContext.tsx";
 import { useRoomKeeping } from "./RoomKeeping.ts";
+import { useGuestKeeping } from "./RoomPins.ts";
 import { RoomView, type RoomViewProps } from "./RoomView.tsx";
 
 // 4d's marks on a room's lines (slice 4's 4d), apart from RoomView.test.tsx: a line saved or pinned says so in a word,
@@ -154,12 +155,21 @@ const NO_PINNING = {
   pin: () => Promise.resolve({ ok: true as const }),
   unpin: () => Promise.resolve({ ok: true as const }),
 };
-function Probe({ room, seed }: { room: string | undefined; seed?: (store: ReturnType<typeof useAppStore>) => void }) {
+type Keeps = typeof useRoomKeeping;
+function Probe({
+  room,
+  seed,
+  keeps = useRoomKeeping,
+}: {
+  room: string | undefined;
+  seed?: (store: ReturnType<typeof useAppStore>) => void;
+  keeps?: Keeps;
+}) {
   const store = useAppStore();
   useEffect(() => {
     seed?.(store);
   }, [seed, store]);
-  const { keeping, pins } = useRoomKeeping(room, NO_PINNING);
+  const { keeping, pins } = keeps(room, NO_PINNING);
   return (
     <p>
       {JSON.stringify({
@@ -172,16 +182,23 @@ function Probe({ room, seed }: { room: string | undefined; seed?: (store: Return
     </p>
   );
 }
-const probed = (room: string | undefined, seed?: (store: ReturnType<typeof useAppStore>) => void) =>
+const probed = (room: string | undefined, seed?: (store: ReturnType<typeof useAppStore>) => void, keeps?: Keeps) =>
   renderToStaticMarkup(
     <StoreProvider>
-      <Probe room={room} {...(seed === undefined ? {} : { seed })} />
+      <Probe room={room} {...(seed === undefined ? {} : { seed })} {...(keeps === undefined ? {} : { keeps })} />
     </StoreProvider>,
   );
 
 describe("the room in view's keeping, from the store", () => {
   it("is none for no room, a direct message's, which has neither", () => {
     expect(probed(undefined)).toBe("<p>{&quot;keeping&quot;:null,&quot;pins&quot;:null}</p>");
+  });
+
+  it("is none for a visitor too, and holds nothing for a room none has been told of", () => {
+    expect(probed(undefined, undefined, useGuestKeeping)).toBe(
+      "<p>{&quot;keeping&quot;:null,&quot;pins&quot;:null}</p>",
+    );
+    expect(probed("#bubble", undefined, useGuestKeeping)).toBe(probed("#bubble"));
   });
 
   it("holds nothing saved or pinned and offers no Pin before the server has answered for the room", () => {
@@ -239,7 +256,7 @@ describe("the version of an edited line that the room acts on", () => {
     return parsed.message;
   };
   // The room's lines are m1, then m2 and m3, the author's edits of it; the store holds m2 and m3's pin.
-  function mounted(lines: readonly IrcMessage[], pinned: readonly string[] = []) {
+  function mounted(lines: readonly IrcMessage[], pinned: readonly string[] = [], keeps: Keeps = useRoomKeeping) {
     const calls: string[] = [];
     const pinning = {
       pin: (id: string) => {
@@ -254,7 +271,7 @@ describe("the version of an edited line that the room acts on", () => {
     const seen: { api?: ReturnType<typeof useRoomKeeping>; store?: ReturnType<typeof useAppStore> } = {};
     const Reader = () => {
       const store = useAppStore();
-      const api = useRoomKeeping("#bubble", pinning);
+      const api = keeps("#bubble", pinning);
       useEffect(() => {
         Object.assign(seen, { api, store });
       });
@@ -291,6 +308,7 @@ describe("the version of an edited line that the room acts on", () => {
     return {
       calls,
       keeping: () => seen.api?.keeping,
+      pins: () => seen.api?.pins,
       saved: () => seen.store?.getState().keep.saved ?? [],
       unread: () => seen.store?.getState().keep.unread ?? {},
     };
@@ -320,6 +338,17 @@ describe("the version of an edited line that the room acts on", () => {
       await keeping()?.pin?.unpin("m1");
     });
     expect(calls).toEqual(["unpin m2"]);
+  });
+
+  // A visitor reads the pins as an account does, and keeps nothing: no Pin though the server says it may, no saved line.
+  it("shows a visitor the edited line pinned and the pin held, with nothing to pin, save or unmark", () => {
+    const { keeping, pins } = mounted(EDITED, ["m2"], useGuestKeeping);
+    expect([...(keeping()?.pinned ?? [])]).toEqual(["m1"]);
+    expect(pins()?.list.map(({ id }) => id)).toEqual(["m2"]);
+    expect(keeping()?.pin).toBeUndefined();
+    expect(keeping()?.saved.size).toBe(0);
+    expect(keeping()?.unread).toBeUndefined();
+    expect(keeping()?.onSave("m1")).toBe("none");
   });
 
   const by = (account: string, message: IrcMessage): IrcMessage => ({

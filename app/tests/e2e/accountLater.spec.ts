@@ -10,6 +10,8 @@ const ACCOUNT_ONLY = [
   "Direct message with",
   "Only people I wrote to",
   "mentioned the room",
+  // What an account keeps on its device: the room keeping's acts on a line.
+  ".markUnread(",
 ];
 
 // The words of every script the page loads, the lines' view and the composer included, once the page is quiet.

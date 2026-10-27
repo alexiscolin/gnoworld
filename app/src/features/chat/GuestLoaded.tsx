@@ -8,7 +8,7 @@ import type { ChatLink } from "./link.ts";
 import { LOG_IN_TO_READ_DMS, LOG_IN_TO_WRITE } from "./loginWords.ts";
 import { roomIds } from "./names.ts";
 import { roomActs } from "./roomActs.ts";
-import { useRoomKeeping } from "./RoomKeeping.ts";
+import { useGuestKeeping } from "./RoomPins.ts";
 import { roomShown } from "./roomShown.ts";
 import { RoomSections, RoomsNav } from "./RoomSections.tsx";
 import { People, RoomView, type RoomViewProps } from "./RoomView.tsx";
@@ -46,7 +46,7 @@ export function GuestLoaded({
   const room = asksDm ? undefined : current;
   useRoomKeys(roomIds(sections), room);
   const acts = roomActs(link, room ?? "", dismissed);
-  const { keeping, pins } = useRoomKeeping(room, usePins(useAppStore(), room, undefined));
+  const { keeping, pins } = useGuestKeeping(room, usePins(useAppStore(), room, undefined));
   const shown = room === undefined ? undefined : roomShown(room, state, acts);
   return (
     <Sidebar space="l">

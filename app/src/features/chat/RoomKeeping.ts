@@ -2,11 +2,12 @@
 // saved lines and the place it asked to go back to, from the device, the room's pins, from the server, and the acts
 // that change them, built from the store and the shown room alone.
 import { foldEdits, type Line } from "@gnoworld/core";
-import type { PinnedLine } from "@gnoworld/schemas";
 import { own } from "../../store/record.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
-import type { Done } from "./askPins.ts";
+import { pinsOf, useRoomPins, type RoomPins } from "./RoomPins.ts";
 import type { Pinning } from "./usePins.ts";
+
+export type { RoomPins };
 
 /** What a room's lines show and offer of what the reader keeps, by the id of each line. */
 export interface RoomKeeping {
@@ -24,20 +25,12 @@ export interface RoomKeeping {
   pin?: Pinning | undefined;
 }
 
-/** The room's pins as the bar above its lines shows them. */
-export interface RoomPins {
-  list: readonly PinnedLine[];
-  may: boolean;
-  onUnpin: (id: string) => Promise<Done>;
-}
-
 /** The shown room's keeping and pins: none for no room, a direct message's, which has neither. */
 export function useRoomKeeping(room: string | undefined, pinning: Pinning) {
   const store = useAppStore();
   const saved = useApp(({ keep }) => keep.saved);
   const unread = useApp(({ keep }) => (room === undefined ? undefined : own(keep.unread, room)));
-  const held = useApp(({ pins }) => (room === undefined ? undefined : own(pins, room)));
-  const lines = useApp(({ chat }) => (room === undefined ? undefined : own(chat.rooms, room)?.lines));
+  const { held, lines } = useRoomPins(room);
   if (room === undefined) return { keeping: undefined, pins: undefined };
   // What the room shows is the newest version of an edited line (foldEdits), but Ergo keeps each version at its own id:
   // the line saved or marked is the one shown (the first's id, the last edit's words), a pin is the last edit's own id
@@ -48,14 +41,12 @@ export function useRoomKeeping(room: string | undefined, pinning: Pinning) {
     const { folded } = foldEdits(lines ?? []);
     return (lines ?? []).findLast((line) => folded.get(line.id) === id)?.id ?? id;
   };
-  const pinsHeld = held?.pins ?? [];
-  const folded = pinsHeld.length === 0 ? undefined : foldEdits(lines ?? []).folded;
-  const shownIdOf = (id: string): string => folded?.get(id) ?? id;
+  const { pinsHeld, shownIdOf, pinned, bar } = pinsOf(held, lines, pinning);
   const { keepActions } = store.getState();
   const keeping: RoomKeeping = {
     unread,
     saved: new Set(saved.filter((line) => line.room === room).map(({ id }) => id)),
-    pinned: new Set(pinsHeld.map(({ id }) => shownIdOf(id))),
+    pinned,
     onSave: (id) => {
       const line = lineOf(id);
       return line === undefined ? "none" : keepActions.save(room, line);
@@ -78,11 +69,5 @@ export function useRoomKeeping(room: string | undefined, pinning: Pinning) {
           }
         : undefined,
   };
-  return {
-    keeping,
-    pins:
-      held === undefined || held.pins.length === 0
-        ? undefined
-        : { list: held.pins, may: held.may, onUnpin: pinning.unpin },
-  };
+  return { keeping, pins: bar };
 }
