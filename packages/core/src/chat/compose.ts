@@ -1,9 +1,9 @@
 // What the composer sends (slice 4's 4c): a draft as the room's IRC line, one PRIVMSG; `/me` sends an action, `//`
 // a slash of text, and any other `/word` is a command it does not know, sent nowhere. IRC's line holds 510 bytes,
-// counted as Ergo relays it, under its sender's name, and no control character: each one but a break is a space, so
-// a draft forges no CTCP of its own. A draft of several lines is one message of lines (draft/multiline, docs/
-// decisions.md row 255), each line a PRIVMSG within that budget, the message within Ergo's caps; an action stays one
-// line, its breaks spaces.
+// counted as Ergo relays it, under its sender's name, and no control character: a tab is four spaces, any other but
+// a break a space, so a draft forges no CTCP of its own. A draft of several lines is one message of lines
+// (draft/multiline, docs/decisions.md row 255), each a PRIVMSG within that budget, the message within Ergo's caps;
+// an action stays one line, its breaks spaces.
 import { bytes, LINE_BYTES } from "../irc/irc.ts";
 import { MULTILINE_BYTES, MULTILINE_LINES } from "../irc/multiline.ts";
 
@@ -40,6 +40,7 @@ export type Composed =
 export function compose(room: string, draft: string, nick: string): Composed {
   const text = draft
     .replaceAll(/\r\n?/gu, "\n")
+    .replaceAll("\t", "    ")
     .replaceAll(/(?!\n)\p{Cc}/gu, " ")
     .trim();
   const word = /^\/\S*/u.exec(text)?.[0];

@@ -192,6 +192,14 @@ describe("compose: a draft of several lines", () => {
     });
   });
 
+  test("reads a tab as four spaces, so a pasted snippet keeps its indents (F1718)", () => {
+    expect(compose(ROOM, "if x:\n\treturn 1\n\t\tdeep\ta", NICK)).toMatchObject({
+      kind: "lines",
+      lines: [to("if x:"), to("    return 1"), to("        deep    a")],
+    });
+    expect(compose(ROOM, "a\tb", NICK)).toStrictEqual(sent("PRIVMSG #bubble/games :a    b"));
+  });
+
   test("sends a draft that is one line once its ends are trimmed as one PRIVMSG, as before", () => {
     expect(compose(ROOM, "one\n\n", NICK)).toStrictEqual(sent(to("one")));
   });
