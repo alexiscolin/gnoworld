@@ -213,6 +213,14 @@ describe("the lines view, compiled: threads' chips", () => {
     expect(host.querySelectorAll("ol > li")[0]?.textContent).toContain("200 replies");
   });
 
+  // CR11 (F1770): a direct message's lines root no thread, so reading its chains each render is work for nothing.
+  it("reads no thread of a direct message's lines, which root none", () => {
+    draw({ ...asked, room: undefined });
+    expect(vi.mocked(threadsOf)).not.toHaveBeenCalled();
+    expect(vi.mocked(ThreadChip)).not.toHaveBeenCalled();
+    expect(host.querySelectorAll("ol > li")).toHaveLength(LINES);
+  });
+
   it("reads and draws no thread again when the pointer moves over lines", () => {
     draw(asked);
     vi.clearAllMocks();

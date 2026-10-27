@@ -105,6 +105,7 @@ const NO_DELETE = () => false;
 const NO_DISMISS = () => undefined;
 const NO_REACT = () => false;
 const NO_REPLY = () => undefined;
+const NO_REPLIES: ReadonlyMap<string, readonly Line[]> = new Map();
 
 // What Ergo refused, said until the page dismisses it: a delete first, then a reaction; none, the page's own word.
 const toldOf = (refused: string | undefined, cannotReact: true | undefined): FlashMessage | undefined => {
@@ -134,10 +135,11 @@ export function Lines(props: LinesProps) {
   // What a plain client answers or reacts to by a folded edit's own msgid reaches the line it corrects (CR5).
   const lineOf = (id: string) => folded.get(id) ?? id;
   const shown = reactionsOn(props.reactions ?? [], props.me, lineOf);
-  // The threads of the lines as shown: a reply that names a folded edit's msgid answers the line it corrects.
-  const { repliesOf } = threadsOf(lines, lineOf);
-  // A direct message's lines root no thread.
-  const onThread = props.room === undefined ? undefined : props.onThread;
+  // The threads of the lines as shown: a reply that names a folded edit's msgid answers the line it corrects. A direct
+  // message's lines root none.
+  const threaded = props.room !== undefined;
+  const repliesOf = threaded ? threadsOf(lines, lineOf).repliesOf : NO_REPLIES;
+  const onThread = threaded ? props.onThread : undefined;
   const byId = new Map(lines.map((line) => [line.id, line]));
   // Each line's chips as a string a line compares by value (F1222).
   const chips = new Map([...shown].map(([id, each]) => [id, chipsOf(each)]));
