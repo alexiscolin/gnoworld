@@ -31,18 +31,20 @@ const guest = (id: string): Line => ({
 
 function setup({ refuses = false } = {}) {
   const kept = new Map<string, string>();
-  const state = { refuses };
+  // `blind`: a key prefix the device cannot read; `noWrite`: it reads but refuses what is written.
+  const state = { refuses, blind: "", noWrite: false };
   const storage = {
     getItem: (key: string) => {
+      if (state.blind !== "" && key.startsWith(state.blind)) throw new DOMException("blocked", "SecurityError");
       if (state.refuses) throw new DOMException("blocked", "SecurityError");
       return kept.get(key) ?? null;
     },
     setItem: (key: string, value: string) => {
-      if (state.refuses) throw new DOMException("blocked", "SecurityError");
+      if (state.refuses || state.noWrite) throw new DOMException("blocked", "SecurityError");
       kept.set(key, value);
     },
     removeItem: (key: string) => {
-      if (state.refuses) throw new DOMException("blocked", "SecurityError");
+      if (state.refuses || state.noWrite) throw new DOMException("blocked", "SecurityError");
       kept.delete(key);
     },
   };
@@ -261,6 +263,133 @@ describe("a device that fails", () => {
         .saved()
         ?.map(({ id }) => id),
     ).toEqual(["m1"]);
+    expect(t.device().unread()).toEqual({});
+  });
+});
+
+// Which key could not be read decides nothing: written over, it would lose what it held (G2).
+describe("a device with one key it cannot read", () => {
+  const GOOD = [{ room: "#bubble", id: "m1", time: T(1), from: BOB, text: "precious" }];
+  it.each([
+    ["saved", "gnoworld:saved:"],
+    ["unread", "gnoworld:unread:"],
+  ])("writes neither key, and says so, when the %s key is unreadable from the start", (_, blind) => {
+    const t = setup();
+    t.device().setSaved(GOOD);
+    t.device().setUnread({ "#bubble": T(0) });
+    t.state.blind = blind;
+    t.begin(t.device());
+    expect(t.now().notKept).toBe(true);
+    t.state.blind = "";
+    t.save("#bubble", line("m2"));
+    t.markUnread("#bubble", line("m2"));
+    t.unsave("#bubble", "m1");
+    t.readThrough("#bubble");
+    expect(t.device().saved()).toEqual(GOOD);
+    expect(t.device().unread()).toEqual({ "#bubble": T(0) });
+  });
+
+  it.each([
+    ["saved", "gnoworld:saved:"],
+    ["unread", "gnoworld:unread:"],
+  ])("writes neither key when the %s key becomes unreadable after the start", (_, blind) => {
+    const t = setup();
+    t.device().setSaved(GOOD);
+    t.device().setUnread({ "#bubble": T(0) });
+    t.begin(t.device());
+    t.state.blind = blind;
+    t.save("#bubble", line("m2"));
+    t.markUnread("#bubble", line("m2"));
+    t.state.blind = "";
+    expect(t.device().saved()).toEqual(GOOD);
+    expect(t.device().unread()).toEqual({ "#bubble": T(0) });
+    expect(t.now().notKept).toBe(true);
+  });
+});
+
+// The warning that the device kept nothing shows only when that is so (G3).
+describe("the warning that the device did not keep", () => {
+  const actions: [string, (t: ReturnType<typeof setup>) => void][] = [
+    [
+      "a save",
+      (t) => {
+        t.save("#bubble", line("m2"));
+      },
+    ],
+    [
+      "an unsave",
+      (t) => {
+        t.unsave("#bubble", "m1");
+      },
+    ],
+    [
+      "a mark",
+      (t) => {
+        t.markUnread("#bubble", line("m2", { time: T(2) }));
+      },
+    ],
+    [
+      "a read-through",
+      (t) => {
+        t.readThrough("#bubble");
+      },
+    ],
+  ];
+  const held = (t: ReturnType<typeof setup>) => {
+    t.begin(t.device());
+    t.save("#bubble", line("m1"));
+    t.markUnread("#bubble", line("m1"));
+  };
+  it.each(actions)("stays off for %s on a device that keeps it", (_, act) => {
+    const t = setup();
+    held(t);
+    act(t);
+    expect(t.now().notKept).toBe(false);
+    expect(t.device().saved()).toEqual(t.now().saved);
+    expect(t.device().unread()).toEqual(t.now().unread);
+  });
+  it.each(actions)("comes on for %s on a device that refuses what is written", (_, act) => {
+    const t = setup();
+    held(t);
+    t.state.noWrite = true;
+    act(t);
+    expect(t.now().notKept).toBe(true);
+  });
+});
+
+describe("marking a room's place again", () => {
+  it("keeps the 100 rooms held, the oldest among them, and puts the room marked last", () => {
+    const t = setup();
+    t.begin(t.device());
+    for (let n = 0; n < 100; n += 1) t.markUnread(`#world-${String(n)}`, line("m", { time: T(1) }));
+    t.markUnread("#world-49", line("m", { time: T(2) }));
+    const rooms = Object.keys(t.now().unread);
+    expect(rooms).toHaveLength(100);
+    expect(rooms[0]).toBe("#world-0");
+    expect(rooms.at(-1)).toBe("#world-49");
+  });
+});
+
+// A guest has no device: nothing it does is kept or throws, whatever an account left on the same device (G9).
+describe("a guest", () => {
+  it("changes nothing by marking, unsaving or reading through, and the state read is its own", () => {
+    const t = setup();
+    t.device(ALICE).setSaved([{ room: "#bubble", id: "m1", time: T(1), from: BOB, text: "hers" }]);
+    t.device(ALICE).setUnread({ "#bubble": T(0) });
+    t.begin(undefined);
+    t.markUnread("#bubble", line("m2"));
+    t.unsave("#bubble", "m1");
+    t.readThrough("#bubble");
+    expect(t.now()).toEqual({ saved: [], unread: {}, notKept: false });
+    expect(t.device(ALICE).saved()).toHaveLength(1);
+    expect(t.device(ALICE).unread()).toEqual({ "#bubble": T(0) });
+  });
+
+  it("marks nothing for a direct message's partner", () => {
+    const t = setup();
+    t.begin(t.device());
+    t.markUnread(BOB, line("m1"));
+    expect(t.now().unread).toEqual({});
     expect(t.device().unread()).toEqual({});
   });
 });
