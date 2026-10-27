@@ -257,6 +257,28 @@ describe("pinning a line", () => {
     expect(added).toContain("m2");
     expect(added).not.toContain("text m2");
   });
+
+  // The audit log of an unpin names what the pin's does: the room, the line, the account (as the log hashes it), no text (G10).
+  it("logs the room, the line's id and the account of an unpin too, and its account is the one that unpinned", async () => {
+    const t = setup();
+    await t.pin({ room: "#bubble/games", msgid: "m2" }, { who: "mod" });
+    await t.pin({ room: "#bubble/games", msgid: "m3" }, { who: "team" });
+    await t.unpin("#bubble/games", "m2", { who: "team" });
+    await t.unpin("#bubble/games", "m3", { who: "mod" });
+    const event = (name: string, msgid: string) =>
+      t.events().find((line) => line.includes(name) && line.includes(`"msgid":"${msgid}"`)) ?? "";
+    const accountOf = (line: string) => /"account":"([0-9a-f]{64})"/.exec(line)?.[1];
+    const [addedByMod, addedByTeam] = [event("pin_added", "m2"), event("pin_added", "m3")];
+    const [removedByTeam, removedByMod] = [event("pin_removed", "m2"), event("pin_removed", "m3")];
+    for (const line of [removedByTeam, removedByMod]) {
+      expect(line).toContain('"room":"#bubble/games"');
+      expect(line).not.toContain("text m");
+      expect(accountOf(line)).toBeDefined();
+    }
+    expect(accountOf(removedByTeam)).toBe(accountOf(addedByTeam));
+    expect(accountOf(removedByMod)).toBe(accountOf(addedByMod));
+    expect(accountOf(removedByTeam)).not.toBe(accountOf(removedByMod));
+  });
 });
 
 // A failure of the database is the server's: a code and no more, and what the database said is no one's to read.
