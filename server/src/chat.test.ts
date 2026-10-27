@@ -377,7 +377,9 @@ describe("the chat, as the server starts it", () => {
       let text = "";
       const read = async (count: number): Promise<unknown[]> => {
         for (;;) {
-          const data = [...text.matchAll(/data: (.*)\n/g)].map(([, json = ""]) => JSON.parse(json) as unknown);
+          const data = [...text.matchAll(/event: verdict\ndata: (.*)\n/g)].map(
+            ([, json = ""]) => JSON.parse(json) as unknown,
+          );
           if (data.length >= count) return data;
           const chunk = await reader?.read();
           if (chunk === undefined || chunk.done) return data;
@@ -1315,5 +1317,112 @@ describe("the chat, as the server starts it", () => {
       await settle(peer);
       expect(peer.lines.filter((l) => /^SAMODE \S+ \+v /.test(l))).toEqual([]);
     });
+  });
+});
+
+// 4g (docs/decisions.md, 2026-10-26): GET /api/verdicts through the chat's own wiring: the stream's rule of who
+// reads (mayRead, by the session), each visitor counted by its address.
+describe("the chat's verdicts route", () => {
+  const CREW = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+  const ACCOUNT = "g1us8428u2a5satrlxzagqqa5m6vmuze025anjlj";
+  const settings = {
+    worlds: new Map([
+      [
+        "bubble",
+        {
+          rules: RULES,
+          groups: new Map([["crew", new Set([CREW])]]),
+          rooms: new Map<string, Room>([
+            ["#bubble/crew", { type: "members" as const, readers: "crew", hidden: false }],
+            ["#bubble/club", { type: "accounts" as const, hidden: false }],
+          ]),
+        },
+      ],
+    ]),
+    ergo: undefined,
+    moderation: OFF,
+  };
+  const ready = (proxy?: string) => {
+    const t = setup(
+      { ...settings, trustedProxy: proxy },
+      {
+        session: (token) =>
+          new Map([
+            ["crew-token", CREW],
+            ["account-token", ACCOUNT],
+          ]).get(token ?? ""),
+      },
+    );
+    t.app.route("/api/verdicts", t.chat.verdicts);
+    const insert = t.db.prepare(
+      "INSERT INTO verdicts (msgid, room, account, action, at) VALUES (?, ?, 'g1a', 'pass', 0)",
+    );
+    insert.run("m1", "#bubble");
+    insert.run("m2", "#bubble/crew");
+    insert.run("m3", "#bubble/club");
+    const ask = (
+      room: string,
+      id: string,
+      { token, peer = "203.0.113.7", realIp }: { token?: string; peer?: string; realIp?: string } = {},
+    ) =>
+      t.app.request(
+        `/api/verdicts?room=${encodeURIComponent(room)}&ids=${id}`,
+        {
+          headers: {
+            ...(token === undefined ? {} : { cookie: `__Host-session=${token}` }),
+            ...(realIp === undefined ? {} : { "x-real-ip": realIp }),
+          },
+        },
+        { incoming: { socket: { remoteAddress: peer } } },
+      );
+    return ask;
+  };
+
+  it("answers the world's main room to anyone, and its members room to its member alone", async () => {
+    const ask = ready();
+    expect(await (await ask("#bubble", "m1")).json()).toEqual({
+      room: "#bubble",
+      verdicts: [{ msgid: "m1", state: "checked" }],
+    });
+    expect((await ask("#bubble/crew", "m2")).status).toBe(403);
+    expect((await ask("#bubble/crew", "m2", { token: "stranger-token" })).status).toBe(403);
+    expect(await (await ask("#bubble/crew", "m2", { token: "crew-token" })).json()).toEqual({
+      room: "#bubble/crew",
+      verdicts: [{ msgid: "m2", state: "checked" }],
+    });
+  });
+
+  it("counts each visitor by its address: one past its minute refused, another answered", async () => {
+    const ask = ready();
+    for (let n = 0; n < 60; n += 1) expect((await ask("#bubble", "m1")).status).toBe(200);
+    expect((await ask("#bubble", "m1")).status).toBe(429);
+    expect((await ask("#bubble", "m1", { peer: "203.0.113.8" })).status).toBe(200);
+  });
+
+  // F877: an accounts room's lines go to any account and to no guest; a room's name in other letters is no room the
+  // verdicts hold, so a members room's are never answered under it.
+  it("answers an accounts room to an account alone, and a members room's lines under no other spelling", async () => {
+    const ask = ready();
+    expect((await ask("#bubble/club", "m3")).status).toBe(403);
+    expect(await (await ask("#bubble/club", "m3", { token: "account-token" })).json()).toEqual({
+      room: "#bubble/club",
+      verdicts: [{ msgid: "m3", state: "checked" }],
+    });
+    for (const spelling of ["#BUBBLE/crew", "#Bubble/Crew", "#bubble/CREW"]) {
+      expect(await (await ask(spelling, "m2")).json()).toEqual({ room: spelling, verdicts: [] });
+    }
+  });
+
+  // F872: behind the proxy every reader shares its address; the one it sets (x-real-ip) is each reader's, believed
+  // from the proxy alone.
+  it("counts each reader behind the trusted proxy by the address the proxy sets, and believes no other peer's", async () => {
+    const ask = ready("10.0.0.2");
+    const proxied = (realIp: string) => ask("#bubble", "m1", { peer: "10.0.0.2", realIp });
+    for (let n = 0; n < 60; n += 1) expect((await proxied("203.0.113.7")).status).toBe(200);
+    expect((await proxied("203.0.113.7")).status).toBe(429);
+    expect((await proxied("203.0.113.8")).status).toBe(200);
+    const spoofed = (n: number) => ask("#bubble", "m1", { peer: "198.51.100.9", realIp: `192.0.2.${String(n)}` });
+    for (let n = 0; n < 60; n += 1) expect((await spoofed(n)).status).toBe(200);
+    expect((await spoofed(60)).status).toBe(429);
   });
 });

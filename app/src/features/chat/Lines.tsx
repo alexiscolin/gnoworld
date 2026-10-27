@@ -2,122 +2,19 @@
 // newest while the reader is there; a line's text is Markdown (4c), built into elements from an allowlist
 // (Message.tsx); one that mentions the reader says so (4d). The message menu (4c, docs/decisions.md 2026-10-26): the
 // list is one tab stop, a line, the arrows moving among them; a line pointed at or focused shows its bar.
-import { markdown, mentions, type Block, type Line } from "@gnoworld/core";
+import type { Line } from "@gnoworld/core";
+import type { StreamEvent } from "@gnoworld/schemas";
 import { Flash } from "@gnoworld/ui";
-import { useLayoutEffect, useRef, type ReactNode } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { LineActions } from "./LineActions.tsx";
 import { useCopy, useRemoval } from "./lineFlash.ts";
 import { useLineFocus } from "./lineFocus.ts";
-import { Markdown } from "./Message.tsx";
-import { Person } from "./Person.tsx";
+import { LineView } from "./LineView.tsx";
 import { useNewMark, useReadAtEnd } from "./reading.ts";
 import shared from "./lists.module.css";
 import styles from "./RoomView.module.css";
 
-// A line's look by its kind: a message plain, a notice and an /me apart.
-const KINDS: Record<Line["kind"], string | undefined> = {
-  message: undefined,
-  notice: styles["notice"],
-  action: styles["action"],
-};
 const LINES = [shared["plain"], shared["scrolls"], styles["lines"]].join(" ");
-const CLOCK = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
-
-// A line's mentions, space-separated, read apart from its drawing so the compiler keeps the drawing's tree out of
-// what a change of members recomputes.
-const namesOf = (text: string): string => mentions(markdown(text)).join(" ");
-
-// The addresses of `names` (a line's mentions, space-separated) that are members, as one string.
-const knownOf = (names: string, members: ReadonlySet<string>): string =>
-  names
-    .split(" ")
-    .filter((address) => members.has(address))
-    .join(" ");
-
-// A line's text drawn, its mentions of `known` (space-separated) shortened. A component of its own, with a string the
-// compiler compares by value: the line keeps its drawing while others join and leave (F812's cost).
-// Its links are Tab stops on the list's stop alone (U1).
-interface LineTextProps {
-  blocks: readonly Block[];
-  me: string | undefined;
-  known: string;
-  stop: boolean;
-}
-
-function LineText({ blocks, me, known, stop }: LineTextProps) {
-  return (
-    <Markdown blocks={blocks} className={styles["text"]} me={me} members={new Set(known.split(" "))} tabbable={stop} />
-  );
-}
-
-// The prototype's divider: a row of its own, its word in the label style and a rule running on.
-function NewDivider() {
-  return (
-    <>
-      <span className={styles["divider"]}>
-        <span className="label">
-          <span className={styles["fresh"]}>
-            New<span className="visually-hidden"> from here</span>
-          </span>
-        </span>
-      </span>{" "}
-    </>
-  );
-}
-
-// A line's author: its account's address shortened or its guest's nick, then "you" if it is mine.
-function Author({ line, mine }: { line: Line; mine: boolean }) {
-  return (
-    <span className={styles["author"]}>
-      <Person name={line.account ?? line.from} guest={line.account === undefined} />
-      {mine ? " you" : null}
-    </span>
-  );
-}
-
-// A line, read once: drawn, and asked whether it mentions the reader, which a word says as well as its colour; a
-// mention shortened for the reader and the room's members alone (F812). A change of members reads its mentions
-// again, never its drawing.
-interface LineViewProps {
-  line: Line;
-  me: string | undefined;
-  members: ReadonlySet<string>;
-  /** Whether it is the list's one tab stop. */
-  stop: boolean;
-  /** Its bar, while pointed at or focused. */
-  actions: ReactNode;
-  /** Whether it is the first line past the reading place as the room opened (4f). */
-  fresh: boolean;
-}
-
-function LineView({ line, me, members, stop, actions, fresh }: LineViewProps) {
-  const blocks = markdown(line.text);
-  const names = namesOf(line.text);
-  const mentioned = names.split(" ").some((address) => address === me);
-  const known = knownOf(names, members);
-  // Mine: my name in mint and the word "you" (DESIGN-SYSTEM.md, Avatar; U5).
-  const mine = me !== undefined && line.account === me;
-  return (
-    <li
-      className={KINDS[line.kind]}
-      data-about-me={mentioned ? "" : undefined}
-      data-new={fresh ? "" : undefined}
-      data-mine={mine ? "" : undefined}
-      tabIndex={stop ? 0 : -1}
-    >
-      {fresh ? <NewDivider /> : null}
-      {/* The line's marks first, before the time: where no sender's words stand (F808). */}
-      {mentioned ? <span className={styles["mentionsYou"]}>Mentions you </span> : null}
-      {line.kind === "notice" ? <span className={styles["mark"]}>Notice </span> : null}
-      <time dateTime={line.time} className={styles["time"]}>
-        {CLOCK.format(new Date(line.time))}
-      </time>{" "}
-      {line.kind === "action" ? "* " : null}
-      <Author line={line} mine={mine} /> <LineText blocks={blocks} me={me} known={known} stop={stop} />
-      {actions}
-    </li>
-  );
-}
 
 // How near the end, in pixels, the reader still reads the newest line.
 const AT_END = 32;
@@ -168,6 +65,10 @@ export interface LinesProps {
   paged?: boolean;
   /** The room read to its line `id`, the newest, while the reader is at the end and the page shows. */
   onRead?: ((id: string) => void) | undefined;
+  /** The room's lines' verdicts, by msgid, from the server's stream (4g). */
+  verdicts?: Readonly<Record<string, StreamEvent["state"]>> | undefined;
+  /** Whether the reader saves data (ADR-0002 §8): then no player is offered (4g, F893). */
+  saving?: boolean;
 }
 
 /** The room's flash, then its lines, oldest first, as a list a screen reader hears grow. */
@@ -183,6 +84,8 @@ export function Lines({
   read,
   paged = false,
   onRead,
+  verdicts,
+  saving = false,
 }: LinesProps) {
   const fresh = useNewMark(lines, paged ? read : undefined, me);
   const { listRef, atEndRef, onScroll } = useNewestInView(lines, fresh);
@@ -240,6 +143,8 @@ export function Lines({
             stop={line.id === stop}
             actions={room !== undefined && mounted(line.id) ? actionsOf(line, room) : null}
             fresh={line.id === fresh}
+            verdict={verdicts?.[line.id]}
+            players={room !== undefined && !saving}
           />
         ))}
       </ol>

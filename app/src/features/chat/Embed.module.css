@@ -1,0 +1,16 @@
+/* A link's player (4g): its card's state in words, then the service's frame, as wide as the line allows. */
+@layer components {
+  .status {
+    color: var(--color-text-muted);
+  }
+
+  .frame {
+    display: block;
+    inline-size: 100%;
+    /* raw: a player's own width, which no token names */
+    max-inline-size: 480px;
+    aspect-ratio: 16 / 9;
+    border: 0;
+    border-radius: var(--radius-m);
+  }
+}

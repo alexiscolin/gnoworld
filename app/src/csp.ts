@@ -1,9 +1,9 @@
 // The site's Content-Security-Policy (ADR-0002 §9; slice 3's plan, 3f), written once at build time for
-// every host: nothing loads unless named, nothing from another host, no eval. React Router writes inline
+// every host: nothing loads unless named, nothing from another host but the accepted players' frames, no eval. React Router writes inline
 // scripts in each pre-rendered page, so the build allows exactly those, by their SHA-256 (F341).
 const SCRIPT_SRC = "script-src 'self'";
 const DIRECTIVES = [
-  // Covers frame-src and object-src too, which the planted frame proves.
+  // Covers every directive not named below, object-src among them.
   "default-src 'none'",
   SCRIPT_SRC,
   "style-src 'self'",
@@ -13,6 +13,9 @@ const DIRECTIVES = [
   "connect-src 'self'",
   "worker-src 'self'",
   "manifest-src 'self'",
+  // The accepted services' players, each loaded on a click (slice 4's 4g; docs/decisions.md, 2026-10-26), by the
+  // path of each one's player, not its whole host (F885); Imgur's form is not read yet.
+  "frame-src https://www.youtube-nocookie.com/embed/ https://player.vimeo.com/video/ https://giphy.com/embed/",
   // These three fall back to nothing, not to default-src.
   "base-uri 'none'",
   "form-action 'self'",

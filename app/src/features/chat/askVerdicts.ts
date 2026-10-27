@@ -1,0 +1,196 @@
+// The verdicts of the shown room's lines (slice 4's 4g; docs/decisions.md, 2026-10-26): the room's stream, which the
+// asker follows, gives them from when it says it began (F890); GET /api/verdicts the lines said before (F884), asked
+// once each while in view, VERDICTS_ASKED a request. After a failure that may pass, nothing is asked for a rest, then the view last
+// given is asked again (F874).
+import { markdown, type Line } from "@gnoworld/core";
+import { type LineVerdicts, type StreamEvent, VerdictId, VERDICTS_ASKED } from "@gnoworld/schemas";
+import type { Result } from "../../lib/api/http.ts";
+import { embedIn } from "./embeds.ts";
+
+export interface Asking {
+  /** The server's verdicts of these lines of a room (lib/api/verdicts.ts). */
+  verdicts: (room: string, ids: readonly string[]) => Promise<Result<LineVerdicts>>;
+  /** A verdict the stream gave, into the store. */
+  judged: (event: StreamEvent) => void;
+  /** The verdicts one answer of the server gave, into the store at once (F1057). */
+  judgedAll: (events: readonly StreamEvent[]) => void;
+  /** The verdicts the page holds of a room's lines. */
+  held: (room: string) => Readonly<Record<string, unknown>> | undefined;
+  /** Follows a room's stream (lib/stream/verdicts.ts), handing on its verdicts, its word of when it began following
+   * (in ms), and its end for good; stops when called. */
+  follow: (room: string, on: Told) => () => void;
+}
+
+// A room's lines in view, the verdicts the page holds of them, and when it began following the room's stream.
+interface InView {
+  lines: readonly Line[];
+  held: Readonly<Record<string, unknown>> | undefined;
+  /** The time the page's stream of the room opened, in ms: a line said from then on has its verdict from it. */
+  since: number;
+}
+
+/** The lines in view whose player waits on a verdict the page does not hold and has not asked for, in their order:
+ * the server answers them (GET /api/verdicts), a line older than the stream's replay among them. */
+export function unjudged(
+  lines: readonly Line[],
+  verdicts: Readonly<Record<string, unknown>> | undefined,
+  asked: ReadonlySet<string>,
+): string[] {
+  return lines
+    .filter(({ id, text }) => {
+      const held = verdicts !== undefined && Object.hasOwn(verdicts, id);
+      return !held && !asked.has(id) && embedIn(markdown(text)) !== undefined;
+    })
+    .map(({ id }) => id);
+}
+
+/** The rest after a failure that may pass; after "too many", the route's minute (server/src/stream/verdicts.ts). */
+export const REST_MS = 10_000;
+export const BUSY_REST_MS = 60_000;
+// The failures that may pass: the others (refused, forbidden, malformed) the server would give again.
+const PASSING: ReadonlySet<string> = new Set(["network", "unavailable", "internal", "not_ready", "too_many"]);
+
+/** What the room's stream tells the asker. */
+interface Told {
+  verdict: (event: StreamEvent) => void;
+  since: (time: number) => void;
+  dead: () => void;
+}
+
+interface Following {
+  room: string;
+  /** Whose stream: an account's, or a guest's (none), for the rooms the server lets it read. */
+  reader: string | undefined;
+  /** The room's lines last shown, none before they load. */
+  lines: readonly Line[] | undefined;
+  /** When its stream began following, by the stream's own word (F890); none before it; after its end, all time. */
+  since: number | undefined;
+  stop: () => void;
+  /** The stream followed again, after its end. */
+  again: ReturnType<typeof setTimeout> | undefined;
+}
+
+// Asks the server of the lines in view said before the stream began (F884), once each while in view, VERDICTS_ASKED
+// a request; after a failure that may pass, rests, then asks the view last given again (F874).
+function serverAsker({ verdicts, judgedAll }: Pick<Asking, "verdicts" | "judgedAll">) {
+  const asked = new Map<string, Set<string>>();
+  // The view last given, asked again when a rest ends; the rest under way, during which nothing is asked.
+  let latest: { room: string; view: InView } | undefined;
+  let resting: ReturnType<typeof setTimeout> | undefined;
+  const rest = (ms: number) => {
+    // One rest at a time: a request failing later in it would otherwise ask again in the middle of the next one.
+    if (resting !== undefined) return;
+    resting = setTimeout(() => {
+      resting = undefined;
+      if (latest !== undefined) ask(latest.room, latest.view);
+    }, ms);
+  };
+  const send = (room: string, ids: readonly string[], mine: Set<string>) => {
+    const failed = (ms: number) => {
+      for (const id of ids) mine.delete(id);
+      rest(ms);
+    };
+    verdicts(room, ids).then(
+      (got) => {
+        if (got.ok) judgedAll(got.value.verdicts.map(({ msgid, state }) => ({ msgid, room, state })));
+        else if (PASSING.has(got.reason)) failed(got.reason === "too_many" ? BUSY_REST_MS : REST_MS);
+      },
+      () => {
+        failed(REST_MS);
+      },
+    );
+  };
+  // Asks the verdicts of the room's lines in view that the page neither holds nor has asked for.
+  const ask = (room: string, view: InView): void => {
+    latest = { room, view };
+    if (resting !== undefined) return;
+    const { lines, since } = view;
+    const mine = asked.get(room) ?? new Set<string>();
+    asked.set(room, mine);
+    // What was asked of a line gone from view is forgotten, so a long session holds no more than its view.
+    const shown = new Set(lines.map(({ id }) => id));
+    for (const id of mine) if (!shown.has(id)) mine.delete(id);
+    // A line already looked at is not read again while in view: only the new ones' Markdown (F1055).
+    const before = lines.filter(({ id, time }) => !mine.has(id) && Date.parse(time) < since);
+    // An id the route refuses (over 128 characters, a comma) would have it refuse the whole request, for good (F892).
+    const wanted = unjudged(before, view.held, mine).filter((id) => VerdictId.safeParse(id).success);
+    for (const { id } of before) mine.add(id);
+    for (let start = 0; start < wanted.length; start += VERDICTS_ASKED) {
+      send(room, wanted.slice(start, start + VERDICTS_ASKED), mine);
+    }
+  };
+  return {
+    ask,
+    /** Forgets what it asked of the room: each line not held is asked again when shown. */
+    forget: (room: string): void => {
+      asked.delete(room);
+    },
+    /** Asks nothing more: a rest under way, or one an answer still to come starts, ends with nothing asked. */
+    stop: (): void => {
+      latest = undefined;
+    },
+  };
+}
+
+export function verdictAsker({ verdicts, judged, judgedAll, held, follow }: Asking) {
+  const server = serverAsker({ verdicts, judgedAll });
+  let following: Following | undefined;
+  // The shown lines said before the stream's word are the server's to answer; before its word, nothing is asked.
+  const askShown = () => {
+    if (following?.lines === undefined || following.since === undefined) return;
+    server.ask(following.room, { lines: following.lines, held: held(following.room), since: following.since });
+  };
+  const unfollow = () => {
+    following?.stop();
+    clearTimeout(following?.again);
+    following = undefined;
+  };
+  const start = (room: string, reader: string | undefined, lines?: readonly Line[]): void => {
+    const mine: Following = { room, reader, lines, since: undefined, stop: () => undefined, again: undefined };
+    // The stream's word after its replay, on the server's clock, which Ergo's server-time shares (F890): never the
+    // page's, which may run ahead or behind. A reconnection's later word moves it, the replay having given the rest;
+    // after a gap, what was asked before is asked again, a line the server had no verdict of yet among it (F891).
+    const since = (time: number) => {
+      if (following !== mine) return;
+      if (mine.since !== undefined && time > mine.since) server.forget(room);
+      mine.since = time;
+      askShown();
+    };
+    // The browser gave the stream up (a 429, a restart's 502), and no verdict comes from it (F888): every line in
+    // view is the server's to answer, and the stream is followed again after the route's minute.
+    const dead = () => {
+      if (following !== mine) return;
+      mine.since = Number.POSITIVE_INFINITY;
+      askShown();
+      mine.again = setTimeout(() => {
+        if (following !== mine) return;
+        mine.stop();
+        start(room, reader, mine.lines);
+      }, BUSY_REST_MS);
+    };
+    // A new stream (a room, a reader, one followed again) asks of what it shows afresh (F891).
+    server.forget(room);
+    following = mine;
+    mine.stop = follow(room, { verdict: judged, since, dead });
+  };
+  return {
+    /** Follows the room's stream for its reader, the stream before stopped; then asks of its lines in view, once
+     * loaded and once the stream has said when it began. A new reader (a login) follows again: the server lets each
+     * read its own rooms. */
+    show: (room: string | undefined, lines: readonly Line[] | undefined, reader?: string): void => {
+      if (following === undefined ? room !== undefined : following.room !== room || following.reader !== reader) {
+        unfollow();
+        if (room !== undefined) start(room, reader);
+      }
+      if (following === undefined) return;
+      following.lines = lines;
+      askShown();
+    },
+    /** Follows and asks nothing more: a rest under way, or one an answer still to come starts, ends with nothing
+     * asked. */
+    stop: (): void => {
+      server.stop();
+      unfollow();
+    },
+  };
+}

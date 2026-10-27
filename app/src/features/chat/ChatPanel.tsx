@@ -3,9 +3,10 @@
 // (?room=<name>), else the world's main room, else the first listed, the one whose history the link asks. The
 // link lives as long as the page: leaving the world leaves Ergo. An account writes in the room through the link
 // (4c); a guest reads, a room letting accounts alone speak.
+import type { Line } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";
-import { Button, Sidebar, Stack } from "@gnoworld/ui";
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { Button, Stack } from "@gnoworld/ui";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { pageLoginApi } from "../../lib/api/login.ts";
 import { pageDmPrefs } from "../../lib/dms/page.ts";
@@ -13,122 +14,20 @@ import { pageDrafts } from "../../lib/drafts/page.ts";
 import { pageRoomsApi } from "../../lib/api/rooms.ts";
 import { drawGuestNick } from "../../lib/ergo/ergo.ts";
 import { pageErgo } from "../../lib/ergo/page.ts";
-import type { AppState } from "../../store/index.ts";
+import { savesData } from "../../lib/saveData.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
-import { useDms, type Dms } from "./Dms.tsx";
+import { useDms } from "./Dms.tsx";
 import { chatLink, type ChatLink } from "./link.ts";
+import { Loaded } from "./Loaded.tsx";
 import { LOADING } from "./Loading.tsx";
-import { dmParams, neighbour, roomIds, roomParams, roomsQuery, shownRoom } from "./names.ts";
+import { roomIds, roomsQuery, shownRoom } from "./names.ts";
 import { useOnHide } from "./reading.ts";
-import { roomActs } from "./roomActs.ts";
-import { RoomsView } from "./RoomsView.tsx";
-import { People, RoomView, type RoomViewProps } from "./RoomView.tsx";
-import { shownOf } from "./shown.tsx";
-import { Writer } from "./Writer.tsx";
+import { useVerdicts } from "./useVerdicts.ts";
 
 // The rooms as last asked, and what came: undefined when the list could not load.
 interface Asked {
   query: string;
   sections: RoomList["sections"] | undefined;
-}
-
-// Alt+Up and Alt+Down: the room before or after the one in view, anywhere on the page (ADR-0002's chat rows). A key
-// pressed before the page draws the room the last one went to starts from that room: the hook keeps it, and the room
-// in view, once drawn or chosen otherwise, sets it again.
-function useRoomKeys(rooms: readonly string[], current: string | undefined) {
-  const [, setParams] = useSearchParams();
-  const fromRef = useRef(current);
-  useLayoutEffect(() => {
-    fromRef.current = current;
-  }, [current]);
-  useEffect(() => {
-    const go = (event: globalThis.KeyboardEvent) => {
-      const step = { ArrowUp: -1, ArrowDown: 1 }[event.key];
-      const alone = event.altKey && !event.shiftKey && !event.ctrlKey && !event.metaKey;
-      const from = fromRef.current;
-      const next = alone && step !== undefined && from !== undefined ? neighbour(rooms, from, step) : undefined;
-      if (next === undefined) return;
-      event.preventDefault();
-      fromRef.current = next;
-      setParams(roomParams(next));
-    };
-    window.addEventListener("keydown", go);
-    return () => {
-      window.removeEventListener("keydown", go);
-    };
-  }, [rooms, setParams]);
-}
-
-// The conversation opened from who is here, whose composer takes the focus as its button goes (U12): asked while it is
-// in view, `partner` the one in view, never again once the reader left it (CR6).
-function useOpened(partner: string | undefined) {
-  const [opened, setOpened] = useState<{ partner: string; seen: boolean }>();
-  if (opened?.seen === false && partner === opened.partner) setOpened({ ...opened, seen: true });
-  if (opened?.seen === true && partner !== opened.partner) setOpened(undefined);
-  return {
-    focus: opened !== undefined && opened.partner === partner,
-    open: (other: string) => {
-      setOpened({ partner: other, seen: false });
-    },
-  };
-}
-
-// The world's rooms once listed: the switcher, the room in view and what writes in it.
-interface LoadedProps {
-  sections: RoomList["sections"];
-  current: string | undefined;
-  state: AppState["chat"]["rooms"][string] | undefined;
-  chat: RoomViewProps["chat"];
-  session: AppState["login"]["session"];
-  /** The page's link to Ergo, which says and deletes the room in view's lines (4c), tells the account's typing and
-   * marks the room read (4f). */
-  link: RefObject<ChatLink | undefined>;
-  /** The room's refused delete, said. */
-  dismissed: (room: string) => void;
-  /** Sends a draft to another account (4e). */
-  sayTo: (partner: string, draft: string) => boolean;
-  dms: Dms;
-  /** What says the rooms could not load, in their place, while a direct message shows (CR8). */
-  failed?: ReactNode;
-}
-
-function Loaded({ sections, current, state, chat, session, link, dismissed, sayTo, dms, failed }: LoadedProps) {
-  const ids = roomIds(sections);
-  // One conversation in view: the direct message ?dm= names, else the room. Alt+Up and Alt+Down move between rooms,
-  // none while a direct message is in view (U15).
-  const room = dms.partner === undefined && dms.problem === undefined ? current : undefined;
-  useRoomKeys(ids, room);
-  const acts = roomActs(link, room ?? "", dismissed);
-  const [, setParams] = useSearchParams();
-  const me = session.kind === "in" ? session.address : undefined;
-  const opened = useOpened(dms.partner);
-  const noteId = useId();
-  // Apart from the room's element, which each line draws again: who is here keeps its drawing (the compiler).
-  const onMessage = (other: string) => {
-    opened.open(other);
-    setParams(dmParams(other));
-  };
-  const people = (
-    <People members={state?.members ?? []} connected={chat === "connected"} me={me} onMessage={onMessage} />
-  );
-  const shown = shownOf(dms, { id: room, state, acts }, { sayTo, focus: opened.focus, noteId });
-  return (
-    <Sidebar space="l">
-      <RoomsView sections={sections} current={room} dms={dms.nav} failed={failed} />
-      {dms.problem === undefined ? null : <p role="status">{dms.problem}</p>}
-      {shown === undefined ? null : (
-        <RoomView
-          key={shown.key}
-          {...shown.view}
-          aside={shown.kind === "room" ? people : undefined}
-          chat={chat}
-          me={me}
-          noteId={noteId}
-          composer={<Writer session={session} rooms={ids} {...shown.writer} />}
-        />
-      )}
-    </Sidebar>
-  );
 }
 
 // What says the rooms could not load, and asks again.
@@ -151,22 +50,9 @@ const pageLink = (store: ReturnType<typeof useAppStore>) =>
     device: (account) => ({ prefs: pageDmPrefs(account), drafts: pageDrafts(account) }),
   });
 
-export function ChatPanel({ world }: { world: string }) {
-  const store = useAppStore();
-  // The page's link to Ergo, made once the page runs: never in the build's pre-render.
-  const linkRef = useRef<ChatLink>(undefined);
+// The rooms as the server lists them for `query`, asked again as it changes; none before the first answer.
+function useRoomsAsked(world: string, query: string | undefined) {
   const [asked, setAsked] = useState<Asked>();
-  const [attempt, setAttempt] = useState(0);
-  const [params] = useSearchParams();
-  const session = useApp(({ login }) => login.session);
-  const query = roomsQuery(world, session, attempt);
-  useEffect(() => {
-    const made = pageLink(store);
-    linkRef.current = made;
-    return () => {
-      made.stop();
-    };
-  }, [store]);
   useEffect(() => {
     if (query === undefined) return;
     let live = true;
@@ -188,7 +74,40 @@ export function ChatPanel({ world }: { world: string }) {
     };
   }, [world, query]);
   const loaded = query !== undefined && asked?.query === query;
-  const sections = loaded ? asked.sections : undefined;
+  return { loaded, sections: loaded ? asked.sections : undefined };
+}
+
+// The shown room's verdicts, which a link's player waits on, followed and asked for the reader; and whether the reader
+// saves data, read once the page runs: the players and the verdicts they wait on agree, whatever it says later.
+function useRoomVerdicts(
+  store: ReturnType<typeof useAppStore>,
+  room: string | undefined,
+  lines: readonly Line[] | undefined,
+) {
+  const session = useApp(({ login }) => login.session);
+  const [saving] = useState(savesData);
+  const reader = session.kind === "in" ? session.address : undefined;
+  useVerdicts(store, { room, lines, reader, saving });
+  const verdicts = useApp((app) => (room === undefined ? undefined : app.verdicts[room]));
+  return { saving, verdicts };
+}
+
+export function ChatPanel({ world }: { world: string }) {
+  const store = useAppStore();
+  // The page's link to Ergo, made once the page runs: never in the build's pre-render.
+  const linkRef = useRef<ChatLink>(undefined);
+  const [attempt, setAttempt] = useState(0);
+  const [params] = useSearchParams();
+  const session = useApp(({ login }) => login.session);
+  const query = roomsQuery(world, session, attempt);
+  useEffect(() => {
+    const made = pageLink(store);
+    linkRef.current = made;
+    return () => {
+      made.stop();
+    };
+  }, [store]);
+  const { loaded, sections } = useRoomsAsked(world, query);
   useEffect(() => {
     if (sections !== undefined) linkRef.current?.follow(roomIds(sections));
   }, [sections]);
@@ -203,6 +122,7 @@ export function ChatPanel({ world }: { world: string }) {
   }, [current]);
   const state = useApp((app) => (current === undefined ? undefined : app.chat.rooms[current]));
   const dms = useDms(world, session, params.get("dm"));
+  const { saving, verdicts } = useRoomVerdicts(store, current, state?.lines);
   const chat = useApp((app) => app.login.chat);
   if (!loaded) return LOADING;
   const failed =
@@ -220,6 +140,8 @@ export function ChatPanel({ world }: { world: string }) {
       sections={sections ?? []}
       current={current}
       state={state}
+      verdicts={verdicts}
+      saving={saving}
       chat={chat}
       session={session}
       link={linkRef}

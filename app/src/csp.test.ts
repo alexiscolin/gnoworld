@@ -11,6 +11,9 @@ const BASE = [
   "connect-src 'self'",
   "worker-src 'self'",
   "manifest-src 'self'",
+  // 4g: the accepted services' players, each on a click (docs/decisions.md, 2026-10-26), by their players' paths
+  // (F885); Imgur's not read yet.
+  "frame-src https://www.youtube-nocookie.com/embed/ https://player.vimeo.com/video/ https://giphy.com/embed/",
   "base-uri 'none'",
   "form-action 'self'",
   "frame-ancestors 'none'",

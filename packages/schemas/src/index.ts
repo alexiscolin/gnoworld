@@ -5,7 +5,7 @@ import { z } from "./zod.ts";
 export { ActivityRooms } from "./activity.ts";
 export { Address, ADDRESS_PROBLEMS, toAddress, type AddressProblem } from "./address.ts";
 export { CreateRoom, MadeRoom, RoomId, RoomList, RoomName, RoomType } from "./rooms.ts";
-export { StreamEvent } from "./stream.ts";
+export { LineVerdicts, StreamEvent, StreamSince, VerdictId, VERDICTS_ASKED } from "./stream.ts";
 export { Challenge, ChallengeRequest, Me, Nonce, Proof, Ticket, TicketRequest, VerifyRequest } from "./login.ts";
 
 // Every refusal and failure the server answers: a code a client can act on, never a stack or what it sent.

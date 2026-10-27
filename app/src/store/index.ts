@@ -4,8 +4,9 @@ import { createStore } from "zustand/vanilla";
 import { chatSlice, type ChatSlice } from "./chat.ts";
 import { dmSlice, type DmSlice } from "./dms.ts";
 import { loginSlice, type LoginSlice } from "./login.ts";
+import { verdictsSlice, type VerdictsSlice } from "./verdicts.ts";
 
-export type AppState = LoginSlice & ChatSlice & DmSlice;
+export type AppState = LoginSlice & ChatSlice & DmSlice & VerdictsSlice;
 
 /** A store of its own: the page makes one, each test another. */
 export const createAppStore = () =>
@@ -13,4 +14,5 @@ export const createAppStore = () =>
     ...loginSlice(...args),
     ...chatSlice(...args),
     ...dmSlice(...args),
+    ...verdictsSlice(...args),
   }));

@@ -5,6 +5,7 @@
 // A line's author is its account tag alone, a nick being only a nick; a member's nick is an account's when it is
 // an address, which a guest's cannot be (Ergo gives a guest 32 characters, server/src/testing/ergo.test.ts:314).
 import { typingAt, type Line, type Typing } from "@gnoworld/core";
+import type { StreamEvent } from "@gnoworld/schemas";
 import { Button, Cluster, Sidebar, Stack } from "@gnoworld/ui";
 import { Fragment, lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import type { ErgoState } from "../../lib/ergo/ergo.ts";
@@ -84,6 +85,10 @@ export interface RoomViewProps {
   empty?: string | undefined;
   /** Beside the lines: a room's who is here; a conversation, of two, has none (4e). */
   aside?: ReactNode;
+  /** The room's lines' verdicts, by msgid, from the server's stream (4g). */
+  verdicts?: Readonly<Record<string, StreamEvent["state"]>> | undefined;
+  /** Whether the reader saves data (ADR-0002 §8): then no player is offered, nor any verdict asked (4g, F893). */
+  saving?: boolean;
 }
 
 /** Who is here: counted once connected, the bot left out, the first MEMBERS_SHOWN named. */
@@ -187,6 +192,7 @@ function Header({ title, topic, id }: { title: ReactNode; topic: ReactNode; id: 
 
 export function RoomView(props: RoomViewProps) {
   const { room, title, note, noteId, state, chat, composer, me, onDelete, onDismiss, onRead, aside } = props;
+  const { verdicts, saving = false } = props;
   const { empty = "No messages yet." } = props;
   const { lines = [], members = [], refused, typing, read, paged } = state ?? {};
   const connected = chat === "connected";
@@ -211,6 +217,8 @@ export function RoomView(props: RoomViewProps) {
             read={read}
             paged={paged === true}
             onRead={onRead}
+            verdicts={verdicts}
+            saving={saving}
           />
           {connected && lines.length === 0 ? <p>{empty}</p> : null}
           {/* A room's, whose place is kept so the composer never moves; a direct message tells none (4e). */}

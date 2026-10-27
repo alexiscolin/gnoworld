@@ -73,6 +73,34 @@ beforeAll(async () => {
 });
 
 describe("RoomView", () => {
+  // 4g: a line's first link to an accepted service gets its player, waiting on the line's verdict; another host none.
+  it("puts a player under a line linking an accepted service, waiting on its verdict, and none under another", () => {
+    const lines = [
+      line({ id: "y", text: "watch https://youtu.be/dQw4w9WgXcQ" }),
+      line({ id: "i", text: "see https://imgur.com/gallery/abcdefg" }),
+    ];
+    const [youtube = "", imgur = ""] = items(part(view({ state: { ...ROOM, lines } }), "Messages"));
+    expect(youtube).toContain("Waiting for the moderation check");
+    expect(imgur).not.toContain("moderation check");
+    const checked = view({ state: { ...ROOM, lines }, verdicts: { y: "checked" } });
+    expect(said(part(checked, "Messages"))).toContain("Play the YouTube video");
+    const hidden = view({ state: { ...ROOM, lines }, verdicts: { y: "hidden" } });
+    expect(said(part(hidden, "Messages"))).not.toContain("YouTube");
+  });
+
+  // F875: each player reads its own line's verdict, not another line's.
+  it("gives each line's player its own line's verdict", () => {
+    const lines = ["a", "b", "c"].map((id) => line({ id, text: `${id}: https://youtu.be/dQw4w9WgXcQ` }));
+    const html = view({ state: { ...ROOM, lines }, verdicts: { a: "checked", b: "hidden" } });
+    const [checked = "", hidden = "", waiting = ""] = items(part(html, "Messages"));
+    expect(checked).toContain("Play the YouTube video");
+    expect(checked).not.toContain("Waiting");
+    expect(hidden).not.toContain("YouTube");
+    expect(hidden).not.toContain("Waiting");
+    expect(waiting).toContain("Waiting for the moderation check");
+    expect(waiting).not.toContain("Play the");
+  });
+
   it("names the room, its description right after, from its topic", () => {
     expect(view()).toMatch(/<h2[^>]*>#games<\/h2>\s*<p[^>]*>Bubbles here<\/p>/);
   });

@@ -8,3 +8,24 @@ export const StreamEvent = z.strictObject({
   state: z.enum(["checked", "hidden"]),
 });
 export type StreamEvent = z.infer<typeof StreamEvent>;
+
+/** The stream's word to each connection after its replay (4g, F890): the server's time as it began following, the
+ * clock Ergo's server-time shares (one host), so a page reads which lines the stream answers without its own. */
+export const StreamSince = z.strictObject({ time: z.iso.datetime() });
+export type StreamSince = z.infer<typeof StreamSince>;
+
+/** A line's msgid as GET /api/verdicts takes it: one word, no comma, at most 128 characters (CR4, F892). */
+export const VerdictId = StreamEvent.shape.msgid.regex(/^[^\s,\0]+$/);
+
+/** The lines a page asks GET /api/verdicts about at most, one request's worth. */
+export const VERDICTS_ASKED = 100;
+
+/** GET /api/verdicts's answer (slice 4's 4g; docs/decisions.md, 2026-10-26): the latest verdict of each line asked
+ * that holds one, for a history older than the stream's replay; a line unchecked, pending or unknown is absent. */
+export const LineVerdicts = z.strictObject({
+  room: StreamEvent.shape.room,
+  verdicts: z
+    .array(z.strictObject({ msgid: StreamEvent.shape.msgid, state: StreamEvent.shape.state }))
+    .max(VERDICTS_ASKED),
+});
+export type LineVerdicts = z.infer<typeof LineVerdicts>;

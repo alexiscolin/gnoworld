@@ -3,12 +3,27 @@
 // reader may not read (3m); bounded: 25 rooms a stream, 4 streams a visitor, a total, each room's last
 // events kept for a late client or one coming back.
 import { getConnInfo } from "@hono/node-server/conninfo";
-import type { ApiError, StreamEvent } from "@gnoworld/schemas";
+import type { ApiError, StreamEvent, StreamSince } from "@gnoworld/schemas";
 import { Hono, type Context } from "hono";
 import { getCookie } from "hono/cookie";
 import { streamSSE, type SSEStreamingApi } from "hono/streaming";
 import { z } from "zod";
 import { visitor } from "../visitor.ts";
+
+// A room's name as the stream and GET /api/verdicts take it: # and one word with no comma, 64 characters at most.
+const ROOM = String.raw`#[^\s,#\0-\x1f\x7f]{1,63}`;
+/** One room's name, as GET /api/verdicts takes it. */
+export const RoomName = z.string().regex(new RegExp(`^${ROOM}$`));
+
+/** A query parameter given exactly once, else none: one given twice is refused as one missing. */
+export const once = (values: readonly string[] | undefined): string | undefined =>
+  values?.length === 1 ? values[0] : undefined;
+
+/** A line's state on the stream from the bot's action on it: an unchecked or pending line has none. */
+export function stateOf(action: string): StreamEvent["state"] | undefined {
+  if (action === "pass") return "checked";
+  return action === "hide" ? "hidden" : undefined;
+}
 
 export interface Stream {
   publish: (event: StreamEvent) => void;
@@ -34,6 +49,7 @@ interface Options {
   heartbeatMs?: number;
   // Events a client may leave unread before it is dropped, and each room's last events kept.
   pending?: number;
+  now?: () => number;
 }
 
 interface Client {
@@ -56,6 +72,15 @@ function writeTo(client: Client, text: string, pending: number): void {
   client.stream.write(text).then(sent, sent);
 }
 
+// The time a connection began following (F890), taken in the same turn as it joins the clients, no event between: a
+// line said from then on has its verdict on this stream. Said after its replay, so the page asks the server only of lines the replay did not answer;
+// with no id, so a reconnection still names the last verdict; outside the unread count, which a full replay fills.
+function tellSince(stream: SSEStreamingApi, time: number): void {
+  const since: StreamSince = { time: new Date(time).toISOString() };
+  const done = (): void => undefined;
+  stream.write(`event: since\ndata: ${JSON.stringify(since)}\n\n`).then(done, done);
+}
+
 // The rooms a reader may see, by its session's account, read once at the start: live events and replay
 // alike (3m).
 function seenBy(c: Context, rooms: ReadonlySet<string>, { visible, session }: Seeing): Set<string> {
@@ -64,10 +89,10 @@ function seenBy(c: Context, rooms: ReadonlySet<string>, { visible, session }: Se
 }
 
 export function makeStream(options: Options = {}): Stream {
-  const { perVisitor = 4, total = 1000, heartbeatMs = 15_000, pending = 64 } = options;
+  const { perVisitor = 4, total = 1000, heartbeatMs = 15_000, pending = 64, now = Date.now } = options;
   const Rooms = z
     .string()
-    .regex(/^#[^\s,#\0-\x1f\x7f]{1,63}(?:,#[^\s,#\0-\x1f\x7f]{1,63}){0,24}$/)
+    .regex(new RegExp(`^${ROOM}(?:,${ROOM}){0,24}$`))
     .transform((list) => new Set(list.split(",")));
   const LastId = z
     .string()
@@ -104,8 +129,7 @@ export function makeStream(options: Options = {}): Stream {
     routes: ({ proxy, visible, session = () => undefined }) => {
       const app = new Hono();
       app.get("/", (c) => {
-        const asked = c.req.queries("rooms") ?? [];
-        const rooms = Rooms.safeParse(asked.length === 1 ? asked[0] : undefined);
+        const rooms = Rooms.safeParse(once(c.req.queries("rooms")));
         const last = LastId.safeParse(c.req.header("last-event-id"));
         if (!rooms.success || !last.success) return c.json({ error: "refused" } satisfies ApiError, 400);
         const who = visitor(getConnInfo(c).remote.address ?? "", c.req.header("x-real-ip"), proxy);
@@ -129,6 +153,7 @@ export function makeStream(options: Options = {}): Stream {
           const missed = [...client.rooms].flatMap((room) => rings.get(room) ?? []).filter(({ id }) => id > after);
           for (const { id, event } of missed.toSorted((a, b) => a.id - b.id).slice(-pending))
             write(client, frame(id, event));
+          tellSince(stream, now());
           // A comment line, which keeps a proxy from closing a quiet stream.
           const beat = setInterval(() => {
             write(client, ": beat\n\n");
