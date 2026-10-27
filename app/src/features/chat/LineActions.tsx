@@ -27,20 +27,45 @@ export interface LineActionsProps {
   onReply: () => void;
 }
 
-// An account's quick reactions, each pressed when the reader gave it, pressed again to take it back.
+// An account's quick reactions, each pressed when the reader gave it, pressed again to take it back. Wide, three chips;
+// narrow (the line's column under what the five controls need), one React menu of the same three, as the bar stands
+// on one row there (U1; LineActions.module.css).
 function QuickReactions({ given, onReact }: { given: ReadonlySet<string>; onReact: LineActionsProps["onReact"] }) {
-  return QUICK.map((emoji) => (
-    <Chip
-      key={emoji}
-      label={`React with ${emoji}`}
-      selected={given.has(emoji)}
-      onClick={() => {
-        onReact(emoji, !given.has(emoji));
-      }}
-    >
-      {emoji}
-    </Chip>
-  ));
+  const toggle = (emoji: string) => {
+    onReact(emoji, !given.has(emoji));
+  };
+  return (
+    <>
+      <span className={styles["quick"]}>
+        {QUICK.map((emoji) => (
+          <Chip
+            key={emoji}
+            label={`React with ${emoji}`}
+            selected={given.has(emoji)}
+            onClick={() => {
+              toggle(emoji);
+            }}
+          >
+            {emoji}
+          </Chip>
+        ))}
+      </span>
+      <span className={styles["react"]}>
+        <Menu
+          trigger="React"
+          icon="smile"
+          emphasis="plain"
+          label="Reactions"
+          items={QUICK.map((emoji) => ({
+            label: `${given.has(emoji) ? "Take back" : "React with"} ${emoji}`,
+            onSelect: () => {
+              toggle(emoji);
+            },
+          }))}
+        />
+      </span>
+    </>
+  );
 }
 
 /** The bar of a line pointed at or focused, out of the list's live announcements: its More menu, and the dialog
@@ -60,7 +85,7 @@ export function LineActions({ line, room, me, onCopy, onDelete, reactions, onRea
     if (asking || after === undefined) return;
     afterRef.current = undefined;
     if (after === "delete" && onDelete(line.id)) return;
-    barRef.current?.querySelector<HTMLElement>("[aria-haspopup='menu']")?.focus();
+    barRef.current?.querySelector<HTMLElement>("[aria-haspopup='menu'][aria-label='More']")?.focus();
   }, [asking, onDelete, line.id]);
   const close = (after: "back" | "delete") => {
     afterRef.current = after;

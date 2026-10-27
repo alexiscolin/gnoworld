@@ -12,6 +12,8 @@
   .lines > li {
     /* layout: the line holds its bar (LineActions), placed over its end */
     position: relative;
+    /* The bar asks the line's own width, not the page's (LineActions). */
+    container-type: inline-size;
     padding-block: var(--space-3xs);
     overflow-wrap: anywhere;
   }
