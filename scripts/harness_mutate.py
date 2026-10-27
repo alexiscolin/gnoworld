@@ -264,6 +264,9 @@ def mutants():
     yield from each(mig, '"${" in texts[0] or ', "", "hooks", "check_migrations refuses a migration built from a value")
     yield from each(mig, ' or "\\\\" in texts[0]', "", "hooks", "check_migrations refuses a migration with an escape")
     yield from each(mig, '.returncode != 0:\n    sys.exit(f"check_migrations: {base} is no commit")', '.returncode == 2:\n    sys.exit(f"check_migrations: {base} is no commit")', "hooks", "check_migrations wants a base that is a commit")
+    yield from each("scripts/harness_mutate.py", "    shards = min(shards, len(found))\n", "", "hooks", "harness_mutate makes no more worktrees than it has mutants (CR9)")
+    yield from each("scripts/harness_mutate.py", "    suites = [test for test in TESTS if any(m[3] == test for m in found)]\n", "    suites = list(TESTS)\n", "hooks", "harness_mutate controls only the suites its mutants run (C4)")
+    yield from each("scripts/harness_mutate.py", 'trees = [stack.enter_context(worktree("HEAD"))]', 'trees = [stack.enter_context(worktree("HEAD")) for _ in range(shards)]', "hooks", "harness_mutate makes its other worktrees once a mutant is selected (CR9)")
     yield from each("scripts/harness_mutate.py", "        if mutated is None:\n", "        if False:\n", "hooks", "harness_mutate --dry sees a stale mutant")
     yield from each("scripts/harness_mutate.py", "        if unknown:\n", "        if False:\n", "hooks", "harness_mutate --dry sees a section its suite lacks")
     yield from each("scripts/harness_mutate.py", '    WORKTREE = "."\n    checked()\n', '    WORKTREE = "."\n', "hooks", "harness_mutate --dry checks the mutants")
@@ -275,11 +278,11 @@ def mutants():
     yield from each(hm, 'SUITE_OF = {"hooks": "scripts/test_hooks.sh' '", ', 'SUITE_OF = {', "hooks", "harness_mutate --changed reads both suites' changed sections (G5)")
     yield from each(hm, "    if diff.returncode != 0:\n", "    if False:\n", "hooks", "harness_mutate --changed wants a base git can compare with")
     yield from each(hm, "killed = verdicts[i % " "shards][i // shards]", "killed = verdicts[0][0]", "hooks", "harness_mutate reads each mutant's own verdict")
-    yield from each(hm, "worktree(\"HEAD\")) for _ in range(shards)]", "worktree(\"HEAD\")) for _ in range(1)]", "hooks", "harness_mutate makes a worktree a shard")
+    yield from each(hm, "worktree(\"HEAD\")) for _ in range(shards - 1)]", "worktree(\"HEAD\")) for _ in range(0)]", "hooks", "harness_mutate makes a worktree a shard")
     yield from each(hm, "ThreadPoolExecutor(" "shards) as pool", "ThreadPoolExecutor(1) as pool", "hooks", "harness_mutate's shards run side by side")
     yield from each(hm, "    finally:\n        with open(target, \"w\") as f:\n            f.write(original)\n", "    finally:\n        pass\n", "hooks", "harness_mutate puts each mutant's file back")
     yield from each(hm, "            if code " "!= 0:\n", "            if False:\n", "hooks", "harness_mutate stops on a failed control")
-    yield from each(hm, "lambda c: run(*c), [(tr, te) for tr in " "trees ", "lambda c: run(*c), [(tr, te) for tr in trees[:1] ", "hooks", "harness_mutate's control runs in every tree")
+    yield from each(hm, "lambda c: run(*c), controls)", "lambda c: run(*c), controls[:1])", "hooks", "harness_mutate's control runs in every tree")
     yield from each(hm, "        since = last_reviewed" "(base)\n", "        since = base\n", "hooks", "harness_mutate --changed judges the guard files changed since the last /pre-merge pass, not since base")
     yield from each(hm, "    except (OSError, ValueError)" " as e:", "    except ZeroDivisionError as e:", "hooks", "harness_mutate --changed refuses a passes file it cannot read, never judging fewer mutants")
     yield from each(hm, "    except (OSError, ValueError)" " as e:", "    except OSError as e:", "hooks", "harness_mutate --changed refuses a passes file that is malformed or no UTF-8, with a message (F1432)")
@@ -877,7 +880,7 @@ elif sys.argv[1:]:
 shards = max(1, int(os.environ.get("HARNESS_SHARDS", "4")))
 failures = []
 with contextlib.ExitStack() as stack:
-    trees = [stack.enter_context(worktree("HEAD")) for _ in range(shards)]
+    trees = [stack.enter_context(worktree("HEAD"))]  # one tree to build and select with: the others only if a mutant is left (CR9)
     WORKTREE = trees[0]
     found = checked()
     if changed is not None and SELF in changed:
@@ -892,9 +895,14 @@ with contextlib.ExitStack() as stack:
             sys.exit("harness_mutate: no mutant to judge: every mutant is gone from this script")
         print("harness_mutate: no mutant to judge")
         sys.exit(0)
-    with concurrent.futures.ThreadPoolExecutor(shards * len(TESTS)) as pool:
+    # No more trees than mutants, and a control only of the suites they run: one mutant took 4 trees and 8 suite runs (C4).
+    shards = min(shards, len(found))
+    trees += [stack.enter_context(worktree("HEAD")) for _ in range(shards - 1)]
+    suites = [test for test in TESTS if any(m[3] == test for m in found)]
+    controls = [(tr, te) for tr in trees for te in suites]
+    with concurrent.futures.ThreadPoolExecutor(len(controls)) as pool:
         # The control: an untouched copy passes, so a failure means the mutant.
-        for (tree, test), code in zip([(tr, te) for tr in trees for te in TESTS], pool.map(lambda c: run(*c), [(tr, te) for tr in trees for te in TESTS])):
+        for (tree, test), code in zip(controls, pool.map(lambda c: run(*c), controls)):
             if code != 0:
                 sys.exit(f"harness_mutate: {test} fails on the untouched copy {tree}; fix that first")
     # Each shard judges every shards-th mutant, one at a time in its own worktree; the verdicts come back in order.

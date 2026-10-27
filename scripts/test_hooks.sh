@@ -608,7 +608,7 @@ printf '%s\n' 'part() { case ",$ONLY," in *",$1,"*) return 0 ;; *) return 1 ;; e
 	'	grep -q KEEP1 g.txt && grep -q KEEP2 g.txt && grep -q KEEP3 g.txt && grep -q KEEP4 h.txt && grep -q KEEP5 i.txt && grep -q KEEP8 "$(printf "\303\251").txt"' \
 	'fi' >"$hs/src/scripts/test_hooks.sh"
 # probe.py's block y reads k.txt (a mutant of k.txt is a probe block's, G5); ONLY names the blocks to run, none for all.
-printf 'import os, sys\n\n\ndef part(name):\n    return name in os.environ.get("ONLY", "").split(",")\n\n\nif part("y"):\n    if "KEEP7" not in open("k.txt").read():\n        sys.exit(1)\nsys.exit(os.path.exists("BROKEN_probe"))\n' >"$hs/src/scripts/probe.py"
+printf 'import os, sys\n\n\ndef part(name):\n    return name in os.environ.get("ONLY", "").split(",")\n\n\nif part("y"):\n    if "KEEP7" not in open("k.txt").read():\n        sys.exit(1)\nif not os.environ.get("ONLY"):\n    open(os.environ["SHARD_ROOT"] + "/probe_controls", "a").write(".\\n")\nsys.exit(os.path.exists("BROKEN_probe"))\n' >"$hs/src/scripts/probe.py"
 printf 'KEEP1 KEEP2 KEEP3 SPARE\n' >"$hs/src/g.txt" && printf 'KEEP4 SPARE2\n' >"$hs/src/h.txt" && printf 'KEEP5\n' >"$hs/src/i.txt" && printf 'KEEP7\n' >"$hs/src/k.txt" && ac=$(printf '\303\251').txt && printf 'KEEP8\n' >"$hs/src/$ac"
 cp "$here/harness_mutate.py" "$here/suite_parts.py" "$hs/repo/"
 # The worktrees: copies, logged when made and when removed; BREAK_SECOND=<suite> breaks the second one. Beside
@@ -670,7 +670,7 @@ cp "$hs/src/g.txt" "$hs/src/h.txt" "$hs/src/i.txt" "$hs/src/k.txt" "$hs/src/$ac"
 git -C "$hs/repo" init -q && git -C "$hs/repo" add -A && git -C "$hs/repo" commit -qm x
 shards() { # $1: the shards; then harness_mutate's arguments
 	n=$1 && shift
-	rm -f "$hs/made" "$hs/removed" "$hs/ran" "$hs/controls" "$hs/lonely" "$hs"/met.*
+	rm -f "$hs/made" "$hs/removed" "$hs/ran" "$hs/controls" "$hs/probe_controls" "$hs/lonely" "$hs"/met.*
 	(cd "${HR:-$hs/repo}" && SHARD_ROOT="$hs" SHARD_SRC="$hs/src" HARNESS_SHARDS=$n python3 -I harness_mutate.py "$@" 2>&1)
 }
 count() { [ -e "$hs/$1" ] && wc -l <"$hs/$1" | tr -d ' ' || echo 0; }
@@ -693,7 +693,7 @@ out=$(shards 0) && fail "harness_mutate passed with surviving mutants on one sha
 [ "$(count made)" = 1 ] || fail "harness_mutate made $(count made) worktrees for HARNESS_SHARDS=0"
 # The control: a suite failing on any untouched tree stops the run before any verdict, its trees removed.
 for suite in hooks probe; do
-	out=$(BREAK_SECOND=$suite shards 3) && fail "harness_mutate passed with $suite failing on an untouched tree"
+	out=$(PROBED=1 BREAK_SECOND=$suite shards 3) && fail "harness_mutate passed with $suite failing on an untouched tree"
 	printf '%s\n' "$out" | grep -q "fails on the untouched copy" || fail "harness_mutate did not stop on $suite failing on an untouched tree: $out"
 	[ "$(verdicts "$out")" = 0 ] || fail "harness_mutate judged mutants after a failed control: $out"
 	[ "$(count removed)" = "$(count made)" ] || fail "harness_mutate left worktrees behind after a failed control"
@@ -705,6 +705,10 @@ out=$(shards 2 --changed "$base") || fail "harness_mutate --changed failed on th
 printf '%s\n' "$out" | grep -q "killed: planted keep5 #1$" || fail "harness_mutate --changed skipped the changed file's mutant: $out"
 [ "$(verdicts "$out")" = 1 ] || fail "harness_mutate --changed judged a mutant of a file that did not change: $out"
 printf '%s\n' "$out" | grep -q "1 of 7 mutants" || fail "harness_mutate --changed did not say how many it kept: $out"
+# One mutant to judge needs one tree, and the control of the one suite it belongs to: no more worktrees than mutants, no
+# control of a suite none of the mutants runs (CR9, C4; 4 trees and 8 suite runs took 601 s at load 30 to 50 for one mutant).
+[ "$(count made)" = 1 ] || fail "harness_mutate made $(count made) worktrees for 1 mutant and 2 shards: $out"
+[ "$(count controls)" = 1 ] && [ "$(count probe_controls)" = 0 ] || fail "harness_mutate ran $(count controls) hooks and $(count probe_controls) probe controls for one hooks mutant"
 # A survivor among the changed files fails the run.
 printf 'KEEP4 SPARE2 changed\n' >"$hs/repo/h.txt" && git -C "$hs/repo" commit -qam h
 out=$(shards 2 --changed "$base") && fail "harness_mutate --changed passed with a survivor: $out"
@@ -745,7 +749,8 @@ out=$(shards 2 --changed "$base") && fail "harness_mutate --changed passed with 
 # Nothing changed since the pass, so no mutant to judge: it says so and runs no control either.
 out=$(shards 2 --changed "$(git -C "$hs/repo" rev-parse HEAD)") || fail "harness_mutate --changed failed with no mutant to judge: $out"
 printf '%s\n' "$out" | grep -q "0 of 7 mutants" || fail "harness_mutate --changed did not say it kept none: $out"
-[ ! -e "$hs/controls" ] || fail "harness_mutate --changed ran a control for no mutant: $out"
+[ ! -e "$hs/controls" ] && [ ! -e "$hs/probe_controls" ] || fail "harness_mutate --changed ran a control for no mutant: $out"
+[ "$(count made)" = 1 ] || fail "harness_mutate --changed made $(count made) worktrees for no mutant to judge, two shards asked: $out"
 # The pass's record, on scratch clones of the first commit (F1430 to F1434): a record names a tree, not a commit,
 # so the commit before it and its own both match; only the newest counts, and what changed after it is judged.
 HR=$hs/r2 && git clone -q "$hs/repo" "$HR" && C0=$(git -C "$HR" rev-list --max-parents=0 HEAD) && main_b=$(git -C "$HR" branch --show-current)
