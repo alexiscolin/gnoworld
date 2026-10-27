@@ -9,6 +9,9 @@ import { logIn, login, talk, ticketOf, type Step } from "./irc.ts";
 // writes over a raw socket: its login, then its message.
 const NOT_ENCRYPTED = "Not encrypted: the server can read these.";
 const dmsNav = (page: Page) => page.getByRole("navigation", { name: "Rooms" });
+// A conversation's row, by its own subtitle: the Notifications list above it links to the same page (4f-n).
+const rowOf = (page: Page, address: string) =>
+  dmsNav(page).getByRole("link", { name: `${short(address)} Not encrypted` });
 
 // Another account, in a browser of its own (the sandbox's Chromium runs one process, one context): its address, and
 // its page to talk from.
@@ -46,7 +49,7 @@ test.describe("direct messages", () => {
     const bob = await another({ playwright, launchOptions }, word("bob"));
     const text = word("hello");
     await dmFrom(bob, me, text);
-    const link = dmsNav(page).getByRole("link", { name: short(bob.address) });
+    const link = rowOf(page, bob.address);
     await expect(link).toBeVisible();
     // U6: the row says it is not encrypted; U7: the page says it is a direct message, the address whole in its title.
     await expect(link).toHaveAccessibleName(`${short(bob.address)} Not encrypted`);
@@ -89,11 +92,11 @@ test.describe("direct messages", () => {
     await expect(page).toHaveURL(new RegExp(`dm=${bob.address}`));
     // Mine, and delivered: Bob's page lists the conversation with me (T10: the journey compared two setup values).
     await expect(lines(page).filter({ hasText: text }).getByTitle(me)).toBeVisible();
-    await expect(dmsNav(bob.page).getByRole("link", { name: short(me) })).toBeVisible();
+    await expect(rowOf(bob.page, me)).toBeVisible();
     // /code-review (CR6): the focus asked once, not each time the conversation comes back in view.
     await dmsNav(page).getByRole("link", { name: "#games" }).click();
     await expect(page.getByRole("heading", { name: "#games" })).toBeVisible();
-    const row = dmsNav(page).getByRole("link", { name: new RegExp(short(bob.address)) });
+    const row = rowOf(page, bob.address);
     await row.click();
     await expect(field).toBeVisible();
     await expect(row).toBeFocused();
@@ -137,9 +140,7 @@ test.describe("direct messages", () => {
     await bob.page.goto("/w/bubble?room=games");
     await expect(whoIsHere(page).getByTitle(bob.address)).toBeVisible();
     await dmFrom(bob, me, word("first"));
-    await dmsNav(page)
-      .getByRole("link", { name: short(bob.address) })
-      .click();
+    await rowOf(page, bob.address).click();
     const field = page.getByRole("textbox", { name: `Message ${short(bob.address)}` });
     await field.fill("hi bob");
     await field.press("Enter");
@@ -152,14 +153,14 @@ test.describe("direct messages", () => {
     await dmFrom(carol, me, word("stranger"));
     await dmFrom(bob, me, word("known"));
     await expect(lines(page).filter({ hasText: "known" })).toHaveCount(1);
-    await expect(dmsNav(page).getByRole("link", { name: short(carol.address) })).toHaveCount(0);
+    await expect(rowOf(page, carol.address)).toHaveCount(0);
     // Refused means discarded (decision B): hearing everyone again shows nothing that came while it was on.
     await dmsNav(page).getByRole("button", { name: "Only people I wrote to" }).click();
     await expect(dmsNav(page).getByRole("button", { name: "Only people I wrote to" })).toHaveAttribute(
       "aria-pressed",
       "false",
     );
-    await expect(dmsNav(page).getByRole("link", { name: short(carol.address) })).toHaveCount(0);
+    await expect(rowOf(page, carol.address)).toHaveCount(0);
     await Promise.all([bob.close(), carol.close()]);
   });
 
