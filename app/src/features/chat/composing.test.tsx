@@ -137,6 +137,26 @@ describe("useComposing", () => {
     expect(now().view.onEdit).toBeUndefined();
   });
 
+  // /code-review on 4d's DM bar (CR7): Reply asked during an edit was stored and hidden by the writer, then came back
+  // over the next composer, on a line the reader may have forgotten.
+  it("ends an edit when a reply is asked, and sends the answer without the correction", () => {
+    draw();
+    act(() => now().view.onEdit?.("m1"));
+    act(() => now().view.onReply?.("m2"));
+    expect(now().writer.editing).toBeUndefined();
+    expect(now().writer.replying?.id).toBe("m2");
+    act(() => {
+      now().writer.onSay?.("an answer");
+    });
+    expect(say).toHaveBeenCalledExactlyOnceWith("an answer", { reply: "m2" });
+  });
+
+  it("asks nothing of the focus when a reply is asked with no edit open", () => {
+    draw();
+    act(() => now().view.onReply?.("m2"));
+    expect(now().writer.focus).toBeUndefined();
+  });
+
   // /code-review on 4d's DM bar (CR5): a line with `edits` set is an orphan correction, whose original left the window:
   // a correction of it would name a line nothing folds into, and show as a new one.
   it("offers no edit of an orphan correction", () => {
