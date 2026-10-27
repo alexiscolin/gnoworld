@@ -180,6 +180,17 @@ def mutants():
     # pictures.spec.ts wait for records.sh to list it (agent-hb/records_pictures.py).
     yield from each("app/playwright.stories.config.ts", "-o ${out} --quiet", "-o ../packages/ui/storybook-static --quiet", "probe", "the stories' Storybook is built where STORIES_OUT says")
     yield from each("app/playwright.stories.config.ts", "if (!Number.isInteger(port) || port < 1024 || port > 65535)", "if (false)", "probe", "the stories' config refuses a port that is no port")
+    # The folder Storybook deletes before it builds (security-S6): the default or a plain absolute folder inside the temporary one.
+    for find, replace, label in (
+        ("out !== DEFAULT_OUT &&", "false &&", "is checked at all"),
+        ('inTmp === "" ||', "", "is not the temporary folder itself"),
+        ('inTmp === ".." ||', "", "is not the folder above the temporary one"),
+        ("inTmp.startsWith(`..${sep}`)", "false", "is not out of the temporary folder"),
+        ("!/^\\/[", "!/^[", "is absolute"),
+        ("[\\w@%+=:,./-]", "[\\w@%+=:,./ -]", "has no space"),
+        ("[\\w@%+=:,./-]", "[\\w@%+=:,./;-]", "has no shell character"),
+    ):
+        yield from each("app/playwright.stories.config.ts", find, replace, "probe", f"the stories' config refuses a STORIES_OUT that is not safe to delete: it {label} (security-S6)")
     yield from each("server/src/testing/toolchain.test.ts", "expect(process.version).toBe(pinnedNode());", "expect(process.version).toBeTruthy();", "probe", "the toolchain test holds a run to the pinned Node")
     yield from each("server/src/testing/toolchain.ts", ".trim()", "", "probe", "the pinned Node is read without its newline")
     # The app's folders (F378): each name of the network and storage, each owner, each folder's path,

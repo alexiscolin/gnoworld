@@ -1,3 +1,5 @@
+import { tmpdir } from "node:os";
+import { relative, resolve, sep } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
 const sandboxed = Boolean(process.env["SANDBOX_RUNTIME"]);
@@ -7,7 +9,19 @@ if (!Number.isInteger(port) || port < 1024 || port > 65535)
   throw new Error(`STORIES_PORT is no port: ${String(process.env["STORIES_PORT"])}`);
 // Where Storybook is built: the design system's folder, or the one check.sh gives the fast gate, whose copy outside a
 // repository would read a build left in the tree (jscpd, knip) while the lane that builds it runs beside theirs.
-const out = process.env["STORIES_OUT"] ?? "../packages/ui/storybook-static";
+const DEFAULT_OUT = "../packages/ui/storybook-static";
+const out = process.env["STORIES_OUT"] ?? DEFAULT_OUT;
+// Storybook deletes that folder before it builds (`rm(outputDir, { recursive: true, force: true })`), and the command below
+// is a shell's: so any other value than the default is a plain absolute path strictly inside the temporary folder, which
+// a variable left set in some other shell cannot turn onto a folder worth keeping (security-S6).
+const inTmp = relative(resolve(tmpdir()), resolve(out));
+if (
+  out !== DEFAULT_OUT &&
+  (!/^\/[\w@%+=:,./-]+$/.test(out) || inTmp === "" || inTmp === ".." || inTmp.startsWith(`..${sep}`))
+)
+  throw new Error(
+    `STORIES_OUT must be a plain absolute folder inside ${tmpdir()}, which Storybook deletes before it builds: ${out}`,
+  );
 
 // The design system's stories in a browser (tests/stories): Storybook built before every run, so no
 // test reads an old build, then served as files. The full gate runs it; the fast one stays under 60 s.

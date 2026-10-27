@@ -276,6 +276,19 @@ try:
             expect(out.returncode != 0 and "a story whose id starts with" in out.stdout + out.stderr, "a prefix no story has fails, comparing nothing")
             out = pictures("tokens--", STORIES_PORT="abc")
             expect(out.returncode != 0 and "STORIES_PORT is no port" in out.stdout + out.stderr, "a port that is no port is refused")
+            # Storybook deletes its output folder before it builds (storybook/dist/core-server/index.js, `rm(outputDir, { recursive,
+            # force })`), so a STORIES_OUT that is not a folder inside the temporary folder is refused before any build (security-S6).
+            # Every value here is harmless even with the guard off: the folder of a TMPDIR of the copy's own, a relative one, one
+            # out of the system's, or with a space or a shell character in it, never the real temporary folder or /.
+            fake = os.path.join(tree, "fake-tmp")
+            os.makedirs(fake)
+            for what, where, tmp in (("the temporary folder itself", fake, fake), ("the folder above the temporary one", f"{fake}/..", fake),
+                                     ("a folder out of the temporary one by `..`", f"{fake}/../escaped", fake),
+                                     ("a relative folder, which would sit inside it", "storybook-out", os.path.realpath(tree)),
+                                     ("a folder out of the temporary one", "/elsewhere/storybook", fake),
+                                     ("a folder with a space", f"{fake}/a b", fake), ("a folder with a shell character", f"{fake}/x;true", fake)):
+                out = pictures("tokens--", STORIES_OUT=where, TMPDIR=tmp)
+                expect(out.returncode != 0 and "STORIES_OUT must be" in out.stdout + out.stderr, f"STORIES_OUT as {what} is refused before Storybook deletes it")
             # The tools missing: never a pass on nothing. No browser where Playwright looks (tokens.css as approved); then,
             # once tokens.css is as approved again, no Storybook to build.
             out = pictures("tokens--", PLAYWRIGHT_BROWSERS_PATH=os.path.join(tree, "no-browsers"))
