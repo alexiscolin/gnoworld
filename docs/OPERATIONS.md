@@ -236,6 +236,12 @@ Slice 3, the mute and the edits (3k):
   lifted early to make room (Ergo's list holds 100: 3b). The roles file's team and trusted are never
   muted, their lines still hidden.
 - **A line too fast** is the 21st of an account in a minute of Ergo's time: hidden, and a strike.
+- **A message of several lines the bot cannot hold whole** (a part holding a CTCP's mark, or from another
+  sender; more than 40 parts; a 17th open at once on its connection) is hidden as `unreadable` by the id of
+  its opening line, before any rule or provider, and is a strike (G1, G5 of slice 4's green pass). Ergo
+  relays and keeps such a batch first (its +C refuses only a part that starts with a CTCP's mark): a
+  reader with draft/multiline sees none of it, a later one finds none in the history, but a client without
+  the capability got the parts as lines, the id on the first alone, so its REDACT hides that first line only.
 - **What the mutes table keeps:** a muted account's address in clear, its world and its end, while
   the mute lasts; the extban names it.
 - **Known limits.** A mute is evaded with a new address (decision 144). A mute lifts within 10 s of its
