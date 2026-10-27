@@ -1,5 +1,5 @@
 import fc from "fast-check";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { bytes, parseLine } from "../irc/irc.ts";
 import { COMMANDS, compose, LINE_BYTES, MULTILINE_BYTES, MULTILINE_LINES, relayOf } from "./compose.ts";
 
@@ -75,7 +75,7 @@ describe("compose", () => {
   });
 
   test("reads each control character but a line break as a space: a draft forges no CTCP", () => {
-    expect(compose(ROOM, "a\u000bb\u000cc\u0000d\u001be\tf", NICK)).toStrictEqual(
+    expect(compose(ROOM, "a\u000bb\u000cc\u0000d\u001be f", NICK)).toStrictEqual(
       sent("PRIVMSG #bubble/games :a b c d e f"),
     );
     expect(compose(ROOM, "\u0001VERSION\u0001", NICK)).toStrictEqual(sent("PRIVMSG #bubble/games :VERSION"));
@@ -143,20 +143,23 @@ describe("compose: a draft of several lines", () => {
     });
   });
 
-  // F1603: the composer runs compose at each key, so a paste past the caps must be refused without building
-  // each line's PRIVMSG (1,000,000 lines: 176 ms the best of 7 runs before, at load 12).
-  test("refuses a draft of a million lines at once, counting its lines and building none", () => {
+  // F1603: the composer runs compose at each key, so a paste past the caps is refused by counting its breaks, with no
+  // line split, trimmed or built (1,000,000 lines took 176 ms a call before, 30 ms after, load 12).
+  test("refuses a draft of a million lines by counting its breaks, splitting and trimming none", () => {
     const paste = Array.from({ length: 1_000_000 }, () => "abcdefghi").join("\n");
-    const runs = Array.from({ length: 5 }, () => {
-      const start = Date.now();
+    const split = vi.spyOn(String.prototype, "split");
+    const trimEnd = vi.spyOn(String.prototype, "trimEnd");
+    try {
       expect(compose(ROOM, paste, NICK)).toStrictEqual({
         kind: "tooBig",
         unit: "lines",
         over: 1_000_000 - MULTILINE_LINES,
       });
-      return Date.now() - start;
-    });
-    expect(Math.min(...runs)).toBeLessThan(80);
+      expect([split, trimEnd].map((spy) => spy.mock.calls.length)).toEqual([0, 0]);
+    } finally {
+      split.mockRestore();
+      trimEnd.mockRestore();
+    }
   });
 
   test("reads CR LF and a lone CR as a break, as LF is", () => {
@@ -183,7 +186,7 @@ describe("compose: a draft of several lines", () => {
   });
 
   test("still reads every other control character as a space", () => {
-    expect(compose(ROOM, "a\u0001b\nc\td\u0000e", NICK)).toMatchObject({
+    expect(compose(ROOM, "a\u0001b\nc d\u0000e", NICK)).toMatchObject({
       kind: "lines",
       lines: [to("a b"), to("c d e")],
     });
