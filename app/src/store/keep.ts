@@ -2,7 +2,7 @@
 // on its device, the lines it saved and, for each room, the reading place it asked to go back to. Read once at a
 // session's start (lib/keep), changed from the device's own state at each change, so another tab's saves are not
 // written over (R10), and never written over a device that could not be read.
-import { placeBefore, type Line } from "@gnoworld/core";
+import { lineOf, placeBefore, type IrcMessage, type Line } from "@gnoworld/core";
 import { RoomId } from "@gnoworld/schemas";
 import type { StateCreator } from "zustand/vanilla";
 import { asSaved, SAVED_KEPT, UNREAD_KEPT, type Keep, type SavedLine } from "../lib/keep/keep.ts";
@@ -30,11 +30,23 @@ export interface KeepSlice {
     markUnread: (room: string, line: Line) => void;
     /** The reader read to the end of a room opened with its place: it is forgotten. */
     readThrough: (room: string) => void;
+    /** One live line from Ergo: a REDACT of a saved line unsaves it, and its author's edit replaces its words (an edit
+     * that leaves no plain message unsaves it); any other line changes nothing. */
+    heard: (message: IrcMessage) => void;
   };
 }
 
 const EMPTY: Kept = { saved: [], unread: {}, notKept: false };
 const sameLine = (room: string, id: string) => (line: SavedLine) => line.room !== room || line.id !== id;
+
+// The saved lines once an edit is heard: the line it corrects, when the same account wrote both, takes its words, or
+// goes if they are no plain message.
+const correctedBy = (saved: readonly SavedLine[], room: string, edit: Line): SavedLine[] =>
+  saved.flatMap((old) =>
+    old.room === room && old.id === edit.edits && old.account !== undefined && old.account === edit.account
+      ? (asSaved(room, { ...old, account: old.account, text: edit.text, kind: edit.kind }) ?? [])
+      : old,
+  );
 
 export const keepSlice: StateCreator<KeepSlice> = (set, get) => {
   // The session's device, none for a guest; whether it was read whole at the start, which alone it is written after.
@@ -105,6 +117,16 @@ export const keepSlice: StateCreator<KeepSlice> = (set, get) => {
       readThrough: (room) => {
         const { unread, readable } = fresh();
         commitUnread(without(unread, room), readable);
+      },
+      heard: (message) => {
+        const [room = "", id = ""] = message.params;
+        const { saved, readable } = fresh();
+        if (message.command === "REDACT") {
+          commitSaved(saved.filter(sameLine(room, id)), readable);
+          return;
+        }
+        const edit = lineOf(message, room);
+        if (edit?.edits !== undefined) commitSaved(correctedBy(saved, room, edit), readable);
       },
     },
   };

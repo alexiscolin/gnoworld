@@ -50,7 +50,7 @@ function setup() {
     if (!parsed.ok) throw new Error(`the test's line does not parse: ${text}`);
     connections.at(-1)?.onLine(parsed.message);
   };
-  return { store, link, asked, line, ...store.getState().loginActions };
+  return { store, link, asked, line, device: () => keep(() => storage, ALICE), ...store.getState().loginActions };
 }
 
 describe("the chat's link and what an account keeps on its device", () => {
@@ -103,5 +103,41 @@ describe("the chat's link and what an account keeps on its device", () => {
     t.line(`:${BOB}!u@h REDACT #bubble/games m1`);
     expect(t.store.getState().pins["#bubble/games"]?.pins.map(({ id }) => id)).toEqual(["m2"]);
     expect(t.store.getState().pins["#bubble"]?.pins.map(({ id }) => id)).toEqual(["m1"]);
+  });
+
+  // A copy on the device outlives the line unless the page hears it go: Ergo's REDACT unsaves it, and its author's edit
+  // replaces its words, as for the room and its pins (F1484, the security review's S2).
+  it("takes a saved line off the device as Ergo's REDACT of it comes, and no other room's", () => {
+    const t = setup();
+    t.signedIn(ALICE);
+    t.line(`:${BOB}!u@h REDACT #bubble/games m1`);
+    expect(t.store.getState().keep.saved).toEqual([SAVED]);
+    t.line(`:${BOB}!u@h REDACT #bubble m1`);
+    expect(t.store.getState().keep.saved).toEqual([]);
+    expect(t.device().saved()).toEqual([]);
+  });
+
+  it("replaces a saved line's words by its author's edit, and by no one else's", () => {
+    const t = setup();
+    t.signedIn(ALICE);
+    const edit = (account: string, text: string) => {
+      t.line(
+        `@msgid=m2;time=2026-10-25T10:01:00.000Z;account=${account};+gnoworld/edit=m1 :x!u@h PRIVMSG #bubble :${text}`,
+      );
+    };
+    edit(ALICE, "not by its author");
+    expect(t.store.getState().keep.saved).toEqual([SAVED]);
+    edit(BOB, "corrected words");
+    expect(t.store.getState().keep.saved).toEqual([{ ...SAVED, text: "corrected words" }]);
+    expect(t.device().saved()).toEqual([{ ...SAVED, text: "corrected words" }]);
+  });
+
+  it("unsaves a line its author edited into one that is no plain message", () => {
+    const t = setup();
+    t.signedIn(ALICE);
+    t.line(
+      `@msgid=m2;time=2026-10-25T10:01:00.000Z;account=${BOB};+gnoworld/edit=m1 :x!u@h PRIVMSG #bubble :\u0001ACTION waves\u0001`,
+    );
+    expect(t.store.getState().keep.saved).toEqual([]);
   });
 });

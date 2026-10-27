@@ -12,10 +12,12 @@ export function beginSession({ store, device, keep }: LinkDeps, session: AppStat
   pinsActions.forget();
 }
 
-/** One live line from Ergo to each slice that reads lines: the rooms', the direct messages' and the pins' (a REDACT). */
+/** One live line from Ergo to each slice that reads lines: the rooms', the direct messages', the saved lines' and the
+ * pins' (a REDACT, an edit). */
 export function heardBy(store: LinkDeps["store"], message: IrcMessage): void {
-  const { chatActions, dmActions, pinsActions } = store.getState();
+  const { chatActions, dmActions, keepActions, pinsActions } = store.getState();
   chatActions.heard(message);
   dmActions.heard(message);
+  keepActions.heard(message);
   pinsActions.heard(message);
 }
