@@ -34,8 +34,8 @@ export interface NoticeSlice {
     left: (room: string) => void;
     /** A room, or a conversation, seen up to `time`: a mark only moves forward. */
     seen: (where: string, time: string) => void;
-    /** Everything unseen, seen. */
-    clear: () => void;
+    /** Everything unseen, seen; the marks set, each a place and the time it is seen up to. */
+    clear: () => readonly (readonly [place: string, time: string])[];
     /** A new session: no notice, no mark, and the modes the account's device holds; none for a guest. */
     begin: (prefs?: NoticePrefs) => void;
     setMode: (room: string, mode: NoticeMode) => void;
@@ -192,6 +192,7 @@ export const noticeSlice: StateCreator<State, [], [], NoticeSlice> = (set, get) 
           return time === undefined ? [] : [[where, time] as const];
         });
         if (marks.length > 0) set({ noticeSeen: { ...state.noticeSeen, ...Object.fromEntries(marks) } });
+        return marks;
       },
       begin: (prefs) => {
         device = prefs;

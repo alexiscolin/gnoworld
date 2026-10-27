@@ -36,6 +36,9 @@ export interface ChatLink {
   /** Marks the room in view read to its line `id`, which the store holds, as Ergo's MARKREAD (draft/read-marker): an
    * account's alone, a line past the place Ergo gave; asked while away, it goes once Ergo says I am in the room. */
   read: (room: string, id: string) => void;
+  /** Marks a room read to a time the page set from outside the room (Clear's), as Ergo's MARKREAD: an account's alone, a
+   * room, not a conversation; asked while away, it goes once Ergo says I am in the room. */
+  markRead: (room: string, time: string) => void;
   /** Sends at once the reading places waiting their 2 s, as the page hides (F940). */
   flush: () => void;
   stop: () => void;

@@ -130,7 +130,14 @@ export function ChatPanel({ world }: { world: string }) {
   const dms = useDms(world, session, params.get("dm"));
   const { saving, verdicts } = useRoomVerdicts(store, current, state?.lines);
   const chat = useApp((app) => app.login.chat);
-  const noticing = useNotices({ world, session, sections, dms, current });
+  const noticing = useNotices({
+    world,
+    session,
+    sections,
+    dms,
+    current,
+    read: (room, time) => linkRef.current?.markRead(room, time),
+  });
   if (!loaded) return LOADING;
   const failed =
     sections === undefined ? (

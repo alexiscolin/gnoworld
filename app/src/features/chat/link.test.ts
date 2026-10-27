@@ -2293,6 +2293,25 @@ describe("the chat's link: notices, the edges", () => {
     });
   });
 
+  // F1676 (CR4): Clear marked the page only, so a reload or another device brought the cleared mentions back.
+  describe("a room marked read from outside it", () => {
+    it("tells Ergo the place for a room followed, though it is not in view, and for no conversation", () => {
+      const t = member();
+      t.fake.sent.length = 0;
+      t.link.markRead(NEWS, T(5));
+      t.link.markRead(OTHER, T(5));
+      expect(t.fake.sent).toEqual([`MARKREAD ${NEWS} timestamp=${T(5)}`]);
+    });
+
+    it("tells Ergo nothing for a guest", () => {
+      const guest = guestIn([GAMES]);
+      guest.fake.line(`:${GUEST}!u@h JOIN ${GAMES}`);
+      guest.fake.sent.length = 0;
+      guest.link.markRead(GAMES, T(5));
+      expect(guest.fake.sent).toEqual([]);
+    });
+  });
+
   // F1681 (CR9): a REDACT that came while a page was open left no trace, so the page's end made the notice again.
   describe("a history page open while a line of it is deleted", () => {
     it("makes no notice of that line, and one of its neighbour", () => {

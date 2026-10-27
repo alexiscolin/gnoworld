@@ -83,10 +83,14 @@ class Link implements ChatLink {
 
   read(room: string, id: string): void {
     const line = this.#deps.store.getState().chat.rooms[room]?.lines.findLast((each) => each.id === id);
-    if (this.#key !== "guest" && room === this.#shown && line !== undefined) {
-      this.#places.ask(room, line.time);
-      this.#deps.store.getState().noticeActions.seen(room, line.time);
-    }
+    const marked = this.#key !== "guest" && room === this.#shown ? line : undefined;
+    if (marked !== undefined) this.#deps.store.getState().noticeActions.seen(room, marked.time);
+    this.markRead(room, marked?.time);
+  }
+
+  // The place asked for a room, an account's alone, and told once Ergo says I am in it; no new place only tells the last.
+  markRead(room: string, time?: string): void {
+    if (time !== undefined && this.#key !== "guest") this.#places.ask(room, time);
     if (this.#inside.has(room)) this.#places.tell(room);
   }
 

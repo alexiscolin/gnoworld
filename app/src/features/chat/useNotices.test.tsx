@@ -181,6 +181,24 @@ describe("useNotices", () => {
     expect(document.title).toBe("(1) Games · gno.world");
   });
 
+  // F1676 (CR4): Clear sees the places on the page; the rooms' marks also go to Ergo, as a read does.
+  it("hands the marks that Clear sets to the link, which tells Ergo those of the rooms", () => {
+    const read = vi.fn();
+    draw(on({ read }));
+    follow();
+    tell(({ noticeActions }) => {
+      noticeActions.add(mention("a", MAIN));
+      noticeActions.add(mention("b", GAMES, 7));
+    });
+    act(() => {
+      told().list?.onClear();
+    });
+    expect(read.mock.calls).toEqual([
+      [MAIN, T(5)],
+      [GAMES, T(7)],
+    ]);
+  });
+
   it("counts nothing for an account whose page holds no room list and no conversation yet", () => {
     draw(on({ sections: undefined }));
     follow();

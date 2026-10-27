@@ -60,8 +60,10 @@ export function useNotices(on: {
   sections: RoomList["sections"] | undefined;
   dms: Dms;
   current: string | undefined;
+  /** Tells Ergo a room is read to a time, as Clear sets it. */
+  read?: (room: string, time: string) => void;
 }): Noticing {
-  const { world, session, sections, dms, current } = on;
+  const { world, session, sections, dms, current, read } = on;
   // The room in view, none while a direct message is; each room and conversation listed counts.
   const room = dms.partner === undefined && dms.problem === undefined ? current : undefined;
   const inView = dms.partner ?? room;
@@ -82,10 +84,14 @@ export function useNotices(on: {
   );
   useTabTitle(total);
   const said = useAnnounced(account ? list : NONE, inView);
+  // Clear sees every place on the page, and its marks go to the link, which tells Ergo those of the rooms, as a read does.
+  const onClear = () => {
+    for (const [place, time] of noticeActions.clear()) read?.(place, time);
+  };
   if (!account) return { seen: noticeActions.seen };
   return {
     badges,
-    list: { list, world, said, onClear: noticeActions.clear },
+    list: { list, world, said, onClear },
     notify: notifyOf(room, held, noticeActions),
     seen: noticeActions.seen,
   };
