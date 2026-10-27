@@ -139,6 +139,32 @@ test.describe("a room's lines: Edit", () => {
     expect(said()).toEqual([`@+gnoworld/edit=m1 PRIVMSG ${ROOM} :my first words, fixed`]);
   });
 
+  // R7 (redpass-red): the device keeps the reader's draft, never the words of an edit, and a reload mid-edit gives the
+  // draft back; the room is told the account types while an edit is typed (F1924, the decision: kept).
+  test("keeps the reader's draft on the device through an edit, none of the edit's words in it, a reload giving it back", async ({
+    page,
+  }) => {
+    const { said, typed } = await asMember(page);
+    const kept = () =>
+      page.evaluate(() =>
+        Object.entries<string>(localStorage)
+          .filter(([key]) => key.startsWith("gnoworld:draft:"))
+          .map(([, value]) => value),
+      );
+    await field(page).fill("a draft in progress");
+    await expect.poll(kept).toEqual(["a draft in progress"]);
+    await startEdit(page, 0);
+    await expect(field(page)).toHaveValue("my first words");
+    await field(page).fill("my first words, changing");
+    await expect.poll(typed).toContain(`@+typing=active TAGMSG ${ROOM}`);
+    await expect.poll(kept).toEqual(["a draft in progress"]);
+    await page.reload();
+    await expect(lines(page)).toHaveCount(2);
+    await expect(editing(page)).toHaveCount(0);
+    await expect(field(page)).toHaveValue("a draft in progress");
+    expect(said()).toEqual([]);
+  });
+
   test("edits a line twice: each correction names the original line, the box starting from the last words", async ({
     page,
   }) => {

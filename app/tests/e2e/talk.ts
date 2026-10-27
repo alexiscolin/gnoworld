@@ -48,6 +48,7 @@ export async function asAccount(page: Page, script: (address: string) => Scripte
     address,
     ergo,
     said: () => sent.filter((line) => /^(@\S+ )?(PRIVMSG|TAGMSG) /.test(line) && !line.includes("+typing=")),
+    typed: () => sent.filter((line) => line.includes("+typing=")),
   };
 }
 
