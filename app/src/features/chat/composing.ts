@@ -12,9 +12,9 @@ interface Chosen {
   asked: number;
 }
 
-// The line as the conversation shows it, while it holds it.
+// The line as the conversation shows it, while it holds it: nothing is folded while none is chosen.
 const shownAs = (chosen: Chosen | undefined, lines: readonly Line[] | undefined) =>
-  foldEdits(lines ?? []).shown.find((line) => line.id === chosen?.id);
+  chosen === undefined ? undefined : foldEdits(lines ?? []).shown.find((line) => line.id === chosen.id);
 
 // Asked again, or for another line: the count goes up.
 const asking = (was: Chosen | undefined, id: string): Chosen => ({ id, asked: (was?.asked ?? 0) + 1 });
