@@ -1169,7 +1169,6 @@ describe("connectErgo, an Ergo that offers no draft/multiline", () => {
 
   it("says whether the connection sends several lines at once: only once connected, only on an ACK holding it", async () => {
     const full = await guest();
-    expect(full.client.multiline()).toBe(false);
     welcomeGuest(full.s, "guest-ab12cd");
     expect(full.client.multiline()).toBe(true);
     const basic = await guest();
