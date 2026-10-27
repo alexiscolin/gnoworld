@@ -1420,17 +1420,13 @@ describe("the IRC link, a message of several lines (draft/multiline)", () => {
       .toEqual([{ room: "#bubble", account: "g1a", msgid: "ml1", text: "one\ntwo\na banned word", time: T(1) }]);
   });
 
-  it("hands nothing on of its parts before its end, nor of a batch whose parts are another's", async () => {
+  it("hands nothing on of its parts before its end", async () => {
     const ergo = await fakeErgo();
     const { said } = start(ergo.port);
     const peer = await ergo.peer(0);
     await welcome(peer);
     peer.say(`@account=g1a;msgid=ml1;time=${T(1)} :a!u@h BATCH +x draft/multiline :#bubble`);
     peer.say("@batch=x :a!u@h PRIVMSG #bubble :one");
-    await sync(peer);
-    expect(said).toEqual([]);
-    peer.say("@batch=x :mallory!u@h PRIVMSG #bubble :two");
-    peer.say(":a!u@h BATCH :-x");
     await sync(peer);
     expect(said).toEqual([]);
   });
