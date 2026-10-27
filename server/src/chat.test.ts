@@ -101,6 +101,10 @@ describe("the chat, as the server starts it", () => {
     const { rooms } = setup({ worlds: worlds("bubble"), ergo: ergoAt, moderation: OFF }, { now: () => clock.now });
     const peer = await ergo.peer(0);
     await welcome(peer);
+    // A line of a history page counts nothing now, however recent its time (the max review).
+    peer.say(":ergo.test BATCH +h chathistory #bubble");
+    peer.say(message("batch=h;account=g1a;msgid=m0", "a!u@h", ["#bubble", "said before"]));
+    peer.say(":ergo.test BATCH -h");
     peer.say(message("account=g1a;msgid=m1", "a!u@h", ["#bubble", "hi"]));
     const rate = (perMinute: number) => JSON.stringify({ rooms: [{ world: "bubble", room: "#bubble", perMinute }] });
     await expect.poll(() => rooms("bubble")).toBe(rate(0.2));
@@ -184,6 +188,16 @@ describe("the chat, as the server starts it", () => {
       { msgid: "m1", action: "hide", reason: "banned_word" },
       { msgid: "m2", action: "unchecked", reason: null },
     ]);
+  });
+
+  it("checks a line to a room's voices like the room's own: hidden for a banned word, struck (F723)", async () => {
+    const { peer, verdicts } = await linked(
+      { worlds: worlds("bubble"), moderation: OFF },
+      { provider: () => Promise.resolve("unchecked") },
+    );
+    peer.say(message("account=g1a;msgid=m1", "a!u@h", ["+#bubble", "buy spam"]));
+    await expect.poll(verdicts).toEqual([{ msgid: "m1", action: "hide", reason: "banned_word" }]);
+    expect(await peer.next(/^REDACT /)).toMatch(/^REDACT #bubble m1 /);
   });
 
   it("passes the moderation's settings on: a new account's hours, and the thresholds", async () => {
@@ -665,6 +679,83 @@ describe("the chat, as the server starts it", () => {
       slow.open();
     });
 
+    it("keeps its mark where a catch-up starts while its page is pending, though a live line passed", async () => {
+      const { peer, verdicts, ergo } = await linked(
+        { worlds: worlds("bubble"), moderation: OFF },
+        { provider: () => Promise.resolve(OFF_ANSWER) },
+      );
+      peer.say(line("m1", 1, ["g1a", "hello"]));
+      await expect.poll(verdicts).toEqual([{ msgid: "m1", action: "pass", reason: null }]);
+      const again = await reconnect(peer, ergo);
+      expect(await again.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(1)} 50`);
+      again.say(line("m9", 9, ["g1b", "live"]));
+      await expect.poll(() => verdicts().length).toBe(2);
+      await settle(again);
+      again.socket.destroy();
+      const third = await ergo.peer(2);
+      await welcome(third);
+      expect(await third.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(1)} 50`);
+    });
+
+    it("keeps a queued room's mark where its catch-up will start, though a live line of it passed", async () => {
+      const { db, peer, verdicts, ergo } = await linked(
+        { worlds: worlds("bubble", "earth"), moderation: OFF },
+        { provider: () => Promise.resolve(OFF_ANSWER) },
+      );
+      for (const room of ["#bubble", "#earth"])
+        peer.say(message(`account=g1a;msgid=old${room};time=${T(1)}`, "g1a!u@h", [room, "before"]));
+      await expect.poll(() => verdicts().length).toBe(2);
+      const again = await reconnect(peer, ergo);
+      const first = (await again.next(/^CHATHISTORY /)).split(" ")[2] ?? "";
+      const queued = first === "#bubble" ? "#earth" : "#bubble";
+      again.say(message(`account=g1b;msgid=live;time=${T(9)}`, "g1b!u@h", [queued, "live"]));
+      await expect.poll(() => verdicts().length).toBe(3);
+      await settle(again);
+      const marks = z
+        .array(z.object({ room: z.string(), time: z.string() }))
+        .parse(db.prepare("SELECT room, time FROM progress ORDER BY room").all());
+      expect(marks).toEqual([
+        { room: "#bubble", time: T(1) },
+        { room: "#earth", time: T(1) },
+      ]);
+    });
+
+    it("asks the next room's page only once the lines of the last are checked, so one account's queue never overflows", async () => {
+      const wait = gate();
+      const { peer, verdicts, ergo } = await linked(
+        { worlds: worlds("bubble", "earth", "moon"), moderation: OFF },
+        {
+          provider: async (text) => {
+            if (text === "flood") await wait.opened;
+            return OFF_ANSWER;
+          },
+        },
+      );
+      for (const room of ["#bubble", "#earth", "#moon"])
+        peer.say(message(`account=g1a;msgid=old${room};time=${T(1)}`, "g1a!u@h", [room, "before"]));
+      await expect.poll(() => verdicts().length).toBe(3);
+      const again = await reconnect(peer, ergo);
+      const asked = () => again.lines.filter((l) => l.startsWith("CHATHISTORY"));
+      for (let round = 0; round < 3; round += 1) {
+        await expect.poll(() => asked().length).toBeGreaterThan(round);
+        const room = asked()[round]?.split(" ")[2] ?? "";
+        again.say(`:ergo.test BATCH +r${String(round)} chathistory ${room}`);
+        for (let n = 0; n < 40; n += 1) {
+          const tags = `batch=r${String(round)};account=g1a;msgid=f${String(round)}-${String(n)};time=${T(10 + n)}`;
+          again.say(message(tags, "g1a!u@h", [room, "flood"]));
+        }
+        again.say(`:ergo.test BATCH -r${String(round)}`);
+        await settle(again);
+        await settle(again);
+        // The first room's 40 lines wait on the provider: no other room is asked until they are checked.
+        if (round === 0) expect(asked()).toHaveLength(1);
+        wait.open();
+      }
+      await expect.poll(() => verdicts().length, { timeout: 10_000 }).toBe(123);
+      expect(asked()).toHaveLength(3);
+      expect(logged.filter((l) => l.includes("moderation_account_full"))).toEqual([]);
+    });
+
     it("checks 300 missed lines of one account page by page, none dropped", async () => {
       const { peer, verdicts, ergo } = await linked(
         { worlds: worlds("bubble"), moderation: OFF },
@@ -747,6 +838,13 @@ describe("the chat, as the server starts it", () => {
         await settle(peer);
         expect(mutes(peer)).toEqual([]);
         peer.say(line("m4", 4, ["g1a", "hurt"]));
+        expect(await peer.next(MUTE_LINE)).toBe("SAMODE #bubble +b m:g1a");
+      });
+
+      it("mutes an account whose lines to a room's voices were hidden three times, as for its own lines (F723)", async () => {
+        const { peer } = await linked({ worlds: worlds("bubble"), moderation: OFF }, hurt());
+        for (const id of ["m1", "m2", "m3"])
+          peer.say(message(`account=g1a;msgid=${id}`, "a!u@h", ["+#bubble", "hurt"]));
         expect(await peer.next(MUTE_LINE)).toBe("SAMODE #bubble +b m:g1a");
       });
 

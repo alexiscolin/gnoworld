@@ -129,6 +129,8 @@ export function makeStream(options: Options = {}): Stream {
     routes: ({ proxy, visible, session = () => undefined }) => {
       const app = new Hono();
       app.get("/", (c) => {
+        // Hono runs a HEAD through this handler: refused before any slot is taken, a stream no HEAD can read (F709).
+        if (c.req.method !== "GET") return c.json({ error: "refused" } satisfies ApiError, 405, { allow: "GET" });
         const rooms = Rooms.safeParse(once(c.req.queries("rooms")));
         const last = LastId.safeParse(c.req.header("last-event-id"));
         if (!rooms.success || !last.success) return c.json({ error: "refused" } satisfies ApiError, 400);

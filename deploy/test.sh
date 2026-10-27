@@ -341,7 +341,13 @@ if [ "${1:-}" = --mutants ]; then
 		template sed 's#default-user-modes: +iR#default-user-modes: +i#'
 	mutant "registration open" "a hand-made account is refused" \
 		template awk '/^  registration:/ { r = 1 } r && /enabled: false/ { sub(/false/, "true"); r = 0 } { print }'
-	mutant "a short oper password taken" "Ergo starts with a short oper password" render_sh sed '/32 characters or more/d'
+	mutant "a short oper password taken" "Ergo starts with a short oper password" render_sh sed '/32 to 72 characters/d'
+	mutant "an oper password's blanks dropped before its check" "Ergo starts with an oper password with a blank first line" \
+		render_sh sed 's#password=$(cat /run/secrets/ergo_oper_password)#password=$(tr -d " \\t\\r\\n" </run/secrets/ergo_oper_password)#'
+	mutant "an oper password of any shape" "Ergo starts with an oper password with a space inside" render_sh sed '/one word of printable characters/d'
+	mutant "the inside network not left alone" "40 connections at once from the inside network are not refused for their number" \
+		template sed 's#exempted: {{EXEMPT}}#exempted: ["localhost"]#'
+	mutant "any INSIDE_SUBNET taken" "Ergo starts with INSIDE_SUBNET [0.0.0.0/0]" render_sh sed '/INSIDE_SUBNET: required/d'
 	mutant "a login by PASS" "login-via-pass-command: false" template sed 's#login-via-pass-command: false#login-via-pass-command: true#'
 	mutant "every address believed as a proxy" "never a forged X-Forwarded-For" template sed 's#proxy-allowed-from: {{PROXY_FROM}}#proxy-allowed-from: ["0.0.0.0/0"]#'
 	mutant "the auth script's socket lost" "the refusal came from the server" compose 'services: { server: { environment: { AUTH_SOCKET: /tmp/elsewhere.sock } } }'
@@ -350,6 +356,8 @@ if [ "${1:-}" = --mutants ]; then
 		nginx sed 's#proxy_set_header X-Forwarded-For $proxy_protocol_addr;#proxy_set_header X-Forwarded-For $http_x_forwarded_for;#'
 	mutant "a forged X-Real-IP handed on" "and the first naming another stays limited, by the server" nginx sed 's#proxy_set_header X-Real-IP $proxy_protocol_addr;#proxy_set_header X-Real-IP $http_x_real_ip;#'
 	mutant "the password handed to the upstreams" "and never the demo's password" nginx sed '/proxy_set_header Authorization "";/d'
+	mutant "the session's cookie handed to Ergo" "and the session's cookie to the API alone, never to Ergo" nginx sed '/proxy_set_header Cookie "";/d'
+	mutant "a large body passed to the server" "web refuses a body past 16 KiB itself, on the login and on a room's route" nginx sed '/client_max_body_size 16k;/d'
 	mutant "the WebSocket open without the password" "no password, no WebSocket" \
 		nginx awk '{ print } /location = \/ws \{/ { print "            auth_basic off;" }'
 	mutant "the API open without the password" "no password, no API" \
@@ -439,6 +447,9 @@ FAKE
 	sleep 3
 	folder=$(sed -n 's#.* -v \([^ ]*\)/out:/k6:ro .*#\1#p' "$tmp/fake.log" | head -n 1)
 	expect "a stopped load run removes its project" "$(sed -n '/\/k6\/load.js$/,$p' "$tmp/fake.log" | grep -c '^compose .* down -v$' || true)" 1
+	# Both of its down calls (the one before the stack starts too) take its profiled services, the guard and the way out.
+	expect "it removes the project twice, at its start and at its end" "$(grep -c '^compose .* down -v$' "$tmp/fake.log" || true)" 2
+	expect "and each takes its profiled services too" "$(grep '^compose .* down -v$' "$tmp/fake.log" | grep -c -e '--profile demo' || true)" 2
 	expect "and its folder, the operator's key with it" "$([ -n "$folder" ] && [ ! -e "$folder" ] && echo gone)" gone
 	expect "and stops its sampler" "$(grep -c '^stats ' "$tmp/fake.log" || true)" "$sampled"
 	# Sizes that are no whole number, or past the visitors' addresses, stop it before it makes anything (F650).
@@ -719,6 +730,73 @@ print("%.2f %d" % (sum(float(s.get("cpus", 0)) for s in services), sum(size(s.ge
 	*"render: the oper's password"*) pass "Ergo's start refuses a short oper password" ;;
 	*) fail "Ergo starts with a short oper password" ;;
 	esac
+	# genpasswd hashes the first line alone: a blank or short one before a long one is refused too, and any shape
+	# but one word of 32 to 72 printable characters, 72 being what bcrypt keeps (F706). Each case is the file's text.
+	oper_render() { # printf's arguments: the file's text
+		printf "$@" >"$tmp/shaped_oper_password"
+		chmod 644 "$tmp/shaped_oper_password"
+		ERGO_OPER_PASSWORD_FILE=$tmp/shaped_oper_password docker compose -p "$project" $files run --rm --no-deps -e RENDER_ONLY=1 ergo 2>&1
+	}
+	oper_refused() { # what it is, then printf's arguments
+		what=$1
+		shift
+		case $(oper_render "$@") in
+		*"render: the oper's password"*) pass "Ergo's start refuses an oper password with $what" ;;
+		*) fail "Ergo starts with an oper password with $what" ;;
+		esac
+	}
+	word=$(openssl rand -hex 24)
+	half=$(openssl rand -hex 10)
+	oper_refused "a blank first line" '\n%s\n' "$word"
+	oper_refused "a short first line" 'x\n%s\n' "$word"
+	oper_refused "a space inside" '%s %s\n' "$half" "$half"
+	oper_refused "a tab after it" '%s\t\n' "$word"
+	oper_refused "a carriage return after it" '%s\r\n' "$word"
+	oper_refused "a control character" '%s\001\n' "$word"
+	oper_refused "a delete character" '%s\177\n' "$word"
+	oper_refused "a letter past ASCII" '%s\303\251\n' "$word"
+	oper_refused "nothing at all" ''
+	for length in 73 31; do oper_refused "$length characters" '%s' "$(head -c "$length" /dev/zero | tr '\0' a)"; done
+	for length in 32 72; do
+		expect "Ergo's start takes an oper password of $length characters" \
+			"$(oper_render '%s' "$(head -c "$length" /dev/zero | tr '\0' a)" | tail -n 1)" "render: the settings are whole"
+	done
+	# The inside network is the one the connection limits leave alone, with the loopback (F720).
+	expect "Ergo's settings leave the inside network's connections unlimited" \
+		"$(grep -cF -- "exempted: [\"localhost\",\"$INSIDE_SUBNET\"]" "$tmp/ircd.yaml")" 1
+	# Nothing, a word, every address (v4 and v6) or a value that breaks out of the JSON list it is put in.
+	for subnet in "" everything 0.0.0.0/0 ::/0 '10.0.0.0/24"]'; do
+		case $(docker compose -p "$project" $files run --rm --no-deps -e RENDER_ONLY=1 -e INSIDE_SUBNET="$subnet" ergo 2>&1) in
+		*"render: INSIDE_SUBNET"*) pass "Ergo's start refuses INSIDE_SUBNET [$subnet]" ;;
+		*) fail "Ergo starts with INSIDE_SUBNET [$subnet]" ;;
+		esac
+	done
+	# Measured, from the server's image on the inside network: 40 connections at once, past the 16 a visitor's address
+	# holds, none refused for their number.
+	crowd=$(docker run --rm --network "$inside" --entrypoint /nodejs/bin/node "$server_image" -e '
+const net = require("node:net");
+let refused = 0;
+let left = 40;
+for (let n = 0; n < 40; n++) {
+  const s = net.connect(6667, "ergo");
+  let text = "";
+  let over = false;
+  const done = () => {
+    if (over) return;
+    over = true;
+    s.destroy();
+    if (--left === 0) console.log(refused);
+  };
+  s.on("connect", () => s.write(`NICK crowd${n}\r\nUSER c 0 * :c\r\n`));
+  s.on("data", (chunk) => {
+    text += chunk;
+    if (/^ERROR/m.test(text)) refused++;
+    if (/ 001 /.test(text) || /^ERROR/m.test(text)) done();
+  });
+  s.on("error", done);
+}
+setTimeout(() => process.exit(2), 20000);' 2>&1 || true)
+	expect "40 connections at once from the inside network are not refused for their number" "$crowd" 0
 
 	# No secret of the stack's in Docker's records, a log or an image.
 	oper=$(cat "$tmp/ergo_oper_password")
@@ -887,6 +965,15 @@ CLIENT
 	# The server through web's /api: the password first, the visitor's address from web alone.
 	expect "no password, no API" "$(status '/api/activity?worlds=earth' 203.0.113.1)" 401
 	expect "the API answers with the password" "$(status '/api/activity?worlds=earth' 203.0.113.1 -u "$auth")" 200
+	# A body past the server's 16 KiB (its BODY_LIMIT) stops at web, before it is buffered in memory (F711's neighbour).
+	post() { # <bytes> <path>: the status and type of a JSON POST of that size through web
+		docker run --rm --network "$inside" "$CURL" -s -o /dev/null -w '%{http_code} %{content_type}' --haproxy-protocol \
+			--haproxy-clientip 203.0.113.36 -u "$auth" -H 'Content-Type: application/json' -H "Origin: $ORIGINS" \
+			-d "$(head -c "$1" /dev/zero | tr '\0' x)" "http://web:8080$2" || true
+	}
+	expect "web refuses a body past 16 KiB itself, on the login and on a room's route" \
+		"$(post 16385 /api/login/challenge) $(post 16385 /api/rooms)" "413 text/html 413 text/html"
+	expect "and hands one of 16 KiB to the server, whose own answer is no 413" "$(post 16384 /api/login/challenge | grep -c '^413' || true)" 0
 	# A backslash is a separator to the server's URL parser alone: refused, or web's login limit is skipped (F617).
 	for path in '/api/x/..\login/challenge' '/api/x/..%5Clogin/challenge'; do
 		expect "a backslash in a path is refused: $path" "$(status "$path" 203.0.113.34 -u "$auth" --path-as-is)" 400
@@ -1053,7 +1140,7 @@ setTimeout(() => {
 	net=$(printf '%s' "$WEB_ADDRESS" | sed 's/\.[0-9]*$//')
 	docker cp "$web:/etc/nginx/nginx.conf" - | tar -xO >"$tmp/nginx.live.conf"
 	printf '%s\n' 'const { createServer } = require("node:http");' \
-		'for (const port of [8080, 8097]) createServer((q, r) => { console.log(JSON.stringify(q.headers)); r.end("ok"); }).listen(port);' >"$tmp/echo.cjs"
+		'for (const port of [8080, 8097]) createServer((q, r) => { console.log(JSON.stringify({ port, ...q.headers })); r.end("ok"); }).listen(port);' >"$tmp/echo.cjs"
 	chmod 644 "$tmp/nginx.live.conf" "$tmp/echo.cjs"
 	echo_box=$(docker run -d --rm --network "$inside" --ip "$net.250" -v "$tmp/echo.cjs:/echo.cjs:ro" --entrypoint /nodejs/bin/node "$server_image" /echo.cjs)
 	mirror=$(docker run -d --rm --network "$inside" --ip "$net.251" --add-host "server:$net.250" --add-host "ergo:$net.250" \
@@ -1061,12 +1148,15 @@ setTimeout(() => {
 	sleep 2
 	for path in '/api/activity?worlds=earth' /ws; do
 		docker run --rm --network "$inside" "$CURL" -s -o /dev/null --max-time 5 --haproxy-protocol --haproxy-clientip 203.0.113.51 -u "$auth" \
-			-H 'X-Real-IP: 192.0.2.67' -H 'X-Forwarded-For: 192.0.2.67' "http://$net.251:8080$path" || true
+			-H 'X-Real-IP: 192.0.2.67' -H 'X-Forwarded-For: 192.0.2.67' -H 'Cookie: __Host-session=sekret' "http://$net.251:8080$path" || true
 	done
 	heard=$(docker logs "$echo_box" 2>&1)
 	docker stop "$echo_box" "$mirror" >/dev/null
 	expect "web hands its upstreams both requests" "$(printf '%s\n' "$heard" | grep -c '^{' || true)" 2
 	expect "and never the demo's password" "$(printf '%s\n' "$heard" | grep -ci '"authorization"' || true)" 0
+	# The session's cookie goes to the server (8080), never to Ergo (8097), which needs only a ticket (decision 143, F711).
+	cookie() { printf '%s\n' "$heard" | grep "\"port\":$1" | grep -c '__Host-session=sekret' || true; }
+	expect "and the session's cookie to the API alone, never to Ergo" "$(cookie 8080) $(cookie 8097)" "1 0"
 	expect "but the visitor's own address, X-Real-IP and X-Forwarded-For alike" \
 		"$(printf '%s\n' "$heard" | grep '"x-real-ip":"203.0.113.51"' | grep -c '"x-forwarded-for":"203.0.113.51"' || true) $(printf '%s\n' "$heard" | grep -c '192.0.2.67' || true)" "2 0"
 
