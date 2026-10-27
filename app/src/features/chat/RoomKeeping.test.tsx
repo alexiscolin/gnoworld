@@ -288,7 +288,12 @@ describe("the version of an edited line that the room acts on", () => {
         pins: pinned.map((id) => ({ id, time: T(0), account: Address.parse(ALICE), text: `held ${id}` })),
       });
     });
-    return { calls, keeping: () => seen.api?.keeping, saved: () => seen.store?.getState().keep.saved ?? [] };
+    return {
+      calls,
+      keeping: () => seen.api?.keeping,
+      saved: () => seen.store?.getState().keep.saved ?? [],
+      unread: () => seen.store?.getState().keep.unread ?? {},
+    };
   }
   const EDITED = [said("m1", "my address is 12 Foo St"), said("m2", "never mind", "m1")];
 
@@ -315,5 +320,40 @@ describe("the version of an edited line that the room acts on", () => {
       await keeping()?.pin?.unpin("m1");
     });
     expect(calls).toEqual(["unpin m2"]);
+  });
+
+  const by = (account: string, message: IrcMessage): IrcMessage => ({
+    ...message,
+    tags: new Map(message.tags).set("account", account),
+  });
+  // R9 of redpass2-4dx: Mark unread reads the line as the room shows it, which is the first line's own place; an edit
+  // folded into it is no line of the room's.
+  it("marks an edited line unread at its own time, and marks none for an edit the room does not show", () => {
+    const { keeping, unread } = mounted(EDITED);
+    act(() => {
+      keeping()?.onMarkUnread("m2");
+    });
+    expect(unread()).toEqual({});
+    act(() => {
+      keeping()?.onMarkUnread("m1");
+    });
+    expect(unread()).toEqual({ "#bubble": "2026-10-25T10:00:00.999Z" });
+  });
+
+  it("pins and unpins a line that is no edited one by its own id", async () => {
+    const { keeping, calls } = mounted([said("m1", "plain")], ["m1"]);
+    await act(async () => {
+      await keeping()?.pin?.pin("m1");
+      await keeping()?.pin?.unpin("m1");
+    });
+    expect(calls).toEqual(["pin m1", "unpin m1"]);
+  });
+
+  it("leaves a line's id alone for an edit by another account, which the room shows as a line of its own", async () => {
+    const { keeping, calls } = mounted([said("m1", "mine"), by(BOB, said("m2", "not mine", "m1"))]);
+    await act(async () => {
+      await keeping()?.pin?.pin("m1");
+    });
+    expect(calls).toEqual(["pin m1"]);
   });
 });
