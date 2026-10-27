@@ -2,9 +2,10 @@
 // line addressed to the account, none for a guest; the notices of a line REDACT takes away or of a room the account is
 // out of; a conversation seen as Ergo's place for it passes. The classifier is core's (roomNotice, dmNotice); this reads
 // what it needs from the store.
-import { dmNotice, dmOf, lineOf, readAfter, roomNotice, type IrcMessage } from "@gnoworld/core";
+import { dmNotice, dmOf, lineOf, readAfter, roomNotice, type IrcMessage, type RoomAt } from "@gnoworld/core";
 import type { createAppStore } from "../../store/index.ts";
-import { modeOf } from "../../store/notices.ts";
+import { modeOf, roomOf } from "../../store/notices.ts";
+import type { AppState } from "../../store/index.ts";
 import { outOf } from "./groups.ts";
 import { isAccount } from "./names.ts";
 
@@ -43,10 +44,9 @@ export class Noticing {
   page(room: string, messages: readonly IrcMessage[]): void {
     const state = this.#store.getState();
     const { me } = state.chat;
-    const held = Object.hasOwn(state.chat.rooms, room) ? state.chat.rooms[room] : undefined;
-    const read = held?.read;
-    if (!this.#account() || me === undefined || held === undefined || read === undefined) return;
-    const at = { me, mode: modeOf(state, room), held: held.lines, groups: this.groups.has(room) };
+    const at = me === undefined ? undefined : this.#at(state, room, me);
+    const read = roomOf(state, room)?.read;
+    if (!this.#account() || at === undefined || read === undefined) return;
     const made = messages.flatMap((message) => {
       const line = lineOf(message, room);
       const notice = line === undefined || line.time <= read ? undefined : roomNotice(line, room, at);
@@ -74,11 +74,18 @@ export class Noticing {
   // A room's line, in a room the page follows and Ergo said I am in.
   #room(message: IrcMessage, room: string, me: string): void {
     const state = this.#store.getState();
-    const held = Object.hasOwn(state.chat.rooms, room) ? state.chat.rooms[room] : undefined;
+    const at = this.#at(state, room, me);
     const line = lineOf(message, room);
-    if (held === undefined || line === undefined || !this.#inside.has(room)) return;
-    const at = { me, mode: modeOf(state, room), held: held.lines, groups: this.groups.has(room) };
+    if (at === undefined || line === undefined || !this.#inside.has(room)) return;
     const notice = roomNotice(line, room, at);
     if (notice !== undefined) state.noticeActions.add(notice);
+  }
+
+  // What the reader is, and holds, in a room the page follows; none for a room it does not.
+  #at(state: AppState, room: string, me: string): RoomAt | undefined {
+    const held = roomOf(state, room);
+    return held === undefined
+      ? undefined
+      : { me, mode: modeOf(state, room), held: held.lines, groups: this.groups.has(room) };
   }
 }

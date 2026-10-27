@@ -44,7 +44,8 @@ type State = ChatSlice & NoticeSlice;
 // A record's own entry: the ids are the relay's, and a room named `constructor` is no one's prototype.
 const own = <T>(record: Readonly<Record<string, T>>, key: string): T | undefined =>
   Object.hasOwn(record, key) ? record[key] : undefined;
-const roomOf = (state: State, where: string) => own(state.chat.rooms, where);
+/** A room the page follows, by its id. */
+export const roomOf = (state: State, where: string) => own(state.chat.rooms, where);
 const later = (one: string | undefined, other: string | undefined) =>
   one === undefined || (other !== undefined && other > one) ? other : one;
 
