@@ -444,6 +444,30 @@ describe("the chat, as the server starts it", () => {
       expect(asked).toEqual([]);
     });
 
+    // The bot's hide comes back to it as a REDACT of its own (Ergo tells each member of the room, the sender too): the
+    // pin of a hidden line goes with it, as with an author's delete (4d's R1).
+    it("takes a line's pin away as Ergo tells it taken from the room, the bot's own hide as an author's delete", async () => {
+      const { peer, chat, db } = await linked({ worlds: worlds("bubble"), moderation: OFF });
+      const AUTHOR = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+      for (const id of ["m1", "m2", "m3"]) {
+        db.prepare(
+          "INSERT INTO pins (room, msgid, time, account, text, pinned_by, pinned_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        ).run("#bubble", id, "2026-10-25T10:00:00.000Z", AUTHOR, `text ${id}`, AUTHOR, T0);
+      }
+      const held = () => chat.pins.list("#bubble").map(({ id }) => id);
+      peer.say(line("m1", 1, ["g1a", "buy spam"]));
+      expect(await peer.next(/^REDACT /)).toBe("REDACT #bubble m1 :a word this world bans");
+      peer.say(":gnoworld!u@h REDACT #bubble m1 :a word this world bans");
+      await expect.poll(held).toEqual(["m3", "m2"]);
+      peer.say(":g1a!u@h REDACT #bubble m2");
+      await expect.poll(held).toEqual(["m3"]);
+      // A REDACT of a room that is not its own is no word on its pins.
+      peer.say(":g1a!u@h REDACT #elsewhere m3");
+      peer.say("PING :done");
+      await peer.next(/^PONG done$/);
+      expect(held()).toEqual(["m3"]);
+    });
+
     it("streams nothing for an unchecked line, and nothing for a line before its verdict", async () => {
       const slow = gate();
       const { app, peer } = await linked(
