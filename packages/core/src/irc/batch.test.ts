@@ -47,12 +47,25 @@ describe("BatchReader: Ergo's batches, each handed on whole at its end", () => {
     expect(a.kind === "done" ? [a.batch.params, texts(a.batch.messages)] : []).toEqual([["#bubble"], ["a1", "a2"]]);
   });
 
+  // Ergo's answer to a labeled command of two lines or more is a labeled-response batch whose BATCH line holds the
+  // label (irc/responsebuffer.go:264-281, v2.19.1): the label is read from the batch, its lines having none.
+  test("keeps its BATCH line's tags: a labeled-response's label", () => {
+    const reader = new BatchReader();
+    reader.read(read("@label=7 BATCH +r1 labeled-response"));
+    reader.read(said("r1", "echo"));
+    const done = reader.read(read("BATCH -r1"));
+    expect(done.kind === "done" ? [done.batch.type, done.batch.tags.get("label")] : []).toEqual([
+      "labeled-response",
+      "7",
+    ]);
+  });
+
   test("hands on an empty batch", () => {
     const reader = new BatchReader();
     reader.read(read("BATCH +h1 chathistory #bubble"));
     expect(reader.read(read("BATCH -h1"))).toEqual({
       kind: "done",
-      batch: { type: "chathistory", params: ["#bubble"], messages: [] },
+      batch: { type: "chathistory", params: ["#bubble"], tags: new Map(), messages: [] },
     });
   });
 

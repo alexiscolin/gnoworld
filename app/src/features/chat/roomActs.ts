@@ -4,6 +4,8 @@
 import type { RefObject } from "react";
 import type { ChatLink } from "./link.ts";
 
+export type RoomActs = ReturnType<typeof roomActs>;
+
 export function roomActs(link: RefObject<ChatLink | undefined>, room: string, dismissed: (room: string) => void) {
   return {
     onDelete: (id: string) => link.current?.redact(room, id) ?? false,

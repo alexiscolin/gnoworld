@@ -5,12 +5,11 @@
 // A line's author is its account tag alone, a nick being only a nick; a member's nick is an account's when it is
 // an address, which a guest's cannot be (Ergo gives a guest 32 characters, server/src/testing/ergo.test.ts:314).
 import { typingAt, type Line, type Typing } from "@gnoworld/core";
-import { Address } from "@gnoworld/schemas";
-import { Sidebar, Stack } from "@gnoworld/ui";
+import { Button, Cluster, Sidebar, Stack } from "@gnoworld/ui";
 import { Fragment, lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import type { ErgoState } from "../../lib/ergo/ergo.ts";
 import type { LinesProps } from "./Lines.tsx";
-import { roomLabel } from "./names.ts";
+import { isAccount, shortAddress } from "./names.ts";
 import { Person } from "./Person.tsx";
 import shared from "./lists.module.css";
 import styles from "./RoomView.module.css";
@@ -48,12 +47,18 @@ const NOTICES: Record<Exclude<ErgoState | "off", "connected">, string> = {
 };
 
 export interface RoomViewProps {
-  room: string;
+  /** The room whose lines are in view: its lines have bars (4c); none for a direct message's (4e). */
+  room?: string | undefined;
+  /** Its name: a room's label; a direct message's partner (4e). */
+  title: ReactNode;
+  /** What it says of itself under its name: a room's description, its IRC topic; a conversation's "not encrypted". */
+  note?: ReactNode;
+  /** The note's id, which the composer points at (4e's U6). */
+  noteId?: string | undefined;
   state:
     | {
         lines: readonly Line[];
         members: readonly string[];
-        topic: string | undefined;
         /** The msgid of a line Ergo refused to delete (4c). */
         refused?: string | undefined;
         /** Who is typing, each nick with the time its typing ends (4f). */
@@ -75,20 +80,51 @@ export interface RoomViewProps {
   onDismiss: () => void;
   /** The room read to its newest line, as the reader reaches it (4f). */
   onRead?: ((id: string) => void) | undefined;
+  /** What it says while it holds no line, once connected: a conversation's own words (4e). */
+  empty?: string | undefined;
+  /** Beside the lines: a room's who is here; a conversation, of two, has none (4e). */
+  aside?: ReactNode;
 }
 
-// Who is here: counted once connected, the bot left out, the first MEMBERS_SHOWN named.
-function People({ members, connected }: { members: readonly string[]; connected: boolean }) {
+/** Who is here: counted once connected, the bot left out, the first MEMBERS_SHOWN named. */
+export interface PeopleProps {
+  members: readonly string[];
+  connected: boolean;
+  /** The reader's address, and how it opens a direct message with another account: each offered beside it. */
+  me: string | undefined;
+  onMessage: ((partner: string) => void) | undefined;
+}
+
+export function People({ members, connected, me, onMessage }: PeopleProps) {
   const people = members.filter((nick) => nick !== BOT);
   return (
     <aside aria-label="Who's here">
       <h3 className={styles["count"]}>{connected ? `${String(people.length)} here` : "Who's here"}</h3>
       <ul className={shared["plain"]}>
-        {people.slice(0, MEMBERS_SHOWN).map((nick) => (
-          <li key={nick}>
-            <Person name={nick} guest={!Address.safeParse(nick).success} />
-          </li>
-        ))}
+        {people.slice(0, MEMBERS_SHOWN).map((nick) => {
+          const account = isAccount(nick);
+          return (
+            <li key={nick}>
+              {/* The name at the start, its Message at the end: one column whatever the name's width (U18). */}
+              <Cluster space="3xs" justify="between">
+                <Person name={nick} guest={!account} account={account} />
+                {onMessage !== undefined && account && me !== undefined && nick !== me ? (
+                  // A visible word, not an icon alone (decision D); the address for a screen reader's list.
+                  <Button
+                    icon="chat"
+                    size="s"
+                    emphasis="quiet"
+                    onClick={() => {
+                      onMessage(nick);
+                    }}
+                  >
+                    Message<span className="visually-hidden"> {shortAddress(nick)}</span>
+                  </Button>
+                ) : null}
+              </Cluster>
+            </li>
+          );
+        })}
       </ul>
       {people.length > MEMBERS_SHOWN ? <p>and {String(people.length - MEMBERS_SHOWN)} more</p> : null}
     </aside>
@@ -117,10 +153,10 @@ function Typists({ typing }: { typing: Typing }) {
   const named = nicks.map((nick, at) => (
     <Fragment key={nick}>
       {at === 0 ? "" : at === nicks.length - 1 ? " and " : ", "}
-      <Person name={nick} guest={!Address.safeParse(nick).success} />
+      <Person name={nick} guest={!isAccount(nick)} />
     </Fragment>
   ));
-  const whole = nicks.map((nick) => (Address.safeParse(nick).success ? nick : `${nick} (guest)`));
+  const whole = nicks.map((nick) => (isAccount(nick) ? nick : `${nick} (guest)`));
   const title = `${whole.length > 1 ? `${whole.slice(0, -1).join(", ")} and ` : ""}${whole.at(-1) ?? ""} ${verb} typing`;
   return (
     <p className={styles["typing"]} title={nicks.length === 0 ? undefined : title}>
@@ -135,15 +171,28 @@ function Typists({ typing }: { typing: Typing }) {
   );
 }
 
-export function RoomView({ room, state, chat, composer, me, onDelete, onDismiss, onRead }: RoomViewProps) {
-  const { lines = [], members = [], topic, refused, typing, read, paged } = state ?? {};
+// A room's name and its description, its IRC topic; a conversation's partner and what it says of itself (4e).
+function Header({ title, topic, id }: { title: ReactNode; topic: ReactNode; id: string | undefined }) {
+  return (
+    <header>
+      <h2>{title}</h2>
+      {topic === undefined ? null : (
+        <p id={id} className={styles["topic"]}>
+          {topic}
+        </p>
+      )}
+    </header>
+  );
+}
+
+export function RoomView(props: RoomViewProps) {
+  const { room, title, note, noteId, state, chat, composer, me, onDelete, onDismiss, onRead, aside } = props;
+  const { empty = "No messages yet." } = props;
+  const { lines = [], members = [], refused, typing, read, paged } = state ?? {};
   const connected = chat === "connected";
   return (
     <Stack as="section" space="s">
-      <header>
-        <h2>{roomLabel(room)}</h2>
-        {topic === undefined ? null : <p className={styles["topic"]}>{topic}</p>}
-      </header>
+      <Header title={title} topic={note} id={noteId} />
       <p role="status" className={styles["status"]}>
         {connected ? null : NOTICES[chat]}
       </p>
@@ -163,11 +212,12 @@ export function RoomView({ room, state, chat, composer, me, onDelete, onDismiss,
             paged={paged === true}
             onRead={onRead}
           />
-          {connected && lines.length === 0 ? <p>No messages yet.</p> : null}
-          <Typists key={`${room} typing`} typing={typing} />
+          {connected && lines.length === 0 ? <p>{empty}</p> : null}
+          {/* A room's, whose place is kept so the composer never moves; a direct message tells none (4e). */}
+          {room === undefined ? null : <Typists key={`${room} typing`} typing={typing} />}
           {composer}
         </div>
-        <People members={members} connected={connected} />
+        {aside}
       </Sidebar>
     </Stack>
   );

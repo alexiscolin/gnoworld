@@ -2,7 +2,7 @@
 // and tells each of its sessions (draft/read-marker, ircv3.net/specs/extensions/read-marker; irc/handlers.go v2.19.1),
 // and the line marked New while the room is open: the first past the place when the room opened.
 import type { IrcMessage } from "../irc/irc.ts";
-import { isTime, sameRoom, type Line } from "./room.ts";
+import { isTime, sameName, type Line } from "./room.ts";
 
 /** How far past the page's clock a place may stand: past it, the place is no place (a clock's skew allowed). */
 export const PLACE_AHEAD_MS = 5 * 60_000;
@@ -15,7 +15,7 @@ const fromServer = (source: string | undefined): boolean => source === undefined
 function placeOf({ command, params, tags, source }: IrcMessage, room: string, now: number): string | undefined {
   if (command !== "MARKREAD") return undefined;
   const [target = "", stamp = ""] = params;
-  const ergo = sameRoom(target, room) && !tags.has("batch") && fromServer(source);
+  const ergo = sameName(target, room) && !tags.has("batch") && fromServer(source);
   const time = ergo && stamp.startsWith("timestamp=") ? stamp.slice("timestamp=".length) : "";
   return isTime(time) && Date.parse(time) <= now + PLACE_AHEAD_MS ? time : undefined;
 }

@@ -32,7 +32,9 @@ const members = [ALICE, BOB, ...Array.from({ length: 98 }, (_, n) => `guest-${St
 const room = (
   <RoomView
     room="#bubble/games"
-    state={{ lines, members, topic: "Games" }}
+    title="#games"
+    note="Games"
+    state={{ lines, members }}
     chat="connected"
     me={BOB}
     onDelete={() => false}

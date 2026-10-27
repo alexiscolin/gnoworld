@@ -4,7 +4,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Result } from "../../lib/api/http.ts";
 import type { Ergo, ErgoState, Who } from "../../lib/ergo/ergo.ts";
 import { createAppStore } from "../../store/index.ts";
-import { chatLink, HISTORY_LINES, ROOMS_JOINED } from "./link.ts";
+import { chatLink, HISTORY_LINES, ROOMS_JOINED, type LinkDeps } from "./link.ts";
+import { WAITING } from "./outbox.ts";
 
 const ADDRESS = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const OTHER = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
@@ -31,13 +32,14 @@ interface Fake extends Ergo {
   line: (text: string) => void;
 }
 
-const setup = (before?: (store: ReturnType<typeof createAppStore>) => void) => {
+const setup = (before?: (store: ReturnType<typeof createAppStore>) => void, device?: LinkDeps["device"]) => {
   const store = createAppStore();
   before?.(store);
   const links: Fake[] = [];
   const asked = { tickets: 0, guests: 0 };
   const link = chatLink({
     store,
+    device,
     ticket: (): Promise<Result<{ ticket: string }>> => {
       asked.tickets += 1;
       return Promise.resolve({ ok: true, value: { ticket: `t${String(asked.tickets)}` } });
@@ -226,6 +228,47 @@ describe("the chat's link: who connects", () => {
     t.signedOut();
     expect(t.chat().rooms).toEqual({});
     expect(t.connected().sent).toEqual([]);
+  });
+
+  // 4e's late test audit (T1): an account's conversations must not follow it into the next session's page.
+  it.each([
+    [
+      "nobody logged in",
+      (t: Setup) => {
+        t.signedOut();
+      },
+    ],
+    [
+      "another account",
+      (t: Setup) => {
+        t.signedIn(OTHER);
+      },
+    ],
+  ])("starts a new session, %s, with no direct message: the last account's not kept", (_, next) => {
+    const t = setup();
+    t.signedIn(ADDRESS);
+    t.connected(ADDRESS);
+    t.last().line(`@msgid=d;time=${T0};account=${OTHER} :${OTHER}!u@h PRIVMSG ${ADDRESS} :for you alone`);
+    expect(Object.keys(t.store.getState().dms)).toEqual([OTHER]);
+    next(t);
+    expect(t.store.getState().dms).toEqual({});
+  });
+
+  // 4e's complexity review: the account's direct-message choices, read from its device by the store at its start.
+  it("hands the store the device of each account's session, and none of a guest's", () => {
+    const asked: string[] = [];
+    const t = setup(undefined, (account) => {
+      asked.push(account);
+      return {
+        prefs: { onlyKnown: () => true, setOnlyKnown: () => true, known: () => [OTHER], setKnown: () => true },
+        drafts: { get: () => "", set: () => true },
+      };
+    });
+    t.signedIn(ADDRESS);
+    expect(t.store.getState().dmChoices).toEqual({ onlyKnown: true, known: new Set([OTHER]) });
+    t.signedOut();
+    expect(t.store.getState().dmChoices).toEqual({ onlyKnown: false, known: new Set() });
+    expect(asked).toEqual([ADDRESS]);
   });
 
   it("connects as a guest when Ergo says the session is gone, the store logged out", () => {
@@ -1286,4 +1329,260 @@ describe("the chat's link: what it says", () => {
       ]);
     });
   });
+});
+
+// 4e: direct messages, an account's alone; Ergo refuses a guest's to any account, which its default-user-modes set +R
+// (deploy/ergo/ircd.yaml.tmpl).
+describe("the chat's link: direct messages", () => {
+  const account = () => {
+    const t = setup();
+    t.link.follow(["#bubble"]);
+    t.signedIn(ADDRESS);
+    return { ...t, fake: t.connected(ADDRESS) };
+  };
+  // A line as sent, its label (labeled-response, the link's own count) taken off; the DMs to OTHER among them.
+  const unlabelled = (line: string) => line.replace(/^@label=\S+ /, "");
+  const dms = (sent: readonly string[]) => sent.map(unlabelled).filter((line) => line.startsWith(`PRIVMSG ${OTHER}`));
+  // The label the `at`th DM to OTHER went with: none while the link sends none.
+  const labelOf = (sent: readonly string[], at: number) =>
+    sent.filter((line) => unlabelled(line).startsWith(`PRIVMSG ${OTHER}`))[at]?.match(/^@label=(\S+) /)?.[1];
+
+  // 4e's late test audit (T2): no test said the link hands Ergo's lines to the direct messages' store.
+  it("hands Ergo's lines to the direct messages' store: an account's to me kept, a room's line not", () => {
+    const t = account();
+    t.fake.line(`@msgid=r;time=${T0};account=${OTHER} :${OTHER}!u@h PRIVMSG #bubble :to the room`);
+    expect(t.store.getState().dms).toEqual({});
+    t.fake.line(`@msgid=d;time=${T0};account=${OTHER} :${OTHER}!u@h PRIVMSG ${ADDRESS} :to you`);
+    expect(t.store.getState().dms[OTHER]?.map(({ text }) => text)).toEqual(["to you"]);
+  });
+
+  // 4e's UX review (U1): Ergo answers 401 to a line for an account not connected (irc/handlers.go:2533, v2.19.1),
+  // and its echo to one it delivered; the page emptied the box all the same, the line lost.
+  // Ergo's answers carry the label of the line they answer (irc/responsebuffer.go:264-281, v2.19.1), when it had one.
+  const refusal = (partner: string, label?: string) =>
+    `${label === undefined ? "" : `@label=${label} `}:ergo.test 401 ${ADDRESS} ${partner} :No such nick`;
+  const echo = (id: string, text: string, label?: string) =>
+    `@${label === undefined ? "" : `label=${label};`}msgid=${id};time=${T0};account=${ADDRESS} :${ADDRESS}!u@h PRIVMSG ${OTHER} :${text}`;
+  // An account connected, its device's drafts what the store puts back.
+  const withDrafts = () => {
+    const kept = new Map<string, string>();
+    const t = setup(undefined, () => ({
+      prefs: { onlyKnown: () => false, setOnlyKnown: () => true, known: () => [], setKnown: () => true },
+      drafts: {
+        get: (room) => kept.get(room) ?? "",
+        set: (room, draft) => {
+          kept.set(room, draft);
+          return true;
+        },
+      },
+    }));
+    t.link.follow(["#bubble"]);
+    t.signedIn(ADDRESS);
+    return { ...t, kept, fake: t.connected(ADDRESS) };
+  };
+  type WithDrafts = ReturnType<typeof withDrafts>;
+
+  it("puts back the draft of a line Ergo refused, its partner not connected, and counts it", () => {
+    const t = withDrafts();
+    expect(t.link.sayTo(OTHER, "  hi **you**  ")).toBe(true);
+    t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 0)));
+    expect(t.kept.get(OTHER)).toBe("  hi **you**  ");
+    expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 1, draft: "  hi **you**  " } });
+  });
+
+  it("puts back each line Ergo refused in turn, past one it delivered", () => {
+    const t = withDrafts();
+    for (const draft of ["one", "/me two", "three"]) t.link.sayTo(OTHER, draft);
+    t.fake.line(echo("a", "one", labelOf(t.fake.sent, 0)));
+    t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 1)));
+    expect(t.kept.get(OTHER)).toBe("/me two");
+    // The composer sent it again, or the reader emptied the box: no draft waits.
+    t.kept.set(OTHER, "");
+    t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 2)));
+    expect(t.kept.get(OTHER)).toBe("three");
+    expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 2, draft: "three" } });
+  });
+
+  // /code-review (CR1): Ergo answers a labeled line by its label, one line or a labeled-response batch
+  // (irc/commands.go:41, responsebuffer.go:264-281, v2.19.1); the outbox matched answers by order, so a line
+  // refused otherwise (a 417, a 477) stayed waiting and a later 401 put back its draft, not the 401's line's.
+  it("sends each direct message with a label of its own", () => {
+    const t = account();
+    t.link.sayTo(OTHER, "one");
+    t.link.sayTo(OTHER, "two");
+    const labels = [labelOf(t.fake.sent, 0), labelOf(t.fake.sent, 1)];
+    expect(labels.every((label) => label !== undefined)).toBe(true);
+    expect(new Set(labels).size).toBe(2);
+  });
+
+  it("puts back the draft of the line each refusal answers, by its label, a line refused otherwise too", () => {
+    const t = withDrafts();
+    t.link.sayTo(OTHER, "a");
+    t.link.sayTo(OTHER, "b");
+    t.fake.line(`@label=${labelOf(t.fake.sent, 0) ?? ""} :ergo.test 417 ${ADDRESS} :Line too long to be relayed`);
+    expect(t.kept.get(OTHER)).toBe("a");
+    expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 1, draft: "a", offline: false } });
+    t.kept.set(OTHER, "");
+    t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 1)));
+    expect(t.kept.get(OTHER)).toBe("b");
+    expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 2, draft: "b" } });
+  });
+
+  it("takes a labeled-response batch for its line's answer: its echo and Ergo's away line deliver it", () => {
+    const t = withDrafts();
+    t.link.sayTo(OTHER, "hi");
+    const label = labelOf(t.fake.sent, 0) ?? "";
+    t.fake.line(`@label=${label} BATCH +r1 labeled-response`);
+    t.fake.line(`@batch=r1;msgid=e;time=${T0};account=${ADDRESS} :${ADDRESS}!u@h PRIVMSG ${OTHER} :hi`);
+    t.fake.line(`@batch=r1 :ergo.test 301 ${ADDRESS} ${OTHER} :back soon`);
+    t.fake.line("BATCH -r1");
+    expect(t.store.getState().dms[OTHER]?.map(({ text }) => text)).toEqual(["hi"]);
+    t.fake.line(refusal(OTHER, label));
+    expect(t.store.getState().dmRefused).toEqual({});
+  });
+
+  it(`keeps ${String(WAITING)} lines waiting at most: the oldest's late answer puts nothing back`, () => {
+    const t = withDrafts();
+    for (let n = 0; n <= WAITING; n += 1) t.link.sayTo(OTHER, `line ${String(n)}`);
+    t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 0)));
+    expect(t.store.getState().dmRefused).toEqual({});
+    t.fake.line(refusal(OTHER, labelOf(t.fake.sent, WAITING)));
+    expect(t.kept.get(OTHER)).toBe(`line ${String(WAITING)}`);
+  });
+
+  // StrykerJS on CR1's fix: a standard reply's FAIL refuses too, and the bound drops a line past 50 waiting, not at 50.
+  it("puts back a line Ergo answers with a FAIL, said refused, not offline", () => {
+    const t = withDrafts();
+    t.link.sayTo(OTHER, "hi");
+    t.fake.line(`@label=${labelOf(t.fake.sent, 0) ?? ""} :ergo.test FAIL PRIVMSG INVALID_TARGET ${OTHER} :No`);
+    expect(t.kept.get(OTHER)).toBe("hi");
+    expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 1, draft: "hi", offline: false } });
+  });
+
+  it(`keeps exactly ${String(WAITING)} lines waiting: the first one's refusal still puts it back`, () => {
+    const t = withDrafts();
+    for (let n = 0; n < WAITING; n += 1) t.link.sayTo(OTHER, `line ${String(n)}`);
+    t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 0)));
+    expect(t.kept.get(OTHER)).toBe("line 0");
+  });
+
+  // With Ergo's multiclient, another tab's line reaches this one as an echo does: it answers none of this one's.
+  it("takes another tab's line to the same account for no answer to its own", () => {
+    const t = withDrafts();
+    t.link.sayTo(OTHER, "mine");
+    t.fake.line(echo("a", "from my other tab"));
+    t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 0)));
+    expect(t.kept.get(OTHER)).toBe("mine");
+  });
+
+  it.each([
+    [
+      "for an account it sent nothing to",
+      (t: WithDrafts) => {
+        t.fake.line(refusal(OTHER));
+      },
+    ],
+    [
+      "for a line Ergo delivered",
+      (t: WithDrafts) => {
+        t.link.sayTo(OTHER, "hi");
+        const label = labelOf(t.fake.sent, 0);
+        t.fake.line(echo("a", "hi", label));
+        t.fake.line(refusal(OTHER, label));
+      },
+    ],
+    [
+      "on a new connection, for the last one's line",
+      (t: WithDrafts) => {
+        t.link.sayTo(OTHER, "hi");
+        const label = labelOf(t.fake.sent, 0);
+        t.fake.state("waiting");
+        t.connected(ADDRESS).line(refusal(OTHER, label));
+      },
+    ],
+  ])("puts back nothing %s", (_, steps) => {
+    const t = withDrafts();
+    steps(t);
+    expect(t.store.getState().dmRefused).toEqual({});
+    expect([...t.kept.keys()]).toEqual([]);
+  });
+
+  // StrykerJS on 4e: what answers a line waiting on Ergo, and what does not.
+  const to = (id: string, text: string) =>
+    `@msgid=${id};time=${T0};account=${OTHER} :${OTHER}!u@h PRIVMSG ${ADDRESS} :${text}`;
+  it.each([
+    [
+      "the partner's own line of the same words",
+      (t: WithDrafts) => {
+        t.fake.line(to("b", "hi"));
+      },
+    ],
+    [
+      "my action's echo, for a line of the same words",
+      (t: WithDrafts) => {
+        t.fake.line(echo("b", "\u0001ACTION hi\u0001"));
+      },
+    ],
+  ])("answers no waiting line by %s: Ergo's refusal still puts it back", (_, heard) => {
+    const t = withDrafts();
+    t.link.sayTo(OTHER, "hi");
+    heard(t);
+    t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 0)));
+    expect(t.kept.get(OTHER)).toBe("hi");
+  });
+
+  it("answers a waiting action by its echo alone, and refuses nothing on a line naming the partner", () => {
+    const t = withDrafts();
+    t.link.sayTo(OTHER, "/me waves");
+    t.fake.line(to("b", OTHER));
+    expect(t.store.getState().dmRefused).toEqual({});
+    const label = labelOf(t.fake.sent, 0);
+    t.fake.line(echo("c", "\u0001ACTION waves\u0001", label));
+    t.fake.line(refusal(OTHER, label));
+    expect(t.store.getState().dmRefused).toEqual({});
+  });
+
+  it("sends an account's draft to another account, as the composer composes it", () => {
+    const t = account();
+    expect(t.link.sayTo(OTHER, "  hi **you**  ")).toBe(true);
+    expect(t.link.sayTo(OTHER, "/me waves")).toBe(true);
+    expect(dms(t.fake.sent)).toEqual([`PRIVMSG ${OTHER} :hi **you**`, `PRIVMSG ${OTHER} :\u0001ACTION waves\u0001`]);
+  });
+
+  it.each([
+    ["a guest's", () => guestIn(["#bubble"])],
+    [
+      "an account's, while away",
+      () => {
+        const t = account();
+        t.fake.state("waiting");
+        return t;
+      },
+    ],
+  ])("sends nothing of %s", (_, made) => {
+    const t = made();
+    expect(t.link.sayTo(OTHER, "hi")).toBe(false);
+    expect(dms(t.fake.sent)).toEqual([]);
+  });
+
+  it.each([
+    ["no address", "alice"],
+    ["a room", "#bubble"],
+    ["its own address", ADDRESS],
+    ["an address with a wrong checksum", `${OTHER.slice(0, -1)}q`],
+  ])("sends nothing to %s", (_, partner) => {
+    const t = account();
+    const before = t.fake.sent.length;
+    expect(t.link.sayTo(partner, "hi")).toBe(false);
+    expect(t.fake.sent.slice(before)).toEqual([]);
+  });
+
+  it.each(["", "  ", "/nick bob", "a".repeat(600)])(
+    "sends nothing of a draft the composer would not send (%j)",
+    (draft) => {
+      const t = account();
+      expect(t.link.sayTo(OTHER, draft)).toBe(false);
+      expect(dms(t.fake.sent)).toEqual([]);
+    },
+  );
 });

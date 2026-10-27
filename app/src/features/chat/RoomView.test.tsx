@@ -2,7 +2,7 @@ import type { Line } from "@gnoworld/core";
 import { renderToStaticMarkup } from "react-dom/server";
 import { prerender } from "react-dom/static";
 import { beforeAll, describe, expect, it } from "vitest";
-import { MEMBERS_SHOWN, RoomView, type RoomViewProps } from "./RoomView.tsx";
+import { MEMBERS_SHOWN, People, RoomView, type PeopleProps, type RoomViewProps } from "./RoomView.tsx";
 
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
@@ -18,17 +18,29 @@ const line = (over: Partial<Line> = {}): Line => ({
 });
 const GUEST_LINE: Line = { id: "g", time: T0, from: "guest-ab12cd", text: "hello", kind: "message" };
 const ROOM = { lines: [line()], members: [ALICE, "guest-ab12cd"], topic: "Bubbles here" };
-const view = (over: Partial<RoomViewProps> = {}) =>
-  renderToStaticMarkup(
+// A room as ChatPanel draws one: #games, its topic under its name, who is here beside it.
+type Room = (NonNullable<RoomViewProps["state"]> & { topic?: string | undefined }) | undefined;
+type Over = Omit<Partial<RoomViewProps>, "state"> & { state?: Room; onMessage?: PeopleProps["onMessage"] };
+const view = ({ onMessage, ...over }: Over = {}) => {
+  const state = "state" in over ? over.state : ROOM;
+  const { chat = "connected", me } = over;
+  const aside = (
+    <People members={state?.members ?? []} connected={chat === "connected"} me={me} onMessage={onMessage} />
+  );
+  return renderToStaticMarkup(
     <RoomView
       room="#bubble/games"
-      state={ROOM}
+      title="#games"
+      note={state?.topic}
+      aside={aside}
       chat="connected"
       onDelete={() => false}
       onDismiss={() => undefined}
       {...over}
+      state={state}
     />,
   );
+};
 const said = (html: string) =>
   html
     .replaceAll(/<[^>]+>/g, " ")
@@ -49,17 +61,20 @@ const paragraphs = (html: string) => (html.match(/<p[ >]/g) ?? []).length;
 // is held, and every view below draws it at once, as a room switch does once the page has it.
 beforeAll(async () => {
   await prerender(
-    <RoomView room="#bubble/games" state={ROOM} chat="connected" onDelete={() => false} onDismiss={() => undefined} />,
+    <RoomView
+      room="#bubble/games"
+      title="#games"
+      state={ROOM}
+      chat="connected"
+      onDelete={() => false}
+      onDismiss={() => undefined}
+    />,
   );
 });
 
 describe("RoomView", () => {
   it("names the room, its description right after, from its topic", () => {
     expect(view()).toMatch(/<h2[^>]*>#games<\/h2>\s*<p[^>]*>Bubbles here<\/p>/);
-  });
-
-  it("names the world's main room by the world", () => {
-    expect(view({ room: "#bubble" })).toMatch(/<h2[^>]*>#bubble<\/h2>/);
   });
 
   it("gives no description when the room has none", () => {
@@ -280,6 +295,11 @@ describe("RoomView", () => {
     expect(said(view())).not.toContain("Could not delete");
   });
 
+  // 4e's UX review (U13): an empty list was a Tab stop of no size, a screen reader saying "Messages, list" of nothing.
+  it("is no Tab stop while it holds no line", () => {
+    expect(view({ state: { ...ROOM, lines: [] } })).not.toMatch(/<ol [^>]*tabindex/i);
+  });
+
   // 4b's pre-merge (/code-review): lines that come while the room is open reach a screen reader.
   it("announces the lines that come, politely, and them alone", () => {
     const html = view();
@@ -312,6 +332,41 @@ describe("RoomView", () => {
     [BOB, "g1jg8m…vsqf5"],
   ])("names a member %s as %s: an address only when it is one", (nick, shown) => {
     expect(items(part(view({ state: { ...ROOM, members: [nick] } }), "Who's here"))).toEqual([shown]);
+  });
+
+  // 4e: an account opens a direct message with another from who is here; a guest has none, nor does one write to
+  // itself or to the bot.
+  it("offers an account a direct message with each other account here, and nothing else", () => {
+    const opened: string[] = [];
+    const members = [ALICE, BOB, "guest-ab12cd", "gnoworld"];
+    const html = part(view({ me: BOB, state: { ...ROOM, members }, onMessage: (a) => opened.push(a) }), "Who's here");
+    // Decision D (U8): a visible "Message", the address after it for a screen reader, which lists many.
+    expect([...html.matchAll(/<button[^>]*>(.*?)<\/button>/gs)].map((m) => said(m[1] ?? ""))).toEqual([
+      "Message g10gh7…3y5tv",
+    ]);
+    expect(html).toMatch(/<button[^>]*>.*Message<span class="visually-hidden"> g10gh7…3y5tv<\/span><\/button>/s);
+    expect(items(part(view({ state: { ...ROOM, members }, onMessage: () => undefined }), "Who's here"))).toEqual([
+      "g10gh7…3y5tv",
+      "g1jg8m…vsqf5",
+      "guest-ab12cd (guest)",
+    ]);
+    expect(
+      items(part(view({ me: BOB, state: { ...ROOM, members: [ALICE] }, onMessage: () => undefined }), "Who's here")),
+    ).toEqual(["g10gh7…3y5tv Message g10gh7…3y5tv"]);
+    expect(part(view({ me: BOB, state: { ...ROOM, members } }), "Who's here")).not.toContain("<button");
+  });
+
+  // 4e: a direct message's page names its partner, and says it is not encrypted, as every DM does.
+  it("names a conversation by the title it is given, its note under it", () => {
+    const html = view({ title: "g10gh7…3y5tv", note: "Not encrypted: the server can read these." });
+    expect(html).toMatch(/<h2[^>]*>g10gh7…3y5tv<\/h2>\s*<p[^>]*>Not encrypted: the server can read these.<\/p>/);
+  });
+
+  // 4e's own review: a conversation has its two people, never a room's "who is here".
+  it("leaves who is here out of a conversation", () => {
+    const html = view({ title: "g10gh7…3y5tv", aside: undefined });
+    expect(html).not.toContain("Who&#x27;s here");
+    expect(said(html)).not.toMatch(/\d+ here/);
   });
 
   it("leaves the moderation bot out of who is here, and out of the count", () => {
@@ -404,6 +459,30 @@ describe("RoomView", () => {
     );
   });
 
+  // 4e's UX review (U5): my own lines read as mine, my name in mint and the word "you" (DESIGN-SYSTEM.md, Avatar).
+  it("marks the reader's own lines as theirs, by the word you, and no one else's", () => {
+    const lines = [line({ id: "a", text: "mine" }), line({ id: "b", from: BOB, account: BOB, text: "theirs" })];
+    const html = part(view({ me: ALICE, state: { ...ROOM, lines } }), "Messages");
+    expect(items(html).map((words) => words.replace(/^\d\d:\d\d /, ""))).toEqual([
+      "g10gh7…3y5tv you mine",
+      "g1jg8m…vsqf5 theirs",
+    ]);
+    expect(html.match(/data-mine=""/g)).toHaveLength(1);
+    expect(items(part(view({ state: { ...ROOM, lines } }), "Messages")).join(" ")).not.toMatch(/\byou\b/);
+  });
+
+  // 4e's UX review (U6): the composer reads the note, a direct message's "not encrypted", as its description.
+  it("gives its note the id it is given, for the composer to point at", () => {
+    expect(view({ note: "Not encrypted.", noteId: "n1" })).toMatch(/<p id="n1"[^>]*>Not encrypted.<\/p>/);
+  });
+
+  // 4e: a conversation says why it is empty in words of its own (decisions B, C).
+  it("says the words it is given when it holds no line, once connected", () => {
+    const html = view({ state: { ...ROOM, lines: [] }, empty: "Nothing kept." });
+    expect(said(html)).toContain("Nothing kept.");
+    expect(said(html)).not.toContain("No messages yet.");
+  });
+
   it("shows a room it holds nothing of yet as empty, once connected", () => {
     const html = view({ state: undefined });
     expect(said(html)).toContain("No messages yet.");
@@ -441,6 +520,11 @@ describe("RoomView: who is typing", () => {
     const html = view({ state: { ...ROOM, typing: typing(ALICE, BOB, CAROL) } });
     expect(words(html)).toContain("g1f6dc…fsksl and g1jg8m…vsqf5 are typing");
     expect(html).toMatch(new RegExp(`<p class="[^"]*typing[^"]*" title="${ALICE}, ${CAROL} and ${BOB} are typing">`));
+  });
+
+  // The merge of 4e and 4f: a direct message (no room) tells no typing, so it keeps no place for it either.
+  it("draws no typing line's place for a direct message", () => {
+    expect(view({ room: undefined })).not.toMatch(/<p class="[^"]*typing[^"]*"/);
   });
 
   // The red pass (R16): a live typist beside the past one, so the test fails while nothing is said at all.

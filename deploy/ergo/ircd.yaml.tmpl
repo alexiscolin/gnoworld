@@ -49,8 +49,10 @@ accounts:
     enabled: true
     duration: 1m
     max-attempts: 3
-  # Invisible by default: a room's members are listed to its members alone (slice 3's max review).
-  default-user-modes: +i
+  # Invisible by default: a room's members are listed to its members alone (slice 3's max review). And +R: no
+  # direct message from a connection with no account, a guest's (irc/handlers.go:2552), set at each connection's
+  # registration (irc/server.go:445) so none arrives before it; decided by Alexis in 4e (docs/decisions.md).
+  default-user-modes: +iR
   nick-reservation:
     enabled: true
     method: strict

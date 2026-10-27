@@ -1,6 +1,6 @@
 // What the link joins (slice 4's 4b, moved out of link.ts): the rooms it follows, in JOIN and PART lines of 510
 // bytes at most.
-import { LINE_BYTES } from "@gnoworld/core";
+import { LINE_BYTES, nickOf, type IrcMessage } from "@gnoworld/core";
 
 // Rooms in groups whose command line holds 510 bytes at most; a room id is ASCII, a character a byte.
 export function groupsOf(command: "JOIN" | "PART", rooms: readonly string[]): string[][] {
@@ -37,3 +37,8 @@ export function asksAfterJoin(
   const unknown = { NAMES: (held?.members.length ?? 0) === 0, MARKREAD: account && held?.read === undefined };
   return Object.entries(unknown).flatMap(([command, ask]) => (ask ? [`${command} ${room}`] : []));
 }
+
+// Whether Ergo's line takes me out of its room: its KICK of me, or its PART of me, another session's PART taking every
+// session out (channel.go:1078-1082, v2.19.1).
+export const outOf = ({ source = "", command, params }: IrcMessage, me: string): boolean =>
+  (command === "KICK" && params[1] === me) || (command === "PART" && nickOf(source) === me);

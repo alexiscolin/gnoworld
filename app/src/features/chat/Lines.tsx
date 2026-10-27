@@ -50,6 +50,31 @@ function LineText({ blocks, me, known, stop }: LineTextProps) {
   );
 }
 
+// The prototype's divider: a row of its own, its word in the label style and a rule running on.
+function NewDivider() {
+  return (
+    <>
+      <span className={styles["divider"]}>
+        <span className="label">
+          <span className={styles["fresh"]}>
+            New<span className="visually-hidden"> from here</span>
+          </span>
+        </span>
+      </span>{" "}
+    </>
+  );
+}
+
+// A line's author: its account's address shortened or its guest's nick, then "you" if it is mine.
+function Author({ line, mine }: { line: Line; mine: boolean }) {
+  return (
+    <span className={styles["author"]}>
+      <Person name={line.account ?? line.from} guest={line.account === undefined} />
+      {mine ? " you" : null}
+    </span>
+  );
+}
+
 // A line, read once: drawn, and asked whether it mentions the reader, which a word says as well as its colour; a
 // mention shortened for the reader and the room's members alone (F812). A change of members reads its mentions
 // again, never its drawing.
@@ -70,25 +95,17 @@ function LineView({ line, me, members, stop, actions, fresh }: LineViewProps) {
   const names = namesOf(line.text);
   const mentioned = names.split(" ").some((address) => address === me);
   const known = knownOf(names, members);
+  // Mine: my name in mint and the word "you" (DESIGN-SYSTEM.md, Avatar; U5).
+  const mine = me !== undefined && line.account === me;
   return (
     <li
       className={KINDS[line.kind]}
       data-about-me={mentioned ? "" : undefined}
       data-new={fresh ? "" : undefined}
+      data-mine={mine ? "" : undefined}
       tabIndex={stop ? 0 : -1}
     >
-      {fresh ? (
-        <>
-          {/* The prototype's divider: a row of its own, its word in the label style and a rule running on. */}
-          <span className={styles["divider"]}>
-            <span className="label">
-              <span className={styles["fresh"]}>
-                New<span className="visually-hidden"> from here</span>
-              </span>
-            </span>
-          </span>{" "}
-        </>
-      ) : null}
+      {fresh ? <NewDivider /> : null}
       {/* The line's marks first, before the time: where no sender's words stand (F808). */}
       {mentioned ? <span className={styles["mentionsYou"]}>Mentions you </span> : null}
       {line.kind === "notice" ? <span className={styles["mark"]}>Notice </span> : null}
@@ -96,8 +113,7 @@ function LineView({ line, me, members, stop, actions, fresh }: LineViewProps) {
         {CLOCK.format(new Date(line.time))}
       </time>{" "}
       {line.kind === "action" ? "* " : null}
-      <Person name={line.account ?? line.from} guest={line.account === undefined} />{" "}
-      <LineText blocks={blocks} me={me} known={known} stop={stop} />
+      <Author line={line} mine={mine} /> <LineText blocks={blocks} me={me} known={known} stop={stop} />
       {actions}
     </li>
   );
@@ -132,7 +148,8 @@ function useNewestInView(lines: readonly Line[], fresh: string | undefined) {
 }
 
 export interface LinesProps {
-  room: string;
+  /** The room, whose lines have bars; none for a direct message's, which have none. */
+  room: string | undefined;
   lines: readonly Line[];
   members: readonly string[];
   /** The reader's address, the lines that mention it marked; none for a guest. */
@@ -171,12 +188,12 @@ export function Lines({
   const { listRef, atEndRef, onScroll } = useNewestInView(lines, fresh);
   const look = useReadAtEnd(lines, atEndRef, paged ? onRead : undefined);
   const { stop, mounted, on, leave } = useLineFocus(lines, listRef, fresh);
-  const { said, setSaid, copy } = useCopy(room);
+  const { said, setSaid, copy } = useCopy();
   const [deleting, remove] = useRemoval({ lines, refused, connected, onDelete, leave, setSaid });
   // Who a mention may shorten (F812): the members, and the authors in view by their account tag, who proved their
   // key as a member did (F819).
   const known = new Set([...members, ...lines.flatMap(({ account }) => (account === undefined ? [] : [account]))]);
-  const actionsOf = (line: Line) => (
+  const actionsOf = (line: Line, room: string) => (
     <LineActions
       line={line}
       room={room}
@@ -184,7 +201,7 @@ export function Lines({
       deleting={line.id === deleting}
       onCopy={(what) => {
         onDismiss();
-        copy(line, what);
+        copy(line, what, room);
       }}
       onDelete={remove}
     />
@@ -221,7 +238,7 @@ export function Lines({
             me={me}
             members={known}
             stop={line.id === stop}
-            actions={mounted(line.id) ? actionsOf(line) : null}
+            actions={room !== undefined && mounted(line.id) ? actionsOf(line, room) : null}
             fresh={line.id === fresh}
           />
         ))}

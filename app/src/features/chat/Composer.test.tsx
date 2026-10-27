@@ -3,6 +3,7 @@ import { completions } from "./complete.ts";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { Composer, NEAR, Preview, said, typingOf } from "./Composer.tsx";
+import { refusalAfter } from "./composerHooks.ts";
 
 const ROOM = "#bubble/games";
 const NICK = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
@@ -10,16 +11,54 @@ const html = () =>
   renderToStaticMarkup(
     <Composer room={ROOM} nick={NICK} rooms={["#games", "#gnogolf"]} members={[]} onSay={() => true} />,
   );
+// A direct message's composer: its room is the partner's address, its label the partner's short one.
+const toPartner = () =>
+  renderToStaticMarkup(
+    <Composer
+      room="g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv"
+      label="g10gh7…3y5tv"
+      nick={NICK}
+      rooms={[]}
+      members={[]}
+      onSay={() => true}
+    />,
+  );
 const CHOICES = { commands: ["/me"], rooms: ["#games", "#gnogolf", "#news"], people: [] };
 const names = (markup: string) => [...markup.matchAll(/aria-label="([^"]+)"/g)].map((found) => found[1]);
 
 describe("Composer", () => {
+  // /code-review on 4e (CR7): a refusal put its draft back over what the reader had typed since.
+  it("puts a refused draft back into an empty box alone; a box holding words keeps them, the unsent ones quoted", () => {
+    const refused = { draft: "hi **you**", why: "Not sent: g10gh7…3y5tv is not online." };
+    expect(refusalAfter("", refused)).toEqual(refused);
+    expect(refusalAfter("typed since", refused)).toEqual({
+      draft: "typed since",
+      why: "Not sent: g10gh7…3y5tv is not online. Unsent: “hi **you**”",
+    });
+    expect(refusalAfter("x", { draft: "a".repeat(80), why: "W." }).why).toBe(`W. Unsent: “${"a".repeat(80)}”`);
+    // Cut past 80 characters as a reader counts them: a thumb and its skin tone stay one.
+    const long = `${"a".repeat(79)}👍🏽tail`;
+    expect(refusalAfter("x", { draft: long, why: "W." }).why).toBe(`W. Unsent: “${"a".repeat(79)}👍🏽…”`);
+  });
+
   it("is a form named for the room, its field labelled, Send off while the line is empty", () => {
     const markup = html();
     expect(markup).toMatch(/<form[^>]*aria-label="Write in #games"/);
     expect(markup).toMatch(/<label[^>]*>Message #games<\/label>/);
     expect(markup).toMatch(/<button(?=[^>]*type="submit")(?=[^>]*disabled="")[^>]*>/);
     expect(markup).not.toContain("inert");
+  });
+
+  // 4e: a direct message's composer is named for its partner, as the page names the conversation.
+  it("names its form and its field by the label it is given, in place of the room's", () => {
+    const markup = toPartner();
+    expect(markup).toMatch(/<form[^>]*aria-label="Write to g10gh7…3y5tv"/);
+    expect(markup).toMatch(/<label[^>]*>Message g10gh7…3y5tv<\/label>/);
+  });
+
+  // The merge of 4e and 4f: typing is told to a room, never to a direct message's partner, which its field's help must not say.
+  it("says nothing of typing to a direct message's partner, whom none is told", () => {
+    expect(toPartner()).not.toContain("see when you type");
   });
 
   it("previews the line out of the keyboard's and the screen reader's reach, its links too", () => {
@@ -118,7 +157,7 @@ describe("what the composer's field says", () => {
   it.each([
     ["", false, {}],
     ["hello", false, {}],
-    ["hello", true, { error: "Not sent: the chat is not in this room yet. Try again in a moment." }],
+    ["hello", true, { error: "Not sent: the chat is not ready yet. Try again in a moment." }],
     ["/nick bob", false, { error: "/nick is not a command. /me sends an action." }],
     ["a".repeat(422), false, { error: "Too long by 3 bytes." }],
     ["a".repeat(420), false, { error: "Too long by 1 byte." }],
@@ -149,7 +188,7 @@ describe("what the composer's field says of a completion", () => {
 
   it("says a line not sent before any completion", () => {
     expect(said(compose(ROOM, "#g", NICK), true, completions("#g", CHOICES))).toStrictEqual({
-      error: "Not sent: the chat is not in this room yet. Try again in a moment.",
+      error: "Not sent: the chat is not ready yet. Try again in a moment.",
     });
   });
 });

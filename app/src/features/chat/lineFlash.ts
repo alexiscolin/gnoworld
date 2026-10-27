@@ -6,9 +6,9 @@ import { useState } from "react";
 import { roomHref } from "./names.ts";
 
 // What a copy says, in the room's flash: done, or not and why, a page with no clipboard (a plain http origin) included.
-export function useCopy(room: string) {
+export function useCopy() {
   const [said, setSaid] = useState<FlashMessage | null>(null);
-  const copy = (line: Line, what: "text" | "link") => {
+  const copy = (line: Line, what: "text" | "link", room: string) => {
     setSaid(null);
     const text = what === "text" ? line.text : new URL(roomHref(room), location.href).href;
     // A page with no clipboard throws at once: inside a then, it fails as a refusal does.

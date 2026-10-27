@@ -69,6 +69,9 @@ Alexis, 2026-10-23: slice 3's reviews found these; none bites today, each comes 
 | Item | Delivers | Why |
 |---|---|---|
 | A phone's way to a line's actions | A quiet "⋯" at each line's end under `(hover: none)`, or a first-use hint, once a phone writes (slice 4's plan: a phone reads only) | Nothing hints that a line can be tapped for its bar, and a tap on a line with a link opens the link (the menu's UX review, U12) |
+| A phone's own layout for the chat | At a phone's width the navigation above the conversation, not beside it, and no composer (a phone reads only); rooms and direct messages alike, with slice 5's page layout | At 390 px the 160 px navigation takes 41% of the width and a line wraps at about 22 characters; the approved rooms-phone picture holds it too (4e's UX review U14) |
+| A navigation row's whole box a link | Row's padding on its link, so what a row shows is what a pointer reaches, in every list | A row shows 160×37 px and its link is 136×21 px, passing WCAG 2.5.8 by the spacing exception alone (4e's UX review U17) |
+| A conversation's face and last line | Each direct message's row with its partner's Avatar and its last line; a new conversation announced, with 4f's notifications | A row shows a short address alone (4e's UX review U19; its order, heard last first, is done: F852) |
 
 ## The design system, after slice 2
 

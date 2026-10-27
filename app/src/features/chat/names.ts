@@ -2,6 +2,9 @@
 import { Address, type RoomList } from "@gnoworld/schemas";
 import type { AppState } from "../../store/index.ts";
 
+/** Whether a nick is an account's: an address, which a guest's cannot be (Ergo gives a guest 32 characters). */
+export const isAccount = (nick: string): boolean => Address.safeParse(nick).success;
+
 /** An address's first six and last five characters, as the login shows one's own. */
 export const shortAddress = (address: string): string => `${address.slice(0, 6)}…${address.slice(-5)}`;
 
@@ -16,6 +19,12 @@ export function roomHref(room: string): string {
   const { world, name } = partsOf(room);
   return name === undefined ? `/w/${world}` : `/w/${world}?room=${name}`;
 }
+
+/** A direct message's address on the site: its world's page, and ?dm=<the partner's address> (4e). */
+export const dmHref = (world: string, partner: string): string => `/w/${world}?dm=${partner}`;
+
+/** A direct message's search on its world's page: ?dm=<the partner's address> (4e). */
+export const dmParams = (partner: string): URLSearchParams => new URLSearchParams({ dm: partner });
 
 /** A room's search on its world's page: ?room=<name>, or none for the main room. */
 export function roomParams(room: string): URLSearchParams {
@@ -45,7 +54,7 @@ export function neighbour(rooms: readonly string[], room: string, step: number):
 
 /** The accounts a mention completes to: the room's members that are addresses, each once, oneself left out. */
 export const peopleOf = (members: readonly string[], self: string): string[] => [
-  ...new Set(members.filter((member) => member !== self && Address.safeParse(member).success)),
+  ...new Set(members.filter((member) => member !== self && isAccount(member))),
 ];
 
 /** Every room a world lists, in its order. */

@@ -5,8 +5,9 @@
 // bar wraps the selection in Markdown's marks; the line shows below as it reads.
 import { COMMANDS, compose, type Composed } from "@gnoworld/core";
 import { Button, Cluster, Field, IconButton, Sidebar, Stack, type FieldProps, type IconName } from "@gnoworld/ui";
-import { useLayoutEffect, useRef, useState, type KeyboardEvent, type SubmitEvent } from "react";
+import { useRef, useState, type KeyboardEvent, type SubmitEvent } from "react";
 import { completed, completions, type Completion } from "./complete.ts";
+import { useFocusAtStart, useRefusal, useSelection, type Refused } from "./composerHooks.ts";
 import { formatted, type Edit, type Format } from "./format.ts";
 import { Message } from "./Message.tsx";
 import { peopleOf, roomLabel, shortAddress } from "./names.ts";
@@ -46,7 +47,7 @@ export function typingOf(draft: string): "active" | "done" | undefined {
 /** What the field says of the line: that it was not sent or is too long, what Tab completes (a command not yet
  * typed whole being no error), an unknown command, or help near the end; or nothing. */
 export function said(composed: Composed, failed: boolean, completion?: Completion): Pick<FieldProps, "error" | "help"> {
-  if (failed) return { error: "Not sent: the chat is not in this room yet. Try again in a moment." };
+  if (failed) return { error: "Not sent: the chat is not ready yet. Try again in a moment." };
   if (composed.kind === "long") return { error: `Too long by ${bytes(composed.over)}.` };
   if (completion !== undefined) {
     const [first = "", ...rest] = completion.options.map(named);
@@ -114,10 +115,21 @@ export interface ComposerProps {
   onDraft?: ((draft: string) => void) | undefined;
   /** What each change of the draft tells the room of the account's typing (4f). */
   onTyping?: ((state: "active" | "done") => void) | undefined;
+  /** The name of whom it writes to, in place of the room's: a direct message's partner (4e). */
+  label?: string | undefined;
+  /** The lines Ergo refused so far, the last one's draft, and why it did not go (4e: a direct message to an account
+   * not connected). One more while the composer is in view puts its draft back in the box. */
+  refused?: Refused | undefined;
+  /** Takes the focus as it starts: a direct message just opened from who is here, whose button went (4e's U12). */
+  focus?: boolean | undefined;
+  /** The id of what describes whom it writes to: a direct message's "not encrypted" (4e's U6). */
+  describedBy?: string | undefined;
 }
 
-export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", onDraft, onTyping }: ComposerProps) {
+export function Composer(props: ComposerProps) {
+  const { room, nick, rooms, members, onSay, draft: kept = "", onDraft, onTyping, label: to, refused } = props;
   const [draft, setDraft] = useState(kept);
+  const refusal = useRefusal(refused, draft, setDraft);
   // Each change of the draft, the device and the room told at once: a render alone (a line arriving, a room opened
   // on a kept draft) writes nothing and tells no one (R3).
   const change = (next: string) => {
@@ -128,9 +140,7 @@ export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", 
   };
   const [failed, setFailed] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
-  // The selection an edit leaves, put back in the box once it shows the new draft.
-  const selectionRef = useRef<Edit>(undefined);
-  const label = roomLabel(room);
+  const label = to ?? roomLabel(room);
   const composed = compose(room, draft, nick);
   // The room's accounts are sorted out of its members only while a word after `@` is typed; read apart, the mention
   // alone, not each key, is what the compiler recomputes them on (F793).
@@ -138,22 +148,17 @@ export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", 
   const people = mentioning ? peopleOf(members, nick) : [];
   const completion = completions(draft, { commands: COMMANDS, rooms, people });
   const says = said(composed, failed, completion);
-  // Nothing else to say, no error either: the disclosure.
-  const shown = says.error === undefined && says.help === undefined ? { help: TELLS } : says;
-  const known = new Set(members);
-  const box = () => formRef.current?.querySelector("input") ?? undefined;
-  useLayoutEffect(() => {
-    const selection = selectionRef.current;
-    if (selection === undefined) return;
-    selectionRef.current = undefined;
-    box()?.focus();
-    box()?.setSelectionRange(selection.start, selection.end);
-  }, [draft]);
+  // Nothing else to say, no error either: the disclosure, to a room's writer; a direct message tells no typing (4e).
+  const shown = says.error === undefined && says.help === undefined && to === undefined ? { help: TELLS } : says;
+  // The selection an edit leaves is put back in the box once it shows the new draft.
+  const { box, keep } = useSelection(formRef, draft);
+  useFocusAtStart(formRef, props.focus);
   // An edit of the format bar or of a completion: the new draft, its selection, and no line not sent any more.
   const apply = (next: Edit) => {
-    selectionRef.current = next;
+    keep(next);
     change(next.text);
     setFailed(false);
+    refusal.said();
   };
   const format = (kind: Format) => {
     const start = box()?.selectionStart ?? draft.length;
@@ -173,10 +178,17 @@ export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", 
     if (composed.kind !== "line") return;
     const went = onSay(draft);
     setFailed(!went);
+    refusal.said();
     if (went) change("");
   };
   return (
-    <form ref={formRef} aria-label={`Write in ${label}`} onSubmit={send} onKeyDown={complete}>
+    <form
+      ref={formRef}
+      aria-label={`Write ${to === undefined ? "in" : "to"} ${label}`}
+      aria-describedby={props.describedBy}
+      onSubmit={send}
+      onKeyDown={complete}
+    >
       <Stack space="2xs">
         <FormatBar onFormat={format} />
         <Sidebar side="end" space="2xs">
@@ -186,14 +198,15 @@ export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", 
             onChange={(value) => {
               change(value);
               setFailed(false);
+              refusal.said();
             }}
-            {...shown}
+            {...(refusal.why === undefined ? shown : { error: refusal.why })}
           />
           <Button type="submit" disabled={composed.kind !== "line"}>
             Send
           </Button>
         </Sidebar>
-        <Preview composed={composed} me={nick} members={known} />
+        <Preview composed={composed} me={nick} members={new Set(members)} />
       </Stack>
     </form>
   );

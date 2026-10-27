@@ -5,31 +5,32 @@
 // (4c); a guest reads, a room letting accounts alone speak.
 import type { RoomList } from "@gnoworld/schemas";
 import { Button, Sidebar, Stack } from "@gnoworld/ui";
-import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useSearchParams } from "react-router";
 import { pageLoginApi } from "../../lib/api/login.ts";
-import { pageRoomsApi } from "../../lib/api/rooms.ts";
+import { pageDmPrefs } from "../../lib/dms/page.ts";
 import { pageDrafts } from "../../lib/drafts/page.ts";
+import { pageRoomsApi } from "../../lib/api/rooms.ts";
 import { drawGuestNick } from "../../lib/ergo/ergo.ts";
 import { pageErgo } from "../../lib/ergo/page.ts";
 import type { AppState } from "../../store/index.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
+import { useDms, type Dms } from "./Dms.tsx";
 import { chatLink, type ChatLink } from "./link.ts";
 import { LOADING } from "./Loading.tsx";
-import { neighbour, roomIds, roomLabel, roomParams, roomsQuery, shownRoom } from "./names.ts";
+import { dmParams, neighbour, roomIds, roomParams, roomsQuery, shownRoom } from "./names.ts";
 import { useOnHide } from "./reading.ts";
 import { roomActs } from "./roomActs.ts";
 import { RoomsView } from "./RoomsView.tsx";
-import { RoomView, type RoomViewProps } from "./RoomView.tsx";
+import { People, RoomView, type RoomViewProps } from "./RoomView.tsx";
+import { shownOf } from "./shown.tsx";
+import { Writer } from "./Writer.tsx";
 
 // The rooms as last asked, and what came: undefined when the list could not load.
 interface Asked {
   query: string;
   sections: RoomList["sections"] | undefined;
 }
-
-// The composer, an account's alone: a visitor's page never loads its code (the first screen's budget, ADR-0001 §12).
-const Composer = lazy(async () => ({ default: (await import("./Composer.tsx")).Composer }));
 
 // Alt+Up and Alt+Down: the room before or after the one in view, anywhere on the page (ADR-0002's chat rows). A key
 // pressed before the page draws the room the last one went to starts from that room: the hook keeps it, and the room
@@ -58,45 +59,25 @@ function useRoomKeys(rooms: readonly string[], current: string | undefined) {
   }, [rooms, setParams]);
 }
 
-// Under a room's lines: the composer for an account, which writes through the link; a word for a guest.
-// The word being typed completes to a room of the world's, by its label, or to another account in the room.
-interface WriterProps {
-  session: AppState["login"]["session"];
-  room: string;
-  rooms: readonly string[];
-  members: readonly string[];
-  onSay: (draft: string) => boolean;
-  onTyping: (state: "active" | "done") => void;
-}
-
-function Writer({ session, room, rooms, members, onSay, onTyping }: WriterProps) {
-  if (session.kind !== "in") return <p>Log in to write in this room.</p>;
-  // The account's drafts on this device: the room's, where the composer starts, and each change kept (4d).
-  const kept = pageDrafts(session.address);
-  return (
-    <Suspense fallback={null}>
-      <Composer
-        draft={kept.get(room)}
-        onDraft={(draft) => {
-          kept.set(room, draft);
-        }}
-        key={room}
-        room={room}
-        nick={session.address}
-        rooms={rooms.map(roomLabel)}
-        members={members}
-        onSay={onSay}
-        onTyping={onTyping}
-      />
-    </Suspense>
-  );
+// The conversation opened from who is here, whose composer takes the focus as its button goes (U12): asked while it is
+// in view, `partner` the one in view, never again once the reader left it (CR6).
+function useOpened(partner: string | undefined) {
+  const [opened, setOpened] = useState<{ partner: string; seen: boolean }>();
+  if (opened?.seen === false && partner === opened.partner) setOpened({ ...opened, seen: true });
+  if (opened?.seen === true && partner !== opened.partner) setOpened(undefined);
+  return {
+    focus: opened !== undefined && opened.partner === partner,
+    open: (other: string) => {
+      setOpened({ partner: other, seen: false });
+    },
+  };
 }
 
 // The world's rooms once listed: the switcher, the room in view and what writes in it.
 interface LoadedProps {
   sections: RoomList["sections"];
   current: string | undefined;
-  state: RoomViewProps["state"];
+  state: AppState["chat"]["rooms"][string] | undefined;
   chat: RoomViewProps["chat"];
   session: AppState["login"]["session"];
   /** The page's link to Ergo, which says and deletes the room in view's lines (4c), tells the account's typing and
@@ -104,39 +85,71 @@ interface LoadedProps {
   link: RefObject<ChatLink | undefined>;
   /** The room's refused delete, said. */
   dismissed: (room: string) => void;
+  /** Sends a draft to another account (4e). */
+  sayTo: (partner: string, draft: string) => boolean;
+  dms: Dms;
+  /** What says the rooms could not load, in their place, while a direct message shows (CR8). */
+  failed?: ReactNode;
 }
 
-function Loaded({ sections, current, state, chat, session, link, dismissed }: LoadedProps) {
+function Loaded({ sections, current, state, chat, session, link, dismissed, sayTo, dms, failed }: LoadedProps) {
   const ids = roomIds(sections);
-  useRoomKeys(ids, current);
-  const acts = roomActs(link, current ?? "", dismissed);
+  // One conversation in view: the direct message ?dm= names, else the room. Alt+Up and Alt+Down move between rooms,
+  // none while a direct message is in view (U15).
+  const room = dms.partner === undefined && dms.problem === undefined ? current : undefined;
+  useRoomKeys(ids, room);
+  const acts = roomActs(link, room ?? "", dismissed);
+  const [, setParams] = useSearchParams();
+  const me = session.kind === "in" ? session.address : undefined;
+  const opened = useOpened(dms.partner);
+  const noteId = useId();
+  // Apart from the room's element, which each line draws again: who is here keeps its drawing (the compiler).
+  const onMessage = (other: string) => {
+    opened.open(other);
+    setParams(dmParams(other));
+  };
+  const people = (
+    <People members={state?.members ?? []} connected={chat === "connected"} me={me} onMessage={onMessage} />
+  );
+  const shown = shownOf(dms, { id: room, state, acts }, { sayTo, focus: opened.focus, noteId });
   return (
     <Sidebar space="l">
-      <RoomsView sections={sections} current={current} />
-      {current === undefined ? null : (
+      <RoomsView sections={sections} current={room} dms={dms.nav} failed={failed} />
+      {dms.problem === undefined ? null : <p role="status">{dms.problem}</p>}
+      {shown === undefined ? null : (
         <RoomView
-          room={current}
-          state={state}
+          key={shown.key}
+          {...shown.view}
+          aside={shown.kind === "room" ? people : undefined}
           chat={chat}
-          me={session.kind === "in" ? session.address : undefined}
-          onDelete={acts.onDelete}
-          onDismiss={acts.onDismiss}
-          onRead={acts.onRead}
-          composer={
-            <Writer
-              session={session}
-              room={current}
-              rooms={ids}
-              members={state?.members ?? []}
-              onSay={acts.onSay}
-              onTyping={acts.onTyping}
-            />
-          }
+          me={me}
+          noteId={noteId}
+          composer={<Writer session={session} rooms={ids} {...shown.writer} />}
         />
       )}
     </Sidebar>
   );
 }
+
+// What says the rooms could not load, and asks again.
+function RoomsFailed({ onRetry }: { onRetry: () => void }) {
+  return (
+    <Stack space="s">
+      <p role="alert">The rooms could not load.</p>
+      <Button onClick={onRetry}>Try again</Button>
+    </Stack>
+  );
+}
+
+// The page's link to Ergo: the page's socket, the login's tickets, a guest's drawn nick, an account's device.
+const pageLink = (store: ReturnType<typeof useAppStore>) =>
+  chatLink({
+    store,
+    connect: pageErgo,
+    ticket: pageLoginApi().ticket,
+    guest: drawGuestNick,
+    device: (account) => ({ prefs: pageDmPrefs(account), drafts: pageDrafts(account) }),
+  });
 
 export function ChatPanel({ world }: { world: string }) {
   const store = useAppStore();
@@ -148,7 +161,7 @@ export function ChatPanel({ world }: { world: string }) {
   const session = useApp(({ login }) => login.session);
   const query = roomsQuery(world, session, attempt);
   useEffect(() => {
-    const made = chatLink({ store, connect: pageErgo, ticket: pageLoginApi().ticket, guest: drawGuestNick });
+    const made = pageLink(store);
     linkRef.current = made;
     return () => {
       made.stop();
@@ -189,25 +202,22 @@ export function ChatPanel({ world }: { world: string }) {
     linkRef.current?.show(current);
   }, [current]);
   const state = useApp((app) => (current === undefined ? undefined : app.chat.rooms[current]));
+  const dms = useDms(world, session, params.get("dm"));
   const chat = useApp((app) => app.login.chat);
   if (!loaded) return LOADING;
-  if (sections === undefined) {
-    return (
-      <Stack space="s">
-        <p role="alert">The rooms could not load.</p>
-        <Button
-          onClick={() => {
-            setAttempt((n) => n + 1);
-          }}
-        >
-          Try again
-        </Button>
-      </Stack>
-    );
-  }
+  const failed =
+    sections === undefined ? (
+      <RoomsFailed
+        onRetry={() => {
+          setAttempt((n) => n + 1);
+        }}
+      />
+    ) : undefined;
+  // A direct message waits on no room: it shows though the rooms could not load (U10).
+  if (failed !== undefined && dms.partner === undefined) return failed;
   return (
     <Loaded
-      sections={sections}
+      sections={sections ?? []}
       current={current}
       state={state}
       chat={chat}
@@ -216,6 +226,9 @@ export function ChatPanel({ world }: { world: string }) {
       dismissed={(room) => {
         store.getState().chatActions.dismissed(room);
       }}
+      sayTo={(partner, draft) => linkRef.current?.sayTo(partner, draft) ?? false}
+      dms={dms}
+      failed={failed}
     />
   );
 }

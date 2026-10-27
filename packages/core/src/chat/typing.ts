@@ -2,7 +2,7 @@
 // (ircv3.net/specs/client-tags/typing): a receiver keeps a nick typing 6 s after its active, 30 s after its paused,
 // until its done, its line in the room, or its leaving. The times are the page's clock, never the line's time tag.
 import type { IrcMessage } from "../irc/irc.ts";
-import { nickOf, sameRoom, type Where } from "./room.ts";
+import { nickOf, sameName, type Where } from "./room.ts";
 
 /** How long a nick stays typing after its active, and after its paused (the spec's receiver rules). */
 export const TYPING_ACTIVE_MS = 6_000;
@@ -33,7 +33,7 @@ const SAYINGS = ["PRIVMSG", "NOTICE", "PART"];
 function ended({ command, params, source }: IrcMessage, room: string): string | undefined {
   const [target = "", kicked] = params;
   if (LEAVINGS.includes(command)) return nickOf(source ?? "");
-  if (!sameRoom(target, room)) return undefined;
+  if (!sameName(target, room)) return undefined;
   return command === "KICK" ? kicked : SAYINGS.includes(command) ? nickOf(source ?? "") : undefined;
 }
 
@@ -44,7 +44,7 @@ const lastOf = (state: string): number | undefined => (Object.hasOwn(LASTS, stat
 function told(typing: Typing, message: IrcMessage, at: TypingAt): Typing {
   const nick = nickOf(message.source ?? "");
   const [target = ""] = message.params;
-  if (!sameRoom(target, at.room) || nick === "" || nick === at.me) return typing;
+  if (!sameName(target, at.room) || nick === "" || nick === at.me) return typing;
   const state = message.tags.get("+typing") ?? "";
   if (state === "done") return holds(typing, nick) ? kept(typing, at.now, nick) : typing;
   const lasts = lastOf(state);

@@ -2,6 +2,7 @@ export { escapeTagValue, formatLine, parseLine, toIrcCommand, unescapeTagValue }
 export type { IrcCommand, IrcMessage, IrcParsed, IrcParseError } from "./irc/irc.ts";
 export { BATCH_LINES, BatchReader, OPEN_BATCHES, type Batch, type Batched } from "./irc/batch.ts";
 export { addLines, concerns, lineOf, membersAfter, nickOf, redactAfter, refusedOf, topicAfter } from "./chat/room.ts";
+export { dmOf } from "./chat/dm.ts";
 export type { Line, Where } from "./chat/room.ts";
 export { TYPING_ACTIVE_MS, TYPING_PAUSED_MS, typingAfter, typingAt, type Typing } from "./chat/typing.ts";
 export { firstUnread, newMarkAfter, PLACE_AHEAD_MS, readAfter, type NewMark } from "./chat/marker.ts";

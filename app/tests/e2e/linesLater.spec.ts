@@ -40,8 +40,9 @@ test.describe("the lines view, loaded after the page", () => {
     await expect(list).toHaveAttribute("aria-busy", "true");
     await expect(form.getByRole("textbox", { name: "Message #games" })).toBeVisible();
     await expect(lines(page)).toHaveCount(0);
-    // Nothing waits for the lines: Tab from the rooms' last link skips the list's place for the composer.
-    await roomsNav(page).getByRole("link").last().focus();
+    // Nothing waits for the lines: Tab from the navigation's last control (an account's direct messages end it, 4e) skips
+    // the list's place for the composer.
+    await roomsNav(page).getByRole("button", { name: "Only people I wrote to" }).focus();
     await page.keyboard.press("Tab");
     await expect(form.locator(":focus")).toHaveCount(1);
     release();
