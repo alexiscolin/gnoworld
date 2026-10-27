@@ -20,7 +20,7 @@ import { useCopy, useRemoval } from "./lineFlash.ts";
 import { useLineFocus } from "./lineFocus.ts";
 import { LineView } from "./LineView.tsx";
 import { mentionable } from "./names.ts";
-import { useNewMark, useReadAtEnd } from "./reading.ts";
+import { useLookWhenResized, useNewMark, useReadAtEnd } from "./reading.ts";
 import { chipsOf } from "./Reactions.tsx";
 import shared from "./lists.module.css";
 import styles from "./RoomView.module.css";
@@ -60,6 +60,20 @@ function useNewestInView(
   // A list with no height is hidden (a phone's open thread hides the room): nothing there is seen, at the end or not.
   const seesEnd = () => atEndRef.current && (listRef.current?.clientHeight ?? 0) > 0;
   return { listRef, seesEnd, onScroll };
+}
+
+// The list held at its newest and the room read to it: what a scroll or a change of the list's size does to both.
+function useReading(list: Pick<LinesProps, "lines" | "reactions" | "onRead"> & { fresh: string | undefined }) {
+  const { listRef, seesEnd, onScroll } = useNewestInView(list.lines, list.fresh, list.reactions);
+  const look = useReadAtEnd(list.lines, seesEnd, list.onRead);
+  useLookWhenResized(listRef, look);
+  return {
+    listRef,
+    onScroll: () => {
+      onScroll();
+      look();
+    },
+  };
 }
 
 export interface LinesProps {
@@ -162,8 +176,7 @@ function List(props: ListProps) {
   const { onDelete = NO_DELETE, onDismiss = NO_DISMISS, onReact = NO_REACT, onReply = NO_REPLY } = props;
   const { read, paged = false, onRead, verdicts, saving = false, byId, chips, repliesOf, onThread } = props;
   const fresh = useNewMark(lines, paged ? read : undefined, me);
-  const { listRef, seesEnd, onScroll } = useNewestInView(lines, fresh, reactions);
-  const look = useReadAtEnd(lines, seesEnd, paged ? onRead : undefined);
+  const { listRef, onScroll } = useReading({ lines, fresh, reactions, onRead: paged ? onRead : undefined });
   const { stop, mounted, on, leave } = useLineFocus(lines, listRef, fresh);
   const { said, setSaid, copy } = useCopy();
   const [deleting, remove] = useRemoval({ lines, refused, connected, onDelete, leave, setSaid });
@@ -205,10 +218,7 @@ function List(props: ListProps) {
       />
       <ol
         ref={listRef}
-        onScroll={() => {
-          onScroll();
-          look();
-        }}
+        onScroll={onScroll}
         {...on}
         aria-label="Messages"
         // How the keyboard moves among the lines, which nothing else tells a screen reader (U14).

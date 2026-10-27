@@ -1,7 +1,7 @@
 // A room's reading place on its page (slice 4's 4f, Ergo's draft/read-marker): the line marked New while the room is
 // open, and the room marked read to its newest line while the reader is at the end and the page shows.
 import { newMarkAfter, type Line, type NewMark } from "@gnoworld/core";
-import { useEffect, useEffectEvent, useState } from "react";
+import { useEffect, useEffectEvent, useState, type RefObject } from "react";
 
 /** The msgid of the line marked New: the first past the place once the room holds lines and the place is known, kept
  * while the room is open, as the place moves on and lines come. */
@@ -55,4 +55,21 @@ export function useReadAtEnd(
     seen();
   }, [newest, reading]);
   return look;
+}
+
+/** Calls `look` each time the list's box changes size: one a phone's panel hid (no height) and Close shows again at its
+ * end is read then, the lines that came meanwhile (F1856). A page with no ResizeObserver has no panel to close. */
+export function useLookWhenResized(listRef: RefObject<HTMLElement | null>, look: () => void) {
+  const seen = useEffectEvent(look);
+  useEffect(() => {
+    const box = listRef.current;
+    if (box === null || typeof ResizeObserver === "undefined") return;
+    const watch = new ResizeObserver(() => {
+      seen();
+    });
+    watch.observe(box);
+    return () => {
+      watch.disconnect();
+    };
+  }, [listRef]);
 }

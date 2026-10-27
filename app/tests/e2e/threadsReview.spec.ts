@@ -107,8 +107,8 @@ test.describe("threads, from the review", () => {
           return list !== null && list.scrollHeight - list.scrollTop - list.clientHeight < 32;
         });
 
-    // CR2 (F1762): a line that comes while the list is hidden is not one the reader saw: no reading place moves.
-    test("marks no line read that comes while the panel hides the list", async ({ page }) => {
+    // The reader at the end of forty lines, read to the reply, then the panel opened: the list hidden.
+    const hiddenByPanel = async (page: Page) => {
       const heard: string[] = [];
       const { ergo } = await asAccount(
         page,
@@ -116,6 +116,12 @@ test.describe("threads, from the review", () => {
         41,
       );
       await threadOf(lineOf(page, "the reply"));
+      return { heard, ergo };
+    };
+
+    // CR2 (F1762): a line that comes while the list is hidden is not one the reader saw: no reading place moves.
+    test("marks no line read that comes while the panel hides the list", async ({ page }) => {
+      const { heard, ergo } = await hiddenByPanel(page);
       await expect(panel(page)).toBeVisible();
       await expect(lines(page).first()).toBeHidden();
       ergo().send(live("m99", T(45), { text: "unseen" }));
@@ -123,6 +129,16 @@ test.describe("threads, from the review", () => {
       await say(page, "barrier");
       await expect.poll(() => heard.some((line) => line.includes(":barrier"))).toBe(true);
       expect(marks(heard).join()).not.toContain(T(45));
+    });
+
+    // R7: what is hidden is read once it is shown at its end again: the line that came meanwhile is marked at Close.
+    test("marks the line that came while the panel hid the list once the panel is closed", async ({ page }) => {
+      const { heard, ergo } = await hiddenByPanel(page);
+      await expect(lines(page).first()).toBeHidden();
+      ergo().send(live("m99", T(45), { text: "unseen" }));
+      await closeButton(page).click();
+      await expect(lines(page).first()).toBeVisible();
+      await expect.poll(() => marks(heard).join()).toContain(T(45));
     });
 
     // CR2: the list comes back at the end it was left at, the reader being there when the panel opened.
