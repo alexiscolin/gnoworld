@@ -612,6 +612,8 @@ def mutants():
     yield from each("scripts/worktree.sh", "\nfinished=1\n", "\n", "hooks", "worktree.sh marks the run that reached its end, so a trap that exits 0 after an error is no success (CR6)")
     yield from each("scripts/worktree.sh", "trap 'status=$?;", "trap ':'; : '", "hooks", "worktree.sh undoes the tree and branch a failing step left half-made (CR6)")
     yield from each("scripts/worktree.sh", '[ ! -e "$dir" ] ||', "true ||", "hooks", "worktree.sh never writes into a folder that exists")
+    for sig, rest in (("HUP", "INT TERM"), ("INT", "HUP TERM"), ("TERM", "HUP INT")):
+        yield from each("scripts/worktree.sh", "trap 'exit 1' HUP INT TERM", f"trap 'exit 1' {rest}", "hooks", f"worktree.sh undoes its tree when SIG{sig} stops it, whichever shell runs it (R6)")
     yield from each("scripts/worktree.sh", ' "$dir/node_modules/.vite" "$dir/node_modules/.vite-temp"', "", "hooks", "worktree.sh gives Vite caches of the tree's own")
     yield from each("scripts/worktree.sh", "case $name in .vite | .vite-temp | ", "case $name in ", "hooks", "worktree.sh never shares Vite's caches")
     yield from each("scripts/worktree.sh", 'else ln -s "$entry"', 'else cp -R "$entry"', "hooks", "worktree.sh links each package, never copies it")

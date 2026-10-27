@@ -2810,6 +2810,22 @@ out=$(cd "$ws/src" && sh "$ws/scripts/worktree.sh" "$ws/half" halfbranch HEAD 2>
 [ ! -e "$ws/half" ] || fail "worktree.sh left the folder of a tree that failed half-made"
 ! git -C "$ws/src" rev-parse -q --verify halfbranch >/dev/null || fail "worktree.sh left the branch of a tree that failed half-made"
 git -C "$ws/src" worktree list | grep -qF "$ws/half" && fail "worktree.sh left $ws/half registered"
+# So does a signal that stops it once the tree stands (R6): the borrow step, here, sends its parent each in turn. In bash (macOS's sh)
+# the EXIT trap runs even when a signal kills the shell, in dash (Linux's sh) only the trap on the signals makes it run: both are tried.
+# SIGINT is ignored by a script started in the background, as this suite's sections are: python resets it to its default first.
+for shell in sh dash; do
+	command -v "$shell" >/dev/null || continue
+	for sig in HUP INT TERM; do
+		tag=$shell$sig
+		printf '#!/bin/sh\nkill -%s "$PPID"\nsleep 1\n' "$sig" >"$ws/scripts/borrow_node_modules.sh"
+		out=$(cd "$ws/src" && python3 -I -c 'import signal, subprocess, sys
+signal.signal(signal.SIGINT, signal.SIG_DFL)
+sys.exit(subprocess.run(sys.argv[1:]).returncode)' "$shell" "$ws/scripts/worktree.sh" "$ws/$tag" "$tag" HEAD 2>&1) && fail "worktree.sh finished a run that got SIG$sig in $shell: $out"
+		[ ! -e "$ws/$tag" ] || fail "worktree.sh left the folder of a tree stopped by SIG$sig in $shell"
+		! git -C "$ws/src" rev-parse -q --verify "$tag" >/dev/null || fail "worktree.sh left the branch of a tree stopped by SIG$sig in $shell"
+		git -C "$ws/src" worktree list | grep -qF "$ws/$tag" && fail "worktree.sh left $ws/$tag registered after SIG$sig in $shell"
+	done
+done
 (cd "$ws/src" && sh "$here/worktree.sh" "$ws/same" same HEAD) >/dev/null 2>&1 || fail "worktree.sh refused a base whose package files are this tree's"
 fi
 
