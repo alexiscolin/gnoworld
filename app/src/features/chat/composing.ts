@@ -72,7 +72,10 @@ function useReplies(shown: Shown | undefined, lines: readonly Line[] | undefined
 function useEdits(shown: Shown | undefined, lines: readonly Line[] | undefined, dropReply: () => void): Composing {
   const { value: edit, update, clear } = useHere<Chosen>(shown?.key);
   const ended = useHere<true>(shown?.key);
-  const editing = shownAs(edit, lines);
+  const found = shownAs(edit, lines);
+  // An orphan correction (its original left the window) is no line to correct: a new correction would name a line
+  // nothing folds into (CR5).
+  const editing = found?.edits === undefined ? found : undefined;
   if (shown?.kind !== "dm") return { view: {}, writer: {} };
   const view = {
     onEdit: (id: string) => {

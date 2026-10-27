@@ -157,19 +157,19 @@ function menu({
   own,
   deleting,
   edit,
-  kind,
+  line,
 }: {
   own: boolean;
   deleting: boolean;
   edit: (() => void) | undefined;
-  kind: Line["kind"];
+  line: Line;
 }): Item[] {
+  // Edit: a message of one's own that corrects none; an orphan correction (its original gone) has none to correct (CR5).
+  const editable = own && !deleting && edit !== undefined && line.kind === "message" && line.edits === undefined;
   return [
     { kinds: ["room", "dm"], label: "Copy text", act: "text" },
     { kinds: ["room"], label: "Copy room link", act: "link" },
-    ...(own && !deleting && edit !== undefined && kind === "message"
-      ? [{ kinds: ["dm"], label: "Edit", act: "edit" } as const]
-      : []),
+    ...(editable ? [{ kinds: ["dm"], label: "Edit", act: "edit" } as const] : []),
     ...(own && !deleting ? [{ kinds: ["room", "dm"], label: "Delete", tone: "danger", act: "delete" } as const] : []),
   ];
 }
@@ -212,7 +212,7 @@ export function LineActions({
     setAsking(false);
   };
   const kind: Kind = dm === undefined ? "room" : "dm";
-  const items = menu({ own, deleting, edit: onEdit, kind: line.kind })
+  const items = menu({ own, deleting, edit: onEdit, line })
     .filter((item) => item.kinds.includes(kind))
     .map(({ label, tone, act }) => ({
       label,

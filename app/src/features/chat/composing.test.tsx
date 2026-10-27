@@ -136,4 +136,13 @@ describe("useComposing", () => {
     draw("room");
     expect(now().view.onEdit).toBeUndefined();
   });
+
+  // /code-review on 4d's DM bar (CR5): a line with `edits` set is an orphan correction, whose original left the window:
+  // a correction of it would name a line nothing folds into, and show as a new one.
+  it("offers no edit of an orphan correction", () => {
+    const orphan: Line = { ...line("m3", "a correction"), edits: "m9" };
+    draw("dm", [...LINES, orphan]);
+    act(() => now().view.onEdit?.("m3"));
+    expect(now().writer.editing).toBeUndefined();
+  });
 });

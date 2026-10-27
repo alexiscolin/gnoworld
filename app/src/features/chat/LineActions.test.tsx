@@ -198,6 +198,11 @@ describe("a line's actions in a direct message", () => {
     expect(items(dm({ me: ALICE, onEdit: undefined }))).toEqual(["Copy text", "Delete"]);
   });
 
+  // /code-review on 4d's DM bar (CR5): an orphan correction (`edits` set, its original gone) is a message of one's own too.
+  it("offer no Edit on an orphan correction, whose original left the window", () => {
+    expect(items(dm({ me: ALICE, line: { ...LINE, edits: "m9" } }))).toEqual(["Copy text", "Delete"]);
+  });
+
   it("still lead with the quick reactions and Reply, an account's, with More last", () => {
     const markup = dm({ me: BOB });
     const names = [...markup.matchAll(/<button(?![^>]*role="menuitem")[^>]*\saria-label="([^"]+)"/g)].map(([, n]) => n);
