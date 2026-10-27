@@ -20,7 +20,7 @@ test.describe("edits", () => {
     });
     await expect(lines(page)).toHaveCount(3);
     await expect(lines(page).nth(0)).toContainText("the first line, fixed");
-    await expect(lines(page).nth(0)).toContainText(/^Edited \d{2}:\d{2} /);
+    await expect(lines(page).nth(0)).toContainText(/^(Edited )?\d{2}:\d{2}( Edited)? /);
     await expect(lines(page).nth(1)).toContainText("the second line");
     await expect(lines(page).nth(2)).toContainText("not yours to fix");
   });

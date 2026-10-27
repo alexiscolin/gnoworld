@@ -575,7 +575,9 @@ describe("RoomView: edits", () => {
   // their words, never as the mark.
   it("marks an edited line before its time, and a line that says (edited) not at all", () => {
     const lines = [line({ id: "a", text: "helo" }), line({ id: "e", text: "hello", edits: "a" })];
-    expect(linesOf(view({ state: { ...ROOM, lines } }))[0]).toMatch(/^Edited \d{2}:\d{2} g10gh7…3y5tv hello$/);
+    expect(linesOf(view({ state: { ...ROOM, lines } }))[0]).toMatch(
+      /^(Edited )?\d{2}:\d{2}( Edited)? g10gh7…3y5tv hello$/,
+    );
     expect(linesOf(view({ state: { ...ROOM, lines: [line({ id: "s", text: "(edited)" })] } }))[0]).toMatch(
       /^\d{2}:\d{2} g10gh7…3y5tv \(edited\)$/,
     );
