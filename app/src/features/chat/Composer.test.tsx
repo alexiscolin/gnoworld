@@ -2,7 +2,8 @@ import { compose } from "@gnoworld/core";
 import { completions } from "./complete.ts";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { Composer, NEAR, Preview, said, typingOf } from "./Composer.tsx";
+import { Composer, Preview, typingOf } from "./Composer.tsx";
+import { NEAR, said } from "./said.ts";
 import { refusalAfter } from "./composerHooks.ts";
 
 const ROOM = "#bubble/games";
