@@ -1452,4 +1452,41 @@ describe("the IRC link, a message of several lines (draft/multiline)", () => {
     await expect.poll(() => said.length).toBe(50);
     expect(said[49]).toMatchObject({ msgid: "ml2", text: "> quoted\nanswer" });
   });
+
+  it("holds 16 messages open at once, and reads none of a 17th, which it does not open", async () => {
+    const ergo = await fakeErgo();
+    const { said } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    const tags = (n: number) => `account=g1a;msgid=m${String(n)};time=${T(n)}`;
+    for (let n = 0; n < 17; n += 1) peer.say(`@${tags(n)} :a!u@h BATCH +r${String(n)} draft/multiline :#bubble`);
+    for (let n = 0; n < 17; n += 1) peer.say(`@batch=r${String(n)} :a!u@h PRIVMSG #bubble :text ${String(n)}`);
+    for (let n = 0; n < 17; n += 1) peer.say(`:a!u@h BATCH :-r${String(n)}`);
+    await sync(peer);
+    expect(said.map(({ msgid }) => msgid)).toEqual(Array.from({ length: 16 }, (_, n) => `m${String(n)}`));
+  });
+
+  it("holds a line of a batch ended no more: a line with that reference and an id, after its end, is said alone", async () => {
+    const ergo = await fakeErgo();
+    const { said } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    several(peer, "x", { tags: `account=g1a;msgid=ml1;time=${T(1)}`, parts: ["one", "two"] });
+    peer.say(message(`batch=x;account=g1a;msgid=s1;time=${T(2)}`, "a!u@h", ["#bubble", "alone"]));
+    await expect.poll(() => said.map(({ msgid }) => msgid)).toEqual(["ml1", "s1"]);
+  });
+
+  it("forgets a message open when its connection ends: its reference, used again, holds nothing of it", async () => {
+    const ergo = await fakeErgo();
+    const { said } = start(ergo.port);
+    const first = await ergo.peer(0);
+    await welcome(first);
+    first.say(`@account=g1a;msgid=ml1;time=${T(1)} :a!u@h BATCH +x draft/multiline :#bubble`);
+    await sync(first);
+    first.socket.destroy();
+    const second = await ergo.peer(1);
+    await welcome(second);
+    second.say(message(`batch=x;account=g1a;msgid=s1;time=${T(2)}`, "a!u@h", ["#bubble", "alone"]));
+    await expect.poll(() => said.map(({ msgid }) => msgid)).toEqual(["s1"]);
+  });
 });

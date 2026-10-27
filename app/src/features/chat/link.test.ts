@@ -943,7 +943,7 @@ describe("the chat's link: what it says", () => {
     const t = memberIn(["#bubble/games"]);
     for (const draft of ["a\nb", "c\nd", "e\nf"]) t.link.say("#bubble/games", composed("#bubble/games", draft));
     const refs = t.fake.sent.flatMap((line) => /^BATCH \+(\S+) /.exec(line)?.[1] ?? []);
-    expect(refs).toHaveLength(3);
+    expect(refs).toEqual(["ml0", "ml1", "ml2"]);
     for (const ref of refs) expect(ref).toMatch(/^[A-Za-z0-9-]{1,32}$/);
   });
 

@@ -231,6 +231,12 @@ describe("the composer, a draft of several lines", () => {
     expect(markup).toMatch(new RegExp(`id="${described}"[^>]*>Shift\\+Enter adds a line\\.<`));
   });
 
+  it("says what keeps a draft from going in the box, in place of the hint", () => {
+    const markup = from("/nick bob");
+    expect(markup).toContain("/nick is not a command. /me sends an action.");
+    expect(markup).not.toContain("Shift+Enter adds a line.");
+  });
+
   it("names the line too long, from 1, and a message too many lines by how many", () => {
     const long = compose(ROOM, `one\ntwo\n${"a".repeat(480)}`, NICK);
     expect(said(long, false)).toStrictEqual({

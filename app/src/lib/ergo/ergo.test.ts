@@ -1180,6 +1180,19 @@ describe("connectErgo, an Ergo that offers no draft/multiline", () => {
     expect(basic.client.multiline()).toBe(false);
   });
 
+  it("says an account's connection sends several lines at once, once its SASL and its welcome have passed", async () => {
+    const t = await connected();
+    expect(t.client.multiline()).toBe(true);
+  });
+
+  it("fails on a second NAK of the whole list too, asking no third", async () => {
+    const t = await guest();
+    t.s.say(`:ergo CAP * NAK :${CAPS}`);
+    t.s.say(`:ergo CAP * NAK :${CAPS}`);
+    expect(t.s.closed).toBe(true);
+    expect(t.s.sent.filter((line) => line.startsWith("CAP REQ"))).toHaveLength(2);
+  });
+
   it("fails on a second NAK, the request without draft/multiline refused too, and asks no third", async () => {
     const t = await guest();
     t.s.say(`:ergo CAP * NAK :${CAPS}`);

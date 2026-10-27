@@ -103,6 +103,8 @@ describe("formatted", () => {
     ["«- a\nb»", "bulleted", "- «a\n- b»"],
     ["«- a\n- b»", "numbered", "1. «a\n1. b»"],
     ["«a\n»b", "bulleted", "- «a\n»b"],
+    ["a|\nb", "bulleted", "- a|\nb"],
+    ["«a\nb\nc»", "bulleted", "- «a\n- b\n- c»"],
     ["x\n«a\n\nb»\ny", "quote", "x\n> «a\n> \n> b»\ny"],
   ] as const)("starts the lines %j touches as %s", (before, format, after) => {
     expect(apply(before, format)).toStrictEqual(draft(after));

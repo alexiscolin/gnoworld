@@ -70,6 +70,15 @@ describe("Field", () => {
     expect(box.getAttribute("aria-describedby")).toBe(screen.getByText("Shift+Enter adds a line").id);
   });
 
+  it("is valid with no error, invalid with one, and takes Enter outside a form without failing", async () => {
+    const { rerender } = render(<Field kind="lines" label="Message" value="" onChange={vi.fn()} />);
+    const box = screen.getByRole("textbox", { name: "Message" });
+    expect(box.getAttribute("aria-invalid")).toBeNull();
+    await userEvent.type(box, "{Enter}");
+    rerender(<Field kind="lines" label="Message" value="" error="No" onChange={vi.fn()} />);
+    expect(screen.getByRole("textbox", { name: "Message" }).getAttribute("aria-invalid")).toBe("true");
+  });
+
   it("submits its form on Enter, and adds a line on Shift+Enter", async () => {
     const submitted = vi.fn((event: SubmitEvent) => {
       event.preventDefault();
