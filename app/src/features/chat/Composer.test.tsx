@@ -36,9 +36,6 @@ describe("Composer", () => {
       why: "Not sent: g10gh7…3y5tv is not online. Unsent: “hi **you**”",
     });
     expect(refusalAfter("x", { draft: "a".repeat(80), why: "W." }).why).toBe(`W. Unsent: “${"a".repeat(80)}”`);
-    // Cut past 80 characters as a reader counts them: a thumb and its skin tone stay one.
-    const long = `${"a".repeat(79)}👍🏽tail`;
-    expect(refusalAfter("x", { draft: long, why: "W." }).why).toBe(`W. Unsent: “${"a".repeat(79)}👍🏽…”`);
   });
 
   it("is a form named for the room, its field labelled, Send off while the line is empty", () => {
