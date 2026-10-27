@@ -21,6 +21,6 @@ test.describe("the composer's word on @room", () => {
     ).toBeVisible();
     await roomsNav(page).getByRole("link", { name: "#news", exact: true }).click();
     await page.getByRole("textbox", { name: "Message #news" }).fill("@room the release is out");
-    await expect(page.getByText("@room notifies everyone in this room.")).toBeVisible();
+    await expect(page.getByText("@room notifies the members who keep notifications on for this room.")).toBeVisible();
   });
 });

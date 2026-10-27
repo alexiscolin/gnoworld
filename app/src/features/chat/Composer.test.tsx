@@ -239,9 +239,17 @@ describe("the composer's preview", () => {
 // 4d's pre-merge: a draft given lets a render show what the composer says of it.
 describe("the composer, from a draft", () => {
   const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
-  const from = (draft: string) =>
+  const from = (draft: string, groups?: boolean) =>
     renderToStaticMarkup(
-      <Composer room={ROOM} nick={NICK} rooms={["#games"]} members={[ALICE, NICK]} draft={draft} onSay={() => true} />,
+      <Composer
+        room={ROOM}
+        nick={NICK}
+        rooms={["#games"]}
+        members={[ALICE, NICK]}
+        draft={draft}
+        groups={groups}
+        onSay={() => true}
+      />,
     );
   it.each([
     ["hi @g10", "Tab completes @g10gh7…3y5tv."],
@@ -288,6 +296,17 @@ describe("the composer, from a draft", () => {
         <Composer room={ROOM} nick={NICK} rooms={[]} members={[]} draft={draft} groups onSay={() => true} />,
       );
     expect(withGroups(`@room ${"a".repeat(600)}`)).not.toContain(ROOM_NOTIFIES);
+  });
+
+  // F1680 (CR8): the hint said "everyone" and hid behind the bytes left or a Tab completion, so a sender could guess.
+  it("says what @room does ahead of the bytes left and of a completion", () => {
+    const near = from(`@room ${"a".repeat(400)}`, true);
+    expect(near).toContain(ROOM_NOTIFIES);
+    expect(near).not.toContain("bytes left");
+    const completing = from("@room hi @r", true);
+    expect(completing).toContain(ROOM_NOTIFIES);
+    expect(completing).not.toContain("Tab completes");
+    expect(ROOM_NOTIFIES).not.toContain("everyone");
   });
 
   it("says nothing of @room in a direct message's composer", () => {

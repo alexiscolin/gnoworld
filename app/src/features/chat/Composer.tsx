@@ -20,7 +20,7 @@ import styles from "./Composer.module.css";
 const TELLS = "People in this room see when you type.";
 
 /** What the field says as @room stands in the draft: whether it notifies in this room (4f-n, decisions 2026-10-27, N3). */
-export const ROOM_NOTIFIES = "@room notifies everyone in this room.";
+export const ROOM_NOTIFIES = "@room notifies the members who keep notifications on for this room.";
 export const ROOM_SILENT = "@room notifies no one in this room: it counts only in announcement and members rooms.";
 
 /** The bytes left from which the composer counts them. */
@@ -51,10 +51,11 @@ export const roomHint = (composed: Composed, groups: boolean): string | undefine
       : ROOM_SILENT
     : undefined;
 
-// What the field says in a room: what `said` has to; else the hint for @room, else that the room sees the typing.
+// What the field says in a room: an error; else the hint for @room, which a promise the sender could misread must not
+// hide behind another help; else what `said` has to; else that the room sees the typing.
 function fieldSays(says: ReturnType<typeof said>, composed: Composed, groups: boolean) {
-  if (says.error !== undefined || says.help !== undefined) return says;
-  return { help: roomHint(composed, groups) ?? TELLS };
+  if (says.error !== undefined) return says;
+  return { help: roomHint(composed, groups) ?? says.help ?? TELLS };
 }
 
 /** What an edit leaving `draft` tells the room of the account's typing (IRCv3's +typing), read as compose reads a
