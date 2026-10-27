@@ -129,7 +129,7 @@ export function Composer(props: ComposerProps) {
   const mentioning = /(^|\s)@\S*$/u.test(draft);
   const people = mentioning ? peopleOf(members, nick) : [];
   const completion = completions(draft, { commands: COMMANDS, rooms, people });
-  const { coarse, shown } = useHelp(composed, { failed, completion, direct: to !== undefined });
+  const { coarse, shown } = useHelp(composed, { failed, completion, direct: to !== undefined, nick, draft });
   // The selection an edit leaves is put back in the box once it shows the new draft.
   const { box, keep } = useSelection(formRef, draft);
   useFocusAtStart(formRef, props.focus);

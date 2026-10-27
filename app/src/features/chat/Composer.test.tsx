@@ -184,11 +184,11 @@ describe("what the composer's field says of a completion", () => {
     [`${"x".repeat(412)} #g`, { help: "Tab completes #games; also #gnogolf." }],
   ])("says, of %j, %j: an unknown command waits, a line too long does not", (draft, shown) => {
     const choices = { ...CHOICES, people: [ALICE] };
-    expect(said(compose(ROOM, draft, NICK), false, completions(draft, choices))).toStrictEqual(shown);
+    expect(said(compose(ROOM, draft, NICK), false, { completion: completions(draft, choices) })).toStrictEqual(shown);
   });
 
   it("says a line not sent before any completion", () => {
-    expect(said(compose(ROOM, "#g", NICK), true, completions("#g", CHOICES))).toStrictEqual({
+    expect(said(compose(ROOM, "#g", NICK), true, { completion: completions("#g", CHOICES) })).toStrictEqual({
       error: "Not sent: the chat is not ready yet. Try again in a moment.",
     });
   });
@@ -197,7 +197,7 @@ describe("what the composer's field says of a completion", () => {
 describe("what the composer's field says of three completions", () => {
   it("names the first, then the others, a comma apart", () => {
     const choices = { commands: [], rooms: ["#a1", "#a2", "#a3"], people: [] };
-    expect(said(compose(ROOM, "#a", NICK), false, completions("#a", choices))).toStrictEqual({
+    expect(said(compose(ROOM, "#a", NICK), false, { completion: completions("#a", choices) })).toStrictEqual({
       help: "Tab completes #a1; also #a2, #a3.",
     });
   });
@@ -326,6 +326,27 @@ describe("the composer, a draft of several lines", () => {
     const over = [...Array.from({ length: 10 }, () => "a".repeat(400)), "a".repeat(87)].join("\n");
     expect(said(compose(ROOM, over, NICK), false)).toStrictEqual({ error: "Too long by 1 byte: 4096 at most." });
     expect(from(over)).toMatch(/<button(?=[^>]*type="submit")(?=[^>]*disabled="")[^>]*>/);
+  });
+
+  // F1720 (CR8): the line's own budget, about 440 bytes, binds before the message's 4096, and its line is named.
+  it("names the line with the fewest bytes left when it has fewer than the message, near its budget", () => {
+    const draft = `one\n${"a".repeat(400)}\ntwo`;
+    expect(said(compose(ROOM, draft, NICK), false, { nick: NICK })).toStrictEqual({
+      help: "Line 2: 19 bytes left.",
+    });
+    expect(said(compose(ROOM, `one\n${"a".repeat(300)}`, NICK), false, { nick: NICK })).toStrictEqual({});
+    // The message's bytes left bind: no line is named.
+    const near = [...Array.from({ length: 10 }, () => "a".repeat(400)), "a".repeat(70)].join("\n");
+    expect(said(compose(ROOM, near, NICK), false, { nick: NICK })).toStrictEqual({ help: "16 bytes left." });
+  });
+
+  // F1718 (CR6): an action is one line, so a draft of several lines after /me loses its breaks without a word.
+  it("says an action is one line when the draft after /me holds line breaks, and nothing for one without", () => {
+    const note = "An action is one line: its line breaks become spaces.";
+    const draft = "/me waves\nhello";
+    expect(said(compose(ROOM, draft, NICK), false, { nick: NICK, draft })).toStrictEqual({ help: note });
+    expect(said(compose(ROOM, "/me waves", NICK), false, { nick: NICK, draft: "/me waves" })).toStrictEqual({});
+    expect(said(compose(ROOM, "/me waves\n", NICK), false, { nick: NICK, draft: "/me waves\n" })).toStrictEqual({});
   });
 
   it("says the bytes a message of several lines has left near its cap", () => {

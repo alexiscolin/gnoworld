@@ -4,7 +4,7 @@ import type { Composed } from "@gnoworld/core";
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
 import type { Completion } from "./complete.ts";
 import type { Edit } from "./format.ts";
-import { said, withHint } from "./said.ts";
+import { said, withHint, type Context } from "./said.ts";
 
 /** The lines Ergo refused so far, the last one's draft, and why it did not go. */
 export interface Refused {
@@ -95,8 +95,13 @@ function useCoarsePointer(): boolean {
  * pointer is a finger. */
 export function useHelp(
   composed: Composed,
-  { failed, completion, direct }: { failed: boolean; completion?: Completion | undefined; direct: boolean },
+  {
+    failed,
+    completion,
+    direct,
+    ...context
+  }: { failed: boolean; completion?: Completion | undefined; direct: boolean } & Context,
 ) {
   const coarse = useCoarsePointer();
-  return { coarse, shown: withHint(said(composed, failed, completion), direct, coarse) };
+  return { coarse, shown: withHint(said(composed, failed, { ...context, completion }), direct, coarse) };
 }
