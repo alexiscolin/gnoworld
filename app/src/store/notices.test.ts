@@ -179,6 +179,17 @@ describe("the store's notices slice", () => {
       expect(ids(unseenNotices(t.state()))).toEqual(["n1"]);
     });
 
+    // G6 (F1505): the same count with other content is a new list, though one place of the old list holds the same notice.
+    it("answers the new list when one notice left and another came, the count the same, the first kept", () => {
+      const t = setup();
+      t.notices.add(notice({ id: "a", where: GAMES, time: T(5) }));
+      t.notices.add(notice({ id: "b", where: MAIN, time: T(5) }));
+      expect(ids(unseenNotices(t.state()))).toEqual(["a", "b"]);
+      t.notices.seen(MAIN, T(5));
+      t.notices.add(notice({ id: "c", where: GAMES, time: T(6) }));
+      expect(ids(unseenNotices(t.state()))).toEqual(["a", "c"]);
+    });
+
     it("keeps a direct message's notice under its partner's address, which no room's reading place reaches", () => {
       const t = setup();
       t.notices.add(notice({ id: "d", kind: "dm", where: ALICE }));
@@ -248,6 +259,19 @@ describe("the store's notices slice", () => {
       t.notices.add(notice({ id: "m1", time: T(5) }));
       expect(badgeOf(t.state(), GAMES)).toBe(1);
       expect(totalUnseen(t.state())).toBe(1);
+    });
+
+    // G7 (F1506): an edit is a line of its own that shows in its target's place, so it is no new unread line.
+    it("counts no edit in all mode: it corrects a line the reader has or has not had", () => {
+      const t = setup();
+      t.notices.setMode(GAMES, "all");
+      t.said(GAMES, ["m1", 1]);
+      t.store
+        .getState()
+        .chatActions.heard(
+          read(`@msgid=e1;time=${T(2)};account=${ALICE};+gnoworld/edit=m1 :${ALICE}!u@h PRIVMSG ${GAMES} :changed`),
+        );
+      expect(badgeOf(t.state(), GAMES)).toBe(1);
     });
 
     it("counts the lines past the later of the page's mark and Ergo's reading place", () => {
@@ -340,6 +364,17 @@ describe("the store's notices slice", () => {
       t.said(MAIN, ["m3", 7]);
       t.notices.add(notice({ id: "b", where: GAMES, time: T(8) }));
       expect(totalUnseen(t.state())).toBe(2);
+    });
+
+    // G10 (F1508): each place's mark is its own newest time, not another place's.
+    it("marks each place at its own newest unseen time", () => {
+      const t = setup();
+      t.notices.add(notice({ id: "a", where: GAMES, time: T(5) }));
+      t.notices.add(notice({ id: "b", where: GAMES, time: T(9) }));
+      t.notices.add(notice({ id: "c", where: MAIN, time: T(3) }));
+      t.notices.add(notice({ id: "d", kind: "dm", where: ALICE, time: T(7) }));
+      t.notices.clear();
+      expect(t.state().noticeSeen).toEqual({ [GAMES]: T(9), [MAIN]: T(3), [ALICE]: T(7) });
     });
 
     it("notifies no one when nothing is unseen", () => {
