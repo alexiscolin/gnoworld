@@ -2140,8 +2140,13 @@ for pair in "$busy $idle" "$idle $busy" "$idle $idle"; do
 	printf '%s\n' "$out" | grep -q "find what grew" || fail "check.sh did not fail past its budget with the load $1 at its start and $2 at its end: $out"
 	[ ! -e "$g/.claude/tmp/green-fast" ] || fail "check.sh recorded a gate past its budget with the load $1 at its start and $2 at its end"
 done
-out=$(LOAD_1="160 160" LOAD_2="160 160" SLOW_STEP=lint GATE_BUDGET=0 gate) && fail "check.sh passed past its budget on a machine at its cores, not above"
-printf '%s\n' "$out" | grep -q "find what grew" || fail "check.sh did not fail past its budget at the machine's cores: $out"
+# At its cores, not above, it still fails, at either reading: the other reading above the cores alone does not excuse it.
+for pair in "160 160" "160 $busy" "$busy 160"; do
+	set -- $pair
+	rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/gate-green"
+	out=$(LOAD_1="$1 160" LOAD_2="$2 160" SLOW_STEP=lint GATE_BUDGET=0 gate) && fail "check.sh passed past its budget with the load $1 at its start and $2 at its end, one at its cores, not above: $out"
+	printf '%s\n' "$out" | grep -q "find what grew" || fail "check.sh did not fail past its budget with the load $1 at its start and $2 at its end, one at its cores: $out"
+done
 # load.py reads the machine itself: its 1-minute load (the first of getloadavg's three) and its cores, in tenths.
 # Run on a machine of known numbers, so the minute's average, the 5- and 15-minute ones and the scale each tell apart (G4).
 loaded() { # $1: the cores os.cpu_count gives
