@@ -11,6 +11,8 @@ export interface Said {
   text: string;
   time?: string;
   edits?: string;
+  /** A message of several lines the link could not read whole: hidden by this id, whatever its text says. */
+  unreadable?: true;
 }
 
 export type Command = "REDACT" | "NOTICE" | "SAMODE" | "JOIN" | "KICK";
@@ -90,4 +92,13 @@ export function said(
   const fields = [text, account, msgid];
   if (fields.includes("") || source?.split("!")[0] === NICK || !joined.has(room)) return undefined;
   return { room, account, msgid, text, ...marks(tags) };
+}
+
+// A line of a history page, counted there with its time, which the page's next asking starts from. A time Date
+// cannot read is no page's end (F552): the next page starts from the last one read.
+export function countInPage(page: { lines: number; last: string } | undefined, { tags }: IrcMessage): void {
+  if (page === undefined) return;
+  page.lines += 1;
+  const time = tags.get("time") ?? "";
+  if (!Number.isNaN(Date.parse(time))) page.last = time;
 }

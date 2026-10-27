@@ -52,6 +52,45 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     expect(verdicts()).toHaveLength(1);
   });
 
+  // G5 of the green pass: Ergo's +C refuses a part that STARTS with a CTCP's mark (not ACTION) and no other, so these
+  // batches are relayed and kept, to readers with the capability, to plain clients line by line, and to history.
+  // The page folds none of them, so the bot must hide each by the id of its opening line, unjudged.
+  it.each([
+    ["a part ends with a CTCP's mark", ["hello", "I will hurt you\u0001"]],
+    ["its first part is an ACTION", ["\u0001ACTION will hurt you\u0001", "and more"]],
+    ["a mark sits in the middle of the first part, the hurt on the second", ["a\u0001b", "I will hurt you"]],
+  ])(
+    "hides by the id of its batch a message of several lines the page cannot fold when %s, for every reader",
+    async (_, parts) => {
+      const e = await start();
+      const asked: string[] = [];
+      const { verdicts } = await chatFor(e, asked);
+      const alice = await login(e, "alice");
+      await join(alice, "#bubble");
+      const bob = await login(e, "bob");
+      await join(bob, "#bubble");
+      const plain = await login(e, "plain", { caps: "message-tags server-time account-tag draft/message-redaction" });
+      await join(plain, "#bubble");
+      alice.send("BATCH +m1 draft/multiline #bubble");
+      for (const text of parts) alice.send(`@batch=m1 PRIVMSG #bubble :${text}`);
+      alice.send("BATCH -m1");
+      const opening = await bob.expect(/ BATCH :?\+\S+ draft\/multiline :?#bubble$/);
+      const id = msgid(opening);
+      await bob.expect(new RegExp(` REDACT #bubble ${id} `), 10_000);
+      // A reader without the capability got the parts as lines, the id on the first: its REDACT hides that one.
+      await plain.expect(new RegExp(` REDACT #bubble ${id} `), 10_000);
+      expect(asked).toEqual([]);
+      expect(verdicts()).toEqual([id]);
+      // Whoever comes later reads nothing of it from the history.
+      const late = await login(e, "late");
+      await join(late, "#bubble");
+      late.send("CHATHISTORY LATEST #bubble * 50");
+      await late.expect(/ BATCH :?-\S+$/);
+      await sync(late);
+      expect(late.lines().filter((line) => line.includes("PRIVMSG #bubble"))).toEqual([]);
+    },
+  );
+
   it("checks what it missed while its link was down, each message once, after a mark Ergo has erased", async () => {
     const e = await start();
     const asked: string[] = [];

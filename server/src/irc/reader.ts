@@ -4,7 +4,7 @@
 import type { Socket } from "node:net";
 import type { IrcMessage } from "@gnoworld/core";
 import type { Log } from "../log.ts";
-import { joins, line, NICK, said, type Said } from "./lines.ts";
+import { countInPage, joins, line, NICK, said, type Said } from "./lines.ts";
 import { several, type Several } from "./several.ts";
 import { roomStates, type States } from "./state.ts";
 
@@ -88,6 +88,13 @@ export function reader(options: Options, state: State) {
     };
     drained().then(next, next);
   };
+  // A line read, counted in its history page, then handed on; a message of several lines the link could not read
+  // whole is handed on marked, to be hidden.
+  const heard = (message: IrcMessage, readable: boolean): void => {
+    const got = said(message, state.joined);
+    countInPage(state.batches.get(message.tags.get("batch") ?? ""), message);
+    if (got !== undefined) onMessage(readable ? got : { ...got, unreadable: true });
+  };
   const handlers: Readonly<Record<string, (s: Socket, message: IrcMessage) => void>> = {
     ...sasl(password, refused),
     "001": (s) => {
@@ -122,7 +129,7 @@ export function reader(options: Options, state: State) {
     ...rejoins(state),
     BATCH: (s, message) => {
       // A message of several lines is read as one at its end; any other batch is a history page.
-      if (!state.several.batch(message, (folded) => handlers["PRIVMSG"]?.(s, folded))) page(s, message);
+      if (!state.several.batch(message, heard)) page(s, message);
     },
     ...refusals(refused, state, log),
     // A hide Ergo refused (F544): the verdict says hidden, the line stays; ops hears of it.
@@ -133,16 +140,7 @@ export function reader(options: Options, state: State) {
     // A NOTICE too (slice 3's max review): Ergo relays and keeps it as any line, so it is checked and counted.
     NOTICE: (s, message) => handlers["PRIVMSG"]?.(s, message),
     PRIVMSG: (_, message) => {
-      if (state.several.hold(message)) return;
-      const batch = state.batches.get(message.tags.get("batch") ?? "");
-      // A time Date cannot read is no page's end (F552): the next page starts from the last one read.
-      const time = message.tags.get("time") ?? "";
-      if (batch !== undefined) {
-        batch.lines += 1;
-        if (!Number.isNaN(Date.parse(time))) batch.last = time;
-      }
-      const heard = said(message, state.joined);
-      if (heard !== undefined) onMessage(heard);
+      if (!state.several.hold(message)) heard(message, true);
     },
   };
   return (s: Socket, message: IrcMessage): void => {

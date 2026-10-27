@@ -153,6 +153,8 @@ export function makeChecker(options: Options): (said: Said) => Promise<Verdict |
     const rules = rulesOf(room);
     // A room no world of the file names sends nothing anywhere.
     if (rules === undefined) return settle({ action: "unchecked" }, { why: "unknown_room" });
+    // A message of several lines the link could not read whole: Ergo relays and keeps it, so it is hidden unjudged.
+    if (said.unreadable === true) return settle({ action: "hide", reason: "unreadable" });
     const reason = byRules(said, rules, { hashed, at });
     if (reason !== undefined) return settle({ action: "hide", reason });
     // Checked by its rules alone: the provider never reads it.

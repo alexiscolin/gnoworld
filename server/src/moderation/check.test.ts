@@ -87,6 +87,24 @@ describe("checking a message", () => {
     expect(lines.join("")).not.toMatch(/hurt|g1jg8m/);
   });
 
+  it("hides a message of several lines the link could not read whole, whatever its text, asking no provider (G5)", async () => {
+    const { check, asked, rows } = setup(() => Promise.resolve(answer()));
+    expect(await check({ ...said("(not read)", "m1"), unreadable: true })).toEqual({
+      action: "hide",
+      reason: "unreadable",
+    });
+    expect(asked).toEqual([]);
+    expect(rows()).toEqual([expect.objectContaining({ msgid: "m1", action: "hide", reason: "unreadable" })]);
+  });
+
+  it("leaves a message of several lines it could not read in a room no world names unchecked, as any line (G5)", async () => {
+    const { check, rows } = setup(() => Promise.resolve(answer()));
+    expect(await check({ ...said("(not read)", "m1"), room: "#nowhere", unreadable: true })).toEqual({
+      action: "unchecked",
+    });
+    expect(rows()).toEqual([expect.objectContaining({ action: "unchecked", reason: "unknown_room" })]);
+  });
+
   it("records a pass, and an unchecked message as unchecked, the text never", async () => {
     const answers: (Answer | "unchecked")[] = [answer(), "unchecked"];
     const { check, rows, db } = setup(() => Promise.resolve(answers.shift() ?? "unchecked"));

@@ -7,7 +7,14 @@ import { fold } from "@gnoworld/core";
 import type { Rules } from "../roles/roles.ts";
 
 export type RuleReason =
-  "too_fast" | "not_their_edit" | "unknown_edit" | "banned_word" | "new_account_links" | "links" | "mentions";
+  | "too_fast"
+  | "not_their_edit"
+  | "unknown_edit"
+  | "unreadable"
+  | "banned_word"
+  | "new_account_links"
+  | "links"
+  | "mentions";
 
 // All the words in one pass over the line: a pass a word grew with both (the complexity review, F530). A
 // word of a script written without spaces has no edge to find: it matches anywhere (F521).

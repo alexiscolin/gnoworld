@@ -1,31 +1,45 @@
 // The messages of several lines Ergo relays to a reader with draft/multiline (slice 4): a batch whose opening line
-// holds the message's id, time and account, each part a PRIVMSG of it. Held until the batch ends, then read as one
-// message (core's foldMultiline), so each line of it is checked; a reader without the capability would get the
-// parts as lines of their own, the id on the first alone (irc/client.go, v2.19.1).
-import { foldMultiline, MULTILINE, type Batch, type IrcMessage } from "@gnoworld/core";
+// holds the message's id, time and account, each part a PRIVMSG of it, held until its end and read as one message
+// (core's foldMultiline), so each line is checked. Fail closed (G1, G5): a batch it cannot hold whole and fold (a
+// part core refuses, more parts than Ergo's cap, a 17th open at once) is handed on as hidden by its opening line's id,
+// never folded in part, never left unjudged: Ergo relays and keeps it all the same (irc/client.go, v2.19.1).
+import { foldMultiline, MULTILINE, MULTILINE_LINES, type Batch, type IrcMessage } from "@gnoworld/core";
 
-// Messages open at once, and the parts one holds; past them a batch is not held, its parts dropped (Ergo's cap is
-// 40 lines). The relay is Ergo's own, so these only bound memory.
+// Messages open at once. The relay is Ergo's own, so this only bounds memory.
 const MAX_OPEN = 16;
-const MAX_PARTS = 64;
+// What is said of a message nobody could read: no one reads it, it is only the text a hidden line needs to be one.
+const UNREAD = "(a message of several lines the bot could not read whole)";
+
+// A message's opening line, its params the room and a stand-in text, to be hidden by its id. A batch with no target
+// names no room.
+const unread = (opening: IrcMessage, target = ""): IrcMessage => ({ ...opening, params: [target, UNREAD] });
 
 export interface Several {
-  /** A BATCH line of a message of several lines, which it takes (true), the message at its end handed to `done`. */
-  batch: (message: IrcMessage, done: (folded: IrcMessage) => void) => boolean;
+  /**
+   * A BATCH line of a message of several lines, which it takes (true). The message is handed to `done` at its end,
+   * whole (true), or as the stand-in of one it could not read (false), which is to be hidden.
+   */
+  batch: (message: IrcMessage, done: (message: IrcMessage, whole: boolean) => void) => boolean;
   /** A part of a message open, which it holds (true). */
   hold: (message: IrcMessage) => boolean;
   clear: () => void;
 }
 
 export function several(): Several {
-  const open = new Map<string, Batch & { messages: IrcMessage[] }>();
+  const open = new Map<string, Batch & { messages: IrcMessage[]; stand: IrcMessage }>();
   return {
-    batch: ({ params: [sign = "", type, ...rest], tags, source }, done) => {
+    batch: (message, done) => {
+      const {
+        params: [sign = "", type, ...rest],
+        tags,
+        source,
+      } = message;
       const ref = sign.slice(1);
       if (sign.startsWith("+") && type === MULTILINE) {
+        const stand = unread(message, rest[0]);
         if (open.size < MAX_OPEN) {
-          open.set(ref, { type, params: rest, messages: [], tags, ...(source === undefined ? {} : { source }) });
-        }
+          open.set(ref, { type, params: rest, messages: [], tags, stand, ...(source === undefined ? {} : { source }) });
+        } else done(stand, false);
         return true;
       }
       const batch = open.get(ref);
@@ -34,14 +48,14 @@ export function several(): Several {
       const folded = foldMultiline(batch);
       // Inside a history page, it stays one line of it: counted there, as the page's own.
       const page = batch.tags.get("batch");
-      if (folded !== undefined) {
-        done(page === undefined ? folded : { ...folded, tags: new Map([...folded.tags, ["batch", page]]) });
-      }
+      if (folded === undefined) done(batch.stand, false);
+      else done(page === undefined ? folded : { ...folded, tags: new Map([...folded.tags, ["batch", page]]) }, true);
       return true;
     },
     hold: (message) => {
       const batch = open.get(message.tags.get("batch") ?? "");
-      if (batch !== undefined && batch.messages.length < MAX_PARTS) batch.messages.push(message);
+      // One part past Ergo's cap is held, so the fold refuses the batch; the parts after it are dropped, for memory.
+      if (batch !== undefined && batch.messages.length <= MULTILINE_LINES) batch.messages.push(message);
       return batch !== undefined;
     },
     clear: () => {
