@@ -78,15 +78,15 @@ function LineView({ line, me, members, stop, actions, reactions, react, answers 
   const known = knownOf(names, members);
   return (
     <li className={KINDS[line.kind]} data-about-me={mentioned ? "" : undefined} tabIndex={stop ? 0 : -1}>
-      {/* The line's marks first, at its start, before a reply's quote and the time: where no sender's words stand
-          (F808, the security review's S2). */}
+      {/* The marks of the line's own kind first, at its start, before a reply's quote: where no sender's words stand
+          (F808, the security review's S2). "Edited" follows the time, on its row, before the sender (U5). */}
       {mentioned ? <span className={styles["mentionsYou"]}>Mentions you </span> : null}
       {line.kind === "notice" ? <span className={styles["mark"]}>Notice </span> : null}
-      {line.edited === true ? <span className={styles["mark"]}>Edited </span> : null}
       <Quote line={line} answers={answers} known={(address) => address === me || members.has(address)} />
       <time dateTime={line.time} className={styles["time"]}>
         {CLOCK.format(new Date(line.time))}
       </time>{" "}
+      {line.edited === true ? <span className={styles["mark"]}>Edited </span> : null}
       {line.kind === "action" ? "* " : null}
       <Person name={line.account ?? line.from} guest={line.account === undefined} />{" "}
       <LineText blocks={blocks} me={me} known={known} />

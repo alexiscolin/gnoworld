@@ -566,20 +566,29 @@ describe("RoomView: edits", () => {
     ];
     const shown = linesOf(view({ state: { ...ROOM, lines } }));
     expect(shown).toHaveLength(2);
-    expect(shown[0]).toMatch(/\d{2}:\d{2}( Edited)? g10gh7…3y5tv hello/);
+    expect(shown[0]).toMatch(/\d{2}:\d{2} Edited g10gh7…3y5tv hello/);
     expect(shown[0]).toMatch(/edited/i);
     expect(shown[1]).toMatch(/^Replying to g10gh7…3y5tv: hello\d/);
   });
 
-  // The green pass: the mark stands with the line's marks, before its time (F808), so a sender's "(edited)" reads as
-  // their words, never as the mark.
-  it("marks an edited line before its time, and a line that says (edited) not at all", () => {
+  // F1177 (the UX review's U5): the mark stands on the time row, right after the time and before the sender, never
+  // after the sender's words (F971), so a sender's "(edited)" reads as theirs; a reply's quote is above that row.
+  it("marks an edited line on its time row, and a line that says (edited) not at all", () => {
     const lines = [line({ id: "a", text: "helo" }), line({ id: "e", text: "hello", edits: "a" })];
-    expect(linesOf(view({ state: { ...ROOM, lines } }))[0]).toMatch(
-      /^(Edited )?\d{2}:\d{2}( Edited)? g10gh7…3y5tv hello$/,
-    );
+    expect(linesOf(view({ state: { ...ROOM, lines } }))[0]).toMatch(/^\d{2}:\d{2} Edited g10gh7…3y5tv hello$/);
     expect(linesOf(view({ state: { ...ROOM, lines: [line({ id: "s", text: "(edited)" })] } }))[0]).toMatch(
       /^\d{2}:\d{2} g10gh7…3y5tv \(edited\)$/,
+    );
+  });
+
+  it("puts an edited reply's mark on the time row, under its quote", () => {
+    const lines = [
+      line({ id: "a", text: "hello" }),
+      line({ id: "b", from: BOB, account: BOB, text: "yes", reply: "a" }),
+      line({ id: "e", from: BOB, account: BOB, text: "yes!", edits: "b" }),
+    ];
+    expect(linesOf(view({ state: { ...ROOM, lines } }))[1]).toMatch(
+      /^Replying to g10gh7…3y5tv: hello\d{2}:\d{2} Edited g1jg8m…vsqf5 yes!$/,
     );
   });
 
