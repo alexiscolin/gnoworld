@@ -27,11 +27,6 @@ const guestWord = "Log in to write in this room.";
 // An account of the test's own in #games with the four lines, Ergo echoing what the page says.
 const open = (page: Page, over: Scripted = {}, shown = 4) =>
   asAccount(page, () => ({ history: BASE, replayed: REPLIES, ...over }), shown);
-// Where the focus is, as the list of lines or the page tells it: a line of the room's list holding it, or its words.
-const focusedLine = (page: Page) =>
-  page.evaluate(
-    () => document.activeElement?.closest("ol[aria-label='Messages'] > li")?.textContent.slice(0, 40) ?? null,
-  );
 
 test.describe("threads", () => {
   test.use({ timezoneId: "UTC", locale: "en-GB" });
@@ -257,10 +252,12 @@ test.describe("threads", () => {
     ergo().send(`:${MEMBER}!u@h REDACT ${ROOM} m1`);
     await expect(lines(page)).toHaveCount(3);
     await expect(threadField(page)).toBeFocused();
+    // The room's own stop is its newest line, before the panel goes and after.
+    await expect(lines(page).last()).toHaveAttribute("tabindex", "0");
     await page.keyboard.press("Escape");
     await expect(panel(page)).toHaveCount(0);
-    // The focus moves a frame after the panel goes: poll it.
-    await expect.poll(() => focusedLine(page)).not.toBeNull();
+    // The focus moves a frame after the panel goes: the stop, not any line of the list (G4).
+    await expect(lines(page).last()).toBeFocused();
   });
 
   // R14: Escape belongs to what has the focus: the room's composer keeps it, the panel stays.
@@ -321,6 +318,18 @@ test.describe("threads", () => {
     await expect(inThread(page).getByRole("button")).toHaveCount(0);
   });
 
+  // G2: the panel's rows are no stop of the room's list, so a link in one is a Tab stop of its own, after Close.
+  test("keeps a link of the panel in the Tab order: one Tab from Close reaches it", async ({ page }) => {
+    const text = "see [the docs](https://example.com/fine)";
+    await open(page, { replayed: [tagged("m3", text, { at: 2, tags: "+reply=m1", who: OTHER })] }, 3);
+    await chipOf(lines(page).first()).click();
+    const link = panel(page).getByRole("link", { name: "the docs" });
+    await expect(link).toBeVisible();
+    await expect(link).not.toHaveAttribute("tabindex", /.*/);
+    await closeButton(page).focus();
+    expect(await tabsTo(page, link, 1)).toBe(1);
+  });
+
   test("lets a guest read a thread: the chip, the panel, no field, the focus on Close", async ({ page }) => {
     await opened(page, GUEST, { history: BASE, replayed: REPLIES });
     await expect(lines(page)).toHaveCount(4);
@@ -332,6 +341,11 @@ test.describe("threads", () => {
     await page.keyboard.press("Escape");
     await expect(panel(page)).toHaveCount(0);
     await expect(lines(page).first()).toBeFocused();
+    // G6: a guest has no field, so a thread opened over another gives Close the focus again.
+    await chipOf(lines(page).first()).click();
+    await threadOf(lineOf(page, "an unrelated line"));
+    await expect(inThread(page)).toHaveText([/an unrelated line/]);
+    await expect(closeButton(page)).toBeFocused();
   });
 
   // R9: a guest's keyboard: the chip on the line the focus is on, and the More menu's item, which every line holds.
