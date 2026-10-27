@@ -4,13 +4,14 @@
 // (4d); the composer, given, goes below.
 // A line's author is its account tag alone, a nick being only a nick; a member's nick is an account's when it is
 // an address, which a guest's cannot be (Ergo gives a guest 32 characters, server/src/testing/ergo.test.ts:314).
-import { typingAt, type Line, type Reacting, type Reaction, type Typing } from "@gnoworld/core";
+import { typingAt, type Line, type NoticeMode, type Reacting, type Reaction, type Typing } from "@gnoworld/core";
 import type { StreamEvent } from "@gnoworld/schemas";
 import { Button, Cluster, Sidebar, Stack } from "@gnoworld/ui";
 import { Fragment, lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import type { ErgoState } from "../../lib/ergo/ergo.ts";
 import type { LinesProps } from "./Lines.tsx";
 import { isAccount, shortAddress } from "./names.ts";
+import { NoticeModes } from "./NoticeModes.tsx";
 import { Person } from "./Person.tsx";
 import shared from "./lists.module.css";
 import styles from "./RoomView.module.css";
@@ -97,6 +98,8 @@ export interface RoomViewProps {
   onReact?: ((reaction: Reacting) => boolean) | undefined;
   /** Makes a line, by its msgid, the one the composer's next answers (4d's replies). */
   onReply?: ((id: string) => void) | undefined;
+  /** The room's notification mode and how it changes: a room's, for an account (4f-n). */
+  notify?: { mode: NoticeMode; onMode: (mode: NoticeMode) => void; notKept?: boolean | undefined } | undefined;
 }
 
 /** Who is here: counted once connected, the bot left out, the first MEMBERS_SHOWN named. */
@@ -198,9 +201,14 @@ function Header({ title, topic, id }: { title: ReactNode; topic: ReactNode; id: 
   );
 }
 
+// A room's notification mode, for an account; a direct message has none of its own (4f-n).
+function Modes({ room, notify }: { room: string | undefined; notify: RoomViewProps["notify"] }) {
+  return notify === undefined || room === undefined ? null : <NoticeModes room={room} {...notify} />;
+}
+
 export function RoomView(props: RoomViewProps) {
   const { room, title, note, noteId, state, chat, composer, me, onDelete, onDismiss, onRead, aside } = props;
-  const { onReact, onReply } = props;
+  const { onReact, onReply, notify } = props;
   const { verdicts, saving = false } = props;
   const { empty = "No messages yet." } = props;
   const { lines = [], members = [], refused, typing, read, paged, reactions, cannotReact } = state ?? {};
@@ -208,6 +216,7 @@ export function RoomView(props: RoomViewProps) {
   return (
     <Stack as="section" space="s">
       <Header title={title} topic={note} id={noteId} />
+      <Modes room={room} notify={notify} />
       <p role="status" className={styles["status"]}>
         {connected ? null : NOTICES[chat]}
       </p>

@@ -850,3 +850,28 @@ describe("RoomView: edits", () => {
     ]);
   });
 });
+
+// 4f-n: a room's notification mode is chosen in the room, by an account; a conversation has none of its own.
+describe("RoomView: the room's notification mode", () => {
+  const notify = { mode: "mentions" as const, onMode: () => undefined };
+  const group = (html: string) => /role="group"[^>]*aria-label="Notifications for #games"/.test(html);
+
+  it("offers the mode of a room to an account, under its name", () => {
+    expect(group(view({ me: ALICE, notify }))).toBe(true);
+  });
+
+  it("offers none to a guest, whom no one can mention", () => {
+    expect(group(view({ me: undefined }))).toBe(false);
+  });
+
+  it("offers none in a direct message, whose notices no room's mode touches", () => {
+    expect(view({ me: ALICE, room: undefined, title: "Direct message with someone", notify })).not.toContain(
+      "Notifications for",
+    );
+  });
+
+  it("says the device did not keep the choice, from what it was given", () => {
+    expect(said(view({ me: ALICE, notify: { ...notify, notKept: true } }))).toContain("Not kept on this device");
+    expect(said(view({ me: ALICE, notify }))).not.toContain("Not kept on this device");
+  });
+});
