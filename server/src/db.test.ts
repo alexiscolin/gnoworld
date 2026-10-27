@@ -28,6 +28,16 @@ describe("openDatabase", () => {
     db.close();
   });
 
+  it("commits in NORMAL, a first start and a start again: no disk sync a commit, a power loss may drop the last ones", () => {
+    const path = fresh();
+    openDatabase(path, [NOTE]).close();
+    for (const migrations of [[NOTE], []]) {
+      const db = openDatabase(path, migrations);
+      expect(one(db, "PRAGMA synchronous")).toEqual({ synchronous: 1 });
+      db.close();
+    }
+  });
+
   it("applies each migration once: a second start changes nothing", () => {
     const path = fresh();
     let db = openDatabase(path, [NOTE]);

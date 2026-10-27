@@ -3,7 +3,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { openDatabase } from "../db.ts";
 import { ensureRooms, ROOM_TABLES } from "../rooms/rooms.ts";
 import { accountKey, VERDICT_TABLES } from "./check.ts";
-import { makeStrikes } from "./strikes.ts";
+import type { Mutes } from "./mute.ts";
+import { makeStrike, makeStrikes } from "./strikes.ts";
 
 const PEPPER = "a-pepper-of-forty-characters-0123456789";
 const T0 = Date.parse("2026-10-22T12:00:00.000Z");
@@ -66,5 +67,68 @@ describe("an account's strikes, an edit it could not place (F549)", () => {
     verdict("g1a", "#bubble", { action: "hide", at: T0, reason: "not_their_edit" });
     verdict("g1a", "#bubble", { action: "hide", at: T0, reason: "banned_word" });
     expect(strikes.count("g1a", "bubble", { since: T0, to: T0 })).toBe(2);
+  });
+});
+
+describe("an account's mute, its hides settled out of order (the max review)", () => {
+  const orders = (xs: readonly number[]): number[][] =>
+    xs.length <= 1
+      ? [[...xs]]
+      : xs.flatMap((x, i) => orders([...xs.slice(0, i), ...xs.slice(i + 1)]).map((rest) => [x, ...rest]));
+  // Each hide's verdict written as its check settles, then the strike counted; long after, as a slow check.
+  const settle = (offsets: readonly number[]): string[] => {
+    const { db, verdict } = setup();
+    const muted: string[] = [];
+    const mutes: Mutes = {
+      mute: (account, world) => {
+        muted.push(`${account} ${world}`);
+        return true;
+      },
+      tick: () => undefined,
+      reapply: () => undefined,
+      putOn: () => undefined,
+    };
+    const strike = makeStrike(db, {
+      pepper: PEPPER,
+      now: () => T0 + 60 * MINUTE,
+      mute: { strikes: 3, windowMinutes: 10 },
+      mutes,
+      spared: () => false,
+    });
+    for (const n of offsets) {
+      verdict("g1a", "#bubble", { action: "hide", at: T0 + n });
+      strike({
+        room: "#bubble",
+        account: "g1a",
+        msgid: `m${String(n)}`,
+        text: "x",
+        time: new Date(T0 + n).toISOString(),
+      });
+    }
+    return muted;
+  };
+
+  it("mutes once three hides fall in one window, whatever order their checks settle in, and never when none holds three", () => {
+    for (const order of orders([0, 5, 10].map((n) => n * MINUTE)))
+      expect(settle(order), `settled ${order.join(", ")}`).toEqual(["g1a bubble"]);
+    for (const spread of [
+      [0, 15, 30],
+      [0, 9, 18],
+      [0, 10, 11],
+    ])
+      for (const order of orders(spread.map((n) => n * MINUTE)))
+        expect(settle(order), `settled ${order.join(", ")}`).toEqual([]);
+  });
+
+  it("mutes at the window's edge to the millisecond, and a millisecond past it never", () => {
+    for (const order of orders([0, 5 * MINUTE, 10 * MINUTE + 1]))
+      expect(settle(order), `settled ${order.join(", ")}`).toEqual([]);
+    for (const order of orders([0, 5 * MINUTE, 10 * MINUTE]))
+      expect(settle(order), `settled ${order.join(", ")}`).toEqual(["g1a bubble"]);
+  });
+
+  it("mutes once for an earlier cluster, and again for a later hide alone never", () => {
+    for (const order of orders([0, 5 * MINUTE, 10 * MINUTE, 40 * MINUTE]))
+      expect(settle(order), `settled ${order.join(", ")}`).toEqual(["g1a bubble"]);
   });
 });

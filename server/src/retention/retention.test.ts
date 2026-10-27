@@ -233,11 +233,30 @@ describe("the retention's budget (3n)", () => {
     expect(sizes).toEqual([10, 10, 10]);
   });
 
-  it("holds its default budget at 10,000 rows a tick", () => {
+  it("holds its default budget at one batch of 500 rows a tick, so no tick holds the event loop long", () => {
+    for (const [rows, left] of [
+      [500, 0],
+      [501, 1],
+      [1_000, 500],
+    ] as const) {
+      const { retention, verdicts, times } = setup();
+      verdicts(rows, T0 - 200 * DAY);
+      retention.tick();
+      expect(times(), `${String(rows)} rows`).toHaveLength(left);
+    }
+  });
+
+  it("says a backlog is left when one batch did not take it all, and drains 1,200 rows over three ticks, the oldest first", () => {
     const { retention, verdicts, times } = setup();
-    verdicts(10_001, T0 - 200 * DAY);
-    retention.tick();
-    expect(times()).toHaveLength(1);
+    verdicts(1_200, T0 - 200 * DAY);
+    expect(retention.tick()).toBe(true);
+    expect(times()[0]).toBe(T0 - 200 * DAY + 500);
+    expect(retention.tick()).toBe(true);
+    expect(retention.tick()).toBe(false);
+    expect(times()).toEqual([]);
+    const small = setup();
+    small.verdicts(499, T0 - 200 * DAY);
+    expect(small.retention.tick()).toBe(false);
   });
 });
 

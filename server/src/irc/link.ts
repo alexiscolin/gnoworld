@@ -8,7 +8,8 @@ import { parseLine, type IrcMessage } from "@gnoworld/core";
 import type { Log } from "../log.ts";
 import type { RoomState } from "../rooms/reconcile.ts";
 import { allowed, line, NICK, type Command } from "./lines.ts";
-import { fresh, reader, type Options } from "./reader.ts";
+import { reader, type Options } from "./reader.ts";
+import { closed, fresh } from "./session.ts";
 
 export type { Said } from "./lines.ts";
 
@@ -95,12 +96,7 @@ export function ircLink(options: Options): Link {
     });
     s.on("close", () => {
       clearInterval(watchdog);
-      state.ready = false;
-      state.batches.clear();
-      state.several.clear();
-      state.asked.clear();
-      state.channels = undefined;
-      state.states.drop();
+      closed(state);
       if (stopped) return;
       log("irc_closed");
       if (state.upSince !== undefined && Date.now() - state.upSince >= 60_000) state.attempt = 0;

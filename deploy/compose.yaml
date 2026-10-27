@@ -65,6 +65,7 @@ services:
       SERVER_NAME: ${SERVER_NAME:-irc.gnoworld.example}
       ORIGINS: ${ORIGINS:?set ORIGINS in deploy/.env, the app's own https origin}
       PROXY_FROM: *web-address
+      INSIDE_SUBNET: ${INSIDE_SUBNET:-172.30.89.0/24}
       AUTH_SOCKET: *auth-socket
     secrets: [ergo_oper_password]
     volumes:

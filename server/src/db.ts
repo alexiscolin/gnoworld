@@ -10,7 +10,9 @@ const Names = z.array(z.object({ name: z.string() }));
 export function openDatabase(path: string, migrations: readonly string[]): DatabaseSync {
   const db = new DatabaseSync(path, { timeout: 0 });
   try {
-    db.exec("PRAGMA locking_mode = EXCLUSIVE; PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
+    db.exec(
+      "PRAGMA locking_mode = EXCLUSIVE; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON;",
+    );
     migrate(db, migrations);
     return db;
   } catch (error) {

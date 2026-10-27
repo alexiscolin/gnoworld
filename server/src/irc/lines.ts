@@ -82,23 +82,20 @@ function marks(tags: IrcMessage["tags"]): { time?: string; edits?: string } {
   };
 }
 
+// A line to a room's voices or operators (STATUSMSG: +#room, @#room, any of ~&@%+ before the name) is the room's
+// line too: Ergo relays it to those members and keeps no history of it (channel.go, #959), so it is read for the
+// rules, the check and the strikes, and its hide is refused (F723).
+const STATUS = /^[~&@%+]+(?=#)/;
+
 // A room's message as the link hands it on, or nothing: a channel line of one of its rooms, with the
 // account and the id Ergo set, from someone else, with text.
 export function said(
-  { tags, source, params: [room = "", text = ""] }: IrcMessage,
+  { tags, source, params: [target = "", text = ""] }: IrcMessage,
   joined: ReadonlySet<string>,
 ): Said | undefined {
+  const room = target.replace(STATUS, "");
   const [account = "", msgid = ""] = [tags.get("account"), tags.get("msgid")];
   const fields = [text, account, msgid];
   if (fields.includes("") || source?.split("!")[0] === NICK || !joined.has(room)) return undefined;
   return { room, account, msgid, text, ...marks(tags) };
-}
-
-// A line of a history page, counted there with its time, which the page's next asking starts from. A time Date
-// cannot read is no page's end (F552): the next page starts from the last one read.
-export function countInPage(page: { lines: number; last: string } | undefined, { tags }: IrcMessage): void {
-  if (page === undefined) return;
-  page.lines += 1;
-  const time = tags.get("time") ?? "";
-  if (!Number.isNaN(Date.parse(time))) page.last = time;
 }
