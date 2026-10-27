@@ -67,8 +67,8 @@ function useReplies(shown: Shown | undefined, lines: readonly Line[] | undefined
 }
 
 // The line of the reader's own a direct message's next one corrects, its words put in the composer, as a reply's: one a
-// conversation, none for a room. Sent tagged with the line's msgid, shown in its place. Asking for one drops a reply
-// asked before (`dropReply`); an edit's end gives the box the focus.
+// conversation, none for a room. Sent tagged with the line's msgid, shown in its place, unless unchanged. Asking for one
+// drops a reply asked before (`dropReply`); an edit's end gives the box the focus.
 function useEdits(shown: Shown | undefined, lines: readonly Line[] | undefined, dropReply: () => void): Composing {
   const { value: edit, update, clear } = useHere<Chosen>(shown?.key);
   const ended = useHere<true>(shown?.key);
@@ -91,7 +91,7 @@ function useEdits(shown: Shown | undefined, lines: readonly Line[] | undefined, 
       editing: { text: editing.text, asked: edit.asked },
       onCancelEdit: end,
       onSay: (draft: string) => {
-        const went = shown.say(draft, { edit: editing.id });
+        const went = draft.trim() === editing.text.trim() || shown.say(draft, { edit: editing.id });
         if (went) end();
         return went;
       },

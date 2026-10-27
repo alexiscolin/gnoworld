@@ -165,6 +165,25 @@ test.describe("a direct message's bar", () => {
     expect(dm.says()).toEqual([`PRIVMSG ${PARTNER} :keep me`]);
   });
 
+  // R7(b), decided by Claude: an emptied box sends nothing and stays in edit mode; unchanged words close the edit, sending nothing.
+  test("sends nothing for an edit emptied, which stays open, nor for one left as it was, which closes", async ({
+    page,
+  }) => {
+    const dm = await inDm(page);
+    await write(page, "as written");
+    await startEdit(page, 0);
+    await field(page).fill("");
+    await field(page).press("Enter");
+    await expect(page.getByText("Editing a message")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Save" })).toBeDisabled();
+    await field(page).fill("as written");
+    await page.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByText("Editing a message")).toHaveCount(0);
+    await expect(lines(page)).toHaveCount(1);
+    await expect(lines(page).nth(0)).not.toContainText(/Edited/);
+    expect(dm.says()).toEqual([`PRIVMSG ${PARTNER} :as written`]);
+  });
+
   // R7(c), decided by Claude: Edit drops a pending Reply, so the next plain message answers nothing.
   test("drops a pending reply when Edit is chosen: the correction and the next line carry no +reply", async ({
     page,
