@@ -7,7 +7,7 @@ import { inline } from "./inline.ts";
 import type { Block, Inline } from "./types.ts";
 
 export { inWord, MAX_INLINE_DEPTH } from "./inline.ts";
-export { mentions } from "./mentions.ts";
+export { mentions, mentionsRoom } from "./mentions.ts";
 export { inlines } from "./nodes.ts";
 export type { Block, Inline } from "./types.ts";
 
