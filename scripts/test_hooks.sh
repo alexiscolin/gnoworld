@@ -2472,6 +2472,7 @@ ws="$t/ws"
 mkdir -p "$ws/src/node_modules/pkg" "$ws/src/node_modules/.vite/deps" "$ws/src/app/node_modules/@gnoworld" "$ws/src/packages/core" "$ws/src/reports"
 git -C "$ws/src" init -q
 printf 'node_modules/\nreports/\n' >"$ws/src/.gitignore" && echo x >"$ws/src/packages/core/a.ts"
+for f in pnpm-lock.yaml package.json app/package.json packages/core/package.json; do echo "$f" >"$ws/src/$f"; done
 git -C "$ws/src" add -A && git -C "$ws/src" commit -qm x
 echo pkg >"$ws/src/node_modules/pkg/index.js" && echo stale >"$ws/src/node_modules/.vite/deps/x"
 ln -s ../../../packages/core "$ws/src/app/node_modules/@gnoworld/core"
@@ -2489,6 +2490,23 @@ cmp -s "$ws/src/reports/stryker-incremental.json" "$ws/new/reports/stryker-incre
 mkdir "$ws/empty" && (cd "$ws/src" && sh "$here/worktree.sh" "$ws/empty" another HEAD) >/dev/null 2>&1 && fail "worktree.sh took an empty folder that exists, which git would fill"
 (cd "$ws/src" && sh "$here/worktree.sh" "$ws/x") >/dev/null 2>&1 && fail "worktree.sh ran with no branch named"
 [ ! -e "$ws/x" ] || fail "worktree.sh made a folder for a call it refused"
+# The packages are the source tree's, linked: a base whose lockfile or package files are not this tree's would run the gate on
+# packages its own lockfile does not name, and a `pnpm install` there would write into this tree's install (security-S5).
+# It is refused, whichever package file differs, and makes nothing: no folder, no branch. A base git cannot read refuses too.
+installed=$(git -C "$ws/src" rev-parse HEAD)
+for f in pnpm-lock.yaml pnpm-workspace.yaml .pnpmfile.cjs .pnpmfile.mjs .npmrc package.json app/package.json packages/core/package.json; do
+	echo changed >>"$ws/src/$f" && git -C "$ws/src" add -A && git -C "$ws/src" commit -qm "$f moves"
+	out=$(cd "$ws/src" && sh "$here/worktree.sh" "$ws/old" "old-${f##*/}" "$installed" 2>&1) && fail "worktree.sh made a tree of a base whose $f is not this tree's: $out"
+	printf '%s\n' "$out" | grep -qF "$f" || fail "worktree.sh did not name the package file $f that differs: $out"
+	[ ! -e "$ws/old" ] && ! git -C "$ws/src" rev-parse -q --verify "old-${f##*/}" >/dev/null || fail "worktree.sh made a folder or a branch for a base whose $f differs"
+	git -C "$ws/src" reset -q --hard "$installed"
+done
+echo changed >>"$ws/src/app/package.json"
+out=$(cd "$ws/src" && sh "$here/worktree.sh" "$ws/dirty" dirty HEAD 2>&1) && fail "worktree.sh made a tree beside a package file of this one changed and not committed: $out"
+git -C "$ws/src" checkout -q -- app/package.json
+out=$(cd "$ws/src" && sh "$here/worktree.sh" "$ws/gone" gone nosuchbase 2>&1) && fail "worktree.sh made a tree of a base git cannot read: $out"
+[ ! -e "$ws/gone" ] || fail "worktree.sh made a folder for a base git cannot read"
+(cd "$ws/src" && sh "$here/worktree.sh" "$ws/same" same HEAD) >/dev/null 2>&1 || fail "worktree.sh refused a base whose package files are this tree's"
 fi
 
 if part bench; then

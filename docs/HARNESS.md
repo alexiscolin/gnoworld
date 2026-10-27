@@ -426,7 +426,7 @@ and the harness is frozen until a real bug crosses it.
 | `scripts/bench.py`, `app/tests/bench/` | the benches and their budgets |
 | `scripts/batch_size.py` | a merge's own product code, a small batch |
 | `scripts/exam.py` | the reviewers' exam's set |
-| `scripts/worktree.sh` | a branch's worktree, ready for the gate: its packages linked, StrykerJS's incremental file seeded |
+| `scripts/worktree.sh` | a branch's worktree, ready for the gate: its packages linked (so a base whose lockfile or package files are not the source tree's is refused, and a `pnpm install` is made in the source tree, never in the worktree: the links lead there; security-S5), StrykerJS's incremental file seeded |
 | `server/src/testing/toolchain.ts` | the Node every test runs on |
 | `docs/review/findings.md`, `docs/review-log.md` | every finding; what Alexis caught and missed |
 | `docs/harness.html`, `docs/harness.png` | the picture above, and its source |
