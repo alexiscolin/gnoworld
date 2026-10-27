@@ -33,13 +33,12 @@ export interface Held {
   reactions: readonly Reaction[] | undefined;
 }
 
-// Whether a REDACT names a line or a reaction its sender did not write: a conversation has no moderators, so a partner's
-// REDACT naming one of mine changes nothing here (Ergo refuses it as well).
+// Whether the msgid `message` names (a REDACT's) is one of a line or reaction its sender did not write: a conversation has
+// no moderators, so a partner's REDACT naming one of mine changes nothing here (Ergo refuses it as well).
 function forbiddenBy(message: IrcMessage) {
   const [, id = ""] = message.params;
   const sender = nickOf(message.source ?? "");
-  return (each: { id: string; from?: string; who?: string }) =>
-    message.command === "REDACT" && each.id === id && (each.from ?? each.who) !== sender;
+  return (each: { id: string; from?: string; who?: string }) => each.id === id && (each.from ?? each.who) !== sender;
 }
 
 /** `held` once `message` is read as a room's are, the target being the room: the same object when it changes nothing. */
