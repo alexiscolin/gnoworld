@@ -44,6 +44,10 @@ interface Page {
   people: ReactNode;
 }
 
+// The words typed in each thread's field and not sent, by account and root: the page's memory, kept on no device, so a
+// close, a room or another thread keeps them (CR1).
+type Typed = Map<string, string>;
+
 // The panel of the thread `open`, with the composer that tags each line with its root: a guest's word, or the field.
 function Panel({
   open,
@@ -53,9 +57,11 @@ function Panel({
   rooms,
   acts,
   close,
-}: Omit<Page, "people"> & { open: Open; shown: Shown; close: () => void }) {
+  typed,
+}: Omit<Page, "people"> & { open: Open; shown: Shown; close: () => void; typed: Typed }) {
   const members = state?.members ?? [];
   const root = rootOf(state?.lines ?? [], open.from);
+  const slot = `${session.kind === "in" ? session.address : ""} ${root}`;
   return (
     <Suspense fallback={null}>
       <Thread
@@ -75,6 +81,11 @@ function Panel({
             onSay={(draft) => acts.onSay(draft, root)}
             focus
             keeps={false}
+            draft={typed.get(slot)}
+            onDraft={(text) => {
+              if (text === "") typed.delete(slot);
+              else typed.set(slot, text);
+            }}
           />
         }
       />
@@ -87,6 +98,7 @@ function Panel({
 export function useThreads(page: Page) {
   const { shown, state, people } = page;
   const [open, setOpen] = useState<Open>();
+  const [typed] = useState<Typed>(() => new Map());
   if (open !== undefined && open.key !== shown?.key) setOpen(undefined);
   if (shown?.kind !== "room") return { view: {}, aside: undefined };
   const close = () => {
@@ -104,6 +116,6 @@ export function useThreads(page: Page) {
       },
       threaded: open !== undefined,
     },
-    aside: open === undefined ? people : <Panel {...page} shown={shown} open={open} close={close} />,
+    aside: open === undefined ? people : <Panel {...page} shown={shown} open={open} close={close} typed={typed} />,
   };
 }

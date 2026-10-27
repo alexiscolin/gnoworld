@@ -1,8 +1,8 @@
-import { lineOf, lines } from "./chat.ts";
+import { lineOf, lines, roomsNav } from "./chat.ts";
 import { expect, test } from "./fixtures.ts";
 import type { HistoryLine } from "./scripted.ts";
 import { asAccount, ROOM, T, tagged } from "./talk.ts";
-import { closeButton, inThread, panel, say, threadOf } from "./thread.ts";
+import { chipOf, closeButton, inThread, panel, say, threadField, threadOf } from "./thread.ts";
 
 // What the code review of 4d's threads found (docs/review/findings.md, F1760 on): each journey fails without its fix.
 test.describe("threads, from the review", () => {
@@ -28,5 +28,47 @@ test.describe("threads, from the review", () => {
     await expect(inThread(page)).toHaveCount(4);
     expect(said()).toEqual([`@+reply=m1 PRIVMSG ${ROOM} :to the root`]);
     await closeButton(page).click();
+  });
+
+  // CR1 (F1761): words typed in a thread are not lost to an Escape, another thread or a room; kept in the page's memory.
+  test("keeps the words typed in a thread through Escape, another thread and a room, till they are sent", async ({
+    page,
+  }) => {
+    const history: HistoryLine[] = [
+      ["m1", T(0), "the root line"],
+      ["m2", T(1), "an unrelated line"],
+    ];
+    const { said } = await asAccount(
+      page,
+      () => ({ history, replayed: [tagged("m3", "a reply", { at: 2, tags: "+reply=m1" })] }),
+      3,
+    );
+    await chipOf(lines(page).first()).click();
+    await threadField(page).fill("half a thought");
+    await page.keyboard.press("Escape");
+    await expect(panel(page)).toHaveCount(0);
+    await chipOf(lines(page).first()).click();
+    await expect(threadField(page)).toHaveValue("half a thought");
+    // Another thread has its own field; this one's words wait.
+    await threadOf(lineOf(page, "an unrelated line"));
+    await expect(threadField(page)).toHaveValue("");
+    await threadField(page).fill("for the other");
+    await chipOf(lines(page).first()).click();
+    await expect(threadField(page)).toHaveValue("half a thought");
+    await roomsNav(page).getByRole("link", { name: "#bubble" }).click();
+    await expect(panel(page)).toHaveCount(0);
+    await roomsNav(page).getByRole("link", { name: "#games" }).click();
+    await chipOf(lines(page).first()).click();
+    await expect(threadField(page)).toHaveValue("half a thought");
+    // Memory only: no draft of the panel's is on the device.
+    const kept = await page.evaluate(() => JSON.stringify(localStorage));
+    expect(kept).not.toContain("half a thought");
+    expect(kept).not.toContain("for the other");
+    await say(page, "half a thought");
+    await expect(inThread(page)).toHaveCount(3);
+    expect(said()).toEqual([`@+reply=m1 PRIVMSG ${ROOM} :half a thought`]);
+    await closeButton(page).click();
+    await chipOf(lines(page).first()).click();
+    await expect(threadField(page)).toHaveValue("");
   });
 });

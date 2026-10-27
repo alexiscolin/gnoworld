@@ -34,26 +34,29 @@ export interface WriterProps {
   replying?: Line | undefined;
   asked?: number | undefined;
   onCancelReply?: (() => void) | undefined;
-  /** Whether the draft is kept on the device, by room; false for a thread's composer, whose lines are no room's draft. */
+  /** Whether the draft is kept on the device, by room; false for a thread's composer, whose lines are no room's draft:
+   * its own `draft` and `onDraft` stand in, which the page keeps in memory. */
   keeps?: boolean | undefined;
+  draft?: string | undefined;
+  onDraft?: ((draft: string) => void) | undefined;
 }
 
 export function Writer(props: WriterProps) {
   const { session, room, label, rooms, members, onSay, onTyping, refused, focus, describedBy } = props;
-  const { replying, asked, onCancelReply, keeps = true } = props;
+  const { replying, asked, onCancelReply, keeps = true, draft, onDraft } = props;
   if (session.kind !== "in") return <p>Log in to write in this room.</p>;
   // The account's drafts on this device: the room's, where the composer starts, and each change kept (4d).
   const kept = pageDrafts(session.address);
   return (
     <Suspense fallback={null}>
       <Composer
-        draft={keeps ? kept.get(room) : undefined}
+        draft={keeps ? kept.get(room) : draft}
         onDraft={
           keeps
-            ? (draft) => {
-                kept.set(room, draft);
+            ? (text) => {
+                kept.set(room, text);
               }
-            : undefined
+            : onDraft
         }
         key={room}
         room={room}
