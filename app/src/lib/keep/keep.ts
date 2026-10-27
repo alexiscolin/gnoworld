@@ -53,6 +53,8 @@ const entriesOf = (value: unknown): [string, unknown][] | undefined =>
 /** An account's saved lines and places on the device `storage` reaches. */
 export function keep(storage: () => DraftStorage, account: Address): Keep {
   const keys = { saved: `gnoworld:saved:${account}`, unread: `gnoworld:unread:${account}` };
+  // What the device held that this page cannot read, from its last read of each key: a newer page's, written back.
+  let unknown: { saved: unknown[]; unread: [string, unknown][] } = { saved: [], unread: [] };
   // What the key holds in the shape `pick` reads, a key holding another shape forgotten; none if unreadable.
   const read = <T>(key: string, pick: (value: unknown) => T[] | undefined): T[] | undefined => {
     try {
@@ -83,26 +85,39 @@ export function keep(storage: () => DraftStorage, account: Address): Keep {
     }
   };
   return {
-    saved: () =>
-      read(keys.saved, (value) =>
+    saved: () => {
+      const strange: unknown[] = [];
+      const lines = read(keys.saved, (value) =>
         itemsOf(value)?.flatMap((item) => {
           const line = Saved.safeParse(item);
+          if (!line.success) strange.push(item);
           return line.success ? [line.data] : [];
         }),
-      )?.slice(0, SAVED_KEPT),
-    setSaved: (lines) => lines.length <= SAVED_KEPT && write(keys.saved, lines, lines.length === 0),
+      );
+      if (lines !== undefined) unknown = { ...unknown, saved: strange };
+      return lines?.slice(0, SAVED_KEPT);
+    },
+    setSaved: (lines) =>
+      lines.length <= SAVED_KEPT &&
+      write(keys.saved, [...lines, ...unknown.saved], lines.length + unknown.saved.length === 0),
     unread: () => {
+      const strange: [string, unknown][] = [];
       const places = read(keys.unread, (value) =>
         entriesOf(value)?.flatMap(([room, time]): [string, string][] => {
           const at = Time.safeParse(time);
+          if (!RoomId.safeParse(room).success || !at.success) strange.push([room, time]);
           return RoomId.safeParse(room).success && at.success ? [[room, at.data]] : [];
         }),
       );
+      if (places !== undefined) unknown = { ...unknown, unread: strange };
       return places === undefined ? undefined : Object.fromEntries(places.slice(0, UNREAD_KEPT));
     },
     setUnread: (places) => {
       const count = Object.keys(places).length;
-      return count <= UNREAD_KEPT && write(keys.unread, places, count === 0);
+      return (
+        count <= UNREAD_KEPT &&
+        write(keys.unread, { ...Object.fromEntries(unknown.unread), ...places }, count + unknown.unread.length === 0)
+      );
     },
   };
 }

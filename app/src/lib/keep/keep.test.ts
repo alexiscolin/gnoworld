@@ -86,6 +86,53 @@ describe("the lines an account saved, on its device", () => {
     ).toEqual(["m1", "m3"]);
   });
 
+  // A newer page may add a field or a form: this page reads what it knows, and writes back what it did not read, so an
+  // older tab never takes a newer page's lines with it (F1489, the code review's CR10).
+  it("writes back the lines it could not read, beside its own", () => {
+    const device = storage();
+    const newer = { ...saved("m2"), pinnedBy: "a newer page" };
+    device.kept.set(`gnoworld:saved:${ALICE}`, JSON.stringify([saved("m1"), newer]));
+    const account = on(device, ALICE);
+    expect(account.saved()?.map(({ id }) => id)).toEqual(["m1"]);
+    expect(account.setSaved([saved("m3"), saved("m1")])).toBe(true);
+    expect(JSON.parse(device.kept.get(`gnoworld:saved:${ALICE}`) ?? "null")).toEqual([saved("m3"), saved("m1"), newer]);
+  });
+
+  it("keeps the key for lines it could not read, when it saves none of its own", () => {
+    const device = storage();
+    device.kept.set(`gnoworld:saved:${ALICE}`, JSON.stringify([{ ...saved("m2"), pinnedBy: "a newer page" }]));
+    const account = on(device, ALICE);
+    expect(account.saved()).toEqual([]);
+    expect(account.setSaved([])).toBe(true);
+    expect(device.kept.has(`gnoworld:saved:${ALICE}`)).toBe(true);
+  });
+
+  it("writes back the places it could not read, beside its own", () => {
+    const device = storage();
+    device.kept.set(
+      `gnoworld:unread:${ALICE}`,
+      JSON.stringify({ "#bubble": "2026-10-25T10:00:00.000Z", "#newer": { at: "a newer form" } }),
+    );
+    const account = on(device, ALICE);
+    expect(Object.keys(account.unread() ?? {})).toEqual(["#bubble"]);
+    expect(account.setUnread({ "#games": "2026-10-25T11:00:00.000Z" })).toBe(true);
+    expect(JSON.parse(device.kept.get(`gnoworld:unread:${ALICE}`) ?? "null")).toEqual({
+      "#games": "2026-10-25T11:00:00.000Z",
+      "#newer": { at: "a newer form" },
+    });
+  });
+
+  it("lets a place it sets replace one of the same room it could not read", () => {
+    const device = storage();
+    device.kept.set(`gnoworld:unread:${ALICE}`, JSON.stringify({ "#bubble": "a newer form" }));
+    const account = on(device, ALICE);
+    expect(account.unread()).toEqual({});
+    expect(account.setUnread({ "#bubble": "2026-10-25T10:00:00.000Z" })).toBe(true);
+    expect(JSON.parse(device.kept.get(`gnoworld:unread:${ALICE}`) ?? "null")).toEqual({
+      "#bubble": "2026-10-25T10:00:00.000Z",
+    });
+  });
+
   it.each([
     ["text that is no JSON", "{not json"],
     ["JSON that is no list", '{"a":1}'],
