@@ -1,6 +1,6 @@
 // What the composer is told of the line the next message answers (slice 4's 4d replies) or corrects (the DM bar's and the
 // room's edits), moved out of Loaded.tsx for the lint's sizes: each its conversation's alone, dropped as another comes in view.
-import { foldEdits, type Line } from "@gnoworld/core";
+import { canEdit, foldEdits, type Line } from "@gnoworld/core";
 import { useState } from "react";
 import type { RefusedTags } from "../../store/dms.ts";
 import type { Shown } from "./shown.tsx";
@@ -104,9 +104,10 @@ function editsOf(
   const editing = found?.edits === undefined ? found : undefined;
   if (shown === undefined) return { view: {}, writer: {} };
   const view = {
-    // The reader's own line alone: the menu offers no other, and the bot hides a correction of another's, a strike.
+    // What the menu offers alone (canEdit): the bot hides a correction of another's line, a strike.
     onEdit: (id: string) => {
-      if (me === undefined || lines?.find((line) => line.id === id)?.account !== me) return;
+      const line = lines?.find((one) => one.id === id);
+      if (line === undefined || !canEdit(line, me)) return;
       dropReply();
       update((was) => asking(was, id));
     },

@@ -5,6 +5,11 @@
 import type { IrcMessage } from "../irc/irc.ts";
 import { nickOf, redactAfter, sameName, type Line } from "./room.ts";
 
+/** Whether `me` may correct `line`: a message of their own that corrects none (an orphan correction names a line nothing
+ * folds into), not an action, which a correction cannot turn back (CR5 of the room edit). */
+export const canEdit = (line: Line, me: string | undefined): boolean =>
+  me !== undefined && line.account === me && line.kind === "message" && line.edits === undefined;
+
 /** A line as shown: corrected by an edit, said so. */
 export type ShownLine = Line & { readonly edited?: true };
 

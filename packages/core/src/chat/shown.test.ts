@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { parseLine, type IrcMessage } from "../irc/irc.ts";
 import type { Line } from "./room.ts";
-import { editsFolded, foldEdits, redactedLines, shownLines } from "./shown.ts";
+import { canEdit, editsFolded, foldEdits, redactedLines, shownLines } from "./shown.ts";
 
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
@@ -245,5 +245,23 @@ describe("redactedLines: a REDACT of a line and of its corrections", () => {
 
   test("reads the REDACT's room whatever its case", () => {
     expect(ids(redactedLines(held, redact("a", ALICE, "#BUBBLE"), "#bubble"))).toEqual(["z", "b"]);
+  });
+});
+
+// CR5 of the room edit: one rule for the menu's Edit and the composer's, which each held a part of it.
+describe("canEdit", () => {
+  const mine = line("a", 1, "mine");
+  test("is true for a message of the reader's own", () => {
+    expect(canEdit(mine, ALICE)).toBe(true);
+  });
+  test.each([
+    ["another account's line", mine, BOB],
+    ["a guest, which has no address", mine, undefined],
+    ["a line no account vouches for", guest("g", 1, "hi"), "guest-ab12cd"],
+    ["an action", { ...mine, kind: "action" as const }, ALICE],
+    ["a notice", { ...mine, kind: "notice" as const }, ALICE],
+    ["a correction, whose original may have left", { ...mine, edits: "z" }, ALICE],
+  ])("is false for %s", (_, subject, me) => {
+    expect(canEdit(subject, me)).toBe(false);
   });
 });

@@ -2,7 +2,7 @@
 // reactions first (4d), its More menu holding Copy text, Copy link and, on the reader's own line, Delete, asked first.
 // More reactions, thread, pin, save and mark unread come with their merges; Report waits for slice 12's moderation
 // queue. Edit (the DM bar's, then the room's) puts one's own message back in the composer.
-import type { Line, Shown } from "@gnoworld/core";
+import { canEdit, type Line, type Shown } from "@gnoworld/core";
 import { Button, Chip, Cluster, Dialog, IconButton, Menu, Stack } from "@gnoworld/ui";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import styles from "./LineActions.module.css";
@@ -153,23 +153,15 @@ interface Item {
   act: "text" | "link" | "edit" | "delete";
 }
 
-function menu({
-  own,
-  deleting,
-  edit,
-  line,
-}: {
-  own: boolean;
-  deleting: boolean;
-  edit: (() => void) | undefined;
-  line: Line;
-}): Item[] {
-  // Edit: a message of one's own that corrects none; an orphan correction (its original gone) has none to correct (CR5).
-  const editable = own && !deleting && edit !== undefined && line.kind === "message" && line.edits === undefined;
+// Whether Edit is offered: an Edit to ask for, and canEdit's rule, which the composer holds as well (CR5).
+const asksEdit = (onEdit: (() => void) | undefined, line: Line, me: string | undefined) =>
+  onEdit !== undefined && canEdit(line, me);
+
+function menu({ own, editable, deleting }: { own: boolean; editable: boolean; deleting: boolean }): Item[] {
   return [
     { kinds: ["room", "dm"], label: "Copy text", act: "text" },
     { kinds: ["room"], label: "Copy room link", act: "link" },
-    ...(editable ? [{ kinds: ["room", "dm"], label: "Edit", act: "edit" } as const] : []),
+    ...(editable && !deleting ? [{ kinds: ["room", "dm"], label: "Edit", act: "edit" } as const] : []),
     ...(own && !deleting ? [{ kinds: ["room", "dm"], label: "Delete", tone: "danger", act: "delete" } as const] : []),
   ];
 }
@@ -212,7 +204,7 @@ export function LineActions({
     setAsking(false);
   };
   const kind: Kind = dm === undefined ? "room" : "dm";
-  const items = menu({ own, deleting, edit: onEdit, line })
+  const items = menu({ own, editable: asksEdit(onEdit, line, me), deleting })
     .filter((item) => item.kinds.includes(kind))
     .map(({ label, tone, act }) => ({
       label,

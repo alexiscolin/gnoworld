@@ -234,6 +234,19 @@ describe("useComposing", () => {
     expect(now().writer.editing).toBeUndefined();
   });
 
+  // CR5 of the room edit: the menu held the kind rule alone; `onEdit` checked ownership only, so an action of the reader's,
+  // which a correction turns into a message nothing can turn back, opened an edit through any other caller.
+  it.each(["dm", "room"] as const)("opens no edit of the reader's own action or notice, in a %s", (kind) => {
+    draw(kind, [
+      { ...line("m3", "waves"), kind: "action" },
+      { ...line("m4", "told"), kind: "notice" },
+    ]);
+    edit("m3");
+    expect(now().writer.editing).toBeUndefined();
+    edit("m4");
+    expect(now().writer.editing).toBeUndefined();
+  });
+
   it("drops a room's reply when an edit is asked, and ends the edit when a reply is asked", () => {
     draw("room");
     act(() => now().view.onReply?.("m2"));
