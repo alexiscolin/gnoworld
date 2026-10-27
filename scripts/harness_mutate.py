@@ -190,6 +190,7 @@ def mutants():
         ("/^check\\.\\w+\\/storybook$/", "/check\\.\\w+\\/storybook$/", "is directly inside the temporary folder"),
         ("/^check\\.\\w+\\/storybook$/", "/^check\\.\\w+\\/storybook/", "is the storybook folder itself"),
         ("/^check\\.\\w+\\/storybook$/", "/^check\\w+\\/storybook$/", "is in a folder named check.*"),
+        ("relative(resolve(tmpdir()), resolve(out)).split(sep).join(\"/\")", "out.slice(resolve(tmpdir()).length + 1)", "is read after its `..` are resolved (R5)"),
         ("!/^\\/[", "!/^[", "is absolute"),
         ("[\\w@%+=:,./-]", "[\\w@%+=:,./ -]", "has no space"),
         ("[\\w@%+=:,./-]", "[\\w@%+=:,./;-]", "has no shell character"),

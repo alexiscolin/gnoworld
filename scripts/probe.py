@@ -376,9 +376,22 @@ try:
                                      ("a storybook folder out of a run folder", f"{fake}/storybook", fake), ("a folder under a run folder's storybook", f"{fake}/check.abc123/storybook/x", fake),
                                      ("a storybook folder of a folder not a run's", f"{fake}/other/storybook", fake),
                                      ("a run folder's storybook, deeper in the temporary folder", f"{fake}/other/check.abc123/storybook", fake),
-                                     ("a storybook folder of a folder named check, not check.*", f"{fake}/checkabc123/storybook", fake)):
+                                     ("a storybook folder of a folder named check, not check.*", f"{fake}/checkabc123/storybook", fake),
+                                     # `..` is resolved before the rule reads the folder, so none of them gets out of it (R5).
+                                     ("a run folder's storybook, by `..`", f"{fake}/check.abc123/storybook/..", fake),
+                                     ("a folder out of a run folder's storybook, by `..`", f"{fake}/check.abc123/storybook/../../escaped", fake),
+                                     ("a folder not a run's, by `..` into a run folder's name", f"{fake}/check.abc123/storybook/../../other/storybook", fake)):
                 out = pictures("tokens--", STORIES_OUT=where, TMPDIR=tmp)
                 expect(out.returncode != 0 and "STORIES_OUT must be" in out.stdout + out.stderr, f"STORIES_OUT as {what} is refused before Storybook deletes it")
+            # What the rule accepts, said as a case (R5): the storybook folder of any `check.*` run folder, another gate's run
+            # included (CR7: its residual state, since a folder the rule cannot tell apart is another run's), and a `..` that
+            # resolves to one. The config loads; `--list` starts no server and builds nothing.
+            for what, where in (("another gate's run folder's storybook", f"{fake}/check.zzz999/storybook"),
+                                ("a run folder's storybook reached by `..`", f"{fake}/other/../check.abc123/storybook")):
+                out = run(["node", "app/node_modules/@playwright/test/cli.js", "test", "-c", "app/playwright.stories.config.ts", "--list", "pictures"],
+                          cwd=tree, env={"PICTURES_OF": "tokens--", "STORIES_PORT": port, "STORIES_OUT": where, "TMPDIR": fake})
+                ok = out.returncode == 0 and "STORIES_OUT must be" not in out.stdout + out.stderr
+                expect(ok, f"STORIES_OUT as {what} is accepted" + ("" if ok else f": {(out.stdout + out.stderr)[-200:]}"))
             # The tools missing: never a pass on nothing. No browser where Playwright looks (tokens.css as approved); then,
             # once tokens.css is as approved again, no Storybook to build.
             out = pictures("tokens--", PLAYWRIGHT_BROWSERS_PATH=os.path.join(tree, "no-browsers"))
