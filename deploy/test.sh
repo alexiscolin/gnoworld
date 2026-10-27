@@ -317,7 +317,7 @@ if [ "${1:-}" = --mutants ]; then
 		nginx sed 's#~^(200|206|304)/assets/#~^[0-9]*/assets/#'
 	mutant "no manifest type" "the manifest's type" nginx sed '/application\/manifest+json webmanifest;/d'
 	mutant "nothing compressed" "is sent compressed" nginx sed '/gzip on;/d'
-	mutant "compressed at nginx's level 1" "web's settings say gzip_comp_level 6" nginx sed '/gzip_comp_level 6;/d'
+	mutant "compressed at nginx's level 1" "web compresses" nginx sed '/gzip_comp_level 6;/d'
 	mutant "no data type" "a world's data's type" nginx sed '/text\/x-script data;/d'
 	mutant "no PROXY protocol" "the server is up and asks" nginx sed 's#listen 8080 proxy_protocol#listen 8080#'
 	mutant "a page cached" "/ revalidates" nginx sed 's#default "no-cache";#default "max-age=600";#'
@@ -920,8 +920,21 @@ CLIENT
 	holds "the stream comes through web: its heartbeat within 20 s" "$stream" '^:'
 	# Buffered, nginx still passed the heartbeat on (the stream-buffered mutant, 2026-10-24): its setting, read back.
 	expect "web's settings say proxy_buffering off" "$(docker exec "$web" cat /etc/nginx/nginx.conf | grep -c 'proxy_buffering off;')" 1
-	# Compressed at the level the budgets measure (F683): nginx's own default, 1, sends files 14% bigger; its setting, read back.
-	expect "web's settings say gzip_comp_level 6" "$(docker exec "$web" cat /etc/nginx/nginx.conf | grep -c 'gzip_comp_level 6;')" 1
+	# Compressed at the level the budgets measure (F683), by its effect and not its line (a commented-out line, or one in
+	# another block, would count): a hashed file fetched with and without gzip. The compressed answer is within 1% of
+	# zlib's level 6 of the file (nginx's compressor), and nearer it than level 1, nginx's own default, 14% bigger.
+	asset() { docker run --rm --network "$inside" "$CURL" -s --haproxy-protocol --haproxy-clientip 203.0.113.71 -u "$auth" "$@" "http://web:8080$first"; }
+	asset >"$tmp/asset.raw"
+	asset -H 'Accept-Encoding: gzip' >"$tmp/asset.gz"
+	expect "web compresses $first at level 6, not nginx's level 1" "$(python3 - "$tmp/asset.raw" "$tmp/asset.gz" <<'PY'
+import sys, zlib
+raw = open(sys.argv[1], "rb").read()
+got = len(open(sys.argv[2], "rb").read())
+gzip = lambda level: (lambda z: len(z.compress(raw) + z.flush()))(zlib.compressobj(level, zlib.DEFLATED, 31))
+six, one = gzip(6), gzip(1)
+print("compressed at 6" if one > six * 1.02 and got <= six * 1.01 and abs(got - six) < abs(got - one) else f"got {got}, level 6 {six}, level 1 {one}")
+PY
+)" "compressed at 6"
 	# Connections that send nothing more are closed (F208): headers never ended, a body never sent, a kept-alive
 	# connection left idle; each one's seconds until web closed it, printed as it closes (F639);
 	# in the background while the holds below run (F651).
