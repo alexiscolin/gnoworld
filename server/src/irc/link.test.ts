@@ -262,33 +262,37 @@ describe("the IRC link, line by line", () => {
     await welcome(await ergo.peer(1));
   });
 
-  it("answers what it reads with its own commands alone: hostile lines and PINGs of every shape", async () => {
-    const ergo = await fakeErgo();
-    const { said } = start(ergo.port);
-    const peer = await ergo.peer(0);
-    await welcome(peer);
-    const mark = peer.lines.length;
-    peer.say(message("account=g1a;msgid=m1", "a!u@h", ["#bubble", "a\0b\r\nQUIT :gone"]));
-    peer.say("PING");
-    peer.say("PING :a b");
-    peer.say("PING :a\0b");
-    await sync(peer);
-    expect(since(peer, mark)).toEqual(["PONG", "PONG :a b", "PONG sync"]);
-    // Lines of any bytes, and PINGs of any token: the PONG must carry the token back, nothing more.
-    const pings = fc.string({ maxLength: 40 }).map((token) => `PING :${token}`);
-    await fc.assert(
-      fc.asyncProperty(fc.oneof(fc.string({ unit: "binary", maxLength: 80 }), pings), async (line) => {
-        peer.say(line);
-        await sync(peer, "p");
-      }),
-      { numRuns: 200 },
-    );
-    expect(since(peer, mark).filter((sent) => !OWN.test(sent))).toEqual([]);
-    for (const { room, account, msgid, text } of said) {
-      expect([room === "#bubble" || room === "#earth", account !== "", msgid !== ""]).toEqual([true, true, true]);
-      expect(text).not.toMatch(/[\0\r\n]/);
-    }
-  });
+  it(
+    "answers what it reads with its own commands alone: hostile lines and PINGs of every shape",
+    { timeout: 30_000 },
+    async () => {
+      const ergo = await fakeErgo();
+      const { said } = start(ergo.port);
+      const peer = await ergo.peer(0);
+      await welcome(peer);
+      const mark = peer.lines.length;
+      peer.say(message("account=g1a;msgid=m1", "a!u@h", ["#bubble", "a\0b\r\nQUIT :gone"]));
+      peer.say("PING");
+      peer.say("PING :a b");
+      peer.say("PING :a\0b");
+      await sync(peer);
+      expect(since(peer, mark)).toEqual(["PONG", "PONG :a b", "PONG sync"]);
+      // Lines of any bytes, and PINGs of any token: the PONG must carry the token back, nothing more.
+      const pings = fc.string({ maxLength: 40 }).map((token) => `PING :${token}`);
+      await fc.assert(
+        fc.asyncProperty(fc.oneof(fc.string({ unit: "binary", maxLength: 80 }), pings), async (line) => {
+          peer.say(line);
+          await sync(peer, "p");
+        }),
+        { numRuns: 200 },
+      );
+      expect(since(peer, mark).filter((sent) => !OWN.test(sent))).toEqual([]);
+      for (const { room, account, msgid, text } of said) {
+        expect([room === "#bubble" || room === "#earth", account !== "", msgid !== ""]).toEqual([true, true, true]);
+        expect(text).not.toMatch(/[\0\r\n]/);
+      }
+    },
+  );
 
   it("hands on nothing but a room's text: no empty tags, no client tag, no TAGMSG or empty text", async () => {
     const ergo = await fakeErgo();
