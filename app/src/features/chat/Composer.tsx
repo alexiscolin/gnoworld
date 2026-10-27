@@ -12,6 +12,10 @@ import { Message } from "./Message.tsx";
 import { peopleOf, roomLabel, shortAddress } from "./names.ts";
 import styles from "./Composer.module.css";
 
+// What the field says while it has nothing else to say: the room is told of the typing from the first key (4f; its
+// switch waits for slice 8's settings, docs/decisions.md 2026-10-26), which the writer reads here (UX review's U9).
+const TELLS = "People in this room see when you type.";
+
 /** The bytes left from which the composer counts them. */
 export const NEAR = 50;
 
@@ -133,6 +137,9 @@ export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", 
   const mentioning = /(^|\s)@\S*$/u.test(draft);
   const people = mentioning ? peopleOf(members, nick) : [];
   const completion = completions(draft, { commands: COMMANDS, rooms, people });
+  const says = said(composed, failed, completion);
+  // Nothing else to say, no error either: the disclosure.
+  const shown = says.error === undefined && says.help === undefined ? { help: TELLS } : says;
   const known = new Set(members);
   const box = () => formRef.current?.querySelector("input") ?? undefined;
   useLayoutEffect(() => {
@@ -180,7 +187,7 @@ export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", 
               change(value);
               setFailed(false);
             }}
-            {...said(composed, failed, completion)}
+            {...shown}
           />
           <Button type="submit" disabled={composed.kind !== "line"}>
             Send

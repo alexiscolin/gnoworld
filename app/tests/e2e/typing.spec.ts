@@ -139,6 +139,15 @@ test.describe("telling the room the account is typing", () => {
     ]);
   });
 
+  // The UX review (U9): who writes is told that the room sees them type, in the field's own help.
+  test("says in the field's help that the room sees the account type", async ({ page }) => {
+    const address = await logIn(page, word("typing"));
+    await room(page, { me: address });
+    await expect(field(page)).toHaveAccessibleDescription("People in this room see when you type.");
+    await field(page).fill("/");
+    await expect(field(page)).toHaveAccessibleDescription("Tab completes /me.");
+  });
+
   // The red pass (R3): a draft the device kept is no typing; opening a room, or coming back to it, tells nothing.
   test("tells nothing as a room opens on a kept draft, or is come back to, and tells the next edit", async ({
     page,

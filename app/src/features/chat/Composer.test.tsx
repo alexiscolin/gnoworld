@@ -193,6 +193,15 @@ describe("the composer, from a draft", () => {
     expect(from(draft)).toContain(help);
   });
 
+  // The UX review (U9): typing is told from the first key, so the field says so, until it has something else to say.
+  it("tells the writer the room sees them type, unless the field has another help to give", () => {
+    const told = "People in this room see when you type.";
+    expect(from("")).toContain(told);
+    expect(from("hello")).toContain(told);
+    expect(from("/m")).not.toContain(told);
+    expect(from("a".repeat(400))).not.toContain(told);
+  });
+
   it.each(["hi@g10", "hi @g10 there", "hi @ g10"])(
     "offers no person for %j: no word after @ ends the draft",
     (draft) => {
