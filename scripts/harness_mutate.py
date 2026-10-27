@@ -758,6 +758,8 @@ def mutants():
         ("STORIES_PORT=$(free_ports 1) PICTURES_OF=tokens-- node", "STORIES_PORT=$(free_ports 1) node", "the tokens pictures compare that story alone (F1190)"),
         ("--reporter=dot pictures\n", "--reporter=dot pictures || :\n", "the tokens pictures failing fails the lane (F1190)"),
         (" PICTURES_OF STORIES_PORT STORIES_OUT #", " #", "the environment narrows no stories' walk (F1190)"),
+        ("else:\n    sys.exit(f\"check.sh: no run of {sys.argv[1]} free ports in 200 tries\")' \"$1\"", "else:\n    pass' \"$1\"", "free_ports fails when it finds no free ports (CR8)"),
+        ("    except OSError:\n        continue\n", "    except OSError:\n        pass\n", "free_ports tries again when a port is taken (CR8)"),
         ('\tif [ "$load" -gt "$cores" ] && [ "$end" -gt "${load_end#* }" ]; then', "\tif false; then", "the fast gate passes past its budget on a machine busy when it started and ended (C.8)"),
         ('\tif [ "$load" -gt "$cores" ] && [ "$end" -gt "${load_end#* }" ]; then', '\tif [ "$load" -ge "$cores" ] && [ "$end" -gt "${load_end#* }" ]; then', "the fast gate fails past its budget on a machine at its cores at its start (C.8)"),
         ('\tif [ "$load" -gt "$cores" ] && [ "$end" -gt "${load_end#* }" ]; then', '\tif [ "$load" -gt "$cores" ] && [ "$end" -ge "${load_end#* }" ]; then', "the fast gate fails past its budget on a machine at its cores at its end (C.8)"),

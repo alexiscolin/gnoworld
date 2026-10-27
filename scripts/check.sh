@@ -161,7 +161,7 @@ finish() {
 	[ -z "$failed" ]
 }
 
-# free_ports <n>: a base from which <n> ports in a row are free, picked at random.
+# free_ports <n>: a base from which <n> ports in a row are free, picked at random; it fails with a message when 200 tries find none.
 free_ports() {
 	python3 -Ic 'import random, socket, sys
 for _ in range(200):
@@ -176,7 +176,9 @@ for _ in range(200):
     finally:
         [s.close() for s in held]
     print(base)
-    break' "$1"
+    break
+else:
+    sys.exit(f"check.sh: no run of {sys.argv[1]} free ports in 200 tries")' "$1"
 }
 
 lane_ts() {

@@ -2020,6 +2020,16 @@ loaded() { # $1: the cores os.cpu_count gives
 [ "$(loaded 0)" = "17 10" ] || fail "load.py did not count a machine that gives no core count as one: $(loaded 0)"
 python3 -I "$here/load.py" | python3 -I -c 'import os, sys; load, cores = map(int, sys.stdin.read().split()); assert cores == (os.cpu_count() or 1) * 10 and load >= 0, (load, cores)' ||
 	fail "load.py did not print the machine's load and cores in tenths"
+# free_ports gives a base from which n ports in a row are free, and fails with a message when it finds none in its tries: an empty
+# E2E_PORT went on to the journeys, whose config then refused it with a message about the port, not the cause (CR8). Run as
+# check.sh defines it, on a machine that cannot bind: a limit of 24 descriptors, where a run of 40 ports never fits.
+eval "$(sed -n '/^free_ports() {/,/^}/p' "$here/check.sh")"
+port=$(free_ports 3) && [ "$port" -ge 20000 ] && [ "$port" -lt 60000 ] || fail "free_ports gave no base for three free ports: $port"
+out=$( (ulimit -n 24 && free_ports 40) 2>&1) && fail "free_ports exited 0 with no run of free ports: $out"
+printf '%s\n' "$out" | grep -qF "no run of 40 free ports" || fail "free_ports did not say it found no free ports: $out"
+# check.sh runs under set -e: the assignment stops there.
+sh -c 'set -e; eval "$1"; E2E_PORT=$( (ulimit -n 24 && free_ports 40) 2>/dev/null); echo "went on: $E2E_PORT"' sh "$(sed -n '/^free_ports() {/,/^}/p' "$here/check.sh")" >"$t/ports.out" 2>&1 &&
+	fail "an assignment of free_ports went on after it found no free ports: $(cat "$t/ports.out")"
 fi
 
 if part gate_full; then
