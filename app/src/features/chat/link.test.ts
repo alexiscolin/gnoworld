@@ -1972,11 +1972,26 @@ describe("the chat's link: a room's edits", () => {
     ["a leading semicolon", ";a"],
     ["a comma", "a,b"],
     ["a NUL", "a\u0000b"],
+    // R5 (redpass-red): what a tag may not carry, and what no line carries, each one a control or a break.
+    ["a TAB", "a\tb"],
+    ["a NEL", "a\u0085b"],
+    ["a line separator", "a\u2028b"],
+    ["a SOH", "a\u0001b"],
+    ["a BEL", "a\u0007b"],
+    ["a DEL", "a\u007fb"],
   ])("sends no correction naming a msgid holding %s, nor the draft without it", (_, id) => {
     const t = memberIn(["#bubble/games"]);
     const before = t.fake.sent.length;
     expect(t.link.correct("#bubble/games", "hi", id)).toBe(false);
     expect(t.fake.sent.slice(before)).toEqual([]);
+  });
+
+  it("sends a draft holding a CR LF and a command as one line: the controls are spaces, no second command goes out", () => {
+    const t = memberIn(["#bubble/games"]);
+    expect(t.link.correct("#bubble/games", "a\r\nQUIT", MSGID)).toBe(true);
+    expect(t.fake.sent.filter((line) => line.includes("QUIT"))).toEqual([
+      `@+gnoworld/edit=${MSGID} PRIVMSG #bubble/games :a  QUIT`,
+    ]);
   });
 
   it("sends a correction naming a msgid of 64 characters", () => {

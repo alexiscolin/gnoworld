@@ -72,9 +72,9 @@ function said(command: string, text: string): Pick<Line, "kind" | "text"> | unde
 }
 
 /** Whether `value` is a msgid a tag carries back: one word of 64 characters at most, no leading colon, nothing a tag
- * escapes, no NUL, which no line may hold. */
+ * escapes, no control character (a NUL, a break or a bell), which no line holds. */
 export function isTagMsgid(value: string): boolean {
-  return /^[^\s,:;\\\0][^\s,;\\\0]{0,63}$/u.test(value);
+  return /^[^\s,:;\\\p{Cc}][^\s,;\\\p{Cc}]{0,63}$/u.test(value);
 }
 /** The line a message answers: +reply, ratified in 2026, before its draft name. */
 export const REPLY = ["+reply", "+draft/reply"];

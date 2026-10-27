@@ -1,7 +1,17 @@
 import fc from "fast-check";
 import { describe, expect, test } from "vitest";
 import { parseLine, type IrcMessage } from "../irc/irc.ts";
-import { addLines, concerns, lineOf, membersAfter, redactAfter, refusedOf, topicAfter, type Line } from "./room.ts";
+import {
+  addLines,
+  concerns,
+  isTagMsgid,
+  lineOf,
+  membersAfter,
+  redactAfter,
+  refusedOf,
+  topicAfter,
+  type Line,
+} from "./room.ts";
 
 const ME = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -574,5 +584,31 @@ describe("lineOf: the line a line corrects", () => {
 
   test("keeps a msgid of 64 characters", () => {
     expect(lineOf(tagged(`+gnoworld/edit=${"a".repeat(64)}`), "#bubble")?.edits).toBe("a".repeat(64));
+  });
+});
+
+describe("isTagMsgid: a msgid a tag carries back", () => {
+  test.each(["abc", "rmq4xvjw9ys5pwtqqjxbqwvhjc", "a".repeat(64), "a:b", "-a"])("takes %s", (id) => {
+    expect(isTagMsgid(id)).toBe(true);
+  });
+
+  test.each([
+    "",
+    "a".repeat(65),
+    ":a",
+    "a b",
+    "a,b",
+    "a;b",
+    "a\\b",
+    "a\u0000b",
+    "a\tb",
+    "a\r\nb",
+    "a\u0085b",
+    "a\u2028b",
+    "a\u0001b",
+    "a\u0007b",
+    "a\u007fb",
+  ])("refuses %j", (id) => {
+    expect(isTagMsgid(id)).toBe(false);
   });
 });
