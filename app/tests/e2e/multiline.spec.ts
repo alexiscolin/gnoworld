@@ -10,6 +10,8 @@ import { scriptedErgo, type HistoryLine } from "./scripted.ts";
 const T = (minute: number) => `2026-10-25T10:${String(minute).padStart(2, "0")}:00.000Z`;
 const field = (page: Page) => page.getByRole("textbox", { name: "Message #games" });
 
+const draft = (count: number) => Array.from({ length: count }, (_, at) => `line ${String(at)}`).join("\n");
+
 // #games on the scripted Ergo as the test's account, its history `history`; what the page sends, as it sends it.
 async function opened(
   page: Page,
@@ -123,13 +125,25 @@ test.describe("a message of several lines", () => {
     await opened(page);
     const height = () => field(page).evaluate((box) => box.getBoundingClientRect().height);
     const empty = await height();
-    await field(page).fill(Array.from({ length: 6 }, (_, at) => `line ${String(at)}`).join("\n"));
+    await field(page).fill(draft(6));
     const six = await height();
     expect(six).toBeGreaterThan(empty + 40);
-    await field(page).fill(Array.from({ length: 60 }, (_, at) => `line ${String(at)}`).join("\n"));
+    await field(page).fill(draft(60));
     expect(await height()).toBeGreaterThan(six);
     expect(await height()).toBeLessThan(350);
     expect(await field(page).evaluate((box) => box.scrollHeight > box.clientHeight)).toBe(true);
+    // F1729: CSS sizes the box, so a long line counts as the lines it wraps to; ten lines is the cap, and the
+    // handle moves the height alone.
+    await field(page).fill("word ".repeat(80));
+    expect(await height()).toBeGreaterThan(empty + 40);
+    await field(page).fill(draft(9));
+    const nine = await height();
+    await field(page).fill(draft(12));
+    const twelve = await height();
+    expect(twelve).toBeGreaterThan(nine);
+    await field(page).fill(draft(60));
+    expect(await height()).toBe(twelve);
+    expect(await field(page).evaluate((box) => getComputedStyle(box).resize)).toBe("block");
     // What a drag of the handle sets on the box: a width far past its place.
     await field(page).evaluate((box) => {
       box.style.width = "2000px";

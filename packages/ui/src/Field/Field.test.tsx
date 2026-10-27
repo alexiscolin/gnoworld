@@ -152,19 +152,6 @@ describe("Field", () => {
     expect(submitted).not.toHaveBeenCalled();
   });
 
-  // F1722 (CR10): a box of two rows showed two lines of a 30-line paste.
-  it.each([
-    ["", 2],
-    ["one", 2],
-    ["one\ntwo", 2],
-    ["1\n2\n3\n4\n5\n6", 6],
-    [Array.from({ length: 10 }, (_, at) => String(at)).join("\n"), 10],
-    [Array.from({ length: 500 }, (_, at) => String(at)).join("\n"), 10],
-  ])("takes the rows of its draft, two to ten: %j has %i", (value, rows) => {
-    render(<Field kind="lines" label="Message" value={value} onChange={vi.fn()} />);
-    expect(screen.getByRole("textbox", { name: "Message" }).getAttribute("rows")).toBe(String(rows));
-  });
-
   it("shows its prefix before the box, outside its value", () => {
     render(<Field label="Name" prefix="@" value="alexis" onChange={vi.fn()} />);
     expect(screen.getByText("@")).toBeTruthy();

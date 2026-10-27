@@ -13,6 +13,7 @@ import server from "./lint/server.config.ts";
 import { CLASS_AT_END, MODULE_STATE, SWALLOWED, SWITCHED_OFF, TESTS } from "./lint/shared.config.ts";
 
 const BASELINE_ALSO = { allowAtRules: ["starting-style"], allowSelectors: ["popover-open"] };
+const BOX = { ...BASELINE_ALSO, allowProperties: ["field-sizing", "resize"] };
 const FACE = { ...BASELINE_ALSO, allowProperties: ["forced-color-adjust"] };
 
 export default defineConfig(
@@ -111,4 +112,6 @@ export default defineConfig(
   // And forced-color-adjust, which only a picture takes, where forced colours exist: the avatar's face,
   // never a control (Alexis, F319; F349).
   { files: ["packages/ui/src/Avatar/**/*.css"], rules: { "css/use-baseline": ["error", FACE] } },
+  // And field-sizing and resize, which the box of lines grows and limits its handle by, in Field's folder alone (F1729).
+  { files: ["packages/ui/src/Field/**/*.css"], rules: { "css/use-baseline": ["error", BOX] } },
 );
