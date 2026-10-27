@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 // 4f-n (G11): the hook that tells the page what the account has not seen, on the real store, rendered in jsdom.
 import { Address } from "@gnoworld/schemas";
-import { act, useEffect } from "react";
+import { act, Profiler, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppState } from "../../store/index.ts";
 import { StoreProvider, useAppStore } from "../../storeContext.tsx";
 import type { Dms } from "./Dms.tsx";
@@ -63,13 +63,17 @@ function Probe({ at }: { at: On }) {
   });
   return null;
 }
+// The probe's commits, one call each.
+const committed = vi.fn();
 const draw = (at: On) => {
   root ??= createRoot(document.body.appendChild(document.createElement("div")));
   const drawn = root;
   act(() => {
     drawn.render(
       <StoreProvider>
-        <Probe at={at} />
+        <Profiler id="probe" onRender={committed}>
+          <Probe at={at} />
+        </Profiler>
       </StoreProvider>,
     );
   });
@@ -222,5 +226,28 @@ describe("useNotices", () => {
     });
     expect(told().list?.list.map(({ id }) => id)).toEqual(["a"]);
     expect(told().list?.said).toBe("g10gh7…3y5tv mentioned you in #news");
+  });
+
+  // F1533: the hook read the whole store, so a line in any room, a typing event or a topic drew the page and its lists again.
+  it("draws nothing again for a change of a room that moves no count and no mode, and once for each that does", () => {
+    draw(on());
+    follow();
+    committed.mockClear();
+    tell((state) => {
+      const room = state.chat.rooms[GAMES];
+      if (room === undefined) throw new Error("not followed");
+      store().setState({
+        chat: { ...state.chat, rooms: { ...state.chat.rooms, [GAMES]: { ...room, topic: "golf" } } },
+      });
+    });
+    expect(committed).not.toHaveBeenCalled();
+    tell(({ noticeActions }) => {
+      noticeActions.add(mention("a", MAIN));
+    });
+    expect(committed).toHaveBeenCalledTimes(1);
+    tell(({ noticeActions }) => {
+      noticeActions.setMode(GAMES, "all");
+    });
+    expect(committed).toHaveBeenCalledTimes(2);
   });
 });

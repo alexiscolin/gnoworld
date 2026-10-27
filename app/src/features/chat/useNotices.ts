@@ -4,6 +4,7 @@
 import type { Notice, NoticeMode } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";
 import { useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { badgeOf, modeOf, totalUnseen, unseenNotices } from "../../store/notices.ts";
 import type { AppState } from "../../store/index.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
@@ -38,12 +39,18 @@ function useAnnounced(list: readonly Notice[], inView: string | undefined): stri
 }
 
 // The room in view's mode and how it changes, as the room's view takes them; none for a direct message.
-function modeIn(state: AppState, room: string | undefined, actions: AppState["noticeActions"]): Noticing["notify"] {
-  if (room === undefined) return undefined;
-  const onMode = (mode: NoticeMode) => {
-    actions.setMode(room, mode);
+function notifyOf(
+  room: string | undefined,
+  held: { mode: NoticeMode; notKept: boolean } | undefined,
+  actions: AppState["noticeActions"],
+): Noticing["notify"] {
+  if (room === undefined || held === undefined) return undefined;
+  return {
+    ...held,
+    onMode: (next) => {
+      actions.setMode(room, next);
+    },
   };
-  return { mode: modeOf(state, room), onMode, notKept: state.noticeNotKept };
 }
 
 /** The notices of the page: its rooms and conversations listed, the one open, and the room in view among them. */
@@ -59,17 +66,24 @@ export function useNotices(on: {
   const room = dms.partner === undefined && dms.problem === undefined ? current : undefined;
   const inView = dms.partner ?? room;
   const places = [...roomIds(sections ?? []), ...(dms.nav?.partners ?? [])];
-  const state = useApp((app) => app);
-  const list = useApp(unseenNotices);
   const { noticeActions } = useAppStore().getState();
   const account = session.kind === "in";
-  useTabTitle(account ? totalUnseen(state) : 0);
+  // Each a value that stays while no count and no mode moves, so a change of a room that moves none draws nothing again.
+  const total = useApp((app) => (account ? totalUnseen(app) : 0));
+  const badges = useApp(
+    useShallow((app) => Object.fromEntries(places.map((where) => [where, account ? badgeOf(app, where) : 0]))),
+  );
+  const list = useApp(unseenNotices);
+  const held = useApp(
+    useShallow((app) => (room === undefined ? undefined : { mode: modeOf(app, room), notKept: app.noticeNotKept })),
+  );
+  useTabTitle(total);
   const said = useAnnounced(account ? list : NONE, inView);
   if (!account) return { seen: noticeActions.seen };
   return {
-    badges: Object.fromEntries(places.map((where) => [where, badgeOf(state, where)])),
+    badges,
     list: { list, world, said, onClear: noticeActions.clear },
-    notify: modeIn(state, room, noticeActions),
+    notify: notifyOf(room, held, noticeActions),
     seen: noticeActions.seen,
   };
 }
