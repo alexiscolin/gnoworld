@@ -271,6 +271,39 @@ describe("pinning and unpinning from the shown room", () => {
     expect(t.told).toEqual([]);
   });
 
+  // Another moderator unpinned the line a second ago, or the reader was demoted, or the stack is full: the bar holds the
+  // list as it was until the minute, and each retry costs a request of the 30 a minute (F1487, the code review's CR6).
+  it.each(["not_found", "forbidden", "full", "not_ready"] as const)(
+    "ask the room's pins again once after a refusal of %s, which the server's list explains",
+    async (reason) => {
+      let polls = 0;
+      const t = setup({
+        answer: (room, call) => {
+          if (call !== "pins") return Promise.resolve({ ok: false, reason });
+          polls += 1;
+          return Promise.resolve(ok(list(room, polls === 1 ? ["m1"] : [], polls > 1)));
+        },
+      });
+      t.asker.show("#bubble", ALICE);
+      await settled();
+      expect(await t.asker.unpin("m1")).toEqual({ ok: false, reason });
+      await settled();
+      expect(t.asked).toEqual(["pins #bubble", "unpin #bubble m1", "pins #bubble"]);
+      expect(t.told.at(-1)).toEqual(list("#bubble", [], true));
+    },
+  );
+
+  it.each(["network", "too_many"] as const)("ask nothing more after a refusal of %s", async (reason) => {
+    const t = setup({
+      answer: (room, call) => Promise.resolve(call === "pins" ? ok(list(room, ["m1"])) : { ok: false, reason }),
+    });
+    t.asker.show("#bubble", ALICE);
+    await settled();
+    await t.asker.pin("m2");
+    await settled();
+    expect(t.asked).toEqual(["pins #bubble", "pin #bubble m2"]);
+  });
+
   it("ask nothing while no room is shown", async () => {
     const t = setup();
     expect(await t.asker.pin("m2")).toEqual({ ok: false, reason: "refused" });

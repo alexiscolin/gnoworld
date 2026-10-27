@@ -62,6 +62,11 @@ export function pinAsker({ pins, pin, unpin, set, visible, reader }: Asking) {
       done();
     });
   }
+  const refresh = (): void => {
+    if (!visible()) return;
+    clearTimeout(timer);
+    ask();
+  };
   // A pin or an unpin: its answer is the room's pins as they now are, which the store takes; the minute starts again.
   const act = async (call: Asking["pin"], msgid: string): Promise<Done> => {
     const { room } = shown;
@@ -70,7 +75,11 @@ export function pinAsker({ pins, pin, unpin, set, visible, reader }: Asking) {
     acts += 1;
     const got = await call(room, msgid);
     acts += 1;
-    if (!got.ok) return got;
+    if (!got.ok) {
+      // The server's list explains a refusal that is no failure to reach it or to be heard: ask for it once.
+      if (!stale(mine) && got.reason !== "network" && got.reason !== "too_many") refresh();
+      return got;
+    }
     if (!stale(mine)) {
       set(got.value);
       arm();
@@ -88,11 +97,7 @@ export function pinAsker({ pins, pin, unpin, set, visible, reader }: Asking) {
       ask();
     },
     /** The page shows again: asked at once, when it shows. */
-    refresh: (): void => {
-      if (!visible()) return;
-      clearTimeout(timer);
-      ask();
-    },
+    refresh,
     pin: (msgid: string) => act(pin, msgid),
     unpin: (msgid: string) => act(unpin, msgid),
     stop: (): void => {
