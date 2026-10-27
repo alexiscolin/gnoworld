@@ -2287,6 +2287,25 @@ fi
 if part regressions; then
 # check_regressions: its rules on small cases (the real run needs a base branch and Vitest).
 python3 -I "$here/check_regressions.py" --self-test >/dev/null || fail "check_regressions's rules do not hold"
+# The benches' budgets (G6), through the whole script on a small repository, which has no Vitest to list: a bench gone
+# or given a longer budget fails unless a commit names it on a `Lowered-floor: bench <name> - why` line.
+rg="$t/regr" && mkdir -p "$rg/scripts" "$rg/app/tests/bench" "$rg/app/src"
+cp "$here/check_regressions.py" "$here/repo_files.py" "$here/borrow_node_modules.sh" "$rg/scripts/"
+git -C "$rg" init -q
+printf 'bench("a line [0.2 ms]", f);\nbench("a room [100 ms]", f);\n' >"$rg/app/tests/bench/a.bench.ts"
+printf 'bench("a call in a file that is no bench [1 ms]", f);\n' >"$rg/app/src/x.ts" # only a `*.bench.ts(x)` file holds benches
+git -C "$rg" add -A && git -C "$rg" commit -qm base && base=$(git -C "$rg" rev-parse HEAD)
+reg() { (cd "$rg" && python3 -I scripts/check_regressions.py "$base" 2>&1); }
+out=$(reg) || fail "check_regressions refused a branch that changed no bench: $out"
+sed 's/\[100 ms\]/[1000 ms]/' "$rg/app/tests/bench/a.bench.ts" >"$rg/b" && mv "$rg/b" "$rg/app/tests/bench/a.bench.ts" && git -C "$rg" commit -qam "a longer budget"
+out=$(reg) && fail "check_regressions passed a bench given a longer budget: $out"
+printf '%s\n' "$out" | grep -qF "a room 100 ms -> 1000 ms" || fail "check_regressions did not name the bench with the longer budget: $out"
+git -C "$rg" commit -q --allow-empty -m "says why" -m "Lowered-floor: bench a room - the plan moved it" && out=$(reg) || fail "check_regressions refused a longer budget a commit says why of: $out"
+git -C "$rg" reset -q --hard "$base" && printf 'bench("a line [0.2 ms]", f);\n' >"$rg/app/tests/bench/a.bench.ts" && git -C "$rg" commit -qam "a bench gone"
+out=$(reg) && fail "check_regressions passed a bench gone: $out"
+printf '%s\n' "$out" | grep -qF "a room 100 ms -> gone" || fail "check_regressions did not name the bench gone: $out"
+git -C "$rg" reset -q --hard "$base" && printf 'bench("a line [0.2 ms]", f);\nbench("a room [10 ms]", f);\nbench("a new one [5 ms]", f);\n' >"$rg/app/tests/bench/a.bench.ts" && git -C "$rg" rm -q app/src/x.ts && git -C "$rg" commit -qam "a shorter budget and a new bench"
+out=$(reg) || fail "check_regressions refused a shorter budget and a new bench: $out"
 fi
 
 if part ergo; then
