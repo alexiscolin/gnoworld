@@ -18,10 +18,11 @@ import type { AppState } from "../../store/index.ts";
 import type { RoomActs } from "./roomActs.ts";
 import type { Shown } from "./shown.tsx";
 import styles from "./Thread.module.css";
-import { Writer } from "./Writer.tsx";
+import { renewComposer, Writer } from "./Writer.tsx";
 
 const load = async () => ({ default: (await import("./Thread.tsx")).Thread });
-// A lazy component keeps its failure for good: a chunk that could not be fetched is made anew (Failing).
+// A lazy component keeps its failure for good: a chunk that could not be fetched, this one's or the composer's, is
+// made anew (Failing).
 let Thread = lazy(load);
 
 // The panel's place while its code comes, or when it could not: a word and Close, which a narrow room needs, as the
@@ -56,6 +57,7 @@ class Failing extends Component<{ close: () => void; children: ReactNode }, { fa
   }
   override componentDidCatch() {
     Thread = lazy(load);
+    renewComposer();
   }
   override render() {
     return this.state.failed ? (
@@ -101,8 +103,8 @@ interface Page {
 }
 
 // The words typed in each thread's field and not sent, by account and the line that opened it (a root changes as its
-// chain grows, R3): the page's memory, kept on no device, so a
-// close, a room or another thread keeps them (CR1), and a logout clears them (R1).
+// chain grows, R3): the page's memory, kept on no device, so a close, a room or another thread keeps them (CR1), and a
+// logout clears them (R1).
 type Typed = Map<string, string>;
 
 // The panel of the thread `open`, with the composer that tags each line with its root: a guest's word, or the field.
