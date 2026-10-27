@@ -71,9 +71,7 @@ const keyOf = ({ who, to, emoji }: Reaction): string => `${who}\n${to}\n${emoji}
 function sharesOf(reactions: readonly Reaction[], share: number): readonly Reaction[] {
   const counts = new Map<string, number>();
   const kept: Reaction[] = [];
-  for (let at = reactions.length - 1; at >= 0; at -= 1) {
-    const reaction = reactions[at];
-    if (reaction === undefined) continue;
+  for (const reaction of reactions.toReversed()) {
     const count = counts.get(reaction.who) ?? 0;
     if (count >= share) continue;
     counts.set(reaction.who, count + 1);
