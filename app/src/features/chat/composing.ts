@@ -85,6 +85,8 @@ interface Edits {
   ended: Here<true>;
   end: () => void;
   dropReply: () => void;
+  /** The reader's address; none for a guest. */
+  me: string | undefined;
 }
 
 // The line of the reader's own the conversation's next one corrects, its words put in the composer, as a reply's: one a
@@ -93,7 +95,7 @@ interface Edits {
 function editsOf(
   shown: Shown | undefined,
   lines: readonly Line[] | undefined,
-  { edit: here, ended, end, dropReply }: Edits,
+  { edit: here, ended, end, dropReply, me }: Edits,
 ): Composing {
   const { value: edit, update } = here;
   const found = shownAs(edit, lines);
@@ -102,7 +104,9 @@ function editsOf(
   const editing = found?.edits === undefined ? found : undefined;
   if (shown === undefined) return { view: {}, writer: {} };
   const view = {
+    // The reader's own line alone: the menu offers no other, and the bot hides a correction of another's, a strike.
     onEdit: (id: string) => {
+      if (me === undefined || lines?.find((line) => line.id === id)?.account !== me) return;
       dropReply();
       update((was) => asking(was, id));
     },
@@ -174,7 +178,7 @@ function useRefusals(shown: Shown | undefined, held: { reply: Here<Chosen>; edit
 }
 
 /** The conversation in view and what its composer is told of the line it answers or corrects. */
-export function useComposing(shown: Shown | undefined) {
+export function useComposing(shown: Shown | undefined, me: string | undefined) {
   const lines = shown?.view.state?.lines;
   const reply = useHere<Chosen>(shown?.key);
   const edit = useHere<Chosen>(shown?.key);
@@ -190,7 +194,7 @@ export function useComposing(shown: Shown | undefined) {
       if (edit.value !== undefined) end();
     },
   });
-  const edits = editsOf(shown, lines, { edit, ended, end, dropReply: reply.clear });
+  const edits = editsOf(shown, lines, { edit, ended, end, dropReply: reply.clear, me });
   return {
     view: { ...replies.view, ...edits.view },
     writer: { ...replies.writer, ...edits.writer, ...(refused === undefined ? {} : { refused }) },

@@ -117,7 +117,7 @@ export function Loaded({
   );
   const bar = dms.partner === undefined ? undefined : dmActs(link, dms.partner, dmDismissed);
   const shown = shownOf(dms, { id: room, state, acts }, { sayTo, focus: opened.focus, noteId, acts: bar });
-  const composing = useComposing(shown);
+  const composing = useComposing(shown, me);
   return (
     <Sidebar space="l">
       <RoomsView sections={sections} current={room} dms={dms.nav} failed={failed} />

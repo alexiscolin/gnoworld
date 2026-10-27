@@ -12,14 +12,17 @@ vi.mock("@gnoworld/core", async (importOriginal) => {
 });
 
 // 4d-dm-bar: what the composer is told of the line it answers or corrects, in a direct message and in a room.
-const line = (id: string, text: string): Line => ({
+// The reader's account, which wrote the lines but "theirs" (m2).
+const ME = "g1reader";
+const line = (id: string, text: string, account = ME): Line => ({
   id,
   time: `2026-10-25T10:00:0${id.slice(1)}.000Z`,
   from: "a",
+  account,
   text,
   kind: "message",
 });
-const LINES = [line("m1", "my words"), line("m2", "theirs")];
+const LINES = [line("m1", "my words"), line("m2", "theirs", "g1other")];
 
 let root: Root;
 type Composed = ReturnType<typeof useComposing>;
@@ -30,10 +33,12 @@ function Probe({
   lines,
   refused,
   who,
+  me,
   seen,
 }: {
   kind: "dm" | "room";
   who: string;
+  me: string | undefined;
   lines: readonly Line[];
   refused: Refusal | undefined;
   seen: (result: Composed) => void;
@@ -45,7 +50,7 @@ function Probe({
     writer: { refused },
     say,
   } as unknown as Shown;
-  const result = useComposing(shown);
+  const result = useComposing(shown, me);
   useEffect(() => {
     seen(result);
   });
@@ -68,11 +73,13 @@ const render = ({
   lines,
   refused,
   who,
+  me = ME,
 }: {
   kind: "dm" | "room";
   lines: readonly Line[];
   refused?: Refusal;
   who: string;
+  me?: string | null;
 }) => {
   act(() => {
     root.render(
@@ -81,6 +88,7 @@ const render = ({
         lines={lines}
         refused={refused}
         who={who}
+        me={me ?? undefined}
         seen={(result) => {
           latest = result;
         }}
@@ -203,6 +211,27 @@ describe("useComposing", () => {
     say.mockReturnValueOnce(false);
     save("changed");
     expect(now().writer.editing?.text).toBe("my words");
+  });
+
+  // R6 (redpass-red): the menu offers Edit on the reader's own lines alone, and the composer holds the same line: an
+  // edit asked for another's line, by a buggy caller, would send a correction Ergo's bot hides as not_their_edit, a
+  // strike against its sender.
+  it.each(["dm", "room"] as const)("opens no edit of a line that is not the reader's, in a %s", (kind) => {
+    draw(kind);
+    edit("m2");
+    expect(now().writer.editing).toBeUndefined();
+    expect(now().writer.onCancelEdit).toBeUndefined();
+    edit("m1");
+    expect(now().writer.editing?.text).toBe("my words");
+  });
+
+  it.each([
+    ["a guest", null],
+    ["another account", "g1other"],
+  ])("opens no edit for %s as the reader of the line", (_, me) => {
+    render({ kind: "room", lines: LINES, who: "x", me });
+    edit("m1");
+    expect(now().writer.editing).toBeUndefined();
   });
 
   it("drops a room's reply when an edit is asked, and ends the edit when a reply is asked", () => {
