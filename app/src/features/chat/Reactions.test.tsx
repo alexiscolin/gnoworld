@@ -24,7 +24,7 @@ describe("Reactions", () => {
 
   it("draws a guest's chips plain, a line with none no chip, and a line with a few of the 20 no word", () => {
     expect(draw(chipsOf([{ emoji: "😂", count: 7, mine: true }]))).toContain("😂 7");
-    expect(draw("")).not.toContain("<button");
+    expect(draw("", () => true)).not.toContain("<button");
     expect(draw(chipsOf([{ emoji: "😂", count: 1, mine: false }]))).not.toContain("more");
   });
 });
