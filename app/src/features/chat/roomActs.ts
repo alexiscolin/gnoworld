@@ -9,7 +9,11 @@ export type RoomActs = ReturnType<typeof roomActs>;
 
 export function roomActs(link: RefObject<ChatLink | undefined>, room: string, dismissed: (room: string) => void) {
   return {
-    onDelete: (id: string) => link.current?.redact(room, id) ?? false,
+    // What Ergo refused before is told no more once the act is tried again (CR4).
+    onDelete: (id: string) => {
+      dismissed(room);
+      return link.current?.redact(room, id) ?? false;
+    },
     onDismiss: () => {
       dismissed(room);
     },
@@ -18,7 +22,10 @@ export function roomActs(link: RefObject<ChatLink | undefined>, room: string, di
     },
     // Tagged +reply with the msgid it answers, when it answers a line (4d).
     onSay: (draft: string, reply?: string) => link.current?.say(room, draft, reply) ?? false,
-    onReact: (reaction: Reacting) => link.current?.react(room, reaction) ?? false,
+    onReact: (reaction: Reacting) => {
+      dismissed(room);
+      return link.current?.react(room, reaction) ?? false;
+    },
     onTyping: (told: "active" | "done") => {
       link.current?.typing(room, told);
     },

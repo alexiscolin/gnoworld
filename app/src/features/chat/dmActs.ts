@@ -10,16 +10,23 @@ export interface DmActs {
   onReact: (reaction: Reacting) => boolean;
 }
 
+// What Ergo refused before is told no more once the act is tried again: its answer, or none, says the rest (CR4).
 export function dmActs(
   link: RefObject<ChatLink | undefined>,
   partner: string,
   dismissed: (partner: string) => void,
 ): DmActs {
   return {
-    onDelete: (id) => link.current?.redactIn(partner, id) ?? false,
+    onDelete: (id) => {
+      dismissed(partner);
+      return link.current?.redactIn(partner, id) ?? false;
+    },
     onDismiss: () => {
       dismissed(partner);
     },
-    onReact: (reaction) => link.current?.reactTo(partner, reaction) ?? false,
+    onReact: (reaction) => {
+      dismissed(partner);
+      return link.current?.reactTo(partner, reaction) ?? false;
+    },
   };
 }
