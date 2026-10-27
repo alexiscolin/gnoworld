@@ -200,6 +200,8 @@ describe("the composer, from a draft", () => {
     expect(from("hello")).toContain(told);
     expect(from("/m")).not.toContain(told);
     expect(from("a".repeat(400))).not.toContain(told);
+    // An error is the field's word alone: the line too long to go.
+    expect(from("a".repeat(600))).not.toContain(told);
   });
 
   it.each(["hi@g10", "hi @g10 there", "hi @ g10"])(
