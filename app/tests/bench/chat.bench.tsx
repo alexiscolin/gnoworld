@@ -1,8 +1,12 @@
 // The chat's budgets (docs/plans/slice-4.md §4), measured by scripts/bench.py in the full gate: each bench names its
 // budget in brackets, and the mean of its runs must stay under it. Out of src, so coverage never counts them.
 import { markdown, mentions, parseLine, type Line } from "@gnoworld/core";
+import type { RoomList } from "@gnoworld/schemas";
+import { Sidebar } from "@gnoworld/ui";
 import { renderToStaticMarkup } from "react-dom/server";
 import { bench, describe } from "vitest";
+import { Composer } from "../../src/features/chat/Composer.tsx";
+import { RoomsView } from "../../src/features/chat/RoomsView.tsx";
 import { RoomView } from "../../src/features/chat/RoomView.tsx";
 
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -32,9 +36,43 @@ describe("a room", () => {
     kind: "message",
   }));
   const members = [ALICE, BOB, ...Array.from({ length: 98 }, (_, n) => `guest-${String(n).padStart(6, "0")}`)];
-  bench("a room of 200 lines and 100 people drawn whole, a room switch's render [100 ms]", () => {
+  bench("RoomView alone, a room of 200 lines and 100 people drawn whole [100 ms]", () => {
     renderToStaticMarkup(
       <RoomView room="#bubble/games" state={{ lines, members, topic: "Games" }} chat="connected" me={BOB} />,
     );
   });
+  // Plan §4: "a room switch under 100 ms with 100 rooms". A switch draws what ChatPanel's Loaded draws for the new
+  // room: the list of the world's 100 rooms, the room, and its composer with a mention in progress, which sorts the
+  // members. Rendered to a string, so no commit and no effect: what a switch costs in React's render, not in the DOM.
+  const rooms = Array.from({ length: 100 }, (_, n) => `#bubble/room-${String(n).padStart(3, "0")}`);
+  const sections: RoomList["sections"] = Array.from({ length: 5 }, (_, s) => ({
+    name: `Section ${String(s)}`,
+    rooms: rooms.slice(s * 20, s * 20 + 20).map((room) => ({ room, type: "open" as const })),
+  }));
+  bench(
+    "a room switch: 100 rooms listed, a room of 200 lines and 100 people, its composer, drawn whole [100 ms]",
+    () => {
+      renderToStaticMarkup(
+        <Sidebar space="l">
+          <RoomsView sections={sections} current={rooms[42]} />
+          <RoomView
+            room="#bubble/room-042"
+            state={{ lines, members, topic: "Games" }}
+            chat="connected"
+            me={BOB}
+            composer={
+              <Composer
+                room="#bubble/room-042"
+                nick={BOB}
+                rooms={rooms.map((room) => room.replace("#bubble/", "#"))}
+                members={members}
+                draft="see @guest-00"
+                onSay={() => true}
+              />
+            }
+          />
+        </Sidebar>,
+      );
+    },
+  );
 });
