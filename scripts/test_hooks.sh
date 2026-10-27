@@ -2442,8 +2442,13 @@ done
 kill -9 "$victim"
 wait "$victim" 2>/dev/null || :
 [ "$(ls "$tmp" | grep -vc '^\(dead\|live\|other\)$')" = 1 ] || fail "the killed run left no copy to clear: $(ls "$tmp")"
-(cd "$w/repo" && TMPDIR="$tmp" python3 -I -c 'import sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); from repo_files import worktree
-with worktree("HEAD") as tree: print(tree)' "$here" >"$w/out" 2>&1) || fail "repo_files.worktree failed beside a dead run's copy: $(cat "$w/out")"
+# Two copies held at once, beside a dead run's `tree` entry: two names, and none is `tree` (F1191: from 2026-10-27
+# the sandbox refuses to create exactly `.git/worktrees/tree`, so a copy named so failed every prove_fix).
+(cd "$w/repo" && TMPDIR="$tmp" python3 -I -c 'import os, sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); from repo_files import worktree
+with worktree("HEAD") as a, worktree("HEAD") as b: print(a); print(b); print(*os.listdir(".git/worktrees"))' "$here" >"$w/out" 2>&1) || fail "repo_files.worktree failed beside a dead run's copy: $(cat "$w/out")"
+[ "$(basename "$(sed -n 1p "$w/out")")" != "$(basename "$(sed -n 2p "$w/out")")" ] || fail "two copies held at once got one name: $(cat "$w/out")"
+for n in 1 2; do [ "$(basename "$(sed -n "${n}p" "$w/out")")" != tree ] || fail "a copy is named tree, which the sandbox may refuse: $(cat "$w/out")"; done
+case " $(sed -n 3p "$w/out") " in *" tree "*) fail "a copy is registered as .git/worktrees/tree: $(cat "$w/out")" ;; esac
 [ ! -e "$tmp/dead" ] || fail "a killed run's copy was left: $(ls "$tmp")"
 [ "$(git -C "$w/repo" worktree list --porcelain | grep -c 'dead/tree')" = 0 ] || fail "a killed run's worktree stayed registered"
 [ -d "$tmp/live/tree" ] || fail "a live run's copy was removed"

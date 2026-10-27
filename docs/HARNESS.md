@@ -276,7 +276,9 @@ costs context in every session: `chrome-devtools-mcp` (1b), `frontend-design` (2
   changed and of the test sections it changed (`scripts/suite_parts.py`), all of them when it
   changed text outside every section, or `harness_mutate.py` itself. Its copies, and
   `prove_fix.py`'s, name their run's pid: the next run removes those of a run killed before its
-  cleanup, never a live run's (`scripts/repo_files.py`).
+  cleanup, never a live run's (`scripts/repo_files.py`). A copy's folder is never named `tree`:
+  from 2026-10-27 the sandbox refuses to create exactly `.git/worktrees/tree`, which git makes
+  for a copy of that name (F1191).
 - **A new guard lands with its planted fault and its mutant;** a check whose test passes
   for the wrong reason is caught by the mutation. On 2026-10-17 this found a lint selector
   that had never matched, and an exit trap that turned any crash into success; on
