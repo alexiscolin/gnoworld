@@ -59,8 +59,8 @@ export function dmPrefs(storage: () => DraftStorage, account: Address): DmPrefs 
   };
 }
 
-// The device's text as JSON, or nothing.
-function parsed(text: string): unknown {
+/** The device's text as JSON, or nothing. */
+export function parsed(text: string): unknown {
   try {
     return JSON.parse(text);
   } catch {
