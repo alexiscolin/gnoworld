@@ -118,6 +118,7 @@ PATH alone. The probe tries the refusal on a copy with a pin of its own, never o
 | `server/src` | tsc, ESLint, every Vitest test (`main.test.ts` runs the server as a child process, outside Vitest's module graph) | 30 s |
 | the TypeScript of `app/src`, `app/tests`, `packages/ui/src` | tsc, ESLint, Vitest's tests related to the change (`--changed`), the app's journeys | 30 s |
 | `packages/core/src`, which the server imports, or any other file of those folders (a fixture, a stylesheet) | tsc, ESLint, every Vitest test (a file read from disk is outside the module graph too), the app's journeys | 30 s |
+| `packages/ui/src/tokens.css` | as for any stylesheet of those folders, and the tokens story's pictures alone at its three widths, in a lane of its own beside the others (`pictures.spec.ts` with `PICTURES_OF=tokens--`, Storybook built in the run's own folder, a free port of its own; 5 s beside Vitest's 20 to 23 s; F1190) | 30 s |
 | `gno/` | the gno lane | 30 s |
 | anything else (a config, the lockfile, the harness, `packages/schemas`, `deploy/`), no change at all, or no repository (pre-commit's staged copy) | everything | 60 s |
 
@@ -146,6 +147,7 @@ whose code had not grown took 61 to 98 s at a load of 65 to 76 on 16 cores.
 | `gno lint`, `gno test` on `gno/...` | every realm and package |
 | `scripts/mutate.py` | a realm guard no test notices when removed |
 | `gofmt`, `go vet`, the seal vectors | Go tools; `gno/r/seal/vectors_test.gno` equals what `go run ./tools/sealvec` prints |
+| the tokens story's pictures, in Chromium (a change of `tokens.css` only) | a token added or changed with no approved picture: the story lists every token (F1190) |
 | `scripts/check_docs.py` | a harness doc naming a file that does not exist; a bad row in the findings ledger, or one citing a commit the repository lacks; a known limit the runbook no longer says (3M-19); a test with no file of its name beside it (F085); a harness script that does not parse (F084) |
 | `scripts/test_hooks.sh` | the hooks, the guard, the settings' boundary, the CI's promises, and the scripts below; a harness mutant that no longer finds its text or names a section its suite lacks (`harness_mutate.py --dry`, in a second) |
 
