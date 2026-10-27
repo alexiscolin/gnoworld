@@ -39,16 +39,38 @@ export function firstUnread(lines: readonly Line[], read: string | undefined, me
   return lines.find((line) => line.time > read && line.account !== me)?.id;
 }
 
-/** The line marked New while a room is open: none decided while the room holds no line or its place is unknown;
- * then the first line past the place, or none, kept as it is until the room closes. */
-export type NewMark = { readonly id: string | undefined } | undefined;
+/** The line marked New while a room is open: none decided while the room holds no line or no place is known;
+ * then the first line past the place, kept as it is until the room closes, but for a place the reader asks to go back
+ * to (4d: Mark unread), `unread`, the device's place the mark was last decided from. */
+export type NewMark = { readonly id: string | undefined; readonly unread?: string | undefined } | undefined;
 
-/** The New mark once the room holds `lines` and its place is `read`: decided once, then the same. */
+/** The reading place that leaves the line at `time` and all after it unread: the millisecond before it, in Ergo's one
+ * form; none for a time that is not one, or one with no millisecond before it. */
+export function placeBefore(time: string): string | undefined {
+  if (!isTime(time)) return undefined;
+  const place = new Date(Date.parse(time) - 1).toISOString();
+  return isTime(place) ? place : undefined;
+}
+
+/** The place a room's New mark is decided from: the earlier of Ergo's, which only moves forward (MARKREAD cannot go
+ * back: irc/getters.go:552, v2.19.1), and the device's, which a reader asked to go back to; none when neither is known. */
+export function placeFrom(read: string | undefined, unread: string | undefined): string | undefined {
+  return read === undefined || (unread !== undefined && unread < read) ? unread : read;
+}
+
+/** The New mark once the room holds `lines`: decided once from `placeFrom(read, unread)`, then the same, until the device
+ * is given another place, which moves it (forward or back); a place cleared, or given again, keeps it. */
 export function newMarkAfter(
   mark: NewMark,
-  { lines, read }: { readonly lines: readonly Line[]; readonly read: string | undefined },
+  {
+    lines,
+    read,
+    unread,
+  }: { readonly lines: readonly Line[]; readonly read: string | undefined; readonly unread?: string | undefined },
   me: string,
 ): NewMark {
-  if (mark !== undefined || read === undefined || lines.length === 0) return mark;
-  return { id: firstUnread(lines, read, me) };
+  if (mark === undefined ? lines.length === 0 : unread === undefined || unread === mark.unread) return mark;
+  const place = placeFrom(read, unread);
+  if (place === undefined) return mark;
+  return { id: firstUnread(lines, place, me), ...(unread === undefined ? {} : { unread }) };
 }

@@ -1,7 +1,8 @@
+import fc from "fast-check";
 import { describe, expect, test } from "vitest";
 import { parseLine, type IrcMessage } from "../irc/irc.ts";
-import { firstUnread, newMarkAfter, PLACE_AHEAD_MS, readAfter } from "./marker.ts";
-import { concerns, type Line } from "./room.ts";
+import { firstUnread, newMarkAfter, PLACE_AHEAD_MS, placeBefore, placeFrom, readAfter } from "./marker.ts";
+import { concerns, isTime, type Line } from "./room.ts";
 
 const ME = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -157,5 +158,151 @@ describe("newMarkAfter: the line marked New while a room is open", () => {
 describe("concerns: the room of a MARKREAD", () => {
   test("names the room of Ergo's MARKREAD, folded", () => {
     expect(concerns(marked("#Bubble", `timestamp=${T(1)}`))).toBe("#bubble");
+  });
+});
+
+// Mark unread (slice 4's 4d, ADR-0002: "Mark unread: 0, on the device"): Ergo's MARKREAD only moves forward
+// (irc/getters.go:552, v2.19.1), so the device keeps a place of its own and the New mark is decided from the
+// earlier of the two.
+const item = (id: string, time: string, account = ALICE): Line => ({
+  id,
+  time,
+  from: account,
+  account,
+  text: id,
+  kind: "message",
+});
+const ITEMS = [item("a", T(0)), item("b", T(1)), item("c", T(2)), item("d", T(3))];
+
+describe("placeBefore: the reading place that leaves a line and all after it unread", () => {
+  test("is the millisecond before the line's time, in Ergo's one form", () => {
+    expect(placeBefore("2026-10-25T10:01:00.000Z")).toBe("2026-10-25T10:00:59.999Z");
+    expect(placeBefore("2026-10-25T10:01:00.001Z")).toBe("2026-10-25T10:01:00.000Z");
+  });
+
+  test.each([
+    ["a day", "2026-03-01T00:00:00.000Z", "2026-02-28T23:59:59.999Z"],
+    ["a leap day", "2028-03-01T00:00:00.000Z", "2028-02-29T23:59:59.999Z"],
+    ["a year", "2027-01-01T00:00:00.000Z", "2026-12-31T23:59:59.999Z"],
+  ])("crosses %s's end", (_, time, place) => {
+    expect(placeBefore(time)).toBe(place);
+  });
+
+  test.each([
+    ["no time", ""],
+    ["a time in another form", "2026-10-25T10:01:00Z"],
+    ["a day that does not exist", "2026-02-30T10:01:00.000Z"],
+    ["a word", "yesterday"],
+  ])("gives no place for %s", (_, time) => {
+    expect(placeBefore(time)).toBeUndefined();
+  });
+
+  // The first millisecond Ergo's form holds has none before it: Date writes it as an extended year, no time Ergo reads.
+  test("gives no place for the first millisecond of its form, and one for the second", () => {
+    expect(placeBefore("0000-01-01T00:00:00.000Z")).toBeUndefined();
+    expect(placeBefore("0000-01-01T00:00:00.001Z")).toBe("0000-01-01T00:00:00.000Z");
+  });
+
+  test("is always a time Ergo reads, and strictly before the line", () => {
+    const times = fc
+      .date({
+        min: new Date("2020-01-01T00:00:00.000Z"),
+        max: new Date("2090-01-01T00:00:00.000Z"),
+        noInvalidDate: true,
+      })
+      .map((date) => date.toISOString());
+    fc.assert(
+      fc.property(times, (time) => {
+        const place = placeBefore(time);
+        expect(place !== undefined && isTime(place) && place < time).toBe(true);
+      }),
+    );
+  });
+
+  test("leaves the line it was made from the first one past it, whoever shares its time with it", () => {
+    const same = [item("x", T(1)), item("y", T(1)), item("z", T(2))];
+    // y's place leaves x and y both past it: they were said in the same millisecond, which Ergo cannot tell apart.
+    expect(firstUnread(same, placeBefore(T(1)), ME)).toBe("x");
+    expect(firstUnread(ITEMS, placeBefore(T(2)), ME)).toBe("c");
+  });
+});
+
+describe("placeFrom: the place the New mark is decided from", () => {
+  test("is the earlier of Ergo's place and the device's", () => {
+    expect(placeFrom(T(3), T(1))).toBe(T(1));
+    expect(placeFrom(T(1), T(3))).toBe(T(1));
+  });
+
+  test.each([
+    { name: "Ergo's alone", read: T(2), unread: undefined, place: T(2) },
+    { name: "the device's alone", read: undefined, unread: T(2), place: T(2) },
+    { name: "none when neither is known", read: undefined, unread: undefined, place: undefined },
+  ])("is $name", ({ read: ergo, unread, place }) => {
+    expect(placeFrom(ergo, unread)).toBe(place);
+  });
+
+  test("is never past a place it was given", () => {
+    const times = fc.option(fc.integer({ min: 0, max: 59 }).map(T), { nil: undefined });
+    fc.assert(
+      fc.property(times, times, (ergo, unread) => {
+        const place = placeFrom(ergo, unread);
+        for (const given of [ergo, unread])
+          if (given !== undefined) expect(place !== undefined && place <= given).toBe(true);
+        expect(place === undefined).toBe(ergo === undefined && unread === undefined);
+      }),
+    );
+  });
+});
+
+describe("newMarkAfter: a line marked unread", () => {
+  // The room opened with Ergo's place at the end: nothing New.
+  const opened = newMarkAfter(undefined, { lines: ITEMS, read: T(3) }, ME);
+
+  test("moves the New mark to the line, though the room was decided before", () => {
+    expect(opened).toEqual({ id: undefined });
+    const moved = newMarkAfter(opened, { lines: ITEMS, read: T(3), unread: placeBefore(T(1)) }, ME);
+    expect(moved?.id).toBe("b");
+  });
+
+  test("decides from the earlier of the two places, a device's place past Ergo's changing nothing", () => {
+    const first = newMarkAfter(undefined, { lines: ITEMS, read: T(1), unread: placeBefore(T(3)) }, ME);
+    expect(first?.id).toBe("c");
+  });
+
+  // The page waits for the history page before it decides (4f's G1), by which time Ergo's MARKREAD has answered: an
+  // unknown place is Ergo knowing none (a room never read), and the device's alone decides.
+  test("decides from the device's place alone where Ergo knows none", () => {
+    expect(newMarkAfter(undefined, { lines: ITEMS, read: undefined, unread: placeBefore(T(2)) }, ME)?.id).toBe("c");
+    expect(newMarkAfter(undefined, { lines: ITEMS, read: undefined, unread: undefined }, ME)).toBeUndefined();
+  });
+
+  test("keeps the mark as the same place is given again, as lines come and Ergo's place moves on", () => {
+    const unread = placeBefore(T(1));
+    const marked = newMarkAfter(opened, { lines: ITEMS, read: T(3), unread }, ME);
+    const more = [...ITEMS, item("e", T(4))];
+    expect(newMarkAfter(marked, { lines: more, read: T(4), unread }, ME)).toBe(marked);
+  });
+
+  test("moves again as another line is marked, forward as well as back", () => {
+    const one = newMarkAfter(opened, { lines: ITEMS, read: T(3), unread: placeBefore(T(1)) }, ME);
+    const two = newMarkAfter(one, { lines: ITEMS, read: T(3), unread: placeBefore(T(2)) }, ME);
+    expect(two?.id).toBe("c");
+    expect(newMarkAfter(two, { lines: ITEMS, read: T(3), unread: placeBefore(T(0)) }, ME)?.id).toBe("a");
+  });
+
+  // The reader reaching the end clears the device's place; the divider they just read through stays until the room
+  // closes, as Ergo's own does (docs/decisions.md, 2026-10-27).
+  test("keeps the mark when the device's place is cleared", () => {
+    const marked = newMarkAfter(opened, { lines: ITEMS, read: T(3), unread: placeBefore(T(1)) }, ME);
+    expect(newMarkAfter(marked, { lines: ITEMS, read: T(3), unread: undefined }, ME)).toBe(marked);
+  });
+
+  test("waits, as it did, while the room holds no line", () => {
+    expect(newMarkAfter(undefined, { lines: [], read: T(1), unread: placeBefore(T(1)) }, ME)).toBeUndefined();
+  });
+
+  test("passes the reader's own lines, as Ergo's place does: marking one's own line unread marks the next of another's", () => {
+    const mixed = [item("a", T(0)), item("mine", T(1), ME), item("c", T(2))];
+    expect(newMarkAfter(undefined, { lines: mixed, read: T(2), unread: placeBefore(T(1)) }, ME)?.id).toBe("c");
   });
 });
