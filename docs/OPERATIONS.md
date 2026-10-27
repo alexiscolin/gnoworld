@@ -291,6 +291,9 @@ Slice 3, the server's retention (3n):
   most a run (about 7 ms measured), and runs again at once while a backlog is left, the server free
   between runs. A verdict removed by the cap before its 180 days makes an edit of its line unknown:
   the edit is hidden (`unknown_edit`), with no strike.
+- **The pins** end with Ergo's history: the same job removes each pin whose line is more than 90 days old
+  (Ergo's `expire-time`), a link that stays up included, since the re-read of a pin runs only when the bot
+  joins a room.
 - **The alerts** `verdicts_near_cap` and `database_near_cap` fire once when the verdicts reach 80% of
   their cap, or the database's used pages 80% of 256 MB, and again only after a fall below. The
   database's file does not shrink: freed pages are reused, and its `-wal` file is not counted. A table
