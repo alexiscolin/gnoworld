@@ -114,7 +114,7 @@ otherwise.
 | the TypeScript of `app/src`, `app/tests`, `packages/ui/src` | tsc, ESLint, Vitest's tests related to the change (`--changed`), the app's journeys | 30 s |
 | `packages/core/src`, which the server imports, or any other file of those folders (a fixture, a stylesheet) | tsc, ESLint, every Vitest test (a file read from disk is outside the module graph too), the app's journeys | 30 s |
 | `gno/` | the gno lane | 30 s |
-| anything else (a config, the lockfile, the harness, `packages/schemas`, `deploy/`), no change at all, or no repository (pre-commit's staged copy) | everything | 60 s |
+| anything else (a config, the lockfile, the harness, `packages/schemas`, `deploy/`), no change at all, or no repository (pre-commit's staged copy) | everything | 75 s |
 
 What a commit leaves out, the full gate runs on the exact tip before `main` takes it (`pre-push`
 wants its record). ESLint reads no cache: a cache is keyed on a file's own text, so a type changed
@@ -149,7 +149,8 @@ whose code had not grown took 61 to 98 s at a load of 65 to 76 on 16 cores.
 | Step | What it catches |
 |---|---|
 | `scripts/probe.py` | a lint rule, selector or check that no longer catches its planted fault |
-| coverage | under 85% anywhere, under 100% (95% branches) in `core` |
+| `test:compiled` | the compiled project's render counts, run alone: the coverage run leaves it out, because the React Compiler's memo cache checks are branches no test takes, in every component it renders (branches 93.8% without it, 82.5% with it, F1350) |
+| coverage | under 85% anywhere, under 100% (95% branches) in `core`; the `node`, `ui` and `slow` projects |
 | `scripts/patch_coverage.py` | under 85% of the changed lines run by a test, or a changed file no coverage measures |
 | `scripts/prove_fix.py` | a fix of the product whose tests or journeys did not fail on the commit before it (F126) |
 | StrykerJS | a mutant of the TypeScript that no test kills |
