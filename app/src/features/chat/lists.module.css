@@ -7,6 +7,13 @@
     list-style: none;
   }
 
+  /* A pin and a saved line, each set apart on its own card (4d). */
+  .card {
+    border-radius: var(--radius-m);
+    background: var(--color-fill);
+    overflow-wrap: anywhere;
+  }
+
   .scrolls {
     /* raw: a share of the screen's height, which no token names, so the list scrolls and the page stays put */
     max-block-size: 60vb;

@@ -9,6 +9,7 @@ import type { StreamEvent } from "@gnoworld/schemas";
 import { Button, Cluster, Sidebar, Stack } from "@gnoworld/ui";
 import { Fragment, lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import type { ErgoState } from "../../lib/ergo/ergo.ts";
+import type { RoomKeeping, RoomPins } from "./RoomKeeping.ts";
 import type { LinesProps } from "./Lines.tsx";
 import { isAccount, shortAddress } from "./names.ts";
 import { Person } from "./Person.tsx";
@@ -19,6 +20,8 @@ import styles from "./RoomView.module.css";
 // WebSocket after the page is drawn, so its code is never the first screen's (ADR-0001 §12; docs/decisions.md,
 // 2026-10-26). One boundary for every feature of a line.
 const Lines = lazy(async () => ({ default: (await import("./Lines.tsx")).Lines }));
+// The room's pins above its lines come from the server after the page is drawn, and show once there is one (4d).
+const PinBar = lazy(async () => ({ default: (await import("./PinBar.tsx")).PinBar }));
 const LINES = [shared["plain"], shared["scrolls"], styles["lines"]].join(" ");
 // The list's place while its code comes, or while the room holds no line: no line, no tab stop; a key pressed meanwhile
 // acts on the page as it stands, nothing queued for the lines.
@@ -31,6 +34,15 @@ function RoomLines(props: LinesProps) {
   ) : (
     <Suspense fallback={waiting(true)}>
       <Lines {...props} />
+    </Suspense>
+  );
+}
+
+// The room's pins above its lines, once it has one: their code is asked then, never on the first screen.
+function PinsAbove({ pins }: { pins: RoomPins | undefined }) {
+  return pins === undefined ? null : (
+    <Suspense fallback={null}>
+      <PinBar pins={pins.list} may={pins.may} onUnpin={pins.onUnpin} />
     </Suspense>
   );
 }
@@ -89,6 +101,10 @@ export interface RoomViewProps {
   verdicts?: Readonly<Record<string, StreamEvent["state"]>> | undefined;
   /** Whether the reader saves data (ADR-0002 §8): then no player is offered, nor any verdict asked (4g, F893). */
   saving?: boolean;
+  /** What the reader keeps in this room and offers of it: none for a direct message's, which has none (4d). */
+  keeping?: RoomKeeping | undefined;
+  /** The room's pins, above its lines; none when it holds none (4d). */
+  pins?: RoomPins | undefined;
 }
 
 /** Who is here: counted once connected, the bot left out, the first MEMBERS_SHOWN named. */
@@ -192,7 +208,7 @@ function Header({ title, topic, id }: { title: ReactNode; topic: ReactNode; id: 
 
 export function RoomView(props: RoomViewProps) {
   const { room, title, note, noteId, state, chat, composer, me, onDelete, onDismiss, onRead, aside } = props;
-  const { verdicts, saving = false } = props;
+  const { verdicts, saving = false, keeping, pins } = props;
   const { empty = "No messages yet." } = props;
   const { lines = [], members = [], refused, typing, read, paged } = state ?? {};
   const connected = chat === "connected";
@@ -204,6 +220,7 @@ export function RoomView(props: RoomViewProps) {
       </p>
       <Sidebar side="end" space="m">
         <div>
+          <PinsAbove key={`${String(room)} pins`} pins={pins} />
           <RoomLines
             key={room}
             room={room}
@@ -219,6 +236,7 @@ export function RoomView(props: RoomViewProps) {
             onRead={onRead}
             verdicts={verdicts}
             saving={saving}
+            keeping={keeping}
           />
           {connected && lines.length === 0 ? <p>{empty}</p> : null}
           {/* A room's, whose place is kept so the composer never moves; a direct message tells none (4e). */}

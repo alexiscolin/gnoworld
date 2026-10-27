@@ -1,0 +1,61 @@
+/* The room's pins above its lines (4d): a line opening into a stack, the prototype's #pinBar in the design system's
+   tokens. */
+@layer components {
+  .bar {
+    border-block-end: var(--line-width) solid var(--color-line);
+  }
+
+  .head {
+    /* layout: the pin, the newest pin's words and their count in one row, the words taking what is left */
+    display: flex;
+    /* layout: the three a step apart */
+    gap: var(--space-xs);
+    /* layout: the three on one line */
+    align-items: center;
+    inline-size: 100%;
+    padding-block: var(--space-2xs);
+    border: 0;
+    background: none;
+    color: var(--color-text);
+    font: var(--font-body);
+    cursor: pointer;
+  }
+
+  .newest {
+    /* layout: takes the room the count leaves, and gives it up, never wider than the bar */
+    flex: 1;
+    /* layout: a flex item shrinks below its words only with this */
+    min-inline-size: 0;
+    overflow: clip;
+    text-overflow: ellipsis;
+    text-align: start;
+    white-space: nowrap;
+  }
+
+  .newest b,
+  .who {
+    font-weight: 500;
+    color: var(--color-text-muted);
+  }
+
+  .count {
+    font: var(--font-meta);
+    color: var(--color-text-muted);
+  }
+
+  .pins {
+    padding-block-end: var(--space-2xs);
+  }
+
+  .pin {
+    position: relative;
+    /* room at the end for Unpin, as a line's own for its bar */
+    padding: var(--space-2xs) calc(var(--control-s) + var(--space-xs)) var(--space-2xs) var(--space-xs);
+  }
+
+  .unpin {
+    position: absolute;
+    inset-block-start: var(--space-3xs);
+    inset-inline-end: var(--space-3xs);
+  }
+}

@@ -1,0 +1,11 @@
+/* The saved messages' list (4d): each line a card, its author and room muted above its words. */
+@layer components {
+  .line {
+    padding: var(--space-2xs) var(--space-xs);
+  }
+
+  .meta {
+    font: var(--font-meta);
+    color: var(--color-text-muted);
+  }
+}

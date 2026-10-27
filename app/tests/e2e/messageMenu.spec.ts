@@ -643,9 +643,20 @@ test.describe("deleting a line", () => {
   // The red pass (M2): another's line offers no Delete, through the page as wired.
   test("offers Delete on the account's own line, never on another's", async ({ page }) => {
     await mine(page);
-    await expect(await itemsOf(page, 0, "another's line")).toHaveText(["Copy text", "Copy room link"]);
+    // 4d adds Save message and Mark unread, which another's line has and one's own line has not (a line one wrote is read).
+    await expect(await itemsOf(page, 0, "another's line")).toHaveText([
+      "Copy text",
+      "Copy room link",
+      "Save message",
+      "Mark unread",
+    ]);
     await page.keyboard.press("Escape");
-    await expect(await itemsOf(page, 1, "my own line")).toHaveText(["Copy text", "Copy room link", "Delete"]);
+    await expect(await itemsOf(page, 1, "my own line")).toHaveText([
+      "Copy text",
+      "Copy room link",
+      "Save message",
+      "Delete",
+    ]);
     // The green pass (G11): the dialog closed until Delete is chosen.
     await expect(page.getByRole("dialog", { name: "Delete message?" })).toBeHidden();
   });
@@ -740,7 +751,12 @@ test.describe("deleting a line", () => {
     await mine(page, { refuseRedact: true });
     await refused(page, "The chat refused it.");
     // 4c's UX review (U4): refused, the line offers its Delete again.
-    await expect(await itemsOf(page, 1, "my own line")).toHaveText(["Copy text", "Copy room link", "Delete"]);
+    await expect(await itemsOf(page, 1, "my own line")).toHaveText([
+      "Copy text",
+      "Copy room link",
+      "Save message",
+      "Delete",
+    ]);
   });
 
   // 4c's UX review (U8): a delete the page cannot send while the chat is out of reach says so, and offers to try again
@@ -768,7 +784,7 @@ test.describe("deleting a line", () => {
     const dialog = await deleteFrom(page, 1);
     await dialog.getByRole("button", { name: "Delete" }).press("Enter");
     expect(sent.filter((line) => line.startsWith("REDACT "))).toEqual(["REDACT #bubble/games o2"]);
-    await expect(await itemsOf(page, 1, "my own line")).toHaveText(["Copy text", "Copy room link"]);
+    await expect(await itemsOf(page, 1, "my own line")).toHaveText(["Copy text", "Copy room link", "Save message"]);
     await page.keyboard.press("Escape");
     await expect(flash(page, "Message deleted.")).toHaveCount(0);
     socket().send(`:${address}!u@h REDACT #bubble/games o2`);

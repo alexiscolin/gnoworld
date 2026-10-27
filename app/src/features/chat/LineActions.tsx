@@ -1,10 +1,12 @@
-// A line's actions (slice 4's 4c; docs/decisions.md, 2026-10-26): the prototype's bar, its More menu holding Copy
-// text, Copy link and, on the reader's own line, Delete, asked first. Reactions, reply, thread, pin, save, edit and
-// mark unread come with their merges; Report waits for slice 12's moderation queue.
+// A line's actions (slice 4's 4c, 4d; docs/decisions.md, 2026-10-26): the prototype's bar, a Pin button for a reader who
+// may pin, and its More menu holding Copy text, Copy link, Save message and Mark unread for an account and, on the
+// reader's own line, Delete, asked first. Reactions, reply, thread and edit come with their merges; Report waits for
+// slice 12's moderation queue.
 import type { Line } from "@gnoworld/core";
 import { Button, Cluster, Dialog, Menu, Stack } from "@gnoworld/ui";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import styles from "./LineActions.module.css";
+import { keptItems, PinButton, type LineKeeping } from "./LineKeeping.tsx";
 import { roomLabel } from "./names.ts";
 
 // What the delete's dialog quotes of its line: its first 80 characters, never one cut in two (an emoji's parts).
@@ -37,6 +39,8 @@ export interface LineActionsProps {
   onDelete: (id: string) => boolean;
   /** Its delete went out, not answered yet: no second one (U4). */
   deleting?: boolean;
+  /** What an account keeps of it (4d); none for a guest, who has no device to keep it on. */
+  keeping?: LineKeeping | undefined;
 }
 
 // The dialog that asks before a delete: which line, where, and that it cannot come back; `close` says whether to delete.
@@ -87,7 +91,7 @@ function AskDelete({
 
 /** The bar of a line pointed at or focused, out of the list's live announcements: its More menu, and the dialog
  * that asks before a delete, which gives the focus back to More when it closes. */
-export function LineActions({ line, room, me, onCopy, onDelete, deleting = false }: LineActionsProps) {
+export function LineActions({ line, room, me, onCopy, onDelete, deleting = false, keeping }: LineActionsProps) {
   const [asking, setAsking] = useState(false);
   const { barRef, inside } = useInside();
   // A delete asked, sent after the dialog's close, which gives the focus back to More (Menu hands it there first).
@@ -118,6 +122,7 @@ export function LineActions({ line, room, me, onCopy, onDelete, deleting = false
         onCopy("link");
       },
     },
+    ...keptItems(line, own, keeping),
     ...(own && !deleting
       ? [
           {
@@ -139,6 +144,7 @@ export function LineActions({ line, room, me, onCopy, onDelete, deleting = false
       className={styles["bar"]}
       data-inside={inside ? "" : undefined}
     >
+      <PinButton line={line} pin={keeping?.pin} />
       <Menu trigger="More actions" icon="more" emphasis="plain" size="s" label="Message actions" items={items} />
       {own ? <AskDelete line={line} room={room} open={asking} close={close} /> : null}
     </div>

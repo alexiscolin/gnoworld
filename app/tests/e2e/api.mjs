@@ -29,10 +29,13 @@ const BUBBLE = {
   sections: [{ name: "Talk", rooms: ["#bubble/games", "#bubble"] }],
 };
 
-// The shipped roles file with the journeys' rooms, written where the server reads it; its worlds.
+// The shipped roles file with the journeys' rooms, and Bubble's moderators (4d's pins): the test wallets named
+// moderator0 to moderator8 (/__wallet?as=moderator0), one a worker and the last for the cap's test, known before the server starts so their addresses
+// are in the file. Written where the server reads it; its worlds.
 function writeRoles(path) {
   const roles = JSON.parse(readFileSync(ROLES, "utf8"));
-  roles.worlds = roles.worlds.map((world) => (world.slug === "bubble" ? { ...world, ...BUBBLE } : world));
+  const moderators = Array.from({ length: 9 }, (_, n) => walletOf({ url: `/?as=moderator${String(n)}` }).address);
+  roles.worlds = roles.worlds.map((world) => (world.slug === "bubble" ? { ...world, ...BUBBLE, moderators } : world));
   writeFileSync(path, JSON.stringify(roles));
   return roles.worlds;
 }

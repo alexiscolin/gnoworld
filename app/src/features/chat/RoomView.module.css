@@ -43,6 +43,13 @@
     color: var(--color-text-muted);
   }
 
+  /* The icon of a mark (Pinned, Saved), a step before its word and on its line. */
+  .mark > svg {
+    /* layout: the step between the icon and the word */
+    margin-inline-end: var(--space-3xs);
+    vertical-align: text-bottom;
+  }
+
   .action {
     font-style: italic;
   }

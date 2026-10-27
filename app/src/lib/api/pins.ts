@@ -21,3 +21,6 @@ export function pinsApi(fetcher: Fetcher, timeoutMs = TIMEOUT_MS) {
     unpin: (room: string, msgid: string) => ask(room, "/api/pins/unpin", { msgid }),
   };
 }
+
+/** The pins' client of this page, on its own fetch. */
+export const pagePinsApi = () => pinsApi((url, init) => fetch(url, init));

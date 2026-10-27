@@ -6,11 +6,13 @@ import type { Line } from "@gnoworld/core";
 import type { StreamEvent } from "@gnoworld/schemas";
 import { Flash } from "@gnoworld/ui";
 import { useLayoutEffect, useRef } from "react";
+import { lineKeeping } from "./LineKeeping.tsx";
+import type { RoomKeeping } from "./RoomKeeping.ts";
 import { LineActions } from "./LineActions.tsx";
 import { useCopy, useRemoval } from "./lineFlash.ts";
 import { useLineFocus } from "./lineFocus.ts";
 import { LineView } from "./LineView.tsx";
-import { useNewMark, useReadAtEnd } from "./reading.ts";
+import { useNewMark, useReading } from "./reading.ts";
 import shared from "./lists.module.css";
 import styles from "./RoomView.module.css";
 
@@ -69,6 +71,8 @@ export interface LinesProps {
   verdicts?: Readonly<Record<string, StreamEvent["state"]>> | undefined;
   /** Whether the reader saves data (ADR-0002 §8): then no player is offered (4g, F893). */
   saving?: boolean;
+  /** What the reader keeps in this room and the room's pins (4d); none for a direct message's lines. */
+  keeping?: RoomKeeping | undefined;
 }
 
 /** The room's flash, then its lines, oldest first, as a list a screen reader hears grow. */
@@ -86,10 +90,11 @@ export function Lines({
   onRead,
   verdicts,
   saving = false,
+  keeping,
 }: LinesProps) {
-  const fresh = useNewMark(lines, paged ? read : undefined, me);
+  const fresh = useNewMark(lines, { read: paged ? read : undefined, unread: paged ? keeping?.unread : undefined }, me);
   const { listRef, atEndRef, onScroll } = useNewestInView(lines, fresh);
-  const look = useReadAtEnd(lines, atEndRef, paged ? onRead : undefined);
+  const look = useReading({ lines, atEndRef, paged, onRead, keeping });
   const { stop, mounted, on, leave } = useLineFocus(lines, listRef, fresh);
   const { said, setSaid, copy } = useCopy();
   const [deleting, remove] = useRemoval({ lines, refused, connected, onDelete, leave, setSaid });
@@ -107,6 +112,7 @@ export function Lines({
         copy(line, what, room);
       }}
       onDelete={remove}
+      keeping={lineKeeping(keeping, me, setSaid)(line)}
     />
   );
   return (
@@ -145,6 +151,8 @@ export function Lines({
             fresh={line.id === fresh}
             verdict={verdicts?.[line.id]}
             players={room !== undefined && !saving}
+            saved={keeping?.saved.has(line.id) === true}
+            pinned={keeping?.pinned.has(line.id) === true}
           />
         ))}
       </ol>

@@ -3,6 +3,7 @@
 // "you" (4e).
 import { markdown, mentions, type Block, type Line } from "@gnoworld/core";
 import type { StreamEvent } from "@gnoworld/schemas";
+import { Icon } from "@gnoworld/ui";
 import type { ReactNode } from "react";
 import { Embed } from "./Embed.tsx";
 import { embedIn } from "./embeds.ts";
@@ -70,12 +71,30 @@ function Author({ line, mine }: { line: Line; mine: boolean }) {
   );
 }
 
-// The line's marks first, before the time: where no sender's words stand (F808).
-function Marks({ mentioned, notice }: { mentioned: boolean; notice: boolean }) {
+// The line's marks first, before the time: where no sender's words stand (F808). Pinned and Saved are a word and an
+// icon (4d): one reads the room's pins, the other what this device kept.
+function Marks({
+  mentioned,
+  notice,
+  saved,
+  pinned,
+}: { mentioned: boolean; notice: boolean } & Pick<LineViewProps, "saved" | "pinned">) {
   return (
     <>
       {mentioned ? <span className={styles["mentionsYou"]}>Mentions you </span> : null}
       {notice ? <span className={styles["mark"]}>Notice </span> : null}
+      {pinned ? (
+        <span className={styles["mark"]}>
+          <Icon name="pin" />
+          Pinned{" "}
+        </span>
+      ) : null}
+      {saved ? (
+        <span className={styles["mark"]}>
+          <Icon name="bookmark" />
+          Saved{" "}
+        </span>
+      ) : null}
     </>
   );
 }
@@ -97,9 +116,12 @@ export interface LineViewProps {
   verdict: StreamEvent["state"] | undefined;
   /** Whether a link's player is offered: not to a reader who saves data, nor in a direct message. */
   players: boolean;
+  /** Whether it is saved on this device, and whether it is pinned in its room (4d). */
+  saved: boolean;
+  pinned: boolean;
 }
 
-export function LineView({ line, me, members, stop, actions, fresh, verdict, players }: LineViewProps) {
+export function LineView({ line, me, members, stop, actions, fresh, verdict, players, saved, pinned }: LineViewProps) {
   const blocks = markdown(line.text);
   // Its first link to an accepted service gets a player, but for a reader who saves data (4g).
   const embed = players ? embedIn(blocks) : undefined;
@@ -117,7 +139,7 @@ export function LineView({ line, me, members, stop, actions, fresh, verdict, pla
       tabIndex={stop ? 0 : -1}
     >
       {fresh ? <NewDivider /> : null}
-      <Marks mentioned={mentioned} notice={line.kind === "notice"} />
+      <Marks mentioned={mentioned} notice={line.kind === "notice"} saved={saved} pinned={pinned} />
       <time dateTime={line.time} className={styles["time"]}>
         {CLOCK.format(new Date(line.time))}
       </time>{" "}
