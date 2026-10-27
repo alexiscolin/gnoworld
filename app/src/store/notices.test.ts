@@ -1,4 +1,5 @@
 import { parseLine, type IrcMessage, type Notice, type NoticeMode } from "@gnoworld/core";
+import { Address } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
 import type { NoticePrefs } from "../lib/notices/prefs.ts";
 import { createAppStore } from "./index.ts";
@@ -317,6 +318,33 @@ describe("the store's notices slice", () => {
       t.said(GAMES, ["m3", 3], { text: "mine", from: ME });
       t.noticed(GAMES, "bot", 4);
       expect(badgeOf(t.state(), GAMES)).toBe(2);
+    });
+
+    // F1679 (CR7): with no mark, the whole window counted ("200 unread") while the page made no notice in that case; and
+    // while the connection was down the account's own lines past the mark counted, `chat.me` being none.
+    it("counts nothing in all mode while the room's mark is unknown, and what is past it once it is known", () => {
+      const t = setup();
+      t.notices.setMode(GAMES, "all");
+      t.said(GAMES, ["m1", 1]);
+      t.said(GAMES, ["m2", 2]);
+      expect(badgeOf(t.state(), GAMES)).toBe(0);
+      expect(totalUnseen(t.state())).toBe(0);
+      t.marked(GAMES, 1);
+      expect(badgeOf(t.state(), GAMES)).toBe(1);
+    });
+
+    it("counts none of the account's own lines in all mode while the connection is down", () => {
+      const t = setup();
+      t.store.getState().loginActions.signedIn(Address.parse(ME));
+      t.notices.setMode(GAMES, "all");
+      t.marked(GAMES, 0);
+      t.said(GAMES, ["m1", 1], { from: ME });
+      t.said(GAMES, ["m2", 2]);
+      expect(badgeOf(t.state(), GAMES)).toBe(1);
+      t.store.getState().chatActions.disconnected();
+      t.store.getState().chatActions.follow([GAMES, MAIN]);
+      expect(t.state().chat.me).toBeUndefined();
+      expect(badgeOf(t.state(), GAMES)).toBe(1);
     });
 
     it("counts a line once in all mode though a notice names it too", () => {

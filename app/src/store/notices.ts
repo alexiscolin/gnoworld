@@ -8,6 +8,7 @@ import type { StateCreator } from "zustand/vanilla";
 import type { NoticePrefs } from "../lib/notices/prefs.ts";
 import type { ChatSlice } from "./chat.ts";
 import { heardFrom, type DmSlice } from "./dms.ts";
+import type { LoginSlice } from "./login.ts";
 
 /** The notices kept at most for each place (a room, a conversation), the newest: a flood in one drops its own oldest. */
 export const NOTICES_KEPT = 100;
@@ -41,7 +42,7 @@ export interface NoticeSlice {
   };
 }
 
-type State = ChatSlice & DmSlice & NoticeSlice;
+type State = ChatSlice & DmSlice & LoginSlice & NoticeSlice;
 
 // A record's own entry: the ids are the relay's, and a room named `constructor` is no one's prototype.
 const own = <T>(record: Readonly<Record<string, T>>, key: string): T | undefined =>
@@ -79,13 +80,18 @@ export function unseenNotices(state: State): readonly Notice[] {
   return next;
 }
 
-// The lines of a room in all mode that are new to the reader: past its mark, another's, no NOTICE, no edit.
+// The reader's address: the connection's nick, else (while it is down) the session's account, so a line of one's own that
+// came before a drop is never new to oneself.
+const meOf = ({ chat, login }: State) => chat.me ?? (login.session.kind === "in" ? login.session.address : undefined);
+
+// The lines of a room in all mode that are new to the reader: past its mark, another's, no NOTICE, no edit. None while
+// the mark is unknown, as a history page makes no notice then (a never read room is not "200 unread").
 function newLines(state: State, where: string) {
   const mark = markOf(state, where);
-  const lines = roomOf(state, where)?.lines ?? [];
-  return lines.filter(
-    ({ time, kind, edits, account }) =>
-      kind !== "notice" && edits === undefined && account !== state.chat.me && (mark === undefined || time > mark),
+  if (mark === undefined) return [];
+  const me = meOf(state);
+  return (roomOf(state, where)?.lines ?? []).filter(
+    ({ time, kind, edits, account }) => kind !== "notice" && edits === undefined && account !== me && time > mark,
   );
 }
 
