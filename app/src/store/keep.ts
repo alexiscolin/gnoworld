@@ -6,6 +6,7 @@ import { placeBefore, type Line } from "@gnoworld/core";
 import { RoomId } from "@gnoworld/schemas";
 import type { StateCreator } from "zustand/vanilla";
 import { asSaved, SAVED_KEPT, UNREAD_KEPT, type Keep, type SavedLine } from "../lib/keep/keep.ts";
+import { lastKept, without } from "./record.ts";
 
 interface Kept {
   /** The lines saved, the newest saved first. */
@@ -99,13 +100,11 @@ export const keepSlice: StateCreator<KeepSlice> = (set, get) => {
         if (device === undefined || place === undefined || !RoomId.safeParse(room).success) return;
         // The room marked longest ago goes first past the bound: its key goes to the end as it is marked again.
         const { unread, readable } = fresh();
-        const others = Object.entries(unread).filter(([each]) => each !== room);
-        const marked: [string, string] = [room, place];
-        commitUnread(Object.fromEntries([...others, marked].slice(-UNREAD_KEPT)), readable);
+        commitUnread(lastKept(unread, [room, place], UNREAD_KEPT), readable);
       },
       readThrough: (room) => {
         const { unread, readable } = fresh();
-        commitUnread(Object.fromEntries(Object.entries(unread).filter(([each]) => each !== room)), readable);
+        commitUnread(without(unread, room), readable);
       },
     },
   };

@@ -3,7 +3,7 @@
 import type { IrcMessage } from "@gnoworld/core";
 import { RoomId, type PinList } from "@gnoworld/schemas";
 import type { StateCreator } from "zustand/vanilla";
-import { own } from "./record.ts";
+import { lastKept, own } from "./record.ts";
 
 /** The rooms whose pins are held at most: a session joins 100 (Ergo's max-channels-per-client). */
 export const PINS_ROOMS = 100;
@@ -52,9 +52,7 @@ export const pinsSlice: StateCreator<PinsSlice> = (set, get) => {
         const next = { may: list.may, pins: list.pins.filter(({ id }) => !gone.has(`${list.room} ${id}`)) };
         const { pins } = get();
         if (same(pins[list.room], next)) return;
-        const others = Object.entries(pins).filter(([room]) => room !== list.room);
-        const answered: [string, Held[string]] = [list.room, next];
-        set({ pins: Object.fromEntries([...others, answered].slice(-PINS_ROOMS)) });
+        set({ pins: lastKept(pins, [list.room, next], PINS_ROOMS) });
       },
       forget: () => {
         if (Object.keys(get().pins).length > 0) set({ pins: {} });
