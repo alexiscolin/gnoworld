@@ -62,7 +62,7 @@ const setup = (before?: (store: ReturnType<typeof createAppStore>) => void, devi
         me: undefined,
         connected: false,
         grants: true,
-        multiline: () => fake.grants && fake.connected,
+        multiline: () => (fake.connected ? fake.grants : undefined),
         send: (line) => {
           if (!fake.connected) return false;
           fake.sent.push(line);
@@ -1073,6 +1073,17 @@ describe("the chat's link: what it says", () => {
     expect(t.link.multiline()).toBe(false);
     t.link.stop();
     expect(t.link.multiline()).toBe(true);
+  });
+
+  it("says yes while the connection has no nick yet, whatever it will grant: no refusal before the welcome (F1915)", () => {
+    const t = setup();
+    t.link.follow(["#bubble/games"]);
+    t.signedOut();
+    t.last().grants = false;
+    expect(t.last().multiline()).toBeUndefined();
+    expect(t.link.multiline()).toBe(true);
+    t.connected();
+    expect(t.link.multiline()).toBe(false);
   });
 
   it("sends the lines of a message one at a time to an Ergo with no draft/multiline, its blank lines left out", () => {

@@ -46,7 +46,7 @@ class Connection implements Ergo {
     return this.#step === "connected" && this.#state === "connected" && oneLine(line) && this.#write(line);
   }
 
-  multiline = (): boolean => this.#multiline && this.nick() !== undefined;
+  multiline = (): boolean | undefined => (this.nick() === undefined ? undefined : this.#multiline);
 
   nick(): string | undefined {
     return this.#step === "connected" && this.#state === "connected" ? this.#nick : undefined;

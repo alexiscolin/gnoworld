@@ -119,7 +119,8 @@ test.describe("a message of several lines", () => {
   });
 
   // The red pass's open question: a draft of 30 lines restored before Ergo's welcome. While the connection has no nick
-  // it is not known whether draft/multiline was granted, which blocks nothing; once Ergo welcomes the page, it is.
+  // it is not known whether draft/multiline was granted, which blocks nothing (no refusal, Send on); once Ergo
+  // welcomes the page, it is.
   test("does not refuse a restored draft of 30 lines once a late welcome shows draft/multiline", async ({ page }) => {
     const address = await logIn(page, word("late"));
     const kept = draft(30);
@@ -141,6 +142,9 @@ test.describe("a message of several lines", () => {
     await hydrated(page);
     const tooMany = page.getByText(/too many: 20 at most/);
     await expect(field(page)).toHaveValue(kept);
+    // F1915: before the welcome nothing is known of draft/multiline, so nothing is refused and Send stays on.
+    await expect(tooMany).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Send" })).toBeEnabled();
     welcome();
     await expect(lines(page)).toHaveCount(2);
     await expect(tooMany).toHaveCount(0);

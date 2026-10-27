@@ -1169,11 +1169,16 @@ describe("connectErgo, an Ergo that offers no draft/multiline", () => {
 
   it("says whether the connection sends several lines at once: only once connected, only on an ACK holding it", async () => {
     const full = await guest();
+    // F1915: unknown (undefined), not false, until the nick comes: a draft restored before the welcome is not refused.
+    expect(full.client.multiline()).toBeUndefined();
+    full.s.say(`:ergo CAP * ACK :${CAPS}`);
+    expect(full.client.multiline()).toBeUndefined();
     welcomeGuest(full.s, "guest-ab12cd");
     expect(full.client.multiline()).toBe(true);
     const basic = await guest();
     basic.s.say(`:ergo CAP * NAK :${CAPS}`);
     basic.s.say(`:ergo CAP * ACK :${BASIC_CAPS}`);
+    expect(basic.client.multiline()).toBeUndefined();
     basic.s.say(":ergo 001 guest-ab12cd :Welcome");
     motd(basic.s);
     expect(basic.client.multiline()).toBe(false);
