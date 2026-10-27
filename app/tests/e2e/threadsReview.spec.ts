@@ -1,5 +1,5 @@
 import { lineOf, lines, roomsNav } from "./chat.ts";
-import { expect, test } from "./fixtures.ts";
+import { expect, test, type Page } from "./fixtures.ts";
 import type { HistoryLine } from "./scripted.ts";
 import { asAccount, ROOM, T, tagged } from "./talk.ts";
 import { chipOf, closeButton, inThread, panel, say, threadField, threadOf } from "./thread.ts";
@@ -70,5 +70,31 @@ test.describe("threads, from the review", () => {
     await closeButton(page).click();
     await chipOf(lines(page).first()).click();
     await expect(threadField(page)).toHaveValue("");
+  });
+
+  // On a phone the open panel hides the room's list (display: none), the composer with it.
+  test.describe("on a phone's screen", () => {
+    test.use({ viewport: { width: 390, height: 844 } });
+    // Forty lines, the last a reply to the first: the list scrolls, and the thread is opened from the reply's menu.
+    const forty: HistoryLine[] = Array.from({ length: 40 }, (_, n) => [`m${String(n)}`, T(n), `line ${String(n)}`]);
+    const reply = tagged("r1", "the reply", { at: 41, tags: "+reply=m0" });
+    const atEnd = (page: Page) =>
+      lines(page)
+        .first()
+        .evaluate((item) => {
+          const list = item.parentElement;
+          return list !== null && list.scrollHeight - list.scrollTop - list.clientHeight < 32;
+        });
+
+    // CR2: the list comes back at the end it was left at, the reader being there when the panel opened.
+    test("gives the list back at its end after a panel opened and closed", async ({ page }) => {
+      await asAccount(page, () => ({ history: forty, replayed: [reply] }), 41);
+      await expect.poll(() => atEnd(page)).toBe(true);
+      await threadOf(lineOf(page, "the reply"));
+      await expect(lines(page).first()).toBeHidden();
+      await closeButton(page).click();
+      await expect(lines(page).first()).toBeVisible();
+      await expect.poll(() => atEnd(page)).toBe(true);
+    });
   });
 });
