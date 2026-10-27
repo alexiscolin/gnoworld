@@ -94,6 +94,18 @@ describe("Thread", () => {
     expect(panel()).toMatch(/<h[1-6][^>]*>Thread/);
   });
 
+  // CR10 (F1769): the title is a heading a screen reader reads out: a member's address in it is shortened, as the room's
+  // lines and the reply quote shorten it, and one that is no member's stays whole.
+  it("shortens a member's address in the title, as the room's lines do, and keeps any other whole", () => {
+    const other = "g1f6dcp6he2vq9gymrm4yrnyx66n0578vf7fsksl";
+    const [title = ""] = heading(
+      panel({ lines: [line("root", 0, { text: `@${BOB} and @${other} hello` }), line("r", 1, { reply: "root" })] }),
+    );
+    expect(title).toContain("@g1jg8m…vsqf5");
+    expect(title).not.toContain(BOB);
+    expect(title).toContain(`@${other}`);
+  });
+
   it("cuts a long root's words in the title, an ellipsis at the cut, the whole line in its row", () => {
     const text = `${"w".repeat(TITLE_LENGTH + 40)} the end`;
     const html = panel({ lines: [line("root", 0, { text }), line("r", 1, { reply: "root" })] });

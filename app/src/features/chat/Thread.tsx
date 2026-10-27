@@ -9,7 +9,7 @@ import { IconButton, Sidebar, Stack } from "@gnoworld/ui";
 import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { LineView } from "./LineView.tsx";
 import shared from "./lists.module.css";
-import { mentionable } from "./names.ts";
+import { mentionable, shortened } from "./names.ts";
 import room from "./RoomView.module.css";
 import styles from "./Thread.module.css";
 
@@ -43,7 +43,13 @@ export function Thread({ root, lines, members, me, onClose, composer }: ThreadPr
   const head = shown.find((line) => line.id === id);
   const rows = head === undefined ? replies : [head, ...replies];
   const known = mentionable(members, shown);
-  const title = head === undefined ? "an earlier message" : excerpt(head.text, TITLE_LENGTH);
+  const title =
+    head === undefined
+      ? "an earlier message"
+      : excerpt(
+          shortened(head.text, (address) => address === me || known.has(address)),
+          TITLE_LENGTH,
+        );
   const boxRef = useRef<HTMLElement>(null);
   // A guest has no field: the focus goes to Close, which an account's composer leaves to the field.
   useEffect(() => {
