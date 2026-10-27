@@ -47,6 +47,13 @@ describe("Composer", () => {
     expect(refusalAfter("fixed", refused)).toEqual(refused);
   });
 
+  // The second red pass on the DM bar (R5): the longest draft quoted above is about 280 graphemes, so a cap at 300 or 500
+  // went unseen. A line is 512 bytes on the wire at most, but the box holds more.
+  it("quotes a draft of 2,000 characters whole", () => {
+    const draft = "word ".repeat(400);
+    expect(refusalAfter("x", { draft, why: "W." }).why).toBe(`W. Unsent: “${draft}”`);
+  });
+
   // A refused correction taken up again starts its composer on the refusal, not told yet: the reader hears why, and the
   // draft is the box's. A composer that starts on a refusal it already knew tells nothing.
   it("tells a refusal not told yet as it starts, and one it already knew as it starts not", () => {

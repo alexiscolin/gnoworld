@@ -119,6 +119,21 @@ describe("afterAct: a delete takes the corrections of the line with it", () => {
     expect(act(held, redactOf(ALICE, "m1")).lines).toEqual([guest]);
   });
 
+  // R4: my own echo, and a partner's delete of a line of mine that left the window.
+  it("takes my own corrections with my own delete, as Ergo echoes it to me", () => {
+    const held = { lines: [lineOf("m1", ME), lineOf("m2", ME, "m1"), lineOf("m3", ALICE)], reactions: undefined };
+    const echo = read(`@msgid=r;account=${ME} :${ME}!u@h REDACT ${ALICE} m1`);
+    expect(act(held, echo).lines.map((line) => line.id)).toEqual(["m3"]);
+  });
+
+  it("leaves my correction of a line that left the window when the partner deletes it, and takes only hers", () => {
+    const held = {
+      lines: [lineOf("m2", ME, "m1"), lineOf("m4", ALICE, "m1"), lineOf("m5", ALICE)],
+      reactions: undefined,
+    };
+    expect(act(held, redactOf(ALICE, "m1")).lines.map((line) => line.id)).toEqual(["m2", "m5"]);
+  });
+
   it("is the same object when the delete names no line and no correction", () => {
     const held = { lines: [lineOf("m1", ME)], reactions: undefined };
     expect(act(held, redactOf(ALICE, "m9"))).toBe(held);
@@ -139,16 +154,13 @@ describe("afterAct: a reaction", () => {
 // /code-review on 4d's DM bar (complexity): a typing TAGMSG, every 3 s from a partner, reads no line and no reaction.
 describe("afterAct: a TAGMSG with no reaction", () => {
   it("is the same object, its lines and reactions never read", () => {
-    const lines = [lineOf("m1", ME)];
-    const reactions: never[] = [];
     const reading = () => {
       throw new Error("read");
     };
-    for (const key of ["some", "filter", "map", "find"] as const) {
-      Object.defineProperty(lines, key, { get: reading });
-      Object.defineProperty(reactions, key, { get: reading });
-    }
-    const held = { lines, reactions };
+    // Every way to read an array: a property, an index, the length, the iterator, a key list (R3).
+    const sealed = <T extends object>(array: T): T =>
+      new Proxy(array, { get: reading, has: reading, ownKeys: reading, getOwnPropertyDescriptor: reading });
+    const held = { lines: sealed([lineOf("m1", ME)]), reactions: sealed([]) };
     const typing = read(`@msgid=t;account=${ALICE};+typing=active :${ALICE}!u@h TAGMSG ${ME}`);
     expect(act(held, typing)).toBe(held);
   });
