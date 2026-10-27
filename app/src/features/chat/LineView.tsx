@@ -150,7 +150,7 @@ export function LineView(props: LineViewProps) {
       <Edited edited={line.edited} />
       {line.kind === "action" ? "* " : null}
       <Author line={line} mine={mine} /> <LineText blocks={blocks} me={me} known={known} stop={stop} />
-      {embed === undefined ? null : <Embed embed={embed} verdict={verdict} />}
+      {embed === undefined ? null : <Embed key={embed.src} embed={embed} verdict={verdict} />}
       {/* Before the chips in the Tab order, so Reply is a few presses away; it floats, so its place shows nowhere (U2). */}
       {actions}
       <Chips to={line.id} chips={chips} react={react} />

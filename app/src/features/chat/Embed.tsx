@@ -90,6 +90,9 @@ export function Embed({ embed, verdict }: EmbedProps) {
     backRef.current = false;
     cardRef.current?.querySelector("button")?.focus();
   }, [playing]);
+  // The player runs on a checked link alone: a verdict that leaves "checked" (a correction awaiting its check) closes it,
+  // and a later "checked" waits for a click again (CR1 of the room edit).
+  if (playing && verdict !== "checked") setPlaying(false);
   if (verdict === "hidden") return null;
   if (playing) {
     // A player stops on its reader's word: an animation loops for good, a video plays on (WCAG 2.2.2, F1053).
