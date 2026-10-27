@@ -5,6 +5,7 @@
   "workspaces": {
     ".": {},
     "app": {
+      "entry": ["src/**/*.test.{ts,tsx}"],
       "react-router": { "config": ["react-router.config.ts"] },
       "playwright": { "config": ["playwright.config.ts", "playwright.stories.config.ts"] }
     },
