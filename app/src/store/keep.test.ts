@@ -50,9 +50,9 @@ function setup({ refuses = false } = {}) {
   };
   const store = createAppStore();
   const device = (account: Address = ALICE) => keep(() => storage, account);
-  const heard = { n: 0 };
-  store.subscribe(() => (heard.n += 1));
-  return { store, kept, state, device, heard, ...store.getState().keepActions, now: () => store.getState().keep };
+  const told = { n: 0 };
+  store.subscribe(() => (told.n += 1));
+  return { store, kept, state, device, told, ...store.getState().keepActions, now: () => store.getState().keep };
 }
 
 describe("the keep slice's start", () => {
@@ -90,9 +90,9 @@ describe("the keep slice's start", () => {
     const t = setup();
     t.begin(t.device());
     t.begin(t.device());
-    expect(t.heard.n).toBe(0);
+    expect(t.told.n).toBe(0);
     t.save("#bubble", line("m1"));
-    expect(t.heard.n).toBe(1);
+    expect(t.told.n).toBe(1);
   });
 });
 
