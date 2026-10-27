@@ -1,4 +1,4 @@
-/* The field: a box on the resting fill, one line at the default control's height, or two for a box of several lines; invalid, coral. */
+/* The field: a box on the resting fill, one line at the default control's height, or a box of lines of two rows or more; invalid, coral. */
 @layer components {
   .label {
     font: var(--font-ui);
@@ -8,6 +8,9 @@
     --_line: var(--color-line);
 
     inline-size: 100%;
+
+    /* A drag of the box's handle never makes it wider than its place: its neighbour stays in view. */
+    max-inline-size: 100%;
     min-block-size: var(--control-m);
     padding-block: var(--space-2xs);
     padding-inline: var(--space-s);

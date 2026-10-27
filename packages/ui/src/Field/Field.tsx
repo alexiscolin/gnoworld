@@ -19,6 +19,16 @@ export interface FieldProps {
   describedBy?: string | undefined;
 }
 
+const MIN_ROWS = 2;
+const MAX_ROWS = 10;
+// A box of lines shows its draft's lines, two to ten, then scrolls. ponytail: counts breaks, not wrapped lines; CSS
+// field-sizing would count both, once it is Baseline widely available (the lint's rule for the design system).
+function rowsOf(value: string): number {
+  let rows = 1;
+  for (let at = value.indexOf("\n"); at !== -1 && rows < MAX_ROWS; at = value.indexOf("\n", at + 1)) rows += 1;
+  return Math.max(rows, MIN_ROWS);
+}
+
 const TYPES = { text: "text", search: "search", date: "datetime-local" } as const;
 
 // Enter sends the form, but not the Enter that ends an input method's composition, which only picks the word: Safari
@@ -52,7 +62,7 @@ function Box({ kind, id, value, invalid, described, enterAddsLine, onChange }: B
   return kind === "lines" ? (
     <textarea
       {...shared}
-      rows={2}
+      rows={rowsOf(value)}
       onCompositionStart={() => {
         composingRef.current = true;
       }}

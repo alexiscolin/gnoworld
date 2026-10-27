@@ -116,6 +116,28 @@ test.describe("a message of several lines", () => {
     expect(sent.filter((line) => /PRIVMSG #bubble\/games :line \d+$/.test(line))).toHaveLength(20);
   });
 
+  // F1722 (CR10): a box of two rows showed two lines of a 30-line paste, and a sideways drag could push Send off a
+  // 320 px screen. It grows with its draft up to ten lines, then scrolls, and no drag makes it wider than its place.
+  test("grows with its draft up to ten lines, and keeps Send in view on a 320 px screen", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 700 });
+    await opened(page);
+    const height = () => field(page).evaluate((box) => box.getBoundingClientRect().height);
+    const empty = await height();
+    await field(page).fill(Array.from({ length: 6 }, (_, at) => `line ${String(at)}`).join("\n"));
+    const six = await height();
+    expect(six).toBeGreaterThan(empty + 40);
+    await field(page).fill(Array.from({ length: 60 }, (_, at) => `line ${String(at)}`).join("\n"));
+    expect(await height()).toBeGreaterThan(six);
+    expect(await height()).toBeLessThan(350);
+    expect(await field(page).evaluate((box) => box.scrollHeight > box.clientHeight)).toBe(true);
+    // What a drag of the handle sets on the box: a width far past its place.
+    await field(page).evaluate((box) => {
+      box.style.width = "2000px";
+    });
+    const send = await page.getByRole("button", { name: "Send" }).boundingBox();
+    expect((send?.x ?? 999) + (send?.width ?? 999)).toBeLessThanOrEqual(320);
+  });
+
   test("passes axe with a draft of several lines and a message of several lines shown", async ({ page }) => {
     await opened(page, [["m1", T(0), "- one\n- two"]]);
     await field(page).fill("first\nsecond");
