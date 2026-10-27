@@ -310,6 +310,7 @@ describe("the store's notices slice", () => {
 
     it("counts a room in all mode by its unseen lines: the others' only, no notice among them, no line of the account's", () => {
       const t = setup();
+      t.marked(GAMES, 0);
       t.notices.setMode(GAMES, "all");
       t.said(GAMES, ["m1", 1]);
       t.said(GAMES, ["m2", 2], { text: "hi", from: BOB });
@@ -320,6 +321,7 @@ describe("the store's notices slice", () => {
 
     it("counts a line once in all mode though a notice names it too", () => {
       const t = setup();
+      t.marked(GAMES, 0);
       t.notices.setMode(GAMES, "all");
       t.said(GAMES, ["m1", 5]);
       t.notices.add(notice({ id: "m1", time: T(5) }));
@@ -330,6 +332,7 @@ describe("the store's notices slice", () => {
     // G7 (F1506): an edit is a line of its own that shows in its target's place, so it is no new unread line.
     it("counts no edit in all mode: it corrects a line the reader has or has not had", () => {
       const t = setup();
+      t.marked(GAMES, 0);
       t.notices.setMode(GAMES, "all");
       t.said(GAMES, ["m1", 1]);
       t.store
@@ -354,6 +357,7 @@ describe("the store's notices slice", () => {
 
     it("counts nothing in a room that is none, lines or notices", () => {
       const t = setup();
+      t.marked(GAMES, 0);
       t.said(GAMES, ["m1", 1]);
       t.notices.add(notice());
       expect(badgeOf(t.state(), GAMES)).toBe(1);
@@ -384,6 +388,7 @@ describe("the store's notices slice", () => {
 
     it("totals the rooms followed and the conversations, each by its own count", () => {
       const t = setup();
+      t.marked(MAIN, 0);
       t.kept(ALICE, BOB);
       t.notices.setMode(MAIN, "all");
       t.said(MAIN, ["m1", 1]);
@@ -422,6 +427,7 @@ describe("the store's notices slice", () => {
   describe("left, in all mode", () => {
     it("keeps counting no unread line of a room left in all mode, its lines still held, and counts again what comes once back", () => {
       const t = setup();
+      t.marked(GAMES, 0);
       t.notices.setMode(GAMES, "all");
       t.said(GAMES, ["m1", 1]);
       t.said(GAMES, ["m2", 2]);
@@ -445,6 +451,7 @@ describe("the store's notices slice", () => {
 
     it("sees a room left in all mode up to its newest line though it holds no notice", () => {
       const t = setup();
+      t.marked(GAMES, 0);
       t.notices.setMode(GAMES, "all");
       t.said(GAMES, ["m1", 1]);
       t.said(GAMES, ["m2", 2]);
@@ -457,6 +464,7 @@ describe("the store's notices slice", () => {
   describe("clear", () => {
     it("sees every place up to its newest notice and its newest line, counting what comes after", () => {
       const t = setup();
+      t.marked(MAIN, 0);
       t.notices.setMode(MAIN, "all");
       t.said(MAIN, ["m1", 1]);
       t.said(MAIN, ["m2", 2]);
