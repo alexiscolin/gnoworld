@@ -256,6 +256,46 @@ describe("addLines: a room's lines, in time order, each once, the newest kept", 
     expect(addLines([], frozen([...flood].reverse()), 200)).toStrictEqual(flood.slice(-200));
   });
 
+  test("keeps the latest arrivals of one time when its cap trims them (F773)", () => {
+    const [x, y, z, w] = ["x", "y", "z", "w"].map((id) => line(id, T0, id));
+    if (x === undefined || y === undefined || z === undefined || w === undefined) throw new Error("missing line");
+    expect(addLines([], frozen([x, y, z, w]), 3)).toStrictEqual([y, z, w]);
+    expect(addLines(frozen([x, y, z]), [w], 3)).toStrictEqual([y, z, w]);
+  });
+
+  test("orders a tie after the held lines, then the page, then a live line, under a cap (F773)", () => {
+    const [h1, h2, p1, p2, l1] = ["h1", "h2", "p1", "p2", "l1"].map((id) => line(id, T0, id));
+    if (h1 === undefined || h2 === undefined || p1 === undefined || p2 === undefined || l1 === undefined)
+      throw new Error("missing line");
+    const paged = addLines(frozen([h1, h2]), frozen([p1, p2]), 3);
+    expect(paged).toStrictEqual([h2, p1, p2]);
+    expect(addLines(paged, [l1], 3)).toStrictEqual([p1, p2, l1]);
+  });
+
+  test("holds ties in arrival order, over any batches and cap: a stable sort of what came, newest cap kept (F773)", () => {
+    // Few times, so lines tie often; every id once (a line already held is another test's).
+    fc.assert(
+      fc.property(
+        fc.array(fc.array(fc.integer({ min: 0, max: 3 }), { maxLength: 6 }), { maxLength: 8 }),
+        fc.integer({ min: 1, max: 10 }),
+        (batches, cap) => {
+          let n = 0;
+          const arrived: Line[] = [];
+          let lines: readonly Line[] = [];
+          for (const batch of batches) {
+            const page = batch.map((second) =>
+              line(`m${String(n++)}`, `2026-10-25T10:00:0${String(second)}.000Z`, "t"),
+            );
+            arrived.push(...page);
+            lines = addLines(lines, frozen(page), cap);
+          }
+          expect(lines).toStrictEqual([...arrived].sort(byTime).slice(-cap));
+        },
+      ),
+      PROPERTY,
+    );
+  });
+
   test("holds whatever order lines come in: exactly the newest, sorted, each once", () => {
     // One time for each id (7 is prime to 31, so 31 ids take 31 seconds, none twice): lines of one time keep
     // their arrival order, which a property over two arrays would have to restate; their own tests hold it.
