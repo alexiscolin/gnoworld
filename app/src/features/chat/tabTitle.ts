@@ -16,11 +16,8 @@ export function titled(base: string, count: number): string {
 export function useTabTitle(count: number): void {
   useEffect(() => {
     document.title = titled(document.title, count);
-  }, [count]);
-  useEffect(
-    () => () => {
+    return () => {
       document.title = titled(document.title, 0);
-    },
-    [],
-  );
+    };
+  }, [count]);
 }
