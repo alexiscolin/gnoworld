@@ -135,4 +135,30 @@ describe("the pins slice", () => {
     heard(line(`:${ALICE}!u@h PRIVMSG #bubble :REDACT #bubble m3`));
     expect(store.getState().pins["#bubble"]?.pins.map(({ id }) => id)).toEqual(["m3"]);
   });
+
+  // A message whose text is a pinned id is a message: only Ergo's REDACT command takes a line (G1).
+  it.each(["PRIVMSG", "NOTICE", "TAGMSG", "JOIN"])("keeps a pin whose id is the text of a %s", (command) => {
+    const store = createAppStore();
+    const { set, heard } = store.getState().pinsActions;
+    const parsed = parseLine(`:${ALICE}!u@h ${command} #bubble :m3`);
+    if (!parsed.ok) throw new Error("the test's line does not parse");
+    set(list("#bubble", ["m3"]));
+    heard(parsed.message);
+    expect(store.getState().pins["#bubble"]?.pins.map(({ id }) => id)).toEqual(["m3"]);
+    set(list("#bubble", ["m3"]));
+    expect(store.getState().pins["#bubble"]?.pins.map(({ id }) => id)).toEqual(["m3"]);
+  });
+
+  it("takes a new answer whose pins are not the same, of the same size or a longer one", () => {
+    const store = createAppStore();
+    const { set } = store.getState().pinsActions;
+    set(list("#bubble", ["m1", "m2"]));
+    set(list("#bubble", ["m1", "m9"]));
+    expect(store.getState().pins["#bubble"]?.pins.map(({ id }) => id)).toEqual(["m1", "m9"]);
+    set(list("#bubble", ["m1"]));
+    set(list("#bubble", ["m1", "m9"]));
+    expect(store.getState().pins["#bubble"]?.pins.map(({ id }) => id)).toEqual(["m1", "m9"]);
+    set(list("#bubble", ["m1", "m9"], true));
+    expect(store.getState().pins["#bubble"]?.may).toBe(true);
+  });
 });
