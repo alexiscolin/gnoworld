@@ -402,6 +402,22 @@ describe("Composer: an edit", () => {
     expect(described.map(words)).toContain("Editing a message");
   });
 
+  // CR4 of the room edit: /me waves in the edit box would turn the message into an action, which has no Edit to turn it back.
+  it("refuses to save an edit that composes to an action, and says so", () => {
+    const markup = draw({ draft: "/me waves" });
+    expect(words(markup)).toContain("An edit cannot be an action.");
+    expect(markup).toMatch(
+      /<button[^>]*disabled=""[^>]*type="submit"[^>]*>Save<\/button>|<button[^>]*type="submit"[^>]*disabled=""[^>]*>Save<\/button>/,
+    );
+  });
+
+  it("lets a plain edit save, and an action go as a new message", () => {
+    expect(words(draw({ draft: "the new words" }))).not.toContain("An edit cannot be an action.");
+    expect(words(draw({ draft: "/me waves", editing: undefined, onCancelEdit: undefined }))).not.toContain(
+      "An edit cannot be an action.",
+    );
+  });
+
   it("shows no edit bar, Send as it was, and no Cancel when nothing is edited", () => {
     const markup = draw({ editing: undefined, onCancelEdit: undefined });
     expect(words(markup)).not.toContain("Editing a message");

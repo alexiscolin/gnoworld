@@ -47,6 +47,15 @@ export function typingOf(draft: string): "active" | "done" | undefined {
   return text.startsWith("/") && !text.startsWith("//") ? undefined : "active";
 }
 
+/** An edit that composes to an action is refused, said in the field: Save would turn the message into one that nothing can
+ * turn back, as Edit is for messages alone (CR4 of the room edit). */
+const editRefusal = (composed: Composed, editing: boolean): Pick<FieldProps, "error"> =>
+  editing && composed.kind === "line" && composed.action ? { error: "An edit cannot be an action." } : {};
+
+/** Whether the draft can go: it composes to a line, and is no action while an edit is saved. */
+const sendable = (composed: Composed, editing: boolean) =>
+  composed.kind === "line" && editRefusal(composed, editing).error === undefined;
+
 /** What the field says of the line: that it was not sent or is too long, what Tab completes (a command not yet
  * typed whole being no error), an unknown command, or help near the end; or nothing. */
 export function said(composed: Composed, failed: boolean, completion?: Completion): Pick<FieldProps, "error" | "help"> {
@@ -161,7 +170,7 @@ export function Composer(props: ComposerProps) {
   const mentioning = /(^|\s)@\S*$/u.test(draft);
   const people = mentioning ? peopleOf(members, nick) : [];
   const completion = completions(draft, { commands: COMMANDS, rooms, people });
-  const says = said(composed, failed, completion);
+  const says = { ...said(composed, failed, completion), ...editRefusal(composed, props.editing === true) };
   // Nothing else to say, no error either: the disclosure, to a room's writer; a direct message tells no typing (4e).
   const shown = says.error === undefined && says.help === undefined && to === undefined ? { help: TELLS } : says;
   // The selection an edit leaves is put back in the box once it shows the new draft.
@@ -191,7 +200,7 @@ export function Composer(props: ComposerProps) {
   const editing = useEditing(props, box, answering);
   const send = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (composed.kind !== "line") return;
+    if (!sendable(composed, props.editing === true)) return;
     const went = onSay(draft);
     setFailed(!went);
     refusal.said();
@@ -220,7 +229,7 @@ export function Composer(props: ComposerProps) {
             }}
             {...(refusal.why === undefined ? shown : { error: refusal.why })}
           />
-          <Button type="submit" disabled={composed.kind !== "line"}>
+          <Button type="submit" disabled={!sendable(composed, props.editing === true)}>
             {editing.send}
           </Button>
         </Sidebar>
