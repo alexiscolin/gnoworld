@@ -2,7 +2,8 @@
 // (+gnoworld/edit, docs/decisions.md 2026-10-21); the room shows the correction in that line's place, marked edited,
 // when the same account wrote both, the line before the edit, in this room, and the line no edit itself. Any other edit
 // stays a line of its own, as a plain IRC client shows it.
-import type { Line } from "./room.ts";
+import type { IrcMessage } from "../irc/irc.ts";
+import { nickOf, redactAfter, sameName, type Line } from "./room.ts";
 
 /** A line as shown: corrected by an edit, said so. */
 export type ShownLine = Line & { readonly edited?: true };
@@ -53,3 +54,27 @@ export const shownLines = (lines: readonly Line[]): readonly ShownLine[] => fold
 
 /** The line each folded edit corrects, by the edit's own msgid: see foldEdits. */
 export const editsFolded = (lines: readonly Line[]): ReadonlyMap<string, string> => foldEdits(lines).folded;
+
+// The lines without the corrections of a line that these accounts wrote: its author's, and its REDACT's sender's.
+function withoutCorrections(lines: readonly Line[], id: string, accounts: readonly string[]): readonly Line[] {
+  const owners = accounts.filter((account) => account !== "");
+  const taken = (line: Line) => line.edits === id && owners.some((owner) => sameName(owner, line.account ?? ""));
+  const kept = lines.filter((line) => !taken(line));
+  return kept.length === lines.length ? lines : kept;
+}
+
+// Whether the sender deletes its own correction, whose line is held.
+const ownCorrection = (lines: readonly Line[], id: string, sender: string): boolean =>
+  folding(lines).folded.has(id) && sameName(lines.find((line) => line.id === id)?.account ?? "", sender);
+
+/** The room's lines once `message` is read: a REDACT of a line takes the corrections shown in its place (R1's orphans);
+ * the author's own of a correction whose line is held is held back, so a refused delete of the line never brings the
+ * words edited out back; a moderator's hide of a correction shows the line as it was. The same array when nothing goes. */
+export function redactedLines(lines: readonly Line[], message: IrcMessage, room: string): readonly Line[] {
+  const [target = "", id = ""] = message.params;
+  if (message.command !== "REDACT" || !sameName(target, room)) return lines;
+  const sender = nickOf(message.source ?? "");
+  if (ownCorrection(lines, id, sender)) return lines;
+  const author = lines.find((line) => line.id === id)?.account ?? "";
+  return withoutCorrections(redactAfter(lines, message, room), id, [author, sender]);
+}

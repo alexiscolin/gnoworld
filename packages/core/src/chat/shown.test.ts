@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
+import { parseLine, type IrcMessage } from "../irc/irc.ts";
 import type { Line } from "./room.ts";
-import { editsFolded, foldEdits, shownLines } from "./shown.ts";
+import { editsFolded, foldEdits, redactedLines, shownLines } from "./shown.ts";
 
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
@@ -176,5 +177,58 @@ describe("foldEdits: the newest edit each corrected line shows", () => {
         .newest.size,
     ).toBe(0);
     expect(foldEdits([{ ...line("e", 1, "orphan"), ...{ edits: "gone" } }]).newest.size).toBe(0);
+  });
+});
+
+// The room edit's red pass (R1): a REDACT of a line takes with it the corrections shown in its place, and one of a
+// correction alone is held back while its line is held.
+describe("redactedLines: a REDACT of a line and of its corrections", () => {
+  const read = (text: string): IrcMessage => {
+    const parsed = parseLine(text);
+    if (!parsed.ok) throw new Error(`the test's line does not parse: ${text}`);
+    return parsed.message;
+  };
+  const edit = (id: string, minute: number, { of, who = ALICE }: { of: string; who?: string }): Line => ({
+    ...line(id, minute, `edit ${id}`),
+    ...{ from: who, account: who, edits: of },
+  });
+  const redact = (id: string, sender = ALICE, room = "#bubble") => read(`:${sender}!u@h REDACT ${room} ${id}`);
+  const ids = (lines: readonly Line[]) => lines.map((each) => each.id);
+  const held = [line("a", 0, "one"), edit("e1", 1, { of: "a" }), edit("e2", 2, { of: "a" }), line("b", 3, "two")];
+
+  test("takes the line and every correction of its author's, whoever deletes it", () => {
+    expect(ids(redactedLines(held, redact("a"), "#bubble"))).toEqual(["b"]);
+    expect(ids(redactedLines(held, redact("a", "gnoworld"), "#bubble"))).toEqual(["b"]);
+  });
+
+  test("keeps another account's line naming it, and a correction of another line", () => {
+    const lines = [...held, edit("p", 4, { of: "a", who: BOB }), edit("e3", 5, { of: "b" })];
+    expect(ids(redactedLines(lines, redact("a", "gnoworld"), "#bubble"))).toEqual(["b", "p", "e3"]);
+  });
+
+  test("takes the sender's own lines naming a line it no longer holds, as its own delete of it", () => {
+    const lines = [edit("e1", 1, { of: "gone" }), edit("p", 2, { of: "gone", who: BOB })];
+    expect(ids(redactedLines(lines, redact("gone"), "#bubble"))).toEqual(["p"]);
+  });
+
+  test("holds back its author's REDACT of a correction whose line is held, and takes one whose line is gone", () => {
+    expect(redactedLines(held, redact("e1"), "#bubble")).toBe(held);
+    expect(ids(redactedLines([edit("e1", 1, { of: "gone" })], redact("e1"), "#bubble"))).toEqual([]);
+  });
+
+  test("takes a moderator's REDACT of a correction, the line showing as it was", () => {
+    expect(ids(redactedLines(held, redact("e2", "gnoworld"), "#bubble"))).toEqual(["a", "e1", "b"]);
+  });
+
+  test.each([
+    ["another room's REDACT", redact("a", ALICE, "#garden")],
+    ["a REDACT of a line it does not hold", redact("zz")],
+    ["a message whose text is a line's id", read(`@msgid=x;time=${at(9)} :${ALICE}!u@h PRIVMSG #bubble a`)],
+  ])("leaves the same array for %s", (_, message) => {
+    expect(redactedLines(held, message, "#bubble")).toBe(held);
+  });
+
+  test("reads the REDACT's room whatever its case", () => {
+    expect(ids(redactedLines(held, redact("a", ALICE, "#BUBBLE"), "#bubble"))).toEqual(["b"]);
   });
 });

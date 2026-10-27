@@ -2015,7 +2015,8 @@ describe("the chat's link: a room's edits", () => {
       `@msgid=${id};time=${at};account=${who}${tags === "" ? "" : `;${tags}`} :${who}!u@h PRIVMSG #bubble/games :${text}`;
     const redacted = (sent: readonly string[]) => sent.filter((line) => line.startsWith("REDACT "));
 
-    it("goes out for a line and each correction of mine to it, the line's first", () => {
+    // R1 (redpass-red): with the line's REDACT last, a refused one finds no correction of it to show the original behind.
+    it("goes out for each correction of mine to a line and then the line, the line's last", () => {
       const t = memberIn(["#bubble/games"]);
       t.fake.line(said("m1", ""));
       t.fake.line(said("e1", "+gnoworld/edit=m1"));
@@ -2023,9 +2024,9 @@ describe("the chat's link: a room's edits", () => {
       t.fake.line(said("o1", ""));
       expect(t.link.redact("#bubble/games", "m1")).toBe(true);
       expect(redacted(t.fake.sent)).toEqual([
-        "REDACT #bubble/games m1",
         "REDACT #bubble/games e1",
         "REDACT #bubble/games e2",
+        "REDACT #bubble/games m1",
       ]);
     });
 
@@ -2043,6 +2044,16 @@ describe("the chat's link: a room's edits", () => {
       t.fake.line(said("m2", ""));
       t.fake.line(said("e2", "+gnoworld/edit=m2"));
       t.fake.line(said("e,1", "+gnoworld/edit=m1"));
+      expect(t.link.redact("#bubble/games", "m1")).toBe(true);
+      expect(redacted(t.fake.sent)).toEqual(["REDACT #bubble/games m1"]);
+    });
+
+    // R2 (redpass-red): a ceiling, written down. The page names the corrections it holds alone; one it never heard (made
+    // from another device while this page was away, then older than its history) is not deleted. The readers who hold
+    // the line never see it (core's redactedLines), the others when they reload.
+    it("names the corrections the page holds alone: one it does not hold is not deleted", () => {
+      const t = memberIn(["#bubble/games"]);
+      t.fake.line(said("m1", ""));
       expect(t.link.redact("#bubble/games", "m1")).toBe(true);
       expect(redacted(t.fake.sent)).toEqual(["REDACT #bubble/games m1"]);
     });

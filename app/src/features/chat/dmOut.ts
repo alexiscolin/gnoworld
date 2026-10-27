@@ -48,7 +48,8 @@ function marksOf({ reply, edit }: { reply?: string | undefined; edit?: string | 
 }
 
 /** The msgids of the corrections of mine to the line `id`, in the order the conversation holds them: a correction is a line of
- * its own, which a REDACT of its line does not take, and Ergo lets an author delete its own lines alone. */
+ * its own, which a REDACT of its line does not take, and Ergo lets an author delete its own lines alone. Only the
+ * lines the store holds are looked through: a correction it never heard is not named (R2's ceiling). */
 function correctionsOf(lines: readonly Line[], me: string | undefined, id: string): string[] {
   return lines
     .filter((line) => line.edits === id && line.account === me && isCommandMsgid(line.id))
@@ -85,15 +86,15 @@ export function speakIn(
   return line !== undefined && out(o, `${tagged}${line}`);
 }
 
-/** A REDACT of a line of a room the page is in (`inside`), and one for each correction of mine to it, which the line's
- * does not take: a deleted line would stay as its newest correction, for every reader. Whether the line's went. */
+/** A REDACT of each correction of mine to a line of a room the page is in (`inside`), which the line's does not take: a
+ * deleted line would stay as its newest correction, for every reader; then the line's, last, so a REDACT of it that is
+ * refused never leaves the words it was corrected from showing alone (the red pass's R1). Whether the line's went. */
 export function redactFrom(o: DmOut, to: { room: string; id: string; inside: boolean }): boolean {
   const { room, id } = to;
   if (o.key === "guest" || !to.inside || !isCommandMsgid(id)) return false;
-  const went = out(o, `REDACT ${room} ${id}`);
   const held = o.store.getState().chat.rooms[room]?.lines ?? [];
-  if (went) for (const edit of correctionsOf(held, o.ergo?.nick(), id)) out(o, `REDACT ${room} ${edit}`);
-  return went;
+  for (const edit of correctionsOf(held, o.ergo?.nick(), id)) out(o, `REDACT ${room} ${edit}`);
+  return out(o, `REDACT ${room} ${id}`);
 }
 
 /** A reaction to a line of the conversation, or its take-back. Whether it went. */
