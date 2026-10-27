@@ -51,10 +51,9 @@ export const roomHint = (composed: Composed, groups: boolean): string | undefine
       : ROOM_SILENT
     : undefined;
 
-// What the field says: what `said` has to; else in a room the hint for @room, else that the room sees the typing; a
-// direct message (`groups` none) tells no typing (4e).
-function fieldSays(says: ReturnType<typeof said>, composed: Composed, groups: boolean | undefined) {
-  if (says.error !== undefined || says.help !== undefined || groups === undefined) return says;
+// What the field says in a room: what `said` has to; else the hint for @room, else that the room sees the typing.
+function fieldSays(says: ReturnType<typeof said>, composed: Composed, groups: boolean) {
+  if (says.error !== undefined || says.help !== undefined) return says;
   return { help: roomHint(composed, groups) ?? TELLS };
 }
 
@@ -177,7 +176,8 @@ export function Composer(props: ComposerProps) {
   const people = mentioning ? peopleOf(members, nick) : [];
   const completion = completions(draft, { commands: COMMANDS, rooms, people, group: to === undefined });
   const says = said(composed, failed, completion);
-  const shown = fieldSays(says, composed, to === undefined ? (props.groups ?? false) : undefined);
+  // A direct message tells no typing (4e).
+  const shown = to === undefined ? fieldSays(says, composed, props.groups ?? false) : says;
   // The selection an edit leaves is put back in the box once it shows the new draft.
   const { box, keep } = useSelection(formRef, draft);
   useFocusAtStart(formRef, props.focus);
