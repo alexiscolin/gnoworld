@@ -371,6 +371,7 @@ describe("the store's chat slice: a direct message's reactions and deletes", () 
   const ME = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
   const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
   const CAROL = "g1pery0j3xzn6wm5m3w8sxkmyafmnd6cle4s3er";
+  const BOB = toAddress(new Uint8Array(20).fill(200));
   const store = () => {
     const made = createAppStore();
     made.getState().chatActions.connected(ME);
@@ -449,11 +450,12 @@ describe("the store's chat slice: a direct message's reactions and deletes", () 
     const { heard } = t.getState().dmActions;
     heard(say("m1", { from: ALICE, to: ME }));
     heard(say("m2", { from: ME, to: ALICE }, { text: "mine", second: 1 }));
+    heard(react("r1", { from: ALICE, to: ME }));
     heard(react("r2", { from: ME, to: ALICE }, "+draft/react=❤️"));
     heard(redact("x1", { from: ALICE, to: ME }, "m2"));
     heard(redact("x2", { from: ALICE, to: ME }, "r2"));
     expect(t.getState().dms[ALICE]?.map(({ id }) => id)).toEqual(["m1", "m2"]);
-    expect(t.getState().dmReactions[ALICE]?.map(({ id }) => id)).toEqual(["r2"]);
+    expect(t.getState().dmReactions[ALICE]?.map(({ id }) => id)).toEqual(["r1", "r2"]);
   });
 
   it("keeps the partner's line at a REDACT of mine naming it, as at one of its own", () => {
@@ -522,6 +524,20 @@ describe("the store's chat slice: a direct message's reactions and deletes", () 
       heard(say(`s${String(n)}`, { from: toAddress(new Uint8Array(20).fill(n + 1)), to: ME }));
     expect(t.getState().dms[ALICE]).toBeUndefined();
     expect(t.getState().dmReactions[ALICE]).toBeUndefined();
+  });
+
+  it("keeps the reactions of the conversations still held when another goes past the bound", () => {
+    const t = store();
+    const { heard } = t.getState().dmActions;
+    heard(say("a", { from: ALICE, to: ME }));
+    heard(react("r1", { from: ALICE, to: ME }));
+    heard(say("c", { from: BOB, to: ME }));
+    heard(react("r2", { from: BOB, to: ME }));
+    for (let n = 0; n < DMS_KEPT - 1; n += 1)
+      heard(say(`s${String(n)}`, { from: toAddress(new Uint8Array(20).fill(n + 1)), to: ME }));
+    expect(t.getState().dms[ALICE]).toBeUndefined();
+    expect(Object.keys(t.getState().dmReactions)).toEqual([BOB]);
+    expect(t.getState().dmReactions[BOB]?.map(({ id }) => id)).toEqual(["r2"]);
   });
 
   it("keeps a refused delete or reaction by partner until dismissed, and forgets them at a new session", () => {
