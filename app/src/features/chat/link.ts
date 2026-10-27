@@ -11,6 +11,7 @@ import type { AppState } from "../../store/index.ts";
 import { asksAfterJoin, followed, groupsOf, outOf } from "./groups.ts";
 import type { ChatLink, LinkDeps } from "./linkTypes.ts";
 import { outbox, type Outbox } from "./outbox.ts";
+import { beginSession, heardBy } from "./session.ts";
 import { Places, TypingOut } from "./telling.ts";
 
 /** The rooms a connection joins: Ergo's max-channels-per-client (deploy/ergo/ircd.yaml.tmpl). */
@@ -138,14 +139,14 @@ class Link implements ChatLink {
     const known = this.#key !== undefined;
     // Noted first: the store's change below calls this again, which must find the session the same.
     this.#key = key;
-    const { store, device, ticket, guest } = this.#deps;
+    const { store, ticket, guest } = this.#deps;
     if (known) {
       this.#listed = [];
       this.#shown = undefined;
       this.#places.forget();
       store.getState().chatActions.follow([]);
     }
-    store.getState().dmActions.begin(session.kind === "in" ? device?.(session.address) : undefined);
+    beginSession(this.#deps, session);
     this.#end();
     this.#open(session.kind === "out" ? { guest } : { account: session.address, ticket });
   }
@@ -234,9 +235,7 @@ class Link implements ChatLink {
 
   // Ergo's JOIN of me, not replayed: I am in that room, its lines asked, its place told; a line taking me out: out of it.
   #heard(message: IrcMessage): void {
-    const { chatActions, dmActions } = this.#deps.store.getState();
-    chatActions.heard(message);
-    dmActions.heard(message);
+    heardBy(this.#deps.store, message);
     // A labeled-response batch's lines carry no label: the batch's own line does, read at its end (#line).
     this.#outbox.answered(message.tags, [message]);
     const { tags, source = "", command, params } = message;

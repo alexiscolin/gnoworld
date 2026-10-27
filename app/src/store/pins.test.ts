@@ -1,3 +1,4 @@
+import { parseLine } from "@gnoworld/core";
 import { Address, type PinList } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
 import { createAppStore } from "./index.ts";
@@ -116,5 +117,22 @@ describe("the pins slice", () => {
     for (let n = 0; n <= 500; n += 1) redacted("#bubble", `m${String(n)}`);
     set(list("#bubble", ["m0", "m1", "m500"]));
     expect(store.getState().pins["#bubble"]?.pins.map(({ id }) => id)).toEqual(["m0"]);
+  });
+
+  // Ergo's REDACT as the link hands it on: a room and a line's id, a reason after them or none.
+  it("takes Ergo's REDACT of a line as a line taken from its room, and no other line of Ergo's", () => {
+    const store = createAppStore();
+    const { set, heard } = store.getState().pinsActions;
+    const line = (text: string) => {
+      const parsed = parseLine(text);
+      if (!parsed.ok) throw new Error(`the test's line does not parse: ${text}`);
+      return parsed.message;
+    };
+    set(list("#bubble", ["m1", "m2", "m3"]));
+    heard(line(`:${ALICE}!u@h REDACT #bubble m1 :spam`));
+    heard(line(`:${ALICE}!u@h REDACT #bubble m2`));
+    heard(line(`:${ALICE}!u@h REDACT #bubble`));
+    heard(line(`:${ALICE}!u@h PRIVMSG #bubble :REDACT #bubble m3`));
+    expect(store.getState().pins["#bubble"]?.pins.map(({ id }) => id)).toEqual(["m3"]);
   });
 });

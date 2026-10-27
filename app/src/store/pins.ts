@@ -1,5 +1,6 @@
 // The pins' slice of the store (slice 4's 4d): each room's pins and whether the reader may pin there, as the server
 // answers (GET /api/pins). A slice of its own, beside the verdicts': they come from the server, not from Ergo's lines.
+import type { IrcMessage } from "@gnoworld/core";
 import { RoomId, type PinList } from "@gnoworld/schemas";
 import type { StateCreator } from "zustand/vanilla";
 
@@ -21,6 +22,8 @@ export interface PinsSlice {
     forget: () => void;
     /** A line taken from a room (Ergo's REDACT): its pin goes, and no answer brings it back. */
     redacted: (room: string, id: string) => void;
+    /** One live line from Ergo: a REDACT is a line taken from its room; any other changes nothing. */
+    heard: (message: IrcMessage) => void;
   };
 }
 
@@ -32,6 +35,14 @@ const same = (a: Held[string] | undefined, b: Held[string]): boolean =>
 export const pinsSlice: StateCreator<PinsSlice> = (set, get) => {
   // The ids taken from rooms, the oldest forgotten first.
   const gone = new Set<string>();
+  const redacted = (room: string, id: string): void => {
+    gone.add(`${room} ${id}`);
+    for (const old of [...gone].slice(0, -GONE_KEPT)) gone.delete(old);
+    const { pins } = get();
+    const held = Object.hasOwn(pins, room) ? pins[room] : undefined;
+    if (held?.pins.some((pin) => pin.id === id) !== true) return;
+    set({ pins: { ...pins, [room]: { ...held, pins: held.pins.filter((pin) => pin.id !== id) } } });
+  };
   return {
     pins: {},
     pinsActions: {
@@ -47,13 +58,9 @@ export const pinsSlice: StateCreator<PinsSlice> = (set, get) => {
       forget: () => {
         if (Object.keys(get().pins).length > 0) set({ pins: {} });
       },
-      redacted: (room, id) => {
-        gone.add(`${room} ${id}`);
-        for (const old of [...gone].slice(0, -GONE_KEPT)) gone.delete(old);
-        const { pins } = get();
-        const held = Object.hasOwn(pins, room) ? pins[room] : undefined;
-        if (held?.pins.some((pin) => pin.id === id) !== true) return;
-        set({ pins: { ...pins, [room]: { ...held, pins: held.pins.filter((pin) => pin.id !== id) } } });
+      redacted,
+      heard: ({ command, params: [room = "", id = ""] }) => {
+        if (command === "REDACT" && id !== "") redacted(room, id);
       },
     },
   };
