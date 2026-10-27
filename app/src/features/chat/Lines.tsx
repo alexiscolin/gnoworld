@@ -162,10 +162,7 @@ export function Lines(props: LinesProps) {
   // What a plain client answers or reacts to by a folded edit's own msgid reaches the line it corrects (CR5).
   const folded = editsFolded(props.lines);
   const lineOf = (id: string) => folded.get(id) ?? id;
-  const shown = reactionsOn(
-    (reactions ?? []).map((reaction) => ({ ...reaction, to: lineOf(reaction.to) })),
-    me,
-  );
+  const shown = reactionsOn(reactions ?? [], me, lineOf);
   // A reply's line by its msgid, this room's alone: a reply naming its own msgid or another room's answers none here.
   const byId = new Map(lines.map((line) => [line.id, line]));
   // Who a mention may shorten (F812): the members, and the authors in view by their account tag, who proved their

@@ -115,23 +115,30 @@ export function addReactions(
 export const redactReactions = (held: readonly Reaction[], message: IrcMessage, room: string): readonly Reaction[] =>
   redactAfter(held, message, room);
 
+// One more account with `emoji` on a line, the emoji mine once any of them is.
+function tally(line: Map<string, Shown>, emoji: string, mine: boolean): void {
+  const was = line.get(emoji);
+  line.set(emoji, { emoji, count: (was?.count ?? 0) + 1, mine: (was?.mine ?? false) || mine });
+}
+
 /** What each line shows, by its msgid: each emoji added and not taken back, counted once an account, mine said; the
  * most reacted first, then in the order first reacted (the security review's S4: one account's lone emoji put no
- * shared one out of sight). */
+ * shared one out of sight). `lineOf` names the line a reaction's msgid belongs to, a folded edit's own to its line. */
 export function reactionsOn(
   reactions: readonly Reaction[],
   me: string | undefined,
+  lineOf: (id: string) => string = (id) => id,
 ): ReadonlyMap<string, readonly Shown[]> {
   const lines = new Map<string, Map<string, Shown>>();
   // Once an account on a line with an emoji, whichever msgid of the line it named (a folded edit's, CR5).
   const counted = new Set<string>();
-  for (const { to, emoji, who, on } of reactions) {
+  for (const { to: named, emoji, who, on } of reactions) {
+    const to = lineOf(named);
     const key = `${to}\n${emoji}\n${who}`;
     if (!on || counted.has(key)) continue;
     counted.add(key);
     const line = lines.get(to) ?? new Map<string, Shown>();
-    const was = line.get(emoji);
-    line.set(emoji, { emoji, count: (was?.count ?? 0) + 1, mine: (was?.mine ?? false) || who === me });
+    tally(line, emoji, who === me);
     lines.set(to, line);
   }
   return new Map(

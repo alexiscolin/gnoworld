@@ -320,6 +320,15 @@ describe("reactionsOn: what each line shows of its reactions", () => {
     ]);
   });
 
+  // F1185 (the simplify pass's E1): each reaction's line is what `lineOf` says of its msgid, the app handing its folded
+  // edits' own, in the loop that counts: no copy of the reactions first.
+  test("reads each reaction's line through lineOf, a folded edit's msgid counted on its line, once an account", () => {
+    const lineOf = (id: string) => (id === "e1" ? "m1" : id);
+    const shown = reactionsOn([on("m1", "👍", ALICE), on("e1", "👍", ALICE), on("e1", "👍", ME)], ME, lineOf);
+    expect(shown.get("m1")).toEqual([{ emoji: "👍", count: 2, mine: true }]);
+    expect(shown.has("e1")).toBe(false);
+  });
+
   // The green pass (G1): mine whoever reacted after me with it.
   test("keeps an emoji mine when another account reacts with it after me", () => {
     expect(reactionsOn([on("m1", "👍", ME), on("m1", "👍", ALICE)], ME).get("m1")).toEqual([
