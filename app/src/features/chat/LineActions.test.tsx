@@ -27,7 +27,11 @@ const draw = (over: Partial<Parameters<typeof LineActions>[0]> = {}) =>
       {...over}
     />,
   );
-const items = (markup: string) => [...markup.matchAll(/role="menuitem"[^>]*>([^<]+)</g)].map((found) => found[1]);
+// The items of the More menu, which comes last: the bar's React menu, when narrow, holds items of its own (U1).
+const items = (markup: string) =>
+  [...markup.slice(markup.indexOf('aria-label="More"')).matchAll(/role="menuitem"[^>]*>([^<]+)</g)].map(
+    (found) => found[1],
+  );
 // An element's opening tag holding each of these attributes, in any order.
 const tagWith = (tag: string, ...attributes: string[]) =>
   new RegExp(
