@@ -5,6 +5,7 @@
 import {
   foldEdits,
   reactionsOn,
+  threadsOf,
   type Line,
   type Reacting,
   type Reaction,
@@ -18,6 +19,7 @@ import { LineActions } from "./LineActions.tsx";
 import { useCopy, useRemoval } from "./lineFlash.ts";
 import { useLineFocus } from "./lineFocus.ts";
 import { LineView } from "./LineView.tsx";
+import { mentionable } from "./names.ts";
 import { useNewMark, useReadAtEnd } from "./reading.ts";
 import { chipsOf } from "./Reactions.tsx";
 import shared from "./lists.module.css";
@@ -82,6 +84,8 @@ export interface LinesProps {
   cannotReact?: true | undefined;
   /** Makes a line, by its msgid, the one the composer's next answers (4d). */
   onReply?: ((id: string) => void) | undefined;
+  /** Opens the thread a line roots, by its msgid (4d's threads); none: no chip, no menu item. */
+  onThread?: ((id: string) => void) | undefined;
   /** The time of the last line the account read here, Ergo's (4f); none while unknown. */
   read?: string | undefined;
   /** The room's history page came: the New mark waits on it, as a live line may come before it (4f's G1). */
@@ -111,6 +115,12 @@ type ListProps = Omit<LinesProps, "lines"> & {
   lines: readonly ShownLine[];
   shown: ReadonlyMap<string, readonly Shown[]>;
   lineOf: (id: string) => string;
+  /** A reply's line by its msgid, this room's alone: a reply naming its own msgid or another room's answers none here. */
+  byId: ReadonlyMap<string, Line>;
+  /** Each line's reactions as chipsOf writes them, by msgid. */
+  chips: ReadonlyMap<string, string>;
+  /** How many replies each root's thread holds, by msgid (4d's threads). */
+  replies: ReadonlyMap<string, number>;
 };
 
 /** The room's flash, then its lines, oldest first, as a list a screen reader hears grow. */
@@ -122,26 +132,39 @@ export function Lines(props: LinesProps) {
   // What a plain client answers or reacts to by a folded edit's own msgid reaches the line it corrects (CR5).
   const lineOf = (id: string) => folded.get(id) ?? id;
   const shown = reactionsOn(props.reactions ?? [], props.me, lineOf);
-  return <List {...props} lines={lines} shown={shown} lineOf={lineOf} />;
+  // The threads of the lines as shown: a reply that names a folded edit's msgid answers the line it corrects.
+  const { repliesOf } = threadsOf(lines, lineOf);
+  const replies = new Map([...repliesOf].map(([root, each]) => [root, each.length]));
+  // A direct message's lines root no thread.
+  const onThread = props.room === undefined ? undefined : props.onThread;
+  const byId = new Map(lines.map((line) => [line.id, line]));
+  // Each line's chips as a string a line compares by value (F1222).
+  const chips = new Map([...shown].map(([id, each]) => [id, chipsOf(each)]));
+  return (
+    <List
+      {...props}
+      byId={byId}
+      chips={chips}
+      onThread={onThread}
+      lines={lines}
+      shown={shown}
+      lineOf={lineOf}
+      replies={replies}
+    />
+  );
 }
 
 function List(props: ListProps) {
   const { room, members, me, refused, connected, reactions, cannotReact, lines, shown, lineOf } = props;
   const { onDelete = NO_DELETE, onDismiss = NO_DISMISS, onReact = NO_REACT, onReply = NO_REPLY } = props;
-  const { read, paged = false, onRead, verdicts, saving = false } = props;
+  const { read, paged = false, onRead, verdicts, saving = false, byId, chips, replies, onThread } = props;
   const fresh = useNewMark(lines, paged ? read : undefined, me);
   const { listRef, atEndRef, onScroll } = useNewestInView(lines, fresh, reactions);
   const look = useReadAtEnd(lines, atEndRef, paged ? onRead : undefined);
   const { stop, mounted, on, leave } = useLineFocus(lines, listRef, fresh);
   const { said, setSaid, copy } = useCopy();
   const [deleting, remove] = useRemoval({ lines, refused, connected, onDelete, leave, setSaid });
-  // Each line's chips as a string a line compares by value (F1222).
-  const chips = new Map([...shown].map(([id, each]) => [id, chipsOf(each)]));
-  // A reply's line by its msgid, this room's alone: a reply naming its own msgid or another room's answers none here.
-  const byId = new Map(lines.map((line) => [line.id, line]));
-  // Who a mention may shorten (F812): the members, and the authors in view by their account tag, who proved their
-  // key as a member did (F819).
-  const known = new Set([...members, ...lines.flatMap(({ account }) => (account === undefined ? [] : [account]))]);
+  const known = mentionable(members, lines);
   // A reaction that could not go out says so at once; one Ergo refuses, when it answers (cannotReact).
   const react = (reaction: Reacting) => {
     const went = onReact(reaction);
@@ -165,6 +188,7 @@ function List(props: ListProps) {
       onReply={() => {
         onReply(line.id);
       }}
+      onThread={onThread}
     />
   );
   return (
@@ -204,6 +228,8 @@ function List(props: ListProps) {
             chips={chips.get(line.id)}
             react={me === undefined || !shown.has(line.id) ? undefined : react}
             answers={line.reply === line.id ? undefined : byId.get(lineOf(line.reply ?? ""))}
+            replies={replies.get(line.id)}
+            onThread={onThread}
           />
         ))}
       </ol>

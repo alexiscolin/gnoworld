@@ -1,6 +1,18 @@
 /* A room: its description and the link's state muted, its lines wrapping anywhere, an /me, a notice, a quote and a
    line that mentions the reader apart. */
 @layer components {
+  /* The room's width, which the thread's panel reads: under it the panel takes the whole width (4d's threads). */
+  .room {
+    container-type: inline-size;
+  }
+
+  /* raw: the width under which a room's lines and a thread's panel do not fit side by side, as a phone's is */
+  @container (inline-size < 40rem) {
+    .main[data-threaded] {
+      display: none;
+    }
+  }
+
   .topic {
     color: var(--color-text-muted);
   }

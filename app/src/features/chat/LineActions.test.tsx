@@ -170,3 +170,41 @@ describe("a line's actions: Reply", () => {
     expect(names(draw({ me: undefined }))).not.toContain("Reply");
   });
 });
+
+// 4d's threads (docs/decisions.md, 2026-10-27, R9): a line's thread opens from an item of its More menu, not a fourth
+// control on the bar, whose phone width holds three on one row (F1170's U1); a page that opens no thread gives no item.
+describe("a line's actions: Open thread", () => {
+  const controls = (markup: string) =>
+    [...markup.matchAll(/<button(?![^>]*role="menuitem")[^>]*\saria-label="([^"]+)"/g)].map((found) => found[1]);
+
+  it("offer Open thread in the More menu, after the copies, when the page opens a thread", () => {
+    expect(items(draw({ onThread: () => undefined }))).toEqual(["Copy text", "Copy room link", "Open thread"]);
+  });
+
+  it("offer Open thread to a guest too: a guest reads a thread", () => {
+    expect(items(draw({ me: undefined, onThread: () => undefined }))).toEqual([
+      "Copy text",
+      "Copy room link",
+      "Open thread",
+    ]);
+  });
+
+  it("offer it before Delete on the reader's own line, Delete still last and apart", () => {
+    expect(items(draw({ me: ALICE, onThread: () => undefined }))).toEqual([
+      "Copy text",
+      "Copy room link",
+      "Open thread",
+      "Delete",
+    ]);
+  });
+
+  it("offer none where the page opens no thread", () => {
+    expect(items(draw())).not.toContain("Open thread");
+  });
+
+  it("add no control to the bar: its buttons are the same with and without it", () => {
+    expect(controls(draw({ onThread: () => undefined }))).toEqual(controls(draw()));
+    expect(controls(draw({ me: undefined, onThread: () => undefined }))).toEqual(["More actions"]);
+    expect(controls(draw({ onThread: () => undefined })).slice(-2)).toEqual(["Reply", "More actions"]);
+  });
+});

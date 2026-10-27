@@ -1,5 +1,5 @@
 // How the chat names a room and an address, and which room a world's page shows.
-import { markdown, mentions } from "@gnoworld/core";
+import { markdown, mentions, type Line } from "@gnoworld/core";
 import { Address, type RoomList } from "@gnoworld/schemas";
 import type { AppState } from "../../store/index.ts";
 
@@ -76,3 +76,8 @@ export function roomsQuery(world: string, session: AppState["login"]["session"],
   if (session.kind === "unknown") return undefined;
   return `${world}|${session.kind === "in" ? session.address : "guest"}|${String(attempt)}`;
 }
+
+/** Whom a mention may shorten (F812): the members, and the authors in view by their account tag, who proved their key as
+ * a member did (F819). */
+export const mentionable = (members: readonly string[], lines: readonly Line[]): Set<string> =>
+  new Set([...members, ...lines.flatMap(({ account }) => (account === undefined ? [] : [account]))]);

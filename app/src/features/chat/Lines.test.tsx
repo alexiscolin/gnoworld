@@ -1,13 +1,15 @@
 // The lines view as the build compiles it, counting what a render recomputes (the complexity review of 4d's
 // reactions): a room at its window, 200 lines each answering the one before, one edit folded, 1,000 reactions.
 import type * as core from "@gnoworld/core";
-import { excerpt, foldEdits, reactionsOn, type Line, type Reaction } from "@gnoworld/core";
+import { excerpt, foldEdits, reactionsOn, threadsOf, type Line, type Reaction } from "@gnoworld/core";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Lines, type LinesProps } from "./Lines.tsx";
 import { Reactions } from "./Reactions.tsx";
 import type * as reactionsModule from "./Reactions.tsx";
+import { ThreadChip } from "./ThreadChip.tsx";
+import type * as threadChipModule from "./ThreadChip.tsx";
 
 vi.mock("@gnoworld/core", async (importOriginal) => {
   const real = await importOriginal<typeof core>();
@@ -16,7 +18,12 @@ vi.mock("@gnoworld/core", async (importOriginal) => {
     excerpt: vi.fn(real.excerpt),
     foldEdits: vi.fn(real.foldEdits),
     reactionsOn: vi.fn(real.reactionsOn),
+    threadsOf: vi.fn(real.threadsOf),
   };
+});
+vi.mock("./ThreadChip.tsx", async (importOriginal) => {
+  const real = await importOriginal<typeof threadChipModule>();
+  return { ...real, ThreadChip: vi.fn(real.ThreadChip) };
 });
 vi.mock("./Reactions.tsx", async (importOriginal) => {
   const real = await importOriginal<typeof reactionsModule>();
@@ -171,5 +178,53 @@ describe("the lines view, compiled", () => {
     vi.clearAllMocks();
     draw({ lines: [...ROOM, line(LINES + 1, { reply: `m${String(LINES - 1)}` })] });
     expect(vi.mocked(Reactions)).not.toHaveBeenCalled();
+  });
+});
+
+// 4d's threads (R11): the root of this room's chain carries a 199-reply chip, so a chip that is a new object each
+// render, or a thread read once a line, would draw the 200 lines again for each live line.
+describe("the lines view, compiled: threads' chips", () => {
+  const asked = { onThread: () => undefined };
+  const reply = (n: number, to: number) => line(n, { reply: `m${String(to)}` });
+
+  it("draws the chain's one chip, on its root, the thread read once", () => {
+    draw(asked);
+    expect(vi.mocked(threadsOf)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(ThreadChip)).toHaveBeenCalledTimes(1);
+    const chips = [...host.querySelectorAll("button")].filter((button) => /\d+ repl/.test(button.textContent));
+    expect(chips).toHaveLength(1);
+    expect(host.querySelectorAll("ol > li")[0]?.textContent).toContain("199 replies");
+  });
+
+  it("reads the threads once for a line that comes, and draws no chip again for a line that answers none", () => {
+    draw(asked);
+    vi.clearAllMocks();
+    draw({ ...asked, lines: [...ROOM, line(LINES + 1, { text: "no one's reply" })] });
+    expect(vi.mocked(threadsOf)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(ThreadChip)).not.toHaveBeenCalled();
+  });
+
+  it("draws again the root's chip alone for a reply that comes", () => {
+    draw(asked);
+    vi.clearAllMocks();
+    draw({ ...asked, lines: [...ROOM, reply(LINES + 1, 150)] });
+    expect(vi.mocked(threadsOf)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(ThreadChip)).toHaveBeenCalledTimes(1);
+    expect(host.querySelectorAll("ol > li")[0]?.textContent).toContain("200 replies");
+  });
+
+  it("reads and draws no thread again when the pointer moves over lines", () => {
+    draw(asked);
+    vi.clearAllMocks();
+    point(5);
+    point(9);
+    expect([vi.mocked(threadsOf).mock.calls.length, vi.mocked(ThreadChip).mock.calls.length]).toEqual([0, 0]);
+  });
+
+  it("draws again no line when a member comes", () => {
+    draw(asked);
+    vi.clearAllMocks();
+    draw({ ...asked, members: [ALICE, BOB, "guest-ab12cd"] });
+    expect(vi.mocked(ThreadChip)).not.toHaveBeenCalled();
   });
 });

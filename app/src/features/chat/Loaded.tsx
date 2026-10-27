@@ -13,6 +13,7 @@ import { roomActs, type RoomActs } from "./roomActs.ts";
 import { RoomsView } from "./RoomsView.tsx";
 import { People, RoomView, type RoomViewProps } from "./RoomView.tsx";
 import { shownOf, type Shown } from "./shown.tsx";
+import { useThreads } from "./Threading.tsx";
 import { Writer } from "./Writer.tsx";
 
 // Alt+Up and Alt+Down: the room before or after the one in view, anywhere on the page (ADR-0002's chat rows). A key
@@ -160,6 +161,7 @@ export function Loaded({
   );
   const shown = shownOf(dms, { id: room, state, acts }, { sayTo, focus: opened.focus, noteId });
   const replies = useReplies(shown, state?.lines, acts);
+  const threads = useThreads({ shown, state, session, rooms: ids, acts, people });
   return (
     <Sidebar space="l">
       <RoomsView sections={sections} current={room} dms={dms.nav} failed={failed} />
@@ -170,11 +172,12 @@ export function Loaded({
           {...shown.view}
           verdicts={verdicts}
           saving={saving}
-          aside={shown.kind === "room" ? people : undefined}
+          aside={threads.aside}
           chat={chat}
           me={me}
           noteId={noteId}
           {...replies.view}
+          {...threads.view}
           composer={<Writer session={session} rooms={ids} {...shown.writer} {...replies.writer} />}
         />
       )}
