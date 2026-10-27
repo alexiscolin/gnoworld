@@ -23,6 +23,8 @@ export interface NoticeSlice {
   noticeActions: {
     /** A notice, once: the same line twice, or more than NOTICES_KEPT, changes nothing of what was held but its oldest. */
     add: (notice: Notice) => void;
+    /** A page's notices, as `add` takes each, in one change. */
+    addAll: (notices: readonly Notice[]) => void;
     /** The notice of a line that is gone (deleted, hidden). */
     drop: (id: string) => void;
     /** The account is out of the room: its notices go. */
@@ -112,6 +114,21 @@ export const noticeSlice: StateCreator<State, [], [], NoticeSlice> = (set, get) 
   // The session's device, and whether it could be read: never written over one that could not (like the DMs').
   let device: NoticePrefs | undefined;
   let writable = false;
+  const add = (fresh: readonly Notice[]) => {
+    const list = [...get().notices];
+    let changed = false;
+    for (const notice of fresh) {
+      if (list.some(({ id }) => id === notice.id)) continue;
+      changed = true;
+      list.push(notice);
+      if (list.length > NOTICES_KEPT) {
+        // A notice no one counts goes first, else the oldest.
+        const gone = list.findIndex((each) => !unseen(get(), each));
+        list.splice(gone === -1 ? 0 : gone, 1);
+      }
+    }
+    if (changed) set({ notices: list });
+  };
   return {
     notices: [],
     noticeSeen: {},
@@ -119,16 +136,9 @@ export const noticeSlice: StateCreator<State, [], [], NoticeSlice> = (set, get) 
     noticeNotKept: false,
     noticeActions: {
       add: (notice) => {
-        const { notices } = get();
-        if (notices.some(({ id }) => id === notice.id)) return;
-        const list = [...notices, notice];
-        if (list.length > NOTICES_KEPT) {
-          // A notice no one counts goes first, else the oldest.
-          const gone = list.findIndex((each) => !unseen(get(), each));
-          list.splice(gone === -1 ? 0 : gone, 1);
-        }
-        set({ notices: list });
+        add([notice]);
       },
+      addAll: add,
       drop: (id) => {
         const { notices } = get();
         if (notices.some((notice) => notice.id === id)) set({ notices: notices.filter((notice) => notice.id !== id) });

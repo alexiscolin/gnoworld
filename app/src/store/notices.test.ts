@@ -65,6 +65,23 @@ describe("the store's notices slice", () => {
       expect(ids(t.state().notices)).toEqual(["a", "b"]);
     });
 
+    // F1534: a history page of up to 200 lines made a notification for each notice.
+    it("adds a list at once: one notification, each notice once, the same cap as one at a time", () => {
+      const t = setup();
+      t.notices.add(notice({ id: "a" }));
+      const heard = t.heard();
+      t.notices.addAll([notice({ id: "a" }), notice({ id: "b", time: T(6) }), notice({ id: "c", time: T(7) })]);
+      expect(heard()).toBe(1);
+      expect(ids(t.state().notices)).toEqual(["a", "b", "c"]);
+      t.notices.addAll([notice({ id: "b" }), notice({ id: "c" })]);
+      t.notices.addAll([]);
+      expect(heard()).toBe(1);
+      const many = Array.from({ length: NOTICES_KEPT + 1 }, (_, at) => notice({ id: `n${String(at)}` }));
+      t.notices.addAll(many);
+      expect(t.state().notices).toHaveLength(NOTICES_KEPT);
+      expect(t.state().notices.at(-1)?.id).toBe(`n${String(NOTICES_KEPT)}`);
+    });
+
     it("keeps the newest NOTICES_KEPT, the oldest going first", () => {
       const t = setup();
       for (let at = 0; at <= NOTICES_KEPT; at += 1) t.notices.add(notice({ id: `n${String(at)}` }));

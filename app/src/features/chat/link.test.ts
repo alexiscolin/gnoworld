@@ -2065,6 +2065,25 @@ describe("the chat's link: notices", () => {
       expect(kinds(t)).toEqual([["h3", "mention", GAMES]]);
     });
 
+    // F1534: each notice of a page set the store on its own, a notification for each of up to 200 lines.
+    it("hands the notices of a page to the store in one change", () => {
+      const t = member();
+      t.fake.line(`:ergo MARKREAD ${GAMES} timestamp=${T(0)}`);
+      let changes = 0;
+      let held = t.store.getState().notices;
+      t.store.subscribe((state) => {
+        if (state.notices !== held) changes += 1;
+        held = state.notices;
+      });
+      page(t.fake, [
+        ["h1", 1, `@${ADDRESS}`],
+        ["h2", 2, `@${ADDRESS}`],
+        ["h3", 3, `@${ADDRESS}`],
+      ]);
+      expect(t.notices()).toHaveLength(3);
+      expect(changes).toBe(1);
+    });
+
     it("makes none while Ergo gave no reading place, none being a place from which every line is unread", () => {
       const t = member();
       page(t.fake, [["h1", 1, `@${ADDRESS}`]]);

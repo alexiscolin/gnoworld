@@ -44,13 +44,15 @@ export class Noticing {
     const state = this.#store.getState();
     const { me } = state.chat;
     const held = Object.hasOwn(state.chat.rooms, room) ? state.chat.rooms[room] : undefined;
-    if (!this.#account() || me === undefined || held?.read === undefined) return;
+    const read = held?.read;
+    if (!this.#account() || me === undefined || held === undefined || read === undefined) return;
     const at = { me, mode: modeOf(state, room), held: held.lines, groups: this.groups.has(room) };
-    for (const message of messages) {
+    const made = messages.flatMap((message) => {
       const line = lineOf(message, room);
-      const notice = line === undefined || line.time <= held.read ? undefined : roomNotice(line, room, at);
-      if (notice !== undefined) state.noticeActions.add(notice);
-    }
+      const notice = line === undefined || line.time <= read ? undefined : roomNotice(line, room, at);
+      return notice === undefined ? [] : [notice];
+    });
+    state.noticeActions.addAll(made);
   }
 
   // Ergo's reading place for a conversation, from another device: `MARKREAD <partner> timestamp=…` sees it up to there.
