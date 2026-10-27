@@ -303,7 +303,10 @@ try:
             held.close()  # the file server takes the port it found free
             pictures = lambda of, **env: run(["node", "app/node_modules/@playwright/test/cli.js", "test", "-c", "app/playwright.stories.config.ts",
                                               "--reporter=dot", "pictures"], cwd=tree, env={"PICTURES_OF": of, "STORIES_PORT": port, **env})
-            built = os.path.join(tree, "built-elsewhere")  # where the fast gate has Storybook built: out of the tree its checks read
+            # Where the fast gate has Storybook built: check.sh's run folder, `check.XXXXXX`, under the temporary folder, whose
+            # `storybook` it takes: out of the tree its checks read.
+            run_folder = tempfile.TemporaryDirectory(prefix="check.")
+            built = os.path.join(run_folder.name, "storybook")
             out = pictures("tokens--", STORIES_OUT=built)
             expect(out.returncode == 0 and "3 passed" in out.stdout, "the tokens story's pictures pass on an untouched tree")
             expect(os.path.exists(f"{built}/index.json") and not os.path.exists(os.path.join(tree, "packages/ui/storybook-static")),
@@ -322,7 +325,15 @@ try:
                                      ("a folder out of the temporary one by `..`", f"{fake}/../escaped", fake),
                                      ("a relative folder, which would sit inside it", "storybook-out", os.path.realpath(tree)),
                                      ("a folder out of the temporary one", "/elsewhere/storybook", fake),
-                                     ("a folder with a space", f"{fake}/a b", fake), ("a folder with a shell character", f"{fake}/x;true", fake)):
+                                     ("a folder with a space", f"{fake}/a b", fake), ("a folder with a shell character", f"{fake}/x;true", fake),
+                                     # Inside the temporary folder, none of them check.sh's own `check.*/storybook` (CR7)
+                                     ("another folder of the temporary one", f"{fake}/other-folder", fake),
+                                     ("the folder of another session", f"{fake}/-Users-someone-Server-gnoworld", fake),
+                                     ("a run folder itself", f"{fake}/check.abc123", fake), ("a folder of a run folder other than storybook", f"{fake}/check.abc123/other", fake),
+                                     ("a storybook folder out of a run folder", f"{fake}/storybook", fake), ("a folder under a run folder's storybook", f"{fake}/check.abc123/storybook/x", fake),
+                                     ("a storybook folder of a folder not a run's", f"{fake}/other/storybook", fake),
+                                     ("a run folder's storybook, deeper in the temporary folder", f"{fake}/other/check.abc123/storybook", fake),
+                                     ("a storybook folder of a folder named check, not check.*", f"{fake}/checkabc123/storybook", fake)):
                 out = pictures("tokens--", STORIES_OUT=where, TMPDIR=tmp)
                 expect(out.returncode != 0 and "STORIES_OUT must be" in out.stdout + out.stderr, f"STORIES_OUT as {what} is refused before Storybook deletes it")
             # The tools missing: never a pass on nothing. No browser where Playwright looks (tokens.css as approved); then,
@@ -338,11 +349,20 @@ try:
                 f.write(text.replace(at, at + "    --color-probe: var(--p-space);\n", 1))
             out = pictures("tokens--")
             expect(out.returncode != 0 and "tokens--all" in out.stdout + out.stderr, "a token added to tokens.css with no new picture fails the tokens story's pictures")
+            # The evidence of a failed run is in a folder of its own, never Playwright's default `app/test-results` that the journeys
+            # (the ts lane, beside the pictures' lane) empty as they start (CR4): beside the run's Storybook build in a gate,
+            # `app/test-results-stories` otherwise.
+            expect(os.path.isdir(os.path.join(tree, "app/test-results-stories")) and not os.path.exists(os.path.join(tree, "app/test-results")),
+                   "the stories' evidence is in app/test-results-stories, not the journeys' app/test-results")
+            out = pictures("tokens--", STORIES_OUT=built)
+            expect(out.returncode != 0 and os.path.isdir(os.path.join(run_folder.name, "stories-results")) and not os.path.exists(os.path.join(tree, "app/test-results")),
+                   "the stories' evidence of a gate's run is in the run's folder, beside its Storybook build")
             with open(css, "w") as f:
                 f.write(text)
             os.remove(os.path.join(tree, "packages/ui/node_modules/.bin/storybook"))
             out = pictures("tokens--")
             expect(out.returncode != 0, "the tokens story's pictures fail with no Storybook to build")
+            run_folder.cleanup()
 
     if part("vitest_ui"):
         # The design system's tests run in jsdom, each on an empty page: none is left out by the

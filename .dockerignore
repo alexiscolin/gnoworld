@@ -14,6 +14,7 @@ app/node_modules
 app/build
 app/.react-router
 app/test-results
+app/test-results-stories
 app/playwright-report
 app/tests
 app/**/*.test.ts

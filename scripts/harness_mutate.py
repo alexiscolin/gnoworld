@@ -178,13 +178,18 @@ def mutants():
     # The tokens story's pictures, which the fast gate compares when tokens.css changes (F1190). The mutants of
     # pictures.spec.ts wait for records.sh to list it (agent-hb/records_pictures.py).
     yield from each("app/playwright.stories.config.ts", "-o ${out} --quiet", "-o ../packages/ui/storybook-static --quiet", "probe", "the stories' Storybook is built where STORIES_OUT says")
+    yield from each("app/playwright.stories.config.ts", '  outputDir: out === DEFAULT_OUT ? "test-results-stories" : resolve(out, "..", "stories-results"),\n', "", "probe", "the stories' evidence has a folder of its own (CR4)")
+    yield from each("app/playwright.stories.config.ts", 'out === DEFAULT_OUT ? "test-results-stories"', 'out === DEFAULT_OUT ? "test-results"', "probe", "the stories' evidence, outside a gate, is not the journeys' folder (CR4)")
+    yield from each("app/playwright.stories.config.ts", 'resolve(out, "..", "stories-results")', '"test-results-stories"', "probe", "the stories' evidence of a gate's run is in the run's folder (CR4)")
     yield from each("app/playwright.stories.config.ts", "if (!Number.isInteger(port) || port < 1024 || port > 65535)", "if (false)", "probe", "the stories' config refuses a port that is no port")
-    # The folder Storybook deletes before it builds (security-S6): the default or a plain absolute folder inside the temporary one.
+    # The folder Storybook deletes before it builds (security-S6, CR7): the default or the storybook folder of a check.* folder
+    # directly inside the temporary one, a plain absolute path.
     for find, replace, label in (
         ("out !== DEFAULT_OUT &&", "false &&", "is checked at all"),
-        ('inTmp === "" ||', "", "is not the temporary folder itself"),
-        ('inTmp === ".." ||', "", "is not the folder above the temporary one"),
-        ("inTmp.startsWith(`..${sep}`)", "false", "is not out of the temporary folder"),
+        ("|| !RUN_FOLDER.test(", "|| false && !RUN_FOLDER.test(", "is a run folder's storybook"),
+        ("/^check\\.\\w+\\/storybook$/", "/check\\.\\w+\\/storybook$/", "is directly inside the temporary folder"),
+        ("/^check\\.\\w+\\/storybook$/", "/^check\\.\\w+\\/storybook/", "is the storybook folder itself"),
+        ("/^check\\.\\w+\\/storybook$/", "/^check\\w+\\/storybook$/", "is in a folder named check.*"),
         ("!/^\\/[", "!/^[", "is absolute"),
         ("[\\w@%+=:,./-]", "[\\w@%+=:,./ -]", "has no space"),
         ("[\\w@%+=:,./-]", "[\\w@%+=:,./;-]", "has no shell character"),

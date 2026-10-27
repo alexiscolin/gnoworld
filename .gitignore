@@ -11,6 +11,7 @@ reports/
 /app/build/
 /app/.react-router/
 /app/test-results/
+/app/test-results-stories/
 /app/playwright-report/
 /packages/ui/storybook-static/
 *.sw[op]
