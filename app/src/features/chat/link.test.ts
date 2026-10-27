@@ -1931,6 +1931,133 @@ describe("the chat's link: replies", () => {
   });
 });
 
+// slice-4-room-edit (docs/decisions.md, 2026-10-28): a correction of a room's line is a PRIVMSG to the room tagged
+// +gnoworld/edit with the msgid of the line it corrects, a msgid a tag carries; the draft composed as any line is.
+describe("the chat's link: a room's edits", () => {
+  const MSGID = "rmq4xvjw9ys5pwtqqjxbqwvhjc";
+  const memberIn = (rooms: readonly string[]) => {
+    const t = setup();
+    t.link.follow(rooms);
+    t.link.show(rooms[0]);
+    t.signedIn(ADDRESS);
+    const fake = t.connected(ADDRESS);
+    fake.line(`:${ADDRESS}!u@h JOIN ${rooms[0] ?? ""}`);
+    return { ...t, fake };
+  };
+  const edits = (sent: readonly string[]) => sent.filter((line) => line.includes("gnoworld/edit"));
+
+  it("sends a correction as the composer composes the draft, tagged with the msgid it corrects, with no label", () => {
+    const t = memberIn(["#bubble/games"]);
+    expect(t.link.correct("#bubble/games", "  hi **all**  ", MSGID)).toBe(true);
+    expect(t.link.correct("#bubble/games", "/me waves", MSGID)).toBe(true);
+    expect(edits(t.fake.sent)).toEqual([
+      `@+gnoworld/edit=${MSGID} PRIVMSG #bubble/games :hi **all**`,
+      `@+gnoworld/edit=${MSGID} PRIVMSG #bubble/games :\u0001ACTION waves\u0001`,
+    ]);
+  });
+
+  it("sends no tag at all for a plain line", () => {
+    const t = memberIn(["#bubble/games"]);
+    expect(t.link.say("#bubble/games", "hi")).toBe(true);
+    expect(t.fake.sent.filter((line) => line.includes("PRIVMSG"))).toEqual(["PRIVMSG #bubble/games :hi"]);
+  });
+
+  it.each([
+    ["a space", "a b"],
+    ["a CR LF and a second command", "a\r\nQUIT"],
+    ["a semicolon and a second tag", "a;+typing=active"],
+    ["a backslash", "a\\b"],
+    ["nothing", ""],
+    ["65 characters", "a".repeat(65)],
+    ["a leading semicolon", ";a"],
+    ["a comma", "a,b"],
+    ["a NUL", "a\u0000b"],
+  ])("sends no correction naming a msgid holding %s, nor the draft without it", (_, id) => {
+    const t = memberIn(["#bubble/games"]);
+    const before = t.fake.sent.length;
+    expect(t.link.correct("#bubble/games", "hi", id)).toBe(false);
+    expect(t.fake.sent.slice(before)).toEqual([]);
+  });
+
+  it("sends a correction naming a msgid of 64 characters", () => {
+    const t = memberIn(["#bubble/games"]);
+    expect(t.link.correct("#bubble/games", "hi", "a".repeat(64))).toBe(true);
+    expect(edits(t.fake.sent)).toEqual([`@+gnoworld/edit=${"a".repeat(64)} PRIVMSG #bubble/games :hi`]);
+  });
+
+  it("sends no correction as a guest, nor in a room Ergo has not said it is in, nor of an empty draft", () => {
+    const g = guestIn(["#bubble/games"]);
+    g.fake.line(`:${GUEST}!u@h JOIN #bubble/games`);
+    const t = memberIn(["#bubble/games", "#bubble"]);
+    expect(g.link.correct("#bubble/games", "hi", MSGID)).toBe(false);
+    expect(t.link.correct("#bubble", "hi", MSGID)).toBe(false);
+    expect(t.link.correct("#bubble/games", "", MSGID)).toBe(false);
+    expect([...g.fake.sent, ...t.fake.sent].filter((line) => line.includes("PRIVMSG"))).toEqual([]);
+  });
+
+  it("ends the account's typing once a correction went, as a plain line does: the next typing is told at once", () => {
+    const t = memberIn(["#bubble/games"]);
+    t.link.typing("#bubble/games", "active");
+    t.link.typing("#bubble/games", "active");
+    t.link.correct("#bubble/games", "hi", MSGID);
+    t.link.typing("#bubble/games", "active");
+    expect(t.fake.sent.filter((line) => line.includes("+typing="))).toEqual([
+      "@+typing=active TAGMSG #bubble/games",
+      "@+typing=active TAGMSG #bubble/games",
+    ]);
+  });
+
+  // A correction is a line of its own, which a REDACT of the line it corrects does not take: a deleted line would stay,
+  // as its newest correction, for every reader (a direct message's delete sends one for each of mine, 4d-dm-bar).
+  describe("a delete", () => {
+    const at = "2026-10-25T10:00:00.000Z";
+    const said = (id: string, tags: string, { text = "words", who = ADDRESS } = {}) =>
+      `@msgid=${id};time=${at};account=${who}${tags === "" ? "" : `;${tags}`} :${who}!u@h PRIVMSG #bubble/games :${text}`;
+    const redacted = (sent: readonly string[]) => sent.filter((line) => line.startsWith("REDACT "));
+
+    it("goes out for a line and each correction of mine to it, the line's first", () => {
+      const t = memberIn(["#bubble/games"]);
+      t.fake.line(said("m1", ""));
+      t.fake.line(said("e1", "+gnoworld/edit=m1"));
+      t.fake.line(said("e2", "+gnoworld/edit=m1"));
+      t.fake.line(said("o1", ""));
+      expect(t.link.redact("#bubble/games", "m1")).toBe(true);
+      expect(redacted(t.fake.sent)).toEqual([
+        "REDACT #bubble/games m1",
+        "REDACT #bubble/games e1",
+        "REDACT #bubble/games e2",
+      ]);
+    });
+
+    it("leaves another account's line naming mine as its correction, which is not mine to delete", () => {
+      const t = memberIn(["#bubble/games"]);
+      t.fake.line(said("m1", ""));
+      t.fake.line(said("p2", "+gnoworld/edit=m1", { who: OTHER }));
+      expect(t.link.redact("#bubble/games", "m1")).toBe(true);
+      expect(redacted(t.fake.sent)).toEqual(["REDACT #bubble/games m1"]);
+    });
+
+    it("leaves a correction of mine to another line, and one no command can name", () => {
+      const t = memberIn(["#bubble/games"]);
+      t.fake.line(said("m1", ""));
+      t.fake.line(said("m2", ""));
+      t.fake.line(said("e2", "+gnoworld/edit=m2"));
+      t.fake.line(said("e,1", "+gnoworld/edit=m1"));
+      expect(t.link.redact("#bubble/games", "m1")).toBe(true);
+      expect(redacted(t.fake.sent)).toEqual(["REDACT #bubble/games m1"]);
+    });
+
+    it("sends no correction's delete when the line's own was not sent", () => {
+      const t = memberIn(["#bubble/games", "#bubble"]);
+      t.fake.line(said("m1", ""));
+      t.fake.line(said("e1", "+gnoworld/edit=m1"));
+      expect(t.link.redact("#bubble", "m1")).toBe(false);
+      expect(t.link.redact("#bubble/games", "m 1")).toBe(false);
+      expect(redacted(t.fake.sent)).toEqual([]);
+    });
+  });
+});
+
 // 4d-dm-bar: a direct message's lines get the message bar. Each act is a line to the partner's nick, labelled so Ergo's
 // refusal (401, its partner not connected) is known; nothing here is a room's, which the link must be in to speak.
 describe("the chat's link: a direct message's bar", () => {

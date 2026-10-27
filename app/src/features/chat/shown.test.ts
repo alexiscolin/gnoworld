@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Dms } from "./Dms.tsx";
+import type { ChatLink } from "./link.ts";
 import { roomActs } from "./roomActs.ts";
 import { shownOf, type DmPage, type Room } from "./shown.tsx";
 
@@ -130,5 +131,31 @@ describe("shownOf: a direct message's bar", () => {
       [ALICE, "an answer", { reply: "m1" }],
       [ALICE, "a correction", { edit: "m1" }],
     ]);
+  });
+});
+
+// slice-4-room-edit: a room's lines are corrected through the link, as its answers are: one say, its tags told.
+describe("shownOf: a room's edits", () => {
+  it("says a line through the link, a reply or a correction as each is", () => {
+    const said: unknown[] = [];
+    const link = {
+      say: (...args: unknown[]) => said.push(["say", ...args]) > 0,
+      correct: (...args: unknown[]) => said.push(["correct", ...args]) > 0,
+    } as unknown as ChatLink;
+    const acts = roomActs({ current: link }, "#bubble/games", () => undefined);
+    const shown = shownOf(dms(), { id: "#bubble/games", state: undefined, acts }, PAGE);
+    expect(shown?.writer.onSay("plain")).toBe(true);
+    expect(shown?.say("an answer", { reply: "m1" })).toBe(true);
+    expect(shown?.say("a correction", { edit: "m1" })).toBe(true);
+    expect(said).toEqual([
+      ["say", "#bubble/games", "plain", undefined],
+      ["say", "#bubble/games", "an answer", "m1"],
+      ["correct", "#bubble/games", "a correction", "m1"],
+    ]);
+  });
+
+  it("says a correction went nowhere while the page gives no link", () => {
+    const shown = shownOf(dms(), room("#bubble/games"), PAGE);
+    expect(shown?.say("a correction", { edit: "m1" })).toBe(false);
   });
 });

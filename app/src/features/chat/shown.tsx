@@ -19,8 +19,7 @@ export interface Shown {
     RoomViewProps,
     "room" | "partner" | "title" | "note" | "state" | "empty" | "onDelete" | "onDismiss" | "onRead" | "onReact"
   >;
-  /** Says a draft in the conversation, an answer to a line (`reply`) or a correction of one (`edit`); whether it went. A
-   * room has no edit. */
+  /** Says a draft in the conversation, an answer to a line (`reply`) or a correction of one (`edit`); whether it went. */
   say: (draft: string, tags?: { reply?: string; edit?: string }) => boolean;
   writer: Pick<WriterProps, "room" | "label" | "members" | "onSay" | "onTyping" | "refused" | "focus" | "describedBy">;
 }
@@ -127,7 +126,7 @@ function roomShown(room: string, state: Room["state"], acts: RoomActs): Shown {
       onRead: acts.onRead,
       onReact: acts.onReact,
     },
-    say: (draft, tags) => tags?.edit === undefined && acts.onSay(draft, tags?.reply),
+    say: (draft, tags) => acts.onSay(draft, tags),
     writer: { room, members: state?.members ?? [], onSay: (draft) => acts.onSay(draft), onTyping: acts.onTyping },
   };
 }

@@ -1,7 +1,7 @@
 // A line's actions (slice 4's 4c; docs/decisions.md, 2026-10-26): the prototype's bar, an account's three quick
 // reactions first (4d), its More menu holding Copy text, Copy link and, on the reader's own line, Delete, asked first.
-// More reactions, thread, pin, save, edit and mark unread come with their merges; Report waits for slice 12's
-// moderation queue.
+// More reactions, thread, pin, save and mark unread come with their merges; Report waits for slice 12's moderation
+// queue. Edit (the DM bar's, then the room's) puts one's own message back in the composer.
 import type { Line, Shown } from "@gnoworld/core";
 import { Button, Chip, Cluster, Dialog, IconButton, Menu, Stack } from "@gnoworld/ui";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -50,7 +50,7 @@ export interface LineActionsProps {
   onReact: (emoji: string, on: boolean) => boolean;
   /** Makes the line the one the composer's next answers (4d). */
   onReply: () => void;
-  /** Puts the line's words in the composer to correct them; given by a view that has edits: a direct message's. */
+  /** Puts the line's words in the composer to correct them; given by a view that has edits. */
   onEdit?: (() => void) | undefined;
 }
 
@@ -169,7 +169,7 @@ function menu({
   return [
     { kinds: ["room", "dm"], label: "Copy text", act: "text" },
     { kinds: ["room"], label: "Copy room link", act: "link" },
-    ...(editable ? [{ kinds: ["dm"], label: "Edit", act: "edit" } as const] : []),
+    ...(editable ? [{ kinds: ["room", "dm"], label: "Edit", act: "edit" } as const] : []),
     ...(own && !deleting ? [{ kinds: ["room", "dm"], label: "Delete", tone: "danger", act: "delete" } as const] : []),
   ];
 }

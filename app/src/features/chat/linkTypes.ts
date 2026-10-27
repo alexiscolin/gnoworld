@@ -23,6 +23,9 @@ export interface ChatLink {
   /** Sends a draft, as the composer composes it, to a room Ergo says it is in; an account's alone; tagged +reply with
    * the msgid it answers, one a tag carries (4d). Whether it went. */
   say: (room: string, draft: string, reply?: string) => boolean;
+  /** Sends a draft, so, as a correction of the line `edit` names: tagged +gnoworld/edit with its msgid, one a tag carries
+   * (the room's Edit). Whether it went. */
+  correct: (room: string, draft: string, edit: string) => boolean;
   /** Sends a draft to another account, a direct message (4e); an account's alone; tagged +reply with the msgid it answers
    * or +gnoworld/edit with the one it corrects, a msgid a tag carries. Whether it went. */
   sayTo: (partner: string, draft: string, tags?: { reply?: string; edit?: string }) => boolean;
@@ -32,7 +35,8 @@ export interface ChatLink {
   /** Deletes a line of the conversation with an account, and each correction of mine to it (REDACT; Ergo lets an author
    * delete its own alone). Whether it went; Ergo's refusal reaches the store. */
   redactIn: (partner: string, id: string) => boolean;
-  /** Deletes a line by its msgid in a room Ergo says it is in (Ergo's REDACT, 4c); an account's alone. Whether it went. */
+  /** Deletes a line by its msgid in a room Ergo says it is in (Ergo's REDACT, 4c), and each correction of mine to it, which
+   * a REDACT of the line leaves; an account's alone. Whether the line's went. */
   redact: (room: string, id: string) => boolean;
   /** Reacts to a line of a room Ergo says it is in, by its msgid, with one emoji of RGI's set, or takes the reaction
    * back (4d); an account's alone. Each is labelled, so Ergo's answer to it is known. Whether it went. */

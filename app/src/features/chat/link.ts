@@ -3,13 +3,13 @@
 // (Ergo's max-channels-per-client); the newest lines of the room in view alone, once Ergo says I joined it, since
 // Ergo paces a client to 2 lines a second (plan §4); Ergo's lines read into the store through one BatchReader a
 // connection. Its parts come in, so the tests give their own.
-import { BatchReader, isTagMsgid, nickOf, reactionLine, type IrcMessage, type Reacting } from "@gnoworld/core";
+import { BatchReader, nickOf, reactionLine, type IrcMessage, type Reacting } from "@gnoworld/core";
 import { RoomId } from "@gnoworld/schemas";
 import type { Ergo, ErgoOptions, Who } from "../../lib/ergo/ergo.ts";
 import type { AppState } from "../../store/index.ts";
 import { asksAfterJoin, followed, outOf } from "./groups.ts";
-import { HISTORY_LINES, isCommandMsgid } from "./history.ts";
-import { lineTo, reactTo as reactIn, redactIn, sayTo as sayIn, type DmOut } from "./dmOut.ts";
+import { HISTORY_LINES } from "./history.ts";
+import { reactTo as reactIn, redactFrom, redactIn, sayTo as sayIn, speakIn, type DmOut } from "./dmOut.ts";
 import { Joins } from "./joins.ts";
 import type { ChatLink, LinkDeps } from "./linkTypes.ts";
 import { outbox, type Outbox } from "./outbox.ts";
@@ -62,10 +62,15 @@ class Link implements ChatLink {
   }
 
   say(room: string, draft: string, reply?: string): boolean {
-    if (reply !== undefined && !isTagMsgid(reply)) return false;
-    const line = lineTo(this.#dm(), { target: room, draft }, () => this.#inside.has(room));
-    const tags = reply === undefined ? "" : `@+reply=${reply} `;
-    const went = line !== undefined && this.#ergo?.send(`${tags}${line}`) === true;
+    return this.#speak(room, draft, { reply });
+  }
+
+  correct(room: string, draft: string, edit: string): boolean {
+    return this.#speak(room, draft, { edit });
+  }
+
+  #speak(room: string, draft: string, tags: { reply?: string | undefined; edit?: string | undefined }): boolean {
+    const went = speakIn(this.#dm(), { room, draft, inside: this.#inside.has(room) }, tags);
     if (went) this.#typing.ended(room);
     return went;
   }
@@ -84,8 +89,7 @@ class Link implements ChatLink {
   }
 
   redact(room: string, id: string): boolean {
-    const allowed = this.#key !== "guest" && this.#inside.has(room) && isCommandMsgid(id);
-    return allowed && this.#ergo?.send(`REDACT ${room} ${id}`) === true;
+    return redactFrom(this.#dm(), { room, id, inside: this.#inside.has(room) });
   }
 
   typing(room: string, state: "active" | "done"): void {

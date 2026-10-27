@@ -187,11 +187,6 @@ describe("a line's actions in a direct message", () => {
     expect(items(dm({ me: ALICE }))).not.toContain("Copy room link");
   });
 
-  it("keep the room's items as they were: no Edit in a room, even on its own line", () => {
-    expect(items(draw({ me: ALICE }))).toEqual(["Copy text", "Copy room link", "Delete"]);
-    expect(items(draw({ me: ALICE, onEdit: () => undefined }))).toEqual(["Copy text", "Copy room link", "Delete"]);
-  });
-
   it("offer Edit on a message of one's own alone: none on an action, none while a delete waits, none unasked", () => {
     expect(items(dm({ me: ALICE, line: { ...LINE, kind: "action" } }))).toEqual(["Copy text", "Delete"]);
     expect(items(dm({ me: ALICE, deleting: true }))).toEqual(["Copy text"]);
@@ -213,5 +208,39 @@ describe("a line's actions in a direct message", () => {
     const markup = dm({ me: ALICE });
     expect(markup).toContain("It leaves your conversation with g10gh7…3y5tv for both of you, and cannot come back.");
     expect(markup).not.toContain("It leaves #");
+  });
+});
+
+// slice-4-room-edit (docs/decisions.md, 2026-10-28, F1560): a room's own lines get Edit as a direct message's do, between
+// the room's link and Delete.
+describe("a line's actions in a room: Edit", () => {
+  const edit = () => undefined;
+
+  it("offer Edit on the reader's own message, between Copy room link and Delete", () => {
+    expect(items(draw({ me: ALICE, onEdit: edit }))).toEqual(["Copy text", "Copy room link", "Edit", "Delete"]);
+  });
+
+  it("offer none unasked: a view that gives no edit has the room's items as they were", () => {
+    expect(items(draw({ me: ALICE }))).toEqual(["Copy text", "Copy room link", "Delete"]);
+  });
+
+  it("offer none on another's line, nor on a guest's, nor to a guest", () => {
+    expect(items(draw({ me: BOB, onEdit: edit }))).toEqual(["Copy text", "Copy room link"]);
+    expect(items(draw({ me: undefined, onEdit: edit }))).toEqual(["Copy text", "Copy room link"]);
+    expect(items(draw({ me: undefined, line: GUEST_LINE, onEdit: edit }))).toEqual(["Copy text", "Copy room link"]);
+  });
+
+  it("offer none on an action, while a delete waits, nor on an orphan correction", () => {
+    expect(items(draw({ me: ALICE, onEdit: edit, line: { ...LINE, kind: "action" } }))).toEqual([
+      "Copy text",
+      "Copy room link",
+      "Delete",
+    ]);
+    expect(items(draw({ me: ALICE, onEdit: edit, deleting: true }))).toEqual(["Copy text", "Copy room link"]);
+    expect(items(draw({ me: ALICE, onEdit: edit, line: { ...LINE, edits: "m9" } }))).toEqual([
+      "Copy text",
+      "Copy room link",
+      "Delete",
+    ]);
   });
 });

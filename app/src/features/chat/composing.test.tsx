@@ -173,9 +173,58 @@ describe("useComposing", () => {
     expect(now().writer.focus).toBeUndefined();
   });
 
-  it("offers a room no edit", () => {
+  // slice-4-room-edit (docs/decisions.md, 2026-10-28): a room's lines are corrected as a direct message's are.
+  const edit = (id: string) => {
+    act(() => now().view.onEdit?.(id));
+  };
+  const save = (words: string) => {
+    act(() => {
+      now().writer.onSay?.(words);
+    });
+  };
+
+  it("offers a room an edit, its line's words in the composer, and sends the correction tagged with the line", () => {
     draw("room");
-    expect(now().view.onEdit).toBeUndefined();
+    edit("m1");
+    expect(now().writer.editing?.text).toBe("my words");
+    save("my words, fixed");
+    expect(say).toHaveBeenCalledExactlyOnceWith("my words, fixed", { edit: "m1" });
+    expect(now().writer.editing).toBeUndefined();
+    expect(now().writer.focus).toBe(true);
+  });
+
+  it("sends nothing for a room's words left as they were, and keeps its edit open when the correction did not go", () => {
+    draw("room");
+    edit("m1");
+    save(" my words ");
+    expect(say).not.toHaveBeenCalled();
+    expect(now().writer.editing).toBeUndefined();
+    edit("m1");
+    say.mockReturnValueOnce(false);
+    save("changed");
+    expect(now().writer.editing?.text).toBe("my words");
+  });
+
+  it("drops a room's reply when an edit is asked, and ends the edit when a reply is asked", () => {
+    draw("room");
+    act(() => now().view.onReply?.("m2"));
+    edit("m1");
+    expect(now().writer.replying).toBeUndefined();
+    act(() => now().view.onReply?.("m2"));
+    expect(now().writer.editing).toBeUndefined();
+    expect(now().writer.replying?.id).toBe("m2");
+  });
+
+  it("offers no edit of a room's orphan correction, and keeps a room's edit its room's alone", () => {
+    draw("room", [...LINES, { ...line("m3", "a correction"), edits: "m9" }]);
+    edit("m3");
+    expect(now().writer.editing).toBeUndefined();
+    draw("room");
+    edit("m1");
+    expect(now().writer.editing?.text).toBe("my words");
+    render({ kind: "room", lines: LINES, who: "y" });
+    expect(now().writer.editing).toBeUndefined();
+    expect(now().writer.focus).toBeUndefined();
   });
 
   // /code-review on 4d's DM bar (CR7): Reply asked during an edit was stored and hidden by the writer, then came back

@@ -1,5 +1,5 @@
-// What the composer is told of the line the next message answers (slice 4's 4d replies) or corrects (the DM bar's edits),
-// moved out of Loaded.tsx for the lint's sizes: each its conversation's alone, dropped as another comes in view.
+// What the composer is told of the line the next message answers (slice 4's 4d replies) or corrects (the DM bar's and the
+// room's edits), moved out of Loaded.tsx for the lint's sizes: each its conversation's alone, dropped as another comes in view.
 import { foldEdits, type Line } from "@gnoworld/core";
 import { useState } from "react";
 import type { RefusedTags } from "../../store/dms.ts";
@@ -87,9 +87,9 @@ interface Edits {
   dropReply: () => void;
 }
 
-// The line of the reader's own a direct message's next one corrects, its words put in the composer, as a reply's: one a
-// conversation, none for a room. Sent tagged with the line's msgid, shown in its place, unless unchanged. Asking for one
-// drops a reply asked before (`dropReply`); an edit's end gives the box the focus.
+// The line of the reader's own the conversation's next one corrects, its words put in the composer, as a reply's: one a
+// conversation. Sent tagged with the line's msgid, shown in its place, unless unchanged. Asking for one drops a reply
+// asked before (`dropReply`); an edit's end gives the box the focus.
 function editsOf(
   shown: Shown | undefined,
   lines: readonly Line[] | undefined,
@@ -100,7 +100,7 @@ function editsOf(
   // An orphan correction (its original left the window) is no line to correct: a new correction would name a line
   // nothing folds into (CR5).
   const editing = found?.edits === undefined ? found : undefined;
-  if (shown?.kind !== "dm") return { view: {}, writer: {} };
+  if (shown === undefined) return { view: {}, writer: {} };
   const view = {
     onEdit: (id: string) => {
       dropReply();
@@ -157,10 +157,14 @@ function useNews(key: string | undefined, count: number) {
   return heard !== undefined;
 }
 
+// What Ergo refused of the conversation's lines: a direct message's alone, whose lines go out labelled so its answers are
+// known; a room's are heard by no one (F1920).
+const refusedIn = (shown: Shown | undefined) => (shown?.kind === "dm" ? shown.writer.refused : undefined);
+
 // A new refusal is taken up as its conversation is in view; what was left plain is told as the refusal's own.
 function useRefusals(shown: Shown | undefined, held: { reply: Here<Chosen>; edit: Here<Chosen> }) {
   const plain = useHere<number>(shown?.key);
-  const refused = shown?.writer.refused;
+  const refused = refusedIn(shown);
   const count = refused?.count ?? 0;
   const news = useNews(shown?.key, count);
   if (news) {

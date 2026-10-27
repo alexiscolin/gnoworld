@@ -648,11 +648,11 @@ test.describe("deleting a line", () => {
   };
 
   // The red pass (M2): another's line offers no Delete, through the page as wired.
-  test("offers Delete on the account's own line, never on another's", async ({ page }) => {
+  test("offers Edit and Delete on the account's own line, never on another's", async ({ page }) => {
     await mine(page);
     await expect(await itemsOf(page, 0, "another's line")).toHaveText(["Copy text", "Copy room link"]);
     await page.keyboard.press("Escape");
-    await expect(await itemsOf(page, 1, "my own line")).toHaveText(["Copy text", "Copy room link", "Delete"]);
+    await expect(await itemsOf(page, 1, "my own line")).toHaveText(["Copy text", "Copy room link", "Edit", "Delete"]);
     // The green pass (G11): the dialog closed until Delete is chosen.
     await expect(page.getByRole("dialog", { name: "Delete message?" })).toBeHidden();
   });
@@ -747,7 +747,7 @@ test.describe("deleting a line", () => {
     await mine(page, { refuseRedact: true });
     await refused(page, "The chat refused it.");
     // 4c's UX review (U4): refused, the line offers its Delete again.
-    await expect(await itemsOf(page, 1, "my own line")).toHaveText(["Copy text", "Copy room link", "Delete"]);
+    await expect(await itemsOf(page, 1, "my own line")).toHaveText(["Copy text", "Copy room link", "Edit", "Delete"]);
   });
 
   // 4c's UX review (U8): a delete the page cannot send while the chat is out of reach says so, and offers to try again

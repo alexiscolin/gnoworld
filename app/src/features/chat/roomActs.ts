@@ -20,8 +20,11 @@ export function roomActs(link: RefObject<ChatLink | undefined>, room: string, di
     onRead: (id: string) => {
       link.current?.read(room, id);
     },
-    // Tagged +reply with the msgid it answers, when it answers a line (4d).
-    onSay: (draft: string, reply?: string) => link.current?.say(room, draft, reply) ?? false,
+    // Tagged +reply with the msgid it answers (4d), or +gnoworld/edit with the one it corrects, when it does.
+    onSay: (draft: string, tags?: { reply?: string; edit?: string }) =>
+      (tags?.edit === undefined
+        ? link.current?.say(room, draft, tags?.reply)
+        : link.current?.correct(room, draft, tags.edit)) ?? false,
     onReact: (reaction: Reacting) => {
       dismissed(room);
       return link.current?.react(room, reaction) ?? false;

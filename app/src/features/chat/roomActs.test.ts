@@ -22,4 +22,26 @@ describe("a room's acts", () => {
     acts.onDismiss();
     expect(calls).toEqual(["#bubble/games", "#bubble/games", "#bubble/games"]);
   });
+
+  // slice-4-room-edit: a line goes out with the reply it answers, or as the correction of the line it corrects.
+  it("say a line through the link, with its reply or as its correction, and nothing with no link", () => {
+    const calls: unknown[] = [];
+    const link = {
+      say: (...args: unknown[]) => calls.push(["say", ...args]) > 0,
+      correct: (...args: unknown[]) => calls.push(["correct", ...args]) > 0,
+    } as unknown as ChatLink;
+    const acts = roomActs({ current: link }, "#bubble/games", () => undefined);
+    expect([acts.onSay("a"), acts.onSay("b", { reply: "m1" }), acts.onSay("c", { edit: "m2" })]).toEqual([
+      true,
+      true,
+      true,
+    ]);
+    expect(calls).toEqual([
+      ["say", "#bubble/games", "a", undefined],
+      ["say", "#bubble/games", "b", "m1"],
+      ["correct", "#bubble/games", "c", "m2"],
+    ]);
+    expect(roomActs({ current: undefined }, "#bubble/games", () => undefined).onSay("x", { edit: "m2" })).toBe(false);
+    expect(roomActs({ current: undefined }, "#bubble/games", () => undefined).onSay("x")).toBe(false);
+  });
 });

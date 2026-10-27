@@ -2,7 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { inGames, lineOf, lines, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import type { Scripted } from "./scripted.ts";
-import { asAccount, barOf, field, OTHER, tagged, tagmsg } from "./talk.ts";
+import { asAccount, barOf, field, OTHER, T, tagged, tagmsg } from "./talk.ts";
 
 // 4d's reactions, replies and edits as they look and as a real Ergo keeps them (docs/decisions.md, 2026-10-26).
 const LOOK = (address: string): Scripted => ({
@@ -76,6 +76,37 @@ test.describe("reactions, replies and edits, as they look", () => {
     expect((await new AxeBuilder({ page }).include("form").analyze()).violations).toEqual([]);
     await expect(form).toHaveScreenshot("reply-bar-computer.png");
   });
+
+  // slice-4-room-edit: the composer's edit bar over the field, on one's own line, pictured and checked as the reply bar is.
+  for (const [screen, width, height] of [
+    ["computer", 1280, 900],
+    ["phone", 390, 844],
+  ] as const)
+    test(`pass axe and look as the prototype's with the edit bar over the field, on a ${screen}'s screen`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height });
+      await asAccount(
+        page,
+        (address) => ({
+          ...LOOK(address),
+          history: [
+            ["m1", T(0), "the first line", address],
+            ["m2", T(1), "the second **line**"],
+          ],
+        }),
+        3,
+      );
+      await steady(page);
+      await lines(page).first().hover();
+      await barOf(page, 0).getByRole("button", { name: "More actions" }).click();
+      await page.getByRole("menuitem", { name: "Edit" }).click();
+      const form = page.getByRole("form", { name: "Write in #games" });
+      await expect(form).toContainText("Editing a message");
+      await expect(field(page)).toHaveValue("the first line");
+      expect((await new AxeBuilder({ page }).include("form").analyze()).violations).toEqual([]);
+      await expect(form).toHaveScreenshot(`edit-bar-${screen}.png`);
+    });
 
   // The green pass: a line's 20 chips and a quote wrap within a phone's width, nothing scrolling sideways.
   test("fit a line of 20 reactions and a reply's quote on a phone's screen, and pass axe", async ({ page }) => {
