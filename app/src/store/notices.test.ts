@@ -283,6 +283,20 @@ describe("the store's notices slice", () => {
       t.notices.add(notice({ id: "r" }));
       expect(t.state().notices).toHaveLength(DMS_KEPT + 1);
     });
+
+    it("drops the notices of an evicted conversation at an add that brings nothing new", () => {
+      const t = setup();
+      const [first = "", ...others] = Array.from({ length: DMS_KEPT + 1 }, (_, n) =>
+        toAddress(new Uint8Array(20).fill(n + 1)),
+      );
+      t.kept(first);
+      t.notices.add(notice({ id: "d", kind: "dm", where: first }));
+      t.notices.add(notice({ id: "r" }));
+      t.kept(...others);
+      expect(t.state().dms).not.toHaveProperty(first);
+      t.notices.add(notice({ id: "r" }));
+      expect(ids(t.state().notices)).toEqual(["r"]);
+    });
   });
 
   describe("a room's mode", () => {
