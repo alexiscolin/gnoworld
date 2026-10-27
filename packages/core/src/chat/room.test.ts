@@ -230,7 +230,10 @@ describe("addLines: a room's lines, in time order, each once, the newest kept", 
   });
 
   test("holds a flood of 10,000 lines in one page, in reverse order, to its cap", () => {
-    const flood = Array.from({ length: 10_000 }, (_, n) => line(`m${String(n).padStart(5, "0")}`, T0, String(n)));
+    // Each line a millisecond after the one before: lines of one time keep the order they came in (F773).
+    const flood = Array.from({ length: 10_000 }, (_, n) =>
+      line(`m${String(n).padStart(5, "0")}`, new Date(Date.parse(T0) + n).toISOString(), String(n)),
+    );
     expect(addLines([], frozen([...flood].reverse()), 200)).toStrictEqual(flood.slice(-200));
   });
 
