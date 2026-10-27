@@ -7,9 +7,6 @@
 import { bytes, LINE_BYTES } from "../irc/irc.ts";
 import { MULTILINE_BYTES, MULTILINE_LINES } from "../irc/multiline.ts";
 
-export { LINE_BYTES } from "../irc/irc.ts";
-export { MULTILINE_BYTES, MULTILINE_LINES } from "../irc/multiline.ts";
-
 // Ergo's cloak of a host: 64 bits in base32, then the network's name (deploy/ergo/ircd.yaml.tmpl, ip-cloaking).
 const CLOAK = "x".repeat(13) + ".gnoworld";
 

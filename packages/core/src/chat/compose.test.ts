@@ -1,7 +1,8 @@
 import fc from "fast-check";
 import { describe, expect, test, vi } from "vitest";
-import { bytes, parseLine } from "../irc/irc.ts";
-import { COMMANDS, compose, LINE_BYTES, MULTILINE_BYTES, MULTILINE_LINES, relayOf } from "./compose.ts";
+import { bytes, LINE_BYTES, parseLine } from "../irc/irc.ts";
+import { MULTILINE_BYTES, MULTILINE_LINES } from "../irc/multiline.ts";
+import { COMMANDS, compose, relayOf } from "./compose.ts";
 
 const ROOM = "#bubble/games";
 // An account's nick: its address, 40 characters (Ergo's force-nick-equals-account).
