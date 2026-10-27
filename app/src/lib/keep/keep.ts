@@ -4,7 +4,7 @@
 // line or a place that is none is dropped and the good ones kept; text that is no list forgets the key; a device that
 // refuses (blocked, full) keeps nothing and says so.
 import type { Line } from "@gnoworld/core";
-import { Address, PinId, RoomId } from "@gnoworld/schemas";
+import { Address, PinId, RoomId, Time } from "@gnoworld/schemas";
 import type { DraftStorage } from "../drafts/drafts.ts";
 import { z } from "../jitless.ts";
 
@@ -13,7 +13,6 @@ export const SAVED_KEPT = 200;
 /** The rooms a place is kept for at most: a session joins 100 (Ergo's max-channels-per-client). */
 export const UNREAD_KEPT = 100;
 
-const Time = z.iso.datetime({ precision: 3 });
 // A saved line: the line as the page held it, its room with it, its author's nick (an address for an account, which
 // the account tag alone proves), and its words, a message's 510 characters at most.
 const Saved = z.strictObject({

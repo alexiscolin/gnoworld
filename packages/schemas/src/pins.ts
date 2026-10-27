@@ -11,10 +11,13 @@ export const PINS_MAX = 10;
 /** A line's msgid as a pin names it: one word, no comma, no control character, at most 128 characters. */
 export const PinId = StreamEvent.shape.msgid.check(z.regex(/^[^\s,\0-\x1f\x7f]+$/));
 
+/** A time as Ergo writes it: ISO 8601, to the millisecond. */
+export const Time = z.iso.datetime({ precision: 3 });
+
 /** A pinned line: its id, Ergo's time, its author's account and its text, a message's 510 characters at most. */
 export const PinnedLine = z.strictObject({
   id: PinId,
-  time: z.iso.datetime({ precision: 3 }),
+  time: Time,
   account: Address,
   text: z.string().check(z.minLength(1), z.maxLength(510)),
 });

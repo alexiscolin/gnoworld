@@ -1,14 +1,16 @@
 // A room's history the link reads a page at a time (slice 3's plan, 3j) and the messages of every room, live or in a
 // page: each handed on to be checked and counted, but for a batch that answers a line asked by its id (fetch.ts).
 import type { Socket } from "node:net";
-import type { IrcMessage } from "@gnoworld/core";
+import { placeBefore, type IrcMessage } from "@gnoworld/core";
 import { line, said } from "./lines.ts";
 import type { Options, Page, State } from "./reader.ts";
 
 // Half of a check's per-account queue, so a page never fills it with a live line waiting (3j).
 const PAGE = 50;
 
-export const earlier = (time: string): string => new Date(Date.parse(time) - 1).toISOString();
+// The millisecond before a line's time, which Ergo wrote; the time itself for one with none before it, which only asks that
+// line again.
+export const earlier = (time: string): string => placeBefore(time) ?? time;
 
 // Ergo answers AFTER a msgid it no longer holds (a line hidden by REDACT) with nothing, and AFTER a
 // time from the next millisecond on (irc/history/history.go:171-175, irc/handlers.go:940, v2.19.1).
