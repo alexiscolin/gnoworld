@@ -152,6 +152,13 @@ describe("the places an account asked to go back to, on its device", () => {
     expect(device.kept.size).toBe(0);
   });
 
+  it("writes no key for no saved lines", () => {
+    const device = storage();
+    on(device, ALICE).setSaved([saved("m1")]);
+    expect(on(device, ALICE).setSaved([])).toBe(true);
+    expect(device.kept.size).toBe(0);
+  });
+
   // A session joins 100 rooms at most (Ergo's max-channels-per-client), so no more places than that are of any use.
   it("keeps 100 rooms' places, and refuses a list of 101 whole, writing nothing", () => {
     const device = storage();
