@@ -1489,4 +1489,17 @@ describe("the IRC link, a message of several lines (draft/multiline)", () => {
     second.say(message(`batch=x;account=g1a;msgid=s1;time=${T(2)}`, "a!u@h", ["#bubble", "alone"]));
     await expect.poll(() => said.map(({ msgid }) => msgid)).toEqual(["s1"]);
   });
+
+  it("hands on a part with an id of its own only once, folded, never as a line besides", async () => {
+    const ergo = await fakeErgo();
+    const { said } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    peer.say(`@account=g1a;msgid=ml1;time=${T(1)} :a!u@h BATCH +x draft/multiline :#bubble`);
+    peer.say(message("batch=x;account=g1a;msgid=p1", "a!u@h", ["#bubble", "one"]));
+    peer.say(message("batch=x", "a!u@h", ["#bubble", "two"]));
+    peer.say(":a!u@h BATCH :-x");
+    await sync(peer);
+    expect(said.map(({ msgid, text }) => [msgid, text])).toEqual([["ml1", "one\ntwo"]]);
+  });
 });
