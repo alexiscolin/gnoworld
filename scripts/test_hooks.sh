@@ -1500,7 +1500,6 @@ n=$1
 shift
 echo "$n $*" >>"$GATE_LOG"
 [ "$n" != py:audit ] || echo "audit-answer ${AUDIT_ANSWER-unset}" >>"$GATE_LOG"
-[ "$n" != py:bench ] || echo "bench-vitest ${BENCH_VITEST-unset}" >>"$GATE_LOG"
 if [ "$n" = py:load ]; then
 	at=$(($(cat "$GATE_LOG.load" 2>/dev/null || echo 0) + 1)) && echo "$at" >"$GATE_LOG.load"
 	eval "echo \"\${LOAD_$at:-0 160}\""
@@ -1882,7 +1881,7 @@ printf 'import { spawnSync } from "node:child_process";\nprocess.exit(spawnSync(
 # The full gate: every fast step but the plain tests, then the full ones in lanes, each told where the
 # branch left main; harness_mutate only when the harness changed since main.
 base=$(git -C "$g" rev-parse HEAD)
-out=$(AUDIT_ANSWER=x BENCH_VITEST=x PICTURES_OF=nothing STORIES_PORT=6007 STORIES_OUT=/elsewhere gate --full) || fail "check.sh --full failed on a copy whose every step passes: $out"
+out=$(AUDIT_ANSWER=x PICTURES_OF=nothing STORIES_PORT=6007 STORIES_OUT=/elsewhere gate --full) || fail "check.sh --full failed on a copy whose every step passes: $out"
 # The stories' walk is every story's, whatever PICTURES_OF the environment carries, and the tokens comparison is the fast
 # gate's alone (F1190).
 grep -q '^stories port=[^ ]* of= on= out= test -c app/playwright.stories.config.ts' "$log" || fail "check.sh --full let its environment narrow or redirect the stories' walk: $(grep '^stories' "$log")"
@@ -1910,7 +1909,6 @@ done
 grep -qx "py:batch_size $base" "$log" || fail "check.sh --full did not size the batch from its base $base: $(grep batch_size "$log")"
 before coverage py:patch_coverage || fail "check.sh --full measured the patch's coverage before the coverage run"
 grep -qx "audit-answer unset" "$log" || fail "check.sh let AUDIT_ANSWER reach the audit"
-grep -qx "bench-vitest unset" "$log" || fail "check.sh let BENCH_VITEST choose the benches' Vitest"
 grep -qxF "$(record)" "$g/.claude/tmp/green-full" || fail "check.sh --full did not record the code it passed"
 rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/green-full"
 out=$(FAIL=py:batch_size gate --full) && fail "check.sh --full passed with its batch size failing"
@@ -2513,12 +2511,12 @@ if part bench; then
 # bench.py: each bench names its budget in brackets and the mean of its runs stays under it; one past it, one with no
 # budget, none at all, or a run that fails, fails the gate. A fake Vitest writes the report it is given.
 b="$t/bench"
-mkdir -p "$b"
-printf '#!/bin/sh\nwhile [ $# -gt 0 ]; do [ "$1" = --outputJson ] && cp "$BENCH_FIXTURE" "$2"; shift; done\nexit "${BENCH_EXIT:-0}"\n' >"$b/vitest" && chmod +x "$b/vitest"
+mkdir -p "$b/node_modules/.bin" # bench.py runs the Vitest of its own root, where the stub stands
+printf '#!/bin/sh\nwhile [ $# -gt 0 ]; do [ "$1" = --outputJson ] && cp "$BENCH_FIXTURE" "$2"; shift; done\nexit "${BENCH_EXIT:-0}"\n' >"$b/node_modules/.bin/vitest" && chmod +x "$b/node_modules/.bin/vitest"
 report() { python3 -I -c 'import json, sys
 pairs = zip(sys.argv[2::2], sys.argv[3::2])
 json.dump({"files": [{"filepath": "a.bench.ts", "groups": [{"fullName": "g", "benchmarks": [{"name": n, "mean": float(m)} for n, m in pairs]}]}]}, open(sys.argv[1], "w"))' "$b/report.json" "$@"; }
-bench() { (cd "$b" && BENCH_VITEST="$b/vitest" BENCH_FIXTURE="$b/report.json" python3 -I "$here/bench.py" 2>&1); }
+bench() { (cd "$b" && BENCH_FIXTURE="$b/report.json" python3 -I "$here/bench.py" 2>&1); }
 report "a line [0.2 ms]" 0.05 "a room [100 ms]" 14.5
 out=$(bench) || fail "bench.py refused benches within their budgets: $out"
 printf '%s\n' "$out" | grep -q "0.0500 ms of 0.2 ms: a line" || fail "bench.py did not print a measure and its budget: $out"
@@ -2556,7 +2554,7 @@ printf '%s\n' "$out" | grep -qF "a helper" && fail "bench.py read a file that is
 report "a room [100 ms]" 14.5
 out=$(bench) && fail "bench.py passed with a bench of the sources (the one a .only left out) missing from its report: $out"
 printf '%s\n' "$out" | grep -qF "a line [0.2 ms]: " || fail "bench.py did not name the bench a .only left out: $out"
-rm -r "${b:?}/app" "${b:?}/node_modules"
+rm -r "${b:?}/app" "${b:?}/node_modules/pkg"
 fi
 
 if part mutant_scope; then

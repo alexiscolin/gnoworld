@@ -16,7 +16,7 @@ sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no _
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # -I leaves this folder off the path
 from repo_files import BENCH, BENCH_FILE, BUDGET, listed
 
-VITEST = os.environ.get("BENCH_VITEST", "node_modules/.bin/vitest")  # tests override it (test_hooks.sh)
+VITEST = "node_modules/.bin/vitest"  # relative to the root the script runs from: a test puts its stub there
 
 with tempfile.TemporaryDirectory() as where:
     path = os.path.join(where, "bench.json")

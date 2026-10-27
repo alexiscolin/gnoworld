@@ -598,7 +598,6 @@ def mutants():
     yield from each("scripts/bench.py", ' - {m["name"] for m in measures}', ' - {m["name"] for m in measures} - named', "hooks", "bench.py fails a bench the sources name that the report lacks (security-S1)")
     yield from each("scripts/bench.py", "if BENCH_FILE.search(p.name)", "if True", "hooks", "bench.py reads the sources of the benches' files alone (security-S1)")
     yield from each("scripts/bench.py", '{".ts", ".tsx"}', '{".ts"}', "hooks", "bench.py reads a .tsx bench's source too (security-S1)")
-    yield from each("scripts/check.sh", " PROVE_FIX_GO BENCH_VITEST", " PROVE_FIX_GO", "hooks", "check.sh: the benches' Vitest is never the environment's")
     yield from each("scripts/suite_parts.py", "    if old_outside != new_outside:", "    if False:", "hooks", "suite_parts: a change outside every section touches them all")
     yield from each("scripts/suite_parts.py", "            depth += 1", "            depth += 0", "hooks", "suite_parts: a nested if's fi does not end its section")
     yield from each("scripts/suite_parts.py", ' and not re.search(r"\\bfi$", bare)', "", "hooks", "suite_parts: a one-line if at the margin opens no section")
@@ -726,7 +725,7 @@ def mutants():
         ("STORIES_OUT=\"$logs/storybook\" STORIES_PORT", "STORIES_PORT", "the tokens pictures build Storybook in the run's own folder (F1190)"),
         ("STORIES_PORT=$(free_ports 1) PICTURES_OF=tokens-- node", "STORIES_PORT=$(free_ports 1) node", "the tokens pictures compare that story alone (F1190)"),
         ("--reporter=dot pictures\n", "--reporter=dot pictures || :\n", "the tokens pictures failing fails the lane (F1190)"),
-        (" BENCH_VITEST PICTURES_OF STORIES_PORT STORIES_OUT #", " BENCH_VITEST #", "the environment narrows no stories' walk (F1190)"),
+        (" PICTURES_OF STORIES_PORT STORIES_OUT #", " #", "the environment narrows no stories' walk (F1190)"),
         ('\tif [ "$load" -gt "$cores" ]; then', "\tif false; then", "the fast gate passes past its budget on a machine busy when it started (C.8)"),
         ('\tif [ "$load" -gt "$cores" ]; then', '\tif [ "$load" -ge "$cores" ]; then', "the fast gate fails past its budget on a machine at its cores (C.8)"),
         ("load=${load_start% *}", "load=$(python3 -I scripts/load.py | cut -d' ' -f1)", "a machine its own lanes loaded is no excuse (security-S3)"),
