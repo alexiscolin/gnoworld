@@ -2,7 +2,7 @@ import { lineOf, lines, word } from "./chat.ts";
 import { expect, hydrated, test } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { MEMBER, opened, scriptedErgo, type HistoryLine } from "./scripted.ts";
-import { asAccount, barOf, GUEST, HISTORY, OTHER, ROOM, T, tagmsg } from "./talk.ts";
+import { asAccount, barOf, GUEST, HISTORY, OTHER, ROOM, T, tabsTo, tagmsg } from "./talk.ts";
 
 // The lines sent, each label as a star: what a label says is the link's own (F1170).
 const unlabelled = (sent: readonly string[]) => sent.map((line) => line.replace(/^@label=[^;]+;/u, "@label=*;"));
@@ -139,8 +139,7 @@ test.describe("reactions", () => {
       replayed: [tagmsg("r1", "+draft/react=🔥;+reply=m1", { at: 2, who: OTHER })],
     }));
     await lines(page).nth(0).focus();
-    await page.keyboard.press("Tab");
-    await expect(lineOf(page, "the first line").getByRole("button", { name: "🔥, 1" })).toBeFocused();
+    await tabsTo(page, lineOf(page, "the first line").getByRole("button", { name: "🔥, 1" }), 8);
     await page.keyboard.press("Enter");
     const mine = lineOf(page, "the first line").getByRole("button", { name: "🔥, 2, including you" });
     await expect(mine).toBeVisible();

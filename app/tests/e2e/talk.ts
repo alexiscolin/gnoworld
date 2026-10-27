@@ -1,6 +1,7 @@
 // What 4d's journeys share: #games' history, a TAGMSG and a tagged line as Ergo replays or relays them, a line's bar,
 // the composer's field, and the test's account on a scripted Ergo that echoes it.
 import { lines, word } from "./chat.ts";
+import type { Locator } from "@playwright/test";
 import { expect, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { MEMBER, opened, type HistoryLine, type Scripted } from "./scripted.ts";
@@ -43,4 +44,13 @@ export async function asAccount(page: Page, script: (address: string) => Scripte
   });
   await expect(lines(page)).toHaveCount(shown);
   return { address, ergo, said: () => sent.filter((line) => /^(@\S+ )?(PRIVMSG|TAGMSG) /.test(line)) };
+}
+
+/** The Tab presses from where the focus is to `target`, at most `most`: the test fails when it takes more. */
+export async function tabsTo(page: Page, target: Locator, most: number): Promise<number> {
+  for (let presses = 1; presses <= most; presses += 1) {
+    await page.keyboard.press("Tab");
+    if (await target.evaluate((element) => element === document.activeElement)) return presses;
+  }
+  throw new Error(`not reached in ${String(most)} Tab presses`);
 }
