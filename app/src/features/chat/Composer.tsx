@@ -1,9 +1,10 @@
-// The composer (slice 4's 4c): one line of Markdown to the room in view, sent with Enter or Send; its caller shows
+// The composer (slice 4's 4c): Markdown to the room in view, sent with Enter or Send, Shift+Enter adding a line (a
+// message of several lines goes as one, 4096 bytes and 40 lines at most: draft/multiline); its caller shows
 // it to an account alone, a room letting accounts alone speak (+M). The design system's field holds the line and
 // says what keeps it from going (too long for IRC's 510 bytes, a command it does not know, the chat away) or the
 // bytes left near the end, or what Tab completes the word being typed to (a command, a room, an account). A format
 // bar wraps the selection in Markdown's marks; the line shows below as it reads.
-import { COMMANDS, compose, type Composed } from "@gnoworld/core";
+import { COMMANDS, compose, MULTILINE_BYTES, MULTILINE_LINES, type Composed } from "@gnoworld/core";
 import { Button, Cluster, Field, IconButton, Sidebar, Stack, type FieldProps, type IconName } from "@gnoworld/ui";
 import { useLayoutEffect, useRef, useState, type KeyboardEvent, type SubmitEvent } from "react";
 import { completed, completions, type Completion } from "./complete.ts";
@@ -31,21 +32,37 @@ const bytes = (count: number) => `${String(count)} ${count === 1 ? "byte" : "byt
 // An option as the help names it: an account by its short address.
 const named = (option: string) => (option.startsWith("@") ? `@${shortAddress(option.slice(1))}` : option);
 
-/** What the field says of the line: that it was not sent or is too long, what Tab completes (a command not yet
- * typed whole being no error), an unknown command, or help near the end; or nothing. */
+const plural = (count: number, unit: string) => `${String(count)} ${unit}${count === 1 ? "" : "s"}`;
+
+// Why a draft is too long: the line of several (named, from 1), the line, or the message past its lines or its bytes.
+function tooLong(composed: Extract<Composed, { kind: "long" | "tooBig" }>): string {
+  if (composed.kind === "tooBig") {
+    return composed.unit === "lines"
+      ? `${plural(composed.over, "line")} too many: ${String(MULTILINE_LINES)} at most.`
+      : `Too long by ${bytes(composed.over)}: ${String(MULTILINE_BYTES)} at most.`;
+  }
+  const by = `too long by ${bytes(composed.over)}`;
+  return composed.line === undefined
+    ? `Too long by ${bytes(composed.over)}.`
+    : `Line ${String(composed.line)} is ${by}.`;
+}
+
+/** What the field says of the draft: that it was not sent or is too long (a line of several named, a message past
+ * its lines or bytes), what Tab completes (a command not yet typed whole being no error), an unknown command, or
+ * help near the end; or, said of nothing else, that Shift+Enter adds a line. */
 export function said(composed: Composed, failed: boolean, completion?: Completion): Pick<FieldProps, "error" | "help"> {
   if (failed) return { error: "Not sent: the chat is not in this room yet. Try again in a moment." };
-  if (composed.kind === "long") return { error: `Too long by ${bytes(composed.over)}.` };
+  if (composed.kind === "long" || composed.kind === "tooBig") return { error: tooLong(composed) };
   if (completion !== undefined) {
     const [first = "", ...rest] = completion.options.map(named);
     return { help: `Tab completes ${first}${rest.length === 0 ? "" : `; also ${rest.join(", ")}`}.` };
   }
   if (composed.kind === "unknown") return { error: `${composed.command} is not a command. /me sends an action.` };
-  if (composed.kind === "line" && composed.left < NEAR) return { help: `${bytes(composed.left)} left.` };
+  if ("left" in composed && composed.left < NEAR) return { help: `${bytes(composed.left)} left.` };
   return {};
 }
 
-/** The line as the room will read it, an action as one, the account's own mention apart, a member's shortened (F812),
+/** The draft as the room will read it, an action as one, the account's own mention apart, a member's shortened (F812),
  * out of reach of the keyboard and of a screen reader (the field says it already); nothing of a line that cannot go. */
 export function Preview({
   composed,
@@ -56,10 +73,10 @@ export function Preview({
   me?: string | undefined;
   members?: ReadonlySet<string> | undefined;
 }) {
-  if (composed.kind !== "line") return null;
+  if (composed.kind !== "line" && composed.kind !== "lines") return null;
   return (
     <div className={styles["preview"]} inert>
-      {composed.action ? "* " : null}
+      {composed.kind === "line" && composed.action ? "* " : null}
       <Message text={composed.text} me={me} members={members} />
     </div>
   );
@@ -120,8 +137,10 @@ export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", 
   const mentioning = /(^|\s)@\S*$/u.test(draft);
   const people = mentioning ? peopleOf(members, nick) : [];
   const completion = completions(draft, { commands: COMMANDS, rooms, people });
+  // Said of nothing else, the box says how to add a line.
+  const note = said(composed, failed, completion);
   const known = new Set(members);
-  const box = () => formRef.current?.querySelector("input") ?? undefined;
+  const box = () => formRef.current?.querySelector("textarea") ?? undefined;
   useLayoutEffect(() => {
     const selection = selectionRef.current;
     if (selection === undefined) return;
@@ -150,7 +169,7 @@ export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", 
   };
   const send = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (composed.kind !== "line") return;
+    if (composed.kind !== "line" && composed.kind !== "lines") return;
     const went = onSay(composed);
     setFailed(!went);
     if (went) change("");
@@ -161,15 +180,16 @@ export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", 
         <FormatBar onFormat={format} />
         <Sidebar side="end" space="2xs">
           <Field
+            kind="lines"
             label={`Message ${label}`}
             value={draft}
             onChange={(value) => {
               change(value);
               setFailed(false);
             }}
-            {...said(composed, failed, completion)}
+            {...("error" in note || "help" in note ? note : { help: "Shift+Enter adds a line." })}
           />
-          <Button type="submit" disabled={composed.kind !== "line"}>
+          <Button type="submit" disabled={composed.kind !== "line" && composed.kind !== "lines"}>
             Send
           </Button>
         </Sidebar>

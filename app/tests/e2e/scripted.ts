@@ -39,12 +39,53 @@ function rooms(
   if (!line.startsWith(`CHATHISTORY LATEST ${told} `)) return [];
   return [
     `BATCH +h1 chathistory ${told}`,
-    ...history.map(
-      ([id, time, text, author = MEMBER]) =>
-        `@batch=h1;msgid=${id};time=${time};account=${author} :${author}!u@h PRIVMSG ${told} :${text}`,
-    ),
+    ...history.flatMap(([id, time, text, author = MEMBER]) => {
+      const stamp = `msgid=${id};time=${time};account=${author}`;
+      if (!text.includes("\n")) return [`@batch=h1;${stamp} :${author}!u@h PRIVMSG ${told} :${text}`];
+      // A message of several lines sits in the page as a draft/multiline batch of its own (draft/multiline).
+      return several(`@batch=h1;${stamp} :${author}!u@h`, { ref: `m${id}`, room: told, parts: text.split("\n") });
+    }),
     "BATCH -h1",
   ];
+}
+
+// A message of several lines as Ergo relays it to a reader with draft/multiline: the opening line (its tags and
+// source given), each part a PRIVMSG of the batch, the end tagged as the opening is, the room and the reference
+// after a colon as Ergo writes them (irc/client.go, composeMultilineBatch, v2.19.1).
+function several(opening: string, { ref, room, parts }: { ref: string; room: string; parts: readonly string[] }) {
+  const [tags, source] = opening.split(" ");
+  const within = /(?:^@|;)(batch=[^;]+)/.exec(tags ?? "")?.[1];
+  return [
+    `${opening} BATCH +${ref} draft/multiline :${room}`,
+    ...parts.map((part) => `@batch=${ref} ${source ?? ""} PRIVMSG ${room} :${part}`),
+    `${within === undefined ? "" : `@${within} `}${source ?? ""} BATCH :-${ref}`,
+  ];
+}
+
+type Open = Map<string, { room: string; parts: string[] }>;
+
+// The page's lines of a batch of several lines, held by its reference until its end; whether the line was one.
+function held(line: string, open: Open): boolean {
+  const opened = /^BATCH \+(\S+) draft\/multiline (\S+)$/.exec(line);
+  if (opened?.[1] !== undefined && opened[2] !== undefined) {
+    open.set(opened[1], { room: opened[2], parts: [] });
+    return true;
+  }
+  const part = /^@batch=(\S+) PRIVMSG \S+ :(.*)$/.exec(line);
+  if (part?.[1] !== undefined) open.get(part[1])?.parts.push(part[2] ?? "");
+  return part !== null;
+}
+
+// The page's own message of several lines, echoed as Ergo echoes it once the page's batch ends (echo-message), its
+// id and time made here.
+function echoed(line: string, me: string, open: Open): string[] {
+  if (held(line, open)) return [];
+  const ref = /^BATCH -(\S+)$/.exec(line)?.[1];
+  const batch = ref === undefined ? undefined : open.get(ref);
+  if (ref === undefined || batch === undefined) return [];
+  open.delete(ref);
+  const stamp = `msgid=echo-${ref};time=${new Date().toISOString()};account=${me}`;
+  return several(`@${stamp} :${me}!u@h`, { ref: `e${ref}`, room: batch.room, parts: batch.parts });
 }
 
 // A REDACT of the page's: Ergo's echo, which takes the line from every reader, or its refusal; none while held.
@@ -72,6 +113,7 @@ export interface Scripted {
 /** Answers the page's socket as Ergo would, the page being `me`: with #games' history, or with what `script` says. */
 export function scriptedErgo(ergo: WebSocketRoute, me: string, script: Scripted = {}): void {
   const { history = LINES, heard, refuseRedact = false, holdRedact = false, room = "#bubble/games" } = script;
+  const multiline: Open = new Map();
   ergo.onMessage((data) => {
     const line = String(data);
     heard?.(line);
@@ -79,6 +121,7 @@ export function scriptedErgo(ergo: WebSocketRoute, me: string, script: Scripted 
       ...welcome(line, me),
       ...rooms(line, me, { history, told: room }),
       ...redaction(line, me, { refuse: refuseRedact, hold: holdRedact }),
+      ...echoed(line, me, multiline),
     ];
     for (const answer of answers) ergo.send(answer);
   });

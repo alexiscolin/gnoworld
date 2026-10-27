@@ -408,7 +408,7 @@ test.describe("the composer", () => {
     await inGames(page);
     const line = word("blocked");
     await field(page).fill(line);
-    await expect(field(page)).not.toHaveAccessibleDescription(/\S/);
+    await expect(field(page)).toHaveAccessibleDescription("Shift+Enter adds a line.");
     await field(page).press("Enter");
     await expect(lineOf(page, line)).toHaveCount(1);
     await expect(field(page)).toHaveValue("");

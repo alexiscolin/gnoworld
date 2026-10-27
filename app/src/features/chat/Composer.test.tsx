@@ -80,16 +80,16 @@ describe("Composer", () => {
         onSay={() => true}
       />,
     );
-    expect(markup).toMatch(/<input[^>]* value="kept \*\*draft\*\*"/);
+    expect(markup).toMatch(/<textarea[^>]*>kept \*\*draft\*\*<\/textarea>/);
     expect(markup).toContain("<strong>draft</strong>");
   });
 
   it("starts empty with no draft given, and writes a stored draft as a value, never as markup", () => {
-    expect(html()).toMatch(/<input[^>]* value=""/);
+    expect(html()).toMatch(/<textarea[^>]*><\/textarea>/);
     const markup = renderToStaticMarkup(
       <Composer room={ROOM} nick={NICK} rooms={[]} members={[]} draft={'"><img src=x onerror=1>'} onSay={() => true} />,
     );
-    expect(markup).toContain('value="&quot;&gt;&lt;img src=x onerror=1&gt;"');
+    expect(markup).toContain("&quot;&gt;&lt;img src=x onerror=1&gt;</textarea>");
     expect(markup).not.toMatch(/<img/);
   });
 
@@ -203,5 +203,59 @@ describe("the composer, from a draft", () => {
   it("leaves Send on for a line that can go, off for one that cannot", () => {
     expect(from("hello")).not.toMatch(/<button(?=[^>]*type="submit")(?=[^>]*disabled)/);
     expect(from("/nick bob")).toMatch(/<button(?=[^>]*type="submit")(?=[^>]*disabled="")[^>]*>/);
+  });
+});
+
+// draft/multiline (docs/decisions.md row 255): Shift+Enter adds a line to the draft, Enter sends it; a message of
+// several lines is previewed as the room reads it, and what keeps it from going is said.
+describe("the composer, a draft of several lines", () => {
+  const from = (draft: string) =>
+    renderToStaticMarkup(
+      <Composer room={ROOM} nick={NICK} rooms={["#games"]} members={[]} draft={draft} onSay={() => true} />,
+    );
+
+  it("holds the draft in a box of several lines, labelled for the room", () => {
+    expect(from("")).toMatch(/<textarea[^>]*>/);
+    expect(from("")).not.toMatch(/<input[^>]*type="text"/);
+  });
+
+  it("previews a draft of several lines as the room reads it, a list as a list", () => {
+    expect(renderToStaticMarkup(<Preview composed={compose(ROOM, "- one\n- two", NICK)} />)).toMatch(
+      /<ul><li>one<\/li><li>two<\/li><\/ul>/,
+    );
+  });
+
+  it("describes the box by the hint that Shift+Enter adds a line, which a message near its cap's help replaces", () => {
+    const markup = from("");
+    const described = /<textarea[^>]* aria-describedby="([^"]+)"/.exec(markup)?.[1] ?? "?";
+    expect(markup).toMatch(new RegExp(`id="${described}"[^>]*>Shift\\+Enter adds a line\\.<`));
+  });
+
+  it("names the line too long, from 1, and a message too many lines by how many", () => {
+    const long = compose(ROOM, `one\ntwo\n${"a".repeat(480)}`, NICK);
+    expect(said(long, false)).toStrictEqual({
+      error: expect.stringMatching(/^Line 3 is too long by \d+ bytes\.$/) as string,
+    });
+    expect(said(compose(ROOM, Array.from({ length: 42 }, () => "x").join("\n"), NICK), false)).toStrictEqual({
+      error: "2 lines too many: 40 at most.",
+    });
+  });
+
+  it("leaves Send on for a message of several lines that can go", () => {
+    expect(from("- one\n- two")).not.toMatch(/<button(?=[^>]*type="submit")(?=[^>]*disabled)/);
+  });
+
+  it("says a message one line or one byte past its caps, and Send off", () => {
+    expect(said(compose(ROOM, Array.from({ length: 41 }, () => "x").join("\n"), NICK), false)).toStrictEqual({
+      error: "1 line too many: 40 at most.",
+    });
+    const over = [...Array.from({ length: 10 }, () => "a".repeat(400)), "a".repeat(87)].join("\n");
+    expect(said(compose(ROOM, over, NICK), false)).toStrictEqual({ error: "Too long by 1 byte: 4096 at most." });
+    expect(from(over)).toMatch(/<button(?=[^>]*type="submit")(?=[^>]*disabled="")[^>]*>/);
+  });
+
+  it("says the bytes a message of several lines has left near its cap", () => {
+    const near = [...Array.from({ length: 10 }, () => "a".repeat(400)), "a".repeat(70)].join("\n");
+    expect(said(compose(ROOM, near, NICK), false)).toStrictEqual({ help: "16 bytes left." });
   });
 });
