@@ -155,6 +155,11 @@ describe("roomNotice: a mention of the whole room", () => {
     ["after a mention of someone", `@${BOB} @room`],
     ["after a link", "[x](https://gno.land) @room"],
     ["after a mark", "**a** @room"],
+    ["in a later paragraph", "intro\n\n@room"],
+    ["in one item of several", "- a\n- @room"],
+    ["in a quote's later paragraph", "> q\n\n@room"],
+    ["right after a mark's closing", "**a**@room"],
+    ["right after a link's closing", "[x](https://gno.land)@room"],
   ])("is a group mention %s, where it may count", (_, text) => {
     expect(kindOf(text, {}, { groups: true })).toBe("group");
   });
@@ -169,6 +174,7 @@ describe("roomNotice: a mention of the whole room", () => {
     ["after a letter and a zero-width mark, which the server folds away", "x\u200b@room"],
     ["after a letter and a combining accent, which the server folds away", "e\u0301@room"],
     ["before a letter with an accent", "@roomé"],
+    ["right after a mention, which ends in a letter", `@${BOB}@room`],
   ])("is none when it stands %s", (_, text) => {
     expect(kindOf(text, {}, { groups: true })).toBeUndefined();
   });
