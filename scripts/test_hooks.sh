@@ -1842,20 +1842,25 @@ for slow in lint gno; do
 	format=$(printf '%s\n' "$out" | sed -n 's/^lane ts .*format \([0-9]*\)\.\([0-9]\).*/\1\2/p') lint=$(printf '%s\n' "$out" | sed -n 's/^lane types .*lint \([0-9]*\)\.\([0-9]\).*/\1\2/p')
 	[ -n "$format" ] && [ "$format" -lt "$lint" ] || fail "check.sh gave a quick step a slow one's time: $out"
 done
-# Past its budget on a busy machine, its 1-minute load above its cores at the run's start or end, the fast gate
-# says so and passes (Alexis, 2026-10-26, C.8): it measured the machine, not the code. At its cores, not above, it
-# still fails.
-busy() { # $1, $2: the load at the run's start and end, in tenths; $3: when the machine was busy
-	rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/gate-green"
-	out=$(LOAD_1="$1 160" LOAD_2="$2 160" SLOW_STEP=lint GATE_BUDGET=0 gate) || fail "check.sh failed past its budget on a machine busy at $3: $out"
-	printf '%s\n' "$out" | grep -q "over its 0 s budget on a busy machine (load 17.0 on 16 cores): passed" ||
-		fail "check.sh did not say it passed past its budget, the machine busy at $3: $out"
-	grep -qxF "$(record)" "$g/.claude/tmp/green-fast" || fail "check.sh did not record the gate it passed on a busy machine"
-	# The load is read as the lanes start and again when they have all ended, not before or after (G3): the stub logs
-	# each call, which the answers by order cannot tell.
-	[ "$(sed -n 1p "$log" | cut -d' ' -f1)" = py:load ] || fail "check.sh read the load after a lane had started: $(sed -n 1p "$log")"
-}
-busy 170 10 "the run's start"
+# Past its budget on a machine already busy when it started, its 1-minute load above its cores, the fast gate says so and
+# passes (Alexis, 2026-10-26, C.8): it measured the machine, not the code. The load is the one read before any lane
+# starts: a reading at the end includes the gate's own lanes (Vitest takes cores - 1 workers, beside four lanes), which a
+# change making its own tests CPU-bound raises, so the slower the change, the likelier its own load excused it
+# (security-S3). At its cores, not above, it still fails.
+busy=170 idle=10
+rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/gate-green"
+out=$(LOAD_1="$busy 160" LOAD_2="$idle 160" SLOW_STEP=lint GATE_BUDGET=0 gate) || fail "check.sh failed past its budget on a machine busy when it started: $out"
+printf '%s\n' "$out" | grep -q "over its 0 s budget on a machine busy when it started (load 17.0 on 16 cores): passed" ||
+	fail "check.sh did not say it passed past its budget, the machine busy at its start: $out"
+grep -qxF "$(record)" "$g/.claude/tmp/green-fast" || fail "check.sh did not record the gate it passed on a busy machine"
+# The load is read once, as the lanes start, never after: the stub logs each call, which the answers by order cannot tell.
+[ "$(grep -c '^py:load' "$log")" = 1 ] || fail "check.sh did not read the load once, as the lanes start: $(grep -c '^py:load' "$log")"
+[ "$(sed -n 1p "$log" | cut -d' ' -f1)" = py:load ] || fail "check.sh read the load after a lane had started: $(sed -n 1p "$log")"
+# A machine idle at the start that its own lanes then loaded is no excuse: the gate fails.
+rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/gate-green"
+out=$(LOAD_1="$idle 160" LOAD_2="$busy 160" SLOW_STEP=lint GATE_BUDGET=0 gate) && fail "check.sh passed past its budget on a machine idle at its start, loaded by its own lanes: $out"
+printf '%s\n' "$out" | grep -q "find what grew" || fail "check.sh did not fail past its budget on a machine idle at its start: $out"
+[ ! -e "$g/.claude/tmp/green-fast" ] || fail "check.sh recorded a gate past its budget on a machine its own lanes loaded"
 out=$(LOAD_1="160 160" LOAD_2="160 160" SLOW_STEP=lint GATE_BUDGET=0 gate) && fail "check.sh passed past its budget on a machine at its cores, not above"
 printf '%s\n' "$out" | grep -q "find what grew" || fail "check.sh did not fail past its budget at the machine's cores: $out"
 # load.py reads the machine itself: its 1-minute load (the first of getloadavg's three) and its cores, in tenths.

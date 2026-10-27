@@ -128,10 +128,12 @@ What a commit leaves out, the full gate runs on the exact tip before `main` take
 wants its record). ESLint reads no cache: a cache is keyed on a file's own text, so a type changed
 in one file would hide the lint error it brings to another (the red pass reproduced it with
 `no-floating-promises`). `GATE_BUDGET` may lower the budget, never raise it. Past its budget,
-the fast gate fails only on a machine at or under its cores, its 1-minute load read as the lanes
-start and as they end (`scripts/load.py`, 0.02 s a read); busier, it says the machine was busy,
-names its slowest step and passes (Alexis, C.8): beside another worktree's merge check, commits
-whose code had not grown took 61 to 98 s at a load of 65 to 76 on 16 cores.
+the fast gate fails only on a machine at or under its cores, its 1-minute load read once, as the
+lanes start and before any of them loads it (`scripts/load.py`, 0.02 s); busier, it says the
+machine was busy when it started, names its slowest step and passes (Alexis, C.8): beside another
+worktree's merge check, commits whose code had not grown took 61 to 98 s at a load of 65 to 76 on
+16 cores. A reading at the end would include the gate's own lanes, which a change making its own
+tests CPU-bound raises (security-S3).
 
 **Fast** (every turn, every commit, a work branch's push; it fails past its budget), its steps:
 
@@ -338,8 +340,10 @@ and the harness is frozen until a real bug crosses it.
   the coverage, StrykerJS and `vitest list` never open a browser: StrykerJS mutates core's code
   against Node's engine alone.
 - **The fast gate's budget, judged on the load, lets a slow change through on a busy machine:**
-  it passes past its budget whenever the load passed the cores, whatever grew; an idle run
-  catches it, and the overrun is printed every time.
+  it passes past its budget whenever the load, read as the lanes started, passed the cores,
+  whatever grew (a run started on a busy machine, or by a process that loaded it first, is
+  excused); an idle run catches it, and the overrun is printed every time. The machine-wide lock
+  of `docs/decisions.md` (2026-10-26, "One gate at a time on the machine") removes the rule.
 - **The benches measure what runs outside React's runtime:** the React Compiler's caches (F818,
   F819) hold only in a rendered app, which no bench drives.
 - **A copy made before 2026-10-26 names no run,** so repo_files leaves it: remove it by hand
