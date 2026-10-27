@@ -52,7 +52,10 @@ export function sayTo(
     ...(reply === undefined ? [] : [`+reply=${reply}`]),
     ...(edit === undefined ? [] : [`+gnoworld/edit=${edit}`]),
   ];
-  return o.outbox.send({ partner, draft }, (label) => out(o, `@${[`label=${label}`, ...marks].join(";")} ${line}`));
+  const kept = marks.length === 0 ? {} : { tags };
+  return o.outbox.send({ partner, draft, ...kept }, (label) =>
+    out(o, `@${[`label=${label}`, ...marks].join(";")} ${line}`),
+  );
 }
 
 /** A reaction to a line of the conversation, or its take-back. Whether it went. */

@@ -123,6 +123,8 @@ export interface ComposerProps {
   /** The lines Ergo refused so far, the last one's draft, and why it did not go (4e: a direct message to an account
    * not connected). One more while the composer is in view puts its draft back in the box. */
   refused?: Refused | undefined;
+  /** Whether `refused` is a refusal not told yet as the composer starts: a correction Ergo refused, taken up again. */
+  fresh?: boolean | undefined;
   /** Takes the focus as it starts: a direct message just opened from who is here, whose button went (4e's U12). */
   focus?: boolean | undefined;
   /** The id of what describes whom it writes to: a direct message's "not encrypted" (4e's U6). */
@@ -141,7 +143,7 @@ export interface ComposerProps {
 export function Composer(props: ComposerProps) {
   const { room, nick, rooms, members, onSay, draft: kept = "", onDraft, onTyping, label: to, refused } = props;
   const [draft, setDraft] = useState(kept);
-  const refusal = useRefusal(refused, draft, setDraft);
+  const refusal = useRefusal(refused, draft, { setDraft, fresh: props.fresh });
   // Each change of the draft, the device and the room told at once: a render alone (a line arriving, a room opened
   // on a kept draft) writes nothing and tells no one (R3).
   const change = (next: string) => {

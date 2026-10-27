@@ -28,25 +28,40 @@ const say = vi.fn<Shown["say"]>(() => true);
 function Probe({
   kind,
   lines,
+  refused,
   seen,
 }: {
   kind: "dm" | "room";
   lines: readonly Line[];
+  refused: Refusal | undefined;
   seen: (result: Composed) => void;
 }) {
-  const shown = { kind, key: `${kind}:x`, view: { state: { lines } }, say } as unknown as Shown;
+  const shown = { kind, key: `${kind}:x`, view: { state: { lines } }, writer: { refused }, say } as unknown as Shown;
   const result = useComposing(shown);
   useEffect(() => {
     seen(result);
   });
   return null;
 }
-const draw = (kind: "dm" | "room" = "dm", lines: readonly Line[] = LINES) => {
+interface Refusal {
+  count: number;
+  draft: string;
+  why: string;
+  tags?: { reply?: string; edit?: string };
+}
+const refusal = (count: number, tags?: Refusal["tags"]): Refusal => ({
+  count,
+  draft: "fixed",
+  why: "Not sent.",
+  ...(tags === undefined ? {} : { tags }),
+});
+const draw = (kind: "dm" | "room" = "dm", lines: readonly Line[] = LINES, refused?: Refusal) => {
   act(() => {
     root.render(
       <Probe
         kind={kind}
         lines={lines}
+        refused={refused}
         seen={(result) => {
           latest = result;
         }}
@@ -186,5 +201,60 @@ describe("useComposing", () => {
     });
     expect(say).not.toHaveBeenCalled();
     expect(now().writer.editing).toBeUndefined();
+  });
+
+  // /code-review on 4d's DM bar (CR2): a refused correction came back as a plain draft, and the next Send posted it as a
+  // new message beside the original; a refused reply lost its link to the line.
+  it("takes a refused correction up again: its line edited, its box the draft put back, its refusal told", () => {
+    draw();
+    draw("dm", LINES, refusal(1, { edit: "m1" }));
+    expect(now().writer.editing).toEqual({ text: "my words", asked: 1, back: true });
+    act(() => {
+      now().writer.onSay?.("fixed");
+    });
+    expect(say).toHaveBeenCalledExactlyOnceWith("fixed", { edit: "m1" });
+    expect(now().writer.editing).toBeUndefined();
+  });
+
+  it("takes a refused reply up again, and a later refusal again", () => {
+    draw();
+    draw("dm", LINES, refusal(1, { reply: "m2" }));
+    expect(now().writer.replying?.id).toBe("m2");
+    act(() => {
+      now().writer.onSay?.("answer");
+    });
+    expect(say).toHaveBeenLastCalledWith("answer", { reply: "m2" });
+    expect(now().writer.replying).toBeUndefined();
+    draw("dm", LINES, refusal(2, { reply: "m1" }));
+    expect(now().writer.replying?.id).toBe("m1");
+  });
+
+  it("takes a refused line's tags in place of the reply asked since, and drops the reply of a correction", () => {
+    draw();
+    act(() => now().view.onReply?.("m1"));
+    draw("dm", LINES, refusal(1, { reply: "m2" }));
+    expect(now().writer.replying?.id).toBe("m2");
+    draw("dm", LINES, refusal(2, { edit: "m1" }));
+    expect(now().writer.replying).toBeUndefined();
+    expect(now().writer.editing?.back).toBe(true);
+  });
+
+  it("takes nothing up while a correction is open, a refusal with no tags, nor one heard as the conversation came in view", () => {
+    draw("dm", LINES, refusal(3, { reply: "m2" }));
+    expect(now().writer.replying).toBeUndefined();
+    draw("dm", LINES, refusal(4));
+    expect(now().writer.replying).toBeUndefined();
+    act(() => now().view.onEdit?.("m1"));
+    draw("dm", LINES, refusal(5, { reply: "m2" }));
+    expect(now().writer.replying).toBeUndefined();
+    expect(now().writer.editing).toEqual({ text: "my words", asked: 1 });
+  });
+
+  it("takes up a refusal heard in a room or of a line gone from the window by no line", () => {
+    draw("room");
+    draw("room", LINES, refusal(1, { edit: "m1" }));
+    expect(now().writer.editing).toBeUndefined();
+    draw("dm", LINES, refusal(1, { reply: "m9" }));
+    expect(now().writer.replying).toBeUndefined();
   });
 });

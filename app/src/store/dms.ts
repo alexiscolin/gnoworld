@@ -24,6 +24,12 @@ export interface DmDevice {
   drafts: Drafts;
 }
 
+/** What a line Ergo refused was tagged with: the msgid it answered, or the one it corrected. */
+export interface RefusedTags {
+  reply?: string;
+  edit?: string;
+}
+
 export interface DmSlice {
   /** Direct messages by the account they are with, each its newest lines (the store's window), the conversation
    * heard last last. */
@@ -36,8 +42,9 @@ export interface DmSlice {
   /** The session's account's choices: a guest's, or one with no device, hear everyone. */
   dmChoices: DmChoices;
   /** The lines Ergo refused this session, by partner: how many, the last one's draft, which the composer takes
-   * back, and `offline: false` when Ergo refused that one for another reason than its partner not connected. */
-  dmRefused: Readonly<Record<string, { count: number; draft: string; offline?: false }>>;
+   * back, `offline: false` when Ergo refused that one for another reason than its partner not connected, and its
+   * `tags` (a reply's, a correction's) when its draft went back on the device, for the composer to take them back too. */
+  dmRefused: Readonly<Record<string, { count: number; draft: string; offline?: false; tags?: RefusedTags }>>;
   /** Whether the session's device failed to keep the choices: it refused a write, or could not be read (CR5). */
   dmNotKept: boolean;
   dmActions: {
@@ -51,8 +58,8 @@ export interface DmSlice {
     /** Notes an account written to, once Ergo delivered my line to it; kept on the device. */
     know: (partner: string) => void;
     /** A line Ergo refused, its partner not connected unless `offline` is false: its draft back on the device, the
-     * refusal counted. */
-    refused: (partner: string, draft: string, offline?: boolean) => void;
+     * refusal counted, with the `tags` the line went with when the draft is back (CR2). */
+    refused: (partner: string, draft: string, how?: { offline?: boolean; tags?: RefusedTags | undefined }) => void;
     /** Ergo refused an act of the page's in a conversation: a delete of the line, or a reaction. */
     actRefused: (partner: string, act: { deleted: string } | { reacted: true }) => void;
     /** The page said what Ergo refused in a conversation: forgotten. */
@@ -87,6 +94,13 @@ function actsOn(
         ? dmReactions
         : { ...dmReactions, [partner]: now.reactions },
   };
+}
+
+// The draft back on the device where none waits: whether it went back.
+function putBack(drafts: Drafts | undefined, partner: string, draft: string): boolean {
+  if (drafts?.get(partner) !== "") return false;
+  drafts.set(partner, draft);
+  return true;
 }
 
 export const dmSlice: StateCreator<ChatSlice & DmSlice, [], [], DmSlice> = (set, get) => {
@@ -153,12 +167,13 @@ export const dmSlice: StateCreator<ChatSlice & DmSlice, [], [], DmSlice> = (set,
         if (!dmChoices.known.has(partner)) set({ dmChoices: { ...dmChoices, known: new Set(written) } });
         if (writable && device?.prefs.setKnown(written) === false) set({ dmNotKept: true });
       },
-      refused: (partner, draft, offline = true) => {
-        // Back on the device where no draft waits: one typed since stays (CR7).
-        if (device?.drafts.get(partner) === "") device.drafts.set(partner, draft);
+      refused: (partner, draft, { offline = true, tags } = {}) => {
+        // Back on the device where no draft waits: one typed since stays (CR7); the tags follow a draft put back alone.
+        const back = putBack(device?.drafts, partner, draft);
         const { dmRefused } = get();
         const count = (dmRefused[partner]?.count ?? 0) + 1;
-        set({ dmRefused: { ...dmRefused, [partner]: offline ? { count, draft } : { count, draft, offline } } });
+        const kept = back && tags !== undefined ? { tags } : {};
+        set({ dmRefused: { ...dmRefused, [partner]: { count, draft, ...(offline ? {} : { offline }), ...kept } } });
       },
       actRefused: (partner, act) => {
         const { dmActRefused } = get();

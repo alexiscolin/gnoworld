@@ -3,6 +3,7 @@
 // delivered it, a numeric when it refused it (401 its partner not connected, irc/handlers.go:2533; 477; 417), or a
 // labeled-response batch of several lines (irc/responsebuffer.go:264-281). Another tab's line carries no label of ours.
 import type { IrcMessage } from "@gnoworld/core";
+import type { RefusedTags } from "../../store/dms.ts";
 import type { createAppStore } from "../../store/index.ts";
 
 /** The lines waiting at once: one more drops the oldest, whose answer then puts nothing back. */
@@ -15,13 +16,17 @@ interface Waiting {
   partner: string;
   draft: string;
   act: Act | undefined;
+  tags: RefusedTags | undefined;
 }
 
 export interface Outbox {
   /** A line to `line.partner`, composed from `line.draft`, sent by `send` with the label it gives, the connection's own
    * count: whether it went, and then waits for Ergo's answer. An `act` (a delete, a reaction) has no draft to put back:
-   * its refusal is told as the act's. */
-  send: (line: { partner: string; draft: string; act?: Act }, send: (label: string) => boolean) => boolean;
+   * its refusal is told as the act's. A reply's or a correction's `tags` come back with its refusal (CR2). */
+  send: (
+    line: { partner: string; draft: string; act?: Act; tags?: RefusedTags },
+    send: (label: string) => boolean,
+  ) => boolean;
   /** Ergo's answer to the line its `tags`' label names, its lines: a refusal among them puts its draft back. */
   answered: (tags: IrcMessage["tags"], messages: readonly IrcMessage[]) => void;
   /** A connection's end: nothing it sent is answered any more. */
@@ -36,11 +41,11 @@ export function outbox(store: ReturnType<typeof createAppStore>): Outbox {
   const waiting = new Map<string, Waiting>();
   let count = 0;
   return {
-    send: ({ partner, draft, act }, send) => {
+    send: ({ partner, draft, act, tags }, send) => {
       count += 1;
       const label = String(count);
       if (!send(label)) return false;
-      waiting.set(label, { partner, draft, act });
+      waiting.set(label, { partner, draft, act, tags });
       const [oldest] = waiting.keys();
       if (waiting.size > WAITING && oldest !== undefined) waiting.delete(oldest);
       return true;
@@ -53,7 +58,8 @@ export function outbox(store: ReturnType<typeof createAppStore>): Outbox {
       const refusal = messages.find(refusing);
       if (refusal === undefined) return;
       const { dmActions } = store.getState();
-      if (line.act === undefined) dmActions.refused(line.partner, line.draft, refusal.command === "401");
+      if (line.act === undefined)
+        dmActions.refused(line.partner, line.draft, { offline: refusal.command === "401", tags: line.tags });
       else dmActions.actRefused(line.partner, line.act);
     },
     clear: () => {

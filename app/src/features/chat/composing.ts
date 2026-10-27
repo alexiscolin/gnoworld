@@ -2,14 +2,17 @@
 // moved out of Loaded.tsx for the lint's sizes: each its conversation's alone, dropped as another comes in view.
 import { foldEdits, type Line } from "@gnoworld/core";
 import { useState } from "react";
+import type { RefusedTags } from "../../store/dms.ts";
 import type { Shown } from "./shown.tsx";
 import type { RoomViewProps } from "./RoomView.tsx";
 import type { WriterProps } from "./Writer.tsx";
 
-// A line chosen to answer or to correct, and how many times it was asked.
+// A line chosen to answer or to correct, how many times it was asked, and whether it is a correction Ergo refused, taken
+// up again (`back`).
 interface Chosen {
   id: string;
   asked: number;
+  back?: true;
 }
 
 // The line as the conversation shows it, while it holds it: nothing is folded while none is chosen.
@@ -109,7 +112,7 @@ function editsOf(
   return {
     view,
     writer: {
-      editing: { text: words, asked: edit.asked },
+      editing: { text: words, asked: edit.asked, ...(edit.back === true ? { back: true as const } : {}) },
       onCancelEdit: end,
       onSay: (draft: string) => {
         const went = draft.trim() === words.trim() || shown.say(draft, { edit: editing.id });
@@ -120,12 +123,37 @@ function editsOf(
   };
 }
 
+// A line Ergo refused, heard while its conversation is in view, takes its reply or its correction up again: its draft is
+// back in the box (the store put it on the device), so the next Send answers or corrects as the first did. Nothing is
+// taken up while a correction is open: the draft waits on the device, a plain one (CR2).
+function takeUp(tags: RefusedTags | undefined, { reply, edit }: { reply: Here<Chosen>; edit: Here<Chosen> }) {
+  if (tags === undefined || edit.value !== undefined) return;
+  const { edit: corrected, reply: answered } = tags;
+  if (corrected !== undefined) {
+    reply.clear();
+    edit.update((was) => ({ ...asking(was, corrected), back: true }));
+  } else if (answered !== undefined) {
+    reply.update((was) => asking(was, answered));
+  }
+}
+
+// The refusals the conversation held as it came in view are not new ones: each later one is taken up.
+function useRefusals(shown: Shown | undefined, held: { reply: Here<Chosen>; edit: Here<Chosen> }) {
+  const heard = useHere<number>(shown?.key);
+  const refused = shown?.writer.refused;
+  const count = refused?.count ?? 0;
+  if (shown === undefined || heard.value === count) return;
+  heard.update(() => count);
+  if (heard.value !== undefined) takeUp(refused?.tags, held);
+}
+
 /** The conversation in view and what its composer is told of the line it answers or corrects. */
 export function useComposing(shown: Shown | undefined) {
   const lines = shown?.view.state?.lines;
   const reply = useHere<Chosen>(shown?.key);
   const edit = useHere<Chosen>(shown?.key);
   const ended = useHere<true>(shown?.key);
+  useRefusals(shown, { reply, edit });
   const end = () => {
     edit.clear();
     ended.update(() => true);

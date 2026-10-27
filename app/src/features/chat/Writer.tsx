@@ -35,8 +35,9 @@ export interface WriterProps {
   asked?: number | undefined;
   onCancelReply?: (() => void) | undefined;
   /** The reader's own line being corrected, its words and how many times Edit was asked: the composer starts again from
-   * them, the device's draft left as it was, and Save sends them (4d's DM bar). */
-  editing?: { text: string; asked: number } | undefined;
+   * them, the device's draft left as it was, and Save sends them (4d's DM bar). A correction Ergo refused, taken up
+   * again (`back`), starts from the device's draft, which the refusal put back, and tells the refusal (CR2). */
+  editing?: { text: string; asked: number; back?: true } | undefined;
   onCancelEdit?: (() => void) | undefined;
 }
 
@@ -46,17 +47,21 @@ export function Writer(props: WriterProps) {
   if (session.kind !== "in") return <p>Log in to write in this room.</p>;
   // The account's drafts on this device: the room's, where the composer starts, and each change kept (4d).
   const kept = pageDrafts(session.address);
+  // A plain composer's draft is the device's, as a refused correction taken up again (`back`) is: only a correction's
+  // own words (an edit) are not kept.
+  const plain = editing === undefined || editing.back === true;
   return (
     <Suspense fallback={null}>
       <Composer
-        draft={editing === undefined ? kept.get(room) : editing.text}
+        draft={plain ? kept.get(room) : editing.text}
         onDraft={
-          editing === undefined
+          plain
             ? (draft) => {
                 kept.set(room, draft);
               }
             : undefined
         }
+        fresh={editing?.back}
         key={editing === undefined ? room : `${room} edit ${String(editing.asked)}`}
         room={room}
         label={label}

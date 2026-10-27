@@ -1445,6 +1445,18 @@ describe("the chat's link: direct messages", () => {
     expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 2, draft: "b" } });
   });
 
+  // /code-review on 4d's DM bar (CR2): a refused correction or reply came back as a plain draft, its tags lost.
+  it("hands the tags of a refused correction or reply back with its draft, where the draft is back", () => {
+    const t = withDrafts();
+    t.link.sayTo(OTHER, "fixed", { edit: "m1" });
+    t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 0)));
+    expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 1, draft: "fixed", tags: { edit: "m1" } } });
+    t.kept.set(OTHER, "");
+    t.link.sayTo(OTHER, "answer", { reply: "m2" });
+    t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 1)));
+    expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 2, draft: "answer", tags: { reply: "m2" } } });
+  });
+
   it("takes a labeled-response batch for its line's answer: its echo and Ergo's away line deliver it", () => {
     const t = withDrafts();
     t.link.sayTo(OTHER, "hi");

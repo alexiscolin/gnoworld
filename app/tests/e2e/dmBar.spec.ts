@@ -252,7 +252,8 @@ test.describe("a direct message's bar", () => {
     ]);
   });
 
-  // R8, F1562 answered by Claude (keep): a refused edit's words come back in the box, and why is said.
+  // R8, F1562 answered by Claude (keep), then CR2 (F1871): a refused edit's words come back in the box with the edit open
+  // again, and why is said; Save sends the correction tagged as before, not a new message beside the line.
   test("puts a refused edit's words back in the box, saying its partner is not online, the line unchanged", async ({
     page,
   }) => {
@@ -261,14 +262,17 @@ test.describe("a direct message's bar", () => {
     await startEdit(page, 0);
     await field(page).fill("as written, fixed");
     await field(page).press("Enter");
-    await expect(page.getByText("Editing a message")).toHaveCount(0);
     await expect(page.getByText(`Not sent: ${SHORT} is not online.`, { exact: true })).toBeVisible();
+    await expect(page.getByText("Editing a message")).toBeVisible();
     await expect(field(page)).toHaveValue("as written, fixed");
     await expect(lines(page)).toHaveCount(1);
     await expect(lines(page).nth(0)).toContainText("as written");
     await expect(lines(page).nth(0)).not.toContainText("as written, fixed");
+    await field(page).press("Enter");
+    await expect.poll(() => dm.says().length).toBe(3);
     expect(dm.says()).toEqual([
       `PRIVMSG ${PARTNER} :as written`,
+      `@+gnoworld/edit=echo1 PRIVMSG ${PARTNER} :as written, fixed`,
       `@+gnoworld/edit=echo1 PRIVMSG ${PARTNER} :as written, fixed`,
     ]);
   });
@@ -280,7 +284,11 @@ test.describe("a direct message's bar", () => {
     await field(page).press("Enter");
     await expect(page.getByText(`Not sent: ${SHORT} is not online.`, { exact: true })).toBeVisible();
     await expect(field(page)).toHaveValue("yes");
+    await expect(page.getByText(`Replying to ${SHORT}: are you coming?`)).toBeVisible();
     await expect(lines(page)).toHaveCount(1);
+    await field(page).press("Enter");
+    await expect.poll(() => dm.says().length).toBe(2);
+    expect(dm.says()).toEqual([`@+reply=p1 PRIVMSG ${PARTNER} :yes`, `@+reply=p1 PRIVMSG ${PARTNER} :yes`]);
   });
 
   test("deletes one's own line after asking, with its corrections, by a REDACT to the partner", async ({ page }) => {

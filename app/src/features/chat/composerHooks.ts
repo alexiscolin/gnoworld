@@ -1,6 +1,7 @@
 // What the composer keeps beside its draft (moved out of Composer.tsx, which the merge of 4e's refusals and 4f's typing
 // grew past the lint's sizes): why Ergo refused the last line, the focus at its start, the selection an edit leaves.
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import type { RefusedTags } from "../../store/dms.ts";
 import type { Edit } from "./format.ts";
 
 /** The lines Ergo refused so far, the last one's draft, and why it did not go. */
@@ -8,26 +9,27 @@ export interface Refused {
   count: number;
   draft: string;
   why: string;
+  /** The reply's or the correction's tags the line went with, when its draft is back on the device (CR2). */
+  tags?: RefusedTags;
 }
 
-// The unsent words quoted, at most 80 characters as a reader counts them.
-const quoted = (words: string) => {
-  const kept = [...new Intl.Segmenter().segment(words)].map(({ segment }) => segment);
-  return kept.length > 80 ? `${kept.slice(0, 80).join("")}…` : words;
-};
-
-/** What a refusal leaves in the box `draft` holds: its draft back into an empty box; else the box as typed since,
- * the unsent words quoted after why (CR7). */
+/** What a refusal leaves in the box `draft` holds: its draft back into an empty box, or into a box that holds it already
+ * (a correction taken up again); else the box as typed since, the unsent words quoted whole after why (CR7, CR2). */
 export function refusalAfter(draft: string, refused: { draft: string; why: string }): { draft: string; why: string } {
-  if (draft === "") return refused;
-  return { draft, why: `${refused.why} Unsent: “${quoted(refused.draft)}”` };
+  if (draft === "" || draft === refused.draft) return refused;
+  return { draft, why: `${refused.why} Unsent: “${refused.draft}”` };
 }
 
 // Why Ergo refused the last line, said until the draft changes or a line goes: one more refusal while in view puts
-// its draft back in an empty box (the store put it back on the device too, where no draft waited).
-export function useRefusal(refused: Refused | undefined, draft: string, setDraft: (draft: string) => void) {
+// its draft back in an empty box (the store put it back on the device too, where no draft waited). A composer that
+// starts on a refusal not told yet (`fresh`: a correction taken up again) tells it as it starts.
+export function useRefusal(
+  refused: Refused | undefined,
+  draft: string,
+  { setDraft, fresh = false }: { setDraft: (draft: string) => void; fresh?: boolean | undefined },
+) {
   const [why, setWhy] = useState<string>();
-  const [answered, setAnswered] = useState(refused?.count);
+  const [answered, setAnswered] = useState(fresh ? undefined : refused?.count);
   if (refused !== undefined && refused.count !== answered) {
     setAnswered(refused.count);
     const after = refusalAfter(draft, refused);

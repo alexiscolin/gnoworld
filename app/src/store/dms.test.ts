@@ -305,6 +305,29 @@ describe("the store's chat slice: direct messages", () => {
     expect(t.store.getState().dmRefused).toEqual({ [ALICE]: { count: 2, draft: "again" } });
   });
 
+  // /code-review on 4d's DM bar (CR2): a refused correction or reply lost its tags with the line, and came back plain.
+  it("keeps a refused line's tags with its draft where the draft went back on the device alone", () => {
+    const t = as(ACCOUNT);
+    const kept = new Map<string, string>();
+    const drafts = {
+      get: (room: string) => kept.get(room) ?? "",
+      set: (room: string, draft: string) => {
+        kept.set(room, draft);
+        return true;
+      },
+    };
+    t.store.getState().dmActions.begin({ prefs: prefs().device, drafts });
+    t.store.getState().dmActions.refused(ALICE, "fixed", { tags: { edit: "m1" } });
+    expect(t.store.getState().dmRefused).toEqual({ [ALICE]: { count: 1, draft: "fixed", tags: { edit: "m1" } } });
+    // A draft waits now, the first one's: the second line's tags have no draft to come back with.
+    t.store.getState().dmActions.refused(ALICE, "answer", { tags: { reply: "m2" }, offline: false });
+    expect(t.store.getState().dmRefused).toEqual({ [ALICE]: { count: 2, draft: "answer", offline: false } });
+    // With no device the draft goes nowhere either.
+    t.store.getState().dmActions.begin();
+    t.store.getState().dmActions.refused(ALICE, "x", { tags: { reply: "m1" } });
+    expect(t.store.getState().dmRefused).toEqual({ [ALICE]: { count: 1, draft: "x" } });
+  });
+
   // 4e's decision B (T5, U3): "refused" means discarded. A stranger's message was kept, hidden, and shown once the
   // account heard everyone again; a flood of strangers grew the store all the while.
   it("keeps no message from an account never written to while it hears those alone, nor shows it once it hears everyone", () => {

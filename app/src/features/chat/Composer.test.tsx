@@ -38,6 +38,35 @@ describe("Composer", () => {
     expect(refusalAfter("x", { draft: "a".repeat(80), why: "W." }).why).toBe(`W. Unsent: “${"a".repeat(80)}”`);
   });
 
+  // /code-review on 4d's DM bar (CR2): the unsent words were cut at 80 characters, and what a reader had typed since kept
+  // the box: the rest of a long correction was lost.
+  it("quotes the unsent words whole, however long, and takes a box holding them already for the draft back", () => {
+    const long = `${"a".repeat(79)}👍🏽${"b".repeat(200)}`;
+    expect(refusalAfter("x", { draft: long, why: "W." }).why).toBe(`W. Unsent: “${long}”`);
+    const refused = { draft: "fixed", why: "W." };
+    expect(refusalAfter("fixed", refused)).toEqual(refused);
+  });
+
+  // A refused correction taken up again starts its composer on the refusal, not told yet: the reader hears why.
+  it("tells a refusal not told yet as it starts, and one it already knew as it starts not", () => {
+    const refused = { count: 1, draft: "fixed", why: "Not sent: g10gh7…3y5tv is not online." };
+    const composer = (fresh: boolean) =>
+      renderToStaticMarkup(
+        <Composer
+          room={ROOM}
+          nick={NICK}
+          rooms={[]}
+          members={[]}
+          onSay={() => true}
+          draft="fixed"
+          refused={refused}
+          fresh={fresh}
+        />,
+      );
+    expect(composer(true)).toContain("Not sent: g10gh7…3y5tv is not online.");
+    expect(composer(false)).not.toContain("Not sent");
+  });
+
   it("is a form named for the room, its field labelled, Send off while the line is empty", () => {
     const markup = html();
     expect(markup).toMatch(/<form[^>]*aria-label="Write in #games"/);
