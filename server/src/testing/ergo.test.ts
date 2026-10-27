@@ -119,6 +119,22 @@ describe("guests and rooms", { timeout: 20_000 }, () => {
     await gus.expect(replayed("PRIVMSG #lobby :persist-marker-1$"));
   });
 
+  // F1492 holds the store is SQLite, not a ring: a room nobody registered keeps its lines across a restart too.
+  it("keeps the history of a room nobody registered across a restart (F1492)", { timeout: 40_000 }, async () => {
+    const e = await start({ dir: keptFolder() });
+    const chief = await lobby(e);
+    await say(chief, "#lobby", "unregistered-marker-1");
+    await sync(chief);
+    const { dir } = e;
+    await e.stop();
+
+    const again = await start({ dir });
+    // Only an operator makes a room (the bot's class, as when it makes them again): the room comes back empty.
+    const reader = await lobby(again);
+    history(reader, "#lobby");
+    await reader.expect(replayed("PRIVMSG #lobby :unregistered-marker-1$"));
+  });
+
   // 4e, decided by Alexis (docs/decisions.md): Ergo sets +R on every connection at its registration
   // (default-user-modes, irc/server.go:445, v2.19.1), so an account that asks nothing hears no guest.
   it("refuses a guest's direct message to an account that sent no MODE, and lets an account's through", async () => {
