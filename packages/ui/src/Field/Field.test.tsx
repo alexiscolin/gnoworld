@@ -93,24 +93,29 @@ describe("Field", () => {
     expect(screen.getByRole("textbox", { name: "Message" }).getAttribute("aria-invalid")).toBe("true");
   });
 
-  it("submits its form on Enter, and adds a line on Shift+Enter", async () => {
+  // A box of lines in a form that submits nothing but a count, its value kept as it is typed from `value`.
+  function formOf(props: { enterAddsLine?: boolean; value?: string } = {}) {
     const submitted = vi.fn((event: SubmitEvent) => {
       event.preventDefault();
     });
     function Form() {
-      const [value, setValue] = useState("");
+      const [value, setValue] = useState(props.value ?? "");
       return (
         <form
           onSubmit={(event) => {
             submitted(event.nativeEvent);
           }}
         >
-          <Field kind="lines" label="Message" value={value} onChange={setValue} />
+          <Field kind="lines" enterAddsLine={props.enterAddsLine} label="Message" value={value} onChange={setValue} />
         </form>
       );
     }
     render(<Form />);
-    const box = screen.getByRole("textbox", { name: "Message" });
+    return { submitted, box: screen.getByRole("textbox", { name: "Message" }) };
+  }
+
+  it("submits its form on Enter, and adds a line on Shift+Enter", async () => {
+    const { submitted, box } = formOf();
     await userEvent.type(box, "one{Shift>}{Enter}{/Shift}two");
     expect(box).toHaveProperty("value", "one\ntwo");
     expect(submitted).not.toHaveBeenCalled();
@@ -120,22 +125,30 @@ describe("Field", () => {
   });
 
   it("submits nothing on the Enter that ends an input method's composition", () => {
-    const submitted = vi.fn((event: SubmitEvent) => {
-      event.preventDefault();
-    });
-    render(
-      <form
-        onSubmit={(event) => {
-          submitted(event.nativeEvent);
-        }}
-      >
-        <Field kind="lines" label="Message" value="か" onChange={vi.fn()} />
-      </form>,
-    );
+    const { submitted, box } = formOf({ value: "か" });
     // Not prevented either: the input method still takes the key.
-    expect(
-      fireEvent.keyDown(screen.getByRole("textbox", { name: "Message" }), { key: "Enter", isComposing: true }),
-    ).toBe(true);
+    expect(fireEvent.keyDown(box, { key: "Enter", isComposing: true })).toBe(true);
+    expect(submitted).not.toHaveBeenCalled();
+  });
+
+  // F1713 (CR1): Safari sends the Enter that confirms a candidate after compositionend, isComposing false, keyCode 229.
+  it("submits nothing on a Safari composition's Enter: keyCode 229 with isComposing false, or while composing", () => {
+    const { submitted, box } = formOf({ value: "か" });
+    expect(fireEvent.keyDown(box, { key: "Enter", keyCode: 229, isComposing: false })).toBe(true);
+    fireEvent.compositionStart(box);
+    expect(fireEvent.keyDown(box, { key: "Enter", keyCode: 13, isComposing: false })).toBe(true);
+    expect(submitted).not.toHaveBeenCalled();
+    // Once the composition ended, an Enter of the key itself sends.
+    fireEvent.compositionEnd(box);
+    expect(fireEvent.keyDown(box, { key: "Enter", keyCode: 13, isComposing: false })).toBe(false);
+    expect(submitted).toHaveBeenCalledTimes(1);
+  });
+
+  // F1714 (CR2, decided by Alexis): a touch keyboard has no Shift, so there Enter adds the line and Send sends.
+  it("adds a line on Enter, and submits nothing, when asked that Enter adds a line", async () => {
+    const { submitted, box } = formOf({ enterAddsLine: true });
+    await userEvent.type(box, "one{Enter}two{Shift>}{Enter}{/Shift}three");
+    expect(box).toHaveProperty("value", "one\ntwo\nthree");
     expect(submitted).not.toHaveBeenCalled();
   });
 

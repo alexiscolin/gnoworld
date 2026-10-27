@@ -1,4 +1,4 @@
-import { useId, type KeyboardEvent } from "react";
+import { useId, useRef, type KeyboardEvent } from "react";
 import { Sidebar, Stack } from "../compositions/index.ts";
 import styles from "./Field.module.css";
 
@@ -9,6 +9,8 @@ export interface FieldProps {
   /** Text unless asked; a date is the browser's date and time; lines is a box of several lines, in which Enter
    * submits the form and Shift+Enter adds a line, a chat's box. */
   kind?: "text" | "search" | "date" | "lines";
+  /** In a box of lines, Enter adds a line, and the form's button submits: a touch keyboard has no Shift. */
+  enterAddsLine?: boolean | undefined;
   help?: string;
   error?: string;
   /** Words before the box, outside its value: "@" before a name. */
@@ -19,14 +21,18 @@ export interface FieldProps {
 
 const TYPES = { text: "text", search: "search", date: "datetime-local" } as const;
 
-// Enter sends the form, but not the Enter that ends an input method's composition, which only picks the word.
-function submitOnEnter(event: KeyboardEvent<HTMLTextAreaElement>): void {
-  if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+// Enter sends the form, but not the Enter that ends an input method's composition, which only picks the word: Safari
+// sends that one after compositionend, isComposing false, keyCode 229 (F1713): the only mark it gives, deprecated
+// and still sent, so read by name.
+function submitOnEnter(event: KeyboardEvent<HTMLTextAreaElement>, composing: boolean): void {
+  const { isComposing } = event.nativeEvent;
+  if (event.key !== "Enter" || event.shiftKey || composing || isComposing) return;
+  if (Reflect.get(event.nativeEvent, "keyCode") === 229) return;
   event.preventDefault();
   event.currentTarget.form?.requestSubmit();
 }
 
-interface BoxProps extends Pick<FieldProps, "value" | "onChange"> {
+interface BoxProps extends Pick<FieldProps, "value" | "onChange" | "enterAddsLine"> {
   kind: NonNullable<FieldProps["kind"]>;
   id: string;
   invalid: boolean;
@@ -34,7 +40,8 @@ interface BoxProps extends Pick<FieldProps, "value" | "onChange"> {
 }
 
 // The box itself: a line of text, or the lines of a message.
-function Box({ kind, id, value, invalid, described, onChange }: BoxProps) {
+function Box({ kind, id, value, invalid, described, enterAddsLine, onChange }: BoxProps) {
+  const composingRef = useRef(false);
   const shared = {
     id,
     className: styles["box"],
@@ -46,7 +53,15 @@ function Box({ kind, id, value, invalid, described, onChange }: BoxProps) {
     <textarea
       {...shared}
       rows={2}
-      onKeyDown={submitOnEnter}
+      onCompositionStart={() => {
+        composingRef.current = true;
+      }}
+      onCompositionEnd={() => {
+        composingRef.current = false;
+      }}
+      onKeyDown={(event) => {
+        if (enterAddsLine !== true) submitOnEnter(event, composingRef.current);
+      }}
       onChange={(event) => {
         onChange(event.target.value);
       }}
@@ -63,7 +78,17 @@ function Box({ kind, id, value, invalid, described, onChange }: BoxProps) {
 }
 
 /** A labelled box, described by its help and its error, which also marks it invalid. */
-export function Field({ label, value, onChange, kind = "text", help, error, prefix, describedBy }: FieldProps) {
+export function Field({
+  label,
+  value,
+  onChange,
+  kind = "text",
+  help,
+  error,
+  prefix,
+  describedBy,
+  enterAddsLine,
+}: FieldProps) {
   const id = useId();
   const helpId = `${id}-help`;
   const errorId = `${id}-error`;
@@ -77,6 +102,7 @@ export function Field({ label, value, onChange, kind = "text", help, error, pref
       value={value}
       invalid={error !== undefined}
       described={described.join(" ") || undefined}
+      enterAddsLine={enterAddsLine}
       onChange={onChange}
     />
   );
