@@ -307,6 +307,25 @@ describe("the composer, from a draft", () => {
     expect(markup).not.toContain("@room notifies");
   });
 
+  // G8 (F1507): a room offers @room as a completion and says it does not notify when its page told no room counts it; a
+  // direct message does neither.
+  it("offers @room while it is typed in a room, none in a direct message", () => {
+    const typed = (room: string, label?: string) =>
+      renderToStaticMarkup(
+        <Composer room={room} label={label} nick={NICK} rooms={[]} members={[]} draft="@ro" onSay={() => true} />,
+      );
+    expect(typed(ROOM)).toContain("@room");
+    expect(typed("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv", "g10gh7…3y5tv")).not.toContain("@room");
+  });
+
+  it("says @room does not notify in a room whose page told nothing of the rooms where it counts", () => {
+    const markup = renderToStaticMarkup(
+      <Composer room={ROOM} nick={NICK} rooms={[]} members={[]} draft="@room hello" onSay={() => true} />,
+    );
+    expect(markup).toContain(ROOM_SILENT);
+    expect(markup).not.toContain(ROOM_NOTIFIES);
+  });
+
   it.each(["hi@g10", "hi @g10 there", "hi @ g10"])(
     "offers no person for %j: no word after @ ends the draft",
     (draft) => {

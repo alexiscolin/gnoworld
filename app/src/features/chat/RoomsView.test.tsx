@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { RoomsView, type RoomsViewProps } from "./RoomsView.tsx";
+import { noticeSaid, RoomsView, type RoomsViewProps } from "./RoomsView.tsx";
 
 const SECTIONS: RoomsViewProps["sections"] = [
   {
@@ -35,6 +35,11 @@ describe("RoomsView", () => {
     expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual(["Talk", "Other rooms"]);
     expect(links(html)).toEqual(["#bubble", "#games", "#news"]);
     expect(hrefs(html)).toEqual(["/w/bubble", "/w/bubble?room=games", "/w/bubble?room=news"]);
+  });
+
+  // G9 (F1510): the navigation takes the focus by code alone (the list's Clear), never into the tab order.
+  it("is reached by code and not by the tab key: tabindex -1", () => {
+    expect(view()).toMatch(/^<nav[^>]*tabindex="-1"/);
   });
 
   it("names the section of the others Rooms when there is no other section", () => {
@@ -281,5 +286,29 @@ describe("RoomsView: notifications", () => {
     it("keeps a guest's navigation free of any status", () => {
       expect(view()).not.toContain('role="status"');
     });
+  });
+});
+
+// G11 (F1511): what a screen reader is told of a notice: who did what, and where; a conversation has no "in".
+describe("noticeSaid", () => {
+  const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+  const at = (kind: "mention" | "group" | "reply" | "dm", by: string, where: string) => ({
+    id: "n1",
+    kind,
+    where,
+    time: "2026-10-25T10:05:00.000Z",
+    by,
+  });
+  it.each([
+    ["mention", "mentioned you in #games"],
+    ["group", "mentioned the room in #games"],
+    ["reply", "replied to you in #games"],
+  ] as const)("says who and what, then where, of a %s", (kind, said) => {
+    expect(noticeSaid(at(kind, ALICE, "#bubble/games"))).toBe(`g10gh7…3y5tv ${said}`);
+  });
+
+  it("says a direct message with no place, and a guest by its nick", () => {
+    expect(noticeSaid(at("dm", ALICE, ALICE))).toBe("g10gh7…3y5tv wrote to you");
+    expect(noticeSaid(at("mention", "guest-bbbbbb", "#bubble"))).toBe("guest-bbbbbb mentioned you in #bubble");
   });
 });

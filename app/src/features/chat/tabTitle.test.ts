@@ -14,6 +14,11 @@ describe("titled: a page's title with the count of what is unseen", () => {
     expect(titled(BASE, 99)).toBe(`(99) ${BASE}`);
   });
 
+  // G9 (F1510): one is the least count that shows.
+  it("shows a count of one", () => {
+    expect(titled(BASE, 1)).toBe(`(1) ${BASE}`);
+  });
+
   it("says 99+ past 99, as the bell's badge does", () => {
     expect(titled(BASE, 100)).toBe(`(99+) ${BASE}`);
     expect(titled(BASE, 5_000)).toBe(`(99+) ${BASE}`);
