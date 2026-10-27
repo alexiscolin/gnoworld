@@ -59,9 +59,17 @@ export function Thread({ root, lines, members, me, onClose, composer }: ThreadPr
   useEffect(() => {
     start();
   }, []);
-  // An Escape that ends an input method's composition belongs to the composition.
+  // An Escape that ends an input method's composition belongs to the composition: Safari marks it with keyCode 229, not
+  // isComposing (R5). The legacy keyCode is the one signal there is: read by name, as the types mark it deprecated.
   const escape = (event: KeyboardEvent) => {
-    if (event.key !== "Escape" || event.defaultPrevented || event.nativeEvent.isComposing) return;
+    const { nativeEvent } = event;
+    if (
+      event.key !== "Escape" ||
+      event.defaultPrevented ||
+      nativeEvent.isComposing ||
+      Reflect.get(nativeEvent, "keyCode") === 229
+    )
+      return;
     event.preventDefault();
     onClose();
   };

@@ -240,7 +240,8 @@ describe("useThreads: the open panel's focus and keys", () => {
     expect(active()).toBe("outside");
   });
 
-  // CR7 (F1767): an Escape that ends an input method's composition belongs to the composition.
+  // CR7 (F1767): an Escape that ends an input method's composition belongs to the composition, whichever way the browser
+  // marks it.
   it("stays open for an Escape that ends a composition, and closes for any other", async () => {
     draw(room);
     act(() => {
@@ -250,6 +251,9 @@ describe("useThreads: the open panel's focus and keys", () => {
     const box = field();
     if (box === null) throw new Error("no field");
     press(box, { key: "Escape", isComposing: true });
+    expect(thread()).not.toBeNull();
+    // Safari's: isComposing false, keyCode 229 (R5).
+    press(box, { key: "Escape", keyCode: 229 });
     expect(thread()).not.toBeNull();
     press(box, { key: "Escape" });
     expect(thread()).toBeNull();
