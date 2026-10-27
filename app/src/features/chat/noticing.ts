@@ -40,13 +40,14 @@ export class Noticer {
     else this.#dm(dm, me);
   }
 
-  /** A room's history page, read: a notice for each line past the reading place Ergo gave, none while it gave none. */
+  /** A room's history page, read: a notice for each line past the reading place Ergo gave, none while it gave none, and
+   * none for a room the account is out of (a page asked before a KICK can come after it). */
   page(room: string, messages: readonly IrcMessage[]): void {
     const state = this.#store.getState();
     const { me } = state.chat;
     const at = me === undefined ? undefined : this.#at(state, room, me);
     const read = roomOf(state, room)?.read;
-    if (!this.#account() || at === undefined || read === undefined) return;
+    if (!this.#account() || !this.#inside.has(room) || at === undefined || read === undefined) return;
     const made = messages.flatMap((message) => {
       const line = lineOf(message, room);
       const notice = line === undefined || line.time <= read ? undefined : roomNotice(line, room, at);

@@ -2258,6 +2258,19 @@ describe("the chat's link: notices, the edges", () => {
     });
   });
 
+  // F1672 (S3): a page asked before a KICK and written after it made notices for a room the account is out of.
+  describe("a history page that comes after the account is taken out of its room", () => {
+    it("makes no notice of its lines", () => {
+      const t = member();
+      t.fake.line(`:ergo MARKREAD ${NEWS} timestamp=${T(2)}`);
+      t.fake.line(`:ergo!u@h KICK ${NEWS} ${ADDRESS} :bye`);
+      t.fake.line(`BATCH +h1 chathistory ${NEWS}`);
+      t.fake.line(`@batch=h1;msgid=h3;time=${T(3)};account=${OTHER} :${OTHER}!u@h PRIVMSG ${NEWS} :@${ADDRESS}`);
+      t.fake.line("BATCH -h1");
+      expect(t.notices()).toEqual([]);
+    });
+  });
+
   describe("the history page, by the same rules as a live line", () => {
     const page = (fake: Fake, lines: readonly (readonly [string, number, string, object?])[], room = GAMES) => {
       fake.line(`BATCH +h1 chathistory ${room}`);
