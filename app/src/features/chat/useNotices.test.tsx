@@ -108,6 +108,20 @@ describe("useNotices", () => {
     });
   };
 
+  // F1512: a guest's list was a new `[]` each render, so useAnnounced set its state on it again and again; only the
+  // compiler of the build, which keeps the one array, hid the loop (the test renders as written).
+  it("draws for a guest without looping on a list made anew each render, and tells it nothing", () => {
+    draw(on({ session: { kind: "out" } }));
+    follow();
+    tell(({ noticeActions }) => {
+      noticeActions.add(mention("a", GAMES));
+    });
+    expect(told().badges).toBeUndefined();
+    expect(told().list).toBeUndefined();
+    expect(told().notify).toBeUndefined();
+    expect(document.title).toBe(TITLE);
+  });
+
   it("counts each room and conversation, lists the notices, and puts the total in the title", () => {
     draw(on());
     follow();

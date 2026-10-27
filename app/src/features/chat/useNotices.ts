@@ -22,6 +22,10 @@ export interface Noticing {
   seen: (partner: string, time: string) => void;
 }
 
+// A guest's list: one array for every render, since a new one each time is a new list to useAnnounced, which sets its state
+// on it again and again; the compiler hid that in the build alone.
+const NONE: readonly Notice[] = [];
+
 // What a screen reader is told as a notice comes, one for a place outside the one in view: the newest of those that came
 // since the list last changed, said until the next. The first list is the one the page started with, told of nothing.
 function useAnnounced(list: readonly Notice[], inView: string | undefined): string {
@@ -60,7 +64,7 @@ export function useNotices(on: {
   const { noticeActions } = useAppStore().getState();
   const account = session.kind === "in";
   useTabTitle(account ? totalUnseen(state) : 0);
-  const said = useAnnounced(account ? list : [], inView);
+  const said = useAnnounced(account ? list : NONE, inView);
   if (!account) return { seen: noticeActions.seen };
   return {
     badges: Object.fromEntries(places.map((where) => [where, badgeOf(state, where)])),
