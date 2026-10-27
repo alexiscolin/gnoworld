@@ -6,7 +6,7 @@
 // Its composer, given, tags every line with the root's msgid; a guest gets a word in its place.
 import { excerpt, foldEdits, threadsOf, type Line } from "@gnoworld/core";
 import { IconButton, Sidebar, Stack } from "@gnoworld/ui";
-import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useEffectEvent, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { LineView } from "./LineView.tsx";
 import shared from "./lists.module.css";
 import { mentionable, shortened } from "./names.ts";
@@ -51,10 +51,14 @@ export function Thread({ root, lines, members, me, onClose, composer }: ThreadPr
           TITLE_LENGTH,
         );
   const boxRef = useRef<HTMLElement>(null);
-  // A guest has no field: the focus goes to Close, which an account's composer leaves to the field.
-  useEffect(() => {
+  // A guest has no field: the focus goes to Close as the panel opens, which an account's composer leaves to the field;
+  // a session that changes later moves it nowhere.
+  const start = useEffectEvent(() => {
     if (me === undefined) boxRef.current?.querySelector("button")?.focus();
-  }, [me]);
+  });
+  useEffect(() => {
+    start();
+  }, []);
   // An Escape that ends an input method's composition belongs to the composition.
   const escape = (event: KeyboardEvent) => {
     if (event.key !== "Escape" || event.defaultPrevented || event.nativeEvent.isComposing) return;

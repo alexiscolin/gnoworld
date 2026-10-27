@@ -101,8 +101,10 @@ function Panel({
   const members = state?.members ?? [];
   const root = rootOf(state?.lines ?? [], open.from);
   const slot = `${session.kind === "in" ? session.address : ""} ${root}`;
+  // The field takes the focus only if the reader was an account as the panel opened: a login later takes none (CR4).
+  const [focus] = useState(session.kind === "in");
   return (
-    <Failing key={open.from} close={close}>
+    <Failing close={close}>
       <Suspense fallback={<Standing word="Opening the thread…" close={close} />}>
         <Thread
           root={root}
@@ -118,7 +120,7 @@ function Panel({
               rooms={rooms}
               members={members}
               onSay={(draft) => acts.onSay(draft, root)}
-              focus
+              focus={focus}
               keeps={false}
               draft={typed.get(slot)}
               onDraft={(text) => {
@@ -156,6 +158,11 @@ export function useThreads(page: Page) {
       },
       threaded: open !== undefined,
     },
-    aside: open === undefined ? people : <Panel {...page} shown={shown} open={open} close={close} typed={typed} />,
+    aside:
+      open === undefined ? (
+        people
+      ) : (
+        <Panel key={open.from} {...page} shown={shown} open={open} close={close} typed={typed} />
+      ),
   };
 }

@@ -114,9 +114,10 @@ describe("useThreads: what a conversation's page opens", () => {
 // The open panel as a page drives it, in jsdom: opened by the handler useThreads hands a line, the focus and the keys
 // watched. The page here is a room's list (one stop), a button outside, and what stands beside.
 describe("useThreads: the open panel's focus and keys", () => {
+  const OUT = { kind: "out" } as const;
   let root: Root;
   let opens: (id: string) => void = () => undefined;
-  type Reader = typeof SESSION;
+  type Reader = typeof SESSION | typeof OUT;
   function Page({ shown, session }: { shown: Shown | undefined; session: Reader }) {
     const { view, aside } = useThreads({ shown, state: STATE, session, rooms: [], acts, people: PEOPLE });
     opens = (id) => view.onThread?.(id);
@@ -141,6 +142,10 @@ describe("useThreads: the open panel's focus and keys", () => {
   };
   const thread = () => document.querySelector("aside[aria-label='Thread']");
   const field = () => document.querySelector<HTMLInputElement>("aside input[type='text'], aside textarea");
+  const active = () => {
+    const now = document.activeElement;
+    return now?.id === "outside" ? "outside" : (now?.getAttribute("data-line") ?? "");
+  };
   // The panel and its lazy code come, then the composer's.
   const loaded = async (guest = false) => {
     const ready = () => thread()?.querySelector("h3") !== null && (guest || field() !== null);
@@ -149,11 +154,25 @@ describe("useThreads: the open panel's focus and keys", () => {
         await new Promise((done) => setTimeout(done, 10));
       });
   };
+  const frame = () =>
+    act(async () => {
+      await new Promise((done) => {
+        requestAnimationFrame(() => {
+          done(undefined);
+        });
+      });
+    });
   const press = (target: Element, over: KeyboardEventInit) => {
     act(() => {
       target.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ...over }));
     });
   };
+  const outside = () => {
+    const button = document.querySelector<HTMLElement>("#outside");
+    if (button === null) throw new Error("no outside button");
+    button.focus();
+  };
+
   beforeEach(() => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     // jsdom has no popover: a close button's tooltip toggles nothing.
@@ -165,6 +184,32 @@ describe("useThreads: the open panel's focus and keys", () => {
       root.unmount();
     });
     document.body.replaceChildren();
+  });
+
+  // CR4 (F1764): the guest's focus goes to Close once, as the panel opens, never again as the session changes.
+  it("leaves the focus where it is when the reader logs out with the panel open", async () => {
+    draw(room);
+    act(() => {
+      opens("root");
+    });
+    await loaded();
+    outside();
+    draw(room, OUT);
+    await frame();
+    expect(active()).toBe("outside");
+  });
+
+  it("leaves the focus where it is when the reader logs in with the panel open", async () => {
+    draw(room, OUT);
+    act(() => {
+      opens("root");
+    });
+    await loaded(true);
+    outside();
+    draw(room);
+    await loaded();
+    await frame();
+    expect(active()).toBe("outside");
   });
 
   // CR7 (F1767): an Escape that ends an input method's composition belongs to the composition.
