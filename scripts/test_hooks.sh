@@ -1774,7 +1774,13 @@ busy 170 10 "the run's start"
 busy 10 170 "the run's end"
 out=$(LOAD_1="160 160" LOAD_2="160 160" SLOW_STEP=lint GATE_BUDGET=0 gate) && fail "check.sh passed past its budget on a machine at its cores, not above"
 printf '%s\n' "$out" | grep -q "find what grew" || fail "check.sh did not fail past its budget at the machine's cores: $out"
-# load.py reads the machine itself: its 1-minute load and its cores, in tenths.
+# load.py reads the machine itself: its 1-minute load (the first of getloadavg's three) and its cores, in tenths.
+# Run on a machine of known numbers, so the minute's average, the 5- and 15-minute ones and the scale each tell apart (G4).
+loaded() { # $1: the cores os.cpu_count gives
+	python3 -I -c 'import os, runpy, sys; os.getloadavg = lambda: (1.7, 5.0, 9.0); os.cpu_count = lambda: int(sys.argv[1]); runpy.run_path(sys.argv[2], run_name="__main__")' "$1" "$here/load.py"
+}
+[ "$(loaded 16)" = "17 160" ] || fail "load.py did not print a 1.7 load on 16 cores as '17 160': $(loaded 16)"
+[ "$(loaded 0)" = "17 10" ] || fail "load.py did not count a machine that gives no core count as one: $(loaded 0)"
 python3 -I "$here/load.py" | python3 -I -c 'import os, sys; load, cores = map(int, sys.stdin.read().split()); assert cores == (os.cpu_count() or 1) * 10 and load >= 0, (load, cores)' ||
 	fail "load.py did not print the machine's load and cores in tenths"
 fi
