@@ -7,15 +7,18 @@ import { RoomView } from "../../src/features/chat/RoomView.tsx";
 
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
-// A line as long as Ergo lets an account's be, its text 442 bytes: marks, code, a link, two mentions, words.
+// A line as long as Ergo lets an account's be, 510 bytes after its tags (parseLine's BODY_MAX), its text 441: marks,
+// code, a link, two mentions, words. One byte more and parseLine refuses it, which the bench below throws on (G1).
 const WORDS = `**gnogolf** at nine, \`#games\`, rules at https://gno.land/r/demo/golf ~~maybe~~ _surely_, @${ALICE} and @${BOB}. `;
-const TEXT = WORDS.repeat(4).slice(0, 442);
+const TEXT = WORDS.repeat(4).slice(0, 441);
 const RAW = `@msgid=AB12cd34;time=2026-10-25T10:00:00.000Z;account=${ALICE} :${ALICE}!u@h PRIVMSG #bubble/games :${TEXT}`;
 
 describe("a line", () => {
   bench("parseLine, markdown and mentions of a 510-byte line [0.2 ms]", () => {
     const parsed = parseLine(RAW);
-    if (parsed.ok) mentions(markdown(parsed.message.params[1] ?? ""));
+    // A line parseLine refuses would time the refusal alone, and leave markdown and mentions unmeasured (G1).
+    if (!parsed.ok) throw new Error(`the bench's line is refused: ${parsed.error}`);
+    mentions(markdown(parsed.message.params[1] ?? ""));
   });
 });
 

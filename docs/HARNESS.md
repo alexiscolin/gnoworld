@@ -289,7 +289,8 @@ everything in five lanes (Vitest's 26 s the longest, `chat.test.ts` alone 22 s o
 the app or the design system 11 to 12 s, of a realm 4 s, of the server 25 s (every test). The
 harness mutation: 596 mutants in 793 s on four shards. On 2026-10-26, at slice-4-harness-b: the
 benches' step 4.7 s (a 510-byte line read in 0.0037 ms of its 0.2, a room of 200 lines drawn in
-9.4 ms of its 100); `harness_mutate --changed` after a change of `check.sh` and of one test section
+9.4 ms of its 100; the first of these timed a line `parseLine` refused, 441 bytes of text being the most a
+510-byte body holds: the real path read in 0.0138 ms on a machine at load 40, G1); `harness_mutate --changed` after a change of `check.sh` and of one test section
 judges 93 of its 678 mutants, about 125 s at the rate above instead of about 900 (estimated from
 that rate, not timed); a worktree made by `worktree.sh` starts StrykerJS from the main tree's
 incremental file, where one without it ran all 9,045 mutants. Earlier measures:
