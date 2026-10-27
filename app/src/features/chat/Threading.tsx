@@ -101,7 +101,7 @@ interface Page {
 }
 
 // The words typed in each thread's field and not sent, by account and root: the page's memory, kept on no device, so a
-// close, a room or another thread keeps them (CR1).
+// close, a room or another thread keeps them (CR1), and a logout clears them (R1).
 type Typed = Map<string, string>;
 
 // The panel of the thread `open`, with the composer that tags each line with its root: a guest's word, or the field.
@@ -169,6 +169,11 @@ export function useThreads(page: Page) {
   const { shown, state, people } = page;
   const [open, setOpen] = useState<Open>();
   const [typed] = useState<Typed>(() => new Map());
+  // A logout is a fresh start: the words are handed to no next account, and kept for no return of the same one (R1).
+  const reader = page.session.kind;
+  useEffect(() => {
+    if (reader !== "in") typed.clear();
+  }, [reader, typed]);
   if (open !== undefined && open.key !== shown?.key) setOpen(undefined);
   if (shown?.kind !== "room") return { view: {}, aside: undefined };
   const close = () => {

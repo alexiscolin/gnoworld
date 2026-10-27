@@ -118,9 +118,17 @@ describe("useThreads: the open panel's focus and keys", () => {
   const other = shownOf(dms(undefined), { id: "#bubble/other", state: STATE, acts }, PAGE);
   let root: Root;
   let opens: (id: string) => void = () => undefined;
-  type Reader = typeof SESSION | typeof OUT;
-  function Page({ shown, session }: { shown: Shown | undefined; session: Reader }) {
-    const { view, aside } = useThreads({ shown, state: STATE, session, rooms: [], acts, people: PEOPLE });
+  const OTHER = { kind: "in", address: Address.parse(BOB) } as const;
+  type Reader = typeof SESSION | typeof OUT | typeof OTHER;
+  function Page({ shown, session, lines }: { shown: Shown | undefined; session: Reader; lines: Line[] }) {
+    const { view, aside } = useThreads({
+      shown,
+      state: { ...STATE, lines },
+      session,
+      rooms: [],
+      acts,
+      people: PEOPLE,
+    });
     opens = (id) => view.onThread?.(id);
     return (
       <div>
@@ -136,9 +144,9 @@ describe("useThreads: the open panel's focus and keys", () => {
       </div>
     );
   }
-  const draw = (shown: Shown | undefined, session: Reader = SESSION) => {
+  const draw = (shown: Shown | undefined, session: Reader = SESSION, lines: Line[] = LINES) => {
     act(() => {
-      root.render(<Page shown={shown} session={session} />);
+      root.render(<Page shown={shown} session={session} lines={lines} />);
     });
   };
   const thread = () => document.querySelector("aside[aria-label='Thread']");
@@ -277,5 +285,38 @@ describe("useThreads: the open panel's focus and keys", () => {
     expect(thread()).not.toBeNull();
     press(box, { key: "Escape" });
     expect(thread()).toBeNull();
+  });
+
+  // R1 (redpass2-4th): the words typed in a thread are the page's memory, and a logout is a fresh start: they are neither
+  // handed to the next account nor kept for the same one.
+  const typeIn = (words: string) => {
+    const box = field();
+    if (box === null) throw new Error("no field");
+    act(() => {
+      Object.getOwnPropertyDescriptor(Object.getPrototypeOf(box), "value")?.set?.call(box, words);
+      box.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  };
+  const logOutIn = async (to: Reader) => {
+    draw(room, OUT);
+    await frame();
+    draw(room, to);
+    act(() => {
+      opens("root");
+    });
+    await loaded();
+  };
+  it("hands a thread's unsent words to no one after a logout, and gives the same account none back", async () => {
+    draw(room);
+    act(() => {
+      opens("root");
+    });
+    await loaded();
+    typeIn("for alice's eyes");
+    expect(field()?.value).toBe("for alice's eyes");
+    await logOutIn(OTHER);
+    expect(field()?.value).toBe("");
+    await logOutIn(SESSION);
+    expect(field()?.value).toBe("");
   });
 });
