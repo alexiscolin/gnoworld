@@ -247,12 +247,16 @@ test.describe("the composer", () => {
     await field(page).fill("/nick bob");
     await expect(field(page)).toHaveAccessibleDescription("/nick is not a command. /me sends an action.");
     await expect(send(page)).toBeDisabled();
+    await field(page).press("Enter");
+    await expect(field(page)).toHaveAccessibleDescription("/nick is not a command. /me sends an action.");
     // An account's line holds 442 bytes: Ergo relays it under its 40-character nick, user and cloak (68 bytes).
     await field(page).fill("a".repeat(420));
     await expect(field(page)).toHaveAccessibleDescription("Too long by 1 byte.");
     await expect(send(page)).toBeDisabled();
     await field(page).press("Enter");
     await expect(lineOf(page, "a".repeat(420))).toHaveCount(0);
+    // Enter sent nothing and says nothing more: the reason stays the cap's, not a "Not sent" of the link's (G9).
+    await expect(field(page)).toHaveAccessibleDescription("Too long by 1 byte.");
   });
 
   test("shows a hostile line it sends as text: no markup, no script run", async ({ page }) => {

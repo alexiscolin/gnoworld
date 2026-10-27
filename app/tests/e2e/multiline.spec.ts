@@ -70,6 +70,8 @@ test.describe("a message of several lines", () => {
     await expect(page.getByRole("button", { name: "Send" })).toBeDisabled();
     await field(page).press("Enter");
     expect(sent.filter((line) => line.startsWith("BATCH ") || line.includes(" PRIVMSG "))).toEqual([]);
+    // Enter says nothing more: the reason stays the cap's, not a "Not sent" of the link's (G9).
+    await expect(field(page)).toHaveAccessibleDescription("1 line too many: 40 at most.");
   });
 
   test("passes axe with a draft of several lines and a message of several lines shown", async ({ page }) => {
