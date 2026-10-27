@@ -18,6 +18,8 @@ import { makeMutes } from "./moderation/mute.ts";
 import { moderationClient, type Answer } from "./moderation/provider.ts";
 import { makeQueue } from "./moderation/queue.ts";
 import { makeStrike } from "./moderation/strikes.ts";
+import type { Pins } from "./pins/pins.ts";
+import { pinsFor } from "./pins/wire.ts";
 import { ensureNamed, ensureRooms, listRooms, roomWorld, worldRooms } from "./rooms/rooms.ts";
 import { makeRooms, type Rooms } from "./rooms/create.ts";
 import { listRoutes } from "./rooms/list.ts";
@@ -37,6 +39,12 @@ export interface Chat {
   verdicts: Hono;
   // The moderators' rooms (3l), made and archived through the link.
   rooms: Rooms;
+  // Each room's pins (4d), kept in the database: read from Ergo by their lines' ids, dropped as their lines leave.
+  pins: Pins;
+  // Whether an account may pin in a room: its world's moderators and the team.
+  mayPin: (room: string, who: string) => boolean;
+  // Whether an account, or a guest (undefined), may read a room: the stream's rule, for the pins' route (4d).
+  mayRead: (room: string, who: string | undefined) => boolean;
   stop: () => Promise<void>;
 }
 
@@ -130,6 +138,17 @@ const unknownChannels =
     for (const room of names) if (!known.has(room)) log("alert", { error: "unknown_room", room });
   };
 
+// The verdicts of lines older than the stream's replay, by the stream's own rule of who reads (4g).
+function verdictsFor(db: DatabaseSync, settings: Settings, { session = () => undefined, now = Date.now }: Options) {
+  return verdictRoutes({
+    db,
+    readable: (room, who) => mayRead(settings, room, who),
+    session,
+    visitor: (c) => visitor(getConnInfo(c).remote.address ?? "", c.req.header("x-real-ip"), settings.trustedProxy),
+    now,
+  });
+}
+
 export function startChat(db: DatabaseSync, settings: Settings, options: Options): Chat {
   const { worlds, ergo, moderation } = settings;
   const { log, pepper, now = Date.now } = options;
@@ -160,6 +179,7 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
   });
   const passes = setInterval(reconciler.ask, options.reconcileMs ?? 60_000);
   const activity = makeActivity();
+  const kept = pinsFor(db, settings, { link: () => link, now, log });
   const link: Link | undefined =
     ergo === undefined
       ? undefined
@@ -174,8 +194,10 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
             reconciler.ask();
           },
           onJoin: reconciler.joined,
+          ...kept.hooks,
           onChannels: unknownChannels(db, log),
           onMessage: (said) => {
+            kept.onEdit(said);
             activity.count(said.room, said.account, now());
             progress.heard(said);
             // A line the full queue drops is left unchecked, with the alert.
@@ -194,15 +216,9 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
       visible: (room, who) => mayRead(settings, room, who),
       session: options.session,
     }),
-    // The verdicts of lines older than the stream's replay, by the stream's own rule of who reads (4g).
-    verdicts: verdictRoutes({
-      db,
-      readable: (room, who) => mayRead(settings, room, who),
-      session: options.session ?? (() => undefined),
-      visitor: (c) => visitor(getConnInfo(c).remote.address ?? "", c.req.header("x-real-ip"), settings.trustedProxy),
-      now,
-    }),
+    verdicts: verdictsFor(db, settings, options),
     rooms: keeping(keeper, { mutes, reconciler }),
+    ...kept.api,
     stop: async () => {
       clearInterval(lifts);
       clearInterval(passes);

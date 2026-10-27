@@ -239,9 +239,16 @@ describe("a pin and its line leaving the room", () => {
       gone.add("#bubble/games m2");
       gone.add("#bubble o1");
       asked.length = 0;
-      await pins.check();
-      expect(asked).toHaveLength(4);
+      await pins.check("#bubble/games");
+      expect(asked).toEqual([
+        ["#bubble/games", "m1"],
+        ["#bubble/games", "m2"],
+        ["#bubble/games", "m3"],
+      ]);
       expect(pins.list("#bubble/games").map(({ id }) => id)).toEqual(["m3", "m1"]);
+      // Another room's pins are its own: asked when the link is in that room.
+      expect(pins.list("#bubble").map(({ id }) => id)).toEqual(["o1"]);
+      await pins.check("#bubble");
       expect(pins.list("#bubble")).toEqual([]);
     });
 
@@ -254,16 +261,16 @@ describe("a pin and its line leaving the room", () => {
       });
       await pins.add("#bubble/games", "m1", MOD);
       state.answer = "unanswered";
-      await pins.check();
+      await pins.check("#bubble/games");
       expect(pins.list("#bubble/games")).toHaveLength(1);
       state.answer = "gone";
-      await pins.check();
+      await pins.check("#bubble/games");
       expect(pins.list("#bubble/games")).toEqual([]);
     });
 
     it("asks nothing when no room holds a pin", async () => {
       const { pins, asked } = setup({ lines: LINES });
-      await pins.check();
+      await pins.check("#bubble/games");
       expect(asked).toEqual([]);
     });
   });

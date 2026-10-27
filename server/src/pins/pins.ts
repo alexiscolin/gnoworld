@@ -35,8 +35,9 @@ export interface Pins {
   drop: (room: string, msgid: string) => void;
   /** The line `msgid` was replaced by an edit of `by`: its pin goes if `by` wrote it. */
   edited: (room: string, msgid: string, by: string) => void;
-  /** Asks Ergo for each pin again and drops those it no longer holds: a delete while the link was down is only seen so. */
-  check: () => Promise<void>;
+  /** Asks Ergo for each pin of a room again and drops those it no longer holds: a delete while the link was down is
+   * only seen so, once the link is in the room. */
+  check: (room: string) => Promise<void>;
 }
 
 interface Options {
@@ -49,7 +50,7 @@ interface Options {
 }
 
 const Count = z.object({ n: z.number() });
-const Keys = z.array(z.object({ room: z.string(), msgid: z.string() }));
+const Ids = z.array(z.object({ msgid: z.string() }));
 
 // A line Ergo gave as a pin, or why it is none: the link's answer is checked, not trusted: that line of that room, a
 // plain message (no CTCP, an /me among them) of an account, with its time.
@@ -113,10 +114,10 @@ export function makePins({ db, fetch, now, max }: Options): Pins {
     edited(room, msgid, by) {
       db.prepare("DELETE FROM pins WHERE room = ? AND msgid = ? AND account = ?").run(room, msgid, by);
     },
-    async check() {
-      const all = Keys.parse(db.prepare("SELECT room, msgid FROM pins ORDER BY rowid").all());
-      // ponytail: one question after another, a room's ten pins each; many rooms of pins want a few at a time.
-      for (const { room, msgid } of all) if ((await fetch(room, msgid)) === "gone") drop(room, msgid);
+    async check(room) {
+      const all = Ids.parse(db.prepare("SELECT msgid FROM pins WHERE room = ? ORDER BY rowid").all(room));
+      // ponytail: a room's pins one after another, ten at most; a link slower than that wants them side by side.
+      for (const { msgid } of all) if ((await fetch(room, msgid)) === "gone") drop(room, msgid);
     },
   };
 }

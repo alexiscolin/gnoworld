@@ -13,6 +13,8 @@ import { PROGRESS_TABLES } from "./moderation/catchup.ts";
 import { MUTE_TABLES } from "./moderation/mute.ts";
 import { STRIKE_TABLES } from "./moderation/strikes.ts";
 import { VERDICT_TABLES } from "./moderation/check.ts";
+import { PIN_TABLES } from "./pins/pins.ts";
+import { pinsRoutes } from "./pins/routes.ts";
 import { ROOM_TABLES } from "./rooms/rooms.ts";
 import { loginFrom } from "./login/routes.ts";
 import { loadRoles, spared } from "./roles/roles.ts";
@@ -37,6 +39,7 @@ const db = openDatabase(config.database, [
   MUTE_TABLES,
   STRIKE_TABLES,
   ROOM_STATE,
+  PIN_TABLES,
 ]);
 // The verdicts kept 180 days and below their cap, now and every five minutes (3n), Ergo's folder measured (3n-b).
 const retention = startRetention(db, { log, ergoData: config.ergoData });
@@ -64,6 +67,18 @@ app.route("/api/verdicts", chat.verdicts);
 app.route(
   "/api/rooms",
   roomsRoutes({ roles, rooms: chat.rooms, session, origins: config.origins, log, now: Date.now }),
+);
+app.route(
+  "/api/pins",
+  pinsRoutes({
+    pins: chat.pins,
+    mayPin: chat.mayPin,
+    readable: chat.mayRead,
+    session,
+    origins: config.origins,
+    log,
+    now: Date.now,
+  }),
 );
 // Ergo's logins go through the socket; without it, Ergo lets nobody in (fails closed).
 const auth = authServer(db, { log, ...(config.ergo === undefined ? {} : { bot: config.ergo.password }) });
