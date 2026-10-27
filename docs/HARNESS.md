@@ -128,12 +128,14 @@ What a commit leaves out, the full gate runs on the exact tip before `main` take
 wants its record). ESLint reads no cache: a cache is keyed on a file's own text, so a type changed
 in one file would hide the lint error it brings to another (the red pass reproduced it with
 `no-floating-promises`). `GATE_BUDGET` may lower the budget, never raise it. Past its budget,
-the fast gate fails only on a machine at or under its cores, its 1-minute load read once, as the
-lanes start and before any of them loads it (`scripts/load.py`, 0.02 s); busier, it says the
-machine was busy when it started, names its slowest step and passes (Alexis, C.8): beside another
-worktree's merge check, commits whose code had not grown took 61 to 98 s at a load of 65 to 76 on
-16 cores. A reading at the end would include the gate's own lanes, which a change making its own
-tests CPU-bound raises (security-S3).
+the fast gate fails unless the machine was busy at both ends: its 1-minute load above its cores when
+the lanes start (read before any of them loads it) and again after they all ended (`scripts/load.py`,
+0.02 s). Then it says the machine was busy when it started and when it ended, names its slowest step
+and passes (Alexis, C.8; Alexis, 2026-10-27, CR10): beside another worktree's merge check, commits whose
+code had not grown took 61 to 98 s at a load of 65 to 76 on 16 cores. The start reading alone excused
+a run begun just after a heavy one on an idle machine (the average lags by about a minute: 335, 311,
+292 in 10 s); the end reading alone includes the gate's own lanes, which a change making its own tests
+CPU-bound raises (security-S3). Both above the cores close the two.
 
 **Fast** (every turn, every commit, a work branch's push; it fails past its budget), its steps:
 

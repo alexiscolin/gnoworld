@@ -262,7 +262,8 @@ lane_docs() {
 	sh scripts/test_hooks.sh
 }
 
-# The machine's 1-minute load and its cores, in tenths (scripts/load.py), read as the lanes start, before any of them loads it.
+# The machine's 1-minute load and its cores, in tenths (scripts/load.py), read as the lanes start, before any of them loads it
+# (and again at the end, if the run is over budget).
 load_start=$(python3 -I scripts/load.py)
 start ts
 start types
@@ -275,13 +276,14 @@ finish ts types tests gno docs pictures
 took=$(($(date +%s) - started))
 if ! $full && [ "$took" -gt "$budget" ]; then
 	slowest=$(cat "$logs"/*.times | sort -k2 -n | tail -1)
-	load=${load_start% *} cores=${load_start#* }
-	# Past its budget on a machine busier than its cores before any lane started, the gate measured the machine: it
-	# says so and passes (C.8). Only that first reading: one at the end would include the gate's own lanes, which a
-	# change making its own tests CPU-bound raises, so the slower the change, the likelier its own load excused it
-	# (security-S3).
-	if [ "$load" -gt "$cores" ]; then
-		echo "check.sh: the fast gate took ${took} s, over its ${budget} s budget on a machine busy when it started (load $((load / 10)).$((load % 10)) on $((cores / 10)) cores): passed; its slowest step, ${slowest%% *}, took $(seconds "${slowest##* }") s" >&2
+	load_end=$(python3 -I scripts/load.py) # read last, once every lane has ended
+	load=${load_start% *} cores=${load_start#* } end=${load_end% *}
+	# Past its budget on a machine busier than its cores both before any lane started and after they all ended, the gate
+	# measured the machine: it says so and passes (C.8; Alexis, 2026-10-27, CR10). The start reading alone excuses a run
+	# begun just after a heavy one on an idle machine (the 1-minute average lags by about a minute); the end reading
+	# alone includes the gate's own lanes, which a change making its own tests CPU-bound raises (security-S3).
+	if [ "$load" -gt "$cores" ] && [ "$end" -gt "${load_end#* }" ]; then
+		echo "check.sh: the fast gate took ${took} s, over its ${budget} s budget on a machine busy when it started and when it ended (load $((load / 10)).$((load % 10)) then $((end / 10)).$((end % 10)) on $((cores / 10)) cores): passed; its slowest step, ${slowest%% *}, took $(seconds "${slowest##* }") s" >&2
 	else
 		echo "check.sh: the fast gate took ${took} s, over its ${budget} s budget: its slowest step, ${slowest%% *}, took $(seconds "${slowest##* }") s; find what grew" >&2
 		exit 1
