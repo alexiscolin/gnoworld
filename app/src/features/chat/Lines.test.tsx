@@ -173,3 +173,37 @@ describe("the lines view, compiled", () => {
     expect(vi.mocked(Reactions)).not.toHaveBeenCalled();
   });
 });
+
+// The device's place forgotten when the room is read through, once: a mark another tab sets after it is the reader's,
+// and the next line this tab reads must not erase it (F1470).
+describe("reading a room through", () => {
+  const reading = (unread: string | undefined, onReadThrough: () => void): LinesProps["keeping"] => ({
+    unread,
+    saved: new Set(),
+    pinned: new Set(),
+    onSave: () => "saved",
+    onUnsave: () => undefined,
+    onMarkUnread: () => undefined,
+    onReadThrough,
+  });
+
+  it("forgets the place when the room opened with one is read to the end", () => {
+    const forget = vi.fn();
+    draw({ paged: true, onRead: () => undefined, keeping: reading(at(0), forget) });
+    expect(forget).toHaveBeenCalledTimes(1);
+  });
+
+  it("forgets nothing when a line comes and the room holds no place", () => {
+    const forget = vi.fn();
+    draw({ paged: true, onRead: () => undefined, keeping: reading(at(0), forget) });
+    draw({ paged: true, onRead: () => undefined, keeping: reading(undefined, forget) });
+    forget.mockClear();
+    draw({
+      paged: true,
+      onRead: () => undefined,
+      keeping: reading(undefined, forget),
+      lines: [...ROOM, line(LINES + 1)],
+    });
+    expect(forget).not.toHaveBeenCalled();
+  });
+});

@@ -85,7 +85,8 @@ export function useReading({
     paged
       ? (id) => {
           onRead?.(id);
-          if (opened) keeping?.onReadThrough();
+          // Only while the room holds a place: once it is forgotten, a mark another tab sets stays (F1470).
+          if (opened && keeping?.unread !== undefined) keeping.onReadThrough();
         }
       : undefined,
   );
