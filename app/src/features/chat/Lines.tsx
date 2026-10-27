@@ -16,11 +16,11 @@ import {
   editsFolded,
 } from "@gnoworld/core";
 import { Flash, type FlashMessage } from "@gnoworld/ui";
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { LineActions } from "./LineActions.tsx";
+import { useCopy } from "./copy.ts";
 import { useLineFocus } from "./lineFocus.ts";
 import { Markdown } from "./Message.tsx";
-import { roomHref } from "./names.ts";
 import { Person } from "./Person.tsx";
 import { Reactions } from "./Reactions.tsx";
 import { Quote } from "./Replying.tsx";
@@ -112,27 +112,6 @@ function useNewestInView(lines: readonly Line[], reactions: readonly Reaction[] 
     if (box !== null) atEndRef.current = box.scrollHeight - box.scrollTop - box.clientHeight < AT_END;
   };
   return { listRef, onScroll };
-}
-
-// What a copy says, in the room's flash: done, or not, a page with no clipboard (a plain http origin) included.
-function useCopy(room: string) {
-  const [said, setSaid] = useState<FlashMessage | null>(null);
-  const copy = (line: Line, what: "text" | "link") => {
-    setSaid(null);
-    const text = what === "text" ? line.text : new URL(roomHref(room), location.href).href;
-    // A page with no clipboard throws at once: inside a then, it fails as a refusal does.
-    Promise.resolve()
-      .then(() => navigator.clipboard.writeText(text))
-      .then(
-        () => {
-          setSaid({ title: what === "text" ? "Text copied." : "Link copied." });
-        },
-        () => {
-          setSaid({ title: "Could not copy." });
-        },
-      );
-  };
-  return { said, setSaid, copy };
 }
 
 export interface LinesProps {
