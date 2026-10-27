@@ -237,6 +237,31 @@ describe("pinning and unpinning from the shown room", () => {
     expect(t.asked.at(-1)).toBe("unpin #bubble m2");
   });
 
+  // A poll asked before the act and answered after it holds the list as it was: taking it would bring an unpinned line
+  // back, or take a pinned one off, for the minute (F1485, the code review's CR2).
+  it.each([
+    ["pin", ["m1", "m2"], ["m1"]],
+    ["unpin", ["m1"], ["m1", "m2"]],
+  ] as const)("drop a poll's older answer that lands after a %s, and ask again", async (call, after, older) => {
+    let release: (value: Result<PinList>) => void = () => undefined;
+    let polls = 0;
+    const t = setup({
+      answer: (room, which) => {
+        if (which !== "pins") return Promise.resolve(ok(list(room, [...after], true)));
+        polls += 1;
+        return polls === 1
+          ? new Promise((resolve) => (release = resolve))
+          : Promise.resolve(ok(list(room, [...after], true)));
+      },
+    });
+    t.asker.show("#bubble", ALICE);
+    await t.asker[call]("m2");
+    release(ok(list("#bubble", [...older], true)));
+    await settled();
+    expect(t.told.map(({ pins }) => pins.map(({ id }) => id))).toEqual([after, after]);
+    expect(t.asked.filter((each) => each.startsWith("pins "))).toHaveLength(2);
+  });
+
   it("say why the server refused, and change nothing", async () => {
     const t = setup({ answer: () => Promise.resolve({ ok: false, reason: "too_many" }) });
     t.asker.show("#bubble", ALICE);

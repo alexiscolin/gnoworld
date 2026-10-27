@@ -32,6 +32,8 @@ export function pinAsker({ pins, pin, unpin, set, visible, reader }: Asking) {
   let run = 0;
   // An answer is the reader's it was asked for: the room and reader unchanged since, and the session still theirs.
   const stale = (mine: number): boolean => mine !== run || reader() !== shown.reader;
+  // The acts started and landed: a poll answered after one holds the list as it was before it, and is asked again.
+  let acts = 0;
   let waiting = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const arm = (): void => {
@@ -44,11 +46,15 @@ export function pinAsker({ pins, pin, unpin, set, visible, reader }: Asking) {
   function ask(): void {
     const { room } = shown;
     if (room === undefined || waiting) return;
-    const mine = run;
+    const [mine, before] = [run, acts];
     waiting = true;
     const done = (got?: Result<PinList>): void => {
       if (stale(mine)) return;
       waiting = false;
+      if (before !== acts) {
+        ask();
+        return;
+      }
       if (got?.ok === true) set(got.value);
       arm();
     };
@@ -61,7 +67,9 @@ export function pinAsker({ pins, pin, unpin, set, visible, reader }: Asking) {
     const { room } = shown;
     if (room === undefined) return { ok: false, reason: "refused" };
     const mine = run;
+    acts += 1;
     const got = await call(room, msgid);
+    acts += 1;
     if (!got.ok) return got;
     if (!stale(mine)) {
       set(got.value);
