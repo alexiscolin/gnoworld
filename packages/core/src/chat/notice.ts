@@ -2,6 +2,7 @@
 // none. An account's alone, in a room it follows or in a direct message; never its own line, a NOTICE (a bot's or a
 // server's) or an edit, a line already counted when it came. One notice a line, in this order: a mention of the account,
 // a reply to one of its lines, a mention of the whole room where that counts.
+import { fold } from "./fold.ts";
 import { markdown } from "../markdown/markdown.ts";
 import { mentions, mentionsRoom } from "../markdown/mentions.ts";
 import type { Line } from "./room.ts";
@@ -53,10 +54,15 @@ const quiet = (line: Line, mode: NoticeMode, me: string): boolean =>
 const repliesTo = (line: Line, held: readonly Line[], me: string): boolean =>
   line.reply !== undefined && held.some((each) => each.id === line.reply && each.account === me);
 
+const hasAt = (text: string): boolean => text.includes("@") || fold(text).includes("@");
+
 /** The notice a room's line is for its reader, or none. */
 export function roomNotice(line: NoticeLine, room: string, at: RoomAt): Notice | undefined {
   const { me, mode, held, groups } = at;
   if (me === undefined || quiet(line, mode, me)) return undefined;
+  // A mention needs an @ (a full-width one folds to it, as the count reads @room), and a reply is told by its tag: most
+  // lines are neither, and are not parsed.
+  if (line.reply === undefined && !hasAt(line.text)) return undefined;
   const tree = markdown(line.text);
   if (mentions(tree).includes(me)) return made(line, "mention", room);
   if (repliesTo(line, held, me)) return made(line, "reply", room);

@@ -1,7 +1,15 @@
 import fc from "fast-check";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
+import { markdown } from "../markdown/markdown.ts";
+import type * as Markdown from "../markdown/markdown.ts";
 import { dmNotice, roomNotice, type NoticeLine, type RoomAt } from "./notice.ts";
 import type { Line } from "./room.ts";
+
+// The real parser, counted: the tests below ask when a line is parsed at all.
+vi.mock("../markdown/markdown.ts", async (original) => {
+  const real = await original<typeof Markdown>();
+  return { ...real, markdown: vi.fn(real.markdown) };
+});
 
 const ME = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -240,5 +248,22 @@ describe("dmNotice: a direct message", () => {
 
   test("is a notice whatever the text says, a mention or none", () => {
     expect(dmNotice(to(ALICE, ALICE, { text: `@${BOB}` }), ME)?.kind).toBe("dm");
+  });
+});
+
+// F1687 (C5): each line of a page or a room was parsed whole, though a mention needs an @ and a reply is told by its tag.
+describe("roomNotice: when a line is parsed", () => {
+  test("parses a line that holds an @ or answers another, and no other", () => {
+    vi.mocked(markdown).mockClear();
+    expect(roomNotice(line("plain words, no sign"), ROOM, at())).toBeUndefined();
+    expect(markdown).not.toHaveBeenCalled();
+    expect(roomNotice(line("hello @room"), ROOM, at({ groups: true }))?.kind).toBe("group");
+    expect(markdown).toHaveBeenCalledTimes(1);
+    // A full-width @ folds to one, as the server's count reads it.
+    expect(roomNotice(line("\uFF20room hello"), ROOM, at({ groups: true }))?.kind).toBe("group");
+    expect(markdown).toHaveBeenCalledTimes(2);
+    const mine = line("first", { id: "m0", from: ME, account: ME });
+    expect(roomNotice(line("an answer", { reply: "m0" }), ROOM, at({ held: [mine] }))?.kind).toBe("reply");
+    expect(markdown).toHaveBeenCalledTimes(3);
   });
 });
