@@ -187,6 +187,26 @@ describe("useThreads: the open panel's focus and keys", () => {
     document.body.replaceChildren();
   });
 
+  // R6: the panel that stands in for the one that comes has its Close, and Escape as well. First of this block: later
+  // ones find the panel's code already come, with no stand-in to see.
+  it("closes with an Escape while its code has not come", async () => {
+    draw(room);
+    act(() => {
+      opens("root");
+    });
+    expect(thread()?.querySelector("h3")).toBeNull();
+    // A tooltip shown on Close takes the first Escape, as it does in the panel's own: the second closes.
+    const standing = thread();
+    if (standing === null) throw new Error("no stand-in");
+    press(standing, { key: "Escape" });
+    press(standing, { key: "Escape" });
+    expect(thread()).toBeNull();
+    // The code comes, to a page that no longer holds the panel.
+    await act(async () => {
+      await new Promise((done) => setTimeout(done, 20));
+    });
+  });
+
   // CR4 (F1764): the guest's focus goes to Close once, as the panel opens, never again as the session changes.
   it("leaves the focus where it is when the reader logs out with the panel open", async () => {
     draw(room);

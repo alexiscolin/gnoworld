@@ -32,7 +32,14 @@ function Standing({ word, close }: { word: string; close: () => void }) {
     boxRef.current?.querySelector("button")?.focus();
   }, []);
   return (
-    <aside ref={boxRef} aria-label="Thread" className={styles["panel"]}>
+    <aside
+      ref={boxRef}
+      aria-label="Thread"
+      className={styles["panel"]}
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && !event.defaultPrevented) close();
+      }}
+    >
       <Sidebar side="end" space="2xs">
         <p role="status">{word}</p>
         <IconButton icon="close" label="Close the thread" size="s" emphasis="plain" onClick={close} />
