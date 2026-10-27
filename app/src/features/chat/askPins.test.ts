@@ -22,22 +22,26 @@ afterEach(() => {
 });
 
 // A server answering each ask as told (one list a room by default), and what it was asked and what the store was told.
-function setup({ answer = (room: string) => Promise.resolve(ok(list(room, ["m1"]))), visible = () => true } = {}) {
+interface Wanted {
+  answer?: (room: string, call: "pins" | "pin" | "unpin") => Promise<Result<PinList>>;
+  visible?: () => boolean;
+}
+function setup({ answer = (room) => Promise.resolve(ok(list(room, ["m1"]))), visible = () => true }: Wanted = {}) {
   const asked: string[] = [];
   const told: PinList[] = [];
   const state = { visible: true };
   const asker = pinAsker({
     pins: (room) => {
       asked.push(`pins ${room}`);
-      return answer(room);
+      return answer(room, "pins");
     },
     pin: (room, id) => {
       asked.push(`pin ${room} ${id}`);
-      return answer(room);
+      return answer(room, "pin");
     },
     unpin: (room, id) => {
       asked.push(`unpin ${room} ${id}`);
-      return answer(room);
+      return answer(room, "unpin");
     },
     set: (next) => told.push(next),
     visible: () => state.visible && visible(),
@@ -226,5 +230,42 @@ describe("pinning and unpinning from the shown room", () => {
     expect(t.asked.filter((each) => each.startsWith("pins "))).toHaveLength(1);
     await vi.advanceTimersByTimeAsync(1);
     expect(t.asked.filter((each) => each.startsWith("pins "))).toHaveLength(2);
+  });
+
+  // The store takes the list each call answers, not the poll's (G7).
+  it("hand the store what the pin and the unpin answered, read in full", async () => {
+    const t = setup({
+      answer: (room, call) => Promise.resolve(ok(list(room, [`from-${call}`], call !== "pins"))),
+    });
+    t.asker.show("#bubble", ALICE);
+    await settled();
+    await t.asker.pin("m2");
+    await t.asker.unpin("m2");
+    expect(t.told).toEqual([
+      list("#bubble", ["from-pins"]),
+      list("#bubble", ["from-pin"], true),
+      list("#bubble", ["from-unpin"], true),
+    ]);
+  });
+
+  it("drop the answer of a pin that comes after the reader changed, though it is done", async () => {
+    let release: (got: Result<PinList>) => void = () => undefined;
+    const t = setup({
+      answer: (room, call) =>
+        call === "pin"
+          ? new Promise((resolve) => {
+              release = resolve;
+            })
+          : Promise.resolve(ok(list(room, ["m1"]))),
+    });
+    t.asker.show("#bubble", ALICE);
+    await settled();
+    const pinned = t.asker.pin("m2");
+    t.asker.show("#bubble", undefined);
+    await settled();
+    t.told.length = 0;
+    release(ok(list("#bubble", ["m2"], true)));
+    expect(await pinned).toEqual({ ok: true });
+    expect(t.told).toEqual([]);
   });
 });
