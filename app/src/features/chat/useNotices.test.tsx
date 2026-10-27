@@ -12,6 +12,7 @@ import { useNotices, type Noticing } from "./useNotices.ts";
 const ME = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const GAMES = "#bubble/games";
+const NEWS = "#bubble/news";
 const MAIN = "#bubble";
 const TITLE = "Bubble";
 const T = (minute: number) => `2026-10-25T10:${String(minute).padStart(2, "0")}:00.000Z`;
@@ -104,7 +105,7 @@ describe("useNotices", () => {
   const follow = () => {
     tell(({ chatActions }) => {
       chatActions.connected(ME);
-      chatActions.follow([MAIN, GAMES]);
+      chatActions.follow([MAIN, GAMES, NEWS]);
     });
   };
 
@@ -160,6 +161,21 @@ describe("useNotices", () => {
     expect(document.title).toBe(TITLE);
   });
 
+  it("counts nothing for an account whose page holds no room list and no conversation yet", () => {
+    draw(on({ sections: undefined }));
+    follow();
+    expect(told().badges).toEqual({});
+    expect(told().list?.list).toEqual([]);
+  });
+
+  it("hands the page's seen to a guest as to an account", () => {
+    draw(on({ session: { kind: "out" } }));
+    act(() => {
+      told().seen(ALICE, T(3));
+    });
+    expect(store().getState().noticeSeen).toEqual({ [ALICE]: T(3) });
+  });
+
   it("gives the room in view's mode, and none while a conversation is in view", () => {
     draw(on());
     follow();
@@ -191,5 +207,20 @@ describe("useNotices", () => {
       noticeActions.add(mention("c", GAMES, 7));
     });
     expect(told().list?.said).toBe("g10gh7…3y5tv mentioned you in #bubble");
+  });
+
+  it("goes on saying the newest notice that came, not an older one still listed, as that one is seen", () => {
+    draw(on());
+    follow();
+    tell(({ noticeActions }) => {
+      noticeActions.add(mention("a", MAIN));
+      noticeActions.add(mention("b", NEWS, 6));
+    });
+    expect(told().list?.said).toBe("g10gh7…3y5tv mentioned you in #news");
+    tell(({ noticeActions }) => {
+      noticeActions.seen(NEWS, T(6));
+    });
+    expect(told().list?.list.map(({ id }) => id)).toEqual(["a"]);
+    expect(told().list?.said).toBe("g10gh7…3y5tv mentioned you in #news");
   });
 });

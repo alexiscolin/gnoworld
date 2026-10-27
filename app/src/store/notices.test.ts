@@ -367,6 +367,25 @@ describe("the store's notices slice", () => {
     });
   });
 
+  describe("left, the marks", () => {
+    it("marks no place in mentions mode, where dropping the notices is all it does", () => {
+      const t = setup();
+      t.notices.add(notice({ id: "a", where: GAMES }));
+      t.notices.left(GAMES);
+      expect(Object.keys(t.state().noticeSeen)).toEqual([]);
+    });
+
+    it("sees a room left in all mode up to its newest line though it holds no notice", () => {
+      const t = setup();
+      t.notices.setMode(GAMES, "all");
+      t.said(GAMES, ["m1", 1]);
+      t.said(GAMES, ["m2", 2]);
+      t.notices.left(GAMES);
+      expect(t.state().noticeSeen).toEqual({ [GAMES]: T(2) });
+      expect(badgeOf(t.state(), GAMES)).toBe(0);
+    });
+  });
+
   describe("clear", () => {
     it("sees every place up to its newest notice and its newest line, counting what comes after", () => {
       const t = setup();
