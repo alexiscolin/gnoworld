@@ -2258,6 +2258,19 @@ describe("the chat's link: notices, the edges", () => {
     });
   });
 
+  // F1693 (the simplify survivor): a live line of a room Ergo says the account joined (from another session, say) that
+  // the page does not follow.
+  describe("a room joined that the page does not follow", () => {
+    it("makes no notice of its live lines", () => {
+      const t = member();
+      const other = "#bubble/other";
+      t.fake.line(`:${ADDRESS}!u@h JOIN ${other}`);
+      say(t.fake, [other, "o1", `@${ADDRESS}`]);
+      say(t.fake, [GAMES, "g1", `@${ADDRESS}`]);
+      expect(ids(t)).toEqual(["g1"]);
+    });
+  });
+
   // F1672 (S3): a page asked before a KICK and written after it made notices for a room the account is out of.
   describe("a history page that comes after the account is taken out of its room", () => {
     it("makes no notice of its lines", () => {
