@@ -8,8 +8,9 @@ import tempfile
 
 
 def git(*args):
-    """git's output, failing loudly."""
-    return subprocess.run(["git", *args], capture_output=True, text=True, check=True).stdout
+    """git's output, failing loudly. Names print as they are: git quotes a path with an accent, "caf\\303\\251/a.ts", by default,
+    which names no file (CR5)."""
+    return subprocess.run(["git", "-c", "core.quotePath=false", *args], capture_output=True, text=True, check=True).stdout
 
 
 # /pre-merge's records (review_pass.py), and the files of the review itself, which a record leaves out.

@@ -2703,7 +2703,16 @@ printf '%s\n' "$out" | grep -qF "a helper" && fail "bench.py read a file that is
 report "a room [100 ms]" 14.5
 out=$(bench) && fail "bench.py passed with a bench of the sources (the one a .only left out) missing from its report: $out"
 printf '%s\n' "$out" | grep -qF "a line [0.2 ms]: " || fail "bench.py did not name the bench a .only left out: $out"
-rm -r "${b:?}/app" "${b:?}/node_modules/pkg"
+# A path git prints quoted, "caf\303\251/d.bench.ts", is no file: the list read it as one it could not open, and a switched-off
+# bench in such a folder went unseen (CR5). Every listing of repo_files.git (ls-files, ls-tree, diff) prints names as they are.
+mkdir -p "$b/app/tests/bench/café" && printf 'bench("a café bench [1 ms]", f);\n' >"$b/app/tests/bench/café/d.bench.ts"
+git -C "$b" init -q && printf 'node_modules/\n' >"$b/.gitignore"
+out=$(cd "$b" && python3 -I -c 'import sys; sys.path.insert(0, sys.argv[1]); from repo_files import git; print(git("ls-files", "--others", "--exclude-standard"))' "$here")
+printf '%s\n' "$out" | grep -qF "app/tests/bench/café/d.bench.ts" || fail "repo_files.git printed a path with an accent quoted: $out"
+report "a line [0.2 ms]" 0.05 "a room [100 ms]" 14.5
+out=$(bench) && fail "bench.py passed with a bench of a folder git quotes (café) missing from its report: $out"
+printf '%s\n' "$out" | grep -qF "a café bench [1 ms]: " || fail "bench.py did not name the bench of the café folder missing from the report: $out"
+rm -r "${b:?}/.git" "${b:?}/app" "${b:?}/node_modules/pkg" && rm "$b/.gitignore"
 fi
 
 if part mutant_scope; then

@@ -56,7 +56,7 @@ SECTIONS = {
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix,worktree_script",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
     "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
-    "scripts/repo_files.py": {"hooks": "worktrees,regressions,batch_size,harness_shards", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench", "scripts/suite_parts.py": "mutant_scope,harness_shards", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
+    "scripts/repo_files.py": {"hooks": "worktrees,regressions,batch_size,harness_shards,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench", "scripts/suite_parts.py": "mutant_scope,harness_shards", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
 }
 
 
@@ -200,6 +200,7 @@ def mutants():
     yield from each("vitest.config.ts", '.trim()', "", "probe", "the pinned Node is read without its newline")
     yield from each("vitest.config.ts", "benchmark: { include: BENCHES },", "", "probe", "vitest runs the benches in the form the guards read (CR3)")
     yield from each("lint/shared.config.ts", '"**/*.bench.tsx"];', '"**/*.bench.tsx", "**/*.benchmark.ts"];', "probe", "the benches' form is the one the guards read (CR3)")
+    yield from each("scripts/repo_files.py", '["git", "-c", "core.quotePath=false", *args]', '["git", *args]', "hooks", "repo_files.git prints a path with an accent as it is (CR5)")
     yield from each("scripts/repo_files.py", 'BENCH_FILE = re.compile(r"\\.bench\\.tsx?$")', 'BENCH_FILE = re.compile(r"\\.bench(mark)?\\.tsx?$")', "probe", "BENCH_FILE reads the form Vitest runs (CR3)")
     yield from each("vitest.config.ts", 'new URL(".node-version", import.meta.url)', 'new URL("../.node-version", import.meta.url)', "probe", "the pin is read from the root's own .node-version")
     # The app's folders (F378): each name of the network and storage, each owner, each folder's path,
