@@ -3,7 +3,7 @@
 # whose packages are installed, and whose package files (lockfile, package.json) base must share: an install in the new tree
 # would write into this one's. Its root node_modules is a real folder of links, one per package: a whole-folder link
 # hides them from borrow_node_modules.sh, so pre-commit's staged copy would find none. A workspace's node_modules is
-# copied as its links, so its @gnoworld links (relative) lead into the new tree, never this one's. Vite's caches are its
+# copied as its links by borrow_node_modules.sh, so its @gnoworld links (relative) lead into the new tree, never this one's. Vite's caches are its
 # own, each tree writing them. StrykerJS's incremental file is seeded: a missing one ran all 9,045 mutants
 # (2026-10-26) where the branch's changes wanted a few dozen.
 set -eu
@@ -20,15 +20,15 @@ differ=$(git diff --name-only "$base" -- pnpm-lock.yaml pnpm-workspace.yaml .pnp
 	exit 1
 }
 git worktree add -q -b "$branch" "$dir" "$base"
+# The workspaces' node_modules are copied as their links by the helper pre-commit's staged copy uses; its link of the root's
+# is replaced by the folder of per-package links below.
+sh "$(dirname "$0")/borrow_node_modules.sh" "$dir"
+rm "${dir:?}/node_modules"
 mkdir "$dir/node_modules" "$dir/node_modules/.vite" "$dir/node_modules/.vite-temp"
 for entry in "$src"/node_modules/* "$src"/node_modules/.[!.]*; do
 	name=${entry##*/}
 	case $name in .vite | .vite-temp | '*' | '.[!.]*') continue ;; esac
 	if [ -L "$entry" ]; then cp -P "$entry" "$dir/node_modules/$name"; else ln -s "$entry" "$dir/node_modules/$name"; fi
-done
-find . -name node_modules -type d -prune -not -path ./node_modules -not -path './.git/*' -not -path './.claude/*' | while read -r m; do
-	mkdir -p "$dir/$(dirname "$m")"
-	cp -RP "$m" "$dir/$m"
 done
 if [ -f reports/stryker-incremental.json ]; then
 	mkdir -p "$dir/reports"
