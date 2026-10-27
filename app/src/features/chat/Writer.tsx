@@ -5,6 +5,7 @@ import type { Line } from "@gnoworld/core";
 import { pageDrafts } from "../../lib/drafts/page.ts";
 import type { AppState } from "../../store/index.ts";
 import type { ComposerProps } from "./Composer.tsx";
+import { LOG_IN_TO_WRITE } from "./loginWords.ts";
 import { roomLabel } from "./names.ts";
 import { answeredOf } from "./Replying.tsx";
 
@@ -41,7 +42,7 @@ export interface WriterProps {
 export function Writer(props: WriterProps) {
   const { session, room, label, rooms, members, groups, onSay, onTyping, refused, focus, describedBy } = props;
   const { replying, asked, onCancelReply } = props;
-  if (session.kind !== "in") return <p>Log in to write in this room.</p>;
+  if (session.kind !== "in") return <p>{LOG_IN_TO_WRITE}</p>;
   // The account's drafts on this device: the room's, where the composer starts, and each change kept (4d).
   const kept = pageDrafts(session.address);
   return (

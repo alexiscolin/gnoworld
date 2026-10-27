@@ -5,6 +5,7 @@ import type { Line } from "@gnoworld/core";
 import { heardFrom } from "../../store/dms.ts";
 import type { AppState } from "../../store/index.ts";
 import { useApp } from "../../storeContext.tsx";
+import { LOG_IN_TO_READ_DMS } from "./loginWords.ts";
 import { isAccount } from "./names.ts";
 import type { DmsProps } from "./RoomsView.tsx";
 
@@ -45,7 +46,7 @@ export const listOf = (heard: readonly string[], partner: string | undefined): s
  * while the session is unknown. */
 export function problemOf(session: AppState["login"]["session"], asked: string | null): string | undefined {
   if (asked === null || session.kind === "unknown") return undefined;
-  if (session.kind === "out") return "Log in to read direct messages.";
+  if (session.kind === "out") return LOG_IN_TO_READ_DMS;
   if (asked === session.address) return "That is your own address.";
   return isAccount(asked) ? undefined : "That is not an account's address.";
 }

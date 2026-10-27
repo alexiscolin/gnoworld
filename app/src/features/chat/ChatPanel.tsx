@@ -6,7 +6,7 @@
 import type { Line } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";
 import { Button, Stack } from "@gnoworld/ui";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { pageLoginApi } from "../../lib/api/login.ts";
 import { pageDmPrefs } from "../../lib/dms/page.ts";
@@ -18,14 +18,15 @@ import { drawGuestNick } from "../../lib/ergo/ergo.ts";
 import { pageErgo } from "../../lib/ergo/page.ts";
 import { savesData } from "../../lib/saveData.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
-import { useDms } from "./Dms.tsx";
 import { chatLink, type ChatLink } from "./link.ts";
-import { Loaded } from "./Loaded.tsx";
+import { GuestLoaded } from "./GuestLoaded.tsx";
 import { LOADING } from "./Loading.tsx";
 import { groupRooms, roomIds, roomsQuery, shownRoom } from "./names.ts";
-import { useOnHide } from "./reading.ts";
-import { useNotices } from "./useNotices.ts";
+import { useOnHide } from "./useOnHide.ts";
 import { useVerdicts } from "./useVerdicts.ts";
+
+// An account's chat, its code asked once the session is an account's (the first screen's budget, ADR-0001 §12).
+const AccountChat = lazy(async () => ({ default: (await import("./AccountChat.tsx")).AccountChat }));
 
 // The rooms as last asked, and what came: undefined when the list could not load.
 interface Asked {
@@ -130,45 +131,56 @@ export function ChatPanel({ world }: { world: string }) {
     linkRef.current?.show(current);
   }, [current]);
   const state = useApp((app) => (current === undefined ? undefined : app.chat.rooms[current]));
-  const dms = useDms(world, session, params.get("dm"));
   const { saving, verdicts } = useRoomVerdicts(store, current, state?.lines);
   const chat = useApp((app) => app.login.chat);
-  const noticing = useNotices({
-    world,
-    session,
-    sections,
-    dms,
-    current,
-    read: (room, time) => linkRef.current?.markRead(room, time),
-  });
-  if (!loaded) return LOADING;
   const failed =
-    sections === undefined ? (
+    loaded && sections === undefined ? (
       <RoomsFailed
         onRetry={() => {
           setAttempt((n) => n + 1);
         }}
       />
     ) : undefined;
-  // A direct message waits on no room: it shows though the rooms could not load (U10).
-  if (failed !== undefined && dms.partner === undefined) return failed;
+  const dismissed = (room: string) => {
+    store.getState().chatActions.dismissed(room);
+  };
+  // An account's code is asked as its rooms are, not after them: its chat says the loading itself.
+  if (session.kind === "in") {
+    return (
+      <Suspense fallback={LOADING}>
+        <AccountChat
+          loaded={loaded}
+          world={world}
+          sections={sections}
+          dm={params.get("dm")}
+          current={current}
+          state={state}
+          verdicts={verdicts}
+          saving={saving}
+          chat={chat}
+          session={session}
+          link={linkRef}
+          dismissed={dismissed}
+          sayTo={(partner, draft) => linkRef.current?.sayTo(partner, draft) ?? false}
+          failed={failed}
+        />
+      </Suspense>
+    );
+  }
+  if (!loaded) return LOADING;
+  // A visitor has no direct message: the rooms that could not load are all the page says.
+  if (failed !== undefined) return failed;
   return (
-    <Loaded
+    <GuestLoaded
       sections={sections ?? []}
       current={current}
       state={state}
       verdicts={verdicts}
       saving={saving}
       chat={chat}
-      session={session}
       link={linkRef}
-      dismissed={(room) => {
-        store.getState().chatActions.dismissed(room);
-      }}
-      sayTo={(partner, draft) => linkRef.current?.sayTo(partner, draft) ?? false}
-      dms={dms}
-      noticing={noticing}
-      failed={failed}
+      dismissed={dismissed}
+      asksDm={params.get("dm") !== null}
     />
   );
 }

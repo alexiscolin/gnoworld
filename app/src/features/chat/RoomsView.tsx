@@ -6,6 +6,7 @@ import type { RoomList } from "@gnoworld/schemas";
 import { useRef, type ReactNode } from "react";
 import { Button, Chip, Cluster, Icon, Row, Stack } from "@gnoworld/ui";
 import { dmHref, isAccount, roomHref, roomLabel, shortAddress } from "./names.ts";
+import { RoomSections, RoomsNav } from "./RoomSections.tsx";
 import shared from "./lists.module.css";
 import styles from "./RoomsView.module.css";
 
@@ -158,33 +159,9 @@ function Dms({
 
 export function RoomsView({ sections, current, dms, failed, badges, notices }: RoomsViewProps) {
   const navRef = useRef<HTMLElement>(null);
-  const shown = sections.filter(({ rooms }) => rooms.length > 0);
-  const listed =
-    failed !== undefined ? (
-      failed
-    ) : shown.length === 0 ? (
-      <p>No room here yet.</p>
-    ) : (
-      <Stack space="m">
-        {shown.map(({ name, rooms }) => (
-          <Stack key={name ?? ""} space="2xs" as="section">
-            <h2 className={styles["section"]}>{name ?? (shown.length === 1 ? "Rooms" : "Other rooms")}</h2>
-            <ul className={shared["plain"]}>
-              {rooms.map(({ room }) => (
-                <li key={room}>
-                  <Row
-                    title={roomLabel(room)}
-                    href={roomHref(room)}
-                    current={room === current}
-                    trail={badged(badges?.[room])}
-                  />
-                </li>
-              ))}
-            </ul>
-          </Stack>
-        ))}
-      </Stack>
-    );
+  const listed = (
+    <RoomSections sections={sections} current={current} failed={failed} trail={(room) => badged(badges?.[room])} />
+  );
   const body =
     dms === undefined ? (
       listed
@@ -195,12 +172,7 @@ export function RoomsView({ sections, current, dms, failed, badges, notices }: R
       </Stack>
     );
   return (
-    <nav
-      ref={navRef}
-      tabIndex={-1}
-      aria-label={dms === undefined ? "Rooms" : "Rooms and direct messages"}
-      className={`${shared["scrolls"] ?? ""} ${styles["nav"] ?? ""}`}
-    >
+    <RoomsNav navRef={navRef} label={dms === undefined ? "Rooms" : "Rooms and direct messages"}>
       {notices === undefined ? (
         body
       ) : (
@@ -215,6 +187,6 @@ export function RoomsView({ sections, current, dms, failed, badges, notices }: R
           </p>
         </>
       )}
-    </nav>
+    </RoomsNav>
   );
 }

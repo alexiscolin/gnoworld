@@ -85,7 +85,7 @@ function useReplies(shown: Shown | undefined, lines: readonly Line[] | undefined
 }
 
 // The world's rooms once listed: the switcher, the room in view and what writes in it.
-interface LoadedProps {
+export interface LoadedProps {
   sections: RoomList["sections"];
   current: string | undefined;
   state: AppState["chat"]["rooms"][string] | undefined;
