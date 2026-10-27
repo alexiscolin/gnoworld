@@ -108,12 +108,12 @@ small batches, `docs/REVIEW.md`): past 600 lines it fails unless a commit says w
 the lines added after it; security-S4), and past 400 it says the tier-1 limit (the
 server's test helpers, `server/src/testing/`, are not product code; a renamed file counts its added lines at
 its new path). `check.sh` puts the
-Node `.node-version` pins first on its PATH, and a test of Vitest's `node` project refuses another Node
-(`server/src/testing/toolchain.test.ts`), since F816 surfaced only because StrykerJS ran once on Homebrew's
-Node 26, whose V8 reads some regexes otherwise. That test holds a whole `vitest run` and StrykerJS's dry run to
-the pin; a run of another project alone (`--project ui`, `core_chromium`), a run by file, the `--changed` run
-of the fast gate (which runs the tests a change reaches), `vitest bench` and the journeys are held by the
-PATH alone. The probe tries the refusal on a copy with a pin of its own, never on `.node-version`.
+Node `.node-version` pins first on its PATH, and `vitest.config.ts` refuses another Node, since F816 surfaced only
+because StrykerJS ran once on Homebrew's Node 26, whose V8 reads some regexes otherwise. Every Vitest run reads that
+file: a whole run, a run of one project (`--project ui`, `core_chromium`), by file, the `--changed` run of the fast
+gate, `vitest list` and `vitest bench`, and StrykerJS's dry run, which starts Vitest through the same `createVitest`
+(a Vitest test would have held only the runs that include its project; simplify-A3). The journeys are held by the
+PATH alone. The probe tries the refusal on a copy of the config with a pin of its own, never on `.node-version`.
 
 | A fast run's change | What runs beside the cheap checks (format, knip, jscpd, CSS, comments, check_docs) | Budget |
 |---|---|---|
@@ -425,6 +425,5 @@ and the harness is frozen until a real bug crosses it.
 | `scripts/bench.py`, `app/tests/bench/` | the benches and their budgets |
 | `scripts/batch_size.py` | a merge's own product code, a small batch |
 | `scripts/worktree.sh` | a branch's worktree, ready for the gate: its packages linked (so a base whose lockfile or package files are not the source tree's is refused, and a `pnpm install` is made in the source tree, never in the worktree: the links lead there; security-S5), StrykerJS's incremental file seeded |
-| `server/src/testing/toolchain.ts` | the Node every test runs on |
 | `docs/review/findings.md`, `docs/review-log.md` | every finding; what Alexis caught and missed |
 | `docs/harness.html`, `docs/harness.png` | the picture above, and its source |

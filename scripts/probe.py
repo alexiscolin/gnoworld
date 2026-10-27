@@ -207,30 +207,33 @@ try:
         shutil.rmtree(HERE)
 
     if part("pinned_node"):
-        # Every test run on the Node .node-version pins, StrykerJS's dry run too: another V8 reads some regexes
-        # otherwise (F816 came from StrykerJS on Homebrew's Node 26). The toolchain test passes on the pin, and fails
-        # once the pin names another.
-        test = "server/src/testing/toolchain.test.ts"
-        out = run(["node_modules/.bin/vitest", "run", test])
-        expect(out.returncode == 0 and "1 passed" in out.stdout, "vitest's toolchain test passes on the pinned Node")
-        # The refusal is probed on a copy of the test with a pin of its own: .node-version, which check.sh reads for
-        # its PATH and the sandbox keeps from a command, stays as it is even when this run is killed (G10).
+        # Every Vitest run is on the Node .node-version pins, whatever it runs: vitest.config.ts refuses another Node as every
+        # run reads it (a whole run, one project, `list`; StrykerJS's dry run and `bench` start Vitest the same way, through
+        # createVitest). Another V8 reads some regexes otherwise (F816 came from StrykerJS on Homebrew's Node 26). Probed on a
+        # copy of the config with a pin of its own: .node-version, which check.sh reads for its PATH and the sandbox keeps from
+        # a command, stays as it is even when this run is killed (G10).
         with open(".node-version") as f:
             pinned = f.read()
+        refusal = "Vitest runs on Node"
         with tempfile.TemporaryDirectory() as copy:
-            os.makedirs(f"{copy}/server/src/testing")
-            for name in ("toolchain.ts", "toolchain.test.ts"):
-                shutil.copy(f"server/src/testing/{name}", f"{copy}/server/src/testing/{name}")
+            os.makedirs(f"{copy}/packages/probe/src")
+            shutil.copy("vitest.config.ts", f"{copy}/vitest.config.ts")
+            with open(f"{copy}/packages/probe/src/a.test.ts", "w") as f:
+                f.write('import { expect, test } from "vitest";\n\ntest("a", () => {\n  expect(1).toBe(1);\n});\n')
             os.symlink(os.path.realpath("node_modules"), f"{copy}/node_modules")
-            vitest = [os.path.realpath("node_modules/.bin/vitest"), "run", "--root", copy]
+            vitest = os.path.realpath("node_modules/.bin/vitest")
             for pin, passes in ((pinned, True), ("0.0.1\n", False)):
                 with open(f"{copy}/.node-version", "w") as f:
                     f.write(pin)
-                out = run(vitest, cwd=copy)
-                if passes:
-                    expect(out.returncode == 0 and "1 passed" in out.stdout, "the toolchain test passes in a copy with the real pin")
-                else:
-                    expect(out.returncode != 0 and "v0.0.1" in out.stdout + out.stderr, "vitest refuses a Node .node-version does not pin")
+                for args in (["run"], ["run", "--project", "ui"], ["list"]):
+                    out = run([vitest, *args], cwd=copy)
+                    said = out.stdout + out.stderr
+                    if passes:
+                        expect(refusal not in said, f"vitest {' '.join(args)} runs in a copy with the real pin")
+                    else:
+                        expect(out.returncode != 0 and f"{refusal} v0.0.1" in said, f"vitest {' '.join(args)} refuses a Node .node-version does not pin")
+                    if passes and args == ["run"]:
+                        expect(out.returncode == 0 and "1 passed" in out.stdout, "vitest passes a test in a copy with the real pin")
 
     if part("core_chromium"):
         # Core's tests run a second time in Chromium, whose engine reads some regexes and Unicode otherwise than

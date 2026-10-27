@@ -46,9 +46,8 @@ SECTIONS = {
     # fail the run as unknown, and count a mutant killed that no test saw.
     "package.json": {"probe": "react_warn,react_tsc,ui_tsc", "hooks": "wiring"}, "pnpm-workspace.yaml": {"hooks": "wiring,regressions"},
     "scripts/check_css.py": "css", "scripts/check_comments.mjs": "comments",
-    ".jscpd.json": "jscpd", "tsconfig.base.json": "tsc", "vitest.config.ts": "vitest,vitest_ui,server,core_chromium",
+    ".jscpd.json": "jscpd", "tsconfig.base.json": "tsc", "vitest.config.ts": "vitest,vitest_ui,server,core_chromium,pinned_node",
     "app/playwright.stories.config.ts": "tokens_pictures",
-    "server/src/testing/toolchain.test.ts": "pinned_node", "server/src/testing/toolchain.ts": "pinned_node",
     "scripts/guard.py": "guard", "scripts/review_pass.py": "review_pass", "scripts/patch_coverage.py": "patch_coverage",
     "scripts/check_docs.py": "check_docs", "scripts/check_regressions.py": "regressions", "scripts/check_migrations.py": "migrations",
     "scripts/harness_mutate.py": "harness_mutate,harness_shards", ".githooks/commit-msg": "commit_msg,installed",
@@ -191,8 +190,10 @@ def mutants():
         ("[\\w@%+=:,./-]", "[\\w@%+=:,./;-]", "has no shell character"),
     ):
         yield from each("app/playwright.stories.config.ts", find, replace, "probe", f"the stories' config refuses a STORIES_OUT that is not safe to delete: it {label} (security-S6)")
-    yield from each("server/src/testing/toolchain.test.ts", "expect(process.version).toBe(pinnedNode());", "expect(process.version).toBeTruthy();", "probe", "the toolchain test holds a run to the pinned Node")
-    yield from each("server/src/testing/toolchain.ts", ".trim()", "", "probe", "the pinned Node is read without its newline")
+    # Every Vitest run on the pinned Node (F816 came from StrykerJS on Homebrew's Node 26): the config refuses another.
+    yield from each("vitest.config.ts", "if (process.version !== PINNED)", "if (false)", "probe", "vitest.config.ts holds every run to the pinned Node")
+    yield from each("vitest.config.ts", '.trim()', "", "probe", "the pinned Node is read without its newline")
+    yield from each("vitest.config.ts", 'new URL(".node-version", import.meta.url)', 'new URL("../.node-version", import.meta.url)', "probe", "the pin is read from the root's own .node-version")
     # The app's folders (F378): each name of the network and storage, each owner, each folder's path,
     # each exception, and React's bans kept there, alone.
     for name in ("fetch", "XMLHttpRequest", "WebSocket", "EventSource", "localStorage", "sessionStorage", "indexedDB", "caches", "cookieStore", "window", "globalThis", "self"):

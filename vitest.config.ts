@@ -1,5 +1,13 @@
+import { readFileSync } from "node:fs";
 import { playwright } from "@vitest/browser-playwright";
 import { configDefaults, defineConfig, type TestProjectInlineConfiguration } from "vitest/config";
+
+// Every Vitest run reads this file, so every run is on the Node .node-version pins: another V8 reads some regexes
+// otherwise (F816: StrykerJS on Homebrew's Node 26), and its results would be of a toolchain nobody ships. Probed in
+// scripts/probe.py (pinned_node), with the pin as process.version writes it: v24.22.0.
+const PINNED = `v${readFileSync(new URL(".node-version", import.meta.url), "utf8").trim()}`;
+if (process.version !== PINNED)
+  throw new Error(`Vitest runs on Node ${PINNED} (.node-version), not ${process.version}`);
 
 const SLOW = ["server/src/testing/ergo*.test.ts", "server/src/testing/soak.test.ts"];
 
