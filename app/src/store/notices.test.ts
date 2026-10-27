@@ -605,6 +605,36 @@ describe("the store's notices slice", () => {
       expect(writes).toEqual([{ [GAMES]: "none" }, { [GAMES]: "none", [MAIN]: "all" }, { [MAIN]: "all" }]);
     });
 
+    // F1675 (CR3): a page held the modes it read at its start and wrote the whole map, so a tab opened earlier undid what
+    // another tab chose since.
+    it("merges what the device holds now with the mode changed, so two pages lose none of each other's", () => {
+      const first = setup();
+      const second = setup();
+      const { prefs } = device({});
+      first.notices.begin(prefs);
+      second.notices.begin(prefs);
+      first.notices.setMode(GAMES, "none");
+      second.notices.setMode(MAIN, "all");
+      expect(prefs.modes()).toEqual({ [GAMES]: "none", [MAIN]: "all" });
+      expect(modeOf(second.state(), GAMES)).toBe("none");
+      first.notices.setMode(GAMES, "mentions");
+      second.notices.setMode(MAIN, "none");
+      expect(prefs.modes()).toEqual({ [MAIN]: "none" });
+    });
+
+    it("says the device did not keep a mode when it can no longer be read, and writes nothing", () => {
+      const t = setup();
+      const { prefs, writes } = device({});
+      t.notices.begin(prefs);
+      const base = prefs.modes;
+      prefs.modes = () => undefined;
+      t.notices.setMode(GAMES, "none");
+      expect(writes).toEqual([]);
+      expect(t.state().noticeNotKept).toBe(true);
+      expect(modeOf(t.state(), GAMES)).toBe("none");
+      prefs.modes = base;
+    });
+
     it("says the device did not keep a mode it refused, the mode held for the page all the same", () => {
       const t = setup();
       t.notices.begin({ modes: () => ({}), setModes: () => false });

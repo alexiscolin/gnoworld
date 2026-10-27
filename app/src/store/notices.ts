@@ -204,9 +204,12 @@ export const noticeSlice: StateCreator<State, [], [], NoticeSlice> = (set, get) 
       setMode: (room, mode) => {
         const state = get();
         if (modeOf(state, room) === mode) return;
-        const noticeModes = kept({ ...state.noticeModes, [room]: mode });
+        // The device's own modes, which another page may have changed since this one read them.
+        const fresh = writable ? device?.modes() : undefined;
+        const noticeModes = kept({ ...(fresh ?? state.noticeModes), [room]: mode });
         set({ noticeModes });
-        if (device !== undefined && (!writable || !device.setModes(noticeModes))) set({ noticeNotKept: true });
+        if (device !== undefined && (fresh === undefined || !device.setModes(noticeModes)))
+          set({ noticeNotKept: true });
       },
     },
   };
