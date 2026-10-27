@@ -29,7 +29,7 @@ export {
   type Shown,
 } from "./chat/reactions.ts";
 export { inlines, inWord, markdown, mentions } from "./markdown/markdown.ts";
-export { excerpt } from "./markdown/plain.ts";
+export { excerpt, firstGraphemes } from "./markdown/plain.ts";
 export type { Block, Inline } from "./markdown/markdown.ts";
 export { COMMANDS, compose, relayOf, type Composed } from "./chat/compose.ts";
 export { fold } from "./chat/fold.ts";
