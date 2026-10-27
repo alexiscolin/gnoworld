@@ -1,8 +1,9 @@
-// A line's actions (slice 4's 4c; docs/decisions.md, 2026-10-26): the prototype's bar, its More menu holding Copy
-// text, Copy link and, on the reader's own line, Delete, asked first. Reactions, reply, thread, pin, save, edit and
-// mark unread come with their merges; Report waits for slice 12's moderation queue.
-import type { Line } from "@gnoworld/core";
-import { Button, Cluster, Dialog, Menu, Stack } from "@gnoworld/ui";
+// A line's actions (slice 4's 4c; docs/decisions.md, 2026-10-26): the prototype's bar, an account's three quick
+// reactions first (4d), its More menu holding Copy text, Copy link and, on the reader's own line, Delete, asked first.
+// More reactions, thread, pin, save, edit and mark unread come with their merges; Report waits for slice 12's
+// moderation queue.
+import type { Line, Shown } from "@gnoworld/core";
+import { Button, Chip, Cluster, Dialog, IconButton, Menu, Stack } from "@gnoworld/ui";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import styles from "./LineActions.module.css";
 import { roomLabel } from "./names.ts";
@@ -13,6 +14,9 @@ function quoted(text: string): string {
   const characters = Array.from(new Intl.Segmenter().segment(text), ({ segment }) => segment);
   return characters.length > QUOTED ? `${characters.slice(0, QUOTED).join("")}…` : text;
 }
+
+// The prototype's three quick reactions (docs/prototype/source/app.js, withActions).
+const QUICK = ["👍", "❤️", "😂"];
 
 // A bar that would rise past the top of the list that scrolls comes down inside its line, as it shows (U10).
 function useInside() {
@@ -37,6 +41,12 @@ export interface LineActionsProps {
   onDelete: (id: string) => boolean;
   /** Its delete went out, not answered yet: no second one (U4). */
   deleting?: boolean;
+  /** The line's reactions as shown: the quick reactions the reader gave show pressed. */
+  reactions?: readonly Shown[] | undefined;
+  /** Reacts to the line with an emoji, or takes the reaction back; whether it went out. */
+  onReact: (emoji: string, on: boolean) => boolean;
+  /** Makes the line the one the composer's next answers (4d). */
+  onReply: () => void;
 }
 
 // The dialog that asks before a delete: which line, where, and that it cannot come back; `close` says whether to delete.
@@ -85,15 +95,68 @@ function AskDelete({
   );
 }
 
+// An account's quick reactions, each pressed when the reader gave it, pressed again to take it back. Wide, three chips;
+// narrow (the line's column under what the five controls need), one React menu of the same three, as the bar stands
+// on one row there (U1; LineActions.module.css).
+function QuickReactions({ given, onReact }: { given: ReadonlySet<string>; onReact: LineActionsProps["onReact"] }) {
+  const toggle = (emoji: string) => {
+    onReact(emoji, !given.has(emoji));
+  };
+  return (
+    <>
+      <span className={styles["quick"]}>
+        {QUICK.map((emoji) => (
+          <Chip
+            key={emoji}
+            label={`React with ${emoji}`}
+            selected={given.has(emoji)}
+            onClick={() => {
+              toggle(emoji);
+            }}
+          >
+            {emoji}
+          </Chip>
+        ))}
+      </span>
+      <span className={styles["react"]}>
+        <Menu
+          trigger="React"
+          icon="smile"
+          emphasis="plain"
+          size="s"
+          label="Reactions"
+          items={QUICK.map((emoji) => ({
+            label: `${given.has(emoji) ? "Take back" : "React with"} ${emoji}`,
+            onSelect: () => {
+              toggle(emoji);
+            },
+          }))}
+        />
+      </span>
+    </>
+  );
+}
+
 /** The bar of a line pointed at or focused, out of the list's live announcements: its More menu, and the dialog
  * that asks before a delete, which gives the focus back to More when it closes. */
-export function LineActions({ line, room, me, onCopy, onDelete, deleting = false }: LineActionsProps) {
+export function LineActions({
+  line,
+  room,
+  me,
+  onCopy,
+  onDelete,
+  deleting = false,
+  reactions,
+  onReact,
+  onReply,
+}: LineActionsProps) {
   const [asking, setAsking] = useState(false);
   const { barRef, inside } = useInside();
   // A delete asked, sent after the dialog's close, which gives the focus back to More (Menu hands it there first).
   const deletingRef = useRef(false);
   // Two missing values are no match: a guest's line has no account tag, a guest no address (M1).
   const own = me !== undefined && line.account === me;
+  const given = new Set(reactions?.flatMap(({ emoji, mine }) => (mine ? [emoji] : [])));
   // After the dialog's own close, as this effect runs after its: the line goes, handing the focus to a neighbour, or
   // stays, the delete unsent, the focus on More.
   useEffect(() => {
@@ -139,6 +202,8 @@ export function LineActions({ line, room, me, onCopy, onDelete, deleting = false
       className={styles["bar"]}
       data-inside={inside ? "" : undefined}
     >
+      {me === undefined ? null : <QuickReactions given={given} onReact={onReact} />}
+      {me === undefined ? null : <IconButton icon="reply" label="Reply" size="s" emphasis="plain" onClick={onReply} />}
       <Menu trigger="More actions" icon="more" emphasis="plain" size="s" label="Message actions" items={items} />
       {own ? <AskDelete line={line} room={room} open={asking} close={close} /> : null}
     </div>

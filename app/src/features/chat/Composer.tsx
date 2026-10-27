@@ -11,6 +11,8 @@ import { useFocusAtStart, useRefusal, useSelection, type Refused } from "./compo
 import { formatted, type Edit, type Format } from "./format.ts";
 import { Message } from "./Message.tsx";
 import { peopleOf, roomLabel, shortAddress } from "./names.ts";
+import { useAnswering } from "./ReplyBar.tsx";
+import type { Answered } from "./Replying.tsx";
 import styles from "./Composer.module.css";
 
 // What the field says while it has nothing else to say: the room is told of the typing from the first key (4f; its
@@ -124,6 +126,11 @@ export interface ComposerProps {
   focus?: boolean | undefined;
   /** The id of what describes whom it writes to: a direct message's "not encrypted" (4e's U6). */
   describedBy?: string | undefined;
+  /** The line the next one answers (4d's replies), said over the field; how many times Reply was asked, each asking
+   * putting the focus in the field; and how to answer none. */
+  replying?: Answered | undefined;
+  asked?: number | undefined;
+  onCancelReply?: (() => void) | undefined;
 }
 
 export function Composer(props: ComposerProps) {
@@ -173,6 +180,7 @@ export function Composer(props: ComposerProps) {
     event.preventDefault();
     apply(completed(draft, completion));
   };
+  const answering = useAnswering(props, { formRef, box, otherwise: complete });
   const send = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (composed.kind !== "line") return;
@@ -187,13 +195,15 @@ export function Composer(props: ComposerProps) {
       aria-label={`Write ${to === undefined ? "in" : "to"} ${label}`}
       aria-describedby={props.describedBy}
       onSubmit={send}
-      onKeyDown={complete}
+      onKeyDown={answering.keys}
     >
       <Stack space="2xs">
+        {answering.bar}
         <FormatBar onFormat={format} />
         <Sidebar side="end" space="2xs">
           <Field
             label={`Message ${label}`}
+            describedBy={answering.describedBy}
             value={draft}
             onChange={(value) => {
               change(value);

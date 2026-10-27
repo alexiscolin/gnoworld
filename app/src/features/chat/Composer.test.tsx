@@ -277,3 +277,62 @@ describe("typingOf: what an edit of the draft tells the room", () => {
     expect(typingOf(draft)).toBe(told);
   });
 });
+
+// 4d: Reply on a line's bar: the composer says which line the next one answers, its author and its words in one line,
+// 60 characters at most, cut between graphemes (R6), markup as text (R5); and offers to answer none.
+describe("Composer: a reply", () => {
+  const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+  const draw = (over: Partial<Parameters<typeof Composer>[0]> = {}) =>
+    renderToStaticMarkup(<Composer room={ROOM} nick={NICK} rooms={[]} members={[]} onSay={() => true} {...over} />);
+  const words = (markup: string) => markup.replaceAll(/<[^>]+>/g, "");
+  const to = (text: string, guest = false) => ({
+    replying: { who: ALICE, guest, text },
+    onCancelReply: () => undefined,
+  });
+
+  it("says the line it answers, its author and its words, and offers to cancel", () => {
+    const markup = draw(to("the **first** line"));
+    expect(words(markup)).toContain("Replying to g10gh7…3y5tv: the first line");
+    expect(names(markup)).toContain("Cancel the reply");
+  });
+
+  // The code review (CR7): the field, which Reply focuses, is described by the bar that says which line it answers.
+  it("describes its field by the line it answers", () => {
+    const markup = draw(to("the first line"));
+    const describedBy = /<input[^>]*aria-describedby="([^"]+)"/.exec(markup)?.[1] ?? "";
+    const ids = describedBy.split(" ");
+    // The field is described by its help too (4f's typing disclosure): the bar is one of what describes it.
+    const described = ids.map((id) => new RegExp(`<p[^>]*id="${id}"[^>]*>(.*?)</p>`, "s").exec(markup)?.[1] ?? "");
+    expect(described.map(words)).toContain("Replying to g10gh7…3y5tv: the first line");
+  });
+
+  // F1176 (the UX review's U4): the bar shows a mention as the line does, a member's and the reader's shortened.
+  it("shortens a mention of a member or of the reader in the words, no other", () => {
+    const CAROL = "g1jt8gqa4fddp0w803ysa6la4epsdn0hd8wwqcdj";
+    const quoted = (text: string) => words(draw({ ...to(text), members: [ALICE] }));
+    expect(quoted(`@${ALICE} @${NICK}`)).toContain(": @g10gh7…3y5tv @g1jg8m…vsqf5");
+    expect(quoted(`@${CAROL}`)).toContain(`: @${CAROL}`);
+  });
+
+  it("names a guest's line by its nick, said a guest's", () => {
+    const markup = draw({ replying: { who: "guest-ab12cd", guest: true, text: "hi" }, onCancelReply: () => undefined });
+    expect(words(markup)).toContain("Replying to guest-ab12cd (guest): hi");
+  });
+
+  it("cuts the words at 60 characters, between two graphemes", () => {
+    expect(words(draw(to("a".repeat(80))))).toContain(`: ${"a".repeat(59)}…`);
+    expect(words(draw(to(`${"a".repeat(58)}👩‍👩‍👧‍👦${"a".repeat(5)}`)))).toContain(`: ${"a".repeat(58)}👩‍👩‍👧‍👦…`);
+  });
+
+  it("keeps markup and a link of another scheme in the words as text", () => {
+    const markup = draw(to("<img src=x onerror=alert(1)> <script>alert(1)</script> [x](javascript:alert(1))"));
+    expect(markup).toContain("&lt;img src=x onerror=alert(1)&gt;");
+    expect(markup).not.toMatch(/<img|<script|href=/);
+  });
+
+  it("says nothing of a reply when it answers no line", () => {
+    const markup = draw();
+    expect(words(markup)).not.toContain("Replying to");
+    expect(names(markup)).not.toContain("Cancel the reply");
+  });
+});

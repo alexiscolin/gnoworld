@@ -14,7 +14,10 @@ import styles from "./shown.module.css";
 export interface Shown {
   kind: "room" | "dm";
   key: string;
-  view: Pick<RoomViewProps, "room" | "title" | "note" | "state" | "empty" | "onDelete" | "onDismiss" | "onRead">;
+  view: Pick<
+    RoomViewProps,
+    "room" | "title" | "note" | "state" | "empty" | "onDelete" | "onDismiss" | "onRead" | "onReact"
+  >;
   writer: Pick<WriterProps, "room" | "label" | "members" | "onSay" | "onTyping" | "refused" | "focus" | "describedBy">;
 }
 
@@ -104,7 +107,8 @@ function roomShown(room: string, state: Room["state"], acts: RoomActs): Shown {
       onDelete: acts.onDelete,
       onDismiss: acts.onDismiss,
       onRead: acts.onRead,
+      onReact: acts.onReact,
     },
-    writer: { room, members: state?.members ?? [], onSay: acts.onSay, onTyping: acts.onTyping },
+    writer: { room, members: state?.members ?? [], onSay: (draft) => acts.onSay(draft), onTyping: acts.onTyping },
   };
 }

@@ -1,6 +1,7 @@
 // A scripted Ergo for the screenshots (slice 4): the page's socket answered line by line, so a room's lines, topic
 // and people are the same each run, the page being a guest or an account; the rooms come from the real server.
 import type { WebSocketRoute } from "@playwright/test";
+import { hydrated, type Page } from "./fixtures.ts";
 
 export const MEMBER = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 /** A line of #games' history; its author MEMBER unless named. */
@@ -19,11 +20,36 @@ function welcome(line: string, me: string): string[] {
   return [];
 }
 
-// Each room joined, with #games' topic and names; the history of `told`, #games unless named.
+// A history batch of `lines` in `room`, Ergo's.
+const page = (id: string, lines: readonly HistoryLine[], room: string): string[] => [
+  `BATCH +${id} chathistory ${room}`,
+  ...lines.map(
+    ([msgid, time, text, author = MEMBER]) =>
+      `@batch=${id};msgid=${msgid};time=${time};account=${author} :${author}!u@h PRIVMSG ${room} :${text}`,
+  ),
+  `BATCH -${id}`,
+];
+
+// A raw line in the history batch: its batch tag first among its own.
+const batched = (raw: string): string => (raw.startsWith("@") ? `@batch=h1;${raw.slice(1)}` : `@batch=h1 ${raw}`);
+
+// Each room joined, with #games' topic and names; the history of `told`, #games unless named, its raw lines last.
 function rooms(
   line: string,
   me: string,
-  { history, told, read }: { history: readonly HistoryLine[]; told: string; read: string | undefined },
+  {
+    history,
+    replayed,
+    older,
+    told,
+    read,
+  }: {
+    history: readonly HistoryLine[];
+    replayed: readonly string[];
+    older: readonly HistoryLine[];
+    told: string;
+    read: string | undefined;
+  },
 ): string[] {
   if (line.startsWith("JOIN ")) {
     return line
@@ -38,6 +64,7 @@ function rooms(
         `:ergo 366 ${me} ${room} :End of /NAMES list.`,
       ]);
   }
+  if (line.startsWith(`CHATHISTORY BEFORE ${told} `)) return page("h2", older, told);
   if (!line.startsWith(`CHATHISTORY LATEST ${told} `)) return [];
   return [
     `BATCH +h1 chathistory ${told}`,
@@ -45,6 +72,7 @@ function rooms(
       ([id, time, text, author = MEMBER]) =>
         `@batch=h1;msgid=${id};time=${time};account=${author} :${author}!u@h PRIVMSG ${told} :${text}`,
     ),
+    ...replayed.map(batched),
     "BATCH -h1",
   ];
 }
@@ -59,7 +87,7 @@ function redaction(line: string, me: string, { refuse, hold }: { refuse: boolean
 }
 
 // The page's MARKREAD: Ergo's answer, the later of the place it holds and the one asked (irc/handlers.go:3247,
-// v2.19.1); the page's PRIVMSG: Ergo's echo (echo-message), at the time given.
+// v2.19.1).
 function marking(line: string, places: Map<string, string>, quiet: boolean): string[] {
   const [command, room = "", stamp = ""] = line.split(" ");
   const time = stamp.replace(/^timestamp=/, "");
@@ -74,11 +102,37 @@ function marking(line: string, places: Map<string, string>, quiet: boolean): str
   return [`:ergo.test MARKREAD ${room} timestamp=${kept}`];
 }
 
-function echoed(line: string, me: string, echo: { time: string | undefined; next: () => number }): string[] {
-  const said = /^PRIVMSG (\S+) :(.*)$/s.exec(line);
-  if (said === null || echo.time === undefined) return [];
-  const [, target = "", text = ""] = said;
-  return [`@msgid=echo${String(echo.next())};time=${echo.time};account=${me} :${me}!u@h PRIVMSG ${target} :${text}`];
+// The page's line: its tags, then the rest.
+function split(line: string): { tags: string; rest: string } {
+  if (!line.startsWith("@")) return { tags: "", rest: line };
+  const space = line.indexOf(" ");
+  return { tags: line.slice(1, space), rest: line.slice(space + 1) };
+}
+
+// Ergo's refusal of a TAGMSG in a room the account may not speak in: a 404, labelled as the TAGMSG was.
+function refusedReaction(line: string, me: string, refuse: boolean): string[] {
+  const { tags, rest } = split(line);
+  const [command, room = ""] = rest.split(" ");
+  if (command !== "TAGMSG" || !refuse) return [];
+  const label = /(?:^|;)label=([^;]*)/.exec(tags)?.[1];
+  return [`${label === undefined ? "" : `@label=${label} `}:ergo 404 ${me} ${room} :Cannot send to channel (+m)`];
+}
+
+// Ergo's echo (echo-message) of a PRIVMSG the page sends, or of a reaction's TAGMSG, under `me`, with a msgid and a
+// time: the one given, or one after the history's, the page's own tags kept. A typing TAGMSG is not echoed, nor a
+// reaction Ergo refused.
+function echoed(
+  line: string,
+  me: string,
+  echo: { time: string | true | undefined; refused: boolean; next: () => number },
+): string[] {
+  const { tags, rest } = split(line);
+  const reaction = rest.startsWith("TAGMSG ") && !echo.refused && /\+draft\/(un)?react=/.test(tags);
+  if (echo.time === undefined || !(rest.startsWith("PRIVMSG ") || reaction)) return [];
+  const count = echo.next();
+  const time =
+    echo.time === true ? new Date(Date.parse("2026-10-25T11:00:00.000Z") + count * 1000).toISOString() : echo.time;
+  return [`@msgid=echo${String(count)};time=${time};account=${me}${tags === "" ? "" : `;${tags}`} :${me}!u@h ${rest}`];
 }
 
 export interface Scripted {
@@ -96,11 +150,21 @@ export interface Scripted {
   read?: string;
   /** Ergo answers no MARKREAD of the page's, as when the link drops before its answer. */
   quietMarks?: boolean;
-  /** Ergo echoes the page's lines, at this time; none unless named. */
-  echo?: string;
+  /** Ergo echoes the page's lines (echo-message), at this time, or true for one after the history's; none unless named. */
+  echo?: string | true;
   /** Ergo answers the page's CHATHISTORY once this settles, so a live line may come before the page (4f's G1). */
   historyAfter?: Promise<void>;
+  /** Lines Ergo replays after the history's, as it sends them: a reaction's TAGMSG, a reply or an edit. */
+  replayed?: readonly string[];
+  /** Ergo refuses each reaction, as in a room the account may not speak in: a 404 to its label, no echo. */
+  refuseReact?: boolean;
+  /** The lines before the history's, which Ergo gives to CHATHISTORY BEFORE. */
+  older?: readonly HistoryLine[];
 }
+
+// The reading places Ergo holds: the room's, when one is given.
+const placesOf = (room: string, read: string | undefined) =>
+  new Map<string, string>(read === undefined ? [] : [[room, read]]);
 
 /** Answers the page's socket as Ergo would, the page being `me`: with #games' history, or with what `script` says. */
 export function scriptedErgo(ergo: WebSocketRoute, me: string, script: Scripted = {}): void {
@@ -114,18 +178,22 @@ export function scriptedErgo(ergo: WebSocketRoute, me: string, script: Scripted 
     quietMarks = false,
     echo,
     historyAfter,
+    replayed = [],
+    refuseReact = false,
+    older = [],
   } = script;
-  const places = new Map<string, string>(read === undefined ? [] : [[room, read]]);
+  const places = placesOf(room, read);
   let echoes = 0;
   ergo.onMessage((data) => {
     const line = String(data);
     heard?.(line);
     const answers = [
       ...welcome(line, me),
-      ...rooms(line, me, { history, told: room, read }),
+      ...rooms(line, me, { history, replayed, older, told: room, read }),
       ...redaction(line, me, { refuse: refuseRedact, hold: holdRedact }),
       ...marking(line, places, quietMarks),
-      ...echoed(line, me, { time: echo, next: () => (echoes += 1) }),
+      ...refusedReaction(line, me, refuseReact),
+      ...echoed(line, me, { time: echo, refused: refuseReact, next: () => (echoes += 1) }),
     ];
     const reply = () => {
       for (const answer of answers) ergo.send(answer);
@@ -133,4 +201,19 @@ export function scriptedErgo(ergo: WebSocketRoute, me: string, script: Scripted 
     if (historyAfter !== undefined && line.startsWith("CHATHISTORY ")) historyAfter.then(reply, () => undefined);
     else reply();
   });
+}
+
+/** #games, or the room `script` names, opened on a scripted Ergo as `me`; the socket, to say a live line on it. */
+export async function opened(page: Page, me: string, script: Scripted = {}): Promise<() => WebSocketRoute> {
+  let socket: WebSocketRoute | undefined;
+  await page.routeWebSocket(/\/ws$/, (ergo) => {
+    socket = ergo;
+    scriptedErgo(ergo, me, script);
+  });
+  await page.goto(`/w/bubble${script.room === "#bubble" ? "" : "?room=games"}`);
+  await hydrated(page);
+  return () => {
+    if (socket === undefined) throw new Error("the page opened no socket");
+    return socket;
+  };
 }

@@ -15,6 +15,10 @@ export interface Line {
   readonly account?: string;
   readonly text: string;
   readonly kind: "message" | "notice" | "action";
+  /** The msgid of the line it answers (4d's replies), a msgid a tag carries; none for a line that answers none. */
+  readonly reply?: string;
+  /** The msgid of the line it corrects (4d's edits shown, +gnoworld/edit), a msgid a tag carries; none for the rest. */
+  readonly edits?: string;
 }
 
 // Ergo folds A to Z alone (casemapping ascii, deploy/ergo/ircd.yaml.tmpl), its names being ASCII alone
@@ -67,8 +71,27 @@ function said(command: string, text: string): Pick<Line, "kind" | "text"> | unde
   return command === "PRIVMSG" && action !== undefined ? { kind: "action", text: action } : undefined;
 }
 
-// The id and the time Ergo set, each in its one form, or none.
-function stamp(tags: IrcMessage["tags"]): Pick<Line, "id" | "time"> | undefined {
+/** Whether `value` is a msgid a tag carries back: one word of 64 characters at most, no leading colon, nothing a tag
+ * escapes, no NUL, which no line may hold. */
+export function isTagMsgid(value: string): boolean {
+  return /^[^\s,:;\\\0][^\s,;\\\0]{0,63}$/u.test(value);
+}
+/** The line a message answers: +reply, ratified in 2026, before its draft name. */
+export const REPLY = ["+reply", "+draft/reply"];
+// The line a message corrects: our own tag, no IRCv3 one existing (docs/decisions.md, 2026-10-21).
+const EDIT = ["+gnoworld/edit"];
+
+/** The first of these tags whose value `fits`, or none. */
+export function first(
+  tags: IrcMessage["tags"],
+  names: readonly string[],
+  fits: (value: string) => boolean,
+): string | undefined {
+  return names.map((name) => tags.get(name) ?? "").find(fits);
+}
+
+/** The id and the time Ergo set, each in its one form, or none. */
+export function stamp(tags: IrcMessage["tags"]): Pick<Line, "id" | "time"> | undefined {
   const [id = "", time = ""] = [tags.get("msgid"), tags.get("time")];
   return /^[^\s,]+$/.test(id) && isTime(time) ? { id, time } : undefined;
 }
@@ -86,8 +109,14 @@ export function lineOf(message: IrcMessage, room: string): Line | undefined {
   const [text, marks, from] = [textTo(message, room), stamp(message.tags), nickOf(message.source ?? "")];
   const body = text === undefined ? undefined : said(message.command, text);
   if (marks === undefined || body === undefined || from === "") return undefined;
-  const account = message.tags.get("account") ?? "";
-  return { ...marks, from, ...(account === "" ? {} : { account }), ...body };
+  const { tags } = message;
+  const [account = "", reply, edits] = [
+    tags.get("account"),
+    first(tags, REPLY, isTagMsgid),
+    first(tags, EDIT, isTagMsgid),
+  ];
+  const marked = { ...(reply === undefined ? {} : { reply }), ...(edits === undefined ? {} : { edits }) };
+  return { ...marks, from, ...(account === "" ? {} : { account }), ...body, ...marked };
 }
 
 const byTimeThenId = (one: Line, other: Line): number => compare(one.time, other.time) || compare(one.id, other.id);
@@ -114,8 +143,12 @@ export function addLines(lines: readonly Line[], incoming: readonly Line[], cap:
   return kept.some((line) => !held.has(line.id)) ? kept : lines;
 }
 
-/** The room's lines without the one Ergo's REDACT hides (draft/message-redaction). */
-export function redactAfter(lines: readonly Line[], message: IrcMessage, room: string): readonly Line[] {
+/** The room's lines, or its reactions, without the one Ergo's REDACT hides (draft/message-redaction). */
+export function redactAfter<T extends { readonly id: string }>(
+  lines: readonly T[],
+  message: IrcMessage,
+  room: string,
+): readonly T[] {
   const [target = "", id = ""] = message.params;
   if (message.command !== "REDACT" || !sameName(target, room)) return lines;
   const kept = lines.filter((line) => line.id !== id);

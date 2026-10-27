@@ -43,7 +43,12 @@ const serviceWorker: Plugin = {
   },
 };
 
+// Baseline widely available (docs/DESIGN-SYSTEM.md, "Browsers") at the newest features the code uses: RegExp's `v` flag
+// and Intl.Segmenter, as MDN's browser-compat-data 8.1.7 dates them. Vite's own default stops at 2026-01-01's (S1).
+const TARGET = ["chrome112", "edge112", "firefox125", "safari17", "ios17"];
+
 // The React Compiler memoizes every component (ADR-0002 §8); one it cannot compile fails the build.
 export default defineConfig({
   plugins: [reactRouter(), babel({ presets: [reactCompilerPreset({ panicThreshold: "all_errors" })] }), serviceWorker],
+  build: { target: TARGET },
 });

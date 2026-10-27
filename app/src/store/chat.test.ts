@@ -1,6 +1,6 @@
 import { parseLine, type IrcMessage } from "@gnoworld/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { LINES_KEPT } from "./chat.ts";
+import { LINES_KEPT, REACTIONS_KEPT } from "./chat.ts";
 import { createAppStore } from "./index.ts";
 
 const ME = "guest-ab12cd";
@@ -423,5 +423,150 @@ describe("the store's chat slice: the reading place", () => {
     t.heard(read(`:ergo MARKREAD #bubble timestamp=${T0}`));
     t.disconnected();
     expect(t.room("#bubble")?.read).toBe(T0);
+  });
+});
+
+// 4d: a room keeps the reactions Ergo relays and replays (TAGMSG, draft/react) beside its lines: the newest of an
+// account to a line with an emoji, in time order, the newest REACTIONS_KEPT; the page counts them (core's reactionsOn).
+describe("the store's chat slice: reactions", () => {
+  const reacted = (room: string, id: string, { to = "m1", emoji = "👍", who = "alice", time = T0 } = {}) =>
+    read(`@msgid=${id};time=${time};account=${who};+draft/react=${emoji};+reply=${to} :${who}!u@h TAGMSG ${room}`);
+  const at = (n: number) => new Date(Date.parse(T0) + n * 1000).toISOString();
+  const ids = (room: ReturnType<ReturnType<typeof following>["room"]>) => room?.reactions?.map(({ id }) => id);
+
+  it("starts a room with no reaction", () => {
+    expect(following().room("#bubble")?.reactions).toBeUndefined();
+  });
+
+  it("keeps a live reaction in its room alone", () => {
+    const t = following();
+    t.heard(said("#bubble", "m1", "hello"));
+    t.heard(reacted("#Bubble", "r1"));
+    expect(t.room("#bubble")?.reactions).toEqual([
+      { id: "r1", time: T0, to: "m1", emoji: "👍", who: "alice", on: true },
+    ]);
+    expect(t.room("#bubble/games")?.reactions).toBeUndefined();
+  });
+
+  it("keeps a page's reactions beside its lines, each once, a page brought again included", () => {
+    const t = following();
+    t.page("#bubble", [
+      said("#bubble", "m1", "hello"),
+      reacted("#bubble", "r1"),
+      reacted("#bubble", "r2", { who: "bob" }),
+    ]);
+    t.page("#bubble", [reacted("#bubble", "r1")]);
+    expect(t.room("#bubble")?.lines.map(({ id }) => id)).toEqual(["m1"]);
+    expect(ids(t.room("#bubble"))).toEqual(["r1", "r2"]);
+  });
+
+  it("takes from a page only the reactions of its room", () => {
+    const t = following();
+    t.page("#bubble", [reacted("#bubble/games", "r1"), reacted("#bubble", "r2")]);
+    expect(ids(t.room("#bubble"))).toEqual(["r2"]);
+    expect(t.room("#bubble/games")?.reactions).toBeUndefined();
+  });
+
+  it("drops a reaction a REDACT names, and keeps the line it answered", () => {
+    const t = following();
+    t.heard(said("#bubble", "m1", "hello"));
+    t.heard(reacted("#bubble", "r1"));
+    t.heard(reacted("#bubble", "r2", { emoji: "😂" }));
+    t.heard(read(":gnoworld!u@h REDACT #bubble r1"));
+    expect(ids(t.room("#bubble"))).toEqual(["r2"]);
+    expect(t.room("#bubble")?.lines.map(({ id }) => id)).toEqual(["m1"]);
+  });
+
+  it("notifies once of a reaction heard twice, and no one of a TAGMSG that is no reaction or of a room not followed", () => {
+    const t = following();
+    // The first page of a room is told once (4f's paged mark): the count starts after it.
+    t.page("#bubble", []);
+    const before = t.notified();
+    t.heard(reacted("#bubble", "r1"));
+    t.heard(reacted("#bubble", "r1"));
+    expect(t.notified()).toBe(before + 1);
+    // A TAGMSG of a tag no one reads (+typing is 4f's, and tells its room).
+    t.heard(read(`@msgid=r2;time=${T0};account=alice;+example=1 :alice!u@h TAGMSG #bubble`));
+    t.heard(reacted("#garden", "r3"));
+    t.page("#bubble", [reacted("#bubble", "r4", { emoji: "nice" })]);
+    expect(t.notified()).toBe(before + 1);
+    expect(t.store.getState().chat.rooms["#garden"]).toBeUndefined();
+  });
+
+  it("keeps the reactions while the link is down, and lets them go with their room", () => {
+    const t = following();
+    t.heard(reacted("#bubble", "r1"));
+    t.disconnected();
+    expect(ids(t.room("#bubble"))).toEqual(["r1"]);
+    t.follow([]);
+    expect(t.store.getState().chat.rooms).toEqual({});
+  });
+
+  // A reaction names a msgid; another room's line of that msgid is not its line (R8).
+  it("keeps a reaction naming another room's line in its own room, the other room untouched", () => {
+    const t = following();
+    t.heard(said("#bubble", "m1", "hello"));
+    const games = t.room("#bubble/games");
+    const bubble = t.room("#bubble");
+    t.heard(reacted("#bubble/games", "r1", { to: "m1" }));
+    expect(t.room("#bubble")).toBe(bubble);
+    expect(ids(t.room("#bubble/games"))).toEqual(["r1"]);
+    expect(t.room("#bubble/games")).not.toBe(games);
+  });
+
+  it("keeps 200 lines' five reactions each, by five accounts, a whole window's", () => {
+    const t = following();
+    for (let line = 0; line < 200; line += 1)
+      for (let who = 0; who < 5; who += 1)
+        t.heard(
+          reacted("#bubble", `r${String(line)}-${String(who)}`, {
+            to: `m${String(line)}`,
+            who: `a${String(who)}`,
+            time: at(line * 5 + who),
+          }),
+        );
+    expect(t.room("#bubble")?.reactions).toHaveLength(1000);
+    // The green pass (G12): the window's size itself, not a bound of it.
+    expect(REACTIONS_KEPT).toBe(1000);
+  });
+
+  it("holds 10,000 reactions of one account to one line with one emoji to one, evicting no other account's", () => {
+    const t = following();
+    t.heard(reacted("#bubble", "theirs", { who: "bob" }));
+    for (let n = 0; n < 10_000; n += 1) t.heard(reacted("#bubble", `r${String(n)}`, { time: at(n + 1) }));
+    expect(ids(t.room("#bubble"))).toEqual(["theirs", "r9999"]);
+  });
+
+  it("holds a flood of distinct reactions to the newest REACTIONS_KEPT, the newest run of them", () => {
+    const t = following();
+    const flood = 1500;
+    for (let n = 0; n < flood; n += 1)
+      t.heard(reacted("#bubble", `r${String(n)}`, { who: `a${String(n)}`, time: at(n) }));
+    const kept = t.room("#bubble")?.reactions ?? [];
+    expect(kept).toHaveLength(1000);
+    expect(kept[0]?.id).toBe("r500");
+    expect(kept.at(-1)?.id).toBe(`r${String(flood - 1)}`);
+  });
+});
+
+// R10: a room's reaction Ergo refused is said until the page has said it.
+describe("the store's chat slice: a reaction Ergo refused", () => {
+  it("keeps a refused reaction with its room until it is dismissed, a refused delete's dismissal with it", () => {
+    const t = following();
+    t.reactionRefused("#bubble");
+    expect(t.room("#bubble")?.cannotReact).toBe(true);
+    expect(t.room("#bubble/games")?.cannotReact).toBeUndefined();
+    t.dismissed("#bubble");
+    expect(t.room("#bubble")?.cannotReact).toBeUndefined();
+  });
+
+  it("notifies once of a refusal said twice, and no one of one in a room not followed", () => {
+    const t = following();
+    const before = t.notified();
+    t.reactionRefused("#bubble");
+    t.reactionRefused("#bubble");
+    t.reactionRefused("#garden");
+    expect(t.notified()).toBe(before + 1);
+    expect(t.store.getState().chat.rooms["#garden"]).toBeUndefined();
   });
 });
