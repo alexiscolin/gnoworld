@@ -2539,6 +2539,23 @@ base=$(git -C "$pf" rev-parse HEAD)
 git -C "$pf" rm -q packages/x/src/e.test.ts && printf 'export const twice = (n: number) => n * 2 + 3 - 3;\n' >"$pf/packages/x/src/a.ts"
 printf '// expects: + 3\n' >"$pf/packages/x/src/f.test.ts" && fix "fix(x): a new test, an old one gone"
 prove "$base" || fail "prove_fix ran a test the fix deleted"
+# A journey that reproduces a race fails on the parent only sometimes (ca98dda, 4e's Alt+arrows): the fix is proven
+# if any of 3 runs fails, refused only when all 3 pass, and the runs stop at the first failure. A fake counts its
+# runs and fails on the one named in $t/fails_on (0: never).
+printf '#!/bin/sh\nn=$(($(cat "%s/count" 2>/dev/null || echo 0) + 1)); echo $n >"%s/count"\n[ "$n" = "$(cat "%s/fails_on")" ] && exit 1\nexit 0\n' "$t" "$t" "$t" >"$t/fake_flaky" && chmod +x "$t/fake_flaky"
+flaky() { echo "$1" >"$t/fails_on"; rm -f "$t/count"; (cd "$pf" && PROVE_FIX_VITEST="$t/fake_flaky" python3 -I "$here/prove_fix.py" "$base" 2>&1); }
+base=$(git -C "$pf" rev-parse HEAD)
+printf 'export const twice = (n: number) => n * 2 + 4 - 4;\n' >"$pf/packages/x/src/a.ts" && printf '// a race\n' >"$pf/packages/x/src/race.test.ts"
+fix "fix(x): a race its test shows one run in three"
+out=$(flaky 3) || fail "prove_fix refused a fix whose test failed on the third run before it"
+[ "$(cat "$t/count")" = 3 ] || fail "prove_fix did not run the parent's test 3 times before accepting the last"
+case "$out" in *"3 runs"*) ;; *) fail "prove_fix did not say how many runs it took: $out" ;; esac
+out=$(flaky 1) || fail "prove_fix refused a fix whose test failed on the first run before it"
+[ "$(cat "$t/count")" = 1 ] || fail "prove_fix went on running the parent's test after it had failed"
+case "$out" in *"1 run"*) ;; *) fail "prove_fix did not say its one run: $out" ;; esac
+out=$(flaky 0) && fail "prove_fix accepted a fix whose test passed on all 3 runs before it"
+[ "$(cat "$t/count")" = 3 ] || fail "prove_fix gave up before the third run"
+case "$out" in *"3 runs"*) ;; *) fail "prove_fix did not say its refusal came after 3 runs: $out" ;; esac
 # The app reads a workspace package through its node_modules' link; the parent's copy must lead it
 # to the parent's package: borrowed whole, the link led to the fixed one (F344).
 base=$(git -C "$pf" rev-parse HEAD) && mkdir -p "$pf/app/node_modules/@g" && ln -s ../../../packages/x "$pf/app/node_modules/@g/x"

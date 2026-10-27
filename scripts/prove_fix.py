@@ -49,12 +49,25 @@ def runs(tests):
     return out
 
 
+# A journey that reproduces a race fails on the parent only sometimes (ca98dda): each command gets up to this
+# many runs there and counts as failing if any one fails, the runs stopping at the first failure.
+RUNS = 3
+
+
 def fails_before(commit, tests):
-    """Whether the commit's tests fail on its parent: a worktree of the parent, with only them added."""
+    """The most runs it took on the commit's parent for each of the tests' commands to fail there, or None when
+    one passed all RUNS runs: a worktree of the parent, with only the tests added."""
     with worktree(f"{commit}^") as tree:
         git("-C", tree, "checkout", commit, "--", *tests)
-        return all(subprocess.run(cmd, shell=True, cwd=os.path.join(tree, folder), capture_output=True).returncode != 0
-                   for folder, cmd in runs(tests))
+        took = 0
+        for folder, cmd in runs(tests):
+            for n in range(1, RUNS + 1):
+                if subprocess.run(cmd, shell=True, cwd=os.path.join(tree, folder), capture_output=True).returncode != 0:
+                    break
+            else:
+                return None
+            took = max(took, n)
+        return took
 
 
 def harness_files(commit):
@@ -80,7 +93,11 @@ def verdict(commit):
         return None
     if not tests:
         return None if re.search(r"^No-test: \S", message, re.M) else "a fix with no test that reproduces the bug (or a `No-test: <why>` line)"
-    return None if fails_before(commit, tests) else f"its tests pass before the fix, so they reproduce nothing: {', '.join(tests)}"
+    took = fails_before(commit, tests)
+    if took is None:
+        return f"its tests pass before the fix in {RUNS} runs, so they reproduce nothing: {', '.join(tests)}"
+    print(f"prove_fix: {commit[:7]} its tests failed before the fix, in {took} run{'s' * (took > 1)}")
+    return None
 
 
 base = sys.argv[1]
