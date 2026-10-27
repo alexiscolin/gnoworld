@@ -165,6 +165,31 @@ test.describe("a direct message's bar", () => {
     expect(dm.says()).toEqual([`PRIVMSG ${PARTNER} :keep me`]);
   });
 
+  // R7(c), decided by Claude: Edit drops a pending Reply, so the next plain message answers nothing.
+  test("drops a pending reply when Edit is chosen: the correction and the next line carry no +reply", async ({
+    page,
+  }) => {
+    const dm = await inDm(page);
+    dm.theirs("p1", "are you coming?", { at: 0 });
+    await expect(lines(page)).toHaveCount(1);
+    await write(page, "mine");
+    await lines(page).nth(0).hover();
+    await barOf(page, 0).getByRole("button", { name: "Reply" }).click();
+    await expect(page.getByText("Replying to", { exact: false })).toHaveCount(1);
+    await startEdit(page, 1);
+    await expect(page.getByText("Replying to", { exact: false })).toHaveCount(0);
+    await field(page).fill("mine, fixed");
+    await field(page).press("Enter");
+    await expect(lines(page).nth(1)).toContainText("mine, fixed");
+    await expect(page.getByText("Replying to", { exact: false })).toHaveCount(0);
+    await write(page, "next");
+    expect(dm.says()).toEqual([
+      `PRIVMSG ${PARTNER} :mine`,
+      `@+gnoworld/edit=echo1 PRIVMSG ${PARTNER} :mine, fixed`,
+      `PRIVMSG ${PARTNER} :next`,
+    ]);
+  });
+
   test("deletes one's own line after asking, with its corrections, by a REDACT to the partner", async ({ page }) => {
     const dm = await inDm(page);
     dm.theirs("p1", "stays", { at: 0 });

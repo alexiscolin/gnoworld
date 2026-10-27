@@ -42,11 +42,12 @@ interface Composing {
 
 // The line the next one answers (4d's replies), and how many times Reply was asked: each asking puts the focus in the
 // field (G8). Its conversation's alone: another in view drops it, as does a line sent.
-function useReplies(shown: Shown | undefined, lines: readonly Line[] | undefined): Composing {
+function useReplies(shown: Shown | undefined, lines: readonly Line[] | undefined): Composing & { drop: () => void } {
   const { value: reply, update, clear } = useHere<Chosen>(shown?.key);
   const replying = shownAs(reply, lines);
-  if (shown === undefined) return { view: {}, writer: {} };
+  if (shown === undefined) return { view: {}, writer: {}, drop: clear };
   return {
+    drop: clear,
     view: {
       onReply: (id: string) => {
         update((was) => asking(was, id));
@@ -65,16 +66,17 @@ function useReplies(shown: Shown | undefined, lines: readonly Line[] | undefined
   };
 }
 
-// The line of the reader's own a direct message's next one corrects, its words put in the composer: one a conversation, as
-// a reply; none for a room. Sent as a correction tagged with the line's msgid, shown in its place. However an edit ends,
-// the composer is the reader's again, its box taking the focus.
-function useEdits(shown: Shown | undefined, lines: readonly Line[] | undefined): Composing {
+// The line of the reader's own a direct message's next one corrects, its words put in the composer, as a reply's: one a
+// conversation, none for a room. Sent tagged with the line's msgid, shown in its place. Asking for one drops a reply
+// asked before (`dropReply`); an edit's end gives the box the focus.
+function useEdits(shown: Shown | undefined, lines: readonly Line[] | undefined, dropReply: () => void): Composing {
   const { value: edit, update, clear } = useHere<Chosen>(shown?.key);
   const ended = useHere<true>(shown?.key);
   const editing = shownAs(edit, lines);
   if (shown?.kind !== "dm") return { view: {}, writer: {} };
   const view = {
     onEdit: (id: string) => {
+      dropReply();
       update((was) => asking(was, id));
     },
   };
@@ -100,7 +102,7 @@ function useEdits(shown: Shown | undefined, lines: readonly Line[] | undefined):
 /** The conversation in view and what its composer is told of the line it answers or corrects. */
 export function useComposing(shown: Shown | undefined) {
   const lines = shown?.view.state?.lines;
-  const replies = useReplies(shown, lines);
-  const edits = useEdits(shown, lines);
+  const { drop, ...replies } = useReplies(shown, lines);
+  const edits = useEdits(shown, lines, drop);
   return { view: { ...replies.view, ...edits.view }, writer: { ...replies.writer, ...edits.writer } };
 }
