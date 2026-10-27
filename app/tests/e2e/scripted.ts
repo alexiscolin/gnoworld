@@ -79,10 +79,15 @@ function rooms(
 
 // A REDACT of the page's: Ergo's echo, which takes the line from every reader, or its refusal; none while held.
 function redaction(line: string, me: string, { refuse, hold }: { refuse: boolean; hold: boolean }): string[] {
-  const [command, room = "", id = ""] = line.split(" ");
+  const { tags, rest } = split(line);
+  const [command, room = "", id = ""] = rest.split(" ");
   if (command !== "REDACT" || hold) return [];
+  // Ergo's answer carries the label of the command it answers (labeled-response), a direct message's delete having one.
+  const label = /(?:^|;)label=([^;]*)/.exec(tags)?.[1];
   if (refuse)
-    return [`:ergo FAIL REDACT REDACT_FORBIDDEN ${room} ${id} :You are not authorised to delete this message`];
+    return [
+      `${label === undefined ? "" : `@label=${label} `}:ergo FAIL REDACT REDACT_FORBIDDEN ${room} ${id} :You are not authorised to delete this message`,
+    ];
   return [`:${me}!u@h REDACT ${room} ${id}`];
 }
 

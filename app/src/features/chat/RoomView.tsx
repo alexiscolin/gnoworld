@@ -50,6 +50,8 @@ const NOTICES: Record<Exclude<ErgoState | "off", "connected">, string> = {
 export interface RoomViewProps {
   /** The room whose lines are in view: its lines have bars (4c); none for a direct message's (4e). */
   room?: string | undefined;
+  /** The partner of the direct message in view: its lines have bars too (4d's DM bar), with no link and no player. */
+  partner?: string | undefined;
   /** Its name: a room's label; a direct message's partner (4e). */
   title: ReactNode;
   /** What it says of itself under its name: a room's description, its IRC topic; a conversation's "not encrypted". */
@@ -97,6 +99,8 @@ export interface RoomViewProps {
   onReact?: ((reaction: Reacting) => boolean) | undefined;
   /** Makes a line, by its msgid, the one the composer's next answers (4d's replies). */
   onReply?: ((id: string) => void) | undefined;
+  /** Puts a line's words in the composer to correct them, the reader's own (a direct message's). */
+  onEdit?: ((id: string) => void) | undefined;
 }
 
 /** Who is here: counted once connected, the bot left out, the first MEMBERS_SHOWN named. */
@@ -200,7 +204,7 @@ function Header({ title, topic, id }: { title: ReactNode; topic: ReactNode; id: 
 
 export function RoomView(props: RoomViewProps) {
   const { room, title, note, noteId, state, chat, composer, me, onDelete, onDismiss, onRead, aside } = props;
-  const { onReact, onReply } = props;
+  const { onReact, onReply, onEdit, partner } = props;
   const { verdicts, saving = false } = props;
   const { empty = "No messages yet." } = props;
   const { lines = [], members = [], refused, typing, read, paged, reactions, cannotReact } = state ?? {};
@@ -216,6 +220,7 @@ export function RoomView(props: RoomViewProps) {
           <RoomLines
             key={room}
             room={room}
+            partner={partner}
             lines={lines}
             members={members}
             me={me}
@@ -232,6 +237,7 @@ export function RoomView(props: RoomViewProps) {
             onReact={onReact}
             cannotReact={cannotReact}
             onReply={onReply}
+            onEdit={onEdit}
           />
           {connected && lines.length === 0 ? <p>{empty}</p> : null}
           {/* A room's, whose place is kept so the composer never moves; a direct message tells none (4e). */}

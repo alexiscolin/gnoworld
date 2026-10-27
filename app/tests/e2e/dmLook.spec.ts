@@ -55,6 +55,22 @@ test.describe("a direct message, as it looks", () => {
       await expect(page).toHaveScreenshot(`dm-${screen}.png`, { mask: [page.getByRole("banner")] });
     });
 
+    // 4d's DM bar: a reaction's chip under the partner's line, and the bar on the reader's own, focused.
+    test(`with a reaction and a line's bar, on a ${screen}'s screen`, async ({ page }) => {
+      const ergo = await conversation(page, width, MEMBER);
+      ergo.send(dm("d1", { from: MEMBER, to: ACCOUNT, minute: 0, text: "Up for a round of **gnogolf** tonight?" }));
+      ergo.send(dm("d2", { from: ACCOUNT, to: MEMBER, minute: 1, text: "Yes, at 9 pm." }));
+      ergo.send(
+        `@msgid=r1;time=2026-10-25T10:02:00.000Z;account=${MEMBER};+draft/react=👍;+reply=d1 :${MEMBER}!u@h TAGMSG ${ACCOUNT}`,
+      );
+      await expect(lines(page)).toHaveCount(2);
+      await expect(lines(page).nth(0).getByRole("button", { name: "👍, 1" })).toBeVisible();
+      await lines(page).nth(1).focus();
+      await expect(lines(page).nth(1).getByRole("toolbar", { name: "Actions on this message" })).toBeVisible();
+      expect(await axe(page)).toEqual([]);
+      await expect(page).toHaveScreenshot(`dm-bar-${screen}.png`, { mask: [page.getByRole("banner")] });
+    });
+
     test(`empty since the page opened, with no accessibility violation, on a ${screen}'s screen`, async ({ page }) => {
       await conversation(page, width, MEMBER);
       await expect(page.getByText("No messages since this page opened.")).toBeVisible();

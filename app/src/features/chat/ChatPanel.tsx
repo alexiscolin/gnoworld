@@ -148,7 +148,10 @@ export function ChatPanel({ world }: { world: string }) {
       dismissed={(room) => {
         store.getState().chatActions.dismissed(room);
       }}
-      sayTo={(partner, draft) => linkRef.current?.sayTo(partner, draft) ?? false}
+      dmDismissed={(partner) => {
+        store.getState().dmActions.dismissed(partner);
+      }}
+      sayTo={(partner, draft, tags) => linkRef.current?.sayTo(partner, draft, tags) ?? false}
       dms={dms}
       failed={failed}
     />

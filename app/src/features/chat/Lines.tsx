@@ -59,8 +59,10 @@ function useNewestInView(
 }
 
 export interface LinesProps {
-  /** The room, whose lines have bars; none for a direct message's, which have none. */
+  /** The room, whose lines have bars; none for a direct message's. */
   room: string | undefined;
+  /** The partner of a direct message, whose lines have bars too (4d's DM bar), but no player and no link. */
+  partner?: string | undefined;
   lines: readonly Line[];
   members: readonly string[];
   /** The reader's address, the lines that mention it marked; none for a guest. */
@@ -82,6 +84,8 @@ export interface LinesProps {
   cannotReact?: true | undefined;
   /** Makes a line, by its msgid, the one the composer's next answers (4d). */
   onReply?: ((id: string) => void) | undefined;
+  /** Puts a line's words in the composer to correct them, one of the reader's own (a direct message's). */
+  onEdit?: ((id: string) => void) | undefined;
   /** The time of the last line the account read here, Ergo's (4f); none while unknown. */
   read?: string | undefined;
   /** The room's history page came: the New mark waits on it, as a live line may come before it (4f's G1). */
@@ -106,12 +110,45 @@ const toldOf = (refused: string | undefined, cannotReact: true | undefined): Fla
   return cannotReact === undefined ? undefined : { title: "Could not react." };
 };
 
+// The flash: what Ergo refused, else the page's own word; closing it dismisses the refusal, or forgets the word.
+interface ToldProps {
+  refused: string | undefined;
+  cannotReact: true | undefined;
+  said: FlashMessage | null;
+  setSaid: (said: FlashMessage | null) => void;
+  onDismiss: () => void;
+}
+
+function Told({ refused, cannotReact, said, setSaid, onDismiss }: ToldProps) {
+  const told = toldOf(refused, cannotReact);
+  return (
+    <Flash
+      message={told ?? said}
+      onClose={() => {
+        if (told === undefined) setSaid(null);
+        else onDismiss();
+      }}
+    />
+  );
+}
+
 // What the list takes of the room: its lines as shown, what each shows of the reactions, and the line a msgid names.
 type ListProps = Omit<LinesProps, "lines"> & {
   lines: readonly ShownLine[];
   shown: ReadonlyMap<string, readonly Shown[]>;
   lineOf: (id: string) => string;
 };
+
+// What a list draws from its lines: each line's chips as a string a line compares by value (F1222); a reply's line by its
+// msgid, this conversation's alone: a reply naming its own msgid or another's answers none here; and who a mention may
+// shorten (F812): the members, and the authors in view by their account tag, who proved their key as a member did (F819).
+function derived(lines: readonly Line[], shown: ReadonlyMap<string, readonly Shown[]>, members: readonly string[]) {
+  return {
+    chips: new Map([...shown].map(([id, each]) => [id, chipsOf(each)])),
+    byId: new Map(lines.map((line) => [line.id, line])),
+    known: new Set([...members, ...lines.flatMap(({ account }) => (account === undefined ? [] : [account]))]),
+  };
+}
 
 /** The room's flash, then its lines, oldest first, as a list a screen reader hears grow. */
 export function Lines(props: LinesProps) {
@@ -126,38 +163,32 @@ export function Lines(props: LinesProps) {
 }
 
 function List(props: ListProps) {
-  const { room, members, me, refused, connected, reactions, cannotReact, lines, shown, lineOf } = props;
+  const { room, partner, members, me, refused, connected, reactions, cannotReact, lines, shown, lineOf } = props;
   const { onDelete = NO_DELETE, onDismiss = NO_DISMISS, onReact = NO_REACT, onReply = NO_REPLY } = props;
-  const { read, paged = false, onRead, verdicts, saving = false } = props;
+  const { read, paged = false, onRead, verdicts, saving = false, onEdit } = props;
   const fresh = useNewMark(lines, paged ? read : undefined, me);
   const { listRef, atEndRef, onScroll } = useNewestInView(lines, fresh, reactions);
   const look = useReadAtEnd(lines, atEndRef, paged ? onRead : undefined);
   const { stop, mounted, on, leave } = useLineFocus(lines, listRef, fresh);
   const { said, setSaid, copy } = useCopy();
   const [deleting, remove] = useRemoval({ lines, refused, connected, onDelete, leave, setSaid });
-  // Each line's chips as a string a line compares by value (F1222).
-  const chips = new Map([...shown].map(([id, each]) => [id, chipsOf(each)]));
-  // A reply's line by its msgid, this room's alone: a reply naming its own msgid or another room's answers none here.
-  const byId = new Map(lines.map((line) => [line.id, line]));
-  // Who a mention may shorten (F812): the members, and the authors in view by their account tag, who proved their
-  // key as a member did (F819).
-  const known = new Set([...members, ...lines.flatMap(({ account }) => (account === undefined ? [] : [account]))]);
+  const { chips, byId, known } = derived(lines, shown, members);
   // A reaction that could not go out says so at once; one Ergo refuses, when it answers (cannotReact).
   const react = (reaction: Reacting) => {
     const went = onReact(reaction);
     if (!went) setSaid({ title: "Could not react." });
     return went;
   };
-  const told = toldOf(refused, cannotReact);
-  const actionsOf = (line: Line, room: string) => (
+  const actionsOf = (line: Line) => (
     <LineActions
       line={line}
       room={room}
+      dm={partner}
       me={me}
       deleting={line.id === deleting}
       onCopy={(what) => {
         onDismiss();
-        copy(line, what, room);
+        copy(line, what, room ?? "");
       }}
       onDelete={remove}
       reactions={shown.get(line.id)}
@@ -165,17 +196,18 @@ function List(props: ListProps) {
       onReply={() => {
         onReply(line.id);
       }}
+      onEdit={
+        onEdit === undefined
+          ? undefined
+          : () => {
+              onEdit(line.id);
+            }
+      }
     />
   );
   return (
     <>
-      <Flash
-        message={told ?? said}
-        onClose={() => {
-          if (told === undefined) setSaid(null);
-          else onDismiss();
-        }}
-      />
+      <Told refused={refused} cannotReact={cannotReact} said={said} setSaid={setSaid} onDismiss={onDismiss} />
       <ol
         ref={listRef}
         onScroll={() => {
@@ -197,7 +229,7 @@ function List(props: ListProps) {
             me={me}
             members={known}
             stop={line.id === stop}
-            actions={room !== undefined && mounted(line.id) ? actionsOf(line, room) : null}
+            actions={(room !== undefined || partner !== undefined) && mounted(line.id) ? actionsOf(line) : null}
             fresh={line.id === fresh}
             verdict={verdicts?.[line.id]}
             players={room !== undefined && !saving}

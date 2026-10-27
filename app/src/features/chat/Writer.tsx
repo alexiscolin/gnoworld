@@ -34,22 +34,30 @@ export interface WriterProps {
   replying?: Line | undefined;
   asked?: number | undefined;
   onCancelReply?: (() => void) | undefined;
+  /** The reader's own line being corrected, its words and how many times Edit was asked: the composer starts again from
+   * them, the device's draft left as it was, and Save sends them (4d's DM bar). */
+  editing?: { text: string; asked: number } | undefined;
+  onCancelEdit?: (() => void) | undefined;
 }
 
 export function Writer(props: WriterProps) {
   const { session, room, label, rooms, members, onSay, onTyping, refused, focus, describedBy } = props;
-  const { replying, asked, onCancelReply } = props;
+  const { replying, asked, onCancelReply, editing, onCancelEdit } = props;
   if (session.kind !== "in") return <p>Log in to write in this room.</p>;
   // The account's drafts on this device: the room's, where the composer starts, and each change kept (4d).
   const kept = pageDrafts(session.address);
   return (
     <Suspense fallback={null}>
       <Composer
-        draft={kept.get(room)}
-        onDraft={(draft) => {
-          kept.set(room, draft);
-        }}
-        key={room}
+        draft={editing === undefined ? kept.get(room) : editing.text}
+        onDraft={
+          editing === undefined
+            ? (draft) => {
+                kept.set(room, draft);
+              }
+            : undefined
+        }
+        key={editing === undefined ? room : `${room} edit ${String(editing.asked)}`}
         room={room}
         label={label}
         nick={session.address}
@@ -58,11 +66,13 @@ export function Writer(props: WriterProps) {
         onSay={onSay}
         onTyping={onTyping}
         refused={refused}
-        focus={focus}
+        focus={focus === true || editing !== undefined}
         describedBy={describedBy}
-        replying={replying === undefined ? undefined : answeredOf(replying)}
+        replying={replying === undefined || editing !== undefined ? undefined : answeredOf(replying)}
         asked={asked}
         onCancelReply={onCancelReply}
+        editing={editing !== undefined}
+        onCancelEdit={onCancelEdit}
       />
     </Suspense>
   );

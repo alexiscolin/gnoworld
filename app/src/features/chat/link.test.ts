@@ -1918,3 +1918,138 @@ describe("the chat's link: replies", () => {
     expect([...g.fake.sent, ...t.fake.sent].filter((line) => line.includes("PRIVMSG"))).toEqual([]);
   });
 });
+
+// 4d-dm-bar: a direct message's lines get the message bar. Each act is a line to the partner's nick, labelled so Ergo's
+// refusal (401, its partner not connected) is known; nothing here is a room's, which the link must be in to speak.
+describe("the chat's link: a direct message's bar", () => {
+  const account = () => {
+    const t = setup();
+    t.link.follow(["#bubble"]);
+    t.signedIn(ADDRESS);
+    return { ...t, fake: t.connected(ADDRESS) };
+  };
+  // The lines to OTHER as sent, each with its label and tags kept apart.
+  const toOther = (sent: readonly string[]) =>
+    sent.filter((line) => / (PRIVMSG|TAGMSG|REDACT) /.test(line) && line.includes(OTHER));
+  const labelOf = (line: string | undefined) => /^@label=([^; ]+)/.exec(line ?? "")?.[1] ?? "";
+  const without = (line: string | undefined) => (line ?? "").replace(/^@label=[^; ]+;?/, "@").replace(/^@ /, "");
+  const refusal = (label: string, command = "401") =>
+    `@label=${label} :ergo.test ${command} ${ADDRESS} ${OTHER} :No such nick`;
+  const mine = (id: string, tags: string, text: string) =>
+    `@msgid=${id};time=${T0};account=${ADDRESS}${tags === "" ? "" : `;${tags}`} :${ADDRESS}!u@h PRIVMSG ${OTHER} :${text}`;
+
+  it("says a reply tagged +reply with the msgid it answers, and an edit tagged +gnoworld/edit with the one it corrects", () => {
+    const t = account();
+    expect(t.link.sayTo(OTHER, "an answer", { reply: "m1" })).toBe(true);
+    expect(t.link.sayTo(OTHER, "a correction", { edit: "m2" })).toBe(true);
+    const [reply, edit] = toOther(t.fake.sent);
+    expect(without(reply)).toBe(`@+reply=m1 PRIVMSG ${OTHER} :an answer`);
+    expect(without(edit)).toBe(`@+gnoworld/edit=m2 PRIVMSG ${OTHER} :a correction`);
+    expect(labelOf(reply)).not.toBe(labelOf(edit));
+  });
+
+  it("sends no line for a msgid no tag can carry, a tag's separator or a space in it", () => {
+    const t = account();
+    for (const bad of ["m 1", "m;1", "", "m\r\nQUIT"]) {
+      expect(t.link.sayTo(OTHER, "x", { reply: bad })).toBe(false);
+      expect(t.link.sayTo(OTHER, "x", { edit: bad })).toBe(false);
+    }
+    expect(toOther(t.fake.sent)).toEqual([]);
+  });
+
+  it("says a line with no tag as it did", () => {
+    const t = account();
+    t.link.sayTo(OTHER, "plain");
+    expect(without(toOther(t.fake.sent)[0])).toBe(`PRIVMSG ${OTHER} :plain`);
+  });
+
+  it("reacts to a line of the conversation, or takes the reaction back, by a labelled TAGMSG to the partner", () => {
+    const t = account();
+    expect(t.link.reactTo(OTHER, { to: "m1", emoji: "👍", on: true })).toBe(true);
+    expect(t.link.reactTo(OTHER, { to: "m1", emoji: "👍", on: false })).toBe(true);
+    const [on, off] = toOther(t.fake.sent);
+    expect(without(on)).toBe(`@+draft/react=👍;+reply=m1 TAGMSG ${OTHER}`);
+    expect(without(off)).toBe(`@+draft/unreact=👍;+reply=m1 TAGMSG ${OTHER}`);
+  });
+
+  it.each([
+    ["an emoji outside RGI's set", { to: "m1", emoji: "x", on: true }, OTHER],
+    ["a msgid no tag can carry", { to: "m 1", emoji: "👍", on: true }, OTHER],
+    ["oneself", { to: "m1", emoji: "👍", on: true }, ADDRESS],
+    ["a nick that is no account's address", { to: "m1", emoji: "👍", on: true }, "guest-ab12cd"],
+  ])("sends no reaction to %s", (_, reaction, partner) => {
+    const t = account();
+    expect(t.link.reactTo(partner, reaction)).toBe(false);
+    expect(t.fake.sent.filter((line) => line.includes("TAGMSG"))).toEqual([]);
+  });
+
+  it("deletes a line by a labelled REDACT to the partner, and each correction of mine to it with it", () => {
+    const t = account();
+    t.fake.line(mine("m1", "", "first"));
+    t.fake.line(mine("e1", "+gnoworld/edit=m1", "second"));
+    t.fake.line(mine("e2", "+gnoworld/edit=m1", "third"));
+    t.fake.line(mine("o1", "", "another line"));
+    expect(t.link.redactIn(OTHER, "m1")).toBe(true);
+    expect(toOther(t.fake.sent).map(without)).toEqual([
+      `REDACT ${OTHER} m1`,
+      `REDACT ${OTHER} e1`,
+      `REDACT ${OTHER} e2`,
+    ]);
+  });
+
+  it("never deletes the partner's corrections, which are not the account's to delete", () => {
+    const t = account();
+    t.fake.line(`@msgid=p1;time=${T0};account=${OTHER} :${OTHER}!u@h PRIVMSG ${ADDRESS} :theirs`);
+    t.fake.line(`@msgid=p2;time=${T0};account=${OTHER};+gnoworld/edit=p1 :${OTHER}!u@h PRIVMSG ${ADDRESS} :fixed`);
+    t.link.redactIn(OTHER, "p1");
+    expect(toOther(t.fake.sent).map(without)).toEqual([`REDACT ${OTHER} p1`]);
+  });
+
+  it("sends no delete for a msgid no command carries, for oneself or a guest's connection, or while not connected", () => {
+    const t = account();
+    expect(t.link.redactIn(OTHER, "m 1")).toBe(false);
+    expect(t.link.redactIn(ADDRESS, "m1")).toBe(false);
+    expect(t.link.redactIn("guest-ab12cd", "m1")).toBe(false);
+    t.fake.state("waiting");
+    expect(t.link.redactIn(OTHER, "m1")).toBe(false);
+    expect(t.link.reactTo(OTHER, { to: "m1", emoji: "👍", on: true })).toBe(false);
+    const guest = guestIn(["#bubble"]);
+    expect(guest.link.redactIn(OTHER, "m1")).toBe(false);
+    expect(guest.link.reactTo(OTHER, { to: "m1", emoji: "👍", on: true })).toBe(false);
+    expect(guest.link.sayTo(OTHER, "x", { reply: "m1" })).toBe(false);
+    expect([...t.fake.sent, ...guest.fake.sent].filter((line) => /REDACT|TAGMSG|PRIVMSG/.test(line))).toEqual([]);
+  });
+
+  it("tells the store Ergo refused a reaction, its partner not connected, and nothing of one it delivered", () => {
+    const t = account();
+    t.link.reactTo(OTHER, { to: "m1", emoji: "👍", on: true });
+    t.link.reactTo(OTHER, { to: "m2", emoji: "👍", on: true });
+    const [first, second] = toOther(t.fake.sent);
+    t.fake.line(
+      `@label=${labelOf(first)};msgid=t1;time=${T0};account=${ADDRESS};+draft/react=👍;+reply=m1 :${ADDRESS}!u@h TAGMSG ${OTHER}`,
+    );
+    expect(t.store.getState().dmActRefused).toEqual({});
+    t.fake.line(refusal(labelOf(second)));
+    expect(t.store.getState().dmActRefused).toEqual({ [OTHER]: { reacted: true } });
+  });
+
+  it("tells the store Ergo refused a delete, the line's id, whichever way it refused", () => {
+    const t = account();
+    t.link.redactIn(OTHER, "m1");
+    t.fake.line(refusal(labelOf(toOther(t.fake.sent)[0])));
+    expect(t.store.getState().dmActRefused).toEqual({ [OTHER]: { deleted: "m1" } });
+    t.store.getState().dmActions.dismissed(OTHER);
+    t.link.redactIn(OTHER, "m2");
+    t.fake.line(
+      `@label=${labelOf(toOther(t.fake.sent)[1])} :ergo.test FAIL REDACT REDACT_FORBIDDEN ${OTHER} m2 :You are not authorized to delete this message`,
+    );
+    expect(t.store.getState().dmActRefused).toEqual({ [OTHER]: { deleted: "m2" } });
+  });
+
+  it("tells the store nothing of a delete Ergo carried out", () => {
+    const t = account();
+    t.link.redactIn(OTHER, "m1");
+    t.fake.line(`@label=${labelOf(toOther(t.fake.sent)[0])} :ergo.test ACK`);
+    expect(t.store.getState().dmActRefused).toEqual({});
+  });
+});

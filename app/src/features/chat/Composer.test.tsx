@@ -336,3 +336,48 @@ describe("Composer: a reply", () => {
     expect(names(markup)).not.toContain("Cancel the reply");
   });
 });
+
+// 4d-dm-bar: Edit on one's own line in a direct message puts its words in the box, to send as a correction (our own
+// convention, docs/decisions.md 2026-10-21); the bar over the field says so and offers to cancel, Send reads Save.
+describe("Composer: an edit", () => {
+  const PARTNER = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+  const draw = (over: Partial<Parameters<typeof Composer>[0]> = {}) =>
+    renderToStaticMarkup(
+      <Composer
+        room={PARTNER}
+        label="g10gh7…3y5tv"
+        nick={NICK}
+        rooms={[]}
+        members={[]}
+        onSay={() => true}
+        draft="the first words"
+        editing
+        onCancelEdit={() => undefined}
+        {...over}
+      />,
+    );
+  const words = (markup: string) => markup.replaceAll(/<[^>]+>/g, "");
+
+  it("says a message is being edited, offers to cancel, starts from its words and sends with Save", () => {
+    const markup = draw();
+    expect(words(markup)).toContain("Editing a message");
+    expect(names(markup)).toContain("Cancel the edit");
+    expect(markup).toMatch(/<input[^>]*value="the first words"/);
+    expect(markup).toMatch(/<button[^>]*type="submit"[^>]*>Save<\/button>/);
+    expect(markup).not.toMatch(/>Send<\/button>/);
+  });
+
+  it("describes its field by the bar that says what is edited", () => {
+    const markup = draw();
+    const ids = (/<input[^>]*aria-describedby="([^"]+)"/.exec(markup)?.[1] ?? "").split(" ");
+    const described = ids.map((id) => new RegExp(`<p[^>]*id="${id}"[^>]*>(.*?)</p>`, "s").exec(markup)?.[1] ?? "");
+    expect(described.map(words)).toContain("Editing a message");
+  });
+
+  it("shows no edit bar, Send as it was, and no Cancel when nothing is edited", () => {
+    const markup = draw({ editing: undefined, onCancelEdit: undefined });
+    expect(words(markup)).not.toContain("Editing a message");
+    expect(names(markup)).not.toContain("Cancel the edit");
+    expect(markup).toMatch(/>Send<\/button>/);
+  });
+});

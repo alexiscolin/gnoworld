@@ -56,3 +56,79 @@ describe("shownOf: the conversation in view", () => {
     expect(shownOf(dms(), room("#bubble"), PAGE)?.key).toBe(shownOf(dms(), room("#bubble"), PAGE)?.key);
   });
 });
+
+// 4d-dm-bar: a direct message's view carries the bar's acts, through the page's own, to its partner.
+describe("shownOf: a direct message's bar", () => {
+  const reaction = { id: "r1", time: "2026-10-25T10:00:00.000Z", to: "m1", emoji: "👍", who: BOB, on: true };
+  const calls: string[] = [];
+  const bar: DmPage = {
+    ...PAGE,
+    acts: {
+      onDelete: (id) => {
+        calls.push(`delete ${id}`);
+        return true;
+      },
+      onDismiss: () => {
+        calls.push("dismiss");
+      },
+      onReact: ({ to, emoji, on }) => {
+        calls.push(`react ${to} ${emoji} ${String(on)}`);
+        return true;
+      },
+    },
+  };
+  const withBar = (): Dms => ({
+    ...dms(ALICE),
+    reactions: [reaction],
+    acts: { deleted: "m9", reacted: true },
+  });
+
+  it("names its partner, so its lines have a bar, and a room's view names none", () => {
+    expect(shownOf(withBar(), room("#bubble"), bar)?.view.partner).toBe(ALICE);
+    expect(shownOf(dms(), room("#bubble"), bar)?.view.partner).toBeUndefined();
+    expect(shownOf(withBar(), room("#bubble"), bar)?.view.room).toBeUndefined();
+  });
+
+  it("gives the lines' view the conversation's reactions and what Ergo refused of its acts", () => {
+    const state = shownOf(withBar(), room("#bubble"), bar)?.view.state;
+    expect(state?.reactions).toEqual([reaction]);
+    expect(state?.refused).toBe("m9");
+    expect(state?.cannotReact).toBe(true);
+    const plain = shownOf(dms(ALICE), room("#bubble"), bar)?.view.state;
+    expect([plain?.reactions, plain?.refused, plain?.cannotReact]).toEqual([undefined, undefined, undefined]);
+  });
+
+  it("deletes, dismisses and reacts through the page's acts, in this conversation", () => {
+    const view = shownOf(withBar(), room("#bubble"), bar)?.view;
+    expect(view?.onDelete("m1")).toBe(true);
+    view?.onDismiss();
+    expect(view?.onReact?.({ to: "m1", emoji: "👍", on: false })).toBe(true);
+    expect(calls).toEqual(["delete m1", "dismiss", "react m1 👍 false"]);
+  });
+
+  it("does nothing, and says it went nowhere, while the page gives no acts", () => {
+    const view = shownOf(dms(ALICE), room("#bubble"), PAGE)?.view;
+    expect(view?.onDelete("m1")).toBe(false);
+    expect(view?.onReact?.({ to: "m1", emoji: "👍", on: true })).toBe(false);
+  });
+
+  it("says a line through the page's sayTo, with the reply or the edit it carries", () => {
+    const said: unknown[] = [];
+    const page: DmPage = {
+      ...PAGE,
+      sayTo: (partner, draft, tags) => {
+        said.push([partner, draft, tags]);
+        return true;
+      },
+    };
+    const shown = shownOf(dms(ALICE), room("#bubble"), page);
+    expect(shown?.writer.onSay("plain")).toBe(true);
+    expect(shown?.say("an answer", { reply: "m1" })).toBe(true);
+    expect(shown?.say("a correction", { edit: "m1" })).toBe(true);
+    expect(said).toEqual([
+      [ALICE, "plain", undefined],
+      [ALICE, "an answer", { reply: "m1" }],
+      [ALICE, "a correction", { edit: "m1" }],
+    ]);
+  });
+});

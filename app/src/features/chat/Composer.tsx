@@ -8,6 +8,7 @@ import { Button, Cluster, Field, IconButton, Sidebar, Stack, type FieldProps, ty
 import { useRef, useState, type KeyboardEvent, type SubmitEvent } from "react";
 import { completed, completions, type Completion } from "./complete.ts";
 import { useFocusAtStart, useRefusal, useSelection, type Refused } from "./composerHooks.ts";
+import { useEditing } from "./EditBar.tsx";
 import { formatted, type Edit, type Format } from "./format.ts";
 import { Message } from "./Message.tsx";
 import { peopleOf, roomLabel, shortAddress } from "./names.ts";
@@ -131,6 +132,10 @@ export interface ComposerProps {
   replying?: Answered | undefined;
   asked?: number | undefined;
   onCancelReply?: (() => void) | undefined;
+  /** A message of the reader's is being corrected, its words the draft: Save sends the correction, which Escape or the
+   * bar's Cancel drops (a direct message's, 4d). */
+  editing?: boolean | undefined;
+  onCancelEdit?: (() => void) | undefined;
 }
 
 export function Composer(props: ComposerProps) {
@@ -181,6 +186,7 @@ export function Composer(props: ComposerProps) {
     apply(completed(draft, completion));
   };
   const answering = useAnswering(props, { formRef, box, otherwise: complete });
+  const editing = useEditing(props, box, answering);
   const send = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (composed.kind !== "line") return;
@@ -195,15 +201,15 @@ export function Composer(props: ComposerProps) {
       aria-label={`Write ${to === undefined ? "in" : "to"} ${label}`}
       aria-describedby={props.describedBy}
       onSubmit={send}
-      onKeyDown={answering.keys}
+      onKeyDown={editing.keys}
     >
       <Stack space="2xs">
-        {answering.bar}
+        {editing.bar}
         <FormatBar onFormat={format} />
         <Sidebar side="end" space="2xs">
           <Field
             label={`Message ${label}`}
-            describedBy={answering.describedBy}
+            describedBy={editing.describedBy}
             value={draft}
             onChange={(value) => {
               change(value);
@@ -213,7 +219,7 @@ export function Composer(props: ComposerProps) {
             {...(refusal.why === undefined ? shown : { error: refusal.why })}
           />
           <Button type="submit" disabled={composed.kind !== "line"}>
-            Send
+            {editing.send}
           </Button>
         </Sidebar>
         <Preview composed={composed} me={nick} members={new Set(members)} />

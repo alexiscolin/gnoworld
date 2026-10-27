@@ -6,7 +6,7 @@ import type { Line, Shown } from "@gnoworld/core";
 import { Button, Chip, Cluster, Dialog, IconButton, Menu, Stack } from "@gnoworld/ui";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import styles from "./LineActions.module.css";
-import { roomLabel } from "./names.ts";
+import { roomLabel, shortAddress } from "./names.ts";
 
 // What the delete's dialog quotes of its line: its first 80 characters, never one cut in two (an emoji's parts).
 const QUOTED = 80;
@@ -32,7 +32,10 @@ function useInside() {
 
 export interface LineActionsProps {
   line: Line;
-  room: string;
+  /** The room the line is in; none for a direct message's. */
+  room?: string | undefined;
+  /** The partner of the direct message the line is in (4d's DM bar); none for a room's. */
+  dm?: string | undefined;
   /** The reader's address; none for a guest. */
   me: string | undefined;
   /** Copies the line's text, or the room's link. */
@@ -47,17 +50,19 @@ export interface LineActionsProps {
   onReact: (emoji: string, on: boolean) => boolean;
   /** Makes the line the one the composer's next answers (4d). */
   onReply: () => void;
+  /** Puts the line's words in the composer to correct them; given by a view that has edits: a direct message's. */
+  onEdit?: (() => void) | undefined;
 }
 
 // The dialog that asks before a delete: which line, where, and that it cannot come back; `close` says whether to delete.
 function AskDelete({
   line,
-  room,
+  place,
   open,
   close,
 }: {
   line: Line;
-  room: string;
+  place: string;
   open: boolean;
   close: (go: boolean) => void;
 }) {
@@ -71,7 +76,7 @@ function AskDelete({
       }}
     >
       <Stack space="s">
-        <p>It leaves {roomLabel(room)} for everyone, and cannot come back.</p>
+        <p>It leaves {place}, and cannot come back.</p>
         <Cluster justify="end">
           <Button
             emphasis="outline"
@@ -137,11 +142,48 @@ function QuickReactions({ given, onReact }: { given: ReadonlySet<string>; onReac
   );
 }
 
+type Kind = "room" | "dm";
+
+// Each item of the More menu says the kinds of conversation it belongs to: an item added for rooms alone (a thread, a
+// pin, mark unread, save) says ["room"] and stays out of a direct message, whose items are the ones saying "dm".
+interface Item {
+  kinds: readonly Kind[];
+  label: string;
+  tone?: "danger";
+  act: "text" | "link" | "edit" | "delete";
+}
+
+function menu({
+  own,
+  deleting,
+  edit,
+  kind,
+}: {
+  own: boolean;
+  deleting: boolean;
+  edit: (() => void) | undefined;
+  kind: Line["kind"];
+}): Item[] {
+  return [
+    { kinds: ["room", "dm"], label: "Copy text", act: "text" },
+    { kinds: ["room"], label: "Copy room link", act: "link" },
+    ...(own && !deleting && edit !== undefined && kind === "message"
+      ? [{ kinds: ["dm"], label: "Edit", act: "edit" } as const]
+      : []),
+    ...(own && !deleting ? [{ kinds: ["room", "dm"], label: "Delete", tone: "danger", act: "delete" } as const] : []),
+  ];
+}
+
+// Where a deleted line leaves, as the dialog says it.
+const placeOf = (room: string, dm: string | undefined) =>
+  dm === undefined ? `${roomLabel(room)} for everyone` : `your conversation with ${shortAddress(dm)} for both of you`;
+
 /** The bar of a line pointed at or focused, out of the list's live announcements: its More menu, and the dialog
  * that asks before a delete, which gives the focus back to More when it closes. */
 export function LineActions({
   line,
-  room,
+  room = "",
+  dm,
   me,
   onCopy,
   onDelete,
@@ -149,6 +191,7 @@ export function LineActions({
   reactions,
   onReact,
   onReply,
+  onEdit,
 }: LineActionsProps) {
   const [asking, setAsking] = useState(false);
   const { barRef, inside } = useInside();
@@ -168,31 +211,18 @@ export function LineActions({
     deletingRef.current = deleting;
     setAsking(false);
   };
-  const items = [
-    {
-      label: "Copy text",
+  const kind: Kind = dm === undefined ? "room" : "dm";
+  const items = menu({ own, deleting, edit: onEdit, kind: line.kind })
+    .filter((item) => item.kinds.includes(kind))
+    .map(({ label, tone, act }) => ({
+      label,
+      ...(tone === undefined ? {} : { tone }),
       onSelect: () => {
-        onCopy("text");
+        if (act === "delete") setAsking(true);
+        else if (act === "edit") onEdit?.();
+        else onCopy(act);
       },
-    },
-    {
-      label: "Copy room link",
-      onSelect: () => {
-        onCopy("link");
-      },
-    },
-    ...(own && !deleting
-      ? [
-          {
-            label: "Delete",
-            tone: "danger" as const,
-            onSelect: () => {
-              setAsking(true);
-            },
-          },
-        ]
-      : []),
-  ];
+    }));
   return (
     <div
       ref={barRef}
@@ -205,7 +235,7 @@ export function LineActions({
       {me === undefined ? null : <QuickReactions given={given} onReact={onReact} />}
       {me === undefined ? null : <IconButton icon="reply" label="Reply" size="s" emphasis="plain" onClick={onReply} />}
       <Menu trigger="More actions" icon="more" emphasis="plain" size="s" label="Message actions" items={items} />
-      {own ? <AskDelete line={line} room={room} open={asking} close={close} /> : null}
+      {own ? <AskDelete line={line} place={placeOf(room, dm)} open={asking} close={close} /> : null}
     </div>
   );
 }

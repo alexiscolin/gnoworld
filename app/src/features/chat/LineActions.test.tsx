@@ -170,3 +170,43 @@ describe("a line's actions: Reply", () => {
     expect(names(draw({ me: undefined }))).not.toContain("Reply");
   });
 });
+
+// 4d-dm-bar (docs/decisions.md, 2026-10-27): a direct message's More menu holds what a conversation of two has, no link
+// (?dm= opens the reader's own) and no room's item (thread, pin, mark unread, save). Each item says its kinds, so one
+// added for rooms later stays out of a direct message until it asks for one.
+describe("a line's actions in a direct message", () => {
+  const dm = (over: Partial<Parameters<typeof LineActions>[0]> = {}) =>
+    draw({ room: undefined, dm: ALICE, onEdit: () => undefined, ...over });
+
+  it("hold the direct message's items alone on another's line: Copy text", () => {
+    expect(items(dm({ me: BOB }))).toEqual(["Copy text"]);
+  });
+
+  it("hold Copy text, Edit and Delete on the reader's own line, and never a room's link", () => {
+    expect(items(dm({ me: ALICE }))).toEqual(["Copy text", "Edit", "Delete"]);
+    expect(items(dm({ me: ALICE }))).not.toContain("Copy room link");
+  });
+
+  it("keep the room's items as they were: no Edit in a room, even on its own line", () => {
+    expect(items(draw({ me: ALICE }))).toEqual(["Copy text", "Copy room link", "Delete"]);
+    expect(items(draw({ me: ALICE, onEdit: () => undefined }))).toEqual(["Copy text", "Copy room link", "Delete"]);
+  });
+
+  it("offer Edit on a message of one's own alone: none on an action, none while a delete waits, none unasked", () => {
+    expect(items(dm({ me: ALICE, line: { ...LINE, kind: "action" } }))).toEqual(["Copy text", "Delete"]);
+    expect(items(dm({ me: ALICE, deleting: true }))).toEqual(["Copy text"]);
+    expect(items(dm({ me: ALICE, onEdit: undefined }))).toEqual(["Copy text", "Delete"]);
+  });
+
+  it("still lead with the quick reactions and Reply, an account's, with More last", () => {
+    const markup = dm({ me: BOB });
+    const names = [...markup.matchAll(/<button(?![^>]*role="menuitem")[^>]*\saria-label="([^"]+)"/g)].map(([, n]) => n);
+    expect(names).toEqual(["React with 👍", "React with ❤️", "React with 😂", "React", "Reply", "More actions"]);
+  });
+
+  it("ask before a delete, saying the line leaves the conversation for both, in the partner's short address", () => {
+    const markup = dm({ me: ALICE });
+    expect(markup).toContain("It leaves your conversation with g10gh7…3y5tv for both of you, and cannot come back.");
+    expect(markup).not.toContain("It leaves #");
+  });
+});
