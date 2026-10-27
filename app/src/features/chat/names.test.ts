@@ -1,6 +1,17 @@
+import type { Line } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
-import { neighbour, peopleOf, roomHref, roomLabel, roomParams, roomsQuery, shortAddress, shownRoom } from "./names.ts";
+import {
+  mentionable,
+  neighbour,
+  peopleOf,
+  roomHref,
+  roomLabel,
+  roomParams,
+  roomsQuery,
+  shortAddress,
+  shownRoom,
+} from "./names.ts";
 
 const open = (...rooms: string[]) => rooms.map((room) => ({ room, type: "open" as const }));
 const SECTIONS = [
@@ -94,5 +105,33 @@ describe("a room's search on its world's page", () => {
   it("names a room by ?room=<name>, and the main room by none", () => {
     expect(roomParams("#bubble/games").toString()).toBe("room=games");
     expect(roomParams("#bubble").toString()).toBe("");
+  });
+});
+
+// F819: whom a mention may shorten: the members, and the authors in view by their account tag.
+describe("whom a mention may shorten", () => {
+  const A = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+  const B = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+  const line = (over: Partial<Line>): Line => ({
+    id: "x",
+    time: "2026-10-25T10:00:00.000Z",
+    from: "n",
+    text: "t",
+    kind: "message",
+    ...over,
+  });
+
+  it("are the members and the lines' account authors, each once", () => {
+    expect(
+      [...mentionable([A], [line({ account: B }), line({ account: B }), line({ account: A })])].toSorted(),
+    ).toEqual([A, B].toSorted());
+  });
+
+  it("leaves out a line with no account tag, though its sender is an address", () => {
+    expect([...mentionable([A], [line({ from: B })])]).toEqual([A]);
+  });
+
+  it("is empty with no member and no line", () => {
+    expect(mentionable([], []).size).toBe(0);
   });
 });

@@ -266,4 +266,34 @@ describe("Thread", () => {
     expect(items(list(html, "In this thread"))).toEqual([]);
     expect(said(html)).toMatch(/No replies yet/);
   });
+
+  // G5: a root with no words (only spaces) has no title to follow the word: no stray colon.
+  it("is named Thread alone when its root's words are only spaces", () => {
+    expect(heading(panel({ lines: [line("root", 0, { text: "   " })] }))).toEqual(["Thread"]);
+  });
+
+  // G2: a link of a panel's row is a Tab stop, as a link of the list's stop line is; no row is a stop of the room's list.
+  it("leaves a reply's link in the Tab order and gives no row a tab stop of its own", () => {
+    const text = "see [the docs](https://example.com/fine)";
+    const html = panel({ lines: [line("root", 0), line("r", 1, { reply: "root", text })] });
+    const tags = [...html.matchAll(/<a [^>]*href="https:\/\/example\.com\/fine"[^>]*>/g)].map(([tag]) => tag);
+    expect(tags).toHaveLength(1);
+    expect(tags[0]).not.toContain("tabindex");
+    expect([...list(panel(), "In this thread").matchAll(/<li\b[^>]*>/g)].map(([tag]) => tag)).toHaveLength(3);
+    expect(list(html, "In this thread")).not.toMatch(/<li\b[^>]*tabindex/);
+  });
+
+  // G3 (F819): an account author in view, by its account tag, makes its mention shortenable though it is not a member;
+  // a guest's nick, whatever it looks like, proves nothing.
+  it("shortens a mention of an account that wrote a line in view and is no member, not a guest's nick", () => {
+    const carol = "g1l6m6l6carqlqqqqqqqqqqqqqqqqqqqqqnkkanc";
+    const lines = [
+      line("root", 0, { text: `@${carol} and @${BOB}` }),
+      line("a", 1, { from: carol, account: carol, reply: "root", text: "here" }),
+      // The guest's nick is an address, but it has no account tag.
+      { id: "g", time: T(2), from: BOB, text: "a lookalike", kind: "message" as const, reply: "root" },
+    ];
+    const words = said(list(panel({ members: [ALICE], lines }), "In this thread"));
+    expect(words).toContain("@g1l6m6…kkanc and @g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
+  });
 });
