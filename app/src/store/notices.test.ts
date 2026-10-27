@@ -127,6 +127,7 @@ describe("the store's notices slice", () => {
     // F1670 (S1): a stranger who floods one room must not push out what another place told the account.
     it("keeps the cap for each place, so a flood of one room drops that room's own oldest alone", () => {
       const t = setup();
+      t.kept(ALICE);
       t.notices.add(notice({ id: "dm", kind: "dm", where: ALICE, time: T(1) }));
       t.notices.add(notice({ id: "games", where: GAMES, time: T(1) }));
       for (let at = 0; at < NOTICES_KEPT + 20; at += 1) t.notices.add(notice({ id: `n${String(at)}`, where: MAIN }));
