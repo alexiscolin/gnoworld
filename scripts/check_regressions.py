@@ -19,11 +19,8 @@ import tempfile
 
 sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no __pycache__
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # -I leaves this folder off the path
-from repo_files import git, worktree
+from repo_files import BENCH_FILE, benches, git, worktree
 
-BENCH_FILE = re.compile(r"\.bench\.tsx?$")
-BENCH = re.compile(r"""\bbench\(\s*(["'`])(.*?)\1""", re.S)
-BUDGET = re.compile(r"\s*\[(\d+(?:\.\d+)?) ms\]$")
 SHOT = re.compile(r"(-snapshots|__screenshots__)/.+\.(png|jpe?g)$")
 GAP_FILES = ["scripts/mutate.py", "scripts/harness_mutate.py"]
 IGNORE_FILES = [".jscpd.json", "knip.json", "stryker.config.json", "eslint.config.ts", "vitest.config.ts", ".prettierignore", "scripts/check_comments.mjs", "scripts/.gitleaksignore"]
@@ -63,17 +60,6 @@ def lowered_floors(before, after, excused):
 def weakened(before, after, excused, kind):
     """Entries added to a list that loosens a check (a gap, an ignore), less those named `<kind> <entry>`."""
     return sorted(e for e in after - before if f"{kind} {e}" not in excused)
-
-
-def benches(files):
-    """Each bench's budget in ms by its name without the budget, from `bench("<name> [<n> ms]"` in {path: text}."""
-    out = {}
-    for text in files.values():
-        for found in BENCH.finditer(text):
-            budget = BUDGET.search(found.group(2))
-            if budget:
-                out[found.group(2)[: budget.start()]] = float(budget.group(1))
-    return out
 
 
 def looser_benches(before, after, excused):

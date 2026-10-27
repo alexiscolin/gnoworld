@@ -2,6 +2,7 @@
 import contextlib
 import os
 import shutil
+import re
 import subprocess
 import tempfile
 
@@ -21,6 +22,24 @@ def fingerprint(commit):
     and any other change voids it."""
     kept = [line for line in git("ls-tree", "-r", commit).splitlines() if line.split("\t", 1)[1] not in OWN]
     return subprocess.run(["git", "hash-object", "--stdin"], input="\n".join(kept), capture_output=True, text=True, check=True).stdout.strip()
+
+
+# A bench names its budget at the end of its name, `bench("<name> [<n> ms]"`: bench.py holds the mean to it, and
+# check_regressions.py holds the bench and its budget in place.
+BENCH_FILE = re.compile(r"\.bench\.tsx?$")
+BENCH = re.compile(r"""\bbench\(\s*(["'`])(.*?)\1""", re.S)
+BUDGET = re.compile(r"\s*\[(\d+(?:\.\d+)?) ms\]$")
+
+
+def benches(files):
+    """Each bench's budget in ms by its name without the budget, from `bench("<name> [<n> ms]"` in {path: text}."""
+    out = {}
+    for text in files.values():
+        for found in BENCH.finditer(text):
+            budget = BUDGET.search(found.group(2))
+            if budget:
+                out[found.group(2)[: budget.start()]] = float(budget.group(1))
+    return out
 
 
 def alive(pid):
