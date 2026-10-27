@@ -234,6 +234,33 @@ test.describe("the reading place", () => {
     expect(rule.row).toBe(rule.line);
   });
 
+  // The UX review (U6): the focus ring of a line, the New line's included, lies whole inside the list that scrolls, so
+  // its sides are not clipped and it keeps off the divider's rule.
+  test("draws a line's focus ring whole inside the list, the New line's too", async ({ page }) => {
+    const address = await logIn(page, word("read"));
+    await room(page, { me: address, read: T(0) });
+    for (const line of [page.locator("[data-new]"), lines(page).first(), lines(page).last()]) {
+      await line.focus();
+      const ring = await page.evaluate(() => {
+        const item = document.activeElement;
+        const list = item?.parentElement;
+        if (!(item instanceof HTMLElement) || list == null) return null;
+        const style = getComputedStyle(item);
+        const reach = parseFloat(style.outlineWidth) + parseFloat(style.outlineOffset);
+        const [box, port] = [item.getBoundingClientRect(), list.getBoundingClientRect()];
+        return {
+          wide: parseFloat(style.outlineWidth) >= 2,
+          inside:
+            box.left - reach >= port.left &&
+            box.right + reach <= port.right &&
+            box.top - reach >= port.top &&
+            box.bottom + reach <= port.bottom,
+        };
+      });
+      expect(ring).toEqual({ wide: true, inside: true });
+    }
+  });
+
   // The green pass (G3): each newest line's look at the tab lets the last one go.
   test("holds one look at the tab however many lines come", async ({ page }) => {
     await hiddenTab(page, false);
