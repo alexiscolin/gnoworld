@@ -20,11 +20,13 @@ const saved = (id: string, over: Partial<SavedLine> = {}): SavedLine => ({
 
 function storage({ refuses = false } = {}) {
   const kept = new Map<string, string>();
+  const state = { refuses };
   const refuse = () => {
-    if (refuses) throw new DOMException("The storage is blocked.", "SecurityError");
+    if (state.refuses) throw new DOMException("The storage is blocked.", "SecurityError");
   };
   return {
     kept,
+    state,
     getItem: (key: string) => {
       refuse();
       return kept.get(key) ?? null;
@@ -116,6 +118,66 @@ describe("the lines an account saved, on its device", () => {
     const account = on(device, ALICE);
     expect(Object.keys(account.unread() ?? {})).toEqual(["#bubble"]);
     expect(account.setUnread({ "#games": "2026-10-25T11:00:00.000Z" })).toBe(true);
+    expect(JSON.parse(device.kept.get(`gnoworld:unread:${ALICE}`) ?? "null")).toEqual({
+      "#games": "2026-10-25T11:00:00.000Z",
+      "#newer": { at: "a newer form" },
+    });
+  });
+
+  // The saved lines' twin of the case above, for the places (R4 of redpass2-4dx).
+  it("keeps the key for places it could not read, when it sets none of its own", () => {
+    const device = storage();
+    device.kept.set(`gnoworld:unread:${ALICE}`, JSON.stringify({ "#newer": { at: "a newer form" } }));
+    const account = on(device, ALICE);
+    expect(account.unread()).toEqual({});
+    expect(account.setUnread({})).toBe(true);
+    expect(JSON.parse(device.kept.get(`gnoworld:unread:${ALICE}`) ?? "null")).toEqual({
+      "#newer": { at: "a newer form" },
+    });
+  });
+
+  // What is held back is what the last read found: a line another tab withdrew since is not written back, and a read
+  // that fails leaves the held set as it was (R5 of redpass2-4dx).
+  it("writes back only what its last read could not read: a line another tab withdrew does not return", () => {
+    const device = storage();
+    const newer = { ...saved("m2"), pinnedBy: "a newer page" };
+    device.kept.set(`gnoworld:saved:${ALICE}`, JSON.stringify([saved("m1"), newer]));
+    const account = on(device, ALICE);
+    account.saved();
+    device.kept.set(`gnoworld:saved:${ALICE}`, JSON.stringify([saved("m1")]));
+    account.saved();
+    expect(account.setSaved([saved("m1")])).toBe(true);
+    expect(JSON.parse(device.kept.get(`gnoworld:saved:${ALICE}`) ?? "null")).toEqual([saved("m1")]);
+  });
+
+  it("writes back only the places its last read could not read: one another tab withdrew does not return", () => {
+    const device = storage();
+    device.kept.set(`gnoworld:unread:${ALICE}`, JSON.stringify({ "#newer": { at: "a newer form" } }));
+    const account = on(device, ALICE);
+    account.unread();
+    device.kept.set(`gnoworld:unread:${ALICE}`, JSON.stringify({}));
+    account.unread();
+    expect(account.setUnread({ "#games": "2026-10-25T11:00:00.000Z" })).toBe(true);
+    expect(JSON.parse(device.kept.get(`gnoworld:unread:${ALICE}`) ?? "null")).toEqual({
+      "#games": "2026-10-25T11:00:00.000Z",
+    });
+  });
+
+  it("keeps what an earlier read could not read when a later read fails", () => {
+    const device = storage();
+    const newer = { ...saved("m2"), pinnedBy: "a newer page" };
+    device.kept.set(`gnoworld:saved:${ALICE}`, JSON.stringify([newer]));
+    device.kept.set(`gnoworld:unread:${ALICE}`, JSON.stringify({ "#newer": { at: "a newer form" } }));
+    const account = on(device, ALICE);
+    account.saved();
+    account.unread();
+    device.state.refuses = true;
+    expect(account.saved()).toBeUndefined();
+    expect(account.unread()).toBeUndefined();
+    device.state.refuses = false;
+    expect(account.setSaved([saved("m1")])).toBe(true);
+    expect(account.setUnread({ "#games": "2026-10-25T11:00:00.000Z" })).toBe(true);
+    expect(JSON.parse(device.kept.get(`gnoworld:saved:${ALICE}`) ?? "null")).toEqual([saved("m1"), newer]);
     expect(JSON.parse(device.kept.get(`gnoworld:unread:${ALICE}`) ?? "null")).toEqual({
       "#games": "2026-10-25T11:00:00.000Z",
       "#newer": { at: "a newer form" },
