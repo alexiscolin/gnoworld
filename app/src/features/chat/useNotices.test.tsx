@@ -88,9 +88,18 @@ const tell = (what: (state: AppState) => void) => {
 const mention = (id: string, where: string, minute = 5) =>
   ({ id, kind: "mention", where, time: T(minute), by: ALICE }) as const;
 
+// R1 (redpass2-4fn): the title's setter is the spy, and lets only a few writes through: the observer sees its own write,
+// so a guard or a disconnect gone loops in microtasks, which no timeout ends. With the cap it fails a count instead.
+let writes = 0;
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   document.title = TITLE;
+  const real = Object.getOwnPropertyDescriptor(Document.prototype, "title");
+  writes = 0;
+  vi.spyOn(document, "title", "set").mockImplementation(function (this: Document, value: string) {
+    writes += 1;
+    if (writes <= 20) real?.set?.call(this, value);
+  });
 });
 // The page leaves the chat: its hooks' cleanups run.
 const leave = () => {
@@ -101,8 +110,11 @@ const leave = () => {
     drawn.unmount();
   });
 };
-afterEach(() => {
+afterEach(async () => {
   leave();
+  // The writes the cleanup woke end, under the cap, before the setter is the page's own again.
+  await new Promise((done) => setTimeout(done));
+  vi.restoreAllMocks();
   document.body.replaceChildren();
 });
 
@@ -179,6 +191,45 @@ describe("useNotices", () => {
     document.title = "Games · gno.world";
     await Promise.resolve();
     expect(document.title).toBe("(1) Games · gno.world");
+  });
+
+  const flush = async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  };
+
+  // The equality guard ends the observer's own write: with the count in place, nothing more is written.
+  it("writes the title once, and again only for a title another writer set", async () => {
+    draw(on());
+    follow();
+    tell(({ noticeActions }) => {
+      noticeActions.add(mention("a", MAIN));
+    });
+    await flush();
+    const settled = writes;
+    expect(settled).toBeLessThanOrEqual(2);
+    await flush();
+    expect(writes).toBe(settled);
+    document.title = "Games · gno.world";
+    await flush();
+    expect(writes).toBe(settled + 2);
+    expect(document.title).toBe("(1) Games · gno.world");
+  });
+
+  // The page that left the chat no longer watches the title: a route's own title stays as it set it.
+  it("leaves a title set after the page left the chat as it was set", async () => {
+    draw(on());
+    follow();
+    tell(({ noticeActions }) => {
+      noticeActions.add(mention("a", MAIN));
+    });
+    leave();
+    await flush();
+    const settled = writes;
+    document.title = "Games · gno.world";
+    await flush();
+    expect(writes).toBe(settled + 1);
+    expect(document.title).toBe("Games · gno.world");
   });
 
   // F1676 (CR4): Clear sees the places on the page; the rooms' marks also go to Ergo, as a read does.
