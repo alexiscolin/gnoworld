@@ -1,0 +1,219 @@
+import { Address } from "@gnoworld/schemas";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { keep, SAVED_KEPT, UNREAD_KEPT, type SavedLine } from "./keep.ts";
+import { pageKeep } from "./page.ts";
+
+// What an account keeps on its device (slice 4's 4d; ADR-0002 "Saved messages and drafts: Device", "Mark unread: 0, on
+// the device"): the lines it saved, and for each room the reading place it asked to go back to. Both are the device's
+// alone: no other device of the account sees them. What the device gives back is checked; one that refuses keeps nothing.
+const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
+const BOB = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
+const saved = (id: string, over: Partial<SavedLine> = {}): SavedLine => ({
+  room: "#bubble/games",
+  id,
+  time: "2026-10-25T10:00:00.000Z",
+  from: BOB,
+  account: BOB,
+  text: `line ${id}`,
+  ...over,
+});
+
+function storage({ refuses = false } = {}) {
+  const kept = new Map<string, string>();
+  const refuse = () => {
+    if (refuses) throw new DOMException("The storage is blocked.", "SecurityError");
+  };
+  return {
+    kept,
+    getItem: (key: string) => {
+      refuse();
+      return kept.get(key) ?? null;
+    },
+    setItem: (key: string, value: string) => {
+      refuse();
+      kept.set(key, value);
+    },
+    removeItem: (key: string) => {
+      refuse();
+      kept.delete(key);
+    },
+  };
+}
+const on = (device: ReturnType<typeof storage>, account: Address) => keep(() => device, account);
+
+describe("the lines an account saved, on its device", () => {
+  it("keeps them as given, in their order, and reads them back", () => {
+    const device = storage();
+    const lines = [saved("m2"), saved("m1", { room: "#bubble", account: undefined, from: "guest-ab12cd" })];
+    expect(on(device, ALICE).setSaved(lines)).toBe(true);
+    expect(on(device, ALICE).saved()).toEqual(lines);
+  });
+
+  it("reads none for an account that saved none, and keeps each account's apart", () => {
+    const device = storage();
+    expect(on(device, ALICE).saved()).toEqual([]);
+    on(device, ALICE).setSaved([saved("m1")]);
+    expect(on(device, BOB).saved()).toEqual([]);
+    expect([...device.kept.keys()]).toEqual([`gnoworld:saved:${ALICE}`]);
+  });
+
+  // The number is the decision's (ADR-0002's saved messages, 200 a device), not the code's own.
+  it("keeps 200 lines, and refuses a 201st list whole, writing nothing", () => {
+    const device = storage();
+    const lines = (count: number) => Array.from({ length: count }, (_, n) => saved(`m${String(n)}`));
+    expect(on(device, ALICE).setSaved(lines(200))).toBe(true);
+    expect(on(device, ALICE).setSaved(lines(201))).toBe(false);
+    expect(on(device, ALICE).saved()).toHaveLength(200);
+    expect(SAVED_KEPT).toBe(200);
+  });
+
+  // The device's text is any text: a line that is not one is dropped, the others kept (never a throw, never a guess).
+  it.each([
+    ["an empty text", { text: "" }],
+    ["a text past a line's 510 characters", { text: "x".repeat(511) }],
+    ["a room that is no room's", { room: "bubble" }],
+    ["a time in another form", { time: "yesterday" }],
+    ["an author that is no address", { account: "alice" }],
+    ["an id with a comma", { id: "a,b" }],
+    ["a field it does not know", { html: "<b>" }],
+  ])("drops a saved line with %s, and keeps the good ones beside it", (_, over) => {
+    const device = storage();
+    device.kept.set(`gnoworld:saved:${ALICE}`, JSON.stringify([saved("m1"), { ...saved("m2"), ...over }, saved("m3")]));
+    expect(
+      on(device, ALICE)
+        .saved()
+        ?.map(({ id }) => id),
+    ).toEqual(["m1", "m3"]);
+  });
+
+  it.each([
+    ["text that is no JSON", "{not json"],
+    ["JSON that is no list", '{"a":1}'],
+    ["a number", "7"],
+  ])("forgets %s and reads none", (_, held) => {
+    const device = storage();
+    device.kept.set(`gnoworld:saved:${ALICE}`, held);
+    expect(on(device, ALICE).saved()).toEqual([]);
+    expect(device.kept.has(`gnoworld:saved:${ALICE}`)).toBe(false);
+  });
+
+  it("reads more than its cap as the first 200, a device written by another version never filling memory", () => {
+    const device = storage();
+    device.kept.set(
+      `gnoworld:saved:${ALICE}`,
+      JSON.stringify(Array.from({ length: 250 }, (_, n) => saved(`m${String(n)}`))),
+    );
+    expect(
+      on(device, ALICE)
+        .saved()
+        ?.map(({ id }) => id),
+    ).toEqual(Array.from({ length: 200 }, (_, n) => `m${String(n)}`));
+  });
+
+  it("reads more places than its cap as the first 100 rooms'", () => {
+    const device = storage();
+    device.kept.set(
+      `gnoworld:unread:${ALICE}`,
+      JSON.stringify(
+        Object.fromEntries(Array.from({ length: 150 }, (_, n) => [`#w${String(n)}`, "2026-10-25T10:00:00.000Z"])),
+      ),
+    );
+    expect(Object.keys(on(device, ALICE).unread() ?? {})).toHaveLength(100);
+  });
+
+  it("keeps nothing and says so when the device refuses, and says it could not be read (not that none are saved)", () => {
+    const device = storage({ refuses: true });
+    expect(on(device, ALICE).setSaved([saved("m1")])).toBe(false);
+    expect(on(device, ALICE).saved()).toBeUndefined();
+  });
+});
+
+describe("the places an account asked to go back to, on its device", () => {
+  const PLACES = { "#bubble/games": "2026-10-25T10:00:59.999Z", "#bubble": "2026-10-25T09:00:00.000Z" };
+
+  it("keeps a place for each room, as given, and reads them back", () => {
+    const device = storage();
+    expect(on(device, ALICE).setUnread(PLACES)).toBe(true);
+    expect(on(device, ALICE).unread()).toEqual(PLACES);
+    expect([...device.kept.keys()]).toEqual([`gnoworld:unread:${ALICE}`]);
+  });
+
+  it("reads none for an account with none, and keeps each account's apart", () => {
+    const device = storage();
+    expect(on(device, ALICE).unread()).toEqual({});
+    on(device, ALICE).setUnread(PLACES);
+    expect(on(device, BOB).unread()).toEqual({});
+  });
+
+  it("writes no key for no places", () => {
+    const device = storage();
+    on(device, ALICE).setUnread(PLACES);
+    expect(on(device, ALICE).setUnread({})).toBe(true);
+    expect(device.kept.size).toBe(0);
+  });
+
+  // A session joins 100 rooms at most (Ergo's max-channels-per-client), so no more places than that are of any use.
+  it("keeps 100 rooms' places, and refuses a list of 101 whole, writing nothing", () => {
+    const device = storage();
+    const rooms = (count: number) =>
+      Object.fromEntries(Array.from({ length: count }, (_, n) => [`#world-${String(n)}`, "2026-10-25T10:00:00.000Z"]));
+    expect(on(device, ALICE).setUnread(rooms(100))).toBe(true);
+    expect(on(device, ALICE).setUnread(rooms(101))).toBe(false);
+    expect(Object.keys(on(device, ALICE).unread() ?? {})).toHaveLength(100);
+    expect(UNREAD_KEPT).toBe(100);
+  });
+
+  it.each([
+    ["a room that is no room's", { bubble: "2026-10-25T10:00:00.000Z" }],
+    ["a time in another form", { "#bubble": "2026-10-25T10:00:00Z" }],
+    ["a day that does not exist", { "#bubble": "2026-02-30T10:00:00.000Z" }],
+    ["no time", { "#bubble": "" }],
+  ])("drops a place with %s, keeping the good ones", (_, bad) => {
+    const device = storage();
+    device.kept.set(`gnoworld:unread:${ALICE}`, JSON.stringify({ ...bad, "#good": "2026-10-25T10:00:00.000Z" }));
+    expect(on(device, ALICE).unread()).toEqual({ "#good": "2026-10-25T10:00:00.000Z" });
+  });
+
+  it("is never fooled by a room named __proto__, which would be a place for every room", () => {
+    const device = storage();
+    device.kept.set(
+      `gnoworld:unread:${ALICE}`,
+      '{"__proto__":"2026-10-25T10:00:00.000Z","#bubble":"2026-10-25T10:00:00.000Z"}',
+    );
+    const read = on(device, ALICE).unread();
+    expect(Object.keys(read ?? {})).toEqual(["#bubble"]);
+    expect(Object.hasOwn(read ?? {}, "__proto__")).toBe(false);
+  });
+
+  it("keeps nothing and reads none when the device refuses", () => {
+    const device = storage({ refuses: true });
+    expect(on(device, ALICE).setUnread(PLACES)).toBe(false);
+    expect(on(device, ALICE).unread()).toBeUndefined();
+  });
+});
+
+describe("the page's device", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    Reflect.deleteProperty(globalThis, "localStorage");
+  });
+
+  it("is the page's localStorage, reached at each use, throwing nothing when it is blocked", () => {
+    const kept = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => kept.get(key) ?? null,
+      setItem: (key: string, value: string) => kept.set(key, value),
+      removeItem: (key: string) => kept.delete(key),
+    });
+    expect(pageKeep(ALICE).setSaved([saved("m1")])).toBe(true);
+    expect([...kept.keys()]).toEqual([`gnoworld:saved:${ALICE}`]);
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      get: () => {
+        throw new DOMException("The storage is blocked.", "SecurityError");
+      },
+    });
+    expect(pageKeep(ALICE).saved()).toBeUndefined();
+    expect(pageKeep(ALICE).setUnread({ "#bubble": "2026-10-25T10:00:00.000Z" })).toBe(false);
+  });
+});
