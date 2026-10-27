@@ -39,8 +39,8 @@ export function pinsFor(db: DatabaseSync, roles: Typed, { link, now, log }: Part
       },
     },
     // A line that replaces another, its author's edit: the replaced line's pin goes.
-    onEdit: ({ room, edits, account }: Said): void => {
-      if (edits !== undefined) pins.edited(room, edits, account);
+    onEdit: ({ room, edits, account, msgid }: Said): void => {
+      if (edits !== undefined) pins.edited(room, edits, { account, msgid });
     },
   };
 }

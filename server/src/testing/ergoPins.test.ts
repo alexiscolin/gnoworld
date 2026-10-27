@@ -100,6 +100,22 @@ describe("a moderator pins a line", { timeout: 40_000 }, () => {
     await expect.poll(async () => (await list("#bubble")).pins, { timeout: 10_000 }).toEqual([]);
   });
 
+  // Ergo keeps the replaced line at its msgid, since an edit is only a tag: a pin of it would publish the words the author
+  // took back (F1480). The page pins the correcting line's own id.
+  it("refuses a line its author edited, and still pins a later one", async () => {
+    const e = await start();
+    const { list, pin } = await pinsFor(e);
+    const alice = await login(e, AUTHOR);
+    await join(alice, "#bubble");
+    const id = await say(alice, "#bubble", "withdrawn words");
+    alice.send(`@+gnoworld/edit=${id} PRIVMSG #bubble :new words`);
+    await sync(alice);
+    const after = await say(alice, "#bubble", "a line after, so the bot has heard the edit");
+    expect((await pin("#bubble", id)).status).toBe(404);
+    expect((await list("#bubble")).pins).toEqual([]);
+    expect((await pin("#bubble", after)).status).toBe(200);
+  });
+
   it("cannot pin a line the bot already hid", async () => {
     const e = await start();
     const { list, pin } = await pinsFor(e);

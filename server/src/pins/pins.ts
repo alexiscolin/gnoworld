@@ -33,8 +33,9 @@ export interface Pins {
   remove: (room: string, msgid: string) => boolean;
   /** The line left its room (a REDACT): its pin goes, a pin being added for it never lands. */
   drop: (room: string, msgid: string) => void;
-  /** The line `msgid` was replaced by an edit of `by`: its pin goes if `by` wrote it. */
-  edited: (room: string, msgid: string, by: string) => void;
+  /** The line `msgid` was replaced by an edit of an account, given alone or with the edit's own id: its pin goes if
+   * that account wrote it, as does the pin of an earlier edit of it, and none of them is pinned after. */
+  edited: (room: string, msgid: string, by: string | Editor) => void;
   /** Asks Ergo for each pin of a room again and drops those it no longer holds: a delete while the link was down is
    * only seen so, once the link is in the room. */
   check: (room: string) => Promise<void>;
@@ -47,6 +48,24 @@ interface Options {
   now: () => number;
   // A room's pins at most.
   max: number;
+}
+
+// The edits heard, as many as are remembered, the oldest forgotten first (heard on this connection alone: the table
+// has no column for them).
+const EDITS_KEPT = 2000;
+const remember = <V>(map: Map<string, V>, key: string, value: V): void => {
+  map.delete(key);
+  map.set(key, value);
+  for (const old of map.keys()) {
+    if (map.size <= EDITS_KEPT) break;
+    map.delete(old);
+  }
+};
+
+/** An edit: the account that made it and its own msgid. */
+interface Editor {
+  account: string;
+  msgid: string;
 }
 
 const Count = z.object({ n: z.number() });
@@ -64,6 +83,10 @@ function pinFrom(room: string, msgid: string, got: Fetched): PinnedLine | "not_f
 export function makePins({ db, fetch, now, max }: Options): Pins {
   // The pins being added, by line: a REDACT heard while Ergo is asked marks them, so the line is not pinned after it.
   const adding = new Map<string, Set<{ gone: boolean }>>();
+  // Ergo keeps a line an edit replaced at its msgid (an edit is only a tag), so a replaced version is never pinned: the
+  // line and account that replaced it; and each edited line's newest edit, by line and account.
+  const replaced = new Map<string, true>();
+  const newest = new Map<string, string>();
   const held = (room: string, msgid: string): boolean =>
     db.prepare("SELECT 1 FROM pins WHERE room = ? AND msgid = ?").get(room, msgid) !== undefined;
   const drop = (room: string, msgid: string): number =>
@@ -97,6 +120,7 @@ export function makePins({ db, fetch, now, max }: Options): Pins {
       if (held(room, msgid)) return "already";
       const pin = pinFrom(room, msgid, await ask(room, msgid));
       if (typeof pin === "string") return pin;
+      if (replaced.has(`${room} ${msgid} ${pin.account}`)) return "not_found";
       // After the wait, in one turn with the insert: another request may have pinned the line or filled the room.
       if (held(room, msgid)) return "already";
       const { n } = Count.parse(db.prepare("SELECT count(*) AS n FROM pins WHERE room = ?").get(room));
@@ -111,8 +135,15 @@ export function makePins({ db, fetch, now, max }: Options): Pins {
       drop(room, msgid);
       for (const watch of adding.get(`${room} ${msgid}`) ?? []) watch.gone = true;
     },
-    edited(room, msgid, by) {
-      db.prepare("DELETE FROM pins WHERE room = ? AND msgid = ? AND account = ?").run(room, msgid, by);
+    edited(room, msgid, editor) {
+      const [by, edit] = typeof editor === "string" ? [editor, undefined] : [editor.account, editor.msgid];
+      const chain = `${room} ${msgid} ${by}`;
+      const before = newest.get(chain);
+      if (edit !== undefined) remember(newest, chain, edit);
+      for (const id of before === undefined ? [msgid] : [msgid, before]) {
+        remember(replaced, `${room} ${id} ${by}`, true);
+        db.prepare("DELETE FROM pins WHERE room = ? AND msgid = ? AND account = ?").run(room, id, by);
+      }
     },
     async check(room) {
       const all = Ids.parse(db.prepare("SELECT msgid FROM pins WHERE room = ? ORDER BY rowid").all(room));

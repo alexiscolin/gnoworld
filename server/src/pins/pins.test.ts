@@ -227,6 +227,53 @@ describe("a pin and its line leaving the room", () => {
     expect(pins.list("#bubble/games")).toEqual([]);
   });
 
+  // Ergo keeps a replaced line at its msgid (an edit is only a tag), so a pin of the older version would publish what
+  // its author took back (F1480, F1481).
+  it("never pins a line its author's edit replaced, heard before the ask or while Ergo is asked", async () => {
+    const release: (() => void)[] = [];
+    const held = setup({
+      lines: LINES,
+      answer: (room, msgid) =>
+        new Promise((resolve) => {
+          release.push(() => {
+            resolve(LINES[`${room} ${msgid}`] ?? "gone");
+          });
+        }),
+    });
+    const adding = held.pins.add("#bubble/games", "m1", MOD);
+    held.pins.edited("#bubble/games", "m1", { account: ALICE, msgid: "m2" });
+    for (const go of release) go();
+    expect(await adding).toBe("not_found");
+    const { pins } = setup({ lines: LINES });
+    pins.edited("#bubble/games", "m1", { account: ALICE, msgid: "m2" });
+    expect(await pins.add("#bubble/games", "m1", MOD)).toBe("not_found");
+    expect(pins.list("#bubble/games")).toEqual([]);
+  });
+
+  it("pins a line another account's edit named, and the room's other lines", async () => {
+    const { pins } = setup({ lines: LINES });
+    pins.edited("#bubble/games", "m1", { account: MOD, msgid: "m9" });
+    pins.edited("#bubble", "m2", { account: ALICE, msgid: "m9" });
+    expect(await pins.add("#bubble/games", "m1", MOD)).toBe("pinned");
+    expect(await pins.add("#bubble/games", "m2", MOD)).toBe("pinned");
+    // Another account's edit heard after the author's does not lift the refusal.
+    pins.edited("#bubble/games", "m3", { account: ALICE, msgid: "m8" });
+    pins.edited("#bubble/games", "m3", { account: MOD, msgid: "m9" });
+    expect(await pins.add("#bubble/games", "m3", MOD)).toBe("not_found");
+  });
+
+  // The correcting line is the newest version until its author edits again: then it is the older one (F1480).
+  it("drops the pin of a correcting line the author's next edit replaced, and pins only the newest", async () => {
+    const edits = Object.fromEntries([said("m2", { edits: "m1" }), said("m3", { edits: "m1" })]);
+    const { pins } = setup({ lines: { ...LINES, ...edits } });
+    pins.edited("#bubble/games", "m1", { account: ALICE, msgid: "m2" });
+    expect(await pins.add("#bubble/games", "m2", MOD)).toBe("pinned");
+    pins.edited("#bubble/games", "m1", { account: ALICE, msgid: "m3" });
+    expect(pins.list("#bubble/games")).toEqual([]);
+    expect(await pins.add("#bubble/games", "m2", MOD)).toBe("not_found");
+    expect(await pins.add("#bubble/games", "m3", MOD)).toBe("pinned");
+  });
+
   // A delete heard while the link was down is seen only by asking Ergo again, at the link's ready (R5).
   describe("checking each pin again", () => {
     it("drops the pins Ergo says it holds no more, and keeps the others", async () => {
