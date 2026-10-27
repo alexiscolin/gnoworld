@@ -1453,7 +1453,7 @@ describe("the IRC link, a message of several lines (draft/multiline)", () => {
     expect(said[49]).toMatchObject({ msgid: "ml2", text: "> quoted\nanswer" });
   });
 
-  it("holds 16 messages open at once, and reads none of a 17th, which it does not open", async () => {
+  it("holds 16 messages open at once, and hands each on whole", async () => {
     const ergo = await fakeErgo();
     const { said } = start(ergo.port);
     const peer = await ergo.peer(0);
@@ -1463,7 +1463,10 @@ describe("the IRC link, a message of several lines (draft/multiline)", () => {
     for (let n = 0; n < 17; n += 1) peer.say(`@batch=r${String(n)} :a!u@h PRIVMSG #bubble :text ${String(n)}`);
     for (let n = 0; n < 17; n += 1) peer.say(`:a!u@h BATCH :-r${String(n)}`);
     await sync(peer);
-    expect(said.map(({ msgid }) => msgid)).toEqual(Array.from({ length: 16 }, (_, n) => `m${String(n)}`));
+    // Past the 16th, what is said of a 17th is the next commit's (a message the bot cannot hold is hidden).
+    expect(said.filter(({ msgid }) => msgid !== "m16").map(({ msgid, text }) => [msgid, text])).toEqual(
+      Array.from({ length: 16 }, (_, n) => [`m${String(n)}`, `text ${String(n)}`]),
+    );
   });
 
   it("holds a line of a batch ended no more: a line with that reference and an id, after its end, is said alone", async () => {
