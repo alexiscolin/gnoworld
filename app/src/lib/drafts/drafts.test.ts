@@ -1,6 +1,6 @@
 import { Address } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
-import { MULTILINE_BYTES } from "@gnoworld/core";
+import { compose, MULTILINE_BYTES } from "@gnoworld/core";
 import { DRAFT_LIMIT, drafts } from "./drafts.ts";
 
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
@@ -71,6 +71,27 @@ describe("an account's drafts on the device", () => {
     expect(mine.set("#bubble", "😀".repeat(DRAFT_LIMIT / 2 + 1))).toBe(false);
     expect(mine.get("#bubble")).toBe("");
     expect(device.kept.size).toBe(0);
+  });
+
+  // G7 of the green pass: compose trims each line's end, so a draft whose trailing spaces alone pass the limit is still
+  // one the composer lets go; it is kept as compose reads it.
+  it("keeps a draft the composer lets go though its trailing spaces pass the limit, as compose reads it", () => {
+    const nick = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+    const lines = Array.from({ length: 38 }, () => `${"a".repeat(100)}${" ".repeat(110)}`);
+    const draft = lines.join("\n");
+    expect(draft.length).toBeGreaterThan(DRAFT_LIMIT);
+    expect(compose("#bubble", draft, nick).kind).toBe("lines");
+    const mine = on(storage(), ALICE);
+    expect(mine.set("#bubble", "an older one")).toBe(true);
+    expect(mine.set("#bubble", draft)).toBe(true);
+    expect(mine.get("#bubble")).toBe(Array.from({ length: 38 }, () => "a".repeat(100)).join("\n"));
+  });
+
+  it("keeps a draft of blank lines and tabs only as none, kept or not: nothing to come back", () => {
+    const mine = on(storage(), ALICE);
+    mine.set("#bubble", "an older one");
+    expect(mine.set("#bubble", `${" ".repeat(DRAFT_LIMIT)}\n\t${"\r\n".repeat(DRAFT_LIMIT)}`)).toBe(true);
+    expect(mine.get("#bubble")).toBe("");
   });
 
   it("reads what the device holds as no draft unless it is one: past the limit, it is none", () => {
