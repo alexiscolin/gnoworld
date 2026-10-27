@@ -36,16 +36,23 @@ LIMITS = [
 # What an agent's brief or the review card must keep saying, which nothing else reads: a line cut from one stays green.
 # Every review agent never writes a worktree's git index (2026-10-26: one staged old files into wt-4dm's and failed the
 # next commit's gate); CLAUDE.md's review card ends with the change's risk and undo.
-AGENT_RULE = "run a git command that writes the index or the work tree"
+AGENT_RULE = "Never run a git command that writes the index or the work tree"
+AGENTS = ("complexity-reviewer", "finding-verifier", "security-reviewer", "test-auditor")  # each must exist (CR2)
 CARD_ITEM = re.compile(r"^8\. Risk and undo:", re.M)
 
 
 def lost_rules(root):
-    """The agents' files without the index rule, and a CLAUDE.md whose review card lost its item 8."""
-    out = [f"{p.relative_to(root)}: no line `{AGENT_RULE}`" for p in sorted(root.glob(".claude/agents/*.md"))
-           if AGENT_RULE not in " ".join(p.read_text().split())]
+    """The agents' files missing or without the index rule, and a CLAUDE.md missing or whose review card lost its item 8."""
+    briefs = {f".claude/agents/{name}.md" for name in AGENTS} | {p.relative_to(root).as_posix() for p in root.glob(".claude/agents/*.md")}
+    out = []
+    for brief in sorted(briefs):
+        p = root / brief
+        if not p.is_file():
+            out.append(f"{brief}: the agent's brief is missing")
+        elif AGENT_RULE not in " ".join(p.read_text().split()):
+            out.append(f"{brief}: no sentence `{AGENT_RULE}`")
     claude = root / "CLAUDE.md"
-    if claude.is_file() and (root / ".claude/agents").is_dir() and not CARD_ITEM.search(claude.read_text()):
+    if not claude.is_file() or not CARD_ITEM.search(claude.read_text()):
         out.append("CLAUDE.md: the review card has no item `8. Risk and undo:`")
     return out
 

@@ -154,7 +154,7 @@ CPU-bound raises (security-S3). Both above the cores close the two.
 | `scripts/mutate.py` | a realm guard no test notices when removed |
 | `gofmt`, `go vet`, the seal vectors | Go tools; `gno/r/seal/vectors_test.gno` equals what `go run ./tools/sealvec` prints |
 | the tokens story's pictures, in Chromium (a change of `tokens.css` only) | a token added or changed with no approved picture: the story lists every token (F1190) |
-| `scripts/check_docs.py` | a harness doc naming a file that does not exist; a bad row in the findings ledger, or one citing a commit the repository lacks; a known limit the runbook no longer says (3M-19); a test with no file of its name beside it (F085); a harness script that does not parse (F084) |
+| `scripts/check_docs.py` | a harness doc naming a file that does not exist; a bad row in the findings ledger, or one citing a commit the repository lacks; a known limit the runbook no longer says (3M-19); one of the four review agents' files missing or without its sentence `Never run a git command that writes the index or the work tree`, or CLAUDE.md without the review card's item 8, in any root (CR2); a test with no file of its name beside it (F085); a harness script that does not parse (F084) |
 | `scripts/test_hooks.sh` | the hooks, the guard, the settings' boundary, the CI's promises, and the scripts below; a harness mutant that no longer finds its text or names a section its suite lacks (`harness_mutate.py --dry`, in a second) |
 
 **Full** (`--full`: `/pre-merge` and a push of `main`) adds:

@@ -50,6 +50,14 @@ case ${ONLY:-,} in
 	;;
 esac
 part() { case ",$ONLY," in *",$1,"*) ran=1 && return 0 ;; *) return 1 ;; esac; }
+# The rules the review depends on are required of every root (CR2): the four agents' briefs, each saying the git-index
+# rule, and CLAUDE.md's review card, its item 8; good_rules gives a fixture its own.
+agents="complexity-reviewer finding-verifier security-reviewer test-auditor"
+good_rules() {
+	mkdir -p "$1/.claude/agents"
+	for a in $agents; do printf 'You never edit.\nNever run a git command that writes the index or the work tree (checkout,\nrestore); copy with cp.\n' >"$1/.claude/agents/$a.md"; done
+	printf '8. Risk and undo: what could go wrong.\n' >>"$1/CLAUDE.md"
+}
 
 if part wiring; then
 # The wiring: settings.json runs each Claude Code hook, and check.sh runs every step it promises.
@@ -395,6 +403,7 @@ d="$t/docs-root"
 mkdir -p "$d/scripts" "$d/.claude/rules"
 touch "$d/scripts/real.sh"
 printf 'Run `scripts/real.sh`, see `docs/plans/slice-$ARGUMENTS.md`.\n' >"$d/CLAUDE.md"
+good_rules "$d"
 python3 -I "$docs" "$d" >/dev/null 2>&1 || fail "check_docs refused a doc whose files exist"
 printf 'Run `scripts/gone.sh`.\n' >"$d/.claude/rules/x.md"
 python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted a doc naming a missing file"
@@ -402,19 +411,33 @@ rm "$d/.claude/rules/x.md"
 git -C "$d" init -q && printf '.claude/tmp/\n' >"$d/.gitignore" && mkdir -p "$d/.claude/tmp/copy"
 printf 'Run `scripts/gone.sh`.\n' >"$d/.claude/tmp/copy/x.md"
 python3 -I "$docs" "$d" >/dev/null 2>&1 || fail "check_docs read a doc in a folder git ignores"
-# The rules the review depends on, which no other check reads: each agent's brief says the git-index rule, and the review
-# card keeps its item 8 (G12).
-r="$t/rules-root" && mkdir -p "$r/.claude/agents"
-printf 'You never edit.\nNever run a git command that writes the index or the work tree (checkout,\nrestore); copy with cp.\n' >"$r/.claude/agents/a.md"
-printf '7. Cards.\n8. Risk and undo: what could go wrong.\n' >"$r/CLAUDE.md"
-python3 -I "$docs" "$r" >/dev/null 2>&1 || fail "check_docs refused an agent with the git-index rule and a review card with its item 8"
-printf 'You never edit.\n' >"$r/.claude/agents/b.md"
-out=$(python3 -I "$docs" "$r" 2>&1) && fail "check_docs accepted an agent whose brief lost the git-index rule"
-printf '%s' "$out" | grep -qF "agents/b.md" || fail "check_docs did not name the agent without the rule: $out"
-printf '%s' "$out" | grep -qF "agents/a.md" && fail "check_docs named an agent that has the rule: $out"
-rm "$r/.claude/agents/b.md" && printf '7. Cards.\n' >"$r/CLAUDE.md"
-out=$(python3 -I "$docs" "$r" 2>&1) && fail "check_docs accepted a review card with no item 8"
+# The rules the review depends on, which no other check reads: each of the four agents' briefs says the git-index rule,
+# in its full sentence, and the review card keeps its item 8 (G12); a missing file, folder or sentence fails (CR2).
+r="$t/rules-root" && mkdir -p "$r" && : >"$r/CLAUDE.md" && good_rules "$r"
+rules() { python3 -I "$docs" "$r" 2>&1; }
+rules >/dev/null || fail "check_docs refused four agents with the git-index rule and a review card with its item 8"
+printf 'You never edit.\n' >"$r/.claude/agents/test-auditor.md"
+out=$(rules) && fail "check_docs accepted an agent whose brief lost the git-index rule"
+printf '%s' "$out" | grep -qF "agents/test-auditor.md" || fail "check_docs did not name the agent without the rule: $out"
+printf '%s' "$out" | grep -qF "agents/security-reviewer.md" && fail "check_docs named an agent that has the rule: $out"
+printf 'You may run a git command that writes the index or the work tree.\n' >"$r/.claude/agents/test-auditor.md"
+rules >/dev/null && fail "check_docs accepted a brief that allows what the rule forbids (CR2)"
+printf 'Never run a git command that reads the index.\n' >"$r/.claude/agents/test-auditor.md"
+rules >/dev/null && fail "check_docs accepted a brief whose sentence is another's (CR2)"
+rm "$r/.claude/agents/test-auditor.md"
+out=$(rules) && fail "check_docs accepted a missing agent file (CR2)"
+printf '%s' "$out" | grep -qF "agents/test-auditor.md: the agent's brief is missing" || fail "check_docs did not name the missing agent file: $out"
+good_rules "$r" && printf 'No rule.\n' >"$r/.claude/agents/extra.md"
+rules >/dev/null && fail "check_docs accepted an added agent whose brief has no rule (CR2)"
+rm "$r/.claude/agents/extra.md"
+rm -r "${r:?}/.claude/agents"
+rules >/dev/null && fail "check_docs accepted a root with no agents folder (CR2)"
+good_rules "$r"
+printf '7. Cards.\n' >"$r/CLAUDE.md"
+out=$(rules) && fail "check_docs accepted a review card with no item 8"
 printf '%s' "$out" | grep -qF "Risk and undo" || fail "check_docs did not name the missing item 8: $out"
+rm "$r/CLAUDE.md"
+rules >/dev/null && fail "check_docs accepted a root with no CLAUDE.md, whose item 8 nothing can hold (CR2)"
 # The findings ledger: a known status, a fixed finding names a commit that exists, a rejected
 # one says why, and no id twice.
 git -C "$d" add -A && git -C "$d" commit -qm base && sha=$(git -C "$d" rev-parse --short HEAD)
@@ -449,7 +472,7 @@ row "| F001 | 2026-10-17 | a | x.py:1 | a bug | moot | as \`0badc0de0badc0de0bad
 row "| F001 | 2026-10-17 | a | x.py:1 | a bug | fixed | \`$sha\`, then \`0badc0de\` |" && fail "check_docs accepted a fix citing a second commit the repo lacks"
 row "| F001 | 2026-10-17 | a | x.py:1 | a bug | claimed | as \`$blob\` holds |" && fail "check_docs accepted a cited blob as a commit"
 row "| F001 | 2026-10-17 | a | x.py:1 | a bug | fixed | its test |" && fail "check_docs accepted a fixed finding citing no commit"
-o="$t/docs-copy" && mkdir -p "$o/docs/review"
+o="$t/docs-copy" && mkdir -p "$o/docs/review" && good_rules "$o"
 printf '| Id | Found | By | Where | Claim | Status | Evidence |\n|---|---|---|---|---|---|---|\n| F001 | 2026-10-17 | a | x.py:1 | a bug | fixed | `0badc0de` |\n| F002 | 2026-10-17 | a | x.py:1 | a bug | moot | as `0badc0de` shows |\n' >"$o/docs/review/findings.md"
 python3 -I "$docs" "$o" >/dev/null 2>&1 || fail "check_docs refused cited commits outside a repository, where none can be read"
 rm -r "$d/docs/review"
@@ -1034,7 +1057,7 @@ if part pre_commit; then
 # pre-commit runs the gate on the staged files, and a failing gate stops the commit.
 c2="$t/precommit"
 precommit() { (cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1); }
-mkdir -p "$c2/scripts" && git -C "$c2" init -q
+mkdir -p "$c2/scripts" && git -C "$c2" init -q && good_rules "$c2"
 printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/repo_files.py" "$c2/scripts/" && secrets_into "$c2/scripts/" && git -C "$c2" add -A && git -C "$c2" commit -qm base
 echo code >"$c2/a.ts" && git -C "$c2" add a.ts
 precommit && fail "pre-commit let a commit through a failing gate"
