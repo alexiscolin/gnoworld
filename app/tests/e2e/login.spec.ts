@@ -85,3 +85,26 @@ test.describe("on a phone", () => {
     await expect(logInButton(page)).toBeHidden();
   });
 });
+
+test.describe("Adena's code", () => {
+  // Adena's calls (connect, sign) are the login's click's: a page that never logs in does not load them, and the click
+  // asks for them (docs/decisions.md, 2026-10-28).
+  const ADENA_CALLS = "SIGN_ARBITRARY";
+
+  test("comes with the click that logs in, not with the page", async ({ page }) => {
+    await adena(page);
+    const bodies: Promise<string>[] = [];
+    page.on("response", (response) => {
+      if (response.request().resourceType() === "script") bodies.push(response.text());
+    });
+    await page.goto("/");
+    await hydrated(page);
+    await expect(logInButton(page)).toBeVisible();
+    const before = (await Promise.all(bodies)).join("\n");
+    expect(before.includes(ADENA_CALLS), "the page's scripts hold Adena's calls").toBe(false);
+    await logInButton(page).click();
+    await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
+    const after = (await Promise.all(bodies)).join("\n");
+    expect(after.includes(ADENA_CALLS), "the click loaded Adena's calls").toBe(true);
+  });
+});
