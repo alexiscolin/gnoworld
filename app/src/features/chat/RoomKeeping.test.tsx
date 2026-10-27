@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { Line } from "@gnoworld/core";
+import { parseLine, type IrcMessage, type Line } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
 import { renderToStaticMarkup } from "react-dom/server";
 import { prerender } from "react-dom/static";
@@ -225,5 +225,95 @@ describe("the room in view's keeping, from the store", () => {
     expect(saved("#bubble")).toEqual(["same"]);
     expect(saved("#bubble/games")).toEqual(["other"]);
     expect(saved("#world")).toEqual([]);
+  });
+});
+
+// An edit is a line of its own that corrects one (+gnoworld/edit): the room shows the corrected text in the first line's
+// place, but Ergo keeps the first at its id. What the reader saves, marks and pins is the version the room shows, and a
+// pin is of the newest version's id (F1483, the code review's CR1).
+describe("the version of an edited line that the room acts on", () => {
+  const said = (id: string, text: string, edits?: string): IrcMessage => {
+    const tags = `msgid=${id};time=2026-10-25T10:00:0${id.slice(1)}.000Z;account=${ALICE}${edits === undefined ? "" : `;+gnoworld/edit=${edits}`}`;
+    const parsed = parseLine(`@${tags} :alice!u@h PRIVMSG #bubble :${text}`);
+    if (!parsed.ok) throw new Error("the test's line does not parse");
+    return parsed.message;
+  };
+  // The room's lines are m1, then m2 and m3, the author's edits of it; the store holds m2 and m3's pin.
+  function mounted(lines: readonly IrcMessage[], pinned: readonly string[] = []) {
+    const calls: string[] = [];
+    const pinning = {
+      pin: (id: string) => {
+        calls.push(`pin ${id}`);
+        return Promise.resolve({ ok: true as const });
+      },
+      unpin: (id: string) => {
+        calls.push(`unpin ${id}`);
+        return Promise.resolve({ ok: true as const });
+      },
+    };
+    const seen: { api?: ReturnType<typeof useRoomKeeping>; store?: ReturnType<typeof useAppStore> } = {};
+    const Reader = () => {
+      const store = useAppStore();
+      const api = useRoomKeeping("#bubble", pinning);
+      useEffect(() => {
+        Object.assign(seen, { api, store });
+      });
+      return null;
+    };
+    const root = createRoot(document.createElement("div"));
+    Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+    act(() => {
+      root.render(
+        <StoreProvider>
+          <Reader />
+        </StoreProvider>,
+      );
+    });
+    const kept: Record<string, string> = {};
+    const storage = {
+      getItem: (key: string) => kept[key] ?? null,
+      setItem: (key: string, value: string) => {
+        kept[key] = value;
+      },
+      removeItem: (key: string) => Reflect.deleteProperty(kept, key),
+    };
+    const state = seen.store?.getState();
+    act(() => {
+      state?.keepActions.begin(keep(() => storage, Address.parse(ALICE)));
+      state?.chatActions.follow(["#bubble"]);
+      state?.chatActions.page("#bubble", lines);
+      state?.pinsActions.set({
+        room: "#bubble",
+        may: true,
+        pins: pinned.map((id) => ({ id, time: T(0), account: Address.parse(ALICE), text: `held ${id}` })),
+      });
+    });
+    return { calls, keeping: () => seen.api?.keeping, saved: () => seen.store?.getState().keep.saved ?? [] };
+  }
+  const EDITED = [said("m1", "my address is 12 Foo St"), said("m2", "never mind", "m1")];
+
+  it("saves the text its author corrected an edited line to, never the one taken back", () => {
+    const { keeping, saved } = mounted(EDITED);
+    act(() => {
+      keeping()?.onSave("m1");
+    });
+    expect(saved().map(({ id, text }) => [id, text])).toEqual([["m1", "never mind"]]);
+  });
+
+  it("pins an edited line by its newest edit's id, the older one being the text taken back", async () => {
+    const { keeping, calls } = mounted([...EDITED, said("m3", "never mind, really", "m1")]);
+    await act(async () => {
+      await keeping()?.pin?.pin("m1");
+    });
+    expect(calls).toEqual(["pin m3"]);
+  });
+
+  it("shows the edited line pinned and unpins the id the server holds, the edit's", async () => {
+    const { keeping, calls } = mounted(EDITED, ["m2"]);
+    expect([...(keeping()?.pinned ?? [])]).toEqual(["m1"]);
+    await act(async () => {
+      await keeping()?.pin?.unpin("m1");
+    });
+    expect(calls).toEqual(["unpin m2"]);
   });
 });
