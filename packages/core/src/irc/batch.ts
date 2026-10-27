@@ -3,7 +3,7 @@
 // lines inside a page (draft/multiline) is folded into the page, in its place (multiline.ts). The relay is
 // untrusted: a batch never ended or ever growing holds no more than its bounds, and a reference is only a key.
 import type { IrcMessage } from "./irc.ts";
-import { foldMultiline, MULTILINE } from "./multiline.ts";
+import { foldMultiline, MULTILINE, MULTILINE_LINES } from "./multiline.ts";
 
 /** The batches open at once: one more is not opened, and its lines pass on their own. */
 export const OPEN_BATCHES = 16;
@@ -74,7 +74,9 @@ export class BatchReader {
   }
 }
 
-// A line held in its batch, the first BATCH_LINES kept.
+// A line held in its batch, the first BATCH_LINES kept; a message of several lines keeps one more than Ergo's 40, which
+// foldMultiline refuses whatever follows (F1724).
 function hold({ batch }: Open, message: IrcMessage): void {
-  if (batch.messages.length < BATCH_LINES) batch.messages.push(message);
+  const cap = batch.type === MULTILINE ? MULTILINE_LINES + 1 : BATCH_LINES;
+  if (batch.messages.length < cap) batch.messages.push(message);
 }

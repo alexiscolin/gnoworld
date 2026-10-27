@@ -1,6 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, test } from "vitest";
 import { BATCH_LINES, BatchReader, OPEN_BATCHES, type Batched } from "./batch.ts";
+import { foldMultiline, MULTILINE_LINES } from "./multiline.ts";
 import { parseLine, type IrcMessage } from "./irc.ts";
 
 const PROPERTY = { seed: 20261017, numRuns: 300 };
@@ -305,6 +306,25 @@ describe("BatchReader: a message of several lines (draft/multiline)", () => {
     const page = pageOf(reader.read(read("BATCH -h1")));
     expect(page).toHaveLength(BATCH_LINES);
     expect(page.at(-1)).toBe(`${String(BATCH_LINES - 1)}\nx`);
+  });
+
+  // F1724 (C2): foldMultiline refuses a message of more than 40 parts, so a multiline batch holds 41 and no more.
+  test(`holds ${String(MULTILINE_LINES + 1)} parts of a multiline batch at most, past which none is read`, () => {
+    const reader = new BatchReader();
+    reader.read(read("BATCH +h1 chathistory #bubble"));
+    reader.read(read(nested("ml")));
+    for (let n = 0; n < 500; n++) reader.read(partOf("ml", String(n)));
+    const done = reader.read(read("@batch=h1 :a!u@h BATCH -ml"));
+    expect(done).toEqual({ kind: "held" });
+    const page = reader.read(read("BATCH -h1"));
+    expect(page.kind === "done" ? page.batch.messages : ["?"]).toEqual([]);
+    const top = new BatchReader();
+    top.read(read(OPENED));
+    for (let n = 0; n < 500; n++) top.read(partOf("ml", String(n)));
+    const ended = top.read(read(":a!u@h BATCH -ml"));
+    const batch = ended.kind === "done" ? ended.batch : undefined;
+    expect(batch?.messages).toHaveLength(MULTILINE_LINES + 1);
+    expect(batch === undefined ? "?" : foldMultiline(batch)).toBeUndefined();
   });
 
   test(`opens no multiline batch past ${String(OPEN_BATCHES)} open: its parts pass on their own`, () => {
