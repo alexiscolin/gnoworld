@@ -12,16 +12,20 @@ export interface FieldProps {
   error?: string;
   /** Words before the box, outside its value: "@" before a name. */
   prefix?: string;
+  /** The ids of what else on the page says what the box is about (a composer's reply bar), after its help. */
+  describedBy?: string | undefined;
 }
 
 const TYPES = { text: "text", search: "search", date: "datetime-local" } as const;
 
 /** A labelled box, described by its help and its error, which also marks it invalid. */
-export function Field({ label, value, onChange, kind = "text", help, error, prefix }: FieldProps) {
+export function Field({ label, value, onChange, kind = "text", help, error, prefix, describedBy }: FieldProps) {
   const id = useId();
   const helpId = `${id}-help`;
   const errorId = `${id}-error`;
-  const described = [help === undefined ? null : helpId, error === undefined ? null : errorId].filter(Boolean);
+  const described = [help === undefined ? null : helpId, error === undefined ? null : errorId, describedBy].filter(
+    Boolean,
+  );
   const box = (
     <input
       id={id}
