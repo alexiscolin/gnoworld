@@ -274,6 +274,7 @@ def mutants():
     yield from each(hm, "        since = last_reviewed" "(base)\n", "        since = base\n", "hooks", "harness_mutate --changed judges the guard files changed since the last /pre-merge pass, not since base")
     yield from each(hm, "    except OSError" " as e:", "    except ZeroDivisionError as e:", "hooks", "harness_mutate --changed refuses a passes file it cannot read, never judging fewer mutants")
     yield from each(hm, "        base, changed = since, " "changed_since(since)\n", "        base = since\n", "hooks", "harness_mutate --changed reads the files changed since the pass, not since base")
+    yield from each(hm, "    if not found" ":  # nothing to judge", "    if False:  # nothing to judge", "hooks", "harness_mutate --changed runs no control when it judges no mutant")
     yield from each(hm, "elif sys.argv[1:]" ":\n", "elif False:\n", "hooks", "harness_mutate refuses an unknown argument")
     yield from each(hm, "    if base.startswith" "(\"-\"):", "    if False:", "hooks", "harness_mutate --changed takes no option for its base")
     yield from each(hm, "if changed is not None and SELF" " in changed:", "if False:", "hooks", "harness_mutate --changed judges every mutant when it changed itself")
@@ -851,6 +852,9 @@ with contextlib.ExitStack() as stack:
         touched_by = {test: suite_touched(base, suite) for test, suite in SUITE_OF.items() if suite in changed}
         found = select(found, changed, touched_by, sections)
         print(f"harness_mutate: the guard files and the suites' sections changed since {base}: {len(found)} of {total} mutants")
+    if not found:  # nothing to judge: the controls would only cost minutes (8 suite runs, 601 s at load 30 to 50)
+        print("harness_mutate: no mutant to judge")
+        sys.exit(0)
     with concurrent.futures.ThreadPoolExecutor(shards * len(TESTS)) as pool:
         # The control: an untouched copy passes, so a failure means the mutant.
         for (tree, test), code in zip([(tr, te) for tr in trees for te in TESTS], pool.map(lambda c: run(*c), [(tr, te) for tr in trees for te in TESTS])):

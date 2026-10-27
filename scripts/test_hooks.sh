@@ -575,7 +575,7 @@ hs="$t/shards" && mkdir -p "$hs/src/scripts" "$hs/repo/scripts"
 # The suite: its section opens at the line's start, as harness_mutate reads it, which this file's
 # runner must not; with SHARDS_MEET, a mutant's run waits for that many trees to run at once.
 printf '%s\n' 'part() { case ",$ONLY," in *",$1,"*) return 0 ;; *) return 1 ;; esac; }' \
-	'[ -n "$ONLY" ] || { [ ! -e BROKEN_hooks ]; exit; }' \
+	'[ -n "$ONLY" ] || { echo . >>"$SHARD_ROOT/controls"; [ ! -e BROKEN_hooks ]; exit; }' \
 	'if part x; then' \
 	'	pwd >>"$SHARD_ROOT/ran"' \
 	'	if [ -n "${SHARDS_MEET:-}" ]; then' \
@@ -643,7 +643,7 @@ cp "$hs/src/g.txt" "$hs/src/h.txt" "$hs/src/i.txt" "$hs/src/k.txt" "$hs/repo/" &
 git -C "$hs/repo" init -q && git -C "$hs/repo" add -A && git -C "$hs/repo" commit -qm x
 shards() { # $1: the shards; then harness_mutate's arguments
 	n=$1 && shift
-	rm -f "$hs/made" "$hs/removed" "$hs/ran" "$hs/lonely" "$hs"/met.*
+	rm -f "$hs/made" "$hs/removed" "$hs/ran" "$hs/controls" "$hs/lonely" "$hs"/met.*
 	(cd "$hs/repo" && SHARD_ROOT="$hs" SHARD_SRC="$hs/src" HARNESS_SHARDS=$n python3 -I harness_mutate.py "$@" 2>&1)
 }
 count() { [ -e "$hs/$1" ] && wc -l <"$hs/$1" | tr -d ' ' || echo 0; }
@@ -715,6 +715,10 @@ printf '%s\n' "$out" | grep -q "killed: planted keep5 #1$" || fail "harness_muta
 git -C "$hs/repo" rm -q docs/review-passes.txt && git -C "$hs/repo" commit -qm "no record"
 out=$(shards 2 --changed "$base") && fail "harness_mutate --changed passed with a survivor and no passes file: $out"
 [ "$(verdicts "$out")" = 3 ] || fail "harness_mutate --changed did not judge every file changed since base with no passes file: $out"
+# Nothing changed since the pass, so no mutant to judge: it says so and runs no control either.
+out=$(shards 2 --changed "$(git -C "$hs/repo" rev-parse HEAD)") || fail "harness_mutate --changed failed with no mutant to judge: $out"
+printf '%s\n' "$out" | grep -q "0 of 7 mutants" || fail "harness_mutate --changed did not say it kept none: $out"
+[ ! -e "$hs/controls" ] || fail "harness_mutate --changed ran a control for no mutant: $out"
 # (Before the section z below: its if, last in the suite, would give every x mutant a passing exit.)
 # A change inside one section of a suite judges that section's mutants alone, with those of the files it changed.
 printf '%s\n' 'if part z; then' '	grep -q KEEP6 j.txt' 'fi' >"$hs/z"
