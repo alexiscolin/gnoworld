@@ -11,10 +11,15 @@ import { isAccount } from "./names.ts";
 
 type Store = ReturnType<typeof createAppStore>;
 
+/** The deleted lines' ids kept at most, the newest: a history page open at a REDACT must not bring its notice back. */
+const GONE_KEPT = 100;
+
 export class Noticer {
   /** The rooms where a mention of the whole room counts, as the page told. */
   groups: ReadonlySet<string> = new Set();
   readonly #store: Store;
+  // The ids of the lines REDACT took away, oldest first (a Set keeps its order).
+  readonly #gone = new Set<string>();
   readonly #inside: ReadonlySet<string>;
   readonly #account: () => boolean;
 
@@ -31,7 +36,14 @@ export class Noticer {
     const { noticeActions, chat } = this.#store.getState();
     const { me } = chat;
     const [room = "", id = ""] = message.params;
-    if (message.command === "REDACT") noticeActions.drop(id);
+    if (message.command === "REDACT") {
+      noticeActions.drop(id);
+      this.#gone.add(id);
+      for (const old of this.#gone) {
+        if (this.#gone.size <= GONE_KEPT) break;
+        this.#gone.delete(old);
+      }
+    }
     if (me === undefined || !this.#account()) return;
     if (outOf(message, me)) noticeActions.left(room);
     this.#marked(message, me);
@@ -50,7 +62,8 @@ export class Noticer {
     if (!this.#account() || !this.#inside.has(room) || at === undefined || read === undefined) return;
     const made = messages.flatMap((message) => {
       const line = lineOf(message, room);
-      const notice = line === undefined || line.time <= read ? undefined : roomNotice(line, room, at);
+      const notice =
+        line === undefined || line.time <= read || this.#gone.has(line.id) ? undefined : roomNotice(line, room, at);
       return notice === undefined ? [] : [notice];
     });
     state.noticeActions.addAll(made);

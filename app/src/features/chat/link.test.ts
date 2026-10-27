@@ -2271,6 +2271,25 @@ describe("the chat's link: notices, the edges", () => {
     });
   });
 
+  // F1681 (CR9): a REDACT that came while a page was open left no trace, so the page's end made the notice again.
+  describe("a history page open while a line of it is deleted", () => {
+    it("makes no notice of that line, and one of its neighbour", () => {
+      const t = member();
+      t.fake.line(`:ergo MARKREAD ${GAMES} timestamp=${T(2)}`);
+      t.fake.line(`BATCH +h1 chathistory ${GAMES}`);
+      for (const [id, minute] of [
+        ["h3", 3],
+        ["h4", 4],
+      ] as const)
+        t.fake.line(
+          `@batch=h1;msgid=${id};time=${T(minute)};account=${OTHER} :${OTHER}!u@h PRIVMSG ${GAMES} :@${ADDRESS}`,
+        );
+      t.fake.line(`:${OTHER}!u@h REDACT ${GAMES} h3`);
+      t.fake.line("BATCH -h1");
+      expect(ids(t)).toEqual(["h4"]);
+    });
+  });
+
   describe("the history page, by the same rules as a live line", () => {
     const page = (fake: Fake, lines: readonly (readonly [string, number, string, object?])[], room = GAMES) => {
       fake.line(`BATCH +h1 chathistory ${room}`);
