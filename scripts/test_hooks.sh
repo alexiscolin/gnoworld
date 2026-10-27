@@ -1638,7 +1638,7 @@ g="$t/$1"
 log="$g.log"
 mkdir -p "$g/scripts" "$g/.githooks" "$g/bin" "$g/toolchain" "$g/gno/r/seal" "$g/app/src" "$g/app/tests" "$g/app/node_modules/@playwright/test" \
 	"$g/server/src" "$g/packages/core/src" "$g/packages/ui/src" "$g/packages/schemas/src" "$g/deploy" "$g/lint"
-cp "$here/check.sh" "$here/code_changed.sh" "$g/scripts/" && cp "$hooks/records.sh" "$g/.githooks/" && cp "$here/../.node-version" "$here/../.gitignore" "$g/"
+cp "$here/check.sh" "$here/code_changed.sh" "$here/unsteady.py" "$g/scripts/" && cp "$hooks/records.sh" "$g/.githooks/" && cp "$here/../.node-version" "$here/../.gitignore" "$g/"
 step="$g/bin/step"
 # The one stub: it logs its name and arguments; it takes 2 s when SLOW_STEP names it, fails when FAIL
 # does, and waits for each step MEET names to start too (30 s at most): steps run one after another
@@ -1668,7 +1668,26 @@ case " ${MEET:-} " in
 	;;
 esac
 [ "${SLOW_STEP:-}" != "$n" ] || sleep 2
-case ",${FAIL:-}," in *,"$n",*) echo "$n failed here" >&2 && exit 1 ;; esac
+# FAIL fails every run of a step; FLAKY only its first, as a test that fails once and then passes does. A failed Vitest
+# run leaves the report its JSON reporter would (NOREPORT: none, as a crash leaves), naming a file that failed and one that passed.
+down=
+case ",${FLAKY:-}," in *,"$n",*) [ -e "$GATE_LOG.flaked.$n" ] || { : >"$GATE_LOG.flaked.$n"; down=1; } ;; esac
+case ",${FAIL:-}," in *,"$n",*) down=1 ;; esac
+if [ -n "$down" ]; then
+	echo "$n failed here" >&2
+	for a in "$@"; do
+		case $a in
+		--outputFile.json=*)
+			case ${NOREPORT:-} in
+			empty) printf '{"testResults":[{"name":"%s/app/src/ok.test.ts","status":"passed","assertionResults":[]}]}' "$PWD" >"${a#*=}" ;;
+			1) ;;
+			*) printf '{"testResults":[{"name":"%s/app/src/a.test.ts","status":"failed","assertionResults":[{"fullName":"a works","status":"failed"},{"fullName":"a stays","status":"passed"}]},{"name":"%s/app/src/ok.test.ts","status":"passed","assertionResults":[]}]}' "$PWD" "$PWD" >"${a#*=}" ;;
+			esac
+			;;
+		esac
+	done
+	exit 1
+fi
 echo "done $n" >>"$GATE_LOG"
 exit 0
 SH
@@ -1680,7 +1699,7 @@ for py in check_css check_docs mutate probe bench batch_size load patch_coverage
 done
 for sh in ergo test_hooks scan_secrets; do printf 'exec sh "%s" sh:%s "$@"\n' "$step" "$sh" >"$g/scripts/$sh.sh"; done
 # The journeys' stub; with PW_EDIT, it edits a package file, as a build that installs would.
-printf 'const { spawnSync } = require("node:child_process");\nconst { appendFileSync } = require("node:fs");\nconst stories = process.argv.some((a) => a.includes("stories"));\nconst name = stories ? (process.env.PICTURES_OF ? "pictures" : "stories") : "playwright";\nif (process.env.PW_EDIT) appendFileSync("app/package.json", "\\n");\nprocess.exit(spawnSync("sh", [%s, name, "port=" + process.env.E2E_PORT, "of=" + (process.env.PICTURES_OF ?? ""), "on=" + (process.env.STORIES_PORT ?? ""), "out=" + (process.env.STORIES_OUT ?? ""), ...process.argv.slice(2)], { stdio: "inherit" }).status);\n' "'$step'" >"$g/app/node_modules/@playwright/test/cli.js"
+printf 'const { spawnSync } = require("node:child_process");\nconst { appendFileSync, writeFileSync } = require("node:fs");\nconst stories = process.argv.some((a) => a.includes("stories"));\nconst name = stories ? (process.env.PICTURES_OF ? "pictures" : "stories") : "playwright";\nif (process.env.PW_EDIT) appendFileSync("app/package.json", "\\n");\nconst status = spawnSync("sh", [%s, name, "port=" + process.env.E2E_PORT, "of=" + (process.env.PICTURES_OF ?? ""), "on=" + (process.env.STORIES_PORT ?? ""), "out=" + (process.env.STORIES_OUT ?? ""), ...process.argv.slice(2)], { stdio: "inherit" }).status;\nconst report = process.env.PLAYWRIGHT_JSON_OUTPUT_NAME;\nconst failing = process.env.NOREPORT === "empty" ? [] : [{ title: "a.spec.ts", file: "a.spec.ts", specs: [{ title: "journey", ok: false, file: "a.spec.ts" }] }];\nif (status && report && process.env.NOREPORT !== "1" && process.argv.some((a) => a.endsWith("json"))) writeFileSync(report, JSON.stringify({ config: { rootDir: process.cwd() + "/app/tests" }, suites: [...failing, { title: "ok.spec.ts", file: "ok.spec.ts", specs: [{ title: "fine", ok: true, file: "ok.spec.ts" }] }] }));\nprocess.exit(status);\n' "'$step'" >"$g/app/node_modules/@playwright/test/cli.js"
 python3 -I - "$g/package.json" "$step" <<'PY'
 import json, sys
 names = ["format:check", "typecheck", "lint", "test", "unused", "copies", "comments", "coverage", "mutate"]
@@ -1693,7 +1712,7 @@ for f in server/src/a.ts server/src/b.ts server/roles.json app/src/a.tsx app/tes
 done
 git -C "$g" init -q && git -C "$g" add -A && git -C "$g" commit -qm x && git -C "$g" update-ref refs/remotes/origin/main HEAD
 }
-gate() { : >"$log" && rm -f "$log".met.* "$log.load" && (cd "$g" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" sh scripts/check.sh "$@" 2>&1); }
+gate() { : >"$log" && rm -f "$log".met.* "$log.load" "$log".flaked.* && (cd "$g" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" sh scripts/check.sh "$@" 2>&1); }
 ran() { grep -q "^$1\( \|$\)" "$log"; }
 before() { [ "$(grep -n "^$1\( \|$\)" "$log" | head -1 | cut -d: -f1)" -lt "$(grep -n "^$2\( \|$\)" "$log" | head -1 | cut -d: -f1)" ]; }
 reset() { git -C "$g" reset -q --hard && git -C "$g" clean -qfd; }
@@ -1972,6 +1991,56 @@ GATE_BUDGET= gate | grep -q "(budget 60 s)$" || fail "check.sh took an empty GAT
 printf 'y\n' >>"$g/server/src/a.ts"
 GATE_BUDGET=999 gate | grep -q "(budget 30 s)$" || fail "check.sh let GATE_BUDGET raise a scoped run's budget"
 reset
+# A Vitest file or a journey that fails runs once more, alone; if it passes the gate passes and the file is logged for
+# /pre-merge, with its failed tests and the load; a file that fails twice, or a failure with no report, refuses (F1700).
+unsteady=$g/.claude/tmp/unsteady.log
+tries() { grep -c "^$1\( \|$\)" "$log"; }
+unsteady_case() { # $1 the step, $2 the tool, $3 the file it fails in (and one that passes), $4 the failed test, $5 the file that passes
+	rm -rf "${unsteady:?}"
+	out=$(LOAD_1="305 160" LOAD_2="305 160" LOAD_3="305 160" LOAD_4="305 160" LOAD_5="305 160" LOAD_6="305 160" FLAKY=$1 gate) || fail "check.sh failed a $2 run that passed the second time: $out"
+	[ "$(tries "$1")" = 2 ] || fail "check.sh ran $1 $(tries "$1") times for one failure, not twice: $out"
+	grep -qF "$6" "$log" || fail "check.sh did not give the failed file to the second $1 run"
+	grep -qF "$5" "$log" && fail "check.sh ran a file that passed again ($1)"
+	[ "$(grep -c "" "$unsteady")" = 1 ] || fail "check.sh did not log the one unsteady file of $1 once: $(cat "$unsteady")"
+	grep -qF "$3" "$unsteady" && grep -qF "$2" "$unsteady" && grep -qF "$4" "$unsteady" || fail "the unsteady log lacks the tool, file or test of $1: $(cat "$unsteady")"
+	grep -qF "load 30.5 on 16 cores" "$unsteady" || fail "the unsteady log lacks the load: $(cat "$unsteady")"
+	grep -qF "$5" "$unsteady" && fail "the unsteady log names a file that passed ($1)"
+	printf '%s\n' "$out" | grep -q "^unsteady: .*running them once more" || fail "check.sh did not say it ran $1 again: $out"
+	# Fails twice: it refuses, after one more run only, and logs nothing.
+	rm -rf "${unsteady:?}"
+	out=$(FAIL=$1 gate) && fail "check.sh passed with $1 failing twice"
+	[ "$(tries "$1")" = 2 ] || fail "check.sh ran $1 $(tries "$1") times when it failed, not twice"
+	printf '%s\n' "$out" | grep -q "failed twice" || fail "check.sh did not say $1 failed twice: $out"
+	[ ! -e "$unsteady" ] || fail "check.sh logged a file of $1 that failed twice"
+	# A failure with no report (a crash, a config error) is no flake: nothing runs again, and it is no pass.
+	out=$(NOREPORT=1 FLAKY=$1 gate) && fail "check.sh passed a $1 failure that left no report"
+	[ "$(tries "$1")" = 1 ] || fail "check.sh ran $1 again after a failure with no report"
+	[ ! -e "$unsteady" ] || fail "check.sh logged a $1 failure with no report"
+	# A report that names no failed file would run every file again: it refuses, with nothing run again.
+	out=$(NOREPORT=empty FLAKY=$1 gate) && fail "check.sh passed a $1 failure whose report names no failed file"
+	[ "$(tries "$1")" = 1 ] || fail "check.sh ran $1 again for a report that names no failed file"
+	# A log that cannot be written (a folder where it goes): an unsteady test no one sees is not a pass.
+	mkdir -p "$unsteady"
+	out=$(FLAKY=$1 gate) && fail "check.sh passed an unsteady $1 test it could not log"
+	printf '%s\n' "$out" | grep -q "cannot be written" || fail "check.sh did not say it could not log $1: $out"
+	rm -rf "${unsteady:?}"
+}
+unsteady_case test vitest app/src/a.test.ts "a works" app/src/ok.test.ts app/src/a.test.ts
+unsteady_case playwright playwright app/tests/a.spec.ts "journey" app/tests/ok.spec.ts 'app/tests/a\.spec\.ts'
+# Pre-commit's staged copy has no repository and a link for node_modules: its unsteady test is logged in the repository's folder,
+# not in the copy, which is deleted after the run.
+c=$g.copy r=$g.repo
+rm -rf "${c:?}" "${r:?}" && cp -R "$g" "$c" && rm -rf "${c:?}/.git" && mkdir -p "$r/node_modules" && ln -s "$r/node_modules" "$c/node_modules"
+(g=$c && FLAKY=test gate >/dev/null) || fail "check.sh failed an unsteady test in a staged copy"
+grep -qF "app/src/a.test.ts" "$r/.claude/tmp/unsteady.log" || fail "check.sh did not log a staged copy's unsteady test in the repository"
+[ ! -e "$c/.claude/tmp/unsteady.log" ] || fail "check.sh logged a staged copy's unsteady test in the copy, which is deleted"
+# A run that passes the first time runs nothing again and logs nothing.
+gate >/dev/null || fail "check.sh failed a clean run"
+[ "$(tries test)" = 1 ] && [ "$(tries playwright)" = 1 ] || fail "check.sh ran a passing step twice"
+[ ! -e "$unsteady" ] || fail "check.sh logged a clean run"
+# The log keeps each run's files: two unsteady runs leave two lines.
+FLAKY=test gate >/dev/null && FLAKY=test gate >/dev/null && [ "$(grep -c "" "$unsteady")" = 2 ] || fail "check.sh did not append to the unsteady log"
+rm -rf "${unsteady:?}"
 fi
 
 if part gate_times; then

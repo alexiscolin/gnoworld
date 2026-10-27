@@ -117,6 +117,16 @@ $related && tests_scope="--changed --passWithNoTests"
 # the pre-commit copy that borrows node_modules. $2, a scoped run's own options.
 PATH="$PWD/node_modules/.bin:$PATH"
 run() { sh -c "$(node -p "require('./package.json').scripts['$1']") ${2:-}"; }
+# A Vitest file or a journey that fails runs once more, alone; the ones that then pass are logged for /pre-merge, a gate
+# that fails twice fails (scripts/unsteady.py, F1700). The log is the repository's own: pre-commit's copy has no repository,
+# but its node_modules is a link to the repository's.
+unsteady_log=.claude/tmp/unsteady.log
+[ -n "$tested" ] || ! [ -L node_modules ] || unsteady_log=$(dirname "$(readlink node_modules)")/.claude/tmp/unsteady.log
+retry() { # retry <tool> <report> <command...>: <report>'s failed files, given to <command>, run once more
+	tool=$1 report=$2
+	shift 2
+	python3 -I scripts/unsteady.py "$tool" "$report" "$unsteady_log" "$(python3 -I scripts/load.py)" -- "$@"
+}
 ms() { python3 -Ic 'import time; print(int(time.time() * 1000))'; }
 # step <name> starts a step of the lane $lane, and closes the one before; `step` alone closes the last.
 step() {
@@ -153,6 +163,7 @@ finish() {
 			total=$((total + took_ms)) parts="$parts${parts:+, }$name $(seconds "$took_ms")"
 		done <"$logs/$l.times"
 		echo "lane $l $(seconds "$total") s: $parts"
+		grep '^unsteady: ' "$logs/$l.log" || : # a test that failed and then passed is said, not only logged
 	done
 	for l in $failed; do
 		echo "check.sh: lane $l failed at $(cat "$logs/$l.at" 2>/dev/null || echo its start):" >&2
@@ -204,7 +215,9 @@ lane_ts() {
 	export E2E_PORT
 	packages() { cat package.json app/package.json pnpm-lock.yaml | cksum; }
 	installed=$(packages)
-	node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot # node: see check_regressions.py
+	export PLAYWRIGHT_JSON_OUTPUT_NAME="$logs/playwright.json"
+	node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot,json || # node: see check_regressions.py
+		retry playwright "$PLAYWRIGHT_JSON_OUTPUT_NAME" env -u PLAYWRIGHT_JSON_OUTPUT_NAME node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot
 	[ "$(packages)" = "$installed" ] || { echo "check.sh: building the app changed package.json or the lockfile" >&2; exit 1; }
 }
 
@@ -222,7 +235,8 @@ lane_tests() {
 	step ergo
 	sh scripts/ergo.sh >/dev/null # the Ergo the server's tests start, built once from deploy/ergo/VERSION
 	$full || step vitest # --full runs the tests once, with coverage
-	$full || run test "$tests_scope"
+	$full || run test "$tests_scope --reporter=default --reporter=json --outputFile.json=$logs/vitest.json" ||
+		retry vitest "$logs/vitest.json" sh -c "$(node -p "require('./package.json').scripts.test") \"\$@\"" sh
 }
 
 lane_gno() {

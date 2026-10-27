@@ -56,7 +56,7 @@ SECTIONS = {
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix,worktree_script",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
     "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
-    "scripts/repo_files.py": {"hooks": "worktrees,regressions,batch_size,harness_shards,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench", "scripts/suite_parts.py": "mutant_scope,harness_shards", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
+    "scripts/repo_files.py": {"hooks": "worktrees,regressions,batch_size,harness_shards,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench", "scripts/suite_parts.py": "mutant_scope,harness_shards", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/unsteady.py": "gate_lanes", "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
 }
 
 
@@ -659,6 +659,26 @@ def mutants():
     yield from each("scripts/load.py", "getloadavg()[0]", "getloadavg()[2]", "hooks", "load.py reads the 1-minute average, not the 15-minute one")
     yield from each("scripts/load.py", "[0] * 10)", "[0] * 1000)", "hooks", "load.py scales the load to tenths")
     yield from each("scripts/load.py", "(os.cpu_count() or 1)", "(os.cpu_count() or 0)", "hooks", "load.py counts one core when it cannot count")
+    # A failed Vitest file or journey runs once more, and is logged (F1700).
+    for name in ("vitest", "playwright"):
+        yield from each("scripts/check.sh", f"retry {name} ", f"false {name} ", "hooks", f"check.sh: a failed {name} run is run once more")
+    yield from each("scripts/check.sh", "--outputFile.json=$logs/vitest.json", "--outputFile.jsn=$logs/vitest.json", "hooks", "check.sh asks Vitest for its report")
+    yield from each("scripts/check.sh", 'export PLAYWRIGHT_JSON_OUTPUT_NAME="$logs/playwright.json"', ":", "hooks", "check.sh asks Playwright for its report")
+    yield from each("scripts/check.sh", "--reporter=dot,json", "--reporter=dot", "hooks", "check.sh asks Playwright for its JSON reporter")
+    yield from each("scripts/check.sh", "unsteady_log=.claude/tmp/unsteady.log\n", "unsteady_log=/dev/null\n", "hooks", "check.sh logs an unsteady test in .claude/tmp")
+    yield from each("scripts/check.sh", 'unsteady_log=$(dirname "$(readlink node_modules)")/', "unsteady_log=", "hooks", "check.sh logs a staged copy's unsteady test in the repository")
+    yield from each("scripts/check.sh", """grep '^unsteady: ' "$logs/$l.log" || :""", ":", "hooks", "check.sh says an unsteady test it ran again")
+    un = "scripts/unsteady.py"
+    yield from each(un, ".returncode != 0:", ".returncode == 99:", "hooks", "unsteady: a file that fails twice fails the gate")
+    yield from each(un, "    if not failed:\n", "    if False:\n", "hooks", "unsteady: a report that names no failed file runs nothing again")
+    yield from each(un, "        sys.exit(f\"unsteady: {', '.join(files)} passed the second time, but", "        print(f\"unsteady: {', '.join(files)} passed the second time, but", "hooks", "unsteady: a log that cannot be written fails the gate")
+    yield from each(un, "sorted(failed.items())", "[]", "hooks", "unsteady: logs each file that failed")
+    yield from each(un, 'if r["status"] == "failed"', 'if r["status"] != "failed"', "hooks", "unsteady: Vitest's failed files only")
+    yield from each(un, 'if not spec["ok"]:', 'if spec["ok"]:', "hooks", "unsteady: Playwright's failed specs only")
+    yield from each(un, "re.escape}", "str}", "hooks", "unsteady: Playwright is given a file's name as a pattern")
+    yield from each(un, "os.path.realpath(path)", "path", "hooks", "unsteady: a file's path is the same through a link")
+    yield from each(un, "tenths / 10", "tenths", "hooks", "unsteady: the load is logged in whole units")
+    yield from each(un, "cores // 10", "cores", "hooks", "unsteady: the cores are logged as cores")
     yield from each("scripts/check_docs.py", ' elif AGENT_RULE not in " ".join(p.read_text().split()):', " elif False:", "hooks", "check_docs wants each agent's brief to say the git-index rule (G12)")
     yield from each("scripts/check_docs.py", "        if not p.is_file():", "        if False:", "hooks", "check_docs wants each agent's brief to exist (CR2)")
     yield from each("scripts/check_docs.py", ' | {p.relative_to(root).as_posix() for p in root.glob(".claude/agents/*.md")}', "", "hooks", "check_docs reads an added agent's brief too (CR2)")

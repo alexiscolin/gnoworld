@@ -137,6 +137,19 @@ a run begun just after a heavy one on an idle machine (the average lags by about
 292 in 10 s); the end reading alone includes the gate's own lanes, which a change making its own tests
 CPU-bound raises (security-S3). Both above the cores close the two.
 
+A Vitest file or a journey that fails in the fast gate runs once more, alone (`scripts/unsteady.py`, F1700;
+Alexis, 2026-10-28, F1621): under a load of 70 to 135 the gate failed on a different timing test at each run
+though each passed alone, and one merge took 8 tries. The gate reads each tool's JSON report (`--reporter=json`),
+gives the second run only the files that failed, and passes if it passes; each such file, with its failed tests, the
+machine's load and the time, is then appended to `.claude/tmp/unsteady.log` (ignored by git; a staged copy in
+pre-commit writes the repository's, through its `node_modules` link), a line the gate also prints, which `/pre-merge`
+reads in its first step. It fails when the files fail a second time, when the log cannot be written (a flake no one
+sees is not a pass), and when the report names no failed file or is missing (a crash or a config error is no flake:
+nothing runs again, and a report that named no file would run every file again). Only failed files run again, and only
+once. The `--full` and `--merge` gates keep their behaviour for Vitest (their coverage run is the only one, and gets no
+second run); their journeys are the same step as the fast gate's, so they get the second run too. The log is a record, not a floor: a test that
+shows in it again and again is a test to fix, not to forgive.
+
 **Fast** (every turn, every commit, a work branch's push; it fails past its budget), its steps:
 
 | Step | What it catches |
@@ -425,6 +438,7 @@ and the harness is frozen until a real bug crosses it.
 | `.githooks/` | `commit-msg`, `pre-commit`, `pre-merge-commit`, `pre-push`; `records.sh`, the prints and the harness list they and `check.sh` share (F076); `merge.sh`, the merge that shows the harness first (F129) |
 | `scripts/install_hooks.sh` | puts `main`'s hooks and the scripts they run in `.git/hooks`; `--check` for `pre-push` (F129) |
 | `scripts/check.sh` | the gate |
+| `scripts/unsteady.py` | the fast gate's second run of a failed Vitest file or journey, and the log of those that then pass (F1700) |
 | `.github/workflows/gate.yml` | the full gate on GitHub's machines, for every branch pushed |
 | `app/playwright.config.ts`, `app/tests/e2e/` | the app's journeys: a build per run, served as a static host serves it (`serve.mjs`), the real server behind its `/api` and a real Ergo behind its `/ws` (`api.mjs`), both ended and their folders removed when the run ends; the shipped roles file with the journeys' rooms added (Bubble's sections), a test wallet for each name a journey gives (`/__wallet?as=`), and `POST /__drop?tag=`, which ends the WebSockets of the pages whose `e2e-tag` cookie names it, as a network gone would |
 | `scripts/guard.py`, `scripts/stop_gate.sh` | Claude Code's hooks |
