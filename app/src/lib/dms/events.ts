@@ -7,7 +7,7 @@ import {
   dmOf,
   nickOf,
   reactionOf,
-  redactAfter,
+  redactedLines,
   redactReactions,
   sameName,
   type IrcMessage,
@@ -50,24 +50,13 @@ function afterReaction(held: Held, message: IrcMessage, cap: number): Held {
   return reactions === held.reactions ? held : { lines: held.lines, reactions };
 }
 
-// The lines without the corrections of the line a REDACT names that its sender wrote: nobody else's goes with it.
-function withoutCorrections(lines: readonly Line[], { params: [, id = ""], source = "" }: IrcMessage): readonly Line[] {
-  const sender = nickOf(source);
-  const kept = lines.filter(
-    (line) => line.edits !== id || line.account === undefined || !sameName(line.account, sender),
-  );
-  return kept.length === lines.length ? lines : kept;
-}
-
-/** `held` once `message` is read as a room's are, the target being the room: the same object when it changes nothing. A
- * REDACT takes with its line the corrections its sender wrote of it, whose own REDACTs may not come (CR3). */
+/** `held` once `message` is read as a room's are, the target being the room: the same object when it changes nothing.
+ * Core's redactedLines (CR3, F1958); forbiddenBy first, for a conversation has no moderators. */
 export function afterAct(held: Held, message: IrcMessage, cap: number): Held {
   if (message.command === "TAGMSG") return afterReaction(held, message, cap);
   const target = message.params[0] ?? "";
   const forbidden = forbiddenBy(message);
-  const lines = held.lines.some(forbidden)
-    ? held.lines
-    : withoutCorrections(redactAfter(held.lines, message, target), message);
+  const lines = held.lines.some(forbidden) ? held.lines : redactedLines(held.lines, message, target);
   const reactions =
     held.reactions === undefined || held.reactions.some(forbidden)
       ? held.reactions

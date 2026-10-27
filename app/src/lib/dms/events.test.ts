@@ -153,6 +153,24 @@ describe("afterAct: a delete takes the corrections of the line with it", () => {
     const held = { lines: [lineOf("m1", ME)], reactions: undefined };
     expect(act(held, redactOf(ALICE, "m9"))).toBe(held);
   });
+
+  // F1958: the room's R1 hole. redactIn sends the line's REDACT first; Ergo refused it (no echo), then the correction's
+  // went through: the page must not bring the words edited out back while the line is held.
+  it("holds back the author's delete of a correction alone while its line is held (F1958)", () => {
+    const held = { lines: [lineOf("m1", ALICE), lineOf("m2", ALICE, "m1")], reactions: undefined };
+    expect(act(held, redactOf(ALICE, "m2"))).toBe(held);
+  });
+
+  it("holds it back for my own delete, as Ergo echoes it to me (F1958)", () => {
+    const held = { lines: [lineOf("m1", ME), lineOf("m2", ME, "m1")], reactions: undefined };
+    const echo = read(`@msgid=r;account=${ME} :${ME}!u@h REDACT ${ALICE} m2`);
+    expect(act(held, echo)).toBe(held);
+  });
+
+  it("takes the author's delete of a correction whose line left the window (F1958)", () => {
+    const held = { lines: [lineOf("m2", ALICE, "m1"), lineOf("m3", ME)], reactions: undefined };
+    expect(act(held, redactOf(ALICE, "m2")).lines.map((line) => line.id)).toEqual(["m3"]);
+  });
 });
 
 describe("afterAct: a reaction", () => {
