@@ -32,6 +32,7 @@ import {
   logged,
   login,
   moderated,
+  msgid,
   open,
   oper,
   ORIGIN,
@@ -61,7 +62,7 @@ describe("guests and rooms", { timeout: 20_000 }, () => {
     const gus = await guest(e, "gus");
     await join(gus, "#lobby");
     gus.send("PRIVMSG #lobby :hello from guest");
-    await gus.expect(/ 404 gus #lobby :Cannot send to channel \(\+M\)/);
+    await gus.expect(/ 404 Guest-gus #lobby :Cannot send to channel \(\+M\)/);
     alice.send("PRIVMSG #lobby :hello from alice");
     await gus.expect(/account=alice.* PRIVMSG #lobby :hello from alice/);
     await sync(alice);
@@ -118,6 +119,22 @@ describe("guests and rooms", { timeout: 20_000 }, () => {
     await gus.expect(replayed("PRIVMSG #lobby :persist-marker-1$"));
   });
 
+  // F1492 holds the store is SQLite, not a ring: a room nobody registered keeps its lines across a restart too.
+  it("keeps the history of a room nobody registered across a restart (F1492)", { timeout: 40_000 }, async () => {
+    const e = await start({ dir: keptFolder() });
+    const chief = await lobby(e);
+    await say(chief, "#lobby", "unregistered-marker-1");
+    await sync(chief);
+    const { dir } = e;
+    await e.stop();
+
+    const again = await start({ dir });
+    // Only an operator makes a room (the bot's class, as when it makes them again): the room comes back empty.
+    const reader = await lobby(again);
+    history(reader, "#lobby");
+    await reader.expect(replayed("PRIVMSG #lobby :unregistered-marker-1$"));
+  });
+
   // 4e, decided by Alexis (docs/decisions.md): Ergo sets +R on every connection at its registration
   // (default-user-modes, irc/server.go:445, v2.19.1), so an account that asks nothing hears no guest.
   it("refuses a guest's direct message to an account that sent no MODE, and lets an account's through", async () => {
@@ -125,7 +142,7 @@ describe("guests and rooms", { timeout: 20_000 }, () => {
     const alice = await login(e, "alice");
     const gus = await guest(e, "gus");
     gus.send("PRIVMSG alice :from a guest");
-    await gus.expect(/ 477 gus alice /);
+    await gus.expect(/ 477 Guest-gus alice /);
     const bob = await login(e, "bob");
     bob.send("PRIVMSG alice :from an account");
     await alice.expect(/PRIVMSG alice :from an account$/);
@@ -158,11 +175,11 @@ describe("logins and the auth script", { timeout: 30_000 }, () => {
     const e = await start();
     const x = await guest(e, "newacct");
     x.send("NS REGISTER newacct pw123");
-    await x.expect(/NOTICE newacct :This command has been disabled by the server administrators/);
+    await x.expect(/NOTICE Guest-newacct :This command has been disabled by the server administrators/);
     x.send("REGISTER newacct * pw123");
     await x.expect(/FAIL REGISTER DISALLOWED newacct :Account registration is disabled/);
     x.send("NS SAREGISTER newacct pw123");
-    expect(await x.expect(/NOTICE newacct :Command restricted/)).toContain("Command restricted");
+    expect(await x.expect(/NOTICE Guest-newacct :Command restricted/)).toContain("Command restricted");
   });
 
   it("ignores PASS account:password, which logs nobody in", async () => {
@@ -198,14 +215,14 @@ describe("logins and the auth script", { timeout: 30_000 }, () => {
     const dave = await login(e, "dave");
     const early = await guest(e, "dave3");
     early.send("NS IDENTIFY dave pw");
-    expect(await early.expect(/ 433 dave3 dave /)).toContain("Nickname is already in use");
+    expect(await early.expect(/ 433 Guest-dave3 dave /)).toContain("Nickname is already in use");
     await early.expect(/try logging out and logging back in with SASL/);
     await dave.close();
     const g = await guest(e, "dave2");
     g.send("NS IDENTIFY dave pw");
     await g.expect(/NOTICE dave :You're now logged in as dave/);
     await sync(g);
-    expect(logged(g)).toMatch(/:dave2!\S+ NICK dave/);
+    expect(logged(g)).toMatch(/:Guest-dave2!\S+ NICK dave/);
     expect(logged(g)).toMatch(/:dave!\S+ ACCOUNT dave/);
   });
 
@@ -415,6 +432,48 @@ describe("history and tags", { timeout: 30_000 }, () => {
     await noPlayback.expect(/:HistServ!HistServ@localhost PRIVMSG #lobby :alice sent a TAGMSG/);
   });
 
+  // F1492: the room's history is Ergo's SQLite store (history.persistent, unregistered-channels), which holds no
+  // count of items, only expire-time: the 2,048 of channel-length is the in-memory ring of a room not persisted.
+  // The reader pages back from the latest item to the first line, 1,000 items a page (chathistory-maxmessages).
+  it(
+    "still reads a room's first line by CHATHISTORY after 3,000 events in it: reactions, joins and parts (F1492)",
+    { timeout: 120_000 },
+    async () => {
+      const e = await start();
+      const chief = await lobby(e);
+      const text = "the room's first line";
+      const first = await say(chief, "#lobby", text);
+      // Operators have no fakelag (the bot's class), so 3,000 events take a second or two.
+      const [reactor, visitor] = [await oper(e, "reactor"), await oper(e, "visitor")];
+      await join(reactor, "#lobby");
+      for (let n = 0; n < 1000; n++) {
+        reactor.send(`@+draft/react=%F0%9F%91%8D;+draft/reply=${first} TAGMSG #lobby`);
+        visitor.send("JOIN #lobby");
+        visitor.send("PART #lobby");
+      }
+      await sync(reactor);
+      await sync(visitor);
+      let items = 0;
+      let found = false;
+      let from = "CHATHISTORY LATEST #lobby * 1000";
+      for (let page = 0; page < 8 && !found; page++) {
+        const mark = chief.lines().length;
+        chief.send(from);
+        await chief.expect(/BATCH -/, 10_000);
+        const stored = chief
+          .lines()
+          .slice(mark)
+          .filter((l) => replayed(" ").test(l));
+        if (stored.length === 0) break;
+        items += stored.length;
+        found = stored.some((l) => l.endsWith(` PRIVMSG #lobby :${text}`));
+        from = `CHATHISTORY BEFORE #lobby msgid=${msgid(stored[0] ?? "")} 1000`;
+      }
+      expect(items, "the items paged through, the first line's among them").toBeGreaterThan(3000);
+      expect(found, "the room's first line, after 3,000 events").toBe(true);
+    },
+  );
+
   it("stops a non-voiced account and guest sending in a +m room, a reaction TAGMSG included, until +v", async () => {
     const { e, chief, members } = await room(["alice", "obs"]);
     const [alice, obs] = members;
@@ -428,7 +487,7 @@ describe("history and tags", { timeout: 30_000 }, () => {
     alice.send("@+draft/react=x TAGMSG #lobby");
     await alice.expect(/ 404 alice #lobby :Cannot send to channel \(\+m\)/);
     gus.send("@+typing=active TAGMSG #lobby");
-    await gus.expect(/ 404 gus #lobby :Cannot send to channel \(\+m\)/);
+    await gus.expect(/ 404 Guest-gus #lobby :Cannot send to channel \(\+m\)/);
     await sync(obs);
     expect(logged(obs)).not.toMatch(/ TAGMSG #lobby/);
     chief.send("MODE #lobby +v alice");
@@ -721,14 +780,14 @@ describe("operators and listeners", { timeout: 30_000 }, () => {
     const e = await start();
     const plain = await guest(e, "plop");
     plain.send(`OPER admin ${e.operPassword}`);
-    await plain.expect(/ 381 plop :You are now an IRC operator/);
+    await plain.expect(/ 381 Guest-plop :You are now an IRC operator/);
     const ws = await wsConnect(e.wsPort, { protocols: ["text.ircv3.net"] });
     if (ws === undefined) throw new Error("the WebSocket did not open");
     const viaWs = wsRaw(ws);
     await hello(viaWs);
     await finish(viaWs, "wsop");
     viaWs.send(`OPER admin ${e.operPassword}`);
-    expect(await viaWs.expect(/ 381 wsop /)).toContain("You are now an IRC operator");
+    expect(await viaWs.expect(/ 381 Guest-wsop /)).toContain("You are now an IRC operator");
   });
 
   it("takes the oper password from the environment as a bcrypt hash, and the old one stops working", async () => {
@@ -822,7 +881,7 @@ describe("the helper", { timeout: 30_000 }, () => {
       [b, "second"],
     ] as const) {
       const c = await guest(e, nick);
-      expect(logged(c)).toContain(` 001 ${nick} `);
+      expect(logged(c)).toContain(` 001 Guest-${nick} `);
     }
   });
 
@@ -983,7 +1042,7 @@ describe("logging in through the server (3d)", { timeout: 30_000 }, () => {
     const gus = await guest(e, "gus");
     await join(gus, "#lobby");
     gus.send("PRIVMSG #lobby :hello from guest");
-    await gus.expect(/ 404 gus #lobby :Cannot send to channel \(\+M\)/);
+    await gus.expect(/ 404 Guest-gus #lobby :Cannot send to channel \(\+M\)/);
     c.send("PRIVMSG #lobby :hello from an account");
     await gus.expect(new RegExp(`account=${me.address}.* PRIVMSG #lobby :hello from an account`));
   });
@@ -1075,7 +1134,7 @@ describe("the server's IRC link (3h)", { timeout: 40_000 }, () => {
       .toHaveLength(1);
     const gus = await guest(e, "gus");
     gus.send("JOIN #bubble");
-    await gus.expect(/ 403 gus #bubble /);
+    await gus.expect(/ 403 Guest-gus #bubble /);
   });
 
   it("logs in as an operator, makes its rooms and reads an account's message, never a direct one", async () => {
@@ -1119,11 +1178,64 @@ describe("the server's IRC link (3h)", { timeout: 40_000 }, () => {
       retryMs: () => 60_000,
     });
     stops.push(() => link.stop());
-    await inRoom(await oper(e, "gus"), "#bubble");
+    const gus = await oper(e, "gus");
+    await inRoom(gus, "#bubble");
     await link.stop();
+    // The bot is away only once Ergo has dropped its session: asked, the nick is unknown (401) rather than listed.
+    for (;;) {
+      const mark = gus.lines().length;
+      gus.send("WHOIS gnoworld");
+      await gus.expect(/ (311|401) gus gnoworld /);
+      if (
+        gus
+          .lines()
+          .slice(mark)
+          .some((l) => l.includes(" 401 gus gnoworld "))
+      )
+        break;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
     const squatter = await open(e);
     await hello(squatter);
-    await finish(squatter, "gnoworld", / 433 /);
+    await finish(squatter, "gnoworld");
+    expect(logged(squatter)).toContain(" 001 Guest-gnoworld ");
+  });
+
+  it("keeps the bot's nick from a guest that asks first, before the bot ever logged in (F722)", async () => {
+    const e = await start();
+    const early = await open(e);
+    await hello(early);
+    await finish(early, "gnoworld");
+    expect(logged(early)).toContain(" 001 Guest-gnoworld ");
+    expect(logged(early)).not.toContain(" 001 gnoworld ");
+    // A change of nick goes the same way: asking for gnoworld is asking for Guest-gnoworld, which the first holds, so it is refused.
+    const later = await guest(e, "later");
+    later.send("NICK gnoworld");
+    await later.expect(/ 433 Guest-later gnoworld :Nickname is already in use/);
+    // The case does not get round it: Ergo casefolds nicks.
+    later.send("NICK GNOWORLD");
+    await later.expect(/ 433 Guest-later GNOWORLD :Nickname is already in use/);
+  });
+
+  it("logs in as gnoworld while a guest already holds Guest-gnoworld (F722)", async () => {
+    const e = await start();
+    const early = await open(e);
+    await hello(early);
+    await finish(early, "gnoworld");
+    expect(logged(early)).toContain(" 001 Guest-gnoworld ");
+    const lines: string[] = [];
+    const link = ircLink({
+      host: "127.0.0.1",
+      port: e.port,
+      password: e.operPassword,
+      rooms: () => ["#bubble"],
+      onMessage: () => undefined,
+      log: logger("a-pepper-of-forty-characters-0123456789", (line) => lines.push(line)),
+      retryMs: () => 200,
+    });
+    stops.push(() => link.stop());
+    expect(await inRoom(await oper(e, "watcher"), "#bubble")).toMatch(/ :(.* )?@gnoworld\b/);
+    expect(lines.join("\n")).not.toContain("irc_refused");
   });
 
   it("gets ready as a second session of its account while its last one lingers (the max review)", async () => {
@@ -1279,8 +1391,8 @@ describe("the template's limits and privacy (slice 3's max review)", { timeout: 
     gus.send("WHO *");
     await sync(gus);
     expect(logged(gus)).not.toMatch(/ 353 .*carol/);
-    expect(logged(gus)).not.toMatch(/ 319 gus carol /);
-    expect(logged(gus)).not.toMatch(/ 352 gus \S+ \S+ \S+ \S+ carol /);
+    expect(logged(gus)).not.toMatch(/ 319 \S+ carol /);
+    expect(logged(gus)).not.toMatch(/ 352 \S+ \S+ \S+ \S+ \S+ carol /);
     chief.send("NAMES #club");
     await chief.expect(/ 353 .*carol/);
   });

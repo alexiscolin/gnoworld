@@ -26,9 +26,8 @@ const line = (id: string, time: string, text: string): Line => ({
 });
 // The room I look at, and my nick.
 const AT = { room: "#bubble", me: ME };
-// Lines by time, then id in code-unit order, written apart from the code under test.
-const byTimeThenId = (p: Line, q: Line) =>
-  p.time === q.time ? (p.id < q.id ? -1 : p.id > q.id ? 1 : 0) : p.time < q.time ? -1 : 1;
+// Lines by time, written apart from the code under test; lines of one time keep their arrival order.
+const byTime = (p: Line, q: Line) => (p.time < q.time ? -1 : p.time > q.time ? 1 : 0);
 const frozen = <T>(list: T[]): readonly T[] => Object.freeze([...list]);
 
 // Which room a line is about, so a client with 100 rooms reads it in one: each command names it at its own place.
@@ -204,12 +203,23 @@ describe("addLines: a room's lines, in time order, each once, the newest kept", 
     expect(addLines(lines, [{ ...a, time: "2026-10-25T11:00:00.000Z" }], 100)).toBe(lines);
   });
 
-  test("orders lines of one time by their id in code-unit order, so two clients agree", () => {
-    const upper = line("B", T0, "upper");
-    const lower = line("a", T0, "lower");
-    const ten = line("10", T0, "ten");
-    const nine = line("9", T0, "nine");
-    expect(addLines([], [lower, nine, upper, ten], 100).map((l) => l.id)).toStrictEqual(["10", "9", "B", "a"]);
+  test("appends a live line of the last line's time after it, whatever its id (F773)", () => {
+    const last = line("z", T0, "z");
+    const live = line("a", T0, "a");
+    expect(addLines(frozen([last]), [live], 100)).toStrictEqual([last, live]);
+  });
+
+  test("keeps a page's lines of one time in the page's order, and after the lines held at that time (F773)", () => {
+    const held = line("m", T0, "held");
+    const page = [line("z", T0, "z"), line("a", T0, "a"), line("b", "2026-10-25T09:59:59.000Z", "older")];
+    expect(addLines(frozen([held]), frozen(page), 100).map((l) => l.id)).toStrictEqual(["b", "m", "z", "a"]);
+  });
+
+  test("still drops a line already held, of the last line's time, whatever its id (F773)", () => {
+    const [low, high] = [line("a", T0, "a"), line("z", T0, "z")];
+    const lines = frozen([low, high]);
+    expect(addLines(lines, [high], 100)).toBe(lines);
+    expect(addLines(lines, [low], 100)).toBe(lines);
   });
 
   test("keeps the newest lines, up to its cap", () => {
@@ -239,14 +249,61 @@ describe("addLines: a room's lines, in time order, each once, the newest kept", 
   });
 
   test("holds a flood of 10,000 lines in one page, in reverse order, to its cap", () => {
-    const flood = Array.from({ length: 10_000 }, (_, n) => line(`m${String(n).padStart(5, "0")}`, T0, String(n)));
+    // Each line a millisecond after the one before: lines of one time keep the order they came in (F773).
+    const flood = Array.from({ length: 10_000 }, (_, n) =>
+      line(`m${String(n).padStart(5, "0")}`, new Date(Date.parse(T0) + n).toISOString(), String(n)),
+    );
     expect(addLines([], frozen([...flood].reverse()), 200)).toStrictEqual(flood.slice(-200));
   });
 
+  test("keeps the latest arrivals of one time when its cap trims them (F773)", () => {
+    const [x, y, z, w] = ["x", "y", "z", "w"].map((id) => line(id, T0, id));
+    if (x === undefined || y === undefined || z === undefined || w === undefined) throw new Error("missing line");
+    expect(addLines([], frozen([x, y, z, w]), 3)).toStrictEqual([y, z, w]);
+    expect(addLines(frozen([x, y, z]), [w], 3)).toStrictEqual([y, z, w]);
+  });
+
+  test("orders a tie after the held lines, then the page, then a live line, under a cap (F773)", () => {
+    const [h1, h2, p1, p2, l1] = ["h1", "h2", "p1", "p2", "l1"].map((id) => line(id, T0, id));
+    if (h1 === undefined || h2 === undefined || p1 === undefined || p2 === undefined || l1 === undefined)
+      throw new Error("missing line");
+    const paged = addLines(frozen([h1, h2]), frozen([p1, p2]), 3);
+    expect(paged).toStrictEqual([h2, p1, p2]);
+    expect(addLines(paged, [l1], 3)).toStrictEqual([p1, p2, l1]);
+  });
+
+  test("holds ties in arrival order, over any batches and cap: a stable sort of what came, newest cap kept (F773)", () => {
+    // Few times, so lines tie often; every id once (a line already held is another test's).
+    fc.assert(
+      fc.property(
+        fc.array(fc.array(fc.integer({ min: 0, max: 3 }), { maxLength: 6 }), { maxLength: 8 }),
+        fc.integer({ min: 1, max: 10 }),
+        (batches, cap) => {
+          let n = 0;
+          const arrived: Line[] = [];
+          let lines: readonly Line[] = [];
+          for (const batch of batches) {
+            const page = batch.map((second) =>
+              line(`m${String(n++)}`, `2026-10-25T10:00:0${String(second)}.000Z`, "t"),
+            );
+            arrived.push(...page);
+            lines = addLines(lines, frozen(page), cap);
+          }
+          expect(lines).toStrictEqual([...arrived].sort(byTime).slice(-cap));
+        },
+      ),
+      PROPERTY,
+    );
+  });
+
   test("holds whatever order lines come in: exactly the newest, sorted, each once", () => {
+    // One time for each id (7 is prime to 31, so 31 ids take 31 seconds, none twice): lines of one time keep
+    // their arrival order, which a property over two arrays would have to restate; their own tests hold it.
     const lineArb = fc
-      .tuple(fc.integer({ min: 0, max: 30 }), fc.integer({ min: 0, max: 9 }))
-      .map(([id, second]) => line(`m${String(id)}`, `2026-10-25T10:00:0${String(second)}.000Z`, `t${String(id)}`));
+      .integer({ min: 0, max: 30 })
+      .map((id) =>
+        line(`m${String(id)}`, `2026-10-25T10:00:${String((id * 7) % 31).padStart(2, "0")}.000Z`, `t${String(id)}`),
+      );
     fc.assert(
       fc.property(
         fc.array(lineArb, { maxLength: 40 }),
@@ -257,7 +314,7 @@ describe("addLines: a room's lines, in time order, each once, the newest kept", 
           const byId = new Map([...old, ...incoming].map((l): [string, Line] => [l.id, l]));
           const canon = (ls: Line[]) => ls.map((l) => byId.get(l.id) ?? l);
           const kept = addLines(addLines([], frozen(canon(old)), cap), frozen(canon(incoming)), cap);
-          expect(kept).toStrictEqual([...byId.values()].sort(byTimeThenId).slice(-cap));
+          expect(kept).toStrictEqual([...byId.values()].sort(byTime).slice(-cap));
         },
       ),
       PROPERTY,
