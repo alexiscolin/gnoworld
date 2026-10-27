@@ -100,7 +100,8 @@ interface Page {
   people: ReactNode;
 }
 
-// The words typed in each thread's field and not sent, by account and root: the page's memory, kept on no device, so a
+// The words typed in each thread's field and not sent, by account and the line that opened it (a root changes as its
+// chain grows, R3): the page's memory, kept on no device, so a
 // close, a room or another thread keeps them (CR1), and a logout clears them (R1).
 type Typed = Map<string, string>;
 
@@ -117,7 +118,7 @@ function Panel({
 }: Omit<Page, "people"> & { open: Open; shown: Shown; close: () => void; typed: Typed }) {
   const members = state?.members ?? [];
   const root = rootOf(state?.lines ?? [], open.from);
-  const slot = `${session.kind === "in" ? session.address : ""} ${root}`;
+  const slot = `${session.kind === "in" ? session.address : ""} ${open.from}`;
   // The field takes the focus only if the reader was an account as the panel opened: a login later takes none (CR4).
   const [focus] = useState(session.kind === "in");
   // A room switch takes the panel away with the focus in it: it goes back to the list, as a close gives it back (CR5).

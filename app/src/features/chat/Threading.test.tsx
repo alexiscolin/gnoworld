@@ -319,4 +319,34 @@ describe("useThreads: the open panel's focus and keys", () => {
     await logOutIn(SESSION);
     expect(field()?.value).toBe("");
   });
+
+  // R3: the words sit under the line that opened the thread, so a chain that grows (a new root) leaves them where they were.
+  it("keeps the words typed while the chain was short, once the chain has grown and the panel is opened again", async () => {
+    const at = (id: string, reply?: string): Line => ({
+      id,
+      ...(reply === undefined ? {} : { reply }),
+      time: "2026-10-25T10:00:00.000Z",
+      from: ALICE,
+      account: ALICE,
+      text: id,
+      kind: "message",
+    });
+    draw(room, SESSION, [at("c", "b")]);
+    act(() => {
+      opens("c");
+    });
+    await loaded();
+    typeIn("half a thought");
+    draw(room, SESSION, [at("a"), at("b", "a"), at("c", "b")]);
+    await loaded();
+    const box = field();
+    if (box === null) throw new Error("no field");
+    press(box, { key: "Escape" });
+    expect(thread()).toBeNull();
+    act(() => {
+      opens("c");
+    });
+    await loaded();
+    expect(field()?.value).toBe("half a thought");
+  });
 });
