@@ -1201,6 +1201,25 @@ describe("connectErgo, an Ergo that offers no draft/multiline", () => {
     expect(t.s.sent.filter((line) => line.startsWith("CAP REQ"))).toHaveLength(2);
   });
 
+  // G2 of the green pass: the first NAK of the next connection must again be the whole list's, answered by the
+  // request without draft/multiline; if it were final, an Ergo without the capability would fail on each reconnection.
+  it("degrades again on its next connection, whose first NAK is no final one", async () => {
+    const t = await guest();
+    t.s.say(`:ergo CAP * NAK :${CAPS}`);
+    t.s.say(`:ergo CAP * ACK :${BASIC_CAPS}`);
+    t.s.say(":ergo 001 guest-ab12cd :Welcome");
+    motd(t.s);
+    expect(t.client.multiline()).toBe(false);
+    t.s.closeEvent();
+    await t.run(t.backoffs()[0]);
+    const next = t.last();
+    expect(next).not.toBe(t.s);
+    next.open();
+    next.say(`:ergo CAP * NAK :${CAPS}`);
+    expect(next.closed).toBe(false);
+    expect(next.sent).toEqual(["CAP LS 302", `CAP REQ :${CAPS}`, `CAP REQ :${BASIC_CAPS}`]);
+  });
+
   it("asks draft/multiline again on its next connection", async () => {
     const t = await guest();
     t.s.say(`:ergo CAP * NAK :${CAPS}`);
