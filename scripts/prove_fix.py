@@ -21,6 +21,8 @@ PRODUCT = ("packages/", "gno/", "app/", "admin/", "server/")
 TEST = re.compile(r"(\.test\.tsx?|\.spec\.ts|_test\.gno|_filetest\.gno|_test\.go)$")
 # The journeys' folder: their helpers are tests too, so a fix of them alone changes no product code.
 JOURNEYS = "app/tests/"
+# The harness's list, one for every script (.githooks/records.sh).
+RECORDS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".githooks", "records.sh")
 # The command per kind of test, run from the worktree's root; tests override them (test_hooks.sh).
 VITEST = os.environ.get("PROVE_FIX_VITEST", "node_modules/.bin/vitest run")
 PLAYWRIGHT = os.environ.get("PROVE_FIX_PLAYWRIGHT", "node app/node_modules/@playwright/test/cli.js test")
@@ -55,6 +57,14 @@ def fails_before(commit, tests):
                    for folder, cmd in runs(tests))
 
 
+def harness_files(commit):
+    """The files of the commit that records.sh lists as the harness's (a tool's config under app/ is one): harness_mutate
+    proves those. A list git cannot give refuses rather than counting them as product or as harness."""
+    listed = subprocess.run(["sh", "-c", '. "$1" && harness --name-only "$2^" "$2"', "-", RECORDS, commit],
+                            capture_output=True, text=True, check=True)  # a failed list raises: the gate refuses
+    return set(listed.stdout.splitlines())
+
+
 def verdict(commit):
     """None when the commit is not a product fix or proves itself; otherwise what is wrong."""
     message = git("log", "-1", "--format=%B", commit)
@@ -63,7 +73,8 @@ def verdict(commit):
     # Every product file it touches, a deleted one included; the tests it runs, those it leaves.
     changed = git("diff-tree", "--no-commit-id", "--name-only", "-r", "--diff-filter=AMDT", commit).splitlines()
     left = set(git("diff-tree", "--no-commit-id", "--name-only", "-r", "--diff-filter=AM", commit).splitlines())
-    product = [f for f in changed if f.startswith(PRODUCT)]
+    harness = harness_files(commit)
+    product = [f for f in changed if f.startswith(PRODUCT) and f not in harness]
     tests = [f for f in product if TEST.search(f) and f in left]
     if all(TEST.search(f) or f.startswith(JOURNEYS) for f in product):  # the harness or tests alone: nothing to prove
         return None

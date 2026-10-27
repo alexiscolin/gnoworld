@@ -2455,6 +2455,17 @@ fix "fix(x): no test"
 prove "$base" && fail "prove_fix accepted a fix with no test"
 git -C "$pf" commit -q --amend -m "fix(x): no test" -m "No-test: the same sum, written as an addition"
 prove "$base" || fail "prove_fix refused a fix that says why it has no test"
+# A fix of a harness file under a product folder (a tool's config, records.sh's list) is the harness's: harness_mutate
+# proves it, prove_fix leaves it (7a0ed4d, 504ed6e: app/playwright.stories.config.ts, probed in probe.py). One that also
+# changes product code still wants its test.
+base=$(git -C "$pf" rev-parse HEAD) && mkdir -p "$pf/app"
+printf 'export default {};\n' >"$pf/app/playwright.x.config.ts"
+fix "fix(gate): a tool's config"
+prove "$base" || fail "prove_fix refused a fix of a harness file under app/ with no test"
+base=$(git -C "$pf" rev-parse HEAD)
+printf 'export default { a: 1 };\n' >"$pf/app/playwright.x.config.ts" && printf 'export const twice = (n: number) => n * 2 - 0;\n' >"$pf/packages/x/src/a.ts"
+fix "fix(x): a config and the code"
+prove "$base" && fail "prove_fix accepted a fix of product code with no test because it also touched a harness file"
 # A journey proves a fix as a unit test does (F126).
 base=$(git -C "$pf" rev-parse HEAD) && mkdir -p "$pf/app/tests"
 printf 'export const twice = (n: number) => n * 2 + 0;\n' >"$pf/packages/x/src/a.ts" && printf '// expects: + 0\n' >"$pf/app/tests/a.spec.ts"
