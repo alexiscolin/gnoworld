@@ -208,16 +208,24 @@ try:
         test = "server/src/testing/toolchain.test.ts"
         out = run(["node_modules/.bin/vitest", "run", test])
         expect(out.returncode == 0 and "1 passed" in out.stdout, "vitest's toolchain test passes on the pinned Node")
+        # The refusal is probed on a copy of the test with a pin of its own: .node-version, which check.sh reads for
+        # its PATH and the sandbox keeps from a command, stays as it is even when this run is killed (G10).
         with open(".node-version") as f:
             pinned = f.read()
-        try:
-            with open(".node-version", "w") as f:
-                f.write("0.0.1\n")
-            out = run(["node_modules/.bin/vitest", "run", test])
-            expect(out.returncode != 0 and "v0.0.1" in out.stdout + out.stderr, "vitest refuses a Node .node-version does not pin")
-        finally:
-            with open(".node-version", "w") as f:
-                f.write(pinned)
+        with tempfile.TemporaryDirectory() as copy:
+            os.makedirs(f"{copy}/server/src/testing")
+            for name in ("toolchain.ts", "toolchain.test.ts"):
+                shutil.copy(f"server/src/testing/{name}", f"{copy}/server/src/testing/{name}")
+            os.symlink(os.path.realpath("node_modules"), f"{copy}/node_modules")
+            vitest = [os.path.realpath("node_modules/.bin/vitest"), "run", "--root", copy]
+            for pin, passes in ((pinned, True), ("0.0.1\n", False)):
+                with open(f"{copy}/.node-version", "w") as f:
+                    f.write(pin)
+                out = run(vitest, cwd=copy)
+                if passes:
+                    expect(out.returncode == 0 and "1 passed" in out.stdout, "the toolchain test passes in a copy with the real pin")
+                else:
+                    expect(out.returncode != 0 and "v0.0.1" in out.stdout + out.stderr, "vitest refuses a Node .node-version does not pin")
 
     if part("core_chromium"):
         # Core's tests run a second time in Chromium, whose engine reads some regexes and Unicode otherwise than
