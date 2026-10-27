@@ -274,6 +274,31 @@ describe("a pin and its line leaving the room", () => {
     expect(await pins.add("#bubble/games", "m3", MOD)).toBe("pinned");
   });
 
+  // The edits heard are remembered 2,000 at most, the oldest forgotten first, and one heard again is the newest (R8 of
+  // redpass2-4dx): a restart or the bound makes an old line pinnable again, which the decision states.
+  describe("the edits it remembers", () => {
+    const editAll = (pins: ReturnType<typeof setup>["pins"], count: number) => {
+      for (let n = 0; n < count; n += 1) pins.edited("#bubble/games", `e${String(n)}`, ALICE);
+    };
+    it("keeps 2,000, and the 2,001st pushes out the oldest, whose line may be pinned again", async () => {
+      const { pins } = setup({ lines: Object.fromEntries([said("e0"), said("e1")]) });
+      editAll(pins, 2000);
+      expect(await pins.add("#bubble/games", "e0", MOD)).toBe("not_found");
+      pins.edited("#bubble/games", "e2000", ALICE);
+      expect(await pins.add("#bubble/games", "e0", MOD)).toBe("pinned");
+      expect(await pins.add("#bubble/games", "e1", MOD)).toBe("not_found");
+    });
+
+    it("takes an edit heard again as the newest, so it is not the one that goes first", async () => {
+      const { pins } = setup({ lines: Object.fromEntries([said("e0"), said("e1")]) });
+      editAll(pins, 2000);
+      pins.edited("#bubble/games", "e0", ALICE);
+      pins.edited("#bubble/games", "e2000", ALICE);
+      expect(await pins.add("#bubble/games", "e0", MOD)).toBe("not_found");
+      expect(await pins.add("#bubble/games", "e1", MOD)).toBe("pinned");
+    });
+  });
+
   // A delete heard while the link was down is seen only by asking Ergo again, at the link's ready (R5).
   describe("checking each pin again", () => {
     it("drops the pins Ergo says it holds no more, and keeps the others", async () => {
