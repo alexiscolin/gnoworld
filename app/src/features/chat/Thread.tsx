@@ -55,8 +55,9 @@ export function Thread({ root, lines, members, me, onClose, composer }: ThreadPr
   useEffect(() => {
     if (me === undefined) boxRef.current?.querySelector("button")?.focus();
   }, [me]);
+  // An Escape that ends an input method's composition belongs to the composition.
   const escape = (event: KeyboardEvent) => {
-    if (event.key !== "Escape" || event.defaultPrevented) return;
+    if (event.key !== "Escape" || event.defaultPrevented || event.nativeEvent.isComposing) return;
     event.preventDefault();
     onClose();
   };

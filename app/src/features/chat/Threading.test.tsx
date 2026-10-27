@@ -1,12 +1,17 @@
+// @vitest-environment jsdom
 import { Address } from "@gnoworld/schemas";
 import type { Line } from "@gnoworld/core";
+import { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { prerender } from "react-dom/static";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import "./Composer.tsx";
 import type { Dms } from "./Dms.tsx";
 import { RoomView } from "./RoomView.tsx";
 import { roomActs } from "./roomActs.ts";
 import { shownOf, type Shown } from "./shown.tsx";
+import "./Thread.tsx";
 import { useThreads } from "./Threading.tsx";
 
 // 4d's threads, G1: a direct message never offers a thread, whatever the page does to give its lines a bar (4d-dm-bar
@@ -103,5 +108,77 @@ describe("useThreads: what a conversation's page opens", () => {
     expect(html).toContain('data-handler="undefined"');
     expect(html).toContain('data-props="0"');
     expect(html).toContain('data-aside="false"');
+  });
+});
+
+// The open panel as a page drives it, in jsdom: opened by the handler useThreads hands a line, the focus and the keys
+// watched. The page here is a room's list (one stop), a button outside, and what stands beside.
+describe("useThreads: the open panel's focus and keys", () => {
+  let root: Root;
+  let opens: (id: string) => void = () => undefined;
+  type Reader = typeof SESSION;
+  function Page({ shown, session }: { shown: Shown | undefined; session: Reader }) {
+    const { view, aside } = useThreads({ shown, state: STATE, session, rooms: [], acts, people: PEOPLE });
+    opens = (id) => view.onThread?.(id);
+    return (
+      <div>
+        <button type="button" id="outside">
+          outside
+        </button>
+        <ol aria-label="Messages">
+          <li tabIndex={0} data-line="root">
+            root
+          </li>
+        </ol>
+        {aside}
+      </div>
+    );
+  }
+  const draw = (shown: Shown | undefined, session: Reader = SESSION) => {
+    act(() => {
+      root.render(<Page shown={shown} session={session} />);
+    });
+  };
+  const thread = () => document.querySelector("aside[aria-label='Thread']");
+  const field = () => document.querySelector<HTMLInputElement>("aside input[type='text'], aside textarea");
+  // The panel and its lazy code come, then the composer's.
+  const loaded = async (guest = false) => {
+    const ready = () => thread()?.querySelector("h3") !== null && (guest || field() !== null);
+    for (let waits = 0; waits < 500 && !ready(); waits++)
+      await act(async () => {
+        await new Promise((done) => setTimeout(done, 10));
+      });
+  };
+  const press = (target: Element, over: KeyboardEventInit) => {
+    act(() => {
+      target.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ...over }));
+    });
+  };
+  beforeEach(() => {
+    Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+    // jsdom has no popover: a close button's tooltip toggles nothing.
+    Object.assign(HTMLElement.prototype, { togglePopover: () => true });
+    root = createRoot(document.body.appendChild(document.createElement("div")));
+  });
+  afterEach(() => {
+    act(() => {
+      root.unmount();
+    });
+    document.body.replaceChildren();
+  });
+
+  // CR7 (F1767): an Escape that ends an input method's composition belongs to the composition.
+  it("stays open for an Escape that ends a composition, and closes for any other", async () => {
+    draw(room);
+    act(() => {
+      opens("root");
+    });
+    await loaded();
+    const box = field();
+    if (box === null) throw new Error("no field");
+    press(box, { key: "Escape", isComposing: true });
+    expect(thread()).not.toBeNull();
+    press(box, { key: "Escape" });
+    expect(thread()).toBeNull();
   });
 });
