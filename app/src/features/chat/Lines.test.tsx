@@ -114,4 +114,19 @@ describe("the lines view, compiled", () => {
     expect(bars).toHaveLength(1);
     expect(bars[0]?.closest("li")).toBe(host.querySelectorAll("ol > li")[5]);
   });
+
+  // A new message made each reply line quote its line again: two Markdown parses and a grapheme cut, 200 times (F1220).
+  it("quotes again the reply that came, never the room's others, when a line comes", () => {
+    draw();
+    vi.mocked(excerpt).mockClear();
+    draw({ lines: [...ROOM, line(LINES + 1, { reply: `m${String(LINES - 1)}` })] });
+    expect(vi.mocked(excerpt)).toHaveBeenCalledTimes(1);
+  });
+
+  it("quotes nothing again when a member comes", () => {
+    draw();
+    vi.mocked(excerpt).mockClear();
+    draw({ members: [ALICE, BOB, "guest-ab12cd"] });
+    expect(vi.mocked(excerpt)).not.toHaveBeenCalled();
+  });
 });

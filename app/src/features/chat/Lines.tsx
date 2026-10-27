@@ -39,11 +39,11 @@ const CLOCK = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-d
 // what a change of members recomputes.
 const namesOf = (text: string): string => mentions(markdown(text)).join(" ");
 
-// The addresses of `names` (a line's mentions, space-separated) that are members, as one string.
-const knownOf = (names: string, members: ReadonlySet<string>): string =>
+// The addresses of `names` (a line's mentions, space-separated) that are members, or `me`, as one string.
+const knownOf = (names: string, members: ReadonlySet<string>, me?: string): string =>
   names
     .split(" ")
-    .filter((address) => members.has(address))
+    .filter((address) => address === me || members.has(address))
     .join(" ");
 
 // A line's text drawn, its mentions of `known` (space-separated) shortened. A component of its own, with a string the
@@ -75,13 +75,16 @@ function LineView({ line, me, members, stop, actions, reactions, react, answers 
   const names = namesOf(line.text);
   const mentioned = names.split(" ").some((address) => address === me);
   const known = knownOf(names, members);
+  // What the quote shortens, a string the compiler compares by value: the quote is cut again only when its own words or
+  // the people they mention change, never as other lines come (F1220).
+  const quoted = answers === undefined ? "" : knownOf(namesOf(answers.text), members, me);
   return (
     <li className={KINDS[line.kind]} data-about-me={mentioned ? "" : undefined} tabIndex={stop ? 0 : -1}>
       {/* The marks of the line's own kind first, at its start, before a reply's quote: where no sender's words stand
           (F808, the security review's S2). "Edited" follows the time, on its row, before the sender (U5). */}
       {mentioned ? <span className={styles["mentionsYou"]}>Mentions you </span> : null}
       {line.kind === "notice" ? <span className={styles["mark"]}>Notice </span> : null}
-      <Quote line={line} answers={answers} known={(address) => address === me || members.has(address)} />
+      <Quote line={line} answers={answers} known={quoted} />
       <time dateTime={line.time} className={styles["time"]}>
         {CLOCK.format(new Date(line.time))}
       </time>{" "}

@@ -38,11 +38,18 @@ export function Replying({ to, length, known }: { to: Answered | undefined; leng
 const QUOTED = 70;
 
 // Above a reply, the line it answers, or an earlier message when the room holds it no more; nothing above another line.
-export function Quote({ line, answers, known }: { line: Line; answers: Line | undefined; known: Known }) {
+// `known` is the addresses in the words shortened, space-separated: a string React compares by value, so a quote keeps
+// its cut while the room's lines and members change around it (F1220).
+export function Quote({ line, answers, known }: { line: Line; answers: Line | undefined; known: string }) {
   if (line.reply === undefined) return null;
+  const shortenable = new Set(known.split(" "));
   return (
     <p className={styles["replying"]}>
-      <Replying to={answers === undefined ? undefined : answeredOf(answers)} length={QUOTED} known={known} />
+      <Replying
+        to={answers === undefined ? undefined : answeredOf(answers)}
+        length={QUOTED}
+        known={(address) => shortenable.has(address)}
+      />
     </p>
   );
 }
