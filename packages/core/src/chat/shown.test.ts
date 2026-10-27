@@ -194,16 +194,24 @@ describe("redactedLines: a REDACT of a line and of its corrections", () => {
   });
   const redact = (id: string, sender = ALICE, room = "#bubble") => read(`:${sender}!u@h REDACT ${room} ${id}`);
   const ids = (lines: readonly Line[]) => lines.map((each) => each.id);
-  const held = [line("a", 0, "one"), edit("e1", 1, { of: "a" }), edit("e2", 2, { of: "a" }), line("b", 3, "two")];
+  // Another account's line first, so a lookup that takes the first line finds no author.
+  const first: Line = { ...line("z", 0, "first"), from: BOB, account: BOB };
+  const held = [
+    first,
+    line("a", 0, "one"),
+    edit("e1", 1, { of: "a" }),
+    edit("e2", 2, { of: "a" }),
+    line("b", 3, "two"),
+  ];
 
   test("takes the line and every correction of its author's, whoever deletes it", () => {
-    expect(ids(redactedLines(held, redact("a"), "#bubble"))).toEqual(["b"]);
-    expect(ids(redactedLines(held, redact("a", "gnoworld"), "#bubble"))).toEqual(["b"]);
+    expect(ids(redactedLines(held, redact("a"), "#bubble"))).toEqual(["z", "b"]);
+    expect(ids(redactedLines(held, redact("a", "gnoworld"), "#bubble"))).toEqual(["z", "b"]);
   });
 
   test("keeps another account's line naming it, and a correction of another line", () => {
     const lines = [...held, edit("p", 4, { of: "a", who: BOB }), edit("e3", 5, { of: "b" })];
-    expect(ids(redactedLines(lines, redact("a", "gnoworld"), "#bubble"))).toEqual(["b", "p", "e3"]);
+    expect(ids(redactedLines(lines, redact("a", "gnoworld"), "#bubble"))).toEqual(["z", "b", "p", "e3"]);
   });
 
   test("takes the sender's own lines naming a line it no longer holds, as its own delete of it", () => {
@@ -217,18 +225,25 @@ describe("redactedLines: a REDACT of a line and of its corrections", () => {
   });
 
   test("takes a moderator's REDACT of a correction, the line showing as it was", () => {
-    expect(ids(redactedLines(held, redact("e2", "gnoworld"), "#bubble"))).toEqual(["a", "e1", "b"]);
+    expect(ids(redactedLines(held, redact("e2", "gnoworld"), "#bubble"))).toEqual(["z", "a", "e1", "b"]);
   });
 
   test.each([
     ["another room's REDACT", redact("a", ALICE, "#garden")],
     ["a REDACT of a line it does not hold", redact("zz")],
+    ["a REDACT with no line", read(":gnoworld!u@h REDACT #bubble")],
+    ["a REDACT with nothing", read(":gnoworld!u@h REDACT")],
     ["a message whose text is a line's id", read(`@msgid=x;time=${at(9)} :${ALICE}!u@h PRIVMSG #bubble a`)],
   ])("leaves the same array for %s", (_, message) => {
     expect(redactedLines(held, message, "#bubble")).toBe(held);
   });
 
+  test("takes a REDACT with no source as one from nobody: the author's corrections go, no account-less line", () => {
+    const lines = [...held, { ...guest("g", 4, "a guest"), edits: "a" }];
+    expect(ids(redactedLines(lines, read("REDACT #bubble a"), "#bubble"))).toEqual(["z", "b", "g"]);
+  });
+
   test("reads the REDACT's room whatever its case", () => {
-    expect(ids(redactedLines(held, redact("a", ALICE, "#BUBBLE"), "#bubble"))).toEqual(["b"]);
+    expect(ids(redactedLines(held, redact("a", ALICE, "#BUBBLE"), "#bubble"))).toEqual(["z", "b"]);
   });
 });
