@@ -401,6 +401,19 @@ rm "$d/.claude/rules/x.md"
 git -C "$d" init -q && printf '.claude/tmp/\n' >"$d/.gitignore" && mkdir -p "$d/.claude/tmp/copy"
 printf 'Run `scripts/gone.sh`.\n' >"$d/.claude/tmp/copy/x.md"
 python3 -I "$docs" "$d" >/dev/null 2>&1 || fail "check_docs read a doc in a folder git ignores"
+# The rules the review depends on, which no other check reads: each agent's brief says the git-index rule, and the review
+# card keeps its item 8 (G12).
+r="$t/rules-root" && mkdir -p "$r/.claude/agents"
+printf 'You never edit.\nNever run a git command that writes the index or the work tree (checkout,\nrestore); copy with cp.\n' >"$r/.claude/agents/a.md"
+printf '7. Cards.\n8. Risk and undo: what could go wrong.\n' >"$r/CLAUDE.md"
+python3 -I "$docs" "$r" >/dev/null 2>&1 || fail "check_docs refused an agent with the git-index rule and a review card with its item 8"
+printf 'You never edit.\n' >"$r/.claude/agents/b.md"
+out=$(python3 -I "$docs" "$r" 2>&1) && fail "check_docs accepted an agent whose brief lost the git-index rule"
+printf '%s' "$out" | grep -qF "agents/b.md" || fail "check_docs did not name the agent without the rule: $out"
+printf '%s' "$out" | grep -qF "agents/a.md" && fail "check_docs named an agent that has the rule: $out"
+rm "$r/.claude/agents/b.md" && printf '7. Cards.\n' >"$r/CLAUDE.md"
+out=$(python3 -I "$docs" "$r" 2>&1) && fail "check_docs accepted a review card with no item 8"
+printf '%s' "$out" | grep -qF "Risk and undo" || fail "check_docs did not name the missing item 8: $out"
 # The findings ledger: a known status, a fixed finding names a commit that exists, a rejected
 # one says why, and no id twice.
 git -C "$d" add -A && git -C "$d" commit -qm base && sha=$(git -C "$d" rev-parse --short HEAD)
