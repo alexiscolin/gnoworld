@@ -566,7 +566,7 @@ describe("RoomView: edits", () => {
     ];
     const shown = linesOf(view({ state: { ...ROOM, lines } }));
     expect(shown).toHaveLength(2);
-    expect(shown[0]).toMatch(/\d{2}:\d{2} g10gh7…3y5tv hello/);
+    expect(shown[0]).toMatch(/\d{2}:\d{2}( Edited)? g10gh7…3y5tv hello/);
     expect(shown[0]).toMatch(/edited/i);
     expect(shown[1]).toMatch(/^Replying to g10gh7…3y5tv: hello\d/);
   });
