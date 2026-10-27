@@ -13,6 +13,7 @@ import { roomActs, type RoomActs } from "./roomActs.ts";
 import { RoomsView } from "./RoomsView.tsx";
 import { People, RoomView, type RoomViewProps } from "./RoomView.tsx";
 import { shownOf, type Shown } from "./shown.tsx";
+import type { Noticing } from "./useNotices.ts";
 import { Writer } from "./Writer.tsx";
 
 // Alt+Up and Alt+Down: the room before or after the one in view, anywhere on the page (ADR-0002's chat rows). A key
@@ -122,6 +123,8 @@ interface LoadedProps {
   /** Sends a draft to another account (4e). */
   sayTo: (partner: string, draft: string) => boolean;
   dms: Dms;
+  /** What the account was told and has not seen (4f-n). */
+  noticing: Noticing;
   /** What says the rooms could not load, in their place, while a direct message shows (CR8). */
   failed?: ReactNode;
 }
@@ -138,6 +141,7 @@ export function Loaded({
   dismissed,
   sayTo,
   dms,
+  noticing,
   failed,
 }: LoadedProps) {
   const ids = roomIds(sections);
@@ -158,11 +162,18 @@ export function Loaded({
   const people = (
     <People members={state?.members ?? []} connected={chat === "connected"} me={me} onMessage={onMessage} />
   );
-  const shown = shownOf(dms, { id: room, state, acts }, { sayTo, focus: opened.focus, noteId });
+  const shown = shownOf(dms, { id: room, state, acts }, { sayTo, focus: opened.focus, noteId, seen: noticing.seen });
   const replies = useReplies(shown, state?.lines, acts);
   return (
     <Sidebar space="l">
-      <RoomsView sections={sections} current={room} dms={dms.nav} failed={failed} />
+      <RoomsView
+        sections={sections}
+        current={room}
+        dms={dms.nav}
+        failed={failed}
+        badges={noticing.badges}
+        notices={noticing.list}
+      />
       {dms.problem === undefined ? null : <p role="status">{dms.problem}</p>}
       {shown === undefined ? null : (
         <RoomView
@@ -175,6 +186,7 @@ export function Loaded({
           me={me}
           noteId={noteId}
           {...replies.view}
+          notify={noticing.notify}
           composer={
             <Writer
               session={session}
