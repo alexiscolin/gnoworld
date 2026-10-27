@@ -55,17 +55,19 @@ export const shownLines = (lines: readonly Line[]): readonly ShownLine[] => fold
 /** The line each folded edit corrects, by the edit's own msgid: see foldEdits. */
 export const editsFolded = (lines: readonly Line[]): ReadonlyMap<string, string> => foldEdits(lines).folded;
 
-// The lines without the corrections of a line that these accounts wrote: its author's, and its REDACT's sender's.
-function withoutCorrections(lines: readonly Line[], id: string, accounts: readonly string[]): readonly Line[] {
-  const owners = accounts.filter((account) => account !== "");
-  const taken = (line: Line) => line.edits === id && owners.some((owner) => sameName(owner, line.account ?? ""));
+// The lines without the corrections of the line `id` that these accounts wrote: its author's, and its REDACT's sender's.
+function withoutCorrections(lines: readonly Line[], id: string, owners: readonly string[]): readonly Line[] {
+  const taken = ({ edits, account }: Line) =>
+    edits === id && account !== undefined && owners.some((owner) => sameName(owner, account));
   const kept = lines.filter((line) => !taken(line));
   return kept.length === lines.length ? lines : kept;
 }
 
 // Whether the sender deletes its own correction, whose line is held.
-const ownCorrection = (lines: readonly Line[], id: string, sender: string): boolean =>
-  folding(lines).folded.has(id) && sameName(lines.find((line) => line.id === id)?.account ?? "", sender);
+function ownCorrection(lines: readonly Line[], id: string, sender: string): boolean {
+  const account = lines.find((line) => line.id === id)?.account;
+  return account !== undefined && sameName(account, sender) && folding(lines).folded.has(id);
+}
 
 /** The room's lines once `message` is read: a REDACT of a line takes the corrections shown in its place (R1's orphans);
  * the author's own of a correction whose line is held is held back, so a refused delete of the line never brings the
@@ -75,6 +77,6 @@ export function redactedLines(lines: readonly Line[], message: IrcMessage, room:
   if (message.command !== "REDACT" || !sameName(target, room)) return lines;
   const sender = nickOf(message.source ?? "");
   if (ownCorrection(lines, id, sender)) return lines;
-  const author = lines.find((line) => line.id === id)?.account ?? "";
-  return withoutCorrections(redactAfter(lines, message, room), id, [author, sender]);
+  const author = lines.find((line) => line.id === id)?.account;
+  return withoutCorrections(redactAfter(lines, message, room), id, author === undefined ? [sender] : [author, sender]);
 }
