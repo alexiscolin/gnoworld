@@ -5,6 +5,9 @@ const sandboxed = Boolean(process.env["SANDBOX_RUNTIME"]);
 const port = Number(process.env["STORIES_PORT"] ?? 6007);
 if (!Number.isInteger(port) || port < 1024 || port > 65535)
   throw new Error(`STORIES_PORT is no port: ${String(process.env["STORIES_PORT"])}`);
+// Where Storybook is built: the design system's folder, or the one check.sh gives the fast gate, whose copy outside a
+// repository would read a build left in the tree (jscpd, knip) while the lane that builds it runs beside theirs.
+const out = process.env["STORIES_OUT"] ?? "../packages/ui/storybook-static";
 
 // The design system's stories in a browser (tests/stories): Storybook built before every run, so no
 // test reads an old build, then served as files. The full gate runs it; the fast one stays under 60 s.
@@ -25,7 +28,7 @@ export default defineConfig({
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
     // The file server's log of each request goes nowhere; Storybook's build still reports its errors.
-    command: `../packages/ui/node_modules/.bin/storybook build -c ../packages/ui/.storybook -o ../packages/ui/storybook-static --quiet && python3 -I -m http.server ${String(port)} --bind 127.0.0.1 --directory ../packages/ui/storybook-static 2>/dev/null`,
+    command: `../packages/ui/node_modules/.bin/storybook build -c ../packages/ui/.storybook -o ${out} --quiet && python3 -I -m http.server ${String(port)} --bind 127.0.0.1 --directory ${out} 2>/dev/null`,
     url: `http://127.0.0.1:${String(port)}/index.json`,
     timeout: 180_000,
   },

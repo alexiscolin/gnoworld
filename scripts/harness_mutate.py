@@ -173,6 +173,7 @@ def mutants():
     # Every test run on the pinned Node (F816 came from StrykerJS on Homebrew's Node 26).
     # The tokens story's pictures, which the fast gate compares when tokens.css changes (F1190). The mutants of
     # pictures.spec.ts wait for records.sh to list it (agent-hb/records_pictures.py).
+    yield from each("app/playwright.stories.config.ts", "-o ${out} --quiet", "-o ../packages/ui/storybook-static --quiet", "probe", "the stories' Storybook is built where STORIES_OUT says")
     yield from each("app/playwright.stories.config.ts", "if (!Number.isInteger(port) || port < 1024 || port > 65535)", "if (false)", "probe", "the stories' config refuses a port that is no port")
     yield from each("server/src/testing/toolchain.test.ts", "expect(process.version).toBe(pinnedNode());", "expect(process.version).toBeTruthy();", "probe", "the toolchain test holds a run to the pinned Node")
     yield from each("server/src/testing/toolchain.ts", ".trim()", "", "probe", "the pinned Node is read without its newline")

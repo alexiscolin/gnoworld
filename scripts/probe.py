@@ -263,12 +263,19 @@ try:
             held.close()  # the file server takes the port it found free
             pictures = lambda of, **env: run(["node", "app/node_modules/@playwright/test/cli.js", "test", "-c", "app/playwright.stories.config.ts",
                                               "--reporter=dot", "pictures"], cwd=tree, env={"PICTURES_OF": of, "STORIES_PORT": port, **env})
-            out = pictures("tokens--")
+            built = os.path.join(tree, "built-elsewhere")  # where the fast gate has Storybook built: out of the tree its checks read
+            out = pictures("tokens--", STORIES_OUT=built)
             expect(out.returncode == 0 and "3 passed" in out.stdout, "the tokens story's pictures pass on an untouched tree")
+            expect(os.path.exists(f"{built}/index.json") and not os.path.exists(os.path.join(tree, "packages/ui/storybook-static")),
+                   "STORIES_OUT takes Storybook's build out of the design system's folder")
             out = pictures("nosuchstory--")
             expect(out.returncode != 0 and "a story whose id starts with" in out.stdout + out.stderr, "a prefix no story has fails, comparing nothing")
             out = pictures("tokens--", STORIES_PORT="abc")
             expect(out.returncode != 0 and "STORIES_PORT is no port" in out.stdout + out.stderr, "a port that is no port is refused")
+            # The tools missing: never a pass on nothing. No browser where Playwright looks (tokens.css as approved); then,
+            # once tokens.css is as approved again, no Storybook to build.
+            out = pictures("tokens--", PLAYWRIGHT_BROWSERS_PATH=os.path.join(tree, "no-browsers"))
+            expect(out.returncode != 0, "the tokens story's pictures fail with no browser to compare them in")
             css = os.path.join(tree, "packages/ui/src/tokens.css")
             with open(css) as f:
                 text = f.read()
@@ -278,6 +285,11 @@ try:
                 f.write(text.replace(at, at + "    --color-probe: var(--p-space);\n", 1))
             out = pictures("tokens--")
             expect(out.returncode != 0 and "tokens--all" in out.stdout + out.stderr, "a token added to tokens.css with no new picture fails the tokens story's pictures")
+            with open(css, "w") as f:
+                f.write(text)
+            os.remove(os.path.join(tree, "packages/ui/node_modules/.bin/storybook"))
+            out = pictures("tokens--")
+            expect(out.returncode != 0, "the tokens story's pictures fail with no Storybook to build")
 
     if part("vitest_ui"):
         # The design system's tests run in jsdom, each on an empty page: none is left out by the
