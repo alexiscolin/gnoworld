@@ -63,6 +63,10 @@ LINT = [
     ("skip_each.test.ts", 'import { test } from "vitest";\n\ntest.skip.each([1])("x %i", () => {});\n', "no-restricted-syntax: A test is never switched off"),
     ("skip_if.test.ts", 'import { test } from "vitest";\n\ntest.skipIf(true)("x", () => {});\n', "no-restricted-syntax: A test is never switched off"),
     ("run_if.test.ts", 'import { test } from "vitest";\n\ntest.runIf(false)("x", () => {});\n', "no-restricted-syntax: A test is never switched off"),
+    # A bench switched off measures nothing, as a test switched off checks nothing (security-S1): the bench files too.
+    ("skipped.bench.ts", 'const describe = { skip: (name: string, f: () => void): string => name + String(f) };\n\ndescribe.skip("x", () => undefined);\n', "no-restricted-syntax: A test is never switched off"),
+    ("focused.bench.tsx", 'const bench = { only: (name: string, f: () => void): string => name + String(f) };\n\nbench.only("x [1 ms]", () => undefined);\n', "no-restricted-syntax: A test is never switched off"),
+    ("clean.bench.ts", 'const bench = (name: string, f: () => void): string => name + String(f);\n\nbench("x [1 ms]", () => undefined);\n', None),
     ("pending.test.ts", 'import { expect, test } from "vitest";\n\ntest.fails("x", () => {\n  expect(1).toBe(2);\n});\n', None),
     ("inline_disable.ts", "export function run(code: string): unknown {\n  // eslint-disable-next-line no-eval\n  return eval(code);\n}\n", "no-eval"),
     ("expect_error.ts", "// @ts-expect-error: the reason\nexport const n: number = \"x\";\n", "@typescript-eslint/ban-ts-comment"),

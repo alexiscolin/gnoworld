@@ -55,3 +55,5 @@ export const MODULE_STATE = {
 };
 // Vitest's tests and Playwright's journeys.
 export const TESTS = ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts"];
+// Vitest's benches: one switched off or focused stays out of its report, which bench.py cannot then read it from.
+export const BENCHES = ["**/*.bench.ts", "**/*.bench.tsx"];
