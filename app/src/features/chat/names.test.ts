@@ -1,6 +1,16 @@
 import { Address } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
-import { neighbour, peopleOf, roomHref, roomLabel, roomParams, roomsQuery, shortAddress, shownRoom } from "./names.ts";
+import {
+  groupRooms,
+  neighbour,
+  peopleOf,
+  roomHref,
+  roomLabel,
+  roomParams,
+  roomsQuery,
+  shortAddress,
+  shownRoom,
+} from "./names.ts";
 
 const open = (...rooms: string[]) => rooms.map((room) => ({ room, type: "open" as const }));
 const SECTIONS = [
@@ -94,5 +104,30 @@ describe("a room's search on its world's page", () => {
   it("names a room by ?room=<name>, and the main room by none", () => {
     expect(roomParams("#bubble/games").toString()).toBe("room=games");
     expect(roomParams("#bubble").toString()).toBe("");
+  });
+});
+
+// 4f-n: a mention of the whole room counts where Ergo's own modes limit who speaks (an announcement room) or who reads
+// (a room of members): the page has no list of a world's moderators, so an open room's @room is a stranger's.
+describe("groupRooms: where a mention of the whole room counts", () => {
+  const typed = (room: string, type: "open" | "announcement" | "accounts" | "members" | "members-write") => ({
+    room,
+    type,
+  });
+
+  it("lists the announcement, members and members-write rooms, in the order the world lists them, and no other", () => {
+    const sections = [
+      {
+        name: "Talk",
+        rooms: [typed("#a/open", "open"), typed("#a/news", "announcement"), typed("#a/who", "accounts")],
+      },
+      { name: null, rooms: [typed("#a/crew", "members"), typed("#a/core", "members-write")] },
+    ];
+    expect(groupRooms(sections)).toEqual(["#a/news", "#a/crew", "#a/core"]);
+  });
+
+  it("lists none for a world of open rooms, or of none", () => {
+    expect(groupRooms([{ name: null, rooms: [typed("#a", "open"), typed("#a/b", "accounts")] }])).toEqual([]);
+    expect(groupRooms([])).toEqual([]);
   });
 });

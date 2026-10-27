@@ -13,6 +13,7 @@ import { Joins } from "./joins.ts";
 import type { ChatLink, LinkDeps } from "./linkTypes.ts";
 import { outbox, type Outbox } from "./outbox.ts";
 import { refusedIn } from "./reacting.ts";
+import { Noticing } from "./noticing.ts";
 import { Sending } from "./sending.ts";
 import { Places, TypingOut } from "./telling.ts";
 
@@ -38,10 +39,12 @@ class Link implements ChatLink {
   readonly #joins = new Joins(this.#out);
   readonly #inside = this.#joins.inside;
   readonly #sending: Sending;
+  readonly #notices: Noticing;
   readonly #places = new Places((room) => this.#deps.store.getState().chat.rooms[room]?.read, this.#out);
 
   constructor(deps: LinkDeps) {
     this.#deps = deps;
+    this.#notices = new Noticing(deps.store, this.#inside, () => this.#key !== "guest");
     this.#outbox = outbox(deps.store);
     this.#sending = new Sending({
       ergo: () => this.#ergo,
@@ -56,8 +59,9 @@ class Link implements ChatLink {
     this.#follow(deps.store.getState().login.session);
   }
 
-  follow(ids: readonly string[]): void {
+  follow(ids: readonly string[], groupRooms: readonly string[] = []): void {
     if (this.#stopped) return;
+    this.#notices.groups = new Set(groupRooms);
     this.#listed = [...new Set(ids.filter((id) => RoomId.safeParse(id).success))];
     this.#keep();
   }
@@ -79,7 +83,10 @@ class Link implements ChatLink {
 
   read(room: string, id: string): void {
     const line = this.#deps.store.getState().chat.rooms[room]?.lines.findLast((each) => each.id === id);
-    if (this.#key !== "guest" && room === this.#shown && line !== undefined) this.#places.ask(room, line.time);
+    if (this.#key !== "guest" && room === this.#shown && line !== undefined) {
+      this.#places.ask(room, line.time);
+      this.#deps.store.getState().noticeActions.seen(room, line.time);
+    }
     if (this.#inside.has(room)) this.#places.tell(room);
   }
 
@@ -124,7 +131,9 @@ class Link implements ChatLink {
       this.#places.forget();
       store.getState().chatActions.follow([]);
     }
-    store.getState().dmActions.begin(session.kind === "in" ? device?.(session.address) : undefined);
+    const kept = session.kind === "in" ? device?.(session.address) : undefined;
+    store.getState().dmActions.begin(kept);
+    store.getState().noticeActions.begin(kept?.notices);
     this.#end();
     this.#open(session.kind === "out" ? { guest } : { account: session.address, ticket });
   }
@@ -203,6 +212,7 @@ class Link implements ChatLink {
   #page(room: string, messages: readonly IrcMessage[]): void {
     const store = this.#deps.store;
     store.getState().chatActions.page(room, messages);
+    this.#notices.page(room, messages);
     const earlier = this.#joins.earlier(room, messages, store.getState().chat.rooms[room]?.lines.length ?? 0);
     if (earlier !== undefined) this.#out(earlier);
   }
@@ -215,6 +225,7 @@ class Link implements ChatLink {
     // A labeled-response batch's lines carry no label: the batch's own line does, read at its end (#line).
     this.#outbox.answered(message.tags, [message]);
     const { tags, source = "", command, params } = message;
+    this.#notices.live(message);
     const refused = refusedIn(message);
     if (refused !== undefined) chatActions.reactionRefused(refused);
     const [room = ""] = params;

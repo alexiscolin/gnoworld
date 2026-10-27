@@ -76,3 +76,9 @@ export function roomsQuery(world: string, session: AppState["login"]["session"],
   if (session.kind === "unknown") return undefined;
   return `${world}|${session.kind === "in" ? session.address : "guest"}|${String(attempt)}`;
 }
+
+/** The rooms where a mention of the whole room counts (4f-n): where Ergo's modes limit who speaks or who reads. */
+export const groupRooms = (sections: RoomList["sections"]): string[] =>
+  sections.flatMap(({ rooms }) =>
+    rooms.filter(({ type }) => ["announcement", "members", "members-write"].includes(type)).map(({ room }) => room),
+  );
