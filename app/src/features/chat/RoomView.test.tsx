@@ -796,6 +796,38 @@ describe("RoomView: edits", () => {
     expect(shown[1]).toMatch(/^Replying to g10gh7…3y5tv: hello\d/);
   });
 
+  // slice-4-room-edit, security: a corrected line keeps its own msgid but shows the correction's words, so its player, which
+  // waits on a verdict, waits on the correction's: the line's own "checked" says nothing of a link the correction brought.
+  it("waits on the correction's verdict for the player of a link a correction brought, not on its line's", () => {
+    const lines = [
+      line({ id: "a", text: "watch this" }),
+      line({ id: "e", text: "watch https://youtu.be/dQw4w9WgXcQ", edits: "a" }),
+    ];
+    const at = (verdicts: RoomViewProps["verdicts"]) =>
+      items(part(view({ state: { ...ROOM, lines }, verdicts }), "Messages"))[0];
+    expect(at({ a: "checked" })).toContain("Waiting for the moderation check");
+    expect(at({ a: "checked" })).not.toContain("Play the YouTube video");
+    expect(at({ a: "checked", e: "checked" })).toContain("Play the YouTube video");
+    expect(at({ a: "checked", e: "hidden" })).not.toContain("YouTube");
+    expect(at({ a: "checked", e: "hidden" })).not.toContain("Waiting");
+    expect(at({ e: "checked" })).toContain("Play the YouTube video");
+  });
+
+  it("reads a line's own verdict while no correction is folded into it, and the newest correction's after two", () => {
+    const lines = [
+      line({ id: "a", text: "watch https://youtu.be/dQw4w9WgXcQ" }),
+      line({ id: "e1", text: "watch https://youtu.be/dQw4w9WgXcQ?t=1", edits: "a" }),
+      line({ id: "e2", text: "watch https://youtu.be/dQw4w9WgXcQ?t=2", edits: "a" }),
+    ];
+    const at = (verdicts: RoomViewProps["verdicts"]) =>
+      items(part(view({ state: { ...ROOM, lines }, verdicts }), "Messages"))[0];
+    expect(at({ a: "checked", e1: "checked" })).toContain("Waiting for the moderation check");
+    expect(at({ e2: "checked" })).toContain("Play the YouTube video");
+    expect(
+      items(part(view({ state: { ...ROOM, lines: lines.slice(0, 1) }, verdicts: { a: "checked" } }), "Messages"))[0],
+    ).toContain("Play the YouTube video");
+  });
+
   // F1177 (the UX review's U5): the mark stands on the time row, right after the time and before the sender, never
   // after the sender's words (F971), so a sender's "(edited)" reads as theirs; a reply's quote is above that row.
   it("marks an edited line on its time row, and a line that says (edited) not at all", () => {

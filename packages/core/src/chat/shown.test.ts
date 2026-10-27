@@ -149,3 +149,32 @@ describe("foldEdits: the shown lines and the folded edits together", () => {
     expect(foldEdits(plain).folded.size).toBe(0);
   });
 });
+
+// slice-4-room-edit, security: a corrected line shows its newest edit's words under its own msgid, and what is checked of
+// a line (the moderation's verdict) is checked by msgid: the reader needs the edit's msgid, to wait on the edit's verdict.
+describe("foldEdits: the newest edit each corrected line shows", () => {
+  test("names, by the line's msgid, the newest edit folded into it", () => {
+    const lines = [
+      line("a", 0, "one"),
+      line("b", 1, "other"),
+      { ...line("e1", 2, "two"), ...{ edits: "a" } },
+      { ...line("e2", 3, "three"), ...{ edits: "a" } },
+      { ...line("e3", 4, "other, fixed"), ...{ edits: "b" } },
+    ];
+    expect(foldEdits(lines).newest).toEqual(
+      new Map([
+        ["a", "e2"],
+        ["b", "e3"],
+      ]),
+    );
+  });
+
+  test("names none for a line no edit is folded into: another account's edit, an orphan, no edit at all", () => {
+    expect(foldEdits([line("a", 0, "one")]).newest.size).toBe(0);
+    expect(
+      foldEdits([line("a", 0, "mine"), { ...line("e", 1, "theirs"), ...{ edits: "a", from: BOB, account: BOB } }])
+        .newest.size,
+    ).toBe(0);
+    expect(foldEdits([{ ...line("e", 1, "orphan"), ...{ edits: "gone" } }]).newest.size).toBe(0);
+  });
+});

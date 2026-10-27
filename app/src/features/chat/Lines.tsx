@@ -137,6 +137,8 @@ type ListProps = Omit<LinesProps, "lines"> & {
   lines: readonly ShownLine[];
   shown: ReadonlyMap<string, readonly Shown[]>;
   lineOf: (id: string) => string;
+  /** The newest edit shown in each corrected line's place, by the line's msgid: the verdict a player waits on is its. */
+  newest: ReadonlyMap<string, string>;
 };
 
 // What a list draws from its lines: each line's chips as a string a line compares by value (F1222); a reply's line by its
@@ -155,15 +157,16 @@ export function Lines(props: LinesProps) {
   // The room's lines as shown: each corrected by its author's newest edit, the edits gone (4d, F664). Folded here, in a
   // component with no hook, as the compiler leaves a fold among hooks unmemoized: a pointer over a line folded the room
   // again (F1221).
-  const { shown: lines, folded } = foldEdits(props.lines);
+  const { shown: lines, folded, newest } = foldEdits(props.lines);
   // What a plain client answers or reacts to by a folded edit's own msgid reaches the line it corrects (CR5).
   const lineOf = (id: string) => folded.get(id) ?? id;
   const shown = reactionsOn(props.reactions ?? [], props.me, lineOf);
-  return <List {...props} lines={lines} shown={shown} lineOf={lineOf} />;
+  return <List {...props} lines={lines} shown={shown} lineOf={lineOf} newest={newest} />;
 }
 
 function List(props: ListProps) {
-  const { room, partner, members, me, refused, connected, reactions, cannotReact, lines, shown, lineOf } = props;
+  const { room, partner, members, me, refused, connected, reactions, cannotReact, lines, shown, lineOf, newest } =
+    props;
   const { onDelete = NO_DELETE, onDismiss = NO_DISMISS, onReact = NO_REACT, onReply = NO_REPLY } = props;
   const { read, paged = false, onRead, verdicts, saving = false, onEdit } = props;
   const fresh = useNewMark(lines, paged ? read : undefined, me);
@@ -173,6 +176,8 @@ function List(props: ListProps) {
   const { said, setSaid, copy } = useCopy();
   const [deleting, remove] = useRemoval({ lines, refused, connected, onDelete, leave, setSaid });
   const { chips, byId, known } = derived(lines, shown, members);
+  // A corrected line's player waits on its newest edit's verdict, the words it shows being the edit's (F1921).
+  const verdictOf = (id: string) => verdicts?.[newest.get(id) ?? id];
   // A reaction that could not go out says so at once; one Ergo refuses, when it answers (cannotReact).
   const react = (reaction: Reacting) => {
     const went = onReact(reaction);
@@ -231,7 +236,7 @@ function List(props: ListProps) {
             stop={line.id === stop}
             actions={(room !== undefined || partner !== undefined) && mounted(line.id) ? actionsOf(line) : null}
             fresh={line.id === fresh}
-            verdict={verdicts?.[line.id]}
+            verdict={verdictOf(line.id)}
             players={room !== undefined && !saving}
             chips={chips.get(line.id)}
             react={me === undefined || !shown.has(line.id) ? undefined : react}

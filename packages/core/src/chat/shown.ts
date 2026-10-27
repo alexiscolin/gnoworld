@@ -26,6 +26,9 @@ function folding(lines: readonly Line[]) {
 interface Folded {
   readonly shown: readonly ShownLine[];
   readonly folded: ReadonlyMap<string, string>;
+  /** The msgid of the newest edit shown in each corrected line's place, by the line's msgid: what is checked of a line (the
+   * moderation's verdict) is checked by msgid, and the words shown are the edit's. */
+  readonly newest: ReadonlyMap<string, string>;
 }
 
 /** The room's lines, in their order, each corrected by its newest edit and the edits gone (the same array when no
@@ -33,6 +36,7 @@ interface Folded {
  * reacts to (the code review's CR5): one fold for both. */
 export function foldEdits(lines: readonly Line[]): Folded {
   const { newest, folded } = folding(lines);
+  const edited = new Map([...newest].map(([id, edit]) => [id, edit.id]));
   const shown =
     folded.size === 0
       ? lines
@@ -41,7 +45,7 @@ export function foldEdits(lines: readonly Line[]): Folded {
           if (edit !== undefined) return [{ ...line, text: edit.text, kind: edit.kind, edited: true }];
           return folded.has(line.id) ? [] : [line];
         });
-  return { shown, folded };
+  return { shown, folded, newest: edited };
 }
 
 /** The room's lines as shown: see foldEdits. */
