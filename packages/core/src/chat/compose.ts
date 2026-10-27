@@ -61,15 +61,18 @@ function said(room: string, nick: string, { text, action }: { text: string; acti
 // A draft of several lines, each line's end trimmed (a line of spaces alone is blank): the message within Ergo's caps
 // first, its blank lines counted as Ergo counts them, then each line within one IRC line's budget.
 function several(room: string, nick: string, draft: string): Composed {
+  // Counted before any line is built: a trim never removes a break, and a paste of a million lines is refused here.
+  let count = 1;
+  for (let at = draft.indexOf("\n"); at !== -1; at = draft.indexOf("\n", at + 1)) count += 1;
+  if (count > MULTILINE_LINES) return { kind: "tooBig", unit: "lines", over: count - MULTILINE_LINES };
   const text = draft
     .split("\n")
     .map((line) => line.trimEnd())
     .join("\n");
-  const lines = text.split("\n").map((line) => `PRIVMSG ${room} :${line}`);
   const left = MULTILINE_BYTES - bytes(text);
-  if (lines.length > MULTILINE_LINES) return { kind: "tooBig", unit: "lines", over: lines.length - MULTILINE_LINES };
   if (left < 0) return { kind: "tooBig", unit: "bytes", over: -left };
   const budget = LINE_BYTES - relayOf(nick);
+  const lines = text.split("\n").map((line) => `PRIVMSG ${room} :${line}`);
   for (const [at, line] of lines.entries()) {
     if (bytes(line) > budget) return { kind: "long", over: bytes(line) - budget, line: at + 1 };
   }

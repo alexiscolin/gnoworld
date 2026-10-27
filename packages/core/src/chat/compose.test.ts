@@ -143,6 +143,22 @@ describe("compose: a draft of several lines", () => {
     });
   });
 
+  // F1603: the composer runs compose at each key, so a paste past the caps must be refused without building
+  // each line's PRIVMSG (1,000,000 lines: 176 ms the best of 7 runs before, at load 12).
+  test("refuses a draft of a million lines at once, counting its lines and building none", () => {
+    const paste = Array.from({ length: 1_000_000 }, () => "abcdefghi").join("\n");
+    const runs = Array.from({ length: 5 }, () => {
+      const start = Date.now();
+      expect(compose(ROOM, paste, NICK)).toStrictEqual({
+        kind: "tooBig",
+        unit: "lines",
+        over: 1_000_000 - MULTILINE_LINES,
+      });
+      return Date.now() - start;
+    });
+    expect(Math.min(...runs)).toBeLessThan(80);
+  });
+
   test("reads CR LF and a lone CR as a break, as LF is", () => {
     expect(compose(ROOM, "a\r\nb\rc", NICK)).toMatchObject({
       kind: "lines",
