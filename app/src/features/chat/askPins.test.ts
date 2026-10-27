@@ -262,6 +262,34 @@ describe("pinning and unpinning from the shown room", () => {
     expect(t.asked.filter((each) => each.startsWith("pins "))).toHaveLength(2);
   });
 
+  // The same class from the other side: a poll that starts while the act is in flight and lands after it holds the list
+  // as it was before the act (R3 of redpass2-4dx).
+  it("drop a poll's older answer that was asked while a pin was in flight and lands after it, and ask again", async () => {
+    const releases: Record<"pin" | "poll", (value: Result<PinList>) => void> = {
+      pin: () => undefined,
+      poll: () => undefined,
+    };
+    let polls = 0;
+    const t = setup({
+      answer: (room, which) => {
+        if (which === "pin") return new Promise((resolve) => (releases.pin = resolve));
+        polls += 1;
+        if (polls === 2) return new Promise((resolve) => (releases.poll = resolve));
+        return Promise.resolve(ok(list(room, polls === 1 ? ["m1"] : ["m1", "m2"], true)));
+      },
+    });
+    t.asker.show("#bubble", ALICE);
+    await settled();
+    const pinned = t.asker.pin("m2");
+    t.asker.refresh();
+    releases.pin(ok(list("#bubble", ["m1", "m2"], true)));
+    await pinned;
+    releases.poll(ok(list("#bubble", ["m1"], true)));
+    await settled();
+    expect(t.told.map(({ pins }) => pins.map(({ id }) => id))).toEqual([["m1"], ["m1", "m2"], ["m1", "m2"]]);
+    expect(t.asked.filter((each) => each.startsWith("pins "))).toHaveLength(3);
+  });
+
   it("say why the server refused, and change nothing", async () => {
     const t = setup({ answer: () => Promise.resolve({ ok: false, reason: "too_many" }) });
     t.asker.show("#bubble", ALICE);
@@ -292,6 +320,23 @@ describe("pinning and unpinning from the shown room", () => {
       expect(t.told.at(-1)).toEqual(list("#bubble", [], true));
     },
   );
+
+  // A refusal that lands after the reader changed explains nothing of the new reader's list (R10 of redpass2-4dx).
+  it("ask nothing after a refusal that lands once the reader changed", async () => {
+    let release: (value: Result<PinList>) => void = () => undefined;
+    const t = setup({
+      answer: (room, call) =>
+        call === "unpin" ? new Promise((resolve) => (release = resolve)) : Promise.resolve(ok(list(room, ["m1"]))),
+    });
+    t.asker.show("#bubble", ALICE);
+    await settled();
+    const unpinned = t.asker.unpin("m1");
+    t.state.reader = undefined;
+    release({ ok: false, reason: "forbidden" });
+    expect(await unpinned).toEqual({ ok: false, reason: "forbidden" });
+    await settled();
+    expect(t.asked).toEqual(["pins #bubble", "unpin #bubble m1"]);
+  });
 
   it.each(["network", "too_many"] as const)("ask nothing more after a refusal of %s", async (reason) => {
     const t = setup({
