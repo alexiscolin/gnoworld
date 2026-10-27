@@ -130,6 +130,12 @@ const unknownChannels =
     for (const room of names) if (!known.has(room)) log("alert", { error: "unknown_room", room });
   };
 
+// Whom a room is listed to: an archived room is a hidden one.
+const listedTo =
+  (settings: Settings, keeper: Rooms) =>
+  (room: string, who: string | undefined): boolean =>
+    keeper.archived(room) ? staffOf(settings, room, who) : listed(settings, room, who);
+
 export function startChat(db: DatabaseSync, settings: Settings, options: Options): Chat {
   const { worlds, ergo, moderation } = settings;
   const { log, pepper, now = Date.now } = options;
@@ -167,6 +173,7 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
           ...ergo,
           rooms: () => listRooms(db).map(({ name }) => name),
           lastChecked: progress.last,
+          hold: progress.hold,
           drained: () => queue.idle(),
           onReady: () => {
             reconciler.flags();
@@ -175,17 +182,16 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
           },
           onJoin: reconciler.joined,
           onChannels: unknownChannels(db, log),
-          onMessage: (said) => {
-            activity.count(said.room, said.account, now());
+          onMessage: (said, replayed) => {
+            // A line of a history page is no activity now, whatever its time.
+            if (!replayed) activity.count(said.room, said.account, now());
             progress.heard(said);
             // A line the full queue drops is left unchecked, with the alert.
             if (!queue.push(said)) progress.settled(said);
           },
           log,
         });
-  // Whom a room is listed to: an archived room is a hidden one.
-  const visible = (room: string, who: string | undefined): boolean =>
-    keeper.archived(room) ? staffOf(settings, room, who) : listed(settings, room, who);
+  const visible = listedTo(settings, keeper);
   return {
     activity: activityRoutes(activity, { db, now, visible, session: options.session }),
     roomList: listRoutes({ db, roles: settings, visible, session: options.session }),

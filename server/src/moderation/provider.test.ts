@@ -151,9 +151,11 @@ describe("the moderation client", () => {
     ["a 403", status(403), "alert"],
     ["a 400", status(400), "alert"],
     ["a 302", status(302), "alert"],
+    ["a 451", status(451), "alert"],
+    ["a 499", status(499), "alert"],
     ["a 500", status(500, "oops"), "down"],
     ["a 503", status(503), "down"],
-    ["a 429, rate limited", status(429, "slow down"), "down"],
+    ["a 429, rate limited", status(429, "slow down"), "rate_limited"],
     ["a timeout", () => Promise.reject(new DOMException("timed out", "TimeoutError")), "down"],
     ["a network error", () => Promise.reject(new TypeError("fetch failed")), "down"],
   ])("counts %s as not checked, logging why, with neither the key nor the body", async (_, answer, kind) => {
@@ -162,7 +164,7 @@ describe("the moderation client", () => {
     expect(events()).toEqual(
       kind === "alert"
         ? ['{"event":"alert","error":"moderation_refused"}\n']
-        : ['{"event":"moderation_unchecked","error":"down"}\n'],
+        : [`{"event":"moderation_unchecked","error":"${kind}"}\n`],
     );
     expect(events().join("")).not.toMatch(/sk-|Incorrect|oops|slow down/);
   });
