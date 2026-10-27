@@ -2,7 +2,7 @@ import { compose } from "@gnoworld/core";
 import { completions } from "./complete.ts";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { Composer, NEAR, Preview, said } from "./Composer.tsx";
+import { Composer, NEAR, Preview, said, typingOf } from "./Composer.tsx";
 
 const ROOM = "#bubble/games";
 const NICK = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
@@ -193,6 +193,17 @@ describe("the composer, from a draft", () => {
     expect(from(draft)).toContain(help);
   });
 
+  // The UX review (U9): typing is told from the first key, so the field says so, until it has something else to say.
+  it("tells the writer the room sees them type, unless the field has another help to give", () => {
+    const told = "People in this room see when you type.";
+    expect(from("")).toContain(told);
+    expect(from("hello")).toContain(told);
+    expect(from("/m")).not.toContain(told);
+    expect(from("a".repeat(400))).not.toContain(told);
+    // An error is the field's word alone: the line too long to go.
+    expect(from("a".repeat(600))).not.toContain(told);
+  });
+
   it.each(["hi@g10", "hi @g10 there", "hi @ g10"])(
     "offers no person for %j: no word after @ ends the draft",
     (draft) => {
@@ -203,5 +214,27 @@ describe("the composer, from a draft", () => {
   it("leaves Send on for a line that can go, off for one that cannot", () => {
     expect(from("hello")).not.toMatch(/<button(?=[^>]*type="submit")(?=[^>]*disabled)/);
     expect(from("/nick bob")).toMatch(/<button(?=[^>]*type="submit")(?=[^>]*disabled="")[^>]*>/);
+  });
+});
+
+// 4f: what an edit of the draft tells the room of the account's typing (IRCv3's +typing): a slash command is no
+// typing, as the spec has it; a cleared field ends it.
+describe("typingOf: what an edit of the draft tells the room", () => {
+  it.each([
+    ["text", "hello", "active"],
+    ["text after spaces", "  hi", "active"],
+    ["a cleared field", "", "done"],
+    ["spaces alone", "   ", "done"],
+    ["a slash command", "/me waves", undefined],
+    ["a slash command after spaces", "  /nick bob", undefined],
+    // The red pass (R15): as compose reads a draft, `//` a slash of text and a control character a space.
+    ["a slash of text", "//shrug", "active"],
+    ["a slash command after a tab", "\t/nick bob", undefined],
+    ["a slash command after a control character", "\u0001/me hi", undefined],
+    ["a slash alone", "/", undefined],
+    ["a slash, a control character, then a slash", "/\u0001/shrug", undefined],
+    ["control characters alone", "\u0001\u0002", "done"],
+  ] as const)("tells %s as %s", (_, draft, told) => {
+    expect(typingOf(draft)).toBe(told);
   });
 });

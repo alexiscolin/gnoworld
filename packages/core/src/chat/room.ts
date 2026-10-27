@@ -19,7 +19,8 @@ export interface Line {
 
 // Ergo folds A to Z alone (casemapping ascii, deploy/ergo/ircd.yaml.tmpl).
 const fold = (name: string): string => name.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
-const sameRoom = (name: string, room: string): boolean => fold(name) === fold(room);
+/** Whether two room names are one, folded as Ergo folds them. */
+export const sameRoom = (name: string, room: string): boolean => fold(name) === fold(room);
 /** The nick of a source: nick!user@host, nick@host, or a nick alone. */
 export const nickOf = (source: string): string => source.replace(/[!@].*$/s, "");
 const compare = (one: string, other: string): number => (one < other ? -1 : one > other ? 1 : 0);
@@ -33,6 +34,8 @@ const PLACES: Readonly<Record<string, number>> = {
   PART: 0,
   KICK: 0,
   REDACT: 0,
+  TAGMSG: 0,
+  MARKREAD: 0,
   "331": 1,
   "332": 1,
   "353": 2,
@@ -49,7 +52,7 @@ export function concerns({ command, params }: IrcMessage): string | undefined {
 }
 
 // A time Ergo writes, on a day that exists: the string reads back as itself.
-function isTime(text: string): boolean {
+export function isTime(text: string): boolean {
   if (!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(text)) return false;
   const date = new Date(text);
   return !Number.isNaN(date.getTime()) && date.toISOString() === text;

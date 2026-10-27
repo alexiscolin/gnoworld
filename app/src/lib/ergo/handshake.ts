@@ -5,7 +5,8 @@ import type { IrcMessage } from "@gnoworld/core";
 /** The capabilities the real Ergo grants the server's tests (server/src/testing/ergoKit.ts). */
 export const CAPS =
   "message-tags server-time account-tag echo-message batch labeled-response sasl draft/chathistory " +
-  "draft/event-playback draft/message-redaction account-notify extended-join multi-prefix draft/metadata-2 standard-replies";
+  "draft/event-playback draft/message-redaction account-notify extended-join multi-prefix draft/metadata-2 standard-replies " +
+  "draft/read-marker";
 const BODY_MAX = 510;
 const CHUNK = 400;
 

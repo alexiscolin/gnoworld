@@ -23,6 +23,7 @@
     --color-warm: var(--p-amber);
     --color-signal: var(--p-violet);
     --color-danger: var(--p-coral);
+    --color-new: var(--p-coral);
     --color-mine-soft: color-mix(in oklab, var(--p-mint) 12%, transparent);
     --color-mine-line: color-mix(in oklab, var(--p-mint) 50%, transparent);
     --color-warm-soft: color-mix(in oklab, var(--p-amber) 12%, transparent);
@@ -31,6 +32,7 @@
     --color-signal-line: color-mix(in oklab, var(--p-violet) 50%, transparent);
     --color-danger-soft: color-mix(in oklab, var(--p-coral) 12%, transparent);
     --color-danger-line: color-mix(in oklab, var(--p-coral) 50%, transparent);
+    --color-new-line: color-mix(in oklab, var(--p-coral) 60%, transparent);
     --color-fill: color-mix(in oklab, var(--p-text) 5%, transparent);
     --color-fill-hover: color-mix(in oklab, var(--p-text) 10%, transparent);
     --color-ink-hover: color-mix(in oklab, var(--p-space) 10%, transparent);

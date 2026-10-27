@@ -1,6 +1,6 @@
 import { parseLine, type IrcMessage } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Result } from "../../lib/api/http.ts";
 import type { Ergo, ErgoState, Who } from "../../lib/ergo/ergo.ts";
 import { createAppStore } from "../../store/index.ts";
@@ -812,6 +812,26 @@ describe("the chat's link: what it says", () => {
     expect(said(t.fake.sent)).toEqual(["PRIVMSG #bubble :hi", "PRIVMSG #bubble :again"]);
   });
 
+  // The security review (4f's S1): Ergo's PART of the account, another session leaving the room (channel.go:1078-1082,
+  // v2.19.1), takes every session out of it, as a KICK does; a PART of the past or of another is no such thing.
+  it("says nothing, tells no typing and marks nothing in a room another session of the account left", () => {
+    const t = memberIn(["#bubble/games", "#bubble"]);
+    t.fake.line(`:${ADDRESS}!u@h JOIN #bubble`);
+    t.fake.line(`@msgid=m1;time=2026-10-25T10:01:00.000Z :alice!u@h PRIVMSG #bubble/games :one`);
+    t.fake.line("BATCH +p1 example.com/replay");
+    t.fake.line(`@batch=p1 :${ADDRESS}!u@h PART #bubble :long ago`);
+    t.fake.line("BATCH -p1");
+    t.fake.line(`:${OTHER}!u@h PART #bubble`);
+    expect(t.link.say("#bubble", "still in")).toBe(true);
+    t.fake.line(`:${ADDRESS}!u@h PART #bubble/games`);
+    t.link.typing("#bubble/games", "active");
+    t.link.read("#bubble/games", "m1");
+    expect(t.link.say("#bubble/games", "still here?")).toBe(false);
+    expect(
+      t.fake.sent.filter((line) => / TAGMSG |^MARKREAD \S+ timestamp=|^PRIVMSG #bubble\/games/.test(line)),
+    ).toEqual([]);
+  });
+
   it("takes no line of another for a KICK of it, though the line names it", () => {
     const t = memberIn(["#bubble/games"]);
     t.fake.line(`:troll!u@h PRIVMSG #bubble/games :${ADDRESS}`);
@@ -841,5 +861,429 @@ describe("the chat's link: what it says", () => {
     t.link.stop();
     expect(t.link.say("#bubble/games", "late")).toBe(false);
     expect(said(again.sent)).toEqual(["PRIVMSG #bubble/games :back"]);
+  });
+
+  // 4f: who is typing (IRCv3's +typing, ircv3.net/specs/client-tags/typing).
+  describe("typing", () => {
+    const tagged = (sent: readonly string[]) => sent.filter((line) => line.includes(" TAGMSG "));
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("tells the room the account is typing, at most once every 3 s, as the spec throttles it", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const t = memberIn(["#bubble/games"]);
+      t.link.typing("#bubble/games", "active");
+      vi.advanceTimersByTime(2_999);
+      t.link.typing("#bubble/games", "active");
+      expect(tagged(t.fake.sent)).toEqual(["@+typing=active TAGMSG #bubble/games"]);
+      vi.advanceTimersByTime(1);
+      t.link.typing("#bubble/games", "active");
+      expect(tagged(t.fake.sent)).toHaveLength(2);
+    });
+
+    it("throttles each room apart", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const t = memberIn(["#bubble/games", "#bubble"]);
+      t.fake.line(`:${ADDRESS}!u@h JOIN #bubble`);
+      t.link.typing("#bubble/games", "active");
+      t.link.typing("#bubble", "active");
+      expect(tagged(t.fake.sent)).toEqual(["@+typing=active TAGMSG #bubble/games", "@+typing=active TAGMSG #bubble"]);
+    });
+
+    it("tells the room the account is done once, and only after it said it was typing", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const t = memberIn(["#bubble/games"]);
+      t.link.typing("#bubble/games", "done");
+      t.link.typing("#bubble/games", "active");
+      t.link.typing("#bubble/games", "done");
+      t.link.typing("#bubble/games", "done");
+      // Typed on: a done may wait its turn.
+      vi.advanceTimersByTime(3_000);
+      expect(tagged(t.fake.sent)).toEqual([
+        "@+typing=active TAGMSG #bubble/games",
+        "@+typing=done TAGMSG #bubble/games",
+      ]);
+    });
+
+    // The code review (CR5), in place of the red pass's R23 (the throttle reset on a done): a field cleared and written
+    // again within the 3 s keeps the typing shown, its readers' 6 s running, and tells nothing more; clearing it and
+    // writing again over and over sends one TAGMSG each 3 s, never two a cycle.
+    it("keeps the typing shown with nothing more told when a field cleared is written again within the 3 s", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const t = memberIn(["#bubble/games"]);
+      t.link.typing("#bubble/games", "active");
+      t.link.typing("#bubble/games", "done");
+      t.link.typing("#bubble/games", "active");
+      vi.advanceTimersByTime(3_000);
+      expect(tagged(t.fake.sent)).toEqual(["@+typing=active TAGMSG #bubble/games"]);
+    });
+
+    it("tells a room one TAGMSG each 3 s however fast its field is cleared and written, the done last", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const t = memberIn(["#bubble/games"]);
+      for (let cycle = 0; cycle < 10; cycle += 1) {
+        t.link.typing("#bubble/games", "active");
+        t.link.typing("#bubble/games", "done");
+        vi.advanceTimersByTime(100);
+      }
+      expect(tagged(t.fake.sent)).toEqual(["@+typing=active TAGMSG #bubble/games"]);
+      vi.advanceTimersByTime(2_000);
+      expect(tagged(t.fake.sent)).toEqual([
+        "@+typing=active TAGMSG #bubble/games",
+        "@+typing=done TAGMSG #bubble/games",
+      ]);
+    });
+
+    it("tells the typing again at once after a line said, which ends it at every reader, and owes no done", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const t = memberIn(["#bubble/games"]);
+      t.link.typing("#bubble/games", "active");
+      expect(t.link.say("#bubble/games", "hi")).toBe(true);
+      t.link.typing("#bubble/games", "done");
+      t.link.typing("#bubble/games", "active");
+      expect(tagged(t.fake.sent)).toEqual([
+        "@+typing=active TAGMSG #bubble/games",
+        "@+typing=active TAGMSG #bubble/games",
+      ]);
+    });
+
+    // StrykerJS's survivors on the pace: a timer for a done waiting its turn, none left once a line or a drop ends it.
+    it("holds one timer for a done waiting its turn, and none once a line ends the typing or the link drops", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const t = memberIn(["#bubble/games"]);
+      const base = vi.getTimerCount();
+      t.link.typing("#bubble/games", "active");
+      t.link.typing("#bubble/games", "done");
+      t.link.typing("#bubble/games", "done");
+      expect(vi.getTimerCount()).toBe(base + 1);
+      expect(t.link.say("#bubble/games", "hi")).toBe(true);
+      expect(vi.getTimerCount()).toBe(base);
+      t.link.typing("#bubble/games", "active");
+      t.link.typing("#bubble/games", "done");
+      expect(vi.getTimerCount()).toBe(base + 1);
+      t.fake.state("waiting");
+      expect(vi.getTimerCount()).toBe(base);
+    });
+
+    it("tells no typing as a guest, nor in a room Ergo has not said it is in, nor after my KICK", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const guest = guestIn(["#bubble/games"]);
+      guest.fake.line(`:${GUEST}!u@h JOIN #bubble/games`);
+      guest.link.typing("#bubble/games", "active");
+      expect(tagged(guest.fake.sent)).toEqual([]);
+      const t = memberIn(["#bubble/games", "#bubble"]);
+      t.link.typing("#bubble", "active");
+      t.link.typing("#bubble/games", "active");
+      t.fake.line(`:gnoworld!u@h KICK #bubble/games ${ADDRESS} :out`);
+      vi.advanceTimersByTime(3_000);
+      t.link.typing("#bubble/games", "active");
+      expect(tagged(t.fake.sent)).toEqual(["@+typing=active TAGMSG #bubble/games"]);
+    });
+
+    // The red pass (R10): nothing counted as sent while the link is away; the first word after the JOIN goes.
+    it("tells no typing while away, and tells it at once once back in the room", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const t = memberIn(["#bubble/games"]);
+      t.fake.state("waiting");
+      t.link.typing("#bubble/games", "active");
+      const again = t.connected(ADDRESS);
+      again.line(`:${ADDRESS}!u@h JOIN #bubble/games`);
+      t.link.typing("#bubble/games", "active");
+      expect(tagged(again.sent)).toEqual(["@+typing=active TAGMSG #bubble/games"]);
+    });
+
+    it("tells the typing again at once on a new connection, whose readers never heard it there", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const t = memberIn(["#bubble/games"]);
+      t.link.typing("#bubble/games", "active");
+      t.fake.state("waiting");
+      const again = t.connected(ADDRESS);
+      again.line(`:${ADDRESS}!u@h JOIN #bubble/games`);
+      const before = again.sent.length;
+      t.link.typing("#bubble/games", "active");
+      expect(tagged(again.sent.slice(before))).toEqual(["@+typing=active TAGMSG #bubble/games"]);
+    });
+  });
+
+  // 4f: the reading place (Ergo's draft/read-marker, ircv3.net/specs/extensions/read-marker).
+  describe("the reading place", () => {
+    // The places set: a MARKREAD with its time, not the ask of Ergo's (CR7).
+    const marked = (sent: readonly string[]) => sent.filter((line) => /^MARKREAD \S+ timestamp=/.test(line));
+    const T = (minute: number) => `2026-10-25T10:${String(minute).padStart(2, "0")}:00.000Z`;
+    // A line of the room in the store, said at T(minute), its msgid m<minute>.
+    const heard = (fake: Fake, room: string, minute: number) => {
+      fake.line(`@msgid=m${String(minute)};time=${T(minute)} :alice!u@h PRIVMSG ${room} :at ${String(minute)}`);
+    };
+
+    it("marks the room in view read at a held line's time, as Ergo's MARKREAD, once a later line", () => {
+      vi.useFakeTimers();
+      const t = memberIn(["#bubble/games"]);
+      heard(t.fake, "#bubble/games", 0);
+      heard(t.fake, "#bubble/games", 1);
+      heard(t.fake, "#bubble/games", 2);
+      t.link.read("#bubble/games", "m1");
+      t.link.read("#bubble/games", "m1");
+      t.link.read("#bubble/games", "m0");
+      t.link.read("#bubble/games", "m2");
+      // Read on: a later place may wait its turn.
+      vi.advanceTimersByTime(2_000);
+      vi.useRealTimers();
+      expect(marked(t.fake.sent)).toEqual([
+        `MARKREAD #bubble/games timestamp=${T(1)}`,
+        `MARKREAD #bubble/games timestamp=${T(2)}`,
+      ]);
+    });
+
+    it("marks nothing at or before the reading place Ergo gave, and nothing for a guest", () => {
+      const t = memberIn(["#bubble/games"]);
+      heard(t.fake, "#bubble/games", 0);
+      heard(t.fake, "#bubble/games", 1);
+      t.fake.line(`:ergo MARKREAD #bubble/games timestamp=${T(1)}`);
+      t.link.read("#bubble/games", "m1");
+      t.link.read("#bubble/games", "m0");
+      expect(marked(t.fake.sent)).toEqual([]);
+      const guest = guestIn(["#bubble/games"]);
+      guest.fake.line(`:${GUEST}!u@h JOIN #bubble/games`);
+      heard(guest.fake, "#bubble/games", 1);
+      guest.link.read("#bubble/games", "m1");
+      expect(marked(guest.fake.sent)).toEqual([]);
+    });
+
+    // The red pass (R4): the room in view alone, and one Ergo said I am in; never another room's newest.
+    it("marks no room read but the one in view, and none Ergo has not said I am in, nor after my PART or KICK", () => {
+      const t = memberIn(["#bubble/games", "#bubble", "#bubble/news"]);
+      heard(t.fake, "#bubble/games", 0);
+      t.link.read("#bubble/games", "m0");
+      t.fake.line(`:${ADDRESS}!u@h JOIN #bubble`);
+      heard(t.fake, "#bubble", 1);
+      t.link.read("#bubble", "m1");
+      heard(t.fake, "#bubble/news", 1);
+      t.link.show("#bubble/news");
+      t.link.read("#bubble/news", "m1");
+      t.link.show("#bubble/games");
+      heard(t.fake, "#bubble/games", 1);
+      t.fake.line(`:gnoworld!u@h KICK #bubble/games ${ADDRESS} :out`);
+      t.link.read("#bubble/games", "m1");
+      expect(marked(t.fake.sent)).toEqual([`MARKREAD #bubble/games timestamp=${T(0)}`]);
+    });
+
+    // The red pass (R5): a time Ergo would keep for good is a held line's own, never a word the caller makes.
+    it.each([
+      ["a line the room does not hold", "nope"],
+      ["a time in place of a msgid", T(1)],
+      ["a CR LF", "m1\r\nQUIT :x"],
+      ["a space", "m1 extra"],
+    ])("marks nothing for %s", (_, id) => {
+      const t = memberIn(["#bubble/games"]);
+      heard(t.fake, "#bubble/games", 1);
+      t.link.read("#bubble/games", id);
+      t.link.read("#bubble/games", "m1");
+      expect(marked(t.fake.sent)).toEqual([`MARKREAD #bubble/games timestamp=${T(1)}`]);
+    });
+
+    // The red pass (R10): a place asked while away, or sent and never answered, goes once the room is joined again.
+    it("marks the room read once back in it, what was asked while away", () => {
+      const t = memberIn(["#bubble/games"]);
+      heard(t.fake, "#bubble/games", 1);
+      t.fake.state("waiting");
+      t.link.read("#bubble/games", "m1");
+      expect(marked(t.fake.sent)).toEqual([]);
+      const again = t.connected(ADDRESS);
+      const before = again.sent.length;
+      again.line(`:${ADDRESS}!u@h JOIN #bubble/games`);
+      expect(marked(again.sent.slice(before))).toEqual([`MARKREAD #bubble/games timestamp=${T(1)}`]);
+    });
+
+    it("marks the room read again on a new connection, what went on the last one unanswered", () => {
+      const t = memberIn(["#bubble/games"]);
+      heard(t.fake, "#bubble/games", 1);
+      t.link.read("#bubble/games", "m1");
+      t.fake.state("waiting");
+      const again = t.connected(ADDRESS);
+      const before = again.sent.length;
+      again.line(`:${ADDRESS}!u@h JOIN #bubble/games`);
+      expect(marked(again.sent.slice(before))).toEqual([`MARKREAD #bubble/games timestamp=${T(1)}`]);
+    });
+
+    it("marks nothing again on a new connection once Ergo answered the place", () => {
+      const t = memberIn(["#bubble/games"]);
+      heard(t.fake, "#bubble/games", 1);
+      t.link.read("#bubble/games", "m1");
+      t.fake.line(`:ergo MARKREAD #bubble/games timestamp=${T(1)}`);
+      t.fake.state("waiting");
+      const again = t.connected(ADDRESS);
+      const before = again.sent.length;
+      again.line(`:${ADDRESS}!u@h JOIN #bubble/games`);
+      expect(marked(again.sent.slice(before))).toEqual([]);
+    });
+
+    // The code review (CR7): Ergo's place lost to a race (its JOIN and MARKREAD played as a second tab attached, before
+    // the page followed the room) is asked of Ergo as the history is: an account's, the store holding none.
+    it("asks Ergo the room's place as its history is asked, an account's, when the store holds none", () => {
+      const asks = (sent: readonly string[]) => sent.filter((line) => /^MARKREAD \S+$/.test(line));
+      const t = memberIn(["#bubble/games"]);
+      expect(asks(t.fake.sent)).toEqual(["MARKREAD #bubble/games"]);
+      const known = setup();
+      known.link.follow(["#bubble/games"]);
+      known.link.show("#bubble/games");
+      known.signedIn(ADDRESS);
+      const fake = known.connected(ADDRESS);
+      fake.line(`:ergo MARKREAD #bubble/games timestamp=${T(1)}`);
+      fake.line(`:${ADDRESS}!u@h JOIN #bubble/games`);
+      expect(asks(fake.sent)).toEqual([]);
+      const guest = guestIn(["#bubble/games"]);
+      guest.fake.line(`:${GUEST}!u@h JOIN #bubble/games`);
+      expect(asks(guest.fake.sent)).toEqual([]);
+    });
+
+    // The red pass (R20): an account's places are its own; another session starts with none.
+    it("forgets an account's places when another session starts", () => {
+      const t = memberIn(["#bubble/games"]);
+      t.fake.line(`:ergo MARKREAD #bubble/games timestamp=${T(1)}`);
+      expect(t.room("#bubble/games")?.read).toBe(T(1));
+      t.signedIn(OTHER);
+      t.link.follow(["#bubble/games"]);
+      expect(t.room("#bubble/games")?.read).toBeUndefined();
+      t.signedOut();
+      t.link.follow(["#bubble/games"]);
+      expect(t.room("#bubble/games")?.read).toBeUndefined();
+    });
+
+    // The code review (CR2) and /simplify (E1): each MARKREAD spends Ergo's fakelag once its budget of 16 is gone, so a
+    // busy room read at its end must not queue the account's own lines behind them.
+    describe("paced", () => {
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+      const reading = () => {
+        vi.useFakeTimers();
+        const t = memberIn(["#bubble/games", "#bubble"]);
+        for (const minute of [0, 1, 2, 3]) heard(t.fake, "#bubble/games", minute);
+        return t;
+      };
+
+      it("sends a room's MARKREAD at most once each 2 s, the newest place asked following", () => {
+        const t = reading();
+        t.link.read("#bubble/games", "m0");
+        t.link.read("#bubble/games", "m1");
+        t.link.read("#bubble/games", "m2");
+        expect(marked(t.fake.sent)).toEqual([`MARKREAD #bubble/games timestamp=${T(0)}`]);
+        vi.advanceTimersByTime(1_999);
+        expect(marked(t.fake.sent)).toHaveLength(1);
+        vi.advanceTimersByTime(1);
+        expect(marked(t.fake.sent)).toEqual([
+          `MARKREAD #bubble/games timestamp=${T(0)}`,
+          `MARKREAD #bubble/games timestamp=${T(2)}`,
+        ]);
+        vi.advanceTimersByTime(10_000);
+        expect(marked(t.fake.sent)).toHaveLength(2);
+      });
+
+      it("sends the place waiting at once as the room in view changes, or as the page asks", () => {
+        const t = reading();
+        t.link.read("#bubble/games", "m0");
+        t.link.read("#bubble/games", "m1");
+        t.link.show("#bubble");
+        expect(marked(t.fake.sent).at(-1)).toBe(`MARKREAD #bubble/games timestamp=${T(1)}`);
+        t.link.show("#bubble/games");
+        t.link.read("#bubble/games", "m3");
+        expect(marked(t.fake.sent)).toHaveLength(2);
+        t.link.flush();
+        expect(marked(t.fake.sent).at(-1)).toBe(`MARKREAD #bubble/games timestamp=${T(3)}`);
+        vi.advanceTimersByTime(10_000);
+        expect(marked(t.fake.sent)).toHaveLength(3);
+      });
+
+      // StrykerJS's survivors on the pace: a timer a room while its place waits, none left once sent, flushed or dropped.
+      it("holds one timer a room while its place waits, and none once it is sent, flushed or the link drops", () => {
+        const t = reading();
+        const base = vi.getTimerCount();
+        t.link.read("#bubble/games", "m0");
+        t.link.read("#bubble/games", "m1");
+        t.link.read("#bubble/games", "m2");
+        expect(vi.getTimerCount()).toBe(base + 1);
+        vi.advanceTimersByTime(2_000);
+        expect(vi.getTimerCount()).toBe(base);
+        t.link.read("#bubble/games", "m3");
+        expect(vi.getTimerCount()).toBe(base + 1);
+        t.link.flush();
+        expect(vi.getTimerCount()).toBe(base);
+        heard(t.fake, "#bubble/games", 4);
+        heard(t.fake, "#bubble/games", 5);
+        t.link.read("#bubble/games", "m4");
+        t.link.read("#bubble/games", "m5");
+        expect(vi.getTimerCount()).toBe(base + 1);
+        t.fake.state("waiting");
+        expect(vi.getTimerCount()).toBe(base);
+      });
+
+      it("sends nothing waiting once the link drops, and the place at once on the next connection's JOIN", () => {
+        const t = reading();
+        t.link.read("#bubble/games", "m0");
+        t.link.read("#bubble/games", "m2");
+        t.fake.state("waiting");
+        vi.advanceTimersByTime(10_000);
+        expect(marked(t.fake.sent)).toEqual([`MARKREAD #bubble/games timestamp=${T(0)}`]);
+        const again = t.connected(ADDRESS);
+        const before = again.sent.length;
+        again.line(`:${ADDRESS}!u@h JOIN #bubble/games`);
+        expect(marked(again.sent.slice(before))).toEqual([`MARKREAD #bubble/games timestamp=${T(2)}`]);
+      });
+    });
+
+    it("sends another session nothing the last one asked while away", () => {
+      const t = memberIn(["#bubble/games"]);
+      heard(t.fake, "#bubble/games", 1);
+      t.fake.state("waiting");
+      t.link.read("#bubble/games", "m1");
+      t.signedIn(OTHER);
+      t.link.follow(["#bubble/games"]);
+      const again = t.connected(OTHER);
+      const before = again.sent.length;
+      again.line(`:${OTHER}!u@h JOIN #bubble/games`);
+      expect(marked(again.sent.slice(before))).toEqual([]);
+    });
+  });
+
+  // The green pass (G5-G7): the edges of what the page tells Ergo as it types and reads.
+  describe("the typing and the reading place, at their edges", () => {
+    const ROOM = "#bubble/games";
+    const TT = (minute: number) => `2026-10-25T10:${String(minute).padStart(2, "0")}:00.000Z`;
+    const spoken = (fake: Fake, minute: number) => {
+      fake.line(`@msgid=m${String(minute)};time=${TT(minute)} :alice!u@h PRIVMSG ${ROOM} :at ${String(minute)}`);
+    };
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+    it("keeps the 3 s between two actives when a line between them could not go", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const t = memberIn([ROOM]);
+      t.link.typing(ROOM, "active");
+      expect(t.link.say(ROOM, "")).toBe(false);
+      t.link.typing(ROOM, "active");
+      expect(t.fake.sent.filter((line) => line.includes(" TAGMSG "))).toEqual([`@+typing=active TAGMSG ${ROOM}`]);
+    });
+    it("reads a room the store does not hold without a throw, and tells Ergo nothing", () => {
+      const t = memberIn([ROOM]);
+      expect(() => {
+        t.link.read("#garden", "m1");
+      }).not.toThrow();
+      expect(t.fake.sent.filter((line) => /^MARKREAD \S+ timestamp=/.test(line))).toEqual([]);
+    });
+    it("keeps the newer place asked when an older line is read after it, through a reconnect", () => {
+      const t = memberIn([ROOM]);
+      spoken(t.fake, 0);
+      spoken(t.fake, 1);
+      t.link.read(ROOM, "m1");
+      t.link.read(ROOM, "m0");
+      t.fake.state("waiting");
+      const again = t.connected(ADDRESS);
+      const before = again.sent.length;
+      again.line(`:${ADDRESS}!u@h JOIN ${ROOM}`);
+      expect(again.sent.slice(before).filter((line) => /^MARKREAD \S+ timestamp=/.test(line))).toEqual([
+        `MARKREAD ${ROOM} timestamp=${TT(1)}`,
+      ]);
+    });
   });
 });

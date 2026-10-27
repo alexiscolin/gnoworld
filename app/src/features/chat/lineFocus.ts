@@ -32,9 +32,11 @@ export function nextLine(press: Press, count: number, at: () => number): number 
   return ((steps[press.key] ?? from) + count) % count;
 }
 
-/** The list's one tab stop: the line last chosen while the list holds it, else the newest; none in an empty list. */
-export function stopOf(lines: readonly Line[], chosen: string | undefined): string | undefined {
-  return lines.some((line) => line.id === chosen) ? chosen : lines.at(-1)?.id;
+/** The list's one tab stop: the line last chosen while the list holds it, else the one marked New (`fresh`, the
+ * keyboard's way to the first news) while it does, else the newest; none in an empty list. */
+export function stopOf(lines: readonly Line[], chosen: string | undefined, fresh?: string): string | undefined {
+  const has = (id: string | undefined) => lines.some((line) => line.id === id);
+  return has(chosen) ? chosen : has(fresh) ? fresh : lines.at(-1)?.id;
 }
 
 function moveAmong(event: KeyboardEvent<HTMLOListElement>) {
@@ -52,15 +54,15 @@ function moveAmong(event: KeyboardEvent<HTMLOListElement>) {
   if (item instanceof HTMLElement) item.focus();
 }
 
-/** The list's one tab stop, the line last focused while it is there, else the newest; the lines whose bars are
- * mounted; the focus handed to a neighbour when a line goes. */
-export function useLineFocus(lines: readonly Line[], listRef: RefObject<HTMLOListElement | null>) {
+/** The list's one tab stop (`stopOf`, with `fresh` the line marked New); the lines whose bars are mounted; the focus
+ * handed to a neighbour when a line goes. */
+export function useLineFocus(lines: readonly Line[], listRef: RefObject<HTMLOListElement | null>, fresh?: string) {
   const [chosen, setChosen] = useState<string>();
   const [focused, setFocused] = useState<string>();
   const [pointed, setPointed] = useState<string>();
   // Whether the focus is in the focused line's bar (its More, its menu): that bar stays whatever the pointer does.
   const [held, setHeld] = useState(false);
-  const stop = stopOf(lines, chosen);
+  const stop = stopOf(lines, chosen, fresh);
   // A focused line's bar, taller than a line, comes into the list's view as the focus comes to it, the same line
   // again after the focus left the list too (G8): never as a line arrives (/code-review) or under the pointer.
   useEffect(() => {

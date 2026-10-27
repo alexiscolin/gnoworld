@@ -5,7 +5,7 @@
 // (4c); a guest reads, a room letting accounts alone speak.
 import type { RoomList } from "@gnoworld/schemas";
 import { Button, Sidebar, Stack } from "@gnoworld/ui";
-import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { useSearchParams } from "react-router";
 import { pageLoginApi } from "../../lib/api/login.ts";
 import { pageRoomsApi } from "../../lib/api/rooms.ts";
@@ -14,9 +14,11 @@ import { drawGuestNick } from "../../lib/ergo/ergo.ts";
 import { pageErgo } from "../../lib/ergo/page.ts";
 import type { AppState } from "../../store/index.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
-import { chatLink } from "./link.ts";
+import { chatLink, type ChatLink } from "./link.ts";
 import { LOADING } from "./Loading.tsx";
 import { neighbour, roomIds, roomLabel, roomParams, roomsQuery, shownRoom } from "./names.ts";
+import { useOnHide } from "./reading.ts";
+import { roomActs } from "./roomActs.ts";
 import { RoomsView } from "./RoomsView.tsx";
 import { RoomView, type RoomViewProps } from "./RoomView.tsx";
 
@@ -64,9 +66,10 @@ interface WriterProps {
   rooms: readonly string[];
   members: readonly string[];
   onSay: (draft: string) => boolean;
+  onTyping: (state: "active" | "done") => void;
 }
 
-function Writer({ session, room, rooms, members, onSay }: WriterProps) {
+function Writer({ session, room, rooms, members, onSay, onTyping }: WriterProps) {
   if (session.kind !== "in") return <p>Log in to write in this room.</p>;
   // The account's drafts on this device: the room's, where the composer starts, and each change kept (4d).
   const kept = pageDrafts(session.address);
@@ -83,6 +86,7 @@ function Writer({ session, room, rooms, members, onSay }: WriterProps) {
         rooms={rooms.map(roomLabel)}
         members={members}
         onSay={onSay}
+        onTyping={onTyping}
       />
     </Suspense>
   );
@@ -95,16 +99,17 @@ interface LoadedProps {
   state: RoomViewProps["state"];
   chat: RoomViewProps["chat"];
   session: AppState["login"]["session"];
-  say: (room: string, draft: string) => boolean;
-  /** Deletes a line of a room, through Ergo's REDACT (4c's message menu); whether it went out. */
-  redact: (room: string, id: string) => boolean;
+  /** The page's link to Ergo, which says and deletes the room in view's lines (4c), tells the account's typing and
+   * marks the room read (4f). */
+  link: RefObject<ChatLink | undefined>;
   /** The room's refused delete, said. */
   dismissed: (room: string) => void;
 }
 
-function Loaded({ sections, current, state, chat, session, say, redact, dismissed }: LoadedProps) {
+function Loaded({ sections, current, state, chat, session, link, dismissed }: LoadedProps) {
   const ids = roomIds(sections);
   useRoomKeys(ids, current);
+  const acts = roomActs(link, current ?? "", dismissed);
   return (
     <Sidebar space="l">
       <RoomsView sections={sections} current={current} />
@@ -114,17 +119,17 @@ function Loaded({ sections, current, state, chat, session, say, redact, dismisse
           state={state}
           chat={chat}
           me={session.kind === "in" ? session.address : undefined}
-          onDelete={(id) => redact(current, id)}
-          onDismiss={() => {
-            dismissed(current);
-          }}
+          onDelete={acts.onDelete}
+          onDismiss={acts.onDismiss}
+          onRead={acts.onRead}
           composer={
             <Writer
               session={session}
               room={current}
               rooms={ids}
               members={state?.members ?? []}
-              onSay={(draft) => say(current, draft)}
+              onSay={acts.onSay}
+              onTyping={acts.onTyping}
             />
           }
         />
@@ -136,7 +141,7 @@ function Loaded({ sections, current, state, chat, session, say, redact, dismisse
 export function ChatPanel({ world }: { world: string }) {
   const store = useAppStore();
   // The page's link to Ergo, made once the page runs: never in the build's pre-render.
-  const linkRef = useRef<ReturnType<typeof chatLink>>(undefined);
+  const linkRef = useRef<ChatLink>(undefined);
   const [asked, setAsked] = useState<Asked>();
   const [attempt, setAttempt] = useState(0);
   const [params] = useSearchParams();
@@ -175,7 +180,12 @@ export function ChatPanel({ world }: { world: string }) {
     if (sections !== undefined) linkRef.current?.follow(roomIds(sections));
   }, [sections]);
   const current = sections === undefined ? undefined : shownRoom(world, sections, params.get("room"));
-  useEffect(() => {
+  // The page hidden: the reading places waiting their 2 s go at once (F940).
+  useOnHide(() => {
+    linkRef.current?.flush();
+  });
+  // Before the room's lines' own effects, which read it to the link: a child's effects run before its parent's (CR1).
+  useLayoutEffect(() => {
     linkRef.current?.show(current);
   }, [current]);
   const state = useApp((app) => (current === undefined ? undefined : app.chat.rooms[current]));
@@ -202,8 +212,7 @@ export function ChatPanel({ world }: { world: string }) {
       state={state}
       chat={chat}
       session={session}
-      say={(room, draft) => linkRef.current?.say(room, draft) ?? false}
-      redact={(room, id) => linkRef.current?.redact(room, id) ?? false}
+      link={linkRef}
       dismissed={(room) => {
         store.getState().chatActions.dismissed(room);
       }}

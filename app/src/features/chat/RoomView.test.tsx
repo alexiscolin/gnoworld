@@ -1,6 +1,7 @@
 import type { Line } from "@gnoworld/core";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { prerender } from "react-dom/static";
+import { beforeAll, describe, expect, it } from "vitest";
 import { MEMBERS_SHOWN, RoomView, type RoomViewProps } from "./RoomView.tsx";
 
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -43,6 +44,14 @@ const part = (html: string, label: string) => {
 // list's own children instead (F814's class).
 const items = (html: string) => [...html.matchAll(/<li[^>]*>(.*?)<\/li>/gs)].map((m) => said(m[1] ?? ""));
 const paragraphs = (html: string) => (html.match(/<p[ >]/g) ?? []).length;
+
+// The lines view loads lazily, after the page is drawn (docs/decisions.md, 2026-10-26): drawn once and waited for, it
+// is held, and every view below draws it at once, as a room switch does once the page has it.
+beforeAll(async () => {
+  await prerender(
+    <RoomView room="#bubble/games" state={ROOM} chat="connected" onDelete={() => false} onDismiss={() => undefined} />,
+  );
+});
 
 describe("RoomView", () => {
   it("names the room, its description right after, from its topic", () => {
@@ -390,12 +399,106 @@ describe("RoomView", () => {
 
   it("shows what it is given under the lines, before who is here: the composer, or a word for a guest", () => {
     const html = view({ composer: <p>Log in to write in this room.</p> });
-    expect(html).toMatch(/aria-label="Messages".*<\/ol><p>Log in to write in this room.<\/p><\/div><aside/s);
+    expect(html).toMatch(
+      /aria-label="Messages".*<\/ol>(<p class="[^"]*typing[^"]*"[^>]*>.*?<\/p>)?<p>Log in to write in this room.<\/p><\/div><aside/s,
+    );
   });
 
   it("shows a room it holds nothing of yet as empty, once connected", () => {
     const html = view({ state: undefined });
     expect(said(html)).toContain("No messages yet.");
     expect(said(part(html, "Who's here"))).toContain("0 here");
+  });
+});
+
+// 4f: who is typing, under the lines (IRCv3's +typing).
+describe("RoomView: who is typing", () => {
+  const CAROL = "g1f6dcp6he2vq9gymrm4yrnyx66n0578vf7fsksl";
+  // Typing until a minute from now, so the render's clock reads it live.
+  const typing = (...nicks: string[]) => Object.fromEntries(nicks.map((nick) => [nick, Date.now() + 60_000]));
+  const words = (html: string) => said(html);
+
+  it("says who is typing, by account shortened, under the lines", () => {
+    expect(words(view({ state: { ...ROOM, typing: typing(ALICE) } }))).toContain("g10gh7…3y5tv is typing");
+  });
+
+  it("says two typists by name, a guest as a guest", () => {
+    expect(words(view({ state: { ...ROOM, typing: typing(ALICE, "guest-ab12cd") } }))).toContain(
+      "g10gh7…3y5tv and guest-ab12cd (guest) are typing",
+    );
+  });
+
+  it("says several are typing past three, naming none", () => {
+    const html = words(view({ state: { ...ROOM, typing: typing(ALICE, BOB, CAROL, "guest-ab12cd") } }));
+    expect(html).toContain("Several people are typing");
+    expect(html).not.toContain("3y5tv is typing");
+  });
+
+  // The UX review (U2, U8, U10): the line's place is always drawn, so the composer below never moves; the names, in
+  // full, are its title, as the line is cut to one.
+  it("draws the typing line's place with no one typing, and names three typists", () => {
+    expect(view()).toMatch(/<p class="[^"]*typing[^"]*"><\/p>/);
+    const html = view({ state: { ...ROOM, typing: typing(ALICE, BOB, CAROL) } });
+    expect(words(html)).toContain("g1f6dc…fsksl and g1jg8m…vsqf5 are typing");
+    expect(html).toMatch(new RegExp(`<p class="[^"]*typing[^"]*" title="${ALICE}, ${CAROL} and ${BOB} are typing">`));
+  });
+
+  // The red pass (R16): a live typist beside the past one, so the test fails while nothing is said at all.
+  it("says nothing of a typist whose time is past, nor with no one typing", () => {
+    const html = words(view({ state: { ...ROOM, typing: { ...typing(BOB), [ALICE]: Date.now() - 1 } } }));
+    expect(html).toContain("g1jg8m…vsqf5 is typing");
+    expect(html).not.toMatch(/3y5tv (and|is typing)/);
+    expect(words(view())).not.toContain("typing");
+  });
+
+  // The red pass (R24): out of every live region of the room, the Messages list and the link's status among them: no
+  // element open around the words has a role or aria-live.
+  it("keeps who is typing out of the room's live announcements", () => {
+    const html = view({ chat: "waiting", state: { ...ROOM, typing: typing(ALICE) } });
+    const at = /is typing…?<\/p>/.exec(html)?.index ?? -1;
+    expect(at).toBeGreaterThan(-1);
+    const open: { name: string; attributes: string }[] = [];
+    for (const [, closing, name = "", attributes = ""] of html.slice(0, at).matchAll(/<(\/?)([a-z0-9]+)([^>]*)>/g)) {
+      if (closing === "/") open.splice(open.map((element) => element.name).lastIndexOf(name), 1);
+      else if (!["br", "img", "input", "hr"].includes(name)) open.push({ name, attributes });
+    }
+    expect(open.filter(({ attributes }) => /role=|aria-live/.test(attributes))).toEqual([]);
+    expect(open.map(({ name }) => name)).toContain("p");
+  });
+});
+
+// 4f: the first line past the reading place marked New (Ergo's draft/read-marker).
+describe("RoomView: what is new", () => {
+  // A room whose history's page came, which the New mark waits on (4f's G1).
+  const OPENED = { ...ROOM, paged: true as const };
+  const T = (minute: number) => `2026-10-25T10:${String(minute).padStart(2, "0")}:00.000Z`;
+
+  const LINES = [line({ id: "a", time: T(0) }), line({ id: "b", time: T(1) }), line({ id: "c", time: T(2) })];
+
+  it("marks the first line past the reading place New, before its time, and that line alone", () => {
+    const html = part(view({ state: { ...OPENED, lines: LINES, read: T(0) } }), "Messages");
+    expect(items(html)).toEqual([
+      expect.stringMatching(/^\d{2}:\d{2} /),
+      expect.stringMatching(/^New( from here)? \d{2}:\d{2} /),
+      expect.stringMatching(/^\d{2}:\d{2} /),
+    ]);
+    expect(html.match(/data-new=""/g)).toHaveLength(1);
+  });
+
+  it("marks no line New with no reading place known, or every line read", () => {
+    expect(view({ state: { ...OPENED, lines: LINES, read: T(1) } })).toContain("data-new");
+    expect(view({ state: { ...OPENED, lines: LINES } })).not.toContain("data-new");
+    expect(view({ state: { ...OPENED, lines: LINES, read: T(2) } })).not.toContain("data-new");
+  });
+
+  it("passes the reader's own lines, read in the writing", () => {
+    const mine = [
+      line({ id: "a", time: T(0) }),
+      line({ id: "b", time: T(1), account: BOB }),
+      line({ id: "c", time: T(2) }),
+    ];
+    const html = part(view({ me: BOB, state: { ...OPENED, lines: mine, read: T(0) } }), "Messages");
+    expect(items(html)[2]).toMatch(/^New /);
+    expect(html.match(/data-new=""/g)).toHaveLength(1);
   });
 });

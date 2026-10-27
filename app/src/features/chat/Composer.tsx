@@ -12,6 +12,10 @@ import { Message } from "./Message.tsx";
 import { peopleOf, roomLabel, shortAddress } from "./names.ts";
 import styles from "./Composer.module.css";
 
+// What the field says while it has nothing else to say: the room is told of the typing from the first key (4f; its
+// switch waits for slice 8's settings, docs/decisions.md 2026-10-26), which the writer reads here (UX review's U9).
+const TELLS = "People in this room see when you type.";
+
 /** The bytes left from which the composer counts them. */
 export const NEAR = 50;
 
@@ -30,6 +34,14 @@ const bytes = (count: number) => `${String(count)} ${count === 1 ? "byte" : "byt
 
 // An option as the help names it: an account by its short address.
 const named = (option: string) => (option.startsWith("@") ? `@${shortAddress(option.slice(1))}` : option);
+
+/** What an edit leaving `draft` tells the room of the account's typing (IRCv3's +typing), read as compose reads a
+ * draft: text is active, an empty field done, a slash command nothing (the spec's), `//` text. */
+export function typingOf(draft: string): "active" | "done" | undefined {
+  const text = draft.replaceAll(/\p{Cc}/gu, " ").trim();
+  if (text === "") return "done";
+  return text.startsWith("/") && !text.startsWith("//") ? undefined : "active";
+}
 
 /** What the field says of the line: that it was not sent or is too long, what Tab completes (a command not yet
  * typed whole being no error), an unknown command, or help near the end; or nothing. */
@@ -100,14 +112,19 @@ export interface ComposerProps {
   draft?: string | undefined;
   /** Each change of the draft, for the device to keep; a line sent leaves it blank. */
   onDraft?: ((draft: string) => void) | undefined;
+  /** What each change of the draft tells the room of the account's typing (4f). */
+  onTyping?: ((state: "active" | "done") => void) | undefined;
 }
 
-export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", onDraft }: ComposerProps) {
+export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", onDraft, onTyping }: ComposerProps) {
   const [draft, setDraft] = useState(kept);
-  // Each change of the draft, the device told at once: a render alone (a line arriving) writes nothing.
+  // Each change of the draft, the device and the room told at once: a render alone (a line arriving, a room opened
+  // on a kept draft) writes nothing and tells no one (R3).
   const change = (next: string) => {
     setDraft(next);
     onDraft?.(next);
+    const told = typingOf(next);
+    if (told !== undefined) onTyping?.(told);
   };
   const [failed, setFailed] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
@@ -120,6 +137,9 @@ export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", 
   const mentioning = /(^|\s)@\S*$/u.test(draft);
   const people = mentioning ? peopleOf(members, nick) : [];
   const completion = completions(draft, { commands: COMMANDS, rooms, people });
+  const says = said(composed, failed, completion);
+  // Nothing else to say, no error either: the disclosure.
+  const shown = says.error === undefined && says.help === undefined ? { help: TELLS } : says;
   const known = new Set(members);
   const box = () => formRef.current?.querySelector("input") ?? undefined;
   useLayoutEffect(() => {
@@ -167,7 +187,7 @@ export function Composer({ room, nick, rooms, members, onSay, draft: kept = "", 
               change(value);
               setFailed(false);
             }}
-            {...said(composed, failed, completion)}
+            {...shown}
           />
           <Button type="submit" disabled={composed.kind !== "line"}>
             Send

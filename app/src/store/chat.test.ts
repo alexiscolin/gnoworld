@@ -1,5 +1,5 @@
 import { parseLine, type IrcMessage } from "@gnoworld/core";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { LINES_KEPT } from "./chat.ts";
 import { createAppStore } from "./index.ts";
 
@@ -122,6 +122,23 @@ describe("the store's chat slice", () => {
     expect(t.notified()).toBe(before + 1);
   });
 
+  // The green pass (G1): the New mark waits on a room's history, which a live line before it must not stand for.
+  it("keeps that a room's history came, an empty page too, and not before", () => {
+    const t = following();
+    t.heard(said("#bubble", "a", "live"));
+    expect(t.room("#bubble")?.paged).toBeUndefined();
+    t.page("#bubble", []);
+    expect(t.room("#bubble")?.paged).toBe(true);
+  });
+
+  // The code review (CR3): each connection's page waited on, not the first's alone.
+  it("forgets that a room's history came when the link drops", () => {
+    const t = following();
+    t.page("#bubble", []);
+    t.disconnected();
+    expect(t.room("#bubble")?.paged).toBeUndefined();
+  });
+
   it("takes from a page only the lines of its room", () => {
     const t = following();
     t.page("#bubble", [said("#bubble", "a", "mine"), said("#garden", "b", "theirs"), read("PING :x")]);
@@ -131,6 +148,8 @@ describe("the store's chat slice", () => {
   it("changes nothing for a page of a room it does not follow, or a page with nothing new", () => {
     const t = following();
     t.heard(said("#bubble", "a", "one"));
+    // Its first page came: a page after it brings what is new, or nothing.
+    t.page("#bubble", []);
     const chat = t.store.getState().chat;
     t.page("#garden", [said("#garden", "x", "theirs")]);
     t.page("#bubble", [said("#bubble", "a", "one")]);
@@ -300,5 +319,109 @@ describe("the store's chat slice: a delete Ergo refused", () => {
     t.dismissed("#garden");
     expect(t.notified()).toBe(before);
     expect(t.store.getState().chat.rooms["#garden"]).toBeUndefined();
+  });
+});
+
+// 4f: who is typing in each room (IRCv3's +typing), on the store's clock.
+describe("the store's chat slice: who is typing", () => {
+  const typing = (room: string, nick: string, state: string) =>
+    read(`@+typing=${state};time=${T0};account=${nick} :${nick}!u@h TAGMSG ${room}`);
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("keeps who is typing in each room, until their 6 s are past, as the store's clock reads it", () => {
+    vi.useFakeTimers({ now: Date.parse(T0) });
+    const t = following();
+    t.heard(typing("#bubble", "alice", "active"));
+    expect(t.room("#bubble")?.typing).toEqual({ alice: Date.parse(T0) + 6_000 });
+    expect(t.room("#bubble/games")?.typing).toBeUndefined();
+    t.heard(said("#bubble", "a", "hello"));
+    expect(t.room("#bubble")?.typing).toBeUndefined();
+  });
+
+  // The red pass (R6): the page's clock, the line's time an hour off.
+  it("counts a typist's 6 s from its own clock, never the line's time", () => {
+    vi.useFakeTimers({ now: Date.parse(T0) });
+    const t = following();
+    t.heard(read("@+typing=active;time=2026-10-25T09:00:00.000Z :alice!u@h TAGMSG #bubble"));
+    expect(t.room("#bubble")?.typing).toEqual({ alice: Date.parse(T0) + 6_000 });
+  });
+
+  it("ignores my own typing, which Ergo echoes, and tells no one of it, another's kept", () => {
+    const t = following();
+    t.heard(typing("#bubble", "alice", "active"));
+    const before = t.notified();
+    t.heard(typing("#bubble", ME, "active"));
+    expect(Object.keys(t.room("#bubble")?.typing ?? {})).toEqual(["alice"]);
+    expect(t.notified()).toBe(before);
+  });
+
+  // The red pass (R17): noise makes no room and tells no one; a flood of one nick is one typist.
+  it("stays quiet on typing in a room it does not follow, to a nick, and a done from nobody", () => {
+    const t = following();
+    const before = t.notified();
+    t.heard(typing("#garden", "alice", "active"));
+    t.heard(typing(ME, "alice", "active"));
+    t.heard(typing("#bubble", "stranger", "done"));
+    expect(t.notified()).toBe(before);
+    expect(t.store.getState().chat.rooms["#garden"]).toBeUndefined();
+  });
+
+  it("holds one typist for a thousand actives of one nick", () => {
+    const t = following();
+    for (let n = 0; n < 1_000; n += 1) t.heard(typing("#bubble", "alice", "active"));
+    expect(Object.keys(t.room("#bubble")?.typing ?? {})).toEqual(["alice"]);
+  });
+
+  it("forgets who is typing when the link drops", () => {
+    const t = following();
+    t.heard(typing("#bubble", "alice", "active"));
+    expect(t.room("#bubble")?.typing).toBeDefined();
+    t.disconnected();
+    expect(t.room("#bubble")?.typing).toBeUndefined();
+  });
+});
+
+// 4f: each room's reading place (Ergo's draft/read-marker), forward alone, on the store's clock.
+describe("the store's chat slice: the reading place", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("keeps the reading place Ergo gives each room, forward alone", () => {
+    const t = following();
+    const later = "2026-10-25T10:05:00.000Z";
+    t.heard(read(`:ergo MARKREAD #bubble timestamp=${later}`));
+    t.heard(read(`:ergo MARKREAD #bubble timestamp=${T0}`));
+    t.heard(read(`:ergo MARKREAD #bubble/games *`));
+    expect(t.room("#bubble")?.read).toBe(later);
+    expect(t.room("#bubble/games")?.read).toBeUndefined();
+  });
+
+  // The red pass (R17): a place for a room not followed makes no room and tells no one.
+  it("keeps no place for a room it does not follow, and tells no one", () => {
+    const t = following();
+    const before = t.notified();
+    t.heard(read(`:ergo MARKREAD #garden timestamp=${T0}`));
+    expect(t.notified()).toBe(before);
+    expect(t.store.getState().chat.rooms["#garden"]).toBeUndefined();
+  });
+
+  // The red pass (R13): the store reads a place against its own clock.
+  it("reads a place more than 5 minutes past its clock as none", () => {
+    vi.useFakeTimers({ now: Date.parse(T0) });
+    const t = following();
+    t.heard(read(":ergo MARKREAD #bubble timestamp=2026-10-25T10:05:00.001Z"));
+    t.heard(read(":ergo MARKREAD #bubble/games timestamp=2026-10-25T10:05:00.000Z"));
+    expect(t.room("#bubble")?.read).toBeUndefined();
+    expect(t.room("#bubble/games")?.read).toBe("2026-10-25T10:05:00.000Z");
+  });
+
+  it("keeps the reading place through a drop of the link, Ergo's being the account's", () => {
+    const t = following();
+    t.heard(read(`:ergo MARKREAD #bubble timestamp=${T0}`));
+    t.disconnected();
+    expect(t.room("#bubble")?.read).toBe(T0);
   });
 });

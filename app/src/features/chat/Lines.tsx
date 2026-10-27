@@ -3,13 +3,14 @@
 // (Message.tsx); one that mentions the reader says so (4d). The message menu (4c, docs/decisions.md 2026-10-26): the
 // list is one tab stop, a line, the arrows moving among them; a line pointed at or focused shows its bar.
 import { markdown, mentions, type Block, type Line } from "@gnoworld/core";
-import { Flash, type FlashMessage } from "@gnoworld/ui";
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { Flash } from "@gnoworld/ui";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { LineActions } from "./LineActions.tsx";
+import { useCopy, useRemoval } from "./lineFlash.ts";
 import { useLineFocus } from "./lineFocus.ts";
 import { Markdown } from "./Message.tsx";
-import { roomHref } from "./names.ts";
 import { Person } from "./Person.tsx";
+import { useNewMark, useReadAtEnd } from "./reading.ts";
 import shared from "./lists.module.css";
 import styles from "./RoomView.module.css";
 
@@ -60,15 +61,34 @@ interface LineViewProps {
   stop: boolean;
   /** Its bar, while pointed at or focused. */
   actions: ReactNode;
+  /** Whether it is the first line past the reading place as the room opened (4f). */
+  fresh: boolean;
 }
 
-function LineView({ line, me, members, stop, actions }: LineViewProps) {
+function LineView({ line, me, members, stop, actions, fresh }: LineViewProps) {
   const blocks = markdown(line.text);
   const names = namesOf(line.text);
   const mentioned = names.split(" ").some((address) => address === me);
   const known = knownOf(names, members);
   return (
-    <li className={KINDS[line.kind]} data-about-me={mentioned ? "" : undefined} tabIndex={stop ? 0 : -1}>
+    <li
+      className={KINDS[line.kind]}
+      data-about-me={mentioned ? "" : undefined}
+      data-new={fresh ? "" : undefined}
+      tabIndex={stop ? 0 : -1}
+    >
+      {fresh ? (
+        <>
+          {/* The prototype's divider: a row of its own, its word in the label style and a rule running on. */}
+          <span className={styles["divider"]}>
+            <span className="label">
+              <span className={styles["fresh"]}>
+                New<span className="visually-hidden"> from here</span>
+              </span>
+            </span>
+          </span>{" "}
+        </>
+      ) : null}
       {/* The line's marks first, before the time: where no sender's words stand (F808). */}
       {mentioned ? <span className={styles["mentionsYou"]}>Mentions you </span> : null}
       {line.kind === "notice" ? <span className={styles["mark"]}>Notice </span> : null}
@@ -86,42 +106,29 @@ function LineView({ line, me, members, stop, actions }: LineViewProps) {
 // How near the end, in pixels, the reader still reads the newest line.
 const AT_END = 32;
 
-// The lines held at their newest while the reader is there; once scrolled up, left where the reader is.
-function useNewestInView(lines: readonly Line[]) {
+// Whether a list is scrolled to its end, or within AT_END of it.
+const atEnd = (box: HTMLElement) => box.scrollHeight - box.scrollTop - box.clientHeight < AT_END;
+
+// The lines held at their newest while the reader is there; once scrolled up, left where the reader is. A room with
+// news opens on its New line, `fresh`, once (UX review's U1), and the reader is at the end only if that shows it.
+function useNewestInView(lines: readonly Line[], fresh: string | undefined) {
   const listRef = useRef<HTMLOListElement>(null);
   const atEndRef = useRef(true);
+  const placedRef = useRef(false);
   useLayoutEffect(() => {
-    if (listRef.current !== null && atEndRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
-  }, [lines]);
-  const onScroll = () => {
     const box = listRef.current;
-    if (box !== null) atEndRef.current = box.scrollHeight - box.scrollTop - box.clientHeight < AT_END;
+    if (box === null) return;
+    const item = fresh === undefined || placedRef.current ? null : box.querySelector(":scope > li[data-new]");
+    if (item !== null) {
+      placedRef.current = true;
+      box.scrollTop += item.getBoundingClientRect().top - box.getBoundingClientRect().top;
+      atEndRef.current = atEnd(box);
+    } else if (atEndRef.current) box.scrollTop = box.scrollHeight;
+  }, [lines, fresh]);
+  const onScroll = () => {
+    if (listRef.current !== null) atEndRef.current = atEnd(listRef.current);
   };
-  return { listRef, onScroll };
-}
-
-// What a copy says, in the room's flash: done, or not and why, a page with no clipboard (a plain http origin) included.
-function useCopy(room: string) {
-  const [said, setSaid] = useState<FlashMessage | null>(null);
-  const copy = (line: Line, what: "text" | "link") => {
-    setSaid(null);
-    const text = what === "text" ? line.text : new URL(roomHref(room), location.href).href;
-    // A page with no clipboard throws at once: inside a then, it fails as a refusal does.
-    Promise.resolve()
-      .then(() => navigator.clipboard.writeText(text))
-      .then(
-        () => {
-          setSaid({ title: what === "text" ? "Text copied." : "Link copied." });
-        },
-        () => {
-          setSaid({
-            title: what === "text" ? "Could not copy the text." : "Could not copy the link.",
-            line: "Your browser blocked the clipboard.",
-          });
-        },
-      );
-  };
-  return { said, setSaid, copy };
+  return { listRef, atEndRef, onScroll };
 }
 
 export interface LinesProps {
@@ -138,46 +145,37 @@ export interface LinesProps {
   onDelete: (id: string) => boolean;
   /** The room's flash said Ergo's refusal of a delete. */
   onDismiss: () => void;
+  /** The time of the last line the account read here, Ergo's (4f); none while unknown. */
+  read?: string | undefined;
+  /** The room's history page came: the New mark waits on it, as a live line may come before it (4f's G1). */
+  paged?: boolean;
+  /** The room read to its line `id`, the newest, while the reader is at the end and the page shows. */
+  onRead?: ((id: string) => void) | undefined;
 }
 
 /** The room's flash, then its lines, oldest first, as a list a screen reader hears grow. */
-export function Lines({ room, lines, members, me, refused, connected, onDelete, onDismiss }: LinesProps) {
-  const { listRef, onScroll } = useNewestInView(lines);
-  const { stop, mounted, on, leave } = useLineFocus(lines, listRef);
+export function Lines({
+  room,
+  lines,
+  members,
+  me,
+  refused,
+  connected,
+  onDelete,
+  onDismiss,
+  read,
+  paged = false,
+  onRead,
+}: LinesProps) {
+  const fresh = useNewMark(lines, paged ? read : undefined, me);
+  const { listRef, atEndRef, onScroll } = useNewestInView(lines, fresh);
+  const look = useReadAtEnd(lines, atEndRef, paged ? onRead : undefined);
+  const { stop, mounted, on, leave } = useLineFocus(lines, listRef, fresh);
   const { said, setSaid, copy } = useCopy(room);
-  // A delete gone out and not answered yet: its line offers no second one; Ergo's echo, taking the line, is said, and
-  // its refusal ends it too (U4). ponytail: a line trimmed out of the window meanwhile reads as deleted, in the
-  // milliseconds a REDACT waits for its echo.
-  const [deleting, setDeleting] = useState<string>();
-  if (deleting !== undefined && (refused === deleting || !lines.some((line) => line.id === deleting))) {
-    setDeleting(undefined);
-    if (refused !== deleting) setSaid({ title: "Message deleted." });
-  }
+  const [deleting, remove] = useRemoval({ lines, refused, connected, onDelete, leave, setSaid });
   // Who a mention may shorten (F812): the members, and the authors in view by their account tag, who proved their
   // key as a member did (F819).
   const known = new Set([...members, ...lines.flatMap(({ account }) => (account === undefined ? [] : [account]))]);
-  // A delete that went out hands the focus to a neighbour; one that could not says so and why, the line kept
-  // (/code-review, U8): the chat out of reach, to try again once back, or a msgid no command carries.
-  const remove = (id: string): boolean => {
-    const went = onDelete(id);
-    if (went) {
-      setDeleting(id);
-      leave(id);
-    } else if (connected) setSaid({ title: "Could not delete the message.", line: "This message cannot be deleted." });
-    else {
-      setSaid({
-        title: "Could not delete the message.",
-        line: "The chat is out of reach.",
-        action: {
-          label: "Try again",
-          onAction: () => {
-            remove(id);
-          },
-        },
-      });
-    }
-    return went;
-  };
   const actionsOf = (line: Line) => (
     <LineActions
       line={line}
@@ -204,7 +202,10 @@ export function Lines({ room, lines, members, me, refused, connected, onDelete, 
       />
       <ol
         ref={listRef}
-        onScroll={onScroll}
+        onScroll={() => {
+          onScroll();
+          look();
+        }}
         {...on}
         aria-label="Messages"
         // How the keyboard moves among the lines, which nothing else tells a screen reader (U14).
@@ -221,6 +222,7 @@ export function Lines({ room, lines, members, me, refused, connected, onDelete, 
             members={known}
             stop={line.id === stop}
             actions={mounted(line.id) ? actionsOf(line) : null}
+            fresh={line.id === fresh}
           />
         ))}
       </ol>

@@ -4,16 +4,36 @@
 // (4d); the composer, given, goes below.
 // A line's author is its account tag alone, a nick being only a nick; a member's nick is an account's when it is
 // an address, which a guest's cannot be (Ergo gives a guest 32 characters, server/src/testing/ergo.test.ts:314).
-import type { Line } from "@gnoworld/core";
+import { typingAt, type Line, type Typing } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
 import { Sidebar, Stack } from "@gnoworld/ui";
-import type { ReactNode } from "react";
+import { Fragment, lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import type { ErgoState } from "../../lib/ergo/ergo.ts";
-import { Lines } from "./Lines.tsx";
+import type { LinesProps } from "./Lines.tsx";
 import { roomLabel } from "./names.ts";
 import { Person } from "./Person.tsx";
 import shared from "./lists.module.css";
 import styles from "./RoomView.module.css";
+
+// The lines view (the lines, what is under them, a line's bar) is asked once the room holds a line: lines come over the
+// WebSocket after the page is drawn, so its code is never the first screen's (ADR-0001 §12; docs/decisions.md,
+// 2026-10-26). One boundary for every feature of a line.
+const Lines = lazy(async () => ({ default: (await import("./Lines.tsx")).Lines }));
+const LINES = [shared["plain"], shared["scrolls"], styles["lines"]].join(" ");
+// The list's place while its code comes, or while the room holds no line: no line, no tab stop; a key pressed meanwhile
+// acts on the page as it stands, nothing queued for the lines.
+const waiting = (busy: boolean) => <ol aria-label="Messages" aria-busy={busy || undefined} className={LINES} />;
+
+// The room's lines: the list's place while it holds none or their code comes, then the lines view.
+function RoomLines(props: LinesProps) {
+  return props.lines.length === 0 ? (
+    waiting(false)
+  ) : (
+    <Suspense fallback={waiting(true)}>
+      <Lines {...props} />
+    </Suspense>
+  );
+}
 
 /** The people a room lists by name; the others are counted. */
 export const MEMBERS_SHOWN = 100;
@@ -36,6 +56,12 @@ export interface RoomViewProps {
         topic: string | undefined;
         /** The msgid of a line Ergo refused to delete (4c). */
         refused?: string | undefined;
+        /** Who is typing, each nick with the time its typing ends (4f). */
+        typing?: Typing;
+        /** The time of the last line the account read here, Ergo's (4f). */
+        read?: string | undefined;
+        /** This connection's history page came (4f's G1, CR3). */
+        paged?: true | undefined;
       }
     | undefined;
   chat: ErgoState | "off";
@@ -47,6 +73,8 @@ export interface RoomViewProps {
   onDelete: (id: string) => boolean;
   /** The room's flash said Ergo's refusal of a delete. */
   onDismiss: () => void;
+  /** The room read to its newest line, as the reader reaches it (4f). */
+  onRead?: ((id: string) => void) | undefined;
 }
 
 // Who is here: counted once connected, the bot left out, the first MEMBERS_SHOWN named.
@@ -67,8 +95,48 @@ function People({ members, connected }: { members: readonly string[]; connected:
   );
 }
 
-export function RoomView({ room, state, chat, composer, me, onDelete, onDismiss }: RoomViewProps) {
-  const { lines = [], members = [], topic, refused } = state ?? {};
+// Who is typing, by name, on the page's clock (its own a room: CR4), drawn again as the next one's time ends, a timer
+// firing early never seen as before it (CR6); under the lines and out of every live region, so a screen reader hears
+// the lines and not each pause of another's.
+function Typists({ typing }: { typing: Typing }) {
+  const [now, setNow] = useState(() => Date.now());
+  const next = Math.min(...Object.values(typing ?? {}).filter((until) => until > now));
+  useEffect(() => {
+    if (next === Infinity) return;
+    const timer = setTimeout(() => {
+      setNow(Math.max(Date.now(), next));
+    }, next - Date.now());
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [next]);
+  const nicks = typingAt(typing, now);
+  const verb = nicks.length === 1 ? "is" : "are";
+  // Up to three by name, which a wide screen holds; the line is cut to one (U2), its whole in its title: the names in
+  // full, a guest said so.
+  const named = nicks.map((nick, at) => (
+    <Fragment key={nick}>
+      {at === 0 ? "" : at === nicks.length - 1 ? " and " : ", "}
+      <Person name={nick} guest={!Address.safeParse(nick).success} />
+    </Fragment>
+  ));
+  const whole = nicks.map((nick) => (Address.safeParse(nick).success ? nick : `${nick} (guest)`));
+  const title = `${whole.length > 1 ? `${whole.slice(0, -1).join(", ")} and ` : ""}${whole.at(-1) ?? ""} ${verb} typing`;
+  return (
+    <p className={styles["typing"]} title={nicks.length === 0 ? undefined : title}>
+      {nicks.length === 0 ? null : nicks.length > 3 ? (
+        "Several people are typing"
+      ) : (
+        <>
+          {named} {verb} typing
+        </>
+      )}
+    </p>
+  );
+}
+
+export function RoomView({ room, state, chat, composer, me, onDelete, onDismiss, onRead }: RoomViewProps) {
+  const { lines = [], members = [], topic, refused, typing, read, paged } = state ?? {};
   const connected = chat === "connected";
   return (
     <Stack as="section" space="s">
@@ -81,7 +149,7 @@ export function RoomView({ room, state, chat, composer, me, onDelete, onDismiss 
       </p>
       <Sidebar side="end" space="m">
         <div>
-          <Lines
+          <RoomLines
             key={room}
             room={room}
             lines={lines}
@@ -91,8 +159,12 @@ export function RoomView({ room, state, chat, composer, me, onDelete, onDismiss 
             connected={connected}
             onDelete={onDelete}
             onDismiss={onDismiss}
+            read={read}
+            paged={paged === true}
+            onRead={onRead}
           />
           {connected && lines.length === 0 ? <p>No messages yet.</p> : null}
+          <Typists key={`${room} typing`} typing={typing} />
           {composer}
         </div>
         <People members={members} connected={connected} />
