@@ -116,6 +116,19 @@ describe("an account's drafts on the device", () => {
     expect(Date.now() - start).toBeLessThan(1000);
   });
 
+  // Survivor of StrykerJS: a lone CR is a break to compose, so the spaces before it are a line's end too.
+  it("trims the end of a line a lone CR or a CR LF ends, as compose does", () => {
+    const nick = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+    for (const lineBreak of ["\r", "\r\n"]) {
+      const draft = Array.from({ length: 38 }, (_, at) => `line ${String(at)}${" ".repeat(110)}`).join(lineBreak);
+      expect(draft.length).toBeGreaterThan(DRAFT_LIMIT);
+      expect(compose("#bubble", draft, nick).kind).toBe("lines");
+      const mine = on(storage(), ALICE);
+      expect(mine.set("#bubble", draft)).toBe(true);
+      expect(mine.get("#bubble")).toBe(Array.from({ length: 38 }, (_, at) => `line ${String(at)}`).join("\n"));
+    }
+  });
+
   it("keeps a draft of exactly the limit as typed, its trailing space too: only a longer one is trimmed", () => {
     const mine = on(storage(), ALICE);
     const draft = `${"a".repeat(DRAFT_LIMIT - 1)} `;

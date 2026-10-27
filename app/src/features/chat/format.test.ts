@@ -125,6 +125,8 @@ describe("formatted", () => {
     ["«- a\n\nb»", "numbered", "1. «a\n\n1. b»"],
     ["«- a\n\nb»", "bulleted", "- «a\n\n- b»"],
     ["a\n|\nb", "bulleted", "a\n- |\nb"],
+    ["a\n|  \nb", "bulleted", "a\n- |  \nb"],
+    ["|  ", "quote", "> |  "],
     ["a\n|\nb", "quote", "a\n> |\nb"],
   ] as const)("treats the blank line of %j as no line of a %s: %j", (before, format, after) => {
     expect(apply(before, format)).toStrictEqual(draft(after));

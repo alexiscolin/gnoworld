@@ -91,7 +91,13 @@ describe("firstGraphemes: the first graphemes of a text, the rest never segmente
   });
 
   test("gives the whole text, segmented, when it is within the cut", () => {
-    expect(firstGraphemes("abc", 70)).toEqual(["a", "b", "c"]);
+    const segment = vi.spyOn(Intl.Segmenter.prototype, "segment");
+    try {
+      expect(firstGraphemes("abc", 70)).toEqual(["a", "b", "c"]);
+      expect(segment).toHaveBeenCalledTimes(1);
+    } finally {
+      segment.mockRestore();
+    }
     expect(firstGraphemes("", 70)).toEqual([]);
   });
 
