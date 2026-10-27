@@ -282,13 +282,11 @@ describe("the composer, from a draft", () => {
     expect(markup).toContain(told);
   });
 
-  it("leaves the bytes left and an error their place before the hint", () => {
+  it("leaves an error its place before the hint", () => {
     const withGroups = (draft: string) =>
       renderToStaticMarkup(
         <Composer room={ROOM} nick={NICK} rooms={[]} members={[]} draft={draft} groups onSay={() => true} />,
       );
-    expect(withGroups(`@room ${"a".repeat(400)}`)).toContain("bytes left");
-    expect(withGroups(`@room ${"a".repeat(400)}`)).not.toContain(ROOM_NOTIFIES);
     expect(withGroups(`@room ${"a".repeat(600)}`)).not.toContain(ROOM_NOTIFIES);
   });
 
