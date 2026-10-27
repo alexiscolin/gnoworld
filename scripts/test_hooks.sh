@@ -1869,6 +1869,12 @@ for s in core_chromium stories py:prove_fix; do
 	printf '%s\n' "$out" | grep -q "^check.sh: the coverage and harness lanes did not run" ||
 		fail "check.sh --full did not say which lanes did not run after $s's failure: $out"
 done
+# The probe and the benches run alone before any lane: either one failing fails the gate, shows, and stops it there (G2).
+for s in py:probe py:bench; do
+	out=$(FAIL=$s gate --full) && fail "check.sh --full passed with $s failing"
+	printf '%s\n' "$out" | grep -q "^$s failed here" || fail "check.sh --full hid $s's failure: $out"
+	ran stories && fail "check.sh --full went on to the stories after $s's failure"
+done
 (FAIL=core_chromium gate --full) >/dev/null && fail "check.sh --full passed with core's Chromium tests failing"
 (FAIL=stories gate --full) >/dev/null && fail "check.sh --full passed with the stories failing"
 ran py:audit || fail "check.sh --full stopped the history lane at the stories' failure: a phase's lanes run to their end"
@@ -1883,6 +1889,13 @@ for s in $fast_steps py:probe py:bench core_chromium stories coverage py:patch_c
 done
 grep -qx "py:harness_mutate --changed $base" "$log" || fail "check.sh --merge did not judge the merge's own harness mutants: $(grep harness_mutate "$log")"
 grep -qx "py:batch_size $base" "$log" || fail "check.sh --merge did not measure the merge's batch from its base: $(grep batch_size "$log")"
+# A batch past its limit fails the merge's gate, shows, and records nothing (G2).
+rm -f "$g/.claude/tmp/green-fast"
+out=$(FAIL=py:batch_size gate --merge) && fail "check.sh --merge passed with its batch size failing"
+printf '%s\n' "$out" | grep -q "^py:batch_size failed here" || fail "check.sh --merge hid the batch size's failure: $out"
+[ ! -e "$g/.claude/tmp/green-fast" ] || fail "check.sh --merge recorded a gate whose batch was too large"
+rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/green-full"
+out=$(gate --merge) || fail "check.sh --merge failed again on a copy whose every step passes: $out"
 [ ! -e "$g/.claude/tmp/green-full" ] || fail "check.sh --merge recorded the full gate"
 grep -qxF "$(record)" "$g/.claude/tmp/green-fast" || fail "check.sh --merge did not record the fast gate it passed"
 gate --full >/dev/null || fail "check.sh --full failed after --merge"
