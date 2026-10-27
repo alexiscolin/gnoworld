@@ -3,7 +3,7 @@ import { completions } from "./complete.ts";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { Composer, Preview, typingOf } from "./Composer.tsx";
-import { NEAR, said } from "./said.ts";
+import { NEAR, said, withHint } from "./said.ts";
 import { refusalAfter } from "./composerHooks.ts";
 
 const ROOM = "#bubble/games";
@@ -280,6 +280,16 @@ describe("the composer, a draft of several lines", () => {
     const markup = from("");
     const described = /<textarea[^>]* aria-describedby="([^"]+)"/.exec(markup)?.[1] ?? "?";
     expect(markup).toMatch(new RegExp(`id="${described}"[^>]*>[^<]*Shift\\+Enter adds a line\\.<`));
+  });
+
+  // F1714 (CR2, by Alexis): on a touch screen Enter adds a line and Send sends; the help names the form that applies.
+  it("hints that Enter adds a line and Send sends on a touch screen, Shift+Enter on a computer", () => {
+    expect(withHint({}, true, true).help).toBe("Enter adds a line; Send sends it.");
+    expect(withHint({}, true, false).help).toBe("Shift+Enter adds a line.");
+    expect(withHint({}, false, true).help).toBe(
+      "People in this room see when you type. Enter adds a line; Send sends it.",
+    );
+    expect(withHint({ error: "No." }, false, true)).toStrictEqual({ error: "No." });
   });
 
   it("says what keeps a draft from going in the box, in place of the hint", () => {

@@ -8,10 +8,9 @@ import { COMMANDS, compose, type Composed } from "@gnoworld/core";
 import { Button, Cluster, Field, IconButton, Sidebar, Stack, type IconName } from "@gnoworld/ui";
 import { useRef, useState, type KeyboardEvent, type SubmitEvent } from "react";
 import { completed, completions } from "./complete.ts";
-import { useFocusAtStart, useRefusal, useSelection, type Refused } from "./composerHooks.ts";
+import { useFocusAtStart, useHelp, useRefusal, useSelection, type Refused } from "./composerHooks.ts";
 import { formatted, type Edit, type Format } from "./format.ts";
 import { Message } from "./Message.tsx";
-import { said, withHint } from "./said.ts";
 import { peopleOf, roomLabel } from "./names.ts";
 import { useAnswering } from "./ReplyBar.tsx";
 import type { Answered } from "./Replying.tsx";
@@ -130,7 +129,7 @@ export function Composer(props: ComposerProps) {
   const mentioning = /(^|\s)@\S*$/u.test(draft);
   const people = mentioning ? peopleOf(members, nick) : [];
   const completion = completions(draft, { commands: COMMANDS, rooms, people });
-  const shown = withHint(said(composed, failed, completion), to !== undefined);
+  const { coarse, shown } = useHelp(composed, { failed, completion, direct: to !== undefined });
   // The selection an edit leaves is put back in the box once it shows the new draft.
   const { box, keep } = useSelection(formRef, draft);
   useFocusAtStart(formRef, props.focus);
@@ -177,6 +176,7 @@ export function Composer(props: ComposerProps) {
         <Sidebar side="end" space="2xs">
           <Field
             kind="lines"
+            enterAddsLine={coarse}
             label={`Message ${label}`}
             describedBy={answering.describedBy}
             value={draft}

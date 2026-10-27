@@ -1,7 +1,10 @@
 // What the composer keeps beside its draft (moved out of Composer.tsx, which the merge of 4e's refusals and 4f's typing
 // grew past the lint's sizes): why Ergo refused the last line, the focus at its start, the selection an edit leaves.
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import type { Composed } from "@gnoworld/core";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
+import type { Completion } from "./complete.ts";
 import type { Edit } from "./format.ts";
+import { said, withHint } from "./said.ts";
 
 /** The lines Ergo refused so far, the last one's draft, and why it did not go. */
 export interface Refused {
@@ -68,4 +71,32 @@ export function useSelection(formRef: RefObject<HTMLFormElement | null>, draft: 
       selectionRef.current = edit;
     },
   };
+}
+
+const COARSE = "(pointer: coarse)";
+
+/** Whether the main pointer is a finger (a touch screen), whose keyboard has no Shift: Enter there adds a line (F1714).
+ * Read as the screen says it, again when it changes; a page rendered on the server says no. */
+function useCoarsePointer(): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      const media = window.matchMedia(COARSE);
+      media.addEventListener("change", onChange);
+      return () => {
+        media.removeEventListener("change", onChange);
+      };
+    },
+    () => window.matchMedia(COARSE).matches,
+    () => false,
+  );
+}
+
+/** What the field says of the draft, its hint of how to add a line following the screen's pointer; and whether that
+ * pointer is a finger. */
+export function useHelp(
+  composed: Composed,
+  { failed, completion, direct }: { failed: boolean; completion?: Completion | undefined; direct: boolean },
+) {
+  const coarse = useCoarsePointer();
+  return { coarse, shown: withHint(said(composed, failed, completion), direct, coarse) };
 }

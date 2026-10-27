@@ -74,6 +74,25 @@ test.describe("a message of several lines", () => {
     await expect(field(page)).toHaveAccessibleDescription("1 line too many: 40 at most.");
   });
 
+  // A phone cannot log in (backlog row 4: a coarse pointer gets no login button), so the page is logged in on a
+  // computer, then switched to touch emulation; the composer follows the pointer media query as it changes.
+  test("on a touch screen, Enter adds a line and Send sends the draft whole (F1714)", async ({ page }) => {
+    const sent = await opened(page);
+    await expect(page.getByText("Shift+Enter adds a line.")).toBeVisible();
+    const client = await page.context().newCDPSession(page);
+    await client.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
+    await expect(page.getByText("Enter adds a line; Send sends it.")).toBeVisible();
+    await field(page).click();
+    await page.keyboard.type("- one");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("- two");
+    await expect(field(page)).toHaveValue("- one\n- two");
+    expect(sent.filter((line) => line.startsWith("BATCH "))).toEqual([]);
+    await page.getByRole("button", { name: "Send" }).click();
+    await expect(field(page)).toHaveValue("");
+    expect(sent.filter((line) => line.startsWith("BATCH +"))).toHaveLength(1);
+  });
+
   test("passes axe with a draft of several lines and a message of several lines shown", async ({ page }) => {
     await opened(page, [["m1", T(0), "- one\n- two"]]);
     await field(page).fill("first\nsecond");

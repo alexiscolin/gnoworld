@@ -9,6 +9,7 @@ import { shortAddress } from "./names.ts";
 // switch waits for slice 8's settings, docs/decisions.md 2026-10-26), which the writer reads here (UX review's U9).
 const TELLS = "People in this room see when you type.";
 const ADDS_LINE = "Shift+Enter adds a line.";
+const ADDS_LINE_TOUCH = "Enter adds a line; Send sends it.";
 
 /** The bytes left from which the composer counts them. */
 export const NEAR = 50;
@@ -55,7 +56,10 @@ export function said(composed: Composed, failed: boolean, completion?: Completio
   return {};
 }
 
-// Nothing else to say, no error either: how to add a line, and the disclosure to a room's writer; a direct message
-// tells no typing (4e).
-export const withHint = (says: ReturnType<typeof said>, direct: boolean): ReturnType<typeof said> =>
-  says.error === undefined && says.help === undefined ? { help: direct ? ADDS_LINE : `${TELLS} ${ADDS_LINE}` } : says;
+// Nothing else to say, no error either: how to add a line (a touch screen's keyboard has no Shift), and the disclosure
+// to a room's writer; a direct message tells no typing (4e).
+export const withHint = (says: ReturnType<typeof said>, direct: boolean, coarse: boolean): ReturnType<typeof said> => {
+  if (says.error !== undefined || says.help !== undefined) return says;
+  const adds = coarse ? ADDS_LINE_TOUCH : ADDS_LINE;
+  return { help: direct ? adds : `${TELLS} ${adds}` };
+};
