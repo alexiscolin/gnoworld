@@ -33,13 +33,23 @@ export interface Held {
   reactions: readonly Reaction[] | undefined;
 }
 
+// Whether a REDACT names a line or a reaction its sender did not write: a conversation has no moderators, so a partner's
+// REDACT naming one of mine changes nothing here (Ergo refuses it as well).
+function forbiddenBy(message: IrcMessage) {
+  const [, id = ""] = message.params;
+  const sender = nickOf(message.source ?? "");
+  return (each: { id: string; from?: string; who?: string }) =>
+    message.command === "REDACT" && each.id === id && (each.from ?? each.who) !== sender;
+}
+
 /** `held` once `message` is read as a room's are, the target being the room: the same object when it changes nothing. */
 export function afterAct(held: Held, message: IrcMessage, cap: number): Held {
   const target = message.params[0] ?? "";
-  const lines = redactAfter(held.lines, message, target);
+  const forbidden = forbiddenBy(message);
+  const lines = held.lines.some(forbidden) ? held.lines : redactAfter(held.lines, message, target);
   const reacted = reactionOf(message, target);
   const added = reacted === undefined ? held.reactions : addReactions(held.reactions ?? [], [reacted], cap);
-  const reactions = added === undefined ? undefined : redactReactions(added, message, target);
+  const reactions = added === undefined || added.some(forbidden) ? added : redactReactions(added, message, target);
   return lines === held.lines && reactions === held.reactions ? held : { lines, reactions };
 }
 

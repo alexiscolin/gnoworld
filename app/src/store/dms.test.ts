@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { DmPrefs } from "../lib/dms/prefs.ts";
 import { KNOWN_KEPT } from "../lib/dms/prefs.ts";
 import { DMS_KEPT, heardFrom } from "./dms.ts";
-import { LINES_KEPT } from "./chat.ts";
+import { LINES_KEPT, REACTIONS_KEPT } from "./chat.ts";
 import { toAddress } from "@gnoworld/schemas";
 import { createAppStore } from "./index.ts";
 
@@ -441,6 +441,56 @@ describe("the store's chat slice: a direct message's reactions and deletes", () 
     expect(t.getState().dms[ALICE]?.map(({ id }) => id)).toEqual(["m2"]);
     heard(redact("x2", { from: ME, to: ALICE }, "m2"));
     expect(t.getState().dms[ALICE]).toEqual([]);
+  });
+
+  // R1 (redpass-dmb): a DM has no moderators, so a REDACT takes a line or a reaction only from its own author.
+  it("keeps my line, and my reaction, at a partner's REDACT naming them", () => {
+    const t = store();
+    const { heard } = t.getState().dmActions;
+    heard(say("m1", { from: ALICE, to: ME }));
+    heard(say("m2", { from: ME, to: ALICE }, { text: "mine", second: 1 }));
+    heard(react("r2", { from: ME, to: ALICE }, "+draft/react=❤️"));
+    heard(redact("x1", { from: ALICE, to: ME }, "m2"));
+    heard(redact("x2", { from: ALICE, to: ME }, "r2"));
+    expect(t.getState().dms[ALICE]?.map(({ id }) => id)).toEqual(["m1", "m2"]);
+    expect(t.getState().dmReactions[ALICE]?.map(({ id }) => id)).toEqual(["r2"]);
+  });
+
+  it("keeps the partner's line at a REDACT of mine naming it, as at one of its own", () => {
+    const t = store();
+    const { heard } = t.getState().dmActions;
+    heard(say("m1", { from: ALICE, to: ME }));
+    heard(redact("x1", { from: ME, to: ALICE }, "m1"));
+    expect(t.getState().dms[ALICE]).toHaveLength(1);
+  });
+
+  // R3: a partner's reaction flood grows with the universe, so each conversation's reactions are bound.
+  it("bounds a conversation's reactions, the oldest first, and an account's flood keeps another's one", () => {
+    const t = store();
+    const { heard } = t.getState().dmActions;
+    heard(say("m1", { from: ALICE, to: ME }));
+    heard(react("mine", { from: ME, to: ALICE }, "+draft/react=❤️"));
+    for (let n = 0; n < REACTIONS_KEPT + 50; n += 1)
+      heard(
+        read(
+          `@msgid=f${String(n).padStart(5, "0")};time=${new Date(Date.parse(T0) + (n + 1) * 1000).toISOString()};account=${ALICE};+draft/react=${String.fromCodePoint(0x1f600 + (n % 60))};+reply=m${String(n)} :${ALICE}!u@h TAGMSG ${ME}`,
+        ),
+      );
+    const kept = t.getState().dmReactions[ALICE] ?? [];
+    expect(kept.length).toBeLessThanOrEqual(REACTIONS_KEPT);
+    expect(kept.some(({ id }) => id === "f00000")).toBe(false);
+    expect(kept.some(({ id }) => id === `f${String(REACTIONS_KEPT + 49).padStart(5, "0")}`)).toBe(true);
+    expect(kept.some(({ id }) => id === "mine")).toBe(true);
+  });
+
+  // R6: a reaction's value is one emoji; markup or a long value leaves no chip.
+  it("keeps no reaction whose value is markup or too long to be an emoji", () => {
+    const t = store();
+    const { heard } = t.getState().dmActions;
+    heard(say("m1", { from: ALICE, to: ME }));
+    heard(react("r1", { from: ALICE, to: ME }, "+draft/react=<b>x</b>"));
+    heard(react("r2", { from: ALICE, to: ME }, `+draft/react=${"x".repeat(2000)}`));
+    expect(t.getState().dmReactions[ALICE] ?? []).toEqual([]);
   });
 
   it("takes a reaction away at a REDACT naming it", () => {
