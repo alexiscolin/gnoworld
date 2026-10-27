@@ -3,10 +3,8 @@
 // (core's foldMultiline), so each line is checked. Fail closed (G1, G5): a batch it cannot hold whole and fold (a
 // part core refuses, more parts than Ergo's cap, a 17th open at once) is handed on as hidden by its opening line's id,
 // never folded in part, never left unjudged: Ergo relays and keeps it all the same (irc/client.go, v2.19.1).
-import { foldMultiline, MULTILINE, MULTILINE_LINES, type Batch, type IrcMessage } from "@gnoworld/core";
+import { foldMultiline, MULTILINE, MULTILINE_LINES, OPEN_BATCHES, type Batch, type IrcMessage } from "@gnoworld/core";
 
-// Messages open at once. The relay is Ergo's own, so this only bounds memory.
-const MAX_OPEN = 16;
 // What is said of a message nobody could read: no one reads it, it is only the text a hidden line needs to be one.
 const UNREAD = "(a message of several lines the bot could not read whole)";
 
@@ -37,7 +35,7 @@ export function several(): Several {
       const ref = sign.slice(1);
       if (sign.startsWith("+") && type === MULTILINE) {
         const stand = unread(message, rest[0]);
-        if (open.size < MAX_OPEN) {
+        if (open.size < OPEN_BATCHES) {
           open.set(ref, { type, params: rest, messages: [], tags, stand, ...(source === undefined ? {} : { source }) });
         } else done(stand, false);
         return true;

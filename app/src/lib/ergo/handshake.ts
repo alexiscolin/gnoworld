@@ -1,16 +1,15 @@
 // The handshake with Ergo, apart from the connection's life (ergo.ts): what each step of a login by SASL
 // takes from Ergo and sends back, the capabilities asked, and what one line a client sends may hold.
-import type { IrcMessage } from "@gnoworld/core";
+import { MULTILINE, type IrcMessage } from "@gnoworld/core";
 
 /** The capabilities the real Ergo grants the server's tests (server/src/testing/ergoKit.ts). */
 export const CAPS =
   "message-tags server-time account-tag echo-message batch labeled-response sasl draft/chathistory " +
   "draft/event-playback draft/message-redaction account-notify extended-join multi-prefix draft/metadata-2 standard-replies " +
   "draft/read-marker draft/multiline";
-/** The capability a message of several lines needs; an Ergo without it NAKs the whole request. */
-const MULTILINE_CAP = "draft/multiline";
-/** The same, asked again of an Ergo that offers no draft/multiline: its drafts go a line at a time. */
-export const BASIC_CAPS = CAPS.replace(` ${MULTILINE_CAP}`, "");
+/** The same, asked again of an Ergo that offers no draft/multiline (which NAKs the whole request): its drafts go a
+ * line at a time. */
+export const BASIC_CAPS = CAPS.replace(` ${MULTILINE}`, "");
 const BODY_MAX = 510;
 const CHUNK = 400;
 
@@ -58,11 +57,11 @@ const STEPS: Record<Exclude<Step, "connected">, (message: IrcMessage, login: Log
     if (command !== "CAP" || (sub !== "ACK" && sub !== "NAK")) return undefined;
     const granted = (params.at(-1) ?? "").split(" ");
     if (sub === "NAK") {
-      return multiline && granted.includes(MULTILINE_CAP)
+      return multiline && granted.includes(MULTILINE)
         ? { next: "caps", send: [`CAP REQ :${BASIC_CAPS}`], multiline: false }
         : { end: "fail" };
     }
-    const on = granted.includes(MULTILINE_CAP);
+    const on = granted.includes(MULTILINE);
     if (ticket === undefined) return { ...register(nick), multiline: on };
     return granted.includes("sasl") ? { next: "sasl", send: ["AUTHENTICATE PLAIN"], multiline: on } : { end: "fail" };
   },
