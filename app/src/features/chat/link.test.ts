@@ -27,6 +27,8 @@ interface Fake extends Ergo {
   stopped: boolean;
   me: string | undefined;
   connected: boolean;
+  /** Whether Ergo granted draft/multiline: yes unless a test says otherwise. */
+  grants: boolean;
   state: (state: ErgoState) => void;
   line: (text: string) => void;
 }
@@ -53,6 +55,8 @@ const setup = (before?: (store: ReturnType<typeof createAppStore>) => void) => {
         stopped: false,
         me: undefined,
         connected: false,
+        grants: true,
+        multiline: () => fake.grants && fake.connected,
         send: (line) => {
           if (!fake.connected) return false;
           fake.sent.push(line);

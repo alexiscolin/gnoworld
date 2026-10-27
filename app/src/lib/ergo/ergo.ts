@@ -9,7 +9,7 @@ import { advance, CAPS, GUEST_TRIES, guestNick, oneLine, REFUSALS, type Step } f
 import type { Result } from "../api/login.ts";
 import type { Ergo, ErgoOptions, ErgoState, Socket } from "./types.ts";
 
-export { CAPS, drawGuestNick } from "./handshake.ts";
+export { BASIC_CAPS, CAPS, drawGuestNick } from "./handshake.ts";
 export type { Ergo, ErgoOptions, ErgoState, Socket, Who } from "./types.ts";
 
 export const BACKOFF = { firstMs: 1000, ceilingMs: 60_000 } as const;
@@ -31,6 +31,8 @@ class Connection implements Ergo {
   #ticket: string | undefined;
   #refusals = 0;
   #step: Step = "caps";
+  // draft/multiline: asked with the rest, then without it once Ergo NAKs the request, granted when its ACK says so.
+  #multiline = true;
   readonly #timers = new Map<string, () => void>();
   constructor(options: ErgoOptions) {
     this.#options = options;
@@ -43,6 +45,8 @@ class Connection implements Ergo {
   send(line: string): boolean {
     return this.#step === "connected" && this.#state === "connected" && oneLine(line) && this.#write(line);
   }
+
+  multiline = (): boolean => this.#multiline && this.nick() !== undefined;
 
   nick(): string | undefined {
     return this.#step === "connected" && this.#state === "connected" ? this.#nick : undefined;
@@ -133,10 +137,11 @@ class Connection implements Ergo {
     // Ergo's welcome names the nick it took; none, or *, leaves the one sent.
     const [named = ""] = message.params;
     if (message.command === "001" && named !== "" && named !== "*") this.#nick = named;
-    const move = advance(step, message, { nick: this.#nick, ticket: this.#ticket });
+    const move = advance(step, message, { nick: this.#nick, ticket: this.#ticket, multiline: this.#multiline });
     if (move === undefined) return;
     if ("next" in move) {
       this.#step = move.next;
+      if (move.multiline !== undefined) this.#multiline = move.multiline;
       for (const line of move.send) this.#write(line);
     } else if (move.end === "fail") {
       this.#fail();
@@ -214,6 +219,7 @@ class Connection implements Ergo {
     this.#ticket = ticket;
     this.#refusals = 0;
     this.#step = "caps";
+    this.#multiline = true;
     const opened = this.#options.open(this.#options.url);
     this.#socket = opened;
     this.#timer("handshake", HANDSHAKE_MS, () => {

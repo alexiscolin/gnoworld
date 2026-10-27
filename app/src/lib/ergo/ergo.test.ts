@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Result } from "../api/login.ts";
 import {
   BACKOFF,
+  BASIC_CAPS,
   CAPS,
   connectErgo,
   drawGuestNick,
@@ -19,7 +20,8 @@ const ERGO = "wss://gnoworld.example/ws";
 // The capabilities the server's own tests ask of the real Ergo (server/src/testing/ergoKit.ts), word for word.
 const KIT_CAPS =
   "message-tags server-time account-tag echo-message batch labeled-response sasl draft/chathistory " +
-  "draft/event-playback draft/message-redaction account-notify extended-join multi-prefix draft/metadata-2 standard-replies";
+  "draft/event-playback draft/message-redaction account-notify extended-join multi-prefix draft/metadata-2 standard-replies " +
+  "draft/multiline";
 // The SASL PLAIN payload of an address and a ticket: base64 of their UTF-8, NUL before each.
 const plain = (ticket: string) => btoa(String.fromCharCode(...new TextEncoder().encode(`\0${ADDRESS}\0${ticket}`)));
 
@@ -304,7 +306,7 @@ describe("connectErgo's handshake", () => {
     await t.settle();
     const s = t.last();
     s.open();
-    s.say(`:ergo CAP * NAK :${CAPS}`);
+    s.say(`:ergo CAP * NAK :${BASIC_CAPS}`);
     expect(s.closed).toBe(true);
     expect(t.backoffs()).toHaveLength(1);
   });
@@ -654,7 +656,7 @@ describe("connectErgo's reconnects", () => {
       "a NAK",
       (s) => {
         s.open();
-        s.say(`:ergo CAP * NAK :${CAPS}`);
+        s.say(`:ergo CAP * NAK :${BASIC_CAPS}`);
       },
     ],
   ];
@@ -1098,7 +1100,7 @@ describe("connectErgo as a guest", () => {
   it("still fails on a NAK: without the capabilities, no history and no tags", async () => {
     const t = await guest();
     t.s.open();
-    t.s.say(`:ergo CAP * NAK :${CAPS}`);
+    t.s.say(`:ergo CAP * NAK :${BASIC_CAPS}`);
     expect(t.s.closed).toBe(true);
   });
 
@@ -1142,5 +1144,56 @@ describe("drawGuestNick", () => {
       random.mockRestore();
       vi.unstubAllGlobals();
     }
+  });
+});
+
+// An Ergo with no draft/multiline (docs/decisions.md, 2026-10-26): it NAKs the whole request, so the page asks again
+// without the capability and the chat goes on, its drafts sent a line at a time.
+describe("connectErgo, an Ergo that offers no draft/multiline", () => {
+  const guest = async () => {
+    const t = setup({ guests: ["guest-ab12cd"] });
+    await t.settle();
+    t.last().open();
+    return { ...t, s: t.last() };
+  };
+
+  it("asks the capabilities again, without draft/multiline alone, after the NAK of its first request", async () => {
+    expect(BASIC_CAPS).toBe(KIT_CAPS.replace(" draft/multiline", ""));
+    const t = await guest();
+    t.s.say(`:ergo CAP * NAK :${CAPS}`);
+    expect(t.s.sent).toEqual(["CAP LS 302", `CAP REQ :${CAPS}`, `CAP REQ :${BASIC_CAPS}`]);
+    expect(t.s.closed).toBe(false);
+    t.s.say(`:ergo CAP * ACK :${BASIC_CAPS}`);
+    expect(t.s.sent.at(-1)).toBe("USER u 0 * :guest-ab12cd");
+  });
+
+  it("says whether the connection sends several lines at once: only once connected, only on an ACK holding it", async () => {
+    const full = await guest();
+    expect(full.client.multiline()).toBe(false);
+    welcomeGuest(full.s, "guest-ab12cd");
+    expect(full.client.multiline()).toBe(true);
+    const basic = await guest();
+    basic.s.say(`:ergo CAP * NAK :${CAPS}`);
+    basic.s.say(`:ergo CAP * ACK :${BASIC_CAPS}`);
+    basic.s.say(":ergo 001 guest-ab12cd :Welcome");
+    motd(basic.s);
+    expect(basic.client.multiline()).toBe(false);
+  });
+
+  it("fails on a second NAK, the request without draft/multiline refused too, and asks no third", async () => {
+    const t = await guest();
+    t.s.say(`:ergo CAP * NAK :${CAPS}`);
+    t.s.say(`:ergo CAP * NAK :${BASIC_CAPS}`);
+    expect(t.s.closed).toBe(true);
+    expect(t.s.sent.filter((line) => line.startsWith("CAP REQ"))).toHaveLength(2);
+  });
+
+  it("asks draft/multiline again on its next connection", async () => {
+    const t = await guest();
+    t.s.say(`:ergo CAP * NAK :${CAPS}`);
+    t.s.say(`:ergo CAP * NAK :${BASIC_CAPS}`);
+    await t.run(t.backoffs()[0]);
+    t.last().open();
+    expect(t.last().sent).toEqual(["CAP LS 302", `CAP REQ :${CAPS}`]);
   });
 });

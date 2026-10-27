@@ -5,7 +5,12 @@ import type { IrcMessage } from "@gnoworld/core";
 /** The capabilities the real Ergo grants the server's tests (server/src/testing/ergoKit.ts). */
 export const CAPS =
   "message-tags server-time account-tag echo-message batch labeled-response sasl draft/chathistory " +
-  "draft/event-playback draft/message-redaction account-notify extended-join multi-prefix draft/metadata-2 standard-replies";
+  "draft/event-playback draft/message-redaction account-notify extended-join multi-prefix draft/metadata-2 standard-replies " +
+  "draft/multiline";
+/** The capability a message of several lines needs; an Ergo without it NAKs the whole request. */
+const MULTILINE_CAP = "draft/multiline";
+/** The same, asked again of an Ergo that offers no draft/multiline: its drafts go a line at a time. */
+export const BASIC_CAPS = CAPS.replace(` ${MULTILINE_CAP}`, "");
 const BODY_MAX = 510;
 const CHUNK = 400;
 
@@ -29,30 +34,37 @@ export const oneLine = (line: string): boolean =>
 export const REFUSALS = new Set(["902", "904", "905", "906", "907", "433", "432"]);
 
 export type Step = "caps" | "sasl" | "auth" | "registering" | "connected";
-/** What a line moves: the step after it and the lines to send, or the end of the handshake. */
-export type Move = { next: Step; send: readonly string[] } | { end: "fail" | "connected" };
+/** What a line moves: the step after it, the lines to send and, once Ergo answers the capabilities asked, whether
+ * draft/multiline is on; or the end of the handshake. */
+export type Move = { next: Step; send: readonly string[]; multiline?: boolean } | { end: "fail" | "connected" };
 // Who registers: an account, its nick its address, by SASL with its ticket; or a guest, its nick its own and
 // no ticket, which needs no sasl (Alexis, 2026-10-25: a visitor reads the public rooms as a guest).
 interface Login {
   nick: string;
   ticket: string | undefined;
+  /** Whether draft/multiline is still asked: Ergo's NAK of a request holding it asks again without. */
+  multiline: boolean;
 }
 const register = (nick: string): Move => ({
   next: "registering",
   send: ["CAP END", `NICK ${nick}`, `USER u 0 * :${nick}`],
 });
 
-// Each step's line, and the move it makes; any other line moves nothing. A NAK fails; so does an account's ACK
-// without sasl.
+// Each step's line, and the move it makes; any other line moves nothing. A NAK fails, but the first of a request
+// holding draft/multiline, which asks again without it; so does an account's ACK without sasl.
 const STEPS: Record<Exclude<Step, "connected">, (message: IrcMessage, login: Login) => Move | undefined> = {
-  caps: ({ command, params }, { nick, ticket }) => {
+  caps: ({ command, params }, { nick, ticket, multiline }) => {
     const sub = params[1];
     if (command !== "CAP" || (sub !== "ACK" && sub !== "NAK")) return undefined;
-    if (sub === "NAK") return { end: "fail" };
-    if (ticket === undefined) return register(nick);
-    return (params.at(-1) ?? "").split(" ").includes("sasl")
-      ? { next: "sasl", send: ["AUTHENTICATE PLAIN"] }
-      : { end: "fail" };
+    const granted = (params.at(-1) ?? "").split(" ");
+    if (sub === "NAK") {
+      return multiline && granted.includes(MULTILINE_CAP)
+        ? { next: "caps", send: [`CAP REQ :${BASIC_CAPS}`], multiline: false }
+        : { end: "fail" };
+    }
+    const on = granted.includes(MULTILINE_CAP);
+    if (ticket === undefined) return { ...register(nick), multiline: on };
+    return granted.includes("sasl") ? { next: "sasl", send: ["AUTHENTICATE PLAIN"], multiline: on } : { end: "fail" };
   },
   sasl: ({ command, params }, { nick, ticket }) =>
     command === "AUTHENTICATE" && params[0] === "+" && ticket !== undefined
