@@ -118,6 +118,38 @@ test.describe("a message of several lines", () => {
     expect(sent.filter((line) => /PRIVMSG #bubble\/games :line \d+$/.test(line))).toHaveLength(20);
   });
 
+  // The red pass's open question: a draft of 30 lines restored before Ergo's welcome. While the connection has no nick
+  // it is not known whether draft/multiline was granted, which blocks nothing; once Ergo welcomes the page, it is.
+  test("does not refuse a restored draft of 30 lines once a late welcome shows draft/multiline", async ({ page }) => {
+    const address = await logIn(page, word("late"));
+    const kept = draft(30);
+    await page.addInitScript(
+      ([key, value]) => {
+        localStorage.setItem(key, value);
+      },
+      [`gnoworld:draft:${address}:#bubble/games`, kept] as const,
+    );
+    const sent: string[] = [];
+    let welcome: () => void = () => undefined;
+    const welcomeAfter = new Promise<void>((resolve) => {
+      welcome = resolve;
+    });
+    await page.routeWebSocket(/\/ws$/, (ergo) => {
+      scriptedErgo(ergo, address, { welcomeAfter, heard: (line) => sent.push(line) });
+    });
+    await page.goto("/w/bubble?room=games");
+    await hydrated(page);
+    const tooMany = page.getByText(/too many: 20 at most/);
+    await expect(field(page)).toHaveValue(kept);
+    welcome();
+    await expect(lines(page)).toHaveCount(2);
+    await expect(tooMany).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Send" })).toBeEnabled();
+    await field(page).press("Enter");
+    await expect(field(page)).toHaveValue("");
+    expect(sent.filter((line) => line.startsWith("BATCH +"))).toHaveLength(1);
+  });
+
   // F1722 (CR10): a box of two rows showed two lines of a 30-line paste, and a sideways drag could push Send off a
   // 320 px screen. It grows with its draft up to ten lines, then scrolls, and no drag makes it wider than its place.
   test("grows with its draft up to ten lines, and keeps Send in view on a 320 px screen", async ({ page }) => {

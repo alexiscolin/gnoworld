@@ -166,6 +166,8 @@ export interface Scripted {
   replayed?: readonly string[];
   /** Ergo refuses each reaction, as in a room the account may not speak in: a 404 to its label, no echo. */
   refuseReact?: boolean;
+  /** Ergo welcomes the page (001) once this settles: the connection starts late, its nick not known yet. */
+  welcomeAfter?: Promise<void>;
   /** Ergo does not offer draft/multiline: it NAKs the request holding it, and ACKs the one without. */
   noMultiline?: boolean;
   /** The lines before the history's, which Ergo gives to CHATHISTORY BEFORE. */
@@ -210,7 +212,12 @@ export function scriptedErgo(ergo: WebSocketRoute, me: string, script: Scripted 
     const reply = () => {
       for (const answer of answers) ergo.send(answer);
     };
-    if (historyAfter !== undefined && line.startsWith("CHATHISTORY ")) historyAfter.then(reply, () => undefined);
+    const after = line.startsWith("CHATHISTORY ")
+      ? historyAfter
+      : line.startsWith("USER ")
+        ? script.welcomeAfter
+        : undefined;
+    if (after !== undefined) after.then(reply, () => undefined);
     else reply();
   });
 }
