@@ -61,7 +61,7 @@ describe("guests and rooms", { timeout: 20_000 }, () => {
     const gus = await guest(e, "gus");
     await join(gus, "#lobby");
     gus.send("PRIVMSG #lobby :hello from guest");
-    await gus.expect(/ 404 gus #lobby :Cannot send to channel \(\+M\)/);
+    await gus.expect(/ 404 Guest-gus #lobby :Cannot send to channel \(\+M\)/);
     alice.send("PRIVMSG #lobby :hello from alice");
     await gus.expect(/account=alice.* PRIVMSG #lobby :hello from alice/);
     await sync(alice);
@@ -125,7 +125,7 @@ describe("guests and rooms", { timeout: 20_000 }, () => {
     const alice = await login(e, "alice");
     const gus = await guest(e, "gus");
     gus.send("PRIVMSG alice :from a guest");
-    await gus.expect(/ 477 gus alice /);
+    await gus.expect(/ 477 Guest-gus alice /);
     const bob = await login(e, "bob");
     bob.send("PRIVMSG alice :from an account");
     await alice.expect(/PRIVMSG alice :from an account$/);
@@ -158,11 +158,11 @@ describe("logins and the auth script", { timeout: 30_000 }, () => {
     const e = await start();
     const x = await guest(e, "newacct");
     x.send("NS REGISTER newacct pw123");
-    await x.expect(/NOTICE newacct :This command has been disabled by the server administrators/);
+    await x.expect(/NOTICE Guest-newacct :This command has been disabled by the server administrators/);
     x.send("REGISTER newacct * pw123");
     await x.expect(/FAIL REGISTER DISALLOWED newacct :Account registration is disabled/);
     x.send("NS SAREGISTER newacct pw123");
-    expect(await x.expect(/NOTICE newacct :Command restricted/)).toContain("Command restricted");
+    expect(await x.expect(/NOTICE Guest-newacct :Command restricted/)).toContain("Command restricted");
   });
 
   it("ignores PASS account:password, which logs nobody in", async () => {
@@ -198,14 +198,14 @@ describe("logins and the auth script", { timeout: 30_000 }, () => {
     const dave = await login(e, "dave");
     const early = await guest(e, "dave3");
     early.send("NS IDENTIFY dave pw");
-    expect(await early.expect(/ 433 dave3 dave /)).toContain("Nickname is already in use");
+    expect(await early.expect(/ 433 Guest-dave3 dave /)).toContain("Nickname is already in use");
     await early.expect(/try logging out and logging back in with SASL/);
     await dave.close();
     const g = await guest(e, "dave2");
     g.send("NS IDENTIFY dave pw");
     await g.expect(/NOTICE dave :You're now logged in as dave/);
     await sync(g);
-    expect(logged(g)).toMatch(/:dave2!\S+ NICK dave/);
+    expect(logged(g)).toMatch(/:Guest-dave2!\S+ NICK dave/);
     expect(logged(g)).toMatch(/:dave!\S+ ACCOUNT dave/);
   });
 
@@ -428,7 +428,7 @@ describe("history and tags", { timeout: 30_000 }, () => {
     alice.send("@+draft/react=x TAGMSG #lobby");
     await alice.expect(/ 404 alice #lobby :Cannot send to channel \(\+m\)/);
     gus.send("@+typing=active TAGMSG #lobby");
-    await gus.expect(/ 404 gus #lobby :Cannot send to channel \(\+m\)/);
+    await gus.expect(/ 404 Guest-gus #lobby :Cannot send to channel \(\+m\)/);
     await sync(obs);
     expect(logged(obs)).not.toMatch(/ TAGMSG #lobby/);
     chief.send("MODE #lobby +v alice");
@@ -721,14 +721,14 @@ describe("operators and listeners", { timeout: 30_000 }, () => {
     const e = await start();
     const plain = await guest(e, "plop");
     plain.send(`OPER admin ${e.operPassword}`);
-    await plain.expect(/ 381 plop :You are now an IRC operator/);
+    await plain.expect(/ 381 Guest-plop :You are now an IRC operator/);
     const ws = await wsConnect(e.wsPort, { protocols: ["text.ircv3.net"] });
     if (ws === undefined) throw new Error("the WebSocket did not open");
     const viaWs = wsRaw(ws);
     await hello(viaWs);
     await finish(viaWs, "wsop");
     viaWs.send(`OPER admin ${e.operPassword}`);
-    expect(await viaWs.expect(/ 381 wsop /)).toContain("You are now an IRC operator");
+    expect(await viaWs.expect(/ 381 Guest-wsop /)).toContain("You are now an IRC operator");
   });
 
   it("takes the oper password from the environment as a bcrypt hash, and the old one stops working", async () => {
@@ -822,7 +822,7 @@ describe("the helper", { timeout: 30_000 }, () => {
       [b, "second"],
     ] as const) {
       const c = await guest(e, nick);
-      expect(logged(c)).toContain(` 001 ${nick} `);
+      expect(logged(c)).toContain(` 001 Guest-${nick} `);
     }
   });
 
@@ -983,7 +983,7 @@ describe("logging in through the server (3d)", { timeout: 30_000 }, () => {
     const gus = await guest(e, "gus");
     await join(gus, "#lobby");
     gus.send("PRIVMSG #lobby :hello from guest");
-    await gus.expect(/ 404 gus #lobby :Cannot send to channel \(\+M\)/);
+    await gus.expect(/ 404 Guest-gus #lobby :Cannot send to channel \(\+M\)/);
     c.send("PRIVMSG #lobby :hello from an account");
     await gus.expect(new RegExp(`account=${me.address}.* PRIVMSG #lobby :hello from an account`));
   });
@@ -1075,7 +1075,7 @@ describe("the server's IRC link (3h)", { timeout: 40_000 }, () => {
       .toHaveLength(1);
     const gus = await guest(e, "gus");
     gus.send("JOIN #bubble");
-    await gus.expect(/ 403 gus #bubble /);
+    await gus.expect(/ 403 Guest-gus #bubble /);
   });
 
   it("logs in as an operator, makes its rooms and reads an account's message, never a direct one", async () => {
@@ -1123,7 +1123,8 @@ describe("the server's IRC link (3h)", { timeout: 40_000 }, () => {
     await link.stop();
     const squatter = await open(e);
     await hello(squatter);
-    await finish(squatter, "gnoworld", / 433 /);
+    await finish(squatter, "gnoworld");
+    expect(logged(squatter)).toContain(" 001 Guest-gnoworld ");
   });
 
   it("gets ready as a second session of its account while its last one lingers (the max review)", async () => {
@@ -1279,8 +1280,8 @@ describe("the template's limits and privacy (slice 3's max review)", { timeout: 
     gus.send("WHO *");
     await sync(gus);
     expect(logged(gus)).not.toMatch(/ 353 .*carol/);
-    expect(logged(gus)).not.toMatch(/ 319 gus carol /);
-    expect(logged(gus)).not.toMatch(/ 352 gus \S+ \S+ \S+ \S+ carol /);
+    expect(logged(gus)).not.toMatch(/ 319 Guest-gus carol /);
+    expect(logged(gus)).not.toMatch(/ 352 Guest-gus \S+ \S+ \S+ \S+ carol /);
     chief.send("NAMES #club");
     await chief.expect(/ 353 .*carol/);
   });

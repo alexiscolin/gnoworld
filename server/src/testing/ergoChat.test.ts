@@ -140,7 +140,7 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     const gus = await guest(e, "gus");
     await join(gus, "#bubble/garden");
     gus.send("PRIVMSG #bubble/garden :hello from a guest");
-    await gus.expect(/ 404 gus #bubble\/garden :Cannot send to channel \(\+M\)/);
+    await gus.expect(/ 404 Guest-gus #bubble\/garden :Cannot send to channel \(\+M\)/);
     alice.send("JOIN #bubble/sneaky");
     await alice.expect(/ 403 alice #bubble\/sneaky :Only server operators can create new channels/);
   });
@@ -160,7 +160,7 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     const gus = await guest(e, "gus");
     await join(gus, "#bubble/garden");
     gus.send("MODE #bubble/garden");
-    await gus.expect(/ 324 gus #bubble\/garden \+\S*M/);
+    await gus.expect(/ 324 Guest-gus #bubble\/garden \+\S*M/);
     await expect.poll(() => lines.filter((line) => line.includes('"unknown_room"'))).toHaveLength(1);
   });
 
@@ -253,7 +253,7 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
         await new Promise((resolve) => setTimeout(resolve, 50));
       }
       const gus = await guest(e, "gus");
-      const people: [string, Raw][] = [["gus", gus]];
+      const people: [string, Raw][] = [["Guest-gus", gus]];
       for (const name of ["stranger", "member", "writer", "mod"]) people.push([name, await login(e, name)]);
       return { e, people };
     };
@@ -363,8 +363,8 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
         expect(seeded, "each room's first line said").toEqual(Array.from({ length: 5 }, () => [true, true]));
         const seen: [string, boolean, boolean][] = [];
         for (const room of ["#bubble", "#bubble/news", "#bubble/door", "#bubble/crew", "#bubble/desk"]) {
-          const joined = await joins(gus[1], "gus", room);
-          seen.push([room, joined, await reads(gus[1], "gus", room)]);
+          const joined = await joins(gus[1], gus[0], room);
+          seen.push([room, joined, await reads(gus[1], gus[0], room)]);
         }
         expect(seen).toEqual([
           ["#bubble", true, true],
@@ -454,11 +454,11 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
       // Closed again, the wildcard gone: the room's modes as a guest reads them, its list as the chief does.
       const shut = async (): Promise<boolean> => {
         gus.send("MODE #bubble/crew");
-        const modes = await gus.expect(/ 324 gus #bubble\/crew /);
+        const modes = await gus.expect(/ 324 Guest-gus #bubble\/crew /);
         return / \+\S*i/.test(modes) && !(await invitesOf(["chief", chief], "#bubble/crew")).includes("*!*@*");
       };
       await expect.poll(shut, { timeout: 5000 }).toBe(true);
-      expect(await joins(gus, "gus", "#bubble/crew")).toBe(false);
+      expect(await joins(gus, "Guest-gus", "#bubble/crew")).toBe(false);
     });
   });
 
