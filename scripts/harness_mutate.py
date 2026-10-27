@@ -47,6 +47,7 @@ SECTIONS = {
     "package.json": {"probe": "react_warn,react_tsc,ui_tsc", "hooks": "wiring"}, "pnpm-workspace.yaml": {"hooks": "wiring,regressions"},
     "scripts/check_css.py": "css", "scripts/check_comments.mjs": "comments",
     ".jscpd.json": "jscpd", "tsconfig.base.json": "tsc", "vitest.config.ts": "vitest,vitest_ui,server,core_chromium",
+    "app/playwright.stories.config.ts": "tokens_pictures",
     "server/src/testing/toolchain.test.ts": "pinned_node", "server/src/testing/toolchain.ts": "pinned_node",
     "scripts/guard.py": "guard", "scripts/review_pass.py": "review_pass", "scripts/patch_coverage.py": "patch_coverage",
     "scripts/check_docs.py": "check_docs", "scripts/check_regressions.py": "regressions", "scripts/check_migrations.py": "migrations",
@@ -170,6 +171,9 @@ def mutants():
     yield from each("scripts/check.sh", " run --project core_chromium #", " run #", "hooks", "check.sh's Chromium run names core's project")
     yield from each("scripts/check.sh", " run --project core_chromium #", " run --project core_chromium || : #", "hooks", "check.sh lets core's Chromium tests fail it")
     # Every test run on the pinned Node (F816 came from StrykerJS on Homebrew's Node 26).
+    # The tokens story's pictures, which the fast gate compares when tokens.css changes (F1190). The mutants of
+    # pictures.spec.ts wait for records.sh to list it (agent-hb/records_pictures.py).
+    yield from each("app/playwright.stories.config.ts", "if (!Number.isInteger(port) || port < 1024 || port > 65535)", "if (false)", "probe", "the stories' config refuses a port that is no port")
     yield from each("server/src/testing/toolchain.test.ts", "expect(process.version).toBe(pinnedNode());", "expect(process.version).toBeTruthy();", "probe", "the toolchain test holds a run to the pinned Node")
     yield from each("server/src/testing/toolchain.ts", ".trim()", "", "probe", "the pinned Node is read without its newline")
     # The app's folders (F378): each name of the network and storage, each owner, each folder's path,

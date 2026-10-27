@@ -8,6 +8,7 @@ Usage: scripts/probe.py, from the repository root, with Node and pnpm on PATH.""
 import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -245,6 +246,38 @@ try:
         projects = {line[1:line.index("]")] for line in out.stdout.splitlines() if line.startswith("[") and "]" in line}
         expect(out.returncode == 0 and projects == {"node"}, f"with no CORE_CHROMIUM, vitest lists core's tests on Node alone: {projects or out.stderr[-300:]}")
         shutil.rmtree(HERE)
+
+    if part("tokens_pictures"):
+        # The fast gate compares the tokens story's pictures when tokens.css changes (F1190): a token added with no new
+        # picture fails the run it makes, the untouched tree passes it, a prefix no story has fails rather than
+        # comparing nothing, and a port that is no port refuses. On a copy of the tracked files as they are (as pre-commit's
+        # staged copy: no repository, borrowing node_modules), so this tree's tokens.css is never written, even by a run
+        # killed half-way.
+        with tempfile.TemporaryDirectory() as tree, socket.socket() as held:
+            files = subprocess.run(["git", "ls-files", "-z"], capture_output=True, check=True).stdout
+            packed = subprocess.run(["tar", "-c", "--null", "-T", "-"], input=files, capture_output=True, check=True).stdout
+            subprocess.run(["tar", "-x", "-C", tree], input=packed, check=True)
+            subprocess.run(["sh", "scripts/borrow_node_modules.sh", tree], check=True)
+            held.bind(("127.0.0.1", 0))
+            port = str(held.getsockname()[1])
+            held.close()  # the file server takes the port it found free
+            pictures = lambda of, **env: run(["node", "app/node_modules/@playwright/test/cli.js", "test", "-c", "app/playwright.stories.config.ts",
+                                              "--reporter=dot", "pictures"], cwd=tree, env={"PICTURES_OF": of, "STORIES_PORT": port, **env})
+            out = pictures("tokens--")
+            expect(out.returncode == 0 and "3 passed" in out.stdout, "the tokens story's pictures pass on an untouched tree")
+            out = pictures("nosuchstory--")
+            expect(out.returncode != 0 and "a story whose id starts with" in out.stdout + out.stderr, "a prefix no story has fails, comparing nothing")
+            out = pictures("tokens--", STORIES_PORT="abc")
+            expect(out.returncode != 0 and "STORIES_PORT is no port" in out.stdout + out.stderr, "a port that is no port is refused")
+            css = os.path.join(tree, "packages/ui/src/tokens.css")
+            with open(css) as f:
+                text = f.read()
+            at = "    --color-space: var(--p-space);\n"
+            expect(at in text, "tokens.css still holds the line the probe adds a token after")
+            with open(css, "w") as f:
+                f.write(text.replace(at, at + "    --color-probe: var(--p-space);\n", 1))
+            out = pictures("tokens--")
+            expect(out.returncode != 0 and "tokens--all" in out.stdout + out.stderr, "a token added to tokens.css with no new picture fails the tokens story's pictures")
 
     if part("vitest_ui"):
         # The design system's tests run in jsdom, each on an empty page: none is left out by the
