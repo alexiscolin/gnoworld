@@ -56,6 +56,9 @@ accounts:
   nick-reservation:
     enabled: true
     method: strict
+    # A connection with no account is renamed Guest-<nick> (guest-nickname-format's default), so a guest can
+    # never hold the bot's nick, before the bot's first login either (F722; v2.19.1 irc/client_lookup_set.go:136).
+    force-guest-format: true
     force-nick-equals-account: true
   # force-nick-equals-account requires it: one account, several connections (a tab each).
   multiclient:

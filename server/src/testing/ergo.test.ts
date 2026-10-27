@@ -1127,6 +1127,19 @@ describe("the server's IRC link (3h)", { timeout: 40_000 }, () => {
     expect(logged(squatter)).toContain(" 001 Guest-gnoworld ");
   });
 
+  it("keeps the bot's nick from a guest that asks first, before the bot ever logged in (F722)", async () => {
+    const e = await start();
+    const early = await open(e);
+    await hello(early);
+    await finish(early, "gnoworld");
+    expect(logged(early)).toContain(" 001 Guest-gnoworld ");
+    expect(logged(early)).not.toContain(" 001 gnoworld ");
+    // A change of nick goes the same way: asking for gnoworld is asking for Guest-gnoworld, which the first holds, so it is refused.
+    const later = await guest(e, "later");
+    later.send("NICK gnoworld");
+    await later.expect(/ 433 Guest-later gnoworld :Nickname is already in use/);
+  });
+
   it("gets ready as a second session of its account while its last one lingers (the max review)", async () => {
     const e = await start();
     const session = (): string[] => {
