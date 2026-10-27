@@ -906,10 +906,24 @@ describe("the chat's link: what it says", () => {
     expect(batches(t.fake.sent)).toEqual([]);
   });
 
-  it("opens no batch while away, and says so", () => {
+  // The lines the link tried to send, those the connection refused too (the connection records only those it took),
+  // the `refuseAt`th among them refused.
+  const tried = (t: ReturnType<typeof memberIn>, refuseAt?: number) => {
+    const attempts: string[] = [];
+    const send = t.fake.send;
+    t.fake.send = (line) => {
+      attempts.push(line);
+      return attempts.length !== refuseAt && send(line);
+    };
+    return attempts;
+  };
+
+  it("opens no batch while away, and says so: not one line is tried", () => {
     const t = memberIn(["#bubble/games"]);
     t.fake.state("waiting");
+    const attempts = tried(t);
     expect(t.link.say("#bubble/games", composed("#bubble/games", "a\nb"))).toBe(false);
+    expect(attempts).toEqual([]);
     expect(batches(t.fake.sent)).toEqual([]);
   });
 
@@ -953,15 +967,13 @@ describe("the chat's link: what it says", () => {
     expect(batches(t.fake.sent)).toEqual([]);
   });
 
-  it("says a message of several lines is not sent when a part is refused, and closes nothing it cannot", () => {
+  it("says a message of several lines is not sent when a part is refused, and tries no line after it", () => {
     const t = memberIn(["#bubble/games"]);
-    const send = t.fake.send;
-    let sent = 0;
-    t.fake.send = (line) => {
-      sent += 1;
-      return sent === 3 ? false : send(line);
-    };
+    const attempts = tried(t, 3);
     expect(t.link.say("#bubble/games", composed("#bubble/games", "a\nb\nc"))).toBe(false);
+    // The batch's opening, its first part, the refused second: not the third, nor the closing.
+    expect(attempts).toHaveLength(3);
+    expect(batches(t.fake.sent)).toHaveLength(2);
   });
 
   it("sends a message of several lines to no one as a guest, nor to a room Ergo has not said I am in", () => {
