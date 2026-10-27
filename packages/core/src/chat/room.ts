@@ -119,18 +119,20 @@ export function lineOf(message: IrcMessage, room: string): Line | undefined {
   return { ...marks, from, ...(account === "" ? {} : { account }), ...body, ...marked };
 }
 
-const byTimeThenId = (one: Line, other: Line): number => compare(one.time, other.time) || compare(one.id, other.id);
+// By time alone: JS sorts stably, so lines of one millisecond keep the order they came in (F773).
+const byTime = (one: Line, other: Line): number => compare(one.time, other.time);
 
 // A live line, the usual case: one line after every line held, and not one of them, is only appended.
 function newest(lines: readonly Line[], incoming: readonly Line[], cap: number): readonly Line[] | undefined {
   const [line] = incoming;
   const last = lines.at(-1);
-  if (incoming.length !== 1 || line === undefined || (last !== undefined && byTimeThenId(last, line) >= 0)) return;
+  if (incoming.length !== 1 || line === undefined || (last !== undefined && byTime(last, line) > 0)) return;
   if (lines.some((each) => each.id === line.id)) return;
   return [...lines.slice(Math.max(0, lines.length - cap + 1)), line];
 }
 
-/** The room's lines with these added: in time order, then by id, each id once, the newest `cap` kept. */
+/** The room's lines with these added: in time order, lines of one time in the order they came, each id once, the
+ * newest `cap` kept. */
 export function addLines(lines: readonly Line[], incoming: readonly Line[], cap: number): readonly Line[] {
   if (!Number.isInteger(cap) || cap < 1) throw new RangeError("addLines: the cap is a whole number, 1 or more");
   const appended = newest(lines, incoming, cap);
@@ -139,7 +141,7 @@ export function addLines(lines: readonly Line[], incoming: readonly Line[], cap:
   const added = new Map<string, Line>();
   for (const line of incoming) if (!held.has(line.id) && !added.has(line.id)) added.set(line.id, line);
   if (added.size === 0) return lines;
-  const kept = [...lines, ...added.values()].sort(byTimeThenId).slice(-cap);
+  const kept = [...lines, ...added.values()].sort(byTime).slice(-cap);
   return kept.some((line) => !held.has(line.id)) ? kept : lines;
 }
 

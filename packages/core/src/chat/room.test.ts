@@ -203,6 +203,25 @@ describe("addLines: a room's lines, in time order, each once, the newest kept", 
     expect(addLines(lines, [{ ...a, time: "2026-10-25T11:00:00.000Z" }], 100)).toBe(lines);
   });
 
+  test("appends a live line of the last line's time after it, whatever its id (F773)", () => {
+    const last = line("z", T0, "z");
+    const live = line("a", T0, "a");
+    expect(addLines(frozen([last]), [live], 100)).toStrictEqual([last, live]);
+  });
+
+  test("keeps a page's lines of one time in the page's order, and after the lines held at that time (F773)", () => {
+    const held = line("m", T0, "held");
+    const page = [line("z", T0, "z"), line("a", T0, "a"), line("b", "2026-10-25T09:59:59.000Z", "older")];
+    expect(addLines(frozen([held]), frozen(page), 100).map((l) => l.id)).toStrictEqual(["b", "m", "z", "a"]);
+  });
+
+  test("still drops a line already held, of the last line's time, whatever its id (F773)", () => {
+    const [low, high] = [line("a", T0, "a"), line("z", T0, "z")];
+    const lines = frozen([low, high]);
+    expect(addLines(lines, [high], 100)).toBe(lines);
+    expect(addLines(lines, [low], 100)).toBe(lines);
+  });
+
   test("keeps the newest lines, up to its cap", () => {
     expect(addLines(frozen([a, b]), frozen([c]), 2)).toStrictEqual([b, c]);
   });
