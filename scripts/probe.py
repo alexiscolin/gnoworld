@@ -264,7 +264,9 @@ try:
             files = subprocess.run(["git", "ls-files", "-z"], capture_output=True, check=True).stdout
             packed = subprocess.run(["tar", "-c", "--null", "-T", "-"], input=files, capture_output=True, check=True).stdout
             subprocess.run(["tar", "-x", "-C", tree], input=packed, check=True)
-            subprocess.run(["sh", "scripts/borrow_node_modules.sh", tree], check=True)
+            # From where the packages are installed: in a harness_mutate copy this folder's node_modules is one link (the helper
+            # finds only real folders), and the workspaces' relative links need the root's beside them.
+            subprocess.run(["sh", os.path.abspath("scripts/borrow_node_modules.sh"), tree], cwd=os.path.dirname(os.path.realpath("node_modules")), check=True)
             held.bind(("127.0.0.1", 0))
             port = str(held.getsockname()[1])
             held.close()  # the file server takes the port it found free
