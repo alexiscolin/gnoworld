@@ -1,6 +1,6 @@
 import { parseLine, type IrcMessage } from "@gnoworld/core";
 import { describe, expect, it } from "vitest";
-import { withOf } from "./events.ts";
+import { keptWith, withOf } from "./events.ts";
 
 const ME = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -40,5 +40,17 @@ describe("withOf: the conversation a reaction or a delete belongs to", () => {
   it("is none while my nick is unknown or no address", () => {
     expect(withOf(tagmsg(ALICE, ME), "")).toBeUndefined();
     expect(withOf(tagmsg("guest-ab12cd", "guest-zzzzzz"), "guest-zzzzzz")).toBeUndefined();
+  });
+});
+
+describe("keptWith: the reactions of the conversations still held", () => {
+  it("is the same object while every conversation with reactions is held, so no one is told", () => {
+    const reactions = { [ALICE]: [1], [CAROL]: [2] };
+    expect(keptWith(reactions, { [ALICE]: [], [CAROL]: [], [ME]: [] })).toBe(reactions);
+  });
+
+  it("leaves out the conversations no longer held, and keeps the others' own", () => {
+    const kept = [2];
+    expect(keptWith({ [ALICE]: [1], [CAROL]: kept }, { [CAROL]: [] })).toEqual({ [CAROL]: kept });
   });
 });
