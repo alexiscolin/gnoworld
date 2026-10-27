@@ -31,8 +31,10 @@ function outgoing(
   }
   const tagged = (line: string) => (tags === "" ? line : `@${tags} ${line}`);
   if (composed.kind === "line") return [tagged(lines[0] ?? "")];
-  if (!multiline)
-    return lines.filter((line) => !line.endsWith(" :")).map((line, at) => (at === 0 ? tagged(line) : line));
+  if (!multiline) {
+    const blank = `PRIVMSG ${room} :`;
+    return lines.filter((line) => line !== blank).map((line, at) => (at === 0 ? tagged(line) : line));
+  }
   return [
     tagged(`BATCH +${ref} ${MULTILINE} ${room}`),
     ...lines.map((line) => `@batch=${ref} ${line}`),

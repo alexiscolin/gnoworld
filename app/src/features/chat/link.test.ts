@@ -1072,6 +1072,13 @@ describe("the chat's link: what it says", () => {
     expect(batches(t.fake.sent)).toEqual(["PRIVMSG #bubble/games :one", "PRIVMSG #bubble/games :two"]);
   });
 
+  it("keeps a line of the fallback whose text ends in a space and a colon, which only a blank line is left out (F1712)", () => {
+    const t = memberIn(["#bubble/games"]);
+    t.fake.grants = false;
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "Attention :\n\nsuite"))).toBe(true);
+    expect(batches(t.fake.sent)).toEqual(["PRIVMSG #bubble/games :Attention :", "PRIVMSG #bubble/games :suite"]);
+  });
+
   it("hears nothing of a message whose parts are another sender's than its opening line's", () => {
     const t = memberIn(["#bubble/games"]);
     t.fake.line(`@msgid=ml1;time=${T0};account=${OTHER} :${OTHER}!u@h BATCH +x draft/multiline #bubble/games`);
