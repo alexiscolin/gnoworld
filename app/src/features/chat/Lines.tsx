@@ -119,8 +119,8 @@ type ListProps = Omit<LinesProps, "lines"> & {
   byId: ReadonlyMap<string, Line>;
   /** Each line's reactions as chipsOf writes them, by msgid. */
   chips: ReadonlyMap<string, string>;
-  /** How many replies each root's thread holds, by msgid (4d's threads). */
-  replies: ReadonlyMap<string, number>;
+  /** Each root's replies, by msgid (4d's threads): a chip counts them. */
+  repliesOf: ReadonlyMap<string, readonly Line[]>;
 };
 
 /** The room's flash, then its lines, oldest first, as a list a screen reader hears grow. */
@@ -134,7 +134,6 @@ export function Lines(props: LinesProps) {
   const shown = reactionsOn(props.reactions ?? [], props.me, lineOf);
   // The threads of the lines as shown: a reply that names a folded edit's msgid answers the line it corrects.
   const { repliesOf } = threadsOf(lines, lineOf);
-  const replies = new Map([...repliesOf].map(([root, each]) => [root, each.length]));
   // A direct message's lines root no thread.
   const onThread = props.room === undefined ? undefined : props.onThread;
   const byId = new Map(lines.map((line) => [line.id, line]));
@@ -149,7 +148,7 @@ export function Lines(props: LinesProps) {
       lines={lines}
       shown={shown}
       lineOf={lineOf}
-      replies={replies}
+      repliesOf={repliesOf}
     />
   );
 }
@@ -157,7 +156,7 @@ export function Lines(props: LinesProps) {
 function List(props: ListProps) {
   const { room, members, me, refused, connected, reactions, cannotReact, lines, shown, lineOf } = props;
   const { onDelete = NO_DELETE, onDismiss = NO_DISMISS, onReact = NO_REACT, onReply = NO_REPLY } = props;
-  const { read, paged = false, onRead, verdicts, saving = false, byId, chips, replies, onThread } = props;
+  const { read, paged = false, onRead, verdicts, saving = false, byId, chips, repliesOf, onThread } = props;
   const fresh = useNewMark(lines, paged ? read : undefined, me);
   const { listRef, atEndRef, onScroll } = useNewestInView(lines, fresh, reactions);
   const look = useReadAtEnd(lines, atEndRef, paged ? onRead : undefined);
@@ -228,7 +227,7 @@ function List(props: ListProps) {
             chips={chips.get(line.id)}
             react={me === undefined || !shown.has(line.id) ? undefined : react}
             answers={line.reply === line.id ? undefined : byId.get(lineOf(line.reply ?? ""))}
-            replies={replies.get(line.id)}
+            replies={repliesOf.get(line.id)?.length}
             onThread={onThread}
           />
         ))}
