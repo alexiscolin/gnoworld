@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 // 4f-n (G11): the hook that tells the page what the account has not seen, on the real store, rendered in jsdom.
+import { parseLine } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
 import { act, Profiler, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -130,7 +131,10 @@ describe("useNotices", () => {
   it("counts each room and conversation, lists the notices, and puts the total in the title", () => {
     draw(on());
     follow();
-    tell(({ noticeActions }) => {
+    tell(({ noticeActions, dmActions }) => {
+      // The conversation the store keeps: a direct message's notice counts only for one.
+      const parsed = parseLine(`@msgid=dm1;time=${T(1)};account=${ALICE} :${ALICE}!u@h PRIVMSG ${ME} :hi`);
+      if (parsed.ok) dmActions.heard(parsed.message);
       noticeActions.add(mention("a", MAIN));
       noticeActions.add(mention("b", MAIN, 6));
       noticeActions.add({ ...mention("d", ALICE), kind: "dm" });

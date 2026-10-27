@@ -35,6 +35,15 @@ describe("the store's notices slice", () => {
     const marked = (room: string, minute: number) => {
       chatActions.heard(read(`:ergo.test MARKREAD ${room} timestamp=${T(minute)}`));
     };
+    // Conversations the store keeps, each with a line of the partner's: a direct message's notice counts only for these.
+    const kept = (...partners: readonly string[]) => {
+      for (const partner of partners)
+        store
+          .getState()
+          .dmActions.heard(
+            read(`@msgid=dm-${partner};time=${T(1)};account=${partner} :${partner}!u@h PRIVMSG ${ME} :hi`),
+          );
+    };
     const heard = () => {
       let count = 0;
       store.subscribe(() => {
@@ -42,7 +51,7 @@ describe("the store's notices slice", () => {
       });
       return () => count;
     };
-    return { store, state, notices, said, noticed, marked, heard };
+    return { store, state, notices, said, noticed, marked, kept, heard };
   };
   const notice = (over: Partial<Notice> = {}): Notice => ({
     id: "n1",
@@ -220,6 +229,7 @@ describe("the store's notices slice", () => {
 
     it("keeps a direct message's notice under its partner's address, which no room's reading place reaches", () => {
       const t = setup();
+      t.kept(ALICE);
       t.notices.add(notice({ id: "d", kind: "dm", where: ALICE }));
       expect(ids(unseenNotices(t.state()))).toEqual(["d"]);
       t.notices.seen(ALICE, T(5));
@@ -239,6 +249,7 @@ describe("the store's notices slice", () => {
 
     it("hides the notices of a room that is none, and brings them back with the mode", () => {
       const t = setup();
+      t.kept(ALICE);
       t.notices.add(notice({ id: "a", where: GAMES }));
       t.notices.add(notice({ id: "b", where: MAIN }));
       t.notices.add(notice({ id: "d", kind: "dm", where: ALICE }));
@@ -328,6 +339,7 @@ describe("the store's notices slice", () => {
 
     it("counts a conversation by its partner's unseen notices, whatever any room's mode", () => {
       const t = setup();
+      t.kept(ALICE);
       t.notices.setMode(GAMES, "none");
       t.notices.add(notice({ id: "d1", kind: "dm", where: ALICE, time: T(1) }));
       t.notices.add(notice({ id: "d2", kind: "dm", where: ALICE, time: T(2) }));
@@ -345,6 +357,7 @@ describe("the store's notices slice", () => {
 
     it("totals the rooms followed and the conversations, each by its own count", () => {
       const t = setup();
+      t.kept(ALICE, BOB);
       t.notices.setMode(MAIN, "all");
       t.said(MAIN, ["m1", 1]);
       t.said(MAIN, ["m2", 2]);
@@ -433,6 +446,7 @@ describe("the store's notices slice", () => {
     // G10 (F1508): each place's mark is its own newest time, not another place's.
     it("marks each place at its own newest unseen time", () => {
       const t = setup();
+      t.kept(ALICE);
       t.notices.add(notice({ id: "a", where: GAMES, time: T(5) }));
       t.notices.add(notice({ id: "b", where: GAMES, time: T(9) }));
       t.notices.add(notice({ id: "c", where: MAIN, time: T(3) }));
