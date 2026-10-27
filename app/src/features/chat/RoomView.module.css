@@ -28,8 +28,11 @@
     font: var(--font-meta);
   }
 
-  /* Above a reply, the line it answers, in one line and muted (4d). */
+  /* Above a reply, the line it answers, in one line and muted, set apart by a rule at its start as a quote is, its
+     author in the text's own colour and bolder: the prototype's quote (4d). */
   .replying {
+    padding-inline-start: var(--space-xs);
+    border-inline-start: var(--line-width) solid var(--color-line-strong);
     color: var(--color-text-muted);
     overflow: hidden;
     white-space: nowrap;
@@ -39,6 +42,11 @@
   .time,
   .mark {
     color: var(--color-text-muted);
+  }
+
+  .who {
+    color: var(--color-text);
+    font-weight: 500;
   }
 
   .action {

@@ -25,7 +25,11 @@ export function Replying({ to, length, known }: { to: Answered | undefined; leng
   if (to === undefined) return <>Replying to an earlier message</>;
   return (
     <>
-      Replying to <Person name={to.who} guest={to.guest} />: {excerpt(shortened(to.text, known), length)}
+      Replying to{" "}
+      <span className={styles["who"]}>
+        <Person name={to.who} guest={to.guest} />
+      </span>
+      : {excerpt(shortened(to.text, known), length)}
     </>
   );
 }

@@ -46,6 +46,25 @@ test.describe("reactions, replies and edits, as they look", () => {
     await expect(page.getByRole("list", { name: "Messages" })).toHaveScreenshot("talk-computer.png");
   });
 
+  // F1179 (the UX review's U7): the prototype's quote, a rule at its start and its author in bold.
+  test("set a reply's quote apart by a rule at its start and its author in bold", async ({ page }) => {
+    await asAccount(page, LOOK, 3);
+    const quote = lineOf(page, "count me in").locator("p");
+    const look = (box: typeof quote) =>
+      box.evaluate((element) => {
+        const rule = getComputedStyle(element);
+        const who = element.querySelector("span");
+        return {
+          rule: parseFloat(rule.borderInlineStartWidth),
+          bold: who === null ? 0 : Number(getComputedStyle(who).fontWeight),
+          plain: Number(rule.fontWeight),
+        };
+      });
+    const { rule, bold, plain } = await look(quote);
+    expect(rule).toBeGreaterThan(0);
+    expect(bold).toBeGreaterThan(plain);
+  });
+
   // The green pass: the composer's reply bar pictured and checked, as the lines are.
   test("pass axe and look as the prototype's with the reply bar over the field, on a computer's screen", async ({
     page,
