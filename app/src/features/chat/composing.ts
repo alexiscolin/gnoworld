@@ -66,6 +66,10 @@ function useReplies(shown: Shown | undefined, lines: readonly Line[] | undefined
   };
 }
 
+// A line's words as the box holds them: compose sends one leading slash less than a line that starts with one is typed
+// with, so the box shows the slash back, as a changed line needs it (CR6).
+const boxed = (text: string) => (text.startsWith("/") ? `/${text}` : text);
+
 // The line of the reader's own a direct message's next one corrects, its words put in the composer, as a reply's: one a
 // conversation, none for a room. Sent tagged with the line's msgid, shown in its place, unless unchanged. Asking for one
 // drops a reply asked before (`dropReply`); an edit's end gives the box the focus.
@@ -91,10 +95,10 @@ function useEdits(shown: Shown | undefined, lines: readonly Line[] | undefined, 
   return {
     view,
     writer: {
-      editing: { text: editing.text, asked: edit.asked },
+      editing: { text: boxed(editing.text), asked: edit.asked },
       onCancelEdit: end,
       onSay: (draft: string) => {
-        const went = draft.trim() === editing.text.trim() || shown.say(draft, { edit: editing.id });
+        const went = draft.trim() === boxed(editing.text).trim() || shown.say(draft, { edit: editing.id });
         if (went) end();
         return went;
       },

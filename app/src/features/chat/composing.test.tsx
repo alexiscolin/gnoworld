@@ -145,4 +145,26 @@ describe("useComposing", () => {
     act(() => now().view.onEdit?.("m3"));
     expect(now().writer.editing).toBeUndefined();
   });
+
+  // /code-review on 4d's DM bar (CR6): the line's text is what compose sent after its one-slash escape; the box showed it
+  // as it is, where a changed "/x2" reads as an unknown command and an unchanged "/x" was a plain "/x".
+  it("shows a line that starts with a slash as the box needs it, and sends it escaped again when changed", () => {
+    draw("dm", [line("m1", "/x"), line("m2", "theirs")]);
+    act(() => now().view.onEdit?.("m1"));
+    expect(now().writer.editing?.text).toBe("//x");
+    act(() => {
+      now().writer.onSay?.("//x2");
+    });
+    expect(say).toHaveBeenCalledExactlyOnceWith("//x2", { edit: "m1" });
+  });
+
+  it("sends nothing for a slashed line left as it was", () => {
+    draw("dm", [line("m1", "/x"), line("m2", "theirs")]);
+    act(() => now().view.onEdit?.("m1"));
+    act(() => {
+      now().writer.onSay?.("//x");
+    });
+    expect(say).not.toHaveBeenCalled();
+    expect(now().writer.editing).toBeUndefined();
+  });
 });
