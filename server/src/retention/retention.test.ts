@@ -214,7 +214,7 @@ describe("the retention's budget (3n)", () => {
         if (key !== "prepare") return Reflect.get(target, key);
         return (sql: string) => {
           const statement = target.prepare(sql);
-          if (!sql.startsWith("DELETE")) return statement;
+          if (!sql.startsWith("DELETE FROM verdicts")) return statement;
           return {
             run: (...params: SQLInputValue[]) => {
               const result = statement.run(...params);
