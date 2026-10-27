@@ -102,23 +102,24 @@ export interface ComposerProps {
   draft?: string | undefined;
   /** Each change of the draft, for the device to keep; a line sent leaves it blank. */
   onDraft?: ((draft: string) => void) | undefined;
-  /** The line the next one answers (4d's replies), said over the field, with how many times Reply was asked; and how
-   * to answer none. */
-  replying?: (Answered & { readonly asked?: number | undefined }) | undefined;
+  /** The line the next one answers (4d's replies), said over the field; how many times Reply was asked, each asking
+   * putting the focus in the field; and how to answer none. */
+  replying?: Answered | undefined;
+  asked?: number | undefined;
   onCancelReply?: (() => void) | undefined;
 }
 
 // A line chosen to answer, each time Reply is asked, the same line's again included: the field takes the focus; an
 // edit of that line's words changes what the bar quotes, never where the focus is (the code review's CR2).
-function useFocusOnReply(replying: ComposerProps["replying"], formRef: RefObject<HTMLFormElement | null>) {
-  const answering = replying === undefined ? undefined : String(replying.asked ?? 0);
+function useFocusOnReply(answers: boolean, asked: number, formRef: RefObject<HTMLFormElement | null>) {
+  const answering = answers ? asked : undefined;
   useLayoutEffect(() => {
     if (answering !== undefined) formRef.current?.querySelector("input")?.focus();
   }, [answering, formRef]);
 }
 
 export function Composer(props: ComposerProps) {
-  const { room, nick, rooms, members, onSay, draft: kept = "", onDraft, replying, onCancelReply } = props;
+  const { room, nick, rooms, members, onSay, draft: kept = "", onDraft, replying, asked = 0, onCancelReply } = props;
   const [draft, setDraft] = useState(kept);
   // Each change of the draft, the device told at once: a render alone (a line arriving) writes nothing.
   const change = (next: string) => {
@@ -139,7 +140,7 @@ export function Composer(props: ComposerProps) {
   const completion = completions(draft, { commands: COMMANDS, rooms, people });
   const known = new Set(members);
   const box = () => formRef.current?.querySelector("input") ?? undefined;
-  useFocusOnReply(replying, formRef);
+  useFocusOnReply(replying !== undefined, asked, formRef);
   useLayoutEffect(() => {
     const selection = selectionRef.current;
     if (selection === undefined) return;

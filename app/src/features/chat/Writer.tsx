@@ -41,7 +41,8 @@ export function Writer({ session, room, rooms, members, onSay, replying, asked, 
         rooms={rooms.map(roomLabel)}
         members={members}
         onSay={onSay}
-        replying={replying === undefined ? undefined : { ...answeredOf(replying), asked }}
+        replying={replying === undefined ? undefined : answeredOf(replying)}
+        asked={asked}
         onCancelReply={onCancelReply}
       />
     </Suspense>
