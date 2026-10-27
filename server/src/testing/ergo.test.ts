@@ -1162,8 +1162,23 @@ describe("the server's IRC link (3h)", { timeout: 40_000 }, () => {
       retryMs: () => 60_000,
     });
     stops.push(() => link.stop());
-    await inRoom(await oper(e, "gus"), "#bubble");
+    const gus = await oper(e, "gus");
+    await inRoom(gus, "#bubble");
     await link.stop();
+    // The bot is away only once Ergo has dropped its session: asked, the nick is unknown (401) rather than listed.
+    for (;;) {
+      const mark = gus.lines().length;
+      gus.send("WHOIS gnoworld");
+      await gus.expect(/ (311|401) gus gnoworld /);
+      if (
+        gus
+          .lines()
+          .slice(mark)
+          .some((l) => l.includes(" 401 gus gnoworld "))
+      )
+        break;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
     const squatter = await open(e);
     await hello(squatter);
     await finish(squatter, "gnoworld");
@@ -1181,6 +1196,30 @@ describe("the server's IRC link (3h)", { timeout: 40_000 }, () => {
     const later = await guest(e, "later");
     later.send("NICK gnoworld");
     await later.expect(/ 433 Guest-later gnoworld :Nickname is already in use/);
+    // The case does not get round it: Ergo casefolds nicks.
+    later.send("NICK GNOWORLD");
+    await later.expect(/ 433 Guest-later GNOWORLD :Nickname is already in use/);
+  });
+
+  it("logs in as gnoworld while a guest already holds Guest-gnoworld (F722)", async () => {
+    const e = await start();
+    const early = await open(e);
+    await hello(early);
+    await finish(early, "gnoworld");
+    expect(logged(early)).toContain(" 001 Guest-gnoworld ");
+    const lines: string[] = [];
+    const link = ircLink({
+      host: "127.0.0.1",
+      port: e.port,
+      password: e.operPassword,
+      rooms: () => ["#bubble"],
+      onMessage: () => undefined,
+      log: logger("a-pepper-of-forty-characters-0123456789", (line) => lines.push(line)),
+      retryMs: () => 200,
+    });
+    stops.push(() => link.stop());
+    expect(await inRoom(await oper(e, "watcher"), "#bubble")).toMatch(/ :(.* )?@gnoworld\b/);
+    expect(lines.join("\n")).not.toContain("irc_refused");
   });
 
   it("gets ready as a second session of its account while its last one lingers (the max review)", async () => {
@@ -1336,8 +1375,8 @@ describe("the template's limits and privacy (slice 3's max review)", { timeout: 
     gus.send("WHO *");
     await sync(gus);
     expect(logged(gus)).not.toMatch(/ 353 .*carol/);
-    expect(logged(gus)).not.toMatch(/ 319 Guest-gus carol /);
-    expect(logged(gus)).not.toMatch(/ 352 Guest-gus \S+ \S+ \S+ \S+ carol /);
+    expect(logged(gus)).not.toMatch(/ 319 \S+ carol /);
+    expect(logged(gus)).not.toMatch(/ 352 \S+ \S+ \S+ \S+ \S+ carol /);
     chief.send("NAMES #club");
     await chief.expect(/ 353 .*carol/);
   });
