@@ -1,5 +1,6 @@
 import { Address } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
+import { MULTILINE_BYTES } from "@gnoworld/core";
 import { DRAFT_LIMIT, drafts } from "./drafts.ts";
 
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
@@ -62,7 +63,8 @@ describe("an account's drafts on the device", () => {
   });
 
   it(`keeps a draft of ${String(DRAFT_LIMIT)} UTF-16 units at most; a longer one forgets the last, no older text to come back`, () => {
-    expect(DRAFT_LIMIT).toBe(4000);
+    // A message of several lines goes at 4096 bytes: no draft the composer lets go is lost (the red pass's R12).
+    expect(DRAFT_LIMIT).toBe(MULTILINE_BYTES);
     const device = storage();
     const mine = on(device, ALICE);
     expect(mine.set("#bubble", "😀".repeat(DRAFT_LIMIT / 2))).toBe(true);

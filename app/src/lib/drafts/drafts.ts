@@ -6,8 +6,9 @@
 import type { Address } from "@gnoworld/schemas";
 import { z } from "../jitless.ts";
 
-/** The UTF-16 units a draft holds at most: past it, none is kept (a line goes out at 442 bytes). */
-export const DRAFT_LIMIT = 4000;
+/** The UTF-16 units a draft holds at most: past it, none is kept. A message of several lines goes out at 4096 bytes
+ * at most (core's MULTILINE_BYTES), one UTF-16 unit being a byte or more, so every draft the composer lets go is kept. */
+export const DRAFT_LIMIT = 4096;
 const Draft = z.string().max(DRAFT_LIMIT);
 
 /** The device's storage, as localStorage offers it. */
