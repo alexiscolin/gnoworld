@@ -47,24 +47,19 @@ describe("Composer", () => {
     expect(refusalAfter("fixed", refused)).toEqual(refused);
   });
 
-  // A refused correction taken up again starts its composer on the refusal, not told yet: the reader hears why.
+  // A refused correction taken up again starts its composer on the refusal, not told yet: the reader hears why, and the
+  // draft is the box's. A composer that starts on a refusal it already knew tells nothing.
   it("tells a refusal not told yet as it starts, and one it already knew as it starts not", () => {
     const refused = { count: 1, draft: "fixed", why: "Not sent: g10gh7…3y5tv is not online." };
-    const composer = (fresh: boolean) =>
+    const composer = (props: { fresh?: boolean; draft: string }) =>
       renderToStaticMarkup(
-        <Composer
-          room={ROOM}
-          nick={NICK}
-          rooms={[]}
-          members={[]}
-          onSay={() => true}
-          draft="fixed"
-          refused={refused}
-          fresh={fresh}
-        />,
+        <Composer room={ROOM} nick={NICK} rooms={[]} members={[]} onSay={() => true} refused={refused} {...props} />,
       );
-    expect(composer(true)).toContain("Not sent: g10gh7…3y5tv is not online.");
-    expect(composer(false)).not.toContain("Not sent");
+    expect(composer({ fresh: true, draft: "fixed" })).toContain("Not sent: g10gh7…3y5tv is not online.");
+    expect(composer({ fresh: true, draft: "" })).toMatch(/<input[^>]*value="fixed"/);
+    expect(composer({ fresh: false, draft: "" })).not.toContain("Not sent");
+    expect(composer({ draft: "" })).not.toContain("Not sent");
+    expect(composer({ draft: "" })).not.toMatch(/value="fixed"/);
   });
 
   it("is a form named for the room, its field labelled, Send off while the line is empty", () => {

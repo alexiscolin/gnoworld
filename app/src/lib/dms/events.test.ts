@@ -106,9 +106,33 @@ describe("afterAct: a delete takes the corrections of the line with it", () => {
     expect(act(held, redactOf(ALICE, "m1"))).toBe(held);
   });
 
+  it("leaves a guest's line that names the deleted one, which no account wrote", () => {
+    const guest: Line = {
+      id: "g1",
+      time: "2026-10-25T10:00:09.000Z",
+      from: "guest-ab12cd",
+      text: "?",
+      kind: "message",
+      edits: "m1",
+    };
+    const held = { lines: [lineOf("m1", ALICE), guest], reactions: undefined };
+    expect(act(held, redactOf(ALICE, "m1")).lines).toEqual([guest]);
+  });
+
   it("is the same object when the delete names no line and no correction", () => {
     const held = { lines: [lineOf("m1", ME)], reactions: undefined };
     expect(act(held, redactOf(ALICE, "m9"))).toBe(held);
+  });
+});
+
+describe("afterAct: a reaction", () => {
+  it("is the same object when it changes nothing, heard twice", () => {
+    const reaction = read(
+      `@msgid=t1;time=2026-10-25T10:00:00.000Z;account=${ALICE};+draft/react=👍;+reply=m1 :${ALICE}!u@h TAGMSG ${ME}`,
+    );
+    const once = act({ lines: [], reactions: [] }, reaction);
+    expect(once.reactions).toHaveLength(1);
+    expect(act(once, reaction)).toBe(once);
   });
 });
 

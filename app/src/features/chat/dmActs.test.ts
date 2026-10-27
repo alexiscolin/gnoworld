@@ -15,4 +15,12 @@ describe("a direct message's acts", () => {
     expect([acts.onDelete("m1"), acts.onReact({ to: "m1", emoji: "👍", on: true })]).toEqual([true, true]);
     expect(calls).toEqual(["dismissed", "redactIn", "dismissed", "reactTo"]);
   });
+
+  it("send nothing with no link, and dismiss on request", () => {
+    const calls: string[] = [];
+    const acts = dmActs({ current: undefined }, "g1partner", (partner) => calls.push(partner));
+    expect([acts.onDelete("m1"), acts.onReact({ to: "m1", emoji: "👍", on: true })]).toEqual([false, false]);
+    acts.onDismiss();
+    expect(calls).toEqual(["g1partner", "g1partner", "g1partner"]);
+  });
 });

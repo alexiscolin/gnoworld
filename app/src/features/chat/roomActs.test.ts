@@ -14,4 +14,12 @@ describe("a room's acts", () => {
     expect([acts.onDelete("m1"), acts.onReact({ to: "m1", emoji: "👍", on: true })]).toEqual([true, true]);
     expect(sent).toEqual(["dismissed", "redact", "dismissed", "react"]);
   });
+
+  it("send nothing with no link, and dismiss on request", () => {
+    const calls: string[] = [];
+    const acts = roomActs({ current: undefined }, "#bubble/games", (room) => calls.push(room));
+    expect([acts.onDelete("m1"), acts.onReact({ to: "m1", emoji: "👍", on: true })]).toEqual([false, false]);
+    acts.onDismiss();
+    expect(calls).toEqual(["#bubble/games", "#bubble/games", "#bubble/games"]);
+  });
 });
