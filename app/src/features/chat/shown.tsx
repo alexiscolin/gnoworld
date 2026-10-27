@@ -1,25 +1,12 @@
 // The conversation in view on a world's page (slice 4's 4e), one RoomView and one Writer whatever it is: a room's or
 // a direct message's, what each is told.
 import { Icon } from "@gnoworld/ui";
-import type { AppState } from "../../store/index.ts";
 import { NOT_ENCRYPTED, PAGE_ONLY, type Dms } from "./Dms.tsx";
-import { roomLabel, shortAddress } from "./names.ts";
-import type { RoomActs } from "./roomActs.ts";
-import type { RoomViewProps } from "./RoomView.tsx";
-import type { WriterProps } from "./Writer.tsx";
+import { shortAddress } from "./names.ts";
+import { roomShown, type Room, type Shown } from "./roomShown.ts";
 import styles from "./shown.module.css";
 
-// The conversation in view, one RoomView and one Writer whatever it is: what each is told. Its key, one a
-// conversation, keeps each one's drawing, its scroll and whether its reader is at the end, apart (CR10).
-export interface Shown {
-  kind: "room" | "dm";
-  key: string;
-  view: Pick<
-    RoomViewProps,
-    "room" | "title" | "note" | "state" | "empty" | "onDelete" | "onDismiss" | "onRead" | "onReact"
-  >;
-  writer: Pick<WriterProps, "room" | "label" | "members" | "onSay" | "onTyping" | "refused" | "focus" | "describedBy">;
-}
+export type { Room, Shown } from "./roomShown.ts";
 
 /** What a direct message's page is told by the page: how it sends, whether its composer takes the focus, and the
  * id of its note, which the composer points at. */
@@ -92,30 +79,4 @@ function dmShown(partner: string, dms: Dms, { sayTo, focus, noteId, seen }: DmPa
 export function shownOf(dms: Dms, room: Room, page: DmPage): Shown | undefined {
   if (dms.partner !== undefined) return dmShown(dms.partner, dms, page);
   return dms.problem !== undefined || room.id === undefined ? undefined : roomShown(room.id, room.state, room.acts);
-}
-
-/** The room in view, if any: its id, its state in the store, and what the page lets its reader do in it. */
-export interface Room {
-  id: string | undefined;
-  state: AppState["chat"]["rooms"][string] | undefined;
-  acts: RoomActs;
-}
-
-// A room's: its label, its description; who is here goes beside it.
-function roomShown(room: string, state: Room["state"], acts: RoomActs): Shown {
-  return {
-    kind: "room",
-    key: `room:${room}`,
-    view: {
-      room,
-      title: roomLabel(room),
-      note: state?.topic,
-      state,
-      onDelete: acts.onDelete,
-      onDismiss: acts.onDismiss,
-      onRead: acts.onRead,
-      onReact: acts.onReact,
-    },
-    writer: { room, members: state?.members ?? [], onSay: (draft) => acts.onSay(draft), onTyping: acts.onTyping },
-  };
 }

@@ -3,13 +3,13 @@
 import { foldEdits, type Line } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";
 import { Sidebar, Stack } from "@gnoworld/ui";
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useId, useState, type ReactNode, type RefObject } from "react";
 import { useSearchParams } from "react-router";
 import { useAppStore } from "../../storeContext.tsx";
 import type { AppState } from "../../store/index.ts";
 import type { Dms } from "./Dms.tsx";
 import type { ChatLink } from "./link.ts";
-import { dmParams, groupsAt, neighbour, roomIds, roomParams } from "./names.ts";
+import { dmParams, groupsAt, roomIds } from "./names.ts";
 import { roomActs, type RoomActs } from "./roomActs.ts";
 import { useRoomKeeping } from "./RoomKeeping.ts";
 import { Saved } from "./Saved.tsx";
@@ -17,35 +17,9 @@ import { RoomsView } from "./RoomsView.tsx";
 import { People, RoomView, type RoomViewProps } from "./RoomView.tsx";
 import { shownOf, type Shown } from "./shown.tsx";
 import { usePins } from "./usePins.ts";
+import { useRoomKeys } from "./useRoomKeys.ts";
 import type { Noticing } from "./useNotices.ts";
 import { Writer } from "./Writer.tsx";
-
-// Alt+Up and Alt+Down: the room before or after the one in view, anywhere on the page (ADR-0002's chat rows). A key
-// pressed before the page draws the room the last one went to starts from that room: the hook keeps it, and the room
-// in view, once drawn or chosen otherwise, sets it again.
-function useRoomKeys(rooms: readonly string[], current: string | undefined) {
-  const [, setParams] = useSearchParams();
-  const fromRef = useRef(current);
-  useLayoutEffect(() => {
-    fromRef.current = current;
-  }, [current]);
-  useEffect(() => {
-    const go = (event: globalThis.KeyboardEvent) => {
-      const step = { ArrowUp: -1, ArrowDown: 1 }[event.key];
-      const alone = event.altKey && !event.shiftKey && !event.ctrlKey && !event.metaKey;
-      const from = fromRef.current;
-      const next = alone && step !== undefined && from !== undefined ? neighbour(rooms, from, step) : undefined;
-      if (next === undefined) return;
-      event.preventDefault();
-      fromRef.current = next;
-      setParams(roomParams(next));
-    };
-    window.addEventListener("keydown", go);
-    return () => {
-      window.removeEventListener("keydown", go);
-    };
-  }, [rooms, setParams]);
-}
 
 // The conversation opened from who is here, whose composer takes the focus as its button goes (U12): asked while it is
 // in view, `partner` the one in view, never again once the reader left it (CR6).
