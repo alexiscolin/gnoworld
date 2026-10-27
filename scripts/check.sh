@@ -215,6 +215,12 @@ lane_tests() {
 	sh scripts/ergo.sh >/dev/null # the Ergo the server's tests start, built once from deploy/ergo/VERSION
 	$full || step vitest # --full runs the tests once, with coverage
 	$full || run test "$tests_scope"
+	# The coverage run leaves the compiled project out (its memo cache checks are branches nothing takes, F1350): the
+	# render counts run here instead, once, beside the coverage lane's work.
+	if $full; then
+		step compiled
+		run test:compiled
+	fi
 }
 
 lane_gno() {
