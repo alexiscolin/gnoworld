@@ -10,19 +10,56 @@
   }
 
   .lines > li {
+    /* layout: the line holds its bar (LineActions), placed over its end */
+    position: relative;
+    /* layout: room for the focus ring, drawn outside the line, which the list that scrolls would clip */
+    margin-inline: calc(var(--focus-width) + var(--focus-offset));
+    /* The bar asks the line's own width, not the page's (LineActions). */
+    container-type: inline-size;
     padding-block: var(--space-3xs);
+    /* room at the line's end for its bar (LineActions: a small control, its padding and border, its inset), so the
+       bar covers no word, shown or not: the text never reflows under the pointer (U2) */
+    padding-inline-end: calc(var(--control-s) + 2 * (var(--space-3xs) + var(--line-width)) + var(--space-2xs));
     overflow-wrap: anywhere;
+    scroll-margin-block: calc(var(--focus-width) + var(--focus-offset));
+  }
+
+  .lines > li:first-child {
+    /* layout: room above the oldest line for its bar, which rises above a line (LineActions) */
+    margin-block-start: var(--space-s);
+  }
+
+  .lines > li:last-child {
+    /* layout: room below the newest line for its focus ring */
+    margin-block-end: calc(var(--focus-width) + var(--focus-offset));
   }
 
   .time,
   .mark,
-  .mentionsYou {
+  .mentionsYou,
+  .replying {
     font: var(--font-meta);
+  }
+
+  /* Above a reply, the line it answers, in one line and muted, set apart by a rule at its start as a quote is, its
+     author in the text's own colour and bolder: the prototype's quote (4d). */
+  .replying {
+    padding-inline-start: var(--space-xs);
+    border-inline-start: var(--line-width) solid var(--color-line-strong);
+    color: var(--color-text-muted);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
 
   .time,
   .mark {
     color: var(--color-text-muted);
+  }
+
+  .who {
+    color: var(--color-text);
+    font-weight: 500;
   }
 
   .action {
@@ -44,6 +81,11 @@
     color: var(--color-warm);
   }
 
+  /* My own line: my name in mint, the word "you" after it (DESIGN-SYSTEM.md, Avatar). */
+  .lines > li[data-mine] .author {
+    color: var(--color-mine);
+  }
+
   /* A quote set apart from the sender's own words, by a rule at its start and a muted colour (F783). */
   .text blockquote {
     padding-inline-start: var(--space-xs);
@@ -59,5 +101,43 @@
   .count {
     font: var(--font-label);
     color: var(--color-text-muted);
+  }
+
+  /* Always drawn, one line high, so the composer below never moves as typists come and go; cut to one line, its
+     whole in its title (UX review U2, U8). */
+  .typing {
+    font: var(--font-meta);
+    color: var(--color-text-muted);
+    /* layout: one line of this font, which no token names */
+    min-block-size: 1lh;
+    /* layout: a step above and below, parting the line from the last message and the format bar */
+    margin-block: var(--space-2xs);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* The first line past the reading place as the room opened: the prototype's "New", a divider row at its head, the word
+     in the label style and a rule running on, so the times stay in one column (UX review U4). */
+  .divider {
+    /* layout: the word and its rule side by side, the rule taking what the word leaves */
+    display: flex;
+    /* layout: a step between the word and its rule */
+    gap: var(--space-2xs);
+    /* layout: the rule runs the line's whole width, over the room kept for its bar, which the row holds none of */
+    margin-inline-end: calc(-1 * (var(--control-s) + 2 * (var(--space-3xs) + var(--line-width)) + var(--space-2xs)));
+  }
+
+  .divider::after {
+    content: "";
+    /* layout: the rule on the word's line (not the row's align-items: Popover's danger item holds the three alike) */
+    align-self: center;
+    /* layout: the rule takes the row's rest */
+    flex: 1;
+    border-block-start: var(--line-width) solid var(--color-new-line);
+  }
+
+  .fresh {
+    color: var(--color-new);
   }
 }

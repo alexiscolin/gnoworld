@@ -122,7 +122,7 @@ PATH alone. The probe tries the refusal on a copy of the config with a pin of it
 | `packages/core/src`, which the server imports, or any other file of those folders (a fixture, a stylesheet) | tsc, ESLint, every Vitest test (a file read from disk is outside the module graph too), the app's journeys | 30 s |
 | `packages/ui/src/tokens.css` | as for any stylesheet of those folders, and the tokens story's pictures alone at its three widths, in a lane of its own beside the others (`pictures.spec.ts` with `PICTURES_OF=tokens--`, Storybook built in the run's own folder, which `STORIES_OUT` must name as the `storybook` folder of a `check.*` folder directly inside the temporary folder, since Storybook deletes it first (security-S6, CR7), the evidence of a failed run in that run folder's `stories-results` (`app/test-results-stories` outside a gate), never Playwright's default `app/test-results` that the journeys empty as they start (CR4), a free port of its own; 5 s beside Vitest's 20 to 23 s; F1190) | 30 s |
 | `gno/` | the gno lane | 30 s |
-| anything else (a config, the lockfile, the harness, `packages/schemas`, `deploy/`), no change at all, or no repository (pre-commit's staged copy) | everything | 60 s |
+| anything else (a config, the lockfile, the harness, `packages/schemas`, `deploy/`), no change at all, or no repository (pre-commit's staged copy) | everything | 75 s |
 
 What a commit leaves out, the full gate runs on the exact tip before `main` takes it (`pre-push`
 wants its record). ESLint reads no cache: a cache is keyed on a file's own text, so a type changed
@@ -161,7 +161,7 @@ shows in it again and again is a test to fix, not to forgive.
 | Prettier | unformatted code |
 | `tsc` | type errors in `core` and the app; `core` sees no DOM and no Node, so it cannot reach the network |
 | ESLint, with `@eslint/css` | floating promises, swallowed errors, `any`, an incomplete switch, `eval`, import cycles, size and complexity limits, impure `core` (clock, chance, globals), switched-off tests (Vitest's and Playwright's), invalid CSS, unlayered CSS, physical properties; in the app, React's hooks and compiler rules, a hand-written `memo`, `useMemo` or `useCallback`, raw HTML into the DOM, a folder's import against ARCHITECTURE.md's table, the network or storage outside `lib` and `sw`, `console` (F378); the config is `eslint.config.ts` and its parts in `lint/` |
-| Vitest, with fast-check | failing tests, `core`'s and the app's (its routes rendered by React Router's static handler); a test with no assertion |
+| Vitest, with fast-check | failing tests, `core`'s and the app's (its routes rendered by React Router's static handler); a test with no assertion; the `compiled` project (`app/vitest.compiled.config.ts`), the app tests it names compiled as the build compiles them, in jsdom, which count what a re-render recomputes (a test there is named in that config and left out of the node project) |
 | knip | unused files, exports and dependencies |
 | jscpd | copies, renamed ones and near ones (similarity 0.8) |
 | `scripts/check_css.py` | CUBE CSS: raw values outside tokens, layout outside compositions, unknown or unused tokens and classes, copied rules |
@@ -179,7 +179,8 @@ shows in it again and again is a test to fix, not to forgive.
 | Step | What it catches |
 |---|---|
 | `scripts/probe.py` | a lint rule, selector or check that no longer catches its planted fault |
-| coverage | under 85% anywhere, under 100% (95% branches) in `core` |
+| `test:compiled` | the compiled project's render counts, run alone: the coverage run leaves it out, because the React Compiler's memo cache checks are branches no test takes, in every component it renders (branches 93.8% without it, 82.5% with it, F1350) |
+| coverage | under 85% anywhere, under 100% (95% branches) in `core`; the `node`, `ui` and `slow` projects |
 | `scripts/patch_coverage.py` | under 85% of the changed lines run by a test, or a changed file no coverage measures |
 | `scripts/prove_fix.py` | a fix of the product whose tests or journeys did not fail on the commit before it (F126) |
 | StrykerJS | a mutant of the TypeScript that no test kills |

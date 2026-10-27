@@ -7,9 +7,9 @@ import { fileURLToPath } from "node:url";
 import { build, defineConfig, type Plugin } from "vite";
 import { precached } from "./src/sw/precache.ts";
 
-// The PWA's worker (ADR-0001 §12): src/sw/sw.ts built on its own into /sw.js, one classic script
-// whatever it shares with the pages, with the hashed files it precaches and their digests. Built once
-// the whole build is done: React Router writes its route manifest during the server build.
+// The PWA's worker (ADR-0001 §12): src/sw/sw.ts built on its own into /sw.js, one classic script, with the
+// files it precaches (hashed ones and the shell) and their digests. Built once the whole build is done:
+// React Router writes its route manifest in the server build, and its pages after the client build.
 const serviceWorker: Plugin = {
   name: "gnoworld:service-worker",
   apply: "build",
@@ -21,7 +21,7 @@ const serviceWorker: Plugin = {
       const out = resolve(builder.config.root, client.config.build.outDir);
       // Each file's digest spelled once, as the worker checks it (src/sw/digest.ts, F342).
       const list = await precached(
-        readdirSync(join(out, "assets")).map((name) => `assets/${name}`),
+        readdirSync(out, { recursive: true }),
         (name) => new Uint8Array(readFileSync(join(out, name))),
       );
       await build({
@@ -43,7 +43,12 @@ const serviceWorker: Plugin = {
   },
 };
 
+// Baseline widely available (docs/DESIGN-SYSTEM.md, "Browsers") at the newest features the code uses: RegExp's `v` flag
+// and Intl.Segmenter, as MDN's browser-compat-data 8.1.7 dates them. Vite's own default stops at 2026-01-01's (S1).
+const TARGET = ["chrome112", "edge112", "firefox125", "safari17", "ios17"];
+
 // The React Compiler memoizes every component (ADR-0002 §8); one it cannot compile fails the build.
 export default defineConfig({
   plugins: [reactRouter(), babel({ presets: [reactCompilerPreset({ panicThreshold: "all_errors" })] }), serviceWorker],
+  build: { target: TARGET },
 });

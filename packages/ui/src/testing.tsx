@@ -1,8 +1,17 @@
 // What the component tests share: their stories as elements, the threat model's abuse cases (slice
 // 2's plan, §3), and the rule that no component takes outside styling (DESIGN-SYSTEM.md).
-import { render } from "@testing-library/react";
+import { act, render } from "@testing-library/react";
 import { createElement, type ComponentType, type ReactElement, type ReactNode } from "react";
 import { expect } from "vitest";
+
+/** The popovers' toggle events handled: the browser queues each as a task, as the stand-in does (testSetup.ts). */
+export const toggled = () =>
+  act(
+    () =>
+      new Promise<void>((done) => {
+        setTimeout(done);
+      }),
+  );
 
 // True only for props that accept neither className nor style: a test assigns `true` to it, so
 // tsc fails the day either prop is added. Each member of a union is read, not their shared keys (F333).

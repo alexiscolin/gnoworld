@@ -1,0 +1,121 @@
+import type { StreamEvent } from "@gnoworld/schemas";
+import { describe, expect, it } from "vitest";
+import { followVerdicts, type VerdictSource } from "./verdicts.ts";
+
+// A stand-in for the page's EventSource: the URL it opened, its listeners, whether it was closed.
+function fakeSource() {
+  const opened: string[] = [];
+  const listeners = new Map<string, (event: { data: unknown }) => void>();
+  let closed = 0;
+  // EventSource's: 0 while it reconnects, 2 once it gives up.
+  let readyState = 1;
+  const open = (url: string): VerdictSource => {
+    opened.push(url);
+    return {
+      addEventListener: (type, listener) => {
+        listeners.set(type, listener);
+      },
+      close: () => {
+        closed += 1;
+      },
+      get readyState() {
+        return readyState;
+      },
+    };
+  };
+  // The browser's error, as it reconnects or once it gave up.
+  const error = (state: 0 | 2) => {
+    readyState = state;
+    listeners.get("error")?.({ data: undefined });
+  };
+  const say = (data: unknown, type = "verdict") => {
+    listeners.get(type)?.({ data });
+  };
+  return { open, opened, say, error, closed: () => closed };
+}
+
+const CHECKED: StreamEvent = { msgid: "m1", room: "#bubble/games", state: "checked" };
+
+// 4g: the server's verdicts' stream (server/src/stream/stream.ts, /api/stream?rooms=), a link's player waiting on
+// "checked"; an event of a state this page does not know is dropped, said once (F675, slice 4's plan §1).
+describe("followVerdicts: the room's verdicts, as the server streams them", () => {
+  it("opens the stream of the room it follows, its name encoded, and hands on each verdict", () => {
+    const source = fakeSource();
+    const heard: StreamEvent[] = [];
+    followVerdicts(["#bubble/games"], (event) => heard.push(event), { open: source.open, log: () => undefined });
+    expect(source.opened).toEqual(["/api/stream?rooms=%23bubble%2Fgames"]);
+    source.say(JSON.stringify(CHECKED));
+    source.say(JSON.stringify({ ...CHECKED, msgid: "m2", state: "hidden" }));
+    expect(heard).toEqual([CHECKED, { ...CHECKED, msgid: "m2", state: "hidden" }]);
+  });
+
+  it("opens one stream for several rooms, their names joined by a comma, encoded", () => {
+    const source = fakeSource();
+    followVerdicts(["#a", "#b/c"], () => undefined, { open: source.open, log: () => undefined });
+    expect(source.opened).toEqual(["/api/stream?rooms=%23a%2C%23b%2Fc"]);
+  });
+
+  it("drops what is no verdict it knows, saying so once, and goes on", () => {
+    const source = fakeSource();
+    const heard: StreamEvent[] = [];
+    const said: string[] = [];
+    followVerdicts(["#bubble"], (event) => heard.push(event), { open: source.open, log: (what) => said.push(what) });
+    source.say(JSON.stringify({ ...CHECKED, state: "blurred" }));
+    source.say("{not json");
+    source.say(JSON.stringify({ ...CHECKED, extra: 1 }));
+    source.say(42);
+    source.say(JSON.stringify(CHECKED));
+    expect(heard).toEqual([CHECKED]);
+    expect(said).toEqual(["verdict_unknown"]);
+  });
+
+  // F890: after its replay, the stream says when it began following, on the server's clock.
+  it("hands on the stream's word of when it began following, in ms, and drops a word of another shape once", () => {
+    const source = fakeSource();
+    const times: number[] = [];
+    const said: string[] = [];
+    followVerdicts(["#bubble"], () => undefined, {
+      open: source.open,
+      log: (what) => said.push(what),
+      since: (time) => times.push(time),
+    });
+    source.say(JSON.stringify({ time: "2026-10-26T12:00:00.000Z" }), "since");
+    source.say(JSON.stringify({ time: "noon" }), "since");
+    source.say("{not json", "since");
+    source.say(JSON.stringify({ time: "2026-10-26T12:00:00.000Z", extra: 1 }), "since");
+    source.say(JSON.stringify({ time: "2026-10-26T12:10:00.000Z" }), "since");
+    expect(times).toEqual([Date.parse("2026-10-26T12:00:00.000Z"), Date.parse("2026-10-26T12:10:00.000Z")]);
+    expect(said).toEqual(["since_unknown"]);
+  });
+
+  // F888: EventSource gives up on an answer not 200 (a 429, a restart's 502), and no verdict comes after it.
+  it("says once the stream ended for good, never while the browser reconnects it, nor once the page stopped", () => {
+    const source = fakeSource();
+    let ends = 0;
+    const options = { open: source.open, log: () => undefined, dead: () => (ends += 1) };
+    followVerdicts(["#bubble"], () => undefined, options);
+    source.error(0);
+    expect(ends).toBe(0);
+    source.error(2);
+    source.error(2);
+    expect(ends).toBe(1);
+    const other = fakeSource();
+    followVerdicts(["#bubble"], () => undefined, { ...options, open: other.open })();
+    other.error(2);
+    expect(ends).toBe(1);
+  });
+
+  it("closes the stream when the page stops following", () => {
+    const source = fakeSource();
+    const stop = followVerdicts(["#bubble"], () => undefined, { open: source.open, log: () => undefined });
+    stop();
+    stop();
+    expect(source.closed()).toBe(1);
+  });
+
+  it("opens no stream for no room", () => {
+    const source = fakeSource();
+    followVerdicts([], () => undefined, { open: source.open, log: () => undefined })();
+    expect(source.opened).toEqual([]);
+  });
+});

@@ -32,6 +32,17 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     expect(bob.lines().filter((line) => line.includes(` REDACT #bubble ${clean}`))).toEqual([]);
   });
 
+  it("checks what was said to a room's voices alone as it checks the room's own (F723)", async () => {
+    const e = await start();
+    const { verdicts } = await chatFor(e, []);
+    const alice = await login(e, "alice");
+    await join(alice, "#bubble");
+    // STATUSMSG: Ergo relays it to the room's voices and operators and keeps no history of it.
+    alice.send("PRIVMSG +#bubble :I will hurt you");
+    const echoed = await alice.expect(/PRIVMSG \+#bubble :I will hurt you$/);
+    await expect.poll(verdicts, { timeout: 10_000 }).toContain(msgid(echoed));
+  });
+
   it("checks what it missed while its link was down, each message once, after a mark Ergo has erased", async () => {
     const e = await start();
     const asked: string[] = [];
@@ -429,6 +440,55 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
         db.close();
         return Promise.resolve();
       });
+    });
+
+    it("checks a closed room's lines said while it was away, once Ergo has it back in (the max review)", async () => {
+      const e = await start();
+      const db = openDatabase(":memory:", TABLES);
+      const restart = () =>
+        chatFor(e, [], { worlds: typed({ ...RULES, bannedWords: ["spam"] }), db, reconcileMs: 300 });
+      const first = await restart();
+      const member = await login(e, "member");
+      for (let n = 0; !(await joins(member, "member", "#bubble/crew")); n += 1) {
+        if (n === 100) throw new Error("the member never got in");
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      // A line checked there first: the room's mark, from which the next catch-up asks.
+      const checked = await say(member, "#bubble/crew", "hello");
+      await expect.poll(first.verdicts).toContain(checked);
+      await first.stop();
+      await member.expect(/:gnoworld!\S+ QUIT /);
+      const missed = await say(member, "#bubble/crew", "buy spam");
+      await restart();
+      await member.expect(new RegExp(` REDACT #bubble/crew ${missed} `), 15_000);
+      stops.push(() => {
+        db.close();
+        return Promise.resolve();
+      });
+    });
+
+    it("comes back by SAJOIN to a room an operator kicked it out of, and checks its lines again (the max review)", async () => {
+      const e = await start();
+      const lines: string[] = [];
+      const bot = await chatFor(e, [], { worlds: typed({ ...RULES, bannedWords: ["spam"] }), lines });
+      const member = await login(e, "member");
+      for (let n = 0; !(await joins(member, "member", "#bubble/crew")); n += 1) {
+        if (n === 100) throw new Error("the member never got in");
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      const checked = await say(member, "#bubble/crew", "hello");
+      await expect.poll(bot.verdicts).toContain(checked);
+      const chief = await oper(e, "chief");
+      chief.send("SAJOIN chief #bubble/crew");
+      await chief.expect(/ 366 chief #bubble\/crew /);
+      chief.send("SAMODE #bubble/crew +o chief");
+      await chief.expect(/ MODE #bubble\/crew \+o chief/);
+      chief.send("KICK #bubble/crew gnoworld :out");
+      await member.expect(/ KICK #bubble\/crew gnoworld /, 10_000);
+      await member.expect(/:gnoworld!\S+ JOIN #bubble\/crew/, 15_000);
+      expect(lines.filter((line) => line.includes('"event":"irc_kicked"'))).toHaveLength(1);
+      const after = await say(member, "#bubble/crew", "buy spam");
+      await member.expect(new RegExp(` REDACT #bubble/crew ${after} `), 15_000);
     });
 
     it("undoes an operator's drift, a wildcard invite included, and asks nothing more once the rooms are so", async () => {

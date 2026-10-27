@@ -1,11 +1,13 @@
 import { readFileSync } from "node:fs";
-import { expect, hydrated, PAGES, test, type Page } from "./fixtures.ts";
+import { controlled, expect, hydrated, PAGES, test, type Page } from "./fixtures.ts";
 import { GUARDED, SITE } from "./sites.ts";
 
 // The policy's shape: the unit test pins its words, this the page's every answer (slice 3's plan, 3f).
 const SHAPE = new RegExp(
   "^default-src 'none'; script-src 'self'( 'sha256-[A-Za-z0-9+/]{43}=')+; style-src 'self'; img-src 'self' data:; " +
-    "font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; base-uri 'none'; " +
+    "font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; " +
+    "frame-src https://www.youtube-nocookie.com/embed/ https://player.vimeo.com/video/ https://giphy.com/embed/; " +
+    "base-uri 'none'; " +
     "form-action 'self'; frame-ancestors 'none'$",
 );
 const PASSWORD = `Basic ${btoa("team:a test password")}`;
@@ -133,12 +135,60 @@ test.describe("a planted violation", () => {
     expect(page.url()).toBe(`${SITE}/`);
   });
 
+  // F883: a service's own site is no player: a frame of youtube.com, not youtube-nocookie.com, is refused.
+  test("refuses a frame of a host the players' list does not name", async ({ page, violations }) => {
+    await page.goto("/");
+    await hydrated(page);
+    await plant(
+      page,
+      "const f = document.createElement('iframe'); f.src = 'https://www.youtube.com/embed/dQw4w9WgXcQ'; document.body.append(f)",
+    );
+    await expect.poll(() => violations).toEqual(["frame-src"]);
+  });
+
+  // F885: frame-src names each service's player by its path, so its host's other pages are refused; any such page
+  // let through is answered here, the test reaching no one.
+  test("refuses a frame of an accepted host outside its player's path", async ({ page, violations }) => {
+    await page.route(/^https:\/\/(?:www\.youtube-nocookie\.com|player\.vimeo\.com|giphy\.com)\//, (route) =>
+      route.fulfill({ status: 200, contentType: "text/html", body: "<!doctype html><title>page</title>" }),
+    );
+    await page.goto("/");
+    await hydrated(page);
+    for (const src of [
+      "https://www.youtube-nocookie.com/watch?v=dQw4w9WgXcQ",
+      "https://player.vimeo.com/76979871",
+      "https://giphy.com/gifs/4548k01F5Ej28",
+    ]) {
+      await plant(page, `const f = document.createElement('iframe'); f.src = '${src}'; document.body.append(f)`);
+    }
+    await expect.poll(() => violations).toEqual(["frame-src", "frame-src", "frame-src"]);
+  });
+
   test("is reported from a second tab of the same context too", async ({ page, violations }) => {
     const other = await page.context().newPage();
     await other.goto("/");
     await hydrated(other);
     await plant(other, "setTimeout('window.ran = true', 0)");
     await expect.poll(() => violations).toEqual(["script-src"]);
+  });
+
+  // F468: the worker has a global scope of its own, where the page's listener never runs.
+  test("is reported from inside the service worker too: a fetch the worker makes to another site", async ({
+    page,
+    violations,
+  }) => {
+    await page.goto("/");
+    await controlled(page);
+    const context = page.context();
+    const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
+    const result = await worker.evaluate(() =>
+      fetch("https://evil.test/x").then(
+        () => "reached",
+        () => "refused",
+      ),
+    );
+    expect(result).toBe("refused");
+    await expect.poll(() => violations).toEqual(["connect-src"]);
   });
 
   test("keeps the page out of another site's frame", async ({ page }) => {

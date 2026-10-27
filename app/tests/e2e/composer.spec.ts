@@ -329,7 +329,7 @@ test.describe("the composer", () => {
     await field(page).fill("are you there?");
     await field(page).press("Enter");
     await expect(field(page)).toHaveAccessibleDescription(
-      "Not sent: the chat is not in this room yet. Try again in a moment.",
+      "Not sent: the chat is not ready yet. Try again in a moment.",
     );
     await expect(field(page)).toHaveValue("are you there?");
     await field(page).press("End");
@@ -408,7 +408,7 @@ test.describe("the composer", () => {
     await inGames(page);
     const line = word("blocked");
     await field(page).fill(line);
-    await expect(field(page)).not.toHaveAccessibleDescription(/\S/);
+    await expect(field(page)).toHaveAccessibleDescription(/^(People in this room see when you type\.)?$/);
     await field(page).press("Enter");
     await expect(lineOf(page, line)).toHaveCount(1);
     await expect(field(page)).toHaveValue("");

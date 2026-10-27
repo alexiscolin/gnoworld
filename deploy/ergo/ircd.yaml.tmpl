@@ -18,7 +18,8 @@ server:
   websockets:
     allowed-origins: {{ORIGINS}}
   # Ergo's defaults (slice 3's max review): a visitor's address, as web passes it, has 16 connections at once
-  # and 32 in 10 minutes, an IPv6 one counted by its /64. The server's link counts under its own address.
+  # and 32 in 10 minutes, an IPv6 one counted by its /64. The server's link counts under its own address, which
+  # the inside network's exemption leaves alone (F720).
   ip-limits:
     count: true
     max-concurrent-connections: 16
@@ -27,7 +28,7 @@ server:
     max-connections-per-window: 32
     cidr-len-ipv4: 32
     cidr-len-ipv6: 64
-    exempted: ["localhost"]
+    exempted: {{EXEMPT}}
   # A visitor's address shown to nobody: WHOIS, WHO and every line carry a hash of it instead.
   ip-cloaking:
     enabled: true
@@ -49,8 +50,10 @@ accounts:
     enabled: true
     duration: 1m
     max-attempts: 3
-  # Invisible by default: a room's members are listed to its members alone (slice 3's max review).
-  default-user-modes: +i
+  # Invisible by default: a room's members are listed to its members alone (slice 3's max review). And +R: no
+  # direct message from a connection with no account, a guest's (irc/handlers.go:2552), set at each connection's
+  # registration (irc/server.go:445) so none arrives before it; decided by Alexis in 4e (docs/decisions.md).
+  default-user-modes: +iR
   nick-reservation:
     enabled: true
     method: strict

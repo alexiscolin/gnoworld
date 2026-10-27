@@ -106,7 +106,7 @@ EOF
 	$code || all=true # prose alone is no change of code, as in a repository
 fi
 $all && ts=true app=true gno=true related=false
-budget=60 # s, for everything; for a run scoped to a change, 30
+budget=75 # s, for everything (Alexis, 2026-10-27: 60 until the journeys grew past it); for a run scoped to a change, 30
 $all || budget=30
 [ "${GATE_BUDGET:-$budget}" -lt "$budget" ] 2>/dev/null && budget=$GATE_BUDGET # a test lowers it; nothing raises it
 tests_scope=
@@ -238,6 +238,12 @@ lane_tests() {
 	$full || step vitest # --full runs the tests once, with coverage
 	$full || run test "$tests_scope --reporter=default --reporter=json --outputFile.json=$logs/vitest.json" >"$logs/vitest.out" 2>&1 ||
 		retry vitest "$logs/vitest.json" "$logs/vitest.out" sh -c "$(node -p "require('./package.json').scripts.test") \"\$@\"" sh
+	# The coverage run leaves the compiled project out (its memo cache checks are branches nothing takes, F1350): the
+	# render counts run here instead, once, beside the coverage lane's work.
+	if $full; then
+		step compiled
+		run test:compiled
+	fi
 }
 
 lane_gno() {

@@ -1,10 +1,13 @@
+import { readFileSync } from "node:fs";
 import { parseLine, type IrcMessage } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Result } from "../../lib/api/http.ts";
 import type { Ergo, ErgoState, Who } from "../../lib/ergo/ergo.ts";
 import { createAppStore } from "../../store/index.ts";
-import { chatLink, HISTORY_LINES, ROOMS_JOINED } from "./link.ts";
+import { HISTORY_RING } from "./history.ts";
+import { chatLink, HISTORY_LINES, ROOMS_JOINED, type LinkDeps } from "./link.ts";
+import { WAITING } from "./outbox.ts";
 
 const ADDRESS = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const OTHER = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
@@ -31,13 +34,14 @@ interface Fake extends Ergo {
   line: (text: string) => void;
 }
 
-const setup = (before?: (store: ReturnType<typeof createAppStore>) => void) => {
+const setup = (before?: (store: ReturnType<typeof createAppStore>) => void, device?: LinkDeps["device"]) => {
   const store = createAppStore();
   before?.(store);
   const links: Fake[] = [];
   const asked = { tickets: 0, guests: 0 };
   const link = chatLink({
     store,
+    device,
     ticket: (): Promise<Result<{ ticket: string }>> => {
       asked.tickets += 1;
       return Promise.resolve({ ok: true, value: { ticket: `t${String(asked.tickets)}` } });
@@ -226,6 +230,47 @@ describe("the chat's link: who connects", () => {
     t.signedOut();
     expect(t.chat().rooms).toEqual({});
     expect(t.connected().sent).toEqual([]);
+  });
+
+  // 4e's late test audit (T1): an account's conversations must not follow it into the next session's page.
+  it.each([
+    [
+      "nobody logged in",
+      (t: Setup) => {
+        t.signedOut();
+      },
+    ],
+    [
+      "another account",
+      (t: Setup) => {
+        t.signedIn(OTHER);
+      },
+    ],
+  ])("starts a new session, %s, with no direct message: the last account's not kept", (_, next) => {
+    const t = setup();
+    t.signedIn(ADDRESS);
+    t.connected(ADDRESS);
+    t.last().line(`@msgid=d;time=${T0};account=${OTHER} :${OTHER}!u@h PRIVMSG ${ADDRESS} :for you alone`);
+    expect(Object.keys(t.store.getState().dms)).toEqual([OTHER]);
+    next(t);
+    expect(t.store.getState().dms).toEqual({});
+  });
+
+  // 4e's complexity review: the account's direct-message choices, read from its device by the store at its start.
+  it("hands the store the device of each account's session, and none of a guest's", () => {
+    const asked: string[] = [];
+    const t = setup(undefined, (account) => {
+      asked.push(account);
+      return {
+        prefs: { onlyKnown: () => true, setOnlyKnown: () => true, known: () => [OTHER], setKnown: () => true },
+        drafts: { get: () => "", set: () => true },
+      };
+    });
+    t.signedIn(ADDRESS);
+    expect(t.store.getState().dmChoices).toEqual({ onlyKnown: true, known: new Set([OTHER]) });
+    t.signedOut();
+    expect(t.store.getState().dmChoices).toEqual({ onlyKnown: false, known: new Set() });
+    expect(asked).toEqual([ADDRESS]);
   });
 
   it("connects as a guest when Ergo says the session is gone, the store logged out", () => {
@@ -705,6 +750,98 @@ describe("the chat's link: what it says", () => {
     },
   );
 
+  // 4c's message menu (docs/decisions.md, 2026-10-26): Delete on one's own line, Ergo's REDACT (draft/message-
+  // redaction, allow-individual-delete), which Ergo refuses for another's line.
+  const redacted = (sent: readonly string[]) => sent.filter((line) => line.startsWith("REDACT "));
+
+  // Ergo's msgid: 26 characters of base32 (irc/utils/crypto.go's GenerateSecretToken).
+  const MSGID = "rmq4xvjw9ys5pwtqqjxbqwvhjc";
+
+  it("deletes a line of a room it is in by its msgid, as Ergo's REDACT", () => {
+    const t = memberIn(["#bubble/games"]);
+    expect(t.link.redact("#bubble/games", MSGID)).toBe(true);
+    expect(redacted(t.fake.sent)).toEqual([`REDACT #bubble/games ${MSGID}`]);
+  });
+
+  it("deletes nothing in a room Ergo has not said it is in, nor in one it left", () => {
+    const t = memberIn(["#bubble/games", "#bubble"]);
+    expect(t.link.redact("#bubble", MSGID)).toBe(false);
+    t.link.follow(["#bubble"]);
+    expect(t.link.redact("#bubble/games", MSGID)).toBe(false);
+    expect(redacted(t.fake.sent)).toEqual([]);
+  });
+
+  it("deletes nothing as a guest, whose lines no account wrote", () => {
+    const g = guestIn(["#bubble/games"]);
+    g.fake.line(`:${GUEST}!u@h JOIN #bubble/games`);
+    expect(g.link.redact("#bubble/games", MSGID)).toBe(false);
+    expect(redacted(g.fake.sent)).toEqual([]);
+  });
+
+  // The red pass (M9): what holds say holds redact.
+  it("deletes nothing in a room Ergo kicked it from", () => {
+    const t = memberIn(["#bubble/games"]);
+    t.fake.line(`:op!u@h KICK #bubble/games ${ADDRESS} :bye`);
+    expect(t.link.redact("#bubble/games", MSGID)).toBe(false);
+    expect(redacted(t.fake.sent)).toEqual([]);
+  });
+
+  it("deletes nothing while away, nothing again before Ergo says it is in the room, and nothing once stopped", () => {
+    const t = memberIn(["#bubble/games"]);
+    t.fake.state("waiting");
+    expect(t.link.redact("#bubble/games", MSGID)).toBe(false);
+    const again = t.connected(ADDRESS);
+    expect(t.link.redact("#bubble/games", MSGID)).toBe(false);
+    again.line(`:${ADDRESS}!u@h JOIN #bubble/games`);
+    expect(t.link.redact("#bubble/games", MSGID)).toBe(true);
+    t.link.stop();
+    expect(t.link.redact("#bubble/games", MSGID)).toBe(false);
+    expect(redacted(again.sent)).toEqual([`REDACT #bubble/games ${MSGID}`]);
+  });
+
+  // The green pass (G13): the rule's bound itself, 64 characters, goes out.
+  it("deletes by a msgid of 64 characters, the rule's longest", () => {
+    const t = memberIn(["#bubble/games"]);
+    const id = "a".repeat(64);
+    expect(t.link.redact("#bubble/games", id)).toBe(true);
+    expect(redacted(t.fake.sent)).toEqual([`REDACT #bubble/games ${id}`]);
+  });
+
+  // The red pass (M10): a msgid comes from a line's tags; one that is no single word never reaches the wire.
+  it.each([
+    ["nothing", ""],
+    ["a space", "a b"],
+    ["a CR LF and a second command", "a\r\nPRIVMSG #bubble/games :x"],
+    ["an LF", "a\nQUIT"],
+    ["a CR", "a\rQUIT"],
+    ["a NUL", "a\u0000b"],
+    ["a comma", "a,b"],
+    ["a leading colon", ":a"],
+    // The green pass (G2): what a command splits on, leading too, and one character past 64.
+    ["a leading space", " a"],
+    ["a leading comma", ",a"],
+    ["a tab", "a\tb"],
+    ["a leading tab", "\ta"],
+    ["a leading CR", "\ra"],
+    ["a leading LF", "\na"],
+    ["a leading NUL", "\u0000a"],
+    ["65 characters", "a".repeat(65)],
+    ["600 characters", "a".repeat(600)],
+    // The green pass (G13): one past the rule's bound.
+    ["65 characters", "a".repeat(65)],
+  ])("sends no REDACT for a msgid holding %s", (_, id) => {
+    const t = memberIn(["#bubble/games"]);
+    const before = t.fake.sent.length;
+    expect(t.link.redact("#bubble/games", id)).toBe(false);
+    expect(t.fake.sent.slice(before)).toEqual([]);
+  });
+
+  it("deletes by a msgid of 64 characters, the longest a line's tags give", () => {
+    const t = memberIn(["#bubble/games"]);
+    expect(t.link.redact("#bubble/games", "a".repeat(64))).toBe(true);
+    expect(redacted(t.fake.sent)).toEqual([`REDACT #bubble/games ${"a".repeat(64)}`]);
+  });
+
   it("says nothing as a guest: a room lets accounts alone speak", () => {
     const t = guestIn(["#bubble/games"]);
     t.fake.line(`:${GUEST}!u@h JOIN #bubble/games`);
@@ -733,6 +870,26 @@ describe("the chat's link: what it says", () => {
     expect(t.link.say("#bubble/games", "hi")).toBe(false);
     expect(t.link.say("#bubble", "again")).toBe(true);
     expect(said(t.fake.sent)).toEqual(["PRIVMSG #bubble :hi", "PRIVMSG #bubble :again"]);
+  });
+
+  // The security review (4f's S1): Ergo's PART of the account, another session leaving the room (channel.go:1078-1082,
+  // v2.19.1), takes every session out of it, as a KICK does; a PART of the past or of another is no such thing.
+  it("says nothing, tells no typing and marks nothing in a room another session of the account left", () => {
+    const t = memberIn(["#bubble/games", "#bubble"]);
+    t.fake.line(`:${ADDRESS}!u@h JOIN #bubble`);
+    t.fake.line(`@msgid=m1;time=2026-10-25T10:01:00.000Z :alice!u@h PRIVMSG #bubble/games :one`);
+    t.fake.line("BATCH +p1 example.com/replay");
+    t.fake.line(`@batch=p1 :${ADDRESS}!u@h PART #bubble :long ago`);
+    t.fake.line("BATCH -p1");
+    t.fake.line(`:${OTHER}!u@h PART #bubble`);
+    expect(t.link.say("#bubble", "still in")).toBe(true);
+    t.fake.line(`:${ADDRESS}!u@h PART #bubble/games`);
+    t.link.typing("#bubble/games", "active");
+    t.link.read("#bubble/games", "m1");
+    expect(t.link.say("#bubble/games", "still here?")).toBe(false);
+    expect(
+      t.fake.sent.filter((line) => / TAGMSG |^MARKREAD \S+ timestamp=|^PRIVMSG #bubble\/games/.test(line)),
+    ).toEqual([]);
   });
 
   it("takes no line of another for a KICK of it, though the line names it", () => {
@@ -764,5 +921,1000 @@ describe("the chat's link: what it says", () => {
     t.link.stop();
     expect(t.link.say("#bubble/games", "late")).toBe(false);
     expect(said(again.sent)).toEqual(["PRIVMSG #bubble/games :back"]);
+  });
+
+  // 4f: who is typing (IRCv3's +typing, ircv3.net/specs/client-tags/typing).
+  describe("typing", () => {
+    const tagged = (sent: readonly string[]) => sent.filter((line) => line.includes(" TAGMSG "));
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("tells the room the account is typing, at most once every 3 s, as the spec throttles it", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const t = memberIn(["#bubble/games"]);
+      t.link.typing("#bubble/games", "active");
+      vi.advanceTimersByTime(2_999);
+      t.link.typing("#bubble/games", "active");
+      expect(tagged(t.fake.sent)).toEqual(["@+typing=active TAGMSG #bubble/games"]);
+      vi.advanceTimersByTime(1);
+      t.link.typing("#bubble/games", "active");
+      expect(tagged(t.fake.sent)).toHaveLength(2);
+    });
+
+    it("throttles each room apart", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const t = memberIn(["#bubble/games", "#bubble"]);
+      t.fake.line(`:${ADDRESS}!u@h JOIN #bubble`);
+      t.link.typing("#bubble/games", "active");
+      t.link.typing("#bubble", "active");
+      expect(tagged(t.fake.sent)).toEqual(["@+typing=active TAGMSG #bubble/games", "@+typing=active TAGMSG #bubble"]);
+    });
+
+    it("tells the room the account is done once, and only after it said it was typing", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const t = memberIn(["#bubble/games"]);
+      t.link.typing("#bubble/games", "done");
+      t.link.typing("#bubble/games", "active");
+      t.link.typing("#bubble/games", "done");
+      t.link.typing("#bubble/games", "done");
+      // Typed on: a done may wait its turn.
+      vi.advanceTimersByTime(3_000);
+      expect(tagged(t.fake.sent)).toEqual([
+        "@+typing=active TAGMSG #bubble/games",
+        "@+typing=done TAGMSG #bubble/games",
+      ]);
+    });
+
+    // The code review (CR5), in place of the red pass's R23 (the throttle reset on a done): a field cleared and written
+    // again within the 3 s keeps the typing shown, its readers' 6 s running, and tells nothing more; clearing it and
+    // writing again over and over sends one TAGMSG each 3 s, never two a cycle.
+    it("keeps the typing shown with nothing more told when a field cleared is written again within the 3 s", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const t = memberIn(["#bubble/games"]);
+      t.link.typing("#bubble/games", "active");
+      t.link.typing("#bubble/games", "done");
+      t.link.typing("#bubble/games", "active");
+      vi.advanceTimersByTime(3_000);
+      expect(tagged(t.fake.sent)).toEqual(["@+typing=active TAGMSG #bubble/games"]);
+    });
+
+    it("tells a room one TAGMSG each 3 s however fast its field is cleared and written, the done last", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const t = memberIn(["#bubble/games"]);
+      for (let cycle = 0; cycle < 10; cycle += 1) {
+        t.link.typing("#bubble/games", "active");
+        t.link.typing("#bubble/games", "done");
+        vi.advanceTimersByTime(100);
+      }
+      expect(tagged(t.fake.sent)).toEqual(["@+typing=active TAGMSG #bubble/games"]);
+      vi.advanceTimersByTime(2_000);
+      expect(tagged(t.fake.sent)).toEqual([
+        "@+typing=active TAGMSG #bubble/games",
+        "@+typing=done TAGMSG #bubble/games",
+      ]);
+    });
+
+    it("tells the typing again at once after a line said, which ends it at every reader, and owes no done", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const t = memberIn(["#bubble/games"]);
+      t.link.typing("#bubble/games", "active");
+      expect(t.link.say("#bubble/games", "hi")).toBe(true);
+      t.link.typing("#bubble/games", "done");
+      t.link.typing("#bubble/games", "active");
+      expect(tagged(t.fake.sent)).toEqual([
+        "@+typing=active TAGMSG #bubble/games",
+        "@+typing=active TAGMSG #bubble/games",
+      ]);
+    });
+
+    // StrykerJS's survivors on the pace: a timer for a done waiting its turn, none left once a line or a drop ends it.
+    it("holds one timer for a done waiting its turn, and none once a line ends the typing or the link drops", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const t = memberIn(["#bubble/games"]);
+      const base = vi.getTimerCount();
+      t.link.typing("#bubble/games", "active");
+      t.link.typing("#bubble/games", "done");
+      t.link.typing("#bubble/games", "done");
+      expect(vi.getTimerCount()).toBe(base + 1);
+      expect(t.link.say("#bubble/games", "hi")).toBe(true);
+      expect(vi.getTimerCount()).toBe(base);
+      t.link.typing("#bubble/games", "active");
+      t.link.typing("#bubble/games", "done");
+      expect(vi.getTimerCount()).toBe(base + 1);
+      t.fake.state("waiting");
+      expect(vi.getTimerCount()).toBe(base);
+    });
+
+    it("tells no typing as a guest, nor in a room Ergo has not said it is in, nor after my KICK", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const guest = guestIn(["#bubble/games"]);
+      guest.fake.line(`:${GUEST}!u@h JOIN #bubble/games`);
+      guest.link.typing("#bubble/games", "active");
+      expect(tagged(guest.fake.sent)).toEqual([]);
+      const t = memberIn(["#bubble/games", "#bubble"]);
+      t.link.typing("#bubble", "active");
+      t.link.typing("#bubble/games", "active");
+      t.fake.line(`:gnoworld!u@h KICK #bubble/games ${ADDRESS} :out`);
+      vi.advanceTimersByTime(3_000);
+      t.link.typing("#bubble/games", "active");
+      expect(tagged(t.fake.sent)).toEqual(["@+typing=active TAGMSG #bubble/games"]);
+    });
+
+    // The red pass (R10): nothing counted as sent while the link is away; the first word after the JOIN goes.
+    it("tells no typing while away, and tells it at once once back in the room", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const t = memberIn(["#bubble/games"]);
+      t.fake.state("waiting");
+      t.link.typing("#bubble/games", "active");
+      const again = t.connected(ADDRESS);
+      again.line(`:${ADDRESS}!u@h JOIN #bubble/games`);
+      t.link.typing("#bubble/games", "active");
+      expect(tagged(again.sent)).toEqual(["@+typing=active TAGMSG #bubble/games"]);
+    });
+
+    it("tells the typing again at once on a new connection, whose readers never heard it there", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const t = memberIn(["#bubble/games"]);
+      t.link.typing("#bubble/games", "active");
+      t.fake.state("waiting");
+      const again = t.connected(ADDRESS);
+      again.line(`:${ADDRESS}!u@h JOIN #bubble/games`);
+      const before = again.sent.length;
+      t.link.typing("#bubble/games", "active");
+      expect(tagged(again.sent.slice(before))).toEqual(["@+typing=active TAGMSG #bubble/games"]);
+    });
+  });
+
+  // 4f: the reading place (Ergo's draft/read-marker, ircv3.net/specs/extensions/read-marker).
+  describe("the reading place", () => {
+    // The places set: a MARKREAD with its time, not the ask of Ergo's (CR7).
+    const marked = (sent: readonly string[]) => sent.filter((line) => /^MARKREAD \S+ timestamp=/.test(line));
+    const T = (minute: number) => `2026-10-25T10:${String(minute).padStart(2, "0")}:00.000Z`;
+    // A line of the room in the store, said at T(minute), its msgid m<minute>.
+    const heard = (fake: Fake, room: string, minute: number) => {
+      fake.line(`@msgid=m${String(minute)};time=${T(minute)} :alice!u@h PRIVMSG ${room} :at ${String(minute)}`);
+    };
+
+    it("marks the room in view read at a held line's time, as Ergo's MARKREAD, once a later line", () => {
+      vi.useFakeTimers();
+      const t = memberIn(["#bubble/games"]);
+      heard(t.fake, "#bubble/games", 0);
+      heard(t.fake, "#bubble/games", 1);
+      heard(t.fake, "#bubble/games", 2);
+      t.link.read("#bubble/games", "m1");
+      t.link.read("#bubble/games", "m1");
+      t.link.read("#bubble/games", "m0");
+      t.link.read("#bubble/games", "m2");
+      // Read on: a later place may wait its turn.
+      vi.advanceTimersByTime(2_000);
+      vi.useRealTimers();
+      expect(marked(t.fake.sent)).toEqual([
+        `MARKREAD #bubble/games timestamp=${T(1)}`,
+        `MARKREAD #bubble/games timestamp=${T(2)}`,
+      ]);
+    });
+
+    it("marks nothing at or before the reading place Ergo gave, and nothing for a guest", () => {
+      const t = memberIn(["#bubble/games"]);
+      heard(t.fake, "#bubble/games", 0);
+      heard(t.fake, "#bubble/games", 1);
+      t.fake.line(`:ergo MARKREAD #bubble/games timestamp=${T(1)}`);
+      t.link.read("#bubble/games", "m1");
+      t.link.read("#bubble/games", "m0");
+      expect(marked(t.fake.sent)).toEqual([]);
+      const guest = guestIn(["#bubble/games"]);
+      guest.fake.line(`:${GUEST}!u@h JOIN #bubble/games`);
+      heard(guest.fake, "#bubble/games", 1);
+      guest.link.read("#bubble/games", "m1");
+      expect(marked(guest.fake.sent)).toEqual([]);
+    });
+
+    // The red pass (R4): the room in view alone, and one Ergo said I am in; never another room's newest.
+    it("marks no room read but the one in view, and none Ergo has not said I am in, nor after my PART or KICK", () => {
+      const t = memberIn(["#bubble/games", "#bubble", "#bubble/news"]);
+      heard(t.fake, "#bubble/games", 0);
+      t.link.read("#bubble/games", "m0");
+      t.fake.line(`:${ADDRESS}!u@h JOIN #bubble`);
+      heard(t.fake, "#bubble", 1);
+      t.link.read("#bubble", "m1");
+      heard(t.fake, "#bubble/news", 1);
+      t.link.show("#bubble/news");
+      t.link.read("#bubble/news", "m1");
+      t.link.show("#bubble/games");
+      heard(t.fake, "#bubble/games", 1);
+      t.fake.line(`:gnoworld!u@h KICK #bubble/games ${ADDRESS} :out`);
+      t.link.read("#bubble/games", "m1");
+      expect(marked(t.fake.sent)).toEqual([`MARKREAD #bubble/games timestamp=${T(0)}`]);
+    });
+
+    // The red pass (R5): a time Ergo would keep for good is a held line's own, never a word the caller makes.
+    it.each([
+      ["a line the room does not hold", "nope"],
+      ["a time in place of a msgid", T(1)],
+      ["a CR LF", "m1\r\nQUIT :x"],
+      ["a space", "m1 extra"],
+    ])("marks nothing for %s", (_, id) => {
+      const t = memberIn(["#bubble/games"]);
+      heard(t.fake, "#bubble/games", 1);
+      t.link.read("#bubble/games", id);
+      t.link.read("#bubble/games", "m1");
+      expect(marked(t.fake.sent)).toEqual([`MARKREAD #bubble/games timestamp=${T(1)}`]);
+    });
+
+    // The red pass (R10): a place asked while away, or sent and never answered, goes once the room is joined again.
+    it("marks the room read once back in it, what was asked while away", () => {
+      const t = memberIn(["#bubble/games"]);
+      heard(t.fake, "#bubble/games", 1);
+      t.fake.state("waiting");
+      t.link.read("#bubble/games", "m1");
+      expect(marked(t.fake.sent)).toEqual([]);
+      const again = t.connected(ADDRESS);
+      const before = again.sent.length;
+      again.line(`:${ADDRESS}!u@h JOIN #bubble/games`);
+      expect(marked(again.sent.slice(before))).toEqual([`MARKREAD #bubble/games timestamp=${T(1)}`]);
+    });
+
+    it("marks the room read again on a new connection, what went on the last one unanswered", () => {
+      const t = memberIn(["#bubble/games"]);
+      heard(t.fake, "#bubble/games", 1);
+      t.link.read("#bubble/games", "m1");
+      t.fake.state("waiting");
+      const again = t.connected(ADDRESS);
+      const before = again.sent.length;
+      again.line(`:${ADDRESS}!u@h JOIN #bubble/games`);
+      expect(marked(again.sent.slice(before))).toEqual([`MARKREAD #bubble/games timestamp=${T(1)}`]);
+    });
+
+    it("marks nothing again on a new connection once Ergo answered the place", () => {
+      const t = memberIn(["#bubble/games"]);
+      heard(t.fake, "#bubble/games", 1);
+      t.link.read("#bubble/games", "m1");
+      t.fake.line(`:ergo MARKREAD #bubble/games timestamp=${T(1)}`);
+      t.fake.state("waiting");
+      const again = t.connected(ADDRESS);
+      const before = again.sent.length;
+      again.line(`:${ADDRESS}!u@h JOIN #bubble/games`);
+      expect(marked(again.sent.slice(before))).toEqual([]);
+    });
+
+    // The code review (CR7): Ergo's place lost to a race (its JOIN and MARKREAD played as a second tab attached, before
+    // the page followed the room) is asked of Ergo as the history is: an account's, the store holding none.
+    it("asks Ergo the room's place as its history is asked, an account's, when the store holds none", () => {
+      const asks = (sent: readonly string[]) => sent.filter((line) => /^MARKREAD \S+$/.test(line));
+      const t = memberIn(["#bubble/games"]);
+      expect(asks(t.fake.sent)).toEqual(["MARKREAD #bubble/games"]);
+      const known = setup();
+      known.link.follow(["#bubble/games"]);
+      known.link.show("#bubble/games");
+      known.signedIn(ADDRESS);
+      const fake = known.connected(ADDRESS);
+      fake.line(`:ergo MARKREAD #bubble/games timestamp=${T(1)}`);
+      fake.line(`:${ADDRESS}!u@h JOIN #bubble/games`);
+      expect(asks(fake.sent)).toEqual([]);
+      const guest = guestIn(["#bubble/games"]);
+      guest.fake.line(`:${GUEST}!u@h JOIN #bubble/games`);
+      expect(asks(guest.fake.sent)).toEqual([]);
+    });
+
+    // The red pass (R20): an account's places are its own; another session starts with none.
+    it("forgets an account's places when another session starts", () => {
+      const t = memberIn(["#bubble/games"]);
+      t.fake.line(`:ergo MARKREAD #bubble/games timestamp=${T(1)}`);
+      expect(t.room("#bubble/games")?.read).toBe(T(1));
+      t.signedIn(OTHER);
+      t.link.follow(["#bubble/games"]);
+      expect(t.room("#bubble/games")?.read).toBeUndefined();
+      t.signedOut();
+      t.link.follow(["#bubble/games"]);
+      expect(t.room("#bubble/games")?.read).toBeUndefined();
+    });
+
+    // The code review (CR2) and /simplify (E1): each MARKREAD spends Ergo's fakelag once its budget of 16 is gone, so a
+    // busy room read at its end must not queue the account's own lines behind them.
+    describe("paced", () => {
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+      const reading = () => {
+        vi.useFakeTimers();
+        const t = memberIn(["#bubble/games", "#bubble"]);
+        for (const minute of [0, 1, 2, 3]) heard(t.fake, "#bubble/games", minute);
+        return t;
+      };
+
+      it("sends a room's MARKREAD at most once each 2 s, the newest place asked following", () => {
+        const t = reading();
+        t.link.read("#bubble/games", "m0");
+        t.link.read("#bubble/games", "m1");
+        t.link.read("#bubble/games", "m2");
+        expect(marked(t.fake.sent)).toEqual([`MARKREAD #bubble/games timestamp=${T(0)}`]);
+        vi.advanceTimersByTime(1_999);
+        expect(marked(t.fake.sent)).toHaveLength(1);
+        vi.advanceTimersByTime(1);
+        expect(marked(t.fake.sent)).toEqual([
+          `MARKREAD #bubble/games timestamp=${T(0)}`,
+          `MARKREAD #bubble/games timestamp=${T(2)}`,
+        ]);
+        vi.advanceTimersByTime(10_000);
+        expect(marked(t.fake.sent)).toHaveLength(2);
+      });
+
+      it("sends the place waiting at once as the room in view changes, or as the page asks", () => {
+        const t = reading();
+        t.link.read("#bubble/games", "m0");
+        t.link.read("#bubble/games", "m1");
+        t.link.show("#bubble");
+        expect(marked(t.fake.sent).at(-1)).toBe(`MARKREAD #bubble/games timestamp=${T(1)}`);
+        t.link.show("#bubble/games");
+        t.link.read("#bubble/games", "m3");
+        expect(marked(t.fake.sent)).toHaveLength(2);
+        t.link.flush();
+        expect(marked(t.fake.sent).at(-1)).toBe(`MARKREAD #bubble/games timestamp=${T(3)}`);
+        vi.advanceTimersByTime(10_000);
+        expect(marked(t.fake.sent)).toHaveLength(3);
+      });
+
+      // StrykerJS's survivors on the pace: a timer a room while its place waits, none left once sent, flushed or dropped.
+      it("holds one timer a room while its place waits, and none once it is sent, flushed or the link drops", () => {
+        const t = reading();
+        const base = vi.getTimerCount();
+        t.link.read("#bubble/games", "m0");
+        t.link.read("#bubble/games", "m1");
+        t.link.read("#bubble/games", "m2");
+        expect(vi.getTimerCount()).toBe(base + 1);
+        vi.advanceTimersByTime(2_000);
+        expect(vi.getTimerCount()).toBe(base);
+        t.link.read("#bubble/games", "m3");
+        expect(vi.getTimerCount()).toBe(base + 1);
+        t.link.flush();
+        expect(vi.getTimerCount()).toBe(base);
+        heard(t.fake, "#bubble/games", 4);
+        heard(t.fake, "#bubble/games", 5);
+        t.link.read("#bubble/games", "m4");
+        t.link.read("#bubble/games", "m5");
+        expect(vi.getTimerCount()).toBe(base + 1);
+        t.fake.state("waiting");
+        expect(vi.getTimerCount()).toBe(base);
+      });
+
+      it("sends nothing waiting once the link drops, and the place at once on the next connection's JOIN", () => {
+        const t = reading();
+        t.link.read("#bubble/games", "m0");
+        t.link.read("#bubble/games", "m2");
+        t.fake.state("waiting");
+        vi.advanceTimersByTime(10_000);
+        expect(marked(t.fake.sent)).toEqual([`MARKREAD #bubble/games timestamp=${T(0)}`]);
+        const again = t.connected(ADDRESS);
+        const before = again.sent.length;
+        again.line(`:${ADDRESS}!u@h JOIN #bubble/games`);
+        expect(marked(again.sent.slice(before))).toEqual([`MARKREAD #bubble/games timestamp=${T(2)}`]);
+      });
+    });
+
+    it("sends another session nothing the last one asked while away", () => {
+      const t = memberIn(["#bubble/games"]);
+      heard(t.fake, "#bubble/games", 1);
+      t.fake.state("waiting");
+      t.link.read("#bubble/games", "m1");
+      t.signedIn(OTHER);
+      t.link.follow(["#bubble/games"]);
+      const again = t.connected(OTHER);
+      const before = again.sent.length;
+      again.line(`:${OTHER}!u@h JOIN #bubble/games`);
+      expect(marked(again.sent.slice(before))).toEqual([]);
+    });
+  });
+
+  // The green pass (G5-G7): the edges of what the page tells Ergo as it types and reads.
+  describe("the typing and the reading place, at their edges", () => {
+    const ROOM = "#bubble/games";
+    const TT = (minute: number) => `2026-10-25T10:${String(minute).padStart(2, "0")}:00.000Z`;
+    const spoken = (fake: Fake, minute: number) => {
+      fake.line(`@msgid=m${String(minute)};time=${TT(minute)} :alice!u@h PRIVMSG ${ROOM} :at ${String(minute)}`);
+    };
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+    it("keeps the 3 s between two actives when a line between them could not go", () => {
+      vi.useFakeTimers({ now: Date.parse(T0) });
+      const t = memberIn([ROOM]);
+      t.link.typing(ROOM, "active");
+      expect(t.link.say(ROOM, "")).toBe(false);
+      t.link.typing(ROOM, "active");
+      expect(t.fake.sent.filter((line) => line.includes(" TAGMSG "))).toEqual([`@+typing=active TAGMSG ${ROOM}`]);
+    });
+    it("reads a room the store does not hold without a throw, and tells Ergo nothing", () => {
+      const t = memberIn([ROOM]);
+      expect(() => {
+        t.link.read("#garden", "m1");
+      }).not.toThrow();
+      expect(t.fake.sent.filter((line) => /^MARKREAD \S+ timestamp=/.test(line))).toEqual([]);
+    });
+    it("keeps the newer place asked when an older line is read after it, through a reconnect", () => {
+      const t = memberIn([ROOM]);
+      spoken(t.fake, 0);
+      spoken(t.fake, 1);
+      t.link.read(ROOM, "m1");
+      t.link.read(ROOM, "m0");
+      t.fake.state("waiting");
+      const again = t.connected(ADDRESS);
+      const before = again.sent.length;
+      again.line(`:${ADDRESS}!u@h JOIN ${ROOM}`);
+      expect(again.sent.slice(before).filter((line) => /^MARKREAD \S+ timestamp=/.test(line))).toEqual([
+        `MARKREAD ${ROOM} timestamp=${TT(1)}`,
+      ]);
+    });
+  });
+});
+
+// 4e: direct messages, an account's alone; Ergo refuses a guest's to any account, which its default-user-modes set +R
+// (deploy/ergo/ircd.yaml.tmpl).
+describe("the chat's link: direct messages", () => {
+  const account = () => {
+    const t = setup();
+    t.link.follow(["#bubble"]);
+    t.signedIn(ADDRESS);
+    return { ...t, fake: t.connected(ADDRESS) };
+  };
+  // A line as sent, its label (labeled-response, the link's own count) taken off; the DMs to OTHER among them.
+  const unlabelled = (line: string) => line.replace(/^@label=\S+ /, "");
+  const dms = (sent: readonly string[]) => sent.map(unlabelled).filter((line) => line.startsWith(`PRIVMSG ${OTHER}`));
+  // The label the `at`th DM to OTHER went with: none while the link sends none.
+  const labelOf = (sent: readonly string[], at: number) =>
+    sent.filter((line) => unlabelled(line).startsWith(`PRIVMSG ${OTHER}`))[at]?.match(/^@label=(\S+) /)?.[1];
+
+  // 4e's late test audit (T2): no test said the link hands Ergo's lines to the direct messages' store.
+  it("hands Ergo's lines to the direct messages' store: an account's to me kept, a room's line not", () => {
+    const t = account();
+    t.fake.line(`@msgid=r;time=${T0};account=${OTHER} :${OTHER}!u@h PRIVMSG #bubble :to the room`);
+    expect(t.store.getState().dms).toEqual({});
+    t.fake.line(`@msgid=d;time=${T0};account=${OTHER} :${OTHER}!u@h PRIVMSG ${ADDRESS} :to you`);
+    expect(t.store.getState().dms[OTHER]?.map(({ text }) => text)).toEqual(["to you"]);
+  });
+
+  // 4e's UX review (U1): Ergo answers 401 to a line for an account not connected (irc/handlers.go:2533, v2.19.1),
+  // and its echo to one it delivered; the page emptied the box all the same, the line lost.
+  // Ergo's answers carry the label of the line they answer (irc/responsebuffer.go:264-281, v2.19.1), when it had one.
+  const refusal = (partner: string, label?: string) =>
+    `${label === undefined ? "" : `@label=${label} `}:ergo.test 401 ${ADDRESS} ${partner} :No such nick`;
+  const echo = (id: string, text: string, label?: string) =>
+    `@${label === undefined ? "" : `label=${label};`}msgid=${id};time=${T0};account=${ADDRESS} :${ADDRESS}!u@h PRIVMSG ${OTHER} :${text}`;
+  // An account connected, its device's drafts what the store puts back.
+  const withDrafts = () => {
+    const kept = new Map<string, string>();
+    const t = setup(undefined, () => ({
+      prefs: { onlyKnown: () => false, setOnlyKnown: () => true, known: () => [], setKnown: () => true },
+      drafts: {
+        get: (room) => kept.get(room) ?? "",
+        set: (room, draft) => {
+          kept.set(room, draft);
+          return true;
+        },
+      },
+    }));
+    t.link.follow(["#bubble"]);
+    t.signedIn(ADDRESS);
+    return { ...t, kept, fake: t.connected(ADDRESS) };
+  };
+  type WithDrafts = ReturnType<typeof withDrafts>;
+
+  it("puts back the draft of a line Ergo refused, its partner not connected, and counts it", () => {
+    const t = withDrafts();
+    expect(t.link.sayTo(OTHER, "  hi **you**  ")).toBe(true);
+    t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 0)));
+    expect(t.kept.get(OTHER)).toBe("  hi **you**  ");
+    expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 1, draft: "  hi **you**  " } });
+  });
+
+  it("puts back each line Ergo refused in turn, past one it delivered", () => {
+    const t = withDrafts();
+    for (const draft of ["one", "/me two", "three"]) t.link.sayTo(OTHER, draft);
+    t.fake.line(echo("a", "one", labelOf(t.fake.sent, 0)));
+    t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 1)));
+    expect(t.kept.get(OTHER)).toBe("/me two");
+    // The composer sent it again, or the reader emptied the box: no draft waits.
+    t.kept.set(OTHER, "");
+    t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 2)));
+    expect(t.kept.get(OTHER)).toBe("three");
+    expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 2, draft: "three" } });
+  });
+
+  // /code-review (CR1): Ergo answers a labeled line by its label, one line or a labeled-response batch
+  // (irc/commands.go:41, responsebuffer.go:264-281, v2.19.1); the outbox matched answers by order, so a line
+  // refused otherwise (a 417, a 477) stayed waiting and a later 401 put back its draft, not the 401's line's.
+  it("sends each direct message with a label of its own", () => {
+    const t = account();
+    t.link.sayTo(OTHER, "one");
+    t.link.sayTo(OTHER, "two");
+    const labels = [labelOf(t.fake.sent, 0), labelOf(t.fake.sent, 1)];
+    expect(labels.every((label) => label !== undefined)).toBe(true);
+    expect(new Set(labels).size).toBe(2);
+  });
+
+  it("puts back the draft of the line each refusal answers, by its label, a line refused otherwise too", () => {
+    const t = withDrafts();
+    t.link.sayTo(OTHER, "a");
+    t.link.sayTo(OTHER, "b");
+    t.fake.line(`@label=${labelOf(t.fake.sent, 0) ?? ""} :ergo.test 417 ${ADDRESS} :Line too long to be relayed`);
+    expect(t.kept.get(OTHER)).toBe("a");
+    expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 1, draft: "a", offline: false } });
+    t.kept.set(OTHER, "");
+    t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 1)));
+    expect(t.kept.get(OTHER)).toBe("b");
+    expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 2, draft: "b" } });
+  });
+
+  it("takes a labeled-response batch for its line's answer: its echo and Ergo's away line deliver it", () => {
+    const t = withDrafts();
+    t.link.sayTo(OTHER, "hi");
+    const label = labelOf(t.fake.sent, 0) ?? "";
+    t.fake.line(`@label=${label} BATCH +r1 labeled-response`);
+    t.fake.line(`@batch=r1;msgid=e;time=${T0};account=${ADDRESS} :${ADDRESS}!u@h PRIVMSG ${OTHER} :hi`);
+    t.fake.line(`@batch=r1 :ergo.test 301 ${ADDRESS} ${OTHER} :back soon`);
+    t.fake.line("BATCH -r1");
+    expect(t.store.getState().dms[OTHER]?.map(({ text }) => text)).toEqual(["hi"]);
+    t.fake.line(refusal(OTHER, label));
+    expect(t.store.getState().dmRefused).toEqual({});
+  });
+
+  it(`keeps ${String(WAITING)} lines waiting at most: the oldest's late answer puts nothing back`, () => {
+    const t = withDrafts();
+    for (let n = 0; n <= WAITING; n += 1) t.link.sayTo(OTHER, `line ${String(n)}`);
+    t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 0)));
+    expect(t.store.getState().dmRefused).toEqual({});
+    t.fake.line(refusal(OTHER, labelOf(t.fake.sent, WAITING)));
+    expect(t.kept.get(OTHER)).toBe(`line ${String(WAITING)}`);
+  });
+
+  // StrykerJS on CR1's fix: a standard reply's FAIL refuses too, and the bound drops a line past 50 waiting, not at 50.
+  it("puts back a line Ergo answers with a FAIL, said refused, not offline", () => {
+    const t = withDrafts();
+    t.link.sayTo(OTHER, "hi");
+    t.fake.line(`@label=${labelOf(t.fake.sent, 0) ?? ""} :ergo.test FAIL PRIVMSG INVALID_TARGET ${OTHER} :No`);
+    expect(t.kept.get(OTHER)).toBe("hi");
+    expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 1, draft: "hi", offline: false } });
+  });
+
+  it(`keeps exactly ${String(WAITING)} lines waiting: the first one's refusal still puts it back`, () => {
+    const t = withDrafts();
+    for (let n = 0; n < WAITING; n += 1) t.link.sayTo(OTHER, `line ${String(n)}`);
+    t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 0)));
+    expect(t.kept.get(OTHER)).toBe("line 0");
+  });
+
+  // With Ergo's multiclient, another tab's line reaches this one as an echo does: it answers none of this one's.
+  it("takes another tab's line to the same account for no answer to its own", () => {
+    const t = withDrafts();
+    t.link.sayTo(OTHER, "mine");
+    t.fake.line(echo("a", "from my other tab"));
+    t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 0)));
+    expect(t.kept.get(OTHER)).toBe("mine");
+  });
+
+  it.each([
+    [
+      "for an account it sent nothing to",
+      (t: WithDrafts) => {
+        t.fake.line(refusal(OTHER));
+      },
+    ],
+    [
+      "for a line Ergo delivered",
+      (t: WithDrafts) => {
+        t.link.sayTo(OTHER, "hi");
+        const label = labelOf(t.fake.sent, 0);
+        t.fake.line(echo("a", "hi", label));
+        t.fake.line(refusal(OTHER, label));
+      },
+    ],
+    [
+      "on a new connection, for the last one's line",
+      (t: WithDrafts) => {
+        t.link.sayTo(OTHER, "hi");
+        const label = labelOf(t.fake.sent, 0);
+        t.fake.state("waiting");
+        t.connected(ADDRESS).line(refusal(OTHER, label));
+      },
+    ],
+  ])("puts back nothing %s", (_, steps) => {
+    const t = withDrafts();
+    steps(t);
+    expect(t.store.getState().dmRefused).toEqual({});
+    expect([...t.kept.keys()]).toEqual([]);
+  });
+
+  // StrykerJS on 4e: what answers a line waiting on Ergo, and what does not.
+  const to = (id: string, text: string) =>
+    `@msgid=${id};time=${T0};account=${OTHER} :${OTHER}!u@h PRIVMSG ${ADDRESS} :${text}`;
+  it.each([
+    [
+      "the partner's own line of the same words",
+      (t: WithDrafts) => {
+        t.fake.line(to("b", "hi"));
+      },
+    ],
+    [
+      "my action's echo, for a line of the same words",
+      (t: WithDrafts) => {
+        t.fake.line(echo("b", "\u0001ACTION hi\u0001"));
+      },
+    ],
+  ])("answers no waiting line by %s: Ergo's refusal still puts it back", (_, heard) => {
+    const t = withDrafts();
+    t.link.sayTo(OTHER, "hi");
+    heard(t);
+    t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 0)));
+    expect(t.kept.get(OTHER)).toBe("hi");
+  });
+
+  it("answers a waiting action by its echo alone, and refuses nothing on a line naming the partner", () => {
+    const t = withDrafts();
+    t.link.sayTo(OTHER, "/me waves");
+    t.fake.line(to("b", OTHER));
+    expect(t.store.getState().dmRefused).toEqual({});
+    const label = labelOf(t.fake.sent, 0);
+    t.fake.line(echo("c", "\u0001ACTION waves\u0001", label));
+    t.fake.line(refusal(OTHER, label));
+    expect(t.store.getState().dmRefused).toEqual({});
+  });
+
+  it("sends an account's draft to another account, as the composer composes it", () => {
+    const t = account();
+    expect(t.link.sayTo(OTHER, "  hi **you**  ")).toBe(true);
+    expect(t.link.sayTo(OTHER, "/me waves")).toBe(true);
+    expect(dms(t.fake.sent)).toEqual([`PRIVMSG ${OTHER} :hi **you**`, `PRIVMSG ${OTHER} :\u0001ACTION waves\u0001`]);
+  });
+
+  it.each([
+    ["a guest's", () => guestIn(["#bubble"])],
+    [
+      "an account's, while away",
+      () => {
+        const t = account();
+        t.fake.state("waiting");
+        return t;
+      },
+    ],
+  ])("sends nothing of %s", (_, made) => {
+    const t = made();
+    expect(t.link.sayTo(OTHER, "hi")).toBe(false);
+    expect(dms(t.fake.sent)).toEqual([]);
+  });
+
+  it.each([
+    ["no address", "alice"],
+    ["a room", "#bubble"],
+    ["its own address", ADDRESS],
+    ["an address with a wrong checksum", `${OTHER.slice(0, -1)}q`],
+  ])("sends nothing to %s", (_, partner) => {
+    const t = account();
+    const before = t.fake.sent.length;
+    expect(t.link.sayTo(partner, "hi")).toBe(false);
+    expect(t.fake.sent.slice(before)).toEqual([]);
+  });
+
+  it.each(["", "  ", "/nick bob", "a".repeat(600)])(
+    "sends nothing of a draft the composer would not send (%j)",
+    (draft) => {
+      const t = account();
+      expect(t.link.sayTo(OTHER, draft)).toBe(false);
+      expect(dms(t.fake.sent)).toEqual([]);
+    },
+  );
+});
+
+// 4d: a reaction is a TAGMSG naming the line it answers (+draft/react to add, +draft/unreact to take back, Ergo storing
+// both), labelled so Ergo's answer to it is known (labeled-response). What holds say and redact holds it: an account's,
+// in a room Ergo says it is in; one emoji of RGI's set, a msgid a tag may carry.
+describe("the chat's link: reactions", () => {
+  const MSGID = "rmq4xvjw9ys5pwtqqjxbqwvhjc";
+  const memberIn = (rooms: readonly string[]) => {
+    const t = setup();
+    t.link.follow(rooms);
+    t.link.show(rooms[0]);
+    t.signedIn(ADDRESS);
+    const fake = t.connected(ADDRESS);
+    fake.line(`:${ADDRESS}!u@h JOIN ${rooms[0] ?? ""}`);
+    return { ...t, fake };
+  };
+  // The tagged lines sent, each label as a star: what a label says is the link's own (F1170).
+  const tagged = (sent: readonly string[]) =>
+    sent.filter((line) => line.startsWith("@")).map((line) => line.replace(/^@label=[^;]+;/u, "@label=*;"));
+
+  it("reacts to a line by its msgid with one emoji, takes the reaction back, each labelled", () => {
+    const t = memberIn(["#bubble/games"]);
+    expect(t.link.react("#bubble/games", { to: MSGID, emoji: "👍", on: true })).toBe(true);
+    expect(t.link.react("#bubble/games", { to: MSGID, emoji: "👩🏻‍❤️‍💋‍👨🏿", on: false })).toBe(true);
+    expect(tagged(t.fake.sent)).toEqual([
+      `@label=*;+draft/react=👍;+reply=${MSGID} TAGMSG #bubble/games`,
+      `@label=*;+draft/unreact=👩🏻‍❤️‍💋‍👨🏿;+reply=${MSGID} TAGMSG #bubble/games`,
+    ]);
+  });
+
+  it.each(["🏴󠁧󠁢󠁥󠁮󠁧󠁿", "🧑‍🦰", "1️⃣"])("reacts with the emoji %s whole", (emoji) => {
+    const t = memberIn(["#bubble/games"]);
+    expect(t.link.react("#bubble/games", { to: MSGID, emoji: emoji, on: true })).toBe(true);
+    expect(tagged(t.fake.sent)).toEqual([`@label=*;+draft/react=${emoji};+reply=${MSGID} TAGMSG #bubble/games`]);
+  });
+
+  it.each([
+    ["words", "nice"],
+    ["two emoji", "👍👍"],
+    ["two emoji joined by a ZWJ into no sequence of RGI's", "👍‍😂"],
+    ["a skin tone on an emoji that takes none", "🙂🏽"],
+    ["an emoji under a combining accent", "👍́"],
+    ["a smile in its text form", "☺︎"],
+    ["a tag's separator and a second tag", "👍;+typing=active"],
+    ["a space and a second command", "👍 TAGMSG #bubble :x"],
+    ["a CR LF and a second command", "👍\r\nQUIT"],
+    ["nothing", ""],
+  ])("sends no reaction of %s", (_, emoji) => {
+    const t = memberIn(["#bubble/games"]);
+    const before = t.fake.sent.length;
+    expect(t.link.react("#bubble/games", { to: MSGID, emoji: emoji, on: true })).toBe(false);
+    expect(t.fake.sent.slice(before)).toEqual([]);
+  });
+
+  it.each([
+    ["a space", "a b"],
+    ["a CR LF and a second command", "a\r\nQUIT"],
+    ["a semicolon and a second tag", "a;+typing=active"],
+    ["a backslash", "a\\b"],
+    ["a comma", "a,b"],
+    ["a leading colon", ":a"],
+    ["nothing", ""],
+    ["65 characters", "a".repeat(65)],
+  ])("sends no reaction to a msgid holding %s", (_, id) => {
+    const t = memberIn(["#bubble/games"]);
+    const before = t.fake.sent.length;
+    expect(t.link.react("#bubble/games", { to: id, emoji: "👍", on: true })).toBe(false);
+    expect(t.fake.sent.slice(before)).toEqual([]);
+  });
+
+  it("reacts nowhere as a guest, nor in a room Ergo has not said it is in, nor while away", () => {
+    const g = guestIn(["#bubble/games"]);
+    g.fake.line(`:${GUEST}!u@h JOIN #bubble/games`);
+    expect(g.link.react("#bubble/games", { to: MSGID, emoji: "👍", on: true })).toBe(false);
+    const t = memberIn(["#bubble/games", "#bubble"]);
+    expect(t.link.react("#bubble", { to: MSGID, emoji: "👍", on: true })).toBe(false);
+    t.fake.state("waiting");
+    expect(t.link.react("#bubble/games", { to: MSGID, emoji: "👍", on: true })).toBe(false);
+    expect(tagged([...g.fake.sent, ...t.fake.sent])).toEqual([]);
+  });
+});
+
+// R10: Ergo refuses a reaction in a room the account may not speak in (+m, a mute), answering its label with a 404; the
+// page shows no reaction Ergo did not echo, and says it could not react.
+describe("the chat's link: a reaction Ergo refused", () => {
+  const MSGID = "rmq4xvjw9ys5pwtqqjxbqwvhjc";
+  const memberIn = (rooms: readonly string[]) => {
+    const t = setup();
+    t.link.follow(rooms);
+    t.link.show(rooms[0]);
+    t.signedIn(ADDRESS);
+    const fake = t.connected(ADDRESS);
+    fake.line(`:${ADDRESS}!u@h JOIN ${rooms[0] ?? ""}`);
+    return { ...t, fake };
+  };
+  // The label of the last reaction sent, which Ergo answers by (the link's own word, F1170).
+  const labelOf = (sent: readonly string[]) =>
+    /^@label=([^;]+);/u.exec(sent.filter((line) => line.startsWith("@")).at(-1) ?? "")?.[1] ?? "";
+  const refusal = (label: string) => `@label=${label} :ergo 404 ${ADDRESS} #bubble/games :Cannot send to channel (+m)`;
+
+  it("tells the store Ergo refused the reaction its label names, in that reaction's room", () => {
+    const t = memberIn(["#bubble/games", "#bubble"]);
+    t.fake.line(`:${ADDRESS}!u@h JOIN #bubble`);
+    t.link.react("#bubble", { to: MSGID, emoji: "😂", on: true });
+    t.link.react("#bubble/games", { to: MSGID, emoji: "👍", on: true });
+    t.fake.line(refusal(labelOf(t.fake.sent)));
+    expect(t.room("#bubble/games")?.cannotReact).toBe(true);
+    expect(t.room("#bubble")?.cannotReact).toBeUndefined();
+  });
+
+  it.each([
+    ["a 404 with no label", `:ergo 404 ${ADDRESS} #bubble/games :Cannot send to channel (+m)`],
+    ["a 404 with a label it never sent", refusal("r9")],
+    [
+      "its reaction's echo, which is no refusal",
+      (label: string) =>
+        `@label=${label};msgid=x;time=2026-10-25T10:00:00.000Z;account=${ADDRESS};+draft/react=👍;+reply=${MSGID} :${ADDRESS}!u@h TAGMSG #bubble/games`,
+    ],
+  ])("tells the store nothing of %s", (_, line) => {
+    const t = memberIn(["#bubble/games"]);
+    t.link.react("#bubble/games", { to: MSGID, emoji: "👍", on: true });
+    t.fake.line(typeof line === "string" ? line : line(labelOf(t.fake.sent)));
+    expect(t.room("#bubble/games")?.cannotReact).toBeUndefined();
+  });
+});
+
+// R1: Ergo counts a stored reaction as a history item, so a page of 200 may hold few lines or none; while a full page
+// leaves the room's window short of lines, the link asks for the items before its oldest, three times at most a room and
+// a connection (docs/decisions.md, 2026-10-26).
+describe("the chat's link: the history read past reactions", () => {
+  const ROOM = "#bubble/games";
+  const T = (n: number) => new Date(Date.parse(T0) + n * 1000).toISOString();
+  // A member's link in ROOM, its history asked.
+  const asked = () => {
+    const t = setup();
+    t.link.follow([ROOM]);
+    t.link.show(ROOM);
+    t.signedIn(ADDRESS);
+    const fake = t.connected(ADDRESS);
+    fake.line(`:${ADDRESS}!u@h JOIN ${ROOM}`);
+    return { ...t, fake };
+  };
+  // A history page of `count` items from the `from`th second, `lines` of them lines, the rest reactions; `first`, the
+  // oldest's msgid.
+  const page = (fake: Fake, { count = HISTORY_LINES, lines = 0, from = 1000, first = `i${String(from)}` } = {}) => {
+    const id = `h${String(from)}`;
+    fake.line(`BATCH +${id} chathistory ${ROOM}`);
+    for (let n = 0; n < count; n += 1) {
+      const msgid = n === 0 ? first : `i${String(from + n)}`;
+      const tags = `@batch=${id};msgid=${msgid};time=${T(from + n)};account=alice`;
+      fake.line(
+        n < lines
+          ? `${tags} :alice!u@h PRIVMSG ${ROOM} :line ${String(n)}`
+          : `${tags};+draft/react=👍;+reply=m1 :alice!u@h TAGMSG ${ROOM}`,
+      );
+    }
+    fake.line(`BATCH -${id}`);
+  };
+  const before = (sent: readonly string[]) => sent.filter((line) => line.startsWith("CHATHISTORY BEFORE "));
+
+  it("asks for the items before the oldest of a full page that holds no line", () => {
+    const t = asked();
+    page(t.fake, { first: "oldest" });
+    expect(before(t.fake.sent)).toEqual([`CHATHISTORY BEFORE ${ROOM} msgid=oldest ${String(HISTORY_LINES)}`]);
+  });
+
+  it("asks again for a full page that leaves the window short of lines, its lines kept", () => {
+    const t = asked();
+    page(t.fake, { lines: 50, first: "oldest" });
+    expect(t.room(ROOM)?.lines).toHaveLength(50);
+    expect(before(t.fake.sent)).toEqual([`CHATHISTORY BEFORE ${ROOM} msgid=oldest ${String(HISTORY_LINES)}`]);
+  });
+
+  // The code review (CR1): JOIN and QUIT events fill pages too; the link reads on while Ergo's ring holds pages.
+  it("asks from each full page's oldest while Ergo's ring of the room holds pages, ten more at most, then stops", () => {
+    const t = asked();
+    const pages = Array.from({ length: 12 }, (_, n) => 12_000 - n * 1000);
+    for (const from of pages) page(t.fake, { from });
+    expect(before(t.fake.sent)).toEqual(
+      pages.slice(0, 10).map((from) => `CHATHISTORY BEFORE ${ROOM} msgid=i${String(from)} ${String(HISTORY_LINES)}`),
+    );
+  });
+
+  // Ergo's ring, as the deploy's template sets it (deploy/ergo/ircd.yaml.tmpl): the bound read from the same number.
+  it("bounds its asks by the ring the deploy's Ergo keeps a room", () => {
+    const template = readFileSync(new URL("../../../../deploy/ergo/ircd.yaml.tmpl", import.meta.url), "utf8");
+    expect(/^ {2}channel-length: (\d+)$/m.exec(template)?.[1]).toBe(String(HISTORY_RING));
+  });
+
+  it("asks no more when a page came short, at the history's start, or the window holds its lines", () => {
+    const short = asked();
+    page(short.fake, { count: HISTORY_LINES - 1 });
+    const full = asked();
+    page(full.fake, { lines: HISTORY_LINES });
+    expect(before([...short.fake.sent, ...full.fake.sent])).toEqual([]);
+  });
+
+  it("asks nothing before an oldest item whose msgid a command cannot carry", () => {
+    const t = asked();
+    page(t.fake, { first: String.raw`a\sb` });
+    expect(before(t.fake.sent)).toEqual([]);
+  });
+
+  // The green pass (G2): the oldest item's msgid as its tag carries it, what a command splits on leading too.
+  it.each([
+    ["a leading space", String.raw`\sa`],
+    ["a leading comma", ",a"],
+    ["a comma", "a,b"],
+    ["a leading colon", ":a"],
+    ["a tab", "a\tb"],
+    ["a leading CR", String.raw`\ra`],
+    ["a leading LF", String.raw`\na`],
+    ["65 characters", "a".repeat(65)],
+  ])("asks nothing before an oldest item whose msgid holds %s", (_, first) => {
+    const t = asked();
+    page(t.fake, { first });
+    expect(before(t.fake.sent)).toEqual([]);
+  });
+
+  it("asks before an oldest item whose msgid has 64 characters", () => {
+    const t = asked();
+    page(t.fake, { first: "a".repeat(64) });
+    expect(before(t.fake.sent)).toEqual([
+      `CHATHISTORY BEFORE ${ROOM} msgid=${"a".repeat(64)} ${String(HISTORY_LINES)}`,
+    ]);
+  });
+
+  // The green pass (G11): a page of nothing asks nothing, and throws nothing.
+  it("asks nothing for an empty page, and throws nothing", () => {
+    const t = asked();
+    expect(() => {
+      page(t.fake, { count: 0 });
+    }).not.toThrow();
+    expect(before(t.fake.sent)).toEqual([]);
+  });
+
+  it("counts its asks again on a new connection", () => {
+    const t = asked();
+    for (const from of [4000, 3000, 2000]) page(t.fake, { from });
+    // Ergo's client reconnects as itself: what it sent before stays in its list.
+    const asks = before(t.fake.sent).length;
+    t.fake.state("waiting");
+    const again = t.connected(ADDRESS);
+    again.line(`:${ADDRESS}!u@h JOIN ${ROOM}`);
+    page(again, { from: 9000 });
+    expect(before(again.sent).slice(asks)).toEqual([`CHATHISTORY BEFORE ${ROOM} msgid=i9000 ${String(HISTORY_LINES)}`]);
+  });
+});
+
+// 4d: a reply is a PRIVMSG tagged +reply with the msgid it answers (ratified in 2026: docs/plans/chat-features.md, M2),
+// the draft composed as the composer composes it; a msgid a tag cannot carry sends nothing, the draft included.
+describe("the chat's link: replies", () => {
+  const MSGID = "rmq4xvjw9ys5pwtqqjxbqwvhjc";
+  const memberIn = (rooms: readonly string[]) => {
+    const t = setup();
+    t.link.follow(rooms);
+    t.link.show(rooms[0]);
+    t.signedIn(ADDRESS);
+    const fake = t.connected(ADDRESS);
+    fake.line(`:${ADDRESS}!u@h JOIN ${rooms[0] ?? ""}`);
+    return { ...t, fake };
+  };
+
+  it("sends a reply as the composer composes the draft, tagged with the msgid it answers", () => {
+    const t = memberIn(["#bubble/games"]);
+    expect(t.link.say("#bubble/games", "  hi **all**  ", MSGID)).toBe(true);
+    expect(t.link.say("#bubble/games", "/me waves", MSGID)).toBe(true);
+    expect(t.fake.sent.filter((line) => line.startsWith("@"))).toEqual([
+      `@+reply=${MSGID} PRIVMSG #bubble/games :hi **all**`,
+      `@+reply=${MSGID} PRIVMSG #bubble/games :\u0001ACTION waves\u0001`,
+    ]);
+  });
+
+  it.each([
+    ["a space", "a b"],
+    ["a CR LF and a second command", "a\r\nQUIT"],
+    ["a semicolon and a second tag", "a;+typing=active"],
+    ["a backslash", "a\\b"],
+    ["nothing", ""],
+    ["65 characters", "a".repeat(65)],
+    // The green pass (G2): what a tag escapes, leading too.
+    ["a leading semicolon", ";a"],
+    ["a leading backslash", "\\a"],
+    ["a leading space", " a"],
+    ["a leading comma", ",a"],
+    ["a comma", "a,b"],
+    ["a leading colon", ":a"],
+    ["a tab", "a\tb"],
+    ["a leading CR", "\ra"],
+    ["a leading LF", "\na"],
+    ["a NUL", "a\u0000b"],
+    ["a leading NUL", "\u0000a"],
+  ])("sends no reply to a msgid holding %s, nor the draft without it", (_, id) => {
+    const t = memberIn(["#bubble/games"]);
+    const before = t.fake.sent.length;
+    expect(t.link.say("#bubble/games", "hi", id)).toBe(false);
+    expect(t.fake.sent.slice(before)).toEqual([]);
+  });
+
+  it("sends a reply to a msgid of 64 characters", () => {
+    const t = memberIn(["#bubble/games"]);
+    expect(t.link.say("#bubble/games", "hi", "a".repeat(64))).toBe(true);
+    expect(t.fake.sent.filter((line) => line.startsWith("@"))).toEqual([
+      `@+reply=${"a".repeat(64)} PRIVMSG #bubble/games :hi`,
+    ]);
+  });
+
+  it("sends no reply as a guest, nor in a room Ergo has not said it is in", () => {
+    const g = guestIn(["#bubble/games"]);
+    g.fake.line(`:${GUEST}!u@h JOIN #bubble/games`);
+    const t = memberIn(["#bubble/games", "#bubble"]);
+    expect(g.link.say("#bubble/games", "hi", MSGID)).toBe(false);
+    expect(t.link.say("#bubble", "hi", MSGID)).toBe(false);
+    expect([...g.fake.sent, ...t.fake.sent].filter((line) => line.includes("PRIVMSG"))).toEqual([]);
   });
 });

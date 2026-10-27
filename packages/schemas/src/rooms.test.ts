@@ -106,6 +106,10 @@ describe("a world's rooms", () => {
     expect(RoomList.safeParse({ world: "bubble", sections }).success).toBe(true);
   });
 
+  it.each(["s", "s".repeat(64)])("takes a section named %j, from 1 to 64 characters", (name) => {
+    expect(RoomList.parse({ world: "bubble", sections: [{ name, rooms: [] }] }).sections[0]?.name).toBe(name);
+  });
+
   it.each(["open", "announcement", "accounts", "members", "members-write"])("takes a room of type %s", (type) => {
     expect(
       RoomList.parse({ world: "bubble", sections: [{ name: null, rooms: [{ room: "#bubble", type }] }] }),

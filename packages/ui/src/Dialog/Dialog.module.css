@@ -15,6 +15,11 @@
     --_w: var(--dialog-wide);
   }
 
+  .description {
+    color: var(--color-text-muted);
+    overflow-wrap: anywhere;
+  }
+
   .dialog::backdrop {
     background: var(--color-scrim);
   }

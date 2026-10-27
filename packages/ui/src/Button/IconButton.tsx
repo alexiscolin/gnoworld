@@ -1,7 +1,7 @@
 import type { MouseEvent } from "react";
 import { Icon, type IconName } from "../icons/Icon.tsx";
 import { Tooltip } from "../Tooltip/Tooltip.tsx";
-import { iconSize, pill, type ControlSize } from "./control.ts";
+import { iconLook, iconSize, type ControlSize } from "./control.ts";
 import styles from "./Button.module.css";
 
 export interface IconButtonProps {
@@ -40,10 +40,7 @@ export function IconButton({
         type="button"
         aria-label={counted === null ? label : `${label}, ${counted.said}`}
         aria-pressed={pressed}
-        className={pill(styles["button"], styles["square"])}
-        data-emphasis={emphasis}
-        data-tone="neutral"
-        data-size={size}
+        {...iconLook(emphasis, size)}
         onClick={onClick}
       >
         <Icon name={icon} size={iconSize(size)} />

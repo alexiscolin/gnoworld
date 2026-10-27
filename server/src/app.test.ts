@@ -166,6 +166,36 @@ describe("listen", () => {
     expect(client.said()).toMatch(/^HTTP\/1\.1 200 /);
   });
 
+  it("logs a body its client dropped mid-way as aborted, never as the server's 500 (the max review)", async () => {
+    const { app, lines } = setup();
+    app.post("/echo", async (c) => c.text(String((await c.req.text()).length)));
+    const server = await listen(app, { port: 0, host: "127.0.0.1" });
+    servers.push(server);
+    const { port } = server.address() as AddressInfo;
+    for (const [head, part] of [
+      ["Content-Length: 100", "x".repeat(10)],
+      ["Transfer-Encoding: chunked", "a\r\nxxxxxxxxxx\r\n"],
+      ["Content-Length: 100", ""],
+    ]) {
+      const s = connect(port, "127.0.0.1");
+      await once(s, "connect");
+      s.write(`POST /echo HTTP/1.1\r\nHost: localhost\r\n${String(head)}\r\n\r\n${String(part)}`);
+      s.destroy();
+    }
+    await expect
+      .poll(() => lines.filter((line) => line.includes('"event":"aborted"')).length, { timeout: 5_000 })
+      .toBe(3);
+    expect(lines.join("\n")).not.toContain('"status":500');
+    const parsed = lines.map((line) => JSON.parse(line) as Record<string, unknown>);
+    for (const entry of parsed)
+      expect(
+        Object.keys(entry)
+          .filter((key) => !["time", "event"].includes(key))
+          .sort(),
+      ).toEqual(["method", "route"]);
+    expect(parsed.map(({ method, route }) => [method, route])).toEqual(Array(3).fill(["POST", "/echo"]));
+  });
+
   it("stops even while a client stalls in its headers, which close() alone waits on for ever", async () => {
     // A long keep-alive, so nothing but the stop cuts the stalled request: close() stops the header checks.
     const client = await socket(await start({ ...QUICK, keepAlive: 60_000 }));

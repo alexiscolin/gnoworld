@@ -79,6 +79,134 @@ describe("Tooltip", () => {
     expect(shown()).toBe("false");
   });
 
+  // F832: Chrome refuses to show a popover inside another popover's show or hide: a menu closed by Esc hands the focus
+  // back to its trigger, this tooltip's control, during its hide. The words show on the next frame, placed then.
+  const refusing = (error: Error) => {
+    const words = tip();
+    const toggle = words.togglePopover.bind(words);
+    let refused = 0;
+    vi.spyOn(words, "togglePopover").mockImplementation((force) => {
+      if (force !== true || refused > 0) return toggle(force);
+      refused += 1;
+      throw error;
+    });
+    return () => refused;
+  };
+
+  it("shows its words on the next frame when the browser refuses them during another popover's toggle (F832)", () => {
+    draw();
+    const refused = refusing(
+      new DOMException("Invalid to show a popover during another show operation", "InvalidStateError"),
+    );
+    keyboardFocus();
+    expect(refused()).toBe(1);
+    expect(tip().style.display).not.toBe("block");
+    act(() => {
+      vi.advanceTimersToNextFrame();
+    });
+    expect(tip().style.display).toBe("block");
+    vi.restoreAllMocks();
+  });
+
+  // /code-review on F832: a refusal that lasts is waited out a few frames, never one every frame for good.
+  it("stops asking after three frames of refusals, its words left hidden (F832)", () => {
+    draw();
+    const words = tip();
+    const toggle = vi.spyOn(words, "togglePopover").mockImplementation((force) => {
+      if (force === true)
+        throw new DOMException("Invalid to show a popover during another show operation", "InvalidStateError");
+      return false;
+    });
+    keyboardFocus();
+    for (let frame = 0; frame < 10; frame += 1) {
+      act(() => {
+        vi.advanceTimersToNextFrame();
+      });
+    }
+    expect(toggle.mock.calls.filter(([force]) => force === true)).toHaveLength(4);
+    expect(words.style.display).not.toBe("block");
+    vi.restoreAllMocks();
+  });
+
+  it("waits out a later refusal as well, the frames counted again from a toggle that went (F832)", () => {
+    draw();
+    const words = tip();
+    let refusing = true;
+    vi.spyOn(words, "togglePopover").mockImplementation(function (this: HTMLElement, force) {
+      if (force === true && refusing) throw new DOMException("Invalid to show", "InvalidStateError");
+      this.style.display = force === true ? "block" : "";
+      return force === true;
+    });
+    for (let round = 0; round < 3; round += 1) {
+      refusing = true;
+      keyboardFocus();
+      act(() => {
+        vi.advanceTimersToNextFrame();
+      });
+      refusing = false;
+      act(() => {
+        vi.advanceTimersToNextFrame();
+      });
+      expect(words.style.display).toBe("block");
+      act(() => {
+        button().blur();
+      });
+      expect(words.style.display).toBe("");
+    }
+    vi.restoreAllMocks();
+  });
+
+  it("lets any other refusal of its words rise (F832)", () => {
+    draw();
+    refusing(new TypeError("not a popover"));
+    expect(() => {
+      keyboardFocus();
+    }).toThrow("not a popover");
+    vi.restoreAllMocks();
+  });
+
+  // The green pass (G4): only Chrome's refusal during another popover's toggle waits; any other DOMException, or an
+  // error that merely shares its name, rises.
+  it.each([
+    ["a DOMException of another name", new DOMException("not allowed", "NotAllowedError")],
+    [
+      "an error named as the refusal, not a DOMException",
+      Object.assign(new Error("look-alike"), { name: "InvalidStateError" }),
+    ],
+  ])("lets %s rise (F832)", (_, error) => {
+    draw();
+    refusing(error);
+    expect(() => {
+      keyboardFocus();
+    }).toThrow(error.message);
+    vi.restoreAllMocks();
+  });
+
+  // The green pass (G3): words shown after a refusal are placed then, by their size once they have one.
+  it("places its words by their size once shown, after a refused show (F832)", () => {
+    Object.defineProperty(document.documentElement, "clientWidth", { value: 1000, configurable: true });
+    Object.defineProperty(document.documentElement, "clientHeight", { value: 800, configurable: true });
+    draw();
+    const words = tip();
+    const anchor = button().parentElement;
+    if (anchor === null) throw new Error("no anchor");
+    vi.spyOn(anchor, "getBoundingClientRect").mockReturnValue(
+      DOMRect.fromRect({ x: 200, y: 300, width: 40, height: 40 }),
+    );
+    // A box out of the top layer has no size, as a browser draws it.
+    vi.spyOn(words, "getBoundingClientRect").mockImplementation(() =>
+      DOMRect.fromRect(words.style.display === "block" ? { width: 80, height: 20 } : {}),
+    );
+    refusing(new DOMException("Invalid to show a popover during another show operation", "InvalidStateError"));
+    keyboardFocus();
+    act(() => {
+      vi.advanceTimersToNextFrame();
+    });
+    expect(words.style.display).toBe("block");
+    expect([words.style.left, words.style.top]).toEqual(["180px", "280px"]);
+    vi.restoreAllMocks();
+  });
+
   // A focused control removed may fire no blur (jsdom fires none): the words go with it all the same (F353).
   it("hides the words the keyboard showed when their control leaves the page", async () => {
     const tipped = (control: boolean) => (

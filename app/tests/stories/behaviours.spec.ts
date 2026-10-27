@@ -97,6 +97,23 @@ test.describe("Dialog", () => {
     await expect(page.getByText("Closed 1", { exact: true })).toBeVisible();
   });
 
+  // 4c's UX review (U6): at a phone's width the title wraps its own words; Close stays at its row's end.
+  test("keeps Close on its title's row at 320 px, a long title wrapping beside it", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 800 });
+    for (const id of ["dialog--standard", "dialog--wide"]) {
+      await open(page, id);
+      const dialog = page.getByRole("dialog");
+      const [title, close, frame] = [
+        await box(dialog.getByRole("heading")),
+        await box(dialog.getByRole("button", { name: "Close" })),
+        await box(dialog),
+      ];
+      expect(close.y).toBeLessThan(title.y + title.height);
+      expect(close.x).toBeGreaterThan(title.x + title.width - 1);
+      expect(close.x + close.width).toBeLessThanOrEqual(frame.x + frame.width);
+    }
+  });
+
   test("its Close button closes it once, focus back on the opener", async ({ page }) => {
     await passport(page);
     await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();

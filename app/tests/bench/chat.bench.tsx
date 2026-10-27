@@ -4,6 +4,7 @@ import { markdown, mentions, parseLine, type Line } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";
 import { Sidebar } from "@gnoworld/ui";
 import { renderToStaticMarkup } from "react-dom/server";
+import { prerender } from "react-dom/static";
 import { bench, describe } from "vitest";
 import { Composer } from "../../src/features/chat/Composer.tsx";
 import { RoomsView } from "../../src/features/chat/RoomsView.tsx";
@@ -26,20 +27,33 @@ describe("a line", () => {
   });
 });
 
+const lines: Line[] = Array.from({ length: 200 }, (_, n) => ({
+  id: `m${String(n)}`,
+  time: new Date(Date.parse("2026-10-25T10:00:00.000Z") + n * 60_000).toISOString(),
+  from: ALICE,
+  account: ALICE,
+  text: `${TEXT.slice(0, 200)} ${String(n)}`,
+  kind: "message",
+}));
+const members = [ALICE, BOB, ...Array.from({ length: 98 }, (_, n) => `guest-${String(n).padStart(6, "0")}`)];
+const room = (
+  <RoomView
+    room="#bubble/games"
+    title="#games"
+    note="Games"
+    state={{ lines, members }}
+    chat="connected"
+    me={BOB}
+    onDelete={() => false}
+    onDismiss={() => undefined}
+  />
+);
+// The lines view loads lazily, once (RoomView.tsx): drawn and waited for here, a room switch then draws it at once.
+await prerender(room);
+
 describe("a room", () => {
-  const lines: Line[] = Array.from({ length: 200 }, (_, n) => ({
-    id: `m${String(n)}`,
-    time: new Date(Date.parse("2026-10-25T10:00:00.000Z") + n * 60_000).toISOString(),
-    from: ALICE,
-    account: ALICE,
-    text: `${TEXT.slice(0, 200)} ${String(n)}`,
-    kind: "message",
-  }));
-  const members = [ALICE, BOB, ...Array.from({ length: 98 }, (_, n) => `guest-${String(n).padStart(6, "0")}`)];
   bench("RoomView alone, a room of 200 lines and 100 people drawn whole [100 ms]", () => {
-    renderToStaticMarkup(
-      <RoomView room="#bubble/games" state={{ lines, members, topic: "Games" }} chat="connected" me={BOB} />,
-    );
+    renderToStaticMarkup(room);
   });
   // Plan §4: "a room switch under 100 ms with 100 rooms". A switch draws what ChatPanel's Loaded draws for the new
   // room: the list of the world's 100 rooms, the room, and its composer with a mention in progress, which sorts the
@@ -57,9 +71,13 @@ describe("a room", () => {
           <RoomsView sections={sections} current={rooms[42]} />
           <RoomView
             room="#bubble/room-042"
-            state={{ lines, members, topic: "Games" }}
+            title="#room-042"
+            note="Games"
+            state={{ lines, members }}
             chat="connected"
             me={BOB}
+            onDelete={() => false}
+            onDismiss={() => undefined}
             composer={
               <Composer
                 room="#bubble/room-042"

@@ -1,7 +1,8 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { eachStory, staysText } from "../testing.tsx";
+import { IconButton } from "../Button/IconButton.tsx";
+import { eachStory, staysText, toggled } from "../testing.tsx";
 import { Menu, Popover } from "./Popover.tsx";
 import * as stories from "./Popover.stories.tsx";
 
@@ -20,7 +21,7 @@ async function focusedInside() {
 }
 
 describe("Popover", () => {
-  it("is opened by its trigger, a button that names it and says it pops up", () => {
+  it("is opened by its trigger, a button that names it and says it pops up", async () => {
     render(
       <Popover trigger="Network" label="Choose the network">
         <p>Onyx</p>
@@ -32,11 +33,13 @@ describe("Popover", () => {
     expect(trigger.getAttribute("popovertarget")).toBe(panel?.id);
     expect(trigger.getAttribute("aria-haspopup")).toBe("dialog");
     fireEvent.click(trigger);
+    await toggled();
     expect(screen.getByRole("dialog", { name: "Choose the network" }).contains(screen.getByText("Onyx"))).toBe(true);
   });
 
   it("gives the focus back to its trigger when it closes with the focus inside it", async () => {
     (await focusedInside()).hidePopover();
+    await toggled();
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Network" }));
   });
 
@@ -52,6 +55,7 @@ describe("Popover", () => {
     await userEvent.click(screen.getByRole("button", { name: "Network" }));
     screen.getByRole("button", { name: "Search" }).focus();
     screen.getByRole("dialog").hidePopover();
+    await toggled();
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Search" }));
   });
 
@@ -62,6 +66,7 @@ describe("Popover", () => {
       screen.getByRole("button", { name: "Switch to Onyx" }).blur();
     });
     panel.hidePopover();
+    await toggled();
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Network" }));
   });
 
@@ -74,6 +79,7 @@ describe("Popover", () => {
     await userEvent.click(screen.getByRole("button", { name: "Network" }));
     screen.getByRole("button", { name: "Network" }).blur();
     screen.getByRole("dialog").hidePopover();
+    await toggled();
     expect(document.activeElement).toBe(document.body);
   });
 
@@ -94,6 +100,7 @@ describe("Popover", () => {
     act(() => {
       screen.getByRole("dialog").hidePopover();
     });
+    await toggled();
     expect(signals.every((signal) => signal.aborted)).toBe(true);
     listened.mockRestore();
   });
@@ -147,6 +154,51 @@ describe("Menu", () => {
     if (found === undefined) throw new Error(`no item ${String(at)}`);
     return found;
   }
+
+  // 4c's UX review (U3): the message bar's trigger is a toolbar's small control (docs/DESIGN-SYSTEM.md: "a toolbar's
+  // small controls stay at 32").
+  it("takes a toolbar's small size for its icon trigger, medium unless asked", () => {
+    render(
+      <>
+        <Menu trigger="Small" icon="more" size="s" label="Message actions" items={items} />
+        <Menu trigger="Medium" icon="more" label="Message actions" items={items} />
+      </>,
+    );
+    expect(screen.getByRole("button", { name: "Small" }).dataset["size"]).toBe("s");
+    expect(screen.getByRole("button", { name: "Medium" }).dataset["size"]).toBe("m");
+  });
+
+  // 4c's UX review (U7): an irreversible act is coral with the alert icon and its word (docs/DESIGN-SYSTEM.md,
+  // "Severity"), apart from the others after a separator, which the arrows pass over.
+  it("draws a danger item apart: after one separator, its tone danger, the alert icon beside its words", async () => {
+    render(
+      <Menu
+        trigger="More"
+        label="Message actions"
+        items={[
+          { label: "Copy", onSelect: vi.fn() },
+          { label: "Delete", tone: "danger", onSelect: vi.fn() },
+        ]}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "More" }));
+    const [copy, remove] = screen.getAllByRole("menuitem");
+    expect(remove?.dataset["tone"]).toBe("danger");
+    expect(copy?.dataset["tone"]).toBeUndefined();
+    expect(remove?.querySelector("svg[data-icon='alert']")).not.toBeNull();
+    expect(copy?.querySelector("svg")).toBeNull();
+    expect(remove?.textContent).toBe("Delete");
+    const separators = screen.getAllByRole("separator");
+    expect(separators).toHaveLength(1);
+    expect(separators[0]?.nextElementSibling).toBe(remove);
+    await userEvent.keyboard("{ArrowDown}");
+    expect(document.activeElement).toBe(remove);
+  });
+
+  it("draws no separator in a menu with no danger item", async () => {
+    await opened();
+    expect(screen.queryAllByRole("separator")).toEqual([]);
+  });
 
   it("is a menu of menu items, its trigger saying so", async () => {
     const all = await opened();
@@ -213,6 +265,18 @@ describe("Menu", () => {
     expect(screen.queryByRole("menu")).toBeNull();
   });
 
+  // An item that opens a dialog: the dialog gives the focus back, as it closes, to what held it as it opened (F905).
+  it("acts with the focus on its trigger, never on its hidden item", async () => {
+    let focused: Element | null = null;
+    await opened(
+      vi.fn(() => {
+        focused = document.activeElement;
+      }),
+    );
+    await userEvent.keyboard("{Enter}");
+    expect(focused).toBe(screen.getByRole("button", { name: "More" }));
+  });
+
   it("opens again after it closed, placed and its first item focused", async () => {
     const all = await opened();
     screen.getByRole("menu").hidePopover();
@@ -235,5 +299,51 @@ describe("Menu", () => {
 
   it("shows its trigger, label and items made of markup, or very long, as text", () => {
     staysText((text) => <Menu trigger={text} label={text} items={[{ label: text, onSelect: vi.fn() }]} />);
+  });
+
+  // 4c's message menu (docs/decisions.md, 2026-10-26): a trigger of an icon alone, its words its name and tooltip.
+  it("draws an icon for its trigger when given one, named by its words, which its tooltip shows", async () => {
+    render(<Menu trigger="More" icon="more" label="Message actions" items={items} />);
+    const trigger = screen.getByRole("button", { name: "More" });
+    expect(trigger.querySelector("svg")?.dataset["icon"]).toBe("more");
+    expect(trigger.textContent).toBe("");
+    expect(trigger.getAttribute("aria-haspopup")).toBe("menu");
+    const tip = screen.getByText("More");
+    expect(tip.closest("[aria-hidden='true']")).not.toBeNull();
+    expect(trigger.contains(tip)).toBe(false);
+    await userEvent.click(trigger);
+    expect(document.activeElement).toBe(screen.getAllByRole("menuitem")[0]);
+  });
+
+  it("wears an icon trigger as an IconButton does: square, outline unless asked plain", () => {
+    render(
+      <>
+        <Menu trigger="More" icon="more" label="Message actions" items={items} />
+        <Menu trigger="Plain" icon="more" emphasis="plain" label="Message actions" items={items} />
+        <IconButton icon="more" label="Alike" />
+        <IconButton icon="more" label="Plain alike" emphasis="plain" />
+      </>,
+    );
+    const look = (name: string) => {
+      const { className, dataset } = screen.getByRole("button", { name });
+      return [className, dataset["emphasis"], dataset["tone"], dataset["size"]];
+    };
+    expect(look("More")).toEqual(look("Alike"));
+    expect(look("Plain")).toEqual(look("Plain alike"));
+    // The green pass (G16): the look stated apart from iconLook, which both sides above call.
+    expect(look("More").slice(1)).toEqual(["outline", "neutral", "m"]);
+    expect(look("Plain").slice(1)).toEqual(["plain", "neutral", "m"]);
+    expect(screen.getByRole("button", { name: "More" }).querySelector("svg")?.dataset["size"]).toBe("m");
+  });
+
+  // The red pass (M13): the words name the trigger, as text, and the trigger draws none of them.
+  it("names an icon trigger by its words, made of markup or very long, as text, drawing none of them", () => {
+    for (const text of ["<b>More</b>", `More ${"x".repeat(400)}`]) {
+      const { unmount } = render(<Menu trigger={text} icon="more" label="Message actions" items={items} />);
+      const trigger = screen.getByRole("button", { name: text });
+      expect(trigger.textContent).toBe("");
+      expect(trigger.querySelector("b")).toBeNull();
+      unmount();
+    }
   });
 });

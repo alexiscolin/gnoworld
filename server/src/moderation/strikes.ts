@@ -15,16 +15,18 @@ CREATE INDEX verdicts_by_account ON verdicts (account, at);
 export interface Strikes {
   // From `since` to `to`, both counted, by Ergo's time.
   count: (account: string, world: string, span: { since: number; to: number }) => number;
+  // The same hides' times, oldest first.
+  times: (account: string, world: string, span: { since: number; to: number }) => number[];
 }
 
 export function makeStrikes(db: DatabaseSync, pepper: string): Strikes {
-  const Count = z.object({ n: z.number() });
+  const Times = z.array(z.object({ at: z.number() }));
   const hidden = db.prepare(
-    "SELECT count(*) AS n FROM verdicts v JOIN rooms r ON r.name = v.room WHERE v.account = ? AND v.action = 'hide' AND v.reason IS NOT 'unknown_edit' AND v.at >= ? AND v.at <= ? AND r.world = ?",
+    "SELECT v.at AS at FROM verdicts v JOIN rooms r ON r.name = v.room WHERE v.account = ? AND v.action = 'hide' AND v.reason IS NOT 'unknown_edit' AND v.at >= ? AND v.at <= ? AND r.world = ? ORDER BY v.at",
   );
-  return {
-    count: (account, world, { since, to }) => Count.parse(hidden.get(accountKey(pepper, account), since, to, world)).n,
-  };
+  const times: Strikes["times"] = (account, world, { since, to }) =>
+    Times.parse(hidden.all(accountKey(pepper, account), since, to, world)).map(({ at }) => at);
+  return { count: (account, world, span) => times(account, world, span).length, times };
 }
 
 interface StrikeOptions {
@@ -35,8 +37,9 @@ interface StrikeOptions {
   spared: (account: string) => boolean;
 }
 
-/** After a hide: the account muted in the line's world once its strikes there reach the setting, within
- * the window back from the line's own time, unless the roles file spares it. */
+/** After a hide: the account muted in the line's world once some window of the setting's minutes, holding the
+ * line's own time, holds as many strikes there as the setting says, unless the roles file spares it. Checks
+ * settle in any order, so a hide later than the line counts too (the max review). */
 export function makeStrike(
   db: DatabaseSync,
   { pepper, now, mute, mutes, spared }: StrikeOptions,
@@ -45,10 +48,15 @@ export function makeStrike(
   return (said) => {
     const world = roomWorld(db, said.room);
     if (world === undefined || spared(said.account)) return;
-    // Up to the line's own time: a later hide, whose check may settle first, is not counted.
-    const at = lineTime(said, now);
-    if (strikes.count(said.account, world, { since: at - mute.windowMinutes * 60_000, to: at }) >= mute.strikes) {
-      mutes.mute(said.account, world);
+    const [at, window] = [lineTime(said, now), mute.windowMinutes * 60_000];
+    const hides = strikes.times(said.account, world, { since: at - window, to: at + window });
+    // The runs of `strikes` hides in a row that fit one window and hold the line's time.
+    for (let i = 0; i + mute.strikes <= hides.length; i += 1) {
+      const [first = at + 1, last = at - 1] = [hides[i], hides[i + mute.strikes - 1]];
+      if (last - first <= window && first <= at && at <= last) {
+        mutes.mute(said.account, world);
+        return;
+      }
     }
   };
 }

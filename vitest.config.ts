@@ -44,12 +44,14 @@ export default defineConfig({
     // default, `*.{bench,benchmark}.?(c|m)[jt]s?(x)`, ran files no guard names, switched off or not (CR3; probe bench_files).
     benchmark: { include: BENCHES },
     projects: [
+      // The app's components compiled, which count their renders (app/vitest.compiled.config.ts).
+      "app/vitest.compiled.config.ts",
       {
         extends: true,
         test: {
           name: "node",
           include: ["packages/*/src/**/*.test.ts", "app/src/**/*.test.{ts,tsx}", "server/src/**/*.test.ts"],
-          exclude: [...configDefaults.exclude, "packages/ui/**", ...SLOW],
+          exclude: [...configDefaults.exclude, "packages/ui/**", "app/src/features/chat/Lines.test.tsx", ...SLOW],
         },
       },
       {

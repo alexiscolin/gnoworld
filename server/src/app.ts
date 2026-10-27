@@ -24,6 +24,11 @@ export function makeApp(log: Log, ready: () => boolean): Hono {
   app.get("/ready", (c) => (ready() ? c.text("ready") : refuse(c, "not_ready", 503)));
   app.notFound((c) => refuse(c, "not_found", 404));
   app.onError((error, c) => {
+    // A client that dropped its body mid-way is no server fault.
+    if (c.req.raw.signal.aborted) {
+      log("aborted", { method: c.req.method, route: routePath(c, -1) });
+      return refuse(c, "internal", 500);
+    }
     // The name only: a message may quote what the request sent.
     log("failed", { method: c.req.method, route: routePath(c, -1), status: 500, error: error.name });
     return refuse(c, "internal", 500);

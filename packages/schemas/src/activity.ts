@@ -3,6 +3,6 @@
 import { z } from "./zod.ts";
 
 export const ActivityRooms = z.object({
-  rooms: z.array(z.object({ world: z.string(), room: z.string(), perMinute: z.number().nonnegative() })),
+  rooms: z.array(z.object({ world: z.string(), room: z.string(), perMinute: z.number().check(z.nonnegative()) })),
 });
 export type ActivityRooms = z.infer<typeof ActivityRooms>;

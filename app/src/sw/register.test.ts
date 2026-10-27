@@ -272,19 +272,90 @@ test("once the page has gone (its signal aborted), no update shows a prompt, nor
   expect(updates).toEqual([]);
 });
 
-test("a second click before the takeover sends nothing more, and the page reloads once", async () => {
+// F679: the message may be lost on the way (a worker stopped, a browser that drops it); the page cannot know.
+test("a second click before the takeover sends SKIP_WAITING again, and the page reloads once", async () => {
   const waiting = worker();
   const { page, takeOver } = container({ waiting });
   const { started, updates, reload } = start(page);
   await started;
   updates[0]?.();
   updates[0]?.();
+  expect(waiting.sent).toEqual([{ type: "SKIP_WAITING" }, { type: "SKIP_WAITING" }]);
   takeOver();
-  expect(waiting.sent).toEqual([{ type: "SKIP_WAITING" }]);
+  takeOver();
   expect(reload).toHaveBeenCalledOnce();
 });
 
-// The page remembers the worker it asked, not that it asked once (F380).
+test("every click of a prompt that stays sends the message, however many", async () => {
+  const waiting = worker();
+  const { page } = container({ waiting });
+  const { started, updates } = start(page);
+  await started;
+  for (let click = 0; click < 5; click += 1) updates[0]?.();
+  expect(waiting.sent).toHaveLength(5);
+});
+
+// The notice closes on its click (Flash), so a lost message leaves no button: the next time the page is
+// shown, the update is offered again, and its click sends the message again.
+test("a click that took nothing over: the page shown again offers the update again, and that click asks again", async () => {
+  const waiting = worker();
+  const { page, takeOver } = container({ waiting });
+  const { started, updates, document, reload } = start(page);
+  await started;
+  updates[0]?.();
+  document.becomes("visible");
+  expect(updates).toHaveLength(2);
+  updates[1]?.();
+  expect(waiting.sent).toEqual([{ type: "SKIP_WAITING" }, { type: "SKIP_WAITING" }]);
+  takeOver();
+  expect(reload).toHaveBeenCalledOnce();
+});
+
+test("a page that was never clicked is not offered the update again when shown: the notice it closed stays closed", async () => {
+  const { page } = container({ waiting: worker() });
+  const { started, updates, document } = start(page);
+  await started;
+  document.becomes("visible");
+  document.becomes("visible");
+  expect(updates).toHaveLength(1);
+});
+
+test("a page hidden after its click is not offered the update again until it is shown", async () => {
+  const { page } = container({ waiting: worker() });
+  const { started, updates, document } = start(page);
+  await started;
+  updates[0]?.();
+  document.becomes("hidden");
+  expect(updates).toHaveLength(1);
+});
+
+test("a page taken over after its click has nothing to be offered when shown", async () => {
+  const { page, takeOver } = container({ waiting: worker() });
+  const { started, updates, document } = start(page);
+  await started;
+  updates[0]?.();
+  takeOver();
+  document.becomes("visible");
+  expect(updates).toHaveLength(1);
+});
+
+test("a lost message again: every time the page is shown after a click that took nothing over, it is offered again", async () => {
+  const waiting = worker();
+  const { page } = container({ waiting });
+  const { started, updates, document } = start(page);
+  await started;
+  updates[0]?.();
+  document.becomes("visible");
+  updates[1]?.();
+  document.becomes("visible");
+  expect(updates).toHaveLength(3);
+  // Shown again with no click between, it is offered again as well: the click before it took nothing over.
+  document.becomes("visible");
+  expect(updates).toHaveLength(4);
+  expect(waiting.sent).toHaveLength(2);
+});
+
+// A click goes to the worker waiting then, not to the one a click asked before (F380).
 test("a newer worker waiting after a click is asked at the next click", async () => {
   const older = worker();
   const { page, registration, updateFound } = container({ waiting: older });

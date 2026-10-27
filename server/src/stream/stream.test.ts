@@ -85,6 +85,25 @@ describe("the verdicts' stream", () => {
     ]);
   });
 
+  // F890: the page reads which lines the stream will answer from the server's clock, which Ergo's server-time
+  // shares, never from its own.
+  it("tells each connection the time it began following, after the events it replays", async () => {
+    let clock = Date.parse("2026-10-26T12:00:00.000Z");
+    const { stream, rooms } = setup({ now: () => clock });
+    stream.publish(event(1));
+    const since = async (client: Awaited<ReturnType<typeof rooms>>) => {
+      while (!client.raw().includes("event: since")) expect(await client.more()).toBe(true);
+      return client.raw();
+    };
+    const first = await rooms("#bubble");
+    expect(await since(first)).toMatch(
+      /^id: \d+\nevent: verdict\ndata: [^\n]+\n\nevent: since\ndata: \{"time":"2026-10-26T12:00:00\.000Z"\}\n\n$/,
+    );
+    clock += 60_000;
+    const again = await rooms("#bubble", { last: (await first.read(1))[0]?.id ?? "" });
+    expect(await since(again)).toBe('event: since\ndata: {"time":"2026-10-26T12:01:00.000Z"}\n\n');
+  });
+
   it("gives a late client each room's last events, then what it missed after its Last-Event-ID", async () => {
     const { stream, rooms } = setup({ pending: 3 });
     for (let n = 1; n <= 5; n += 1) stream.publish(event(n));
@@ -314,12 +333,12 @@ describe("the verdicts' stream, rooms by role (3m)", () => {
       const reader: ReadableStreamDefaultReader<Uint8Array> | undefined = response.body?.getReader();
       let text = "";
       return async (count: number) => {
-        while ((text.match(/data: /g) ?? []).length < count) {
+        while ((text.match(/event: verdict\ndata: /g) ?? []).length < count) {
           const chunk = await reader?.read();
           if (chunk === undefined || chunk.done) break;
           text += new TextDecoder().decode(chunk.value);
         }
-        return [...text.matchAll(/data: (.*)\n/g)].map(
+        return [...text.matchAll(/event: verdict\ndata: (.*)\n/g)].map(
           ([, json = ""]) => (JSON.parse(json) as { msgid: string }).msgid,
         );
       };
@@ -389,7 +408,9 @@ describe("the verdicts' stream's replay, rooms by role (3m)", () => {
         if (chunk === undefined || chunk.done) break;
         text += new TextDecoder().decode(chunk.value);
       }
-      return [...text.matchAll(/data: (.*)\n/g)].map(([, json = ""]) => (JSON.parse(json) as { msgid: string }).msgid);
+      return [...text.matchAll(/event: verdict\ndata: (.*)\n/g)].map(
+        ([, json = ""]) => (JSON.parse(json) as { msgid: string }).msgid,
+      );
     };
     expect(await replayed(undefined, undefined, "198.51.100.1")).toEqual(["open1"]);
     expect(await replayed(undefined, "0", "198.51.100.2")).toEqual(["open1"]);
@@ -410,5 +431,46 @@ describe("StreamEvent", () => {
     ]) {
       expect(StreamEvent.safeParse(bad).success).toBe(false);
     }
+  });
+});
+
+describe("the verdicts' stream, the max review", () => {
+  it("answers a HEAD with 405 before it takes a place, so the visitor's stream after it is served", async () => {
+    const { stream, rooms } = setup();
+    const app = makeApp(
+      logger("a-pepper-of-forty-characters-0123456789", () => true),
+      () => true,
+    );
+    app.route("/api/stream", stream.routes({ proxy: undefined, visible: () => true }));
+    for (let n = 0; n < 4; n++) {
+      const head = await app.request(
+        "/api/stream?rooms=%23bubble",
+        { method: "HEAD" },
+        { incoming: { socket: { remoteAddress: PEER } } },
+      );
+      expect([head.status, head.headers.get("allow")]).toEqual([405, "GET"]);
+    }
+    expect(stream.size()).toMatchObject({ clients: 0, visitors: 0 });
+    expect((await rooms("#bubble")).response.status).toBe(200);
+  });
+
+  it("takes no global place for a HEAD, whatever its rooms: a stream of another visitor is served", async () => {
+    const { stream, open, rooms } = setup({ total: 1 });
+    const app = makeApp(
+      logger("a-pepper-of-forty-characters-0123456789", () => true),
+      () => true,
+    );
+    app.route("/api/stream", stream.routes({ proxy: undefined, visible: () => true }));
+    for (const query of ["rooms=%23bubble", "", "rooms=%23a%20b"]) {
+      const head = await app.request(
+        `/api/stream?${query}`,
+        { method: "HEAD" },
+        { incoming: { socket: { remoteAddress: PEER } } },
+      );
+      expect([head.status, head.headers.get("allow")]).toEqual([405, "GET"]);
+    }
+    expect(stream.size()).toMatchObject({ clients: 0, visitors: 0 });
+    expect((await rooms("#bubble", { peer: "203.0.113.8" })).response.status).toBe(200);
+    expect((await open("rooms=%23bubble", { peer: "203.0.113.9" })).response.status).toBe(429);
   });
 });

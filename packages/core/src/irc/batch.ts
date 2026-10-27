@@ -11,6 +11,8 @@ export const BATCH_LINES = 1000;
 export interface Batch {
   readonly type: string;
   readonly params: readonly string[];
+  /** Its BATCH line's tags: a labeled-response's label rides there. */
+  readonly tags: IrcMessage["tags"];
   readonly messages: readonly IrcMessage[];
 }
 
@@ -23,6 +25,7 @@ const PASS: Batched = { kind: "pass" };
 interface Open {
   type: string;
   params: readonly string[];
+  tags: IrcMessage["tags"];
   messages: IrcMessage[];
 }
 
@@ -31,7 +34,7 @@ export class BatchReader {
   readonly #open = new Map<string, Open>();
 
   read(message: IrcMessage): Batched {
-    if (message.command === "BATCH") return this.#batch(message.params);
+    if (message.command === "BATCH") return this.#batch(message.params, message.tags);
     const open = this.#open.get(message.tags.get("batch") ?? "");
     if (open === undefined) return PASS;
     if (open.messages.length < BATCH_LINES) open.messages.push(message);
@@ -39,12 +42,12 @@ export class BatchReader {
   }
 
   // BATCH +ref type params... opens; BATCH -ref ends; anything else does nothing.
-  #batch([sign = "", type = "", ...params]: readonly string[]): Batched {
+  #batch([sign = "", type = "", ...params]: readonly string[], tags: IrcMessage["tags"]): Batched {
     const ref = sign.slice(1);
     if (ref === "") return HELD;
     if (sign.startsWith("-")) return this.#end(ref);
     if (sign.startsWith("+") && type !== "" && !this.#open.has(ref) && this.#open.size < OPEN_BATCHES) {
-      this.#open.set(ref, { type, params, messages: [] });
+      this.#open.set(ref, { type, params, tags, messages: [] });
     }
     return HELD;
   }

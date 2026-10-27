@@ -1,7 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, test } from "vitest";
 import { parseLine, type IrcMessage } from "../irc/irc.ts";
-import { addLines, concerns, lineOf, membersAfter, redactAfter, topicAfter, type Line } from "./room.ts";
+import { addLines, concerns, lineOf, membersAfter, redactAfter, refusedOf, topicAfter, type Line } from "./room.ts";
 
 const ME = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -265,6 +265,30 @@ describe("addLines: a room's lines, in time order, each once, the newest kept", 
   });
 });
 
+// 4c's message menu: Ergo's refusal of a delete (irc/handlers.go, v2.19.1: FAIL REDACT <code> <target> <msgid> :text),
+// which the page says.
+describe("refusedOf: the line Ergo refused to delete", () => {
+  test.each([
+    ["REDACT_FORBIDDEN", ":ergo FAIL REDACT REDACT_FORBIDDEN #bubble a :You are not authorised to delete this message"],
+    ["UNKNOWN_MSGID", ":ergo FAIL REDACT UNKNOWN_MSGID #bubble a :This message does not exist or is too old"],
+  ])("reads the room, folded, and the msgid of a %s", (_, line) => {
+    expect(refusedOf(read(line))).toStrictEqual({ room: "#bubble", id: "a" });
+    expect(refusedOf(read(line.replace("#bubble", "#BUBBLE")))).toStrictEqual({ room: "#bubble", id: "a" });
+  });
+
+  test.each([
+    ["a refusal of no room (INVALID_TARGET has no msgid)", ":ergo FAIL REDACT INVALID_TARGET #bubble :No such channel"],
+    ["another command's FAIL", ":ergo FAIL CHATHISTORY MESSAGE_ERROR #bubble a :error"],
+    ["a WARN of a REDACT", ":ergo WARN REDACT REDACT_FORBIDDEN #bubble a :careful"],
+    ["a FAIL REDACT cut short", ":ergo FAIL REDACT REDACT_FORBIDDEN #bubble"],
+    // The green pass (G13): a reply of another shape than Ergo's five parameters is no refusal read.
+    ["a FAIL REDACT with a parameter more", ":ergo FAIL REDACT REDACT_FORBIDDEN #bubble a b :You are not"],
+    ["a REDACT itself", ":gnoworld!u@h REDACT #bubble a"],
+  ])("reads none of %s", (_, line) => {
+    expect(refusedOf(read(line))).toBeUndefined();
+  });
+});
+
 describe("redactAfter: a line hidden by moderation", () => {
   const a = line("a", T0, "one");
   const b = line("b", "2026-10-25T10:00:01.000Z", "two");
@@ -437,5 +461,118 @@ describe("topicAfter: the room's description", () => {
     ["a line of the room", `@msgid=a;time=${T0} :${ALICE}!u@h PRIVMSG #bubble :x`],
   ])("leaves the topic alone for %s", (_, text) => {
     expect(topicAfter("mine", read(text), "#bubble")).toBe("mine");
+  });
+});
+
+// 4d: a reaction travels as a TAGMSG to its room (draft/react), which a client with 100 rooms reads in that one.
+describe("concerns: a reaction's room", () => {
+  test("names the room of a TAGMSG, whatever its case", () => {
+    expect(concerns(read(`@+draft/react=x;+reply=a :${ALICE}!u@h TAGMSG #Bubble`))).toBe("#bubble");
+  });
+});
+
+// 4d: a line answers another by its msgid (+reply, ratified in 2026; +draft/reply, its draft name, read too:
+// docs/plans/chat-features.md, M2). A value is a msgid a tag may carry back, of 64 characters at most, or no mark.
+describe("lineOf: the line a line answers", () => {
+  const tagged = (tags: string) =>
+    read(`@msgid=b;time=${T0};account=${ALICE};${tags} :${ALICE}!u@h PRIVMSG #bubble :x`);
+
+  test("keeps the msgid a reply answers, from +reply or its draft name, +reply first", () => {
+    expect(lineOf(tagged("+reply=a"), "#bubble")?.reply).toBe("a");
+    expect(lineOf(tagged("+draft/reply=a"), "#bubble")?.reply).toBe("a");
+    expect(lineOf(tagged("+reply=a;+draft/reply=z"), "#bubble")?.reply).toBe("a");
+  });
+
+  test("reads the draft name when +reply holds no msgid", () => {
+    expect(lineOf(tagged("+reply=a,b;+draft/reply=z"), "#bubble")?.reply).toBe("z");
+  });
+
+  test("adds no reply key to a line that answers none", () => {
+    expect(Object.keys(lineOf(said("b", T0, "x"), "#bubble") ?? {})).not.toContain("reply");
+  });
+
+  // A tag's value is escaped on the wire (\s a space, \: a semicolon, \\ a backslash): the parser hands it back whole.
+  test.each([
+    ["nothing", ""],
+    ["a space", String.raw`a\sb`],
+    ["a semicolon", String.raw`a\:b`],
+    ["a backslash", String.raw`a\\b`],
+    ["a leading space", String.raw`\sa`],
+    ["a leading semicolon", String.raw`\:a`],
+    ["a leading backslash", String.raw`\\a`],
+    ["a leading comma", ",a"],
+    ["a tab", "a\tb"],
+    ["a leading tab", "\ta"],
+    ["a CR", String.raw`a\rb`],
+    ["a leading CR", String.raw`\ra`],
+    ["an LF", String.raw`a\nb`],
+    ["a leading LF", String.raw`\na`],
+    ["a comma", "a,b"],
+    ["a leading colon", ":a"],
+    ["65 characters", "a".repeat(65)],
+  ])("takes no reply of a value holding %s", (_, value) => {
+    const answering = lineOf(tagged(`+reply=${value};+draft/reply=${value}`), "#bubble");
+    expect(answering).toBeDefined();
+    expect(Object.keys(answering ?? {})).not.toContain("reply");
+  });
+
+  test("keeps a msgid of 64 characters, the longest the link sends", () => {
+    expect(lineOf(tagged(`+reply=${"a".repeat(64)}`), "#bubble")?.reply).toBe("a".repeat(64));
+  });
+});
+
+// 4d: a line corrects one of its author's by our own tag (+gnoworld/edit, docs/decisions.md 2026-10-21), whose value is
+// a msgid a tag may carry back, of 64 characters at most, or no mark.
+describe("lineOf: the line a line corrects", () => {
+  const tagged = (tags: string) =>
+    read(`@msgid=b;time=${T0};account=${ALICE};${tags} :${ALICE}!u@h PRIVMSG #bubble :x`);
+
+  test("keeps the msgid an edit corrects", () => {
+    expect(lineOf(tagged("+gnoworld/edit=a"), "#bubble")?.edits).toBe("a");
+  });
+
+  test("keeps both marks of a line that answers one line and corrects another", () => {
+    expect(lineOf(tagged("+reply=a;+gnoworld/edit=c"), "#bubble")).toEqual({
+      id: "b",
+      time: T0,
+      from: ALICE,
+      account: ALICE,
+      text: "x",
+      kind: "message",
+      reply: "a",
+      edits: "c",
+    });
+  });
+
+  test("adds no edits key to a line that corrects none", () => {
+    expect(Object.keys(lineOf(said("b", T0, "x"), "#bubble") ?? {})).not.toContain("edits");
+  });
+
+  test.each([
+    ["nothing", ""],
+    ["a space", String.raw`a\sb`],
+    ["a semicolon", String.raw`a\:b`],
+    ["a backslash", String.raw`a\\b`],
+    ["a leading space", String.raw`\sa`],
+    ["a leading semicolon", String.raw`\:a`],
+    ["a leading backslash", String.raw`\\a`],
+    ["a leading comma", ",a"],
+    ["a tab", "a\tb"],
+    ["a leading tab", "\ta"],
+    ["a CR", String.raw`a\rb`],
+    ["a leading CR", String.raw`\ra`],
+    ["an LF", String.raw`a\nb`],
+    ["a leading LF", String.raw`\na`],
+    ["a comma", "a,b"],
+    ["a leading colon", ":a"],
+    ["65 characters", "a".repeat(65)],
+  ])("takes no edit of a value holding %s", (_, value) => {
+    const correcting = lineOf(tagged(`+gnoworld/edit=${value}`), "#bubble");
+    expect(correcting).toBeDefined();
+    expect(Object.keys(correcting ?? {})).not.toContain("edits");
+  });
+
+  test("keeps a msgid of 64 characters", () => {
+    expect(lineOf(tagged(`+gnoworld/edit=${"a".repeat(64)}`), "#bubble")?.edits).toBe("a".repeat(64));
   });
 });

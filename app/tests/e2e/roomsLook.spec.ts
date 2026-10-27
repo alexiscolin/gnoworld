@@ -56,11 +56,13 @@ test.describe("a world's rooms, as they look", () => {
     await page.setViewportSize({ width: 1280, height: 900 });
     const address = await logIn(page, "mention-look");
     await page.routeWebSocket(/\/ws$/, (ergo) => {
-      scriptedErgo(ergo, ACCOUNT, [
-        ["m1", "2026-10-25T10:00:00.000Z", `Who is up for a round of **gnogolf**? @${MEMBER} is in.`],
-        ["m2", "2026-10-25T10:01:00.000Z", `@${address} are you in too?`],
-        ["m3", "2026-10-25T10:02:00.000Z", `Write \`@${address}\` to call them.`],
-      ]);
+      scriptedErgo(ergo, ACCOUNT, {
+        history: [
+          ["m1", "2026-10-25T10:00:00.000Z", `Who is up for a round of **gnogolf**? @${MEMBER} is in.`],
+          ["m2", "2026-10-25T10:01:00.000Z", `@${address} are you in too?`],
+          ["m3", "2026-10-25T10:02:00.000Z", `Write \`@${address}\` to call them.`],
+        ],
+      });
     });
     await page.goto("/w/bubble?room=games");
     await hydrated(page);
@@ -110,7 +112,7 @@ async function sixtyLines(page: Page): Promise<() => WebSocketRoute> {
   let socket: WebSocketRoute | undefined;
   await page.routeWebSocket(/\/ws$/, (route) => {
     socket = route;
-    scriptedErgo(route, GUEST, history);
+    scriptedErgo(route, GUEST, { history });
   });
   await page.goto("/w/bubble?room=games");
   await hydrated(page);
@@ -149,7 +151,7 @@ test("leaves a reader who scrolled up where they are as a line comes", async ({ 
 // /code-review (F783): a quote reads as one, set apart from the sender's own words.
 test("sets a quoted line apart from the sender's own words", async ({ page }) => {
   await page.routeWebSocket(/\/ws$/, (ergo) => {
-    scriptedErgo(ergo, GUEST, [["q1", "2026-10-25T10:00:00.000Z", "> what was said before"]]);
+    scriptedErgo(ergo, GUEST, { history: [["q1", "2026-10-25T10:00:00.000Z", "> what was said before"]] });
   });
   await page.goto("/w/bubble?room=games");
   await hydrated(page);
@@ -169,7 +171,9 @@ test("sets a quoted line apart from the sender's own words", async ({ page }) =>
 test("shows a mention of an account not in the room whole, beside the member it copies shortened", async ({ page }) => {
   const ground = "g1jg8m2vtwlmmyz8swgu76ug4tklwnays8yvsqf5";
   await page.routeWebSocket(/\/ws$/, (ergo) => {
-    scriptedErgo(ergo, ACCOUNT, [["g1", "2026-10-25T10:00:00.000Z", `ask @${ground} or @${ACCOUNT} or @${MEMBER}`]]);
+    scriptedErgo(ergo, ACCOUNT, {
+      history: [["g1", "2026-10-25T10:00:00.000Z", `ask @${ground} or @${ACCOUNT} or @${MEMBER}`]],
+    });
   });
   await page.goto("/w/bubble?room=games");
   await hydrated(page);
@@ -183,7 +187,7 @@ test("shows a mention of an account not in the room whole, beside the member it 
 // character class just before `$` for a letter past the BMP, which made 𐐀@<address> a mention here alone.
 test("draws no mention after a letter past the BMP, in the browser's own engine", async ({ page }) => {
   await page.routeWebSocket(/\/ws$/, (ergo) => {
-    scriptedErgo(ergo, GUEST, [["b1", "2026-10-25T10:00:00.000Z", `\u{10400}@${MEMBER} and @${MEMBER}`]]);
+    scriptedErgo(ergo, GUEST, { history: [["b1", "2026-10-25T10:00:00.000Z", `\u{10400}@${MEMBER} and @${MEMBER}`]] });
   });
   await page.goto("/w/bubble?room=games");
   await hydrated(page);
@@ -194,10 +198,12 @@ test("draws no mention after a letter past the BMP, in the browser's own engine"
 // F814: a line that is a list holds list items of its own; a room's lines are the Messages list's own items.
 test("counts a line that is a list as one line of the room", async ({ page }) => {
   await page.routeWebSocket(/\/ws$/, (ergo) => {
-    scriptedErgo(ergo, GUEST, [
-      ["l1", "2026-10-25T10:00:00.000Z", "- gnogolf at nine"],
-      ["l2", "2026-10-25T10:01:00.000Z", "1. bring a putter"],
-    ]);
+    scriptedErgo(ergo, GUEST, {
+      history: [
+        ["l1", "2026-10-25T10:00:00.000Z", "- gnogolf at nine"],
+        ["l2", "2026-10-25T10:01:00.000Z", "1. bring a putter"],
+      ],
+    });
   });
   await page.goto("/w/bubble?room=games");
   await hydrated(page);

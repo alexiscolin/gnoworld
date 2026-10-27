@@ -454,7 +454,11 @@ describe("the server's process", { timeout: 30_000 }, () => {
     expect(other.status).toBe(200);
     server.child.kill("SIGTERM");
     expect(await exited(server)).toBe(0);
-    expect((await other.body?.getReader().read())?.done).toBe(true);
+    // Read to its end: what it says before it ends is not this test's.
+    const reader = other.body?.getReader();
+    let chunk = await reader?.read();
+    while (chunk?.done === false) chunk = await reader?.read();
+    expect(chunk?.done).toBe(true);
   });
 
   it("drains on SIGTERM: a request already begun is answered, then the process exits 0", async () => {
