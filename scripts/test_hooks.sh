@@ -612,6 +612,7 @@ printf '%s\n' 'part() { case ",$ONLY," in *",$1,"*) return 0 ;; *) return 1 ;; e
 	'[ -n "$ONLY" ] || { echo . >>"$SHARD_ROOT/controls"; [ ! -e BROKEN_hooks ]; exit; }' \
 	'if part x; then' \
 	'	pwd >>"$SHARD_ROOT/ran"' \
+	'	! grep -q " SPARE" g.txt && [ -n "${FLAKE:-}" ] && [ ! -e "$SHARD_ROOT/flaked" ] && { : >"$SHARD_ROOT/flaked"; exit 1; }' \
 	'	if [ -n "${SHARDS_MEET:-}" ]; then' \
 	'		: >"$SHARD_ROOT/met.${PWD##*/}" && n=0' \
 	'		until [ "$(ls "$SHARD_ROOT" | grep -c "^met\.")" -ge "$SHARDS_MEET" ]; do n=$((n + 1)); [ "$n" -lt 100 ] || { : >"$SHARD_ROOT/lonely"; break; }; sleep 0.1; done' \
@@ -672,7 +673,11 @@ planted = '''def mutants():
 
 
 def every_mutant():'''
-for a, b in (("def mutants():", planted), ("SECTIONS = {\n", 'SECTIONS = {\n    "g.txt": "x", "h.txt": "x", "i.txt": "x", "j.txt": "z", "k.txt": "y", "\\u00e9.txt": "x",\n')):
+gaps = '''GAPS = {
+    **({"planted spare #1": "planted gap"} if os.environ.get("GAPPED") else {}),
+    **({"planted keep1 #1": "planted gap"} if os.environ.get("GAPPED_KEEP") else {}),
+'''
+for a, b in (("def mutants():", planted), ("GAPS = {  # label -> why no test can notice it yet\n", gaps), ("SECTIONS = {\n", 'SECTIONS = {\n    "g.txt": "x", "h.txt": "x", "i.txt": "x", "j.txt": "z", "k.txt": "y", "\\u00e9.txt": "x",\n')):
     assert s.count(a) == 1, f"harness_mutate.py no longer holds {a!r}: update test_hooks.sh's harness_shards"
     s = s.replace(a, b)
 open(p, "w").write(s)
@@ -681,7 +686,7 @@ cp "$hs/src/g.txt" "$hs/src/h.txt" "$hs/src/i.txt" "$hs/src/k.txt" "$hs/src/$ac"
 git -C "$hs/repo" init -q && git -C "$hs/repo" add -A && git -C "$hs/repo" commit -qm x
 shards() { # $1: the shards; then harness_mutate's arguments
 	n=$1 && shift
-	rm -f "$hs/made" "$hs/removed" "$hs/ran" "$hs/controls" "$hs/probe_controls" "$hs/lonely" "$hs"/met.*
+	rm -f "$hs/made" "$hs/removed" "$hs/ran" "$hs/controls" "$hs/probe_controls" "$hs/lonely" "$hs/flaked" "$hs"/met.*
 	(cd "${HR:-$hs/repo}" && SHARD_ROOT="$hs" SHARD_SRC="$hs/src" HARNESS_SHARDS=$n python3 -I harness_mutate.py "$@" 2>&1)
 }
 count() { [ -e "$hs/$1" ] && wc -l <"$hs/$1" | tr -d ' ' || echo 0; }
@@ -702,6 +707,13 @@ for k in spare spare2; do printf '%s\n' "$out" | grep -q "^FAIL  survives: plant
 # No shard asked for: one.
 out=$(shards 0) && fail "harness_mutate passed with surviving mutants on one shard"
 [ "$(count made)" = 1 ] || fail "harness_mutate made $(count made) worktrees for HARNESS_SHARDS=0"
+# A known gap that a run "kills" is a test that failed for the load, not for the mutant: it is judged once more, and
+# survives when the second run passes (the merge check of 01:54 failed on one); a gap killed twice is out of date.
+out=$(GAPPED=1 FLAKE=1 shards 3) && fail "harness_mutate passed with surviving mutants beside a flaky known gap"
+printf '%s\n' "$out" | grep -q "^ok    survives: planted spare #1  (known gap: planted gap)$" || fail "harness_mutate failed a known gap that one failed run had killed: $out"
+[ -e "$hs/flaked" ] || fail "harness_mutate's flaky gap did not fail once: the case tests nothing"
+out=$(GAPPED_KEEP=1 shards 3) && fail "harness_mutate passed with surviving mutants beside a gap"
+printf '%s\n' "$out" | grep -q "^FAIL  killed, yet listed in GAPS: planted keep1 #1$" || fail "harness_mutate let a gap that is killed every time stay listed: $out"
 # The control: a suite failing on any untouched tree stops the run before any verdict, its trees removed.
 for suite in hooks probe; do
 	out=$(PROBED=1 BREAK_SECOND=$suite shards 3) && fail "harness_mutate passed with $suite failing on an untouched tree"

@@ -283,6 +283,7 @@ def mutants():
     yield from each(hm, "ThreadPoolExecutor(" "shards) as pool", "ThreadPoolExecutor(1) as pool", "hooks", "harness_mutate's shards run side by side")
     yield from each(hm, "    finally:\n        with open(target, \"w\") as f:\n            f.write(original)\n", "    finally:\n        pass\n", "hooks", "harness_mutate puts each mutant's file back")
     yield from each(hm, "            if code " "!= 0:\n", "            if False:\n", "hooks", "harness_mutate stops on a failed control")
+    yield from each(hm, "return killed and (label not in GAPS or " "run(tree", "return killed and (True or run(tree", "hooks", "harness_mutate judges a known gap that a run killed once more (F1832)")
     yield from each(hm, "lambda c: run(*c), " "controls)", "lambda c: run(*c), controls[:1])", "hooks", "harness_mutate's control runs in every tree")
     yield from each(hm, "        since = last_reviewed" "(base)\n", "        since = base\n", "hooks", "harness_mutate --changed judges the guard files changed since the last /pre-merge pass, not since base")
     yield from each(hm, "    except (OSError, ValueError)" " as e:", "    except ZeroDivisionError as e:", "hooks", "harness_mutate --changed refuses a passes file it cannot read, never judging fewer mutants")
@@ -846,7 +847,9 @@ def judged(tree, label, path, mutated, test):
     with open(target, "w") as f:
         f.write(mutated)
     try:
-        return run(tree, test, sections(path, test)) != 0
+        killed = run(tree, test, sections(path, test)) != 0
+        # A known gap is a mutant no test can notice: a failure here is the load, not the mutant, so it is judged once more.
+        return killed and (label not in GAPS or run(tree, test, sections(path, test)) != 0)
     finally:
         with open(target, "w") as f:
             f.write(original)
