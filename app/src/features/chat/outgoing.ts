@@ -13,7 +13,7 @@ export function send(
   ergo: Pick<Ergo, "multiline" | "send">,
   { room, composed, tags, ref }: { room: string; composed: Composed; tags: string; ref: string },
 ): boolean {
-  const lines = outgoing(room, composed, { multiline: ergo.multiline() ?? true, ref, tags });
+  const lines = outgoing(room, composed, { multiline: ergo.multiline() !== false, ref, tags });
   return lines?.every((line) => ergo.send(line)) === true;
 }
 
