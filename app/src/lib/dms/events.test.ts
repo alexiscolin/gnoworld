@@ -37,6 +37,21 @@ describe("withOf: the conversation a reaction or a delete belongs to", () => {
     expect(withOf(message, ME)).toBeUndefined();
   });
 
+  // /code-review on 4d's DM bar (CR8): dmOf folds the case of my nick, withOf did not, so a partner writing it in capitals
+  // had its line taken and its reaction and delete dropped, its own delete staying on my screen.
+  it.each([
+    ["a reaction", tagmsg(ALICE, ME.toUpperCase())],
+    ["a delete", redact(ALICE, ME.toUpperCase())],
+  ])("takes %s to my nick in capitals, as Ergo folds it", (_, message) => {
+    expect(withOf(message, ME)).toBe(ALICE);
+  });
+
+  it("takes my own echo whatever the case of the nick it names me by", () => {
+    expect(
+      withOf(read(`@msgid=t;account=${ME};+draft/react=👍;+reply=m1 :${ME.toUpperCase()}!u@h TAGMSG ${ALICE}`), ME),
+    ).toBe(ALICE);
+  });
+
   it("is none while my nick is unknown or no address", () => {
     expect(withOf(tagmsg(ALICE, ME), "")).toBeUndefined();
     expect(withOf(tagmsg("guest-ab12cd", "guest-zzzzzz"), "guest-zzzzzz")).toBeUndefined();

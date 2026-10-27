@@ -15,15 +15,18 @@ import {
 } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
 
+// Ergo folds A to Z alone, as core's sameName does (not exported there): a partner may write my nick in capitals (CR8).
+const same = (one: string, other: string) => one.toLowerCase() === other.toLowerCase();
+
 /** The account the other side of `message` is, or none: a room's, a guest's, one between two others or to oneself. */
 export function withOf(message: IrcMessage, me: string): string | undefined {
   const { command, params, source = "" } = message;
   if (command !== "TAGMSG" && command !== "REDACT") return undefined;
   const [target = ""] = params;
   const from = nickOf(source);
-  const mine = from === me;
+  const mine = same(from, me);
   const partner = mine ? target : from;
-  if (mine === (target === me) || !Address.safeParse(me).success) return undefined;
+  if (mine === same(target, me) || !Address.safeParse(me).success) return undefined;
   return Address.safeParse(partner).success ? partner : undefined;
 }
 
