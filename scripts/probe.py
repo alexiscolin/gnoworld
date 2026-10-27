@@ -210,6 +210,49 @@ try:
         expect(out.returncode != 0 and "assertion" in (out.stdout + out.stderr).lower(), "vitest refuses a test with no assertion")
         shutil.rmtree(HERE)
 
+    if part("unsteady_real"):
+        # unsteady.py reads the reports the real tools write, not stubs' (R1, R4): two files failing at once, a failed test in a
+        # nested describe, then what besides the failed files refuses the retry: Vitest's unhandled error (its report holds
+        # none), a file that did not load, Playwright's top-level errors (here a global teardown that throws).
+        unsteady = os.path.realpath("scripts/unsteady.py")
+        vitest, playwright = os.path.realpath("node_modules/.bin/vitest"), os.path.realpath("app/node_modules/@playwright/test/cli.js")
+        failing = lambda name: f'import {{ describe, expect, test }} from "vitest";\n\ndescribe("outer", () => {{\n  test("{name} fails", () => {{\n    expect(1).toBe(2);\n  }});\n}});\n'
+        timer = 'import { test } from "vitest";\n\ntest("late", async () => {\n  setTimeout(() => {\n    throw new Error("late");\n  }, 5);\n  await new Promise((r) => setTimeout(r, 50));\n});\n'
+        broken = 'import "./missing.ts";\nimport { test } from "vitest";\n\ntest("c", () => undefined);\n'
+        spec = lambda name: f'import {{ expect, test }} from "@playwright/test";\n\ntest.describe("outer", () => {{\n  test("{name} fails", () => {{\n    expect(1).toBe(2);\n  }});\n}});\n'
+        config = 'import { defineConfig } from "@playwright/test";\n\nexport default defineConfig({ testDir: "tests"%s });\n'
+        teardown = 'export default function teardown(): void {\n  throw new Error("teardown");\n}\n'
+        # name: (the tool, its files, the refusal's words or None when the retry goes on, the failed files and tests the log names)
+        cases = {
+            "vitest_two": ("vitest", {"tests/a.test.ts": failing("a"), "tests/b.test.ts": failing("b")}, None, ["tests/a.test.ts", "tests/b.test.ts", "outer a fails", "outer b fails"]),
+            "vitest_unhandled": ("vitest", {"tests/a.test.ts": failing("a"), "tests/late.test.ts": timer}, "an unhandled error", []),
+            "vitest_no_load": ("vitest", {"tests/a.test.ts": failing("a"), "tests/c.test.ts": broken}, "failed with no failed test", []),
+            "playwright_nested": ("playwright", {"playwright.config.ts": config % "", "tests/a.spec.ts": spec("a")}, None, ["tests/a.spec.ts", "outer > a fails"]),
+            "playwright_teardown": ("playwright", {"playwright.config.ts": config % ', globalTeardown: "./teardown.ts"', "teardown.ts": teardown, "tests/a.spec.ts": spec("a")}, "errors of its own", []),
+        }
+        with tempfile.TemporaryDirectory() as root:
+            for case, (tool, files, refusal, logged) in cases.items():
+                where = os.path.join(os.path.realpath(root), case)
+                plant(files, where=where)
+                os.symlink(os.path.realpath("node_modules" if tool == "vitest" else "app/node_modules"), f"{where}/node_modules")
+                report, output, log = f"{where}/report.json", f"{where}/output.txt", f"{where}/unsteady.log"
+                if tool == "vitest":
+                    first = run([vitest, "run", "--reporter=default", "--reporter=json", f"--outputFile.json={report}"], cwd=where)
+                else:
+                    first = run(["node", playwright, "test", "-c", "playwright.config.ts", "--reporter=dot,json"], cwd=where, env={"PLAYWRIGHT_JSON_OUTPUT_NAME": report})
+                with open(output, "w") as f:
+                    f.write(first.stdout + first.stderr)
+                out = run([sys.executable, "-I", unsteady, tool, report, output, log, "10 160", "--", "true"], cwd=where)
+                said = out.stdout + out.stderr
+                expect(first.returncode != 0 and os.path.exists(report), f"unsteady {case}: the real {tool} run fails and writes its report")
+                if refusal is None:
+                    got = open(log).read() if os.path.exists(log) else ""
+                    ok = out.returncode == 0 and all(name in got for name in logged) and got.count("\n") == len([n for n in logged if "/" in n])
+                    expect(ok, f"unsteady {case}: the retry goes on and logs {logged}" + ("" if ok else f": {said[-200:]} {got}"))
+                else:
+                    ok = out.returncode != 0 and refusal in said and not os.path.exists(log)
+                    expect(ok, f"unsteady {case}: refuses with {refusal!r}, logging nothing" + ("" if ok else f": {said[-200:]}"))
+
     if part("pinned_node"):
         # Every Vitest run is on the Node .node-version pins, whatever it runs: vitest.config.ts refuses another Node as every
         # run reads it (a whole run, one project, `list`; StrykerJS's dry run and `bench` start Vitest the same way, through

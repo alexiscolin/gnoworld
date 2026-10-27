@@ -1681,7 +1681,15 @@ if [ -n "$down" ]; then
 			case ${NOREPORT:-} in
 			empty) printf '{"testResults":[{"name":"%s/app/src/ok.test.ts","status":"passed","assertionResults":[]}]}' "$PWD" >"${a#*=}" ;;
 			1) ;;
-			*) printf '{"testResults":[{"name":"%s/app/src/a.test.ts","status":"failed","assertionResults":[{"fullName":"a works","status":"failed"},{"fullName":"a stays","status":"passed"}]},{"name":"%s/app/src/ok.test.ts","status":"passed","assertionResults":[]}]}' "$PWD" "$PWD" >"${a#*=}" ;;
+			*)
+				# ALSO: what else the run had. errors: Vitest's unhandled error, which its JSON report never holds; noload: the
+				# file failed with no failed test (it did not load); two: a second file fails too.
+				a_tests='[{"fullName":"a works","status":"failed"},{"fullName":"a stays","status":"passed"}]' b_file=
+				[ "${ALSO:-}" != noload ] || a_tests='[]'
+				[ "${ALSO:-}" != two ] || b_file=",{\"name\":\"$PWD/app/src/b.test.ts\",\"status\":\"failed\",\"assertionResults\":[{\"fullName\":\"b works\",\"status\":\"failed\"}]}"
+				printf '{"testResults":[{"name":"%s/app/src/a.test.ts","status":"failed","assertionResults":%s}%s,{"name":"%s/app/src/ok.test.ts","status":"passed","assertionResults":[]}]}' "$PWD" "$a_tests" "$b_file" "$PWD" >"${a#*=}"
+				[ "${ALSO:-}" != errors ] || echo "Vitest caught 1 unhandled error during the test run." >&2
+				;;
 			esac
 			;;
 		esac
@@ -1699,7 +1707,7 @@ for py in check_css check_docs mutate probe bench batch_size load patch_coverage
 done
 for sh in ergo test_hooks scan_secrets; do printf 'exec sh "%s" sh:%s "$@"\n' "$step" "$sh" >"$g/scripts/$sh.sh"; done
 # The journeys' stub; with PW_EDIT, it edits a package file, as a build that installs would.
-printf 'const { spawnSync } = require("node:child_process");\nconst { appendFileSync, writeFileSync } = require("node:fs");\nconst stories = process.argv.some((a) => a.includes("stories"));\nconst name = stories ? (process.env.PICTURES_OF ? "pictures" : "stories") : "playwright";\nif (process.env.PW_EDIT) appendFileSync("app/package.json", "\\n");\nconst status = spawnSync("sh", [%s, name, "port=" + process.env.E2E_PORT, "of=" + (process.env.PICTURES_OF ?? ""), "on=" + (process.env.STORIES_PORT ?? ""), "out=" + (process.env.STORIES_OUT ?? ""), ...process.argv.slice(2)], { stdio: "inherit" }).status;\nconst report = process.env.PLAYWRIGHT_JSON_OUTPUT_NAME;\nconst failing = process.env.NOREPORT === "empty" ? [] : [{ title: "a.spec.ts", file: "a.spec.ts", specs: [{ title: "journey", ok: false, file: "a.spec.ts" }] }];\nif (status && report && process.env.NOREPORT !== "1" && process.argv.some((a) => a.endsWith("json"))) writeFileSync(report, JSON.stringify({ config: { rootDir: process.cwd() + "/app/tests" }, suites: [...failing, { title: "ok.spec.ts", file: "ok.spec.ts", specs: [{ title: "fine", ok: true, file: "ok.spec.ts" }] }] }));\nprocess.exit(status);\n' "'$step'" >"$g/app/node_modules/@playwright/test/cli.js"
+printf 'const { spawnSync } = require("node:child_process");\nconst { appendFileSync, writeFileSync } = require("node:fs");\nconst stories = process.argv.some((a) => a.includes("stories"));\nconst name = stories ? (process.env.PICTURES_OF ? "pictures" : "stories") : "playwright";\nif (process.env.PW_EDIT) appendFileSync("app/package.json", "\\n");\nconst status = spawnSync("sh", [%s, name, "port=" + process.env.E2E_PORT, "of=" + (process.env.PICTURES_OF ?? ""), "on=" + (process.env.STORIES_PORT ?? ""), "out=" + (process.env.STORIES_OUT ?? ""), ...process.argv.slice(2)], { stdio: "inherit" }).status;\nconst report = process.env.PLAYWRIGHT_JSON_OUTPUT_NAME;\nconst failing = process.env.NOREPORT === "empty" ? [] : [{ title: "a.spec.ts", file: "a.spec.ts", specs: [{ title: "journey", ok: false, file: "a.spec.ts" }] }];\nif (process.env.ALSO === "two") failing.push({ title: "b.spec.ts", file: "b.spec.ts", specs: [{ title: "second", ok: false, file: "b.spec.ts" }] });\nif (status && report && process.env.NOREPORT !== "1" && process.argv.some((a) => a.endsWith("json"))) writeFileSync(report, JSON.stringify({ config: { rootDir: process.cwd() + "/app/tests" }, errors: process.env.ALSO === "errors" ? [{ message: "globalSetup failed" }] : [], suites: [...failing, { title: "ok.spec.ts", file: "ok.spec.ts", specs: [{ title: "fine", ok: true, file: "ok.spec.ts" }] }] }));\nprocess.exit(status);\n' "'$step'" >"$g/app/node_modules/@playwright/test/cli.js"
 python3 -I - "$g/package.json" "$step" <<'PY'
 import json, sys
 names = ["format:check", "typecheck", "lint", "test", "unused", "copies", "comments", "coverage", "mutate"]
@@ -2025,6 +2033,31 @@ unsteady_case() { # $1 the step, $2 the tool, $3 the file it fails in (and one t
 	printf '%s\n' "$out" | grep -q "cannot be written" || fail "check.sh did not say it could not log $1: $out"
 	rm -rf "${unsteady:?}"
 }
+# What else the first run had is no flake a second run of the failed files could clear: an unhandled error (Vitest's JSON report
+# holds none: its console does), Playwright's own errors, a failed file with no failed test (it did not load, or a hook failed).
+# The run refuses with nothing run again and nothing logged, even when the failed file itself passes the second time (R1).
+unsteady_refuses() { # $1 the step, $2 what else the run had (ALSO), $3 what check.sh says
+	rm -rf "${unsteady:?}"
+	out=$(ALSO=$2 FLAKY=$1 gate) && fail "check.sh passed a $1 run that also had: $2: $out"
+	[ "$(tries "$1")" = 1 ] || fail "check.sh ran $1 again though the run also had: $2"
+	printf '%s\n' "$out" | grep -qF "$3" || fail "check.sh did not say why it refused $1 with: $2: $out"
+	[ ! -e "$unsteady" ] || fail "check.sh logged a $1 run that also had: $2"
+	printf '%s\n' "$out" | grep -qF "$1 failed here" || fail "check.sh hid the first $1 run's own console when it refused: $out"
+}
+# Two files fail at once: both run again, in one run, and both are logged.
+unsteady_two() { # $1 the step, $2 the first file, $3 the second, as the second run is given them
+	rm -rf "${unsteady:?}"
+	out=$(ALSO=two FLAKY=$1 gate) || fail "check.sh failed two $1 files that passed the second time: $out"
+	[ "$(tries "$1")" = 2 ] || fail "check.sh ran $1 $(tries "$1") times for two files failing at once: $out"
+	grep -qF "$2" "$log" && grep -qF "$3" "$log" || fail "check.sh did not give both failed files to the second $1 run"
+	[ "$(grep -c "" "$unsteady")" = 2 ] || fail "check.sh did not log both unsteady files of $1: $(cat "$unsteady")"
+	rm -rf "${unsteady:?}"
+}
+unsteady_refuses test errors "an unhandled error"
+unsteady_refuses test noload "failed with no failed test"
+unsteady_refuses playwright errors "errors of its own"
+unsteady_two test 'app/src/a.test.ts' 'app/src/b.test.ts'
+unsteady_two playwright 'app/tests/a\.spec\.ts' 'app/tests/b\.spec\.ts'
 unsteady_case test vitest app/src/a.test.ts "a works" app/src/ok.test.ts app/src/a.test.ts
 unsteady_case playwright playwright app/tests/a.spec.ts "journey" app/tests/ok.spec.ts 'app/tests/a\.spec\.ts'
 # Pre-commit's staged copy has no repository and a link for node_modules: its unsteady test is logged in the repository's folder,

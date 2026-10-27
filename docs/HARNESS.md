@@ -145,8 +145,12 @@ machine's load and the time, is then appended to `.claude/tmp/unsteady.log` (ign
 pre-commit writes the repository's, through its `node_modules` link), a line the gate also prints, which `/pre-merge`
 reads in its first step. It fails when the files fail a second time, when the log cannot be written (a flake no one
 sees is not a pass), and when the report names no failed file or is missing (a crash or a config error is no flake:
-nothing runs again, and a report that named no file would run every file again). Only failed files run again, and only
-once. The `--full` and `--merge` gates keep their behaviour for Vitest (their coverage run is the only one, and gets no
+nothing runs again, and a report that named no file would run every file again), and when the run had anything besides
+the failed files that a second run of them cannot clear (R1: a flaky `a` beside a `b` that throws in a timer passed the
+gate, whose retry never ran `b`): Vitest's unhandled error, which its JSON report does not hold, so `check.sh` keeps the
+first run's console in a file and `unsteady.py` reads "Vitest caught N unhandled errors" in it; a Vitest file that failed
+with no failed test (it did not load, or a hook failed); Playwright's own top-level `errors`. Such a run refuses with
+nothing run again and nothing logged. Only failed files run again, and only once. The `--full` and `--merge` gates keep their behaviour for Vitest (their coverage run is the only one, and gets no
 second run); their journeys are the same step as the fast gate's, so they get the second run too. The log is a record, not a floor: a test that
 shows in it again and again is a test to fix, not to forgive.
 

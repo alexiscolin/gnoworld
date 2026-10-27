@@ -56,7 +56,7 @@ SECTIONS = {
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix,worktree_script",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
     "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
-    "scripts/repo_files.py": {"hooks": "worktrees,regressions,batch_size,harness_shards,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench", "scripts/suite_parts.py": "mutant_scope,harness_shards", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/unsteady.py": "gate_lanes", "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
+    "scripts/repo_files.py": {"hooks": "worktrees,regressions,batch_size,harness_shards,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench", "scripts/suite_parts.py": "mutant_scope,harness_shards", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/unsteady.py": {"hooks": "gate_lanes", "probe": "unsteady_real"}, "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
 }
 
 
@@ -678,6 +678,18 @@ def mutants():
     yield from each(un, "re.escape}", "str}", "hooks", "unsteady: Playwright is given a file's name as a pattern")
     yield from each(un, "tenths / 10", "tenths", "hooks", "unsteady: the load is logged in whole units")
     yield from each(un, "cores // 10", "cores", "hooks", "unsteady: the cores are logged as cores")
+    yield from each(un, "    if besides:\n", "    if False:\n", "hooks", "unsteady: a run with more than failed files refuses (R1)")
+    yield from each(un, 'if UNHANDLED.search(output) else', "if False else", "hooks", "unsteady: an unhandled error of Vitest refuses (R1)")
+    yield from each(un, "if not names]", "if names]", "hooks", "unsteady: a Vitest file that failed with no failed test refuses (R1, R3)")
+    yield from each(un, 'if report["errors"] else', "if False else", "hooks", "unsteady: Playwright's own errors refuse (R1)")
+    # The real tools' reports and console (probe.py's unsteady_real): the stubs print the words these read as they were written.
+    yield from each(un, 'r"Vitest caught', 'r"Vitest caugt', "probe", "unsteady: Vitest's unhandled error is read as Vitest prints it (R1)")
+    yield from each(un, 'if not names]', 'if names]', "probe", "unsteady: a real Vitest file that did not load refuses (R3)")
+    yield from each(un, 'report["errors"]', 'report["errorz"]', "probe", "unsteady: Playwright's real report holds its errors under errors (R1)")
+    yield from each(un, 'titles + ([child["title"]] if', 'titles + ([] if', "probe", "unsteady: a failed test of a nested describe is named by its titles (R4)")
+    yield from each(un, 'os.path.join(root, spec["file"])', 'spec["file"]', "probe", "unsteady: a Playwright file is read from its testDir (R4)")
+    yield from each("scripts/check.sh", '>"$logs/vitest.out" 2>&1', '>"$logs/vitest.out"', "hooks", "check.sh gives unsteady.py Vitest's stderr, where it prints an unhandled error (R1)")
+    yield from each("scripts/check.sh", '\tcat "$output"\n', "", "hooks", "check.sh shows the first run's console of a refused retry (R1)")
     yield from each("scripts/check_docs.py", ' elif AGENT_RULE not in " ".join(p.read_text().split()):', " elif False:", "hooks", "check_docs wants each agent's brief to say the git-index rule (G12)")
     yield from each("scripts/check_docs.py", "        if not p.is_file():", "        if False:", "hooks", "check_docs wants each agent's brief to exist (CR2)")
     yield from each("scripts/check_docs.py", ' | {p.relative_to(root).as_posix() for p in root.glob(".claude/agents/*.md")}', "", "hooks", "check_docs reads an added agent's brief too (CR2)")

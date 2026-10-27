@@ -122,10 +122,11 @@ run() { sh -c "$(node -p "require('./package.json').scripts['$1']") ${2:-}"; }
 # but its node_modules is a link to the repository's.
 unsteady_log=.claude/tmp/unsteady.log
 [ -n "$tested" ] || ! [ -L node_modules ] || unsteady_log=$(dirname "$(readlink node_modules)")/.claude/tmp/unsteady.log
-retry() { # retry <tool> <report> <command...>: <report>'s failed files, given to <command>, run once more
-	tool=$1 report=$2
-	shift 2
-	python3 -I scripts/unsteady.py "$tool" "$report" "$unsteady_log" "$(python3 -I scripts/load.py)" -- "$@"
+retry() { # retry <tool> <report> <output> <command...>: <report>'s failed files, given to <command>, run once more; <output>, the first run's console, is shown first
+	tool=$1 report=$2 output=$3
+	shift 3
+	cat "$output"
+	python3 -I scripts/unsteady.py "$tool" "$report" "$output" "$unsteady_log" "$(python3 -I scripts/load.py)" -- "$@"
 }
 ms() { python3 -Ic 'import time; print(int(time.time() * 1000))'; }
 # step <name> starts a step of the lane $lane, and closes the one before; `step` alone closes the last.
@@ -216,8 +217,8 @@ lane_ts() {
 	packages() { cat package.json app/package.json pnpm-lock.yaml | cksum; }
 	installed=$(packages)
 	export PLAYWRIGHT_JSON_OUTPUT_NAME="$logs/playwright.json"
-	node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot,json || # node: see check_regressions.py
-		retry playwright "$PLAYWRIGHT_JSON_OUTPUT_NAME" env -u PLAYWRIGHT_JSON_OUTPUT_NAME node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot
+	node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot,json >"$logs/playwright.out" 2>&1 || # node: see check_regressions.py
+		retry playwright "$PLAYWRIGHT_JSON_OUTPUT_NAME" "$logs/playwright.out" env -u PLAYWRIGHT_JSON_OUTPUT_NAME node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot
 	[ "$(packages)" = "$installed" ] || { echo "check.sh: building the app changed package.json or the lockfile" >&2; exit 1; }
 }
 
@@ -235,8 +236,8 @@ lane_tests() {
 	step ergo
 	sh scripts/ergo.sh >/dev/null # the Ergo the server's tests start, built once from deploy/ergo/VERSION
 	$full || step vitest # --full runs the tests once, with coverage
-	$full || run test "$tests_scope --reporter=default --reporter=json --outputFile.json=$logs/vitest.json" ||
-		retry vitest "$logs/vitest.json" sh -c "$(node -p "require('./package.json').scripts.test") \"\$@\"" sh
+	$full || run test "$tests_scope --reporter=default --reporter=json --outputFile.json=$logs/vitest.json" >"$logs/vitest.out" 2>&1 ||
+		retry vitest "$logs/vitest.json" "$logs/vitest.out" sh -c "$(node -p "require('./package.json').scripts.test") \"\$@\"" sh
 }
 
 lane_gno() {
