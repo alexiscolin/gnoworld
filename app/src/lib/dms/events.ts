@@ -44,14 +44,24 @@ function forbiddenBy(message: IrcMessage) {
   return (each: { id: string; from?: string; who?: string }) => each.id === id && (each.from ?? each.who) !== sender;
 }
 
+// A TAGMSG changes the reactions alone, and one that carries none (a partner's typing, every 3 s) nothing.
+function afterReaction(held: Held, message: IrcMessage, cap: number): Held {
+  const reacted = reactionOf(message, message.params[0] ?? "");
+  if (reacted === undefined) return held;
+  const reactions = addReactions(held.reactions ?? [], [reacted], cap);
+  return reactions === held.reactions ? held : { lines: held.lines, reactions };
+}
+
 /** `held` once `message` is read as a room's are, the target being the room: the same object when it changes nothing. */
 export function afterAct(held: Held, message: IrcMessage, cap: number): Held {
+  if (message.command === "TAGMSG") return afterReaction(held, message, cap);
   const target = message.params[0] ?? "";
   const forbidden = forbiddenBy(message);
   const lines = held.lines.some(forbidden) ? held.lines : redactAfter(held.lines, message, target);
-  const reacted = reactionOf(message, target);
-  const added = reacted === undefined ? held.reactions : addReactions(held.reactions ?? [], [reacted], cap);
-  const reactions = added === undefined || added.some(forbidden) ? added : redactReactions(added, message, target);
+  const reactions =
+    held.reactions === undefined || held.reactions.some(forbidden)
+      ? held.reactions
+      : redactReactions(held.reactions, message, target);
   return lines === held.lines && reactions === held.reactions ? held : { lines, reactions };
 }
 

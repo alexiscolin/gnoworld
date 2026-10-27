@@ -1,6 +1,6 @@
-import { parseLine, type IrcMessage } from "@gnoworld/core";
+import { parseLine, type IrcMessage, type Line } from "@gnoworld/core";
 import { describe, expect, it } from "vitest";
-import { keptWith, withOf } from "./events.ts";
+import { afterAct, keptWith, withOf, type Held } from "./events.ts";
 
 const ME = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -67,5 +67,34 @@ describe("keptWith: the reactions of the conversations still held", () => {
   it("leaves out the conversations no longer held, and keeps the others' own", () => {
     const kept = [2];
     expect(keptWith({ [ALICE]: [1], [CAROL]: kept }, { [CAROL]: [] })).toEqual({ [CAROL]: kept });
+  });
+});
+
+const lineOf = (id: string, from: string, edits?: string): Line => ({
+  id,
+  time: `2026-10-25T10:00:0${id.slice(1)}.000Z`,
+  from,
+  account: from,
+  text: `text ${id}`,
+  kind: "message",
+  ...(edits === undefined ? {} : { edits }),
+});
+const act = (held: Held, message: IrcMessage) => afterAct(held, message, 1000);
+
+// /code-review on 4d's DM bar (complexity): a typing TAGMSG, every 3 s from a partner, reads no line and no reaction.
+describe("afterAct: a TAGMSG with no reaction", () => {
+  it("is the same object, its lines and reactions never read", () => {
+    const lines = [lineOf("m1", ME)];
+    const reactions: never[] = [];
+    const reading = () => {
+      throw new Error("read");
+    };
+    for (const key of ["some", "filter", "map", "find"] as const) {
+      Object.defineProperty(lines, key, { get: reading });
+      Object.defineProperty(reactions, key, { get: reading });
+    }
+    const held = { lines, reactions };
+    const typing = read(`@msgid=t;account=${ALICE};+typing=active :${ALICE}!u@h TAGMSG ${ME}`);
+    expect(act(held, typing)).toBe(held);
   });
 });
