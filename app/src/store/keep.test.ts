@@ -491,10 +491,31 @@ describe("a session whose memory is behind the device", () => {
   });
 
   it("takes a place another tab forgot from the device, though only a line was saved here", () => {
-    const { a, b } = tabs();
+    const { a, b, device } = tabs();
     b.getState().keepActions.readThrough("#bubble");
     a.getState().keepActions.save("#bubble", line("m2"));
     expect(a.getState().keep.unread).toEqual({});
+    expect(device().unread()).toEqual({});
+    expect(
+      device()
+        .saved()
+        ?.map(({ id }) => id),
+    ).toEqual(["m2", "m1"]);
+  });
+
+  // The device is right and the memory behind: a change that alters neither still brings the memory up to the device
+  // (R7 of redpass2-4dx), or the list shows lines the next change would find gone.
+  it("takes the device's lines into its memory when a change changes nothing on the device", () => {
+    const { a, b, device } = tabs();
+    b.getState().keepActions.save("#bubble", line("m2"));
+    expect(a.getState().keep.saved.map(({ id }) => id)).toEqual(["m1"]);
+    a.getState().keepActions.unsave("#bubble", "nope");
+    expect(a.getState().keep.saved.map(({ id }) => id)).toEqual(["m2", "m1"]);
+    expect(
+      device()
+        .saved()
+        ?.map(({ id }) => id),
+    ).toEqual(["m2", "m1"]);
   });
 });
 

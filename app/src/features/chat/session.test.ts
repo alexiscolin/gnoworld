@@ -22,10 +22,21 @@ const SAVED: SavedLine = {
 
 function setup() {
   const kept = new Map<string, string>();
+  // `blind`: the device cannot be read; `writes`: how many times it was written.
+  const state = { blind: false, writes: 0 };
   const storage = {
-    getItem: (key: string) => kept.get(key) ?? null,
-    setItem: (key: string, value: string) => void kept.set(key, value),
-    removeItem: (key: string) => void kept.delete(key),
+    getItem: (key: string) => {
+      if (state.blind) throw new DOMException("blocked", "SecurityError");
+      return kept.get(key) ?? null;
+    },
+    setItem: (key: string, value: string) => {
+      state.writes += 1;
+      kept.set(key, value);
+    },
+    removeItem: (key: string) => {
+      state.writes += 1;
+      kept.delete(key);
+    },
   };
   keep(() => storage, ALICE).setSaved([SAVED]);
   const store = createAppStore();
@@ -50,7 +61,15 @@ function setup() {
     if (!parsed.ok) throw new Error(`the test's line does not parse: ${text}`);
     connections.at(-1)?.onLine(parsed.message);
   };
-  return { store, link, asked, line, device: () => keep(() => storage, ALICE), ...store.getState().loginActions };
+  return {
+    store,
+    link,
+    asked,
+    state,
+    line,
+    device: () => keep(() => storage, ALICE),
+    ...store.getState().loginActions,
+  };
 }
 
 describe("the chat's link and what an account keeps on its device", () => {
@@ -139,5 +158,89 @@ describe("the chat's link and what an account keeps on its device", () => {
       `@msgid=m2;time=2026-10-25T10:01:00.000Z;account=${BOB};+gnoworld/edit=m1 :x!u@h PRIVMSG #bubble :\u0001ACTION waves\u0001`,
     );
     expect(t.store.getState().keep.saved).toEqual([]);
+  });
+
+  // The device's copy follows the room's own rule (core's foldEdits): an edit with no account proves no author, so a
+  // guest's saved line, which has none either, is not its to rewrite (R1 of redpass2-4dx).
+  it("leaves a guest's saved line as it is for an edit that carries no account", () => {
+    const t = setup();
+    const guestLine: SavedLine = {
+      room: "#bubble",
+      id: "g1",
+      time: SAVED.time,
+      from: "guest-ab12cd",
+      text: "guest words",
+    };
+    t.device().setSaved([guestLine]);
+    t.signedIn(ALICE);
+    t.line("@msgid=m2;time=2026-10-25T10:01:00.000Z;+gnoworld/edit=g1 :guest-zzzzzz!u@h PRIVMSG #bubble :rewritten");
+    expect(t.store.getState().keep.saved).toEqual([guestLine]);
+    expect(t.device().saved()).toEqual([guestLine]);
+  });
+
+  // The edit is by the line's room: an edit of the same id in another room corrects no saved line of this one (R2).
+  it("replaces no saved line by an edit of the same id in another room", () => {
+    const t = setup();
+    t.signedIn(ALICE);
+    t.line(
+      `@msgid=m2;time=2026-10-25T10:01:00.000Z;account=${BOB};+gnoworld/edit=m1 :x!u@h PRIVMSG #bubble/games :other room`,
+    );
+    expect(t.store.getState().keep.saved).toEqual([SAVED]);
+    expect(t.device().saved()).toEqual([SAVED]);
+  });
+
+  // What Ergo says of a line is heard by the device the session holds, and only by it (R6 of redpass2-4dx).
+  describe("hearing a line taken back", () => {
+    const REDACT = `:${BOB}!u@h REDACT #bubble m1`;
+    const EDIT = `@msgid=m2;time=2026-10-25T10:01:00.000Z;account=${BOB};+gnoworld/edit=m1 :x!u@h PRIVMSG #bubble :corrected`;
+
+    it.each([
+      ["a REDACT", REDACT],
+      ["an edit", EDIT],
+    ])("writes nothing over a device it could not read, as %s comes", (_, heard) => {
+      const t = setup();
+      t.state.blind = true;
+      t.signedIn(ALICE);
+      t.state.blind = false;
+      const writes = t.state.writes;
+      t.line(heard);
+      expect(t.state.writes).toBe(writes);
+      expect(t.device().saved()).toEqual([SAVED]);
+      expect(t.store.getState().keep.notKept).toBe(true);
+    });
+
+    it.each([
+      ["a REDACT", REDACT],
+      ["an edit", EDIT],
+    ])("touches no account's device in a guest's session, or after a logout, as %s comes", (_, heard) => {
+      const t = setup();
+      t.signedIn(ALICE);
+      t.signedOut();
+      const writes = t.state.writes;
+      t.line(heard);
+      expect(t.state.writes).toBe(writes);
+      expect(t.device().saved()).toEqual([SAVED]);
+      expect(t.store.getState().keep.saved).toEqual([]);
+    });
+
+    it("unsaves a line another tab saved, which this page's memory does not hold", () => {
+      const t = setup();
+      t.signedIn(ALICE);
+      const other: SavedLine = { ...SAVED, id: "m9", text: "saved by another tab" };
+      t.device().setSaved([other, SAVED]);
+      t.line(`:${BOB}!u@h REDACT #bubble m9`);
+      expect(t.device().saved()).toEqual([SAVED]);
+      expect(t.store.getState().keep.saved).toEqual([SAVED]);
+    });
+
+    it("keeps a line another tab saved when it takes another line off, from the device's own list", () => {
+      const t = setup();
+      t.signedIn(ALICE);
+      const other: SavedLine = { ...SAVED, id: "m9", text: "saved by another tab" };
+      t.device().setSaved([other, SAVED]);
+      t.line(REDACT);
+      expect(t.device().saved()).toEqual([other]);
+      expect(t.store.getState().keep.saved).toEqual([other]);
+    });
   });
 });
