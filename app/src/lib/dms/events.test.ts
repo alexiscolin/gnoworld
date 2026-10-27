@@ -81,6 +81,37 @@ const lineOf = (id: string, from: string, edits?: string): Line => ({
 });
 const act = (held: Held, message: IrcMessage) => afterAct(held, message, 1000);
 
+// /code-review on 4d's DM bar (CR3): a REDACT names one line; the corrections of it a partner's client did not send its
+// own REDACT for (refused, flood-limited, past the outbox's window) showed, as plain lines, the words just deleted.
+describe("afterAct: a delete takes the corrections of the line with it", () => {
+  const redactOf = (from: string, id: string) => read(`@msgid=r;account=${from} :${from}!u@h REDACT ${ME} ${id}`);
+
+  it("takes the corrections of the sender's own, with the line", () => {
+    const held = { lines: [lineOf("m1", ALICE), lineOf("m2", ALICE, "m1"), lineOf("m3", ME)], reactions: undefined };
+    expect(act(held, redactOf(ALICE, "m1")).lines.map((line) => line.id)).toEqual(["m3"]);
+  });
+
+  it("takes them though the line itself left the window long ago", () => {
+    const held = { lines: [lineOf("m2", ALICE, "m1"), lineOf("m3", ME)], reactions: undefined };
+    expect(act(held, redactOf(ALICE, "m1")).lines.map((line) => line.id)).toEqual(["m3"]);
+  });
+
+  it("leaves a correction of the line by another account, which is a line of its own", () => {
+    const held = { lines: [lineOf("m1", ALICE), lineOf("m2", ME, "m1")], reactions: undefined };
+    expect(act(held, redactOf(ALICE, "m1")).lines.map((line) => line.id)).toEqual(["m2"]);
+  });
+
+  it("changes nothing when the line is another's, whose delete Ergo refuses, nor its corrections", () => {
+    const held = { lines: [lineOf("m1", ME), lineOf("m2", ALICE, "m1")], reactions: undefined };
+    expect(act(held, redactOf(ALICE, "m1"))).toBe(held);
+  });
+
+  it("is the same object when the delete names no line and no correction", () => {
+    const held = { lines: [lineOf("m1", ME)], reactions: undefined };
+    expect(act(held, redactOf(ALICE, "m9"))).toBe(held);
+  });
+});
+
 // /code-review on 4d's DM bar (complexity): a typing TAGMSG, every 3 s from a partner, reads no line and no reaction.
 describe("afterAct: a TAGMSG with no reaction", () => {
   it("is the same object, its lines and reactions never read", () => {
