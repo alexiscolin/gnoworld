@@ -20,4 +20,5 @@ export const Marks: Story = {
     </Cluster>
   ),
 };
+export const Reaction: Story = { args: { children: "👍", count: 2, selected: true, label: "👍, 2, including you" } };
 export const LongText: Story = { args: { children: "Room games · the quiz on realms, every Friday evening" } };

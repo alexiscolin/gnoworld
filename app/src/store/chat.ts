@@ -4,10 +4,13 @@
 // change once and nothing else.
 import {
   addLines,
+  addReactions,
   concerns,
   lineOf,
   membersAfter,
+  reactionOf,
   redactAfter,
+  redactReactions,
   refusedOf,
   topicAfter,
   typingAfter,
@@ -15,12 +18,15 @@ import {
   type IrcMessage,
   type Line,
   type Typing,
+  type Reaction,
   type Where,
 } from "@gnoworld/core";
 import type { StateCreator } from "zustand/vanilla";
 
 /** The lines a room keeps: its history's window (docs/plans/slice-4.md, §4). */
 export const LINES_KEPT = 200;
+/** The reactions a room keeps, after one an account, a line and an emoji: five on each line of a window. */
+export const REACTIONS_KEPT = 1000;
 
 interface RoomState {
   readonly lines: readonly Line[];
@@ -37,6 +43,10 @@ interface RoomState {
   /** This connection's history page came, an empty one too: the New mark and the read mark wait on it (4f's G1,
    * CR3); none before, and none again once the link drops. */
   readonly paged?: true | undefined;
+  /** The reactions Ergo relayed and replayed (4d), in time order; none until the first. */
+  readonly reactions?: readonly Reaction[];
+  /** Ergo refused one of the page's reactions here (4d), until the page has said so. */
+  readonly cannotReact?: true | undefined;
 }
 
 interface ChatState {
@@ -54,12 +64,14 @@ export interface ChatSlice {
     connected: (me: string) => void;
     /** One live line from Ergo, read by every room it concerns. */
     heard: (message: IrcMessage) => void;
-    /** A history page of a room: its lines added at once; its replayed events change nothing. */
+    /** A history page of a room: its lines and reactions added at once; its other replayed events change nothing. */
     page: (room: string, messages: readonly IrcMessage[]) => void;
     /** The link gone: my nick and who is here forgotten; the lines and topics kept to show meanwhile. */
     disconnected: () => void;
-    /** The page said a room's refused delete: it is forgotten. */
+    /** The page said a room's refused delete or reaction: they are forgotten. */
     dismissed: (room: string) => void;
+    /** Ergo refused a reaction the page sent in a room. */
+    reactionRefused: (room: string) => void;
   };
 }
 
@@ -72,6 +84,13 @@ const EMPTY: RoomState = {
   read: undefined,
 };
 
+// A room's reactions once a live line is read: the same array, or none, when it changes nothing of them.
+function reactionsAfter(held: RoomState["reactions"], message: IrcMessage, room: string): RoomState["reactions"] {
+  const reaction = reactionOf(message, room);
+  const added = reaction === undefined ? held : addReactions(held ?? [], [reaction], REACTIONS_KEPT);
+  return added === undefined ? undefined : redactReactions(added, message, room);
+}
+
 // A room once a live line is read at `now`, the page's clock: the same object when the line changes nothing of it.
 function roomAfter(room: RoomState, message: IrcMessage, at: Where & { now: number }): RoomState {
   const line = lineOf(message, at.room);
@@ -81,13 +100,17 @@ function roomAfter(room: RoomState, message: IrcMessage, at: Where & { now: numb
   const topic = topicAfter(room.topic, message, at.room);
   const typing = typingAfter(room.typing, message, at);
   const read = readAfter(room.read, message, at);
+  const reactions = reactionsAfter(room.reactions, message, at.room);
   const same =
     lines === room.lines &&
     members === room.members &&
     topic === room.topic &&
     typing === room.typing &&
-    read === room.read;
-  return same ? room : { ...room, lines, members, topic, typing, read };
+    read === room.read &&
+    reactions === room.reactions;
+  return same
+    ? room
+    : { ...room, lines, members, topic, typing, read, ...(reactions === undefined ? {} : { reactions }) };
 }
 
 // A room followed, by its id: an own key alone, the ids being the relay's.
@@ -151,14 +174,26 @@ export const chatSlice: StateCreator<ChatSlice> = (set, get) => {
         const room = roomOf(rooms, id);
         if (room === undefined) return;
         const read = messages.flatMap((message) => lineOf(message, id) ?? []);
+        const reacted = messages.flatMap((message) => reactionOf(message, id) ?? []);
         const lines = addLines(room.lines, read, LINES_KEPT);
-        if (lines !== room.lines || room.paged !== true)
-          change({ rooms: { ...rooms, [id]: { ...room, lines, paged: true } } });
+        const reactions =
+          reacted.length === 0 ? room.reactions : addReactions(room.reactions ?? [], reacted, REACTIONS_KEPT);
+        if (lines === room.lines && reactions === room.reactions && room.paged === true) return;
+        change({
+          rooms: { ...rooms, [id]: { ...room, lines, paged: true, ...(reactions === undefined ? {} : { reactions }) } },
+        });
       },
       dismissed: (id) => {
         const { rooms } = get().chat;
         const room = roomOf(rooms, id);
-        if (room?.refused !== undefined) change({ rooms: { ...rooms, [id]: { ...room, refused: undefined } } });
+        if (room === undefined || (room.refused === undefined && room.cannotReact === undefined)) return;
+        change({ rooms: { ...rooms, [id]: { ...room, refused: undefined, cannotReact: undefined } } });
+      },
+      reactionRefused: (id) => {
+        const { rooms } = get().chat;
+        const room = roomOf(rooms, id);
+        if (room !== undefined && room.cannotReact === undefined)
+          change({ rooms: { ...rooms, [id]: { ...room, cannotReact: true } } });
       },
       // Who is here, who is typing and the history page go with the link; the reading place is the account's, kept.
       disconnected: () => {

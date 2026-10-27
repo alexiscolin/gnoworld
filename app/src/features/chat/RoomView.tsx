@@ -4,7 +4,7 @@
 // (4d); the composer, given, goes below.
 // A line's author is its account tag alone, a nick being only a nick; a member's nick is an account's when it is
 // an address, which a guest's cannot be (Ergo gives a guest 32 characters, server/src/testing/ergo.test.ts:314).
-import { typingAt, type Line, type Typing } from "@gnoworld/core";
+import { typingAt, type Line, type Reacting, type Reaction, type Typing } from "@gnoworld/core";
 import type { StreamEvent } from "@gnoworld/schemas";
 import { Button, Cluster, Sidebar, Stack } from "@gnoworld/ui";
 import { Fragment, lazy, Suspense, useEffect, useState, type ReactNode } from "react";
@@ -68,6 +68,10 @@ export interface RoomViewProps {
         read?: string | undefined;
         /** This connection's history page came (4f's G1, CR3). */
         paged?: true | undefined;
+        /** Its reactions (4d). */
+        reactions?: readonly Reaction[] | undefined;
+        /** Ergo refused one of the page's reactions here (4d). */
+        cannotReact?: true | undefined;
       }
     | undefined;
   chat: ErgoState | "off";
@@ -89,6 +93,10 @@ export interface RoomViewProps {
   verdicts?: Readonly<Record<string, StreamEvent["state"]>> | undefined;
   /** Whether the reader saves data (ADR-0002 §8): then no player is offered, nor any verdict asked (4g, F893). */
   saving?: boolean;
+  /** Reacts to a line, or takes the reaction back (4d's reactions); whether it went out. */
+  onReact?: ((reaction: Reacting) => boolean) | undefined;
+  /** Makes a line, by its msgid, the one the composer's next answers (4d's replies). */
+  onReply?: ((id: string) => void) | undefined;
 }
 
 /** Who is here: counted once connected, the bot left out, the first MEMBERS_SHOWN named. */
@@ -192,9 +200,10 @@ function Header({ title, topic, id }: { title: ReactNode; topic: ReactNode; id: 
 
 export function RoomView(props: RoomViewProps) {
   const { room, title, note, noteId, state, chat, composer, me, onDelete, onDismiss, onRead, aside } = props;
+  const { onReact, onReply } = props;
   const { verdicts, saving = false } = props;
   const { empty = "No messages yet." } = props;
-  const { lines = [], members = [], refused, typing, read, paged } = state ?? {};
+  const { lines = [], members = [], refused, typing, read, paged, reactions, cannotReact } = state ?? {};
   const connected = chat === "connected";
   return (
     <Stack as="section" space="s">
@@ -219,6 +228,10 @@ export function RoomView(props: RoomViewProps) {
             onRead={onRead}
             verdicts={verdicts}
             saving={saving}
+            reactions={reactions}
+            onReact={onReact}
+            cannotReact={cannotReact}
+            onReply={onReply}
           />
           {connected && lines.length === 0 ? <p>{empty}</p> : null}
           {/* A room's, whose place is kept so the composer never moves; a direct message tells none (4e). */}

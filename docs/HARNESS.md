@@ -132,7 +132,7 @@ whose code had not grown took 61 to 98 s at a load of 65 to 76 on 16 cores.
 | Prettier | unformatted code |
 | `tsc` | type errors in `core` and the app; `core` sees no DOM and no Node, so it cannot reach the network |
 | ESLint, with `@eslint/css` | floating promises, swallowed errors, `any`, an incomplete switch, `eval`, import cycles, size and complexity limits, impure `core` (clock, chance, globals), switched-off tests (Vitest's and Playwright's), invalid CSS, unlayered CSS, physical properties; in the app, React's hooks and compiler rules, a hand-written `memo`, `useMemo` or `useCallback`, raw HTML into the DOM, a folder's import against ARCHITECTURE.md's table, the network or storage outside `lib` and `sw`, `console` (F378); the config is `eslint.config.ts` and its parts in `lint/` |
-| Vitest, with fast-check | failing tests, `core`'s and the app's (its routes rendered by React Router's static handler); a test with no assertion |
+| Vitest, with fast-check | failing tests, `core`'s and the app's (its routes rendered by React Router's static handler); a test with no assertion; the `compiled` project (`app/vitest.compiled.config.ts`), the app tests it names compiled as the build compiles them, in jsdom, which count what a re-render recomputes (a test there is named in that config and left out of the node project) |
 | knip | unused files, exports and dependencies |
 | jscpd | copies, renamed ones and near ones (similarity 0.8) |
 | `scripts/check_css.py` | CUBE CSS: raw values outside tokens, layout outside compositions, unknown or unused tokens and classes, copied rules |

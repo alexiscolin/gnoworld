@@ -3,27 +3,23 @@
 // (Ergo's max-channels-per-client); the newest lines of the room in view alone, once Ergo says I joined it, since
 // Ergo paces a client to 2 lines a second (plan §4); Ergo's lines read into the store through one BatchReader a
 // connection. Its parts come in, so the tests give their own.
-import { BatchReader, compose, nickOf, type IrcMessage } from "@gnoworld/core";
+import { BatchReader, compose, isTagMsgid, nickOf, reactionLine, type IrcMessage, type Reacting } from "@gnoworld/core";
 import { Address, RoomId } from "@gnoworld/schemas";
 import type { Ergo, ErgoOptions, Who } from "../../lib/ergo/ergo.ts";
-import { LINES_KEPT } from "../../store/chat.ts";
 import type { AppState } from "../../store/index.ts";
-import { asksAfterJoin, followed, groupsOf, outOf } from "./groups.ts";
+import { asksAfterJoin, followed, outOf } from "./groups.ts";
+import { HISTORY_LINES, isCommandMsgid } from "./history.ts";
+import { Joins } from "./joins.ts";
 import type { ChatLink, LinkDeps } from "./linkTypes.ts";
 import { outbox, type Outbox } from "./outbox.ts";
+import { reactLabel, refusedIn } from "./reacting.ts";
 import { Places, TypingOut } from "./telling.ts";
 
 /** The rooms a connection joins: Ergo's max-channels-per-client (deploy/ergo/ircd.yaml.tmpl). */
 export const ROOMS_JOINED = 100;
-/** The lines a room's history asks: the store's window. */
-export const HISTORY_LINES = LINES_KEPT;
-// A msgid: one word of 64 characters at most (Ergo's are 26), no space, comma, NUL or leading colon.
-const MSGID = /^[^\s,:\0][^\s,\0]{0,63}$/;
+export { HISTORY_LINES } from "./history.ts";
 
 export type { ChatLink, LinkDeps };
-
-// Where a room this page follows stands on this connection: a JOIN went for it; its history went.
-type Phase = "joined" | "asked";
 
 class Link implements ChatLink {
   readonly #deps: LinkDeps;
@@ -34,14 +30,12 @@ class Link implements ChatLink {
   #stopped = false;
   #listed: readonly string[] = [];
   #shown: string | undefined;
-  readonly #phases = new Map<string, Phase>();
-  // The rooms Ergo said, live, I am in on this connection, joined by this page or not: with Ergo's multiclient a
-  // second tab's own JOIN brings no echo, Ergo having told it of the room at its welcome or as the first joined.
-  readonly #inside = new Set<string>();
   readonly #outbox: Outbox;
   #reader = new BatchReader();
   readonly #typing = new TypingOut();
   readonly #out = (line: string): boolean => this.#ergo?.send(line) === true;
+  readonly #joins = new Joins(this.#out);
+  readonly #inside = this.#joins.inside;
   readonly #places = new Places((room) => this.#deps.store.getState().chat.rooms[room]?.read, this.#out);
 
   constructor(deps: LinkDeps) {
@@ -66,9 +60,11 @@ class Link implements ChatLink {
     this.#keep();
   }
 
-  say(room: string, draft: string): boolean {
+  say(room: string, draft: string, reply?: string): boolean {
+    if (reply !== undefined && !isTagMsgid(reply)) return false;
     const line = this.#lineTo(room, draft, () => this.#inside.has(room));
-    const went = line !== undefined && this.#ergo?.send(line) === true;
+    const tags = reply === undefined ? "" : `@+reply=${reply} `;
+    const went = line !== undefined && this.#ergo?.send(`${tags}${line}`) === true;
     if (went) this.#typing.ended(room);
     return went;
   }
@@ -89,7 +85,7 @@ class Link implements ChatLink {
   }
 
   redact(room: string, id: string): boolean {
-    const allowed = this.#key !== "guest" && this.#inside.has(room) && MSGID.test(id);
+    const allowed = this.#key !== "guest" && this.#inside.has(room) && isCommandMsgid(id);
     return allowed && this.#ergo?.send(`REDACT ${room} ${id}`) === true;
   }
 
@@ -107,6 +103,11 @@ class Link implements ChatLink {
     this.#places.flush();
   }
 
+  react(room: string, reaction: Reacting): boolean {
+    const line = reactionLine(reaction, room, reactLabel(room));
+    return line !== undefined && this.#key !== "guest" && this.#inside.has(room) && this.#out(line);
+  }
+
   stop(): void {
     if (this.#stopped) return;
     this.#stopped = true;
@@ -119,11 +120,8 @@ class Link implements ChatLink {
   // connected: Ergo's send then refuses).
   #keep(): void {
     const wanted = followed(this.#listed, this.#shown, ROOMS_JOINED);
-    const parted = [...this.#phases.keys()].filter((room) => !wanted.includes(room));
-    const joined = wanted.filter((room) => !this.#phases.has(room));
+    this.#joins.follow(wanted);
     this.#deps.store.getState().chatActions.follow(wanted);
-    this.#send("PART", parted);
-    this.#send("JOIN", joined);
     this.#history(this.#shown);
   }
 
@@ -188,13 +186,12 @@ class Link implements ChatLink {
     }
     this.#reader = new BatchReader();
     chatActions.connected(this.#ergo?.nick() ?? "");
-    this.#send("JOIN", followed(this.#listed, this.#shown, ROOMS_JOINED));
+    this.#joins.join(followed(this.#listed, this.#shown, ROOMS_JOINED));
     this.#history(this.#shown);
   }
 
   #forget(): void {
-    this.#phases.clear();
-    this.#inside.clear();
+    this.#joins.clear();
     this.#typing.forget();
     this.#places.reconnected();
     this.#outbox.clear();
@@ -202,23 +199,11 @@ class Link implements ChatLink {
 
   // The room in view's newest lines, once joined by this page and Ergo said I am in it, once a connection.
   #history(room: string | undefined): void {
-    if (room === undefined || !this.#inside.has(room) || this.#phases.get(room) !== "joined") return;
-    this.#phases.set(room, "asked");
+    if (room === undefined || !this.#inside.has(room) || this.#joins.phase(room) !== "joined") return;
+    this.#joins.asked(room);
     this.#ergo?.send(`CHATHISTORY LATEST ${room} * ${String(HISTORY_LINES)}`);
     const held = this.#deps.store.getState().chat.rooms[room];
     for (const ask of asksAfterJoin(room, held, this.#key !== "guest")) this.#ergo?.send(ask);
-  }
-
-  // A JOIN sent marks its rooms joined; a PART sent forgets them.
-  #send(command: "JOIN" | "PART", rooms: readonly string[]): void {
-    for (const group of groupsOf(command, rooms)) {
-      if (this.#ergo?.send(`${command} ${group.join(",")}`) !== true) return;
-      for (const room of group) {
-        if (command === "PART") this.#inside.delete(room);
-        if (command === "JOIN") this.#phases.set(room, "joined");
-        else this.#phases.delete(room);
-      }
-    }
   }
 
   // A live line to the store; a history page to it at once at its end; another batch's lines one by one.
@@ -227,9 +212,18 @@ class Link implements ChatLink {
     if (read.kind === "pass") this.#heard(message);
     if (read.kind !== "done") return;
     const { type, params, tags, messages } = read.batch;
-    if (type === "chathistory") this.#deps.store.getState().chatActions.page(params[0] ?? "", messages);
+    if (type === "chathistory") this.#page(params[0] ?? "", messages);
     else for (const each of messages) this.#heard(each);
     if (type === "labeled-response") this.#outbox.answered(tags, messages);
+  }
+
+  // A history page to the store at once; then, in a room this page asked, the items before its oldest when the page
+  // leaves the window short of lines (history.ts).
+  #page(room: string, messages: readonly IrcMessage[]): void {
+    const store = this.#deps.store;
+    store.getState().chatActions.page(room, messages);
+    const earlier = this.#joins.earlier(room, messages, store.getState().chat.rooms[room]?.lines.length ?? 0);
+    if (earlier !== undefined) this.#out(earlier);
   }
 
   // Ergo's JOIN of me, not replayed: I am in that room, its lines asked, its place told; a line taking me out: out of it.
@@ -240,6 +234,8 @@ class Link implements ChatLink {
     // A labeled-response batch's lines carry no label: the batch's own line does, read at its end (#line).
     this.#outbox.answered(message.tags, [message]);
     const { tags, source = "", command, params } = message;
+    const refused = refusedIn(message);
+    if (refused !== undefined) chatActions.reactionRefused(refused);
     const [room = ""] = params;
     const me = this.#ergo?.nick();
     if (tags.has("batch") || me === undefined) return;

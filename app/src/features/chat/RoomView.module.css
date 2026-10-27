@@ -14,6 +14,8 @@
     position: relative;
     /* layout: room for the focus ring, drawn outside the line, which the list that scrolls would clip */
     margin-inline: calc(var(--focus-width) + var(--focus-offset));
+    /* The bar asks the line's own width, not the page's (LineActions). */
+    container-type: inline-size;
     padding-block: var(--space-3xs);
     /* room at the line's end for its bar (LineActions: a small control, its padding and border, its inset), so the
        bar covers no word, shown or not: the text never reflows under the pointer (U2) */
@@ -34,13 +36,30 @@
 
   .time,
   .mark,
-  .mentionsYou {
+  .mentionsYou,
+  .replying {
     font: var(--font-meta);
+  }
+
+  /* Above a reply, the line it answers, in one line and muted, set apart by a rule at its start as a quote is, its
+     author in the text's own colour and bolder: the prototype's quote (4d). */
+  .replying {
+    padding-inline-start: var(--space-xs);
+    border-inline-start: var(--line-width) solid var(--color-line-strong);
+    color: var(--color-text-muted);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
 
   .time,
   .mark {
     color: var(--color-text-muted);
+  }
+
+  .who {
+    color: var(--color-text);
+    font-weight: 500;
   }
 
   .action {
