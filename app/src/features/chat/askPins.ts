@@ -63,9 +63,7 @@ export function pinAsker({ pins, pin, unpin, set, visible, reader }: Asking) {
     });
   }
   const refresh = (): void => {
-    if (!visible()) return;
-    clearTimeout(timer);
-    ask();
+    if (visible()) ask();
   };
   // A pin or an unpin: its answer is the room's pins as they now are, which the store takes; the minute starts again.
   const act = async (call: Asking["pin"], msgid: string): Promise<Done> => {
