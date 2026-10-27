@@ -528,11 +528,14 @@ describe("the store's notices slice", () => {
 
   describe("a session", () => {
     // The device's modes: what it holds and what was written to it.
+    // Like a real device, it gives back what was last written to it.
     const device = (held: Record<string, NoticeMode> | undefined, writes: Record<string, NoticeMode>[] = []) => {
+      let now = held;
       const prefs: NoticePrefs = {
-        modes: () => held,
+        modes: () => now,
         setModes: (modes) => {
           writes.push({ ...modes });
+          now = { ...modes };
           return true;
         },
       };
