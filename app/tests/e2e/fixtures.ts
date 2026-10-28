@@ -41,17 +41,27 @@ async function flush(page: Page): Promise<void> {
 
 // A worker's violation reaches the test as a message to the pages (src/sw/report.ts), after the worker's own
 // task: a fetch the policy refuses, planted last in the worker, says every earlier violation of the worker came.
+// A navigation under way may lose the message with the old document: each try plants the fetch again (F2066).
 async function flushWorker(page: Page, worker: Worker): Promise<void> {
-  const done = page.waitForEvent("console", (message) => message.text() === `${MARK} flush`);
-  await worker.evaluate(
-    (url) =>
-      fetch(url).then(
-        () => undefined,
-        () => undefined,
+  await expect(async () => {
+    const done = page.waitForEvent("console", {
+      predicate: (message) => message.text() === `${MARK} flush`,
+      timeout: 3000,
+    });
+    // Both settled, so a try that fails leaves no rejection unhandled behind it.
+    const tries = await Promise.allSettled([
+      worker.evaluate(
+        (url) =>
+          fetch(url).then(
+            () => undefined,
+            () => undefined,
+          ),
+        FLUSH,
       ),
-    FLUSH,
-  );
-  await done;
+      done,
+    ]);
+    expect(tries.map(({ status }) => status)).toEqual(["fulfilled", "fulfilled"]);
+  }).toPass();
 }
 
 // Every journey runs under the site's CSP: a violation no test planted fails it (slice 3's plan, 3f).
