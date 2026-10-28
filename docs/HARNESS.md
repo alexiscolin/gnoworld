@@ -122,7 +122,7 @@ PATH alone. The probe tries the refusal on a copy of the config with a pin of it
 | `packages/core/src`, which the server imports, or any other file of those folders (a fixture, a stylesheet) | tsc, ESLint, every Vitest test (a file read from disk is outside the module graph too), the app's journeys | 30 s |
 | `packages/ui/src/tokens.css` | as for any stylesheet of those folders, and the tokens story's pictures alone at its three widths, in a lane of its own beside the others (`pictures.spec.ts` with `PICTURES_OF=tokens--`, Storybook built in the run's own folder, which `STORIES_OUT` must name as the `storybook` folder of a `check.*` folder directly inside the temporary folder, since Storybook deletes it first (security-S6, CR7), the evidence of a failed run in that run folder's `stories-results` (`app/test-results-stories` outside a gate), never Playwright's default `app/test-results` that the journeys empty as they start (CR4), a free port of its own; 5 s beside Vitest's 20 to 23 s; F1190) | 30 s |
 | `gno/` | the gno lane | 30 s |
-| anything else (a config, the lockfile, the harness, `packages/schemas`, `deploy/`), no change at all, or no repository (pre-commit's staged copy) | everything | 75 s |
+| anything else (a config, the lockfile, the harness, `packages/schemas`, `deploy/`), no change at all, or no repository (pre-commit's staged copy) | everything | 120 s |
 
 What a commit leaves out, the full gate runs on the exact tip before `main` takes it (`pre-push`
 wants its record). ESLint reads no cache: a cache is keyed on a file's own text, so a type changed
