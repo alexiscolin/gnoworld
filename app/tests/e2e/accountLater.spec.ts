@@ -13,6 +13,8 @@ const ACCOUNT_ONLY = [
   "Notifications for",
   // What an account keeps on its device: the room keeping's acts on a line.
   ".markUnread(",
+  // The composer's side of a thread and of a reply: a visitor reads a thread, whose field is an account's.
+  "Replying to an earlier message",
 ];
 
 // The words of every script the page loads, the lines' view and the composer included, once the page is quiet.

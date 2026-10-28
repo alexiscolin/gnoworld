@@ -18,9 +18,9 @@ import type { AppState } from "../../store/index.ts";
 import type { RoomActs } from "./roomActs.ts";
 import type { Shown } from "./shown.tsx";
 import styles from "./Thread.module.css";
-import { renewComposer, Writer } from "./Writer.tsx";
+import { renewComposer } from "./composerChunk.ts";
 
-const load = async () => ({ default: (await import("./Thread.tsx")).Thread });
+const load = async () => ({ default: (await import("./ThreadBody.tsx")).ThreadBody });
 // A lazy component keeps its failure for good: a chunk that could not be fetched, this one's or the composer's, is
 // made anew (Failing).
 let Thread = lazy(load);
@@ -143,23 +143,21 @@ function Panel({
           members={members}
           me={session.kind === "in" ? session.address : undefined}
           onClose={close}
-          composer={
-            <Writer
-              session={session}
-              room={shown.writer.room}
-              label="this thread"
-              rooms={rooms}
-              members={members}
-              onSay={(composed) => acts.onSay(composed, { reply: root })}
-              focus={focus}
-              keeps={false}
-              draft={typed.get(slot)}
-              onDraft={(text) => {
-                if (text === "") typed.delete(slot);
-                else typed.set(slot, text);
-              }}
-            />
-          }
+          writer={{
+            session,
+            room: shown.writer.room,
+            label: "this thread",
+            rooms,
+            members,
+            onSay: (composed) => acts.onSay(composed, { reply: root }),
+            focus,
+            keeps: false,
+            draft: typed.get(slot),
+            onDraft: (text) => {
+              if (text === "") typed.delete(slot);
+              else typed.set(slot, text);
+            },
+          }}
         />
       </Suspense>
     </Failing>
