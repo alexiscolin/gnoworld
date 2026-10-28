@@ -165,9 +165,9 @@ describe("RoomsView: notifications", () => {
     onOnlyKnown: () => undefined,
   };
   // The row's words of the room or conversation linked at `href`: its list item's, markup taken off.
-  const rowAt = (html: string, href: string) => {
-    const item = [...html.matchAll(/<li[^>]*>(.*?)<\/li>/gs)].find((m) => (m[1] ?? "").includes(`href="${href}"`));
-    return said(item?.[1] ?? "");
+  const rowAt = (html: string, href: string, last = false) => {
+    const items = [...html.matchAll(/<li[^>]*>(.*?)<\/li>/gs)].filter((m) => (m[1] ?? "").includes(`href="${href}"`));
+    return said((last ? items.at(-1) : items[0])?.[1] ?? "");
   };
   const notices = (over: Partial<NonNullable<RoomsViewProps["notices"]>> = {}) => ({
     list: [],
@@ -221,8 +221,9 @@ describe("RoomsView: notifications", () => {
           list: [note("mention", "#bubble/games"), note("group", "#bubble/news", BOB)],
         }),
       });
-      expect(rowAt(html, "/w/bubble?room=games")).toContain("g10gh7…3y5tv mentioned you #games");
-      expect(rowAt(html, "/w/bubble?room=news")).toContain("g1f6dc…fsksl mentioned the room #news");
+      // The notice's row is the room's link's last: the list comes after the rooms (U4).
+      expect(rowAt(html, "/w/bubble?room=games", true)).toContain("g10gh7…3y5tv mentioned you #games");
+      expect(rowAt(html, "/w/bubble?room=news", true)).toContain("g1f6dc…fsksl mentioned the room #news");
     });
 
     it.each([
@@ -255,6 +256,17 @@ describe("RoomsView: notifications", () => {
         "Talk",
       ]);
       expect(said(html).indexOf("replied to you")).toBeLessThan(said(html).indexOf("mentioned you"));
+    });
+
+    // U4: a first notice came in above the rooms and pushed every row down; it comes in after them.
+    it("puts the list after the rooms and the direct messages, so a notice moves no row", () => {
+      const html = view({ dms, notices: notices({ list: [note("mention", "#bubble")] }) });
+      expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual([
+        "Talk",
+        "Other rooms",
+        "Direct messages",
+        "Notifications",
+      ]);
     });
 
     it("offers to clear them, a button, and only while there is one", () => {

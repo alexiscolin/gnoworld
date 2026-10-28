@@ -10,6 +10,7 @@ import type { Dms } from "./Dms.tsx";
 import type { ChatLink } from "./link.ts";
 import { useComposing } from "./composing.ts";
 import { dmActs } from "./dmActs.ts";
+import styles from "./Loaded.module.css";
 import type { Say } from "./linkTypes.ts";
 import { dmParams, groupsAt, roomIds } from "./names.ts";
 import { NoticeModes } from "./NoticeModes.tsx";
@@ -88,10 +89,12 @@ export interface LoadedProps {
 // The rooms' column: the rooms, and for an account its saved messages, a button under them until slice 8's menu (4d).
 function Rail({ signedIn, children }: { signedIn: boolean; children: ReactNode }) {
   return (
-    <Stack space="s">
-      {children}
-      {signedIn ? <Saved /> : null}
-    </Stack>
+    <div className={styles["rail"]}>
+      <Stack space="s">
+        {children}
+        {signedIn ? <Saved /> : null}
+      </Stack>
+    </div>
   );
 }
 
