@@ -34,7 +34,30 @@ describe("NoticeModes", () => {
   });
 
   it("says in words that Nothing leaves out the mentions too, which the name alone does not tell", () => {
-    expect(said(view())).toContain("not even mentions");
+    expect(said(view({ mode: "none" }))).toContain("not even mentions");
+  });
+
+  // U2: one paragraph read "Nothing: not even mentions." whichever mode was selected, so with Mentions chosen it read as
+  // the current state; the selected mode's own words show, under a visible label.
+  const WORDS = {
+    all: "Every new message in this room.",
+    mentions: "Messages that mention you, and replies to you.",
+    none: "Nothing: not even mentions.",
+  } as const;
+  it.each(["all", "mentions", "none"] as const)(
+    "describes the mode %s in its own words and no other mode's",
+    (mode) => {
+      const text = said(view({ mode }));
+      expect(text).toContain(WORDS[mode]);
+      for (const other of ["all", "mentions", "none"] as const)
+        if (other !== mode) expect(text).not.toContain(WORDS[other]);
+    },
+  );
+
+  it("names the group in words anyone sees, Notify me about, before its buttons", () => {
+    const html = view();
+    expect(said(html)).toMatch(/^Notify me about\b/);
+    expect(html.indexOf("Notify me about")).toBeLessThan(html.indexOf("<button"));
   });
 
   it("says beside the choice when the device does not keep it, and only then", () => {

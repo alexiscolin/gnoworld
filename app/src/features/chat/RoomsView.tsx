@@ -178,8 +178,9 @@ export function RoomsView({ sections, current, dms, failed, badges, notices }: R
       ) : (
         <>
           <Stack space="l">
-            {notices.list.length === 0 ? null : <Notices {...notices} navRef={navRef} />}
             {body}
+            {/* After the rooms, so a first notice moves none of their rows (U4). */}
+            {notices.list.length === 0 ? null : <Notices {...notices} navRef={navRef} />}
           </Stack>
           {/* Its own place, so the list's absence leaves no gap: what comes is said even as the list is empty. */}
           <p key={notices.saidId} role="status" className="visually-hidden">

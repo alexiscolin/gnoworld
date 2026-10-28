@@ -1,4 +1,4 @@
-/* A phone reads only (docs/plans/backlog.md, row 4): a coarse pointer gets the words, a computer the button. */
+/* A phone cannot log in (U6): a coarse pointer gets the words, a computer the button; once logged in, a phone writes. */
 @layer components {
   .phone {
     display: none;

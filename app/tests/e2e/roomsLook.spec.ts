@@ -33,9 +33,7 @@ test.describe("a world's rooms, as they look", () => {
   }
 
   // The test wallet is drawn at each server's start: the header, which names it, is masked.
-  test("with the composer, a line being written, on a computer's screen (a phone reads only: plan §2)", async ({
-    page,
-  }) => {
+  test("with the composer, a line being written, on a computer's screen", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await logIn(page, "composer-look");
     await page.routeWebSocket(/\/ws$/, (ergo) => {

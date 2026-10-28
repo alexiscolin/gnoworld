@@ -177,7 +177,7 @@ test.describe("saved messages", () => {
 });
 
 // The bar is the line's focus: a tap on a line focuses it, as a click does, so a phone reaches Save the way a computer does.
-// A phone reads only and cannot log in (its pointer is coarse): the account is logged in on a computer's browser, its session
+// A phone cannot log in (its pointer is coarse), but an account logged in writes there as on a computer: the account is logged in on a computer's browser, its session
 // handed to a phone's, in a browser of its own.
 test.describe("on a phone", () => {
   test.use({ timezoneId: "UTC", locale: "en-GB" });

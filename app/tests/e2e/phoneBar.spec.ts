@@ -1,6 +1,6 @@
 import { lineOf, lines } from "./chat.ts";
 import { expect, test } from "./fixtures.ts";
-import { asAccount, barOf, ROOM } from "./talk.ts";
+import { asAccount, barOf, crossedByBar, ROOM } from "./talk.ts";
 
 // F1170's U1 (the UX review): on a phone a line's column is about 168 px wide; the bar's five controls wrapped to two
 // rows over the line's own words. Narrow, the bar stands in the flow under the line, on one row, its three quick
@@ -24,22 +24,7 @@ test.describe("a line's bar on a phone's screen", () => {
       }),
     );
     expect(Math.max(...centres) - Math.min(...centres)).toBeLessThan(5);
-    // The words of the list, a word at a time, that the bar's box crosses.
-    const crossed = await page.getByRole("list", { name: "Messages" }).evaluate((list) => {
-      const toolbar = list.querySelector("[role='toolbar']");
-      const box = toolbar?.getBoundingClientRect() ?? new DOMRect();
-      const over = (rect: DOMRect) =>
-        rect.right > box.left && rect.left < box.right && rect.bottom > box.top && rect.top < box.bottom;
-      const found: string[] = [];
-      const walker = document.createTreeWalker(list, NodeFilter.SHOW_TEXT);
-      for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
-        const range = document.createRange();
-        range.selectNodeContents(node);
-        if (toolbar?.contains(node) !== true && [...range.getClientRects()].some(over))
-          found.push(node.textContent ?? "");
-      }
-      return found;
-    });
+    const crossed = await crossedByBar(page);
     expect(crossed).toEqual([]);
   });
 

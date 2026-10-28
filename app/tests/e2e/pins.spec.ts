@@ -185,7 +185,7 @@ test.describe("pins", () => {
     await expect(pinBar(page)).toHaveCount(0);
   });
 
-  // A phone reads: the pin bar is one line, the stack opens under it, and a pin's words are all there.
+  // On a phone the pin bar is one line, the stack opens under it, and a pin's words are all there.
   test("opens on a phone from its one line to the stack, with no sideways scroll", async ({ page }) => {
     const text = word("a pinned line that is long enough to need the room it is given ".repeat(2));
     const address = await said(page, text);

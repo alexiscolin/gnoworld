@@ -69,10 +69,17 @@ Alexis, 2026-10-23: slice 3's reviews found these; none bites today, each comes 
 
 | Item | Delivers | Why |
 |---|---|---|
-| A phone's way to a line's actions | A quiet "⋯" at each line's end under `(hover: none)`, or a first-use hint, once a phone writes (slice 4's plan: a phone reads only) | Nothing hints that a line can be tapped for its bar, and a tap on a line with a link opens the link (the menu's UX review, U12) |
-| A phone's own layout for the chat | At a phone's width the navigation above the conversation, not beside it, and no composer (a phone reads only); rooms and direct messages alike, with slice 5's page layout | At 390 px the 160 px navigation takes 41% of the width and a line wraps at about 22 characters; the approved rooms-phone picture holds it too (4e's UX review U14) |
+| A phone's way to a line's actions | A quiet "⋯" at each line's end under `(hover: none)`, or a first-use hint, since an account logged in writes on a phone (docs/decisions.md, 2026-10-28) | Nothing hints that a line can be tapped for its bar, and a tap on a line with a link opens the link (the menu's UX review, U12) |
+| A phone's own layout for the chat | At a phone's width the navigation above the conversation, not beside it, the composer kept, an account writing on a phone (docs/decisions.md, 2026-10-28); rooms and direct messages alike, with slice 5's page layout | At 390 px the 160 px navigation takes 41% of the width and a line wraps at about 22 characters; the approved rooms-phone picture holds it too (4e's UX review U14) |
 | A navigation row's whole box a link | Row's padding on its link, so what a row shows is what a pointer reaches, in every list | A row shows 160×37 px and its link is 136×21 px, passing WCAG 2.5.8 by the spacing exception alone (4e's UX review U17) |
 | A conversation's face and last line | Each direct message's row with its partner's Avatar and its last line; a new conversation announced, with 4f's notifications | A row shows a short address alone (4e's UX review U19; its order, heard last first, is done: F852) |
+
+## Slice 5, its head (slice 4's UX review, by Alexis)
+
+| Item | Delivers | Why |
+|---|---|---|
+| A phone's room list as a drawer | Under about 600 px the room list behind a Rooms button or a drawer, the conversation, its reply, edit and thread panels full width | At 390 px the list takes about 190 px and the messages wrap at 3 to 5 words (slice 4's UX review, U3; `ph-acct-room.png`) |
+| The page's shell | A 16 px gutter, a header row for the home link, the account and Log out; the approved pictures change with it | Text, the home link and the account's address touch the viewport's left edge, and the header is unstyled links on separate rows (U5; `smoke.png`) |
 
 ## Slice 4, its leftovers
 
@@ -119,7 +126,7 @@ comes with the slice that brings what it needs.
 ## Phase 0: a public hub
 
 Users sign their own calls in Adena, on a computer. gnoworld's only write of its own is the
-slot realm, on Onyx (ADR-0002 §8, row 11). Phones read (ADR-0002 §1).
+slot realm, on Onyx (ADR-0002 §8, row 11). Phones log in on a computer only; once logged in, a phone writes (docs/decisions.md, 2026-10-28).
 
 | # | Slice | Delivers | Tests first (the main ones) | Human | Asks |
 |---|---|---|---|---|---|
