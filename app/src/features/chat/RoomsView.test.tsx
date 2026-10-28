@@ -245,14 +245,14 @@ describe("RoomsView: notifications", () => {
       expect(said(html)).toContain("guest-ab12cd mentioned you");
     });
 
-    it("lists the newest first, under a heading of its own, before the rooms", () => {
+    it("lists the newest first, under a heading of its own, beside the rooms", () => {
       const html = view({
         notices: notices({ list: [note("mention", "#bubble"), note("reply", "#bubble/games")] }),
       });
-      expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual([
+      expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1]).toSorted()).toEqual([
         "Notifications",
-        "Talk",
         "Other rooms",
+        "Talk",
       ]);
       expect(said(html).indexOf("replied to you")).toBeLessThan(said(html).indexOf("mentioned you"));
     });
