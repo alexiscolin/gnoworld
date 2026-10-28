@@ -13,10 +13,17 @@ export interface NoticeModesProps {
 }
 
 const NAMES: Record<NoticeMode, string> = { all: "All messages", mentions: "Mentions", none: "Nothing" };
+// What the selected mode does, in its own words: Nothing leaves out the mentions too, which its name does not tell (U2).
+const WORDS: Record<NoticeMode, string> = {
+  all: "Every new message in this room.",
+  mentions: "Messages that mention you, and replies to you.",
+  none: "Nothing: not even mentions.",
+};
 
 export function NoticeModes({ room, mode, onMode, notKept }: NoticeModesProps) {
   return (
     <Stack space="3xs">
+      <p className="label">Notify me about</p>
       <div role="group" aria-label={`Notifications for ${roomLabel(room)}`}>
         <Cluster space="2xs">
           {NOTICE_MODES.map((each) => (
@@ -32,7 +39,7 @@ export function NoticeModes({ room, mode, onMode, notKept }: NoticeModesProps) {
           ))}
         </Cluster>
       </div>
-      <p>Nothing: not even mentions.</p>
+      <p>{WORDS[mode]}</p>
       {notKept === true ? <p>Not kept on this device</p> : null}
     </Stack>
   );
