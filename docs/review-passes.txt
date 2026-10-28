@@ -48,3 +48,4 @@
 2026-10-28 55b7bfb650f552a9ac87f5b2d4c311c4c1018980 test-auditor (red R1-R6) and its closing tests; check.sh --merge on the final code (3955 s)
 2026-10-28 a9070a4133b6a54e44ec2fa55072e8ed26f81f6e slice-4's integration: each branch's red pass and gate; the workspace reviews (server, app, packages, UX) and their fix branches; check.sh --full on the final code (5635 s, harness_mutate in full)
 2026-10-28 1396b71b28aee587533ea1e8337c28f8160e02a0 as a9070a41 (5ea26d53's full gate), plus F2126-F2129's four rows in docs/review/findings.md
+2026-10-28 1361c10d6d454e2bb73b457072b0d922857e6155 as a9070a41 (5ea26d53's full gate), plus ledger and decisions rows (F2126-F2132)
