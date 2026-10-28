@@ -52,7 +52,7 @@ esac
 part() { case ",$ONLY," in *",$1,"*) ran=1 && return 0 ;; *) return 1 ;; esac; }
 # The rules the review depends on are required of every root (CR2): the four agents' briefs, each saying the git-index
 # rule, and CLAUDE.md's review card, its item 8; good_rules gives a fixture its own.
-agents="complexity-reviewer finding-verifier security-reviewer test-auditor"
+agents="finding-verifier reviewer security-reviewer test-auditor"
 good_rules() {
 	mkdir -p "$1/.claude/agents"
 	for a in $agents; do printf 'You never edit.\nNever run a git command that writes the index or the work tree (checkout,\nrestore); copy with cp.\n' >"$1/.claude/agents/$a.md"; done

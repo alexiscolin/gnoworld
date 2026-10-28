@@ -1,84 +1,54 @@
 ---
-description: The review before a merge, cheapest first — the gate and mutations (no tokens), the test audit, /simplify, then every review lens Claude Code has, sized up by risk. Never merges.
+description: The review before a merge, cheapest first — the merge's gate and mutations (no tokens), then one combined review agent, sized up by risk. Never merges.
 ---
 
 Run the review before merging the current branch (base: $ARGUMENTS, or `main` if empty).
 Follow `docs/REVIEW.md` ("AI review before a merge"). Never merge, push, rebase, skip a hook,
 or edit a test to make it pass. Claude runs every step itself, through the real commands and
 agents, in this order; it never hands a step to Alexis, and never stands in for a command.
-A branch that changes `deploy/` also runs semgrep's Dockerfile and Compose rules
-(`p/dockerfile`, `p/docker-compose`) in step 1, and the operator's own tests on the host
-(`deploy/test.sh`, then its `--mutants`). Those are asked for once, after every fix of steps 4
-to 6 is committed, never in between: each run costs him its whole length.
+A branch's Workflow loop runs these steps; the chief session runs them on the slice's last merge.
 
-1. **No tokens first.** Run the merge's own gate, `scripts/check.sh --merge`: the full gate's
-   lanes with the harness mutants of the guard files the merge changed (`harness_mutate.py
-   --changed`). The full gate runs once a slice, on the tip pushed to `main` (step 8; Alexis,
-   2026-10-25). If it fails, stop and report its output. Write the diff to
-   `.claude/tmp/diff.patch` and pass agents its path, never its content. Past the size
-   `docs/REVIEW.md` allows (about 400 lines of product code with a tier-1 file, 600 otherwise),
-   say so and propose a split before reviewing.
-2. **The plan.** List the files changed that the slice plan does not name; each gets its
-   reason in the review card, or leaves the merge.
-3. **One round, every agent at once.** Launch in one message the `test-auditor`'s green pass (the
-   diff path and the surviving mutants), `/simplify`'s angles (step 4, report only) and every lens
-   of step 5; the `finding-verifier` takes each tier-1 finding as it arrives (step 6). The
-   round's findings are fixed in one batch, after it.
-4. **Simplify.** Run `/simplify`'s altitude and simplification angles on the range, two agents
-   in parallel with its own briefs; add its efficiency angle for a slice with a hot path (the 3D,
-   the chat); its reuse angle no more (docs/decisions.md, 2026-10-21). A follow-up merge of fixes
-   (2f, 2g) runs the altitude angle alone. Apply their fixes in the round's one batch (each in
-   its own commit, a refactor apart), note what they skip and why; the fast gate checks them.
-5. **Every review lens, sized up by risk.** Count the branch's review rounds first (its rows in
-   `docs/review-passes.txt` and `docs/review-log.md`). The first round reads the range; any later
-   one reads only the diff since the last round. A fourth round does not run: stop, report, and
-   reconsider the approach with Alexis before any more code. These run in step 3's round:
-   - always: Claude Code's `/code-review`; tell it the ledger's open and fixed findings for the
-     files it reads, so none is raised again;
-   - a tier-1 file or the harness (`scripts/`, `.githooks/`, `.claude/`, `.github/`, the tools'
-     configs): also `/security-review`, told the ledger as `/code-review` is;
-   - always: the `complexity-reviewer` agent, the cost in big O of each loop the range adds;
-   - a tier-1 file (`docs/REVIEW.md`): also the `security-reviewer` agent (Opus), which reads
-     the project's threat model, and, for a realm, the `gno-auditor`;
-   - the last merge of a slice with tier-1 code: propose to Alexis that he runs
-     `/code-review ultra` (a deeper review in the cloud, billed per run; Claude cannot start it);
-   - the true last merge of a slice: also `/code-review` on each workspace the slice touched, as
-     a path, so it reads the whole folder and not only the diff, with the export map; once per
-     slice, a follow-up merge of fixes reading only its range.
-   Ask every agent and lens for a short report: its findings, one row each with its evidence,
-   no summary of the diff.
-   A finding names its class, the kind of bug, and its fix covers every instance of the class,
-   not the one line. A finding only about style, diagnostics or cleanup is dropped: `/simplify`
-   owns those.
-   A finding beyond the plan (its "done when" and threat model) that is not high is verified
-   and recorded like any other, then put to Alexis with a recommendation, fix now or a backlog
-   row, instead of being fixed by default.
-6. **Verify, then reproduce each finding** before fixing it. For each tier-1 lot (the harness,
-   a realm, a security path), give its findings to the `finding-verifier` agent (Opus), which
-   tries to refute each one, then to reproduce it, and rates it again; a `refuted` finding is
-   `rejected` with its evidence. Then reproduce what is left yourself: the command, or a test
-   seen failing. Write every
-   finding to `docs/review/findings.md` with its status and evidence: `fixed` with its commit,
-   `rejected` (it is wrong), `intended` (the behaviour is wanted) or `moot` (true, and it does not
-   matter), each with its reason; a finding nobody reproduced stays `claimed`. A fix's commit body names
-   its finding (`Finding: F012`). Fixes are re-checked by the gate and the mutation tester, not by a new pass. A
-   second pass runs only for a high finding fixed in a tier-1 file, and only that lens.
-7. **Report** to Alexis, in French:
-   - the review card of `CLAUDE.md` (in the first slices, only its items 1–3, 7 and 8, and the
-     findings held back until Alexis has reviewed, per "Blind first");
-   - the findings, most severe first, each with its scenario and its tag: important, nit, or
-     pre-existing (in the code before the branch: never read as its author's);
-   - what was dropped as a false positive, in one line each.
-8. **Record the pass.** Once every finding is fixed or put to Alexis, run `scripts/check.sh
-   --merge` on the final, committed code; on the slice's last merge, the tip pushed to `main`, run
-   `scripts/check.sh --full` instead: pushing `main` wants that code's full-gate record (F076).
-   Then run `python3 -I scripts/review_pass.py record HEAD "<the lenses that ran>"`. Without both,
-   the pre-push hook refuses `main`.
-9. **Log.** Append to `docs/review-log.md`: the date, the branch, the rounds it took to pass,
-   each finding with its lens and outcome (fixed, wrong, intended, moot, put to Alexis), and what Alexis caught that the
-   agents missed. A miss seen twice becomes a proposed rule, lint or test; a lens whose
-   findings are mostly dropped over five slices is narrowed or removed. Commit the log and
-   `docs/review-passes.txt` together, with a line `Harness-changed: <path> - why` for each
-   harness file the branch changes (`git diff --name-only main...HEAD` against the list of
-   `harness` in `.githooks/records.sh`): pushing `main` is refused without them. That commit
-   keeps the pass valid.
+1. **No tokens first.** Run `scripts/check.sh --merge` (the full gate's lanes, with the harness
+   mutants of the guard files the branch changed). If it fails, run the failing lane alone, fix,
+   and run it again; stop and report if it still fails. Read `.claude/tmp/unsteady.log` (test files
+   the fast gate ran twice: failed once, then passed; docs/HARNESS.md): give each file named a
+   ledger row or its fix, then delete the log. Write the diff to `.claude/tmp/diff.patch` and pass
+   agents its path, never its content. Past the size `docs/REVIEW.md` allows (about 400 lines of
+   product code with a tier-1 file, 600 otherwise), say so and propose a split before reviewing.
+   A branch that changes `deploy/` also runs semgrep's Dockerfile and Compose rules
+   (`p/dockerfile`, `p/docker-compose`).
+2. **The plan.** List the files changed that the slice plan does not name; each gets its reason
+   in the review card, or leaves the merge.
+3. **One combined review.** Launch the `reviewer` agent with the diff path, the surviving mutants
+   and the ledger's rows for the files it reads. It reads the code once: the tests' green pass,
+   correctness, security, cost and simplification, in one table. A tier-1 file or the harness
+   (`docs/REVIEW.md`) adds the `security-reviewer` agent, and a realm the `gno-auditor`, in the
+   same message; nothing else adds a lens. The last merge of a slice with tier-1 code: propose
+   `/code-review ultra` to Alexis (billed per run; Claude cannot start it).
+4. **Verify, then reproduce.** Give the findings on tier-1 files to the `finding-verifier` agent,
+   which tries to refute each one, then to reproduce it, and rates it again; a `refuted` finding
+   is `rejected` with its evidence. Reproduce what is left yourself: a command, or a test seen
+   failing. Write every finding to `docs/review/findings.md` with its status and evidence:
+   `fixed` with its commit, `rejected`, `intended`, `moot` or `asked`, each with its reason; one
+   nobody reproduced stays `claimed`.
+5. **Fix high and medium.** Each test first, its commit body naming its finding (`Finding: F012`).
+   Low findings, and any finding beyond the plan, go to one list for Alexis with a recommendation
+   (fix now, a backlog row, or moot), never to a fixer by default. A fixer's tests get no red pass:
+   the gate and the mutation tester re-check them. A second review round runs only for a high
+   finding fixed in a tier-1 file, and only its lens, on the diff since the first. A fourth round
+   does not run: stop and reconsider with Alexis.
+6. **The operator's tests.** A branch that changes `deploy/` asks Alexis once, after every fix is
+   committed, for `deploy/test.sh` and its `--mutants` on the host; never in between.
+7. **Report** to Alexis, in French: the review card of `CLAUDE.md` (in the first slices, its
+   items 1–3, 7 and 8 only, the findings held back until he has reviewed, per "Blind first");
+   the findings, most severe first, each with its scenario and its tag (important, nit, or
+   pre-existing: in the code before the branch); the low list; what was dropped, one line each.
+8. **Record the pass.** On the final committed code, run `scripts/check.sh --merge`; on the
+   slice's last merge, the tip pushed to `main`, `scripts/check.sh --full` instead (pushing `main`
+   wants its record). Then `python3 -I scripts/review_pass.py record HEAD "<the agents that ran>"`.
+   Without both, the pre-push hook refuses `main`.
+9. **Log.** Append to `docs/review-log.md`: the date, the branch, its rounds, each finding with its
+   agent and outcome, the tokens and hours the branch took, and what Alexis caught that the agents
+   missed. Commit it with `docs/review-passes.txt`, with a line `Harness-changed: <path> - why` for
+   each harness file the branch changes (`git diff --name-only main...HEAD` against `harness` in
+   `.githooks/records.sh`): pushing `main` is refused without them. That commit keeps the pass valid.

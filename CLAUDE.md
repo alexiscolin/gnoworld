@@ -7,7 +7,7 @@ gnoworld: a social, on-chain, graphical hub for gno.land. The design is
 [docs/DESIGN-SYSTEM.md](docs/DESIGN-SYSTEM.md); the order of work is
 [docs/plans/backlog.md](docs/plans/backlog.md). How to build and test is
 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md); how changes are reviewed is
-[docs/REVIEW.md](docs/REVIEW.md).
+[docs/REVIEW.md](docs/REVIEW.md). How the AI works, in one picture: [docs/harness.png](docs/harness.png).
 
 ## Rules
 
@@ -18,12 +18,11 @@ gnoworld: a social, on-chain, graphical hub for gno.land. The design is
 
 ## How we work
 
-- Test first: write the failing tests, run them, see them fail, then launch the `test-auditor` for its red pass (complete, relevant, impact first, security) and fix its findings; the commit of those tests says so in a line `Red-pass: <findings fixed>` (outside core, the commit that brings their code: a red commit fails the gate), the mark the green pass measures drift from. Only then write the code. The mutation check finds every guard; one no test can catch yet goes into `GAPS` in `scripts/mutate.py`, with the reason.
+- Test first: write the failing tests, run them, see them fail, then launch the `test-auditor` for its red pass (complete, relevant, impact first, security; once per branch, never on a fixer's tests) and fix its findings; the commit that brings those tests and their code says so in a line `Red-pass: <findings fixed>` (a red commit fails the gate), the mark the `reviewer`'s green pass measures drift from. Only then write the code. The mutation check finds every guard; one no test can catch yet goes into `GAPS` in `scripts/mutate.py`, with the reason.
 - `scripts/check.sh` must pass before every commit that changes code (the pre-commit hook runs it). Never commit with `--no-verify`.
 - Strict TypeScript: no `any`, no `@ts-ignore`, no `!`. Data from the relay, the indexer or a realm goes through Zod first.
 - Never change a test to make code pass without saying so in the review card.
 - Each area's rules are in `.claude/rules/`, loaded when its files are touched. Every review, `/code-review` included, also reads the tiers in `docs/REVIEW.md`.
-- No pairing since slice 4 (Alexis, 2026-10-25, docs/decisions.md): Claude writes `packages/core` too, test first and red-passed like any code; the `test.fails` marks already there are removed by the code that makes them pass.
 - Claude writes the realms, the server and any Go (who reviews what: docs/REVIEW.md).
 - Everything about gno (realms, pure packages, chain reads and writes) goes through gnomcp, never memory, `gnokey` or raw RPC; `scripts/guard.py` refuses the rest (`.claude/rules/gno.md`).
 - Read a file before changing it; before changing an exported symbol, find every reference through the language server (`typescript-lsp`), not by text search.
@@ -33,9 +32,9 @@ gnoworld: a social, on-chain, graphical hub for gno.land. The design is
 - Invent nothing. A claim about a library, a browser API or a gno package comes from the installed types or source at the pinned version, official docs read in this session, or a live query of the target chain (gnomcp); never from memory. Every claim in a review card cites its evidence (a command's output, `file:line`, a URL), and what was not verified is named.
 - When the harness misses something (a bug that passed the gate and review found, a surviving mutant, a clean file refused), propose in the same turn the rule, the probe case or the test that would have caught it, not only the code fix; the probe and the harness mutation print their own proposals.
 - A new guard (a lint rule, a check, a hook) lands with the fault that proves it (`scripts/probe.py` or `scripts/test_hooks.sh`), and `scripts/harness_mutate.py` must see a test fail when the guard is switched off; the full gate runs it whenever the harness changes. Its tests plant its bypasses too: the comment that allows it, the tool it needs missing, the command it runs failing; each must refuse (F113, F116, F125).
-- A turn that changes code ends with the gate green: run `scripts/check.sh` (in the sandbox); the Stop hook blocks once until it has passed on exactly the current tree. How the gate, the hooks and the reviews work: `docs/HARNESS.md`. The fast gate holds a 120 s budget for a run of everything (75 until 2026-10-28, 60 until 2026-10-27); the benches (speed, growth, memory, the GPU) arrive with slice 1b and run in `/pre-merge`.
+- A turn that changes code ends with the gate green: run `scripts/check.sh` (in the sandbox); the Stop hook blocks once until it has passed on exactly the current tree. How the gate, the hooks and the reviews work: `docs/HARNESS.md`. The fast gate's budget is 120 s for a run of everything and 30 s for a run scoped to its change; a merge commit has none.
 - Work one slice at a time (`docs/plans/`), each merge on its own branch (`slice-1a`) and in its own Claude Code session (docs/REVIEW.md, "Keep it cheap"), pushed only when asked; `main` takes a merge only after `/pre-merge` (the pre-push hook refuses it otherwise). Stop at the end of a slice for review.
-- Inside a slice (from slice 5, Alexis 2026-10-28): a new "chief" session plans, splits, integrates and runs the full gate; each branch runs in a new session of its own, in its own worktree, at most two at once (never two sessions on one worktree); they coordinate through files (the plan, docs/decisions.md, the ledger, a state file per branch, a shared learnings file). A branch's pipeline (tests first, build, one combined review, high and medium fixes, merge check) runs as a Workflow loop. Agents are fresh, briefed from files (a fork carries the whole conversation), four at most at once. At each slice's end a dream (one read-only agent over the agents' reports and the learnings) proposes rule and memory changes with evidence; Alexis accepts each.
+- Inside a slice (from slice 5, Alexis 2026-10-28): a new "chief" session plans, splits, integrates and runs the full gate; each branch runs in a new session of its own, in its own worktree, at most two at once (never two sessions on one worktree); they coordinate through files (the plan, docs/decisions.md, the ledger, a state file per branch, a shared learnings file). A branch's pipeline (tests first, build, one combined review, high and medium fixes, merge check) runs as a Workflow loop. Agents are fresh, briefed from files, never forks (a fork carries the whole conversation), four at most at once: the `test-auditor` (red pass), the `reviewer` (one combined review), the `security-reviewer` and `gno-auditor` for tier 1, the `finding-verifier`. At each slice's end a dream (one read-only agent over the agents' reports and the learnings) proposes rule and memory changes with evidence; Alexis accepts each.
 - The prototype (`docs/prototype/`) is the reference for what to build and how it feels. Never copy its code: rebuild each concept test first, with the design system's components.
 - When Alexis corrects something this file or `.claude/rules/` could have prevented, propose the line that would have.
 - A decision Alexis makes in conversation goes into `docs/decisions.md` at once: one row, with its reason and where it lives.
@@ -44,7 +43,7 @@ gnoworld: a social, on-chain, graphical hub for gno.land. The design is
 
 - A fix starts with a test that reproduces the bug, seen failing, and is committed with it; the test's name says the bug. A test the fix forces to change lands in its own commit before it: every test of a fix's commit fails without the fix (`prove_fix`, F345).
 - A feature lands with its journey (Playwright) and, when it shows something, its approved screenshots.
-- The safety net never shrinks quietly: a test gone (Vitest, gno or Go; a rename included) or switched to `.fails`, a floor lowered (coverage, mutation), a known gap or an ignore added, or an approved screenshot changed fails the push unless a commit of the branch says why on a line of its own, `Key: <item> - why` (`Removed-test:`, `Lowered-floor:`, `Updated-baseline:`), which Alexis reads in review (`scripts/check_regressions.py`). No test is switched off (`.skip`, `.only`, `.todo`); `.fails` is for pairing, in core only.
+- The safety net never shrinks quietly: a test gone (Vitest, gno or Go; a rename included) or switched to `.fails`, a floor lowered (coverage, mutation), a known gap or an ignore added, or an approved screenshot changed fails the push unless a commit of the branch says why on a line of its own, `Key: <item> - why` (`Removed-test:`, `Lowered-floor:`, `Updated-baseline:`), which Alexis reads in review (`scripts/check_regressions.py`). No test is switched off (`.skip`, `.only`, `.todo`, `.fails`).
 - Floors rise with the scores, and never come down.
 
 ## Stop and ask
