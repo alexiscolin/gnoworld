@@ -1,5 +1,5 @@
 // How the chat names a room and an address, and which room a world's page shows.
-import { firstGraphemes, markdown, mentions, type Line } from "@gnoworld/core";
+import { firstGraphemes, type Line } from "@gnoworld/core";
 import { Address, type RoomList } from "@gnoworld/schemas";
 import type { AppState } from "../../store/index.ts";
 
@@ -15,14 +15,6 @@ export function quoted(words: string): string {
 
 /** An address's first six and last five characters, as the login shows one's own. */
 export const shortAddress = (address: string): string => `${address.slice(0, 6)}…${address.slice(-5)}`;
-
-/** A message's text with each mention of an address `known` shortened as a line shows it (F812): a quote cuts these
- * words, never an address in the middle. */
-export function shortened(text: string, known: (address: string) => boolean): string {
-  return mentions(markdown(text))
-    .filter((address) => Address.safeParse(address).success && known(address))
-    .reduce((out, address) => out.replaceAll(`@${address}`, `@${shortAddress(address)}`), text);
-}
 
 /** A room by its own name: #games for #bubble/games, the world's main room by the world. */
 export const roomLabel = (room: string): string => {

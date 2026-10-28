@@ -1,7 +1,7 @@
 // What a line answers (slice 4's 4d replies): its author and its words in one line, as the room reads them, cut between
 // graphemes, markup kept as text; or an earlier message, when the room no longer holds it.
 import { excerpt, type Line } from "@gnoworld/core";
-import { shortened } from "./names.ts";
+import { shortened } from "./shortened.ts";
 import { Person } from "./Person.tsx";
 import styles from "./RoomView.module.css";
 
