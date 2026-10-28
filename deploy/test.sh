@@ -374,7 +374,7 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "every visitor one connection key" "the 33rd refused, another visitor served" \
 		nginx sed 's#limit_conn_zone $proxy_protocol_addr#limit_conn_zone $remote_addr#'
 	mutant "the limit answered 503" "the 33rd refused" nginx sed '/limit_conn_status/d'
-	mutant "web's room for 1,024 connections" "sixteen visitors at their 32 WebSockets each, and another is served" \
+	mutant "web's room for 1,024 connections" "twenty visitors at their 32 WebSockets each, and another is served" \
 		nginx sed 's#worker_connections [0-9]*;#worker_connections 1024;#'
 	mutant "web's files left to Docker's default" "web may hold 8,192 files" compose 'services: { web: { ulimits: !reset {} } }'
 	mutant "the server may write Ergo's volume" "the server holds Ergo's volume read-only" \
@@ -1097,9 +1097,10 @@ setTimeout(() => {
 	expect "a visitor holding 31 requests, streams among them, is served a 32nd" "$(cat "$tmp/hold.31")" "200 200 31 200"
 	expect "a visitor holds 32 requests at once: the 33rd refused, another visitor served, the slots freed after" \
 		"$(cat "$tmp/hold.32")" "429 200 32 200"
-	# Sixteen visitors each at their 32 WebSockets leave room for another (3NB-1, F638): a held request takes two
+	# Twenty visitors each at their 32 WebSockets leave room for another (3NB-1, F638): a held request takes two
 	# of web's connections, the visitor's and Ergo's, which nginx never reclaims (a silent one it closes when
-	# short, which 256 already survived), so these need more than 1,024. How many were upgraded, then the other's
+	# short, which 256 already survived), so these need 1,280, past 1,024 (sixteen's 1,024 exactly let it survive,
+	# F2137). How many were upgraded, then the other's
 	# code, within 4 s.
 	crowded=$(docker run --rm --network "$inside" --entrypoint /nodejs/bin/node "$server_image" -e '
 const net = require("node:net");
@@ -1109,7 +1110,7 @@ const auth = `Basic ${Buffer.from(user).toString("base64")}`;
 const proxy = (ip) => `PROXY TCP4 ${ip} 192.0.2.1 40000 8080\r\n`;
 const upgrade = `GET /ws HTTP/1.1\r\nHost: web\r\nAuthorization: ${auth}\r\nOrigin: ${origin}\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: ${randomBytes(16).toString("base64")}\r\n\r\n`;
 let upgraded = 0;
-for (let visitor = 0; visitor < 16; visitor += 1) {
+for (let visitor = 0; visitor < 20; visitor += 1) {
   for (let i = 0; i < 32; i += 1) {
     const socket = net.connect(8080, "web", () => socket.write(`${proxy(`203.0.113.${String(70 + visitor)}`)}${upgrade}`));
     socket.once("data", (chunk) => {
@@ -1134,7 +1135,7 @@ setTimeout(() => {
   console.log(`${String(upgraded)} not served within 4 s`);
   process.exit(0);
 }, 7000);' "$auth" "$ORIGINS" 2>&1 || true)
-	expect "sixteen visitors at their 32 WebSockets each, and another is served" "$crowded" "512 200"
+	expect "twenty visitors at their 32 WebSockets each, and another is served" "$crowded" "640 200"
 	# The server reads Ergo's volume and never writes it (3n-b): mounted read-only, named, and read with no fault.
 	expect "the server holds Ergo's volume read-only" \
 		"$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/ergo"}}{{.RW}}{{end}}{{end}}' "$server")" false
