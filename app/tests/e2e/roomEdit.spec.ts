@@ -347,7 +347,9 @@ test.describe("a room's lines: Edit, between two accounts", () => {
     await field(page).fill(text);
     await field(page).press("Enter");
     await expect(lineOf(bob.page, text)).toHaveCount(1);
-    await lineOf(page, text).hover();
+    // The line holds the focus, not the pointer: on #games, shared by the journeys running at once, a line arriving moves
+    // the list under a pointer, and the bar goes with it to the line then under it (F2066).
+    await lineOf(page, text).focus();
     await lineOf(page, text).getByRole("button", { name: "More actions" }).click();
     await page.getByRole("menuitem", { name: "Edit" }).click();
     const fixed = word("fixed");
@@ -355,7 +357,7 @@ test.describe("a room's lines: Edit, between two accounts", () => {
     await field(page).press("Enter");
     await expect(lineOf(bob.page, fixed)).toContainText(/Edited/);
     await expect(lineOf(bob.page, text)).toHaveCount(0);
-    await lineOf(bob.page, fixed).hover();
+    await lineOf(bob.page, fixed).focus();
     await lineOf(bob.page, fixed).getByRole("button", { name: "More actions" }).click();
     await expect(bob.page.getByRole("menu", { name: "Message actions" }).getByRole("menuitem")).toHaveText([
       "Copy text",
