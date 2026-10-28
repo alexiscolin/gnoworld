@@ -73,6 +73,8 @@ export function roomsRoutes({ roles, rooms, session, origins, log, now }: Option
     const who = allowed(c, world);
     if (who instanceof Response) return who;
     if (!RoomName.safeParse(name).success) return refuse(c, "body");
+    // A room the roles file types is the file's, not the API's: archived, it would stay so after a fixed file (F2050).
+    if (roles.worlds.get(world)?.rooms?.has(`#${world}/${name}`) === true) return refuse(c, "forbidden");
     if (rooms.archive(world, name) === "not_found") return refuse(c, "not_found");
     log("room_archived", { room: `#${world}/${name}`, account: who });
     return c.body(null, 204);
