@@ -412,10 +412,12 @@ describe("Composer: an edit", () => {
   });
 
   it("lets a plain edit save, and an action go as a new message", () => {
-    expect(words(draw({ draft: "the new words" }))).not.toContain("An edit cannot be an action.");
-    expect(words(draw({ draft: "/me waves", editing: undefined, onCancelEdit: undefined }))).not.toContain(
-      "An edit cannot be an action.",
-    );
+    const enabled = (markup: string) => !/<button[^>]*disabled=""[^>]*>(Save|Send)<\/button>/.test(markup);
+    const edit = draw({ draft: "the new words" });
+    const action = draw({ draft: "/me waves", editing: undefined, onCancelEdit: undefined });
+    expect(words(edit)).not.toContain("An edit cannot be an action.");
+    expect(words(action)).not.toContain("An edit cannot be an action.");
+    expect([enabled(edit), enabled(action)]).toEqual([true, true]);
   });
 
   // CR3 of the room edit: the line being corrected went, so the edit closed; the box, plain again, tells why its words went.
