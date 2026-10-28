@@ -322,6 +322,74 @@ describe("the store's chat slice: a delete Ergo refused", () => {
   });
 });
 
+// The room edit's red pass (R1): a correction is a line of its own, so a REDACT of its line must not leave it showing the
+// deleted words, and a refused delete of the line must never bring the words edited out back.
+describe("the store's chat slice: a deleted line's corrections", () => {
+  const corrected = (id: string, edits: string, { text, account = "alice" }: { text: string; account?: string }) =>
+    read(
+      `@msgid=${id};time=2026-10-25T10:00:05.000Z;account=${account};+gnoworld/edit=${edits} :${account}!u@h PRIVMSG #bubble :${text}`,
+    );
+  const ids = (t: ReturnType<typeof following>) => t.room("#bubble")?.lines.map((line) => line.id);
+  const held = () => {
+    const t = following();
+    t.heard(said("#bubble", "a", "the original"));
+    t.heard(corrected("e1", "a", { text: "the correction" }));
+    return t;
+  };
+
+  it("takes the line's corrections with it at a REDACT of the line", () => {
+    const t = held();
+    t.heard(read(":alice!u@h REDACT #bubble a"));
+    expect(ids(t)).toEqual([]);
+  });
+
+  it("takes them at a moderator's REDACT of the line too, the author's words being the line's as shown", () => {
+    const t = held();
+    t.heard(read(":gnoworld!u@h REDACT #bubble a :hidden by moderation"));
+    expect(ids(t)).toEqual([]);
+  });
+
+  it("keeps another account's line that names the deleted one, which was never its correction", () => {
+    const t = held();
+    t.heard(corrected("e2", "a", { text: "a plain reply", account: "bob" }));
+    t.heard(read(":gnoworld!u@h REDACT #bubble a"));
+    expect(ids(t)).toEqual(["e2"]);
+  });
+
+  it("keeps the correction at a REDACT of the correction alone while its line is held, so no edited-out words return", () => {
+    const t = held();
+    t.heard(read(":alice!u@h REDACT #bubble e1"));
+    expect(ids(t)).toEqual(["a", "e1"]);
+    t.heard(read(":alice!u@h REDACT #bubble a"));
+    expect(ids(t)).toEqual([]);
+  });
+
+  it("takes a moderator's REDACT of the correction alone, the line showing as it was", () => {
+    const t = held();
+    t.heard(read(":gnoworld!u@h REDACT #bubble e1 :hidden by moderation"));
+    expect(ids(t)).toEqual(["a"]);
+  });
+
+  it("drops a correction's REDACT when its line is not held, as any other line's", () => {
+    const t = following();
+    t.heard(corrected("e1", "a", { text: "the correction" }));
+    t.heard(read(":alice!u@h REDACT #bubble e1"));
+    expect(ids(t)).toEqual([]);
+  });
+
+  it("tells a refused REDACT of a correction as its line's, the line being what the room shows", () => {
+    const t = held();
+    t.heard(read(":ergo FAIL REDACT REDACT_FORBIDDEN #bubble e1 :You are not authorised to delete this message"));
+    expect(t.room("#bubble")?.refused).toBe("a");
+  });
+
+  it("leaves a refusal naming a line it does not hold as it was told", () => {
+    const t = held();
+    t.heard(read(":ergo FAIL REDACT REDACT_FORBIDDEN #bubble zz :You are not authorised to delete this message"));
+    expect(t.room("#bubble")?.refused).toBe("zz");
+  });
+});
+
 // 4f: who is typing in each room (IRCv3's +typing), on the store's clock.
 describe("the store's chat slice: who is typing", () => {
   const typing = (room: string, nick: string, state: string) =>

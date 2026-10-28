@@ -1,6 +1,5 @@
 // The world's rooms once listed (slice 4's 4b, moved out of ChatPanel.tsx): the switcher, the conversation in view (a
 // room, or a direct message, 4e) and what writes in it.
-import { foldEdits, type Composed, type Line } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";
 import { Sidebar, Stack } from "@gnoworld/ui";
 import { useId, useState, type ReactNode, type RefObject } from "react";
@@ -9,14 +8,17 @@ import { useAppStore } from "../../storeContext.tsx";
 import type { AppState } from "../../store/index.ts";
 import type { Dms } from "./Dms.tsx";
 import type { ChatLink } from "./link.ts";
+import { useComposing } from "./composing.ts";
+import { dmActs } from "./dmActs.ts";
+import type { Say } from "./linkTypes.ts";
 import { dmParams, groupsAt, roomIds } from "./names.ts";
 import { NoticeModes } from "./NoticeModes.tsx";
-import { multilineOf, roomActs, type RoomActs } from "./roomActs.ts";
+import { multilineOf, roomActs } from "./roomActs.ts";
 import { useRoomKeeping } from "./RoomKeeping.ts";
 import { Saved } from "./Saved.tsx";
 import { RoomsView } from "./RoomsView.tsx";
 import { People, RoomView, type RoomViewProps } from "./RoomView.tsx";
-import { shownOf, type Shown } from "./shown.tsx";
+import { shownOf } from "./shown.tsx";
 import { usePins } from "./usePins.ts";
 import { useRoomKeys } from "./useRoomKeys.ts";
 import type { Noticing } from "./useNotices.ts";
@@ -37,58 +39,26 @@ function useOpened(partner: string | undefined) {
   };
 }
 
+// Who is here, a button on each to write to them: it opens the conversation (`open`) and asks for it in the address.
+// Apart from the room's element, which each line draws again: who is here keeps its drawing (the compiler).
+function useWhoIsHere(
+  members: readonly string[],
+  { connected, me }: { connected: boolean; me: string | undefined },
+  open: (partner: string) => void,
+) {
+  const [, setParams] = useSearchParams();
+  const onMessage = (other: string) => {
+    open(other);
+    setParams(dmParams(other));
+  };
+  return <People members={members} connected={connected} me={me} onMessage={onMessage} />;
+}
+
 // A room's notification modes, an account's; a direct message has none of its own (4f-n).
 const modesOf = (room: string | undefined, notify: Noticing["notify"]) =>
   room === undefined || notify === undefined ? undefined : <NoticeModes room={room} {...notify} />;
 
 const addressOf = (session: AppState["login"]["session"]) => (session.kind === "in" ? session.address : undefined);
-
-interface Reply {
-  key: string;
-  id: string;
-  asked: number;
-}
-
-// The line a reply answers, as the room shows it, while the room holds it.
-const answered = (reply: Reply | undefined, lines: readonly Line[] | undefined) =>
-  foldEdits(lines ?? []).shown.find((line) => line.id === reply?.id);
-
-// Reply asked again, or for another line: the count goes up for the same conversation.
-const asking = (was: Reply | undefined, key: string, id: string): Reply => ({
-  key,
-  id,
-  asked: was?.key === key ? was.asked + 1 : 1,
-});
-
-// The line the room's next one answers (4d's replies), and how many times Reply was asked: each asking puts the focus in
-// the field (G8). Its conversation's alone: another in view drops it, as does a line sent. A direct message has none.
-function useReplies(shown: Shown | undefined, lines: readonly Line[] | undefined, acts: RoomActs) {
-  const [reply, setReply] = useState<Reply>();
-  const key = shown?.key;
-  if (reply !== undefined && reply.key !== key) setReply(undefined);
-  const current = reply?.key === key ? reply : undefined;
-  const replying = current === undefined ? undefined : answered(current, lines);
-  if (shown?.kind !== "room") return { view: {}, writer: {} };
-  return {
-    view: {
-      onReply: (id: string) => {
-        setReply((was) => asking(was, shown.key, id));
-      },
-    },
-    writer: {
-      replying,
-      asked: current?.asked,
-      onCancelReply: () => {
-        setReply(undefined);
-      },
-      onSay: (composed: Composed) => {
-        const went = acts.onSay(composed, replying?.id);
-        if (went) setReply(undefined);
-        return went;
-      },
-    },
-  };
-}
 
 // The world's rooms once listed: the switcher, the room in view and what writes in it.
 export interface LoadedProps {
@@ -104,8 +74,10 @@ export interface LoadedProps {
   link: RefObject<ChatLink | undefined>;
   /** The room's refused delete, said. */
   dismissed: (room: string) => void;
-  /** Sends a draft to another account (4e). */
-  sayTo: (partner: string, composed: Composed, draft: string) => boolean;
+  /** The conversation's refused delete or reaction, said (4d's DM bar). */
+  dmDismissed: (partner: string) => void;
+  /** Sends what the composer composed to another account (4e), answering a line or correcting one when it says so. */
+  sayTo: (partner: string, say: Say, tags?: { reply?: string; edit?: string }) => boolean;
   dms: Dms;
   /** What the account was told and has not seen (4f-n). */
   noticing: Noticing;
@@ -133,6 +105,7 @@ export function Loaded({
   session,
   link,
   dismissed,
+  dmDismissed,
   sayTo,
   dms,
   noticing,
@@ -144,22 +117,19 @@ export function Loaded({
   const room = dms.partner === undefined && dms.problem === undefined ? current : undefined;
   useRoomKeys(ids, room);
   const acts = roomActs(link, room ?? "", dismissed);
-  const [, setParams] = useSearchParams();
   const me = addressOf(session);
   const opened = useOpened(dms.partner);
   const noteId = useId();
-  // Apart from the room's element, which each line draws again: who is here keeps its drawing (the compiler).
-  const onMessage = (other: string) => {
-    opened.open(other);
-    setParams(dmParams(other));
-  };
-  const people = (
-    <People members={state?.members ?? []} connected={chat === "connected"} me={me} onMessage={onMessage} />
+  const people = useWhoIsHere(state?.members ?? [], { connected: chat === "connected", me }, opened.open);
+  const bar = dms.partner === undefined ? undefined : dmActs(link, dms.partner, dmDismissed);
+  const shown = shownOf(
+    dms,
+    { id: room, state, acts },
+    { sayTo, focus: opened.focus, noteId, seen: noticing.seen, acts: bar },
   );
-  const shown = shownOf(dms, { id: room, state, acts }, { sayTo, focus: opened.focus, noteId, seen: noticing.seen });
   // What the reader keeps in the room in view and the room's pins, which are asked for it: none for a direct message.
   const { keeping, pins } = useRoomKeeping(room, usePins(useAppStore(), room, me));
-  const replies = useReplies(shown, state?.lines, acts);
+  const composing = useComposing(shown, me);
   const threads = useThreads({ shown, state, session, rooms: ids, acts, people });
   return (
     <Sidebar space="l">
@@ -186,7 +156,7 @@ export function Loaded({
           chat={chat}
           me={me}
           noteId={noteId}
-          {...replies.view}
+          {...composing.view}
           modes={modesOf(room, noticing.notify)}
           {...threads.view}
           composer={
@@ -196,7 +166,7 @@ export function Loaded({
               groups={groupsAt(sections, room)}
               multiline={multilineOf(link)}
               {...shown.writer}
-              {...replies.writer}
+              {...composing.writer}
             />
           }
         />

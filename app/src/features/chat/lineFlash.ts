@@ -50,6 +50,9 @@ export function useRemoval({ lines, refused, connected, onDelete, leave, setSaid
   if (deleting !== undefined && (refused === deleting || !lines.some((line) => line.id === deleting))) {
     setDeleting(undefined);
     if (refused !== deleting) setSaid({ title: "Message deleted." });
+  } else if (deleting !== undefined && !connected) {
+    // A link that dropped forgot the act waiting for its answer: no refusal will end it (CR1).
+    setDeleting(undefined);
   }
   // A delete that went out hands the focus to a neighbour; one that could not says so and why, the line kept
   // (/code-review, U8): the chat out of reach, to try again once back, or a msgid no command carries.

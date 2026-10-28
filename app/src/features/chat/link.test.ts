@@ -1614,7 +1614,7 @@ describe("the chat's link: direct messages", () => {
 
   it("puts back the draft of a line Ergo refused, its partner not connected, and counts it", () => {
     const t = withDrafts();
-    expect(t.link.sayTo(OTHER, composed(OTHER, "  hi **you**  "), "  hi **you**  ")).toBe(true);
+    expect(t.link.sayTo(OTHER, { composed: composed(OTHER, "  hi **you**  "), draft: "  hi **you**  " })).toBe(true);
     t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 0)));
     expect(t.kept.get(OTHER)).toBe("  hi **you**  ");
     expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 1, draft: "  hi **you**  " } });
@@ -1622,7 +1622,7 @@ describe("the chat's link: direct messages", () => {
 
   it("labels a direct message of several lines on its batch's opening line, and puts its draft back if refused", () => {
     const t = withDrafts();
-    expect(t.link.sayTo(OTHER, composed(OTHER, "one\ntwo"), "one\ntwo")).toBe(true);
+    expect(t.link.sayTo(OTHER, { composed: composed(OTHER, "one\ntwo"), draft: "one\ntwo" })).toBe(true);
     expect(t.fake.sent.filter((line) => /BATCH|PRIVMSG/.test(line))).toEqual([
       `@label=1 BATCH +ml0 draft/multiline ${OTHER}`,
       `@batch=ml0 PRIVMSG ${OTHER} :one`,
@@ -1635,7 +1635,8 @@ describe("the chat's link: direct messages", () => {
 
   it("puts back each line Ergo refused in turn, past one it delivered", () => {
     const t = withDrafts();
-    for (const draft of ["one", "/me two", "three"]) t.link.sayTo(OTHER, composed(OTHER, draft), draft);
+    for (const draft of ["one", "/me two", "three"])
+      t.link.sayTo(OTHER, { composed: composed(OTHER, draft), draft: draft });
     t.fake.line(echo("a", "one", labelOf(t.fake.sent, 0)));
     t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 1)));
     expect(t.kept.get(OTHER)).toBe("/me two");
@@ -1651,8 +1652,8 @@ describe("the chat's link: direct messages", () => {
   // refused otherwise (a 417, a 477) stayed waiting and a later 401 put back its draft, not the 401's line's.
   it("sends each direct message with a label of its own", () => {
     const t = account();
-    t.link.sayTo(OTHER, composed(OTHER, "one"), "one");
-    t.link.sayTo(OTHER, composed(OTHER, "two"), "two");
+    t.link.sayTo(OTHER, { composed: composed(OTHER, "one"), draft: "one" });
+    t.link.sayTo(OTHER, { composed: composed(OTHER, "two"), draft: "two" });
     const labels = [labelOf(t.fake.sent, 0), labelOf(t.fake.sent, 1)];
     expect(labels.every((label) => label !== undefined)).toBe(true);
     expect(new Set(labels).size).toBe(2);
@@ -1660,8 +1661,8 @@ describe("the chat's link: direct messages", () => {
 
   it("puts back the draft of the line each refusal answers, by its label, a line refused otherwise too", () => {
     const t = withDrafts();
-    t.link.sayTo(OTHER, composed(OTHER, "a"), "a");
-    t.link.sayTo(OTHER, composed(OTHER, "b"), "b");
+    t.link.sayTo(OTHER, { composed: composed(OTHER, "a"), draft: "a" });
+    t.link.sayTo(OTHER, { composed: composed(OTHER, "b"), draft: "b" });
     t.fake.line(`@label=${labelOf(t.fake.sent, 0) ?? ""} :ergo.test 417 ${ADDRESS} :Line too long to be relayed`);
     expect(t.kept.get(OTHER)).toBe("a");
     expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 1, draft: "a", offline: false } });
@@ -1671,9 +1672,21 @@ describe("the chat's link: direct messages", () => {
     expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 2, draft: "b" } });
   });
 
+  // /code-review on 4d's DM bar (CR2): a refused correction or reply came back as a plain draft, its tags lost.
+  it("hands the tags of a refused correction or reply back with its draft, where the draft is back", () => {
+    const t = withDrafts();
+    t.link.sayTo(OTHER, { composed: composed(OTHER, "fixed"), draft: "fixed" }, { edit: "m1" });
+    t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 0)));
+    expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 1, draft: "fixed", tags: { edit: "m1" } } });
+    t.kept.set(OTHER, "");
+    t.link.sayTo(OTHER, { composed: composed(OTHER, "answer"), draft: "answer" }, { reply: "m2" });
+    t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 1)));
+    expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 2, draft: "answer", tags: { reply: "m2" } } });
+  });
+
   it("takes a labeled-response batch for its line's answer: its echo and Ergo's away line deliver it", () => {
     const t = withDrafts();
-    t.link.sayTo(OTHER, composed(OTHER, "hi"), "hi");
+    t.link.sayTo(OTHER, { composed: composed(OTHER, "hi"), draft: "hi" });
     const label = labelOf(t.fake.sent, 0) ?? "";
     t.fake.line(`@label=${label} BATCH +r1 labeled-response`);
     t.fake.line(`@batch=r1;msgid=e;time=${T0};account=${ADDRESS} :${ADDRESS}!u@h PRIVMSG ${OTHER} :hi`);
@@ -1687,7 +1700,7 @@ describe("the chat's link: direct messages", () => {
   it(`keeps ${String(WAITING)} lines waiting at most: the oldest's late answer puts nothing back`, () => {
     const t = withDrafts();
     for (let n = 0; n <= WAITING; n += 1)
-      t.link.sayTo(OTHER, composed(OTHER, `line ${String(n)}`), `line ${String(n)}`);
+      t.link.sayTo(OTHER, { composed: composed(OTHER, `line ${String(n)}`), draft: `line ${String(n)}` });
     t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 0)));
     expect(t.store.getState().dmRefused).toEqual({});
     t.fake.line(refusal(OTHER, labelOf(t.fake.sent, WAITING)));
@@ -1697,7 +1710,7 @@ describe("the chat's link: direct messages", () => {
   // StrykerJS on CR1's fix: a standard reply's FAIL refuses too, and the bound drops a line past 50 waiting, not at 50.
   it("puts back a line Ergo answers with a FAIL, said refused, not offline", () => {
     const t = withDrafts();
-    t.link.sayTo(OTHER, composed(OTHER, "hi"), "hi");
+    t.link.sayTo(OTHER, { composed: composed(OTHER, "hi"), draft: "hi" });
     t.fake.line(`@label=${labelOf(t.fake.sent, 0) ?? ""} :ergo.test FAIL PRIVMSG INVALID_TARGET ${OTHER} :No`);
     expect(t.kept.get(OTHER)).toBe("hi");
     expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 1, draft: "hi", offline: false } });
@@ -1705,7 +1718,8 @@ describe("the chat's link: direct messages", () => {
 
   it(`keeps exactly ${String(WAITING)} lines waiting: the first one's refusal still puts it back`, () => {
     const t = withDrafts();
-    for (let n = 0; n < WAITING; n += 1) t.link.sayTo(OTHER, composed(OTHER, `line ${String(n)}`), `line ${String(n)}`);
+    for (let n = 0; n < WAITING; n += 1)
+      t.link.sayTo(OTHER, { composed: composed(OTHER, `line ${String(n)}`), draft: `line ${String(n)}` });
     t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 0)));
     expect(t.kept.get(OTHER)).toBe("line 0");
   });
@@ -1713,7 +1727,7 @@ describe("the chat's link: direct messages", () => {
   // With Ergo's multiclient, another tab's line reaches this one as an echo does: it answers none of this one's.
   it("takes another tab's line to the same account for no answer to its own", () => {
     const t = withDrafts();
-    t.link.sayTo(OTHER, composed(OTHER, "mine"), "mine");
+    t.link.sayTo(OTHER, { composed: composed(OTHER, "mine"), draft: "mine" });
     t.fake.line(echo("a", "from my other tab"));
     t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 0)));
     expect(t.kept.get(OTHER)).toBe("mine");
@@ -1729,7 +1743,7 @@ describe("the chat's link: direct messages", () => {
     [
       "for a line Ergo delivered",
       (t: WithDrafts) => {
-        t.link.sayTo(OTHER, composed(OTHER, "hi"), "hi");
+        t.link.sayTo(OTHER, { composed: composed(OTHER, "hi"), draft: "hi" });
         const label = labelOf(t.fake.sent, 0);
         t.fake.line(echo("a", "hi", label));
         t.fake.line(refusal(OTHER, label));
@@ -1738,7 +1752,7 @@ describe("the chat's link: direct messages", () => {
     [
       "on a new connection, for the last one's line",
       (t: WithDrafts) => {
-        t.link.sayTo(OTHER, composed(OTHER, "hi"), "hi");
+        t.link.sayTo(OTHER, { composed: composed(OTHER, "hi"), draft: "hi" });
         const label = labelOf(t.fake.sent, 0);
         t.fake.state("waiting");
         t.connected(ADDRESS).line(refusal(OTHER, label));
@@ -1769,7 +1783,7 @@ describe("the chat's link: direct messages", () => {
     ],
   ])("answers no waiting line by %s: Ergo's refusal still puts it back", (_, heard) => {
     const t = withDrafts();
-    t.link.sayTo(OTHER, composed(OTHER, "hi"), "hi");
+    t.link.sayTo(OTHER, { composed: composed(OTHER, "hi"), draft: "hi" });
     heard(t);
     t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 0)));
     expect(t.kept.get(OTHER)).toBe("hi");
@@ -1777,7 +1791,7 @@ describe("the chat's link: direct messages", () => {
 
   it("answers a waiting action by its echo alone, and refuses nothing on a line naming the partner", () => {
     const t = withDrafts();
-    t.link.sayTo(OTHER, composed(OTHER, "/me waves"), "/me waves");
+    t.link.sayTo(OTHER, { composed: composed(OTHER, "/me waves"), draft: "/me waves" });
     t.fake.line(to("b", OTHER));
     expect(t.store.getState().dmRefused).toEqual({});
     const label = labelOf(t.fake.sent, 0);
@@ -1788,8 +1802,8 @@ describe("the chat's link: direct messages", () => {
 
   it("sends an account's draft to another account, as the composer composes it", () => {
     const t = account();
-    expect(t.link.sayTo(OTHER, composed(OTHER, "  hi **you**  "), "  hi **you**  ")).toBe(true);
-    expect(t.link.sayTo(OTHER, composed(OTHER, "/me waves"), "/me waves")).toBe(true);
+    expect(t.link.sayTo(OTHER, { composed: composed(OTHER, "  hi **you**  "), draft: "  hi **you**  " })).toBe(true);
+    expect(t.link.sayTo(OTHER, { composed: composed(OTHER, "/me waves"), draft: "/me waves" })).toBe(true);
     expect(dms(t.fake.sent)).toEqual([`PRIVMSG ${OTHER} :hi **you**`, `PRIVMSG ${OTHER} :\u0001ACTION waves\u0001`]);
   });
 
@@ -1805,7 +1819,7 @@ describe("the chat's link: direct messages", () => {
     ],
   ])("sends nothing of %s", (_, made) => {
     const t = made();
-    expect(t.link.sayTo(OTHER, composed(OTHER, "hi"), "hi")).toBe(false);
+    expect(t.link.sayTo(OTHER, { composed: composed(OTHER, "hi"), draft: "hi" })).toBe(false);
     expect(dms(t.fake.sent)).toEqual([]);
   });
 
@@ -1817,7 +1831,7 @@ describe("the chat's link: direct messages", () => {
   ])("sends nothing to %s", (_, partner) => {
     const t = account();
     const before = t.fake.sent.length;
-    expect(t.link.sayTo(partner, composed(partner, "hi"), "hi")).toBe(false);
+    expect(t.link.sayTo(partner, { composed: composed(partner, "hi"), draft: "hi" })).toBe(false);
     expect(t.fake.sent.slice(before)).toEqual([]);
   });
 
@@ -1825,7 +1839,7 @@ describe("the chat's link: direct messages", () => {
     "sends nothing of a draft the composer would not send (%j)",
     (draft) => {
       const t = account();
-      expect(t.link.sayTo(OTHER, composed(OTHER, draft), draft)).toBe(false);
+      expect(t.link.sayTo(OTHER, { composed: composed(OTHER, draft), draft: draft })).toBe(false);
       expect(dms(t.fake.sent)).toEqual([]);
     },
   );
@@ -2766,3 +2780,307 @@ describe("the chat's link: notices, the edges", () => {
 const unseen = (t: { store: ReturnType<typeof createAppStore> }) =>
   unseenNotices(t.store.getState()).map(({ id }) => id);
 const totalOf = (t: { store: ReturnType<typeof createAppStore> }) => totalUnseen(t.store.getState());
+// slice-4-room-edit (docs/decisions.md, 2026-10-28): a correction of a room's line is a PRIVMSG to the room tagged
+// +gnoworld/edit with the msgid of the line it corrects, a msgid a tag carries; the draft composed as any line is.
+describe("the chat's link: a room's edits", () => {
+  const MSGID = "rmq4xvjw9ys5pwtqqjxbqwvhjc";
+  const memberIn = (rooms: readonly string[]) => {
+    const t = setup();
+    t.link.follow(rooms);
+    t.link.show(rooms[0]);
+    t.signedIn(ADDRESS);
+    const fake = t.connected(ADDRESS);
+    fake.line(`:${ADDRESS}!u@h JOIN ${rooms[0] ?? ""}`);
+    return { ...t, fake };
+  };
+  const edits = (sent: readonly string[]) => sent.filter((line) => line.includes("gnoworld/edit"));
+
+  it("sends a correction as the composer composes the draft, tagged with the msgid it corrects, with no label", () => {
+    const t = memberIn(["#bubble/games"]);
+    expect(t.link.correct("#bubble/games", composed("#bubble/games", "  hi **all**  "), MSGID)).toBe(true);
+    expect(t.link.correct("#bubble/games", composed("#bubble/games", "/me waves"), MSGID)).toBe(true);
+    expect(edits(t.fake.sent)).toEqual([
+      `@+gnoworld/edit=${MSGID} PRIVMSG #bubble/games :hi **all**`,
+      `@+gnoworld/edit=${MSGID} PRIVMSG #bubble/games :\u0001ACTION waves\u0001`,
+    ]);
+  });
+
+  it("sends no tag at all for a plain line", () => {
+    const t = memberIn(["#bubble/games"]);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "hi"))).toBe(true);
+    expect(t.fake.sent.filter((line) => line.includes("PRIVMSG"))).toEqual(["PRIVMSG #bubble/games :hi"]);
+  });
+
+  it.each([
+    ["a space", "a b"],
+    ["a CR LF and a second command", "a\r\nQUIT"],
+    ["a semicolon and a second tag", "a;+typing=active"],
+    ["a backslash", "a\\b"],
+    ["nothing", ""],
+    ["65 characters", "a".repeat(65)],
+    ["a leading semicolon", ";a"],
+    ["a comma", "a,b"],
+    ["a NUL", "a\u0000b"],
+    // R5 (redpass-red): what a tag may not carry, and what no line carries, each one a control or a break.
+    ["a TAB", "a\tb"],
+    ["a NEL", "a\u0085b"],
+    ["a line separator", "a\u2028b"],
+    ["a SOH", "a\u0001b"],
+    ["a BEL", "a\u0007b"],
+    ["a DEL", "a\u007fb"],
+  ])("sends no correction naming a msgid holding %s, nor the draft without it", (_, id) => {
+    const t = memberIn(["#bubble/games"]);
+    const before = t.fake.sent.length;
+    expect(t.link.correct("#bubble/games", composed("#bubble/games", "hi"), id)).toBe(false);
+    expect(t.fake.sent.slice(before)).toEqual([]);
+  });
+
+  it("sends a draft holding a CR LF and a command as a message of two lines: the command is text, no second command goes out", () => {
+    const t = memberIn(["#bubble/games"]);
+    expect(t.link.correct("#bubble/games", composed("#bubble/games", "a\r\nQUIT"), MSGID)).toBe(true);
+    expect(t.fake.sent.filter((line) => line.includes("QUIT"))).toEqual([
+      expect.stringMatching(/^@batch=ml\d+ PRIVMSG #bubble\/games :QUIT$/),
+    ]);
+  });
+
+  it("sends a correction naming a msgid of 64 characters", () => {
+    const t = memberIn(["#bubble/games"]);
+    expect(t.link.correct("#bubble/games", composed("#bubble/games", "hi"), "a".repeat(64))).toBe(true);
+    expect(edits(t.fake.sent)).toEqual([`@+gnoworld/edit=${"a".repeat(64)} PRIVMSG #bubble/games :hi`]);
+  });
+
+  it("sends no correction as a guest, nor in a room Ergo has not said it is in, nor of an empty draft", () => {
+    const g = guestIn(["#bubble/games"]);
+    g.fake.line(`:${GUEST}!u@h JOIN #bubble/games`);
+    const t = memberIn(["#bubble/games", "#bubble"]);
+    expect(g.link.correct("#bubble/games", composed("#bubble/games", "hi"), MSGID)).toBe(false);
+    expect(t.link.correct("#bubble", composed("#bubble", "hi"), MSGID)).toBe(false);
+    expect(t.link.correct("#bubble/games", composed("#bubble/games", ""), MSGID)).toBe(false);
+    expect([...g.fake.sent, ...t.fake.sent].filter((line) => line.includes("PRIVMSG"))).toEqual([]);
+  });
+
+  it("ends the account's typing once a correction went, as a plain line does: the next typing is told at once", () => {
+    const t = memberIn(["#bubble/games"]);
+    t.link.typing("#bubble/games", "active");
+    t.link.typing("#bubble/games", "active");
+    t.link.correct("#bubble/games", composed("#bubble/games", "hi"), MSGID);
+    t.link.typing("#bubble/games", "active");
+    expect(t.fake.sent.filter((line) => line.includes("+typing="))).toEqual([
+      "@+typing=active TAGMSG #bubble/games",
+      "@+typing=active TAGMSG #bubble/games",
+    ]);
+  });
+
+  // A correction is a line of its own, which a REDACT of the line it corrects does not take: a deleted line would stay,
+  // as its newest correction, for every reader (a direct message's delete sends one for each of mine, 4d-dm-bar).
+  describe("a delete", () => {
+    const at = "2026-10-25T10:00:00.000Z";
+    const said = (id: string, tags: string, { text = "words", who = ADDRESS } = {}) =>
+      `@msgid=${id};time=${at};account=${who}${tags === "" ? "" : `;${tags}`} :${who}!u@h PRIVMSG #bubble/games :${text}`;
+    const redacted = (sent: readonly string[]) => sent.filter((line) => line.startsWith("REDACT "));
+
+    // R1 (redpass-red): with the line's REDACT last, a refused one finds no correction of it to show the original behind.
+    it("goes out for each correction of mine to a line and then the line, the line's last", () => {
+      const t = memberIn(["#bubble/games"]);
+      t.fake.line(said("m1", ""));
+      t.fake.line(said("e1", "+gnoworld/edit=m1"));
+      t.fake.line(said("e2", "+gnoworld/edit=m1"));
+      t.fake.line(said("o1", ""));
+      expect(t.link.redact("#bubble/games", "m1")).toBe(true);
+      expect(redacted(t.fake.sent)).toEqual([
+        "REDACT #bubble/games e1",
+        "REDACT #bubble/games e2",
+        "REDACT #bubble/games m1",
+      ]);
+    });
+
+    it("leaves another account's line naming mine as its correction, which is not mine to delete", () => {
+      const t = memberIn(["#bubble/games"]);
+      t.fake.line(said("m1", ""));
+      t.fake.line(said("p2", "+gnoworld/edit=m1", { who: OTHER }));
+      expect(t.link.redact("#bubble/games", "m1")).toBe(true);
+      expect(redacted(t.fake.sent)).toEqual(["REDACT #bubble/games m1"]);
+    });
+
+    it("leaves a correction of mine to another line, and one no command can name", () => {
+      const t = memberIn(["#bubble/games"]);
+      t.fake.line(said("m1", ""));
+      t.fake.line(said("m2", ""));
+      t.fake.line(said("e2", "+gnoworld/edit=m2"));
+      t.fake.line(said("e,1", "+gnoworld/edit=m1"));
+      expect(t.link.redact("#bubble/games", "m1")).toBe(true);
+      expect(redacted(t.fake.sent)).toEqual(["REDACT #bubble/games m1"]);
+    });
+
+    // R2 (redpass-red): a ceiling, written down. The page names the corrections it holds alone; one it never heard (made
+    // from another device while this page was away, then older than its history) is not deleted. The readers who hold
+    // the line never see it (core's redactedLines), the others when they reload.
+    it("names the corrections the page holds alone: one it does not hold is not deleted", () => {
+      const t = memberIn(["#bubble/games"]);
+      t.fake.line(said("m1", ""));
+      expect(t.link.redact("#bubble/games", "m1")).toBe(true);
+      expect(redacted(t.fake.sent)).toEqual(["REDACT #bubble/games m1"]);
+    });
+
+    it("sends no correction's delete when the line's own was not sent", () => {
+      const t = memberIn(["#bubble/games", "#bubble"]);
+      t.fake.line(said("m1", ""));
+      t.fake.line(said("e1", "+gnoworld/edit=m1"));
+      expect(t.link.redact("#bubble", "m1")).toBe(false);
+      expect(t.link.redact("#bubble/games", "m 1")).toBe(false);
+      expect(redacted(t.fake.sent)).toEqual([]);
+    });
+  });
+});
+
+// 4d-dm-bar: a direct message's lines get the message bar. Each act is a line to the partner's nick, labelled so Ergo's
+// refusal (401, its partner not connected) is known; nothing here is a room's, which the link must be in to speak.
+describe("the chat's link: a direct message's bar", () => {
+  const account = () => {
+    const t = setup();
+    t.link.follow(["#bubble"]);
+    t.signedIn(ADDRESS);
+    return { ...t, fake: t.connected(ADDRESS) };
+  };
+  // The lines to OTHER as sent, each with its label and tags kept apart.
+  const toOther = (sent: readonly string[]) =>
+    sent.filter((line) => / (PRIVMSG|TAGMSG|REDACT) /.test(line) && line.includes(OTHER));
+  const labelOf = (line: string | undefined) => /^@label=([^; ]+)/.exec(line ?? "")?.[1] ?? "";
+  const without = (line: string | undefined) => (line ?? "").replace(/^@label=[^; ]+;?/, "@").replace(/^@ /, "");
+  const refusal = (label: string, command = "401") =>
+    `@label=${label} :ergo.test ${command} ${ADDRESS} ${OTHER} :No such nick`;
+  const mine = (id: string, tags: string, text: string) =>
+    `@msgid=${id};time=${T0};account=${ADDRESS}${tags === "" ? "" : `;${tags}`} :${ADDRESS}!u@h PRIVMSG ${OTHER} :${text}`;
+
+  it("says a reply tagged +reply with the msgid it answers, and an edit tagged +gnoworld/edit with the one it corrects", () => {
+    const t = account();
+    expect(t.link.sayTo(OTHER, { composed: composed(OTHER, "an answer"), draft: "an answer" }, { reply: "m1" })).toBe(
+      true,
+    );
+    expect(
+      t.link.sayTo(OTHER, { composed: composed(OTHER, "a correction"), draft: "a correction" }, { edit: "m2" }),
+    ).toBe(true);
+    const [reply, edit] = toOther(t.fake.sent);
+    expect(without(reply)).toBe(`@+reply=m1 PRIVMSG ${OTHER} :an answer`);
+    expect(without(edit)).toBe(`@+gnoworld/edit=m2 PRIVMSG ${OTHER} :a correction`);
+    expect(labelOf(reply)).not.toBe(labelOf(edit));
+  });
+
+  it("sends no line for a msgid no tag can carry, a tag's separator or a space in it", () => {
+    const t = account();
+    for (const bad of ["m 1", "m;1", "", "m\r\nQUIT"]) {
+      expect(t.link.sayTo(OTHER, { composed: composed(OTHER, "x"), draft: "x" }, { reply: bad })).toBe(false);
+      expect(t.link.sayTo(OTHER, { composed: composed(OTHER, "x"), draft: "x" }, { edit: bad })).toBe(false);
+    }
+    expect(toOther(t.fake.sent)).toEqual([]);
+  });
+
+  it("says a line with no tag as it did", () => {
+    const t = account();
+    t.link.sayTo(OTHER, { composed: composed(OTHER, "plain"), draft: "plain" });
+    expect(without(toOther(t.fake.sent)[0])).toBe(`PRIVMSG ${OTHER} :plain`);
+  });
+
+  it("reacts to a line of the conversation, or takes the reaction back, by a labelled TAGMSG to the partner", () => {
+    const t = account();
+    expect(t.link.reactTo(OTHER, { to: "m1", emoji: "👍", on: true })).toBe(true);
+    expect(t.link.reactTo(OTHER, { to: "m1", emoji: "👍", on: false })).toBe(true);
+    const [on, off] = toOther(t.fake.sent);
+    expect(without(on)).toBe(`@+draft/react=👍;+reply=m1 TAGMSG ${OTHER}`);
+    expect(without(off)).toBe(`@+draft/unreact=👍;+reply=m1 TAGMSG ${OTHER}`);
+  });
+
+  it.each([
+    ["an emoji outside RGI's set", { to: "m1", emoji: "x", on: true }, OTHER],
+    ["a msgid no tag can carry", { to: "m 1", emoji: "👍", on: true }, OTHER],
+    ["oneself", { to: "m1", emoji: "👍", on: true }, ADDRESS],
+    ["a nick that is no account's address", { to: "m1", emoji: "👍", on: true }, "guest-ab12cd"],
+  ])("sends no reaction to %s", (_, reaction, partner) => {
+    const t = account();
+    expect(t.link.reactTo(partner, reaction)).toBe(false);
+    expect(t.fake.sent.filter((line) => line.includes("TAGMSG"))).toEqual([]);
+  });
+
+  // CR2 of the room edit: the room's order (F1950), the line's REDACT last, so a refused one never leaves the words it was
+  // corrected from showing alone.
+  it("deletes a line by a labelled REDACT to the partner, and each correction of mine to it before it", () => {
+    const t = account();
+    t.fake.line(mine("m1", "", "first"));
+    t.fake.line(mine("e1", "+gnoworld/edit=m1", "second"));
+    t.fake.line(mine("e2", "+gnoworld/edit=m1", "third"));
+    t.fake.line(mine("o1", "", "another line"));
+    expect(t.link.redactIn(OTHER, "m1")).toBe(true);
+    expect(toOther(t.fake.sent).map(without)).toEqual([
+      `REDACT ${OTHER} e1`,
+      `REDACT ${OTHER} e2`,
+      `REDACT ${OTHER} m1`,
+    ]);
+  });
+
+  it("never deletes the partner's corrections, which are not the account's to delete", () => {
+    const t = account();
+    t.fake.line(`@msgid=p1;time=${T0};account=${OTHER} :${OTHER}!u@h PRIVMSG ${ADDRESS} :theirs`);
+    t.fake.line(`@msgid=p2;time=${T0};account=${OTHER};+gnoworld/edit=p1 :${OTHER}!u@h PRIVMSG ${ADDRESS} :fixed`);
+    t.link.redactIn(OTHER, "p1");
+    expect(toOther(t.fake.sent).map(without)).toEqual([`REDACT ${OTHER} p1`]);
+  });
+
+  // R4 (redpass-dmb): a partner's PRIVMSG tagged as a correction of my line is not mine, so my delete leaves it alone.
+  it("deletes my line alone when the partner's line is tagged as a correction of it", () => {
+    const t = account();
+    t.fake.line(mine("m1", "", "mine"));
+    t.fake.line(
+      `@msgid=p2;time=${T0};account=${OTHER};+gnoworld/edit=m1 :${OTHER}!u@h PRIVMSG ${ADDRESS} :not my words`,
+    );
+    expect(t.link.redactIn(OTHER, "m1")).toBe(true);
+    expect(toOther(t.fake.sent).map(without)).toEqual([`REDACT ${OTHER} m1`]);
+  });
+
+  it("sends no delete for a msgid no command carries, for oneself or a guest's connection, or while not connected", () => {
+    const t = account();
+    expect(t.link.redactIn(OTHER, "m 1")).toBe(false);
+    expect(t.link.redactIn(ADDRESS, "m1")).toBe(false);
+    expect(t.link.redactIn("guest-ab12cd", "m1")).toBe(false);
+    t.fake.state("waiting");
+    expect(t.link.redactIn(OTHER, "m1")).toBe(false);
+    expect(t.link.reactTo(OTHER, { to: "m1", emoji: "👍", on: true })).toBe(false);
+    const guest = guestIn(["#bubble"]);
+    expect(guest.link.redactIn(OTHER, "m1")).toBe(false);
+    expect(guest.link.reactTo(OTHER, { to: "m1", emoji: "👍", on: true })).toBe(false);
+    expect(guest.link.sayTo(OTHER, { composed: composed(OTHER, "x"), draft: "x" }, { reply: "m1" })).toBe(false);
+    expect([...t.fake.sent, ...guest.fake.sent].filter((line) => /REDACT|TAGMSG|PRIVMSG/.test(line))).toEqual([]);
+  });
+
+  it("tells the store Ergo refused a reaction, its partner not connected, and nothing of one it delivered", () => {
+    const t = account();
+    t.link.reactTo(OTHER, { to: "m1", emoji: "👍", on: true });
+    t.link.reactTo(OTHER, { to: "m2", emoji: "👍", on: true });
+    const [first, second] = toOther(t.fake.sent);
+    t.fake.line(
+      `@label=${labelOf(first)};msgid=t1;time=${T0};account=${ADDRESS};+draft/react=👍;+reply=m1 :${ADDRESS}!u@h TAGMSG ${OTHER}`,
+    );
+    expect(t.store.getState().dmActRefused).toEqual({});
+    t.fake.line(refusal(labelOf(second)));
+    expect(t.store.getState().dmActRefused).toEqual({ [OTHER]: { reacted: true } });
+  });
+
+  it("tells the store Ergo refused a delete, the line's id, whichever way it refused", () => {
+    const t = account();
+    t.link.redactIn(OTHER, "m1");
+    t.fake.line(refusal(labelOf(toOther(t.fake.sent)[0])));
+    expect(t.store.getState().dmActRefused).toEqual({ [OTHER]: { deleted: "m1" } });
+    t.store.getState().dmActions.dismissed(OTHER);
+    t.link.redactIn(OTHER, "m2");
+    t.fake.line(
+      `@label=${labelOf(toOther(t.fake.sent)[1])} :ergo.test FAIL REDACT REDACT_FORBIDDEN ${OTHER} m2 :You are not authorized to delete this message`,
+    );
+    expect(t.store.getState().dmActRefused).toEqual({ [OTHER]: { deleted: "m2" } });
+  });
+
+  it("tells the store nothing of a delete Ergo carried out", () => {
+    const t = account();
+    t.link.redactIn(OTHER, "m1");
+    t.fake.line(`@label=${labelOf(toOther(t.fake.sent)[0])} :ergo.test ACK`);
+    expect(t.store.getState().dmActRefused).toEqual({});
+  });
+});

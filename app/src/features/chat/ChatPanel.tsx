@@ -161,7 +161,10 @@ export function ChatPanel({ world }: { world: string }) {
           session={session}
           link={linkRef}
           dismissed={dismissed}
-          sayTo={(partner, composed, draft) => linkRef.current?.sayTo(partner, composed, draft) ?? false}
+          dmDismissed={(partner) => {
+            store.getState().dmActions.dismissed(partner);
+          }}
+          sayTo={(partner, say, tags) => linkRef.current?.sayTo(partner, say, tags) ?? false}
           failed={failed}
         />
       </Suspense>

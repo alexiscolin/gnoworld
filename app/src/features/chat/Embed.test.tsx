@@ -1,6 +1,11 @@
+// @vitest-environment jsdom
+import type { ShownLine } from "@gnoworld/core";
+import { act } from "react";
+import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { Embed, PlayerFrame } from "./Embed.tsx";
+import { LineView } from "./LineView.tsx";
 
 const YOUTUBE = {
   service: "YouTube",
@@ -62,5 +67,95 @@ describe("Embed", () => {
 
   it("shows nothing of a link whose message was hidden", () => {
     expect(renderToStaticMarkup(<Embed embed={YOUTUBE} verdict="hidden" />)).toBe("");
+  });
+
+  // The player is a state of its own, kept across what the line shows (CR1/S1 of the room edit): a reader pressed Play on a
+  // checked link, then the author's correction brought the line another verdict.
+  describe("once playing", () => {
+    const host = document.createElement("div");
+    const root = createRoot(host);
+    const show = (verdict: Parameters<typeof Embed>[0]["verdict"]) => {
+      act(() => {
+        root.render(<Embed embed={YOUTUBE} verdict={verdict} />);
+      });
+    };
+    const play = () => {
+      act(() => {
+        host.querySelector("button")?.click();
+      });
+    };
+    // jsdom has no layout: the frame's scrollIntoView is not there.
+    Element.prototype.scrollIntoView = () => undefined;
+    Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+    afterEach(() => {
+      act(() => {
+        root.render(null);
+      });
+    });
+
+    it("plays the frame once the reader pressed Play on a checked link", () => {
+      show("checked");
+      play();
+      expect(host.querySelector("iframe")?.getAttribute("src")).toBe(YOUTUBE.src);
+    });
+
+    it("falls back to its card, no frame, when the verdict leaves checked for none (a correction awaiting its check)", () => {
+      show("checked");
+      play();
+      show(undefined);
+      expect(host.querySelector("iframe")).toBeNull();
+      expect(host.textContent).toContain("Waiting for the moderation check…");
+      // Back to checked, it waits for a click again.
+      show("checked");
+      expect(host.querySelector("iframe")).toBeNull();
+    });
+
+    it("shows nothing when the verdict goes from checked to hidden while it plays", () => {
+      show("checked");
+      play();
+      show("hidden");
+      expect(host.childElementCount).toBe(0);
+    });
+
+    // Another link, though its verdict is already "checked", is a card again: the key is the link's source.
+    it("starts a card, not a frame, when an edit brings another link", () => {
+      const line = (text: string): ShownLine => ({
+        id: "AB12",
+        time: "2026-10-25T10:00:00.000Z",
+        from: "a",
+        account: "a",
+        text,
+        kind: "message",
+      });
+      const view = (text: string) => {
+        act(() => {
+          root.render(
+            <ul>
+              <LineView
+                line={line(text)}
+                me="a"
+                members={new Set()}
+                stop={false}
+                actions={null}
+                fresh={false}
+                verdict="checked"
+                players
+                saved={false}
+                pinned={false}
+                chips={undefined}
+                react={undefined}
+                answers={undefined}
+              />
+            </ul>,
+          );
+        });
+      };
+      view("https://youtu.be/dQw4w9WgXcQ");
+      play();
+      expect(host.querySelector("iframe")?.getAttribute("src")).toContain("dQw4w9WgXcQ");
+      view("https://youtu.be/9bZkp7q19f0");
+      expect(host.querySelector("iframe")).toBeNull();
+      expect(host.textContent).toContain("Ready to play");
+    });
   });
 });

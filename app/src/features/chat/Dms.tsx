@@ -1,7 +1,7 @@
 // Direct messages on a world's page (slice 4's 4e): the conversation the address names (?dm=<address>), an
 // account's with another account; the list the rooms' navigation shows; and, when the account asks so, none from an
 // account it never wrote to (ADR-0002's "only from people I have talked with"), as the store keeps the choice.
-import type { Line } from "@gnoworld/core";
+import type { Line, Reaction } from "@gnoworld/core";
 import { heardFrom } from "../../store/dms.ts";
 import type { AppState } from "../../store/index.ts";
 import { useApp } from "../../storeContext.tsx";
@@ -29,6 +29,10 @@ export interface Dms {
   refused: AppState["dmRefused"][string] | undefined;
   /** Why the ?dm= asked shows no conversation, said in its place (U9). */
   problem: string | undefined;
+  /** The reactions to the conversation's lines (4d's DM bar). */
+  reactions?: readonly Reaction[] | undefined;
+  /** What Ergo refused of the page's delete or reaction in it: the line whose delete, and a reaction. */
+  acts?: AppState["dmActRefused"][string] | undefined;
 }
 
 /** The account the address's ?dm= names: another account's, never the reader's own nor an address that is none. */
@@ -68,6 +72,8 @@ export function useDms(world: string, session: AppState["login"]["session"], ask
   const choices = useApp((app) => app.dmChoices);
   const refusals = useApp((app) => app.dmRefused);
   const notKept = useApp((app) => app.dmNotKept);
+  const reactions = useApp((app) => app.dmReactions);
+  const acts = useApp((app) => app.dmActRefused);
   const { setOnlyKnown } = useApp((app) => app.dmActions);
   const account = session.kind === "in" ? session.address : undefined;
   const partner = partnerOf(account, asked);
@@ -87,6 +93,8 @@ export function useDms(world: string, session: AppState["login"]["session"], ask
           },
     ...conversationOf(all, choices, partner),
     refused: partner === undefined ? undefined : refusals[partner],
+    reactions: partner === undefined ? undefined : reactions[partner],
+    acts: partner === undefined ? undefined : acts[partner],
     problem: problemOf(session, asked),
   };
 }

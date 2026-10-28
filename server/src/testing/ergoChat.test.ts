@@ -645,3 +645,48 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     expect(changed()).toBeGreaterThan(before);
   });
 });
+
+// 4d-dm-bar (docs/decisions.md, 2026-10-27): the message bar in a direct message rests on Ergo v2.19.1 carrying each act
+// between two accounts as in a room: tags on a PRIVMSG or TAGMSG to a nick, a REDACT reaching both and kept to the
+// line's author (irc/server.go:1327-1334).
+describe("a direct message's bar on the real Ergo", { timeout: 40_000 }, () => {
+  it("relays a reply, a reaction and an edit to the partner and echoes each to the sender, tags intact", async () => {
+    const e = await start();
+    const alice = await login(e, "alice");
+    const bob = await login(e, "bob");
+    const id = await say(alice, "bob", "first");
+    await bob.expect(/PRIVMSG bob :first$/);
+    alice.send(`@+reply=${id} PRIVMSG bob :answer`);
+    alice.send(`@+draft/react=👍;+reply=${id} TAGMSG bob`);
+    alice.send(`@+gnoworld/edit=${id} PRIVMSG bob :fixed`);
+    for (const c of [alice, bob]) {
+      await c.expect(new RegExp(`account=alice.*\\+reply=${id} :alice!\\S+ PRIVMSG bob :answer$`));
+      await c.expect(
+        new RegExp(`^(?=.*account=alice)(?=.*\\+draft/react=👍)(?=.*\\+reply=${id}[; ]).* :alice!\\S+ TAGMSG bob$`),
+      );
+      await c.expect(new RegExp(`account=alice.*\\+gnoworld/edit=${id} :alice!\\S+ PRIVMSG bob :fixed$`));
+    }
+  });
+
+  it("relays an author's REDACT of a line to both, the target as the sender wrote it, and refuses the partner's", async () => {
+    const e = await start();
+    const alice = await login(e, "alice");
+    const bob = await login(e, "bob");
+    const id = await say(alice, "bob", "to delete");
+    await bob.expect(/PRIVMSG bob :to delete$/);
+    bob.send(`REDACT alice ${id}`);
+    await bob.expect(new RegExp(`FAIL REDACT REDACT_FORBIDDEN alice ${id} `));
+    alice.send(`REDACT bob ${id}`);
+    for (const c of [alice, bob]) await c.expect(new RegExp(`:alice!\\S+ REDACT bob ${id}$`));
+  });
+
+  it("answers a labelled act to an account not connected with 401, its label kept", async () => {
+    const e = await start();
+    const alice = await login(e, "alice");
+    alice.send("@label=r1;+draft/react=👍;+reply=m1 TAGMSG bob");
+    await alice.expect(/^@\S*label=r1\S* \S+ 401 alice bob /);
+    alice.send("@label=r2 REDACT bob m1");
+    await alice.expect(/^@\S*label=r2\S* \S+ 401 alice bob /);
+    await sync(alice);
+  });
+});

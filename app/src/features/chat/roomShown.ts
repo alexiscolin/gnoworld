@@ -1,5 +1,6 @@
 // A room in view on a world's page (slice 4's 4b): the conversation's shape, one RoomView and one Writer whatever it is,
 // and what a room is told. Apart from shown.tsx, whose direct messages an account alone has.
+import type { Composed } from "@gnoworld/core";
 import type { AppState } from "../../store/index.ts";
 import { roomLabel } from "./names.ts";
 import type { RoomActs } from "./roomActs.ts";
@@ -13,8 +14,11 @@ export interface Shown {
   key: string;
   view: Pick<
     RoomViewProps,
-    "room" | "title" | "note" | "state" | "empty" | "onDelete" | "onDismiss" | "onRead" | "onReact"
+    "room" | "partner" | "title" | "note" | "state" | "empty" | "onDelete" | "onDismiss" | "onRead" | "onReact"
   >;
+  /** Says what the composer composed in the conversation, an answer to a line (`reply`) or a correction of one (`edit`);
+   * `draft` is what its writer typed; whether it went. */
+  say: (composed: Composed, draft: string, tags?: { reply?: string; edit?: string }) => boolean;
   writer: Pick<WriterProps, "room" | "label" | "members" | "onSay" | "onTyping" | "refused" | "focus" | "describedBy">;
 }
 
@@ -40,6 +44,7 @@ export function roomShown(room: string, state: Room["state"], acts: RoomActs): S
       onRead: acts.onRead,
       onReact: acts.onReact,
     },
+    say: (composed, _draft, tags) => acts.onSay(composed, tags),
     writer: { room, members: state?.members ?? [], onSay: (composed) => acts.onSay(composed), onTyping: acts.onTyping },
   };
 }

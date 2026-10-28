@@ -1,14 +1,15 @@
 // A line's actions (slice 4's 4c, 4d; docs/decisions.md, 2026-10-26): the prototype's bar, an account's three quick
 // reactions first and a Pin button for a reader who may pin (4d), its More menu holding Copy text, Copy link, Open
-// thread (4d's threads), Save message and Mark unread for an account and, on the reader's own line, Delete, asked
-// first. More reactions and edit come with their merges; Report waits for slice 12's moderation queue.
-import type { Line, Shown } from "@gnoworld/core";
+// thread (4d's threads), Save message and Mark unread for an account, Edit (the DM bar's, then the room's: it puts one's
+// own message back in the composer) and, on the reader's own line, Delete, asked first. More reactions come with their
+// merges; Report waits for slice 12's moderation queue.
+import { canEdit, type Line, type Shown } from "@gnoworld/core";
 import { Button, Chip, Cluster, Dialog, IconButton, Menu, Stack } from "@gnoworld/ui";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import styles from "./LineActions.module.css";
 import { keptItems, PinButton, type LineKeeping } from "./LineKeeping.tsx";
 import { menuItems } from "./menuItems.ts";
-import { quoted, roomLabel } from "./names.ts";
+import { quoted, roomLabel, shortAddress } from "./names.ts";
 
 // The prototype's three quick reactions (docs/prototype/source/app.js, withActions).
 const QUICK = ["👍", "❤️", "😂"];
@@ -27,7 +28,10 @@ function useInside() {
 
 export interface LineActionsProps {
   line: Line;
-  room: string;
+  /** The room the line is in; none for a direct message's. */
+  room?: string | undefined;
+  /** The partner of the direct message the line is in (4d's DM bar); none for a room's. */
+  dm?: string | undefined;
   /** The reader's address; none for a guest. */
   me: string | undefined;
   /** Copies the line's text, or the room's link. */
@@ -46,17 +50,19 @@ export interface LineActionsProps {
   onReply: () => void;
   /** Opens the thread the line is in, or starts one (4d's threads); none: no item. */
   onThread?: ((id: string) => void) | undefined;
+  /** Puts the line's words in the composer to correct them; given by a view that has edits. */
+  onEdit?: (() => void) | undefined;
 }
 
 // The dialog that asks before a delete: which line, where, and that it cannot come back; `close` says whether to delete.
 function AskDelete({
   line,
-  room,
+  place,
   open,
   close,
 }: {
   line: Line;
-  room: string;
+  place: string;
   open: boolean;
   close: (go: boolean) => void;
 }) {
@@ -70,7 +76,7 @@ function AskDelete({
       }}
     >
       <Stack space="s">
-        <p>It leaves {roomLabel(room)} for everyone, and cannot come back.</p>
+        <p>It leaves {place}, and cannot come back.</p>
         <Cluster justify="end">
           <Button
             emphasis="outline"
@@ -146,12 +152,40 @@ function Answering({ reactions, onReact, onReply }: Pick<LineActionsProps, "reac
     </>
   );
 }
+// Whether Edit is offered: an Edit to ask for, and canEdit's rule, which the composer holds as well (CR5).
+const asksEdit = (onEdit: (() => void) | undefined, line: Line, me: string | undefined) =>
+  onEdit !== undefined && canEdit(line, me);
+
+// Where a deleted line leaves, as the dialog says it.
+const placeOf = (room: string, dm: string | undefined) =>
+  dm === undefined ? `${roomLabel(room)} for everyone` : `your conversation with ${shortAddress(dm)} for both of you`;
+
+// The More menu's items for a line: what its conversation, its reader and a delete under way allow.
+function itemsOf(
+  props: Pick<LineActionsProps, "line" | "dm" | "me" | "onCopy" | "onThread" | "onEdit" | "keeping">,
+  { own, deleting }: { own: boolean; deleting: boolean },
+  askDelete: () => void,
+) {
+  const { line, dm, me, onCopy, onThread, onEdit, keeping } = props;
+  return menuItems(
+    {
+      onCopy,
+      link: dm === undefined,
+      onThread,
+      kept: keptItems(line, own, keeping),
+      onEdit: asksEdit(onEdit, line, me) && !deleting ? onEdit : undefined,
+      onDelete: own && !deleting ? askDelete : undefined,
+    },
+    line.id,
+  );
+}
 
 /** The bar of a line pointed at or focused, out of the list's live announcements: its More menu, and the dialog
  * that asks before a delete, which gives the focus back to More when it closes. */
 export function LineActions({
   line,
-  room,
+  room = "",
+  dm,
   me,
   onCopy,
   onDelete,
@@ -161,6 +195,7 @@ export function LineActions({
   onReact,
   onReply,
   onThread,
+  onEdit,
 }: LineActionsProps) {
   const [asking, setAsking] = useState(false);
   const { barRef, inside } = useInside();
@@ -179,20 +214,9 @@ export function LineActions({
     deletingRef.current = deleting;
     setAsking(false);
   };
-  const items = menuItems(
-    {
-      onCopy,
-      onThread,
-      kept: keptItems(line, own, keeping),
-      onDelete:
-        own && !deleting
-          ? () => {
-              setAsking(true);
-            }
-          : undefined,
-    },
-    line.id,
-  );
+  const items = itemsOf({ line, dm, me, onCopy, onThread, onEdit, keeping }, { own, deleting }, () => {
+    setAsking(true);
+  });
   return (
     <div
       ref={barRef}
@@ -205,7 +229,7 @@ export function LineActions({
       {me === undefined ? null : <Answering reactions={reactions} onReact={onReact} onReply={onReply} />}
       <PinButton line={line} pin={keeping?.pin} />
       <Menu trigger="More actions" icon="more" emphasis="plain" size="s" label="Message actions" items={items} />
-      {own ? <AskDelete line={line} room={room} open={asking} close={close} /> : null}
+      {own ? <AskDelete line={line} place={placeOf(room, dm)} open={asking} close={close} /> : null}
     </div>
   );
 }

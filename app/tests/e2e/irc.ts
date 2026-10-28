@@ -3,7 +3,8 @@
 import { Address, Ticket } from "@gnoworld/schemas";
 import { z } from "zod";
 import { adena } from "./adena.ts";
-import { expect, hydrated, type Page } from "./fixtures.ts";
+import type { PlaywrightWorkerArgs, PlaywrightWorkerOptions } from "@playwright/test";
+import { expect, hydrated, test, type Page } from "./fixtures.ts";
 
 // Each step is a line sent once a received line matches its pattern ("" waits for none).
 export type Step = readonly [after: string, line: string];
@@ -82,4 +83,16 @@ export async function ticketOf(page: Page): Promise<string> {
 export async function loggedIn(page: Page, as = ""): Promise<{ address: string; ticket: string }> {
   const address = await logIn(page, as);
   return { address, ticket: await ticketOf(page) };
+}
+
+type Launcher = Pick<PlaywrightWorkerArgs, "playwright"> & Pick<PlaywrightWorkerOptions, "launchOptions">;
+
+/** Another account, in a browser of its own (the sandbox's Chromium runs one process, one context): its address, and its
+ * page to talk from. */
+export async function another({ playwright, launchOptions }: Launcher, as: string) {
+  const { baseURL } = test.info().project.use;
+  if (baseURL === undefined) throw new Error("no baseURL");
+  const browser = await playwright.chromium.launch(launchOptions);
+  const second = await (await browser.newContext({ baseURL })).newPage();
+  return { address: await logIn(second, as), page: second, close: () => browser.close() };
 }

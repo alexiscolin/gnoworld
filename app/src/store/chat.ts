@@ -6,10 +6,11 @@ import {
   addLines,
   addReactions,
   concerns,
+  foldEdits,
   lineOf,
   membersAfter,
   reactionOf,
-  redactAfter,
+  redactedLines,
   redactReactions,
   refusedOf,
   topicAfter,
@@ -96,7 +97,7 @@ function reactionsAfter(held: RoomState["reactions"], message: IrcMessage, room:
 function roomAfter(room: RoomState, message: IrcMessage, at: Where & { now: number }): RoomState {
   const line = lineOf(message, at.room);
   const added = line === undefined ? room.lines : addLines(room.lines, [line], LINES_KEPT);
-  const lines = redactAfter(added, message, at.room);
+  const lines = redactedLines(added, message, at.room);
   const members = membersAfter(room.members, message, at);
   const topic = topicAfter(room.topic, message, at.room);
   const typing = typingAfter(room.typing, message, at);
@@ -112,6 +113,17 @@ function roomAfter(room: RoomState, message: IrcMessage, at: Where & { now: numb
   return same
     ? room
     : { ...room, lines, members, topic, typing, read, ...(reactions === undefined ? {} : { reactions }) };
+}
+
+// Ergo's refusal of a delete names its room and line at its own places (FAIL REDACT): the room it leaves refusing that
+// line, none for another reply or a room not followed. A correction's is its line's: the room shows the line, in the
+// correction's words.
+function refusalIn(rooms: ChatState["rooms"], message: IrcMessage): { room: string; state: RoomState } | undefined {
+  const refusal = refusedOf(message);
+  const state = refusal === undefined ? undefined : own(rooms, refusal.room);
+  if (refusal === undefined || state === undefined) return undefined;
+  const refused = foldEdits(state.lines).folded.get(refusal.id) ?? refusal.id;
+  return { room: refusal.room, state: { ...state, refused } };
 }
 
 // Each room changed by `change`, or the same record when none was.
@@ -145,11 +157,9 @@ export const chatSlice: StateCreator<ChatSlice> = (set, get) => {
       // A line goes to the room it names; a QUIT or a NICK to every room.
       heard: (message) => {
         const { me = "", rooms } = get().chat;
-        // Ergo's refusal of a delete names its room and line at its own places (FAIL REDACT).
-        const refusal = refusedOf(message);
-        const refusing = refusal === undefined ? undefined : own(rooms, refusal.room);
-        if (refusal !== undefined && refusing !== undefined) {
-          change({ rooms: { ...rooms, [refusal.room]: { ...refusing, refused: refusal.id } } });
+        const refusal = refusalIn(rooms, message);
+        if (refusal !== undefined) {
+          change({ rooms: { ...rooms, [refusal.room]: refusal.state } });
           return;
         }
         const id = concerns(message);

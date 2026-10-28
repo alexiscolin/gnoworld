@@ -11,6 +11,7 @@ export {
   nickOf,
   redactAfter,
   refusedOf,
+  sameName,
   topicAfter,
 } from "./chat/room.ts";
 export { dmOf } from "./chat/dm.ts";
@@ -36,7 +37,7 @@ export {
   readAfter,
   type NewMark,
 } from "./chat/marker.ts";
-export { foldEdits, type ShownLine } from "./chat/shown.ts";
+export { canEdit, foldEdits, redactedLines, shownLine, type ShownLine } from "./chat/shown.ts";
 export {
   addReactions,
   reactionLine,

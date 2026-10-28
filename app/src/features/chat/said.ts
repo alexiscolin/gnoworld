@@ -79,6 +79,11 @@ const ALONE_LINES = 20;
 const tooMany = (composed: Composed, multiline: boolean | undefined): number =>
   multiline === false && composed.kind === "lines" ? composed.lines.length - ALONE_LINES : 0;
 
+/** An edit that composes to an action is refused, said in the field: Save would turn the message into one that nothing can
+ * turn back, as Edit is for messages alone (CR4 of the room edit). */
+export const editRefusal = (composed: Composed, editing: boolean): Pick<FieldProps, "error"> =>
+  editing && composed.kind === "line" && composed.action ? { error: "An edit cannot be an action." } : {};
+
 /** Whether the draft may go: a line or a message of lines, not past what the connection sends (F1719). */
 export const sendable = (
   composed: Composed,

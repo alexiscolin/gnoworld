@@ -12,16 +12,26 @@ export const multilineOf = (link: RefObject<ChatLink | undefined>): boolean => l
 
 export function roomActs(link: RefObject<ChatLink | undefined>, room: string, dismissed: (room: string) => void) {
   return {
-    onDelete: (id: string) => link.current?.redact(room, id) ?? false,
+    // What Ergo refused before is told no more once the act is tried again (CR4).
+    onDelete: (id: string) => {
+      dismissed(room);
+      return link.current?.redact(room, id) ?? false;
+    },
     onDismiss: () => {
       dismissed(room);
     },
     onRead: (id: string) => {
       link.current?.read(room, id);
     },
-    // Tagged +reply with the msgid it answers, when it answers a line (4d).
-    onSay: (composed: Composed, reply?: string) => link.current?.say(room, composed, reply) ?? false,
-    onReact: (reaction: Reacting) => link.current?.react(room, reaction) ?? false,
+    // Tagged +reply with the msgid it answers (4d), or +gnoworld/edit with the one it corrects, when it does.
+    onSay: (composed: Composed, tags?: { reply?: string; edit?: string }) =>
+      (tags?.edit === undefined
+        ? link.current?.say(room, composed, tags?.reply)
+        : link.current?.correct(room, composed, tags.edit)) ?? false,
+    onReact: (reaction: Reacting) => {
+      dismissed(room);
+      return link.current?.react(room, reaction) ?? false;
+    },
     onTyping: (told: "active" | "done") => {
       link.current?.typing(room, told);
     },

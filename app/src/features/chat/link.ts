@@ -3,7 +3,7 @@
 // (Ergo's max-channels-per-client); the newest lines of the room in view alone, once Ergo says I joined it, since
 // Ergo paces a client to 2 lines a second (plan §4); Ergo's lines read into the store through one BatchReader a
 // connection. Its parts come in, so the tests give their own.
-import { BatchReader, nickOf, type Composed, type IrcMessage, type Reacting } from "@gnoworld/core";
+import { BatchReader, nickOf, type IrcMessage } from "@gnoworld/core";
 import { RoomId } from "@gnoworld/schemas";
 import type { Ergo, ErgoOptions, Who } from "../../lib/ergo/ergo.ts";
 import type { AppState } from "../../store/index.ts";
@@ -15,7 +15,7 @@ import { outbox, type Outbox } from "./outbox.ts";
 import { heardIn } from "./outgoing.ts";
 import { refusedIn } from "./reacting.ts";
 import { Noticer } from "./noticing.ts";
-import { Sending } from "./sending.ts";
+import { Speaking } from "./speaking.ts";
 import { beginSession, heardBy } from "./session.ts";
 import { Places, TypingOut } from "./telling.ts";
 
@@ -40,7 +40,7 @@ class Link implements ChatLink {
   readonly #out = (line: string): boolean => this.#ergo?.send(line) === true;
   readonly #joins = new Joins(this.#out);
   readonly #inside = this.#joins.inside;
-  readonly #sending: Sending;
+  readonly #speaking: Speaking;
   readonly #notices: Noticer;
   readonly #places = new Places((room) => this.#deps.store.getState().chat.rooms[room]?.read, this.#out);
 
@@ -48,12 +48,13 @@ class Link implements ChatLink {
     this.#deps = deps;
     this.#notices = new Noticer(deps.store, this.#inside, () => this.#key !== "guest");
     this.#outbox = outbox(deps.store);
-    this.#sending = new Sending({
+    this.#speaking = new Speaking({
       ergo: () => this.#ergo,
-      guest: () => this.#key === "guest",
+      key: () => this.#key,
       inside: this.#inside,
       outbox: this.#outbox,
       typing: this.#typing,
+      store: deps.store,
     });
     this.#unsubscribe = deps.store.subscribe((state) => {
       this.#follow(state.login.session);
@@ -77,14 +78,16 @@ class Link implements ChatLink {
 
   // Yes while Ergo has no nick yet (its answer is unknown then): no refusal before the welcome; read at each render.
   readonly multiline = (): boolean => this.#ergo?.multiline() ?? true;
-  say = (room: string, composed: Composed, reply?: string): boolean => this.#sending.say(room, composed, reply);
-  sayTo = (partner: string, composed: Composed, draft: string): boolean =>
-    this.#sending.sayTo(partner, composed, draft);
-  redact = (room: string, id: string): boolean => this.#sending.redact(room, id);
 
-  typing(room: string, state: "active" | "done"): void {
-    if (this.#key !== "guest" && this.#inside.has(room)) this.#typing.tell(room, state, this.#out);
-  }
+  readonly say: ChatLink["say"] = (...args) => this.#speaking.say(...args);
+  readonly correct: ChatLink["correct"] = (...args) => this.#speaking.correct(...args);
+  readonly sayTo: ChatLink["sayTo"] = (...args) => this.#speaking.sayTo(...args);
+  readonly reactTo: ChatLink["reactTo"] = (...args) => this.#speaking.reactTo(...args);
+  readonly redactIn: ChatLink["redactIn"] = (...args) => this.#speaking.redactIn(...args);
+  readonly redact: ChatLink["redact"] = (...args) => this.#speaking.redact(...args);
+  readonly react: ChatLink["react"] = (...args) => this.#speaking.react(...args);
+
+  readonly typing: ChatLink["typing"] = (...args) => this.#speaking.typing(...args);
 
   read(room: string, id: string): void {
     const line = this.#deps.store.getState().chat.rooms[room]?.lines.findLast((each) => each.id === id);
@@ -99,11 +102,9 @@ class Link implements ChatLink {
     if (this.#inside.has(room)) this.#places.tell(room);
   }
 
-  flush(): void {
+  readonly flush = (): void => {
     this.#places.flush();
-  }
-
-  react = (room: string, reaction: Reacting): boolean => this.#sending.react(room, reaction);
+  };
 
   stop(): void {
     if (this.#stopped) return;

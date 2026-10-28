@@ -8,6 +8,12 @@ import type { createAppStore } from "../../store/index.ts";
 import type { Composed, Reacting } from "@gnoworld/core";
 import type { Address } from "@gnoworld/schemas";
 
+/** What the composer hands its writer: the draft as composed, and as typed (which a refused direct message puts back). */
+export interface Say {
+  composed: Composed;
+  draft: string;
+}
+
 export interface LinkDeps {
   store: ReturnType<typeof createAppStore>;
   connect: (who: Who, on: Pick<ErgoOptions, "onState" | "onLine">) => Ergo;
@@ -29,13 +35,24 @@ export interface ChatLink {
    * in; an account's alone; tagged +reply with the msgid it answers, one a tag carries (4d). A message of several lines
    * goes as one draft/multiline batch, or a line at a time to an Ergo without it. Whether it went. */
   say: (room: string, composed: Composed, reply?: string) => boolean;
+  /** Sends what the composer composed, so, as a correction of the line `edit` names: tagged +gnoworld/edit with its
+   * msgid, one a tag carries (the room's Edit). Whether it went. */
+  correct: (room: string, composed: Composed, edit: string) => boolean;
   /** Sends what the composer composed to another account, a direct message (4e); an account's alone; `draft` is what
-   * its writer typed, which Ergo's refusal puts back. Whether it went. */
-  sayTo: (partner: string, composed: Composed, draft: string) => boolean;
+   * its writer typed (`say`), which Ergo's refusal puts back; tagged +reply with the msgid it answers or +gnoworld/edit with
+   * the one it corrects, a msgid a tag carries. Whether it went. */
+  sayTo: (partner: string, say: Say, tags?: { reply?: string; edit?: string }) => boolean;
   /** Whether a message of several lines goes whole as one batch, as far as the connection says: yes while there is none or
    * Ergo granted draft/multiline, no once it refused it (a line at a time, the composer's 20 at most). */
   multiline: () => boolean;
-  /** Deletes a line by its msgid in a room Ergo says it is in (Ergo's REDACT, 4c); an account's alone. Whether it went. */
+  /** Reacts to a line of the conversation with an account, or takes the reaction back (4d's DM bar); an account's alone,
+   * to another account. Whether it went; Ergo's refusal (the partner not connected) reaches the store. */
+  reactTo: (partner: string, reaction: Reacting) => boolean;
+  /** Deletes a line of the conversation with an account, and each correction of mine to it (REDACT; Ergo lets an author
+   * delete its own alone). Whether it went; Ergo's refusal reaches the store. */
+  redactIn: (partner: string, id: string) => boolean;
+  /** Deletes a line by its msgid in a room Ergo says it is in (Ergo's REDACT, 4c), and each correction of mine to it, which
+   * a REDACT of the line leaves; an account's alone. Whether the line's went. */
   redact: (room: string, id: string) => boolean;
   /** Reacts to a line of a room Ergo says it is in, by its msgid, with one emoji of RGI's set, or takes the reaction
    * back (4d); an account's alone. Each is labelled, so Ergo's answer to it is known. Whether it went. */

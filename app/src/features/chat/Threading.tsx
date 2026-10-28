@@ -150,7 +150,7 @@ function Panel({
               label="this thread"
               rooms={rooms}
               members={members}
-              onSay={(draft) => acts.onSay(draft, root)}
+              onSay={(composed) => acts.onSay(composed, { reply: root })}
               focus={focus}
               keeps={false}
               draft={typed.get(slot)}

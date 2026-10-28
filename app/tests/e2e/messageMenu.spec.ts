@@ -653,7 +653,7 @@ test.describe("deleting a line", () => {
   };
 
   // The red pass (M2): another's line offers no Delete, through the page as wired.
-  test("offers Delete on the account's own line, never on another's", async ({ page }) => {
+  test("offers Edit and Delete on the account's own line, never on another's", async ({ page }) => {
     await mine(page);
     // 4d adds Save message and Mark unread, which another's line has and one's own line has not (a line one wrote is read).
     await expect(await itemsOf(page, 0, "another's line")).toHaveText([
@@ -667,6 +667,7 @@ test.describe("deleting a line", () => {
       "Copy text",
       "Copy room link",
       "Save message",
+      "Edit",
       "Delete",
     ]);
     // The green pass (G11): the dialog closed until Delete is chosen.
@@ -767,6 +768,7 @@ test.describe("deleting a line", () => {
       "Copy text",
       "Copy room link",
       "Save message",
+      "Edit",
       "Delete",
     ]);
   });

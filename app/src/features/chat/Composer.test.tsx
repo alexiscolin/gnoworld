@@ -40,9 +40,37 @@ describe("Composer", () => {
       why: "Not sent: g10gh7…3y5tv is not online. Unsent: “hi **you**”",
     });
     expect(refusalAfter("x", { draft: "a".repeat(80), why: "W." }).why).toBe(`W. Unsent: “${"a".repeat(80)}”`);
-    // Cut past 80 characters as a reader counts them: a thumb and its skin tone stay one.
-    const long = `${"a".repeat(79)}👍🏽tail`;
-    expect(refusalAfter("x", { draft: long, why: "W." }).why).toBe(`W. Unsent: “${"a".repeat(79)}👍🏽…”`);
+  });
+
+  // /code-review on 4d's DM bar (CR2): the unsent words were cut at 80 characters, and what a reader had typed since kept
+  // the box: the rest of a long correction was lost.
+  it("quotes the unsent words whole, however long, and takes a box holding them already for the draft back", () => {
+    const long = `${"a".repeat(79)}👍🏽${"b".repeat(200)}`;
+    expect(refusalAfter("x", { draft: long, why: "W." }).why).toBe(`W. Unsent: “${long}”`);
+    const refused = { draft: "fixed", why: "W." };
+    expect(refusalAfter("fixed", refused)).toEqual(refused);
+  });
+
+  // The second red pass on the DM bar (R5): the longest draft quoted above is about 280 graphemes, so a cap at 300 or 500
+  // went unseen. A line is 512 bytes on the wire at most, but the box holds more.
+  it("quotes a draft of 2,000 characters whole", () => {
+    const draft = "word ".repeat(400);
+    expect(refusalAfter("x", { draft, why: "W." }).why).toBe(`W. Unsent: “${draft}”`);
+  });
+
+  // A refused correction taken up again starts its composer on the refusal, not told yet: the reader hears why, and the
+  // draft is the box's. A composer that starts on a refusal it already knew tells nothing.
+  it("tells a refusal not told yet as it starts, and one it already knew as it starts not", () => {
+    const refused = { count: 1, draft: "fixed", why: "Not sent: g10gh7…3y5tv is not online." };
+    const composer = (props: { fresh?: boolean; draft: string }) =>
+      renderToStaticMarkup(
+        <Composer room={ROOM} nick={NICK} rooms={[]} members={[]} onSay={() => true} refused={refused} {...props} />,
+      );
+    expect(composer({ fresh: true, draft: "fixed" })).toContain("Not sent: g10gh7…3y5tv is not online.");
+    expect(composer({ fresh: true, draft: "" })).toMatch(/<textarea[^>]*>fixed<\/textarea>/);
+    expect(composer({ fresh: false, draft: "" })).not.toContain("Not sent");
+    expect(composer({ draft: "" })).not.toContain("Not sent");
+    expect(composer({ draft: "" })).not.toMatch(/value="fixed"/);
   });
 
   it("is a form named for the room, its field labelled, Send off while the line is empty", () => {
@@ -653,5 +681,75 @@ describe("Enter in the composer's box", () => {
 
   it("sends nothing of 21 lines on a connection without draft/multiline, whatever the Send button says", () => {
     expect(enter(lines(21), false)).toEqual([]);
+  });
+});
+
+// 4d-dm-bar: Edit on one's own line in a direct message puts its words in the box, to send as a correction (our own
+// convention, docs/decisions.md 2026-10-21); the bar over the field says so and offers to cancel, Send reads Save.
+describe("Composer: an edit", () => {
+  const PARTNER = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+  const draw = (over: Partial<Parameters<typeof Composer>[0]> = {}) =>
+    renderToStaticMarkup(
+      <Composer
+        room={PARTNER}
+        label="g10gh7…3y5tv"
+        nick={NICK}
+        rooms={[]}
+        members={[]}
+        onSay={() => true}
+        draft="the first words"
+        editing
+        onCancelEdit={() => undefined}
+        {...over}
+      />,
+    );
+  const words = (markup: string) => markup.replaceAll(/<[^>]+>/g, "");
+
+  it("says a message is being edited, offers to cancel, starts from its words and sends with Save", () => {
+    const markup = draw();
+    expect(words(markup)).toContain("Editing a message");
+    expect(names(markup)).toContain("Cancel the edit");
+    expect(markup).toMatch(/<textarea[^>]*>the first words<\/textarea>/);
+    expect(markup).toMatch(/<button[^>]*type="submit"[^>]*>Save<\/button>/);
+    expect(markup).not.toMatch(/>Send<\/button>/);
+  });
+
+  it("describes its field by the bar that says what is edited", () => {
+    const markup = draw();
+    const ids = (/<textarea[^>]*aria-describedby="([^"]+)"/.exec(markup)?.[1] ?? "").split(" ");
+    const described = ids.map((id) => new RegExp(`<p[^>]*id="${id}"[^>]*>(.*?)</p>`, "s").exec(markup)?.[1] ?? "");
+    expect(described.map(words)).toContain("Editing a message");
+  });
+
+  // CR4 of the room edit: /me waves in the edit box would turn the message into an action, which has no Edit to turn it back.
+  it("refuses to save an edit that composes to an action, and says so", () => {
+    const markup = draw({ draft: "/me waves" });
+    expect(words(markup)).toContain("An edit cannot be an action.");
+    expect(markup).toMatch(
+      /<button[^>]*disabled=""[^>]*type="submit"[^>]*>Save<\/button>|<button[^>]*type="submit"[^>]*disabled=""[^>]*>Save<\/button>/,
+    );
+  });
+
+  it("lets a plain edit save, and an action go as a new message", () => {
+    const enabled = (markup: string) => !/<button[^>]*disabled=""[^>]*>(Save|Send)<\/button>/.test(markup);
+    const edit = draw({ draft: "the new words" });
+    const action = draw({ draft: "/me waves", editing: undefined, onCancelEdit: undefined });
+    expect(words(edit)).not.toContain("An edit cannot be an action.");
+    expect(words(action)).not.toContain("An edit cannot be an action.");
+    expect([enabled(edit), enabled(action)]).toEqual([true, true]);
+  });
+
+  // CR3 of the room edit: the line being corrected went, so the edit closed; the box, plain again, tells why its words went.
+  it("says the message is gone when the edit's line left, until the draft changes", () => {
+    const markup = draw({ gone: true, editing: undefined, onCancelEdit: undefined, draft: "" });
+    expect(words(markup)).toContain("That message is gone.");
+    expect(words(draw({ editing: undefined, onCancelEdit: undefined }))).not.toContain("That message is gone.");
+  });
+
+  it("shows no edit bar, Send as it was, and no Cancel when nothing is edited", () => {
+    const markup = draw({ editing: undefined, onCancelEdit: undefined });
+    expect(words(markup)).not.toContain("Editing a message");
+    expect(names(markup)).not.toContain("Cancel the edit");
+    expect(markup).toMatch(/>Send<\/button>/);
   });
 });

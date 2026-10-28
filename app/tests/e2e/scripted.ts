@@ -3,6 +3,7 @@
 import { echoedLines, several, type Open } from "./severalLines.ts";
 import type { WebSocketRoute } from "@playwright/test";
 import { hydrated, type Page } from "./fixtures.ts";
+import { echoed, marking, redaction, refusedReaction, refusedSay, tagged } from "./scriptedAnswers.ts";
 
 export const MEMBER = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 /** A line of #games' history; its author MEMBER unless named. */
@@ -91,66 +92,6 @@ function rooms(
   ];
 }
 
-// A REDACT of the page's: Ergo's echo, which takes the line from every reader, or its refusal; none while held.
-function redaction(line: string, me: string, { refuse, hold }: { refuse: boolean; hold: boolean }): string[] {
-  const [command, room = "", id = ""] = line.split(" ");
-  if (command !== "REDACT" || hold) return [];
-  if (refuse)
-    return [`:ergo FAIL REDACT REDACT_FORBIDDEN ${room} ${id} :You are not authorised to delete this message`];
-  return [`:${me}!u@h REDACT ${room} ${id}`];
-}
-
-// The page's MARKREAD: Ergo's answer, the later of the place it holds and the one asked (irc/handlers.go:3247,
-// v2.19.1).
-function marking(line: string, places: Map<string, string>, quiet: boolean): string[] {
-  const [command, room = "", stamp = ""] = line.split(" ");
-  const time = stamp.replace(/^timestamp=/, "");
-  if (command !== "MARKREAD" || quiet) return [];
-  // The ask of the place it holds (handlers.go:3229-3233, v2.19.1): `*` for none.
-  const asked = places.get(room);
-  if (stamp === "") return [`:ergo.test MARKREAD ${room} ${asked === undefined ? "*" : `timestamp=${asked}`}`];
-  if (time === stamp) return [];
-  const held = places.get(room);
-  const kept = held !== undefined && held > time ? held : time;
-  places.set(room, kept);
-  return [`:ergo.test MARKREAD ${room} timestamp=${kept}`];
-}
-
-// The page's line: its tags, then the rest.
-function split(line: string): { tags: string; rest: string } {
-  if (!line.startsWith("@")) return { tags: "", rest: line };
-  const space = line.indexOf(" ");
-  return { tags: line.slice(1, space), rest: line.slice(space + 1) };
-}
-
-// Ergo's refusal of a TAGMSG in a room the account may not speak in: a 404, labelled as the TAGMSG was.
-function refusedReaction(line: string, me: string, refuse: boolean): string[] {
-  const { tags, rest } = split(line);
-  const [command, room = ""] = rest.split(" ");
-  if (command !== "TAGMSG" || !refuse) return [];
-  const label = /(?:^|;)label=([^;]*)/.exec(tags)?.[1];
-  return [`${label === undefined ? "" : `@label=${label} `}:ergo 404 ${me} ${room} :Cannot send to channel (+m)`];
-}
-
-// Ergo's echo (echo-message) of a PRIVMSG the page sends, or of a reaction's TAGMSG, under `me`, with a msgid and a
-// time: the one given, or one after the history's, the page's own tags kept. A typing TAGMSG is not echoed, nor a
-// reaction Ergo refused.
-function echoed(
-  line: string,
-  me: string,
-  echo: { time: string | true | undefined; refused: boolean; next: () => number },
-): string[] {
-  const { tags, rest } = split(line);
-  const reaction = rest.startsWith("TAGMSG ") && !echo.refused && /\+draft\/(un)?react=/.test(tags);
-  // A line of a message of several lines is echoed with the batch (echoedLines), not one by one.
-  const single = rest.startsWith("PRIVMSG ") && !/(?:^|;)batch=/.test(tags);
-  if (echo.time === undefined || !(single || reaction)) return [];
-  const count = echo.next();
-  const time =
-    echo.time === true ? new Date(Date.parse("2026-10-25T11:00:00.000Z") + count * 1000).toISOString() : echo.time;
-  return [`@msgid=echo${String(count)};time=${time};account=${me}${tags === "" ? "" : `;${tags}`} :${me}!u@h ${rest}`];
-}
-
 export interface Scripted {
   /** #games' history, or the named room's. */
   history?: readonly HistoryLine[];
@@ -174,6 +115,9 @@ export interface Scripted {
   historyAfter?: Promise<void>;
   /** Lines Ergo replays after the history's, as it sends them: a reaction's TAGMSG, a reply or an edit. */
   replayed?: readonly string[];
+  /** Ergo refuses each PRIVMSG that carries a tag of the page's (a reply or an edit) as to a nick not connected: a 401 to
+   * its label, no echo; a line with no tag goes through. */
+  refuseTagged?: boolean;
   /** Ergo refuses each reaction, as in a room the account may not speak in: a 404 to its label, no echo. */
   refuseReact?: boolean;
   /** Ergo welcomes the page (001) once this settles: the connection starts late, its nick not known yet. */
@@ -202,6 +146,7 @@ export function scriptedErgo(ergo: WebSocketRoute, me: string, script: Scripted 
     historyAfter,
     replayed = [],
     refuseReact = false,
+    refuseTagged,
     older = [],
   } = script;
   const places = placesOf(room, read);
@@ -217,7 +162,13 @@ export function scriptedErgo(ergo: WebSocketRoute, me: string, script: Scripted 
       ...echoedLines(line, me, multiline),
       ...marking(line, places, quietMarks),
       ...refusedReaction(line, me, refuseReact),
-      ...echoed(line, me, { time: echo, refused: refuseReact, next: () => (echoes += 1) }),
+      ...refusedSay(line, me, tagged(line, refuseTagged)),
+      ...echoed(line, me, {
+        time: echo,
+        refused: refuseReact,
+        saying: !tagged(line, refuseTagged),
+        next: () => (echoes += 1),
+      }),
     ];
     const reply = () => {
       for (const answer of answers) ergo.send(answer);

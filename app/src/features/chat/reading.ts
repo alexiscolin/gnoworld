@@ -6,7 +6,7 @@ import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, type RefO
 /** The msgid of the line marked New: the first past the place once the room holds lines and the place is known, kept
  * while the room is open, as the place moves on and lines come; moved to the line a reader asks to go back to (4d: the
  * device's place `unread`, which only the earlier of it and Ergo's `read` decides from). */
-export function useNewMark(
+function useNewMark(
   lines: readonly Line[],
   places: { read: string | undefined; unread: string | undefined },
   me: string | undefined,
@@ -127,7 +127,7 @@ function useNewestInView(
 }
 
 // The list held at its newest and the room read to it: what a scroll or a change of the list's size does to both.
-export function useListReading(
+function useListReading(
   list: Pick<Parameters<typeof useReading>[0], "lines" | "paged" | "onRead" | "keeping"> & {
     fresh: string | undefined;
     reactions: readonly Reaction[] | undefined;
@@ -149,4 +149,23 @@ export function useListReading(
       look();
     },
   };
+}
+
+// Where the reader left the room, once its history page came: Ergo's reading place, or the account's own mark (4f, 4d).
+const placeOf = (paged: boolean, read: string | undefined, unread: string | undefined) =>
+  paged ? { read, unread } : { read: undefined, unread: undefined };
+
+/** What a list reads of its room: the line marked New, the list held at its newest and the room read to it. */
+export function useListRead(list: {
+  lines: readonly Line[];
+  me: string | undefined;
+  reactions?: readonly Reaction[] | undefined;
+  read?: string | undefined;
+  paged?: boolean | undefined;
+  onRead?: ((id: string) => void) | undefined;
+  keeping?: Parameters<typeof useReading>[0]["keeping"];
+}) {
+  const { lines, me, reactions, read, paged = false, onRead, keeping } = list;
+  const fresh = useNewMark(lines, placeOf(paged, read, keeping?.unread), me);
+  return { fresh, ...useListReading({ lines, fresh, reactions, paged, onRead, keeping }) };
 }

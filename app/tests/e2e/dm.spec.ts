@@ -1,8 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { inGames, lines, whoIsHere, word } from "./chat.ts";
-import type { PlaywrightWorkerArgs, PlaywrightWorkerOptions } from "@playwright/test";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
-import { logIn, login, talk, ticketOf, type Step } from "./irc.ts";
+import { another, login, talk, ticketOf, type Step } from "./irc.ts";
 
 // 4e (docs/plans/slice-4.md §1, §7): direct messages between accounts, through the real Ergo. The page's account
 // reads and writes them; another account, logged in by a page of a context of its own (a session of its own),
@@ -12,17 +11,6 @@ const dmsNav = (page: Page) => page.getByRole("navigation", { name: "Rooms" });
 // A conversation's row, by its own subtitle: the Notifications list above it links to the same page (4f-n).
 const rowOf = (page: Page, address: string) =>
   dmsNav(page).getByRole("link", { name: `${short(address)} Not encrypted` });
-
-// Another account, in a browser of its own (the sandbox's Chromium runs one process, one context): its address, and
-// its page to talk from.
-type Launcher = Pick<PlaywrightWorkerArgs, "playwright"> & Pick<PlaywrightWorkerOptions, "launchOptions">;
-async function another({ playwright, launchOptions }: Launcher, as: string) {
-  const { baseURL } = test.info().project.use;
-  if (baseURL === undefined) throw new Error("no baseURL");
-  const browser = await playwright.chromium.launch(launchOptions);
-  const second = await (await browser.newContext({ baseURL })).newPage();
-  return { address: await logIn(second, as), page: second, close: () => browser.close() };
-}
 
 // A direct message from that account, over its own socket with a ticket of its own (one a connection), once it is
 // registered; every line Ergo answered.

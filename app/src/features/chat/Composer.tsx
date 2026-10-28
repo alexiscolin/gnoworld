@@ -9,6 +9,7 @@ import { Button, Cluster, Field, IconButton, Sidebar, Stack, type IconName } fro
 import { useRef, useState, type KeyboardEvent, type SubmitEvent } from "react";
 import { completed } from "./complete.ts";
 import { completionOf, useFocusAtStart, useHelp, useRefusal, useSelection, type Refused } from "./composerHooks.ts";
+import { useEditing } from "./EditBar.tsx";
 import { formatted, type Edit, type Format } from "./format.ts";
 import { Message } from "./Message.tsx";
 import { roomLabel } from "./names.ts";
@@ -99,6 +100,8 @@ export interface ComposerProps {
   /** The lines Ergo refused so far, the last one's draft, and why it did not go (4e: a direct message to an account
    * not connected). One more while the composer is in view puts its draft back in the box. */
   refused?: Refused | undefined;
+  /** Whether `refused` is a refusal not told yet as the composer starts: a correction Ergo refused, taken up again. */
+  fresh?: boolean | undefined;
   /** Takes the focus as it starts: a direct message just opened from who is here, whose button went (4e's U12). */
   focus?: boolean | undefined;
   /** The id of what describes whom it writes to: a direct message's "not encrypted" (4e's U6). */
@@ -110,12 +113,18 @@ export interface ComposerProps {
   onCancelReply?: (() => void) | undefined;
   /** Whether the connection sends a message of several lines whole; else a draft goes a line at a time, 20 at most (CR7). */
   multiline?: boolean | undefined;
+  /** A message of the reader's is being corrected, its words the draft: Save sends the correction, which Escape or the
+   * bar's Cancel drops (a direct message's, 4d). */
+  editing?: boolean | undefined;
+  onCancelEdit?: (() => void) | undefined;
+  /** The line it was correcting went from the conversation: the field says so until the draft changes (CR3). */
+  gone?: boolean | undefined;
 }
 
 export function Composer(props: ComposerProps) {
   const { room, nick, rooms, members, onSay, draft: kept = "", onDraft, onTyping, label: to, refused } = props;
   const [draft, setDraft] = useState(kept);
-  const refusal = useRefusal(refused, draft, setDraft);
+  const refusal = useRefusal(refused, draft, { setDraft, fresh: props.fresh, gone: props.gone });
   // Each change of the draft, the device and the room told at once: a render alone (a line arriving, a room opened
   // on a kept draft) writes nothing and tells no one (R3).
   const change = (next: string) => {
@@ -154,6 +163,7 @@ export function Composer(props: ComposerProps) {
     apply(completed(draft, completion));
   };
   const answering = useAnswering(props, { formRef, box, otherwise: complete });
+  const editing = useEditing(props, box, answering);
   const send = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!goes) return;
@@ -168,17 +178,17 @@ export function Composer(props: ComposerProps) {
       aria-label={`Write ${to === undefined ? "in" : "to"} ${label}`}
       aria-describedby={props.describedBy}
       onSubmit={send}
-      onKeyDown={answering.keys}
+      onKeyDown={editing.keys}
     >
       <Stack space="2xs">
-        {answering.bar}
+        {editing.bar}
         <FormatBar onFormat={format} />
         <Sidebar side="end" space="2xs">
           <Field
             kind="lines"
             enterAddsLine={coarse}
             label={`Message ${label}`}
-            describedBy={answering.describedBy}
+            describedBy={editing.describedBy}
             value={draft}
             onChange={(value) => {
               change(value);
@@ -188,7 +198,7 @@ export function Composer(props: ComposerProps) {
             {...(refusal.why === undefined ? shown : { error: refusal.why })}
           />
           <Button type="submit" disabled={!goes}>
-            Send
+            {editing.send}
           </Button>
         </Sidebar>
         <Preview composed={composed} me={nick} members={new Set(members)} />

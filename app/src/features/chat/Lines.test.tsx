@@ -115,6 +115,24 @@ describe("the lines view, compiled", () => {
     expect(vi.mocked(Reactions)).toHaveBeenCalled();
   });
 
+  // R4 (redpass-dmb): in a direct message the partner's tag +gnoworld/edit naming my line corrects nothing of mine.
+  it("leaves my words alone when the partner's line is tagged as a correction of my line", () => {
+    draw({
+      room: undefined,
+      partner: ALICE,
+      reactions: [],
+      lines: [
+        line(1, { id: "m1", from: BOB, account: BOB, text: "my words" }),
+        line(2, { id: "p2", edits: "m1", text: "their words" }),
+      ],
+    });
+    const texts = [...host.querySelectorAll("ol > li")].map((item) => item.textContent);
+    expect(texts).toHaveLength(2);
+    expect(texts[0]).toContain("my words");
+    expect(texts[0]).not.toContain("their words");
+    expect(texts[1]).toContain("their words");
+  });
+
   it("shows the bar of the line the pointer enters, and of that one alone", () => {
     draw();
     expect(host.querySelectorAll("[role='toolbar']")).toHaveLength(0);

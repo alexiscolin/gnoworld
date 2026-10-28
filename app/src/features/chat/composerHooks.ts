@@ -2,30 +2,42 @@
 // grew past the lint's sizes): why Ergo refused the last line, the focus at its start, the selection an edit leaves.
 import { COMMANDS, type Composed } from "@gnoworld/core";
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
+import type { RefusedTags } from "../../store/dms.ts";
 import { completions, type Completion } from "./complete.ts";
 import type { Edit } from "./format.ts";
-import { peopleOf, quoted } from "./names.ts";
-import { roomHint, said, sendable, withHint } from "./said.ts";
+import { peopleOf } from "./names.ts";
+import { editRefusal, roomHint, said, sendable, withHint } from "./said.ts";
 
 /** The lines Ergo refused so far, the last one's draft, and why it did not go. */
 export interface Refused {
   count: number;
   draft: string;
   why: string;
+  /** The reply's or the correction's tags the line went with, when its draft is back on the device (CR2). */
+  tags?: RefusedTags;
 }
 
-/** What a refusal leaves in the box `draft` holds: its draft back into an empty box; else the box as typed since,
- * the unsent words quoted after why (CR7). */
+/** What a refusal leaves in the box `draft` holds: its draft back into an empty box, or into a box that holds it already
+ * (a correction taken up again); else the box as typed since, the unsent words quoted whole after why (CR7, CR2). */
 export function refusalAfter(draft: string, refused: { draft: string; why: string }): { draft: string; why: string } {
-  if (draft === "") return refused;
-  return { draft, why: `${refused.why} Unsent: “${quoted(refused.draft)}”` };
+  if (draft === "" || draft === refused.draft) return refused;
+  return { draft, why: `${refused.why} Unsent: “${refused.draft}”` };
 }
 
 // Why Ergo refused the last line, said until the draft changes or a line goes: one more refusal while in view puts
-// its draft back in an empty box (the store put it back on the device too, where no draft waited).
-export function useRefusal(refused: Refused | undefined, draft: string, setDraft: (draft: string) => void) {
-  const [why, setWhy] = useState<string>();
-  const [answered, setAnswered] = useState(refused?.count);
+// its draft back in an empty box (the store put it back on the device too, where no draft waited). A composer starts
+// telling a refusal not told yet (`fresh`: a correction taken up again), or that its edit's line went (`gone`, CR3).
+export function useRefusal(
+  refused: Refused | undefined,
+  draft: string,
+  {
+    setDraft,
+    fresh = false,
+    gone = false,
+  }: { setDraft: (draft: string) => void; fresh?: boolean | undefined; gone?: boolean | undefined },
+) {
+  const [why, setWhy] = useState<string | undefined>(gone ? "That message is gone." : undefined);
+  const [answered, setAnswered] = useState(fresh ? undefined : refused?.count);
   if (refused !== undefined && refused.count !== answered) {
     setAnswered(refused.count);
     const after = refusalAfter(draft, refused);
@@ -100,19 +112,30 @@ export function useHelp(
     label: to,
     multiline,
     groups,
-  }: { nick: string; label?: string | undefined; multiline?: boolean | undefined; groups?: boolean | undefined },
+    editing,
+  }: {
+    nick: string;
+    label?: string | undefined;
+    multiline?: boolean | undefined;
+    groups?: boolean | undefined;
+    editing?: boolean | undefined;
+  },
   { failed, completion, draft }: { failed: boolean; completion?: Completion | undefined; draft: string },
 ) {
   const coarse = useCoarsePointer();
   const context = { nick, draft, multiline, completion };
+  const refusal = editRefusal(composed, editing === true);
   return {
     coarse,
     shown: withHint(
-      hinted(said(composed, failed, context), to === undefined ? roomHint(composed, groups ?? false) : undefined),
+      hinted(
+        { ...said(composed, failed, context), ...refusal },
+        to === undefined ? roomHint(composed, groups ?? false) : undefined,
+      ),
       to !== undefined,
       coarse,
     ),
-    goes: sendable(composed, multiline),
+    goes: sendable(composed, multiline) && refusal.error === undefined,
   };
 }
 

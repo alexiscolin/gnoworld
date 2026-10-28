@@ -2,12 +2,12 @@
 // lazily, which writes through the link; a word for a guest.
 import { lazy, Suspense } from "react";
 import type { Line } from "@gnoworld/core";
-import { pageDrafts } from "../../lib/drafts/page.ts";
 import type { AppState } from "../../store/index.ts";
 import type { ComposerProps } from "./Composer.tsx";
 import { LOG_IN_TO_WRITE } from "./loginWords.ts";
 import { roomLabel } from "./names.ts";
 import { answeredOf } from "./Replying.tsx";
+import { draftOf } from "./writerDraft.ts";
 
 // The composer, an account's alone: a visitor's page never loads its code (the first screen's budget, ADR-0001 §12).
 const load = async () => ({ default: (await import("./Composer.tsx")).Composer });
@@ -50,26 +50,23 @@ export interface WriterProps {
   onDraft?: ((draft: string) => void) | undefined;
   /** Whether the connection sends a message of several lines whole (draft/multiline). */
   multiline?: boolean | undefined;
+  /** The reader's own line being corrected, its words and how many times Edit was asked: the composer starts again from
+   * them, the device's draft left as it was, and Save sends them (4d's DM bar). A correction Ergo refused, taken up
+   * again (`back`), starts from the device's draft, which the refusal put back, and tells the refusal (CR2). */
+  editing?: { text: string; asked: number; back?: true } | undefined;
+  onCancelEdit?: (() => void) | undefined;
+  /** The line being corrected went from the conversation: the box says so (CR3 of the room edit). */
+  gone?: true | undefined;
 }
 
 export function Writer(props: WriterProps) {
   const { session, room, label, rooms, members, groups, onSay, onTyping, refused, focus, describedBy } = props;
-  const { replying, asked, onCancelReply, keeps = true, draft, onDraft, multiline } = props;
+  const { replying, asked, onCancelReply, editing, onCancelEdit, gone, multiline } = props;
   if (session.kind !== "in") return <p>{LOG_IN_TO_WRITE}</p>;
-  // The account's drafts on this device: the room's, where the composer starts, and each change kept (4d).
-  const kept = pageDrafts(session.address);
   return (
     <Suspense fallback={null}>
       <Composer
-        draft={keeps ? kept.get(room) : draft}
-        onDraft={
-          keeps
-            ? (text) => {
-                kept.set(room, text);
-              }
-            : onDraft
-        }
-        key={room}
+        {...draftOf(props, session.address)}
         room={room}
         label={label}
         nick={session.address}
@@ -79,12 +76,15 @@ export function Writer(props: WriterProps) {
         onSay={onSay}
         onTyping={onTyping}
         refused={refused}
-        focus={focus}
+        focus={focus === true || editing !== undefined}
         describedBy={describedBy}
-        replying={replying === undefined ? undefined : answeredOf(replying)}
+        replying={replying === undefined || editing !== undefined ? undefined : answeredOf(replying)}
         asked={asked}
         onCancelReply={onCancelReply}
         multiline={multiline}
+        editing={editing !== undefined}
+        onCancelEdit={onCancelEdit}
+        gone={gone}
       />
     </Suspense>
   );

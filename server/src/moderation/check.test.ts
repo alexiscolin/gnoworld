@@ -9,6 +9,7 @@ import { LOGIN_TABLES } from "../login/login.ts";
 import type { Rules } from "../roles/roles.ts";
 import { accountKey, checkAgain, makeChecker, VERDICT_TABLES } from "./check.ts";
 import { answer } from "../testing/answers.ts";
+import { makeQueue } from "./queue.ts";
 import type { Answer } from "./provider.ts";
 
 const T0 = Date.parse("2026-10-22T12:00:00.000Z");
@@ -333,6 +334,39 @@ describe("checking a message", () => {
       reason: "unknown_edit",
     });
     expect(asked).toEqual(["hello", "hello, fixed"]);
+  });
+
+  // The red pass (slice-4-room-edit): an edit sent right after its line, the line's check still waiting on the provider,
+  // is placed all the same: the queue starts an account's lines in the order they came, and a check claims its line's
+  // row before it waits on anything.
+  it("places an edit sent right after its line, the line's check still waiting on the provider, through the queue", async () => {
+    const release: (() => void)[] = [];
+    const { check, rows } = setup(
+      () =>
+        new Promise<Answer | "unchecked">((resolve) => {
+          release.push(() => {
+            resolve(answer());
+          });
+        }),
+    );
+    const done: unknown[] = [];
+    const queue = makeQueue<ReturnType<typeof said> & { edits?: string }>({
+      run: async (line) => {
+        done.push(await check(line));
+      },
+      log: logger(PEPPER, () => undefined),
+    });
+    queue.push(said("hello", "m1"));
+    queue.push({ ...said("hello, fixed", "m2"), edits: "m1" });
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(rows().map(({ msgid, action }) => [msgid, action])).toEqual([
+      ["m1", "pending"],
+      ["m2", "pending"],
+    ]);
+    for (const go of release.splice(0)) go();
+    await queue.idle();
+    queue.stop();
+    expect(done).toEqual([{ action: "pass" }, { action: "pass" }]);
   });
 
   it("checks an own edit by the rules and the provider like any line: an edit evades nothing (3k)", async () => {
