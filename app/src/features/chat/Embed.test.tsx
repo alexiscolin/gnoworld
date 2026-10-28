@@ -117,6 +117,15 @@ describe("Embed", () => {
       expect(host.childElementCount).toBe(0);
     });
 
+    it("waits for a click again when a hidden line is checked again (R1 of the second red pass)", () => {
+      show("checked");
+      play();
+      show("hidden");
+      show("checked");
+      expect(host.querySelector("iframe")).toBeNull();
+      expect(host.textContent).toContain("Ready to play");
+    });
+
     // Another link, though its verdict is already "checked", is a card again: the key is the link's source.
     it("starts a card, not a frame, when an edit brings another link", () => {
       const line = (text: string): ShownLine => ({
