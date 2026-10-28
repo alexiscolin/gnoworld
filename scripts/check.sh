@@ -8,7 +8,7 @@
 #   and patch coverage, mutations, and the scan of the whole history for secrets. It checks
 #   everything, and its record lets main take the code (pre-push).
 # - `--merge`, a merge's own /pre-merge: the same, but the harness mutants of the guard files the
-#   merge changed alone (Alexis, 2026-10-25); it records the fast gate only.
+#   merge changed alone, since its last recorded pass (Alexis, 2026-10-25, 2026-10-27); it records the fast gate only.
 #
 # GNO_TOOLCHAIN is the folder holding a gno that matches the chain, and its gnohome
 # (docs/DEVELOPMENT.md, "Toolchain"). Node comes from .node-version, through nvm when the
@@ -16,7 +16,7 @@
 set -eu
 cd "$(realpath "$(dirname "$0")/..")" # the folder's own case: a $PWD spelled otherwise loads a tool twice (F081)
 unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a hook's git environment must not steer the gate's git calls
-unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO BENCH_VITEST # the scripts' test switches, which would fake a pass
+unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO PICTURES_OF STORIES_PORT STORIES_OUT # the scripts' test switches, which would fake a pass
 full=false merge=false
 [ "${1:-}" = "--full" ] && full=true
 [ "${1:-}" = "--merge" ] && full=true merge=true
@@ -76,7 +76,7 @@ fi
 # TypeScript: main.test.ts runs the server, which imports core, as a child process, outside Vitest's
 # module graph, and a fixture read from disk is outside it too. ESLint reads no cache: one is keyed
 # on a file's own text, so a type changed elsewhere would hide the error it brings there.
-all=true ts=false app=false gno=false related=true changed=
+all=true ts=false app=false gno=false tokens=false related=true changed=
 if ! $full && [ -z "$tested" ]; then
 	changed=${GATE_CHANGED:-} related=false # Vitest finds the related tests through git, which a copy has not
 elif ! $full; then
@@ -95,6 +95,7 @@ if [ -n "$changed" ]; then
 		case $path in
 		server/src/*) ts=true related=false ;;
 		app/src/*.ts | app/src/*.tsx | app/tests/*.ts | packages/ui/src/*.ts | packages/ui/src/*.tsx) ts=true app=true ;;
+		packages/ui/src/tokens.css) ts=true app=true tokens=true related=false ;; # the tokens story lists every token (F1190)
 		app/src/* | app/tests/* | packages/core/src/* | packages/ui/src/*) ts=true app=true related=false ;;
 		gno/*) gno=true ;;
 		*) all=true ;;
@@ -116,6 +117,17 @@ $related && tests_scope="--changed --passWithNoTests"
 # the pre-commit copy that borrows node_modules. $2, a scoped run's own options.
 PATH="$PWD/node_modules/.bin:$PATH"
 run() { sh -c "$(node -p "require('./package.json').scripts['$1']") ${2:-}"; }
+# A Vitest file or a journey that fails runs once more, alone; the ones that then pass are logged for /pre-merge, a gate
+# that fails twice fails (scripts/unsteady.py, F1700). The log is the repository's own: pre-commit's copy has no repository,
+# but its node_modules is a link to the repository's.
+unsteady_log=.claude/tmp/unsteady.log
+[ -n "$tested" ] || ! [ -L node_modules ] || unsteady_log=$(dirname "$(readlink node_modules)")/.claude/tmp/unsteady.log
+retry() { # retry <tool> <report> <output> <command...>: <report>'s failed files, given to <command>, run once more; <output>, the first run's console, is shown first
+	tool=$1 report=$2 output=$3
+	shift 3
+	cat "$output"
+	python3 -I scripts/unsteady.py "$tool" "$report" "$output" "$unsteady_log" "$(python3 -I scripts/load.py)" -- "$@"
+}
 ms() { python3 -Ic 'import time; print(int(time.time() * 1000))'; }
 # step <name> starts a step of the lane $lane, and closes the one before; `step` alone closes the last.
 step() {
@@ -152,12 +164,33 @@ finish() {
 			total=$((total + took_ms)) parts="$parts${parts:+, }$name $(seconds "$took_ms")"
 		done <"$logs/$l.times"
 		echo "lane $l $(seconds "$total") s: $parts"
+		grep '^unsteady: ' "$logs/$l.log" || : # a test that failed and then passed is said, not only logged
 	done
 	for l in $failed; do
 		echo "check.sh: lane $l failed at $(cat "$logs/$l.at" 2>/dev/null || echo its start):" >&2
 		cat "$logs/$l.log" >&2
 	done
 	[ -z "$failed" ]
+}
+
+# free_ports <n>: a base from which <n> ports in a row are free, picked at random; it fails with a message when 200 tries find none.
+free_ports() {
+	python3 -Ic 'import random, socket, sys
+for _ in range(200):
+    base, held = random.randrange(20000, 60000), []
+    try:
+        for p in range(base, base + int(sys.argv[1])):
+            s = socket.socket()
+            s.bind(("127.0.0.1", p))
+            held.append(s)
+    except OSError:
+        continue
+    finally:
+        [s.close() for s in held]
+    print(base)
+    break
+else:
+    sys.exit(f"check.sh: no run of {sys.argv[1]} free ports in 200 tries")' "$1"
 }
 
 lane_ts() {
@@ -177,26 +210,15 @@ lane_ts() {
 	# A build never installs: React Router's default server entry adds isbot and runs the package
 	# manager, with whatever access the build has (finding F080).
 	step app
-	# Three free ports from a base of this run's own (the journeys' hosts), so gates of several
-	# worktrees run at once; a port taken between this and the build fails the run, never another's.
-	E2E_PORT=$(python3 -Ic 'import random, socket
-for _ in range(200):
-    base, held = random.randrange(20000, 60000), []
-    try:
-        for p in range(base, base + 3):
-            s = socket.socket()
-            s.bind(("127.0.0.1", p))
-            held.append(s)
-    except OSError:
-        continue
-    finally:
-        [s.close() for s in held]
-    print(base)
-    break')
+	# Three free ports from a base of this run's own (the journeys' hosts), so gates of several worktrees run at once;
+	# a port taken between this and the build fails the run, never another's.
+	E2E_PORT=$(free_ports 3)
 	export E2E_PORT
 	packages() { cat package.json app/package.json pnpm-lock.yaml | cksum; }
 	installed=$(packages)
-	node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot # node: see check_regressions.py
+	export PLAYWRIGHT_JSON_OUTPUT_NAME="$logs/playwright.json"
+	node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot,json >"$logs/playwright.out" 2>&1 || # node: see check_regressions.py
+		retry playwright "$PLAYWRIGHT_JSON_OUTPUT_NAME" "$logs/playwright.out" env -u PLAYWRIGHT_JSON_OUTPUT_NAME node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot
 	[ "$(packages)" = "$installed" ] || { echo "check.sh: building the app changed package.json or the lockfile" >&2; exit 1; }
 }
 
@@ -214,7 +236,8 @@ lane_tests() {
 	step ergo
 	sh scripts/ergo.sh >/dev/null # the Ergo the server's tests start, built once from deploy/ergo/VERSION
 	$full || step vitest # --full runs the tests once, with coverage
-	$full || run test "$tests_scope"
+	$full || run test "$tests_scope --reporter=default --reporter=json --outputFile.json=$logs/vitest.json" >"$logs/vitest.out" 2>&1 ||
+		retry vitest "$logs/vitest.json" "$logs/vitest.out" sh -c "$(node -p "require('./package.json').scripts.test") \"\$@\"" sh
 	# The coverage run leaves the compiled project out (its memo cache checks are branches nothing takes, F1350): the
 	# render counts run here instead, once, beside the coverage lane's work.
 	if $full; then
@@ -241,6 +264,17 @@ lane_gno() {
 	)
 }
 
+# The design system's tokens story lists every token, so a token added or changed moves its pictures: a change of
+# tokens.css compares them, that story alone at its three widths, which the full gate walks with every other (F1190:
+# a95a764 added two tokens, every commit's fast gate passed, and --merge failed 30 minutes later). Storybook is built
+# in this run's own folder: a copy outside a repository would have jscpd and knip read a build left in the tree.
+lane_pictures() {
+	$tokens || return 0
+	step pictures
+	port=$(free_ports 1) # a line of its own: in a prefix assignment, its failure would be swallowed and the tool would start with no port (R2)
+	STORIES_OUT="$logs/storybook" STORIES_PORT=$port PICTURES_OF=tokens-- node app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts --reporter=dot pictures
+}
+
 lane_docs() {
 	step check_docs # harness docs name only files that exist
 	python3 -I scripts/check_docs.py
@@ -252,28 +286,28 @@ lane_docs() {
 	sh scripts/test_hooks.sh
 }
 
-# The machine's 1-minute load and its cores, in tenths (scripts/load.py), as the lanes start; read again at their end.
+# The machine's 1-minute load and its cores, in tenths (scripts/load.py), read as the lanes start, before any of them loads it
+# (and again at the end, if the run is over budget).
 load_start=$(python3 -I scripts/load.py)
 start ts
 start types
 start tests
 start gno
 start docs
-finish ts types tests gno docs
+start pictures
+finish ts types tests gno docs pictures
 
-# busy <load at the start> <cores> <load at the end> <cores>: the higher load and the cores, when it passed them.
-busy() {
-	high=$1
-	[ "$3" -le "$high" ] || high=$3
-	[ "$high" -gt "$2" ] && echo "$((high / 10)).$((high % 10)) on $(($2 / 10))"
-}
 took=$(($(date +%s) - started))
 if ! $full && [ "$took" -gt "$budget" ]; then
 	slowest=$(cat "$logs"/*.times | sort -k2 -n | tail -1)
-	# Past its budget on a machine busier than its cores, the gate measured the machine: it says so and passes (C.8).
-	# shellcheck disable=SC2086 # the loads split into their words on purpose
-	if machine=$(busy $load_start $(python3 -I scripts/load.py)); then
-		echo "check.sh: the fast gate took ${took} s, over its ${budget} s budget on a busy machine (load $machine cores): passed; its slowest step, ${slowest%% *}, took $(seconds "${slowest##* }") s" >&2
+	load_end=$(python3 -I scripts/load.py) # read last, once every lane has ended
+	load=${load_start% *} cores=${load_start#* } end=${load_end% *}
+	# Past its budget on a machine busier than its cores both before any lane started and after they all ended, the gate
+	# measured the machine: it says so and passes (C.8; Alexis, 2026-10-27, CR10). The start reading alone excuses a run
+	# begun just after a heavy one on an idle machine (the 1-minute average lags by about a minute); the end reading
+	# alone includes the gate's own lanes, which a change making its own tests CPU-bound raises (security-S3).
+	if [ "$load" -gt "$cores" ] && [ "$end" -gt "${load_end#* }" ]; then
+		echo "check.sh: the fast gate took ${took} s, over its ${budget} s budget on a machine busy when it started and when it ended (load $((load / 10)).$((load % 10)) then $((end / 10)).$((end % 10)) on $((cores / 10)) cores): passed; its slowest step, ${slowest%% *}, took $(seconds "${slowest##* }") s" >&2
 	else
 		echo "check.sh: the fast gate took ${took} s, over its ${budget} s budget: its slowest step, ${slowest%% *}, took $(seconds "${slowest##* }") s; find what grew" >&2
 		exit 1
@@ -291,6 +325,8 @@ if $full; then
 		python3 -I scripts/bench.py
 	}
 	lane_stories() {
+		step core_chromium # core's tests again in Chromium, whose engine reads some regexes and Unicode otherwise (F816)
+		CORE_CHROMIUM=1 node node_modules/vitest/vitest.mjs run --project core_chromium # vitest.config.ts opens it then alone
 		step stories # the design system's stories in a browser: axe, the invariants and the CSS jsdom cannot see
 		node app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts --reporter=dot
 	}
@@ -307,10 +343,9 @@ if $full; then
 		run mutate "--concurrency $half"
 	}
 	lane_history() {
-		if $merge; then
-			step batch_size # a merge's own product code is a small batch (DORA; docs/REVIEW.md)
-			python3 -I scripts/batch_size.py "$base"
-		fi
+		# --full too: a slice's last merge is checked by it (pre-merge.md, step 8) and is the one that reaches main (security-S2).
+		step batch_size # a merge's own product code is a small batch (DORA; docs/REVIEW.md)
+		python3 -I scripts/batch_size.py "$base"
 		step prove_fix # every fix of the product comes with a test that failed before it
 		python3 -I scripts/prove_fix.py "$base"
 		step regressions # no test gone, no floor lower, no approved screenshot changed, unless a commit says why

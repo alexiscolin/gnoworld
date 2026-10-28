@@ -10,7 +10,7 @@ import app from "./lint/app.config.ts";
 import core from "./lint/core.config.ts";
 import react from "./lint/react.config.ts";
 import server from "./lint/server.config.ts";
-import { CLASS_AT_END, MODULE_STATE, SWALLOWED, SWITCHED_OFF, TESTS } from "./lint/shared.config.ts";
+import { BENCHES, CLASS_AT_END, MODULE_STATE, SWALLOWED, SWITCHED_OFF, TESTS } from "./lint/shared.config.ts";
 
 const BASELINE_ALSO = { allowAtRules: ["starting-style"], allowSelectors: ["popover-open"] };
 const FACE = { ...BASELINE_ALSO, allowProperties: ["forced-color-adjust"] };
@@ -93,6 +93,12 @@ export default defineConfig(
     },
   },
   core,
+  {
+    // A bench is switched off like a test (security-S1). Last, since a later no-restricted-syntax replaces an earlier
+    // one's: the list every other file of the app has, and no bench of core, the server or the design system exists.
+    files: BENCHES,
+    rules: { "no-restricted-syntax": ["error", ...SWALLOWED, CLASS_AT_END, SWITCHED_OFF] },
+  },
   {
     files: ["**/*.css"],
     language: "css/css",

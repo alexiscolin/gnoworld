@@ -21,6 +21,8 @@ PRODUCT = ("packages/", "gno/", "app/", "admin/", "server/")
 TEST = re.compile(r"(\.test\.tsx?|\.spec\.ts|_test\.gno|_filetest\.gno|_test\.go)$")
 # The journeys' folder: their helpers are tests too, so a fix of them alone changes no product code.
 JOURNEYS = "app/tests/"
+# The harness's list, one for every script (.githooks/records.sh).
+RECORDS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".githooks", "records.sh")
 # The command per kind of test, run from the worktree's root; tests override them (test_hooks.sh).
 VITEST = os.environ.get("PROVE_FIX_VITEST", "node_modules/.bin/vitest run")
 PLAYWRIGHT = os.environ.get("PROVE_FIX_PLAYWRIGHT", "node app/node_modules/@playwright/test/cli.js test")
@@ -47,12 +49,33 @@ def runs(tests):
     return out
 
 
+# A journey that reproduces a race fails on the parent only sometimes (ca98dda): each command gets up to this
+# many runs there and counts as failing if any one fails, the runs stopping at the first failure.
+RUNS = 3
+
+
 def fails_before(commit, tests):
-    """Whether the commit's tests fail on its parent: a worktree of the parent, with only them added."""
+    """The most runs it took on the commit's parent for each of the tests' commands to fail there, or None when
+    one passed all RUNS runs: a worktree of the parent, with only the tests added."""
     with worktree(f"{commit}^") as tree:
         git("-C", tree, "checkout", commit, "--", *tests)
-        return all(subprocess.run(cmd, shell=True, cwd=os.path.join(tree, folder), capture_output=True).returncode != 0
-                   for folder, cmd in runs(tests))
+        took = 0
+        for folder, cmd in runs(tests):
+            for n in range(1, RUNS + 1):
+                if subprocess.run(cmd, shell=True, cwd=os.path.join(tree, folder), capture_output=True).returncode != 0:
+                    break
+            else:
+                return None
+            took = max(took, n)
+        return took
+
+
+def harness_files(commit):
+    """The files of the commit that records.sh lists as the harness's (a tool's config under app/ is one): harness_mutate
+    proves those. A list git cannot give refuses rather than counting them as product or as harness."""
+    listed = subprocess.run(["sh", "-c", '. "$1" && harness --name-only "$2^" "$2"', "-", RECORDS, commit],
+                            capture_output=True, text=True, check=True)  # a failed list raises: the gate refuses
+    return set(listed.stdout.splitlines())
 
 
 def verdict(commit):
@@ -63,13 +86,18 @@ def verdict(commit):
     # Every product file it touches, a deleted one included; the tests it runs, those it leaves.
     changed = git("diff-tree", "--no-commit-id", "--name-only", "-r", "--diff-filter=AMDT", commit).splitlines()
     left = set(git("diff-tree", "--no-commit-id", "--name-only", "-r", "--diff-filter=AM", commit).splitlines())
-    product = [f for f in changed if f.startswith(PRODUCT)]
+    harness = harness_files(commit)
+    product = [f for f in changed if f.startswith(PRODUCT) and f not in harness]
     tests = [f for f in product if TEST.search(f) and f in left]
     if all(TEST.search(f) or f.startswith(JOURNEYS) for f in product):  # the harness or tests alone: nothing to prove
         return None
     if not tests:
         return None if re.search(r"^No-test: \S", message, re.M) else "a fix with no test that reproduces the bug (or a `No-test: <why>` line)"
-    return None if fails_before(commit, tests) else f"its tests pass before the fix, so they reproduce nothing: {', '.join(tests)}"
+    took = fails_before(commit, tests)
+    if took is None:
+        return f"its tests pass before the fix in {RUNS} runs, so they reproduce nothing: {', '.join(tests)}"
+    print(f"prove_fix: {commit[:7]} its tests failed before the fix, in {took} run{'s' * (took > 1)}")
+    return None
 
 
 base = sys.argv[1]

@@ -8,9 +8,14 @@ Usage: scripts/probe.py, from the repository root, with Node and pnpm on PATH.""
 import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
+
+sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no __pycache__
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # -I leaves this folder off the path
+from repo_files import BENCH_FILE
 
 HERE = "packages/core/src/__probe__"
 APP = "app/src/__probe__"
@@ -62,6 +67,10 @@ LINT = [
     ("skip_each.test.ts", 'import { test } from "vitest";\n\ntest.skip.each([1])("x %i", () => {});\n', "no-restricted-syntax: A test is never switched off"),
     ("skip_if.test.ts", 'import { test } from "vitest";\n\ntest.skipIf(true)("x", () => {});\n', "no-restricted-syntax: A test is never switched off"),
     ("run_if.test.ts", 'import { test } from "vitest";\n\ntest.runIf(false)("x", () => {});\n', "no-restricted-syntax: A test is never switched off"),
+    # A bench switched off measures nothing, as a test switched off checks nothing (security-S1): the bench files too.
+    ("skipped.bench.ts", 'const describe = { skip: (name: string, f: () => void): string => name + String(f) };\n\ndescribe.skip("x", () => undefined);\n', "no-restricted-syntax: A test is never switched off"),
+    ("focused.bench.tsx", 'const bench = { only: (name: string, f: () => void): string => name + String(f) };\n\nbench.only("x [1 ms]", () => undefined);\n', "no-restricted-syntax: A test is never switched off"),
+    ("clean.bench.ts", 'const bench = (name: string, f: () => void): string => name + String(f);\n\nbench("x [1 ms]", () => undefined);\n', None),
     ("pending.test.ts", 'import { expect, test } from "vitest";\n\ntest.fails("x", () => {\n  expect(1).toBe(2);\n});\n', None),
     ("inline_disable.ts", "export function run(code: string): unknown {\n  // eslint-disable-next-line no-eval\n  return eval(code);\n}\n", "no-eval"),
     ("expect_error.ts", "// @ts-expect-error: the reason\nexport const n: number = \"x\";\n", "@typescript-eslint/ban-ts-comment"),
@@ -108,8 +117,8 @@ def restricted(name):
     return f"no-restricted-properties: {name} is restricted from being used. Nothing reaches the DOM as HTML"
 
 
-def run(cmd, cwd="."):
-    return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+def run(cmd, cwd=".", env=None):
+    return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, env=None if env is None else {**os.environ, **env})
 
 
 def plant(files, where=HERE):
@@ -124,6 +133,17 @@ failures = []
 # ONLY=<block>[,<block>...] runs only those blocks: harness_mutate runs the one a guard belongs to.
 ONLY = set(filter(None, os.environ.get("ONLY", "").split(",")))
 ran = set()
+
+
+# What vitest.config.ts reads to load, copied into a probe's copy: one list, so a file the config comes to read
+# (lint/shared.config.ts in b4a33fa, the compiled project in a633d92) breaks no copy for want of it (F1747).
+VITEST_CONFIG = ("vitest.config.ts", "lint/shared.config.ts", "app/vitest.compiled.config.ts")
+
+
+def vitest_config(copy):
+    for name in VITEST_CONFIG:
+        os.makedirs(os.path.dirname(f"{copy}/{name}"), exist_ok=True)
+        shutil.copy(name, f"{copy}/{name}")
 
 
 def part(name):
@@ -146,6 +166,22 @@ def reported(messages):
 def carries(got, rule):
     """A rule alone matches its name; "rule: words" matches a message that starts with them."""
     return rule in got if ": " not in rule else any(str(g).startswith(rule) for g in got)
+
+
+def verdicts(cmd, env=None):
+    """A Vitest run, and each test's title and status in its JSON report, none when it wrote none. The report goes
+    to a file: the run also prints on stdout (another run's port taken, Vite's dependencies), which no parser reads."""
+    fd, report = tempfile.mkstemp(suffix=".json")
+    os.close(fd)
+    try:
+        out = run([*cmd, "--reporter=json", f"--outputFile={report}"], env=env)
+        try:
+            with open(report) as f:
+                return out, {t["title"]: t["status"] for r in json.load(f)["testResults"] for t in r["assertionResults"]}
+        except (ValueError, KeyError):
+            return out, {}
+    finally:
+        os.remove(report)
 
 
 def expect(ok, what):
@@ -185,23 +221,220 @@ try:
         expect(out.returncode != 0 and "assertion" in (out.stdout + out.stderr).lower(), "vitest refuses a test with no assertion")
         shutil.rmtree(HERE)
 
+    if part("unsteady_real"):
+        # unsteady.py reads the reports the real tools write, not stubs' (R1, R4): two files failing at once, a failed test in a
+        # nested describe, then what besides the failed files refuses the retry: Vitest's unhandled error (its report holds
+        # none), a file that did not load, Playwright's top-level errors (here a global teardown that throws).
+        unsteady = os.path.realpath("scripts/unsteady.py")
+        vitest, playwright = os.path.realpath("node_modules/.bin/vitest"), os.path.realpath("app/node_modules/@playwright/test/cli.js")
+        failing = lambda name: f'import {{ describe, expect, test }} from "vitest";\n\ndescribe("outer", () => {{\n  test("{name} fails", () => {{\n    expect(1).toBe(2);\n  }});\n}});\n'
+        timer = 'import { test } from "vitest";\n\ntest("late", async () => {\n  setTimeout(() => {\n    throw new Error("late");\n  }, 5);\n  await new Promise((r) => setTimeout(r, 50));\n});\n'
+        broken = 'import "./missing.ts";\nimport { test } from "vitest";\n\ntest("c", () => undefined);\n'
+        spec = lambda name: f'import {{ expect, test }} from "@playwright/test";\n\ntest.describe("outer", () => {{\n  test("{name} fails", () => {{\n    expect(1).toBe(2);\n  }});\n}});\n'
+        config = 'import { defineConfig } from "@playwright/test";\n\nexport default defineConfig({ testDir: "tests"%s });\n'
+        teardown = 'export default function teardown(): void {\n  throw new Error("teardown");\n}\n'
+        # name: (the tool, its files, the refusal's words or None when the retry goes on, the failed files and tests the log names)
+        cases = {
+            "vitest_two": ("vitest", {"tests/a.test.ts": failing("a"), "tests/b.test.ts": failing("b")}, None, ["tests/a.test.ts", "tests/b.test.ts", "outer a fails", "outer b fails"]),
+            "vitest_unhandled": ("vitest", {"tests/a.test.ts": failing("a"), "tests/late.test.ts": timer}, "an unhandled error", []),
+            "vitest_no_load": ("vitest", {"tests/a.test.ts": failing("a"), "tests/c.test.ts": broken}, "failed with no failed test", []),
+            "playwright_nested": ("playwright", {"playwright.config.ts": config % "", "tests/a.spec.ts": spec("a")}, None, ["tests/a.spec.ts", "outer > a fails"]),
+            "playwright_teardown": ("playwright", {"playwright.config.ts": config % ', globalTeardown: "./teardown.ts"', "teardown.ts": teardown, "tests/a.spec.ts": spec("a")}, "errors of its own", []),
+        }
+        with tempfile.TemporaryDirectory() as root:
+            for case, (tool, files, refusal, logged) in cases.items():
+                where = os.path.join(os.path.realpath(root), case)
+                plant(files, where=where)
+                os.symlink(os.path.realpath("node_modules" if tool == "vitest" else "app/node_modules"), f"{where}/node_modules")
+                report, output, log = f"{where}/report.json", f"{where}/output.txt", f"{where}/unsteady.log"
+                if tool == "vitest":
+                    first = run([vitest, "run", "--reporter=default", "--reporter=json", f"--outputFile.json={report}"], cwd=where)
+                else:
+                    first = run(["node", playwright, "test", "-c", "playwright.config.ts", "--reporter=dot,json"], cwd=where, env={"PLAYWRIGHT_JSON_OUTPUT_NAME": report})
+                with open(output, "w") as f:
+                    f.write(first.stdout + first.stderr)
+                out = run([sys.executable, "-I", unsteady, tool, report, output, log, "10 160", "--", "true"], cwd=where)
+                said = out.stdout + out.stderr
+                expect(first.returncode != 0 and os.path.exists(report), f"unsteady {case}: the real {tool} run fails and writes its report")
+                if refusal is None:
+                    got = open(log).read() if os.path.exists(log) else ""
+                    ok = out.returncode == 0 and all(name in got for name in logged) and got.count("\n") == len([n for n in logged if "/" in n])
+                    expect(ok, f"unsteady {case}: the retry goes on and logs {logged}" + ("" if ok else f": {said[-200:]} {got}"))
+                else:
+                    ok = out.returncode != 0 and refusal in said and not os.path.exists(log)
+                    expect(ok, f"unsteady {case}: refuses with {refusal!r}, logging nothing" + ("" if ok else f": {said[-200:]}"))
+
     if part("pinned_node"):
-        # Every test run on the Node .node-version pins, StrykerJS's dry run too: another V8 reads some regexes
-        # otherwise (F816 came from StrykerJS on Homebrew's Node 26). The toolchain test passes on the pin, and fails
-        # once the pin names another.
-        test = "server/src/testing/toolchain.test.ts"
-        out = run(["node_modules/.bin/vitest", "run", test])
-        expect(out.returncode == 0 and "1 passed" in out.stdout, "vitest's toolchain test passes on the pinned Node")
+        # Every Vitest run is on the Node .node-version pins, whatever it runs: vitest.config.ts refuses another Node as every
+        # run reads it (a whole run, one project, `list`; StrykerJS's dry run and `bench` start Vitest the same way, through
+        # createVitest). Another V8 reads some regexes otherwise (F816 came from StrykerJS on Homebrew's Node 26). Probed on a
+        # copy of the config with a pin of its own: .node-version, which check.sh reads for its PATH and the sandbox keeps from
+        # a command, stays as it is even when this run is killed (G10).
         with open(".node-version") as f:
             pinned = f.read()
-        try:
-            with open(".node-version", "w") as f:
-                f.write("0.0.1\n")
-            out = run(["node_modules/.bin/vitest", "run", test])
-            expect(out.returncode != 0 and "v0.0.1" in out.stdout + out.stderr, "vitest refuses a Node .node-version does not pin")
-        finally:
-            with open(".node-version", "w") as f:
-                f.write(pinned)
+        refusal = "Vitest runs on Node"
+        with tempfile.TemporaryDirectory() as copy:
+            os.makedirs(f"{copy}/packages/probe/src")
+            vitest_config(copy)
+            with open(f"{copy}/packages/probe/src/a.test.ts", "w") as f:
+                f.write('import { expect, test } from "vitest";\n\ntest("a", () => {\n  expect(1).toBe(1);\n});\n')
+            os.symlink(os.path.realpath("node_modules"), f"{copy}/node_modules")
+            vitest = os.path.realpath("node_modules/.bin/vitest")
+            for pin, passes in ((pinned, True), ("0.0.1\n", False)):
+                with open(f"{copy}/.node-version", "w") as f:
+                    f.write(pin)
+                for args in (["run"], ["run", "--project", "ui"], ["list"]):
+                    out = run([vitest, *args], cwd=copy)
+                    said = out.stdout + out.stderr
+                    if passes:
+                        expect(refusal not in said, f"vitest {' '.join(args)} runs in a copy with the real pin")
+                    else:
+                        expect(out.returncode != 0 and f"{refusal} v0.0.1" in said, f"vitest {' '.join(args)} refuses a Node .node-version does not pin")
+                    if passes and args == ["run"]:
+                        expect(out.returncode == 0 and "1 passed" in out.stdout, "vitest passes a test in a copy with the real pin")
+
+    if part("bench_files"):
+        # Vitest runs the benches vitest.config.ts names, the form `*.bench.ts(x)` that ESLint's BENCHES and BENCH_FILE
+        # (bench.py, check_regressions.py) read, and no other: its own default, `*.{bench,benchmark}.?(c|m)[jt]s?(x)`, ran
+        # a `room.benchmark.tsx` or an `x.bench.mts` no guard named, switched off or not (CR3). On a copy of the config
+        # (and the lint's shared names it imports), with one bench of each form.
+        forms = {"a.bench.ts": True, "b.bench.tsx": True, "c.benchmark.ts": False, "d.bench.mts": False, "e.benchmark.tsx": False}
+        with tempfile.TemporaryDirectory() as copy:
+            os.makedirs(f"{copy}/packages/probe/src")
+            vitest_config(copy)
+            shutil.copy(".node-version", f"{copy}/.node-version")
+            os.symlink(os.path.realpath("node_modules"), f"{copy}/node_modules")
+            for name in forms:
+                with open(f"{copy}/packages/probe/src/{name}", "w") as f:
+                    f.write(f'import {{ bench }} from "vitest";\n\nbench("{name[0]} [1000 ms]", () => undefined);\n')
+            report = f"{copy}/bench.json"
+            out = run([os.path.realpath("node_modules/.bin/vitest"), "bench", "--run", "--project", "node", "--outputJson", report], cwd=copy)
+            ran_ok = out.returncode == 0 and os.path.exists(report)
+            expect(ran_ok, "vitest runs the benches of a copy" + ("" if ran_ok else f": {(out.stdout + out.stderr)[-300:]}"))
+            if os.path.exists(report):
+                with open(report) as f:
+                    ran_files = {os.path.basename(file["filepath"]) for file in json.load(f).get("files", [])}
+                ours_only = ran_files == {n for n, ours in forms.items() if ours}
+                expect(ours_only, "vitest runs the benches in the form the guards read, and no other" + ("" if ours_only else f": {sorted(ran_files)}"))
+            for name, ours in forms.items():
+                expect(bool(BENCH_FILE.search(name)) == ours, f"BENCH_FILE reads {name} as the guards' bench form does: {ours}")
+
+    if part("core_chromium"):
+        # Core's tests run a second time in Chromium, whose engine reads some regexes and Unicode otherwise than
+        # Node's (F816, F817), and only when CORE_CHROMIUM is set: a planted test that passes on
+        # Node fails there while a clean one passes beside it, a failure writes nothing beside the code, and with no
+        # CORE_CHROMIUM, `vitest list` (check_regressions.py) lists core's tests on Node alone, opening no browser.
+        tests = {"engine.test.ts": ("outside a page", 'expect(typeof document).toBe("undefined")'), "clean.test.ts": ("anywhere", "expect(1 + 1).toBe(2)")}
+        plant({name: f'import {{ expect, test }} from "vitest";\n\ntest("{title}", () => {{\n  {check};\n}});\n' for name, (title, check) in tests.items()})
+        paths = [f"{HERE}/{name}" for name in tests]
+        out = run(["node_modules/.bin/vitest", "run", "--project", "node", *paths])
+        expect(out.returncode == 0, "core's planted tests pass on Node")
+        out, states = verdicts(["node_modules/.bin/vitest", "run", "--project", "core_chromium", *paths], env={"CORE_CHROMIUM": "1"})
+        expect(states == {"outside a page": "failed", "anywhere": "passed"}, f"core_chromium runs core's tests in a page: {states or (out.stderr or out.stdout)[-300:]}")
+        expect(not os.path.exists(f"{HERE}/__screenshots__") and not os.path.exists(".vitest-attachments"), "core_chromium writes nothing beside the code on a failure")
+        # Plain lines, `[project] file > title`: `--json` would take the next path for its output file.
+        out = run(["node_modules/.bin/vitest", "list", *paths])
+        projects = {line[1:line.index("]")] for line in out.stdout.splitlines() if line.startswith("[") and "]" in line}
+        expect(out.returncode == 0 and projects == {"node"}, f"with no CORE_CHROMIUM, vitest lists core's tests on Node alone: {projects or out.stderr[-300:]}")
+        shutil.rmtree(HERE)
+
+    if part("tokens_pictures"):
+        # The fast gate compares the tokens story's pictures when tokens.css changes (F1190): a token added with no new
+        # picture fails the run it makes, the untouched tree passes it, a prefix no story has fails rather than
+        # comparing nothing, and a port that is no port refuses. On a copy of the tracked files as they are (as pre-commit's
+        # staged copy: no repository, borrowing node_modules), so this tree's tokens.css is never written, even by a run
+        # killed half-way.
+        with tempfile.TemporaryDirectory() as tree, socket.socket() as held:
+            files = subprocess.run(["git", "ls-files", "-z"], capture_output=True, check=True).stdout
+            packed = subprocess.run(["tar", "-c", "--null", "-T", "-"], input=files, capture_output=True, check=True).stdout
+            subprocess.run(["tar", "-x", "-C", tree], input=packed, check=True)
+            # From where the packages are installed: in a harness_mutate copy this folder's node_modules is one link (the helper
+            # finds only real folders), and the workspaces' relative links need the root's beside them.
+            subprocess.run(["sh", os.path.abspath("scripts/borrow_node_modules.sh"), tree], cwd=os.path.dirname(os.path.realpath("node_modules")), check=True)
+            held.bind(("127.0.0.1", 0))
+            port = str(held.getsockname()[1])
+            held.close()  # the file server takes the port it found free
+            pictures = lambda of, **env: run(["node", "app/node_modules/@playwright/test/cli.js", "test", "-c", "app/playwright.stories.config.ts",
+                                              "--reporter=dot", "pictures"], cwd=tree, env={"PICTURES_OF": of, "STORIES_PORT": port, **env})
+            # Where the fast gate has Storybook built: check.sh's run folder, `check.XXXXXX`, under the temporary folder, whose
+            # `storybook` it takes: out of the tree its checks read.
+            run_folder = tempfile.TemporaryDirectory(prefix="check.")
+            built = os.path.join(run_folder.name, "storybook")
+            out = pictures("tokens--", STORIES_OUT=built)
+            expect(out.returncode == 0 and "3 passed" in out.stdout, "the tokens story's pictures pass on an untouched tree")
+            expect(os.path.exists(f"{built}/index.json") and not os.path.exists(os.path.join(tree, "packages/ui/storybook-static")),
+                   "STORIES_OUT takes Storybook's build out of the design system's folder")
+            out = pictures("nosuchstory--")
+            expect(out.returncode != 0 and "a story whose id starts with" in out.stdout + out.stderr, "a prefix no story has fails, comparing nothing")
+            out = pictures("tokens--", STORIES_PORT="abc")
+            expect(out.returncode != 0 and "STORIES_PORT is no port" in out.stdout + out.stderr, "a port that is no port is refused")
+            # Storybook deletes its output folder before it builds (storybook/dist/core-server/index.js, `rm(outputDir, { recursive,
+            # force })`), so a STORIES_OUT that is not a folder inside the temporary folder is refused before any build (security-S6).
+            # Every value here is harmless even with the guard off: the folder of a TMPDIR of the copy's own, a relative one, one
+            # out of the system's, or with a space or a shell character in it, never the real temporary folder or /.
+            fake = os.path.join(tree, "fake-tmp")
+            os.makedirs(fake)
+            for what, where, tmp in (("the temporary folder itself", fake, fake), ("the folder above the temporary one", f"{fake}/..", fake),
+                                     ("a folder out of the temporary one by `..`", f"{fake}/../escaped", fake),
+                                     ("a relative folder, which would sit inside it", "storybook-out", os.path.realpath(tree)),
+                                     # A run folder's storybook by every rule but the shape of the path itself: only that shape's
+                                     # check refuses these (a temporary folder with a space or a shell character in its own name,
+                                     # a relative path that resolves into one).
+                                     ("a relative run folder's storybook, which would sit inside it", "check.abc123/storybook", os.path.realpath(tree)),
+                                     ("a run folder's storybook under a temporary folder with a space", f"{fake}/a b/check.abc123/storybook", f"{fake}/a b"),
+                                     ("a run folder's storybook under a temporary folder with a shell character", f"{fake}/x;true/check.abc123/storybook", f"{fake}/x;true"),
+                                     ("a folder out of the temporary one", "/elsewhere/storybook", fake),
+                                     ("a folder with a space", f"{fake}/a b", fake), ("a folder with a shell character", f"{fake}/x;true", fake),
+                                     # Inside the temporary folder, none of them check.sh's own `check.*/storybook` (CR7)
+                                     ("another folder of the temporary one", f"{fake}/other-folder", fake),
+                                     ("the folder of another session", f"{fake}/-Users-someone-Server-gnoworld", fake),
+                                     ("a run folder itself", f"{fake}/check.abc123", fake), ("a folder of a run folder other than storybook", f"{fake}/check.abc123/other", fake),
+                                     ("a storybook folder out of a run folder", f"{fake}/storybook", fake), ("a folder under a run folder's storybook", f"{fake}/check.abc123/storybook/x", fake),
+                                     ("a storybook folder of a folder not a run's", f"{fake}/other/storybook", fake),
+                                     ("a run folder's storybook, deeper in the temporary folder", f"{fake}/other/check.abc123/storybook", fake),
+                                     ("a storybook folder of a folder named check, not check.*", f"{fake}/checkabc123/storybook", fake),
+                                     # `..` is resolved before the rule reads the folder, so none of them gets out of it (R5).
+                                     ("a run folder's storybook, by `..`", f"{fake}/check.abc123/storybook/..", fake),
+                                     ("a folder out of a run folder's storybook, by `..`", f"{fake}/check.abc123/storybook/../../escaped", fake),
+                                     ("a folder not a run's, by `..` into a run folder's name", f"{fake}/check.abc123/storybook/../../other/storybook", fake)):
+                out = pictures("tokens--", STORIES_OUT=where, TMPDIR=tmp)
+                expect(out.returncode != 0 and "STORIES_OUT must be" in out.stdout + out.stderr, f"STORIES_OUT as {what} is refused before Storybook deletes it")
+            # What the rule accepts, said as a case (R5): the storybook folder of any `check.*` run folder, another gate's run
+            # included (CR7: its residual state, since a folder the rule cannot tell apart is another run's), and a `..` that
+            # resolves to one. The config loads; `--list` starts no server and builds nothing.
+            for what, where in (("another gate's run folder's storybook", f"{fake}/check.zzz999/storybook"),
+                                ("a run folder's storybook reached by `..`", f"{fake}/other/../check.abc123/storybook")):
+                out = run(["node", "app/node_modules/@playwright/test/cli.js", "test", "-c", "app/playwright.stories.config.ts", "--list", "pictures"],
+                          cwd=tree, env={"PICTURES_OF": "tokens--", "STORIES_PORT": port, "STORIES_OUT": where, "TMPDIR": fake})
+                ok = out.returncode == 0 and "STORIES_OUT must be" not in out.stdout + out.stderr
+                expect(ok, f"STORIES_OUT as {what} is accepted" + ("" if ok else f": {(out.stdout + out.stderr)[-200:]}"))
+            # The tools missing: never a pass on nothing. No browser where Playwright looks (tokens.css as approved); then,
+            # once tokens.css is as approved again, no Storybook to build.
+            out = pictures("tokens--", PLAYWRIGHT_BROWSERS_PATH=os.path.join(tree, "no-browsers"))
+            expect(out.returncode != 0, "the tokens story's pictures fail with no browser to compare them in")
+            css = os.path.join(tree, "packages/ui/src/tokens.css")
+            with open(css) as f:
+                text = f.read()
+            at = "    --color-space: var(--p-space);\n"
+            expect(at in text, "tokens.css still holds the line the probe adds a token after")
+            with open(css, "w") as f:
+                f.write(text.replace(at, at + "    --color-probe: var(--p-space);\n", 1))
+            out = pictures("tokens--")
+            expect(out.returncode != 0 and "tokens--all" in out.stdout + out.stderr, "a token added to tokens.css with no new picture fails the tokens story's pictures")
+            # The evidence of a failed run is in a folder of its own, never Playwright's default `app/test-results` that the journeys
+            # (the ts lane, beside the pictures' lane) empty as they start (CR4): beside the run's Storybook build in a gate,
+            # `app/test-results-stories` otherwise.
+            expect(os.path.isdir(os.path.join(tree, "app/test-results-stories")) and not os.path.exists(os.path.join(tree, "app/test-results")),
+                   "the stories' evidence is in app/test-results-stories, not the journeys' app/test-results")
+            out = pictures("tokens--", STORIES_OUT=built)
+            expect(out.returncode != 0 and os.path.isdir(os.path.join(run_folder.name, "stories-results")) and not os.path.exists(os.path.join(tree, "app/test-results")),
+                   "the stories' evidence of a gate's run is in the run's folder, beside its Storybook build")
+            with open(css, "w") as f:
+                f.write(text)
+            os.remove(os.path.join(tree, "packages/ui/node_modules/.bin/storybook"))
+            out = pictures("tokens--")
+            expect(out.returncode != 0, "the tokens story's pictures fail with no Storybook to build")
+            run_folder.cleanup()
 
     if part("vitest_ui"):
         # The design system's tests run in jsdom, each on an empty page: none is left out by the
@@ -209,11 +442,7 @@ try:
         page = 'test("ui probe {}", () => {{\n  render(<p>once</p>);\n  expect(screen.getAllByText("once")).toHaveLength(1);\n}});\n'.format
         plant({"probe.test.tsx": 'import { render, screen } from "@testing-library/react";\nimport { expect, test } from "vitest";\n\n' + page("one") + page("two")
                + 'test("ui probe fails", () => {\n  expect(document.title).toBe("never this title");\n});\n'}, where=UI)
-        out = run(["node_modules/.bin/vitest", "run", "--reporter=json", f"{UI}/probe.test.tsx"])
-        try:
-            states = {t["title"]: t["status"] for f in json.loads(out.stdout)["testResults"] for t in f["assertionResults"]}
-        except (ValueError, KeyError):
-            states = {}
+        out, states = verdicts(["node_modules/.bin/vitest", "run", f"{UI}/probe.test.tsx"])
         expect(states == {"ui probe one": "passed", "ui probe two": "passed", "ui probe fails": "failed"}, f"vitest runs ui's tests in jsdom, each on an empty page: {states}")
         shutil.rmtree(UI)
 
@@ -669,6 +898,7 @@ finally:
     shutil.rmtree(UI, ignore_errors=True)
     shutil.rmtree(AVATAR, ignore_errors=True)
     shutil.rmtree(APP, ignore_errors=True)
+    shutil.rmtree(".vitest-attachments", ignore_errors=True)  # a browser test's screenshots, should a guard fail
 
 if ONLY - ran:
     failures.append(f"ONLY names no block: {', '.join(sorted(ONLY - ran))}")

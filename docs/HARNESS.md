@@ -82,7 +82,7 @@ touches against `HEAD`, untracked files included.
 ```
 fast gate                                              full gate (--full, --merge), after it
   ts     format, knip, jscpd, CSS, comments ─▶ app       probe     probe.py ─▶ the benches, alone
-  types  tsc ─▶ ESLint                                   ─▶ stories   the stories' journeys
+  types  tsc ─▶ ESLint                                   ─▶ stories   core in Chromium ─▶ the stories' journeys
   tests  Ergo's build ─▶ Vitest                             history   the batch's size (--merge) ─▶ prove_fix
   gno    gno lint, test ─▶ mutate.py ─▶ Go                            ─▶ regressions ─▶ migrations ─▶ gitleaks ─▶ audit
   docs   check_docs, parse ─▶ test_hooks.sh              ─▶ coverage  coverage ─▶ patch coverage ─▶ StrykerJS
@@ -100,19 +100,27 @@ the machine's width, their load outlasted Ergo's 9 s auth script in the real-Erg
 
 The benches (`scripts/bench.py`, `app/tests/bench/`) run alone, after `probe.py`: each names its
 budget in brackets, from the slice's plan (`docs/plans/slice-4.md`, section 4), and the mean of its runs
-must stay under it; a bench beside other work would measure the load. `--merge` alone counts
-the merge's own product code since the last reviewed commit (`scripts/batch_size.py`, DORA's
+must stay under it, and a bench a `*.bench.ts(x)` source names that Vitest's report lacks (a `describe.skip` around it, an
+`.only` beside it, a comment) fails too, and ESLint refuses `.skip`, `.only` and `.todo` in a bench file as in a test (security-S1); `vitest.config.ts` runs only that form (`benchmark.include` is ESLint's `BENCHES`: Vitest's own default also ran `*.benchmark.ts` and `*.bench.mts`, which no guard read, CR3; probe `bench_files`); a bench beside other work would measure the load. `--merge` and `--full` count
+the merge's own product code (a slice's last merge is checked by `--full`, and it is the one that reaches `main`) since the last reviewed commit (`scripts/batch_size.py`, DORA's
 small batches, `docs/REVIEW.md`): past 600 lines it fails unless a commit says why on a line
-`Batch-size: <lines> - <why>`, and past 400 it says the tier-1 limit. Every test run is on the
-Node `.node-version` pins: a test refuses another (`server/src/testing/toolchain.test.ts`), since
-F816 surfaced only because StrykerJS ran once on Homebrew's Node 26, whose V8 reads some regexes
-otherwise.
+`Batch-size: <lines> - <why>` giving the count, a tenth more at most (a far larger number would waive
+the lines added after it; security-S4), and past 400 it says the tier-1 limit (the
+server's test helpers, `server/src/testing/`, are not product code; a renamed file counts its added lines at
+its new path). `check.sh` puts the
+Node `.node-version` pins first on its PATH, and `vitest.config.ts` refuses another Node, since F816 surfaced only
+because StrykerJS ran once on Homebrew's Node 26, whose V8 reads some regexes otherwise. Every Vitest run reads that
+file: a whole run, a run of one project (`--project ui`, `core_chromium`), by file, the `--changed` run of the fast
+gate, `vitest list` and `vitest bench`, and StrykerJS's dry run, which starts Vitest through the same `createVitest`
+(a Vitest test would have held only the runs that include its project; simplify-A3). The journeys are held by the
+PATH alone. The probe tries the refusal on a copy of the config with a pin of its own, never on `.node-version`.
 
 | A fast run's change | What runs beside the cheap checks (format, knip, jscpd, CSS, comments, check_docs) | Budget |
 |---|---|---|
 | `server/src` | tsc, ESLint, every Vitest test (`main.test.ts` runs the server as a child process, outside Vitest's module graph) | 30 s |
 | the TypeScript of `app/src`, `app/tests`, `packages/ui/src` | tsc, ESLint, Vitest's tests related to the change (`--changed`), the app's journeys | 30 s |
 | `packages/core/src`, which the server imports, or any other file of those folders (a fixture, a stylesheet) | tsc, ESLint, every Vitest test (a file read from disk is outside the module graph too), the app's journeys | 30 s |
+| `packages/ui/src/tokens.css` | as for any stylesheet of those folders, and the tokens story's pictures alone at its three widths, in a lane of its own beside the others (`pictures.spec.ts` with `PICTURES_OF=tokens--`, Storybook built in the run's own folder, which `STORIES_OUT` must name as the `storybook` folder of a `check.*` folder directly inside the temporary folder, since Storybook deletes it first (security-S6, CR7), the evidence of a failed run in that run folder's `stories-results` (`app/test-results-stories` outside a gate), never Playwright's default `app/test-results` that the journeys empty as they start (CR4), a free port of its own; 5 s beside Vitest's 20 to 23 s; F1190) | 30 s |
 | `gno/` | the gno lane | 30 s |
 | anything else (a config, the lockfile, the harness, `packages/schemas`, `deploy/`), no change at all, or no repository (pre-commit's staged copy) | everything | 75 s |
 
@@ -120,10 +128,31 @@ What a commit leaves out, the full gate runs on the exact tip before `main` take
 wants its record). ESLint reads no cache: a cache is keyed on a file's own text, so a type changed
 in one file would hide the lint error it brings to another (the red pass reproduced it with
 `no-floating-promises`). `GATE_BUDGET` may lower the budget, never raise it. Past its budget,
-the fast gate fails only on a machine at or under its cores, its 1-minute load read as the lanes
-start and as they end (`scripts/load.py`, 0.02 s a read); busier, it says the machine was busy,
-names its slowest step and passes (Alexis, C.8): beside another worktree's merge check, commits
-whose code had not grown took 61 to 98 s at a load of 65 to 76 on 16 cores.
+the fast gate fails unless the machine was busy at both ends: its 1-minute load above its cores when
+the lanes start (read before any of them loads it) and again after they all ended (`scripts/load.py`,
+0.02 s). Then it says the machine was busy when it started and when it ended, names its slowest step
+and passes (Alexis, C.8; Alexis, 2026-10-27, CR10): beside another worktree's merge check, commits whose
+code had not grown took 61 to 98 s at a load of 65 to 76 on 16 cores. The start reading alone excused
+a run begun just after a heavy one on an idle machine (the average lags by about a minute: 335, 311,
+292 in 10 s); the end reading alone includes the gate's own lanes, which a change making its own tests
+CPU-bound raises (security-S3). Both above the cores close the two.
+
+A Vitest file or a journey that fails in the fast gate runs once more, alone (`scripts/unsteady.py`, F1700;
+Alexis, 2026-10-28, F1621): under a load of 70 to 135 the gate failed on a different timing test at each run
+though each passed alone, and one merge took 8 tries. The gate reads each tool's JSON report (`--reporter=json`),
+gives the second run only the files that failed, and passes if it passes; each such file, with its failed tests, the
+machine's load and the time, is then appended to `.claude/tmp/unsteady.log` (ignored by git; a staged copy in
+pre-commit writes the repository's, through its `node_modules` link), a line the gate also prints, which `/pre-merge`
+reads in its first step. It fails when the files fail a second time, when the log cannot be written (a flake no one
+sees is not a pass), and when the report names no failed file or is missing (a crash or a config error is no flake:
+nothing runs again, and a report that named no file would run every file again), and when the run had anything besides
+the failed files that a second run of them cannot clear (R1: a flaky `a` beside a `b` that throws in a timer passed the
+gate, whose retry never ran `b`): Vitest's unhandled error, which its JSON report does not hold, so `check.sh` keeps the
+first run's console in a file and `unsteady.py` reads "Vitest caught N unhandled errors" in it; a Vitest file that failed
+with no failed test (it did not load, or a hook failed); Playwright's own top-level `errors`. Such a run refuses with
+nothing run again and nothing logged. Only failed files run again, and only once. The `--full` and `--merge` gates keep their behaviour for Vitest (their coverage run is the only one, and gets no
+second run); their journeys are the same step as the fast gate's, so they get the second run too. The log is a record, not a floor: a test that
+shows in it again and again is a test to fix, not to forgive.
 
 **Fast** (every turn, every commit, a work branch's push; it fails past its budget), its steps:
 
@@ -141,7 +170,8 @@ whose code had not grown took 61 to 98 s at a load of 65 to 76 on 16 cores.
 | `gno lint`, `gno test` on `gno/...` | every realm and package |
 | `scripts/mutate.py` | a realm guard no test notices when removed |
 | `gofmt`, `go vet`, the seal vectors | Go tools; `gno/r/seal/vectors_test.gno` equals what `go run ./tools/sealvec` prints |
-| `scripts/check_docs.py` | a harness doc naming a file that does not exist; a bad row in the findings ledger, or one citing a commit the repository lacks; a known limit the runbook no longer says (3M-19); a test with no file of its name beside it (F085); a harness script that does not parse (F084) |
+| the tokens story's pictures, in Chromium (a change of `tokens.css` only) | a token added or changed with no approved picture: the story lists every token (F1190) |
+| `scripts/check_docs.py` | a harness doc naming a file that does not exist; a bad row in the findings ledger, or one citing a commit the repository lacks; a known limit the runbook no longer says (3M-19); one of the four review agents' files missing or without its sentence `Never run a git command that writes the index or the work tree`, or CLAUDE.md without the review card's item 8, in any root (CR2); a test with no file of its name beside it (F085); a harness script that does not parse (F084) |
 | `scripts/test_hooks.sh` | the hooks, the guard, the settings' boundary, the CI's promises, and the scripts below; a harness mutant that no longer finds its text or names a section its suite lacks (`harness_mutate.py --dry`, in a second) |
 
 **Full** (`--full`: `/pre-merge` and a push of `main`) adds:
@@ -152,13 +182,13 @@ whose code had not grown took 61 to 98 s at a load of 65 to 76 on 16 cores.
 | `test:compiled` | the compiled project's render counts, run alone: the coverage run leaves it out, because the React Compiler's memo cache checks are branches no test takes, in every component it renders (branches 93.8% without it, 82.5% with it, F1350) |
 | coverage | under 85% anywhere, under 100% (95% branches) in `core`; the `node`, `ui` and `slow` projects |
 | `scripts/patch_coverage.py` | under 85% of the changed lines run by a test, or a changed file no coverage measures |
-| `scripts/prove_fix.py` | a fix of the product whose tests or journeys did not fail on the commit before it (F126) |
+| `scripts/prove_fix.py` | a fix of the product whose tests or journeys did not fail on the commit before it, in any of 3 runs there (F126, F1980) |
 | StrykerJS | a mutant of the TypeScript that no test kills |
 | `scripts/check_regressions.py` | the safety net shrinking (next section) |
 | `scripts/check_migrations.py` | a migration `main` has, edited, moved or removed (F466), or one it cannot read |
 | gitleaks | a secret anywhere in the history; a path into a home folder or a service of the demo's host (`gitleaks-private.toml`: the repository will be public); both rule sets always run (F120); every change reaches it as text, on every branch, whatever an attribute, a NUL byte, a diff driver or a replace ref would show (F132) |
 | `pnpm audit` | a dependency with a known advisory, moderate or worse |
-| `scripts/harness_mutate.py` | when a file of the harness list changed (one list, word for word `pre-push`'s, F124): a guard of the harness that no test notices switched off; every mutant judged, over `HARNESS_SHARDS` worktrees side by side (4 by default), each tree first passing both suites untouched; `--changed <base>`, for a merge's own review, judges the mutants of the guard files committed since base, or all of them when `test_hooks.sh`, `probe.py` or `harness_mutate.py` changed. A test killed by a signal (a lack of memory under four shards) counts its mutant killed |
+| `scripts/harness_mutate.py` | when a file of the harness list changed (one list, word for word `pre-push`'s, F124): a guard of the harness that no test notices switched off; every mutant judged, over `HARNESS_SHARDS` worktrees side by side (4 by default, never more than the mutants selected: the first tree is built to select with, the others once one is left), each tree first passing, untouched, the suites its mutants run (CR9); `--changed <base>`, for a merge's own review, judges the mutants of the guard files committed since the last /pre-merge pass in `base..HEAD` (`docs/review-passes.txt`, found as `batch_size.py` finds its base; since base when none, and a passes file it cannot read or parse refuses; a renamed guard file counts under both names), or all of them when `test_hooks.sh`, `probe.py` or `harness_mutate.py` changed; no mutant selected ends the run at once, no control, but with no argument no mutant to judge refuses. A record names a tree (the fingerprint), not a person: a branch's author can commit one for the final tree, and `--merge` then judges 0 mutants. Accepted (F1433): `batch_size.py` trusts the same file, and `--full` and CI judge every mutant whatever the file says. A test killed by a signal (a lack of memory under four shards) counts its mutant killed |
 
 ## The safety net never shrinks quietly
 
@@ -177,6 +207,12 @@ Each is allowed only when a commit of the branch says why, on a line of its own:
 in review. A sentence that merely mentions a floor excuses nothing. On `main`, `pre-push`
 also wants each harness file changed on a line `Harness-changed: <path> - why`.
 
+The comparison is with where the branch left `main`, so what a slice itself creates has no baseline there: a bench
+or a test born in the slice can have its budget raised, or be renamed, with no excuse line, and the excuse key
+`bench <name>` carries no old or new value, so one excuse covers every later raise of that bench. Review alone holds
+those until the slice reaches `main` (CR1, intended: counting from `last_reviewed`, as `batch_size.py` does, would
+count from a commit another branch reviewed).
+
 ## Reviews and findings
 
 A finding is a claim until it is reproduced: a command, or a test seen failing. Every finding
@@ -186,10 +222,9 @@ by) and its evidence; a fixed one names its commit, the others say why.
 Reviews read the ledger first, so a rejected claim is not raised again and a fixed one that
 comes back is a regression. The review agents (`.claude/agents/`) report rows for it.
 
-The reviewers' exam (Anthropic's incidents become evals): `scripts/exam.py` builds, from the
-ledger's fixed findings, a set of cases, each the code before its fix, the file and the bug, the
-newest 40 at most. A change to a reviewer (an agent's file, a prompt, a model) is scored on it,
-the cases whose bug it names, before it lands; never per merge, so no step of the gate.
+The reviewers' exam (Anthropic's incidents become evals) is a row of `docs/plans/backlog.md`: the ledger's fixed
+findings become a set, each the code before its fix, the file and the bug. Its builder (exam.py, 51 lines) was
+removed with its tests on 2026-10-27, since nothing ran a reviewer on the set (simplify-S3); it comes back with its scorer.
 
 | Who | When | Model |
 |---|---|---|
@@ -267,7 +302,8 @@ costs context in every session: `chrome-devtools-mcp` (1b), `frontend-design` (2
   to add. With `ONLY` set, the probe stops at its first failing block. It runs in the full
   gate when the harness changed; its `--dry`, in the fast one, builds every mutant without a test.
   With `--changed <base>` (a merge's own) it judges the mutants of the guard files the branch
-  changed and of the test sections it changed (`scripts/suite_parts.py`), all of them when it
+  changed since its last /pre-merge pass (`repo_files.last_reviewed`: what the pass reviewed was
+  judged by that merge's own check; the full gate and CI still judge every mutant) and of the test sections it changed (`scripts/suite_parts.py`), all of them when it
   changed text outside every section, or `harness_mutate.py` itself. Its copies, and
   `prove_fix.py`'s, name their run's pid: the next run removes those of a run killed before its
   cleanup, never a live run's (`scripts/repo_files.py`). A copy's folder is never named `tree`:
@@ -287,10 +323,15 @@ everything in five lanes (Vitest's 26 s the longest, `chat.test.ts` alone 22 s o
 the app or the design system 11 to 12 s, of a realm 4 s, of the server 25 s (every test). The
 harness mutation: 596 mutants in 793 s on four shards. On 2026-10-26, at slice-4-harness-b: the
 benches' step 4.7 s (a 510-byte line read in 0.0037 ms of its 0.2, a room of 200 lines drawn in
-9.4 ms of its 100); `harness_mutate --changed` after a change of `check.sh` and of one test section
+9.4 ms of its 100; the first of these timed a line `parseLine` refused, 441 bytes of text being the most a
+510-byte body holds: the real path read in 0.0138 ms on a machine at load 40, G1); `harness_mutate --changed` after a change of `check.sh` and of one test section
 judges 93 of its 678 mutants, about 125 s at the rate above instead of about 900 (estimated from
 that rate, not timed); a worktree made by `worktree.sh` starts StrykerJS from the main tree's
-incremental file, where one without it ran all 9,045 mutants. Earlier measures:
+incremental file, where one without it ran all 9,045 mutants. On 2026-10-27, StrykerJS on seven files (744 mutants, `--force`,
+`--concurrency 4`, the same incremental file, load 13 to 23): with the TypeScript checker 72 s, 108 mutants dropped as compile
+errors; without it 19 s, and of those 108, 99 killed and 9 survivors (`room.ts`), mutants that do not compile counted against the
+score (78.3% became 80.5% with 99 more kills and 9 false survivors). So `checkers: ["typescript"]` stays, at 53 s more on these
+files. Earlier measures:
 
 Measured on this machine, 2026-10-18: the fast gate 19 to 24 s (budget 60 s), the app's
 build and its 18 journeys included; the full gate 263 s, with the harness mutation proving
@@ -322,13 +363,17 @@ and the harness is frozen until a real bug crosses it.
 
 ## Known limits
 
-- **The unit tests run on one engine,** Node 24's V8; the browser's reads some regexes and
-  Unicode otherwise (F816, F817). Core's code meets Chromium's engine only through the app's
-  journeys, until core's Vitest runs in Chromium too: Alexis approved it (2026-10-26), and its
-  dependency waits for his script (`@vitest/browser-playwright`, a closed `package.json`).
+- **Core's tests alone run on both engines,** Node 24's V8 and Chromium's, whose reads of some
+  regexes and of Unicode differ (F816, F817): the full gate's `core_chromium` step runs them in a
+  page, one file after another, as Chromium in one process (the sandbox) allows. The app's and the server's unit tests run on Node alone; the app's code meets Chromium
+  through its journeys. The project exists only when `CORE_CHROMIUM` is set, so
+  the coverage, StrykerJS and `vitest list` never open a browser: StrykerJS mutates core's code
+  against Node's engine alone.
 - **The fast gate's budget, judged on the load, lets a slow change through on a busy machine:**
-  it passes past its budget whenever the load passed the cores, whatever grew; an idle run
-  catches it, and the overrun is printed every time.
+  it passes past its budget whenever the load, read as the lanes started, passed the cores,
+  whatever grew (a run started on a busy machine, or by a process that loaded it first, is
+  excused); an idle run catches it, and the overrun is printed every time. The machine-wide lock
+  of `docs/decisions.md` (2026-10-26, "One gate at a time on the machine") removes the rule.
 - **The benches measure what runs outside React's runtime:** the React Compiler's caches (F818,
   F819) hold only in a rendered app, which no bench drives.
 - **A copy made before 2026-10-26 names no run,** so repo_files leaves it: remove it by hand
@@ -398,6 +443,7 @@ and the harness is frozen until a real bug crosses it.
 | `.githooks/` | `commit-msg`, `pre-commit`, `pre-merge-commit`, `pre-push`; `records.sh`, the prints and the harness list they and `check.sh` share (F076); `merge.sh`, the merge that shows the harness first (F129) |
 | `scripts/install_hooks.sh` | puts `main`'s hooks and the scripts they run in `.git/hooks`; `--check` for `pre-push` (F129) |
 | `scripts/check.sh` | the gate |
+| `scripts/unsteady.py` | the fast gate's second run of a failed Vitest file or journey, and the log of those that then pass (F1700) |
 | `.github/workflows/gate.yml` | the full gate on GitHub's machines, for every branch pushed |
 | `app/playwright.config.ts`, `app/tests/e2e/` | the app's journeys: a build per run, served as a static host serves it (`serve.mjs`), the real server behind its `/api` and a real Ergo behind its `/ws` (`api.mjs`), both ended and their folders removed when the run ends; the shipped roles file with the journeys' rooms added (Bubble's sections), a test wallet for each name a journey gives (`/__wallet?as=`), and `POST /__drop?tag=`, which ends the WebSockets of the pages whose `e2e-tag` cookie names it, as a network gone would |
 | `scripts/guard.py`, `scripts/stop_gate.sh` | Claude Code's hooks |
@@ -410,8 +456,6 @@ and the harness is frozen until a real bug crosses it.
 | `scripts/probe.py`, `scripts/test_hooks.sh`, `scripts/harness_mutate.py`, `scripts/suite_parts.py` | the harness's own tests, and the sections a change touched |
 | `scripts/bench.py`, `app/tests/bench/` | the benches and their budgets |
 | `scripts/batch_size.py` | a merge's own product code, a small batch |
-| `scripts/exam.py` | the reviewers' exam's set |
-| `scripts/worktree.sh` | a branch's worktree, ready for the gate: its packages linked, StrykerJS's incremental file seeded |
-| `server/src/testing/toolchain.ts` | the Node every test runs on |
+| `scripts/worktree.sh` | a branch's worktree, ready for the gate: its packages linked (so a base whose lockfile or package files are not the source tree's is refused, and a `pnpm install` is made in the source tree, never in the worktree: the links lead there; security-S5), StrykerJS's incremental file seeded |
 | `docs/review/findings.md`, `docs/review-log.md` | every finding; what Alexis caught and missed |
 | `docs/harness.html`, `docs/harness.png` | the picture above, and its source |
