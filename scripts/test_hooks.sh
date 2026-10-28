@@ -2949,6 +2949,24 @@ sys.exit(subprocess.run(sys.argv[1:]).returncode)' "$shell" "$ws/scripts/worktre
 	done
 done
 (cd "$ws/src" && sh "$here/worktree.sh" "$ws/same" same HEAD) >/dev/null 2>&1 || fail "worktree.sh refused a base whose package files are this tree's"
+# A workspace's .bin reached through a link (a tree whose packages were linked by hand) is borrowed as a folder of its own:
+# the probe deletes a tool in its copy, which went through the link and deleted the main tree's (F2127).
+mkdir -p "$ws/bins/.bin" "$ws/src/packages/core/node_modules" "$ws/borrowed" && echo tool >"$ws/bins/.bin/storybook"
+ln -s "$ws/bins/.bin" "$ws/src/packages/core/node_modules/.bin"
+(cd "$ws/src" && sh "$here/borrow_node_modules.sh" "$ws/borrowed") >"$ws/out" 2>&1 || fail "borrow_node_modules.sh failed on a linked .bin: $(cat "$ws/out")"
+[ -d "$ws/borrowed/packages/core/node_modules/.bin" ] && [ ! -L "$ws/borrowed/packages/core/node_modules/.bin" ] || fail "borrow_node_modules.sh kept a workspace's .bin a link into the tree it borrows from"
+[ "$(cat "$ws/borrowed/packages/core/node_modules/.bin/storybook")" = tool ] || fail "borrow_node_modules.sh left the linked .bin's tools behind"
+rm "$ws/borrowed/packages/core/node_modules/.bin/storybook"
+[ -f "$ws/bins/.bin/storybook" ] || fail "a tool deleted in the borrowed copy was deleted where its .bin's link led (F2127)"
+# A relative link, as a hand-made one into another tree's store would be, borrowed the same way; a real .bin stays as it is.
+mkdir -p "$ws/src/packages/ui/node_modules" "$ws/src/app/node_modules/.bin" "$ws/borrowed2" && echo own >"$ws/src/app/node_modules/.bin/vite"
+ln -s ../../../../bins/.bin "$ws/src/packages/ui/node_modules/.bin"
+[ -f "$ws/src/packages/ui/node_modules/.bin/storybook" ] || fail "the relative .bin link of this case leads nowhere"
+(cd "$ws/src" && sh "$here/borrow_node_modules.sh" "$ws/borrowed2") >"$ws/out" 2>&1 || fail "borrow_node_modules.sh failed on a relative .bin link: $(cat "$ws/out")"
+[ ! -L "$ws/borrowed2/packages/ui/node_modules/.bin" ] && rm "$ws/borrowed2/packages/ui/node_modules/.bin/storybook" && [ -f "$ws/bins/.bin/storybook" ] ||
+	fail "a tool deleted in the borrowed copy of a relative .bin link was deleted where the link led (F2127)"
+[ -d "$ws/borrowed2/app/node_modules/.bin" ] && [ ! -L "$ws/borrowed2/app/node_modules/.bin" ] && [ "$(cat "$ws/borrowed2/app/node_modules/.bin/vite")" = own ] ||
+	fail "borrow_node_modules.sh did not keep a real .bin as it is"
 fi
 
 if part bench; then
