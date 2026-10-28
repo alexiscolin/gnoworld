@@ -13,6 +13,10 @@ export const canEdit = (line: Line, me: string | undefined): boolean =>
 /** A line as shown: corrected by an edit, said so. */
 export type ShownLine = Line & { readonly edited?: true };
 
+// Whether `edit` corrects `line`: of the same account, the line itself no correction.
+const corrects = (edit: Line, line: Line | undefined): line is Line =>
+  line !== undefined && line.edits === undefined && edit.account !== undefined && edit.account === line.account;
+
 // Each corrected line's newest edit, by the line's msgid; each folded edit's line, by the edit's msgid.
 function folding(lines: readonly Line[]) {
   const places = new Map(lines.map((line, at) => [line.id, at]));
@@ -21,8 +25,7 @@ function folding(lines: readonly Line[]) {
   for (const [at, edit] of lines.entries()) {
     const target = places.get(edit.edits ?? "");
     const line = target === undefined || target >= at ? undefined : lines[target];
-    if (line === undefined || line.edits !== undefined || edit.account === undefined || edit.account !== line.account)
-      continue;
+    if (!corrects(edit, line)) continue;
     newest.set(line.id, edit);
     folded.set(edit.id, line.id);
   }
@@ -52,6 +55,18 @@ export function foldEdits(lines: readonly Line[]): Folded {
           return folded.has(line.id) ? [] : [line];
         });
   return { shown, folded, newest: edited };
+}
+
+/** One line as shownLines shows it, or none when it is folded into another or not there, in one pass and no allocation:
+ * what a composer asks on each render while a reply or an edit is open (the room edit's complexity review). */
+export function shownLine(lines: readonly Line[], id: string): ShownLine | undefined {
+  const at = lines.findIndex((line) => line.id === id);
+  const line = lines[at];
+  if (line === undefined) return undefined;
+  const into = lines.findIndex((other) => other.id === line.edits);
+  if (into < at && corrects(line, lines[into])) return undefined;
+  const edit = lines.findLast((other, i) => i > at && other.edits === id && corrects(other, line));
+  return edit === undefined ? line : { ...line, text: edit.text, kind: edit.kind, edited: true };
 }
 
 /** The room's lines as shown: see foldEdits. */

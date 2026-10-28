@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { parseLine, type IrcMessage } from "../irc/irc.ts";
 import type { Line } from "./room.ts";
-import { canEdit, editsFolded, foldEdits, redactedLines, shownLines } from "./shown.ts";
+import { canEdit, editsFolded, foldEdits, redactedLines, shownLine, shownLines } from "./shown.ts";
 
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
@@ -257,11 +257,45 @@ describe("canEdit", () => {
   test.each([
     ["another account's line", mine, BOB],
     ["a guest, which has no address", mine, undefined],
+    ["a guest, whose line no account vouches for", guest("g", 1, "hi"), undefined],
     ["a line no account vouches for", guest("g", 1, "hi"), "guest-ab12cd"],
     ["an action", { ...mine, kind: "action" as const }, ALICE],
     ["a notice", { ...mine, kind: "notice" as const }, ALICE],
     ["a correction, whose original may have left", { ...mine, edits: "z" }, ALICE],
   ])("is false for %s", (_, subject, me) => {
     expect(canEdit(subject, me)).toBe(false);
+  });
+});
+
+// The composer asks for one line as shown, which a fold of the whole conversation answered on each render while a reply or an
+// edit was open (the complexity review of the room edit): one pass answers the same.
+describe("shownLine: one line as shownLines shows it", () => {
+  // A correction of `of` by the account of the line, at `minute`; `over` changes its other fields.
+  const edit = ([id, minute]: [string, number], of: string, over: Partial<Line> = {}): Line => ({
+    ...line(id, minute, `${id} corrects ${of}`),
+    edits: of,
+    ...over,
+  });
+  const rooms: readonly [string, readonly Line[]][] = [
+    ["no edit", [line("a", 1, "one"), line("b", 2, "two")]],
+    ["an edit and a newer one", [line("a", 1, "one"), edit(["e1", 2], "a"), edit(["e2", 3], "a")]],
+    ["an action corrected into a message", [{ ...line("a", 1, "waves"), kind: "action" }, edit(["e1", 2], "a")]],
+    ["another account's edit", [line("a", 1, "one"), edit(["e1", 2], "a", { account: BOB })]],
+    ["an edit of a guest's line", [guest("g", 1, "hi"), { ...guest("e1", 2, "x"), edits: "g" }]],
+    ["an orphan correction", [edit(["e1", 2], "zz"), line("b", 3, "two")]],
+    ["an edit before its line", [edit(["e1", 1], "a"), line("a", 2, "one")]],
+    ["an edit of an edit", [line("a", 1, "one"), edit(["e1", 2], "a"), edit(["e2", 3], "e1")]],
+    ["an edit of a line that is itself an orphan", [edit(["o", 1], "zz"), edit(["e", 2], "o")]],
+  ];
+  test.each(rooms)("gives what shownLines gives, for each msgid of %s, and none for another", (_, lines) => {
+    for (const { id } of lines) {
+      expect(shownLine(lines, id)).toEqual(shownLines(lines).find((shown) => shown.id === id));
+    }
+    expect(shownLine(lines, "nowhere")).toBeUndefined();
+  });
+
+  test("gives the line itself when no edit is folded into it", () => {
+    const lines = [line("a", 1, "one")];
+    expect(shownLine(lines, "a")).toBe(lines[0]);
   });
 });

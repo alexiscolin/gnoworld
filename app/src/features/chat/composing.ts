@@ -1,6 +1,6 @@
 // What the composer is told of the line the next message answers (slice 4's 4d replies) or corrects (the DM bar's and the
 // room's edits), moved out of Loaded.tsx for the lint's sizes: each its conversation's alone, dropped as another comes in view.
-import { canEdit, foldEdits, type Line } from "@gnoworld/core";
+import { canEdit, shownLine, type Line } from "@gnoworld/core";
 import { useState } from "react";
 import type { RefusedTags } from "../../store/dms.ts";
 import type { Shown } from "./shown.tsx";
@@ -15,9 +15,9 @@ interface Chosen {
   back?: true;
 }
 
-// The line as the conversation shows it, while it holds it: nothing is folded while none is chosen.
+// The line as the conversation shows it, while it holds it, read in one pass: nothing is folded for it.
 const shownAs = (chosen: Chosen | undefined, lines: readonly Line[] | undefined) =>
-  chosen === undefined ? undefined : foldEdits(lines ?? []).shown.find((line) => line.id === chosen.id);
+  chosen === undefined ? undefined : shownLine(lines ?? [], chosen.id);
 
 // Asked again, or for another line: the count goes up.
 const asking = (was: Chosen | undefined, id: string): Chosen => ({ id, asked: (was?.asked ?? 0) + 1 });

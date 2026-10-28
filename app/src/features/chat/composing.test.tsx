@@ -129,6 +129,18 @@ describe("useComposing", () => {
     expect(vi.mocked(foldEdits)).not.toHaveBeenCalled();
   });
 
+  // The complexity review of the room edit: the composer found its line by folding the whole conversation on each render
+  // while a reply or an edit was open, a second fold beside the list's own.
+  it("folds no conversation either while a reply or an edit is open, a line coming in", () => {
+    draw();
+    act(() => now().view.onEdit?.("m1"));
+    draw("dm", [...LINES, line("m3", "more")]);
+    act(() => now().view.onReply?.("m2"));
+    draw("dm", [...LINES, line("m3", "more"), line("m4", "and more")]);
+    expect(now().writer.replying?.id).toBe("m2");
+    expect(vi.mocked(foldEdits)).not.toHaveBeenCalled();
+  });
+
   it("drops a reply asked before when an edit is asked, and sends the correction without it", () => {
     draw();
     act(() => now().view.onReply?.("m2"));
