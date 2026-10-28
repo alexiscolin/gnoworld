@@ -1,7 +1,10 @@
+// @vitest-environment jsdom
 import { compose } from "@gnoworld/core";
+import { act } from "react";
+import { createRoot } from "react-dom/client";
 import { completions } from "./complete.ts";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Composer, NEAR, Preview, said, typingOf } from "./Composer.tsx";
 import { refusalAfter } from "./composerHooks.ts";
 
@@ -432,5 +435,48 @@ describe("Composer: an edit", () => {
     expect(words(markup)).not.toContain("Editing a message");
     expect(names(markup)).not.toContain("Cancel the edit");
     expect(markup).toMatch(/>Send<\/button>/);
+  });
+});
+
+// R3 (redpass2-red): the static markup tests check the disabled button, not the form's own submit handler, which a
+// keyboard's Enter reaches with the button disabled. A mounted composer, its form submitted.
+describe("Composer: submitting an edit", () => {
+  const PARTNER = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  // jsdom has no popover: the format bar's menu asks for it as it mounts.
+  HTMLElement.prototype.togglePopover = () => false;
+  const host = document.createElement("div");
+  const root = createRoot(host);
+  afterEach(() => {
+    act(() => {
+      root.render(null);
+    });
+  });
+
+  const submit = (draft: string, over: { editing?: true } = { editing: true }) => {
+    const onSay = vi.fn(() => true);
+    act(() => {
+      root.render(
+        <Composer room={PARTNER} nick={NICK} rooms={[]} members={[]} onSay={onSay} draft={draft} {...over} />,
+      );
+    });
+    const form = host.querySelector("form");
+    act(() => {
+      form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    return onSay;
+  };
+
+  it("sends nothing for /me waves in an edit, which would turn the message into an action", () => {
+    expect(submit("/me waves")).not.toHaveBeenCalled();
+  });
+
+  it("saves //me waves, which is plain text", () => {
+    const onSay = submit("//me waves");
+    expect(onSay).toHaveBeenCalledExactlyOnceWith("//me waves");
+  });
+
+  it("still sends /me waves as a new message when no edit is open", () => {
+    expect(submit("/me waves", {})).toHaveBeenCalledExactlyOnceWith("/me waves");
   });
 });
