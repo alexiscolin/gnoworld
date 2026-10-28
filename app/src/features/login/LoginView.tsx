@@ -1,6 +1,6 @@
 // The login's place in the header (slice 4's 4a): a way in with Adena, the step a login is at, the account
-// logged in and a way out, and why the last login stopped. A phone reads only: it is told to log in on a
-// computer (docs/plans/backlog.md, row 4).
+// logged in and a way out, and why the last login stopped. A phone cannot log in: it is told to use a
+// computer for that, and that it writes once logged in (U6).
 import { Button, Cluster } from "@gnoworld/ui";
 import type { LoginSlice } from "../../store/login.ts";
 import styles from "./LoginView.module.css";
@@ -37,7 +37,7 @@ export function LoginView({ session, step, problem, onLogIn, onLogOut }: LoginVi
               {step === "idle" ? "Log in with Adena" : STEPS[step]}
             </Button>
           </span>
-          <span className={styles["phone"]}>To speak, log in on a computer.</span>
+          <span className={styles["phone"]}>To log in, use a computer; once logged in you can write from here.</span>
         </>
       ) : null}
       {/* There from the start, empty: a screen reader announces a region's change. */}

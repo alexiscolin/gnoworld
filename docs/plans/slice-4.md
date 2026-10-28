@@ -16,7 +16,7 @@ findings fixed (F706 to F711, F718, F720, F722 to F724, the twenty smaller ones)
 
 ## 2. Out of scope
 Uploads (4b), search (4c), the Discord bridge (4d), the rest of `lib/adena` (slice 9), the 3D scene, a contest of a
-hide (slice 12), slow mode, encrypted DMs. On a phone: reading only.
+hide (slice 12), slow mode, encrypted DMs. On a phone: reading only (changed by Alexis, docs/decisions.md, 2026-10-28: a logged-in account writes on a phone).
 
 ## 3. Threat model
 | Asset / entry | Abuse | Mitigation | Proving test |

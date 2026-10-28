@@ -77,11 +77,11 @@ test.describe("the login with Adena", () => {
 test.describe("on a phone", () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
 
-  test("reads only: no login, and the words to log in on a computer", async ({ page }) => {
+  test("logs in on a computer only: no login button, and the words that say so", async ({ page }) => {
     await adena(page);
     await page.goto("/");
     await hydrated(page);
-    await expect(page.getByText("To speak, log in on a computer.")).toBeVisible();
+    await expect(page.getByText("To log in, use a computer; once logged in you can write from here.")).toBeVisible();
     await expect(logInButton(page)).toBeHidden();
   });
 });
