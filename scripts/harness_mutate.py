@@ -290,6 +290,7 @@ def mutants():
     yield from each(hm, "killed = verdicts[i % " "shards][i // shards]", "killed = verdicts[0][0]", "hooks", "harness_mutate reads each mutant's own verdict")
     yield from each(hm, "worktree(\"HEAD\")) for _ in range(shards - 1)]", "worktree(\"HEAD\")) for _ in range(0)]", "hooks", "harness_mutate makes a worktree a shard")
     yield from each(hm, "ThreadPoolExecutor(" "shards) as pool", "ThreadPoolExecutor(1) as pool", "hooks", "harness_mutate's shards run side by side")
+    yield from each(hm, "ThreadPoolExecutor(" "CONTROLS_AT_ONCE)", "ThreadPoolExecutor(len(controls))", "hooks", "harness_mutate runs its controls two at a time (F2138)")
     yield from each(hm, "    finally:\n        with open(target, \"w\") as f:\n            f.write(original)\n", "    finally:\n        pass\n", "hooks", "harness_mutate puts each mutant's file back")
     yield from each(hm, "            if code " "!= 0:\n", "            if False:\n", "hooks", "harness_mutate stops on a failed control")
     yield from each(hm, "return killed and (label not in GAPS or " "run(tree", "return killed and (True or run(tree", "hooks", "harness_mutate judges a known gap that a run killed once more (F1832)")
@@ -947,6 +948,7 @@ if sys.argv[1:2] == ["--changed"] and len(sys.argv) == 3:
 elif sys.argv[1:]:
     sys.exit("usage: harness_mutate.py [--dry | --changed <base>]")
 shards = max(1, int(os.environ.get("HARNESS_SHARDS", "4")))
+CONTROLS_AT_ONCE = 2  # every tree's suites at once overran their 600 s limit beside the coverage lane (F2138)
 failures = []
 with contextlib.ExitStack() as stack:
     trees = [stack.enter_context(worktree("HEAD"))]  # one tree to build and select with: the others only if a mutant is left (CR9)
@@ -969,7 +971,7 @@ with contextlib.ExitStack() as stack:
     trees += [stack.enter_context(worktree("HEAD")) for _ in range(shards - 1)]
     suites = [test for test in TESTS if any(m[3] == test for m in found)]
     controls = [(tr, te) for tr in trees for te in suites]
-    with concurrent.futures.ThreadPoolExecutor(len(controls)) as pool:
+    with concurrent.futures.ThreadPoolExecutor(CONTROLS_AT_ONCE) as pool:
         # The control: an untouched copy passes, so a failure means the mutant.
         for (tree, test), code in zip(controls, pool.map(lambda c: run(*c), controls)):
             if code != 0:

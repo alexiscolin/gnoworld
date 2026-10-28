@@ -609,7 +609,7 @@ hs="$t/shards" && mkdir -p "$hs/src/scripts" "$hs/repo/scripts"
 # The suite: its section opens at the line's start, as harness_mutate reads it, which this file's
 # runner must not; with SHARDS_MEET, a mutant's run waits for that many trees to run at once.
 printf '%s\n' 'part() { case ",$ONLY," in *",$1,"*) return 0 ;; *) return 1 ;; esac; }' \
-	'[ -n "$ONLY" ] || { echo . >>"$SHARD_ROOT/controls"; [ ! -e BROKEN_hooks ]; exit; }' \
+	'[ -n "$ONLY" ] || { echo . >>"$SHARD_ROOT/controls"; [ -z "${CONTROLS_SLOW:-}" ] || { : >"$SHARD_ROOT/live.$$"; n=0; until [ "$(ls "$SHARD_ROOT" | grep -c "^live\.")" -ge 2 ] || [ "$n" -ge 50 ]; do n=$((n + 1)); sleep 0.1; done; sleep 0.3; ls "$SHARD_ROOT" | grep -c "^live\." >>"$SHARD_ROOT/overlap"; rm -f "$SHARD_ROOT/live.$$"; }; [ ! -e BROKEN_hooks ]; exit; }' \
 	'if part x; then' \
 	'	pwd >>"$SHARD_ROOT/ran"' \
 	'	! grep -q " SPARE" g.txt && [ -n "${FLAKE:-}" ] && [ ! -e "$SHARD_ROOT/flaked" ] && { : >"$SHARD_ROOT/flaked"; exit 1; }' \
@@ -686,7 +686,7 @@ cp "$hs/src/g.txt" "$hs/src/h.txt" "$hs/src/i.txt" "$hs/src/k.txt" "$hs/src/$ac"
 git -C "$hs/repo" init -q && git -C "$hs/repo" add -A && git -C "$hs/repo" commit -qm x
 shards() { # $1: the shards; then harness_mutate's arguments
 	n=$1 && shift
-	rm -f "$hs/made" "$hs/removed" "$hs/ran" "$hs/controls" "$hs/probe_controls" "$hs/lonely" "$hs/flaked" "$hs"/met.*
+	rm -f "$hs/made" "$hs/removed" "$hs/ran" "$hs/controls" "$hs/probe_controls" "$hs/lonely" "$hs/flaked" "$hs"/met.* "$hs"/live.* "$hs/overlap"
 	(cd "${HR:-$hs/repo}" && SHARD_ROOT="$hs" SHARD_SRC="$hs/src" HARNESS_SHARDS=$n python3 -I harness_mutate.py "$@" 2>&1)
 }
 count() { [ -e "$hs/$1" ] && wc -l <"$hs/$1" | tr -d ' ' || echo 0; }
@@ -899,6 +899,12 @@ for args in "--changed" "--changed a b" "--dry --changed x" "--bogus"; do
 	printf '%s\n' "$out" | grep -q "usage\|--changed" || fail "harness_mutate did not say why it refused $args: $out"
 	[ ! -e "$hs/made" ] || fail "harness_mutate made a worktree for the arguments $args"
 done
+# The controls run two at a time, never every tree's suites at once: beside the full gate's coverage lane, eight at once
+# overran their 600 s limit where they take 96 s alone (F2138). Each control still runs, in every tree; each fake control
+# waits for a second one beside it (5 s at most), so a serial run shows as one at once, not as a pass.
+CONTROLS_SLOW=1 shards 4 >/dev/null || : # the planted survivors fail the run; only its controls are read here
+[ "$(count controls)" = 4 ] || fail "harness_mutate did not run the control in each of its 4 trees: $(count controls)"
+[ "$(sort -n "$hs/overlap" | tail -1)" = 2 ] || fail "harness_mutate ran $(sort -n "$hs/overlap" | tail -1) controls at once, not two (F2138)"
 fi
 
 if part migrations; then
