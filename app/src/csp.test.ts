@@ -1,4 +1,6 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import { inlineScripts, outputs, pagesPolicy, policy, sha256 } from "./csp.ts";
 
 // Written out, not built from the module: a directive that loosens must fail here.
@@ -171,4 +173,25 @@ describe("outputs", () => {
       nginx: `add_header Content-Security-Policy "default-src 'none'" always;\n`,
     });
   });
+});
+
+// The demo's web image builds the app from the workspaces it imports; one it leaves out fails only in Docker, which
+// the gate never runs (F2133: slice 4's runtime imports of core and schemas reached Alexis's deploy/test.sh alone).
+// csp.ts writes the nginx file that image serves; the image is tested here, beside it.
+it("the web image copies each workspace the app imports, its package.json before the install and its src", () => {
+  const app = z
+    .object({ dependencies: z.record(z.string(), z.string()) })
+    .parse(JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")));
+  const dockerfile = readFileSync(new URL("../../deploy/web/Dockerfile", import.meta.url), "utf8");
+  const workspaces = Object.keys(app.dependencies)
+    .filter((name) => name.startsWith("@gnoworld/"))
+    .map((name) => name.slice("@gnoworld/".length));
+  expect(workspaces).toContain("core");
+  const install = dockerfile.indexOf("RUN pnpm install");
+  for (const name of workspaces) {
+    const manifest = dockerfile.indexOf(`COPY packages/${name}/package.json packages/${name}/\n`);
+    expect(manifest, `packages/${name}/package.json`).toBeGreaterThan(-1);
+    expect(manifest, `packages/${name}/package.json before the install`).toBeLessThan(install);
+    expect(dockerfile, `packages/${name}/src`).toContain(`COPY packages/${name}/src packages/${name}/src\n`);
+  }
 });

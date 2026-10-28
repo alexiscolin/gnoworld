@@ -6,11 +6,14 @@ WORKDIR /repo
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/core/package.json packages/core/
+COPY packages/schemas/package.json packages/schemas/
 COPY packages/ui/package.json packages/ui/
 COPY app/package.json app/
 # The app and the workspaces it imports, each with its own dependencies (the design system's fonts).
 RUN pnpm install --frozen-lockfile --filter @gnoworld/app...
 COPY tsconfig.base.json ./
+COPY packages/core/src packages/core/src
+COPY packages/schemas/src packages/schemas/src
 COPY packages/ui/src packages/ui/src
 COPY app app
 RUN cd app && node_modules/.bin/react-router build
