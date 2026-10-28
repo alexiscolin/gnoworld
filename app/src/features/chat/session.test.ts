@@ -48,7 +48,12 @@ function setup() {
     guest: () => "guest-aaaaaa",
     connect: (_, on) => {
       connections.push(on);
-      return { send: () => false, stop: () => undefined, nick: () => undefined } satisfies Ergo;
+      return {
+        send: () => false,
+        stop: () => undefined,
+        nick: () => undefined,
+        multiline: () => undefined,
+      } satisfies Ergo;
     },
     keep: (account: Address) => {
       asked.push(account);

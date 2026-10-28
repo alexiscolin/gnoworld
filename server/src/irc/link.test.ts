@@ -7,7 +7,7 @@ import { fakeErgo, message, PASSWORD, register, welcome, type Peer } from "../te
 import { ircLink, retryDelay, type Link, type Said } from "./link.ts";
 
 const CAPS =
-  "CAP REQ :message-tags account-tag batch draft/chathistory server-time multi-prefix sasl draft/message-redaction";
+  "CAP REQ :message-tags account-tag batch draft/chathistory server-time multi-prefix sasl draft/message-redaction draft/multiline";
 // Stopped before the fake Ergo closes, so no link reconnects to a server that is gone.
 const links: Link[] = [];
 afterEach(async () => {
@@ -1737,6 +1737,216 @@ describe("the IRC link's account (the max review)", () => {
     for (const n of [7, 8, 9]) await taken(n);
     await ergo.peer(10);
     expect(alerts()).toHaveLength(2);
+  });
+});
+
+// draft/multiline (slice 4, R1 of the red pass): Ergo gives a reader without the capability the parts of a message
+// as lines of their own, the id on the first alone (irc/client.go, v2.19.1), so the link asks for it and reads the
+// batch as the one message it is: its text whole to the checks, its id and time from the opening line.
+describe("the IRC link, a message of several lines (draft/multiline)", () => {
+  const T = (n: number) => `2026-10-22T08:00:${String(n).padStart(2, "0")}.000Z`;
+  // A message as Ergo relays it to a reader with the capability: the opening line holds its tags, the parts the batch's.
+  const several = (
+    peer: Peer,
+    ref: string,
+    { tags, parts, source = "a!u@h" }: { tags: string; parts: readonly string[]; source?: string },
+  ) => {
+    peer.say(`@${tags} :${source} BATCH +${ref} draft/multiline :#bubble`);
+    for (const part of parts) peer.say(`@batch=${ref} :${source} PRIVMSG #bubble :${part}`);
+    peer.say(`:${source} BATCH :-${ref}`);
+  };
+
+  it("hands a message of several lines on once, its whole text, its id and time those of its opening line", async () => {
+    const ergo = await fakeErgo();
+    const { said } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    several(peer, "x", { tags: `account=g1a;msgid=ml1;time=${T(1)}`, parts: ["one", "two", "a banned word"] });
+    await expect
+      .poll(() => said)
+      .toEqual([{ room: "#bubble", account: "g1a", msgid: "ml1", text: "one\ntwo\na banned word", time: T(1) }]);
+  });
+
+  it("hands nothing on of its parts before its end", async () => {
+    const ergo = await fakeErgo();
+    const { said } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    peer.say(`@account=g1a;msgid=ml1;time=${T(1)} :a!u@h BATCH +x draft/multiline :#bubble`);
+    peer.say("@batch=x :a!u@h PRIVMSG #bubble :one");
+    await sync(peer);
+    expect(said).toEqual([]);
+  });
+
+  it("counts a message of several lines inside a history page as one line, and asks the next page after a full one", async () => {
+    const ergo = await fakeErgo();
+    const { said } = start(ergo.port, { lastChecked: (room) => (room === "#bubble" ? T(0) : undefined) });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    await peer.next(/^CHATHISTORY /);
+    peer.say(":ergo.test BATCH +a chathistory #bubble");
+    for (let n = 0; n < 49; n += 1)
+      peer.say(message(`batch=a;account=g1a;msgid=p${String(n)};time=${T(n)}`, "a!u@h", ["#bubble", "x"]));
+    several(peer, "m", { tags: `batch=a;account=g1a;msgid=ml2;time=${T(49)}`, parts: ["> quoted", "answer"] });
+    peer.say(":ergo.test BATCH -a");
+    expect(await peer.next(/^CHATHISTORY /)).toBe(
+      `CHATHISTORY AFTER #bubble timestamp=${new Date(Date.parse(T(49)) - 1).toISOString()} 50`,
+    );
+    await expect.poll(() => said.length).toBe(50);
+    expect(said[49]).toMatchObject({ msgid: "ml2", text: "> quoted\nanswer" });
+  });
+
+  it("holds 16 messages open at once, and hands each on whole", async () => {
+    const ergo = await fakeErgo();
+    const { said } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    const tags = (n: number) => `account=g1a;msgid=m${String(n)};time=${T(n)}`;
+    for (let n = 0; n < 17; n += 1) peer.say(`@${tags(n)} :a!u@h BATCH +r${String(n)} draft/multiline :#bubble`);
+    for (let n = 0; n < 17; n += 1) peer.say(`@batch=r${String(n)} :a!u@h PRIVMSG #bubble :text ${String(n)}`);
+    for (let n = 0; n < 17; n += 1) peer.say(`:a!u@h BATCH :-r${String(n)}`);
+    await sync(peer);
+    // Past the 16th, what is said of a 17th is the next commit's (a message the bot cannot hold is hidden).
+    expect(said.filter(({ msgid }) => msgid !== "m16").map(({ msgid, text }) => [msgid, text])).toEqual(
+      Array.from({ length: 16 }, (_, n) => [`m${String(n)}`, `text ${String(n)}`]),
+    );
+  });
+
+  // G1 and G5 of the green pass: the bot moderates the text readers fold, or it hides the message by the id of its
+  // opening line, never a part of it and never none. Its text, which no one reads, is a stand-in.
+  const hidden = (msgid: string, time: string) => ({ room: "#bubble", account: "g1a", msgid, time, unreadable: true });
+  // What the link said, but for its text: the parts' text never reaches the check of a hidden message.
+  const shown = (said: Said[]) =>
+    said.map(({ text, ...rest }) => {
+      expect(text).not.toMatch(/hurt|hello|and more|line \d|text \d/);
+      return rest;
+    });
+  const tags = (n: number) => `account=g1a;msgid=ml${String(n)};time=${T(n)}`;
+
+  it("hands on the 40 lines of a message whole, the last one the banned: Ergo's longest, none of it cut", async () => {
+    const ergo = await fakeErgo();
+    const { said } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    const parts = Array.from({ length: 40 }, (_, n) => (n === 39 ? "a banned word" : `line ${String(n + 1)}`));
+    several(peer, "x", { tags: tags(1), parts });
+    await expect
+      .poll(() => said)
+      .toEqual([{ room: "#bubble", account: "g1a", msgid: "ml1", text: parts.join("\n"), time: T(1) }]);
+  });
+
+  it.each([
+    ["a part holds a CTCP's mark, however placed", ["hello", "I will hurt you\u0001"]],
+    ["its first part is an ACTION", ["\u0001ACTION will hurt you\u0001", "and more"]],
+    ["a mark sits in the middle of the first, the hurt on the second", ["a\u0001b", "I will hurt you"]],
+    ["it has 41 lines, one past Ergo's 40", Array.from({ length: 41 }, (_, n) => `line ${String(n)}`)],
+    ["it has 100 lines", Array.from({ length: 100 }, (_, n) => `line ${String(n)}`)],
+  ])("hides the message by its id when %s, and says nothing of its parts", async (_, parts) => {
+    const ergo = await fakeErgo();
+    const { said } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    several(peer, "x", { tags: tags(1), parts });
+    await sync(peer);
+    expect(shown(said)).toEqual([hidden("ml1", T(1))]);
+  });
+
+  it("hides a message by its id when a part of it comes from another sender, and says nothing of its parts", async () => {
+    const ergo = await fakeErgo();
+    const { said } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    peer.say(`@${tags(1)} :a!u@h BATCH +x draft/multiline :#bubble`);
+    peer.say("@batch=x :a!u@h PRIVMSG #bubble :one");
+    peer.say("@batch=x :mallory!u@h PRIVMSG #bubble :two");
+    await sync(peer);
+    expect(said).toEqual([]);
+    peer.say(":a!u@h BATCH :-x");
+    await sync(peer);
+    expect(shown(said)).toEqual([hidden("ml1", T(1))]);
+  });
+
+  it("hides a 17th message open at once by its id, and keeps the 16 it holds", async () => {
+    const ergo = await fakeErgo();
+    const { said } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    for (let n = 0; n < 17; n += 1) peer.say(`@${tags(n)} :a!u@h BATCH +r${String(n)} draft/multiline :#bubble`);
+    for (let n = 0; n < 17; n += 1) peer.say(`@batch=r${String(n)} :a!u@h PRIVMSG #bubble :text ${String(n)}`);
+    for (let n = 0; n < 17; n += 1) peer.say(`:a!u@h BATCH :-r${String(n)}`);
+    await sync(peer);
+    expect(said.map(({ msgid }) => msgid).sort()).toEqual(
+      Array.from({ length: 17 }, (_, n) => `ml${String(n)}`).sort(),
+    );
+    expect(shown(said.filter(({ unreadable }) => unreadable === true))).toEqual([hidden("ml16", T(16))]);
+  });
+
+  it("says nothing of a message of a room the bot is not in, readable or not", async () => {
+    const ergo = await fakeErgo();
+    const { said } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    several(peer, "x", { tags: tags(1), parts: ["a\u0001b"] });
+    peer.say(`@${tags(2)} :a!u@h BATCH +y draft/multiline :#elsewhere`);
+    peer.say("@batch=y :a!u@h PRIVMSG #elsewhere :a\u0001b");
+    peer.say(":a!u@h BATCH :-y");
+    await sync(peer);
+    expect(said.map(({ msgid }) => msgid)).toEqual(["ml1"]);
+  });
+
+  it("counts a message it hides inside a history page as one line of it, and asks the next page after a full one", async () => {
+    const ergo = await fakeErgo();
+    const { said } = start(ergo.port, { lastChecked: (room) => (room === "#bubble" ? T(0) : undefined) });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    await peer.next(/^CHATHISTORY /);
+    peer.say(":ergo.test BATCH +a chathistory #bubble");
+    for (let n = 0; n < 49; n += 1)
+      peer.say(message(`batch=a;account=g1a;msgid=p${String(n)};time=${T(n)}`, "a!u@h", ["#bubble", "x"]));
+    several(peer, "m", { tags: `batch=a;account=g1a;msgid=ml2;time=${T(49)}`, parts: ["a\u0001b"] });
+    peer.say(":ergo.test BATCH -a");
+    expect(await peer.next(/^CHATHISTORY /)).toBe(
+      `CHATHISTORY AFTER #bubble timestamp=${new Date(Date.parse(T(49)) - 1).toISOString()} 50`,
+    );
+    await expect.poll(() => said.length).toBe(50);
+    expect(said[49]).toMatchObject({ msgid: "ml2", unreadable: true });
+  });
+
+  it("holds a line of a batch ended no more: a line with that reference and an id, after its end, is said alone", async () => {
+    const ergo = await fakeErgo();
+    const { said } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    several(peer, "x", { tags: `account=g1a;msgid=ml1;time=${T(1)}`, parts: ["one", "two"] });
+    peer.say(message(`batch=x;account=g1a;msgid=s1;time=${T(2)}`, "a!u@h", ["#bubble", "alone"]));
+    await expect.poll(() => said.map(({ msgid }) => msgid)).toEqual(["ml1", "s1"]);
+  });
+
+  it("forgets a message open when its connection ends: its reference, used again, holds nothing of it", async () => {
+    const ergo = await fakeErgo();
+    const { said } = start(ergo.port);
+    const first = await ergo.peer(0);
+    await welcome(first);
+    first.say(`@account=g1a;msgid=ml1;time=${T(1)} :a!u@h BATCH +x draft/multiline :#bubble`);
+    await sync(first);
+    first.socket.destroy();
+    const second = await ergo.peer(1);
+    await welcome(second);
+    second.say(message(`batch=x;account=g1a;msgid=s1;time=${T(2)}`, "a!u@h", ["#bubble", "alone"]));
+    await expect.poll(() => said.map(({ msgid }) => msgid)).toEqual(["s1"]);
+  });
+
+  it("hands on a part with an id of its own only once, folded, never as a line besides", async () => {
+    const ergo = await fakeErgo();
+    const { said } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    peer.say(`@account=g1a;msgid=ml1;time=${T(1)} :a!u@h BATCH +x draft/multiline :#bubble`);
+    peer.say(message("batch=x;account=g1a;msgid=p1", "a!u@h", ["#bubble", "one"]));
+    peer.say(message("batch=x", "a!u@h", ["#bubble", "two"]));
+    peer.say(":a!u@h BATCH :-x");
+    await sync(peer);
+    expect(said.map(({ msgid, text }) => [msgid, text])).toEqual([["ml1", "one\ntwo"]]);
   });
 });
 

@@ -43,6 +43,7 @@ test.describe("a world's rooms, as they look", () => {
     });
     await page.goto("/w/bubble?room=games");
     await hydrated(page);
+    await expect(lines(page)).toHaveCount(2);
     await expect(page.getByRole("complementary", { name: "Who's here" })).toContainText("2 here");
     await page.getByRole("textbox", { name: "Message #games" }).fill("I'm in: **tonight**, `9 pm` UTC");
     await expect(page).toHaveScreenshot("composer-computer.png", {

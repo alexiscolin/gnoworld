@@ -40,6 +40,6 @@ export function roomShown(room: string, state: Room["state"], acts: RoomActs): S
       onRead: acts.onRead,
       onReact: acts.onReact,
     },
-    writer: { room, members: state?.members ?? [], onSay: (draft) => acts.onSay(draft), onTyping: acts.onTyping },
+    writer: { room, members: state?.members ?? [], onSay: (composed) => acts.onSay(composed), onTyping: acts.onTyping },
   };
 }

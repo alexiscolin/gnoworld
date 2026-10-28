@@ -1,6 +1,6 @@
 // The world's rooms once listed (slice 4's 4b, moved out of ChatPanel.tsx): the switcher, the conversation in view (a
 // room, or a direct message, 4e) and what writes in it.
-import { foldEdits, type Line } from "@gnoworld/core";
+import { foldEdits, type Composed, type Line } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";
 import { Sidebar, Stack } from "@gnoworld/ui";
 import { useId, useState, type ReactNode, type RefObject } from "react";
@@ -11,7 +11,7 @@ import type { Dms } from "./Dms.tsx";
 import type { ChatLink } from "./link.ts";
 import { dmParams, groupsAt, roomIds } from "./names.ts";
 import { NoticeModes } from "./NoticeModes.tsx";
-import { roomActs, type RoomActs } from "./roomActs.ts";
+import { multilineOf, roomActs, type RoomActs } from "./roomActs.ts";
 import { useRoomKeeping } from "./RoomKeeping.ts";
 import { Saved } from "./Saved.tsx";
 import { RoomsView } from "./RoomsView.tsx";
@@ -81,8 +81,8 @@ function useReplies(shown: Shown | undefined, lines: readonly Line[] | undefined
       onCancelReply: () => {
         setReply(undefined);
       },
-      onSay: (draft: string) => {
-        const went = acts.onSay(draft, replying?.id);
+      onSay: (composed: Composed) => {
+        const went = acts.onSay(composed, replying?.id);
         if (went) setReply(undefined);
         return went;
       },
@@ -105,7 +105,7 @@ export interface LoadedProps {
   /** The room's refused delete, said. */
   dismissed: (room: string) => void;
   /** Sends a draft to another account (4e). */
-  sayTo: (partner: string, draft: string) => boolean;
+  sayTo: (partner: string, composed: Composed, draft: string) => boolean;
   dms: Dms;
   /** What the account was told and has not seen (4f-n). */
   noticing: Noticing;
@@ -194,6 +194,7 @@ export function Loaded({
               session={session}
               rooms={ids}
               groups={groupsAt(sections, room)}
+              multiline={multilineOf(link)}
               {...shown.writer}
               {...replies.writer}
             />

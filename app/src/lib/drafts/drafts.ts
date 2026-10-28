@@ -6,9 +6,21 @@
 import type { Address } from "@gnoworld/schemas";
 import { z } from "../jitless.ts";
 
-/** The UTF-16 units a draft holds at most: past it, none is kept (a line goes out at 442 bytes). */
-export const DRAFT_LIMIT = 4000;
+/** The UTF-16 units a draft holds at most: past it, none is kept. A message of several lines goes out at 4096 bytes
+ * at most (core's MULTILINE_BYTES), one UTF-16 unit being a byte or more, so every draft the composer lets go is kept,
+ * once its lines' ends are trimmed as compose trims them (a draft past the limit is kept so: those spaces were no text). */
+export const DRAFT_LIMIT = 4096;
 const Draft = z.string().check(z.maxLength(DRAFT_LIMIT));
+
+// The draft as compose reads it, as far as its size goes: each line's end trimmed as compose trims it (trimEnd: a
+// no-break or ideographic space too), and the draft's ends. Line by line, so a long run of spaces costs its length.
+// A control character at a line's end, which compose reads as a space, is not (it keeps the draft's size).
+const squeezed = (draft: string): string =>
+  draft
+    .split(/\r\n?|\n/u)
+    .map((line) => line.trimEnd())
+    .join("\n")
+    .trim();
 
 /** The device's storage, as localStorage offers it. */
 export interface DraftStorage {
@@ -39,10 +51,11 @@ export function drafts(storage: () => DraftStorage, account: Address): Drafts {
       }
     },
     set: (room, draft) => {
-      const within = draft.length <= DRAFT_LIMIT;
+      const kept = draft.length <= DRAFT_LIMIT ? draft : squeezed(draft);
+      const within = kept.length <= DRAFT_LIMIT;
       try {
-        if (!within || draft.trim() === "") storage().removeItem(key(room));
-        else storage().setItem(key(room), draft);
+        if (!within || kept.trim() === "") storage().removeItem(key(room));
+        else storage().setItem(key(room), kept);
         return within;
       } catch {
         return false;

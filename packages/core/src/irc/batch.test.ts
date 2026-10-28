@@ -1,6 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, test } from "vitest";
-import { BATCH_LINES, BatchReader, OPEN_BATCHES } from "./batch.ts";
+import { BATCH_LINES, BatchReader, OPEN_BATCHES, type Batched } from "./batch.ts";
+import { foldMultiline, MULTILINE_LINES } from "./multiline.ts";
 import { parseLine, type IrcMessage } from "./irc.ts";
 
 const PROPERTY = { seed: 20261017, numRuns: 300 };
@@ -63,7 +64,7 @@ describe("BatchReader: Ergo's batches, each handed on whole at its end", () => {
   test("hands on an empty batch", () => {
     const reader = new BatchReader();
     reader.read(read("BATCH +h1 chathistory #bubble"));
-    expect(reader.read(read("BATCH -h1"))).toEqual({
+    expect(reader.read(read("BATCH -h1"))).toMatchObject({
       kind: "done",
       batch: { type: "chathistory", params: ["#bubble"], tags: new Map(), messages: [] },
     });
@@ -212,5 +213,135 @@ describe("BatchReader: Ergo's batches, each handed on whole at its end", () => {
       }),
       PROPERTY,
     );
+  });
+});
+
+// draft/multiline (slice 4, docs/decisions.md row 255): a message of several lines is a batch whose opening line
+// carries its id, time and account (Ergo's composeMultilineBatch, irc/client.go, v2.19.1); inside a history page it
+// sits as a batch of its own in its place (irc/responsebuffer.go, AddSplitMessageFromClient's nested batch).
+describe("BatchReader: a message of several lines (draft/multiline)", () => {
+  const OPENED = "@msgid=m2;time=2026-10-25T10:01:00.000Z;account=a :a!u@h BATCH +ml draft/multiline #bubble";
+
+  test("keeps a batch's opening line, its tags and its source, with what it hands on", () => {
+    const reader = new BatchReader();
+    reader.read(read(OPENED));
+    reader.read(read("@batch=ml :a!u@h PRIVMSG #bubble :one"));
+    const done = reader.read(read(":a!u@h BATCH -ml"));
+    expect(done).toMatchObject({
+      kind: "done",
+      batch: { type: "draft/multiline", params: ["#bubble"], source: "a!u@h" },
+    });
+    expect(done.kind === "done" ? done.batch.tags.get("msgid") : undefined).toBe("m2");
+  });
+
+  test("folds a multiline batch inside a history page into one line of that page, in its place", () => {
+    const reader = new BatchReader();
+    reader.read(read("BATCH +h1 chathistory #bubble"));
+    reader.read(said("h1", "before"));
+    reader.read(read(`@batch=h1;${OPENED.slice(1)}`));
+    reader.read(read("@batch=ml :a!u@h PRIVMSG #bubble :one"));
+    reader.read(read("@batch=ml :a!u@h PRIVMSG #bubble :two"));
+    expect(reader.read(read("@batch=h1 :a!u@h BATCH -ml"))).toEqual({ kind: "held" });
+    reader.read(said("h1", "after"));
+    const page = reader.read(read("BATCH -h1"));
+    expect(page.kind === "done" ? texts(page.batch.messages) : []).toEqual(["before", "one\ntwo", "after"]);
+    expect(page.kind === "done" ? page.batch.messages[1]?.tags.get("msgid") : undefined).toBe("m2");
+  });
+
+  // The red pass (R2, R3): the relay is untrusted, a nested multiline batch held to the reader's bounds.
+  const nested = (ref: string, parent = "h1") => `@batch=${parent};${OPENED.slice(1).replace("+ml", `+${ref}`)}`;
+  const partOf = (ref: string, text: string) => read(`@batch=${ref} :a!u@h PRIVMSG #bubble :${text}`);
+  const pageOf = (done: Batched) => (done.kind === "done" ? texts(done.batch.messages) : ["not done"]);
+
+  test("hands on a page without its multiline batch still open at the page's end", () => {
+    const reader = new BatchReader();
+    reader.read(read("BATCH +h1 chathistory #bubble"));
+    reader.read(read(nested("ml")));
+    reader.read(partOf("ml", "never ended"));
+    expect(pageOf(reader.read(read("BATCH -h1")))).toEqual([]);
+  });
+
+  test("hands on a multiline batch whose parent is unknown, or ended first, as a batch of its own", () => {
+    const reader = new BatchReader();
+    reader.read(read(nested("ml", "nope")));
+    reader.read(partOf("ml", "orphan"));
+    expect(reader.read(read("@batch=nope :a!u@h BATCH -ml"))).toMatchObject({
+      kind: "done",
+      batch: { type: "draft/multiline" },
+    });
+    reader.read(read("BATCH +h1 chathistory #bubble"));
+    reader.read(read(nested("m2")));
+    reader.read(partOf("m2", "late"));
+    reader.read(read("BATCH -h1"));
+    expect(reader.read(read("@batch=h1 :a!u@h BATCH -m2"))).toMatchObject({
+      kind: "done",
+      batch: { type: "draft/multiline" },
+    });
+  });
+
+  test("folds two multiline batches of one reference in turn, in a page and after it", () => {
+    const reader = new BatchReader();
+    reader.read(read("BATCH +h1 chathistory #bubble"));
+    for (const text of ["first", "second"]) {
+      reader.read(read(nested("ml")));
+      reader.read(partOf("ml", text));
+      reader.read(partOf("ml", "line"));
+      reader.read(read("@batch=h1 :a!u@h BATCH -ml"));
+    }
+    expect(pageOf(reader.read(read("BATCH -h1")))).toEqual(["first\nline", "second\nline"]);
+    reader.read(read(OPENED));
+    reader.read(partOf("ml", "top"));
+    expect(reader.read(read(":a!u@h BATCH -ml"))).toMatchObject({ kind: "done", batch: { type: "draft/multiline" } });
+  });
+
+  test(`holds ${String(BATCH_LINES)} folded messages a page at most, as it holds lines`, () => {
+    const reader = new BatchReader();
+    reader.read(read("BATCH +h1 chathistory #bubble"));
+    for (let n = 0; n <= BATCH_LINES; n++) {
+      reader.read(read(nested(`m${String(n)}`)));
+      reader.read(partOf(`m${String(n)}`, String(n)));
+      reader.read(partOf(`m${String(n)}`, "x"));
+      reader.read(read(`@batch=h1 :a!u@h BATCH -m${String(n)}`));
+    }
+    const page = pageOf(reader.read(read("BATCH -h1")));
+    expect(page).toHaveLength(BATCH_LINES);
+    expect(page.at(-1)).toBe(`${String(BATCH_LINES - 1)}\nx`);
+  });
+
+  // F1724 (C2): foldMultiline refuses a message of more than 40 parts, so a multiline batch holds 41 and no more.
+  test(`holds ${String(MULTILINE_LINES + 1)} parts of a multiline batch at most, past which none is read`, () => {
+    const reader = new BatchReader();
+    reader.read(read("BATCH +h1 chathistory #bubble"));
+    reader.read(read(nested("ml")));
+    for (let n = 0; n < 500; n++) reader.read(partOf("ml", String(n)));
+    const done = reader.read(read("@batch=h1 :a!u@h BATCH -ml"));
+    expect(done).toEqual({ kind: "held" });
+    const page = reader.read(read("BATCH -h1"));
+    expect(page.kind === "done" ? page.batch.messages : ["?"]).toEqual([]);
+    const top = new BatchReader();
+    top.read(read(OPENED));
+    for (let n = 0; n < 500; n++) top.read(partOf("ml", String(n)));
+    const ended = top.read(read(":a!u@h BATCH -ml"));
+    const batch = ended.kind === "done" ? ended.batch : undefined;
+    expect(batch?.messages).toHaveLength(MULTILINE_LINES + 1);
+    expect(batch === undefined ? "?" : foldMultiline(batch)).toBeUndefined();
+  });
+
+  test(`opens no multiline batch past ${String(OPEN_BATCHES)} open: its parts pass on their own`, () => {
+    const reader = new BatchReader();
+    reader.read(read("BATCH +h1 chathistory #bubble"));
+    for (let n = 1; n < OPEN_BATCHES; n++) reader.read(read(`BATCH +o${String(n)} netjoin`));
+    reader.read(read(nested("ml")));
+    expect(reader.read(partOf("ml", "on its own"))).toEqual({ kind: "pass" });
+  });
+
+  test("puts nothing in its page for a multiline batch that folds into none", () => {
+    const reader = new BatchReader();
+    reader.read(read("BATCH +h1 chathistory #bubble"));
+    reader.read(read(`@batch=h1;${OPENED.slice(1)}`));
+    reader.read(read("@batch=ml :mallory!u@h PRIVMSG #bubble :not the sender"));
+    reader.read(read("@batch=h1 :a!u@h BATCH -ml"));
+    const page = reader.read(read("BATCH -h1"));
+    expect(page.kind === "done" ? page.batch.messages : ["?"]).toEqual([]);
   });
 });

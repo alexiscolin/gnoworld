@@ -1,5 +1,6 @@
 // A scripted Ergo for the screenshots (slice 4): the page's socket answered line by line, so a room's lines, topic
 // and people are the same each run, the page being a guest or an account; the rooms come from the real server.
+import { echoedLines, several, type Open } from "./severalLines.ts";
 import type { WebSocketRoute } from "@playwright/test";
 import { hydrated, type Page } from "./fixtures.ts";
 
@@ -12,8 +13,11 @@ const LINES: readonly HistoryLine[] = [
 ];
 
 // Ergo's half of the handshake, as `me`: the ACK, SASL's yes to an account, the welcome.
-function welcome(line: string, me: string): string[] {
-  if (line.startsWith("CAP REQ :")) return [`:ergo CAP * ACK :${line.slice("CAP REQ :".length)}`];
+function welcome(line: string, me: string, noMultiline: boolean): string[] {
+  if (line.startsWith("CAP REQ :")) {
+    const refused = noMultiline && line.includes("draft/multiline");
+    return [`:ergo CAP * ${refused ? "NAK" : "ACK"} :${line.slice("CAP REQ :".length)}`];
+  }
   if (line === "AUTHENTICATE PLAIN") return ["AUTHENTICATE +"];
   if (line.startsWith("AUTHENTICATE ")) return [`:ergo 903 * :SASL authentication successful`];
   if (line.startsWith("USER ")) return [`:ergo 001 ${me} :Welcome`, `:ergo 376 ${me} :End of MOTD`];
@@ -76,10 +80,12 @@ function rooms(
   if (held === undefined) return [];
   return [
     `BATCH +h1 chathistory ${asked}`,
-    ...held.map(
-      ([id, time, text, author = MEMBER]) =>
-        `@batch=h1;msgid=${id};time=${time};account=${author} :${author}!u@h PRIVMSG ${asked} :${text}`,
-    ),
+    ...held.flatMap(([id, time, text, author = MEMBER]) => {
+      const stamp = `msgid=${id};time=${time};account=${author}`;
+      if (!text.includes("\n")) return [`@batch=h1;${stamp} :${author}!u@h PRIVMSG ${asked} :${text}`];
+      // A message of several lines sits in the page as a draft/multiline batch of its own (draft/multiline).
+      return several(`@batch=h1;${stamp} :${author}!u@h`, { ref: `m${id}`, room: asked, parts: text.split("\n") });
+    }),
     ...replayed.map(batched),
     "BATCH -h1",
   ];
@@ -136,7 +142,9 @@ function echoed(
 ): string[] {
   const { tags, rest } = split(line);
   const reaction = rest.startsWith("TAGMSG ") && !echo.refused && /\+draft\/(un)?react=/.test(tags);
-  if (echo.time === undefined || !(rest.startsWith("PRIVMSG ") || reaction)) return [];
+  // A line of a message of several lines is echoed with the batch (echoedLines), not one by one.
+  const single = rest.startsWith("PRIVMSG ") && !/(?:^|;)batch=/.test(tags);
+  if (echo.time === undefined || !(single || reaction)) return [];
   const count = echo.next();
   const time =
     echo.time === true ? new Date(Date.parse("2026-10-25T11:00:00.000Z") + count * 1000).toISOString() : echo.time;
@@ -168,6 +176,10 @@ export interface Scripted {
   replayed?: readonly string[];
   /** Ergo refuses each reaction, as in a room the account may not speak in: a 404 to its label, no echo. */
   refuseReact?: boolean;
+  /** Ergo welcomes the page (001) once this settles: the connection starts late, its nick not known yet. */
+  welcomeAfter?: Promise<void>;
+  /** Ergo does not offer draft/multiline: it NAKs the request holding it, and ACKs the one without. */
+  noMultiline?: boolean;
   /** The lines before the history's, which Ergo gives to CHATHISTORY BEFORE. */
   older?: readonly HistoryLine[];
 }
@@ -194,13 +206,15 @@ export function scriptedErgo(ergo: WebSocketRoute, me: string, script: Scripted 
   } = script;
   const places = placesOf(room, read);
   let echoes = 0;
+  const multiline: Open = new Map();
   ergo.onMessage((data) => {
     const line = String(data);
     heard?.(line);
     const answers = [
-      ...welcome(line, me),
+      ...welcome(line, me, script.noMultiline === true),
       ...rooms(line, me, { history, replayed, older, told: room, read, others: script.others }),
       ...redaction(line, me, { refuse: refuseRedact, hold: holdRedact }),
+      ...echoedLines(line, me, multiline),
       ...marking(line, places, quietMarks),
       ...refusedReaction(line, me, refuseReact),
       ...echoed(line, me, { time: echo, refused: refuseReact, next: () => (echoes += 1) }),
@@ -208,7 +222,12 @@ export function scriptedErgo(ergo: WebSocketRoute, me: string, script: Scripted 
     const reply = () => {
       for (const answer of answers) ergo.send(answer);
     };
-    if (historyAfter !== undefined && line.startsWith("CHATHISTORY ")) historyAfter.then(reply, () => undefined);
+    const after = line.startsWith("CHATHISTORY ")
+      ? historyAfter
+      : line.startsWith("USER ")
+        ? script.welcomeAfter
+        : undefined;
+    if (after !== undefined) after.then(reply, () => undefined);
     else reply();
   });
 }

@@ -53,6 +53,14 @@ export function reader(options: Options, state: State) {
     log("irc_refused", { error });
     s.destroy();
   };
+  // A line read, counted in its history page, then handed on; a message of several lines the link could not read
+  // whole is handed on marked, to be hidden.
+  const heard = (message: IrcMessage, readable: boolean): void => {
+    const got = said(message, state.joined);
+    if (answered(state, message, got)) return;
+    const batched = replayed(state, message);
+    if (got !== undefined) onMessage(readable ? got : { ...got, unreadable: true }, batched);
+  };
   const handlers: Readonly<Record<string, (s: Socket, message: IrcMessage) => void>> = {
     ...sasl(password, refused),
     "001": (s) => {
@@ -85,6 +93,10 @@ export function reader(options: Options, state: State) {
     ...rejoins(state),
     KICK: kicked(state, log),
     ...pages.handlers,
+    BATCH: (s, message) => {
+      // A message of several lines is read as one at its end; any other batch is a history page.
+      if (!state.several.batch(message, heard)) pages.handlers["BATCH"]?.(s, message);
+    },
     ...refusals(refused, state, log),
     // A hide Ergo refused (F544): the verdict says hidden, the line stays; ops hears of it. A line its author
     // deleted first is not one: Ergo knows its id no more. A refused page of history is history.ts's.
@@ -101,10 +113,7 @@ export function reader(options: Options, state: State) {
     // A NOTICE too (slice 3's max review): Ergo relays and keeps it as any line, so it is checked and counted.
     NOTICE: (s, message) => handlers["PRIVMSG"]?.(s, message),
     PRIVMSG: (_, message) => {
-      const heard = said(message, state.joined);
-      if (answered(state, message, heard)) return;
-      const batched = replayed(state, message);
-      if (heard !== undefined) onMessage(heard, batched);
+      if (!state.several.hold(message)) heard(message, true);
     },
   };
   return (s: Socket, message: IrcMessage): void => {

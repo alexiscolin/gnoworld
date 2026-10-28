@@ -1,7 +1,9 @@
-/* The composer's line as it will read: muted, wrapping anywhere. */
+/* The composer's line as it will read: muted, wrapping anywhere, ten lines high at most, then scrolled (F1722). */
 @layer components {
   .preview {
     color: var(--color-text-muted);
     overflow-wrap: anywhere;
+    max-block-size: 10lh;
+    overflow: auto;
   }
 }

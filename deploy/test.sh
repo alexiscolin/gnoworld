@@ -350,6 +350,8 @@ if [ "${1:-}" = --mutants ]; then
 		template sed 's#exempted: {{EXEMPT}}#exempted: ["localhost"]#'
 	mutant "any INSIDE_SUBNET taken" "Ergo starts with INSIDE_SUBNET [0.0.0.0/0]" render_sh sed '/INSIDE_SUBNET: required/d'
 	mutant "a login by PASS" "login-via-pass-command: false" template sed 's#login-via-pass-command: false#login-via-pass-command: true#'
+	mutant "messages of several lines turned off" "at 4096 bytes" template sed 's#max-bytes: 4096#max-bytes: 0#'
+	mutant "a message of lines past the composer's cap" "at 40 lines" template sed 's#max-lines: 40#max-lines: 0#'
 	mutant "every address believed as a proxy" "never a forged X-Forwarded-For" template sed 's#proxy-allowed-from: {{PROXY_FROM}}#proxy-allowed-from: ["0.0.0.0/0"]#'
 	mutant "the auth script's socket lost" "the refusal came from the server" compose 'services: { server: { environment: { AUTH_SOCKET: /tmp/elsewhere.sock } } }'
 	mutant "the server believes no proxy" "is its own visitor" compose 'services: { server: { environment: { TRUSTED_PROXY: 192.0.2.1 } } }'
@@ -715,6 +717,9 @@ print("%.2f %d" % (sum(float(s.get("cpus", 0)) for s in services), sum(size(s.ge
 		expect "Ergo's settings say $line" "$(grep -cF -- "$line" "$tmp/ircd.yaml")" 1
 	done
 	expect "Ergo's settings hold 100 channels a client" "$(grep -cE '^ +max-channels-per-client: 100$' "$tmp/ircd.yaml")" 1
+	# A message of several lines (draft/multiline, slice 4): capped as core's composer counts, its whole lines read.
+	expect "Ergo's settings cap a message of several lines at 4096 bytes" "$(grep -cE '^ +max-bytes: 4096$' "$tmp/ircd.yaml")" 1
+	expect "Ergo's settings cap a message of several lines at 40 lines" "$(grep -cE '^ +max-lines: 40$' "$tmp/ircd.yaml")" 1
 	# The whole line: +i alone holds the words '+i' too (F1091).
 	expect "Ergo's settings set +i and +R at each connection" "$(grep -cE '^ +default-user-modes: \+iR$' "$tmp/ircd.yaml")" 1
 	expect "Ergo's settings close registration" "$(awk '/^  registration:/ { r = 1 } r && /enabled:/ { print $2; exit }' "$tmp/ircd.yaml")" false

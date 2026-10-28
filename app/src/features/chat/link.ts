@@ -3,7 +3,7 @@
 // (Ergo's max-channels-per-client); the newest lines of the room in view alone, once Ergo says I joined it, since
 // Ergo paces a client to 2 lines a second (plan §4); Ergo's lines read into the store through one BatchReader a
 // connection. Its parts come in, so the tests give their own.
-import { BatchReader, nickOf, type IrcMessage, type Reacting } from "@gnoworld/core";
+import { BatchReader, nickOf, type Composed, type IrcMessage, type Reacting } from "@gnoworld/core";
 import { RoomId } from "@gnoworld/schemas";
 import type { Ergo, ErgoOptions, Who } from "../../lib/ergo/ergo.ts";
 import type { AppState } from "../../store/index.ts";
@@ -12,6 +12,7 @@ import { HISTORY_LINES } from "./history.ts";
 import { Joins } from "./joins.ts";
 import type { ChatLink, LinkDeps } from "./linkTypes.ts";
 import { outbox, type Outbox } from "./outbox.ts";
+import { heardIn } from "./outgoing.ts";
 import { refusedIn } from "./reacting.ts";
 import { Noticer } from "./noticing.ts";
 import { Sending } from "./sending.ts";
@@ -74,8 +75,11 @@ class Link implements ChatLink {
     this.#keep();
   }
 
-  say = (room: string, draft: string, reply?: string): boolean => this.#sending.say(room, draft, reply);
-  sayTo = (partner: string, draft: string): boolean => this.#sending.sayTo(partner, draft);
+  // Yes while Ergo has no nick yet (its answer is unknown then): no refusal before the welcome; read at each render.
+  readonly multiline = (): boolean => this.#ergo?.multiline() ?? true;
+  say = (room: string, composed: Composed, reply?: string): boolean => this.#sending.say(room, composed, reply);
+  sayTo = (partner: string, composed: Composed, draft: string): boolean =>
+    this.#sending.sayTo(partner, composed, draft);
   redact = (room: string, id: string): boolean => this.#sending.redact(room, id);
 
   typing(room: string, state: "active" | "done"): void {
@@ -206,7 +210,7 @@ class Link implements ChatLink {
     if (read.kind !== "done") return;
     const { type, params, tags, messages } = read.batch;
     if (type === "chathistory") this.#page(params[0] ?? "", messages);
-    else for (const each of messages) this.#heard(each);
+    else for (const each of heardIn(read.batch)) this.#heard(each);
     if (type === "labeled-response") this.#outbox.answered(tags, messages);
   }
 

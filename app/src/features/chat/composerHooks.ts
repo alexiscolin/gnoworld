@@ -1,7 +1,11 @@
 // What the composer keeps beside its draft (moved out of Composer.tsx, which the merge of 4e's refusals and 4f's typing
 // grew past the lint's sizes): why Ergo refused the last line, the focus at its start, the selection an edit leaves.
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { COMMANDS, type Composed } from "@gnoworld/core";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
+import { completions, type Completion } from "./complete.ts";
 import type { Edit } from "./format.ts";
+import { peopleOf, quoted } from "./names.ts";
+import { roomHint, said, sendable, withHint } from "./said.ts";
 
 /** The lines Ergo refused so far, the last one's draft, and why it did not go. */
 export interface Refused {
@@ -9,12 +13,6 @@ export interface Refused {
   draft: string;
   why: string;
 }
-
-// The unsent words quoted, at most 80 characters as a reader counts them.
-const quoted = (words: string) => {
-  const kept = [...new Intl.Segmenter().segment(words)].map(({ segment }) => segment);
-  return kept.length > 80 ? `${kept.slice(0, 80).join("")}…` : words;
-};
 
 /** What a refusal leaves in the box `draft` holds: its draft back into an empty box; else the box as typed since,
  * the unsent words quoted after why (CR7). */
@@ -46,11 +44,11 @@ export function useRefusal(refused: Refused | undefined, draft: string, setDraft
 export function useFocusAtStart(formRef: RefObject<HTMLFormElement | null>, focus: boolean | undefined) {
   const [asked] = useState(focus === true);
   useEffect(() => {
-    if (asked) formRef.current?.querySelector("input")?.focus();
+    if (asked) formRef.current?.querySelector("textarea")?.focus();
   }, [asked, formRef]);
 }
 
-const boxOf = (form: RefObject<HTMLFormElement | null>) => form.current?.querySelector("input") ?? undefined;
+const boxOf = (form: RefObject<HTMLFormElement | null>) => form.current?.querySelector("textarea") ?? undefined;
 
 /** The form's box, and the selection an edit leaves (`keep`), put back in the box once it shows the new `draft`. */
 export function useSelection(formRef: RefObject<HTMLFormElement | null>, draft: string) {
@@ -68,4 +66,67 @@ export function useSelection(formRef: RefObject<HTMLFormElement | null>, draft: 
       selectionRef.current = edit;
     },
   };
+}
+
+const COARSE = "(pointer: coarse)";
+
+/** Whether the main pointer is a finger (a touch screen), whose keyboard has no Shift: Enter there adds a line (F1714).
+ * Read as the screen says it, again when it changes; a page rendered on the server says no. */
+function useCoarsePointer(): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      const media = window.matchMedia(COARSE);
+      media.addEventListener("change", onChange);
+      return () => {
+        media.removeEventListener("change", onChange);
+      };
+    },
+    () => window.matchMedia(COARSE).matches,
+    () => false,
+  );
+}
+
+// What the field says as @room stands in the draft, which a promise the sender could misread must not hide behind
+// another help: it replaces any help, and no error.
+const hinted = (says: ReturnType<typeof said>, hint: string | undefined) =>
+  says.error === undefined && hint !== undefined ? { help: hint } : says;
+
+/** What the field says of the draft, its hint of how to add a line following the screen's pointer; whether that pointer
+ * is a finger; and whether the draft may go. `to` names a direct message's partner, whom no typing is told to. */
+export function useHelp(
+  composed: Composed,
+  {
+    nick,
+    label: to,
+    multiline,
+    groups,
+  }: { nick: string; label?: string | undefined; multiline?: boolean | undefined; groups?: boolean | undefined },
+  { failed, completion, draft }: { failed: boolean; completion?: Completion | undefined; draft: string },
+) {
+  const coarse = useCoarsePointer();
+  const context = { nick, draft, multiline, completion };
+  return {
+    coarse,
+    shown: withHint(
+      hinted(said(composed, failed, context), to === undefined ? roomHint(composed, groups ?? false) : undefined),
+      to !== undefined,
+      coarse,
+    ),
+    goes: sendable(composed, multiline),
+  };
+}
+
+/** What Tab completes the draft's last word to. The room's accounts are sorted out of its members only while a word
+ * after `@` is typed: the mention alone, not each key, is what the compiler recomputes them on (F793). */
+export function completionOf(
+  draft: string,
+  {
+    rooms,
+    members,
+    nick,
+    group,
+  }: { rooms: readonly string[]; members: readonly string[]; nick: string; group: boolean },
+) {
+  const people = /(^|\s)@\S*$/u.test(draft) ? peopleOf(members, nick) : [];
+  return completions(draft, { commands: COMMANDS, rooms, people, group });
 }

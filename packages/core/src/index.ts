@@ -1,6 +1,7 @@
-export { escapeTagValue, formatLine, parseLine, toIrcCommand, unescapeTagValue } from "./irc/irc.ts";
+export { escapeTagValue, formatLine, LINE_BYTES, parseLine, toIrcCommand, unescapeTagValue } from "./irc/irc.ts";
 export type { IrcCommand, IrcMessage, IrcParsed, IrcParseError } from "./irc/irc.ts";
 export { BATCH_LINES, BatchReader, OPEN_BATCHES, type Batch, type Batched } from "./irc/batch.ts";
+export { foldMultiline, MULTILINE, MULTILINE_BYTES, MULTILINE_LINES } from "./irc/multiline.ts";
 export {
   addLines,
   concerns,
@@ -47,8 +48,8 @@ export {
   type Shown,
 } from "./chat/reactions.ts";
 export { inlines, inWord, markdown, mentions, mentionsRoom } from "./markdown/markdown.ts";
-export { excerpt } from "./markdown/plain.ts";
+export { excerpt, firstGraphemes } from "./markdown/plain.ts";
 export type { Block, Inline } from "./markdown/markdown.ts";
-export { COMMANDS, compose, LINE_BYTES, relayOf, type Composed } from "./chat/compose.ts";
+export { COMMANDS, compose, relayOf, type Composed } from "./chat/compose.ts";
 export { fold } from "./chat/fold.ts";
 export { threadsOf, type Threaded, type Threads } from "./chat/threads.ts";

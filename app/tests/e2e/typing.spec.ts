@@ -143,7 +143,9 @@ test.describe("telling the room the account is typing", () => {
   test("says in the field's help that the room sees the account type", async ({ page }) => {
     const address = await logIn(page, word("typing"));
     await room(page, { me: address });
-    await expect(field(page)).toHaveAccessibleDescription("People in this room see when you type.");
+    await expect(field(page)).toHaveAccessibleDescription(
+      "People in this room see when you type. Shift+Enter adds a line.",
+    );
     await field(page).fill("/");
     await expect(field(page)).toHaveAccessibleDescription("Tab completes /me.");
   });

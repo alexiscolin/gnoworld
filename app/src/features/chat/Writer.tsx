@@ -29,7 +29,7 @@ export interface WriterProps {
   members: readonly string[];
   /** Whether a mention of the whole room counts here (4f-n). */
   groups?: boolean | undefined;
-  onSay: (draft: string) => boolean;
+  onSay: ComposerProps["onSay"];
   /** What each change of the draft tells the room of the account's typing (4f); a direct message's tells none. */
   onTyping?: ((state: "active" | "done") => void) | undefined;
   /** The lines Ergo refused, and why the last did not go: a direct message's (4e). */
@@ -48,11 +48,13 @@ export interface WriterProps {
   keeps?: boolean | undefined;
   draft?: string | undefined;
   onDraft?: ((draft: string) => void) | undefined;
+  /** Whether the connection sends a message of several lines whole (draft/multiline). */
+  multiline?: boolean | undefined;
 }
 
 export function Writer(props: WriterProps) {
   const { session, room, label, rooms, members, groups, onSay, onTyping, refused, focus, describedBy } = props;
-  const { replying, asked, onCancelReply, keeps = true, draft, onDraft } = props;
+  const { replying, asked, onCancelReply, keeps = true, draft, onDraft, multiline } = props;
   if (session.kind !== "in") return <p>{LOG_IN_TO_WRITE}</p>;
   // The account's drafts on this device: the room's, where the composer starts, and each change kept (4d).
   const kept = pageDrafts(session.address);
@@ -82,6 +84,7 @@ export function Writer(props: WriterProps) {
         replying={replying === undefined ? undefined : answeredOf(replying)}
         asked={asked}
         onCancelReply={onCancelReply}
+        multiline={multiline}
       />
     </Suspense>
   );

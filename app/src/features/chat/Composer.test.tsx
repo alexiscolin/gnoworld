@@ -1,8 +1,12 @@
-import { compose } from "@gnoworld/core";
+// @vitest-environment jsdom
+import { compose, type Composed } from "@gnoworld/core";
 import { completions } from "./complete.ts";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
-import { Composer, NEAR, Preview, ROOM_NOTIFIES, ROOM_SILENT, roomHint, said, typingOf } from "./Composer.tsx";
+import { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Composer, Preview, typingOf } from "./Composer.tsx";
+import { NEAR, ROOM_NOTIFIES, ROOM_SILENT, roomHint, said, sendable, withHint } from "./said.ts";
 import { refusalAfter } from "./composerHooks.ts";
 
 const ROOM = "#bubble/games";
@@ -119,16 +123,16 @@ describe("Composer", () => {
         onSay={() => true}
       />,
     );
-    expect(markup).toMatch(/<input[^>]* value="kept \*\*draft\*\*"/);
+    expect(markup).toMatch(/<textarea[^>]*>kept \*\*draft\*\*<\/textarea>/);
     expect(markup).toContain("<strong>draft</strong>");
   });
 
   it("starts empty with no draft given, and writes a stored draft as a value, never as markup", () => {
-    expect(html()).toMatch(/<input[^>]* value=""/);
+    expect(html()).toMatch(/<textarea[^>]*><\/textarea>/);
     const markup = renderToStaticMarkup(
       <Composer room={ROOM} nick={NICK} rooms={[]} members={[]} draft={'"><img src=x onerror=1>'} onSay={() => true} />,
     );
-    expect(markup).toContain('value="&quot;&gt;&lt;img src=x onerror=1&gt;"');
+    expect(markup).toContain("&quot;&gt;&lt;img src=x onerror=1&gt;</textarea>");
     expect(markup).not.toMatch(/<img/);
   });
 
@@ -203,11 +207,11 @@ describe("what the composer's field says of a completion", () => {
     [`${"x".repeat(412)} #g`, { help: "Tab completes #games; also #gnogolf." }],
   ])("says, of %j, %j: an unknown command waits, a line too long does not", (draft, shown) => {
     const choices = { ...CHOICES, people: [ALICE] };
-    expect(said(compose(ROOM, draft, NICK), false, completions(draft, choices))).toStrictEqual(shown);
+    expect(said(compose(ROOM, draft, NICK), false, { completion: completions(draft, choices) })).toStrictEqual(shown);
   });
 
   it("says a line not sent before any completion", () => {
-    expect(said(compose(ROOM, "#g", NICK), true, completions("#g", CHOICES))).toStrictEqual({
+    expect(said(compose(ROOM, "#g", NICK), true, { completion: completions("#g", CHOICES) })).toStrictEqual({
       error: "Not sent: the chat is not ready yet. Try again in a moment.",
     });
   });
@@ -216,7 +220,7 @@ describe("what the composer's field says of a completion", () => {
 describe("what the composer's field says of three completions", () => {
   it("names the first, then the others, a comma apart", () => {
     const choices = { commands: [], rooms: ["#a1", "#a2", "#a3"], people: [] };
-    expect(said(compose(ROOM, "#a", NICK), false, completions("#a", choices))).toStrictEqual({
+    expect(said(compose(ROOM, "#a", NICK), false, { completion: completions("#a", choices) })).toStrictEqual({
       help: "Tab completes #a1; also #a2, #a3.",
     });
   });
@@ -356,6 +360,158 @@ describe("the composer, from a draft", () => {
   });
 });
 
+// draft/multiline (docs/decisions.md row 255): Shift+Enter adds a line to the draft, Enter sends it; a message of
+// several lines is previewed as the room reads it, and what keeps it from going is said.
+describe("the composer, a draft of several lines", () => {
+  const from = (draft: string) =>
+    renderToStaticMarkup(
+      <Composer room={ROOM} nick={NICK} rooms={["#games"]} members={[]} draft={draft} onSay={() => true} />,
+    );
+
+  it("holds the draft in a box of several lines, labelled for the room", () => {
+    expect(from("")).toMatch(/<textarea[^>]*>/);
+    expect(from("")).not.toMatch(/<input[^>]*type="text"/);
+  });
+
+  it("previews a draft of several lines as the room reads it, a list as a list", () => {
+    expect(renderToStaticMarkup(<Preview composed={compose(ROOM, "- one\n- two", NICK)} />)).toMatch(
+      /<ul><li>one<\/li><li>two<\/li><\/ul>/,
+    );
+  });
+
+  it("describes the box by the hint that Shift+Enter adds a line, which a message near its cap's help replaces", () => {
+    const markup = from("");
+    const described = /<textarea[^>]* aria-describedby="([^"]+)"/.exec(markup)?.[1] ?? "?";
+    expect(markup).toMatch(new RegExp(`id="${described}"[^>]*>[^<]*Shift\\+Enter adds a line\\.<`));
+  });
+
+  // F1714 (CR2, by Alexis): on a touch screen Enter adds a line and Send sends; the help names the form that applies.
+  it("hints that Enter adds a line and Send sends on a touch screen, Shift+Enter on a computer", () => {
+    expect(withHint({}, true, true).help).toBe("Enter adds a line; Send sends it.");
+    expect(withHint({}, true, false).help).toBe("Shift+Enter adds a line.");
+    expect(withHint({}, false, true).help).toBe(
+      "People in this room see when you type. Enter adds a line; Send sends it.",
+    );
+    expect(withHint({ error: "No." }, false, true)).toStrictEqual({ error: "No." });
+  });
+
+  it("says what keeps a draft from going in the box, in place of the hint", () => {
+    const markup = from("/nick bob");
+    expect(markup).toContain("/nick is not a command. /me sends an action.");
+    expect(markup).not.toContain("Shift+Enter adds a line.");
+  });
+
+  it("names the line too long, from 1, and a message too many lines by how many", () => {
+    const long = compose(ROOM, `one\ntwo\n${"a".repeat(480)}`, NICK);
+    expect(said(long, false)).toStrictEqual({
+      error: expect.stringMatching(/^Line 3 is too long by \d+ bytes\.$/) as string,
+    });
+    expect(said(compose(ROOM, Array.from({ length: 42 }, () => "x").join("\n"), NICK), false)).toStrictEqual({
+      error: "2 lines too many: 40 at most.",
+    });
+  });
+
+  it("says a draft holding half of an emoji cannot go, and Send off, not that the chat is not ready (F1717)", () => {
+    const message = "This text holds half of an emoji and cannot be sent. Delete it.";
+    expect(said(compose(ROOM, "a\ud800b", NICK), false)).toStrictEqual({ error: message });
+    expect(from("one\n\ud83d")).toContain(message);
+    expect(from("one\n\ud83d")).toMatch(/<button(?=[^>]*type="submit")(?=[^>]*disabled="")[^>]*>/);
+  });
+
+  it("leaves Send on for a message of several lines that can go", () => {
+    expect(from("- one\n- two")).not.toMatch(/<button(?=[^>]*type="submit")(?=[^>]*disabled)/);
+  });
+
+  it("says a message one line or one byte past its caps, and Send off", () => {
+    expect(said(compose(ROOM, Array.from({ length: 41 }, () => "x").join("\n"), NICK), false)).toStrictEqual({
+      error: "1 line too many: 40 at most.",
+    });
+    const over = [...Array.from({ length: 10 }, () => "a".repeat(400)), "a".repeat(87)].join("\n");
+    expect(said(compose(ROOM, over, NICK), false)).toStrictEqual({ error: "Too long by 1 byte: 4096 at most." });
+    expect(from(over)).toMatch(/<button(?=[^>]*type="submit")(?=[^>]*disabled="")[^>]*>/);
+  });
+
+  // F1720 (CR8): the line's own budget, about 440 bytes, binds before the message's 4096, and its line is named.
+  it("names the line with the fewest bytes left when it has fewer than the message, near its budget", () => {
+    const draft = `one\n${"a".repeat(400)}\ntwo`;
+    expect(said(compose(ROOM, draft, NICK), false, { nick: NICK })).toStrictEqual({
+      help: "Line 2: 19 bytes left.",
+    });
+    expect(said(compose(ROOM, `one\n${"a".repeat(300)}`, NICK), false, { nick: NICK })).toStrictEqual({});
+    // The message's bytes left bind: no line is named.
+    const near = [...Array.from({ length: 10 }, () => "a".repeat(400)), "a".repeat(70)].join("\n");
+    expect(said(compose(ROOM, near, NICK), false, { nick: NICK })).toStrictEqual({ help: "16 bytes left." });
+  });
+
+  // F1718 (CR6): an action is one line, so a draft of several lines after /me loses its breaks without a word.
+  it("says an action is one line when the draft after /me holds line breaks, and nothing for one without", () => {
+    const note = "An action is one line: its line breaks become spaces.";
+    const draft = "/me waves\nhello";
+    expect(said(compose(ROOM, draft, NICK), false, { nick: NICK, draft })).toStrictEqual({ help: note });
+    expect(said(compose(ROOM, "/me waves", NICK), false, { nick: NICK, draft: "/me waves" })).toStrictEqual({});
+    expect(said(compose(ROOM, "/me waves\n", NICK), false, { nick: NICK, draft: "/me waves\n" })).toStrictEqual({});
+  });
+
+  it("says an action is one line for a lone CR in the draft too, as compose reads it as a break (R3)", () => {
+    const draft = "/me waves\rhello";
+    expect(said(compose(ROOM, draft, NICK), false, { nick: NICK, draft })).toStrictEqual({
+      help: "An action is one line: its line breaks become spaces.",
+    });
+  });
+
+  it("names no line when the message has as few bytes left as its tightest line (R3)", () => {
+    // Ten lines of 400 bytes leave 19 each of the line's budget; the message's 4096 less 4010 and 67 leaves 19 too.
+    const draft = [...Array.from({ length: 10 }, () => "a".repeat(400)), "a".repeat(67)].join("\n");
+    expect(said(compose(ROOM, draft, NICK), false, { nick: NICK })).toStrictEqual({ help: "19 bytes left." });
+  });
+
+  // F1719 (CR7): without draft/multiline each line goes as a PRIVMSG, and the bot's 20 messages a minute hide the rest.
+  it("refuses more than 20 lines when the connection has no draft/multiline, and Send is off", () => {
+    const twentyOne = Array.from({ length: 21 }, (_, at) => `line ${String(at)}`).join("\n");
+    const composed = compose(ROOM, twentyOne, NICK);
+    expect(said(composed, false, { multiline: false })).toStrictEqual({
+      error: "1 line too many: 20 at most, as this chat sends one line at a time.",
+    });
+    expect(said(composed, false, { multiline: true })).toStrictEqual({});
+    expect(sendable(composed, false)).toBe(false);
+    expect(sendable(composed, true)).toBe(true);
+    expect(sendable(compose(ROOM, twentyOne.split("\n").slice(0, 20).join("\n"), NICK), false)).toBe(true);
+    expect(sendable(compose(ROOM, "/nick bob", NICK), true)).toBe(false);
+    expect(sendable(compose(ROOM, "hi", NICK), false)).toBe(true);
+  });
+
+  // R2: undefined is "not known yet" (a story, the connection's start), which blocks nothing: only a false does.
+  it("lets 21 to 40 lines go while it is not known whether the connection has draft/multiline", () => {
+    const composed = compose(ROOM, Array.from({ length: 40 }, (_, at) => `line ${String(at)}`).join("\n"), NICK);
+    expect(said(composed, false, {})).toStrictEqual({});
+    expect(said(composed, false, { multiline: undefined })).toStrictEqual({});
+    expect(sendable(composed, undefined)).toBe(true);
+    expect(sendable(composed, false)).toBe(false);
+  });
+
+  it("leaves Send off for a draft past 20 lines in a box told there is no draft/multiline", () => {
+    const twentyOne = Array.from({ length: 21 }, (_, at) => `line ${String(at)}`).join("\n");
+    const markup = renderToStaticMarkup(
+      <Composer
+        room={ROOM}
+        nick={NICK}
+        rooms={["#games"]}
+        members={[]}
+        draft={twentyOne}
+        multiline={false}
+        onSay={() => true}
+      />,
+    );
+    expect(markup).toContain("1 line too many: 20 at most, as this chat sends one line at a time.");
+    expect(markup).toMatch(/<button(?=[^>]*type="submit")(?=[^>]*disabled="")[^>]*>/);
+  });
+
+  it("says the bytes a message of several lines has left near its cap", () => {
+    const near = [...Array.from({ length: 10 }, () => "a".repeat(400)), "a".repeat(70)].join("\n");
+    expect(said(compose(ROOM, near, NICK), false)).toStrictEqual({ help: "16 bytes left." });
+  });
+});
+
 // 4f: what an edit of the draft tells the room of the account's typing (IRCv3's +typing): a slash command is no
 // typing, as the spec has it; a cleared field ends it.
 describe("typingOf: what an edit of the draft tells the room", () => {
@@ -399,7 +555,7 @@ describe("Composer: a reply", () => {
   // The code review (CR7): the field, which Reply focuses, is described by the bar that says which line it answers.
   it("describes its field by the line it answers", () => {
     const markup = draw(to("the first line"));
-    const describedBy = /<input[^>]*aria-describedby="([^"]+)"/.exec(markup)?.[1] ?? "";
+    const describedBy = /<(?:input|textarea)[^>]*aria-describedby="([^"]+)"/.exec(markup)?.[1] ?? "";
     const ids = describedBy.split(" ");
     // The field is described by its help too (4f's typing disclosure): the bar is one of what describes it.
     const described = ids.map((id) => new RegExp(`<p[^>]*id="${id}"[^>]*>(.*?)</p>`, "s").exec(markup)?.[1] ?? "");
@@ -434,5 +590,68 @@ describe("Composer: a reply", () => {
     const markup = draw();
     expect(words(markup)).not.toContain("Replying to");
     expect(names(markup)).not.toContain("Cancel the reply");
+  });
+});
+
+// What Enter does in the composer's box, which the markup tests above cannot say (they render, they press nothing): the
+// form's submit is the only gate on the Enter path, as requestSubmit() ignores the Send button's disabled (R5).
+describe("Enter in the composer's box", () => {
+  const lines = (count: number) => Array.from({ length: count }, (_, at) => `line ${String(at)}`).join("\n");
+
+  let root: Root | undefined;
+  let host: HTMLElement;
+  beforeEach(() => {
+    Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
+    // jsdom has no matchMedia: a computer's pointer, which is not coarse.
+    // ... nor the popover API, which the composer's live region uses; the pop-up itself is the journeys'.
+    Object.assign(HTMLElement.prototype, { togglePopover: vi.fn(), showPopover: vi.fn(), hidePopover: vi.fn() });
+    vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    host = document.body.appendChild(document.createElement("div"));
+  });
+  afterEach(() => {
+    act(() => {
+      root?.unmount();
+    });
+    host.remove();
+    vi.unstubAllGlobals();
+  });
+
+  // Presses Enter in the box of a composer holding `draft`; what onSay was given.
+  function enter(draft: string, multiline: boolean | undefined): Composed[] {
+    const went: Composed[] = [];
+    root = createRoot(host);
+    act(() => {
+      root?.render(
+        <Composer
+          room="#bubble/games"
+          nick={NICK}
+          rooms={["#games"]}
+          members={[]}
+          draft={draft}
+          multiline={multiline}
+          onSay={(composed) => {
+            went.push(composed);
+            return true;
+          }}
+        />,
+      );
+    });
+    const box = host.querySelector("textarea");
+    act(() => {
+      box?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    });
+    return went;
+  }
+
+  it("sends a draft of 21 lines on a connection with draft/multiline, once", () => {
+    expect(enter(lines(21), true)).toHaveLength(1);
+  });
+
+  it("sends a draft of 21 lines while it is not known whether the connection has it (R2)", () => {
+    expect(enter(lines(21), undefined)).toHaveLength(1);
+  });
+
+  it("sends nothing of 21 lines on a connection without draft/multiline, whatever the Send button says", () => {
+    expect(enter(lines(21), false)).toEqual([]);
   });
 });

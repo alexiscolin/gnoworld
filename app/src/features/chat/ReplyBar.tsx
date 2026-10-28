@@ -33,7 +33,7 @@ function ReplyBar({ id, to, me, members, onCancel }: ReplyBarProps) {
         onClick={(event) => {
           const form = event.currentTarget.closest("form");
           onCancel?.();
-          form?.querySelector("input")?.focus();
+          form?.querySelector("textarea")?.focus();
         }}
       />
     </Sidebar>
@@ -45,7 +45,7 @@ function ReplyBar({ id, to, me, members, onCancel }: ReplyBarProps) {
 function useFocusOnReply(answers: boolean, asked: number, formRef: RefObject<HTMLFormElement | null>) {
   const answering = answers ? asked : undefined;
   useLayoutEffect(() => {
-    if (answering !== undefined) formRef.current?.querySelector("input")?.focus();
+    if (answering !== undefined) formRef.current?.querySelector("textarea")?.focus();
   }, [answering, formRef]);
 }
 

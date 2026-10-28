@@ -161,7 +161,7 @@ export function ChatPanel({ world }: { world: string }) {
           session={session}
           link={linkRef}
           dismissed={dismissed}
-          sayTo={(partner, draft) => linkRef.current?.sayTo(partner, draft) ?? false}
+          sayTo={(partner, composed, draft) => linkRef.current?.sayTo(partner, composed, draft) ?? false}
           failed={failed}
         />
       </Suspense>

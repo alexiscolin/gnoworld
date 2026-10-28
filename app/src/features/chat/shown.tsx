@@ -1,5 +1,6 @@
 // The conversation in view on a world's page (slice 4's 4e), one RoomView and one Writer whatever it is: a room's or
 // a direct message's, what each is told.
+import type { Composed } from "@gnoworld/core";
 import { Icon } from "@gnoworld/ui";
 import { NOT_ENCRYPTED, PAGE_ONLY, type Dms } from "./Dms.tsx";
 import { shortAddress } from "./names.ts";
@@ -11,7 +12,7 @@ export type { Room, Shown } from "./roomShown.ts";
 /** What a direct message's page is told by the page: how it sends, whether its composer takes the focus, and the
  * id of its note, which the composer points at. */
 export interface DmPage {
-  sayTo: (partner: string, draft: string) => boolean;
+  sayTo: (partner: string, composed: Composed, draft: string) => boolean;
   focus: boolean;
   noteId: string;
   /** The conversation seen up to a line's time, as its reader reaches its end (4f-n). */
@@ -58,7 +59,7 @@ function dmShown(partner: string, dms: Dms, { sayTo, focus, noteId, seen }: DmPa
       room: partner,
       label: short,
       members: [],
-      onSay: (draft) => sayTo(partner, draft),
+      onSay: (composed, draft) => sayTo(partner, composed, draft),
       refused:
         refused === undefined
           ? undefined

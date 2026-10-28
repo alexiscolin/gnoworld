@@ -8,14 +8,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import styles from "./LineActions.module.css";
 import { keptItems, PinButton, type LineKeeping } from "./LineKeeping.tsx";
 import { menuItems } from "./menuItems.ts";
-import { roomLabel } from "./names.ts";
-
-// What the delete's dialog quotes of its line: its first 80 characters, never one cut in two (an emoji's parts).
-const QUOTED = 80;
-function quoted(text: string): string {
-  const characters = Array.from(new Intl.Segmenter().segment(text), ({ segment }) => segment);
-  return characters.length > QUOTED ? `${characters.slice(0, QUOTED).join("")}…` : text;
-}
+import { quoted, roomLabel } from "./names.ts";
 
 // The prototype's three quick reactions (docs/prototype/source/app.js, withActions).
 const QUICK = ["👍", "❤️", "😂"];

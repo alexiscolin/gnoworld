@@ -81,13 +81,13 @@ export function ircLink(options: Options): Link {
       silent += 1;
     }, pingMs);
     s.on("connect", () => {
-      // multi-prefix: NAMES gives each person every power, so the reconciler reads a voiced operator whole;
-      // sasl: the bot logs in as its account, which holds its nick (slice 3's max review); message-redaction:
-      // Ergo tells a room's members each REDACT, the bot's own hide too (irc/handlers.go:3010), for the pins.
+      // multi-prefix: NAMES gives each person every power; sasl: the bot logs in as its account; message-redaction:
+      // Ergo tells each REDACT, the bot's own too (irc/handlers.go:3010), for the pins; draft/multiline: a message of
+      // several lines comes whole (several.ts).
       s.write(
         line("CAP", [
           "REQ",
-          "message-tags account-tag batch draft/chathistory server-time multi-prefix sasl draft/message-redaction",
+          "message-tags account-tag batch draft/chathistory server-time multi-prefix sasl draft/message-redaction draft/multiline",
         ]),
       );
       s.write(line("NICK", [NICK]));

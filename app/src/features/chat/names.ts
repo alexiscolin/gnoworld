@@ -1,10 +1,17 @@
 // How the chat names a room and an address, and which room a world's page shows.
-import { markdown, mentions, type Line } from "@gnoworld/core";
+import { firstGraphemes, markdown, mentions, type Line } from "@gnoworld/core";
 import { Address, type RoomList } from "@gnoworld/schemas";
 import type { AppState } from "../../store/index.ts";
 
 /** Whether a nick is an account's: an address, which a guest's cannot be (Ergo gives a guest 32 characters). */
 export const isAccount = (nick: string): boolean => Address.safeParse(nick).success;
+
+/** The first 80 graphemes of words, an ellipsis after them when more follow: what a dialog or a refusal quotes of a
+ * line, never one cut in two (an emoji's parts). */
+export function quoted(words: string): string {
+  const first = firstGraphemes(words, 81);
+  return first.length > 80 ? `${first.slice(0, 80).join("")}…` : words;
+}
 
 /** An address's first six and last five characters, as the login shows one's own. */
 export const shortAddress = (address: string): string => `${address.slice(0, 6)}…${address.slice(-5)}`;

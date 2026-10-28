@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { toAddress } from "@gnoworld/schemas";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { openDatabase } from "../db.ts";
 import { logger } from "../log.ts";
@@ -31,6 +31,7 @@ const Row = z.object({
 
 const opened: DatabaseSync[] = [];
 afterEach(() => {
+  vi.useRealTimers();
   for (const db of opened.splice(0)) db.close();
 });
 
@@ -85,6 +86,24 @@ describe("checking a message", () => {
       at: T0,
     });
     expect(lines.join("")).not.toMatch(/hurt|g1jg8m/);
+  });
+
+  it("hides a message of several lines the link could not read whole, whatever its text, asking no provider (G5)", async () => {
+    const { check, asked, rows } = setup(() => Promise.resolve(answer()));
+    expect(await check({ ...said("(not read)", "m1"), unreadable: true })).toEqual({
+      action: "hide",
+      reason: "unreadable",
+    });
+    expect(asked).toEqual([]);
+    expect(rows()).toEqual([expect.objectContaining({ msgid: "m1", action: "hide", reason: "unreadable" })]);
+  });
+
+  it("leaves a message of several lines it could not read in a room no world names unchecked, as any line (G5)", async () => {
+    const { check, rows } = setup(() => Promise.resolve(answer()));
+    expect(await check({ ...said("(not read)", "m1"), room: "#nowhere", unreadable: true })).toEqual({
+      action: "unchecked",
+    });
+    expect(rows()).toEqual([expect.objectContaining({ action: "unchecked", reason: "unknown_room" })]);
   });
 
   it("records a pass, and an unchecked message as unchecked, the text never", async () => {
@@ -228,6 +247,74 @@ describe("checking a message", () => {
     const { check } = setup(() => Promise.resolve(answer()));
     for (let n = 0; n < 20; n += 1) await check(stamped(n, n));
     expect(await check(stamped(20, 20, OTHER))).toEqual({ action: "pass" });
+  });
+
+  // A second rate rule (docs/decisions.md f0c19ce, F1123): 100 lines a minute an account, a message of several lines
+  // counting each of its lines, beside the 20 messages; counted in memory, so a restart forgets it.
+  const lines = (count: number, { n, ms }: { n: number; ms: number }, account = OLD) => {
+    const text = Array.from({ length: count }, (_, at) => `line ${String(at)}`).join("\n");
+    return { ...said(text, `m${String(n)}`, account), time: new Date(T0 + ms).toISOString() };
+  };
+
+  it("hides a message that takes an account past 100 lines in a minute as too fast, each line of it counted (G4)", async () => {
+    const { check, asked } = setup(() => Promise.resolve(answer()));
+    expect(await check(lines(40, { n: 0, ms: 0 }))).toEqual({ action: "pass" });
+    expect(await check(lines(40, { n: 1, ms: 1000 }))).toEqual({ action: "pass" });
+    expect(await check(lines(40, { n: 2, ms: 2000 }))).toEqual({ action: "hide", reason: "too_fast" });
+    expect(asked).toHaveLength(2);
+  });
+
+  it("lets an account send exactly 100 lines in a minute, and hides the next line", async () => {
+    const { check } = setup(() => Promise.resolve(answer()));
+    for (const [n, count] of [40, 40, 20].entries())
+      expect(await check(lines(count, { n, ms: n }))).toEqual({ action: "pass" });
+    expect(await check(stamped(9, 3))).toEqual({ action: "hide", reason: "too_fast" });
+  });
+
+  it("counts a blank line of a message as a line, and a line it hid still counts", async () => {
+    const { check } = setup(() => Promise.resolve(answer()));
+    const blanks = (n: number, ms: number) => ({
+      ...said(`a${"\n".repeat(39)}`, `b${String(n)}`),
+      time: new Date(T0 + ms).toISOString(),
+    });
+    expect(await check(blanks(0, 0))).toEqual({ action: "pass" });
+    expect(await check(blanks(1, 1))).toEqual({ action: "pass" });
+    expect(await check(blanks(2, 2))).toEqual({ action: "hide", reason: "too_fast" });
+    // The hidden message's 40 lines stay in the minute: 120 of them, and one line more is too many.
+    expect(await check(stamped(9, 3))).toEqual({ action: "hide", reason: "too_fast" });
+  });
+
+  it("counts the lines of the minute before a message, not the minute before it out, apart for each account", async () => {
+    const OTHER = toAddress(new Uint8Array(20).fill(9));
+    const { db, check } = setup(() => Promise.resolve(answer()));
+    db.prepare("INSERT INTO accounts (address, first_seen) VALUES (?, ?)").run(OTHER, T0 - 30 * 24 * HOUR);
+    await check(lines(40, { n: 0, ms: 0 }));
+    await check(lines(40, { n: 1, ms: 0 }));
+    expect(await check(lines(40, { n: 2, ms: 1 }, OTHER))).toEqual({ action: "pass" });
+    expect(await check(lines(21, { n: 3, ms: 59_999 }))).toEqual({ action: "hide", reason: "too_fast" });
+    expect(await check(lines(40, { n: 4, ms: 60_000 }))).toEqual({ action: "pass" });
+  });
+
+  it("counts an account's lines whatever the server's clock did between them, Ergo's stamps alone counting (R1)", async () => {
+    // S1 as reported forgot an account 60 s after the server last heard of it; both clocks jump 61 s before each line.
+    vi.useFakeTimers();
+    const { check, clock } = setup(() => Promise.resolve(answer()));
+    const verdicts = [];
+    for (const [n, ms] of [0, 1000, 2000].entries()) {
+      clock.now += 61_000;
+      vi.advanceTimersByTime(61_000);
+      verdicts.push(await check(lines(40, { n, ms }, OLD)));
+    }
+    expect(verdicts).toEqual([{ action: "pass" }, { action: "pass" }, { action: "hide", reason: "too_fast" }]);
+  });
+
+  it("counts a message once when it is checked again (an unchecked one comes back)", async () => {
+    const { check, db } = setup(() => Promise.resolve("unchecked"));
+    expect(await check(lines(40, { n: 0, ms: 0 }))).toEqual({ action: "unchecked" });
+    db.prepare("UPDATE verdicts SET action = 'unchecked'").run();
+    expect(await check(lines(40, { n: 0, ms: 0 }))).toEqual({ action: "unchecked" });
+    expect(await check(lines(40, { n: 1, ms: 1 }))).toEqual({ action: "unchecked" });
+    expect(await check(lines(21, { n: 2, ms: 2 }))).toEqual({ action: "hide", reason: "too_fast" });
   });
 
   it("hides an edit of another's line, and checks an edit of one's own as any line (3k)", async () => {

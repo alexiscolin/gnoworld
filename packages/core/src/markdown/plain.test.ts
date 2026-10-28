@@ -1,5 +1,5 @@
-import { describe, expect, test } from "vitest";
-import { excerpt, plain } from "./plain.ts";
+import { describe, expect, test, vi } from "vitest";
+import { excerpt, firstGraphemes, plain } from "./plain.ts";
 
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 
@@ -74,5 +74,53 @@ describe("excerpt: a message's words cut to a length", () => {
 
   test.each([0, 1, 1.5, Number.NaN])("refuses a length of %s", (length) => {
     expect(() => excerpt("words", length)).toThrow(RangeError);
+  });
+});
+
+// F1723 (C1): a reply quotes its parent's first 69 graphemes and a delete's dialog its first 80, from a parent of up to
+// 4096 bytes: the text is cut to a few units before it is segmented, not segmented whole.
+describe("firstGraphemes: the first graphemes of a text, the rest never segmented", () => {
+  test("segments no more than eight units a grapheme asked for, of a long text", () => {
+    const segment = vi.spyOn(Intl.Segmenter.prototype, "segment");
+    try {
+      expect(firstGraphemes("a".repeat(4096), 70)).toEqual(Array.from({ length: 70 }, () => "a"));
+      expect(segment.mock.calls.map(([text]) => text.length)).toEqual([560]);
+    } finally {
+      segment.mockRestore();
+    }
+  });
+
+  test("gives the whole text, segmented, when it is within the cut", () => {
+    const segment = vi.spyOn(Intl.Segmenter.prototype, "segment");
+    try {
+      expect(firstGraphemes("abc", 70)).toEqual(["a", "b", "c"]);
+      expect(segment).toHaveBeenCalledTimes(1);
+    } finally {
+      segment.mockRestore();
+    }
+    expect(firstGraphemes("", 70)).toEqual([]);
+  });
+
+  test("keeps a grapheme whole where the cut would split it, and reads a text of long graphemes whole", () => {
+    const long = `a${"\u0301".repeat(20)}`;
+    expect(firstGraphemes(long.repeat(10), 5)).toEqual(Array.from({ length: 5 }, () => long));
+    expect(firstGraphemes(`${"a".repeat(558)}👍🏽${"b".repeat(100)}`, 559)).toEqual([
+      ...Array.from({ length: 558 }, () => "a"),
+      "👍🏽",
+    ]);
+  });
+
+  test("agrees with the whole text's segmentation on any text and count", () => {
+    const whole = (text: string, count: number) =>
+      [...new Intl.Segmenter().segment(text)].slice(0, count).map(({ segment }) => segment);
+    for (const text of [
+      "x".repeat(9000),
+      "👩‍👩‍👧‍👦é🇫🇷a".repeat(300),
+      `${"a\u0301".repeat(400)}z`,
+      "é".repeat(20) + "\u0301",
+    ]) {
+      for (const count of [1, 2, 20, 69, 70, 81, 500])
+        expect(firstGraphemes(text, count), `${text.slice(0, 8)} ${String(count)}`).toEqual(whole(text, count));
+    }
   });
 });

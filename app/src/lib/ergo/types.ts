@@ -32,6 +32,9 @@ export interface Ergo {
   /** Sends one line once connected; false when it is not one line, or not connected. */
   send: (line: string) => boolean;
   stop: () => void;
+  /** Whether Ergo granted draft/multiline on this connection, which sends a message of several lines as one batch;
+   * undefined (unknown) until the connection has its nick. */
+  multiline: () => boolean | undefined;
   /** The nick Ergo's welcome (001) named, else the last one sent, while connected; undefined otherwise. */
   nick: () => string | undefined;
 }

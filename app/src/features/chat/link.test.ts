@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { parseLine, type IrcMessage } from "@gnoworld/core";
+import { compose, parseLine, type IrcMessage } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Result } from "../../lib/api/http.ts";
@@ -11,6 +11,8 @@ import { chatLink, HISTORY_LINES, ROOMS_JOINED, type LinkDeps } from "./link.ts"
 import { WAITING } from "./outbox.ts";
 
 const ADDRESS = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
+// A draft as the account's composer composes it for a room or a partner: the link sends what it is given.
+const composed = (to: string, draft: string) => compose(to, draft, ADDRESS);
 const OTHER = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 // The nick drawn, and the one Ergo took after a 433: the link must read the second from the connection.
 const DRAWN = "guest-aaaaaa";
@@ -31,6 +33,8 @@ interface Fake extends Ergo {
   stopped: boolean;
   me: string | undefined;
   connected: boolean;
+  /** Whether Ergo granted draft/multiline: yes unless a test says otherwise. */
+  grants: boolean;
   state: (state: ErgoState) => void;
   line: (text: string) => void;
 }
@@ -58,6 +62,8 @@ const setup = (before?: (store: ReturnType<typeof createAppStore>) => void, devi
         stopped: false,
         me: undefined,
         connected: false,
+        grants: true,
+        multiline: () => (fake.connected ? fake.grants : undefined),
         send: (line) => {
           if (!fake.connected) return false;
           fake.sent.push(line);
@@ -734,19 +740,26 @@ describe("the chat's link: what it says", () => {
 
   it("sends a draft to a room it is in, as the composer composes it", () => {
     const t = memberIn(["#bubble/games"]);
-    expect(t.link.say("#bubble/games", "  hi **all**  ")).toBe(true);
-    expect(t.link.say("#bubble/games", "/me waves")).toBe(true);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "  hi **all**  "))).toBe(true);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "/me waves"))).toBe(true);
     expect(said(t.fake.sent)).toEqual([
       "PRIVMSG #bubble/games :hi **all**",
       "PRIVMSG #bubble/games :\u0001ACTION waves\u0001",
     ]);
   });
 
+  it("sends nothing composed for another room than the one it is told, though it is in both", () => {
+    const t = memberIn(["#bubble/games", "#bubble"]);
+    t.fake.line(`:${ADDRESS}!u@h JOIN #bubble`);
+    expect(t.link.say("#bubble", composed("#bubble/games", "hi"))).toBe(false);
+    expect(said(t.fake.sent)).toEqual([]);
+  });
+
   it.each(["", "  ", "/nick bob", "a".repeat(600)])(
     "sends nothing of a draft the composer would not send (%j)",
     (draft) => {
       const t = memberIn(["#bubble/games"]);
-      expect(t.link.say("#bubble/games", draft)).toBe(false);
+      expect(t.link.say("#bubble/games", composed("#bubble/games", draft))).toBe(false);
       expect(said(t.fake.sent)).toEqual([]);
     },
   );
@@ -846,16 +859,16 @@ describe("the chat's link: what it says", () => {
   it("says nothing as a guest: a room lets accounts alone speak", () => {
     const t = guestIn(["#bubble/games"]);
     t.fake.line(`:${GUEST}!u@h JOIN #bubble/games`);
-    expect(t.link.say("#bubble/games", "hi")).toBe(false);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "hi"))).toBe(false);
     expect(said(t.fake.sent)).toEqual([]);
   });
 
   it("says nothing in a room Ergo has not said it is in, nor in one it left", () => {
     const t = memberIn(["#bubble/games", "#bubble"]);
-    expect(t.link.say("#bubble", "hi")).toBe(false);
-    expect(t.link.say("#garden", "hi")).toBe(false);
+    expect(t.link.say("#bubble", composed("#bubble", "hi"))).toBe(false);
+    expect(t.link.say("#garden", composed("#garden", "hi"))).toBe(false);
     t.link.follow(["#bubble"]);
-    expect(t.link.say("#bubble/games", "hi")).toBe(false);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "hi"))).toBe(false);
     expect(said(t.fake.sent)).toEqual([]);
   });
 
@@ -865,11 +878,11 @@ describe("the chat's link: what it says", () => {
     t.fake.line("BATCH +n1 example.com/replay");
     t.fake.line(`@batch=n1 :op!u@h KICK #bubble ${ADDRESS} :long ago`);
     t.fake.line("BATCH -n1");
-    expect(t.link.say("#bubble", "hi")).toBe(true);
+    expect(t.link.say("#bubble", composed("#bubble", "hi"))).toBe(true);
     t.fake.line(`:op!u@h KICK #bubble/games ${ADDRESS} :bye`);
     t.fake.line(`:op!u@h KICK #bubble ${OTHER} :not me`);
-    expect(t.link.say("#bubble/games", "hi")).toBe(false);
-    expect(t.link.say("#bubble", "again")).toBe(true);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "hi"))).toBe(false);
+    expect(t.link.say("#bubble", composed("#bubble", "again"))).toBe(true);
     expect(said(t.fake.sent)).toEqual(["PRIVMSG #bubble :hi", "PRIVMSG #bubble :again"]);
   });
 
@@ -883,11 +896,11 @@ describe("the chat's link: what it says", () => {
     t.fake.line(`@batch=p1 :${ADDRESS}!u@h PART #bubble :long ago`);
     t.fake.line("BATCH -p1");
     t.fake.line(`:${OTHER}!u@h PART #bubble`);
-    expect(t.link.say("#bubble", "still in")).toBe(true);
+    expect(t.link.say("#bubble", composed("#bubble", "still in"))).toBe(true);
     t.fake.line(`:${ADDRESS}!u@h PART #bubble/games`);
     t.link.typing("#bubble/games", "active");
     t.link.read("#bubble/games", "m1");
-    expect(t.link.say("#bubble/games", "still here?")).toBe(false);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "still here?"))).toBe(false);
     expect(
       t.fake.sent.filter((line) => / TAGMSG |^MARKREAD \S+ timestamp=|^PRIVMSG #bubble\/games/.test(line)),
     ).toEqual([]);
@@ -897,7 +910,7 @@ describe("the chat's link: what it says", () => {
     const t = memberIn(["#bubble/games"]);
     t.fake.line(`:troll!u@h PRIVMSG #bubble/games :${ADDRESS}`);
     t.fake.line(`:troll!u@h NOTICE #bubble/games ${ADDRESS}`);
-    expect(t.link.say("#bubble/games", "still here")).toBe(true);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "still here"))).toBe(true);
   });
 
   it("forgets, as a connection drops, the rooms it had joined: the next one parts none of them", () => {
@@ -914,14 +927,213 @@ describe("the chat's link: what it says", () => {
   it("says nothing while away, nothing again before Ergo says it is in the room, and nothing once stopped", () => {
     const t = memberIn(["#bubble/games"]);
     t.fake.state("waiting");
-    expect(t.link.say("#bubble/games", "away")).toBe(false);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "away"))).toBe(false);
     const again = t.connected(ADDRESS);
-    expect(t.link.say("#bubble/games", "early")).toBe(false);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "early"))).toBe(false);
     again.line(`:${ADDRESS}!u@h JOIN #bubble/games`);
-    expect(t.link.say("#bubble/games", "back")).toBe(true);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "back"))).toBe(true);
     t.link.stop();
-    expect(t.link.say("#bubble/games", "late")).toBe(false);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "late"))).toBe(false);
     expect(said(again.sent)).toEqual(["PRIVMSG #bubble/games :back"]);
+  });
+
+  // draft/multiline (docs/decisions.md row 255): a draft of several lines goes as one batch, its lines PRIVMSGs of
+  // it (Ergo's batchHandlerMultiline and absorbBatchedMessage, irc/handlers.go, v2.19.1); Ergo echoes it, and every
+  // reader with the capability hears it, as a batch whose opening line carries its id, time and account.
+  const batches = (sent: readonly string[]) => sent.filter((line) => /^(@batch=\S+ )?(BATCH|PRIVMSG) /.test(line));
+
+  it("sends a draft of several lines as one draft/multiline batch, each line a PRIVMSG of it", () => {
+    const t = memberIn(["#bubble/games"]);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "- one\n- two"))).toBe(true);
+    const sent = batches(t.fake.sent);
+    const ref = /^BATCH \+(\S+) draft\/multiline #bubble\/games$/.exec(sent[0] ?? "")?.[1] ?? "?";
+    expect(sent).toEqual([
+      `BATCH +${ref} draft/multiline #bubble/games`,
+      `@batch=${ref} PRIVMSG #bubble/games :- one`,
+      `@batch=${ref} PRIVMSG #bubble/games :- two`,
+      `BATCH -${ref}`,
+    ]);
+  });
+
+  it("gives each batch a reference of its own on a connection", () => {
+    const t = memberIn(["#bubble/games"]);
+    t.link.say("#bubble/games", composed("#bubble/games", "a\nb"));
+    t.link.say("#bubble/games", composed("#bubble/games", "c\nd"));
+    const refs = t.fake.sent.flatMap((line) => /^BATCH \+(\S+) /.exec(line)?.[1] ?? []);
+    expect(new Set(refs).size).toBe(2);
+  });
+
+  it("sends a blank line inside a message as a PRIVMSG with no text", () => {
+    const t = memberIn(["#bubble/games"]);
+    t.link.say("#bubble/games", composed("#bubble/games", "one\n\ntwo"));
+    expect(said(t.fake.sent.map((line) => line.replace(/^@batch=\S+ /, "")))).toEqual([
+      "PRIVMSG #bubble/games :one",
+      "PRIVMSG #bubble/games :",
+      "PRIVMSG #bubble/games :two",
+    ]);
+  });
+
+  it("sends nothing of a message the composer would refuse, over its lines or its bytes", () => {
+    const t = memberIn(["#bubble/games"]);
+    expect(
+      t.link.say("#bubble/games", composed("#bubble/games", Array.from({ length: 41 }, () => "x").join("\n"))),
+    ).toBe(false);
+    expect(
+      t.link.say(
+        "#bubble/games",
+        composed("#bubble/games", Array.from({ length: 11 }, () => "x".repeat(400)).join("\n")),
+      ),
+    ).toBe(false);
+    expect(batches(t.fake.sent)).toEqual([]);
+  });
+
+  // The lines the link tried to send, those the connection refused too (the connection records only those it took),
+  // the `refuseAt`th among them refused.
+  const tried = (t: ReturnType<typeof memberIn>, refuseAt?: number) => {
+    const attempts: string[] = [];
+    const send = t.fake.send;
+    t.fake.send = (line) => {
+      attempts.push(line);
+      return attempts.length !== refuseAt && send(line);
+    };
+    return attempts;
+  };
+
+  it("opens no batch while away, and says so: not one line is tried", () => {
+    const t = memberIn(["#bubble/games"]);
+    t.fake.state("waiting");
+    const attempts = tried(t);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "a\nb"))).toBe(false);
+    expect(attempts).toEqual([]);
+    expect(batches(t.fake.sent)).toEqual([]);
+  });
+
+  it("adds a message of several lines Ergo says as one line of its room, its parts joined by breaks", () => {
+    const t = memberIn(["#bubble/games"]);
+    t.fake.line(`@msgid=ml1;time=${T0};account=${OTHER} :${OTHER}!u@h BATCH +x draft/multiline #bubble/games`);
+    t.fake.line(`@batch=x :${OTHER}!u@h PRIVMSG #bubble/games :- one`);
+    t.fake.line(`@batch=x :${OTHER}!u@h PRIVMSG #bubble/games :- two`);
+    expect(t.room("#bubble/games")?.lines ?? []).toEqual([]);
+    t.fake.line(`:${OTHER}!u@h BATCH -x`);
+    expect(t.room("#bubble/games")?.lines).toEqual([
+      { id: "ml1", time: T0, from: OTHER, account: OTHER, kind: "message", text: "- one\n- two" },
+    ]);
+  });
+
+  it("adds a message of several lines inside a history page as one line, in its place", () => {
+    const t = memberIn(["#bubble/games"]);
+    t.fake.line("BATCH +h chathistory #bubble/games");
+    t.fake.line(`@batch=h;msgid=a1;time=${T0} :alice!u@h PRIVMSG #bubble/games :before`);
+    t.fake.line(`@batch=h;msgid=ml2;time=${T0};account=${OTHER} :${OTHER}!u@h BATCH +y draft/multiline #bubble/games`);
+    t.fake.line(`@batch=y :${OTHER}!u@h PRIVMSG #bubble/games :> quoted`);
+    t.fake.line(`@batch=y :${OTHER}!u@h PRIVMSG #bubble/games :answer`);
+    t.fake.line(`@batch=h :${OTHER}!u@h BATCH -y`);
+    t.fake.line("BATCH -h");
+    expect(t.room("#bubble/games")?.lines.map((line) => line.text)).toEqual(["before", "> quoted\nanswer"]);
+  });
+
+  // The red pass's R7, R8, R15 and the fallback (docs/decisions.md, 2026-10-26): what a message of several lines
+  // sends, to whom, and with an Ergo that never granted draft/multiline.
+  it("names each batch with a reference Ergo accepts: letters, digits and hyphens, 32 at most", () => {
+    const t = memberIn(["#bubble/games"]);
+    for (const draft of ["a\nb", "c\nd", "e\nf"]) t.link.say("#bubble/games", composed("#bubble/games", draft));
+    const refs = t.fake.sent.flatMap((line) => /^BATCH \+(\S+) /.exec(line)?.[1] ?? []);
+    expect(refs).toEqual(["ml0", "ml1", "ml2"]);
+    for (const ref of refs) expect(ref).toMatch(/^[A-Za-z0-9-]{1,32}$/);
+  });
+
+  it("sends nothing of a message a line of which Ergo's connection would refuse, a lone surrogate", () => {
+    const t = memberIn(["#bubble/games"]);
+    const lines = ["PRIVMSG #bubble/games :a", "PRIVMSG #bubble/games :\ud800"];
+    expect(t.link.say("#bubble/games", { kind: "lines", lines, text: "a\n\ud800", left: 0 })).toBe(false);
+    expect(batches(t.fake.sent)).toEqual([]);
+  });
+
+  it("says a message of several lines is not sent when a part is refused, and tries no line after it", () => {
+    const t = memberIn(["#bubble/games"]);
+    const attempts = tried(t, 3);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "a\nb\nc"))).toBe(false);
+    // The batch's opening, its first part, the refused second: not the third, nor the closing.
+    expect(attempts).toHaveLength(3);
+    expect(batches(t.fake.sent)).toHaveLength(2);
+  });
+
+  it("sends a message of several lines to no one as a guest, nor to a room Ergo has not said I am in", () => {
+    const guest = guestIn(["#bubble/games"]);
+    guest.fake.line(`:${GUEST}!u@h JOIN #bubble/games`);
+    expect(guest.link.say("#bubble/games", composed("#bubble/games", "a\nb"))).toBe(false);
+    const t = memberIn(["#bubble/games", "#bubble"]);
+    expect(t.link.say("#bubble", composed("#bubble", "a\nb"))).toBe(false);
+    expect([...batches(guest.fake.sent), ...batches(t.fake.sent)]).toEqual([]);
+  });
+
+  it("says whether the connection takes a message of several lines whole: yes until Ergo refuses the capability (F1719)", () => {
+    const t = memberIn(["#bubble/games"]);
+    expect(t.link.multiline()).toBe(true);
+    t.fake.grants = false;
+    expect(t.link.multiline()).toBe(false);
+    t.link.stop();
+    expect(t.link.multiline()).toBe(true);
+  });
+
+  it("says yes while the connection has no nick yet, whatever it will grant: no refusal before the welcome (F1915)", () => {
+    const t = setup();
+    t.link.follow(["#bubble/games"]);
+    t.signedOut();
+    t.last().grants = false;
+    expect(t.last().multiline()).toBeUndefined();
+    expect(t.link.multiline()).toBe(true);
+    t.connected();
+    expect(t.link.multiline()).toBe(false);
+  });
+
+  it("sends the lines of a message one at a time to an Ergo with no draft/multiline, its blank lines left out", () => {
+    const t = memberIn(["#bubble/games"]);
+    t.fake.grants = false;
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "one\n\ntwo"))).toBe(true);
+    expect(batches(t.fake.sent)).toEqual(["PRIVMSG #bubble/games :one", "PRIVMSG #bubble/games :two"]);
+  });
+
+  it("keeps a line of the fallback whose text ends in a space and a colon, which only a blank line is left out (F1712)", () => {
+    const t = memberIn(["#bubble/games"]);
+    t.fake.grants = false;
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "Attention :\n\nsuite"))).toBe(true);
+    expect(batches(t.fake.sent)).toEqual(["PRIVMSG #bubble/games :Attention :", "PRIVMSG #bubble/games :suite"]);
+  });
+
+  it("hears nothing of a message whose parts are another sender's than its opening line's", () => {
+    const t = memberIn(["#bubble/games"]);
+    t.fake.line(`@msgid=ml1;time=${T0};account=${OTHER} :${OTHER}!u@h BATCH +x draft/multiline #bubble/games`);
+    t.fake.line(`@batch=x :${OTHER}!u@h PRIVMSG #bubble/games :one`);
+    t.fake.line("@batch=x :mallory!u@h PRIVMSG #bubble/games :two");
+    t.fake.line(`:${OTHER}!u@h BATCH -x`);
+    expect(t.room("#bubble/games")?.lines ?? []).toEqual([]);
+  });
+
+  it("keeps two senders' messages open together apart, each folded to its own text", () => {
+    const t = memberIn(["#bubble/games"]);
+    t.fake.line(`@msgid=a1;time=${T0};account=${OTHER} :${OTHER}!u@h BATCH +x draft/multiline #bubble/games`);
+    t.fake.line(`@msgid=b1;time=${T0};account=g1b :bob!u@h BATCH +y draft/multiline #bubble/games`);
+    t.fake.line(`@batch=x :${OTHER}!u@h PRIVMSG #bubble/games :one`);
+    t.fake.line("@batch=y :bob!u@h PRIVMSG #bubble/games :uno");
+    t.fake.line(`@batch=x :${OTHER}!u@h PRIVMSG #bubble/games :two`);
+    t.fake.line("@batch=y :bob!u@h PRIVMSG #bubble/games :dos");
+    t.fake.line("BATCH -y");
+    t.fake.line("BATCH -x");
+    expect(
+      t
+        .room("#bubble/games")
+        ?.lines.map((line) => line.text)
+        .toSorted(),
+    ).toEqual(["one\ntwo", "uno\ndos"]);
+  });
+
+  it("hears a line outside a batch at once, between a message's opening and its end", () => {
+    const t = memberIn(["#bubble/games"]);
+    t.fake.line(`@msgid=ml1;time=${T0};account=${OTHER} :${OTHER}!u@h BATCH +x draft/multiline #bubble/games`);
+    t.fake.line(`@batch=x :${OTHER}!u@h PRIVMSG #bubble/games :one`);
+    t.fake.line(live("#bubble/games", "m9", "between"));
+    expect(t.room("#bubble/games")?.lines.map((line) => line.text)).toEqual(["between"]);
   });
 
   // 4f: who is typing (IRCv3's +typing, ircv3.net/specs/client-tags/typing).
@@ -1000,7 +1212,7 @@ describe("the chat's link: what it says", () => {
       vi.useFakeTimers({ now: Date.parse(T0) });
       const t = memberIn(["#bubble/games"]);
       t.link.typing("#bubble/games", "active");
-      expect(t.link.say("#bubble/games", "hi")).toBe(true);
+      expect(t.link.say("#bubble/games", composed("#bubble/games", "hi"))).toBe(true);
       t.link.typing("#bubble/games", "done");
       t.link.typing("#bubble/games", "active");
       expect(tagged(t.fake.sent)).toEqual([
@@ -1018,7 +1230,7 @@ describe("the chat's link: what it says", () => {
       t.link.typing("#bubble/games", "done");
       t.link.typing("#bubble/games", "done");
       expect(vi.getTimerCount()).toBe(base + 1);
-      expect(t.link.say("#bubble/games", "hi")).toBe(true);
+      expect(t.link.say("#bubble/games", composed("#bubble/games", "hi"))).toBe(true);
       expect(vi.getTimerCount()).toBe(base);
       t.link.typing("#bubble/games", "active");
       t.link.typing("#bubble/games", "done");
@@ -1321,7 +1533,7 @@ describe("the chat's link: what it says", () => {
       vi.useFakeTimers({ now: Date.parse(T0) });
       const t = memberIn([ROOM]);
       t.link.typing(ROOM, "active");
-      expect(t.link.say(ROOM, "")).toBe(false);
+      expect(t.link.say(ROOM, composed(ROOM, ""))).toBe(false);
       t.link.typing(ROOM, "active");
       expect(t.fake.sent.filter((line) => line.includes(" TAGMSG "))).toEqual([`@+typing=active TAGMSG ${ROOM}`]);
     });
@@ -1402,15 +1614,28 @@ describe("the chat's link: direct messages", () => {
 
   it("puts back the draft of a line Ergo refused, its partner not connected, and counts it", () => {
     const t = withDrafts();
-    expect(t.link.sayTo(OTHER, "  hi **you**  ")).toBe(true);
+    expect(t.link.sayTo(OTHER, composed(OTHER, "  hi **you**  "), "  hi **you**  ")).toBe(true);
     t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 0)));
     expect(t.kept.get(OTHER)).toBe("  hi **you**  ");
     expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 1, draft: "  hi **you**  " } });
   });
 
+  it("labels a direct message of several lines on its batch's opening line, and puts its draft back if refused", () => {
+    const t = withDrafts();
+    expect(t.link.sayTo(OTHER, composed(OTHER, "one\ntwo"), "one\ntwo")).toBe(true);
+    expect(t.fake.sent.filter((line) => /BATCH|PRIVMSG/.test(line))).toEqual([
+      `@label=1 BATCH +ml0 draft/multiline ${OTHER}`,
+      `@batch=ml0 PRIVMSG ${OTHER} :one`,
+      `@batch=ml0 PRIVMSG ${OTHER} :two`,
+      "BATCH -ml0",
+    ]);
+    t.fake.line(refusal(OTHER, "1"));
+    expect(t.kept.get(OTHER)).toBe("one\ntwo");
+  });
+
   it("puts back each line Ergo refused in turn, past one it delivered", () => {
     const t = withDrafts();
-    for (const draft of ["one", "/me two", "three"]) t.link.sayTo(OTHER, draft);
+    for (const draft of ["one", "/me two", "three"]) t.link.sayTo(OTHER, composed(OTHER, draft), draft);
     t.fake.line(echo("a", "one", labelOf(t.fake.sent, 0)));
     t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 1)));
     expect(t.kept.get(OTHER)).toBe("/me two");
@@ -1426,8 +1651,8 @@ describe("the chat's link: direct messages", () => {
   // refused otherwise (a 417, a 477) stayed waiting and a later 401 put back its draft, not the 401's line's.
   it("sends each direct message with a label of its own", () => {
     const t = account();
-    t.link.sayTo(OTHER, "one");
-    t.link.sayTo(OTHER, "two");
+    t.link.sayTo(OTHER, composed(OTHER, "one"), "one");
+    t.link.sayTo(OTHER, composed(OTHER, "two"), "two");
     const labels = [labelOf(t.fake.sent, 0), labelOf(t.fake.sent, 1)];
     expect(labels.every((label) => label !== undefined)).toBe(true);
     expect(new Set(labels).size).toBe(2);
@@ -1435,8 +1660,8 @@ describe("the chat's link: direct messages", () => {
 
   it("puts back the draft of the line each refusal answers, by its label, a line refused otherwise too", () => {
     const t = withDrafts();
-    t.link.sayTo(OTHER, "a");
-    t.link.sayTo(OTHER, "b");
+    t.link.sayTo(OTHER, composed(OTHER, "a"), "a");
+    t.link.sayTo(OTHER, composed(OTHER, "b"), "b");
     t.fake.line(`@label=${labelOf(t.fake.sent, 0) ?? ""} :ergo.test 417 ${ADDRESS} :Line too long to be relayed`);
     expect(t.kept.get(OTHER)).toBe("a");
     expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 1, draft: "a", offline: false } });
@@ -1448,7 +1673,7 @@ describe("the chat's link: direct messages", () => {
 
   it("takes a labeled-response batch for its line's answer: its echo and Ergo's away line deliver it", () => {
     const t = withDrafts();
-    t.link.sayTo(OTHER, "hi");
+    t.link.sayTo(OTHER, composed(OTHER, "hi"), "hi");
     const label = labelOf(t.fake.sent, 0) ?? "";
     t.fake.line(`@label=${label} BATCH +r1 labeled-response`);
     t.fake.line(`@batch=r1;msgid=e;time=${T0};account=${ADDRESS} :${ADDRESS}!u@h PRIVMSG ${OTHER} :hi`);
@@ -1461,7 +1686,8 @@ describe("the chat's link: direct messages", () => {
 
   it(`keeps ${String(WAITING)} lines waiting at most: the oldest's late answer puts nothing back`, () => {
     const t = withDrafts();
-    for (let n = 0; n <= WAITING; n += 1) t.link.sayTo(OTHER, `line ${String(n)}`);
+    for (let n = 0; n <= WAITING; n += 1)
+      t.link.sayTo(OTHER, composed(OTHER, `line ${String(n)}`), `line ${String(n)}`);
     t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 0)));
     expect(t.store.getState().dmRefused).toEqual({});
     t.fake.line(refusal(OTHER, labelOf(t.fake.sent, WAITING)));
@@ -1471,7 +1697,7 @@ describe("the chat's link: direct messages", () => {
   // StrykerJS on CR1's fix: a standard reply's FAIL refuses too, and the bound drops a line past 50 waiting, not at 50.
   it("puts back a line Ergo answers with a FAIL, said refused, not offline", () => {
     const t = withDrafts();
-    t.link.sayTo(OTHER, "hi");
+    t.link.sayTo(OTHER, composed(OTHER, "hi"), "hi");
     t.fake.line(`@label=${labelOf(t.fake.sent, 0) ?? ""} :ergo.test FAIL PRIVMSG INVALID_TARGET ${OTHER} :No`);
     expect(t.kept.get(OTHER)).toBe("hi");
     expect(t.store.getState().dmRefused).toEqual({ [OTHER]: { count: 1, draft: "hi", offline: false } });
@@ -1479,7 +1705,7 @@ describe("the chat's link: direct messages", () => {
 
   it(`keeps exactly ${String(WAITING)} lines waiting: the first one's refusal still puts it back`, () => {
     const t = withDrafts();
-    for (let n = 0; n < WAITING; n += 1) t.link.sayTo(OTHER, `line ${String(n)}`);
+    for (let n = 0; n < WAITING; n += 1) t.link.sayTo(OTHER, composed(OTHER, `line ${String(n)}`), `line ${String(n)}`);
     t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 0)));
     expect(t.kept.get(OTHER)).toBe("line 0");
   });
@@ -1487,7 +1713,7 @@ describe("the chat's link: direct messages", () => {
   // With Ergo's multiclient, another tab's line reaches this one as an echo does: it answers none of this one's.
   it("takes another tab's line to the same account for no answer to its own", () => {
     const t = withDrafts();
-    t.link.sayTo(OTHER, "mine");
+    t.link.sayTo(OTHER, composed(OTHER, "mine"), "mine");
     t.fake.line(echo("a", "from my other tab"));
     t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 0)));
     expect(t.kept.get(OTHER)).toBe("mine");
@@ -1503,7 +1729,7 @@ describe("the chat's link: direct messages", () => {
     [
       "for a line Ergo delivered",
       (t: WithDrafts) => {
-        t.link.sayTo(OTHER, "hi");
+        t.link.sayTo(OTHER, composed(OTHER, "hi"), "hi");
         const label = labelOf(t.fake.sent, 0);
         t.fake.line(echo("a", "hi", label));
         t.fake.line(refusal(OTHER, label));
@@ -1512,7 +1738,7 @@ describe("the chat's link: direct messages", () => {
     [
       "on a new connection, for the last one's line",
       (t: WithDrafts) => {
-        t.link.sayTo(OTHER, "hi");
+        t.link.sayTo(OTHER, composed(OTHER, "hi"), "hi");
         const label = labelOf(t.fake.sent, 0);
         t.fake.state("waiting");
         t.connected(ADDRESS).line(refusal(OTHER, label));
@@ -1543,7 +1769,7 @@ describe("the chat's link: direct messages", () => {
     ],
   ])("answers no waiting line by %s: Ergo's refusal still puts it back", (_, heard) => {
     const t = withDrafts();
-    t.link.sayTo(OTHER, "hi");
+    t.link.sayTo(OTHER, composed(OTHER, "hi"), "hi");
     heard(t);
     t.fake.line(refusal(OTHER, labelOf(t.fake.sent, 0)));
     expect(t.kept.get(OTHER)).toBe("hi");
@@ -1551,7 +1777,7 @@ describe("the chat's link: direct messages", () => {
 
   it("answers a waiting action by its echo alone, and refuses nothing on a line naming the partner", () => {
     const t = withDrafts();
-    t.link.sayTo(OTHER, "/me waves");
+    t.link.sayTo(OTHER, composed(OTHER, "/me waves"), "/me waves");
     t.fake.line(to("b", OTHER));
     expect(t.store.getState().dmRefused).toEqual({});
     const label = labelOf(t.fake.sent, 0);
@@ -1562,8 +1788,8 @@ describe("the chat's link: direct messages", () => {
 
   it("sends an account's draft to another account, as the composer composes it", () => {
     const t = account();
-    expect(t.link.sayTo(OTHER, "  hi **you**  ")).toBe(true);
-    expect(t.link.sayTo(OTHER, "/me waves")).toBe(true);
+    expect(t.link.sayTo(OTHER, composed(OTHER, "  hi **you**  "), "  hi **you**  ")).toBe(true);
+    expect(t.link.sayTo(OTHER, composed(OTHER, "/me waves"), "/me waves")).toBe(true);
     expect(dms(t.fake.sent)).toEqual([`PRIVMSG ${OTHER} :hi **you**`, `PRIVMSG ${OTHER} :\u0001ACTION waves\u0001`]);
   });
 
@@ -1579,7 +1805,7 @@ describe("the chat's link: direct messages", () => {
     ],
   ])("sends nothing of %s", (_, made) => {
     const t = made();
-    expect(t.link.sayTo(OTHER, "hi")).toBe(false);
+    expect(t.link.sayTo(OTHER, composed(OTHER, "hi"), "hi")).toBe(false);
     expect(dms(t.fake.sent)).toEqual([]);
   });
 
@@ -1591,7 +1817,7 @@ describe("the chat's link: direct messages", () => {
   ])("sends nothing to %s", (_, partner) => {
     const t = account();
     const before = t.fake.sent.length;
-    expect(t.link.sayTo(partner, "hi")).toBe(false);
+    expect(t.link.sayTo(partner, composed(partner, "hi"), "hi")).toBe(false);
     expect(t.fake.sent.slice(before)).toEqual([]);
   });
 
@@ -1599,7 +1825,7 @@ describe("the chat's link: direct messages", () => {
     "sends nothing of a draft the composer would not send (%j)",
     (draft) => {
       const t = account();
-      expect(t.link.sayTo(OTHER, draft)).toBe(false);
+      expect(t.link.sayTo(OTHER, composed(OTHER, draft), draft)).toBe(false);
       expect(dms(t.fake.sent)).toEqual([]);
     },
   );
@@ -1868,11 +2094,33 @@ describe("the chat's link: replies", () => {
 
   it("sends a reply as the composer composes the draft, tagged with the msgid it answers", () => {
     const t = memberIn(["#bubble/games"]);
-    expect(t.link.say("#bubble/games", "  hi **all**  ", MSGID)).toBe(true);
-    expect(t.link.say("#bubble/games", "/me waves", MSGID)).toBe(true);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "  hi **all**  "), MSGID)).toBe(true);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "/me waves"), MSGID)).toBe(true);
     expect(t.fake.sent.filter((line) => line.startsWith("@"))).toEqual([
       `@+reply=${MSGID} PRIVMSG #bubble/games :hi **all**`,
       `@+reply=${MSGID} PRIVMSG #bubble/games :\u0001ACTION waves\u0001`,
+    ]);
+  });
+
+  // draft/multiline: the tags of a message of several lines ride on its batch's opening line, none on its parts.
+  it("tags the opening line of a reply of several lines, no part of it", () => {
+    const t = memberIn(["#bubble/games"]);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "one\ntwo"), MSGID)).toBe(true);
+    expect(t.fake.sent.filter((line) => /BATCH|PRIVMSG/.test(line))).toEqual([
+      `@+reply=${MSGID} BATCH +ml0 draft/multiline #bubble/games`,
+      "@batch=ml0 PRIVMSG #bubble/games :one",
+      "@batch=ml0 PRIVMSG #bubble/games :two",
+      "BATCH -ml0",
+    ]);
+  });
+
+  it("tags the first line alone of a reply of several lines sent to an Ergo without draft/multiline", () => {
+    const t = memberIn(["#bubble/games"]);
+    t.fake.grants = false;
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "one\ntwo"), MSGID)).toBe(true);
+    expect(t.fake.sent.filter((line) => line.includes("PRIVMSG"))).toEqual([
+      `@+reply=${MSGID} PRIVMSG #bubble/games :one`,
+      "PRIVMSG #bubble/games :two",
     ]);
   });
 
@@ -1898,13 +2146,13 @@ describe("the chat's link: replies", () => {
   ])("sends no reply to a msgid holding %s, nor the draft without it", (_, id) => {
     const t = memberIn(["#bubble/games"]);
     const before = t.fake.sent.length;
-    expect(t.link.say("#bubble/games", "hi", id)).toBe(false);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "hi"), id)).toBe(false);
     expect(t.fake.sent.slice(before)).toEqual([]);
   });
 
   it("sends a reply to a msgid of 64 characters", () => {
     const t = memberIn(["#bubble/games"]);
-    expect(t.link.say("#bubble/games", "hi", "a".repeat(64))).toBe(true);
+    expect(t.link.say("#bubble/games", composed("#bubble/games", "hi"), "a".repeat(64))).toBe(true);
     expect(t.fake.sent.filter((line) => line.startsWith("@"))).toEqual([
       `@+reply=${"a".repeat(64)} PRIVMSG #bubble/games :hi`,
     ]);
@@ -1914,8 +2162,8 @@ describe("the chat's link: replies", () => {
     const g = guestIn(["#bubble/games"]);
     g.fake.line(`:${GUEST}!u@h JOIN #bubble/games`);
     const t = memberIn(["#bubble/games", "#bubble"]);
-    expect(g.link.say("#bubble/games", "hi", MSGID)).toBe(false);
-    expect(t.link.say("#bubble", "hi", MSGID)).toBe(false);
+    expect(g.link.say("#bubble/games", composed("#bubble/games", "hi"), MSGID)).toBe(false);
+    expect(t.link.say("#bubble", composed("#bubble", "hi"), MSGID)).toBe(false);
     expect([...g.fake.sent, ...t.fake.sent].filter((line) => line.includes("PRIVMSG"))).toEqual([]);
   });
 });

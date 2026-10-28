@@ -5,7 +5,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { prerender } from "react-dom/static";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import "./Composer.tsx";
 import type { Dms } from "./Dms.tsx";
 import { RoomView } from "./RoomView.tsx";
@@ -186,6 +186,8 @@ describe("useThreads: the open panel's focus and keys", () => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     // jsdom has no popover: a close button's tooltip toggles nothing.
     Object.assign(HTMLElement.prototype, { togglePopover: () => true });
+    // ... nor matchMedia, which the composer reads for a touch screen: a computer's pointer.
+    vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
     root = createRoot(document.body.appendChild(document.createElement("div")));
   });
   afterEach(() => {
@@ -193,6 +195,7 @@ describe("useThreads: the open panel's focus and keys", () => {
       root.unmount();
     });
     document.body.replaceChildren();
+    vi.unstubAllGlobals();
   });
 
   // R6: the panel that stands in for the one that comes has its Close, and Escape as well. First of this block: later

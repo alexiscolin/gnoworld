@@ -93,6 +93,45 @@ describe("formatted", () => {
     expect(formatted({ text, start: 2, end: 2 }, format).text).toBe(result);
   });
 
+  // A draft of several lines (slice 4's multiline): a quote or a list starts the lines the selection touches, the
+  // caret's line alone for a caret, never the draft's first.
+  it.each([
+    ["a\nb|", "bulleted", "a\n- b|"],
+    ["a\n|b\nc", "quote", "a\n> |b\nc"],
+    ["«a\nb»", "bulleted", "- «a\n- b»"],
+    ["«- a\n- b»", "bulleted", "«a\nb»"],
+    ["«- a\nb»", "bulleted", "- «a\n- b»"],
+    ["«- a\n- b»", "numbered", "1. «a\n1. b»"],
+    ["«a\n»b", "bulleted", "- «a\n»b"],
+    ["a|\nb", "bulleted", "- a|\nb"],
+    // G6: a selection that starts at a line's end keeps its caret there, the lines after it started too.
+    ["a«\nb»", "bulleted", "- a«\n- b»"],
+    ["a«\nb»", "quote", "> a«\n> b»"],
+    ["«a\nb\nc»", "bulleted", "- «a\n- b\n- c»"],
+    ["x\n«a\n\nb»\ny", "quote", "x\n> «a\n> \n> b»\ny"],
+  ] as const)("starts the lines %j touches as %s", (before, format, after) => {
+    expect(apply(before, format)).toStrictEqual(draft(after));
+  });
+
+  // F1715 (CR3): a blank line between marked lines has no mark, so the toggle never turned off; a list leaves the blank
+  // line bare when it starts the lines (an empty item is no text), a quote goes on through it.
+  it.each([
+    ["«- a\n\n- b»", "bulleted", "«a\n\nb»"],
+    ["«1. a\n\n1. b»", "numbered", "«a\n\nb»"],
+    ["«> a\n\n> b»", "quote", "«a\n\nb»"],
+    ["«- a\n  \n- b»", "bulleted", "«a\n  \nb»"],
+    ["«a\n\nb»", "bulleted", "- «a\n\n- b»"],
+    ["«a\n\nb»", "numbered", "1. «a\n\n1. b»"],
+    ["«- a\n\nb»", "numbered", "1. «a\n\n1. b»"],
+    ["«- a\n\nb»", "bulleted", "- «a\n\n- b»"],
+    ["a\n|\nb", "bulleted", "a\n- |\nb"],
+    ["a\n|  \nb", "bulleted", "a\n- |  \nb"],
+    ["|  ", "quote", "> |  "],
+    ["a\n|\nb", "quote", "a\n> |\nb"],
+  ] as const)("treats the blank line of %j as no line of a %s: %j", (before, format, after) => {
+    expect(apply(before, format)).toStrictEqual(draft(after));
+  });
+
   it("keeps the caret on the same letter when a line's start changes", () => {
     expect(formatted({ text: "hello", start: 2, end: 4 }, "quote")).toStrictEqual({
       text: "> hello",

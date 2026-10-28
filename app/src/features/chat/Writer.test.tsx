@@ -73,11 +73,14 @@ async function settle(until: () => boolean = () => false) {
 }
 
 beforeEach(() => {
+  // jsdom has no matchMedia, which the composer reads for a touch screen: a computer's pointer.
+  vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   Object.assign(HTMLElement.prototype, { togglePopover: () => true });
 });
 afterEach(() => {
   document.body.replaceChildren();
+  vi.unstubAllGlobals();
 });
 
 it("says it could not open the thread when the composer's code cannot be fetched, and asks again for the next", async () => {

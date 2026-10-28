@@ -5,7 +5,7 @@ import type { Keep } from "../../lib/keep/keep.ts";
 import type { NoticePrefs } from "../../lib/notices/prefs.ts";
 import type { DmDevice } from "../../store/dms.ts";
 import type { createAppStore } from "../../store/index.ts";
-import type { Reacting } from "@gnoworld/core";
+import type { Composed, Reacting } from "@gnoworld/core";
 import type { Address } from "@gnoworld/schemas";
 
 export interface LinkDeps {
@@ -25,11 +25,16 @@ export interface ChatLink {
   follow: (ids: readonly string[], groupRooms?: readonly string[]) => void;
   /** The room in view: its history asked once Ergo says I joined it, once a connection; the last one's place told. */
   show: (room: string | undefined) => void;
-  /** Sends a draft, as the composer composes it, to a room Ergo says it is in; an account's alone; tagged +reply with
-   * the msgid it answers, one a tag carries (4d). Whether it went. */
-  say: (room: string, draft: string, reply?: string) => boolean;
-  /** Sends a draft to another account, a direct message (4e); an account's alone. Whether it went. */
-  sayTo: (partner: string, draft: string) => boolean;
+  /** Sends what the composer composed (a visitor's page never loads it: budgets.spec.ts) for a room Ergo says it is
+   * in; an account's alone; tagged +reply with the msgid it answers, one a tag carries (4d). A message of several lines
+   * goes as one draft/multiline batch, or a line at a time to an Ergo without it. Whether it went. */
+  say: (room: string, composed: Composed, reply?: string) => boolean;
+  /** Sends what the composer composed to another account, a direct message (4e); an account's alone; `draft` is what
+   * its writer typed, which Ergo's refusal puts back. Whether it went. */
+  sayTo: (partner: string, composed: Composed, draft: string) => boolean;
+  /** Whether a message of several lines goes whole as one batch, as far as the connection says: yes while there is none or
+   * Ergo granted draft/multiline, no once it refused it (a line at a time, the composer's 20 at most). */
+  multiline: () => boolean;
   /** Deletes a line by its msgid in a room Ergo says it is in (Ergo's REDACT, 4c); an account's alone. Whether it went. */
   redact: (room: string, id: string) => boolean;
   /** Reacts to a line of a room Ergo says it is in, by its msgid, with one emoji of RGI's set, or takes the reaction

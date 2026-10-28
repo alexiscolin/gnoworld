@@ -11,6 +11,8 @@ export interface Said {
   text: string;
   time?: string;
   edits?: string;
+  /** A message of several lines the link could not read whole: hidden by this id, whatever its text says. */
+  unreadable?: true;
 }
 
 export type Command = "REDACT" | "NOTICE" | "SAMODE" | "JOIN" | "KICK";

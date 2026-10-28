@@ -1,5 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, test } from "vitest";
+import { bytes } from "../irc/irc.ts";
+import { MULTILINE_BYTES, MULTILINE_LINES } from "../irc/multiline.ts";
 import { MAX_INLINE_DEPTH, MAX_QUOTE_DEPTH, markdown, mentions, type Block, type Inline } from "./markdown.ts";
 
 // The same seed as core's other properties, so the gate never flaps on one.
@@ -1071,5 +1073,23 @@ describe("markdown: whatever comes", () => {
     };
     expect(linear(pile)).toBe(true);
     expect(depthOf(markdown(pile(16_000)))).toBeLessThanOrEqual(MAX_INLINE_DEPTH);
+  });
+
+  // A window of messages at the caps of several lines (docs/decisions.md row 255): 200 lines, the store's LINES_KEPT
+  // (app/src/store/chat.ts), each 40 lines and 4096 bytes of deep quotes, nested lists and fences never closed. It
+  // reads in 5 to 10 ms (2026-10-26); 250 ms, the fastest of three, leaves a loaded gate its margin.
+  test("reads a window of 200 messages of 40 lines and 4096 bytes in under 250 ms", () => {
+    const kinds = ["> > > > **a _b ~~c", "- item *a", "  - nested _b", "1. one ~~c", "```"];
+    const lines = Array.from({ length: MULTILINE_LINES }, (_, at) =>
+      (kinds[at % kinds.length] ?? "").padEnd(101, " x"),
+    );
+    const message = lines.join("\n").padEnd(MULTILINE_BYTES, "y");
+    expect([bytes(message), message.split("\n").length]).toEqual([MULTILINE_BYTES, MULTILINE_LINES]);
+    const window = () => {
+      const start = Date.now();
+      for (let n = 0; n < 200; n++) markdown(message);
+      return Date.now() - start;
+    };
+    expect(instrumented || Math.min(window(), window(), window()) < 250).toBe(true);
   });
 });
