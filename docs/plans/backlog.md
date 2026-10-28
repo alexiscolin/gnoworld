@@ -74,6 +74,13 @@ Alexis, 2026-10-23: slice 3's reviews found these; none bites today, each comes 
 | A navigation row's whole box a link | Row's padding on its link, so what a row shows is what a pointer reaches, in every list | A row shows 160×37 px and its link is 136×21 px, passing WCAG 2.5.8 by the spacing exception alone (4e's UX review U17) |
 | A conversation's face and last line | Each direct message's row with its partner's Avatar and its last line; a new conversation announced, with 4f's notifications | A row shows a short address alone (4e's UX review U19; its order, heard last first, is done: F852) |
 
+## Slice 5, its head (slice 4's UX review, by Alexis)
+
+| Item | Delivers | Why |
+|---|---|---|
+| A phone's room list as a drawer | Under about 600 px the room list behind a Rooms button or a drawer, the conversation, its reply, edit and thread panels full width | At 390 px the list takes about 190 px and the messages wrap at 3 to 5 words (slice 4's UX review, U3; `ph-acct-room.png`) |
+| The page's shell | A 16 px gutter, a header row for the home link, the account and Log out; the approved pictures change with it | Text, the home link and the account's address touch the viewport's left edge, and the header is unstyled links on separate rows (U5; `smoke.png`) |
+
 ## Slice 4, its leftovers
 
 | Item | Delivers | Why |
