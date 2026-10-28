@@ -264,6 +264,11 @@ test.describe("a room's lines: Edit", () => {
     await expect(lines(page)).toHaveCount(1);
     await expect(editing(page)).toHaveCount(0);
     await expect(field(page)).toHaveValue("a draft in progress");
+    // The box says so (F2004) until the draft changes, across the remount of the writer (R4 of the second red pass).
+    await expect(page.getByText("That message is gone.", { exact: true })).toBeVisible();
+    await field(page).press("End");
+    await field(page).pressSequentially("!");
+    await expect(page.getByText("That message is gone.", { exact: true })).toHaveCount(0);
   });
 
   // The delete of a line is a REDACT of it; a correction is a line of its own, so each correction of mine goes with it, or the
