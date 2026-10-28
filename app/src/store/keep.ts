@@ -31,7 +31,7 @@ export interface KeepSlice {
     /** The reader read to the end of a room opened with its place: it is forgotten. */
     readThrough: (room: string) => void;
     /** One live line from Ergo: a REDACT of a saved line unsaves it, and its author's edit replaces its words (an edit
-     * that leaves no plain message unsaves it); any other line changes nothing. */
+     * that leaves no plain message unsaves it); any other line changes nothing, and reads no device. */
     heard: (message: IrcMessage) => void;
   };
 }
@@ -127,13 +127,13 @@ export const keepSlice: StateCreator<KeepSlice> = (set, get) => {
       },
       heard: (message) => {
         const [room = "", id = ""] = message.params;
+        const edit = message.command === "REDACT" ? undefined : lineOf(message, room);
+        if (message.command !== "REDACT" && edit?.edits === undefined) return;
         const held = fresh();
-        if (message.command === "REDACT") {
-          commitSaved(held.saved.filter(sameLine(room, id)), held);
-          return;
-        }
-        const edit = lineOf(message, room);
-        if (edit?.edits !== undefined) commitSaved(correctedBy(held.saved, room, edit), held);
+        commitSaved(
+          edit === undefined ? held.saved.filter(sameLine(room, id)) : correctedBy(held.saved, room, edit),
+          held,
+        );
       },
     },
   };
