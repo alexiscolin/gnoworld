@@ -129,17 +129,16 @@ class Link implements ChatLink {
     if (session.kind === "unknown") return;
     const key = session.kind === "out" ? "guest" : session.address;
     if (key === this.#key) return;
-    // Another session than a known one starts with no room: a reader's rooms are its own, which the page lists
-    // for it again.
+    // Another session than a known one starts with no room: a reader's rooms are its own, which the page lists for it
+    // again; the store has already forgotten the last one's (its own subscriber), the link's are its own.
     const known = this.#key !== undefined;
     // Noted first: the store's change below calls this again, which must find the session the same.
     this.#key = key;
-    const { store, ticket, guest } = this.#deps;
+    const { ticket, guest } = this.#deps;
     if (known) {
       this.#listed = [];
       this.#shown = undefined;
       this.#places.forget();
-      store.getState().chatActions.follow([]);
     }
     beginSession(this.#deps, session);
     this.#end();
