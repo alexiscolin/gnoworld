@@ -13,6 +13,7 @@ import type { RoomKeeping, RoomPins } from "./RoomKeeping.ts";
 import type { LinesProps } from "./Lines.tsx";
 import { isAccount, shortAddress } from "./names.ts";
 import { Person } from "./Person.tsx";
+import { RoomMain } from "./RoomMain.tsx";
 import shared from "./lists.module.css";
 import styles from "./RoomView.module.css";
 import { Typists } from "./Typists.tsx";
@@ -116,6 +117,10 @@ export interface RoomViewProps {
   onReply?: ((id: string) => void) | undefined;
   /** The room's notification modes, under its name: an account's alone, which its code draws (4f-n). */
   modes?: ReactNode;
+  /** Opens a line's thread, by the msgid of its root (4d's threads); none for a direct message's lines. */
+  onThread?: ((id: string) => void) | undefined;
+  /** A thread is open in `aside`: a narrow room gives it the whole width (RoomView.module.css). */
+  threaded?: boolean | undefined;
 }
 
 /** Who is here: counted once connected, the bot left out, the first MEMBERS_SHOWN named. */
@@ -179,7 +184,7 @@ function Header({ title, topic, id }: { title: ReactNode; topic: ReactNode; id: 
 
 export function RoomView(props: RoomViewProps) {
   const { room, title, note, noteId, state, chat, composer, me, onDelete, onDismiss, onRead, aside } = props;
-  const { onReact, onReply, modes } = props;
+  const { onReact, onReply, modes, onThread, threaded } = props;
   const { verdicts, saving = false, keeping, pins } = props;
   const { empty = "No messages yet." } = props;
   const { lines = [], members = [], refused, typing, read, paged, reactions, cannotReact } = state ?? {};
@@ -191,37 +196,40 @@ export function RoomView(props: RoomViewProps) {
       <p role="status" className={styles["status"]}>
         {connected ? null : NOTICES[chat]}
       </p>
-      <Sidebar side="end" space="m">
-        <div>
-          <PinsAbove key={`${String(room)} pins`} pins={pins} />
-          <RoomLines
-            key={room}
-            room={room}
-            lines={lines}
-            members={members}
-            me={me}
-            refused={refused}
-            connected={connected}
-            onDelete={onDelete}
-            onDismiss={onDismiss}
-            read={read}
-            paged={paged === true}
-            onRead={onRead}
-            verdicts={verdicts}
-            saving={saving}
-            keeping={keeping}
-            reactions={reactions}
-            onReact={onReact}
-            cannotReact={cannotReact}
-            onReply={onReply}
-          />
-          {connected && lines.length === 0 ? <p>{empty}</p> : null}
-          {/* A room's, whose place is kept so the composer never moves; a direct message tells none (4e). */}
-          {room === undefined ? null : <Typists key={`${room} typing`} typing={typing} />}
-          {composer}
-        </div>
-        {aside}
-      </Sidebar>
+      <div className={styles["room"]}>
+        <Sidebar side="end" space="m">
+          <RoomMain threaded={threaded}>
+            <PinsAbove key={`${String(room)} pins`} pins={pins} />
+            <RoomLines
+              key={room}
+              room={room}
+              lines={lines}
+              members={members}
+              me={me}
+              refused={refused}
+              connected={connected}
+              onDelete={onDelete}
+              onDismiss={onDismiss}
+              read={read}
+              paged={paged === true}
+              onRead={onRead}
+              verdicts={verdicts}
+              saving={saving}
+              keeping={keeping}
+              reactions={reactions}
+              onReact={onReact}
+              cannotReact={cannotReact}
+              onReply={onReply}
+              onThread={onThread}
+            />
+            {connected && lines.length === 0 ? <p>{empty}</p> : null}
+            {/* A room's, whose place is kept so the composer never moves; a direct message tells none (4e). */}
+            {room === undefined ? null : <Typists key={`${room} typing`} typing={typing} />}
+            {composer}
+          </RoomMain>
+          {aside}
+        </Sidebar>
+      </div>
     </Stack>
   );
 }

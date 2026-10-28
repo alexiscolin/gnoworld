@@ -12,6 +12,7 @@ import { useGuestKeeping } from "./RoomPins.ts";
 import { roomShown } from "./roomShown.ts";
 import { RoomSections, RoomsNav } from "./RoomSections.tsx";
 import { People, RoomView, type RoomViewProps } from "./RoomView.tsx";
+import { useThreads } from "./Threading.tsx";
 import { usePins } from "./usePins.ts";
 import { useRoomKeys } from "./useRoomKeys.ts";
 import type { AppState } from "../../store/index.ts";
@@ -48,6 +49,17 @@ export function GuestLoaded({
   const acts = roomActs(link, room ?? "", dismissed);
   const { keeping, pins } = useGuestKeeping(room, usePins(useAppStore(), room, undefined));
   const shown = room === undefined ? undefined : roomShown(room, state, acts);
+  // A visitor reads a thread, whose panel says to log in where an account writes (4d's threads).
+  const threads = useThreads({
+    shown,
+    state,
+    session: { kind: "out" },
+    rooms: roomIds(sections),
+    acts,
+    people: (
+      <People members={state?.members ?? []} connected={chat === "connected"} me={undefined} onMessage={undefined} />
+    ),
+  });
   return (
     <Sidebar space="l">
       <Stack space="s">
@@ -60,19 +72,13 @@ export function GuestLoaded({
         <RoomView
           key={shown.key}
           {...shown.view}
+          {...threads.view}
+          chat={chat}
           verdicts={verdicts}
           saving={saving}
+          aside={threads.aside}
           keeping={keeping}
           pins={pins}
-          aside={
-            <People
-              members={state?.members ?? []}
-              connected={chat === "connected"}
-              me={undefined}
-              onMessage={undefined}
-            />
-          }
-          chat={chat}
           composer={<p>{LOG_IN_TO_WRITE}</p>}
         />
       )}

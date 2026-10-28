@@ -26,17 +26,28 @@ async function another({ playwright, launchOptions }: Launcher, as: string) {
 
 // A direct message from that account, over its own socket with a ticket of its own (one a connection), once it is
 // registered; every line Ergo answered.
-async function dmFrom(sender: { address: string; page: Page }, to: string, text: string): Promise<string[]> {
+// With `reply`, the line answers that msgid (+reply); with `echo`, Ergo echoes it back to the sender, msgid and all.
+interface Saying {
+  to: string;
+  text: string;
+  reply?: string | undefined;
+  echo?: boolean;
+}
+async function dmSaying(sender: { address: string; page: Page }, { to, text, reply, echo = false }: Saying) {
+  const asked = (step: Step): Step =>
+    echo && step[1].startsWith("CAP REQ") ? [step[0], "CAP REQ :message-tags echo-message sasl"] : step;
   const steps: Step[] = [
-    ...login(sender.address, await ticketOf(sender.page)),
+    ...login(sender.address, await ticketOf(sender.page)).map(asked),
     ["\\s903\\s", `NICK ${sender.address}`],
     ["\\s903\\s", "USER u 0 * :u"],
     ["\\s903\\s", "CAP END"],
-    ["\\s001\\s", `PRIVMSG ${to} :${text}`],
+    ["\\s001\\s", `${reply === undefined ? "" : `@+reply=${reply} `}PRIVMSG ${to} :${text}`],
     ["\\s001\\s", "PING :sent"],
   ];
   return talk(sender.page, steps, "PONG.*sent");
 }
+const dmFrom = (sender: { address: string; page: Page }, to: string, text: string): Promise<string[]> =>
+  dmSaying(sender, { to, text });
 const short = (address: string) => `${address.slice(0, 6)}…${address.slice(-5)}`;
 
 test.describe("direct messages", () => {
@@ -65,6 +76,32 @@ test.describe("direct messages", () => {
     await expect(page.getByText("Kept only while this page is open.")).toBeVisible();
     await expect(lines(page).filter({ hasText: text })).toHaveCount(1);
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    await bob.close();
+  });
+
+  // 4d's threads (G1): a reply in a direct message is no thread, so a root there shows no chip and opens no panel.
+  test("show a root that has a reply as a line like another: no thread chip, no panel", async ({
+    page,
+    playwright,
+    launchOptions,
+  }) => {
+    const me = await inGames(page);
+    const bob = await another({ playwright, launchOptions }, word("bob"));
+    const root = word("root");
+    const echoed = await dmSaying(bob, { to: me, text: root, echo: true });
+    const id = /msgid=([^;\s]+)[^ ]* :\S+ PRIVMSG \S+ :/.exec(
+      echoed.find((line) => line.endsWith(` :${root}`)) ?? "",
+    )?.[1];
+    expect(id).toBeDefined();
+    const answer = word("answer");
+    await dmSaying(bob, { to: me, text: answer, reply: id });
+    await rowOf(page, bob.address).click();
+    await expect(lines(page)).toHaveCount(2);
+    await expect(lines(page).filter({ hasText: answer })).toHaveCount(1);
+    await expect(page.getByRole("button", { name: /^\d+ repl(y|ies)\b/ })).toHaveCount(0);
+    await expect(page.getByRole("complementary", { name: "Thread" })).toHaveCount(0);
+    await lines(page).first().hover();
+    await expect(page.getByRole("menuitem", { name: "Open thread" })).toHaveCount(0);
     await bob.close();
   });
 

@@ -229,7 +229,11 @@ test.describe("a line's actions", () => {
     await page.keyboard.press("Tab");
     await page.keyboard.press("Enter");
     const menu = page.getByRole("menu", { name: "Message actions" });
-    await expect(menu.getByRole("menuitem")).toHaveText(["Copy text", "Copy room link"]);
+    // Open thread (4d's threads) is the page's own item beside them: these are the copies a guest gets.
+    await expect(menu.getByRole("menuitem").filter({ hasNotText: "Open thread" })).toHaveText([
+      "Copy text",
+      "Copy room link",
+    ]);
     await page.keyboard.press("Escape");
     await expect(menu).toBeHidden();
     await expect(moreOf(page, 1)).toBeFocused();
@@ -637,7 +641,8 @@ test.describe("deleting a line", () => {
   const itemsOf = async (page: Page, at: number, text: string) => {
     await lineOf(page, text).hover();
     await moreOf(page, at).click();
-    return page.getByRole("menu").getByRole("menuitem");
+    // Without Open thread (4d's threads), which is every line's: these items are what Delete and the copies hold.
+    return page.getByRole("menu").getByRole("menuitem").filter({ hasNotText: "Open thread" });
   };
   // The second line kept as its dialog closes: nothing sent, More holding the focus again.
   const kept = async (page: Page, dialog: Locator, sent: readonly string[]) => {

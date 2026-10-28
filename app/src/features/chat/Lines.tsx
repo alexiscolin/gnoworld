@@ -5,6 +5,7 @@
 import {
   foldEdits,
   reactionsOn,
+  threadsOf,
   type Line,
   type Reacting,
   type Reaction,
@@ -13,52 +14,19 @@ import {
 } from "@gnoworld/core";
 import type { StreamEvent } from "@gnoworld/schemas";
 import { Flash, type FlashMessage } from "@gnoworld/ui";
-import { useLayoutEffect, useRef } from "react";
 import { lineKeeping } from "./LineKeeping.tsx";
 import type { RoomKeeping } from "./RoomKeeping.ts";
 import { LineActions } from "./LineActions.tsx";
 import { useCopy, useRemoval } from "./lineFlash.ts";
 import { useLineFocus } from "./lineFocus.ts";
 import { LineView } from "./LineView.tsx";
+import { mentionable } from "./names.ts";
 import { chipsOf } from "./Reactions.tsx";
-import { useNewMark, useReading } from "./reading.ts";
+import { useListReading, useNewMark } from "./reading.ts";
 import shared from "./lists.module.css";
 import styles from "./RoomView.module.css";
 
 const LINES = [shared["plain"], shared["scrolls"], styles["lines"]].join(" ");
-
-// How near the end, in pixels, the reader still reads the newest line.
-const AT_END = 32;
-
-// Whether a list is scrolled to its end, or within AT_END of it.
-const atEnd = (box: HTMLElement) => box.scrollHeight - box.scrollTop - box.clientHeight < AT_END;
-
-// The lines held at their newest while the reader is there, as a line comes or a reaction grows one (the code review's
-// CR3); once scrolled up, left where the reader is. A room with news opens on its New line, `fresh`, once (UX review's
-// U1), and the reader is at the end only if that shows it.
-function useNewestInView(
-  lines: readonly Line[],
-  fresh: string | undefined,
-  reactions: readonly Reaction[] | undefined,
-) {
-  const listRef = useRef<HTMLOListElement>(null);
-  const atEndRef = useRef(true);
-  const placedRef = useRef(false);
-  useLayoutEffect(() => {
-    const box = listRef.current;
-    if (box === null) return;
-    const item = fresh === undefined || placedRef.current ? null : box.querySelector(":scope > li[data-new]");
-    if (item !== null) {
-      placedRef.current = true;
-      box.scrollTop += item.getBoundingClientRect().top - box.getBoundingClientRect().top;
-      atEndRef.current = atEnd(box);
-    } else if (atEndRef.current) box.scrollTop = box.scrollHeight;
-  }, [lines, fresh, reactions]);
-  const onScroll = () => {
-    if (listRef.current !== null) atEndRef.current = atEnd(listRef.current);
-  };
-  return { listRef, atEndRef, onScroll };
-}
 
 export interface LinesProps {
   /** The room, whose lines have bars; none for a direct message's, which have none. */
@@ -84,6 +52,8 @@ export interface LinesProps {
   cannotReact?: true | undefined;
   /** Makes a line, by its msgid, the one the composer's next answers (4d). */
   onReply?: ((id: string) => void) | undefined;
+  /** Opens the thread a line roots, by its msgid (4d's threads); none: no chip, no menu item. */
+  onThread?: ((id: string) => void) | undefined;
   /** The time of the last line the account read here, Ergo's (4f); none while unknown. */
   read?: string | undefined;
   /** The room's history page came: the New mark waits on it, as a live line may come before it (4f's G1). */
@@ -103,6 +73,7 @@ const NO_DELETE = () => false;
 const NO_DISMISS = () => undefined;
 const NO_REACT = () => false;
 const NO_REPLY = () => undefined;
+const NO_REPLIES: ReadonlyMap<string, readonly Line[]> = new Map();
 
 // What Ergo refused, said until the page dismisses it: a delete first, then a reaction; none, the page's own word.
 const toldOf = (refused: string | undefined, cannotReact: true | undefined): FlashMessage | undefined => {
@@ -117,6 +88,12 @@ type ListProps = Omit<LinesProps, "lines"> & {
   lineOf: (id: string) => string;
   /** Who a mention may shorten. */
   known: ReadonlySet<string>;
+  /** A reply's line by its msgid, this room's alone: a reply naming its own msgid or another room's answers none here. */
+  byId: ReadonlyMap<string, Line>;
+  /** Each line's reactions as chipsOf writes them, by msgid. */
+  chips: ReadonlyMap<string, string>;
+  /** Each root's replies, by msgid (4d's threads): a chip counts them. */
+  repliesOf: ReadonlyMap<string, readonly Line[]>;
 };
 
 // Where the reader left the room, once its history page came: Ergo's reading place, or the account's own mark (4f, 4d).
@@ -128,11 +105,6 @@ const keptOf = (keeping: RoomKeeping | undefined, id: string) => ({
   saved: keeping?.saved.has(id) === true,
   pinned: keeping?.pinned.has(id) === true,
 });
-
-// Who a mention may shorten (F812): the members, and the authors in view by their account tag, who proved their key as
-// a member did (F819).
-const knownIn = (members: readonly string[], lines: readonly Line[]) =>
-  new Set([...members, ...lines.flatMap(({ account }) => (account === undefined ? [] : [account]))]);
 
 // The line a reply answers, when this room holds it: a reply naming its own msgid or another room's answers none here.
 const answeredBy = (line: ShownLine, byId: ReadonlyMap<string, Line>, lineOf: (id: string) => string) =>
@@ -147,23 +119,38 @@ export function Lines(props: LinesProps) {
   // What a plain client answers or reacts to by a folded edit's own msgid reaches the line it corrects (CR5).
   const lineOf = (id: string) => folded.get(id) ?? id;
   const shown = reactionsOn(props.reactions ?? [], props.me, lineOf);
-  return <List {...props} lines={lines} shown={shown} lineOf={lineOf} known={knownIn(props.members, lines)} />;
+  // The threads of the lines as shown: a reply that names a folded edit's msgid answers the line it corrects. A direct
+  // message's lines root none.
+  const threaded = props.room !== undefined;
+  const repliesOf = threaded ? threadsOf(lines, lineOf).repliesOf : NO_REPLIES;
+  const onThread = threaded ? props.onThread : undefined;
+  const byId = new Map(lines.map((line) => [line.id, line]));
+  // Each line's chips as a string a line compares by value (F1222).
+  const chips = new Map([...shown].map(([id, each]) => [id, chipsOf(each)]));
+  return (
+    <List
+      {...props}
+      known={mentionable(props.members, lines)}
+      byId={byId}
+      chips={chips}
+      onThread={onThread}
+      lines={lines}
+      shown={shown}
+      lineOf={lineOf}
+      repliesOf={repliesOf}
+    />
+  );
 }
 
 function List(props: ListProps) {
   const { room, known, me, refused, connected, reactions, cannotReact, lines, shown, lineOf } = props;
   const { onDelete = NO_DELETE, onDismiss = NO_DISMISS, onReact = NO_REACT, onReply = NO_REPLY } = props;
-  const { read, paged = false, onRead, verdicts, saving = false, keeping } = props;
+  const { read, paged = false, onRead, verdicts, saving = false, keeping, byId, chips, repliesOf, onThread } = props;
   const fresh = useNewMark(lines, placeOf(paged, read, keeping), me);
-  const { listRef, atEndRef, onScroll } = useNewestInView(lines, fresh, reactions);
-  const look = useReading({ lines, atEndRef, paged, onRead, keeping });
+  const { listRef, onScroll } = useListReading({ lines, fresh, reactions, paged, onRead, keeping });
   const { stop, mounted, on, leave } = useLineFocus(lines, listRef, fresh);
   const { said, setSaid, copy } = useCopy();
   const [deleting, remove] = useRemoval({ lines, refused, connected, onDelete, leave, setSaid });
-  // Each line's chips as a string a line compares by value (F1222).
-  const chips = new Map([...shown].map(([id, each]) => [id, chipsOf(each)]));
-  // A reply's line by its msgid, this room's alone: a reply naming its own msgid or another room's answers none here.
-  const byId = new Map(lines.map((line) => [line.id, line]));
   // A reaction that could not go out says so at once; one Ergo refuses, when it answers (cannotReact).
   const react = (reaction: Reacting) => {
     const went = onReact(reaction);
@@ -188,6 +175,7 @@ function List(props: ListProps) {
       onReply={() => {
         onReply(line.id);
       }}
+      onThread={onThread}
     />
   );
   return (
@@ -201,10 +189,7 @@ function List(props: ListProps) {
       />
       <ol
         ref={listRef}
-        onScroll={() => {
-          onScroll();
-          look();
-        }}
+        onScroll={onScroll}
         {...on}
         aria-label="Messages"
         // How the keyboard moves among the lines, which nothing else tells a screen reader (U14).
@@ -228,6 +213,8 @@ function List(props: ListProps) {
             chips={chips.get(line.id)}
             react={me === undefined || !shown.has(line.id) ? undefined : react}
             answers={answeredBy(line, byId, lineOf)}
+            replies={repliesOf.get(line.id)?.length}
+            onThread={onThread}
           />
         ))}
       </ol>

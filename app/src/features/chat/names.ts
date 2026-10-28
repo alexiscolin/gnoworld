@@ -1,5 +1,5 @@
 // How the chat names a room and an address, and which room a world's page shows.
-import { markdown, mentions } from "@gnoworld/core";
+import { markdown, mentions, type Line } from "@gnoworld/core";
 import { Address, type RoomList } from "@gnoworld/schemas";
 import type { AppState } from "../../store/index.ts";
 
@@ -86,3 +86,8 @@ export const groupRooms = (sections: RoomList["sections"]): string[] =>
 /** Whether a mention of the whole room counts in `room`, one of the world's. */
 export const groupsAt = (sections: RoomList["sections"], room: string | undefined): boolean =>
   room !== undefined && groupRooms(sections).includes(room);
+
+/** Whom a mention may shorten (F812): the members, and the authors in view by their account tag, who proved their key as
+ * a member did (F819). */
+export const mentionable = (members: readonly string[], lines: readonly Line[]): Set<string> =>
+  new Set([...members, ...lines.flatMap(({ account }) => (account === undefined ? [] : [account]))]);

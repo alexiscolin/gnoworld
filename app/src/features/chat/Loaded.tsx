@@ -20,6 +20,7 @@ import { shownOf, type Shown } from "./shown.tsx";
 import { usePins } from "./usePins.ts";
 import { useRoomKeys } from "./useRoomKeys.ts";
 import type { Noticing } from "./useNotices.ts";
+import { useThreads } from "./Threading.tsx";
 import { Writer } from "./Writer.tsx";
 
 // The conversation opened from who is here, whose composer takes the focus as its button goes (U12): asked while it is
@@ -159,6 +160,7 @@ export function Loaded({
   // What the reader keeps in the room in view and the room's pins, which are asked for it: none for a direct message.
   const { keeping, pins } = useRoomKeeping(room, usePins(useAppStore(), room, me));
   const replies = useReplies(shown, state?.lines, acts);
+  const threads = useThreads({ shown, state, session, rooms: ids, acts, people });
   return (
     <Sidebar space="l">
       <Rail signedIn={me !== undefined}>
@@ -180,12 +182,13 @@ export function Loaded({
           saving={saving}
           keeping={keeping}
           pins={pins}
-          aside={shown.kind === "room" ? people : undefined}
+          aside={threads.aside}
           chat={chat}
           me={me}
           noteId={noteId}
           {...replies.view}
           modes={modesOf(room, noticing.notify)}
+          {...threads.view}
           composer={
             <Writer
               session={session}

@@ -10,7 +10,13 @@ import { roomLabel } from "./names.ts";
 import { answeredOf } from "./Replying.tsx";
 
 // The composer, an account's alone: a visitor's page never loads its code (the first screen's budget, ADR-0001 §12).
-const Composer = lazy(async () => ({ default: (await import("./Composer.tsx")).Composer }));
+const load = async () => ({ default: (await import("./Composer.tsx")).Composer });
+let Composer = lazy(load);
+
+/** A lazy component keeps its failure for good: the page that caught a chunk that could not be fetched makes it anew. */
+export function renewComposer() {
+  Composer = lazy(load);
+}
 
 // Under a room's lines: the composer for an account, which writes through the link; a word for a guest.
 // The word being typed completes to a room of the world's, by its label, or to another account in the room.
@@ -37,21 +43,30 @@ export interface WriterProps {
   replying?: Line | undefined;
   asked?: number | undefined;
   onCancelReply?: (() => void) | undefined;
+  /** Whether the draft is kept on the device, by room; false for a thread's composer, whose lines are no room's draft:
+   * its own `draft` and `onDraft` stand in, which the page keeps in memory. */
+  keeps?: boolean | undefined;
+  draft?: string | undefined;
+  onDraft?: ((draft: string) => void) | undefined;
 }
 
 export function Writer(props: WriterProps) {
   const { session, room, label, rooms, members, groups, onSay, onTyping, refused, focus, describedBy } = props;
-  const { replying, asked, onCancelReply } = props;
+  const { replying, asked, onCancelReply, keeps = true, draft, onDraft } = props;
   if (session.kind !== "in") return <p>{LOG_IN_TO_WRITE}</p>;
   // The account's drafts on this device: the room's, where the composer starts, and each change kept (4d).
   const kept = pageDrafts(session.address);
   return (
     <Suspense fallback={null}>
       <Composer
-        draft={kept.get(room)}
-        onDraft={(draft) => {
-          kept.set(room, draft);
-        }}
+        draft={keeps ? kept.get(room) : draft}
+        onDraft={
+          keeps
+            ? (text) => {
+                kept.set(room, text);
+              }
+            : onDraft
+        }
         key={room}
         room={room}
         label={label}

@@ -1,12 +1,13 @@
 // A line's actions (slice 4's 4c, 4d; docs/decisions.md, 2026-10-26): the prototype's bar, an account's three quick
-// reactions first and a Pin button for a reader who may pin (4d), its More menu holding Copy text, Copy link, Save
-// message and Mark unread for an account and, on the reader's own line, Delete, asked first. More reactions, thread
-// and edit come with their merges; Report waits for slice 12's moderation queue.
+// reactions first and a Pin button for a reader who may pin (4d), its More menu holding Copy text, Copy link, Open
+// thread (4d's threads), Save message and Mark unread for an account and, on the reader's own line, Delete, asked
+// first. More reactions and edit come with their merges; Report waits for slice 12's moderation queue.
 import type { Line, Shown } from "@gnoworld/core";
 import { Button, Chip, Cluster, Dialog, IconButton, Menu, Stack } from "@gnoworld/ui";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import styles from "./LineActions.module.css";
 import { keptItems, PinButton, type LineKeeping } from "./LineKeeping.tsx";
+import { menuItems } from "./menuItems.ts";
 import { roomLabel } from "./names.ts";
 
 // What the delete's dialog quotes of its line: its first 80 characters, never one cut in two (an emoji's parts).
@@ -50,6 +51,8 @@ export interface LineActionsProps {
   onReact: (emoji: string, on: boolean) => boolean;
   /** Makes the line the one the composer's next answers (4d). */
   onReply: () => void;
+  /** Opens the thread the line is in, or starts one (4d's threads); none: no item. */
+  onThread?: ((id: string) => void) | undefined;
 }
 
 // The dialog that asks before a delete: which line, where, and that it cannot come back; `close` says whether to delete.
@@ -164,6 +167,7 @@ export function LineActions({
   reactions,
   onReact,
   onReply,
+  onThread,
 }: LineActionsProps) {
   const [asking, setAsking] = useState(false);
   const { barRef, inside } = useInside();
@@ -182,32 +186,20 @@ export function LineActions({
     deletingRef.current = deleting;
     setAsking(false);
   };
-  const items = [
+  const items = menuItems(
     {
-      label: "Copy text",
-      onSelect: () => {
-        onCopy("text");
-      },
-    },
-    {
-      label: "Copy room link",
-      onSelect: () => {
-        onCopy("link");
-      },
-    },
-    ...keptItems(line, own, keeping),
-    ...(own && !deleting
-      ? [
-          {
-            label: "Delete",
-            tone: "danger" as const,
-            onSelect: () => {
+      onCopy,
+      onThread,
+      kept: keptItems(line, own, keeping),
+      onDelete:
+        own && !deleting
+          ? () => {
               setAsking(true);
-            },
-          },
-        ]
-      : []),
-  ];
+            }
+          : undefined,
+    },
+    line.id,
+  );
   return (
     <div
       ref={barRef}

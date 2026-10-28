@@ -11,6 +11,7 @@ import { Markdown } from "./Message.tsx";
 import { Person } from "./Person.tsx";
 import { Reactions } from "./Reactions.tsx";
 import { Quote } from "./Replying.tsx";
+import { ThreadChip } from "./ThreadChip.tsx";
 import styles from "./RoomView.module.css";
 
 // A line's look by its kind: a message plain, a notice and an /me apart.
@@ -115,6 +116,40 @@ function Marks({
 const quoteKnown = (answers: Line | undefined, members: ReadonlySet<string>, me: string | undefined): string =>
   answers === undefined ? "" : knownOf(namesOf(answers.text), members, me);
 
+// How a row stands in its list: the list's tab stop or not, its links Tab stops, and its msgid on a line that opens a
+// thread (the focus comes back to it). A thread's own row is none of the list's: no stop, its links Tab stops.
+function rowOf({
+  id,
+  stop,
+  inThread,
+  threads,
+}: {
+  id: string;
+  stop: boolean;
+  inThread: true | undefined;
+  threads: boolean;
+}) {
+  const attrs = { ...(threads ? { "data-line": id } : {}), tabIndex: inThread === true ? undefined : stop ? 0 : -1 };
+  return { attrs, links: stop || inThread === true };
+}
+
+interface ChipOf {
+  id: string;
+  replies: number | undefined;
+  stop: boolean;
+  onThread: ((id: string) => void) | undefined;
+}
+
+// The chip of the thread a line roots, when the page opens threads and the line has replies; none for a line without.
+function chipOf({ id, replies, stop, onThread }: ChipOf) {
+  return replies === undefined || onThread === undefined ? null : (
+    <>
+      {" "}
+      <ThreadChip id={id} count={replies} stop={stop} onThread={onThread} />
+    </>
+  );
+}
+
 // A line, read once: drawn, and asked whether it mentions the reader, which a word says as well as its colour; a
 // mention shortened for the reader and the room's members alone (F812). A change of members reads its mentions
 // again, never its drawing.
@@ -140,10 +175,17 @@ export interface LineViewProps {
   react: ((reaction: Reacting) => boolean) | undefined;
   /** The line it answers, when the room holds it (4d's replies). */
   answers: Line | undefined;
+  /** The replies of the thread it roots, and how a chip opens it (4d's threads); none draws no chip. */
+  replies?: number | undefined;
+  onThread?: ((id: string) => void) | undefined;
+  /** A row of a thread's own list: no quote, no tab stop of the list's, its links Tab stops. */
+  inThread?: true | undefined;
 }
 
 export function LineView(props: LineViewProps) {
   const { line, me, members, stop, actions, fresh, verdict, players, saved, pinned, chips, react, answers } = props;
+  const { replies, onThread, inThread } = props;
+  const row = rowOf({ id: line.id, stop, inThread, threads: onThread !== undefined });
   const blocks = markdown(line.text);
   // Its first link to an accepted service gets a player, but for a reader who saves data (4g).
   const embed = players ? embedIn(blocks) : undefined;
@@ -161,21 +203,22 @@ export function LineView(props: LineViewProps) {
       data-about-me={mentioned ? "" : undefined}
       data-new={fresh ? "" : undefined}
       data-mine={mine ? "" : undefined}
-      tabIndex={stop ? 0 : -1}
+      {...row.attrs}
     >
       {fresh ? <NewDivider /> : null}
       <Marks mentioned={mentioned} notice={line.kind === "notice"} saved={saved} pinned={pinned} />
-      <Quote line={line} answers={answers} known={quoted} />
+      {inThread === true ? null : <Quote line={line} answers={answers} known={quoted} />}
       <time dateTime={line.time} className={styles["time"]}>
         {CLOCK.format(new Date(line.time))}
       </time>{" "}
       <Edited edited={line.edited} />
       {line.kind === "action" ? "* " : null}
-      <Author line={line} mine={mine} /> <LineText blocks={blocks} me={me} known={known} stop={stop} />
+      <Author line={line} mine={mine} /> <LineText blocks={blocks} me={me} known={known} stop={row.links} />
       {embed === undefined ? null : <Embed embed={embed} verdict={verdict} />}
       {/* Before the chips in the Tab order, so Reply is a few presses away; it floats, so its place shows nowhere (U2). */}
       {actions}
       <Chips to={line.id} chips={chips} react={react} />
+      {chipOf({ id: line.id, replies, stop, onThread })}
     </li>
   );
 }
