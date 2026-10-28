@@ -19,6 +19,8 @@ const ACCOUNT_ONLY = [
   "@+typing=",
   "MARKREAD ",
   "+gnoworld/edit=",
+  // What reads a line's Markdown for a mention of the room: a notice's, or a line shown, never an empty room's first screen.
+  "@room(?!",
 ];
 
 // The words of every script the page loads, the lines' view and the composer included, once the page is quiet.

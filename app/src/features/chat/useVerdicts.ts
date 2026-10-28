@@ -8,6 +8,9 @@ import { pageVerdicts } from "../../lib/stream/verdicts.ts";
 import type { createAppStore } from "../../store/index.ts";
 import { verdictAsker } from "./askVerdicts.ts";
 
+type Linked = (text: string) => boolean;
+// Outside the hook, which the React Compiler cannot lower an import() in.
+const loadLinked = () => import("./linked.ts");
 type Store = ReturnType<typeof createAppStore>;
 
 /** The room shown, its lines once loaded, and who reads it: an account's address, or none for a guest. */
@@ -23,6 +26,8 @@ export interface Shown {
 export function useVerdicts(store: Store, { room, lines, reader, saving }: Shown): void {
   // The asker, made once the page runs, as the panel's link is; none for a reader who saves data (F879).
   const askerRef = useRef<ReturnType<typeof verdictAsker>>(undefined);
+  // What finds a player's link in a line, asked with the room's first lines: the first screen holds no Markdown's code.
+  const linkedRef = useRef<Linked>(undefined);
   useEffect(() => {
     if (saving) return;
     const api = pageVerdictsApi();
@@ -31,11 +36,27 @@ export function useVerdicts(store: Store, { room, lines, reader, saving }: Shown
       ...store.getState().verdictActions,
       held: (room) => store.getState().verdicts[room],
       follow: (room, on) => pageVerdicts([room], on),
+      linked: (text) => linkedRef.current?.(text) ?? false,
     });
     askerRef.current = asker;
     return asker.stop;
   }, [store, saving]);
   useEffect(() => {
-    askerRef.current?.show(room, lines, reader);
+    // Lines given the asker before it can read them would be counted looked at and never asked of: it follows the room alone.
+    const ready = linkedRef.current !== undefined || lines === undefined || lines.length === 0;
+    askerRef.current?.show(room, ready ? lines : undefined, reader);
+    if (ready) return;
+    let live = true;
+    // A chunk that could not be fetched is asked for again as the lines change.
+    void loadLinked().then(
+      ({ linked }) => {
+        linkedRef.current = linked;
+        if (live) askerRef.current?.show(room, lines, reader);
+      },
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
   }, [room, lines, reader]);
 }

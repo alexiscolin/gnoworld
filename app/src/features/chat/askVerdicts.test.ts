@@ -2,6 +2,7 @@ import type { Line } from "@gnoworld/core";
 import type { LineVerdicts, StreamEvent } from "@gnoworld/schemas";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Result } from "../../lib/api/http.ts";
+import { linked } from "./linked.ts";
 import { BUSY_REST_MS, REST_MS, unjudged, verdictAsker } from "./askVerdicts.ts";
 
 // When the page began following the room's stream; a line before it is the room's history.
@@ -35,6 +36,7 @@ function server(answer: (ids: readonly string[]) => Promise<Result<LineVerdicts>
       heard.push(...events);
     },
     held: () => holding,
+    linked,
     // The stream says it began following when the page did.
     follow: (_room, on) => {
       on.since(OPENED);
@@ -172,6 +174,7 @@ function told(clock = OPENED) {
     judged: () => undefined,
     judgedAll: () => undefined,
     held: () => undefined,
+    linked,
     follow: (_room: string, on: { since: (time: number) => void; dead: () => void }) => {
       follows += 1;
       said = on.since;
@@ -432,9 +435,9 @@ describe("unjudged: the lines in view whose player waits on a verdict the page d
       said("e", "see https://gno.land"),
       said("f", "> https://youtu.be/dQw4w9WgXcQ"),
     ];
-    expect(unjudged(lines, { c: "checked" }, new Set(["d"]))).toEqual(["a", "f"]);
-    expect(unjudged(lines, undefined, new Set())).toEqual(["a", "c", "d", "f"]);
-    expect(unjudged([], undefined, new Set())).toEqual([]);
+    expect(unjudged(lines, { held: { c: "checked" }, asked: new Set(["d"]) }, linked)).toEqual(["a", "f"]);
+    expect(unjudged(lines, { held: undefined, asked: new Set() }, linked)).toEqual(["a", "c", "d", "f"]);
+    expect(unjudged([], { held: undefined, asked: new Set() }, linked)).toEqual([]);
   });
 
   // R4 (redpass-red): the player of a corrected line waits on its correction's verdict, so the correction's own id is
@@ -444,8 +447,8 @@ describe("unjudged: the lines in view whose player waits on a verdict the page d
       { ...said("a", "no link yet"), account: "g1x" },
       { ...said("e1", "https://youtu.be/dQw4w9WgXcQ"), account: "g1x", edits: "a" },
     ];
-    expect(unjudged(lines, undefined, new Set())).toEqual(["e1"]);
-    expect(unjudged(lines, { a: "checked" }, new Set())).toEqual(["e1"]);
-    expect(unjudged(lines, { e1: "checked" }, new Set())).toEqual([]);
+    expect(unjudged(lines, { held: undefined, asked: new Set() }, linked)).toEqual(["e1"]);
+    expect(unjudged(lines, { held: { a: "checked" }, asked: new Set() }, linked)).toEqual(["e1"]);
+    expect(unjudged(lines, { held: { e1: "checked" }, asked: new Set() }, linked)).toEqual([]);
   });
 });
