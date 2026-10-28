@@ -21,14 +21,16 @@ feature of slice 5. No product code.
 6. One script gives a worktree its packages (F2127): `scripts/worktree.sh`, for the chief and every agent; probe.py
    never deletes through a linked `.bin`, a test_hooks case planting one.
 7. harness_mutate's controls run in small groups, each within its 600 s limit (F2138).
-8. deploy/test.sh's static checks (no Docker) run in the fast gate when `deploy/` changes (F2133); the
-   interactive steps stay in the script.
-9. check_migrations runs in the fast gate when the migration list changes (F2126).
+8. Each branch's merge asks Alexis for `deploy/test.sh` once, in the background, not only a branch that changes
+   `deploy/` (F2133-F2136: an app change broke the web image, found days later). Its static checks are not moved
+   into the gate: none of the four bugs was static (an image's build, a burst, a variable's order, a renamed nick).
+9. `.fails` is refused in every test, core's too: no pairing is left (no `test.fails` in the repository).
 10. F1907's ledger row, left on `slice-4d-dm-bar`, reaches main.
 
 ## Out of scope
 
-The Workflow script per branch and the first dream over slice 4: the next steps, once this branch is merged (the
+F2126 (check_migrations in the fast gate): `--merge` runs it, and a staged copy has no repository to read main's list
+from. The Workflow script per branch and the first dream over slice 4: the next steps, once this branch is merged (the
 script needs the agents this branch writes). Slice 5's features (the phone drawer U3, the page shell U5).
 
 ## Threat model
@@ -39,12 +41,13 @@ can. Each guard changed keeps its planted fault and its mutant (`probe.py`, `tes
 
 ## Tests, by level
 
-`test_hooks.sh` cases first for 6 (a worktree's `.bin` reached through a link survives the probe), 7 (the controls'
-groups), 8 and 9 (the gate runs the check for a change of its files, and not otherwise); seen failing, red-passed.
+Seen failing first, then red-passed once: `test_hooks.sh` cases for 6 (a `.bin` reached through a link is borrowed as a
+folder of its own; a tool deleted in the copy survives where the link led) and 7 (two controls at once at most, each
+still run); `probe.py`'s `pending.test.ts` refused in core and outside it (9).
 
 ## Files
 
 Docs: `CLAUDE.md`, `docs/{HARNESS,REVIEW,DEVELOPMENT}.md`, `docs/harness.{html,png}`, `docs/review/findings.md`.
 Harness (tier 1 for review): `.claude/agents/*`, `.claude/commands/*`, `.claude/rules/core.md`, `.githooks/records.sh`,
-`scripts/{check.sh,check_docs.py,harness_mutate.py,probe.py,test_hooks.sh,worktree.sh,borrow_node_modules.sh}`,
-`eslint.config.ts` (the pairing exception goes).
+`scripts/{check_docs.py,harness_mutate.py,probe.py,test_hooks.sh,borrow_node_modules.sh}`, `eslint.config.ts` and
+`lint/shared.config.ts` (the pairing exception goes), `docs/plans/slice-5-cleanup.md`.

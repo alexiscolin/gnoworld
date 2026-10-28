@@ -34,6 +34,17 @@ claude plugin install context7@claude-plugins-official --scope project
 claude plugin install gnomcp@gnoverse --scope project   # its marketplace is declared in .claude/settings.json
 ```
 
+## A branch's worktree
+
+Each branch works in a worktree of its own, made from the main checkout by one script, never by
+hand: `sh scripts/worktree.sh <dir> <branch> <base>`. It makes the branch, links the main tree's
+installed packages one by one (one store), copies each workspace's `node_modules` with its
+relative links and a `.bin` of its own, and seeds StrykerJS's incremental file. Hand-made links
+loaded React twice in Storybook and let the probe delete main's own `.bin/storybook` (F2127).
+After a merge that changes the lockfile, install in the main checkout
+(`PATH=$HOME/.nvm/versions/node/v24.22.0/bin:$PATH pnpm install --frozen-lockfile`); the sandbox
+cannot remove a worktree's record in `.git/worktrees`, so `git worktree prune` is run in your shell.
+
 ## Toolchain
 
 The chains run the release named in ADR-0001's "Verified against" row. The gate uses
@@ -73,7 +84,9 @@ Anthropic key is Alexis's own for tests, then the company's.
 
 ## Slices
 
-One slice at a time, each with its plan in `docs/plans/` (ADR-0001 §14, CLAUDE.md).
+One slice at a time, each with its plan in `docs/plans/` (ADR-0001 §14, CLAUDE.md): a chief session
+plans it and cuts it into branches, each run in a session and a worktree of its own, two at once at
+most (`docs/HARNESS.md`, "Who does what").
 
 The order, from phase 0 to phase 3, is in [plans/backlog.md](plans/backlog.md), with the
 concepts of ADR-0002 placed in it. Each slice gets its plan before it starts.

@@ -37,8 +37,10 @@ A branch's Workflow loop runs these steps; the chief session runs them on the sl
    the gate and the mutation tester re-check them. A second review round runs only for a high
    finding fixed in a tier-1 file, and only its lens, on the diff since the first. A fourth round
    does not run: stop and reconsider with Alexis.
-6. **The operator's tests.** A branch that changes `deploy/` asks Alexis once, after every fix is
-   committed, for `deploy/test.sh` and its `--mutants` on the host; never in between.
+6. **The operator's tests.** Every branch asks Alexis once, after every fix is committed, for
+   `deploy/test.sh` on the host (and its `--mutants` for a branch that changes `deploy/`), run in the
+   background while the review goes on; never in between. An app change alone broke the web image
+   in slice 4, found days later at the slice's end (F2133-F2136).
 7. **Report** to Alexis, in French: the review card of `CLAUDE.md` (in the first slices, its
    items 1–3, 7 and 8 only, the findings held back until he has reviewed, per "Blind first");
    the findings, most severe first, each with its scenario and its tag (important, nit, or
