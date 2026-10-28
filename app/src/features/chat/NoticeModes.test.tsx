@@ -34,7 +34,7 @@ describe("NoticeModes", () => {
   });
 
   it("says in words that Nothing leaves out the mentions too, which the name alone does not tell", () => {
-    expect(said(view())).toContain("not even mentions");
+    expect(said(view({ mode: "none" }))).toContain("not even mentions");
   });
 
   it("says beside the choice when the device does not keep it, and only then", () => {
