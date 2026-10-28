@@ -1,22 +1,14 @@
 // What writes under a room's lines (slice 4's 4c, moved out of ChatPanel.tsx): the composer for an account, loaded
 // lazily, which writes through the link; a word for a guest.
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
 import type { Line } from "@gnoworld/core";
 import type { AppState } from "../../store/index.ts";
+import { Composer } from "./composerChunk.ts";
 import type { ComposerProps } from "./Composer.tsx";
 import { LOG_IN_TO_WRITE } from "./loginWords.ts";
 import { roomLabel } from "./names.ts";
 import { answeredOf } from "./Replying.tsx";
 import { draftOf } from "./writerDraft.ts";
-
-// The composer, an account's alone: a visitor's page never loads its code (the first screen's budget, ADR-0001 §12).
-const load = async () => ({ default: (await import("./Composer.tsx")).Composer });
-let Composer = lazy(load);
-
-/** A lazy component keeps its failure for good: the page that caught a chunk that could not be fetched makes it anew. */
-export function renewComposer() {
-  Composer = lazy(load);
-}
 
 // Under a room's lines: the composer for an account, which writes through the link; a word for a guest.
 // The word being typed completes to a room of the world's, by its label, or to another account in the room.

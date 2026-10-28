@@ -15,17 +15,8 @@ export {
   topicAfter,
 } from "./chat/room.ts";
 export { dmOf } from "./chat/dm.ts";
-export {
-  DEFAULT_MODE,
-  dmNotice,
-  NOTICE_MODES,
-  roomNotice,
-  type Notice,
-  type NoticeKind,
-  type NoticeLine,
-  type NoticeMode,
-  type RoomAt,
-} from "./chat/notice.ts";
+export { dmNotice, roomNotice, type Notice, type NoticeKind, type NoticeLine, type RoomAt } from "./chat/notice.ts";
+export { DEFAULT_MODE, NOTICE_MODES, type NoticeMode } from "./chat/noticeModes.ts";
 export type { Line, Where } from "./chat/room.ts";
 export { TYPING_ACTIVE_MS, TYPING_PAUSED_MS, typingAfter, typingAt, type Typing } from "./chat/typing.ts";
 export {
@@ -49,7 +40,8 @@ export {
   type Shown,
 } from "./chat/reactions.ts";
 export { inlines, inWord, markdown, mentions, mentionsRoom } from "./markdown/markdown.ts";
-export { excerpt, firstGraphemes } from "./markdown/plain.ts";
+export { firstGraphemes } from "./markdown/graphemes.ts";
+export { excerpt } from "./markdown/plain.ts";
 export type { Block, Inline } from "./markdown/markdown.ts";
 export { COMMANDS, compose, relayOf, type Composed } from "./chat/compose.ts";
 export { fold } from "./chat/fold.ts";

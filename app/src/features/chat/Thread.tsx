@@ -9,7 +9,8 @@ import { IconButton, Sidebar, Stack } from "@gnoworld/ui";
 import { useEffect, useEffectEvent, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { LineView } from "./LineView.tsx";
 import shared from "./lists.module.css";
-import { mentionable, shortened } from "./names.ts";
+import { mentionable } from "./names.ts";
+import { shortened } from "./shortened.ts";
 import room from "./RoomView.module.css";
 import styles from "./Thread.module.css";
 

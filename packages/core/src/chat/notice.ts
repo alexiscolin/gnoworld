@@ -3,16 +3,13 @@
 // server's) or an edit, a line already counted when it came. One notice a line, in this order: a mention of the account,
 // a reply to one of its lines, a mention of the whole room where that counts.
 import { fold } from "./fold.ts";
+import type { NoticeMode } from "./noticeModes.ts";
 import { markdown } from "../markdown/markdown.ts";
 import { mentions, mentionsRoom } from "../markdown/mentions.ts";
 import type { Line } from "./room.ts";
 
 /** What a line is to its reader: a mention of them, a mention of the whole room, a reply to them, a direct message. */
 export type NoticeKind = "mention" | "group" | "reply" | "dm";
-/** What a room tells its reader of: every line, the mentions and replies, or nothing, mentions included. */
-export const NOTICE_MODES = ["all", "mentions", "none"] as const;
-export type NoticeMode = (typeof NOTICE_MODES)[number];
-export const DEFAULT_MODE: NoticeMode = "mentions";
 
 export interface Notice {
   /** The line's msgid. */

@@ -1,5 +1,6 @@
 // What the chat's link takes and offers (link.ts), apart from how it does it.
 import type { Result } from "../../lib/api/http.ts";
+import type { MakeKit } from "./accountKit.ts";
 import type { Ergo, ErgoOptions, Who } from "../../lib/ergo/ergo.ts";
 import type { Keep } from "../../lib/keep/keep.ts";
 import type { NoticePrefs } from "../../lib/notices/prefs.ts";
@@ -24,6 +25,10 @@ export interface LinkDeps {
   /** An account's saved lines and reading places on its device, which the store reads at its session's start; none in
    * a test. */
   keep?: ((account: Address) => Keep) | undefined;
+  /** An account's half of the link (accountKit.ts), at hand: a test's. */
+  kit?: MakeKit | undefined;
+  /** The same, asked for as an account connects, never for a guest: the page's, whose first screen does not hold it. */
+  loadKit?: (() => Promise<MakeKit>) | undefined;
 }
 
 export interface ChatLink {

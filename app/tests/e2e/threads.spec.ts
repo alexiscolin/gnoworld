@@ -473,7 +473,7 @@ test.describe("threads", () => {
     test("loads the panel's code when a thread is first opened, never before", async ({ page }) => {
       const asked: string[] = [];
       page.on("request", (request) => {
-        if (/\/assets\/Thread-[\w-]+\.js$/.test(request.url())) asked.push(request.url());
+        if (/\/assets\/ThreadBody-[\w-]+\.js$/.test(request.url())) asked.push(request.url());
       });
       await open(page);
       await expect(chipOf(lines(page).first())).toBeVisible();

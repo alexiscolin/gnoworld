@@ -158,7 +158,7 @@ test.describe("threads, from the review", () => {
   // room is hidden meanwhile.
   test.describe("the panel's code", () => {
     test.use({ serviceWorkers: "block" });
-    const chunk = /\/assets\/Thread-[\w-]+\.js$/;
+    const chunk = /\/assets\/ThreadBody-[\w-]+\.js$/;
     const base: HistoryLine[] = [["m1", T(0), "the root line"]];
     const answer = tagged("m2", "an answer", { at: 1, tags: "+reply=m1" });
 

@@ -42,3 +42,7 @@ export function asksAfterJoin(
 // session out (channel.go:1078-1082, v2.19.1).
 export const outOf = ({ source = "", command, params }: IrcMessage, me: string): boolean =>
   (command === "KICK" && params[1] === me) || (command === "PART" && nickOf(source) === me);
+
+/** Whether Ergo's line is its JOIN of me (not another's). */
+export const joined = ({ source = "", command }: IrcMessage, me: string): boolean =>
+  command === "JOIN" && nickOf(source) === me;
