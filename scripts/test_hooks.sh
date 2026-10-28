@@ -951,6 +951,16 @@ printf 'export const ROOM_TABLES = `\n  CREATE TABLE \\`r\\` (x TEXT) STRICT;\n`
 git -C "$r" add -A && git -C "$r" commit -qm escaped && escaped=$(git -C "$r" rev-parse HEAD)
 printf 'export const ROOM_TABLES = `\n  CREATE TABLE \\`r\\` (y TEXT) STRICT;\n`;\n' >"$r/server/src/ROOM_TABLES.ts"
 refuses "a migration with an escape, changed past it" ROOM_TABLES "$escaped"
+# The list main.ts imports from server/src/migrations.ts (SV2), read there; main's own may still be in main.ts.
+table ROOM_TABLES
+held() { printf 'export const migrations: readonly string[] = [\n  %s,\n];\n' "$1" >"$r/server/src/migrations.ts"; }
+named() { printf 'import { migrations } from "%s";\nconst db = openDatabase(config.database, migrations);\n' "${1:-./migrations.ts}" >"$r/server/src/main.ts"; }
+named && held "LOGIN_TABLES, ROOM_TABLES, MUTE_TABLES" && judge || fail "check_migrations refused main's list moved to migrations.ts: $out"
+held "ROOM_TABLES, LOGIN_TABLES, MUTE_TABLES" && refuses "main's migrations reordered in migrations.ts" LOGIN_TABLES
+held "LOGIN_TABLES, ROOM_TABLES" && git -C "$r" add -A && git -C "$r" commit -qm moved && moved=$(git -C "$r" rev-parse HEAD)
+held "LOGIN_TABLES" && refuses "main's list in migrations.ts cut short" ROOM_TABLES "$moved"
+held "LOGIN_TABLES, ROOM_TABLES" && named ./other.ts && refuses "a list imported from another file" main.ts "$moved"
+named && rm "$r/server/src/migrations.ts" && refuses "migrations.ts gone" main.ts "$moved"
 fi
 
 if part patch_coverage; then
