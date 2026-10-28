@@ -3,6 +3,7 @@
 import type { Line } from "@gnoworld/core";
 import type { FlashMessage } from "@gnoworld/ui";
 import { useState } from "react";
+import { LINES_KEPT } from "../../store/chat.ts";
 import { roomHref } from "./names.ts";
 
 // What a copy says, in the room's flash: done, or not and why, a page with no clipboard (a plain http origin) included.
@@ -39,14 +40,46 @@ interface RemovalProps {
   /** Hands the focus to a neighbour of the line `id`, which goes. */
   leave: (id: string) => void;
   setSaid: (said: FlashMessage | null) => void;
+  /** The reader, and the room the lines are of: the reader's own message that leaves them is a hide (F2093). */
+  me?: string | undefined;
+  room?: string | undefined;
+}
+
+// Whether a message of `me` went from a room's lines, though no delete of its own took it: the bot's hide (a REDACT by
+// another). A full window's oldest line going as another comes in is no hide; nor are the lines of another room.
+function hidden(
+  before: readonly Line[],
+  after: readonly Line[],
+  who: { me: string; deleting: string | undefined },
+): boolean {
+  const kept = new Set(after.map(({ id }) => id));
+  const { me, deleting } = who;
+  return before.some(
+    (line, at) =>
+      line.account === me &&
+      !kept.has(line.id) &&
+      (deleting === undefined || (line.id !== deleting && line.edits !== deleting)) &&
+      (at > 0 || before.length < LINES_KEPT),
+  );
+}
+
+// Says one's own message was hidden, when it leaves the lines of the room in view without a delete of one's own (F2093).
+function useHidden(props: Pick<RemovalProps, "lines" | "room" | "me" | "setSaid"> & { deleting: string | undefined }) {
+  const { lines, room, me, deleting, setSaid } = props;
+  const [seen, setSeen] = useState({ room, lines });
+  if (seen.lines === lines) return;
+  setSeen({ room, lines });
+  if (me !== undefined && room !== undefined && seen.room === room && hidden(seen.lines, lines, { me, deleting }))
+    setSaid({ title: "Your message was hidden." });
 }
 
 /** The id of a delete gone out and not answered yet, and the delete itself, which says whether it went out. */
-export function useRemoval({ lines, refused, connected, onDelete, leave, setSaid }: RemovalProps) {
+export function useRemoval({ lines, refused, connected, onDelete, leave, setSaid, me, room }: RemovalProps) {
   // A delete gone out and not answered yet: its line offers no second one; Ergo's echo, taking the line, is said, and
   // its refusal ends it too (U4). ponytail: a line trimmed out of the window meanwhile reads as deleted, in the
   // milliseconds a REDACT waits for its echo.
   const [deleting, setDeleting] = useState<string>();
+  useHidden({ lines, room, me, deleting, setSaid });
   if (deleting !== undefined && (refused === deleting || !lines.some((line) => line.id === deleting))) {
     setDeleting(undefined);
     if (refused !== deleting) setSaid({ title: "Message deleted." });
