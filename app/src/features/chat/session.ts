@@ -1,17 +1,16 @@
-// What a new session of the chat's link starts the store's device-bound state with (slice 4's 4d, 4e): the last session's
-// is forgotten, an account's own read from its device, none for a guest, and the last reader's right to pin dropped.
+// What a new session of the chat's link starts the store's device-bound state with (slice 4's 4d, 4e): an account's own
+// read from its device, none for a guest; the last session's was forgotten by the store itself (store/index.ts).
 import type { IrcMessage } from "@gnoworld/core";
 import type { AppState } from "../../store/index.ts";
 import type { LinkDeps } from "./linkTypes.ts";
 
 export function beginSession({ store, device, keep }: LinkDeps, session: AppState["login"]["session"]): void {
   const account = session.kind === "in" ? session.address : undefined;
-  const { dmActions, keepActions, noticeActions, pinsActions } = store.getState();
+  const { dmActions, keepActions, noticeActions } = store.getState();
   const kept = account === undefined ? undefined : device?.(account);
   dmActions.begin(kept);
   noticeActions.begin(kept?.notices);
   keepActions.begin(account === undefined ? undefined : keep?.(account));
-  pinsActions.forget();
 }
 
 /** One live line from Ergo to each slice that reads lines: the rooms', the direct messages', the saved lines' and the

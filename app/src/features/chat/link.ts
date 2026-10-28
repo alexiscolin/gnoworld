@@ -80,6 +80,7 @@ class Link implements ChatLink {
   readonly multiline = (): boolean => this.#ergo?.multiline() ?? true;
 
   readonly say: ChatLink["say"] = (...args) => this.#speaking.say(...args);
+  readonly slow: ChatLink["slow"] = (composed) => this.#speaking.slow(composed);
   readonly correct: ChatLink["correct"] = (...args) => this.#speaking.correct(...args);
   readonly sayTo: ChatLink["sayTo"] = (...args) => this.#speaking.sayTo(...args);
   readonly reactTo: ChatLink["reactTo"] = (...args) => this.#speaking.reactTo(...args);
@@ -129,17 +130,16 @@ class Link implements ChatLink {
     if (session.kind === "unknown") return;
     const key = session.kind === "out" ? "guest" : session.address;
     if (key === this.#key) return;
-    // Another session than a known one starts with no room: a reader's rooms are its own, which the page lists
-    // for it again.
+    // Another session than a known one starts with no room: a reader's rooms are its own, which the page lists for it
+    // again; the store has already forgotten the last one's (its own subscriber), the link's are its own.
     const known = this.#key !== undefined;
     // Noted first: the store's change below calls this again, which must find the session the same.
     this.#key = key;
-    const { store, ticket, guest } = this.#deps;
+    const { ticket, guest } = this.#deps;
     if (known) {
       this.#listed = [];
       this.#shown = undefined;
       this.#places.forget();
-      store.getState().chatActions.follow([]);
     }
     beginSession(this.#deps, session);
     this.#end();

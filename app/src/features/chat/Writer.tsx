@@ -30,6 +30,7 @@ export interface WriterProps {
   /** Whether a mention of the whole room counts here (4f-n). */
   groups?: boolean | undefined;
   onSay: ComposerProps["onSay"];
+  slow?: ComposerProps["slow"];
   /** What each change of the draft tells the room of the account's typing (4f); a direct message's tells none. */
   onTyping?: ((state: "active" | "done") => void) | undefined;
   /** The lines Ergo refused, and why the last did not go: a direct message's (4e). */
@@ -60,7 +61,7 @@ export interface WriterProps {
 }
 
 export function Writer(props: WriterProps) {
-  const { session, room, label, rooms, members, groups, onSay, onTyping, refused, focus, describedBy } = props;
+  const { session, room, label, rooms, members, groups, onSay, slow, onTyping, refused, focus, describedBy } = props;
   const { replying, asked, onCancelReply, editing, onCancelEdit, gone, multiline } = props;
   if (session.kind !== "in") return <p>{LOG_IN_TO_WRITE}</p>;
   return (
@@ -74,6 +75,7 @@ export function Writer(props: WriterProps) {
         members={members}
         groups={groups}
         onSay={onSay}
+        slow={slow}
         onTyping={onTyping}
         refused={refused}
         focus={focus === true || editing !== undefined}

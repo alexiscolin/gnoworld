@@ -174,7 +174,7 @@ function List(props: ListProps) {
   const { fresh, listRef, onScroll } = useListRead(props);
   const { stop, mounted, on, leave } = useLineFocus(lines, listRef, fresh);
   const { said, setSaid, copy } = useCopy();
-  const [deleting, remove] = useRemoval({ lines, refused, connected, onDelete, leave, setSaid });
+  const [deleting, remove] = useRemoval({ lines, refused, connected, onDelete, leave, setSaid, me, room });
   // A corrected line's player waits on its newest edit's verdict, the words it shows being the edit's (F1921).
   const verdictOf = (id: string) => verdicts?.[newest.get(id) ?? id];
   // A reaction that could not go out says so at once; one Ergo refuses, when it answers (cannotReact).

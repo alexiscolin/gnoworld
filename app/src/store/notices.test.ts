@@ -739,7 +739,8 @@ describe("the store's notices slice", () => {
       loginActions.signedIn(Address.parse(BOB));
       expect(t.state().notices).toEqual([]);
       expect(t.state().dms).toEqual({});
-      // The same account again is no new session.
+      // The same account again is no new session. A session starts with no room followed (the page lists its own).
+      t.store.getState().chatActions.follow([GAMES, MAIN]);
       hold();
       loginActions.signedIn(Address.parse(BOB));
       expect(totalUnseen(t.state())).toBe(2);

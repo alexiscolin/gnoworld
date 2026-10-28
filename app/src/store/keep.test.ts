@@ -1,4 +1,4 @@
-import type { Line } from "@gnoworld/core";
+import { parseLine, type IrcMessage, type Line } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
 import { keep } from "../lib/keep/keep.ts";
@@ -32,9 +32,10 @@ const guest = (id: string): Line => ({
 function setup({ refuses = false } = {}) {
   const kept = new Map<string, string>();
   // `blind`: a key prefix the device cannot read; `noWrite`: it reads but refuses what is written.
-  const state = { refuses, blind: "", noWrite: false };
+  const state = { refuses, blind: "", noWrite: false, reads: 0 };
   const storage = {
     getItem: (key: string) => {
+      state.reads += 1;
       if (state.blind !== "" && key.startsWith(state.blind)) throw new DOMException("blocked", "SecurityError");
       if (state.refuses) throw new DOMException("blocked", "SecurityError");
       return kept.get(key) ?? null;
@@ -538,5 +539,42 @@ describe("a session's end", () => {
     expect(Object.keys(t.device().unread() ?? {})).toEqual(["#bubble"]);
     t.begin(t.device());
     expect(t.now().saved.map(({ id }) => id)).toEqual(["m1"]);
+  });
+});
+
+const heard = (line: string): IrcMessage => {
+  const parsed = parseLine(line);
+  if (!parsed.ok) throw new Error(`the test's line does not parse: ${line}`);
+  return parsed.message;
+};
+
+// F2090 (AP1): the device is read for a REDACT or an edit alone, never for each live line of a busy room.
+describe("a live line heard by the keep slice", () => {
+  const said = `@msgid=m9;time=${T(2)};account=${BOB} :${BOB}!u@h PRIVMSG #bubble :hello`;
+  it("reads the device for no line that is no REDACT and no edit", () => {
+    const t = setup();
+    t.begin(t.device());
+    t.save("#bubble", line("m1"));
+    const before = t.state.reads;
+    for (const text of [
+      said,
+      `:${BOB}!u@h JOIN #bubble`,
+      `:${BOB}!u@h PART #bubble`,
+      `@+typing=active;account=${BOB} :${BOB}!u@h TAGMSG #bubble`,
+    ])
+      t.heard(heard(text));
+    expect(t.state.reads).toBe(before);
+    expect(t.now().saved.map(({ id }) => id)).toEqual(["m1"]);
+  });
+
+  it("still reads it to unsave a REDACTed line, and to take an edit's words", () => {
+    const t = setup();
+    t.begin(t.device());
+    t.save("#bubble", line("m1"));
+    t.save("#bubble", line("m2"));
+    t.heard(heard(`@msgid=e1;time=${T(3)};account=${BOB};+gnoworld/edit=m2 :${BOB}!u@h PRIVMSG #bubble :corrected`));
+    expect(t.now().saved.find(({ id }) => id === "m2")?.text).toBe("corrected");
+    t.heard(heard(`@msgid=r1;time=${T(4)};account=${BOB} :${BOB}!u@h REDACT #bubble m1`));
+    expect(t.now().saved.map(({ id }) => id)).toEqual(["m2"]);
   });
 });

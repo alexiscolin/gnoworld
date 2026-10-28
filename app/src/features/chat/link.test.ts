@@ -713,7 +713,7 @@ describe("the chat's link: drops and reconnects", () => {
     t.link.follow(["#garden"]);
     t.signedIn(ADDRESS);
     expect(t.links).toHaveLength(1);
-    expect(t.room("#bubble")?.lines).toEqual([]);
+    expect(t.room("#bubble")?.lines ?? []).toEqual([]);
     expect(t.fake.sent).toEqual(["JOIN #bubble"]);
   });
 
@@ -746,6 +746,50 @@ describe("the chat's link: what it says", () => {
       "PRIVMSG #bubble/games :hi **all**",
       "PRIVMSG #bubble/games :\u0001ACTION waves\u0001",
     ]);
+  });
+
+  // F2092 (AP3): the server hides the 21st message and the 101st line of an account's minute, a strike each; the link
+  // refuses them before sending, and says why through `slow`.
+  describe("at the server's pace", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+    const paced = () => {
+      vi.useFakeTimers();
+      return memberIn(["#bubble"]);
+    };
+    const go = (t: ReturnType<typeof paced>, text: string) => t.link.say("#bubble", composed("#bubble", text));
+
+    it("sends 20 messages in a minute and refuses the 21st, sending nothing, until the minute has passed", () => {
+      const t = paced();
+      for (let each = 0; each < 20; each += 1) expect(go(t, `m${String(each)}`)).toBe(true);
+      expect(t.link.slow(composed("#bubble", "late"))).toMatch(
+        /^Too fast: 20 messages a minute at most\. Try again in \d+ s\.$/u,
+      );
+      expect(go(t, "late")).toBe(false);
+      expect(said(t.fake.sent)).toHaveLength(20);
+      vi.advanceTimersByTime(60_001);
+      expect(t.link.slow(composed("#bubble", "late"))).toBeUndefined();
+      expect(go(t, "late")).toBe(true);
+    });
+
+    it("counts the lines of a message: two of 40 lines are sent, a third message of 21 lines is not", () => {
+      const t = paced();
+      const lines = (count: number) => Array.from({ length: count }, (_, each) => `l${String(each)}`).join("\n");
+      expect(go(t, lines(40))).toBe(true);
+      expect(go(t, lines(40))).toBe(true);
+      expect(t.link.slow(composed("#bubble", lines(21)))).toMatch(/^Too fast: 100 lines a minute at most\./u);
+      expect(go(t, lines(21))).toBe(false);
+      expect(go(t, lines(20))).toBe(true);
+    });
+
+    it("counts a correction as a message, and a refused send as none", () => {
+      const t = paced();
+      for (let each = 0; each < 19; each += 1) go(t, `m${String(each)}`);
+      expect(t.link.say("#bubble/games", composed("#bubble/games", "elsewhere"))).toBe(false);
+      expect(t.link.correct("#bubble", composed("#bubble", "fixed"), "m1")).toBe(true);
+      expect(go(t, "one too many")).toBe(false);
+    });
   });
 
   it("sends nothing composed for another room than the one it is told, though it is in both", () => {

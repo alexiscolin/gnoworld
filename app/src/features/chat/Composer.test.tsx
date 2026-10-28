@@ -7,6 +7,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Composer, Preview, typingOf } from "./Composer.tsx";
 import { NEAR, ROOM_NOTIFIES, ROOM_SILENT, roomHint, said, sendable, withHint } from "./said.ts";
+import { tooFast } from "./pace.ts";
 import { refusalAfter } from "./composerHooks.ts";
 
 const ROOM = "#bubble/games";
@@ -681,6 +682,50 @@ describe("Enter in the composer's box", () => {
 
   it("sends nothing of 21 lines on a connection without draft/multiline, whatever the Send button says", () => {
     expect(enter(lines(21), false)).toEqual([]);
+  });
+
+  const press = (slow: (composed: Composed) => string | undefined) => {
+    const sent: Composed[] = [];
+    root = createRoot(host);
+    act(() => {
+      root?.render(
+        <Composer
+          room={ROOM}
+          nick={NICK}
+          rooms={[]}
+          members={[]}
+          draft="hello"
+          slow={slow}
+          onSay={(composed) => {
+            sent.push(composed);
+            return true;
+          }}
+        />,
+      );
+    });
+    act(() => {
+      host
+        .querySelector("textarea")
+        ?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    });
+    return sent;
+  };
+
+  // F2092 (AP3): the composer asks the link, as Send is pressed, whether the account is past the server's pace.
+  it("sends nothing and keeps the draft when the link says the account is too fast, and says why", () => {
+    const why = tooFast({ limit: "messages", wait: 12_001 });
+    expect(why).toBe("Too fast: 20 messages a minute at most. Try again in 13 s.");
+    expect(press(() => why)).toEqual([]);
+    expect(host.textContent).toContain(why);
+    expect(host.querySelector("textarea")?.value).toBe("hello");
+  });
+
+  it("names the lines' limit as it names the messages'", () => {
+    expect(tooFast({ limit: "lines", wait: 1000 })).toBe("Too fast: 100 lines a minute at most. Try again in 1 s.");
+  });
+
+  it("sends the draft when the link says nothing against it", () => {
+    expect(press(() => undefined)).toHaveLength(1);
   });
 });
 
