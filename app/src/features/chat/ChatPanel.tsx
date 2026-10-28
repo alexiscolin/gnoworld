@@ -58,6 +58,8 @@ const pageLink = (store: ReturnType<typeof useAppStore>) =>
       notices: pageNoticePrefs(account),
     }),
     keep: pageKeep,
+    // What the link does for an account alone, asked as an account connects (the first screen's budget, ADR-0001 §12).
+    loadKit: async () => (await import("./accountKit.ts")).makeKit,
   });
 
 // The rooms as the server lists them for `query`, asked again as it changes; none before the first answer.

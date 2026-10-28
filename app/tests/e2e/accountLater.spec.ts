@@ -15,6 +15,10 @@ const ACCOUNT_ONLY = [
   ".markUnread(",
   // The composer's side of a thread and of a reply: a visitor reads a thread, whose field is an account's.
   "Replying to an earlier message",
+  // What the page's link sends for an account: its typing, a room's reading place, a correction of a line.
+  "@+typing=",
+  "MARKREAD ",
+  "+gnoworld/edit=",
 ];
 
 // The words of every script the page loads, the lines' view and the composer included, once the page is quiet.

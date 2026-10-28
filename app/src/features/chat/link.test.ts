@@ -7,6 +7,7 @@ import type { Ergo, ErgoState, Who } from "../../lib/ergo/ergo.ts";
 import { createAppStore } from "../../store/index.ts";
 import { totalUnseen, unseenNotices } from "../../store/notices.ts";
 import { HISTORY_RING } from "./history.ts";
+import { makeKit } from "./accountKit.ts";
 import { chatLink, HISTORY_LINES, ROOMS_JOINED, type LinkDeps } from "./link.ts";
 import { WAITING } from "./outbox.ts";
 
@@ -46,6 +47,7 @@ const setup = (before?: (store: ReturnType<typeof createAppStore>) => void, devi
   const asked = { tickets: 0, guests: 0 };
   const link = chatLink({
     store,
+    kit: makeKit,
     device,
     ticket: (): Promise<Result<{ ticket: string }>> => {
       asked.tickets += 1;

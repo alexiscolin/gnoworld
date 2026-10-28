@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { Ergo, ErgoOptions } from "../../lib/ergo/ergo.ts";
 import { keep, type SavedLine } from "../../lib/keep/keep.ts";
 import { createAppStore } from "../../store/index.ts";
+import { makeKit } from "./accountKit.ts";
 import { chatLink } from "./link.ts";
 
 // 4d's part of the chat's link: at each session's start it hands the keep slice the account's device (what it saved,
@@ -44,6 +45,7 @@ function setup() {
   const connections: Pick<ErgoOptions, "onState" | "onLine">[] = [];
   const link = chatLink({
     store,
+    kit: makeKit,
     ticket: () => Promise.resolve({ ok: true, value: { ticket: "t" } }),
     guest: () => "guest-aaaaaa",
     connect: (_, on) => {
