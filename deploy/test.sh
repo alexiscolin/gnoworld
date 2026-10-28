@@ -914,6 +914,7 @@ CLIENT
 		"$server_image" /test-ws.cjs "$@" 2>&1 || true; }
 	first() { printf '%s\n' "$1" | head -n 1; }
 	holds() { if printf '%s\n' "$2" | grep -qE -- "$3"; then pass "$1"; else fail "$1"; fi; }
+	# Ergo renames a connection with no account Guest-<nick> (force-guest-format, F722): its answers name that nick.
 	# The bot makes the worlds' rooms once it is in Ergo (3h): a guest can join none before.
 	bot=""
 	for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
@@ -932,7 +933,7 @@ CLIENT
 	chief=$!
 	# The guest comes once the room is made and the marker said.
 	for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
-		grep -q " 366 chief25 $room " "$tmp/chief.txt" 2>/dev/null && break
+		grep -q " 366 Guest-chief25 $room " "$tmp/chief.txt" 2>/dev/null && break
 		sleep 1
 	done
 	sleep 1
@@ -941,19 +942,19 @@ CLIENT
 		"NS REGISTER a-password" "AUTHENTICATE PLAIN" "AUTHENTICATE $(printf 'g1x\0g1x\0a-password' | base64)" "OPER admin wrong" "OPER admin wrong")
 	wait "$chief" || true
 	expect "a visitor's WebSocket reaches Ergo through web" "$(first "$guest")" "HTTP/1.1 101 Switching Protocols"
-	holds "an operator logs in through the WebSocket and makes a room (a known limit, and the control)" "$(cat "$tmp/chief.txt")" " 366 chief25 $room "
-	holds "a guest joins a room" "$guest" "^:guest21![^ ]+ JOIN $room\$"
+	holds "an operator logs in through the WebSocket and makes a room (a known limit, and the control)" "$(cat "$tmp/chief.txt")" " 366 Guest-chief25 $room "
+	holds "a guest joins a room" "$guest" "^:Guest-guest21![^ ]+ JOIN $room\$"
 	holds "and reads its history: the operator's line (CHATHISTORY)" "$guest" " PRIVMSG $room :$marker\$"
-	holds "a guest is refused when it speaks, in a room Ergo made with its default modes" "$guest" " 404 guest21 $room "
-	holds "and in a world's room" "$guest" ' 404 guest21 #earth '
-	holds "a guest makes no room: only operators do" "$guest" ' 403 guest21 #byaguest[0-9a-f]+ :Only server operators can create new channels'
+	holds "a guest is refused when it speaks, in a room Ergo made with its default modes" "$guest" " 404 Guest-guest21 $room "
+	holds "and in a world's room" "$guest" ' 404 Guest-guest21 #earth '
+	holds "a guest makes no room: only operators do" "$guest" ' 403 Guest-guest21 #byaguest[0-9a-f]+ :Only server operators can create new channels'
 	holds "a hand-made account is refused: no registration" "$guest" 'FAIL REGISTER DISALLOWED'
-	holds "nor through NickServ" "$guest" 'NickServ!.* NOTICE guest21 :This command has been disabled'
-	holds "a password of one's own logs no one in: SASL refused" "$guest" ' 904 guest21 '
+	holds "nor through NickServ" "$guest" 'NickServ!.* NOTICE Guest-guest21 :This command has been disabled'
+	holds "a password of one's own logs no one in: SASL refused" "$guest" ' 904 Guest-guest21 '
 	holds "the refusal came from the server, through Ergo's auth script and its socket" \
 		"$(docker logs "$server" 2>&1 | grep '"irc_login_refused"' || true)" '"error":"(ticket|account)"'
-	holds "an OPER with a wrong password is refused" "$guest" ' 491 guest21 :OPER failed'
-	holds "and the next one waits: Ergo's oper throttle" "$guest" ' 491 guest21 :You must wait'
+	holds "an OPER with a wrong password is refused" "$guest" ' 491 Guest-guest21 :OPER failed'
+	holds "and the next one waits: Ergo's oper throttle" "$guest" ' 491 Guest-guest21 :You must wait'
 	# A known limit (OPERATIONS.md): Ergo takes OPER on any listener; the password's length (render.sh) and the throttle hold it.
 	expect "a WebSocket from another site is refused" "$(first "$(ws 203.0.113.22 "$auth" https://evil.test "NICK x")")" "HTTP/1.1 403 Forbidden"
 	for origin in - "http://gnoworld.test.evil.test" "https://gnoworld.test" "http://gnoworld.test:81"; do
@@ -963,10 +964,10 @@ CLIENT
 	# The address Ergo sees, as a WHOIS of oneself shows it (338; its log holds none, connect-ip off: F702): the
 	# visitor's own through web, and straight from another container of the internal network, never the forged
 	# X-Forwarded-For. The variables are exported: docker run reads them from its environment.
-	seen=$(ws 203.0.113.27 "$auth" "$ORIGINS" "NICK seen27" "USER s 0 * :s" + "WHOIS seen27" | grep ' 338 seen27 ' || true)
-	if printf '%s\n' "$seen" | grep -qE ' 338 seen27 seen27 [^ ]+ 203\.0\.113\.27 '; then pass "Ergo sees the visitor's own address through web, never a forged X-Forwarded-For"; else fail "never a forged X-Forwarded-For, through web: [$seen]"; fi
-	direct=$(export WS_TARGET=ergo:8097 WS_PROXY=0; ws 203.0.113.26 - "$ORIGINS" "NICK direct26" "USER d 0 * :d" + "WHOIS direct26" | grep ' 338 direct26 ' || true)
-	if printf '%s\n' "$direct" | grep -qE ' 338 direct26 direct26 [^ ]+ [0-9.]+ ' && ! printf '%s\n' "$direct" | grep -qE '192\.0\.2\.66|203\.0\.113\.26'; then pass "and never a forged X-Forwarded-For, straight"; else fail "never a forged X-Forwarded-For, straight: [$direct]"; fi
+	seen=$(ws 203.0.113.27 "$auth" "$ORIGINS" "NICK seen27" "USER s 0 * :s" + "WHOIS Guest-seen27" | grep ' 338 Guest-seen27 ' || true)
+	if printf '%s\n' "$seen" | grep -qE ' 338 Guest-seen27 Guest-seen27 [^ ]+ 203\.0\.113\.27 '; then pass "Ergo sees the visitor's own address through web, never a forged X-Forwarded-For"; else fail "never a forged X-Forwarded-For, through web: [$seen]"; fi
+	direct=$(export WS_TARGET=ergo:8097 WS_PROXY=0; ws 203.0.113.26 - "$ORIGINS" "NICK direct26" "USER d 0 * :d" + "WHOIS Guest-direct26" | grep ' 338 Guest-direct26 ' || true)
+	if printf '%s\n' "$direct" | grep -qE ' 338 Guest-direct26 Guest-direct26 [^ ]+ [0-9.]+ ' && ! printf '%s\n' "$direct" | grep -qE '192\.0\.2\.66|203\.0\.113\.26'; then pass "and never a forged X-Forwarded-For, straight"; else fail "never a forged X-Forwarded-For, straight: [$direct]"; fi
 	expect "and no address in Ergo's log" "$(docker logs "$ergo" 2>&1 | grep -cE '203\.0\.113\.|192\.0\.2\.66' || true)" 0
 
 	# The server through web's /api: the password first, the visitor's address from web alone.
