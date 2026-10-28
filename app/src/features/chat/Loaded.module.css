@@ -1,0 +1,10 @@
+/* The rooms' column keeps one width whatever the notices hold, so a first notice moves nothing beside it (U4). */
+@layer components {
+  .rail {
+    /* layout: the Sidebar's side grows only when it stands over the room; its width is its basis, never its content's */
+    /* raw: the width of the longest room name and a count, which no token names */
+    flex: 1 0 10rem;
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+  }
+}

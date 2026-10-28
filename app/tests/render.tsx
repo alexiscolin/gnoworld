@@ -3,6 +3,7 @@
 import { LinkProvider, type PageLinkProps } from "@gnoworld/ui";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createStaticHandler, createStaticRouter, StaticRouterProvider, type RouteObject } from "react-router";
+import { StoreProvider } from "../src/storeContext.tsx";
 
 async function query(route: RouteObject, path: string) {
   const handler = createStaticHandler([route]);
@@ -14,10 +15,15 @@ async function query(route: RouteObject, path: string) {
 // What the app's router draws for ui's link slot, here a stand-in that marks the links it draws.
 const routed = (props: PageLinkProps) => <a data-routed="" {...props} />;
 
-/** A route as the build renders it; inside ui's link slot when asked, its links through the router marked. */
+/** A route as the build renders it, inside the page's store as the shell puts every route; inside ui's link slot
+ * when asked, its links through the router marked. */
 export async function render(route: RouteObject, path: string, { slot = false } = {}): Promise<string> {
   const { handler, context } = await query(route, path);
-  const page = <StaticRouterProvider router={createStaticRouter(handler.dataRoutes, context)} context={context} />;
+  const page = (
+    <StoreProvider>
+      <StaticRouterProvider router={createStaticRouter(handler.dataRoutes, context)} context={context} />
+    </StoreProvider>
+  );
   return renderToStaticMarkup(slot ? <LinkProvider link={routed}>{page}</LinkProvider> : page);
 }
 

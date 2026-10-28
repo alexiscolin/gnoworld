@@ -24,6 +24,7 @@ review card and stops.
 
 | Item | Delivers | Why |
 |---|---|---|
+| One gate at a time on the machine (right after slice 4) | A machine-wide lock around `check.sh`, so worktrees' gates queue instead of running side by side; measured before and after: refusals for a slow test in a day, a commit queue's whole time | Parallel forks' gates at load 40-80 refused commits on fixed timeouts and lost browsers (docs/decisions.md, 2026-10-26) |
 | `main` protected, with code owners | First, once the repository is public or the company's Team plan is on: a merge into `main` needs the CI green; a `CODEOWNERS` file makes Alexis's approval required on the CI, the hooks, `scripts/`, `.claude/` and the configs; a bot's approval never counts as his | The CI reports today but cannot block a merge (`docs/decisions.md`); the files that steer the gate and the agents get a human every time ("Solving code review at Anthropic", claude.dev, read 2026-10-17). With one repository shared by Claude's sandbox and Alexis's shell (Alexis, 2026-10-18), this is the boundary the local hooks cannot be: the sandbox writes refs and objects in `.git` (F152, F153) |
 | DORA's five measures for the demo | With the demo's automatic deployment, from git and its deploy log: change lead time, deployment frequency, failed deployment recovery time, change fail rate, deployment rework rate; read per slice and per service, never set as goals | How fast and how safely changes reach people, measured rather than felt; DORA's own guidance on these metrics (dora.dev/guides/dora-metrics, read 2026-10-18) |
 | The demo rolled back in one command | With slice 1's automatic deployment of the demo: each deployed image keeps its tag, and one command puts the previous one back; feature flags and progressive rollout wait for the public phase, where a release has users to protect | A merge that breaks the demo is undone in a minute, not by a fix under pressure; the third practice of "Solving code review at Anthropic" (claude.dev, read 2026-10-17) that we lack |
@@ -64,6 +65,41 @@ Alexis, 2026-10-23: slice 3's reviews found these; none bites today, each comes 
 | Banned words compiled once | The pattern kept per word list, if the k6 messages run shows the cost | Folded and compiled again for each message (F662) |
 | Archived rooms at once | The activity route asks a world's archived rooms in one query; sized from the k6 run | One query a room, up to about 500 a request (F663) |
 
+## Slice 4, after its reviews
+
+| Item | Delivers | Why |
+|---|---|---|
+| A phone's way to a line's actions | A quiet "⋯" at each line's end under `(hover: none)`, or a first-use hint, since an account logged in writes on a phone (docs/decisions.md, 2026-10-28) | Nothing hints that a line can be tapped for its bar, and a tap on a line with a link opens the link (the menu's UX review, U12) |
+| A phone's own layout for the chat | At a phone's width the navigation above the conversation, not beside it, the composer kept, an account writing on a phone (docs/decisions.md, 2026-10-28); rooms and direct messages alike, with slice 5's page layout | At 390 px the 160 px navigation takes 41% of the width and a line wraps at about 22 characters; the approved rooms-phone picture holds it too (4e's UX review U14) |
+| A navigation row's whole box a link | Row's padding on its link, so what a row shows is what a pointer reaches, in every list | A row shows 160×37 px and its link is 136×21 px, passing WCAG 2.5.8 by the spacing exception alone (4e's UX review U17) |
+| A conversation's face and last line | Each direct message's row with its partner's Avatar and its last line; a new conversation announced, with 4f's notifications | A row shows a short address alone (4e's UX review U19; its order, heard last first, is done: F852) |
+
+## Slice 5, its head (slice 4's UX review, by Alexis)
+
+| Item | Delivers | Why |
+|---|---|---|
+| A phone's room list as a drawer | Under about 600 px the room list behind a Rooms button or a drawer, the conversation, its reply, edit and thread panels full width | At 390 px the list takes about 190 px and the messages wrap at 3 to 5 words (slice 4's UX review, U3; `ph-acct-room.png`) |
+| The page's shell | A 16 px gutter, a header row for the home link, the account and Log out; the approved pictures change with it | Text, the home link and the account's address touch the viewport's left edge, and the header is unstyled links on separate rows (U5; `smoke.png`) |
+
+## Slice 4, its leftovers
+
+| Item | Delivers | Why |
+|---|---|---|
+| Imgur's player | Imgur's links open its own player on a click once checked, as YouTube's, Vimeo's and Giphy's do (4g); `frame-src` gains its host | Its embed form could not be read on 2026-10-26, its pages refusing crawlers; a form read from its documentation first (Alexis, 2026-10-26) |
+| The verdict's pill and the "why" | A pill by a link's player naming its verdict, and on a hidden message a "why" button with the reason and a way to contest, as the decision of 2026-10-21 ("Verdicts reach clients two ways") names | Not built in 4g; it goes with slice 12's moderation queue, which holds the reasons (Alexis, 2026-10-26, F882) |
+| The gallery and the lightbox | A message's pictures from the accepted services seen together, and one large over the page, as ADR-0002's "Photos and videos, gallery and lightbox" row names | Beyond 4g's players; pictures need `img-src` for the services' hosts, a CSP change of its own (Alexis, 2026-10-26) |
+| The server's schemas in zod/mini | One way to write a schema across the repository: the server's own schemas (18 files) written with `zod/mini`'s checks as `packages/schemas` already is | Consistency only, no size: the server sends no code to a browser, and mini and classic share zod's one core (`zod/v4/{mini,classic}/schemas.js` both import `../core/index.js`, zod 4.6.7). Kept as is during slice 4, by Alexis (docs/decisions.md, 2026-10-27) |
+| A draft's length counted once | `lib/drafts` holds a stored draft to its limit in the unit `set` enforces (UTF-16 units); zod/mini's `maxLength` counts code points, so a stored draft of emoji up to about twice the limit reads back accepted | Pre-existing, found when the shared schemas moved to zod/mini (slice-4, f86bdd0); a check of the same unit on read closes it |
+| The fast gate's journeys scoped to the change | The fast gate runs every journey (about 270, 43 s of its 61 at slice 4's end, on an idle machine), past its 60 s budget: it runs those a change can reach, by the files each journey's pages load, and the merge check keeps every one; then the budget comes back to 60 s | The budget was raised to 75 s on 2026-10-27 so commits could land (docs/decisions.md) |
+| A room Ergo refuses or took me out of (F770, F771, F774, F788) | The chat store holds a room's state (joined, refused by 403/473/474/477, kicked), the pane says "You can not join this room" or "You were removed from this room" instead of "No messages yet.", the composer is off with the same words, a failed CHATHISTORY puts the room back to "not asked" | A +i room listed but refused stays "joined" with a false empty pane (reproduced on the real Ergo, F770); after a KICK the composer says "try again in a moment" for good (F788) |
+| Moderation lines several a request (F692) | One `input` array a call, verdicts mapped by position, a count mismatch fails closed | 1,810 of 2,200 verdicts unchecked at 2,400 lines/min, one request each; waits on a live answer of OpenAI's array input from Alexis's key |
+| A nick's rooms indexed (F764) | QUIT and NICK touch only the rooms the nick is in | 1,000 QUITs at 100 rooms of 2,500 cost about 0.22 s (store/chat.ts:159); build when a bench shows it |
+| Reactions held to a rate an account | The moderation bot counts each account's reactions a room and mutes one past a rate, as its rules do for lines (slice 12's queue) | A reaction takes a place in a history page of 200, so one account's reactions at fakelag's 2 a second can fill pages with them (the red pass's R1, 4d; docs/decisions.md 2026-10-26). Not a rotation: a room's history has no cap of items, the correction of 2026-10-28 |
+| A JS Baseline lint, as the CSS's | The JavaScript held to Baseline widely available as `css/use-baseline` holds the CSS: a lint of the features the code uses against the rule's date (web-features), its probe and its mutant; the build's target read from the same data, not written by hand | The build's target was Vite's (Baseline on 2026-01-01), older than the rule, and nothing tied the code's JS features to the rule (the security review's S1 on 4d, refuted only because both features had just become widely available; docs/decisions.md, 2026-10-26) |
+| A capacity test before ops sizes the machines (slice 12) | How many readers at once one machine holds for Ergo and for `server`, and the memory each connection takes, at 256 MB and at 1 GB; its load tool asked for first, as a new dependency | Each reader keeps two long-lived connections (a WebSocket to Ergo, a stream to `server`); `server` (SQLite, a singleton) and Ergo grow only by a bigger machine, and no number yet says how big: hosting is ops's choice (ADR-0002), and this sets it (Alexis, 2026-10-26, after Fly.io's prices) |
+| A Threads view and following a thread | A view of the threads the account is in, with unread at the top, and a follow set (on the server or the device) with per-thread unread and notifications, as `docs/decisions.md:161` first named them | Narrowed out of slice 4 on 2026-10-27: the thread is read from the room's lines, with no follow state (M3); both need a store nothing holds yet |
+| A thread kept whole when a middle reply is deleted | A root map in the room's store (each reply's root, kept as a line arrives), so a deleted reply's own replies stay in the thread, and a thread's replies are found past the window | Accepted as a limit on 2026-10-27: `threadsOf` reads the window's lines, so a reply to a line gone is a thread of that msgid; a store's shape is Alexis's to approve |
+
 ## The design system, after slice 2
 
 Alexis, 2026-10-21: 2e's and 2f's reviews found these; each is true and none bites today, so each
@@ -71,6 +107,7 @@ comes with the slice that brings what it needs.
 
 | Item | Delivers | Why |
 |---|---|---|
+| A control's description (F898) | ui's Button takes an optional description wired to aria-describedby, as Dialog does; each player card's Play named by its line (sender, time) | Every card of one service names its button alike today (4g's UX review, U6); decided for the design system's next merge (docs/decisions.md, 2026-10-26) |
 | `/index.html` as a page | The host redirects or refuses a path that names an `index.html`, nginx and the test host together, with the operator's tests | It serves a page the router has no route for, which fails to hydrate (React #418) and ends noindexed (F340) |
 | A link to a file of the site | The app hands ui's link slot its route test, so a path that names a file (the sitemap, a download) stays a plain anchor; with the sitemap (slice 5) | Every path from the root goes to the router today, whose catch-all shows "No page here" (F326) |
 | A thumb's picture from data | `PlanetThumb` takes only the site's own paths and data URIs, with no referrer; with the first picture from data | A picture from another host tells it each visitor's address (F336) |
@@ -89,7 +126,7 @@ comes with the slice that brings what it needs.
 ## Phase 0: a public hub
 
 Users sign their own calls in Adena, on a computer. gnoworld's only write of its own is the
-slot realm, on Onyx (ADR-0002 §8, row 11). Phones read (ADR-0002 §1).
+slot realm, on Onyx (ADR-0002 §8, row 11). Phones log in on a computer only; once logged in, a phone writes (docs/decisions.md, 2026-10-28).
 
 | # | Slice | Delivers | Tests first (the main ones) | Human | Asks |
 |---|---|---|---|---|---|

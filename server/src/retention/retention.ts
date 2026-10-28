@@ -1,5 +1,5 @@
 // The server's retention (slice 3's plan, 3n; decision 154): the bot's verdict records kept 180 days and
-// below a row cap, the oldest going first, a budget of small batches a tick so a backlog never holds the
+// below a row cap, the oldest going first, one small batch a tick so a backlog never holds the
 // event loop; the verdicts and the database's used pages measured after, with one alert a crossing of 80%,
 // and Ergo's data folder too, read-only (3n-b). The other stores purge themselves (nonces, tokens, tickets,
 // mutes) or hold one row a room or an account.
@@ -9,13 +9,16 @@ import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import type { Log } from "../log.ts";
 
+// Ergo's `expire-time` (deploy/ergo/ircd.yaml.tmpl): a line older than that is gone from Ergo, and so is its pin.
+const ERGO_EXPIRE_MS = 90 * 24 * 60 * 60_000;
+
 interface Options {
   log: Log;
   now?: () => number;
   // 150,000 verdicts of about 1.2 KB with their indexes (measured), 176 MB; 256 MB for the database.
   maxVerdicts?: number;
   maxBytes?: number;
-  // Rows a batch and batches a tick: 10,000 rows at most a tick.
+  // Rows a batch and batches a tick: one batch of 500 a tick, a backlog drained over the next ticks (F710).
   batch?: number;
   batches?: number;
   // Ergo's data folder and its cap; none, no measure.
@@ -29,7 +32,7 @@ export interface Retention {
 
 export function makeRetention(db: DatabaseSync, options: Options): Retention {
   const { log, now = Date.now, maxVerdicts = 150_000, maxBytes = 256 * 1024 * 1024 } = options;
-  const { batch = 500, batches = 20 } = options;
+  const { batch = 500, batches = 1 } = options;
   const N = z.object({ n: z.number() });
   // By verdicts_by_time, the oldest first, ties by row; a verdict pending its check stays, its settle to
   // come (F598).
@@ -37,6 +40,8 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
     oldest: db.prepare(
       "DELETE FROM verdicts WHERE rowid IN (SELECT rowid FROM verdicts WHERE action <> 'pending' ORDER BY at, rowid LIMIT ?)",
     ),
+    // A pin ends with Ergo's history: its line's time (Ergo's ISO time, which sorts as a string) past `expire-time`.
+    pins: db.prepare("DELETE FROM pins WHERE time < ?"),
     count: db.prepare("SELECT count(*) AS n FROM verdicts"),
     // Counted up to the tick's budget, which is all a tick may take of them.
     old: db.prepare("SELECT count(*) AS n FROM (SELECT 1 FROM verdicts WHERE at < ? AND action <> 'pending' LIMIT ?)"),
@@ -71,6 +76,8 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
   return {
     tick() {
       let budget = batch * batches;
+      // At most 10 a room: no batch.
+      sql.pins.run(new Date(now() - ERGO_EXPIRE_MS).toISOString());
       // The verdicts past their days are the oldest ones: the same walk takes them and those past the cap.
       const old = N.parse(sql.old.get(now() - 180 * 24 * 60 * 60_000, budget)).n;
       for (let over = Math.max(old, count() - maxVerdicts), removed = 1; over > 0 && budget > 0 && removed > 0;) {

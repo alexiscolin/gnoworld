@@ -1,0 +1,175 @@
+/* A room: its description and the link's state muted, its lines wrapping anywhere, an /me, a notice, a quote and a
+   line that mentions the reader apart. */
+@layer components {
+  /* The room's width, which the thread's panel reads: under it the panel takes the whole width (4d's threads). */
+  .room {
+    container-type: inline-size;
+  }
+
+  /* raw: the width under which a room's lines and a thread's panel do not fit side by side, as a phone's is */
+  @container (inline-size < 40rem) {
+    .main[data-threaded] {
+      display: none;
+    }
+  }
+
+  .topic {
+    color: var(--color-text-muted);
+  }
+
+  .status:empty {
+    display: none;
+  }
+
+  /* The bar asks the list's own width, not the page's (LineActions). */
+  .lines {
+    container-type: inline-size;
+  }
+
+  .lines > li {
+    /* The room at the line's end for its bar, on every row: the width of the bar of a reader who may pin (six
+       controls and its inset), so the bar, which rises over the line above's last row, covers no word (U1). */
+    --_gutter: calc(8 * var(--control-s));
+    /* layout: the line holds its bar (LineActions), placed over its end */
+    position: relative;
+    /* layout: room for the focus ring, drawn outside the line, which the list that scrolls would clip */
+    margin-inline: calc(var(--focus-width) + var(--focus-offset));
+    padding-block: var(--space-3xs);
+    padding-inline-end: var(--_gutter);
+    overflow-wrap: anywhere;
+    scroll-margin-block: calc(var(--focus-width) + var(--focus-offset));
+  }
+
+  /* raw: the width under which the bar stands under the line, in the flow (LineActions), which then keeps no room */
+  @container (inline-size < 24rem) {
+    .lines > li {
+      --_gutter: calc(0 * var(--control-s));
+    }
+  }
+
+  .lines > li:first-child {
+    /* layout: room above the oldest line for its bar, which rises above a line (LineActions) */
+    margin-block-start: var(--space-s);
+  }
+
+  .lines > li:last-child {
+    /* layout: room below the newest line for its focus ring */
+    margin-block-end: calc(var(--focus-width) + var(--focus-offset));
+  }
+
+  .time,
+  .mark,
+  .mentionsYou,
+  .replying {
+    font: var(--font-meta);
+  }
+
+  /* Above a reply, the line it answers, in one line and muted, set apart by a rule at its start as a quote is, its
+     author in the text's own colour and bolder: the prototype's quote (4d). */
+  .replying {
+    padding-inline-start: var(--space-xs);
+    border-inline-start: var(--line-width) solid var(--color-line-strong);
+    color: var(--color-text-muted);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .time,
+  .mark {
+    color: var(--color-text-muted);
+  }
+
+  /* The icon of a mark (Pinned, Saved), a step before its word and on its line. */
+  .mark > svg {
+    /* layout: the icon sits in the line of words, as a letter would, not on a row of its own */
+    display: inline-block;
+    /* layout: the step between the icon and the word */
+    margin-inline-end: var(--space-3xs);
+    vertical-align: text-bottom;
+  }
+
+  .who {
+    color: var(--color-text);
+    font-weight: 500;
+  }
+
+  .action {
+    font-style: italic;
+  }
+
+  .notice .text {
+    color: var(--color-text-muted);
+  }
+
+  /* A line that mentions the reader: amber, the design system's "about me", at its start and in its word (4d). */
+  .lines > li[data-about-me] {
+    padding-inline-start: var(--space-2xs);
+    border-inline-start: var(--line-width) solid var(--color-warm);
+    background: var(--color-warm-soft);
+  }
+
+  .mentionsYou {
+    color: var(--color-warm);
+  }
+
+  /* My own line: my name in mint, the word "you" after it (DESIGN-SYSTEM.md, Avatar). */
+  .lines > li[data-mine] .author {
+    color: var(--color-mine);
+  }
+
+  /* A quote set apart from the sender's own words, by a rule at its start and a muted colour (F783). */
+  .text blockquote {
+    padding-inline-start: var(--space-xs);
+    border-inline-start: var(--line-width) solid var(--color-line-strong);
+    color: var(--color-text-muted);
+  }
+
+  /* Code kept as written scrolls on its own, wider than the line (F783). */
+  .text pre {
+    overflow: auto;
+  }
+
+  .count {
+    font: var(--font-label);
+    color: var(--color-text-muted);
+  }
+
+  /* Always drawn, one line high, so the composer below never moves as typists come and go; cut to one line, its
+     whole in its title (UX review U2, U8). */
+  .typing {
+    font: var(--font-meta);
+    color: var(--color-text-muted);
+    /* layout: one line of this font, which no token names */
+    min-block-size: 1lh;
+    /* layout: a step above and below, parting the line from the last message and the format bar */
+    margin-block: var(--space-2xs);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* The first line past the reading place as the room opened: the prototype's "New", a divider row at its head, the word
+     in the label style and a rule running on, so the times stay in one column (UX review U4). */
+  .divider {
+    /* layout: the word and its rule side by side, the rule taking what the word leaves */
+    display: flex;
+    /* layout: a step between the word and its rule */
+    gap: var(--space-2xs);
+    /* layout: the rule runs the line's whole width, over the room kept for its bar, which the row holds none of */
+    margin-inline-end: calc(-1 * var(--_gutter));
+  }
+
+  .divider::after {
+    content: "";
+    /* layout: the rule on the word's line (not the row's align-items: Popover's danger item holds the three alike) */
+    align-self: center;
+    /* layout: the rule takes the row's rest */
+    flex: 1;
+    border-block-start: var(--line-width) solid var(--color-new-line);
+  }
+
+  .fresh {
+    color: var(--color-new);
+  }
+}

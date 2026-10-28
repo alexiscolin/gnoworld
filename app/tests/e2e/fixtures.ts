@@ -1,9 +1,10 @@
 // In Claude Code's sandbox Chromium runs as one process (playwright.config.ts), where closing a
 // context ends the browser, so each test gets a browser of its own; elsewhere, Playwright's own.
-import { expect, test as base, type Page } from "@playwright/test";
+import { expect, test as base, type Page, type Response as Answer, type Worker } from "@playwright/test";
+import { VIOLATION } from "../../src/sw/report.ts";
 import { WORLDS, worldPath } from "../../src/worlds.ts";
 
-export { expect, type Page };
+export { expect, type Answer, type Page };
 
 declare const process: { env: Record<string, string | undefined> };
 // Playwright hands a screenshot as Node's Buffer, whose types this folder leaves out, as process's.
@@ -38,6 +39,31 @@ async function flush(page: Page): Promise<void> {
   await done;
 }
 
+// A worker's violation reaches the test as a message to the pages (src/sw/report.ts), after the worker's own
+// task: a fetch the policy refuses, planted last in the worker, says every earlier violation of the worker came.
+// A navigation under way may lose the message with the old document: each try plants the fetch again (F2066).
+async function flushWorker(page: Page, worker: Worker): Promise<void> {
+  await expect(async () => {
+    const done = page.waitForEvent("console", {
+      predicate: (message) => message.text() === `${MARK} flush`,
+      timeout: 3000,
+    });
+    // Both settled, so a try that fails leaves no rejection unhandled behind it.
+    const tries = await Promise.allSettled([
+      worker.evaluate(
+        (url) =>
+          fetch(url).then(
+            () => undefined,
+            () => undefined,
+          ),
+        FLUSH,
+      ),
+      done,
+    ]);
+    expect(tries.map(({ status }) => status)).toEqual(["fulfilled", "fulfilled"]);
+  }).toPass();
+}
+
 // Every journey runs under the site's CSP: a violation no test planted fails it (slice 3's plan, 3f).
 // The directives a page's documents reported, written to its console, which outlives a navigation.
 export const test = (process.env["SANDBOX_RUNTIME"] ? ownBrowser : base).extend<{
@@ -66,15 +92,26 @@ export const test = (process.env["SANDBOX_RUNTIME"] ? ownBrowser : base).extend<
         if (mark === MARK && directive !== undefined && directive !== "flush") seen.push(directive);
       });
       await context.addInitScript(
-        ([mark, flush]) => {
+        ([mark, flush, told]) => {
           document.addEventListener("securitypolicyviolation", (event) => {
             console.info(mark, event.blockedURI === flush ? "flush" : event.effectiveDirective);
           });
+          // What the service worker tells its pages of its own violations.
+          navigator.serviceWorker.addEventListener("message", (event: MessageEvent<unknown>) => {
+            const data = event.data;
+            if (typeof data !== "object" || data === null || !("type" in data) || data.type !== told) return;
+            if ("directive" in data && "blockedURI" in data)
+              console.info(mark, data.blockedURI === flush ? "flush" : data.directive);
+          });
         },
-        [MARK, FLUSH],
+        [MARK, FLUSH, VIOLATION],
       );
       await use(seen);
-      for (const each of javaScriptEnabled ? policed : []) if (!each.isClosed()) await flush(each);
+      const open = [...policed].filter((each) => !each.isClosed());
+      // The first open page takes the worker's messages; each is flushed after.
+      const [listening] = javaScriptEnabled ? open : [];
+      if (listening !== undefined) for (const worker of context.serviceWorkers()) await flushWorker(listening, worker);
+      for (const each of javaScriptEnabled ? open : []) await flush(each);
       if (!planted) expect(seen, "a CSP violation no test planted").toEqual([]);
     },
     { auto: true },

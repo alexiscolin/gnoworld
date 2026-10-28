@@ -69,3 +69,34 @@ describe("Chip", () => {
       expect(shown.some((c) => !c.control && c.tone === tone)).toBe(true);
   });
 });
+
+// 4d: a reaction's chip says more than its words to a screen reader (its emoji, its count, "including you":
+// docs/DESIGN-SYSTEM.md), a label of its own; a static mark is read by its words alone.
+describe("Chip: its label", () => {
+  it("names a control by its label, its words and its count still shown", () => {
+    render(
+      <Chip label="👍, 2, including you" count={2} selected onClick={vi.fn()}>
+        👍
+      </Chip>,
+    );
+    const chip = screen.getByRole("button", { name: "👍, 2, including you", pressed: true });
+    expect(chip.textContent).toBe("👍 2");
+  });
+
+  it("names a control by its words when it has no label", () => {
+    render(<Chip onClick={vi.fn()}>Games</Chip>);
+    expect(screen.getByRole("button").hasAttribute("aria-label")).toBe(false);
+  });
+
+  it("gives a static mark no label: its words name it", () => {
+    render(<Chip tone="mine">Your vote</Chip>);
+    expect(screen.getByText("Your vote").hasAttribute("aria-label")).toBe(false);
+  });
+
+  it("has a story for a reaction, labelled", () => {
+    const labels = eachStory(stories, (container) =>
+      [...container.querySelectorAll("button[aria-label]")].map((chip) => chip.getAttribute("aria-label")),
+    ).flat();
+    expect(labels).toContain("👍, 2, including you");
+  });
+});

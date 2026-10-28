@@ -2,7 +2,8 @@
 
 The server applies its migrations by index (server/src/db.ts): one edited in place, moved or removed never
 reaches a database made before it. Each migration server/src/main.ts lists at the base must stand in the
-working tree (what the gate tests) in the same place, its text the same; new ones may follow. What it cannot
+working tree (what the gate tests) in the same place (main.ts's list, or the one it imports from
+server/src/migrations.ts), its text the same; new ones may follow. What it cannot
 read (the list in another shape, a migration not a plain template literal) is refused, never passed over.
 Usage: check_migrations.py <base>, from the repository root (check.sh --full)."""
 import pathlib
@@ -12,6 +13,10 @@ import sys
 
 MAIN = "server/src/main.ts"
 LIST = re.compile(r"openDatabase\(config\.database, \[([^\]]*)\]")
+# Or main.ts opens it with the list server/src/migrations.ts exports (SV2), imported from there alone.
+HELD = "server/src/migrations.ts"
+NAMED = re.compile(r'^import \{ migrations \} from "\./migrations\.ts";$[\s\S]*openDatabase\(config\.database, migrations\)', re.M)
+HELD_LIST = re.compile(r"export const migrations: readonly string\[\] = \[([^\]]*)\]")
 
 
 def git(*args):
@@ -24,6 +29,8 @@ def listed(read, holders):
     if main is None or "openDatabase(" not in main:
         return []
     found = LIST.search(main)
+    if found is None and NAMED.search(main):
+        found = HELD_LIST.search(read(HELD) or "")
     if found is None or not re.fullmatch(r"[\w\s,]*", found.group(1)):
         sys.exit(f"check_migrations: {MAIN}'s openDatabase list cannot be read: name each migration's constant")
     out = []

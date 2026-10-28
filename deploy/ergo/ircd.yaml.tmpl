@@ -18,7 +18,8 @@ server:
   websockets:
     allowed-origins: {{ORIGINS}}
   # Ergo's defaults (slice 3's max review): a visitor's address, as web passes it, has 16 connections at once
-  # and 32 in 10 minutes, an IPv6 one counted by its /64. The server's link counts under its own address.
+  # and 32 in 10 minutes, an IPv6 one counted by its /64. The server's link counts under its own address, which
+  # the inside network's exemption leaves alone (F720).
   ip-limits:
     count: true
     max-concurrent-connections: 16
@@ -27,7 +28,7 @@ server:
     max-connections-per-window: 32
     cidr-len-ipv4: 32
     cidr-len-ipv6: 64
-    exempted: ["localhost"]
+    exempted: {{EXEMPT}}
   # A visitor's address shown to nobody: WHOIS, WHO and every line carry a hash of it instead.
   ip-cloaking:
     enabled: true
@@ -49,11 +50,16 @@ accounts:
     enabled: true
     duration: 1m
     max-attempts: 3
-  # Invisible by default: a room's members are listed to its members alone (slice 3's max review).
-  default-user-modes: +i
+  # Invisible by default: a room's members are listed to its members alone (slice 3's max review). And +R: no
+  # direct message from a connection with no account, a guest's (irc/handlers.go:2552), set at each connection's
+  # registration (irc/server.go:445) so none arrives before it; decided by Alexis in 4e (docs/decisions.md).
+  default-user-modes: +iR
   nick-reservation:
     enabled: true
     method: strict
+    # A connection with no account is renamed Guest-<nick> (guest-nickname-format's default), so a guest can
+    # never hold the bot's nick, before the bot's first login either (F722; v2.19.1 irc/client_lookup_set.go:136).
+    force-guest-format: true
     force-nick-equals-account: true
   # force-nick-equals-account requires it: one account, several connections (a tab each).
   multiclient:
@@ -108,6 +114,12 @@ limits:
   kicklen: 390
   topiclen: 390
   chan-list-modes: 100
+  # draft/multiline (slice 4, docs/decisions.md row 255): a message of several lines, its breaks counted, 4096 bytes
+  # (Ergo's own default) and 40 lines (its default 100 would let one message fill half the 200 lines a page keeps).
+  # core's MULTILINE_BYTES and MULTILINE_LINES say the same, as the composer's caps (deploy/test.sh checks both).
+  multiline:
+    max-bytes: 4096
+    max-lines: 40
 history:
   enabled: true
   channel-length: 2048

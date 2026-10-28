@@ -300,7 +300,7 @@ if [ "${1:-}" = --mutants ]; then
 		guard sed 's# -m conntrack --ctstate ESTABLISHED##'
 	mutant "no rate limit" "a burst with no password gets 429" nginx sed '/limit_req zone=/d'
 	mutant "a flood answered 503" "a burst with no password gets 429" nginx sed '/limit_req_status 429/d'
-	mutant "a first load cut short" "a visitor's first load" nginx sed 's#burst=60#burst=25#'
+	mutant "a first load cut short" "a visitor's first load" nginx sed 's#burst=160#burst=60#'
 	mutant "one limit for every visitor" "a visitor is served right after another's burst" \
 		nginx sed 's#limit_req_zone $proxy_protocol_addr#limit_req_zone $server_port#'
 	mutant "no password at all" "no password, no /" nginx sed 's#auth_basic "gno.world demo";#auth_basic off;#'
@@ -317,6 +317,7 @@ if [ "${1:-}" = --mutants ]; then
 		nginx sed 's#~^(200|206|304)/assets/#~^[0-9]*/assets/#'
 	mutant "no manifest type" "the manifest's type" nginx sed '/application\/manifest+json webmanifest;/d'
 	mutant "nothing compressed" "is sent compressed" nginx sed '/gzip on;/d'
+	mutant "compressed at nginx's level 1" "web compresses" nginx sed '/gzip_comp_level 6;/d'
 	mutant "no data type" "a world's data's type" nginx sed '/text\/x-script data;/d'
 	mutant "no PROXY protocol" "the server is up and asks" nginx sed 's#listen 8080 proxy_protocol#listen 8080#'
 	mutant "a page cached" "/ revalidates" nginx sed 's#default "no-cache";#default "max-age=600";#'
@@ -337,10 +338,20 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "an origin of * taken" "Ergo starts with ORIGINS [*]" render_sh sed "s#'https?://\[A-Za-z0-9.-\]+(:\[0-9\]{1,5})?'#'.+'#"
 	mutant "rooms without +M by default" "in a room Ergo made with its default modes" template sed 's#default-modes: .*#default-modes: +nt#'
 	mutant "anyone makes a room" "a guest makes no room" template sed 's#operator-only-creation: true#operator-only-creation: false#'
+	mutant "guests' DMs let in, +R gone from the user modes" "Ergo's settings set +i and +R at each connection" \
+		template sed 's#default-user-modes: +iR#default-user-modes: +i#'
 	mutant "registration open" "a hand-made account is refused" \
 		template awk '/^  registration:/ { r = 1 } r && /enabled: false/ { sub(/false/, "true"); r = 0 } { print }'
-	mutant "a short oper password taken" "Ergo starts with a short oper password" render_sh sed '/32 characters or more/d'
+	mutant "a short oper password taken" "Ergo starts with a short oper password" render_sh sed '/32 to 72 characters/d'
+	mutant "an oper password's blanks dropped before its check" "Ergo starts with an oper password with a blank first line" \
+		render_sh sed 's#password=$(cat /run/secrets/ergo_oper_password)#password=$(tr -d " \\t\\r\\n" </run/secrets/ergo_oper_password)#'
+	mutant "an oper password of any shape" "Ergo starts with an oper password with a space inside" render_sh sed '/one word of printable characters/d'
+	mutant "the inside network not left alone" "40 connections at once from the inside network are not refused for their number" \
+		template sed 's#exempted: {{EXEMPT}}#exempted: ["localhost"]#'
+	mutant "any INSIDE_SUBNET taken" "Ergo starts with INSIDE_SUBNET [0.0.0.0/0]" render_sh sed '/INSIDE_SUBNET: required/d'
 	mutant "a login by PASS" "login-via-pass-command: false" template sed 's#login-via-pass-command: false#login-via-pass-command: true#'
+	mutant "messages of several lines turned off" "at 4096 bytes" template sed 's#max-bytes: 4096#max-bytes: 0#'
+	mutant "a message of lines past the composer's cap" "at 40 lines" template sed 's#max-lines: 40#max-lines: 0#'
 	mutant "every address believed as a proxy" "never a forged X-Forwarded-For" template sed 's#proxy-allowed-from: {{PROXY_FROM}}#proxy-allowed-from: ["0.0.0.0/0"]#'
 	mutant "the auth script's socket lost" "the refusal came from the server" compose 'services: { server: { environment: { AUTH_SOCKET: /tmp/elsewhere.sock } } }'
 	mutant "the server believes no proxy" "is its own visitor" compose 'services: { server: { environment: { TRUSTED_PROXY: 192.0.2.1 } } }'
@@ -348,6 +359,8 @@ if [ "${1:-}" = --mutants ]; then
 		nginx sed 's#proxy_set_header X-Forwarded-For $proxy_protocol_addr;#proxy_set_header X-Forwarded-For $http_x_forwarded_for;#'
 	mutant "a forged X-Real-IP handed on" "and the first naming another stays limited, by the server" nginx sed 's#proxy_set_header X-Real-IP $proxy_protocol_addr;#proxy_set_header X-Real-IP $http_x_real_ip;#'
 	mutant "the password handed to the upstreams" "and never the demo's password" nginx sed '/proxy_set_header Authorization "";/d'
+	mutant "the session's cookie handed to Ergo" "and the session's cookie to the API alone, never to Ergo" nginx sed '/proxy_set_header Cookie "";/d'
+	mutant "a large body passed to the server" "web refuses a body past 16 KiB itself, on the login and on a room's route" nginx sed '/client_max_body_size 16k;/d'
 	mutant "the WebSocket open without the password" "no password, no WebSocket" \
 		nginx awk '{ print } /location = \/ws \{/ { print "            auth_basic off;" }'
 	mutant "the API open without the password" "no password, no API" \
@@ -361,7 +374,7 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "every visitor one connection key" "the 33rd refused, another visitor served" \
 		nginx sed 's#limit_conn_zone $proxy_protocol_addr#limit_conn_zone $remote_addr#'
 	mutant "the limit answered 503" "the 33rd refused" nginx sed '/limit_conn_status/d'
-	mutant "web's room for 1,024 connections" "sixteen visitors at their 32 WebSockets each, and another is served" \
+	mutant "web's room for 1,024 connections" "forty visitors at their 16 WebSockets each, and another is served" \
 		nginx sed 's#worker_connections [0-9]*;#worker_connections 1024;#'
 	mutant "web's files left to Docker's default" "web may hold 8,192 files" compose 'services: { web: { ulimits: !reset {} } }'
 	mutant "the server may write Ergo's volume" "the server holds Ergo's volume read-only" \
@@ -437,6 +450,9 @@ FAKE
 	sleep 3
 	folder=$(sed -n 's#.* -v \([^ ]*\)/out:/k6:ro .*#\1#p' "$tmp/fake.log" | head -n 1)
 	expect "a stopped load run removes its project" "$(sed -n '/\/k6\/load.js$/,$p' "$tmp/fake.log" | grep -c '^compose .* down -v$' || true)" 1
+	# Both of its down calls (the one before the stack starts too) take its profiled services, the guard and the way out.
+	expect "it removes the project twice, at its start and at its end" "$(grep -c '^compose .* down -v$' "$tmp/fake.log" || true)" 2
+	expect "and each takes its profiled services too" "$(grep '^compose .* down -v$' "$tmp/fake.log" | grep -c -e '--profile demo' || true)" 2
 	expect "and its folder, the operator's key with it" "$([ -n "$folder" ] && [ ! -e "$folder" ] && echo gone)" gone
 	expect "and stops its sampler" "$(grep -c '^stats ' "$tmp/fake.log" || true)" "$sampled"
 	# Sizes that are no whole number, or past the visitors' addresses, stop it before it makes anything (F650).
@@ -632,13 +648,13 @@ FAKE
 	expect "a font's type" "$(header content-type "$font" 203.0.113.1 -u "$auth")" font/woff2
 	expect "a font is kept a year" "$(header cache-control "$font" 203.0.113.1 -u "$auth")" "public, max-age=31536000, immutable"
 
-	at_least "a burst with no password gets 429" "$(codes 429 198.51.100.1 'http://web:8080/[1-200]')" 100
-	at_least "a burst with a wrong password gets 429" "$(codes 429 198.51.100.2 -u team:wrong 'http://web:8080/[1-200]')" 100
-	at_least "a burst on the worker gets 429" "$(codes 429 198.51.100.3 -u "$auth" 'http://web:8080/sw.js?[1-200]')" 100
+	at_least "a burst with no password gets 429" "$(codes 429 198.51.100.1 'http://web:8080/[1-400]')" 200
+	at_least "a burst with a wrong password gets 429" "$(codes 429 198.51.100.2 -u team:wrong 'http://web:8080/[1-400]')" 200
+	at_least "a burst on the worker gets 429" "$(codes 429 198.51.100.3 -u "$auth" 'http://web:8080/sw.js?[1-400]')" 200
 	# Each answer's code with its Cache-Control (a browser keeps a 429 that says immutable) and its policy.
 	kept=$(docker run --rm --network "$inside" "$CURL" -s -o /dev/null -w '%{http_code} %header{cache-control}|%header{content-security-policy}\n' --haproxy-protocol \
-		--haproxy-clientip 198.51.100.4 -u "$auth" "http://web:8080$first?[1-200]" || true)
-	at_least "a burst on a hashed file gets 429" "$(printf '%s\n' "$kept" | grep -c '^429 ' || true)" 100
+		--haproxy-clientip 198.51.100.4 -u "$auth" "http://web:8080$first?[1-400]" || true)
+	at_least "a burst on a hashed file gets 429" "$(printf '%s\n' "$kept" | grep -c '^429 ' || true)" 200
 	expect "a 429 on a hashed file revalidates" "$(printf '%s\n' "$kept" | grep '^429 ' | cut -d'|' -f1 | sort -u)" "429 no-cache"
 	expect "a 429 carries the policy" "$(printf '%s\n' "$kept" | grep '^429 ' | cut -d'|' -f2- | sort -u)" "$policy"
 	expect "a 401 on a hashed file revalidates" "$(header cache-control "$first" 203.0.113.1)" no-cache
@@ -653,13 +669,15 @@ FAKE
 	expect "and every request of it is served" "$(printf '%s\n' "$load" | grep -c '^200$' || true)" "$(printf '%s\n' $urls $urls | grep -c .)"
 	# One container, two visitors, the second right after the first's burst: the limit is each one's.
 	expect "a visitor is served right after another's burst" "$(docker run --rm --network "$inside" --entrypoint sh "$CURL" -c '
-		curl -s -o /dev/null --haproxy-protocol --haproxy-clientip 198.51.100.11 -u "$1" "http://web:8080/[1-200]"
+		curl -s -o /dev/null --haproxy-protocol --haproxy-clientip 198.51.100.11 -u "$1" "http://web:8080/[1-400]"
 		curl -s -o /dev/null -w "%{http_code}" --haproxy-protocol --haproxy-clientip 198.51.100.12 -u "$1" http://web:8080/' sh "$auth")" 200
 	expect "no log holds the password, its hash or the header that carries it" \
 		"$(docker logs "$web" 2>&1 | grep -cF -e "$password" -e "$hash" -e "$(printf 'team:%s' "$password" | base64)" || true)" 0
 	# --- Slice 3 (3e): Ergo, the server and the way out, as the demo runs them.
 	ergo=$(docker compose -p "$project" $files ps -q ergo)
 	server=$(docker compose -p "$project" $files ps -q server)
+	# Its image, for the node checks run beside it on the inside network (the crowd's first, F2135).
+	server_image=$(docker inspect --format '{{.Image}}' "$server")
 	egress=$(docker compose -p "$project" $files ps -q egress)
 	hardened "$ergo" ergo
 	hardened "$server" server
@@ -693,7 +711,7 @@ print("%.2f %d" % (sum(float(s.get("cpus", 0)) for s in services), sum(size(s.ge
 	docker exec "$ergo" cat /tmp/ircd.yaml >"$tmp/ircd.yaml"
 	for line in "name: \"$SERVER_NAME\"" '":6667": {}' '":8097":' "proxy-allowed-from: [\"$WEB_ADDRESS\"]" \
 		"allowed-origins: [\"$ORIGINS\"]" 'login-via-pass-command: false' 'operator-only-creation: true' \
-		'default-modes: +ntCMi' 'expire-time: 90d' 'direct-messages: disabled' 'default-user-modes: +i' \
+		'default-modes: +ntCMi' 'expire-time: 90d' 'direct-messages: disabled' \
 		'allow-truncation: false' 'max-concurrent-connections: 16' 'max-connections-per-window: 32' \
 		'netname: gnoworld' 'messages-per-window: 2' 'max-attempts: 3' '"+draft/unreact"' \
 		'capabilities: [sajoin, samode, chanreg, history, nofakelag]' \
@@ -701,6 +719,11 @@ print("%.2f %d" % (sum(float(s.get("cpus", 0)) for s in services), sum(size(s.ge
 		expect "Ergo's settings say $line" "$(grep -cF -- "$line" "$tmp/ircd.yaml")" 1
 	done
 	expect "Ergo's settings hold 100 channels a client" "$(grep -cE '^ +max-channels-per-client: 100$' "$tmp/ircd.yaml")" 1
+	# A message of several lines (draft/multiline, slice 4): capped as core's composer counts, its whole lines read.
+	expect "Ergo's settings cap a message of several lines at 4096 bytes" "$(grep -cE '^ +max-bytes: 4096$' "$tmp/ircd.yaml")" 1
+	expect "Ergo's settings cap a message of several lines at 40 lines" "$(grep -cE '^ +max-lines: 40$' "$tmp/ircd.yaml")" 1
+	# The whole line: +i alone holds the words '+i' too (F1091).
+	expect "Ergo's settings set +i and +R at each connection" "$(grep -cE '^ +default-user-modes: \+iR$' "$tmp/ircd.yaml")" 1
 	expect "Ergo's settings close registration" "$(awk '/^  registration:/ { r = 1 } r && /enabled:/ { print $2; exit }' "$tmp/ircd.yaml")" false
 	# Its start refuses an origin list that would let every site in (F422): checked by the service's own render.
 	render() { docker compose -p "$project" $files run --rm --no-deps -e RENDER_ONLY=1 -e ORIGINS="$1" ergo 2>&1; }
@@ -715,6 +738,73 @@ print("%.2f %d" % (sum(float(s.get("cpus", 0)) for s in services), sum(size(s.ge
 	*"render: the oper's password"*) pass "Ergo's start refuses a short oper password" ;;
 	*) fail "Ergo starts with a short oper password" ;;
 	esac
+	# genpasswd hashes the first line alone: a blank or short one before a long one is refused too, and any shape
+	# but one word of 32 to 72 printable characters, 72 being what bcrypt keeps (F706). Each case is the file's text.
+	oper_render() { # printf's arguments: the file's text
+		printf "$@" >"$tmp/shaped_oper_password"
+		chmod 644 "$tmp/shaped_oper_password"
+		ERGO_OPER_PASSWORD_FILE=$tmp/shaped_oper_password docker compose -p "$project" $files run --rm --no-deps -e RENDER_ONLY=1 ergo 2>&1
+	}
+	oper_refused() { # what it is, then printf's arguments
+		what=$1
+		shift
+		case $(oper_render "$@") in
+		*"render: the oper's password"*) pass "Ergo's start refuses an oper password with $what" ;;
+		*) fail "Ergo starts with an oper password with $what" ;;
+		esac
+	}
+	word=$(openssl rand -hex 24)
+	half=$(openssl rand -hex 10)
+	oper_refused "a blank first line" '\n%s\n' "$word"
+	oper_refused "a short first line" 'x\n%s\n' "$word"
+	oper_refused "a space inside" '%s %s\n' "$half" "$half"
+	oper_refused "a tab after it" '%s\t\n' "$word"
+	oper_refused "a carriage return after it" '%s\r\n' "$word"
+	oper_refused "a control character" '%s\001\n' "$word"
+	oper_refused "a delete character" '%s\177\n' "$word"
+	oper_refused "a letter past ASCII" '%s\303\251\n' "$word"
+	oper_refused "nothing at all" ''
+	for length in 73 31; do oper_refused "$length characters" '%s' "$(head -c "$length" /dev/zero | tr '\0' a)"; done
+	for length in 32 72; do
+		expect "Ergo's start takes an oper password of $length characters" \
+			"$(oper_render '%s' "$(head -c "$length" /dev/zero | tr '\0' a)" | tail -n 1)" "render: the settings are whole"
+	done
+	# The inside network is the one the connection limits leave alone, with the loopback (F720).
+	expect "Ergo's settings leave the inside network's connections unlimited" \
+		"$(grep -cF -- "exempted: [\"localhost\",\"$INSIDE_SUBNET\"]" "$tmp/ircd.yaml")" 1
+	# Nothing, a word, every address (v4 and v6) or a value that breaks out of the JSON list it is put in.
+	for subnet in "" everything 0.0.0.0/0 ::/0 '10.0.0.0/24"]'; do
+		case $(docker compose -p "$project" $files run --rm --no-deps -e RENDER_ONLY=1 -e INSIDE_SUBNET="$subnet" ergo 2>&1) in
+		*"render: INSIDE_SUBNET"*) pass "Ergo's start refuses INSIDE_SUBNET [$subnet]" ;;
+		*) fail "Ergo starts with INSIDE_SUBNET [$subnet]" ;;
+		esac
+	done
+	# Measured, from the server's image on the inside network: 40 connections at once, past the 16 a visitor's address
+	# holds, none refused for their number.
+	crowd=$(docker run --rm --network "$inside" --entrypoint /nodejs/bin/node "$server_image" -e '
+const net = require("node:net");
+let refused = 0;
+let left = 40;
+for (let n = 0; n < 40; n++) {
+  const s = net.connect(6667, "ergo");
+  let text = "";
+  let over = false;
+  const done = () => {
+    if (over) return;
+    over = true;
+    s.destroy();
+    if (--left === 0) console.log(refused);
+  };
+  s.on("connect", () => s.write(`NICK crowd${n}\r\nUSER c 0 * :c\r\n`));
+  s.on("data", (chunk) => {
+    text += chunk;
+    if (/^ERROR/m.test(text)) refused++;
+    if (/ 001 /.test(text) || /^ERROR/m.test(text)) done();
+  });
+  s.on("error", done);
+}
+setTimeout(() => process.exit(2), 20000);' 2>&1 || true)
+	expect "40 connections at once from the inside network are not refused for their number" "$crowd" 0
 
 	# No secret of the stack's in Docker's records, a log or an image.
 	oper=$(cat "$tmp/ergo_oper_password")
@@ -820,11 +910,11 @@ socket.on("error", (error) => console.log(`ERROR ${error.message}`));
 setTimeout(() => process.exit(0), 20_000).unref();
 CLIENT
 	chmod 644 "$tmp/test-ws.cjs"
-	server_image=$(docker inspect --format '{{.Image}}' "$server")
 	ws() { docker run --rm --network "$inside" -e WS_TARGET -e WS_PROXY -v "$tmp/test-ws.cjs:/test-ws.cjs:ro" --entrypoint /nodejs/bin/node \
 		"$server_image" /test-ws.cjs "$@" 2>&1 || true; }
 	first() { printf '%s\n' "$1" | head -n 1; }
 	holds() { if printf '%s\n' "$2" | grep -qE -- "$3"; then pass "$1"; else fail "$1"; fi; }
+	# Ergo renames a connection with no account Guest-<nick> (force-guest-format, F722): its answers name that nick.
 	# The bot makes the worlds' rooms once it is in Ergo (3h): a guest can join none before.
 	bot=""
 	for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
@@ -843,7 +933,7 @@ CLIENT
 	chief=$!
 	# The guest comes once the room is made and the marker said.
 	for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
-		grep -q " 366 chief25 $room " "$tmp/chief.txt" 2>/dev/null && break
+		grep -q " 366 Guest-chief25 $room " "$tmp/chief.txt" 2>/dev/null && break
 		sleep 1
 	done
 	sleep 1
@@ -852,19 +942,19 @@ CLIENT
 		"NS REGISTER a-password" "AUTHENTICATE PLAIN" "AUTHENTICATE $(printf 'g1x\0g1x\0a-password' | base64)" "OPER admin wrong" "OPER admin wrong")
 	wait "$chief" || true
 	expect "a visitor's WebSocket reaches Ergo through web" "$(first "$guest")" "HTTP/1.1 101 Switching Protocols"
-	holds "an operator logs in through the WebSocket and makes a room (a known limit, and the control)" "$(cat "$tmp/chief.txt")" " 366 chief25 $room "
-	holds "a guest joins a room" "$guest" "^:guest21![^ ]+ JOIN $room\$"
+	holds "an operator logs in through the WebSocket and makes a room (a known limit, and the control)" "$(cat "$tmp/chief.txt")" " 366 Guest-chief25 $room "
+	holds "a guest joins a room" "$guest" "^:Guest-guest21![^ ]+ JOIN $room\$"
 	holds "and reads its history: the operator's line (CHATHISTORY)" "$guest" " PRIVMSG $room :$marker\$"
-	holds "a guest is refused when it speaks, in a room Ergo made with its default modes" "$guest" " 404 guest21 $room "
-	holds "and in a world's room" "$guest" ' 404 guest21 #earth '
-	holds "a guest makes no room: only operators do" "$guest" ' 403 guest21 #byaguest[0-9a-f]+ :Only server operators can create new channels'
+	holds "a guest is refused when it speaks, in a room Ergo made with its default modes" "$guest" " 404 Guest-guest21 $room "
+	holds "and in a world's room" "$guest" ' 404 Guest-guest21 #earth '
+	holds "a guest makes no room: only operators do" "$guest" ' 403 Guest-guest21 #byaguest[0-9a-f]+ :Only server operators can create new channels'
 	holds "a hand-made account is refused: no registration" "$guest" 'FAIL REGISTER DISALLOWED'
-	holds "nor through NickServ" "$guest" 'NickServ!.* NOTICE guest21 :This command has been disabled'
-	holds "a password of one's own logs no one in: SASL refused" "$guest" ' 904 guest21 '
+	holds "nor through NickServ" "$guest" 'NickServ!.* NOTICE Guest-guest21 :This command has been disabled'
+	holds "a password of one's own logs no one in: SASL refused" "$guest" ' 904 Guest-guest21 '
 	holds "the refusal came from the server, through Ergo's auth script and its socket" \
 		"$(docker logs "$server" 2>&1 | grep '"irc_login_refused"' || true)" '"error":"(ticket|account)"'
-	holds "an OPER with a wrong password is refused" "$guest" ' 491 guest21 :OPER failed'
-	holds "and the next one waits: Ergo's oper throttle" "$guest" ' 491 guest21 :You must wait'
+	holds "an OPER with a wrong password is refused" "$guest" ' 491 Guest-guest21 :OPER failed'
+	holds "and the next one waits: Ergo's oper throttle" "$guest" ' 491 Guest-guest21 :You must wait'
 	# A known limit (OPERATIONS.md): Ergo takes OPER on any listener; the password's length (render.sh) and the throttle hold it.
 	expect "a WebSocket from another site is refused" "$(first "$(ws 203.0.113.22 "$auth" https://evil.test "NICK x")")" "HTTP/1.1 403 Forbidden"
 	for origin in - "http://gnoworld.test.evil.test" "https://gnoworld.test" "http://gnoworld.test:81"; do
@@ -874,15 +964,24 @@ CLIENT
 	# The address Ergo sees, as a WHOIS of oneself shows it (338; its log holds none, connect-ip off: F702): the
 	# visitor's own through web, and straight from another container of the internal network, never the forged
 	# X-Forwarded-For. The variables are exported: docker run reads them from its environment.
-	seen=$(ws 203.0.113.27 "$auth" "$ORIGINS" "NICK seen27" "USER s 0 * :s" + "WHOIS seen27" | grep ' 338 seen27 ' || true)
-	if printf '%s\n' "$seen" | grep -qE ' 338 seen27 seen27 [^ ]+ 203\.0\.113\.27 '; then pass "Ergo sees the visitor's own address through web, never a forged X-Forwarded-For"; else fail "never a forged X-Forwarded-For, through web: [$seen]"; fi
-	direct=$(export WS_TARGET=ergo:8097 WS_PROXY=0; ws 203.0.113.26 - "$ORIGINS" "NICK direct26" "USER d 0 * :d" + "WHOIS direct26" | grep ' 338 direct26 ' || true)
-	if printf '%s\n' "$direct" | grep -qE ' 338 direct26 direct26 [^ ]+ [0-9.]+ ' && ! printf '%s\n' "$direct" | grep -qE '192\.0\.2\.66|203\.0\.113\.26'; then pass "and never a forged X-Forwarded-For, straight"; else fail "never a forged X-Forwarded-For, straight: [$direct]"; fi
+	seen=$(ws 203.0.113.27 "$auth" "$ORIGINS" "NICK seen27" "USER s 0 * :s" + "WHOIS Guest-seen27" | grep ' 338 Guest-seen27 ' || true)
+	if printf '%s\n' "$seen" | grep -qE ' 338 Guest-seen27 Guest-seen27 [^ ]+ 203\.0\.113\.27 '; then pass "Ergo sees the visitor's own address through web, never a forged X-Forwarded-For"; else fail "never a forged X-Forwarded-For, through web: [$seen]"; fi
+	direct=$(export WS_TARGET=ergo:8097 WS_PROXY=0; ws 203.0.113.26 - "$ORIGINS" "NICK direct26" "USER d 0 * :d" + "WHOIS Guest-direct26" | grep ' 338 Guest-direct26 ' || true)
+	if printf '%s\n' "$direct" | grep -qE ' 338 Guest-direct26 Guest-direct26 [^ ]+ [0-9.]+ ' && ! printf '%s\n' "$direct" | grep -qE '192\.0\.2\.66|203\.0\.113\.26'; then pass "and never a forged X-Forwarded-For, straight"; else fail "never a forged X-Forwarded-For, straight: [$direct]"; fi
 	expect "and no address in Ergo's log" "$(docker logs "$ergo" 2>&1 | grep -cE '203\.0\.113\.|192\.0\.2\.66' || true)" 0
 
 	# The server through web's /api: the password first, the visitor's address from web alone.
 	expect "no password, no API" "$(status '/api/activity?worlds=earth' 203.0.113.1)" 401
 	expect "the API answers with the password" "$(status '/api/activity?worlds=earth' 203.0.113.1 -u "$auth")" 200
+	# A body past the server's 16 KiB (its BODY_LIMIT) stops at web, before it is buffered in memory (F711's neighbour).
+	post() { # <bytes> <path>: the status and type of a JSON POST of that size through web
+		docker run --rm --network "$inside" "$CURL" -s -o /dev/null -w '%{http_code} %{content_type}' --haproxy-protocol \
+			--haproxy-clientip 203.0.113.36 -u "$auth" -H 'Content-Type: application/json' -H "Origin: $ORIGINS" \
+			-d "$(head -c "$1" /dev/zero | tr '\0' x)" "http://web:8080$2" || true
+	}
+	expect "web refuses a body past 16 KiB itself, on the login and on a room's route" \
+		"$(post 16385 /api/login/challenge) $(post 16385 /api/rooms)" "413 text/html 413 text/html"
+	expect "and hands one of 16 KiB to the server, whose own answer is no 413" "$(post 16384 /api/login/challenge | grep -c '^413' || true)" 0
 	# A backslash is a separator to the server's URL parser alone: refused, or web's login limit is skipped (F617).
 	for path in '/api/x/..\login/challenge' '/api/x/..%5Clogin/challenge'; do
 		expect "a backslash in a path is refused: $path" "$(status "$path" 203.0.113.34 -u "$auth" --path-as-is)" 400
@@ -915,6 +1014,21 @@ CLIENT
 	holds "the stream comes through web: its heartbeat within 20 s" "$stream" '^:'
 	# Buffered, nginx still passed the heartbeat on (the stream-buffered mutant, 2026-10-24): its setting, read back.
 	expect "web's settings say proxy_buffering off" "$(docker exec "$web" cat /etc/nginx/nginx.conf | grep -c 'proxy_buffering off;')" 1
+	# Compressed at the level the budgets measure (F683), by its effect and not its line (a commented-out line, or one in
+	# another block, would count): a hashed file fetched with and without gzip. The compressed answer is within 1% of
+	# zlib's level 6 of the file (nginx's compressor), and nearer it than level 1, nginx's own default, 14% bigger.
+	asset() { docker run --rm --network "$inside" "$CURL" -s --haproxy-protocol --haproxy-clientip 203.0.113.71 -u "$auth" "$@" "http://web:8080$first"; }
+	asset >"$tmp/asset.raw"
+	asset -H 'Accept-Encoding: gzip' >"$tmp/asset.gz"
+	expect "web compresses $first at level 6, not nginx's level 1" "$(python3 - "$tmp/asset.raw" "$tmp/asset.gz" <<'PY'
+import sys, zlib
+raw = open(sys.argv[1], "rb").read()
+got = len(open(sys.argv[2], "rb").read())
+gzip = lambda level: (lambda z: len(z.compress(raw) + z.flush()))(zlib.compressobj(level, zlib.DEFLATED, 31))
+six, one = gzip(6), gzip(1)
+print("compressed at 6" if one > six * 1.02 and got <= six * 1.01 and abs(got - six) < abs(got - one) else f"got {got}, level 6 {six}, level 1 {one}")
+PY
+)" "compressed at 6"
 	# Connections that send nothing more are closed (F208): headers never ended, a body never sent, a kept-alive
 	# connection left idle; each one's seconds until web closed it, printed as it closes (F639);
 	# in the background while the holds below run (F651).
@@ -983,10 +1097,11 @@ setTimeout(() => {
 	expect "a visitor holding 31 requests, streams among them, is served a 32nd" "$(cat "$tmp/hold.31")" "200 200 31 200"
 	expect "a visitor holds 32 requests at once: the 33rd refused, another visitor served, the slots freed after" \
 		"$(cat "$tmp/hold.32")" "429 200 32 200"
-	# Sixteen visitors each at their 32 WebSockets leave room for another (3NB-1, F638): a held request takes two
-	# of web's connections, the visitor's and Ergo's, which nginx never reclaims (a silent one it closes when
-	# short, which 256 already survived), so these need more than 1,024. How many were upgraded, then the other's
-	# code, within 4 s.
+	# Forty visitors each at 16 WebSockets leave room for another (3NB-1, F638): a held request takes two of web's
+	# connections, the visitor's and Ergo's, which nginx never reclaims (a silent one it closes when short, which
+	# 256 already survived), so these hold 1,280, past 1,024. Sixteen each, Ergo's max-concurrent-connections for
+	# one address (ircd.yaml.tmpl): past it Ergo closes the rest, which freed web's room and let 1,024 survive
+	# (F2137). How many were upgraded, then the other's code, within 4 s.
 	crowded=$(docker run --rm --network "$inside" --entrypoint /nodejs/bin/node "$server_image" -e '
 const net = require("node:net");
 const { randomBytes } = require("node:crypto");
@@ -995,9 +1110,9 @@ const auth = `Basic ${Buffer.from(user).toString("base64")}`;
 const proxy = (ip) => `PROXY TCP4 ${ip} 192.0.2.1 40000 8080\r\n`;
 const upgrade = `GET /ws HTTP/1.1\r\nHost: web\r\nAuthorization: ${auth}\r\nOrigin: ${origin}\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: ${randomBytes(16).toString("base64")}\r\n\r\n`;
 let upgraded = 0;
-for (let visitor = 0; visitor < 16; visitor += 1) {
-  for (let i = 0; i < 32; i += 1) {
-    const socket = net.connect(8080, "web", () => socket.write(`${proxy(`203.0.113.${String(70 + visitor)}`)}${upgrade}`));
+for (let visitor = 0; visitor < 40; visitor += 1) {
+  for (let i = 0; i < 16; i += 1) {
+    const socket = net.connect(8080, "web", () => socket.write(`${proxy(`203.0.113.${String(130 + visitor)}`)}${upgrade}`));
     socket.once("data", (chunk) => {
       if (chunk.toString().startsWith("HTTP/1.1 101")) upgraded += 1;
     });
@@ -1020,7 +1135,7 @@ setTimeout(() => {
   console.log(`${String(upgraded)} not served within 4 s`);
   process.exit(0);
 }, 7000);' "$auth" "$ORIGINS" 2>&1 || true)
-	expect "sixteen visitors at their 32 WebSockets each, and another is served" "$crowded" "512 200"
+	expect "forty visitors at their 16 WebSockets each, and another is served" "$crowded" "640 200"
 	# The server reads Ergo's volume and never writes it (3n-b): mounted read-only, named, and read with no fault.
 	expect "the server holds Ergo's volume read-only" \
 		"$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/ergo"}}{{.RW}}{{end}}{{end}}' "$server")" false
@@ -1049,7 +1164,7 @@ setTimeout(() => {
 	net=$(printf '%s' "$WEB_ADDRESS" | sed 's/\.[0-9]*$//')
 	docker cp "$web:/etc/nginx/nginx.conf" - | tar -xO >"$tmp/nginx.live.conf"
 	printf '%s\n' 'const { createServer } = require("node:http");' \
-		'for (const port of [8080, 8097]) createServer((q, r) => { console.log(JSON.stringify(q.headers)); r.end("ok"); }).listen(port);' >"$tmp/echo.cjs"
+		'for (const port of [8080, 8097]) createServer((q, r) => { console.log(JSON.stringify({ port, ...q.headers })); r.end("ok"); }).listen(port);' >"$tmp/echo.cjs"
 	chmod 644 "$tmp/nginx.live.conf" "$tmp/echo.cjs"
 	echo_box=$(docker run -d --rm --network "$inside" --ip "$net.250" -v "$tmp/echo.cjs:/echo.cjs:ro" --entrypoint /nodejs/bin/node "$server_image" /echo.cjs)
 	mirror=$(docker run -d --rm --network "$inside" --ip "$net.251" --add-host "server:$net.250" --add-host "ergo:$net.250" \
@@ -1057,12 +1172,15 @@ setTimeout(() => {
 	sleep 2
 	for path in '/api/activity?worlds=earth' /ws; do
 		docker run --rm --network "$inside" "$CURL" -s -o /dev/null --max-time 5 --haproxy-protocol --haproxy-clientip 203.0.113.51 -u "$auth" \
-			-H 'X-Real-IP: 192.0.2.67' -H 'X-Forwarded-For: 192.0.2.67' "http://$net.251:8080$path" || true
+			-H 'X-Real-IP: 192.0.2.67' -H 'X-Forwarded-For: 192.0.2.67' -H 'Cookie: __Host-session=sekret' "http://$net.251:8080$path" || true
 	done
 	heard=$(docker logs "$echo_box" 2>&1)
 	docker stop "$echo_box" "$mirror" >/dev/null
 	expect "web hands its upstreams both requests" "$(printf '%s\n' "$heard" | grep -c '^{' || true)" 2
 	expect "and never the demo's password" "$(printf '%s\n' "$heard" | grep -ci '"authorization"' || true)" 0
+	# The session's cookie goes to the server (8080), never to Ergo (8097), which needs only a ticket (decision 143, F711).
+	cookie() { printf '%s\n' "$heard" | grep "\"port\":$1" | grep -c '__Host-session=sekret' || true; }
+	expect "and the session's cookie to the API alone, never to Ergo" "$(cookie 8080) $(cookie 8097)" "1 0"
 	expect "but the visitor's own address, X-Real-IP and X-Forwarded-For alike" \
 		"$(printf '%s\n' "$heard" | grep '"x-real-ip":"203.0.113.51"' | grep -c '"x-forwarded-for":"203.0.113.51"' || true) $(printf '%s\n' "$heard" | grep -c '192.0.2.67' || true)" "2 0"
 

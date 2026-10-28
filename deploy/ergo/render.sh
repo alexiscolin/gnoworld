@@ -20,14 +20,22 @@ printf '%s\n' "${SERVER_NAME:-}" | grep -Eqx '[a-z0-9-]+(\.[a-z0-9-]+)+' || fail
 printf '%s\n' "${PROXY_FROM:-}" | grep -Eqx '[0-9]{1,3}(\.[0-9]{1,3}){3}' || fail "PROXY_FROM: required, web's address"
 # The server's socket, which Ergo dials for each login, with no command (irc/script.go, RunScript).
 printf '%s\n' "${AUTH_SOCKET:-}" | grep -Eqx '/[A-Za-z0-9/._-]+' || fail "AUTH_SOCKET: required, the server's socket"
-# The oper's password as the server takes it (config.ts): 32 characters or more, blanks aside. Ergo's
-# genpasswd hashes any, an empty file too, and OPER is open on /ws (a known limit, OPERATIONS.md).
-tr -d ' \t\r\n' </run/secrets/ergo_oper_password | grep -Eq '^.{32}' || fail "the oper's password: 32 characters or more"
-hash=$(/ircd-bin/ergo genpasswd </run/secrets/ergo_oper_password | tail -n 1)
+# The inside network, whose addresses (the server's link among them) the connection limits leave alone: the
+# server's crash loop must not meet the throttle (F720). A visitor's address is never one of its own.
+printf '%s\n' "${INSIDE_SUBNET:-}" | grep -Eqx '[0-9]{1,3}(\.[0-9]{1,3}){3}/([89]|[12][0-9]|3[0-2])' || fail "INSIDE_SUBNET: required, the internal network (/8 to /32)"
+# The oper's password: one word of printable characters, 32 to 72 of them (bcrypt keeps 72 bytes: genpasswd refuses
+# more, and the server takes up to 256, config.ts). Ergo's genpasswd hashes the file's first line alone, an empty one
+# too, and OPER is open on /ws (F706): the whole file is read, and a blank line, a space or a tab in it is refused.
+LC_ALL=C
+export LC_ALL
+password=$(cat /run/secrets/ergo_oper_password)
+case $password in *[!!-~]*) fail "the oper's password: one word of printable characters" ;; esac
+[ "${#password}" -ge 32 ] && [ "${#password}" -le 72 ] || fail "the oper's password: 32 to 72 characters"
+hash=$(printf '%s\n' "$password" | /ircd-bin/ergo genpasswd | tail -n 1)
 case $hash in '$2'*) ;; *) fail "the oper's password file gave no hash" ;; esac
 
 export V_NAME="\"$SERVER_NAME\"" V_PLAIN='":6667"' V_WEBSOCKET='":8097"' V_PROXY_FROM="[\"$PROXY_FROM\"]"
-export V_ORIGINS="[$origins]" V_AUTH_SCRIPT='""' V_SOCKET="\"$AUTH_SOCKET\"" V_AUTH_TIMEOUT='"9s"' V_OPER_HASH="\"$hash\""
+export V_EXEMPT="[\"localhost\",\"$INSIDE_SUBNET\"]" V_ORIGINS="[$origins]" V_AUTH_SCRIPT='""' V_SOCKET="\"$AUTH_SOCKET\"" V_AUTH_TIMEOUT='"9s"' V_OPER_HASH="\"$hash\""
 export V_DATABASE='"/data/ircd.db"' V_HISTORY='"/data/history.db"' V_LOCK='"/data/ircd.lock"'
 export V_LOG_TYPES='"* -userinput -useroutput -connect-ip"' V_LOG_LEVEL='"info"'
 awk '

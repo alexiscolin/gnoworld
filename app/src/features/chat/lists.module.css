@@ -1,0 +1,22 @@
+/* What the chat's lists share: drawn without marker or indent, and scrolling on their own. */
+@layer components {
+  .plain {
+    padding: 0;
+    /* layout: a list's own margin, which the browser gives it, taken off as the reset takes a paragraph's */
+    margin: 0;
+    list-style: none;
+  }
+
+  /* A pin and a saved line, each set apart on its own card (4d). */
+  .card {
+    border-radius: var(--radius-m);
+    background: var(--color-fill);
+    overflow-wrap: anywhere;
+  }
+
+  .scrolls {
+    /* raw: a share of the screen's height, which no token names, so the list scrolls and the page stays put */
+    max-block-size: 60vb;
+    overflow: auto;
+  }
+}

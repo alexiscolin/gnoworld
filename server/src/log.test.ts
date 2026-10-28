@@ -38,6 +38,14 @@ describe("logger", () => {
     );
   });
 
+  it("writes a line's id as it is, with its room, before the account: Ergo's id is every reader's", () => {
+    const { log, lines } = capture();
+    log("pin_added", { room: "#bubble/games", msgid: "abc123", account: ADDRESS });
+    expect(lines[0]?.replace(/^\{"time":"[^"]+",/, "{")).toBe(
+      `{"event":"pin_added","room":"#bubble/games","msgid":"abc123","account":"${createHmac("sha256", PEPPER).update(ADDRESS).digest("hex")}"}\n`,
+    );
+  });
+
   it("writes an account only as its HMAC with the pepper", () => {
     const { log, lines } = capture();
     log("login", { account: ADDRESS });

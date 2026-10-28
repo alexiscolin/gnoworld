@@ -28,6 +28,13 @@ export const SWALLOWED = [
     message: "A .catch that only logs swallows the error.",
   },
 ];
+// No character class right before `$` in a `u` regex: V8 14.6 (Chromium 156, Node 26) misses a character past the
+// BMP there while Node 24's reads it, so the page and the server would disagree unseen (F816, F821).
+export const CLASS_AT_END = {
+  selector: "Literal[regex.flags=/u/][regex.pattern=/\\](\\{1\\})?\\$/]",
+  message:
+    "A character class right before `$` in a `u` regex misses a character past the BMP on V8 14.6 (F816): write it as an alternation, (?:a|b)$.",
+};
 // No test is switched off or focused, so none stops guarding quietly (CLAUDE.md, "No regression").
 export const SWITCHED_OFF = {
   // Vitest's and Playwright's ways: skip, focus, leave for later, run on a condition, expect to fail.
@@ -48,3 +55,5 @@ export const MODULE_STATE = {
 };
 // Vitest's tests and Playwright's journeys.
 export const TESTS = ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts"];
+// Vitest's benches: one switched off or focused stays out of its report, which bench.py cannot then read it from.
+export const BENCHES = ["**/*.bench.ts", "**/*.bench.tsx"];

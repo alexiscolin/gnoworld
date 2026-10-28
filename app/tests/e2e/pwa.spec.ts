@@ -1,9 +1,26 @@
-import { cacheContents, controlled, expect, hydrated, PAGES, test, type Page } from "./fixtures.ts";
+import { cacheContents, controlled, expect, hydrated, PAGES, test, type Answer, type Page } from "./fixtures.ts";
+import { GUARDED, UPDATING } from "./sites.ts";
 
-// The PWA as ADR-0001 §12 asks: a manifest Chromium reads, the build's hashed files answered
-// from the worker's cache and nothing else cached, updates that wait for a click, and `?nosw`.
-// (Chromium's own installability check answers nothing in a one-process browser, so it is not used.)
+// The PWA as ADR-0001 §12 asks, nuanced by the 2026-10-18 decision (F172, F175): a manifest Chromium reads, the
+// hashed files and the shell answered from the cache and nothing else cached, the app open with no network,
+// updates that wait for a click, `?nosw`. (Chromium's installability check answers nothing here: not used.)
 const HASHED = /^\/assets\/[\w.-]+-[\w-]{8}\.(js|css|woff2)$/;
+// What the build's shell holds beside its hashed files: each page, the fallback for a path the build never made,
+// the world's data, the manifest and the icon the pages link.
+const SHELL = ["/", "/__spa-fallback.html", "/icon.svg", "/manifest.webmanifest", "/w/bubble", "/w/bubble.data"];
+const VERSION = /^gnoworld-precache-[A-Za-z0-9]{16}$/;
+const RECORD = /^gnoworld-precache-active-[A-Za-z0-9]{16}-(?:none|[A-Za-z0-9]{16})$/;
+
+// A document as the page received it: from the worker or not, and the headers a worker must hand on whole,
+// the policy the page runs under (fixtures.ts watches only pages whose document came with one) and its type.
+const documentOf = (response: Answer) => ({
+  path: new URL(response.url()).pathname,
+  fromWorker: response.fromServiceWorker(),
+  policy: (response.headers()["content-security-policy"] ?? "").startsWith(
+    "default-src 'none'; script-src 'self' 'sha256-",
+  ),
+  type: response.headers()["content-type"],
+});
 
 const promptOf = (page: Page) => page.getByRole("status").filter({ hasText: "New version available." });
 // The notice's words, in the top layer: its region stays in the page's flow and takes no room (F331).
@@ -88,7 +105,7 @@ for (const path of PAGES) {
 test.describe("behind the demo's password", () => {
   test.describe.configure({ mode: "serial" });
   test.use({ contextOptions: { httpCredentials: { username: "team", password: "a test password" } } });
-  const site = "http://127.0.0.1:4175";
+  const site = GUARDED;
   const password = { authorization: `Basic ${btoa("team:a test password")}` };
 
   // Node's own fetch: Playwright's request client would answer the challenge with the test's password.
@@ -236,16 +253,19 @@ test("the icons draw the mark in cream on space, the maskable one opaque and ins
   expect(maskable?.reach).toBeLessThanOrEqual(0.4);
 });
 
-test("the worker answers the build's hashed files from its cache, and caches no page as they load", async ({
+test("the worker answers the build's hashed files and shell from its cache, and caches nothing as pages load", async ({
   page,
 }) => {
   await page.goto("/");
   await controlled(page);
-  // What install wrote: one cache, the build's hashed files only.
+  // What install wrote: a cache of this version, the build's hashed files and its shell only, and the
+  // record of which version runs.
   const installed = await cacheContents(page);
-  expect(installed.names).toEqual(["gnoworld-precache"]);
+  expect(installed.names.filter((name) => VERSION.test(name))).toHaveLength(1);
+  expect(installed.names.filter((name) => RECORD.test(name))).toHaveLength(1);
+  expect(installed.names).toHaveLength(2);
   expect(installed.paths.length, "install precached nothing").toBeGreaterThan(0);
-  for (const path of installed.paths) expect(path).toMatch(HASHED);
+  expect(installed.paths.filter((path) => !HASHED.test(path))).toEqual(SHELL);
   // The fonts too, the text's latin face among them: offline, the page keeps its face.
   const faces = installed.paths.filter((path) => /\/geist-latin-wght-normal-[\w-]{8}\.woff2$/.test(path));
   expect(faces).toHaveLength(1);
@@ -282,18 +302,70 @@ test("the worker answers the build's hashed files from its cache, and caches no 
   const offline = await page.evaluate(
     async ([asset, font]) => {
       const answer = async (url: string) => (await fetch(url).catch(() => null))?.status ?? "no answer";
-      return { asset: await answer(asset), font: await answer(font), page: await answer("/w/bubble") };
+      return {
+        asset: await answer(asset),
+        font: await answer(font),
+        page: await answer("/w/bubble"),
+        // Not the build's: nothing answers it, the worker's cache or the host.
+        other: await answer("/api/rooms"),
+      };
     },
     [fromWorker[0] ?? "", face] as const,
   );
-  expect(offline).toEqual({ asset: 200, font: 200, page: "no answer" });
+  expect(offline).toEqual({ asset: 200, font: 200, page: 200, other: "no answer" });
+});
+
+// ADR-0001 §12: offline, the page keeps its face and starts; here its documents do too (slice 4's plan, 4w).
+test("the app opens with no network: the home, a world, a reload on it, and a path the build never made", async ({
+  page,
+  context,
+}) => {
+  await page.goto("/");
+  await controlled(page);
+  await hydrated(page);
+  await context.setOffline(true);
+  const documents: { path: string; fromWorker: boolean; policy: boolean; type: string | undefined }[] = [];
+  page.on("response", (response) => {
+    if (response.request().isNavigationRequest()) documents.push(documentOf(response));
+  });
+  await page.reload();
+  await hydrated(page);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("gno.world");
+  // The router's own move to a world needs its route files and data, which are the cache's too.
+  await page.getByRole("link", { name: "Bubble" }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Bubble");
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await page.reload();
+  await hydrated(page);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Bubble");
+  // A new tab opens it too; and a path the build never made gets the shell, whose router says it is not here.
+  const other = await context.newPage();
+  await other.goto("/w/bubble");
+  await hydrated(other);
+  await expect(other.getByRole("heading", { level: 1 })).toHaveText("Bubble");
+  await other.goto("/nowhere");
+  await hydrated(other);
+  await expect(other.getByRole("heading", { level: 1 })).toHaveText("No page here");
+  expect(documents).toEqual([
+    { path: "/", fromWorker: true, policy: true, type: "text/html; charset=utf-8" },
+    { path: "/w/bubble", fromWorker: true, policy: true, type: "text/html; charset=utf-8" },
+  ]);
+});
+
+test("online, a path the build never made is the host's own answer: a 404, not the cached shell", async ({ page }) => {
+  await page.goto("/");
+  await controlled(page);
+  const answer = await page.goto("/nowhere");
+  expect(answer?.status()).toBe(404);
+  await hydrated(page);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("No page here");
 });
 
 // The second host (tests/e2e/serve.mjs) serves the same build, and a new worker once bumped: one
 // bump at a time, so these run in turn.
 test.describe("updates", () => {
   test.describe.configure({ mode: "serial" });
-  const site = "http://127.0.0.1:4174";
+  const site = UPDATING;
 
   async function open(page: Page): Promise<void> {
     await page.goto(`${site}/`);
@@ -316,6 +388,32 @@ test.describe("updates", () => {
         marked: document.body.dataset["before"] === "update",
       };
     });
+
+  // The click on Reload, once the new worker has taken the page: no worker waits, the old page's mark is gone.
+  async function clickedThrough(page: Page): Promise<void> {
+    await reload(page);
+    await controlled(page);
+    await hydrated(page);
+    expect((await untouched(page)).waiting).toBe(false);
+    await expect(page.locator("body[data-before]")).toHaveCount(0);
+  }
+
+  // Both tabs are offered the update, the first clicks and reloads, and the other stays on its page.
+  async function firstTabClicks(page: Page, other: Page): Promise<void> {
+    await expect(noticeOf(page)).toBeVisible();
+    await expect(noticeOf(other)).toBeVisible();
+    await reload(page);
+    await hydrated(page);
+    await expect(other.locator("body[data-before]")).toHaveCount(1);
+  }
+
+  // Two tabs on the version running, the second made first so that the test's own page opens last.
+  async function twoTabs(page: Page): Promise<Page> {
+    const other = await page.context().newPage();
+    await open(page);
+    await open(other);
+    return other;
+  }
 
   // Offline, the check an installed page makes when shown again fails, as expected: nothing is
   // reported (F343). Chromium's own check escapes the page's offline mode, so the host goes down too.
@@ -367,15 +465,13 @@ test.describe("updates", () => {
   }) => {
     await open(page);
     const installed = await cacheContents(page);
-    // An older version's file, one of this list's gone and one changed: the new worker fetches
-    // what it lacks or holds wrong, and drops what it does not list once it takes over.
+    // One file of this list gone and one changed: the new worker fetches what it lacks or holds wrong.
     const changed = await page.evaluate(async () => {
-      const [name] = await caches.keys();
+      const name = (await caches.keys()).find((each) => /^gnoworld-precache-[A-Za-z0-9]{16}$/.test(each));
       const cache = await caches.open(name ?? "the worker's cache");
       const [first, second] = await cache.keys();
       if (first !== undefined) await cache.delete(first);
       if (second !== undefined) await cache.put(second, new Response("a file someone changed"));
-      await cache.put("/assets/older-AAAAAAAA.js", new Response("an older version's"));
       return second?.url ?? "";
     });
     // The region the prompt fills is there, empty, before it: a screen reader announces the change.
@@ -386,11 +482,7 @@ test.describe("updates", () => {
     await expect(noticeOf(page)).toBeVisible();
     await expect(promptOf(page)).toHaveAttribute("id", "there-before");
     expect(await untouched(page)).toEqual({ same: true, waiting: true, marked: true });
-    await reload(page);
-    await controlled(page);
-    await hydrated(page);
-    expect((await untouched(page)).waiting).toBe(false);
-    await expect(page.locator("body[data-before]")).toHaveCount(0);
+    await clickedThrough(page);
     await expect(promptOf(page)).toHaveCount(0);
     await expect.poll(async () => cacheContents(page)).toEqual(installed);
     const held = await page.evaluate(async (url) => (await caches.match(url))?.text(), changed);
@@ -413,18 +505,117 @@ test.describe("updates", () => {
   });
 
   test("two tabs: the one clicked reloads; the other keeps its page until its own click", async ({ page, request }) => {
-    const other = await page.context().newPage();
-    await open(page);
-    await open(other);
+    const other = await twoTabs(page);
     await bump(page, request, { site });
-    await expect(noticeOf(page)).toBeVisible();
-    await expect(noticeOf(other)).toBeVisible();
-    await reload(page);
-    await hydrated(page);
-    await expect(other.locator("body[data-before]")).toHaveCount(1);
+    await firstTabClicks(page, other);
     await reload(other);
     await hydrated(other);
     await expect(other.locator("body[data-before]")).toHaveCount(0);
+  });
+
+  // The host as a deploy leaves it (tests/e2e/serve.mjs): the build under new names, the old ones gone.
+  const entries = (page: Page) =>
+    page.evaluate(() =>
+      performance
+        .getEntriesByType("resource")
+        .map(({ name }) => new URL(name).pathname)
+        .filter((path) => path.includes("/entry.client-")),
+    );
+  async function deploy(page: Page, request: { post(url: string): Promise<{ status(): number }> }) {
+    expect((await request.post(`${site}/__deploy`)).status()).toBe(204);
+    await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  }
+  const undeploy = async (request: { post(url: string): Promise<{ status(): number }> }) => {
+    expect((await request.post(`${site}/__deploy`)).status()).toBe(204);
+  };
+
+  // F679: a message to the worker may be lost; the page cannot tell, so the next click sends it again.
+  test("a Reload click whose message was lost works at the next click", async ({ page, request }) => {
+    await open(page);
+    await page.evaluate(() => {
+      const post: (this: ServiceWorker, message: unknown) => void = Reflect.get(ServiceWorker.prototype, "postMessage");
+      let lost = true;
+      Object.defineProperty(ServiceWorker.prototype, "postMessage", {
+        value(this: ServiceWorker, message: unknown) {
+          if (lost) {
+            lost = false;
+            document.documentElement.dataset["lost"] = "yes";
+            return;
+          }
+          post.call(this, message);
+        },
+      });
+    });
+    await bump(page, request, { site });
+    await expect(noticeOf(page)).toBeVisible();
+    await promptOf(page).getByRole("button", { name: "Reload" }).click();
+    await expect(page.locator("html")).toHaveAttribute("data-lost", "yes");
+    // The notice closes on its click and the page stays: the worker was told nothing.
+    await expect(promptOf(page)).toHaveCount(0);
+    expect(await untouched(page)).toEqual({ same: true, waiting: true, marked: true });
+    // Shown again, the page offers the update again, and that click reaches the worker.
+    await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+    await expect(noticeOf(page)).toBeVisible();
+    await clickedThrough(page);
+  });
+
+  // F175: the worker running answers a tab opened after the deploy with its own version, so the click is real.
+  test("a tab opened after a deploy runs the version before the click; its own click takes the new one", async ({
+    page,
+    request,
+  }) => {
+    await open(page);
+    const before = await entries(page);
+    expect(before).toHaveLength(1);
+    try {
+      await deploy(page, request);
+      await expect(noticeOf(page)).toBeVisible();
+      const other = await page.context().newPage();
+      const documents: ReturnType<typeof documentOf>[] = [];
+      other.on("response", (response) => {
+        if (response.request().isNavigationRequest()) documents.push(documentOf(response));
+      });
+      await other.goto(`${site}/`);
+      await hydrated(other);
+      expect(documents).toEqual([{ path: "/", fromWorker: true, policy: true, type: "text/html; charset=utf-8" }]);
+      expect(await entries(other), "the new tab runs the version it was opened under").toEqual(before);
+      await expect(noticeOf(other)).toBeVisible();
+      await reload(other);
+      await hydrated(other);
+      const after = await entries(other);
+      expect(after).toHaveLength(1);
+      expect(after, "the click brings the new version").not.toEqual(before);
+    } finally {
+      await undeploy(request);
+    }
+  });
+
+  // F172: the host dropped the old files; the tab still on that version keeps them from the worker's cache.
+  test("a tab still on the version before works after another tab's click took the new one", async ({
+    page,
+    request,
+  }) => {
+    const other = await twoTabs(page);
+    try {
+      await deploy(page, request);
+      await firstTabClicks(page, other);
+      const routeFiles: { status: number; fromWorker: boolean }[] = [];
+      other.on("response", (response) => {
+        if (new URL(response.url()).pathname.includes("/assets/world-"))
+          routeFiles.push({ status: response.status(), fromWorker: response.fromServiceWorker() });
+      });
+      await other.getByRole("link", { name: "Bubble" }).click();
+      await expect(other.getByRole("heading", { level: 1 })).toHaveText("Bubble");
+      await expect(other.getByRole("alert")).toHaveCount(0);
+      expect(routeFiles.length, "the world's route files were fetched").toBeGreaterThan(0);
+      for (const file of routeFiles) expect(file).toEqual({ status: 200, fromWorker: true });
+      // The tab's own click then brings it to the new version.
+      await reload(other);
+      await hydrated(other);
+      await expect(other.locator("body[data-before]")).toHaveCount(0);
+    } finally {
+      await undeploy(request);
+    }
   });
 
   test("a file whose bytes are not the build's fails the install: no worker keeps it", async ({ page, request }) => {
@@ -477,7 +668,8 @@ test("?nosw frees the site even when the scripts the worker holds cannot run", a
   await controlled(page);
   // The first screen's entry, broken in the worker's cache: the pages it serves cannot start.
   await page.evaluate(async () => {
-    const cache = await caches.open("gnoworld-precache");
+    const name = (await caches.keys()).find((each) => /^gnoworld-precache-[A-Za-z0-9]{16}$/.test(each));
+    const cache = await caches.open(name ?? "the worker's cache");
     for (const request of await cache.keys())
       if (request.url.includes("/entry.client-"))
         await cache.put(

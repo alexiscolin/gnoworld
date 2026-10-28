@@ -1,0 +1,20 @@
+/* A phone cannot log in (U6): a coarse pointer gets the words, a computer the button; once logged in, a phone writes. */
+@layer components {
+  .phone {
+    display: none;
+  }
+
+  .problem:empty {
+    display: none;
+  }
+
+  @media (pointer: coarse) {
+    .phone {
+      display: inline;
+    }
+
+    .computer {
+      display: none;
+    }
+  }
+}

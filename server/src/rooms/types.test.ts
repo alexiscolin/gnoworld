@@ -1,7 +1,7 @@
 import { Address, toAddress } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
 import type { Roles } from "../roles/roles.ts";
-import { desired, listed, mayRead, publicRoom } from "./types.ts";
+import { desired, listed, mayRead, publicRoom, roomType } from "./types.ts";
 
 const TEAM = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const MOD = Address.parse("g1zgldsmn6ck6w4p325xd3j8y779ky6fpjnz3uh9");
@@ -105,5 +105,23 @@ describe("who sees a room listed (3m)", () => {
     expect(sees("#earth/vault")).toEqual([true, true, false, false, false, false, false]);
     expect(sees("#earth/crew")).toEqual([true, true, true, false, false, false, false]);
     expect(sees("#earth")).toEqual([true, true, true, true, true, true, true]);
+  });
+});
+
+describe("a room's type (4b)", () => {
+  it.each([
+    ["#earth/news", "announcement"],
+    ["#earth/door", "accounts"],
+    ["#earth/crew", "members"],
+    ["#earth/desk", "members-write"],
+    ["#earth/vault", "members"],
+    // Typed in the file as open, or not in it, or of a world the file does not name: open.
+    ["#earth", "open"],
+    ["#earth/unlisted-in-the-file", "open"],
+    ["#bubble", "open"],
+    ["#gone", "open"],
+    ["#gone/room", "open"],
+  ])("types %s as %s", (room, type) => {
+    expect(roomType(ROLES, room)).toBe(type);
   });
 });

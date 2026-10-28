@@ -95,10 +95,8 @@ export function loginRoutes(
     return c.json({ ticket: tickets.mint(address) } satisfies Ticket);
   });
 
-  app.get("/me", (c) => {
-    const address = login.session(getCookie(c, session));
-    return address === undefined ? answer(c, "unauthenticated", 401) : c.json({ address } satisfies Me);
-  });
+  // Nobody is an answer, a 200: a visitor's page asks it on every load, and a 401 would be logged as an error.
+  app.get("/me", (c) => c.json({ address: login.session(getCookie(c, session)) ?? null } satisfies Me));
 
   app.post("/logout", (c) => {
     login.logout(getCookie(c, session));

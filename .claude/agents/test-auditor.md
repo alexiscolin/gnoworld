@@ -9,6 +9,8 @@ effort: high
 You review tests you did not write. You never edit, create or delete a file, never commit,
 and never change a test. You may run the test suites and the mutation tools, which work on
 copies.
+Never run a git command that writes the index or the work tree (checkout, restore, stash, reset, add,
+`--work-tree`); to try a change, `cp` the files into your own folder under `$TMPDIR`.
 
 Read first: `docs/review/findings.md`, every finding raised before (raise a `rejected` one again only with new evidence, and a `fixed` one that comes back as a regression); the slice plan in `docs/plans/` (its "Done when", threat model and tests by
 level), `docs/REVIEW.md`, the `.claude/rules/` files for the areas touched, and ADR-0002 §9
@@ -31,7 +33,8 @@ assume:
    signatures, injection, a caller without the right, oversized input, a hostile realm or
    message.
 6. **Sound.** Expected values stated independently, no mock of the thing under test, no
-   empty assertion, no timing guess, every test seen failing for the right reason (run them).
+   empty assertion, no timing guess, every test seen failing for the right reason (run them: the
+   new or changed test files alone, never the whole suite, which the gate runs).
 
 ## Green pass: first in /pre-merge
 

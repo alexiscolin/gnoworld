@@ -53,6 +53,25 @@ describe("Dialog", () => {
     expect(screen.getByRole("button", { name: "Close", hidden: true })).toBeTruthy();
   });
 
+  // 4c's UX review (U5): what the dialog asks about, read with its title by assistive technology.
+  it("is described by its description, when it has one", () => {
+    render(
+      <>
+        <Dialog title="Delete message?" description="the first line" open={false} onClose={vi.fn()}>
+          <p>It leaves #games for everyone.</p>
+        </Dialog>
+        <Dialog title="Your passport" open={false} onClose={vi.fn()}>
+          <p>Stamps</p>
+        </Dialog>
+      </>,
+    );
+    const [described, plain] = screen.getAllByRole("dialog", { hidden: true });
+    const id = described?.getAttribute("aria-describedby") ?? "";
+    expect(document.getElementById(id)?.textContent).toBe("the first line");
+    expect(plain?.hasAttribute("aria-describedby")).toBe(false);
+    expect(plain?.querySelectorAll("p")).toHaveLength(1);
+  });
+
   it("is standard unless asked to be wide", () => {
     const { rerender } = render(
       <Dialog title="Passport" open={false} onClose={vi.fn()}>

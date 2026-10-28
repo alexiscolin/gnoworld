@@ -4,7 +4,8 @@ Against the base (where the branch left main), it refuses, unless a commit of th
 so on a line of its own, `Key: <item> - why`, which Alexis reads in review:
 - a test gone (Vitest, gno, Go; a rename included), or switched to `.fails`: `Removed-test:`;
 - a floor lowered (coverage thresholds, StrykerJS's break), a known gap added to a mutation
-  check's GAPS, or an ignore added to a tool's ignore list: `Lowered-floor:`;
+  check's GAPS, an ignore added to a tool's ignore list, or a bench gone or given a longer budget
+  (`bench("<name> [<n> ms]"`, named `bench <name>`): `Lowered-floor:`;
 - an approved screenshot changed or deleted: `Updated-baseline:`.
 Usage: check_regressions.py <base>, from the repository root; --self-test checks the rules."""
 import ast
@@ -18,7 +19,7 @@ import tempfile
 
 sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no __pycache__
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # -I leaves this folder off the path
-from repo_files import git, worktree
+from repo_files import BENCH_FILE, benches, git, worktree
 
 SHOT = re.compile(r"(-snapshots|__screenshots__)/.+\.(png|jpe?g)$")
 GAP_FILES = ["scripts/mutate.py", "scripts/harness_mutate.py"]
@@ -59,6 +60,12 @@ def lowered_floors(before, after, excused):
 def weakened(before, after, excused, kind):
     """Entries added to a list that loosens a check (a gap, an ignore), less those named `<kind> <entry>`."""
     return sorted(e for e in after - before if f"{kind} {e}" not in excused)
+
+
+def looser_benches(before, after, excused):
+    """Benches gone, or given a longer budget, less those named `bench <name>`: the budgets are the slice plan's."""
+    return sorted(f"{name} {old:g} ms -> {f'{after[name]:g} ms' if name in after else 'gone'}" for name, old in before.items()
+                  if after.get(name, float("inf")) > old and f"bench {name}" not in excused)
 
 
 def gaps(read):
@@ -256,6 +263,16 @@ def self_test():
         assert changed_settings(workspace(before), workspace(after + "pnpmfile: x.cjs\n"), set()) != [], listed
     assert changed_settings(settings(old.get), settings(new.get), set()) == [".jscpd.json exitCode 1 -> gone"]
     assert changed_settings(settings(old.get), settings(new.get), {"setting .jscpd.json exitCode"}) == []
+    plan = {"a.bench.ts": 'bench("a line [0.2 ms]", () => {});\nbench(\n  "a room [100 ms]",\n  () => {},\n);\n'}
+    held = benches(plan)
+    assert held == {"a line": 0.2, "a room": 100.0} and benches({"x.bench.ts": 'bench("no budget", f)'}) == {}
+    assert looser_benches(held, benches({"a.bench.ts": plan["a.bench.ts"]}), set()) == []
+    assert looser_benches(held, benches({"a.bench.ts": plan["a.bench.ts"].replace("[100 ms]", "[1000 ms]")}), set()) == ["a room 100 ms -> 1000 ms"], "a bench's budget raised went unseen"
+    assert looser_benches(held, benches({"a.bench.ts": 'bench("a line [0.2 ms]", () => {});'}), set()) == ["a room 100 ms -> gone"], "a bench gone went unseen"
+    assert looser_benches(held, benches({"a.bench.ts": plan["a.bench.ts"].replace("[100 ms]", "[10 ms]")}), set()) == [], "a lower budget was refused"
+    assert looser_benches(held, benches({"a.bench.ts": plan["a.bench.ts"] + 'bench("new [5 ms]", f)'}), set()) == [], "a new bench was refused"
+    assert looser_benches(held, {}, {"bench a room", "bench a line"}) == [], "an item named exactly did not excuse its bench"
+    assert looser_benches(held, {}, declared(["Lowered-floor: bench a room - renamed", "Lowered-floor: a line - x"], "Lowered-floor")) == ["a line 0.2 ms -> gone"], "a sentence excused a bench"
     diff = "+++ b/p/a.test.ts\n-  test(\"parses x\", () => {\n+  test.fails(\"parses x\", () => {\n+  test.fails(\"new one\", () => {\n+++ b/p/b.test.ts\n-  test.fails(\"done\", () => {\n+  test(\"done\", () => {\n"
     assert switched_to_fails(diff) == ["p/a.test.ts > parses x"]
     files = {"r/s/s_test.gno": "func TestBind(t *testing.T) {}\nfunc helper() {}\n", "r/s/z1_filetest.gno": "", "tools/v/main_test.go": "func TestVec(t *testing.T) {}\n", "r/s/s.gno": "func TestNot() {}\n"}
@@ -291,12 +308,15 @@ problems = [f"a test is gone: {t}" for t in removed_tests(before, after, tests_o
 problems += [f"a test is switched to fails: {t}" for t in switched_to_fails(git("diff", "-U0", base, "--", "*.test.ts", "*.test.tsx")) if t not in tests_ok]
 problems += [f"a floor is lower: {f}" for f in lowered_floors(floors(show(base, "vitest.config.ts"), show(base, "stryker.config.json")),
                                                                floors(here("vitest.config.ts"), here("stryker.config.json")), floors_ok)]
+benched = lambda paths, read: benches({p: read(p) for p in paths.splitlines() if BENCH_FILE.search(p)})
+problems += [f"a bench is gone or its budget longer: {b}" for b in looser_benches(benched(git("ls-tree", "-r", "--name-only", base), lambda p: show(base, p)),
+                                                                                  benched(git("ls-files"), here), floors_ok)]
 problems += [f"a known gap is added: {g}" for g in weakened(gaps(lambda p: show(base, p)), gaps(here), floors_ok, "gap")]
 problems += [f"an ignore is added: {i}" for i in weakened(ignores(lambda p: show(base, p)), ignores(here), floors_ok, "ignore")]
 problems += [f"a check's setting changed: {s}" for s in changed_settings(settings(lambda p: show(base, p)), settings(here), floors_ok)]
 problems += [f"an approved screenshot changed: {p}" for p in changed_baselines(git("diff", "--name-status", f"{base}..HEAD"), shots_ok)]
 if problems:
     print("check_regressions: the safety net shrank. Undo it, or say why on a line of a commit, `Key: <item> - why`"
-          " (Removed-test:, Lowered-floor: [gap |ignore ]<item>, Updated-baseline:):", *problems, sep="\n  ", file=sys.stderr)
+          " (Removed-test:, Lowered-floor: [gap |ignore |bench ]<item>, Updated-baseline:):", *problems, sep="\n  ", file=sys.stderr)
     sys.exit(1)
-print("check_regressions: no test gone or switched off, no floor lower, no gap or ignore added, no approved screenshot changed")
+print("check_regressions: no test gone or switched off, no floor lower, no bench gone or looser, no gap or ignore added, no approved screenshot changed")

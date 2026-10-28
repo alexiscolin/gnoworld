@@ -1,0 +1,19 @@
+/* A thread's panel beside the room (4d's threads): a column of the design system's medium width, or the whole of a
+   narrow room, whose lines give it the place (RoomView.module.css). */
+@layer components {
+  .panel {
+    inline-size: min(100%, var(--column-m));
+  }
+
+  /* The root's words, cut: the room's text size and a heavier weight, the close button at its end. */
+  .title {
+    font: var(--font-body);
+    font-weight: 500;
+    overflow-wrap: anywhere;
+  }
+
+  .count {
+    font: var(--font-label);
+    color: var(--color-text-muted);
+  }
+}

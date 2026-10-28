@@ -2,10 +2,13 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
+import { Address, PinList, RoomList } from "@gnoworld/schemas";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { makeApp } from "./app.ts";
 import { startChat, type Chat } from "./chat.ts";
+import { PIN_TABLES } from "./pins/pins.ts";
+import { pinsRoutes } from "./pins/routes.ts";
 import { loadConfig } from "./config.ts";
 import { openDatabase } from "./db.ts";
 import { logger } from "./log.ts";
@@ -17,6 +20,7 @@ import { ROOM_STATE } from "./rooms/create.ts";
 import type { Answer } from "./moderation/provider.ts";
 import type { Room, Rules } from "./roles/roles.ts";
 import { listRooms, ROOM_TABLES } from "./rooms/rooms.ts";
+import type { World } from "./rooms/types.ts";
 import { answer } from "./testing/answers.ts";
 import { fakeErgo, message, PASSWORD, welcome } from "./testing/fakeErgo.ts";
 
@@ -62,6 +66,7 @@ const setup = (
     PROGRESS_TABLES,
     MUTE_TABLES,
     ROOM_STATE,
+    PIN_TABLES,
   ]);
   const options = {
     log,
@@ -100,6 +105,10 @@ describe("the chat, as the server starts it", () => {
     const { rooms } = setup({ worlds: worlds("bubble"), ergo: ergoAt, moderation: OFF }, { now: () => clock.now });
     const peer = await ergo.peer(0);
     await welcome(peer);
+    // A line of a history page counts nothing now, however recent its time (the max review).
+    peer.say(":ergo.test BATCH +h chathistory #bubble");
+    peer.say(message("batch=h;account=g1a;msgid=m0", "a!u@h", ["#bubble", "said before"]));
+    peer.say(":ergo.test BATCH -h");
     peer.say(message("account=g1a;msgid=m1", "a!u@h", ["#bubble", "hi"]));
     const rate = (perMinute: number) => JSON.stringify({ rooms: [{ world: "bubble", room: "#bubble", perMinute }] });
     await expect.poll(() => rooms("bubble")).toBe(rate(0.2));
@@ -169,7 +178,7 @@ describe("the chat, as the server starts it", () => {
 
   it("applies each world's own rules to its own room", async () => {
     const earth: Rules = { ...RULES, bannedWords: ["moon"] };
-    const both = new Map([
+    const both = new Map<string, World>([
       ["earth", { rules: earth }],
       ["bubble", { rules: RULES }],
     ]);
@@ -183,6 +192,16 @@ describe("the chat, as the server starts it", () => {
       { msgid: "m1", action: "hide", reason: "banned_word" },
       { msgid: "m2", action: "unchecked", reason: null },
     ]);
+  });
+
+  it("checks a line to a room's voices like the room's own: hidden for a banned word, struck (F723)", async () => {
+    const { peer, verdicts } = await linked(
+      { worlds: worlds("bubble"), moderation: OFF },
+      { provider: () => Promise.resolve("unchecked") },
+    );
+    peer.say(message("account=g1a;msgid=m1", "a!u@h", ["+#bubble", "buy spam"]));
+    await expect.poll(verdicts).toEqual([{ msgid: "m1", action: "hide", reason: "banned_word" }]);
+    expect(await peer.next(/^REDACT /)).toMatch(/^REDACT #bubble m1 /);
   });
 
   it("passes the moderation's settings on: a new account's hours, and the thresholds", async () => {
@@ -376,7 +395,9 @@ describe("the chat, as the server starts it", () => {
       let text = "";
       const read = async (count: number): Promise<unknown[]> => {
         for (;;) {
-          const data = [...text.matchAll(/data: (.*)\n/g)].map(([, json = ""]) => JSON.parse(json) as unknown);
+          const data = [...text.matchAll(/event: verdict\ndata: (.*)\n/g)].map(
+            ([, json = ""]) => JSON.parse(json) as unknown,
+          );
           if (data.length >= count) return data;
           const chunk = await reader?.read();
           if (chunk === undefined || chunk.done) return data;
@@ -435,6 +456,30 @@ describe("the chat, as the server starts it", () => {
       );
       expect(await page.read(1)).toEqual([{ msgid: "m1", room: "#bubble", state: "hidden" }]);
       expect(asked).toEqual([]);
+    });
+
+    // The bot's hide comes back to it as a REDACT of its own (Ergo tells each member of the room, the sender too): the
+    // pin of a hidden line goes with it, as with an author's delete (4d's R1).
+    it("takes a line's pin away as Ergo tells it taken from the room, the bot's own hide as an author's delete", async () => {
+      const { peer, chat, db } = await linked({ worlds: worlds("bubble"), moderation: OFF });
+      const AUTHOR = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+      for (const id of ["m1", "m2", "m3"]) {
+        db.prepare(
+          "INSERT INTO pins (room, msgid, time, account, text, pinned_by, pinned_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        ).run("#bubble", id, "2026-10-25T10:00:00.000Z", AUTHOR, `text ${id}`, AUTHOR, T0);
+      }
+      const held = () => chat.pins.list("#bubble").map(({ id }) => id);
+      peer.say(line("m1", 1, ["g1a", "buy spam"]));
+      expect(await peer.next(/^REDACT /)).toBe("REDACT #bubble m1 :a word this world bans");
+      peer.say(":gnoworld!u@h REDACT #bubble m1 :a word this world bans");
+      await expect.poll(held).toEqual(["m3", "m2"]);
+      peer.say(":g1a!u@h REDACT #bubble m2");
+      await expect.poll(held).toEqual(["m3"]);
+      // A REDACT of a room that is not its own is no word on its pins.
+      peer.say(":g1a!u@h REDACT #elsewhere m3");
+      peer.say("PING :done");
+      await peer.next(/^PONG done$/);
+      expect(held()).toEqual(["m3"]);
     });
 
     it("streams nothing for an unchecked line, and nothing for a line before its verdict", async () => {
@@ -662,6 +707,83 @@ describe("the chat, as the server starts it", () => {
       slow.open();
     });
 
+    it("keeps its mark where a catch-up starts while its page is pending, though a live line passed", async () => {
+      const { peer, verdicts, ergo } = await linked(
+        { worlds: worlds("bubble"), moderation: OFF },
+        { provider: () => Promise.resolve(OFF_ANSWER) },
+      );
+      peer.say(line("m1", 1, ["g1a", "hello"]));
+      await expect.poll(verdicts).toEqual([{ msgid: "m1", action: "pass", reason: null }]);
+      const again = await reconnect(peer, ergo);
+      expect(await again.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(1)} 50`);
+      again.say(line("m9", 9, ["g1b", "live"]));
+      await expect.poll(() => verdicts().length).toBe(2);
+      await settle(again);
+      again.socket.destroy();
+      const third = await ergo.peer(2);
+      await welcome(third);
+      expect(await third.next(/^CHATHISTORY /)).toBe(`CHATHISTORY AFTER #bubble timestamp=${before(1)} 50`);
+    });
+
+    it("keeps a queued room's mark where its catch-up will start, though a live line of it passed", async () => {
+      const { db, peer, verdicts, ergo } = await linked(
+        { worlds: worlds("bubble", "earth"), moderation: OFF },
+        { provider: () => Promise.resolve(OFF_ANSWER) },
+      );
+      for (const room of ["#bubble", "#earth"])
+        peer.say(message(`account=g1a;msgid=old${room};time=${T(1)}`, "g1a!u@h", [room, "before"]));
+      await expect.poll(() => verdicts().length).toBe(2);
+      const again = await reconnect(peer, ergo);
+      const first = (await again.next(/^CHATHISTORY /)).split(" ")[2] ?? "";
+      const queued = first === "#bubble" ? "#earth" : "#bubble";
+      again.say(message(`account=g1b;msgid=live;time=${T(9)}`, "g1b!u@h", [queued, "live"]));
+      await expect.poll(() => verdicts().length).toBe(3);
+      await settle(again);
+      const marks = z
+        .array(z.object({ room: z.string(), time: z.string() }))
+        .parse(db.prepare("SELECT room, time FROM progress ORDER BY room").all());
+      expect(marks).toEqual([
+        { room: "#bubble", time: T(1) },
+        { room: "#earth", time: T(1) },
+      ]);
+    });
+
+    it("asks the next room's page only once the lines of the last are checked, so one account's queue never overflows", async () => {
+      const wait = gate();
+      const { peer, verdicts, ergo } = await linked(
+        { worlds: worlds("bubble", "earth", "moon"), moderation: OFF },
+        {
+          provider: async (text) => {
+            if (text === "flood") await wait.opened;
+            return OFF_ANSWER;
+          },
+        },
+      );
+      for (const room of ["#bubble", "#earth", "#moon"])
+        peer.say(message(`account=g1a;msgid=old${room};time=${T(1)}`, "g1a!u@h", [room, "before"]));
+      await expect.poll(() => verdicts().length).toBe(3);
+      const again = await reconnect(peer, ergo);
+      const asked = () => again.lines.filter((l) => l.startsWith("CHATHISTORY"));
+      for (let round = 0; round < 3; round += 1) {
+        await expect.poll(() => asked().length).toBeGreaterThan(round);
+        const room = asked()[round]?.split(" ")[2] ?? "";
+        again.say(`:ergo.test BATCH +r${String(round)} chathistory ${room}`);
+        for (let n = 0; n < 40; n += 1) {
+          const tags = `batch=r${String(round)};account=g1a;msgid=f${String(round)}-${String(n)};time=${T(10 + n)}`;
+          again.say(message(tags, "g1a!u@h", [room, "flood"]));
+        }
+        again.say(`:ergo.test BATCH -r${String(round)}`);
+        await settle(again);
+        await settle(again);
+        // The first room's 40 lines wait on the provider: no other room is asked until they are checked.
+        if (round === 0) expect(asked()).toHaveLength(1);
+        wait.open();
+      }
+      await expect.poll(() => verdicts().length, { timeout: 10_000 }).toBe(123);
+      expect(asked()).toHaveLength(3);
+      expect(logged.filter((l) => l.includes("moderation_account_full"))).toEqual([]);
+    });
+
     it("checks 300 missed lines of one account page by page, none dropped", async () => {
       const { peer, verdicts, ergo } = await linked(
         { worlds: worlds("bubble"), moderation: OFF },
@@ -744,6 +866,13 @@ describe("the chat, as the server starts it", () => {
         await settle(peer);
         expect(mutes(peer)).toEqual([]);
         peer.say(line("m4", 4, ["g1a", "hurt"]));
+        expect(await peer.next(MUTE_LINE)).toBe("SAMODE #bubble +b m:g1a");
+      });
+
+      it("mutes an account whose lines to a room's voices were hidden three times, as for its own lines (F723)", async () => {
+        const { peer } = await linked({ worlds: worlds("bubble"), moderation: OFF }, hurt());
+        for (const id of ["m1", "m2", "m3"])
+          peer.say(message(`account=g1a;msgid=${id}`, "a!u@h", ["+#bubble", "hurt"]));
         expect(await peer.next(MUTE_LINE)).toBe("SAMODE #bubble +b m:g1a");
       });
 
@@ -1150,6 +1279,96 @@ describe("the chat, as the server starts it", () => {
       expect(await rooms("member")).toContain("#bubble/crew");
     });
 
+    // Who reads and who pins, by the real rules of the roles file (4d's R2): a members room's pins are its members', and
+    // pinning is its world's moderators' and the team's alone, whoever they moderate elsewhere.
+    describe("the pins' right to read and to pin", () => {
+      const TEAM = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+      const both = new Map<string, World>([...roled(), ["other", { rules: RULES, moderators: new Set([WRITER]) }]]);
+      const tokens = new Map([
+        ["mod", MOD],
+        ["member", MEMBER],
+        ["writer", WRITER],
+        ["team", TEAM],
+      ]);
+      const here = () => {
+        const t = setup(
+          { worlds: both, moderation: OFF, ergo: undefined, team: new Set([TEAM]) },
+          { session: (token) => tokens.get(token ?? "") },
+        );
+        t.db
+          .prepare(
+            "INSERT INTO pins (room, msgid, time, account, text, pinned_by, pinned_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+          )
+          .run("#bubble/crew", "m1", "2026-10-25T10:00:00.000Z", MEMBER, "for the crew", MOD, T0);
+        t.app.route(
+          "/api/pins",
+          pinsRoutes({
+            pins: t.chat.pins,
+            mayPin: t.chat.mayPin,
+            readable: t.chat.mayRead,
+            session: (token) => {
+              const who = tokens.get(token ?? "");
+              return who === undefined ? undefined : Address.parse(who);
+            },
+            origins: ["https://gnoworld.test"],
+            log,
+            now: () => T0,
+          }),
+        );
+        return t;
+      };
+
+      it("lets a members room's members, its moderators and the team read, and no guest or stranger", () => {
+        const { chat } = here();
+        const reads = (room: string) => [undefined, WRITER, MEMBER, MOD, TEAM].map((who) => chat.mayRead(room, who));
+        // A writer of #bubble/desk is no reader of #bubble/crew, whom its group names; another world's moderator neither.
+        expect(reads("#bubble/crew")).toEqual([false, false, true, true, true]);
+        expect(reads("#bubble")).toEqual([true, true, true, true, true]);
+      });
+
+      it("lets its world's moderators and the team pin there, and no member, writer or other world's moderator", () => {
+        const { chat } = here();
+        for (const room of ["#bubble", "#bubble/crew", "#bubble/desk"])
+          expect([MOD, TEAM, MEMBER, WRITER].map((who) => chat.mayPin(room, who))).toEqual([true, true, false, false]);
+        expect(chat.mayPin("#other", WRITER)).toBe(true);
+        expect(chat.mayPin("#other", MOD)).toBe(false);
+      });
+
+      it("answers a members room's pins to its members alone, through the route, and says who may pin", async () => {
+        const { app } = here();
+        const get = (who?: string) =>
+          app.request("/api/pins?room=%23bubble%2Fcrew", {
+            headers: who === undefined ? {} : { cookie: `__Host-session=${who}` },
+          });
+        for (const who of [undefined, "writer"]) expect((await get(who)).status).toBe(403);
+        const member = PinList.parse(await (await get("member")).json());
+        expect([member.may, member.pins.map(({ id }) => id)]).toEqual([false, ["m1"]]);
+        expect(PinList.parse(await (await get("mod")).json()).may).toBe(true);
+        expect(PinList.parse(await (await get("team")).json()).may).toBe(true);
+      });
+
+      it("refuses a pin and an unpin in this world to another world's moderator, and to a member", async () => {
+        const { app, db } = here();
+        const post = (path: string, who: string) =>
+          app.request(`/api/pins${path}`, {
+            method: "POST",
+            headers: {
+              origin: "https://gnoworld.test",
+              "content-type": "application/json",
+              cookie: `__Host-session=${who}`,
+            },
+            body: JSON.stringify({ room: "#bubble/crew", msgid: "m1" }),
+          });
+        for (const who of ["writer", "member"]) {
+          expect((await post("", who)).status).toBe(403);
+          expect((await post("/unpin", who)).status).toBe(403);
+        }
+        expect(db.prepare("SELECT count(*) AS n FROM pins").get()).toEqual({ n: 1 });
+        expect((await post("/unpin", "team")).status).toBe(200);
+        expect(db.prepare("SELECT count(*) AS n FROM pins").get()).toEqual({ n: 0 });
+      });
+    });
+
     it("leaves an archived room read-only and unlisted, sending it nothing once Ergo has it so", async () => {
       const { peer, chat, ergo } = await linked({ worlds: roled(), moderation: OFF });
       for (const room of ["#bubble", "#bubble/crew", "#bubble/desk"]) await answer(peer, room);
@@ -1255,6 +1474,54 @@ describe("the chat, as the server starts it", () => {
       ]);
     });
 
+    it("lists a world's rooms by section to whom may see them: a members room, a hidden one, an archived one (4b)", async () => {
+      const TEAM = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+      const sectioned = new Map(
+        [...roled()].map(
+          ([slug, world]) =>
+            [
+              slug,
+              {
+                ...world,
+                rooms: new Map<string, Room>([...world.rooms, ["#bubble/attic", { type: "open", hidden: true }]]),
+                sections: [
+                  { name: "Crew", rooms: ["#bubble/crew", "#bubble/desk", "#bubble/attic"] },
+                  { name: "Past", rooms: ["#bubble/old"] },
+                ],
+              },
+            ] as const,
+        ),
+      );
+      const tokens = new Map([
+        ["mod", MOD],
+        ["member", MEMBER],
+        ["team", TEAM],
+        ["stranger", "g1uauvt7txunf9zeu2qyrzv0pa5uvwjlq90r3qpa"],
+      ]);
+      const { app, chat } = setup(
+        { worlds: sectioned, moderation: OFF, ergo: undefined, team: new Set([TEAM]) },
+        { session: (token) => tokens.get(token ?? "") },
+      );
+      app.route("/api/rooms", chat.roomList);
+      chat.rooms.create("bubble", "old");
+      chat.rooms.create("bubble", "garden");
+      chat.rooms.archive("bubble", "old");
+      const lists = async (who?: string) => {
+        const headers = who === undefined ? {} : { cookie: `__Host-session=${who}` };
+        const text = await (await app.request("/api/rooms?world=bubble", { headers })).text();
+        const body = RoomList.parse(JSON.parse(text));
+        return body.sections.map(({ name, rooms }) => [name, rooms.map(({ room, type }) => `${room} ${type}`)]);
+      };
+      const others = [null, ["#bubble open", "#bubble/garden open"]];
+      const crew = ["#bubble/crew members", "#bubble/desk members-write"];
+      const staff = [["Crew", [...crew, "#bubble/attic open"]], ["Past", ["#bubble/old open"]], others];
+      expect(await lists()).toEqual([others]);
+      expect(await lists("stranger")).toEqual([others]);
+      expect(await lists("member")).toEqual([["Crew", crew], others]);
+      expect(await lists("mod")).toEqual(staff);
+      expect(await lists("team")).toEqual(staff);
+    });
+
     it("voices no one else on a JOIN: a reader who is no writer, a guest, the bot itself, anyone in an open room", async () => {
       const { peer } = await linked({ worlds: roled(), moderation: OFF });
       for (const room of ["#bubble", "#bubble/crew", "#bubble/desk"]) await answer(peer, room);
@@ -1266,5 +1533,112 @@ describe("the chat, as the server starts it", () => {
       await settle(peer);
       expect(peer.lines.filter((l) => /^SAMODE \S+ \+v /.test(l))).toEqual([]);
     });
+  });
+});
+
+// 4g (docs/decisions.md, 2026-10-26): GET /api/verdicts through the chat's own wiring: the stream's rule of who
+// reads (mayRead, by the session), each visitor counted by its address.
+describe("the chat's verdicts route", () => {
+  const CREW = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+  const ACCOUNT = "g1us8428u2a5satrlxzagqqa5m6vmuze025anjlj";
+  const settings = {
+    worlds: new Map([
+      [
+        "bubble",
+        {
+          rules: RULES,
+          groups: new Map([["crew", new Set([CREW])]]),
+          rooms: new Map<string, Room>([
+            ["#bubble/crew", { type: "members" as const, readers: "crew", hidden: false }],
+            ["#bubble/club", { type: "accounts" as const, hidden: false }],
+          ]),
+        },
+      ],
+    ]),
+    ergo: undefined,
+    moderation: OFF,
+  };
+  const ready = (proxy?: string) => {
+    const t = setup(
+      { ...settings, trustedProxy: proxy },
+      {
+        session: (token) =>
+          new Map([
+            ["crew-token", CREW],
+            ["account-token", ACCOUNT],
+          ]).get(token ?? ""),
+      },
+    );
+    t.app.route("/api/verdicts", t.chat.verdicts);
+    const insert = t.db.prepare(
+      "INSERT INTO verdicts (msgid, room, account, action, at) VALUES (?, ?, 'g1a', 'pass', 0)",
+    );
+    insert.run("m1", "#bubble");
+    insert.run("m2", "#bubble/crew");
+    insert.run("m3", "#bubble/club");
+    const ask = (
+      room: string,
+      id: string,
+      { token, peer = "203.0.113.7", realIp }: { token?: string; peer?: string; realIp?: string } = {},
+    ) =>
+      t.app.request(
+        `/api/verdicts?room=${encodeURIComponent(room)}&ids=${id}`,
+        {
+          headers: {
+            ...(token === undefined ? {} : { cookie: `__Host-session=${token}` }),
+            ...(realIp === undefined ? {} : { "x-real-ip": realIp }),
+          },
+        },
+        { incoming: { socket: { remoteAddress: peer } } },
+      );
+    return ask;
+  };
+
+  it("answers the world's main room to anyone, and its members room to its member alone", async () => {
+    const ask = ready();
+    expect(await (await ask("#bubble", "m1")).json()).toEqual({
+      room: "#bubble",
+      verdicts: [{ msgid: "m1", state: "checked" }],
+    });
+    expect((await ask("#bubble/crew", "m2")).status).toBe(403);
+    expect((await ask("#bubble/crew", "m2", { token: "stranger-token" })).status).toBe(403);
+    expect(await (await ask("#bubble/crew", "m2", { token: "crew-token" })).json()).toEqual({
+      room: "#bubble/crew",
+      verdicts: [{ msgid: "m2", state: "checked" }],
+    });
+  });
+
+  it("counts each visitor by its address: one past its minute refused, another answered", async () => {
+    const ask = ready();
+    for (let n = 0; n < 60; n += 1) expect((await ask("#bubble", "m1")).status).toBe(200);
+    expect((await ask("#bubble", "m1")).status).toBe(429);
+    expect((await ask("#bubble", "m1", { peer: "203.0.113.8" })).status).toBe(200);
+  });
+
+  // F877: an accounts room's lines go to any account and to no guest; a room's name in other letters is no room the
+  // verdicts hold, so a members room's are never answered under it.
+  it("answers an accounts room to an account alone, and a members room's lines under no other spelling", async () => {
+    const ask = ready();
+    expect((await ask("#bubble/club", "m3")).status).toBe(403);
+    expect(await (await ask("#bubble/club", "m3", { token: "account-token" })).json()).toEqual({
+      room: "#bubble/club",
+      verdicts: [{ msgid: "m3", state: "checked" }],
+    });
+    for (const spelling of ["#BUBBLE/crew", "#Bubble/Crew", "#bubble/CREW"]) {
+      expect(await (await ask(spelling, "m2")).json()).toEqual({ room: spelling, verdicts: [] });
+    }
+  });
+
+  // F872: behind the proxy every reader shares its address; the one it sets (x-real-ip) is each reader's, believed
+  // from the proxy alone.
+  it("counts each reader behind the trusted proxy by the address the proxy sets, and believes no other peer's", async () => {
+    const ask = ready("10.0.0.2");
+    const proxied = (realIp: string) => ask("#bubble", "m1", { peer: "10.0.0.2", realIp });
+    for (let n = 0; n < 60; n += 1) expect((await proxied("203.0.113.7")).status).toBe(200);
+    expect((await proxied("203.0.113.7")).status).toBe(429);
+    expect((await proxied("203.0.113.8")).status).toBe(200);
+    const spoofed = (n: number) => ask("#bubble", "m1", { peer: "198.51.100.9", realIp: `192.0.2.${String(n)}` });
+    for (let n = 0; n < 60; n += 1) expect((await spoofed(n)).status).toBe(200);
+    expect((await spoofed(60)).status).toBe(429);
   });
 });

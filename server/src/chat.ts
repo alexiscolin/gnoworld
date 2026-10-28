@@ -2,7 +2,7 @@
 // roles file's typed rooms made, the IRC link in them when Ergo is set, each room kept as its type says,
 // their activity counted, and each message checked by its world's rules and OpenAI (a members room's by
 // its rules alone), through a fair queue, then acted on, streamed, and struck toward a mute; the routes
-// that tell the activity and the verdicts, each room's to whom may see it.
+// that tell the activity, the rooms by section and the verdicts, each room's to whom may see it.
 import type { DatabaseSync } from "node:sqlite";
 import type { Hono } from "hono";
 import { makeActivity } from "./activity/activity.ts";
@@ -18,17 +18,33 @@ import { makeMutes } from "./moderation/mute.ts";
 import { moderationClient, type Answer } from "./moderation/provider.ts";
 import { makeQueue } from "./moderation/queue.ts";
 import { makeStrike } from "./moderation/strikes.ts";
+import type { Pins } from "./pins/pins.ts";
+import { pinsFor } from "./pins/wire.ts";
 import { ensureNamed, ensureRooms, listRooms, roomWorld, worldRooms } from "./rooms/rooms.ts";
 import { makeRooms, type Rooms } from "./rooms/create.ts";
+import { listRoutes } from "./rooms/list.ts";
 import { listed, mayRead, publicRoom, staffOf, type World } from "./rooms/types.ts";
-import { makeStream, type Stream } from "./stream/stream.ts";
+import { getConnInfo } from "@hono/node-server/conninfo";
+import { makeStream, stateOf, type Stream } from "./stream/stream.ts";
+import { verdictRoutes } from "./stream/verdicts.ts";
+import { visitor } from "./visitor.ts";
 import { keeping, reconcilerFor, typedRooms } from "./rooms/wire.ts";
 
 export interface Chat {
   activity: Hono;
+  // A world's rooms by section, to whom may see them (4b).
+  roomList: Hono;
   stream: Hono;
+  // The verdicts of lines older than the stream's replay (4g).
+  verdicts: Hono;
   // The moderators' rooms (3l), made and archived through the link.
   rooms: Rooms;
+  // Each room's pins (4d), kept in the database: read from Ergo by their lines' ids, dropped as their lines leave.
+  pins: Pins;
+  // Whether an account may pin in a room: its world's moderators and the team.
+  mayPin: (room: string, who: string) => boolean;
+  // Whether an account, or a guest (undefined), may read a room: the stream's rule, for the pins' route (4d).
+  mayRead: (room: string, who: string | undefined) => boolean;
   stop: () => Promise<void>;
 }
 
@@ -82,8 +98,9 @@ function moderate({ db, check, send, stream, progress, strike }: Steps): (said: 
       done = act(said, verdict, { send });
       if (!done) checkAgain(db, said.msgid);
       // An unchecked line has no event: its previews wait.
-      else if (verdict.action !== "unchecked") {
-        stream.publish({ msgid: said.msgid, room: said.room, state: verdict.action === "hide" ? "hidden" : "checked" });
+      else {
+        const state = stateOf(verdict.action);
+        if (state !== undefined) stream.publish({ msgid: said.msgid, room: said.room, state });
         if (verdict.action === "hide") strike(said);
       }
     } finally {
@@ -121,6 +138,23 @@ const unknownChannels =
     for (const room of names) if (!known.has(room)) log("alert", { error: "unknown_room", room });
   };
 
+// Whom a room is listed to: an archived room is a hidden one.
+const listedTo =
+  (settings: Settings, keeper: Rooms) =>
+  (room: string, who: string | undefined): boolean =>
+    keeper.archived(room) ? staffOf(settings, room, who) : listed(settings, room, who);
+
+// The verdicts of lines older than the stream's replay, by the stream's own rule of who reads (4g).
+function verdictsFor(db: DatabaseSync, settings: Settings, { session = () => undefined, now = Date.now }: Options) {
+  return verdictRoutes({
+    db,
+    readable: (room, who) => mayRead(settings, room, who),
+    session,
+    visitor: (c) => visitor(getConnInfo(c).remote.address ?? "", c.req.header("x-real-ip"), settings.trustedProxy),
+    now,
+  });
+}
+
 export function startChat(db: DatabaseSync, settings: Settings, options: Options): Chat {
   const { worlds, ergo, moderation } = settings;
   const { log, pepper, now = Date.now } = options;
@@ -151,6 +185,7 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
   });
   const passes = setInterval(reconciler.ask, options.reconcileMs ?? 60_000);
   const activity = makeActivity();
+  const kept = pinsFor(db, settings, { link: () => link, now, log });
   const link: Link | undefined =
     ergo === undefined
       ? undefined
@@ -158,6 +193,7 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
           ...ergo,
           rooms: () => listRooms(db).map(({ name }) => name),
           lastChecked: progress.last,
+          hold: progress.hold,
           drained: () => queue.idle(),
           onReady: () => {
             reconciler.flags();
@@ -165,28 +201,30 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
             reconciler.ask();
           },
           onJoin: reconciler.joined,
+          ...kept.hooks,
           onChannels: unknownChannels(db, log),
-          onMessage: (said) => {
-            activity.count(said.room, said.account, now());
+          onMessage: (said, replayed) => {
+            kept.onEdit(said);
+            // A line of a history page is no activity now, whatever its time.
+            if (!replayed) activity.count(said.room, said.account, now());
             progress.heard(said);
             // A line the full queue drops is left unchecked, with the alert.
             if (!queue.push(said)) progress.settled(said);
           },
           log,
         });
+  const visible = listedTo(settings, keeper);
   return {
-    activity: activityRoutes(activity, {
-      db,
-      now,
-      visible: (room, who) => (keeper.archived(room) ? staffOf(settings, room, who) : listed(settings, room, who)),
-      session: options.session,
-    }),
+    activity: activityRoutes(activity, { db, now, visible, session: options.session }),
+    roomList: listRoutes({ db, roles: settings, visible, session: options.session }),
     stream: stream.routes({
       proxy: settings.trustedProxy,
       visible: (room, who) => mayRead(settings, room, who),
       session: options.session,
     }),
+    verdicts: verdictsFor(db, settings, options),
     rooms: keeping(keeper, { mutes, reconciler }),
+    ...kept.api,
     stop: async () => {
       clearInterval(lifts);
       clearInterval(passes);

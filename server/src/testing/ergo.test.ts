@@ -5,6 +5,18 @@ import { tmpdir } from "node:os";
 import type { AddressInfo } from "node:net";
 import { join as joinPath } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  BatchReader,
+  compose,
+  foldMultiline,
+  LINE_BYTES,
+  MULTILINE_BYTES,
+  MULTILINE_LINES,
+  parseLine,
+  refusedOf,
+  relayOf,
+  type IrcMessage,
+} from "@gnoworld/core";
 import type { Address } from "@gnoworld/schemas";
 import { z } from "zod";
 import { authServer } from "../ergo/auth.ts";
@@ -31,6 +43,7 @@ import {
   logged,
   login,
   moderated,
+  msgid,
   open,
   oper,
   ORIGIN,
@@ -60,7 +73,7 @@ describe("guests and rooms", { timeout: 20_000 }, () => {
     const gus = await guest(e, "gus");
     await join(gus, "#lobby");
     gus.send("PRIVMSG #lobby :hello from guest");
-    await gus.expect(/ 404 gus #lobby :Cannot send to channel \(\+M\)/);
+    await gus.expect(/ 404 Guest-gus #lobby :Cannot send to channel \(\+M\)/);
     alice.send("PRIVMSG #lobby :hello from alice");
     await gus.expect(/account=alice.* PRIVMSG #lobby :hello from alice/);
     await sync(alice);
@@ -117,6 +130,36 @@ describe("guests and rooms", { timeout: 20_000 }, () => {
     await gus.expect(replayed("PRIVMSG #lobby :persist-marker-1$"));
   });
 
+  // F1492 holds the store is SQLite, not a ring: a room nobody registered keeps its lines across a restart too.
+  it("keeps the history of a room nobody registered across a restart (F1492)", { timeout: 40_000 }, async () => {
+    const e = await start({ dir: keptFolder() });
+    const chief = await lobby(e);
+    await say(chief, "#lobby", "unregistered-marker-1");
+    await sync(chief);
+    const { dir } = e;
+    await e.stop();
+
+    const again = await start({ dir });
+    // Only an operator makes a room (the bot's class, as when it makes them again): the room comes back empty.
+    const reader = await lobby(again);
+    history(reader, "#lobby");
+    await reader.expect(replayed("PRIVMSG #lobby :unregistered-marker-1$"));
+  });
+
+  // 4e, decided by Alexis (docs/decisions.md): Ergo sets +R on every connection at its registration
+  // (default-user-modes, irc/server.go:445, v2.19.1), so an account that asks nothing hears no guest.
+  it("refuses a guest's direct message to an account that sent no MODE, and lets an account's through", async () => {
+    const e = await start();
+    const alice = await login(e, "alice");
+    const gus = await guest(e, "gus");
+    gus.send("PRIVMSG alice :from a guest");
+    await gus.expect(/ 477 Guest-gus alice /);
+    const bob = await login(e, "bob");
+    bob.send("PRIVMSG alice :from an account");
+    await alice.expect(/PRIVMSG alice :from an account$/);
+    expect(logged(alice)).not.toContain("from a guest");
+  });
+
   it("keeps no direct message across a restart: none is stored until slice 4 (3e)", { timeout: 40_000 }, async () => {
     const e = await start({ dir: keptFolder() });
     const alice = await login(e, "alice");
@@ -143,11 +186,11 @@ describe("logins and the auth script", { timeout: 30_000 }, () => {
     const e = await start();
     const x = await guest(e, "newacct");
     x.send("NS REGISTER newacct pw123");
-    await x.expect(/NOTICE newacct :This command has been disabled by the server administrators/);
+    await x.expect(/NOTICE Guest-newacct :This command has been disabled by the server administrators/);
     x.send("REGISTER newacct * pw123");
     await x.expect(/FAIL REGISTER DISALLOWED newacct :Account registration is disabled/);
     x.send("NS SAREGISTER newacct pw123");
-    expect(await x.expect(/NOTICE newacct :Command restricted/)).toContain("Command restricted");
+    expect(await x.expect(/NOTICE Guest-newacct :Command restricted/)).toContain("Command restricted");
   });
 
   it("ignores PASS account:password, which logs nobody in", async () => {
@@ -183,14 +226,14 @@ describe("logins and the auth script", { timeout: 30_000 }, () => {
     const dave = await login(e, "dave");
     const early = await guest(e, "dave3");
     early.send("NS IDENTIFY dave pw");
-    expect(await early.expect(/ 433 dave3 dave /)).toContain("Nickname is already in use");
+    expect(await early.expect(/ 433 Guest-dave3 dave /)).toContain("Nickname is already in use");
     await early.expect(/try logging out and logging back in with SASL/);
     await dave.close();
     const g = await guest(e, "dave2");
     g.send("NS IDENTIFY dave pw");
     await g.expect(/NOTICE dave :You're now logged in as dave/);
     await sync(g);
-    expect(logged(g)).toMatch(/:dave2!\S+ NICK dave/);
+    expect(logged(g)).toMatch(/:Guest-dave2!\S+ NICK dave/);
     expect(logged(g)).toMatch(/:dave!\S+ ACCOUNT dave/);
   });
 
@@ -400,6 +443,48 @@ describe("history and tags", { timeout: 30_000 }, () => {
     await noPlayback.expect(/:HistServ!HistServ@localhost PRIVMSG #lobby :alice sent a TAGMSG/);
   });
 
+  // F1492: the room's history is Ergo's SQLite store (history.persistent, unregistered-channels), which holds no
+  // count of items, only expire-time: the 2,048 of channel-length is the in-memory ring of a room not persisted.
+  // The reader pages back from the latest item to the first line, 1,000 items a page (chathistory-maxmessages).
+  it(
+    "still reads a room's first line by CHATHISTORY after 3,000 events in it: reactions, joins and parts (F1492)",
+    { timeout: 120_000 },
+    async () => {
+      const e = await start();
+      const chief = await lobby(e);
+      const text = "the room's first line";
+      const first = await say(chief, "#lobby", text);
+      // Operators have no fakelag (the bot's class), so 3,000 events take a second or two.
+      const [reactor, visitor] = [await oper(e, "reactor"), await oper(e, "visitor")];
+      await join(reactor, "#lobby");
+      for (let n = 0; n < 1000; n++) {
+        reactor.send(`@+draft/react=%F0%9F%91%8D;+draft/reply=${first} TAGMSG #lobby`);
+        visitor.send("JOIN #lobby");
+        visitor.send("PART #lobby");
+      }
+      await sync(reactor);
+      await sync(visitor);
+      let items = 0;
+      let found = false;
+      let from = "CHATHISTORY LATEST #lobby * 1000";
+      for (let page = 0; page < 8 && !found; page++) {
+        const mark = chief.lines().length;
+        chief.send(from);
+        await chief.expect(/BATCH -/, 10_000);
+        const stored = chief
+          .lines()
+          .slice(mark)
+          .filter((l) => replayed(" ").test(l));
+        if (stored.length === 0) break;
+        items += stored.length;
+        found = stored.some((l) => l.endsWith(` PRIVMSG #lobby :${text}`));
+        from = `CHATHISTORY BEFORE #lobby msgid=${msgid(stored[0] ?? "")} 1000`;
+      }
+      expect(items, "the items paged through, the first line's among them").toBeGreaterThan(3000);
+      expect(found, "the room's first line, after 3,000 events").toBe(true);
+    },
+  );
+
   it("stops a non-voiced account and guest sending in a +m room, a reaction TAGMSG included, until +v", async () => {
     const { e, chief, members } = await room(["alice", "obs"]);
     const [alice, obs] = members;
@@ -413,7 +498,7 @@ describe("history and tags", { timeout: 30_000 }, () => {
     alice.send("@+draft/react=x TAGMSG #lobby");
     await alice.expect(/ 404 alice #lobby :Cannot send to channel \(\+m\)/);
     gus.send("@+typing=active TAGMSG #lobby");
-    await gus.expect(/ 404 gus #lobby :Cannot send to channel \(\+m\)/);
+    await gus.expect(/ 404 Guest-gus #lobby :Cannot send to channel \(\+m\)/);
     await sync(obs);
     expect(logged(obs)).not.toMatch(/ TAGMSG #lobby/);
     chief.send("MODE #lobby +v alice");
@@ -446,6 +531,45 @@ describe("history and tags", { timeout: 30_000 }, () => {
     await sync(alice);
     await sync(obs);
     expect(obs.lines().slice(seen).join("\n")).not.toContain("TAGMSG");
+  });
+
+  // 4f: who is typing, relayed live to the room's members (IRCv3's +typing), as the page shows it.
+  it("relays an account's +typing to the room's members live", async () => {
+    const { members } = await room(["alice", "obs"]);
+    const [alice, obs] = members;
+    if (alice === undefined || obs === undefined) throw new Error("missing members");
+    alice.send("@+typing=active TAGMSG #lobby");
+    expect(await obs.expect(/ TAGMSG #lobby$/)).toMatch(/^@(\S*;)?\+typing=active[;\s].*:alice!/);
+  });
+
+  // 4f: the reading place Ergo keeps for an account and tells each of its sessions (draft/read-marker).
+  it("tells each session of an account the room's place as it joins, then every other one a later place set", async () => {
+    const { e } = await room([]);
+    const one = await login(e, "alice");
+    await join(one, "#lobby");
+    // From the server's own name, no user source, as core's fromServer reads it (the green pass's G8).
+    expect(one.lines().join("\n")).toMatch(/^(@\S+ )?:[^!@\s]+ MARKREAD #lobby \*$/m);
+    const id = await say(one, "#lobby", "read me");
+    const time = /time=([^;\s]+)/.exec(one.lines().find((l) => l.includes(id)) ?? "")?.[1] ?? "";
+    const two = await login(e, "alice");
+    await join(two, "#lobby");
+    one.send(`MARKREAD #lobby timestamp=${time}`);
+    await one.expect(new RegExp(`^(@\\S+ )?:[^!@\\s]+ MARKREAD #lobby timestamp=${time.replaceAll(".", "\\.")}`));
+    await two.expect(new RegExp(` MARKREAD #lobby timestamp=${time.replaceAll(".", "\\.")}`));
+    one.send("MARKREAD #lobby timestamp=2001-01-01T00:00:00.000Z");
+    await one.expect(new RegExp(` MARKREAD #lobby timestamp=${time.replaceAll(".", "\\.")}$`));
+    await sync(two);
+    expect(two.lines().filter((l) => l.includes(" MARKREAD "))).toHaveLength(2);
+    const three = await login(e, "alice");
+    await join(three, "#lobby");
+    expect(three.lines().join("\n")).toContain(` MARKREAD #lobby timestamp=${time}`);
+  });
+
+  it("tells no place to a session that did not ask draft/read-marker", async () => {
+    const { e } = await room([]);
+    const plain = await login(e, "alice", { caps: "sasl message-tags server-time batch" });
+    await join(plain, "#lobby");
+    expect(plain.lines().join("\n")).not.toContain("MARKREAD");
   });
 });
 
@@ -500,6 +624,29 @@ describe("moderation", { timeout: 40_000 }, () => {
     await allowed(opr, "opr", "by an oper in the room");
     await allowed(outsider, "outsider", "by an oper outside the room");
     await forbidden(alice, bob, "another author");
+  });
+
+  // The menu's green pass (G14): the page reads Ergo's own refusal (core's refusedOf), not the scripted Ergo's copy.
+  it("refuses another's line and an unknown msgid as the page reads them, and names no line for no room", async () => {
+    const e = await start();
+    await lobby(e);
+    const [alice, bob] = await Promise.all([login(e, "alice"), login(e, "bob")]);
+    await join(alice, "#lobby");
+    await join(bob, "#lobby");
+    const refusal = async (redact: string, code: string) => {
+      bob.send(redact);
+      const parsed = parseLine(await bob.expect(new RegExp(` FAIL REDACT ${code} `)));
+      if (!parsed.ok) throw new Error(`Ergo's refusal does not parse: ${parsed.error}`);
+      return refusedOf(parsed.message);
+    };
+    const id = await say(alice, "#lobby", "alice's own");
+    const unknown = "z".repeat(26);
+    expect(await refusal(`REDACT #lobby ${id} :x`, "REDACT_FORBIDDEN")).toStrictEqual({ room: "#lobby", id });
+    expect(await refusal(`REDACT #LOBBY ${unknown} :x`, "UNKNOWN_MSGID")).toStrictEqual({
+      room: "#lobby",
+      id: unknown,
+    });
+    expect(await refusal(`REDACT #nowhere ${id} :x`, "INVALID_TARGET")).toBeUndefined();
   });
 
   it("tells members who redacted, tells a client without the cap nothing, and drops it from history", async () => {
@@ -644,14 +791,14 @@ describe("operators and listeners", { timeout: 30_000 }, () => {
     const e = await start();
     const plain = await guest(e, "plop");
     plain.send(`OPER admin ${e.operPassword}`);
-    await plain.expect(/ 381 plop :You are now an IRC operator/);
+    await plain.expect(/ 381 Guest-plop :You are now an IRC operator/);
     const ws = await wsConnect(e.wsPort, { protocols: ["text.ircv3.net"] });
     if (ws === undefined) throw new Error("the WebSocket did not open");
     const viaWs = wsRaw(ws);
     await hello(viaWs);
     await finish(viaWs, "wsop");
     viaWs.send(`OPER admin ${e.operPassword}`);
-    expect(await viaWs.expect(/ 381 wsop /)).toContain("You are now an IRC operator");
+    expect(await viaWs.expect(/ 381 Guest-wsop /)).toContain("You are now an IRC operator");
   });
 
   it("takes the oper password from the environment as a bcrypt hash, and the old one stops working", async () => {
@@ -745,7 +892,7 @@ describe("the helper", { timeout: 30_000 }, () => {
       [b, "second"],
     ] as const) {
       const c = await guest(e, nick);
-      expect(logged(c)).toContain(` 001 ${nick} `);
+      expect(logged(c)).toContain(` 001 Guest-${nick} `);
     }
   });
 
@@ -906,7 +1053,7 @@ describe("logging in through the server (3d)", { timeout: 30_000 }, () => {
     const gus = await guest(e, "gus");
     await join(gus, "#lobby");
     gus.send("PRIVMSG #lobby :hello from guest");
-    await gus.expect(/ 404 gus #lobby :Cannot send to channel \(\+M\)/);
+    await gus.expect(/ 404 Guest-gus #lobby :Cannot send to channel \(\+M\)/);
     c.send("PRIVMSG #lobby :hello from an account");
     await gus.expect(new RegExp(`account=${me.address}.* PRIVMSG #lobby :hello from an account`));
   });
@@ -998,7 +1145,7 @@ describe("the server's IRC link (3h)", { timeout: 40_000 }, () => {
       .toHaveLength(1);
     const gus = await guest(e, "gus");
     gus.send("JOIN #bubble");
-    await gus.expect(/ 403 gus #bubble /);
+    await gus.expect(/ 403 Guest-gus #bubble /);
   });
 
   it("logs in as an operator, makes its rooms and reads an account's message, never a direct one", async () => {
@@ -1042,11 +1189,64 @@ describe("the server's IRC link (3h)", { timeout: 40_000 }, () => {
       retryMs: () => 60_000,
     });
     stops.push(() => link.stop());
-    await inRoom(await oper(e, "gus"), "#bubble");
+    const gus = await oper(e, "gus");
+    await inRoom(gus, "#bubble");
     await link.stop();
+    // The bot is away only once Ergo has dropped its session: asked, the nick is unknown (401) rather than listed.
+    for (;;) {
+      const mark = gus.lines().length;
+      gus.send("WHOIS gnoworld");
+      await gus.expect(/ (311|401) gus gnoworld /);
+      if (
+        gus
+          .lines()
+          .slice(mark)
+          .some((l) => l.includes(" 401 gus gnoworld "))
+      )
+        break;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
     const squatter = await open(e);
     await hello(squatter);
-    await finish(squatter, "gnoworld", / 433 /);
+    await finish(squatter, "gnoworld");
+    expect(logged(squatter)).toContain(" 001 Guest-gnoworld ");
+  });
+
+  it("keeps the bot's nick from a guest that asks first, before the bot ever logged in (F722)", async () => {
+    const e = await start();
+    const early = await open(e);
+    await hello(early);
+    await finish(early, "gnoworld");
+    expect(logged(early)).toContain(" 001 Guest-gnoworld ");
+    expect(logged(early)).not.toContain(" 001 gnoworld ");
+    // A change of nick goes the same way: asking for gnoworld is asking for Guest-gnoworld, which the first holds, so it is refused.
+    const later = await guest(e, "later");
+    later.send("NICK gnoworld");
+    await later.expect(/ 433 Guest-later gnoworld :Nickname is already in use/);
+    // The case does not get round it: Ergo casefolds nicks.
+    later.send("NICK GNOWORLD");
+    await later.expect(/ 433 Guest-later GNOWORLD :Nickname is already in use/);
+  });
+
+  it("logs in as gnoworld while a guest already holds Guest-gnoworld (F722)", async () => {
+    const e = await start();
+    const early = await open(e);
+    await hello(early);
+    await finish(early, "gnoworld");
+    expect(logged(early)).toContain(" 001 Guest-gnoworld ");
+    const lines: string[] = [];
+    const link = ircLink({
+      host: "127.0.0.1",
+      port: e.port,
+      password: e.operPassword,
+      rooms: () => ["#bubble"],
+      onMessage: () => undefined,
+      log: logger("a-pepper-of-forty-characters-0123456789", (line) => lines.push(line)),
+      retryMs: () => 200,
+    });
+    stops.push(() => link.stop());
+    expect(await inRoom(await oper(e, "watcher"), "#bubble")).toMatch(/ :(.* )?@gnoworld\b/);
+    expect(lines.join("\n")).not.toContain("irc_refused");
   });
 
   it("gets ready as a second session of its account while its last one lingers (the max review)", async () => {
@@ -1087,6 +1287,29 @@ describe("the server's IRC link (3h)", { timeout: 40_000 }, () => {
 });
 
 describe("the template's limits and privacy (slice 3's max review)", { timeout: 30_000 }, () => {
+  // The composer's budget (core's compose, 4c): Ergo relays an account's line of exactly it, under its nick, user
+  // and cloak, and refuses one byte more rather than cut it (allow-truncation off).
+  it("relays an account's line of the composer's whole budget, 510 bytes relayed, and refuses one byte more", async () => {
+    const e = await start();
+    const chief = await lobby(e);
+    const member = await login(e, ADDRESS);
+    await join(member, "#lobby");
+    const head = "PRIVMSG #lobby :";
+    const budget = LINE_BYTES - relayOf(ADDRESS);
+    const text = (bytes: number) => "a".repeat(bytes - head.length);
+    expect(compose("#lobby", text(budget), ADDRESS)).toMatchObject({
+      kind: "line",
+      line: head + text(budget),
+      left: 0,
+    });
+    member.send(head + text(budget));
+    const seen = await chief.expect(/PRIVMSG #lobby :a+$/);
+    expect(Buffer.byteLength(seen.replace(/^@\S+ /, ""))).toBe(LINE_BYTES);
+    expect(compose("#lobby", text(budget + 1), ADDRESS)).toStrictEqual({ kind: "long", over: 1 });
+    member.send(head + text(budget + 1));
+    await member.expect(/ 417 /);
+  });
+
   // A visitor reaching Ergo through web: its address in X-Forwarded-For, from a trusted peer (loopback).
   const visitor = (e: Ergo, address: string): Promise<Ws | undefined> =>
     wsConnect(e.wsPort, { protocols: ["text.ircv3.net"], headers: { "X-Forwarded-For": address } });
@@ -1179,8 +1402,8 @@ describe("the template's limits and privacy (slice 3's max review)", { timeout: 
     gus.send("WHO *");
     await sync(gus);
     expect(logged(gus)).not.toMatch(/ 353 .*carol/);
-    expect(logged(gus)).not.toMatch(/ 319 gus carol /);
-    expect(logged(gus)).not.toMatch(/ 352 gus \S+ \S+ \S+ \S+ carol /);
+    expect(logged(gus)).not.toMatch(/ 319 \S+ carol /);
+    expect(logged(gus)).not.toMatch(/ 352 \S+ \S+ \S+ \S+ \S+ carol /);
     chief.send("NAMES #club");
     await chief.expect(/ 353 .*carol/);
   });
@@ -1234,5 +1457,141 @@ describe("the template's limits and privacy (slice 3's max review)", { timeout: 
     const stored = late.lines().filter((l) => replayed(" TAGMSG #lobby").test(l));
     expect(stored.join("\n")).toContain("+draft/react=x");
     expect(stored.join("\n")).toContain("+draft/unreact=x");
+  });
+});
+
+// draft/multiline (slice 4, docs/decisions.md row 255): the template turns it on with the composer's caps (core's
+// compose); Ergo relays a message of several lines to a reader with the capability as one batch, its id on the
+// opening line, replays it so inside a history page, and refuses one past its caps (irc/handlers.go, v2.19.1).
+describe("messages of several lines (draft/multiline)", { timeout: 30_000 }, () => {
+  // A message of several lines as the page sends it: its composed lines, each a PRIVMSG of one batch.
+  const sendLines = (c: Raw, room: string, text: string) => {
+    const composed = compose(room, text, ADDRESS);
+    if (composed.kind !== "lines") throw new Error(`the test's text is no message of several lines: ${composed.kind}`);
+    c.send(`BATCH +m1 draft/multiline ${room}`);
+    for (const line of composed.lines) c.send(`@batch=m1 ${line}`);
+    c.send("BATCH -m1");
+  };
+  // What a connection heard, read as the page reads it: batches held, a multiline one folded into one message.
+  const heard = (c: Raw): IrcMessage[] => {
+    const reader = new BatchReader();
+    return c.lines().flatMap((line) => {
+      const parsed = parseLine(line);
+      if (!parsed.ok) return [];
+      const read = reader.read(parsed.message);
+      if (read.kind === "pass") return [parsed.message];
+      if (read.kind !== "done") return [];
+      if (read.batch.type === "draft/multiline") return [foldMultiline(read.batch) ?? []].flat();
+      return read.batch.messages;
+    });
+  };
+  const said = (messages: readonly IrcMessage[]) =>
+    messages.filter((m) => m.command === "PRIVMSG").map((m) => m.params[1]);
+
+  it("advertises draft/multiline with the composer's caps", async () => {
+    const e = await start();
+    const c = await open(e);
+    c.send("CAP LS 302");
+    const ls = await c.expect(/ CAP \S+ LS .*draft\/multiline=/);
+    expect(/draft\/multiline=max-bytes=(\d+),max-lines=(\d+)/.exec(ls)?.slice(1)).toEqual([
+      String(MULTILINE_BYTES),
+      String(MULTILINE_LINES),
+    ]);
+  });
+
+  it("relays an account's message of several lines as one batch, its id, time and account on its opening line", async () => {
+    const e = await start();
+    const chief = await lobby(e);
+    const member = await login(e, ADDRESS);
+    await join(member, "#lobby");
+    sendLines(member, "#lobby", "- one\n- two\n\n> quoted");
+    const opening = await chief.expect(/ BATCH :?\+\S+ draft\/multiline :?#lobby$/);
+    expect(opening).toMatch(/^@\S*msgid=\S+/);
+    expect(opening).toMatch(/[@;]time=\S+/);
+    expect(opening).toMatch(new RegExp(`[@;]account=${ADDRESS}[; ]`));
+    await chief.expect(/ BATCH :?-\S+$/);
+    expect(said(heard(chief))).toEqual(["- one\n- two\n\n> quoted"]);
+  });
+
+  it("replays a message of several lines as one batch inside the history page, read as one line", async () => {
+    const e = await start();
+    await lobby(e);
+    const member = await login(e, ADDRESS);
+    await join(member, "#lobby");
+    sendLines(member, "#lobby", "first\nsecond");
+    await member.expect(/ BATCH :?-\S+$/);
+    const late = await login(e, "alice");
+    await join(late, "#lobby");
+    history(late, "#lobby");
+    await late.expect(/ BATCH :?-\S+$/);
+    await sync(late);
+    expect(said(heard(late))).toContain("first\nsecond");
+  });
+
+  it(`refuses a message of ${String(MULTILINE_LINES + 1)} lines, saying so, and relays none of it`, async () => {
+    const e = await start();
+    const chief = await lobby(e);
+    const member = await login(e, ADDRESS);
+    await join(member, "#lobby");
+    member.send("BATCH +big draft/multiline #lobby");
+    for (let n = 0; n <= MULTILINE_LINES; n++) member.send(`@batch=big PRIVMSG #lobby :line ${String(n)}`);
+    member.send("BATCH -big");
+    await member.expect(/ FAIL BATCH MULTILINE_MAX_LINES /);
+    await sync(chief);
+    expect(logged(chief)).not.toMatch(/PRIVMSG #lobby :line 0/);
+  });
+
+  it(`refuses a message past ${String(MULTILINE_BYTES)} bytes, breaks counted, saying so`, async () => {
+    const e = await start();
+    const chief = await lobby(e);
+    const member = await login(e, ADDRESS);
+    await join(member, "#lobby");
+    member.send("BATCH +big draft/multiline #lobby");
+    for (let n = 0; n < 10; n++) member.send(`@batch=big PRIVMSG #lobby :${"a".repeat(400)}`);
+    member.send(`@batch=big PRIVMSG #lobby :${"a".repeat(MULTILINE_BYTES - 4010 + 1)}`);
+    member.send("BATCH -big");
+    await member.expect(/ FAIL BATCH MULTILINE_MAX_BYTES /);
+    await sync(chief);
+    expect(logged(chief)).not.toMatch(/PRIVMSG #lobby :a{10}/);
+  });
+
+  // The red pass's R10: the caps counted as Ergo counts them (every break billed one byte, a blank line a line),
+  // so the composer's last byte and last line go, and its part budget is Ergo's (a part over it: 417, none relayed).
+  it(`relays a message at exactly ${String(MULTILINE_LINES)} lines and ${String(MULTILINE_BYTES)} bytes, blank lines inside, whole`, async () => {
+    const e = await start();
+    const chief = await lobby(e);
+    const member = await login(e, ADDRESS);
+    await join(member, "#lobby");
+    // 40 lines, 4 of them blank inside (the draft is trimmed, so the last is not): 4057 bytes of text, 39 breaks.
+    const full = Array.from({ length: 40 }, (_, n) => {
+      if (n % 8 === 7 && n < 39) return "";
+      return "a".repeat(n === 0 ? 110 : n === 39 ? 10 : n < 32 ? 116 : 115);
+    }).join("\n");
+    const composed = compose("#lobby", full, ADDRESS);
+    expect(composed).toMatchObject({ kind: "lines", left: 0 });
+    sendLines(member, "#lobby", full);
+    await chief.expect(/ BATCH :?-\S+$/);
+    expect(said(heard(chief))).toEqual([full]);
+  });
+
+  it("relays a part of exactly the composer's budget, and refuses one byte more with a 417, relaying none", async () => {
+    const e = await start();
+    const chief = await lobby(e);
+    const member = await login(e, ADDRESS);
+    await join(member, "#lobby");
+    const head = "PRIVMSG #lobby :";
+    const budget = LINE_BYTES - relayOf(ADDRESS) - head.length;
+    expect(compose("#lobby", `a\n${"b".repeat(budget)}`, ADDRESS)).toMatchObject({ kind: "lines" });
+    expect(compose("#lobby", `a\n${"b".repeat(budget + 1)}`, ADDRESS)).toMatchObject({ kind: "long", line: 2 });
+    sendLines(member, "#lobby", `a\n${"b".repeat(budget)}`);
+    await chief.expect(/ BATCH :?-\S+$/);
+    expect(said(heard(chief))).toEqual([`a\n${"b".repeat(budget)}`]);
+    member.send("BATCH +long draft/multiline #lobby");
+    member.send("@batch=long PRIVMSG #lobby :a");
+    member.send(`@batch=long PRIVMSG #lobby :${"b".repeat(budget + 1)}`);
+    member.send("BATCH -long");
+    await member.expect(/ 417 /);
+    await sync(chief);
+    expect(said(heard(chief))).toHaveLength(1);
   });
 });

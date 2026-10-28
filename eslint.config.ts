@@ -10,9 +10,10 @@ import app from "./lint/app.config.ts";
 import core from "./lint/core.config.ts";
 import react from "./lint/react.config.ts";
 import server from "./lint/server.config.ts";
-import { MODULE_STATE, SWALLOWED, SWITCHED_OFF, TESTS } from "./lint/shared.config.ts";
+import { BENCHES, CLASS_AT_END, MODULE_STATE, SWALLOWED, SWITCHED_OFF, TESTS } from "./lint/shared.config.ts";
 
 const BASELINE_ALSO = { allowAtRules: ["starting-style"], allowSelectors: ["popover-open"] };
+const BOX = { ...BASELINE_ALSO, allowProperties: ["field-sizing", "resize"] };
 const FACE = { ...BASELINE_ALSO, allowProperties: ["forced-color-adjust"] };
 
 export default defineConfig(
@@ -39,7 +40,7 @@ export default defineConfig(
       "no-useless-catch": "error",
       "no-unsafe-finally": "error",
       "preserve-caught-error": ["error", { requireCatchParameter: true }],
-      "no-restricted-syntax": ["error", ...SWALLOWED],
+      "no-restricted-syntax": ["error", ...SWALLOWED, CLASS_AT_END],
       "@typescript-eslint/no-floating-promises": ["error", { ignoreVoid: false }],
       "@typescript-eslint/switch-exhaustiveness-check": "error",
       // The type checker is never silenced, not even with a reason.
@@ -64,7 +65,7 @@ export default defineConfig(
   // tests' lists replace it.
   {
     files: ["server/src/**/*.ts", "packages/*/src/**/*.{ts,tsx}"],
-    rules: { "no-restricted-syntax": ["error", ...SWALLOWED, MODULE_STATE] },
+    rules: { "no-restricted-syntax": ["error", ...SWALLOWED, CLASS_AT_END, MODULE_STATE] },
   },
   react,
   app,
@@ -75,7 +76,7 @@ export default defineConfig(
     rules: {
       "max-lines": "off",
       "max-lines-per-function": "off",
-      "no-restricted-syntax": ["error", ...SWALLOWED, SWITCHED_OFF],
+      "no-restricted-syntax": ["error", ...SWALLOWED, CLASS_AT_END, SWITCHED_OFF],
     },
   },
   {
@@ -86,12 +87,19 @@ export default defineConfig(
       "no-restricted-syntax": [
         "error",
         ...SWALLOWED,
+        CLASS_AT_END,
         SWITCHED_OFF,
         { selector: "MemberExpression[property.name='fails']", message: "`fails` is for pairing in core only." },
       ],
     },
   },
   core,
+  {
+    // A bench is switched off like a test (security-S1). Last, since a later no-restricted-syntax replaces an earlier
+    // one's: the list every other file of the app has, and no bench of core, the server or the design system exists.
+    files: BENCHES,
+    rules: { "no-restricted-syntax": ["error", ...SWALLOWED, CLASS_AT_END, SWITCHED_OFF] },
+  },
   {
     files: ["**/*.css"],
     language: "css/css",
@@ -110,4 +118,6 @@ export default defineConfig(
   // And forced-color-adjust, which only a picture takes, where forced colours exist: the avatar's face,
   // never a control (Alexis, F319; F349).
   { files: ["packages/ui/src/Avatar/**/*.css"], rules: { "css/use-baseline": ["error", FACE] } },
+  // And field-sizing and resize, which the box of lines grows and limits its handle by, in Field's folder alone (F1729).
+  { files: ["packages/ui/src/Field/**/*.css"], rules: { "css/use-baseline": ["error", BOX] } },
 );

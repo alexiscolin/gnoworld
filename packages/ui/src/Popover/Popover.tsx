@@ -1,5 +1,16 @@
-import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type ToggleEvent } from "react";
-import { buttonLook } from "../Button/control.ts";
+import {
+  Fragment,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+  type ToggleEvent,
+} from "react";
+import { buttonLook, iconLook, iconSize } from "../Button/control.ts";
+import { Icon, type IconName } from "../icons/Icon.tsx";
+import { Tooltip } from "../Tooltip/Tooltip.tsx";
 import { rove } from "../roving.ts";
 import { floating, usePlaced } from "./floating.ts";
 import styles from "./Popover.module.css";
@@ -68,18 +79,29 @@ export function Popover({ trigger: words, label, children }: PopoverProps) {
 export interface MenuItem {
   label: string;
   onSelect: () => void;
+  /** An irreversible act: coral, with the alert icon, after a separator (docs/DESIGN-SYSTEM.md, "Severity"). */
+  tone?: "danger";
 }
 
 export interface MenuProps {
+  /** The trigger's words; with an icon, its name, which assistive technology reads and its tooltip shows. */
   trigger: string;
   label: string;
   items: MenuItem[];
+  /** An icon in place of the words: the trigger is then square, as an IconButton. */
+  icon?: IconName;
+  /** An icon trigger's look, as an IconButton's: outline unless plain. */
+  emphasis?: "outline" | "plain";
+  /** An icon trigger's size: small in a toolbar (docs/DESIGN-SYSTEM.md, "a toolbar's small controls stay at 32"). */
+  size?: "s" | "m";
 }
 
 /** A list of acts under its trigger, its first item focused as it opens; the arrows move among the
  * items, round the ends, Home and End go to the ends, and an act closes it first (WAI-ARIA's menu). */
-export function Menu({ trigger: words, label, items }: MenuProps) {
+export function Menu({ trigger: words, label, items, icon, emphasis = "outline", size = "m" }: MenuProps) {
   const { open, panelRef, trigger, panel } = useAnchored("menu");
+  // The danger acts come last, apart: a separator before the first.
+  const apart = items.findIndex((item) => item.tone === "danger");
   // Its first item, once placed and so seen: a hidden item takes no focus.
   useLayoutEffect(() => {
     if (open) panelRef.current?.querySelector<HTMLElement>("[role='menuitem']")?.focus();
@@ -93,24 +115,39 @@ export function Menu({ trigger: words, label, items }: MenuProps) {
   };
   return (
     <>
-      <button type="button" {...trigger}>
-        {words}
-      </button>
-      <div {...panel} aria-label={label} onKeyDown={move}>
-        {items.map((item) => (
-          <button
-            key={item.label}
-            type="button"
-            role="menuitem"
-            tabIndex={-1}
-            className={styles["item"]}
-            onClick={() => {
-              panelRef.current?.hidePopover();
-              item.onSelect();
-            }}
-          >
-            {item.label}
+      {icon === undefined ? (
+        <button type="button" {...trigger}>
+          {words}
+        </button>
+      ) : (
+        <Tooltip label={words}>
+          <button type="button" {...trigger} aria-label={words} {...iconLook(emphasis, size)}>
+            <Icon name={icon} size={iconSize(size)} />
           </button>
+        </Tooltip>
+      )}
+      <div {...panel} aria-label={label} onKeyDown={move}>
+        {items.map((item, at) => (
+          <Fragment key={item.label}>
+            {at === apart ? <div role="separator" className={styles["separator"]} /> : null}
+            <button
+              type="button"
+              role="menuitem"
+              tabIndex={-1}
+              className={styles["item"]}
+              data-tone={item.tone}
+              onClick={() => {
+                panelRef.current?.hidePopover();
+                // The trigger holds the focus as the item acts, which a browser that never focused it does not give back
+                // on hiding: a dialog the item opens returns the focus there as it closes, never to the page.
+                trigger.ref.current?.focus();
+                item.onSelect();
+              }}
+            >
+              {item.tone === "danger" ? <Icon name="alert" /> : null}
+              {item.label}
+            </button>
+          </Fragment>
         ))}
       </div>
     </>

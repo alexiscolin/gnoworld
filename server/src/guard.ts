@@ -27,7 +27,8 @@ export function guard(
 }
 
 // The body's JSON, or undefined for text that is not JSON, which the schema then refuses like any bad
-// body. Hono's body limit has read the body whole before a route runs (hono/body-limit, 4.13.13).
+// body. Hono's body limit checks a declared length at once, and reads a body with none (chunked) whole before
+// a route runs (hono/body-limit, 4.13.13).
 export async function json(c: Context): Promise<unknown> {
   const text = await c.req.text();
   try {

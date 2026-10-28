@@ -68,4 +68,20 @@ export const WithAction: Story = {
     ),
   },
 };
+// A confirmation that quotes what it is about (4c's delete), its danger button naming the act.
+export const Asking: Story = {
+  args: {
+    title: "Delete message?",
+    description: "the second line, as it was written",
+    children: (
+      <Stack>
+        <p>It leaves #games for everyone, and cannot come back.</p>
+        <Cluster justify="end">
+          <Button emphasis="outline">Keep it</Button>
+          <Button tone="danger">Delete message</Button>
+        </Cluster>
+      </Stack>
+    ),
+  },
+};
 export const FromAButton: Story = { render: () => <Opener />, tags: ["!viewport"] };

@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, useRef, type KeyboardEvent } from "react";
 import { Sidebar, Stack } from "../compositions/index.ts";
 import styles from "./Field.module.css";
 
@@ -6,33 +6,104 @@ export interface FieldProps {
   label: string;
   value: string;
   onChange: (value: string) => void;
-  /** Text unless asked; a date is the browser's date and time. */
-  kind?: "text" | "search" | "date";
+  /** Text unless asked; a date is the browser's date and time; lines is a box of several lines, in which Enter
+   * submits the form and Shift+Enter adds a line, a chat's box. */
+  kind?: "text" | "search" | "date" | "lines";
+  /** In a box of lines, Enter adds a line, and the form's button submits: a touch keyboard has no Shift. */
+  enterAddsLine?: boolean | undefined;
   help?: string;
   error?: string;
   /** Words before the box, outside its value: "@" before a name. */
   prefix?: string;
+  /** The ids of what else on the page says what the box is about (a composer's reply bar), after its help. */
+  describedBy?: string | undefined;
 }
 
 const TYPES = { text: "text", search: "search", date: "datetime-local" } as const;
 
-/** A labelled box, described by its help and its error, which also marks it invalid. */
-export function Field({ label, value, onChange, kind = "text", help, error, prefix }: FieldProps) {
-  const id = useId();
-  const helpId = `${id}-help`;
-  const errorId = `${id}-error`;
-  const described = [help === undefined ? null : helpId, error === undefined ? null : errorId].filter(Boolean);
-  const box = (
-    <input
-      id={id}
-      type={TYPES[kind]}
-      className={styles["box"]}
-      value={value}
-      aria-invalid={error === undefined ? undefined : true}
-      aria-describedby={described.join(" ") || undefined}
+// Enter sends the form, but not the Enter that ends an input method's composition, which only picks the word: Safari
+// sends that one after compositionend, isComposing false, keyCode 229 (F1713): the only mark it gives, deprecated
+// and still sent, so read by name.
+function submitOnEnter(event: KeyboardEvent<HTMLTextAreaElement>, composing: boolean): void {
+  const { isComposing } = event.nativeEvent;
+  if (event.key !== "Enter" || event.shiftKey || composing || isComposing) return;
+  if (Reflect.get(event.nativeEvent, "keyCode") === 229) return;
+  event.preventDefault();
+  event.currentTarget.form?.requestSubmit();
+}
+
+interface BoxProps extends Pick<FieldProps, "value" | "onChange" | "enterAddsLine"> {
+  kind: NonNullable<FieldProps["kind"]>;
+  id: string;
+  invalid: boolean;
+  described: string | undefined;
+}
+
+// The box itself: a line of text, or the lines of a message.
+function Box({ kind, id, value, invalid, described, enterAddsLine, onChange }: BoxProps) {
+  const composingRef = useRef(false);
+  const shared = {
+    id,
+    className: styles["box"],
+    value,
+    "aria-invalid": invalid ? true : undefined,
+    "aria-describedby": described,
+  };
+  return kind === "lines" ? (
+    <textarea
+      {...shared}
+      rows={2}
+      onCompositionStart={() => {
+        composingRef.current = true;
+      }}
+      onCompositionEnd={() => {
+        composingRef.current = false;
+      }}
+      onKeyDown={(event) => {
+        if (enterAddsLine !== true) submitOnEnter(event, composingRef.current);
+      }}
       onChange={(event) => {
         onChange(event.target.value);
       }}
+    />
+  ) : (
+    <input
+      {...shared}
+      type={TYPES[kind]}
+      onChange={(event) => {
+        onChange(event.target.value);
+      }}
+    />
+  );
+}
+
+/** A labelled box, described by its help and its error, which also marks it invalid. */
+export function Field({
+  label,
+  value,
+  onChange,
+  kind = "text",
+  help,
+  error,
+  prefix,
+  describedBy,
+  enterAddsLine,
+}: FieldProps) {
+  const id = useId();
+  const helpId = `${id}-help`;
+  const errorId = `${id}-error`;
+  const described = [help === undefined ? null : helpId, error === undefined ? null : errorId, describedBy].filter(
+    Boolean,
+  );
+  const box = (
+    <Box
+      kind={kind}
+      id={id}
+      value={value}
+      invalid={error !== undefined}
+      described={described.join(" ") || undefined}
+      enterAddsLine={enterAddsLine}
+      onChange={onChange}
     />
   );
   return (

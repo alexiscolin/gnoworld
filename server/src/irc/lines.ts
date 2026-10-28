@@ -11,6 +11,8 @@ export interface Said {
   text: string;
   time?: string;
   edits?: string;
+  /** A message of several lines the link could not read whole: hidden by this id, whatever its text says. */
+  unreadable?: true;
 }
 
 export type Command = "REDACT" | "NOTICE" | "SAMODE" | "JOIN" | "KICK";
@@ -80,12 +82,18 @@ function marks(tags: IrcMessage["tags"]): { time?: string; edits?: string } {
   };
 }
 
+// A line to a room's voices or operators (STATUSMSG: +#room, @#room, any of ~&@%+ before the name) is the room's
+// line too: Ergo relays it to those members and keeps no history of it (channel.go, #959), so it is read for the
+// rules, the check and the strikes, and its hide is refused (F723).
+const STATUS = /^[~&@%+]+(?=#)/;
+
 // A room's message as the link hands it on, or nothing: a channel line of one of its rooms, with the
 // account and the id Ergo set, from someone else, with text.
 export function said(
-  { tags, source, params: [room = "", text = ""] }: IrcMessage,
+  { tags, source, params: [target = "", text = ""] }: IrcMessage,
   joined: ReadonlySet<string>,
 ): Said | undefined {
+  const room = target.replace(STATUS, "");
   const [account = "", msgid = ""] = [tags.get("account"), tags.get("msgid")];
   const fields = [text, account, msgid];
   if (fields.includes("") || source?.split("!")[0] === NICK || !joined.has(room)) return undefined;

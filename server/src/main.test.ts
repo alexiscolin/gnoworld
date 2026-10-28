@@ -77,7 +77,9 @@ const listening = (server: Server): Promise<number> =>
     });
   });
 
-describe("the server's process", () => {
+// Each test boots a Node process, which takes seconds when the machine is busy (three gates at once): 30 s, not
+// Vitest's 5, the assertions unchanged.
+describe("the server's process", { timeout: 30_000 }, () => {
   it("starts as the image starts it, and answers /health", async () => {
     const port = await listening(start(settings()));
     expect((await fetch(`http://127.0.0.1:${String(port)}/health`)).status).toBe(200);
@@ -126,7 +128,7 @@ describe("the server's process", () => {
     const known = await call("me", { headers: { cookie } });
     expect([known.status, await known.json()]).toEqual([200, { address: who.address }]);
     expect((await posted("logout", {}, cookie)).status).toBe(204);
-    expect((await call("me", { headers: { cookie } })).status).toBe(401);
+    expect(await (await call("me", { headers: { cookie } })).json()).toEqual({ address: null });
     const foreign = await call("challenge", {
       method: "POST",
       headers: { origin: "https://evil.test", "content-type": "application/json" },
@@ -306,6 +308,35 @@ describe("the server's process", () => {
     expect(await rooms({ cookie: await session(lead) })).toContain("#bubble/crew");
   });
 
+  it("lists a world's rooms by section from the roles file, to a guest only the rooms it may see (4b)", async () => {
+    const rules = { bannedWords: [], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
+    const roles = join(folder("gnoworld-roles-"), "roles.json");
+    const crew = { room: "#bubble/crew", type: "members", readers: "crew" };
+    const sections = [
+      { name: "Crew", rooms: ["#bubble/crew"] },
+      { name: "Lobby", rooms: ["#bubble"] },
+    ];
+    writeFileSync(
+      roles,
+      JSON.stringify({
+        team: [],
+        trusted: [],
+        worlds: [{ slug: "bubble", moderators: [], rules, groups: { crew: [] }, rooms: [crew], sections }],
+      }),
+    );
+    const port = await listening(start({ ...settings(), ROLES_FILE: roles }));
+    const ask = (query: string) => fetch(`http://127.0.0.1:${String(port)}/api/rooms${query}`);
+    const answer = await ask("?world=bubble");
+    expect([answer.status, await answer.text(), answer.headers.get("cache-control")]).toEqual([
+      200,
+      JSON.stringify({ world: "bubble", sections: [{ name: "Lobby", rooms: [{ room: "#bubble", type: "open" }] }] }),
+      "public, max-age=5",
+    ]);
+    expect((await ask("?world=nowhere")).status).toBe(200);
+    expect((await ask("?world=Bubble")).status).toBe(400);
+    expect((await ask("")).status).toBe(400);
+  });
+
   it("removes the verdicts older than 180 days when it starts, and keeps the others (3n)", async () => {
     const env = settings();
     const first = start(env);
@@ -354,6 +385,19 @@ describe("the server's process", () => {
         ],
       }),
     ]);
+  });
+
+  // 4d: the pins' table is among its migrations and its routes are mounted, with no Ergo set to read a line from.
+  it("serves a room's pins to a guest, none yet, saying it may not pin, and refuses a room that is no room's (4d)", async () => {
+    const port = await listening(start(settings()));
+    const ask = (query: string) => fetch(`http://127.0.0.1:${String(port)}/api/pins${query}`);
+    const answer = await ask("?room=%23bubble");
+    expect([answer.status, await answer.text(), answer.headers.get("cache-control")]).toEqual([
+      200,
+      JSON.stringify({ room: "#bubble", may: false, pins: [] }),
+      "no-store",
+    ]);
+    expect((await ask("?room=bubble")).status).toBe(400);
   });
 
   it("takes the login's chains and its new accounts an hour from its settings", async () => {
@@ -423,7 +467,11 @@ describe("the server's process", () => {
     expect(other.status).toBe(200);
     server.child.kill("SIGTERM");
     expect(await exited(server)).toBe(0);
-    expect((await other.body?.getReader().read())?.done).toBe(true);
+    // Read to its end: what it says before it ends is not this test's.
+    const reader = other.body?.getReader();
+    let chunk = await reader?.read();
+    while (chunk?.done === false) chunk = await reader?.read();
+    expect(chunk?.done).toBe(true);
   });
 
   it("drains on SIGTERM: a request already begun is answered, then the process exits 0", async () => {

@@ -27,6 +27,7 @@ export const REASON_WORDS: Readonly<Record<Category | RuleReason, string>> = {
   too_fast: "too many messages too fast",
   not_their_edit: "an edit of a message that is not yours",
   unknown_edit: "an edit of a message the bot cannot place",
+  unreadable: "a message of several lines the bot could not read whole",
 };
 
 const RULES = "https://gno.world/rules";

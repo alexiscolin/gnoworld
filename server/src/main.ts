@@ -7,16 +7,11 @@ import { openDatabase } from "./db.ts";
 import { logger } from "./log.ts";
 import { startChat } from "./chat.ts";
 import { authServer, listenAt } from "./ergo/auth.ts";
-import { LOGIN_TABLES, makeLogin, NONCE_HOST } from "./login/login.ts";
-import { TICKET_TABLES } from "./login/ticket.ts";
-import { PROGRESS_TABLES } from "./moderation/catchup.ts";
-import { MUTE_TABLES } from "./moderation/mute.ts";
-import { STRIKE_TABLES } from "./moderation/strikes.ts";
-import { VERDICT_TABLES } from "./moderation/check.ts";
-import { ROOM_TABLES } from "./rooms/rooms.ts";
+import { makeLogin } from "./login/login.ts";
+import { migrations } from "./migrations.ts";
+import { pinsRoutes } from "./pins/routes.ts";
 import { loginFrom } from "./login/routes.ts";
 import { loadRoles, spared } from "./roles/roles.ts";
-import { ROOM_STATE } from "./rooms/create.ts";
 import { startRetention } from "./retention/retention.ts";
 import { roomsRoutes } from "./rooms/routes.ts";
 
@@ -27,17 +22,7 @@ const config = loadConfig(process.env);
 // Checked at boot, so a bad roles file never starts a server; the bot's link (3h) reads it.
 const roles = loadRoles(config.roles);
 const log = logger(config.pepper, (line) => process.stdout.write(line));
-const db = openDatabase(config.database, [
-  LOGIN_TABLES,
-  TICKET_TABLES,
-  NONCE_HOST,
-  ROOM_TABLES,
-  VERDICT_TABLES,
-  PROGRESS_TABLES,
-  MUTE_TABLES,
-  STRIKE_TABLES,
-  ROOM_STATE,
-]);
+const db = openDatabase(config.database, migrations);
 // The verdicts kept 180 days and below their cap, now and every five minutes (3n), Ergo's folder measured (3n-b).
 const retention = startRetention(db, { log, ergoData: config.ergoData });
 let draining = false;
@@ -58,10 +43,24 @@ const chat = startChat(
   { log, pepper: config.pepper, session },
 );
 app.route("/api/activity", chat.activity);
+app.route("/api/rooms", chat.roomList);
 app.route("/api/stream", chat.stream);
+app.route("/api/verdicts", chat.verdicts);
 app.route(
   "/api/rooms",
   roomsRoutes({ roles, rooms: chat.rooms, session, origins: config.origins, log, now: Date.now }),
+);
+app.route(
+  "/api/pins",
+  pinsRoutes({
+    pins: chat.pins,
+    mayPin: chat.mayPin,
+    readable: chat.mayRead,
+    session,
+    origins: config.origins,
+    log,
+    now: Date.now,
+  }),
 );
 // Ergo's logins go through the socket; without it, Ergo lets nobody in (fails closed).
 const auth = authServer(db, { log, ...(config.ergo === undefined ? {} : { bot: config.ergo.password }) });

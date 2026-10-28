@@ -16,6 +16,8 @@ the ADR sections it names. Read only what the slice touches. At most 80 lines, i
    first, and what is marked `test.fails` for Alexis (`.claude/rules/core.md`).
 7. **Files:** what it creates or changes; the tier-1 files (`docs/REVIEW.md`); the parts
    Alexis writes.
+   **Merges:** the slice cut into merges, each with its failing tests; which merge waits on which,
+   and the ones that can be built side by side, each on its own branch and worktree.
 8. **Dependencies to ask for,** each with its version and date read on npm today.
 9. **Questions for Alexis.**
 

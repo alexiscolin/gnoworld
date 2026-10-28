@@ -32,6 +32,101 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     expect(bob.lines().filter((line) => line.includes(` REDACT #bubble ${clean}`))).toEqual([]);
   });
 
+  // The red pass's R1: Ergo gives a reader without draft/multiline each part as a line of its own, the id on the
+  // first alone, so a line past the first would go unchecked; the link asks for the capability.
+  it("checks a message of several lines whole, its last line the flagged one, and hides it by the id of its batch", async () => {
+    const e = await start();
+    const asked: string[] = [];
+    const { verdicts } = await chatFor(e, asked);
+    const alice = await login(e, "alice");
+    await join(alice, "#bubble");
+    const bob = await login(e, "bob");
+    await join(bob, "#bubble");
+    alice.send("BATCH +m1 draft/multiline #bubble");
+    for (const text of ["hello", "", "I will hurt you"]) alice.send(`@batch=m1 PRIVMSG #bubble :${text}`);
+    alice.send("BATCH -m1");
+    const opening = await bob.expect(/ BATCH :?\+\S+ draft\/multiline :?#bubble$/);
+    const id = /(?:^@|;)msgid=([^;\s]+)/.exec(opening)?.[1] ?? "?";
+    await bob.expect(new RegExp(` REDACT #bubble ${id} violence`), 10_000);
+    expect(asked).toEqual(["hello\n\nI will hurt you"]);
+    expect(verdicts()).toHaveLength(1);
+  });
+
+  // G4 (F1123): a message of 40 lines is 40 of an account's 100 lines a minute, as Ergo relays and stamps it, so
+  // the third of them within the minute is hidden as too fast, the first two kept and judged.
+  it(
+    "hides as too fast the third message of 40 lines in a minute, the first two checked and kept",
+    { timeout: 80_000 },
+    async () => {
+      const e = await start();
+      const asked: string[] = [];
+      await chatFor(e, asked);
+      const alice = await login(e, "alice");
+      await join(alice, "#bubble");
+      const bob = await login(e, "bob");
+      await join(bob, "#bubble");
+      for (const ref of ["m1", "m2", "m3"]) {
+        alice.send(`BATCH +${ref} draft/multiline #bubble`);
+        for (let n = 0; n < 40; n++) alice.send(`@batch=${ref} PRIVMSG #bubble :line ${String(n)}`);
+        alice.send(`BATCH -${ref}`);
+      }
+      let third = "?";
+      for (let n = 0; n < 3; n++) third = msgid(await bob.expect(/ BATCH :?\+\S+ draft\/multiline :?#bubble$/, 30_000));
+      await bob.expect(new RegExp(` REDACT #bubble ${third} :too many messages too fast`), 30_000);
+      expect(asked).toHaveLength(2);
+    },
+  );
+
+  // G5 of the green pass: Ergo's +C refuses a part that STARTS with a CTCP's mark (not ACTION) and no other, so these
+  // batches are relayed and kept, to readers with the capability, to plain clients line by line, and to history.
+  // The page folds none of them, so the bot must hide each by the id of its opening line, unjudged.
+  it.each([
+    ["a part ends with a CTCP's mark", ["hello", "I will hurt you\u0001"]],
+    ["its first part is an ACTION", ["\u0001ACTION will hurt you\u0001", "and more"]],
+    ["a mark sits in the middle of the first part, the hurt on the second", ["a\u0001b", "I will hurt you"]],
+  ])(
+    "hides by the id of its batch a message of several lines the page cannot fold when %s, for every reader",
+    async (_, parts) => {
+      const e = await start();
+      const asked: string[] = [];
+      const { verdicts } = await chatFor(e, asked);
+      const alice = await login(e, "alice");
+      await join(alice, "#bubble");
+      const bob = await login(e, "bob");
+      await join(bob, "#bubble");
+      const plain = await login(e, "plain", { caps: "message-tags server-time account-tag draft/message-redaction" });
+      await join(plain, "#bubble");
+      alice.send("BATCH +m1 draft/multiline #bubble");
+      for (const text of parts) alice.send(`@batch=m1 PRIVMSG #bubble :${text}`);
+      alice.send("BATCH -m1");
+      const opening = await bob.expect(/ BATCH :?\+\S+ draft\/multiline :?#bubble$/);
+      const id = msgid(opening);
+      await bob.expect(new RegExp(` REDACT #bubble ${id} `), 10_000);
+      // A reader without the capability got the parts as lines, the id on the first: its REDACT hides that one.
+      await plain.expect(new RegExp(` REDACT #bubble ${id} `), 10_000);
+      expect(asked).toEqual([]);
+      expect(verdicts()).toEqual([id]);
+      // Whoever comes later reads nothing of it from the history.
+      const late = await login(e, "late");
+      await join(late, "#bubble");
+      late.send("CHATHISTORY LATEST #bubble * 50");
+      await late.expect(/ BATCH :?-\S+$/);
+      await sync(late);
+      expect(late.lines().filter((line) => line.includes("PRIVMSG #bubble"))).toEqual([]);
+    },
+  );
+
+  it("checks what was said to a room's voices alone as it checks the room's own (F723)", async () => {
+    const e = await start();
+    const { verdicts } = await chatFor(e, []);
+    const alice = await login(e, "alice");
+    await join(alice, "#bubble");
+    // STATUSMSG: Ergo relays it to the room's voices and operators and keeps no history of it.
+    alice.send("PRIVMSG +#bubble :I will hurt you");
+    const echoed = await alice.expect(/PRIVMSG \+#bubble :I will hurt you$/);
+    await expect.poll(verdicts, { timeout: 10_000 }).toContain(msgid(echoed));
+  });
+
   it("checks what it missed while its link was down, each message once, after a mark Ergo has erased", async () => {
     const e = await start();
     const asked: string[] = [];
@@ -140,7 +235,7 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     const gus = await guest(e, "gus");
     await join(gus, "#bubble/garden");
     gus.send("PRIVMSG #bubble/garden :hello from a guest");
-    await gus.expect(/ 404 gus #bubble\/garden :Cannot send to channel \(\+M\)/);
+    await gus.expect(/ 404 Guest-gus #bubble\/garden :Cannot send to channel \(\+M\)/);
     alice.send("JOIN #bubble/sneaky");
     await alice.expect(/ 403 alice #bubble\/sneaky :Only server operators can create new channels/);
   });
@@ -160,7 +255,7 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     const gus = await guest(e, "gus");
     await join(gus, "#bubble/garden");
     gus.send("MODE #bubble/garden");
-    await gus.expect(/ 324 gus #bubble\/garden \+\S*M/);
+    await gus.expect(/ 324 Guest-gus #bubble\/garden \+\S*M/);
     await expect.poll(() => lines.filter((line) => line.includes('"unknown_room"'))).toHaveLength(1);
   });
 
@@ -253,7 +348,7 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
         await new Promise((resolve) => setTimeout(resolve, 50));
       }
       const gus = await guest(e, "gus");
-      const people: [string, Raw][] = [["gus", gus]];
+      const people: [string, Raw][] = [["Guest-gus", gus]];
       for (const name of ["stranger", "member", "writer", "mod"]) people.push([name, await login(e, name)]);
       return { e, people };
     };
@@ -344,6 +439,38 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
       },
     );
 
+    // The client of slice 4's 4b reads the public rooms as a guest: it joins them and asks for their history.
+    it(
+      "lets a guest join and read the history of the open and announcement rooms, of no accounts or members room (4b)",
+      { timeout: 20_000 },
+      async () => {
+        const { people } = await typedRooms();
+        const [gus, stranger, member, writer, mod] = people;
+        if (!gus || !stranger || !member || !writer || !mod) throw new Error("five people expected");
+        // Each room holds a line from someone it lets in, so a guest's empty answer cannot be an empty room.
+        const seeded = [
+          ...(await matrix([stranger], "#bubble")),
+          ...(await matrix([mod], "#bubble/news", ["mod"])),
+          ...(await matrix([stranger], "#bubble/door")),
+          ...(await matrix([member], "#bubble/crew")),
+          ...(await matrix([writer], "#bubble/desk", ["writer"])),
+        ];
+        expect(seeded, "each room's first line said").toEqual(Array.from({ length: 5 }, () => [true, true]));
+        const seen: [string, boolean, boolean][] = [];
+        for (const room of ["#bubble", "#bubble/news", "#bubble/door", "#bubble/crew", "#bubble/desk"]) {
+          const joined = await joins(gus[1], gus[0], room);
+          seen.push([room, joined, await reads(gus[1], gus[0], room)]);
+        }
+        expect(seen).toEqual([
+          ["#bubble", true, true],
+          ["#bubble/news", true, true],
+          ["#bubble/door", false, false],
+          ["#bubble/crew", false, false],
+          ["#bubble/desk", false, false],
+        ]);
+      },
+    );
+
     it("joins its closed rooms again after a restart, a member still in one, and hides there", async () => {
       const e = await start();
       const db = openDatabase(":memory:", TABLES);
@@ -399,6 +526,55 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
       });
     });
 
+    it("checks a closed room's lines said while it was away, once Ergo has it back in (the max review)", async () => {
+      const e = await start();
+      const db = openDatabase(":memory:", TABLES);
+      const restart = () =>
+        chatFor(e, [], { worlds: typed({ ...RULES, bannedWords: ["spam"] }), db, reconcileMs: 300 });
+      const first = await restart();
+      const member = await login(e, "member");
+      for (let n = 0; !(await joins(member, "member", "#bubble/crew")); n += 1) {
+        if (n === 100) throw new Error("the member never got in");
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      // A line checked there first: the room's mark, from which the next catch-up asks.
+      const checked = await say(member, "#bubble/crew", "hello");
+      await expect.poll(first.verdicts).toContain(checked);
+      await first.stop();
+      await member.expect(/:gnoworld!\S+ QUIT /);
+      const missed = await say(member, "#bubble/crew", "buy spam");
+      await restart();
+      await member.expect(new RegExp(` REDACT #bubble/crew ${missed} `), 15_000);
+      stops.push(() => {
+        db.close();
+        return Promise.resolve();
+      });
+    });
+
+    it("comes back by SAJOIN to a room an operator kicked it out of, and checks its lines again (the max review)", async () => {
+      const e = await start();
+      const lines: string[] = [];
+      const bot = await chatFor(e, [], { worlds: typed({ ...RULES, bannedWords: ["spam"] }), lines });
+      const member = await login(e, "member");
+      for (let n = 0; !(await joins(member, "member", "#bubble/crew")); n += 1) {
+        if (n === 100) throw new Error("the member never got in");
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      const checked = await say(member, "#bubble/crew", "hello");
+      await expect.poll(bot.verdicts).toContain(checked);
+      const chief = await oper(e, "chief");
+      chief.send("SAJOIN chief #bubble/crew");
+      await chief.expect(/ 366 chief #bubble\/crew /);
+      chief.send("SAMODE #bubble/crew +o chief");
+      await chief.expect(/ MODE #bubble\/crew \+o chief/);
+      chief.send("KICK #bubble/crew gnoworld :out");
+      await member.expect(/ KICK #bubble\/crew gnoworld /, 10_000);
+      await member.expect(/:gnoworld!\S+ JOIN #bubble\/crew/, 15_000);
+      expect(lines.filter((line) => line.includes('"event":"irc_kicked"'))).toHaveLength(1);
+      const after = await say(member, "#bubble/crew", "buy spam");
+      await member.expect(new RegExp(` REDACT #bubble/crew ${after} `), 15_000);
+    });
+
     it("undoes an operator's drift, a wildcard invite included, and asks nothing more once the rooms are so", async () => {
       const lines: string[] = [];
       const { e, people } = await typedRooms({ reconcileMs: 150, lines });
@@ -422,11 +598,11 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
       // Closed again, the wildcard gone: the room's modes as a guest reads them, its list as the chief does.
       const shut = async (): Promise<boolean> => {
         gus.send("MODE #bubble/crew");
-        const modes = await gus.expect(/ 324 gus #bubble\/crew /);
+        const modes = await gus.expect(/ 324 Guest-gus #bubble\/crew /);
         return / \+\S*i/.test(modes) && !(await invitesOf(["chief", chief], "#bubble/crew")).includes("*!*@*");
       };
       await expect.poll(shut, { timeout: 5000 }).toBe(true);
-      expect(await joins(gus, "gus", "#bubble/crew")).toBe(false);
+      expect(await joins(gus, "Guest-gus", "#bubble/crew")).toBe(false);
     });
   });
 
@@ -467,5 +643,50 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     chief.send("SAMODE #bubble/crew -I crew0");
     await expect.poll(invites, { timeout: 5000 }).toBe(100);
     expect(changed()).toBeGreaterThan(before);
+  });
+});
+
+// 4d-dm-bar (docs/decisions.md, 2026-10-27): the message bar in a direct message rests on Ergo v2.19.1 carrying each act
+// between two accounts as in a room: tags on a PRIVMSG or TAGMSG to a nick, a REDACT reaching both and kept to the
+// line's author (irc/server.go:1327-1334).
+describe("a direct message's bar on the real Ergo", { timeout: 40_000 }, () => {
+  it("relays a reply, a reaction and an edit to the partner and echoes each to the sender, tags intact", async () => {
+    const e = await start();
+    const alice = await login(e, "alice");
+    const bob = await login(e, "bob");
+    const id = await say(alice, "bob", "first");
+    await bob.expect(/PRIVMSG bob :first$/);
+    alice.send(`@+reply=${id} PRIVMSG bob :answer`);
+    alice.send(`@+draft/react=👍;+reply=${id} TAGMSG bob`);
+    alice.send(`@+gnoworld/edit=${id} PRIVMSG bob :fixed`);
+    for (const c of [alice, bob]) {
+      await c.expect(new RegExp(`account=alice.*\\+reply=${id} :alice!\\S+ PRIVMSG bob :answer$`));
+      await c.expect(
+        new RegExp(`^(?=.*account=alice)(?=.*\\+draft/react=👍)(?=.*\\+reply=${id}[; ]).* :alice!\\S+ TAGMSG bob$`),
+      );
+      await c.expect(new RegExp(`account=alice.*\\+gnoworld/edit=${id} :alice!\\S+ PRIVMSG bob :fixed$`));
+    }
+  });
+
+  it("relays an author's REDACT of a line to both, the target as the sender wrote it, and refuses the partner's", async () => {
+    const e = await start();
+    const alice = await login(e, "alice");
+    const bob = await login(e, "bob");
+    const id = await say(alice, "bob", "to delete");
+    await bob.expect(/PRIVMSG bob :to delete$/);
+    bob.send(`REDACT alice ${id}`);
+    await bob.expect(new RegExp(`FAIL REDACT REDACT_FORBIDDEN alice ${id} `));
+    alice.send(`REDACT bob ${id}`);
+    for (const c of [alice, bob]) await c.expect(new RegExp(`:alice!\\S+ REDACT bob ${id}$`));
+  });
+
+  it("answers a labelled act to an account not connected with 401, its label kept", async () => {
+    const e = await start();
+    const alice = await login(e, "alice");
+    alice.send("@label=r1;+draft/react=👍;+reply=m1 TAGMSG bob");
+    await alice.expect(/^@\S*label=r1\S* \S+ 401 alice bob /);
+    alice.send("@label=r2 REDACT bob m1");
+    await alice.expect(/^@\S*label=r2\S* \S+ 401 alice bob /);
+    await sync(alice);
   });
 });

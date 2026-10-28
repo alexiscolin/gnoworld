@@ -181,7 +181,8 @@ Slice 3, the bot's link and the rooms (3h):
 
 - **The link's settings.** `ERGO_HOST` and `ERGO_PORT` name Ergo's internal listener (127.0.0.1:6667
   by default); `ERGO_OPER_PASSWORD_FILE` holds the operator's password, one word of printable ASCII,
-  32 characters at least. Unset, the server keeps no link: rooms exist, nobody's activity counts.
+  32 to 72 characters (bcrypt keeps 72 bytes, so Ergo's start refuses more; the server alone takes 256); Ergo's
+  start refuses any other shape, a blank line before the word included (F706). Unset, the server keeps no link: rooms exist, nobody's activity counts.
 - **Rooms stay.** A world removed from the roles file keeps its room and history; removing one is a
   moderator's act (3l).
 - **The bot's account.** The bot logs in by SASL as the account `gnoworld`, whose nick Ergo keeps for
@@ -190,6 +191,9 @@ Slice 3, the bot's link and the rooms (3h):
   session of the account (multiclient). A refusal of the nick comes from a guest who took it before the
   account first logged in (a new Ergo database): the link logs `irc_refused` (`nick`), tries again, and
   raises the alert `irc_nick_taken` at the third in a row. A refused login logs `irc_refused` (`sasl`).
+- **The inside network is exempt from Ergo's connection limits** (`INSIDE_SUBNET`, F720): the server's link
+  and web's own connections never meet the 16-at-once or the 32-in-10-minutes limit, so a crash loop of the
+  server cannot lock the bot out. A visitor is limited by the address web passes, never one of that network.
 - **Ergo logs no address** (`-connect-ip`, slice 3's max review): its refusals by ip-limits go unlogged
   with it, so a visitor behind a shared address who meets the limit leaves no trace (slice 4).
 
@@ -209,9 +213,13 @@ Slice 3, the check (3i):
 - **A message caught in a restart** stays `pending` in the verdicts; 3j's catch-up checks it again.
 - **OpenAI's rate limit.** One line a request, and OpenAI caps a key's requests a minute by its account's tier
   (`omni-moderation-latest`: 250 on Free, 500 on Build, 2,000 on Launch, 5,000 on Grow; its model page, read
-  2026-10-24): past it, its refusals count as down, five open the breaker for 30 s, and lines pass unchecked
-  meanwhile. The load run's 200 accounts, a line each every 5 s (2,400 a minute), left 1,810 of 2,200 unchecked
-  (F692). Several lines a request is slice 4's (`docs/plans/backlog.md`).
+  2026-10-24): past it, its refusals count as down (logged `moderation_unchecked` with `rate_limited`, an outage's
+  `down`), five open the breaker for 30 s, and lines pass unchecked meanwhile. The load run's 200 accounts, a line each every 5 s (2,400 a minute), left 1,810 of 2,200 unchecked
+  (F692). Several lines a request is slice 4's (`docs/plans/backlog.md`), once OpenAI's rules for an array
+  input are read from a live answer (its reference states no maximum and no order of the results). The
+  checks run four at a time, so the ceiling is 4 over OpenAI's latency a second (about 13 lines a second
+  at 300 ms, measured): a faster crowd waits in the queue, and past a full queue its lines pass unchecked,
+  with the alert.
 
 Slice 3, the bot acts and the stream (3j):
 
@@ -222,12 +230,21 @@ Slice 3, the bot acts and the stream (3j):
   caught up: a line the full queue drops (the log says so), a line left unchecked by a provider
   outage (its previews wait), a room's first lines said while the link was down, and, past a full
   page of 50 lines all in one millisecond, the rest of that millisecond (each next page starts in its
-  last line's millisecond, F542).
+  last line's millisecond, F542). A room's history is asked once Ergo says the bot is in it, one page at
+  a time across the rooms, and a room's mark stays where its catch-up starts while it runs, so a live line
+  checked meanwhile loses no older line (F707, F708). A room Ergo refuses the history of keeps its mark
+  until the next start.
+- **A line to a room's voices or operators** (`+#room`, STATUSMSG) is read as the room's line: checked,
+  counted, struck, and its author muted as for any line. Ergo keeps no history of it (#959), so its REDACT is
+  refused and the line stays on the screens it reached (F723). Ergo relays such a line by rank, so the bot reads
+  it only where it holds the prefix's power: in the rooms it made (it is their operator), not yet in a members
+  room it re-entered by SAJOIN after a restart, where it is a plain member (put to Alexis).
 - **A hide Ergo refuses** raises the alert `redact_refused`; its verdict still says hidden, the line
   stays shown, and the author's notice and strike stand: the alert is for ops to look.
 - **`GET /api/stream`** is public: 25 rooms a stream, 4 streams a visitor, 1,000 in all, a beat every
   15 s, a client 64 events behind dropped; each room's last 64 events are kept, which a new client gets
-  and a client coming back gets after its `Last-Event-ID`. nginx must not buffer it (3e).
+  and a client coming back gets after its `Last-Event-ID`. nginx must not buffer it (3e). A HEAD is
+  refused with 405 and takes no place (F709).
 
 Slice 3, the mute and the edits (3k):
 
@@ -236,6 +253,12 @@ Slice 3, the mute and the edits (3k):
   lifted early to make room (Ergo's list holds 100: 3b). The roles file's team and trusted are never
   muted, their lines still hidden.
 - **A line too fast** is the 21st of an account in a minute of Ergo's time: hidden, and a strike.
+- **A message of several lines the bot cannot hold whole** (a part holding a CTCP's mark, or from another
+  sender; more than 40 parts; a 17th open at once on its connection) is hidden as `unreadable` by the id of
+  its opening line, before any rule or provider, and is a strike (G1, G5 of slice 4's green pass). Ergo
+  relays and keeps such a batch first (its +C refuses only a part that starts with a CTCP's mark): a
+  reader with draft/multiline sees none of it, a later one finds none in the history, but a client without
+  the capability got the parts as lines, the id on the first alone, so its REDACT hides that first line only.
 - **What the mutes table keeps:** a muted account's address in clear, its world and its end, while
   the mute lasts; the extban names it.
 - **Known limits.** A mute is evaded with a new address (decision 144). A mute lifts within 10 s of its
@@ -260,6 +283,12 @@ Slice 3, rooms by role (3m):
   `accounts` (no guest joins), `members` (its `readers` group joins and speaks) or `members-write` (its
   `readers` join, its `writers` speak), and `hidden` to keep it out of the lists. A change waits for a
   restart. The server makes the file's rooms at start.
+- **The roles file's sections (4b).** Each world may list `sections`, an ordered list of a `name` (1 to
+  64 characters, once in the world) and the `rooms` it holds (the world's own room ids, each in one
+  section at most, a moderator's room included; 50 sections and 500 rooms a section at most). `GET
+  /api/rooms?world=<slug>` answers a reader the rooms it may see in that order, then the world's other
+  rooms in a section named `null`: a reader sees no section it sees no room of. A change waits for a
+  restart.
 - **Restricted, not encrypted.** A members room keeps guests and strangers out in Ergo, for every
   client, but its lines are read by the server, the bot and Ergo's operators, and stored in Ergo's
   history like any other. Its lines are never sent to OpenAI: the world's rules alone check them.
@@ -281,10 +310,14 @@ Slice 3, the server's retention (3n):
 
 - **The verdicts** (ids, rooms, hashed accounts, categories and scores, never a text) are kept 180 days
   and 150,000 at most (about 1.2 KB each with their indexes, 176 MB), the oldest going first; a verdict
-  still waiting on OpenAI stays. A job runs at start and every five minutes, removing 10,000 rows at
-  most a run (about 7 ms measured), and runs again at once while a backlog is left, the server free
+  still waiting on OpenAI stays. A job runs at start and every five minutes, removing 500 rows at
+  most a run (6 to 29 ms measured on a 190,000-row file on disk; 10,000 rows in one run held the server's
+  event loop about 400 ms, F710), and runs again at once while a backlog is left, the server free
   between runs. A verdict removed by the cap before its 180 days makes an edit of its line unknown:
   the edit is hidden (`unknown_edit`), with no strike.
+- **The pins** end with Ergo's history: the same job removes each pin whose line is more than 90 days old
+  (Ergo's `expire-time`), a link that stays up included, since the re-read of a pin runs only when the bot
+  joins a room.
 - **The alerts** `verdicts_near_cap` and `database_near_cap` fire once when the verdicts reach 80% of
   their cap, or the database's used pages 80% of 256 MB, and again only after a fall below. The
   database's file does not shrink: freed pages are reused, and its `-wal` file is not counted. A table
@@ -347,6 +380,19 @@ Slice 3, the stack (3e):
   `deploy/ergo/Dockerfile` and `VERSION`, then `sh deploy/test.sh` before `up -d --build`.
 - **`web`'s fixed address** is in `INSIDE_SUBNET`: a host with another network in that range refuses
   to start the stack (Compose names the overlap); set both in `deploy/.env`.
+
+Slice 4, pins and what an account keeps (4d):
+
+- **Pins live in the server's database** (the `pins` table), not in Ergo, which writes a channel's metadata back for
+  registered channels alone and ours are not (`unregistered-channels: true`). A world's moderators and the team pin,
+  10 a room, 30 pin or unpin requests a minute an account; the server reads the line from Ergo by its id
+  (`CHATHISTORY AROUND`), never from what the page sent, and keeps its text, author and time.
+- **A pin ends with its line.** An author's delete, the bot's hide (Ergo sends the bot each REDACT of its rooms,
+  `draft/message-redaction`) and the author's edit drop it. Each time the bot is back in a room, its pins there are
+  asked of Ergo again and those Ergo no longer holds are dropped, so a pin also ends with Ergo's history (90 days,
+  above). A question Ergo does not answer keeps its pin; a re-read that throws logs `pins_unchecked` (no alert).
+- **Saved messages and "Mark unread" are on the reader's device** (ADR-0002) and nowhere on the server: nothing
+  to back up, and a cleared browser loses them.
 
 ## Secrets: rotation and revocation
 

@@ -1,6 +1,7 @@
 // The roles file (decisions 147 and 149): the team, the trusted, and each world's moderators and
-// anti-spam rules; since 3m, each world's groups of accounts and the type of its rooms. Who may do what is
-// answered from it alone. Read whole in review: a wrong line here hands out power.
+// anti-spam rules; since 3m, each world's groups of accounts and the type of its rooms; since 4b, the
+// sections its rooms are listed in. Who may do what is answered from it alone. Read whole in review: a
+// wrong line here hands out power.
 import { readFileSync } from "node:fs";
 import { Address, RoomName } from "@gnoworld/schemas";
 import { z } from "zod";
@@ -34,6 +35,35 @@ function room() {
   ]);
 }
 
+// A room of the world: its main room, or #<slug>/<a room's name>, within Ergo's channellen of 64.
+function ownRoom(slug: string, name: string): boolean {
+  return (
+    name === `#${slug}` ||
+    (name.startsWith(`#${slug}/`) && RoomName.safeParse(name.slice(slug.length + 2)).success && name.length <= 64)
+  );
+}
+
+// A section of a world's rooms (4b): a name for the lists, and its room ids, in the order to show them.
+function section() {
+  return z.strictObject({ name: z.string().min(1).max(64), rooms: z.array(z.string()).max(500) });
+}
+
+// A section's name once in the world and each room of it in one section, once: either twice would show
+// twice in the lists. A section may name a room the file does not type, one a moderator made.
+function checkSections(slug: string, sections: readonly Section[], ctx: z.RefinementCtx): void {
+  const names = new Set<string>();
+  const placed = new Set<string>();
+  for (const [at, { name, rooms }] of sections.entries()) {
+    if (names.has(name)) ctx.addIssue({ code: "custom", path: ["sections", at, "name"] });
+    names.add(name);
+    for (const [index, id] of rooms.entries()) {
+      if (!ownRoom(slug, id) || placed.has(id))
+        ctx.addIssue({ code: "custom", path: ["sections", at, "rooms", index] });
+      placed.add(id);
+    }
+  }
+}
+
 function world(Addresses: z.ZodType<Address[]>) {
   // A __proto__ key would vanish in the record (zod 4.6.5, $ZodRecord skips it): refused by name instead.
   const Groups = z
@@ -48,17 +78,14 @@ function world(Addresses: z.ZodType<Address[]>) {
       rules: rules(),
       groups: Groups.default({}),
       rooms: z.array(room()).default([]),
+      sections: z.array(section()).max(50).default([]),
     })
-    .superRefine(({ slug, groups, rooms }, ctx) => {
+    .superRefine(({ slug, groups, rooms, sections }, ctx) => {
+      checkSections(slug, sections, ctx);
       const seen = new Set<string>();
       for (const [at, { room: name, readers, writers }] of rooms.entries()) {
-        // Its main room, or #<slug>/<a room's name>, once.
-        const own =
-          name === `#${slug}` ||
-          (name.startsWith(`#${slug}/`) &&
-            RoomName.safeParse(name.slice(slug.length + 2)).success &&
-            name.length <= 64);
-        if (!own || seen.has(name)) ctx.addIssue({ code: "custom", path: ["rooms", at, "room"], message: "room" });
+        if (!ownRoom(slug, name) || seen.has(name))
+          ctx.addIssue({ code: "custom", path: ["rooms", at, "room"], message: "room" });
         seen.add(name);
         for (const [key, group] of Object.entries({ readers, writers }))
           if (group !== undefined && !Object.hasOwn(groups, group))
@@ -104,6 +131,12 @@ export type Room =
   | { type: "members"; readers: string; hidden: boolean }
   | { type: "members-write"; readers: string; writers: string; hidden: boolean };
 
+/** A named list of a world's rooms, in the order a reader sees them (4b). */
+export interface Section {
+  name: string;
+  rooms: readonly string[];
+}
+
 export interface Roles {
   team: ReadonlySet<Address>;
   trusted: ReadonlySet<Address>;
@@ -112,9 +145,10 @@ export interface Roles {
     {
       moderators: ReadonlySet<Address>;
       rules: Rules;
-      // Both filled by loadRoles; a world without them has none.
+      // All filled by loadRoles; a world without them has none.
       groups?: ReadonlyMap<string, ReadonlySet<Address>>;
       rooms?: ReadonlyMap<string, Room>;
+      sections?: readonly Section[];
     }
   >;
 }
@@ -139,13 +173,14 @@ export function loadRoles(path: string): Roles {
     team: new Set(team),
     trusted: new Set(trusted),
     worlds: new Map(
-      worlds.map(({ slug, moderators, rules, groups, rooms }) => [
+      worlds.map(({ slug, moderators, rules, groups, rooms, sections }) => [
         slug,
         {
           moderators: new Set(moderators),
           rules,
           groups: new Map(Object.entries(groups).map(([name, members]) => [name, new Set(members)])),
           rooms: new Map(rooms.map(({ room: name, ...type }) => [name, type])),
+          sections,
         },
       ]),
     ),

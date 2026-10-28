@@ -33,6 +33,30 @@ LIMITS = [
 ]
 
 
+# What an agent's brief or the review card must keep saying, which nothing else reads: a line cut from one stays green.
+# Every review agent never writes a worktree's git index (2026-10-26: one staged old files into wt-4dm's and failed the
+# next commit's gate); CLAUDE.md's review card ends with the change's risk and undo.
+AGENT_RULE = "Never run a git command that writes the index or the work tree"
+AGENTS = ("complexity-reviewer", "finding-verifier", "security-reviewer", "test-auditor")  # each must exist (CR2)
+CARD_ITEM = re.compile(r"^8\. Risk and undo:", re.M)
+
+
+def lost_rules(root):
+    """The agents' files missing or without the index rule, and a CLAUDE.md missing or whose review card lost its item 8."""
+    briefs = {f".claude/agents/{name}.md" for name in AGENTS} | {p.relative_to(root).as_posix() for p in root.glob(".claude/agents/*.md")}
+    out = []
+    for brief in sorted(briefs):
+        p = root / brief
+        if not p.is_file():
+            out.append(f"{brief}: the agent's brief is missing")
+        elif AGENT_RULE not in " ".join(p.read_text().split()):
+            out.append(f"{brief}: no sentence `{AGENT_RULE}`")
+    claude = root / "CLAUDE.md"
+    if not claude.is_file() or not CARD_ITEM.search(claude.read_text()):
+        out.append("CLAUDE.md: the review card has no item `8. Risk and undo:`")
+    return out
+
+
 def commits(root, shas):
     """Which of shas name a commit of root's repository, in one call; all of them outside a repository (the
     staged copy), where none can be read."""
@@ -53,7 +77,7 @@ def ledger_problems(root):
     rows = []
     for line in ledger.read_text().splitlines():
         cells = [c.strip() for c in re.split(r"(?<!\\)\|", line.strip().strip("|"))]
-        if len(cells) == 7 and re.fullmatch(r"F\d{3}", cells[0]):
+        if len(cells) == 7 and re.fullmatch(r"F\d{3,}", cells[0]):
             rows.append((cells[0], cells[5], cells[6], re.findall(r"`([0-9a-f]{7,40})`", cells[6])))
     real = commits(root, [sha for *_, shas in rows for sha in shas])
     for fid, status, evidence, shas in rows:
@@ -86,6 +110,9 @@ for f in files:
 if missing:
     print("check_docs: these docs name files that do not exist:", *missing, sep="\n  ", file=sys.stderr)
 problems = ledger_problems(root)
+rules = lost_rules(root)
+if rules:
+    print("check_docs: a rule the review depends on is gone:", *rules, sep="\n  ", file=sys.stderr)
 if problems:
     print("check_docs: the findings ledger (docs/review/findings.md):", *problems, sep="\n  ", file=sys.stderr)
 # A test sits beside the file it tests, under its name (docs/ARCHITECTURE.md, "Naming").
@@ -119,5 +146,5 @@ if unnamed:
 lost = [limit for limit in LIMITS if runbook.is_file() and limit not in " ".join(said.split())]
 if lost:
     print("check_docs: docs/OPERATIONS.md no longer says these known limits (slice 3's plan, section 8):", *lost, sep="\n  ", file=sys.stderr)
-if missing or problems or orphans or unnamed or lost:
+if missing or problems or orphans or unnamed or lost or rules:
     sys.exit(1)
