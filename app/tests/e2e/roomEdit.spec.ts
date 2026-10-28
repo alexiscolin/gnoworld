@@ -265,6 +265,11 @@ test.describe("a room's lines: Edit", () => {
     await expect(lines(page)).toHaveCount(1);
     await expect(editing(page)).toHaveCount(0);
     await expect(field(page)).toHaveValue("a draft in progress");
+    // The box says so (F2004) until the draft changes, across the remount of the writer (R4 of the second red pass).
+    await expect(page.getByText("That message is gone.", { exact: true })).toBeVisible();
+    await field(page).press("End");
+    await field(page).pressSequentially("!");
+    await expect(page.getByText("That message is gone.", { exact: true })).toHaveCount(0);
   });
 
   // The delete of a line is a REDACT of it; a correction is a line of its own, so each correction of mine goes with it, or the
@@ -349,7 +354,9 @@ test.describe("a room's lines: Edit, between two accounts", () => {
     await field(page).fill(text);
     await field(page).press("Enter");
     await expect(lineOf(bob.page, text)).toHaveCount(1);
-    await lineOf(page, text).hover();
+    // The line holds the focus, not the pointer: on #games, shared by the journeys running at once, a line arriving moves
+    // the list under a pointer, and the bar goes with it to the line then under it (F2066).
+    await lineOf(page, text).focus();
     await lineOf(page, text).getByRole("button", { name: "More actions" }).click();
     await page.getByRole("menuitem", { name: "Edit" }).click();
     const fixed = word("fixed");
@@ -357,7 +364,7 @@ test.describe("a room's lines: Edit, between two accounts", () => {
     await field(page).press("Enter");
     await expect(lineOf(bob.page, fixed)).toContainText(/Edited/);
     await expect(lineOf(bob.page, text)).toHaveCount(0);
-    await lineOf(bob.page, fixed).hover();
+    await lineOf(bob.page, fixed).focus();
     await lineOf(bob.page, fixed).getByRole("button", { name: "More actions" }).click();
     await expect(bob.page.getByRole("menu", { name: "Message actions" }).getByRole("menuitem")).toHaveText([
       "Copy text",

@@ -2902,12 +2902,24 @@ describe("the chat's link: a room's edits", () => {
       expect(redacted(t.fake.sent)).toEqual(["REDACT #bubble/games m1"]);
     });
 
-    it("leaves a correction of mine to another line, and one no command can name", () => {
+    it("leaves a correction of mine to another line", () => {
       const t = memberIn(["#bubble/games"]);
       t.fake.line(said("m1", ""));
       t.fake.line(said("m2", ""));
       t.fake.line(said("e2", "+gnoworld/edit=m2"));
-      t.fake.line(said("e,1", "+gnoworld/edit=m1"));
+      expect(t.link.redact("#bubble/games", "m1")).toBe(true);
+      expect(redacted(t.fake.sent)).toEqual(["REDACT #bubble/games m1"]);
+    });
+
+    // R2 (redpass2-red): the ids the store keeps (stamp drops a comma or a space) that no command can name: a leading
+    // colon, which IRC reads as the REDACT's trailing parameter, and 65 characters.
+    it.each([
+      ["a leading colon", ":e1"],
+      ["65 characters", "e".repeat(65)],
+    ])("leaves a correction of mine whose msgid has %s, which no command can name", (_, id) => {
+      const t = memberIn(["#bubble/games"]);
+      t.fake.line(said("m1", ""));
+      t.fake.line(said(id, "+gnoworld/edit=m1"));
       expect(t.link.redact("#bubble/games", "m1")).toBe(true);
       expect(redacted(t.fake.sent)).toEqual(["REDACT #bubble/games m1"]);
     });
@@ -3023,6 +3035,18 @@ describe("the chat's link: a direct message's bar", () => {
     t.fake.line(`@msgid=p2;time=${T0};account=${OTHER};+gnoworld/edit=p1 :${OTHER}!u@h PRIVMSG ${ADDRESS} :fixed`);
     t.link.redactIn(OTHER, "p1");
     expect(toOther(t.fake.sent).map(without)).toEqual([`REDACT ${OTHER} p1`]);
+  });
+
+  // R2 (redpass2-red): the same for a msgid no command can name, a leading colon or 65 characters.
+  it.each([
+    ["a leading colon", ":e1"],
+    ["65 characters", "e".repeat(65)],
+  ])("never deletes a correction of mine whose msgid has %s", (_, id) => {
+    const t = account();
+    t.fake.line(mine("m1", "", "first"));
+    t.fake.line(mine(id, "+gnoworld/edit=m1", "second"));
+    expect(t.link.redactIn(OTHER, "m1")).toBe(true);
+    expect(toOther(t.fake.sent).map(without)).toEqual([`REDACT ${OTHER} m1`]);
   });
 
   // R4 (redpass-dmb): a partner's PRIVMSG tagged as a correction of my line is not mine, so my delete leaves it alone.

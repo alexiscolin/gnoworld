@@ -753,3 +753,58 @@ describe("Composer: an edit", () => {
     expect(markup).toMatch(/>Send<\/button>/);
   });
 });
+
+// R3 (redpass2-red): the static markup tests check the disabled button, not the form's own submit handler, which a
+// keyboard's Enter reaches with the button disabled. A mounted composer, its form submitted.
+describe("Composer: submitting an edit", () => {
+  const PARTNER = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  // jsdom has no popover: the format bar's menu asks for it as it mounts.
+  HTMLElement.prototype.togglePopover = () => false;
+  const host = document.createElement("div");
+  const root = createRoot(host);
+  // jsdom has no matchMedia: a computer's pointer, which is not coarse (the composer reads it as it mounts).
+  beforeEach(() => {
+    vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+  });
+  afterEach(() => {
+    act(() => {
+      root.render(null);
+    });
+    vi.unstubAllGlobals();
+  });
+
+  const submit = (draft: string, over: { editing?: true } = { editing: true }) => {
+    const onSay = vi.fn(() => true);
+    act(() => {
+      root.render(
+        <Composer room={PARTNER} nick={NICK} rooms={[]} members={[]} onSay={onSay} draft={draft} {...over} />,
+      );
+    });
+    const form = host.querySelector("form");
+    act(() => {
+      form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    return onSay;
+  };
+
+  it("sends nothing for /me waves in an edit, which would turn the message into an action", () => {
+    expect(submit("/me waves")).not.toHaveBeenCalled();
+  });
+
+  it("saves //me waves, which is plain text", () => {
+    const onSay = submit("//me waves");
+    // onSay is given what compose made of the draft, then the draft: "//me waves" is plain text, not an action.
+    expect(onSay).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ action: false, text: "/me waves" }),
+      "//me waves",
+    );
+  });
+
+  it("still sends /me waves as a new message when no edit is open", () => {
+    expect(submit("/me waves", {})).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ action: true, text: "waves" }),
+      "/me waves",
+    );
+  });
+});
