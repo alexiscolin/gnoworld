@@ -120,7 +120,7 @@ export function useHelp(
     groups?: boolean | undefined;
     editing?: boolean | undefined;
   },
-  { failed, completion, draft }: { failed: boolean; completion?: Completion | undefined; draft: string },
+  { failed, completion, draft }: { failed: boolean | string; completion?: Completion | undefined; draft: string },
 ) {
   const coarse = useCoarsePointer();
   const context = { nick, draft, multiline, completion };

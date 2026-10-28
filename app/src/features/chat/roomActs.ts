@@ -28,6 +28,8 @@ export function roomActs(link: RefObject<ChatLink | undefined>, room: string, di
       (tags?.edit === undefined
         ? link.current?.say(room, composed, tags?.reply)
         : link.current?.correct(room, composed, tags.edit)) ?? false,
+    // Why the server's pace keeps a message back, none if it may go (F2092).
+    slow: (composed: Composed) => link.current?.slow(composed),
     onReact: (reaction: Reacting) => {
       dismissed(room);
       return link.current?.react(room, reaction) ?? false;

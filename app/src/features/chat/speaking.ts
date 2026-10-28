@@ -6,6 +6,7 @@ import type { Ergo } from "../../lib/ergo/ergo.ts";
 import type { createAppStore } from "../../store/index.ts";
 import { reactInRoom, reactTo, redactFrom, redactIn, sayTo, speakIn, type DmOut } from "./dmOut.ts";
 import type { Say } from "./linkTypes.ts";
+import { Pace, tooFast, type Slow } from "./pace.ts";
 import type { Outbox } from "./outbox.ts";
 import type { TypingOut } from "./telling.ts";
 
@@ -29,6 +30,8 @@ export class Speaking {
   readonly #host: Host;
   // The next batch's reference, one a connection's own: letters and digits, as Ergo takes them (irc/utils/args.go).
   #batches = 0;
+  // What the account sent in the last minute, against the server's rates (F2092).
+  readonly #pace = new Pace();
 
   constructor(host: Host) {
     this.#host = host;
@@ -59,9 +62,32 @@ export class Speaking {
     return may;
   };
 
+  /** Why a message of a room is held back for the server's pace, none when it may go (F2092). */
+  readonly slow = (composed: Composed): string | undefined => {
+    const slow = this.#slow(composed);
+    return slow === undefined ? undefined : tooFast(slow);
+  };
+
+  // What of the account's minute a message of a room takes: its lines, and its messages, one more each when the
+  // connection sends the lines one at a time.
+  #weight(composed: Composed): { messages: number; lines: number } {
+    const lines = composed.kind === "lines" ? composed.lines.length : composed.kind === "line" ? 1 : 0;
+    return { messages: this.#host.ergo()?.multiline() === false ? lines : Math.min(lines, 1), lines };
+  }
+
+  #slow(composed: Composed): Slow | undefined {
+    const { messages, lines } = this.#weight(composed);
+    return this.#pace.slow(Date.now(), messages, lines);
+  }
+
   #speak(room: string, composed: Composed, tags: Tags): boolean {
+    if (this.#slow(composed) !== undefined) return false;
     const went = speakIn(this.#dm(), { room, composed, inside: this.#host.inside.has(room) }, tags);
-    if (went) this.#host.typing.ended(room);
+    if (went) {
+      const { messages, lines } = this.#weight(composed);
+      this.#pace.record(Date.now(), messages, lines);
+      this.#host.typing.ended(room);
+    }
     return went;
   }
 

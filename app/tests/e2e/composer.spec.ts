@@ -35,6 +35,22 @@ test.describe("the composer", () => {
     await expect(field(page)).toHaveValue("");
   });
 
+  // F2092: the server hides the 21st message of a minute and strikes the account; the page holds it back and says why.
+  test("holds the 21st message of a minute back, its draft kept, and says why", async ({ page }) => {
+    await inGames(page);
+    const text = word("fast");
+    for (let each = 0; each < 20; each += 1) {
+      await field(page).fill(`${text} ${String(each)}`);
+      await field(page).press("Enter");
+      await expect(field(page)).toHaveValue("");
+    }
+    await field(page).fill(`${text} 20`);
+    await field(page).press("Enter");
+    await expect(page.getByText(/Too fast: 20 messages a minute at most\. Try again in \d+ s\./).first()).toBeVisible();
+    await expect(field(page)).toHaveValue(`${text} 20`);
+    await expect(lineOf(page, `${text} 20`)).toHaveCount(0);
+  });
+
   test("sends an action with /me, and a slash of text with //", async ({ page }) => {
     await inGames(page);
     const action = word("waves");

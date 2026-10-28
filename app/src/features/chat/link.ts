@@ -80,6 +80,7 @@ class Link implements ChatLink {
   readonly multiline = (): boolean => this.#ergo?.multiline() ?? true;
 
   readonly say: ChatLink["say"] = (...args) => this.#speaking.say(...args);
+  readonly slow: ChatLink["slow"] = (composed) => this.#speaking.slow(composed);
   readonly correct: ChatLink["correct"] = (...args) => this.#speaking.correct(...args);
   readonly sayTo: ChatLink["sayTo"] = (...args) => this.#speaking.sayTo(...args);
   readonly reactTo: ChatLink["reactTo"] = (...args) => this.#speaking.reactTo(...args);

@@ -125,8 +125,13 @@ function completes({ options }: Completion): string {
 /** What the field says of the draft: that it was not sent or is too long (a line of several named, a message past
  * its lines or bytes), what Tab completes (a command not yet typed whole being no error), an unknown command, or
  * help near the end or on an action; or nothing. */
-export function said(composed: Composed, failed: boolean, context: Context = {}): Pick<FieldProps, "error" | "help"> {
+export function said(
+  composed: Composed,
+  failed: boolean | string,
+  context: Context = {},
+): Pick<FieldProps, "error" | "help"> {
   const { completion, multiline } = context;
+  if (typeof failed === "string") return { error: failed };
   if (failed) return { error: "Not sent: the chat is not ready yet. Try again in a moment." };
   const refusing = refusal(composed, multiline);
   if (refusing !== undefined) return { error: refusing };

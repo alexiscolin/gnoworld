@@ -35,6 +35,9 @@ export interface ChatLink {
    * in; an account's alone; tagged +reply with the msgid it answers, one a tag carries (4d). A message of several lines
    * goes as one draft/multiline batch, or a line at a time to an Ergo without it. Whether it went. */
   say: (room: string, composed: Composed, reply?: string) => boolean;
+  /** Why a message of a room would be held back for the server's pace (20 messages and 100 lines an account a minute,
+   * which hides the one past it and strikes the account), as `say` and `correct` refuse it; none when it may go. */
+  slow: (composed: Composed) => string | undefined;
   /** Sends what the composer composed, so, as a correction of the line `edit` names: tagged +gnoworld/edit with its
    * msgid, one a tag carries (the room's Edit). Whether it went. */
   correct: (room: string, composed: Composed, edit: string) => boolean;

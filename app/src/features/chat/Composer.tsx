@@ -89,6 +89,8 @@ export interface ComposerProps {
   groups?: boolean | undefined;
   /** Sends the draft as composed (and as written, which a refused direct message puts back); whether it went. */
   onSay: (composed: Composed, draft: string) => boolean;
+  /** Why the draft is held back for the server's pace, asked as Send is pressed: none when it may go (F2092). */
+  slow?: ((composed: Composed) => string | undefined) | undefined;
   /** Where the draft starts: the room's, kept on the device (4d). */
   draft?: string | undefined;
   /** Each change of the draft, for the device to keep; a line sent leaves it blank. */
@@ -133,7 +135,7 @@ export function Composer(props: ComposerProps) {
     const told = typingOf(next);
     if (told !== undefined) onTyping?.(told);
   };
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<boolean | string>(false);
   const formRef = useRef<HTMLFormElement>(null);
   const label = to ?? roomLabel(room);
   const composed = compose(room, draft, nick);
@@ -167,8 +169,9 @@ export function Composer(props: ComposerProps) {
   const send = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!goes) return;
-    const went = onSay(composed, draft);
-    setFailed(!went);
+    const slow = props.slow?.(composed);
+    const went = slow === undefined && onSay(composed, draft);
+    setFailed(slow ?? !went);
     refusal.said();
     if (went) change("");
   };

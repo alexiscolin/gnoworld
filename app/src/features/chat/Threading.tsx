@@ -151,6 +151,7 @@ function Panel({
               rooms={rooms}
               members={members}
               onSay={(composed) => acts.onSay(composed, { reply: root })}
+              slow={acts.slow}
               focus={focus}
               keeps={false}
               draft={typed.get(slot)}
