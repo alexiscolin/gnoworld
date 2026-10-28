@@ -1084,7 +1084,7 @@ fi
 if part pre_commit; then
 # pre-commit runs the gate on the staged files, and a failing gate stops the commit.
 c2="$t/precommit"
-precommit() { (cd "$c2" && sh "$hooks/pre-commit" >/dev/null 2>&1); }
+precommit() { (cd "$c2" && sh "$hooks/pre-commit" "$@" >/dev/null 2>&1); }
 mkdir -p "$c2/scripts" && git -C "$c2" init -q && good_rules "$c2"
 printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/repo_files.py" "$c2/scripts/" && secrets_into "$c2/scripts/" && git -C "$c2" add -A && git -C "$c2" commit -qm base
 echo code >"$c2/a.ts" && git -C "$c2" add a.ts
@@ -1139,11 +1139,21 @@ precommit && fail "pre-commit took a failing code_changed.sh for prose alone (F1
 git -C "$c2" checkout -q HEAD -- scripts/code_changed.sh a.ts
 # It hands the staged gate what the commit changes, one path a line: a rename's two paths, what is
 # staged only, so check.sh checks those areas alone.
-printf '#!/bin/sh\nprintf "%%s" "$GATE_CHANGED" >"%s/gate-changed"\n' "$t" >"$c2/scripts/check.sh" && echo x >"$c2/c.ts" && echo x >"$c2/g.ts"
+printf '#!/bin/sh\nprintf "%%s" "$GATE_CHANGED" >"%s/gate-changed"\nprintf "%%s" "${GATE_MERGE-unset}" >"%s/gate-merge"\n' "$t" "$t" >"$c2/scripts/check.sh" && echo x >"$c2/c.ts" && echo x >"$c2/g.ts"
 git -C "$c2" add -A && git -C "$c2" commit -qm listing
 echo listed >>"$c2/a.ts" && git -C "$c2" add a.ts && git -C "$c2" mv c.ts d.ts && echo unstaged >>"$c2/g.ts" && echo untracked >"$c2/u.ts"
 precommit || fail "pre-commit failed with a gate that passes"
 [ "$(sort "$t/gate-changed" | paste -sd' ' -)" = "a.ts c.ts d.ts" ] || fail "pre-commit handed the gate another list than the commit's: $(cat "$t/gate-changed")"
+# It tells the staged gate, which has no repository to ask, that a merge is being committed: pre-merge-commit's --merge (git
+# writes MERGE_HEAD only after that hook) or a merge in progress (a conflict concluded by hand). A work commit says no
+# (a merge commit has no time budget, a work commit keeps its own: Alexis, 2026-10-28).
+[ "$(cat "$t/gate-merge")" = 0 ] || fail "pre-commit told the gate a work commit was a merge: $(cat "$t/gate-merge")"
+precommit --merge || fail "pre-commit refused a merge with a gate that passes"
+[ "$(cat "$t/gate-merge")" = 1 ] || fail "pre-commit did not tell the gate pre-merge-commit's merge was one: $(cat "$t/gate-merge")"
+git -C "$c2" rev-parse HEAD >"$c2/.git/MERGE_HEAD" && precommit || fail "pre-commit refused a merge in progress with a gate that passes"
+[ "$(cat "$t/gate-merge")" = 1 ] || fail "pre-commit did not tell the gate a merge in progress was one: $(cat "$t/gate-merge")"
+rm -f "$c2/.git/MERGE_HEAD"
+GATE_MERGE=1 precommit && [ "$(cat "$t/gate-merge")" = 0 ] || fail "pre-commit passed on a GATE_MERGE of its caller: a work commit's budget would be off"
 git -C "$c2" reset -q --hard && rm -f "$c2/u.ts"
 fi
 
@@ -2159,6 +2169,51 @@ for pair in "160 160" "160 $busy" "$busy 160"; do
 	out=$(LOAD_1="$1 160" LOAD_2="$2 160" SLOW_STEP=lint GATE_BUDGET=0 gate) && fail "check.sh passed past its budget with the load $1 at its start and $2 at its end, one at its cores, not above: $out"
 	printf '%s\n' "$out" | grep -q "find what grew" || fail "check.sh did not fail past its budget with the load $1 at its start and $2 at its end, one at its cores: $out"
 done
+# A merge commit has no time budget (Alexis, 2026-10-28): the full gate follows every merge, and a merge's checks run on the
+# merged tree, not on a change a work commit's budget could blame. It still says the time. A merge in progress is MERGE_HEAD, which
+# git reads; the staged copy of pre-commit has no repository, so pre-commit tells it with GATE_MERGE=1 (never read in a repository,
+# where an environment variable would switch the budget off for any run). A MERGE_HEAD git cannot read is no merge: the budget holds.
+merge() { git -C "$g" rev-parse HEAD >"$g/.git/MERGE_HEAD"; }
+rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/gate-green"
+merge
+out=$(LOAD_1="$idle 160" LOAD_2="$idle 160" SLOW_STEP=lint GATE_BUDGET=0 gate) || fail "check.sh failed a merge in progress past its budget: $out"
+printf '%s\n' "$out" | grep -qE "the fast gate took [0-9]+ s, past its 0 s budget, which a merge commit has none of \(the full gate follows it\); its slowest step, [a-z.]+, took [0-9.]+ s" ||
+	fail "check.sh did not say the time of a merge past its budget: $out"
+rm -f "$g/.git/MERGE_HEAD"
+out=$(LOAD_1="$idle 160" LOAD_2="$idle 160" SLOW_STEP=lint GATE_BUDGET=0 gate) && fail "check.sh passed a work commit past its budget once the merge was over: $out"
+printf '%s\n' "$out" | grep -q "find what grew" || fail "check.sh did not fail a work commit past its budget once the merge was over: $out"
+for garbage in "not a commit" ""; do
+	printf '%s\n' "$garbage" >"$g/.git/MERGE_HEAD"
+	out=$(LOAD_1="$idle 160" LOAD_2="$idle 160" SLOW_STEP=lint GATE_BUDGET=0 gate) && fail "check.sh took an unreadable MERGE_HEAD ('$garbage') for a merge and let the budget off: $out"
+	printf '%s\n' "$out" | grep -q "find what grew" || fail "check.sh did not fail past its budget with an unreadable MERGE_HEAD ('$garbage'): $out"
+done
+rm -f "$g/.git/MERGE_HEAD"
+# GATE_MERGE is read in a staged copy alone: in a repository, a caller's variable switches no budget off.
+out=$(GATE_MERGE=1 LOAD_1="$idle 160" LOAD_2="$idle 160" SLOW_STEP=lint GATE_BUDGET=0 gate) && fail "check.sh let GATE_MERGE=1 switch the budget off in a repository: $out"
+c=$g.merge
+rm -rf "${c:?}" && cp -R "$g" "$c" && rm -rf "${c:?}/.git"
+out=$(g=$c GATE_MERGE=1 LOAD_1="$idle 160" LOAD_2="$idle 160" SLOW_STEP=lint GATE_BUDGET=0 gate) || fail "check.sh failed a staged copy of a merge past its budget: $out"
+printf '%s\n' "$out" | grep -q "which a merge commit has none of" || fail "check.sh did not say the time of a staged copy of a merge: $out"
+for v in 0 ""; do
+	out=$(g=$c GATE_MERGE=$v LOAD_1="$idle 160" LOAD_2="$idle 160" SLOW_STEP=lint GATE_BUDGET=0 gate) && fail "check.sh let a staged copy of a work commit (GATE_MERGE='$v') past its budget: $out"
+done
+# Every pass the machine's load excused is appended to the unsteady log, with its time and its two loads, which /pre-merge reads
+# (F2070: an agent ran the journeys beside its own commit to raise the load, and its slow commit passed as a busy machine's).
+unsteady=$g/.claude/tmp/unsteady.log
+rm -f "$unsteady" "$g/.claude/tmp/green-fast" "$g/.claude/tmp/gate-green"
+out=$(LOAD_1="$busy 160" LOAD_2="$((busy + 20)) 160" SLOW_STEP=lint GATE_BUDGET=0 gate) || fail "check.sh failed past its budget on a busy machine: $out"
+[ "$(grep -c "" "$unsteady")" = 1 ] || fail "check.sh did not log the pass a busy machine excused, once: $(cat "$unsteady" 2>&1)"
+grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]{8}Z	gate	' "$unsteady" && grep -q "over its 0 s budget" "$unsteady" && grep -q "load 17.0 then 19.0 on 16 cores" "$unsteady" && grep -q "slowest step" "$unsteady" ||
+	fail "the unsteady log lacks the time, the loads or the step of the pass a busy machine excused: $(cat "$unsteady")"
+# A pass under its budget, or one a merge needed no excuse for, logs nothing.
+rm -f "$unsteady" && gate >/dev/null && merge && LOAD_1="$busy 160" LOAD_2="$busy 160" SLOW_STEP=lint GATE_BUDGET=0 gate >/dev/null; rm -f "$g/.git/MERGE_HEAD"
+[ ! -e "$unsteady" ] || fail "check.sh logged a pass nothing excused: $(cat "$unsteady")"
+# A pass no one sees is not a pass: a log that cannot be written fails it.
+rm -rf "${unsteady:?}" "$g/.claude/tmp/green-fast" "$g/.claude/tmp/gate-green" && mkdir -p "$unsteady"
+out=$(LOAD_1="$busy 160" LOAD_2="$busy 160" SLOW_STEP=lint GATE_BUDGET=0 gate) && fail "check.sh passed a busy machine's slow run with a log it cannot write: $out"
+printf '%s\n' "$out" | grep -q "cannot be written" || fail "check.sh did not say its unsteady log cannot be written: $out"
+[ ! -e "$g/.claude/tmp/green-fast" ] || fail "check.sh recorded a busy machine's pass it could not log"
+rm -rf "${unsteady:?}"
 # load.py reads the machine itself: its 1-minute load (the first of getloadavg's three) and its cores, in tenths.
 # Run on a machine of known numbers, so the minute's average, the 5- and 15-minute ones and the scale each tell apart (G4).
 loaded() { # $1: the cores os.cpu_count gives

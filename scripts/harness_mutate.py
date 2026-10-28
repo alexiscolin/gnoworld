@@ -458,6 +458,10 @@ def mutants():
     yield from each(ms, "GNOWORLD_MERGE=$tip ", "", "hooks", "merge.sh marks the merge it showed")
     yield from each(".githooks/pre-commit", '[ "${1:-}" = --merge ] || ', "", "hooks", "pre-commit checks a merge pre-merge-commit hands it (F129)")
     yield from each(".githooks/pre-commit", " || git rev-parse -q --verify MERGE_HEAD >/dev/null", "", "hooks", "pre-commit checks a merge concluded by hand (F129)")
+    yield from each(".githooks/pre-commit", "GATE_MERGE=$merge ", "", "hooks", "pre-commit tells the staged gate whether it commits a merge: a caller's value counts for nothing")
+    yield from each(".githooks/pre-commit", "merge=0\n{", "merge=1\n{", "hooks", "pre-commit gives a work commit its time budget")
+    yield from each(".githooks/pre-commit", '{ [ "${1:-}" = --merge ] || git', "{ false || git", "hooks", "pre-commit tells the staged gate of pre-merge-commit's merge")
+    yield from each(".githooks/pre-commit", "|| git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; } && merge=1", "|| false; } && merge=1", "hooks", "pre-commit tells the staged gate of a merge in progress")
     yield from each(".githooks/pre-commit", '[ -n "$changed" ] && ', "", "hooks", "pre-commit wants merge.sh only for a merge that changes the harness")
     yield from each(".githooks/pre-commit", '[ "$(git merge-tree --write-tree HEAD "${GNOWORLD_MERGE:-}" 2>/dev/null)" != "$(git write-tree)" ]',
                     '[ -z "${GNOWORLD_MERGE:-}" ]', "hooks", "pre-commit wants merge.sh's mark for this merge, not any (F129)")
@@ -533,7 +537,7 @@ def mutants():
     yield from each(pc, 'if [ "$prose" = 0 ] && ! green "$(git write-tree)" fast; then', "if false; then", "hooks", "pre-commit wants recorded code outside the sandbox")
     yield from each(pc, 'or let Claude commit it there" >&2\n\t\texit 1', 'or let Claude commit it there" >&2', "hooks", "pre-commit refuses unrecorded code outside the sandbox")
     yield from each(pc, "\texit 0\nfi\nstaged=", "fi\nstaged=", "hooks", "pre-commit ends outside the sandbox before any gate")
-    gate_line, rec_line = 'env -u GIT_INDEX_FILE -u GIT_DIR -u GIT_WORK_TREE GATE_CHANGED="$changed" sh "$s/check.sh"\n', 'put "$(code_print "$(git write-tree)")" fast'
+    gate_line, rec_line = 'env -u GIT_INDEX_FILE -u GIT_DIR -u GIT_WORK_TREE GATE_CHANGED="$changed" GATE_MERGE=$merge sh "$s/check.sh"\n', 'put "$(code_print "$(git write-tree)")" fast'
     yield from each(pc, rec_line, "true", "hooks", "pre-commit records the code it passed")
     yield from each(pc, gate_line + rec_line, rec_line + "\n" + gate_line.rstrip("\n"), "hooks", "pre-commit records only after its gate passed")
     pp = ".githooks/pre-push"
@@ -810,11 +814,11 @@ def mutants():
         (" PICTURES_OF STORIES_PORT STORIES_OUT #", " #", "the environment narrows no stories' walk (F1190)"),
         ("else:\n    sys.exit(f\"check.sh: no run of {sys.argv[1]} free ports in 200 tries\")' \"$1\"", "else:\n    pass' \"$1\"", "free_ports fails when it finds no free ports (CR8)"),
         ("    except OSError:\n        continue\n", "    except OSError:\n        pass\n", "free_ports tries again when a port is taken (CR8)"),
-        ('\tif [ "$load" -gt "$cores" ] && [ "$end" -gt "${load_end#* }" ]; then', "\tif false; then", "the fast gate passes past its budget on a machine busy when it started and ended (C.8)"),
-        ('\tif [ "$load" -gt "$cores" ] && [ "$end" -gt "${load_end#* }" ]; then', '\tif [ "$load" -ge "$cores" ] && [ "$end" -gt "${load_end#* }" ]; then', "the fast gate fails past its budget on a machine at its cores at its start (C.8)"),
-        ('\tif [ "$load" -gt "$cores" ] && [ "$end" -gt "${load_end#* }" ]; then', '\tif [ "$load" -gt "$cores" ] && [ "$end" -ge "${load_end#* }" ]; then', "the fast gate fails past its budget on a machine at its cores at its end (C.8)"),
-        ('\tif [ "$load" -gt "$cores" ] && [ "$end" -gt "${load_end#* }" ]; then', '\tif [ "$end" -gt "${load_end#* }" ]; then', "a machine idle at its start is no excuse (CR10)"),
-        ('\tif [ "$load" -gt "$cores" ] && [ "$end" -gt "${load_end#* }" ]; then', '\tif [ "$load" -gt "$cores" ]; then', "a machine idle at its end is no excuse (CR10)"),
+        ('\telif [ "$load" -gt "$cores" ] && [ "$end" -gt "${load_end#* }" ]; then', "\telif false; then", "the fast gate passes past its budget on a machine busy when it started and ended (C.8)"),
+        ('\telif [ "$load" -gt "$cores" ] && [ "$end" -gt "${load_end#* }" ]; then', '\tif [ "$load" -ge "$cores" ] && [ "$end" -gt "${load_end#* }" ]; then', "the fast gate fails past its budget on a machine at its cores at its start (C.8)"),
+        ('\telif [ "$load" -gt "$cores" ] && [ "$end" -gt "${load_end#* }" ]; then', '\tif [ "$load" -gt "$cores" ] && [ "$end" -ge "${load_end#* }" ]; then', "the fast gate fails past its budget on a machine at its cores at its end (C.8)"),
+        ('\telif [ "$load" -gt "$cores" ] && [ "$end" -gt "${load_end#* }" ]; then', '\telif [ "$end" -gt "${load_end#* }" ]; then', "a machine idle at its start is no excuse (CR10)"),
+        ('\telif [ "$load" -gt "$cores" ] && [ "$end" -gt "${load_end#* }" ]; then', '\telif [ "$load" -gt "$cores" ]; then', "a machine idle at its end is no excuse (CR10)"),
         ("load_end=$(python3 -I scripts/load.py)", "load_end=$load_start", "the end reading is read at the end (CR10)"),
         ("load=${load_start% *}", "load=$(python3 -I scripts/load.py | cut -d' ' -f1)", "a machine its own lanes loaded is no excuse (security-S3)"),
         ("cores=${load_start#* }", "cores=0", "the cores a busy machine is judged by are the ones counted (C.8)"),
@@ -824,6 +828,14 @@ def mutants():
         ('run mutate "--concurrency $half"', "run mutate", "--full caps StrykerJS at half the machine (F777)"),
         ("\tstart probe\n\tfinish probe\n", "\tstart probe\n", "probe.py runs alone, before the full lanes"),
         ("\t! $merge || full=false", "\t:", "--merge records no full gate"),
+        ("\tif $merging; then\n", "\tif false; then\n", "a merge commit has no time budget (Alexis, 2026-10-28)"),
+        ("\tif git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then merging=true; fi\n", '\tif [ -e "$(git rev-parse --git-path MERGE_HEAD)" ]; then merging=true; fi\n', "a MERGE_HEAD git cannot read is no merge, the budget holds"),
+        ("\tif git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then merging=true; fi\n", "\t:\n", "a merge in progress, in a repository, has no time budget"),
+        ('elif [ "${GATE_MERGE:-}" = 1 ]; then', "elif true; then", "a staged copy is a merge only when pre-commit says so"),
+        ("merging=false\nif git rev-parse --git-dir", 'merging=false\n[ "${GATE_MERGE:-}" != 1 ] || merging=true\nif git rev-parse --git-dir', "a caller's GATE_MERGE switches no budget off in a repository"),
+        ('mkdir -p "$(dirname "$unsteady_log")" && printf \'%s\\tgate', 'true || printf \'%s\\tgate', "a pass the machine's load excused is logged for /pre-merge (F2070)"),
+        ('>>"$unsteady_log" || {', '>>"$unsteady_log" || true || {', "a busy machine's pass that cannot be logged fails (F2070)"),
+        ('\t\t\t"$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${slowest%% *}" "$((load / 10))" "$((load % 10))" "$((end / 10))"', '\t\t\t"$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${slowest%% *}" "$((load / 10))" "$((load % 10))" "$((load / 10))"', "the log of a busy machine's pass holds the end load (F2070)"),
         ("\texport E2E_PORT\n", "\n", "the journeys get a free port of their own"),
         ('[ "${1:-}" = "--merge" ] && full=true merge=true', '[ "${1:-}" = "--merge" ] && full=true', "--merge judges the merge's own harness mutants"),
         ('[ "${1:-}" = "--merge" ] && full=true merge=true', '[ "${1:-}" = "--merge" ] && merge=true', "--merge runs the full gate's steps"),

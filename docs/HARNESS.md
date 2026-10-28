@@ -137,6 +137,15 @@ a run begun just after a heavy one on an idle machine (the average lags by about
 292 in 10 s); the end reading alone includes the gate's own lanes, which a change making its own tests
 CPU-bound raises (security-S3). Both above the cores close the two.
 
+Every pass that load excused is appended to `.claude/tmp/unsteady.log`, the unsteady tests' own log, with its time, both
+loads and its slowest step (a `gate` line), and fails when the log cannot be written: the excuse was gamed once, an
+agent running the journeys beside its own commit to raise the load (F2070), and `/pre-merge` now reads each such line
+in its first step instead of trusting the pass. A merge commit has no budget at all (Alexis, 2026-10-28, F2071): the
+full gate follows every merge, and the merge's time is not a change's to blame. Its output still says the time. A merge
+is told by git (`MERGE_HEAD`, read as a commit: one git cannot read leaves the budget on) or, in pre-commit's staged
+copy, which has no repository, by `GATE_MERGE=1`, which pre-commit always sets (`1` for `pre-merge-commit`'s `--merge` and
+for a merge in progress, `0` otherwise) and which check.sh reads nowhere else.
+
 A Vitest file or a journey that fails in the fast gate runs once more, alone (`scripts/unsteady.py`, F1700;
 Alexis, 2026-10-28, F1621): under a load of 70 to 135 the gate failed on a different timing test at each run
 though each passed alone, and one merge took 8 tries. The gate reads each tool's JSON report (`--reporter=json`),
