@@ -4,9 +4,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import { BODY_LIMIT, makeApp } from "../app.ts";
 import { openDatabase } from "../db.ts";
 import { logger } from "../log.ts";
-import type { Roles } from "../roles/roles.ts";
+import type { Room, Roles } from "../roles/roles.ts";
 import { makeRooms, ROOM_STATE } from "./create.ts";
-import { ensureRooms, listRooms, ROOM_TABLES } from "./rooms.ts";
+import { ensureNamed, ensureRooms, listRooms, ROOM_TABLES } from "./rooms.ts";
 import { roomsRoutes } from "./routes.ts";
 
 const T0 = Date.parse("2026-10-22T12:00:00.000Z");
@@ -26,7 +26,20 @@ const ROLES: Roles = {
   trusted: new Set([TRUSTED]),
   worlds: new Map([
     ["earth", { moderators: new Set([EARTH_MOD]), rules: RULES }],
-    ["bubble", { moderators: new Set([BUBBLE_MOD]), rules: RULES }],
+    [
+      "bubble",
+      {
+        moderators: new Set([BUBBLE_MOD]),
+        rules: RULES,
+        rooms: new Map<string, Room>([
+          ["#bubble/open", { type: "open", hidden: false }],
+          ["#bubble/news", { type: "announcement", hidden: false }],
+          ["#bubble/accounts", { type: "accounts", hidden: false }],
+          ["#bubble/crew", { type: "members", readers: "crew", hidden: false }],
+          ["#bubble/crew-write", { type: "members-write", readers: "crew", writers: "crew", hidden: false }],
+        ]),
+      },
+    ],
     [LONG, { moderators: new Set<Address>(), rules: RULES }],
   ]),
 };
@@ -277,6 +290,24 @@ describe("archiving a room", () => {
     expect((await archive("bubble/garden", { who: "bubble" })).status).toBe(204);
     expect(sent).toHaveLength(2);
   });
+
+  it.each(["open", "news", "accounts", "crew", "crew-write"])(
+    "refuses to archive #bubble/%s, a room the roles file types, to a moderator and to the team alike (F2050)",
+    async (name) => {
+      const { db, sent, archive, events } = setup();
+      ensureNamed(db, [{ name: `#bubble/${name}`, world: "bubble" }], T0);
+      for (const who of ["bubble", "team"]) {
+        expect(await answer(await archive(`bubble/${name}`, { who }))).toEqual([
+          403,
+          '{"error":"forbidden"}',
+          "no-store",
+        ]);
+      }
+      expect(sent).toEqual([]);
+      expect(db.prepare("SELECT archived FROM rooms WHERE name = ?").get(`#bubble/${name}`)).toEqual({ archived: 0 });
+      expect(events().at(-1)).toMatch(/"room_refused".*"error":"forbidden"/);
+    },
+  );
 
   it("logs who archived which room", async () => {
     const { create, archive, events } = setup();
