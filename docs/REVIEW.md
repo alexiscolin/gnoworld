@@ -105,6 +105,9 @@ Code written by an agent gets the same reading as anyone's, plus this. `/pre-mer
    workspace is reviewed whole once per slice, at its true last merge; a follow-up merge of
    fixes reads only its range, with `/simplify`'s altitude angle alone. Every agent and lens
    is asked for a short report: its findings, one row each with its evidence.
+   From slice 5 (Alexis, 2026-10-28): one combined review per branch, high and medium findings fixed,
+   low ones on one list for Alexis, no red pass of a fixer's tests, a second round only for a high
+   finding fixed in a tier-1 file; tokens and hours per merge are measured against slice 4's.
 
 ## Before a push
 
