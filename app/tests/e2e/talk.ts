@@ -52,6 +52,24 @@ export async function asAccount(page: Page, script: (address: string) => Scripte
   };
 }
 
+/** The words of the list, a word at a time, that the box of a line's bar crosses. */
+export const crossedByBar = (page: Page) =>
+  page.getByRole("list", { name: "Messages" }).evaluate((list) => {
+    const toolbar = list.querySelector("[role='toolbar']");
+    const box = toolbar?.getBoundingClientRect() ?? new DOMRect();
+    const over = (rect: DOMRect) =>
+      rect.right > box.left && rect.left < box.right && rect.bottom > box.top && rect.top < box.bottom;
+    const found: string[] = [];
+    const walker = document.createTreeWalker(list, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      if (toolbar?.contains(node) !== true && [...range.getClientRects()].some(over))
+        found.push(node.textContent ?? "");
+    }
+    return found;
+  });
+
 /** The Tab presses from where the focus is to `target`, at most `most`: the test fails when it takes more. */
 export async function tabsTo(page: Page, target: Locator, most: number): Promise<number> {
   for (let presses = 1; presses <= most; presses += 1) {
