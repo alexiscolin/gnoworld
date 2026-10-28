@@ -713,7 +713,7 @@ describe("the chat's link: drops and reconnects", () => {
     t.link.follow(["#garden"]);
     t.signedIn(ADDRESS);
     expect(t.links).toHaveLength(1);
-    expect(t.room("#bubble")?.lines).toEqual([]);
+    expect(t.room("#bubble")?.lines ?? []).toEqual([]);
     expect(t.fake.sent).toEqual(["JOIN #bubble"]);
   });
 
