@@ -2332,7 +2332,11 @@ ran test:compiled || fail "check.sh --full ran no render-count test: the coverag
 half=$(($(node -p "require('os').availableParallelism()") / 2))
 [ "$half" -ge 1 ] || half=1
 grep -qx "coverage --maxWorkers=$half" "$log" || fail "check.sh --full let Vitest's coverage take the whole machine (F777): $(grep '^coverage' "$log")"
-grep -qx "mutate --concurrency $half" "$log" || fail "check.sh --full let StrykerJS take the whole machine (F777): $(grep '^mutate' "$log")"
+# StrykerJS's incremental file is one cache every tree shares, in the tools' cache: a worktree's own, copied from the main
+# tree's (63 of 142 files, a week old), made each branch mutate again what others had judged (Alexis, 2026-10-29).
+cache="$HOME/.cache/gnoworld-tools/stryker-incremental.json"
+grep -qx "mutate --concurrency $half --incrementalFile $cache" "$log" ||
+	fail "check.sh --full let StrykerJS take the whole machine (F777), or read its tree's own incremental file: $(grep '^mutate' "$log")"
 ran py:harness_mutate && fail "check.sh --full mutated a harness main already has"
 for s in py:prove_fix py:patch_coverage py:check_regressions py:check_migrations; do
 	grep -q "^$s $base$" "$log" || fail "check.sh --full did not give $s the base $base"
@@ -2408,6 +2412,7 @@ ran py:audit || fail "check.sh --full stopped the history lane at the stories' f
 # alone, and no full record, which only --full writes (pre-push wants it for main).
 rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/green-full"
 base=$(git -C "$g" merge-base HEAD origin/main)
+printf 'z\n' >>"$g/server/src/a.ts" && git -C "$g" commit -qam "product code"
 out=$(gate --merge) || fail "check.sh --merge failed on a copy whose every step passes: $out"
 for s in $fast_steps py:probe py:bench core_chromium stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
 	[ "$s" = test ] || ran "$s" || fail "check.sh --merge skipped $s"
@@ -2425,6 +2430,37 @@ out=$(gate --merge) || fail "check.sh --merge failed again on a copy whose every
 grep -qxF "$(record)" "$g/.claude/tmp/green-fast" || fail "check.sh --merge did not record the fast gate it passed"
 gate --full >/dev/null || fail "check.sh --full failed after --merge"
 grep -qxE "py:harness_mutate ?" "$log" || fail "check.sh --full did not judge every harness mutant"
+# A merge with no product code since main (docs, the harness, the lint) has no coverage, mutant or fix of the product to
+# judge: --merge skips the stories, the coverage lane and prove_fix, and says so; the probe, the history's other steps
+# and the harness's mutants still run (Alexis, 2026-10-29). --full never skips them; a path it cannot place is product.
+git -C "$g" update-ref refs/remotes/origin/main HEAD && base=$(git -C "$g" rev-parse HEAD)
+mkdir -p "$g/docs" "$g/.claude/agents" "$g/adr" "$g/.github/workflows" && printf 'x\n' >"$g/docs/x.md" && printf '\n' >>"$g/scripts/check_css.py" &&
+	printf '\n' >>"$g/.githooks/records.sh" && printf 'x\n' >"$g/.claude/agents/x.md" && printf '\n' >>"$g/lint/x.ts" && printf 'x\n' >"$g/README.md" &&
+	printf 'x\n' >"$g/adr/x.md" && printf 'x\n' >"$g/.github/workflows/x.yml" && printf '\n' >>"$g/eslint.config.ts" && git -C "$g" add -A && git -C "$g" commit -qm "no product"
+out=$(gate --merge) || fail "check.sh --merge failed on a branch with no product code: $out"
+for s in core_chromium stories coverage py:patch_coverage mutate py:prove_fix; do
+	ran "$s" && fail "check.sh --merge ran $s on a branch with no product code"
+done
+for s in $fast_steps py:probe py:bench py:batch_size py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
+	[ "$s" = test ] || ran "$s" || fail "check.sh --merge skipped $s on a branch with no product code"
+done
+grep -qx "py:harness_mutate --changed $base" "$log" || fail "check.sh --merge did not judge the harness mutants of a branch with no product code"
+printf '%s\n' "$out" | grep -q "no product code since" || fail "check.sh --merge did not say why it skipped the product's lanes: $out"
+gate --full >/dev/null || fail "check.sh --full failed on a branch with no product code"
+for s in core_chromium stories coverage mutate py:prove_fix; do ran "$s" || fail "check.sh --full skipped $s on a branch with no product code"; done
+for change in deploy/x app/src/a.ts packages/schemas/src/a.ts gno/r/x/gnomod.toml pnpm-lock.yaml docsx/a.ts lintx/a.ts scriptsx/a.ts; do
+	git -C "$g" reset -q --hard "$base" && mkdir -p "$g/$(dirname "$change")" && printf '\n' >>"$g/$change" && git -C "$g" add -A && git -C "$g" commit -qm "$change"
+	gate --merge >/dev/null || fail "check.sh --merge failed on a change of $change"
+	ran mutate && ran py:prove_fix && ran stories || fail "check.sh --merge skipped the product's lanes for a change of $change"
+done
+# Product code that leaves is a change of the product too: renamed into docs/, deleted, or added and not yet committed.
+git -C "$g" reset -q --hard "$base" && mkdir -p "$g/docs" && git -C "$g" mv server/src/a.ts docs/a.md && git -C "$g" commit -qm "into docs"
+gate --merge >/dev/null && ran mutate || fail "check.sh --merge read product code renamed into docs/ as no product"
+git -C "$g" reset -q --hard "$base" && git -C "$g" rm -q server/src/a.ts && git -C "$g" commit -qm gone
+gate --merge >/dev/null && ran mutate || fail "check.sh --merge read deleted product code as no product"
+git -C "$g" reset -q --hard "$base" && printf 'x\n' >"$g/app/src/new.ts"
+gate --merge >/dev/null && ran mutate || fail "check.sh --merge read an untracked product file as no product"
+reset
 # No origin/main to compare with: --full fails, saying so.
 git -C "$g" update-ref -d refs/remotes/origin/main
 out=$(gate --full) && fail "check.sh --full passed with no origin/main"

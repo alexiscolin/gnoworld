@@ -332,6 +332,19 @@ fi
 
 if $full; then
 	base=$(git merge-base HEAD origin/main) || { echo "check.sh --full: needs origin/main to compare with (git fetch)" >&2; exit 1; }
+	# A merge's own gate judges the product when its change since main holds some (Alexis, 2026-10-29): docs, the harness and
+	# the lint alone have no coverage, mutant or fix of the product to judge, which took 40 of its 47 minutes. --full judges all.
+	product=true
+	if $merge; then
+		product=false
+		changes=$(git -c core.quotePath=false diff --no-renames --name-only "$base" -- && git -c core.quotePath=false ls-files --others --exclude-standard)
+		while IFS= read -r path; do
+			case $path in '' | docs/* | adr/* | *.md | scripts/* | .githooks/* | .claude/* | .github/* | lint/* | eslint.config.ts) ;; *) product=true ;; esac
+		done <<EOF
+$changes
+EOF
+		$product || echo "check.sh --merge: no product code since $base: the stories, the coverage lane and prove_fix do not run"
+	fi
 	# probe.py plants its faults in the source tree, so it runs alone: a lane beside it (the coverage's Vitest,
 	# check_regressions' list, StrykerJS, the stories' build) would read its files as they come and go.
 	lane_probe() {
@@ -355,15 +368,19 @@ if $full; then
 		run coverage "--maxWorkers=$half"
 		step patch_coverage # 85% of the lines this branch changed
 		python3 -I scripts/patch_coverage.py "$base"
-		step stryker # mutations, incremental
-		run mutate "--concurrency $half"
+		step stryker # mutations, incremental, from the one cache every tree shares: a tree's own copy went stale (Alexis, 2026-10-29)
+		# ponytail: two trees ending StrykerJS at once write the file one after the other; a lost entry costs a rerun, not a verdict.
+		mkdir -p "$HOME/.cache/gnoworld-tools"
+		run mutate "--concurrency $half --incrementalFile $HOME/.cache/gnoworld-tools/stryker-incremental.json"
 	}
 	lane_history() {
 		# --full too: a slice's last merge is checked by it (pre-merge.md, step 8) and is the one that reaches main (security-S2).
 		step batch_size # a merge's own product code is a small batch (DORA; docs/REVIEW.md)
 		python3 -I scripts/batch_size.py "$base"
-		step prove_fix # every fix of the product comes with a test that failed before it
-		python3 -I scripts/prove_fix.py "$base"
+		if $product; then
+			step prove_fix # every fix of the product comes with a test that failed before it
+			python3 -I scripts/prove_fix.py "$base"
+		fi
 		step regressions # no test gone, no floor lower, no approved screenshot changed, unless a commit says why
 		python3 -I scripts/check_regressions.py "$base"
 		step migrations # a migration main has keeps its text and its place (F466)
@@ -387,15 +404,15 @@ if $full; then
 	# The stories' journeys run beside the history lane alone: under the coverage's Vitest and StrykerJS and
 	# the harness's worktrees, a Dialog's teardown in the browser outlasted its test (F815). A failure there stops
 	# the gate before the two after them, whose fifteen to twenty minutes would fix nothing of it (C.5, F823).
-	start stories
+	! $product || start stories
 	start history
-	finish stories history || {
+	finish $($product && echo stories) history || {
 		echo "check.sh: the coverage and harness lanes did not run: the stories' or the history lane failed first" >&2
 		exit 1
 	}
-	start coverage
+	! $product || start coverage
 	start harness
-	finish coverage harness
+	finish $($product && echo coverage) harness
 fi
 
 if [ -n "$tested" ]; then
