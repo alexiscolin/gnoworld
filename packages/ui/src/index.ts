@@ -9,6 +9,7 @@ export { Button, type ButtonProps } from "./Button/Button.tsx";
 export { IconButton, type IconButtonProps } from "./Button/IconButton.tsx";
 export { Card, type CardHeaderProps, type CardProps } from "./Card/Card.tsx";
 export { Chip, type ChipProps } from "./Chip/Chip.tsx";
+export { Combobox, type ComboboxGroup, type ComboboxOption, type ComboboxProps } from "./Combobox/Combobox.tsx";
 export * from "./compositions/index.ts";
 export { Dialog, type DialogProps } from "./Dialog/Dialog.tsx";
 export { EmptyState, type EmptyStateProps } from "./EmptyState/EmptyState.tsx";

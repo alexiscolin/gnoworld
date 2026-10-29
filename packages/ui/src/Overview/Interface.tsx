@@ -16,6 +16,7 @@ import { Menu, Popover } from "../Popover/Popover.tsx";
 import { Row } from "../Row/Row.tsx";
 import { Stat } from "../Stat/Stat.tsx";
 import { Tabs } from "../Tabs/Tabs.tsx";
+import { Comboboxes } from "./Comboboxes.tsx";
 import { ADDRESS, DAY, disc, short } from "./samples.ts";
 
 export function Chips() {
@@ -144,7 +145,12 @@ export function Rows() {
 }
 
 export function Fields() {
-  return <Field label="Name" prefix="@" help="Letters and digits, 6 at least" value="" onChange={() => undefined} />;
+  return (
+    <Stack>
+      <Field label="Name" prefix="@" help="Letters and digits, 6 at least" value="" onChange={() => undefined} />
+      <Comboboxes />
+    </Stack>
+  );
 }
 
 export function Stats() {
