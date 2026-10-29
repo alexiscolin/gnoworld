@@ -305,6 +305,19 @@ describe("Universes", () => {
     expect(Universes.safeParse([one, { ...universe, default: undefined }]).success).toBe(false);
   });
 
+  it("refuses two universes of one id, even on two chains, and says which row and field", () => {
+    const result = Universes.safeParse([one, { ...second, id: "onyx" }]);
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map((i) => [i.path, i.message])).toEqual([[[1, "id"], 'duplicate id "onyx"']]);
+  });
+
+  it("says which row and field refuse a second default, a repeated chain, and no default", () => {
+    const issues = (rows: unknown[]) => Universes.safeParse(rows).error?.issues.map((i) => [i.path, i.message]);
+    expect(issues([one, { ...second, default: true }])).toEqual([[[1, "default"], "a second default universe"]]);
+    expect(issues([one, { ...second, chainId: "onyx-1" }])).toEqual([[[1, "chainId"], 'duplicate chainId "onyx-1"']]);
+    expect(issues([universe])).toEqual([[[], "no universe is the default"]]);
+  });
+
   it("refuses two universes of one chain", () => {
     expect(Universes.safeParse([one, { ...second, chainId: "onyx-1" }]).success).toBe(false);
   });
