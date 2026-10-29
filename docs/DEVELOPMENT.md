@@ -38,8 +38,9 @@ claude plugin install gnomcp@gnoverse --scope project   # its marketplace is dec
 
 Each branch works in a worktree of its own, made from the main checkout by one script, never by
 hand: `sh scripts/worktree.sh <dir> <branch> <base>`. It makes the branch, links the main tree's
-installed packages one by one (one store), copies each workspace's `node_modules` with its
-relative links and a `.bin` of its own, and seeds StrykerJS's incremental file. Hand-made links
+installed packages one by one (one store), and copies each workspace's `node_modules` with its
+relative links and a `.bin` of its own; the gate's StrykerJS reads one incremental file every tree
+shares (`~/.cache/gnoworld-tools/stryker-incremental.json`). Hand-made links
 loaded React twice in Storybook and let the probe delete main's own `.bin/storybook` (F2127).
 After a merge that changes the lockfile, install in the main checkout
 (`PATH=$HOME/.nvm/versions/node/v24.22.0/bin:$PATH pnpm install --frozen-lockfile`); the sandbox

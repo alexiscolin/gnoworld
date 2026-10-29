@@ -52,7 +52,10 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
 3. **Code.** Before each Bash command, web fetch or edit, `scripts/guard.py` runs.
 4. **End of each turn.** When code changed, the Stop hook (`scripts/stop_gate.sh`) stops the turn
    once unless the fast gate, which Claude runs in the sandbox, passed on exactly this tree. The
-   hook itself runs nothing from the repository.
+   hook itself runs nothing from the repository. First, it stops what runs of this project left
+   behind, which the sandbox cannot see: a process naming a folder `gnoworld/` whose parent is
+   gone (unless a gate runs and it is under 2 hours old), or a test tool's 3 hours old or more,
+   each logged to `.claude/tmp/reaped.log`.
 5. **Each commit.** The git hooks run from `.git/hooks`, installed from `main` with the scripts
    they run, where no merge, checkout or sandboxed command writes: no branch brings its own
    (F129). `commit-msg` holds the subject's form, refuses attribution lines and a `fix` of the
@@ -141,7 +144,9 @@ refuses another Node (F816).
 | `scripts/test_hooks.sh` | the hooks, the guard, the settings' boundary, the CI's promises, the scripts; a harness mutant that no longer finds its text (`harness_mutate.py --dry`) |
 
 **Full** (`--full`: the slice's last merge and a push of `main`; `--merge`: each branch's
-`/pre-merge`, with the harness mutants of the guard files it changed) adds:
+`/pre-merge`, with the harness mutants of the guard files it changed, and without the stories,
+the coverage lane and `prove_fix` when nothing but docs, the harness and the lint changed since
+`main`) adds:
 
 | Step | What it catches |
 |---|---|
@@ -153,12 +158,12 @@ refuses another Node (F816).
 | `scripts/patch_coverage.py` | under 85% of the changed lines run by a test |
 | `scripts/batch_size.py` | a merge's own product code past 600 lines (400 with a tier-1 file) with no `Batch-size:` line |
 | `scripts/prove_fix.py` | a fix of the product whose tests did not fail on the commit before it, in any of 3 runs |
-| StrykerJS | a mutant of the TypeScript that no test kills (`checkers: ["typescript"]` stays) |
+| StrykerJS | a mutant of the TypeScript that no test kills (`checkers: ["typescript"]` stays); its incremental file is one cache every tree shares, `~/.cache/gnoworld-tools/stryker-incremental.json` |
 | `scripts/check_regressions.py` | the safety net shrinking (next section) |
 | `scripts/check_migrations.py` | a migration `main` has, edited, moved or removed (F466) |
 | gitleaks | a secret anywhere in the history; a path into a home folder or the demo's host |
 | `pnpm audit` | a dependency with a known advisory, moderate or worse |
-| `scripts/harness_mutate.py` | a guard of the harness that no test notices switched off; over `HARNESS_SHARDS` worktrees (4), each first passing its suites untouched, two such controls at once (F2138); `--changed <base>` judges only the guard files changed since the last review pass |
+| `scripts/harness_mutate.py` | a guard of the harness that no test notices switched off; over `HARNESS_SHARDS` worktrees (4), each first passing its suites untouched, two such controls at once (F2138); `--changed <base>` judges only the mutants of the guard files and suite sections changed since the last review pass, and, when the script itself changed, those it defines anew or otherwise |
 
 ## The safety net never shrinks quietly
 
