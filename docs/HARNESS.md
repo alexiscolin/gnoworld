@@ -34,14 +34,18 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
   slice's last `/pre-merge`, then the dream.
 - **A branch session**, one per branch, two at most at once, works in its own worktree, made by
   `scripts/worktree.sh` and never by hand (one store of packages, a real `.bin`, F2127). Its
-  pipeline is a Workflow loop: the failing tests, the red pass, the code, the merge check, one
-  combined review, the high and medium fixes, the merge check again.
+  pipeline is the Workflow `branch` (`.claude/workflows/branch.js`): the failing tests, the red
+  pass, the code, the merge check, one combined review, the high and medium fixes, the merge check
+  again; it returns its commits, the low findings for Alexis and its tokens. A Workflow script is a
+  body Claude Code runs, which no test of the gate can run: its first branch is its test.
 - **Agents** are fresh, briefed from files (never forks), four at most at once, each asked for a
   short report saved to a file. The sessions coordinate through files: the plan,
   `docs/decisions.md`, the ledger, a state file per branch and one shared learnings file.
-- **The dream**, at each slice's end, is one read-only agent over the agents' reports, the
-  learnings, the review log, the ledger and the handoff (never transcripts); it proposes rule
-  and memory changes with their evidence, which Alexis accepts one by one.
+- **The dream** (`/dream <slice>`, `.claude/commands/dream.md`), at each slice's end, keeps a
+  dated copy of the memory, then one read-only agent reads the agents' reports, the learnings,
+  the review log, the ledger and the handoff (never transcripts) and proposes rule, memory, test
+  and check changes, each with its evidence, prevalence and cost. Alexis accepts each; a memory
+  changes at once, a rule or a check on a branch through `merge.sh`.
 
 ## A change, from plan to merge
 
@@ -281,7 +285,8 @@ costs context in every session.
 | `CLAUDE.md`, `.claude/rules/` | the rules Claude reads; each area's file loads when its files are touched |
 | `.claude/settings.json` | permissions, the sandbox, the hooks, the plugins |
 | `.claude/agents/` | `test-auditor`, `reviewer`, `security-reviewer`, `finding-verifier` |
-| `.claude/commands/` | `/slice-plan`, `/pre-merge` |
+| `.claude/commands/` | `/slice-plan`, `/pre-merge`, `/dream` |
+| `.claude/workflows/` | `branch`, a branch's loop |
 | `.githooks/` | `commit-msg`, `pre-commit`, `pre-merge-commit`, `pre-push`; `records.sh`, the prints and the harness list; `merge.sh`, the merge that shows the harness first |
 | `scripts/install_hooks.sh` | puts `main`'s hooks and the scripts they run in `.git/hooks` |
 | `scripts/check.sh` | the gate |
