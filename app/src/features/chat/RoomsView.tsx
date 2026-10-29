@@ -156,6 +156,17 @@ function Dms({
   );
 }
 
+/** What a screen reader is told as a notice comes: a status always on the page, never inside the rooms' list, which a
+ * phone's closed drawer hides from it (F2301). Its own place, so an empty list still says what comes. */
+export function NoticeStatus({ notices }: { notices: Pick<NoticesProps, "said" | "saidId"> | undefined }) {
+  // None for a guest, who is told of nothing.
+  return notices === undefined ? null : (
+    <p key={notices.saidId} role="status" className="visually-hidden">
+      {notices.said}
+    </p>
+  );
+}
+
 export function RoomsView({ sections, current, dms, failed, badges, notices }: RoomsViewProps) {
   const navRef = useRef<HTMLElement>(null);
   const listed = (
@@ -175,17 +186,11 @@ export function RoomsView({ sections, current, dms, failed, badges, notices }: R
       {notices === undefined ? (
         body
       ) : (
-        <>
-          <Stack space="l">
-            {body}
-            {/* After the rooms, so a first notice moves none of their rows (U4). */}
-            {notices.list.length === 0 ? null : <Notices {...notices} navRef={navRef} />}
-          </Stack>
-          {/* Its own place, so the list's absence leaves no gap: what comes is said even as the list is empty. */}
-          <p key={notices.saidId} role="status" className="visually-hidden">
-            {notices.said}
-          </p>
-        </>
+        <Stack space="l">
+          {body}
+          {/* After the rooms, so a first notice moves none of their rows (U4). */}
+          {notices.list.length === 0 ? null : <Notices {...notices} navRef={navRef} />}
+        </Stack>
       )}
     </RoomsNav>
   );

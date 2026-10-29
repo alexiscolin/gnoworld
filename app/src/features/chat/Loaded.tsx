@@ -17,7 +17,7 @@ import { NoticeModes } from "./NoticeModes.tsx";
 import { multilineOf, roomActs } from "./roomActs.ts";
 import { useRoomKeeping } from "./RoomKeeping.ts";
 import { Saved } from "./Saved.tsx";
-import { RoomsView } from "./RoomsView.tsx";
+import { NoticeStatus, RoomsView } from "./RoomsView.tsx";
 import { useRoomsDrawer } from "./RoomsDrawer.tsx";
 import { unreadOf } from "./unread.ts";
 import { People, RoomView, type RoomViewProps } from "./RoomView.tsx";
@@ -187,6 +187,7 @@ export function Loaded({
           />
         )}
       </Sidebar>
+      <NoticeStatus notices={noticing.list} />
       {rooms.drawer}
     </>
   );

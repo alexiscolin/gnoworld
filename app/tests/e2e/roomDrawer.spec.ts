@@ -219,6 +219,17 @@ test.describe("the rooms as a drawer, on a phone's screen", () => {
     await expect(drawer(page)).toBeHidden();
   });
 
+  // F2301: the status sat in the rail's list, which the closed drawer hides from a screen reader (display: none).
+  test("tells a screen reader a notice came, with the drawer closed, and moves no focus", async ({ page }) => {
+    const { address, ergo } = await account(page, 390);
+    await page.getByRole("textbox", { name: "Message #games" }).focus();
+    ergo().send(live("n1", T(31), { room: "#bubble", text: `look @${address}` }));
+    // By role, which leaves out what display: none hides: the locator by markup would find it in the closed dialog.
+    await expect(page.getByRole("status").filter({ hasText: "mentioned you in #bubble" })).toHaveCount(1);
+    await expect(drawer(page)).toBeHidden();
+    await expect(page.getByRole("textbox", { name: "Message #games" })).toBeFocused();
+  });
+
   test("clears the notices from the drawer, which stays open with the focus in it", async ({ page }) => {
     const { address, ergo } = await account(page, 390);
     ergo().send(live("n1", T(31), { room: "#bubble", text: `look @${address}` }));

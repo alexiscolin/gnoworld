@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { noticeSaid, RoomsView, type RoomsViewProps } from "./RoomsView.tsx";
+import { noticeSaid, NoticeStatus, RoomsView, type RoomsViewProps } from "./RoomsView.tsx";
 
 const SECTIONS: RoomsViewProps["sections"] = [
   {
@@ -288,11 +288,15 @@ describe("RoomsView: notifications", () => {
       expect(html).toContain("&lt;img");
     });
 
-    it("keeps a status of its own that tells a screen reader what came, present before anything does", () => {
-      const quiet = view({ notices: notices() });
+    it("keeps a status for a screen reader, present before anything is said, outside the rooms' navigation", () => {
+      const quiet = renderToStaticMarkup(<NoticeStatus notices={{ said: "" }} />);
       expect(quiet).toMatch(/<p[^>]*role="status"[^>]*><\/p>/);
-      const told = view({ notices: notices({ said: "g10gh7…3y5tv mentioned you in #games" }) });
+      const told = renderToStaticMarkup(
+        <NoticeStatus notices={{ said: "g10gh7…3y5tv mentioned you in #games", saidId: "n1" }} />,
+      );
       expect(told).toMatch(/<p[^>]*role="status"[^>]*>g10gh7…3y5tv mentioned you in #games<\/p>/);
+      expect(view({ notices: notices({ said: "told" }) })).not.toContain('role="status"');
+      expect(renderToStaticMarkup(<NoticeStatus notices={undefined} />)).toBe("");
     });
 
     it("keeps a guest's navigation free of any status", () => {
