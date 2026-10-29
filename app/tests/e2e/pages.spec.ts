@@ -98,6 +98,25 @@ test.describe("as a search engine reads it, before any script runs", () => {
     });
   }
 
+  // What Lighthouse's SEO audits read besides the tags: the page's language and a link's text.
+  for (const { path } of pages) {
+    test(`${path} names its language, and every link has text of its own`, async ({ page }) => {
+      await page.goto(path);
+      await expect(page.locator("html")).toHaveAttribute("lang", /^[a-z]{2}(-[A-Za-z0-9]+)*$/);
+      const texts = await page.locator("a[href]").evaluateAll((links) =>
+        links.map((link) => {
+          const text = link.textContent.trim();
+          return text === "" ? (link.getAttribute("aria-label") ?? "").trim() : text;
+        }),
+      );
+      expect(texts.length).toBeGreaterThan(0);
+      for (const text of texts) {
+        expect(text).not.toBe("");
+        expect(text.toLowerCase()).not.toMatch(/^(click here|here|read more|more|learn more|link|this)$/);
+      }
+    });
+  }
+
   test("the host serves robots.txt and the sitemap of the mainnet, not a page", async ({ request }) => {
     const robots = await request.get("/robots.txt");
     expect(robots.status()).toBe(200);

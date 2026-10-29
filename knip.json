@@ -3,7 +3,7 @@
   "ignoreFiles": ["docs/**", ".claude/workflows/**"],
   "treatConfigHintsAsErrors": true,
   "workspaces": {
-    ".": {},
+    ".": { "entry": ["scripts/lighthouse_check.mjs"] },
     "app": {
       "entry": ["src/**/*.test.{ts,tsx}"],
       "react-router": { "config": ["react-router.config.ts"] },
