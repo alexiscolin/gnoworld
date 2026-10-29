@@ -138,4 +138,8 @@
   .center[data-max="dialog"] {
     --_max: var(--dialog-w);
   }
+
+  .center[data-max="page"] {
+    --_max: none;
+  }
 }

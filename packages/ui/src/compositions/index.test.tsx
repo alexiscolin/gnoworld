@@ -89,6 +89,8 @@ describe("each composition's own choice", () => {
     expect(only(container).dataset["max"]).toBe("measure");
     rerender(<Center max="dialog">a</Center>);
     expect(only(container).dataset["max"]).toBe("dialog");
+    rerender(<Center max="page">a</Center>);
+    expect(only(container).dataset["max"]).toBe("page");
   });
 });
 
