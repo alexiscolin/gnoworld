@@ -15,6 +15,11 @@
     font: var(--font-label);
   }
 
+  /* Open, the field's edge stays on the strong line, as when hovered: the state is drawn, not only announced. */
+  .field[aria-expanded="true"] {
+    --_line: var(--color-line-strong);
+  }
+
   .list [aria-selected="true"] {
     background: var(--color-fill-hover);
   }

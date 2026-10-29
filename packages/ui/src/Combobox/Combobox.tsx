@@ -126,7 +126,7 @@ export function Combobox({ label, value, onValueChange, groups, onSelect }: Comb
       </label>
       <input
         id={`${rootId}-field`}
-        className={field["box"]}
+        className={[field["box"], styles["field"]].join(" ")}
         type="text"
         role="combobox"
         autoComplete="off"
