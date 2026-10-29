@@ -2580,7 +2580,8 @@ grep -qxE "py:harness_mutate ?" "$log" || fail "check.sh --full did not judge ev
 git -C "$g" update-ref refs/remotes/origin/main HEAD && base=$(git -C "$g" rev-parse HEAD)
 mkdir -p "$g/docs" "$g/.claude/agents" "$g/adr" "$g/.github/workflows" && printf 'x\n' >"$g/docs/x.md" && printf '\n' >>"$g/scripts/check_css.py" &&
 	printf '\n' >>"$g/.githooks/records.sh" && printf 'x\n' >"$g/.claude/agents/x.md" && printf '\n' >>"$g/lint/x.ts" && printf 'x\n' >"$g/README.md" &&
-	printf 'x\n' >"$g/adr/x.md" && printf 'x\n' >"$g/.github/workflows/x.yml" && printf '\n' >>"$g/eslint.config.ts" && git -C "$g" add -A && git -C "$g" commit -qm "no product"
+	printf 'x\n' >"$g/adr/x.md" && printf 'x\n' >"$g/.github/workflows/x.yml" && printf '\n' >>"$g/eslint.config.ts" && for f in knip.json .jscpd.json .prettierrc.json .prettierignore; do printf '\n' >>"$g/$f"; done &&
+	git -C "$g" add -A && git -C "$g" commit -qm "no product"
 out=$(gate --merge) || fail "check.sh --merge failed on a branch with no product code: $out"
 for s in core_chromium stories coverage py:patch_coverage mutate py:prove_fix; do
 	ran "$s" && fail "check.sh --merge ran $s on a branch with no product code"

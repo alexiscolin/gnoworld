@@ -150,7 +150,7 @@ refuses another Node (F816).
 
 **Full** (`--full`: the slice's last merge and a push of `main`; `--merge`: each branch's
 `/pre-merge`, with the harness mutants of the guard files it changed, and without the stories,
-the coverage lane and `prove_fix` when nothing but docs, the harness and the lint changed since
+the coverage lane and `prove_fix` when nothing but docs, the harness and the linters' configs changed since
 `main`) adds:
 
 | Step | What it catches |
