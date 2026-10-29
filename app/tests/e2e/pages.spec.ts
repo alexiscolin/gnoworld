@@ -170,6 +170,8 @@ test.describe("once the client takes over", () => {
       });
       await page.goto(path);
       await hydrated(page);
+      // fonts.ready can settle before layout has asked for the face, under load: ask for it, then wait.
+      await page.evaluate(() => document.fonts.load('1em "Geist Variable"'));
       await page.evaluate(() => document.fonts.ready);
       // check() answers true for a family no face declares: only a loaded face proves the font.
       const look = await page.evaluate(() => ({

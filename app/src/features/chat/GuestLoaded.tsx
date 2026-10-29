@@ -11,6 +11,7 @@ import { roomActs } from "./roomActs.ts";
 import { useGuestKeeping } from "./RoomPins.ts";
 import { roomShown } from "./roomShown.ts";
 import { RoomSections, RoomsNav } from "./RoomSections.tsx";
+import { useRoomsDrawer } from "./RoomsDrawer.tsx";
 import { People, RoomView, type RoomViewProps } from "./RoomView.tsx";
 import { useThreads } from "./Threading.tsx";
 import { usePins } from "./usePins.ts";
@@ -60,28 +61,38 @@ export function GuestLoaded({
       <People members={state?.members ?? []} connected={chat === "connected"} me={undefined} onMessage={undefined} />
     ),
   });
+  const rail = (
+    <Stack space="s">
+      <RoomsNav label="Rooms">
+        <RoomSections sections={sections} current={room} />
+      </RoomsNav>
+    </Stack>
+  );
+  const rooms = useRoomsDrawer(0, rail);
   return (
-    <Sidebar space="l">
-      <Stack space="s">
-        <RoomsNav label="Rooms">
-          <RoomSections sections={sections} current={room} />
-        </RoomsNav>
-      </Stack>
-      {asksDm ? <p role="status">{LOG_IN_TO_READ_DMS}</p> : null}
-      {shown === undefined ? null : (
-        <RoomView
-          key={shown.key}
-          {...shown.view}
-          {...threads.view}
-          chat={chat}
-          verdicts={verdicts}
-          saving={saving}
-          aside={threads.aside}
-          keeping={keeping}
-          pins={pins}
-          composer={<p>{LOG_IN_TO_WRITE}</p>}
-        />
-      )}
-    </Sidebar>
+    <>
+      <Sidebar space="l">
+        {rooms.phone ? null : rail}
+        {asksDm ? <p role="status">{LOG_IN_TO_READ_DMS}</p> : null}
+        {shown === undefined ? (
+          rooms.control
+        ) : (
+          <RoomView
+            rooms={rooms.control}
+            key={shown.key}
+            {...shown.view}
+            {...threads.view}
+            chat={chat}
+            verdicts={verdicts}
+            saving={saving}
+            aside={threads.aside}
+            keeping={keeping}
+            pins={pins}
+            composer={<p>{LOG_IN_TO_WRITE}</p>}
+          />
+        )}
+      </Sidebar>
+      {rooms.drawer}
+    </>
   );
 }

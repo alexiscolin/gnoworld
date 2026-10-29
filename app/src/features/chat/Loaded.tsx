@@ -17,7 +17,9 @@ import { NoticeModes } from "./NoticeModes.tsx";
 import { multilineOf, roomActs } from "./roomActs.ts";
 import { useRoomKeeping } from "./RoomKeeping.ts";
 import { Saved } from "./Saved.tsx";
-import { RoomsView } from "./RoomsView.tsx";
+import { NoticeStatus, RoomsView } from "./RoomsView.tsx";
+import { useRoomsDrawer } from "./RoomsDrawer.tsx";
+import { unreadOf } from "./unread.ts";
 import { People, RoomView, type RoomViewProps } from "./RoomView.tsx";
 import { shownOf } from "./shown.tsx";
 import { usePins } from "./usePins.ts";
@@ -87,14 +89,27 @@ export interface LoadedProps {
 }
 
 // The rooms' column: the rooms, and for an account its saved messages, a button under them until slice 8's menu (4d).
-function Rail({ signedIn, children }: { signedIn: boolean; children: ReactNode }) {
+// On a phone it sits in the rooms' drawer instead (5b), without the column's width.
+function Rail({
+  signedIn,
+  sections,
+  current,
+  dms,
+  failed,
+  noticing,
+}: Pick<LoadedProps, "sections" | "dms" | "failed" | "noticing"> & { signedIn: boolean; current: string | undefined }) {
   return (
-    <div className={styles["rail"]}>
-      <Stack space="s">
-        {children}
-        {signedIn ? <Saved /> : null}
-      </Stack>
-    </div>
+    <Stack space="s">
+      <RoomsView
+        sections={sections}
+        current={current}
+        dms={dms.nav}
+        failed={failed}
+        badges={noticing.badges}
+        notices={noticing.list}
+      />
+      {signedIn ? <Saved /> : null}
+    </Stack>
   );
 }
 
@@ -134,46 +149,46 @@ export function Loaded({
   const { keeping, pins } = useRoomKeeping(room, usePins(useAppStore(), room, me));
   const composing = useComposing(shown, me);
   const threads = useThreads({ shown, state, session, rooms: ids, acts, people });
+  const rail = <Rail signedIn={me !== undefined} {...{ sections, dms, failed }} current={room} noticing={noticing} />;
+  const rooms = useRoomsDrawer(unreadOf(noticing.badges), rail);
   return (
-    <Sidebar space="l">
-      <Rail signedIn={me !== undefined}>
-        <RoomsView
-          sections={sections}
-          current={room}
-          dms={dms.nav}
-          failed={failed}
-          badges={noticing.badges}
-          notices={noticing.list}
-        />
-      </Rail>
-      {dms.problem === undefined ? null : <p role="status">{dms.problem}</p>}
-      {shown === undefined ? null : (
-        <RoomView
-          key={shown.key}
-          {...shown.view}
-          verdicts={verdicts}
-          saving={saving}
-          keeping={keeping}
-          pins={pins}
-          aside={threads.aside}
-          chat={chat}
-          me={me}
-          noteId={noteId}
-          {...composing.view}
-          modes={modesOf(room, noticing.notify)}
-          {...threads.view}
-          composer={
-            <Writer
-              session={session}
-              rooms={ids}
-              groups={groupsAt(sections, room)}
-              multiline={multilineOf(link)}
-              {...shown.writer}
-              {...composing.writer}
-            />
-          }
-        />
-      )}
-    </Sidebar>
+    <>
+      <Sidebar space="l">
+        {rooms.phone ? null : <div className={styles["rail"]}>{rail}</div>}
+        {dms.problem === undefined ? null : <p role="status">{dms.problem}</p>}
+        {shown === undefined ? (
+          rooms.control
+        ) : (
+          <RoomView
+            rooms={rooms.control}
+            key={shown.key}
+            {...shown.view}
+            verdicts={verdicts}
+            saving={saving}
+            keeping={keeping}
+            pins={pins}
+            aside={threads.aside}
+            chat={chat}
+            me={me}
+            noteId={noteId}
+            {...composing.view}
+            modes={modesOf(room, noticing.notify)}
+            {...threads.view}
+            composer={
+              <Writer
+                session={session}
+                rooms={ids}
+                groups={groupsAt(sections, room)}
+                multiline={multilineOf(link)}
+                {...shown.writer}
+                {...composing.writer}
+              />
+            }
+          />
+        )}
+      </Sidebar>
+      <NoticeStatus notices={noticing.list} />
+      {rooms.drawer}
+    </>
   );
 }

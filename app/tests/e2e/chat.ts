@@ -10,6 +10,8 @@ const messages = (page: Page) => page.getByRole("list", { name: "Messages" });
 export const lines = (page: Page) => messages(page).locator(":scope > li");
 export const lineOf = (page: Page, text: string) => lines(page).filter({ hasText: text });
 export const whoIsHere = (page: Page) => page.getByRole("complementary", { name: "Who's here" });
+/** The polite status that tells a screen reader a notice came: apart from the rooms' list, which a phone hides. */
+export const noticeStatus = (page: Page) => page.locator('p[role="status"].visually-hidden');
 export const roomsNav = (page: Page) => page.getByRole("navigation", { name: "Rooms" });
 
 /** A test's own account, logged in, in #games, Ergo having said it is here. */
