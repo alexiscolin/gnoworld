@@ -298,6 +298,7 @@ def mutants():
     yield from each(hm, "ThreadPoolExecutor(" "CONTROLS_AT_ONCE)", "ThreadPoolExecutor(len(controls))", "hooks", "harness_mutate runs its controls two at a time (F2138)")
     yield from each("scripts/borrow_node_modules.sh", '[ -L "$1/$m/.bin" ]', "false", "hooks", "a borrowed workspace's linked .bin becomes a folder of its own (F2127)")
     yield from each(hm, "        if rel not in (path, suite," " SELF):", "        if False:", "hooks", "a cached verdict stands on the files its sections name")
+    yield from each(hm, "for n in names if n" ' != ".git"]', "for n in names]", "hooks", "a cached verdict never stands on a worktree's .git file")
     yield from each(hm, "os.path.basename(f) in context or f" " in ALWAYS", "os.path.basename(f) in context", "hooks", "a cached verdict stands on the tools' lockfile")
     yield from each(hm, "context = outside" " + ", "context = ", "hooks", "a cached verdict stands on its suite's text outside its sections")
     yield from each(hm, "identity(mutant, sections, GAPS), context," " RUNNER]", "identity(mutant, sections, GAPS), context]", "hooks", "a cached verdict stands on the runner that judged it")
@@ -974,7 +975,8 @@ def named_in(context, memo={}):
         files = []
         for top, dirs, names in os.walk(WORKTREE):
             dirs[:] = [d for d in dirs if d not in (".git", "node_modules")]
-            files += [os.path.relpath(os.path.join(top, n), WORKTREE) for n in names]
+            # A worktree's .git is a file naming its copy, another each run: read, it made every key new.
+            files += [os.path.relpath(os.path.join(top, n), WORKTREE) for n in names if n != ".git"]
         memo[context] = sorted(f for f in files if os.path.basename(f) in context or f in ALWAYS)
     return memo[context]
 

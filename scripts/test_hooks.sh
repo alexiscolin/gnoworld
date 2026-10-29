@@ -685,7 +685,7 @@ if part harness_shards; then
 hs="$t/shards" && mkdir -p "$hs/src/scripts" "$hs/repo/scripts"
 # The suite: its section opens at the line's start, as harness_mutate reads it, which this file's
 # runner must not; with SHARDS_MEET, a mutant's run waits for that many trees to run at once.
-printf '%s\n' 'part() { case ",$ONLY," in *",$1,"*) return 0 ;; *) return 1 ;; esac; }' \
+printf '%s\n' '# Each section reads the tree, never its .git file.' 'part() { case ",$ONLY," in *",$1,"*) return 0 ;; *) return 1 ;; esac; }' \
 	'[ -n "$ONLY" ] || { echo . >>"$SHARD_ROOT/controls"; [ -z "${CONTROLS_SLOW:-}" ] || { : >"$SHARD_ROOT/live.$$"; n=0; until [ "$(ls "$SHARD_ROOT" | grep -c "^live\.")" -ge 2 ] || [ "$n" -ge 50 ]; do n=$((n + 1)); sleep 0.1; done; sleep 0.3; ls "$SHARD_ROOT" | grep -c "^live\." >>"$SHARD_ROOT/overlap"; rm -f "$SHARD_ROOT/live.$$"; }; [ ! -e BROKEN_hooks ]; exit; }' \
 	'if part x; then' \
 	'	pwd >>"$SHARD_ROOT/ran"' \
@@ -715,6 +715,8 @@ def worktree(rev):
     tree = tempfile.mkdtemp(dir=root)
     shutil.copytree(os.environ["SHARD_SRC"], tree, dirs_exist_ok=True)
     made.append(tree)
+    with open(os.path.join(tree, ".git"), "w") as f:  # as git worktree writes it: the copy's own path, another each run
+        f.write("gitdir: " + tree + "\n")
     if len(made) == 2 and os.environ.get("BREAK_SECOND"):
         open(os.path.join(tree, "BROKEN_" + os.environ["BREAK_SECOND"]), "w").close()
     with open(os.path.join(root, "made"), "a") as f:
