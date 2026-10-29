@@ -2,7 +2,7 @@ import { data, type ClientLoaderFunctionArgs, type MetaArgs, type RouteObject } 
 import { describe, expect, test } from "vitest";
 import { BACK_HOME, alertOf, render, routeError } from "../../tests/render.tsx";
 import { failedWorldMeta, worldMeta } from "../meta.ts";
-import { findWorld } from "../worlds.ts";
+import { findWorld } from "../places.ts";
 import World, { clientLoader, ErrorBoundary, loader, meta } from "./world.tsx";
 
 function route(worldLoader: RouteObject["loader"] = loader): RouteObject {

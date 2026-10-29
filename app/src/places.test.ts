@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { findWorld, WORLDS } from "./worlds.ts";
+import { findWorld, WORLDS } from "./places.ts";
 
 describe("findWorld", () => {
   test("finds a world by its name in the path", () => {
@@ -29,5 +29,19 @@ describe("the list of worlds", () => {
 
   test("no two worlds share a name", () => {
     expect(new Set(WORLDS.map((world) => world.slug)).size).toBe(WORLDS.length);
+  });
+});
+
+describe("the worlds of the data files", () => {
+  test("hold Bubble, as worlds.ts held it, at /w/bubble", () => {
+    expect(WORLDS).toEqual([
+      {
+        slug: "bubble",
+        name: "Bubble",
+        description:
+          "Bubble, a world of gno.land: the BUBBLE token, its governance, and the games played with it on chain.",
+        path: "/w/bubble",
+      },
+    ]);
   });
 });

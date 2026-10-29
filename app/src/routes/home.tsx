@@ -1,7 +1,7 @@
 import { Link } from "react-router";
 import { PageError } from "../features/errors/index.ts";
 import { homeMeta } from "../meta.ts";
-import { worldPath, WORLDS } from "../worlds.ts";
+import { worldPath, WORLDS } from "../places.ts";
 
 export const meta = homeMeta;
 
