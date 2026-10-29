@@ -3,7 +3,7 @@
 # at its first failure, every lane runs to its end, and the gate fails when one did, showing each.
 # - Fast, by default: every commit (the pre-commit hook) and every turn of Claude Code (the Stop
 #   hook) run it. In a repository it checks only the areas its change touches (below); it prints
-#   each lane's and each step's time, and fails past its budget.
+#   each lane's and each step's time, and logs a run past its budget for /pre-merge.
 # - `--full` adds what the slice's last /pre-merge and CI run: the harness's own probe, coverage
 #   and patch coverage, mutations, and the scan of the whole history for secrets. It checks
 #   everything, and its record lets main take the code (pre-push).
@@ -311,24 +311,18 @@ if ! $full && [ "$took" -gt "$budget" ]; then
 	slowest=$(cat "$logs"/*.times | sort -k2 -n | tail -1)
 	load_end=$(python3 -I scripts/load.py) # read last, once every lane has ended
 	load=${load_start% *} cores=${load_start#* } end=${load_end% *}
-	# Past its budget on a machine busier than its cores both before any lane started and after they all ended, the gate
-	# measured the machine: it says so and passes (C.8; Alexis, 2026-10-27, CR10). The start reading alone excuses a run
-	# begun just after a heavy one on an idle machine (the 1-minute average lags by about a minute); the end reading
-	# alone includes the gate's own lanes, which a change making its own tests CPU-bound raises (security-S3).
 	if $merging; then
 		echo "check.sh: the fast gate took ${took} s, past its ${budget} s budget, which a merge commit has none of (the full gate follows it); its slowest step, ${slowest%% *}, took $(seconds "${slowest##* }") s" >&2
-	elif [ "$load" -gt "$cores" ] && [ "$end" -gt "${load_end#* }" ]; then
-		echo "check.sh: the fast gate took ${took} s, over its ${budget} s budget on a machine busy when it started and when it ended (load $((load / 10)).$((load % 10)) then $((end / 10)).$((end % 10)) on $((cores / 10)) cores): passed; its slowest step, ${slowest%% *}, took $(seconds "${slowest##* }") s" >&2
-		# Logged for /pre-merge like an unsteady test, with its time and loads: a load an agent raised itself to earn this
-		# excuse (F2070) is then read, not trusted. A pass no one can see is not a pass, as in scripts/unsteady.py.
+	else
+		# Past its budget, a run that passed passes (Alexis, 2026-10-30: refusing it made agents run it again and again): it says
+		# so and is logged, with its time and the machine's loads, for /pre-merge and the dream to read, as an unsteady test is.
+		# A pass no one can see is not a pass, as in scripts/unsteady.py: a log it cannot write fails it.
+		echo "check.sh: the fast gate took ${took} s, over its ${budget} s budget: passed, and logged for /pre-merge; its slowest step, ${slowest%% *}, took $(seconds "${slowest##* }") s (load $((load / 10)).$((load % 10)) then $((end / 10)).$((end % 10)) on $((cores / 10)) cores)" >&2
 		mkdir -p "$(dirname "$unsteady_log")" && printf '%s\tgate\t%s\tload %s.%s then %s.%s on %s cores\tthe fast gate took %s s, over its %s s budget; slowest step, %s, took %s s\n' \
 			"$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${slowest%% *}" "$((load / 10))" "$((load % 10))" "$((end / 10))" "$((end % 10))" "$((cores / 10))" "$took" "$budget" "${slowest%% *}" "$(seconds "${slowest##* }")" >>"$unsteady_log" || {
-			echo "check.sh: the machine's load excused this run, but $unsteady_log cannot be written: a pass no one sees is not a pass" >&2
+			echo "check.sh: the fast gate ran past its budget, and $unsteady_log cannot be written: a pass no one sees is not a pass" >&2
 			exit 1
 		}
-	else
-		echo "check.sh: the fast gate took ${took} s, over its ${budget} s budget: its slowest step, ${slowest%% *}, took $(seconds "${slowest##* }") s; find what grew" >&2
-		exit 1
 	fi
 fi
 

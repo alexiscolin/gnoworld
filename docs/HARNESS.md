@@ -118,9 +118,10 @@ gate fails, run the failing lane alone before running the whole gate again.
 | anything else (a config, the lockfile, the harness, `packages/schemas`, `deploy/`), no change at all, or pre-commit's staged copy | everything | 120 s |
 
 `GATE_BUDGET` may lower the budget, never raise it. A merge commit has none (F2071): the full
-gate follows every merge. Past its budget the fast gate fails, unless the machine's 1-minute load
-was above its cores both when the lanes started and after they ended (`scripts/load.py`); such a
-pass is written to `.claude/tmp/unsteady.log`, which `/pre-merge` reads in its first step (F2070).
+gate follows every merge. A run past its budget that passed still passes (Alexis, 2026-10-30:
+refusing it made agents run it again and again): it says so and is written, with its time and the
+machine's loads (`scripts/load.py`), to `.claude/tmp/unsteady.log`, which `/pre-merge` reads in its
+first step and the dream reads (F2070); a log it cannot write fails it. The budget is a measure, not a wall.
 
 A Vitest file or a journey that fails in the fast gate runs once more, alone
 (`scripts/unsteady.py`, F1700): the gate passes if it passes, and logs the file, its failed
