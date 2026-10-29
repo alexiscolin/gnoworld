@@ -73,6 +73,7 @@ describe("the worlds of the data files", () => {
         description:
           "Bubble, a world of gno.land: the BUBBLE token, its governance, and the games played with it on chain.",
         universe: "onyx",
+        testnet: true,
         path: "/w/bubble",
         canonical: "/net/onyx/w/bubble",
       },

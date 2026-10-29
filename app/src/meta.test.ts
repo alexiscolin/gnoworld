@@ -11,7 +11,8 @@ import {
   notFoundMeta,
   worldMeta,
 } from "./meta.ts";
-import { site, type UniverseView } from "./places.ts";
+import { site, siteOf, type UniverseView } from "./places.ts";
+import { FIXTURE } from "./placesFixture.ts";
 
 const onyx = site.universe(new Request("https://gno.world/"), "cosmos");
 const bubble = site.world(new Request("https://gno.world/w/bubble"));
@@ -19,6 +20,7 @@ const other: UniverseView = {
   id: "gnoland",
   name: "gno.land",
   isDefault: false,
+  testnet: false,
   home: { path: "/net/gnoland/", canonical: "/net/gnoland/" },
   earth: { path: "/net/gnoland/earth", canonical: "/net/gnoland/earth" },
   worlds: [],
@@ -64,7 +66,8 @@ describe("the tags of a page", () => {
     expect(page.get("og:title")).toBe("Bubble · gno.world");
     expect(page.get("description")).toBe(bubble.description);
     expect(page.get("og:description")).toBe(page.get("description"));
-    expect(page.get("robots")).toBeUndefined();
+    // Bubble is in Onyx, a testnet (app/data/universes.json): noindex. Was undefined before 5e.
+    expect(page.get("robots")).toBe("noindex");
   });
 
   test.each([
@@ -97,6 +100,7 @@ describe("the tags of a page", () => {
       name: "Tokens",
       description: "T".repeat(300),
       universe: "onyx",
+      testnet: true,
       path: "/e/tokens",
       canonical: "/net/onyx/e/tokens",
     };
@@ -130,5 +134,131 @@ describe("the tags of a page", () => {
       listMeta(),
     ].map((meta) => tags(meta).get("description"));
     expect(new Set(descriptions).size).toBe(descriptions.length);
+  });
+});
+
+// Slice 5's 5e: what a search engine and a share read of each place's page. The fixture's Onyx is a testnet, as the
+// data's is (app/data/universes.json); its gno.land is the mainnet. Walked with each universe the default: a mainnet
+// place's path is its canonical address only when it is not.
+const fixture = (defaultId: string) =>
+  siteOf({
+    ...FIXTURE,
+    universes: FIXTURE.universes.map((universe) => ({
+      id: universe.id,
+      name: universe.name,
+      testnet: universe.id === "onyx",
+      ...(universe.id === defaultId ? { default: true as const } : {}),
+    })),
+  });
+
+// Every page the site has a place for, with the universe it is in, and what its meta says.
+const pages = ["onyx", "gnoland"].flatMap((defaultId) => {
+  const built = fixture(defaultId);
+  const label = `${defaultId} default`;
+  return [
+    ...["onyx", "gnoland"].flatMap((id) => {
+      const universe = built.universe(new Request(`https://gno.world/net/${id}/`), "cosmos");
+      const testnet = id === "onyx";
+      return [
+        {
+          name: `${label}: the cosmos of ${id}`,
+          testnet,
+          canonical: universe.home.canonical,
+          heading: undefined,
+          meta: homeMeta(universe),
+        },
+        {
+          name: `${label}: the Earth of ${id}`,
+          testnet,
+          canonical: universe.earth.canonical,
+          heading: undefined,
+          meta: earthMeta(universe),
+        },
+      ];
+    }),
+    ...built.worlds.map((world) => ({
+      name: `${label}: the world ${world.universe}/${world.slug}`,
+      testnet: world.universe === "onyx",
+      canonical: world.canonical,
+      heading: world.name,
+      meta: worldMeta(world),
+    })),
+    ...built.ecosystems.map((ecosystem) => ({
+      name: `${label}: the ecosystem ${ecosystem.universe}/${ecosystem.slug}`,
+      testnet: ecosystem.universe === "onyx",
+      canonical: ecosystem.canonical,
+      heading: ecosystem.name,
+      meta: ecosystemMeta(ecosystem),
+    })),
+  ];
+});
+
+const content = (meta: MetaDescriptor[], key: "name" | "property", value: string) =>
+  meta.flatMap((tag) => {
+    const fields: Record<string, unknown> = tag;
+    return fields[key] === value ? [String(fields["content"])] : [];
+  });
+const title = (meta: MetaDescriptor[]) => meta.flatMap((tag) => ("title" in tag ? [String(tag.title)] : []))[0];
+const ld = (meta: MetaDescriptor[]) => meta.flatMap((tag) => ("script:ld+json" in tag ? [tag["script:ld+json"]] : []));
+
+describe("the places the tests walk", () => {
+  test("hold a world and an ecosystem on a testnet and on the mainnet, so no case goes unseen", () => {
+    expect(pages.filter((page) => page.testnet).length).toBeGreaterThan(2);
+    expect(pages.filter((page) => !page.testnet).length).toBeGreaterThan(2);
+    expect(pages.some((page) => page.name.includes("the world gnoland/"))).toBe(true);
+    expect(pages.some((page) => page.name.includes("the ecosystem gnoland/"))).toBe(true);
+  });
+});
+
+describe.each(pages)("the page of $name", ({ meta, testnet, canonical, heading }) => {
+  test("carries a Twitter Card that repeats its title and description", () => {
+    expect(content(meta, "name", "twitter:card")).toEqual(["summary"]);
+    expect(content(meta, "name", "twitter:title")).toEqual([title(meta)]);
+    expect(content(meta, "name", "twitter:description")).toEqual(content(meta, "name", "description"));
+  });
+
+  test(testnet ? "is noindex, a testnet's page, with its canonical address kept" : "is indexed", () => {
+    expect(content(meta, "name", "robots")).toEqual(testnet ? ["noindex"] : []);
+    expect(content(meta, "property", "og:url")).toEqual([`https://gno.world${canonical}`]);
+  });
+
+  test("holds one JSON-LD of a WebPage at its canonical address, that survives being read back", () => {
+    const [only, ...more] = ld(meta);
+    expect(more).toEqual([]);
+    const parsed: unknown = JSON.parse(JSON.stringify(only));
+    expect(parsed).toMatchObject({
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      url: `https://gno.world${canonical}`,
+      description: content(meta, "name", "description")[0],
+    });
+    // A world or an ecosystem names itself; a cosmos or an Earth, by its page's title.
+    expect(parsed).toMatchObject({ name: heading ?? title(meta)?.replace(/ · gno\.world$/, "") });
+  });
+});
+
+describe("a page that is no place", () => {
+  test("the list has its Twitter Card and JSON-LD, and is indexed", () => {
+    const meta = listMeta();
+    expect(content(meta, "name", "twitter:card")).toEqual(["summary"]);
+    expect(content(meta, "name", "robots")).toEqual([]);
+    expect(ld(meta)).toHaveLength(1);
+    expect(ld(meta)[0]).toMatchObject({ "@type": "WebPage", name: "Places", url: "https://gno.world/list" });
+  });
+
+  test("an unknown world or ecosystem or universe, and a page that failed, carry no card and no JSON-LD, and are noindex", () => {
+    const unindexed = [
+      worldMeta(undefined),
+      ecosystemMeta(undefined),
+      missingUniverseMeta(),
+      failedWorldMeta(),
+      failedPageMeta(),
+      notFoundMeta(),
+    ];
+    for (const meta of unindexed) {
+      expect(ld(meta)).toEqual([]);
+      expect(content(meta, "name", "twitter:card")).toEqual([]);
+      expect(content(meta, "name", "robots")).toEqual(["noindex"]);
+    }
   });
 });

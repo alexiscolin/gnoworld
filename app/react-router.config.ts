@@ -6,6 +6,7 @@ import { outputs, pagesPolicy } from "./src/csp.ts";
 import { loadData } from "./src/dataFiles.ts";
 import { placesFrom } from "./src/dataPlaces.ts";
 import { prerenderPaths } from "./src/prerender.ts";
+import { robotsTxt, sitemapXml } from "./src/sitemap.ts";
 
 // The data files are checked before anything builds: a malformed one throws here and stops the build, naming the file
 // and the field (slice 5's 5c). GNOWORLD_DATA names another directory, for the tests.
@@ -25,5 +26,8 @@ export default {
     const { headers, nginx } = outputs(await pagesPolicy(pages));
     await writeFile(join(client, "_headers"), headers);
     await writeFile(join(buildDirectory, "csp.conf"), nginx);
+    // What a search engine reads: the mainnet's places, from the data the pages were built from.
+    await writeFile(join(client, "sitemap.xml"), sitemapXml(data));
+    await writeFile(join(client, "robots.txt"), robotsTxt());
   },
 } satisfies Config;

@@ -1,5 +1,6 @@
 // The tags each page carries: a title, a description and one canonical address on the site's
-// origin, with their Open Graph twins; a page with no address of its own is not indexed.
+// origin, with their Open Graph and Twitter twins and a JSON-LD of the page; a page with no address of its
+// own, and every page of a testnet, is not indexed.
 import type { MetaDescriptor } from "react-router";
 import type { Ecosystem, UniverseView, World } from "./places.ts";
 
@@ -15,6 +16,7 @@ export function homeMeta(universe: UniverseView): MetaDescriptor[] {
       ? `${HUB}, where its worlds, their rooms and their realms meet.`
       : `The worlds of ${universe.name} on ${HUB}.`,
     path: universe.home.canonical,
+    testnet: universe.testnet,
   });
 }
 
@@ -24,6 +26,7 @@ export function earthMeta(universe: UniverseView): MetaDescriptor[] {
     title: universe.isDefault ? "Earth · gno.world" : `Earth of ${universe.name} · gno.world`,
     description: `The Earth of ${universe.name}: the worlds and the ecosystems of this universe, on ${HUB}.`,
     path: universe.earth.canonical,
+    testnet: universe.testnet,
   });
 }
 
@@ -34,6 +37,7 @@ export function ecosystemMeta(ecosystem: Ecosystem | undefined): MetaDescriptor[
     title: `${ecosystem.name} · gno.world`,
     description: ecosystem.description.slice(0, 160),
     path: ecosystem.canonical,
+    testnet: ecosystem.testnet,
   });
 }
 
@@ -43,6 +47,7 @@ export function listMeta(): MetaDescriptor[] {
     title: "Places · gno.world",
     description: `Every place of ${HUB}, to filter by genre.`,
     path: "/list",
+    testnet: false,
   });
 }
 
@@ -54,7 +59,12 @@ export function missingUniverseMeta(): MetaDescriptor[] {
 /** A world's tags, or, with no world, a not-found page's. */
 export function worldMeta(world: World | undefined): MetaDescriptor[] {
   if (!world) return unindexed("No world here");
-  return pageMeta({ title: `${world.name} · gno.world`, description: world.description, path: world.canonical });
+  return pageMeta({
+    title: `${world.name} · gno.world`,
+    description: world.description,
+    path: world.canonical,
+    testnet: world.testnet,
+  });
 }
 
 /** A world that failed to load for another reason than its name. */
@@ -71,16 +81,30 @@ function unindexed(title: string): MetaDescriptor[] {
   return [{ title: `${title} · gno.world` }, { name: "robots", content: "noindex" }];
 }
 
-function pageMeta(page: { title: string; description: string; path: string }): MetaDescriptor[] {
+function pageMeta(page: { title: string; description: string; path: string; testnet: boolean }): MetaDescriptor[] {
   const url = ORIGIN + page.path;
   return [
     { title: page.title },
     { name: "description", content: page.description },
+    ...(page.testnet ? [{ name: "robots", content: "noindex" }] : []),
     { tagName: "link", rel: "canonical", href: url },
     { property: "og:title", content: page.title },
     { property: "og:description", content: page.description },
     { property: "og:url", content: url },
     { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+    { name: "twitter:title", content: page.title },
+    { name: "twitter:description", content: page.description },
+    // React Router writes it as a script of type application/ld+json, its text escaped (< > & U+2028), so a description is only text.
+    {
+      "script:ld+json": {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        url,
+        name: page.title.replace(/ · gno\.world$/, ""),
+        description: page.description,
+      },
+    },
   ];
 }
 

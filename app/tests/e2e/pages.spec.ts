@@ -90,10 +90,22 @@ test.describe("as a search engine reads it, before any script runs", () => {
       expect.soft(await tag(page, 'meta[property="og:description"]')).toBe(description);
       expect.soft(await tag(page, 'meta[property="og:url"]')).toBe(canonical);
       expect.soft(await tag(page, 'meta[property="og:type"]')).toBe("website");
-      await expect.soft(page.locator('meta[name="robots"]')).toHaveCount(0);
+      // Every page here is Onyx's, a testnet: not indexed (5e).
+      expect.soft(await tag(page, 'meta[name="robots"]')).toBe("noindex");
+      expect.soft(await tag(page, 'meta[name="twitter:card"]')).toBe("summary");
+      await expect.soft(page.locator('script[type="application/ld+json"]')).toHaveCount(1);
       expect.soft(await tag(page, 'link[rel="icon"][type="image/svg+xml"]')).toBe("/icon.svg");
     });
   }
+
+  test("the host serves robots.txt and the sitemap of the mainnet, not a page", async ({ request }) => {
+    const robots = await request.get("/robots.txt");
+    expect(robots.status()).toBe(200);
+    expect(await robots.text()).toContain("Sitemap: https://gno.world/sitemap.xml");
+    const sitemap = await request.get("/sitemap.xml");
+    expect(sitemap.status()).toBe(200);
+    expect(await sitemap.text()).toContain("<loc>https://gno.world/net/gnoland/</loc>");
+  });
 
   test("a world's page names the same canonical with a trailing slash", async ({ page }) => {
     await page.goto("/w/bubble/");

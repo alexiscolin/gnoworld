@@ -22,6 +22,8 @@ const TYPES = {
   ".js": "text/javascript",
   ".data": "text/x-script",
   ".webmanifest": "application/manifest+json",
+  ".xml": "application/xml",
+  ".txt": "text/plain; charset=utf-8",
   ".png": "image/png",
   ".svg": "image/svg+xml",
   ".css": "text/css; charset=utf-8",
