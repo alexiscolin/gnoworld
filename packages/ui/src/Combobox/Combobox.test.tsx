@@ -38,7 +38,8 @@ beforeEach(() => {
 describe("Combobox", () => {
   it("is a combobox named by its label, which owns a listbox", () => {
     render(<Held />);
-    expect(field().getAttribute("aria-controls")).toBe(screen.getByRole("listbox").id);
+    expect(document.getElementById(field().getAttribute("aria-controls") ?? "")).toBe(screen.getByRole("listbox"));
+    expect(field().getAttribute("aria-expanded")).toBe("true");
     expect(field().getAttribute("aria-autocomplete")).toBe("list");
   });
 
@@ -69,6 +70,23 @@ describe("Combobox", () => {
     expect(document.activeElement).toBe(field());
     expect(screen.getByRole("option", { name: "Tokens" }).getAttribute("aria-selected")).toBe("true");
     expect(screen.getByRole("option", { name: "Bubble" }).getAttribute("aria-selected")).toBe("false");
+    await userEvent.keyboard("{ArrowUp}");
+    expect(screen.getByRole("option", { name: "Arcade" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("option", { name: "Tokens" }).getAttribute("aria-selected")).toBe("false");
+  });
+
+  it("keeps the focus in the field when an option is clicked", async () => {
+    render(<Held />);
+    await userEvent.click(field());
+    await userEvent.click(screen.getByRole("option", { name: "Tokens" }));
+    expect(document.activeElement).toBe(field());
+  });
+
+  it("prevents the default of the arrows and Enter while options show, so the caret stays", () => {
+    render(<Held />);
+    for (const key of ["ArrowDown", "ArrowUp", "ArrowDown", "Enter"]) {
+      expect(fireEvent.keyDown(field(), { key })).toBe(false);
+    }
   });
 
   it("goes round the ends: down from the last is the first, up from the first is the last", async () => {
