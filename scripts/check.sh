@@ -8,7 +8,8 @@
 #   and patch coverage, mutations, and the scan of the whole history for secrets. It checks
 #   everything, and its record lets main take the code (pre-push).
 # - `--merge`, a merge's own /pre-merge: the same, but the harness mutants of the guard files the
-#   merge changed alone, since its last recorded pass (Alexis, 2026-10-25, 2026-10-27); it records the fast gate only.
+#   merge changed alone, since its last recorded pass (Alexis, 2026-10-25, 2026-10-27), and without the stories, the
+#   coverage lane and prove_fix when no product code changed since main (2026-10-29); it records the fast gate only.
 #
 # GNO_TOOLCHAIN is the folder holding a gno that matches the chain, and its gnohome
 # (docs/DEVELOPMENT.md, "Toolchain"). Node comes from .node-version, through nvm when the
@@ -363,15 +364,23 @@ EOF
 	# width, their load outlasted Ergo's 9 s auth script (F777).
 	half=$(($(node -p "require('os').availableParallelism()") / 2))
 	[ "$half" -ge 1 ] || half=1
+	parses() { python3 -Ic 'import json, sys; json.load(open(sys.argv[1]))' "$1" 2>/dev/null; }
 	lane_coverage() {
 		step coverage # 85% everywhere, core 100%
 		run coverage "--maxWorkers=$half"
 		step patch_coverage # 85% of the lines this branch changed
 		python3 -I scripts/patch_coverage.py "$base"
 		step stryker # mutations, incremental, from the one cache every tree shares: a tree's own copy went stale (Alexis, 2026-10-29)
-		# ponytail: two trees ending StrykerJS at once write the file one after the other; a lost entry costs a rerun, not a verdict.
-		mkdir -p "$HOME/.cache/gnoworld-tools"
-		run mutate "--concurrency $half --incrementalFile $HOME/.cache/gnoworld-tools/stryker-incremental.json"
+		# StrykerJS works on this run's copy, taken only if the cache reads as JSON, and the copy goes back whole only if it reads
+		# in turn: StrykerJS rethrows a file it cannot parse, so a run cut short would fail every tree's. Two runs that end at once
+		# keep the last one's verdicts: the other's are judged again, never lost to a half-written file.
+		cache="$HOME/.cache/gnoworld-tools/stryker-incremental.json" own="$logs/stryker-incremental.json"
+		mkdir -p "${cache%/*}"
+		! parses "$cache" || cp "$cache" "$own"
+		stryker=0
+		run mutate "--concurrency $half --incrementalFile $own" || stryker=$?
+		! parses "$own" || { cp "$own" "$cache.$$" && mv -f "$cache.$$" "$cache"; }
+		[ "$stryker" = 0 ]
 	}
 	lane_history() {
 		# --full too: a slice's last merge is checked by it (pre-merge.md, step 8) and is the one that reaches main (security-S2).

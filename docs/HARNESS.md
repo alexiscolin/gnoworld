@@ -53,9 +53,10 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
 4. **End of each turn.** When code changed, the Stop hook (`scripts/stop_gate.sh`) stops the turn
    once unless the fast gate, which Claude runs in the sandbox, passed on exactly this tree. The
    hook itself runs nothing from the repository. First, it stops what runs of this project left
-   behind, which the sandbox cannot see: a process naming a folder `gnoworld/` whose parent is
-   gone (unless a gate runs and it is under 2 hours old), or a test tool's 3 hours old or more,
-   each logged to `.claude/tmp/reaped.log`.
+   behind, which the sandbox cannot see: a node process naming a folder `gnoworld/` whose parent
+   is gone for 30 minutes (2 hours while a gate runs), or a test tool's 3 hours old or more but a
+   dev or watch mode, each logged to `~/Library/Logs/gnoworld-reaped.log`, where the sandbox
+   cannot write.
 5. **Each commit.** The git hooks run from `.git/hooks`, installed from `main` with the scripts
    they run, where no merge, checkout or sandboxed command writes: no branch brings its own
    (F129). `commit-msg` holds the subject's form, refuses attribution lines and a `fix` of the
@@ -158,12 +159,12 @@ the coverage lane and `prove_fix` when nothing but docs, the harness and the lin
 | `scripts/patch_coverage.py` | under 85% of the changed lines run by a test |
 | `scripts/batch_size.py` | a merge's own product code past 600 lines (400 with a tier-1 file) with no `Batch-size:` line |
 | `scripts/prove_fix.py` | a fix of the product whose tests did not fail on the commit before it, in any of 3 runs |
-| StrykerJS | a mutant of the TypeScript that no test kills (`checkers: ["typescript"]` stays); its incremental file is one cache every tree shares, `~/.cache/gnoworld-tools/stryker-incremental.json` |
+| StrykerJS | a mutant of the TypeScript that no test kills (`checkers: ["typescript"]` stays); it starts from one cache every tree shares, `~/.cache/gnoworld-tools/stryker-incremental.json`, and puts its file back only whole |
 | `scripts/check_regressions.py` | the safety net shrinking (next section) |
 | `scripts/check_migrations.py` | a migration `main` has, edited, moved or removed (F466) |
 | gitleaks | a secret anywhere in the history; a path into a home folder or the demo's host |
 | `pnpm audit` | a dependency with a known advisory, moderate or worse |
-| `scripts/harness_mutate.py` | a guard of the harness that no test notices switched off; over `HARNESS_SHARDS` worktrees (4), each first passing its suites untouched, two such controls at once (F2138); `--changed <base>` judges only the mutants of the guard files and suite sections changed since the last review pass, and, when the script itself changed, those it defines anew or otherwise |
+| `scripts/harness_mutate.py` | a guard of the harness that no test notices switched off; over `HARNESS_SHARDS` worktrees (4), each first passing its suites untouched, two such controls at once (F2138); `--changed <base>` judges only the mutants of the guard files and suite sections changed since the last review pass, and, when the script itself changed, those it defines anew or otherwise; a killed mutant whose key holds (its text, its sections, the files they name, the runner) comes from a cache of verdicts, a survivor is always judged again |
 
 ## The safety net never shrinks quietly
 
@@ -262,6 +263,11 @@ costs context in every session.
   TypeScript; the full gate runs every test.
 - **Core's tests alone run on both engines,** Node's V8 and Chromium's (F816, F817).
 - **`prove_fix.py` covers the product;** a fix of the harness is proven by `harness_mutate.py`.
+- **Two caches every tree shares** (`~/.cache/gnoworld-tools`): StrykerJS's incremental file and the harness mutants'
+  verdicts. A verdict is reused when what it was keyed on is unchanged; StrykerJS does not see a test helper it neither
+  mutates nor counts as a test, and a harness verdict sees only the files its sections name. So a "killed" judged in
+  another branch's tree can stand in a local `--full`. The CI keeps neither cache and judges everything on each push
+  (security-S7, review 8).
 - **The three-round limit is a written rule;** nothing counts the rounds.
 - **The review pass is recorded by the agent that ran the review;** the pre-push hook checks it
   matches the tree, not who wrote it.

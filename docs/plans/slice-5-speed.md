@@ -12,7 +12,10 @@ weakening its security. Branch `slice-5-speed`, on `slice-5-cleanup`. No product
    lint changed since main, and says so; `--full` never skips. StrykerJS reads one incremental file every tree shares.
 3. The Stop hook stops, at each turn's end, a process of this project whose parent is gone (unless a gate runs and it
    is under 2 hours old), or a test tool's over 3 hours old, and logs it; nothing else.
-4. Measured: the merge check of `slice-5-cleanup` before and after, the same tree and the same work, both times shown.
+4. A killed harness mutant whose verdict's key holds (its text, the sections that judge it, its suite's text outside
+   them, the files they name, the tools' lockfile, the runner) comes from a cache in `~/.cache/gnoworld-tools`; a survivor
+   is always judged again; the CI keeps no cache.
+5. Measured: the gate before and after, the same work, both times shown.
 
 ## Out of scope
 
