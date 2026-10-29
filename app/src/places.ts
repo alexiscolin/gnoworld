@@ -60,8 +60,38 @@ export function pageOf(request: Request): Request {
   return new Request(url);
 }
 
-/** The site's places as the data files hold them. */
+/** The site's places as the data files hold them. Built when first asked, never at a module's load (F2206: a build at
+ * load is a static mutant, which StrykerJS leaves unjudged). */
 export function siteOf(source: Source) {
+  let built: ReturnType<typeof build> | undefined;
+  const get = () => (built ??= build(source));
+  return {
+    get places() {
+      return get().places;
+    },
+    get worlds() {
+      return get().worlds;
+    },
+    get ecosystems() {
+      return get().ecosystems;
+    },
+    get genres() {
+      return get().genres;
+    },
+    /** The world a request names. */
+    world: (request: Request): World => get().world(request),
+    /** The ecosystem a request names. */
+    ecosystem: (request: Request): Ecosystem => get().ecosystem(request),
+    /** The ecosystem a path names, or none: for a route with no loader, which a build with no ecosystem cannot pre-render. */
+    ecosystemAt: (pathname: string): Ecosystem | undefined => get().ecosystemAt(pathname),
+    /** The universe whose cosmos or Earth a request names. */
+    universe: (request: Request, kind: "cosmos" | "earth"): UniverseView => get().universe(request, kind),
+    /** The universe a world or an ecosystem of the list belongs to. */
+    home: (each: Listed): UniverseView => get().home(each),
+  };
+}
+
+function build(source: Source) {
   const places = placesFrom(source);
   const listed = (kind: PlaceKind, from: Row[]): Listed[] => {
     const rows = new Map(from.map((row) => [`${row.universe}/${row.slug}`, row]));

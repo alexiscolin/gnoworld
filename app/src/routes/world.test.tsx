@@ -5,7 +5,8 @@ import { failedWorldMeta, worldMeta } from "../meta.ts";
 import { site } from "../places.ts";
 import World, { clientLoader, ErrorBoundary, loader, meta } from "./world.tsx";
 
-const bubble = site.world(new Request("https://gno.world/w/bubble"));
+const bubbleOf = () => site.world(new Request("https://gno.world/w/bubble"));
+type Bubble = ReturnType<typeof bubbleOf>;
 const at = (path: string) =>
   ({ params: {}, request: new Request(`https://gno.world${path}`) }) as unknown as ClientLoaderFunctionArgs;
 
@@ -13,7 +14,7 @@ function route(worldLoader: RouteObject["loader"] = loader): RouteObject {
   return { path: "/w/:world", Component: World, loader: worldLoader, ErrorBoundary };
 }
 
-function metaArgs(loaderData: typeof bubble | undefined, error?: unknown) {
+function metaArgs(loaderData: Bubble | undefined, error?: unknown) {
   return { loaderData, error } as MetaArgs<typeof loader>;
 }
 
@@ -74,7 +75,7 @@ describe("a world's page", () => {
   });
 
   test("carries a world's tags, or not found's when no world has the name", async () => {
-    expect(meta(metaArgs(bubble))).toEqual(worldMeta(bubble));
+    expect(meta(metaArgs(bubbleOf()))).toEqual(worldMeta(bubbleOf()));
     expect(meta(metaArgs(undefined, await routeError(route(), "/w/nowhere")))).toEqual(worldMeta(undefined));
   });
 
@@ -84,7 +85,7 @@ describe("a world's page", () => {
   });
 
   test("finds a world in the browser as at build time, by the request's path", () => {
-    expect(clientLoader(at("/w/bubble"))).toEqual(bubble);
+    expect(clientLoader(at("/w/bubble"))).toEqual(bubbleOf());
     expect(clientLoader(at("/w/bubble"))).toEqual(loader(at("/w/bubble")));
     expect(() => clientLoader(at("/w/nowhere"))).toThrow(expect.objectContaining({ init: { status: 404 } }));
   });
@@ -116,7 +117,7 @@ describe("a world's page, by the case of its path (F376)", () => {
   test.each(["/w/bubble", "/w/bubble/", "/net/onyx/w/bubble", "/w/bubble?utm=1", "/w/bubble#x"])(
     "still serves %s",
     (path) => {
-      expect(clientLoader(at(path))).toEqual(bubble);
+      expect(clientLoader(at(path))).toEqual(bubbleOf());
     },
   );
 

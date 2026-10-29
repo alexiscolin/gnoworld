@@ -22,14 +22,14 @@ export function clientLoader({ request }: { request: Request }) {
 }
 
 // No genre is in the data files yet (the hubs' and stations' rows carry none): each place lists with none.
-const PLACES = [...site.worlds, ...site.ecosystems].map((place) => ({ ...place, genres: [] }));
+const placesOf = () => [...site.worlds, ...site.ecosystems].map((place) => ({ ...place, genres: [] }));
 
 export default function List() {
   return (
     <>
       <Breadcrumb label="You are here" items={[{ label: "Home", href: "/" }, { label: "Places" }]} />
       <h1>Places</h1>
-      <PlacesList places={PLACES} genres={site.genres} />
+      <PlacesList places={placesOf()} genres={site.genres} />
     </>
   );
 }
