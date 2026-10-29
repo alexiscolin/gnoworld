@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { placesFrom } from "./dataPlaces.ts";
 import { describe, expect, test } from "vitest";
 import { robotsTxt, sitemapXml } from "./sitemap.ts";
@@ -19,6 +20,15 @@ describe("sitemapXml", () => {
     expect(xml.startsWith('<?xml version="1.0" encoding="UTF-8"?>')).toBe(true);
     expect(xml).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">');
     expect(xml.match(/<url>/g)).toHaveLength(locs(xml).length);
+  });
+
+  test("parses as XML, whose locs are the places", () => {
+    const doc = new DOMParser().parseFromString(sitemapXml(data), "application/xml");
+    expect(doc.querySelector("parsererror")).toBeNull();
+    expect(doc.documentElement.localName).toBe("urlset");
+    const read = [...doc.getElementsByTagName("loc")].map((loc) => loc.textContent);
+    expect(read.sort()).toEqual(locs(sitemapXml(data)).sort());
+    expect(read.length).toBeGreaterThan(1);
   });
 
   test("names each mainnet place once, at its canonical address, and the list", () => {

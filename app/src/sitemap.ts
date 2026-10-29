@@ -1,18 +1,11 @@
 // The files a search engine reads (slice 5's 5e): sitemap.xml names the mainnet's places, at their canonical addresses, and
 // robots.txt names the sitemap. A testnet's pages exist but are noindex and out of the sitemap (decisions, 2026-10-29).
-// Limits from sitemaps.org/protocol.html (read 2026-10-29): 50,000 URLs and 50 MB uncompressed a file, values entity-escaped.
+// Limits from sitemaps.org/protocol.html (read 2026-10-29): 50,000 URLs and 50 MB uncompressed a file. Values need entity escapes,
+// but a Slug is [a-z0-9-] (packages/schemas/src/data.ts) and the origin is constant: nothing here holds a character to escape.
 import { placesFrom } from "./dataPlaces.ts";
 
 const ORIGIN = "https://gno.world";
 const MAX_URLS = 50_000;
-
-const escape = (text: string) =>
-  text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
 
 interface Row {
   slug: string;
@@ -40,7 +33,7 @@ export function sitemapXml(data: {
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-    ...urls.map((url) => `<url><loc>${escape(url)}</loc></url>`),
+    ...urls.map((url) => `<url><loc>${url}</loc></url>`),
     "</urlset>",
     "",
   ].join("\n");
