@@ -40,11 +40,19 @@ export function searchPlaces(items: SearchItem[], query: string): SearchGroup[] 
 export function searchItemsOf(site: ReturnType<typeof siteOf>): SearchItem[] {
   const names = new Map(site.universes.map((universe) => [universe.id, universe.name]));
   const listed = new Map([...site.worlds, ...site.ecosystems].map((each) => [each.path, each.name]));
-  return site.places.map(({ kind, universe, path }) => {
+  const items = site.places.map(({ kind, universe, path }) => {
     const home = names.get(universe) ?? universe;
     const name = kind === "cosmos" ? home : kind === "earth" ? `Earth of ${home}` : (listed.get(path) ?? path);
     return { name, kind, universe, path };
   });
+  // The schema lets two universes hold the same name: the option then says which universe it leads to.
+  const seen = new Map<string, number>();
+  for (const { name, kind } of items) seen.set(`${kind}/${name}`, (seen.get(`${kind}/${name}`) ?? 0) + 1);
+  return items.map((item) =>
+    (seen.get(`${item.kind}/${item.name}`) ?? 0) > 1
+      ? { ...item, name: `${item.name} (${names.get(item.universe) ?? item.universe})` }
+      : item,
+  );
 }
 
 /** ⌘K on a Mac, Ctrl+K elsewhere, with no other modifier: a bare k, or Shift or Alt with it, is for the page. */

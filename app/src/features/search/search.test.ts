@@ -170,6 +170,27 @@ describe("searchItemsOf", () => {
   });
 });
 
+describe("searchItemsOf, one name in two universes", () => {
+  const twin = (universe: string) => ({
+    slug: "tokens",
+    name: "Tokens",
+    description: "Tokens, a place of the fixture, described at more than fifty characters, as the schema asks.",
+    universe,
+  });
+  const items = searchItemsOf(siteOf({ ...FIXTURE, ecosystems: [twin("onyx"), twin("gnoland")], stations: [] }));
+
+  it("gives two places of one name, in two universes, two names that tell them apart", () => {
+    const found = items.filter((i) => i.kind === "ecosystem");
+    expect(found).toHaveLength(2);
+    expect(new Set(found.map((i) => i.name)).size).toBe(2);
+    expect(found.find((i) => i.path === "/net/gnoland/e/tokens")?.name).toContain("gno.land");
+  });
+
+  it("leaves a name that is alone as the data files hold it", () => {
+    expect(items.find((i) => i.path === "/w/bubble")?.name).toBe("Bubble");
+  });
+});
+
 describe("opensPalette", () => {
   const press = (key: string, modifiers: Partial<Record<"metaKey" | "ctrlKey" | "shiftKey" | "altKey", true>> = {}) =>
     opensPalette({ key, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, ...modifiers });
