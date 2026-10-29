@@ -165,14 +165,14 @@ const pages = ["onyx", "gnoland"].flatMap((defaultId) => {
           testnet,
           canonical: universe.home.canonical,
           heading: undefined,
-          meta: homeMeta(universe),
+          meta: () => homeMeta(universe),
         },
         {
           name: `${label}: the Earth of ${id}`,
           testnet,
           canonical: universe.earth.canonical,
           heading: undefined,
-          meta: earthMeta(universe),
+          meta: () => earthMeta(universe),
         },
       ];
     }),
@@ -181,14 +181,14 @@ const pages = ["onyx", "gnoland"].flatMap((defaultId) => {
       testnet: world.universe === "onyx",
       canonical: world.canonical,
       heading: world.name,
-      meta: worldMeta(world),
+      meta: () => worldMeta(world),
     })),
     ...built.ecosystems.map((ecosystem) => ({
       name: `${label}: the ecosystem ${ecosystem.universe}/${ecosystem.slug}`,
       testnet: ecosystem.universe === "onyx",
       canonical: ecosystem.canonical,
       heading: ecosystem.name,
-      meta: ecosystemMeta(ecosystem),
+      meta: () => ecosystemMeta(ecosystem),
     })),
   ];
 });
@@ -210,19 +210,23 @@ describe("the places the tests walk", () => {
   });
 });
 
-describe.each(pages)("the page of $name", ({ meta, testnet, canonical, heading }) => {
+// Each test builds its page: a value made at collection time is outside any test, where StrykerJS turns no mutant on.
+describe.each(pages)("the page of $name", ({ meta: build, testnet, canonical, heading }) => {
   test("carries a Twitter Card that repeats its title and description", () => {
+    const meta = build();
     expect(content(meta, "name", "twitter:card")).toEqual(["summary"]);
     expect(content(meta, "name", "twitter:title")).toEqual([title(meta)]);
     expect(content(meta, "name", "twitter:description")).toEqual(content(meta, "name", "description"));
   });
 
   test(testnet ? "is noindex, a testnet's page, with its canonical address kept" : "is indexed", () => {
+    const meta = build();
     expect(content(meta, "name", "robots")).toEqual(testnet ? ["noindex"] : []);
     expect(content(meta, "property", "og:url")).toEqual([`https://gno.world${canonical}`]);
   });
 
   test("holds one JSON-LD of a WebPage at its canonical address, that survives being read back", () => {
+    const meta = build();
     const [only, ...more] = ld(meta);
     expect(more).toEqual([]);
     const parsed: unknown = JSON.parse(JSON.stringify(only));
