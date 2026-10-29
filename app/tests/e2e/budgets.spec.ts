@@ -1,4 +1,4 @@
-import { cacheContents, controlled, expect, hydrated, PAGES, test, type Page } from "./fixtures.ts";
+import { cacheContents, controlled, expect, hydrated, isWorld, PAGES, test, type Page } from "./fixtures.ts";
 
 // ADR-0001 §12's budgets: compressed JavaScript before the first usable screen (the page
 // hydrated; its steps in docs/decisions.md, the last on 2026-10-28), 3 MB in all, the worker's
@@ -38,7 +38,7 @@ for (const path of PAGES) {
       all.add(response.url());
       if (response.request().resourceType() === "script") scripts.add(response.url());
     });
-    const world = path !== "/";
+    const world = isWorld(path);
     // The chat's socket answers nothing: no line comes, so nothing asks the lines' view but a fault.
     if (world) await page.routeWebSocket(/\/ws$/, () => undefined);
     const chat = world ? page.waitForResponse((response) => CHAT.test(response.url())) : undefined;

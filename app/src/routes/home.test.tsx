@@ -1,9 +1,9 @@
 import { expect, test } from "vitest";
 import { BACK_HOME, alertOf, render } from "../../tests/render.tsx";
-import Home, { ErrorBoundary } from "./home.tsx";
+import Home, { ErrorBoundary, loader } from "./home.tsx";
 
 test("home links to each world by its name, at the world's path", async () => {
-  const html = await render({ path: "/", Component: Home }, "/");
+  const html = await render({ path: "/", Component: Home, loader }, "/");
   expect(html).toContain("<h1>gno.world</h1>");
   expect(html).toContain('<a href="/w/bubble"');
   expect(html).toContain(">Bubble</a>");

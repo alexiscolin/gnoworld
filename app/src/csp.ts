@@ -22,9 +22,9 @@ const DIRECTIVES = [
   "frame-ancestors 'none'",
 ];
 
-// ponytail: one header for all pages, so it holds every page's script hashes: two more per world, 728
-// characters for three pages. A host that caps a _headers line at 2,000 characters (Cloudflare Pages'
-// docs) takes about 12 worlds; nginx sets no such cap. Per-page headers, through the host, past that.
+// ponytail: one header for all pages, so it holds every page's script hashes: two per page, and a world has two pages
+// since 5d (its path and its canonical address). 323 characters and 54 a hash: a host that caps a _headers line at 2,000
+// (Cloudflare Pages) takes some 31 hashes, 7 worlds; nginx sets no cap. Per-page headers, through the host, past that (5f).
 export function policy(hashes: readonly string[]): string {
   for (const hash of hashes) {
     if (!/^'sha256-[A-Za-z0-9+/]{43}='$/.test(hash)) throw new RangeError(`csp: ${hash} is no SHA-256 source`);

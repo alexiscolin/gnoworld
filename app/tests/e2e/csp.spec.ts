@@ -25,7 +25,8 @@ test.describe("the content security policy", () => {
     answers.push(await request.get(`${GUARDED}/`));
     answers.push(await request.get(`${GUARDED}/`, { headers: { authorization: PASSWORD } }));
     expect(answers.map((answer) => answer.status()).toSorted()).toEqual(
-      [200, 200, 200, 200, 200, 200, 400, 401, 404, 404, 404, 500].toSorted(),
+      // Each page, the worker, the manifest, the icon, and the guarded home with its password.
+      [...PAGES.map(() => 200), 200, 200, 200, 200, 400, 401, 404, 404, 404, 500].toSorted(),
     );
     const policies = new Set(answers.map((answer) => answer.headers()["content-security-policy"]));
     expect(policies.size).toBe(1);
