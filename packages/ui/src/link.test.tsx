@@ -99,3 +99,28 @@ describe("LinkProvider", () => {
     for (const link of screen.getAllByRole("link")) expect(link.hasAttribute("data-page-link")).toBe(false);
   });
 });
+
+// F326: the app says which paths are its pages; a path that names a file (the sitemap) stays a plain anchor.
+describe("LinkProvider's pages", () => {
+  const pages = (href: string) => !href.endsWith(".xml");
+
+  it("draws a link to a path the app does not route as a plain anchor, and the others with the page's link", () => {
+    render(
+      <LinkProvider link={PageLink} pages={pages}>
+        <Button href="/sitemap.xml">Sitemap</Button>
+        <Button href="/w/bubble">Bubble</Button>
+      </LinkProvider>,
+    );
+    expect(screen.getByRole("link", { name: "Sitemap" }).hasAttribute("data-page-link")).toBe(false);
+    expect(screen.getByRole("link", { name: "Bubble" }).hasAttribute("data-page-link")).toBe(true);
+  });
+
+  it("still sends a path outside the site, whatever the app says, to a plain anchor", () => {
+    render(
+      <LinkProvider link={PageLink} pages={() => true}>
+        <Button href="//evil.example/x">Away</Button>
+      </LinkProvider>,
+    );
+    expect(screen.getByRole("link", { name: "Away" }).hasAttribute("data-page-link")).toBe(false);
+  });
+});
