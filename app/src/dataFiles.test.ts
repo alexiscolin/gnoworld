@@ -136,7 +136,9 @@ describe("loadData", () => {
 // its pages. The build runs in a copy of the app in the temp directory (its generated files stay out of the app's folder),
 // node_modules linked; GNOWORLD_DATA points it at the planted data.
 const BIN = new URL("../node_modules/@react-router/dev/bin.cjs", import.meta.url).pathname;
-const APP = new URL("..", import.meta.url).pathname;
+// StrykerJS runs the tests in a sandbox whose sources it has instrumented (hooks inside its mutant switches): the
+// compiler refuses them, and a build in a child process reaches no mutant. The build takes the real sources.
+const APP = new URL("..", import.meta.url).pathname.replace(/\/\.stryker-tmp\/sandbox-[^/]+\//, "/");
 const KEPT = ["src", "data", "public", "react-router.config.ts", "vite.config.ts", "package.json", "tsconfig.json"];
 
 describe("react-router build", () => {
