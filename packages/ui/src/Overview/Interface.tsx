@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { ActivityChart } from "../ActivityChart/ActivityChart.tsx";
 import { Avatar } from "../Avatar/Avatar.tsx";
+import { Breadcrumb } from "../Breadcrumb/Breadcrumb.tsx";
 import { Button } from "../Button/Button.tsx";
 import { Card } from "../Card/Card.tsx";
 import { Chip } from "../Chip/Chip.tsx";
@@ -199,6 +200,7 @@ export function Links() {
       <Cluster space="m">
         <Button href="/w/bubble">Fly to Bubble</Button>
         <Row title="Bubble" subtitle="A path from the site's root: the page's own link" href="/w/bubble" />
+        <Breadcrumb label="You are here" items={[{ label: "gno.world", href: "/" }, { label: "Bubble" }]} />
       </Cluster>
     </LinkProvider>
   );

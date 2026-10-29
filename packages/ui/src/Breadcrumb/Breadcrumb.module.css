@@ -1,0 +1,17 @@
+@layer components {
+  .trail ol {
+    padding-inline-start: 0;
+    list-style: none;
+    /* layout: the list's own margin, which the browser gives it, taken off */
+    margin: 0;
+  }
+
+  .trail li + li::before {
+    content: "/\00a0";
+    color: var(--color-text-muted);
+  }
+
+  .trail [aria-current="page"] {
+    color: var(--color-text);
+  }
+}
