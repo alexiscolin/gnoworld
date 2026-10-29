@@ -405,6 +405,55 @@ code=0; stop '{"stop_hook_active":false}' || code=$?
 green && echo '{"a":2}' >"$r/.claude/settings.json"
 code=0; stop '{"stop_hook_active":false}' || code=$?
 [ "$code" = 2 ] || fail "stop_gate let an unstaged edit of a tracked file through (exit $code)"
+# It also stops what runs of this project left behind, at the end of every turn, before anything else (Alexis,
+# 2026-10-29: six StrykerJS workers whose run was killed spun at 75% of a core each for 31 hours, a vitest for 6 days).
+# The sandbox refuses ps; this hook runs outside it. A process of this project names a folder `gnoworld/` (any case:
+# the checkout, a session's scratchpad) in its command. It is stopped when its parent is gone (PPID 1), unless a gate
+# runs (sh, bash or ./ running scripts/check.sh) and it is under 2 hours old; or when it is a test tool's (vitest,
+# stryker, playwright, storybook) 3 hours old or more, whatever its parent. TERM first, KILL a second later. Each is
+# logged to .claude/tmp/reaped.log as `<pid> <seconds> <command>`. Nothing else: another project, this project's dev
+# server, a young test tool whose run lives. Here a fake ps, padded as ps pads, describes real sleeping processes.
+mkdir -p "$t/fakeps"
+for n in 1 2 3 4 5 6 7 8 9 10 11; do sleep 60 </dev/null >/dev/null 2>&1 & eval "z$n=\$!"; done # nothing of the suite held open
+sh -c "trap '' TERM; while :; do sleep 1; done" </dev/null >/dev/null 2>&1 & z12=$! # a worker deaf to TERM
+table() { # $1: the line of a gate's run, or a line that only mentions one
+	printf '%6s %5s %11s %s\n' \
+		"$z1" 1 10:00 "/opt/homebrew/bin/node --require /private/tmp/claude-501/-Users-twee-Server-gnoworld/s/scratchpad/wt/node_modules/@stryker-mutator/w.js" \
+		"$z2" "$$" 6-04:00:00 "node /srv/gnoworld/node_modules/.pnpm/vitest@4/node_modules/vitest/vitest.mjs" \
+		"$z3" "$$" 02:59:59 "node /srv/gnoworld/node_modules/@stryker-mutator/core/bin/stryker.js" \
+		"$z4" 1 2-01:00:00 "node /srv/other/server.js" \
+		"$z5" "$$" 10:00:00 "node /srv/gnoworld/node_modules/.bin/vite dev" \
+		"$z6" 1 01:59:59 "node /srv/gnoworld/app/tests/e2e/api.mjs" \
+		"$z7" 1 02:00:00 "node /srv/gnoworld/app/tests/e2e/serve.mjs" \
+		"$z8" "$$" 05:00:00 "node /srv/other/node_modules/vitest/vitest.mjs" \
+		"$z9" 1 10:00 "node /srv/other/node_modules/@stryker-mutator/w.js" \
+		"$z10" 1 1-00:00:00 "node /srv/gnoworld-other/x.js" \
+		"$z11" "$$" 03:00:00 "node /srv/GnoWorld/app/node_modules/@playwright/test/cli.js test" \
+		"$z12" 1 1-07:00:00 "node --require /private/tmp/claude-501/-Users-twee-Server-gnoworld/s/w.js"
+	[ -z "${1:-}" ] || printf '%6s %5s %11s %s\n' "$$" "$$" 05:00 "$1"
+}
+gone() { n=0; while kill -0 "$1" 2>/dev/null; do n=$((n + 1)); [ "$n" -lt 40 ] || return 1; sleep 0.1; done; }
+alive() { kill -0 "$1" 2>/dev/null; }
+fakeps() { # $1: its exit status; then table's argument
+	code=$1 && shift
+	table "$@" >"$t/fakeps/table" && printf '#!/bin/sh\ncat "%s"\nexit %s\n' "$t/fakeps/table" "$code" >"$t/fakeps/ps" && chmod +x "$t/fakeps/ps"
+}
+reap() { printf '{"stop_hook_active":true}' | PATH="$t/fakeps:$PATH" CLAUDE_PROJECT_DIR="$r" sh "$gate" 2>/dev/null || fail "stop_gate failed while stopping what runs left behind"; }
+fakeps 0 "bash /srv/gnoworld/scripts/check.sh --full" && reap
+for z in "$z2" "$z7" "$z11" "$z12"; do gone "$z" || fail "stop_gate left $(grep "^ *$z " "$t/fakeps/table")"; done
+for z in "$z1" "$z6"; do alive "$z" || fail "stop_gate stopped a young orphan while a gate runs, maybe the gate's: $(grep "^ *$z " "$t/fakeps/table")"; done
+grep -q "^$z2 [0-9]* node /srv/gnoworld/" "$r/.claude/tmp/reaped.log" || fail "stop_gate did not log <pid> <seconds> <command>: $(cat "$r/.claude/tmp/reaped.log")"
+grep -q "^$z2 532800 " "$r/.claude/tmp/reaped.log" || fail "stop_gate misread 6-04:00:00 as $(grep "^$z2 " "$r/.claude/tmp/reaped.log")"
+# A command that only mentions check.sh (an editor, a grep) is no gate: the young orphans go.
+fakeps 0 "vim scripts/check.sh" && reap
+for z in "$z1" "$z6"; do gone "$z" || fail "stop_gate took a mention of check.sh for a gate: $(grep "^ *$z " "$t/fakeps/table")"; done
+for z in "$z3" "$z4" "$z5" "$z8" "$z9" "$z10"; do alive "$z" || fail "stop_gate stopped $(grep "^ *$z " "$t/fakeps/table")"; done
+# What fails in the cleanup never costs the gate's block: ps failing, the log unwritable.
+fakeps 1 && rm -f "$r/.claude/tmp/reaped.log" && mkdir "$r/.claude/tmp/reaped.log" && echo '{"a":3}' >"$r/.claude/settings.json"
+code=0; printf '{"stop_hook_active":false}' | PATH="$t/fakeps:$PATH" CLAUDE_PROJECT_DIR="$r" sh "$gate" 2>/dev/null || code=$?
+[ "$code" = 2 ] || fail "stop_gate lost its block when ps failed and the log could not be written (exit $code)"
+rmdir "$r/.claude/tmp/reaped.log"
+for n in 1 2 3 4 5 6 7 8 9 10 11 12; do eval "kill -9 \$z$n" 2>/dev/null || :; done
 fi
 
 if part check_docs; then
