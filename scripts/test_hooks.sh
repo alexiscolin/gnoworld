@@ -3331,15 +3331,15 @@ async function run(answer) {
   const calls = [];
   const agent = async (prompt, o) => { calls.push({ label: o.label, prompt, agentType: o.agentType, schema: o.schema }); return answer(o.label, prompt, o); };
   const parallel = async (ts) => Promise.all(ts.map((t) => t().catch(() => null)));
-  const r = await body(agent, parallel, () => {}, () => {}, { branch: "b", worktree: "w", plan: "p", brief: "x", shared: "s" }, { spent: () => 0 });
+  const r = await body(agent, parallel, () => {}, () => {}, { branch: "b", worktree: "w", plan: "p", brief: "x", shared: "s", ids: "F9000-F9049" }, { spent: () => 0 });
   return { r, labels: calls.map((c) => c.label), calls };
 }
-const gateOf = (files) => ({ passed: true, failingLane: "", tail: "", survivors: [], files, relaxations: [], seconds: 1 });
+const gateOf = (files) => ({ passed: true, failingLane: "", tail: "", survivors: [], files, relaxations: [], seconds: 1, branch: "b" });
 const base = (files) => (l) =>
   l === "tests" ? { files: ["t"], seenFailing: true, notes: "" }
   : l === "red pass" ? { findings: [] }
   : l === "merge check" ? gateOf(files)
-  : l === "build" || (l || "").startsWith("ledger") ? { commits: ["c"], notes: "" }
+  : l === "build" || (l || "").startsWith("ledger") ? { commits: ["c"], notes: "", branch: "b" }
   : l === "reviewer" || l === "security" || l === "gno-auditor" ? { findings: [] } : null;
 const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
 (async () => {
@@ -3360,7 +3360,7 @@ const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
     l === "reviewer" ? { findings: [finding("high", "scripts/a.sh")] }
     : l === "security" ? { findings: [finding("medium", "scripts/b.sh")] }
     : l === "verifier" ? { verdicts: [{ id: idOf(o, 0), verdict: "refuted", severity: "low", evidence: "e" }] }
-    : (l || "").startsWith("fix round") ? { fixed: [{ id: "security-1-1", commit: "f1" }], notes: "" }
+    : (l || "").startsWith("fix round") ? { fixed: [{ id: "security-1-1", commit: "f1" }], notes: "", branch: "b" }
     : base(["scripts/a.sh"])(l, p));
   const fix = t.calls.find((c) => (c.label || "").startsWith("fix round"));
   ok(fix && fix.prompt.includes("security-1-1") && !fix.prompt.includes("reviewer-1-1"), `the refuted finding's twin was dropped, or the refuted one fixed: ${fix && fix.prompt}`);
@@ -3368,7 +3368,7 @@ const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
   t = await run((l, p, o) =>
     l === "security" ? { findings: [finding("high", "scripts/a.sh")] }
     : l === "verifier" ? { verdicts: [{ id: idOf(o, 0), verdict: "reproduced", severity: "high", evidence: "e" }] }
-    : (l || "").startsWith("fix round") ? { fixed: [{ id: p.match(/"id":"(security-\d-1)"/)[1], commit: "f" + l.slice(-1) }], notes: "" }
+    : (l || "").startsWith("fix round") ? { fixed: [{ id: p.match(/"id":"(security-\d-1)"/)[1], commit: "f" + l.slice(-1) }], notes: "", branch: "b" }
     : base(["scripts/a.sh"])(l, p));
   ok(t.r.status.startsWith("reconsider with Alexis"), `three rounds of high tier-1 findings ended as ${t.r.status}`);
   ok(t.labels.filter((l) => l === "reviewer").length === 1, `round 2 ran the reviewer again: ${t.labels}`);
@@ -3378,6 +3378,17 @@ const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
     const readOnly = ["red pass", "reviewer", "security", "gno-auditor", "verifier"].includes(c.label);
     ok(readOnly ? c.prompt.includes("write nothing") && !c.prompt.includes("learnings.md") : c.prompt.includes("learnings.md"), `${c.label} was told the wrong way to write`);
   }
+  // Each Bash command of an agent starts in the main checkout (the shell goes back there after every call): every one begins
+  // with the cd, and a writer that committed on another branch than its own blocks the loop (slice-5a's commit on main).
+  for (const c of t.calls) ok(c.prompt.includes('every Bash command begins with `cd "w" || exit 1`'), `${c.label} was not told to cd in every command`);
+  let u = await run((l, p) => (l === "build" ? { commits: ["c"], notes: "", branch: "main" } : base(["app/src/a.ts"])(l, p)));
+  ok(u.r.status.startsWith("blocked") && u.r.status.includes("main"), `a build committed on main was taken: ${u.r.status}`);
+  // The files changed are git's, never the agent's own: a list holding .claude/tmp or an absolute path blocks the loop
+  // (slice-5a's security lens skipped, the list naming the diff file the agent wrote).
+  u = await run(base([".claude/tmp/diff.patch", "/tmp/x/report.md"]));
+  ok(u.r.status.startsWith("blocked") && u.r.status.includes("files"), `a merge check's list of its own files was taken: ${u.r.status}`);
+  // The ledger's numbers come from the branch's own range, which the chief gives (two branches took the same F numbers).
+  for (const c of t.calls.filter((c) => (c.label || "").startsWith("ledger"))) ok(c.prompt.includes("F9000-F9049"), "the scribe was not given the branch's range of F numbers");
   // Every round's findings go to the ledger, a refuted or low one included.
   ok(t.labels.filter((l) => (l || "").startsWith("ledger")).length === 3, `not every round wrote its findings to the ledger: ${t.labels}`);
 })();
