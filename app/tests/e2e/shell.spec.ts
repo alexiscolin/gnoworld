@@ -61,7 +61,7 @@ for (const width of WIDTHS) {
     };
 
     for (const path of PAGES) {
-      test(`${path}: the home link, the search, the account and Log out share one header row`, async ({ page }) => {
+      test(`${path}: the home link, the account and Log out share one header row`, async ({ page }) => {
         const address = await logInAt(page);
         await page.goto(path);
         await hydrated(page);
