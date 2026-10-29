@@ -13,7 +13,6 @@ export default defineConfig({
       "src/features/chat/Lines.test.tsx",
       "src/features/chat/composing.test.tsx",
       "src/features/chat/lineFlash.test.tsx",
-      "src/features/list/PlacesList.test.tsx",
     ],
     environment: "jsdom",
     expect: { requireAssertions: true },

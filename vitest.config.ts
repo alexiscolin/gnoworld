@@ -57,7 +57,6 @@ export default defineConfig({
             "app/src/features/chat/Lines.test.tsx",
             "app/src/features/chat/composing.test.tsx",
             "app/src/features/chat/lineFlash.test.tsx",
-            "app/src/features/list/PlacesList.test.tsx",
             ...SLOW,
           ],
         },
