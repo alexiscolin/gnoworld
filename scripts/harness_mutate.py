@@ -13,6 +13,7 @@ own, and those whose sections of a suite it changed (suite_parts.py: a change ou
 them all); all of them when this script changed; the full gate judges them all."""
 import concurrent.futures
 import contextlib
+import hashlib
 import os
 import re
 import subprocess
@@ -281,7 +282,7 @@ def mutants():
     yield from each("scripts/harness_mutate.py", "        if unknown:\n", "        if False:\n", "hooks", "harness_mutate --dry sees a section its suite lacks")
     yield from each("scripts/harness_mutate.py", '    WORKTREE = "."\n    checked()\n', '    WORKTREE = "."\n', "hooks", "harness_mutate --dry checks the mutants")
     hm = "scripts/harness_mutate.py"
-    yield from each(hm, "        found = select" "(found, changed, touched_by, sections)\n", "", "hooks", "harness_mutate --changed judges only the changed guard files and sections")
+    yield from each(hm, "{id(m) for m in select" "(found, changed, touched_by, sections)} | ", "", "hooks", "harness_mutate --changed judges the changed guard files and sections")
     yield from each(hm, "for test, suite in SUITE_OF" ".items() if suite in changed}", "for test, suite in SUITE_OF.items() if False}", "hooks", "harness_mutate --changed reads the suites' changed sections")
     yield from each(hm, '"probe": "scripts/' 'probe.py"}', '"probe": "scripts/nowhere.py"}', "hooks", "harness_mutate --changed reads probe.py's changed blocks as test_hooks.sh's (G5)")
     # The find is split in two, so that this line holds it nowhere itself: a spot of its own would be a mutant of no guard.
@@ -305,7 +306,10 @@ def mutants():
     yield from each(hm, "    if not found" ":  # nothing to judge", "    if False:  # nothing to judge", "hooks", "harness_mutate --changed runs no control when it judges no mutant")
     yield from each(hm, "elif sys.argv[1:]" ":\n", "elif False:\n", "hooks", "harness_mutate refuses an unknown argument")
     yield from each(hm, "    if base.startswith" "(\"-\"):", "    if False:", "hooks", "harness_mutate --changed takes no option for its base")
-    yield from each(hm, "if changed is not None and SELF" " in changed:", "if False:", "hooks", "harness_mutate --changed judges every mutant when it changed itself")
+    yield from each(hm, "    if before is" " None:", "    if False:", "hooks", "harness_mutate --changed judges every mutant against a base script it cannot read")
+    yield from each(hm, "identity(m, sections, GAPS) not" " in before}", "False}", "hooks", "harness_mutate --changed judges the mutants it defines anew or otherwise")
+    yield from each(hm, "return label, path, test, judged_by, label" " in gaps, None", "return label, path, test, None, False, None", "hooks", "harness_mutate --changed tells a mutant by its sections and its place in GAPS")
+    yield from each(hm, "else hashlib.sha256(" "mutated.encode()).hexdigest()", 'else ""', "hooks", "harness_mutate --changed tells a mutant by the text it writes")
     yield from each(hm, "if failures" ":\n    sys.exit", "if failures and changed is None:\n    sys.exit", "hooks", "a survivor fails harness_mutate --changed")
     yield from each(hm, "    found = " "checked()\n", "    found = list(mutants())\n", "hooks", "harness_mutate --changed still checks every mutant")
     # The hooks and their scripts.
@@ -923,6 +927,34 @@ def suite_touched(base, suite):
     return None if old.returncode or new.returncode else touched(suite, old.stdout, new.stdout)
 
 
+DRY = re.compile(r'^if sys\.argv\[1:\] == \["--dry"\]:$', re.M)  # where this script's definitions end
+
+
+def identity(mutant, sections_of, gaps):
+    """A mutant as its label, file, suite, the sections that judge it, its place in GAPS and the text it writes, hashed:
+    two scripts that define it alike agree; a section it cannot name is None, which no readable one equals."""
+    label, path, mutated, test = mutant
+    try:
+        judged_by = sections_of(path, test)
+    except Exception:  # base's tables may not know a file this tree's do
+        judged_by = None
+    return label, path, test, judged_by, label in gaps, None if mutated is None else hashlib.sha256(mutated.encode()).hexdigest()
+
+
+def defined_at(base):
+    """The identities of the mutants base's script defines, built on this tree's files; None when it cannot say (no
+    such file, no `--dry` line to cut its definitions at, its code failing here): then every mutant is judged."""
+    shown = subprocess.run(["git", "show", f"{base}:{SELF}"], capture_output=True, text=True).stdout
+    space = {"__name__": "harness_mutate_at_base", "__file__": os.path.abspath(__file__)}
+    try:  # base's own code, whatever it raises: judging every mutant is the safe side
+        exec(compile(shown[: DRY.search(shown).start()], f"{base}:{SELF}", "exec"), space)
+        space["WORKTREE"] = WORKTREE
+        return {identity(m, space["sections"], space["GAPS"]) for m in space["mutants"]()}
+    except Exception as e:
+        print(f"harness_mutate: {base}'s {SELF} cannot say its mutants here ({e!r})")
+        return None
+
+
 def changed_since(base):
     """The files committed since base, a renamed one under both names and a name git would quote as it is; a base git
     cannot compare with stops the run."""
@@ -954,13 +986,16 @@ with contextlib.ExitStack() as stack:
     trees = [stack.enter_context(worktree("HEAD"))]  # one tree to build and select with: the others only if a mutant is left (CR9)
     WORKTREE = trees[0]
     found = checked()
-    if changed is not None and SELF in changed:
-        print(f"harness_mutate: {SELF} changed since {base}: every mutant")
+    before = defined_at(base) if changed is not None and SELF in changed else set()
+    if before is None:
+        print(f"harness_mutate: {SELF} changed since {base}, whose mutants it cannot read: every mutant")
     elif changed is not None:
         total = len(found)
         touched_by = {test: suite_touched(base, suite) for test, suite in SUITE_OF.items() if suite in changed}
-        found = select(found, changed, touched_by, sections)
-        print(f"harness_mutate: the guard files and the suites' sections changed since {base}: {len(found)} of {total} mutants")
+        # Its own guards are mutants of a file it changed; the others, those it defines anew or otherwise than base's.
+        kept = {id(m) for m in select(found, changed, touched_by, sections)} | {id(m) for m in found if SELF in changed and identity(m, sections, GAPS) not in before}
+        found = [m for m in found if id(m) in kept]
+        print(f"harness_mutate: the guard files, the suites' sections and the mutants changed since {base}: {len(found)} of {total} mutants")
     if not found:  # nothing to judge: the controls would only cost minutes (8 suite runs, 601 s at load 30 to 50)
         if changed is None:  # a full run with no mutant is a harness that lost them, not a green run
             sys.exit("harness_mutate: no mutant to judge: every mutant is gone from this script")

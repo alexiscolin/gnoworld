@@ -877,11 +877,65 @@ out=$(PROBED=1 shards 2 --changed "$base") || fail "harness_mutate --changed fai
 printf '%s\n' "$out" | grep -q "killed: planted keep7 #1$" || fail "harness_mutate --changed skipped the changed probe block's mutant: $out"
 [ "$(verdicts "$out")" = 1 ] || fail "harness_mutate --changed judged more than the changed probe block's mutant: $out"
 printf '%s\n' "$out" | grep -q "1 of 8 mutants" || fail "harness_mutate --changed did not say how many it kept after a probe change: $out"
-# harness_mutate.py itself changed: its selection may be what changed, so every mutant runs.
+# harness_mutate.py itself changed: the mutants it defines anew or otherwise than base's script (a label, a text, a
+# suite) are judged, with those of the files and sections changed, not every mutant (Alexis, 2026-10-29: ~700 judged
+# for two new ones, 32 minutes). Its own guards are mutants of a file it changed, so they are judged. A comment alone:
 base=$(git -C "$hs/repo" rev-parse HEAD)
 printf '\n# a change of its own\n' >>"$hs/repo/harness_mutate.py" && git -C "$hs/repo" commit -qam itself
-out=$(shards 2 --changed "$base") && fail "harness_mutate --changed passed with survivors after it changed itself: $out"
-[ "$(verdicts "$out")" = 7 ] || fail "harness_mutate --changed did not judge every mutant after it changed itself: $out"
+out=$(shards 2 --changed "$base") || fail "harness_mutate --changed judged mutants after a comment of its own: $out"
+[ "$(verdicts "$out")" = 0 ] && printf '%s\n' "$out" | grep -q " 0 of 7 mutants" || fail "harness_mutate --changed judged unchanged mutants after it changed itself: $out"
+# A new mutant, and one whose text changed: those two alone. (Section z makes every x mutant survive, as above: the new
+# one is a probe block's, which can be killed.)
+python3 -I - "$hs/repo/harness_mutate.py" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p).read()
+keep5 = '    yield from each("i.txt", "KEEP5", "", "hooks", "planted keep5")\n'
+spare2 = 'each("h.txt", " SPARE2", "", "hooks", "planted spare2")'
+assert s.count(keep5) == 1 and s.count(spare2) == 1, "the planted mutants changed: update test_hooks.sh's harness_shards"
+s = s.replace(keep5, keep5 + '    yield from each("k.txt", "KEEP7", "", "probe", "planted keep7 again")\n')
+s = s.replace(spare2, 'each("h.txt", " SPARE2", " SPARE3", "hooks", "planted spare2")')
+open(p, "w").write(s)
+PY
+git -C "$hs/repo" commit -qam "a new mutant, a changed one"
+out=$(shards 2 --changed "$base") && fail "harness_mutate --changed passed with the survivor it defined otherwise: $out"
+[ "$(verdicts "$out")" = 2 ] || fail "harness_mutate --changed did not judge only its new and changed mutants: $out"
+printf '%s\n' "$out" | grep -q "killed: planted keep7 again #1$" || fail "harness_mutate --changed skipped a mutant it defined anew: $out"
+printf '%s\n' "$out" | grep -q "^FAIL  survives: planted spare2 #1$" || fail "harness_mutate --changed skipped a mutant whose text it changed: $out"
+printf '%s\n' "$out" | grep -q " 2 of 8 mutants" || fail "harness_mutate --changed did not say 2 of 8 mutants: $out"
+# A mutant is also told by its label alone, by the sections that judge it and by its place in GAPS: one change each.
+for edit in label sections gaps; do
+	base=$(git -C "$hs/repo" rev-parse HEAD)
+	python3 -I - "$hs/repo/harness_mutate.py" "$edit" <<'PY'
+import sys
+p, edit = sys.argv[1], sys.argv[2]
+s = open(p).read()
+old, new = {
+    "label": ('"hooks", "planted keep4")', '"hooks", "planted keep4 renamed")'),
+    "sections": ('"i.txt": "x",', '"i.txt": "x,z",'),
+    "gaps": ("GAPS = {\n", 'GAPS = {\n    "planted keep2 #1": "a planted gap",\n'),
+}[edit]
+assert s.count(old) == 1, f"the planted {edit} changed: update test_hooks.sh's harness_shards"
+open(p, "w").write(s.replace(old, new))
+PY
+	git -C "$hs/repo" commit -qam "$edit alone"
+	out=$(shards 2 --changed "$base") || :
+	[ "$(verdicts "$out")" = 1 ] && printf '%s\n' "$out" | grep -q " 1 of 8 mutants" || fail "harness_mutate --changed did not judge the one mutant whose $edit alone changed: $out"
+done
+# A base script that does not run (a syntax error before its --dry line): every mutant.
+cp "$hs/repo/harness_mutate.py" "$hs/hm.keep"
+python3 -I -c 'import sys; p = sys.argv[1]; s = open(p).read(); open(p, "w").write(s.replace("\nif sys.argv[1:] == [\"--dry\"]:", "\ndef (:\nif sys.argv[1:] == [\"--dry\"]:", 1))' "$hs/repo/harness_mutate.py"
+git -C "$hs/repo" commit -qam "a syntax error" && base=$(git -C "$hs/repo" rev-parse HEAD)
+cp "$hs/hm.keep" "$hs/repo/harness_mutate.py" && git -C "$hs/repo" commit -qam "it runs again"
+out=$(shards 2 --changed "$base") || :
+[ "$(verdicts "$out")" = 8 ] || fail "harness_mutate --changed did not judge every mutant against a base script that does not run: $out"
+# A base whose script it cannot read as definitions (no `--dry` line to cut it at): every mutant, as before.
+cp "$hs/repo/harness_mutate.py" "$hs/hm.keep"
+sed 's|^if sys.argv\[1:\] == \["--dry"\]:$|if ["--dry"] == sys.argv[1:]:|' "$hs/hm.keep" >"$hs/repo/harness_mutate.py"
+git -C "$hs/repo" commit -qam "no dry line" && base=$(git -C "$hs/repo" rev-parse HEAD)
+cp "$hs/hm.keep" "$hs/repo/harness_mutate.py" && git -C "$hs/repo" commit -qam "the dry line back"
+out=$(shards 2 --changed "$base") && fail "harness_mutate --changed passed with survivors after a base it could not read: $out"
+[ "$(verdicts "$out")" = 8 ] || fail "harness_mutate --changed did not judge every mutant against a base script it could not read: $out"
 # A passes file it cannot read (a folder here): it refuses, before any worktree, and never judges fewer mutants.
 mkdir -p "$hs/repo/docs/review-passes.txt" && : >"$hs/repo/docs/review-passes.txt/x" && git -C "$hs/repo" add docs && git -C "$hs/repo" commit -qm "an unreadable record"
 rm -f "$hs/made"
