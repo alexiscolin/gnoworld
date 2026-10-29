@@ -103,6 +103,18 @@ test.describe("the rooms as a drawer, on a phone's screen", () => {
     await takesWidth(threadField(page).locator("xpath=ancestor::form[1]"), 390);
   });
 
+  test("the search chord with the drawer open leaves the drawer the screen: no second dialog opens", async ({
+    page,
+  }) => {
+    await account(page, 390);
+    await control(page).click();
+    await expect(drawer(page)).toBeVisible();
+    await page.keyboard.press("Control+k");
+    await expect(drawer(page)).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Search" })).toBeHidden();
+    await expect(page.locator("dialog[open]")).toHaveCount(1);
+  });
+
   test("opens the drawer, chooses a room: the room opens and the drawer closes", async ({ page }) => {
     await account(page, 390);
     await control(page).click();
