@@ -2234,7 +2234,7 @@ reset
 GATE_BUDGET=999 gate | grep -q "(budget 120 s)$" || fail "check.sh let GATE_BUDGET raise its budget"
 GATE_BUDGET=abc gate | grep -q "(budget 120 s)$" || fail "check.sh took a GATE_BUDGET that is no number"
 GATE_BUDGET= gate | grep -q "(budget 120 s)$" || fail "check.sh took an empty GATE_BUDGET"
-(GATE_BUDGET=-5 gate) >/dev/null && fail "check.sh took a negative GATE_BUDGET as no budget"
+(GATE_BUDGET=-5 gate) 2>&1 | grep -q "over its -5 s budget: passed, and logged" || fail "check.sh took a negative GATE_BUDGET as no budget"
 printf 'y\n' >>"$g/server/src/a.ts"
 GATE_BUDGET=999 gate | grep -q "(budget 30 s)$" || fail "check.sh let GATE_BUDGET raise a scoped run's budget"
 reset
@@ -2327,95 +2327,62 @@ fi
 
 if part gate_times; then
 gate_fixture gate_times
-# Past its budget, the fast gate fails, names its slowest step as printed, and records nothing; each
-# step's time is its own: a 2 s step prints 2 s, a quick one less than 1 s, its lane at least 2 s.
+# Past its budget, the fast gate passes and says so (Alexis, 2026-10-30: a budget that refused a run which had passed made
+# agents run it again and again, three times in slice 5): it names its slowest step as printed, records the code it passed,
+# and appends the run to the unsteady log with its time and the machine's two loads, which /pre-merge and the dream read; a
+# log it cannot write fails it, a pass no one sees being no pass. Each step's time is its own: a 2 s step prints 2 s, a quick
+# one less than 1 s, its lane at least 2 s.
+unsteady=$g/.claude/tmp/unsteady.log
+busy=170 idle=10
 for slow in lint gno; do
-	rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/gate-green"
-	out=$(SLOW_STEP=$slow GATE_BUDGET=0 gate) && fail "check.sh passed over its budget"
+	rm -f "$unsteady" "$g/.claude/tmp/green-fast" "$g/.claude/tmp/gate-green"
+	out=$(LOAD_1="$idle 160" LOAD_2="$busy 160" SLOW_STEP=$slow GATE_BUDGET=0 gate) || fail "check.sh failed a run that passed, past its budget: $out"
 	slowest=$(printf '%s\n' "$out" | sed -n 's/^lane [a-z]* [0-9.]* s: //p' | tr ',' '\n' | awk '{print $2, $1}' | sort -n | tail -1 | cut -d' ' -f2)
-	printf '%s\n' "$out" | grep -q "over its 0 s budget: its slowest step, $slowest," || fail "check.sh did not name its slowest step, $slowest: $out"
-	[ ! -e "$g/.claude/tmp/green-fast" ] && [ ! -e "$g/.claude/tmp/gate-green" ] || fail "check.sh recorded a gate past its budget"
+	printf '%s\n' "$out" | grep -q "over its 0 s budget: passed, and logged for /pre-merge; its slowest step, $slowest," || fail "check.sh did not say it passed past its budget, naming its slowest step, $slowest: $out"
+	grep -qxF "$(record)" "$g/.claude/tmp/green-fast" || fail "check.sh did not record the gate it passed past its budget"
+	[ "$(grep -c "" "$unsteady")" = 1 ] || fail "check.sh did not log its run past its budget, once: $(cat "$unsteady" 2>&1)"
+	grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]{8}Z	gate	' "$unsteady" && grep -q "over its 0 s budget" "$unsteady" && grep -q "load 1.0 then 17.0 on 16 cores" "$unsteady" && grep -q "slowest step, $slowest" "$unsteady" ||
+		fail "the unsteady log lacks the time, the loads or the step of a run past its budget: $(cat "$unsteady")"
 	[ "$slow" = lint ] || continue
 	printf '%s\n' "$out" | grep -qE '^lane types ([2-9]|[1-9][0-9])\.[0-9] s: .*lint [2-9]\.[0-9]' || fail "check.sh did not time the slow lint: $out"
 	printf '%s\n' "$out" | grep -qE '^lane gno [0-9.]+ s: gno [0-9]+\.[0-9], mutate.py [0-9]+\.[0-9], go [0-9]+\.[0-9]$' || fail "check.sh did not time the gno lane's steps: $out"
 	format=$(printf '%s\n' "$out" | sed -n 's/^lane ts .*format \([0-9]*\)\.\([0-9]\).*/\1\2/p') lint=$(printf '%s\n' "$out" | sed -n 's/^lane types .*lint \([0-9]*\)\.\([0-9]\).*/\1\2/p')
 	[ -n "$format" ] && [ "$format" -lt "$lint" ] || fail "check.sh gave a quick step a slow one's time: $out"
 done
-# Past its budget on a machine busy both when it started and when it ended, its 1-minute load above its cores at both
-# readings, the fast gate says so and passes (Alexis, 2026-10-26, C.8; Alexis, 2026-10-27, on the review's CR10): it
-# measured the machine, not the code. A start reading alone excused a run begun just after another heavy one on an idle
-# machine, the 1-minute average lagging by about a minute; an end reading alone includes the gate's own lanes (Vitest
-# takes cores - 1 workers, beside four lanes), which a change making its own tests CPU-bound raises (security-S3). Both
-# above the cores: the machine was busy before the lanes, and still is after them. At its cores, not above, it still fails.
-busy=170 idle=10
-rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/gate-green"
-out=$(LOAD_1="$busy 160" LOAD_2="$busy 160" SLOW_STEP=lint GATE_BUDGET=0 gate) || fail "check.sh failed past its budget on a machine busy at its start and at its end: $out"
-printf '%s\n' "$out" | grep -q "over its 0 s budget on a machine busy when it started and when it ended (load 17.0 then 17.0 on 16 cores): passed" ||
-	fail "check.sh did not say it passed past its budget, the machine busy at both readings: $out"
-grep -qxF "$(record)" "$g/.claude/tmp/green-fast" || fail "check.sh did not record the gate it passed on a busy machine"
 # The load is read twice: first as the lanes start, before any of them runs, then last, once they have all ended.
 [ "$(grep -c '^py:load' "$log")" = 2 ] || fail "check.sh did not read the load twice: $(grep -c '^py:load' "$log")"
 [ "$(sed -n 1p "$log" | cut -d' ' -f1)" = py:load ] || fail "check.sh read the load after a lane had started: $(sed -n 1p "$log")"
 [ "$(tail -1 "$log" | cut -d' ' -f1)" = py:load ] || fail "check.sh read the end load before its lanes had ended: $(tail -1 "$log")"
-# Busy at the start only (a load left by the run before, decaying), or at the end only (the gate's own lanes) is no excuse.
-for pair in "$busy $idle" "$idle $busy" "$idle $idle"; do
-	set -- $pair
-	rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/gate-green"
-	out=$(LOAD_1="$1 160" LOAD_2="$2 160" SLOW_STEP=lint GATE_BUDGET=0 gate) && fail "check.sh passed past its budget with the load $1 at its start and $2 at its end: $out"
-	printf '%s\n' "$out" | grep -q "find what grew" || fail "check.sh did not fail past its budget with the load $1 at its start and $2 at its end: $out"
-	[ ! -e "$g/.claude/tmp/green-fast" ] || fail "check.sh recorded a gate past its budget with the load $1 at its start and $2 at its end"
-done
-# At its cores, not above, it still fails, at either reading: the other reading above the cores alone does not excuse it.
-for pair in "160 160" "160 $busy" "$busy 160"; do
-	set -- $pair
-	rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/gate-green"
-	out=$(LOAD_1="$1 160" LOAD_2="$2 160" SLOW_STEP=lint GATE_BUDGET=0 gate) && fail "check.sh passed past its budget with the load $1 at its start and $2 at its end, one at its cores, not above: $out"
-	printf '%s\n' "$out" | grep -q "find what grew" || fail "check.sh did not fail past its budget with the load $1 at its start and $2 at its end, one at its cores: $out"
-done
-# A merge commit has no time budget (Alexis, 2026-10-28): the full gate follows every merge, and a merge's checks run on the
-# merged tree, not on a change a work commit's budget could blame. It still says the time. A merge in progress is MERGE_HEAD, which
-# git reads; the staged copy of pre-commit has no repository, so pre-commit tells it with GATE_MERGE=1 (never read in a repository,
-# where an environment variable would switch the budget off for any run). A MERGE_HEAD git cannot read is no merge: the budget holds.
+# A merge commit has no budget (Alexis, 2026-10-28): it says its time and logs nothing, the full gate following it. A merge in
+# progress is MERGE_HEAD, which git reads; the staged copy of pre-commit has no repository, so pre-commit tells it with
+# GATE_MERGE=1, never read in a repository. A MERGE_HEAD git cannot read is no merge, and the run is logged as any other.
 merge() { git -C "$g" rev-parse HEAD >"$g/.git/MERGE_HEAD"; }
-rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/gate-green"
-merge
+rm -f "$unsteady" && merge
 out=$(LOAD_1="$idle 160" LOAD_2="$idle 160" SLOW_STEP=lint GATE_BUDGET=0 gate) || fail "check.sh failed a merge in progress past its budget: $out"
 printf '%s\n' "$out" | grep -qE "the fast gate took [0-9]+ s, past its 0 s budget, which a merge commit has none of \(the full gate follows it\); its slowest step, [a-z.]+, took [0-9.]+ s" ||
 	fail "check.sh did not say the time of a merge past its budget: $out"
-rm -f "$g/.git/MERGE_HEAD"
-out=$(LOAD_1="$idle 160" LOAD_2="$idle 160" SLOW_STEP=lint GATE_BUDGET=0 gate) && fail "check.sh passed a work commit past its budget once the merge was over: $out"
-printf '%s\n' "$out" | grep -q "find what grew" || fail "check.sh did not fail a work commit past its budget once the merge was over: $out"
+[ ! -e "$unsteady" ] || fail "check.sh logged a merge's run past the budget a merge has not: $(cat "$unsteady")"
 for garbage in "not a commit" ""; do
-	printf '%s\n' "$garbage" >"$g/.git/MERGE_HEAD"
-	out=$(LOAD_1="$idle 160" LOAD_2="$idle 160" SLOW_STEP=lint GATE_BUDGET=0 gate) && fail "check.sh took an unreadable MERGE_HEAD ('$garbage') for a merge and let the budget off: $out"
-	printf '%s\n' "$out" | grep -q "find what grew" || fail "check.sh did not fail past its budget with an unreadable MERGE_HEAD ('$garbage'): $out"
+	printf '%s\n' "$garbage" >"$g/.git/MERGE_HEAD" && rm -f "$unsteady"
+	out=$(LOAD_1="$idle 160" LOAD_2="$idle 160" SLOW_STEP=lint GATE_BUDGET=0 gate) || fail "check.sh failed a run past its budget beside an unreadable MERGE_HEAD ('$garbage'): $out"
+	[ -s "$unsteady" ] || fail "check.sh took an unreadable MERGE_HEAD ('$garbage') for a merge and logged nothing: $out"
 done
-rm -f "$g/.git/MERGE_HEAD"
-# GATE_MERGE is read in a staged copy alone: in a repository, a caller's variable switches no budget off.
-out=$(GATE_MERGE=1 LOAD_1="$idle 160" LOAD_2="$idle 160" SLOW_STEP=lint GATE_BUDGET=0 gate) && fail "check.sh let GATE_MERGE=1 switch the budget off in a repository: $out"
+rm -f "$g/.git/MERGE_HEAD" "$unsteady"
+# GATE_MERGE is read in a staged copy alone: in a repository, a caller's variable makes no merge of a work commit.
+(GATE_MERGE=1 LOAD_1="$idle 160" LOAD_2="$idle 160" SLOW_STEP=lint GATE_BUDGET=0 gate) >/dev/null # a subshell: sh keeps a function's prefix assignments
+[ -s "$unsteady" ] || fail "check.sh let GATE_MERGE=1 make a merge of a work commit in a repository"
 c=$g.merge
 rm -rf "${c:?}" && cp -R "$g" "$c" && rm -rf "${c:?}/.git"
 out=$(g=$c GATE_MERGE=1 LOAD_1="$idle 160" LOAD_2="$idle 160" SLOW_STEP=lint GATE_BUDGET=0 gate) || fail "check.sh failed a staged copy of a merge past its budget: $out"
 printf '%s\n' "$out" | grep -q "which a merge commit has none of" || fail "check.sh did not say the time of a staged copy of a merge: $out"
-for v in 0 ""; do
-	out=$(g=$c GATE_MERGE=$v LOAD_1="$idle 160" LOAD_2="$idle 160" SLOW_STEP=lint GATE_BUDGET=0 gate) && fail "check.sh let a staged copy of a work commit (GATE_MERGE='$v') past its budget: $out"
-done
-# Every pass the machine's load excused is appended to the unsteady log, with its time and its two loads, which /pre-merge reads
-# (F2070: an agent ran the journeys beside its own commit to raise the load, and its slow commit passed as a busy machine's).
-unsteady=$g/.claude/tmp/unsteady.log
-rm -f "$unsteady" "$g/.claude/tmp/green-fast" "$g/.claude/tmp/gate-green"
-out=$(LOAD_1="$busy 160" LOAD_2="$((busy + 20)) 160" SLOW_STEP=lint GATE_BUDGET=0 gate) || fail "check.sh failed past its budget on a busy machine: $out"
-[ "$(grep -c "" "$unsteady")" = 1 ] || fail "check.sh did not log the pass a busy machine excused, once: $(cat "$unsteady" 2>&1)"
-grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]{8}Z	gate	' "$unsteady" && grep -q "over its 0 s budget" "$unsteady" && grep -q "load 17.0 then 19.0 on 16 cores" "$unsteady" && grep -q "slowest step" "$unsteady" ||
-	fail "the unsteady log lacks the time, the loads or the step of the pass a busy machine excused: $(cat "$unsteady")"
-# A pass under its budget, or one a merge needed no excuse for, logs nothing.
-rm -f "$unsteady" && gate >/dev/null && merge && LOAD_1="$busy 160" LOAD_2="$busy 160" SLOW_STEP=lint GATE_BUDGET=0 gate >/dev/null; rm -f "$g/.git/MERGE_HEAD"
-[ ! -e "$unsteady" ] || fail "check.sh logged a pass nothing excused: $(cat "$unsteady")"
-# A pass no one sees is not a pass: a log that cannot be written fails it.
-rm -rf "${unsteady:?}" "$g/.claude/tmp/green-fast" "$g/.claude/tmp/gate-green" && mkdir -p "$unsteady"
-out=$(LOAD_1="$busy 160" LOAD_2="$busy 160" SLOW_STEP=lint GATE_BUDGET=0 gate) && fail "check.sh passed a busy machine's slow run with a log it cannot write: $out"
+# A pass under its budget logs nothing.
+rm -f "$unsteady" && gate >/dev/null
+[ ! -e "$unsteady" ] || fail "check.sh logged a pass under its budget: $(cat "$unsteady")"
+# A pass no one sees is not a pass: a log that cannot be written fails it, and records nothing.
+rm -rf "${unsteady:?}" && rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/gate-green" && mkdir -p "$unsteady"
+out=$(LOAD_1="$busy 160" LOAD_2="$busy 160" SLOW_STEP=lint GATE_BUDGET=0 gate) && fail "check.sh passed a slow run with a log it cannot write: $out"
 printf '%s\n' "$out" | grep -q "cannot be written" || fail "check.sh did not say its unsteady log cannot be written: $out"
-[ ! -e "$g/.claude/tmp/green-fast" ] || fail "check.sh recorded a busy machine's pass it could not log"
+[ ! -e "$g/.claude/tmp/green-fast" ] || fail "check.sh recorded a slow pass it could not log"
 rm -rf "${unsteady:?}"
 # load.py reads the machine itself: its 1-minute load (the first of getloadavg's three) and its cores, in tenths.
 # Run on a machine of known numbers, so the minute's average, the 5- and 15-minute ones and the scale each tell apart (G4).
