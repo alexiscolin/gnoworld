@@ -20,7 +20,7 @@ const find = (places: ReturnType<typeof placesOf>) => (kind: string, universe: s
   places.find((p) => p.kind === kind && p.universe === universe && p.slug === slug);
 
 describe("placesOf", () => {
-  const places = placesOf(SOURCE);
+  const places = () => placesOf(SOURCE);
 
   it("gives the cosmos and the Earth to every universe, whatever the files hold", () => {
     expect(placesOf({ ...SOURCE, hubs: [], ecosystems: [], stations: [] }).map((p) => p.canonical)).toEqual(
@@ -29,21 +29,21 @@ describe("placesOf", () => {
   });
 
   it("puts every canonical under /net/<universe>, the default universe's too", () => {
-    expect(find(places)("world", "onyx", "bubble")?.canonical).toBe("/net/onyx/w/bubble");
-    expect(find(places)("world", "gnoland", "bubble")?.canonical).toBe("/net/gnoland/w/bubble");
-    expect(find(places)("ecosystem", "onyx", "tokens")?.canonical).toBe("/net/onyx/e/tokens");
+    expect(find(places())("world", "onyx", "bubble")?.canonical).toBe("/net/onyx/w/bubble");
+    expect(find(places())("world", "gnoland", "bubble")?.canonical).toBe("/net/gnoland/w/bubble");
+    expect(find(places())("ecosystem", "onyx", "tokens")?.canonical).toBe("/net/onyx/e/tokens");
   });
 
   it("makes a station a world: /w/<slug>", () => {
-    expect(find(places)("world", "gnoland", "moon")?.canonical).toBe("/net/gnoland/w/moon");
+    expect(find(places())("world", "gnoland", "moon")?.canonical).toBe("/net/gnoland/w/moon");
   });
 
   it("keeps the default universe's pages unprefixed and the others' under /net", () => {
-    expect(find(places)("cosmos", "onyx")?.path).toBe("/");
-    expect(find(places)("earth", "onyx")?.path).toBe("/earth");
-    expect(find(places)("world", "onyx", "bubble")?.path).toBe("/w/bubble");
-    expect(find(places)("world", "gnoland", "bubble")?.path).toBe("/net/gnoland/w/bubble");
-    expect(find(places)("cosmos", "gnoland")?.path).toBe("/net/gnoland/");
+    expect(find(places())("cosmos", "onyx")?.path).toBe("/");
+    expect(find(places())("earth", "onyx")?.path).toBe("/earth");
+    expect(find(places())("world", "onyx", "bubble")?.path).toBe("/w/bubble");
+    expect(find(places())("world", "gnoland", "bubble")?.path).toBe("/net/gnoland/w/bubble");
+    expect(find(places())("cosmos", "gnoland")?.path).toBe("/net/gnoland/");
   });
 
   it("is empty-proof: universes listed, no world, no ecosystem: the cosmos and the Earth alone", () => {
@@ -129,18 +129,19 @@ describe("placesOf", () => {
 });
 
 describe("placeAt", () => {
-  const places = placesOf(SOURCE);
+  const places = () => placesOf(SOURCE);
 
   it("finds a place by its path and by its canonical", () => {
-    const bubble = find(places)("world", "onyx", "bubble");
-    expect(placeAt(places, "/w/bubble")).toBe(bubble);
-    expect(placeAt(places, "/net/onyx/w/bubble")).toBe(bubble);
+    const all = places();
+    const bubble = find(all)("world", "onyx", "bubble");
+    expect(placeAt(all, "/w/bubble")).toBe(bubble);
+    expect(placeAt(all, "/net/onyx/w/bubble")).toBe(bubble);
   });
 
   it.each([["/W/bubble"], ["/w/Bubble"], ["/w/bubble/"], ["/w/nowhere"], ["/net/mars/"], [""], ["w/bubble"]])(
     "knows no place at %j (a world's path is lower case, F376 is 5d's)",
     (path) => {
-      expect(placeAt(places, path)).toBeUndefined();
+      expect(placeAt(places(), path)).toBeUndefined();
     },
   );
 });
