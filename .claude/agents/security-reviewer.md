@@ -1,6 +1,6 @@
 ---
 name: security-reviewer
-description: A fresh-context security review of a change that touches a tier-1 file (docs/REVIEW.md), beside /code-review. Use in /pre-merge after the test audit. Read-only.
+description: A fresh-context security review of a change that touches a tier-1 file or the harness (docs/REVIEW.md), beside the reviewer agent in /pre-merge. Read-only.
 tools: Read, Grep, Glob, Bash
 model: opus
 effort: high

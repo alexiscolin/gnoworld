@@ -4,8 +4,7 @@
 # would write into this one's. Its root node_modules is a real folder of links, one per package: a whole-folder link
 # hides them from borrow_node_modules.sh, so pre-commit's staged copy would find none. A workspace's node_modules is
 # copied as its links by borrow_node_modules.sh, so its @gnoworld links (relative) lead into the new tree, never this one's. Vite's caches are its
-# own, each tree writing them. StrykerJS's incremental file is seeded: a missing one ran all 9,045 mutants
-# (2026-10-26) where the branch's changes wanted a few dozen.
+# own, each tree writing them. StrykerJS's incremental file is the one the gate's every run shares (check.sh).
 set -eu
 [ $# = 3 ] || { echo "usage: sh scripts/worktree.sh <dir> <branch> <base>" >&2; exit 2; }
 dir=$1 branch=$2 base=$3
@@ -42,9 +41,5 @@ for entry in "$src"/node_modules/* "$src"/node_modules/.[!.]*; do
 	case $name in .vite | .vite-temp | '*' | '.[!.]*') continue ;; esac
 	if [ -L "$entry" ]; then cp -P "$entry" "$dir/node_modules/$name"; else ln -s "$entry" "$dir/node_modules/$name"; fi
 done
-if [ -f reports/stryker-incremental.json ]; then
-	mkdir -p "$dir/reports"
-	cp reports/stryker-incremental.json "$dir/reports/"
-fi
 echo "worktree.sh: $dir on $branch, from $base, its packages linked from $src"
 finished=1

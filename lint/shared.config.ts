@@ -39,7 +39,7 @@ export const CLASS_AT_END = {
 export const SWITCHED_OFF = {
   // Vitest's and Playwright's ways: skip, focus, leave for later, run on a condition, expect to fail.
   selector:
-    "MemberExpression[property.name=/^(only|skip|todo|skipIf|runIf|fixme)$/], MemberExpression[property.name='fail']:not([object.name=/^(expect|assert)$/])",
+    "MemberExpression[property.name=/^(only|skip|todo|skipIf|runIf|fixme|fails)$/], MemberExpression[property.name='fail']:not([object.name=/^(expect|assert)$/])",
   message: "A test is never switched off or focused: fix it, or remove it with `Removed-test:` in the commit.",
 };
 // No Map, WeakMap or Set made at a module's top in a workspace's source, nor inside what a top-level name holds:

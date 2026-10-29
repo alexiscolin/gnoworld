@@ -79,20 +79,6 @@ export default defineConfig(
       "no-restricted-syntax": ["error", ...SWALLOWED, CLASS_AT_END, SWITCHED_OFF],
     },
   },
-  {
-    // `fails` marks a test waiting for Alexis's code (pairing), which happens only in core.
-    files: TESTS,
-    ignores: ["packages/core/**"],
-    rules: {
-      "no-restricted-syntax": [
-        "error",
-        ...SWALLOWED,
-        CLASS_AT_END,
-        SWITCHED_OFF,
-        { selector: "MemberExpression[property.name='fails']", message: "`fails` is for pairing in core only." },
-      ],
-    },
-  },
   core,
   {
     // A bench is switched off like a test (security-S1). Last, since a later no-restricted-syntax replaces an earlier

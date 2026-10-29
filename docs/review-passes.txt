@@ -50,3 +50,4 @@
 2026-10-28 1396b71b28aee587533ea1e8337c28f8160e02a0 as a9070a41 (5ea26d53's full gate), plus F2126-F2129's four rows in docs/review/findings.md
 2026-10-28 1361c10d6d454e2bb73b457072b0d922857e6155 as a9070a41 (5ea26d53's full gate), plus ledger and decisions rows (F2126-F2132)
 2026-10-29 bc3c93f685663c2506dcbc17111f16486699eaa7 slice-4's integration and end: each branch's red pass and gate, the workspace reviews and their fixes, Alexis's deploy/test.sh fixes; check.sh --full on the final code (e533021a, 5236 s, harness_mutate in full)
+2026-10-29 fb7d1f48c14ab7181ea23b96d3e738cbd5f9ae69 reviewer, security-reviewer, test-auditor (two red passes)

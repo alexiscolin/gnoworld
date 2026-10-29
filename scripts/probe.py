@@ -74,7 +74,7 @@ LINT = [
     ("skipped.bench.ts", 'const describe = { skip: (name: string, f: () => void): string => name + String(f) };\n\ndescribe.skip("x", () => undefined);\n', "no-restricted-syntax: A test is never switched off"),
     ("focused.bench.tsx", 'const bench = { only: (name: string, f: () => void): string => name + String(f) };\n\nbench.only("x [1 ms]", () => undefined);\n', "no-restricted-syntax: A test is never switched off"),
     ("clean.bench.ts", 'const bench = (name: string, f: () => void): string => name + String(f);\n\nbench("x [1 ms]", () => undefined);\n', None),
-    ("pending.test.ts", 'import { expect, test } from "vitest";\n\ntest.fails("x", () => {\n  expect(1).toBe(2);\n});\n', None),
+    ("pending.test.ts", 'import { expect, test } from "vitest";\n\ntest.fails("x", () => {\n  expect(1).toBe(2);\n});\n', "no-restricted-syntax: A test is never switched off"),
     ("inline_disable.ts", "export function run(code: string): unknown {\n  // eslint-disable-next-line no-eval\n  return eval(code);\n}\n", "no-eval"),
     ("expect_error.ts", "// @ts-expect-error: the reason\nexport const n: number = \"x\";\n", "@typescript-eslint/ban-ts-comment"),
     ("catch_undefined.ts", "export function load(p: Promise<number>): Promise<number | undefined> {\n  return p.catch(() => undefined);\n}\n", "no-restricted-syntax: A .catch that returns undefined"),
@@ -464,9 +464,9 @@ try:
         shutil.rmtree(HERE)
 
     if part("outside_core"):
-        # Outside core: `fails` is refused (pairing happens only in core), and a swallowed error too.
+        # Outside core as in it: `fails` is refused (no pairing since slice 4), and a swallowed error too.
         lint = dict((n, c) for n, c, _ in LINT)
-        lint_cases([("pending.test.ts", 'import { expect, test } from "vitest";\n\ntest.fails("x", () => {\n  expect(1).toBe(2);\n});\n', "no-restricted-syntax: `fails` is for pairing"),
+        lint_cases([("pending.test.ts", 'import { expect, test } from "vitest";\n\ntest.fails("x", () => {\n  expect(1).toBe(2);\n});\n', "no-restricted-syntax: A test is never switched off"),
                     ("log_catch.ts", lint["log_catch.ts"], "no-restricted-syntax: A catch that only logs"),
                     # Every workspace's source, not core's, ui's and the server's alone: schemas too.
                     ("module_map.ts", lint["module_map.ts"], MODULE),
