@@ -359,7 +359,8 @@ EOF
 		step core_chromium # core's tests again in Chromium, whose engine reads some regexes and Unicode otherwise (F816)
 		CORE_CHROMIUM=1 node node_modules/vitest/vitest.mjs run --project core_chromium # vitest.config.ts opens it then alone
 		step stories # the design system's stories in a browser: axe, the invariants and the CSS jsdom cannot see
-		node app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts --reporter=dot
+		port=$(free_ports 1) # its own, as the pictures' lane: two worktrees' gates both took 6007 and one failed (2026-10-29)
+		STORIES_PORT=$port node app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts --reporter=dot
 	}
 	# The coverage lane's tools take half the machine each, the harness lane beside them the rest: at the machine's
 	# width, their load outlasted Ergo's 9 s auth script (F777).

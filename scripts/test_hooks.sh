@@ -172,7 +172,7 @@ assert "packages() { cat package.json app/package.json pnpm-lock.yaml | cksum; }
 assert at("copies=$(run copies") < at("installed=$(packages)") < at("node app/node_modules/@playwright/test/cli.js test") < at('[ "$(packages)" = "$installed" ]')
 PY
 # The full gate walks the stories: a command of its own, not a line that names it and runs nothing.
-grep -v '^[[:space:]]*#' "$gate_file" | grep -qE '^[[:space:]]*node app/node_modules/@playwright/test/cli\.js test -c app/playwright\.stories\.config\.ts( --[a-z]+(=[a-z]+)?)*$' ||
+grep -v '^[[:space:]]*#' "$gate_file" | grep -qE '^[[:space:]]*(STORIES_PORT=\$port )?node app/node_modules/@playwright/test/cli\.js test -c app/playwright\.stories\.config\.ts( --[a-z]+(=[a-z]+)?)*$' ||
 	fail "check.sh no longer walks the design system's stories in a browser"
 # One harness list, records.sh's: --full runs harness_mutate when a file of it changes, pre-push
 # wants each declared on main, merge.sh shows each first (F129); every file harness_mutate
@@ -2449,7 +2449,10 @@ base=$(git -C "$g" rev-parse HEAD)
 out=$(AUDIT_ANSWER=x PICTURES_OF=nothing STORIES_PORT=6007 STORIES_OUT=/elsewhere gate --full) || fail "check.sh --full failed on a copy whose every step passes: $out"
 # The stories' walk is every story's, whatever PICTURES_OF the environment carries, and the tokens comparison is the fast
 # gate's alone (F1190).
-grep -q '^stories port=[^ ]* of= on= out= test -c app/playwright.stories.config.ts' "$log" || fail "check.sh --full let its environment narrow or redirect the stories' walk: $(grep '^stories' "$log")"
+# Its file server takes a free port of its own run, as the tokens' pictures do, never the caller's 6007 nor the config's: two
+# worktrees' gates at once both took 6007, and one failed (slice-5c's and slice-5d's merge checks, 2026-10-29).
+grep -q '^stories port=[^ ]* of= on=[0-9][0-9]* out= test -c app/playwright.stories.config.ts' "$log" && ! grep -q '^stories .* on=6007 ' "$log" ||
+	fail "check.sh --full let its environment narrow or redirect the stories' walk, or gave it no port of its own: $(grep '^stories' "$log")"
 ran pictures && fail "check.sh --full compared the tokens story's pictures beside its whole walk"
 for s in $fast_steps py:probe py:bench core_chromium stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
 	[ "$s" = test ] || ran "$s" || fail "check.sh --full skipped $s"
