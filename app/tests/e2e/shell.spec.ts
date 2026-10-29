@@ -61,7 +61,7 @@ for (const width of WIDTHS) {
     };
 
     for (const path of PAGES) {
-      test(`${path}: the home link, the account and Log out share one header row`, async ({ page }) => {
+      test(`${path}: the home link, the search, the account and Log out share one header row`, async ({ page }) => {
         const address = await logInAt(page);
         await page.goto(path);
         await hydrated(page);
@@ -70,16 +70,23 @@ for (const width of WIDTHS) {
         await expect(account).toHaveText(`${address.slice(0, 6)}…${address.slice(-5)}`);
         // One row means the boxes share a middle: each one's centre lies inside the others' height.
         const boxes = await Promise.all(
-          [page.getByRole("link", { name: "gno.world" }), account, page.getByRole("button", { name: "Log out" })].map(
-            async (item) => {
-              await expect(item).toBeVisible();
-              return item.evaluate((element) => {
-                const { top, bottom } = element.getBoundingClientRect();
-                return { top, bottom };
-              });
-            },
-          ),
+          [
+            page.getByRole("link", { name: "gno.world" }),
+            page.getByRole("button", { name: /^Search/ }),
+            account,
+            page.getByRole("button", { name: "Log out" }),
+          ].map(async (item) => {
+            await expect(item).toBeVisible();
+            return item.evaluate((element) => {
+              const { top, bottom } = element.getBoundingClientRect();
+              return { top, bottom };
+            });
+          }),
         );
+        // The search control is the default control, 40 px with a mouse (44 by touch: search.spec.ts).
+        const search = await page.getByRole("button", { name: /^Search/ }).boundingBox();
+        expect(search?.width).toBeGreaterThanOrEqual(40);
+        expect(search?.height).toBeGreaterThanOrEqual(40);
         const middles = boxes.map(({ top, bottom }) => (top + bottom) / 2);
         expect(boxes.filter(({ top, bottom }) => middles.some((m) => m < top || m > bottom))).toEqual([]);
         // The header keeps to the gutter too, logged in.
@@ -149,7 +156,7 @@ for (const width of WIDTHS) {
     }
 
     // The test wallet is drawn at each server's start: its address, as wide as its letters, is
-    // replaced by one of the same length in the letters that fill the same width.
+    // replaced by one of the same length in letters of about the same width, so the header's row is one, as with the real one.
     test("the shell as it looks, logged out and logged in", async ({ page }) => {
       await page.goto("/");
       await hydrated(page);
@@ -158,7 +165,7 @@ for (const width of WIDTHS) {
       await page.goto("/");
       await hydrated(page);
       await page.getByTitle(address).evaluate((element) => {
-        element.textContent = "g1mmmm…mmmmm";
+        element.textContent = "g1xxxx…xxxxx";
       });
       await expect(page).toHaveScreenshot(`shell-in-${String(width)}.png`);
     });

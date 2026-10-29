@@ -46,3 +46,10 @@ export function searchItemsOf(site: ReturnType<typeof siteOf>): SearchItem[] {
     return { name, kind, universe, path };
   });
 }
+
+/** ⌘K on a Mac, Ctrl+K elsewhere, with no other modifier: a bare k, or Shift or Alt with it, is for the page. */
+export function opensPalette(
+  event: Pick<KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "shiftKey" | "altKey">,
+): boolean {
+  return event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey;
+}

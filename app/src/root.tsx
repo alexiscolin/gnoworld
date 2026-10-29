@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import { Link, Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
 import { PageError } from "./features/errors/index.ts";
 import { LoginControl } from "./features/login/index.ts";
+import { SearchPalette } from "./features/search/index.ts";
 import { UpdatePrompt } from "./features/update/index.ts";
 import { RouterLink } from "./routerLink.tsx";
 import { StoreProvider } from "./storeContext.tsx";
@@ -29,7 +30,7 @@ export function Layout({ children }: { children: ReactNode }) {
             <Center as="header" max="page" gutter="all">
               <Cluster justify="between">
                 <Link to="/">gno.world</Link>
-                {/* The search 5n adds sits here, between the home link and the account. */}
+                <SearchPalette />
                 <LoginControl />
               </Cluster>
             </Center>

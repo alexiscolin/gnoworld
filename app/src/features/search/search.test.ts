@@ -2,7 +2,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { FIXTURE } from "../../placesFixture.ts";
 import { siteOf } from "../../places.ts";
-import { searchItemsOf, searchPlaces, type SearchItem } from "./search.ts";
+import { opensPalette, searchItemsOf, searchPlaces, type SearchItem } from "./search.ts";
 
 // Slice 5's 5n: the palette's search, over the places the page holds already (no request, docs/plans/slice-5.md §1).
 const ITEMS: SearchItem[] = [
@@ -167,5 +167,23 @@ describe("searchItemsOf", () => {
     const named = items.filter((i) => i.kind === "cosmos" || i.kind === "earth");
     expect(named).toHaveLength(4);
     expect(new Set(named.map((i) => i.name)).size).toBe(4);
+  });
+});
+
+describe("opensPalette", () => {
+  const press = (key: string, modifiers: Partial<Record<"metaKey" | "ctrlKey" | "shiftKey" | "altKey", true>> = {}) =>
+    opensPalette({ key, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, ...modifiers });
+
+  it("is ⌘K and Ctrl+K, whatever the case of the k", () => {
+    expect(press("k", { metaKey: true })).toBe(true);
+    expect(press("k", { ctrlKey: true })).toBe(true);
+    expect(press("K", { ctrlKey: true })).toBe(true);
+  });
+
+  it("is no other key and no other chord: a bare k, Shift or Alt with it, another letter", () => {
+    expect(press("k")).toBe(false);
+    expect(press("k", { ctrlKey: true, shiftKey: true })).toBe(false);
+    expect(press("k", { metaKey: true, altKey: true })).toBe(false);
+    expect(press("j", { ctrlKey: true })).toBe(false);
   });
 });
