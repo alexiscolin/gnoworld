@@ -511,6 +511,22 @@ test.describe("a line's actions", () => {
     await expect(bars(page).filter({ visible: true })).toHaveCount(0);
   });
 
+  // F2165: a timed flash covers the page's top and moves nothing in it: no line's top changes as it comes or goes.
+  test("move no line when a timed flash comes and goes", async ({ page, context }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await room(page);
+    const top = () =>
+      lines(page)
+        .nth(1)
+        .evaluate((line) => line.getBoundingClientRect().top);
+    const before = await top();
+    await choose(page, 1, "Copy text");
+    await expect(flash(page, "Text copied.")).toBeVisible();
+    expect(await top()).toBe(before);
+    await expect(flash(page, "Text copied.")).toHaveCount(0, { timeout: 7000 });
+    expect(await top()).toBe(before);
+  });
+
   // /code-review: a room's flash stays in its room; gone at once, well before its own five seconds end it (G10).
   test("leave a room's flash behind when the room changes", async ({ page, context }) => {
     await copied(page, context);
