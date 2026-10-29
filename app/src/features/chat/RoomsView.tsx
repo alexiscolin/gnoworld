@@ -6,6 +6,7 @@ import type { RoomList } from "@gnoworld/schemas";
 import { useRef, type ReactNode } from "react";
 import { Button, Chip, Cluster, Icon, Row, Stack } from "@gnoworld/ui";
 import { dmHref, isAccount, roomHref, roomLabel, shortAddress } from "./names.ts";
+import { countWords } from "./unread.ts";
 import { RoomSections, RoomsNav } from "./RoomSections.tsx";
 import shared from "./lists.module.css";
 import styles from "./RoomsView.module.css";
@@ -49,9 +50,7 @@ export interface DmsProps {
 
 // What a row says it holds unseen: its count, 99+ past 99, as a mark after the link, so the link is named by the room alone.
 const badged = (count: number | undefined) =>
-  count === undefined || count < 1 ? undefined : (
-    <Chip tone="signal">{`${count > 99 ? "99+" : String(count)} unread`}</Chip>
-  );
+  count === undefined || count < 1 ? undefined : <Chip tone="signal">{`${countWords(count)} unread`}</Chip>;
 
 const WORDS = {
   mention: "mentioned you",

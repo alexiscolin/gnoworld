@@ -123,6 +123,8 @@ export interface RoomViewProps {
   onThread?: ((id: string) => void) | undefined;
   /** A thread is open in `aside`: a narrow room gives it the whole width (RoomView.module.css). */
   threaded?: boolean | undefined;
+  /** The control to the rooms, above the name, on a phone's screen (5b's drawer); none beside the rooms. */
+  rooms?: ReactNode;
   /** Puts a line's words in the composer to correct them, the reader's own (a direct message's). */
   onEdit?: ((id: string) => void) | undefined;
 }
@@ -173,9 +175,20 @@ export function People({ members, connected, me, onMessage }: PeopleProps) {
 }
 
 // A room's name and its description, its IRC topic; a conversation's partner and what it says of itself (4e).
-function Header({ title, topic, id }: { title: ReactNode; topic: ReactNode; id: string | undefined }) {
+function Header({
+  title,
+  topic,
+  id,
+  rooms,
+}: {
+  title: ReactNode;
+  topic: ReactNode;
+  id: string | undefined;
+  rooms: ReactNode;
+}) {
   return (
     <header>
+      {rooms}
       <h2>{title}</h2>
       {topic === undefined ? null : (
         <p id={id} className={styles["topic"]}>
@@ -195,7 +208,7 @@ export function RoomView(props: RoomViewProps) {
   const connected = chat === "connected";
   return (
     <Stack as="section" space="s">
-      <Header title={title} topic={note} id={noteId} />
+      <Header title={title} topic={note} id={noteId} rooms={props.rooms} />
       {modes}
       <p role="status" className={styles["status"]}>
         {connected ? null : NOTICES[chat]}

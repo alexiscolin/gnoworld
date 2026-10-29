@@ -15,22 +15,35 @@ const ACCOUNT = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 test.describe("a world's rooms, as they look", () => {
   test.use({ timezoneId: "UTC", locale: "en-GB" });
 
+  // #games as a guest sees it, at a width, once its first line shows.
+  async function asGuest(page: Page, width: number) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.routeWebSocket(/\/ws$/, (ergo) => {
+      scriptedErgo(ergo, GUEST);
+    });
+    await page.goto("/w/bubble?room=games");
+    await hydrated(page);
+    await expect(page.getByText("Who is up for a round of")).toBeVisible();
+  }
+
   for (const [screen, width] of [
     ["computer", 1280],
     ["phone", 390],
   ] as const) {
     test(`on a ${screen}'s screen`, async ({ page }) => {
-      await page.setViewportSize({ width, height: 900 });
-      await page.routeWebSocket(/\/ws$/, (ergo) => {
-        scriptedErgo(ergo, GUEST);
-      });
-      await page.goto("/w/bubble?room=games");
-      await hydrated(page);
-      await expect(page.getByText("Who is up for a round of")).toBeVisible();
+      await asGuest(page, width);
       await expect(page.getByRole("complementary", { name: "Who's here" })).toContainText("2 here");
       await expect(page).toHaveScreenshot(`rooms-${screen}.png`);
     });
   }
+
+  // Slice 5's 5b: on a phone the rooms sit behind the Rooms control, in a drawer over the conversation.
+  test("with the rooms' drawer open, on a phone's screen", async ({ page }) => {
+    await asGuest(page, 390);
+    await page.getByRole("button", { name: "Rooms" }).click();
+    await expect(page.getByRole("dialog", { name: "Rooms" })).toBeVisible();
+    await expect(page).toHaveScreenshot("rooms-drawer-phone.png");
+  });
 
   // The test wallet is drawn at each server's start: the header, which names it, is masked.
   test("with the composer, a line being written, on a computer's screen", async ({ page }) => {
