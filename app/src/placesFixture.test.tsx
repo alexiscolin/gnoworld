@@ -177,10 +177,8 @@ describe("a world of another universe", () => {
 });
 
 describe("the page that lists the places", () => {
-  test("hands the data's genres to the list, which then offers them as toggles", async () => {
+  test("lists the places of every universe, as links to their pages", async () => {
     const html = await render({ path: "/list", Component: List }, "/list");
-    expect(html).toContain('aria-label="Genres"');
-    expect(html).toMatch(/<button [^>]*aria-pressed="false"[^>]*>Game<\/button>/);
     expect(html).toMatch(/href="\/net\/gnoland\/w\/other"/);
     expect(html).toMatch(/href="\/e\/tokens"/);
   });
