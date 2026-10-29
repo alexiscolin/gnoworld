@@ -131,11 +131,19 @@
     margin-inline: auto;
   }
 
+  .center[data-gutter="all"] {
+    padding-block: var(--_space);
+  }
+
   .center[data-max="measure"] {
     --_max: var(--measure);
   }
 
   .center[data-max="dialog"] {
     --_max: var(--dialog-w);
+  }
+
+  .center[data-max="page"] {
+    --_max: none;
   }
 }

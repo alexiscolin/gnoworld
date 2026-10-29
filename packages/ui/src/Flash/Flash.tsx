@@ -63,6 +63,7 @@ function Pill({ message, onClose }: { message: FlashMessage; onClose: () => void
     <div
       ref={pillRef}
       popover="manual"
+      data-stays={action === undefined ? undefined : ""}
       className={surface(styles["flash"])}
       onPointerEnter={() => {
         setPointed(true);
