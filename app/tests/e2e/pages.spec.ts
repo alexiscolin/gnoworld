@@ -4,8 +4,20 @@ import { expect, hydrated, reactMark, test, type Page } from "./fixtures.ts";
 
 // The pages slice 1 pre-renders (ADR-0002 §2), with the address each names as its own.
 const pages = [
-  { path: "/", title: "gno.world", heading: "gno.world", canonical: "https://gno.world/" },
-  { path: "/w/bubble", title: "Bubble · gno.world", heading: "Bubble", canonical: "https://gno.world/w/bubble" },
+  { path: "/", title: "gno.world", heading: "gno.world", canonical: "https://gno.world/net/onyx/" },
+  {
+    path: "/w/bubble",
+    title: "Bubble · gno.world",
+    heading: "Bubble",
+    canonical: "https://gno.world/net/onyx/w/bubble",
+  },
+  { path: "/net/onyx/", title: "gno.world", heading: "gno.world", canonical: "https://gno.world/net/onyx/" },
+  {
+    path: "/net/onyx/w/bubble",
+    title: "Bubble · gno.world",
+    heading: "Bubble",
+    canonical: "https://gno.world/net/onyx/w/bubble",
+  },
 ];
 // Paths no file answers: an unknown world, and paths that match no route at all.
 const notFound = [
@@ -85,7 +97,7 @@ test.describe("as a search engine reads it, before any script runs", () => {
 
   test("a world's page names the same canonical with a trailing slash", async ({ page }) => {
     await page.goto("/w/bubble/");
-    expect(await tag(page, 'link[rel="canonical"]')).toBe("https://gno.world/w/bubble");
+    expect(await tag(page, 'link[rel="canonical"]')).toBe("https://gno.world/net/onyx/w/bubble");
   });
 
   test("a path no file answers is not pre-rendered: the host answers 404", async ({ request }) => {
@@ -131,8 +143,8 @@ test.describe("once the client takes over", () => {
       url: "/w/bubble",
       title: "Bubble · gno.world",
     });
-    expect(await tag(page, 'link[rel="canonical"]')).toBe("https://gno.world/w/bubble");
-    expect(await tag(page, 'meta[property="og:url"]')).toBe("https://gno.world/w/bubble");
+    expect(await tag(page, 'link[rel="canonical"]')).toBe("https://gno.world/net/onyx/w/bubble");
+    expect(await tag(page, 'meta[property="og:url"]')).toBe("https://gno.world/net/onyx/w/bubble");
     await expect(page.locator('meta[name="description"]')).toHaveCount(1);
   });
 
@@ -238,7 +250,7 @@ test("the React Compiler compiled the routes, not only React's own runtime", asy
   // own built-in one only lists it (`c:function`).
   const texts = await Promise.all(chunks.map(async (chunk) => (await request.get(chunk)).text()));
   expect(texts.some((text) => /\.c=function\(\w+\)\{return \w+\.H\.useMemoCache\(\w+\)\}/.test(text))).toBe(true);
-  const routes = chunks.filter((chunk) => /\/assets\/(root|home)-/.test(chunk));
+  const routes = chunks.filter((chunk) => /\/assets\/(root|home-main)-/.test(chunk));
   expect(routes.length).toBeGreaterThan(0);
   for (const chunk of routes) {
     expect(await (await request.get(chunk)).text(), chunk).toContain("react.memo_cache_sentinel");

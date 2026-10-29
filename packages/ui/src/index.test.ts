@@ -11,6 +11,7 @@ const unstyled: { [Name in keyof Exported]: Unstyled<ComponentProps<Exported[Nam
   Button: true,
   ActivityChart: true,
   Avatar: true,
+  Breadcrumb: true,
   Card: true,
   Center: true,
   Chip: true,
@@ -50,6 +51,7 @@ it("exports every component of the design system, and nothing else", () => {
     [
       "ActivityChart",
       "Avatar",
+      "Breadcrumb",
       "Button",
       "Card",
       "Center",

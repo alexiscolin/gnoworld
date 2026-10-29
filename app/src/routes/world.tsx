@@ -1,39 +1,40 @@
-// A world's page: pre-rendered for each known world; any other name gets this route's not-found.
-import {
-  isRouteErrorResponse,
-  useLoaderData,
-  useRouteError,
-  type ClientLoaderFunctionArgs,
-  type LoaderFunctionArgs,
-  type MetaArgs,
-} from "react-router";
+// A world's page: pre-rendered for each known world, at its path and at its canonical address; any other path gets this
+// route's not-found. The world is found by the request's path as written: its case is part of the address (F376).
+import { useLoaderData, useRouteError, type MetaArgs } from "react-router";
+import { Breadcrumb } from "@gnoworld/ui";
 import { failedWorldMeta, worldMeta } from "../meta.ts";
-import { findWorld } from "../places.ts";
+import { pageOf, site } from "../places.ts";
 import { Chat } from "../features/chat/index.ts";
-import { PageError } from "../features/errors/index.ts";
+import { isMissing, PageError } from "../features/errors/index.ts";
 
-export function loader({ params }: LoaderFunctionArgs) {
-  return findWorld(params["world"]);
+export function loader({ request }: { request: Request }) {
+  return site.world(pageOf(request));
 }
 
-// The list ships with the client, so the browser fetches no world: an unknown name is a 404
-// here, not a request the static host answers with its fallback page.
-export function clientLoader({ params }: ClientLoaderFunctionArgs) {
-  return findWorld(params["world"]);
+// The list ships with the client, so the browser fetches no world: an unknown path is a 404 here, not a request the
+// static host answers with its fallback page. React Router 8.4.0 drops `caseSensitive` on the client: `site.world`
+// reads the path itself.
+export function clientLoader({ request }: { request: Request }) {
+  return site.world(request);
 }
 
 export function meta({ loaderData, error }: MetaArgs<typeof loader>) {
   return loaderData || isMissing(error) ? worldMeta(loaderData) : failedWorldMeta();
 }
 
-function isMissing(error: unknown): boolean {
-  return isRouteErrorResponse(error) && error.status === 404;
-}
-
 export default function World() {
   const world = useLoaderData<typeof loader>();
+  const universe = site.home(world);
   return (
     <>
+      <Breadcrumb
+        label="You are here"
+        items={[
+          { label: universe.name, href: universe.home.path },
+          { label: "Earth", href: universe.earth.path },
+          { label: world.name },
+        ]}
+      />
       <h1>{world.name}</h1>
       <p>{world.description}</p>
       <Chat world={world.slug} />

@@ -4,6 +4,7 @@
 import "./styles.css";
 export { ActivityChart, type ActivityChartProps } from "./ActivityChart/ActivityChart.tsx";
 export { Avatar, type AvatarProps } from "./Avatar/Avatar.tsx";
+export { Breadcrumb, type BreadcrumbProps } from "./Breadcrumb/Breadcrumb.tsx";
 export { Button, type ButtonProps } from "./Button/Button.tsx";
 export { IconButton, type IconButtonProps } from "./Button/IconButton.tsx";
 export { Card, type CardHeaderProps, type CardProps } from "./Card/Card.tsx";

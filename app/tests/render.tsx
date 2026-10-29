@@ -3,6 +3,9 @@
 import { LinkProvider, type PageLinkProps } from "@gnoworld/ui";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createStaticHandler, createStaticRouter, StaticRouterProvider, type RouteObject } from "react-router";
+import type { PlaceKind } from "@gnoworld/core";
+import { expect } from "vitest";
+import { site } from "../src/places.ts";
 import { StoreProvider } from "../src/storeContext.tsx";
 
 async function query(route: RouteObject, path: string) {
@@ -48,4 +51,18 @@ export function alertOf(html: string): string {
     if (depth === 0) return html.slice(from, from + tag.index);
   }
   return "";
+}
+
+/** The browser's loader gives every pre-rendered page of a kind, at its path and its canonical one, what the build's does. */
+export function expectClientAsBuild(
+  kind: PlaceKind,
+  client: (args: { request: Request }) => unknown,
+  build: (args: { request: Request }) => unknown,
+): void {
+  const paths = site.places.filter((place) => place.kind === kind).flatMap((place) => [place.path, place.canonical]);
+  expect(paths.length).toBeGreaterThan(0);
+  for (const path of paths) {
+    const request = new Request(`https://gno.world${path}`);
+    expect(client({ request }), path).toEqual(build({ request }));
+  }
 }

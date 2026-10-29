@@ -6,8 +6,30 @@ import { GUARDED, UPDATING } from "./sites.ts";
 // updates that wait for a click, `?nosw`. (Chromium's installability check answers nothing here: not used.)
 const HASHED = /^\/assets\/[\w.-]+-[\w-]{8}\.(js|css|woff2)$/;
 // What the build's shell holds beside its hashed files: each page, the fallback for a path the build never made,
-// the world's data, the manifest and the icon the pages link.
-const SHELL = ["/", "/__spa-fallback.html", "/icon.svg", "/manifest.webmanifest", "/w/bubble", "/w/bubble.data"];
+// each page's data, the manifest and the icon the pages link.
+const SHELL = [
+  "/",
+  "/_.data",
+  "/__spa-fallback.html",
+  "/earth",
+  "/earth.data",
+  "/icon.svg",
+  "/list",
+  "/list.data",
+  "/manifest.webmanifest",
+  "/net/gnoland",
+  "/net/gnoland/_.data",
+  "/net/gnoland/earth",
+  "/net/gnoland/earth.data",
+  "/net/onyx",
+  "/net/onyx/_.data",
+  "/net/onyx/earth",
+  "/net/onyx/earth.data",
+  "/net/onyx/w/bubble",
+  "/net/onyx/w/bubble.data",
+  "/w/bubble",
+  "/w/bubble.data",
+];
 const VERSION = /^gnoworld-precache-[A-Za-z0-9]{16}$/;
 const RECORD = /^gnoworld-precache-active-[A-Za-z0-9]{16}-(?:none|[A-Za-z0-9]{16})$/;
 

@@ -179,24 +179,52 @@ describe("react-router build", () => {
   });
 
   // The positive control: the data drives the pages. A build that ignored GNOWORLD_DATA, or kept a list in the config,
-  // would write bubble alone; a config that failed on every build would write nothing.
-  it("writes the home and the page of each world of the default universe, and no other", { timeout: 120_000 }, () => {
+  // would write bubble alone; a config that failed on every build would write nothing. 5d: each place has its page, at its
+  // path and at its canonical address: a world of another universe, the Earth of each universe, an ecosystem, the list.
+  it("writes the page of each place, at its path and its canonical address, and the list", { timeout: 120_000 }, () => {
     const dir = plant((files) => {
       const hubs = files["hubs.json"] as Record<string, unknown>[];
       hubs.push({ ...hubs[0], slug: "mars", name: "Mars" });
       hubs.push({ ...hubs[0], slug: "other", name: "Other", universe: "gnoland" });
+      files["ecosystems.json"] = [
+        { slug: "tokens", name: "Tokens", description: "The tokens of the chain.", universe: "onyx" },
+      ];
     });
     try {
       const run = build(dir);
       expect(run.status, `${run.stdout}${run.stderr}`).toBe(0);
       const client = join(copy, "build", "client");
-      expect(existsSync(join(client, "index.html"))).toBe(true);
-      expect(existsSync(join(client, "w", "bubble", "index.html"))).toBe(true);
-      expect(readFileSync(join(client, "w", "mars", "index.html"), "utf8")).toContain("<h1>Mars</h1>");
-      // A world of another universe has no page until 5d; the data's order is not a page.
+      const page = (...path: string[]) => readFileSync(join(client, ...path, "index.html"), "utf8");
+      const pages: [string[], string, string][] = [
+        [[], "gno.world", "/net/onyx/"],
+        [["w", "bubble"], "Bubble", "/net/onyx/w/bubble"],
+        [["w", "mars"], "Mars", "/net/onyx/w/mars"],
+        [["net", "onyx"], "gno.world", "/net/onyx/"],
+        [["net", "onyx", "w", "mars"], "Mars", "/net/onyx/w/mars"],
+        [["net", "gnoland"], "gno.land", "/net/gnoland/"],
+        [["net", "gnoland", "w", "other"], "Other", "/net/gnoland/w/other"],
+        [["earth"], "Earth", "/net/onyx/earth"],
+        [["net", "onyx", "earth"], "Earth", "/net/onyx/earth"],
+        [["net", "gnoland", "earth"], "Earth", "/net/gnoland/earth"],
+        [["e", "tokens"], "Tokens", "/net/onyx/e/tokens"],
+        [["net", "onyx", "e", "tokens"], "Tokens", "/net/onyx/e/tokens"],
+        [["list"], "Places", "/list"],
+      ];
+      for (const [path, heading, canonical] of pages) {
+        const html = page(...path);
+        const where = path.join("/") || "/";
+        expect(html, where).toContain(`<h1>${heading}</h1>`);
+        expect(html, where).toContain(`<link rel="canonical" href="https://gno.world${canonical}"/>`);
+      }
+      // The home lists the worlds of its universe alone, and the data's order is not a page.
+      expect(page()).toContain(">Mars</a>");
+      expect(page()).not.toContain(">Other</a>");
       expect(existsSync(join(client, "w", "other"))).toBe(false);
-      expect(existsSync(join(client, "net"))).toBe(false);
-      expect(readFileSync(join(client, "index.html"), "utf8")).toContain(">Mars</a>");
+      expect(existsSync(join(client, "e", "other"))).toBe(false);
+      // csp.ts's one header line holds every page's hashes: a host may cut a _headers line past 2,000 characters, and
+      // each world now writes two pages in the default universe. This set has three worlds and an ecosystem.
+      const headers = readFileSync(join(client, "_headers"), "utf8").split("\n")[1] ?? "";
+      expect(headers.length, "the _headers policy line").toBeLessThan(2000);
     } finally {
       rmSync(dir, { recursive: true });
     }
