@@ -115,7 +115,8 @@ EOF
 fi
 $all && ts=true app=true gno=true related=false
 budget=120 # s, for everything (Alexis, 2026-10-28: 75 refused a harness commit on a half-busy machine; 60 before 2026-10-27); for a run scoped to a change, 30
-$all || budget=30
+# A run that builds the app runs every journey, the work of a run of everything: 73-96 s on a quiet machine (slice-5a, F2162).
+$all || $app || budget=30
 [ "${GATE_BUDGET:-$budget}" -lt "$budget" ] 2>/dev/null && budget=$GATE_BUDGET # a test lowers it; nothing raises it
 tests_scope=
 $related && tests_scope="--changed --passWithNoTests"
