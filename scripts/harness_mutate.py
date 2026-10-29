@@ -838,6 +838,7 @@ def mutants():
         ('harness --quiet "$base" && return 0', 'true && return 0', "--full mutates a changed harness"),
         ("\tfinish $($product && echo stories) history || {\n", "\t: || {\n", "--full fails when the stories or the history lane did"),
         ("*) product=true ;; esac", "*) ;; esac", "--merge judges the product for any path it cannot place"),
+        ("\t\tSTORIES_PORT=$port node app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts", "\t\tnode app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts", "the stories' walk takes a free port of its own"),
         ("\t\tproduct=false\n", "", "--merge skips the product's lanes with no product code"),
         ('changes=$(git -c core.quotePath=false diff --no-renames --name-only', 'changes=$(git -c core.quotePath=false diff --name-only', "--merge reads product code renamed away as a change of the product"),
         ('-- && git -c core.quotePath=false ls-files --others --exclude-standard)', '--)', "--merge reads an untracked product file as a change of the product"),
