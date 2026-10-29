@@ -2019,7 +2019,9 @@ reset
 # A new TypeScript file of the app, untracked: the app's journeys and the related tests; the journeys
 # after every reader of the build's output (F082); gno still not.
 printf 'x\n' >"$g/app/src/b.tsx"
-gate >/dev/null || fail "check.sh failed on a new app file"
+out=$(gate) || fail "check.sh failed on a new app file: $out"
+# The app's step builds it and runs every journey, the work of a run of everything: its budget (slice-5a, F2162).
+printf '%s\n' "$out" | grep -q "(budget 120 s)$" || fail "check.sh gave a run that builds the app another budget than 120 s: $out"
 scoped "a new app file" $cheap typecheck lint test playwright - gno sh:test_hooks
 grep -q '^test .*--changed' "$log" || fail "check.sh did not run only the tests an app change touches"
 for s in unused copies comments py:check_css; do before "$s" playwright || fail "check.sh built the app before $s read the tree (F082)"; done

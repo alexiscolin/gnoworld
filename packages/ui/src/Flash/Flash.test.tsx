@@ -75,6 +75,15 @@ describe("Flash", () => {
     vi.useRealTimers();
   });
 
+  // F2165: the body's room for a flash was claimed by every flash, so a timed one shifted the page twice.
+  it("marks only a flash that stays (one with an action) as one the page makes room for", () => {
+    const { rerender } = render(<Flash message={saved} onClose={vi.fn()} />);
+    expect(document.querySelector(".flash[data-stays]")).toBeNull();
+    expect(document.querySelector("[popover]")?.hasAttribute("data-stays")).toBe(false);
+    rerender(<Flash message={{ title: "Update", action: { label: "Reload", onAction: vi.fn() } }} onClose={vi.fn()} />);
+    expect(document.querySelector("[popover]")?.hasAttribute("data-stays")).toBe(true);
+  });
+
   it("is a status region on the page from the start, empty while it has nothing to say: no text, no button", () => {
     const { container } = render(<Flash message={null} onClose={vi.fn()} />);
     expect(screen.getByRole("status").textContent).toBe("");

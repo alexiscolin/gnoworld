@@ -111,9 +111,9 @@ gate fails, run the failing lane alone before running the whole gate again.
 | A fast run's change | What runs beside the cheap checks (format, knip, jscpd, CSS, comments, check_docs) | Budget |
 |---|---|---|
 | `server/src` | tsc, ESLint, every Vitest test (`main.test.ts` runs the server as a child process, outside Vitest's module graph) | 30 s |
-| the TypeScript of `app/src`, `app/tests`, `packages/ui/src` | tsc, ESLint, Vitest's tests related to the change (`--changed`), the app's journeys | 30 s |
-| `packages/core/src`, or any other file of those folders (a fixture, a stylesheet) | tsc, ESLint, every Vitest test, the app's journeys | 30 s |
-| `packages/ui/src/tokens.css` | as above, and the tokens story's pictures at their three widths (F1190) | 30 s |
+| the TypeScript of `app/src`, `app/tests`, `packages/ui/src` | tsc, ESLint, Vitest's tests related to the change (`--changed`), the app's journeys | 120 s (the app's journeys, F2162) |
+| `packages/core/src`, or any other file of those folders (a fixture, a stylesheet) | tsc, ESLint, every Vitest test, the app's journeys | 120 s (the app's journeys, F2162) |
+| `packages/ui/src/tokens.css` | as above, and the tokens story's pictures at their three widths (F1190) | 120 s |
 | `gno/` | the gno lane | 30 s |
 | anything else (a config, the lockfile, the harness, `packages/schemas`, `deploy/`), no change at all, or pre-commit's staged copy | everything | 120 s |
 
