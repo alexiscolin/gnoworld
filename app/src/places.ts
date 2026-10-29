@@ -78,6 +78,9 @@ export function siteOf(source: Source) {
     get genres() {
       return get().genres;
     },
+    get universes() {
+      return get().views;
+    },
     /** The world a request names. */
     world: (request: Request): World => get().world(request),
     /** The ecosystem a request names. */
@@ -149,6 +152,7 @@ function build(source: Source) {
 
   return {
     places,
+    views,
     worlds,
     ecosystems: ecosystemList,
     genres: source.genres,
