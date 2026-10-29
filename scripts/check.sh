@@ -334,13 +334,13 @@ fi
 if $full; then
 	base=$(git merge-base HEAD origin/main) || { echo "check.sh --full: needs origin/main to compare with (git fetch)" >&2; exit 1; }
 	# A merge's own gate judges the product when its change since main holds some (Alexis, 2026-10-29): docs, the harness and
-	# the lint alone have no coverage, mutant or fix of the product to judge, which took 40 of its 47 minutes. --full judges all.
+	# the linters' configs alone have no coverage, mutant or fix of the product to judge, which took 40 of its 47 minutes. --full judges all.
 	product=true
 	if $merge; then
 		product=false
 		changes=$(git -c core.quotePath=false diff --no-renames --name-only "$base" -- && git -c core.quotePath=false ls-files --others --exclude-standard)
 		while IFS= read -r path; do
-			case $path in '' | docs/* | adr/* | *.md | scripts/* | .githooks/* | .claude/* | .github/* | lint/* | eslint.config.ts) ;; *) product=true ;; esac
+			case $path in '' | docs/* | adr/* | *.md | scripts/* | .githooks/* | .claude/* | .github/* | lint/* | eslint.config.ts | knip.json | .jscpd.json | .prettierrc.json | .prettierignore) ;; *) product=true ;; esac
 		done <<EOF
 $changes
 EOF

@@ -18,7 +18,8 @@ const FACE = { ...BASELINE_ALSO, allowProperties: ["forced-color-adjust"] };
 
 export default defineConfig(
   includeIgnoreFile(`${import.meta.dirname}/.gitignore`),
-  globalIgnores(["docs/", "gno/"]),
+  // Workflow scripts are bodies Claude Code runs, with an export and a return at their top: no JavaScript parser reads them.
+  globalIgnores(["docs/", "gno/", ".claude/workflows/"]),
   // A rule is changed in this file, with its reason, never switched off in a comment.
   { linterOptions: { noInlineConfig: true, reportUnusedDisableDirectives: "error" } },
   {

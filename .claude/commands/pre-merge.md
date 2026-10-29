@@ -6,7 +6,9 @@ Run the review before merging the current branch (base: $ARGUMENTS, or `main` if
 Follow `docs/REVIEW.md` ("AI review before a merge"). Never merge, push, rebase, skip a hook,
 or edit a test to make it pass. Claude runs every step itself, through the real commands and
 agents, in this order; it never hands a step to Alexis, and never stands in for a command.
-A branch's Workflow loop runs these steps; the chief session runs them on the slice's last merge.
+A branch's Workflow `branch` (`.claude/workflows/branch.js`) runs steps 1, 3, 4 and 5 and returns its low findings, the
+lines that loosen the net and its tokens; the branch session then runs steps 2 and 6 to 9. The chief session runs them all
+on the slice's last merge.
 
 1. **No tokens first.** Run `scripts/check.sh --merge` (the full gate's lanes, with the harness
    mutants of the guard files the branch changed). If it fails, run the failing lane alone, fix,
