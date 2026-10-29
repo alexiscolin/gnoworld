@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
-import { BACK_HOME, alertOf, render } from "../../tests/render.tsx";
-import Home, { ErrorBoundary, loader } from "./home.tsx";
+import { BACK_HOME, alertOf, expectClientAsBuild, render } from "../../tests/render.tsx";
+import Home, { clientLoader, ErrorBoundary, loader } from "./home.tsx";
 
 test("home links to each world by its name, at the world's path", async () => {
   const html = await render({ path: "/", Component: Home, loader }, "/");
@@ -30,4 +30,9 @@ test("home's way out of a failure loads the document again", async () => {
   const alert = alertOf(await render(failing, "/", { slot: true }));
   expect(alert).toMatch(BACK_HOME);
   expect(alert).not.toContain("data-routed");
+});
+
+// The browser serves the pages the build wrote, from the same data (F2208).
+test("the browser's loader gives each pre-rendered home what the build's does", () => {
+  expectClientAsBuild("cosmos", clientLoader, loader);
 });

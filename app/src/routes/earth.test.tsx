@@ -1,7 +1,7 @@
 import { isRouteErrorResponse, type MetaArgs, type RouteObject } from "react-router";
 import { describe, expect, test } from "vitest";
-import { render, routeError } from "../../tests/render.tsx";
-import Earth, { ErrorBoundary, loader, meta } from "./earth.tsx";
+import { expectClientAsBuild, render, routeError } from "../../tests/render.tsx";
+import Earth, { clientLoader, ErrorBoundary, loader, meta } from "./earth.tsx";
 
 const route = (path: string): RouteObject => ({ path, Component: Earth, loader, ErrorBoundary });
 const canonical = (tags: ReturnType<typeof meta>) =>
@@ -65,4 +65,9 @@ describe("the Earth's page", () => {
     expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/"[^>]*>gno\.land<\/a>/);
     expect(html).toMatch(/aria-current="page"[^>]*>Earth</);
   });
+});
+
+// The browser serves the pages the build wrote, from the same data (F2208).
+test("the browser's loader gives each pre-rendered earth what the build's does", () => {
+  expectClientAsBuild("earth", clientLoader, loader);
 });
