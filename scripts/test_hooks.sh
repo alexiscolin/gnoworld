@@ -1934,8 +1934,9 @@ echo "done $n" >>"$GATE_LOG"
 exit 0
 SH
 for tool in go gofmt; do printf '#!/bin/sh\nexec sh "%s" %s "$@"\n' "$step" "$tool" >"$g/bin/$tool"; done
-# python3, which fails check.sh's free_ports (its one script that says "in 200 tries") when PORTS_FAIL is set, as a machine with no free port would.
-printf '#!/bin/sh\ncase "$*" in *"free ports in 200 tries"*) [ -z "${PORTS_FAIL:-}" ] || { echo "check.sh: no run of free ports (stub)" >&2; exit 1; } ;; esac\nexec "%s" "$@"\n' "$(command -v python3)" >"$g/bin/python3"
+# python3, which fails check.sh's free_ports (its one script that says "in 200 tries") when PORTS_FAIL is set, as a machine with no free port would;
+# PORTS_FAIL_ONE fails only an ask for one port (the stories' and the pictures'), the journeys' three still found.
+printf '#!/bin/sh\ncase "$*" in *"free ports in 200 tries"*) [ -z "${PORTS_FAIL:-}" ] || { echo "check.sh: no run of free ports (stub)" >&2; exit 1; }; [ -z "${PORTS_FAIL_ONE:-}" ] || case "$*" in *" 1") echo "check.sh: no run of 1 free ports (stub)" >&2; exit 1 ;; esac ;; esac\nexec "%s" "$@"\n' "$(command -v python3)" >"$g/bin/python3"
 chmod +x "$g/bin/python3"
 printf '#!/bin/sh\nexec sh "%s" gno "$@"\n' "$step" >"$g/toolchain/gno"
 chmod +x "$g/bin/go" "$g/bin/gofmt" "$g/toolchain/gno"
@@ -2375,6 +2376,10 @@ c=$g.merge
 rm -rf "${c:?}" && cp -R "$g" "$c" && rm -rf "${c:?}/.git"
 out=$(g=$c GATE_MERGE=1 LOAD_1="$idle 160" LOAD_2="$idle 160" SLOW_STEP=lint GATE_BUDGET=0 gate) || fail "check.sh failed a staged copy of a merge past its budget: $out"
 printf '%s\n' "$out" | grep -q "which a merge commit has none of" || fail "check.sh did not say the time of a staged copy of a merge: $out"
+for v in 0 ""; do
+	out=$(g=$c GATE_MERGE=$v LOAD_1="$idle 160" LOAD_2="$idle 160" SLOW_STEP=lint GATE_BUDGET=0 gate) || fail "check.sh failed a staged copy of a work commit past its budget: $out"
+	printf '%s\n' "$out" | grep -q "passed, and logged for /pre-merge" || fail "check.sh took a staged copy of a work commit (GATE_MERGE='$v') for a merge: $out"
+done
 # A pass under its budget logs nothing.
 rm -f "$unsteady" && gate >/dev/null
 [ ! -e "$unsteady" ] || fail "check.sh logged a pass under its budget: $(cat "$unsteady")"
@@ -2578,6 +2583,11 @@ gate --merge >/dev/null && ran mutate || fail "check.sh --merge read deleted pro
 git -C "$g" reset -q --hard "$base" && printf 'x\n' >"$g/app/src/new.ts"
 gate --merge >/dev/null && ran mutate || fail "check.sh --merge read an untracked product file as no product"
 reset
+# The stories' lane asks free_ports for its port: when that fails, the lane fails before Playwright starts (R2's rule, for the port
+# of d11330a3), and the gate says which lane.
+out=$(PORTS_FAIL_ONE=1 gate --full) && fail "check.sh --full passed with no free port for the stories: $out"
+printf '%s\n' "$out" | grep -q "lane stories failed at stories" || fail "check.sh --full did not fail the stories' lane when free_ports failed: $out"
+grep -q '^stories ' "$log" && fail "check.sh --full started the stories with no free port"
 # No origin/main to compare with: --full fails, saying so.
 git -C "$g" update-ref -d refs/remotes/origin/main
 out=$(gate --full) && fail "check.sh --full passed with no origin/main"

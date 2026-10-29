@@ -21,6 +21,7 @@
     "!server/src/testing/**"
   ],
   "incremental": true,
+  "dryRunTimeoutMinutes": 20,
   "ignoreStatic": true,
   "htmlReporter": {
     "fileName": "reports/mutation/index.html"
