@@ -1,7 +1,7 @@
 // The document shell every page shares, and the boundary for an error no route caught.
 // First: no schema may be built before Zod is told not to compile (lib/jitless.ts).
 import "./lib/jitless.ts";
-import { LinkProvider } from "@gnoworld/ui";
+import { Center, Cluster, LinkProvider } from "@gnoworld/ui";
 import "@gnoworld/ui/styles.css";
 import type { ReactNode } from "react";
 import { Link, Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
@@ -26,11 +26,16 @@ export function Layout({ children }: { children: ReactNode }) {
       <body>
         <StoreProvider>
           <LinkProvider link={RouterLink}>
-            <header>
-              <Link to="/">gno.world</Link>
-              <LoginControl />
-            </header>
-            <main>{children}</main>
+            <Center as="header" max="page">
+              <Cluster justify="between">
+                <Link to="/">gno.world</Link>
+                {/* The search 5n adds sits here, between the home link and the account. */}
+                <LoginControl />
+              </Cluster>
+            </Center>
+            <Center max="page">
+              <main>{children}</main>
+            </Center>
             <UpdatePrompt />
           </LinkProvider>
         </StoreProvider>

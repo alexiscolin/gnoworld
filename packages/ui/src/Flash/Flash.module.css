@@ -20,6 +20,11 @@
     scroll-padding-block-start: calc(var(--space-m) * 2 + var(--control-l));
   }
 
+  /* The top layer covers what is under it, and no scroll clears that: the page starts below the flash (F355). */
+  :root:has(.flash:popover-open) body {
+    padding-block-start: calc(var(--space-m) * 2 + var(--control-l));
+  }
+
   .title {
     font: var(--font-ui);
   }
