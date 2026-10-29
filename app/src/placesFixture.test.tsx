@@ -183,6 +183,13 @@ describe("the page that lists the places", () => {
     expect(html).toMatch(/href="\/e\/tokens"/);
   });
 
+  // F2209: a chip for a genre no place has would only empty the list.
+  test("offers no genre that no place has, though the data lists some", async () => {
+    const html = await render({ path: "/list", Component: List }, "/list");
+    expect(html).not.toContain('aria-label="Genres"');
+    expect(html).not.toContain("Game");
+  });
+
   test("has a trail to the home, ending on the list", async () => {
     const html = await render({ path: "/list", Component: List }, "/list");
     expect(html).toMatch(/<a [^>]*href="\/"[^>]*>Home<\/a>/);
