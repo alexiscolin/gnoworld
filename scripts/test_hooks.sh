@@ -97,7 +97,7 @@ outside = {"Edit(/scripts/guard.py)", "Edit(/scripts/stop_gate.sh)", "Edit(/scri
            "Edit(/scripts/scan_secrets.sh)", "Edit(/scripts/gitleaks.toml)", "Edit(/scripts/gitleaks-private.toml)", "Edit(/scripts/.gitleaksignore)",
            "Edit(/scripts/install_hooks.sh)", "Edit(/.git/hooks/**)", "Edit(/.git/config)", "Edit(/.git/commondir)", "Edit(/.mcp.json)",
            "Edit(/.claude/settings.json)", "Edit(/.claude/settings.local.json)", "Edit(/.claude/agents/**)", "Edit(/.claude/commands/**)",
-           "Edit(/.claude/skills/**)", "Edit(/.claude/rules/**)", "Edit(/.claude/hooks/**)",
+           "Edit(/.claude/skills/**)", "Edit(/.claude/rules/**)", "Edit(/.claude/hooks/**)", "Edit(/.claude/workflows/**)",
            "Edit(/package.json)", "Edit(/app/package.json)", "Edit(/packages/*/package.json)",
            "Edit(/server/package.json)", "Edit(/packages/schemas/package.json)",
            "Edit(/.npmrc)", "Edit(/pnpm-workspace.yaml)", "Edit(/.pnpmfile.cjs)", "Edit(/.pnpmfile.mjs)"}
@@ -3313,6 +3313,75 @@ assert labels(select(found, set(), {"hooks": None}, sections)) == ["g1", "g2", "
 assert labels(select(found, set(), {}, sections)) == [], "nothing changed"
 assert labels(select(found, set(), {"probe": {"p"}}, sections)) == ["g3"], "a probe block"
 PY
+fi
+
+if part workflow_branch; then
+# The Workflow branch (.claude/workflows/branch.js), run by Node with its globals stubbed: each agent answers as the case
+# says, and the loop's verdict must follow (the reviews of slice-5-loop). An agent that dies blocks the loop, never counts as
+# a clean report; the harness and realms bring their lenses whatever the arguments; the script numbers the findings; a third
+# round's fix stops for Alexis; a second round re-runs only the lens whose high tier-1 finding was fixed.
+command -v node >/dev/null || fail "node is needed to run the Workflow branch's cases"
+node - "$here/../.claude/workflows/branch.js" <<'JS' || fail "the Workflow branch broke a promise (above)"
+const { readFileSync } = require("node:fs");
+const src = readFileSync(process.argv[2], "utf8").replace("export const meta", "const meta");
+const body = new Function("agent", "parallel", "phase", "log", "args", "budget", `return (async () => {${src}\n})();`);
+const ok = (cond, why) => { if (!cond) { console.error("workflow_branch: " + why); process.exit(1); } };
+const finding = (severity, file) => ({ severity, file, scenario: "s", evidence: "e", fix: "f", beyondPlan: false });
+async function run(answer) {
+  const calls = [];
+  const agent = async (prompt, o) => { calls.push({ label: o.label, prompt, agentType: o.agentType, schema: o.schema }); return answer(o.label, prompt, o); };
+  const parallel = async (ts) => Promise.all(ts.map((t) => t().catch(() => null)));
+  const r = await body(agent, parallel, () => {}, () => {}, { branch: "b", worktree: "w", plan: "p", brief: "x", shared: "s" }, { spent: () => 0 });
+  return { r, labels: calls.map((c) => c.label), calls };
+}
+const gateOf = (files) => ({ passed: true, failingLane: "", tail: "", survivors: [], files, relaxations: [], seconds: 1 });
+const base = (files) => (l) =>
+  l === "tests" ? { files: ["t"], seenFailing: true, notes: "" }
+  : l === "red pass" ? { findings: [] }
+  : l === "merge check" ? gateOf(files)
+  : l === "build" || (l || "").startsWith("ledger") ? { commits: ["c"], notes: "" }
+  : l === "reviewer" || l === "security" || l === "gno-auditor" ? { findings: [] } : null;
+const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
+(async () => {
+  let t = await run(base(["app/src/a.ts"]));
+  ok(t.r.status === "ready for the chief", `a clean branch is not ready: ${t.r.status}`);
+  ok(!t.labels.includes("security") && !t.labels.some((l) => (l || "").startsWith("fix")), `a clean product branch ran ${t.labels}`);
+  t = await run((l, p) => (l === "red pass" ? null : base(["app/src/a.ts"])(l, p)));
+  ok(t.r.status.startsWith("blocked") && !t.labels.includes("build"), `a dead red pass let the build run: ${t.r.status} ${t.labels}`);
+  t = await run((l, p) => (l === "reviewer" ? null : base(["app/src/a.ts"])(l, p)));
+  ok(t.r.status.startsWith("blocked"), `a dead reviewer counted as a clean review: ${t.r.status}`);
+  t = await run((l, p) => (l === "reviewer" ? { findings: [finding("high", "app/src/a.ts")] } : base(["app/src/a.ts"])(l, p)));
+  ok(t.r.status.startsWith("blocked") && t.r.status.includes("open"), `a dead fixer left a high finding open as ready: ${t.r.status}`);
+  // The harness and the realms bring their lenses with no argument saying so.
+  t = await run(base(["scripts/check.sh", "gno/r/seal/gnomod.toml"]));
+  ok(t.labels.includes("security") && t.labels.includes("gno-auditor"), `a harness and realm branch ran no security or gno lens: ${t.labels}`);
+  // Two lenses' findings both numbered 1 by their agents: the script's ids tell them apart, a refutation drops only its own.
+  t = await run((l, p, o) =>
+    l === "reviewer" ? { findings: [finding("high", "scripts/a.sh")] }
+    : l === "security" ? { findings: [finding("medium", "scripts/b.sh")] }
+    : l === "verifier" ? { verdicts: [{ id: idOf(o, 0), verdict: "refuted", severity: "low", evidence: "e" }] }
+    : (l || "").startsWith("fix round") ? { fixed: [{ id: "security-1-1", commit: "f1" }], notes: "" }
+    : base(["scripts/a.sh"])(l, p));
+  const fix = t.calls.find((c) => (c.label || "").startsWith("fix round"));
+  ok(fix && fix.prompt.includes("security-1-1") && !fix.prompt.includes("reviewer-1-1"), `the refuted finding's twin was dropped, or the refuted one fixed: ${fix && fix.prompt}`);
+  // A high tier-1 finding each round: round 2 runs only its lens, on the diff since its fix; after the third, Alexis decides.
+  t = await run((l, p, o) =>
+    l === "security" ? { findings: [finding("high", "scripts/a.sh")] }
+    : l === "verifier" ? { verdicts: [{ id: idOf(o, 0), verdict: "reproduced", severity: "high", evidence: "e" }] }
+    : (l || "").startsWith("fix round") ? { fixed: [{ id: p.match(/"id":"(security-\d-1)"/)[1], commit: "f" + l.slice(-1) }], notes: "" }
+    : base(["scripts/a.sh"])(l, p));
+  ok(t.r.status.startsWith("reconsider with Alexis"), `three rounds of high tier-1 findings ended as ${t.r.status}`);
+  ok(t.labels.filter((l) => l === "reviewer").length === 1, `round 2 ran the reviewer again: ${t.labels}`);
+  ok(t.calls.some((c) => c.label === "security" && c.prompt.includes("since f1^")), "round 2 did not read the diff since its first fix");
+  // Read-only agents are told to write nothing; writers get the shared files.
+  for (const c of t.calls) {
+    const readOnly = ["red pass", "reviewer", "security", "gno-auditor", "verifier"].includes(c.label);
+    ok(readOnly ? c.prompt.includes("write nothing") && !c.prompt.includes("learnings.md") : c.prompt.includes("learnings.md"), `${c.label} was told the wrong way to write`);
+  }
+  // Every round's findings go to the ledger, a refuted or low one included.
+  ok(t.labels.filter((l) => (l || "").startsWith("ledger")).length === 3, `not every round wrote its findings to the ledger: ${t.labels}`);
+})();
+JS
 fi
 
 if part batch_size; then

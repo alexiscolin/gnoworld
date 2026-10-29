@@ -13,14 +13,19 @@ export const meta = {
       title: "Review",
       detail: "the reviewer; the security-reviewer for tier 1 or the harness; the gno-auditor for a realm",
     },
-    { title: "Verify", detail: "the finding-verifier on tier-1 findings" },
-    { title: "Fix", detail: "high and medium findings, test first; low ones listed for Alexis" },
+    { title: "Verify", detail: "the finding-verifier on findings in tier-1 files" },
+    {
+      title: "Fix",
+      detail: "every finding to the ledger; high and medium fixed, test first; low ones listed for Alexis",
+    },
   ],
 };
 
-// args: { branch, worktree, plan, brief, shared, tier1, realm }. shared is the slice's folder of shared files in the main
-// checkout (.claude/tmp/slice-<n>): learnings.md, <branch>.state.md, reports/. tier1 and realm say which reviews to add.
+// args: { branch, worktree, plan, brief, shared, tier1 }: shared, the slice's folder the chief makes (.claude/tmp/slice-<n>);
+// tier1, path prefixes of tier-1 files (docs/REVIEW.md) added to the harness's and the realms', which no argument can
+// leave out (security review of slice-5-loop, 2).
 const A = args;
+const start = budget.spent();
 const SEVERITY = { type: "string", enum: ["high", "medium", "low"] };
 const FINDINGS = {
   type: "object",
@@ -30,7 +35,6 @@ const FINDINGS = {
       items: {
         type: "object",
         properties: {
-          id: { type: "string" },
           severity: SEVERITY,
           file: { type: "string" },
           scenario: { type: "string" },
@@ -38,7 +42,7 @@ const FINDINGS = {
           fix: { type: "string" },
           beyondPlan: { type: "boolean" },
         },
-        required: ["id", "severity", "file", "scenario", "evidence", "fix", "beyondPlan"],
+        required: ["severity", "file", "scenario", "evidence", "fix", "beyondPlan"],
       },
     },
   },
@@ -58,6 +62,21 @@ const DONE = {
   properties: { commits: { type: "array", items: { type: "string" } }, notes: { type: "string" } },
   required: ["commits", "notes"],
 };
+const FIXED = {
+  type: "object",
+  properties: {
+    fixed: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { id: { type: "string" }, commit: { type: "string" } },
+        required: ["id", "commit"],
+      },
+    },
+    notes: { type: "string" },
+  },
+  required: ["fixed", "notes"],
+};
 const GATE = {
   type: "object",
   properties: {
@@ -65,11 +84,14 @@ const GATE = {
     failingLane: { type: "string" },
     tail: { type: "string" },
     survivors: { type: "array", items: { type: "string" } },
+    files: { type: "array", items: { type: "string" } },
+    relaxations: { type: "array", items: { type: "string" } },
     seconds: { type: "number" },
   },
-  required: ["passed", "failingLane", "tail", "survivors", "seconds"],
+  required: ["passed", "failingLane", "tail", "survivors", "files", "relaxations", "seconds"],
 };
-const VERDICTS = {
+// The verifier answers for the ids it is given, and only those.
+const verdictsFor = (ids) => ({
   type: "object",
   properties: {
     verdicts: {
@@ -77,119 +99,152 @@ const VERDICTS = {
       items: {
         type: "object",
         properties: {
-          id: { type: "string" },
+          id: { type: "string", enum: ids },
           verdict: { type: "string", enum: ["reproduced", "refuted", "unverified"] },
           severity: SEVERITY,
+          evidence: { type: "string" },
         },
-        required: ["id", "verdict", "severity"],
+        required: ["id", "verdict", "severity", "evidence"],
       },
     },
   },
   required: ["verdicts"],
-};
+});
 
-// What every agent of the loop is told: where it works, what it reads, and the shared files it leaves its trace in.
-const where = (step) =>
+const commits = [];
+const low = [];
+const judged = [];
+const verdicts = [];
+const TIER1 = ["scripts/", ".githooks/", ".github/", ".claude/", "gno/", ...(A.tier1 || [])];
+const tier1 = (file) => TIER1.some((prefix) => file === prefix || file.startsWith(prefix));
+const realm = (file) => file.startsWith("gno/r/") || file.startsWith("gno/p/");
+const result = (status, extra) => ({
+  branch: A.branch,
+  status,
+  outputTokens: budget.spent() - start,
+  commits,
+  low,
+  judged,
+  verdicts,
+  ...extra,
+});
+
+// What every agent of the loop is told: where it works and what it reads. One that writes also leaves its trace in the slice's
+// shared files; a reviewer, which never writes, has its report saved by the scribe.
+const where = (step, writes) =>
   `Branch ${A.branch}, worktree ${A.worktree}: work there alone, \`cd "${A.worktree}" || exit 1\` before any command. ` +
   `The slice plan: ${A.plan}. This branch's brief: ${A.brief}. Your step: ${step}. ` +
-  `When you learn something a later branch should know (a flaky test, a wrong assumption, a tool's trap), append one dated line to ${A.shared}/learnings.md. ` +
-  `When you finish, append one line to ${A.shared}/${A.branch}.state.md (the step, what it did, its commits) and save your report to ${A.shared}/reports/${A.branch}-${step}.md. ` +
-  "rtk swallows git's output written to a file: write a diff to a file through python3's subprocess.";
+  "rtk swallows git's output written to a file: write a diff to a file through python3's subprocess. " +
+  (writes
+    ? `When you learn something a later branch should know (a flaky test, a wrong assumption, a tool's trap), append one dated line to ${A.shared}/learnings.md. ` +
+      `When you finish, append one line to ${A.shared}/${A.branch}.state.md (the step, what it did, its commits) and save your report to ${A.shared}/reports/${A.branch}-${step}.md.`
+    : "You are read-only: report, write nothing.");
 
 const gateCheck = () =>
   agent(
-    `${where("merge-check")}. Run \`sh scripts/check.sh --merge\` (minutes) and time it. Report whether it passed, the failing lane and the tail of its output, ` +
-      "and the surviving mutants it printed (StrykerJS's and harness_mutate's). Read .claude/tmp/unsteady.log: give each file named a ledger row " +
-      "(docs/review/findings.md) and a line in the learnings, then delete the log. Change no code.",
+    `${where("merge-check", true)}. Run \`sh scripts/check.sh --merge\` (minutes) and time it. Report whether it passed, the failing lane and the ` +
+      "tail of its output, the surviving mutants it printed (StrykerJS's and harness_mutate's), the files changed since main, and every line of " +
+      "`git log main..HEAD` that loosens the net (`Removed-test:`, `Lowered-floor:`, `Updated-baseline:`, `Batch-size:`, `No-test:`), which " +
+      "the chief and Alexis read. Write that diff " +
+      "to .claude/tmp/diff.patch. Read .claude/tmp/unsteady.log: give each file named a ledger row (docs/review/findings.md) and a line in the " +
+      "learnings, delete the log, and commit the rows (`docs(review): unsteady ...`). Change no code.",
     // An agent that runs a command and waits for it: the cheaper model, little reasoning.
     { phase: "Merge check", label: "merge check", schema: GATE, model: "sonnet", effort: "low" },
   );
 
 phase("Tests");
 const tests = await agent(
-  `${where("tests")}. Write the failing tests the brief calls for, test first (CLAUDE.md), and run them: each must fail for the reason it names. ` +
-    "Write no product code and commit nothing.",
+  `${where("tests", true)}. Write the failing tests the brief calls for, test first (CLAUDE.md), and run them: each must fail for the reason ` +
+    "it names. Write no product code and commit nothing.",
   { label: "tests", schema: TESTS },
 );
-if (!tests || !tests.seenFailing)
-  return { branch: A.branch, status: "blocked at the tests", tokens: budget.spent(), tests };
+if (!tests || !tests.seenFailing) return result("blocked at the tests", { tests });
 
 phase("Red pass");
-const red = await agent(`Red pass. ${where("red-pass")}. The failing tests, uncommitted: ${tests.files.join(", ")}.`, {
-  agentType: "test-auditor",
-  label: "red pass",
-  schema: FINDINGS,
-});
+const red = await agent(
+  `Red pass. ${where("red-pass", false)}. The failing tests, uncommitted: ${tests.files.join(", ")}.`,
+  {
+    agentType: "test-auditor",
+    label: "red pass",
+    schema: FINDINGS,
+  },
+);
+if (!red) return result("blocked at the red pass: the test-auditor gave no report");
 
 phase("Build");
 const built = await agent(
-  `${where("build")}. First fix the red pass's findings in the tests: ${JSON.stringify(red ? red.findings : [])}. ` +
-    "Then write the code until they pass. Commit each behaviour with its tests (the fast gate runs at each commit: a refused commit is fixed, never " +
-    "bypassed); the commit that brings the tests says `Red-pass: <the findings fixed>`.",
+  `${where("build", true)}. Save the red pass's findings to ${A.shared}/reports/${A.branch}-red-pass.md, then fix them in the tests: ` +
+    `${JSON.stringify(red.findings)}. Then write the code until they pass. Commit each behaviour with its tests (the fast gate runs at each ` +
+    "commit: a refused commit is fixed, never bypassed); the commit that brings the tests says `Red-pass: <the findings fixed>`.",
   { label: "build", schema: DONE },
 );
+if (!built) return result("blocked at the build");
+commits.push(...built.commits);
 
-const commits = [...(built ? built.commits : [])];
-const low = [];
-const judged = [];
 let gate = null;
-let round = 0;
-while (round < 3) {
-  round += 1;
+let since = "main";
+let lensesDue = null; // all lenses in round 1; afterwards only those whose high findings in tier-1 files were fixed
+for (let round = 1; ; round += 1) {
   gate = await gateCheck();
   for (let tries = 0; gate && !gate.passed && tries < 2; tries += 1) {
     const fixed = await agent(
-      `${where("gate-fix")}. The merge check failed in its ${gate.failingLane} lane:\n${gate.tail}\n` +
+      `${where("gate-fix", true)}. The merge check failed in its ${gate.failingLane} lane:\n${gate.tail}\n` +
         "Run that lane's commands alone, find the cause and fix it, test first for a bug of the product. A test that fails once and passes alone " +
         "is a flaky one: a ledger row and a learnings line, not a retry. Never change a test to make code pass without saying so in its commit. Commit.",
       { phase: "Merge check", label: `gate fix ${tries + 1}`, schema: DONE },
     );
-    if (fixed) commits.push(...fixed.commits);
+    if (!fixed) return result("blocked at the merge check: its fixer gave no report", { gate });
+    commits.push(...fixed.commits);
     gate = await gateCheck();
   }
-  if (!gate || !gate.passed)
-    return {
-      branch: A.branch,
-      status: "blocked at the merge check",
-      tokens: budget.spent(),
-      gate,
-      commits,
-      low,
-      judged,
-    };
+  if (!gate || !gate.passed) return result("blocked at the merge check", { gate });
+  if (round === 4)
+    return result("reconsider with Alexis: a high tier-1 finding came back three rounds running", { gate, rounds: 3 });
 
   phase("Review");
-  const since = round === 1 ? "main" : `the last round (round ${round - 1})`;
-  // [agent type, label, what it is asked]: the reviewer always, the security-reviewer for tier 1, the gno-auditor for a realm.
+  const touchesTier1 = gate.files.some(tier1);
+  // [agent type, label, what it is asked]
   const lenses = [
     [
       "reviewer",
       "reviewer",
-      `Review the branch's diff since ${since}; the surviving mutants: ${JSON.stringify(gate.survivors)}.`,
+      `Review the branch's diff since ${since} (.claude/tmp/diff.patch holds the diff since main); the surviving mutants: ${JSON.stringify(gate.survivors)}.`,
     ],
-    ...(A.tier1 ? [["security-reviewer", "security", `Review the branch's diff since ${since} for security.`]] : []),
-    ...(A.realm
+    ...(touchesTier1
+      ? [["security-reviewer", "security", `Review the branch's diff since ${since} for security.`]]
+      : []),
+    ...(gate.files.some(realm)
       ? [["gnomcp:gno-auditor", "gno-auditor", `Audit every realm the branch changes, since ${since}.`]]
       : []),
-  ];
-  const reviews = await parallel(
-    lenses.map(
-      ([agentType, label, ask]) =>
-        () =>
-          agent(`${where(`${label}-${round}`)}. ${ask}`, { agentType, phase: "Review", label, schema: FINDINGS }),
-    ),
+  ].filter(([, label]) => !lensesDue || lensesDue.has(label));
+  const ask = ([agentType, label, question]) =>
+    agent(`${where(`${label}-${round}`, false)}. ${question}`, { agentType, phase: "Review", label, schema: FINDINGS });
+  // Four agents at most at once on the machine (CLAUDE.md): with two branches in review, three lenses run one after another.
+  const reviews =
+    lenses.length > 2
+      ? await lenses.reduce(async (done, lens) => [...(await done), await ask(lens)], Promise.resolve([]))
+      : await parallel(lenses.map((lens) => () => ask(lens)));
+  if (!reviews.every(Boolean)) return result(`blocked at review round ${round}: a lens gave no report`, { gate });
+  // Numbered here, by lens and order: each lens counts from 1, and a verdict must name one finding alone.
+  const found = reviews.flatMap((r, i) =>
+    r.findings.map((f, n) => ({ ...f, id: `${lenses[i][1]}-${round}-${n + 1}`, lens: lenses[i][1] })),
   );
-  const found = reviews.filter(Boolean).flatMap((r) => r.findings);
 
   phase("Verify");
   let kept = found;
-  if (A.tier1 && found.length) {
-    const checked = await agent(`${where(`verify-${round}`)}. Verify these findings: ${JSON.stringify(found)}.`, {
-      agentType: "finding-verifier",
-      label: "verifier",
-      schema: VERDICTS,
-    });
-    const verdict = new Map((checked ? checked.verdicts : []).map((v) => [v.id, v]));
+  const onTier1 = found.filter((f) => tier1(f.file));
+  if (onTier1.length) {
+    const checked = await agent(
+      `${where(`verify-${round}`, false)}. Verify these findings: ${JSON.stringify(onTier1)}.`,
+      {
+        agentType: "finding-verifier",
+        label: "verifier",
+        schema: verdictsFor(onTier1.map((f) => f.id)),
+      },
+    );
+    if (!checked) return result(`blocked at verification round ${round}: the verifier gave no report`, { gate });
+    verdicts.push(...checked.verdicts);
+    const verdict = new Map(checked.verdicts.map((v) => [v.id, v]));
     kept = found
       .filter((f) => !verdict.has(f.id) || verdict.get(f.id).verdict !== "refuted")
       .map((f) => (verdict.has(f.id) ? { ...f, severity: verdict.get(f.id).severity } : f));
@@ -200,31 +255,47 @@ while (round < 3) {
   phase("Fix");
   const urgent = kept.filter((f) => f.severity !== "low" && !f.beyondPlan);
   low.push(...kept.filter((f) => f.severity === "low" || f.beyondPlan));
-  if (!urgent.length) break;
-  const fixed = await agent(
-    `${where(`fix-${round}`)}. Fix these findings, each test first, its commit body naming it (\`Finding: <id>\`), after writing each to ` +
-      `docs/review/findings.md with its status and evidence: ${JSON.stringify(urgent)}. No red pass of these tests: the gate and the mutation tester check them.`,
-    { label: `fix round ${round}`, schema: DONE },
+  // The scribe: every finding of the round to the ledger with its status and evidence (a refuted one rejected with the
+  // verifier's), the round's reports saved; the reviewers wrote nothing themselves.
+  const scribed = await agent(
+    `${where(`ledger-${round}`, true)}. Write each of these findings as a row of docs/review/findings.md, with the next free F number: ` +
+      `the urgent ones \`reproduced\`, the low ones and those beyond the plan \`asked\`, a refuted one \`rejected\` with the verifier's evidence. ` +
+      `Findings: ${JSON.stringify(found)}. Urgent: ${JSON.stringify(urgent.map((f) => f.id))}. Verdicts: ${JSON.stringify(verdicts)}. ` +
+      `Save them as ${A.shared}/reports/${A.branch}-review-${round}.md. Commit the ledger (\`docs(review): ${A.branch}'s round ${round}\`).`,
+    { phase: "Fix", label: `ledger ${round}`, schema: DONE, model: "sonnet", effort: "low" },
   );
-  if (fixed) commits.push(...fixed.commits);
-  // A second round only for a high finding fixed in tier-1 code (docs/REVIEW.md); otherwise one last merge check.
-  if (!(A.tier1 && urgent.some((f) => f.severity === "high"))) {
+  if (!scribed) return result(`blocked at the ledger of round ${round}`, { gate });
+  commits.push(...scribed.commits);
+  if (!urgent.length) break;
+
+  const fixed = await agent(
+    `${where(`fix-${round}`, true)}. Fix these findings, each test first, its commit body naming its ledger row (\`Finding: F<n>\`), and mark the ` +
+      `row fixed with its commit: ${JSON.stringify(urgent)}. No red pass of these tests: the gate and the mutation tester check them. ` +
+      "Return each finding's id with the commit that fixes it.",
+    { label: `fix round ${round}`, schema: FIXED },
+  );
+  const fixedIds = new Set(fixed ? fixed.fixed.map((f) => f.id) : []);
+  const open = urgent.filter((f) => !fixedIds.has(f.id));
+  if (open.length)
+    return result(`blocked at the fixes of round ${round}: ${open.map((f) => f.id).join(", ")} still open`, {
+      gate,
+      open,
+    });
+  commits.push(...fixed.fixed.map((f) => f.commit));
+  // A second round only for a high finding fixed in a tier-1 file, and only its lens, on the diff since its first fix
+  // (docs/REVIEW.md); otherwise one last merge check.
+  const highOnTier1 = urgent.filter((f) => f.severity === "high" && tier1(f.file));
+  if (!highOnTier1.length) {
     gate = await gateCheck();
     break;
   }
+  lensesDue = new Set(highOnTier1.map((f) => f.lens));
+  since = `${fixed.fixed.find((f) => f.id === highOnTier1[0].id).commit}^`;
 }
-// The branch's cost, which docs/review-log.md compares with slice 4's; the chief stamps the hours, which a script cannot read.
-const tokens = budget.spent();
 log(
-  `${A.branch}: ${round} rounds, ${commits.length} commits, ${low.length} low findings for Alexis, ${tokens} output tokens`,
+  `${A.branch}: ${commits.length} commits, ${low.length} low findings for Alexis, ${budget.spent() - start} output tokens`,
 );
-return {
-  branch: A.branch,
-  status: gate && gate.passed ? "ready for the chief" : "blocked at the last merge check",
-  rounds: round,
-  tokens,
+return result(gate && gate.passed ? "ready for the chief" : "blocked at the last merge check", {
   gate,
-  commits,
-  low,
-  judged,
-};
+  relaxations: gate ? gate.relaxations : [],
+});

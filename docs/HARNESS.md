@@ -29,23 +29,24 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
 - **Alexis** approves each slice's plan, opens the sessions, reviews blind first, runs what the
   sandbox refuses (Docker's `deploy/test.sh`, the merge into `main`, the push), and accepts or
   refuses each rule the dream proposes.
-- **The chief session**, one per slice, plans it (`/slice-plan`), cuts it into branches, gives
-  Alexis each branch's starting brief, integrates the branches, runs the full gate and the
+- **The chief session**, one per slice, plans it (`/slice-plan`), makes the slice's shared folder
+  (`.claude/tmp/slice-<n>/` with `reports/`), cuts it into branches, gives Alexis each branch's starting brief, integrates the branches, runs the full gate and the
   slice's last `/pre-merge`, then the dream.
 - **A branch session**, one per branch, two at most at once, works in its own worktree, made by
   `scripts/worktree.sh` and never by hand (one store of packages, a real `.bin`, F2127). Its
   pipeline is the Workflow `branch` (`.claude/workflows/branch.js`): the failing tests, the red
   pass, the code, the merge check, one combined review, the high and medium fixes, the merge check
-  again; it returns its commits, the low findings for Alexis and its tokens. A Workflow script is a
-  body Claude Code runs, which no test of the gate can run: its first branch is its test.
+  again; it returns its commits, the low findings for Alexis, the lines that loosen the net and its tokens.
+  An agent that gives no report blocks it; the harness's and the realms' files bring their reviews
+  whatever its arguments say. `test_hooks.sh`'s section `workflow_branch` runs it under stubbed globals.
 - **Agents** are fresh, briefed from files (never forks), four at most at once, each asked for a
   short report saved to a file. The sessions coordinate through files: the plan,
   `docs/decisions.md`, the ledger, a state file per branch and one shared learnings file.
 - **The dream** (`/dream <slice>`, `.claude/commands/dream.md`), at each slice's end, keeps a
-  dated copy of the memory, then one read-only agent reads the agents' reports, the learnings,
+  dated copy of the memory, then the `dreamer` agent (read only, no shell) reads the agents' reports, the learnings,
   the review log, the ledger and the handoff (never transcripts) and proposes rule, memory, test
-  and check changes, each with its evidence, prevalence and cost. Alexis accepts each; a memory
-  changes at once, a rule or a check on a branch through `merge.sh`.
+  and check changes, each with its evidence, prevalence and cost, standing on committed rows. Alexis
+  accepts each, reading a memory's full text first; a rule or a check goes on a branch through `merge.sh`.
 
 ## A change, from plan to merge
 
@@ -208,7 +209,7 @@ with `/cd`:
   `gno_run`, `gno_key_send`, `gno_cla_sign`).
 - **Refused outright in the main checkout:** an edit of the harness (the guard, the Stop hook,
   the git hooks, `.git/hooks` and `.git/config`, Claude Code's settings, agents, commands, skills,
-  rules and hooks in `.claude/` but `.claude/tmp/`, the `package.json` files and what pnpm loads),
+  rules, workflows and hooks in `.claude/` but `.claude/tmp/`, the `package.json` files and what pnpm loads),
   `pnpm add` and `rm -rf`. A branch changes the harness in its own worktree, where Alexis sees
   each such file at `merge.sh`. In his shell the hooks run nothing of the repository but the
   records the sandboxed gate wrote (F076).
@@ -284,7 +285,7 @@ costs context in every session.
 |---|---|
 | `CLAUDE.md`, `.claude/rules/` | the rules Claude reads; each area's file loads when its files are touched |
 | `.claude/settings.json` | permissions, the sandbox, the hooks, the plugins |
-| `.claude/agents/` | `test-auditor`, `reviewer`, `security-reviewer`, `finding-verifier` |
+| `.claude/agents/` | `test-auditor`, `reviewer`, `security-reviewer`, `finding-verifier`, `dreamer` |
 | `.claude/commands/` | `/slice-plan`, `/pre-merge`, `/dream` |
 | `.claude/workflows/` | `branch`, a branch's loop |
 | `.githooks/` | `commit-msg`, `pre-commit`, `pre-merge-commit`, `pre-push`; `records.sh`, the prints and the harness list; `merge.sh`, the merge that shows the harness first |
