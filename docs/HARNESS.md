@@ -30,7 +30,8 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
   sandbox refuses (Docker's `deploy/test.sh`, the merge into `main`, the push), and accepts or
   refuses each rule the dream proposes.
 - **The chief session**, one per slice, plans it (`/slice-plan`), makes the slice's shared folder
-  (`.claude/tmp/slice-<n>/` with `reports/`), cuts it into branches, gives Alexis each branch's starting brief, integrates the branches, runs the full gate and the
+  (`.claude/tmp/slice-<n>/` with `reports/`), cuts it into branches, gives each branch its range of F numbers
+  (two branches side by side once took the same ones) and Alexis each branch's starting brief, integrates the branches, runs the full gate and the
   slice's last `/pre-merge`, then the dream.
 - **A branch session**, one per branch, two at most at once, works in its own worktree, made by
   `scripts/worktree.sh` and never by hand (one store of packages, a real `.bin`, F2127). Its
