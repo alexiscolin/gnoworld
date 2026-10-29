@@ -131,6 +131,10 @@
     margin-inline: auto;
   }
 
+  .center[data-gutter="all"] {
+    padding-block: var(--_space);
+  }
+
   .center[data-max="measure"] {
     --_max: var(--measure);
   }

@@ -10,12 +10,12 @@ const GUTTER = 16;
 const WIDTHS = [390, 1280] as const;
 const PAGES = ["/", "/w/bubble", "/nowhere"];
 
-// Every visible word (a text node's lines, one box each) and every visible control, as a box's left and right edge.
+// Every visible word (a text node's lines, one box each) and every visible control, as a box's top, left and right edge.
 const edgesOf = (page: Page) =>
   page.evaluate(() => {
-    const found: { what: string; left: number; right: number }[] = [];
+    const found: { what: string; top: number; left: number; right: number }[] = [];
     const take = (what: string, rect: DOMRect) => {
-      if (rect.width > 0 && rect.height > 0) found.push({ what, left: rect.left, right: rect.right });
+      if (rect.width > 0 && rect.height > 0) found.push({ what, top: rect.top, left: rect.left, right: rect.right });
     };
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
@@ -40,11 +40,13 @@ for (const width of WIDTHS) {
     test.use({ viewport: { width, height: 844 } });
 
     for (const path of PAGES) {
-      test(`${path}: no text and no control within ${String(GUTTER)} px of the viewport's edge`, async ({ page }) => {
+      test(`${path}: no text and no control within ${String(GUTTER)} px of the viewport's edge, the top included`, async ({
+        page,
+      }) => {
         await page.goto(path);
         await hydrated(page);
         const touching = (await edgesOf(page)).filter(
-          ({ left, right }) => left < GUTTER - 0.5 || right > width - GUTTER + 0.5,
+          ({ top, left, right }) => top < GUTTER - 0.5 || left < GUTTER - 0.5 || right > width - GUTTER + 0.5,
         );
         expect(touching).toEqual([]);
       });
@@ -82,7 +84,9 @@ for (const width of WIDTHS) {
         expect(boxes.filter(({ top, bottom }) => middles.some((m) => m < top || m > bottom))).toEqual([]);
         // The header keeps to the gutter too, logged in.
         expect(
-          (await edgesOf(page)).filter(({ left, right }) => left < GUTTER - 0.5 || right > width - GUTTER + 0.5),
+          (await edgesOf(page)).filter(
+            ({ top, left, right }) => top < GUTTER - 0.5 || left < GUTTER - 0.5 || right > width - GUTTER + 0.5,
+          ),
         ).toEqual([]);
       });
     }

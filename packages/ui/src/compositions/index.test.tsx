@@ -92,6 +92,14 @@ describe("each composition's own choice", () => {
     rerender(<Center max="page">a</Center>);
     expect(only(container).dataset["max"]).toBe("page");
   });
+
+  // F2164: the header sat against the viewport's top edge, its gutter being inline only.
+  it("Center's gutter is inline unless asked for all four edges", () => {
+    const { container, rerender } = render(<Center>a</Center>);
+    expect(only(container).dataset["gutter"]).toBe("inline");
+    rerender(<Center gutter="all">a</Center>);
+    expect(only(container).dataset["gutter"]).toBe("all");
+  });
 });
 
 it("has a story for each composition, each of which renders", () => {

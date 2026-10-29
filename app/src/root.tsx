@@ -26,7 +26,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <body>
         <StoreProvider>
           <LinkProvider link={RouterLink}>
-            <Center as="header" max="page">
+            <Center as="header" max="page" gutter="all">
               <Cluster justify="between">
                 <Link to="/">gno.world</Link>
                 {/* The search 5n adds sits here, between the home link and the account. */}
