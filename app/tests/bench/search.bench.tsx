@@ -38,18 +38,25 @@ function keystroke(items: SearchItem[], query: string) {
   return found.length;
 }
 
+/** One keystroke timed; a query that should find and finds nothing, or the reverse, throws: the bench then has no sample. */
+const timed = (items: SearchItem[], query: string, finds: boolean) => () => {
+  if (keystroke(items, query) > 0 !== finds)
+    throw new Error(`the bench's query ${JSON.stringify(query)} should ${finds ? "" : "not "}find`);
+};
+
+// Each name a literal, so scripts/bench.py sees a bench switched off. A query that finds nothing times the cheapest pass,
+// and one that finds all the most grouping: each is timed.
 describe("⌘K", () => {
-  for (const count of [1000, 10_000, 100_000]) {
-    const items = universe(count);
-    // A query that finds nothing would time the cheapest pass, and one that finds all the most grouping: each is timed.
-    for (const [what, query, finds] of [
-      ["the empty query", "", true],
-      ["a query that matches", "number 1", true],
-      ["a query that matches nothing", "zzz", false],
-    ] as const)
-      bench(`a keystroke, ${what}, over ${String(count)} places [16 ms]`, () => {
-        if (keystroke(items, query) > 0 !== finds)
-          throw new Error(`the bench's query ${JSON.stringify(query)} should ${finds ? "" : "not "}find`);
-      });
-  }
+  const thousand = universe(1000);
+  const tenThousand = universe(10_000);
+  const hundredThousand = universe(100_000);
+  bench("a keystroke, the empty query, over 1000 places [16 ms]", timed(thousand, "", true));
+  bench("a keystroke, a query that matches, over 1000 places [16 ms]", timed(thousand, "number 1", true));
+  bench("a keystroke, a query that matches nothing, over 1000 places [16 ms]", timed(thousand, "zzz", false));
+  bench("a keystroke, the empty query, over 10000 places [16 ms]", timed(tenThousand, "", true));
+  bench("a keystroke, a query that matches, over 10000 places [16 ms]", timed(tenThousand, "number 1", true));
+  bench("a keystroke, a query that matches nothing, over 10000 places [16 ms]", timed(tenThousand, "zzz", false));
+  bench("a keystroke, the empty query, over 100000 places [16 ms]", timed(hundredThousand, "", true));
+  bench("a keystroke, a query that matches, over 100000 places [16 ms]", timed(hundredThousand, "number 1", true));
+  bench("a keystroke, a query that matches nothing, over 100000 places [16 ms]", timed(hundredThousand, "zzz", false));
 });
