@@ -23,8 +23,8 @@ const DIRECTIVES = [
 ];
 
 // ponytail: one header for all pages, so it holds every page's script hashes: two per page, and a world has two pages
-// since 5d (its path and its canonical address). 323 characters and 54 a hash: a host that caps a _headers line at 2,000
-// (Cloudflare Pages) takes some 31 hashes, 7 worlds; nginx sets no cap. Per-page headers, through the host, past that (5f).
+// since 5d (its path and its canonical address); a page's JSON-LD (5e) is a data block and has none. 323 characters and 54
+// a hash: a host that caps a _headers line at 2,000 (Cloudflare Pages) takes some 31 hashes, 7 worlds; nginx sets no cap. Per-page headers, through the host, past that (5f).
 export function policy(hashes: readonly string[]): string {
   for (const hash of hashes) {
     if (!/^'sha256-[A-Za-z0-9+/]{43}='$/.test(hash)) throw new RangeError(`csp: ${hash} is no SHA-256 source`);
@@ -40,12 +40,19 @@ const ATTRIBUTES = String.raw`(?:[^>"']|"[^"]*"|'[^']*')*`;
 // A script, its attributes, its text: it ends at the first `</script` that a space, a slash or a > follows.
 const SCRIPT = String.raw`<script\b(${ATTRIBUTES})>([\s\S]*?)<\/script(?=[\s/>])[^>]*>`;
 
-// What the browser hashes: the text between a script's tags, for each script that loads no file. An
+// A script whose type is JSON-LD: a data block, which the browser never runs, so the policy has no hash to give it. The first
+// type attribute counts, as the HTML parser keeps the first of a repeated one.
+function isData(attributes: string): boolean {
+  const type = /[\s/"']type\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/i.exec(attributes);
+  return (type?.[1] ?? type?.[2] ?? type?.[3] ?? "").trim().toLowerCase() === "application/ld+json";
+}
+
+// What the browser hashes: the text between a script's tags, for each script that loads no file and runs. An
 // attribute starts after a space, a slash or a quote, as the HTML parser reads it.
 export function inlineScripts(html: string): string[] {
   return (
     [...html.matchAll(new RegExp(SCRIPT, "gi"))]
-      .filter(([, attributes = ""]) => !/[\s/"']src\s*=/i.test(attributes))
+      .filter(([, attributes = ""]) => !/[\s/"']src\s*=/i.test(attributes) && !isData(attributes))
       // The parser turns CR LF and a lone CR into LF before a script's text is hashed.
       .map(([, , text = ""]) => text.replace(/\r\n?/g, "\n"))
   );
