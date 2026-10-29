@@ -11,7 +11,17 @@
     color: var(--color-text-muted);
   }
 
+  /* A step is a target of 24 px at least, as every control (WCAG 2.5.8). */
+  .trail a {
+    /* layout: a step's words centred in its 24 px target */
+    display: inline-flex;
+    /* layout: a step's words centred in its 24 px target */
+    align-items: center;
+    min-block-size: var(--control-xs);
+  }
+
   .trail [aria-current="page"] {
     color: var(--color-text);
+    font-weight: 500;
   }
 }
