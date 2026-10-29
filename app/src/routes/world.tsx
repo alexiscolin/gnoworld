@@ -8,7 +8,7 @@ import {
   type MetaArgs,
 } from "react-router";
 import { failedWorldMeta, worldMeta } from "../meta.ts";
-import { findWorld } from "../worlds.ts";
+import { findWorld } from "../places.ts";
 import { Chat } from "../features/chat/index.ts";
 import { PageError } from "../features/errors/index.ts";
 

@@ -2,7 +2,7 @@ import { reactRouter } from "@react-router/dev/vite";
 import babel from "@rolldown/plugin-babel";
 import { reactCompilerPreset } from "@vitejs/plugin-react";
 import { readdirSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build, defineConfig, type Plugin } from "vite";
 import { precached } from "./src/sw/precache.ts";
@@ -43,12 +43,31 @@ const serviceWorker: Plugin = {
   },
 };
 
+// The data files the bundle holds are app/data's, or GNOWORLD_DATA's directory when it is set (the tests of the build
+// plant their own): an import of one of app/data's files reads the file of the same name there.
+const DATA = fileURLToPath(new URL("data", import.meta.url));
+const dataFiles: Plugin = {
+  name: "gnoworld:data",
+  enforce: "pre",
+  resolveId(source, importer) {
+    const other = process.env["GNOWORLD_DATA"];
+    if (other === undefined || importer === undefined || !source.endsWith(".json")) return null;
+    const file = resolve(dirname(importer), source);
+    return dirname(file) === DATA ? join(other, basename(file)) : null;
+  },
+};
+
 // Baseline widely available (docs/DESIGN-SYSTEM.md, "Browsers") at the newest features the code uses: RegExp's `v` flag
 // and Intl.Segmenter, as MDN's browser-compat-data 8.1.7 dates them. Vite's own default stops at 2026-01-01's (S1).
 const TARGET = ["chrome112", "edge112", "firefox125", "safari17", "ios17"];
 
 // The React Compiler memoizes every component (ADR-0002 §8); one it cannot compile fails the build.
 export default defineConfig({
-  plugins: [reactRouter(), babel({ presets: [reactCompilerPreset({ panicThreshold: "all_errors" })] }), serviceWorker],
+  plugins: [
+    dataFiles,
+    reactRouter(),
+    babel({ presets: [reactCompilerPreset({ panicThreshold: "all_errors" })] }),
+    serviceWorker,
+  ],
   build: { target: TARGET },
 });

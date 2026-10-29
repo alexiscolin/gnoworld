@@ -1,7 +1,7 @@
 // The tags each page carries: a title, a description and one canonical address on the site's
 // origin, with their Open Graph twins; a page with no address of its own is not indexed.
 import type { MetaDescriptor } from "react-router";
-import { worldPath, type World } from "./worlds.ts";
+import { worldPath, type World } from "./places.ts";
 
 const ORIGIN = "https://gno.world";
 

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+import { EMBED_PREFIXES } from "@gnoworld/schemas";
 import { inlineScripts, outputs, pagesPolicy, policy, sha256 } from "./csp.ts";
 
 // Written out, not built from the module: a directive that loosens must fail here.
@@ -194,4 +195,15 @@ it("the web image copies each workspace the app imports, its package.json before
     expect(manifest, `packages/${name}/package.json before the install`).toBeLessThan(install);
     expect(dockerfile, `packages/${name}/src`).toContain(`COPY packages/${name}/src packages/${name}/src\n`);
   }
+});
+
+// The data files' embed allowlist (packages/schemas) is a second copy of frame-src: one drifting from the other would let
+// a page carry an embed the browser blocks, or the policy allow a player no file may name (F885).
+describe("the policy's frame-src and the data files' embeds", () => {
+  it("name the same player paths", () => {
+    const frame = policy([])
+      .split("; ")
+      .find((directive) => directive.startsWith("frame-src "));
+    expect(frame?.slice("frame-src ".length).split(" ").sort()).toEqual([...EMBED_PREFIXES].sort());
+  });
 });

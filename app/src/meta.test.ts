@@ -1,7 +1,7 @@
 import type { MetaDescriptor } from "react-router";
 import { describe, expect, test } from "vitest";
 import { failedWorldMeta, homeMeta, notFoundMeta, worldMeta } from "./meta.ts";
-import { findWorld, worldPath, WORLDS } from "./worlds.ts";
+import { findWorld, worldPath, WORLDS } from "./places.ts";
 
 // The value of each tag a page carries, by its name, property, rel or title; a tag given twice is a fault.
 function tags(meta: MetaDescriptor[]): Map<string, string> {
@@ -57,6 +57,8 @@ describe("the tags of a page", () => {
     expect(page.has("og:url")).toBe(false);
   });
 
+  // In 5c the canonical is the page's own address, /w/bubble: the /net/onyx/ form of core/places (decisions, 2026-10-29)
+  // names a page that exists with 5d, and a canonical to a missing page would drop the world from search.
   test("a world's path is the one its page names as canonical", () => {
     const bubble = findWorld("bubble");
     expect(worldPath(bubble)).toBe("/w/bubble");

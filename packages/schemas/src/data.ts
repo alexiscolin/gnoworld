@@ -1,0 +1,133 @@
+// The data files' schemas (slice 5's 5c; ADR-0002 §8 row 10): the lists in app/data, checked when the app builds, so a
+// malformed file stops the build. A list may be empty, but the universes'. Nothing here is trusted: a link is https and
+// no more, a name in a path is a slug, every string and every list has a cap (DATA_CAPS), a duplicate is refused.
+import { z } from "./zod.ts";
+
+/** The most a data file may hold: rows in a list, and each kind of string, in characters. */
+export const DATA_CAPS = {
+  rows: 1000,
+  universes: 20,
+  key: 40,
+  name: 80,
+  title: 120,
+  description: 500,
+  seoDescription: 160,
+  link: 2048,
+} as const;
+
+const text = (max: number) => z.string().check(z.minLength(1), z.maxLength(max));
+
+/** A name in a path, and the id of a universe: lower case, digits, single hyphens. */
+const Slug = z.string().check(z.regex(/^[a-z0-9]+(-[a-z0-9]+)*$/), z.maxLength(DATA_CAPS.key));
+
+/** A link: https alone, a host, no credentials, no space (a `javascript:`, `data:` or `http:` link never gets in). */
+const Link = z.string().check(z.maxLength(DATA_CAPS.link), z.regex(/^https:\/\/[^\s/?#@\\]+(?:[/?#]\S*)?$/));
+
+/** The players a news item may embed, each by its own path (F885: csp.ts's frame-src names the same prefixes). */
+export const EMBED_PREFIXES = [
+  "https://www.youtube-nocookie.com/embed/",
+  "https://player.vimeo.com/video/",
+  "https://giphy.com/embed/",
+] as const;
+const EMBED_ID = [/^[A-Za-z0-9_-]{11}$/, /^\d{1,12}$/, /^[A-Za-z0-9]{1,40}$/] as const;
+const Embed = z
+  .string()
+  .check(
+    z.refine(
+      (embed) =>
+        EMBED_PREFIXES.some((prefix, i) => embed.startsWith(prefix) && EMBED_ID[i]?.test(embed.slice(prefix.length))),
+      "an embed is an accepted player's address",
+    ),
+  );
+
+/** Rows may not repeat a key: the second names the field, as the message of the build does. */
+function unique<T extends z.ZodMiniType>(rows: T, field: string, key: (row: never) => string) {
+  return rows.check(
+    z.check((ctx) => {
+      const seen = new Set<string>();
+      (ctx.value as never[]).forEach((row, index) => {
+        const k = key(row);
+        if (seen.has(k))
+          ctx.issues.push({
+            code: "custom",
+            input: ctx.value,
+            path: [index, field],
+            message: `duplicate ${field} ${JSON.stringify(k)}`,
+          });
+        seen.add(k);
+      });
+    }),
+  );
+}
+
+const list = <T extends z.ZodMiniType>(row: T) => z.array(row).check(z.maxLength(DATA_CAPS.rows));
+const byId = <T extends z.ZodMiniType>(row: T) => unique(list(row), "id", (r: { id: string }) => r.id);
+const bySlug = <T extends z.ZodMiniType>(row: T) => unique(list(row), "slug", (r: { slug: string }) => r.slug);
+const inUniverse = <T extends z.ZodMiniType>(row: T) =>
+  unique(list(row), "slug", (r: { slug: string; universe: string }) => `${r.universe}/${r.slug}`);
+
+const World = z.strictObject({
+  slug: Slug,
+  name: text(DATA_CAPS.name),
+  description: z.string().check(z.minLength(50), z.maxLength(DATA_CAPS.seoDescription)),
+  universe: Slug,
+});
+
+export const Hubs = inUniverse(World);
+export const Stations = inUniverse(World);
+export const Ecosystems = inUniverse(
+  z.strictObject({ slug: Slug, name: text(DATA_CAPS.name), description: text(DATA_CAPS.description), universe: Slug }),
+);
+export const Genres = bySlug(z.strictObject({ slug: Slug, name: text(DATA_CAPS.name) }));
+export const Events = byId(
+  z.strictObject({ id: text(DATA_CAPS.key), title: text(DATA_CAPS.title), start: z.iso.datetime(), link: Link }),
+);
+export const Expedition = byId(
+  z.strictObject({
+    id: text(DATA_CAPS.key),
+    title: text(DATA_CAPS.title),
+    description: text(DATA_CAPS.description),
+    link: Link,
+  }),
+);
+export const Quests = byId(
+  z.strictObject({ id: text(DATA_CAPS.key), title: text(DATA_CAPS.title), description: text(DATA_CAPS.description) }),
+);
+export const News = byId(
+  z.strictObject({
+    id: text(DATA_CAPS.key),
+    title: text(DATA_CAPS.title),
+    date: z.iso.date(),
+    link: Link,
+    embed: z.optional(Embed),
+  }),
+);
+
+const Universe = z.strictObject({
+  id: Slug,
+  name: text(DATA_CAPS.name),
+  chainId: text(DATA_CAPS.key),
+  rpc: Link,
+  testnet: z.boolean(),
+  default: z.optional(z.literal(true)),
+});
+
+/** The networks the site shows; exactly one is the build's default (docs/decisions.md, 2026-10-29: Onyx). */
+export const Universes = z.array(Universe).check(
+  z.maxLength(DATA_CAPS.universes),
+  z.check((ctx) => {
+    const ids = new Set<string>();
+    const chains = new Set<string>();
+    let defaults = 0;
+    ctx.value.forEach((row, index) => {
+      const issue = (field: string, message: string) =>
+        ctx.issues.push({ code: "custom", input: ctx.value, path: [index, field], message });
+      if (ids.has(row.id)) issue("id", `duplicate id ${JSON.stringify(row.id)}`);
+      if (chains.has(row.chainId)) issue("chainId", `duplicate chainId ${JSON.stringify(row.chainId)}`);
+      ids.add(row.id);
+      chains.add(row.chainId);
+      if (row.default === true && ++defaults > 1) issue("default", "a second default universe");
+    });
+    if (defaults === 0) ctx.issues.push({ code: "custom", input: ctx.value, message: "no universe is the default" });
+  }),
+);

@@ -4,6 +4,7 @@
     // The browser's DOM and JSX, which core never sees; the compiler flags come from the base.
     "lib": ["es2024", "dom", "dom.iterable"],
     "jsx": "react-jsx",
+    "resolveJsonModule": true,
     "types": []
   },
   "include": ["src", "tests"]

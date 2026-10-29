@@ -2,7 +2,7 @@
 // context ends the browser, so each test gets a browser of its own; elsewhere, Playwright's own.
 import { expect, test as base, type Page, type Response as Answer, type Worker } from "@playwright/test";
 import { VIOLATION } from "../../src/sw/report.ts";
-import { WORLDS, worldPath } from "../../src/worlds.ts";
+import { WORLDS, worldPath } from "../../src/places.ts";
 
 export { expect, type Answer, type Page };
 
