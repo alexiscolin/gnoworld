@@ -60,3 +60,4 @@
 2026-10-29 5d427d97d3bfb7f840858e2e8e10a7cdfe578817 test-auditor (red), reviewer, security-reviewer, finding-verifier (F2211)
 2026-10-29 541b089ea2d506c58de48fa69e1a4d9733b37554 chief: integration of reviewed slice-5d (five phone pictures taken again on the merged tree)
 2026-10-30 c924989d62778f09280635ca71dd2dd7d9f96b59 chief: the budget that logs (ebdd690a) and its two lost cases (29184711), their mutants checked by hand; the slice's --full judges every mutant
+2026-10-30 53b226b862a28193385674c6a628c523abf5df59 test-auditor, reviewer, finding-verifier (the Workflow branch; check.sh --merge on ec9100e1, 632 s)
