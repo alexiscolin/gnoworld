@@ -578,8 +578,9 @@ describe("outputs", () => {
     expect(forward.headers.startsWith("/*\n")).toBe(true);
   });
 
-  // nginx: a map of the decoded path, which the server's add_header reads ($csp). try_files serves a page at its directory
-  // and at its file, so each page is keyed at both and at its slashless address.
+  // nginx: a map of the decoded path, which the server's add_header reads ($csp). Each page is keyed at the paths a visitor
+  // asks (a 401 answers before try_files) and at the $uri try_files leaves: its file, and for a slashed address the file
+  // joined without merging slashes (F2460).
   const table = (nginx: string): Map<string, string> =>
     new Map(
       [...nginx.matchAll(/^\s*("?)([^"\s]+)\1\s+"([^"]*)";$/gm)].map((match) => [match[2] ?? "", match[3] ?? ""]),
@@ -596,9 +597,11 @@ describe("outputs", () => {
     expect(map.get("default")).toBe(policy([]));
     for (const [key, expected] of [
       ["/", ok],
+      ["//index.html", ok],
       ["/index.html", ok],
       ["/w/bubble", other],
       ["/w/bubble/", other],
+      ["/w/bubble//index.html", other],
       ["/w/bubble/index.html", other],
       ["/__spa-fallback.html", fallback],
     ] as const) {
@@ -606,7 +609,17 @@ describe("outputs", () => {
     }
     // Nothing else: a key for each address, no more.
     expect([...map.keys()].sort()).toEqual(
-      ["/", "/__spa-fallback.html", "/index.html", "/w/bubble", "/w/bubble/", "/w/bubble/index.html", "default"].sort(),
+      [
+        "/",
+        "//index.html",
+        "/__spa-fallback.html",
+        "/index.html",
+        "/w/bubble",
+        "/w/bubble/",
+        "/w/bubble//index.html",
+        "/w/bubble/index.html",
+        "default",
+      ].sort(),
     );
   });
 
@@ -696,5 +709,32 @@ describe("the web image's nginx", () => {
   // so the table's own map_hash_max_size after it was a duplicate, and nginx did not start.
   it("reads the table before any other map, which would set the hash sizes first", () => {
     expect(conf.search(/^\s*map /m)).toBeGreaterThan(conf.indexOf("include /etc/nginx/csp.conf;"));
+  });
+
+  // F2460: try_files joins `$uri/index.html` without merging slashes (ngx_http_try_files_module.c:270-271), so `/w/bubble/`,
+  // a directory, is served from `/w/bubble//index.html`, the $uri the table is read with: without that key the page got
+  // the bare policy, and none of its scripts ran.
+  it("keys each address of a page at the $uri that the root location's try_files leaves", () => {
+    // The table is keyed for this line: a change to it changes the keys.
+    expect(/location \/ \{\s*try_files ([^;]+);/.exec(conf)?.[1]).toBe("$uri $uri/index.html =404");
+    // nginx tries `$uri`, then `$uri/index.html`, as files, and keeps the first the disk holds (which reads a doubled slash
+    // as one), its $uri as joined.
+    const files = ["index.html", "w/bubble/index.html", "__spa-fallback.html"];
+    const served = (uri: string) =>
+      [uri, `${uri}/index.html`].find((path) => files.includes(path.replace(/\/+/g, "/").slice(1))) ?? "(no file)";
+    const home = policy([`'sha256-${"A".repeat(43)}='`]);
+    const world = policy([`'sha256-${"B".repeat(43)}='`]);
+    const fallback = policy([`'sha256-${"C".repeat(43)}='`]);
+    const { nginx } = outputs({ "index.html": home, "w/bubble/index.html": world, "__spa-fallback.html": fallback });
+    for (const [address, expected] of [
+      ["/", home],
+      ["/index.html", home],
+      ["/w/bubble", world],
+      ["/w/bubble/", world],
+      ["/w/bubble/index.html", world],
+      ["/__spa-fallback.html", fallback],
+    ] as const) {
+      expect(nginx, address).toContain(`    "${served(address)}" "${expected}";\n`);
+    }
   });
 });

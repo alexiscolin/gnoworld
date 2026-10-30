@@ -43,7 +43,10 @@ function pagesOf(client: string): [string, string][] {
     .map((file) => [`/${file.replace(/(?:^|\/)index\.html$/, "")}`, readFileSync(join(client, file), "utf8")]);
 }
 
-/** The policies a host holds for a page: _headers takes its address with and without its slash; nginx's table, also at its file. */
+/**
+ * The policies a host holds for a page: _headers takes its address with and without its slash; nginx's table, also at its
+ * file and at the $uri try_files leaves for its slashed address, the file joined without merging slashes (F2460).
+ */
 function lookups(
   address: string,
   headers: Map<string, string>,
@@ -61,6 +64,7 @@ function lookups(
     ["nginx", table.get(address)],
     ["nginx", table.get(slashed)],
     ["nginx", table.get(`${slashed}index.html`)],
+    ["nginx", table.get(`${slashed}/index.html`)],
   ];
 }
 

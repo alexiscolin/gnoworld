@@ -653,18 +653,18 @@ FAKE
 	expect "a 401 carries the policy" "$(header content-security-policy / 203.0.113.1)" "$(keyed /)"
 	expect "a 405 carries the policy" "$(header content-security-policy / 203.0.113.1 -u "$auth" -X POST)" "$(keyed /)"
 	# nginx builds the table in a hash of fixed size: the longest names the data allows (40 characters in a 40-character universe,
-	# 99-character keys) in 480 pages must give a table it starts with, and the same table without its sizes must not (so the
-	# check sees the fault). The sizes are csp.ts's rule, stated again here: a bucket of a power of two over key + 18, a table of
-	# a power of two over twice the keys.
+	# 100-character keys, a page's file as try_files joins it, F2460) in 480 pages must give a table it starts with, and the same
+	# table without its sizes must not (so the check sees the fault). The keys and sizes are csp.ts's, stated again here: a
+	# bucket of a power of two over key + 18, a table of a power of two over twice the keys.
 	longconf() { # $1 "sized" or "default": the table's directives; written to $tmp/csp.long.$1
 		python3 - "$1" >"$tmp/csp.long.$1" <<'PY'
 import sys
 policy = "default-src 'none'; script-src 'self' 'sha256-" + "A" * 43 + "='"
-keys = ["/"]
+keys = ["/", "//index.html", "/index.html"]
 for n in range(480):
     slug = str(n).rjust(40, "s")
     base = "/net/" + "u" * 40 + "/w/" + slug
-    keys += [base, base + "/", base + "/index.html"]
+    keys += [base, base + "/", base + "//index.html", base + "/index.html"]
 if sys.argv[1] == "sized":
     bucket, size = 64, 2048
     while bucket < max(map(len, keys)) + 18:

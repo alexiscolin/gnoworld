@@ -168,12 +168,14 @@ const HEADER_CAP = 2000;
 const FILE_NAME = /^[a-z0-9/._-]+$/;
 const FILE_ERROR = "csp: a page's name holds only a-z, 0-9, /, ., _ and -";
 
-// The addresses a host answers a page at, for _headers and for nginx's table ($uri is the page's file after try_files).
+// The addresses a host answers a page at: for _headers, the paths asked; for nginx's table, $uri, which is the path asked
+// until try_files (a 401 answers before it), then the file it serves, joined without merging slashes: `/w/bubble/` is
+// served from `/w/bubble//index.html` (deploy/web/nginx.conf's `try_files $uri $uri/index.html`, F2460).
 function addresses(file: string): { headers: string[]; nginx: string[] } {
-  if (file === "index.html") return { headers: ["/"], nginx: ["/", "/index.html"] };
+  if (file === "index.html") return { headers: ["/"], nginx: ["/", "//index.html", "/index.html"] };
   if (file.endsWith("/index.html")) {
     const path = `/${file.slice(0, -"/index.html".length)}`;
-    return { headers: [path, `${path}/`], nginx: [path, `${path}/`, `/${file}`] };
+    return { headers: [path, `${path}/`], nginx: [path, `${path}/`, `${path}//index.html`, `/${file}`] };
   }
   return { headers: [`/${file}`], nginx: [`/${file}`] };
 }
