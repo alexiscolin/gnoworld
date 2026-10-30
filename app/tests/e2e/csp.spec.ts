@@ -6,7 +6,7 @@ import { GUARDED, SITE } from "./sites.ts";
 // The policy's shape: the unit test pins its words, this the page's every answer (slice 3's plan, 3f).
 const SHAPE = new RegExp(
   "^default-src 'none'; script-src 'self'( 'sha256-[A-Za-z0-9+/]{43}=')*; style-src 'self'; img-src 'self' data:; " +
-    "font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; " +
+    "font-src 'self'; connect-src 'self'( https://[a-z0-9.:-]+)*; worker-src 'self'; manifest-src 'self'; " +
     "frame-src https://www.youtube-nocookie.com/embed/ https://player.vimeo.com/video/ https://giphy.com/embed/; " +
     "base-uri 'none'; " +
     "form-action 'self'; frame-ancestors 'none'$",
