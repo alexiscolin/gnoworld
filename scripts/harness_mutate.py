@@ -1168,6 +1168,12 @@ def nginx_mutants():
         ('forms = [canonical + "/", canonical, "/" + rel]', 'forms = [canonical + "/", canonical]', "asks a page at its index.html address"),
         ('forms = [canonical + "/", canonical, "/" + rel]', 'forms = [canonical, "/" + rel]', "asks a page at its slashed address"),
         ('canonical, forms = "/", ["/", "/index.html"]', 'canonical, forms = "/", ["/"]', "asks the home at /index.html"),
+        ('forms = [canonical + "/", canonical, "/" + rel]', 'forms = ["/" + rel]', "asks a page at its slashed and bare addresses"),
+        ("        if n == 0:\n            fail(", "        if False:\n            fail(", "fails on a line of the image's config that is gone"),
+        ("        if not want:\n", "        if False:\n", "names a page that _headers has no rule for"),
+        ("                elif len(got) != 1:", "                elif False:", "fails a page answering two policies"),
+        ('    conf = re.sub(r"(\\s)/tmp/(\\w+_temp)\\b", lambda m: f"{m.group(1)}{where}/{m.group(2)}", conf)\n', "", "moves the temporary paths out of /tmp"),
+        ('    conf = re.sub(r"^(\\s*pid\\s+)\\S+;", lambda m: f"{m.group(1)}{where}/nginx.pid;", conf, flags=re.M)\n', "", "moves the pid file out of /tmp"),
         ('    conf = re.sub(r"^\\s*auth_basic(_user_file)?\\s+[^;]*;\\n", "", conf, flags=re.M)', "", "serves with no password"),
         ('    return re.sub(r"(proxy_pass\\s+https?://)[A-Za-z][\\w.-]*(:\\d+;)", r"\\g<1>127.0.0.1\\2", conf)', "    return conf", "points the upstream hosts at an address"),
         ('f"listen 127.0.0.1:{ports[0]};"', 'f"listen 8080;"', "serves on a free port"),
@@ -1185,6 +1191,8 @@ def bench_load_mutants():
         ("if polls > 1 else", "if True else", "says it waited only when it did"),
         ("        if waited >= ceiling:", "        if False:", "gives up past its ceiling"),
         ("        time.sleep(min(step,", "        time.sleep(0 * min(step,", "waits between two reads of the load"),
+        ("CEILING, STEP = 600.0, 10.0", "CEILING, STEP = 1.0, 10.0", "waits up to 600 s by default"),
+        ("CEILING, STEP = 600.0, 10.0", "CEILING, STEP = 600.0, 0.0", "reads the load every 10 s by default"),
     ))
 
 

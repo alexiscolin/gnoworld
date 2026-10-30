@@ -3864,6 +3864,12 @@ for m in re.finditer(r"^\s*proxy_pass\s+https?://([^:/;\s]+)", conf, re.M):
     if not (re.fullmatch(r"\d+\.\d+\.\d+\.\d+", host) or host == "localhost"):  # nginx resolves a literal host as it loads
         print(f'nginx: [emerg] host not found in upstream "{host}" in {conf_path}', file=sys.stderr)
         sys.exit(1)
+if re.search(r"^\s*pid\s+/tmp/nginx\.pid;", conf, re.M):  # the image's pid file is in /tmp: the sandbox refuses it, or two runs collide
+    print('nginx: [emerg] open() "/tmp/nginx.pid" failed (1: Operation not permitted)', file=sys.stderr)
+    sys.exit(1)
+if re.search(r"^\s*\w+_temp_path\s+/tmp/\w+_temp;", conf, re.M):
+    print('nginx: [emerg] mkdir() "/tmp/client_temp" failed (1: Operation not permitted)', file=sys.stderr)
+    sys.exit(1)
 if os.environ.get("STUB_WARN"):
     print("nginx: [warn] " + os.environ["STUB_WARN"], file=sys.stderr)
 if test:
@@ -3905,6 +3911,8 @@ class H(http.server.BaseHTTPRequestHandler):
             uri = p + "/index.html"  # try_files joins without merging slashes: "/w/bubble/" + "/index.html"
         self.send_response(200 if uri else 404)
         self.send_header("Content-Security-Policy", rows.get(uri, default) if uri else default)
+        if os.environ.get("STUB_DOUBLE"):  # a second policy header, as two add_header rules would send
+            self.send_header("Content-Security-Policy", default)
         self.send_header("Content-Length", "0")
         self.end_headers()
     def log_message(self, *x):
@@ -3917,7 +3925,7 @@ sha=$(python3 -I -c 'import hashlib, sys; print(hashlib.sha256(open(sys.argv[1],
 chk() {
 	case "${SHA:-}" in UNSET) shaenv="-u NGINX_SHA256" ;; EMPTY) shaenv="NGINX_SHA256=" ;; "") shaenv="NGINX_SHA256=$sha" ;; *) shaenv="NGINX_SHA256=$SHA" ;; esac
 	rm -f "$nc/stub.pid"
-	(cd "$nc" && env $shaenv GNOWORLD_TOOLS="$nc/tools" STUB_LOG="$nc/stub.log" STUB_PID="$nc/stub.pid" STUB_WARN="${WARN:-}" STUB_NOSERVE="${NOSERVE:-}" python3 -I "$here/check_nginx.py" 2>&1)
+	(cd "$nc" && env $shaenv GNOWORLD_TOOLS="$nc/tools" STUB_LOG="$nc/stub.log" STUB_PID="$nc/stub.pid" STUB_WARN="${WARN:-}" STUB_NOSERVE="${NOSERVE:-}" STUB_DOUBLE="${DOUBLE:-}" python3 -I "$here/check_nginx.py" 2>&1)
 }
 # What a failed check leaves running is a server per failed merge check: the nginx it started is dead, whatever failed.
 stopped() { # $1: what failed
@@ -3928,8 +3936,9 @@ rm -f "$nc/stub.log" "$nc/stub.pid"
 out=$(chk) || fail "check_nginx refused the image's config with a good table, every page answering its own policy: $out"
 grep -q "^test " "$nc/stub.log" || fail "check_nginx ran no nginx -t"
 grep -q "^serve " "$nc/stub.log" || fail "check_nginx did not serve the build after nginx -t"
-for form in "/w/bubble/" "/w/bubble" "/w/bubble/index.html" "/index.html"; do
-	printf '%s\n' "$out" | grep -qF "$form" || fail "check_nginx did not say it asked $form: $out"
+# Whole lines: `/index.html` is a part of `/w/bubble/index.html`, and a substring said it asked an address it never did (F2619).
+for form in "/" "/index.html" "/w/bubble/" "/w/bubble" "/w/bubble/index.html"; do
+	printf '%s\n' "$out" | grep -q "^ok    GET $form -> 200, " || fail "check_nginx did not say it asked $form: $out"
 done
 # The config tested is the image's, with the build's table: no path of the image's filesystem is left in it, the table is read
 # from the build, and the served one answers a free port without the PROXY protocol or the password (a plain request has neither).
@@ -3951,6 +3960,38 @@ out=$(chk) && fail "check_nginx passed a page answering another page's policy: $
 printf '%s\n' "$out" | grep -qF "/w/bubble" || fail "check_nginx did not name the page that got another's policy: $out"
 stopped "a page that got another's policy"
 table
+# F2619: the three address forms of a page come from the page files, not from _headers. A _headers that holds only a page's bare row
+# (or only its slashed row) still has every form asked: a home that loses /index.html, or a page its slashed address, goes unseen
+# when _headers names the address itself.
+cp "$nc/app/build/client/_headers" "$nc/headers.good"
+for only in bare slashed; do
+	if [ "$only" = bare ]; then drop='^/w/bubble/$'; keep=/w/bubble/; else drop='^/w/bubble$'; keep=/w/bubble; fi
+	python3 -I -c 'import re, sys; t = open(sys.argv[1]).read(); open(sys.argv[2], "w").write(re.sub(r"^" + sys.argv[3][1:-1] + r"\n  ! Content-Security-Policy\n  Content-Security-Policy: [^\n]*\n", "", t, flags=re.M))' "$nc/headers.good" "$nc/app/build/client/_headers" "$drop"
+	grep -qx "$keep" "$nc/app/build/client/_headers" && fail "the fixture did not drop the row of the page's $only form"
+	out=$(chk) || fail "check_nginx refused a _headers holding only the $only row of a page: $out"
+	for form in "/" "/index.html" "/w/bubble/" "/w/bubble" "/w/bubble/index.html"; do
+		printf '%s\n' "$out" | grep -q "^ok    GET $form -> 200, " || fail "check_nginx did not ask $form when _headers holds only the $only row of the page: $out"
+	done
+done
+cp "$nc/headers.good" "$nc/app/build/client/_headers"
+# A page of the build that _headers has no rule for gets none: the check names the page, not only a policy that differs.
+mkdir -p "$nc/app/build/client/w/other" && printf '<html></html>\n' >"$nc/app/build/client/w/other/index.html"
+out=$(chk) && fail "check_nginx passed a page that _headers has no Content-Security-Policy rule for: $out"
+printf '%s\n' "$out" | grep -qF "has no Content-Security-Policy rule for the page w/other/index.html" || fail "check_nginx did not name the page with no rule: $out"
+stopped "a page with no rule"
+rm -r "$nc/app/build/client/w/other"
+# A page answering two policies is not answering its own.
+out=$(DOUBLE=1 chk) && fail "check_nginx passed a page answering two Content-Security-Policy headers: $out"
+printf '%s\n' "$out" | grep -qF "headers, not one" || fail "check_nginx did not say a page answered two policies: $out"
+stopped "a page answering two policies"
+# The image changed: a line this check rewrites is gone. It fails naming the line and runs nginx on nothing.
+cp "$nc/deploy/web/nginx.conf" "$nc/nginx.good"
+grep -v 'listen 127.0.0.1:8081;' "$nc/nginx.good" >"$nc/deploy/web/nginx.conf"
+rm -f "$nc/stub.log"
+out=$(chk) && fail "check_nginx tested a config that lacks a line it rewrites: $out"
+printf '%s\n' "$out" | grep -qF "has no line" || fail "check_nginx did not say the image's config changed: $out"
+[ ! -e "$nc/stub.log" ] || fail "check_nginx ran nginx on a config it could not stage"
+cp "$nc/nginx.good" "$nc/deploy/web/nginx.conf"
 # A page the build's _headers lists and the build does not hold: nginx answers 404, and the check names the page and the status.
 cp "$nc/app/build/client/_headers" "$nc/headers.good"
 printf '/gone\n  ! Content-Security-Policy\n  Content-Security-Policy: %s\n' "$bare" >>"$nc/app/build/client/_headers"
@@ -4033,7 +4074,7 @@ printf '{"files": [{"groups": [{"benchmarks": [{"name": "a line [0.2 ms]", "mean
 bload() { # $1: the load lines, one a read, separated by commas
 	rm -f "$bl/ran" "$bl/load.n" && printf '%s\n' "$1" | tr , '\n' >"$bl/seq"
 	# Bounded: a bench.py that waits for ever on a busy machine fails the case, it does not hang the suite.
-	(cd "$bl" && BENCH_FIXTURE="$bl/report.json" BENCH_RAN="$bl/ran" LOAD_SEQ="$bl/seq" LOAD_N="$bl/load.n" BENCH_WAIT_CEILING="${CEILING:-10}" BENCH_WAIT_STEP=0.05 python3 -I -c 'import subprocess, sys
+	(cd "$bl" && BENCH_FIXTURE="$bl/report.json" BENCH_RAN="$bl/ran" LOAD_SEQ="$bl/seq" LOAD_N="$bl/load.n" BENCH_WAIT_CEILING="${CEILING:-10}" BENCH_WAIT_STEP="${STEP:-0.05}" python3 -I -c 'import subprocess, sys
 try:
     r = subprocess.run([sys.executable, "-I", "scripts/bench.py"], capture_output=True, text=True, timeout=40)
 except subprocess.TimeoutExpired:
@@ -4059,6 +4100,25 @@ out=$(CEILING=1 bload "900 160") && fail "bench.py gave a verdict on a machine t
 printf '%s\n' "$out" | grep -qF "needs a machine that can measure it" || fail "bench.py did not say why it refused (a machine that can measure): $out"
 printf '%s\n' "$out" | grep -qF "90.0" || fail "bench.py did not print the load it gave up at: $out"
 [ ! -e "$bl/ran" ] || fail "bench.py ran the benches on a machine past its ceiling"
+# The pause between two reads is the step (F2620): over a 2 s ceiling with a step of 1 s the load is read a few times, not in a loop.
+out=$(CEILING=2 STEP=1 bload "900 160") && fail "bench.py gave a verdict on a machine that never fell quiet (step 1 s): $out"
+[ "$(cat "$bl/load.n")" -le 5 ] || fail "bench.py read the load $(cat "$bl/load.n") times in 2 s with a step of 1 s: it does not pause between two reads (F2620)"
+[ "$(cat "$bl/load.n")" -ge 2 ] || fail "bench.py read the load once in 2 s with a step of 1 s: it did not read again"
+# The defaults, with no switch: a ceiling of 600 s said, and a step of 10 s (one read in the first seconds). It is stopped once seen.
+rm -f "$bl/ran" "$bl/load.n" && printf '900 160\n' >"$bl/seq"
+(cd "$bl" && env -u BENCH_WAIT_CEILING -u BENCH_WAIT_STEP BENCH_FIXTURE="$bl/report.json" BENCH_RAN="$bl/ran" LOAD_SEQ="$bl/seq" LOAD_N="$bl/load.n" python3 -I scripts/bench.py >"$bl/dflt.out" 2>&1 & echo $! >"$bl/dflt.pid")
+tries=0
+until grep -q "up to" "$bl/dflt.out" 2>/dev/null; do
+	tries=$((tries + 1))
+	[ "$tries" -lt 300 ] || { kill "$(cat "$bl/dflt.pid")" 2>/dev/null; fail "bench.py with its defaults never said how long it waits: $(cat "$bl/dflt.out")"; }
+	kill -0 "$(cat "$bl/dflt.pid")" 2>/dev/null || fail "bench.py with its defaults ended at a busy load before its ceiling: $(cat "$bl/dflt.out")"
+	sleep 0.1
+done
+sleep 2
+kill -0 "$(cat "$bl/dflt.pid")" 2>/dev/null || fail "bench.py with its defaults gave up within seconds at a busy load: $(cat "$bl/dflt.out")"
+kill "$(cat "$bl/dflt.pid")" 2>/dev/null
+grep -qF "up to 600 s" "$bl/dflt.out" || fail "bench.py's default ceiling is not 600 s (F2620): $(cat "$bl/dflt.out")"
+[ "$(cat "$bl/load.n")" -le 2 ] || fail "bench.py's default step is not seconds long: $(cat "$bl/load.n") reads within 3 s (F2620)"
 # A load that cannot be read is no quiet one: bench.py refuses, saying so, and runs no bench (it would measure a busy machine unannounced),
 # whether load.py fails, prints nothing or garbage, or reports no core.
 cp "$bl/scripts/load.py" "$bl/load.good"
