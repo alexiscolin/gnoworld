@@ -3020,6 +3020,65 @@ printf 'x\n' >"$b/src/node_modules/pkg/i.js" && printf 'x\n' >"$b/src/.stryker-t
 [ ! -e "$b/copy/.stryker-tmp" ] || fail "borrow_node_modules.sh copied a StrykerJS sandbox into the staged copy (F2414): $(find "$b/copy/.stryker-tmp" -maxdepth 2 | head -5)"
 fi
 
+# The heavy sections are split (the brief, item 5): a change of harness_mutate.py rejudges its ~90 own mutants, each running
+# its sections; one of 400 lines made each run the whole. No section of these two families is past 150 lines, each family
+# holds more than one, and harness_mutate.py's SECTIONS (read as the data it is, not as text) names every section of this
+# file for the guard files that matter to it: a mention in a comment proves nothing. A file lists a proper part of a split family
+# unless it guards the whole of it, which `whole` lists.
+if part sections_split; then
+sizes=$(awk '/^if part /{n=$3; sub(/;$/, "", n); c=0} n!=""{c++} /^fi$/ && n!=""{print n, c; n=""}' "$here/test_hooks.sh")
+for family in gate_full harness_shards; do
+	names=$(printf '%s\n' "$sizes" | awk -v f="$family" 'index($1, f) == 1 {print $1}')
+	[ "$(printf '%s\n' "$names" | grep -c .)" -ge 2 ] || fail "test_hooks.sh holds $(printf '%s\n' "$names" | grep -c .) section of $family: split it, so a mutant reruns its own case"
+	printf '%s\n' "$sizes" | awk -v f="$family" 'index($1, f) == 1 && $2 > 150 {print $1, $2}' | grep . && fail "a section of $family is past 150 lines: split it"
+done
+printf '%s\n' "$sizes" | python3 -I -c '
+import ast, re, sys
+sizes = [line.split()[0] for line in sys.stdin.read().splitlines() if line]
+src = open(sys.argv[1]).read()
+tree = ast.parse(src)
+table = next(ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast.Assign) and any(getattr(t, "id", "") == "SECTIONS" for t in n.targets))
+listed = {}  # file -> the hooks sections it names
+for path, only in table.items():
+    names = only.get("hooks", "") if isinstance(only, dict) else only
+    listed[path] = set(names.split(",")) - {""}
+problems = []
+# What must guard what: the new guards, by file.
+need = {
+    "scripts/check.sh": {"gate_journeys", "gate_checks", "gate_stryker"},
+    ".githooks/pre-commit": {"gate_checks"},
+    "scripts/borrow_node_modules.sh": {"borrow"},
+    "vitest.config.ts": {"vitest_stryker"},
+    "scripts/journeys.py": {"gate_journeys"},
+}
+for path, sections in need.items():
+    missing = sections - listed.get(path, set())
+    if missing:
+        problems.append(path + " is not mapped to " + ",".join(sorted(missing)) + ": removing its guard would run no test that sees it")
+whole = {"harness_shards": {"scripts/harness_mutate.py", "scripts/repo_files.py", "scripts/suite_parts.py", "scripts/test_hooks.sh"}, "gate_full": {"scripts/check.sh", "scripts/test_hooks.sh"}}
+for family, owners in whole.items():
+    members = {s for s in sizes if s.startswith(family)}
+    if not any(members & l for l in listed.values()):
+        problems.append(f"no file is mapped to any section of {family}")
+    for path, l in listed.items():
+        if members <= l and path not in owners:
+            problems.append(f"{path} is mapped to every section of {family}: its mutants rerun them all; name the ones that see it")
+    for path in owners - {"scripts/test_hooks.sh"}:
+        if path in listed and not members & listed[path]:
+            problems.append(f"{path} names no section of {family}")
+    # The file the family tests whole names every section of it.
+    main = "scripts/harness_mutate.py" if family == "harness_shards" else "scripts/check.sh"
+    if members - listed.get(main, set()):
+        problems.append(main + " is not mapped to " + ",".join(sorted(members - listed.get(main, set()))))
+for s in sizes:
+    if s != "sections_split" and not any(s in l for l in listed.values()):
+        problems.append(f"no guard file is mapped to the section {s}: a mutant would never rerun it")
+if problems:
+    sys.exit("harness_mutate.py SECTIONS: " + "; ".join(problems))
+' "$here/harness_mutate.py" || fail "harness_mutate.py's SECTIONS do not name the sections that see its guards"
+:
+fi
+
 if part guard; then
 # guard: no git hook skipped, no forced push, gno only through gnomcp. Exit 2 blocks the call.
 gd="$here"/guard.py

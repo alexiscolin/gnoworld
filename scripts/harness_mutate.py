@@ -196,8 +196,8 @@ def stryker_mutants():
         ("if [ -L .stryker-tmp ]; then rm .stryker-tmp; elif", "if false; then rm .stryker-tmp; elif", "does not follow a link named .stryker-tmp"),
     ):
         yield from each(check, find, replace, "hooks", f"check.sh {label}")
-    yield from each("vitest.config.ts", ", STRYKER_TMP] }", "] }", "probe", "vitest benches nothing a StrykerJS sandbox left (5n)")
-    yield from each("vitest.config.ts", 'const STRYKER_TMP = "**/.stryker-tmp/**";', 'const STRYKER_TMP = "**/.nothing/**";', "probe", "vitest's exclusion names StrykerJS's folder (5n)")
+    yield from each("vitest.config.ts", ", STRYKER_TMP] }", "] }", "hooks", "vitest benches nothing a StrykerJS sandbox left (5n)")
+    yield from each("vitest.config.ts", 'const STRYKER_TMP = "**/.stryker-tmp/**";', 'const STRYKER_TMP = "**/.nothing/**";', "hooks", "vitest's exclusion names StrykerJS's folder (5n)")
     yield from each("scripts/borrow_node_modules.sh", " -not -path './.stryker-tmp/*'", "", "hooks", "borrow_node_modules.sh borrows nothing of a StrykerJS sandbox (F2414)")
 
 
