@@ -311,7 +311,12 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "noindex only on success" "the 401 is not indexed" nginx sed 's#X-Robots-Tag "noindex" always#X-Robots-Tag "noindex"#'
 	mutant "sniffing allowed" "is never sniffed" nginx sed '/X-Content-Type-Options/d'
 	mutant "the referrer sent along" "names no referrer to another site" nginx sed '/Referrer-Policy/d'
-	mutant "no content security policy" "carries the policy" nginx sed '/include \/etc\/nginx\/csp.conf;/d'
+	mutant "no content security policy" "carries its own policy" nginx sed '/add_header Content-Security-Policy $csp always;/d'
+	mutant "a content security policy on success only" "a 401 carries the policy" \
+		nginx sed 's#add_header Content-Security-Policy $csp always;#add_header Content-Security-Policy $csp;#'
+	mutant "one policy for every page" "carries its own policy" \
+		nginx sed "s#add_header Content-Security-Policy \$csp always;#add_header Content-Security-Policy \"default-src 'none'\" always;#"
+	mutant "the table not read" "carries its own policy" nginx sed 's#include /etc/nginx/csp.conf;#map $uri $csp { default ""; }#'
 	mutant "hashed files not kept" "is kept a year" nginx sed 's#public, max-age=31536000, immutable#no-cache#'
 	mutant "an error on a hashed file kept a year" "a 401 on a hashed file revalidates" \
 		nginx sed 's#~^(200|206|304)/assets/#~^[0-9]*/assets/#'
@@ -623,14 +628,65 @@ FAKE
 	for path in $pages /nowhere /sw.js /manifest.webmanifest /icon-192.png; do
 		expect "$path revalidates" "$(header cache-control "$path" 203.0.113.1 -u "$auth")" no-cache
 	done
-	# The build's policy, the one the image's include sets, on every answer: pages, files, errors.
-	policy=$(docker exec "$web" cat /etc/nginx/csp.conf | sed -n 's/^add_header Content-Security-Policy "\(.*\)" always;$/\1/p')
-	case $policy in "default-src 'none'; script-src 'self' 'sha256-"*) pass "the image holds the build's policy" ;; *) fail "no policy in the image's csp.conf" ;; esac
-	for path in $pages /nowhere /sw.js /manifest.webmanifest /icon-192.png $assets; do
-		expect "$path carries the policy" "$(header content-security-policy "$path" 203.0.113.1 -u "$auth")" "$policy"
+	# The build's policies (app/src/csp.ts, 5f): the table the image's csp.conf holds, a policy for each page by its path and a
+	# bare one (no script hash) for any other answer. Each answer carries the policy of the file nginx serves it from ($uri).
+	conf=$(docker exec "$web" cat /etc/nginx/csp.conf)
+	bare=$(printf '%s\n' "$conf" | sed -n 's/^    default "\(.*\)";$/\1/p')
+	keyed() { printf '%s\n' "$conf" | awk -v key="\"$1\"" '$1 == key { sub(/^ *"[^"]*" "/, ""); sub(/";$/, ""); print }'; }
+	case $bare in "default-src 'none'; script-src 'self'; style-src 'self'; "*) pass "the image holds the bare policy" ;; *) fail "no bare policy in the image's csp.conf" ;; esac
+	for path in $pages; do
+		own=$(keyed "$path")
+		case $own in "default-src 'none'; script-src 'self' 'sha256-"*) pass "$path has a policy of its own in the table" ;; *) fail "$path has none in the table" ;; esac
+		expect "$path carries its own policy" "$(header content-security-policy "$path" 203.0.113.1 -u "$auth")" "$own"
+		if [ "$path" = / ]; then
+			expect "/index.html carries its own policy" "$(header content-security-policy /index.html 203.0.113.1 -u "$auth")" "$own"
+		else
+			expect "$path/ carries its own policy" "$(header content-security-policy "$path/" 203.0.113.1 -u "$auth")" "$own"
+			expect "$path/index.html carries its own policy" "$(header content-security-policy "$path/index.html" 203.0.113.1 -u "$auth")" "$own"
+		fi
 	done
-	expect "a 401 carries the policy" "$(header content-security-policy / 203.0.113.1)" "$policy"
-	expect "a 405 carries the policy" "$(header content-security-policy / 203.0.113.1 -u "$auth" -X POST)" "$policy"
+	at_least "the policies the pages carry differ" "$(for path in $pages; do keyed "$path"; done | sort -u | grep -c . || true)" 2
+	expect "an address that is no page carries the fallback's policy" "$(header content-security-policy /nowhere 203.0.113.1 -u "$auth")" "$(keyed /__spa-fallback.html)"
+	for path in /sw.js /manifest.webmanifest /icon-192.png /api/x $assets; do
+		expect "$path carries the bare policy" "$(header content-security-policy "$path" 203.0.113.1 -u "$auth")" "$bare"
+	done
+	expect "a 401 carries the policy" "$(header content-security-policy / 203.0.113.1)" "$(keyed /)"
+	expect "a 405 carries the policy" "$(header content-security-policy / 203.0.113.1 -u "$auth" -X POST)" "$(keyed /)"
+	# nginx builds the table in a hash of fixed size: the longest names the data allows (40 characters in a 40-character universe,
+	# 99-character keys) in 480 pages must give a table it starts with, and the same table without its sizes must not (so the
+	# check sees the fault). The sizes are csp.ts's rule, stated again here: a bucket of a power of two over key + 18, a table of
+	# a power of two over twice the keys.
+	longconf() { # $1 "sized" or "default": the table's directives; written to $tmp/csp.long.$1
+		python3 - "$1" >"$tmp/csp.long.$1" <<'PY'
+import sys
+policy = "default-src 'none'; script-src 'self' 'sha256-" + "A" * 43 + "='"
+keys = ["/"]
+for n in range(480):
+    slug = str(n).rjust(40, "s")
+    base = "/net/" + "u" * 40 + "/w/" + slug
+    keys += [base, base + "/", base + "/index.html"]
+if sys.argv[1] == "sized":
+    bucket, size = 64, 2048
+    while bucket < max(map(len, keys)) + 18:
+        bucket *= 2
+    while size < 2 * (len(keys) + 1):
+        size *= 2
+    print("map_hash_max_size %d;\nmap_hash_bucket_size %d;" % (size, bucket))
+print("map $uri $csp {\n    default \"%s\";" % policy)
+for key in keys:
+    print("    \"%s\" \"%s\";" % (key, policy))
+print("}")
+PY
+		chmod 644 "$tmp/csp.long.$1"
+	}
+	nginx_t() { # nginx -t on the image's own nginx.conf, with the table $1 in place of the build's, on the stack's network
+		docker run --rm --network "$inside" -v "$tmp/csp.long.$1:/etc/nginx/csp.conf:ro" --entrypoint nginx \
+			"$(docker inspect --format '{{.Image}}' "$web")" -t 2>&1 || true
+	}
+	longconf sized
+	longconf default
+	case $(nginx_t sized) in *"test is successful"*) pass "nginx starts with the table of the longest names" ;; *) fail "nginx does not start with the table of the longest names" ;; esac
+	case $(nginx_t default) in *"map_hash_max_size or map_hash_bucket_size"*) pass "nginx refuses the same table with its default hash sizes" ;; *) fail "nginx takes the table of the longest names with its default hash sizes: the sizes prove nothing" ;; esac
 	for path in $assets; do
 		expect "$path is kept a year" "$(header cache-control "$path" 203.0.113.1 -u "$auth")" "public, max-age=31536000, immutable"
 	done
@@ -656,7 +712,7 @@ FAKE
 		--haproxy-clientip 198.51.100.4 -u "$auth" "http://web:8080$first?[1-400]" || true)
 	at_least "a burst on a hashed file gets 429" "$(printf '%s\n' "$kept" | grep -c '^429 ' || true)" 200
 	expect "a 429 on a hashed file revalidates" "$(printf '%s\n' "$kept" | grep '^429 ' | cut -d'|' -f1 | sort -u)" "429 no-cache"
-	expect "a 429 carries the policy" "$(printf '%s\n' "$kept" | grep '^429 ' | cut -d'|' -f2- | sort -u)" "$policy"
+	expect "a 429 carries the policy" "$(printf '%s\n' "$kept" | grep '^429 ' | cut -d'|' -f2- | sort -u)" "$bare"
 	expect "a 401 on a hashed file revalidates" "$(header cache-control "$first" 203.0.113.1)" no-cache
 	urls=""
 	for path in $pages /sw.js /manifest.webmanifest /icon-192.png /icon-512.png $assets; do urls="$urls http://web:8080$path"; done
