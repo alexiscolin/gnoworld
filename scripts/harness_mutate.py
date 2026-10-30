@@ -300,7 +300,9 @@ def mutants():
     yield from each(hm, "context = code(" "outside", "context = (outside", "hooks", "a cached verdict does not stand on a suite's blank lines")
     yield from each(hm, "sha256(code(" "mutated)", "sha256((mutated)", "hooks", "a cached verdict does not stand on its file's blank lines")
     yield from each(hm, '"--no-renames", "--no-color"' ', "--no-ext-diff"', '"--no-renames", "--no-ext-diff"', "hooks", "harness_mutate --changed reads the hunks whatever git's colours")
-    yield from each(hm, '"--no-color", "--no-ext-diff"' ", base", '"--no-color", base', "hooks", "harness_mutate --changed reads the hunks whatever git's external diff")
+    yield from each(hm, '"--no-color", "--no-ext-diff"' ', "--text"', '"--no-color", "--text"', "hooks", "harness_mutate --changed reads the hunks whatever git's external diff")
+    yield from each(hm, '"--no-ext-diff", "--text"' ', "--no-textconv"', '"--no-ext-diff", "--no-textconv"', "hooks", "harness_mutate --changed reads a file marked -diff as text, not as Binary files differ (F2537)")
+    yield from each(hm, '"--text", "--no-textconv"' ", base", '"--text", base', "hooks", "harness_mutate --changed reads the hunks whatever a textconv (F2537)")
     yield from each(hm, "int(hunk.group(2)" " or 1)", "int(hunk.group(2) or 0)", "hooks", "harness_mutate --changed reads a hunk of one line, which git writes with no count")
     yield from each(hm, "if count else {start," " start + 1}", "if count else set()", "hooks", "harness_mutate --changed: a removed line touches the two beside it")
     yield from each(hm, "if count else {start," " start + 1}", "if count else {start}", "hooks", "harness_mutate --changed: a removed line touches the line after it")
@@ -1111,7 +1113,7 @@ HUNK = re.compile(r"^@@ -\S+ \+(\d+)(?:,(\d+))? @@", re.M)
 def changed_lines(base, path):
     """The lines of HEAD's `path` that changed since base; a hunk of count 0, which only removes, touches the two beside it."""
     lines = set()
-    for hunk in HUNK.finditer(git("diff", "-U0", "--no-renames", "--no-color", "--no-ext-diff", base, "HEAD", "--", path)):
+    for hunk in HUNK.finditer(git("diff", "-U0", "--no-renames", "--no-color", "--no-ext-diff", "--text", "--no-textconv", base, "HEAD", "--", path)):
         start, count = int(hunk.group(1)), int(hunk.group(2) or 1)
         lines |= set(range(start, start + count)) if count else {start, start + 1}
     return lines

@@ -879,6 +879,18 @@ printf 'LINE1 changed\nLINE2\n' >"$hs/repo/m.txt" && git -C "$hs/repo" commit -q
 out=$(LINED=1 shards 2 --changed "$base") || fail "harness_mutate --changed failed on a changed line: $out"
 printf '%s\n' "$out" | grep -q "killed: planted line1 #1$" || fail "harness_mutate --changed skipped the changed line's mutant: $out"
 [ "$(verdicts "$out")" = 1 ] && printf '%s\n' "$out" | grep -q " 1 of 9 mutants" || fail "harness_mutate --changed asked for more than the changed line's mutant: $out"
+# A file the branch marks `-diff` in .gitattributes (or one with a NUL byte) makes git print "Binary files differ", and a textconv
+# can turn its text into another: the changed lines are read as text, as the file is (F2537; merge.sh and scan_secrets.sh do too).
+base=$(git -C "$hs/repo" rev-parse HEAD)
+printf '* -diff\n' >"$hs/repo/.gitattributes" && printf 'LINE1 again\nLINE2\n' >"$hs/repo/m.txt" && git -C "$hs/repo" add .gitattributes && git -C "$hs/repo" commit -qam "a line changed, diff off"
+out=$(LINED=1 shards 2 --changed "$base") || fail "harness_mutate --changed failed on a file marked -diff: $out"
+printf '%s\n' "$out" | grep -q "killed: planted line1 #1$" || fail "harness_mutate --changed skipped the changed line of a file marked -diff: $out"
+[ "$(verdicts "$out")" = 1 ] && printf '%s\n' "$out" | grep -q " 1 of 9 mutants" || fail "harness_mutate --changed did not ask for the one changed line of a file marked -diff: $out"
+base=$(git -C "$hs/repo" rev-parse HEAD)
+printf 'm.txt diff=nc\n' >"$hs/repo/.gitattributes" && printf 'LINE1 once more\nLINE2\n' >"$hs/repo/m.txt" && git -C "$hs/repo" config diff.nc.textconv true && git -C "$hs/repo" commit -qam "a line changed, textconv"
+out=$(LINED=1 shards 2 --changed "$base") || fail "harness_mutate --changed failed on a file with a textconv: $out"
+printf '%s\n' "$out" | grep -q "killed: planted line1 #1$" || fail "harness_mutate --changed skipped the changed line of a file with a textconv: $out"
+git -C "$hs/repo" config --unset diff.nc.textconv && git -C "$hs/repo" rm -q .gitattributes && git -C "$hs/repo" commit -qm "no attributes"
 git -C "$hs/repo" config --unset color.ui && git -C "$hs/repo" config --unset diff.external
 # More than 100 to judge: --changed stops before any tree beyond the first, any control, any verdict, and says how many,
 # from where, and the way on. A control that fails proves a run got past the limit with nothing judged: 100 goes on, and
