@@ -100,6 +100,14 @@ Alexis, 2026-10-23: slice 3's reviews found these; none bites today, each comes 
 | A Threads view and following a thread | A view of the threads the account is in, with unread at the top, and a follow set (on the server or the device) with per-thread unread and notifications, as `docs/decisions.md:161` first named them | Narrowed out of slice 4 on 2026-10-27: the thread is read from the room's lines, with no follow state (M3); both need a store nothing holds yet |
 | A thread kept whole when a middle reply is deleted | A root map in the room's store (each reply's root, kept as a line arrives), so a deleted reply's own replies stay in the thread, and a thread's replies are found past the window | Accepted as a limit on 2026-10-27: `threadsOf` reads the window's lines, so a reply to a line gone is a thread of that msgid; a store's shape is Alexis's to approve |
 
+## Slice 5, after part 1's review
+
+| Item | Delivers | Why |
+|---|---|---|
+| More worlds than `_headers` holds (F2461) | The build's stop at 100 rules, about 20 worlds, replaced before the data reaches it: a host's rules that scale, and no stop for nginx, which has no such cap | Alexis, 2026-10-30: kept for now, one world today; the data's growth decides when |
+| A Combobox group's id (F2410) | `ui`'s `Combobox` says or checks that a group's id holds no space and no repeat, since it is joined into `aria-labelledby`; with its next change | An id with a space leaves the group unnamed for a screen reader; the palette's kinds have none today |
+| The composer's lost key (F2411) | The cause of the Home and End lost after a Tab's focus found, and `composer.spec.ts`'s `caretAt` stops pressing them again | The test retries, so a composer that loses the first key would still pass; F2402 left the cause unexplained |
+
 ## The design system, after slice 2
 
 Alexis, 2026-10-21: 2e's and 2f's reviews found these; each is true and none bites today, so each
