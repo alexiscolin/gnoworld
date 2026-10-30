@@ -118,19 +118,24 @@ const commits = [];
 const low = [];
 const judged = [];
 const verdicts = [];
-// The tier-1 paths of docs/REVIEW.md's table that exist: the harness, the realms, the CSP, the deploy folder, the markdown scanner, Adena, the
-// server's login and the admin API's rights, the worker. A check in scripts/test_hooks.sh (workflow_branch) fails when the table names a path this list lacks.
+// The tier-1 paths of docs/REVIEW.md's table that exist: the harness, the realms, the relay's auth script, the CSP, the deploy folder, the markdown
+// scanner, Adena, the login (server and client), the admin API's rights, the worker. A check in scripts/test_hooks.sh (workflow_branch) fails when the
+// table names in backticks a path this list lacks, or this list holds one the table does not name.
 const TIER1 = [
   "scripts/",
   ".githooks/",
   ".github/",
   ".claude/",
   "gno/",
+  "server/src/ergo/",
   "app/src/csp.ts",
   "deploy/",
   "packages/core/src/markdown/",
   "app/src/lib/adena/",
   "server/src/login/",
+  "app/src/features/login/",
+  "app/src/lib/api/login.ts",
+  "app/src/lib/ergo/",
   "server/src/roles/",
   "server/roles.json",
   "app/src/sw/",

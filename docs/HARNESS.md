@@ -39,9 +39,10 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
   pass, the code, the merge check, one combined review, the high and medium fixes, the merge check
   again; it returns its commits, the low findings for Alexis, the lines that loosen the net and its tokens.
   An agent that gives no report blocks it; the harness's and the realms' files bring their reviews
-  whatever its arguments say, and so does every tier-1 path of `docs/REVIEW.md`'s table that exists (the CSP,
-  `deploy/`, `core/markdown`, `lib/adena`, the server's login and roles, the worker): a `workflow_branch` case
-  fails when the table names a path its `TIER1` lacks. Its argument `base` (`main` when absent) is the branch the
+  whatever its arguments say, and so does every tier-1 path of `docs/REVIEW.md`'s table that exists (the relay's auth script,
+  the CSP, `deploy/`, `core/markdown`, `lib/adena`, the login of the server and of the client, the server's roles, the worker): the
+  table writes each path in backticks, and a `workflow_branch` case fails when the table names one its `TIER1` lacks, or `TIER1` holds
+  one the table does not name. Its argument `base` (`main` when absent) is the branch the
   work is cut from: the merge check's file list, the reviewer's diff and `since` read from it. The merge check
   reports the `survivor: ` lines `check.sh --merge` prints, pass or fail, and the reviewer gets them.
   `test_hooks.sh`'s section `workflow_branch` runs it under stubbed globals.

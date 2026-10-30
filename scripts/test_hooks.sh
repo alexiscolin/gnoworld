@@ -3508,7 +3508,8 @@ const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
   // Two files of each folder, so a prefix cut to one file fails (server/src/login/ is also ticket.ts and routes.ts).
   for (const file of ["app/src/csp.ts", "deploy/test.sh", "deploy/compose.yaml", "deploy/web/nginx.conf", "packages/core/src/markdown/inline.ts", "packages/core/src/markdown/scan.ts",
     "app/src/lib/adena/adena.ts", "app/src/lib/adena/digest.ts", "server/src/login/login.ts", "server/src/login/ticket.ts", "server/src/roles/roles.ts", "server/roles.json",
-    "app/src/sw/worker.ts", "app/src/sw/register.ts"]) {
+    "app/src/sw/worker.ts", "app/src/sw/register.ts", "server/src/ergo/auth.ts", "app/src/features/login/logIn.ts", "app/src/features/login/LoginView.tsx",
+    "app/src/lib/api/login.ts", "app/src/lib/ergo/ergo.ts", "app/src/lib/ergo/handshake.ts"]) {
     const labels = await lensOf(file);
     ok(labels.includes("security"), `a change of ${file} alone ran no security lens: ${labels}`);
     ok(labels.includes("verifier"), `a security finding in ${file} never reached the finding-verifier: ${labels}`);
@@ -3532,6 +3533,18 @@ const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
     const table = readFileSync(root + "/docs/REVIEW.md", "utf8").split("\n").filter((l) => l.startsWith("| 1 |"));
     const paths = [...new Set(table.flatMap((l) => [...l.matchAll(/`([^`]*\/[^`]*)`/g)].map((m) => m[1])))];
     ok(paths.length >= 3, `the tier-1 rows of docs/REVIEW.md name no path I can read: ${paths}`);
+    // Both ways (F2530): a path of TIER1 that no tier-1 row names is a review nobody asked for, and a row written in prose, with
+    // no path in backticks, would pass the loop above unseen. The harness's folders and gno/ are tier 1 by the harness's own rule;
+    // the realms' two folders are the table's `gno/r/` and `gno/p/`.
+    {
+      const src = readFileSync(root + "/.claude/workflows/branch.js", "utf8");
+      const block = src.slice(src.indexOf("const TIER1 = ["), src.indexOf("...(A.tier1"));
+      const listed = [...block.matchAll(/^\s+"([^"]+)",$/gm)].map((m) => m[1]).filter((e) => !["scripts/", ".githooks/", ".github/", ".claude/", "gno/"].includes(e));
+      const named = paths.filter((e) => !["gno/r/", "gno/p/"].includes(e));
+      ok(listed.length >= 10, `I read no TIER1 list in branch.js: ${listed}`);
+      for (const e of listed) ok(named.includes(e), `branch.js's TIER1 holds ${e}, which no tier-1 row of docs/REVIEW.md names in backticks`);
+      for (const e of named) ok(listed.includes(e), `docs/REVIEW.md names ${e} as tier 1 in backticks, which branch.js's TIER1 lacks`);
+    }
     for (const path of paths) {
       const files = tracked.filter((f) => (f.startsWith(path) || f.includes("/" + path)) && !f.endsWith(".test.ts"));
       if (!files.length) continue;
