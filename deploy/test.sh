@@ -1016,11 +1016,15 @@ CLIENT
 	expect "web's settings say proxy_buffering off" "$(docker exec "$web" cat /etc/nginx/nginx.conf | grep -c 'proxy_buffering off;')" 1
 	# Compressed at the level the budgets measure (F683), by its effect and not its line (a commented-out line, or one in
 	# another block, would count): a hashed file fetched with and without gzip. The compressed answer is within 1% of
-	# zlib's level 6 of the file (nginx's compressor), and nearer it than level 1, nginx's own default, 14% bigger.
-	asset() { docker run --rm --network "$inside" "$CURL" -s --haproxy-protocol --haproxy-clientip 203.0.113.71 -u "$auth" "$@" "http://web:8080$first"; }
+	# zlib's level 6 of the file (nginx's compressor), and nearer it than level 1, nginx's own default, 14% bigger. The
+	# file is the client's entry, some 200 KB: below a few hundred bytes both levels give the same size, and the first
+	# file of the list, a 203-byte stylesheet since slice 5, could not tell them apart (2026-10-30, Alexis).
+	entry=$(printf '%s\n' "$assets" | grep '^/assets/entry\.client-' | head -1 || true)
+	expect "the worker lists the client's entry, the file the compression is judged on" "$(printf '%s' "$entry" | grep -c . || true)" 1
+	asset() { docker run --rm --network "$inside" "$CURL" -s --haproxy-protocol --haproxy-clientip 203.0.113.71 -u "$auth" "$@" "http://web:8080$entry"; }
 	asset >"$tmp/asset.raw"
 	asset -H 'Accept-Encoding: gzip' >"$tmp/asset.gz"
-	expect "web compresses $first at level 6, not nginx's level 1" "$(python3 - "$tmp/asset.raw" "$tmp/asset.gz" <<'PY'
+	expect "web compresses $entry at level 6, not nginx's level 1" "$(python3 - "$tmp/asset.raw" "$tmp/asset.gz" <<'PY'
 import sys, zlib
 raw = open(sys.argv[1], "rb").read()
 got = len(open(sys.argv[2], "rb").read())
