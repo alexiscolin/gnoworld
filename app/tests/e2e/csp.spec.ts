@@ -53,10 +53,12 @@ test.describe("the content security policy", () => {
     // The pre-rendered pages, and the fallback a path the build never made gets.
     for (const path of [...PAGES, "/nowhere"]) {
       const html = await (await request.get(path)).text();
-      // The browser's own parser and digest, apart from the build's reading of the same pages.
+      // The browser's own parser and digest, apart from the build's reading of the same pages. A JSON-LD block runs nothing: no hash.
       const found = await page.evaluate(async (source) => {
         const scripts = [...new DOMParser().parseFromString(source, "text/html").scripts];
-        const texts = scripts.filter((script) => !script.hasAttribute("src")).map((script) => script.text);
+        const texts = scripts
+          .filter((script) => !script.hasAttribute("src") && script.type !== "application/ld+json")
+          .map((script) => script.text);
         return Promise.all(
           texts.map(async (text) => {
             const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));

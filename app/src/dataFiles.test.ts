@@ -4,7 +4,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadData, MAX_FILE_BYTES } from "./dataFiles.ts";
+import { sha256 } from "./csp.ts";
 import { at, FAULTS, plant } from "./dataFixture.ts";
+
+// Markup, a comment opener and a line separator in a description: what JSON-LD must carry as text.
+const HOSTILE = "</script><script>alert(1)</script><!-- \u2028";
+/** The text of each JSON-LD script of a page, as the browser reads it. */
+const ldScripts = (html: string): string[] =>
+  [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((match) => match[1] ?? "");
 
 // Slice 5's 5c: the data files read and checked at build time (docs/plans/slice-5.md §3, "Data files").
 describe("loadData", () => {
@@ -222,9 +229,61 @@ describe("react-router build", () => {
       expect(existsSync(join(client, "w", "other"))).toBe(false);
       expect(existsSync(join(client, "e", "other"))).toBe(false);
       // csp.ts's one header line holds every page's hashes: a host may cut a _headers line past 2,000 characters, and
-      // each world now writes two pages in the default universe. This set has three worlds and an ecosystem.
+      // each world now writes two pages in the default universe. This set has three worlds and an ecosystem, and each page
+      // carries a JSON-LD, which the policy leaves unhashed (5e).
       const headers = readFileSync(join(client, "_headers"), "utf8").split("\n")[1] ?? "";
       expect(headers.length, "the _headers policy line").toBeLessThan(2000);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  // Slice 5's 5e: the build writes what a search engine reads, from the same data: the mainnet's places in sitemap.xml, robots.txt
+  // naming it, and the pages' tags (a testnet's page noindex, a card and a JSON-LD on each).
+  it("writes sitemap.xml and robots.txt, and tags each page", { timeout: 120_000 }, async () => {
+    const dir = plant((files) => {
+      const hubs = files["hubs.json"] as Record<string, unknown>[];
+      // Hostile text in a description, which the schema lets through: it must stay text in the page's JSON-LD.
+      hubs.push({
+        ...hubs[0],
+        slug: "other",
+        name: "Other",
+        universe: "gnoland",
+        description: `${HOSTILE} ${"B".repeat(60)}`,
+      });
+    });
+    try {
+      const run = build(dir);
+      expect(run.status, `${run.stdout}${run.stderr}`).toBe(0);
+      const client = join(copy, "build", "client");
+      const sitemap = readFileSync(join(client, "sitemap.xml"), "utf8");
+      const locs = [...sitemap.matchAll(/<loc>([^<]*)<\/loc>/g)].map((match) => match[1]).sort();
+      expect(locs).toEqual(
+        [
+          "https://gno.world/list",
+          "https://gno.world/net/gnoland/",
+          "https://gno.world/net/gnoland/earth",
+          "https://gno.world/net/gnoland/w/other",
+        ].sort(),
+      );
+      expect(readFileSync(join(client, "robots.txt"), "utf8")).toContain("Sitemap: https://gno.world/sitemap.xml");
+      const page = (...path: string[]) => readFileSync(join(client, ...path, "index.html"), "utf8");
+      const onyx = page("w", "bubble");
+      expect(onyx).toContain('<meta name="robots" content="noindex"/>');
+      expect(onyx).toContain('<meta name="twitter:card" content="summary"/>');
+      expect(onyx).toMatch(/<script type="application\/ld\+json">[^<]*"@type":"WebPage"[^<]*<\/script>/);
+      const mainnet = page("net", "gnoland", "w", "other");
+      expect(mainnet).not.toContain('name="robots"');
+      expect(mainnet).toContain('<meta name="twitter:card" content="summary"/>');
+      // One JSON-LD, whose text is the description as planted; no second script the hostile text could have opened.
+      const lds = ldScripts(mainnet);
+      expect(lds).toHaveLength(1);
+      expect(JSON.parse(lds[0] ?? "")).toMatchObject({ description: `${HOSTILE} ${"B".repeat(60)}` });
+      expect(mainnet).not.toContain("<script>alert(1)");
+      expect(mainnet.match(/<script\b/g)).toHaveLength(page("w", "bubble").match(/<script\b/g)?.length ?? -1);
+      // A data block runs nothing, so the policy names no hash for it: it would only fill the header line.
+      const policy = readFileSync(join(client, "_headers"), "utf8");
+      for (const text of [...ldScripts(onyx), ...lds]) expect(policy).not.toContain(await sha256(text));
     } finally {
       rmSync(dir, { recursive: true });
     }

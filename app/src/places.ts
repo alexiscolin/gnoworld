@@ -16,6 +16,8 @@ export interface Listed {
   name: string;
   description: string;
   universe: string;
+  /** Whether its universe is a testnet: its page is not indexed. */
+  testnet: boolean;
   /** Where its page lives, and where its links point. */
   path: string;
   /** Its one address on the site, always under /net/<universe>. */
@@ -29,6 +31,8 @@ export interface UniverseView {
   id: string;
   name: string;
   isDefault: boolean;
+  /** A testnet's pages are not indexed (ADR-0002 §2). */
+  testnet: boolean;
   home: { path: string; canonical: string };
   earth: { path: string; canonical: string };
   worlds: Listed[];
@@ -42,7 +46,7 @@ interface Row {
   universe: string;
 }
 interface Source {
-  universes: { id: string; name: string; default?: boolean | undefined }[];
+  universes: { id: string; name: string; default?: boolean | undefined; testnet?: boolean | undefined }[];
   hubs: Row[];
   ecosystems: Row[];
   stations: Row[];
@@ -91,15 +95,20 @@ export function siteOf(source: Source) {
   };
 }
 
+function listedFrom(row: Row, testnet: boolean, at: { path: string; canonical: string }): Listed {
+  return { slug: row.slug, name: row.name, description: row.description, universe: row.universe, testnet, ...at };
+}
+
 function build(source: Source) {
   const places = placesFrom(source);
+  const testnets = new Set(
+    source.universes.filter((universe) => universe.testnet === true).map((universe) => universe.id),
+  );
   const listed = (kind: PlaceKind, from: Row[]): Listed[] => {
     const rows = new Map(from.map((row) => [`${row.universe}/${row.slug}`, row]));
     return places.flatMap(({ kind: is, universe, slug, path, canonical }) => {
       const row = is === kind && slug !== undefined ? rows.get(`${universe}/${slug}`) : undefined;
-      return row === undefined
-        ? []
-        : [{ slug: row.slug, name: row.name, description: row.description, universe, path, canonical }];
+      return row === undefined ? [] : [listedFrom(row, testnets.has(universe), { path, canonical })];
     });
   };
   const worlds = listed("world", [...source.hubs, ...source.stations]);
@@ -114,6 +123,7 @@ function build(source: Source) {
       id: universe.id,
       name: universe.name,
       isDefault: universe.default === true,
+      testnet: testnets.has(universe.id),
       home: { path: at("cosmos").path, canonical: at("cosmos").canonical },
       earth: { path: at("earth").path, canonical: at("earth").canonical },
       worlds: worlds.filter((world) => world.universe === universe.id),

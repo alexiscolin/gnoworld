@@ -1,7 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router";
 import { expect, test } from "vitest";
-import { RouterLink } from "./routerLink.tsx";
+import { Button } from "@gnoworld/ui";
+import { AppLinks, RouterLink } from "./routerLink.tsx";
 
 // An anchor's attributes, sorted, its router's own mark aside, and its words.
 function read(html: string) {
@@ -21,4 +22,22 @@ test("draws the anchor the design system asks for: every attribute it was given,
   );
   expect(read(routed)).toEqual(read(plain));
   expect(read(plain).attributes).toHaveLength(4);
+});
+
+// F326: a link to a file of the site (the sitemap) stays a plain anchor, where the catch-all route would say "No page here".
+test.each([
+  ["/sitemap.xml", false],
+  ["/robots.txt", false],
+  ["/list", true],
+  ["/w/bubble", true],
+])("the app's links: %s goes through the router: %s", (href, routed) => {
+  const html = renderToStaticMarkup(
+    <MemoryRouter>
+      <AppLinks>
+        <Button href={href}>Go</Button>
+      </AppLinks>
+    </MemoryRouter>,
+  );
+  expect(html).toContain(`href="${href}"`);
+  expect(html.includes('data-discover="true"')).toBe(routed);
 });

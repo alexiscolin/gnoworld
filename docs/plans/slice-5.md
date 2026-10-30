@@ -22,7 +22,7 @@ The 3D and "View in space" (7); bubbles (6); the passport, expedition, quests, c
 | A realm's page (anyone's Markdown) | XSS, a tracking image, a phishing link, a page that freezes the tab, a hidden form field | `core/markdown` to an allowlisted tree, no raw HTML; gnoweb tags degraded to text; images from accepted hosts only; external links behind a warning; a size cap | Property: no input yields an element outside the list; fuzz; §1's journey; the cap's test |
 | Read functions' fields | A field that injects a second expression into `vm/qeval` | Each argument encoded by its type in `core`, never pasted in | Property: any string becomes one literal; the expression parses to one call |
 | RPC, indexer, CoinGecko answers | A wrong shape, a hostile string | Zod in `lib` and `server/src/prices`; on failure the last `markets.json` stays | Contract tests on recorded answers; fault journeys: RPC down, indexer down, no `markets.json` |
-| The CSP | An injected inline script allowed by its hash; a header past a host's cap | Only the expected scripts hashed, JSON-LD included (F475); one policy per page | A planted script fails the build; the CSP journey watches for violations |
+| The CSP | An injected inline script allowed by its hash; a header past a host's cap | Only the expected scripts hashed; JSON-LD is a data block, never hashed (F475, decisions 2026-10-30); one policy per page | A planted script fails the build; the CSP journey watches for violations |
 | Preview captures | An abusive picture captured from a site | Checked as a link preview (§6); no capture, no preview | The row's test; a refused capture never ships |
 | `server`'s way out | The timer reaching other hosts | The egress proxy allows CoinGecko alone | `deploy/test.sh`: any other host refused |
 
@@ -47,7 +47,7 @@ Each branch runs as the Workflow `branch`, about 600 lines of product code at mo
 | 1 | 5c | Data files, Zod at build, `core/places`, prerender from data, `worlds.ts` gone | Planted bad files fail the build; `core/places` properties | — |
 | 1 | 5d | `/earth`, worlds from data, `/e/:ecosystem`, `/list` with genre filters, `/net/:network/…`, Breadcrumb, F376 | Every place has a page; `/W/bubble` refused; filters | 5c |
 | 1 | 5e | Twitter Card, JSON-LD, testnet `noindex`, `sitemap.xml`, `robots.txt`, F326, Lighthouse in the gate | The row's sitemap and Lighthouse tests; testnet `noindex` | 5d |
-| 1 | 5f (tier 1) | One CSP a page, F475, JSON-LD by hash | A planted script fails the build; each page's header size | 5e |
+| 1 | 5f (tier 1) | One CSP a page, F475; JSON-LD needs no hash | A planted script fails the build; each page's header size | 5e |
 | 1 | 5n | ⌘K over the universe's places | No request while typing; keyboard; bench at 10× and 100× | 5d |
 | 2 | 5g | `lib/chain`: `vm/qrender`, `qeval`, `qfuncs`, block height | Contract tests on recorded answers; RPC down | 5c |
 | 2 | 5h (tier 1) | `core/markdown`'s page blocks, gnoweb tags degraded, the cap; realm card and view | Allowlist property and fuzz; §1's journey; the cap | 5f, 5g |

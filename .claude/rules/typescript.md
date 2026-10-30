@@ -24,6 +24,8 @@ Check, in a change and in a review:
 - a refactor is its own commit, and changes no test;
 - a guard that matters (a schema, a pattern, a check) lives in the function that uses it, not at a
   module's top: StrykerJS ignores what runs outside a test (`ignoreStatic`, F412);
+- a value a test asserts is computed inside the test, never at collection time (a `describe.each` row holds a
+  builder): StrykerJS turns a mutant on only during a test (F2356);
 - comments say only what the code cannot (a constraint, a surprise, a reason): a file's
   header 6 lines at most, any other comment 3; no TODO, banner, numbered steps or emoji
   (`scripts/check_comments.mjs`).

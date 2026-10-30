@@ -90,10 +90,41 @@ test.describe("as a search engine reads it, before any script runs", () => {
       expect.soft(await tag(page, 'meta[property="og:description"]')).toBe(description);
       expect.soft(await tag(page, 'meta[property="og:url"]')).toBe(canonical);
       expect.soft(await tag(page, 'meta[property="og:type"]')).toBe("website");
-      await expect.soft(page.locator('meta[name="robots"]')).toHaveCount(0);
+      // Every page here is Onyx's, a testnet: not indexed (5e).
+      expect.soft(await tag(page, 'meta[name="robots"]')).toBe("noindex");
+      expect.soft(await tag(page, 'meta[name="twitter:card"]')).toBe("summary");
+      await expect.soft(page.locator('script[type="application/ld+json"]')).toHaveCount(1);
       expect.soft(await tag(page, 'link[rel="icon"][type="image/svg+xml"]')).toBe("/icon.svg");
     });
   }
+
+  // What Lighthouse's SEO audits read besides the tags: the page's language and a link's text.
+  for (const { path } of pages) {
+    test(`${path} names its language, and every link has text of its own`, async ({ page }) => {
+      await page.goto(path);
+      await expect(page.locator("html")).toHaveAttribute("lang", /^[a-z]{2}(-[A-Za-z0-9]+)*$/);
+      const texts = await page.locator("a[href]").evaluateAll((links) =>
+        links.map((link) => {
+          const text = link.textContent.trim();
+          return text === "" ? (link.getAttribute("aria-label") ?? "").trim() : text;
+        }),
+      );
+      expect(texts.length).toBeGreaterThan(0);
+      for (const text of texts) {
+        expect(text).not.toBe("");
+        expect(text.toLowerCase()).not.toMatch(/^(click here|here|read more|more|learn more|link|this)$/);
+      }
+    });
+  }
+
+  test("the host serves robots.txt and the sitemap of the mainnet, not a page", async ({ request }) => {
+    const robots = await request.get("/robots.txt");
+    expect(robots.status()).toBe(200);
+    expect(await robots.text()).toContain("Sitemap: https://gno.world/sitemap.xml");
+    const sitemap = await request.get("/sitemap.xml");
+    expect(sitemap.status()).toBe(200);
+    expect(await sitemap.text()).toContain("<loc>https://gno.world/net/gnoland/</loc>");
+  });
 
   test("a world's page names the same canonical with a trailing slash", async ({ page }) => {
     await page.goto("/w/bubble/");

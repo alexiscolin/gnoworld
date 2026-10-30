@@ -84,10 +84,21 @@ describe("inlineScripts", () => {
     ["a tag that only starts like the closing one", "<script>a()</scripty>b()</script>", ["a()</scripty>b()"]],
     ["a start tag written self-closing, which HTML reads as open", "<script/>a()</script>", ["a()"]],
     [
-      "JSON-LD and an import map, hashed like any inline script",
-      '<script type="application/ld+json">{}</script><script type="importmap">{}</script>',
-      ["{}", "{}"],
+      "JSON-LD, a data block the browser never runs and so leaves unhashed, and an import map, hashed",
+      '<script type="application/ld+json">{"a":1}</script><script type="importmap">{}</script>',
+      ["{}"],
     ],
+    [
+      "JSON-LD in capitals, with other attributes and a single quote",
+      "<script id=x TYPE='Application/LD+JSON'>{}</script>",
+      [],
+    ],
+    [
+      "a first type that runs, then a JSON-LD one, which the parser ignores",
+      '<script type="module" type="application/ld+json">a()</script>',
+      ["a()"],
+    ],
+    ["a type that only holds ld+json", '<script type="text/ld+json-x">a()</script>', ["a()"]],
     ["a script inside a comment, hashed: its text is ours", "<!-- <script>a()</script> -->", ["a()"]],
     ["CR LF and a lone CR, as the browser reads them: LF", "<script>a\r\nb\rc</script>", ["a\nb\nc"]],
   ])("reads %s", (_, html, scripts) => {
