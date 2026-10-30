@@ -486,15 +486,13 @@ describe("the prices timer: when it runs", () => {
     expect(secondStart - firstEnd).toBeGreaterThanOrEqual(95);
   });
 
-  it("stops: no request after stop()", async () => {
-    const { calls, timer } = setup([json(ANSWER)], { everyMs: 30 });
-    await vi.waitFor(() => {
-      expect(calls.length).toBeGreaterThanOrEqual(1);
-    });
+  it("stops: no request after stop(), with a timer pending", async () => {
+    const { calls, file, timer } = setup([json(ANSWER)], { everyMs: 100 });
+    // The first read has ended and the next is waiting on its timer: this is the state stop() must cancel.
+    await wrote(file);
     timer.stop();
-    await new Promise((resolve) => setTimeout(resolve, 60));
     const count = calls.length;
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await quiet(250);
     expect(calls).toHaveLength(count);
   });
 
