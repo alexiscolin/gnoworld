@@ -2016,6 +2016,19 @@ cat >"$step" <<'SH'
 n=$1
 shift
 echo "$n $*" >>"$GATE_LOG"
+# check.sh raises the open-files limit its steps inherit (F2543): every step logs the one it got.
+ulimit -n >>"$GATE_LOG.ulimit"
+# The switches check.sh drops (a run must not trust a binary or measure a busy machine on a caller's say-so): what each step saw.
+echo "$n sha=${NGINX_SHA256-} ceiling=${BENCH_WAIT_CEILING-} step=${BENCH_WAIT_STEP-} timeout=${NGINX_START_TIMEOUT-}" >>"$GATE_LOG.env"
+# The merge lock a step runs under (harness-c): LOCKPEEK makes each step write the lock's pid (and whether it is alive), worktree and
+# since; RUN_TAG tags the steps of one run among several sharing a log.
+if [ -n "${LOCKPEEK:-}" ]; then
+	l="$HOME/.cache/gnoworld-tools/merge.lock"
+	p=$(cat "$l/pid" 2>/dev/null || :)
+	if [ -n "$p" ] && kill -0 "$p" 2>/dev/null; then alive=live; else alive=dead; fi
+	echo "$n pid=$p $alive worktree=$(cat "$l/worktree" 2>/dev/null || :) since=$(cat "$l/since" 2>/dev/null || :)" >>"$GATE_LOG.lockpeek"
+fi
+[ -z "${RUN_TAG:-}" ] || echo "$RUN_TAG $n" >>"$GATE_LOG.tags"
 [ "$n" != py:audit ] || echo "audit-answer ${AUDIT_ANSWER-unset}" >>"$GATE_LOG"
 if [ "$n" = py:load ]; then
 	at=$(($(cat "$GATE_LOG.load" 2>/dev/null || echo 0) + 1)) && echo "$at" >"$GATE_LOG.load"
@@ -3591,6 +3604,186 @@ git -C "$tx" reset -q --hard "$base"
 mkdir -p "$t/badgit" && printf '#!/bin/sh\ncase " $* " in *" log "*|*" diff "*) exit 128 ;; esac\nexec "%s" "$@"\n' "$(command -v git)" >"$t/badgit/git" && chmod +x "$t/badgit/git"
 (cd "$tx" && PATH="$t/badgit:$PATH" sh scripts/scan_secrets.sh >/dev/null 2>&1) && fail "scan_secrets passed a history git could not read (F140)"
 (cd "$tx" && PATH="$t/badgit:$PATH" sh scripts/scan_secrets.sh --staged >/dev/null 2>&1) && fail "scan_secrets passed a staged diff git could not read (F140)"
+fi
+
+if part merge_lock; then
+full_fixture merge_lock
+# One merge check at a time on the machine (harness-c, Alexis 2026-10-31: five merge checks side by side at a load of 25 to 40
+# on 16 cores failed by load alone). `check.sh --merge` takes a lock in the tools' cache, shared by every worktree: a folder
+# `merge.lock` holding `pid`, `worktree` and `since` (seconds). It WAITS for a live holder, saying which worktree holds it and since
+# when, and never refuses; a holder whose pid is gone (a Ctrl+C, a crash) leaves no wait. The fast gate and --full ignore it, and
+# the run's time leaves the wait out. The same run also checks nginx (scripts/check_nginx.py), after the build, in --merge alone.
+lockdir="$g.home/.cache/gnoworld-tools/merge.lock"
+mkdir -p "${lockdir%/*}"
+hold() { # $1: the holder's pid, $2: its worktree
+	rm -rf "$lockdir" && mkdir "$lockdir" && printf '%s\n' "$1" >"$lockdir/pid" && printf '%s\n' "$2" >"$lockdir/worktree" && date +%s >"$lockdir/since"
+}
+took() { printf '%s\n' "$1" | sed -n 's/^all checks passed in \([0-9]*\) s.*/\1/p'; }
+printf 'z\n' >>"$g/server/src/a.ts" && git -C "$g" commit -qam "product code"
+out=$(gate --merge) || fail "check.sh --merge failed on a copy whose every step passes, with no lock held: $out"
+[ ! -e "$lockdir" ] || fail "check.sh --merge left its lock behind after a pass: $(ls "$lockdir")"
+printf '%s\n' "$out" | grep -qi "waiting" && fail "check.sh --merge waited with no lock held: $out"
+solo=$(took "$out")
+[ -n "$solo" ] || fail "check.sh --merge printed no time: $out"
+# A running merge check HOLDS the lock (a check.sh that waited for a holder but never took the lock would let a second one start beside
+# it, the failure this branch ends): each step it runs sees the lock, its pid alive and one for the whole run, this worktree, a recent since.
+rm -f "$log.lockpeek"
+out=$(LOCKPEEK=1 gate --merge) || fail "check.sh --merge failed with its lock peeked at: $out"
+[ -s "$log.lockpeek" ] || fail "no step of check.sh --merge saw a lock (it holds none while it runs)"
+gp=$(cd "$g" && pwd -P)
+grep -q " dead " "$log.lockpeek" && fail "a step of check.sh --merge saw a lock whose pid is not alive: $(grep ' dead ' "$log.lockpeek" | head -1)"
+bad=$(grep -v " live worktree=$gp since=[0-9][0-9]*$" "$log.lockpeek" | head -1)
+[ -z "$bad" ] || fail "a step of check.sh --merge saw a lock with no pid, another worktree or no since: $bad"
+[ "$(sed -n 's/^[^ ]* pid=\([0-9]*\) .*/\1/p' "$log.lockpeek" | sort -u | wc -l | tr -d ' ')" = 1 ] || fail "the steps of one merge check saw different lock holders: $(cat "$log.lockpeek")"
+since_seen=$(sed -n 's/.* since=\([0-9]*\)$/\1/p' "$log.lockpeek" | sort -n | tail -1)
+[ "$(($(date +%s) - since_seen))" -lt 600 ] || fail "the lock's since is not the time the merge check started: $since_seen"
+gate >/dev/null || fail "check.sh failed (fast)"
+# A holder that died: no wait, the lock taken over.
+sh -c 'exit 0' & dead=$!
+wait "$dead" || :
+hold "$dead" "/dead/worktree"
+out=$(gate --merge) || fail "check.sh --merge failed beside a lock whose holder died: $out"
+printf '%s\n' "$out" | grep -qi "waiting" && fail "check.sh --merge waited for a holder that died: $out"
+[ ! -e "$lockdir" ] || fail "check.sh --merge kept a dead holder's lock"
+# A folder with no pid (a run killed between making it and writing the pid) is nobody's: the next merge check takes it, after a short wait.
+mkdir -p "$lockdir"
+: >"$lockdir/pid"
+out=$(gate --merge) || fail "check.sh --merge failed beside a lock folder with no pid: $out"
+[ ! -e "$lockdir" ] || fail "check.sh --merge kept a pid-less lock"
+# A live holder: the fast gate and --full go on, untouched; the lock stays the holder's.
+sleep 120 & holder=$!
+hold "$holder" "/other/worktree"
+out=$(gate) || fail "check.sh's fast gate failed beside a held merge lock: $out"
+printf '%s\n' "$out" | grep -qi "waiting" && fail "check.sh's fast gate waited for the merge lock: $out"
+out=$(AUDIT_ANSWER=x gate --full) || fail "check.sh --full failed beside a held merge lock: $out"
+printf '%s\n' "$out" | grep -qi "waiting" && fail "check.sh --full waited for the merge lock: $out"
+[ "$(cat "$lockdir/pid" 2>/dev/null)" = "$holder" ] || fail "the fast gate or --full took or dropped the merge lock of another"
+# A waiter that is interrupted (TERM, HUP, and Ctrl+C as a terminal sends it) takes nothing and drops nothing: the lock stays the
+# holder's, and no step ran. A Ctrl+C reaches a background job of a script with its signal ignored, so the INT case starts through a
+# launcher that restores it. rawrun execs check.sh in the job itself, so its pid is the job's.
+printf 'import os, signal, sys\nsignal.signal(signal.SIGINT, signal.SIG_DFL)\nos.execvp(sys.argv[1], sys.argv[1:])\n' >"$t/unign.py"
+rawrun() { # $1: a launcher or nothing; $2: the run's tag; then check.sh's arguments (the log is not truncated: runs share it)
+	launch=$1 tag=$2
+	shift 2
+	cd "$g" && exec env -u SANDBOX_RUNTIME GATE_LOG="$log" RUN_TAG="$tag" LOCKPEEK=1 SLOW_STEP="${SLOW:-}" GNO_TOOLCHAIN="$g/toolchain" NVM_DIR="${NVM_DIR:-$HOME/.nvm}" HOME="$g.home" PATH="$g/bin:$PATH" $launch sh scripts/check.sh "$@"
+}
+for sig in TERM HUP INT; do
+	launch=
+	[ "$sig" != INT ] || launch="python3 -I $t/unign.py"
+	: >"$log"
+	rawrun "$launch" W --merge >"$t/w.out" 2>&1 &
+	w=$!
+	tries=0
+	until grep -q "/other/worktree" "$t/w.out" 2>/dev/null; do
+		tries=$((tries + 1))
+		[ "$tries" -lt 200 ] || { kill "$w" "$holder" 2>/dev/null; fail "a merge check waiting for the lock never said so ($sig case): $(cat "$t/w.out")"; }
+		sleep 0.1
+	done
+	kill "-$sig" "$w"
+	tries=0
+	while kill -0 "$w" 2>/dev/null; do
+		tries=$((tries + 1))
+		[ "$tries" -lt 100 ] || { kill -9 "$w" "$holder" 2>/dev/null; fail "a merge check waiting for the lock ignored $sig"; }
+		sleep 0.1
+	done
+	wait "$w" 2>/dev/null || :
+	[ "$(cat "$lockdir/pid" 2>/dev/null)" = "$holder" ] && [ "$(cat "$lockdir/worktree" 2>/dev/null)" = /other/worktree ] || fail "a merge check interrupted by $sig while it waited took or dropped the lock of the holder"
+	[ ! -s "$log" ] || fail "a merge check interrupted by $sig while it waited ran a step: $(head -2 "$log")"
+done
+# --merge waits: it says which worktree holds the lock and since when, runs no step meanwhile, and starts when the holder dies;
+# its time in the log and on screen leaves the wait out.
+: >"$t/waiter.out"
+gate --merge >"$t/waiter.out" 2>&1 &
+waiter=$!
+tries=0
+until grep -q "/other/worktree" "$t/waiter.out" 2>/dev/null; do
+	tries=$((tries + 1))
+	[ "$tries" -lt 200 ] || { kill "$holder" "$waiter" 2>/dev/null; fail "check.sh --merge did not say which worktree holds the merge lock: $(cat "$t/waiter.out")"; }
+	sleep 0.1
+done
+grep -qi "waiting" "$t/waiter.out" && grep -q "since" "$t/waiter.out" || { kill "$holder" "$waiter" 2>/dev/null; fail "check.sh --merge did not say it waits, and since when: $(cat "$t/waiter.out")"; }
+sleep 5
+kill -0 "$waiter" 2>/dev/null || { kill "$holder" 2>/dev/null; fail "check.sh --merge gave up waiting for a live holder: $(cat "$t/waiter.out")"; }
+[ ! -s "$log" ] || { kill "$holder" "$waiter" 2>/dev/null; fail "check.sh --merge ran a step while another merge check held the lock: $(head -3 "$log")"; }
+kill "$holder"
+wait "$holder" 2>/dev/null || :
+tries=0
+while kill -0 "$waiter" 2>/dev/null; do
+	tries=$((tries + 1))
+	[ "$tries" -lt 600 ] || { kill "$waiter" 2>/dev/null; fail "check.sh --merge did not start when the holder died: $(cat "$t/waiter.out")"; }
+	sleep 0.1
+done
+wait "$waiter" || fail "check.sh --merge failed after its wait: $(cat "$t/waiter.out")"
+waited=$(took "$(cat "$t/waiter.out")")
+[ -n "$waited" ] && [ "$waited" -le $((solo + 2)) ] || fail "check.sh --merge counted its 5 s wait in its time: $waited s against $solo s alone"
+[ ! -e "$lockdir" ] || fail "check.sh --merge kept the lock after its pass"
+# Two real merge checks side by side, one machine's cache: the second says it waits and runs no step until the first has ended.
+rm -f "$log" "$log.tags" "$log.lockpeek"
+: >"$log"
+SLOW=py:probe rawrun "" A --merge >"$t/a.out" 2>&1 &
+a=$!
+tries=0
+until [ "$(cat "$lockdir/pid" 2>/dev/null)" = "$a" ]; do
+	tries=$((tries + 1))
+	[ "$tries" -lt 200 ] || { kill "$a" 2>/dev/null; fail "a running check.sh --merge did not take the lock with its own pid: '$(cat "$lockdir/pid" 2>/dev/null)' for $a"; }
+	sleep 0.1
+done
+rawrun "" B --merge >"$t/b.out" 2>&1 &
+b=$!
+wait "$a" || fail "the first of two merge checks failed: $(cat "$t/a.out")"
+wait "$b" || fail "the second of two merge checks failed: $(cat "$t/b.out")"
+grep -qi "waiting" "$t/b.out" && grep -q "since" "$t/b.out" || fail "the second merge check did not say it waited: $(cat "$t/b.out")"
+grep -qi "waiting" "$t/a.out" && fail "the first merge check waited with no lock held: $(cat "$t/a.out")"
+last_a=$(grep -n '^A ' "$log.tags" | tail -1 | cut -d: -f1)
+first_b=$(grep -n '^B ' "$log.tags" | head -1 | cut -d: -f1)
+[ -n "$last_a" ] && [ -n "$first_b" ] && [ "$last_a" -lt "$first_b" ] || fail "the second merge check ran a step before the first had ended: $(cut -c1-40 "$log.tags" | tr '\n' ' ')"
+[ ! -e "$lockdir" ] || fail "two merge checks in turn left a lock behind"
+# A holder killed (TERM: it frees the lock; KILL: it cannot, the next one finds its pid gone): the next merge check does not wait.
+for sig in TERM KILL; do
+	: >"$log"
+	SLOW=py:probe rawrun "" H --merge >"$t/h.out" 2>&1 &
+	h=$!
+	tries=0
+	until [ "$(cat "$lockdir/pid" 2>/dev/null)" = "$h" ]; do
+		tries=$((tries + 1))
+		[ "$tries" -lt 200 ] || { kill -9 "$h" 2>/dev/null; fail "a running check.sh --merge did not take the lock ($sig case)"; }
+		sleep 0.1
+	done
+	kill "-$sig" "$h"
+	wait "$h" 2>/dev/null || :
+	[ "$sig" != TERM ] || [ ! -e "$lockdir" ] || fail "a merge check killed by TERM kept its lock"
+	out=$(gate --merge) || fail "check.sh --merge failed after a holder was killed by $sig: $out"
+	printf '%s\n' "$out" | grep -qi "waiting" && fail "check.sh --merge waited for a holder killed by $sig: $out"
+	[ ! -e "$lockdir" ] || fail "check.sh --merge kept a lock after a holder killed by $sig"
+done
+sleep 3 # the killed runs' lanes finish on their own
+fi
+
+if part gate_limits; then
+gate_fixture gate_limits
+# check.sh raises its own open-files limit (F2543): the e2e web server dies of EMFILE under a low one, and each session had to
+# remember `ulimit -n 10240`. A limit it cannot raise is said, never hidden, and a higher one is left as it is.
+# The lowest limit a step saw (a Node step raises its own soft limit to the hard one, whatever check.sh gave).
+ul() { sort -n "$log.ulimit" 2>/dev/null | head -1; }
+rm -f "$log.ulimit"
+out=$( (ulimit -S -n 512 && gate) ) || fail "check.sh failed under a low soft limit of open files: $out"
+[ "$(ul)" = 10240 ] || fail "check.sh did not raise the open-files limit to 10240 for its steps: got '$(ul)'"
+rm -f "$log.ulimit"
+out=$( (ulimit -n 512 && gate) ) || fail "check.sh failed when it could not raise the open-files limit: $out"
+[ "$(ul)" = 512 ] || fail "check.sh changed a hard limit it could not raise: got '$(ul)'"
+printf '%s\n' "$out" | grep -qi "open files" && printf '%s\n' "$out" | grep -q "512" || fail "check.sh did not say it could not raise the open-files limit (F2543): $out"
+# The switches of the nginx check and the bench's wait are the tests': a caller's value reaches no step (a run would trust any binary,
+# or measure a busy machine), whatever the order in check.sh. Each step logs what it saw.
+rm -f "$log.env"
+out=$(NGINX_SHA256=x BENCH_WAIT_CEILING=0 BENCH_WAIT_STEP=0 NGINX_START_TIMEOUT=0 gate) || fail "check.sh failed with the tests' switches set: $out"
+[ -s "$log.env" ] || fail "no step logged the switches it saw"
+leak=$(grep -v "^[^ ]* sha= ceiling= step= timeout=$" "$log.env" | head -1)
+[ -z "$leak" ] || fail "check.sh passed one of NGINX_SHA256, BENCH_WAIT_CEILING, BENCH_WAIT_STEP, NGINX_START_TIMEOUT to a step: $leak"
+if (ulimit -S -n 20000) 2>/dev/null; then
+	rm -f "$log.ulimit"
+	out=$( (ulimit -S -n 20000 && gate) ) || fail "check.sh failed under a high soft limit: $out"
+	[ "$(ul)" = 20000 ] || fail "check.sh lowered an open-files limit above 10240: got '$(ul)'"
+fi
 fi
 
 if part bench_load; then

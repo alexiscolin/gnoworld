@@ -18,6 +18,13 @@ set -eu
 cd "$(realpath "$(dirname "$0")/..")" # the folder's own case: a $PWD spelled otherwise loads a tool twice (F081)
 unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a hook's git environment must not steer the gate's git calls
 unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO PICTURES_OF STORIES_PORT STORIES_OUT # the scripts' test switches, which would fake a pass
+unset NGINX_SHA256 NGINX_START_TIMEOUT BENCH_WAIT_CEILING BENCH_WAIT_STEP # a run must not trust any nginx binary, nor measure a busy machine, on a caller's say-so
+# The e2e web server dies of EMFILE under the default soft limit of open files (F2543): raised for every step, never lowered, and a limit
+# that cannot be raised is said.
+open_files=$(ulimit -S -n)
+if [ "$open_files" != unlimited ] && [ "$open_files" -lt 10240 ]; then
+	ulimit -S -n 10240 2>/dev/null || echo "check.sh: could not raise the limit of open files from $open_files to 10240 (its hard limit is $(ulimit -H -n)): the e2e web server may die of EMFILE" >&2
+fi
 full=false merge=false
 [ "${1:-}" = "--full" ] && full=true
 [ "${1:-}" = "--merge" ] && full=true merge=true
@@ -35,8 +42,51 @@ started=$(date +%s)
 logs=$(mktemp -d "${TMPDIR:-/tmp}/check.XXXXXX")
 # bash 3.2, macOS's sh, exits 0 through an EXIT trap after an unbound variable: `finished`, set
 # on the last line, tells a run that reached its end from one that died on the way.
-trap 'status=$?; rm -rf "$logs" || :; [ "$status" != 0 ] || [ "${finished:-}" = 1 ] || status=1; exit "$status"' EXIT
+merge_lock="${HOME}/.cache/gnoworld-tools/merge.lock" # --merge's lock, below
+lock_held=
+# Only the run that took the lock frees it: by its pid, or while the pid is not yet written (a signal between the folder and the pid).
+release_lock() {
+	[ -n "$lock_held" ] || return 0
+	holder=$(cat "$merge_lock/pid" 2>/dev/null || :)
+	if [ -z "$holder" ] || [ "$holder" = "$$" ]; then rm -rf "${merge_lock:?}"; fi
+}
+trap 'status=$?; rm -rf "$logs" || :; release_lock; [ "$status" != 0 ] || [ "${finished:-}" = 1 ] || status=1; exit "$status"' EXIT
 trap 'exit 1' HUP INT TERM # so the EXIT trap also runs on Ctrl-C under dash
+# One merge check at a time on the machine (harness-c, Alexis 2026-10-31: five side by side at a load of 25 to 40 on 16 cores failed by load
+# alone). `--merge` takes a lock shared by every worktree, a folder in the tools' cache holding its pid, its worktree and its start (seconds),
+# and WAITS for a live holder, never refuses; a holder whose pid is gone (a crash, a kill -9) leaves no wait and its lock is taken over.
+# mkdir is the atomic step. Only the run that took the lock frees it, by its pid, so a waiter that is interrupted drops nothing of another's.
+# The fast gate and --full take none. The run's time starts after the wait.
+if $merge; then
+	mkdir -p "${merge_lock%/*}"
+	announced= unread=0
+	until mkdir "$merge_lock" 2>/dev/null; do
+		holder=$(cat "$merge_lock/pid" 2>/dev/null || :)
+		if [ -z "$holder" ]; then
+			# The run that made the folder is writing its pid; a folder that stays empty (a run killed in between) is nobody's.
+			unread=$((unread + 1))
+			[ "$unread" -lt 6 ] || { rm -rf "${merge_lock:?}"; unread=0; continue; }
+			sleep 1
+			continue
+		fi
+		unread=0
+		if ! kill -0 "$holder" 2>/dev/null; then # dead: its lock is taken over
+			rm -rf "${merge_lock:?}"
+			continue
+		fi
+		if [ -z "$announced" ]; then
+			since=$(cat "$merge_lock/since" 2>/dev/null || :)
+			echo "check.sh --merge: waiting for the merge check of $(cat "$merge_lock/worktree" 2>/dev/null || echo "another worktree") (pid $holder), running since $(date -r "${since:-0}" '+%H:%M:%S' 2>/dev/null || echo "${since:-an unknown time}"): one merge check at a time on this machine" >&2
+			announced=1
+		fi
+		sleep 1
+	done
+	lock_held=1
+	printf '%s\n' "$$" >"$merge_lock/pid"
+	pwd >"$merge_lock/worktree"
+	date +%s >"$merge_lock/since"
+	started=$(date +%s) # the wait is not the run's time
+fi
 # The code this run tests; at the end it is recorded, unless it changed meanwhile (F076).
 tested=
 # A merge being committed has no time budget (Alexis, 2026-10-28): the full gate follows every merge. In a repository, git says

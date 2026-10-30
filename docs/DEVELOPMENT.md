@@ -63,6 +63,7 @@ GNO_TOOLCHAIN=$T GNOROOT=$T/src ./scripts/check.sh   # the first run downloads p
 ## The gate and the harness
 
 `./scripts/check.sh` is the gate, and `./scripts/check.sh --full` the one `/pre-merge` runs.
+`--merge` takes a lock shared by every worktree and waits for it: one merge check at a time on the machine (HARNESS.md).
 What each step catches, the hooks, the permissions, the reviews and how the harness proves
 itself: [HARNESS.md](HARNESS.md).
 

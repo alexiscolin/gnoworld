@@ -210,6 +210,13 @@ refuses another Node (F816).
 | `scripts/check_docs.py` | a harness doc naming a file that does not exist; a bad ledger row or one citing a missing commit; a known limit the runbook no longer says; a review agent's file missing or without its sentence `Never run a git command that writes the index or the work tree`; CLAUDE.md without the review card's item 8 |
 | `scripts/test_hooks.sh` | the hooks, the guard, the settings' boundary, the CI's promises, the scripts; a harness mutant that no longer finds its text (`harness_mutate.py --dry`) |
 
+**One merge check at a time.** `check.sh --merge` takes the lock `~/.cache/gnoworld-tools/merge.lock`, a folder holding `pid`,
+`worktree` and `since`, shared by every worktree of the machine: five side by side at a load of 25 to 40 on 16 cores failed by load
+alone (2026-10-30). It waits for a live holder, printing which worktree holds it and since when, and never refuses; a holder whose pid is
+gone (a crash, `kill -9`) leaves no wait, its lock taken over; a waiter that is interrupted frees nothing of another's. The fast gate and
+`--full` take none, and the time a run prints leaves the wait out. `check.sh` also raises the soft limit of open files to 10240 for its
+steps (F2543), saying so when it cannot.
+
 **Full** (`--full`: the slice's last merge and a push of `main`; `--merge`: each branch's
 `/pre-merge`, with the harness mutants of the lines it changed, and without the stories,
 the coverage lane and `prove_fix` when nothing but docs, the harness and the linters' configs changed since

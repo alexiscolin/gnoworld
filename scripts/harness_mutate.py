@@ -64,7 +64,7 @@ SECTIONS = {
     ".githooks/records.sh": "outside,installed,wiring", ".githooks/pre-merge-commit": "outside,installed", ".githooks/merge.sh": "installed",
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix,worktree_script,borrow",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
-    "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys,gate_checks,gate_stryker", "scripts/mutate.py": "wiring", "scripts/journeys.py": "gate_journeys", "scripts/prove_fix.py": "prove_fix",
+    "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys,gate_checks,gate_stryker,merge_lock,gate_limits", "scripts/mutate.py": "wiring", "scripts/journeys.py": "gate_journeys", "scripts/prove_fix.py": "prove_fix",
     "scripts/repo_files.py": {"hooks": "worktrees,regressions,batch_size,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/suite_parts.py": "mutant_scope,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/unsteady.py": {"hooks": "gate_lanes", "probe": "unsteady_real"}, "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
 }
 
@@ -1096,6 +1096,7 @@ def mutants():
     yield from quick_mutants()
     yield from checks_mutants()
     yield from stryker_mutants()
+    yield from merge_lock_mutants()
     yield from bench_load_mutants()
     yield from regressions_name_mutants()
 
@@ -1104,6 +1105,25 @@ def swaps(path, name, rows):
     """One mutant per occurrence of each (find, replace, label) row, in the hooks' tests, labelled `<name> <label>`."""
     for find, replace, label in rows:
         yield from each(path, find, replace, "hooks", f"{name} {label}")
+
+
+def merge_lock_mutants():
+    """One merge check at a time, the open-files limit, the test switches dropped (slice-5 harness-c)."""
+    c = "scripts/check.sh"
+    yield from swaps(c, "check.sh", (
+        ('if $merge; then\n\tmkdir -p "${merge_lock%/*}"', 'if false; then\n\tmkdir -p "${merge_lock%/*}"', "--merge takes the machine's lock"),
+        ('until mkdir "$merge_lock" 2>/dev/null; do', "while false; do", "--merge waits for a live holder"),
+        ("\tlock_held=1\n", "\tlock_held=\n", "--merge frees its lock"),
+        ('\t[ -n "$lock_held" ] || return 0\n', "", "a waiter that is interrupted leaves the lock of another"),
+        ("\tstarted=$(date +%s) # the wait is not the run's time", "\t: # the wait is the run's time", "--merge's time leaves its wait out"),
+        ('if [ -z "$announced" ]; then', "if false; then", "--merge says which worktree it waits for"),
+        ("ulimit -S -n 10240 2>/dev/null ||", ": ||", "raises the limit of open files"),
+        ('|| echo "check.sh: could not raise the limit', '|| : "check.sh: could not raise the limit', "says a limit of open files it cannot raise"),
+        ("unset NGINX_SHA256 NGINX_START_TIMEOUT", "unset NGINX_START_TIMEOUT", "drops NGINX_SHA256"),
+        ("unset NGINX_SHA256 NGINX_START_TIMEOUT", "unset NGINX_SHA256", "drops NGINX_START_TIMEOUT"),
+        (" BENCH_WAIT_CEILING BENCH_WAIT_STEP #", " BENCH_WAIT_STEP #", "drops BENCH_WAIT_CEILING"),
+        (" BENCH_WAIT_CEILING BENCH_WAIT_STEP #", " BENCH_WAIT_CEILING #", "drops BENCH_WAIT_STEP"),
+    ))
 
 
 def bench_load_mutants():
