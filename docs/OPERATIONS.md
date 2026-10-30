@@ -332,6 +332,13 @@ Slice 3, the server's retention (3n):
   alone (its one `expire-time`, 90 days), not by size: at the alert, give the disk room and raise
   `ERGO_DATA_MB`, or shorten `expire-time` in `deploy/ergo/ircd.yaml.tmpl` and restart Ergo; whether
   Ergo then frees the space at once is not verified.
+- **The prices** (`MARKETS_FILE`, `/markets/markets.json` in the `markets` volume, 5l): every five minutes, counted from
+  the end of the last read, the server asks CoinGecko's keyless `api.coingecko.com` (through the egress proxy, which
+  lets that host out by its full name) for GNOT, ATONE and BTC and writes `markets.json` by renaming a temporary file.
+  Any failure keeps the last file and logs `{"event":"prices_failed","error":"<kind>"}`, the kind one of `rate_limited`
+  (a 429: the free tier's limit is per IP and shared, so a run of them means another user of the address),
+  `status`, `timeout`, `request`, `too_large`, `not_json`, `shape`, `no_price` or `write` (the volume): never the answer.
+  A file that stops changing means the failures repeat in the log; `updated` in the file is the time of the last good read.
 - **The load runs** are the operator's: `sh deploy/k6/run.sh` (Docker) builds a stack of its own, in the
   project `gnoworld-load`, and refuses to start while the demo runs on the host. From inside its network,
   each scenario's numbers: every account logging in at once (`ACCOUNTS`, 200), guests in a world's room

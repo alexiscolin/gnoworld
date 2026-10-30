@@ -1,4 +1,5 @@
-# The hosts the stack may reach (decision 151): OpenAI's API, which the server's check asks (3i). One file,
+# The hosts the stack may reach (decision 151): OpenAI's API, which the server's check asks (3i), and CoinGecko's, which
+# the prices timer asks (5l), each by its full name, never its domain. One file,
 # read by the proxy and by deploy/test.sh. A host is matched as the request names it, then resolved and
 # refused if its address is private (config.yaml).
 version: v1
@@ -7,4 +8,5 @@ default:
   project: gnoworld
   action: enforce
   allowed_domains:
+    - api.coingecko.com
     - api.openai.com
