@@ -155,6 +155,25 @@ slot realm, on Onyx (ADR-0002 §8, row 11). Phones log in on a computer only; on
 | 11 | Satellites, on Onyx | The slot realm, written by Claude and audited (`gno-audit`), deployed on Onyx: a rent needs the moderation service's approval, verified in the realm (ed25519) and bound to everything it allows; 1, 3 or 7 days; one per world; 40 characters; the operator key's takedown with the days left refunded; the owner multisig's rotation and pause. The rent card, the slot on the plate, the satellites in space in the Onyx universe only, "Sponsored" and "Testnet" labels | A rent without a valid approval, or with one for other text, another slot or past its expiry, is refused; a takedown refunds the days left; a second satellite on a world is refused; only the multisig rotates or pauses; the mutation check finds every guard and now also flips operators and shifts constants (`>=` and `>`, `==` and `!=`, `&&` and `||`, `+` and `-`, a number by one), every survivor killed or in `GAPS` with its reason; the same approval sent twice at once is accepted once | — | — |
 | 12 | Phase-0 exit | The admin console on its own origin, on the private network only (ADR-0002 §6): roles from the repo (a file `server` has read since slice 3: `docs/decisions.md:147`, `:149`), the moderation queue with reports and contests, curation as pull requests, kill switches, the audit log shipped to the log backend. PostHog: counts only, cookieless, with field Web Vitals and the field frame rate. The hand-off to ops: every image (multi-architecture, SBOM, pinned), `.env.example`, `docs/OPERATIONS.md`, backups with a restore test, the outside probe and its alerts, checked by bringing the whole stack up from scratch on a clean machine. The red-team pass on Jarvis and the penetration test of the console. ADR-0001's and ADR-0002's exit criteria checked on a computer and on a phone; a plain IRC client joins the same room on the private network | A contest reaches a person; no PostHog event carries text or a name; a person without a role cannot open the console; a sensitive action without a fresh signature is refused; every action lands in the audit log; a call lands; Jarvis's evals pass; a satellite shows on Onyx only after its check; a backup restores; the exit criteria | — | `posthog-js`; a GitHub App; Claude Code's `posthog` plugin |
 
+## From the video's audit (2026-10-31)
+
+The end state is the prototype's video, to the pixel (`docs/decisions.md`, `docs/design/video-screens.md`). The audit of
+2026-10-31 found what the rows above leave out; a row's own text does not yet say so, this list does, and each slice's plan
+takes its lines. A slice's plan names the video's frames each of its screens is built to.
+
+| What | Goes to |
+|---|---|
+| The header, the plate, the home's layout, the list, "Testnet" | 5r |
+| The compact dock, the opt-in country tag, the person card, the bell and notifications by kind, the room's Media tab | 5s |
+| The rail: its order, its cap of 25, "See all" | 7 |
+| Open Graph images and the preview-capture job, moved from slice 5 (question 5) | 7 |
+| The "Credits" link for the CC BY textures (`docs/DESIGN-SYSTEM.md:403`) | 7, with the first texture |
+| The scene's meteors, signs and the header's live counters | 7, once the 3:36 cut shows what they are |
+| The dock beside the 3D | 7 |
+| The "first words" arrival banner | 9 |
+| The AI Ring and Harbor station bodies | Once their content exists (slice 5, question 6) |
+| The composer's emoji picker | Waits for Alexis: it needs `emojibase-data` |
+
 ## Phase 1: social on chain
 
 ADR-0001's phase 1 stands, with ADR-0002's concepts added. Each slice gets its plan when

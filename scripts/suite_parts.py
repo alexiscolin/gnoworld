@@ -1,9 +1,8 @@
-"""suite_parts.py: which sections of the harness's two suites a change touched, so harness_mutate --changed judges
-the mutants those sections test, not all of them (about 660, twenty minutes) whenever a suite changed at all.
+"""suite_parts.py: what harness_mutate reads of a change and of its two suites: the mutants a change asks for, those
+that rewrite a line it changed (select), and a suite's text by section, which a verdict's key stands on (parts).
 
 A section of test_hooks.sh runs from its `if part <name>; then` to the `fi` that closes it, the ifs nested at the
-margin counted; one of probe.py from its `if part("<name>"):` to the next line as little indented. A change outside
-every section (a helper, a fixture, the preamble) may reach any section: it touches them all."""
+margin counted; one of probe.py from its `if part("<name>"):` to the next line as little indented."""
 import re
 
 SH_START = re.compile(r"^if part (\w+); then$")
@@ -35,23 +34,31 @@ def parts(path, text):
     return found, "".join(outside)
 
 
-def touched(path, old, new):
-    """The sections whose text differs, a new or a gone one included; None when text outside every section changed,
-    which may reach any of them."""
-    (old_parts, old_outside), (new_parts, new_outside) = parts(path, old), parts(path, new)
-    if old_outside != new_outside:
-        return None
-    return {name for name in old_parts.keys() | new_parts.keys() if old_parts.get(name) != new_parts.get(name)}
+def code(text):
+    """Text without its blank lines, which run nothing. Comments stay: a `#` line in a heredoc or a multi-line string is
+    text, and telling them apart would take a shell's parser."""
+    return "".join(line for line in text.splitlines(keepends=True) if line.strip())
 
 
-def select(found, changed, touched_by_suite, sections):
-    """The mutants a change asks for: those of the guard files it changed, and those whose sections of their suite
-    it touched; a suite touched outside its sections (None) asks for all of its mutants."""
+def rewritten(old, new):
+    """The lines of `old`, numbered from 1, that `new` differs on, from the first to the last; a line only added touches
+    the two beside it."""
+    before, after = old.split("\n"), new.split("\n")
+    shared = min(len(before), len(after))
+    head = 0
+    while head < shared and before[head] == after[head]:
+        head += 1
+    tail = 0
+    while tail < shared - head and before[-1 - tail] == after[-1 - tail]:
+        tail += 1
+    return set(range(head + 1, len(before) - tail + 1)) or {head, head + 1}
 
-    def asked(path, test):
-        if path in changed:
-            return True
-        touched_here = touched_by_suite.get(test, set())
-        return touched_here is None or bool(set(sections(path, test).split(",")) & touched_here)
 
-    return [mutant for mutant in found if asked(mutant[1], mutant[3])]
+def select(found, changed, original):
+    """The mutants a change asks for: those that rewrite a line it changed. `changed` holds each changed file's lines on
+    HEAD, `original` reads a file. A mutant with no text to place is asked when its file changed."""
+
+    def asked(path, mutated):
+        return path in changed and (mutated is None or bool(rewritten(original(path), mutated) & changed[path]))
+
+    return [mutant for mutant in found if asked(mutant[1], mutant[2])]

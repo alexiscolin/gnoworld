@@ -307,3 +307,18 @@ test("a page meets the design system's six layers in their order", async ({ page
   });
   expect(met).toEqual(["reset", "tokens", "base", "compositions", "components", "utilities"]);
 });
+
+// Slice 5p: no world has a capture yet (the capture job is slice 7), so a world's page shows no preview of it, whether
+// read before any script runs or once it runs, and its tags name no social image. A preview added later comes with its
+// capture, and with this test changed in its own commit.
+test.describe("a world with no capture shows no preview", () => {
+  for (const path of ["/w/bubble", "/net/onyx/w/bubble"]) {
+    test(`${path} holds no picture, frame or preview, and no og:image`, async ({ page }) => {
+      await page.goto(path);
+      await hydrated(page);
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText("Bubble");
+      await expect(page.locator("figure, picture, img, video, canvas, iframe, [data-preview]")).toHaveCount(0);
+      await expect(page.locator('meta[property="og:image"], meta[name="twitter:image"]')).toHaveCount(0);
+    });
+  }
+});

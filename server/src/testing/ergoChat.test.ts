@@ -1,3 +1,5 @@
+import { join as pathJoin } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Rules } from "../roles/roles.ts";
 import { openDatabase } from "../db.ts";
@@ -113,6 +115,36 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
       await late.expect(/ BATCH :?-\S+$/);
       await sync(late);
       expect(late.lines().filter((line) => line.includes("PRIVMSG #bubble"))).toEqual([]);
+    },
+  );
+
+  // F2651, F2653: Ergo writes a line into its SQLite history after relaying it, and waits up to 10 s for a writer
+  // that holds the database (irc/sqlite/history.go busy_timeout). The bot's hide reaches Ergo in that gap and is
+  // refused UNKNOWN_MSGID until the write lands: the asks must outlast the hold, not just a quick race.
+  it.each([[300], [2000]])(
+    "hides a message of several lines Ergo writes into its history %d ms late",
+    { timeout: 40_000 },
+    async (held) => {
+      const e = await start();
+      const { verdicts } = await chatFor(e, []);
+      const alice = await login(e, "alice");
+      await join(alice, "#bubble");
+      const bob = await login(e, "bob");
+      await join(bob, "#bubble");
+      const history = new DatabaseSync(pathJoin(e.dir, "history.db"));
+      try {
+        history.exec("BEGIN IMMEDIATE");
+        alice.send("BATCH +m1 draft/multiline #bubble");
+        for (const text of ["hello", "I will hurt you\u0001"]) alice.send(`@batch=m1 PRIVMSG #bubble :${text}`);
+        alice.send("BATCH -m1");
+        const id = msgid(await bob.expect(/ BATCH :?\+\S+ draft\/multiline :?#bubble$/));
+        await new Promise((resolve) => setTimeout(resolve, held));
+        history.exec("COMMIT");
+        await bob.expect(new RegExp(` REDACT #bubble ${id} `), 20_000);
+        expect(verdicts()).toEqual([id]);
+      } finally {
+        history.close();
+      }
     },
   );
 

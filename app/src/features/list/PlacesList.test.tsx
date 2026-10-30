@@ -74,6 +74,18 @@ describe("PlacesList", () => {
     expect(shown(el)).toEqual(["Arcade", "Forge"]);
   });
 
+  it("toggles one genre off while two are chosen: only the other stays, and only it stays pressed", () => {
+    const el = draw({ places, genres });
+    click(button(el, "Game"));
+    click(button(el, "Tool"));
+    click(button(el, "Game"));
+    expect(shown(el)).toEqual(["Forge"]);
+    expect([button(el, "Game"), button(el, "Tool")].map((b) => b.getAttribute("aria-pressed"))).toEqual([
+      "false",
+      "true",
+    ]);
+  });
+
   // The keyboard: a native button is in the tab order and Enter and Space press it (jsdom presses no key: only a browser proves it, and no data holds a genre yet to build such a page from, so the
   // journey tries the list's links by keyboard, places.spec.ts).
   it("draws each filter as a native button the keyboard reaches: no tabindex, type button", () => {
@@ -107,5 +119,52 @@ describe("PlacesList", () => {
     });
     expect(el.querySelector("b, script")).toBeNull();
     expect(el.querySelector("a")?.textContent).toBe("<b>x</b>");
+  });
+});
+
+// Slice 5p: the phone's list shows each place with its planet thumbnail. No world has a capture yet, so none shows a
+// preview, and no empty frame or broken picture stands in its place; a thumb is the drawn fallback of `ui`.
+describe("PlacesList thumbnails", () => {
+  const items = (el: HTMLElement) => [...el.querySelectorAll('ul[aria-label="Places"] > li')];
+
+  it("a world with no capture shows no preview: no figure, no frame, no picture but its thumb", () => {
+    const el = draw({ places, genres });
+    expect(el.querySelectorAll("figure, picture, video, canvas, iframe, [data-preview]")).toHaveLength(0);
+    for (const item of items(el)) {
+      const pictures = [...item.querySelectorAll("img")];
+      expect(pictures).toHaveLength(1);
+      expect(pictures[0]?.closest("[data-kind]")).not.toBeNull();
+    }
+  });
+
+  it("each place has a planet thumbnail, the drawn fallback, decorative beside the name", () => {
+    const el = draw({ places, genres });
+    expect(items(el)).toHaveLength(3);
+    for (const item of items(el)) {
+      expect(item.querySelectorAll("[data-fallback]")).toHaveLength(1);
+      expect(item.querySelector("img")?.getAttribute("alt")).toBe("");
+    }
+    expect(shown(el)).toEqual(["Arcade", "Forge", "Bubble"]);
+  });
+
+  it("no picture is empty, from another host or a path that is not the site's: nothing broken to draw", () => {
+    const el = draw({ places, genres });
+    expect(el.querySelectorAll("img")).toHaveLength(3);
+    for (const img of el.querySelectorAll("img")) {
+      const src = img.getAttribute("src") ?? "";
+      expect(src).not.toBe("");
+      expect(src.startsWith("/") || src.startsWith("data:image/")).toBe(true);
+      expect(img.getAttribute("referrerpolicy")).toBe("no-referrer");
+    }
+  });
+
+  it("a place that a genre filter shows again keeps its thumb, and one filtered out has none left", () => {
+    const el = draw({ places, genres });
+    click(button(el, "Game"));
+    expect(items(el)).toHaveLength(1);
+    expect(items(el)[0]?.querySelectorAll("img")).toHaveLength(1);
+    expect(el.querySelectorAll("img")).toHaveLength(1);
+    click(button(el, "Game"));
+    expect(items(el)).toHaveLength(3);
   });
 });
