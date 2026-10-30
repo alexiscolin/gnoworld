@@ -132,6 +132,17 @@ a redirect after its first page is not followed, and a `journeys.py` that fails 
 and any change of the harness run every journey. Playwright reads a filter as a regular expression: a name's own
 characters are escaped; its dots are not (they match more, never less).
 
+**Two checks the fast gate runs on a trigger** (harness-b): a commit that touches a test, a bench or an approved picture
+(`*.test.ts(x)`, `*.bench.ts(x)`, `*.spec.ts`, gno and Go test files, `*-snapshots/*.png`, `*__screenshots__/*.png`;
+deleted or renamed ones too) runs `check_regressions.py` (a renamed test passed the fast gate in 5b and failed only the merge
+check); a commit that changes `pnpm-lock.yaml` runs the audit (lighthouse's advisories showed only at the merge check, 5e).
+The base of `check_regressions.py` is where the branch left `main` (the merge base with `origin/main`; HEAD with none), so a
+`Removed-test:`, `Lowered-floor:` or `Updated-baseline:` line of an earlier commit of the branch lets a later removal
+through. The commit that removes the test cannot carry its own line, because its message does not exist yet at pre-commit:
+declare it first, on an empty commit if need be. The staged copy has no git, so `.githooks/pre-commit` runs the staged
+`check_regressions.py` in the repository (it reads the working tree, not the index: a test staged in part is judged as it is
+on disk), and `check.sh` runs it in a repository only. Neither runs in a merge commit, whose full gate follows.
+
 `GATE_BUDGET` may lower the budget, never raise it. A merge commit has none (F2071): the full
 gate follows every merge. A run past its budget that passed still passes (Alexis, 2026-10-30:
 refusing it made agents run it again and again): it says so and is written, with its time and the

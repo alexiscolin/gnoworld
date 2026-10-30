@@ -85,6 +85,7 @@ fi
 # module graph, and a fixture read from disk is outside it too. ESLint reads no cache: one is keyed
 # on a file's own text, so a type changed elsewhere would hide the error it brings there.
 all=true ts=false app=false gno=false tokens=false related=true changed=
+regressions=false audit=false # a test file touched; the lockfile changed (below)
 if ! $full && [ -z "$tested" ]; then
 	changed=${GATE_CHANGED:-} related=false # Vitest finds the related tests through git, which a copy has not
 elif ! $full; then
@@ -100,6 +101,13 @@ if [ -n "$changed" ]; then
 	while IFS= read -r path; do
 		case $path in docs/* | adr/* | *.md) continue ;; esac # prose, which pre-commit's list may hold
 		code=true
+		# A commit that touches a test, a bench or an approved picture runs check_regressions (a renamed test passed the fast gate
+		# in 5b and failed only the merge check); one that changes the lockfile runs the audit (lighthouse's advisories showed only
+		# at the merge check, 5e). .githooks/pre-commit holds the same list of tests, for the staged copy's own gate.
+		case $path in
+		*.test.ts | *.test.tsx | *.bench.ts | *.bench.tsx | *.spec.ts | *_test.gno | *_test.go | *-snapshots/*.png | *__screenshots__/*.png) regressions=true ;;
+		pnpm-lock.yaml) audit=true ;;
+		esac
 		case $path in
 		server/src/*) ts=true related=false ;;
 		app/src/*.ts | app/src/*.tsx | app/tests/*.ts | packages/ui/src/*.ts | packages/ui/src/*.tsx) ts=true app=true ;;
@@ -114,6 +122,16 @@ EOF
 	$code || all=true # prose alone is no change of code, as in a repository
 fi
 $all && ts=true app=true gno=true related=false
+# check_regressions reads git, which the staged copy has not (pre-commit runs it in the repository); a merge's full gate follows and
+# runs it (and the audit) whole. Its base is where the branch left main, so a `Removed-test:` line of an earlier commit of the
+# branch counts; with no origin/main, HEAD; with no commit yet, nothing to compare.
+regr_base=
+if $merging || [ -z "$tested" ]; then regressions=false; fi
+if $merging; then audit=false; fi
+if $regressions; then
+	regr_base=$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse -q --verify HEAD 2>/dev/null) || regr_base=
+	[ -n "$regr_base" ] || regressions=false
+fi
 budget=120 # s, for everything (Alexis, 2026-10-28: 75 refused a harness commit on a half-busy machine; 60 before 2026-10-27); for a run scoped to a change, 30
 # A run that builds the app runs every journey, the work of a run of everything: 73-96 s on a quiet machine (slice-5a, F2162).
 $all || $app || budget=30
@@ -301,6 +319,14 @@ lane_pictures() {
 lane_docs() {
 	step check_docs # harness docs name only files that exist
 	python3 -I scripts/check_docs.py
+	if $regressions; then
+		step regressions # no test gone, no floor lower, no approved picture changed, unless a commit of the branch says why
+		python3 -I scripts/check_regressions.py "$regr_base"
+	fi
+	if $audit; then
+		step audit
+		python3 -I scripts/audit.py
+	fi
 	step parse
 	# Some scripts run only in --full: a broken one would pass every commit (finding F084).
 	python3 -I -c 'import ast, sys; [ast.parse(open(f).read(), f) for f in sys.argv[1:]]' scripts/*.py

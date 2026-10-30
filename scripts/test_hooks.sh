@@ -2820,6 +2820,146 @@ printf 'y\n' >>"$g/app/src/features/world/w.ts"
 gate >/dev/null && fail "check.sh passed when journeys.py failed: the change would run no journey"
 fi
 
+# A commit that touches a test file runs check_regressions in the fast gate (a renamed test passed it in 5b and failed only
+# the merge check), and a lockfile change runs the audit (lighthouse's advisories showed only at the merge check, 5e). The
+# commit has no message yet: the base is where the branch left main (the merge base with origin/main), so a `Removed-test:` line
+# of an earlier commit of the branch lets a later removal through; HEAD with no origin/main; none, and no check, with no commit
+# yet or in a merge (its full gate follows and judges the whole).
+if part gate_checks; then
+gate_fixture gate_checks
+printf 'test("a", () => {});\n' >"$g/server/src/a.test.ts" && printf 'func TestA(t *testing.T) {}\n' >"$g/gno/r/a_test.gno"
+git -C "$g" add -A && git -C "$g" commit -qm "tests"
+head=$(git -C "$g" rev-parse HEAD) base=$(git -C "$g" merge-base HEAD origin/main)
+[ "$head" != "$base" ] || fail "the fixture's branch has no commit past main: the base cannot be told from HEAD"
+git -C "$g" mv server/src/a.test.ts server/src/renamed.test.ts
+gate >/dev/null || fail "check.sh failed on a renamed test"
+grep -qx "py:check_regressions $base" "$log" || fail "check.sh did not run check_regressions from where the branch left main on a renamed test (a Removed-test: line of a commit of the branch must count): $(grep check_regressions "$log")"
+reset
+# Every kind of file that is a test, a bench or an approved picture.
+for f in server/src/a.test.ts gno/r/a_test.gno app/tests/a.spec.ts packages/core/src/new.test.ts app/src/home.test.tsx gno/tools/a_test.go app/tests/bench/a.bench.ts app/tests/bench/a.bench.tsx \
+	"app/tests/e2e/home.spec.ts-snapshots/a-chromium.png" app/tests/e2e/__screenshots__/b.png; do
+	mkdir -p "$g/$(dirname "$f")" && printf 'y\n' >>"$g/$f"
+	gate >/dev/null || fail "check.sh failed on a change of $f"
+	grep -qx "py:check_regressions $base" "$log" || fail "check.sh did not run check_regressions on a change of $f"
+	reset
+done
+# A merge being committed (MERGE_HEAD): the full gate follows and judges the whole, so the fast gate does not.
+git -C "$g" rev-parse HEAD >"$g/.git/MERGE_HEAD"
+git -C "$g" mv server/src/a.test.ts server/src/renamed.test.ts
+gate >/dev/null || fail "check.sh failed on a renamed test in a merge"
+ran py:check_regressions && fail "check.sh ran check_regressions in a merge commit, whose declarations sit in the merged branch's commits"
+rm -f "$g/.git/MERGE_HEAD"
+reset
+# With no origin/main the base is HEAD.
+git -C "$g" update-ref -d refs/remotes/origin/main
+git -C "$g" mv server/src/a.test.ts server/src/renamed.test.ts
+gate >/dev/null || fail "check.sh failed on a renamed test with no origin/main"
+grep -qx "py:check_regressions $head" "$log" || fail "check.sh did not fall back to HEAD with no origin/main: $(grep check_regressions "$log")"
+git -C "$g" update-ref refs/remotes/origin/main "$base"
+reset
+git -C "$g" rm -q server/src/a.test.ts
+gate >/dev/null || fail "check.sh failed on a deleted test"
+ran py:check_regressions || fail "check.sh did not run check_regressions on a deleted test"
+reset
+git -C "$g" rm -q gno/r/a_test.gno
+gate >/dev/null || fail "check.sh failed on a deleted gno test"
+ran py:check_regressions || fail "check.sh did not run check_regressions on a deleted gno test"
+reset
+for f in server/src/a.ts app/src/a.tsx; do
+	printf 'y\n' >>"$g/$f"
+	gate >/dev/null || fail "check.sh failed on a change of $f"
+	ran py:check_regressions && fail "check.sh ran check_regressions on a change of $f, which touches no test"
+	reset
+done
+gate >/dev/null || fail "check.sh failed on a tree with no change"
+ran py:check_regressions && fail "check.sh ran check_regressions on a tree with no change"
+printf 'y\n' >>"$g/server/src/a.test.ts"
+out=$(FAIL=py:check_regressions gate) && fail "check.sh passed with check_regressions refusing a test change: $out"
+printf '%s\n' "$out" | grep -q "^py:check_regressions failed here" || fail "check.sh hid check_regressions's refusal: $out"
+reset
+# The audit: a lockfile change, and only it. It asks npm (AUDIT_ANSWER, the test switch, never inherited).
+printf '\n' >>"$g/pnpm-lock.yaml"
+AUDIT_ANSWER=x gate >/dev/null || fail "check.sh failed on a lockfile change"
+ran py:audit || fail "check.sh did not run the audit on a lockfile change (5e: lighthouse's advisories showed at the merge check)"
+grep -qx "audit-answer unset" "$log" || fail "check.sh let AUDIT_ANSWER reach the audit of a lockfile change"
+# A merge being committed: the full gate follows and runs the audit whole.
+git -C "$g" rev-parse HEAD >"$g/.git/MERGE_HEAD"
+AUDIT_ANSWER=x gate >/dev/null || fail "check.sh failed on a lockfile change in a merge"
+ran py:audit && fail "check.sh ran the audit in a merge commit, whose full gate follows"
+rm -f "$g/.git/MERGE_HEAD"
+out=$(FAIL=py:audit gate) && fail "check.sh passed a lockfile change whose audit found an advisory"
+printf '%s\n' "$out" | grep -q "^py:audit failed here" || fail "check.sh hid the audit's failure: $out"
+reset
+printf '\n' >>"$g/pnpm-lock.yaml" && printf 'y\n' >>"$g/server/src/a.ts"
+gate >/dev/null || fail "check.sh failed on a lockfile change beside a server one"
+ran py:audit || fail "check.sh skipped the audit on a lockfile change beside a server one"
+reset
+for f in package.json app/package.json server/src/a.ts vitest.config.ts; do
+	printf '\n' >>"$g/$f"
+	gate >/dev/null || fail "check.sh failed on a change of $f"
+	ran py:audit && fail "check.sh ran the audit on a change of $f, which leaves the lockfile alone"
+	reset
+done
+gate >/dev/null || fail "check.sh failed on a tree with no change"
+ran py:audit && fail "check.sh ran the audit on a tree with no change"
+# Pre-commit's staged copy: the list names the lockfile; no repository there, so check_regressions is the hook's (below).
+cp -R "$g" "$g-copy" && rm -rf "$g-copy/.git"
+: >"$log" && (cd "$g-copy" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" GATE_CHANGED="pnpm-lock.yaml" sh scripts/check.sh >/dev/null 2>&1) || fail "check.sh failed outside a repository on a lockfile change"
+ran py:audit || fail "check.sh did not run the audit on a lockfile change outside a repository"
+: >"$log" && (cd "$g-copy" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" GATE_CHANGED="server/src/a.test.ts" sh scripts/check.sh >/dev/null 2>&1) || fail "check.sh failed outside a repository on a test change"
+ran py:check_regressions && fail "check.sh ran check_regressions in a copy with no repository, where git has nothing to compare"
+# pre-commit does, in the repository, before the staged copy's gate: a commit that touches a test file runs the staged copy's
+# check_regressions.py from the repository, with the base check.sh takes (where the branch left main, else HEAD), and a refusal
+# stops the commit. Not in a merge, not with no commit yet (nothing to compare).
+c3="$t/precommit_regr"
+precommit_in() { d=$1 code=$2 && shift 2 && (cd "$d" && REG_LOG="$t/reg.log" REG_EXIT="$code" sh "$hooks/pre-commit" "$@" >/dev/null 2>&1); }
+precommit3() { code=${1:-0} && { [ $# -eq 0 ] || shift; } && precommit_in "$c3" "$code" "$@"; }
+regr_fixture() { # $1: a folder
+	mkdir -p "$1/scripts" "$1/server/src" && git -C "$1" init -q && good_rules "$1"
+	printf '#!/bin/sh\nexit 0\n' >"$1/scripts/check.sh"
+	printf 'import os, sys\nopen(os.environ["REG_LOG"], "a").write(os.getcwd() + " " + " ".join(sys.argv[1:]) + "\\n")\nsys.exit(int(os.environ["REG_EXIT"]))\n' >"$1/scripts/check_regressions.py"
+	cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/repo_files.py" "$1/scripts/" && secrets_into "$1/scripts/"
+	printf 'test("a", () => {});\n' >"$1/server/src/a.test.ts" && printf 'x\n' >"$1/server/src/a.ts"
+}
+logged() { grep -qx "$(cd "$c3" && pwd -P) $1" "$t/reg.log" 2>/dev/null || grep -qx "$c3 $1" "$t/reg.log" 2>/dev/null; }
+regr_fixture "$c3"
+git -C "$c3" add -A && git -C "$c3" commit -qm base
+head3=$(git -C "$c3" rev-parse HEAD) && rm -f "$t/reg.log"
+git -C "$c3" mv server/src/a.test.ts server/src/b.test.ts
+precommit3 || fail "pre-commit refused a renamed test with a check_regressions that passes"
+logged "$head3" || fail "pre-commit did not run check_regressions from the repository with HEAD as the base, there being no origin/main: $(cat "$t/reg.log" 2>&1)"
+precommit3 1 && fail "pre-commit let a renamed test through, check_regressions refusing it (the fast gate passed it in 5b)"
+git -C "$c3" reset -q --hard && rm -f "$t/reg.log"
+printf 'y\n' >>"$c3/server/src/a.ts" && git -C "$c3" add server/src/a.ts
+precommit3 1 || fail "pre-commit ran check_regressions on a commit that touches no test"
+[ ! -e "$t/reg.log" ] || fail "pre-commit ran check_regressions on a commit that touches no test: $(cat "$t/reg.log")"
+# Where the branch left main is the base, so an earlier commit's `Removed-test:` line counts.
+git -C "$c3" update-ref refs/remotes/origin/main "$head3" && git -C "$c3" commit -qm "a commit of the branch"
+head3b=$(git -C "$c3" rev-parse HEAD)
+[ "$head3b" != "$head3" ] || fail "the fixture's branch has no commit past main"
+git -C "$c3" mv server/src/a.test.ts server/src/b.test.ts
+precommit3 || fail "pre-commit refused a renamed test with a check_regressions that passes, on a branch"
+logged "$head3" || fail "pre-commit did not take where the branch left main as the base: $(cat "$t/reg.log" 2>&1)"
+! logged "$head3b" || fail "pre-commit took HEAD as the base on a branch: a Removed-test: line of an earlier commit could not count"
+# A merge being committed: the full gate follows.
+rm -f "$t/reg.log"
+precommit3 1 --merge || fail "pre-commit ran check_regressions in a merge commit"
+[ ! -e "$t/reg.log" ] || fail "pre-commit ran check_regressions in a merge commit: $(cat "$t/reg.log")"
+git -C "$c3" reset -q --hard
+# Every kind of test file, bench and approved picture.
+for f in app/src/home.test.tsx gno/tools/a_test.go app/tests/bench/a.bench.ts app/tests/bench/a.bench.tsx app/tests/a.spec.ts gno/r/a_test.gno "app/tests/e2e/home.spec.ts-snapshots/a.png" app/tests/e2e/__screenshots__/b.png; do
+	rm -f "$t/reg.log" && mkdir -p "$c3/$(dirname "$f")" && printf 'y\n' >>"$c3/$f" && git -C "$c3" add "$f"
+	precommit3 || fail "pre-commit refused a change of $f with a check_regressions that passes"
+	logged "$head3" || fail "pre-commit did not run check_regressions on a change of $f"
+	git -C "$c3" reset -q --hard && git -C "$c3" clean -qfd
+done
+# No commit yet: nothing to compare, and the commit is not refused for it.
+c4="$t/precommit_unborn" && regr_fixture "$c4" && rm -f "$t/reg.log"
+git -C "$c4" add -A
+precommit_in "$c4" 1 || fail "pre-commit refused the first commit of a repository, check_regressions having nothing to compare"
+[ ! -e "$t/reg.log" ] || fail "pre-commit ran check_regressions with no commit yet: $(cat "$t/reg.log")"
+fi
+
 if part guard; then
 # guard: no git hook skipped, no forced push, gno only through gnomcp. Exit 2 blocks the call.
 gd="$here"/guard.py

@@ -56,11 +56,11 @@ SECTIONS = {
     "scripts/guard.py": "guard", "scripts/review_pass.py": "review_pass", "scripts/patch_coverage.py": "patch_coverage",
     "scripts/check_docs.py": "check_docs", "scripts/check_regressions.py": "regressions", "scripts/check_migrations.py": "migrations",
     "scripts/harness_mutate.py": "harness_mutate,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache", ".githooks/commit-msg": "commit_msg,installed",
-    ".githooks/pre-push": "pre_push,wiring,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed",
+    ".githooks/pre-push": "pre_push,wiring,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed,gate_checks",
     ".githooks/records.sh": "outside,installed,wiring", ".githooks/pre-merge-commit": "outside,installed", ".githooks/merge.sh": "installed",
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix,worktree_script",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
-    "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys", "scripts/mutate.py": "wiring", "scripts/journeys.py": "gate_journeys", "scripts/prove_fix.py": "prove_fix",
+    "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys,gate_checks", "scripts/mutate.py": "wiring", "scripts/journeys.py": "gate_journeys", "scripts/prove_fix.py": "prove_fix",
     "scripts/repo_files.py": {"hooks": "worktrees,regressions,batch_size,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench", "scripts/suite_parts.py": "mutant_scope,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/unsteady.py": {"hooks": "gate_lanes", "probe": "unsteady_real"}, "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
 }
 
@@ -149,6 +149,42 @@ def scoping_mutants():
         ("or not ORIGIN.match(", "or False and not ORIGIN.match(", "reads only the site's own origin at a template's start"),
     ):
         yield from each(j, find, replace, "hooks", f"journeys.py {label}")
+
+
+def checks_mutants():
+    """The fast gate runs check_regressions when a commit touches a test, and the audit when the lockfile changes (slice-5 harness-b)."""
+    check = "scripts/check.sh"
+    for find, replace, label in (
+        ("*.test.ts | ", "", "runs check_regressions on a .test.ts"),
+        ("*.test.tsx | ", "", "runs check_regressions on a .test.tsx"),
+        ("*.bench.ts | ", "", "runs check_regressions on a .bench.ts"),
+        ("*.bench.tsx | ", "", "runs check_regressions on a .bench.tsx"),
+        ("*.spec.ts | ", "", "runs check_regressions on a journey"),
+        ("*_test.gno | ", "", "runs check_regressions on a gno test"),
+        ("*_test.go | ", "", "runs check_regressions on a Go test"),
+        ("*-snapshots/*.png | ", "", "runs check_regressions on an approved picture"),
+        (" | *__screenshots__/*.png)", ")", "runs check_regressions on a story's picture"),
+        ("pnpm-lock.yaml) audit=true ;;", "pnpm-lock.yaml) ;;", "runs the audit when the lockfile changes"),
+        ('if $merging || [ -z "$tested" ]; then regressions=false; fi', 'if [ -z "$tested" ]; then regressions=false; fi', "leaves check_regressions to a merge's full gate"),
+        ('if $merging || [ -z "$tested" ]; then regressions=false; fi', 'if $merging; then regressions=false; fi', "runs no check_regressions where git has nothing to compare"),
+        ("if $merging; then audit=false; fi", "if false; then audit=false; fi", "leaves the audit to a merge's full gate"),
+        ("git merge-base HEAD origin/main 2>/dev/null || ", "", "compares with where the branch left main"),
+        ('[ -n "$regr_base" ] || regressions=false', ":", "runs no check_regressions with nothing to compare"),
+    ):
+        yield from each(check, find, replace, "hooks", f"check.sh {label}")
+    hook = ".githooks/pre-commit"
+    for find, replace, label in (
+        ('[ "$merge" = 0 ] && [ -n "$tests" ]', '[ -n "$tests" ]', "leaves check_regressions to a merge's full gate"),
+        ('[ -n "$tests" ] && base=', "base=", "runs check_regressions only when a test is staged"),
+        ("git merge-base HEAD origin/main 2>/dev/null || ", "", "compares with where the branch left main"),
+        (r"\.(test|bench)\.tsx?$|", "", "runs check_regressions on a test and a bench"),
+        (r"\.spec\.ts$|", "", "runs check_regressions on a journey"),
+        (r"_test\.(gno|go)$|", "", "runs check_regressions on a gno or Go test"),
+        (r"-snapshots/.*\.png$|", "", "runs check_regressions on an approved picture"),
+        (r"|__screenshots__/.*\.png$", "", "runs check_regressions on a story's picture"),
+        ('python3 -I "$s/check_regressions.py" "$base"', ":", "runs check_regressions"),
+    ):
+        yield from each(hook, find, replace, "hooks", f"pre-commit {label}")
 
 
 def mutants():
@@ -945,6 +981,7 @@ def mutants():
     # The gate: each step dropped.
     yield from lines("scripts/check.sh", r"^(\s*)((?:run |python3 -I |sh scripts/|gitleaks |go vet |go run |\(cd gno |\$full \|\| run ).*)$", r"\1:", "hooks", "check.sh drops")
     yield from scoping_mutants()
+    yield from checks_mutants()
 
 
 def sections(path, test):
