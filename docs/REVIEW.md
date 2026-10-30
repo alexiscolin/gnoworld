@@ -60,7 +60,9 @@ branch's Workflow loop runs it (Alexis, 2026-10-28, `docs/decisions.md`):
    mutation survivors (tautologies, mocks of the thing under test, empty assertions, timing
    guesses, a test weakened since its red pass), correctness, security, cost in big O against the
    size each input reaches, and simplification. A tier-1 file or the harness adds the
-   `security-reviewer` (Opus, the threat model), a realm the `gno-auditor`. Each finding names its
+   `security-reviewer` (Opus, the threat model), a realm the `gno-auditor`, a changed screen (`app/src/`,
+   `packages/ui/src/`) the `design-reviewer`, which compares it with the video's frames in the branch loop
+   (`docs/design/video-screens.md`; frames missing fail the step). Each finding names its
    class, and its fix covers every instance; one only about style is dropped. A merge carries
    about 400 lines of product code at most when it touches a tier-1 file, and about 600 otherwise
    (DORA's small batches; Alexis, 2026-10-22).

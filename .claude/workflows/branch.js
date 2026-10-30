@@ -11,7 +11,8 @@ export const meta = {
     { title: "Merge check", detail: "check.sh --merge, the failing lane alone until it passes" },
     {
       title: "Review",
-      detail: "the reviewer; the security-reviewer for tier 1 or the harness; the gno-auditor for a realm",
+      detail:
+        "the reviewer; the security-reviewer for tier 1 or the harness; the gno-auditor for a realm; the design-reviewer for a screen",
     },
     { title: "Verify", detail: "the finding-verifier on findings in tier-1 files" },
     {
@@ -47,6 +48,12 @@ const FINDINGS = {
     },
   },
   required: ["findings"],
+};
+// The design-reviewer's answer: findings like the others', and whether the video's frames were missing (which fails the step).
+const DESIGN = {
+  ...FINDINGS,
+  properties: { ...FINDINGS.properties, framesMissing: { type: "boolean" } },
+  required: ["findings", "framesMissing"],
 };
 const TESTS = {
   type: "object",
@@ -144,6 +151,8 @@ const TIER1 = [
 const BASE = A.base || "main";
 const tier1 = (file) => TIER1.some((prefix) => file === prefix || file.startsWith(prefix));
 const realm = (file) => file.startsWith("gno/r/") || file.startsWith("gno/p/");
+// A screen: the app's own source and the design system's (Alexis, 2026-10-31); the design-reviewer compares it with the video's frames.
+const screen = (file) => file.startsWith("app/src/") || file.startsWith("packages/ui/src/");
 // A writer that committed on another branch than its own (slice-5a's commit on main) counts as no report, and the loop
 // stops there, its status naming the branch; so does a list of files holding the agent's own rather than git's.
 const strays = [];
@@ -255,15 +264,34 @@ for (let round = 1; ; round += 1) {
     ...(gate.files.some(realm)
       ? [["gnomcp:gno-auditor", "gno-auditor", `Audit every realm the branch changes, since ${since}.`]]
       : []),
+    ...(gate.files.some(screen)
+      ? [
+          [
+            "design-reviewer",
+            "design-reviewer",
+            `Compare every screen the branch changes since ${since} (.claude/tmp/diff.patch holds the diff since ${BASE}) with the video's frames: ` +
+              "render each at 1728 by 1080, open the frames docs/design/video-screens.md gives for it in ~/.cache/gnoworld-tools/video-frames/, " +
+              "and report each difference as a finding naming both pictures. Frames missing: set framesMissing, the step fails.",
+          ],
+        ]
+      : []),
   ].filter(([, label]) => !lensesDue || lensesDue.has(label));
   const ask = ([agentType, label, question]) =>
-    agent(`${where(`${label}-${round}`, false)}. ${question}`, { agentType, phase: "Review", label, schema: FINDINGS });
+    agent(`${where(`${label}-${round}`, false)}. ${question}`, {
+      agentType,
+      phase: "Review",
+      label,
+      schema: label === "design-reviewer" ? DESIGN : FINDINGS,
+    });
   // Four agents at most at once on the machine (CLAUDE.md): with two branches in review, three lenses run one after another.
   const reviews =
     lenses.length > 2
       ? await lenses.reduce(async (done, lens) => [...(await done), await ask(lens)], Promise.resolve([]))
       : await parallel(lenses.map((lens) => () => ask(lens)));
   if (!reviews.every(Boolean)) return result(`blocked at review round ${round}: a lens gave no report`, { gate });
+  // Frames missing fail the step, never skip it: a comparison nobody made is not a clean review.
+  if (reviews.some((r, i) => lenses[i][1] === "design-reviewer" && r.framesMissing))
+    return result(`blocked at review round ${round}: the design-reviewer found the video's frames missing`, { gate });
   // Numbered here, by lens and order: each lens counts from 1, and a verdict must name one finding alone.
   const found = reviews.flatMap((r, i) =>
     r.findings.map((f, n) => ({ ...f, id: `${lenses[i][1]}-${round}-${n + 1}`, lens: lenses[i][1] })),

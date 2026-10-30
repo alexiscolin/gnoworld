@@ -1100,6 +1100,7 @@ def mutants():
     yield from nginx_mutants()
     yield from bench_load_mutants()
     yield from regressions_name_mutants()
+    yield from design_mutants()
 
 
 def swaps(path, name, rows):
@@ -1176,6 +1177,19 @@ def regressions_name_mutants():
         ("            if not OWN_DEFAULTS.match(spread):", "            if True:", "lets the spread of a tool's own defaults stay"),
         ("if tail else []), pos", "if False else []), pos", "reads what follows a list (`.concat`)"),
         ("        elif template:\n            entries.append(template)", "        elif template:\n            pass", "reads a template literal as an entry"),
+    ))
+
+
+def design_mutants():
+    """The design-reviewer starts for a screen, and missing frames fail the step (slice-5 harness-c)."""
+    yield from each("scripts/check_docs.py", 'AGENTS = ("design-reviewer", ', "AGENTS = (", "hooks", "check_docs.py asks for the design-reviewer's brief")
+    j = ".claude/workflows/branch.js"
+    yield from swaps(j, "branch.js", (
+        ('file.startsWith("app/src/") || file.startsWith("packages/ui/src/")', 'file.startsWith("packages/ui/src/")', "starts the design-reviewer for a change of app/src/"),
+        ('file.startsWith("app/src/") || file.startsWith("packages/ui/src/")', 'file.startsWith("app/src/")', "starts the design-reviewer for a change of packages/ui/src/"),
+        ("gate.files.some(screen)", "false", "starts the design-reviewer for a screen"),
+        ('label === "design-reviewer" ? DESIGN : FINDINGS', "FINDINGS", "asks the design-reviewer whether the frames are missing"),
+        ('lenses[i][1] === "design-reviewer" && r.framesMissing', "false", "fails the step on missing frames"),
     ))
 
 

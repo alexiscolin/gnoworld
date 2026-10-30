@@ -354,7 +354,7 @@ costs context in every session.
 |---|---|
 | `CLAUDE.md`, `.claude/rules/` | the rules Claude reads; each area's file loads when its files are touched |
 | `.claude/settings.json` | permissions, the sandbox, the hooks, the plugins |
-| `.claude/agents/` | `test-auditor`, `reviewer`, `security-reviewer`, `finding-verifier`, `dreamer` |
+| `.claude/agents/` | `test-auditor`, `reviewer`, `security-reviewer`, `finding-verifier`, `design-reviewer`, `dreamer` |
 | `.claude/commands/` | `/slice-plan`, `/pre-merge`, `/dream` |
 | `.claude/workflows/` | `branch`, a branch's loop |
 | `.githooks/` | `commit-msg`, `pre-commit`, `pre-merge-commit`, `pre-push`; `records.sh`, the prints and the harness list; `merge.sh`, the merge that shows the harness first |

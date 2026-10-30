@@ -52,7 +52,7 @@ esac
 part() { case ",$ONLY," in *",$1,"*) ran=1 && return 0 ;; *) return 1 ;; esac; }
 # The rules the review depends on are required of every root (CR2): the four agents' briefs, each saying the git-index
 # rule, and CLAUDE.md's review card, its item 8; good_rules gives a fixture its own.
-agents="finding-verifier reviewer security-reviewer test-auditor"
+agents="design-reviewer finding-verifier reviewer security-reviewer test-auditor"
 good_rules() {
 	mkdir -p "$1/.claude/agents"
 	for a in $agents; do printf 'You never edit.\nNever run a git command that writes the index or the work tree (checkout,\nrestore); copy with cp.\n' >"$1/.claude/agents/$a.md"; done
@@ -512,6 +512,11 @@ printf 'You may run a git command that writes the index or the work tree.\n' >"$
 rules >/dev/null && fail "check_docs accepted a brief that allows what the rule forbids (CR2)"
 printf 'Never run a git command that reads the index.\n' >"$r/.claude/agents/test-auditor.md"
 rules >/dev/null && fail "check_docs accepted a brief whose sentence is another's (CR2)"
+good_rules "$r"
+rm "$r/.claude/agents/design-reviewer.md"
+out=$(rules) && fail "check_docs accepted a root with no design-reviewer brief (harness-c, 5)"
+printf '%s' "$out" | grep -qF "agents/design-reviewer.md: the agent's brief is missing" || fail "check_docs did not name the missing design-reviewer brief: $out"
+good_rules "$r"
 rm "$r/.claude/agents/test-auditor.md"
 out=$(rules) && fail "check_docs accepted a missing agent file (CR2)"
 printf '%s' "$out" | grep -qF "agents/test-auditor.md: the agent's brief is missing" || fail "check_docs did not name the missing agent file: $out"
@@ -4571,7 +4576,8 @@ const base = (files) => (l) =>
   : l === "red pass" ? { findings: [] }
   : l === "merge check" ? gateOf(files)
   : l === "build" || (l || "").startsWith("ledger") ? { commits: ["c"], notes: "", branch: "b" }
-  : l === "reviewer" || l === "security" || l === "gno-auditor" ? { findings: [] } : null;
+  : l === "reviewer" || l === "security" || l === "gno-auditor" ? { findings: [] }
+  : l === "design-reviewer" ? { findings: [], framesMissing: false } : null;
 const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
 (async () => {
   let t = await run(base(["app/src/a.ts"]));
@@ -4607,7 +4613,7 @@ const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
   ok(t.calls.some((c) => c.label === "security" && c.prompt.includes("since f1^")), "round 2 did not read the diff since its first fix");
   // Read-only agents are told to write nothing; writers get the shared files.
   for (const c of t.calls) {
-    const readOnly = ["red pass", "reviewer", "security", "gno-auditor", "verifier"].includes(c.label);
+    const readOnly = ["red pass", "reviewer", "security", "gno-auditor", "verifier", "design-reviewer"].includes(c.label);
     ok(readOnly ? c.prompt.includes("write nothing") && !c.prompt.includes("learnings.md") : c.prompt.includes("learnings.md"), `${c.label} was told the wrong way to write`);
   }
   // Each Bash command of an agent starts in the main checkout (the shell goes back there after every call): every one begins
@@ -4645,6 +4651,69 @@ const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
   for (const file of ["deploy-notes/x.md", "server/src/loginx.ts", "app/src/lib/adenax/a.ts", "app/src/sw.ts.md", "packages/core/src/markdown.md"]) {
     const labels = await lensOf(file);
     ok(!labels.includes("security"), `${file}, a lookalike of a tier-1 path, started the security lens: ${labels}`);
+  }
+  // The design-reviewer (Alexis, 2026-10-31): a read-only agent that renders each changed screen at 1728 by 1080 and compares it with
+  // the video's frames. It starts by itself when a branch changes app/src/ or packages/ui/src/ (a `ui` change alone included), reports
+  // like the other lenses (numbered findings, high and medium fixed), and frames missing fail the step, never skip it.
+  {
+    const withDesign = (files, design) => run((l, p, o) =>
+      l === "design-reviewer" ? (design ? design(p, o) : { findings: [], framesMissing: false })
+      : (l || "").startsWith("fix round") ? { fixed: [{ id: "design-reviewer-1-1", commit: "fd" }], notes: "", branch: "b" }
+      : base(files)(l, p, o));
+    for (const file of ["packages/ui/src/Button.tsx", "packages/ui/src/tokens.css", "app/src/features/home/Home.tsx", "app/src/routes/home.tsx"]) {
+      const d = await withDesign([file]);
+      ok(d.labels.includes("design-reviewer"), `a change of ${file} alone started no design-reviewer: ${d.labels}`);
+      ok(d.r.status === "ready for the chief", `a clean design review of ${file} did not end ready: ${d.r.status}`);
+    }
+    for (const file of ["server/src/a.ts", "docs/x.md", "app/tests/e2e/a.spec.ts", "app/srcx/a.ts", "packages/ui/srcs/a.ts", "packages/core/src/a.ts", "scripts/check.sh"]) {
+      const d = await withDesign([file]);
+      ok(!d.labels.includes("design-reviewer"), `${file}, which is no screen, started the design-reviewer: ${d.labels}`);
+    }
+    const d = await withDesign(["packages/ui/src/Button.tsx"]);
+    const call = d.calls.find((c) => c.label === "design-reviewer");
+    ok(call.agentType === "design-reviewer", `the design lens ran as ${call.agentType}`);
+    for (const word of ["1728", "1080", "docs/design/video-screens.md", "video-frames", "write nothing"])
+      ok(call.prompt.includes(word), `the design-reviewer was not told ${word}: ${call.prompt}`);
+    ok(!call.prompt.includes("learnings.md"), "the read-only design-reviewer was told to write the learnings");
+    ok(call.schema.properties.framesMissing && call.schema.properties.findings, "the design-reviewer's answer has no framesMissing, or no findings");
+    // Its findings follow the loop: numbered by its label, a medium one fixed, the round's findings to the ledger.
+    const f = await withDesign(["app/src/a.ts"], () => ({ findings: [finding("medium", "app/src/a.ts")], framesMissing: false }));
+    const fixCall = f.calls.find((c) => (c.label || "").startsWith("fix round"));
+    ok(fixCall && fixCall.prompt.includes("design-reviewer-1-1"), `a medium design finding was not given to the fixer: ${fixCall && fixCall.prompt}`);
+    ok(f.labels.includes("ledger 1"), `a design finding never reached the ledger: ${f.labels}`);
+    // A screen and a tier-1 path in one change start both lenses; a finding fixed in round 1 starts no second design review, and a
+    // second round for a tier-1 high finding runs its lens alone.
+    const both = await withDesign(["packages/ui/src/a.ts", "app/src/csp.ts"]);
+    ok(both.labels.includes("design-reviewer") && both.labels.includes("security"), `a screen and a tier-1 path did not start both lenses: ${both.labels}`);
+    const hi = await withDesign(["packages/ui/src/a.ts"], () => ({ findings: [finding("high", "packages/ui/src/a.ts")], framesMissing: false }));
+    ok(hi.r.status === "ready for the chief", `a high design finding, fixed, did not end ready: ${hi.r.status}`);
+    ok(hi.labels.filter((l) => l === "design-reviewer").length === 1, `the design-reviewer ran again after its finding was fixed: ${hi.labels}`);
+    let secRuns = 0;
+    const two = await run((l, p, o) =>
+      l === "security" ? (secRuns++ ? { findings: [] } : { findings: [finding("high", "app/src/csp.ts")] })
+      : l === "verifier" ? { verdicts: [{ id: idOf(o, 0), verdict: "reproduced", severity: "high", evidence: "e" }] }
+      : (l || "").startsWith("fix round") ? { fixed: [{ id: "security-1-1", commit: "fs" }], notes: "", branch: "b" }
+      : base(["app/src/csp.ts"])(l, p));
+    ok(two.labels.filter((l) => l === "security").length === 2 && two.labels.filter((l) => l === "design-reviewer").length === 1 && two.labels.filter((l) => l === "reviewer").length === 1,
+      `round 2 for a tier-1 high finding did not run its lens alone: ${two.labels}`);
+    // Frames missing fail the step; so does an agent that dies.
+    const m = await withDesign(["app/src/a.ts"], () => ({ findings: [], framesMissing: true }));
+    ok(m.r.status.startsWith("blocked") && m.r.status.includes("frames"), `missing frames did not stop the loop: ${m.r.status}`);
+    const dead = await withDesign(["app/src/a.ts"], () => null);
+    ok(dead.r.status.startsWith("blocked"), `a dead design-reviewer counted as a clean review: ${dead.r.status}`);
+    // The agent's own brief.
+    const { dirname: dn } = require("node:path");
+    const repoRoot = dn(dn(dn(process.argv[2])));
+    let brief = "";
+    try { brief = readFileSync(repoRoot + "/.claude/agents/design-reviewer.md", "utf8"); } catch { /* absent */ }
+    ok(brief !== "", ".claude/agents/design-reviewer.md does not exist");
+    ok(/^name: design-reviewer$/m.test(brief), "the design-reviewer's brief names another agent");
+    const tools = ((brief.match(/^tools: (.*)$/m) || [])[1] || "");
+    ok(/\bRead\b/.test(tools) && !/\b(Write|Edit|NotebookEdit)\b/.test(tools), `the design-reviewer is not read-only: tools: ${tools}`);
+    for (const word of ["1728", "1080", "docs/design/video-screens.md", "~/.cache/gnoworld-tools/video-frames/", "position", "size", "spacing", "type", "colour", "radius", "both pictures"])
+      ok(brief.includes(word), `the design-reviewer's brief lacks ${word}`);
+    ok(/missing[^.]*fail[^.]*never skip/i.test(brief), "the design-reviewer's brief has no one sentence saying that missing frames fail the step, never skip it");
+    ok(/git command that writes the index/.test(brief), "the design-reviewer's brief lacks the git-index rule");
   }
   // The list and docs/REVIEW.md's table agree: each path of its tier-1 rows (a backticked word with a "/") that names files in the
   // repository starts the lens through the first of them. A tier-1 area added to the table and not to the loop fails here.
