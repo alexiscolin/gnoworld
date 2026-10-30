@@ -138,7 +138,7 @@ machine at load 11 to 43 on 16 cores, so the times are an order of magnitude, no
 `routes/earth.tsx` (8 journeys of 43) took 122 s before (the `app` step 116 s) and 30 s after (23 s); one added to a
 spec (1 journey) took 224 s before (153 s, load 23 then 43) and 46 s after (17 s); one added to `routes/world.tsx`
 (39 journeys) took 88 s before (83 s) and 110 s after (96 s), no gain: nearly every journey goes to a world page. That is
-why a run of some journeys has 60 s and a run of all 120 s.
+why a run of half the journeys or fewer has 60 s, and a run of more than half, all included, 120 s (F2577).
 
 **Two checks the fast gate runs on a trigger** (harness-b): a commit that touches a test, a bench or an approved picture
 (`*.test.ts(x)`, `*.bench.ts(x)`, `*.spec.ts`, gno and Go test files, `*-snapshots/*.png`, `*__screenshots__/*.png`;

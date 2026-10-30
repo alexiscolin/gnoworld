@@ -120,10 +120,8 @@ def scoping_mutants():
     check = "scripts/check.sh"
     for find, replace, label in (
         ("if ! $full && ! $all && $app; then scope=", "if false; then scope=", "scopes the journeys to the change"),
-        ('[ "$scope" = all ] || [ "$scope" = none ] || budget=60', '[ "$scope" = all ] || [ "$scope" = none ] || budget=120', "gives a run of some journeys a shorter budget"),
-        ('[ "$scope" = all ] || [ "$scope" = none ] || budget=60', ":", "gives a run of some journeys a budget of its own"),
         ('if [ "$scope" != all ]; then', "if false; then", "gives Playwright the journeys journeys.py names"),
-        ('[ "$scope" = all ] || [ "$scope" = none ] || budget=60', '[ "$scope" = all ] || budget=60', "gives a run with no journey the budget of one with some"),
+        ('if [ "$scope" != all ] && [ "$scope" != none ]; then', 'if [ "$scope" != all ]; then', "gives a run with no journey the budget of one with some"),
         (r"""sed 's/[][+(){}^$|?*\\]/\\&/g'""", r"""sed 's/[][+(){}^$|?*\\]/&/g'""", "escapes the regular-expression characters of a journey's name"),
         ('set -- "$@" "$(printf', 'set -- "$(printf', "gives every journey journeys.py names"),
         ("printf '%s\\n' \"$changed\" | python3 -I scripts/journeys.py", "python3 -I scripts/journeys.py </dev/null", "tells journeys.py what changed"),
@@ -157,6 +155,12 @@ def scoping_mutants():
 def journeys_more_mutants():
     """What the journeys' scoping also does: a request or a location is a goto in a spec (F2575), tests alone are no journey (F2578)."""
     yield from each("scripts/check.sh", '[ "$scope" != none ] || app=false', ":", "hooks", "check.sh builds and walks the app for a change of its tests alone")
+    for find, replace, label in (
+        ("[ $((journeys_due * 2)) -gt \"$journeys_all\" ] || budget=60", "[ $((journeys_due * 2)) -gt \"$journeys_all\" ] || budget=120", "gives a run of half the journeys or fewer a shorter budget"),
+        ("[ $((journeys_due * 2)) -gt", "[ $((journeys_due * 2)) -ge", "counts exactly half of the journeys as most of them"),
+        ("[ $((journeys_due * 2)) -gt", "[ $((journeys_due)) -gt", "counts the journeys due by half their number"),
+    ):
+        yield from each("scripts/check.sh", find, replace, "hooks", f"check.sh {label}")
     for find, replace, label in (
         ("*(OTHER_GO.finditer(text) if own else ())", "*()", "places a journey by its gotos alone, not by a request or a location it sets"),
         ("OTHER_GO.finditer(text) if own else ()", "OTHER_GO.finditer(text)", "reads a helper's request through a variable as a journey's page"),

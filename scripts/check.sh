@@ -140,7 +140,12 @@ if ! $full && ! $all && $app; then scope=$(printf '%s\n' "$changed" | python3 -I
 budget=120 # s, for everything (Alexis, 2026-10-28: 75 refused a harness commit on a half-busy machine; 60 before 2026-10-27); for a run scoped to a change, 30
 # A run that builds the app runs every journey, the work of a run of everything: 73-96 s on a quiet machine (slice-5a, F2162).
 $all || $app || budget=30
-[ "$scope" = all ] || [ "$scope" = none ] || budget=60 # some journeys, not all: 17 to 23 s of them for 1 and 8 of 43, 96 s for 39 (harness-b, measured)
+if [ "$scope" != all ] && [ "$scope" != none ]; then
+	# Half of the journeys or fewer: 17 to 23 s of them for 1 and 8 of 43. More: 110 s for 39 of 43 (harness-b, measured), the budget of all (F2577).
+	journeys_due=$(printf '%s\n' "$scope" | grep -c . || :)
+	journeys_all=$(find app/tests/e2e -type f | grep -cE '\.(spec|test)\.[cm]?[jt]sx?$' || :)
+	[ $((journeys_due * 2)) -gt "$journeys_all" ] || budget=60
+fi
 [ "${GATE_BUDGET:-$budget}" -lt "$budget" ] 2>/dev/null && budget=$GATE_BUDGET # a test lowers it; nothing raises it
 tests_scope=
 $related && tests_scope="--changed --passWithNoTests"
