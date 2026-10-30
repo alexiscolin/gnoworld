@@ -26,7 +26,9 @@ const unstyled: { [Name in keyof Exported]: Unstyled<ComponentProps<Exported[Nam
   IconButton: true,
   Kicker: true,
   LinkProvider: true,
+  Logo: true,
   Menu: true,
+  Panel: true,
   PlanetThumb: true,
   Popover: true,
   Row: true,
@@ -43,7 +45,10 @@ const parts: [
   Unstyled<ComponentProps<typeof ui.Card.Header>>,
   Unstyled<ComponentProps<typeof ui.Card.Body>>,
   Unstyled<ComponentProps<typeof ui.Card.Actions>>,
-] = [true, true, true];
+  Unstyled<ComponentProps<typeof ui.Panel.Header>>,
+  Unstyled<ComponentProps<typeof ui.Panel.Body>>,
+  Unstyled<ComponentProps<typeof ui.Panel.Footer>>,
+] = [true, true, true, true, true, true];
 
 // What @gnoworld/ui gives the app and the admin console: a component left out of the entry
 // would pass its own tests and still be out of their reach.
@@ -68,7 +73,9 @@ it("exports every component of the design system, and nothing else", () => {
       "IconButton",
       "Kicker",
       "LinkProvider",
+      "Logo",
       "Menu",
+      "Panel",
       "PlanetThumb",
       "Popover",
       "Row",

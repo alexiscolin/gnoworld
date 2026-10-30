@@ -33,6 +33,8 @@
     --color-danger-soft: color-mix(in oklab, var(--p-coral) 12%, transparent);
     --color-danger-line: color-mix(in oklab, var(--p-coral) 50%, transparent);
     --color-new-line: color-mix(in oklab, var(--p-coral) 60%, transparent);
+    /* The world's own colour on its plate: a Panel sets it from the world's data; amber until it does. */
+    --world: var(--color-warm);
     --color-fill: color-mix(in oklab, var(--p-text) 5%, transparent);
     --color-fill-hover: color-mix(in oklab, var(--p-text) 10%, transparent);
     --color-ink-hover: color-mix(in oklab, var(--p-space) 10%, transparent);

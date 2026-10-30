@@ -1,0 +1,77 @@
+/* The panel: a surface with a line and rounded corners; floating, a shadow over the scene; the plate, the
+   world's tinted dot grid at the left of its frame, which fades into space over its last 64 px. */
+@layer components {
+  .panel {
+    --_fill: var(--color-surface);
+
+    position: relative;
+    border: var(--line-width) solid var(--color-line);
+    border-radius: var(--radius-l);
+    background: var(--_fill);
+  }
+
+  .panel[data-look="floating"] {
+    box-shadow: var(--shadow-float);
+  }
+
+  .content {
+    padding: var(--space-m);
+  }
+
+  .panel[data-look="plate"] {
+    /* raw: the world's tint over the night, 16% (the prototype's #fPlate); amber when the data has none */
+    --_fill: color-mix(in oklab, var(--world) 16%, var(--color-surface));
+
+    border-inline-end: 0;
+    /* raw: the dot grid, white at 7% on a 14 px pitch (the prototype's #fPlate) */
+    background:
+      radial-gradient(color-mix(in oklab, var(--color-text) 7%, transparent) 1px, transparent 1.3px) 0 0 / 14px 14px,
+      var(--_fill);
+  }
+
+  /* Seen only on the wide plate: a block in the page keeps its height to its words (the room under it needs the screen). */
+  .caption {
+    display: none;
+    position: absolute;
+    inset-inline-start: var(--space-m);
+    inset-block-end: var(--space-xl);
+  }
+
+  /* Under 1360 px the plate is a block in the page, under the header: beside it a room would have under the 40rem it needs
+     next to a thread's panel (the page places it: routes/plate.module.css). */
+  /* raw: the plate's width, the page's gutters and a room's 40rem, rounded up */
+  @media (min-width: 1360px) {
+    .caption {
+      display: block;
+    }
+
+    .panel[data-look="plate"] {
+      /* The page places the plate (fixed, 98 px from the top, 24 from the left and the bottom); the plate fills its place. */
+      block-size: 100%;
+      /* raw: the plate's width (DESIGN-SYSTEM.md, Layout) */
+      inline-size: 620px;
+      border-start-end-radius: 0;
+      border-end-end-radius: 0;
+      /* raw: the fade: the last 64 px go to space, so the planet keeps the frame's free area */
+      mask-image: linear-gradient(to right, #000 calc(100% - 64px), transparent);
+    }
+
+    .panel[data-look="plate"] .content {
+      block-size: 100%;
+      overflow: auto;
+      box-sizing: border-box;
+      /* raw: the text column starts 76 px into the plate, at x 100 (frame 20) */
+      padding-inline-start: 76px;
+      /* raw: and ends at x 584, 484 px wide (frame 20) */
+      padding-inline-end: calc(620px - 76px - 484px);
+    }
+
+    .panel[data-look="plate"] h1 {
+      /* raw: the display size, clamp(4.5rem, 8vi, 7rem): 112 px at the video's width */
+      font-size: clamp(4.5rem, 8vi, 7rem);
+      font-weight: 500;
+      letter-spacing: -0.05em;
+      line-height: 0.9;
+    }
+  }
+}

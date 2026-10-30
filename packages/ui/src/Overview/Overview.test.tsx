@@ -14,6 +14,8 @@ const SHOWN: Record<keyof typeof ui, readonly [region: string, mark: string]> = 
   Button: ["Buttons", "button[data-emphasis]:not([aria-label])"],
   IconButton: ["Icon buttons", "button[data-emphasis][aria-label]"],
   Kicker: ["Kickers", "p.label"],
+  Logo: ["Logos", "svg[aria-hidden='true']"],
+  Panel: ["Panels", "section[data-look]"],
   Flash: ["Flashes", "[role='status'] p"],
   EmptyState: ["Empty states", "h3 + p"],
   Icon: ["Icons", "svg[data-icon]"],

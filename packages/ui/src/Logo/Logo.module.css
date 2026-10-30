@@ -1,0 +1,21 @@
+/* The logo: the mark's box at a control's size, and the wordmark in the light title weight. */
+@layer components {
+  .mark {
+    display: block;
+    inline-size: var(--control-s);
+    block-size: var(--control-s);
+  }
+
+  .word {
+    font: var(--font-title-s);
+    font-weight: 300;
+    letter-spacing: var(--tracking-tight);
+  }
+
+  /* When narrow, the word drops before the mark (DESIGN-SYSTEM.md, Layout); the link around it keeps its name. */
+  @media (max-width: 600px) {
+    .word {
+      display: none;
+    }
+  }
+}
