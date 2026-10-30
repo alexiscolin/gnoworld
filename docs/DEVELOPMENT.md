@@ -60,6 +60,23 @@ mkdir -p $T/src && git -C ~/Server/gno archive v1.5.1 | tar -x -C $T/src
 GNO_TOOLCHAIN=$T GNOROOT=$T/src ./scripts/check.sh   # the first run downloads p/nt/* into $T/gnohome
 ```
 
+## The pinned nginx
+
+The merge check (`check.sh --merge`) runs `nginx -t` on the image's `deploy/web/nginx.conf` with the build's table, then serves the
+built pages and asks each at its slashed, bare and `index.html` addresses (`scripts/check_nginx.py`; HARNESS.md). Docker is refused in
+the sandbox, so it needs an nginx at the image's version, 1.30.6 (`deploy/web/Dockerfile`), in the tools' cache, and a merge check
+without it fails: it never skips. Alexis sets it up once, on the machine that runs the merge checks:
+
+1. Build nginx 1.30.6 from the source release (check the release's signature against nginx.org's published keys), with a prefix of its own.
+2. Put the built binary at `~/.cache/gnoworld-tools/nginx-1.30.6/nginx` and the release's `conf/mime.types` at
+   `~/.cache/gnoworld-tools/nginx-1.30.6/conf/mime.types` (`GNOWORLD_TOOLS` moves the cache).
+3. Record the binary's checksum in `scripts/nginx.sha256` (one line: `shasum -a 256 ~/.cache/gnoworld-tools/nginx-1.30.6/nginx`), committed
+   with a line `Harness-changed: scripts/nginx.sha256 - why`. Until then the file says `unrecorded` and the check fails naming the checksum.
+   The check runs the binary only when its SHA-256 is the pinned one.
+
+One real `nginx -t` on the image's config, by hand, confirms the step: the check rewrites the image's paths, its listen line and its
+upstream hosts, and its stand-in for nginx in `scripts/test_hooks.sh` is a model of what F2459 and F2460 hit, not nginx.
+
 ## The gate and the harness
 
 `./scripts/check.sh` is the gate, and `./scripts/check.sh --full` the one `/pre-merge` runs.

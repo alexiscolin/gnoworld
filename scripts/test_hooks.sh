@@ -2093,7 +2093,7 @@ printf '#!/bin/sh\ncase "$*" in *"free ports in 200 tries"*) [ -z "${PORTS_FAIL:
 chmod +x "$g/bin/python3"
 printf '#!/bin/sh\nexec sh "%s" gno "$@"\n' "$step" >"$g/toolchain/gno"
 chmod +x "$g/bin/go" "$g/bin/gofmt" "$g/toolchain/gno"
-for py in check_css check_docs mutate probe bench batch_size load patch_coverage prove_fix check_regressions check_migrations audit harness_mutate; do
+for py in check_css check_docs mutate probe bench batch_size load patch_coverage prove_fix check_regressions check_migrations audit harness_mutate check_nginx; do
 	printf 'import os, sys\nos.execvp("sh", ["sh", %s, "py:%s", *sys.argv[1:]])\n' "'$step'" "$py" >"$g/scripts/$py.py"
 done
 for sh in ergo test_hooks scan_secrets; do printf 'exec sh "%s" sh:%s "$@"\n' "$step" "$sh" >"$g/scripts/$sh.sh"; done
@@ -3637,7 +3637,14 @@ bad=$(grep -v " live worktree=$gp since=[0-9][0-9]*$" "$log.lockpeek" | head -1)
 [ "$(sed -n 's/^[^ ]* pid=\([0-9]*\) .*/\1/p' "$log.lockpeek" | sort -u | wc -l | tr -d ' ')" = 1 ] || fail "the steps of one merge check saw different lock holders: $(cat "$log.lockpeek")"
 since_seen=$(sed -n 's/.* since=\([0-9]*\)$/\1/p' "$log.lockpeek" | sort -n | tail -1)
 [ "$(($(date +%s) - since_seen))" -lt 600 ] || fail "the lock's since is not the time the merge check started: $since_seen"
+# nginx -t and the served build: in the merge check, after the build; never in the fast gate.
+ran py:check_nginx || fail "check.sh --merge did not run scripts/check_nginx.py (nginx -t and the served build's policies)"
+before playwright py:check_nginx || fail "check.sh --merge checked nginx before the build the journeys make"
+out=$(FAIL=py:check_nginx gate --merge) && fail "check.sh --merge passed with the nginx check failing: $out"
+printf '%s\n' "$out" | grep -q "^py:check_nginx failed here" || fail "check.sh --merge hid the nginx check's failure: $out"
+[ ! -e "$lockdir" ] || fail "check.sh --merge left its lock behind after a failure"
 gate >/dev/null || fail "check.sh failed (fast)"
+ran py:check_nginx && fail "check.sh's fast gate ran the nginx check, which needs a pinned binary and a build"
 # A holder that died: no wait, the lock taken over.
 sh -c 'exit 0' & dead=$!
 wait "$dead" || :
@@ -3784,6 +3791,209 @@ if (ulimit -S -n 20000) 2>/dev/null; then
 	out=$( (ulimit -S -n 20000 && gate) ) || fail "check.sh failed under a high soft limit: $out"
 	[ "$(ul)" = 20000 ] || fail "check.sh lowered an open-files limit above 10240: got '$(ul)'"
 fi
+fi
+
+if part nginx_check; then
+# scripts/check_nginx.py, in the merge check: the pinned nginx (1.30.6, the image's) from the tools' cache with its checksum
+# checked, `nginx -t` on the image's deploy/web/nginx.conf with the build's table (app/build/csp.conf), then the build served on a
+# free port, each page asked at its slashed, bare and index.html forms, each answering with its own policy (the build's _headers
+# rule), never the bare one. 5f's two high findings passed the gate and the first read of the review: F2459 (a second
+# map_hash_max_size, nginx refuses to start) and F2460 (a slashed address got the bare policy). The binary here is a stub that
+# models what those faults hit: nginx's duplicate directive, its missing include, the map keyed by $uri after try_files joined
+# without merging slashes. Docker stays refused in the sandbox (deploy/test.sh is Alexis's).
+nc="$t/nginxchk"
+mkdir -p "$nc/scripts" "$nc/deploy/web" "$nc/app/build/client/w/bubble" "$nc/tools/nginx-1.30.6/conf"
+cp "$here/../deploy/web/nginx.conf" "$nc/deploy/web/nginx.conf"
+bare="default-src 'none'; script-src 'self'"
+home="default-src 'none'; script-src 'self' 'sha256-HOMEHOMEHOMEHOMEHOMEHOMEHOMEHOMEHOMEHOMEHOM='"
+bub="default-src 'none'; script-src 'self' 'sha256-BUBBBUBBBUBBBUBBBUBBBUBBBUBBBUBBBUBBBUBBBU='"
+printf '<html></html>\n' >"$nc/app/build/client/index.html" && printf '<html></html>\n' >"$nc/app/build/client/w/bubble/index.html"
+printf '/*\n  Content-Security-Policy: %s\n/\n  ! Content-Security-Policy\n  Content-Security-Policy: %s\n/w/bubble\n  ! Content-Security-Policy\n  Content-Security-Policy: %s\n/w/bubble/\n  ! Content-Security-Policy\n  Content-Security-Policy: %s\n' \
+	"$bare" "$home" "$bub" "$bub" >"$nc/app/build/client/_headers"
+table() { # $1: extra rows
+	printf 'map_hash_max_size 2048;\nmap_hash_bucket_size 64;\nmap $uri $csp {\n    default "%s";\n    "/" "%s";\n    "//index.html" "%s";\n    "/index.html" "%s";\n    "/w/bubble" "%s";\n    "/w/bubble/" "%s";\n    "/w/bubble//index.html" "%s";\n    "/w/bubble/index.html" "%s";\n%s}\n' \
+		"$bare" "$home" "$home" "$home" "$bub" "$bub" "$bub" "$bub" "${1:-}" >"$nc/app/build/csp.conf"
+}
+table
+: >"$nc/tools/nginx-1.30.6/conf/mime.types"
+cat >"$nc/tools/nginx-1.30.6/nginx" <<'PY'
+#!/usr/bin/env python3
+import http.server, os, re, sys
+a = sys.argv[1:]
+conf_path = a[a.index("-c") + 1]
+test = "-t" in a
+log = open(os.environ["STUB_LOG"], "a")
+conf = open(conf_path).read()
+log.write(("test " if test else "serve ") + " ".join(a) + "\n---\n" + conf + "\n===\n")
+log.flush()
+texts, includes = [conf], re.findall(r"^\s*include\s+(\S+);", conf, re.M)
+for inc in includes:
+    if not os.path.exists(inc):
+        print(f'nginx: [emerg] open() "{inc}" failed (2: No such file or directory) in {conf_path}', file=sys.stderr)
+        sys.exit(1)
+    texts.append(open(inc).read())
+everything = "\n".join(texts)
+if len(re.findall(r"^\s*map_hash_max_size\s", everything, re.M)) > 1:
+    print(f'nginx: [emerg] "map_hash_max_size" directive is duplicate in {conf_path}:50', file=sys.stderr)
+    sys.exit(1)
+for m in re.finditer(r"^\s*proxy_pass\s+https?://([^:/;\s]+)", conf, re.M):
+    host = m.group(1)
+    if not (re.fullmatch(r"\d+\.\d+\.\d+\.\d+", host) or host == "localhost"):  # nginx resolves a literal host as it loads
+        print(f'nginx: [emerg] host not found in upstream "{host}" in {conf_path}', file=sys.stderr)
+        sys.exit(1)
+if os.environ.get("STUB_WARN"):
+    print("nginx: [warn] " + os.environ["STUB_WARN"], file=sys.stderr)
+if test:
+    print(f"nginx: configuration file {conf_path} test is successful", file=sys.stderr)
+    sys.exit(0)
+open(os.environ["STUB_PID"], "w").write(str(os.getpid()))
+if os.environ.get("STUB_NOSERVE") == "exit":  # a server that dies at once
+    print("nginx: [emerg] bind() to 127.0.0.1 failed (98: Address already in use)", file=sys.stderr)
+    sys.exit(1)
+if os.environ.get("STUB_NOSERVE") == "hang":  # one that never listens
+    import time
+    time.sleep(60)
+    sys.exit(1)
+listen = re.search(r"^\s*listen\s+([^;]*);", conf, re.M).group(1)
+port = int(re.search(r"(?:127\.0\.0\.1:)?(\d+)", listen).group(1))
+needs_proxy_protocol = "proxy_protocol" in listen
+needs_password = re.search(r"^\s*auth_basic\s+\"", conf, re.M) is not None
+root = re.search(r"^\s*root\s+(\S+);", conf, re.M).group(1)
+table_text = next(t for t, i in zip(texts[1:], includes) if not i.endswith("mime.types"))
+default = re.search(r'default "([^"]*)";', table_text).group(1)
+rows = dict(re.findall(r'^\s*"(/[^"]*)" "([^"]*)";', table_text, re.M))
+class H(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        if needs_proxy_protocol:  # a plain request on a PROXY-protocol port is not understood
+            self.send_response(400)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        if needs_password:
+            self.send_response(401)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        p = self.path.split("?")[0]
+        uri = None
+        if os.path.isfile(root + p):
+            uri = p
+        elif os.path.isfile(root + p + "/index.html"):
+            uri = p + "/index.html"  # try_files joins without merging slashes: "/w/bubble/" + "/index.html"
+        self.send_response(200 if uri else 404)
+        self.send_header("Content-Security-Policy", rows.get(uri, default) if uri else default)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+    def log_message(self, *x):
+        pass
+http.server.ThreadingHTTPServer(("127.0.0.1", port), H).serve_forever()
+PY
+chmod +x "$nc/tools/nginx-1.30.6/nginx"
+sha=$(python3 -I -c 'import hashlib, sys; print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())' "$nc/tools/nginx-1.30.6/nginx")
+# SHA: UNSET runs with no NGINX_SHA256, EMPTY with an empty one (the pin file's digest then decides), a value is the digest to trust.
+chk() {
+	case "${SHA:-}" in UNSET) shaenv="-u NGINX_SHA256" ;; EMPTY) shaenv="NGINX_SHA256=" ;; "") shaenv="NGINX_SHA256=$sha" ;; *) shaenv="NGINX_SHA256=$SHA" ;; esac
+	rm -f "$nc/stub.pid"
+	(cd "$nc" && env $shaenv GNOWORLD_TOOLS="$nc/tools" STUB_LOG="$nc/stub.log" STUB_PID="$nc/stub.pid" STUB_WARN="${WARN:-}" STUB_NOSERVE="${NOSERVE:-}" python3 -I "$here/check_nginx.py" 2>&1)
+}
+# What a failed check leaves running is a server per failed merge check: the nginx it started is dead, whatever failed.
+stopped() { # $1: what failed
+	[ -s "$nc/stub.pid" ] || return 0
+	if kill -0 "$(cat "$nc/stub.pid")" 2>/dev/null; then kill -9 "$(cat "$nc/stub.pid")"; fail "check_nginx left the nginx it started running after $1"; fi
+}
+rm -f "$nc/stub.log" "$nc/stub.pid"
+out=$(chk) || fail "check_nginx refused the image's config with a good table, every page answering its own policy: $out"
+grep -q "^test " "$nc/stub.log" || fail "check_nginx ran no nginx -t"
+grep -q "^serve " "$nc/stub.log" || fail "check_nginx did not serve the build after nginx -t"
+for form in "/w/bubble/" "/w/bubble" "/w/bubble/index.html" "/index.html"; do
+	printf '%s\n' "$out" | grep -qF "$form" || fail "check_nginx did not say it asked $form: $out"
+done
+# The config tested is the image's, with the build's table: no path of the image's filesystem is left in it, the table is read
+# from the build, and the served one answers a free port without the PROXY protocol or the password (a plain request has neither).
+conf_tested=$(sed -n '/^test /,/^===$/p' "$nc/stub.log")
+printf '%s\n' "$conf_tested" | grep -qF "worker_connections 4096" || fail "check_nginx tested another config than deploy/web/nginx.conf"
+printf '%s\n' "$conf_tested" | grep -qF "/etc/nginx/csp.conf" && fail "check_nginx left the image's /etc/nginx/csp.conf in the config it tested"
+conf_served=$(sed -n '/^serve /,/^===$/p' "$nc/stub.log")
+printf '%s\n' "$conf_served" | grep -qE "^ *(listen +8080|listen .*proxy_protocol|auth_basic)" && fail "check_nginx served the config as the image has it (a fixed port, the PROXY protocol, the password file): a plain request cannot reach it"
+if [ -s "$nc/stub.pid" ]; then kill -0 "$(cat "$nc/stub.pid")" 2>/dev/null && { kill "$(cat "$nc/stub.pid")"; fail "check_nginx left the nginx it started running"; }; fi
+# F2460: a table with no row for the slashed address (try_files' $uri/index.html joins without merging slashes): the page gets
+# the bare policy at /w/bubble/, and the check says so.
+grep -v '//index.html' "$nc/app/build/csp.conf" >"$nc/c" && mv "$nc/c" "$nc/app/build/csp.conf"
+out=$(chk) && fail "check_nginx passed a table with no row for a slashed address (F2460): $out"
+printf '%s\n' "$out" | grep -qF "/w/bubble/" && printf '%s\n' "$out" | grep -qi "bare" || fail "check_nginx did not name the slashed address that got the bare policy: $out"
+stopped "a page that got the bare policy (F2460)"
+# Another page's policy is no more its own than the bare one.
+table '' && sed -E 's#("/w/bubble[^"]*" )"[^"]*"#\1"'"$home"'"#' "$nc/app/build/csp.conf" >"$nc/c" && mv "$nc/c" "$nc/app/build/csp.conf"
+out=$(chk) && fail "check_nginx passed a page answering another page's policy: $out"
+printf '%s\n' "$out" | grep -qF "/w/bubble" || fail "check_nginx did not name the page that got another's policy: $out"
+stopped "a page that got another's policy"
+table
+# A page the build's _headers lists and the build does not hold: nginx answers 404, and the check names the page and the status.
+cp "$nc/app/build/client/_headers" "$nc/headers.good"
+printf '/gone\n  ! Content-Security-Policy\n  Content-Security-Policy: %s\n' "$bare" >>"$nc/app/build/client/_headers"
+out=$(chk) && fail "check_nginx passed a page of _headers that the build does not hold: $out"
+printf '%s\n' "$out" | grep -qF "/gone" && printf '%s\n' "$out" | grep -qF "404" || fail "check_nginx did not name the missing page and its 404: $out"
+stopped "a page that answered 404"
+cp "$nc/headers.good" "$nc/app/build/client/_headers"
+# A server that never answers: dead at once, or listening to nothing. The check fails in a bounded time, saying nginx did not start, and
+# leaves nothing running.
+t0=$(date +%s)
+out=$(NOSERVE=exit chk) && fail "check_nginx passed with an nginx that died at once: $out"
+[ "$(($(date +%s) - t0))" -lt 8 ] || fail "check_nginx waited $(($(date +%s) - t0)) s for an nginx that had already died"
+printf '%s\n' "$out" | grep -qi "did not start" || fail "check_nginx did not say that nginx did not start: $out"
+stopped "an nginx that died at once"
+t0=$(date +%s)
+out=$(NOSERVE=hang NGINX_START_TIMEOUT=2 chk) && fail "check_nginx passed with an nginx that never listens: $out"
+[ "$(($(date +%s) - t0))" -lt 15 ] || fail "check_nginx waited $(($(date +%s) - t0)) s for an nginx that never listens"
+printf '%s\n' "$out" | grep -qi "did not start" || fail "check_nginx did not say that nginx never answered: $out"
+stopped "an nginx that never listens"
+# A literal upstream host (deploy/web/nginx.conf's ergo and server) is one nginx -t refuses where no such host resolves: the check
+# tests a config that names none. Docker's names are the image's own; the stub refuses any host that is no address.
+sed -n '/^test /,/^===$/p' "$nc/stub.log" | grep -qE "proxy_pass +http://(ergo|server)[:;]" && fail "check_nginx left the image's upstream host names in the config it tested (nginx: host not found in upstream)"
+# F2459: a second map_hash_max_size in the config nginx refuses; the check shows nginx's own words and serves nothing.
+cp "$nc/deploy/web/nginx.conf" "$nc/nginx.good"
+python3 -I -c 'import re, sys; t = open(sys.argv[1]).read(); open(sys.argv[2], "w").write(re.sub(r"^( *)(include /etc/nginx/csp\.conf;)", r"\1map_hash_max_size 4096;\n\1\2", t, flags=re.M))' "$nc/nginx.good" "$nc/deploy/web/nginx.conf"
+[ "$(grep -c '^ *map_hash_max_size' "$nc/deploy/web/nginx.conf")" = 1 ] || fail "the fixture did not plant F2459's fault"
+rm -f "$nc/stub.log"
+out=$(chk) && fail "check_nginx passed a config nginx refuses to start with (F2459): $out"
+printf '%s\n' "$out" | grep -qF '"map_hash_max_size" directive is duplicate' || fail "check_nginx did not show nginx's own error for F2459: $out"
+grep -q "^serve " "$nc/stub.log" && fail "check_nginx served a build after nginx -t failed"
+cp "$nc/nginx.good" "$nc/deploy/web/nginx.conf"
+# A warning: the hash table's, which csp-fixes (F2454) removes by sizing the table, is the one named and allowed until then;
+# any other warning fails.
+out=$(WARN='could not build optimal map_hash, you should increase either map_hash_max_size: 2048 or map_hash_bucket_size: 64' chk) || fail "check_nginx refused the one warning it allows until csp-fixes sizes the table (F2454): $out"
+printf '%s\n' "$out" | grep -qi "allowed" || fail "check_nginx did not say it allowed a warning, and which: $out"
+out=$(WARN='the "user" directive makes sense only if the master process runs with super-user privileges, ignored' chk) && fail "check_nginx passed an unknown warning: $out"
+printf '%s\n' "$out" | grep -qF 'the "user" directive' || fail "check_nginx did not show the warning that failed it: $out"
+# What it cannot do fails, never skips: no binary, a binary whose checksum is not the pinned one, no build.
+out=$(cd "$nc" && mkdir -p empty && GNOWORLD_TOOLS="$nc/empty" python3 -I "$here/check_nginx.py" 2>&1) && fail "check_nginx passed with no nginx in the tools' cache: $out"
+printf '%s\n' "$out" | grep -qF "nginx-1.30.6" && printf '%s\n' "$out" | grep -qF "docs/DEVELOPMENT.md" || fail "check_nginx did not say where the pinned nginx comes from: $out"
+out=$(SHA=0000 chk) && fail "check_nginx ran a binary whose checksum is not the pinned one: $out"
+printf '%s\n' "$out" | grep -qi "checksum" || fail "check_nginx did not name the checksum: $out"
+# The switch is the tests': with none (or an empty one), the pin committed beside the script decides, and a stub is not nginx 1.30.6.
+for mode in UNSET EMPTY; do
+	out=$(SHA=$mode chk) && fail "check_nginx ran a binary that is not the pinned nginx, with NGINX_SHA256 $mode: $out"
+	printf '%s\n' "$out" | grep -qi "checksum" || fail "check_nginx did not name the checksum with NGINX_SHA256 $mode: $out"
+	stopped "a binary that is not the pinned one"
+done
+pin=$(head -1 "$here/nginx.sha256" 2>/dev/null || :)
+case "$pin" in
+unrecorded) ;;
+*[!0-9a-f]* | "") fail "scripts/nginx.sha256 holds neither a SHA-256 in hex nor the word 'unrecorded': '$pin'" ;;
+*) [ ${#pin} -eq 64 ] || fail "scripts/nginx.sha256 is not 64 hex characters: '$pin'" ;;
+esac
+# The default location: nothing in GNOWORLD_TOOLS, the binary at $HOME/.cache/gnoworld-tools/nginx-1.30.6/nginx.
+mkdir -p "$nc/home/.cache/gnoworld-tools/nginx-1.30.6/conf" && cp "$nc/tools/nginx-1.30.6/nginx" "$nc/home/.cache/gnoworld-tools/nginx-1.30.6/nginx" && : >"$nc/home/.cache/gnoworld-tools/nginx-1.30.6/conf/mime.types"
+out=$(cd "$nc" && env -u GNOWORLD_TOOLS HOME="$nc/home" NGINX_SHA256="$sha" STUB_LOG="$nc/stub.log" STUB_PID="$nc/stub.pid" python3 -I "$here/check_nginx.py" 2>&1) || fail "check_nginx did not find the pinned nginx at \$HOME/.cache/gnoworld-tools/nginx-1.30.6/nginx: $out"
+out=$(cd "$nc" && mkdir -p home2 && env -u GNOWORLD_TOOLS HOME="$nc/home2" python3 -I "$here/check_nginx.py" 2>&1) && fail "check_nginx passed with no nginx in the default location: $out"
+mv "$nc/app/build/csp.conf" "$nc/csp.keep"
+out=$(chk) && fail "check_nginx passed with no build's table: $out"
+printf '%s\n' "$out" | grep -qi "csp.conf" || fail "check_nginx did not name the missing table: $out"
+mv "$nc/csp.keep" "$nc/app/build/csp.conf"
+# The pinned binary is documented where Alexis sets the tools up, and the harness doc says how the lock works.
+grep -q "gnoworld-tools/nginx-1\.30\.6/nginx" "$here/../docs/DEVELOPMENT.md" && grep -q "scripts/nginx\.sha256" "$here/../docs/DEVELOPMENT.md" && grep -qi "sha256\|checksum" "$here/../docs/DEVELOPMENT.md" || fail "docs/DEVELOPMENT.md does not say how to get the pinned nginx 1.30.6 with its checksum"
+grep -qi "merge.lock\|one merge check at a time" "$here/../docs/HARNESS.md" || fail "docs/HARNESS.md does not say that merge checks take a lock, one at a time"
+# Its switches are the tests', never a run's: check.sh drops them (section gate_limits runs it with them set and shows the steps see none).
 fi
 
 if part bench_load; then

@@ -480,6 +480,10 @@ EOF
 		python3 -I scripts/probe.py
 		step bench # the budgets of docs/plans/, after probe.py and alone: beside other work a bench measures the load
 		python3 -I scripts/bench.py
+		if $merge; then
+			step nginx # the image's nginx.conf with the build's table in a pinned nginx, then the built pages served: each answers its own policy (5f's F2459, F2460)
+			python3 -I scripts/check_nginx.py
+		fi
 	}
 	lane_stories() {
 		step core_chromium # core's tests again in Chromium, whose engine reads some regexes and Unicode otherwise (F816)

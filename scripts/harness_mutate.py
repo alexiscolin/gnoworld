@@ -64,7 +64,7 @@ SECTIONS = {
     ".githooks/records.sh": "outside,installed,wiring", ".githooks/pre-merge-commit": "outside,installed", ".githooks/merge.sh": "installed",
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix,worktree_script,borrow",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
-    "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys,gate_checks,gate_stryker,merge_lock,gate_limits", "scripts/mutate.py": "wiring", "scripts/journeys.py": "gate_journeys", "scripts/prove_fix.py": "prove_fix",
+    "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys,gate_checks,gate_stryker,merge_lock,gate_limits", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring", "scripts/journeys.py": "gate_journeys", "scripts/prove_fix.py": "prove_fix",
     "scripts/repo_files.py": {"hooks": "worktrees,regressions,batch_size,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/suite_parts.py": "mutant_scope,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/unsteady.py": {"hooks": "gate_lanes", "probe": "unsteady_real"}, "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
 }
 
@@ -1097,6 +1097,7 @@ def mutants():
     yield from checks_mutants()
     yield from stryker_mutants()
     yield from merge_lock_mutants()
+    yield from nginx_mutants()
     yield from bench_load_mutants()
     yield from regressions_name_mutants()
 
@@ -1123,6 +1124,31 @@ def merge_lock_mutants():
         ("unset NGINX_SHA256 NGINX_START_TIMEOUT", "unset NGINX_SHA256", "drops NGINX_START_TIMEOUT"),
         (" BENCH_WAIT_CEILING BENCH_WAIT_STEP #", " BENCH_WAIT_STEP #", "drops BENCH_WAIT_CEILING"),
         (" BENCH_WAIT_CEILING BENCH_WAIT_STEP #", " BENCH_WAIT_CEILING #", "drops BENCH_WAIT_STEP"),
+    ))
+
+
+def nginx_mutants():
+    """The merge check proves nginx accepts the image's config and serves each page its own policy (slice-5 harness-c)."""
+    c = "scripts/check.sh"
+    yield from each(c, "\t\tif $merge; then\n\t\t\tstep nginx", "\t\tif false; then\n\t\t\tstep nginx", "hooks", "check.sh --merge checks nginx")
+    n = "scripts/check_nginx.py"
+    yield from swaps(n, "check_nginx.py", (
+        ("    if actual != want:", "    if False:", "refuses a binary whose checksum is not the pinned one"),
+        ("        if test.returncode != 0:", "        if False:", "fails on a config nginx refuses (F2459)"),
+        ("        refused = [w for w in warnings if not any(a in w for a in ALLOWED)]", "        refused = []", "fails on a warning that is not allowed"),
+        ('ALLOWED = ("could not build optimal map_hash",)', "ALLOWED = ()", "allows the hash table's warning until csp-fixes sizes it"),
+        ("                if status != 200:", "                if False:", "fails a page that does not answer 200"),
+        ("                elif got[0] == want:", "                elif True:", "fails a page that answers another policy than its own (F2460)"),
+        ("                elif got[0] == bare:", "                elif False:", "says the bare policy when a page got it"),
+        ("        finally:\n            stop(proc)", "        finally:\n            pass", "stops the nginx it started after a failure"),
+        ("            if proc.poll() is not None:", "            if False:", "fails at once on an nginx that died"),
+        ("            if time.monotonic() - began > timeout:", "            if False:", "stops waiting for an nginx that never listens"),
+        ('forms = [canonical + "/", canonical, "/" + rel]', 'forms = [canonical + "/", canonical]', "asks a page at its index.html address"),
+        ('forms = [canonical + "/", canonical, "/" + rel]', 'forms = [canonical, "/" + rel]', "asks a page at its slashed address"),
+        ('canonical, forms = "/", ["/", "/index.html"]', 'canonical, forms = "/", ["/"]', "asks the home at /index.html"),
+        ('    conf = re.sub(r"^\\s*auth_basic(_user_file)?\\s+[^;]*;\\n", "", conf, flags=re.M)', "", "serves with no password"),
+        ('    return re.sub(r"(proxy_pass\\s+https?://)[A-Za-z][\\w.-]*(:\\d+;)", r"\\g<1>127.0.0.1\\2", conf)', "    return conf", "points the upstream hosts at an address"),
+        ('f"listen 127.0.0.1:{ports[0]};"', 'f"listen 8080;"', "serves on a free port"),
     ))
 
 
