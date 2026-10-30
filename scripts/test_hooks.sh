@@ -3662,6 +3662,24 @@ mkdir -p "$lockdir"
 : >"$lockdir/pid"
 out=$(gate --merge) || fail "check.sh --merge failed beside a lock folder with no pid: $out"
 [ ! -e "$lockdir" ] || fail "check.sh --merge kept a pid-less lock"
+# A holder another sandbox owns: a signal to it is refused (EPERM), which is a live process, not a dead one (F2616: each session runs its
+# merge check in a Bash call of its own, and `kill -0` failing for either reason read the holder as dead). pid 1 is alive for every user
+# and refuses the signal to any but root; the waiter must wait, say so, and leave the lock alone.
+hold 1 "/other/sandbox"
+gate --merge >"$t/eperm.out" 2>&1 &
+eperm=$!
+tries=0
+until grep -q "/other/sandbox" "$t/eperm.out" 2>/dev/null; do
+	tries=$((tries + 1))
+	[ "$tries" -lt 100 ] || { kill "$eperm" 2>/dev/null; fail "check.sh --merge did not wait for a holder whose pid refuses a signal (EPERM, F2616): $(cat "$t/eperm.out")"; }
+	if ! kill -0 "$eperm" 2>/dev/null; then break; fi
+	sleep 0.1
+done
+grep -q "/other/sandbox" "$t/eperm.out" 2>/dev/null && kill -0 "$eperm" 2>/dev/null || fail "check.sh --merge took the lock of a live holder it was not allowed to signal (F2616): $(cat "$t/eperm.out")"
+kill "$eperm" 2>/dev/null
+wait "$eperm" 2>/dev/null || :
+[ "$(cat "$lockdir/pid" 2>/dev/null)" = 1 ] || fail "check.sh --merge dropped the lock of a holder it could not signal (F2616)"
+rm -rf "${lockdir:?}"
 # A live holder: the fast gate and --full go on, untouched; the lock stays the holder's.
 sleep 120 & holder=$!
 hold "$holder" "/other/worktree"
@@ -5060,6 +5078,12 @@ kill -9 "$(cat "$d/killed.pid")"
 soon ended killed || { stop_all; fail "a run killed hard still runs"; }
 deploy_run after "$p1"
 reached after || { stop_all; fail "a run was refused by the lock of a run that is dead: $(cat "$d/after.out")"; }
+stop_all
+# A holder another sandbox owns (its pid refuses a signal, EPERM, F2616) is alive: pid 1 holds the lock, and the run is refused.
+mkdir -p "$d/home/.cache/gnoworld-tools/deploy-test-$p1.lock" && printf '1\n' >"$d/home/.cache/gnoworld-tools/deploy-test-$p1.lock/pid"
+deploy_run eperm "$p1"
+refused eperm || { stop_all; fail "deploy/test.sh took over the lock of a live holder it was not allowed to signal (F2616): $(cat "$d/eperm.out")"; }
+grep -q "$p1" "$d/eperm.out" || { stop_all; fail "the run refused for a holder it could not signal did not name the project: $(cat "$d/eperm.out")"; }
 stop_all
 # A first run stopped by TERM releases the lock, under a Linux host's shell too: dash, unlike macOS's sh, runs no EXIT trap for a
 # signal with no trap of its own. The test waits for the run to end (after ending the stub `docker run` it waits on, which a

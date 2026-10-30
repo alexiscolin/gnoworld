@@ -52,6 +52,17 @@ release_lock() {
 }
 trap 'status=$?; rm -rf "$logs" || :; release_lock; [ "$status" != 0 ] || [ "${finished:-}" = 1 ] || status=1; exit "$status"' EXIT
 trap 'exit 1' HUP INT TERM # so the EXIT trap also runs on Ctrl-C under dash
+# Alive means the process exists: `kill -0` fails alike for a gone pid (ESRCH) and for a live one another sandbox owns (EPERM, F2616), so
+# only ESRCH counts as dead. Python reads the errno, not the shell's wording.
+pid_alive() {
+	python3 -Ic 'import os, sys
+try:
+    os.kill(int(sys.argv[1]), 0)
+except ProcessLookupError:
+    sys.exit(1)
+except PermissionError:
+    pass' "$1"
+}
 # One merge check at a time on the machine (harness-c, Alexis 2026-10-31: five side by side at a load of 25 to 40 on 16 cores failed by load
 # alone). `--merge` takes a lock shared by every worktree, a folder in the tools' cache holding its pid, its worktree and its start (seconds),
 # and WAITS for a live holder, never refuses; a holder whose pid is gone (a crash, a kill -9) leaves no wait and its lock is taken over.
@@ -70,7 +81,7 @@ if $merge; then
 			continue
 		fi
 		unread=0
-		if ! kill -0 "$holder" 2>/dev/null; then # dead: its lock is taken over
+		if ! pid_alive "$holder"; then # gone (ESRCH): its lock is taken over. A refused signal (EPERM) is a live process of another sandbox (F2616)
 			rm -rf "${merge_lock:?}"
 			continue
 		fi
