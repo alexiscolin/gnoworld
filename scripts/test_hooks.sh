@@ -2794,6 +2794,9 @@ py() { (cd "$g" && python3 -I scripts/journeys.py "$@" 2>&1 | sort | paste -sd' 
 [ "$(py app/src/features/world/w.test.ts)" = none ] || fail "journeys.py did not say 'none' for a change of the app's test files alone, which no page loads: $(py app/src/features/world/w.test.ts)"
 [ "$(py app/src/features/world/w.test.ts docs/a.md)" = none ] || fail "journeys.py let a prose path beside a test of the app make the change one it cannot place"
 [ "$(py app/src/features/world/w.test.ts app/src/features/world/gone.ts)" = all ] || fail "journeys.py let a test file hide a deleted file, which it cannot place"
+# A deleted journey reaches the end with nothing to run, where a change of tests alone does: only the count tells them apart.
+[ "$(py $e2e/gone.spec.ts)" = all ] || fail "journeys.py said 'none' for a deleted journey: $(py $e2e/gone.spec.ts)"
+[ "$(py app/src/features/world/w.test.ts $e2e/gone.spec.ts)" = all ] || fail "journeys.py let a test file hide a deleted journey: $(py app/src/features/world/w.test.ts $e2e/gone.spec.ts)"
 [ "$(py app/tests/e2e/gone.spec.ts-snapshots/a.png)" = all ] || fail "journeys.py placed a picture of a spec that does not exist"
 [ "$(py app/src/lib/shared.ts app/src/routes/eco.tsx app/src/routes/notFound.tsx)" = all ] || fail "journeys.py listed every journey instead of saying 'all'"
 # A list of routes it cannot read is no list: every journey. The fixture's own list with one thing added, so that what it
