@@ -44,7 +44,10 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
   table writes each path in backticks, and a `workflow_branch` case fails when the table names one its `TIER1` lacks, or `TIER1` holds
   one the table does not name. Its argument `base` (`main` when absent) is the branch the
   work is cut from: the merge check's file list, the reviewer's diff and `since` read from it. The merge check
-  reports the `survivor: ` lines `check.sh --merge` prints, pass or fail, and the reviewer gets them.
+  reports the `survivor: ` lines `check.sh --merge` prints, pass or fail, and the reviewer gets them: StrykerJS's survivors on the
+  files the branch changed, one `survivors not listed:` count for the rest, and every harness mutant. With a base the loop runs
+  `check.sh --merge --base <base>`, so every lane (batch, fixes, regressions, migrations, patch coverage, harness mutants, product
+  or not) measures from the merge-base with it, `origin/main` when absent (F2529, F2531).
   `test_hooks.sh`'s section `workflow_branch` runs it under stubbed globals.
 - **Agents** are fresh, briefed from files (never forks), four at most at once, each asked for a
   short report saved to a file. The sessions coordinate through files: the plan,

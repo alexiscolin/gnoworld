@@ -21,6 +21,16 @@ unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO PICTURES_OF STORI
 full=false merge=false
 [ "${1:-}" = "--full" ] && full=true
 [ "${1:-}" = "--merge" ] && full=true merge=true
+# `--full|--merge --base <ref>`: what this run's branch is measured against, in every lane that reads a base (the batch, the fixes, the
+# regressions, the migrations, the patch's coverage, the harness's mutants, what counts as product code, the survivors listed): the
+# merge-base with <ref>, origin/main when absent. A branch cut from an integration branch names it (F2531): from main its range holds
+# the other branches' lines too.
+base_ref=origin/main
+if [ "${2:-}" = "--base" ]; then
+	base_ref=${3:-}
+	[ -n "$base_ref" ] || { echo "check.sh: --base wants a ref to compare with" >&2; exit 1; }
+fi
+changed_list= # the paths this branch changed since its base, one a line, once a full run has computed them
 started=$(date +%s)
 logs=$(mktemp -d "${TMPDIR:-/tmp}/check.XXXXXX")
 # bash 3.2, macOS's sh, exits 0 through an EXIT trap after an unbound variable: `finished`, set
@@ -161,18 +171,23 @@ seconds() { echo "$(($1 / 1000)).$(($1 % 1000 / 100))"; }
 # lanes' logs are shown only on failure, and StrykerJS exits 0 with survivors, so the Workflow loop never saw one). StrykerJS's
 # clear-text report (clear-text-reporter.js, v10) writes `[Survived] Kind` or `[NoCoverage] Kind`, then `path:line:column`;
 # harness_mutate.py writes `FAIL  survives: <mutant>`. A Killed mutant is neither.
+# Output sized by the change, not the codebase (F2529): with `changed_list`, a StrykerJS survivor on a file this branch did not change is
+# counted in one line (`survivors not listed: N ...`, no `survivor: ` line), the others and every harness mutant are listed.
 survivors() {
-	awk '
+	awk -v changed_list="$changed_list" '
+	BEGIN { while (changed_list != "" && (getline file < changed_list) > 0) changed[file] = 1 }
 	/^\[(Survived|NoCoverage)\] / { status = $1; gsub(/[][]/, "", status); kind = $0; sub(/^\[[A-Za-z]+\] /, "", kind); want = 1; next }
 	want && $0 ~ /^[^ :][^ ]*:[0-9]+:[0-9]+$/ {
 		n = split($0, part, ":")
 		path = substr($0, 1, length($0) - length(part[n]) - length(part[n - 1]) - 2)
-		print "survivor: " path ": line " part[n - 1] ":" part[n] " [" status "] " kind
 		want = 0
+		if (changed_list != "" && !(path in changed)) { left++; if (!(path in elsewhere)) { elsewhere[path] = 1; files++ } next }
+		print "survivor: " path ": line " part[n - 1] ":" part[n] " [" status "] " kind
 		next
 	}
 	/^\[/ { want = 0 }
 	/^FAIL  survives: / { sub(/^FAIL  survives: /, ""); print "survivor: " $0 }
+	END { if (left) print "survivors not listed: " left " StrykerJS survivors on " files " unchanged file" (files == 1 ? "" : "s") ", none of them changed by this branch since its base" }
 	' "$1"
 }
 # finish <lane>...: waits for each lane, prints its time and its steps', then each failed one's output.
@@ -346,13 +361,14 @@ if ! $full && [ "$took" -gt "$budget" ]; then
 fi
 
 if $full; then
-	base=$(git merge-base HEAD origin/main) || { echo "check.sh --full: needs origin/main to compare with (git fetch)" >&2; exit 1; }
+	base=$(git merge-base HEAD "$base_ref") || { echo "check.sh --full: needs $base_ref to compare with (git fetch, or a ref that exists)" >&2; exit 1; }
+	changes=$(git -c core.quotePath=false diff --no-renames --name-only "$base" -- && git -c core.quotePath=false ls-files --others --exclude-standard)
+	printf '%s\n' "$changes" >"$logs/changed" && changed_list="$logs/changed"
 	# A merge's own gate judges the product when its change since main holds some (Alexis, 2026-10-29): docs, the harness and
 	# the linters' configs alone have no coverage, mutant or fix of the product to judge, which took 40 of its 47 minutes. --full judges all.
 	product=true
 	if $merge; then
 		product=false
-		changes=$(git -c core.quotePath=false diff --no-renames --name-only "$base" -- && git -c core.quotePath=false ls-files --others --exclude-standard)
 		while IFS= read -r path; do
 			case $path in '' | docs/* | adr/* | *.md | scripts/* | .githooks/* | .claude/* | .github/* | lint/* | eslint.config.ts | knip.json | .jscpd.json | .prettierrc.json | .prettierignore) ;; *) product=true ;; esac
 		done <<EOF

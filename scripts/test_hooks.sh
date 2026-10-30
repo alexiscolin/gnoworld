@@ -3558,7 +3558,10 @@ const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
   const fromMain = /since main|main\.\.\.?HEAD/;
   t = await run(base(["scripts/check.sh"]));
   for (const label of ["merge check", "reviewer", "security"]) ok(fromMain.test(promptOf(t, label)), `${label} did not read from main when no base was given: ${promptOf(t, label)}`);
+  ok(!promptOf(t, "merge check").includes("--base"), `the merge check was given a base when none was: ${promptOf(t, "merge check")}`);
   t = await run(base(["scripts/check.sh"]), { base: "slice-5-p2" });
+  // check.sh reads the same base (F2531): the prompt's file list and diffs alone would leave every lane on origin/main.
+  ok(promptOf(t, "merge check").includes("check.sh --merge --base slice-5-p2"), `the merge check was not told to run check.sh against the base: ${promptOf(t, "merge check")}`);
   ok(promptOf(t, "merge check").includes("slice-5-p2...HEAD") && promptOf(t, "merge check").includes("slice-5-p2..HEAD"), `the merge check did not list files and loosening commits from the base: ${promptOf(t, "merge check")}`);
   for (const label of ["merge check", "reviewer", "security"]) {
     ok(!fromMain.test(promptOf(t, label)), `${label} still read from main with base slice-5-p2: ${promptOf(t, label)}`);
@@ -3663,7 +3666,8 @@ gate_fixture gate_survivors
 mkdir -p "$g/node_modules/vitest"
 printf 'import { spawnSync } from "node:child_process";\nprocess.exit(spawnSync("sh", [%s, "core_chromium", "switch=" + (process.env.CORE_CHROMIUM ?? ""), ...process.argv.slice(2)], { stdio: "inherit" }).status ?? 1);\n' "'$step'" >"$g/node_modules/vitest/vitest.mjs"
 base=$(git -C "$g" merge-base HEAD origin/main)
-printf 'z\n' >>"$g/server/src/a.ts" && git -C "$g" commit -qam "product code"
+# The branch changes the files its survivors are on (the report lists the survivors of the files it changed alone, F2529).
+printf 'z\n' >>"$g/server/src/a.ts" && printf 'z\n' >>"$g/server/src/b.ts" && printf 'x\n' >"$g/app/src/a.ts" && git -C "$g" add app/src/a.ts && git -C "$g" commit -qam "product code"
 cat >"$g/bin/survive" <<SH
 #!/bin/sh
 sh "$step" mutate "\$@" || exit \$?
@@ -3711,6 +3715,47 @@ out=$(FAIL=py:harness_mutate gate --merge) && fail "check.sh --merge passed with
 # The coverage lane never ran (the history lane failed first, batch_size is in it): there is nothing to print, and it says so.
 out=$(FAIL=py:batch_size gate --merge) && fail "check.sh --merge passed with its batch size failing"
 printf '%s\n' "$out" | grep -q '^survivor: ' && fail "check.sh --merge printed a survivor though the coverage lane never ran: $out"
+# A survivor on a file this branch did not change is no line to read: the report is sized by the codebase, not the change (2794
+# survivors, about 200 KB, on a branch of nine files that touched none of them, F2529), and the reviewer's brief by the change. It
+# is counted in one line, so that the total is still known; a mutant of the harness is always listed.
+cat >>"$g/survivors.txt" <<'TXT'
+
+[Survived] ConditionalExpression
+app/src/untouched.ts:4:1
+-   if (q) {
++   if (true) {
+
+[NoCoverage] StringLiteral
+app/src/untouched.ts:8:2
+-   "z"
++   ""
+TXT
+out=$(gate --merge) || fail "check.sh --merge failed with survivors on unchanged files: $out"
+printf '%s\n' "$out" | grep -q '^survivor: .*untouched' && fail "check.sh --merge listed a survivor on a file the branch did not change: $out"
+[ "$(printf '%s\n' "$out" | grep -c '^survivor: ')" = 2 ] || fail "check.sh --merge changed the survivors it lists when others sat on unchanged files: $out"
+printf '%s\n' "$out" | grep -q '^survivors not listed: 2 .*unchanged' || fail "check.sh --merge did not count the survivors it left out, 2 on one unchanged file: $out"
+# --base <ref>: the branch's own lines on an integration branch. Its range from main holds other branches' lines; every lane that reads
+# the base (the batch, the fixes, the regressions, the migrations, the patch's coverage, the harness's mutants, what counts as product
+# code) reads from the ref, and without the argument from origin/main (F2531).
+printf 'survivors.txt\nnode_modules/\nbin/\n' >>"$g/.git/info/exclude" && git -C "$g" commit -qam "the fixture's stubs" # product code is judged on what git sees
+git -C "$g" branch -f integ HEAD
+printf 'own\n' >"$g/scripts/own.sh" && git -C "$g" add scripts/own.sh && git -C "$g" commit -qm "own lines"
+integ=$(git -C "$g" rev-parse integ) main=$(git -C "$g" rev-parse origin/main)
+out=$(gate --merge --base integ) || fail "check.sh --merge --base failed on a copy whose every step passes: $out"
+for s in py:batch_size py:check_regressions py:check_migrations; do
+	grep -qx "$s $integ" "$log" || fail "check.sh --merge --base integ did not give $s the base integ: $(grep "^$s" "$log")"
+	grep -qx "$s $main" "$log" && fail "check.sh --merge --base integ gave $s origin/main as its base"
+done
+printf '%s\n' "$out" | grep -q "no product code since $integ" || fail "check.sh --merge --base integ took other branches' product lines for its own: $out"
+ran py:prove_fix && fail "check.sh --merge --base integ ran prove_fix on a branch with no product code of its own"
+out=$(gate --merge) || fail "check.sh --merge failed on a copy whose every step passes: $out"
+grep -qx "py:batch_size $main" "$log" || fail "check.sh --merge, with no argument, did not read from origin/main: $(grep '^py:batch_size' "$log")"
+ran py:prove_fix || fail "check.sh --merge, with no argument, did not read the product code since origin/main"
+grep -qx "py:patch_coverage $main" "$log" || fail "check.sh --merge, with no argument, gave the patch's coverage a base other than origin/main's: $(grep '^py:patch_coverage' "$log")"
+out=$(gate --merge --base) && fail "check.sh --merge --base passed with no ref after it: $out"
+printf '%s\n' "$out" | grep -q "wants a ref" || fail "check.sh --merge --base with no ref did not say it wants one: $out"
+out=$(gate --merge --base no-such-ref) && fail "check.sh --merge --base passed with a ref that is none: $out"
+printf '%s\n' "$out" | grep -q "no-such-ref" || fail "check.sh --merge --base did not name the ref it could not compare with: $out"
 # No survivor, no line.
 : >"$g/survivors.txt"
 out=$(gate --merge) || fail "check.sh --merge failed with no survivor: $out"
