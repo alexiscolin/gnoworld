@@ -1116,7 +1116,7 @@ def merge_lock_mutants():
         ('if $merge; then\n\tmkdir -p "${merge_lock%/*}"', 'if false; then\n\tmkdir -p "${merge_lock%/*}"', "--merge takes the machine's lock"),
         ('until mkdir "$merge_lock" 2>/dev/null; do', "while false; do", "--merge waits for a live holder"),
         ("\tlock_held=1\n", "\tlock_held=\n", "--merge frees its lock"),
-        ('\t[ -n "$lock_held" ] || return 0\n', "", "a waiter that is interrupted leaves the lock of another"),
+        ('\t[ -n "$lock_held" ] || return 0\n\tholder=$(cat "$merge_lock/pid" 2>/dev/null || :)\n\tif [ -z "$holder" ] || [ "$holder" = "$$" ]; then rm', '\tif true; then rm', "a run that is interrupted frees the lock whoever holds it"),
         ("\tstarted=$(date +%s) # the wait is not the run's time", "\t: # the wait is the run's time", "--merge's time leaves its wait out"),
         ('if [ -z "$announced" ]; then', "if false; then", "--merge says which worktree it waits for"),
         ("ulimit -S -n 10240 2>/dev/null ||", ": ||", "raises the limit of open files"),
