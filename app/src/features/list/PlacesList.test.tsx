@@ -74,6 +74,18 @@ describe("PlacesList", () => {
     expect(shown(el)).toEqual(["Arcade", "Forge"]);
   });
 
+  it("toggles one genre off while two are chosen: only the other stays, and only it stays pressed", () => {
+    const el = draw({ places, genres });
+    click(button(el, "Game"));
+    click(button(el, "Tool"));
+    click(button(el, "Game"));
+    expect(shown(el)).toEqual(["Forge"]);
+    expect([button(el, "Game"), button(el, "Tool")].map((b) => b.getAttribute("aria-pressed"))).toEqual([
+      "false",
+      "true",
+    ]);
+  });
+
   // The keyboard: a native button is in the tab order and Enter and Space press it (jsdom presses no key: only a browser proves it, and no data holds a genre yet to build such a page from, so the
   // journey tries the list's links by keyboard, places.spec.ts).
   it("draws each filter as a native button the keyboard reaches: no tabindex, type button", () => {

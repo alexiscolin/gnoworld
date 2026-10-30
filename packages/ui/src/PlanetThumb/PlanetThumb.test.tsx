@@ -58,6 +58,10 @@ describe("PlanetThumb", () => {
     "\u0001//evil.example/a.png",
     " //evil.example/a.png",
     "\r\n//evil.example/a.png",
+    "https://evil.example/data:image/a.png",
+    " data:image/png;base64,AA==",
+    "/\u001f/a.png",
+    "/\u007f/a.png",
     "https:evil.example/a.png",
     "https:/evil.example/a.png",
     "thumbs/a.png",
@@ -83,6 +87,13 @@ describe("PlanetThumb", () => {
       if (!each.startsWith("data:")) expect(new URL(each, "https://site.test/list").origin).toBe("https://site.test");
     expect(container.querySelector("[data-fallback]")).not.toBeNull();
     expect(screen.getByRole("img", { name: "Bubble" })).toBeTruthy();
+  });
+
+  it("marks the fallback with an empty data-fallback and gives the disc and the picture their classes", () => {
+    const { container } = render(<PlanetThumb src="https://evil.example/a.png" name="Bubble" />);
+    expect(container.querySelector("[data-fallback]")?.getAttribute("data-fallback")).toBe("");
+    expect(container.querySelector("[data-fallback]")?.className).not.toBe("");
+    expect(container.querySelector("img")?.className).not.toBe("");
   });
 
   it("refuses a foreign src whatever the kind, the size or the other props say", () => {
