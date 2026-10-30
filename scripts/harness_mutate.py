@@ -1110,6 +1110,24 @@ def swaps(path, name, rows):
         yield from each(path, find, replace, "hooks", f"{name} {label}")
 
 
+REGRESSION_ROWS = (  # (find, replace, label) in scripts/check_regressions.py
+        ("                entries.append(ref)\n", "                pass\n", "reads a name in an exclusion list as an entry (F2523)"),
+        ("        if double or single:", "        if double:", "reads a single-quoted entry"),
+        ("            if not (spread and OWN_DEFAULTS.fullmatch(spread)):", "            if False:", "reads a spread of anything but a tool's defaults as an entry"),
+        ("            if not (spread and OWN_DEFAULTS.fullmatch(spread)):", "            if True:", "lets the spread of a tool's own defaults stay"),
+        ("        if comment:\n            continue", "        if False:\n            continue", "skips a comment in a list (F2623)"),
+        ("consts.get(ref.removeprefix(\"...\"), [])", "[]", "reads what a name or a spread holds (F2622)"),
+        ("            out[m.group(1)] = list_entries(text, m.end())[0]", "            pass", "reads a const holding a list (F2622)"),
+        ("            out[m.group(1)] = [(t.group(2) or t.group(3))[1:-1]]", "            pass", "reads a const holding a string (F2622)"),
+        ("for m in SHORTHAND.finditer(text):", "for m in []:", "reads the shorthand { exclude } (F2627)"),
+        ("globalIgnores\\(\\s*|", "globalIgnores\\(|", "reads a globalIgnores list on the next line (F2627)"),
+        ("(?:ignores|exclude)[\\\"']?", "(?:ignores|exclude)", "reads an exclusion under a quoted key (F2627)"),
+        (" and f\"{kind} {e.split(SEP)[0]}\" not in excused", "", "excuses a name's value by the name (F2622)"),
+        ("if tail else []), pos", "if False else []), pos", "reads what follows a list (`.concat`)"),
+        ("        elif template:\n            entries.append(template)", "        elif template:\n            pass", "reads a template literal as an entry"),
+)
+
+
 def merge_lock_mutants():
     """One merge check at a time, the open-files limit, the test switches dropped (slice-5 harness-c)."""
     c = "scripts/check.sh"
@@ -1172,15 +1190,8 @@ def bench_load_mutants():
 
 def regressions_name_mutants():
     """An exclusion written with a name is read (F2523, slice-5 harness-c)."""
-    r = "scripts/check_regressions.py"
-    yield from swaps(r, "check_regressions.py", (
-        ("            entries.append(name)", "            pass", "reads a name in an exclusion list as an entry (F2523)"),
-        ("        if double or single:", "        if double:", "reads a single-quoted entry"),
-        ("            if not OWN_DEFAULTS.match(spread):", "            if False:", "reads a spread of anything but a tool's defaults as an entry"),
-        ("            if not OWN_DEFAULTS.match(spread):", "            if True:", "lets the spread of a tool's own defaults stay"),
-        ("if tail else []), pos", "if False else []), pos", "reads what follows a list (`.concat`)"),
-        ("        elif template:\n            entries.append(template)", "        elif template:\n            pass", "reads a template literal as an entry"),
-    ))
+    for find, replace, label in REGRESSION_ROWS:
+        yield from each("scripts/check_regressions.py", find, replace, "hooks", f"check_regressions.py {label}")
 
 
 def design_mutants():

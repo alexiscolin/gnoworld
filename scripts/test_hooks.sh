@@ -4128,10 +4128,17 @@ printf "export default { test: { exclude: ['a/**', 'c/**'] } };\n" >"$rx/vitest.
 out=$(regx) && fail "check_regressions passed a single-quoted exclusion added to a list: $out"
 printf '%s\n' "$out" | grep -qF "c/**" || fail "check_regressions did not name the single-quoted entry c/**: $out"
 nameback
-for shape in 'exclude: ALL_EXCLUDES' 'exclude: ["a/**"].concat(MORE)' 'exclude: [...MORE]''exclude: ["a/**", `${DIR}/**`]'; do
+for shape in 'exclude: ALL_EXCLUDES' 'exclude: ["a/**"].concat(MORE)' 'exclude: [...MORE]' 'exclude: ["a/**", `${DIR}/**`]'; do
+	case $shape in
+	'exclude: ALL'*) want=ALL_EXCLUDES ;;
+	*concat*) want='.concat(MORE)' ;;
+	*'[...MORE]') want='...MORE' ;;
+	*) want='${DIR}/**' ;;
+	esac
 	printf 'export default { test: { %s } };\n' "$shape" >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "an exclusion written another way"
 	out=$(regx) && fail "check_regressions passed an exclusion it cannot read, written as: $shape: $out"
 	printf '%s\n' "$out" | grep -q "vitest.config.ts" || fail "check_regressions did not name vitest.config.ts for: $shape: $out"
+	printf '%s\n' "$out" | grep -qF -- "$want" || fail "check_regressions did not name the entry $want of: $shape (F2618): $out"
 	nameback
 done
 # A bare name is excused as a quoted entry is, by a line of a commit naming it: `Lowered-floor: ignore <file> <name> - why`.
@@ -4155,6 +4162,57 @@ printf '%s\n' "$out" | grep -qF "b/**" && ! printf '%s\n' "$out" | grep -qF "STR
 nameback
 printf 'export default { test: { exclude: [...configDefaults.exclude] } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "the name taken away"
 out=$(regx) || fail "check_regressions refused a name taken away: $out"
+nameback
+# F2622: a name stands for its value. A const the file holds behind a name or a spread is read: its value is the entry, so widening
+# `STRYKER_TMP` to "**/*.test.ts", or adding to `SLOW`, shows though the list names the same words. Only the tool's own
+# `...configDefaults.exclude` is the tool's: a lookalike (`...myConfigDefaults.list`) is an entry.
+printf 'const STRYKER_TMP = "**/.stryker-tmp/**";\nconst SLOW = ["s/**"];\nexport default { test: { exclude: [...configDefaults.exclude, STRYKER_TMP, ...SLOW] } };\n' >"$rx/vitest.config.ts"
+git -C "$rx" commit -qam "a base whose list holds a name and a spread of consts" && xbase=$(git -C "$rx" rev-parse HEAD)
+out=$(regx) || fail "check_regressions refused a branch that changed nothing, over a base whose names are consts: $out"
+printf 'const STRYKER_TMP = "**/*.test.ts";\nconst SLOW = ["s/**"];\nexport default { test: { exclude: [...configDefaults.exclude, STRYKER_TMP, ...SLOW] } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "the name's value widened"
+out=$(regx) && fail "check_regressions passed a const widened to every test, behind a name the base held (F2622): $out"
+printf '%s\n' "$out" | grep -qF '**/*.test.ts' || fail "check_regressions did not name the value the const now holds: $out"
+git -C "$rx" commit -q --amend -m "the name's value widened" -m "Lowered-floor: ignore vitest.config.ts STRYKER_TMP - tests are measured elsewhere"
+out=$(regx) || fail "check_regressions refused a name's new value that a commit names on a Lowered-floor line: $out"
+nameback
+printf 'const STRYKER_TMP = "**/.stryker-tmp/**";\nconst SLOW = ["s/**", "t/**"];\nexport default { test: { exclude: [...configDefaults.exclude, STRYKER_TMP, ...SLOW] } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "a list behind a spread grown"
+out=$(regx) && fail "check_regressions passed an entry added to the list a spread names (F2622): $out"
+printf '%s\n' "$out" | grep -qF 't/**' || fail "check_regressions did not name the entry added behind the spread: $out"
+nameback
+printf 'const STRYKER_TMP = "**/.stryker-tmp/**"; // reworded\nconst SLOW = ["s/**"];\nexport default { test: { exclude: [...configDefaults.exclude, STRYKER_TMP, ...SLOW] } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "a comment"
+out=$(regx) || fail "check_regressions refused a comment added beside consts that hold their values: $out"
+nameback
+printf 'const myConfigDefaults = { list: ["server/**"] };\nexport default { test: { exclude: [...myConfigDefaults.list, STRYKER_TMP, ...SLOW] } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "a lookalike of the defaults"
+out=$(regx) && fail "check_regressions passed a spread that only looks like the tool's defaults (F2627): $out"
+printf '%s\n' "$out" | grep -qF 'myConfigDefaults.list' || fail "check_regressions did not name the lookalike spread: $out"
+nameback
+# F2627: the other forms of the same exclusion: shorthand (`{ exclude }`), a quoted key, and the list on the next line, as Prettier
+# breaks a call of two arguments.
+printf 'const exclude = ["z/**"];\nexport default { test: { exclude } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "shorthand"
+out=$(regx) && fail "check_regressions passed an exclusion written as the shorthand { exclude } (F2627): $out"
+printf '%s\n' "$out" | grep -qF 'z/**' || fail "check_regressions did not name the entry behind the shorthand: $out"
+nameback
+printf 'export default { test: { "exclude": ["z/**"] } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "a quoted key"
+out=$(regx) && fail "check_regressions passed an exclusion under a quoted key (F2627): $out"
+printf '%s\n' "$out" | grep -qF 'z/**' || fail "check_regressions did not name the entry under a quoted key: $out"
+nameback
+printf 'export default [globalIgnores(\n  ["docs/", "server/**"],\n  "name",\n), { ignores: ["packages/core/**"] }];\n' >"$rx/eslint.config.ts" && git -C "$rx" commit -qam "a list on the next line"
+out=$(regx) && fail "check_regressions passed a globalIgnores list that starts on the next line (F2627): $out"
+printf '%s\n' "$out" | grep -qF 'server/**' || fail "check_regressions did not name the entry on the next line: $out"
+nameback
+# F2623: a comment in a list is no entry. An apostrophe in one opened a string that ran across the list (the real vitest.config.ts has
+# `// The server's entry`), so raising a floor was refused as an ignore added; a `]` in one ended the list early.
+printf 'export default { test: { exclude: [\n  "a/**",\n  // The server'"'"'s entry, see [1]\n  "b/**",\n], coverage: { thresholds: { lines: 85 } } } };\n' >"$rx/vitest.config.ts"
+git -C "$rx" commit -qam "a base with a comment in the list" && xbase=$(git -C "$rx" rev-parse HEAD)
+sed 's/lines: 85/lines: 90/' "$rx/vitest.config.ts" >"$rx/v.tmp" && mv "$rx/v.tmp" "$rx/vitest.config.ts" && git -C "$rx" commit -qam "a floor raised"
+out=$(regx) || fail "check_regressions refused a floor raised beside a comment with an apostrophe in a list (F2623): $out"
+nameback
+sed "s/The server's entry, see \[1\]/The entry, reworded/" "$rx/vitest.config.ts" >"$rx/v.tmp" && mv "$rx/v.tmp" "$rx/vitest.config.ts" && git -C "$rx" commit -qam "a comment reworded"
+out=$(regx) || fail "check_regressions refused a comment reworded in a list (F2623): $out"
+nameback
+sed 's|^  "b/\*\*",|  "b/**",\n  "c/**",|' "$rx/vitest.config.ts" >"$rx/v.tmp" && mv "$rx/v.tmp" "$rx/vitest.config.ts" && git -C "$rx" commit -qam "an entry after the comment"
+out=$(regx) && fail "check_regressions passed an entry added after a comment holding a bracket (F2623): $out"
+printf '%s\n' "$out" | grep -qF 'c/**' || fail "check_regressions did not name c/** added after a comment: $out"
 nameback
 # The benches' budgets (G6), through the whole script on a small repository, which has no Vitest to list: a bench gone
 # or given a longer budget fails unless a commit names it on a `Lowered-floor: bench <name> - why` line.
