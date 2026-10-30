@@ -16,7 +16,8 @@ const BUILD = new URL("../../build/", import.meta.url);
 
 test.describe("the content security policy", () => {
   // 5f: one policy a page, not one for all of them: a page's holds its own scripts' hashes, so a host that cuts a line at
-  // 2,000 characters (Cloudflare Pages) takes any number of worlds.
+  // 2,000 characters (Cloudflare Pages) takes any number of worlds by line length; its 100 rules take about 20 (the build
+  // stops past them, F2452).
   test("is a policy of the right shape on every answer: each page, the fallback, files, a 400, a 401 and a 500", async ({
     request,
   }) => {
@@ -34,6 +35,18 @@ test.describe("the content security policy", () => {
       [...PAGES.map(() => 200), 200, 200, 200, 200, 400, 401, 404, 404, 404, 500].toSorted(),
     );
     for (const answer of answers) expect(answer.headers()["content-security-policy"]).toMatch(SHAPE);
+  });
+
+  // F2451: a _headers host matches the request path, and a path no page names is served a document that runs the app.
+  test("gives a path the build never made the catch-all's policy, not none", async ({ request }) => {
+    const headers = readFileSync(new URL("client/_headers", BUILD), "utf8");
+    const catchAll = /^\/\*\n(?: {2}.*\n)*? {2}Content-Security-Policy: (.+)$/m.exec(headers)?.[1];
+    expect(catchAll).toMatch(SHAPE);
+    expect(catchAll?.match(HASH)?.length).toBeGreaterThan(5);
+    for (const path of ["/nowhere", "/w/Bubble", "/net/onyx/w/none/", "/w/bubble/index.html"]) {
+      const answer = await request.get(path);
+      expect(answer.headers()["content-security-policy"], path).toBe(catchAll);
+    }
   });
 
   test("gives each page a policy of its own, under a host's 2,000-character line, and another at its canonical address", async ({
@@ -100,7 +113,10 @@ test.describe("the content security policy", () => {
           }),
         );
       }, html);
-      expect(found.toSorted(), path).toEqual((served.match(HASH) ?? []).toSorted());
+      const named = served.match(HASH) ?? [];
+      // A path the build never made falls to the catch-all, which names the home's scripts as well (F2451).
+      if (path === "/nowhere") for (const hash of found) expect(named, path).toContain(hash);
+      else expect(found.toSorted(), path).toEqual(named.toSorted());
     }
   });
 

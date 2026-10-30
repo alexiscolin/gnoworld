@@ -395,10 +395,13 @@ describe("outputs", () => {
     const ok = policy([`'sha256-${"A".repeat(43)}='`]);
     const other = policy([`'sha256-${"B".repeat(43)}='`]);
     const fallback = policy([`'sha256-${"C".repeat(43)}='`]);
+    // What a path no page names gets (F2451): the home's scripts and the fallback's, so either document runs there.
+    const any = policy([`'sha256-${"A".repeat(43)}='`, `'sha256-${"C".repeat(43)}='`]);
     return {
       ok,
       other,
       fallback,
+      any,
       policies: { "index.html": ok, "w/bubble/index.html": other, "__spa-fallback.html": fallback },
     };
   };
@@ -454,39 +457,69 @@ describe("outputs", () => {
       });
   const matches = (rule: string, path: string): boolean =>
     new RegExp(`^${rule.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`).test(path);
-  const csp = (headers: string, path: string): string[] =>
-    blocks(headers)
-      .filter(([rule]) => matches(rule, path))
-      .flatMap(([, lines]) => lines.filter((line) => line.startsWith("  Content-Security-Policy: ")))
-      .map((line) => line.slice("  Content-Security-Policy: ".length));
+  // The policy a host sends for a path: every rule that matches adds its line, and a rule's `! Content-Security-Policy` first
+  // detaches what the earlier ones added (Cloudflare Pages' syntax).
+  const csp = (headers: string, path: string): string[] => {
+    let found: string[] = [];
+    for (const [rule, lines] of blocks(headers)) {
+      if (!matches(rule, path)) continue;
+      if (lines.includes("  ! Content-Security-Policy")) found = [];
+      for (const line of lines)
+        if (line.startsWith("  Content-Security-Policy: "))
+          found.push(line.slice("  Content-Security-Policy: ".length));
+    }
+    return found;
+  };
 
-  it("writes each page's policy in _headers for its addresses, and no rule that gives it another", () => {
-    const { ok, other, fallback, policies } = sample();
+  it("writes each page's policy in _headers for its addresses, and one policy at any other path", () => {
+    const { ok, other, fallback, any, policies } = sample();
     const { headers } = outputs(policies);
-    // One policy to each address: a rule for every path (/*) would add a second one, which a host may join to the first.
+    // One policy to each address: a page's rule detaches the catch-all's before it sets its own, so a host sends one.
     for (const [path, expected] of [
       ["/", ok],
       ["/w/bubble", other],
       ["/w/bubble/", other],
       ["/__spa-fallback.html", fallback],
+      // F2451: a path the build did not pre-render is served a document that runs the app, so it has a policy too.
+      ["/w/other", any],
+      ["/nowhere", any],
+      ["/w/Bubble", any],
+      ["/w/bubble/index.html", any],
     ] as const) {
       expect(csp(headers, path), path).toEqual([expected]);
     }
-    expect(csp(headers, "/w/other")).toEqual([]);
+  });
+
+  it("writes the catch-all first, and a detach in each other rule", () => {
+    const { headers } = outputs(sample().policies, ["sw.js"]);
+    const rules = blocks(headers);
+    expect(rules[0]?.[0]).toBe("/*");
+    expect(rules[0]?.[1]).toHaveLength(1);
+    for (const [path, lines] of rules.slice(1)) {
+      expect(lines[0], path).toBe("  ! Content-Security-Policy");
+      expect(lines, path).toHaveLength(2);
+    }
+  });
+
+  it("gives a path no page names the bare policy when the build holds neither the home nor the fallback", () => {
+    const { other } = sample();
+    const { headers } = outputs({ "w/bubble/index.html": other });
+    expect(csp(headers, "/nowhere")).toEqual([policy([])]);
   });
 
   // Only a document or a worker obeys a policy. The worker's script is the one file of the build that is neither a page nor
   // inert: a _headers host gives it the policy with no hash (decisions, 2026-10-30); the manifest, the icons, the assets and
   // the data files run nowhere, and have none there. (nginx sends the bare policy on every other answer, below.)
-  it("gives the service worker's script the bare policy in _headers, and no other file of the build one", () => {
-    const { policies } = sample();
+  it("gives the service worker's script the bare policy in _headers, and any other file the catch-all's", () => {
+    const { any, policies } = sample();
     const { headers } = outputs(policies, ["sw.js"]);
     expect(csp(headers, "/sw.js")).toEqual([policy([])]);
+    // The manifest, the icons, the assets and the data files run nowhere: the catch-all's policy changes nothing for them.
     for (const path of ["/manifest.webmanifest", "/icon-192.png", "/assets/a-1.js", "/w/bubble.data"])
-      expect(csp(headers, path), path).toEqual([]);
+      expect(csp(headers, path), path).toEqual([any]);
     for (const path of ["/", "/w/bubble", "/w/bubble/", "/__spa-fallback.html"])
       expect(csp(headers, path), path).toHaveLength(1);
-    expect(csp(outputs(policies).headers, "/sw.js")).toEqual([]);
+    expect(csp(outputs(policies).headers, "/sw.js")).toEqual([any]);
   });
 
   it("writes no _headers line past a host's 2,000 characters when each policy is under", () => {
@@ -511,14 +544,38 @@ describe("outputs", () => {
       );
   });
 
+  // F2452: Cloudflare Pages takes at most 100 header rules (developers.cloudflare.com/pages/configuration/headers). The
+  // catch-all is one; a file that is no directory index is one rule.
+  it.each([
+    [99, true],
+    [100, true],
+    [101, false],
+  ])("a _headers of %i rules is %s", (rules, passes) => {
+    const { ok } = sample();
+    const pages = Object.fromEntries(Array.from({ length: rules - 1 }, (_, n) => [`p${String(n)}.html`, ok]));
+    const build = () => outputs(pages);
+    if (passes) expect(build).not.toThrow();
+    else expect(build).toThrow(new RangeError("csp: _headers holds 101 rules, past a host's 100"));
+  });
+
+  it("counts the worker's rule and a directory page's two", () => {
+    const { ok } = sample();
+    const dirs = Object.fromEntries(Array.from({ length: 49 }, (_, n) => [`d${String(n)}/index.html`, ok]));
+    // 1 catch-all + 98 + the worker = 100; one page more is 102.
+    expect(() => outputs(dirs, ["sw.js"])).not.toThrow();
+    expect(() => outputs({ ...dirs, "d49/index.html": ok }, ["sw.js"])).toThrow(
+      new RangeError("csp: _headers holds 102 rules, past a host's 100"),
+    );
+  });
+
   it("writes the same bytes whatever the order of the pages it is given", () => {
     const { policies } = sample();
     const forward = outputs(policies, ["sw.js", "a.json"]);
     const reversed = outputs(Object.fromEntries(Object.entries(policies).reverse()), ["a.json", "sw.js"]);
     expect(reversed.headers).toBe(forward.headers);
     expect(reversed.nginx).toBe(forward.nginx);
-    // Sorted, not in the order given: the home's rule first.
-    expect(forward.headers.startsWith("/\n")).toBe(true);
+    // Sorted, not in the order given: the catch-all first, then the home's rule.
+    expect(forward.headers.startsWith("/*\n")).toBe(true);
   });
 
   // nginx: a map of the decoded path, which the server's add_header reads ($csp). try_files serves a page at its directory
@@ -566,7 +623,8 @@ describe("outputs", () => {
       const name = String(n).padStart(slug, "s");
       pages[`net/${"u".repeat(slug)}/w/${name}/index.html`] = ok;
     }
-    const { nginx } = outputs(pages);
+    // Past a _headers host's 100 rules, which the table does not care about.
+    const { nginx } = outputs(pages, [], Number.POSITIVE_INFINITY);
     const keys = [...table(nginx).keys()].filter((key) => key !== "default");
     const size = Number(/^map_hash_max_size (\d+);$/m.exec(nginx)?.[1]);
     const bucket = Number(/^map_hash_bucket_size (\d+);$/m.exec(nginx)?.[1]);

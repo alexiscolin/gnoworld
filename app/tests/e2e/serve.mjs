@@ -23,8 +23,9 @@ const RULES = new Map();
     if (found !== undefined) RULES.set(rule, found);
   }
 }
-const ANY = RULES.values().next().value;
-if (ANY === undefined) throw new Error("serve.mjs: the build's _headers names no Content-Security-Policy");
+// The catch-all rule (`/*`) every path no page names falls to.
+const ANY = RULES.get("/*");
+if (ANY === undefined) throw new Error("serve.mjs: the build's _headers names no catch-all Content-Security-Policy");
 const BARE = ANY.replace(/ 'sha256-[^']+'/g, "");
 // The types of what the build writes (`.data`: React Router's single-fetch.js). Any other kind of
 // file answers 500, so the journeys fail on it rather than pass on a type no real host would give.
@@ -114,12 +115,13 @@ function policyOfRelease(file) {
   return BARE.replace("script-src 'self'", `script-src 'self' ${[...hashes].join(" ")}`);
 }
 
-// The policy of the file an answer is: a page's own, else the bare one.
-function policyOf(file, deployed) {
+// The policy of an answer: a page's, as a host that reads _headers picks it, by the request path (the rule that names it, else
+// the catch-all `/*`, whatever file is served there: F2451); a release's from the bytes it is sent with; any other file the
+// bare one, as nginx's map sends its default.
+function policyOf(file, pathname, deployed) {
   if (!file.endsWith(".html")) return BARE;
   if (deployed) return policyOfRelease(file);
-  const address = `/${file.slice(root.length).replace(/(?:^|\/)index\.html$/, "")}`;
-  return RULES.get(address) ?? BARE;
+  return RULES.get(pathname) ?? ANY;
 }
 
 // The test's own password, never the demo's.
@@ -196,7 +198,7 @@ function host({ bumping = false, password = false }) {
       response.writeHead(500).end();
       return;
     }
-    response.setHeader("content-security-policy", policyOf(served, deployed));
+    response.setHeader("content-security-policy", policyOf(served, pathname, deployed));
     response.writeHead(found ? 200 : 404, { "content-type": type });
     if (deployed) {
       const body = pathname === "/sw.js" ? workerOfRelease() : released(served);

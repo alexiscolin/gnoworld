@@ -413,7 +413,8 @@ describe("react-router build", () => {
   // page is named when a line is over the cap of a host that cuts a _headers line there (Cloudflare Pages).
   it.each([
     ["3 worlds", 3],
-    ["16 times as many: 48 worlds", 48],
+    // F2452: the most a host's 100 header rules take (four a world, and the catch-all).
+    ["21 worlds, the most a host's 100 header rules take", 21],
   ])("keeps every page's policy line under 2,000 characters at %s", { timeout: 300_000 }, async (_, worlds) => {
     const dir = plant((files) => {
       const hubs = files["hubs.json"] as Record<string, unknown>[];
@@ -434,6 +435,27 @@ describe("react-router build", () => {
       rmSync(dir, { recursive: true });
     }
   });
+
+  // F2452: 16 times the data's size is past Cloudflare Pages' 100 header rules, which the build refuses rather than ship rules
+  // the host may drop (a page without a rule has no policy there).
+  it(
+    "stops at 16 times as many worlds: 48 worlds make more _headers rules than a host takes",
+    { timeout: 300_000 },
+    () => {
+      const dir = plant((files) => {
+        const hubs = files["hubs.json"] as Record<string, unknown>[];
+        for (let n = 1; n < 48; n += 1) hubs.push({ ...hubs[0], slug: `w${String(n)}`, name: `World ${String(n)}` });
+      });
+      try {
+        const run = build(dir);
+        expect(run.status).not.toBe(0);
+        expect(`${run.stdout}${run.stderr}`).toMatch(/csp: _headers holds \d+ rules, past a host's 100/);
+        expect(existsSync(join(copy, "build", "client", "_headers"))).toBe(false);
+      } finally {
+        rmSync(dir, { recursive: true });
+      }
+    },
+  );
 
   // F475: a script planted in a page fails the build and writes no policy. The page is planted through the app's own root
   // (a copy of it, as this describe's builds are), as a component of the app that wrote a script would.

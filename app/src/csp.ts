@@ -22,9 +22,9 @@ const DIRECTIVES = [
   "frame-ancestors 'none'",
 ];
 
-// A page's policy holds its own scripts' hashes alone (5f): five a page, so some 600 characters whatever the number of
-// pages. One policy for all of them held every hash, and a host that caps a _headers line at 2,000 characters (Cloudflare
-// Pages) took some 7 worlds. A page's JSON-LD (5e) is a data block and has no hash.
+// A page's policy holds its own scripts' hashes alone (5f): five a page, some 600 characters whatever the number of pages.
+// One policy for all of them took some 7 worlds under Cloudflare Pages' 2,000-character line; its 100 rules take about 20
+// worlds (F2452). A page's JSON-LD (5e) is a data block and has no hash.
 export function policy(hashes: readonly string[]): string {
   for (const hash of hashes) {
     if (!/^'sha256-[A-Za-z0-9+/]{43}='$/.test(hash)) throw new RangeError(`csp: ${hash} is no SHA-256 source`);
@@ -206,12 +206,30 @@ function hashSizes(table: readonly [string, string][]): string {
   return `map_hash_max_size ${String(sized(2048, 2 * (table.length + 1)))};\nmap_hash_bucket_size ${String(sized(64, longest + 8 + 2 + 8))};\n`;
 }
 
-// The policies as `_headers` takes them, and as nginx's map of the answer's path (which add_header reads): a page has its own,
-// any other nginx answer the bare one. `workers` are the files that run as a worker (the service worker's script): a _headers
-// host gives each the bare policy; no other file of the build runs anything.
+// A host that reads _headers takes this many rules (Cloudflare Pages: developers.cloudflare.com/pages/configuration/headers).
+const RULE_CAP = 100;
+const DETACH = "  ! Content-Security-Policy\n";
+const SOURCE = /'sha256-[A-Za-z0-9+/]{43}='/g;
+
+function refuseRules(rules: number, cap: number): void {
+  if (rules > cap) throw new RangeError(`csp: _headers holds ${String(rules)} rules, past a host's ${String(cap)}`);
+}
+
+// The policy of a path no page names (F2451): a host without a 404 page answers it with the home, one with the fallback
+// answers it with that, so it names the scripts of both, and of nothing else.
+function anywhere(policies: Readonly<Record<string, string>>): string {
+  const documents = ["index.html", "__spa-fallback.html"];
+  return policy(documents.flatMap((name) => policies[name]?.match(SOURCE) ?? []));
+}
+
+// The policies as `_headers` takes them (the catch-all `/*` first; every other rule detaches it, then sets its own), and as
+// nginx's map of the answer's path: a page has its own, any other nginx answer the bare one. `workers` are the files that run
+// as a worker (the service worker's script): a _headers host gives each the bare policy.
 export function outputs(
   policies: Readonly<Record<string, string>>,
   workers: readonly string[] = [],
+  // Past it the build stops; the nginx table's own sizing is tested past it.
+  ruleCap = RULE_CAP,
 ): { headers: string; nginx: string } {
   const files = Object.keys(policies).sort();
   for (const name of [...files, ...workers]) if (!FILE_NAME.test(name)) throw new RangeError(FILE_ERROR);
@@ -225,15 +243,18 @@ export function outputs(
   }
   const bare = policy([]);
   for (const worker of workers) headers.push([`/${worker}`, bare]);
+  refuseRules(headers.length + 1, ruleCap);
   const rows = table
     .sort(byPath)
     .map(([path, csp]) => `    "${path}" "${csp}";\n`)
     .join("");
   return {
-    headers: headers
-      .sort(byPath)
-      .map(([path, csp]) => `${path}\n${HEADER}${csp}\n`)
-      .join(""),
+    headers:
+      `/*\n${HEADER}${checked("/*", anywhere(policies))}\n` +
+      headers
+        .sort(byPath)
+        .map(([path, csp]) => `${path}\n${DETACH}${HEADER}${csp}\n`)
+        .join(""),
     nginx: `${hashSizes(table)}map $uri $csp {\n    default "${bare}";\n${rows}}\n`,
   };
 }
