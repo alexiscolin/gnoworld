@@ -313,6 +313,14 @@ def mutants():
     yield from each(hm, "worktree(\"HEAD\")) for _ in range(shards - 1)]", "worktree(\"HEAD\")) for _ in range(0)]", "hooks", "harness_mutate makes a worktree a shard")
     yield from each(hm, "ThreadPoolExecutor(" "shards) as pool", "ThreadPoolExecutor(1) as pool", "hooks", "harness_mutate's shards run side by side")
     yield from each(hm, "ThreadPoolExecutor(" "CONTROLS_AT_ONCE)", "ThreadPoolExecutor(len(controls))", "hooks", "harness_mutate runs its controls two at a time (F2138)")
+    # F2526: a run cut short keeps no verdict. The finds are split so that these lines hold none of them.
+    yield from each(hm, "if code < 0 or " "code in CUT_BY_SIGNAL:", "if code in CUT_BY_SIGNAL:", "hooks", "harness_mutate takes a suite ended by a signal for no verdict (F2526)")
+    for kept in ("137, 143", "130, 143", "130, 137"):
+        yield from each(hm, "CUT_BY_SIGNAL = (" "130, 137, 143)", f"CUT_BY_SIGNAL = ({kept})", "hooks", f"harness_mutate takes the code of a shell's signal for no verdict, without {({'137, 143': '130', '130, 143': '137', '130, 137': '143'})[kept]} (F2526)")
+    yield from each(hm, '                if STOP.is_set' '():\n                    raise Cut("the run was stopped")\n                killed = judged(', "                killed = judged(", "hooks", "harness_mutate's shards start no mutant once the run is stopped (F2526)")
+    yield from each(hm, '                    if STOP.is_set' '():\n                        raise Cut("the run was stopped")\n                    if killed !=', "                    if killed !=", "hooks", "harness_mutate keeps no verdict once the run is stopped (F2526)")
+    yield from each(hm, "                STOP.set" "()\n", "", "hooks", "harness_mutate stops its shards when it is interrupted (F2526)")
+    yield from each(hm, "except BaseException " "as e:", "except Cut as e:", "hooks", "harness_mutate stops its shards on an interrupt of its main thread (F2526)")
     yield from each(".claude/workflows/branch.js", "if (!red) return", "if (false) return", "hooks", "the branch loop stops on a red pass that gave no report")
     yield from each(".claude/workflows/branch.js", "return done && done.branch === A.branch ? done : null;", "return done;", "hooks", "the branch loop takes no commit made on another branch")
     yield from each(".claude/workflows/branch.js", "if (notGits(gate.files))", "if (false)", "hooks", "the branch loop takes no list of files but git's")
@@ -957,10 +965,22 @@ def sections(path, test):
     return only[test] if isinstance(only, dict) else only
 
 
+class Cut(Exception):
+    """A suite ended by a signal, or a run asked to stop: no verdict."""
+
+
+STOP = threading.Event()  # set when the run is interrupted: no shard starts a mutant or keeps a verdict after it
+CUT_BY_SIGNAL = (130, 137, 143)  # a shell's INT, KILL, TERM; a suite run by Python or sh itself ends with a negative code
+
+
 def run(tree, test, only=""):
-    """A test's exit code in the worktree `tree`; `only` names its sections, empty for all of them."""
+    """A test's exit code in the worktree `tree`; `only` names its sections, empty for all of them. A suite cut short by a
+    signal (a Ctrl+C reaches every suite in flight) has no verdict, as a failing mutant would have: it raises (F2526)."""
     env = {**os.environ, "ONLY": only}
-    return subprocess.run(TESTS[test], cwd=tree, env=env, capture_output=True, text=True, timeout=600).returncode
+    code = subprocess.run(TESTS[test], cwd=tree, env=env, capture_output=True, text=True, timeout=600).returncode
+    if code < 0 or code in CUT_BY_SIGNAL:
+        raise Cut(f"{test} in {tree} ended with {code}, a signal")
+    return code
 
 
 def judged(tree, label, path, mutated, test):
@@ -1202,14 +1222,25 @@ with contextlib.ExitStack() as stack:
 
             def judge(tree, m):
                 """One verdict, kept in the cache as soon as it is known: a run cut short (a time limit, a Ctrl+C) leaves the
-                verdicts it reached, as a run of 700 mutants cut at 100 minutes judged all of them again (2026-10-30)."""
+                verdicts it reached, as a run of 700 mutants cut at 100 minutes judged all of them again (2026-10-30). A run
+                that is stopping keeps none: its suites died of the signal, not of the mutant (F2526)."""
+                if STOP.is_set():
+                    raise Cut("the run was stopped")
                 killed = judged(tree, *m)
-                if killed != (m[0] in GAPS):
-                    with keep:
+                with keep:
+                    if STOP.is_set():
+                        raise Cut("the run was stopped")
+                    if killed != (m[0] in GAPS):
                         remember({keys[id(m)]: "killed" if killed else "survives"})
                 return killed
 
-            verdicts = list(pool.map(lambda n: [judge(trees[n], m) for m in found[n::shards]], range(shards)))
+            try:
+                verdicts = list(pool.map(lambda n: [judge(trees[n], m) for m in found[n::shards]], range(shards)))
+            except BaseException as e:  # the main thread's Ctrl+C, or a shard's suite cut short: the others stop at their next step
+                STOP.set()
+                if isinstance(e, Cut):
+                    sys.exit(f"harness_mutate: {e}; no verdict of this mutant is kept, run it again")
+                raise
 learned = {}
 if found:
     for i, (label, path, mutated, test) in enumerate(found):

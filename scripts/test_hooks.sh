@@ -690,6 +690,9 @@ printf '%s\n' '# Each section reads the tree, never its .git file.' 'part() { ca
 	'if part x; then' \
 	'	pwd >>"$SHARD_ROOT/ran"' \
 	'	[ -n "${CUT:-}" ] && [ -n "$ONLY" ] && ! grep -q KEEP3 g.txt && kill -9 "$PPID"' \
+	'	if [ -n "${INTR:-}" ] && ! grep -q " SPARE" g.txt; then' \
+	'		case $INTR in group) kill -INT 0; sleep 5 ;; ppid) kill -INT "$PPID"; sleep 1 ;; *) exit "$INTR" ;; esac' \
+	'	fi' \
 	'	! grep -q " SPARE" g.txt && [ -n "${FLAKE:-}" ] && [ ! -e "$SHARD_ROOT/flaked" ] && { : >"$SHARD_ROOT/flaked"; exit 1; }' \
 	'	if [ -n "${SHARDS_MEET:-}" ]; then' \
 	'		: >"$SHARD_ROOT/met.${PWD##*/}" && n=0' \
@@ -774,7 +777,7 @@ shards() { # $1: the shards; then harness_mutate's arguments
 	n=$1 && shift
 	rm -f "$hs/made" "$hs/removed" "$hs/ran" "$hs/controls" "$hs/probe_controls" "$hs/lonely" "$hs/flaked" "$hs"/met.* "$hs"/live.* "$hs/overlap"
 	[ -n "${WARM:-}" ] || rm -rf "${hs:?}/home" # each run with no cache of verdicts, unless WARM keeps the last run's
-	(cd "${HR:-$hs/repo}" && HOME="$hs/home" SHARD_ROOT="$hs" SHARD_SRC="$hs/src" HARNESS_SHARDS=$n python3 -I harness_mutate.py "$@" 2>&1)
+	(cd "${HR:-$hs/repo}" && HOME="$hs/home" SHARD_ROOT="$hs" SHARD_SRC="$hs/src" HARNESS_SHARDS=$n ${GROUPED:+python3 -I "$hs/group.py"} python3 -I harness_mutate.py "$@" 2>&1)
 }
 count() { [ -e "$hs/$1" ] && wc -l <"$hs/$1" | tr -d ' ' || echo 0; }
 verdicts() { printf '%s\n' "$1" | grep -c "killed: \|survives: " || :; }
@@ -799,6 +802,26 @@ out=$(WARM=1 shards 1) && fail "harness_mutate passed with surviving mutants aft
 for k in keep1 keep2; do
 	printf '%s\n' "$out" | grep -q "^ok    killed (cached): planted $k #1$" || fail "harness_mutate lost the verdict of planted $k when its run was cut short: $out"
 done
+# A Ctrl+C reaches the suite of every mutant in flight, which dies of the signal: that is no verdict, and none is kept. The run
+# was reading it as "killed" and writing it to the cache, where the next run, --full too, passed with the survivor (F2526, from
+# 2ca90ff6). The run is a group of its own, signalled from inside its surviving mutant's suite; the next run still fails on it.
+printf 'import signal, subprocess, sys\nsignal.signal(signal.SIGINT, lambda *_: None)  # this section runs in the background, whose shell ignores INT: the run below must not\nsys.exit(subprocess.run(sys.argv[1:], start_new_session=True).returncode)\n' >"$hs/group.py"
+out=$(INTR=group GROUPED=1 shards 1) && fail "harness_mutate passed after a signal cut its suite short: $out"
+printf '%s\n' "$out" | grep -q "^ok    killed: planted spare #1$" && fail "harness_mutate read the signal that cut a suite short as a kill: $out"
+out=$(WARM=1 shards 1) && fail "harness_mutate passed with a survivor after a run cut by a signal: $out"
+printf '%s\n' "$out" | grep -q "^ok    killed (cached): planted spare #1$" && fail "harness_mutate cached the signal that cut a suite short as a kill: $out"
+printf '%s\n' "$out" | grep -q "^FAIL  survives: planted spare #1$" || fail "harness_mutate lost its survivor after a run cut by a signal: $out"
+# The codes a shell gives a suite it ends by a signal are no verdict either (INT, KILL, TERM).
+for c in 130 137 143; do
+	out=$(INTR=$c shards 1) && fail "harness_mutate passed after a suite ended with $c: $out"
+	printf '%s\n' "$out" | grep -q "no verdict of this mutant is kept" || fail "harness_mutate took the end of a suite with $c for a verdict: $out"
+	printf '%s\n' "$out" | grep -q "killed: planted spare #1" && fail "harness_mutate read $c as a kill: $out"
+done
+# A Ctrl+C that reaches the run alone, its suites unharmed: the shard stops at once, starting no mutant and keeping no
+# verdict after it (the suite of the survivor goes on to pass; four mutants had run, never the seven).
+out=$(INTR=ppid GROUPED=1 shards 1) && fail "harness_mutate passed after an interrupt: $out"
+[ "$(count ran)" = 4 ] || fail "harness_mutate went on judging after its interrupt: $(count ran) of 7 mutants ran"
+grep -q survives "$hs"/home/.cache/gnoworld-tools/* 2>/dev/null && fail "harness_mutate kept the verdict of a mutant judged after its interrupt"
 # No shard asked for: one.
 out=$(shards 0) && fail "harness_mutate passed with surviving mutants on one shard"
 [ "$(count made)" = 1 ] || fail "harness_mutate made $(count made) worktrees for HARNESS_SHARDS=0"
