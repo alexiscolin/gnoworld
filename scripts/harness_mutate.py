@@ -170,6 +170,18 @@ def journeys_more_mutants():
         yield from each("scripts/journeys.py", find, replace, "hooks", f"journeys.py {label}")
 
 
+def quick_mutants():
+    """check_regressions --quick, per commit (F2579): the hook and the fast gate ask for it, and it lists only what the change touches."""
+    yield from each(".githooks/pre-commit", '--quick "$base"', '"$base"', "hooks", "pre-commit lists every test of the base and the tree per commit")
+    yield from each("scripts/check.sh", '--quick "$regr_base"', '"$regr_base"', "hooks", "check.sh lists every test of the base and the tree per commit")
+    c, h = "scripts/check_regressions.py", "hooks"
+    yield from each(c, 'if n.split(" > ", 1)[0] not in touched}', "if True}", h, "check_regressions.py keeps the base's tests of the files the change touches")
+    yield from each(c, 'or not all(VITEST_FILE.search(p)', "or False and not all(VITEST_FILE.search(p)", h, "check_regressions.py lists only the touched files for any change")
+    yield from each(c, "os.replace(f.name, path)", "pass", h, "check_regressions.py keeps the base's listing in the cache")
+    yield from each(c, 'git("ls-files", "--others", "--exclude-standard").splitlines()', "[]", h, "check_regressions.py lists the touched files without the new ones")
+    yield from each(c, "        return set(json.load(f))\n", "        raise OSError\n", h, "check_regressions.py reads the base's listing from the cache")
+
+
 def checks_mutants():
     """The fast gate runs check_regressions when a commit touches a test, and the audit when the lockfile changes (slice-5 harness-b)."""
     check = "scripts/check.sh"
@@ -200,7 +212,7 @@ def checks_mutants():
         (r"_test\.(gno|go)$|", "", "runs check_regressions on a gno or Go test"),
         (r"-snapshots/.*\.png$|", "", "runs check_regressions on an approved picture"),
         (r"|__screenshots__/.*\.png$", "", "runs check_regressions on a story's picture"),
-        ('python3 -I "$s/check_regressions.py" "$base"', ":", "runs check_regressions"),
+        ('python3 -I "$s/check_regressions.py" --quick "$base"', ":", "runs check_regressions"),
     ):
         yield from each(hook, find, replace, "hooks", f"pre-commit {label}")
 
@@ -1015,6 +1027,7 @@ def mutants():
     yield from lines("scripts/check.sh", r"^(\s*)((?:run |python3 -I |sh scripts/|gitleaks |go vet |go run |\(cd gno |\$full \|\| run ).*)$", r"\1:", "hooks", "check.sh drops")
     yield from scoping_mutants()
     yield from journeys_more_mutants()
+    yield from quick_mutants()
     yield from checks_mutants()
     yield from stryker_mutants()
 

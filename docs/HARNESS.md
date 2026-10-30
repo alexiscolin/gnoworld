@@ -150,6 +150,12 @@ through. The commit that removes the test cannot carry its own line, because its
 declare it first, on an empty commit if need be. The staged copy has no git, so `.githooks/pre-commit` runs the staged
 `check_regressions.py` in the repository (it reads the working tree, not the index: a test staged in part is judged as it is
 on disk), and `check.sh` runs it in a repository only. Neither runs in a merge commit, whose full gate follows.
+Both pass `--quick` (F2579): the base's listing of Vitest tests and journeys is kept in the tools' cache
+(`~/.cache/gnoworld-tools/regressions/`, one file per base commit, which never changes), and a change of nothing but Vitest
+files, gno or Go sources, approved pictures and prose lists only the Vitest files it touches (about 3 s for one file, against
+33 s for all 6,944 tests, measured by the reviewer); any other change lists the tree whole. The merge check runs without
+`--quick`, whole and with no cache. A picture is judged on the tree, not on `base..HEAD` (F2574): its own commit's message does not
+exist yet, so its `Updated-baseline:` line goes on an earlier commit too.
 
 **StrykerJS's sandboxes** (harness-b): a run cut short leaves `.stryker-tmp/`, which Vitest's bench project once measured
 (5n: Cmd-K at 27 to 41 ms instead of 2 to 4). `vitest.config.ts` leaves `**/.stryker-tmp/**` out of its benches (only a bench

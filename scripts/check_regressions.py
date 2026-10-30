@@ -7,7 +7,10 @@ so on a line of its own, `Key: <item> - why`, which Alexis reads in review:
   check's GAPS, an ignore added to a tool's ignore list, or a bench gone or given a longer budget
   (`bench("<name> [<n> ms]"`, named `bench <name>`): `Lowered-floor:`;
 - an approved screenshot changed or deleted: `Updated-baseline:`.
-Usage: check_regressions.py <base>, from the repository root; --self-test checks the rules."""
+Usage: check_regressions.py [--quick] <base>, from the repository root; --self-test checks the rules.
+--quick (the hook and the fast gate, per commit: F2579) keeps the base's listing of tests in the tools' cache, one per base
+commit, and lists only the Vitest files the change touches when the change is nothing but those, gno or Go sources, pictures
+and prose; any other change lists the tree whole. The merge check runs without it, whole and with no cache."""
 import ast
 import hashlib
 import json
@@ -216,6 +219,51 @@ def base_tests(base):
         return test_names(tree)
 
 
+TOUCHES_NO_NAMES = re.compile(r"\.(gno|go|md)$")  # a test of these kinds is read from the files; they list no Vitest or Playwright name
+VITEST_FILE = re.compile(r"\.test\.tsx?$")
+
+
+def cached_base_tests(base):
+    """base_tests(base), kept in the tools' cache under the base's commit (it never changes for one): a quick run lists the
+    whole of the base's tests once per base, not once per commit."""
+    sha = git("rev-parse", "--verify", f"{base}^{{commit}}").strip()
+    folder = os.path.join(os.environ.get("GNOWORLD_TOOLS") or os.path.join(os.path.expanduser("~"), ".cache", "gnoworld-tools"), "regressions")
+    path = os.path.join(folder, f"base-{sha}.json")
+    try:
+        with open(path) as f:
+            return set(json.load(f))
+    except (OSError, ValueError):
+        pass
+    names = base_tests(base)
+    try:  # a cache that cannot be written costs the next run its listing, nothing else
+        os.makedirs(folder, exist_ok=True)
+        with tempfile.NamedTemporaryFile("w", dir=folder, delete=False, suffix=".tmp") as f:
+            json.dump(sorted(names), f)
+        os.replace(f.name, path)
+    except OSError:
+        pass
+    return names
+
+
+def quick_tests(base, before):
+    """The Vitest and Playwright names the tree holds, from the base's (`before`) and a listing of the files the change touches,
+    or None when the change is more than those Vitest files, gno or Go sources, approved pictures and prose."""
+    paths = [p for p in git("diff", "--no-renames", "--name-only", base).splitlines() + git("ls-files", "--others", "--exclude-standard").splitlines() if p]
+    if not os.path.exists("vitest.config.ts") or not all(VITEST_FILE.search(p) or TOUCHES_NO_NAMES.search(p) or SHOT.search(p) for p in paths):
+        return None
+    touched = {p for p in paths if VITEST_FILE.search(p)}
+    kept = {n for n in before if n.split(" > ", 1)[0] not in touched}
+    existing = sorted(p for p in touched if os.path.exists(p))
+    if not existing:
+        return kept
+    with tempfile.TemporaryDirectory() as where:
+        out = os.path.join(where, "list.json")  # `--json <file>` would read the first path as the output's
+        subprocess.run(["node_modules/.bin/vitest", "list", f"--json={out}", *existing], capture_output=True, text=True, check=True)
+        with open(out) as f:
+            listing = json.load(f)
+    return kept | {f"{relative(t['file'], '.')} > {t['name']}" for t in listing if relative(t["file"], ".") in touched}
+
+
 def self_test():
     """The rules on small cases: each refuses its fault and lets a declared one through."""
     log = ["docs: explain why the mutation break follows the score", "Removed-test: a > xy - another test",
@@ -298,12 +346,15 @@ def self_test():
 if sys.argv[1:] == ["--self-test"]:
     self_test()
     sys.exit(0)
-base = sys.argv[1]
+quick = "--quick" in sys.argv[1:]
+base = [a for a in sys.argv[1:] if a != "--quick"][0]
 log = git("log", "--format=%B", f"{base}..HEAD").splitlines()
 tests_ok, floors_ok, shots_ok = declared(log, "Removed-test"), declared(log, "Lowered-floor"), declared(log, "Updated-baseline")
 sources = lambda paths, read: source_tests({p: read(p) for p in paths.splitlines() if p.endswith((".gno", ".go"))})
-before = base_tests(base) | sources(git("ls-tree", "-r", "--name-only", base, "--", "gno"), lambda p: show(base, p))
-after = test_names(".") | sources(git("ls-files", "gno"), here)
+base_names = cached_base_tests(base) if quick else base_tests(base)
+before = base_names | sources(git("ls-tree", "-r", "--name-only", base, "--", "gno"), lambda p: show(base, p))
+tree_names = quick_tests(base, base_names) if quick else None
+after = (test_names(".") if tree_names is None else tree_names) | sources(git("ls-files", "gno"), here)
 problems = [f"a test is gone: {t}" for t in removed_tests(before, after, tests_ok)]
 problems += [f"a test is switched to fails: {t}" for t in switched_to_fails(git("diff", "-U0", base, "--", "*.test.ts", "*.test.tsx")) if t not in tests_ok]
 problems += [f"a floor is lower: {f}" for f in lowered_floors(floors(show(base, "vitest.config.ts"), show(base, "stryker.config.json")),

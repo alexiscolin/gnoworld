@@ -328,7 +328,7 @@ lane_docs() {
 	python3 -I scripts/check_docs.py
 	if $regressions; then
 		step regressions # no test gone, no floor lower, no approved picture changed, unless a commit of the branch says why
-		python3 -I scripts/check_regressions.py "$regr_base"
+		python3 -I scripts/check_regressions.py --quick "$regr_base" # per commit: the base's listing cached, only the touched files listed (F2579)
 	fi
 	if $audit; then
 		step audit

@@ -74,7 +74,7 @@ tests=$(printf '%s\n' "$changed" | grep -E '\.(test|bench)\.tsx?$|\.spec\.ts$|_t
 if [ "$merge" = 0 ] && [ -n "$tests" ] && base=$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse -q --verify HEAD 2>/dev/null); then
 	nodebin= # Vitest's list in check_regressions reads the Node .node-version pins (a bare shell may hold another)
 	[ ! -f .node-version ] || nodebin="${NVM_DIR:-$HOME/.nvm}/versions/node/v$(cat .node-version)/bin:"
-	env -u GIT_INDEX_FILE -u GIT_DIR -u GIT_WORK_TREE PATH="$nodebin$PATH" python3 -I "$s/check_regressions.py" "$base"
+	env -u GIT_INDEX_FILE -u GIT_DIR -u GIT_WORK_TREE PATH="$nodebin$PATH" python3 -I "$s/check_regressions.py" --quick "$base"
 fi
 env -u GIT_INDEX_FILE -u GIT_DIR -u GIT_WORK_TREE GATE_CHANGED="$changed" GATE_MERGE=$merge sh "$s/check.sh"
 put "$(code_print "$(git write-tree)")" fast # for the hooks outside the sandbox

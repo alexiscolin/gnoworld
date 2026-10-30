@@ -2855,14 +2855,14 @@ head=$(git -C "$g" rev-parse HEAD) base=$(git -C "$g" merge-base HEAD origin/mai
 [ "$head" != "$base" ] || fail "the fixture's branch has no commit past main: the base cannot be told from HEAD"
 git -C "$g" mv server/src/a.test.ts server/src/renamed.test.ts
 gate >/dev/null || fail "check.sh failed on a renamed test"
-grep -qx "py:check_regressions $base" "$log" || fail "check.sh did not run check_regressions from where the branch left main on a renamed test (a Removed-test: line of a commit of the branch must count): $(grep check_regressions "$log")"
+grep -qx "py:check_regressions --quick $base" "$log" || fail "check.sh did not run check_regressions from where the branch left main on a renamed test (a Removed-test: line of a commit of the branch must count): $(grep check_regressions "$log")"
 reset
 # Every kind of file that is a test, a bench or an approved picture.
 for f in server/src/a.test.ts gno/r/a_test.gno app/tests/a.spec.ts packages/core/src/new.test.ts app/src/home.test.tsx gno/tools/a_test.go app/tests/bench/a.bench.ts app/tests/bench/a.bench.tsx \
 	"app/tests/e2e/home.spec.ts-snapshots/a-chromium.png" app/tests/e2e/__screenshots__/b.png; do
 	mkdir -p "$g/$(dirname "$f")" && printf 'y\n' >>"$g/$f"
 	gate >/dev/null || fail "check.sh failed on a change of $f"
-	grep -qx "py:check_regressions $base" "$log" || fail "check.sh did not run check_regressions on a change of $f"
+	grep -qx "py:check_regressions --quick $base" "$log" || fail "check.sh did not run check_regressions on a change of $f"
 	reset
 done
 # A merge being committed (MERGE_HEAD): the full gate follows and judges the whole, so the fast gate does not.
@@ -2876,7 +2876,7 @@ reset
 git -C "$g" update-ref -d refs/remotes/origin/main
 git -C "$g" mv server/src/a.test.ts server/src/renamed.test.ts
 gate >/dev/null || fail "check.sh failed on a renamed test with no origin/main"
-grep -qx "py:check_regressions $head" "$log" || fail "check.sh did not fall back to HEAD with no origin/main: $(grep check_regressions "$log")"
+grep -qx "py:check_regressions --quick $head" "$log" || fail "check.sh did not fall back to HEAD with no origin/main: $(grep check_regressions "$log")"
 git -C "$g" update-ref refs/remotes/origin/main "$base"
 reset
 git -C "$g" rm -q server/src/a.test.ts
@@ -2949,7 +2949,7 @@ git -C "$c3" add -A && git -C "$c3" commit -qm base
 head3=$(git -C "$c3" rev-parse HEAD) && rm -f "$t/reg.log"
 git -C "$c3" mv server/src/a.test.ts server/src/b.test.ts
 precommit3 || fail "pre-commit refused a renamed test with a check_regressions that passes"
-logged "$head3" || fail "pre-commit did not run check_regressions from the repository with HEAD as the base, there being no origin/main: $(cat "$t/reg.log" 2>&1)"
+logged "--quick $head3" || fail "pre-commit did not run check_regressions from the repository with HEAD as the base, there being no origin/main: $(cat "$t/reg.log" 2>&1)"
 precommit3 1 && fail "pre-commit let a renamed test through, check_regressions refusing it (the fast gate passed it in 5b)"
 git -C "$c3" reset -q --hard && rm -f "$t/reg.log"
 printf 'y\n' >>"$c3/server/src/a.ts" && git -C "$c3" add server/src/a.ts
@@ -2961,8 +2961,8 @@ head3b=$(git -C "$c3" rev-parse HEAD)
 [ "$head3b" != "$head3" ] || fail "the fixture's branch has no commit past main"
 git -C "$c3" mv server/src/a.test.ts server/src/b.test.ts
 precommit3 || fail "pre-commit refused a renamed test with a check_regressions that passes, on a branch"
-logged "$head3" || fail "pre-commit did not take where the branch left main as the base: $(cat "$t/reg.log" 2>&1)"
-! logged "$head3b" || fail "pre-commit took HEAD as the base on a branch: a Removed-test: line of an earlier commit could not count"
+logged "--quick $head3" || fail "pre-commit did not take where the branch left main as the base: $(cat "$t/reg.log" 2>&1)"
+! logged "--quick $head3b" || fail "pre-commit took HEAD as the base on a branch: a Removed-test: line of an earlier commit could not count"
 # A merge being committed: the full gate follows.
 rm -f "$t/reg.log"
 precommit3 1 --merge || fail "pre-commit ran check_regressions in a merge commit"
@@ -2972,7 +2972,7 @@ git -C "$c3" reset -q --hard
 for f in app/src/home.test.tsx gno/tools/a_test.go app/tests/bench/a.bench.ts app/tests/bench/a.bench.tsx app/tests/a.spec.ts gno/r/a_test.gno "app/tests/e2e/home.spec.ts-snapshots/a.png" app/tests/e2e/__screenshots__/b.png; do
 	rm -f "$t/reg.log" && mkdir -p "$c3/$(dirname "$f")" && printf 'y\n' >>"$c3/$f" && git -C "$c3" add "$f"
 	precommit3 || fail "pre-commit refused a change of $f with a check_regressions that passes"
-	logged "$head3" || fail "pre-commit did not run check_regressions on a change of $f"
+	logged "--quick $head3" || fail "pre-commit did not run check_regressions on a change of $f"
 	git -C "$c3" reset -q --hard && git -C "$c3" clean -qfd
 done
 # No commit yet: nothing to compare, and the commit is not refused for it.
@@ -3514,6 +3514,59 @@ out=$(reg) && fail "check_regressions passed an approved picture changed in the 
 git -C "$rg" reset -q --hard "$base" && printf 'new\n' >"$rg/app/tests/e2e/home.spec.ts-snapshots/c.png" && git -C "$rg" add -A
 out=$(reg) || fail "check_regressions refused a new approved picture: $out"
 git -C "$rg" reset -q --hard "$base"
+# --quick, which the hook and the fast gate run per commit (F2579): the base's listing of tests is kept in the tools' cache, one per base commit,
+# and a change of nothing but Vitest files, gno or Go sources, pictures and prose lists only the Vitest files it touches. A vitest that logs
+# its calls stands for the real one; a listing with no file is a whole one. The merge check runs without it, whole and with no cache.
+rq="$t/regq" && mkdir -p "$rq/scripts" "$rq/node_modules/.bin" "$rq/app/src"
+cp "$here/check_regressions.py" "$here/repo_files.py" "$here/borrow_node_modules.sh" "$rq/scripts/"
+cat >"$rq/node_modules/.bin/vitest" <<'EOF'
+#!/usr/bin/env python3
+import json, os, re, sys
+a = sys.argv[1:]
+out = next((x.split("=", 1)[1] for x in a if x.startswith("--json=")), None)
+files = [x for x in a[1:] if not x.startswith("--")]
+open(os.environ["VT_LOG"], "a").write(os.getcwd() + " " + " ".join(files) + "\n")
+found = []
+for d, ds, fs in os.walk("."):
+    ds[:] = [x for x in ds if x not in ("node_modules", ".git")]
+    for f in fs:
+        p = os.path.join(d, f)
+        if f.endswith(".test.ts") and (not files or any(x in p for x in files)):
+            found += [{"file": os.path.abspath(p), "name": n} for n in re.findall(r'test\("([^"]+)"', open(p).read())]
+json.dump(found, open(out, "w") if out else sys.stdout)
+EOF
+chmod +x "$rq/node_modules/.bin/vitest"
+git -C "$rq" init -q && printf 'node_modules/\n' >"$rq/.gitignore" && : >"$rq/vitest.config.ts"
+printf 'test("a one", f);\ntest("a two", f);\n' >"$rq/app/src/a.test.ts" && printf 'test("b one", f);\n' >"$rq/app/src/b.test.ts" && printf 'x\n' >"$rq/app/src/c.ts"
+git -C "$rq" add -A && git -C "$rq" commit -qm base && qbase=$(git -C "$rq" rev-parse HEAD)
+reqq() { : >"$t/vt.log" && (cd "$rq" && VT_LOG="$t/vt.log" GNOWORLD_TOOLS="$t/rtools" python3 -I scripts/check_regressions.py "$@" 2>&1); }
+wholes() { grep -c ' $' "$t/vt.log" || :; }
+back() { git -C "$rq" reset -q --hard "$qbase" && git -C "$rq" clean -qfd; }
+printf 'test("b new", f);\n' >"$rq/app/src/b.test.ts"
+out=$(reqq --quick "$qbase") && fail "check_regressions --quick passed a test gone: $out"
+printf '%s\n' "$out" | grep -qF "app/src/b.test.ts > b one" || fail "check_regressions --quick did not name the test gone: $out"
+[ "$(wholes)" = 1 ] || fail "check_regressions --quick listed $(wholes) whole times, not once (the base's, which nothing cached yet): $(cat "$t/vt.log")"
+grep -q ' app/src/b.test.ts$' "$t/vt.log" && ! grep -q 'a.test.ts' "$t/vt.log" || fail "check_regressions --quick did not list the one file the change touches: $(cat "$t/vt.log")"
+[ -f "$t/rtools/regressions/base-$qbase.json" ] || fail "check_regressions --quick did not keep the base's listing in the tools' cache"
+out=$(reqq --quick "$qbase") && fail "check_regressions --quick passed a test gone, with the base cached: $out"
+[ "$(wholes)" = 0 ] || fail "check_regressions --quick listed the base again, though its listing is cached: $(cat "$t/vt.log")"
+out=$(reqq "$qbase") && fail "check_regressions without --quick passed a test gone: $out"
+[ "$(wholes)" = 2 ] || fail "check_regressions without --quick did not list the base and the tree whole ($(wholes) whole listings): $(cat "$t/vt.log")"
+git -C "$rq" commit -qam "a test replaced" -m "Removed-test: app/src/b.test.ts > b one - replaced by b new"
+out=$(reqq --quick "$qbase") || fail "check_regressions --quick refused a test gone that a commit says why of: $out"
+back
+rm -f "$rq/app/src/a.test.ts" && git -C "$rq" add -A
+out=$(reqq --quick "$qbase") && fail "check_regressions --quick passed a test file deleted: $out"
+printf '%s\n' "$out" | grep -qF "app/src/a.test.ts > a one" || fail "check_regressions --quick did not name the tests of the deleted file: $out"
+back
+printf 'test("b new", f);\n' >"$rq/app/src/b.test.ts" && printf 'y\n' >>"$rq/app/src/c.ts"
+out=$(reqq --quick "$qbase") && fail "check_regressions --quick passed a test gone beside a change of another file: $out"
+[ "$(wholes)" = 1 ] || fail "check_regressions --quick did not list the tree whole for a change beside the test files ($(wholes) whole listings): $(cat "$t/vt.log")"
+back
+printf 'test("new", f);\n' >"$rq/app/src/d.test.ts"
+out=$(reqq --quick "$qbase") || fail "check_regressions --quick refused a new test file: $out"
+grep -q ' app/src/d.test.ts$' "$t/vt.log" || fail "check_regressions --quick did not list a new, untracked test file: $(cat "$t/vt.log")"
+back
 fi
 
 if part ergo; then
