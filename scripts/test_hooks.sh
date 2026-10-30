@@ -3946,6 +3946,7 @@ for new, want, what in [
 ]:
     assert rewritten(text, new) == want, f"{what}: {rewritten(text, new)} for {want}"
 assert rewritten("a\na\n", "a\na\na\n") == {2, 3}, "a line added among its like"
+assert rewritten("a\na\na\n", "a\na\n") == {3}, "a line removed among its like counts once, from one end"
 found = [("g1", "a.sh", "A\nb\nc\n", "hooks"), ("g2", "a.sh", "a\nb\nC\n", "hooks"), ("g3", "b.py", "x2\n", "probe"), ("g4", "a.sh", None, "hooks"), ("g5", "c.sh", None, "hooks")]
 original = {"a.sh": text, "b.py": "x\n"}.__getitem__
 labels = lambda chosen: [m[0] for m in chosen]
