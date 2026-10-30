@@ -6,10 +6,11 @@ Review by risk, not line by line everywhere.
 
 | Tier | What | Written by | How it is reviewed |
 |---|---|---|---|
-| 1 | Realms (`gno/r/`, `gno/p/`), the sponsor, relay authorization | Claude | Claude and a fresh-context `gno-auditor` read every line. Alexis reviews the function cards and the attack scenarios. External audit before mainnet |
-| 1 | Client crypto (keys, signed statements, Merkle, the MLS boundary), the CSP | Alexis for the core, Claude elsewhere | Alexis reads every line |
+| 1 | Realms (`gno/r/`, `gno/p/`), the sponsor, relay authorization (`server/src/ergo/`) | Claude | Claude and a fresh-context `gno-auditor` read every line. Alexis reviews the function cards and the attack scenarios. External audit before mainnet |
+| 1 | Client crypto (keys, signed statements, Merkle, the MLS boundary), the CSP (`app/src/csp.ts`) | Alexis for the core, Claude elsewhere | Alexis reads every line |
 | 2 | Other TypeScript (state, queries, views) | Alexis for the core, Claude elsewhere | Alexis reads the tests first, then every line |
-| 1 | The server's login, the admin API's rights, the approval signing, the admin console, Jarvis's tool-allowlist loop, `lib/adena` | Claude | Alexis reads every line |
+| 1 | The server's login (`server/src/login/`) and the client's (`app/src/features/login/`, `app/src/lib/api/login.ts`, `app/src/lib/ergo/`), the admin API's rights (`server/src/roles/`, `server/roles.json`), the approval signing, the admin console, Jarvis's tool-allowlist loop, Adena (`app/src/lib/adena/`) | Claude | Alexis reads every line |
+| 1 | What decides who may do what at the edge: the deploy folder (`deploy/`), the markdown scanner (`packages/core/src/markdown/`), the service worker (`app/src/sw/`) | Claude | Alexis reads every line |
 | 2 | The rest of the server (TypeScript on Node) | Claude | Alexis reads the tests first, then every line |
 | 2 | Go (the seal reference client) | Claude | Behaviour and tests |
 | 3 | Interface, 3D, motion | Either | Run it; read the budgets the gate prints |

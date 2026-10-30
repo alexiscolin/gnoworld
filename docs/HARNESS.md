@@ -39,7 +39,16 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
   pass, the code, the merge check, one combined review, the high and medium fixes, the merge check
   again; it returns its commits, the low findings for Alexis, the lines that loosen the net and its tokens.
   An agent that gives no report blocks it; the harness's and the realms' files bring their reviews
-  whatever its arguments say. `test_hooks.sh`'s section `workflow_branch` runs it under stubbed globals.
+  whatever its arguments say, and so does every tier-1 path of `docs/REVIEW.md`'s table that exists (the relay's auth script,
+  the CSP, `deploy/`, `core/markdown`, `lib/adena`, the login of the server and of the client, the server's roles, the worker): the
+  table writes each path in backticks, and a `workflow_branch` case fails when the table names one its `TIER1` lacks, or `TIER1` holds
+  one the table does not name. Its argument `base` (`main` when absent) is the branch the
+  work is cut from: the merge check's file list, the reviewer's diff and `since` read from it. The merge check
+  reports the `survivor: ` lines `check.sh --merge` prints, pass or fail, and the reviewer gets them: StrykerJS's survivors on the
+  files the branch changed, one `survivors not listed:` count for the rest, and every harness mutant. With a base the loop runs
+  `check.sh --merge --base <base>`, so every lane (batch, fixes, regressions, migrations, patch coverage, harness mutants, product
+  or not) measures from the merge-base with it, `origin/main` when absent (F2529, F2531).
+  `test_hooks.sh`'s section `workflow_branch` runs it under stubbed globals.
 - **Agents** are fresh, briefed from files (never forks), four at most at once, each asked for a
   short report saved to a file. The sessions coordinate through files: the plan,
   `docs/decisions.md`, the ledger, a state file per branch and one shared learnings file.
@@ -77,7 +86,10 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
    by the `reviewer` agent (with the `security-reviewer` for a tier-1 file or the harness, the
    `gno-auditor` for a realm), the `finding-verifier` on tier-1 findings, high and medium fixed,
    low ones listed for Alexis, then a recorded review pass (`scripts/review_pass.py`).
-8. **Alexis reviews,** blind first, in revdiff, and runs `deploy/test.sh` once per branch.
+8. **Alexis reviews,** blind first, in revdiff, and runs `deploy/test.sh` once per branch. It takes a lock per Docker project
+   (a folder in `~/.cache/gnoworld-tools` holding its pid): a second run, from another terminal or session, is
+   refused while a first holds it; a project a Ctrl+C left up (`gnoworld-demo-mutant-<pid>`) is named with the
+   command that removes it. `test_hooks.sh`'s section `deploy_lock` runs it against stubbed Docker.
 9. **Merge and push, by Alexis, in his own shell.** Through `.git/hooks/merge.sh`, which shows
    each harness file the branch changes, with its diff, before git writes it. Pushing `main` wants
    the hooks installed from it, the full gate recorded green on that code, the committed review

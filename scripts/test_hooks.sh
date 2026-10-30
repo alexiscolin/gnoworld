@@ -686,6 +686,9 @@ printf '%s\n' '# Each section reads the tree, never its .git file.' 'part() { ca
 	'if part x; then' \
 	'	pwd >>"$SHARD_ROOT/ran"' \
 	'	[ -n "${CUT:-}" ] && [ -n "$ONLY" ] && ! grep -q KEEP3 g.txt && kill -9 "$PPID"' \
+	'	if [ -n "${INTR:-}" ] && ! grep -q " SPARE" g.txt; then' \
+	'		case $INTR in group) kill -INT 0; sleep 5 ;; ppid) kill -INT "$PPID"; sleep 1 ;; *) exit "$INTR" ;; esac' \
+	'	fi' \
 	'	! grep -q " SPARE" g.txt && [ -n "${FLAKE:-}" ] && [ ! -e "$SHARD_ROOT/flaked" ] && { : >"$SHARD_ROOT/flaked"; exit 1; }' \
 	'	if [ -n "${SHARDS_MEET:-}" ]; then' \
 	'		: >"$SHARD_ROOT/met.${PWD##*/}" && n=0' \
@@ -770,7 +773,7 @@ shards() { # $1: the shards; then harness_mutate's arguments
 	n=$1 && shift
 	rm -f "$hs/made" "$hs/removed" "$hs/ran" "$hs/controls" "$hs/probe_controls" "$hs/lonely" "$hs/flaked" "$hs"/met.* "$hs"/live.* "$hs/overlap"
 	[ -n "${WARM:-}" ] || rm -rf "${hs:?}/home" # each run with no cache of verdicts, unless WARM keeps the last run's
-	(cd "${HR:-$hs/repo}" && HOME="$hs/home" SHARD_ROOT="$hs" SHARD_SRC="$hs/src" HARNESS_SHARDS=$n python3 -I harness_mutate.py "$@" 2>&1)
+	(cd "${HR:-$hs/repo}" && HOME="$hs/home" SHARD_ROOT="$hs" SHARD_SRC="$hs/src" HARNESS_SHARDS=$n ${GROUPED:+python3 -I "$hs/group.py"} python3 -I harness_mutate.py "$@" 2>&1)
 }
 count() { [ -e "$hs/$1" ] && wc -l <"$hs/$1" | tr -d ' ' || echo 0; }
 verdicts() { printf '%s\n' "$1" | grep -c "killed: \|survives: " || :; }
@@ -931,6 +934,46 @@ printf '%s\n' "$out" | grep -q "0 of 7 mutants" || fail "harness_mutate --change
 CONTROLS_SLOW=1 shards 4 >/dev/null || : # the planted survivors fail the run; only its controls are read here
 [ "$(count controls)" = 4 ] || fail "harness_mutate did not run the control in each of its 4 trees: $(count controls)"
 [ "$(sort -n "$hs/overlap" | tail -1)" = 2 ] || fail "harness_mutate ran $(sort -n "$hs/overlap" | tail -1) controls at once, not two (F2138)"
+fi
+
+if part harness_shards_signal; then
+shards_fixture
+# A Ctrl+C reaches the suite of every mutant in flight, which dies of the signal: that is no verdict, and none is kept. The run
+# was reading it as "killed" and writing it to the cache, where the next run, --full too, passed with the survivor (F2526, from
+# 2ca90ff6). The run is a group of its own, signalled from inside its surviving mutant's suite; the next run still fails on it.
+printf 'import signal, subprocess, sys\nsignal.signal(signal.SIGINT, lambda *_: None)  # this section runs in the background, whose shell ignores INT: the run below must not\nsys.exit(subprocess.run(sys.argv[1:], start_new_session=True).returncode)\n' >"$hs/group.py"
+out=$(INTR=group GROUPED=1 shards 1) && fail "harness_mutate passed after a signal cut its suite short: $out"
+printf '%s\n' "$out" | grep -q "^ok    killed: planted spare #1$" && fail "harness_mutate read the signal that cut a suite short as a kill: $out"
+out=$(WARM=1 shards 1) && fail "harness_mutate passed with a survivor after a run cut by a signal: $out"
+printf '%s\n' "$out" | grep -q "^ok    killed (cached): planted spare #1$" && fail "harness_mutate cached the signal that cut a suite short as a kill: $out"
+printf '%s\n' "$out" | grep -q "^FAIL  survives: planted spare #1$" || fail "harness_mutate lost its survivor after a run cut by a signal: $out"
+# The codes a shell gives a suite it ends by a signal are no verdict either (INT, KILL, TERM).
+for c in 130 137 143; do
+	out=$(INTR=$c shards 1) && fail "harness_mutate passed after a suite ended with $c: $out"
+	printf '%s\n' "$out" | grep -q "no verdict of this mutant is kept" || fail "harness_mutate took the end of a suite with $c for a verdict: $out"
+	printf '%s\n' "$out" | grep -q "killed: planted spare #1" && fail "harness_mutate read $c as a kill: $out"
+done
+# A Ctrl+C that reaches the run alone, its suites unharmed: the shard stops at once, starting no mutant and keeping no
+# verdict after it (the suite of the survivor goes on to pass; four mutants had run, never the seven).
+out=$(INTR=ppid GROUPED=1 shards 1) && fail "harness_mutate passed after an interrupt: $out"
+[ "$(count ran)" = 4 ] || fail "harness_mutate went on judging after its interrupt: $(count ran) of 7 mutants ran"
+grep -q survives "$hs"/home/.cache/gnoworld-tools/* 2>/dev/null && fail "harness_mutate kept the verdict of a mutant judged after its interrupt"
+fi
+
+if part harness_shards_text; then
+shards_fixture
+# A file the branch marks `-diff` in .gitattributes (or one with a NUL byte) makes git print "Binary files differ", and a textconv
+# can turn its text into another: the changed lines are read as text, as the file is (F2537; merge.sh and scan_secrets.sh do too).
+base=$(git -C "$hs/repo" rev-parse HEAD)
+printf '* -diff\n' >"$hs/repo/.gitattributes" && printf 'LINE1 again\nLINE2\n' >"$hs/repo/m.txt" && git -C "$hs/repo" add .gitattributes && git -C "$hs/repo" commit -qam "a line changed, diff off"
+out=$(LINED=1 shards 2 --changed "$base") || fail "harness_mutate --changed failed on a file marked -diff: $out"
+printf '%s\n' "$out" | grep -q "killed: planted line1 #1$" || fail "harness_mutate --changed skipped the changed line of a file marked -diff: $out"
+[ "$(verdicts "$out")" = 1 ] && printf '%s\n' "$out" | grep -q " 1 of 9 mutants" || fail "harness_mutate --changed did not ask for the one changed line of a file marked -diff: $out"
+base=$(git -C "$hs/repo" rev-parse HEAD)
+printf 'm.txt diff=nc\n' >"$hs/repo/.gitattributes" && printf 'LINE1 once more\nLINE2\n' >"$hs/repo/m.txt" && git -C "$hs/repo" config diff.nc.textconv true && git -C "$hs/repo" commit -qam "a line changed, textconv"
+out=$(LINED=1 shards 2 --changed "$base") || fail "harness_mutate --changed failed on a file with a textconv: $out"
+printf '%s\n' "$out" | grep -q "killed: planted line1 #1$" || fail "harness_mutate --changed skipped the changed line of a file with a textconv: $out"
+git -C "$hs/repo" config --unset diff.nc.textconv && git -C "$hs/repo" rm -q .gitattributes && git -C "$hs/repo" commit -qm "no attributes"
 fi
 
 if part harness_shards_records; then
@@ -3975,11 +4018,11 @@ const src = readFileSync(process.argv[2], "utf8").replace("export const meta", "
 const body = new Function("agent", "parallel", "phase", "log", "args", "budget", `return (async () => {${src}\n})();`);
 const ok = (cond, why) => { if (!cond) { console.error("workflow_branch: " + why); process.exit(1); } };
 const finding = (severity, file) => ({ severity, file, scenario: "s", evidence: "e", fix: "f", beyondPlan: false });
-async function run(answer) {
+async function run(answer, extra = {}) {
   const calls = [];
   const agent = async (prompt, o) => { calls.push({ label: o.label, prompt, agentType: o.agentType, schema: o.schema }); return answer(o.label, prompt, o); };
   const parallel = async (ts) => Promise.all(ts.map((t) => t().catch(() => null)));
-  const r = await body(agent, parallel, () => {}, () => {}, { branch: "b", worktree: "w", plan: "p", brief: "x", shared: "s", ids: "F9000-F9049" }, { spent: () => 0 });
+  const r = await body(agent, parallel, () => {}, () => {}, { branch: "b", worktree: "w", plan: "p", brief: "x", shared: "s", ids: "F9000-F9049", ...extra }, { spent: () => 0 });
   return { r, labels: calls.map((c) => c.label), calls };
 }
 const gateOf = (files) => ({ passed: true, failingLane: "", tail: "", survivors: [], files, relaxations: [], seconds: 1, branch: "b" });
@@ -4013,11 +4056,12 @@ const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
   const fix = t.calls.find((c) => (c.label || "").startsWith("fix round"));
   ok(fix && fix.prompt.includes("security-1-1") && !fix.prompt.includes("reviewer-1-1"), `the refuted finding's twin was dropped, or the refuted one fixed: ${fix && fix.prompt}`);
   // A high tier-1 finding each round: round 2 runs only its lens, on the diff since its fix; after the third, Alexis decides.
-  t = await run((l, p, o) =>
+  const highEveryRound = (extra) => run((l, p, o) =>
     l === "security" ? { findings: [finding("high", "scripts/a.sh")] }
     : l === "verifier" ? { verdicts: [{ id: idOf(o, 0), verdict: "reproduced", severity: "high", evidence: "e" }] }
     : (l || "").startsWith("fix round") ? { fixed: [{ id: p.match(/"id":"(security-\d-1)"/)[1], commit: "f" + l.slice(-1) }], notes: "", branch: "b" }
-    : base(["scripts/a.sh"])(l, p));
+    : base(["scripts/a.sh"])(l, p), extra);
+  t = await highEveryRound();
   ok(t.r.status.startsWith("reconsider with Alexis"), `three rounds of high tier-1 findings ended as ${t.r.status}`);
   ok(t.labels.filter((l) => l === "reviewer").length === 1, `round 2 ran the reviewer again: ${t.labels}`);
   ok(t.calls.some((c) => c.label === "security" && c.prompt.includes("since f1^")), "round 2 did not read the diff since its first fix");
@@ -4039,6 +4083,89 @@ const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
   for (const c of t.calls.filter((c) => (c.label || "").startsWith("ledger"))) ok(c.prompt.includes("F9000-F9049"), "the scribe was not given the branch's range of F numbers");
   // Every round's findings go to the ledger, a refuted or low one included.
   ok(t.labels.filter((l) => (l || "").startsWith("ledger")).length === 3, `not every round wrote its findings to the ledger: ${t.labels}`);
+  // Every tier-1 product path of docs/REVIEW.md's table that exists starts the security lens by itself, with no `tier1` argument, and
+  // a finding in it reaches the finding-verifier (5e and 5f launched the security-reviewer by hand; no csp.ts finding was verified).
+  const lensOf = async (file) => {
+    const only = await run((l, p, o) =>
+      l === "security" ? { findings: [finding("medium", file)] }
+      : l === "verifier" ? { verdicts: [{ id: idOf(o, 0), verdict: "reproduced", severity: "low", evidence: "e" }] }
+      : base([file])(l, p));
+    return only.labels;
+  };
+  // Two files of each folder, so a prefix cut to one file fails (server/src/login/ is also ticket.ts and routes.ts).
+  for (const file of ["app/src/csp.ts", "deploy/test.sh", "deploy/compose.yaml", "deploy/web/nginx.conf", "packages/core/src/markdown/inline.ts", "packages/core/src/markdown/scan.ts",
+    "app/src/lib/adena/adena.ts", "app/src/lib/adena/digest.ts", "server/src/login/login.ts", "server/src/login/ticket.ts", "server/src/roles/roles.ts", "server/roles.json",
+    "app/src/sw/worker.ts", "app/src/sw/register.ts", "server/src/ergo/auth.ts", "app/src/features/login/logIn.ts", "app/src/features/login/LoginView.tsx",
+    "app/src/lib/api/login.ts", "app/src/lib/ergo/ergo.ts", "app/src/lib/ergo/handshake.ts"]) {
+    const labels = await lensOf(file);
+    ok(labels.includes("security"), `a change of ${file} alone ran no security lens: ${labels}`);
+    ok(labels.includes("verifier"), `a security finding in ${file} never reached the finding-verifier: ${labels}`);
+  }
+  // A lookalike is no tier-1 file.
+  for (const file of ["deploy-notes/x.md", "server/src/loginx.ts", "app/src/lib/adenax/a.ts", "app/src/sw.ts.md", "packages/core/src/markdown.md"]) {
+    const labels = await lensOf(file);
+    ok(!labels.includes("security"), `${file}, a lookalike of a tier-1 path, started the security lens: ${labels}`);
+  }
+  // The list and docs/REVIEW.md's table agree: each path of its tier-1 rows (a backticked word with a "/") that names files in the
+  // repository starts the lens through the first of them. A tier-1 area added to the table and not to the loop fails here.
+  {
+    const { readdirSync } = require("node:fs");
+    const { dirname } = require("node:path");
+    const root = dirname(dirname(dirname(process.argv[2])));
+    // A walk, not git: pre-commit runs this in a staged copy that is no repository. .stryker-tmp holds full copies of the repo
+    // (gitignored leftovers of a mutation run): their files are no tracked files.
+    const walk = (dir) => readdirSync(root + "/" + dir, { withFileTypes: true }).flatMap((e) =>
+      [".git", "node_modules", "dist", ".claude", ".stryker-tmp"].includes(e.name) ? [] : e.isDirectory() ? walk(dir + e.name + "/") : [dir + e.name]);
+    const tracked = walk("");
+    const table = readFileSync(root + "/docs/REVIEW.md", "utf8").split("\n").filter((l) => l.startsWith("| 1 |"));
+    const paths = [...new Set(table.flatMap((l) => [...l.matchAll(/`([^`]*\/[^`]*)`/g)].map((m) => m[1])))];
+    ok(paths.length >= 3, `the tier-1 rows of docs/REVIEW.md name no path I can read: ${paths}`);
+    // Both ways (F2530): a path of TIER1 that no tier-1 row names is a review nobody asked for, and a row written in prose, with
+    // no path in backticks, would pass the loop above unseen. The harness's folders and gno/ are tier 1 by the harness's own rule;
+    // the realms' two folders are the table's `gno/r/` and `gno/p/`.
+    {
+      const src = readFileSync(root + "/.claude/workflows/branch.js", "utf8");
+      const block = src.slice(src.indexOf("const TIER1 = ["), src.indexOf("...(A.tier1"));
+      const listed = [...block.matchAll(/^\s+"([^"]+)",$/gm)].map((m) => m[1]).filter((e) => !["scripts/", ".githooks/", ".github/", ".claude/", "gno/"].includes(e));
+      const named = paths.filter((e) => !["gno/r/", "gno/p/"].includes(e));
+      ok(listed.length >= 10, `I read no TIER1 list in branch.js: ${listed}`);
+      for (const e of listed) ok(named.includes(e), `branch.js's TIER1 holds ${e}, which no tier-1 row of docs/REVIEW.md names in backticks`);
+      for (const e of named) ok(listed.includes(e), `docs/REVIEW.md names ${e} as tier 1 in backticks, which branch.js's TIER1 lacks`);
+    }
+    for (const path of paths) {
+      const files = tracked.filter((f) => (f.startsWith(path) || f.includes("/" + path)) && !f.endsWith(".test.ts"));
+      if (!files.length) continue;
+      const labels = await lensOf(files[0]);
+      ok(labels.includes("security"), `docs/REVIEW.md names ${path} as tier 1, but a change of ${files[0]} starts no security lens: ${labels}`);
+    }
+  }
+  // The loop's base: main when absent; an argument for a branch cut from an integration branch. The merge check's file list and
+  // its diff file, the reviewer's and the security lens's diff all read from it, not from main (5f: 201 files from main).
+  const promptOf = (x, label) => (x.calls.find((c) => c.label === label) || { prompt: "" }).prompt;
+  const fromMain = /since main|main\.\.\.?HEAD/;
+  t = await run(base(["scripts/check.sh"]));
+  for (const label of ["merge check", "reviewer", "security"]) ok(fromMain.test(promptOf(t, label)), `${label} did not read from main when no base was given: ${promptOf(t, label)}`);
+  ok(!promptOf(t, "merge check").includes("--base"), `the merge check was given a base when none was: ${promptOf(t, "merge check")}`);
+  t = await run(base(["scripts/check.sh"]), { base: "slice-5-p2" });
+  // check.sh reads the same base (F2531): the prompt's file list and diffs alone would leave every lane on origin/main.
+  ok(promptOf(t, "merge check").includes("check.sh --merge --base slice-5-p2"), `the merge check was not told to run check.sh against the base: ${promptOf(t, "merge check")}`);
+  ok(promptOf(t, "merge check").includes("slice-5-p2...HEAD") && promptOf(t, "merge check").includes("slice-5-p2..HEAD"), `the merge check did not list files and loosening commits from the base: ${promptOf(t, "merge check")}`);
+  for (const label of ["merge check", "reviewer", "security"]) {
+    ok(!fromMain.test(promptOf(t, label)), `${label} still read from main with base slice-5-p2: ${promptOf(t, label)}`);
+    if (label !== "merge check") ok(promptOf(t, label).includes("since slice-5-p2"), `${label} did not read the diff since the base: ${promptOf(t, label)}`);
+  }
+  ok(promptOf(t, "reviewer").includes("holds the diff since slice-5-p2"), "the reviewer was told the diff file holds the diff since main, not since the base");
+  // A round 2 still reads since its first fix, whatever the base.
+  t = await highEveryRound({ base: "slice-5-p2" });
+  ok(t.calls.some((c) => c.label === "security" && c.prompt.includes("since f1^")), "round 2 did not read since its first fix when a base was given");
+  // StrykerJS's and harness_mutate's survivors reach the reviewer: the merge check is told to take the lines `check.sh --merge`
+  // prints as `survivor: ...`, pass or fail, and hands them on.
+  ok(promptOf(t, "merge check").includes("survivor: "), "the merge check was not told to report the `survivor: ` lines check.sh prints, a pass included");
+  const gs = { ...gateOf(["app/src/a.ts"]), survivors: ["survivor: app/src/a.ts: line 3:5 [Survived] ConditionalExpression"] };
+  t = await run((l, p) => (l === "merge check" ? gs : base(["app/src/a.ts"])(l, p)));
+  ok(promptOf(t, "reviewer").includes("app/src/a.ts: line 3:5 [Survived] ConditionalExpression"), "a surviving mutant of a passing merge check did not reach the reviewer's brief");
+  t = await run(base(["app/src/a.ts"]));
+  ok(promptOf(t, "reviewer").includes("surviving mutants: []"), "a merge check with no survivor did not hand the reviewer an empty list");
 })();
 JS
 fi
@@ -4115,6 +4242,313 @@ printf '%s\n' "$out" | grep -q "^batch_size: 650 lines" || fail "batch_size.py d
 # Helpers that only tests use are no product code (G8).
 git -C "$bs" checkout -q -f -b helpers "$base" && mkdir -p "$bs/server/src/testing" && lines 700 >"$bs/server/src/testing/kit.ts" && commit "a test helper"
 out=$(size "$base") || fail "batch_size.py counted server/src/testing, a test helper's folder, as product code: $out"
+fi
+
+if part gate_full; then
+# The merge check prints every surviving mutant, pass or fail (F2359, F2409): the lane logs are shown only on failure, and
+# StrykerJS exits 0 with survivors (the config has no break threshold), so the Workflow loop's `survivors` was always empty. Each
+# survivor of StrykerJS's clear-text report (`[Survived] Kind` or `[NoCoverage] Kind`, then `path:L:C`) is printed by
+# `check.sh --merge` as one line `survivor: <path>: line L:C [Status] Kind`; a killed mutant is not.
+gate_fixture gate_survivors
+mkdir -p "$g/node_modules/vitest"
+printf 'import { spawnSync } from "node:child_process";\nprocess.exit(spawnSync("sh", [%s, "core_chromium", "switch=" + (process.env.CORE_CHROMIUM ?? ""), ...process.argv.slice(2)], { stdio: "inherit" }).status ?? 1);\n' "'$step'" >"$g/node_modules/vitest/vitest.mjs"
+base=$(git -C "$g" merge-base HEAD origin/main)
+# The branch changes the files its survivors are on (the report lists the survivors of the files it changed alone, F2529).
+printf 'z\n' >>"$g/server/src/a.ts" && printf 'z\n' >>"$g/server/src/b.ts" && printf 'x\n' >"$g/app/src/a.ts" && git -C "$g" add app/src/a.ts && git -C "$g" commit -qam "product code"
+cat >"$g/bin/survive" <<SH
+#!/bin/sh
+sh "$step" mutate "\$@" || exit \$?
+cat "$g/survivors.txt"
+SH
+python3 -I - "$g/package.json" "$g/bin/survive" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+d["scripts"]["mutate"] = f"sh {sys.argv[2]}"
+json.dump(d, open(sys.argv[1], "w"))
+PY
+git -C "$g" update-ref refs/remotes/origin/main HEAD~1
+# StrykerJS 10's clear-text report as clear-text-reporter.js writes it (reportMutantResult, colorSourceFileAndLocation; stryker.config.json
+# sets no reporters, so it is the default one, with no colour): `[Status] Mutator`, then `path:line:column`, the original lines
+# after `-   ` and the mutated after `+   `. A Killed mutant is only in the debug log, but a report holding one must not make a survivor.
+cat >"$g/survivors.txt" <<'TXT'
+
+[Killed] ConditionalExpression
+app/src/killed.ts:9:1
+-   if (y) {
++   if (false) {
+Killed by: a works
+
+[Survived] ConditionalExpression
+app/src/a.ts:3:5
+-   if (x) {
++   if (true) {
+Ran all tests for this mutant.
+
+[NoCoverage] StringLiteral
+server/src/b.ts:7:12
+-   "kept"
++   ""
+
+Ran 4.00 tests per mutant on average.
+TXT
+out=$(gate --merge) || fail "check.sh --merge failed with a surviving mutant, which StrykerJS does not fail on: $out"
+printf '%s\n' "$out" | grep -qE '^survivor: app/src/a\.ts: line 3:5 .*Survived.*ConditionalExpression' || fail "check.sh --merge did not print StrykerJS's survivor on a passing run: $out"
+printf '%s\n' "$out" | grep -qE '^survivor: server/src/b\.ts: line 7:12 .*NoCoverage.*StringLiteral' || fail "check.sh --merge did not print StrykerJS's NoCoverage mutant on a passing run: $out"
+printf '%s\n' "$out" | grep -q '^survivor: .*killed\.ts' && fail "check.sh --merge printed a killed mutant as a survivor: $out"
+[ "$(printf '%s\n' "$out" | grep -c '^survivor: ')" = 2 ] || fail "check.sh --merge did not print each survivor once: $out"
+# On a failing run too, once each (the failed lane's log is printed as well): a lane that runs beside or after the coverage lane fails.
+out=$(FAIL=py:harness_mutate gate --merge) && fail "check.sh --merge passed with its harness mutants failing"
+[ "$(printf '%s\n' "$out" | grep -c '^survivor: ')" = 2 ] || fail "check.sh --merge did not print the survivors once each when a lane failed: $out"
+# The coverage lane never ran (the history lane failed first, batch_size is in it): there is nothing to print, and it says so.
+out=$(FAIL=py:batch_size gate --merge) && fail "check.sh --merge passed with its batch size failing"
+printf '%s\n' "$out" | grep -q '^survivor: ' && fail "check.sh --merge printed a survivor though the coverage lane never ran: $out"
+# A survivor on a file this branch did not change is no line to read: the report is sized by the codebase, not the change (2794
+# survivors, about 200 KB, on a branch of nine files that touched none of them, F2529), and the reviewer's brief by the change. It
+# is counted in one line, so that the total is still known; a mutant of the harness is always listed.
+cat >>"$g/survivors.txt" <<'TXT'
+
+[Survived] ConditionalExpression
+app/src/untouched.ts:4:1
+-   if (q) {
++   if (true) {
+
+[NoCoverage] StringLiteral
+app/src/untouched.ts:8:2
+-   "z"
++   ""
+TXT
+out=$(gate --merge) || fail "check.sh --merge failed with survivors on unchanged files: $out"
+printf '%s\n' "$out" | grep -q '^survivor: .*untouched' && fail "check.sh --merge listed a survivor on a file the branch did not change: $out"
+[ "$(printf '%s\n' "$out" | grep -c '^survivor: ')" = 2 ] || fail "check.sh --merge changed the survivors it lists when others sat on unchanged files: $out"
+printf '%s\n' "$out" | grep -q '^survivors not listed: 2 .*unchanged' || fail "check.sh --merge did not count the survivors it left out, 2 on one unchanged file: $out"
+# --base <ref>: the branch's own lines on an integration branch. Its range from main holds other branches' lines; every lane that reads
+# the base (the batch, the fixes, the regressions, the migrations, the patch's coverage, the harness's mutants, what counts as product
+# code) reads from the ref, and without the argument from origin/main (F2531).
+printf 'survivors.txt\nnode_modules/\nbin/\n' >>"$g/.git/info/exclude" && git -C "$g" commit -qam "the fixture's stubs" # product code is judged on what git sees
+git -C "$g" branch -f integ HEAD
+printf 'own\n' >"$g/scripts/own.sh" && git -C "$g" add scripts/own.sh && git -C "$g" commit -qm "own lines"
+integ=$(git -C "$g" rev-parse integ) main=$(git -C "$g" rev-parse origin/main)
+out=$(gate --merge --base integ) || fail "check.sh --merge --base failed on a copy whose every step passes: $out"
+for s in py:batch_size py:check_regressions py:check_migrations; do
+	grep -qx "$s $integ" "$log" || fail "check.sh --merge --base integ did not give $s the base integ: $(grep "^$s" "$log")"
+	grep -qx "$s $main" "$log" && fail "check.sh --merge --base integ gave $s origin/main as its base"
+done
+printf '%s\n' "$out" | grep -q "no product code since $integ" || fail "check.sh --merge --base integ took other branches' product lines for its own: $out"
+ran py:prove_fix && fail "check.sh --merge --base integ ran prove_fix on a branch with no product code of its own"
+out=$(gate --merge) || fail "check.sh --merge failed on a copy whose every step passes: $out"
+grep -qx "py:batch_size $main" "$log" || fail "check.sh --merge, with no argument, did not read from origin/main: $(grep '^py:batch_size' "$log")"
+ran py:prove_fix || fail "check.sh --merge, with no argument, did not read the product code since origin/main"
+grep -qx "py:patch_coverage $main" "$log" || fail "check.sh --merge, with no argument, gave the patch's coverage a base other than origin/main's: $(grep '^py:patch_coverage' "$log")"
+out=$(gate --merge --base) && fail "check.sh --merge --base passed with no ref after it: $out"
+printf '%s\n' "$out" | grep -q "wants a ref" || fail "check.sh --merge --base with no ref did not say it wants one: $out"
+out=$(gate --merge --base no-such-ref) && fail "check.sh --merge --base passed with a ref that is none: $out"
+printf '%s\n' "$out" | grep -q "no-such-ref" || fail "check.sh --merge --base did not name the ref it could not compare with: $out"
+# No survivor, no line.
+: >"$g/survivors.txt"
+out=$(gate --merge) || fail "check.sh --merge failed with no survivor: $out"
+printf '%s\n' "$out" | grep -q '^survivor: ' && fail "check.sh --merge printed a survivor when there was none: $out"
+# harness_mutate's survivors (`FAIL  survives: <mutant>`) are survivors too, on a merge that fails on them.
+printf 'import os, sys\nprint("FAIL  survives: planted spare2 #1")\nsys.exit(1)\n' >"$g/scripts/harness_mutate.py"
+out=$(gate --merge) && fail "check.sh --merge passed with a harness mutant surviving"
+printf '%s\n' "$out" | grep -q '^survivor: .*planted spare2 #1' || fail "check.sh --merge did not print a harness mutant's survivor as a survivor: $out"
+fi
+
+if part deploy_lock; then
+# deploy/test.sh takes a lock (harness list item 10): two runs at once share the Docker project gnoworld-demo-test and each one's
+# start removes the other's containers (2026-10-30: `FAIL ... No such container`). It needs Docker, which the sandbox refuses, so
+# the tools it calls are stubs on PATH; the first run is held at its first `docker run` while a second starts beside it.
+# Every process a run starts is recorded by pid (the stubs write them), killed by pid, and checked dead at the end: no pkill, which
+# the sandbox refuses.
+d="$t/lock" && mkdir -p "$d/bin" "$d/tmp" "$d/home"
+for tool in curl openssl htpasswd git netstat route ifconfig arp ss ip dig; do printf '#!/bin/sh\nexit 0\n' >"$d/bin/$tool"; done
+# macOS's mktemp -d ignores TMPDIR; the run's folder goes where the test can find it.
+printf '#!/bin/sh\nexec /usr/bin/mktemp -d "$TMPDIR/tmp.XXXXXX"\n' >"$d/bin/mktemp"
+# python3 records its pid (the canary's http.server is one) and becomes the real one.
+printf '#!/bin/sh\necho $$ >>"$LOCK_DOCKER_LOG.pids"\nexec "%s" "$@"\n' "$(command -v python3)" >"$d/bin/python3"
+cat >"$d/bin/docker" <<'SH'
+#!/bin/sh
+echo "$*" >>"$LOCK_DOCKER_LOG"
+case $1 in
+version) echo 28.0.0 ;;
+run) echo $$ >>"$LOCK_DOCKER_LOG.pids"; exec sleep 20 ;;
+compose)
+	case $2 in
+	ls) if [ -n "${LOCK_LEFTOVER:-}" ] && [ "${LOCK_LEFTOVER_VIA:-}" != network ]; then printf '[{"Name":"%s","Status":"running(2)","ConfigFiles":"/x/compose.yaml"}]\n' "$LOCK_LEFTOVER"; else echo '[]'; fi ;;
+	esac
+	;;
+network) if [ -n "${LOCK_LEFTOVER:-}" ] && [ "${LOCK_LEFTOVER_VIA:-}" != compose ]; then echo "${LOCK_LEFTOVER}_default"; fi ;;
+esac
+exit 0
+SH
+chmod +x "$d/bin/"*
+# deploy_run <log's name> <project> [VAR=value...]: runs deploy/test.sh in the background (with $mode as its argument) in its own TMPDIR,
+# the same HOME as every run (the lock must not hang on TMPDIR, which a sandbox and a terminal do not share).
+deploy_run() {
+	name=$1 project=$2
+	shift 2
+	mkdir -p "$d/tmp.$name"
+	: >"$d/$name.docker" && (env HOME="$d/home" TMPDIR="$d/tmp.$name" PATH="$d/bin:$PATH" LOCK_DOCKER_LOG="$d/$name.docker" TEST_PROJECT="$project" "$@" "$shell" "$here/../deploy/test.sh" $mode >"$d/$name.out" 2>&1 & echo $! >"$d/$name.pid")
+}
+alive() { kill -0 "$1" 2>/dev/null; }
+gone() { ! alive "$1"; }
+ended() { gone "$(cat "$d/$1.pid")"; }
+began() { grep -q '^run ' "$d/$1.docker"; }
+settled() { began "$1" || ended "$1"; }
+# The runner starts every section at once, and a run's first steps took over 15 s of that at load 45 (3 full suites in 9 failed
+# here): every wait ends on what it waits for, so only a fault reaches the ceiling, 2 minutes, and no clock decides a verdict.
+soon() {
+	tries=0
+	until "$@"; do
+		tries=$((tries + 1))
+		[ "$tries" -lt 600 ] || return 1
+		sleep 0.2
+	done
+}
+reached() { soon settled "$1" && began "$1"; } # $1 the log's name: the run got past its checks to the first docker run
+refused() { soon settled "$1" && ! began "$1"; } # $1 the log's name: the run ended on its own, before any docker run
+stop_all() { # every process any run started is killed by its pid, then none may be alive
+	for f in "$d"/*.pid "$d"/*.docker.pids; do [ -e "$f" ] || continue; for p in $(cat "$f"); do kill -9 "$p" 2>/dev/null || true; done; done
+	for f in "$d"/*.pid "$d"/*.docker.pids; do
+		[ -e "$f" ] || continue
+		for p in $(cat "$f"); do soon gone "$p" || fail "a process of the lock test (pid $p, from $f) outlived it"; done
+	done
+	rm -f "$d"/*.pid "$d"/*.docker.pids
+	rm -rf "${d:?}/home/.cache"
+}
+mode= shell=sh
+p1=gnoworld-lock-a-$$
+deploy_run first "$p1"
+reached first || { stop_all; fail "the first deploy/test.sh never reached its first docker run (stubs): $(cat "$d/first.out")"; }
+# A second run of the same project beside it, even from another TMPDIR (a sandbox's is not a terminal's), is refused at once, with a
+# word naming the project, and starts nothing.
+deploy_run second "$p1"
+refused second || { stop_all; fail "a second deploy/test.sh ran beside a first holding the project $p1"; }
+grep -q "$p1" "$d/second.out" || { stop_all; fail "the refused run did not name the project it found held: $(cat "$d/second.out")"; }
+grep -qi 'already\|held\|in use\|another' "$d/second.out" || { stop_all; fail "the refused run did not say another run holds the project: $(cat "$d/second.out")"; }
+grep -q '^run \|^compose .* up' "$d/second.docker" && { stop_all; fail "the refused run still started docker work: $(cat "$d/second.docker")"; }
+grep -q 'down' "$d/second.docker" && { stop_all; fail "the refused run removed the first run's containers (compose down): $(cat "$d/second.docker")"; }
+alive "$(cat "$d/first.pid")" || { stop_all; fail "the refused second run stopped the first: $(cat "$d/first.out")"; }
+# The modes that start a stack take the same project: --mutants of it is refused too.
+mode=--mutants
+deploy_run mutants "$p1"
+mode=
+refused mutants || { stop_all; fail "deploy/test.sh --mutants ran beside a first run holding the project $p1"; }
+grep -q "$p1" "$d/mutants.out" || { stop_all; fail "the refused --mutants did not name the project: $(cat "$d/mutants.out")"; }
+grep -q '^run ' "$d/mutants.docker" && { stop_all; fail "the refused --mutants still started docker work: $(cat "$d/mutants.docker")"; }
+# --demo starts and removes nothing of the test's: the lock does not stop it, and it goes on to its own checks' first docker run.
+mode=--demo
+deploy_run demo "$p1"
+mode=
+reached demo || { stop_all; fail "deploy/test.sh --demo was refused by a test run's lock: $(cat "$d/demo.out")"; }
+# Another project is no one's lock.
+deploy_run other "gnoworld-lock-b-$$"
+reached other || { stop_all; fail "a run of another project was refused by the first's lock: $(cat "$d/other.out")"; }
+stop_all
+# A first run killed hard (no trap runs) leaves a stale lock: the next run takes it over.
+deploy_run killed "$p1"
+reached killed || { stop_all; fail "the run meant to be killed never started: $(cat "$d/killed.out")"; }
+kill -9 "$(cat "$d/killed.pid")"
+soon ended killed || { stop_all; fail "a run killed hard still runs"; }
+deploy_run after "$p1"
+reached after || { stop_all; fail "a run was refused by the lock of a run that is dead: $(cat "$d/after.out")"; }
+stop_all
+# A first run stopped by TERM releases the lock, under a Linux host's shell too: dash, unlike macOS's sh, runs no EXIT trap for a
+# signal with no trap of its own. The test waits for the run to end (after ending the stub `docker run` it waits on, which a
+# shell's trap otherwise outlasts).
+shell=$(command -v dash || echo sh)
+deploy_run quit "$p1"
+shell=sh
+reached quit || { stop_all; fail "the run meant to end never started: $(cat "$d/quit.out")"; }
+kill -TERM "$(cat "$d/quit.pid")"
+for p in $(cat "$d/quit.docker.pids"); do kill -TERM "$p" 2>/dev/null || true; done
+soon ended quit || { stop_all; fail "a run stopped by TERM never ended"; }
+[ -z "$(find "$d/home/.cache/gnoworld-tools" -name "*$p1*" 2>/dev/null)" ] || { stop_all; fail "a run stopped by TERM left its lock: $(ls "$d/home/.cache/gnoworld-tools")"; }
+deploy_run again "$p1"
+reached again || { stop_all; fail "a run was refused by the lock of a run that was stopped: $(cat "$d/again.out")"; }
+stop_all
+# A run left by a Ctrl+C (5f's gnoworld-demo-mutant-18219, whose network held the test's 172.30.90.0/24) is named in the refusal
+# with the command that removes it; nothing is started beside it.
+left=gnoworld-demo-mutant-77777777
+deploy_run left "gnoworld-lock-c-$$" LOCK_LEFTOVER="$left"
+refused left || { stop_all; fail "deploy/test.sh started beside a mutant project a Ctrl+C left up"; }
+grep -q "docker compose -p $left down -v" "$d/left.out" || { stop_all; fail "the refusal did not give the command that removes $left: $(cat "$d/left.out")"; }
+grep -q '^run ' "$d/left.docker" && { stop_all; fail "deploy/test.sh went on after finding $left up"; }
+stop_all
+# Each source of a leftover is read alone (F2528: the stub printed it through both, so either guard passed without the other),
+# and a refusal on a leftover releases the lock it took.
+for via in compose network; do
+	deploy_run "via$via" "gnoworld-lock-$via-$$" LOCK_LEFTOVER="$left" LOCK_LEFTOVER_VIA=$via
+	refused "via$via" || { stop_all; fail "deploy/test.sh started beside a mutant project that only docker $via shows"; }
+	grep -q "docker compose -p $left down -v" "$d/via$via.out" || { stop_all; fail "the refusal did not name the leftover docker $via shows: $(cat "$d/via$via.out")"; }
+	[ -z "$(find "$d/home/.cache/gnoworld-tools" -name "*gnoworld-lock-$via-$$*" 2>/dev/null)" ] || { stop_all; fail "a run refused on a leftover (docker $via) kept its lock"; }
+	stop_all
+done
+# --mutants runs each fault in a project of that name: a run never takes its own for a leftover.
+own=gnoworld-demo-mutant-88888888
+deploy_run own "$own" LOCK_LEFTOVER="$own"
+reached own || { stop_all; fail "deploy/test.sh took its own project for a leftover: $(cat "$d/own.out")"; }
+stop_all
+# Another Compose project running on the machine is none of its business.
+deploy_run unrelated "gnoworld-lock-d-$$" LOCK_LEFTOVER=myapp
+reached unrelated || { stop_all; fail "deploy/test.sh was refused by an unrelated running project: $(cat "$d/unrelated.out")"; }
+stop_all
+# A run releases only a lock that holds its own pid: one another run took over (here, a live process's) stays when the first ends.
+lockdir=$d/home/.cache/gnoworld-tools
+deploy_run foreign "$p1"
+reached foreign || { stop_all; fail "the run meant to lose its lock never started: $(cat "$d/foreign.out")"; }
+sleep 60 &
+echo $! >"$d/other.pid"
+cat "$d/other.pid" >"$lockdir/deploy-test-$p1.lock/pid"
+kill -TERM "$(cat "$d/foreign.pid")"
+for p in $(cat "$d/foreign.docker.pids"); do kill -TERM "$p" 2>/dev/null || true; done
+soon ended foreign || { stop_all; fail "the run that lost its lock never ended"; }
+[ "$(cat "$lockdir/deploy-test-$p1.lock/pid" 2>/dev/null)" = "$(cat "$d/other.pid")" ] || { stop_all; fail "a run took down the lock of another run when it ended"; }
+stop_all
+# A real Ctrl+C, to a run in the foreground of a process group of its own (a section's shell, in the background, ignores INT):
+# the run ends with 130 and its lock is gone. Without the INT trap a shell ends of the signal, its EXIT trap unrun.
+py=$(command -v python3)
+cat >"$d/intrun.py" <<'PYX'
+import os, signal, subprocess, sys, time
+
+signal.signal(signal.SIGINT, lambda *_: None)  # a handler, not SIG_IGN, which the run below would inherit
+log, out = sys.argv[1], sys.argv[2]
+run = subprocess.Popen(sys.argv[3:], start_new_session=True, stdout=open(out, "w"), stderr=subprocess.STDOUT)
+for _ in range(600):
+    if run.poll() is not None or (os.path.exists(log) and any(line.startswith("run ") for line in open(log))):
+        break
+    time.sleep(0.2)
+os.killpg(run.pid, signal.SIGINT)
+try:
+    print(run.wait(timeout=60))
+except subprocess.TimeoutExpired:
+    os.killpg(run.pid, signal.SIGKILL)
+    print("hung")
+PYX
+mkdir -p "$d/tmp.int" && : >"$d/int.docker"
+code=$(env HOME="$d/home" TMPDIR="$d/tmp.int" PATH="$d/bin:$PATH" LOCK_DOCKER_LOG="$d/int.docker" TEST_PROJECT="$p1" "$py" "$d/intrun.py" "$d/int.docker" "$d/int.out" sh "$here/../deploy/test.sh")
+[ "$code" = 130 ] || { stop_all; fail "a run stopped by Ctrl+C ended with [$code], not 130: $(cat "$d/int.out")"; }
+[ -z "$(find "$lockdir" -name "*$p1*" 2>/dev/null)" ] || { stop_all; fail "a run stopped by Ctrl+C left its lock"; }
+stop_all
+# The run that made a lock is writing its pid: an empty lock is read again a second later (the stub sleep writes it there, at once
+# and with no clock), and a live holder's refuses; a lock found dead and removed, then taken by another run that very moment, refuses.
+mkdir -p "$d/bin2" "$d/bin3"
+printf '#!/bin/sh\n[ -n "${LOCK_FILL:-}" ] && [ "$1" = 1 ] && cat "$LOCK_FILL_SRC" >"$LOCK_FILL"\nexec /bin/sleep "$@"\n' >"$d/bin2/sleep"
+printf '#!/bin/sh\n/bin/rm "$@"\nstatus=$?\ncase "$*" in *deploy-test-*.lock*) [ -z "${LOCK_RETAKE:-}" ] || { mkdir -p "$LOCK_RETAKE"; cat "$LOCK_RETAKE_SRC" >"$LOCK_RETAKE/pid"; } ;; esac\nexit $status\n' >"$d/bin3/rm"
+chmod +x "$d/bin2/sleep" "$d/bin3/rm"
+sleep 60 &
+echo $! >"$d/live.pid"
+pw=gnoworld-lock-w-$$
+mkdir -p "$lockdir/deploy-test-$pw.lock"
+deploy_run waited "$pw" PATH="$d/bin2:$d/bin:$PATH" LOCK_FILL="$lockdir/deploy-test-$pw.lock/pid" LOCK_FILL_SRC="$d/live.pid"
+refused waited || { stop_all; fail "a run took over a lock whose run had not yet written its pid: $(cat "$d/waited.out")"; }
+grep -q "pid $(cat "$d/live.pid")" "$d/waited.out" || { stop_all; fail "the refusal did not name the holder that wrote its pid late: $(cat "$d/waited.out")"; }
+sh -c 'echo $$' >"$d/dead.txt"
+pr=gnoworld-lock-r-$$
+mkdir -p "$lockdir/deploy-test-$pr.lock" && cp "$d/dead.txt" "$lockdir/deploy-test-$pr.lock/pid"
+deploy_run retaken "$pr" PATH="$d/bin3:$d/bin:$PATH" LOCK_RETAKE="$lockdir/deploy-test-$pr.lock" LOCK_RETAKE_SRC="$d/live.pid"
+refused retaken || { stop_all; fail "a run went on after another took the lock it had just removed: $(cat "$d/retaken.out")"; }
+grep -q "took the project" "$d/retaken.out" || { stop_all; fail "the refusal did not say another run took the project: $(cat "$d/retaken.out")"; }
+stop_all
 fi
 
 [ -z "${ONLY:-}" ] || [ "${ran:-}" = 1 ] || fail "ONLY=$ONLY names no section"
