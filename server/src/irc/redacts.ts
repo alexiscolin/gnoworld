@@ -4,8 +4,10 @@
 // again, a few times and a little later, on the same connection; the author's NOTICE and the strike are not sent twice,
 // since they belong to the verdict, not to this.
 
-// How many times a refused hide is asked again: a line really gone (its author deleted it) stops there, with no alert.
-const REDACT_RETRIES = 3;
+// How many times a refused hide is asked again, the wait doubling from the first (250 ms to 8 s by default, 15.75 s in
+// all): Ergo waits up to 10 s for a writer that holds its SQLite history (irc/sqlite/history.go busy_timeout), and the
+// line's id is unknown until that write lands. A line really gone (its author deleted it) stops there, with no alert.
+const REDACT_RETRIES = 6;
 // Past this many hides waiting for Ergo's word, the oldest is let go.
 const WAITING_MAX = 1000;
 
@@ -18,6 +20,7 @@ interface Waiting {
 /** What asks again: the hide to send, and the wait before it. */
 interface Again {
   send: (params: readonly string[]) => void;
+  /** The first wait; each next one is twice the one before. */
   ms: number;
 }
 
@@ -58,10 +61,11 @@ export function makeRedacts(): Redacts {
         return;
       }
       entry.tries += 1;
+      const wait = again.ms * 2 ** (entry.tries - 1);
       entry.timer = setTimeout(() => {
         entry.timer = undefined;
         again.send(entry.params);
-      }, again.ms);
+      }, wait);
     },
     done: (room, msgid) => {
       drop(keyOf(room, msgid));

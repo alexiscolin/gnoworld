@@ -493,18 +493,18 @@ describe("the chat, as the server starts it", () => {
     });
 
     it(
-      "gives up after three more asks for a line Ergo never knows, with no alert (F2462)",
-      { timeout: 5000 },
+      "gives up after six more asks for a line Ergo never knows, with no alert (F2462)",
+      { timeout: 10_000 },
       async () => {
         const { peer } = await linked({ worlds: worlds("bubble"), moderation: OFF }, RETRY);
         peer.say(line("m1", 1, ["g1a", "buy spam"]));
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < 7; i++) {
           await peer.next(/^REDACT /);
           peer.say(unknown("m1"));
         }
         await quiet(peer);
-        // The first ask and three more: four, never a fifth.
-        expect(hides(peer)).toHaveLength(4);
+        // The first ask and six more: seven, never an eighth.
+        expect(hides(peer)).toHaveLength(7);
         expect(logged.filter((l) => l.includes("redact_refused"))).toEqual([]);
       },
     );
