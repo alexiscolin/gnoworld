@@ -53,7 +53,7 @@ New: `app/src/lib/chain`, the RPC, indexer and markets schemas in `packages/sche
 | 5j | World page: facts, activity with F304, connected worlds, talk box, quick actions, chat first on a phone | A component and a journey a block; the tooltip | harness-b |
 | 5i (tier 1) | Parameterless read functions through `qeval`, the label, Adena never opened | The names' property; the label; no Adena | 5h |
 | 5k | Realm facts from the indexer, proposal cards (read), the status ring's data | Contract tests; indexer down | 5g, 5j, question 4 |
-| 5m | Hero, markets row, block height, ticker (the data's news and events) | Source and time shown; `markets.json` missing | 5l, 5g, question 6 |
+| 5m (tier 1, `deploy/`) | Hero, markets row, block height, ticker (the data's news and events); `markets.json` served: its volume mounted read-only on `web`, a location with a short cache, a case in `deploy/test.sh` (5l's review) | Source and time shown; `markets.json` missing | 5l, 5g, question 6 |
 | 5o | Broadcast Moon: categories, generative pieces, embeds on a click | No request before the click; an unlisted host fails the build | question 6 |
 | 5p | The phone's places list, F336, "no capture, no preview" | The row's test; a foreign `src` refused | question 5 |
 | 5q | The chat as the video shows it: the full-screen layout of `docs/DESIGN-SYSTEM.md:401`, messages with avatars and countries, the pinned line, the video's composer, with no 3D (Alexis, 2026-10-31) | Each piece's tests; journeys at both widths with axe; a report element by element against the video's frames | — |
