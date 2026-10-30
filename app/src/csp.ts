@@ -100,16 +100,22 @@ function isJson(text: string, kind: "object" | "string"): boolean {
   }
 }
 
-// Whether a script's text is one of React Router's forms.
-function isPinned(text: string): boolean {
-  if (text === SCROLL_RESTORATION || text === STREAM_CLOSE || MODULE_SCRIPT.test(text)) return true;
+// The loader data: a JSON text in a string literal, handed to the stream.
+function isLoaderData(text: string): boolean {
+  if (!text.startsWith(ENQUEUE_HEAD) || !text.endsWith(");")) return false;
+  const literal = text.slice(ENQUEUE_HEAD.length, -2);
+  return STRING_LITERAL.test(literal) && isJson(literal, "string");
+}
+
+// Which of React Router's forms a script's text is, as its place in the order a page holds them (scroll restoration, context,
+// module script, loader data, close), or -1 when it is none of them.
+function formOf(text: string): number {
+  if (text === SCROLL_RESTORATION) return 0;
+  if (text === STREAM_CLOSE) return 4;
+  if (MODULE_SCRIPT.test(text)) return 2;
   if (text.startsWith(CONTEXT_HEAD) && text.endsWith(CONTEXT_TAIL))
-    return isJson(text.slice(CONTEXT_HEAD.length, -CONTEXT_TAIL.length), "object");
-  if (text.startsWith(ENQUEUE_HEAD) && text.endsWith(");")) {
-    const literal = text.slice(ENQUEUE_HEAD.length, -2);
-    return STRING_LITERAL.test(literal) && isJson(literal, "string");
-  }
-  return false;
+    return isJson(text.slice(CONTEXT_HEAD.length, -CONTEXT_TAIL.length), "object") ? 1 : -1;
+  return isLoaderData(text) ? 3 : -1;
 }
 
 // A tag the policy would refuse in the browser: a style element, an inline handler or style, a
@@ -136,11 +142,20 @@ export async function pagePolicies(pages: Readonly<Record<string, string>>): Pro
       if (refused(tag)) throw new Error(`csp: a page holds ${tag.slice(0, 40)}, which the policy refuses`);
     }
     const scripts = inlineScripts(page);
+    // F2450: each form once, in React Router's order (the fallback page has no scroll restoration): a second one, well formed,
+    // is a planted script. A page that holds fewer is no harm.
+    let last = -1;
     for (const text of scripts) {
-      if (!isPinned(text))
+      const form = formOf(text);
+      if (form < 0)
         throw new Error(
           `csp: ${file} holds a script that is none of React Router's: ${JSON.stringify(text.slice(0, 40))}`,
         );
+      if (form <= last)
+        throw new Error(
+          `csp: ${file} holds a React Router script twice or out of order: ${JSON.stringify(text.slice(0, 40))}`,
+        );
+      last = form;
     }
     policies[file] = policy(await Promise.all(scripts.map(sha256)));
   }

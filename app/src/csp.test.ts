@@ -292,6 +292,45 @@ describe("pagePolicies", () => {
     expect(accepted).toEqual([]);
   });
 
+  // F2450: the pin read each script alone, so a second well-formed one (another context, another loader data, a repeat of the
+  // close) was hashed and allowed. A page holds React Router's scripts once each, in its order.
+  const planted = (...texts: string[]): string =>
+    page().replace("</body>", `${texts.map((text) => `<script>${text}</script>`).join("")}</body>`);
+  it.each([
+    ["a second context with other JSON", planted(CONTEXT.replace('"basename":"/"', '"basename":"/evil"'))],
+    ["a second context, the same", planted(CONTEXT)],
+    ["a second loader data", planted(ENQUEUE_LIST)],
+    ["a second loader data, the same", planted(ENQUEUE)],
+    ["a second close", planted(CLOSE)],
+    ["a second scroll restoration", planted(SCROLL)],
+    [
+      "a second module script",
+      page().replace("</body>", `<script type="module" async="">${MODULE_LIST}</script></body>`),
+    ],
+    [
+      "the close before the loader data",
+      [
+        `<script>${CONTEXT}</script>`,
+        `<script type="module" async="">${MODULE}</script>`,
+        `<script>${CLOSE}</script>`,
+        `<script>${ENQUEUE}</script>`,
+      ].join(""),
+    ],
+    ["the context after the module script", `<script type="module">${MODULE}</script><script>${CONTEXT}</script>`],
+  ])("fails the build on %s, a script of React Router's form that the page does not hold", async (_, html) => {
+    await expect(one(html)).rejects.toThrow(/^csp: index\.html holds .* twice or out of order/s);
+  });
+
+  // The fallback page of a real build: no scroll restoration (read from a build, 2026-10-30).
+  it("takes the fallback page's set: the context, the module script, the loader data and the close", async () => {
+    const fallback = [CONTEXT, `<MODULE>`, ENQUEUE, CLOSE]
+      .map((text) =>
+        text === "<MODULE>" ? `<script type="module" async="">${MODULE}</script>` : `<script>${text}</script>`,
+      )
+      .join("");
+    await expect(one(fallback)).resolves.toBeDefined();
+  });
+
   // F2362: the text of a JSON-LD block closes it at the first closing tag; what follows is a script of the page.
   it("fails the build on a JSON-LD whose text closed its own tag and opened a script", async () => {
     const hostile = page(MODULE, ENQUEUE, `{"description":"</script><script>alert(1)</script>"}`);
