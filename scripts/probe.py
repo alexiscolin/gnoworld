@@ -310,6 +310,11 @@ try:
             for name in forms:
                 with open(f"{copy}/packages/probe/src/{name}", "w") as f:
                     f.write(f'import {{ bench }} from "vitest";\n\nbench("{name[0]} [1000 ms]", () => undefined);\n')
+            # A StrykerJS sandbox left by a stopped run holds a full copy of every bench: it ran as a second one, slower
+            # (two 100k universes in one heap), and failed the budget with no change of code (F2518).
+            os.makedirs(f"{copy}/.stryker-tmp/sandbox-x/packages/probe/src")
+            with open(f"{copy}/.stryker-tmp/sandbox-x/packages/probe/src/g.bench.ts", "w") as f:
+                f.write('import { bench } from "vitest";\n\nbench("g [1000 ms]", () => undefined);\n')
             report = f"{copy}/bench.json"
             out = run([os.path.realpath("node_modules/.bin/vitest"), "bench", "--run", "--project", "node", "--outputJson", report], cwd=copy)
             ran_ok = out.returncode == 0 and os.path.exists(report)

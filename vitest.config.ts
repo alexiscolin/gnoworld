@@ -42,7 +42,8 @@ export default defineConfig({
     expect: { requireAssertions: true },
     // The benches are the files ESLint's BENCHES and scripts/repo_files.py's BENCH_FILE read, `*.bench.ts(x)`: Vitest's own
     // default, `*.{bench,benchmark}.?(c|m)[jt]s?(x)`, ran files no guard names, switched off or not (CR3; probe bench_files).
-    benchmark: { include: BENCHES },
+    // A StrykerJS sandbox (.stryker-tmp) left by a stopped run holds a copy of each bench: not one of ours (F2518).
+    benchmark: { include: BENCHES, exclude: [...configDefaults.exclude, "**/.stryker-tmp/**"] },
     projects: [
       // The app's components compiled, which count their renders (app/vitest.compiled.config.ts).
       "app/vitest.compiled.config.ts",
