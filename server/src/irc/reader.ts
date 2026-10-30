@@ -48,8 +48,7 @@ export interface Options {
 export function reader(options: Options, state: State) {
   const { password, rooms, onMessage, log, lastChecked = () => undefined, onReady = () => undefined } = options;
   const { drained = () => Promise.resolve(), onChannels, onJoin = () => undefined } = options;
-  const { hold = () => undefined, onIn = () => undefined, onRedact = () => undefined } = options;
-  const { redactRetryMs = 250 } = options;
+  const { hold = () => undefined, onIn = () => undefined, onRedact = () => undefined, redactRetryMs = 250 } = options;
   const pages = histories({ lastChecked, hold, drained }, state);
   // A refusal Ergo will not change by itself: log it, and try again later and later.
   const refused = (s: Socket, error: string): void => {
@@ -110,6 +109,9 @@ export function reader(options: Options, state: State) {
         state.redacts.unknown(room, msgid, {
           send: (params) => s.write(line("REDACT", params)),
           ms: redactRetryMs,
+          gaveUp: () => {
+            log("redact_gave_up", { room, msgid });
+          },
         });
       } else if (command === "REDACT") {
         state.redacts.done(room, msgid);

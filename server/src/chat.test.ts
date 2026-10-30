@@ -506,6 +506,11 @@ describe("the chat, as the server starts it", () => {
         // The first ask and six more: seven, never an eighth.
         expect(hides(peer)).toHaveLength(7);
         expect(logged.filter((l) => l.includes("redact_refused"))).toEqual([]);
+        // No alert, but a trace: ops can tell a line its author deleted from one still seen (F2652).
+        const gaveUp = logged.filter((l) => l.includes('"event":"redact_gave_up"'));
+        expect(gaveUp).toHaveLength(1);
+        expect(gaveUp[0]).toContain('"room":"#bubble"');
+        expect(gaveUp[0]).toContain('"msgid":"m1"');
       },
     );
 

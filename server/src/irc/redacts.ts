@@ -22,12 +22,14 @@ interface Again {
   send: (params: readonly string[]) => void;
   /** The first wait; each next one is twice the one before. */
   ms: number;
+  /** The last ask was spent: Ergo never knew the line, or has not by now. */
+  gaveUp: () => void;
 }
 
 export interface Redacts {
   /** A REDACT sent by the link: Ergo's word on it is waited for. */
   sent: (params: readonly string[]) => void;
-  /** Ergo refused it as unknown: asked again after the delay if it was ours and under the bound. */
+  /** Ergo refused it as unknown: asked again after the delay if it was ours and under the bound, else given up. */
   unknown: (room: string, msgid: string, again: Again) => void;
   /** Ergo took the hide, or refused it for good: nothing more to ask. */
   done: (room: string, msgid: string) => void;
@@ -58,6 +60,7 @@ export function makeRedacts(): Redacts {
       if (entry === undefined || entry.timer !== undefined) return;
       if (entry.tries >= REDACT_RETRIES) {
         waiting.delete(key);
+        again.gaveUp();
         return;
       }
       entry.tries += 1;
