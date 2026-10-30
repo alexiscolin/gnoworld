@@ -129,6 +129,8 @@ const TIER1 = [
   "gno/",
   "server/src/ergo/",
   "app/src/csp.ts",
+  "app/src/cspOrigins.ts",
+  "app/src/cspForms.ts",
   "deploy/",
   "packages/core/src/markdown/",
   "app/src/lib/adena/",
