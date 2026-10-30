@@ -63,3 +63,4 @@
 2026-10-30 47726414e228690f37ac16690c9e1b260f528beb test-auditor, reviewer, security-reviewer (the Workflow branch and the session); as c9e63102 (its check.sh --merge, 650 s), plus F2375's row in docs/review/findings.md
 2026-10-30 53b226b862a28193385674c6a628c523abf5df59 test-auditor, reviewer, finding-verifier (the Workflow branch; check.sh --merge on ec9100e1, 632 s)
 2026-10-30 2f7d9ab73ff6e4008225852a5b55a128aeac9f7c as ec9100e1 (its check.sh --merge, 632 s), plus F2415-F2416's two rows in docs/review/findings.md
+2026-10-30 526a25cb09e67b46e6ff9fe3595852205467b508 chief: integration of slice-5e (0d5df44d) and slice-5n (24062b43, the palette moved into 5e's shell.tsx); check.sh --merge on 24062b43, 641 s
