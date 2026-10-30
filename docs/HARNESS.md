@@ -111,11 +111,26 @@ gate fails, run the failing lane alone before running the whole gate again.
 | A fast run's change | What runs beside the cheap checks (format, knip, jscpd, CSS, comments, check_docs) | Budget |
 |---|---|---|
 | `server/src` | tsc, ESLint, every Vitest test (`main.test.ts` runs the server as a child process, outside Vitest's module graph) | 30 s |
-| the TypeScript of `app/src`, `app/tests`, `packages/ui/src` | tsc, ESLint, Vitest's tests related to the change (`--changed`), the app's journeys | 120 s (the app's journeys, F2162) |
-| `packages/core/src`, or any other file of those folders (a fixture, a stylesheet) | tsc, ESLint, every Vitest test, the app's journeys | 120 s (the app's journeys, F2162) |
+| the TypeScript of `app/src`, `app/tests`, `packages/ui/src` | tsc, ESLint, Vitest's tests related to the change (`--changed`), the journeys the change can reach (below) | 120 s (the app's build and journeys, F2162) |
+| `packages/core/src`, or any other file of those folders (a fixture, a stylesheet) | tsc, ESLint, every Vitest test, every journey | 120 s (the app's build and journeys, F2162) |
 | `packages/ui/src/tokens.css` | as above, and the tokens story's pictures at their three widths (F1190) | 120 s |
 | `gno/` | the gno lane | 30 s |
 | anything else (a config, the lockfile, the harness, `packages/schemas`, `deploy/`), no change at all, or pre-commit's staged copy | everything | 120 s |
+
+**The journeys a change can reach** (`scripts/journeys.py`, Alexis 2026-10-29 and 2026-10-30; harness-b): a fast
+run of a change in `app/src` gives Playwright only the journeys whose pages load a changed file, as filters after
+its options. A journey's pages are the routes of `app/src/routes.ts` that its `page.goto()` paths match, and a
+route loads what it imports, followed through every `import`, `import()`, re-export, type import and stylesheet.
+A journey's own spec, or the approved pictures beside it, run that journey alone. What the scoping cannot place
+runs every journey: a path outside `app/src` and the journeys' specs (a config, a helper the journeys share, `serve.mjs`,
+`server/src`, which the journeys start), the routes' list, a file no route loads, one every page loads (`root.tsx`),
+a file deleted, a `routes.ts` with a `layout()`. A journey whose `goto` is not a literal path (a variable, a helper's
+argument) cannot be placed and runs on every change of the app; a template's `${...}` in the path means any one segment,
+and one at its start stands for the site's origin only when it is named `site`, `origin`, `base` or `host`. A test of
+the app (`.test.ts(x)`, `.bench`, `.stories`) is no change of the pages. What a journey reaches by a click, a link or
+a redirect after its first page is not followed, and a `journeys.py` that fails fails the gate. `--full`, `--merge`
+and any change of the harness run every journey. Playwright reads a filter as a regular expression: a name's own
+characters are escaped; its dots are not (they match more, never less).
 
 `GATE_BUDGET` may lower the budget, never raise it. A merge commit has none (F2071): the full
 gate follows every merge. A run past its budget that passed still passes (Alexis, 2026-10-30:

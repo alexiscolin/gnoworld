@@ -226,7 +226,21 @@ lane_ts() {
 	packages() { cat package.json app/package.json pnpm-lock.yaml | cksum; }
 	installed=$(packages)
 	export PLAYWRIGHT_JSON_OUTPUT_NAME="$logs/playwright.json"
-	node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot,json >"$logs/playwright.out" 2>&1 || # node: see check_regressions.py
+	# The journeys the change can reach (scripts/journeys.py), given to Playwright as filters, which it reads as regular
+	# expressions: a name's own characters escaped, its dots left (they match more, never less). The full gate and a change it
+	# cannot place run every journey. A journeys.py that fails fails the run: a change scoped to nothing would pass unseen.
+	set --
+	if ! $full && ! $all; then
+		scope=$(printf '%s\n' "$changed" | python3 -I scripts/journeys.py)
+		if [ "$scope" != all ]; then
+			while IFS= read -r journey; do
+				set -- "$@" "$(printf '%s' "$journey" | sed 's/[][+(){}^$|?*\\]/\\&/g')"
+			done <<EOF
+$scope
+EOF
+		fi
+	fi
+	node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot,json "$@" >"$logs/playwright.out" 2>&1 || # node: see check_regressions.py
 		retry playwright "$PLAYWRIGHT_JSON_OUTPUT_NAME" "$logs/playwright.out" env -u PLAYWRIGHT_JSON_OUTPUT_NAME node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot
 	[ "$(packages)" = "$installed" ] || { echo "check.sh: building the app changed package.json or the lockfile" >&2; exit 1; }
 }

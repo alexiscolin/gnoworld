@@ -1892,7 +1892,7 @@ g="$t/$1"
 log="$g.log"
 mkdir -p "$g/scripts" "$g/.githooks" "$g/bin" "$g/toolchain" "$g/gno/r/seal" "$g/app/src" "$g/app/tests" "$g/app/node_modules/@playwright/test" \
 	"$g/server/src" "$g/packages/core/src" "$g/packages/ui/src" "$g/packages/schemas/src" "$g/deploy" "$g/lint"
-cp "$here/check.sh" "$here/code_changed.sh" "$here/unsteady.py" "$g/scripts/" && cp "$hooks/records.sh" "$g/.githooks/" && cp "$here/../.node-version" "$here/../.gitignore" "$g/"
+cp "$here/check.sh" "$here/code_changed.sh" "$here/unsteady.py" "$here/journeys.py" "$g/scripts/" && cp "$hooks/records.sh" "$g/.githooks/" && cp "$here/../.node-version" "$here/../.gitignore" "$g/"
 step="$g/bin/step"
 # The one stub: it logs its name and arguments; it takes 2 s when SLOW_STEP names it, fails when FAIL
 # does, and waits for each step MEET names to start too (30 s at most): steps run one after another
@@ -2635,6 +2635,174 @@ grep -q '^stories ' "$log" && fail "check.sh --full started the stories with no 
 git -C "$g" update-ref -d refs/remotes/origin/main
 out=$(gate --full) && fail "check.sh --full passed with no origin/main"
 printf '%s\n' "$out" | grep -q "needs origin/main" || fail "check.sh --full did not say it needs origin/main: $out"
+fi
+
+# The fast gate's cost follows the change (slice-5 harness-b; Alexis, 2026-10-29 and 2026-10-30): a commit of the app ran every
+# journey, 73 to 136 s a commit in part 1 (F2352, F2405). It runs the journeys its change can reach, by the files each
+# journey's pages load (scripts/journeys.py, which prints their paths, or `all` for a change it cannot place); the merge check
+# and --full keep every one. check.sh gives Playwright those paths after its options; none given is every journey. A journey
+# it cannot place (its page's URL is not a literal, or a helper it uses goes to one that is not) runs on every change of the
+# app, and any path outside app/src and the journeys' own specs (server/src included: the journeys start the real server,
+# app/tests/e2e/api.mjs) runs them all.
+if part gate_journeys; then
+gate_fixture gate_journeys
+[ -f "$here/journeys.py" ] || fail "scripts/journeys.py does not exist: nothing places a change among the journeys"
+cp "$here/journeys.py" "$g/scripts/"
+mkdir -p "$g/app/src/routes" "$g/app/src/features/world" "$g/app/src/features/home" "$g/app/src/features/realm" "$g/app/src/features/lazyhome" "$g/app/src/features/barrel" "$g/app/src/lib" "$g/app/tests/e2e/home.spec.ts-snapshots" "$g/node_modules/vitest"
+# routes.ts mounts world.tsx twice, as the app's does, and a splat; deep.ts is loaded through w.ts by the world and directly by
+# home; the realm and lazyhome are lazy chunks; barrel/ is a re-export; w.css a side-effect import; types.ts a type import.
+printf 'import { index, route } from "@react-router/dev/routes";\nexport default [index("routes/home.tsx"), route("w/:world", "routes/world.tsx"), route("net/:network/w/:world", "routes/world.tsx", { id: "universe-world" }), route("w/special", "routes/special.tsx"), route("e/:eco", "routes/eco.tsx"), route("*", "routes/notFound.tsx")];\n' >"$g/app/src/routes.ts"
+printf 'import { h } from "../features/home/h.ts";\nimport { shared } from "../lib/shared.ts";\nimport { deep } from "../lib/deep.ts";\nimport { b } from "../features/barrel";\nimport type { T } from "../lib/types.ts";\nconst L = lazy(() => import("../features/lazyhome/L.ts"));\nexport default () => h + shared + deep + b;\n' >"$g/app/src/routes/home.tsx"
+printf 'import { w } from "../features/world/w.ts";\nimport { shared } from "../lib/shared.ts";\nimport "../features/world/w.css";\nconst Realm = lazy(() => import("../features/realm/Realm.ts"));\nexport default () => w + shared;\n' >"$g/app/src/routes/world.tsx"
+printf 'export default () => "404";\n' >"$g/app/src/routes/notFound.tsx"
+printf 'export default () => "special";\n' >"$g/app/src/routes/special.tsx"
+printf 'export default () => "eco";\n' >"$g/app/src/routes/eco.tsx"
+printf 'export const h = 1;\n' >"$g/app/src/features/home/h.ts"
+printf 'import { deep } from "../../lib/deep.ts";\nexport const w = deep;\n' >"$g/app/src/features/world/w.ts"
+printf '.w { color: red; }\n' >"$g/app/src/features/world/w.css"
+printf 'test("w", () => {});\n' >"$g/app/src/features/world/w.test.ts"
+printf 'export const Realm = 1;\n' >"$g/app/src/features/realm/Realm.ts"
+printf 'export const L = 1;\n' >"$g/app/src/features/lazyhome/L.ts"
+printf 'export * from "./b.ts";\n' >"$g/app/src/features/barrel/index.ts"
+printf 'export const b = 1;\n' >"$g/app/src/features/barrel/b.ts"
+printf 'export const shared = 1;\n' >"$g/app/src/lib/shared.ts"
+printf 'export const deep = 1;\n' >"$g/app/src/lib/deep.ts"
+printf 'export type T = number;\n' >"$g/app/src/lib/types.ts"
+printf 'export const helper = 1;\n' >"$g/app/tests/e2e/fixtures.ts"
+printf 'export const go = (page, p) => page.goto(p);\n' >"$g/app/tests/e2e/nav.ts"
+printf 'export const SITE = "http://127.0.0.1:1";\n' >"$g/app/tests/e2e/sites.ts"
+printf 'import { helper } from "./fixtures.ts";\ntest("home", async ({ page }) => { await page.goto("/"); helper; });\n' >"$g/app/tests/e2e/home.spec.ts"
+printf 'import { helper } from "./fixtures.ts";\ntest("world", async ({ page }) => { await page.goto("/w/a"); helper; });\n' >"$g/app/tests/e2e/world.spec.ts"
+printf 'test("net", async ({ page }) => { await page.goto(`/net/x/w/a?tab=1`); });\n' >"$g/app/tests/e2e/net.spec.ts"
+printf 'test("odd", async ({ page }) => { await page.goto("/nothing/here"); });\n' >"$g/app/tests/e2e/odd name+(1).spec.ts"
+printf 'test("var", async ({ page }) => { const somePath = "/w/" + String(1); await page.goto(somePath); });\n' >"$g/app/tests/e2e/varnav.spec.ts"
+printf 'test("eco", async ({ page }) => { await page.goto("/e/x"); });\n' >"$g/app/tests/e2e/eco.spec.ts"
+printf 'test("tpl", async ({ page }) => { const x = "a"; await page.goto(`/w/${x}`); await page.goto(`${SITE}/`); });\n' >"$g/app/tests/e2e/tpl.spec.ts"
+printf 'test("prefix", async ({ page }) => { await page.goto(`${prefix}/w/a`); });\n' >"$g/app/tests/e2e/prefix.spec.ts"
+printf 'import { go } from "./nav.ts";\ntest("helper", async ({ page }) => { await go(page, "/w/b"); });\n' >"$g/app/tests/e2e/viaHelper.spec.ts"
+printf 'png\n' >"$g/app/tests/e2e/home.spec.ts-snapshots/a-chromium.png"
+printf 'serve\n' >"$g/app/tests/e2e/serve.mjs"
+printf 'export default {};\n' >"$g/app/playwright.config.ts"
+git -C "$g" add -A && git -C "$g" commit -qm "a small app" && git -C "$g" update-ref refs/remotes/origin/main HEAD
+# What check.sh gave Playwright after its options (a name may hold a space); the plain names, sorted, on one line.
+journeys_raw() { sed -n 's/^playwright .* --reporter=dot,json *//p' "$log"; }
+journeys_ran() { journeys_raw | tr ' ' '\n' | grep . | sort | paste -sd' ' -; }
+e2e=app/tests/e2e home=$e2e/home.spec.ts world=$e2e/world.spec.ts net=$e2e/net.spec.ts varnav=$e2e/varnav.spec.ts viaHelper=$e2e/viaHelper.spec.ts eco=$e2e/eco.spec.ts tpl=$e2e/tpl.spec.ts prefix=$e2e/prefix.spec.ts
+# The odd one: a space, a plus and parentheses in its name, which Playwright reads as a regular expression. It goes to a path
+# only the splat matches.
+odd_arg="$e2e/odd name\\+\\(1\\).spec.ts"
+# Journeys the scoping cannot place: a variable, a helper that goes to one, a template whose start is no origin. They run on every
+# change of the app. tpl goes to /w/<something> and to the site's own root: every route it can mean.
+unplaced="$varnav $viaHelper $prefix"
+sorted() { printf '%s\n' "$@" | sort | paste -sd' ' -; }
+# places: $1 a path changed, then the journeys check.sh must run (empty: all of them).
+places() {
+	what=$1 && shift
+	reset
+	mkdir -p "$g/$(dirname "$what")" && printf 'y\n' >>"$g/$what"
+	gate >/dev/null || fail "check.sh failed on a change of $what"
+	ran playwright || fail "check.sh ran no journey on a change of $what: the app's step still builds and walks"
+	[ "$(journeys_ran)" = "$(sorted "$@")" ] || fail "check.sh gave the journeys '$(journeys_ran)' on a change of $what, not '$(sorted "$@")'"
+}
+# scripts/journeys.py itself: the paths of the journeys a list of changed paths can reach, one a line, or `all`.
+py() { (cd "$g" && python3 -I scripts/journeys.py "$@" 2>&1 | sort | paste -sd' ' -); }
+[ "$(py app/src/features/world/w.ts)" = "$(sorted $world $net $tpl $unplaced)" ] || fail "journeys.py did not place a world feature in the world's journeys and the ones it cannot place alone: $(py app/src/features/world/w.ts)"
+[ "$(py app/src/lib/shared.ts)" = "$(sorted $home $world $net $tpl $unplaced)" ] || fail "journeys.py did not place a file both pages load in both pages' journeys: $(py app/src/lib/shared.ts)"
+[ "$(py app/src/lib/unloaded.ts)" = all ] || fail "journeys.py did not say 'all' for a file no page loads"
+[ "$(py app/src/features/world/w.ts server/src/a.ts)" = all ] || fail "journeys.py scoped a list that holds a path outside the app"
+[ "$(py app/src/features/world/gone.ts)" = all ] || fail "journeys.py placed a file that does not exist (a deleted one)"
+[ "$(py app/src/features/world/w.ts docs/a.md)" = "$(sorted $world $net $tpl $unplaced)" ] || fail "journeys.py let a prose path in the list widen the journeys"
+[ "$(py app/src/features/world/w.ts app/src/features/world/w.test.ts)" = "$(sorted $world $net $tpl $unplaced)" ] || fail "journeys.py read a test file of the app as a change the journeys can reach, or as one no page loads"
+[ "$(py app/src/features/world/w.test.ts)" = all ] || fail "journeys.py scoped a change of test files alone to nothing"
+[ "$(py app/tests/e2e/gone.spec.ts-snapshots/a.png)" = all ] || fail "journeys.py placed a picture of a spec that does not exist"
+[ "$(py app/src/lib/shared.ts app/src/routes/eco.tsx app/src/routes/notFound.tsx)" = all ] || fail "journeys.py listed every journey instead of saying 'all'"
+printf 'import { index, route, layout } from "@react-router/dev/routes";\nexport default [layout("l.tsx", [index("routes/home.tsx")])];\n' >"$g/app/src/routes.ts"
+[ "$(py app/src/features/world/w.ts)" = all ] || fail "journeys.py placed a change by a routes.ts with a layout, which it does not read"
+reset
+# A route's change runs its journeys only; so does a feature it loads, and a journey's own file or picture.
+places app/src/features/world/w.ts $world $net $tpl $unplaced
+places app/src/routes/world.tsx $world $net $tpl $unplaced
+places app/src/routes/home.tsx $home $tpl $unplaced
+places app/src/features/home/h.ts $home $tpl $unplaced
+places app/tests/e2e/world.spec.ts $world
+places "app/tests/e2e/home.spec.ts-snapshots/a-chromium.png" $home
+# The graph is followed past one hop, through a lazy import(), a re-export, a directory's index, a type import and a stylesheet.
+places app/src/lib/shared.ts $home $world $net $tpl $unplaced
+places app/src/lib/deep.ts $home $world $net $tpl $unplaced
+places app/src/features/world/w.css $world $net $tpl $unplaced
+places app/src/features/realm/Realm.ts $world $net $tpl $unplaced
+places app/src/features/lazyhome/L.ts $home $tpl $unplaced
+places app/src/features/barrel/b.ts $home $tpl $unplaced
+places app/src/features/barrel/index.ts $home $tpl $unplaced
+places app/src/lib/types.ts $home $tpl $unplaced
+# A static route beats a parameter's for a literal URL, and a template's ${} may mean either: special.tsx runs the template's journey
+# and the unplaced ones; world.tsx (a parameter's) also runs it; eco.tsx, another prefix, runs its own.
+places app/src/routes/special.tsx $tpl $unplaced
+places app/src/routes/eco.tsx $eco $unplaced
+# A path only the splat matches: its route's file places it; the name goes whole, its regular-expression characters escaped.
+reset
+printf 'y\n' >>"$g/app/src/routes/notFound.tsx"
+gate >/dev/null || fail "check.sh failed on a change of the not-found page"
+rest=$(journeys_raw | python3 -c 'import sys; print(sys.stdin.read().replace(sys.argv[1], ""))' "$odd_arg" | tr ' ' '\n' | grep . | sort | paste -sd' ' -)
+[ "$rest" = "$(sorted $unplaced)" ] || fail "check.sh gave '$(journeys_raw)' on a change of the not-found page: the odd name whole and the journeys it cannot place were due"
+grep -qF -- "$odd_arg" "$log" || fail "check.sh did not give Playwright the odd name whole, its regular-expression characters escaped: $(journeys_raw)"
+# Two changes run the union; a change placed twice runs its journey once.
+reset
+printf 'y\n' >>"$g/app/src/features/world/w.ts" && printf 'y\n' >>"$g/app/src/features/home/h.ts" && printf 'y\n' >>"$g/app/src/routes/home.tsx"
+gate >/dev/null || fail "check.sh failed on two routes' changes"
+[ "$(journeys_ran)" = "$(sorted $home $world $net $tpl $unplaced)" ] || fail "check.sh gave the journeys '$(journeys_ran)' on a change of two routes"
+# A change the scoping cannot place runs every journey: a helper the journeys share, the file server, the routes' list, the
+# journeys' config, a file no page loads, a file deleted.
+for f in app/tests/e2e/fixtures.ts app/tests/e2e/nav.ts app/tests/e2e/serve.mjs app/tests/e2e/sites.ts app/src/routes.ts app/playwright.config.ts app/src/lib/unloaded.ts app/src/a.tsx; do
+	places "$f"
+done
+reset
+git -C "$g" rm -q app/src/features/world/w.ts
+gate >/dev/null || fail "check.sh failed on a deleted file"
+ran playwright || fail "check.sh ran no journey on a deleted file"
+[ -z "$(journeys_ran)" ] || fail "check.sh scoped a deleted file to '$(journeys_ran)'"
+# A world's change beside one the scoping cannot place, or beside the server's (app/tests/e2e/api.mjs starts it): all of them.
+for beside in app/tests/e2e/serve.mjs server/src/a.ts; do
+	reset
+	printf 'y\n' >>"$g/app/src/features/world/w.ts" && printf 'y\n' >>"$g/$beside"
+	gate >/dev/null || fail "check.sh failed on a world change beside $beside"
+	ran playwright || fail "check.sh ran no journey on a world change beside $beside"
+	[ -z "$(journeys_ran)" ] || fail "check.sh scoped a change that holds $beside: $(journeys_ran)"
+done
+# The server alone starts no journey, as before.
+reset
+printf 'y\n' >>"$g/server/src/a.ts"
+gate >/dev/null || fail "check.sh failed on a server change"
+ran playwright && fail "check.sh ran the journeys on a change of the server alone"
+# A comment in the changed file decides nothing.
+reset
+printf '// journeys: skip, gate: off\n' >>"$g/app/src/features/world/w.ts"
+gate >/dev/null || fail "check.sh failed on a change with a comment that asks to skip"
+[ "$(journeys_ran)" = "$(sorted $world $net $tpl $unplaced)" ] || fail "check.sh let a comment in the changed file steer the journeys: $(journeys_ran)"
+# The merge check and --full keep every journey, whatever changed and was not committed.
+printf 'import { spawnSync } from "node:child_process";\nprocess.exit(spawnSync("sh", [%s, "core_chromium", "switch=" + (process.env.CORE_CHROMIUM ?? ""), ...process.argv.slice(2)], { stdio: "inherit" }).status ?? 1);\n' "'$step'" >"$g/node_modules/vitest/vitest.mjs"
+for mode in --full --merge; do
+	reset
+	printf 'y\n' >>"$g/app/src/features/world/w.ts"
+	AUDIT_ANSWER=x gate $mode >/dev/null || fail "check.sh $mode failed on a copy whose every step passes"
+	ran playwright || fail "check.sh $mode ran no journey"
+	[ -z "$(journeys_ran)" ] || fail "check.sh $mode scoped the journeys to '$(journeys_ran)': the merge check keeps every one"
+done
+# Pre-commit's staged copy has no repository: its list names the change, and the copy places it as well.
+reset
+cp -R "$g" "$g-copy" && rm -rf "${g:?}-copy/.git"
+copy() { : >"$log" && (cd "$g-copy" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" GATE_CHANGED="$1" sh scripts/check.sh 2>&1); }
+copy "app/src/features/world/w.ts" >/dev/null || fail "check.sh failed outside a repository on a world change"
+[ "$(journeys_ran)" = "$(sorted $world $net $tpl $unplaced)" ] || fail "check.sh gave the journeys '$(journeys_ran)' on a world change outside a repository"
+copy "app/src/features/world/w.ts
+app/tests/e2e/serve.mjs" >/dev/null || fail "check.sh failed outside a repository on serve.mjs"
+[ -z "$(journeys_ran)" ] || fail "check.sh scoped a list that holds serve.mjs outside a repository: $(journeys_ran)"
+# journeys.py failing fails the gate: a change scoped to nothing would pass unseen.
+reset
+printf 'import sys\nsys.exit("journeys: broken")\n' >"$g/scripts/journeys.py"
+git -C "$g" add -A && git -C "$g" commit -qm "journeys.py breaks"
+printf 'y\n' >>"$g/app/src/features/world/w.ts"
+gate >/dev/null && fail "check.sh passed when journeys.py failed: the change would run no journey"
 fi
 
 if part guard; then

@@ -60,7 +60,7 @@ SECTIONS = {
     ".githooks/records.sh": "outside,installed,wiring", ".githooks/pre-merge-commit": "outside,installed", ".githooks/merge.sh": "installed",
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix,worktree_script",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
-    "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
+    "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys", "scripts/mutate.py": "wiring", "scripts/journeys.py": "gate_journeys", "scripts/prove_fix.py": "prove_fix",
     "scripts/repo_files.py": {"hooks": "worktrees,regressions,batch_size,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench", "scripts/suite_parts.py": "mutant_scope,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/unsteady.py": {"hooks": "gate_lanes", "probe": "unsteady_real"}, "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
 }
 
@@ -113,6 +113,42 @@ def selectors(path, test):
         for n, part in enumerate(parts):
             off = ",".join(parts[:n] + [" Never" if n else "Never"] + parts[n + 1:])
             yield f"eslint selector `{part.strip()[:100]}`", path, text[: m.start(2)] + off + text[m.end(2):], test
+
+
+def scoping_mutants():
+    """The fast gate runs the journeys its change can reach (slice-5 harness-b): check.sh's use of scripts/journeys.py, and the rules in it."""
+    check = "scripts/check.sh"
+    for find, replace, label in (
+        ("if ! $full && ! $all; then\n\t\tscope=", "if false; then\n\t\tscope=", "scopes the journeys to the change"),
+        ('if [ "$scope" != all ]; then', "if false; then", "gives Playwright the journeys journeys.py names"),
+        (r"""sed 's/[][+(){}^$|?*\\]/\\&/g'""", r"""sed 's/[][+(){}^$|?*\\]/&/g'""", "escapes the regular-expression characters of a journey's name"),
+        ('set -- "$@" "$(printf', 'set -- "$(printf', "gives every journey journeys.py names"),
+        ("printf '%s\\n' \"$changed\" | python3 -I scripts/journeys.py", "python3 -I scripts/journeys.py </dev/null", "tells journeys.py what changed"),
+    ):
+        yield from each(check, find, replace, "hooks", f"check.sh {label}")
+    j = "scripts/journeys.py"
+    for find, replace, label in (
+        ("or path == ROUTES ", "", "runs every journey on a change of the routes' list"),
+        ("or not os.path.isfile(path) ", "", "runs every journey on a file that was deleted"),
+        ("or path in always", "", "runs every journey on a file every page loads"),
+        ("if path not in loaded:\n            return None", "if False:\n            return None", "runs every journey on a file no page loads"),
+        ("| unplaced\n", "\n", "runs the journeys it cannot place on every change"),
+        ("if opaque or not urls:", "if False:", "cannot place a journey whose page is not a literal"),
+        ("    if graph.opaque:\n        return None\n", "", "gives up on an import it cannot follow"),
+        (r"(?:from|import)\s*\(?", r"(?:from)\s*\(?", "follows an import() and a side-effect import"),
+        ('os.path.join(base, "index" + e) for e in EXTENSIONS[1:]', "base for e in ()", "follows a directory's index"),
+        ('-2 if s == "*" else', '20 if s == "*" else', "ranks the splat last"),
+        ("if unknown and any(not splat for _, _, splat in hits):", "if False:", "means every route a template's ${} could"),
+        ("if not os.path.isfile(shots.group(1)):\n                return None", "if False:\n                return None", "runs every journey on a picture of no journey"),
+        ("        if TEST_FILE.search(path):\n            continue\n", "", "reads a test file as no change of the pages"),
+        ("        if PROSE.search(path):\n            continue\n", "", "reads prose as no change of the pages"),
+        ("if not run or run >= set(specs):", "if not run:", "says 'all' when every journey is due"),
+        (r"""|children|\?[:\"']""", "", "reads only a routes list it can read"),
+        ("or re.search(", "or False and re.search(", "refuses a routes list with a layout"),
+        ("or not ORIGIN.match(", "or False and not ORIGIN.match(", "reads only the site's own origin at a template's start"),
+        ("if len(found) != len(re.findall(", "if False and len(found) != len(re.findall(", "refuses a routes list with a call it does not read"),
+    ):
+        yield from each(j, find, replace, "hooks", f"journeys.py {label}")
 
 
 def mutants():
@@ -908,6 +944,7 @@ def mutants():
         yield from each("scripts/check.sh", find, replace, "hooks", f"check.sh: {label}")
     # The gate: each step dropped.
     yield from lines("scripts/check.sh", r"^(\s*)((?:run |python3 -I |sh scripts/|gitleaks |go vet |go run |\(cd gno |\$full \|\| run ).*)$", r"\1:", "hooks", "check.sh drops")
+    yield from scoping_mutants()
 
 
 def sections(path, test):
