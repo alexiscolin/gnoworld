@@ -3596,6 +3596,82 @@ fi
 if part regressions; then
 # check_regressions: its rules on small cases (the real run needs a base branch and Vitest).
 python3 -I "$here/check_regressions.py" --self-test >/dev/null || fail "check_regressions's rules do not hold"
+# F2523: an exclusion written with a name is read. `exclude: [...configDefaults.exclude, STRYKER_TMP]` added an ignore that
+# ignores() never saw (it read only the quoted strings), so no `Lowered-floor:` line was asked for. A bare name in these lists is
+# refused as an unread entry; a quoted entry is seen as before, and the spread of a tool's own defaults alone stays.
+rx="$t/regrname" && mkdir -p "$rx/scripts"
+cp "$here/check_regressions.py" "$here/repo_files.py" "$here/borrow_node_modules.sh" "$rx/scripts/"
+git -C "$rx" init -q && printf 'node_modules/\n' >"$rx/.gitignore"
+mkdir -p "$rx/node_modules/.bin" && printf '#!/bin/sh\necho "[]"\n' >"$rx/node_modules/.bin/vitest" && chmod +x "$rx/node_modules/.bin/vitest" # no test to list
+printf 'const STRYKER_TMP = "**/.stryker-tmp/**";\nexport default { test: { exclude: ["a/**"] } };\n' >"$rx/vitest.config.ts"
+printf 'export default [globalIgnores(["docs/"]), { ignores: ["packages/core/**"] }];\n' >"$rx/eslint.config.ts"
+printf 'const SKIP = new Set(["a"]);\n' >"$rx/scripts/check_comments.mjs"
+git -C "$rx" add -A && git -C "$rx" commit -qm base && xbase=$(git -C "$rx" rev-parse HEAD)
+regx() { (cd "$rx" && python3 -I scripts/check_regressions.py "$xbase" 2>&1); }
+nameback() { git -C "$rx" reset -q --hard "$xbase"; }
+out=$(regx) || fail "check_regressions refused a branch that changed no ignore: $out"
+printf 'const STRYKER_TMP = "**/.stryker-tmp/**";\nexport default { test: { exclude: ["a/**", STRYKER_TMP] } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "an exclusion by name"
+out=$(regx) && fail "check_regressions passed an exclude list with a name added to it, which it cannot read (F2523): $out"
+printf '%s\n' "$out" | grep -qF "STRYKER_TMP" || fail "check_regressions did not name the unread entry STRYKER_TMP: $out"
+nameback
+printf 'const STRYKER_TMP = "**/.stryker-tmp/**";\nexport default { test: { exclude: [...configDefaults.exclude, STRYKER_TMP] } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "the real shape of vitest.config.ts"
+out=$(regx) && fail "check_regressions passed [...configDefaults.exclude, STRYKER_TMP], the shape F2523 hid an ignore in: $out"
+printf '%s\n' "$out" | grep -qF "STRYKER_TMP" || fail "check_regressions did not name STRYKER_TMP behind a spread: $out"
+nameback
+printf 'export default [globalIgnores(["docs/", GENERATED]), { ignores: ["packages/core/**"] }];\n' >"$rx/eslint.config.ts" && git -C "$rx" commit -qam "a name in globalIgnores"
+out=$(regx) && fail "check_regressions passed a bare name in globalIgnores: $out"
+printf '%s\n' "$out" | grep -qF "GENERATED" || fail "check_regressions did not name the unread entry GENERATED: $out"
+nameback
+printf 'export default [globalIgnores(["docs/"]), { ignores: [OTHER] }];\n' >"$rx/eslint.config.ts" && git -C "$rx" commit -qam "a name alone in ignores"
+out=$(regx) && fail "check_regressions passed a name alone in an ignores list: $out"
+printf '%s\n' "$out" | grep -qF "OTHER" || fail "check_regressions did not name the unread entry OTHER: $out"
+nameback
+printf 'const SKIP = new Set(["a", HIDDEN]);\n' >"$rx/scripts/check_comments.mjs" && git -C "$rx" commit -qam "a name in SKIP"
+out=$(regx) && fail "check_regressions passed a bare name in SKIP's list: $out"
+printf '%s\n' "$out" | grep -qF "HIDDEN" || fail "check_regressions did not name the unread entry HIDDEN: $out"
+nameback
+# What was read before is read still: a quoted entry named after the spread, and the spread of the defaults on its own.
+printf 'export default { test: { exclude: [...configDefaults.exclude, "a/**"] } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "the defaults spread, nothing new"
+out=$(regx) || fail "check_regressions refused the spread of a tool's own defaults beside an entry the base had: $out"
+nameback
+printf 'export default { test: { exclude: [...configDefaults.exclude, "b/**"] } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "a quoted entry beside the spread"
+out=$(regx) && fail "check_regressions passed a quoted exclusion added beside the spread of the defaults: $out"
+printf '%s\n' "$out" | grep -qF "b/**" || fail "check_regressions did not name the quoted exclusion b/**: $out"
+nameback
+# Other shapes the reader could not see are refused too: a single-quoted entry is read (and named), a list passed by name with no
+# bracket, a list with a method on it (`.concat`), a template literal.
+printf "export default { test: { exclude: ['a/**', 'c/**'] } };\n" >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "a single-quoted entry"
+out=$(regx) && fail "check_regressions passed a single-quoted exclusion added to a list: $out"
+printf '%s\n' "$out" | grep -qF "c/**" || fail "check_regressions did not name the single-quoted entry c/**: $out"
+nameback
+for shape in 'exclude: ALL_EXCLUDES' 'exclude: ["a/**"].concat(MORE)' 'exclude: [...MORE]''exclude: ["a/**", `${DIR}/**`]'; do
+	printf 'export default { test: { %s } };\n' "$shape" >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "an exclusion written another way"
+	out=$(regx) && fail "check_regressions passed an exclusion it cannot read, written as: $shape: $out"
+	printf '%s\n' "$out" | grep -q "vitest.config.ts" || fail "check_regressions did not name vitest.config.ts for: $shape: $out"
+	nameback
+done
+# A bare name is excused as a quoted entry is, by a line of a commit naming it: `Lowered-floor: ignore <file> <name> - why`.
+printf 'const STRYKER_TMP = "**/.stryker-tmp/**";\nexport default { test: { exclude: ["a/**", STRYKER_TMP] } };\n' >"$rx/vitest.config.ts"
+git -C "$rx" commit -qam "an exclusion by name" -m "Lowered-floor: ignore vitest.config.ts STRYKER_TMP - the sandboxes of StrykerJS are not tests"
+out=$(regx) || fail "check_regressions refused a bare name that a commit names on a Lowered-floor line: $out"
+nameback
+# The real vitest.config.ts already holds a bare name at its base: a name that was there is no change. A new base with a name in each
+# file, then: an unrelated line changed passes; a quoted entry added is the only entry named; a name taken away passes.
+printf 'const STRYKER_TMP = "**/.stryker-tmp/**";\nexport default { test: { exclude: [...configDefaults.exclude, STRYKER_TMP] } };\n' >"$rx/vitest.config.ts"
+printf 'export default [globalIgnores(["docs/", GENERATED]), { ignores: ["packages/core/**"] }];\n' >"$rx/eslint.config.ts"
+printf 'const SKIP = new Set(["a", HIDDEN]);\n' >"$rx/scripts/check_comments.mjs"
+git -C "$rx" add -A && git -C "$rx" commit -qm "a base that holds a name in each file" && xbase=$(git -C "$rx" rev-parse HEAD)
+out=$(regx) || fail "check_regressions refused a branch that changed nothing, over a base that holds bare names: $out"
+printf 'const STRYKER_TMP = "**/.stryker-tmp/**"; // the sandboxes\nexport default { test: { exclude: [...configDefaults.exclude, STRYKER_TMP] } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "an unrelated line"
+out=$(regx) || fail "check_regressions refused a bare name the base already held (the real vitest.config.ts has one): $out"
+nameback
+printf 'const STRYKER_TMP = "**/.stryker-tmp/**";\nexport default { test: { exclude: [...configDefaults.exclude, STRYKER_TMP, "b/**"] } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "a quoted entry beside the name"
+out=$(regx) && fail "check_regressions passed a quoted exclusion added beside a name the base held: $out"
+printf '%s\n' "$out" | grep -qF "b/**" && ! printf '%s\n' "$out" | grep -qF "STRYKER_TMP" || fail "check_regressions named something other than the one entry added, b/**: $out"
+nameback
+printf 'export default { test: { exclude: [...configDefaults.exclude] } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "the name taken away"
+out=$(regx) || fail "check_regressions refused a name taken away: $out"
+nameback
 # The benches' budgets (G6), through the whole script on a small repository, which has no Vitest to list: a bench gone
 # or given a longer budget fails unless a commit names it on a `Lowered-floor: bench <name> - why` line.
 rg="$t/regr" && mkdir -p "$rg/scripts" "$rg/app/tests/bench" "$rg/app/src"

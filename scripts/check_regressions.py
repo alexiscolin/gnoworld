@@ -103,8 +103,42 @@ def changed_settings(before, after, excused):
                   for name, old in before.items() if after.get(name) != old and f"setting {name}" not in excused)
 
 
+LIST_START = re.compile(r"(?:globalIgnores\(|ignores:\s*|exclude:\s*|SKIP = new Set\()")
+TOKEN = re.compile(r"\s*(?:(\"[^\"]*\")|('[^']*')|(`[^`]*`)|(\.\.\.[\w$.]+)|([\w$.]+)|(.))", re.S)
+OWN_DEFAULTS = re.compile(r"\.\.\.\w*[cC]onfigDefaults\.\w+$")  # the spread of a tool's own defaults: its entries are the tool's, not a change
+
+
+def list_entries(text, at):
+    """The entries of the list that starts at text[at]: a quoted string is read; a name, a template, a spread of anything but a tool's
+    own defaults, or what follows the list (`.concat(...)`) is an entry that cannot be read, named as written (F2523)."""
+    entries, pos = [], at
+    if text[at] != "[":  # a list passed by name, or an expression: unread
+        m = re.match(r"[^,;})\n]+", text[at:])
+        return ([m.group(0).strip()] if m and m.group(0).strip() else []), at
+    pos += 1
+    while pos < len(text):
+        m = TOKEN.match(text, pos)
+        pos = m.end()
+        double, single, template, spread, name, other = m.groups()
+        if double or single:
+            entries.append((double or single)[1:-1])
+        elif template:
+            entries.append(template)
+        elif spread:
+            if not OWN_DEFAULTS.match(spread):
+                entries.append(spread)
+        elif name:
+            entries.append(name)
+        elif other == "]":
+            tail = re.match(r"\s*(\.\w+\([^)]*\)|\+[^,;}\n]*)", text[pos:])  # `].concat(X)`, `] + X`
+            return entries + ([tail.group(1).strip()] if tail else []), pos
+        elif other not in ",":
+            entries.append(other)
+    return entries, pos
+
+
 def ignores(read):
-    """Each entry of the lists that keep files from a check, as `<file> <entry>`."""
+    """Each entry of the lists that keep files from a check, as `<file> <entry>`; an entry written with a name is its name."""
     out = set()
     for name in IGNORE_FILES:
         text = read(name) or ""
@@ -123,8 +157,9 @@ def ignores(read):
         elif name in (".prettierignore", "scripts/.gitleaksignore"):
             out |= {f"{name} {line.strip()}" for line in text.splitlines() if line.strip() and not line.startswith("#")}
         else:
-            for m in re.finditer(r"(?:globalIgnores\(|ignores:\s*|exclude:\s*|SKIP = new Set\()\[([^\]]*)\]", text):
-                out |= {f"{name} {entry}" for entry in re.findall(r'"([^"]*)"', m.group(1))}
+            for m in LIST_START.finditer(text):
+                if m.end() < len(text):
+                    out |= {f"{name} {entry}" for entry in list_entries(text, m.end())[0]}
     return out
 
 
@@ -292,6 +327,10 @@ def self_test():
     assert weakened(ignores(stryker.get), ignores(unmutated.get), set(), "ignore") == ["stryker.config.json !packages/core/src/x.ts"]
     leaks = {"scripts/.gitleaksignore": "# a reason\n"}
     hidden = {"scripts/.gitleaksignore": "# a reason\nabc:docs/a.md:home-folder-path:4\n"}
+    named = {"vitest.config.ts": "export default { test: { exclude: [...configDefaults.exclude, STRYKER_TMP, 'c/**', \"a,b/**\"] } };\n"}
+    assert ignores(named.get) == {"vitest.config.ts STRYKER_TMP", "vitest.config.ts c/**", "vitest.config.ts a,b/**"}, "a name is an entry, a spread of the defaults is not, quotes either way"
+    assert ignores({"vitest.config.ts": "exclude: LIST,\n"}.get) == {"vitest.config.ts LIST"}, "a list passed by name"
+    assert ignores({"vitest.config.ts": 'exclude: ["a"].concat(X)'}.get) == {"vitest.config.ts a", "vitest.config.ts .concat(X)"}, "a list with a method"
     assert weakened(ignores(leaks.get), ignores(hidden.get), set(), "ignore") == ["scripts/.gitleaksignore abc:docs/a.md:home-folder-path:4"]
     # pnpm's supply-chain file: any change outside its packages list is read in review, whatever
     # its form (F079, F088): quoted or spaced keys, a pnpmfile, builds, overrides, a lower age.
@@ -369,6 +408,7 @@ problems += [f"a check's setting changed: {s}" for s in changed_settings(setting
 problems += [f"an approved screenshot changed: {p}" for p in changed_baselines(git("diff", "--name-status", base), shots_ok)]
 if problems:
     print("check_regressions: the safety net shrank. Undo it, or say why on a line of a commit, `Key: <item> - why`"
-          " (Removed-test:, Lowered-floor: [gap |ignore |bench ]<item>, Updated-baseline:):", *problems, sep="\n  ", file=sys.stderr)
+          " (Removed-test:, Lowered-floor: [gap |ignore |bench ]<item>, Updated-baseline:). An ignore written with a name is read as the name, "
+          "not its value: write the glob quoted:", *problems, sep="\n  ", file=sys.stderr)
     sys.exit(1)
 print("check_regressions: no test gone or switched off, no floor lower, no bench gone or looser, no gap or ignore added, no approved screenshot changed")

@@ -1096,6 +1096,26 @@ def mutants():
     yield from quick_mutants()
     yield from checks_mutants()
     yield from stryker_mutants()
+    yield from regressions_name_mutants()
+
+
+def swaps(path, name, rows):
+    """One mutant per occurrence of each (find, replace, label) row, in the hooks' tests, labelled `<name> <label>`."""
+    for find, replace, label in rows:
+        yield from each(path, find, replace, "hooks", f"{name} {label}")
+
+
+def regressions_name_mutants():
+    """An exclusion written with a name is read (F2523, slice-5 harness-c)."""
+    r = "scripts/check_regressions.py"
+    yield from swaps(r, "check_regressions.py", (
+        ("            entries.append(name)", "            pass", "reads a name in an exclusion list as an entry (F2523)"),
+        ("        if double or single:", "        if double:", "reads a single-quoted entry"),
+        ("            if not OWN_DEFAULTS.match(spread):", "            if False:", "reads a spread of anything but a tool's defaults as an entry"),
+        ("            if not OWN_DEFAULTS.match(spread):", "            if True:", "lets the spread of a tool's own defaults stay"),
+        ("if tail else []), pos", "if False else []), pos", "reads what follows a list (`.concat`)"),
+        ("        elif template:\n            entries.append(template)", "        elif template:\n            pass", "reads a template literal as an entry"),
+    ))
 
 
 def sections(path, test):
