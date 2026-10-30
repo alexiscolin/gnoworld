@@ -3599,7 +3599,7 @@ git -C "$bs" checkout -q -f -b helpers "$base" && mkdir -p "$bs/server/src/testi
 out=$(size "$base") || fail "batch_size.py counted server/src/testing, a test helper's folder, as product code: $out"
 fi
 
-if part gate_survivors; then
+if part gate_full; then
 # The merge check prints every surviving mutant, pass or fail (F2359, F2409): the lane logs are shown only on failure, and
 # StrykerJS exits 0 with survivors (the config has no break threshold), so the Workflow loop's `survivors` was always empty. Each
 # survivor of StrykerJS's clear-text report (`[Survived] Kind` or `[NoCoverage] Kind`, then `path:L:C`) is printed by
