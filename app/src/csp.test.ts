@@ -691,4 +691,10 @@ describe("the web image's nginx", () => {
   it("copies the build's csp.conf where the include reads it", () => {
     expect(dockerfile).toContain("--from=build /repo/app/build/csp.conf /etc/nginx/csp.conf");
   });
+
+  // F2459: the http block's first map sets the map module's hash sizes to their defaults (ngx_http_map_module.c:190-200),
+  // so the table's own map_hash_max_size after it was a duplicate, and nginx did not start.
+  it("reads the table before any other map, which would set the hash sizes first", () => {
+    expect(conf.search(/^\s*map /m)).toBeGreaterThan(conf.indexOf("include /etc/nginx/csp.conf;"));
+  });
 });
