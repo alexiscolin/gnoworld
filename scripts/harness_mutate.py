@@ -10,7 +10,7 @@ from the repository root; it takes minutes, so the full gate runs it when the ha
 gate's check, through test_hooks.sh. The mutants are judged over HARNESS_SHARDS worktrees side by side
 (4 by default); `--changed <base>`, a branch's merge check, judges only those that rewrite a line committed since base
 (suite_parts.py: a change to a suite's section, or to a guard file's other lines, asks for none) and, when this script
-changed, those it defines anew or otherwise than base's; past MOST left to judge after the cache it stops before
+changed, those it defines anew or otherwise than base's (sections a mutant only gained are no other definition); past MOST left to judge after the cache it stops before
 judging any, and the way on is the chief's check.sh --full. With no argument, what main requires, every mutant is judged.
 A killed mutant whose verdict's key holds (verdict_key, which blank lines do not move) is taken from the cache in
 ~/.cache/gnoworld-tools, a survivor is always judged again; the CI keeps no cache, so it judges every one."""
@@ -468,7 +468,9 @@ def mutants():
     yield from each(hm, "    if base.startswith" "(\"-\"):", "    if False:", "hooks", "harness_mutate --changed takes no option for its base")
     yield from each(hm, 'sys.modules["suite_parts"]' " = theirs", "theirs", "hooks", "harness_mutate --changed reads base's script with base's helper")
     yield from each(hm, "    if before is" " None:", "    if False:", "hooks", "harness_mutate --changed judges every mutant against a base script it cannot read")
-    yield from each(hm, "identity(m, sections, GAPS) not" " in before}", "False}", "hooks", "harness_mutate --changed judges the mutants it defines anew or otherwise")
+    yield from each(hm, "and not alike" "(m, before)}", "and False}", "hooks", "harness_mutate --changed judges the mutants it defines anew or otherwise")
+    yield from each(hm, 'set(theirs.split(","))' " <= set(", 'set(theirs.split(",")) == set(', "hooks", "harness_mutate --changed does not ask again for a mutant whose sections only grew")
+    yield from each(hm, 'theirs is not None and set(theirs.split(","))' ' <= set(mine[3].split(","))', "theirs is not None", "hooks", "harness_mutate --changed asks again for a mutant that lost a section")
     yield from each(hm, "return label, path, test, judged_by, label" " in gaps, None", "return label, path, test, None, False, None", "hooks", "harness_mutate --changed tells a mutant by its sections and its place in GAPS")
     yield from each(hm, "else hashlib.sha256(" "code(mutated).encode()).hexdigest()", 'else ""', "hooks", "harness_mutate --changed tells a mutant by the text it writes")
     yield from each(hm, "if failures" ":\n    sys.exit", "if failures and changed is None:\n    sys.exit", "hooks", "a survivor fails harness_mutate --changed")
@@ -1208,9 +1210,10 @@ def identity(mutant, sections_of, gaps):
 
 
 def defined_at(base):
-    """The identities of the mutants base's script defines, built on this tree's files; None when it cannot say (no
-    such file, no `--dry` line to cut its definitions at, its code failing here): then every mutant is judged. Its helper
-    is base's too: a name this tree's dropped would otherwise fail its import, and every mutant look new."""
+    """The mutants base's script defines, built on this tree's files, each identity with its sections apart, which alike()
+    reads; None when it cannot say (no such file, no `--dry` line to cut its definitions at, its code failing here): then
+    every mutant is judged. Its helper is base's too: a name this tree's dropped would otherwise fail its import, and every
+    mutant look new."""
     shown, helper = (subprocess.run(["git", "show", f"{base}:{path}"], capture_output=True, text=True).stdout for path in (SELF, os.path.join(os.path.dirname(SELF), "suite_parts.py")))
     space = {"__name__": "harness_mutate_at_base", "__file__": os.path.abspath(__file__)}
     theirs = types.ModuleType("suite_parts")
@@ -1219,10 +1222,18 @@ def defined_at(base):
         sys.modules["suite_parts"] = theirs  # this script bound its own names when it started
         exec(compile(shown[: DRY.search(shown).start()], f"{base}:{SELF}", "exec"), space)
         space["WORKTREE"] = WORKTREE
-        return {identity(m, space["sections"], space["GAPS"]) for m in space["mutants"]()}
+        return {i[:3] + i[4:]: i[3] for i in (identity(m, space["sections"], space["GAPS"]) for m in space["mutants"]())}
     except BaseException as e:  # a sys.exit in base's code too (security-S6)
         print(f"harness_mutate: {base}'s {SELF} cannot say its mutants here ({e!r})")
         return None
+
+
+def alike(mutant, before):
+    """Whether `before`, what defined_at(base) says, defines this mutant as this script does. Sections it only gained change
+    nothing here, though the cache's key does move with them: a mutant S kills, S and T kill. One it lost is another mutant."""
+    mine = identity(mutant, sections, GAPS)
+    theirs = before.get(mine[:3] + mine[4:])
+    return theirs is not None and set(theirs.split(",")) <= set(mine[3].split(","))
 
 
 def changed_since(base):
@@ -1256,14 +1267,14 @@ with contextlib.ExitStack() as stack:
     trees = [stack.enter_context(worktree("HEAD"))]  # one tree to build and select with: the others only if a mutant is left (CR9)
     WORKTREE = trees[0]
     found = checked()
-    before = defined_at(base) if changed is not None and SELF in changed else set()
+    before = defined_at(base) if changed is not None and SELF in changed else {}
     if before is None:
         print(f"harness_mutate: {SELF} changed since {base}, whose mutants it cannot read: every mutant")
     elif changed is not None:
         total = len(found)
         lines = {path: changed_lines(base, path) for path in {m[1] for m in found} & changed}
-        # The lines a change rewrites ask for their mutants; when this script changed, those it defines anew or otherwise than base's too.
-        kept = {id(m) for m in select(found, lines, read)} | {id(m) for m in found if SELF in changed and identity(m, sections, GAPS) not in before}
+        # The lines a change rewrites ask for their mutants; when this script changed, those it does not define alike too.
+        kept = {id(m) for m in select(found, lines, read)} | {id(m) for m in found if SELF in changed and not alike(m, before)}
         found = [m for m in found if id(m) in kept]
         print(f"harness_mutate: the lines and the mutants changed since {base}: {len(found)} of {total} mutants")
     if not found:  # nothing to judge: the controls would only cost minutes (8 suite runs, 601 s at load 30 to 50)
