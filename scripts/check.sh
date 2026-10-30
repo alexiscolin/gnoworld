@@ -124,9 +124,9 @@ fi
 $all && ts=true app=true gno=true related=false
 # check_regressions reads git, which the staged copy has not (pre-commit runs it in the repository); a merge's full gate follows and
 # runs it (and the audit) whole. Its base is where the branch left main, so a `Removed-test:` line of an earlier commit of the
-# branch counts; with no origin/main, HEAD; with no commit yet, nothing to compare.
+# branch counts; with no origin/main, HEAD; with no commit yet, or no repository, nothing to compare (no base).
 regr_base=
-if $merging || [ -z "$tested" ]; then regressions=false; fi
+if $merging; then regressions=false; fi
 if $merging; then audit=false; fi
 if $regressions; then
 	regr_base=$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse -q --verify HEAD 2>/dev/null) || regr_base=
