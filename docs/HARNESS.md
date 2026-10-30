@@ -111,7 +111,7 @@ gate fails, run the failing lane alone before running the whole gate again.
 | A fast run's change | What runs beside the cheap checks (format, knip, jscpd, CSS, comments, check_docs) | Budget |
 |---|---|---|
 | `server/src` | tsc, ESLint, every Vitest test (`main.test.ts` runs the server as a child process, outside Vitest's module graph) | 30 s |
-| the TypeScript of `app/src`, `app/tests`, `packages/ui/src` | tsc, ESLint, Vitest's tests related to the change (`--changed`), the journeys the change can reach (below) | 120 s (the app's build and journeys, F2162) |
+| the TypeScript of `app/src`, `app/tests`, `packages/ui/src` | tsc, ESLint, Vitest's tests related to the change (`--changed`), the journeys the change can reach (below) | 60 s when some journeys run, 120 s when all do (F2162; the measure below) |
 | `packages/core/src`, or any other file of those folders (a fixture, a stylesheet) | tsc, ESLint, every Vitest test, every journey | 120 s (the app's build and journeys, F2162) |
 | `packages/ui/src/tokens.css` | as above, and the tokens story's pictures at their three widths (F1190) | 120 s |
 | `gno/` | the gno lane | 30 s |
@@ -131,6 +131,13 @@ the app (`.test.ts(x)`, `.bench`, `.stories`) is no change of the pages. What a 
 a redirect after its first page is not followed, and a `journeys.py` that fails fails the gate. `--full`, `--merge`
 and any change of the harness run every journey. Playwright reads a filter as a regular expression: a name's own
 characters are escaped; its dots are not (they match more, never less).
+
+The measure (slice-5 harness-b, 2026-10-30, the same change run by the old `check.sh` and the new, one after the other on a
+machine at load 11 to 43 on 16 cores, so the times are an order of magnitude, not a benchmark): a comment added to
+`routes/earth.tsx` (8 journeys of 43) took 122 s before (the `app` step 116 s) and 30 s after (23 s); one added to a
+spec (1 journey) took 224 s before (153 s, load 23 then 43) and 46 s after (17 s); one added to `routes/world.tsx`
+(39 journeys) took 88 s before (83 s) and 110 s after (96 s), no gain: nearly every journey goes to a world page. That is
+why a run of some journeys has 60 s and a run of all 120 s.
 
 **Two checks the fast gate runs on a trigger** (harness-b): a commit that touches a test, a bench or an approved picture
 (`*.test.ts(x)`, `*.bench.ts(x)`, `*.spec.ts`, gno and Go test files, `*-snapshots/*.png`, `*__screenshots__/*.png`;

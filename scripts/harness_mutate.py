@@ -119,7 +119,9 @@ def scoping_mutants():
     """The fast gate runs the journeys its change can reach (slice-5 harness-b): check.sh's use of scripts/journeys.py, and the rules in it."""
     check = "scripts/check.sh"
     for find, replace, label in (
-        ("if ! $full && ! $all; then\n\t\tscope=", "if false; then\n\t\tscope=", "scopes the journeys to the change"),
+        ("if ! $full && ! $all && $app; then scope=", "if false; then scope=", "scopes the journeys to the change"),
+        ('[ "$scope" = all ] || budget=60', '[ "$scope" = all ] || budget=120', "gives a run of some journeys a shorter budget"),
+        ('[ "$scope" = all ] || budget=60', ":", "gives a run of some journeys a budget of its own"),
         ('if [ "$scope" != all ]; then', "if false; then", "gives Playwright the journeys journeys.py names"),
         (r"""sed 's/[][+(){}^$|?*\\]/\\&/g'""", r"""sed 's/[][+(){}^$|?*\\]/&/g'""", "escapes the regular-expression characters of a journey's name"),
         ('set -- "$@" "$(printf', 'set -- "$(printf', "gives every journey journeys.py names"),

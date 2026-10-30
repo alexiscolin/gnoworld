@@ -2734,6 +2734,12 @@ routes_say_all 'route(prefix + "x", "routes/eco.tsx")' "a path that is no litera
 printf 'export const more = (n) => import(n);\n' >>"$g/app/src/features/home/h.ts"
 [ "$(py app/src/features/world/w.ts)" = all ] || fail "journeys.py placed a change beside an import() with no literal, which it cannot follow"
 reset
+# The budget follows the work: some journeys, 60 s; all of them, 120 s; none (no app), 30 s (the measure is in docs/HARNESS.md).
+budget_of() { reset; for f in "$@"; do mkdir -p "$g/$(dirname "$f")" && printf 'y\n' >>"$g/$f"; done; gate | sed -n 's/.*(budget \([0-9]*\) s).*/\1/p'; }
+[ "$(budget_of app/src/features/world/w.ts)" = 60 ] || fail "check.sh gave a run of some journeys '$(budget_of app/src/features/world/w.ts)' s, not 60"
+[ "$(budget_of app/tests/e2e/serve.mjs)" = 120 ] || fail "check.sh gave a run of every journey '$(budget_of app/tests/e2e/serve.mjs)' s, not 120"
+[ "$(budget_of app/src/features/world/w.ts app/tests/e2e/serve.mjs)" = 120 ] || fail "check.sh gave a run that holds a change it cannot place a budget other than 120 s"
+[ "$(budget_of server/src/a.ts)" = 30 ] || fail "check.sh gave a run of the server alone '$(budget_of server/src/a.ts)' s, not 30"
 # A route's change runs its journeys only; so does a feature it loads, and a journey's own file or picture.
 places app/src/features/world/w.ts $world $net $tpl $unplaced
 places app/src/routes/world.tsx $world $net $tpl $unplaced
