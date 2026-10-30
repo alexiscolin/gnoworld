@@ -71,7 +71,7 @@ for (const width of WIDTHS) {
         // One row means the boxes share a middle: each one's centre lies inside the others' height.
         const boxes = await Promise.all(
           [
-            page.getByRole("link", { name: "gno.world" }),
+            page.getByRole("link", { name: "gnoworld" }),
             page.getByRole("button", { name: /^Search/ }),
             account,
             page.getByRole("button", { name: "Log out" }),

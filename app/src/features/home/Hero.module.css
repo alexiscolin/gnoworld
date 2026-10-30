@@ -1,0 +1,77 @@
+/* The hero: bottom left of the cosmos, 48 px from the left and 64 from the bottom, the number at 176 px in mono, two actions of
+   52 px (the prototype's #hero, lines 514 to 546); a block in the page on a phone. */
+@layer components {
+  /* The kicker over the number is the one label style, which its wrapper carries; the heading takes it as it is. */
+  .hero h1 {
+    /* layout: a heading or paragraph with no margin of its own: the stack spaces it */
+    margin-block: 0;
+    font: inherit;
+    letter-spacing: inherit;
+  }
+
+  .number {
+    /* layout: a heading or paragraph with no margin of its own: the stack spaces it */
+    margin-block: 0;
+    font-family: var(--family-mono);
+    /* raw: 88 px to 176 px, 11vi between (the prototype's #hero .num) */
+    font-size: clamp(88px, 11vi, 176px);
+    font-weight: 400;
+    /* raw: the prototype's tight tracking and line for the big number */
+    letter-spacing: -0.06em;
+    line-height: 0.82;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .line {
+    /* layout: a heading or paragraph with no margin of its own: the stack spaces it */
+    margin-block: 0;
+    color: var(--color-text-muted);
+    /* raw: the line is 17 px (the prototype's #hero .heroCap) */
+    font-size: 17px;
+    line-height: 1.5;
+  }
+
+  .action {
+    /* layout: the label and its arrow in a row, centred */
+    display: inline-grid;
+    /* layout: the label and its arrow in a row */
+    grid-auto-flow: column;
+    /* layout: the label and its arrow share a middle */
+    align-items: center;
+    /* layout: the content in the middle of the action */
+    justify-content: center;
+    /* layout: a space step between the label and its arrow */
+    gap: var(--space-xs);
+    /* raw: the action is 52 px tall, 48 on a phone (the prototype's #hero .cta .link, lines 543 and 772) */
+    block-size: 52px;
+    padding-inline: var(--space-m);
+    /* the action's edge is a ring inside its box, so a solid one needs none */
+    box-shadow: inset 0 0 0 var(--line-width) var(--color-line-strong);
+    border-radius: var(--radius-pill);
+    /* raw: the surface at 50% over the scene, as the prototype's 0.5 night */
+    background: color-mix(in oklab, var(--color-surface) 50%, transparent);
+    font: var(--font-action);
+    text-decoration: none;
+  }
+
+  .action[data-emphasis="solid"] {
+    box-shadow: none;
+    background: var(--color-primary);
+    color: var(--color-ink);
+  }
+
+  @media (max-width: 899px) {
+    .action {
+      /* raw: 48 px on a phone (the prototype's line 772) */
+      block-size: 48px;
+    }
+  }
+
+  @media (min-width: 900px) {
+    .hero {
+      position: fixed;
+      inset-inline-start: var(--space-xl);
+      inset-block-end: var(--space-2xl);
+    }
+  }
+}

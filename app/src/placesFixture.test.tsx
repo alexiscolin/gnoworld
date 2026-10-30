@@ -138,7 +138,8 @@ describe("a universe's index", () => {
     const html = await page("home", "/net/gnoland/");
     expect(html).toContain("<h1>gno.land</h1>");
     expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/w\/other"[^>]*>Other<\/a>/);
-    expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/earth"[^>]*>Earth<\/a>/);
+    // Slice 5r: the way to the Earth is the hero's big action, "Go explore" (frame 6), and the header's Earth view.
+    expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/earth"[^>]*>Go explore/);
     expect(html).not.toContain("Bubble");
   });
 

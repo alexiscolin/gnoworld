@@ -1,5 +1,6 @@
-import { Button, Chip, Cluster, PlanetThumb, Stack } from "@gnoworld/ui";
+import { Button, Chip, Cluster, PlanetThumb, Row, Stack } from "@gnoworld/ui";
 import { useState } from "react";
+import styles from "./PlacesList.module.css";
 import { filterByGenre, type ListedPlace } from "./filter.ts";
 
 /** The places, as links to their pages, with a toggle per genre: a native button, so the keyboard reaches it. */
@@ -43,15 +44,16 @@ export function PlacesList({ places, genres }: { places: ListedPlace[]; genres: 
           </Cluster>
         </Stack>
       ) : (
-        <ul aria-label="Places">
+        <ul aria-label="Places" className={styles["places"]}>
           {shown.map((place) => (
             <li key={place.path}>
               {/* No capture exists yet: the drawn fallback, never a picture from elsewhere. */}
-              <PlanetThumb src="" name={place.name} size="s" decorative />
-              <Button href={place.path} emphasis="quiet">
-                {place.name}
-              </Button>
-              <p>{place.description}</p>
+              <Row
+                href={place.path}
+                title={place.name}
+                subtitle={place.description}
+                lead={<PlanetThumb src="" name={place.name} size="s" decorative />}
+              />
             </li>
           ))}
         </ul>

@@ -203,7 +203,7 @@ test.describe("a world's rooms", () => {
     await page.goto("/w/bubble?room=games");
     await hydrated(page);
     await expect(whoIsHere(page)).toContainText(/\b[1-9]\d* here/);
-    await page.getByRole("link", { name: "gno.world" }).click();
+    await page.getByRole("link", { name: "gnoworld" }).click();
     await expect(page).toHaveURL(/\/$/);
     await expect.poll(() => closed).toBe(true);
   });

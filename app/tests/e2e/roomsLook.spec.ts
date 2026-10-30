@@ -126,6 +126,8 @@ async function sixtyLines(page: Page): Promise<() => WebSocketRoute> {
     socket = route;
     scriptedErgo(route, GUEST, { history });
   });
+  // The video's header (96 px) and the plate above the room leave a 720-high screen too little for the newest line.
+  await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/w/bubble?room=games");
   await hydrated(page);
   await expect(page.getByText("Line 59 of the room's history")).toBeInViewport();

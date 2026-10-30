@@ -1,0 +1,23 @@
+/* The place of a plate in a page: on a wide computer, fixed at the left of the screen, 98 px from the top (under the header's 96)
+   and 24 from the left and the bottom (frames 20 and 37); below that width, as on a phone, a block in the page: the chat's slot
+   beside it would be under the 40rem a room needs to sit beside a thread's panel (RoomView). */
+@layer components {
+  /* raw: the plate's 668 px, the page's side gutters and the 40rem (640 px) of the room, rounded up */
+  @media (min-width: 1360px) {
+    .plate {
+      position: fixed;
+      /* raw: the header's clearance of 96 and the 2 px the frame keeps under it (frame 20) */
+      inset-block-start: 98px;
+      inset-block-end: var(--space-m);
+      inset-inline-start: var(--space-m);
+      /* raw: the plate's width (DESIGN-SYSTEM.md, Layout) */
+      inline-size: 620px;
+    }
+
+    /* A page whose plate stands fixed at the left keeps its other content, the chat's slot, to the plate's right. */
+    .beside {
+      /* raw: the plate's 24 px of margin, its 620 px, and 24 px between it and the page's content (frame 20) */
+      padding-inline-start: 668px;
+    }
+  }
+}

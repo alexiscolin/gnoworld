@@ -1,0 +1,9 @@
+/* The places' list: one row to a line, with none of the list's own marks. */
+@layer components {
+  .places {
+    /* layout: the list's own indent and margin go, the rows space themselves */
+    margin-block: 0;
+    padding-inline-start: 0;
+    list-style: none;
+  }
+}
