@@ -21,7 +21,7 @@ export const meta = {
   ],
 };
 
-// args: { branch, worktree, plan, brief, shared, ids, tier1 }: ids, the F numbers the chief gives the branch; shared, the slice's folder the chief makes (.claude/tmp/slice-<n>);
+// args: { branch, worktree, plan, brief, shared, ids, base, tier1 }: base, the branch the work is cut from and reviewed against (main when absent: an integration branch for part 2 of a slice); ids, the F numbers the chief gives the branch; shared, the slice's folder the chief makes (.claude/tmp/slice-<n>);
 // tier1, path prefixes of tier-1 files (docs/REVIEW.md) added to the harness's and the realms', which no argument can
 // leave out (security review of slice-5-loop, 2).
 const A = args;
@@ -118,7 +118,30 @@ const commits = [];
 const low = [];
 const judged = [];
 const verdicts = [];
-const TIER1 = ["scripts/", ".githooks/", ".github/", ".claude/", "gno/", ...(A.tier1 || [])];
+// The tier-1 paths of docs/REVIEW.md's table that exist: the harness, the realms, the relay's auth script, the CSP, the deploy folder, the markdown
+// scanner, Adena, the login (server and client), the admin API's rights, the worker. A check in scripts/test_hooks.sh (workflow_branch) fails when the
+// table names in backticks a path this list lacks, or this list holds one the table does not name.
+const TIER1 = [
+  "scripts/",
+  ".githooks/",
+  ".github/",
+  ".claude/",
+  "gno/",
+  "server/src/ergo/",
+  "app/src/csp.ts",
+  "deploy/",
+  "packages/core/src/markdown/",
+  "app/src/lib/adena/",
+  "server/src/login/",
+  "app/src/features/login/",
+  "app/src/lib/api/login.ts",
+  "app/src/lib/ergo/",
+  "server/src/roles/",
+  "server/roles.json",
+  "app/src/sw/",
+  ...(A.tier1 || []),
+];
+const BASE = A.base || "main";
 const tier1 = (file) => TIER1.some((prefix) => file === prefix || file.startsWith(prefix));
 const realm = (file) => file.startsWith("gno/r/") || file.startsWith("gno/p/");
 // A writer that committed on another branch than its own (slice-5a's commit on main) counts as no report, and the loop
@@ -155,11 +178,11 @@ const where = (step, writes) =>
 
 const gateCheck = () =>
   write(
-    `${where("merge-check", true)}. Run \`sh scripts/check.sh --merge\` (minutes) and time it. Report whether it passed, the failing lane and the ` +
-      "tail of its output, the surviving mutants it printed (StrykerJS's and harness_mutate's), the files changed since main as \`git diff " +
-      "--name-only main...HEAD\` prints them (nothing else: not the files you write), and every line of " +
-      "`git log main..HEAD` that loosens the net (`Removed-test:`, `Lowered-floor:`, `Updated-baseline:`, `Batch-size:`, `No-test:`), which " +
-      "the chief and Alexis read. Write that diff " +
+    `${where("merge-check", true)}. Run \`sh scripts/check.sh --merge${BASE === "main" ? "" : ` --base ${BASE}`}\` (minutes) and time it. Report whether it passed, the failing lane and the ` +
+      "tail of its output, the surviving mutants it printed, pass or fail (every line that starts with `survivor: `, StrykerJS's and harness_mutate's: " +
+      `copy each whole, one string each, and the line \`survivors not listed: \` if it prints one: the survivors of files this branch did not change), the files changed since ${BASE} as \`git diff --name-only ${BASE}...HEAD\` prints them (nothing else: not the files you write), and every line of ` +
+      `\`git log ${BASE}..HEAD\` that loosens the net (\`Removed-test:\`, \`Lowered-floor:\`, \`Updated-baseline:\`, \`Batch-size:\`, \`No-test:\`), which ` +
+      `the chief and Alexis read. Write the diff since ${BASE} ` +
       "to .claude/tmp/diff.patch. Read .claude/tmp/unsteady.log: give each file named a ledger row (docs/review/findings.md) and a line in the " +
       `learnings, delete the log, and commit the rows (\`docs(review): unsteady ...\`), numbered within ${A.ids}. Change no code.`,
     // An agent that runs a command and waits for it: the cheaper model, little reasoning.
@@ -196,7 +219,7 @@ if (!built) return result("blocked at the build");
 commits.push(...built.commits);
 
 let gate = null;
-let since = "main";
+let since = BASE;
 let lensesDue = null; // all lenses in round 1; afterwards only those whose high findings in tier-1 files were fixed
 for (let round = 1; ; round += 1) {
   gate = await gateCheck();
@@ -224,7 +247,7 @@ for (let round = 1; ; round += 1) {
     [
       "reviewer",
       "reviewer",
-      `Review the branch's diff since ${since} (.claude/tmp/diff.patch holds the diff since main); the surviving mutants: ${JSON.stringify(gate.survivors)}.`,
+      `Review the branch's diff since ${since} (.claude/tmp/diff.patch holds the diff since ${BASE}); the surviving mutants: ${JSON.stringify(gate.survivors)}.`,
     ],
     ...(touchesTier1
       ? [["security-reviewer", "security", `Review the branch's diff since ${since} for security.`]]
