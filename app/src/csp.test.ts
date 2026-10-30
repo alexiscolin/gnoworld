@@ -1128,7 +1128,10 @@ describe("nginxTable", () => {
   });
 });
 
-const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
+// StrykerJS runs the tests in a sandbox whose sources it has instrumented (every string reads as a mutant switch): a test that
+// reads a source file reads the real one, outside the sandbox (F2703).
+const read = (path: string) =>
+  readFileSync(new URL(path, import.meta.url.replace(/\/\.stryker-tmp\/sandbox-[^/]+\//, "/")), "utf8");
 
 // F2457, DRY (Alexis's explicit rule): nothing is written twice. The parsers are read in one file (tests/e2e/cspFiles.mjs);
 // the files that read the build's output import them, and hold no reading of their own, in any shape.
