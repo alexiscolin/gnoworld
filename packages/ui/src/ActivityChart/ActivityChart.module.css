@@ -1,6 +1,20 @@
 /* The chart: past bars in the muted grey, the current one in text, the line in text; each holds 3:1
    or more on the page (docs/DESIGN-SYSTEM.md, "Data graphics"). */
 @layer components {
+  /* The drawing and its tooltip: the words are placed by the chart's own width, so the box is the chart's. */
+  .plot {
+    position: relative;
+    inline-size: 100%;
+    max-inline-size: var(--column-l);
+  }
+
+  /* The words over a bar: the tooltip's look (its class too, in the component), placed in script (Popover/floating.ts) in the screen's coordinates. */
+  .tip {
+    position: fixed;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
   /* Thin bars: a day's 24 fill a column at most, whatever the room. */
   .chart {
     display: block;
