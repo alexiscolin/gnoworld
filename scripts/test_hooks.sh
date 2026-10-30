@@ -1030,8 +1030,10 @@ out=$(shards 2 --changed "$base") && fail "harness_mutate --changed passed with 
 printf '%s\n' "$out" | grep -q "killed: planted keep7 again #1$" || fail "harness_mutate --changed skipped a mutant it defined anew: $out"
 printf '%s\n' "$out" | grep -q "^FAIL  survives: planted spare2 #1$" || fail "harness_mutate --changed skipped a mutant whose text it changed: $out"
 printf '%s\n' "$out" | grep -q " 2 of 8 mutants" || fail "harness_mutate --changed did not say 2 of 8 mutants: $out"
-# A mutant is also told by its label alone, by the sections that judge it and by its place in GAPS: one change each.
-for edit in label sections gaps; do
+# A mutant is also told by its label alone, by a section it lost and by its place in GAPS: one change each. Sections it only
+# gained are no other definition: a mutant S kills, S and T kill. A branch that splits a section would otherwise ask for every
+# mutant of the file (harness-a: 158 of check.sh's for one section added; harness-b, past 256).
+for edit in label grown lost regrown gaps; do
 	base=$(git -C "$hs/repo" rev-parse HEAD)
 	python3 -I - "$hs/repo/harness_mutate.py" "$edit" <<'PY'
 import sys
@@ -1039,7 +1041,9 @@ p, edit = sys.argv[1], sys.argv[2]
 s = open(p).read()
 old, new = {
     "label": ('"hooks", "planted keep4")', '"hooks", "planted keep4 renamed")'),
-    "sections": ('"i.txt": "x",', '"i.txt": "x,z",'),
+    "grown": ('"i.txt": "x",', '"i.txt": "x,z",'),
+    "lost": ('"i.txt": "x,z",', '"i.txt": "z",'),
+    "regrown": ('"i.txt": "z",', '"i.txt": "x,z",'),
     "gaps": ("GAPS = {\n", 'GAPS = {\n    "planted keep2 #1": "a planted gap",\n'),
 }[edit]
 assert s.count(old) == 1, f"the planted {edit} changed: update test_hooks.sh's harness_shards"
@@ -1047,7 +1051,8 @@ open(p, "w").write(s.replace(old, new))
 PY
 	git -C "$hs/repo" commit -qam "$edit alone"
 	out=$(shards 2 --changed "$base") || :
-	[ "$(verdicts "$out")" = 1 ] && printf '%s\n' "$out" | grep -q " 1 of 8 mutants" || fail "harness_mutate --changed did not judge the one mutant whose $edit alone changed: $out"
+	case $edit in grown | regrown) want=0 ;; *) want=1 ;; esac
+	[ "$(verdicts "$out")" = "$want" ] && printf '%s\n' "$out" | grep -q " $want of 8 mutants" || fail "harness_mutate --changed did not judge $want mutant after its $edit alone: $out"
 done
 # A base script that does not run (a syntax error before its --dry line): every mutant.
 cp "$hs/repo/harness_mutate.py" "$hs/hm.keep"
