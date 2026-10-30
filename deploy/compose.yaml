@@ -111,11 +111,14 @@ services:
       HTTPS_PROXY: ${EGRESS_PROXY:-http://guard:4750}
       NO_PROXY: ergo,localhost,127.0.0.1
       NODE_USE_ENV_PROXY: "1"
+      # The prices timer's file (5l): CoinGecko's prices every 5 minutes, in a volume of their own.
+      MARKETS_FILE: /markets/markets.json
     secrets: [log_pepper, ergo_oper_password, openai_api_key]
     volumes:
       - server:/data
       - auth:/run/gnoworld
       - ergo:/ergo:ro
+      - markets:/markets
     cpus: 0.4
     mem_limit: 512m
     pids_limit: 128
@@ -235,6 +238,8 @@ volumes:
   tailscale: {}
   ergo: {}
   server: {}
+  # markets.json, which the server writes and the home page reads (5l, 5m).
+  markets: {}
   # The auth socket's folder, which the server makes the socket in and Ergo dials.
   auth: {}
 
