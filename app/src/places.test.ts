@@ -35,6 +35,15 @@ describe("a site", () => {
   });
 });
 
+describe("the site's universes", () => {
+  test("lists each with its id and its name, the default flagged", () => {
+    expect(fixtureSite().universes.map(({ id, name, isDefault }) => [id, name, isDefault])).toEqual([
+      ["onyx", "Onyx", true],
+      ["gnoland", "gno.land", false],
+    ]);
+  });
+});
+
 describe("the site's worlds, by request", () => {
   test("finds a world by its path, as written", () => {
     expect(site.world(at("/w/bubble")).name).toBe("Bubble");

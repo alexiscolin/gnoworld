@@ -10,6 +10,15 @@ import type { WebSocketRoute } from "@playwright/test";
 
 const field = (page: Page) => page.getByRole("textbox", { name: "Message #games" });
 const send = (page: Page) => page.getByRole("button", { name: "Send" });
+// A key pressed just after the box took its text or focus is sometimes lost (the caret stays: logged, a few in 200
+// runs at 16 workers), so Home or End is pressed until the caret is where it takes it.
+const caretAt = (page: Page, key: "Home" | "End", at: number) =>
+  expect
+    .poll(async () => {
+      await field(page).press(key);
+      return field(page).evaluate((box: HTMLTextAreaElement) => box.selectionStart);
+    })
+    .toBe(at);
 // The drafts the page's device holds, by key, sorted.
 const draftKeys = (page: Page) =>
   page.evaluate(() =>
@@ -127,7 +136,7 @@ test.describe("the composer", () => {
     await field(page).fill("see #ne");
     await expect(field(page)).toHaveAccessibleDescription("Tab completes #news.");
     // The caret elsewhere than the end: Tab moves on, the draft as it was; and Tab on Send completes nothing.
-    await field(page).press("Home");
+    await caretAt(page, "Home", 0);
     await field(page).press("Tab");
     await expect(send(page)).toBeFocused();
     await page.keyboard.press("Tab");
@@ -141,8 +150,8 @@ test.describe("the composer", () => {
     await page.keyboard.press("Tab");
     await expect(field(page)).toBeFocused();
     await expect(field(page)).toHaveValue("see #ne");
-    // Come back by Tab, the box's text is selected: the caret at its end again, Tab completes.
-    await field(page).press("End");
+    // Come back by Tab: the caret at the end again, Tab completes.
+    await caretAt(page, "End", "see #ne".length);
     await field(page).press("Tab");
     await expect(field(page)).toHaveValue("see #news ");
     await expect(field(page)).not.toHaveAccessibleDescription(/Tab completes/);

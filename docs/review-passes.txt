@@ -61,3 +61,5 @@
 2026-10-29 541b089ea2d506c58de48fa69e1a4d9733b37554 chief: integration of reviewed slice-5d (five phone pictures taken again on the merged tree)
 2026-10-30 c924989d62778f09280635ca71dd2dd7d9f96b59 chief: the budget that logs (ebdd690a) and its two lost cases (29184711), their mutants checked by hand; the slice's --full judges every mutant
 2026-10-30 47726414e228690f37ac16690c9e1b260f528beb test-auditor, reviewer, security-reviewer (the Workflow branch and the session); as c9e63102 (its check.sh --merge, 650 s), plus F2375's row in docs/review/findings.md
+2026-10-30 53b226b862a28193385674c6a628c523abf5df59 test-auditor, reviewer, finding-verifier (the Workflow branch; check.sh --merge on ec9100e1, 632 s)
+2026-10-30 2f7d9ab73ff6e4008225852a5b55a128aeac9f7c as ec9100e1 (its check.sh --merge, 632 s), plus F2415-F2416's two rows in docs/review/findings.md
