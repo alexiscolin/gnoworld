@@ -120,9 +120,10 @@ def scoping_mutants():
     check = "scripts/check.sh"
     for find, replace, label in (
         ("if ! $full && ! $all && $app; then scope=", "if false; then scope=", "scopes the journeys to the change"),
-        ('[ "$scope" = all ] || budget=60', '[ "$scope" = all ] || budget=120', "gives a run of some journeys a shorter budget"),
-        ('[ "$scope" = all ] || budget=60', ":", "gives a run of some journeys a budget of its own"),
+        ('[ "$scope" = all ] || [ "$scope" = none ] || budget=60', '[ "$scope" = all ] || [ "$scope" = none ] || budget=120', "gives a run of some journeys a shorter budget"),
+        ('[ "$scope" = all ] || [ "$scope" = none ] || budget=60', ":", "gives a run of some journeys a budget of its own"),
         ('if [ "$scope" != all ]; then', "if false; then", "gives Playwright the journeys journeys.py names"),
+        ('[ "$scope" = all ] || [ "$scope" = none ] || budget=60', '[ "$scope" = all ] || budget=60', "gives a run with no journey the budget of one with some"),
         (r"""sed 's/[][+(){}^$|?*\\]/\\&/g'""", r"""sed 's/[][+(){}^$|?*\\]/&/g'""", "escapes the regular-expression characters of a journey's name"),
         ('set -- "$@" "$(printf', 'set -- "$(printf', "gives every journey journeys.py names"),
         ("printf '%s\\n' \"$changed\" | python3 -I scripts/journeys.py", "python3 -I scripts/journeys.py </dev/null", "tells journeys.py what changed"),
@@ -134,16 +135,14 @@ def scoping_mutants():
         ("if path not in loaded:\n            return None", "if False:\n            return None", "runs every journey on a file no page loads"),
         ("| unplaced\n", "\n", "runs the journeys it cannot place on every change"),
         ("if opaque or not urls:", "if False:", "cannot place a journey whose page is not a literal"),
-        ("*(OTHER_GO.finditer(text) if own else ())", "*()", "places a journey by its gotos alone, not by a request or a location it sets"),
-        ("OTHER_GO.finditer(text) if own else ()", "OTHER_GO.finditer(text)", "reads a helper's request through a variable as a journey's page"),
         ("    if graph.opaque:\n        return None\n", "", "gives up on an import it cannot follow"),
         (r"(?:from|import)\s*\(?", r"(?:from)\s*\(?", "follows an import() and a side-effect import"),
         ('os.path.join(base, "index" + e) for e in EXTENSIONS[1:]', "base for e in ()", "follows a directory's index"),
         ('-2 if s == "*" else', '20 if s == "*" else', "ranks the splat last"),
         ("if unknown and any(not splat for _, _, splat in hits):", "if False:", "means every route a template's ${} could"),
         ("if not os.path.isfile(shots.group(1)):\n                return None", "if False:\n                return None", "runs every journey on a picture of no journey"),
-        ("        if TEST_FILE.search(path):\n            continue\n", "", "reads a test file as no change of the pages"),
-        ("        if PROSE.search(path):\n            continue\n", "", "reads prose as no change of the pages"),
+        ("        if TEST_FILE.search(path):\n            skipped += 1\n            continue\n", "", "reads a test file as no change of the pages"),
+        ("        if PROSE.search(path):\n            skipped += 1\n            continue\n", "", "reads prose as no change of the pages"),
         ("if not run or run >= set(specs):", "if not run:", "says 'all' when every journey is due"),
         ("if len(found) != len(", "if False and len(found) != len(", "refuses a routes list with a call it does not read"),
         ("(?:layout|prefix)", "(?:prefix)", "refuses a routes list with a layout"),
@@ -153,6 +152,18 @@ def scoping_mutants():
         ("or not ORIGIN.match(", "or False and not ORIGIN.match(", "reads only the site's own origin at a template's start"),
     ):
         yield from each(j, find, replace, "hooks", f"journeys.py {label}")
+
+
+def journeys_more_mutants():
+    """What the journeys' scoping also does: a request or a location is a goto in a spec (F2575), tests alone are no journey (F2578)."""
+    yield from each("scripts/check.sh", '[ "$scope" != none ] || app=false', ":", "hooks", "check.sh builds and walks the app for a change of its tests alone")
+    for find, replace, label in (
+        ("*(OTHER_GO.finditer(text) if own else ())", "*()", "places a journey by its gotos alone, not by a request or a location it sets"),
+        ("OTHER_GO.finditer(text) if own else ()", "OTHER_GO.finditer(text)", "reads a helper's request through a variable as a journey's page"),
+        ("if not run and changed and skipped == len(changed):", "if False:", "says 'all' for a change of tests and prose alone"),
+        ("if not run and changed and skipped == len(changed):", "if not run:", "says 'none' for a deleted file beside a test"),
+    ):
+        yield from each("scripts/journeys.py", find, replace, "hooks", f"journeys.py {label}")
 
 
 def checks_mutants():
@@ -999,6 +1010,7 @@ def mutants():
     # The gate: each step dropped.
     yield from lines("scripts/check.sh", r"^(\s*)((?:run |python3 -I |sh scripts/|gitleaks |go vet |go run |\(cd gno |\$full \|\| run ).*)$", r"\1:", "hooks", "check.sh drops")
     yield from scoping_mutants()
+    yield from journeys_more_mutants()
     yield from checks_mutants()
     yield from stryker_mutants()
 

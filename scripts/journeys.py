@@ -1,7 +1,8 @@
 """journeys.py: which of the app's journeys a change can reach (the fast gate's cost follows the change, Alexis 2026-10-29).
 
 Usage: journeys.py [path ...] from the repository root; with no argument, the paths come one a line on stdin.
-Prints the paths of the journeys (Playwright specs) to run, one a line, or `all` when the change cannot be placed.
+Prints the paths of the journeys (Playwright specs) to run, one a line, `all` when the change cannot be placed, or `none` when
+every path is a test of the app or prose: no page loads them, so no journey is due (F2578).
 
 A journey reaches the files its pages load: the page of each URL it goes to (`page.goto("/w/a")`) is the route whose path
 matches it in app/src/routes.ts, and a route loads what it imports, followed through every import, import(), re-export, type
@@ -173,7 +174,7 @@ def specs_in(folder):
 
 
 def journeys(changed):
-    """The specs a list of changed paths reaches, or None for all of them."""
+    """The specs a list of changed paths reaches, None for all of them, or [] when none is due."""
     table = routes()
     specs = specs_in(E2E)
     if table is None or not specs:
@@ -202,9 +203,10 @@ def journeys(changed):
     loaded = set().union(*(graph.closure(f) for _, f in table), *placed.values())
     if graph.opaque:
         return None
-    run = set()
+    run, skipped = set(), 0
     for path in changed:
         if PROSE.search(path):
+            skipped += 1
             continue
         if SPEC.search(path) and path.startswith(E2E + "/"):
             run |= {path} if os.path.isfile(path) else set()
@@ -219,10 +221,13 @@ def journeys(changed):
         if not path.startswith(SRC + "/") or path in always:
             return None
         if TEST_FILE.search(path):
+            skipped += 1
             continue
         if path not in loaded:
             return None
         run |= {s for s, reached in placed.items() if path in reached} | unplaced
+    if not run and changed and skipped == len(changed):
+        return []
     if not run or run >= set(specs):
         return None
     return sorted(run)
@@ -231,4 +236,4 @@ def journeys(changed):
 if __name__ == "__main__":
     paths = sys.argv[1:] or [line for line in sys.stdin.read().split("\n") if line]
     chosen = journeys(paths)
-    print("all" if chosen is None else "\n".join(chosen))
+    print("all" if chosen is None else "none" if not chosen else "\n".join(chosen))

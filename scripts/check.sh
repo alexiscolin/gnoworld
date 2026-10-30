@@ -132,14 +132,15 @@ if $regressions; then
 	regr_base=$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse -q --verify HEAD 2>/dev/null) || regr_base=
 	[ -n "$regr_base" ] || regressions=false
 fi
-# The journeys the change can reach (scripts/journeys.py): `all`, or their paths one a line. The full gate and a change it cannot
+# The journeys the change can reach (scripts/journeys.py): `all`, `none` (tests of the app alone: no build, no journey), or their paths one a line. The full gate and a change it cannot
 # place run every journey. A journeys.py that fails fails the run: a change scoped to nothing would pass unseen.
 scope=all
 if ! $full && ! $all && $app; then scope=$(printf '%s\n' "$changed" | python3 -I scripts/journeys.py); fi
+[ "$scope" != none ] || app=false # a change of tests of the app alone: no page loads them (F2578)
 budget=120 # s, for everything (Alexis, 2026-10-28: 75 refused a harness commit on a half-busy machine; 60 before 2026-10-27); for a run scoped to a change, 30
 # A run that builds the app runs every journey, the work of a run of everything: 73-96 s on a quiet machine (slice-5a, F2162).
 $all || $app || budget=30
-[ "$scope" = all ] || budget=60 # some journeys, not all: 17 to 23 s of them for 1 and 8 of 43, 96 s for 39 (harness-b, measured)
+[ "$scope" = all ] || [ "$scope" = none ] || budget=60 # some journeys, not all: 17 to 23 s of them for 1 and 8 of 43, 96 s for 39 (harness-b, measured)
 [ "${GATE_BUDGET:-$budget}" -lt "$budget" ] 2>/dev/null && budget=$GATE_BUDGET # a test lowers it; nothing raises it
 tests_scope=
 $related && tests_scope="--changed --passWithNoTests"

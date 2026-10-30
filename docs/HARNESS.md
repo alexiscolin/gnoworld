@@ -127,7 +127,8 @@ runs every journey: a path outside `app/src` and the journeys' specs (a config, 
 a file deleted, a `routes.ts` with a `layout()`. A journey whose `goto`, or `request.get()`/`location.href =` in its own spec file (F2575), is not a literal path
 (a variable, a helper's argument) cannot be placed and runs on every change of the app; a template's `${...}` in the path means any one segment,
 and one at its start stands for the site's origin only when it is named `site`, `origin`, `base` or `host`. A test of
-the app (`.test.ts(x)`, `.bench`, `.stories`) is no change of the pages. What a journey reaches by a click, a link or
+the app (`.test.ts(x)`, `.bench`, `.stories`) is no change of the pages: a change of those and prose alone builds
+and walks nothing of the app (budget 30 s, F2578). What a journey reaches by a click, a link or
 a redirect after its first page is not followed, and a `journeys.py` that fails fails the gate. `--full`, `--merge`
 and any change of the harness run every journey. Playwright reads a filter as a regular expression: a name's own
 characters are escaped; its dots are not (they match more, never less).

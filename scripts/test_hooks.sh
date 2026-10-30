@@ -2720,7 +2720,9 @@ py() { (cd "$g" && python3 -I scripts/journeys.py "$@" 2>&1 | sort | paste -sd' 
 [ "$(py app/src/features/world/gone.ts)" = all ] || fail "journeys.py placed a file that does not exist (a deleted one)"
 [ "$(py app/src/features/world/w.ts docs/a.md)" = "$(sorted $world $net $tpl $unplaced)" ] || fail "journeys.py let a prose path in the list widen the journeys"
 [ "$(py app/src/features/world/w.ts app/src/features/world/w.test.ts)" = "$(sorted $world $net $tpl $unplaced)" ] || fail "journeys.py read a test file of the app as a change the journeys can reach, or as one no page loads"
-[ "$(py app/src/features/world/w.test.ts)" = all ] || fail "journeys.py scoped a change of test files alone to nothing"
+[ "$(py app/src/features/world/w.test.ts)" = none ] || fail "journeys.py did not say 'none' for a change of the app's test files alone, which no page loads: $(py app/src/features/world/w.test.ts)"
+[ "$(py app/src/features/world/w.test.ts docs/a.md)" = none ] || fail "journeys.py let a prose path beside a test of the app make the change one it cannot place"
+[ "$(py app/src/features/world/w.test.ts app/src/features/world/gone.ts)" = all ] || fail "journeys.py let a test file hide a deleted file, which it cannot place"
 [ "$(py app/tests/e2e/gone.spec.ts-snapshots/a.png)" = all ] || fail "journeys.py placed a picture of a spec that does not exist"
 [ "$(py app/src/lib/shared.ts app/src/routes/eco.tsx app/src/routes/notFound.tsx)" = all ] || fail "journeys.py listed every journey instead of saying 'all'"
 # A list of routes it cannot read is no list: every journey. The fixture's own list with one thing added, so that what it
@@ -2744,7 +2746,15 @@ budget_of() { reset; for f in "$@"; do mkdir -p "$g/$(dirname "$f")" && printf '
 [ "$(budget_of app/src/features/world/w.ts)" = 60 ] || fail "check.sh gave a run of some journeys '$(budget_of app/src/features/world/w.ts)' s, not 60"
 [ "$(budget_of app/tests/e2e/serve.mjs)" = 120 ] || fail "check.sh gave a run of every journey '$(budget_of app/tests/e2e/serve.mjs)' s, not 120"
 [ "$(budget_of app/src/features/world/w.ts app/tests/e2e/serve.mjs)" = 120 ] || fail "check.sh gave a run that holds a change it cannot place a budget other than 120 s"
+[ "$(budget_of app/src/features/world/w.test.ts)" = 30 ] || fail "check.sh gave a run of a test of the app alone '$(budget_of app/src/features/world/w.test.ts)' s, not 30: nothing of the app is built or walked"
 [ "$(budget_of server/src/a.ts)" = 30 ] || fail "check.sh gave a run of the server alone '$(budget_of server/src/a.ts)' s, not 30"
+# A test of the app alone (F2578): no page loads it, so the app is neither built nor walked; the tests lane still runs it.
+reset
+printf 'y\n' >>"$g/app/src/features/world/w.test.ts"
+gate >/dev/null || fail "check.sh failed on a change of a test of the app alone"
+ran playwright && fail "check.sh ran the journeys on a change of a test of the app alone"
+ran app && fail "check.sh built the app on a change of a test of the app alone"
+ran test || fail "check.sh did not run the tests on a change of a test of the app alone"
 # A route's change runs its journeys only; so does a feature it loads, and a journey's own file or picture.
 places app/src/features/world/w.ts $world $net $tpl $unplaced
 places app/src/routes/world.tsx $world $net $tpl $unplaced
