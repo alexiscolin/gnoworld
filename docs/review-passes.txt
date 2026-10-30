@@ -68,3 +68,4 @@
 2026-10-30 2c292f9046358996e26162a9ed908027b2e97783 test-auditor, reviewer, security-reviewer (the Workflow's, then two rounds by the session), finding-verifier; check.sh --merge on 4a8d1fdb, 594 s
 2026-10-30 09317f703ae3493ec69b3041b9ac1d6dedd370b4 test-auditor, reviewer, security-reviewer (the Workflow's, then two rounds by the session), finding-verifier; as 4a8d1fdb (its check.sh --merge, 594 s), plus F475, F2360 and F2362 marked fixed
 2026-10-30 c2cf11d2db08e9b09e1190cda9c635cf30de27ca chief: integration of slice-5f (fast-forward, 52935a98) and part 2's plan (066fc52c); check.sh --full on 066fc52c, 639 s
+2026-10-31 91ce97c6b3c4c1f9c0ad4a538f77df31db8070ca test-auditor, reviewer, security-reviewer, finding-verifier (the Workflow's); semgrep p/dockerfile and p/docker-compose on deploy/ by the session; check.sh --merge on 6212735d, 823 s, third try
