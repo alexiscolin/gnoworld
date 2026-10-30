@@ -2,6 +2,7 @@
 // @types/node out (as tests/e2e/node.d.ts), so each module declares its own handful.
 declare module "node:fs" {
   export function readFileSync(path: string, encoding: "utf8"): string;
+  export function readdirSync(path: string, options: { recursive: true }): string[];
   export function statSync(path: string): { size: number };
   export function existsSync(path: string): boolean;
   export function mkdirSync(path: string, options?: { recursive: true }): void;

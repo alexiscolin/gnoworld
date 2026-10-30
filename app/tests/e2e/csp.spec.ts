@@ -4,17 +4,22 @@ import { GUARDED, SITE } from "./sites.ts";
 
 // The policy's shape: the unit test pins its words, this the page's every answer (slice 3's plan, 3f).
 const SHAPE = new RegExp(
-  "^default-src 'none'; script-src 'self'( 'sha256-[A-Za-z0-9+/]{43}=')+; style-src 'self'; img-src 'self' data:; " +
+  "^default-src 'none'; script-src 'self'( 'sha256-[A-Za-z0-9+/]{43}=')*; style-src 'self'; img-src 'self' data:; " +
     "font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; " +
     "frame-src https://www.youtube-nocookie.com/embed/ https://player.vimeo.com/video/ https://giphy.com/embed/; " +
     "base-uri 'none'; " +
     "form-action 'self'; frame-ancestors 'none'$",
 );
+const HASH = /'sha256-[^']+'/g;
 const PASSWORD = `Basic ${btoa("team:a test password")}`;
 const BUILD = new URL("../../build/", import.meta.url);
 
 test.describe("the content security policy", () => {
-  test("is one policy on every answer: each page, the fallback, files, a 400, a 401 and a 500", async ({ request }) => {
+  // 5f: one policy a page, not one for all of them: a page's holds its own scripts' hashes, so a host that cuts a line at
+  // 2,000 characters (Cloudflare Pages) takes any number of worlds.
+  test("is a policy of the right shape on every answer: each page, the fallback, files, a 400, a 401 and a 500", async ({
+    request,
+  }) => {
     const answers = [];
     for (const path of [...PAGES, "/nowhere", "/w/Bubble", "/sw.js", "/manifest.webmanifest", "/icon-192.png"]) {
       answers.push(await request.get(path));
@@ -28,31 +33,60 @@ test.describe("the content security policy", () => {
       // Each page, the worker, the manifest, the icon, and the guarded home with its password.
       [...PAGES.map(() => 200), 200, 200, 200, 200, 400, 401, 404, 404, 404, 500].toSorted(),
     );
-    const policies = new Set(answers.map((answer) => answer.headers()["content-security-policy"]));
-    expect(policies.size).toBe(1);
-    expect([...policies][0]).toMatch(SHAPE);
+    for (const answer of answers) expect(answer.headers()["content-security-policy"]).toMatch(SHAPE);
   });
 
-  test("is the same in the three places a host reads it: _headers, nginx's include and the test host", async ({
+  test("gives each page a policy of its own, under a host's 2,000-character line, and another at its canonical address", async ({
     request,
   }) => {
-    const served = (await request.get("/")).headers()["content-security-policy"];
-    const headers = readFileSync(new URL("client/_headers", BUILD), "utf8");
-    const nginx = readFileSync(new URL("csp.conf", BUILD), "utf8");
-    expect(headers).toBe(`/*\n  Content-Security-Policy: ${String(served)}\n`);
-    expect(nginx).toBe(`add_header Content-Security-Policy "${String(served)}" always;\n`);
+    const served = new Map<string, string>();
+    for (const path of PAGES) {
+      const policy = String((await request.get(path)).headers()["content-security-policy"]);
+      served.set(path, policy);
+      expect(`  Content-Security-Policy: ${policy}`.length, path).toBeLessThan(2000);
+      // A page holds its scripts: React Router's five, so five hashes.
+      expect(policy.match(HASH), path).toHaveLength(5);
+    }
+    // A world's page and the home differ in their scripts (the routes' files, the loader data): not the same policy.
+    expect(new Set(served.values()).size).toBeGreaterThan(1);
+    // A page's path and its canonical address hold different loader data: a policy of its own for each.
+    expect(served.get("/w/bubble")).not.toBe(served.get("/net/onyx/w/bubble"));
   });
 
-  test("names the hash of every inline script the built pages hold, as the browser parses them, and no other", async ({
+  test("is the same in the three places a host reads it: _headers, nginx's table and the test host", async ({
+    request,
+  }) => {
+    const headers = readFileSync(new URL("client/_headers", BUILD), "utf8");
+    const nginx = readFileSync(new URL("csp.conf", BUILD), "utf8");
+    expect(nginx).toMatch(/^map \$uri \$csp \{$/m);
+    // Read as a host and nginx read them, apart from how the build wrote them: a rule's path, its policy line; a key, its value.
+    const rules = new Map<string, string>();
+    let rule = "";
+    for (const line of headers.split("\n")) {
+      if (/^\S/.test(line)) rule = line;
+      const found = /^ {2}Content-Security-Policy: (.+)$/.exec(line)?.[1];
+      if (found !== undefined) rules.set(rule, found);
+    }
+    const table = new Map(
+      [...nginx.matchAll(/^\s*"?([^"\s]+)"?\s+"([^"]*)";$/gm)].map((match) => [match[1] ?? "", match[2] ?? ""]),
+    );
+    for (const path of PAGES) {
+      const served = String((await request.get(path)).headers()["content-security-policy"]);
+      expect(rules.get(path), path).toBe(served);
+      expect(table.get(path), path).toBe(served);
+    }
+  });
+
+  test("names, for each page, the hash of every inline script the page holds, as the browser parses it, and no other", async ({
     page,
     request,
   }) => {
-    const served = String((await request.get("/")).headers()["content-security-policy"]);
     await page.goto("/");
-    const hashes = new Set<string>();
     // The pre-rendered pages, and the fallback a path the build never made gets.
     for (const path of [...PAGES, "/nowhere"]) {
-      const html = await (await request.get(path)).text();
+      const answer = await request.get(path);
+      const served = String(answer.headers()["content-security-policy"]);
+      const html = await answer.text();
       // The browser's own parser and digest, apart from the build's reading of the same pages. A JSON-LD block runs nothing: no hash.
       const found = await page.evaluate(async (source) => {
         const scripts = [...new DOMParser().parseFromString(source, "text/html").scripts];
@@ -66,9 +100,8 @@ test.describe("the content security policy", () => {
           }),
         );
       }, html);
-      for (const hash of found) hashes.add(hash);
+      expect(found.toSorted(), path).toEqual((served.match(HASH) ?? []).toSorted());
     }
-    expect([...hashes].toSorted()).toEqual((served.match(/'sha256-[^']+'/g) ?? []).toSorted());
   });
 
   test("ends on a navigation under way, which the fixture's last check waits out", async ({ page }) => {

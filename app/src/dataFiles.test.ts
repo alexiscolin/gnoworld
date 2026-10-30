@@ -1,10 +1,20 @@
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadData, MAX_FILE_BYTES } from "./dataFiles.ts";
-import { sha256 } from "./csp.ts";
+import { inlineScripts, sha256 } from "./csp.ts";
 import { at, FAULTS, plant } from "./dataFixture.ts";
 
 // Markup, a comment opener and a line separator in a description: what JSON-LD must carry as text.
@@ -12,6 +22,75 @@ const HOSTILE = "</script><script>alert(1)</script><!-- \u2028";
 /** The text of each JSON-LD script of a page, as the browser reads it. */
 const ldScripts = (html: string): string[] =>
   [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((match) => match[1] ?? "");
+
+/** Each page's policy in `_headers`: the address of its rule, then the policy. */
+function headerPolicies(headers: string): Map<string, string> {
+  const found = new Map<string, string>();
+  let rule = "";
+  for (const line of headers.split("\n")) {
+    if (/^\S/.test(line)) rule = line;
+    const policy = /^ {2}Content-Security-Policy: (.+)$/.exec(line)?.[1];
+    if (policy !== undefined) found.set(rule, policy);
+  }
+  return found;
+}
+
+/** The pages of a build: the address each is served at and its html. */
+function pagesOf(client: string): [string, string][] {
+  return readdirSync(client, { recursive: true })
+    .map(String)
+    .filter((file) => file.endsWith(".html"))
+    .map((file) => [`/${file.replace(/(?:^|\/)index\.html$/, "")}`, readFileSync(join(client, file), "utf8")]);
+}
+
+/** The policies a host holds for a page: _headers takes its address with and without its slash; nginx's table, also at its file. */
+function lookups(
+  address: string,
+  headers: Map<string, string>,
+  table: Map<string, string>,
+): (readonly [string, string | undefined])[] {
+  if (address.endsWith(".html"))
+    return [
+      ["_headers", headers.get(address)],
+      ["nginx", table.get(address)],
+    ];
+  const slashed = address.endsWith("/") ? address : `${address}/`;
+  return [
+    ["_headers", headers.get(address)],
+    ["_headers", headers.get(slashed)],
+    ["nginx", table.get(address)],
+    ["nginx", table.get(slashed)],
+    ["nginx", table.get(`${slashed}index.html`)],
+  ];
+}
+
+/**
+ * Every page's policy, in `_headers` and in nginx's table: exactly the hashes of the scripts the page holds (JSON-LD, a
+ * data block, has none), each line under `cap` characters, the longest page named when one is not.
+ */
+async function expectPolicies(client: string, conf: string, cap: number): Promise<void> {
+  const headers = headerPolicies(readFileSync(join(client, "_headers"), "utf8"));
+  const table = new Map(
+    [...readFileSync(conf, "utf8").matchAll(/^\s*"?([^"\s]+)"?\s+"([^"]*)";$/gm)].map((match) => [
+      match[1] ?? "",
+      match[2] ?? "",
+    ]),
+  );
+  const pages = pagesOf(client);
+  expect(pages.length).toBeGreaterThan(1);
+  let longest = ["", 0] as [string, number];
+  for (const [address, html] of pages) {
+    const own = (await Promise.all(inlineScripts(html).map(sha256))).sort();
+    for (const [where, policy] of lookups(address, headers, table)) {
+      expect(policy, `${where} ${address}`).toBeDefined();
+      expect(policy?.match(/'sha256-[^']+'/g)?.sort(), `${where} ${address}`).toEqual(own);
+    }
+    const length = `  Content-Security-Policy: ${headers.get(address) ?? ""}`.length;
+    if (length > longest[1]) longest = [address, length];
+  }
+  // Five scripts a page, none shared as one list of every page's: the longest page is named when it is over.
+  expect(longest[1], `the longest _headers line is ${longest[0]}`).toBeLessThan(cap);
+}
 
 // Slice 5's 5c: the data files read and checked at build time (docs/plans/slice-5.md §3, "Data files").
 describe("loadData", () => {
@@ -188,55 +267,57 @@ describe("react-router build", () => {
   // The positive control: the data drives the pages. A build that ignored GNOWORLD_DATA, or kept a list in the config,
   // would write bubble alone; a config that failed on every build would write nothing. 5d: each place has its page, at its
   // path and at its canonical address: a world of another universe, the Earth of each universe, an ecosystem, the list.
-  it("writes the page of each place, at its path and its canonical address, and the list", { timeout: 120_000 }, () => {
-    const dir = plant((files) => {
-      const hubs = files["hubs.json"] as Record<string, unknown>[];
-      hubs.push({ ...hubs[0], slug: "mars", name: "Mars" });
-      hubs.push({ ...hubs[0], slug: "other", name: "Other", universe: "gnoland" });
-      files["ecosystems.json"] = [
-        { slug: "tokens", name: "Tokens", description: "The tokens of the chain.", universe: "onyx" },
-      ];
-    });
-    try {
-      const run = build(dir);
-      expect(run.status, `${run.stdout}${run.stderr}`).toBe(0);
-      const client = join(copy, "build", "client");
-      const page = (...path: string[]) => readFileSync(join(client, ...path, "index.html"), "utf8");
-      const pages: [string[], string, string][] = [
-        [[], "gno.world", "/net/onyx/"],
-        [["w", "bubble"], "Bubble", "/net/onyx/w/bubble"],
-        [["w", "mars"], "Mars", "/net/onyx/w/mars"],
-        [["net", "onyx"], "gno.world", "/net/onyx/"],
-        [["net", "onyx", "w", "mars"], "Mars", "/net/onyx/w/mars"],
-        [["net", "gnoland"], "gno.land", "/net/gnoland/"],
-        [["net", "gnoland", "w", "other"], "Other", "/net/gnoland/w/other"],
-        [["earth"], "Earth", "/net/onyx/earth"],
-        [["net", "onyx", "earth"], "Earth", "/net/onyx/earth"],
-        [["net", "gnoland", "earth"], "Earth", "/net/gnoland/earth"],
-        [["e", "tokens"], "Tokens", "/net/onyx/e/tokens"],
-        [["net", "onyx", "e", "tokens"], "Tokens", "/net/onyx/e/tokens"],
-        [["list"], "Places", "/list"],
-      ];
-      for (const [path, heading, canonical] of pages) {
-        const html = page(...path);
-        const where = path.join("/") || "/";
-        expect(html, where).toContain(`<h1>${heading}</h1>`);
-        expect(html, where).toContain(`<link rel="canonical" href="https://gno.world${canonical}"/>`);
+  it(
+    "writes the page of each place, at its path and its canonical address, and the list",
+    { timeout: 120_000 },
+    async () => {
+      const dir = plant((files) => {
+        const hubs = files["hubs.json"] as Record<string, unknown>[];
+        hubs.push({ ...hubs[0], slug: "mars", name: "Mars" });
+        hubs.push({ ...hubs[0], slug: "other", name: "Other", universe: "gnoland" });
+        files["ecosystems.json"] = [
+          { slug: "tokens", name: "Tokens", description: "The tokens of the chain.", universe: "onyx" },
+        ];
+      });
+      try {
+        const run = build(dir);
+        expect(run.status, `${run.stdout}${run.stderr}`).toBe(0);
+        const client = join(copy, "build", "client");
+        const page = (...path: string[]) => readFileSync(join(client, ...path, "index.html"), "utf8");
+        const pages: [string[], string, string][] = [
+          [[], "gno.world", "/net/onyx/"],
+          [["w", "bubble"], "Bubble", "/net/onyx/w/bubble"],
+          [["w", "mars"], "Mars", "/net/onyx/w/mars"],
+          [["net", "onyx"], "gno.world", "/net/onyx/"],
+          [["net", "onyx", "w", "mars"], "Mars", "/net/onyx/w/mars"],
+          [["net", "gnoland"], "gno.land", "/net/gnoland/"],
+          [["net", "gnoland", "w", "other"], "Other", "/net/gnoland/w/other"],
+          [["earth"], "Earth", "/net/onyx/earth"],
+          [["net", "onyx", "earth"], "Earth", "/net/onyx/earth"],
+          [["net", "gnoland", "earth"], "Earth", "/net/gnoland/earth"],
+          [["e", "tokens"], "Tokens", "/net/onyx/e/tokens"],
+          [["net", "onyx", "e", "tokens"], "Tokens", "/net/onyx/e/tokens"],
+          [["list"], "Places", "/list"],
+        ];
+        for (const [path, heading, canonical] of pages) {
+          const html = page(...path);
+          const where = path.join("/") || "/";
+          expect(html, where).toContain(`<h1>${heading}</h1>`);
+          expect(html, where).toContain(`<link rel="canonical" href="https://gno.world${canonical}"/>`);
+        }
+        // The home lists the worlds of its universe alone, and the data's order is not a page.
+        expect(page()).toContain(">Mars</a>");
+        expect(page()).not.toContain(">Other</a>");
+        expect(existsSync(join(client, "w", "other"))).toBe(false);
+        expect(existsSync(join(client, "e", "other"))).toBe(false);
+        // 5f: each page has a policy of its own, holding its own scripts' hashes and no other (csp.ts), in _headers and in
+        // nginx's table.
+        await expectPolicies(client, join(copy, "build", "csp.conf"), 2000);
+      } finally {
+        rmSync(dir, { recursive: true });
       }
-      // The home lists the worlds of its universe alone, and the data's order is not a page.
-      expect(page()).toContain(">Mars</a>");
-      expect(page()).not.toContain(">Other</a>");
-      expect(existsSync(join(client, "w", "other"))).toBe(false);
-      expect(existsSync(join(client, "e", "other"))).toBe(false);
-      // csp.ts's one header line holds every page's hashes: a host may cut a _headers line past 2,000 characters, and
-      // each world now writes two pages in the default universe. This set has three worlds and an ecosystem, and each page
-      // carries a JSON-LD, which the policy leaves unhashed (5e).
-      const headers = readFileSync(join(client, "_headers"), "utf8").split("\n")[1] ?? "";
-      expect(headers.length, "the _headers policy line").toBeLessThan(2000);
-    } finally {
-      rmSync(dir, { recursive: true });
-    }
-  });
+    },
+  );
 
   // Slice 5's 5e: the build writes what a search engine reads, from the same data: the mainnet's places in sitemap.xml, robots.txt
   // naming it, and the pages' tags (a testnet's page noindex, a card and a JSON-LD on each).
@@ -285,6 +366,94 @@ describe("react-router build", () => {
       const policy = readFileSync(join(client, "_headers"), "utf8");
       for (const text of [...ldScripts(onyx), ...lds]) expect(policy).not.toContain(await sha256(text));
     } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+  // 5f, F2362: the hostile description of 5e's test, in the pages the policy is read from: the page holds the scripts React
+  // Router wrote and no other, so the escape of its JSON (React Router's own, markup.js) is pinned by the build. Five
+  // inline scripts a page and a JSON-LD: the module, the scroll restoration, the context, the loader data, its close.
+  it(
+    "holds, in a page with a hostile description, the five scripts React Router writes and one JSON-LD block, and no other",
+    { timeout: 120_000 },
+    () => {
+      const dir = plant((files) => {
+        const hubs = files["hubs.json"] as Record<string, unknown>[];
+        hubs.push({
+          ...hubs[0],
+          slug: "other",
+          name: "Other",
+          universe: "gnoland",
+          description: `${HOSTILE} ${"B".repeat(60)}`,
+        });
+      });
+      try {
+        const run = build(dir);
+        expect(run.status, `${run.stdout}${run.stderr}`).toBe(0);
+        const client = join(copy, "build", "client");
+        // A positive control: the description did reach the page, as the text of its one JSON-LD block.
+        const hostile = readFileSync(join(client, "net", "gnoland", "w", "other", "index.html"), "utf8");
+        expect(hostile).toContain("alert(1)");
+        expect(hostile.match(/<script type="application\/ld\+json">/g)).toHaveLength(1);
+        expect(hostile.match(/<script\b/g)).toHaveLength(6);
+        for (const [address, html] of pagesOf(client)) {
+          if (address === "/__spa-fallback.html") continue;
+          expect(inlineScripts(html), address).toHaveLength(5);
+          expect(html, address).not.toContain("<script>alert(1)");
+          // The text closed nothing: the markup after it is the page's own.
+          expect(html, address).not.toMatch(/<\/script><script>alert/);
+        }
+      } finally {
+        rmSync(dir, { recursive: true });
+      }
+    },
+  );
+
+  // 5f: header size at the data's size and at 16 times it. Each page's policy holds its own scripts: a line of some 600
+  // characters whatever the number of pages, where one policy for all of them passed 2,000 at about 7 worlds. The largest
+  // page is named when a line is over the cap of a host that cuts a _headers line there (Cloudflare Pages).
+  it.each([
+    ["3 worlds", 3],
+    ["16 times as many: 48 worlds", 48],
+  ])("keeps every page's policy line under 2,000 characters at %s", { timeout: 300_000 }, async (_, worlds) => {
+    const dir = plant((files) => {
+      const hubs = files["hubs.json"] as Record<string, unknown>[];
+      for (let n = 1; n < worlds; n += 1) hubs.push({ ...hubs[0], slug: `w${String(n)}`, name: `World ${String(n)}` });
+    });
+    try {
+      const run = build(dir);
+      expect(run.status, `${run.stdout}${run.stderr}`).toBe(0);
+      const client = join(copy, "build", "client");
+      await expectPolicies(client, join(copy, "build", "csp.conf"), 2000);
+      // The cap's check fails for its own reason, naming the longest page, when a line is over it.
+      await expect(expectPolicies(client, join(copy, "build", "csp.conf"), 100)).rejects.toThrow(
+        /the longest _headers line is \/\S*/,
+      );
+      // Two pages a world in the default universe, and the home, the earth, the list, the fallback.
+      expect(pagesOf(client).length).toBeGreaterThanOrEqual(worlds * 2);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  // F475: a script planted in a page fails the build and writes no policy. The page is planted through the app's own root
+  // (a copy of it, as this describe's builds are), as a component of the app that wrote a script would.
+  it("stops on a script planted in the pages: the build fails and writes neither policy", { timeout: 120_000 }, () => {
+    const dir = plant();
+    const root = join(copy, "src", "root.tsx");
+    const original = readFileSync(root, "utf8");
+    try {
+      expect(original).toContain("<Scripts />");
+      writeFileSync(
+        root,
+        original.replace("<Scripts />", '<Scripts /><script dangerouslySetInnerHTML={{ __html: "alert(1)" }} />'),
+      );
+      const run = build(dir);
+      expect(run.status).not.toBe(0);
+      expect(`${run.stdout}${run.stderr}`).toMatch(/csp: .*script/);
+      expect(existsSync(join(copy, "build", "client", "_headers"))).toBe(false);
+      expect(existsSync(join(copy, "build", "csp.conf"))).toBe(false);
+    } finally {
+      writeFileSync(root, original);
       rmSync(dir, { recursive: true });
     }
   });
