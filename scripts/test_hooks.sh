@@ -1063,6 +1063,15 @@ git -C "$hs/repo" commit -qam "no dry line" && base=$(git -C "$hs/repo" rev-pars
 cp "$hs/hm.keep" "$hs/repo/harness_mutate.py" && git -C "$hs/repo" commit -qam "the dry line back"
 out=$(shards 2 --changed "$base") && fail "harness_mutate --changed passed with survivors after a base it could not read: $out"
 [ "$(verdicts "$out")" = 8 ] || fail "harness_mutate --changed did not judge every mutant against a base script it could not read: $out"
+# A name base's script imports that this tree's suite_parts.py dropped: base's script reads base's helper, and still says its
+# mutants (touched(), gone with the rule by lines, made all 973 of harness-a's look new, which only --full could then pass).
+cp "$hs/repo/harness_mutate.py" "$hs/hm.keep" && cp "$hs/repo/suite_parts.py" "$hs/sp.keep"
+printf '\n\ndef dropped():\n    pass\n' >>"$hs/repo/suite_parts.py"
+sed 's|^from suite_parts import code, parts, select$|from suite_parts import code, dropped, parts, select|' "$hs/hm.keep" >"$hs/repo/harness_mutate.py"
+git -C "$hs/repo" commit -qam "a helper base has" && base=$(git -C "$hs/repo" rev-parse HEAD)
+cp "$hs/hm.keep" "$hs/repo/harness_mutate.py" && cp "$hs/sp.keep" "$hs/repo/suite_parts.py" && git -C "$hs/repo" commit -qam "the helper dropped"
+out=$(shards 2 --changed "$base") || :
+[ "$(verdicts "$out")" = 0 ] && printf '%s\n' "$out" | grep -q " 0 of 8 mutants" || fail "harness_mutate --changed took every mutant for new when base's helper had a name this tree's lacks: $out"
 # A passes file it cannot read (a folder here): it refuses, before any worktree, and never judges fewer mutants.
 mkdir -p "$hs/repo/docs/review-passes.txt" && : >"$hs/repo/docs/review-passes.txt/x" && git -C "$hs/repo" add docs && git -C "$hs/repo" commit -qm "an unreadable record"
 rm -f "$hs/made"

@@ -25,6 +25,7 @@ import re
 import subprocess
 import sys
 import threading
+import types
 
 sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no __pycache__
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # -I leaves this folder off the path
@@ -364,6 +365,7 @@ def mutants():
     yield from each(hm, "    if not found" ":  # nothing to judge", "    if False:  # nothing to judge", "hooks", "harness_mutate --changed runs no control when it judges no mutant")
     yield from each(hm, "elif sys.argv[1:]" ":\n", "elif False:\n", "hooks", "harness_mutate refuses an unknown argument")
     yield from each(hm, "    if base.startswith" "(\"-\"):", "    if False:", "hooks", "harness_mutate --changed takes no option for its base")
+    yield from each(hm, 'sys.modules["suite_parts"]' " = theirs", "theirs", "hooks", "harness_mutate --changed reads base's script with base's helper")
     yield from each(hm, "    if before is" " None:", "    if False:", "hooks", "harness_mutate --changed judges every mutant against a base script it cannot read")
     yield from each(hm, "identity(m, sections, GAPS) not" " in before}", "False}", "hooks", "harness_mutate --changed judges the mutants it defines anew or otherwise")
     yield from each(hm, "return label, path, test, judged_by, label" " in gaps, None", "return label, path, test, None, False, None", "hooks", "harness_mutate --changed tells a mutant by its sections and its place in GAPS")
@@ -1101,10 +1103,14 @@ def identity(mutant, sections_of, gaps):
 
 def defined_at(base):
     """The identities of the mutants base's script defines, built on this tree's files; None when it cannot say (no
-    such file, no `--dry` line to cut its definitions at, its code failing here): then every mutant is judged."""
-    shown = subprocess.run(["git", "show", f"{base}:{SELF}"], capture_output=True, text=True).stdout
+    such file, no `--dry` line to cut its definitions at, its code failing here): then every mutant is judged. Its helper
+    is base's too: a name this tree's dropped would otherwise fail its import, and every mutant look new."""
+    shown, helper = (subprocess.run(["git", "show", f"{base}:{path}"], capture_output=True, text=True).stdout for path in (SELF, os.path.join(os.path.dirname(SELF), "suite_parts.py")))
     space = {"__name__": "harness_mutate_at_base", "__file__": os.path.abspath(__file__)}
+    theirs = types.ModuleType("suite_parts")
     try:  # base's own code, whatever it raises: judging every mutant is the safe side
+        exec(compile(helper, f"{base}:suite_parts.py", "exec"), theirs.__dict__)
+        sys.modules["suite_parts"] = theirs  # this script bound its own names when it started
         exec(compile(shown[: DRY.search(shown).start()], f"{base}:{SELF}", "exec"), space)
         space["WORKTREE"] = WORKTREE
         return {identity(m, space["sections"], space["GAPS"]) for m in space["mutants"]()}
