@@ -1,4 +1,4 @@
-import { Button, Chip, Cluster, Stack } from "@gnoworld/ui";
+import { Button, Chip, Cluster, PlanetThumb, Stack } from "@gnoworld/ui";
 import { useState } from "react";
 import { filterByGenre, type ListedPlace } from "./filter.ts";
 
@@ -46,6 +46,8 @@ export function PlacesList({ places, genres }: { places: ListedPlace[]; genres: 
         <ul aria-label="Places">
           {shown.map((place) => (
             <li key={place.path}>
+              {/* No capture exists yet: the drawn fallback, never a picture from elsewhere. */}
+              <PlanetThumb src="" name={place.name} size="s" decorative />
               <Button href={place.path} emphasis="quiet">
                 {place.name}
               </Button>
