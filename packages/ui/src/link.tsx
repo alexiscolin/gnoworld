@@ -9,6 +9,9 @@ export type PageLinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & { href: st
 type DrawLink = (props: PageLinkProps) => ReactNode;
 
 const PageLinkContext = createContext<DrawLink | null>(null);
+// Which of the site's own paths the app routes (F326): one it does not, a file of the site, stays a plain anchor.
+const everyPath = () => true;
+const PagesContext = createContext<(href: string) => boolean>(everyPath);
 
 // A path from the site's root, as the browser's own parser reads it: an href it takes for another host
 // ("//…", "/\…", tabs and line ends dropped first) or cannot read stays a plain anchor. The origin
@@ -22,14 +25,28 @@ function ownPath(href: string): boolean {
   }
 }
 
-/** Hands every link of the design system inside it the page's own link, for the site's own paths. */
-export function LinkProvider({ link, children }: { link: DrawLink; children: ReactNode }) {
-  return <PageLinkContext value={link}>{children}</PageLinkContext>;
+/** Hands every link of the design system inside it the page's own link, for the site's own paths; `pages` says which
+ * of them the app routes (all, by default). */
+export function LinkProvider({
+  link,
+  pages = everyPath,
+  children,
+}: {
+  link: DrawLink;
+  pages?: (href: string) => boolean;
+  children: ReactNode;
+}) {
+  return (
+    <PagesContext value={pages}>
+      <PageLinkContext value={link}>{children}</PageLinkContext>
+    </PagesContext>
+  );
 }
 
 /** An anchor: the page's link for a path from the site's root, a plain one for anything else, or
  * when it must `reload` the document, as an error page's way out does (F325). */
 export function Anchor({ reload = false, ...props }: PageLinkProps & { reload?: boolean }) {
   const link = use(PageLinkContext);
-  return link !== null && !reload && ownPath(props.href) ? link(props) : <a {...props} />;
+  const pages = use(PagesContext);
+  return link !== null && !reload && ownPath(props.href) && pages(props.href) ? link(props) : <a {...props} />;
 }

@@ -4,8 +4,20 @@ import { expect, hydrated, reactMark, test, type Page } from "./fixtures.ts";
 
 // The pages slice 1 pre-renders (ADR-0002 §2), with the address each names as its own.
 const pages = [
-  { path: "/", title: "gno.world", heading: "gno.world", canonical: "https://gno.world/" },
-  { path: "/w/bubble", title: "Bubble · gno.world", heading: "Bubble", canonical: "https://gno.world/w/bubble" },
+  { path: "/", title: "gno.world", heading: "gno.world", canonical: "https://gno.world/net/onyx/" },
+  {
+    path: "/w/bubble",
+    title: "Bubble · gno.world",
+    heading: "Bubble",
+    canonical: "https://gno.world/net/onyx/w/bubble",
+  },
+  { path: "/net/onyx/", title: "gno.world", heading: "gno.world", canonical: "https://gno.world/net/onyx/" },
+  {
+    path: "/net/onyx/w/bubble",
+    title: "Bubble · gno.world",
+    heading: "Bubble",
+    canonical: "https://gno.world/net/onyx/w/bubble",
+  },
 ];
 // Paths no file answers: an unknown world, and paths that match no route at all.
 const notFound = [
@@ -78,14 +90,45 @@ test.describe("as a search engine reads it, before any script runs", () => {
       expect.soft(await tag(page, 'meta[property="og:description"]')).toBe(description);
       expect.soft(await tag(page, 'meta[property="og:url"]')).toBe(canonical);
       expect.soft(await tag(page, 'meta[property="og:type"]')).toBe("website");
-      await expect.soft(page.locator('meta[name="robots"]')).toHaveCount(0);
+      // Every page here is Onyx's, a testnet: not indexed (5e).
+      expect.soft(await tag(page, 'meta[name="robots"]')).toBe("noindex");
+      expect.soft(await tag(page, 'meta[name="twitter:card"]')).toBe("summary");
+      await expect.soft(page.locator('script[type="application/ld+json"]')).toHaveCount(1);
       expect.soft(await tag(page, 'link[rel="icon"][type="image/svg+xml"]')).toBe("/icon.svg");
     });
   }
 
+  // What Lighthouse's SEO audits read besides the tags: the page's language and a link's text.
+  for (const { path } of pages) {
+    test(`${path} names its language, and every link has text of its own`, async ({ page }) => {
+      await page.goto(path);
+      await expect(page.locator("html")).toHaveAttribute("lang", /^[a-z]{2}(-[A-Za-z0-9]+)*$/);
+      const texts = await page.locator("a[href]").evaluateAll((links) =>
+        links.map((link) => {
+          const text = link.textContent.trim();
+          return text === "" ? (link.getAttribute("aria-label") ?? "").trim() : text;
+        }),
+      );
+      expect(texts.length).toBeGreaterThan(0);
+      for (const text of texts) {
+        expect(text).not.toBe("");
+        expect(text.toLowerCase()).not.toMatch(/^(click here|here|read more|more|learn more|link|this)$/);
+      }
+    });
+  }
+
+  test("the host serves robots.txt and the sitemap of the mainnet, not a page", async ({ request }) => {
+    const robots = await request.get("/robots.txt");
+    expect(robots.status()).toBe(200);
+    expect(await robots.text()).toContain("Sitemap: https://gno.world/sitemap.xml");
+    const sitemap = await request.get("/sitemap.xml");
+    expect(sitemap.status()).toBe(200);
+    expect(await sitemap.text()).toContain("<loc>https://gno.world/net/gnoland/</loc>");
+  });
+
   test("a world's page names the same canonical with a trailing slash", async ({ page }) => {
     await page.goto("/w/bubble/");
-    expect(await tag(page, 'link[rel="canonical"]')).toBe("https://gno.world/w/bubble");
+    expect(await tag(page, 'link[rel="canonical"]')).toBe("https://gno.world/net/onyx/w/bubble");
   });
 
   test("a path no file answers is not pre-rendered: the host answers 404", async ({ request }) => {
@@ -131,8 +174,8 @@ test.describe("once the client takes over", () => {
       url: "/w/bubble",
       title: "Bubble · gno.world",
     });
-    expect(await tag(page, 'link[rel="canonical"]')).toBe("https://gno.world/w/bubble");
-    expect(await tag(page, 'meta[property="og:url"]')).toBe("https://gno.world/w/bubble");
+    expect(await tag(page, 'link[rel="canonical"]')).toBe("https://gno.world/net/onyx/w/bubble");
+    expect(await tag(page, 'meta[property="og:url"]')).toBe("https://gno.world/net/onyx/w/bubble");
     await expect(page.locator('meta[name="description"]')).toHaveCount(1);
   });
 
@@ -170,6 +213,8 @@ test.describe("once the client takes over", () => {
       });
       await page.goto(path);
       await hydrated(page);
+      // fonts.ready can settle before layout has asked for the face, under load: ask for it, then wait.
+      await page.evaluate(() => document.fonts.load('1em "Geist Variable"'));
       await page.evaluate(() => document.fonts.ready);
       // check() answers true for a family no face declares: only a loaded face proves the font.
       const look = await page.evaluate(() => ({
@@ -236,7 +281,7 @@ test("the React Compiler compiled the routes, not only React's own runtime", asy
   // own built-in one only lists it (`c:function`).
   const texts = await Promise.all(chunks.map(async (chunk) => (await request.get(chunk)).text()));
   expect(texts.some((text) => /\.c=function\(\w+\)\{return \w+\.H\.useMemoCache\(\w+\)\}/.test(text))).toBe(true);
-  const routes = chunks.filter((chunk) => /\/assets\/(root|home)-/.test(chunk));
+  const routes = chunks.filter((chunk) => /\/assets\/(root|home-main)-/.test(chunk));
   expect(routes.length).toBeGreaterThan(0);
   for (const chunk of routes) {
     expect(await (await request.get(chunk)).text(), chunk).toContain("react.memo_cache_sentinel");

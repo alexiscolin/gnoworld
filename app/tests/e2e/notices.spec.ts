@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { lineOf, roomsNav, word } from "./chat.ts";
+import { lineOf, noticeStatus, roomsNav, word } from "./chat.ts";
 import { expect, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { field, hiddenTab, HISTORY, live, OTHER, room, tab, T } from "./scriptedRoom.ts";
@@ -74,7 +74,7 @@ test.describe("notifications", () => {
     await expect(lineOf(page, "a barrier")).toBeVisible();
     await expect(page).toHaveTitle(BASE);
     await expect(rowOf(page, "#games")).not.toContainText("unread");
-    await expect(roomsNav(page).getByRole("status")).toHaveText("");
+    await expect(noticeStatus(page)).toHaveText("");
   });
 
   test("tells a screen reader nothing for a mention in a room set to Nothing, or in the room in view", async ({
@@ -86,7 +86,7 @@ test.describe("notifications", () => {
     ergo().send(live("n1", T(31), { text: mentioned(address, "muted") }));
     ergo().send(live("n2", T(32), { room: "#bubble", text: "a barrier" }));
     await expect(page).toHaveTitle(BASE);
-    await expect(roomsNav(page).getByRole("status")).toHaveText("");
+    await expect(noticeStatus(page)).toHaveText("");
   });
 
   const modes = (page: Page, name: string) => page.getByRole("group", { name: `Notifications for ${name}` });
@@ -269,7 +269,7 @@ test.describe("notifications", () => {
     const { address, ergo } = await account(page);
     await field(page).focus();
     ergo().send(live("n1", T(31), { room: "#bubble", text: mentioned(address) }));
-    await expect(roomsNav(page).getByRole("status")).toHaveText(`${SHORT} mentioned you in #bubble`);
+    await expect(noticeStatus(page)).toHaveText(`${SHORT} mentioned you in #bubble`);
     await expect(field(page)).toBeFocused();
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   });

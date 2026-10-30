@@ -1,0 +1,11 @@
+[
+  {
+    "id": "onyx",
+    "name": "Onyx",
+    "chainId": "onyx-1",
+    "rpc": "https://rpc.onyx.testnets.gno.land:443",
+    "testnet": true,
+    "default": true
+  },
+  { "id": "gnoland", "name": "gno.land", "chainId": "gnoland-1", "rpc": "https://rpc.gno.land:443", "testnet": false }
+]

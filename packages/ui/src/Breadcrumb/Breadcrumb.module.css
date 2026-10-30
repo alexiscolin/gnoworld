@@ -1,0 +1,27 @@
+@layer components {
+  .trail ol {
+    padding-inline-start: 0;
+    list-style: none;
+    /* layout: the list's own margin, which the browser gives it, taken off */
+    margin: 0;
+  }
+
+  .trail li + li::before {
+    content: "/\00a0";
+    color: var(--color-text-muted);
+  }
+
+  /* A step is a target of 24 px at least, as every control (WCAG 2.5.8). */
+  .trail a {
+    /* layout: a step's words centred in its 24 px target */
+    display: inline-flex;
+    /* layout: a step's words centred in its 24 px target */
+    align-items: center;
+    min-block-size: var(--control-xs);
+  }
+
+  .trail [aria-current="page"] {
+    color: var(--color-text);
+    font-weight: 500;
+  }
+}

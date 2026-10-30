@@ -2,7 +2,7 @@
 // context ends the browser, so each test gets a browser of its own; elsewhere, Playwright's own.
 import { expect, test as base, type Page, type Response as Answer, type Worker } from "@playwright/test";
 import { VIOLATION } from "../../src/sw/report.ts";
-import { WORLDS, worldPath } from "../../src/worlds.ts";
+import { site } from "../../src/places.ts";
 
 export { expect, type Answer, type Page };
 
@@ -125,8 +125,12 @@ export async function hydrated(page: Page): Promise<void> {
   await page.waitForFunction(reactMark);
 }
 
-// The site's pages: the home, and each world's.
-export const PAGES = ["/", ...WORLDS.map(worldPath)];
+// The site's pages: each place of the data, at its path and at its canonical address (the same page, written twice, with
+// its own inline scripts), and the list.
+export const PAGES = [...new Set([...site.places.flatMap((place) => [place.path, place.canonical]), "/list"])];
+
+/** Whether a page is a world's, which holds a chat. */
+export const isWorld = (path: string) => /\/w\/[^/]+$/.test(path);
 
 // A worker controls the page, so its install is done.
 export async function controlled(page: Page): Promise<void> {

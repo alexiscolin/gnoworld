@@ -2,14 +2,19 @@ import { data, type ClientLoaderFunctionArgs, type MetaArgs, type RouteObject } 
 import { describe, expect, test } from "vitest";
 import { BACK_HOME, alertOf, render, routeError } from "../../tests/render.tsx";
 import { failedWorldMeta, worldMeta } from "../meta.ts";
-import { findWorld } from "../worlds.ts";
+import { site } from "../places.ts";
 import World, { clientLoader, ErrorBoundary, loader, meta } from "./world.tsx";
+
+const bubbleOf = () => site.world(new Request("https://gno.world/w/bubble"));
+type Bubble = ReturnType<typeof bubbleOf>;
+const at = (path: string) =>
+  ({ params: {}, request: new Request(`https://gno.world${path}`) }) as unknown as ClientLoaderFunctionArgs;
 
 function route(worldLoader: RouteObject["loader"] = loader): RouteObject {
   return { path: "/w/:world", Component: World, loader: worldLoader, ErrorBoundary };
 }
 
-function metaArgs(loaderData: ReturnType<typeof findWorld> | undefined, error?: unknown) {
+function metaArgs(loaderData: Bubble | undefined, error?: unknown) {
   return { loaderData, error } as MetaArgs<typeof loader>;
 }
 
@@ -70,8 +75,7 @@ describe("a world's page", () => {
   });
 
   test("carries a world's tags, or not found's when no world has the name", async () => {
-    const world = findWorld("bubble");
-    expect(meta(metaArgs(world))).toEqual(worldMeta(world));
+    expect(meta(metaArgs(bubbleOf()))).toEqual(worldMeta(bubbleOf()));
     expect(meta(metaArgs(undefined, await routeError(route(), "/w/nowhere")))).toEqual(worldMeta(undefined));
   });
 
@@ -80,15 +84,63 @@ describe("a world's page", () => {
     expect(meta(metaArgs(undefined, error))).toEqual(failedWorldMeta());
   });
 
-  test("finds a world in the browser as at build time, with no request", () => {
-    const params = (world: string) => ({ params: { world } }) as unknown as ClientLoaderFunctionArgs;
-    expect(clientLoader(params("bubble"))).toEqual(findWorld("bubble"));
-    expect(() => clientLoader(params("nowhere"))).toThrow();
+  test("finds a world in the browser as at build time, by the request's path", () => {
+    expect(clientLoader(at("/w/bubble"))).toEqual(bubbleOf());
+    expect(clientLoader(at("/w/bubble"))).toEqual(loader(at("/w/bubble")));
+    expect(() => clientLoader(at("/w/nowhere"))).toThrow(expect.objectContaining({ init: { status: 404 } }));
   });
 
   // Any throw passed the case above; only React Router's 404 selects the not-found page (F382).
   test("throws React Router's 404 in the browser for a world that does not exist", () => {
-    const params = { params: { world: "nowhere" } } as unknown as ClientLoaderFunctionArgs;
-    expect(() => clientLoader(params)).toThrow(expect.objectContaining({ init: { status: 404 } }));
+    expect(() => clientLoader(at("/w/nowhere"))).toThrow(expect.objectContaining({ init: { status: 404 } }));
+  });
+});
+
+// F376: React Router matches /W/bubble to the world route and the world is found by its name alone: the path's own
+// case is checked too, in the browser (React Router 8.4.0 drops `caseSensitive` on the client).
+describe("a world's page, by the case of its path (F376)", () => {
+  test.each([
+    "/W/bubble",
+    "/w/Bubble",
+    "/W/Bubble",
+    "/net/onyx/W/bubble",
+    "/NET/onyx/w/bubble",
+    "/net/Onyx/w/bubble",
+    "/net/ONYX/w/bubble",
+    "/net/gnoland/w/bubble",
+    "/net/nowhere/w/bubble",
+    "/w/__proto__",
+  ])("refuses %s in the browser with a 404", (path) => {
+    expect(() => clientLoader(at(path))).toThrow(expect.objectContaining({ init: { status: 404 } }));
+  });
+
+  test.each(["/w/bubble", "/w/bubble/", "/net/onyx/w/bubble", "/w/bubble?utm=1", "/w/bubble#x"])(
+    "still serves %s",
+    (path) => {
+      expect(clientLoader(at(path))).toEqual(bubbleOf());
+    },
+  );
+
+  test("refuses /W/bubble at build time too: the page is not served as bubble", async () => {
+    const html = await render(route(), "/W/bubble");
+    expect(html).toContain("<h1>No world here</h1>");
+  });
+
+  test("answers a refused path with tags that are not indexed and name no address", async () => {
+    const error = await routeError(route(), "/W/bubble");
+    expect(meta(metaArgs(undefined, error))).toEqual(worldMeta(undefined));
+  });
+
+  test("never echoes the path it refuses", async () => {
+    expect(await render(route(), "/w/__proto__")).not.toContain("__proto__");
+  });
+});
+
+describe("a world's page, its breadcrumb", () => {
+  test("is a navigation to the home and the Earth, ending on the world as the current page", async () => {
+    const html = await render(route(), "/w/bubble");
+    expect(html).toMatch(/<nav [^>]*aria-label="[^"]+"[^>]*>/);
+    expect(html).toMatch(/<a [^>]*href="\/earth"[^>]*>Earth<\/a>/);
+    expect(html).toMatch(/aria-current="page"[^>]*>Bubble</);
   });
 });

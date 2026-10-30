@@ -251,7 +251,10 @@ test("reads the rooms, a long unbroken line and a long link at a phone's width, 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/w/bubble?room=games");
   await hydrated(page);
+  // At a phone's width the rooms sit behind the Rooms control (slice 5's 5b): its drawer is opened to see them.
+  await page.getByRole("button", { name: /^Rooms\b/ }).click();
   for (const link of await roomsNav(page).getByRole("link").all()) await expect(link).toBeVisible();
+  await page.keyboard.press("Escape");
   await expect(lineOf(page, long)).toBeVisible();
   await expect(lineOf(page, url).getByRole("link")).toHaveAttribute("href", url);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

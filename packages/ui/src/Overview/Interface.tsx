@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { ActivityChart } from "../ActivityChart/ActivityChart.tsx";
 import { Avatar } from "../Avatar/Avatar.tsx";
+import { Breadcrumb } from "../Breadcrumb/Breadcrumb.tsx";
 import { Button } from "../Button/Button.tsx";
 import { Card } from "../Card/Card.tsx";
 import { Chip } from "../Chip/Chip.tsx";
@@ -15,6 +16,7 @@ import { Menu, Popover } from "../Popover/Popover.tsx";
 import { Row } from "../Row/Row.tsx";
 import { Stat } from "../Stat/Stat.tsx";
 import { Tabs } from "../Tabs/Tabs.tsx";
+import { Comboboxes } from "./Comboboxes.tsx";
 import { ADDRESS, DAY, disc, short } from "./samples.ts";
 
 export function Chips() {
@@ -143,7 +145,12 @@ export function Rows() {
 }
 
 export function Fields() {
-  return <Field label="Name" prefix="@" help="Letters and digits, 6 at least" value="" onChange={() => undefined} />;
+  return (
+    <Stack>
+      <Field label="Name" prefix="@" help="Letters and digits, 6 at least" value="" onChange={() => undefined} />
+      <Comboboxes />
+    </Stack>
+  );
 }
 
 export function Stats() {
@@ -199,6 +206,7 @@ export function Links() {
       <Cluster space="m">
         <Button href="/w/bubble">Fly to Bubble</Button>
         <Row title="Bubble" subtitle="A path from the site's root: the page's own link" href="/w/bubble" />
+        <Breadcrumb label="You are here" items={[{ label: "gno.world", href: "/" }, { label: "Bubble" }]} />
       </Cluster>
     </LinkProvider>
   );

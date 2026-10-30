@@ -1,11 +1,12 @@
 // What the composer keeps beside its draft (moved out of Composer.tsx, which the merge of 4e's refusals and 4f's typing
 // grew past the lint's sizes): why Ergo refused the last line, the focus at its start, the selection an edit leaves.
 import { COMMANDS, type Composed } from "@gnoworld/core";
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import type { RefusedTags } from "../../store/dms.ts";
 import { completions, type Completion } from "./complete.ts";
 import type { Edit } from "./format.ts";
 import { peopleOf } from "./names.ts";
+import { useMedia } from "./useMedia.ts";
 import { editRefusal, roomHint, said, sendable, withHint } from "./said.ts";
 
 /** The lines Ergo refused so far, the last one's draft, and why it did not go. */
@@ -82,21 +83,8 @@ export function useSelection(formRef: RefObject<HTMLFormElement | null>, draft: 
 
 const COARSE = "(pointer: coarse)";
 
-/** Whether the main pointer is a finger (a touch screen), whose keyboard has no Shift: Enter there adds a line (F1714).
- * Read as the screen says it, again when it changes; a page rendered on the server says no. */
-function useCoarsePointer(): boolean {
-  return useSyncExternalStore(
-    (onChange) => {
-      const media = window.matchMedia(COARSE);
-      media.addEventListener("change", onChange);
-      return () => {
-        media.removeEventListener("change", onChange);
-      };
-    },
-    () => window.matchMedia(COARSE).matches,
-    () => false,
-  );
-}
+/** Whether the main pointer is a finger (a touch screen), whose keyboard has no Shift: Enter there adds a line (F1714). */
+const useCoarsePointer = (): boolean => useMedia(COARSE);
 
 // What the field says as @room stands in the draft, which a promise the sender could misread must not hide behind
 // another help: it replaces any help, and no error.

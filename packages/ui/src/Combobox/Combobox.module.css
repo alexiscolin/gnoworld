@@ -1,0 +1,31 @@
+/* The combobox: a field over a scrolling list of groups of options; the field is Field's box and an option is a menu's
+   row, the active one on the hover fill. */
+@layer components {
+  /* Seven rows or so, then it scrolls inside the dialog. */
+  .list {
+    /* raw: half the screen's height, the dialog's room above the keyboard */
+    max-block-size: 50vb;
+    overflow: auto;
+  }
+
+  .group {
+    padding-block: var(--space-2xs);
+    padding-inline: var(--space-xs);
+    color: var(--color-text-muted);
+    font: var(--font-label);
+  }
+
+  /* Open, the field's edge stays on the strong line, as when hovered: the state is drawn, not only announced. */
+  .field[aria-expanded="true"] {
+    --_line: var(--color-line-strong);
+  }
+
+  .list [aria-selected="true"] {
+    background: var(--color-fill-hover);
+  }
+
+  .status {
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+  }
+}

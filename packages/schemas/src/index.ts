@@ -4,6 +4,18 @@ import { z } from "./zod.ts";
 
 export { ActivityRooms } from "./activity.ts";
 export { Address, ADDRESS_PROBLEMS, toAddress, type AddressProblem } from "./address.ts";
+export {
+  Ecosystems,
+  EMBED_PREFIXES,
+  Events,
+  Expedition,
+  Genres,
+  Hubs,
+  News,
+  Quests,
+  Stations,
+  Universes,
+} from "./data.ts";
 export { CreateRoom, MadeRoom, RoomId, RoomList, RoomName, RoomType } from "./rooms.ts";
 export { PinId, PinList, PinnedLine, PinRequest, PINS_MAX, Time } from "./pins.ts";
 export { LineVerdicts, StreamEvent, StreamSince, VerdictId, VERDICTS_ASKED } from "./stream.ts";

@@ -12,9 +12,21 @@ import { fileURLToPath } from "node:url";
 import { dropSockets, relay, relayUpgrade, startBackend, walletAnswer } from "./api.mjs";
 
 const root = fileURLToPath(new URL("../../build/client/", import.meta.url));
-// The policy the build wrote for every answer (src/csp.ts), as a host that reads _headers sends it.
-const POLICY = /^  Content-Security-Policy: (.+)$/m.exec(readFileSync(join(root, "_headers"), "utf8"))?.[1];
-if (POLICY === undefined) throw new Error("serve.mjs: the build's _headers names no Content-Security-Policy");
+// The policy of each page the build wrote (src/csp.ts), by its address, as a host that reads _headers sends it. Every other
+// answer (a file, a 400, a 401, a 500) gets the one with no hash, as nginx's map sends its default.
+const RULES = new Map();
+{
+  let rule = "";
+  for (const line of readFileSync(join(root, "_headers"), "utf8").split("\n")) {
+    if (/^\S/.test(line)) rule = line;
+    const found = /^ {2}Content-Security-Policy: (.+)$/.exec(line)?.[1];
+    if (found !== undefined) RULES.set(rule, found);
+  }
+}
+// The catch-all rule (`/*`) every path no page names falls to.
+const ANY = RULES.get("/*");
+if (ANY === undefined) throw new Error("serve.mjs: the build's _headers names no catch-all Content-Security-Policy");
+const BARE = ANY.replace(/ 'sha256-[^']+'/g, "");
 // The types of what the build writes (`.data`: React Router's single-fetch.js). Any other kind of
 // file answers 500, so the journeys fail on it rather than pass on a type no real host would give.
 const TYPES = {
@@ -22,6 +34,8 @@ const TYPES = {
   ".js": "text/javascript",
   ".data": "text/x-script",
   ".webmanifest": "application/manifest+json",
+  ".xml": "application/xml",
+  ".txt": "text/plain; charset=utf-8",
   ".png": "image/png",
   ".svg": "image/svg+xml",
   ".css": "text/css; charset=utf-8",
@@ -90,21 +104,24 @@ function workerOfRelease() {
   return Buffer.from(releasedWorker);
 }
 
-let releasedPolicy;
-function policyOfRelease() {
-  releasedPolicy ??= (() => {
-    const hashes = new Set();
-    for (const name of FILES.filter((each) => each.endsWith(".html")))
-      for (const [, attributes, text] of released(join(root, name))
-        .toString("utf8")
-        .matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi))
-        if (!/\ssrc\s*=/i.test(attributes)) hashes.add(`'sha256-${digest(text, "sha256")}'`);
-    return POLICY.replace(/ 'sha256-[^']+'/g, "").replace(
-      "script-src 'self'",
-      `script-src 'self' ${[...hashes].join(" ")}`,
-    );
-  })();
-  return releasedPolicy;
+// A page of the release: its own scripts' hashes, from the bytes it is sent with (a data block has none).
+function policyOfRelease(file) {
+  const hashes = new Set();
+  for (const [, attributes, text] of released(file)
+    .toString("utf8")
+    .matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi))
+    if (!/\ssrc\s*=/i.test(attributes) && !/ld\+json/i.test(attributes))
+      hashes.add(`'sha256-${digest(text, "sha256")}'`);
+  return BARE.replace("script-src 'self'", `script-src 'self' ${[...hashes].join(" ")}`);
+}
+
+// The policy of an answer: a page's, as a host that reads _headers picks it, by the request path (the rule that names it, else
+// the catch-all `/*`, whatever file is served there: F2451); a release's from the bytes it is sent with; any other file the
+// bare one, as nginx's map sends its default.
+function policyOf(file, pathname, deployed) {
+  if (!file.endsWith(".html")) return BARE;
+  if (deployed) return policyOfRelease(file);
+  return RULES.get(pathname) ?? ANY;
 }
 
 // The test's own password, never the demo's.
@@ -116,7 +133,7 @@ function host({ bumping = false, password = false }) {
   let down = false;
   let deployed = false;
   return (request, response) => {
-    response.setHeader("content-security-policy", deployed ? policyOfRelease() : POLICY);
+    response.setHeader("content-security-policy", BARE);
     if (password && request.headers.authorization !== PASSWORD) {
       response.writeHead(401, { "www-authenticate": 'Basic realm="gno.world demo"' }).end();
       return;
@@ -181,6 +198,7 @@ function host({ bumping = false, password = false }) {
       response.writeHead(500).end();
       return;
     }
+    response.setHeader("content-security-policy", policyOf(served, pathname, deployed));
     response.writeHead(found ? 200 : 404, { "content-type": type });
     if (deployed) {
       const body = pathname === "/sw.js" ? workerOfRelease() : released(served);

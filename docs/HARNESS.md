@@ -30,7 +30,8 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
   sandbox refuses (Docker's `deploy/test.sh`, the merge into `main`, the push), and accepts or
   refuses each rule the dream proposes.
 - **The chief session**, one per slice, plans it (`/slice-plan`), makes the slice's shared folder
-  (`.claude/tmp/slice-<n>/` with `reports/`), cuts it into branches, gives Alexis each branch's starting brief, integrates the branches, runs the full gate and the
+  (`.claude/tmp/slice-<n>/` with `reports/`), cuts it into branches, gives each branch its range of F numbers
+  (two branches side by side once took the same ones) and Alexis each branch's starting brief, integrates the branches, runs the full gate and the
   slice's last `/pre-merge`, then the dream.
 - **A branch session**, one per branch, two at most at once, works in its own worktree, made by
   `scripts/worktree.sh` and never by hand (one store of packages, a real `.bin`, F2127). Its
@@ -110,16 +111,17 @@ gate fails, run the failing lane alone before running the whole gate again.
 | A fast run's change | What runs beside the cheap checks (format, knip, jscpd, CSS, comments, check_docs) | Budget |
 |---|---|---|
 | `server/src` | tsc, ESLint, every Vitest test (`main.test.ts` runs the server as a child process, outside Vitest's module graph) | 30 s |
-| the TypeScript of `app/src`, `app/tests`, `packages/ui/src` | tsc, ESLint, Vitest's tests related to the change (`--changed`), the app's journeys | 30 s |
-| `packages/core/src`, or any other file of those folders (a fixture, a stylesheet) | tsc, ESLint, every Vitest test, the app's journeys | 30 s |
-| `packages/ui/src/tokens.css` | as above, and the tokens story's pictures at their three widths (F1190) | 30 s |
+| the TypeScript of `app/src`, `app/tests`, `packages/ui/src` | tsc, ESLint, Vitest's tests related to the change (`--changed`), the app's journeys | 120 s (the app's journeys, F2162) |
+| `packages/core/src`, or any other file of those folders (a fixture, a stylesheet) | tsc, ESLint, every Vitest test, the app's journeys | 120 s (the app's journeys, F2162) |
+| `packages/ui/src/tokens.css` | as above, and the tokens story's pictures at their three widths (F1190) | 120 s |
 | `gno/` | the gno lane | 30 s |
 | anything else (a config, the lockfile, the harness, `packages/schemas`, `deploy/`), no change at all, or pre-commit's staged copy | everything | 120 s |
 
 `GATE_BUDGET` may lower the budget, never raise it. A merge commit has none (F2071): the full
-gate follows every merge. Past its budget the fast gate fails, unless the machine's 1-minute load
-was above its cores both when the lanes started and after they ended (`scripts/load.py`); such a
-pass is written to `.claude/tmp/unsteady.log`, which `/pre-merge` reads in its first step (F2070).
+gate follows every merge. A run past its budget that passed still passes (Alexis, 2026-10-30:
+refusing it made agents run it again and again): it says so and is written, with its time and the
+machine's loads (`scripts/load.py`), to `.claude/tmp/unsteady.log`, which `/pre-merge` reads in its
+first step and the dream reads (F2070); a log it cannot write fails it. The budget is a measure, not a wall.
 
 A Vitest file or a journey that fails in the fast gate runs once more, alone
 (`scripts/unsteady.py`, F1700): the gate passes if it passes, and logs the file, its failed

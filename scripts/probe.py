@@ -525,17 +525,18 @@ try:
         shutil.rmtree(APP)
 
     if part("ui_lint"):
-        # The design system: React's rules as in the app, and it imports nothing but itself.
+        # The design system: React's rules as in the app, and it imports nothing but itself. Its app target is routes.ts,
+        # the one app file no slice renames: a target that does not resolve is no violation (5c renamed worlds.ts).
         ui = [
             ("clean.tsx", "export function Card({ n }: { n: number }) {\n  return <p>{n}</p>;\n}\n", None),
             ("manual_memo.tsx", 'import { useMemo } from "react";\n\nexport function Card({ n }: { n: number }) {\n  const twice = useMemo(() => n * 2, [n]);\n  return <p>{twice}</p>;\n}\n',
              banned("useMemo")),
             ("nested.tsx", "export function Card({ n }: { n: number }) {\n  function Inner() {\n    return <p>{n}</p>;\n  }\n  return <Inner />;\n}\n", "@eslint-react/no-nested-component-definitions"),
-            ("reaches_app.ts", 'import { WORLDS } from "../../../../app/src/worlds.ts";\n\nexport const w: unknown = WORLDS;\n', "import-x/no-restricted-paths"),
+            ("reaches_app.ts", 'import routes from "../../../../app/src/routes.ts";\n\nexport const w: unknown = routes;\n', "import-x/no-restricted-paths"),
             ("reaches_core.ts", 'import * as core from "../../../core/src/index.ts";\n\nexport const c: unknown = core;\n', "import-x/no-restricted-paths"),
             ("reaches_config.ts", 'import config from "../../../../vitest.config.ts";\n\nexport const c: unknown = config;\n', "import-x/no-restricted-paths"),
-            ("passes_app_on.ts", 'export { WORLDS } from "../../../../app/src/worlds.ts";\n', "import-x/no-restricted-paths"),
-            ("loads_app.ts", 'export async function load(): Promise<unknown> {\n  return import("../../../../app/src/worlds.ts");\n}\n', "import-x/no-restricted-paths"),
+            ("passes_app_on.ts", 'export { default } from "../../../../app/src/routes.ts";\n', "import-x/no-restricted-paths"),
+            ("loads_app.ts", 'export async function load(): Promise<unknown> {\n  return import("../../../../app/src/routes.ts");\n}\n', "import-x/no-restricted-paths"),
             ("raw_html.tsx", "export function Card({ n }: { n: string }) {\n  return <p dangerouslySetInnerHTML={{ __html: n }} />;\n}\n", "@eslint-react/dom-no-dangerously-set-innerhtml"),
             # A link drawn past the slot would reload the app on the site's own paths (F259, F317).
             ("raw_anchor.tsx", "export function Card({ href }: { href: string }) {\n  return <a href={href}>Go</a>;\n}\n",

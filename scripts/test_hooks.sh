@@ -172,7 +172,7 @@ assert "packages() { cat package.json app/package.json pnpm-lock.yaml | cksum; }
 assert at("copies=$(run copies") < at("installed=$(packages)") < at("node app/node_modules/@playwright/test/cli.js test") < at('[ "$(packages)" = "$installed" ]')
 PY
 # The full gate walks the stories: a command of its own, not a line that names it and runs nothing.
-grep -v '^[[:space:]]*#' "$gate_file" | grep -qE '^[[:space:]]*node app/node_modules/@playwright/test/cli\.js test -c app/playwright\.stories\.config\.ts( --[a-z]+(=[a-z]+)?)*$' ||
+grep -v '^[[:space:]]*#' "$gate_file" | grep -qE '^[[:space:]]*(STORIES_PORT=\$port )?node app/node_modules/@playwright/test/cli\.js test -c app/playwright\.stories\.config\.ts( --[a-z]+(=[a-z]+)?)*$' ||
 	fail "check.sh no longer walks the design system's stories in a browser"
 # One harness list, records.sh's: --full runs harness_mutate when a file of it changes, pre-push
 # wants each declared on main, merge.sh shows each first (F129); every file harness_mutate
@@ -1934,8 +1934,9 @@ echo "done $n" >>"$GATE_LOG"
 exit 0
 SH
 for tool in go gofmt; do printf '#!/bin/sh\nexec sh "%s" %s "$@"\n' "$step" "$tool" >"$g/bin/$tool"; done
-# python3, which fails check.sh's free_ports (its one script that says "in 200 tries") when PORTS_FAIL is set, as a machine with no free port would.
-printf '#!/bin/sh\ncase "$*" in *"free ports in 200 tries"*) [ -z "${PORTS_FAIL:-}" ] || { echo "check.sh: no run of free ports (stub)" >&2; exit 1; } ;; esac\nexec "%s" "$@"\n' "$(command -v python3)" >"$g/bin/python3"
+# python3, which fails check.sh's free_ports (its one script that says "in 200 tries") when PORTS_FAIL is set, as a machine with no free port would;
+# PORTS_FAIL_ONE fails only an ask for one port (the stories' and the pictures'), the journeys' three still found.
+printf '#!/bin/sh\ncase "$*" in *"free ports in 200 tries"*) [ -z "${PORTS_FAIL:-}" ] || { echo "check.sh: no run of free ports (stub)" >&2; exit 1; }; [ -z "${PORTS_FAIL_ONE:-}" ] || case "$*" in *" 1") echo "check.sh: no run of 1 free ports (stub)" >&2; exit 1 ;; esac ;; esac\nexec "%s" "$@"\n' "$(command -v python3)" >"$g/bin/python3"
 chmod +x "$g/bin/python3"
 printf '#!/bin/sh\nexec sh "%s" gno "$@"\n' "$step" >"$g/toolchain/gno"
 chmod +x "$g/bin/go" "$g/bin/gofmt" "$g/toolchain/gno"
@@ -2019,7 +2020,9 @@ reset
 # A new TypeScript file of the app, untracked: the app's journeys and the related tests; the journeys
 # after every reader of the build's output (F082); gno still not.
 printf 'x\n' >"$g/app/src/b.tsx"
-gate >/dev/null || fail "check.sh failed on a new app file"
+out=$(gate) || fail "check.sh failed on a new app file: $out"
+# The app's step builds it and runs every journey, the work of a run of everything: its budget (slice-5a, F2162).
+printf '%s\n' "$out" | grep -q "(budget 120 s)$" || fail "check.sh gave a run that builds the app another budget than 120 s: $out"
 scoped "a new app file" $cheap typecheck lint test playwright - gno sh:test_hooks
 grep -q '^test .*--changed' "$log" || fail "check.sh did not run only the tests an app change touches"
 for s in unused copies comments py:check_css; do before "$s" playwright || fail "check.sh built the app before $s read the tree (F082)"; done
@@ -2232,7 +2235,7 @@ reset
 GATE_BUDGET=999 gate | grep -q "(budget 120 s)$" || fail "check.sh let GATE_BUDGET raise its budget"
 GATE_BUDGET=abc gate | grep -q "(budget 120 s)$" || fail "check.sh took a GATE_BUDGET that is no number"
 GATE_BUDGET= gate | grep -q "(budget 120 s)$" || fail "check.sh took an empty GATE_BUDGET"
-(GATE_BUDGET=-5 gate) >/dev/null && fail "check.sh took a negative GATE_BUDGET as no budget"
+(GATE_BUDGET=-5 gate) 2>&1 | grep -q "over its -5 s budget: passed, and logged" || fail "check.sh took a negative GATE_BUDGET as no budget"
 printf 'y\n' >>"$g/server/src/a.ts"
 GATE_BUDGET=999 gate | grep -q "(budget 30 s)$" || fail "check.sh let GATE_BUDGET raise a scoped run's budget"
 reset
@@ -2325,95 +2328,66 @@ fi
 
 if part gate_times; then
 gate_fixture gate_times
-# Past its budget, the fast gate fails, names its slowest step as printed, and records nothing; each
-# step's time is its own: a 2 s step prints 2 s, a quick one less than 1 s, its lane at least 2 s.
+# Past its budget, the fast gate passes and says so (Alexis, 2026-10-30: a budget that refused a run which had passed made
+# agents run it again and again, three times in slice 5): it names its slowest step as printed, records the code it passed,
+# and appends the run to the unsteady log with its time and the machine's two loads, which /pre-merge and the dream read; a
+# log it cannot write fails it, a pass no one sees being no pass. Each step's time is its own: a 2 s step prints 2 s, a quick
+# one less than 1 s, its lane at least 2 s.
+unsteady=$g/.claude/tmp/unsteady.log
+busy=170 idle=10
 for slow in lint gno; do
-	rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/gate-green"
-	out=$(SLOW_STEP=$slow GATE_BUDGET=0 gate) && fail "check.sh passed over its budget"
+	rm -f "$unsteady" "$g/.claude/tmp/green-fast" "$g/.claude/tmp/gate-green"
+	out=$(LOAD_1="$idle 160" LOAD_2="$busy 160" SLOW_STEP=$slow GATE_BUDGET=0 gate) || fail "check.sh failed a run that passed, past its budget: $out"
 	slowest=$(printf '%s\n' "$out" | sed -n 's/^lane [a-z]* [0-9.]* s: //p' | tr ',' '\n' | awk '{print $2, $1}' | sort -n | tail -1 | cut -d' ' -f2)
-	printf '%s\n' "$out" | grep -q "over its 0 s budget: its slowest step, $slowest," || fail "check.sh did not name its slowest step, $slowest: $out"
-	[ ! -e "$g/.claude/tmp/green-fast" ] && [ ! -e "$g/.claude/tmp/gate-green" ] || fail "check.sh recorded a gate past its budget"
+	printf '%s\n' "$out" | grep -q "over its 0 s budget: passed, and logged for /pre-merge; its slowest step, $slowest," || fail "check.sh did not say it passed past its budget, naming its slowest step, $slowest: $out"
+	grep -qxF "$(record)" "$g/.claude/tmp/green-fast" || fail "check.sh did not record the gate it passed past its budget"
+	[ "$(grep -c "" "$unsteady")" = 1 ] || fail "check.sh did not log its run past its budget, once: $(cat "$unsteady" 2>&1)"
+	grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]{8}Z	gate	' "$unsteady" && grep -q "over its 0 s budget" "$unsteady" && grep -q "load 1.0 then 17.0 on 16 cores" "$unsteady" && grep -q "slowest step, $slowest" "$unsteady" ||
+		fail "the unsteady log lacks the time, the loads or the step of a run past its budget: $(cat "$unsteady")"
 	[ "$slow" = lint ] || continue
 	printf '%s\n' "$out" | grep -qE '^lane types ([2-9]|[1-9][0-9])\.[0-9] s: .*lint [2-9]\.[0-9]' || fail "check.sh did not time the slow lint: $out"
 	printf '%s\n' "$out" | grep -qE '^lane gno [0-9.]+ s: gno [0-9]+\.[0-9], mutate.py [0-9]+\.[0-9], go [0-9]+\.[0-9]$' || fail "check.sh did not time the gno lane's steps: $out"
 	format=$(printf '%s\n' "$out" | sed -n 's/^lane ts .*format \([0-9]*\)\.\([0-9]\).*/\1\2/p') lint=$(printf '%s\n' "$out" | sed -n 's/^lane types .*lint \([0-9]*\)\.\([0-9]\).*/\1\2/p')
 	[ -n "$format" ] && [ "$format" -lt "$lint" ] || fail "check.sh gave a quick step a slow one's time: $out"
 done
-# Past its budget on a machine busy both when it started and when it ended, its 1-minute load above its cores at both
-# readings, the fast gate says so and passes (Alexis, 2026-10-26, C.8; Alexis, 2026-10-27, on the review's CR10): it
-# measured the machine, not the code. A start reading alone excused a run begun just after another heavy one on an idle
-# machine, the 1-minute average lagging by about a minute; an end reading alone includes the gate's own lanes (Vitest
-# takes cores - 1 workers, beside four lanes), which a change making its own tests CPU-bound raises (security-S3). Both
-# above the cores: the machine was busy before the lanes, and still is after them. At its cores, not above, it still fails.
-busy=170 idle=10
-rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/gate-green"
-out=$(LOAD_1="$busy 160" LOAD_2="$busy 160" SLOW_STEP=lint GATE_BUDGET=0 gate) || fail "check.sh failed past its budget on a machine busy at its start and at its end: $out"
-printf '%s\n' "$out" | grep -q "over its 0 s budget on a machine busy when it started and when it ended (load 17.0 then 17.0 on 16 cores): passed" ||
-	fail "check.sh did not say it passed past its budget, the machine busy at both readings: $out"
-grep -qxF "$(record)" "$g/.claude/tmp/green-fast" || fail "check.sh did not record the gate it passed on a busy machine"
 # The load is read twice: first as the lanes start, before any of them runs, then last, once they have all ended.
 [ "$(grep -c '^py:load' "$log")" = 2 ] || fail "check.sh did not read the load twice: $(grep -c '^py:load' "$log")"
 [ "$(sed -n 1p "$log" | cut -d' ' -f1)" = py:load ] || fail "check.sh read the load after a lane had started: $(sed -n 1p "$log")"
 [ "$(tail -1 "$log" | cut -d' ' -f1)" = py:load ] || fail "check.sh read the end load before its lanes had ended: $(tail -1 "$log")"
-# Busy at the start only (a load left by the run before, decaying), or at the end only (the gate's own lanes) is no excuse.
-for pair in "$busy $idle" "$idle $busy" "$idle $idle"; do
-	set -- $pair
-	rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/gate-green"
-	out=$(LOAD_1="$1 160" LOAD_2="$2 160" SLOW_STEP=lint GATE_BUDGET=0 gate) && fail "check.sh passed past its budget with the load $1 at its start and $2 at its end: $out"
-	printf '%s\n' "$out" | grep -q "find what grew" || fail "check.sh did not fail past its budget with the load $1 at its start and $2 at its end: $out"
-	[ ! -e "$g/.claude/tmp/green-fast" ] || fail "check.sh recorded a gate past its budget with the load $1 at its start and $2 at its end"
-done
-# At its cores, not above, it still fails, at either reading: the other reading above the cores alone does not excuse it.
-for pair in "160 160" "160 $busy" "$busy 160"; do
-	set -- $pair
-	rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/gate-green"
-	out=$(LOAD_1="$1 160" LOAD_2="$2 160" SLOW_STEP=lint GATE_BUDGET=0 gate) && fail "check.sh passed past its budget with the load $1 at its start and $2 at its end, one at its cores, not above: $out"
-	printf '%s\n' "$out" | grep -q "find what grew" || fail "check.sh did not fail past its budget with the load $1 at its start and $2 at its end, one at its cores: $out"
-done
-# A merge commit has no time budget (Alexis, 2026-10-28): the full gate follows every merge, and a merge's checks run on the
-# merged tree, not on a change a work commit's budget could blame. It still says the time. A merge in progress is MERGE_HEAD, which
-# git reads; the staged copy of pre-commit has no repository, so pre-commit tells it with GATE_MERGE=1 (never read in a repository,
-# where an environment variable would switch the budget off for any run). A MERGE_HEAD git cannot read is no merge: the budget holds.
+# A merge commit has no budget (Alexis, 2026-10-28): it says its time and logs nothing, the full gate following it. A merge in
+# progress is MERGE_HEAD, which git reads; the staged copy of pre-commit has no repository, so pre-commit tells it with
+# GATE_MERGE=1, never read in a repository. A MERGE_HEAD git cannot read is no merge, and the run is logged as any other.
 merge() { git -C "$g" rev-parse HEAD >"$g/.git/MERGE_HEAD"; }
-rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/gate-green"
-merge
+rm -f "$unsteady" && merge
 out=$(LOAD_1="$idle 160" LOAD_2="$idle 160" SLOW_STEP=lint GATE_BUDGET=0 gate) || fail "check.sh failed a merge in progress past its budget: $out"
 printf '%s\n' "$out" | grep -qE "the fast gate took [0-9]+ s, past its 0 s budget, which a merge commit has none of \(the full gate follows it\); its slowest step, [a-z.]+, took [0-9.]+ s" ||
 	fail "check.sh did not say the time of a merge past its budget: $out"
-rm -f "$g/.git/MERGE_HEAD"
-out=$(LOAD_1="$idle 160" LOAD_2="$idle 160" SLOW_STEP=lint GATE_BUDGET=0 gate) && fail "check.sh passed a work commit past its budget once the merge was over: $out"
-printf '%s\n' "$out" | grep -q "find what grew" || fail "check.sh did not fail a work commit past its budget once the merge was over: $out"
+[ ! -e "$unsteady" ] || fail "check.sh logged a merge's run past the budget a merge has not: $(cat "$unsteady")"
 for garbage in "not a commit" ""; do
-	printf '%s\n' "$garbage" >"$g/.git/MERGE_HEAD"
-	out=$(LOAD_1="$idle 160" LOAD_2="$idle 160" SLOW_STEP=lint GATE_BUDGET=0 gate) && fail "check.sh took an unreadable MERGE_HEAD ('$garbage') for a merge and let the budget off: $out"
-	printf '%s\n' "$out" | grep -q "find what grew" || fail "check.sh did not fail past its budget with an unreadable MERGE_HEAD ('$garbage'): $out"
+	printf '%s\n' "$garbage" >"$g/.git/MERGE_HEAD" && rm -f "$unsteady"
+	out=$(LOAD_1="$idle 160" LOAD_2="$idle 160" SLOW_STEP=lint GATE_BUDGET=0 gate) || fail "check.sh failed a run past its budget beside an unreadable MERGE_HEAD ('$garbage'): $out"
+	[ -s "$unsteady" ] || fail "check.sh took an unreadable MERGE_HEAD ('$garbage') for a merge and logged nothing: $out"
 done
-rm -f "$g/.git/MERGE_HEAD"
-# GATE_MERGE is read in a staged copy alone: in a repository, a caller's variable switches no budget off.
-out=$(GATE_MERGE=1 LOAD_1="$idle 160" LOAD_2="$idle 160" SLOW_STEP=lint GATE_BUDGET=0 gate) && fail "check.sh let GATE_MERGE=1 switch the budget off in a repository: $out"
+rm -f "$g/.git/MERGE_HEAD" "$unsteady"
+# GATE_MERGE is read in a staged copy alone: in a repository, a caller's variable makes no merge of a work commit.
+(GATE_MERGE=1 LOAD_1="$idle 160" LOAD_2="$idle 160" SLOW_STEP=lint GATE_BUDGET=0 gate) >/dev/null # a subshell: sh keeps a function's prefix assignments
+[ -s "$unsteady" ] || fail "check.sh let GATE_MERGE=1 make a merge of a work commit in a repository"
 c=$g.merge
 rm -rf "${c:?}" && cp -R "$g" "$c" && rm -rf "${c:?}/.git"
 out=$(g=$c GATE_MERGE=1 LOAD_1="$idle 160" LOAD_2="$idle 160" SLOW_STEP=lint GATE_BUDGET=0 gate) || fail "check.sh failed a staged copy of a merge past its budget: $out"
 printf '%s\n' "$out" | grep -q "which a merge commit has none of" || fail "check.sh did not say the time of a staged copy of a merge: $out"
 for v in 0 ""; do
-	out=$(g=$c GATE_MERGE=$v LOAD_1="$idle 160" LOAD_2="$idle 160" SLOW_STEP=lint GATE_BUDGET=0 gate) && fail "check.sh let a staged copy of a work commit (GATE_MERGE='$v') past its budget: $out"
+	out=$(g=$c GATE_MERGE=$v LOAD_1="$idle 160" LOAD_2="$idle 160" SLOW_STEP=lint GATE_BUDGET=0 gate) || fail "check.sh failed a staged copy of a work commit past its budget: $out"
+	printf '%s\n' "$out" | grep -q "passed, and logged for /pre-merge" || fail "check.sh took a staged copy of a work commit (GATE_MERGE='$v') for a merge: $out"
 done
-# Every pass the machine's load excused is appended to the unsteady log, with its time and its two loads, which /pre-merge reads
-# (F2070: an agent ran the journeys beside its own commit to raise the load, and its slow commit passed as a busy machine's).
-unsteady=$g/.claude/tmp/unsteady.log
-rm -f "$unsteady" "$g/.claude/tmp/green-fast" "$g/.claude/tmp/gate-green"
-out=$(LOAD_1="$busy 160" LOAD_2="$((busy + 20)) 160" SLOW_STEP=lint GATE_BUDGET=0 gate) || fail "check.sh failed past its budget on a busy machine: $out"
-[ "$(grep -c "" "$unsteady")" = 1 ] || fail "check.sh did not log the pass a busy machine excused, once: $(cat "$unsteady" 2>&1)"
-grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]{8}Z	gate	' "$unsteady" && grep -q "over its 0 s budget" "$unsteady" && grep -q "load 17.0 then 19.0 on 16 cores" "$unsteady" && grep -q "slowest step" "$unsteady" ||
-	fail "the unsteady log lacks the time, the loads or the step of the pass a busy machine excused: $(cat "$unsteady")"
-# A pass under its budget, or one a merge needed no excuse for, logs nothing.
-rm -f "$unsteady" && gate >/dev/null && merge && LOAD_1="$busy 160" LOAD_2="$busy 160" SLOW_STEP=lint GATE_BUDGET=0 gate >/dev/null; rm -f "$g/.git/MERGE_HEAD"
-[ ! -e "$unsteady" ] || fail "check.sh logged a pass nothing excused: $(cat "$unsteady")"
-# A pass no one sees is not a pass: a log that cannot be written fails it.
-rm -rf "${unsteady:?}" "$g/.claude/tmp/green-fast" "$g/.claude/tmp/gate-green" && mkdir -p "$unsteady"
-out=$(LOAD_1="$busy 160" LOAD_2="$busy 160" SLOW_STEP=lint GATE_BUDGET=0 gate) && fail "check.sh passed a busy machine's slow run with a log it cannot write: $out"
+# A pass under its budget logs nothing.
+rm -f "$unsteady" && gate >/dev/null
+[ ! -e "$unsteady" ] || fail "check.sh logged a pass under its budget: $(cat "$unsteady")"
+# A pass no one sees is not a pass: a log that cannot be written fails it, and records nothing.
+rm -rf "${unsteady:?}" && rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/gate-green" && mkdir -p "$unsteady"
+out=$(LOAD_1="$busy 160" LOAD_2="$busy 160" SLOW_STEP=lint GATE_BUDGET=0 gate) && fail "check.sh passed a slow run with a log it cannot write: $out"
 printf '%s\n' "$out" | grep -q "cannot be written" || fail "check.sh did not say its unsteady log cannot be written: $out"
-[ ! -e "$g/.claude/tmp/green-fast" ] || fail "check.sh recorded a busy machine's pass it could not log"
+[ ! -e "$g/.claude/tmp/green-fast" ] || fail "check.sh recorded a slow pass it could not log"
 rm -rf "${unsteady:?}"
 # load.py reads the machine itself: its 1-minute load (the first of getloadavg's three) and its cores, in tenths.
 # Run on a machine of known numbers, so the minute's average, the 5- and 15-minute ones and the scale each tell apart (G4).
@@ -2447,7 +2421,10 @@ base=$(git -C "$g" rev-parse HEAD)
 out=$(AUDIT_ANSWER=x PICTURES_OF=nothing STORIES_PORT=6007 STORIES_OUT=/elsewhere gate --full) || fail "check.sh --full failed on a copy whose every step passes: $out"
 # The stories' walk is every story's, whatever PICTURES_OF the environment carries, and the tokens comparison is the fast
 # gate's alone (F1190).
-grep -q '^stories port=[^ ]* of= on= out= test -c app/playwright.stories.config.ts' "$log" || fail "check.sh --full let its environment narrow or redirect the stories' walk: $(grep '^stories' "$log")"
+# Its file server takes a free port of its own run, as the tokens' pictures do, never the caller's 6007 nor the config's: two
+# worktrees' gates at once both took 6007, and one failed (slice-5c's and slice-5d's merge checks, 2026-10-29).
+grep -q '^stories port=[^ ]* of= on=[0-9][0-9]* out= test -c app/playwright.stories.config.ts' "$log" && ! grep -q '^stories .* on=6007 ' "$log" ||
+	fail "check.sh --full let its environment narrow or redirect the stories' walk, or gave it no port of its own: $(grep '^stories' "$log")"
 ran pictures && fail "check.sh --full compared the tokens story's pictures beside its whole walk"
 for s in $fast_steps py:probe py:bench core_chromium stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
 	[ "$s" = test ] || ran "$s" || fail "check.sh --full skipped $s"
@@ -2606,6 +2583,11 @@ gate --merge >/dev/null && ran mutate || fail "check.sh --merge read deleted pro
 git -C "$g" reset -q --hard "$base" && printf 'x\n' >"$g/app/src/new.ts"
 gate --merge >/dev/null && ran mutate || fail "check.sh --merge read an untracked product file as no product"
 reset
+# The stories' lane asks free_ports for its port: when that fails, the lane fails before Playwright starts (R2's rule, for the port
+# of d11330a3), and the gate says which lane.
+out=$(PORTS_FAIL_ONE=1 gate --full) && fail "check.sh --full passed with no free port for the stories: $out"
+printf '%s\n' "$out" | grep -q "lane stories failed at stories" || fail "check.sh --full did not fail the stories' lane when free_ports failed: $out"
+grep -q '^stories ' "$log" && fail "check.sh --full started the stories with no free port"
 # No origin/main to compare with: --full fails, saying so.
 git -C "$g" update-ref -d refs/remotes/origin/main
 out=$(gate --full) && fail "check.sh --full passed with no origin/main"
@@ -3331,15 +3313,15 @@ async function run(answer) {
   const calls = [];
   const agent = async (prompt, o) => { calls.push({ label: o.label, prompt, agentType: o.agentType, schema: o.schema }); return answer(o.label, prompt, o); };
   const parallel = async (ts) => Promise.all(ts.map((t) => t().catch(() => null)));
-  const r = await body(agent, parallel, () => {}, () => {}, { branch: "b", worktree: "w", plan: "p", brief: "x", shared: "s" }, { spent: () => 0 });
+  const r = await body(agent, parallel, () => {}, () => {}, { branch: "b", worktree: "w", plan: "p", brief: "x", shared: "s", ids: "F9000-F9049" }, { spent: () => 0 });
   return { r, labels: calls.map((c) => c.label), calls };
 }
-const gateOf = (files) => ({ passed: true, failingLane: "", tail: "", survivors: [], files, relaxations: [], seconds: 1 });
+const gateOf = (files) => ({ passed: true, failingLane: "", tail: "", survivors: [], files, relaxations: [], seconds: 1, branch: "b" });
 const base = (files) => (l) =>
   l === "tests" ? { files: ["t"], seenFailing: true, notes: "" }
   : l === "red pass" ? { findings: [] }
   : l === "merge check" ? gateOf(files)
-  : l === "build" || (l || "").startsWith("ledger") ? { commits: ["c"], notes: "" }
+  : l === "build" || (l || "").startsWith("ledger") ? { commits: ["c"], notes: "", branch: "b" }
   : l === "reviewer" || l === "security" || l === "gno-auditor" ? { findings: [] } : null;
 const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
 (async () => {
@@ -3360,7 +3342,7 @@ const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
     l === "reviewer" ? { findings: [finding("high", "scripts/a.sh")] }
     : l === "security" ? { findings: [finding("medium", "scripts/b.sh")] }
     : l === "verifier" ? { verdicts: [{ id: idOf(o, 0), verdict: "refuted", severity: "low", evidence: "e" }] }
-    : (l || "").startsWith("fix round") ? { fixed: [{ id: "security-1-1", commit: "f1" }], notes: "" }
+    : (l || "").startsWith("fix round") ? { fixed: [{ id: "security-1-1", commit: "f1" }], notes: "", branch: "b" }
     : base(["scripts/a.sh"])(l, p));
   const fix = t.calls.find((c) => (c.label || "").startsWith("fix round"));
   ok(fix && fix.prompt.includes("security-1-1") && !fix.prompt.includes("reviewer-1-1"), `the refuted finding's twin was dropped, or the refuted one fixed: ${fix && fix.prompt}`);
@@ -3368,7 +3350,7 @@ const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
   t = await run((l, p, o) =>
     l === "security" ? { findings: [finding("high", "scripts/a.sh")] }
     : l === "verifier" ? { verdicts: [{ id: idOf(o, 0), verdict: "reproduced", severity: "high", evidence: "e" }] }
-    : (l || "").startsWith("fix round") ? { fixed: [{ id: p.match(/"id":"(security-\d-1)"/)[1], commit: "f" + l.slice(-1) }], notes: "" }
+    : (l || "").startsWith("fix round") ? { fixed: [{ id: p.match(/"id":"(security-\d-1)"/)[1], commit: "f" + l.slice(-1) }], notes: "", branch: "b" }
     : base(["scripts/a.sh"])(l, p));
   ok(t.r.status.startsWith("reconsider with Alexis"), `three rounds of high tier-1 findings ended as ${t.r.status}`);
   ok(t.labels.filter((l) => l === "reviewer").length === 1, `round 2 ran the reviewer again: ${t.labels}`);
@@ -3378,6 +3360,17 @@ const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
     const readOnly = ["red pass", "reviewer", "security", "gno-auditor", "verifier"].includes(c.label);
     ok(readOnly ? c.prompt.includes("write nothing") && !c.prompt.includes("learnings.md") : c.prompt.includes("learnings.md"), `${c.label} was told the wrong way to write`);
   }
+  // Each Bash command of an agent starts in the main checkout (the shell goes back there after every call): every one begins
+  // with the cd, and a writer that committed on another branch than its own blocks the loop (slice-5a's commit on main).
+  for (const c of t.calls) ok(c.prompt.includes('every Bash command begins with `cd "w" || exit 1`'), `${c.label} was not told to cd in every command`);
+  let u = await run((l, p) => (l === "build" ? { commits: ["c"], notes: "", branch: "main" } : base(["app/src/a.ts"])(l, p)));
+  ok(u.r.status.startsWith("blocked") && u.r.status.includes("main"), `a build committed on main was taken: ${u.r.status}`);
+  // The files changed are git's, never the agent's own: a list holding .claude/tmp or an absolute path blocks the loop
+  // (slice-5a's security lens skipped, the list naming the diff file the agent wrote).
+  u = await run(base([".claude/tmp/diff.patch", "/tmp/x/report.md"]));
+  ok(u.r.status.startsWith("blocked") && u.r.status.includes("files"), `a merge check's list of its own files was taken: ${u.r.status}`);
+  // The ledger's numbers come from the branch's own range, which the chief gives (two branches took the same F numbers).
+  for (const c of t.calls.filter((c) => (c.label || "").startsWith("ledger"))) ok(c.prompt.includes("F9000-F9049"), "the scribe was not given the branch's range of F numbers");
   // Every round's findings go to the ledger, a refuted or low one included.
   ok(t.labels.filter((l) => (l || "").startsWith("ledger")).length === 3, `not every round wrote its findings to the ledger: ${t.labels}`);
 })();
