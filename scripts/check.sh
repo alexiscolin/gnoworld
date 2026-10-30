@@ -7,7 +7,7 @@
 # - `--full` adds what the slice's last /pre-merge and CI run: the harness's own probe, coverage
 #   and patch coverage, mutations, and the scan of the whole history for secrets. It checks
 #   everything, and its record lets main take the code (pre-push).
-# - `--merge`, a merge's own /pre-merge: the same, but the harness mutants of the guard files the
+# - `--merge`, a merge's own /pre-merge: the same, but the harness mutants of the lines the
 #   merge changed alone, since its last recorded pass (Alexis, 2026-10-25, 2026-10-27), and without the stories, the
 #   coverage lane and prove_fix when no product code changed since main (2026-10-29); it records the fast gate only.
 #

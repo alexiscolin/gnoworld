@@ -199,7 +199,7 @@ refuses another Node (F816).
 | `scripts/test_hooks.sh` | the hooks, the guard, the settings' boundary, the CI's promises, the scripts; a harness mutant that no longer finds its text (`harness_mutate.py --dry`) |
 
 **Full** (`--full`: the slice's last merge and a push of `main`; `--merge`: each branch's
-`/pre-merge`, with the harness mutants of the guard files it changed, and without the stories,
+`/pre-merge`, with the harness mutants of the lines it changed, and without the stories,
 the coverage lane and `prove_fix` when nothing but docs, the harness and the linters' configs changed since
 `main`) adds:
 
@@ -218,7 +218,7 @@ the coverage lane and `prove_fix` when nothing but docs, the harness and the lin
 | `scripts/check_migrations.py` | a migration `main` has, edited, moved or removed (F466) |
 | gitleaks | a secret anywhere in the history; a path into a home folder or the demo's host |
 | `pnpm audit` | a dependency with a known advisory, moderate or worse |
-| `scripts/harness_mutate.py` | a guard of the harness that no test notices switched off; over `HARNESS_SHARDS` worktrees (4), each first passing its suites untouched, two such controls at once (F2138); `--changed <base>` judges only the mutants of the guard files and suite sections changed since the last review pass, and, when the script itself changed, those it defines anew or otherwise; a killed mutant whose key holds (its text, its sections, the files they name, the runner) comes from a cache of verdicts, a survivor is always judged again |
+| `scripts/harness_mutate.py` | a guard of the harness that no test notices switched off; over `HARNESS_SHARDS` worktrees (4), each first passing its suites untouched, two such controls at once (F2138); `--changed <base>` (a branch's merge check) judges only the mutants that rewrite a line changed since the last review pass (a change to a suite's section or to a guard file's other lines asks for none) and, when the script itself changed, those it defines anew or otherwise, and stops before judging more than 100 left after the cache, the way on being the chief's `check.sh --full`, which judges every one and which `main` requires, so a test a branch weakens shows there, not on the branch (Alexis, 2026-10-30); a killed mutant whose key holds (its text, its sections, the files they name, the runner; blank lines do not count, comments do, a `#` line in a heredoc being text) comes from a cache of verdicts, a survivor is always judged again |
 
 ## The safety net never shrinks quietly
 
