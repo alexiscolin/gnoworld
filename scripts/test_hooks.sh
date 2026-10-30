@@ -3309,11 +3309,11 @@ const src = readFileSync(process.argv[2], "utf8").replace("export const meta", "
 const body = new Function("agent", "parallel", "phase", "log", "args", "budget", `return (async () => {${src}\n})();`);
 const ok = (cond, why) => { if (!cond) { console.error("workflow_branch: " + why); process.exit(1); } };
 const finding = (severity, file) => ({ severity, file, scenario: "s", evidence: "e", fix: "f", beyondPlan: false });
-async function run(answer) {
+async function run(answer, extra = {}) {
   const calls = [];
   const agent = async (prompt, o) => { calls.push({ label: o.label, prompt, agentType: o.agentType, schema: o.schema }); return answer(o.label, prompt, o); };
   const parallel = async (ts) => Promise.all(ts.map((t) => t().catch(() => null)));
-  const r = await body(agent, parallel, () => {}, () => {}, { branch: "b", worktree: "w", plan: "p", brief: "x", shared: "s", ids: "F9000-F9049" }, { spent: () => 0 });
+  const r = await body(agent, parallel, () => {}, () => {}, { branch: "b", worktree: "w", plan: "p", brief: "x", shared: "s", ids: "F9000-F9049", ...extra }, { spent: () => 0 });
   return { r, labels: calls.map((c) => c.label), calls };
 }
 const gateOf = (files) => ({ passed: true, failingLane: "", tail: "", survivors: [], files, relaxations: [], seconds: 1, branch: "b" });
@@ -3347,11 +3347,12 @@ const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
   const fix = t.calls.find((c) => (c.label || "").startsWith("fix round"));
   ok(fix && fix.prompt.includes("security-1-1") && !fix.prompt.includes("reviewer-1-1"), `the refuted finding's twin was dropped, or the refuted one fixed: ${fix && fix.prompt}`);
   // A high tier-1 finding each round: round 2 runs only its lens, on the diff since its fix; after the third, Alexis decides.
-  t = await run((l, p, o) =>
+  const highEveryRound = (extra) => run((l, p, o) =>
     l === "security" ? { findings: [finding("high", "scripts/a.sh")] }
     : l === "verifier" ? { verdicts: [{ id: idOf(o, 0), verdict: "reproduced", severity: "high", evidence: "e" }] }
     : (l || "").startsWith("fix round") ? { fixed: [{ id: p.match(/"id":"(security-\d-1)"/)[1], commit: "f" + l.slice(-1) }], notes: "", branch: "b" }
-    : base(["scripts/a.sh"])(l, p));
+    : base(["scripts/a.sh"])(l, p), extra);
+  t = await highEveryRound();
   ok(t.r.status.startsWith("reconsider with Alexis"), `three rounds of high tier-1 findings ended as ${t.r.status}`);
   ok(t.labels.filter((l) => l === "reviewer").length === 1, `round 2 ran the reviewer again: ${t.labels}`);
   ok(t.calls.some((c) => c.label === "security" && c.prompt.includes("since f1^")), "round 2 did not read the diff since its first fix");
@@ -3373,6 +3374,72 @@ const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
   for (const c of t.calls.filter((c) => (c.label || "").startsWith("ledger"))) ok(c.prompt.includes("F9000-F9049"), "the scribe was not given the branch's range of F numbers");
   // Every round's findings go to the ledger, a refuted or low one included.
   ok(t.labels.filter((l) => (l || "").startsWith("ledger")).length === 3, `not every round wrote its findings to the ledger: ${t.labels}`);
+  // Every tier-1 product path of docs/REVIEW.md's table that exists starts the security lens by itself, with no `tier1` argument, and
+  // a finding in it reaches the finding-verifier (5e and 5f launched the security-reviewer by hand; no csp.ts finding was verified).
+  const lensOf = async (file) => {
+    const only = await run((l, p, o) =>
+      l === "security" ? { findings: [finding("medium", file)] }
+      : l === "verifier" ? { verdicts: [{ id: idOf(o, 0), verdict: "reproduced", severity: "low", evidence: "e" }] }
+      : base([file])(l, p));
+    return only.labels;
+  };
+  // Two files of each folder, so a prefix cut to one file fails (server/src/login/ is also ticket.ts and routes.ts).
+  for (const file of ["app/src/csp.ts", "deploy/test.sh", "deploy/compose.yaml", "deploy/web/nginx.conf", "packages/core/src/markdown/inline.ts", "packages/core/src/markdown/scan.ts",
+    "app/src/lib/adena/adena.ts", "app/src/lib/adena/digest.ts", "server/src/login/login.ts", "server/src/login/ticket.ts", "server/src/roles/roles.ts", "server/roles.json",
+    "app/src/sw/worker.ts", "app/src/sw/register.ts"]) {
+    const labels = await lensOf(file);
+    ok(labels.includes("security"), `a change of ${file} alone ran no security lens: ${labels}`);
+    ok(labels.includes("verifier"), `a security finding in ${file} never reached the finding-verifier: ${labels}`);
+  }
+  // A lookalike is no tier-1 file.
+  for (const file of ["deploy-notes/x.md", "server/src/loginx.ts", "app/src/lib/adenax/a.ts", "app/src/sw.ts.md", "packages/core/src/markdown.md"]) {
+    const labels = await lensOf(file);
+    ok(!labels.includes("security"), `${file}, a lookalike of a tier-1 path, started the security lens: ${labels}`);
+  }
+  // The list and docs/REVIEW.md's table agree: each path of its tier-1 rows (a backticked word with a "/") that names files in the
+  // repository starts the lens through the first of them. A tier-1 area added to the table and not to the loop fails here.
+  {
+    const { readdirSync } = require("node:fs");
+    const { dirname } = require("node:path");
+    const root = dirname(dirname(dirname(process.argv[2])));
+    // A walk, not git: pre-commit runs this in a staged copy that is no repository.
+    const walk = (dir) => readdirSync(root + "/" + dir, { withFileTypes: true }).flatMap((e) =>
+      [".git", "node_modules", "dist", ".claude"].includes(e.name) ? [] : e.isDirectory() ? walk(dir + e.name + "/") : [dir + e.name]);
+    const tracked = walk("");
+    const table = readFileSync(root + "/docs/REVIEW.md", "utf8").split("\n").filter((l) => l.startsWith("| 1 |"));
+    const paths = [...new Set(table.flatMap((l) => [...l.matchAll(/`([^`]*\/[^`]*)`/g)].map((m) => m[1])))];
+    ok(paths.length >= 3, `the tier-1 rows of docs/REVIEW.md name no path I can read: ${paths}`);
+    for (const path of paths) {
+      const files = tracked.filter((f) => (f.startsWith(path) || f.includes("/" + path)) && !f.endsWith(".test.ts"));
+      if (!files.length) continue;
+      const labels = await lensOf(files[0]);
+      ok(labels.includes("security"), `docs/REVIEW.md names ${path} as tier 1, but a change of ${files[0]} starts no security lens: ${labels}`);
+    }
+  }
+  // The loop's base: main when absent; an argument for a branch cut from an integration branch. The merge check's file list and
+  // its diff file, the reviewer's and the security lens's diff all read from it, not from main (5f: 201 files from main).
+  const promptOf = (x, label) => (x.calls.find((c) => c.label === label) || { prompt: "" }).prompt;
+  const fromMain = /since main|main\.\.\.?HEAD/;
+  t = await run(base(["scripts/check.sh"]));
+  for (const label of ["merge check", "reviewer", "security"]) ok(fromMain.test(promptOf(t, label)), `${label} did not read from main when no base was given: ${promptOf(t, label)}`);
+  t = await run(base(["scripts/check.sh"]), { base: "slice-5-p2" });
+  ok(promptOf(t, "merge check").includes("slice-5-p2...HEAD") && promptOf(t, "merge check").includes("slice-5-p2..HEAD"), `the merge check did not list files and loosening commits from the base: ${promptOf(t, "merge check")}`);
+  for (const label of ["merge check", "reviewer", "security"]) {
+    ok(!fromMain.test(promptOf(t, label)), `${label} still read from main with base slice-5-p2: ${promptOf(t, label)}`);
+    if (label !== "merge check") ok(promptOf(t, label).includes("since slice-5-p2"), `${label} did not read the diff since the base: ${promptOf(t, label)}`);
+  }
+  ok(promptOf(t, "reviewer").includes("holds the diff since slice-5-p2"), "the reviewer was told the diff file holds the diff since main, not since the base");
+  // A round 2 still reads since its first fix, whatever the base.
+  t = await highEveryRound({ base: "slice-5-p2" });
+  ok(t.calls.some((c) => c.label === "security" && c.prompt.includes("since f1^")), "round 2 did not read since its first fix when a base was given");
+  // StrykerJS's and harness_mutate's survivors reach the reviewer: the merge check is told to take the lines `check.sh --merge`
+  // prints as `survivor: ...`, pass or fail, and hands them on.
+  ok(promptOf(t, "merge check").includes("survivor: "), "the merge check was not told to report the `survivor: ` lines check.sh prints, a pass included");
+  const gs = { ...gateOf(["app/src/a.ts"]), survivors: ["survivor: app/src/a.ts: line 3:5 [Survived] ConditionalExpression"] };
+  t = await run((l, p) => (l === "merge check" ? gs : base(["app/src/a.ts"])(l, p)));
+  ok(promptOf(t, "reviewer").includes("app/src/a.ts: line 3:5 [Survived] ConditionalExpression"), "a surviving mutant of a passing merge check did not reach the reviewer's brief");
+  t = await run(base(["app/src/a.ts"]));
+  ok(promptOf(t, "reviewer").includes("surviving mutants: []"), "a merge check with no survivor did not hand the reviewer an empty list");
 })();
 JS
 fi
