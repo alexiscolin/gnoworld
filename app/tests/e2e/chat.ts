@@ -9,7 +9,7 @@ const messages = (page: Page) => page.getByRole("list", { name: "Messages" });
 /** A room's lines: the Messages list's own items, never those of a line that is a list (F814). */
 export const lines = (page: Page) => messages(page).locator(":scope > li");
 export const lineOf = (page: Page, text: string) => lines(page).filter({ hasText: text });
-export const whoIsHere = (page: Page) => page.getByRole("complementary", { name: "Who's here" });
+export const whoIsHere = (page: Page) => page.getByRole("region", { name: "Who's here" });
 /** The polite status that tells a screen reader a notice came: apart from the rooms' list, which a phone hides. */
 export const noticeStatus = (page: Page) => page.locator('p[role="status"].visually-hidden');
 export const roomsNav = (page: Page) => page.getByRole("navigation", { name: "Rooms" });

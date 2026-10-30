@@ -90,3 +90,6 @@ export const groupsAt = (sections: RoomList["sections"], room: string | undefine
  * a member did (F819). */
 export const mentionable = (members: readonly string[], lines: readonly Line[]): Set<string> =>
   new Set([...members, ...lines.flatMap(({ account }) => (account === undefined ? [] : [account]))]);
+
+/** The server's moderation bot (server/src/irc/lines.ts), in every room, never listed. */
+export const BOT = "gnoworld";

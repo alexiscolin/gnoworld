@@ -37,11 +37,13 @@ test.describe("the lines view, loaded after the page", () => {
     await expect(form.getByRole("textbox", { name: "Message #games" })).toBeVisible();
     await expect(lines(page)).toHaveCount(0);
     // Nothing waits for the lines: Tab from the room's last control before them (an account's notification modes end it,
-    // 4f-n) skips the list's place for the composer.
+    // 4f-n) skips the list's place for the quick actions (5q), then the composer.
     await page
       .getByRole("group", { name: "Notifications for #games" })
       .getByRole("button", { name: "Nothing" })
       .focus();
+    await page.keyboard.press("Tab");
+    await expect(page.getByRole("button", { name: "Who's here" })).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(form.locator(":focus")).toHaveCount(1);
     release();

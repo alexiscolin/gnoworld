@@ -1,16 +1,29 @@
 /* A room: its description and the link's state muted, its lines wrapping anywhere, an /me, a notice, a quote and a
    line that mentions the reader apart. */
 @layer components {
-  /* The room's width, which the thread's panel reads: under it the panel takes the whole width (4d's threads). */
-  .room {
-    container-type: inline-size;
+  /* The conversation: a column that fills its region, the list in it scrolling alone (.fill) over the composer. */
+  .main {
+    /* layout: the conversation fills the region the frame gives it, a column whose list is the only part that scrolls */
+    display: flex;
+    /* layout: takes the region's height */
+    flex-grow: 1;
+    /* layout: the pins, the lines and the composer one under the other */
+    flex-direction: column;
+    /* layout: lets the column shrink below its content, so the list scrolls and the page does not */
+    min-block-size: 0;
   }
 
-  /* raw: the width under which a room's lines and a thread's panel do not fit side by side, as a phone's is */
-  @container (inline-size < 40rem) {
-    .main[data-threaded] {
-      display: none;
-    }
+  /* What stands above the lines, at the lines' own inset. */
+  .lead {
+    /* layout: a column at the lines' inset, a step apart; a composition takes no padding of its own, and the markup holds
+       the note first in the one element */
+    display: flex;
+    /* layout: one under the other */
+    flex-direction: column;
+    /* layout: a step apart */
+    gap: var(--space-2xs);
+    padding-block-start: var(--space-s);
+    padding-inline: var(--space-l);
   }
 
   .topic {
@@ -21,9 +34,29 @@
     display: none;
   }
 
-  /* The bar asks the list's own width, not the page's (LineActions). */
+  /* The bar asks the list's own width, not the page's (LineActions); the lines a step apart, as the video's are. */
   .lines {
     container-type: inline-size;
+    /* layout: the lines one under the other, a step apart, on the list itself, which a composition cannot name or label */
+    display: flex;
+    /* layout: one under the other */
+    flex-direction: column;
+    /* layout: a step apart, as the video's are */
+    gap: var(--space-s);
+  }
+
+  /* The conversation's own list: it takes what the pins above it and the composer below leave, and scrolls alone, never
+     the page (the video's frame 23.58.01); the thread's list keeps its own height. */
+  .fill {
+    /* layout: a list's own margin and marks, taken off as the reset takes a paragraph's */
+    margin: 0;
+    list-style: none;
+    /* layout: takes what the pins above and the composer below leave */
+    flex: 1;
+    min-block-size: 0;
+    overflow: auto;
+    padding-block: var(--space-m);
+    padding-inline: calc(var(--space-l) - var(--focus-width) - var(--focus-offset));
   }
 
   .lines > li {
@@ -34,7 +67,6 @@
     position: relative;
     /* layout: room for the focus ring, drawn outside the line, which the list that scrolls would clip */
     margin-inline: calc(var(--focus-width) + var(--focus-offset));
-    padding-block: var(--space-3xs);
     padding-inline-end: var(--_gutter);
     overflow-wrap: anywhere;
     scroll-margin-block: calc(var(--focus-width) + var(--focus-offset));
@@ -78,6 +110,33 @@
   .time,
   .mark {
     color: var(--color-text-muted);
+  }
+
+  /* A line's head: its face, who, what it is marked and the time at the far end, which runs over the room kept for the
+     bar, as the divider's rule does (the bar covers it only while pointed at). */
+  .head {
+    /* layout: runs over the room kept for the bar */
+    margin-inline-end: calc(-1 * var(--_gutter));
+  }
+
+  .head .time {
+    /* layout: the far end of the head's row */
+    margin-inline-start: auto;
+    font: var(--font-data);
+  }
+
+  /* Where the person comes from, as the video draws it: two letters on a fill, in the label's face. */
+  .country {
+    padding-inline: var(--space-3xs);
+    border-radius: var(--radius-s);
+    background: var(--color-fill);
+    color: var(--color-text-muted);
+    font: var(--font-label);
+  }
+
+  [data-line-text] {
+    /* layout: the text a hair under its head, as the video sets it */
+    margin-block-start: calc(var(--space-3xs) / 2);
   }
 
   /* The icon of a mark (Pinned, Saved), a step before its word and on its line. */
@@ -130,14 +189,10 @@
     overflow: auto;
   }
 
-  .count {
-    font: var(--font-label);
-    color: var(--color-text-muted);
-  }
-
   /* Always drawn, one line high, so the composer below never moves as typists come and go; cut to one line, its
      whole in its title (UX review U2, U8). */
   .typing {
+    padding-inline: var(--space-l);
     font: var(--font-meta);
     color: var(--color-text-muted);
     /* layout: one line of this font, which no token names */

@@ -159,7 +159,8 @@ test.describe("a world's rooms", () => {
       await page.goto(`/w/bubble?room=${asked}`);
       await hydrated(page);
       await expect(heading(page, "#bubble")).toBeVisible();
-      await expect(page.locator("main img")).toHaveCount(0);
+      // The image the address names is not drawn (the world's planets, in the column of worlds, are the page's own).
+      await expect(page.locator("main img[src='x']")).toHaveCount(0);
     }
     await page.goto("/w/bubble?room=games&room=news");
     await hydrated(page);

@@ -3,12 +3,11 @@
 // "you" (4e).
 import { markdown, mentions, type Block, type Line, type Reacting, type ShownLine } from "@gnoworld/core";
 import type { StreamEvent } from "@gnoworld/schemas";
-import { Icon } from "@gnoworld/ui";
 import type { ReactNode } from "react";
 import { Embed } from "./Embed.tsx";
 import { embedIn } from "./embeds.ts";
 import { Markdown } from "./Message.tsx";
-import { Person } from "./Person.tsx";
+import { Head, type Country } from "./LineHead.tsx";
 import { Reactions } from "./Reactions.tsx";
 import { Quote } from "./Replying.tsx";
 import { ThreadChip } from "./ThreadChip.tsx";
@@ -20,7 +19,6 @@ const KINDS: Record<Line["kind"], string | undefined> = {
   notice: styles["notice"],
   action: styles["action"],
 };
-const CLOCK = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 
 // A line's mentions, space-separated, read apart from its drawing so the compiler keeps the drawing's tree out of
 // what a change of members recomputes.
@@ -64,52 +62,9 @@ function NewDivider() {
   );
 }
 
-// A line's author: its account's address shortened or its guest's nick, then "you" if it is mine.
-function Author({ line, mine }: { line: Line; mine: boolean }) {
-  return (
-    <span className={styles["author"]}>
-      <Person name={line.account ?? line.from} guest={line.account === undefined} />
-      {mine ? " you" : null}
-    </span>
-  );
-}
-
-// "Edited" on the time's row, before the sender, when the author's later edit is what the line shows (4d, U5).
-function Edited({ edited }: { edited: boolean | undefined }) {
-  return edited === true ? <span className={styles["mark"]}>Edited </span> : null;
-}
-
 // A line's reactions under it, when it has any (4d).
 function Chips({ to, chips, react }: { to: string; chips: string | undefined; react: LineViewProps["react"] }) {
   return chips === undefined ? null : <Reactions to={to} chips={chips} react={react} />;
-}
-
-// The line's marks first, before the time: where no sender's words stand (F808). Pinned and Saved are a word and an
-// icon (4d): one reads the room's pins, the other what this device kept.
-function Marks({
-  mentioned,
-  notice,
-  saved,
-  pinned,
-}: { mentioned: boolean; notice: boolean } & Pick<LineViewProps, "saved" | "pinned">) {
-  return (
-    <>
-      {mentioned ? <span className={styles["mentionsYou"]}>Mentions you </span> : null}
-      {notice ? <span className={styles["mark"]}>Notice </span> : null}
-      {pinned ? (
-        <span className={styles["mark"]}>
-          <Icon name="pin" />
-          Pinned{" "}
-        </span>
-      ) : null}
-      {saved ? (
-        <span className={styles["mark"]}>
-          <Icon name="bookmark" />
-          Saved{" "}
-        </span>
-      ) : null}
-    </>
-  );
 }
 
 // What the quote of a reply shortens: the mentions of the line answered, as the line shortens its own.
@@ -180,11 +135,13 @@ export interface LineViewProps {
   onThread?: ((id: string) => void) | undefined;
   /** A row of a thread's own list: no quote, no tab stop of the list's, its links Tab stops. */
   inThread?: true | undefined;
+  /** Where its author comes from, when they opted in: none draws no tag. */
+  country?: Country | undefined;
 }
 
 export function LineView(props: LineViewProps) {
   const { line, me, members, stop, actions, fresh, verdict, players, saved, pinned, chips, react, answers } = props;
-  const { replies, onThread, inThread } = props;
+  const { replies, onThread, inThread, country } = props;
   const row = rowOf({ id: line.id, stop, inThread, threads: onThread !== undefined });
   const blocks = markdown(line.text);
   // Its first link to an accepted service gets a player, but for a reader who saves data (4g).
@@ -206,14 +163,11 @@ export function LineView(props: LineViewProps) {
       {...row.attrs}
     >
       {fresh ? <NewDivider /> : null}
-      <Marks mentioned={mentioned} notice={line.kind === "notice"} saved={saved} pinned={pinned} />
+      <Head {...{ line, mine, mentioned, saved, pinned, country }} />
       {inThread === true ? null : <Quote line={line} answers={answers} known={quoted} />}
-      <time dateTime={line.time} className={styles["time"]}>
-        {CLOCK.format(new Date(line.time))}
-      </time>{" "}
-      <Edited edited={line.edited} />
-      {line.kind === "action" ? "* " : null}
-      <Author line={line} mine={mine} /> <LineText blocks={blocks} me={me} known={known} stop={row.links} />
+      <div data-line-text="">
+        <LineText blocks={blocks} me={me} known={known} stop={row.links} />
+      </div>
       {embed === undefined ? null : <Embed key={embed.src} embed={embed} verdict={verdict} />}
       {/* Before the chips in the Tab order, so Reply is a few presses away; it floats, so its place shows nowhere (U2). */}
       {actions}

@@ -3,8 +3,8 @@
 import { useLoaderData, useRouteError, type MetaArgs } from "react-router";
 import { Breadcrumb } from "@gnoworld/ui";
 import { failedWorldMeta, worldMeta } from "../meta.ts";
-import { pageOf, site } from "../places.ts";
-import { Chat } from "../features/chat/index.ts";
+import { pageOf, site, type World as WorldPlace } from "../places.ts";
+import { Chat, type ChatPlace } from "../features/chat/index.ts";
 import { isMissing, PageError } from "../features/errors/index.ts";
 
 export function loader({ request }: { request: Request }) {
@@ -22,6 +22,20 @@ export function meta({ loaderData, error }: MetaArgs<typeof loader>) {
   return loaderData || isMissing(error) ? worldMeta(loaderData) : failedWorldMeta();
 }
 
+// Until slice 7 draws each planet from its own look, every world in the column of worlds wears the one disc.
+const PLANET = "/planet.svg";
+
+// What the chat's header, its column of worlds and its info panel say of the place.
+function placeOf(world: WorldPlace, universe: ReturnType<typeof site.home>): ChatPlace {
+  return {
+    slug: world.slug,
+    name: world.name,
+    description: world.description,
+    kicker: `${universe.name} · ${world.name}`,
+    worlds: universe.worlds.map(({ slug, name, path }) => ({ slug, name, href: path, src: PLANET })),
+  };
+}
+
 export default function World() {
   const world = useLoaderData<typeof loader>();
   const universe = site.home(world);
@@ -37,7 +51,7 @@ export default function World() {
       />
       <h1>{world.name}</h1>
       <p>{world.description}</p>
-      <Chat world={world.slug} />
+      <Chat world={world.slug} place={placeOf(world, universe)} />
     </>
   );
 }

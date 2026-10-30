@@ -18,7 +18,7 @@ export function RoomsNav({
   children: ReactNode;
 }) {
   return (
-    <nav ref={navRef} tabIndex={-1} aria-label={label} className={`${shared["scrolls"] ?? ""} ${styles["nav"] ?? ""}`}>
+    <nav ref={navRef} tabIndex={-1} aria-label={label} className={styles["nav"]}>
       {children}
     </nav>
   );

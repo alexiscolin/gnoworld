@@ -40,6 +40,9 @@ export default defineConfig({
   test: {
     // A test that asserts nothing passes whatever the code does.
     expect: { requireAssertions: true },
+    // The `beforeAll` that draws a RoomView once, to load its lazy lines' view, takes under a second alone and past Vitest's
+    // 10 s on a machine at load 50 to 120, where the files' first transforms queue (F3200): a hook gets a minute.
+    hookTimeout: 60_000,
     // The benches are the files ESLint's BENCHES and scripts/repo_files.py's BENCH_FILE read, `*.bench.ts(x)`: Vitest's own
     // default, `*.{bench,benchmark}.?(c|m)[jt]s?(x)`, ran files no guard names, switched off or not (CR3; probe bench_files).
     benchmark: { include: BENCHES },

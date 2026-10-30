@@ -1,6 +1,7 @@
 // A room in view on a world's page (slice 4's 4b): the conversation's shape, one RoomView and one Writer whatever it is,
 // and what a room is told. Apart from shown.tsx, whose direct messages an account alone has.
 import type { Composed } from "@gnoworld/core";
+import type { ReactNode } from "react";
 import type { AppState } from "../../store/index.ts";
 import { roomLabel } from "./names.ts";
 import type { RoomActs } from "./roomActs.ts";
@@ -12,9 +13,11 @@ import type { WriterProps } from "./Writer.tsx";
 export interface Shown {
   kind: "room" | "dm";
   key: string;
+  /** Its name, in the chat's header: a room's label, a direct message's partner. */
+  title: ReactNode;
   view: Pick<
     RoomViewProps,
-    "room" | "partner" | "title" | "note" | "state" | "empty" | "onDelete" | "onDismiss" | "onRead" | "onReact"
+    "room" | "partner" | "note" | "state" | "empty" | "onDelete" | "onDismiss" | "onRead" | "onReact"
   >;
   /** Says what the composer composed in the conversation, an answer to a line (`reply`) or a correction of one (`edit`);
    * `draft` is what its writer typed; whether it went. */
@@ -37,9 +40,9 @@ export function roomShown(room: string, state: Room["state"], acts: RoomActs): S
   return {
     kind: "room",
     key: `room:${room}`,
+    title: roomLabel(room),
     view: {
       room,
-      title: roomLabel(room),
       note: state?.topic,
       state,
       onDelete: acts.onDelete,

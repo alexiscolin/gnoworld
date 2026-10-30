@@ -3,7 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { prerender } from "react-dom/static";
 import { beforeAll, describe, expect, it } from "vitest";
 import { NoticeModes } from "./NoticeModes.tsx";
-import { MEMBERS_SHOWN, People, RoomView, type PeopleProps, type RoomViewProps } from "./RoomView.tsx";
+import { MEMBERS_SHOWN, People, type PeopleProps } from "./People.tsx";
+import { RoomView, type RoomViewProps } from "./RoomView.tsx";
 
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
@@ -19,27 +20,33 @@ const line = (over: Partial<Line> = {}): Line => ({
 });
 const GUEST_LINE: Line = { id: "g", time: T0, from: "guest-ab12cd", text: "hello", kind: "message" };
 const ROOM = { lines: [line()], members: [ALICE, "guest-ab12cd"], topic: "Bubbles here" };
-// A room as ChatPanel draws one: #games, its topic under its name, who is here beside it.
+// A room as the page draws one: its description above its lines, and who is here, which the info panel holds (5q).
 type Room = (NonNullable<RoomViewProps["state"]> & { topic?: string | undefined }) | undefined;
-type Over = Omit<Partial<RoomViewProps>, "state"> & { state?: Room; onMessage?: PeopleProps["onMessage"] };
-const view = ({ onMessage, ...over }: Over = {}) => {
+type Over = Omit<Partial<RoomViewProps>, "state"> & {
+  state?: Room;
+  onMessage?: PeopleProps["onMessage"];
+  /** Whether the page draws who is here: not beside a direct message. */
+  people?: boolean;
+};
+const view = ({ onMessage, people = true, ...over }: Over = {}) => {
   const state = "state" in over ? over.state : ROOM;
   const { chat = "connected", me } = over;
   const aside = (
     <People members={state?.members ?? []} connected={chat === "connected"} me={me} onMessage={onMessage} />
   );
   return renderToStaticMarkup(
-    <RoomView
-      room="#bubble/games"
-      title="#games"
-      note={state?.topic}
-      aside={aside}
-      chat="connected"
-      onDelete={() => false}
-      onDismiss={() => undefined}
-      {...over}
-      state={state}
-    />,
+    <>
+      <RoomView
+        room="#bubble/games"
+        note={state?.topic}
+        chat="connected"
+        onDelete={() => false}
+        onDismiss={() => undefined}
+        {...over}
+        state={state}
+      />
+      {people ? aside : null}
+    </>,
   );
 };
 const said = (html: string) =>
@@ -47,10 +54,10 @@ const said = (html: string) =>
     .replaceAll(/<[^>]+>/g, " ")
     .replaceAll(/\s+/g, " ")
     .trim();
-// The inside of the list or aside named `label`, as React writes the name (an apostrophe escaped).
+// The inside of the list, aside or section named `label`, as React writes the name (an apostrophe escaped).
 const part = (html: string, label: string) => {
   const name = label.replaceAll("'", "&#x27;");
-  const found = new RegExp(`<(ol|aside)[^>]*aria-label="${name}"[^>]*>(.*?)</\\1>`, "s").exec(html);
+  const found = new RegExp(`<(ol|aside|section)[^>]*aria-label="${name}"[^>]*>(.*?)</\\1>`, "s").exec(html);
   return found?.[2] ?? "";
 };
 // Each list item's words: a line that is a list holds items of its own, so a test of one counts the Messages
@@ -62,14 +69,7 @@ const paragraphs = (html: string) => (html.match(/<p[ >]/g) ?? []).length;
 // is held, and every view below draws it at once, as a room switch does once the page has it.
 beforeAll(async () => {
   await prerender(
-    <RoomView
-      room="#bubble/games"
-      title="#games"
-      state={ROOM}
-      chat="connected"
-      onDelete={() => false}
-      onDismiss={() => undefined}
-    />,
+    <RoomView room="#bubble/games" state={ROOM} chat="connected" onDelete={() => false} onDismiss={() => undefined} />,
   );
 });
 
@@ -102,8 +102,8 @@ describe("RoomView", () => {
     expect(waiting).not.toContain("Play the");
   });
 
-  it("names the room, its description right after, from its topic", () => {
-    expect(view()).toMatch(/<h2[^>]*>#games<\/h2>\s*<p[^>]*>Bubbles here<\/p>/);
+  it("says the room's description, its topic, above its lines", () => {
+    expect(view()).toMatch(/^<div[^>]*><div[^>]*><p[^>]*>Bubbles here<\/p>/);
   });
 
   it("gives no description when the room has none", () => {
@@ -114,12 +114,12 @@ describe("RoomView", () => {
     const html = part(view(), "Messages");
     expect(html).toMatch(new RegExp(`<time dateTime="${T0}"[^>]*>\\d{2}:\\d{2}</time>`));
     expect(html).toContain(`title="${ALICE}"`);
-    expect(items(html)).toEqual([expect.stringMatching(/^\d{2}:\d{2} g10gh7…3y5tv hello$/)]);
+    expect(items(html)).toEqual([expect.stringMatching(/^g10gh7…3y5tv \d{2}:\d{2} hello$/)]);
   });
 
   it("names a guest's line by its nick and says it is a guest's, never by an account", () => {
     const html = part(view({ state: { ...ROOM, lines: [GUEST_LINE] } }), "Messages");
-    expect(items(html)).toEqual([expect.stringMatching(/^\d{2}:\d{2} guest-ab12cd \(guest\) hello$/)]);
+    expect(items(html)).toEqual([expect.stringMatching(/^guest-ab12cd \(guest\) \d{2}:\d{2} hello$/)]);
     expect(html).not.toContain("title=");
   });
 
@@ -135,12 +135,12 @@ describe("RoomView", () => {
       view({ state: { ...ROOM, lines: [line({ from: "gnoworld", account: "gnoworld" })] } }),
       "Messages",
     );
-    expect(items(html)).toEqual([expect.stringMatching(/^\d{2}:\d{2} gnoworld hello$/)]);
+    expect(items(html)).toEqual([expect.stringMatching(/^gnoworld \d{2}:\d{2} hello$/)]);
   });
 
   it("shows an /me as its author doing it", () => {
     const html = part(view({ state: { ...ROOM, lines: [line({ kind: "action", text: "waves" })] } }), "Messages");
-    expect(items(html)).toEqual([expect.stringMatching(/^\d{2}:\d{2} \* g10gh7…3y5tv waves$/)]);
+    expect(items(html)).toEqual([expect.stringMatching(/^\* g10gh7…3y5tv \d{2}:\d{2} waves$/)]);
   });
 
   it("marks a notice as one", () => {
@@ -149,8 +149,8 @@ describe("RoomView", () => {
     expect(notice).toContain("Notice");
     expect(notice).toContain("heads up");
     expect(notice).not.toContain("*");
-    // Its mark first, before the time: where no sender's words stand (F808).
-    expect(notice).toMatch(/^Notice \d{2}:\d{2} g10gh7…3y5tv heads up$/);
+    // Its mark in the head, after the name and before the time: where no sender's words stand (F808).
+    expect(notice).toMatch(/^g10gh7…3y5tv Notice \d{2}:\d{2} heads up$/);
     // Muted, its mark apart: the classes the sheet reads (`.notice .text`, `.mark`).
     expect(html).toMatch(
       /<li class="[^"]*notice[^"]*"(?: tabindex="-?\d")?>.*<span class="[^"]*mark[^"]*">Notice <\/span>.*<span class="[^"]*text[^"]*">heads up<\/span>/s,
@@ -164,15 +164,13 @@ describe("RoomView", () => {
     const [first = "", second = ""] = items(html);
     expect(first).toContain("Mentions you");
     expect(first).toMatch(/g10gh7…3y5tv .*ready, @g1jg8m…vsqf5 \?$/);
-    expect(second).toMatch(/^\d{2}:\d{2} g10gh7…3y5tv and @g10gh7…3y5tv$/);
+    expect(second).toMatch(/^g10gh7…3y5tv \d{2}:\d{2} and @g10gh7…3y5tv$/);
     expect(html).toMatch(
       /<li data-about-me=""(?: tabindex="-?\d")?>.*<span class="[^"]*mentionsYou[^"]*">Mentions you <\/span>/s,
     );
-    // The mark comes first, before the time: where no sender's words stand (F808).
-    expect(first).toMatch(/^Mentions you \d{2}:\d{2} g10gh7…3y5tv ready, @g1jg8m…vsqf5 \?$/);
-    expect(html).toMatch(
-      /<li data-about-me=""(?: tabindex="-?\d")?><span class="[^"]*mentionsYou[^"]*">Mentions you <\/span><time /,
-    );
+    // The mark comes in the head, after the name and before the time: where no sender's words stand (F808).
+    expect(first).toMatch(/^g10gh7…3y5tv Mentions you \d{2}:\d{2} ready, @g1jg8m…vsqf5 \?$/);
+    expect(html).toMatch(/<span class="[^"]*mentionsYou[^"]*">Mentions you <\/span><time /);
     expect(html).toContain(`<span data-mention="me" title="${BOB}">`);
     expect(html.match(/data-about-me/g)).toHaveLength(1);
     // The line that does not mention the reader carries nothing: no class, no attribute.
@@ -190,8 +188,8 @@ describe("RoomView", () => {
     expect(notice).toContain("Notice");
     expect(notice).toMatch(/@g1jg8m…vsqf5 heads up$/);
     expect(action).toMatch(/\* g10gh7…3y5tv .*waves at @g1jg8m…vsqf5$/);
-    expect(notice).toMatch(/^Mentions you Notice \d{2}:\d{2} g10gh7…3y5tv @g1jg8m…vsqf5 heads up$/);
-    expect(action).toMatch(/^Mentions you \d{2}:\d{2} \* g10gh7…3y5tv waves at @g1jg8m…vsqf5$/);
+    expect(notice).toMatch(/^g10gh7…3y5tv Mentions you Notice \d{2}:\d{2} @g1jg8m…vsqf5 heads up$/);
+    expect(action).toMatch(/^\* g10gh7…3y5tv Mentions you \d{2}:\d{2} waves at @g1jg8m…vsqf5$/);
     // Each keeps its kind's one class, whole, and says it is about the reader by its attribute.
     expect(html).toMatch(/<li class="[^" ]*notice[^" ]*" data-about-me=""(?: tabindex="-?\d")?>/);
     expect(html).toMatch(/<li class="[^" ]*action[^" ]*" data-about-me=""(?: tabindex="-?\d")?>/);
@@ -215,7 +213,7 @@ describe("RoomView", () => {
     const ground = "g1jg8m2vtwlmmyz8swgu76ug4tklwnays8yvsqf5";
     const lines = [line({ text: `@${ground} @${ALICE} @${BOB}` })];
     const html = part(view({ me: BOB, state: { ...ROOM, lines } }), "Messages");
-    expect(said(html)).toMatch(new RegExp(`g10gh7…3y5tv @${ground} @g10gh7…3y5tv @g1jg8m…vsqf5$`));
+    expect(said(html)).toMatch(new RegExp(`\\d{2}:\\d{2} @${ground} @g10gh7…3y5tv @g1jg8m…vsqf5$`));
     expect(html).toContain(`<span data-mention="" title="${ground}">@${ground}</span>`);
   });
 
@@ -250,9 +248,9 @@ describe("RoomView", () => {
     expect(html).not.toContain("data-mention");
   });
 
-  it('tells a sender\'s own words "Mentions you" from the mark: they come after the author, the mark before the time', () => {
+  it('tells a sender\'s own words "Mentions you" from the mark: they come under the head, the mark in it', () => {
     const html = part(view({ me: BOB, state: { ...ROOM, lines: [line({ text: "Mentions you, look" })] } }), "Messages");
-    expect(items(html)).toEqual([expect.stringMatching(/^\d{2}:\d{2} g10gh7…3y5tv Mentions you, look$/)]);
+    expect(items(html)).toEqual([expect.stringMatching(/^g10gh7…3y5tv \d{2}:\d{2} Mentions you, look$/)]);
     expect(html).not.toContain("data-about-me");
   });
 
@@ -386,14 +384,15 @@ describe("RoomView", () => {
   });
 
   // 4e: a direct message's page names its partner, and says it is not encrypted, as every DM does.
-  it("names a conversation by the title it is given, its note under it", () => {
-    const html = view({ title: "g10gh7…3y5tv", note: "Not encrypted: the server can read these." });
-    expect(html).toMatch(/<h2[^>]*>g10gh7…3y5tv<\/h2>\s*<p[^>]*>Not encrypted: the server can read these.<\/p>/);
+  it("puts a conversation's note above its lines, which the header's title, the chat's, no longer holds", () => {
+    const html = view({ note: "Not encrypted: the server can read these." });
+    expect(html).toMatch(/^<div[^>]*><div[^>]*><p[^>]*>Not encrypted: the server can read these.<\/p>/);
+    expect(html).not.toContain("<h2");
   });
 
   // 4e's own review: a conversation has its two people, never a room's "who is here".
   it("leaves who is here out of a conversation", () => {
-    const html = view({ title: "g10gh7…3y5tv", aside: undefined });
+    const html = view({ people: false });
     expect(html).not.toContain("Who&#x27;s here");
     expect(said(html)).not.toMatch(/\d+ here/);
   });
@@ -432,9 +431,10 @@ describe("RoomView", () => {
   });
 
   // The words a reader gets, the markup taken off with nothing in its place.
-  it("puts a space between a line's time, author and text", () => {
+  it("puts a space between a line's author and time, and its text in a block under them", () => {
     const [item = ""] = [...part(view(), "Messages").matchAll(/<li[^>]*>(.*?)<\/li>/gs)].map((m) => m[1] ?? "");
-    expect(item.replaceAll(/<[^>]+>/g, "")).toMatch(/^\d{2}:\d{2} g10gh7…3y5tv hello$/);
+    expect(item.replaceAll(/<[^>]+>/g, "")).toMatch(/^g10gh7…3y5tv \d{2}:\d{2}hello$/);
+    expect(item).toContain('</div><div data-line-text="">');
   });
 
   it.each([
@@ -484,7 +484,7 @@ describe("RoomView", () => {
   it("shows what it is given under the lines, before who is here: the composer, or a word for a guest", () => {
     const html = view({ composer: <p>Log in to write in this room.</p> });
     expect(html).toMatch(
-      /aria-label="Messages".*<\/ol>(<p class="[^"]*typing[^"]*"[^>]*>.*?<\/p>)?<p>Log in to write in this room.<\/p><\/div><aside/s,
+      /aria-label="Messages".*<\/ol>(<p class="[^"]*typing[^"]*"[^>]*>.*?<\/p>)?<p>Log in to write in this room.<\/p><\/div><section aria-label="Who/s,
     );
   });
 
@@ -492,7 +492,7 @@ describe("RoomView", () => {
   it("marks the reader's own lines as theirs, by the word you, and no one else's", () => {
     const lines = [line({ id: "a", text: "mine" }), line({ id: "b", from: BOB, account: BOB, text: "theirs" })];
     const html = part(view({ me: ALICE, state: { ...ROOM, lines } }), "Messages");
-    expect(items(html).map((words) => words.replace(/^\d\d:\d\d /, ""))).toEqual([
+    expect(items(html).map((words) => words.replace(/ \d\d:\d\d/, ""))).toEqual([
       "g10gh7…3y5tv you mine",
       "g1jg8m…vsqf5 theirs",
     ]);
@@ -591,9 +591,9 @@ describe("RoomView: what is new", () => {
   it("marks the first line past the reading place New, before its time, and that line alone", () => {
     const html = part(view({ state: { ...OPENED, lines: LINES, read: T(0) } }), "Messages");
     expect(items(html)).toEqual([
-      expect.stringMatching(/^\d{2}:\d{2} /),
-      expect.stringMatching(/^New( from here)? \d{2}:\d{2} /),
-      expect.stringMatching(/^\d{2}:\d{2} /),
+      expect.stringMatching(/^g10gh7…3y5tv \d{2}:\d{2} /),
+      expect.stringMatching(/^New( from here)? g10gh7…3y5tv \d{2}:\d{2} /),
+      expect.stringMatching(/^g10gh7…3y5tv \d{2}:\d{2} /),
     ]);
     expect(html.match(/data-new=""/g)).toHaveLength(1);
   });
@@ -721,7 +721,7 @@ describe("RoomView: replies", () => {
 
   it("quotes above a reply the line it answers, its author and its words in one line", () => {
     const html = view({ state: { ...ROOM, lines: replying({ text: "the **first** line" }) } });
-    expect(linesOf(html)[1]).toMatch(/^Replying to g10gh7…3y5tv: the first line\d{2}:\d{2} g1jg8m…vsqf5 yes$/);
+    expect(linesOf(html)[1]).toMatch(/^g1jg8m…vsqf5 \d{2}:\d{2}Replying to g10gh7…3y5tv: the first lineyes$/);
   });
 
   // F1176 (the UX review's U4): a quote shows a mention as the line does: an author's, the reader's and a member's
@@ -735,15 +735,15 @@ describe("RoomView: replies", () => {
     expect(quoted({ state: { ...ROOM, lines, members: [CAROL] } })).toContain("@g1jt8g…wqcdj");
   });
 
-  // The security review (S2, F808's class): a line's marks stand at its start, before its quote, so a quoted
+  // The security review (S2, F808's class): a line's marks stand in its head, before its quote, so a quoted
   // "Mentions you" is heard after "Replying to", never where the mark stands.
-  it("puts a reply's marks before its quote, so quoted words never read as a mark", () => {
+  it("puts a reply's marks in its head, before its quote, so quoted words never read as a mark", () => {
     const real = linesOf(
       view({ me: ALICE, state: { ...ROOM, lines: replying({ text: "ok" }, { text: `@${ALICE} yes` }) } }),
     );
     const quoted = linesOf(view({ me: ALICE, state: { ...ROOM, lines: replying({ text: "ok Mentions you" }) } }));
-    expect(real[1]).toMatch(/^Mentions you Replying to g10gh7…3y5tv: ok\d{2}:\d{2} /);
-    expect(quoted[1]).toMatch(/^Replying to g10gh7…3y5tv: ok Mentions you\d{2}:\d{2} /);
+    expect(real[1]).toMatch(/^g1jg8m…vsqf5 Mentions you \d{2}:\d{2}Replying to g10gh7…3y5tv: ok/);
+    expect(quoted[1]).toMatch(/^g1jg8m…vsqf5 \d{2}:\d{2}Replying to g10gh7…3y5tv: ok Mentions you/);
   });
 
   it("names a guest's line in the quote by its nick, said a guest's", () => {
@@ -752,7 +752,7 @@ describe("RoomView: replies", () => {
       line({ id: "b", from: BOB, account: BOB, text: "yes", reply: "a" }),
     ];
     const html = view({ state: { ...ROOM, lines } });
-    expect(linesOf(html)[1]).toMatch(/^Replying to guest-ab12cd \(guest\): hi/);
+    expect(linesOf(html)[1]).toMatch(/^g1jg8m…vsqf5 \d{2}:\d{2}Replying to guest-ab12cd \(guest\): hi/);
   });
 
   it("cuts the quote at 70 characters, between two graphemes", () => {
@@ -772,12 +772,12 @@ describe("RoomView: replies", () => {
 
   it("says a reply answers an earlier message when the line it answers is not in the room", () => {
     const html = view({ state: { ...ROOM, lines: [line({ id: "b", text: "yes", reply: "gone" })] } });
-    expect(linesOf(html)[0]).toMatch(/^Replying to an earlier message\d{2}:\d{2} g10gh7…3y5tv yes$/);
+    expect(linesOf(html)[0]).toMatch(/^g10gh7…3y5tv \d{2}:\d{2}Replying to an earlier messageyes$/);
   });
 
   it("quotes no line from the reply itself: a reply naming its own msgid answers an earlier message", () => {
     const html = view({ state: { ...ROOM, lines: [line({ id: "b", text: "yes", reply: "b" })] } });
-    expect(linesOf(html)[0]).toMatch(/^Replying to an earlier message/);
+    expect(linesOf(html)[0]).toMatch(/^g10gh7…3y5tv \d{2}:\d{2}Replying to an earlier message/);
   });
 });
 
@@ -792,9 +792,9 @@ describe("RoomView: edits", () => {
     ];
     const shown = linesOf(view({ state: { ...ROOM, lines } }));
     expect(shown).toHaveLength(2);
-    expect(shown[0]).toMatch(/\d{2}:\d{2} Edited g10gh7…3y5tv hello/);
+    expect(shown[0]).toMatch(/g10gh7…3y5tv Edited \d{2}:\d{2}hello/);
     expect(shown[0]).toMatch(/edited/i);
-    expect(shown[1]).toMatch(/^Replying to g10gh7…3y5tv: hello\d/);
+    expect(shown[1]).toMatch(/^g1jg8m…vsqf5 \d{2}:\d{2}Replying to g10gh7…3y5tv: hello/);
   });
 
   // slice-4-room-edit, security: a corrected line keeps its own msgid but shows the correction's words, so its player, which
@@ -849,24 +849,24 @@ describe("RoomView: edits", () => {
     expect(first).not.toContain("Waiting");
   });
 
-  // F1177 (the UX review's U5): the mark stands on the time row, right after the time and before the sender, never
-  // after the sender's words (F971), so a sender's "(edited)" reads as theirs; a reply's quote is above that row.
+  // F1177 (the UX review's U5): the mark stands in the head, right before the time, never after the sender's words
+  // (F971), so a sender's "(edited)" reads as theirs; a reply's quote is under that row.
   it("marks an edited line on its time row, and a line that says (edited) not at all", () => {
     const lines = [line({ id: "a", text: "helo" }), line({ id: "e", text: "hello", edits: "a" })];
-    expect(linesOf(view({ state: { ...ROOM, lines } }))[0]).toMatch(/^\d{2}:\d{2} Edited g10gh7…3y5tv hello$/);
+    expect(linesOf(view({ state: { ...ROOM, lines } }))[0]).toMatch(/^g10gh7…3y5tv Edited \d{2}:\d{2}hello$/);
     expect(linesOf(view({ state: { ...ROOM, lines: [line({ id: "s", text: "(edited)" })] } }))[0]).toMatch(
-      /^\d{2}:\d{2} g10gh7…3y5tv \(edited\)$/,
+      /^g10gh7…3y5tv \d{2}:\d{2}\(edited\)$/,
     );
   });
 
-  it("puts an edited reply's mark on the time row, under its quote", () => {
+  it("puts an edited reply's mark in the head, over its quote", () => {
     const lines = [
       line({ id: "a", text: "hello" }),
       line({ id: "b", from: BOB, account: BOB, text: "yes", reply: "a" }),
       line({ id: "e", from: BOB, account: BOB, text: "yes!", edits: "b" }),
     ];
     expect(linesOf(view({ state: { ...ROOM, lines } }))[1]).toMatch(
-      /^Replying to g10gh7…3y5tv: hello\d{2}:\d{2} Edited g1jg8m…vsqf5 yes!$/,
+      /^g1jg8m…vsqf5 Edited \d{2}:\d{2}Replying to g10gh7…3y5tv: helloyes!$/,
     );
   });
 
@@ -881,7 +881,7 @@ describe("RoomView: edits", () => {
     const shown = linesOf(view({ state: { ...ROOM, lines, reactions } }));
     expect(shown).toHaveLength(2);
     expect(shown[0]).toMatch(/👍 1$/);
-    expect(shown[1]).toMatch(/^Replying to g10gh7…3y5tv: hello\d/);
+    expect(shown[1]).toMatch(/^g1jg8m…vsqf5 \d{2}:\d{2}Replying to g10gh7…3y5tv: hello/);
   });
 
   it("keeps another account's edit a line of its own, the line it names as written", () => {
@@ -890,16 +890,16 @@ describe("RoomView: edits", () => {
       line({ id: "e", from: BOB, account: BOB, text: "theirs", edits: "a" }),
     ];
     expect(linesOf(view({ state: { ...ROOM, lines } }))).toEqual([
-      expect.stringMatching(/ mine$/),
-      expect.stringMatching(/ theirs$/),
+      expect.stringMatching(/\d{2}:\d{2}mine$/),
+      expect.stringMatching(/\d{2}:\d{2}theirs$/),
     ]);
   });
 
   it("keeps an edit naming a line not in this room, another room's of that msgid included, a line of its own", () => {
     const lines = [line({ id: "b", text: "here" }), line({ id: "e", text: "fixed", edits: "a" })];
     expect(linesOf(view({ state: { ...ROOM, lines } }))).toEqual([
-      expect.stringMatching(/ here$/),
-      expect.stringMatching(/ fixed$/),
+      expect.stringMatching(/\d{2}:\d{2}here$/),
+      expect.stringMatching(/\d{2}:\d{2}fixed$/),
     ]);
   });
 });
@@ -913,14 +913,12 @@ describe("RoomView: the room's notification modes", () => {
   it("draws the modes it is given under the room's name, before its status", () => {
     const html = view({ me: ALICE, modes });
     expect(group(html)).toBe(true);
-    expect(html.indexOf("<h2")).toBeLessThan(html.indexOf('role="group"'));
+    expect(html.indexOf("Bubbles here")).toBeLessThan(html.indexOf('role="group"'));
     expect(html.indexOf('role="group"')).toBeLessThan(html.indexOf('role="status"'));
   });
 
   it("draws none when given none, a guest's whom no one can mention, or a direct message's", () => {
     expect(group(view({ me: undefined }))).toBe(false);
-    expect(view({ me: ALICE, room: undefined, title: "Direct message with someone" })).not.toContain(
-      "Notifications for",
-    );
+    expect(view({ me: ALICE, room: undefined })).not.toContain("Notifications for");
   });
 });

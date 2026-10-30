@@ -1,0 +1,22 @@
+@layer components {
+  .panel {
+    padding: var(--space-m);
+  }
+
+  .panel:focus {
+    outline: none;
+  }
+
+  .name {
+    font: var(--font-title-l);
+    letter-spacing: var(--tracking-tight);
+  }
+
+  .about {
+    color: var(--color-text-muted);
+  }
+
+  .here {
+    padding-block-start: var(--space-s);
+  }
+}

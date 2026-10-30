@@ -1,0 +1,10 @@
+@layer components {
+  .bar {
+    padding-block: var(--space-s);
+  }
+
+  .bar > * > * {
+    /* layout: the chips share the row's width alike, which Cluster leaves to each child's own */
+    flex: 1;
+  }
+}

@@ -30,6 +30,7 @@ export function groups() {
         "--popover-",
         "--thumb-",
         "--avatar-",
+        "--chat-",
       ],
     },
     { name: "Shape", prefixes: ["--radius-", "--line-", "--focus-"] },

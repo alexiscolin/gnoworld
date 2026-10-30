@@ -1,0 +1,28 @@
+/* The chat's screen: the rooms' column at the video's inset, and what stands under the lines, which never scrolls with them. */
+@layer components {
+  /* The screen takes the height of the window, so the regions scroll alone and the page does not. */
+  .screen {
+    block-size: 100dvb;
+  }
+
+  .rail {
+    padding: var(--space-s);
+    overflow-wrap: anywhere;
+  }
+
+  /* The quick actions and the composer under the lines, set off by a rule across the conversation. */
+  .dock {
+    /* the video's 21 px under the box, from the tokens: 16 and 4 */
+    padding-block-end: calc(var(--space-s) + var(--space-3xs));
+    padding-inline: var(--space-l);
+    border-block-start: var(--line-width) solid var(--color-line);
+  }
+
+  /* raw: the design system's one breakpoint for the chat, a phone's layout: the page's gutter is the inset, the box takes
+     the width it leaves */
+  @media (max-width: 900px) {
+    .dock {
+      padding-inline: 0;
+    }
+  }
+}

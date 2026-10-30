@@ -64,6 +64,8 @@ export const crossedByBar = (page: Page) =>
     for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
       const range = document.createRange();
       range.selectNodeContents(node);
+      // The time at the head's far end lies under the bar, as the video's does: it is not a word of the line.
+      if (node.parentElement?.closest("time") != null) continue;
       if (toolbar?.contains(node) !== true && [...range.getClientRects()].some(over))
         found.push(node.textContent ?? "");
     }

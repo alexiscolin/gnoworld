@@ -54,11 +54,11 @@ function dmShown(partner: string, dms: Dms, { sayTo, focus, noteId, seen, acts }
   return {
     kind: "dm",
     key: `dm:${partner}`,
+    title,
     // Its lines have the bar (4d's DM bar): a reaction, a reply, an edit and a delete of one's own; no link, no player.
     view: {
       room: undefined,
       partner,
-      title,
       note,
       // Its page is the one it holds, so its reader's reach of the end counts as a read (4f-n).
       state: stateOf(dms),

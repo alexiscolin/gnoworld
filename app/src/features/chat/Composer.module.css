@@ -1,5 +1,40 @@
 /* The composer's line as it will read: muted, wrapping anywhere, ten lines high at most, then scrolled (F1722). */
 @layer components {
+  /* The composer's one box, as the video draws it (frame 23.58.01): an edge, a rounded fill, the ring of the edge where
+     the focus is; the field inside it draws no edge of its own, and its label, the field's name, is for assistive
+     technology alone, the placeholder's job in the video. */
+  .box {
+    padding: var(--space-2xs);
+    border: var(--line-width) solid var(--color-line);
+    border-radius: var(--radius-box);
+    background: var(--color-fill);
+  }
+
+  .box:focus-within {
+    border-color: var(--color-mine-line);
+  }
+
+  /* Send at the box's foot, not as tall as the field beside it. */
+  .send {
+    /* layout: Send sits at the box's foot, which the sidebar composition (centred or stretched) does not do */
+    align-self: end;
+  }
+
+  .box textarea {
+    border: 0;
+    background: none;
+  }
+
+  .box label {
+    position: absolute;
+    /* raw: one pixel, the least a box can be and still be read (the utility's own, for a label ui draws) */
+    inline-size: 1px;
+    /* raw: one pixel, the least a box can be and still be read (the utility's own, for a label ui draws) */
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
   .preview {
     color: var(--color-text-muted);
     overflow-wrap: anywhere;

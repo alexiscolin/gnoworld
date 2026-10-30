@@ -39,6 +39,7 @@ const SHOWN: Record<keyof typeof ui, readonly [region: string, mark: string]> = 
   PlanetThumb: ["Planets", "[data-kind]"],
   Avatar: ["Avatars", "[data-kind] svg"],
   LinkProvider: ["Links", "a[data-page-link]"],
+  ChatLayout: ["Chat layout", "[data-chat-layout] [data-region='conversation']"],
 };
 
 describe("Overview", () => {

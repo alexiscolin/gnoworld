@@ -87,10 +87,15 @@
     --avatar-s: 20px;
     --avatar-m: 24px;
     --avatar-l: 48px;
+    --chat-head: 52px;
+    --chat-worlds: 82px;
+    --chat-rooms: 158px;
+    --chat-info: 300px;
 
     --radius-s: 8px;
     --radius-m: 12px;
     --radius-l: 24px;
+    --radius-box: 16px;
     --radius-pill: 999px;
     --line-width: 1px;
     --focus-width: 2px;

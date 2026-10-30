@@ -2,6 +2,8 @@
 @layer components {
   .section {
     font: var(--font-label);
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
     color: var(--color-text-muted);
   }
 }

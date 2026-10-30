@@ -123,18 +123,23 @@ export interface ComposerProps {
   gone?: boolean | undefined;
 }
 
-export function Composer(props: ComposerProps) {
-  const { room, nick, rooms, members, onSay, draft: kept = "", onDraft, onTyping, label: to, refused } = props;
+// The draft, and each change of it: the device and the room told at once. A render alone (a line arriving, a room opened
+// on a kept draft) writes nothing and tells no one (R3).
+function useDraft({ draft: kept = "", onDraft, onTyping }: Pick<ComposerProps, "draft" | "onDraft" | "onTyping">) {
   const [draft, setDraft] = useState(kept);
-  const refusal = useRefusal(refused, draft, { setDraft, fresh: props.fresh, gone: props.gone });
-  // Each change of the draft, the device and the room told at once: a render alone (a line arriving, a room opened
-  // on a kept draft) writes nothing and tells no one (R3).
   const change = (next: string) => {
     setDraft(next);
     onDraft?.(next);
     const told = typingOf(next);
     if (told !== undefined) onTyping?.(told);
   };
+  return { draft, setDraft, change };
+}
+
+export function Composer(props: ComposerProps) {
+  const { room, nick, rooms, members, onSay, label: to, refused } = props;
+  const { draft, setDraft, change } = useDraft(props);
+  const refusal = useRefusal(refused, draft, { setDraft, fresh: props.fresh, gone: props.gone });
   const [failed, setFailed] = useState<boolean | string>(false);
   const formRef = useRef<HTMLFormElement>(null);
   const label = to ?? roomLabel(room);
@@ -185,25 +190,30 @@ export function Composer(props: ComposerProps) {
     >
       <Stack space="2xs">
         {editing.bar}
-        <FormatBar onFormat={format} />
-        <Sidebar side="end" space="2xs">
-          <Field
-            kind="lines"
-            enterAddsLine={coarse}
-            label={`Message ${label}`}
-            describedBy={editing.describedBy}
-            value={draft}
-            onChange={(value) => {
-              change(value);
-              setFailed(false);
-              refusal.said();
-            }}
-            {...(refusal.why === undefined ? shown : { error: refusal.why })}
-          />
-          <Button type="submit" disabled={!goes}>
-            {editing.send}
-          </Button>
-        </Sidebar>
+        {/* The video's one rounded box: the format bar, the field and the send button inside one edge. */}
+        <div role="group" aria-label="Message box" className={styles["box"]}>
+          <FormatBar onFormat={format} />
+          <Sidebar side="end" space="2xs">
+            <Field
+              kind="lines"
+              enterAddsLine={coarse}
+              label={`Message ${label}`}
+              describedBy={editing.describedBy}
+              value={draft}
+              onChange={(value) => {
+                change(value);
+                setFailed(false);
+                refusal.said();
+              }}
+              {...(refusal.why === undefined ? shown : { error: refusal.why })}
+            />
+            <span className={styles["send"]}>
+              <Button type="submit" disabled={!goes}>
+                {editing.send}
+              </Button>
+            </span>
+          </Sidebar>
+        </div>
         <Preview composed={composed} me={nick} members={new Set(members)} />
       </Stack>
     </form>

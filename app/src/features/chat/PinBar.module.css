@@ -2,6 +2,8 @@
    tokens. */
 @layer components {
   .bar {
+    /* layout: the rule under the pins stops at the lines' inset, as the lines do */
+    margin-inline: var(--space-l);
     border-block-end: var(--line-width) solid var(--color-line);
   }
 

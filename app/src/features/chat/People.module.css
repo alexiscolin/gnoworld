@@ -1,0 +1,12 @@
+@layer components {
+  .count {
+    font: var(--font-label);
+    color: var(--color-text-muted);
+  }
+
+  /* The country in words at the end of a person's row: the video's mono, muted. */
+  .where {
+    color: var(--color-text-muted);
+    font: var(--font-data);
+  }
+}

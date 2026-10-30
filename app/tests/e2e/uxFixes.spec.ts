@@ -2,7 +2,8 @@ import { lines, roomsNav, word } from "./chat.ts";
 import { expect, test } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { live, room, T } from "./scriptedRoom.ts";
-import { asAccount, barOf, crossedByBar } from "./talk.ts";
+import { asAccount, barOf, crossedByBar, OTHER, tagged } from "./talk.ts";
+import { chipOf, panel } from "./thread.ts";
 import type { HistoryLine } from "./scripted.ts";
 
 // The slice 4 UX review's majors that ship before slice 5: U1 (the bar over a line's words) and U4 (a first
@@ -49,5 +50,24 @@ test.describe("the slice 4 UX review's fixes", () => {
     );
     await expect(roomsNav(page).getByRole("heading", { name: "Notifications" })).toBeVisible();
     expect(await place()).toEqual(before);
+  });
+
+  // The focus brings a line's bar into the list's view (G8): a click on a chip of a line the list's top cuts moved the list
+  // under the pointer between the press and the release, so the click was lost and no thread opened.
+  test("a click on a chip in a line the list's top cuts opens its thread, the list not moving under the pointer", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    const history: HistoryLine[] = [
+      ["m1", T(0), "the root line"],
+      ["m2", T(1), "an unrelated line"],
+    ];
+    const replayed = [
+      tagged("m3", "first reply", { at: 2, tags: "+reply=m1", who: OTHER }),
+      tagged("m4", "a reply to the reply", { at: 3, tags: "+reply=m3", who: OTHER }),
+    ];
+    await asAccount(page, () => ({ history, replayed }), 4);
+    await chipOf(lines(page).first()).click();
+    await expect(panel(page)).toBeVisible();
   });
 });

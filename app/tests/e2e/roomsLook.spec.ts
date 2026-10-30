@@ -32,7 +32,8 @@ test.describe("a world's rooms, as they look", () => {
   ] as const) {
     test(`on a ${screen}'s screen`, async ({ page }) => {
       await asGuest(page, width);
-      await expect(page.getByRole("complementary", { name: "Who's here" })).toContainText("2 here");
+      // A phone has no info panel: its people open from the quick action, in a dialog.
+      if (screen === "computer") await expect(page.getByRole("region", { name: "Who's here" })).toContainText("2 here");
       await expect(page).toHaveScreenshot(`rooms-${screen}.png`);
     });
   }
@@ -55,7 +56,7 @@ test.describe("a world's rooms, as they look", () => {
     await page.goto("/w/bubble?room=games");
     await hydrated(page);
     await expect(lines(page)).toHaveCount(2);
-    await expect(page.getByRole("complementary", { name: "Who's here" })).toContainText("2 here");
+    await expect(page.getByRole("region", { name: "Who's here" })).toContainText("2 here");
     await page.getByRole("textbox", { name: "Message #games" }).fill("I'm in: **tonight**, `9 pm` UTC");
     await expect(page).toHaveScreenshot("composer-computer.png", {
       mask: [page.getByRole("banner")],

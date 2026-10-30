@@ -52,9 +52,11 @@ function draw(shown: Shown | undefined) {
       acts,
       people: PEOPLE,
     });
+    // Loaded keeps `threaded` for the layout, whose info panel the thread takes; RoomView reads only the props it names.
     return (
       <div data-handler={typeof view.onThread} data-props={Object.keys(view).length} data-aside={aside !== undefined}>
-        {shown === undefined ? null : <RoomView {...shown.view} {...view} aside={aside} chat="connected" me={ALICE} />}
+        {shown === undefined ? null : <RoomView {...shown.view} {...view} chat="connected" me={ALICE} />}
+        {aside}
       </div>
     );
   }

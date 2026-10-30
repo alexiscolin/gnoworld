@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { all, markup, one } from "../../../tests/mount.tsx";
 import { Composer, Preview, typingOf } from "./Composer.tsx";
 import { NEAR, ROOM_NOTIFIES, ROOM_SILENT, roomHint, said, sendable, withHint } from "./said.ts";
 import { tooFast } from "./pace.ts";
@@ -851,5 +852,24 @@ describe("Composer: submitting an edit", () => {
       expect.objectContaining({ action: true, text: "waves" }),
       "/me waves",
     );
+  });
+});
+
+// 5q: the composer of the video (frame 23.58.01, bottom): one rounded box holding the format bar, the field and the send
+// button. The box is a group; its edge is what the reader sees as the composer.
+const boxed = () =>
+  markup(<Composer room="#bubble/games" nick={NICK} rooms={["#games"]} members={[]} onSay={() => true} />);
+
+describe("the composer's box", () => {
+  it("holds the format bar, the field and the send button in one group named Message box", () => {
+    const box = one(boxed(), '[role="group"][aria-label="Message box"]');
+    expect(all(box, '[role="group"][aria-label="Format"]')).toHaveLength(1);
+    expect(all(box, "textarea, [role='textbox']")).toHaveLength(1);
+    expect(all(box, "button[type='submit']")).toHaveLength(1);
+  });
+
+  it("keeps the box inside the form, so Enter and the send button still say the line", () => {
+    const view = boxed();
+    expect(one(view, "form").contains(one(view, '[aria-label="Message box"]'))).toBe(true);
   });
 });

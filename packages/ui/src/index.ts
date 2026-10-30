@@ -7,6 +7,7 @@ export { Avatar, type AvatarProps } from "./Avatar/Avatar.tsx";
 export { Breadcrumb, type BreadcrumbProps } from "./Breadcrumb/Breadcrumb.tsx";
 export { Button, type ButtonProps } from "./Button/Button.tsx";
 export { IconButton, type IconButtonProps } from "./Button/IconButton.tsx";
+export { ChatLayout, type ChatLayoutProps } from "./ChatLayout/ChatLayout.tsx";
 export { Card, type CardHeaderProps, type CardProps } from "./Card/Card.tsx";
 export { Chip, type ChipProps } from "./Chip/Chip.tsx";
 export { Combobox, type ComboboxGroup, type ComboboxOption, type ComboboxProps } from "./Combobox/Combobox.tsx";

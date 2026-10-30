@@ -5,6 +5,14 @@
     inline-size: min(100%, var(--column-m));
   }
 
+  /* raw: the design system's one breakpoint for the chat: a phone's thread takes the whole width the page's gutter leaves
+     (ChatLayout gives it the conversation's place) */
+  @media (max-width: 900px) {
+    .panel {
+      inline-size: 100%;
+    }
+  }
+
   /* The root's words, cut: the room's text size and a heavier weight, the close button at its end. */
   .title {
     font: var(--font-body);
