@@ -1,7 +1,8 @@
 import { spawn, spawnSync, type ChildProcessByStdio } from "node:child_process";
 import { once } from "node:events";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { connect } from "node:net";
+import { createServer as createHttpServer } from "node:http";
+import { connect, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -371,6 +372,56 @@ describe("the server's process", { timeout: 30_000 }, () => {
     const roomy = start({ ...settings(), ERGO_DATA: data, ERGO_DATA_MB: "2" });
     await listening(roomy);
     expect(roomy.out.stdout).not.toContain("ergo_volume");
+  });
+
+  // The prices timer (5l) against a proxy that records what the server asks it to tunnel to, as the egress proxy would
+  // see it: the server reaches out only through HTTPS_PROXY (NODE_USE_ENV_PROXY), as in the stack.
+  const tunnels = async (): Promise<{ proxy: string; seen: string[]; close: () => void }> => {
+    const seen: string[] = [];
+    const proxy = createHttpServer();
+    proxy.on("connect", (request, socket) => {
+      seen.push(request.url ?? "");
+      socket.end("HTTP/1.1 502 Bad Gateway\r\nconnection: close\r\n\r\n");
+    });
+    await new Promise<void>((resolve) => proxy.listen(0, "127.0.0.1", resolve));
+    const { port } = proxy.address() as AddressInfo;
+    return { proxy: `http://127.0.0.1:${String(port)}`, seen, close: () => proxy.close() };
+  };
+
+  it("starts the prices timer when MARKETS_FILE is set: it asks CoinGecko at boot, and stops with the server on SIGTERM (5l)", async () => {
+    const way = await tunnels();
+    try {
+      const file = join(folder("gnoworld-markets-"), "markets.json");
+      const server = start({
+        ...settings(),
+        MARKETS_FILE: file,
+        HTTPS_PROXY: way.proxy,
+        NODE_USE_ENV_PROXY: "1",
+      });
+      await listening(server);
+      await until(() => way.seen.length > 0);
+      expect(way.seen).toEqual(["api.coingecko.com:443"]);
+      // The failed first read left a timer of five minutes: the server leaves by itself only if SIGTERM stopped it.
+      server.child.kill("SIGTERM");
+      expect(await exited(server)).toBe(0);
+      expect(way.seen).toEqual(["api.coingecko.com:443"]);
+      expect(server.out.stdout).toContain('"event":"prices_failed"');
+    } finally {
+      way.close();
+    }
+  });
+
+  it("starts no prices timer without MARKETS_FILE: nothing is asked of CoinGecko", async () => {
+    const way = await tunnels();
+    try {
+      const server = start({ ...settings(), HTTPS_PROXY: way.proxy, NODE_USE_ENV_PROXY: "1" });
+      await listening(server);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      expect(way.seen).toEqual([]);
+      expect(server.out.stdout).not.toContain("prices");
+    } finally {
+      way.close();
+    }
   });
 
   it("answers the rooms of the roles file's worlds, made at boot, with no Ergo set", async () => {
