@@ -676,12 +676,8 @@ printf '%s' "$out" | grep -qF "no_such_block" || fail "harness_mutate --dry did 
 [ ! -e "$m/ran" ] || fail "harness_mutate --dry ran a test, which takes minutes"
 fi
 
-if part harness_shards; then
-# harness_mutate judges its mutants over HARNESS_SHARDS worktrees side by side, each mutant once and in
-# a tree put back after each one, after a control run of each suite in every tree; with --changed
-# <base>, only the mutants of the guard files committed since base (a merge's own), all of them when a
-# suite or harness_mutate itself changed; a survivor fails the run either way, and the worktrees go.
-# On a copy whose worktrees are copies of a small tree, and whose mutants are planted.
+# The planted copy these sections share: a suite, a guard file and a harness_mutate.py of its own, in a repository of two trees' worth of files.
+shards_fixture() {
 hs="$t/shards" && mkdir -p "$hs/src/scripts" "$hs/repo/scripts"
 # The suite: its section opens at the line's start, as harness_mutate reads it, which this file's
 # runner must not; with SHARDS_MEET, a mutant's run waits for that many trees to run at once.
@@ -771,6 +767,30 @@ shards() { # $1: the shards; then harness_mutate's arguments
 }
 count() { [ -e "$hs/$1" ] && wc -l <"$hs/$1" | tr -d ' ' || echo 0; }
 verdicts() { printf '%s\n' "$1" | grep -c "killed: \|survives: " || :; }
+}
+# The four sections run apart, so a change of harness_mutate.py reruns the one that holds its case.
+# A new mutant and one whose text changed, planted in the copy's harness_mutate.py and committed.
+plant_new_mutants() {
+python3 -I - "$hs/repo/harness_mutate.py" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p).read()
+keep5 = '    yield from each("i.txt", "KEEP5", "", "hooks", "planted keep5")\n'
+spare2 = 'each("h.txt", " SPARE2", "", "hooks", "planted spare2")'
+assert s.count(keep5) == 1 and s.count(spare2) == 1, "the planted mutants changed: update test_hooks.sh's harness_shards"
+s = s.replace(keep5, keep5 + '    yield from each("k.txt", "KEEP7", "", "probe", "planted keep7 again")\n')
+s = s.replace(spare2, 'each("h.txt", " SPARE2", " SPARE3", "hooks", "planted spare2")')
+open(p, "w").write(s)
+PY
+git -C "$hs/repo" commit -qam "a new mutant, a changed one"
+}
+if part harness_shards; then
+# harness_mutate judges its mutants over HARNESS_SHARDS worktrees side by side, each mutant once and in
+# a tree put back after each one, after a control run of each suite in every tree; with --changed
+# <base>, only the mutants of the guard files committed since base (a merge's own), all of them when a
+# suite or harness_mutate itself changed; a survivor fails the run either way, and the worktrees go.
+# On a copy whose worktrees are copies of a small tree, and whose mutants are planted.
+shards_fixture
 # Three shards at once: every mutant judged once, in its order; the survivor behind another file's
 # killed mutant in its shard still survives (its tree put back); every worktree removed.
 out=$(SHARDS_MEET=3 shards 3) && fail "harness_mutate passed with surviving mutants: $out"
@@ -854,6 +874,16 @@ out=$(shards 2 --changed "$(git -C "$hs/repo" rev-parse HEAD)") || fail "harness
 printf '%s\n' "$out" | grep -q "0 of 7 mutants" || fail "harness_mutate --changed did not say it kept none: $out"
 [ ! -e "$hs/controls" ] && [ ! -e "$hs/probe_controls" ] || fail "harness_mutate --changed ran a control for no mutant: $out"
 [ "$(count made)" = 1 ] || fail "harness_mutate --changed made $(count made) worktrees for no mutant to judge, two shards asked: $out"
+# The controls run two at a time, never every tree's suites at once: beside the full gate's coverage lane, eight at once
+# overran their 600 s limit where they take 96 s alone (F2138). Each control still runs, in every tree; each fake control
+# waits for a second one beside it (5 s at most), so a serial run shows as one at once, not as a pass.
+CONTROLS_SLOW=1 shards 4 >/dev/null || : # the planted survivors fail the run; only its controls are read here
+[ "$(count controls)" = 4 ] || fail "harness_mutate did not run the control in each of its 4 trees: $(count controls)"
+[ "$(sort -n "$hs/overlap" | tail -1)" = 2 ] || fail "harness_mutate ran $(sort -n "$hs/overlap" | tail -1) controls at once, not two (F2138)"
+fi
+
+if part harness_shards_records; then
+shards_fixture
 # The pass's record, on scratch clones of the first commit (F1430 to F1434): a record names a tree, not a commit,
 # so the commit before it and its own both match; only the newest counts, and what changed after it is judged.
 HR=$hs/r2 && git clone -q "$hs/repo" "$HR" && C0=$(git -C "$HR" rev-list --max-parents=0 HEAD) && main_b=$(git -C "$HR" branch --show-current)
@@ -932,6 +962,10 @@ out=$(NONE=1 shards 2) && fail "harness_mutate passed with no mutant to judge an
 printf '%s\n' "$out" | grep -q "no mutant" || fail "harness_mutate did not say it had no mutant: $out"
 [ "$(count removed)" = "$(count made)" ] || fail "harness_mutate left worktrees behind with no mutant"
 unset HR
+fi
+
+if part harness_shards_changed; then
+shards_fixture
 # (Before the section z below: its if, last in the suite, would give every x mutant a passing exit.)
 # A change inside one section of a suite judges that section's mutants alone, with those of the files it changed.
 printf '%s\n' 'if part z; then' '	grep -q KEEP6 j.txt' 'fi' >"$hs/z"
@@ -966,18 +1000,7 @@ out=$(shards 2 --changed "$base") || fail "harness_mutate --changed judged mutan
 [ "$(verdicts "$out")" = 0 ] && printf '%s\n' "$out" | grep -q " 0 of 7 mutants" || fail "harness_mutate --changed judged unchanged mutants after it changed itself: $out"
 # A new mutant, and one whose text changed: those two alone. (Section z makes every x mutant survive, as above: the new
 # one is a probe block's, which can be killed.)
-python3 -I - "$hs/repo/harness_mutate.py" <<'PY'
-import sys
-p = sys.argv[1]
-s = open(p).read()
-keep5 = '    yield from each("i.txt", "KEEP5", "", "hooks", "planted keep5")\n'
-spare2 = 'each("h.txt", " SPARE2", "", "hooks", "planted spare2")'
-assert s.count(keep5) == 1 and s.count(spare2) == 1, "the planted mutants changed: update test_hooks.sh's harness_shards"
-s = s.replace(keep5, keep5 + '    yield from each("k.txt", "KEEP7", "", "probe", "planted keep7 again")\n')
-s = s.replace(spare2, 'each("h.txt", " SPARE2", " SPARE3", "hooks", "planted spare2")')
-open(p, "w").write(s)
-PY
-git -C "$hs/repo" commit -qam "a new mutant, a changed one"
+plant_new_mutants
 out=$(shards 2 --changed "$base") && fail "harness_mutate --changed passed with the survivor it defined otherwise: $out"
 [ "$(verdicts "$out")" = 2 ] || fail "harness_mutate --changed did not judge only its new and changed mutants: $out"
 printf '%s\n' "$out" | grep -q "killed: planted keep7 again #1$" || fail "harness_mutate --changed skipped a mutant it defined anew: $out"
@@ -1033,6 +1056,15 @@ for args in "--changed" "--changed a b" "--dry --changed x" "--bogus"; do
 	printf '%s\n' "$out" | grep -q "usage\|--changed" || fail "harness_mutate did not say why it refused $args: $out"
 	[ ! -e "$hs/made" ] || fail "harness_mutate made a worktree for the arguments $args"
 done
+fi
+
+if part harness_shards_cache; then
+shards_fixture
+printf '%s\n' 'if part z; then' '	grep -q KEEP6 j.txt' 'fi' >"$hs/z"
+cat "$hs/z" >>"$hs/src/scripts/test_hooks.sh" && cat "$hs/z" >>"$hs/repo/scripts/test_hooks.sh"
+printf 'KEEP6\n' >"$hs/src/j.txt" && printf 'KEEP6\n' >"$hs/repo/j.txt"
+git -C "$hs/repo" add -A && git -C "$hs/repo" commit -qm z
+plant_new_mutants # the sections before it left them in the copy
 # The verdicts' cache (Alexis, 2026-10-29): a killed mutant whose text, the sections that judge it, the suite's text
 # outside its sections, every file of the tree that text names, and harness_mutate's own runner are as they were is not
 # judged again; a survivor always is. It lives in ~/.cache/gnoworld-tools; the CI starts with none and judges all.
@@ -1078,12 +1110,6 @@ sed 's|^part() {|part() { # changed outside every section\n|' "$hs/src/scripts/t
 python3 -I -c 'import sys; p = sys.argv[1]; s = open(p).read(); open(p, "w").write(s.replace("def judged(tree, label, path, mutated, test):\n", "def judged(tree, label, path, mutated, test):  # changed\n", 1))' "$hs/repo/harness_mutate.py"
 [ "$(warm)" = 0 ] || fail "harness_mutate kept cached verdicts after the runner that judges them changed: $out"
 rm -rf "${hs:?}/home"
-# The controls run two at a time, never every tree's suites at once: beside the full gate's coverage lane, eight at once
-# overran their 600 s limit where they take 96 s alone (F2138). Each control still runs, in every tree; each fake control
-# waits for a second one beside it (5 s at most), so a serial run shows as one at once, not as a pass.
-CONTROLS_SLOW=1 shards 4 >/dev/null || : # the planted survivors fail the run; only its controls are read here
-[ "$(count controls)" = 4 ] || fail "harness_mutate did not run the control in each of its 4 trees: $(count controls)"
-[ "$(sort -n "$hs/overlap" | tail -1)" = 2 ] || fail "harness_mutate ran $(sort -n "$hs/overlap" | tail -1) controls at once, not two (F2138)"
 fi
 
 if part migrations; then
@@ -2410,11 +2436,14 @@ sh -c 'set -e; eval "$1"; E2E_PORT=$( (ulimit -n 24 && free_ports 40) 2>/dev/nul
 	fail "an assignment of free_ports went on after it found no free ports: $(cat "$t/ports.out")"
 fi
 
+full_fixture() { # $1: its folder's name
+	gate_fixture "$1"
+	# Core's Chromium run's stub, here alone: a fixture's node_modules folder would hide gate_triggers' linked one.
+	mkdir -p "$g/node_modules/vitest"
+	printf 'import { spawnSync } from "node:child_process";\nprocess.exit(spawnSync("sh", [%s, "core_chromium", "switch=" + (process.env.CORE_CHROMIUM ?? ""), ...process.argv.slice(2)], { stdio: "inherit" }).status ?? 1);\n' "'$step'" >"$g/node_modules/vitest/vitest.mjs"
+}
 if part gate_full; then
-gate_fixture gate_full
-# Core's Chromium run's stub, here alone: a fixture's node_modules folder would hide gate_triggers' linked one.
-mkdir -p "$g/node_modules/vitest"
-printf 'import { spawnSync } from "node:child_process";\nprocess.exit(spawnSync("sh", [%s, "core_chromium", "switch=" + (process.env.CORE_CHROMIUM ?? ""), ...process.argv.slice(2)], { stdio: "inherit" }).status ?? 1);\n' "'$step'" >"$g/node_modules/vitest/vitest.mjs"
+full_fixture gate_full
 # The full gate: every fast step but the plain tests, then the full ones in lanes, each told where the
 # branch left main; harness_mutate only when the harness changed since main.
 base=$(git -C "$g" rev-parse HEAD)
@@ -2472,6 +2501,10 @@ rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/green-full"
 out=$(FAIL=py:batch_size gate --full) && fail "check.sh --full passed with its batch size failing"
 printf '%s\n' "$out" | grep -q "^py:batch_size failed here" || fail "check.sh --full hid the batch size's failure: $out"
 [ ! -e "$g/.claude/tmp/green-full" ] || fail "check.sh --full recorded a gate whose batch was too large"
+fi
+
+if part gate_full_order; then
+full_fixture gate_full_order
 # probe.py plants its faults in the source tree: it runs alone, before any full lane reads the tree (the
 # coverage's Vitest, check_regressions' list, StrykerJS, the stories' build), which saw its files come and go.
 (SLOW_STEP=py:probe gate --full) >/dev/null || fail "check.sh --full failed with a slow probe"
@@ -2491,6 +2524,10 @@ for s in coverage py:patch_coverage mutate; do
 	before "done stories" "$s" || fail "check.sh --full ran $s beside the stories' journeys (F815)"
 done
 (MEET="stories py:prove_fix" gate --full) >/dev/null || fail "check.sh --full ran the stories and the history lane one after the other"
+fi
+
+if part gate_full_fail; then
+full_fixture gate_full_fail
 # A dirty tree of one area: --full still checks everything, and records it.
 printf 'y\n' >>"$g/server/src/a.ts"
 gate --full >/dev/null || fail "check.sh --full failed on a server change"
@@ -2529,6 +2566,12 @@ done
 (FAIL=stories gate --full) >/dev/null && fail "check.sh --full passed with the stories failing"
 ran py:audit || fail "check.sh --full stopped the history lane at the stories' failure: a phase's lanes run to their end"
 [ ! -e "$g/.claude/tmp/green-full" ] || fail "check.sh --full recorded a gate that failed"
+fi
+
+if part gate_full_merge; then
+full_fixture gate_full_merge
+# A harness changed since main, as the sections before it left it: --merge then judges its mutants.
+printf '\n' >>"$g/scripts/check_css.py" && git -C "$g" commit -qam y
 # --merge, a merge's own review: the full gate's steps, the harness mutants of the merge's guard files
 # alone, and no full record, which only --full writes (pre-push wants it for main).
 rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/green-full"
