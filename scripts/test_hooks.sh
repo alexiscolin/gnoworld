@@ -3489,9 +3489,10 @@ const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
     const { readdirSync } = require("node:fs");
     const { dirname } = require("node:path");
     const root = dirname(dirname(dirname(process.argv[2])));
-    // A walk, not git: pre-commit runs this in a staged copy that is no repository.
+    // A walk, not git: pre-commit runs this in a staged copy that is no repository. .stryker-tmp holds full copies of the repo
+    // (gitignored leftovers of a mutation run): their files are no tracked files.
     const walk = (dir) => readdirSync(root + "/" + dir, { withFileTypes: true }).flatMap((e) =>
-      [".git", "node_modules", "dist", ".claude"].includes(e.name) ? [] : e.isDirectory() ? walk(dir + e.name + "/") : [dir + e.name]);
+      [".git", "node_modules", "dist", ".claude", ".stryker-tmp"].includes(e.name) ? [] : e.isDirectory() ? walk(dir + e.name + "/") : [dir + e.name]);
     const tracked = walk("");
     const table = readFileSync(root + "/docs/REVIEW.md", "utf8").split("\n").filter((l) => l.startsWith("| 1 |"));
     const paths = [...new Set(table.flatMap((l) => [...l.matchAll(/`([^`]*\/[^`]*)`/g)].map((m) => m[1])))];
