@@ -5,9 +5,9 @@
 import type * as z from "zod/mini";
 
 /** The time an answer has, its body read included. */
-export const CHAIN_TIMEOUT_MS = 8_000;
+const CHAIN_TIMEOUT_MS = 8_000;
 /** The most bytes an answer may weigh; past it the read stops and the rest is not kept. */
-export const CHAIN_MAX_BYTES = 1024 * 1024;
+const CHAIN_MAX_BYTES = 1024 * 1024;
 
 export type ChainFetch = (url: string, init?: RequestInit) => Promise<Response>;
 

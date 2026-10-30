@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as z from "zod/mini";
-import { CHAIN_MAX_BYTES, CHAIN_TIMEOUT_MS, readChain, type ChainFetch, type ChainRead, type Failure } from "./read.ts";
+import { readChain, type ChainFetch, type ChainRead, type Failure } from "./read.ts";
 
 // 5g, the failure paths of what the browser reads from the chain (the plan's §3 row on the RPC's answers). A small schema stands
 // in: these paths do not depend on what an answer holds. The answers' own shapes (qrender, qeval, qfuncs, the block height)
@@ -51,13 +51,6 @@ describe("readChain, an answer that is sound", () => {
     expect(init?.signal).toBeInstanceOf(AbortSignal);
   });
 
-  it("has a finite cap and a finite time by default", () => {
-    expect(Number.isInteger(CHAIN_MAX_BYTES)).toBe(true);
-    expect(CHAIN_MAX_BYTES).toBeGreaterThan(0);
-    expect(Number.isInteger(CHAIN_TIMEOUT_MS)).toBe(true);
-    expect(CHAIN_TIMEOUT_MS).toBeGreaterThan(0);
-  });
-
   it("leaves no timer behind: nothing polls", async () => {
     await read(respond(GOOD));
     expect(vi.getTimerCount()).toBe(0);
@@ -66,7 +59,7 @@ describe("readChain, an answer that is sound", () => {
   it("asks again only when called again: each call is one request, a failure is not retried", async () => {
     const fetcher = respond("down", { status: 503 });
     await read(fetcher);
-    await vi.advanceTimersByTimeAsync(10 * CHAIN_TIMEOUT_MS);
+    await vi.advanceTimersByTimeAsync(10 * 8000);
     expect(fetcher).toHaveBeenCalledTimes(1);
     await read(fetcher);
     expect(fetcher).toHaveBeenCalledTimes(2);
@@ -216,6 +209,11 @@ describe("readChain, an answer that is no JSON or the wrong shape", () => {
     ["a cut JSON", '{"height":"4'],
     ["text", "ok"],
     ["bytes that are no UTF-8", new Uint8Array([0xff, 0xfe, 0x7b, 0x7d])],
+    // Valid JSON apart from one byte: a decoder that is not strict would hand the page a U+FFFD inside an ok value.
+    [
+      "an invalid byte inside an otherwise valid JSON string",
+      new Uint8Array([...new TextEncoder().encode('{"height":"'), 0xff, 0x22, 0x7d]),
+    ],
   ])("is not-json on %s", async (_name, body) => {
     const result = await read(respond(body));
     expect(failureOf(result).kind).toBe("not-json");
@@ -287,5 +285,139 @@ describe("readChain, an address that is not https", () => {
     const result = await readChain(url, Answer, { fetch: fetcher, now: () => NOW });
     expect(failureOf(result).kind).toBe("refused");
     expect(fetcher).not.toHaveBeenCalled();
+  });
+});
+
+describe("readChain, a body that comes in pieces or not at all", () => {
+  const enc = new TextEncoder();
+  const piecesOf = (...parts: Uint8Array[]): ReadableStream<Uint8Array> =>
+    new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const part of parts) controller.enqueue(part);
+        controller.close();
+      },
+    });
+
+  it("joins a good answer split in two chunks, a multi-byte character across the split", async () => {
+    const bytes = enc.encode('{"height":"é"}');
+    const cut = bytes.indexOf(0xc3) + 1;
+    expect(cut).toBeGreaterThan(0);
+    const result = await read(respond(piecesOf(bytes.slice(0, cut), bytes.slice(cut))));
+    expect(result).toMatchObject({ ok: true, value: { height: "é" } });
+  });
+
+  it("is not-json on a 200 with no body at all", async () => {
+    expect(failureOf(await read(respond(null))).kind).toBe("not-json");
+  });
+
+  it("reads a body of exactly the cap that declares its Content-Length", async () => {
+    const body = jsonOf(1000);
+    const result = await read(respond(body, { headers: { "content-length": "1000" } }), { maxBytes: 1000 });
+    expect(result).toMatchObject({ ok: true });
+  });
+});
+
+describe("readChain, a refused answer frees its connection", () => {
+  // A source that records its cancel; `fails` makes the cancel itself reject, which must change nothing for the caller.
+  const watched = (fails: boolean, chunks = 0) => {
+    const cancel = vi.fn(() => (fails ? Promise.reject(new Error("cancel failed")) : undefined));
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(new Uint8Array(64).fill(97));
+      },
+      cancel,
+    });
+    return { cancel, stream, chunks };
+  };
+  const paths: [string, (stream: ReadableStream<Uint8Array>) => ChainFetch, string][] = [
+    ["a non-ok status", (stream) => respond(stream, { status: 503 }), "down"],
+    ["a declared size past the cap", (stream) => respond(stream, { headers: { "content-length": "1001" } }), "too-big"],
+    ["a counted size past the cap", (stream) => respond(stream), "too-big"],
+  ];
+
+  it.each(paths)("cancels the stream once on %s", async (_name, make, kind) => {
+    const { cancel, stream } = watched(false);
+    const result = await read(make(stream), { maxBytes: 1000 });
+    expect(failureOf(result).kind).toBe(kind);
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(paths)("gives the same typed failure when the cancel rejects, on %s", async (_name, make, kind) => {
+    const { cancel, stream } = watched(true);
+    const result = await read(make(stream), { maxBytes: 1000 });
+    expect(failureOf(result).kind).toBe(kind);
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("readChain, each failure's next step", () => {
+  const NEXT = {
+    refused: "This address is not a secure (https) one, so it was not asked. Check the universe's RPC in the data.",
+    down: "The chain's service did not answer. Try again in a moment.",
+    timeout: "The chain's service took too long. Try again in a moment.",
+    tooBig: "The chain's answer was larger than this page reads. Try a smaller view.",
+    notJson: "The chain's service answered with something that is not data. Try again later.",
+    wrongShape: "The chain's answer was not the shape this page expects. Try again later, or report it.",
+  };
+  const cases: [string, () => Promise<ChainRead<unknown>>, Failure][] = [
+    [
+      "refused",
+      () => readChain("http://rpc.example.org/", Answer, { now: () => NOW }),
+      { kind: "refused", next: NEXT.refused },
+    ],
+    ["down, no answer", () => read(vi.fn(() => Promise.reject(new TypeError("x")))), { kind: "down", next: NEXT.down }],
+    ["down, HTTP 503", () => read(respond("", { status: 503 })), { kind: "down", next: NEXT.down, status: 503 }],
+    [
+      "timeout",
+      async () => {
+        const pending = read(() => new Promise(() => undefined), { timeoutMs: 100 });
+        await vi.advanceTimersByTimeAsync(100);
+        return pending;
+      },
+      { kind: "timeout", next: NEXT.timeout },
+    ],
+    ["too-big", () => read(respond(jsonOf(1001)), { maxBytes: 1000 }), { kind: "too-big", next: NEXT.tooBig }],
+    ["not-json", () => read(respond("ok")), { kind: "not-json", next: NEXT.notJson }],
+    ["wrong-shape", () => read(respond("{}")), { kind: "wrong-shape", next: NEXT.wrongShape }],
+  ];
+
+  it.each(cases)("is exact on %s", async (_name, run, expected) => {
+    const result = await run();
+    expect(result.ok ? null : result.failure).toEqual(expected);
+  });
+});
+
+describe("readChain, the defaults production uses", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("asks the global fetch and stamps the source with the clock", async () => {
+    vi.setSystemTime(NOW);
+    const global = vi.fn(() => Promise.resolve(new Response(GOOD)));
+    vi.stubGlobal("fetch", global);
+    const result = await readChain(URL_OK, Answer);
+    expect(global).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ ok: true, value: { height: "42" }, source: { url: URL_OK, at: NOW.toISOString() } });
+  });
+
+  it("times out a deaf fetch at exactly 8,000 ms", async () => {
+    vi.stubGlobal("fetch", () => new Promise(() => undefined));
+    let settled = false;
+    const pending = readChain(URL_OK, Answer).then((result) => {
+      settled = true;
+      return result;
+    });
+    await vi.advanceTimersByTimeAsync(7999);
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await pending).toMatchObject({ ok: false, failure: { kind: "timeout" } });
+  });
+
+  it("reads 1,048,576 bytes and refuses 1,048,577", async () => {
+    vi.stubGlobal("fetch", () => Promise.resolve(new Response(jsonOf(1_048_576))));
+    expect(await readChain(URL_OK, Answer)).toMatchObject({ ok: true });
+    vi.stubGlobal("fetch", () => Promise.resolve(new Response(jsonOf(1_048_577))));
+    expect(await readChain(URL_OK, Answer)).toMatchObject({ ok: false, failure: { kind: "too-big" } });
   });
 });
