@@ -59,7 +59,7 @@ SECTIONS = {
     ".githooks/pre-push": "pre_push,wiring,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed",
     ".githooks/records.sh": "outside,installed,wiring", ".githooks/pre-merge-commit": "outside,installed", ".githooks/merge.sh": "installed",
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix,worktree_script",
-    "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
+    "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
     "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_survivors", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
     "scripts/repo_files.py": {"hooks": "worktrees,regressions,batch_size,harness_shards,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench", "scripts/suite_parts.py": "mutant_scope,harness_shards", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/unsteady.py": {"hooks": "gate_lanes", "probe": "unsteady_real"}, "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
 }
@@ -316,6 +316,14 @@ def mutants():
     yield from each("scripts/check.sh", '		survivors "$logs/$l.log"\n', "", "hooks", "check.sh prints the surviving mutants of every lane, pass or fail (F2359, F2409)")
     yield from each("scripts/check.sh", "(Survived|NoCoverage)", "(Survived)", "hooks", "check.sh prints a mutant no test covers as a survivor")
     yield from each("scripts/check.sh", "	/^FAIL  survives: / {", "	/^FAIL  survives_: / {", "hooks", "check.sh prints a harness mutant that survives as a survivor")
+    yield from each("deploy/test.sh", '	if ! mkdir "$lock" 2>/dev/null; then\n', "	if false; then\n", "hooks", "deploy/test.sh refuses to run beside a run holding its project")
+    yield from each("deploy/test.sh", 'kill -0 "$holder" 2>/dev/null; then\n			missing', 'false; then\n			missing', "hooks", "deploy/test.sh takes over the lock of a run that is dead, and only of that")
+    yield from each("deploy/test.sh", "lock_dir=$HOME/.cache/gnoworld-tools", "lock_dir=$TMPDIR", "hooks", "deploy/test.sh's lock does not hang on TMPDIR")
+    yield from each("deploy/test.sh", "trap 'exit 143' HUP TERM\n", "", "hooks", "deploy/test.sh releases its lock when it is stopped by TERM")
+    yield from each("deploy/test.sh", "cleanup() {\n	release\n", "cleanup() {\n", "hooks", "deploy/test.sh releases its lock when it ends")
+    yield from each("deploy/test.sh", "grep -E '^gnoworld-demo-mutant-[0-9]+$'", "grep -E '.'", "hooks", "deploy/test.sh names only a mutant project as a leftover")
+    yield from each("deploy/test.sh", "grep -vx \"$project\" |", "", "hooks", "deploy/test.sh does not take its own project for a leftover")
+    yield from each("deploy/test.sh", 'if [ "${1:-}" != --demo ]; then\n	mkdir -p "$lock_dir"', 'if true; then\n	mkdir -p "$lock_dir"', "hooks", "deploy/test.sh --demo takes no lock")
     yield from each("scripts/borrow_node_modules.sh", '[ -L "$1/$m/.bin" ]', "false", "hooks", "a borrowed workspace's linked .bin becomes a folder of its own (F2127)")
     yield from each(hm, "        if rel not in (path, suite," " SELF):", "        if False:", "hooks", "a cached verdict stands on the files its sections name")
     yield from each(hm, "for n in names if n" ' != ".git"]', "for n in names]", "hooks", "a cached verdict never stands on a worktree's .git file")

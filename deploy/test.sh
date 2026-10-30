@@ -36,6 +36,48 @@ done
 engine=$(docker version --format '{{.Server.Version}}' 2>/dev/null || true)
 [ "${engine%%.*}" -ge 28 ] 2>/dev/null || missing "Docker Engine 28 or later is needed (an isolated network's gateway), not [$engine]"
 
+# --- One run at a time per project (2026-10-30: two runs shared gnoworld-demo-test, and each one's start removed the other's
+# containers: `No such container`). The lock is a folder in the user's own cache, not in TMPDIR, which a sandbox and a terminal
+# do not share; it holds its run's pid, so a run killed hard leaves a lock the next one finds dead and takes over. --demo starts
+# and removes nothing of the test's, and takes none.
+lock_dir=$HOME/.cache/gnoworld-tools
+lock=$lock_dir/deploy-test-$project.lock
+locked=
+release() { if [ -n "$locked" ] && [ "$(cat "$lock/pid" 2>/dev/null || true)" = "$$" ]; then rm -rf "${lock:?}"; fi; }
+if [ "${1:-}" != --demo ]; then
+	mkdir -p "$lock_dir"
+	if ! mkdir "$lock" 2>/dev/null; then
+		holder=$(cat "$lock/pid" 2>/dev/null || true)
+		if [ -z "$holder" ]; then sleep 1; holder=$(cat "$lock/pid" 2>/dev/null || true); fi # the run that made it is writing its pid
+		if [ -n "$holder" ] && kill -0 "$holder" 2>/dev/null; then
+			missing "another run (pid $holder) already holds the project $project: wait for it to end, or stop it"
+		fi
+		rm -rf "${lock:?}"
+		mkdir "$lock" 2>/dev/null || missing "another run took the project $project at this very moment"
+	fi
+	echo "$$" >"$lock/pid"
+	locked=yes
+fi
+# Stopped by a signal, a run still removes what it made: exit runs the EXIT trap, which a shell otherwise skips while a command runs.
+trap 'release' EXIT
+trap 'exit 130' INT
+trap 'exit 143' HUP TERM
+# A run a Ctrl+C left up (5f's gnoworld-demo-mutant-18219, whose network held the test's 172.30.90.0/24) is named, not run beside.
+if [ "${1:-}" != --demo ]; then
+	leftover=$({
+		docker compose ls --all --format json 2>/dev/null | python3 -I -c 'import json, sys
+try:
+    for p in json.load(sys.stdin):
+        print(p.get("Name", ""))
+except ValueError:
+    pass' || true
+		docker network ls --format '{{.Name}}' 2>/dev/null | sed -n 's/^\(gnoworld-demo-mutant-[0-9]*\)_.*/\1/p' || true
+	} | grep -E '^gnoworld-demo-mutant-[0-9]+$' | grep -vx "$project" | sort -u | head -1 || true)
+	if [ -n "$leftover" ]; then
+		missing "the project $leftover is up (a run still going, or one a Ctrl+C left); it holds the test's network: docker compose -p $leftover down -v"
+	fi
+fi
+
 pass() { printf 'ok    %s\n' "$1"; }
 fail() {
 	printf 'FAIL  %s\n' "$1"
@@ -104,6 +146,7 @@ python3 -m http.server --bind 0.0.0.0 --directory "$tmp/canary" "$canary" >/dev/
 canary_pid=$!
 files="-f $here/compose.yaml${TEST_OVERRIDE:+ -f $TEST_OVERRIDE} --profile demo" # down leaves a profile's services otherwise
 cleanup() {
+	release
 	kill "$canary_pid" 2>/dev/null || true
 	wait "$canary_pid" 2>/dev/null || true
 	if [ -n "${started:-}" ]; then

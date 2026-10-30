@@ -3585,6 +3585,133 @@ out=$(gate --merge) && fail "check.sh --merge passed with a harness mutant survi
 printf '%s\n' "$out" | grep -q '^survivor: .*planted spare2 #1' || fail "check.sh --merge did not print a harness mutant's survivor as a survivor: $out"
 fi
 
+if part deploy_lock; then
+# deploy/test.sh takes a lock (harness list item 10): two runs at once share the Docker project gnoworld-demo-test and each one's
+# start removes the other's containers (2026-10-30: `FAIL ... No such container`). It needs Docker, which the sandbox refuses, so
+# the tools it calls are stubs on PATH; the first run is held at its first `docker run` while a second starts beside it.
+# Every process a run starts is recorded by pid (the stubs write them), killed by pid, and checked dead at the end: no pkill, which
+# the sandbox refuses.
+d="$t/lock" && mkdir -p "$d/bin" "$d/tmp" "$d/home"
+for tool in curl openssl htpasswd git netstat route ifconfig arp ss ip dig; do printf '#!/bin/sh\nexit 0\n' >"$d/bin/$tool"; done
+# macOS's mktemp -d ignores TMPDIR; the run's folder goes where the test can find it.
+printf '#!/bin/sh\nexec /usr/bin/mktemp -d "$TMPDIR/tmp.XXXXXX"\n' >"$d/bin/mktemp"
+# python3 records its pid (the canary's http.server is one) and becomes the real one.
+printf '#!/bin/sh\necho $$ >>"$LOCK_DOCKER_LOG.pids"\nexec "%s" "$@"\n' "$(command -v python3)" >"$d/bin/python3"
+cat >"$d/bin/docker" <<'SH'
+#!/bin/sh
+echo "$*" >>"$LOCK_DOCKER_LOG"
+case $1 in
+version) echo 28.0.0 ;;
+run) echo $$ >>"$LOCK_DOCKER_LOG.pids"; exec sleep 20 ;;
+compose)
+	case $2 in
+	ls) if [ -n "${LOCK_LEFTOVER:-}" ]; then printf '[{"Name":"%s","Status":"running(2)","ConfigFiles":"/x/compose.yaml"}]\n' "$LOCK_LEFTOVER"; else echo '[]'; fi ;;
+	esac
+	;;
+network) if [ -n "${LOCK_LEFTOVER:-}" ]; then echo "${LOCK_LEFTOVER}_default"; fi ;;
+esac
+exit 0
+SH
+chmod +x "$d/bin/"*
+# deploy_run <log's name> <project> [VAR=value...]: runs deploy/test.sh in the background (with $mode as its argument) in its own TMPDIR,
+# the same HOME as every run (the lock must not hang on TMPDIR, which a sandbox and a terminal do not share).
+deploy_run() {
+	name=$1 project=$2
+	shift 2
+	mkdir -p "$d/tmp.$name"
+	: >"$d/$name.docker" && (env HOME="$d/home" TMPDIR="$d/tmp.$name" PATH="$d/bin:$PATH" LOCK_DOCKER_LOG="$d/$name.docker" TEST_PROJECT="$project" "$@" sh "$here/../deploy/test.sh" $mode >"$d/$name.out" 2>&1 & echo $! >"$d/$name.pid")
+	sleep 0.2
+}
+alive() { kill -0 "$1" 2>/dev/null; }
+reached() { # $1 the log's name: the run got past its checks to the first docker run
+	for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
+		grep -q '^run ' "$d/$1.docker" && return 0
+		alive "$(cat "$d/$1.pid")" || return 1
+		sleep 0.5
+	done
+	return 1
+}
+refused() { # $1 the log's name: the run ended on its own, quickly
+	for _ in 1 2 3 4 5 6 7 8 9 10; do alive "$(cat "$d/$1.pid")" || return 0; sleep 0.5; done
+	return 1
+}
+stop_all() { # every process any run started is killed by its pid, then none may be alive
+	for f in "$d"/*.pid "$d"/*.docker.pids; do [ -e "$f" ] || continue; for p in $(cat "$f"); do kill -9 "$p" 2>/dev/null || true; done; done
+	sleep 0.3
+	for f in "$d"/*.pid "$d"/*.docker.pids; do
+		[ -e "$f" ] || continue
+		for p in $(cat "$f"); do
+			for _ in 1 2 3 4 5 6 7 8 9 10; do alive "$p" || break; sleep 0.3; done
+			if alive "$p"; then fail "a process of the lock test (pid $p, from $f) outlived it"; fi
+		done
+	done
+	rm -f "$d"/*.pid "$d"/*.docker.pids
+	rm -rf "${d:?}/home/.cache"
+}
+mode=
+p1=gnoworld-lock-a-$$
+deploy_run first "$p1"
+reached first || { stop_all; fail "the first deploy/test.sh never reached its first docker run (stubs): $(cat "$d/first.out")"; }
+# A second run of the same project beside it, even from another TMPDIR (a sandbox's is not a terminal's), is refused at once, with a
+# word naming the project, and starts nothing.
+deploy_run second "$p1"
+refused second || { stop_all; fail "a second deploy/test.sh ran beside a first holding the project $p1"; }
+grep -q "$p1" "$d/second.out" || { stop_all; fail "the refused run did not name the project it found held: $(cat "$d/second.out")"; }
+grep -qi 'already\|held\|in use\|another' "$d/second.out" || { stop_all; fail "the refused run did not say another run holds the project: $(cat "$d/second.out")"; }
+grep -q '^run \|^compose .* up' "$d/second.docker" && { stop_all; fail "the refused run still started docker work: $(cat "$d/second.docker")"; }
+grep -q 'down' "$d/second.docker" && { stop_all; fail "the refused run removed the first run's containers (compose down): $(cat "$d/second.docker")"; }
+alive "$(cat "$d/first.pid")" || { stop_all; fail "the refused second run stopped the first: $(cat "$d/first.out")"; }
+# The modes that start a stack take the same project: --mutants of it is refused too.
+mode=--mutants
+deploy_run mutants "$p1"
+mode=
+refused mutants || { stop_all; fail "deploy/test.sh --mutants ran beside a first run holding the project $p1"; }
+grep -q "$p1" "$d/mutants.out" || { stop_all; fail "the refused --mutants did not name the project: $(cat "$d/mutants.out")"; }
+grep -q '^run ' "$d/mutants.docker" && { stop_all; fail "the refused --mutants still started docker work: $(cat "$d/mutants.docker")"; }
+# --demo starts and removes nothing of the test's: the lock does not stop it (it meets its own checks, not the lock).
+mode=--demo
+deploy_run demo "$p1"
+mode=
+sleep 1
+grep -qi 'already' "$d/demo.out" && { stop_all; fail "deploy/test.sh --demo was refused by a test run's lock: $(cat "$d/demo.out")"; }
+# Another project is no one's lock.
+deploy_run other "gnoworld-lock-b-$$"
+reached other || { stop_all; fail "a run of another project was refused by the first's lock: $(cat "$d/other.out")"; }
+stop_all
+# A first run killed hard (no trap runs) leaves a stale lock: the next run takes it over.
+deploy_run killed "$p1"
+reached killed || { stop_all; fail "the run meant to be killed never started: $(cat "$d/killed.out")"; }
+kill -9 "$(cat "$d/killed.pid")"
+sleep 0.3
+deploy_run after "$p1"
+reached after || { stop_all; fail "a run was refused by the lock of a run that is dead: $(cat "$d/after.out")"; }
+stop_all
+# A first run stopped by TERM releases the lock: no clock guess, the test waits for the run to end (after ending the stub
+# `docker run` it waits on, which a shell's trap otherwise outlasts).
+deploy_run quit "$p1"
+reached quit || { stop_all; fail "the run meant to end never started: $(cat "$d/quit.out")"; }
+kill -TERM "$(cat "$d/quit.pid")"
+for p in $(cat "$d/quit.docker.pids"); do kill -TERM "$p" 2>/dev/null || true; done
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do alive "$(cat "$d/quit.pid")" || break; sleep 0.5; done
+alive "$(cat "$d/quit.pid")" && { stop_all; fail "a run stopped by TERM never ended"; }
+[ -z "$(find "$d/home/.cache/gnoworld-tools" -name "*$p1*" 2>/dev/null)" ] || { stop_all; fail "a run stopped by TERM left its lock: $(ls "$d/home/.cache/gnoworld-tools")"; }
+deploy_run again "$p1"
+reached again || { stop_all; fail "a run was refused by the lock of a run that was stopped: $(cat "$d/again.out")"; }
+stop_all
+# A run left by a Ctrl+C (5f's gnoworld-demo-mutant-18219, whose network held the test's 172.30.90.0/24) is named in the refusal
+# with the command that removes it; nothing is started beside it.
+left=gnoworld-demo-mutant-77777777
+deploy_run left "gnoworld-lock-c-$$" LOCK_LEFTOVER="$left"
+refused left || { stop_all; fail "deploy/test.sh started beside a mutant project a Ctrl+C left up"; }
+grep -q "docker compose -p $left down -v" "$d/left.out" || { stop_all; fail "the refusal did not give the command that removes $left: $(cat "$d/left.out")"; }
+grep -q '^run ' "$d/left.docker" && { stop_all; fail "deploy/test.sh went on after finding $left up"; }
+stop_all
+# Another Compose project running on the machine is none of its business.
+deploy_run unrelated "gnoworld-lock-d-$$" LOCK_LEFTOVER=myapp
+reached unrelated || { stop_all; fail "deploy/test.sh was refused by an unrelated running project: $(cat "$d/unrelated.out")"; }
+stop_all
+fi
+
 [ -z "${ONLY:-}" ] || [ "${ran:-}" = 1 ] || fail "ONLY=$ONLY names no section"
 echo "hooks: ok"
 finished=1
