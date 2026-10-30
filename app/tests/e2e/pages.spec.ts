@@ -244,9 +244,12 @@ test.describe("once the client takes over", () => {
   });
 });
 
-// The files of one kind a page loads, by the paths its HTML names.
+// The files of one kind a page loads, by the paths its HTML names. A sheet a lazy chunk also needs
+// ends in "#": React Router's mark.
 function assets(html: string, kind: "js" | "css"): string[] {
-  return [...html.matchAll(new RegExp(`(?:src|href)="(/assets/[^"]+\\.${kind})"`, "g"))].map((match) => match[1] ?? "");
+  return [...html.matchAll(new RegExp(`(?:src|href)="(/assets/[^"#]+\\.${kind})#?"`, "g"))].map(
+    (match) => match[1] ?? "",
+  );
 }
 
 test("the test host serves each kind of file the build writes with its type, as a real host would", async ({
