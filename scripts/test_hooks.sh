@@ -3482,6 +3482,22 @@ out=$(reg) && fail "check_regressions passed a bench gone: $out"
 printf '%s\n' "$out" | grep -qF "a room 100 ms -> gone" || fail "check_regressions did not name the bench gone: $out"
 git -C "$rg" reset -q --hard "$base" && printf 'bench("a line [0.2 ms]", f);\nbench("a room [10 ms]", f);\nbench("a new one [5 ms]", f);\n' >"$rg/app/tests/bench/a.bench.ts" && git -C "$rg" rm -q app/src/x.ts && git -C "$rg" commit -qam "a shorter budget and a new bench"
 out=$(reg) || fail "check_regressions refused a shorter budget and a new bench: $out"
+# An approved picture changed or deleted in the index or the working tree, not yet committed, is judged too: the hook and the fast
+# gate run this before the commit exists, so a diff of base..HEAD alone saw nothing (F2574). A picture the base never had is new.
+git -C "$rg" reset -q --hard "$base"
+mkdir -p "$rg/app/tests/e2e/home.spec.ts-snapshots" && printf 'one\n' >"$rg/app/tests/e2e/home.spec.ts-snapshots/a.png" && printf 'two\n' >"$rg/app/tests/e2e/home.spec.ts-snapshots/b.png"
+git -C "$rg" add -A && git -C "$rg" commit -qm "two pictures" && base=$(git -C "$rg" rev-parse HEAD)
+printf 'changed\n' >"$rg/app/tests/e2e/home.spec.ts-snapshots/a.png" && git -C "$rg" add -A
+out=$(reg) && fail "check_regressions passed an approved picture changed in the index only (the commit does not hold it yet): $out"
+printf '%s\n' "$out" | grep -qF "a.png" || fail "check_regressions did not name the picture changed in the index: $out"
+git -C "$rg" reset -q --hard "$base" && git -C "$rg" rm -q app/tests/e2e/home.spec.ts-snapshots/b.png
+out=$(reg) && fail "check_regressions passed an approved picture deleted in the index only: $out"
+printf '%s\n' "$out" | grep -qF "b.png" || fail "check_regressions did not name the picture deleted in the index: $out"
+git -C "$rg" reset -q --hard "$base" && printf 'changed\n' >"$rg/app/tests/e2e/home.spec.ts-snapshots/a.png"
+out=$(reg) && fail "check_regressions passed an approved picture changed in the working tree only: $out"
+git -C "$rg" reset -q --hard "$base" && printf 'new\n' >"$rg/app/tests/e2e/home.spec.ts-snapshots/c.png" && git -C "$rg" add -A
+out=$(reg) || fail "check_regressions refused a new approved picture: $out"
+git -C "$rg" reset -q --hard "$base"
 fi
 
 if part ergo; then

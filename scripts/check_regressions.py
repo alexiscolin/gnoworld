@@ -314,7 +314,8 @@ problems += [f"a bench is gone or its budget longer: {b}" for b in looser_benche
 problems += [f"a known gap is added: {g}" for g in weakened(gaps(lambda p: show(base, p)), gaps(here), floors_ok, "gap")]
 problems += [f"an ignore is added: {i}" for i in weakened(ignores(lambda p: show(base, p)), ignores(here), floors_ok, "ignore")]
 problems += [f"a check's setting changed: {s}" for s in changed_settings(settings(lambda p: show(base, p)), settings(here), floors_ok)]
-problems += [f"an approved screenshot changed: {p}" for p in changed_baselines(git("diff", "--name-status", f"{base}..HEAD"), shots_ok)]
+# The tree, not base..HEAD: the hook and the fast gate run this before the commit exists (F2574), as the line for the tests above.
+problems += [f"an approved screenshot changed: {p}" for p in changed_baselines(git("diff", "--name-status", base), shots_ok)]
 if problems:
     print("check_regressions: the safety net shrank. Undo it, or say why on a line of a commit, `Key: <item> - why`"
           " (Removed-test:, Lowered-floor: [gap |ignore |bench ]<item>, Updated-baseline:):", *problems, sep="\n  ", file=sys.stderr)
