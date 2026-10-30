@@ -3716,10 +3716,10 @@ version) echo 28.0.0 ;;
 run) echo $$ >>"$LOCK_DOCKER_LOG.pids"; exec sleep 20 ;;
 compose)
 	case $2 in
-	ls) if [ -n "${LOCK_LEFTOVER:-}" ]; then printf '[{"Name":"%s","Status":"running(2)","ConfigFiles":"/x/compose.yaml"}]\n' "$LOCK_LEFTOVER"; else echo '[]'; fi ;;
+	ls) if [ -n "${LOCK_LEFTOVER:-}" ] && [ "${LOCK_LEFTOVER_VIA:-}" != network ]; then printf '[{"Name":"%s","Status":"running(2)","ConfigFiles":"/x/compose.yaml"}]\n' "$LOCK_LEFTOVER"; else echo '[]'; fi ;;
 	esac
 	;;
-network) if [ -n "${LOCK_LEFTOVER:-}" ]; then echo "${LOCK_LEFTOVER}_default"; fi ;;
+network) if [ -n "${LOCK_LEFTOVER:-}" ] && [ "${LOCK_LEFTOVER_VIA:-}" != compose ]; then echo "${LOCK_LEFTOVER}_default"; fi ;;
 esac
 exit 0
 SH
@@ -3817,6 +3817,15 @@ refused left || { stop_all; fail "deploy/test.sh started beside a mutant project
 grep -q "docker compose -p $left down -v" "$d/left.out" || { stop_all; fail "the refusal did not give the command that removes $left: $(cat "$d/left.out")"; }
 grep -q '^run ' "$d/left.docker" && { stop_all; fail "deploy/test.sh went on after finding $left up"; }
 stop_all
+# Each source of a leftover is read alone (F2528: the stub printed it through both, so either guard passed without the other),
+# and a refusal on a leftover releases the lock it took.
+for via in compose network; do
+	deploy_run "via$via" "gnoworld-lock-$via-$$" LOCK_LEFTOVER="$left" LOCK_LEFTOVER_VIA=$via
+	refused "via$via" || { stop_all; fail "deploy/test.sh started beside a mutant project that only docker $via shows"; }
+	grep -q "docker compose -p $left down -v" "$d/via$via.out" || { stop_all; fail "the refusal did not name the leftover docker $via shows: $(cat "$d/via$via.out")"; }
+	[ -z "$(find "$d/home/.cache/gnoworld-tools" -name "*gnoworld-lock-$via-$$*" 2>/dev/null)" ] || { stop_all; fail "a run refused on a leftover (docker $via) kept its lock"; }
+	stop_all
+done
 # --mutants runs each fault in a project of that name: a run never takes its own for a leftover.
 own=gnoworld-demo-mutant-88888888
 deploy_run own "$own" LOCK_LEFTOVER="$own"
@@ -3825,6 +3834,63 @@ stop_all
 # Another Compose project running on the machine is none of its business.
 deploy_run unrelated "gnoworld-lock-d-$$" LOCK_LEFTOVER=myapp
 reached unrelated || { stop_all; fail "deploy/test.sh was refused by an unrelated running project: $(cat "$d/unrelated.out")"; }
+stop_all
+# A run releases only a lock that holds its own pid: one another run took over (here, a live process's) stays when the first ends.
+lockdir=$d/home/.cache/gnoworld-tools
+deploy_run foreign "$p1"
+reached foreign || { stop_all; fail "the run meant to lose its lock never started: $(cat "$d/foreign.out")"; }
+sleep 60 &
+echo $! >"$d/other.pid"
+cat "$d/other.pid" >"$lockdir/deploy-test-$p1.lock/pid"
+kill -TERM "$(cat "$d/foreign.pid")"
+for p in $(cat "$d/foreign.docker.pids"); do kill -TERM "$p" 2>/dev/null || true; done
+soon ended foreign || { stop_all; fail "the run that lost its lock never ended"; }
+[ "$(cat "$lockdir/deploy-test-$p1.lock/pid" 2>/dev/null)" = "$(cat "$d/other.pid")" ] || { stop_all; fail "a run took down the lock of another run when it ended"; }
+stop_all
+# A real Ctrl+C, to a run in the foreground of a process group of its own (a section's shell, in the background, ignores INT):
+# the run ends with 130 and its lock is gone. Without the INT trap a shell ends of the signal, its EXIT trap unrun.
+py=$(command -v python3)
+cat >"$d/intrun.py" <<'PYX'
+import os, signal, subprocess, sys, time
+
+signal.signal(signal.SIGINT, lambda *_: None)  # a handler, not SIG_IGN, which the run below would inherit
+log, out = sys.argv[1], sys.argv[2]
+run = subprocess.Popen(sys.argv[3:], start_new_session=True, stdout=open(out, "w"), stderr=subprocess.STDOUT)
+for _ in range(600):
+    if run.poll() is not None or (os.path.exists(log) and any(line.startswith("run ") for line in open(log))):
+        break
+    time.sleep(0.2)
+os.killpg(run.pid, signal.SIGINT)
+try:
+    print(run.wait(timeout=60))
+except subprocess.TimeoutExpired:
+    os.killpg(run.pid, signal.SIGKILL)
+    print("hung")
+PYX
+mkdir -p "$d/tmp.int" && : >"$d/int.docker"
+code=$(env HOME="$d/home" TMPDIR="$d/tmp.int" PATH="$d/bin:$PATH" LOCK_DOCKER_LOG="$d/int.docker" TEST_PROJECT="$p1" "$py" "$d/intrun.py" "$d/int.docker" "$d/int.out" sh "$here/../deploy/test.sh")
+[ "$code" = 130 ] || { stop_all; fail "a run stopped by Ctrl+C ended with [$code], not 130: $(cat "$d/int.out")"; }
+[ -z "$(find "$lockdir" -name "*$p1*" 2>/dev/null)" ] || { stop_all; fail "a run stopped by Ctrl+C left its lock"; }
+stop_all
+# The run that made a lock is writing its pid: an empty lock is read again a second later (the stub sleep writes it there, at once
+# and with no clock), and a live holder's refuses; a lock found dead and removed, then taken by another run that very moment, refuses.
+mkdir -p "$d/bin2" "$d/bin3"
+printf '#!/bin/sh\n[ -n "${LOCK_FILL:-}" ] && [ "$1" = 1 ] && cat "$LOCK_FILL_SRC" >"$LOCK_FILL"\nexec /bin/sleep "$@"\n' >"$d/bin2/sleep"
+printf '#!/bin/sh\n/bin/rm "$@"\nstatus=$?\ncase "$*" in *deploy-test-*.lock*) [ -z "${LOCK_RETAKE:-}" ] || { mkdir -p "$LOCK_RETAKE"; cat "$LOCK_RETAKE_SRC" >"$LOCK_RETAKE/pid"; } ;; esac\nexit $status\n' >"$d/bin3/rm"
+chmod +x "$d/bin2/sleep" "$d/bin3/rm"
+sleep 60 &
+echo $! >"$d/live.pid"
+pw=gnoworld-lock-w-$$
+mkdir -p "$lockdir/deploy-test-$pw.lock"
+deploy_run waited "$pw" PATH="$d/bin2:$d/bin:$PATH" LOCK_FILL="$lockdir/deploy-test-$pw.lock/pid" LOCK_FILL_SRC="$d/live.pid"
+refused waited || { stop_all; fail "a run took over a lock whose run had not yet written its pid: $(cat "$d/waited.out")"; }
+grep -q "pid $(cat "$d/live.pid")" "$d/waited.out" || { stop_all; fail "the refusal did not name the holder that wrote its pid late: $(cat "$d/waited.out")"; }
+sh -c 'echo $$' >"$d/dead.txt"
+pr=gnoworld-lock-r-$$
+mkdir -p "$lockdir/deploy-test-$pr.lock" && cp "$d/dead.txt" "$lockdir/deploy-test-$pr.lock/pid"
+deploy_run retaken "$pr" PATH="$d/bin3:$d/bin:$PATH" LOCK_RETAKE="$lockdir/deploy-test-$pr.lock" LOCK_RETAKE_SRC="$d/live.pid"
+refused retaken || { stop_all; fail "a run went on after another took the lock it had just removed: $(cat "$d/retaken.out")"; }
+grep -q "took the project" "$d/retaken.out" || { stop_all; fail "the refusal did not say another run took the project: $(cat "$d/retaken.out")"; }
 stop_all
 fi
 
