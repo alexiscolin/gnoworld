@@ -65,7 +65,7 @@ SECTIONS = {
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix,worktree_script,borrow",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
     "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys,gate_checks,gate_stryker", "scripts/mutate.py": "wiring", "scripts/journeys.py": "gate_journeys", "scripts/prove_fix.py": "prove_fix",
-    "scripts/repo_files.py": {"hooks": "worktrees,regressions,batch_size,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench", "scripts/suite_parts.py": "mutant_scope,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/unsteady.py": {"hooks": "gate_lanes", "probe": "unsteady_real"}, "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
+    "scripts/repo_files.py": {"hooks": "worktrees,regressions,batch_size,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/suite_parts.py": "mutant_scope,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/unsteady.py": {"hooks": "gate_lanes", "probe": "unsteady_real"}, "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
 }
 
 
@@ -1096,6 +1096,7 @@ def mutants():
     yield from quick_mutants()
     yield from checks_mutants()
     yield from stryker_mutants()
+    yield from bench_load_mutants()
     yield from regressions_name_mutants()
 
 
@@ -1103,6 +1104,20 @@ def swaps(path, name, rows):
     """One mutant per occurrence of each (find, replace, label) row, in the hooks' tests, labelled `<name> <label>`."""
     for find, replace, label in rows:
         yield from each(path, find, replace, "hooks", f"{name} {label}")
+
+
+def bench_load_mutants():
+    """A bench measures a quiet machine (slice-5 harness-c)."""
+    b = "scripts/bench.py"
+    yield from swaps(b, "bench.py", (
+        ("        if load < cores:", "        if True:", "waits for the load to fall"),
+        ("        if load < cores:", "        if load <= cores:", "waits at a load equal to the cores"),
+        ("        if now is None:", "        if False:", "refuses a load it cannot read"),
+        ("load >= 0 and cores > 0 else None", "load >= 0 else None", "refuses a machine of no core"),
+        ("if polls > 1 else", "if True else", "says it waited only when it did"),
+        ("        if waited >= ceiling:", "        if False:", "gives up past its ceiling"),
+        ("        time.sleep(min(step,", "        time.sleep(0 * min(step,", "waits between two reads of the load"),
+    ))
 
 
 def regressions_name_mutants():

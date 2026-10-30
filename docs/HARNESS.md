@@ -218,7 +218,7 @@ the coverage lane and `prove_fix` when nothing but docs, the harness and the lin
 | Step | What it catches |
 |---|---|
 | `scripts/probe.py` | a lint rule, selector or check that no longer catches its planted fault |
-| the benches (`scripts/bench.py`, `app/tests/bench/`) | a bench over its budget, or one a source names that the report lacks |
+| the benches (`scripts/bench.py`, `app/tests/bench/`) | a bench over its budget, or one a source names that the report lacks; it first waits, up to 10 minutes, for the 1-minute load to fall under the machine's cores, prints the load it measured at, and refuses (no verdict) when the load stays up or cannot be read |
 | `core_chromium`, the stories' journeys | core's tests on Chromium's engine; the design system's stories |
 | `test:compiled` | the compiled project's render counts, run alone |
 | coverage | under 85% anywhere, under 100% (95% branches) in `core` |

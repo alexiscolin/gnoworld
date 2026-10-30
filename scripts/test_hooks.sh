@@ -3593,6 +3593,64 @@ mkdir -p "$t/badgit" && printf '#!/bin/sh\ncase " $* " in *" log "*|*" diff "*) 
 (cd "$tx" && PATH="$t/badgit:$PATH" sh scripts/scan_secrets.sh --staged >/dev/null 2>&1) && fail "scan_secrets passed a staged diff git could not read (F140)"
 fi
 
+if part bench_load; then
+# bench.py measures a quiet machine (harness-c, 4b): before it runs the benches it reads the load (scripts/load.py: tenths, "170 160"
+# is a load of 17.0 on 16 cores) and waits, up to a ceiling, for it to fall under the cores; it prints what it waited and the load,
+# and refuses, saying so, when the ceiling passes. No budget changes: an over-budget bench at a quiet load still fails. The tests' load
+# is scripts/load.py's stub, a line a read; BENCH_WAIT_CEILING and BENCH_WAIT_STEP (seconds) are theirs and check.sh drops them.
+bl="$t/benchload"
+mkdir -p "$bl/scripts" "$bl/node_modules/.bin"
+cp "$here/bench.py" "$here/repo_files.py" "$bl/scripts/"
+printf '#!/bin/sh\necho ran >>"$BENCH_RAN"\nwhile [ $# -gt 0 ]; do [ "$1" = --outputJson ] && cp "$BENCH_FIXTURE" "$2"; shift; done\n' >"$bl/node_modules/.bin/vitest" && chmod +x "$bl/node_modules/.bin/vitest"
+printf 'import os, sys\nlines = open(os.environ["LOAD_SEQ"]).read().split("\\n")\nlines = [l for l in lines if l]\nn = int(open(os.environ["LOAD_N"]).read()) if os.path.exists(os.environ["LOAD_N"]) else 0\nopen(os.environ["LOAD_N"], "w").write(str(n + 1))\nprint(lines[min(n, len(lines) - 1)])\n' >"$bl/scripts/load.py"
+printf '{"files": [{"groups": [{"benchmarks": [{"name": "a line [0.2 ms]", "mean": %s}]}]}]}\n' 0.05 >"$bl/report.json"
+bload() { # $1: the load lines, one a read, separated by commas
+	rm -f "$bl/ran" "$bl/load.n" && printf '%s\n' "$1" | tr , '\n' >"$bl/seq"
+	# Bounded: a bench.py that waits for ever on a busy machine fails the case, it does not hang the suite.
+	(cd "$bl" && BENCH_FIXTURE="$bl/report.json" BENCH_RAN="$bl/ran" LOAD_SEQ="$bl/seq" LOAD_N="$bl/load.n" BENCH_WAIT_CEILING="${CEILING:-10}" BENCH_WAIT_STEP=0.05 python3 -I -c 'import subprocess, sys
+try:
+    r = subprocess.run([sys.executable, "-I", "scripts/bench.py"], capture_output=True, text=True, timeout=40)
+except subprocess.TimeoutExpired:
+    print("bench.py was still running after 40 s")
+    sys.exit(124)
+print(r.stdout + r.stderr)
+sys.exit(r.returncode)' 2>&1)
+}
+out=$(bload "10 160") || fail "bench.py refused a quiet machine: $out"
+printf '%s\n' "$out" | grep -qF "load 1.0" && printf '%s\n' "$out" | grep -qF "16 cores" || fail "bench.py did not print the load it measured at: $out"
+printf '%s\n' "$out" | grep -qi "waited" && fail "bench.py said it waited on a quiet machine: $out"
+[ "$(wc -l <"$bl/ran")" -eq 1 ] || fail "bench.py did not run the benches once at a quiet load"
+out=$(bload "900 160,900 160,100 160") || fail "bench.py did not wait for the load to fall: $out"
+printf '%s\n' "$out" | grep -qi "waited" || fail "bench.py did not say it waited for the load: $out"
+printf '%s\n' "$out" | grep -qF "load 90.0" && printf '%s\n' "$out" | grep -qF "16 cores" || fail "bench.py did not print the load it waited on, and the cores: $out"
+[ "$(cat "$bl/load.n")" -ge 3 ] || fail "bench.py did not read the load again while it waited: $(cat "$bl/load.n") reads"
+[ "$(wc -l <"$bl/ran")" -eq 1 ] || fail "bench.py ran the benches while the load was high"
+# Under the cores means under: a load equal to them waits.
+out=$(bload "160 160,159 160") || fail "bench.py did not wait at a load equal to the cores: $out"
+printf '%s\n' "$out" | grep -qi "waited" || fail "bench.py measured at a load equal to the machine's cores: $out"
+# A ceiling past: no verdict, said so, and the benches never run.
+out=$(CEILING=1 bload "900 160") && fail "bench.py gave a verdict on a machine that never fell quiet: $out"
+printf '%s\n' "$out" | grep -qF "needs a machine that can measure it" || fail "bench.py did not say why it refused (a machine that can measure): $out"
+printf '%s\n' "$out" | grep -qF "90.0" || fail "bench.py did not print the load it gave up at: $out"
+[ ! -e "$bl/ran" ] || fail "bench.py ran the benches on a machine past its ceiling"
+# A load that cannot be read is no quiet one: bench.py refuses, saying so, and runs no bench (it would measure a busy machine unannounced),
+# whether load.py fails, prints nothing or garbage, or reports no core.
+cp "$bl/scripts/load.py" "$bl/load.good"
+for bad in 'import sys; sys.exit(1)' 'print("x")' 'print("")' 'print("10 0")' 'print("10")'; do
+	printf '%s\n' "$bad" >"$bl/scripts/load.py"
+	out=$(bload "10 160") && fail "bench.py measured with a load it could not read ($bad): $out"
+	printf '%s\n' "$out" | grep -qi "cannot be read" || fail "bench.py did not say the load cannot be read ($bad): $out"
+	printf '%s\n' "$out" | grep -qi "traceback" && fail "bench.py crashed with a traceback on an unreadable load ($bad): $out"
+	[ ! -e "$bl/ran" ] || fail "bench.py ran the benches with a load it could not read ($bad)"
+done
+cp "$bl/load.good" "$bl/scripts/load.py"
+# No budget changes: an over-budget bench at a quiet load fails as before.
+printf '{"files": [{"groups": [{"benchmarks": [{"name": "a line [0.2 ms]", "mean": 0.25}]}]}]}\n' >"$bl/report.json"
+out=$(bload "10 160") && fail "bench.py passed a bench over its budget at a quiet load: $out"
+printf '%s\n' "$out" | grep -qF "a line [0.2 ms]: 0.2500 ms, over its 0.2 ms" || fail "bench.py did not name the bench over its budget at a quiet load: $out"
+# check.sh drops BENCH_WAIT_CEILING and BENCH_WAIT_STEP, with which a run would measure a busy machine: section gate_limits runs it with them set.
+fi
+
 if part regressions; then
 # check_regressions: its rules on small cases (the real run needs a base branch and Vitest).
 python3 -I "$here/check_regressions.py" --self-test >/dev/null || fail "check_regressions's rules do not hold"
@@ -3968,7 +4026,10 @@ printf '#!/bin/sh\nwhile [ $# -gt 0 ]; do [ "$1" = --outputJson ] && cp "$BENCH_
 report() { python3 -I -c 'import json, sys
 pairs = zip(sys.argv[2::2], sys.argv[3::2])
 json.dump({"files": [{"filepath": "a.bench.ts", "groups": [{"fullName": "g", "benchmarks": [{"name": n, "mean": float(m)} for n, m in pairs]}]}]}, open(sys.argv[1], "w"))' "$b/report.json" "$@"; }
-bench() { (cd "$b" && BENCH_FIXTURE="$b/report.json" python3 -I "$here/bench.py" 2>&1); }
+# A quiet machine's load, so these cases never wait on the real one (bench.py reads scripts/load.py before it measures; the cases of
+# the wait itself are the section bench_load's): a copy of the script beside a load.py that says 1.0 on 16 cores.
+mkdir -p "$b/scripts" && cp "$here/bench.py" "$here/repo_files.py" "$b/scripts/" && printf 'print("10 160")\n' >"$b/scripts/load.py"
+bench() { (cd "$b" && BENCH_FIXTURE="$b/report.json" python3 -I scripts/bench.py 2>&1); }
 report "a line [0.2 ms]" 0.05 "a room [100 ms]" 14.5
 out=$(bench) || fail "bench.py refused benches within their budgets: $out"
 printf '%s\n' "$out" | grep -q "0.0500 ms of 0.2 ms: a line" || fail "bench.py did not print a measure and its budget: $out"
