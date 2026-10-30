@@ -1192,8 +1192,8 @@ describe("serve.mjs's policy of a release", () => {
 // test is measured against (.claude/rules/typescript.md, F412). Each is built inside the function that applies it: a top-level
 // constant is one string, one number, a list of strings or a function, nothing else (a pattern, however it is written, a joined text too).
 describe("csp.ts's guards", () => {
-  // The forms' constants moved to cspForms.ts (a refactor, nothing else changed): the guard reads both files.
-  const source = `${read("./csp.ts")}\n${read("./cspForms.ts")}`;
+  // The policy's guards live in three files (the forms' constants in cspForms.ts, the origins' in cspOrigins.ts): the guard reads all three.
+  const source = `${read("./csp.ts")}\n${read("./cspForms.ts")}\n${read("./cspOrigins.ts")}`;
   const constants = source
     .split(/\n(?=(?:export )?(?:const|let|var|function|async function|class|type|interface)\b)/)
     .filter((chunk) => /^(?:export )?(?:const|let|var)\b/.test(chunk))
