@@ -77,6 +77,7 @@ describe("inlineScripts", () => {
     ["an attribute that only ends in src", '<script data-src="x">a()</script>', ["a()"]],
     ["src as an attribute's value", '<script id="src">a()</script>', ["a()"]],
     ["SRC in capitals", '<script SRC="/x.js"></script>', []],
+    ["a bare src, with no value", "<script src>x</script>", []],
     ["a > in a quoted attribute", '<script data-x="a>b">a()</script>', ["a()"]],
     ["a single-quoted attribute", "<script id='ab'>a()</script>", ["a()"]],
     ["a > in a single-quoted attribute", "<script data-x='a>b'>a()</script>", ["a()"]],
@@ -655,6 +656,15 @@ describe("outputs", () => {
           `csp: the policy of w/long/index.html makes a header of ${String(length)} characters, past a host's 2,000`,
         ),
       );
+  });
+
+  // F2705: the catch-all `/*` names the scripts of both documents, so it can pass the cap where each page does; its error names it.
+  it("names /* when the catch-all's header, made of both documents' hashes, passes in each page but not together", () => {
+    const hashes = (letter: string, count: number) =>
+      Array.from({ length: count }, (_, n) => `'sha256-${letter.repeat(42)}${String.fromCharCode(65 + n)}='`);
+    const page = (letter: string) => `script-src 'self' ${hashes(letter, 20).join(" ")}`;
+    const pages = { "index.html": page("a"), "__spa-fallback.html": page("b") };
+    expect(() => outputs(pages)).toThrow(/^csp: the policy of \/\* makes a header of \d+ characters/);
   });
 
   // F2452: Cloudflare Pages takes at most 100 header rules (developers.cloudflare.com/pages/configuration/headers). The
