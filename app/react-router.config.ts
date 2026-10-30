@@ -1,4 +1,3 @@
-import { existsSync } from "node:fs";
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,8 +25,9 @@ export default {
     const pages = Object.fromEntries(
       await Promise.all(files.map(async (file) => [file, await readFile(join(client, file), "utf8")] as const)),
     );
-    // The service worker's script runs under the policy of its own answer: a _headers host gives it the bare one.
-    const { headers, nginx } = outputs(await pagePolicies(pages), existsSync(join(client, "sw.js")) ? ["sw.js"] : []);
+    // The service worker's script runs under the policy of its own answer: a _headers host gives it the bare one. Vite's post
+    // hook writes sw.js after this runs (F2458), so the build does not look for it: a rule for a file never written is harmless.
+    const { headers, nginx } = outputs(await pagePolicies(pages), ["sw.js"]);
     await writeFile(join(client, "_headers"), headers);
     await writeFile(join(buildDirectory, "csp.conf"), nginx);
     // What a search engine reads: the mainnet's places, from the data the pages were built from.

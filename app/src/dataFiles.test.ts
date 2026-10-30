@@ -14,26 +14,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadData, MAX_FILE_BYTES } from "./dataFiles.ts";
-import { inlineScripts, sha256 } from "./csp.ts";
+import { inlineScripts, policy, sha256 } from "./csp.ts";
 import { at, FAULTS, plant } from "./dataFixture.ts";
+import { headerRules, nginxTable } from "../tests/e2e/cspFiles.mjs";
 
 // Markup, a comment opener and a line separator in a description: what JSON-LD must carry as text.
 const HOSTILE = "</script><script>alert(1)</script><!-- \u2028";
 /** The text of each JSON-LD script of a page, as the browser reads it. */
 const ldScripts = (html: string): string[] =>
   [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((match) => match[1] ?? "");
-
-/** Each page's policy in `_headers`: the address of its rule, then the policy. */
-function headerPolicies(headers: string): Map<string, string> {
-  const found = new Map<string, string>();
-  let rule = "";
-  for (const line of headers.split("\n")) {
-    if (/^\S/.test(line)) rule = line;
-    const policy = /^ {2}Content-Security-Policy: (.+)$/.exec(line)?.[1];
-    if (policy !== undefined) found.set(rule, policy);
-  }
-  return found;
-}
 
 /** The pages of a build: the address each is served at and its html. */
 function pagesOf(client: string): [string, string][] {
@@ -73,13 +62,8 @@ function lookups(
  * data block, has none), each line under `cap` characters, the longest page named when one is not.
  */
 async function expectPolicies(client: string, conf: string, cap: number): Promise<void> {
-  const headers = headerPolicies(readFileSync(join(client, "_headers"), "utf8"));
-  const table = new Map(
-    [...readFileSync(conf, "utf8").matchAll(/^\s*"?([^"\s]+)"?\s+"([^"]*)";$/gm)].map((match) => [
-      match[1] ?? "",
-      match[2] ?? "",
-    ]),
-  );
+  const headers = headerRules(readFileSync(join(client, "_headers"), "utf8"));
+  const table = nginxTable(readFileSync(conf, "utf8"));
   const pages = pagesOf(client);
   expect(pages.length).toBeGreaterThan(1);
   let longest = ["", 0] as [string, number];
@@ -317,6 +301,13 @@ describe("react-router build", () => {
         // 5f: each page has a policy of its own, holding its own scripts' hashes and no other (csp.ts), in _headers and in
         // nginx's table.
         await expectPolicies(client, join(copy, "build", "csp.conf"), 2000);
+        // F2458: buildEnd looked for sw.js before Vite's post hook wrote it, so a real build's _headers never held the worker's
+        // rule (decisions, 2026-10-30) and the worker shipped with the catch-all's policy on a _headers host. One rule, the bare
+        // policy, with the catch-all detached.
+        expect(existsSync(join(client, "sw.js"))).toBe(true);
+        const headers = readFileSync(join(client, "_headers"), "utf8");
+        const rule = `\n/sw.js\n  ! Content-Security-Policy\n  Content-Security-Policy: ${policy([])}\n`;
+        expect(headers.split(rule)).toHaveLength(2);
       } finally {
         rmSync(dir, { recursive: true });
       }
