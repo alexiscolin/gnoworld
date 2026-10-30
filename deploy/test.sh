@@ -681,12 +681,13 @@ PY
 	}
 	nginx_t() { # nginx -t on the image's own nginx.conf, with the table $1 in place of the build's, on the stack's network
 		docker run --rm --network "$inside" -v "$tmp/csp.long.$1:/etc/nginx/csp.conf:ro" --entrypoint nginx \
-			"$(docker inspect --format '{{.Image}}' "$web")" -t 2>&1 || true
+			"$(docker inspect --format '{{.Image}}' "$web")" -t 2>&1 || echo "nginx -t exit $?"
 	}
 	longconf sized
 	longconf default
 	case $(nginx_t sized) in *"test is successful"*) pass "nginx starts with the table of the longest names" ;; *) fail "nginx does not start with the table of the longest names" ;; esac
-	case $(nginx_t default) in *"map_hash_max_size or map_hash_bucket_size"*) pass "nginx refuses the same table with its default hash sizes" ;; *) fail "nginx takes the table of the longest names with its default hash sizes: the sizes prove nothing" ;; esac
+	# The message is nginx 1.30.6's (src/core/ngx_hash.c, ngx_hash_init): the bucket is checked first and stops nginx.
+	case $(nginx_t default) in *"could not build map_hash, you should increase map_hash_bucket_size"*"nginx -t exit "[1-9]*) pass "nginx refuses the same table with its default hash sizes" ;; *) fail "nginx takes the table of the longest names with its default hash sizes: the sizes prove nothing" ;; esac
 	for path in $assets; do
 		expect "$path is kept a year" "$(header cache-control "$path" 203.0.113.1 -u "$auth")" "public, max-age=31536000, immutable"
 	done
