@@ -66,3 +66,4 @@
 2026-10-30 526a25cb09e67b46e6ff9fe3595852205467b508 chief: integration of slice-5e (0d5df44d) and slice-5n (24062b43, the palette moved into 5e's shell.tsx); check.sh --merge on 24062b43, 641 s
 2026-10-30 99a42b3d9258342e0184c55b7d692abd1b8dc49e chief: integration of slice-5-deployfix (5085cc9b, deploy/test.sh judges gzip on the client's entry, Alexis's approval); its check.sh --merge, 567 s
 2026-10-30 2c292f9046358996e26162a9ed908027b2e97783 test-auditor, reviewer, security-reviewer (the Workflow's, then two rounds by the session), finding-verifier; check.sh --merge on 4a8d1fdb, 594 s
+2026-10-30 09317f703ae3493ec69b3041b9ac1d6dedd370b4 test-auditor, reviewer, security-reviewer (the Workflow's, then two rounds by the session), finding-verifier; as 4a8d1fdb (its check.sh --merge, 594 s), plus F475, F2360 and F2362 marked fixed
