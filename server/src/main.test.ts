@@ -376,16 +376,24 @@ describe("the server's process", { timeout: 30_000 }, () => {
 
   // The prices timer (5l) against a proxy that records what the server asks it to tunnel to, as the egress proxy would
   // see it: the server reaches out only through HTTPS_PROXY (NODE_USE_ENV_PROXY), as in the stack.
-  const tunnels = async (): Promise<{ proxy: string; seen: string[]; close: () => void }> => {
+  const tunnels = async (silent = false): Promise<{ proxy: string; seen: string[]; close: () => void }> => {
     const seen: string[] = [];
     const proxy = createHttpServer();
     proxy.on("connect", (request, socket) => {
       seen.push(request.url ?? "");
-      socket.end("HTTP/1.1 502 Bad Gateway\r\nconnection: close\r\n\r\n");
+      // A silent proxy never answers the CONNECT: the read stays open (F2758).
+      if (!silent) socket.end("HTTP/1.1 502 Bad Gateway\r\nconnection: close\r\n\r\n");
     });
     await new Promise<void>((resolve) => proxy.listen(0, "127.0.0.1", resolve));
     const { port } = proxy.address() as AddressInfo;
-    return { proxy: `http://127.0.0.1:${String(port)}`, seen, close: () => proxy.close() };
+    return {
+      proxy: `http://127.0.0.1:${String(port)}`,
+      seen,
+      close: () => {
+        proxy.close();
+        proxy.closeAllConnections();
+      },
+    };
   };
 
   it("starts the prices timer when MARKETS_FILE is set: it asks CoinGecko at boot, and stops with the server on SIGTERM (5l)", async () => {
@@ -410,6 +418,23 @@ describe("the server's process", { timeout: 30_000 }, () => {
       way.close();
     }
   });
+
+  it("exits on SIGTERM within a bound even with a price read still open on a proxy that never answers (F2758)", async () => {
+    const way = await tunnels(true);
+    try {
+      const file = join(folder("gnoworld-markets-"), "markets.json");
+      const server = start({ ...settings(), MARKETS_FILE: file, HTTPS_PROXY: way.proxy, NODE_USE_ENV_PROXY: "1" });
+      await listening(server);
+      await until(() => way.seen.length > 0);
+      const begun = Date.now();
+      server.child.kill("SIGTERM");
+      expect(await exited(server)).toBe(0);
+      // Without the bound the open request holds the process for the connect timeout (10 s) or longer.
+      expect(Date.now() - begun).toBeLessThan(3000);
+    } finally {
+      way.close();
+    }
+  }, 20_000);
 
   it("starts no prices timer without MARKETS_FILE: nothing is asked of CoinGecko", async () => {
     const way = await tunnels();

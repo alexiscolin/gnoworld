@@ -83,7 +83,12 @@ const drain = (): void => {
   let open = 2;
   const closed = (): void => {
     open -= 1;
-    if (open === 0) db.close();
+    if (open === 0) {
+      db.close();
+      // A call out still open (a price read on a stalled proxy) would hold the exit past the container's grace
+      // period: everything is closed by now, so the process leaves within 200 ms whatever is left.
+      setTimeout(() => process.exit(0), 200).unref();
+    }
   };
   auth.close(closed);
   const close = (): void => {
