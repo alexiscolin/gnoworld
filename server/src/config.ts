@@ -22,6 +22,8 @@ export interface Config {
   ergo: { host: string; port: number; password: string } | undefined;
   // Ergo's data folder, mounted read-only, and the bytes it may fill before the alert's 80% (3n-b).
   ergoData: { dir: string; maxBytes: number } | undefined;
+  // The file the prices timer writes (5l): absolute, none by default, so no timer.
+  markets: string | undefined;
   moderation: {
     openaiKey: Secret | undefined;
     thresholds: Thresholds;
@@ -65,6 +67,12 @@ const whole = (max: number, otherwise: number) =>
     .transform(Number)
     .pipe(z.number().max(max))
     .default(otherwise);
+
+// An absolute path whose every part is a name (no "", "." or ".."), so never the root a walk would take whole (F636).
+const absolute = z.string().refine((path) => {
+  const [root, ...parts] = path.split("/");
+  return root === "" && parts.length > 0 && parts.every((part) => !["", ".", ".."].includes(part));
+});
 
 const Env = z.object({
   HOST: z.string().min(1).max(253).default("127.0.0.1"),
@@ -119,14 +127,10 @@ const Env = z.object({
   ERGO_OPER_PASSWORD_FILE: z.string().min(1).optional(),
   // Ergo's data folder, measured (3n-b): absolute, each part a name (no "", "." or ".."), so never the root a
   // walk would take whole, however spelled (F636).
-  ERGO_DATA: z
-    .string()
-    .refine((path) => {
-      const [root, ...parts] = path.split("/");
-      return root === "" && parts.length > 0 && parts.every((part) => !["", ".", ".."].includes(part));
-    })
-    .optional(),
+  ERGO_DATA: absolute.optional(),
   ERGO_DATA_MB: whole(1_048_576, 1024),
+  // The prices timer's file (5l), written as ERGO_DATA is: no trailing slash, so a file's name.
+  MARKETS_FILE: absolute.optional(),
   OPENAI_API_KEY_FILE: z.string().min(1).optional(),
   // A score that hides a category in place of OpenAI's own flag, by category: {"harassment": 0.9}.
   MODERATION_THRESHOLDS: z
@@ -179,6 +183,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     authSocket: AUTH_SOCKET,
     ergo: ergoOf(env, { host: ERGO_HOST, port: ERGO_PORT, passwordFile: ERGO_OPER_PASSWORD_FILE }),
     ergoData: ergoDataOf(env, ERGO_DATA, ERGO_DATA_MB),
+    markets: parsed.data.MARKETS_FILE,
     moderation: {
       openaiKey:
         OPENAI_API_KEY_FILE === undefined ? undefined : new Secret(word("OPENAI_API_KEY_FILE", OPENAI_API_KEY_FILE)),

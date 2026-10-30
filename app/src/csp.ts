@@ -35,18 +35,26 @@ export function policy(hashes: readonly string[]): string {
   return DIRECTIVES.map((directive) => (directive === SCRIPT_SRC ? script : directive)).join("; ");
 }
 
+// The guards below are built inside functions, never as module-level constants: StrykerJS leaves a module-level constant
+// unmutated (ignoreStatic), so a guard written there is one no test is measured against (.claude/rules/typescript.md, F412).
+
 // A tag's attributes as the HTML parser reads them: a > inside quotes ends nothing.
-const ATTRIBUTES = String.raw`(?:[^>"']|"[^"]*"|'[^']*')*`;
+function attributesSource(): string {
+  return /(?:[^>"']|"[^"]*"|'[^']*')*/.source;
+}
+
 // A script, its attributes, its text: it ends at the first `</script` that a space, a slash or a > follows.
-const SCRIPT = String.raw`<script\b(${ATTRIBUTES})>([\s\S]*?)<\/script(?=[\s/>])[^>]*>`;
-// One attribute: its name (a slash, a space or a quote starts the next), then its value, quoted or not.
-const ATTRIBUTE = String.raw`([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?`;
+function scriptTags(): RegExp {
+  return new RegExp(String.raw`<script\b(${attributesSource()})>([\s\S]*?)<\/script(?=[\s/>])[^>]*>`, "gi");
+}
 
 // The attributes of a tag by name, the first of a repeated one, as the HTML parser keeps it: a name inside another attribute's
 // value is no attribute (F2360).
 function attributesOf(attributes: string): Map<string, string> {
   const found = new Map<string, string>();
-  for (const [, name = "", double, single, bare] of attributes.matchAll(new RegExp(ATTRIBUTE, "g"))) {
+  // One attribute: its name (a slash, a space or a quote starts the next), then its value, quoted or not.
+  const attribute = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g;
+  for (const [, name = "", double, single, bare] of attributes.matchAll(attribute)) {
     const key = name.toLowerCase();
     if (!found.has(key)) found.set(key, double ?? single ?? bare ?? "");
   }
@@ -57,7 +65,7 @@ function attributesOf(attributes: string): Map<string, string> {
 // JSON-LD is a data block, which the browser never runs, so the policy has no hash to give it.
 export function inlineScripts(html: string): string[] {
   return (
-    [...html.matchAll(new RegExp(SCRIPT, "gi"))]
+    [...html.matchAll(scriptTags())]
       .filter(([, attributes = ""]) => {
         const found = attributesOf(attributes);
         return !found.has("src") && (found.get("type") ?? "").trim().toLowerCase() !== "application/ld+json";
@@ -82,14 +90,16 @@ const CONTEXT_HEAD = "window.__reactRouterContext = ";
 const CONTEXT_TAIL =
   ";window.__reactRouterContext.stream = new ReadableStream({start(controller){window.__reactRouterContext.streamController = controller;}}).pipeThrough(new TextEncoderStream());";
 const ENQUEUE_HEAD = "window.__reactRouterContext.streamController.enqueue(";
-// A file of the build's assets, by its name alone: no slash, so no path leaves /assets/.
-const ASSET = String.raw`"\/assets\/[\w.-]+\.js"`;
-const MODULE_SCRIPT = new RegExp(
-  String.raw`^(?:import ${ASSET};\n|import \* as route\d+(?:_\w+)? from ${ASSET};\n|const route\d+ = \{\.\.\.route\d+_\w+(?:,\.\.\.route\d+_\w+)*\};\n)+` +
-    String.raw`\s*window\.__reactRouterRouteModules = \{"[\w/.$-]+":route\d+(?:,"[\w/.$-]+":route\d+)*\};\n\nimport\(${ASSET}\);$`,
-);
-// A JSON string literal: the quotes of its content escaped, no line break.
-const STRING_LITERAL = /^"(?:[^"\\\r\n]|\\.)*"$/;
+
+// The module script: imports of the build's assets, the routes' table, the entry's import.
+function isModuleScript(text: string): boolean {
+  // A file of the build's assets, by its name alone: no slash, so no path leaves /assets/.
+  const asset = /"\/assets\/[\w.-]+\.js"/.source;
+  return new RegExp(
+    String.raw`^(?:import ${asset};\n|import \* as route\d+(?:_\w+)? from ${asset};\n|const route\d+ = \{\.\.\.route\d+_\w+(?:,\.\.\.route\d+_\w+)*\};\n)+` +
+      String.raw`\s*window\.__reactRouterRouteModules = \{"[\w/.$-]+":route\d+(?:,"[\w/.$-]+":route\d+)*\};\n\nimport\(${asset}\);$`,
+  ).test(text);
+}
 
 function isJson(text: string, kind: "object" | "string"): boolean {
   try {
@@ -100,11 +110,11 @@ function isJson(text: string, kind: "object" | "string"): boolean {
   }
 }
 
-// The loader data: a JSON text in a string literal, handed to the stream.
+// The loader data: a JSON text in a string literal (JSON.parse takes no raw line break, no code joined to it), handed to the stream.
 function isLoaderData(text: string): boolean {
   if (!text.startsWith(ENQUEUE_HEAD) || !text.endsWith(");")) return false;
   const literal = text.slice(ENQUEUE_HEAD.length, -2);
-  return STRING_LITERAL.test(literal) && isJson(literal, "string");
+  return isJson(literal, "string");
 }
 
 // Which of React Router's forms a script's text is, as its place in the order a page holds them (scroll restoration, context,
@@ -112,7 +122,7 @@ function isLoaderData(text: string): boolean {
 function formOf(text: string): number {
   if (text === SCROLL_RESTORATION) return 0;
   if (text === STREAM_CLOSE) return 4;
-  if (MODULE_SCRIPT.test(text)) return 2;
+  if (isModuleScript(text)) return 2;
   if (text.startsWith(CONTEXT_HEAD) && text.endsWith(CONTEXT_TAIL))
     return isJson(text.slice(CONTEXT_HEAD.length, -CONTEXT_TAIL.length), "object") ? 1 : -1;
   return isLoaderData(text) ? 3 : -1;
@@ -137,8 +147,8 @@ export async function pagePolicies(pages: Readonly<Record<string, string>>): Pro
   for (const file of files) {
     const page = pages[file] ?? "";
     // A script's text is no markup.
-    const markup = page.replace(new RegExp(SCRIPT, "gi"), "");
-    for (const [tag = ""] of markup.matchAll(new RegExp(`<[a-z]${ATTRIBUTES}>`, "gi"))) {
+    const markup = page.replace(scriptTags(), "");
+    for (const [tag = ""] of markup.matchAll(new RegExp(`<[a-z]${attributesSource()}>`, "gi"))) {
       if (refused(tag)) throw new Error(`csp: a page holds ${tag.slice(0, 40)}, which the policy refuses`);
     }
     const scripts = inlineScripts(page);
@@ -165,7 +175,6 @@ export async function pagePolicies(pages: Readonly<Record<string, string>>): Pro
 const HEADER = "  Content-Security-Policy: ";
 // A host that reads _headers cuts a line past this many characters (Cloudflare Pages).
 const HEADER_CAP = 2000;
-const FILE_NAME = /^[a-z0-9/._-]+$/;
 const FILE_ERROR = "csp: a page's name holds only a-z, 0-9, /, ., _ and -";
 
 // The addresses a host answers a page at: for _headers, the paths asked; for nginx's table, $uri, which is the path asked
@@ -180,7 +189,7 @@ function addresses(file: string): { headers: string[]; nginx: string[] } {
   return { headers: [`/${file}`], nginx: [`/${file}`] };
 }
 
-// The next power of two from `from` that holds `least`: nginx rounds its hash sizes.
+// The next power of two from `from` that is at least `least`: nginx rounds its hash sizes.
 function sized(from: number, least: number): number {
   let size = from;
   while (size < least) size *= 2;
@@ -198,20 +207,27 @@ function checked(file: string, csp: string): string {
   return csp;
 }
 
-// Code units, not a locale's order: every machine writes the same bytes.
-const byPath = ([a]: [string, string], [b]: [string, string]): number => (a < b ? -1 : a > b ? 1 : 0);
+// The rows of an output, each as `line` writes it, in code-unit order of their paths, not a locale's: every machine writes the
+// same bytes. The one place an output is sorted.
+function rows(found: [string, string][], line: (path: string, csp: string) => string): string {
+  return found
+    .slice()
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([path, csp]) => line(path, csp))
+    .join("");
+}
 
-// The map's hash sizes: a bucket holds a key, a pointer and a length (8 + 2 bytes) and the pointer that ends it (8); nginx
-// does not start with a key longer than that, nor with more keys than its table holds (nginx.org/en/docs/hash.html).
+// The map's hash sizes (ngx_hash_init, nginx 1.30 src/core/ngx_hash.c): a key takes a pointer, then its length and bytes rounded
+// up to a pointer; a bucket holds four of the longest and the pointer that ends it, and the table four slots a key (F2454).
 function hashSizes(table: readonly [string, string][]): string {
-  const longest = Math.max(0, ...table.map(([path]) => path.length));
-  return `map_hash_max_size ${String(sized(2048, 2 * (table.length + 1)))};\nmap_hash_bucket_size ${String(sized(64, longest + 8 + 2 + 8))};\n`;
+  const pointer = 8;
+  const longest = Math.max(0, ...table.map(([path]) => pointer + Math.ceil((path.length + 2) / pointer) * pointer));
+  return `map_hash_max_size ${String(sized(2048, 4 * table.length))};\nmap_hash_bucket_size ${String(sized(64, 4 * longest + pointer))};\n`;
 }
 
 // A host that reads _headers takes this many rules (Cloudflare Pages: developers.cloudflare.com/pages/configuration/headers).
 const RULE_CAP = 100;
 const DETACH = "  ! Content-Security-Policy\n";
-const SOURCE = /'sha256-[A-Za-z0-9+/]{43}='/g;
 
 function refuseRules(rules: number, cap: number): void {
   if (rules > cap) throw new RangeError(`csp: _headers holds ${String(rules)} rules, past a host's ${String(cap)}`);
@@ -221,7 +237,7 @@ function refuseRules(rules: number, cap: number): void {
 // answers it with that, so it names the scripts of both, and of nothing else.
 function anywhere(policies: Readonly<Record<string, string>>): string {
   const documents = ["index.html", "__spa-fallback.html"];
-  return policy(documents.flatMap((name) => policies[name]?.match(SOURCE) ?? []));
+  return policy(documents.flatMap((name) => policies[name]?.match(/'sha256-[A-Za-z0-9+/]{43}='/g) ?? []));
 }
 
 // The policies as `_headers` takes them (the catch-all `/*` first; every other rule detaches it, then sets its own), and as
@@ -234,7 +250,7 @@ export function outputs(
   ruleCap = RULE_CAP,
 ): { headers: string; nginx: string } {
   const files = Object.keys(policies).sort();
-  for (const name of [...files, ...workers]) if (!FILE_NAME.test(name)) throw new RangeError(FILE_ERROR);
+  for (const name of [...files, ...workers]) if (!/^[a-z0-9/._-]+$/.test(name)) throw new RangeError(FILE_ERROR);
   const headers: [string, string][] = [];
   const table: [string, string][] = [];
   for (const file of files) {
@@ -246,17 +262,10 @@ export function outputs(
   const bare = policy([]);
   for (const worker of workers) headers.push([`/${worker}`, bare]);
   refuseRules(headers.length + 1, ruleCap);
-  const rows = table
-    .sort(byPath)
-    .map(([path, csp]) => `    "${path}" "${csp}";\n`)
-    .join("");
   return {
     headers:
       `/*\n${HEADER}${checked("/*", anywhere(policies))}\n` +
-      headers
-        .sort(byPath)
-        .map(([path, csp]) => `${path}\n${DETACH}${HEADER}${csp}\n`)
-        .join(""),
-    nginx: `${hashSizes(table)}map $uri $csp {\n    default "${bare}";\n${rows}}\n`,
+      rows(headers, (path, csp) => `${path}\n${DETACH}${HEADER}${csp}\n`),
+    nginx: `${hashSizes(table)}map $uri $csp {\n    default "${bare}";\n${rows(table, (path, csp) => `    "${path}" "${csp}";\n`)}}\n`,
   };
 }

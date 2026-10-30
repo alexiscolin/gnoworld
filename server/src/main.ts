@@ -12,6 +12,7 @@ import { migrations } from "./migrations.ts";
 import { pinsRoutes } from "./pins/routes.ts";
 import { loginFrom } from "./login/routes.ts";
 import { loadRoles, spared } from "./roles/roles.ts";
+import { startPrices } from "./prices/prices.ts";
 import { startRetention } from "./retention/retention.ts";
 import { roomsRoutes } from "./rooms/routes.ts";
 
@@ -25,6 +26,8 @@ const log = logger(config.pepper, (line) => process.stdout.write(line));
 const db = openDatabase(config.database, migrations);
 // The verdicts kept 180 days and below their cap, now and every five minutes (3n), Ergo's folder measured (3n-b).
 const retention = startRetention(db, { log, ergoData: config.ergoData });
+// CoinGecko's prices every five minutes into the file MARKETS_FILE names (5l); without it, no timer.
+const prices = config.markets === undefined ? undefined : startPrices({ file: config.markets, log });
 let draining = false;
 const app = makeApp(log, () => !draining);
 app.route("/api/login", loginFrom(db, config, { log }));
@@ -73,13 +76,19 @@ const drain = (): void => {
   draining = true;
   log("stopping");
   retention.stop();
+  prices?.stop();
   // The IRC link first. The database last, once the HTTP server and Ergo's socket have both let their
   // connections go: a line Ergo sent before the stop still meets an open database (the socket's deadline
   // bounds the wait).
   let open = 2;
   const closed = (): void => {
     open -= 1;
-    if (open === 0) db.close();
+    if (open === 0) {
+      db.close();
+      // A call out still open (a price read on a stalled proxy) would hold the exit past the container's grace
+      // period: everything is closed by now, so the process leaves within 200 ms whatever is left.
+      setTimeout(() => process.exit(0), 200).unref();
+    }
   };
   auth.close(closed);
   const close = (): void => {

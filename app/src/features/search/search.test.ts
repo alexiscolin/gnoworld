@@ -98,6 +98,7 @@ describe("searchPlaces", () => {
     );
   });
 
+  // Its limit is its own: the ratio below holds under load, and five seconds stopped StrykerJS's whole dry run on its slower copy (F2592).
   it("scales with the list, not with its square: 16 times the places cost far less than 64 times the time", () => {
     const universe = (count: number): SearchItem[] =>
       Array.from({ length: count }, (_, n) => ({
@@ -121,7 +122,7 @@ describe("searchPlaces", () => {
     const large = universe(80_000);
     for (const query of ["", "number 1", "zzz"])
       expect(least(large, query) / Math.max(least(small, query), 0.01)).toBeLessThan(64);
-  });
+  }, 30_000);
 
   it("counts every item of the list in the empty query's groups", () => {
     fc.assert(

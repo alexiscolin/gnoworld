@@ -13,12 +13,13 @@ COPY packages/core/src packages/core/src
 COPY packages/schemas/src packages/schemas/src
 COPY server/src server/src
 COPY server/roles.json server/
-RUN mkdir -p /data /run/gnoworld && chown 65532:65532 /data /run/gnoworld
+RUN mkdir -p /data /markets /run/gnoworld && chown 65532:65532 /data /markets /run/gnoworld
 
 FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:78f07ef1b5ea71ad7c055df15d0dd8997f2d288f9158623c4d4ae3d765b7d50d
 WORKDIR /app
 COPY --from=build /repo /app
 COPY --from=build --chown=65532:65532 /data /data
+COPY --from=build --chown=65532:65532 /markets /markets
 COPY --from=build --chown=65532:65532 /run/gnoworld /run/gnoworld
 USER 65532:65532
 CMD ["--disallow-code-generation-from-strings", "server/src/main.ts"]
