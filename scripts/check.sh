@@ -411,6 +411,9 @@ EOF
 		# in turn: StrykerJS rethrows a file it cannot parse, so a run cut short would fail every tree's. Two runs that end at once
 		# keep the last one's verdicts: the other's are judged again, never lost to a half-written file.
 		cache="$HOME/.cache/gnoworld-tools/stryker-incremental.json" own="$logs/stryker-incremental.json"
+		# A run cut short leaves its sandboxes in .stryker-tmp, which a bench measured (5n: Cmd-K at 27 to 41 ms instead of 2 to 4):
+		# emptied before StrykerJS starts. A link is removed, never followed: what it leads to is not StrykerJS's.
+		if [ -L .stryker-tmp ]; then rm .stryker-tmp; elif [ -d .stryker-tmp ]; then find .stryker-tmp -mindepth 1 -delete; fi
 		mkdir -p "${cache%/*}"
 		! parses "$cache" || cp "$cache" "$own"
 		stryker=0

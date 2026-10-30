@@ -2960,6 +2960,66 @@ precommit_in "$c4" 1 || fail "pre-commit refused the first commit of a repositor
 [ ! -e "$t/reg.log" ] || fail "pre-commit ran check_regressions with no commit yet: $(cat "$t/reg.log")"
 fi
 
+# StrykerJS's sandboxes: a timed-out dry run leaves .stryker-tmp, which Vitest's bench project measured (the bench at 27 to
+# 41 ms instead of 2 to 4, 5n). Vitest ignores the folder, and check.sh empties it before StrykerJS starts.
+if part gate_stryker; then
+gate_fixture gate_stryker
+mkdir -p "$g/node_modules/vitest"
+printf 'import { spawnSync } from "node:child_process";\nprocess.exit(spawnSync("sh", [%s, "core_chromium", "switch=" + (process.env.CORE_CHROMIUM ?? ""), ...process.argv.slice(2)], { stdio: "inherit" }).status ?? 1);\n' "'$step'" >"$g/node_modules/vitest/vitest.mjs"
+# StrykerJS's step, here, fails when a sandbox is still there as it starts.
+python3 -I - "$g/package.json" "$step" <<'PY'
+import json, sys
+p = json.load(open(sys.argv[1]))
+p["scripts"]["mutate"] = f'test -z "$(ls -A .stryker-tmp 2>/dev/null)" || {{ echo "a sandbox was left in .stryker-tmp" >&2; exit 1; }}; sh {sys.argv[2]} mutate'
+json.dump(p, open(sys.argv[1], "w"))
+PY
+git -C "$g" add -A && git -C "$g" commit -qm "mutate checks its folder"
+mkdir -p "$g/.stryker-tmp/sandbox-1/app/src" "$g/.stryker-tmp/.vite" && printf 'x\n' >"$g/.stryker-tmp/sandbox-1/app/src/a.ts"
+out=$(AUDIT_ANSWER=x gate --full) || fail "check.sh --full did not empty .stryker-tmp before StrykerJS started: $(printf '%s\n' "$out" | tail -5)"
+ran mutate || fail "check.sh --full did not run StrykerJS"
+[ -z "$(ls -A "$g/.stryker-tmp" 2>/dev/null)" ] || fail "check.sh --full left a sandbox in .stryker-tmp: $(ls -A "$g/.stryker-tmp")"
+# Only that folder: another folder of a tree is never emptied.
+mkdir -p "$g/.stryker-tmpx" "$g/keep" && printf 'x\n' >"$g/.stryker-tmpx/a" && printf 'x\n' >"$g/keep/a"
+AUDIT_ANSWER=x gate --full >/dev/null || fail "check.sh --full failed with folders beside .stryker-tmp"
+[ -e "$g/.stryker-tmpx/a" ] && [ -e "$g/keep/a" ] || fail "check.sh --full emptied a folder that is not .stryker-tmp"
+# A link named .stryker-tmp is emptied no further than itself: what it leads to is not StrykerJS's.
+rm -rf "$g/.stryker-tmp" && mkdir -p "$t/stryker-away" && printf 'x\n' >"$t/stryker-away/a" && ln -s "$t/stryker-away" "$g/.stryker-tmp"
+AUDIT_ANSWER=x gate --full >/dev/null || fail "check.sh --full failed with .stryker-tmp as a link"
+[ -e "$t/stryker-away/a" ] || fail "check.sh --full emptied what a link named .stryker-tmp leads to"
+fi
+
+# Vitest does not bench what a StrykerJS sandbox holds: on a copy of the config, a bench in .stryker-tmp is not measured. Only a
+# bench is reachable: the projects' includes (`app/src/**`, `packages/*/src/**`, `server/src/**`) are anchored at the root and
+# match nothing under .stryker-tmp, with or without the exclusion (a `vitest list` check passed with it removed); BENCHES is a
+# `**` glob, which does.
+if part vitest_stryker; then
+vt="$t/vt"
+mkdir -p "$vt/lint" "$vt/app/tests/bench" "$vt/.stryker-tmp/sandbox-1/app/tests/bench" "$vt/.stryker-tmp/sandbox-1/app/src"
+cp "$here/../vitest.config.ts" "$here/../.node-version" "$vt/" && cp "$here/../lint/shared.config.ts" "$vt/lint/" && cp "$here/../app/vitest.compiled.config.ts" "$vt/app/"
+ln -s "$here/../node_modules" "$vt/node_modules" && ln -s "$here/../app/node_modules" "$vt/app/node_modules"
+printf 'import { bench } from "vitest";\nbench("kept [1000 ms]", () => {});\n' >"$vt/app/tests/bench/ok.bench.ts"
+printf 'import { bench } from "vitest";\nbench("stale [1000 ms]", () => {});\n' >"$vt/.stryker-tmp/sandbox-1/app/tests/bench/x.bench.ts"
+printf 'import { test, expect } from "vitest";\ntest("stale", () => { expect(1).toBe(1); });\n' >"$vt/.stryker-tmp/sandbox-1/app/src/stale.test.ts"
+nodebin="${NVM_DIR:-$HOME/.nvm}/versions/node/v$(cat "$here/../.node-version")/bin"
+(cd "$vt" && PATH="$nodebin:$PATH" node node_modules/vitest/vitest.mjs bench --run --project node --outputJson "$vt/bench.json") >"$vt/bench.out" 2>&1 || fail "vitest bench failed on the copy of the config: $(tail -5 "$vt/bench.out")"
+grep -q "kept" "$vt/bench.json" || fail "vitest bench did not measure the bench beside the config: $(tail -5 "$vt/bench.out")"
+grep -q "stale" "$vt/bench.json" && fail "vitest bench measured a bench a StrykerJS sandbox left in .stryker-tmp (5n: Cmd-K at 27 to 41 ms instead of 2 to 4)"
+:
+fi
+
+# F2414: the staged copy's lint once reported "14683 problems" and passed on retry; its first output was not kept. The one
+# cause found by reading: borrow_node_modules.sh copies every node_modules folder it finds, those of a StrykerJS sandbox
+# in .stryker-tmp too. This is hygiene, NOT the cause's proof: planted in such a copy, a sandbox's node_modules did not make
+# `eslint --max-warnings 0 .` report anything (eslint.config.ts includes .gitignore, which names .stryker-tmp/). The ledger
+# row stays `asked`; no test here reproduces "14683 problems".
+if part borrow; then
+b="$t/borrow" && mkdir -p "$b/src/node_modules/pkg" "$b/src/app/node_modules/@x" "$b/src/.stryker-tmp/sandbox-1/node_modules/pkg" "$b/src/.stryker-tmp/sandbox-1/app/node_modules/@x" "$b/copy"
+printf 'x\n' >"$b/src/node_modules/pkg/i.js" && printf 'x\n' >"$b/src/.stryker-tmp/sandbox-1/node_modules/pkg/i.js"
+(cd "$b/src" && sh "$here/borrow_node_modules.sh" "$b/copy") || fail "borrow_node_modules.sh failed"
+[ -e "$b/copy/node_modules/pkg/i.js" ] && [ -d "$b/copy/app/node_modules" ] || fail "borrow_node_modules.sh did not borrow the packages"
+[ ! -e "$b/copy/.stryker-tmp" ] || fail "borrow_node_modules.sh copied a StrykerJS sandbox into the staged copy (F2414): $(find "$b/copy/.stryker-tmp" -maxdepth 2 | head -5)"
+fi
+
 if part guard; then
 # guard: no git hook skipped, no forced push, gno only through gnomcp. Exit 2 blocks the call.
 gd="$here"/guard.py

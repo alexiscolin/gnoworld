@@ -143,6 +143,13 @@ declare it first, on an empty commit if need be. The staged copy has no git, so 
 `check_regressions.py` in the repository (it reads the working tree, not the index: a test staged in part is judged as it is
 on disk), and `check.sh` runs it in a repository only. Neither runs in a merge commit, whose full gate follows.
 
+**StrykerJS's sandboxes** (harness-b): a run cut short leaves `.stryker-tmp/`, which Vitest's bench project once measured
+(5n: Cmd-K at 27 to 41 ms instead of 2 to 4). `vitest.config.ts` leaves `**/.stryker-tmp/**` out of its benches (only a bench
+could reach the folder: the projects' includes are anchored at the root), `check.sh --full` empties the folder before
+StrykerJS starts (a link of that name is removed, never followed), and `borrow_node_modules.sh` copies nothing of it into
+pre-commit's staged copy. That last one is hygiene, not a proven cause of F2414 (the staged copy's lint that once reported
+14,683 problems): planted in such a copy, a sandbox's `node_modules` did not make ESLint report anything.
+
 `GATE_BUDGET` may lower the budget, never raise it. A merge commit has none (F2071): the full
 gate follows every merge. A run past its budget that passed still passes (Alexis, 2026-10-30:
 refusing it made agents run it again and again): it says so and is written, with its time and the
