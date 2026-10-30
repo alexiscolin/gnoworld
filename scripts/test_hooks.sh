@@ -2718,17 +2718,18 @@ py() { (cd "$g" && python3 -I scripts/journeys.py "$@" 2>&1 | sort | paste -sd' 
 [ "$(py app/src/features/world/w.test.ts)" = all ] || fail "journeys.py scoped a change of test files alone to nothing"
 [ "$(py app/tests/e2e/gone.spec.ts-snapshots/a.png)" = all ] || fail "journeys.py placed a picture of a spec that does not exist"
 [ "$(py app/src/lib/shared.ts app/src/routes/eco.tsx app/src/routes/notFound.tsx)" = all ] || fail "journeys.py listed every journey instead of saying 'all'"
-# A list of routes it cannot read is no list: every journey. One variant each, so each refusal is tried alone.
-routes_say_all() { # $1: what routes.ts holds, $2: what it is
-	printf '%s\n' "$1" >"$g/app/src/routes.ts"
+# A list of routes it cannot read is no list: every journey. The fixture's own list with one thing added, so that what it
+# reads alone would still place the change and only the refusal of that thing gives 'all'.
+routes_say_all() { # $1: what is added to the list, $2: what it is
+	sed "s|^export default \[|export default [$1, |" "$g/app/src/routes.ts" >"$g/routes.new" && mv "$g/routes.new" "$g/app/src/routes.ts"
 	[ "$(py app/src/features/world/w.ts)" = all ] || fail "journeys.py placed a change by a routes.ts with $2, which it does not read: $(py app/src/features/world/w.ts)"
 	reset
 }
-routes_say_all 'export default [layout("l.tsx"), index("routes/home.tsx")];' "a layout"
-routes_say_all 'export default [prefix("p", [index("routes/home.tsx")])];' "a prefix"
-routes_say_all 'export default [route("a", "routes/world.tsx", [route("b", "routes/home.tsx")])];' "routes nested in a route"
-routes_say_all 'export default [index("routes/home.tsx"), route("w/:world?", "routes/world.tsx")];' "an optional segment"
-routes_say_all 'export default [index("routes/home.tsx"), route(prefix + "x", "routes/world.tsx")];' "a path that is no literal"
+routes_say_all 'layout("l.tsx")' "a layout"
+routes_say_all 'prefix("p")' "a prefix"
+routes_say_all 'route("a", "routes/eco.tsx", [route("b", "routes/special.tsx")])' "routes nested in a route"
+routes_say_all 'route("x/:y?", "routes/eco.tsx")' "an optional segment"
+routes_say_all 'route(prefix + "x", "routes/eco.tsx")' "a path that is no literal"
 # An import it cannot follow in a file some page loads: every journey, whatever else changed.
 printf 'export const more = (n) => import(n);\n' >>"$g/app/src/features/home/h.ts"
 [ "$(py app/src/features/world/w.ts)" = all ] || fail "journeys.py placed a change beside an import() with no literal, which it cannot follow"
