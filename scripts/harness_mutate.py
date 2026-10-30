@@ -134,6 +134,8 @@ def scoping_mutants():
         ("if path not in loaded:\n            return None", "if False:\n            return None", "runs every journey on a file no page loads"),
         ("| unplaced\n", "\n", "runs the journeys it cannot place on every change"),
         ("if opaque or not urls:", "if False:", "cannot place a journey whose page is not a literal"),
+        ("*(OTHER_GO.finditer(text) if own else ())", "*()", "places a journey by its gotos alone, not by a request or a location it sets"),
+        ("OTHER_GO.finditer(text) if own else ()", "OTHER_GO.finditer(text)", "reads a helper's request through a variable as a journey's page"),
         ("    if graph.opaque:\n        return None\n", "", "gives up on an import it cannot follow"),
         (r"(?:from|import)\s*\(?", r"(?:from)\s*\(?", "follows an import() and a side-effect import"),
         ('os.path.join(base, "index" + e) for e in EXTENSIONS[1:]', "base for e in ()", "follows a directory's index"),

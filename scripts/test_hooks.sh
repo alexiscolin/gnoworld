@@ -2670,7 +2670,7 @@ printf 'export const b = 1;\n' >"$g/app/src/features/barrel/b.ts"
 printf 'export const shared = 1;\n' >"$g/app/src/lib/shared.ts"
 printf 'export const deep = 1;\n' >"$g/app/src/lib/deep.ts"
 printf 'export type T = number;\n' >"$g/app/src/lib/types.ts"
-printf 'export const helper = 1;\n' >"$g/app/tests/e2e/fixtures.ts"
+printf 'export const helper = 1;\nexport const ping = (page, p) => page.request.get(p);\n' >"$g/app/tests/e2e/fixtures.ts"
 printf 'export const go = (page, p) => page.goto(p);\n' >"$g/app/tests/e2e/nav.ts"
 printf 'export const SITE = "http://127.0.0.1:1";\n' >"$g/app/tests/e2e/sites.ts"
 printf 'import { helper } from "./fixtures.ts";\ntest("home", async ({ page }) => { await page.goto("/"); helper; });\n' >"$g/app/tests/e2e/home.spec.ts"
@@ -2681,6 +2681,11 @@ printf 'test("var", async ({ page }) => { const somePath = "/w/" + String(1); aw
 printf 'test("eco", async ({ page }) => { await page.goto("/e/x"); });\n' >"$g/app/tests/e2e/eco.spec.ts"
 printf 'test("tpl", async ({ page }) => { const x = "a"; await page.goto(`/w/${x}`); await page.goto(`${SITE}/`); });\n' >"$g/app/tests/e2e/tpl.spec.ts"
 printf 'test("prefix", async ({ page }) => { await page.goto(`${prefix}/w/a`); });\n' >"$g/app/tests/e2e/prefix.spec.ts"
+# A spec that goes to a page by a request or a location, not by goto (F2575; csp.spec.ts asks every page for its policy): a literal
+# places it, a variable cannot; a helper's request through a variable stays out of it (irc.ts and fixtures.ts ask for non-page URLs).
+printf 'test("loop", async ({ page, request }) => { await page.goto("/"); for (const p of paths) await request.get(p); });\n' >"$g/app/tests/e2e/loop.spec.ts"
+printf 'test("lit", async ({ page, request }) => { await page.goto("/"); await request.get("/e/x"); });\n' >"$g/app/tests/e2e/lit.spec.ts"
+printf 'test("loc", async ({ page }) => { await page.goto("/"); await page.evaluate(() => { location.href = "/w/special"; }); });\n' >"$g/app/tests/e2e/loc.spec.ts"
 printf 'import { go } from "./nav.ts";\ntest("helper", async ({ page }) => { await go(page, "/w/b"); });\n' >"$g/app/tests/e2e/viaHelper.spec.ts"
 printf 'png\n' >"$g/app/tests/e2e/home.spec.ts-snapshots/a-chromium.png"
 printf 'serve\n' >"$g/app/tests/e2e/serve.mjs"
@@ -2689,13 +2694,13 @@ git -C "$g" add -A && git -C "$g" commit -qm "a small app" && git -C "$g" update
 # What check.sh gave Playwright after its options (a name may hold a space); the plain names, sorted, on one line.
 journeys_raw() { sed -n 's/^playwright .* --reporter=dot,json *//p' "$log"; }
 journeys_ran() { journeys_raw | tr ' ' '\n' | grep . | sort | paste -sd' ' -; }
-e2e=app/tests/e2e home=$e2e/home.spec.ts world=$e2e/world.spec.ts net=$e2e/net.spec.ts varnav=$e2e/varnav.spec.ts viaHelper=$e2e/viaHelper.spec.ts eco=$e2e/eco.spec.ts tpl=$e2e/tpl.spec.ts prefix=$e2e/prefix.spec.ts
+e2e=app/tests/e2e home=$e2e/home.spec.ts world=$e2e/world.spec.ts net=$e2e/net.spec.ts varnav=$e2e/varnav.spec.ts viaHelper=$e2e/viaHelper.spec.ts eco=$e2e/eco.spec.ts tpl=$e2e/tpl.spec.ts prefix=$e2e/prefix.spec.ts loop=$e2e/loop.spec.ts lit=$e2e/lit.spec.ts loc=$e2e/loc.spec.ts
 # The odd one: a space, a plus and parentheses in its name, which Playwright reads as a regular expression. It goes to a path
 # only the splat matches.
 odd_arg="$e2e/odd name\\+\\(1\\).spec.ts"
 # Journeys the scoping cannot place: a variable, a helper that goes to one, a template whose start is no origin. They run on every
 # change of the app. tpl goes to /w/<something> and to the site's own root: every route it can mean.
-unplaced="$varnav $viaHelper $prefix"
+unplaced="$varnav $viaHelper $prefix $loop"
 sorted() { printf '%s\n' "$@" | sort | paste -sd' ' -; }
 # places: $1 a path changed, then the journeys check.sh must run (empty: all of them).
 places() {
@@ -2709,7 +2714,7 @@ places() {
 # scripts/journeys.py itself: the paths of the journeys a list of changed paths can reach, one a line, or `all`.
 py() { (cd "$g" && python3 -I scripts/journeys.py "$@" 2>&1 | sort | paste -sd' ' -); }
 [ "$(py app/src/features/world/w.ts)" = "$(sorted $world $net $tpl $unplaced)" ] || fail "journeys.py did not place a world feature in the world's journeys and the ones it cannot place alone: $(py app/src/features/world/w.ts)"
-[ "$(py app/src/lib/shared.ts)" = "$(sorted $home $world $net $tpl $unplaced)" ] || fail "journeys.py did not place a file both pages load in both pages' journeys: $(py app/src/lib/shared.ts)"
+[ "$(py app/src/lib/shared.ts)" = "$(sorted $home $lit $loc $world $net $tpl $unplaced)" ] || fail "journeys.py did not place a file both pages load in both pages' journeys: $(py app/src/lib/shared.ts)"
 [ "$(py app/src/lib/unloaded.ts)" = all ] || fail "journeys.py did not say 'all' for a file no page loads"
 [ "$(py app/src/features/world/w.ts server/src/a.ts)" = all ] || fail "journeys.py scoped a list that holds a path outside the app"
 [ "$(py app/src/features/world/gone.ts)" = all ] || fail "journeys.py placed a file that does not exist (a deleted one)"
@@ -2743,23 +2748,23 @@ budget_of() { reset; for f in "$@"; do mkdir -p "$g/$(dirname "$f")" && printf '
 # A route's change runs its journeys only; so does a feature it loads, and a journey's own file or picture.
 places app/src/features/world/w.ts $world $net $tpl $unplaced
 places app/src/routes/world.tsx $world $net $tpl $unplaced
-places app/src/routes/home.tsx $home $tpl $unplaced
-places app/src/features/home/h.ts $home $tpl $unplaced
+places app/src/routes/home.tsx $home $lit $loc $tpl $unplaced
+places app/src/features/home/h.ts $home $lit $loc $tpl $unplaced
 places app/tests/e2e/world.spec.ts $world
 places "app/tests/e2e/home.spec.ts-snapshots/a-chromium.png" $home
 # The graph is followed past one hop, through a lazy import(), a re-export, a directory's index, a type import and a stylesheet.
-places app/src/lib/shared.ts $home $world $net $tpl $unplaced
-places app/src/lib/deep.ts $home $world $net $tpl $unplaced
+places app/src/lib/shared.ts $home $lit $loc $world $net $tpl $unplaced
+places app/src/lib/deep.ts $home $lit $loc $world $net $tpl $unplaced
 places app/src/features/world/w.css $world $net $tpl $unplaced
 places app/src/features/realm/Realm.ts $world $net $tpl $unplaced
-places app/src/features/lazyhome/L.ts $home $tpl $unplaced
-places app/src/features/barrel/b.ts $home $tpl $unplaced
-places app/src/features/barrel/index.ts $home $tpl $unplaced
-places app/src/lib/types.ts $home $tpl $unplaced
+places app/src/features/lazyhome/L.ts $home $lit $loc $tpl $unplaced
+places app/src/features/barrel/b.ts $home $lit $loc $tpl $unplaced
+places app/src/features/barrel/index.ts $home $lit $loc $tpl $unplaced
+places app/src/lib/types.ts $home $lit $loc $tpl $unplaced
 # A static route beats a parameter's for a literal URL, and a template's ${} may mean either: special.tsx runs the template's journey
 # and the unplaced ones; world.tsx (a parameter's) also runs it; eco.tsx, another prefix, runs its own.
-places app/src/routes/special.tsx $tpl $unplaced
-places app/src/routes/eco.tsx $eco $unplaced
+places app/src/routes/special.tsx $tpl $loc $unplaced
+places app/src/routes/eco.tsx $eco $lit $unplaced
 # A path only the splat matches: its route's file places it; the name goes whole, its regular-expression characters escaped.
 reset
 printf 'y\n' >>"$g/app/src/routes/notFound.tsx"
@@ -2771,7 +2776,7 @@ grep -qF -- "$odd_arg" "$log" || fail "check.sh did not give Playwright the odd 
 reset
 printf 'y\n' >>"$g/app/src/features/world/w.ts" && printf 'y\n' >>"$g/app/src/features/home/h.ts" && printf 'y\n' >>"$g/app/src/routes/home.tsx"
 gate >/dev/null || fail "check.sh failed on two routes' changes"
-[ "$(journeys_ran)" = "$(sorted $home $world $net $tpl $unplaced)" ] || fail "check.sh gave the journeys '$(journeys_ran)' on a change of two routes"
+[ "$(journeys_ran)" = "$(sorted $home $lit $loc $world $net $tpl $unplaced)" ] || fail "check.sh gave the journeys '$(journeys_ran)' on a change of two routes"
 # A change the scoping cannot place runs every journey: a helper the journeys share, the file server, the routes' list, the
 # journeys' config, a file no page loads, a file deleted.
 for f in app/src/lib/rootLib.ts app/src/root.tsx app/tests/e2e/fixtures.ts app/tests/e2e/nav.ts app/tests/e2e/serve.mjs app/tests/e2e/sites.ts app/src/routes.ts app/playwright.config.ts app/src/lib/unloaded.ts app/src/a.tsx; do

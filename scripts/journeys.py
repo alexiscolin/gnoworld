@@ -9,7 +9,8 @@ import and stylesheet. A changed file runs the journeys that reach it. What cann
 - a path outside app/src and the journeys' own folder (a config, a helper the journeys share, the file server, the server's
   code: the journeys start it), or a file no route loads (the routes' list, a deleted file), or one the root loads (every page does);
 - a routes' list that holds more than index() and route() calls with literal paths (a layout, nested routes, an optional segment).
-A journey whose URL is not a literal, or that goes to no URL, cannot be placed: it runs on every change of the app. What a
+A journey whose URL is not a literal, or that goes to no URL, cannot be placed (a request.get() or a location.href = in the
+spec's own file counts as a goto; a helper's does not): it runs on every change of the app. What a
 journey reaches by a click, a link or a redirect after its first page is not followed: the merge check runs every journey.
 A comment in a changed file decides nothing; nothing here reads one."""
 import os
@@ -28,6 +29,8 @@ IMPORT = re.compile(r"""\b(?:from|import)\s*\(?\s*(["'])([^"'\n]+)\1""")
 # import(expr) with no literal, or a glob: what the graph cannot follow.
 OPAQUE = re.compile(r"""\bimport\s*\(\s*[^"'\s)]|\bimport\.meta\.glob""")
 GOTO = re.compile(r"\.goto\(\s*")
+# What else in a spec itself goes to a page: a request for it (csp.spec.ts asks every page for its policy) or a location set.
+OTHER_GO = re.compile(r"\brequest\.(?:get|head|post|put|fetch)\(\s*|\blocation\.href\s*=(?!=)\s*")
 SPEC = re.compile(r"\.(spec|test)\.[cm]?[jt]sx?$")
 TEST_FILE = re.compile(r"\.(test|bench|stories)\.tsx?$")  # never loaded by a page
 PROSE = re.compile(r"^(docs/|adr/)|\.md$")
@@ -152,10 +155,11 @@ def literal_at(text, at):
     return body if body.startswith("/") else None
 
 
-def urls_of(text):
-    """The paths a file goes to, and whether some goto() it holds has none (a variable, a call, a full URL)."""
+def urls_of(text, own=False):
+    """The paths a file goes to, and whether some goto() it holds has none (a variable, a call, a full URL). A spec's own file
+    also goes by request.get() and location.href = (F2575); a helper's does not: irc.ts and fixtures.ts request non-page URLs."""
     urls, opaque = set(), False
-    for m in GOTO.finditer(text):
+    for m in (*GOTO.finditer(text), *(OTHER_GO.finditer(text) if own else ())):
         url = literal_at(text, m.end())
         if url is None:
             opaque = True
@@ -181,7 +185,7 @@ def journeys(changed):
         files, urls, opaque = graph.closure(spec), set(), False
         for f in files:
             if f.startswith(E2E + "/"):
-                found, bad = urls_of(read(f) or "")
+                found, bad = urls_of(read(f) or "", f == spec)
                 urls |= found
                 opaque = opaque or bad
         if opaque or not urls:

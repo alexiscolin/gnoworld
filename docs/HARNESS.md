@@ -124,8 +124,8 @@ route loads what it imports, followed through every `import`, `import()`, re-exp
 A journey's own spec, or the approved pictures beside it, run that journey alone. What the scoping cannot place
 runs every journey: a path outside `app/src` and the journeys' specs (a config, a helper the journeys share, `serve.mjs`,
 `server/src`, which the journeys start), the routes' list, a file no route loads, one every page loads (`root.tsx`),
-a file deleted, a `routes.ts` with a `layout()`. A journey whose `goto` is not a literal path (a variable, a helper's
-argument) cannot be placed and runs on every change of the app; a template's `${...}` in the path means any one segment,
+a file deleted, a `routes.ts` with a `layout()`. A journey whose `goto`, or `request.get()`/`location.href =` in its own spec file (F2575), is not a literal path
+(a variable, a helper's argument) cannot be placed and runs on every change of the app; a template's `${...}` in the path means any one segment,
 and one at its start stands for the site's origin only when it is named `site`, `origin`, `base` or `host`. A test of
 the app (`.test.ts(x)`, `.bench`, `.stories`) is no change of the pages. What a journey reaches by a click, a link or
 a redirect after its first page is not followed, and a `journeys.py` that fails fails the gate. `--full`, `--merge`
