@@ -52,11 +52,13 @@ const setup = (
     provider,
     tickMs,
     session,
+    redactRetryMs,
   }: {
     now?: () => number;
     provider?: (text: string) => Promise<Answer | "unchecked">;
     tickMs?: number;
     session?: (token: string | undefined) => string | undefined;
+    redactRetryMs?: number;
   } = {},
 ) => {
   const db = openDatabase(":memory:", [
@@ -75,6 +77,7 @@ const setup = (
     ...(provider === undefined ? {} : { provider }),
     ...(tickMs === undefined ? {} : { tickMs }),
     ...(session === undefined ? {} : { session }),
+    ...(redactRetryMs === undefined ? {} : { redactRetryMs }),
   };
   const chat = startChat(db, settings, options);
   started.push({ db, chat });
@@ -435,6 +438,103 @@ describe("the chat, as the server starts it", () => {
         { msgid: "m1", room: "#bubble", state: "hidden" },
         { msgid: "m2", room: "#bubble", state: "checked" },
       ]);
+    });
+
+    // F2462: Ergo relays a room's line to its members, then writes it into its history (channel.go:1418, then 1424),
+    // so a REDACT sent at once on the line just read can reach it first and be refused UNKNOWN_MSGID: the id is then
+    // not yet known, not gone. Nothing was hidden, and the line stays seen by everyone.
+    const HIDE = "REDACT #bubble m1 :a word this world bans";
+    const unknown = (id: string) =>
+      `:ergo.test FAIL REDACT UNKNOWN_MSGID #bubble ${id} :This message does not exist or is too old`;
+    const hides = (peer: { lines: string[] }) => peer.lines.filter((l) => l.startsWith("REDACT"));
+    // The retry waits 20 ms here; 200 ms is ten times that, so a retry still to come would have come.
+    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+    const RETRY = { redactRetryMs: 20 };
+    const quiet = async (peer: Parameters<typeof settle>[0]) => {
+      await sleep(200);
+      await settle(peer);
+    };
+
+    it(
+      "hides a line again when Ergo refuses its first REDACT as UNKNOWN_MSGID, the line not yet in its history (F2462)",
+      { timeout: 5000 },
+      async () => {
+        const { peer } = await linked({ worlds: worlds("bubble"), moderation: OFF }, RETRY);
+        peer.say(line("m1", 1, ["g1a", "buy spam"]));
+        expect(await peer.next(/^REDACT /)).toBe(HIDE);
+        peer.say(unknown("m1"));
+        expect(await peer.next(/^REDACT /)).toBe(HIDE);
+      },
+    );
+
+    it("asks no third time once Ergo has taken the hide the second time (F2462)", { timeout: 5000 }, async () => {
+      const { peer } = await linked({ worlds: worlds("bubble"), moderation: OFF }, RETRY);
+      peer.say(line("m1", 1, ["g1a", "buy spam"]));
+      await peer.next(/^REDACT /);
+      peer.say(unknown("m1"));
+      await peer.next(/^REDACT /);
+      peer.say(":gnoworld!u@h REDACT #bubble m1 :a word this world bans");
+      await quiet(peer);
+      expect(hides(peer)).toEqual([HIDE, HIDE]);
+    });
+
+    it("tells the author once and counts one strike for a line hidden twice (F2462)", { timeout: 5000 }, async () => {
+      const mute = { ...MUTE, strikes: 2 };
+      const { peer } = await linked({ worlds: worlds("bubble"), moderation: { ...OFF, mute } }, RETRY);
+      peer.say(line("m1", 1, ["g1a", "buy spam"]));
+      await peer.next(/^REDACT /);
+      peer.say(unknown("m1"));
+      await peer.next(/^REDACT /);
+      await quiet(peer);
+      expect(hides(peer)).toHaveLength(2);
+      expect(sent(peer).filter((l) => l.startsWith("NOTICE"))).toHaveLength(1);
+      // Two strikes mute: the line counted once leaves the author free to speak.
+      expect(peer.lines.filter((l) => MUTE_LINE.test(l))).toEqual([]);
+    });
+
+    it(
+      "gives up after three more asks for a line Ergo never knows, with no alert (F2462)",
+      { timeout: 5000 },
+      async () => {
+        const { peer } = await linked({ worlds: worlds("bubble"), moderation: OFF }, RETRY);
+        peer.say(line("m1", 1, ["g1a", "buy spam"]));
+        for (let i = 0; i < 4; i++) {
+          await peer.next(/^REDACT /);
+          peer.say(unknown("m1"));
+        }
+        await quiet(peer);
+        // The first ask and three more: four, never a fifth.
+        expect(hides(peer)).toHaveLength(4);
+        expect(logged.filter((l) => l.includes("redact_refused"))).toEqual([]);
+      },
+    );
+
+    it("asks again only for the line Ergo named (F2462)", { timeout: 5000 }, async () => {
+      const { peer } = await linked({ worlds: worlds("bubble"), moderation: OFF }, RETRY);
+      peer.say(line("m1", 1, ["g1a", "buy spam"]));
+      peer.say(line("m2", 2, ["g1b", "buy spam"]));
+      await peer.next(/^REDACT #bubble m1 /);
+      await peer.next(/^REDACT #bubble m2 /);
+      peer.say(unknown("m2"));
+      await quiet(peer);
+      expect(hides(peer)).toEqual([HIDE, HIDE.replace("m1", "m2"), HIDE.replace("m1", "m2")]);
+    });
+
+    it("sends no hide for a refusal about a line it never hid (F2462)", { timeout: 5000 }, async () => {
+      const { peer } = await linked({ worlds: worlds("bubble"), moderation: OFF }, RETRY);
+      peer.say(unknown("m9"));
+      await quiet(peer);
+      expect(hides(peer)).toEqual([]);
+    });
+
+    it("does not ask again for a hide Ergo forbids, and raises the alert (F2462)", { timeout: 5000 }, async () => {
+      const { peer } = await linked({ worlds: worlds("bubble"), moderation: OFF }, RETRY);
+      peer.say(line("m1", 1, ["g1a", "buy spam"]));
+      await peer.next(/^REDACT /);
+      peer.say(":ergo.test FAIL REDACT REDACT_FORBIDDEN #bubble m1 :You are not authorized to delete this message");
+      await quiet(peer);
+      expect(hides(peer)).toEqual([HIDE]);
+      expect(logged.filter((l) => l.includes("redact_refused"))).toHaveLength(1);
     });
 
     it("hides on a world's rule without asking the provider, in the rule's own words", async () => {

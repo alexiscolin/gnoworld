@@ -40,6 +40,8 @@ export interface Options {
   onRedact?: (room: string, msgid: string) => void;
   // How long a line asked for by its id may take to come (4d).
   lineMs?: number;
+  // How long after a hide Ergo does not know the line yet it is asked again (F2462).
+  redactRetryMs?: number;
 }
 
 // The lines Ergo sends that ask for an answer, as 3b's table found them.
@@ -47,6 +49,7 @@ export function reader(options: Options, state: State) {
   const { password, rooms, onMessage, log, lastChecked = () => undefined, onReady = () => undefined } = options;
   const { drained = () => Promise.resolve(), onChannels, onJoin = () => undefined } = options;
   const { hold = () => undefined, onIn = () => undefined, onRedact = () => undefined } = options;
+  const { redactRetryMs = 250 } = options;
   const pages = histories({ lastChecked, hold, drained }, state);
   // A refusal Ergo will not change by itself: log it, and try again later and later.
   const refused = (s: Socket, error: string): void => {
@@ -101,12 +104,22 @@ export function reader(options: Options, state: State) {
     // A hide Ergo refused (F544): the verdict says hidden, the line stays; ops hears of it. A line its author
     // deleted first is not one: Ergo knows its id no more. A refused page of history is history.ts's.
     FAIL: (s, message) => {
-      if (message.params[0] === "REDACT" && message.params[1] !== "UNKNOWN_MSGID")
+      const [command, code, room = "", msgid = ""] = message.params;
+      if (command === "REDACT" && code === "UNKNOWN_MSGID") {
+        // Not yet in Ergo's history, or gone: a hide of ours is asked again a few times, then let go (F2462).
+        state.redacts.unknown(room, msgid, {
+          send: (params) => s.write(line("REDACT", params)),
+          ms: redactRetryMs,
+        });
+      } else if (command === "REDACT") {
+        state.redacts.done(room, msgid);
         log("alert", { error: "redact_refused" });
+      }
       pages.handlers["FAIL"]?.(s, message);
     },
     // A line taken from one of its rooms, whoever took it, the bot's own hide included (draft/message-redaction).
     REDACT: (_, { params: [room = "", msgid = ""] }) => {
+      state.redacts.done(room, msgid);
       if (state.joined.has(room) && msgid !== "") onRedact(room, msgid);
     },
     PING: (s, { params }) => s.write(line("PONG", params)),

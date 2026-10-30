@@ -71,6 +71,8 @@ interface Options {
   reconcileMs?: number;
   // The account of a session's token (login.ts's session), for the rooms a reader may see.
   session?: (token: string | undefined) => string | undefined;
+  // How long after a refused hide (the line not yet in Ergo's history) it is asked again (F2462).
+  redactRetryMs?: number;
 }
 
 interface Steps {
@@ -195,6 +197,7 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
           lastChecked: progress.last,
           hold: progress.hold,
           drained: () => queue.idle(),
+          ...(options.redactRetryMs === undefined ? {} : { redactRetryMs: options.redactRetryMs }),
           onReady: () => {
             reconciler.flags();
             mutes.reapply();
