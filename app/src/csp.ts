@@ -3,6 +3,8 @@
 // scripts in each pre-rendered page, so the build allows exactly those, by their SHA-256 (F341).
 import { formOf } from "./cspForms.ts";
 
+import { connectSrc, originsOf } from "./cspOrigins.ts";
+
 const SCRIPT_SRC = "script-src 'self'";
 const DIRECTIVES = [
   // Covers every directive not named below, object-src among them.
@@ -24,17 +26,20 @@ const DIRECTIVES = [
   "frame-ancestors 'none'",
 ];
 
-// A page's policy holds its own scripts' hashes alone (5f): five a page, some 600 characters whatever the number of pages.
-// One policy for all of them took some 7 worlds under Cloudflare Pages' 2,000-character line; its 100 rules take about 20
-// worlds (F2452). A page's JSON-LD (5e) is a data block and has no hash.
-export function policy(hashes: readonly string[]): string {
+// A page's policy holds its own scripts' hashes alone (5f), and the RPC origins connect-src names (5g, cspOrigins.ts): about 600
+// characters a page, some 20 worlds under Cloudflare Pages' 2,000-character line and 100 rules (F2452). A page's JSON-LD (5e)
+// is a data block and has no hash.
+export function policy(hashes: readonly string[], origins: readonly string[] = []): string {
   for (const hash of hashes) {
     if (!/^'sha256-[A-Za-z0-9+/]{43}='$/.test(hash)) throw new RangeError(`csp: ${hash} is no SHA-256 source`);
   }
   // Code units, not a locale's order: every machine writes the same policy.
   const scripts = [...new Set(hashes)].sort();
   const script = [SCRIPT_SRC, ...scripts].join(" ");
-  return DIRECTIVES.map((directive) => (directive === SCRIPT_SRC ? script : directive)).join("; ");
+  const connect = connectSrc(origins);
+  return DIRECTIVES.map((directive) =>
+    directive === SCRIPT_SRC ? script : directive.startsWith("connect-src") ? connect : directive,
+  ).join("; ");
 }
 
 // The guards below are built inside functions, never as module-level constants: StrykerJS leaves a module-level constant
@@ -92,19 +97,26 @@ function refused(tag: string): boolean {
   );
 }
 
+// A page's markup, scripts aside (a script's text is no markup), holds no tag the policy would refuse.
+function refuseMarkup(page: string): void {
+  const markup = page.replace(scriptTags(), "");
+  for (const [tag = ""] of markup.matchAll(new RegExp(`<[a-z]${attributesSource()}>`, "gi"))) {
+    if (refused(tag)) throw new Error(`csp: a page holds ${tag.slice(0, 40)}, which the policy refuses`);
+  }
+}
+
 // The policy of each built page (a key is its file under build/client), holding its own scripts' hashes alone; the build stops
 // on a page the policy would break in the browser, or on a script that is none of React Router's, rather than ship it.
-export async function pagePolicies(pages: Readonly<Record<string, string>>): Promise<Record<string, string>> {
+export async function pagePolicies(
+  pages: Readonly<Record<string, string>>,
+  origins: readonly string[] = [],
+): Promise<Record<string, string>> {
   const files = Object.keys(pages).sort();
   if (files.length === 0) throw new Error("csp: the build holds no page");
   const policies: Record<string, string> = {};
   for (const file of files) {
     const page = pages[file] ?? "";
-    // A script's text is no markup.
-    const markup = page.replace(scriptTags(), "");
-    for (const [tag = ""] of markup.matchAll(new RegExp(`<[a-z]${attributesSource()}>`, "gi"))) {
-      if (refused(tag)) throw new Error(`csp: a page holds ${tag.slice(0, 40)}, which the policy refuses`);
-    }
+    refuseMarkup(page);
     const scripts = inlineScripts(page);
     // F2450: each form once, in React Router's order (the fallback page has no scroll restoration): a second one, well formed,
     // is a planted script. A page that holds fewer is no harm.
@@ -121,7 +133,7 @@ export async function pagePolicies(pages: Readonly<Record<string, string>>): Pro
         );
       last = form;
     }
-    policies[file] = policy(await Promise.all(scripts.map(sha256)));
+    policies[file] = policy(await Promise.all(scripts.map(sha256)), origins);
   }
   return policies;
 }
@@ -188,15 +200,19 @@ function refuseRules(rules: number, cap: number): void {
 }
 
 // The policy of a path no page names (F2451): a host without a 404 page answers it with the home, one with the fallback
-// answers it with that, so it names the scripts of both, and of nothing else.
+// answers it with that, so it names the scripts of both and their connect origins, and nothing else.
 function anywhere(policies: Readonly<Record<string, string>>): string {
   const documents = ["index.html", "__spa-fallback.html"];
-  return policy(documents.flatMap((name) => policies[name]?.match(/'sha256-[A-Za-z0-9+/]{43}='/g) ?? []));
+  const found = documents.map((name) => policies[name] ?? "");
+  return policy(
+    found.flatMap((csp) => csp.match(/'sha256-[A-Za-z0-9+/]{43}='/g) ?? []),
+    found.flatMap(originsOf),
+  );
 }
 
 // The policies as `_headers` takes them (the catch-all `/*` first; every other rule detaches it, then sets its own), and as
-// nginx's map of the answer's path: a page has its own, any other nginx answer the bare one. `workers` are the files that run
-// as a worker (the service worker's script): a _headers host gives each the bare policy.
+// nginx's map of the answer's path: a page has its own, any other answer the bare one, as does each of `workers` (the service
+// worker's script): they fetch no RPC, so 'self' alone (docs/decisions.md, 2026-10-31).
 export function outputs(
   policies: Readonly<Record<string, string>>,
   workers: readonly string[] = [],

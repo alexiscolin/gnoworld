@@ -209,6 +209,37 @@ test.describe("a planted violation", () => {
     await expect.poll(() => violations).toEqual(["frame-src", "frame-src", "frame-src"]);
   });
 
+  // 5g: connect-src names the data's RPC origins, so a fetch to one is let through (answered here, the test reaching no
+  // one) and the same fetch to any other https host is refused: what the browser enforces, not a header compared with itself (F461).
+  test("lets a fetch through to a listed RPC origin and refuses one to an unlisted https host, once", async ({
+    page,
+    violations,
+  }) => {
+    await page.route(/^https:\/\/rpc\.(?:gno\.land|onyx\.testnets\.gno\.land)\//, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        headers: { "access-control-allow-origin": "*" },
+        body: "{}",
+      }),
+    );
+    await page.goto("/");
+    await hydrated(page);
+    const reached = await page.evaluate(() =>
+      Promise.all(
+        ["https://rpc.gno.land/status", "https://rpc.onyx.testnets.gno.land/status"].map((url) =>
+          fetch(url).then(
+            () => "reached",
+            () => "refused",
+          ),
+        ),
+      ),
+    );
+    expect(reached).toEqual(["reached", "reached"]);
+    await plant(page, "fetch('https://rpc.evil.example/status').catch(() => undefined)");
+    await expect.poll(() => violations).toEqual(["connect-src"]);
+  });
+
   test("is reported from a second tab of the same context too", async ({ page, violations }) => {
     const other = await page.context().newPage();
     await other.goto("/");
