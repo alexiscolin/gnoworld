@@ -37,17 +37,16 @@
     font: var(--font-ui);
   }
 
-  .testnet {
-    /* layout: the tag stands off its network's name */
+  .caution {
+    /* layout: the warning icon and its chip on a line, off the network's name */
+    display: inline-flex;
+    /* layout: the icon and the chip share a middle */
+    align-items: center;
+    /* layout: a step between them, and off the name */
+    gap: var(--space-3xs);
+    /* layout: the group stands off its network's name */
     margin-inline-start: var(--space-2xs);
-    padding: var(--space-3xs) var(--space-2xs);
-    border: var(--line-width) solid var(--color-warm-line);
-    border-radius: var(--radius-pill);
-    background: var(--color-warm-soft);
     color: var(--color-warm);
-    font: var(--font-label);
-    letter-spacing: var(--tracking-caps);
-    text-transform: uppercase;
   }
 
   /* The views: a pill with its links, a bar over the page's foot on a phone. */

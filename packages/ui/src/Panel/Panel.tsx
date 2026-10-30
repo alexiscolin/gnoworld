@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Stack } from "../compositions/index.ts";
 import { Kicker } from "../Kicker/Kicker.tsx";
 import styles from "./Panel.module.css";
@@ -8,21 +8,15 @@ export interface PanelProps {
   label: string;
   /** Docked beside the scene, floating over it, or the plate of a world's page. */
   look?: "docked" | "floating" | "plate";
-  /** The plate's own colour, from the world's data: a hex colour, or none. */
-  tint?: string;
   /** The plate's vertical atlas caption, seen and never read; no other look has one. */
   caption?: string;
   children: ReactNode;
 }
 
-// A colour is all a tint may be: any other text would join the style attribute as a declaration of its own.
-const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
-
-/** A panel: a region with its header, body and footer; the plate adds the world's tint, its dot grid and its caption. */
-export function Panel({ label, look = "docked", tint, caption, children }: PanelProps) {
-  const own = tint !== undefined && HEX.test(tint) ? ({ "--world": tint } as CSSProperties) : undefined;
+/** A panel: a region with its header, body and footer; the plate adds its dot grid and its caption. */
+export function Panel({ label, look = "docked", caption, children }: PanelProps) {
   return (
-    <section className={styles["panel"]} aria-label={label} data-look={look} style={own}>
+    <section className={styles["panel"]} aria-label={label} data-look={look}>
       {look === "plate" && caption !== undefined ? (
         <div className={styles["caption"]} aria-hidden="true">
           <Kicker vertical>{caption}</Kicker>

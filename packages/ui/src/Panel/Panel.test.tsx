@@ -47,50 +47,13 @@ describe("Panel", () => {
   });
 
   describe("as the plate", () => {
-    it("carries the world's own colour as --world, and no colour when it has none", () => {
-      const { rerender } = render(
-        <Panel label="Bubble" look="plate" tint="#ff9c4a">
-          x
+    it("carries no style attribute: the policy refuses one on a page the build writes (csp.ts), so a colour comes by the sheet", () => {
+      const html = renderToStaticMarkup(
+        <Panel label="Bubble" look="plate" caption="gnoworld · hub atlas">
+          <Panel.Body>x</Panel.Body>
         </Panel>,
       );
-      const plate = () => screen.getByRole("region", { name: "Bubble" });
-      expect(plate().dataset["look"]).toBe("plate");
-      expect(plate().style.getPropertyValue("--world")).toBe("#ff9c4a");
-      rerender(
-        <Panel label="Bubble" look="plate">
-          x
-        </Panel>,
-      );
-      expect(plate().style.getPropertyValue("--world")).toBe("");
-    });
-
-    it("takes no declaration from a colour that is none: a tint with a semicolon or a url( is refused, whole", () => {
-      for (const tint of [
-        "red;background:url(//evil.example/x)",
-        "url(//evil.example/x)",
-        "#fff;x:y",
-        "var(--a)",
-        "",
-      ]) {
-        const html = renderToStaticMarkup(
-          <Panel label="Bubble" look="plate" tint={tint}>
-            x
-          </Panel>,
-        );
-        expect(html, tint).not.toMatch(/evil|url\(|background|--world/);
-      }
-    });
-
-    it("keeps the colours a world's data may hold: a hex colour of 3, 6 or 8 digits", () => {
-      for (const tint of ["#fa4", "#ff9c4a", "#ff9c4acc"]) {
-        expect(
-          renderToStaticMarkup(
-            <Panel label="Bubble" look="plate" tint={tint}>
-              x
-            </Panel>,
-          ),
-        ).toContain(`--world:${tint}`);
-      }
+      expect(html).not.toMatch(/\sstyle=|--world/);
     });
 
     it("shows its vertical caption to the eye only: no reader says it, and it is the one label style", () => {

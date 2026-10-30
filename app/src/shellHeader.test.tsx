@@ -20,6 +20,8 @@ const inShell = (Page: () => React.JSX.Element) => () => (
 const routes: Record<string, RouteObject> = {
   "/": { path: "/", Component: inShell(Home), loader: homeLoader },
   "/net/gnoland": { path: "/net/:network", Component: inShell(Home), loader: homeLoader },
+  "/net/onyx": { path: "/net/:network", Component: inShell(Home), loader: homeLoader },
+  "/net/onyx/earth": { path: "/net/:network/earth", Component: inShell(Earth), loader: earthLoader },
   "/earth": { path: "/earth", Component: inShell(Earth), loader: earthLoader },
   "/w/bubble": { path: "/w/:world", Component: inShell(World), loader: worldLoader },
   "/list": { path: "/list", Component: inShell(List) },
@@ -86,10 +88,31 @@ describe("the header", () => {
     expect(/<a [^>]*aria-current="page"[^>]*>(?:(?!<\/a>)[\s\S])*Cosmos/.test(cosmos)).toBe(true);
   });
 
+  // F3270: the addresses `canonical` and `og:url` publish are /net/onyx/ and /net/onyx/earth, and a person can arrive on them.
+  test.each([
+    ["/net/onyx/earth", "Earth"],
+    ["/net/onyx", "Cosmos"],
+  ])("%s, a canonical address, marks %s as the current view", async (path, view) => {
+    const html = await header(path);
+    expect(html.match(/aria-current="page"/g)).toHaveLength(1);
+    expect(new RegExp(`<a [^>]*aria-current="page"[^>]*>(?:(?!</a>)[\\s\\S])*${view}`).test(html)).toBe(true);
+  });
+
+  test("marks no view on a page that is none of them", async () => {
+    expect(await header("/w/bubble")).not.toContain("aria-current");
+  });
+
   test("names the network, and says Testnet on the default universe, Onyx, which is one (O4)", async () => {
     const html = await header("/");
     expect(html).toContain("Onyx");
     expect(html).toContain("Testnet");
+  });
+
+  // F3268: "Testnet" is a use of the static chip, in the caution tone with the warning icon (DESIGN-SYSTEM.md, "Severity").
+  test("says Testnet in the static chip, warm, with the warning icon beside it", async () => {
+    const html = await header("/");
+    expect(html).toMatch(/<span [^>]*data-tone="warm"[^>]*data-size="xs"[^>]*>Testnet<\/span>/);
+    expect(html).toMatch(/data-icon="warning"/);
   });
 
   test("says Testnet on a world of a testnet too, and not on a universe that is no testnet", async () => {
