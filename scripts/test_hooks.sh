@@ -3451,6 +3451,73 @@ git -C "$bs" checkout -q -f -b helpers "$base" && mkdir -p "$bs/server/src/testi
 out=$(size "$base") || fail "batch_size.py counted server/src/testing, a test helper's folder, as product code: $out"
 fi
 
+if part gate_survivors; then
+# The merge check prints every surviving mutant, pass or fail (F2359, F2409): the lane logs are shown only on failure, and
+# StrykerJS exits 0 with survivors (the config has no break threshold), so the Workflow loop's `survivors` was always empty. Each
+# survivor of StrykerJS's clear-text report (`[Survived] Kind` or `[NoCoverage] Kind`, then `path:L:C`) is printed by
+# `check.sh --merge` as one line `survivor: <path>: line L:C [Status] Kind`; a killed mutant is not.
+gate_fixture gate_survivors
+mkdir -p "$g/node_modules/vitest"
+printf 'import { spawnSync } from "node:child_process";\nprocess.exit(spawnSync("sh", [%s, "core_chromium", "switch=" + (process.env.CORE_CHROMIUM ?? ""), ...process.argv.slice(2)], { stdio: "inherit" }).status ?? 1);\n' "'$step'" >"$g/node_modules/vitest/vitest.mjs"
+base=$(git -C "$g" merge-base HEAD origin/main)
+printf 'z\n' >>"$g/server/src/a.ts" && git -C "$g" commit -qam "product code"
+cat >"$g/bin/survive" <<SH
+#!/bin/sh
+sh "$step" mutate "\$@" || exit \$?
+cat "$g/survivors.txt"
+SH
+python3 -I - "$g/package.json" "$g/bin/survive" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+d["scripts"]["mutate"] = f"sh {sys.argv[2]}"
+json.dump(d, open(sys.argv[1], "w"))
+PY
+git -C "$g" update-ref refs/remotes/origin/main HEAD~1
+# StrykerJS 10's clear-text report as clear-text-reporter.js writes it (reportMutantResult, colorSourceFileAndLocation; stryker.config.json
+# sets no reporters, so it is the default one, with no colour): `[Status] Mutator`, then `path:line:column`, the original lines
+# after `-   ` and the mutated after `+   `. A Killed mutant is only in the debug log, but a report holding one must not make a survivor.
+cat >"$g/survivors.txt" <<'TXT'
+
+[Killed] ConditionalExpression
+app/src/killed.ts:9:1
+-   if (y) {
++   if (false) {
+Killed by: a works
+
+[Survived] ConditionalExpression
+app/src/a.ts:3:5
+-   if (x) {
++   if (true) {
+Ran all tests for this mutant.
+
+[NoCoverage] StringLiteral
+server/src/b.ts:7:12
+-   "kept"
++   ""
+
+Ran 4.00 tests per mutant on average.
+TXT
+out=$(gate --merge) || fail "check.sh --merge failed with a surviving mutant, which StrykerJS does not fail on: $out"
+printf '%s\n' "$out" | grep -qE '^survivor: app/src/a\.ts: line 3:5 .*Survived.*ConditionalExpression' || fail "check.sh --merge did not print StrykerJS's survivor on a passing run: $out"
+printf '%s\n' "$out" | grep -qE '^survivor: server/src/b\.ts: line 7:12 .*NoCoverage.*StringLiteral' || fail "check.sh --merge did not print StrykerJS's NoCoverage mutant on a passing run: $out"
+printf '%s\n' "$out" | grep -q '^survivor: .*killed\.ts' && fail "check.sh --merge printed a killed mutant as a survivor: $out"
+[ "$(printf '%s\n' "$out" | grep -c '^survivor: ')" = 2 ] || fail "check.sh --merge did not print each survivor once: $out"
+# On a failing run too, once each (the failed lane's log is printed as well): a lane that runs beside or after the coverage lane fails.
+out=$(FAIL=py:harness_mutate gate --merge) && fail "check.sh --merge passed with its harness mutants failing"
+[ "$(printf '%s\n' "$out" | grep -c '^survivor: ')" = 2 ] || fail "check.sh --merge did not print the survivors once each when a lane failed: $out"
+# The coverage lane never ran (the history lane failed first, batch_size is in it): there is nothing to print, and it says so.
+out=$(FAIL=py:batch_size gate --merge) && fail "check.sh --merge passed with its batch size failing"
+printf '%s\n' "$out" | grep -q '^survivor: ' && fail "check.sh --merge printed a survivor though the coverage lane never ran: $out"
+# No survivor, no line.
+: >"$g/survivors.txt"
+out=$(gate --merge) || fail "check.sh --merge failed with no survivor: $out"
+printf '%s\n' "$out" | grep -q '^survivor: ' && fail "check.sh --merge printed a survivor when there was none: $out"
+# harness_mutate's survivors (`FAIL  survives: <mutant>`) are survivors too, on a merge that fails on them.
+printf 'import os, sys\nprint("FAIL  survives: planted spare2 #1")\nsys.exit(1)\n' >"$g/scripts/harness_mutate.py"
+out=$(gate --merge) && fail "check.sh --merge passed with a harness mutant surviving"
+printf '%s\n' "$out" | grep -q '^survivor: .*planted spare2 #1' || fail "check.sh --merge did not print a harness mutant's survivor as a survivor: $out"
+fi
+
 [ -z "${ONLY:-}" ] || [ "${ran:-}" = 1 ] || fail "ONLY=$ONLY names no section"
 echo "hooks: ok"
 finished=1

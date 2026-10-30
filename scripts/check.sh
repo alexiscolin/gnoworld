@@ -157,6 +157,24 @@ start() {
 	eval "pid_$lane=\$!"
 }
 seconds() { echo "$(($1 / 1000)).$(($1 % 1000 / 100))"; }
+# survivors <log>: every mutant that survived, as one line `survivor: <path>: line L:C [Status] Kind`, pass or fail (F2359, F2409: the
+# lanes' logs are shown only on failure, and StrykerJS exits 0 with survivors, so the Workflow loop never saw one). StrykerJS's
+# clear-text report (clear-text-reporter.js, v10) writes `[Survived] Kind` or `[NoCoverage] Kind`, then `path:line:column`;
+# harness_mutate.py writes `FAIL  survives: <mutant>`. A Killed mutant is neither.
+survivors() {
+	awk '
+	/^\[(Survived|NoCoverage)\] / { status = $1; gsub(/[][]/, "", status); kind = $0; sub(/^\[[A-Za-z]+\] /, "", kind); want = 1; next }
+	want && $0 ~ /^[^ :][^ ]*:[0-9]+:[0-9]+$/ {
+		n = split($0, part, ":")
+		path = substr($0, 1, length($0) - length(part[n]) - length(part[n - 1]) - 2)
+		print "survivor: " path ": line " part[n - 1] ":" part[n] " [" status "] " kind
+		want = 0
+		next
+	}
+	/^\[/ { want = 0 }
+	/^FAIL  survives: / { sub(/^FAIL  survives: /, ""); print "survivor: " $0 }
+	' "$1"
+}
 # finish <lane>...: waits for each lane, prints its time and its steps', then each failed one's output.
 finish() {
 	failed=
@@ -174,6 +192,7 @@ finish() {
 		done <"$logs/$l.times"
 		echo "lane $l $(seconds "$total") s: $parts"
 		grep '^unsteady: ' "$logs/$l.log" || : # a test that failed and then passed is said, not only logged
+		survivors "$logs/$l.log"
 	done
 	for l in $failed; do
 		echo "check.sh: lane $l failed at $(cat "$logs/$l.at" 2>/dev/null || echo its start):" >&2
