@@ -46,6 +46,16 @@ describe("a world's page", () => {
     expect(html).toMatch(/<p role="status">Loading the chat…<\/p>/);
   });
 
+  // Slice 5p: no world has a capture yet (the capture job is slice 7), so a world's page shows no preview of it: no
+  // figure, picture, video, frame or picture of any kind, and no social image in its tags. A preview added here later
+  // must come with its capture, and with this test changed in its own commit.
+  test("a world with no capture shows no preview: no picture on its page, no og:image in its tags", async () => {
+    const html = await render(route(), "/w/bubble");
+    expect(html).not.toMatch(/<(figure|picture|img|video|canvas|iframe|object|embed|svg)\b|data-preview/i);
+    const tags = JSON.stringify(meta(metaArgs(bubbleOf())));
+    expect(tags).not.toMatch(/og:image|twitter:image|"image"/i);
+  });
+
   test("shows not found, as an alert, for a world that does not exist", async () => {
     const html = await render(route(), "/w/nowhere");
     expect(html).toContain('role="alert"');
