@@ -3619,36 +3619,35 @@ deploy_run() {
 	name=$1 project=$2
 	shift 2
 	mkdir -p "$d/tmp.$name"
-	: >"$d/$name.docker" && (env HOME="$d/home" TMPDIR="$d/tmp.$name" PATH="$d/bin:$PATH" LOCK_DOCKER_LOG="$d/$name.docker" TEST_PROJECT="$project" "$@" sh "$here/../deploy/test.sh" $mode >"$d/$name.out" 2>&1 & echo $! >"$d/$name.pid")
-	sleep 0.2
+	: >"$d/$name.docker" && (env HOME="$d/home" TMPDIR="$d/tmp.$name" PATH="$d/bin:$PATH" LOCK_DOCKER_LOG="$d/$name.docker" TEST_PROJECT="$project" "$@" "$shell" "$here/../deploy/test.sh" $mode >"$d/$name.out" 2>&1 & echo $! >"$d/$name.pid")
 }
 alive() { kill -0 "$1" 2>/dev/null; }
-reached() { # $1 the log's name: the run got past its checks to the first docker run
-	for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
-		grep -q '^run ' "$d/$1.docker" && return 0
-		alive "$(cat "$d/$1.pid")" || return 1
-		sleep 0.5
+gone() { ! alive "$1"; }
+ended() { gone "$(cat "$d/$1.pid")"; }
+began() { grep -q '^run ' "$d/$1.docker"; }
+settled() { began "$1" || ended "$1"; }
+# The runner starts every section at once, and a run's first steps took over 15 s of that at load 45 (3 full suites in 9 failed
+# here): every wait ends on what it waits for, so only a fault reaches the ceiling, 2 minutes, and no clock decides a verdict.
+soon() {
+	tries=0
+	until "$@"; do
+		tries=$((tries + 1))
+		[ "$tries" -lt 600 ] || return 1
+		sleep 0.2
 	done
-	return 1
 }
-refused() { # $1 the log's name: the run ended on its own, quickly
-	for _ in 1 2 3 4 5 6 7 8 9 10; do alive "$(cat "$d/$1.pid")" || return 0; sleep 0.5; done
-	return 1
-}
+reached() { soon settled "$1" && began "$1"; } # $1 the log's name: the run got past its checks to the first docker run
+refused() { soon settled "$1" && ! began "$1"; } # $1 the log's name: the run ended on its own, before any docker run
 stop_all() { # every process any run started is killed by its pid, then none may be alive
 	for f in "$d"/*.pid "$d"/*.docker.pids; do [ -e "$f" ] || continue; for p in $(cat "$f"); do kill -9 "$p" 2>/dev/null || true; done; done
-	sleep 0.3
 	for f in "$d"/*.pid "$d"/*.docker.pids; do
 		[ -e "$f" ] || continue
-		for p in $(cat "$f"); do
-			for _ in 1 2 3 4 5 6 7 8 9 10; do alive "$p" || break; sleep 0.3; done
-			if alive "$p"; then fail "a process of the lock test (pid $p, from $f) outlived it"; fi
-		done
+		for p in $(cat "$f"); do soon gone "$p" || fail "a process of the lock test (pid $p, from $f) outlived it"; done
 	done
 	rm -f "$d"/*.pid "$d"/*.docker.pids
 	rm -rf "${d:?}/home/.cache"
 }
-mode=
+mode= shell=sh
 p1=gnoworld-lock-a-$$
 deploy_run first "$p1"
 reached first || { stop_all; fail "the first deploy/test.sh never reached its first docker run (stubs): $(cat "$d/first.out")"; }
@@ -3668,12 +3667,11 @@ mode=
 refused mutants || { stop_all; fail "deploy/test.sh --mutants ran beside a first run holding the project $p1"; }
 grep -q "$p1" "$d/mutants.out" || { stop_all; fail "the refused --mutants did not name the project: $(cat "$d/mutants.out")"; }
 grep -q '^run ' "$d/mutants.docker" && { stop_all; fail "the refused --mutants still started docker work: $(cat "$d/mutants.docker")"; }
-# --demo starts and removes nothing of the test's: the lock does not stop it (it meets its own checks, not the lock).
+# --demo starts and removes nothing of the test's: the lock does not stop it, and it goes on to its own checks' first docker run.
 mode=--demo
 deploy_run demo "$p1"
 mode=
-sleep 1
-grep -qi 'already' "$d/demo.out" && { stop_all; fail "deploy/test.sh --demo was refused by a test run's lock: $(cat "$d/demo.out")"; }
+reached demo || { stop_all; fail "deploy/test.sh --demo was refused by a test run's lock: $(cat "$d/demo.out")"; }
 # Another project is no one's lock.
 deploy_run other "gnoworld-lock-b-$$"
 reached other || { stop_all; fail "a run of another project was refused by the first's lock: $(cat "$d/other.out")"; }
@@ -3682,18 +3680,20 @@ stop_all
 deploy_run killed "$p1"
 reached killed || { stop_all; fail "the run meant to be killed never started: $(cat "$d/killed.out")"; }
 kill -9 "$(cat "$d/killed.pid")"
-sleep 0.3
+soon ended killed || { stop_all; fail "a run killed hard still runs"; }
 deploy_run after "$p1"
 reached after || { stop_all; fail "a run was refused by the lock of a run that is dead: $(cat "$d/after.out")"; }
 stop_all
-# A first run stopped by TERM releases the lock: no clock guess, the test waits for the run to end (after ending the stub
-# `docker run` it waits on, which a shell's trap otherwise outlasts).
+# A first run stopped by TERM releases the lock, under a Linux host's shell too: dash, unlike macOS's sh, runs no EXIT trap for a
+# signal with no trap of its own. The test waits for the run to end (after ending the stub `docker run` it waits on, which a
+# shell's trap otherwise outlasts).
+shell=$(command -v dash || echo sh)
 deploy_run quit "$p1"
+shell=sh
 reached quit || { stop_all; fail "the run meant to end never started: $(cat "$d/quit.out")"; }
 kill -TERM "$(cat "$d/quit.pid")"
 for p in $(cat "$d/quit.docker.pids"); do kill -TERM "$p" 2>/dev/null || true; done
-for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do alive "$(cat "$d/quit.pid")" || break; sleep 0.5; done
-alive "$(cat "$d/quit.pid")" && { stop_all; fail "a run stopped by TERM never ended"; }
+soon ended quit || { stop_all; fail "a run stopped by TERM never ended"; }
 [ -z "$(find "$d/home/.cache/gnoworld-tools" -name "*$p1*" 2>/dev/null)" ] || { stop_all; fail "a run stopped by TERM left its lock: $(ls "$d/home/.cache/gnoworld-tools")"; }
 deploy_run again "$p1"
 reached again || { stop_all; fail "a run was refused by the lock of a run that was stopped: $(cat "$d/again.out")"; }
@@ -3705,6 +3705,11 @@ deploy_run left "gnoworld-lock-c-$$" LOCK_LEFTOVER="$left"
 refused left || { stop_all; fail "deploy/test.sh started beside a mutant project a Ctrl+C left up"; }
 grep -q "docker compose -p $left down -v" "$d/left.out" || { stop_all; fail "the refusal did not give the command that removes $left: $(cat "$d/left.out")"; }
 grep -q '^run ' "$d/left.docker" && { stop_all; fail "deploy/test.sh went on after finding $left up"; }
+stop_all
+# --mutants runs each fault in a project of that name: a run never takes its own for a leftover.
+own=gnoworld-demo-mutant-88888888
+deploy_run own "$own" LOCK_LEFTOVER="$own"
+reached own || { stop_all; fail "deploy/test.sh took its own project for a leftover: $(cat "$d/own.out")"; }
 stop_all
 # Another Compose project running on the machine is none of its business.
 deploy_run unrelated "gnoworld-lock-d-$$" LOCK_LEFTOVER=myapp
