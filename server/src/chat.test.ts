@@ -474,8 +474,35 @@ describe("the chat, as the server starts it", () => {
       peer.say(unknown("m1"));
       await peer.next(/^REDACT /);
       peer.say(":gnoworld!u@h REDACT #bubble m1 :a word this world bans");
+      // A refusal coming late, after the echo: the hide is taken, so nothing is asked on it (F2654).
+      peer.say(unknown("m1"));
       await quiet(peer);
       expect(hides(peer)).toEqual([HIDE, HIDE]);
+    });
+
+    // F2654: the retry timer is pending when Ergo's word comes; the word cancels it. The wait is 300 ms here, so
+    // the word (a line away) comes well before it, and 900 ms is three times that.
+    const SLOW = { redactRetryMs: 300 };
+    it("cancels the ask waiting when Ergo's echo of the hide comes first (F2654)", { timeout: 5000 }, async () => {
+      const { peer } = await linked({ worlds: worlds("bubble"), moderation: OFF }, SLOW);
+      peer.say(line("m1", 1, ["g1a", "buy spam"]));
+      await peer.next(/^REDACT /);
+      peer.say(unknown("m1"));
+      peer.say(":gnoworld!u@h REDACT #bubble m1 :a word this world bans");
+      await sleep(900);
+      await settle(peer);
+      expect(hides(peer)).toEqual([HIDE]);
+    });
+
+    it("cancels the ask waiting when Ergo forbids the hide (F2654)", { timeout: 5000 }, async () => {
+      const { peer } = await linked({ worlds: worlds("bubble"), moderation: OFF }, SLOW);
+      peer.say(line("m1", 1, ["g1a", "buy spam"]));
+      await peer.next(/^REDACT /);
+      peer.say(unknown("m1"));
+      peer.say(":ergo.test FAIL REDACT REDACT_FORBIDDEN #bubble m1 :You are not authorized to delete this message");
+      await sleep(900);
+      await settle(peer);
+      expect(hides(peer)).toEqual([HIDE]);
     });
 
     it("tells the author once and counts one strike for a line hidden twice (F2462)", { timeout: 5000 }, async () => {
