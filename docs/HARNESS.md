@@ -111,11 +111,58 @@ gate fails, run the failing lane alone before running the whole gate again.
 | A fast run's change | What runs beside the cheap checks (format, knip, jscpd, CSS, comments, check_docs) | Budget |
 |---|---|---|
 | `server/src` | tsc, ESLint, every Vitest test (`main.test.ts` runs the server as a child process, outside Vitest's module graph) | 30 s |
-| the TypeScript of `app/src`, `app/tests`, `packages/ui/src` | tsc, ESLint, Vitest's tests related to the change (`--changed`), the app's journeys | 120 s (the app's journeys, F2162) |
-| `packages/core/src`, or any other file of those folders (a fixture, a stylesheet) | tsc, ESLint, every Vitest test, the app's journeys | 120 s (the app's journeys, F2162) |
+| the TypeScript of `app/src`, `app/tests`, `packages/ui/src` | tsc, ESLint, Vitest's tests related to the change (`--changed`), the journeys the change can reach (below) | 60 s when some journeys run, 120 s when all do (F2162; the measure below) |
+| `packages/core/src`, or any other file of those folders (a fixture, a stylesheet) | tsc, ESLint, every Vitest test, every journey | 120 s (the app's build and journeys, F2162) |
 | `packages/ui/src/tokens.css` | as above, and the tokens story's pictures at their three widths (F1190) | 120 s |
 | `gno/` | the gno lane | 30 s |
 | anything else (a config, the lockfile, the harness, `packages/schemas`, `deploy/`), no change at all, or pre-commit's staged copy | everything | 120 s |
+
+**The journeys a change can reach** (`scripts/journeys.py`, Alexis 2026-10-29 and 2026-10-30; harness-b): a fast
+run of a change in `app/src` gives Playwright only the journeys whose pages load a changed file, as filters after
+its options. A journey's pages are the routes of `app/src/routes.ts` that its `page.goto()` paths match, and a
+route loads what it imports, followed through every `import`, `import()`, re-export, type import and stylesheet.
+A journey's own spec, or the approved pictures beside it, run that journey alone. What the scoping cannot place
+runs every journey: a path outside `app/src` and the journeys' specs (a config, a helper the journeys share, `serve.mjs`,
+`server/src`, which the journeys start), the routes' list, a file no route loads, one every page loads (`root.tsx`),
+a file deleted, a `routes.ts` with a `layout()`. A journey whose `goto`, or `request.get()`/`location.href =` in its own spec file (F2575), is not a literal path
+(a variable, a helper's argument) cannot be placed and runs on every change of the app; a template's `${...}` in the path means any one segment,
+and one at its start stands for the site's origin only when it is named `site`, `origin`, `base` or `host`. A test of
+the app (`.test.ts(x)`, `.bench`, `.stories`) is no change of the pages: a change of those and prose alone builds
+and walks nothing of the app (budget 30 s, F2578). What a journey reaches by a click, a link or
+a redirect after its first page is not followed, and a `journeys.py` that fails fails the gate. `--full`, `--merge`
+and any change of the harness run every journey. Playwright reads a filter as a regular expression: a name's own
+characters are escaped; its dots are not (they match more, never less).
+
+The measure (slice-5 harness-b, 2026-10-30, the same change run by the old `check.sh` and the new, one after the other on a
+machine at load 11 to 43 on 16 cores, so the times are an order of magnitude, not a benchmark): a comment added to
+`routes/earth.tsx` (8 journeys of 43) took 122 s before (the `app` step 116 s) and 30 s after (23 s); one added to a
+spec (1 journey) took 224 s before (153 s, load 23 then 43) and 46 s after (17 s); one added to `routes/world.tsx`
+(39 journeys) took 88 s before (83 s) and 110 s after (96 s), no gain: nearly every journey goes to a world page. That is
+why a run of half the journeys or fewer has 60 s, and a run of more than half, all included, 120 s (F2577).
+
+**Two checks the fast gate runs on a trigger** (harness-b): a commit that touches a test, a bench or an approved picture
+(`*.test.ts(x)`, `*.bench.ts(x)`, `*.spec.ts`, gno and Go test files, `*-snapshots/*.png`, `*__screenshots__/*.png`;
+deleted or renamed ones too) runs `check_regressions.py` (a renamed test passed the fast gate in 5b and failed only the merge
+check); a commit that changes `pnpm-lock.yaml` runs the audit (lighthouse's advisories showed only at the merge check, 5e).
+The base of `check_regressions.py` is where the branch left `main` (the merge base with `origin/main`; HEAD with none), so a
+`Removed-test:`, `Lowered-floor:` or `Updated-baseline:` line of an earlier commit of the branch lets a later removal
+through. The commit that removes the test cannot carry its own line, because its message does not exist yet at pre-commit:
+declare it first, on an empty commit if need be. The staged copy has no git, so `.githooks/pre-commit` runs the staged
+`check_regressions.py` in the repository (it reads the working tree, not the index: a test staged in part is judged as it is
+on disk), and `check.sh` runs it in a repository only. Neither runs in a merge commit, whose full gate follows.
+Both pass `--quick` (F2579): the base's listing of Vitest tests and journeys is kept in the tools' cache
+(`~/.cache/gnoworld-tools/regressions/`, one file per base commit, which never changes), and a change of nothing but Vitest
+files, gno or Go sources, approved pictures and prose lists only the Vitest files it touches (about 3 s for one file, against
+33 s for all 6,944 tests, measured by the reviewer); any other change lists the tree whole. The merge check runs without
+`--quick`, whole and with no cache. A picture is judged on the tree, not on `base..HEAD` (F2574): its own commit's message does not
+exist yet, so its `Updated-baseline:` line goes on an earlier commit too.
+
+**StrykerJS's sandboxes** (harness-b): a run cut short leaves `.stryker-tmp/`, which Vitest's bench project once measured
+(5n: Cmd-K at 27 to 41 ms instead of 2 to 4). `vitest.config.ts` leaves `**/.stryker-tmp/**` out of its benches (only a bench
+could reach the folder: the projects' includes are anchored at the root), `check.sh --full` empties the folder before
+StrykerJS starts (a link of that name is removed, never followed), and `borrow_node_modules.sh` copies nothing of it into
+pre-commit's staged copy. That last one is hygiene, not a proven cause of F2414 (the staged copy's lint that once reported
+14,683 problems): planted in such a copy, a sandbox's `node_modules` did not make ESLint report anything.
 
 `GATE_BUDGET` may lower the budget, never raise it. A merge commit has none (F2071): the full
 gate follows every merge. A run past its budget that passed still passes (Alexis, 2026-10-30:
@@ -152,7 +199,7 @@ refuses another Node (F816).
 | `scripts/test_hooks.sh` | the hooks, the guard, the settings' boundary, the CI's promises, the scripts; a harness mutant that no longer finds its text (`harness_mutate.py --dry`) |
 
 **Full** (`--full`: the slice's last merge and a push of `main`; `--merge`: each branch's
-`/pre-merge`, with the harness mutants of the guard files it changed, and without the stories,
+`/pre-merge`, with the harness mutants of the lines it changed, and without the stories,
 the coverage lane and `prove_fix` when nothing but docs, the harness and the linters' configs changed since
 `main`) adds:
 
@@ -171,7 +218,7 @@ the coverage lane and `prove_fix` when nothing but docs, the harness and the lin
 | `scripts/check_migrations.py` | a migration `main` has, edited, moved or removed (F466) |
 | gitleaks | a secret anywhere in the history; a path into a home folder or the demo's host |
 | `pnpm audit` | a dependency with a known advisory, moderate or worse |
-| `scripts/harness_mutate.py` | a guard of the harness that no test notices switched off; over `HARNESS_SHARDS` worktrees (4), each first passing its suites untouched, two such controls at once (F2138); `--changed <base>` judges only the mutants of the guard files and suite sections changed since the last review pass, and, when the script itself changed, those it defines anew or otherwise; a killed mutant whose key holds (its text, its sections, the files they name, the runner) comes from a cache of verdicts, a survivor is always judged again |
+| `scripts/harness_mutate.py` | a guard of the harness that no test notices switched off; over `HARNESS_SHARDS` worktrees (4), each first passing its suites untouched, two such controls at once (F2138); `--changed <base>` (a branch's merge check) judges only the mutants that rewrite a line changed since the last review pass (a change to a suite's section or to a guard file's other lines asks for none) and, when the script itself changed, those it defines anew or otherwise (sections a mutant only gained are no other definition: what S kills, S and T kill; one it lost is), and stops before judging more than 100 left after the cache, the way on being the chief's `check.sh --full`, which judges every one and which `main` requires, so a test a branch weakens shows there, not on the branch (Alexis, 2026-10-30); a killed mutant whose key holds (its text, its sections, the files they name, the runner; blank lines do not count, comments do, a `#` line in a heredoc being text) comes from a cache of verdicts, a survivor is always judged again |
 
 ## The safety net never shrinks quietly
 

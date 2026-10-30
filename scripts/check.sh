@@ -7,7 +7,7 @@
 # - `--full` adds what the slice's last /pre-merge and CI run: the harness's own probe, coverage
 #   and patch coverage, mutations, and the scan of the whole history for secrets. It checks
 #   everything, and its record lets main take the code (pre-push).
-# - `--merge`, a merge's own /pre-merge: the same, but the harness mutants of the guard files the
+# - `--merge`, a merge's own /pre-merge: the same, but the harness mutants of the lines the
 #   merge changed alone, since its last recorded pass (Alexis, 2026-10-25, 2026-10-27), and without the stories, the
 #   coverage lane and prove_fix when no product code changed since main (2026-10-29); it records the fast gate only.
 #
@@ -85,6 +85,7 @@ fi
 # module graph, and a fixture read from disk is outside it too. ESLint reads no cache: one is keyed
 # on a file's own text, so a type changed elsewhere would hide the error it brings there.
 all=true ts=false app=false gno=false tokens=false related=true changed=
+regressions=false audit=false # a test file touched; the lockfile changed (below)
 if ! $full && [ -z "$tested" ]; then
 	changed=${GATE_CHANGED:-} related=false # Vitest finds the related tests through git, which a copy has not
 elif ! $full; then
@@ -100,6 +101,13 @@ if [ -n "$changed" ]; then
 	while IFS= read -r path; do
 		case $path in docs/* | adr/* | *.md) continue ;; esac # prose, which pre-commit's list may hold
 		code=true
+		# A commit that touches a test, a bench or an approved picture runs check_regressions (a renamed test passed the fast gate
+		# in 5b and failed only the merge check); one that changes the lockfile runs the audit (lighthouse's advisories showed only
+		# at the merge check, 5e). .githooks/pre-commit holds the same list of tests, for the staged copy's own gate.
+		case $path in
+		*.test.ts | *.test.tsx | *.bench.ts | *.bench.tsx | *.spec.ts | *_test.gno | *_test.go | *-snapshots/*.png | *__screenshots__/*.png) regressions=true ;;
+		pnpm-lock.yaml) audit=true ;;
+		esac
 		case $path in
 		server/src/*) ts=true related=false ;;
 		app/src/*.ts | app/src/*.tsx | app/tests/*.ts | packages/ui/src/*.ts | packages/ui/src/*.tsx) ts=true app=true ;;
@@ -114,9 +122,30 @@ EOF
 	$code || all=true # prose alone is no change of code, as in a repository
 fi
 $all && ts=true app=true gno=true related=false
+# check_regressions reads git, which the staged copy has not (pre-commit runs it in the repository); a merge's full gate follows and
+# runs it (and the audit) whole. Its base is where the branch left main, so a `Removed-test:` line of an earlier commit of the
+# branch counts; with no origin/main, HEAD; with no commit yet, or no repository, nothing to compare (no base).
+regr_base=
+if $merging; then regressions=false; fi
+if $merging; then audit=false; fi
+if $regressions; then
+	regr_base=$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse -q --verify HEAD 2>/dev/null) || regr_base=
+	[ -n "$regr_base" ] || regressions=false
+fi
+# The journeys the change can reach (scripts/journeys.py): `all`, `none` (tests of the app alone: no build, no journey), or their paths one a line. The full gate and a change it cannot
+# place run every journey. A journeys.py that fails fails the run: a change scoped to nothing would pass unseen.
+scope=all
+if ! $full && ! $all && $app; then scope=$(printf '%s\n' "$changed" | python3 -I scripts/journeys.py); fi
+[ "$scope" != none ] || app=false # a change of tests of the app alone: no page loads them (F2578)
 budget=120 # s, for everything (Alexis, 2026-10-28: 75 refused a harness commit on a half-busy machine; 60 before 2026-10-27); for a run scoped to a change, 30
 # A run that builds the app runs every journey, the work of a run of everything: 73-96 s on a quiet machine (slice-5a, F2162).
 $all || $app || budget=30
+if [ "$scope" != all ] && [ "$scope" != none ]; then
+	# Half of the journeys or fewer: 17 to 23 s of them for 1 and 8 of 43. More: 110 s for 39 of 43 (harness-b, measured), the budget of all (F2577).
+	journeys_due=$(printf '%s\n' "$scope" | grep -c . || :)
+	journeys_all=$(find app/tests/e2e -type f | grep -cE '\.(spec|test)\.[cm]?[jt]sx?$' || :)
+	[ $((journeys_due * 2)) -gt "$journeys_all" ] || budget=60
+fi
 [ "${GATE_BUDGET:-$budget}" -lt "$budget" ] 2>/dev/null && budget=$GATE_BUDGET # a test lowers it; nothing raises it
 tests_scope=
 $related && tests_scope="--changed --passWithNoTests"
@@ -226,7 +255,17 @@ lane_ts() {
 	packages() { cat package.json app/package.json pnpm-lock.yaml | cksum; }
 	installed=$(packages)
 	export PLAYWRIGHT_JSON_OUTPUT_NAME="$logs/playwright.json"
-	node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot,json >"$logs/playwright.out" 2>&1 || # node: see check_regressions.py
+	# The journeys are given to Playwright as filters, which it reads as regular expressions: a name's own characters
+	# escaped, its dots left (they match more, never less).
+	set --
+	if [ "$scope" != all ]; then
+		while IFS= read -r journey; do
+			set -- "$@" "$(printf '%s' "$journey" | sed 's/[][+(){}^$|?*\\]/\\&/g')"
+		done <<EOF
+$scope
+EOF
+	fi
+	node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot,json "$@" >"$logs/playwright.out" 2>&1 || # node: see check_regressions.py
 		retry playwright "$PLAYWRIGHT_JSON_OUTPUT_NAME" "$logs/playwright.out" env -u PLAYWRIGHT_JSON_OUTPUT_NAME node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot
 	[ "$(packages)" = "$installed" ] || { echo "check.sh: building the app changed package.json or the lockfile" >&2; exit 1; }
 }
@@ -287,6 +326,14 @@ lane_pictures() {
 lane_docs() {
 	step check_docs # harness docs name only files that exist
 	python3 -I scripts/check_docs.py
+	if $regressions; then
+		step regressions # no test gone, no floor lower, no approved picture changed, unless a commit of the branch says why
+		python3 -I scripts/check_regressions.py --quick "$regr_base" # per commit: the base's listing cached, only the touched files listed (F2579)
+	fi
+	if $audit; then
+		step audit
+		python3 -I scripts/audit.py
+	fi
 	step parse
 	# Some scripts run only in --full: a broken one would pass every commit (finding F084).
 	python3 -I -c 'import ast, sys; [ast.parse(open(f).read(), f) for f in sys.argv[1:]]' scripts/*.py
@@ -371,6 +418,9 @@ EOF
 		# in turn: StrykerJS rethrows a file it cannot parse, so a run cut short would fail every tree's. Two runs that end at once
 		# keep the last one's verdicts: the other's are judged again, never lost to a half-written file.
 		cache="$HOME/.cache/gnoworld-tools/stryker-incremental.json" own="$logs/stryker-incremental.json"
+		# A run cut short leaves its sandboxes in .stryker-tmp, which a bench measured (5n: Cmd-K at 27 to 41 ms instead of 2 to 4):
+		# emptied before StrykerJS starts. A link is removed, never followed: what it leads to is not StrykerJS's.
+		if [ -L .stryker-tmp ]; then rm .stryker-tmp; elif [ -d .stryker-tmp ]; then find .stryker-tmp -mindepth 1 -delete; fi
 		mkdir -p "${cache%/*}"
 		! parses "$cache" || cp "$cache" "$own"
 		stryker=0
