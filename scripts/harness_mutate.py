@@ -128,8 +128,6 @@ def scoping_mutants():
         yield from each(check, find, replace, "hooks", f"check.sh {label}")
     j = "scripts/journeys.py"
     for find, replace, label in (
-        ("or path == ROUTES ", "", "runs every journey on a change of the routes' list"),
-        ("or not os.path.isfile(path) ", "", "runs every journey on a file that was deleted"),
         ("or path in always", "", "runs every journey on a file every page loads"),
         ("if path not in loaded:\n            return None", "if False:\n            return None", "runs every journey on a file no page loads"),
         ("| unplaced\n", "\n", "runs the journeys it cannot place on every change"),
@@ -143,10 +141,12 @@ def scoping_mutants():
         ("        if TEST_FILE.search(path):\n            continue\n", "", "reads a test file as no change of the pages"),
         ("        if PROSE.search(path):\n            continue\n", "", "reads prose as no change of the pages"),
         ("if not run or run >= set(specs):", "if not run:", "says 'all' when every journey is due"),
-        (r"""|children|\?[:\"']""", "", "reads only a routes list it can read"),
-        ("or re.search(", "or False and re.search(", "refuses a routes list with a layout"),
+        ("if len(found) != len(", "if False and len(found) != len(", "refuses a routes list with a call it does not read"),
+        ("(?:layout|prefix)", "(?:prefix)", "refuses a routes list with a layout"),
+        ("(?:layout|prefix)", "(?:layout)", "refuses a routes list with a prefix"),
+        (' or body.count("[") > 1', "", "refuses a routes list with routes nested in routes"),
+        ('if any("?" in path for path, _ in found):', "if False:", "refuses a routes list with an optional segment"),
         ("or not ORIGIN.match(", "or False and not ORIGIN.match(", "reads only the site's own origin at a template's start"),
-        ("if len(found) != len(re.findall(", "if False and len(found) != len(re.findall(", "refuses a routes list with a call it does not read"),
     ):
         yield from each(j, find, replace, "hooks", f"journeys.py {label}")
 

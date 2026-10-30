@@ -7,8 +7,8 @@ A journey reaches the files its pages load: the page of each URL it goes to (`pa
 matches it in app/src/routes.ts, and a route loads what it imports, followed through every import, import(), re-export, type
 import and stylesheet. A changed file runs the journeys that reach it. What cannot be placed runs everything:
 - a path outside app/src and the journeys' own folder (a config, a helper the journeys share, the file server, the server's
-  code: the journeys start it), or a file no route loads, one the root loads (every page does), or one that was deleted;
-- the routes' list, when it holds more than index() and route() calls.
+  code: the journeys start it), or a file no route loads (the routes' list, a deleted file), or one the root loads (every page does);
+- a routes' list that holds more than index() and route() calls with literal paths (a layout, nested routes, an optional segment).
 A journey whose URL is not a literal, or that goes to no URL, cannot be placed: it runs on every change of the app. What a
 journey reaches by a click, a link or a redirect after its first page is not followed: the merge check runs every journey.
 A comment in a changed file decides nothing; nothing here reads one."""
@@ -83,7 +83,11 @@ def routes():
     body = re.sub(r"//[^\n]*", "", text)
     found = [("", m.group(1)) for m in re.finditer(r"""\bindex\(\s*["']([^"']+)["']""", body)]
     found += [(m.group(1) or "", m.group(2)) for m in re.finditer(r"""\broute\(\s*["']([^"']*)["']\s*,\s*["']([^"']+)["']""", body)]
-    if len(found) != len(re.findall(r"\b(?:index|route)\(", body)) or re.search(r"\b(?:layout|prefix)\(|children|\?[:\"']", body):
+    if len(found) != len(re.findall(r"\b(?:index|route)\(", body)):  # a call whose path or file is no literal
+        return None
+    if re.search(r"\b(?:layout|prefix)\(", body) or body.count("[") > 1:  # a layout, or routes nested in routes
+        return None
+    if any("?" in path for path, _ in found):  # an optional segment
         return None
     return [([s for s in p.strip("/").split("/") if s], os.path.normpath(os.path.join(SRC, f))) for p, f in found]
 
@@ -207,7 +211,8 @@ def journeys(changed):
                 return None
             run.add(shots.group(1))
             continue
-        if not path.startswith(SRC + "/") or path == ROUTES or not os.path.isfile(path) or path in always:
+        # Not in the app, or loaded by every page. The routes' list and a file that was deleted are loaded by no route: below.
+        if not path.startswith(SRC + "/") or path in always:
             return None
         if TEST_FILE.search(path):
             continue

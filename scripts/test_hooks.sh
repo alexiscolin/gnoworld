@@ -2653,7 +2653,9 @@ mkdir -p "$g/app/src/routes" "$g/app/src/features/world" "$g/app/src/features/ho
 # home; the realm and lazyhome are lazy chunks; barrel/ is a re-export; w.css a side-effect import; types.ts a type import.
 printf 'import { index, route } from "@react-router/dev/routes";\nexport default [index("routes/home.tsx"), route("w/:world", "routes/world.tsx"), route("net/:network/w/:world", "routes/world.tsx", { id: "universe-world" }), route("w/special", "routes/special.tsx"), route("e/:eco", "routes/eco.tsx"), route("*", "routes/notFound.tsx")];\n' >"$g/app/src/routes.ts"
 printf 'import { h } from "../features/home/h.ts";\nimport { shared } from "../lib/shared.ts";\nimport { deep } from "../lib/deep.ts";\nimport { b } from "../features/barrel";\nimport type { T } from "../lib/types.ts";\nconst L = lazy(() => import("../features/lazyhome/L.ts"));\nexport default () => h + shared + deep + b;\n' >"$g/app/src/routes/home.tsx"
-printf 'import { w } from "../features/world/w.ts";\nimport { shared } from "../lib/shared.ts";\nimport "../features/world/w.css";\nconst Realm = lazy(() => import("../features/realm/Realm.ts"));\nexport default () => w + shared;\n' >"$g/app/src/routes/world.tsx"
+printf 'import { rootLib } from "./lib/rootLib.ts";\nexport default () => rootLib;\n' >"$g/app/src/root.tsx"
+printf 'export const rootLib = 1;\n' >"$g/app/src/lib/rootLib.ts"
+printf 'import { w } from "../features/world/w.ts";\nimport { rootLib } from "../lib/rootLib.ts";\nimport { shared } from "../lib/shared.ts";\nimport "../features/world/w.css";\nconst Realm = lazy(() => import("../features/realm/Realm.ts"));\nexport default () => w + shared;\n' >"$g/app/src/routes/world.tsx"
 printf 'export default () => "404";\n' >"$g/app/src/routes/notFound.tsx"
 printf 'export default () => "special";\n' >"$g/app/src/routes/special.tsx"
 printf 'export default () => "eco";\n' >"$g/app/src/routes/eco.tsx"
@@ -2716,8 +2718,20 @@ py() { (cd "$g" && python3 -I scripts/journeys.py "$@" 2>&1 | sort | paste -sd' 
 [ "$(py app/src/features/world/w.test.ts)" = all ] || fail "journeys.py scoped a change of test files alone to nothing"
 [ "$(py app/tests/e2e/gone.spec.ts-snapshots/a.png)" = all ] || fail "journeys.py placed a picture of a spec that does not exist"
 [ "$(py app/src/lib/shared.ts app/src/routes/eco.tsx app/src/routes/notFound.tsx)" = all ] || fail "journeys.py listed every journey instead of saying 'all'"
-printf 'import { index, route, layout } from "@react-router/dev/routes";\nexport default [layout("l.tsx", [index("routes/home.tsx")])];\n' >"$g/app/src/routes.ts"
-[ "$(py app/src/features/world/w.ts)" = all ] || fail "journeys.py placed a change by a routes.ts with a layout, which it does not read"
+# A list of routes it cannot read is no list: every journey. One variant each, so each refusal is tried alone.
+routes_say_all() { # $1: what routes.ts holds, $2: what it is
+	printf '%s\n' "$1" >"$g/app/src/routes.ts"
+	[ "$(py app/src/features/world/w.ts)" = all ] || fail "journeys.py placed a change by a routes.ts with $2, which it does not read: $(py app/src/features/world/w.ts)"
+	reset
+}
+routes_say_all 'export default [layout("l.tsx"), index("routes/home.tsx")];' "a layout"
+routes_say_all 'export default [prefix("p", [index("routes/home.tsx")])];' "a prefix"
+routes_say_all 'export default [route("a", "routes/world.tsx", [route("b", "routes/home.tsx")])];' "routes nested in a route"
+routes_say_all 'export default [index("routes/home.tsx"), route("w/:world?", "routes/world.tsx")];' "an optional segment"
+routes_say_all 'export default [index("routes/home.tsx"), route(prefix + "x", "routes/world.tsx")];' "a path that is no literal"
+# An import it cannot follow in a file some page loads: every journey, whatever else changed.
+printf 'export const more = (n) => import(n);\n' >>"$g/app/src/features/home/h.ts"
+[ "$(py app/src/features/world/w.ts)" = all ] || fail "journeys.py placed a change beside an import() with no literal, which it cannot follow"
 reset
 # A route's change runs its journeys only; so does a feature it loads, and a journey's own file or picture.
 places app/src/features/world/w.ts $world $net $tpl $unplaced
@@ -2753,7 +2767,7 @@ gate >/dev/null || fail "check.sh failed on two routes' changes"
 [ "$(journeys_ran)" = "$(sorted $home $world $net $tpl $unplaced)" ] || fail "check.sh gave the journeys '$(journeys_ran)' on a change of two routes"
 # A change the scoping cannot place runs every journey: a helper the journeys share, the file server, the routes' list, the
 # journeys' config, a file no page loads, a file deleted.
-for f in app/tests/e2e/fixtures.ts app/tests/e2e/nav.ts app/tests/e2e/serve.mjs app/tests/e2e/sites.ts app/src/routes.ts app/playwright.config.ts app/src/lib/unloaded.ts app/src/a.tsx; do
+for f in app/src/lib/rootLib.ts app/src/root.tsx app/tests/e2e/fixtures.ts app/tests/e2e/nav.ts app/tests/e2e/serve.mjs app/tests/e2e/sites.ts app/src/routes.ts app/playwright.config.ts app/src/lib/unloaded.ts app/src/a.tsx; do
 	places "$f"
 done
 reset
