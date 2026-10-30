@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { logger } from "../log.ts";
-import { startPrices } from "./prices.ts";
+import { MAX_BYTES, startPrices } from "./prices.ts";
 
 // CoinGecko's /simple/price as it answered on 2026-10-30 (api.coingecko.com, keyless, read in this session) for
 // ids=bitcoin,gno-land,atomone with vs_currencies=usd, include_24hr_change and include_last_updated_at. An id it does
@@ -203,6 +203,7 @@ const bad: [string, () => Promise<Response>, string][] = [
   ["every coin without a price", json({ bitcoin: {}, "gno-land": {}, atomone: {} }), "no_price"],
   ["a body that is not JSON", text("<html>Just a moment...</html>"), "not_json"],
   ["an empty body", text(""), "not_json"],
+  ["a 204 with no body at all", () => Promise.resolve(new Response(null, { status: 204 })), "not_json"],
   ["a JSON body cut short", text('{"bitcoin":{"usd":774'), "not_json"],
   ["a huge answer", text(JSON.stringify({ ...ANSWER, pad: "x".repeat(1_000_000) })), "too_large"],
   ["a 429 Too Many Requests", text('{"status":{"error_code":429}}', 429), "rate_limited"],
@@ -267,6 +268,25 @@ describe("the prices timer: a bad answer keeps the last file", () => {
     expect(pulled).toBeLessThanOrEqual(200);
     expect(written(file)).toBe(KEPT);
     expect(kindOf(lines[0])).toBe("too_large");
+  });
+
+  it("accepts a coin priced with no change key: its change is null, the answer is kept (F2760)", async () => {
+    const { file } = setup([json({ bitcoin: { usd: 1 } })]);
+    await wrote(file);
+    expect(Markets.parse(JSON.parse(written(file))).tokens).toEqual([{ symbol: "BTC", usd: 1, change24h: null }]);
+  });
+
+  // A valid answer padded with spaces to an exact size: JSON allows whitespace around a value.
+  const sized = (bytes: number) => text(JSON.stringify(ANSWER).padEnd(bytes, " "));
+
+  it("takes an answer of exactly the cap and refuses one byte more (F2760)", async () => {
+    const at = setup([sized(MAX_BYTES)]);
+    await wrote(at.file);
+    expect(Markets.parse(JSON.parse(written(at.file))).tokens).toEqual(TOKENS);
+    const over = setup([sized(MAX_BYTES + 1)], { folder: withKept() });
+    await failed(over.lines);
+    expect(kindOf(over.lines[0])).toBe("too_large");
+    expect(written(over.file)).toBe(KEPT);
   });
 
   it("recovers: a good answer after a bad one replaces the kept file", async () => {

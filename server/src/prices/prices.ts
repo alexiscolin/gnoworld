@@ -28,7 +28,7 @@ const IDS = { GNOT: "gno-land", ATONE: "atomone", BTC: "bitcoin" } as const;
 const URL_ASKED = `https://api.coingecko.com/api/v3/simple/price?ids=${MARKET_SYMBOLS.map((symbol) => IDS[symbol]).join(",")}&vs_currencies=usd&include_24hr_change=true`;
 const TIMEOUT_MS = 10_000;
 // A good answer is under 1 KB; 64 KB leaves room and stops a stream that never ends.
-const MAX_BYTES = 64 * 1024;
+export const MAX_BYTES = 64 * 1024;
 const EVERY_MS = 300_000;
 
 type Kind =
