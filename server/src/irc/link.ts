@@ -10,7 +10,7 @@ import type { RoomState } from "../rooms/reconcile.ts";
 import { allowed, line, NICK, type Command } from "./lines.ts";
 import type { Fetched } from "./fetch.ts";
 import { reader, type Options } from "./reader.ts";
-import { forget, fresh } from "./session.ts";
+import { forget, fresh, sentOn } from "./session.ts";
 
 export type { Fetched } from "./fetch.ts";
 export type { Said } from "./lines.ts";
@@ -123,7 +123,7 @@ export function ircLink(options: Options): Link {
       // formatLine refuses a line that would break in two; nothing of it is sent.
       try {
         s.write(line(command, params));
-        if (command === "JOIN") state.asked.add(params[0] ?? "");
+        sentOn(state, command, params);
         return true;
       } catch {
         return false;
