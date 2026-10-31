@@ -142,7 +142,9 @@ describe("a universe's index", () => {
     expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/w\/other"[^>]*>Other<\/a>/);
     // Slice 5r: the way to the Earth is the hero's big action, "Go explore" (frame 6), and the header's Earth view.
     expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/earth"[^>]*>Go explore/);
-    expect(html).not.toContain("Bubble");
+    // Onyx's world is not listed here; the ticker's placeholder news names it, and is the site's, not a universe's.
+    expect(html).not.toContain("/w/bubble");
+    expect(html).not.toMatch(/>Bubble<\/a>/);
   });
 
   test("is the home itself for the default universe, at / and at /net/onyx/", async () => {

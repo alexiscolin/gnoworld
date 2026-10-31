@@ -1,0 +1,70 @@
+/* The hero's live line: a rule, then the prices and the block in one row, 66 px high whatever it holds, so the actions above it
+   never move (frame 6: the rule 22 px under the actions, the box ending 64 px from the foot). Hidden on a phone, as the prototype
+   hides its #heroStats under 900 px. */
+@layer components {
+  .live {
+    box-sizing: border-box;
+    /* raw: the box is 66 px high in every state (frame 6: 950 to 1016) */
+    block-size: 66px;
+    /* the prototype's 16 px between the rule and the line */
+    padding-block-start: var(--space-s);
+    border-block-start: var(--line-width) solid var(--color-line);
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .label {
+    display: block;
+    /* raw: 2 px under the label (the prototype's .stat .col) */
+    padding-block-end: 2px;
+    /* raw: 10 px mono, in capitals (the prototype's .stat small) */
+    font: 400 10px/1 var(--family-mono);
+    /* raw: the prototype's wide tracking for a small label */
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+  }
+
+  .value {
+    display: block;
+    /* raw: 16 px, regular (the prototype's .stat .big) */
+    font: 400 16px/1.2 var(--family-mono);
+  }
+
+  .delta {
+    display: block;
+    /* raw: 10.5 px mono (the prototype's .stat .delta) */
+    font: 400 10.5px/1 var(--family-mono);
+  }
+
+  .delta[data-delta="up"] {
+    color: var(--color-mine);
+  }
+
+  .delta[data-delta="down"] {
+    color: var(--color-danger);
+  }
+
+  .delta[data-delta="flat"] {
+    color: var(--color-text-muted);
+  }
+
+  .credit {
+    display: block;
+    font: var(--font-hint);
+    color: var(--color-text-muted);
+  }
+
+  .state {
+    /* layout: a paragraph with no margin of its own */
+    margin-block: 0;
+    font: var(--font-meta);
+    color: var(--color-text-muted);
+  }
+
+  @media (max-width: 899px) {
+    .live {
+      display: none;
+    }
+  }
+}

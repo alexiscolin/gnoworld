@@ -48,6 +48,8 @@ export interface ReadOptions {
   maxBytes?: number;
   /** The clock, for the source's time. */
   now?: () => Date;
+  /** Ends the request early: a page that left. */
+  signal?: AbortSignal;
 }
 
 const NEXT: Record<FailureKind, string> = {
@@ -166,6 +168,10 @@ async function attempt({ url, fetcher, signal, maxBytes }: Attempt): Promise<Out
   }
 }
 
+// The request ends with its own limit or with the caller's signal, whichever comes first.
+const linked = (own: AbortSignal, outer: AbortSignal | undefined) =>
+  outer === undefined ? own : AbortSignal.any([own, outer]);
+
 /** One read of an https address through a schema: the value with its source, or a typed failure with its next step. */
 export async function readChain<T>(
   url: string,
@@ -178,6 +184,7 @@ export async function readChain<T>(
   const failed = (kind: FailureKind, status?: number): ChainRead<T> => failedRead(kind, source, status);
   if (!isHttps(url)) return failed("refused");
   const controller = new AbortController();
+  const signal = linked(controller.signal, options.signal);
   let timer: ReturnType<typeof setTimeout> | undefined;
   // The limit does not rely on fetch honouring its signal: it wins the race by itself.
   const late = new Promise<Outcome>((resolve) => {
@@ -187,7 +194,7 @@ export async function readChain<T>(
     }, timeoutMs);
   });
   try {
-    const outcome = await Promise.race([attempt({ url, fetcher, signal: controller.signal, maxBytes }), late]);
+    const outcome = await Promise.race([attempt({ url, fetcher, signal, maxBytes }), late]);
     if ("kind" in outcome) return failed(outcome.kind, outcome.status);
     const parsed = schema.safeParse(outcome.value);
     return parsed.success ? { ok: true, value: parsed.data, source } : failed("wrong-shape");

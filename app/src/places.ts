@@ -33,6 +33,8 @@ export interface UniverseView {
   isDefault: boolean;
   /** A testnet's pages are not indexed (ADR-0002 §2). */
   testnet: boolean;
+  /** The chain's RPC address, where the home reads the block height. */
+  rpc: string;
   home: { path: string; canonical: string };
   earth: { path: string; canonical: string };
   worlds: Listed[];
@@ -46,7 +48,7 @@ interface Row {
   universe: string;
 }
 interface Source {
-  universes: { id: string; name: string; default?: boolean | undefined; testnet?: boolean | undefined }[];
+  universes: { id: string; name: string; rpc: string; default?: boolean | undefined; testnet?: boolean | undefined }[];
   hubs: Row[];
   ecosystems: Row[];
   stations: Row[];
@@ -153,6 +155,7 @@ function build(source: Source) {
       name: universe.name,
       isDefault: universe.default === true,
       testnet: testnets.has(universe.id),
+      rpc: universe.rpc,
       home: { path: at("cosmos").path, canonical: at("cosmos").canonical },
       earth: { path: at("earth").path, canonical: at("earth").canonical },
       worlds: worlds.filter((world) => world.universe === universe.id),

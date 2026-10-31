@@ -435,6 +435,10 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "web's room for 1,024 connections" "forty visitors at their 16 WebSockets each, and another is served" \
 		nginx sed 's#worker_connections [0-9]*;#worker_connections 1024;#'
 	mutant "web's files left to Docker's default" "web may hold 8,192 files" compose 'services: { web: { ulimits: !reset {} } }'
+	mutant "web does not mount markets" "web serves markets.json from the volume" \
+		compose 'services: { web: { volumes: !override [] } }'
+	mutant "web mounts markets writable" "web cannot write in the folder of markets.json" \
+		compose 'services: { web: { volumes: !override [ "markets:/markets" ] } }'
 	mutant "the server may write Ergo's volume" "the server holds Ergo's volume read-only" \
 		compose 'services: { server: { volumes: !override [ "server:/data", "auth:/run/gnoworld", "ergo:/ergo" ] } }'
 	mutant "the server measures another volume" "and it is Ergo's own volume" \
@@ -1330,6 +1334,17 @@ setTimeout(() => {
 	# markets.json's folder is the volume the server may write in, as 65532, on a read-only root (5l).
 	expect "the server may write in the folder of markets.json" "$(docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); f.writeFileSync('/markets/probe', 'x'); f.unlinkSync('/markets/probe'); console.log('written')" 2>&1 || true)" written
 	expect "and nothing else" "$(fetched https://example.com/)" refused
+	# markets.json through the web container (5m): a file the server wrote, read-only there, kept for a minute, with the
+	# server's headers (the location adds none of its own); the proof that Compose's volume, nginx's location and its cache
+	# line agree. The timer's file is replaced for the run and removed after: the timer writes it again.
+	docker exec "$server" /nodejs/bin/node -e "require('fs').writeFileSync('/markets/markets.json', JSON.stringify({ source: 'CoinGecko', updated: new Date().toISOString(), tokens: [] }))" >/dev/null 2>&1 || true
+	expect "web serves markets.json from the volume the server writes" "$(status /markets.json 203.0.113.1 -u "$auth")" 200
+	expect "web serves markets.json with a short cache" "$(header cache-control /markets.json 203.0.113.1 -u "$auth")" "public, max-age=60"
+	expect "web serves markets.json never sniffed" "$(header x-content-type-options /markets.json 203.0.113.1 -u "$auth")" nosniff
+	expect "web serves markets.json as JSON" "$(header content-type /markets.json 203.0.113.1 -u "$auth")" application/json
+	expect "web cannot write in the folder of markets.json" "$(docker exec "$web" sh -c 'touch /markets/probe 2>&1 && echo written || echo refused' | tail -n 1)" refused
+	docker exec "$server" /nodejs/bin/node -e "require('fs').unlinkSync('/markets/markets.json')" >/dev/null 2>&1 || true
+	expect "web answers a missing markets.json with a 404" "$(status /markets.json 203.0.113.2 -u "$auth")" 404
 	# It resolves before it connects (smokescreen.go, safeResolve): a public name for a private address is refused,
 	# whatever its list says. An ad hoc proxy of the same image and the live settings, its list its own, in the
 	# guard's network on 4751, asked from there: the guard's rules let only 4750's replies out to the network.

@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "id": "sample-event-community-call",
+    "title": "Community call, date to be confirmed",
+    "start": "2099-12-31T00:00:00Z",
+    "link": "https://gno.land/"
+  },
+  {
+    "id": "sample-event-demo-session",
+    "title": "Demo session of gno.world, date to be confirmed",
+    "start": "2099-12-30T00:00:00Z",
+    "link": "https://gno.land/"
+  }
+]

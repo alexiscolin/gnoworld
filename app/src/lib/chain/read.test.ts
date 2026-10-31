@@ -12,7 +12,7 @@ const GOOD = JSON.stringify({ height: "42" });
 
 const respond = (body: BodyInit | null, init?: ResponseInit): ChainFetch =>
   vi.fn(() => Promise.resolve(new Response(body, init)));
-const read = (fetcher: ChainFetch, options: { timeoutMs?: number; maxBytes?: number } = {}) =>
+const read = (fetcher: ChainFetch, options: { timeoutMs?: number; maxBytes?: number; signal?: AbortSignal } = {}) =>
   readChain(URL_OK, Answer, { fetch: fetcher, now: () => NOW, ...options });
 
 // A body of exactly `bytes` bytes that is JSON: a string padded with "a".
@@ -145,6 +145,31 @@ describe("readChain, the time", () => {
     const pending = read(respond(GOOD), { timeoutMs: 1000 });
     expect(await pending).toMatchObject({ ok: true });
     await vi.advanceTimersByTimeAsync(5000);
+  });
+});
+
+describe("readChain, a caller that leaves", () => {
+  it("ends the request when the caller's signal aborts, with no timer left, as the home's reads end when its page leaves", async () => {
+    const seen: (AbortSignal | null | undefined)[] = [];
+    const slow: ChainFetch = (_url, init) =>
+      new Promise((_resolve, reject) => {
+        seen.push(init?.signal);
+        init?.signal?.addEventListener("abort", () => {
+          reject(new DOMException("aborted", "AbortError"));
+        });
+      });
+    const caller = new AbortController();
+    const pending = read(slow, { signal: caller.signal });
+    await vi.advanceTimersByTimeAsync(10);
+    expect(seen[0]?.aborted).toBe(false);
+    caller.abort();
+    expect(failureOf(await pending).kind).toBe("down");
+    expect(seen[0]?.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("asks as before with no signal given", async () => {
+    expect((await read(respond(GOOD))).ok).toBe(true);
   });
 });
 

@@ -34,6 +34,9 @@ services:
       inside:
         ipv4_address: *web-address
     secrets: [demo_htpasswd]
+    # markets.json, which the server writes (5l) and this serves at /markets.json (5m): read-only here.
+    volumes:
+      - markets:/markets:ro
     cpus: 0.5
     mem_limit: 128m
     pids_limit: 64

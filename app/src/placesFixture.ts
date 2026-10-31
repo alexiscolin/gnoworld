@@ -9,8 +9,8 @@ const row = (slug: string, universe: string, name = slug.toUpperCase()) => ({
 
 export const FIXTURE = {
   universes: [
-    { id: "onyx", name: "Onyx", default: true as const },
-    { id: "gnoland", name: "gno.land" },
+    { id: "onyx", name: "Onyx", rpc: "https://rpc.onyx.example.test", default: true as const },
+    { id: "gnoland", name: "gno.land", rpc: "https://rpc.gnoland.example.test" },
   ],
   hubs: [row("bubble", "onyx", "Bubble"), row("other", "gnoland", "Other")],
   ecosystems: [row("tokens", "onyx", "Tokens"), row("tokens", "gnoland", "Tokens of gno.land")],
@@ -32,8 +32,8 @@ const planted = (slug: string, universe: string, name: string) => ({
 
 export const PLANTED = {
   universes: [
-    { id: "main", name: "Mainland", default: true as const },
-    { id: "lab", name: "Lab", testnet: true as const },
+    { id: "main", name: "Mainland", rpc: "https://rpc.main.example.test", default: true as const },
+    { id: "lab", name: "Lab", rpc: "https://rpc.lab.example.test", testnet: true as const },
   ],
   hubs: [planted("alpha", "main", "Alpha"), planted("beta", "main", "Beta"), planted("gamma", "lab", "Gamma")],
   ecosystems: [],
