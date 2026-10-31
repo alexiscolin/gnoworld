@@ -348,6 +348,19 @@ describe("your own message", () => {
     expect(out.bubbles[0]?.text).toBe("x".repeat(RULES.maxChars));
   });
 
+  it("draws nothing when it is one cluster over the limit: the cut leaves nothing to say", () => {
+    const out = pick([mine({ text: `a${"́".repeat(40)}` })]);
+    expect(out.bubbles).toEqual([]);
+    expect(out.counts).toEqual([]);
+  });
+
+  it("is counted when the screen holds only yours and no other's place can be taken", () => {
+    const rules: Rules = { ...RULES, maxOnScreen: 1 };
+    const out = pickBubbles([mine(), mine({ id: "second", country: "FR", at: NOW - 70_000 })], NOW, ME, rules, []);
+    expect(ids(out.bubbles)).toEqual(["mine"]);
+    expect(countOf(out.counts, "FR")).toBe(1);
+  });
+
   it("is never shown without a declared country, in a private room or a direct message, or once hidden", () => {
     expect(ids(pick([mine()]).bubbles)).toEqual(["mine"]);
     for (const m of [
@@ -445,6 +458,12 @@ describe("the text", () => {
 
   it("drops a message whose text is blank once it is cleaned: nothing to say", () => {
     const out = pick([msg(1, { text: "\u200b\u202e\n" }), msg(2, { country: "JP", at: NOW - 5000 })]);
+    expect(ids(out.bubbles)).toEqual(["m2"]);
+    expect(out.counts).toEqual([]);
+  });
+
+  it("drops a message that is one cluster over the limit: it takes no country's place and no speaker's delay", () => {
+    const out = pick([msg(1, { text: `a${"́".repeat(40)}` }), msg(2, { country: "FR", at: NOW - 5000 })]);
     expect(ids(out.bubbles)).toEqual(["m2"]);
     expect(out.counts).toEqual([]);
   });
