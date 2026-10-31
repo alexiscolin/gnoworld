@@ -227,7 +227,7 @@ describe("a world's plate", () => {
 
   // F2865: the page reads and tabs in the order it is drawn on a computer, the plate first; a phone draws the chat above it by CSS
   // alone (worldPage.spec.ts).
-  test("keeps the plate before the chat's slot in the page, so a reader meets the title first (F2865)", async () => {
+  test("keeps the chat's slot in the page, after the plate opens", async () => {
     const { html } = await plateOf();
     expect(html).toMatch(/<section [^>]*data-look="plate"[\s\S]*<div id="chat"[^>]*>[\s\S]*Loading the chat/);
   });

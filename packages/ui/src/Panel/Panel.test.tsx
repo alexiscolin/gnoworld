@@ -113,7 +113,7 @@ describe("Panel", () => {
 
   // F3259: the page's layout round a plate: the plate in its place, one outline no reader meets, and what stands beside it.
   describe("Panel.Layout", () => {
-    it("holds the plate in its place first, then what stands beside it, after an outline no reader meets", () => {
+    it("holds the plate in its place, then what stands beside it, after an outline no reader meets", () => {
       const { container } = render(
         <Panel.Layout
           plate={
