@@ -14,7 +14,6 @@ const FACTS = {
   path: REALM,
   deployer: "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5",
   firstBlock: 786661,
-  callsPerDay: 96,
 };
 
 const answering = (body: unknown, init?: ResponseInit) =>
@@ -97,8 +96,6 @@ describe("readRealmFacts", () => {
     ["a deployer that is no text", withFacts({ deployer: { a: 1 } })],
     ["a first block as text", withFacts({ firstBlock: "7" })],
     ["a negative first block", withFacts({ firstBlock: -1 })],
-    ["a fractional calls count", withFacts({ callsPerDay: 1.5 })],
-    ["a calls count past a safe integer", withFacts({ callsPerDay: 2 ** 60 })],
     ["facts that are no object", withFacts("x")],
     ["an overlong path", withFacts({ path: `gno.land/r/${"a".repeat(300)}` })],
     ["an overlong deployer", withFacts({ deployer: "g".repeat(200) })],

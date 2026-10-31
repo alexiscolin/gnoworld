@@ -1,7 +1,7 @@
 // What the browser reads from the public indexer for a realm's facts (slice 5 part 2, 5k). THE SHAPE IS OURS, NOT RECORDED: no
 // indexer answer has been read through gnomcp yet (ledger F2950), so this is the shape the reader asks for and refuses anything
 // else by; the day a recording differs, this file and its test are what change. The indexer has no time field (F2950), so no fact
-// here may be a count by date (`callsPerDay` waits on F2974). Every text is capped, every count is a whole number: what an account
+// here may be a count by date (the calls in 24 h wait on an indexer with dates, F2974). Every text is capped, every count is a whole number: what an account
 // or a realm wrote reaches the page as bounded text or not at all.
 import { z } from "./zod.ts";
 
@@ -15,7 +15,6 @@ const RealmFacts = z.object({
   path: z.optional(z.string().check(z.maxLength(REALM_FACTS_CAPS.path))),
   deployer: z.optional(z.string().check(z.maxLength(REALM_FACTS_CAPS.deployer))),
   firstBlock: z.optional(count),
-  callsPerDay: z.optional(count),
 });
 export type RealmFactsValue = z.infer<typeof RealmFacts>;
 

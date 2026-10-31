@@ -9,7 +9,6 @@ const FACTS = {
   path: "gno.land/r/demo/hostile",
   deployer: "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5",
   firstBlock: 12345,
-  callsPerDay: 96,
 };
 
 // The realm a request asks about, from its `variables`.

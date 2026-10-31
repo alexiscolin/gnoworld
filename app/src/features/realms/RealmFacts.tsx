@@ -1,4 +1,4 @@
-// A realm's facts from the public indexer (5k, ADR-0002 §4): its path, its deployer, its first block and its calls in 24 h, each
+// A realm's facts from the public indexer (5k, ADR-0002 §4): its path, its deployer, its first block, each
 // one drawn only when the indexer gave it (never a zero in its place), with the source and the time of the read. Everything the
 // indexer returns is text, in left-to-right, in an element of its own.
 import type { RealmFactsValue } from "@gnoworld/schemas";
@@ -20,7 +20,7 @@ function Fact({ label, children, ltr = false }: { label: string; children: strin
 
 export function RealmFacts({ read }: { read: ChainRead<RealmFactsValue> }) {
   if (!read.ok) return <ReadFailed failure={read.failure} source={read.source} role="status" />;
-  const { path, deployer, firstBlock, callsPerDay } = read.value;
+  const { path, deployer, firstBlock } = read.value;
   return (
     <section aria-label="Facts from the indexer">
       <dl>
@@ -35,7 +35,6 @@ export function RealmFacts({ read }: { read: ChainRead<RealmFactsValue> }) {
           </Fact>
         )}
         {firstBlock === undefined ? null : <Fact label="First block">{grouped(firstBlock)}</Fact>}
-        {callsPerDay === undefined ? null : <Fact label="Calls in 24 h">{grouped(callsPerDay)}</Fact>}
       </dl>
       <ReadSource source={read.source} />
     </section>

@@ -99,7 +99,6 @@ test.describe("a realm's view", () => {
     await hydrated(page);
     const facts = page.getByRole("main").getByRole("region", { name: "Facts from the indexer" });
     await expect(facts).toContainText("12,345");
-    await expect(facts).toContainText("96");
     await expect(facts).toContainText("Read from indexer.onyx.testnets.gno.land at ");
     expect(await violations(page)).toEqual([]);
     await page.waitForTimeout(1000);

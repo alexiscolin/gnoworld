@@ -13,7 +13,6 @@ const FACTS: RealmFactsValue = {
   path: "gno.land/r/gnoland/wugnot",
   deployer: "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5",
   firstBlock: 786661,
-  callsPerDay: 96,
 };
 const ok = (value: RealmFactsValue): ChainRead<RealmFactsValue> => ({ ok: true, value, source: SOURCE });
 
@@ -31,7 +30,7 @@ function valueOf(el: HTMLElement, label: string): Element | null {
   const term = [...el.querySelectorAll("dt")].find((node) => node.textContent === label);
   return term?.nextElementSibling ?? null;
 }
-const LABELS = ["Path", "Deployer", "First block", "Calls in 24 h"];
+const LABELS = ["Path", "Deployer", "First block"];
 
 describe("a realm's facts", () => {
   it("pairs each label with its own value", () => {
@@ -39,7 +38,6 @@ describe("a realm's facts", () => {
     expect(valueOf(el, "Path")?.textContent).toBe("gno.land/r/gnoland/wugnot");
     expect(valueOf(el, "Deployer")?.textContent).toBe("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
     expect(valueOf(el, "First block")?.textContent).toBe("786,661");
-    expect(valueOf(el, "Calls in 24 h")?.textContent).toBe("96");
   });
 
   it("names the source and the time it was asked, as a machine-readable time with a visible age", () => {
@@ -53,7 +51,6 @@ describe("a realm's facts", () => {
   it("leaves out a fact the indexer did not give, label and value, and shows no zero in its place", () => {
     const el = draw(ok({ path: FACTS.path, deployer: FACTS.deployer }));
     expect(valueOf(el, "First block")).toBeNull();
-    expect(valueOf(el, "Calls in 24 h")).toBeNull();
     expect([...el.querySelectorAll("dd")].map((node) => node.textContent)).toEqual([FACTS.path, FACTS.deployer]);
   });
 
@@ -62,12 +59,10 @@ describe("a realm's facts", () => {
     expect(valueOf(el, "Path")?.getAttribute("dir")).toBe("ltr");
     expect(valueOf(el, "Deployer")?.getAttribute("dir")).toBe("ltr");
     expect(valueOf(el, "First block")?.hasAttribute("dir")).toBe(false);
-    expect(valueOf(el, "Calls in 24 h")?.hasAttribute("dir")).toBe(false);
   });
 
-  it("shows a real 0 calls and a real block 0 as a 0 under their own labels", () => {
-    const el = draw(ok({ ...FACTS, callsPerDay: 0, firstBlock: 0 }));
-    expect(valueOf(el, "Calls in 24 h")?.textContent).toBe("0");
+  it("shows a real block 0 as a 0 under its own label", () => {
+    const el = draw(ok({ ...FACTS, firstBlock: 0 }));
     expect(valueOf(el, "First block")?.textContent).toBe("0");
   });
 

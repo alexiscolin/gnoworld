@@ -19,7 +19,6 @@ const FACTS = {
   path: "gno.land/r/gnoland/wugnot",
   deployer: "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5",
   firstBlock: 12,
-  callsPerDay: 96,
 };
 
 // A fetch that answers /status with a height, the indexer with `facts` (or as `indexer` says) and any query with `page`; or
@@ -112,7 +111,7 @@ describe("a realm's view", () => {
     const fetcher = chain(WUGNOT?.body ?? null);
     const box = await view(fetcher);
     const facts = one(box, '[aria-label="Facts from the indexer"]');
-    expect(facts.textContent).toContain("96");
+    expect(facts.textContent).toContain("gno.land/r/gnoland/wugnot");
     expect(facts.textContent).toContain("Read from indexer.onyx.testnets.gno.land at ");
     const asked = fetcher.mock.calls.map(([url]) => url).find((url) => url.startsWith("https://indexer."));
     expect(decodeURIComponent(asked ?? "")).toContain('"path":"gno.land/r/gnoland/wugnot"');
@@ -132,7 +131,7 @@ describe("a realm's view", () => {
   test("shows the facts while the page could not be read, each read on its own", async () => {
     const box = await view(chain(null, { error: "down" }));
     expect(one(box, '[role="alert"]').textContent).toContain("could not be read");
-    expect(one(box, '[aria-label="Facts from the indexer"]').textContent).toContain("96");
+    expect(one(box, '[aria-label="Facts from the indexer"]').textContent).toContain("gno.land/r/gnoland/wugnot");
   });
 
   test("shows a page's form read only, and a link off gnoweb behind a button, whatever the realm wrote", async () => {
