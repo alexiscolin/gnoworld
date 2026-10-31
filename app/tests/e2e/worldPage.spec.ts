@@ -66,14 +66,14 @@ test.describe("a world's page at the video's size", () => {
     near(second.y, first.y, "Share's top");
   });
 
-  test("the activity block says in words that no history is known, and draws no chart or fact for Bubble", async ({
+  test("the activity block says in words that no history is known, and draws no chart or rate for Bubble", async ({
     page,
   }) => {
     await page.goto("/w/bubble");
     await hydrated(page);
     await expect(page.getByText(/no activity (recorded|known) yet/i)).toBeVisible();
     await expect(page.locator("[data-look='plate'] [data-hour]")).toHaveCount(0);
-    await expect(page.getByText("right now", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("messages now")).toHaveCount(0);
     await expect(page.getByText(/connected worlds/i)).toHaveCount(0);
   });
 });
@@ -89,6 +89,23 @@ test.describe("Say hi in the chat", () => {
       await expect(page.locator("#chat textarea")).toBeFocused();
     });
   }
+});
+
+// F2868: who is here comes from the chat, once it has connected; the page draws no rate (nothing gives one).
+test.describe("who is here right now", () => {
+  test.use({ viewport: { width: 1728, height: 1080 }, deviceScaleFactor: 1 });
+
+  test("appears in the plate once the chat has connected, as a count of people, and writes no rate", async ({
+    page,
+  }) => {
+    await page.goto("/w/bubble");
+    await hydrated(page);
+    const plate = page.locator("[data-look='plate']");
+    await expect(plate.getByText("right now", { exact: true })).toBeVisible();
+    const people = Number(await plate.locator("[data-value]").first().getAttribute("data-value"));
+    expect(people).toBeGreaterThan(0);
+    await expect(plate.getByText("messages now")).toHaveCount(0);
+  });
 });
 
 test.describe("Share", () => {

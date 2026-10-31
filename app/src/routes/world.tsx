@@ -6,7 +6,7 @@ import { failedWorldMeta, ORIGIN, worldMeta } from "../meta.ts";
 import { pageOf, site, type World as WorldPlace } from "../places.ts";
 import { Chat, type ChatPlace } from "../features/chat/index.ts";
 import { isMissing, PageError } from "../features/errors/index.ts";
-import { Actions, Activity } from "../features/world/index.ts";
+import { Actions, Activity, Here } from "../features/world/index.ts";
 import styles from "./world.module.css";
 
 export function loader({ request }: { request: Request }) {
@@ -52,7 +52,9 @@ export default function World() {
               <Kicker>{universe.name}</Kicker>
               <h1>{world.name}</h1>
               <p>{world.description}</p>
-              {/* No source yet for the history: the block says so. The connected worlds have none either (Connected: a component test only). Who is here has one, the chat's members in the store, but its block costs the first screen 240 bytes more than ADR-0001's 170 KiB (budgets.spec.ts): parked for a decision (F2868). */}
+              {/* Who is here comes from the chat once it has connected; no source gives the rate, nor a link to another world (Connected: a component test only). */}
+              <Here />
+              {/* No source yet for the history: the block says so. */}
               <Activity />
               <Actions address={ORIGIN + world.canonical} />
             </Stack>

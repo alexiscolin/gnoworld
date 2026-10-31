@@ -67,7 +67,8 @@ const TARGET = ["chrome112", "edge112", "firefox125", "safari17", "ios17"];
 const CHUNKS = [
   { name: "store", test: /\/app\/src\/store\// },
   // The activity chart is no part of it: a world's page loads the bars apart, once it has a history (F304, slice 5j).
-  { name: "ui", test: /\/packages\/ui\/src\/(?!ActivityChart\/)/ },
+  // The stat is none of it either: the figure of who is here comes once the chat has someone to count (F2868).
+  { name: "ui", test: /\/packages\/ui\/src\/(?!(?:ActivityChart|Stat)\/)/ },
   { name: "vendor", test: /node_modules/, minShareCount: 2 },
 ];
 
