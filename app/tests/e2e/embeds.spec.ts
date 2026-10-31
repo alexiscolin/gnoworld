@@ -53,7 +53,7 @@ async function room(page: Page, verdicts: () => string, status = 200): Promise<R
     socket = ergo;
     scriptedErgo(ergo, GUEST, { history: HISTORY });
   });
-  await page.goto("/w/bubble?room=games");
+  await page.goto("/w/bubble?room=games&chat=full");
   await hydrated(page);
   await expect(lines(page)).toHaveCount(2);
   const say = (id: string, text: string, time = new Date().toISOString()) => {

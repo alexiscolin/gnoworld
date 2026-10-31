@@ -1,0 +1,17 @@
+/* Who is here, as the video's info panel draws it: a row a rule under each, the person at its start. */
+@layer components {
+  .row {
+    padding-block: var(--space-2xs);
+    border-block-end: var(--line-width) solid var(--color-line);
+  }
+
+  /* A person the reader may write to: face and name in one button, plain as the row's words are. */
+  .person {
+    border-radius: var(--radius-s);
+    cursor: pointer;
+  }
+
+  .person:hover {
+    background: var(--color-fill);
+  }
+}

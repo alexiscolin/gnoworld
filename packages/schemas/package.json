@@ -2,6 +2,9 @@
   "name": "@gnoworld/schemas",
   "private": true,
   "type": "module",
+  "sideEffects": [
+    "./src/zod.ts"
+  ],
   "exports": {
     ".": "./src/index.ts"
   },

@@ -62,19 +62,19 @@ Panel.Layout = Layout;
 interface LayoutProps {
   /** The plate: a Panel of the plate look. */
   plate: ReactNode;
-  /** What the page holds beside the plate: it keeps to the plate's right on a wide screen, and follows it in the page otherwise. */
+  /** The dock at the plate's right, inside the same outline, on a wide screen; under that width it takes no place of its own,
+   * and what it holds (a chat) takes the page. */
   children?: ReactNode;
 }
 
-/** A world's page: the plate first in the page, so it reads and tabs as it is drawn from 900 px; under 900 px the chat is drawn above
- * it by CSS (DESIGN-SYSTEM.md, Breakpoints: chat first). On a wide screen the plate is fixed at the left, inside one outline
- * the scene and the dock will share. The widths are this sheet's alone. */
+/** A world's page: the plate and what stands beside it. On a wide screen the plate is fixed at the left, inside one outline
+ * the scene and the dock share; under that width it is a block in the page. The width is this sheet's alone. */
 function Layout({ plate, children }: LayoutProps) {
   return (
-    <div className={styles["layout"]}>
+    <div>
       <div className={styles["frame"]} aria-hidden="true" />
       <div className={styles["place"]}>{plate}</div>
-      {children}
+      {children === undefined ? null : <div className={styles["dock"]}>{children}</div>}
     </div>
   );
 }

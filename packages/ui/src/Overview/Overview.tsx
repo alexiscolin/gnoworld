@@ -4,7 +4,6 @@ import { Center, Cluster, Grid, Sidebar, Stack, Switcher } from "../compositions
 import { EmptyState } from "../EmptyState/EmptyState.tsx";
 import { Flash } from "../Flash/Flash.tsx";
 import { Icon, ICON_NAMES } from "../icons/Icon.tsx";
-import { Kicker } from "../Kicker/Kicker.tsx";
 import { Skeleton } from "../Skeleton/Skeleton.tsx";
 import {
   Activity,
@@ -20,7 +19,9 @@ import {
   Stats,
   TabRows,
 } from "./Interface.tsx";
-import { Frames } from "./Frames.tsx";
+import { NavItems } from "./NavItems.tsx";
+import { Kicker } from "../Kicker/Kicker.tsx";
+import { Frames, Kickers, Layout } from "./Frames.tsx";
 import { Region } from "./Region.tsx";
 
 function Buttons() {
@@ -129,12 +130,7 @@ export function Overview() {
         <IconButtons />
       </Region>
       <Region name="Kickers">
-        <Cluster space="l">
-          <Kicker>On chain · 96 calls a day</Kicker>
-          <Kicker dot="warm">Live</Kicker>
-          <Kicker dot="mine">Your vote</Kicker>
-          <Kicker dot="signal">An uncharted signal</Kicker>
-        </Cluster>
+        <Kickers />
       </Region>
       <Frames />
       <Region name="Flashes">
@@ -171,6 +167,7 @@ export function Overview() {
       </Region>
       <Region name="Rows">
         <Rows />
+        <NavItems />
       </Region>
       <Region name="Fields">
         <Fields />
@@ -189,6 +186,9 @@ export function Overview() {
       </Region>
       <Region name="Links">
         <Links />
+      </Region>
+      <Region name="Chat layout">
+        <Layout />
       </Region>
       <Region name="Text">
         <Text />

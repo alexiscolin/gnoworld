@@ -17,6 +17,13 @@
       box-shadow var(--motion-fast) var(--ease-standard);
   }
 
+  .button[data-size="xs"] {
+    --_h: var(--control-xs);
+
+    /* The smallest control is its icon in its edge: no padding to make it taller than its size. */
+    padding-block: 0;
+  }
+
   .button[data-size="s"] {
     --_h: var(--control-s);
   }

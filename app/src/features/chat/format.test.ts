@@ -1,7 +1,7 @@
 import { markdown } from "@gnoworld/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { formatted, type Edit, type Format } from "./format.ts";
+import { formatted, inserted, type Edit, type Format } from "./format.ts";
 
 // A draft with its selection written in it: « and » around what is selected, | where the caret is.
 function draft(marked: string): Edit {
@@ -206,5 +206,17 @@ describe("formatted, at the edges StrykerJS found", () => {
     { text: "a > b", start: 0, end: 0, format: "quote", result: { text: "> a > b", start: 2, end: 2 } },
   ])("makes, of $text from $start to $end in $format, $result.text", ({ text, start, end, format, result }) => {
     expect(formatted({ text, start, end }, format)).toStrictEqual(result);
+  });
+});
+
+// 5q: the composer's @ and / buttons put their mark where the selection is, and the caret after it.
+describe("inserted", () => {
+  it("puts the mark at the caret and the caret after it", () => {
+    expect(inserted(draft("hi |there"), "@")).toEqual({ text: "hi @there", start: 4, end: 4 });
+    expect(inserted(draft("|"), "/")).toEqual({ text: "/", start: 1, end: 1 });
+  });
+
+  it("replaces a selection, as typing over it would", () => {
+    expect(inserted(draft("say «this» now"), "@")).toEqual({ text: "say @ now", start: 5, end: 5 });
   });
 });

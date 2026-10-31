@@ -49,29 +49,24 @@
     display: none;
   }
 
-  /* The plate is first in the page, as it is drawn from 900 px; what stands beside it is drawn first on a phone, the first thing it shows. */
-  .layout {
-    /* layout: the order of the page's parts is the screen's, not the reader's */
-    display: flex;
-    /* layout: the chat above the plate */
-    flex-direction: column;
-  }
-
-  /* raw: the phone layout's width less a pixel: 900 px is the computer's (DESIGN-SYSTEM.md, Breakpoints) */
-  @media (max-width: 899.98px) {
-    .layout > :not(.place, .frame) {
-      /* layout: the chat above the plate */
-      order: -1;
-    }
-  }
-
-  /* The one breakpoint of the plate beside a page: the video's width, where its frames draw the plate. The room's message list is
-     then 414 px (the width less 1313: its rooms and people eat the rest), and 400 at least from here; slice 5q puts the dock at the right. */
-  /* raw: the video's width */
-  @media (min-width: 1728px) {
-    .layout {
-      /* raw: the plate's 24 px of margin, its width, and 24 px between it and the page's content (frame 20) */
-      padding-inline-start: calc(var(--plate-w) + 2 * var(--space-m));
+  /* The one breakpoint of the plate and the dock beside it: 808, 320 and the margins leave 104 px of sky at 1280. Under it the
+     plate is a block in the page and the chat takes the page, as a phone's does (DESIGN-SYSTEM.md, Breakpoints). */
+  /* raw: the width where the plate and the dock fit with a sky between */
+  @media (min-width: 1280px) {
+    .dock {
+      position: fixed;
+      /* raw: above the page's header, which the full chat covers (shellHeader.module.css holds 2) */
+      z-index: 3;
+      /* raw: inside the outline: the header's clearance of 96 and the 2 px the frame keeps under it, then 24 from the edges (frame 26) */
+      inset-block: 98px var(--space-m);
+      inset-inline-end: var(--space-m);
+      /* raw: 320 under 1400 px (DESIGN-SYSTEM.md, Layout) */
+      inline-size: 320px;
+      overflow: clip;
+      /* raw: the outline's own colour and edge, drawn over its right side, which the dock covers */
+      border: var(--line-width) solid #2c313c;
+      border-start-end-radius: var(--radius-l);
+      border-end-end-radius: var(--radius-l);
     }
 
     .place {
@@ -182,6 +177,13 @@
     .panel[data-look="plate"][data-fit="more"] h1 {
       /* raw: the prototype's and the frames' own value */
       font-size: 36px;
+    }
+  }
+
+  /* raw: the dock's own width, from the 1400 px the design system names */
+  @media (min-width: 1400px) {
+    .dock {
+      inline-size: var(--chat-dock);
     }
   }
 }

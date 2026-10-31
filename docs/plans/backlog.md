@@ -164,7 +164,7 @@ takes its lines. A slice's plan names the video's frames each of its screens is 
 | What | Goes to |
 |---|---|
 | The header, the plate, the home's layout, the list, "Testnet" | 5r |
-| The compact dock, the opt-in country tag, the person card, the bell and notifications by kind, the room's Media tab | 5s |
+| The opt-in country tag, the person card, the bell and notifications by kind, the room's Media tab | 7 (Alexis, 2026-10-31; the compact dock is in 5q) |
 | The rail: its order, its cap of 25, "See all" | 7 |
 | Open Graph images and the preview-capture job, moved from slice 5 (question 5) | 7 |
 | The "Credits" link for the CC BY textures (`docs/DESIGN-SYSTEM.md:403`) | 7, with the first texture |

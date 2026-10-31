@@ -1,10 +1,7 @@
-/* The world's chat slot: a jump to it (the plate's "Say hi in the chat") lands under the header, which is sticky from 900 px. */
+/* The world's chat slot, inside the dock: it fills it, so the chat keeps the dock's whole height (frame 26). */
 @layer components {
-  /* raw: the phone layout's width, 900 px: under it the header scrolls away */
-  @media (min-width: 900px) {
-    .chat {
-      /* raw: the header's 96 px (shellHeader.module.css) */
-      scroll-margin-block-start: 96px;
-    }
+  .chat {
+    /* layout: the chat takes the dock's height */
+    block-size: 100%;
   }
 }

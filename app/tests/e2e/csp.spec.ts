@@ -1,11 +1,12 @@
 import { readFileSync } from "node:fs";
 import { controlled, expect, hydrated, PAGES, test, type Page } from "./fixtures.ts";
+import { headerRules, nginxTable } from "./cspFiles.mjs";
 import { GUARDED, SITE } from "./sites.ts";
 
 // The policy's shape: the unit test pins its words, this the page's every answer (slice 3's plan, 3f).
 const SHAPE = new RegExp(
   "^default-src 'none'; script-src 'self'( 'sha256-[A-Za-z0-9+/]{43}=')*; style-src 'self'; img-src 'self' data:; " +
-    "font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; " +
+    "font-src 'self'; connect-src 'self'( https://[a-z0-9.:-]+)*; worker-src 'self'; manifest-src 'self'; " +
     "frame-src https://www.youtube-nocookie.com/embed/ https://player.vimeo.com/video/ https://giphy.com/embed/; " +
     "base-uri 'none'; " +
     "form-action 'self'; frame-ancestors 'none'$",
@@ -40,7 +41,7 @@ test.describe("the content security policy", () => {
   // F2451: a _headers host matches the request path, and a path no page names is served a document that runs the app.
   test("gives a path the build never made the catch-all's policy, not none", async ({ request }) => {
     const headers = readFileSync(new URL("client/_headers", BUILD), "utf8");
-    const catchAll = /^\/\*\n(?: {2}.*\n)*? {2}Content-Security-Policy: (.+)$/m.exec(headers)?.[1];
+    const catchAll = headerRules(headers).get("/*");
     expect(catchAll).toMatch(SHAPE);
     expect(catchAll?.match(HASH)?.length).toBeGreaterThan(5);
     for (const path of ["/nowhere", "/w/Bubble", "/net/onyx/w/none/", "/w/bubble/index.html"]) {
@@ -73,16 +74,8 @@ test.describe("the content security policy", () => {
     const nginx = readFileSync(new URL("csp.conf", BUILD), "utf8");
     expect(nginx).toMatch(/^map \$uri \$csp \{$/m);
     // Read as a host and nginx read them, apart from how the build wrote them: a rule's path, its policy line; a key, its value.
-    const rules = new Map<string, string>();
-    let rule = "";
-    for (const line of headers.split("\n")) {
-      if (/^\S/.test(line)) rule = line;
-      const found = /^ {2}Content-Security-Policy: (.+)$/.exec(line)?.[1];
-      if (found !== undefined) rules.set(rule, found);
-    }
-    const table = new Map(
-      [...nginx.matchAll(/^\s*"?([^"\s]+)"?\s+"([^"]*)";$/gm)].map((match) => [match[1] ?? "", match[2] ?? ""]),
-    );
+    const rules = headerRules(headers);
+    const table = nginxTable(nginx);
     for (const path of PAGES) {
       const served = String((await request.get(path)).headers()["content-security-policy"]);
       expect(rules.get(path), path).toBe(served);
@@ -214,6 +207,37 @@ test.describe("a planted violation", () => {
       await plant(page, `const f = document.createElement('iframe'); f.src = '${src}'; document.body.append(f)`);
     }
     await expect.poll(() => violations).toEqual(["frame-src", "frame-src", "frame-src"]);
+  });
+
+  // 5g: connect-src names the data's RPC origins, so a fetch to one is let through (answered here, the test reaching no
+  // one) and the same fetch to any other https host is refused: what the browser enforces, not a header compared with itself (F461).
+  test("lets a fetch through to a listed RPC origin and refuses one to an unlisted https host, once", async ({
+    page,
+    violations,
+  }) => {
+    await page.route(/^https:\/\/rpc\.(?:gno\.land|onyx\.testnets\.gno\.land)\//, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        headers: { "access-control-allow-origin": "*" },
+        body: "{}",
+      }),
+    );
+    await page.goto("/");
+    await hydrated(page);
+    const reached = await page.evaluate(() =>
+      Promise.all(
+        ["https://rpc.gno.land/status", "https://rpc.onyx.testnets.gno.land/status"].map((url) =>
+          fetch(url).then(
+            () => "reached",
+            () => "refused",
+          ),
+        ),
+      ),
+    );
+    expect(reached).toEqual(["reached", "reached"]);
+    await plant(page, "fetch('https://rpc.evil.example/status').catch(() => undefined)");
+    await expect.poll(() => violations).toEqual(["connect-src"]);
   });
 
   test("is reported from a second tab of the same context too", async ({ page, violations }) => {

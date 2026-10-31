@@ -21,7 +21,7 @@ that changes the harness has written it before any hook runs, and its commit is 
 it at once (`git merge --abort`). Pushing `main` wants the hooks installed from it. The gate needs Node 24.22.0 (from `.node-version`, found through nvm when the shell
 has another; in a shell, `nvm use` picks it, since `.nvmrc` links to `.node-version`; nvm must be loaded
 first, by `source ~/.nvm/nvm.sh` or the shell's profile), pnpm, Go 1.26, Python 3, gitleaks, and a gno toolchain that matches the chain.
-The app's journeys need Playwright's Chromium, once per Playwright version: `node app/node_modules/@playwright/test/cli.js install chromium`
+The app's journeys need Playwright's Chromium, once per Playwright version (a commit's gate walks none: run the spec you write or change yourself, `node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts <spec>`; the merge check and `--full` walk them all): `node app/node_modules/@playwright/test/cli.js install chromium`
 (the CI adds `--with-deps` for Linux's libraries), and Ergo's binary, which `sh scripts/ergo.sh` builds from the pin (the gate does).
 
 Start Claude Code in this folder, so it reads the project's settings, hooks and sandbox, and
@@ -60,9 +60,34 @@ mkdir -p $T/src && git -C ~/Server/gno archive v1.5.1 | tar -x -C $T/src
 GNO_TOOLCHAIN=$T GNOROOT=$T/src ./scripts/check.sh   # the first run downloads p/nt/* into $T/gnohome
 ```
 
+## The pinned nginx
+
+The merge check (`check.sh --merge`) runs `nginx -t` on the image's `deploy/web/nginx.conf` with the build's table, then serves the
+built pages and asks each at its slashed, bare and `index.html` addresses (`scripts/check_nginx.py`; HARNESS.md). Docker is refused in
+the sandbox, so it needs an nginx at the image's version, 1.30.6 (`deploy/web/Dockerfile`), in the tools' cache, and a merge check
+without it fails: it never skips. It was set up once on the machine that runs the merge checks (the chief, 2026-10-31); anyone who
+sets up another does the same:
+
+1. Build nginx 1.30.6 from nginx.org's source release, its signature checked (`gpg --verify` of `nginx-1.30.6.tar.gz.asc` against the
+   key `D6786CE303D9A9022998DC6CC8464D549AF75C0A`, from `https://nginx.org/keys/pluknet.key`; the tarball was good). The prefix is the
+   pin's own folder: `./configure --prefix=$HOME/.cache/gnoworld-tools/nginx-1.30.6 --with-cc-opt=-I/opt/homebrew/opt/pcre2/include
+   --with-ld-opt=-L/opt/homebrew/opt/pcre2/lib`, then `make` and `make install`.
+2. One local patch, in `src/os/unix/ngx_darwin_init.c`: the loop over the sysctls passes over `NGX_EPERM` as it does `NGX_ENOENT`. The
+   sandbox refuses reading `net.inet.tcp.sendspace`, and without the patch nginx does not start there.
+3. The binary is at `~/.cache/gnoworld-tools/nginx-1.30.6/nginx` and `conf/mime.types` beside it (`GNOWORLD_TOOLS` moves the cache).
+4. Its checksum is in `scripts/nginx.sha256` (one line: `shasum -a 256 ~/.cache/gnoworld-tools/nginx-1.30.6/nginx`), committed
+   with a line `Harness-changed: scripts/nginx.sha256 - why`. Recorded: `ad773dcb709c8cb21a0fecd1b50bac4511d1847d4e20fa68247967ac84897a68`.
+   The check runs the binary only when its SHA-256 is the pinned one; a rebuilt binary has another and needs a new pin.
+
+The step passes on the real binary with no warning (the build's table is sized, F2454). Its logs go to a file of its own folder, not
+`/dev/stderr`, which the real `nginx -t` cannot open under the sandbox. F2459's and F2460's faults, planted by hand on a scratch copy,
+each fail it on the real binary (`.claude/tmp/slice-5/reports/slice-5-harness-c-final.md`); the stand-in for nginx in
+`scripts/test_hooks.sh` models them for every run.
+
 ## The gate and the harness
 
 `./scripts/check.sh` is the gate, and `./scripts/check.sh --full` the one `/pre-merge` runs.
+`--merge` takes a lock shared by every worktree and waits for it: one merge check at a time on the machine (HARNESS.md).
 What each step catches, the hooks, the permissions, the reviews and how the harness proves
 itself: [HARNESS.md](HARNESS.md).
 

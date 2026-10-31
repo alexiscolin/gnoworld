@@ -1,11 +1,14 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, hydrated, test } from "./fixtures.ts";
-import { roomsNav } from "./chat.ts";
+import { open } from "./chatScreenOpen.ts";
+import { logIn } from "./irc.ts";
 import { box, near } from "./geometry.ts";
 
 // Slice 5j: a world's page as frames 20 to 35 and 90 to 97 show it, at the video's size (1728 by 1080, scale 1; a box to
 // 2 px of the frame's, as pageGeometry.spec.ts holds it). Bubble has no figure, no history and no linked world, so the
 // page draws what its data holds: the kicker, the title, its line, the activity's words, the actions.
+
+const ACCOUNT = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 
 test.describe("a world's page at the video's size", () => {
   test.use({ viewport: { width: 1728, height: 1080 }, deviceScaleFactor: 1 });
@@ -75,22 +78,15 @@ test.describe("a world's page at the video's size", () => {
   });
 });
 
-// A room that fills the screen is taller than the window: "Say hi in the chat" must land its head under the header, not behind it (F2864).
+// F2864, with the dock: the chat stands beside the plate from 1280 px, so "Say hi in the chat" needs no scroll; it puts the reader's
+// cursor in the chat's composer. Under 1280 px the chat is the page and the plate is not seen.
 test.describe("Say hi in the chat", () => {
-  for (const width of [900, 1280, 1728] as const) {
-    test(`at ${String(width)} px lands the chat's top under the 96 px header`, async ({ page }) => {
-      await page.setViewportSize({ width, height: 800 });
-      await page.goto("/w/bubble");
-      await hydrated(page);
-      // Through the style object: the page's policy refuses a style tag.
-      await page.evaluate(() => {
-        const slot = document.querySelector<HTMLElement>("#chat");
-        if (slot !== null) slot.style.minBlockSize = "2000px";
-      });
+  for (const width of [1280, 1728] as const) {
+    test(`at ${String(width)} px puts the cursor in the dock's composer`, async ({ page }) => {
+      await logIn(page, "say-hi-world");
+      await open(page, { width, as: ACCOUNT, full: false });
       await page.getByRole("link", { name: "Say hi in the chat" }).click();
-      const top = await page.evaluate(() => document.querySelector("#chat")?.getBoundingClientRect().top ?? -1);
-      // The header is 96 px; at 1728 the chat is already at the top of the page and does not move under it.
-      expect(top, `the chat's top at ${String(width)} px`).toBeGreaterThanOrEqual(96 - 2);
+      await expect(page.locator("#chat textarea")).toBeFocused();
     });
   }
 });
@@ -119,18 +115,24 @@ test.describe("Share where the browser cannot copy", () => {
   });
 });
 
-// "900 px: phone layout, chat first" (docs/DESIGN-SYSTEM.md, Breakpoints): the chat above the plate under 900 px, the plate before it
-// from 900 px, and from 1360 px the plate fixed at the left with the chat beside it.
+// From 1280 px the chat is a dock at the plate's right, inside one outline; under it the chat is the page, drawn over the plate.
+// The plate comes first in the reading and tab order at every width (F2865).
 test.describe("the page's order", () => {
-  // F2865: the reading and the tab order are the plate's first at every width, and equal to the sight's on a computer; a phone
-  // alone draws the chat above, by CSS (the order of a computer's page is the brief's, the phone's is DESIGN-SYSTEM.md's).
-  test("on a phone, the chat is drawn above the plate, which stays first in the reading order", async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
+  for (const width of [390, 1279] as const) {
+    test(`at ${String(width)} px the chat takes the whole page`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto("/w/bubble");
+      await hydrated(page);
+      const chat = await box(page, "[data-chat-layout]");
+      near(chat.x, 0, "the chat's left");
+      near(chat.y, 0, "the chat's top");
+      near(chat.width, width, "the chat's width");
+    });
+  }
+
+  test("the plate comes first in the document, the chat after it", async ({ page }) => {
     await page.goto("/w/bubble");
     await hydrated(page);
-    const slot = await box(page, "#chat");
-    const plate = await box(page, "[data-look='plate']");
-    expect(slot.y).toBeLessThan(plate.y);
     const plateFirst = await page.evaluate(() => {
       const plateEl = document.querySelector("[data-look='plate']");
       const slotEl = document.querySelector("#chat");
@@ -149,8 +151,8 @@ test.describe("the page's order", () => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto("/w/bubble");
     await hydrated(page);
-    // The chat has loaded: its rooms are links to tab through.
-    await expect(roomsNav(page)).toBeVisible();
+    // The chat has loaded: its dock is drawn.
+    await expect(page.locator("[data-chat-layout]")).toBeVisible();
     const places: string[] = [];
     for (let step = 0; step < 40; step += 1) {
       await page.keyboard.press("Tab");
@@ -170,23 +172,7 @@ test.describe("the page's order", () => {
     );
   });
 
-  // The switch is at 900: 899 is a phone's, 900 and the widths up to 1359 draw the plate first.
-  for (const [width, plateFirst] of [
-    [899, false],
-    [900, true],
-    [1280, true],
-  ] as const) {
-    test(`at ${String(width)} px the ${plateFirst ? "plate" : "chat"} comes first`, async ({ page }) => {
-      await page.setViewportSize({ width, height: 900 });
-      await page.goto("/w/bubble");
-      await hydrated(page);
-      const slot = await box(page, "#chat");
-      const plate = await box(page, "[data-look='plate']");
-      expect(plate.y < slot.y).toBe(plateFirst);
-    });
-  }
-
-  test("on a computer, the plate stays fixed at the left with the chat beside it", async ({ page }) => {
+  test("on a computer, the plate stays fixed at the left with the chat docked at the right", async ({ page }) => {
     await page.setViewportSize({ width: 1728, height: 1080 });
     await page.goto("/w/bubble");
     await hydrated(page);

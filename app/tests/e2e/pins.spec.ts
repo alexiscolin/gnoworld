@@ -36,14 +36,14 @@ async function reader({ playwright, launchOptions }: Launcher, as?: string, room
   const context = await browser.newContext({ baseURL });
   const second = await context.newPage();
   const address = as === undefined ? undefined : await logIn(second, as);
-  await second.goto(`/w/bubble?room=${room}`);
+  await second.goto(`/w/bubble?room=${room}&chat=full`);
   await hydrated(second);
   return { page: second, address, close: () => browser.close() };
 }
 // The moderator (the worker's own, or the named one) in `room`, having said `text`, which shows.
 async function said(page: Page, text: string, { room = "games", as }: { room?: string; as?: string } = {}) {
   const address = await logIn(page, moderator(as));
-  await page.goto(`/w/bubble?room=${room}`);
+  await page.goto(`/w/bubble?room=${room}&chat=full`);
   await hydrated(page);
   // Ergo having said the account is here: a line sent before it is lost, and the load of a full run makes that likely.
   await expect(whoIsHere(page).getByTitle(address)).toBeVisible({ timeout: 15_000 });
@@ -79,15 +79,15 @@ test.describe("pins", () => {
     const text = word("pin");
     const address = await said(page, text);
     await pin(page, text);
-    await expect(lineOf(page, text)).toContainText(/^Pinned /);
+    await expect(lineOf(page, text)).toContainText(/^\S+( you)? Pinned /);
     for (const as of [undefined, word("reader")]) {
       const other = await reader({ playwright, launchOptions }, as);
       await expect.poll(held(other.page, text)).toBe(1);
-      await expect(lineOf(other.page, text)).toContainText(/^Pinned /);
+      await expect(lineOf(other.page, text)).toContainText(/^\S+( you)? Pinned /);
       await other.close();
     }
     await unpin(page, address, text);
-    await expect(lineOf(page, text)).not.toContainText(/^Pinned /);
+    await expect(lineOf(page, text)).not.toContainText(/^\S+( you)? Pinned /);
   });
 
   test("offers Pin to the moderator alone: a guest and another account have no button and no Unpin", async ({

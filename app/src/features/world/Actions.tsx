@@ -14,10 +14,14 @@ const canCopy = () => typeof clipboard()?.writeText === "function";
 const cannotKnow = () => false;
 
 // The link goes to the chat; the focus follows it to the composer, so the reader can type at once (F2864). The composer is the
-// chat's own textarea: when the rooms have not loaded there is none, and the link only scrolls.
+// chat's own textarea: the jump to a fragment would blur it, so when there is one the click stops there. With none (the rooms have
+// not loaded, or a guest reads), the link keeps its jump.
 const focusComposer = (event: MouseEvent) => {
-  if (event.target instanceof Element && event.target.closest("[href='#chat']"))
-    document.querySelector<HTMLElement>("#chat textarea")?.focus();
+  if (!(event.target instanceof Element) || !event.target.closest("[href='#chat']")) return;
+  const composer = document.querySelector<HTMLElement>("#chat textarea");
+  if (composer === null) return;
+  event.preventDefault();
+  composer.focus();
 };
 
 export function Actions({ address }: { address: string }) {

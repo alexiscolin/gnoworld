@@ -6,7 +6,7 @@
 import type { Line } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";
 import { Button, Stack } from "@gnoworld/ui";
-import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { useSearchParams } from "react-router";
 import { pageLoginApi } from "../../lib/api/login.ts";
 import { pageDmPrefs } from "../../lib/dms/page.ts";
@@ -22,6 +22,7 @@ import { chatLink, type ChatLink } from "./link.ts";
 import { GuestLoaded } from "./GuestLoaded.tsx";
 import { LOADING } from "./Loading.tsx";
 import { groupRooms, roomIds, roomsQuery, shownRoom } from "./names.ts";
+import type { ChatPlace } from "./ChatScreen.tsx";
 import { useOnHide } from "./useOnHide.ts";
 import { useVerdicts } from "./useVerdicts.ts";
 
@@ -104,7 +105,22 @@ function useRoomVerdicts(
   return { saving, verdicts };
 }
 
-export function ChatPanel({ world }: { world: string }) {
+// The link told the rooms to follow and the room in view.
+function useLinkAt(
+  linkRef: RefObject<ChatLink | undefined>,
+  sections: RoomList["sections"] | undefined,
+  current: string | undefined,
+) {
+  useEffect(() => {
+    if (sections !== undefined) linkRef.current?.follow(roomIds(sections), groupRooms(sections));
+  }, [linkRef, sections]);
+  // Before the room's lines' own effects, which read it to the link: a child's effects run before its parent's (CR1).
+  useLayoutEffect(() => {
+    linkRef.current?.show(current);
+  }, [linkRef, current]);
+}
+
+export function ChatPanel({ world, place }: { world: string; place: ChatPlace }) {
   const store = useAppStore();
   // The page's link to Ergo, made once the page runs: never in the build's pre-render.
   const linkRef = useRef<ChatLink>(undefined);
@@ -120,18 +136,12 @@ export function ChatPanel({ world }: { world: string }) {
     };
   }, [store]);
   const { loaded, sections } = useRoomsAsked(world, query);
-  useEffect(() => {
-    if (sections !== undefined) linkRef.current?.follow(roomIds(sections), groupRooms(sections));
-  }, [sections]);
   const current = sections === undefined ? undefined : shownRoom(world, sections, params.get("room"));
   // The page hidden: the reading places waiting their 2 s go at once (F940).
   useOnHide(() => {
     linkRef.current?.flush();
   });
-  // Before the room's lines' own effects, which read it to the link: a child's effects run before its parent's (CR1).
-  useLayoutEffect(() => {
-    linkRef.current?.show(current);
-  }, [current]);
+  useLinkAt(linkRef, sections, current);
   const state = useApp((app) => (current === undefined ? undefined : app.chat.rooms[current]));
   const { saving, verdicts } = useRoomVerdicts(store, current, state?.lines);
   const chat = useApp((app) => app.login.chat);
@@ -168,6 +178,7 @@ export function ChatPanel({ world }: { world: string }) {
           }}
           sayTo={(partner, say, tags) => linkRef.current?.sayTo(partner, say, tags) ?? false}
           failed={failed}
+          place={place}
         />
       </Suspense>
     );
@@ -186,6 +197,7 @@ export function ChatPanel({ world }: { world: string }) {
       link={linkRef}
       dismissed={dismissed}
       asksDm={params.get("dm") !== null}
+      place={place}
     />
   );
 }

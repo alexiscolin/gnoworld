@@ -47,7 +47,7 @@ This ADR records:
 - **station:** a world the team builds, not a realm.
 - **moon:** one of a world's busiest rooms. The Earth's Moon, and Broadcast Moon (a
   station), keep their names.
-- **status ring:** the arc a realm's state draws. **Rings:** a planet's own. AI Ring is a
+- **status ring:** the tilted orbit a realm's state draws. **Rings:** a planet's own. AI Ring is a
   station.
 - **signal:** a new realm not yet charted.
 - **satellite:** a sponsored slot (§1); people are not drawn as satellites (§8). People are
@@ -120,7 +120,7 @@ Phases are ADR-0001's:
 | Embassies | A room shared by two worlds, drawn as a small station between them | 0 | One Ergo channel listed by two worlds | — |
 | Focus view | The plate: name, two facts, activity chart, one main action, connected worlds, a real capture of the world's page, links. The planet sits on the plate's edge; the chat is docked. A connected world is one of three rows: a realm it calls or that calls it, with calls a day; a shared room; "N people from X are here now · say hi". Each row flies there or sends a comet (phase 1) | 0 | — | Read |
 | Flight panel | During a flight: "In transit", the target, distance, speed, arrival and a progress bar; "Course plotted" on leaving, "Entering orbit" on arrival | 0 | Scene | — |
-| Status ring | A thin arc around a world for what the realm itself reports: a proposal's tally, a deadline the realm defines. gnoworld invents no timer (§8, row 2). Activity trends belong to the heat badge, never the ring | 0 | Realm reads | Read |
+| Status ring | A tilted orbit around a world, passing behind it and in front of it, for what the realm itself reports: a proposal's tally, a deadline the realm defines. A small moon on its front half marks the state, the arc up to the moon is lit, a mark stands at the threshold, the orbit's shadow falls on the planet, and a pill under the planet carries the numbers, so the state never rests on the ring alone (Alexis, 2026-10-31: the flat ring was a third party's concept's, ADR-0001). gnoworld invents no timer (§8, row 2). Activity trends belong to the heat badge, never the ring | 0 | Realm reads | Read |
 | Rooms as moons | The busiest rooms orbit as moons, four at most, and the room you are in is always one: a moon's size follows the people present, it flares when someone speaks (the activity API, near a world), a click joins the room. A "+96" chip beside them opens the room switcher. The Earth keeps one moon, the real Moon, for its busiest room after the general one (§3) | 0 | Ergo counts | — |
 | Storms | A conversation speeding up forms a storm's eye on the planet, growing with the pace of messages; a click joins that room. Shown near a world or a system, never from afar | 0 | The activity API (§7) | — |
 | Auroras | The poles light with calls to the realm, stronger with calls per minute | 1 | The signals at scale (§7) | Read |

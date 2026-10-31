@@ -1,12 +1,14 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { useSearchParams } from "react-router";
+import { asksFull } from "./full.ts";
 import { neighbour, roomParams } from "./names.ts";
 
 // Alt+Up and Alt+Down: the room before or after the one in view, anywhere on the page (ADR-0002's chat rows). A key
 // pressed before the page draws the room the last one went to starts from that room: the hook keeps it, and the room
 // in view, once drawn or chosen otherwise, sets it again.
 export function useRoomKeys(rooms: readonly string[], current: string | undefined) {
-  const [, setParams] = useSearchParams();
+  const [params, setParams] = useSearchParams();
+  const full = asksFull(params);
   const fromRef = useRef(current);
   useLayoutEffect(() => {
     fromRef.current = current;
@@ -20,11 +22,11 @@ export function useRoomKeys(rooms: readonly string[], current: string | undefine
       if (next === undefined) return;
       event.preventDefault();
       fromRef.current = next;
-      setParams(roomParams(next));
+      setParams(roomParams(next, full));
     };
     window.addEventListener("keydown", go);
     return () => {
       window.removeEventListener("keydown", go);
     };
-  }, [rooms, setParams]);
+  }, [rooms, setParams, full]);
 }

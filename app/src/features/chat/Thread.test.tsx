@@ -57,9 +57,9 @@ describe("Thread", () => {
   it("lists the root first, then its replies in the room's order, a reply to a reply among them", () => {
     const lines = items(list(panel(), "In this thread"));
     expect(lines).toEqual([
-      expect.stringMatching(/^\d{2}:\d{2} g10gh7…3y5tv you the root line$/),
-      expect.stringMatching(/^\d{2}:\d{2} g1jg8m…vsqf5 first reply$/),
-      expect.stringMatching(/^\d{2}:\d{2} g10gh7…3y5tv you a reply to a reply$/),
+      expect.stringMatching(/^g10gh7…3y5tv you \d{2}:\d{2} the root line$/),
+      expect.stringMatching(/^g1jg8m…vsqf5 \d{2}:\d{2} first reply$/),
+      expect.stringMatching(/^g10gh7…3y5tv you \d{2}:\d{2} a reply to a reply$/),
     ]);
   });
 
@@ -236,7 +236,7 @@ describe("Thread", () => {
       ];
       const html = panel({ root: "a", lines });
       expect(
-        items(list(html, "In this thread")).map((words) => words.replace(/^\S+ (Edited )?\S+ (you )?/, "")),
+        items(list(html, "In this thread")).map((words) => words.replace(/^\S+ (you )?(Edited )?\S+ /, "")),
       ).toEqual(["the root, corrected", "a reply", "to the edit"]);
       expect(said(html)).toMatch(/\b2 replies\b/);
     });
