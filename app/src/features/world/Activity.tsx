@@ -1,6 +1,7 @@
-// A world's activity (frame 26): "ACTIVITY · LAST 24 H" and the rate now above the bars, "24 H AGO", the peak and "NOW" under
-// them. With no history, the words say so, and no chart is drawn: a chart of nothing would read as a quiet world.
-import { Cluster, Stack } from "@gnoworld/ui";
+// A world's activity (frame 26): "ACTIVITY · LAST 24 H" above the bars and "24 H AGO" under them. The peak and the rate now are the
+// chart's own row, "Peak" and "Now", written once (F2867). With no history, the words say so, and no chart is drawn: a chart of
+// nothing would read as a quiet world.
+import { Stack } from "@gnoworld/ui";
 import { lazy, Suspense } from "react";
 
 // The bars come in their own chunk, once a world has a history: the first screen of a page with none does not pay for them.
@@ -14,22 +15,13 @@ export function Activity({ hours }: { hours?: number[] | undefined }) {
     return <p className="label">No activity recorded yet</p>;
   }
   const counts = hours.map(counted);
-  const peak = Math.max(...counts);
-  const now = counts.at(-1) ?? 0;
   return (
     <Stack space="2xs">
-      <Cluster space="s" justify="between">
-        <p className="label">Activity · last 24 h</p>
-        <p className="label">{now} msgs/h now</p>
-      </Cluster>
+      <p className="label">Activity · last 24 h</p>
       <Suspense fallback={<p className="label">Loading the chart</p>}>
         <Bars values={counts} />
       </Suspense>
-      <Cluster space="s" justify="between">
-        <p className="label">{counts.length} h ago</p>
-        <p className="label">peak {peak}/h</p>
-        <p className="label">now</p>
-      </Cluster>
+      <p className="label">{counts.length} h ago</p>
     </Stack>
   );
 }

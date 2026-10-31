@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Activity } from "./Activity.tsx";
 
-// Slice 5j (frame 26): "ACTIVITY · LAST 24 H", the rate now, "24 H AGO", the peak, "NOW". With no history the block says
+// Slice 5j (frame 26): "ACTIVITY · LAST 24 H", the bars with the chart's row of peak and now, "24 H AGO". With no history the block says
 // so in words and draws no chart.
 const day = Array.from({ length: 24 }, (_, hour) => (hour === 18 ? 43 : hour));
 let host: HTMLElement | undefined;
@@ -36,19 +36,16 @@ describe("a world's activity", () => {
     expect(el.querySelectorAll("svg [data-hour]")).toHaveLength(24);
   });
 
-  it("writes the rate now at the right of the title, then the bars, then 24 h ago, the peak and now, in that order", async () => {
+  it("writes the title, then the bars with their one row of peak and now, and 24 h ago, with the peak and now written once (F2867)", async () => {
     const el = await draw(day);
     const text = el.textContent;
     const at = (part: RegExp) => text.search(part);
-    expect(at(/activity\s*·\s*last 24 h/i)).toBeLessThan(at(/23 msgs\/h now/i));
-    expect(at(/23 msgs\/h now/i)).toBeLessThan(at(/24 h ago/i));
-    expect(at(/24 h ago/i)).toBeLessThan(at(/peak 43\/h/i));
-    expect(at(/peak 43\/h/i)).toBeLessThan(text.lastIndexOf("now"));
-    // "now" stands alone at the right of the axis, apart from the rate's.
-    const labels = [...el.querySelectorAll("p.label")].map((node) => node.textContent);
-    expect(labels.at(-1)).toBe("now");
-    expect(labels.at(-3)).toBe("24 h ago");
-    expect(text.match(/peak 43\/h/gi)).toHaveLength(1);
+    expect(at(/activity\s*·\s*last 24 h/i)).toBeLessThan(at(/peak 43/i));
+    expect(at(/peak 43/i)).toBeLessThan(at(/now 23/i));
+    expect(at(/now 23/i)).toBeLessThan(at(/24 h ago/i));
+    expect(text.match(/peak/gi)).toHaveLength(1);
+    expect(text.match(/now/gi)).toHaveLength(1);
+    expect([...el.querySelectorAll("p.label")].at(-1)?.textContent).toBe("24 h ago");
   });
 
   it("says the hours it holds, never 24 for a shorter history", async () => {
@@ -58,11 +55,11 @@ describe("a world's activity", () => {
   });
 
   it("writes a peak of 0 for a history of none, and no NaN or negative for a value that is no count", async () => {
-    expect((await draw(Array.from({ length: 24 }, () => 0))).textContent).toMatch(/peak 0\/h/i);
+    expect((await draw(Array.from({ length: 24 }, () => 0))).textContent).toMatch(/peak 0/i);
     host?.remove();
     const text = (await draw([Number.NaN, -1, 3])).textContent;
-    expect(text).toMatch(/peak 3\/h/i);
-    expect(text).toMatch(/3 msgs\/h now/i);
+    expect(text).toMatch(/peak 3/i);
+    expect(text).toMatch(/now 3/i);
     expect(text).not.toMatch(/NaN|-1|undefined/);
   });
 
