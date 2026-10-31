@@ -181,9 +181,12 @@ if [ -n "$changed" ]; then
 		esac
 		case $path in
 		server/src/*) ts=true related=false ;;
-		app/src/*.ts | app/src/*.tsx | app/tests/*.ts | packages/ui/src/*.ts | packages/ui/src/*.tsx) ts=true app=true ;;
+		app/src/*.test.ts | app/src/*.test.tsx) ts=true ;; # no page loads a test of the app: no build
+		app/tests/*.ts) ts=true ;; # the journeys and their helpers run in the merge check and --full alone
+		app/src/*.ts | app/src/*.tsx | packages/ui/src/*.ts | packages/ui/src/*.tsx) ts=true app=true ;;
 		packages/ui/src/tokens.css) ts=true app=true tokens=true related=false ;; # the tokens story lists every token (F1190)
-		app/src/* | app/tests/* | packages/core/src/* | packages/ui/src/*) ts=true app=true related=false ;;
+		app/tests/*) ts=true related=false ;;
+		app/src/* | packages/core/src/* | packages/ui/src/*) ts=true app=true related=false ;;
 		gno/*) gno=true ;;
 		*) all=true ;;
 		esac
@@ -203,20 +206,9 @@ if $regressions; then
 	regr_base=$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse -q --verify HEAD 2>/dev/null) || regr_base=
 	[ -n "$regr_base" ] || regressions=false
 fi
-# The journeys the change can reach (scripts/journeys.py): `all`, `none` (tests of the app alone: no build, no journey), or their paths one a line. The full gate and a change it cannot
-# place run every journey. A journeys.py that fails fails the run: a change scoped to nothing would pass unseen.
-scope=all
-if ! $full && ! $all && $app; then scope=$(printf '%s\n' "$changed" | python3 -I scripts/journeys.py); fi
-[ "$scope" != none ] || app=false # a change of tests of the app alone: no page loads them (F2578)
 budget=120 # s, for everything (Alexis, 2026-10-28: 75 refused a harness commit on a half-busy machine; 60 before 2026-10-27); for a run scoped to a change, 30
-# A run that builds the app runs every journey, the work of a run of everything: 73-96 s on a quiet machine (slice-5a, F2162).
+# A run that builds the app has the build to wait for, and the lint and types of a whole project: the budget of a run of everything. A commit's gate walks no journey (Alexis, 2026-10-31): the merge check and --full do.
 $all || $app || budget=30
-if [ "$scope" != all ] && [ "$scope" != none ]; then
-	# Half of the journeys or fewer: 17 to 23 s of them for 1 and 8 of 43. More: 110 s for 39 of 43 (harness-b, measured), the budget of all (F2577).
-	journeys_due=$(printf '%s\n' "$scope" | grep -c . || :)
-	journeys_all=$(find app/tests/e2e -type f | grep -cE '\.(spec|test)\.[cm]?[jt]sx?$' || :)
-	[ $((journeys_due * 2)) -gt "$journeys_all" ] || budget=60
-fi
 [ "${GATE_BUDGET:-$budget}" -lt "$budget" ] 2>/dev/null && budget=$GATE_BUDGET # a test lowers it; nothing raises it
 tests_scope=
 $related && tests_scope="--changed --passWithNoTests"
@@ -343,24 +335,22 @@ lane_ts() {
 	# A build never installs: React Router's default server entry adds isbot and runs the package
 	# manager, with whatever access the build has (finding F080).
 	step app
+	packages() { cat package.json app/package.json pnpm-lock.yaml | cksum; }
+	installed=$(packages)
+	if ! $full; then
+		# A commit's gate builds the app and walks no journey (Alexis, 2026-10-31: 487 and 505 CPU s of journeys against 67 to 91 for the
+		# rest of a commit's gate, speed-audit.md): the build still fails on a route or an import the types do not see. The merge check
+		# and --full walk every journey, which build the app themselves.
+		run build:app
+		[ "$(packages)" = "$installed" ] || { echo "check.sh: building the app changed package.json or the lockfile" >&2; exit 1; }
+		return 0
+	fi
 	# Three free ports from a base of this run's own (the journeys' hosts), so gates of several worktrees run at once;
 	# a port taken between this and the build fails the run, never another's.
 	E2E_PORT=$(free_ports 3)
 	export E2E_PORT
-	packages() { cat package.json app/package.json pnpm-lock.yaml | cksum; }
-	installed=$(packages)
 	export PLAYWRIGHT_JSON_OUTPUT_NAME="$logs/playwright.json"
-	# The journeys are given to Playwright as filters, which it reads as regular expressions: a name's own characters
-	# escaped, its dots left (they match more, never less).
-	set --
-	if [ "$scope" != all ]; then
-		while IFS= read -r journey; do
-			set -- "$@" "$(printf '%s' "$journey" | sed 's/[][+(){}^$|?*\\]/\\&/g')"
-		done <<EOF
-$scope
-EOF
-	fi
-	node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot,json "$@" >"$logs/playwright.out" 2>&1 || # node: see check_regressions.py
+	node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot,json >"$logs/playwright.out" 2>&1 || # node: see check_regressions.py
 		retry playwright "$PLAYWRIGHT_JSON_OUTPUT_NAME" "$logs/playwright.out" env -u PLAYWRIGHT_JSON_OUTPUT_NAME node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot
 	[ "$(packages)" = "$installed" ] || { echo "check.sh: building the app changed package.json or the lockfile" >&2; exit 1; }
 }

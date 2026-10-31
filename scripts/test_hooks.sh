@@ -169,7 +169,8 @@ import sys
 lines = [l.strip() for l in open(sys.argv[1]) if not l.lstrip().startswith("#")]
 at = lambda text: next(i for i, l in enumerate(lines) if l.startswith(text))
 assert "packages() { cat package.json app/package.json pnpm-lock.yaml | cksum; }" in lines
-assert at("copies=$(run copies") < at("installed=$(packages)") < at("node app/node_modules/@playwright/test/cli.js test") < at('[ "$(packages)" = "$installed" ]')
+last = lambda text: max(i for i, l in enumerate(lines) if l.startswith(text))
+assert at("copies=$(run copies") < at("installed=$(packages)") < at("run build:app") < at("node app/node_modules/@playwright/test/cli.js test") < last('[ "$(packages)" = "$installed" ]')
 PY
 # The full gate walks the stories: a command of its own, not a line that names it and runs nothing.
 grep -v '^[[:space:]]*#' "$gate_file" | grep -qE '^[[:space:]]*(STORIES_PORT=\$port )?node app/node_modules/@playwright/test/cli\.js test -c app/playwright\.stories\.config\.ts( --[a-z]+(=[a-z]+)?)*$' ||
@@ -2011,7 +2012,7 @@ g="$t/$1"
 log="$g.log"
 mkdir -p "$g/scripts" "$g/.githooks" "$g/bin" "$g/toolchain" "$g/gno/r/seal" "$g/app/src" "$g/app/tests" "$g/app/node_modules/@playwright/test" \
 	"$g/server/src" "$g/packages/core/src" "$g/packages/ui/src" "$g/packages/schemas/src" "$g/deploy" "$g/lint"
-cp "$here/check.sh" "$here/code_changed.sh" "$here/unsteady.py" "$here/journeys.py" "$g/scripts/" && cp "$hooks/records.sh" "$g/.githooks/" && cp "$here/../.node-version" "$here/../.gitignore" "$g/"
+cp "$here/check.sh" "$here/code_changed.sh" "$here/unsteady.py" "$g/scripts/" && cp "$hooks/records.sh" "$g/.githooks/" && cp "$here/../.node-version" "$here/../.gitignore" "$g/"
 step="$g/bin/step"
 # The one stub: it logs its name and arguments; it takes 2 s when SLOW_STEP names it, fails when FAIL
 # does, and waits for each step MEET names to start too (30 s at most): steps run one after another
@@ -2035,6 +2036,7 @@ if [ -n "${LOCKPEEK:-}" ]; then
 fi
 [ -z "${RUN_TAG:-}" ] || echo "$RUN_TAG $n" >>"$GATE_LOG.tags"
 [ "$n" != py:audit ] || echo "audit-answer ${AUDIT_ANSWER-unset}" >>"$GATE_LOG"
+[ "$n" != build:app ] || [ -z "${PW_EDIT:-}" ] || printf '\n' >>app/package.json # a build that installs edits a package file
 if [ "$n" = py:load ]; then
 	at=$(($(cat "$GATE_LOG.load" 2>/dev/null || echo 0) + 1)) && echo "$at" >"$GATE_LOG.load"
 	eval "echo \"\${LOAD_$at:-0 160}\""
@@ -2104,9 +2106,10 @@ done
 for sh in ergo test_hooks scan_secrets; do printf 'exec sh "%s" sh:%s "$@"\n' "$step" "$sh" >"$g/scripts/$sh.sh"; done
 # The journeys' stub; with PW_EDIT, it edits a package file, as a build that installs would.
 printf 'const { spawnSync } = require("node:child_process");\nconst { appendFileSync, writeFileSync } = require("node:fs");\nconst stories = process.argv.some((a) => a.includes("stories"));\nconst name = stories ? (process.env.PICTURES_OF ? "pictures" : "stories") : "playwright";\nif (process.env.PW_EDIT) appendFileSync("app/package.json", "\\n");\nconst status = spawnSync("sh", [%s, name, "port=" + process.env.E2E_PORT, "of=" + (process.env.PICTURES_OF ?? ""), "on=" + (process.env.STORIES_PORT ?? ""), "out=" + (process.env.STORIES_OUT ?? ""), ...process.argv.slice(2)], { stdio: "inherit" }).status;\nconst report = process.env.PLAYWRIGHT_JSON_OUTPUT_NAME;\nconst failing = process.env.NOREPORT === "empty" ? [] : [{ title: "a.spec.ts", file: "a.spec.ts", specs: [{ title: "journey", ok: false, file: "a.spec.ts" }] }];\nif (process.env.ALSO === "two") failing.push({ title: "b.spec.ts", file: "b.spec.ts", specs: [{ title: "second", ok: false, file: "b.spec.ts" }] });\nif (status && report && process.env.NOREPORT !== "1" && process.argv.some((a) => a.endsWith("json"))) writeFileSync(report, JSON.stringify({ config: { rootDir: process.cwd() + "/app/tests" }, errors: process.env.ALSO === "errors" ? [{ message: "globalSetup failed" }] : [], suites: [...failing, { title: "ok.spec.ts", file: "ok.spec.ts", specs: [{ title: "fine", ok: true, file: "ok.spec.ts" }] }] }));\nprocess.exit(status);\n' "'$step'" >"$g/app/node_modules/@playwright/test/cli.js"
+mkdir -p "$g/node_modules/vitest" && printf 'import { spawnSync } from "node:child_process";\nprocess.exit(spawnSync("sh", [%s, "core_chromium", "switch=" + (process.env.CORE_CHROMIUM ?? ""), ...process.argv.slice(2)], { stdio: "inherit" }).status ?? 1);\n' "'$step'" >"$g/node_modules/vitest/vitest.mjs"
 python3 -I - "$g/package.json" "$step" <<'PY'
 import json, sys
-names = ["format:check", "typecheck", "lint", "test", "test:compiled", "unused", "copies", "comments", "coverage", "mutate"]
+names = ["build:app", "format:check", "typecheck", "lint", "test", "test:compiled", "unused", "copies", "comments", "coverage", "mutate"]
 json.dump({"scripts": {n: f"sh {sys.argv[2]} {n}" for n in names}}, open(sys.argv[1], "w"))
 PY
 printf '{}\n' >"$g/app/package.json" && printf '{}\n' >"$g/server/package.json" && : >"$g/pnpm-lock.yaml" && : >"$g/gno/r/seal/vectors_test.gno"
@@ -2120,11 +2123,13 @@ gate() { : >"$log" && rm -f "$log".met.* "$log.load" "$log".flaked.* && (cd "$g"
 ran() { grep -q "^$1\( \|$\)" "$log"; }
 before() { [ "$(grep -n "^$1\( \|$\)" "$log" | head -1 | cut -d: -f1)" -lt "$(grep -n "^$2\( \|$\)" "$log" | head -1 | cut -d: -f1)" ]; }
 reset() { git -C "$g" reset -q --hard && git -C "$g" clean -qfd; }
-fast_steps="format:check typecheck lint test unused copies comments py:check_css sh:ergo playwright gno py:mutate gofmt go py:check_docs sh:test_hooks"
+fast_steps="format:check typecheck lint test unused copies comments py:check_css sh:ergo build:app gno py:mutate gofmt go py:check_docs sh:test_hooks"
+full_steps=$(printf '%s' "$fast_steps" | sed 's/build:app/playwright/') # the merge check and --full walk the journeys, which build the app themselves
 cheap="format:check unused copies comments py:check_css py:check_docs"
 everything() { # $1: what the run was given
 	for s in $fast_steps; do ran "$s" || fail "check.sh skipped $s on $1, which must run everything"; done
 	grep -q '^test .*--changed' "$log" && fail "check.sh ran only the changed tests on $1, which must run every test"
+	ran playwright && fail "check.sh walked the journeys on $1: a commit's gate walks none"
 	:
 }
 scoped() { # $1: what the run was given; then the steps it must run, "-", the steps it must not
@@ -2143,16 +2148,12 @@ nocache() { if grep -q '^lint .*--cache' "$log"; then fail "check.sh linted from
 if part gate_scope; then
 gate_fixture gate_scope
 # Nothing changed: everything runs, the lanes at once; each lane prints its time and each step's.
-out=$(MEET="lint gno sh:test_hooks playwright test" gate) || fail "check.sh's lanes did not run side by side: $out"
+out=$(MEET="lint gno sh:test_hooks build:app test" gate) || fail "check.sh's lanes did not run side by side: $out"
 everything "a tree with no change" && nocache "a tree with no change"
 for lane in ts types tests gno docs; do
 	printf '%s\n' "$out" | grep -qE "^lane $lane [0-9]+\.[0-9] s:" || fail "check.sh did not print lane $lane's time: $out"
 done
 [ -z "$(git -C "$g" status --porcelain)" ] || fail "check.sh left files git sees: $(git -C "$g" status --porcelain)"
-# The journeys get a base port of their own, three free ports from it, so gates of several worktrees
-# run at once; never the fixed 4173 another gate may hold.
-port=$(sed -n 's/^playwright port=\([0-9]*\) .*/\1/p' "$log")
-[ -n "$port" ] && [ "$port" -ge 1024 ] && [ "$port" -le 65533 ] && [ "$port" != 4173 ] || fail "check.sh gave the journeys no free port of their own: $(grep '^playwright' "$log")"
 grep -qxF "$(record)" "$g/.claude/tmp/green-fast" || fail "check.sh did not record the code it passed"
 # Prose alone is no change of code: everything runs.
 printf 'x\n' >>"$g/README.md"
@@ -2164,7 +2165,7 @@ reset
 rm -f "$g/.claude/tmp/green-full"
 printf 'y\n' >>"$g/server/src/a.ts"
 out=$(gate) || fail "check.sh failed on a server change: $out"
-scoped "a server change" $cheap typecheck lint test - playwright gno py:mutate go sh:test_hooks
+scoped "a server change" $cheap typecheck lint test - build:app gno py:mutate go sh:test_hooks
 nocache "a server change"
 grep -q '^test .*--changed' "$log" && fail "check.sh ran only Vitest's related tests on a server change"
 printf '%s\n' "$out" | grep -q "(budget 30 s)$" || fail "check.sh gave a scoped run another budget than 30 s: $out"
@@ -2173,7 +2174,7 @@ reset
 # A server file deleted: its types still checked, which see what imported it.
 git -C "$g" rm -q server/src/b.ts
 gate >/dev/null || fail "check.sh failed on a deleted server file"
-scoped "a deleted server file" typecheck lint test - playwright
+scoped "a deleted server file" typecheck lint test - build:app
 reset
 # A new TypeScript file of the app, untracked: the app's journeys and the related tests; the journeys
 # after every reader of the build's output (F082); gno still not.
@@ -2181,15 +2182,16 @@ printf 'x\n' >"$g/app/src/b.tsx"
 out=$(gate) || fail "check.sh failed on a new app file: $out"
 # The app's step builds it and runs every journey, the work of a run of everything: its budget (slice-5a, F2162).
 printf '%s\n' "$out" | grep -q "(budget 120 s)$" || fail "check.sh gave a run that builds the app another budget than 120 s: $out"
-scoped "a new app file" $cheap typecheck lint test playwright - gno sh:test_hooks
+scoped "a new app file" $cheap typecheck lint test build:app - gno sh:test_hooks
 grep -q '^test .*--changed' "$log" || fail "check.sh did not run only the tests an app change touches"
-for s in unused copies comments py:check_css; do before "$s" playwright || fail "check.sh built the app before $s read the tree (F082)"; done
+for s in unused copies comments py:check_css; do before "$s" build:app || fail "check.sh built the app before $s read the tree (F082)"; done
 reset
 # The design system's TypeScript, and a journey: the same.
 for f in packages/ui/src/a.ts app/tests/a.spec.ts; do
 	printf 'y\n' >>"$g/$f"
 	gate >/dev/null || fail "check.sh failed on a change of $f"
-	scoped "a change of $f" typecheck lint test playwright - gno sh:test_hooks
+	scoped "a change of $f" typecheck lint test - gno sh:test_hooks playwright
+	if [ "$f" = packages/ui/src/a.ts ]; then ran build:app || fail "check.sh did not build the app on a change of the design system"; else ran build:app && fail "check.sh built the app on a change of a journey"; fi
 	grep -q '^test .*--changed' "$log" || fail "check.sh did not run only the related tests on a change of $f"
 	reset
 done
@@ -2199,7 +2201,7 @@ done
 # Vitest's graph); another stylesheet of the design system, and no change, do not.
 printf 'y\n' >>"$g/packages/ui/src/tokens.css"
 gate >/dev/null || fail "check.sh failed on a change of tokens.css"
-scoped "a change of tokens.css" typecheck lint test playwright pictures - gno sh:test_hooks stories
+scoped "a change of tokens.css" typecheck lint test build:app pictures - gno sh:test_hooks stories
 grep -q '^test .*--changed' "$log" && fail "check.sh ran only Vitest's related tests on a change of a stylesheet"
 grep -q '^pictures port=[^ ]* of=tokens-- on=[0-9]* out=[^ ]*/storybook test -c app/playwright.stories.config.ts --reporter=dot pictures$' "$log" ||
 	fail "check.sh did not compare the tokens story's pictures alone, on a port of its own: $(grep '^pictures' "$log")"
@@ -2209,11 +2211,11 @@ reset
 # Beside another area's change, and under any comment: the stylesheet's text decides nothing, its path does.
 printf '/* pictures: skip, gate: off */\n' >>"$g/packages/ui/src/tokens.css" && printf 'y\n' >>"$g/server/src/a.ts"
 gate >/dev/null || fail "check.sh failed on a change of tokens.css beside a server change"
-scoped "a change of tokens.css beside a server change, with a comment that asks to skip" typecheck lint test playwright pictures - gno
+scoped "a change of tokens.css beside a server change, with a comment that asks to skip" typecheck lint test build:app pictures - gno
 reset
 printf 'y\n' >>"$g/packages/ui/src/base.css"
 gate >/dev/null || fail "check.sh failed on a change of another stylesheet"
-scoped "a change of base.css" typecheck test playwright - pictures gno
+scoped "a change of base.css" typecheck test build:app - pictures gno
 reset
 # The tokens pictures failing fails the gate, which names the lane and shows what it printed; a gate recorded nothing.
 rm -f "$g/.claude/tmp/green-fast"
@@ -2241,24 +2243,24 @@ done
 # Core: the server imports it, and main.test.ts runs the server as a child: every test, and the journeys.
 printf 'y\n' >>"$g/packages/core/src/a.ts"
 gate >/dev/null || fail "check.sh failed on a core change"
-scoped "a core change" typecheck lint test playwright - gno sh:test_hooks
+scoped "a core change" typecheck lint test build:app - gno sh:test_hooks
 grep -q '^test .*--changed' "$log" && fail "check.sh ran only Vitest's related tests on a core change"
 reset
 # A file of the app that is not TypeScript (a fixture, a stylesheet) sits outside Vitest's graph: every test.
 printf 'x\n' >"$g/app/src/b.json"
 gate >/dev/null || fail "check.sh failed on an app fixture"
-scoped "an app fixture" test playwright
+scoped "an app fixture" test build:app
 grep -q '^test .*--changed' "$log" && fail "check.sh ran only Vitest's related tests on a change outside its graph"
 reset
 # A name with a space is one path, of its area.
 printf 'x\n' >"$g/server/src/a b.ts"
 gate >/dev/null || fail "check.sh failed on a path with a space"
-scoped "a server path with a space" typecheck - sh:test_hooks playwright
+scoped "a server path with a space" typecheck - sh:test_hooks build:app
 reset
 # A realm: gno, its mutations and the Go tools, the cheap checks, no other TypeScript step.
 printf 'y\n' >>"$g/gno/r/a.gno"
 gate >/dev/null || fail "check.sh failed on a gno change"
-scoped "a gno change" $cheap gno py:mutate gofmt go - typecheck lint test playwright sh:test_hooks
+scoped "a gno change" $cheap gno py:mutate gofmt go - typecheck lint test build:app sh:test_hooks
 reset
 # Outside a repository (pre-commit's staged copy): everything.
 cp -R "$g" "$g-copy" && rm -rf "$g-copy/.git"
@@ -2270,23 +2272,23 @@ everything "a copy outside a repository"
 outside() { : >"$log" && (cd "$g-copy" && env -u SANDBOX_RUNTIME -u GATE_MERGE GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" GATE_CHANGED="$1" sh scripts/check.sh 2>&1); }
 out=$(outside "server/src/a.ts
 docs/x.md") || fail "check.sh failed outside a repository on pre-commit's list: $out"
-scoped "pre-commit's list of a server change" $cheap typecheck lint test - playwright gno sh:test_hooks
+scoped "pre-commit's list of a server change" $cheap typecheck lint test - build:app gno sh:test_hooks
 grep -q '^test .*--changed' "$log" && fail "check.sh asked Vitest for the related tests outside a repository"
 outside "app/src/a.tsx" >/dev/null || fail "check.sh failed outside a repository on an app change"
-scoped "pre-commit's list of an app change" typecheck playwright test - gno
+scoped "pre-commit's list of an app change" typecheck build:app test - gno
 grep -q '^test .*--changed' "$log" && fail "check.sh asked Vitest for the related tests outside a repository"
 outside "gno/r/a.gno" >/dev/null || fail "check.sh failed outside a repository on a gno change"
-scoped "pre-commit's list of a gno change" gno - typecheck playwright
+scoped "pre-commit's list of a gno change" gno - typecheck build:app
 # The tokens story's pictures there too: pre-commit's list names the change, which a staged copy holds no repository to read.
 outside "packages/ui/src/tokens.css" >/dev/null || fail "check.sh failed outside a repository on a change of tokens.css"
-scoped "pre-commit's list of a change of tokens.css" typecheck test playwright pictures - gno
+scoped "pre-commit's list of a change of tokens.css" typecheck test build:app pictures - gno
 outside "packages/ui/src/base.css" >/dev/null || fail "check.sh failed outside a repository on a change of base.css"
-scoped "pre-commit's list of a change of base.css" typecheck test playwright - pictures
+scoped "pre-commit's list of a change of base.css" typecheck test build:app - pictures
 # Prose is prose anywhere, and nothing else is: beside a server change, the run stays the server's.
 for prose in adr/0001.txt docs/x.ts server/src/x.md; do
 	outside "server/src/a.ts
 $prose" >/dev/null || fail "check.sh failed outside a repository on $prose"
-	scoped "pre-commit's list of a server change and $prose" typecheck - playwright sh:test_hooks
+	scoped "pre-commit's list of a server change and $prose" typecheck - build:app sh:test_hooks
 done
 # Prose alone, an empty list, an unknown path, a line git quoted or that reads otherwise (an empty
 # line, a space, a backslash): everything, as in a repository.
@@ -2308,7 +2310,7 @@ outside "server/src/a.ts" >/dev/null || fail "check.sh failed outside a reposito
 cmp -s "$t/green-before" "$g-copy/.claude/tmp/green-fast" 2>/dev/null || [ ! -e "$g-copy/.claude/tmp/green-fast" ] || fail "check.sh recorded a copy's scoped run"
 # --full there is never scoped.
 : >"$log" && (cd "$g-copy" && env -u SANDBOX_RUNTIME -u GATE_MERGE GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" GATE_CHANGED=gno/r/a.gno sh scripts/check.sh --full >/dev/null 2>&1) || : # it fails at merge-base, with no repository
-for s in $fast_steps; do [ "$s" = test ] || ran "$s" || fail "check.sh --full took GATE_CHANGED's scope and skipped $s"; done
+for s in $full_steps; do [ "$s" = test ] || [ "$s" = build:app ] || ran "$s" || fail "check.sh --full took GATE_CHANGED's scope and skipped $s"; done
 # In a repository, the run reads its change from git, never from GATE_CHANGED.
 : >"$log" && (cd "$g" && env -u SANDBOX_RUNTIME -u GATE_MERGE GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" GATE_CHANGED=gno/r/a.gno sh scripts/check.sh >/dev/null 2>&1) ||
 	fail "check.sh failed in a repository with GATE_CHANGED set"
@@ -2316,7 +2318,7 @@ everything "a repository with no change and GATE_CHANGED naming a realm"
 printf 'y\n' >>"$g/server/src/a.ts"
 : >"$log" && (cd "$g" && env -u SANDBOX_RUNTIME -u GATE_MERGE GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" GATE_CHANGED=deploy/a.conf sh scripts/check.sh >/dev/null 2>&1) ||
 	fail "check.sh failed in a repository with a change and GATE_CHANGED set"
-scoped "a server change in a repository and GATE_CHANGED naming the deployment" typecheck - playwright sh:test_hooks
+scoped "a server change in a repository and GATE_CHANGED naming the deployment" typecheck - build:app sh:test_hooks
 reset
 fi
 
@@ -2334,7 +2336,7 @@ done
 # Two areas at once run both: what is staged counts with what is not.
 printf 'y\n' >>"$g/gno/r/a.gno" && git -C "$g" add gno && printf 'y\n' >>"$g/server/src/a.ts"
 gate >/dev/null || fail "check.sh failed on a staged gno change beside a server one"
-scoped "a staged gno change beside an unstaged server one" gno typecheck test - playwright sh:test_hooks
+scoped "a staged gno change beside an unstaged server one" gno typecheck test - build:app sh:test_hooks
 reset
 # A rename keeps where it came from: a schema moved into the server runs everything.
 git -C "$g" mv packages/schemas/src/a.ts server/src/moved.ts
@@ -2349,7 +2351,7 @@ reset
 # A worktree's borrowed node_modules is a link, which .gitignore's folder rule misses: no change of code.
 ln -s "$t" "$g/node_modules" && printf 'y\n' >>"$g/server/src/a.ts"
 gate >/dev/null || fail "check.sh failed beside a linked node_modules"
-scoped "a server change beside a linked node_modules" typecheck - playwright sh:test_hooks
+scoped "a server change beside a linked node_modules" typecheck - build:app sh:test_hooks
 rm "$g/node_modules" && reset
 # A git that cannot list the change fails the gate, rather than scoping it to nothing.
 real_git=$(command -v git)
@@ -2378,7 +2380,7 @@ ran py:mutate && fail "a lane went on past its failed step"
 (SLOW_STEP=py:check_docs FAIL=lint gate) >/dev/null && fail "check.sh passed with a failing lint"
 ran sh:test_hooks || fail "a lane's failure stopped another lane before its end"
 # Each lane's first and last step fail the gate, name their lane, and stop it.
-for case in format:check:ts playwright:ts typecheck:types lint:types sh:ergo:tests test:tests gno:gno go:gno py:check_docs:docs sh:test_hooks:docs; do
+for case in format:check:ts build:app:ts typecheck:types lint:types sh:ergo:tests test:tests gno:gno go:gno py:check_docs:docs sh:test_hooks:docs; do
 	s=${case%:*} lane=${case##*:}
 	out=$(FAIL=$s gate) && fail "check.sh passed with $s failing"
 	printf '%s\n' "$out" | grep -q "^check.sh: lane $lane failed" || fail "check.sh did not name lane $lane when $s failed: $out"
@@ -2388,6 +2390,9 @@ ran test && fail "check.sh ran the tests without the Ergo they start"
 # A build that edits a package file fails the gate (F080).
 out=$(PW_EDIT=1 gate) && fail "check.sh passed a build that edited app/package.json"
 printf '%s\n' "$out" | grep -q "building the app changed package.json" || fail "check.sh did not say the build changed a package file: $out"
+reset
+out=$(PW_EDIT=1 gate --full) && fail "check.sh --full passed journeys whose build edited app/package.json"
+printf '%s\n' "$out" | grep -q "building the app changed package.json" || fail "check.sh --full did not say the build changed a package file: $out"
 reset
 # GATE_BUDGET lowers the budget, never raises it, and a value that is no number leaves it.
 GATE_BUDGET=999 gate | grep -q "(budget 120 s)$" || fail "check.sh let GATE_BUDGET raise its budget"
@@ -2402,8 +2407,9 @@ reset
 unsteady=$g/.claude/tmp/unsteady.log
 tries() { grep -c "^$1\( \|$\)" "$log"; }
 unsteady_case() { # $1 the step, $2 the tool, $3 the file it fails in (and one that passes), $4 the failed test, $5 the file that passes
+	gm= && [ "$1" != playwright ] || gm=--full # the journeys run in the merge check and --full alone
 	rm -rf "${unsteady:?}"
-	out=$(LOAD_1="305 160" LOAD_2="305 160" LOAD_3="305 160" LOAD_4="305 160" LOAD_5="305 160" LOAD_6="305 160" FLAKY=$1 gate) || fail "check.sh failed a $2 run that passed the second time: $out"
+	out=$(LOAD_1="305 160" LOAD_2="305 160" LOAD_3="305 160" LOAD_4="305 160" LOAD_5="305 160" LOAD_6="305 160" FLAKY=$1 gate $gm) || fail "check.sh failed a $2 run that passed the second time: $out"
 	[ "$(tries "$1")" = 2 ] || fail "check.sh ran $1 $(tries "$1") times for one failure, not twice: $out"
 	grep -qF "$6" "$log" || fail "check.sh did not give the failed file to the second $1 run"
 	grep -qF "$5" "$log" && fail "check.sh ran a file that passed again ($1)"
@@ -2414,20 +2420,20 @@ unsteady_case() { # $1 the step, $2 the tool, $3 the file it fails in (and one t
 	printf '%s\n' "$out" | grep -q "^unsteady: .*running them once more" || fail "check.sh did not say it ran $1 again: $out"
 	# Fails twice: it refuses, after one more run only, and logs nothing.
 	rm -rf "${unsteady:?}"
-	out=$(FAIL=$1 gate) && fail "check.sh passed with $1 failing twice"
+	out=$(FAIL=$1 gate $gm) && fail "check.sh passed with $1 failing twice"
 	[ "$(tries "$1")" = 2 ] || fail "check.sh ran $1 $(tries "$1") times when it failed, not twice"
 	printf '%s\n' "$out" | grep -q "failed twice" || fail "check.sh did not say $1 failed twice: $out"
 	[ ! -e "$unsteady" ] || fail "check.sh logged a file of $1 that failed twice"
 	# A failure with no report (a crash, a config error) is no flake: nothing runs again, and it is no pass.
-	out=$(NOREPORT=1 FLAKY=$1 gate) && fail "check.sh passed a $1 failure that left no report"
+	out=$(NOREPORT=1 FLAKY=$1 gate $gm) && fail "check.sh passed a $1 failure that left no report"
 	[ "$(tries "$1")" = 1 ] || fail "check.sh ran $1 again after a failure with no report"
 	[ ! -e "$unsteady" ] || fail "check.sh logged a $1 failure with no report"
 	# A report that names no failed file would run every file again: it refuses, with nothing run again.
-	out=$(NOREPORT=empty FLAKY=$1 gate) && fail "check.sh passed a $1 failure whose report names no failed file"
+	out=$(NOREPORT=empty FLAKY=$1 gate $gm) && fail "check.sh passed a $1 failure whose report names no failed file"
 	[ "$(tries "$1")" = 1 ] || fail "check.sh ran $1 again for a report that names no failed file"
 	# A log that cannot be written (a folder where it goes): an unsteady test no one sees is not a pass.
 	mkdir -p "$unsteady"
-	out=$(FLAKY=$1 gate) && fail "check.sh passed an unsteady $1 test it could not log"
+	out=$(FLAKY=$1 gate $gm) && fail "check.sh passed an unsteady $1 test it could not log"
 	printf '%s\n' "$out" | grep -q "cannot be written" || fail "check.sh did not say it could not log $1: $out"
 	rm -rf "${unsteady:?}"
 }
@@ -2435,8 +2441,9 @@ unsteady_case() { # $1 the step, $2 the tool, $3 the file it fails in (and one t
 # holds none: its console does), Playwright's own errors, a failed file with no failed test (it did not load, or a hook failed).
 # The run refuses with nothing run again and nothing logged, even when the failed file itself passes the second time (R1).
 unsteady_refuses() { # $1 the step, $2 what else the run had (ALSO), $3 what check.sh says
+	gm= && [ "$1" != playwright ] || gm=--full # the journeys run in the merge check and --full alone
 	rm -rf "${unsteady:?}"
-	out=$(ALSO=$2 FLAKY=$1 gate) && fail "check.sh passed a $1 run that also had: $2: $out"
+	out=$(ALSO=$2 FLAKY=$1 gate $gm) && fail "check.sh passed a $1 run that also had: $2: $out"
 	[ "$(tries "$1")" = 1 ] || fail "check.sh ran $1 again though the run also had: $2"
 	printf '%s\n' "$out" | grep -qF "$3" || fail "check.sh did not say why it refused $1 with: $2: $out"
 	[ ! -e "$unsteady" ] || fail "check.sh logged a $1 run that also had: $2"
@@ -2444,8 +2451,9 @@ unsteady_refuses() { # $1 the step, $2 what else the run had (ALSO), $3 what che
 }
 # Two files fail at once: both run again, in one run, and both are logged.
 unsteady_two() { # $1 the step, $2 the first file, $3 the second, as the second run is given them
+	gm= && [ "$1" != playwright ] || gm=--full # the journeys run in the merge check and --full alone
 	rm -rf "${unsteady:?}"
-	out=$(ALSO=two FLAKY=$1 gate) || fail "check.sh failed two $1 files that passed the second time: $out"
+	out=$(ALSO=two FLAKY=$1 gate $gm) || fail "check.sh failed two $1 files that passed the second time: $out"
 	[ "$(tries "$1")" = 2 ] || fail "check.sh ran $1 $(tries "$1") times for two files failing at once: $out"
 	grep -qF "$2" "$log" && grep -qF "$3" "$log" || fail "check.sh did not give both failed files to the second $1 run"
 	[ "$(grep -c "" "$unsteady")" = 2 ] || fail "check.sh did not log both unsteady files of $1: $(cat "$unsteady")"
@@ -2461,13 +2469,15 @@ unsteady_case playwright playwright app/tests/a.spec.ts "journey" app/tests/ok.s
 # Pre-commit's staged copy has no repository and a link for node_modules: its unsteady test is logged in the repository's folder,
 # not in the copy, which is deleted after the run.
 c=$g.copy r=$g.repo
-rm -rf "${c:?}" "${r:?}" && cp -R "$g" "$c" && rm -rf "${c:?}/.git" && mkdir -p "$r/node_modules" && ln -s "$r/node_modules" "$c/node_modules"
+rm -rf "${c:?}" "${r:?}" && cp -R "$g" "$c" && rm -rf "${c:?}/.git" "${c:?}/node_modules" && mkdir -p "$r/node_modules" && ln -s "$r/node_modules" "$c/node_modules"
 (g=$c && FLAKY=test gate >/dev/null) || fail "check.sh failed an unsteady test in a staged copy"
 grep -qF "app/src/a.test.ts" "$r/.claude/tmp/unsteady.log" || fail "check.sh did not log a staged copy's unsteady test in the repository"
 [ ! -e "$c/.claude/tmp/unsteady.log" ] || fail "check.sh logged a staged copy's unsteady test in the copy, which is deleted"
 # A run that passes the first time runs nothing again and logs nothing.
 gate >/dev/null || fail "check.sh failed a clean run"
-[ "$(tries test)" = 1 ] && [ "$(tries playwright)" = 1 ] || fail "check.sh ran a passing step twice"
+[ "$(tries test)" = 1 ] && [ "$(tries build:app)" = 1 ] || fail "check.sh ran a passing step twice"
+gate --full >/dev/null || fail "check.sh --full failed a clean run"
+[ "$(tries playwright)" = 1 ] || fail "check.sh --full ran the journeys $(tries playwright) times on a clean run"
 [ ! -e "$unsteady" ] || fail "check.sh logged a clean run"
 # The log keeps each run's files: two unsteady runs leave two lines.
 FLAKY=test gate >/dev/null && FLAKY=test gate >/dev/null && [ "$(grep -c "" "$unsteady")" = 2 ] || fail "check.sh did not append to the unsteady log"
@@ -2477,10 +2487,16 @@ rm -rf "${unsteady:?}"
 # runs both lanes (CR8, R2).
 printf '\n' >>"$g/packages/ui/src/tokens.css"
 out=$(PORTS_FAIL=1 gate) && fail "check.sh passed with no free port: $out"
-printf '%s\n' "$out" | grep -q "^check.sh: lane ts failed at app" || fail "check.sh did not fail the journeys' lane at its app step when free_ports failed: $out"
 printf '%s\n' "$out" | grep -q "^check.sh: lane pictures failed at pictures" || fail "check.sh did not fail the pictures' lane when free_ports failed: $out"
-ran playwright && fail "check.sh started the journeys with no free port"
 ran pictures && fail "check.sh started the pictures with no free port"
+reset
+# The journeys of --full ask for three ports of their own (never the fixed 4173 another gate may hold), and a free_ports that fails stops them.
+out=$(PORTS_FAIL=1 gate --full) && fail "check.sh --full passed with no free port: $out"
+printf '%s\n' "$out" | grep -q "^check.sh: lane ts failed at app" || fail "check.sh --full did not fail the journeys' lane at its app step when free_ports failed: $out"
+ran playwright && fail "check.sh --full started the journeys with no free port"
+gate --full >/dev/null || fail "check.sh --full failed on a copy whose every step passes"
+port=$(sed -n 's/^playwright port=\([0-9]*\) .*/\1/p' "$log")
+[ -n "$port" ] && [ "$port" -ge 1024 ] && [ "$port" -le 65533 ] && [ "$port" != 4173 ] || fail "check.sh --full gave the journeys no free port of their own: $(grep '^playwright' "$log")"
 reset
 fi
 
@@ -2572,8 +2588,7 @@ full_fixture() { # $1: its folder's name
 	gate_fixture "$1"
 	# Core's Chromium run's stub, here alone: a fixture's node_modules folder would hide gate_triggers' linked one.
 	mkdir -p "$g/node_modules/vitest"
-	printf 'import { spawnSync } from "node:child_process";\nprocess.exit(spawnSync("sh", [%s, "core_chromium", "switch=" + (process.env.CORE_CHROMIUM ?? ""), ...process.argv.slice(2)], { stdio: "inherit" }).status ?? 1);\n' "'$step'" >"$g/node_modules/vitest/vitest.mjs"
-}
+	}
 if part gate_full; then
 full_fixture gate_full
 # The full gate: every fast step but the plain tests, then the full ones in lanes, each told where the
@@ -2587,7 +2602,7 @@ out=$(AUDIT_ANSWER=x PICTURES_OF=nothing STORIES_PORT=6007 STORIES_OUT=/elsewher
 grep -q '^stories port=[^ ]* of= on=[0-9][0-9]* out= test -c app/playwright.stories.config.ts' "$log" && ! grep -q '^stories .* on=6007 ' "$log" ||
 	fail "check.sh --full let its environment narrow or redirect the stories' walk, or gave it no port of its own: $(grep '^stories' "$log")"
 ran pictures && fail "check.sh --full compared the tokens story's pictures beside its whole walk"
-for s in $fast_steps py:probe py:bench core_chromium stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
+for s in $full_steps py:probe py:bench core_chromium stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
 	[ "$s" = test ] || ran "$s" || fail "check.sh --full skipped $s"
 done
 ran test && fail "check.sh --full ran the tests twice, with and without coverage"
@@ -2663,7 +2678,7 @@ full_fixture gate_full_fail
 # A dirty tree of one area: --full still checks everything, and records it.
 printf 'y\n' >>"$g/server/src/a.ts"
 gate --full >/dev/null || fail "check.sh --full failed on a server change"
-for s in $fast_steps; do [ "$s" = test ] || ran "$s" || fail "check.sh --full with a server change skipped $s"; done
+for s in $full_steps; do [ "$s" = test ] || ran "$s" || fail "check.sh --full with a server change skipped $s"; done
 nocache "--full with a server change"
 grep -qxF "$(record)" "$g/.claude/tmp/green-full" || fail "check.sh --full did not record a dirty tree it passed"
 reset
@@ -2710,7 +2725,7 @@ rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/green-full"
 base=$(git -C "$g" merge-base HEAD origin/main)
 printf 'z\n' >>"$g/server/src/a.ts" && git -C "$g" commit -qam "product code"
 out=$(gate --merge) || fail "check.sh --merge failed on a copy whose every step passes: $out"
-for s in $fast_steps py:probe py:bench core_chromium stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
+for s in $full_steps py:probe py:bench core_chromium stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
 	[ "$s" = test ] || ran "$s" || fail "check.sh --merge skipped $s"
 done
 grep -qx "py:harness_mutate --changed $base" "$log" || fail "check.sh --merge did not judge the merge's own harness mutants: $(grep harness_mutate "$log")"
@@ -2738,7 +2753,7 @@ out=$(gate --merge) || fail "check.sh --merge failed on a branch with no product
 for s in core_chromium stories coverage py:patch_coverage mutate py:prove_fix; do
 	ran "$s" && fail "check.sh --merge ran $s on a branch with no product code"
 done
-for s in $fast_steps py:probe py:bench py:batch_size py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
+for s in $full_steps py:probe py:bench py:batch_size py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
 	[ "$s" = test ] || ran "$s" || fail "check.sh --merge skipped $s on a branch with no product code"
 done
 grep -qx "py:harness_mutate --changed $base" "$log" || fail "check.sh --merge did not judge the harness mutants of a branch with no product code"
@@ -2769,212 +2784,57 @@ out=$(gate --full) && fail "check.sh --full passed with no origin/main"
 printf '%s\n' "$out" | grep -q "needs origin/main" || fail "check.sh --full did not say it needs origin/main: $out"
 fi
 
-# The fast gate's cost follows the change (slice-5 harness-b; Alexis, 2026-10-29 and 2026-10-30): a commit of the app ran every
-# journey, 73 to 136 s a commit in part 1 (F2352, F2405). It runs the journeys its change can reach, by the files each
-# journey's pages load (scripts/journeys.py, which prints their paths, or `all` for a change it cannot place); the merge check
-# and --full keep every one. check.sh gives Playwright those paths after its options; none given is every journey. A journey
-# it cannot place (its page's URL is not a literal, or a helper it uses goes to one that is not) runs on every change of the
-# app, and any path outside app/src and the journeys' own specs (server/src included: the journeys start the real server,
-# app/tests/e2e/api.mjs) runs them all.
+# A commit's gate walks no journey (Alexis, 2026-10-31): the audit measured 487 and 505 CPU s of journeys against 67 to 91 for
+# the rest of a commit's gate. It still builds the app (the build fails on a route or an import the types do not see) and starts
+# no browser for it; the merge check and --full walk every journey, unfiltered. A session that writes a journey runs it itself.
 if part gate_journeys; then
 gate_fixture gate_journeys
-[ -f "$here/journeys.py" ] || fail "scripts/journeys.py does not exist: nothing places a change among the journeys"
-cp "$here/journeys.py" "$g/scripts/"
-mkdir -p "$g/app/src/routes" "$g/app/src/features/world" "$g/app/src/features/home" "$g/app/src/features/realm" "$g/app/src/features/lazyhome" "$g/app/src/features/barrel" "$g/app/src/lib" "$g/app/tests/e2e/home.spec.ts-snapshots" "$g/node_modules/vitest"
-# routes.ts mounts world.tsx twice, as the app's does, and a splat; deep.ts is loaded through w.ts by the world and directly by
-# home; the realm and lazyhome are lazy chunks; barrel/ is a re-export; w.css a side-effect import; types.ts a type import.
-printf 'import { index, route } from "@react-router/dev/routes";\nexport default [index("routes/home.tsx"), route("w/:world", "routes/world.tsx"), route("net/:network/w/:world", "routes/world.tsx", { id: "universe-world" }), route("w/special", "routes/special.tsx"), route("e/:eco", "routes/eco.tsx"), route("*", "routes/notFound.tsx")];\n' >"$g/app/src/routes.ts"
-printf 'import { h } from "../features/home/h.ts";\nimport { shared } from "../lib/shared.ts";\nimport { deep } from "../lib/deep.ts";\nimport { b } from "../features/barrel";\nimport type { T } from "../lib/types.ts";\nconst L = lazy(() => import("../features/lazyhome/L.ts"));\nexport default () => h + shared + deep + b;\n' >"$g/app/src/routes/home.tsx"
-printf 'import { rootLib } from "./lib/rootLib.ts";\nexport default () => rootLib;\n' >"$g/app/src/root.tsx"
-printf 'export const rootLib = 1;\n' >"$g/app/src/lib/rootLib.ts"
-printf 'import { w } from "../features/world/w.ts";\nimport { rootLib } from "../lib/rootLib.ts";\nimport { shared } from "../lib/shared.ts";\nimport "../features/world/w.css";\nconst Realm = lazy(() => import("../features/realm/Realm.ts"));\nexport default () => w + shared;\n' >"$g/app/src/routes/world.tsx"
-printf 'export default () => "404";\n' >"$g/app/src/routes/notFound.tsx"
-printf 'export default () => "special";\n' >"$g/app/src/routes/special.tsx"
-printf 'export default () => "eco";\n' >"$g/app/src/routes/eco.tsx"
-printf 'export const h = 1;\n' >"$g/app/src/features/home/h.ts"
-printf 'import { deep } from "../../lib/deep.ts";\nexport const w = deep;\n' >"$g/app/src/features/world/w.ts"
-printf '.w { color: red; }\n' >"$g/app/src/features/world/w.css"
-printf 'test("w", () => {});\n' >"$g/app/src/features/world/w.test.ts"
-printf 'export const Realm = 1;\n' >"$g/app/src/features/realm/Realm.ts"
-printf 'export const L = 1;\n' >"$g/app/src/features/lazyhome/L.ts"
-printf 'export * from "./b.ts";\n' >"$g/app/src/features/barrel/index.ts"
-printf 'export const b = 1;\n' >"$g/app/src/features/barrel/b.ts"
-printf 'export const shared = 1;\n' >"$g/app/src/lib/shared.ts"
-printf 'export const deep = 1;\n' >"$g/app/src/lib/deep.ts"
-printf 'export type T = number;\n' >"$g/app/src/lib/types.ts"
-printf 'export const helper = 1;\nexport const ping = (page, p) => page.request.get(p);\n' >"$g/app/tests/e2e/fixtures.ts"
-printf 'export const go = (page, p) => page.goto(p);\n' >"$g/app/tests/e2e/nav.ts"
-printf 'export const SITE = "http://127.0.0.1:1";\n' >"$g/app/tests/e2e/sites.ts"
-printf 'import { helper } from "./fixtures.ts";\ntest("home", async ({ page }) => { await page.goto("/"); helper; });\n' >"$g/app/tests/e2e/home.spec.ts"
-printf 'import { helper } from "./fixtures.ts";\ntest("world", async ({ page }) => { await page.goto("/w/a"); helper; });\n' >"$g/app/tests/e2e/world.spec.ts"
-printf 'test("net", async ({ page }) => { await page.goto(`/net/x/w/a?tab=1`); });\n' >"$g/app/tests/e2e/net.spec.ts"
-printf 'test("odd", async ({ page }) => { await page.goto("/nothing/here"); });\n' >"$g/app/tests/e2e/odd name+(1).spec.ts"
-printf 'test("var", async ({ page }) => { const somePath = "/w/" + String(1); await page.goto(somePath); });\n' >"$g/app/tests/e2e/varnav.spec.ts"
-printf 'test("eco", async ({ page }) => { await page.goto("/e/x"); });\n' >"$g/app/tests/e2e/eco.spec.ts"
-printf 'test("tpl", async ({ page }) => { const x = "a"; await page.goto(`/w/${x}`); await page.goto(`${SITE}/`); });\n' >"$g/app/tests/e2e/tpl.spec.ts"
-printf 'test("prefix", async ({ page }) => { await page.goto(`${prefix}/w/a`); });\n' >"$g/app/tests/e2e/prefix.spec.ts"
-# A spec that goes to a page by a request or a location, not by goto (F2575; csp.spec.ts asks every page for its policy): a literal
-# places it, a variable cannot; a helper's request through a variable stays out of it (irc.ts and fixtures.ts ask for non-page URLs).
-printf 'test("loop", async ({ page, request }) => { await page.goto("/"); for (const p of paths) await request.get(p); });\n' >"$g/app/tests/e2e/loop.spec.ts"
-printf 'test("lit", async ({ page, request }) => { await page.goto("/"); await request.get("/e/x"); });\n' >"$g/app/tests/e2e/lit.spec.ts"
-printf 'test("loc", async ({ page }) => { await page.goto("/"); await page.evaluate(() => { location.href = "/w/special"; }); });\n' >"$g/app/tests/e2e/loc.spec.ts"
-printf 'import { go } from "./nav.ts";\ntest("helper", async ({ page }) => { await go(page, "/w/b"); });\n' >"$g/app/tests/e2e/viaHelper.spec.ts"
-printf 'png\n' >"$g/app/tests/e2e/home.spec.ts-snapshots/a-chromium.png"
-printf 'serve\n' >"$g/app/tests/e2e/serve.mjs"
-printf 'export default {};\n' >"$g/app/playwright.config.ts"
-git -C "$g" add -A && git -C "$g" commit -qm "a small app" && git -C "$g" update-ref refs/remotes/origin/main HEAD
-# What check.sh gave Playwright after its options (a name may hold a space); the plain names, sorted, on one line.
-journeys_raw() { sed -n 's/^playwright .* --reporter=dot,json *//p' "$log"; }
-journeys_ran() { journeys_raw | tr ' ' '\n' | grep . | sort | paste -sd' ' -; }
-e2e=app/tests/e2e home=$e2e/home.spec.ts world=$e2e/world.spec.ts net=$e2e/net.spec.ts varnav=$e2e/varnav.spec.ts viaHelper=$e2e/viaHelper.spec.ts eco=$e2e/eco.spec.ts tpl=$e2e/tpl.spec.ts prefix=$e2e/prefix.spec.ts loop=$e2e/loop.spec.ts lit=$e2e/lit.spec.ts loc=$e2e/loc.spec.ts
-# The odd one: a space, a plus and parentheses in its name, which Playwright reads as a regular expression. It goes to a path
-# only the splat matches.
-odd_arg="$e2e/odd name\\+\\(1\\).spec.ts"
-# Journeys the scoping cannot place: a variable, a helper that goes to one, a template whose start is no origin. They run on every
-# change of the app. tpl goes to /w/<something> and to the site's own root: every route it can mean.
-unplaced="$varnav $viaHelper $prefix $loop"
-sorted() { printf '%s\n' "$@" | sort | paste -sd' ' -; }
-# places: $1 a path changed, then the journeys check.sh must run (empty: all of them).
-places() {
-	what=$1 && shift
+[ ! -e "$here/journeys.py" ] || fail "scripts/journeys.py still exists: nothing reads it since a commit's gate walks no journey"
+ran_browser() { grep -q "^\(playwright\|stories\|pictures\)\( \|$\)" "$log"; }
+for f in app/src/a.tsx packages/ui/src/a.ts app/tests/a.spec.ts server/src/a.ts app/src/a.json; do
+	printf 'y\n' >>"$g/$f"
+	out=$(gate) || fail "check.sh failed on a change of $f: $out"
+	ran playwright && fail "check.sh walked the journeys in a commit's gate on a change of $f"
+	ran_browser && fail "check.sh started a browser in a commit's gate on a change of $f: $(grep '^\(playwright\|stories\|pictures\)' "$log")"
 	reset
-	mkdir -p "$g/$(dirname "$what")" && printf 'y\n' >>"$g/$what"
-	gate >/dev/null || fail "check.sh failed on a change of $what"
-	ran playwright || fail "check.sh ran no journey on a change of $what: the app's step still builds and walks"
-	[ "$(journeys_ran)" = "$(sorted "$@")" ] || fail "check.sh gave the journeys '$(journeys_ran)' on a change of $what, not '$(sorted "$@")'"
-}
-# scripts/journeys.py itself: the paths of the journeys a list of changed paths can reach, one a line, or `all`.
-py() { (cd "$g" && python3 -I scripts/journeys.py "$@" 2>&1 | sort | paste -sd' ' -); }
-[ "$(py app/src/features/world/w.ts)" = "$(sorted $world $net $tpl $unplaced)" ] || fail "journeys.py did not place a world feature in the world's journeys and the ones it cannot place alone: $(py app/src/features/world/w.ts)"
-[ "$(py app/src/lib/shared.ts)" = "$(sorted $home $lit $loc $world $net $tpl $unplaced)" ] || fail "journeys.py did not place a file both pages load in both pages' journeys: $(py app/src/lib/shared.ts)"
-[ "$(py app/src/lib/unloaded.ts)" = all ] || fail "journeys.py did not say 'all' for a file no page loads"
-[ "$(py app/src/features/world/w.ts server/src/a.ts)" = all ] || fail "journeys.py scoped a list that holds a path outside the app"
-[ "$(py app/src/features/world/gone.ts)" = all ] || fail "journeys.py placed a file that does not exist (a deleted one)"
-[ "$(py app/src/features/world/w.ts docs/a.md)" = "$(sorted $world $net $tpl $unplaced)" ] || fail "journeys.py let a prose path in the list widen the journeys"
-[ "$(py app/src/features/world/w.ts app/src/features/world/w.test.ts)" = "$(sorted $world $net $tpl $unplaced)" ] || fail "journeys.py read a test file of the app as a change the journeys can reach, or as one no page loads"
-[ "$(py app/src/features/world/w.test.ts)" = none ] || fail "journeys.py did not say 'none' for a change of the app's test files alone, which no page loads: $(py app/src/features/world/w.test.ts)"
-[ "$(py app/src/features/world/w.test.ts docs/a.md)" = none ] || fail "journeys.py let a prose path beside a test of the app make the change one it cannot place"
-[ "$(py app/src/features/world/w.test.ts app/src/features/world/gone.ts)" = all ] || fail "journeys.py let a test file hide a deleted file, which it cannot place"
-# A deleted journey reaches the end with nothing to run, where a change of tests alone does: only the count tells them apart.
-[ "$(py $e2e/gone.spec.ts)" = all ] || fail "journeys.py said 'none' for a deleted journey: $(py $e2e/gone.spec.ts)"
-[ "$(py app/src/features/world/w.test.ts $e2e/gone.spec.ts)" = all ] || fail "journeys.py let a test file hide a deleted journey: $(py app/src/features/world/w.test.ts $e2e/gone.spec.ts)"
-[ "$(py app/tests/e2e/gone.spec.ts-snapshots/a.png)" = all ] || fail "journeys.py placed a picture of a spec that does not exist"
-[ "$(py app/src/lib/shared.ts app/src/routes/eco.tsx app/src/routes/notFound.tsx)" = all ] || fail "journeys.py listed every journey instead of saying 'all'"
-# A list of routes it cannot read is no list: every journey. The fixture's own list with one thing added, so that what it
-# reads alone would still place the change and only the refusal of that thing gives 'all'.
-routes_say_all() { # $1: what is added to the list, $2: what it is
-	sed "s|^export default \[|export default [$1, |" "$g/app/src/routes.ts" >"$g/routes.new" && mv "$g/routes.new" "$g/app/src/routes.ts"
-	[ "$(py app/src/features/world/w.ts)" = all ] || fail "journeys.py placed a change by a routes.ts with $2, which it does not read: $(py app/src/features/world/w.ts)"
+done
+# What is built is the app: the build, in the app's step, for a change a page can load and for a run of everything; not for the server, a test of the
+# app or a journey, which no page loads. Its budget stays the 120 s of a run that builds.
+for f in app/src/a.tsx packages/ui/src/a.ts app/src/a.json; do
+	printf 'y\n' >>"$g/$f"
+	out=$(gate) || fail "check.sh failed on a change of $f: $out"
+	ran build:app || fail "check.sh did not build the app on a change of $f"
+	printf '%s\n' "$out" | grep -q "(budget 120 s)$" || fail "check.sh gave a run that builds the app another budget than 120 s: $out"
 	reset
-}
-routes_say_all 'layout("l.tsx")' "a layout"
-routes_say_all 'prefix("p")' "a prefix"
-routes_say_all 'route("a", "routes/eco.tsx", [route("b", "routes/special.tsx")])' "routes nested in a route"
-routes_say_all 'route("x/:y?", "routes/eco.tsx")' "an optional segment"
-routes_say_all 'route(prefix + "x", "routes/eco.tsx")' "a path that is no literal"
-# An import it cannot follow in a file some page loads: every journey, whatever else changed.
-printf 'export const more = (n) => import(n);\n' >>"$g/app/src/features/home/h.ts"
-[ "$(py app/src/features/world/w.ts)" = all ] || fail "journeys.py placed a change beside an import() with no literal, which it cannot follow"
-reset
-# The budget follows the work: half the journeys or fewer, 60 s; more, all of them included, 120 s; none (no app), 30 s (the measure is in docs/HARNESS.md).
-budget_of() { reset; for f in "$@"; do mkdir -p "$g/$(dirname "$f")" && printf 'y\n' >>"$g/$f"; done; gate | sed -n 's/.*(budget \([0-9]*\) s).*/\1/p'; }
-[ "$(budget_of app/src/routes/eco.tsx)" = 60 ] || fail "check.sh gave a run of exactly half the journeys '$(budget_of app/src/routes/eco.tsx)' s, not 60"
-[ "$(budget_of app/src/features/world/w.ts)" = 120 ] || fail "check.sh gave a run of most of the journeys '$(budget_of app/src/features/world/w.ts)' s, not 120 (F2577: 110 s measured for 39 of 43)"
-[ "$(budget_of app/tests/e2e/serve.mjs)" = 120 ] || fail "check.sh gave a run of every journey '$(budget_of app/tests/e2e/serve.mjs)' s, not 120"
-[ "$(budget_of app/src/features/world/w.ts app/tests/e2e/serve.mjs)" = 120 ] || fail "check.sh gave a run that holds a change it cannot place a budget other than 120 s"
-[ "$(budget_of app/src/features/world/w.test.ts)" = 30 ] || fail "check.sh gave a run of a test of the app alone '$(budget_of app/src/features/world/w.test.ts)' s, not 30: nothing of the app is built or walked"
-[ "$(budget_of server/src/a.ts)" = 30 ] || fail "check.sh gave a run of the server alone '$(budget_of server/src/a.ts)' s, not 30"
-# A test of the app alone (F2578): no page loads it, so the app is neither built nor walked; the tests lane still runs it.
-reset
-printf 'y\n' >>"$g/app/src/features/world/w.test.ts"
+done
+for f in server/src/a.ts app/tests/a.spec.ts app/tests/e2e/serve.mjs; do
+	mkdir -p "$g/$(dirname "$f")" && printf 'y\n' >>"$g/$f"
+	gate >/dev/null || fail "check.sh failed on a change of $f"
+	ran build:app && fail "check.sh built the app on a change of $f, which no page loads"
+	reset
+done
+printf 'y\n' >>"$g/app/src/a.test.ts"
 gate >/dev/null || fail "check.sh failed on a change of a test of the app alone"
-ran playwright && fail "check.sh ran the journeys on a change of a test of the app alone"
-ran app && fail "check.sh built the app on a change of a test of the app alone"
+ran build:app && fail "check.sh built the app on a change of a test of the app alone"
 ran test || fail "check.sh did not run the tests on a change of a test of the app alone"
-# A route's change runs its journeys only; so does a feature it loads, and a journey's own file or picture.
-places app/src/features/world/w.ts $world $net $tpl $unplaced
-places app/src/routes/world.tsx $world $net $tpl $unplaced
-places app/src/routes/home.tsx $home $lit $loc $tpl $unplaced
-places app/src/features/home/h.ts $home $lit $loc $tpl $unplaced
-places app/tests/e2e/world.spec.ts $world
-places "app/tests/e2e/home.spec.ts-snapshots/a-chromium.png" $home
-# The graph is followed past one hop, through a lazy import(), a re-export, a directory's index, a type import and a stylesheet.
-places app/src/lib/shared.ts $home $lit $loc $world $net $tpl $unplaced
-places app/src/lib/deep.ts $home $lit $loc $world $net $tpl $unplaced
-places app/src/features/world/w.css $world $net $tpl $unplaced
-places app/src/features/realm/Realm.ts $world $net $tpl $unplaced
-places app/src/features/lazyhome/L.ts $home $lit $loc $tpl $unplaced
-places app/src/features/barrel/b.ts $home $lit $loc $tpl $unplaced
-places app/src/features/barrel/index.ts $home $lit $loc $tpl $unplaced
-places app/src/lib/types.ts $home $lit $loc $tpl $unplaced
-# A static route beats a parameter's for a literal URL, and a template's ${} may mean either: special.tsx runs the template's journey
-# and the unplaced ones; world.tsx (a parameter's) also runs it; eco.tsx, another prefix, runs its own.
-places app/src/routes/special.tsx $tpl $loc $unplaced
-places app/src/routes/eco.tsx $eco $lit $unplaced
-# A path only the splat matches: its route's file places it; the name goes whole, its regular-expression characters escaped.
 reset
-printf 'y\n' >>"$g/app/src/routes/notFound.tsx"
-gate >/dev/null || fail "check.sh failed on a change of the not-found page"
-rest=$(journeys_raw | python3 -c 'import sys; print(sys.stdin.read().replace(sys.argv[1], ""))' "$odd_arg" | tr ' ' '\n' | grep . | sort | paste -sd' ' -)
-[ "$rest" = "$(sorted $unplaced)" ] || fail "check.sh gave '$(journeys_raw)' on a change of the not-found page: the odd name whole and the journeys it cannot place were due"
-grep -qF -- "$odd_arg" "$log" || fail "check.sh did not give Playwright the odd name whole, its regular-expression characters escaped: $(journeys_raw)"
-# Two changes run the union; a change placed twice runs its journey once.
+gate >/dev/null || fail "check.sh failed on a tree with no change"
+ran build:app || fail "check.sh did not build the app on a run of everything"
+ran playwright && fail "check.sh walked the journeys on a run of everything at a commit"
+# A build that fails fails the gate, and names the lane and the step.
+printf 'y\n' >>"$g/app/src/a.tsx"
+out=$(FAIL=build:app gate) && fail "check.sh passed with the app's build failing"
+printf '%s\n' "$out" | grep -q "^check.sh: lane ts failed at app" || fail "check.sh did not name the lane ts and its step app when the build failed: $out"
 reset
-printf 'y\n' >>"$g/app/src/features/world/w.ts" && printf 'y\n' >>"$g/app/src/features/home/h.ts" && printf 'y\n' >>"$g/app/src/routes/home.tsx"
-gate >/dev/null || fail "check.sh failed on two routes' changes"
-[ "$(journeys_ran)" = "$(sorted $home $lit $loc $world $net $tpl $unplaced)" ] || fail "check.sh gave the journeys '$(journeys_ran)' on a change of two routes"
-# A change the scoping cannot place runs every journey: a helper the journeys share, the file server, the routes' list, the
-# journeys' config, a file no page loads, a file deleted.
-for f in app/src/lib/rootLib.ts app/src/root.tsx app/tests/e2e/fixtures.ts app/tests/e2e/nav.ts app/tests/e2e/serve.mjs app/tests/e2e/sites.ts app/src/routes.ts app/playwright.config.ts app/src/lib/unloaded.ts app/src/a.tsx; do
-	places "$f"
-done
-reset
-git -C "$g" rm -q app/src/features/world/w.ts
-gate >/dev/null || fail "check.sh failed on a deleted file"
-ran playwright || fail "check.sh ran no journey on a deleted file"
-[ -z "$(journeys_ran)" ] || fail "check.sh scoped a deleted file to '$(journeys_ran)'"
-# A world's change beside one the scoping cannot place, or beside the server's (app/tests/e2e/api.mjs starts it): all of them.
-for beside in app/tests/e2e/serve.mjs server/src/a.ts; do
-	reset
-	printf 'y\n' >>"$g/app/src/features/world/w.ts" && printf 'y\n' >>"$g/$beside"
-	gate >/dev/null || fail "check.sh failed on a world change beside $beside"
-	ran playwright || fail "check.sh ran no journey on a world change beside $beside"
-	[ -z "$(journeys_ran)" ] || fail "check.sh scoped a change that holds $beside: $(journeys_ran)"
-done
-# The server alone starts no journey, as before.
-reset
-printf 'y\n' >>"$g/server/src/a.ts"
-gate >/dev/null || fail "check.sh failed on a server change"
-ran playwright && fail "check.sh ran the journeys on a change of the server alone"
-# A comment in the changed file decides nothing.
-reset
-printf '// journeys: skip, gate: off\n' >>"$g/app/src/features/world/w.ts"
-gate >/dev/null || fail "check.sh failed on a change with a comment that asks to skip"
-[ "$(journeys_ran)" = "$(sorted $world $net $tpl $unplaced)" ] || fail "check.sh let a comment in the changed file steer the journeys: $(journeys_ran)"
-# The merge check and --full keep every journey, whatever changed and was not committed.
-printf 'import { spawnSync } from "node:child_process";\nprocess.exit(spawnSync("sh", [%s, "core_chromium", "switch=" + (process.env.CORE_CHROMIUM ?? ""), ...process.argv.slice(2)], { stdio: "inherit" }).status ?? 1);\n' "'$step'" >"$g/node_modules/vitest/vitest.mjs"
+# The merge check and --full walk every journey, whatever changed: unfiltered, on a port of their own, and they build only through Playwright.
 for mode in --full --merge; do
-	reset
-	printf 'y\n' >>"$g/app/src/features/world/w.ts"
+	printf 'y\n' >>"$g/app/src/a.tsx"
 	AUDIT_ANSWER=x gate $mode >/dev/null || fail "check.sh $mode failed on a copy whose every step passes"
 	ran playwright || fail "check.sh $mode ran no journey"
-	[ -z "$(journeys_ran)" ] || fail "check.sh $mode scoped the journeys to '$(journeys_ran)': the merge check keeps every one"
+	[ "$(sed -n 's/^playwright .* --reporter=dot,json *//p' "$log")" = "" ] || fail "check.sh $mode gave the journeys a filter: the merge check keeps every one"
+	ran build:app && fail "check.sh $mode built the app beside the journeys, which build it themselves"
+	reset
 done
-# Pre-commit's staged copy has no repository: its list names the change, and the copy places it as well.
-reset
-cp -R "$g" "$g-copy" && rm -rf "${g:?}-copy/.git"
-copy() { : >"$log" && (cd "$g-copy" && env -u SANDBOX_RUNTIME -u GATE_MERGE GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" GATE_CHANGED="$1" sh scripts/check.sh 2>&1); }
-copy "app/src/features/world/w.ts" >/dev/null || fail "check.sh failed outside a repository on a world change"
-[ "$(journeys_ran)" = "$(sorted $world $net $tpl $unplaced)" ] || fail "check.sh gave the journeys '$(journeys_ran)' on a world change outside a repository"
-copy "app/src/features/world/w.ts
-app/tests/e2e/serve.mjs" >/dev/null || fail "check.sh failed outside a repository on serve.mjs"
-[ -z "$(journeys_ran)" ] || fail "check.sh scoped a list that holds serve.mjs outside a repository: $(journeys_ran)"
-# journeys.py failing fails the gate: a change scoped to nothing would pass unseen.
-reset
-printf 'import sys\nsys.exit("journeys: broken")\n' >"$g/scripts/journeys.py"
-git -C "$g" add -A && git -C "$g" commit -qm "journeys.py breaks"
-printf 'y\n' >>"$g/app/src/features/world/w.ts"
-gate >/dev/null && fail "check.sh passed when journeys.py failed: the change would run no journey"
 fi
 
 # A commit that touches a test file runs check_regressions in the fast gate (a renamed test passed it in 5b and failed only
@@ -3122,7 +2982,6 @@ fi
 if part gate_stryker; then
 gate_fixture gate_stryker
 mkdir -p "$g/node_modules/vitest"
-printf 'import { spawnSync } from "node:child_process";\nprocess.exit(spawnSync("sh", [%s, "core_chromium", "switch=" + (process.env.CORE_CHROMIUM ?? ""), ...process.argv.slice(2)], { stdio: "inherit" }).status ?? 1);\n' "'$step'" >"$g/node_modules/vitest/vitest.mjs"
 # StrykerJS's step, here, fails when a sandbox is still there as it starts.
 python3 -I - "$g/package.json" "$step" <<'PY'
 import json, sys
@@ -3206,7 +3065,6 @@ need = {
     ".githooks/pre-commit": {"gate_checks"},
     "scripts/borrow_node_modules.sh": {"borrow"},
     "vitest.config.ts": {"vitest_stryker"},
-    "scripts/journeys.py": {"gate_journeys"},
 }
 for path, sections in need.items():
     missing = sections - listed.get(path, set())
@@ -5033,7 +4891,6 @@ if part gate_full; then
 # `check.sh --merge` as one line `survivor: <path>: line L:C [Status] Kind`; a killed mutant is not.
 gate_fixture gate_survivors
 mkdir -p "$g/node_modules/vitest"
-printf 'import { spawnSync } from "node:child_process";\nprocess.exit(spawnSync("sh", [%s, "core_chromium", "switch=" + (process.env.CORE_CHROMIUM ?? ""), ...process.argv.slice(2)], { stdio: "inherit" }).status ?? 1);\n' "'$step'" >"$g/node_modules/vitest/vitest.mjs"
 base=$(git -C "$g" merge-base HEAD origin/main)
 # The branch changes the files its survivors are on (the report lists the survivors of the files it changed alone, F2529).
 printf 'z\n' >>"$g/server/src/a.ts" && printf 'z\n' >>"$g/server/src/b.ts" && printf 'x\n' >"$g/app/src/a.ts" && git -C "$g" add app/src/a.ts && git -C "$g" commit -qam "product code"

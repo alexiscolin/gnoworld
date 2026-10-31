@@ -64,7 +64,7 @@ SECTIONS = {
     ".githooks/records.sh": "outside,installed,wiring", ".githooks/pre-merge-commit": "outside,installed", ".githooks/merge.sh": "installed",
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix,worktree_script,borrow",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
-    "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys,gate_checks,gate_stryker,merge_lock,gate_limits", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring", "scripts/journeys.py": "gate_journeys", "scripts/prove_fix.py": "prove_fix",
+    "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys,gate_checks,gate_stryker,merge_lock,gate_limits", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
     "scripts/repo_files.py": {"hooks": "worktrees,regressions,batch_size,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/suite_parts.py": "mutant_scope,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/unsteady.py": {"hooks": "gate_lanes", "probe": "unsteady_real"}, "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
 }
 
@@ -119,59 +119,18 @@ def selectors(path, test):
             yield f"eslint selector `{part.strip()[:100]}`", path, text[: m.start(2)] + off + text[m.end(2):], test
 
 
-def scoping_mutants():
-    """The fast gate runs the journeys its change can reach (slice-5 harness-b): check.sh's use of scripts/journeys.py, and the rules in it."""
+def journeys_mutants():
+    """A commit's gate walks no journey (Alexis, 2026-10-31): it builds the app and starts no browser for it; the merge check and --full walk every journey."""
     check = "scripts/check.sh"
     for find, replace, label in (
-        ("if ! $full && ! $all && $app; then scope=", "if false; then scope=", "scopes the journeys to the change"),
-        ('if [ "$scope" != all ]; then', "if false; then", "gives Playwright the journeys journeys.py names"),
-        ('if [ "$scope" != all ] && [ "$scope" != none ]; then', 'if [ "$scope" != all ]; then', "gives a run with no journey the budget of one with some"),
-        (r"""sed 's/[][+(){}^$|?*\\]/\\&/g'""", r"""sed 's/[][+(){}^$|?*\\]/&/g'""", "escapes the regular-expression characters of a journey's name"),
-        ('set -- "$@" "$(printf', 'set -- "$(printf', "gives every journey journeys.py names"),
-        ("printf '%s\\n' \"$changed\" | python3 -I scripts/journeys.py", "python3 -I scripts/journeys.py </dev/null", "tells journeys.py what changed"),
+        ("\tif ! $full; then\n\t\t# A commit's gate builds the app", "\tif false; then\n\t\t# A commit's gate builds the app", "walks the journeys at a commit"),
+        ("\t\trun build:app\n", "\t\t:\n", "builds the app at a commit"),
+        ("\t\treturn 0\n\tfi\n\t# Three free ports", "\tfi\n\t# Three free ports", "stops after the build at a commit"),
+        ("\t\tapp/src/*.test.ts | app/src/*.test.tsx) ts=true ;;", "\t\tapp/src/*.test.ts | app/src/*.test.tsx) ts=true app=true ;;", "builds the app for a change of its tests alone"),
+        ("\t\tapp/tests/*.ts) ts=true ;;", "\t\tapp/tests/*.ts) ts=true app=true ;;", "builds the app for a change of a journey"),
+        ("--reporter=dot,json >", "--reporter=dot,json app/tests/e2e/home.spec.ts >", "gives the merge check's journeys a filter"),
     ):
         yield from each(check, find, replace, "hooks", f"check.sh {label}")
-    j = "scripts/journeys.py"
-    for find, replace, label in (
-        ("or path in always", "", "runs every journey on a file every page loads"),
-        ("if path not in loaded:\n            return None", "if False:\n            return None", "runs every journey on a file no page loads"),
-        ("| unplaced\n", "\n", "runs the journeys it cannot place on every change"),
-        ("if opaque or not urls:", "if False:", "cannot place a journey whose page is not a literal"),
-        ("    if graph.opaque:\n        return None\n", "", "gives up on an import it cannot follow"),
-        (r"(?:from|import)\s*\(?", r"(?:from)\s*\(?", "follows an import() and a side-effect import"),
-        ('os.path.join(base, "index" + e) for e in EXTENSIONS[1:]', "base for e in ()", "follows a directory's index"),
-        ('-2 if s == "*" else', '20 if s == "*" else', "ranks the splat last"),
-        ("if unknown and any(not splat for _, _, splat in hits):", "if False:", "means every route a template's ${} could"),
-        ("if not os.path.isfile(shots.group(1)):\n                return None", "if False:\n                return None", "runs every journey on a picture of no journey"),
-        ("        if TEST_FILE.search(path):\n            skipped += 1\n            continue\n", "", "reads a test file as no change of the pages"),
-        ("        if PROSE.search(path):\n            skipped += 1\n            continue\n", "", "reads prose as no change of the pages"),
-        ("if not run or run >= set(specs):", "if not run:", "says 'all' when every journey is due"),
-        ("if len(found) != len(", "if False and len(found) != len(", "refuses a routes list with a call it does not read"),
-        ("(?:layout|prefix)", "(?:prefix)", "refuses a routes list with a layout"),
-        ("(?:layout|prefix)", "(?:layout)", "refuses a routes list with a prefix"),
-        (' or body.count("[") > 1', "", "refuses a routes list with routes nested in routes"),
-        ('if any("?" in path for path, _ in found):', "if False:", "refuses a routes list with an optional segment"),
-        ("or not ORIGIN.match(", "or False and not ORIGIN.match(", "reads only the site's own origin at a template's start"),
-    ):
-        yield from each(j, find, replace, "hooks", f"journeys.py {label}")
-
-
-def journeys_more_mutants():
-    """What the journeys' scoping also does: a request or a location is a goto in a spec (F2575), tests alone are no journey (F2578)."""
-    yield from each("scripts/check.sh", '[ "$scope" != none ] || app=false', ":", "hooks", "check.sh builds and walks the app for a change of its tests alone")
-    for find, replace, label in (
-        ("[ $((journeys_due * 2)) -gt \"$journeys_all\" ] || budget=60", "[ $((journeys_due * 2)) -gt \"$journeys_all\" ] || budget=120", "gives a run of half the journeys or fewer a shorter budget"),
-        ("[ $((journeys_due * 2)) -gt", "[ $((journeys_due * 2)) -ge", "counts exactly half of the journeys as most of them"),
-        ("[ $((journeys_due * 2)) -gt", "[ $((journeys_due)) -gt", "counts the journeys due by half their number"),
-    ):
-        yield from each("scripts/check.sh", find, replace, "hooks", f"check.sh {label}")
-    for find, replace, label in (
-        ("*(OTHER_GO.finditer(text) if own else ())", "*()", "places a journey by its gotos alone, not by a request or a location it sets"),
-        ("OTHER_GO.finditer(text) if own else ()", "OTHER_GO.finditer(text)", "reads a helper's request through a variable as a journey's page"),
-        ("if not run and changed and skipped == len(changed):", "if False:", "says 'all' for a change of tests and prose alone"),
-        ("if not run and changed and skipped == len(changed):", "if not run:", "says 'none' for a deleted file beside a test"),
-    ):
-        yield from each("scripts/journeys.py", find, replace, "hooks", f"journeys.py {label}")
 
 
 def quick_mutants():
@@ -1093,8 +1052,7 @@ def mutants():
         yield from each("scripts/check.sh", find, replace, "hooks", f"check.sh: {label}")
     # The gate: each step dropped.
     yield from lines("scripts/check.sh", r"^(\s*)((?:run |python3 -I |sh scripts/|gitleaks |go vet |go run |\(cd gno |\$full \|\| run ).*)$", r"\1:", "hooks", "check.sh drops")
-    yield from scoping_mutants()
-    yield from journeys_more_mutants()
+    yield from journeys_mutants()
     yield from quick_mutants()
     yield from checks_mutants()
     yield from stryker_mutants()
