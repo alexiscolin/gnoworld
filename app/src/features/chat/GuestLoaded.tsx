@@ -2,8 +2,9 @@
 // no direct message, no notice, nothing kept, no composer. What an account adds is AccountChat's, loaded for one.
 import type { RoomList } from "@gnoworld/schemas";
 import { Stack } from "@gnoworld/ui";
-import { lazy, Suspense, type RefObject } from "react";
+import type { RefObject } from "react";
 import { useAppStore } from "../../storeContext.tsx";
+import { chunked } from "./Failing.tsx";
 import { ChatScreen, Dock, type ChatPlace } from "./ChatScreen.tsx";
 import type { ChatLink } from "./link.ts";
 import { LOG_IN_TO_READ_DMS, LOG_IN_TO_WRITE } from "./loginWords.ts";
@@ -22,14 +23,14 @@ import type { AppState } from "../../store/index.ts";
 
 // The people's list, its code (the nebula faces, the country tags) asked once someone is here: a room nobody has joined yet
 // draws none, and the first screen's budget (ADR-0001 §12) does not carry it.
-const People = lazy(async () => ({ default: (await import("./People.tsx")).People }));
+// A chunk that cannot be fetched leaves the list's place with a word, never the page (F1763).
+const People = chunked(async () => ({ default: (await import("./People.tsx")).People }), {
+  waiting: null,
+  failed: <p role="status">Who is here could not load.</p>,
+});
 
 function PeopleHere(props: PeopleProps) {
-  return props.members.some((nick) => nick !== BOT) ? (
-    <Suspense fallback={null}>
-      <People {...props} />
-    </Suspense>
-  ) : null;
+  return props.members.some((nick) => nick !== BOT) ? <People {...props} /> : null;
 }
 
 interface GuestLoadedProps {

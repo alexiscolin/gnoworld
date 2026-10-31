@@ -2,6 +2,7 @@
 import { firstGraphemes, type Line } from "@gnoworld/core";
 import { Address, type RoomList } from "@gnoworld/schemas";
 import type { AppState } from "../../store/index.ts";
+import { withFull } from "./full.ts";
 
 /** Whether a nick is an account's: an address, which a guest's cannot be (Ergo gives a guest 32 characters). */
 export const isAccount = (nick: string): boolean => Address.safeParse(nick).success;
@@ -23,21 +24,28 @@ export const roomLabel = (room: string): string => {
 };
 
 /** A room's address on the site: its world's page, and ?room=<name> for one that is not the main room. */
-export function roomHref(room: string): string {
-  const { world, name } = partsOf(room);
-  return name === undefined ? `/w/${world}` : `/w/${world}?room=${name}`;
+export function roomHref(room: string, full = false): string {
+  const { world } = partsOf(room);
+  return hrefOf(world, roomParams(room), full);
+}
+
+// A world's page at `params`, the full chat asked for or not.
+function hrefOf(world: string, params: URLSearchParams, full: boolean): string {
+  const search = withFull(params, full).toString();
+  return search === "" ? `/w/${world}` : `/w/${world}?${search}`;
 }
 
 /** A direct message's address on the site: its world's page, and ?dm=<the partner's address> (4e). */
-export const dmHref = (world: string, partner: string): string => `/w/${world}?dm=${partner}`;
+export const dmHref = (world: string, partner: string, full = false): string => hrefOf(world, dmParams(partner), full);
 
 /** A direct message's search on its world's page: ?dm=<the partner's address> (4e). */
-export const dmParams = (partner: string): URLSearchParams => new URLSearchParams({ dm: partner });
+export const dmParams = (partner: string, full = false): URLSearchParams =>
+  withFull(new URLSearchParams({ dm: partner }), full);
 
 /** A room's search on its world's page: ?room=<name>, or none for the main room. */
-export function roomParams(room: string): URLSearchParams {
+export function roomParams(room: string, full = false): URLSearchParams {
   const { name } = partsOf(room);
-  return new URLSearchParams(name === undefined ? {} : { room: name });
+  return withFull(new URLSearchParams(name === undefined ? {} : { room: name }), full);
 }
 
 // A room id's world and name: #<world>, or #<world>/<name>.

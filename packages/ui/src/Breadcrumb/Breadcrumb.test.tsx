@@ -27,6 +27,13 @@ describe("Breadcrumb", () => {
     expect(current.closest("a")).toBeNull();
   });
 
+  it("wears the one label style and a dot no reader meets, as the video's kicker does", () => {
+    render(<Breadcrumb label="You are here" items={trail} />);
+    const nav = screen.getByRole("navigation", { name: "You are here" });
+    expect(nav.className).toContain("label");
+    expect(nav.querySelector("[aria-hidden='true']")?.textContent).toBe("");
+  });
+
   it("marks no other step as current", () => {
     render(<Breadcrumb label="You are here" items={trail} />);
     expect(document.querySelectorAll("[aria-current]")).toHaveLength(1);

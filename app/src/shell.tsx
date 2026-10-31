@@ -1,27 +1,23 @@
 // What every page sits in: the store, the page's links (F326), the header and the main column. Layout (root.tsx) wraps the
 // document around it; apart, so a test can render it without the router's document components.
-import { Center, Cluster } from "@gnoworld/ui";
+import { Center } from "@gnoworld/ui";
 import type { ReactNode } from "react";
-import { Link } from "react-router";
-import { LoginControl } from "./features/login/index.ts";
-import { SearchPalette } from "./features/search/index.ts";
+import { useLocation } from "react-router";
 import { UpdatePrompt } from "./features/update/index.ts";
+import { site } from "./places.ts";
 import { AppLinks } from "./routerLink.tsx";
+import { ShellHeader } from "./shellHeader.tsx";
+import header from "./shellHeader.module.css";
 import { StoreProvider } from "./storeContext.tsx";
 
 export function Shell({ children }: { children: ReactNode }) {
+  const universe = site.universeAt(useLocation().pathname);
   return (
     <StoreProvider>
       <AppLinks>
-        <Center as="header" max="page" gutter="all">
-          <Cluster justify="between">
-            <Link to="/">gno.world</Link>
-            <SearchPalette />
-            <LoginControl />
-          </Cluster>
-        </Center>
+        <ShellHeader universe={universe} />
         <Center max="page">
-          <main>{children}</main>
+          <main className={header["page"]}>{children}</main>
         </Center>
         <UpdatePrompt />
       </AppLinks>

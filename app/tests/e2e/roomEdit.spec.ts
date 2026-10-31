@@ -343,8 +343,8 @@ test.describe("a room's lines: Edit, between two accounts", () => {
     const bob = await another({ playwright, launchOptions }, word("bob"));
     const me = await logIn(page, word("as"));
     // Each page in the room, then each seeing the other there.
-    await bob.page.goto("/w/bubble?room=games");
-    await page.goto("/w/bubble?room=games");
+    await bob.page.goto("/w/bubble?room=games&chat=full");
+    await page.goto("/w/bubble?room=games&chat=full");
     for (const [each, who] of [
       [bob.page, me],
       [page, bob.address],

@@ -17,7 +17,7 @@ export const roomsNav = (page: Page) => page.getByRole("navigation", { name: "Ro
 /** A test's own account, logged in, in #games, Ergo having said it is here. */
 export async function inGames(page: Page): Promise<string> {
   const address = await logIn(page, word("as"));
-  await page.goto("/w/bubble?room=games");
+  await page.goto("/w/bubble?room=games&chat=full");
   await hydrated(page);
   await expect(whoIsHere(page).getByTitle(address)).toBeVisible();
   return address;

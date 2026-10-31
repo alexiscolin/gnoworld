@@ -154,3 +154,44 @@ describe("a world's page, its breadcrumb", () => {
     expect(html).toMatch(/aria-current="page"[^>]*>Bubble</);
   });
 });
+
+// Slice 5r (frames 90 to 97, 102 to 107): a world's page is a plate, with no 3D and the chat's slot as it was.
+describe("a world's plate", () => {
+  const plateOf = async () => {
+    const html = await render(route(), "/w/bubble");
+    return { html, tag: /<section [^>]*data-look="plate"[^>]*>/.exec(html)?.[0] ?? "" };
+  };
+
+  test("is a plate named for the world, holding the one heading, the description and the breadcrumb", async () => {
+    const { html, tag } = await plateOf();
+    expect(tag).toContain('aria-label="Bubble"');
+    const inside = html.slice(html.indexOf(tag));
+    expect(inside.indexOf("<h1")).toBeGreaterThan(0);
+    expect(inside.indexOf("the BUBBLE token, its governance")).toBeGreaterThan(inside.indexOf("<h1"));
+    expect(html.match(/<h1\b/g)).toHaveLength(1);
+    // The trail is part of the plate: it opens before the plate closes.
+    const plate = inside.slice(0, inside.indexOf("</section>"));
+    expect(plate).toMatch(/<nav [^>]*aria-label="You are here"/);
+  });
+
+  test("says its kind in its vertical caption, to the eye only", async () => {
+    const { html } = await plateOf();
+    expect(html).toMatch(/gnoworld[^<]*hub/i);
+    expect(html).toMatch(/aria-hidden="true"[^>]*><p [^>]*>gnoworld/);
+  });
+
+  test("shows no figure, chart or planet the data does not hold: no sample numbers, no 3D", async () => {
+    const { html } = await plateOf();
+    expect(html).not.toMatch(/here now|messages now|<canvas\b|data-value=|data-hour=/i);
+  });
+
+  test("offers no Follow and no Share while neither works", async () => {
+    const { html } = await plateOf();
+    expect(html).not.toMatch(/>Follow<|>Share</);
+  });
+
+  test("keeps the chat's slot in the page, after the plate opens", async () => {
+    const { html } = await plateOf();
+    expect(html).toMatch(/<section [^>]*data-look="plate"[\s\S]*Loading the chat/);
+  });
+});

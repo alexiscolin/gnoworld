@@ -1,7 +1,15 @@
 /* The full-screen chat: a header over a row of regions, filling the height its place gives it, each holding its own scroll, the page none (the video's frame
    23.58.01). The widths are the video's, measured at 1728 px. */
 @layer components {
+  /* The box the chat is given: its width, not the window's, says which regions are drawn (a dock beside a scene is narrow
+     inside a wide window). */
   .root {
+    container-type: inline-size;
+    block-size: 100%;
+    min-block-size: 0;
+  }
+
+  .frame {
     /* layout: the header over the body, filling the height its place gives it; no composition fills a height */
     display: flex;
     /* layout: the header over the body */
@@ -66,9 +74,9 @@
     min-block-size: 0;
   }
 
-  /* raw: the design system's one breakpoint for the chat, a phone's layout (docs/DESIGN-SYSTEM.md): the conversation
-     alone, the rooms behind a control */
-  @media (max-width: 900px) {
+  /* raw: the design system's one breakpoint for the chat, a phone's layout (docs/DESIGN-SYSTEM.md), read from the box's
+     width: the conversation alone, the rooms behind a control */
+  @container (inline-size <= 900px) {
     .worlds,
     .info {
       display: none;

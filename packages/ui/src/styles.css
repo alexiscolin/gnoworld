@@ -1,5 +1,5 @@
-/* The design system in one sheet: its layers, declared once in their order of strength, then its
-   fonts, served from the site, and its parts, each in its layer. */
+/* The design system in one sheet: its layers (the same statement as layers.css, which the app links first), then its fonts, served from the site, and its
+   parts, each in its layer. */
 @layer reset, tokens, base, compositions, components, utilities;
 @import "@fontsource-variable/geist" layer(base);
 @import "@fontsource-variable/geist-mono" layer(base);

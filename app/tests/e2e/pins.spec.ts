@@ -36,14 +36,14 @@ async function reader({ playwright, launchOptions }: Launcher, as?: string, room
   const context = await browser.newContext({ baseURL });
   const second = await context.newPage();
   const address = as === undefined ? undefined : await logIn(second, as);
-  await second.goto(`/w/bubble?room=${room}`);
+  await second.goto(`/w/bubble?room=${room}&chat=full`);
   await hydrated(second);
   return { page: second, address, close: () => browser.close() };
 }
 // The moderator (the worker's own, or the named one) in `room`, having said `text`, which shows.
 async function said(page: Page, text: string, { room = "games", as }: { room?: string; as?: string } = {}) {
   const address = await logIn(page, moderator(as));
-  await page.goto(`/w/bubble?room=${room}`);
+  await page.goto(`/w/bubble?room=${room}&chat=full`);
   await hydrated(page);
   // Ergo having said the account is here: a line sent before it is lost, and the load of a full run makes that likely.
   await expect(whoIsHere(page).getByTitle(address)).toBeVisible({ timeout: 15_000 });

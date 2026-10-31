@@ -103,12 +103,16 @@ export function useLineFocus(lines: readonly Line[], listRef: RefObject<HTMLOLis
     // A press on the bar's own controls keeps the bar in view, as before: only a line's words, a chip, a link, are pressed.
     onPointerDown: (event: { target: EventTarget }) => {
       pressedRef.current = !(event.target instanceof Element && event.target.closest("[role='toolbar']") !== null);
-    },
-    onPointerUp: () => {
-      pressedRef.current = false;
-    },
-    onPointerCancel: () => {
-      pressedRef.current = false;
+      // Released anywhere, outside the list too: a press dragged off it would else leave the list thinking it is held (27).
+      if (pressedRef.current) {
+        const until = new AbortController();
+        const release = () => {
+          pressedRef.current = false;
+          until.abort();
+        };
+        document.addEventListener("pointerup", release, { signal: until.signal });
+        document.addEventListener("pointercancel", release, { signal: until.signal });
+      }
     },
     onKeyDown: (event: KeyboardEvent<HTMLOListElement>) => {
       moveAmong(event);

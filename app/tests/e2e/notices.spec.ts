@@ -170,7 +170,7 @@ test.describe("notifications", () => {
     const { address, ergo, sent } = await account(page);
     const registered = () => sent.filter((line) => line.startsWith("USER ")).length;
     const before = registered();
-    await page.goto(`/w/bubble?dm=${OTHER}`);
+    await page.goto(`/w/bubble?dm=${OTHER}&chat=full`);
     await expect(page.getByRole("heading", { name: `Direct message with ${OTHER_SHORT}` })).toBeVisible();
     // The reload opens a socket of its own: a line said before its registration went to the old one, or came before
     // the welcome that tells the page who it is (a load of 35 or more lost it in 4 runs of 7).

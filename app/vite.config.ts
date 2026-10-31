@@ -61,6 +61,15 @@ const dataFiles: Plugin = {
 // and Intl.Segmenter, as MDN's browser-compat-data 8.1.7 dates them. Vite's own default stops at 2026-01-01's (S1).
 const TARGET = ["chrome112", "edge112", "firefox125", "safari17", "ios17"];
 
+// One chunk each for the store, all of ui and the libraries two chunks share: 20 chunks, not 27, /w/bubble's first screen
+// 173,363 B, not 178,495 B (F3157). The chat's and the lines' code stay behind their own chunks: budgets.spec.ts holds that.
+// The order of the CSS layers does not hang on these groups: root.tsx links the layers' sheet first (F3260).
+const CHUNKS = [
+  { name: "store", test: /\/app\/src\/store\// },
+  { name: "ui", test: /\/packages\/ui\/src\// },
+  { name: "vendor", test: /node_modules/, minShareCount: 2 },
+];
+
 // The React Compiler memoizes every component (ADR-0002 §8); one it cannot compile fails the build.
 export default defineConfig({
   plugins: [
@@ -69,5 +78,5 @@ export default defineConfig({
     babel({ presets: [reactCompilerPreset({ panicThreshold: "all_errors" })] }),
     serviceWorker,
   ],
-  build: { target: TARGET },
+  build: { target: TARGET, rolldownOptions: { output: { codeSplitting: { groups: CHUNKS } } } },
 });

@@ -68,6 +68,16 @@ beforeAll(async () => {
   await prerender(
     <RoomView room="#bubble/games" state={ROOM} chat="connected" onDelete={() => false} onDismiss={() => undefined} />,
   );
+  // The typists' code comes once someone is typing (5q's fix pass, the first screen's budget): held the same way.
+  await prerender(
+    <RoomView
+      room="#bubble/games"
+      state={{ ...ROOM, typing: { someone: Date.now() + 60_000 } }}
+      chat="connected"
+      onDelete={() => false}
+      onDismiss={() => undefined}
+    />,
+  );
 });
 
 describe("RoomView", () => {

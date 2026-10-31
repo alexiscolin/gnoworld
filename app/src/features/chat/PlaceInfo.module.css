@@ -3,8 +3,10 @@
     padding: var(--space-m);
   }
 
+  /* Who's here lands here from code: the ring says where the reader is. */
   .panel:focus {
-    outline: none;
+    outline: var(--focus-width) solid var(--color-mine);
+    outline-offset: calc(-1 * var(--focus-width));
   }
 
   .name {

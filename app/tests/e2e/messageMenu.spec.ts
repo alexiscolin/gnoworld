@@ -37,7 +37,7 @@ async function room(
     socket = ergo;
     scriptedErgo(ergo, me, { history, ...options });
   });
-  await page.goto(`/w/bubble${options.room === "#bubble" ? "" : "?room=games"}`);
+  await page.goto(`/w/bubble${options.room === "#bubble" ? "?chat=full" : "?room=games&chat=full"}`);
   await hydrated(page);
   await expect(lines(page)).toHaveCount(history.length);
   return () => {
@@ -455,6 +455,8 @@ test.describe("a line's actions", () => {
 
   // /code-review: the list stays where the reader left it as lines come, whichever line holds the focus.
   test("keep the list where the reader left it as a line comes while a line holds the focus", async ({ page }) => {
+    // The video's header (96 px) and the plate above the room leave a 720-high screen too little for the lines.
+    await page.setViewportSize({ width: 1280, height: 800 });
     const ergo = await room(page, { history: SIXTY });
     await lines(page).first().focus();
     await expect(lines(page).first()).toBeInViewport();

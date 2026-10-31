@@ -44,8 +44,9 @@ test.describe("the chat as the video shows it", () => {
     expect(talk.x + talk.width).toBeLessThanOrEqual(i.x + 1);
     expect(h.y + h.height).toBeLessThanOrEqual(w.y + 1);
     await expect(worlds(page).getByRole("link", { name: "Bubble" })).toHaveAttribute("aria-current", "page");
-    // Shrink has no dock to shrink to before slice 7: the header draws none; Close leaves the chat, which works today.
-    await expect(page.getByRole("button", { name: /^(Expand|Shrink) the chat$/ })).toHaveCount(0);
+    // The full chat has its dock to shrink to, and Close leaves the chat for the universe's home.
+    await expect(page.getByRole("button", { name: "Shrink the chat" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Expand the chat" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Close the chat" })).toBeVisible();
   });
 
@@ -136,7 +137,7 @@ test.describe("the chat as the video shows it", () => {
         ]),
       });
     });
-    await page.goto("/w/bubble?room=games");
+    await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
     const list = page.getByRole("list", { name: "Messages" });
     await expect(list.locator(":scope > li")).toHaveCount(40);
@@ -148,8 +149,12 @@ test.describe("the chat as the video shows it", () => {
       element.scrollTop = 0;
     });
     expect(await box(composer)).toEqual(before);
+    // The document does not scroll and the box is the window's: the composer is in view, at 1280 by 600 as at any size.
     const layout = await box(page.locator("[data-chat-layout]"));
-    expect(layout.height).toBe(600);
+    expect(layout.y).toBe(0);
+    expect(layout.y + layout.height).toBeLessThanOrEqual(600);
+    await expect(composer).toBeInViewport();
+    expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(600);
   });
 
   test("passes axe at a computer's width, an account's and a guest's", async ({ page }) => {

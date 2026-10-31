@@ -29,7 +29,7 @@ async function conversation(page: Page, width: number, partner: string): Promise
     scriptedErgo(ergo, ACCOUNT);
     opened(ergo);
   });
-  await page.goto(`/w/bubble?dm=${partner}`);
+  await page.goto(`/w/bubble?dm=${partner}&chat=full`);
   await hydrated(page);
   const ergo = await socket;
   // Said once Ergo welcomed the page (RoomView's empty words wait on "connected"): no "Connecting" holds before it

@@ -3,6 +3,7 @@
 import type { RoomList as Rooms } from "@gnoworld/schemas";
 import { NavItem, Stack, type NavItemProps } from "@gnoworld/ui";
 import type { ReactNode, Ref } from "react";
+import { useFull } from "./full.ts";
 import { roomHref, roomLabel } from "./names.ts";
 import shared from "./lists.module.css";
 import styles from "./RoomsView.module.css";
@@ -34,6 +35,7 @@ export interface RoomSectionsProps {
 }
 
 export function RoomSections({ sections, current, failed, badge }: RoomSectionsProps) {
+  const full = useFull();
   const shown = sections.filter(({ rooms }) => rooms.length > 0);
   if (failed !== undefined) return failed;
   if (shown.length === 0) return <p>No room here yet.</p>;
@@ -45,7 +47,7 @@ export function RoomSections({ sections, current, failed, badge }: RoomSectionsP
           <ul className={[shared["plain"], shared["items"]].join(" ")}>
             {rooms.map(({ room }) => (
               <li key={room}>
-                <NavItem href={roomHref(room)} current={room === current} badge={badge?.(room)}>
+                <NavItem href={roomHref(room, full)} current={room === current} badge={badge?.(room)}>
                   {roomLabel(room)}
                 </NavItem>
               </li>

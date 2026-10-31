@@ -26,15 +26,11 @@
 
   .main {
     /* layout: the lead and the words side by side from the start */
-    display: grid;
-    /* layout: one after the other */
-    grid-auto-flow: column;
-    /* layout: from the start of the item */
-    justify-content: start;
+    display: flex;
     /* layout: the lead centred on the words' line */
     align-items: center;
     /* layout: a step between the lead and the words */
-    gap: var(--space-xs);
+    column-gap: var(--space-xs);
     /* layout: as tall as the item, so the whole height is the link */
     align-self: stretch;
     text-decoration: none;

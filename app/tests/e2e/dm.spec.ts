@@ -108,7 +108,7 @@ test.describe("direct messages", () => {
     const me = await inGames(page);
     const bob = await another({ playwright, launchOptions }, word("bob"));
     // Bob in the room, so who is here lists him: his own page joins #games.
-    await bob.page.goto("/w/bubble?room=games");
+    await bob.page.goto("/w/bubble?room=games&chat=full");
     await expect(whoIsHere(page).getByTitle(bob.address)).toBeVisible();
     await whoIsHere(page)
       .getByRole("button", { name: `Message ${short(bob.address)}` })
@@ -145,7 +145,7 @@ test.describe("direct messages", () => {
     await inGames(page);
     // Bob logged in, his page on no world: not connected to Ergo.
     const bob = await another({ playwright, launchOptions }, word("bob"));
-    await page.goto(`/w/bubble?dm=${bob.address}`);
+    await page.goto(`/w/bubble?dm=${bob.address}&chat=full`);
     await hydrated(page);
     const field = page.getByRole("textbox", { name: `Message ${short(bob.address)}` });
     await expect(field).toBeVisible();
@@ -169,7 +169,7 @@ test.describe("direct messages", () => {
     const carol = await another({ playwright, launchOptions }, word("carol"));
     // Bob connected, so Ergo delivers my line to him (it answers 401 to one for an account not connected): his own
     // page joins #games.
-    await bob.page.goto("/w/bubble?room=games");
+    await bob.page.goto("/w/bubble?room=games&chat=full");
     await expect(whoIsHere(page).getByTitle(bob.address)).toBeVisible();
     await dmFrom(bob, me, word("first"));
     await rowOf(page, bob.address).click();
@@ -194,7 +194,7 @@ test.describe("direct messages", () => {
   test("stay in a conversation on Alt+Up and Alt+Down, which move between rooms", async ({ page }) => {
     await inGames(page);
     const partner = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
-    await page.goto(`/w/bubble?dm=${partner}`);
+    await page.goto(`/w/bubble?dm=${partner}&chat=full`);
     await hydrated(page);
     await expect(page.getByRole("heading", { name: short(partner) })).toBeVisible();
     await page.keyboard.press("Alt+ArrowDown");
@@ -215,11 +215,11 @@ test.describe("direct messages", () => {
   // 4e's UX review (U9): ?dm= a page cannot show said nothing, the main room in its place.
   test("say why a ?dm= shows no conversation: a guest's, or an address that is none", async ({ page }) => {
     const partner = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
-    await page.goto(`/w/bubble?dm=${partner}`);
+    await page.goto(`/w/bubble?dm=${partner}&chat=full`);
     await hydrated(page);
     await expect(page.getByRole("status").filter({ hasText: "Log in to read direct messages." })).toBeVisible();
     await inGames(page);
-    await page.goto("/w/bubble?dm=g1nope");
+    await page.goto("/w/bubble?dm=g1nope&chat=full");
     await hydrated(page);
     await expect(page.getByRole("status").filter({ hasText: "That is not an account's address." })).toBeVisible();
     await expect(page.getByRole("heading", { name: "#bubble" })).toHaveCount(0);
@@ -230,7 +230,7 @@ test.describe("direct messages", () => {
     await inGames(page);
     const partner = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
     await page.route("**/api/rooms*", (route) => route.abort());
-    await page.goto(`/w/bubble?dm=${partner}`);
+    await page.goto(`/w/bubble?dm=${partner}&chat=full`);
     await hydrated(page);
     await expect(dmsNav(page).getByRole("alert").filter({ hasText: "The rooms could not load." })).toBeVisible();
     // /code-review (CR8): the failure stands in the rooms' place, never beside "No room here yet.".

@@ -7,7 +7,7 @@ import styles from "./RoomView.module.css";
 // Who is typing, by name, on the page's clock (its own a room: CR4), drawn again as the next one's time ends, a timer
 // firing early never seen as before it (CR6); under the lines and out of every live region, so a screen reader hears
 // the lines and not each pause of another's.
-export function Typists({ typing }: { typing: Typing }) {
+export function Typists({ typing }: { typing: Typing | undefined }) {
   const [now, setNow] = useState(() => Date.now());
   const next = Math.min(...Object.values(typing ?? {}).filter((until) => until > now));
   useEffect(() => {

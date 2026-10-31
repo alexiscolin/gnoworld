@@ -20,29 +20,31 @@ export interface ChatLayoutProps {
  * inside it, over a composer that stays. */
 export function ChatLayout({ header, worlds, rooms, info, infoFirst, children }: ChatLayoutProps) {
   return (
-    <div className={styles["root"]} data-chat-layout="" data-info-first={infoFirst === true ? "" : undefined}>
-      <div className={styles["header"]} data-region="header">
-        {header}
-      </div>
-      <div className={styles["body"]}>
-        {worlds === undefined ? null : (
-          <div className={styles["worlds"]} data-region="worlds">
-            {worlds}
-          </div>
-        )}
-        {rooms === undefined ? null : (
-          <div className={styles["rooms"]} data-region="rooms">
-            {rooms}
-          </div>
-        )}
-        <div className={styles["conversation"]} data-region="conversation">
-          {children}
+    <div className={styles["root"]}>
+      <div className={styles["frame"]} data-chat-layout="" data-info-first={infoFirst === true ? "" : undefined}>
+        <div className={styles["header"]} data-region="header">
+          {header}
         </div>
-        {info === undefined ? null : (
-          <div className={styles["info"]} data-region="info">
-            {info}
+        <div className={styles["body"]}>
+          {worlds === undefined ? null : (
+            <div className={styles["worlds"]} data-region="worlds">
+              {worlds}
+            </div>
+          )}
+          {rooms === undefined ? null : (
+            <div className={styles["rooms"]} data-region="rooms">
+              {rooms}
+            </div>
+          )}
+          <div className={styles["conversation"]} data-region="conversation">
+            {children}
           </div>
-        )}
+          {info === undefined ? null : (
+            <div className={styles["info"]} data-region="info">
+              {info}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

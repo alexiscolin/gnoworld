@@ -1,7 +1,7 @@
 // A world's page: pre-rendered for each known world, at its path and at its canonical address; any other path gets this
 // route's not-found. The world is found by the request's path as written: its case is part of the address (F376).
 import { useLoaderData, useRouteError, type MetaArgs } from "react-router";
-import { Breadcrumb } from "@gnoworld/ui";
+import { Breadcrumb, Panel, Stack } from "@gnoworld/ui";
 import { failedWorldMeta, worldMeta } from "../meta.ts";
 import { pageOf, site, type World as WorldPlace } from "../places.ts";
 import { Chat, type ChatPlace } from "../features/chat/index.ts";
@@ -22,9 +22,6 @@ export function meta({ loaderData, error }: MetaArgs<typeof loader>) {
   return loaderData || isMissing(error) ? worldMeta(loaderData) : failedWorldMeta();
 }
 
-// Until slice 7 draws each planet from its own look, every world in the column of worlds wears the one disc.
-const PLANET = "/planet.svg";
-
 // What the chat's header, its column of worlds and its info panel say of the place.
 function placeOf(world: WorldPlace, universe: ReturnType<typeof site.home>): ChatPlace {
   return {
@@ -33,7 +30,7 @@ function placeOf(world: WorldPlace, universe: ReturnType<typeof site.home>): Cha
     description: world.description,
     kicker: `${universe.name} · ${world.name}`,
     home: universe.home.path,
-    worlds: universe.worlds.map(({ slug, name, path }) => ({ slug, name, href: path, src: PLANET })),
+    worlds: universe.worlds.map(({ slug, name, path }) => ({ slug, name, href: path })),
   };
 }
 
@@ -41,19 +38,28 @@ export default function World() {
   const world = useLoaderData<typeof loader>();
   const universe = site.home(world);
   return (
-    <>
-      <Breadcrumb
-        label="You are here"
-        items={[
-          { label: universe.name, href: universe.home.path },
-          { label: "Earth", href: universe.earth.path },
-          { label: world.name },
-        ]}
-      />
-      <h1>{world.name}</h1>
-      <p>{world.description}</p>
+    <Panel.Layout
+      plate={
+        <Panel label={world.name} look="plate" caption="gnoworld · hub atlas">
+          <Panel.Body>
+            <Stack>
+              <Breadcrumb
+                label="You are here"
+                items={[
+                  { label: universe.name, href: universe.home.path },
+                  { label: "Earth", href: universe.earth.path },
+                  { label: world.name },
+                ]}
+              />
+              <h1>{world.name}</h1>
+              <p>{world.description}</p>
+            </Stack>
+          </Panel.Body>
+        </Panel>
+      }
+    >
       <Chat world={world.slug} place={placeOf(world, universe)} />
-    </>
+    </Panel.Layout>
   );
 }
 

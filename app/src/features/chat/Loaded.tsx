@@ -11,6 +11,7 @@ import type { ChatLink } from "./link.ts";
 import { useComposing } from "./composing.ts";
 import { dmActs } from "./dmActs.ts";
 import type { Say } from "./linkTypes.ts";
+import { asksFull } from "./full.ts";
 import { dmParams, groupsAt, roomIds, talkingOf } from "./names.ts";
 import { NoticeModes } from "./NoticeModes.tsx";
 import { OnlyKnown } from "./OnlyKnown.tsx";
@@ -52,10 +53,11 @@ function useWhoIsHere(
   { connected, me }: { connected: boolean; me: string | undefined },
   open: (partner: string) => void,
 ) {
-  const [, setParams] = useSearchParams();
+  const [params, setParams] = useSearchParams();
+  const full = asksFull(params);
   const onMessage = (other: string) => {
     open(other);
-    setParams(dmParams(other));
+    setParams(dmParams(other, full));
   };
   return <People members={members} connected={connected} me={me} onMessage={onMessage} />;
 }
@@ -214,7 +216,7 @@ export function Loaded(props: LoadedProps) {
             ...composing.view,
             ...threads.view,
           }}
-          composer={room === undefined ? writer : <Dock onWhoIsHere={ask}>{writer}</Dock>}
+          composer={<Dock onWhoIsHere={ask}>{writer}</Dock>}
         />
       )}
     </ChatScreen>

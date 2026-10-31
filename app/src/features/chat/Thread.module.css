@@ -5,11 +5,14 @@
     inline-size: min(100%, var(--column-m));
   }
 
-  /* raw: the design system's one breakpoint for the chat: a phone's thread takes the whole width the page's gutter leaves
-     (ChatLayout gives it the conversation's place) */
-  @media (max-width: 900px) {
+  /* raw: the design system's one breakpoint for the chat, read from the chat's own width: a narrow chat's thread takes the
+     whole width (ChatLayout gives it the conversation's place) */
+  @container (inline-size <= 900px) {
     .panel {
       inline-size: 100%;
+      /* the chat's own inset, as the lines have, which the box's edge no longer leaves to the page's gutter */
+      box-sizing: border-box;
+      padding-inline: var(--chat-inset);
     }
   }
 

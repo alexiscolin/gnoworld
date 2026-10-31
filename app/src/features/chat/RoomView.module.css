@@ -16,7 +16,7 @@
   /* What stands above the lines, at the lines' own inset: the link's state, and a room's word while it holds no line. */
   .lead {
     padding-block-start: var(--space-s);
-    padding-inline: var(--space-l);
+    padding-inline: var(--chat-inset);
   }
 
   .status:empty {
@@ -45,7 +45,7 @@
     min-block-size: 0;
     overflow: auto;
     padding-block: var(--space-m);
-    padding-inline: calc(var(--space-l) - var(--focus-width) - var(--focus-offset));
+    padding-inline: calc(var(--chat-inset) - var(--focus-width) - var(--focus-offset));
     /* the video's chat text, a half point under the body's */
     font: var(--font-chat);
   }
@@ -183,7 +183,7 @@
   /* Always drawn, one line high, so the composer below never moves as typists come and go; cut to one line, its
      whole in its title (UX review U2, U8). */
   .typing {
-    padding-inline: var(--space-l);
+    padding-inline: var(--chat-inset);
     font: var(--font-meta);
     color: var(--color-text-muted);
     /* layout: one line of this font, which no token names */

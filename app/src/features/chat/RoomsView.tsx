@@ -5,7 +5,8 @@ import type { Notice } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";
 import { useRef, type ReactNode } from "react";
 import { Avatar, Button, Cluster, NavItem, Row, Stack, type NavItemProps } from "@gnoworld/ui";
-import { NOT_ENCRYPTED } from "./Dms.tsx";
+import { NOT_ENCRYPTED, PAGE_ONLY } from "./Dms.tsx";
+import { useFull } from "./full.ts";
 import { dmHref, isAccount, roomHref, roomLabel, shortAddress } from "./names.ts";
 import { countWords } from "./unread.ts";
 import { RoomSections, RoomsNav } from "./RoomSections.tsx";
@@ -77,6 +78,7 @@ function Notices({
   onClear,
   navRef,
 }: Omit<NoticesProps, "said" | "saidId"> & { navRef: { current: HTMLElement | null } }) {
+  const full = useFull();
   return (
     <Stack space="2xs" as="section">
       <Cluster space="xs" justify="between">
@@ -103,7 +105,7 @@ function Notices({
             <Row
               title={`${whoIs(notice.by)} ${WORDS[notice.kind]}`}
               subtitle={notice.kind === "dm" ? "Direct message" : roomLabel(notice.where)}
-              href={notice.kind === "dm" ? dmHref(world, notice.where) : roomHref(notice.where)}
+              href={notice.kind === "dm" ? dmHref(world, notice.where, full) : roomHref(notice.where, full)}
             />
           </li>
         ))}
@@ -117,7 +119,9 @@ function Dms({
   partners,
   current,
   badges,
-}: Pick<DmsProps, "world" | "partners" | "current"> & { badges: RoomsViewProps["badges"] }) {
+  notKept,
+}: Pick<DmsProps, "world" | "partners" | "current" | "notKept"> & { badges: RoomsViewProps["badges"] }) {
+  const full = useFull();
   return (
     <Stack space="2xs" as="section">
       <h2 className={styles["section"]}>Direct messages</h2>
@@ -130,7 +134,7 @@ function Dms({
             {partners.map((partner) => (
               <li key={partner}>
                 <NavItem
-                  href={dmHref(world, partner)}
+                  href={dmHref(world, partner, full)}
                   current={partner === current}
                   lead={<Avatar address={partner} name={partner} decorative />}
                   badge={badged(badges?.[partner], true)}
@@ -141,9 +145,13 @@ function Dms({
             ))}
           </ul>
           {/* What every direct message says of itself, in the video's small grey note under the list. */}
-          <p className={styles["note"]}>{NOT_ENCRYPTED}</p>
+          <p className={styles["note"]}>
+            {NOT_ENCRYPTED} {PAGE_ONLY}
+          </p>
         </>
       )}
+      {/* Said in view, not behind the menu: a device that kept none of the choices is a risk the reader must not miss (CR5). */}
+      {notKept === true ? <p className={styles["note"]}>Not kept on this device</p> : null}
     </Stack>
   );
 }

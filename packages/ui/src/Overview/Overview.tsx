@@ -21,7 +21,7 @@ import {
 } from "./Interface.tsx";
 import { NavItems } from "./NavItems.tsx";
 import { Kicker } from "../Kicker/Kicker.tsx";
-import { Kickers, Layout } from "./Frames.tsx";
+import { Frames, Kickers, Layout } from "./Frames.tsx";
 import { Region } from "./Region.tsx";
 
 function Buttons() {
@@ -132,6 +132,7 @@ export function Overview() {
       <Region name="Kickers">
         <Kickers />
       </Region>
+      <Frames />
       <Region name="Flashes">
         <Flashes />
       </Region>

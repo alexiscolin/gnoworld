@@ -1,8 +1,35 @@
-/* The chat's screen: the rooms' column at the video's inset, and what stands under the lines, which never scrolls with them. */
+/* The chat's screen: docked in the slot the page's plate leaves it, or full bleed over the page, and what stands under the
+   lines, which never scrolls with them. The inset is the lines' own: the video's 32 px (frame 66), 24 in the dock (frame
+   26), a phone's gutter. */
 @layer components {
-  /* The screen takes the height of the window, so the regions scroll alone and the page does not. */
   .screen {
-    block-size: 100dvb;
+    /* layout: the screen fills the slot the page gives it, and the regions scroll alone, the page none */
+    block-size: 100%;
+  }
+
+  /* Full bleed over the page, the video's frames 56 to 77, below a flash that stays, as the page is (F2165). */
+  .screen[data-full] {
+    position: fixed;
+    inset: var(--flash-room) 0 0;
+    /* raw: above the page's header, whose z-index is 2 (shellHeader.module.css), until the layers' tokens come with the scene */
+    z-index: 3;
+  }
+
+  /* The dock: what the slot (320 under 1400 px, the video's 360) holds beside the scene, at the video's 24 px inset. */
+  .screen:not([data-full]) {
+    --chat-inset: var(--space-m);
+  }
+
+  /* raw: the 320 px dock of a window under 1400 px: the list keeps 300 px */
+  @media (max-width: 1399px) {
+    .screen:not([data-full]) {
+      --chat-inset: 8px;
+    }
+  }
+
+  /* A phone's chat: the gutter the page gives, which the focus ring's margin follows. */
+  .screen[data-full][data-compact] {
+    --chat-inset: var(--space-s);
   }
 
   .rail {
@@ -14,15 +41,7 @@
   .dock {
     /* the video's 21 px under the box, from the tokens: 16 and 4 */
     padding-block-end: calc(var(--space-s) + var(--space-3xs));
-    padding-inline: var(--space-l);
+    padding-inline: var(--chat-inset);
     border-block-start: var(--line-width) solid var(--color-line);
-  }
-
-  /* raw: the design system's one breakpoint for the chat, a phone's layout: the page's gutter is the inset, the box takes
-     the width it leaves */
-  @media (max-width: 900px) {
-    .dock {
-      padding-inline: 0;
-    }
   }
 }

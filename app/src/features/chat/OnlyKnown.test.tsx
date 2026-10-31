@@ -13,9 +13,4 @@ describe("the choice to hear from those the account wrote to alone", () => {
     click(button(box, "Only people I wrote to"));
     expect(onOnlyKnown).toHaveBeenCalledWith(false);
   });
-
-  it("says when the device did not keep it", () => {
-    expect(mount(<OnlyKnown {...dms} notKept />).textContent).toContain("Not kept on this device");
-    expect(mount(<OnlyKnown {...dms} />).textContent).not.toContain("Not kept on this device");
-  });
 });

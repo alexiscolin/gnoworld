@@ -133,6 +133,19 @@ describe("RoomsView: direct messages", () => {
     expect(html.match(/aria-current="true"/g)).toHaveLength(1);
   });
 
+  // Review 8 of 5q: both words sat behind the room menu's chevron, where nobody reads them before writing.
+  it("says in view that these lines are kept only while the page is open, beside that they are not encrypted", () => {
+    expect(said(view({ current: undefined, dms: dms() }))).toContain(
+      "Not encrypted: the server can read these. Kept only while this page is open.",
+    );
+  });
+
+  it("says in view, under the list, when the device did not keep the choices, and not otherwise", () => {
+    expect(said(view({ dms: dms({ notKept: true }) }))).toContain("Not kept on this device");
+    expect(said(view({ dms: dms({ notKept: true, partners: [] }) }))).toContain("Not kept on this device");
+    expect(said(view({ dms: dms() }))).not.toContain("Not kept on this device");
+  });
+
   it("says when there is none yet, and has no section for a guest", () => {
     // 4e's UX review (U4): the empty list says how to start one.
     expect(said(view({ dms: dms({ partners: [] }) })).replaceAll("&#x27;", "'")).toContain(

@@ -45,6 +45,8 @@ test.describe("mark unread", () => {
   test("moves the New mark to the line, tells Ergo nothing backwards, and keeps it through a reload until read to the end", async ({
     page,
   }) => {
+    // The video's header (96 px) and the plate above the room leave a 720-high screen too little for the lines.
+    await page.setViewportSize({ width: 1280, height: 1100 });
     const address = await logIn(page, word("unread"));
     // Read to the newest line: no New, and Ergo's place already there, so nothing is told.
     const { sent } = await room(page, { me: address, history: SIXTY, read: T(59) });
@@ -125,7 +127,10 @@ test.describe("saved messages", () => {
     const dialog = savedDialog(page);
     await expect(dialog).toContainText("the second line");
     await expect(dialog).toContainText("Saved on this device only.");
-    await expect(dialog.getByRole("link", { name: "Open in room" })).toHaveAttribute("href", "/w/bubble?room=games");
+    await expect(dialog.getByRole("link", { name: "Open in room" })).toHaveAttribute(
+      "href",
+      "/w/bubble?room=games&chat=full",
+    );
     await dialog.getByRole("button", { name: /^Remove .* saved message$/ }).click();
     await expect(dialog).toContainText("Nothing saved yet.");
     await page.keyboard.press("Escape");

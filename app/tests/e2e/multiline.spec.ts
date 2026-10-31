@@ -23,7 +23,7 @@ async function opened(
   await page.routeWebSocket(/\/ws$/, (ergo) => {
     scriptedErgo(ergo, address, { history, noMultiline, heard: (line) => sent.push(line) });
   });
-  await page.goto("/w/bubble?room=games");
+  await page.goto("/w/bubble?room=games&chat=full");
   await hydrated(page);
   await expect(lines(page)).toHaveCount(history.length);
   return sent;
@@ -138,7 +138,7 @@ test.describe("a message of several lines", () => {
     await page.routeWebSocket(/\/ws$/, (ergo) => {
       scriptedErgo(ergo, address, { welcomeAfter, heard: (line) => sent.push(line) });
     });
-    await page.goto("/w/bubble?room=games");
+    await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
     const tooMany = page.getByText(/too many: 20 at most/);
     await expect(field(page)).toHaveValue(kept);

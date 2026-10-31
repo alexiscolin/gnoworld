@@ -5,8 +5,8 @@ import { all, mount as draw, one } from "../../../tests/mount.tsx";
 import { Worlds } from "./Worlds.tsx";
 
 // 5q: the full-screen chat's column of worlds (the video's left edge): one planet each, the world in view marked.
-const BUBBLE = { slug: "bubble", name: "Bubble", href: "/w/bubble", src: "/planets/bubble.webp" };
-const GOVDAO = { slug: "govdao", name: "GovDAO", href: "/w/govdao", src: "/planets/govdao.webp" };
+const BUBBLE = { slug: "bubble", name: "Bubble", href: "/w/bubble" };
+const GOVDAO = { slug: "govdao", name: "GovDAO", href: "/w/govdao" };
 
 // A world is a link of the router's, so the column is drawn inside one.
 const mount = (element: React.ReactElement) => draw(<MemoryRouter>{element}</MemoryRouter>);
@@ -19,10 +19,13 @@ describe("Worlds", () => {
     expect(links.map((link) => link.getAttribute("aria-label"))).toEqual(["Bubble", "GovDAO"]);
   });
 
-  it("draws each world as its planet's picture in a disc, the picture saying nothing more than the link's name", () => {
+  it("draws each world as ui's own disc, the picture saying nothing more than the link's name", () => {
     const box = mount(<Worlds worlds={[BUBBLE, GOVDAO]} current="bubble" />);
     const pictures = all(box, "img");
-    expect(pictures.map((picture) => picture.getAttribute("src"))).toEqual([BUBBLE.src, GOVDAO.src]);
+    expect(pictures.map((picture) => picture.getAttribute("src")?.startsWith("data:image/svg+xml"))).toEqual([
+      true,
+      true,
+    ]);
     expect(pictures.map((picture) => picture.getAttribute("alt"))).toEqual(["", ""]);
     expect(all(box, "[data-kind='world']")).toHaveLength(2);
   });

@@ -11,7 +11,7 @@ import type { ErgoState } from "../../lib/ergo/ergo.ts";
 import type { RoomKeeping, RoomPins } from "./RoomKeeping.ts";
 import type { LinesProps } from "./Lines.tsx";
 import styles from "./RoomView.module.css";
-import { Typists } from "./Typists.tsx";
+import { chunked } from "./Failing.tsx";
 
 // The lines view (the lines, what is under them, a line's bar) is asked once the room holds a line: lines come over the
 // WebSocket after the page is drawn, so its code is never the first screen's (ADR-0001 §12; docs/decisions.md,
@@ -19,6 +19,16 @@ import { Typists } from "./Typists.tsx";
 const Lines = lazy(async () => ({ default: (await import("./Lines.tsx")).Lines }));
 // The room's pins above its lines come from the server after the page is drawn, and show once there is one (4d).
 const PinBar = lazy(async () => ({ default: (await import("./PinBar.tsx")).PinBar }));
+// Who is typing is asked once someone is: a room where nobody types draws only its one empty line, kept so the composer never
+// moves, and the first screen does not carry the names' code (ADR-0001 §12).
+const NOBODY = <p className={styles["typing"]} />;
+const Typists = chunked(async () => ({ default: (await import("./Typists.tsx")).Typists }), {
+  waiting: NOBODY,
+  failed: NOBODY,
+});
+function TypistsHere({ typing }: { typing: Typing | undefined }) {
+  return Object.keys(typing ?? {}).length === 0 ? NOBODY : <Typists typing={typing} />;
+}
 const LINES = [styles["lines"], styles["fill"]].join(" ");
 // The list's place while its code comes, or while the room holds no line: no line, no tab stop; a key pressed meanwhile
 // acts on the page as it stands, nothing queued for the lines.
@@ -155,7 +165,7 @@ export function RoomView(props: RoomViewProps) {
       />
       {connected && lines.length === 0 ? <p className={styles["lead"]}>{empty}</p> : null}
       {/* A room's, whose place is kept so the composer never moves; a direct message tells none (4e). */}
-      {room === undefined ? null : <Typists key={`${room} typing`} typing={typing} />}
+      {room === undefined ? null : <TypistsHere key={`${room} typing`} typing={typing} />}
       {composer}
     </div>
   );
