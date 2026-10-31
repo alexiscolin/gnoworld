@@ -10,6 +10,31 @@ describe("COUNTRIES", () => {
     expect(COUNTRIES.length).toBeLessThanOrEqual(260);
   });
 
+  // F3370: a lost or an added row changes this list in a diff, which the range above would not notice. Bonaire, Sint
+  // Eustatius and Saba (BQ) are in the map units file of the release the header names, so a message from there counts.
+  it("holds exactly these 250 codes, Natural Earth 5.1.2's 249 and BQ from its map units", () => {
+    const pinned =
+      "AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT " +
+      "BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH " +
+      "ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT " +
+      "HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS " +
+      "LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI " +
+      "NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG " +
+      "SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG " +
+      "UM US UY UZ VA VC VE VG VI VN VU WF WS XK YE YT ZA ZM ZW ";
+    expect(COUNTRIES.map((c) => c.code)).toEqual(pinned.trim().split(" "));
+    expect(COUNTRIES).toHaveLength(250);
+  });
+
+  it("holds Bonaire, Sint Eustatius and Saba under BQ, among the leeward islands", () => {
+    expect(COUNTRIES.find((c) => c.code === "BQ")?.name).toBe("Caribbean Netherlands");
+    const c = centreOf("BQ");
+    expect(c?.lat).toBeGreaterThanOrEqual(12);
+    expect(c?.lat).toBeLessThanOrEqual(18);
+    expect(c?.lon).toBeGreaterThanOrEqual(-69);
+    expect(c?.lon).toBeLessThanOrEqual(-62);
+  });
+
   it("gives each a two-capital code, once, and a name", () => {
     const codes = COUNTRIES.map((c) => c.code);
     expect(codes.every((c) => /^[A-Z]{2}$/.test(c))).toBe(true);

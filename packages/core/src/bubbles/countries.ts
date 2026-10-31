@@ -1,9 +1,9 @@
 // The countries a bubble can come from: an ISO 3166-1 alpha-2 code, a name and a centre in degrees.
 // Source: Natural Earth (public domain, https://www.naturalearthdata.com/about/terms-of-use/), release 5.1.2, read from
 // https://github.com/nvkelso/natural-earth-vector/tree/v5.1.2/geojson: ne_10m_admin_0_countries (ISO_A2_EH, NAME_EN,
-// LABEL_Y, LABEL_X; one row a code, the feature of the lowest LABELRANK) and, for ten overseas territories that file folds
+// LABEL_Y, LABEL_X; one row a code, the feature of the lowest LABELRANK) and, for eleven overseas territories that file folds
 // into their state, ne_10m_admin_0_map_units. The centre is the source's label point to a tenth of a degree. Bonaire,
-// Sint Eustatius and Saba (BQ) are in neither file: a message from there is dropped.
+// Sint Eustatius and Saba (BQ, "Caribbean Netherlands") are in the map units file: LABEL_Y 17.5438, LABEL_X -63.1334.
 export interface Country {
   readonly code: string;
   readonly name: string;
@@ -20,7 +20,7 @@ const ROWS = [
   "AZ,Azerbaijan,40.4,47.2;BA,Bosnia and Herzegovina,44.1,18.1;BB,Barbados,13.2,-59.6;",
   "BD,Bangladesh,24.2,89.7;BE,Belgium,50.8,4.8;BF,Burkina Faso,12.7,-1.4;BG,Bulgaria,42.5,25.2;",
   "BH,Bahrain,26.1,50.6;BI,Burundi,-3.3,29.9;BJ,Benin,10.3,2.4;BL,Saint Barthélemy,17.9,-62.8;",
-  "BM,Bermuda,32.3,-64.8;BN,Brunei,4.4,114.6;BO,Bolivia,-16.7,-64.6;BR,Brazil,-12.1,-49.6;",
+  "BM,Bermuda,32.3,-64.8;BN,Brunei,4.4,114.6;BO,Bolivia,-16.7,-64.6;BQ,Caribbean Netherlands,17.5,-63.1;BR,Brazil,-12.1,-49.6;",
   "BS,The Bahamas,26.4,-77.1;BT,Bhutan,27.5,90.0;BV,Bouvet Island,-54.4,3.4;BW,Botswana,-22.1,24.2;",
   "BY,Belarus,53.8,28.4;BZ,Belize,17.2,-88.7;CA,Canada,60.3,-101.9;CC,Cocos (Keeling) Islands,-12.2,96.8;",
   "CD,Democratic Republic of the Congo,-1.9,23.5;CF,Central African Republic,7.0,20.9;",
