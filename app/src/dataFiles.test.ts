@@ -87,7 +87,7 @@ async function expectPolicies(client: string, conf: string, cap: number): Promis
 
 // Slice 5's 5c: the data files read and checked at build time (docs/plans/slice-5.md §3, "Data files").
 describe("loadData", () => {
-  it("reads the nine files into their schemas' shapes", () => {
+  it("reads the ten files into their schemas' shapes", () => {
     const dir = plant();
     try {
       const data = loadData(dir);
@@ -95,6 +95,7 @@ describe("loadData", () => {
       expect(data.hubs[0]?.slug).toBe("bubble");
       expect(data.ecosystems).toEqual([]);
       expect(Object.keys(data).sort()).toEqual([
+        "bubbles",
         "ecosystems",
         "events",
         "expedition",
@@ -216,6 +217,66 @@ describe("loadData", () => {
     } finally {
       rmSync(dir, { recursive: true });
     }
+  });
+});
+
+// Slice 6's 6a: the bubbles' rules (ADR-0001 §7), one object in app/data/bubbles.json, checked when the app builds.
+describe("bubbles.json", () => {
+  const planted = (change: (rules: Record<string, unknown>) => void) =>
+    plant((f) => {
+      change(f["bubbles.json"] as Record<string, unknown>);
+    });
+  const message = (dir: string): string => {
+    try {
+      loadData(dir);
+    } catch (error) {
+      return error instanceof Error ? error.message : "";
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+    return "";
+  };
+
+  it("is read as the rules, and the repository ships ADR-0001 section 7's starting values", () => {
+    const data = loadData(new URL("../data", import.meta.url).pathname);
+    expect(data.bubbles).toEqual({
+      maxOnScreen: 6,
+      showSeconds: 5,
+      speakerDelaySeconds: 30,
+      maxChars: 80,
+      readLast: 500,
+    });
+  });
+
+  it.each([
+    ["maxOnScreen", 13],
+    ["showSeconds", 16],
+    ["speakerDelaySeconds", 121],
+    ["maxChars", 19],
+    ["maxChars", 161],
+    ["readLast", 2001],
+    ["maxOnScreen", 0],
+  ])("stops the build on %s of %d, naming the file and the field", (field, value) => {
+    expect(
+      message(
+        planted((r) => {
+          r[field] = value;
+        }),
+      ),
+    ).toMatch(new RegExp(`^bubbles\\.json: ${field}\\b`));
+  });
+
+  it("stops the build on a missing rule, a wrong type, a list and an unknown rule, naming the file", () => {
+    const fault = (change: (r: Record<string, unknown>) => void) => message(planted(change));
+    expect(fault((r) => Reflect.deleteProperty(r, "maxChars"))).toMatch(/^bubbles\.json: maxChars\b/);
+    expect(fault((r) => Reflect.set(r, "showSeconds", "5"))).toMatch(/^bubbles\.json: showSeconds\b/);
+    expect(fault((r) => Reflect.set(r, "extra", 1))).toMatch(/^bubbles\.json: /);
+    expect(message(plant((f) => Reflect.set(f, "bubbles.json", [])))).toMatch(/^bubbles\.json: \(file\)/);
+  });
+
+  it("stops the build when the file is missing or is no JSON", () => {
+    expect(message(plant((f) => Reflect.deleteProperty(f, "bubbles.json")))).toMatch(/bubbles\.json/);
+    expect(message(plant((f) => Reflect.set(f, "bubbles.json", "{")))).toMatch(/bubbles\.json/);
   });
 });
 

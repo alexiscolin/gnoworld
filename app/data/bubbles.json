@@ -1,0 +1,7 @@
+{
+  "maxOnScreen": 6,
+  "showSeconds": 5,
+  "speakerDelaySeconds": 30,
+  "maxChars": 80,
+  "readLast": 500
+}

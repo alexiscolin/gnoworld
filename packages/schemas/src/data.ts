@@ -100,6 +100,18 @@ export const Expedition = byId(
 export const Quests = byId(
   z.strictObject({ id: text(DATA_CAPS.key), title: text(DATA_CAPS.title), description: text(DATA_CAPS.description) }),
 );
+
+const rule = (low: number, high: number) => z.int().check(z.gte(low), z.lte(high));
+
+/** The rules of the Earth's bubbles (ADR-0001 §7), one object; each bound keeps a rule from drowning the globe. */
+export const BubbleRules = z.strictObject({
+  maxOnScreen: rule(1, 12),
+  showSeconds: rule(1, 15),
+  speakerDelaySeconds: rule(1, 120),
+  maxChars: rule(20, 160),
+  readLast: rule(1, 2000),
+});
+
 export const News = byId(
   z.strictObject({
     id: text(DATA_CAPS.key),

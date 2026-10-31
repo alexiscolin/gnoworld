@@ -5,6 +5,7 @@ import { z } from "./zod.ts";
 export { ActivityRooms } from "./activity.ts";
 export { Address, ADDRESS_PROBLEMS, toAddress, type AddressProblem } from "./address.ts";
 export {
+  BubbleRules,
   Ecosystems,
   EMBED_PREFIXES,
   Events,
