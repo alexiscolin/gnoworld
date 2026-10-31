@@ -4,7 +4,7 @@
 // referrer, as the chat's does.
 import type { Inline, PageBlock } from "@gnoworld/core";
 import { createElement, type ReactNode } from "react";
-import { ANONYMOUS, drawBlock, drawInlines } from "../chat/index.ts";
+import type { Drawing } from "../chat/index.ts";
 import styles from "./RealmBlocks.module.css";
 import { RealmForm } from "./RealmForm.tsx";
 
@@ -49,36 +49,36 @@ class Budget {
 const inlinesOf = (block: PageBlock): readonly Inline[] =>
   block.type === "paragraph" || block.type === "heading" ? block.children : [];
 
-function drawAll(blocks: readonly PageBlock[], budget: Budget): ReactNode[] {
+function drawAll(blocks: readonly PageBlock[], budget: Budget, via: Drawing): ReactNode[] {
   const drawn: ReactNode[] = [];
   for (const block of blocks) {
     if (!budget.spend(weigh(inlinesOf(block)))) break;
-    drawn.push(draw(block, budget));
+    drawn.push(draw(block, budget, via));
   }
   return drawn;
 }
 
-function draw(block: PageBlock, budget: Budget): ReactNode {
+function draw(block: PageBlock, budget: Budget, via: Drawing): ReactNode {
   switch (block.type) {
     case "heading":
-      return createElement(HEADINGS[block.level], null, ...drawInlines(block.children, ANONYMOUS));
+      return createElement(HEADINGS[block.level], null, ...via.inlines(block.children, via.reader));
     case "form":
       return createElement(RealmForm, { exec: block.exec, fields: budget.fit(block.fields, () => 0) });
     case "quote":
-      return createElement("blockquote", null, ...drawAll(block.children, budget));
+      return createElement("blockquote", null, ...drawAll(block.children, budget, via));
     case "list":
-      return drawBlock({ ...block, items: budget.fit(block.items, weigh) }, ANONYMOUS);
+      return via.block({ ...block, items: budget.fit(block.items, weigh) }, via.reader);
     case "paragraph":
     case "codeBlock":
-      return drawBlock(block, ANONYMOUS);
+      return via.block(block, via.reader);
   }
 }
 
 /** A page's blocks, in order, in the page's own column; `more` is the address of the page on gnoweb, which a page cut at
  * the limit links to. */
-export function RealmBlocks({ blocks, more }: { blocks: readonly PageBlock[]; more?: string }) {
+export function RealmBlocks({ blocks, more, via }: { blocks: readonly PageBlock[]; more?: string; via: Drawing }) {
   const budget = new Budget();
-  const drawn = drawAll(blocks, budget);
+  const drawn = drawAll(blocks, budget, via);
   const notice = budget.cut
     ? createElement(
         "p",

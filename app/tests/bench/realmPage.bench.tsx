@@ -3,6 +3,7 @@
 import { page, PAGE_MAX_BYTES } from "@gnoworld/core";
 import { renderToStaticMarkup } from "react-dom/server";
 import { bench, describe } from "vitest";
+import { drawing } from "../../src/features/chat/index.ts";
 import { RealmBlocks } from "../../src/features/realms/RealmBlocks.tsx";
 
 // A page of everything the reader reads: headings, marks, links, a list, code, a quote, an alert, columns, a form.
@@ -66,17 +67,19 @@ const headings = treeOf("# a\n".repeat(PAGE_MAX_BYTES / 4));
 const items = treeOf("- a\n".repeat(PAGE_MAX_BYTES / 4));
 const marks = treeOf("*a* ".repeat(PAGE_MAX_BYTES / 4));
 
+const via = await drawing();
+
 describe("a realm page, drawn", () => {
   bench("RealmBlocks, 256 KB of every block, drawn whole [100 ms]", () => {
-    renderToStaticMarkup(<RealmBlocks blocks={everything} />);
+    renderToStaticMarkup(<RealmBlocks via={via} blocks={everything} />);
   });
   bench("RealmBlocks, 256 KB of one-character headings, drawn whole [100 ms]", () => {
-    renderToStaticMarkup(<RealmBlocks blocks={headings} />);
+    renderToStaticMarkup(<RealmBlocks via={via} blocks={headings} />);
   });
   bench("RealmBlocks, 256 KB of one-character list items, drawn whole [100 ms]", () => {
-    renderToStaticMarkup(<RealmBlocks blocks={items} />);
+    renderToStaticMarkup(<RealmBlocks via={via} blocks={items} />);
   });
   bench("RealmBlocks, 256 KB of marks in one paragraph, drawn whole [100 ms]", () => {
-    renderToStaticMarkup(<RealmBlocks blocks={marks} />);
+    renderToStaticMarkup(<RealmBlocks via={via} blocks={marks} />);
   });
 });

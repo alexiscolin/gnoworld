@@ -1,12 +1,15 @@
 import { page, type Page } from "@gnoworld/core";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
+import { drawing } from "../chat/index.ts";
 import { DRAW_LIMIT, INLINE_LIMIT, RealmBlocks } from "./RealmBlocks.tsx";
+
+const via = await drawing();
 
 function draw(source: string): string {
   const read: Page = page(source, { origin: "https://gno.land" });
   if (read.kind !== "page") throw new Error("too big");
-  return renderToStaticMarkup(<RealmBlocks blocks={read.blocks} />);
+  return renderToStaticMarkup(<RealmBlocks via={via} blocks={read.blocks} />);
 }
 
 const textOf = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
@@ -138,7 +141,9 @@ describe("RealmBlocks: a page too long to draw", () => {
   const drawn = (source: string, more?: string) => {
     const read = page(source);
     if (read.kind !== "page") throw new Error("too big");
-    return renderToStaticMarkup(<RealmBlocks blocks={read.blocks} {...(more === undefined ? {} : { more })} />);
+    return renderToStaticMarkup(
+      <RealmBlocks via={via} blocks={read.blocks} {...(more === undefined ? {} : { more })} />,
+    );
   };
   const count = (html: string, tag: string) => html.split(`<${tag}`).length - 1;
 
