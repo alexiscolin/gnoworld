@@ -3870,6 +3870,9 @@ if re.search(r"^\s*pid\s+/tmp/nginx\.pid;", conf, re.M):  # the image's pid file
 if re.search(r"^\s*\w+_temp_path\s+/tmp/\w+_temp;", conf, re.M):
     print('nginx: [emerg] mkdir() "/tmp/client_temp" failed (1: Operation not permitted)', file=sys.stderr)
     sys.exit(1)
+if re.search(r"^\s*(error|access)_log\s+/dev/std", conf, re.M):  # the real nginx -t fails on /dev/stderr under the sandbox (seen on 1.30.6)
+    print('nginx: [emerg] open() "/dev/stderr" failed (6: Device not configured)', file=sys.stderr)
+    sys.exit(1)
 if os.environ.get("STUB_WARN"):
     print("nginx: [warn] " + os.environ["STUB_WARN"], file=sys.stderr)
 if test:
@@ -4014,6 +4017,9 @@ stopped "an nginx that never listens"
 # A literal upstream host (deploy/web/nginx.conf's ergo and server) is one nginx -t refuses where no such host resolves: the check
 # tests a config that names none. Docker's names are the image's own; the stub refuses any host that is no address.
 sed -n '/^test /,/^===$/p' "$nc/stub.log" | grep -qE "proxy_pass +http://(ergo|server)[:;]" && fail "check_nginx left the image's upstream host names in the config it tested (nginx: host not found in upstream)"
+# The image logs to /dev/stderr and /dev/stdout, which a real nginx -t cannot open under the sandbox: the check tests a config that logs
+# to a file of its own folder (the stub refuses the device paths as nginx does).
+sed -n '/^test /,/^===$/p' "$nc/stub.log" | grep -qE "^ *(error|access)_log +/dev/std" && fail "check_nginx left the image's /dev/stderr or /dev/stdout log in the config it tested"
 # F2459: a second map_hash_max_size in the config nginx refuses; the check shows nginx's own words and serves nothing.
 cp "$nc/deploy/web/nginx.conf" "$nc/nginx.good"
 python3 -I -c 'import re, sys; t = open(sys.argv[1]).read(); open(sys.argv[2], "w").write(re.sub(r"^( *)(include /etc/nginx/csp\.conf;)", r"\1map_hash_max_size 4096;\n\1\2", t, flags=re.M))' "$nc/nginx.good" "$nc/deploy/web/nginx.conf"
@@ -4023,10 +4029,9 @@ out=$(chk) && fail "check_nginx passed a config nginx refuses to start with (F24
 printf '%s\n' "$out" | grep -qF '"map_hash_max_size" directive is duplicate' || fail "check_nginx did not show nginx's own error for F2459: $out"
 grep -q "^serve " "$nc/stub.log" && fail "check_nginx served a build after nginx -t failed"
 cp "$nc/nginx.good" "$nc/deploy/web/nginx.conf"
-# A warning: the hash table's, which csp-fixes (F2454) removes by sizing the table, is the one named and allowed until then;
-# any other warning fails.
-out=$(WARN='could not build optimal map_hash, you should increase either map_hash_max_size: 2048 or map_hash_bucket_size: 64' chk) || fail "check_nginx refused the one warning it allows until csp-fixes sizes the table (F2454): $out"
-printf '%s\n' "$out" | grep -qi "allowed" || fail "check_nginx did not say it allowed a warning, and which: $out"
+# A warning fails, the hash table's included: csp-fixes (F2454) sized the table, and nginx 1.30.6 builds it with none.
+out=$(WARN='could not build optimal map_hash, you should increase either map_hash_max_size: 2048 or map_hash_bucket_size: 64' chk) && fail "check_nginx passed the hash table's warning, which csp-fixes' sizes removed (F2625): $out"
+printf '%s\n' "$out" | grep -qF 'could not build optimal map_hash' || fail "check_nginx did not show the hash table's warning that failed it: $out"
 out=$(WARN='the "user" directive makes sense only if the master process runs with super-user privileges, ignored' chk) && fail "check_nginx passed an unknown warning: $out"
 printf '%s\n' "$out" | grep -qF 'the "user" directive' || fail "check_nginx did not show the warning that failed it: $out"
 # What it cannot do fails, never skips: no binary, a binary whose checksum is not the pinned one, no build.

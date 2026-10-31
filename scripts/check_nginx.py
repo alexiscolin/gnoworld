@@ -5,8 +5,8 @@ nginx refused to start) and F2460 (a slashed address got the bare policy). Docke
 (1.30.6, the image's) from the tools' cache, with the checksum of the binary checked:
 
 1. `nginx -t` on deploy/web/nginx.conf as the image has it, with the build's table (app/build/csp.conf) where the image copies it, and
-   the paths of the image's filesystem pointed at this tree's and a temporary folder. Nginx's own words are shown when it refuses. A warning
-   fails, but the one named in ALLOWED, until csp-fixes (F2454) sizes the table.
+   the paths of the image's filesystem pointed at this tree's and a temporary folder (its logs too: a real nginx -t cannot open /dev/stderr
+   under the sandbox). Nginx's own words are shown when it refuses. A warning fails.
 2. The same config served on a free port, with what a plain request cannot give left out (the PROXY protocol, the password, the upstream
    hosts of Docker's network): every page of app/build/client/_headers and every .html file, at each address form (slashed, bare,
    index.html), answers 200 with the policy of its own rule in _headers, not the bare one.
@@ -31,8 +31,6 @@ sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no _
 VERSION = "1.30.6"
 PIN = pathlib.Path(__file__).resolve().with_name("nginx.sha256")
 START_TIMEOUT = 20.0  # s, for nginx to answer on its port
-# The warnings the check lets through, each named: csp-fixes (F2454) sizes the table so nginx builds its hash with none, and removes this.
-ALLOWED = ("could not build optimal map_hash",)
 
 
 def fail(*lines):
@@ -91,6 +89,7 @@ def staged(conf, where, mime, table, root, ports):
     conf = once(r"^\s*listen\s+127\.0\.0\.1:8081;", f"listen 127.0.0.1:{ports[1]};", conf)
     conf = re.sub(r"^\s*auth_basic(_user_file)?\s+[^;]*;\n", "", conf, flags=re.M)  # a plain request has no password
     conf = re.sub(r"^(\s*pid\s+)\S+;", lambda m: f"{m.group(1)}{where}/nginx.pid;", conf, flags=re.M)
+    conf = re.sub(r"^(\s*(?:error|access)_log\s+)/dev/std\w+", lambda m: f"{m.group(1)}{where}/nginx.log", conf, flags=re.M)  # the sandbox refuses /dev/stderr
     conf = re.sub(r"(\s)/tmp/(\w+_temp)\b", lambda m: f"{m.group(1)}{where}/{m.group(2)}", conf)
     # nginx resolves a literal upstream host as it loads: Docker's names (ergo, server) are no host here.
     return re.sub(r"(proxy_pass\s+https?://)[A-Za-z][\w.-]*(:\d+;)", r"\g<1>127.0.0.1\2", conf)
@@ -205,11 +204,8 @@ def main():
         if test.returncode != 0:
             fail("nginx -t refused deploy/web/nginx.conf with the build's table:", said)
         warnings = [line for line in said.splitlines() if "[warn]" in line]
-        refused = [w for w in warnings if not any(a in w for a in ALLOWED)]
-        if refused:
-            fail("nginx -t warned (a warning fails the merge check):", *refused)
-        for w in warnings:
-            print(f"check_nginx.py: allowed warning, until csp-fixes sizes the table (F2454): {w.strip()}")
+        if warnings:
+            fail("nginx -t warned (a warning fails the merge check):", *warnings)
         print(f"check_nginx.py: nginx {VERSION} -t accepts deploy/web/nginx.conf with the build's table")
 
         proc = serve(exe, conf, where, ports[0])

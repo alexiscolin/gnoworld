@@ -65,17 +65,24 @@ GNO_TOOLCHAIN=$T GNOROOT=$T/src ./scripts/check.sh   # the first run downloads p
 The merge check (`check.sh --merge`) runs `nginx -t` on the image's `deploy/web/nginx.conf` with the build's table, then serves the
 built pages and asks each at its slashed, bare and `index.html` addresses (`scripts/check_nginx.py`; HARNESS.md). Docker is refused in
 the sandbox, so it needs an nginx at the image's version, 1.30.6 (`deploy/web/Dockerfile`), in the tools' cache, and a merge check
-without it fails: it never skips. Alexis sets it up once, on the machine that runs the merge checks:
+without it fails: it never skips. It was set up once on the machine that runs the merge checks (the chief, 2026-10-31); anyone who
+sets up another does the same:
 
-1. Build nginx 1.30.6 from the source release (check the release's signature against nginx.org's published keys), with a prefix of its own.
-2. Put the built binary at `~/.cache/gnoworld-tools/nginx-1.30.6/nginx` and the release's `conf/mime.types` at
-   `~/.cache/gnoworld-tools/nginx-1.30.6/conf/mime.types` (`GNOWORLD_TOOLS` moves the cache).
-3. Record the binary's checksum in `scripts/nginx.sha256` (one line: `shasum -a 256 ~/.cache/gnoworld-tools/nginx-1.30.6/nginx`), committed
-   with a line `Harness-changed: scripts/nginx.sha256 - why`. Until then the file says `unrecorded` and the check fails naming the checksum.
-   The check runs the binary only when its SHA-256 is the pinned one.
+1. Build nginx 1.30.6 from nginx.org's source release, its signature checked (`gpg --verify` of `nginx-1.30.6.tar.gz.asc` against the
+   key `D6786CE303D9A9022998DC6CC8464D549AF75C0A`, from `https://nginx.org/keys/pluknet.key`; the tarball was good). The prefix is the
+   pin's own folder: `./configure --prefix=$HOME/.cache/gnoworld-tools/nginx-1.30.6 --with-cc-opt=-I/opt/homebrew/opt/pcre2/include
+   --with-ld-opt=-L/opt/homebrew/opt/pcre2/lib`, then `make` and `make install`.
+2. One local patch, in `src/os/unix/ngx_darwin_init.c`: the loop over the sysctls passes over `NGX_EPERM` as it does `NGX_ENOENT`. The
+   sandbox refuses reading `net.inet.tcp.sendspace`, and without the patch nginx does not start there.
+3. The binary is at `~/.cache/gnoworld-tools/nginx-1.30.6/nginx` and `conf/mime.types` beside it (`GNOWORLD_TOOLS` moves the cache).
+4. Its checksum is in `scripts/nginx.sha256` (one line: `shasum -a 256 ~/.cache/gnoworld-tools/nginx-1.30.6/nginx`), committed
+   with a line `Harness-changed: scripts/nginx.sha256 - why`. Recorded: `ad773dcb709c8cb21a0fecd1b50bac4511d1847d4e20fa68247967ac84897a68`.
+   The check runs the binary only when its SHA-256 is the pinned one; a rebuilt binary has another and needs a new pin.
 
-One real `nginx -t` on the image's config, by hand, confirms the step: the check rewrites the image's paths, its listen line and its
-upstream hosts, and its stand-in for nginx in `scripts/test_hooks.sh` is a model of what F2459 and F2460 hit, not nginx.
+The step passes on the real binary with no warning (the build's table is sized, F2454). Its logs go to a file of its own folder, not
+`/dev/stderr`, which the real `nginx -t` cannot open under the sandbox. F2459's and F2460's faults, planted by hand on a scratch copy,
+each fail it on the real binary (`.claude/tmp/slice-5/reports/slice-5-harness-c-final.md`); the stand-in for nginx in
+`scripts/test_hooks.sh` models them for every run.
 
 ## The gate and the harness
 

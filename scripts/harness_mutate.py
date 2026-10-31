@@ -1157,8 +1157,8 @@ def nginx_mutants():
     yield from swaps(n, "check_nginx.py", (
         ("    if actual != want:", "    if False:", "refuses a binary whose checksum is not the pinned one"),
         ("        if test.returncode != 0:", "        if False:", "fails on a config nginx refuses (F2459)"),
-        ("        refused = [w for w in warnings if not any(a in w for a in ALLOWED)]", "        refused = []", "fails on a warning that is not allowed"),
-        ('ALLOWED = ("could not build optimal map_hash",)', "ALLOWED = ()", "allows the hash table's warning until csp-fixes sizes it"),
+        ("        if warnings:\n", "        if False:\n", "fails on a warning"),
+        ('    conf = re.sub(r"^(\\s*(?:error|access)_log\\s+)/dev/std\\w+", lambda m: f"{m.group(1)}{where}/nginx.log", conf, flags=re.M)', "    pass", "logs to a file of its own folder"),
         ("                if status != 200:", "                if False:", "fails a page that does not answer 200"),
         ("                elif got[0] == want:", "                elif True:", "fails a page that answers another policy than its own (F2460)"),
         ("                elif got[0] == bare:", "                elif False:", "says the bare policy when a page got it"),
