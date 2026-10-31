@@ -8,8 +8,9 @@ import { gnowebLink, gnowebOrigin } from "../../lib/chain/gnoweb.ts";
 import type { Failure, ReadOptions } from "../../lib/chain/read.ts";
 import { bigLine } from "./RealmCard.tsx";
 import { RealmBlocks } from "./RealmBlocks.tsx";
+import { RealmFunctions } from "./RealmFunctions.tsx";
 import styles from "./RealmView.module.css";
-import { useRealm, type Height, type Realm } from "./useRealm.ts";
+import { isHeight, useRealm, type Height, type Realm } from "./useRealm.ts";
 
 export interface RealmViewProps {
   /** The realm, `gno.land/r/demo/dao`. */
@@ -21,8 +22,6 @@ export interface RealmViewProps {
   /** lib/chain's options, for a test's fetch. */
   options?: ReadOptions;
 }
-
-const isHeight = (at: Height | Failure): at is Height => "height" in at;
 
 // Where the page was read: the block's height and time, or why neither is known.
 function Read({ height, rpc }: { height: Height | Failure; rpc: string }) {
@@ -106,6 +105,7 @@ export function RealmView({ realm, chain, home, options }: RealmViewProps) {
           )}
           <Body state={state} origin={origin} link={link} />
           {state.state === "read" ? <Read height={state.height} rpc={chain.rpc} /> : null}
+          <RealmFunctions realm={realm} chain={chain} {...(options === undefined ? {} : { options })} />
         </Stack>
       </Center>
     </section>

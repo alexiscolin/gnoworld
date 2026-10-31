@@ -12,6 +12,9 @@ export interface Height {
   time: string;
 }
 
+/** Whether a height was read, or `at` says why it could not be. */
+export const isHeight = (at: Height | Failure): at is Height => "height" in at;
+
 export type Realm =
   | { state: "loading" }
   /** The page was read; `height` is when, or why it could not be known. */

@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { describe, expect, test, vi } from "vitest";
 import { PAGES } from "../../../tests/chain/chainFixture.ts";
 import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "../../../tests/chain/chainEnvelopes.ts";
-import { all, button, click, mount, one } from "../../../tests/mount.tsx";
+import { all, button, click, follows, mount, one } from "../../../tests/mount.tsx";
 import type { ChainFetch } from "../../lib/chain/read.ts";
 import { RealmView } from "./RealmView.tsx";
 
@@ -49,11 +49,17 @@ describe("a realm's view", () => {
     expect(one(box, "#realm-title").textContent).toBe("gno.land/r/gnoland/wugnot");
     expect(box.textContent).toContain("wrapped GNOT ($wugnot)");
     expect(box.textContent).toContain("Total supply");
-    expect(box.textContent).toMatch(
-      /Read at block 786,661, 2026-10-30T23:43:10Z, from rpc\.onyx\.testnets\.gno\.land$/,
-    );
+    // The line is the last of the page itself; the read functions' panel, with its own text, follows it (5i).
+    expect(
+      all(box, "p").some((p) =>
+        /^Read at block 786,661, 2026-10-30T23:43:10Z, from rpc\.onyx\.testnets\.gno\.land$/.test(p.textContent),
+      ),
+    ).toBe(true);
+    // 5i: the read functions' panel carries the link too, in every state; the page's own is the one outside it.
     const links = all(box, "a").filter(
-      (a) => a.getAttribute("href") === "https://onyx.testnets.gno.land/r/gnoland/wugnot",
+      (a) =>
+        a.getAttribute("href") === "https://onyx.testnets.gno.land/r/gnoland/wugnot" &&
+        a.closest('[aria-label="Read functions"]') === null,
     );
     expect(links).toHaveLength(1);
   });
@@ -70,10 +76,13 @@ describe("a realm's view", () => {
       await vi.advanceTimersByTimeAsync(60_000);
     });
     vi.useRealTimers();
-    expect(fetcher).toHaveBeenCalledTimes(2);
+    // 5i: the read functions' list is a third request (vm/qfuncs), asked once; no result is asked before a click.
+    expect(fetcher).toHaveBeenCalledTimes(3);
     const urls = fetcher.mock.calls.map(([url]) => url);
     expect(urls.filter((url) => url.includes("/status"))).toHaveLength(1);
-    expect(urls.filter((url) => url.includes("/abci_query"))).toHaveLength(1);
+    expect(urls.filter((url) => url.includes("vm%2Fqrender"))).toHaveLength(1);
+    expect(urls.filter((url) => url.includes("vm%2Fqfuncs"))).toHaveLength(1);
+    expect(urls.filter((url) => url.includes("vm%2Fqeval"))).toHaveLength(0);
   });
 
   test("shows a page's form read only, and a link off gnoweb behind a button, whatever the realm wrote", async () => {
@@ -123,6 +132,31 @@ describe("a realm's view", () => {
     expect(one(box, '[role="alert"]').textContent).toMatch(/\S/);
     expect(all(box, "a").map((a) => a.getAttribute("href"))).toContain(
       "https://onyx.testnets.gno.land/r/gnoland/wugnot",
+    );
+  });
+
+  test("shows the realm's read functions below its page, and a failed list leaves the page standing", async () => {
+    const box = await view(chain(WUGNOT?.body ?? null));
+    const functions = one(box, '[aria-label="Read functions"]');
+    expect(follows(one(box, "#realm-title"), functions)).toBe(true);
+    // After "Read at block", which stays beside the page it dates, not parted from it by up to a hundred buttons.
+    const read = all(box, "p").find((p) => p.textContent.startsWith("Read at block"));
+    expect(read !== undefined && follows(read, functions)).toBe(true);
+    // This fetch answers vm/qfuncs with the page's text: the list is a state of its own, the page and the link stand.
+    expect(box.textContent).toContain("wrapped GNOT ($wugnot)");
+    expect(functions.querySelector('[role="status"]')).not.toBeNull();
+    expect(all(functions, "a").map((a) => a.getAttribute("href"))).toContain(
+      "https://onyx.testnets.gno.land/r/gnoland/wugnot$help",
+    );
+  });
+
+  test("shows the read functions' state beside a page that could not be read", async () => {
+    const box = await view(chain(null, { error: "down" }));
+    expect(one(box, '[role="alert"]').textContent).toContain("could not be read");
+    const functions = one(box, '[aria-label="Read functions"]');
+    expect(one(functions, '[role="status"]').textContent).toMatch(/\S/);
+    expect(all(functions, "a").map((a) => a.getAttribute("href"))).toContain(
+      "https://onyx.testnets.gno.land/r/gnoland/wugnot$help",
     );
   });
 

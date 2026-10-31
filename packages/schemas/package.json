@@ -6,7 +6,8 @@
     "./src/zod.ts"
   ],
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./functions": "./src/functions.ts"
   },
   "dependencies": {
     "zod": "4.6.7"
