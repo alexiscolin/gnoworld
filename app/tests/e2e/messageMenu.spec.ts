@@ -37,7 +37,7 @@ async function room(
     socket = ergo;
     scriptedErgo(ergo, me, { history, ...options });
   });
-  await page.goto(`/w/bubble${options.room === "#bubble" ? "" : "?room=games"}`);
+  await page.goto(`/w/bubble${options.room === "#bubble" ? "?chat=full" : "?room=games&chat=full"}`);
   await hydrated(page);
   await expect(lines(page)).toHaveCount(history.length);
   return () => {
@@ -200,8 +200,8 @@ test.describe("a line's actions", () => {
     await expect(moreOf(page, 1)).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(focusedLines(page)).toHaveCount(0);
-    await expect(page.locator("[role='toolbar']:focus-within")).toHaveCount(0);
-    // Nothing after the list takes the focus for a guest: Shift+Tab comes back to the line, or to its bar.
+    await expect(page.getByRole("list", { name: "Messages" }).locator("[role='toolbar']:focus-within")).toHaveCount(0);
+    // Who's here, under the list, takes the focus: Shift+Tab comes back to the line, or to its bar.
     await page.keyboard.press("Shift+Tab");
     expect(await page.evaluate(() => document.activeElement?.closest("ol > li")?.textContent)).toContain("the second");
   });
@@ -551,13 +551,13 @@ test.describe("a line's actions", () => {
       await lines(page).nth(1).hover();
       const bar = await barOf(page, 1).boundingBox();
       if (bar === null) throw new Error("no bar");
-      // Every word's box in the list, the bar's own left out.
+      // Every word's box in the list, the bar's own and the time's (the video's lies under the bar) left out.
       const words = await page.getByRole("list", { name: "Messages" }).evaluate((list) =>
         [...list.querySelectorAll(":scope > li")].flatMap((line) => {
           const walk = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
           const found: { x: number; y: number; width: number; height: number }[] = [];
           for (let text = walk.nextNode(); text !== null; text = walk.nextNode()) {
-            if (text.parentElement?.closest("[role='toolbar']") != null) continue;
+            if (text.parentElement?.closest("[role='toolbar'], time") != null) continue;
             const range = document.createRange();
             range.selectNodeContents(text);
             for (const { x, y, width: w, height } of range.getClientRects()) found.push({ x, y, width: w, height });

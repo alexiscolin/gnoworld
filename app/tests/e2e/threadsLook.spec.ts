@@ -42,7 +42,7 @@ test.describe("a thread, as it looks", () => {
       await room(page, width);
       await expect(chipOf(lines(page).first())).toHaveText(/^2 replies\b/);
       // Who's here holds the account's address, a new one each run (the test wallet draws its key): masked too.
-      const here = page.getByRole("complementary", { name: "Who's here" });
+      const here = page.getByRole("region", { name: "Who's here" });
       await expect(page).toHaveScreenshot(`thread-chip-${screen}.png`, { mask: [page.getByRole("banner"), here] });
     });
 

@@ -15,7 +15,7 @@ describe("the saved messages' button", () => {
         </StoreProvider>
       </MemoryRouter>,
     );
-    expect(html).toMatch(/<button[^>]*type="button"[^>]*>.*Saved<\/button>/);
+    expect(html).toMatch(/<button[^>]*type="button"[^>]*>.*Saved<\/span><\/button>/);
     expect(html).toContain('data-icon="bookmark"');
     expect(html).not.toContain("<dialog");
   });

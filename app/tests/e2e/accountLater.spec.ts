@@ -49,7 +49,7 @@ test.describe("what only an account uses, loaded for an account alone", () => {
   test("a visitor's world page loads none of it, and still reads and is told to log in", async ({ page }) => {
     const words = scriptWords(page);
     await page.routeWebSocket(/\/ws$/, () => undefined);
-    await page.goto("/w/bubble?room=games");
+    await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
     await expect(page.getByRole("navigation", { name: "Rooms" })).toBeVisible();
     await expect(page.getByText("Log in to write in this room.")).toBeVisible();
@@ -59,7 +59,7 @@ test.describe("what only an account uses, loaded for an account alone", () => {
 
   test("a visitor's ?dm= says to log in, no room in its place", async ({ page }) => {
     await page.routeWebSocket(/\/ws$/, () => undefined);
-    await page.goto("/w/bubble?dm=g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
+    await page.goto("/w/bubble?dm=g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv&chat=full");
     await hydrated(page);
     await expect(page.getByRole("status").filter({ hasText: "Log in to read direct messages." })).toBeVisible();
     await expect(page.getByRole("form", { name: /Write in/ })).toHaveCount(0);

@@ -21,8 +21,12 @@
   }
 
   /* The top layer covers what is under it, and no scroll clears that: the page starts below a flash that stays; a timed one would shift it twice (F2165). */
+  :root:has(.flash[data-stays]:popover-open) {
+    --flash-room: calc(var(--space-m) * 2 + var(--control-l));
+  }
+
   :root:has(.flash[data-stays]:popover-open) body {
-    padding-block-start: calc(var(--space-m) * 2 + var(--control-l));
+    padding-block-start: var(--flash-room);
   }
 
   .title {

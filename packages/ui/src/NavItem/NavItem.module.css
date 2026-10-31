@@ -1,0 +1,78 @@
+/* The item of a column of places: on the video's pill (38 px high, 10 px round), cream when it is the one in view, a count
+   or a dot at its end (the prototype's .room, index.html:603-641). */
+@layer components {
+  .item {
+    position: relative;
+    /* layout: the link and the badge side by side, the link taking what the badge leaves */
+    display: grid;
+    /* layout: the link takes the width, the badge its own */
+    grid-template-columns: minmax(0, 1fr) auto;
+    /* layout: the badge centred on the link's line */
+    align-items: center;
+    min-block-size: var(--chat-item);
+    padding-inline: var(--space-xs);
+    border-radius: var(--radius-item);
+    font: var(--font-body);
+    cursor: pointer;
+  }
+
+  .item:hover {
+    background: var(--color-fill);
+  }
+
+  .item[data-current] {
+    background: var(--color-primary);
+    color: var(--color-ink);
+  }
+
+  .main {
+    min-inline-size: 0;
+    /* layout: the lead and the words side by side from the start */
+    display: flex;
+    /* layout: the lead centred on the words' line */
+    align-items: center;
+    /* layout: a step between the lead and the words */
+    column-gap: var(--space-xs);
+    /* layout: as tall as the item, so the whole height is the link */
+    align-self: stretch;
+    text-decoration: none;
+  }
+
+  /* The whole pill is the link: its sides and its count too (review 25 of 5q). */
+  .main::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+  }
+
+  /* The item in view says so on its link too, a half step heavier, as a Row's current link does. */
+  .main[aria-current="true"] {
+    font-weight: 500;
+  }
+
+  .lead {
+    /* layout: the lead keeps its size beside the words */
+    flex: none;
+    color: var(--color-text-muted);
+  }
+
+  .item[data-current] .lead {
+    color: inherit;
+  }
+
+  .badge {
+    color: inherit;
+    font: var(--font-label);
+    opacity: 0.6;
+  }
+
+  /* A dot, the mint of what is mine, in place of a count. */
+  .badge[data-dot] {
+    inline-size: var(--size-dot);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: var(--color-mine);
+    opacity: 1;
+  }
+}

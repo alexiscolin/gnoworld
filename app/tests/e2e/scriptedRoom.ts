@@ -23,7 +23,7 @@ export async function room(page: Page, { me = GUEST, ...options }: Scripted & { 
     sockets.push(ergo);
     scriptedErgo(ergo, me, { history: HISTORY, heard: (line) => sent.push(line), ...options });
   });
-  await page.goto("/w/bubble?room=games");
+  await page.goto("/w/bubble?room=games&chat=full");
   await hydrated(page);
   await expect(lines(page)).toHaveCount(options.history?.length ?? HISTORY.length);
   const ergo = () => {

@@ -30,7 +30,7 @@ async function inDm(page: Page, script: Scripted = {}) {
     },
     ...script,
   });
-  await page.goto(`/w/bubble?dm=${PARTNER}`);
+  await page.goto(`/w/bubble?dm=${PARTNER}&chat=full`);
   await hydrated(page);
   await expect(field(page)).toBeVisible();
   await expect(page.getByText("Connecting to the chat…")).toHaveCount(0);
@@ -398,7 +398,7 @@ test.describe("a direct message's bar", () => {
   });
 
   test("is a guest's none: its page asks to log in and shows no bar", async ({ page }) => {
-    await page.goto(`/w/bubble?dm=${PARTNER}`);
+    await page.goto(`/w/bubble?dm=${PARTNER}&chat=full`);
     await hydrated(page);
     await expect(page.getByRole("status").filter({ hasText: "Log in to read direct messages." })).toBeVisible();
     await expect(page.getByRole("toolbar", { name: "Actions on this message" })).toHaveCount(0);
@@ -413,10 +413,10 @@ test.describe("a direct message's bar, between two accounts", () => {
   async function twoAccounts(args: Parameters<typeof another>[0], page: Page) {
     const bob = await another(args, word("bob"));
     const me = await logIn(page, word("as"));
-    await bob.page.goto(`/w/bubble?dm=${me}`);
+    await bob.page.goto(`/w/bubble?dm=${me}&chat=full`);
     await hydrated(bob.page);
     await expect(bob.page.getByText("No messages since this page opened.")).toBeVisible();
-    await page.goto(`/w/bubble?dm=${bob.address}`);
+    await page.goto(`/w/bubble?dm=${bob.address}&chat=full`);
     await hydrated(page);
     const mine = page.getByRole("textbox", { name: `Message ${short(bob.address)}` });
     const his = bob.page.getByRole("textbox", { name: `Message ${short(me)}` });

@@ -27,6 +27,13 @@ const draftKeys = (page: Page) =>
       .sort(),
   );
 
+// The account menu is the page's header's, which the full chat covers: the chat is docked, then expanded again.
+async function logOut(page: Page) {
+  await page.getByRole("button", { name: "Shrink the chat" }).click();
+  await page.getByRole("button", { name: "Log out" }).click();
+  await page.getByRole("button", { name: "Expand the chat" }).click();
+}
+
 test.describe("the composer", () => {
   test("sends a line with Enter, shown once Ergo echoes it, its Markdown as marks and its link https", async ({
     page,
@@ -137,7 +144,12 @@ test.describe("the composer", () => {
     await expect(field(page)).toHaveAccessibleDescription("Tab completes #news.");
     // The caret elsewhere than the end: Tab moves on, the draft as it was; and Tab on Send completes nothing.
     await caretAt(page, "Home", 0);
+    // Past the field come the box's marks (@ and /), then Send (5q: the video's box foot).
     await field(page).press("Tab");
+    await expect(page.getByRole("button", { name: "Mention someone" })).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(page.getByRole("button", { name: "Start a command" })).toBeFocused();
+    await page.keyboard.press("Tab");
     await expect(send(page)).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(field(page)).toHaveValue("see #ne");
@@ -163,7 +175,7 @@ test.describe("the composer", () => {
     await page.keyboard.press("Alt+ArrowDown");
     await page.keyboard.press("Alt+ArrowDown");
     await expect(page.getByRole("heading", { level: 2, name: "#news", exact: true })).toBeVisible();
-    await expect(page).toHaveURL(/\/w\/bubble\?room=news$/);
+    await expect(page).toHaveURL(/\/w\/bubble\?room=news&chat=full$/);
   });
 
   test("goes from room to room with Alt+Down and Alt+Up alone, across sections, the ends stopping it", async ({
@@ -181,20 +193,20 @@ test.describe("the composer", () => {
     ]) {
       await page.keyboard.press(keys);
     }
-    await expect(page).toHaveURL(/\/w\/bubble\?room=games$/);
+    await expect(page).toHaveURL(/\/w\/bubble\?room=games&chat=full$/);
     await expect(heading("#games")).toBeVisible();
     await page.keyboard.press("Alt+ArrowDown");
     await expect(heading("#bubble")).toBeVisible();
-    await expect(page).toHaveURL(/\/w\/bubble$/);
+    await expect(page).toHaveURL(/\/w\/bubble\?chat=full$/);
     await page.keyboard.press("Alt+ArrowDown");
     await expect(heading("#news")).toBeVisible();
     await page.keyboard.press("Alt+ArrowDown");
-    await expect(page).toHaveURL(/\/w\/bubble\?room=news$/);
+    await expect(page).toHaveURL(/\/w\/bubble\?room=news&chat=full$/);
     await page.keyboard.press("Alt+ArrowUp");
     await expect(heading("#bubble")).toBeVisible();
     await page.keyboard.press("Alt+ArrowUp");
     await expect(heading("#games")).toBeVisible();
-    await page.getByRole("link", { name: "gnoworld" }).click();
+    await page.getByRole("button", { name: "Close the chat" }).click();
     await expect(page).toHaveURL(/\/$/);
     await page.keyboard.press("Alt+ArrowDown");
     await expect(page).toHaveURL(/\/$/);
@@ -250,22 +262,22 @@ test.describe("the composer", () => {
   test("shows an account's drafts to it alone: not to the next account, nor to a guest", async ({ page }) => {
     const alice = word("alice");
     const kept = [`gnoworld:draft:${await logIn(page, alice)}:#bubble/games`];
-    await page.goto("/w/bubble?room=games");
+    await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
     const draft = word("draft");
     await field(page).fill(draft);
-    await page.getByRole("button", { name: "Log out" }).click();
+    await logOut(page);
     await expect(page.getByText("Log in to write in this room.")).toBeVisible();
     await expect(page.getByRole("textbox", { name: /^Message/ })).toHaveCount(0);
     expect(await draftKeys(page)).toEqual(kept);
     await logIn(page, word("bob"));
-    await page.goto("/w/bubble?room=games");
+    await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
     await expect(field(page)).toHaveValue("");
     expect(await draftKeys(page)).toEqual(kept);
-    await page.getByRole("button", { name: "Log out" }).click();
+    await logOut(page);
     await logIn(page, alice);
-    await page.goto("/w/bubble?room=games");
+    await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
     await expect(field(page)).toHaveValue(draft);
   });
@@ -326,7 +338,7 @@ test.describe("the composer", () => {
     page.on("request", (request) => {
       if (request.resourceType() === "script") scripts.push(request.url());
     });
-    await page.goto("/w/bubble?room=games");
+    await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
     await expect(page.getByText("Log in to write in this room.")).toBeVisible();
     await expect(page.getByRole("textbox", { name: /^Message/ })).toHaveCount(0);
@@ -354,7 +366,7 @@ test.describe("the composer", () => {
       if (sockets.length === 0) scriptedErgo(ergo, address);
       sockets.push(ergo);
     });
-    await page.goto("/w/bubble?room=games");
+    await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
     await expect(whoIsHere(page)).toContainText("2 here");
     await sockets[0]?.close();
@@ -405,7 +417,7 @@ test.describe("the composer", () => {
         }),
       });
     });
-    await page.goto("/w/bubble?room=games");
+    await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
     await expect(whoIsHere(page)).toContainText("2 here");
     await field(page).fill("half a thought");

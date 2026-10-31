@@ -54,7 +54,6 @@ const view = (over: Partial<RoomViewProps> = {}) =>
   renderToStaticMarkup(
     <RoomView
       room="#bubble/games"
-      title="#games"
       state={room()}
       chat="connected"
       me={BOB}
@@ -78,7 +77,6 @@ beforeAll(async () => {
   await prerender(
     <RoomView
       room="#bubble/games"
-      title="#games"
       state={room()}
       chat="connected"
       onDelete={() => false}
@@ -88,23 +86,23 @@ beforeAll(async () => {
 });
 
 describe("the marks of a saved and a pinned line", () => {
-  it("say Saved, in a word before the time, on the saved lines alone", () => {
+  it("say Saved, in a word of the head before the time, on the saved lines alone", () => {
     const rows = items(view({ keeping: keeping({ saved: new Set(["b", "d"]) }) }));
-    expect(rows.map((row) => /^Saved \d{2}:\d{2} /.test(row))).toEqual([false, true, false, true]);
+    expect(rows.map((row) => / Saved \d{2}:\d{2} /.test(row))).toEqual([false, true, false, true]);
     expect(view({ keeping: keeping({ saved: new Set(["b"]) }) })).toContain('data-icon="bookmark"');
   });
 
-  it("say Pinned, in a word before the time, on the pinned lines alone, to every reader", () => {
+  it("say Pinned, in a word of the head before the time, on the pinned lines alone, to every reader", () => {
     const html = view({ keeping: keeping({ pinned: new Set(["c"]) }) });
-    expect(items(html).map((row) => /^Pinned \d{2}:\d{2} /.test(row))).toEqual([false, false, true, false]);
+    expect(items(html).map((row) => / Pinned \d{2}:\d{2} /.test(row))).toEqual([false, false, true, false]);
     expect(html).toContain('data-icon="pin"');
     // A guest has no keeping, and reads the pin's word all the same, from the room's own pins.
-    expect(items(view({ me: undefined, keeping: keeping({ pinned: new Set(["c"]) }) }))[2]).toMatch(/^Pinned /);
+    expect(items(view({ me: undefined, keeping: keeping({ pinned: new Set(["c"]) }) }))[2]).toMatch(/ Pinned /);
   });
 
   it("say both on a line that is saved and pinned, and neither on a room given none", () => {
     expect(items(view({ keeping: keeping({ saved: new Set(["a"]), pinned: new Set(["a"]) }) }))[0]).toMatch(
-      /^(Saved Pinned|Pinned Saved) /,
+      / Pinned Saved \d{2}:\d{2} /,
     );
     const plain = items(view());
     expect(plain.join(" ")).not.toMatch(/Saved|Pinned/);
@@ -113,7 +111,7 @@ describe("the marks of a saved and a pinned line", () => {
   // A line's own words are the sender's: a line that says "Saved" is no saved line.
   it("never mistake a line's own words for the mark", () => {
     const rows = items(view({ state: room({ lines: [line("a", 0, { text: "Saved Pinned" })] }) }));
-    expect(rows[0]).toMatch(/^\d{2}:\d{2} /);
+    expect(rows[0]).toMatch(/^g10gh7…3y5tv \d{2}:\d{2} Saved Pinned$/);
   });
 });
 
@@ -122,7 +120,7 @@ describe("a line marked unread", () => {
     expect(items(view()).filter((row) => row.startsWith("New "))).toEqual([]);
     const rows = items(view({ keeping: keeping({ unread: BEFORE_B }) }));
     expect(rows.map((row) => row.startsWith("New "))).toEqual([false, true, false, false]);
-    expect(rows[1]).toMatch(/^New from here \d{2}:\d{2} /);
+    expect(rows[1]).toMatch(/^New from here g10gh7…3y5tv \d{2}:\d{2} /);
   });
 
   it("is the earlier of the two places: Ergo's place behind the device's wins, and the device's behind Ergo's", () => {

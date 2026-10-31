@@ -1,6 +1,6 @@
 // The saved messages' button and its list (slice 4's 4d): for an account alone, which has a device to keep them on,
 // beside the rooms until slice 8's account menu takes it. The list's code comes when it is first asked for.
-import { Button } from "@gnoworld/ui";
+import { Icon, NavItem } from "@gnoworld/ui";
 import { lazy, Suspense, useState } from "react";
 import { useLocation } from "react-router";
 import { useApp, useAppStore } from "../../storeContext.tsx";
@@ -18,16 +18,15 @@ export function Saved() {
   const open = opened === key;
   return (
     <>
-      <Button
-        icon="bookmark"
-        emphasis="quiet"
+      <NavItem
+        lead={<Icon name="bookmark" />}
         onClick={() => {
           setAsked(true);
           setOpened(key);
         }}
       >
         Saved
-      </Button>
+      </NavItem>
       {asked ? (
         <Suspense fallback={null}>
           <SavedView

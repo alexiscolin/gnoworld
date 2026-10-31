@@ -10,6 +10,7 @@ import {
   roomHref,
   roomLabel,
   roomParams,
+  talkingOf,
   roomsQuery,
   shortAddress,
   shownRoom,
@@ -178,5 +179,21 @@ describe("whom a mention may shorten", () => {
 
   it("is empty with no member and no line", () => {
     expect(mentionable([], []).size).toBe(0);
+  });
+});
+
+// Review 18 of 5q: the filter on the bot was removed and no test failed; on a real Ergo the count was one too many.
+describe("talkingOf", () => {
+  const A = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+  const B = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+  it("counts those in the room, the moderation bot left out, once connected", () => {
+    expect(talkingOf(["gnoworld", A, B], true)).toBe(2);
+    expect(talkingOf([A], true)).toBe(1);
+    expect(talkingOf(["gnoworld"], true)).toBe(0);
+  });
+
+  it("says none before the connection, and none for a room not known", () => {
+    expect(talkingOf([A, B], false)).toBeUndefined();
+    expect(talkingOf(undefined, true)).toBeUndefined();
   });
 });

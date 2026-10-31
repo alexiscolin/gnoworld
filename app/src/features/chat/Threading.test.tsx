@@ -38,7 +38,6 @@ const dms = (partner: string | undefined): Dms => ({
   refused: undefined,
   problem: undefined,
 });
-const PEOPLE = <p>who is here</p>;
 
 // The conversation in view as the page gives it, its lines the thread's: what useThreads hands the view, drawn with it
 // as Loaded.tsx does, and marked by what it handed (a handler for a line, how many props, whether anything stands beside).
@@ -50,11 +49,12 @@ function draw(shown: Shown | undefined) {
       session: SESSION,
       rooms: [],
       acts,
-      people: PEOPLE,
     });
+    // Loaded keeps `threaded` for the layout, whose info panel the thread takes; RoomView reads only the props it names.
     return (
       <div data-handler={typeof view.onThread} data-props={Object.keys(view).length} data-aside={aside !== undefined}>
-        {shown === undefined ? null : <RoomView {...shown.view} {...view} aside={aside} chat="connected" me={ALICE} />}
+        {shown === undefined ? null : <RoomView {...shown.view} {...view} chat="connected" me={ALICE} />}
+        {aside}
       </div>
     );
   }
@@ -83,11 +83,10 @@ beforeAll(async () => {
 });
 
 describe("useThreads: what a conversation's page opens", () => {
-  it("opens threads in a room: a handler for its lines, Who's here beside them, a chip on the root", () => {
+  it("opens threads in a room: a handler for its lines, nothing beside them until one opens, a chip on the root", () => {
     const html = draw(room);
     expect(html).toContain('data-handler="function"');
-    expect(html).toContain('data-aside="true"');
-    expect(html).toContain("who is here");
+    expect(html).toContain('data-aside="false"');
     expect(chips(html)).toEqual(["2 replies"]);
   });
 
@@ -97,7 +96,6 @@ describe("useThreads: what a conversation's page opens", () => {
     expect(html).toContain('data-handler="undefined"');
     expect(html).toContain('data-props="0"');
     expect(html).toContain('data-aside="false"');
-    expect(html).not.toContain("who is here");
     expect(html).toContain(">root<");
     expect(chips(html)).toEqual([]);
     expect(html).not.toContain("Open thread");
@@ -127,7 +125,6 @@ describe("useThreads: the open panel's focus and keys", () => {
       session,
       rooms: [],
       acts,
-      people: PEOPLE,
     });
     opens = (id) => view.onThread?.(id);
     return (

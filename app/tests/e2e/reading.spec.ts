@@ -41,7 +41,7 @@ async function heldHistory(
     sockets.push(ergo);
     scriptedErgo(ergo, address, { heard: (line) => sent.push(line), ...scripts(sockets.length, held) });
   });
-  await page.goto("/w/bubble?room=games");
+  await page.goto("/w/bubble?room=games&chat=full");
   await hydrated(page);
   return { sent, sockets, release };
 }

@@ -13,6 +13,9 @@ test.describe("who is typing", () => {
   async function paused(page: Page) {
     await page.clock.install({ time: new Date(T(30)) });
     const { ergo } = await room(page);
+    // The typists' code comes once someone types: asked before the clock stops, which it needs to run.
+    ergo().send(typingOf("active"));
+    await expect(typist(page)).toBeVisible();
     await page.clock.pauseAt(new Date(Date.parse(T(30)) + 120_000));
     return ergo;
   }

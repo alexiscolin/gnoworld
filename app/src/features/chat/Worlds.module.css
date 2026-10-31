@@ -1,0 +1,17 @@
+/* The column of worlds: planets one under another, a ring around the one in view. */
+@layer components {
+  .list {
+    padding-block: var(--space-s);
+  }
+
+  .world {
+    display: block;
+    padding: var(--space-3xs);
+    border: var(--line-width) solid transparent;
+    border-radius: var(--radius-pill);
+  }
+
+  .world[aria-current="page"] {
+    border-color: var(--color-text);
+  }
+}

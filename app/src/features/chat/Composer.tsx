@@ -5,28 +5,18 @@
 // bytes left near the end, or what Tab completes the word being typed to (a command, a room, an account). A format
 // bar wraps the selection in Markdown's marks; the line shows below as it reads.
 import { compose, type Composed } from "@gnoworld/core";
-import { Button, Cluster, Field, IconButton, Sidebar, Stack, type IconName } from "@gnoworld/ui";
+import { Field, Stack } from "@gnoworld/ui";
 import { useRef, useState, type KeyboardEvent, type SubmitEvent } from "react";
 import { completed } from "./complete.ts";
 import { completionOf, useFocusAtStart, useHelp, useRefusal, useSelection, type Refused } from "./composerHooks.ts";
 import { useEditing } from "./EditBar.tsx";
-import { formatted, type Edit, type Format } from "./format.ts";
+import { formatted, inserted, type Edit, type Format } from "./format.ts";
 import { Message } from "./Message.tsx";
+import { MessageBox } from "./MessageBox.tsx";
 import { roomLabel } from "./names.ts";
 import { useAnswering } from "./ReplyBar.tsx";
 import type { Answered } from "./Replying.tsx";
 import styles from "./Composer.module.css";
-
-const BAR: readonly { format: Format; icon: IconName; label: string }[] = [
-  { format: "bold", icon: "bold", label: "Bold" },
-  { format: "italic", icon: "italic", label: "Italic" },
-  { format: "strike", icon: "strikethrough", label: "Strikethrough" },
-  { format: "code", icon: "code", label: "Code" },
-  { format: "link", icon: "link", label: "Link" },
-  { format: "quote", icon: "quote", label: "Quote" },
-  { format: "bulleted", icon: "list-bulleted", label: "Bulleted list" },
-  { format: "numbered", icon: "list-numbered", label: "Numbered list" },
-];
 
 /** What an edit leaving `draft` tells the room of the account's typing (IRCv3's +typing), read as compose reads a
  * draft: text is active, an empty field done, a slash command nothing (the spec's), `//` text. */
@@ -52,28 +42,6 @@ export function Preview({
     <div className={styles["preview"]} inert>
       {composed.kind === "line" && composed.action ? "* " : null}
       <Message text={composed.text} me={me} members={members} />
-    </div>
-  );
-}
-
-// The format bar: each format of BAR, named, applied to the box's selection.
-function FormatBar({ onFormat }: { onFormat: (format: Format) => void }) {
-  return (
-    <div role="group" aria-label="Format">
-      <Cluster space="3xs">
-        {BAR.map((tool) => (
-          <IconButton
-            key={tool.format}
-            icon={tool.icon}
-            label={tool.label}
-            size="s"
-            emphasis="plain"
-            onClick={() => {
-              onFormat(tool.format);
-            }}
-          />
-        ))}
-      </Cluster>
     </div>
   );
 }
@@ -123,18 +91,23 @@ export interface ComposerProps {
   gone?: boolean | undefined;
 }
 
-export function Composer(props: ComposerProps) {
-  const { room, nick, rooms, members, onSay, draft: kept = "", onDraft, onTyping, label: to, refused } = props;
+// The draft, and each change of it: the device and the room told at once. A render alone (a line arriving, a room opened
+// on a kept draft) writes nothing and tells no one (R3).
+function useDraft({ draft: kept = "", onDraft, onTyping }: Pick<ComposerProps, "draft" | "onDraft" | "onTyping">) {
   const [draft, setDraft] = useState(kept);
-  const refusal = useRefusal(refused, draft, { setDraft, fresh: props.fresh, gone: props.gone });
-  // Each change of the draft, the device and the room told at once: a render alone (a line arriving, a room opened
-  // on a kept draft) writes nothing and tells no one (R3).
   const change = (next: string) => {
     setDraft(next);
     onDraft?.(next);
     const told = typingOf(next);
     if (told !== undefined) onTyping?.(told);
   };
+  return { draft, setDraft, change };
+}
+
+export function Composer(props: ComposerProps) {
+  const { room, nick, rooms, members, onSay, label: to, refused } = props;
+  const { draft, setDraft, change } = useDraft(props);
+  const refusal = useRefusal(refused, draft, { setDraft, fresh: props.fresh, gone: props.gone });
   const [failed, setFailed] = useState<boolean | string>(false);
   const formRef = useRef<HTMLFormElement>(null);
   const label = to ?? roomLabel(room);
@@ -150,6 +123,10 @@ export function Composer(props: ComposerProps) {
     change(next.text);
     setFailed(false);
     refusal.said();
+  };
+  const insert = (mark: string) => {
+    const start = box()?.selectionStart ?? draft.length;
+    apply(inserted({ text: draft, start, end: box()?.selectionEnd ?? start }, mark));
   };
   const format = (kind: Format) => {
     const start = box()?.selectionStart ?? draft.length;
@@ -185,12 +162,15 @@ export function Composer(props: ComposerProps) {
     >
       <Stack space="2xs">
         {editing.bar}
-        <FormatBar onFormat={format} />
-        <Sidebar side="end" space="2xs">
+        {/* The video's one rounded box: the format bar, the field, and at its foot the marks, the field's words and Send. */}
+        <MessageBox onFormat={format} onInsert={insert} send={editing.send} goes={goes}>
           <Field
             kind="lines"
             enterAddsLine={coarse}
             label={`Message ${label}`}
+            placeholder={`Message ${label}`}
+            hideLabel
+            resizable={false}
             describedBy={editing.describedBy}
             value={draft}
             onChange={(value) => {
@@ -200,10 +180,7 @@ export function Composer(props: ComposerProps) {
             }}
             {...(refusal.why === undefined ? shown : { error: refusal.why })}
           />
-          <Button type="submit" disabled={!goes}>
-            {editing.send}
-          </Button>
-        </Sidebar>
+        </MessageBox>
         <Preview composed={composed} me={nick} members={new Set(members)} />
       </Stack>
     </form>

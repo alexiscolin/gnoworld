@@ -49,10 +49,13 @@
     --font-meta: 400 0.75rem/1.4 var(--family-sans);
     --font-data: 400 0.75rem/1.4 var(--family-mono);
     --font-ui: 500 0.8125rem/1 var(--family-sans);
+    --font-chat: 400 0.84375rem/1.45 var(--family-sans);
+    --font-hint: 400 0.65625rem/1.4 var(--family-sans);
     --font-body: 400 0.875rem/1.5 var(--family-sans);
     --font-field: var(--font-body);
     --font-action: 500 1rem/1 var(--family-sans);
     --font-title-s: 400 1.25rem/1.4 var(--family-sans);
+    --font-title-room: 300 1.375rem/1 var(--family-sans);
     --font-title-m: 300 1.75rem/1 var(--family-sans);
     --font-title-l: 300 2.25rem/1 var(--family-sans);
     --tracking-caps: 0.14em;
@@ -91,10 +94,23 @@
     --avatar-s: 20px;
     --avatar-m: 24px;
     --avatar-l: 48px;
+    --chat-head: 52px;
+    --chat-item: 38px;
+    --chat-item-gap: 6px;
+    --chat-worlds: 82px;
+    --chat-rooms: 158px;
+    --chat-info: 300px;
+    --chat-dock: 360px;
+    /* The inset of what the chat draws, set by the screen it is in: the video's 32 px; 24 in its dock, a phone's gutter. */
+    --chat-inset: var(--space-l);
+    /* The room a flash that stays holds at the top of the screen; the flash sets it while it shows. */
+    --flash-room: 0px;
 
     --radius-s: 8px;
+    --radius-item: 10px;
     --radius-m: 12px;
     --radius-l: 24px;
+    --radius-box: 16px;
     --radius-pill: 999px;
     --line-width: 1px;
     --focus-width: 2px;

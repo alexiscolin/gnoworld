@@ -85,7 +85,7 @@ test.describe("a world's rooms", () => {
     await page.getByRole("button", { name: "Log out" }).click();
     await expect(page.getByRole("button", { name: "Log in with Adena" })).toBeVisible();
     const nicks = guestNicks(page);
-    await page.goto("/w/bubble?room=games");
+    await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
     await expect(roomsNav(page).getByRole("heading")).toHaveText(["Talk", "Other rooms"]);
     await expect(roomsNav(page).getByRole("link")).toHaveText(["#games", "#bubble", "#news"]);
@@ -113,7 +113,7 @@ test.describe("a world's rooms", () => {
     const before = word("before");
     await say(page, { address, room: "#bubble/games" }, [before]);
     const tag = await tagged(page);
-    await page.goto("/w/bubble?room=games");
+    await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
     await expect(lineOf(page, before)).toHaveCount(1);
     await expect(whoIsHere(page).getByTitle(address)).toBeVisible();
@@ -132,19 +132,19 @@ test.describe("a world's rooms", () => {
     const [main, games] = [word("main"), word("games")];
     await say(page, { address, room: "#bubble" }, [main]);
     await say(page, { address, room: "#bubble/games" }, [games]);
-    await page.goto("/w/bubble?room=games");
+    await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
     await expect(lineOf(page, games)).toHaveCount(1);
     let sockets = 0;
     page.on("websocket", () => (sockets += 1));
     await roomsNav(page).getByRole("link", { name: "#bubble" }).click();
-    await expect(page).toHaveURL(/\/w\/bubble$/);
+    await expect(page).toHaveURL(/\/w\/bubble\?chat=full$/);
     await expect(heading(page, "#bubble")).toBeVisible();
     await expect(roomsNav(page).getByRole("link", { name: "#bubble" })).toHaveAttribute("aria-current", "true");
     await expect(lineOf(page, main)).toHaveCount(1);
     await expect(lineOf(page, games)).toHaveCount(0);
     await roomsNav(page).getByRole("link", { name: "#news" }).click();
-    await expect(page).toHaveURL(/\/w\/bubble\?room=news$/);
+    await expect(page).toHaveURL(/\/w\/bubble\?room=news&chat=full$/);
     await expect(heading(page, "#news")).toBeVisible();
     await expect(lineOf(page, main)).toHaveCount(0);
     await page.goBack();
@@ -156,12 +156,13 @@ test.describe("a world's rooms", () => {
     page,
   }) => {
     for (const asked of ["nowhere", "%3Cimg%20src%3Dx%3E", "games,%23other", "GAMES"]) {
-      await page.goto(`/w/bubble?room=${asked}`);
+      await page.goto(`/w/bubble?room=${asked}&chat=full`);
       await hydrated(page);
       await expect(heading(page, "#bubble")).toBeVisible();
-      await expect(page.locator("main img")).toHaveCount(0);
+      // The image the address names is not drawn (the world's planets, in the column of worlds, are the page's own).
+      await expect(page.locator("main img[src='x']")).toHaveCount(0);
     }
-    await page.goto("/w/bubble?room=games&room=news");
+    await page.goto("/w/bubble?room=games&room=news&chat=full");
     await hydrated(page);
     await expect(heading(page, "#games")).toBeVisible();
   });
@@ -174,7 +175,7 @@ test.describe("a world's rooms", () => {
       `javascript:window.__xss=1 ${word("link")}`,
     ];
     await say(page, { address, room: "#bubble/games" }, hostile);
-    await page.goto("/w/bubble?room=games");
+    await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
     for (const text of hostile) {
       await expect(lineOf(page, text)).toHaveCount(1);
@@ -186,7 +187,10 @@ test.describe("a world's rooms", () => {
   test("connects again as a guest when its account logs out on the world's page", async ({ page }) => {
     const address = await inGames(page);
     const nicks = guestNicks(page);
+    // The account menu is the page's header's, which the full chat covers: the chat is docked, then expanded again.
+    await page.getByRole("button", { name: "Shrink the chat" }).click();
     await page.getByRole("button", { name: "Log out" }).click();
+    await page.getByRole("button", { name: "Expand the chat" }).click();
     await expect(page.getByRole("button", { name: "Log in with Adena" })).toBeVisible();
     await expect(roomsNav(page).getByRole("link")).toHaveText(["#games", "#bubble", "#news"]);
     await expect(heading(page, "#games")).toBeVisible();
@@ -200,17 +204,17 @@ test.describe("a world's rooms", () => {
     page.on("websocket", (socket) => {
       socket.on("close", () => (closed = true));
     });
-    await page.goto("/w/bubble?room=games");
+    await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
     await expect(whoIsHere(page)).toContainText(/\b[1-9]\d* here/);
-    await page.getByRole("link", { name: "gnoworld" }).click();
-    await expect(page).toHaveURL(/\/$/);
+    await page.getByRole("button", { name: "Close the chat" }).click();
+    await expect(page).toHaveURL(/\/net\/onyx\/?$|\/$/);
     await expect.poll(() => closed).toBe(true);
   });
 
   test("says the rooms could not load, and tries again on asking", async ({ page }) => {
     await page.route("**/api/rooms*", (route) => route.abort());
-    await page.goto("/w/bubble");
+    await page.goto("/w/bubble?chat=full");
     await hydrated(page);
     await expect(page.getByRole("alert").filter({ hasText: "The rooms could not load." })).toBeVisible();
     await page.unroute("**/api/rooms*");
@@ -222,7 +226,7 @@ test.describe("a world's rooms", () => {
     const built = await (await page.request.get("/w/bubble")).text();
     expect(built).not.toMatch(/ChatPanel-[\w-]+\.js/);
     const asked = page.waitForRequest(/\/assets\/ChatPanel-[\w-]+\.js$/);
-    await page.goto("/w/bubble");
+    await page.goto("/w/bubble?chat=full");
     await asked;
     await expect(roomsNav(page)).toBeVisible();
   });
@@ -231,7 +235,7 @@ test.describe("a world's rooms", () => {
     const address = await logIn(page, word("as"));
     const seen = word("axe");
     await say(page, { address, room: "#bubble/games" }, [seen]);
-    await page.goto("/w/bubble?room=games");
+    await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
     await expect(lineOf(page, seen)).toHaveCount(1);
     await expect(whoIsHere(page).getByTitle(address)).toBeVisible();
@@ -249,7 +253,7 @@ test("reads the rooms, a long unbroken line and a long link at a phone's width, 
   const url = `https://a.example/${"y".repeat(350)}${word("link")}`;
   await say(page, { address, room: "#bubble/games" }, [long, url]);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/w/bubble?room=games");
+  await page.goto("/w/bubble?room=games&chat=full");
   await hydrated(page);
   // At a phone's width the rooms sit behind the Rooms control (slice 5's 5b): its drawer is opened to see them.
   await page.getByRole("button", { name: /^Rooms\b/ }).click();
