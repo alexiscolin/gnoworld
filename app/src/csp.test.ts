@@ -1192,7 +1192,8 @@ describe("serve.mjs's policy of a release", () => {
 // test is measured against (.claude/rules/typescript.md, F412). Each is built inside the function that applies it: a top-level
 // constant is one string, one number, a list of strings or a function, nothing else (a pattern, however it is written, a joined text too).
 describe("csp.ts's guards", () => {
-  const source = read("./csp.ts");
+  // The policy's guards live in three files (the forms' constants in cspForms.ts, the origins' in cspOrigins.ts): the guard reads all three.
+  const source = `${read("./csp.ts")}\n${read("./cspForms.ts")}\n${read("./cspOrigins.ts")}`;
   const constants = source
     .split(/\n(?=(?:export )?(?:const|let|var|function|async function|class|type|interface)\b)/)
     .filter((chunk) => /^(?:export )?(?:const|let|var)\b/.test(chunk))
@@ -1219,5 +1220,124 @@ describe("csp.ts's guards", () => {
 
   it("are built inside their functions: a module-level constant is a string, a number, a list of strings or a function", () => {
     expect(constants.filter(([, value]) => !simple(value)).map(([name]) => name)).toEqual([]);
+  });
+});
+
+// Slice 5 part 2, 5g: the browser reads the chain, so connect-src names the universes' RPC origins, from the data and
+// nothing else (the plan's §3: "a data file's rpc naming a host that reads visitors" shows in the CSP, an http: one stops the build).
+const ONYX = "https://rpc.onyx.testnets.gno.land";
+const GNOLAND = "https://rpc.gno.land";
+const connectOf = (csp: string): string =>
+  csp.split("; ").find((directive) => directive.startsWith("connect-src")) ?? "";
+
+describe("policy's connect-src", () => {
+  it("is 'self' alone when no origin is given", () => {
+    expect(connectOf(policy([]))).toBe("connect-src 'self'");
+    expect(connectOf(policy([], []))).toBe("connect-src 'self'");
+  });
+
+  it("names 'self' then each origin, once, in code-unit order whatever order they came in", () => {
+    expect(connectOf(policy([], [ONYX, GNOLAND, ONYX]))).toBe(`connect-src 'self' ${GNOLAND} ${ONYX}`);
+  });
+
+  it("orders by code unit, not by locale", () => {
+    const dot = "https://a.example.b";
+    const port = "https://a.example:8443";
+    expect(connectOf(policy([], [port, dot]))).toBe(`connect-src 'self' ${dot} ${port}`);
+  });
+
+  it("accepts an origin with a port", () => {
+    expect(connectOf(policy([], ["https://rpc.example.org:8443"]))).toBe(
+      "connect-src 'self' https://rpc.example.org:8443",
+    );
+  });
+
+  it("changes no other directive", () => {
+    const strip = (csp: string) => csp.split("; ").filter((directive) => !directive.startsWith("connect-src"));
+    expect(strip(policy([], [ONYX, GNOLAND]))).toEqual(strip(policy([])));
+  });
+
+  it("keeps the script hashes beside the origins", () => {
+    const hash = `'sha256-${"A".repeat(43)}='`;
+    const csp = policy([hash], [ONYX]);
+    expect(csp).toContain(`script-src 'self' ${hash}`);
+    expect(connectOf(csp)).toBe(`connect-src 'self' ${ONYX}`);
+  });
+
+  // An origin written into a directive that is no bare https origin would widen the policy or add a directive.
+  it.each([
+    ["an http: origin", "http://rpc.gno.land"],
+    ["a wildcard", "*"],
+    ["a wildcard host", "https://*.gno.land"],
+    ["a scheme alone", "https:"],
+    ["a path", "https://rpc.gno.land/rpc"],
+    ["a trailing slash", "https://rpc.gno.land/"],
+    ["a directive", "https://rpc.gno.land; script-src *"],
+    ["a space", "https://rpc.gno.land https://evil.example"],
+    ["a quote", "https://rpc.gno.land'"],
+    ["a user", "https://a@rpc.gno.land"],
+    ["a keyword", "'unsafe-eval'"],
+    ["an empty string", ""],
+    ["a wildcard port", "https://rpc.gno.land:*"],
+    ["a trailing line break", "https://rpc.gno.land\n"],
+    ["a wss: origin", "wss://rpc.gno.land"],
+    ["a ws: origin", "ws://rpc.gno.land"],
+    ["a host with no scheme", "rpc.gno.land"],
+    ["an upper-case scheme", "HTTPS://rpc.gno.land"],
+    ["an upper-case host", "https://RPC.gno.land"],
+  ])("refuses %s as an origin", (_name, origin) => {
+    expect(() => policy([], [origin])).toThrow(RangeError);
+    expect(() => policy([], [origin])).toThrow(/csp:/);
+  });
+});
+
+describe("pagePolicies' and outputs' connect-src", () => {
+  it("gives each page's policy the origins", async () => {
+    const policies = await pagePolicies({ "index.html": page(), "w/bubble/index.html": page() }, [ONYX, GNOLAND]);
+    expect(Object.keys(policies).length).toBe(2);
+    for (const csp of Object.values(policies)) expect(connectOf(csp)).toBe(`connect-src 'self' ${GNOLAND} ${ONYX}`);
+  });
+
+  it("gives a page no origin when none is given, as before", async () => {
+    const policies = await pagePolicies({ "index.html": page() });
+    expect(connectOf(policies["index.html"] ?? "")).toBe("connect-src 'self'");
+  });
+
+  it("gives every rule of _headers and every row of nginx's table the origins: the catch-all, the worker, the default", async () => {
+    const policies = await pagePolicies({ "index.html": page(), "w/bubble/index.html": page() }, [ONYX, GNOLAND]);
+    const out = outputs(policies, ["sw.js"]);
+    const want = `connect-src 'self' ${GNOLAND} ${ONYX}`;
+    const headers = headerRules(out.headers);
+    // The catch-all `/*`, `/`, `/w/bubble` and its slash, `/sw.js`.
+    expect(headers.size).toBeGreaterThanOrEqual(5);
+    // The worker's script is the one exception: it fetches no RPC (page code does), so its rule keeps 'self' alone
+    // (docs/decisions.md, 2026-10-31).
+    for (const [path, csp] of headers)
+      expect(connectOf(csp), path).toBe(path === "/sw.js" ? "connect-src 'self'" : want);
+    const table = nginxTable(out.nginx);
+    expect(table.size).toBeGreaterThan(1);
+    for (const [path, csp] of table) if (path !== "default") expect(connectOf(csp), path).toBe(want);
+    // nginx's default answers a path no row names (no page): the bare policy, 'self' alone.
+    const fallback = /default "([^"]*)";/.exec(out.nginx)?.[1] ?? "";
+    expect(fallback).toBe(policy([]));
+    expect(headers.get("/sw.js")).toBe(policy([]));
+  });
+
+  it("writes the same bytes when the origins come in another order", async () => {
+    const policies = await pagePolicies({ "index.html": page() }, [ONYX, GNOLAND]);
+    expect(outputs(policies, [])).toEqual(outputs(await pagePolicies({ "index.html": page() }, [GNOLAND, ONYX]), []));
+  });
+
+  it("gives the catch-all the origins of the home's and the fallback's policies, and no other", async () => {
+    const policies = await pagePolicies({ "index.html": page(), "__spa-fallback.html": page() }, [ONYX]);
+    const out = outputs({ ...policies, "w/odd/index.html": policy([], [GNOLAND]) }, []);
+    expect(connectOf(headerRules(out.headers).get("/*") ?? "")).toBe(`connect-src 'self' ${ONYX}`);
+  });
+
+  // A header past a host's 2,000 characters is cut, so the build stops rather than write one: the origins count in it.
+  it("stops, naming the page, when the origins make a header past 2,000 characters", async () => {
+    const many = Array.from({ length: 80 }, (_, index) => `https://rpc${String(index)}.example.org`);
+    const policies = await pagePolicies({ "index.html": page() }, many);
+    expect(() => outputs(policies, [])).toThrow(/csp: the policy of .* makes a header of \d+ characters/);
   });
 });

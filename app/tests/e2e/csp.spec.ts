@@ -6,7 +6,7 @@ import { GUARDED, SITE } from "./sites.ts";
 // The policy's shape: the unit test pins its words, this the page's every answer (slice 3's plan, 3f).
 const SHAPE = new RegExp(
   "^default-src 'none'; script-src 'self'( 'sha256-[A-Za-z0-9+/]{43}=')*; style-src 'self'; img-src 'self' data:; " +
-    "font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; " +
+    "font-src 'self'; connect-src 'self'( https://[a-z0-9.:-]+)*; worker-src 'self'; manifest-src 'self'; " +
     "frame-src https://www.youtube-nocookie.com/embed/ https://player.vimeo.com/video/ https://giphy.com/embed/; " +
     "base-uri 'none'; " +
     "form-action 'self'; frame-ancestors 'none'$",
@@ -207,6 +207,37 @@ test.describe("a planted violation", () => {
       await plant(page, `const f = document.createElement('iframe'); f.src = '${src}'; document.body.append(f)`);
     }
     await expect.poll(() => violations).toEqual(["frame-src", "frame-src", "frame-src"]);
+  });
+
+  // 5g: connect-src names the data's RPC origins, so a fetch to one is let through (answered here, the test reaching no
+  // one) and the same fetch to any other https host is refused: what the browser enforces, not a header compared with itself (F461).
+  test("lets a fetch through to a listed RPC origin and refuses one to an unlisted https host, once", async ({
+    page,
+    violations,
+  }) => {
+    await page.route(/^https:\/\/rpc\.(?:gno\.land|onyx\.testnets\.gno\.land)\//, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        headers: { "access-control-allow-origin": "*" },
+        body: "{}",
+      }),
+    );
+    await page.goto("/");
+    await hydrated(page);
+    const reached = await page.evaluate(() =>
+      Promise.all(
+        ["https://rpc.gno.land/status", "https://rpc.onyx.testnets.gno.land/status"].map((url) =>
+          fetch(url).then(
+            () => "reached",
+            () => "refused",
+          ),
+        ),
+      ),
+    );
+    expect(reached).toEqual(["reached", "reached"]);
+    await plant(page, "fetch('https://rpc.evil.example/status').catch(() => undefined)");
+    await expect.poll(() => violations).toEqual(["connect-src"]);
   });
 
   test("is reported from a second tab of the same context too", async ({ page, violations }) => {
