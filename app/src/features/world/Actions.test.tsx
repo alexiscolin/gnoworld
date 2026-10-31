@@ -34,6 +34,27 @@ describe("a world's actions", () => {
     expect(main?.querySelector("svg[aria-hidden='true']")).not.toBeNull();
   });
 
+  it("moves the focus to the chat's composer when the link is clicked, and leaves the focus alone when the chat has none (F2864)", () => {
+    vi.stubGlobal("navigator", { clipboard: { writeText: vi.fn() } });
+    const el = draw();
+    const chat = document.createElement("div");
+    chat.id = "chat";
+    const composer = document.createElement("textarea");
+    chat.append(composer);
+    document.body.append(chat);
+    const link = el.querySelector("a");
+    act(() => {
+      link?.click();
+    });
+    expect(document.activeElement).toBe(composer);
+    composer.blur();
+    chat.remove();
+    act(() => {
+      link?.click();
+    });
+    expect(document.activeElement).toBe(document.body);
+  });
+
   it("never draws Follow", () => {
     vi.stubGlobal("navigator", { clipboard: { writeText: vi.fn() } });
     expect(draw().textContent).not.toMatch(/follow/i);

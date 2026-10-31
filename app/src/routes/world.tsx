@@ -7,6 +7,7 @@ import { pageOf, site } from "../places.ts";
 import { Chat } from "../features/chat/index.ts";
 import { isMissing, PageError } from "../features/errors/index.ts";
 import { Actions, Activity } from "../features/world/index.ts";
+import styles from "./world.module.css";
 
 export function loader({ request }: { request: Request }) {
   return site.world(pageOf(request));
@@ -46,7 +47,7 @@ export default function World() {
         </Panel>
       }
     >
-      <div id="chat">
+      <div id="chat" className={styles["chat"]}>
         <Chat world={world.slug} />
       </div>
     </Panel.Layout>

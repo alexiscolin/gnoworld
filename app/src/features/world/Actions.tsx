@@ -4,8 +4,6 @@
 import { Button, Cluster } from "@gnoworld/ui";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
-type Said = "copied" | "refused" | null;
-
 // How long the answer to a click stays, in milliseconds.
 const SAID_FOR = 2_500;
 
@@ -15,10 +13,17 @@ const clipboard = (): Clipboard | undefined => navigator.clipboard;
 const canCopy = () => typeof clipboard()?.writeText === "function";
 const cannotKnow = () => false;
 
+// The link goes to the chat; the focus follows it to the composer, so the reader can type at once (F2864). The composer is the
+// chat's own textarea: when the rooms have not loaded there is none, and the link only scrolls.
+const focusComposer = (event: MouseEvent) => {
+  if (event.target instanceof Element && event.target.closest("[href='#chat']"))
+    document.querySelector<HTMLElement>("#chat textarea")?.focus();
+};
+
 export function Actions({ address }: { address: string }) {
   // false in the pre-render and while hydrating, then what the browser says: the same words are drawn first.
   const copying = useSyncExternalStore(unchanging, canCopy, cannotKnow);
-  const [said, setSaid] = useState<Said>(null);
+  const [said, setSaid] = useState<string | null>(null);
   useEffect(() => {
     if (said === null) return;
     const timer = setTimeout(() => {
@@ -28,6 +33,13 @@ export function Actions({ address }: { address: string }) {
       clearTimeout(timer);
     };
   }, [said]);
+  // The focus follows the link to the chat's composer (F2864).
+  useEffect(() => {
+    document.addEventListener("click", focusComposer);
+    return () => {
+      document.removeEventListener("click", focusComposer);
+    };
+  }, []);
   return (
     <Cluster space="2xs">
       {/* The world's chat sits on the page: the one thing to do here is to say hi in it. */}
@@ -40,10 +52,10 @@ export function Actions({ address }: { address: string }) {
           onClick={() => {
             navigator.clipboard.writeText(address).then(
               () => {
-                setSaid("copied");
+                setSaid("Copied");
               },
               () => {
-                setSaid("refused");
+                setSaid("Could not copy the address");
               },
             );
           }}
@@ -52,7 +64,7 @@ export function Actions({ address }: { address: string }) {
         </Button>
       ) : null}
       <span role="status" className="label">
-        {said === "copied" ? "Copied" : said === "refused" ? "Could not copy the address" : null}
+        {said}
       </span>
     </Cluster>
   );

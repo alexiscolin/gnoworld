@@ -54,6 +54,26 @@ test.describe("a world's page at the video's size", () => {
   });
 });
 
+// A room that fills the screen is taller than the window: "Say hi in the chat" must land its head under the header, not behind it (F2864).
+test.describe("Say hi in the chat", () => {
+  for (const width of [900, 1280, 1728] as const) {
+    test(`at ${String(width)} px lands the chat's top under the 96 px header`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto("/w/bubble");
+      await hydrated(page);
+      // Through the style object: the page's policy refuses a style tag.
+      await page.evaluate(() => {
+        const slot = document.querySelector<HTMLElement>("#chat");
+        if (slot !== null) slot.style.minBlockSize = "2000px";
+      });
+      await page.getByRole("link", { name: "Say hi in the chat" }).click();
+      const top = await page.evaluate(() => document.querySelector("#chat")?.getBoundingClientRect().top ?? -1);
+      // The header is 96 px; at 1728 the chat is already at the top of the page and does not move under it.
+      expect(top, `the chat's top at ${String(width)} px`).toBeGreaterThanOrEqual(96 - 2);
+    });
+  }
+});
+
 test.describe("Share", () => {
   test.use({ permissions: ["clipboard-read", "clipboard-write"] });
 
