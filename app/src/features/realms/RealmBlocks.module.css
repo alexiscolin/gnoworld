@@ -24,6 +24,8 @@
     font: var(--font-title-s);
   }
 
+  /* The chat's quote (RoomView.module.css, `.text blockquote`) on a page's measure: the same rule and colour, one step more
+     padding, a page's column being wider than a chat line. Two rules on purpose: they differ by that token. */
   .page blockquote {
     padding-inline-start: var(--space-s);
     border-inline-start: var(--line-width) solid var(--color-line-strong);
