@@ -539,7 +539,7 @@ describe("how much it reads", () => {
 
   it("reads the newest readLast messages: the one before them changes nothing", () => {
     const window = crowd(RULES.readLast);
-    const older = msg(9999, { id: "ancient", country: "FR", at: NOW - 10_000_000, account: "old" });
+    const older = msg(9999, { id: "ancient", country: "FR", at: NOW - 250_000, account: "old" });
     expect(pick([...window, older])).toEqual(pick(window));
     expect(pick([...window, older]).counts.map((c) => c.country)).toEqual(["JP"]);
   });
@@ -547,7 +547,7 @@ describe("how much it reads", () => {
   it("reads the oldest one still inside the window", () => {
     const window = [
       ...crowd(RULES.readLast - 1),
-      msg(9999, { id: "edge", country: "FR", at: NOW - 10_000_000, account: "old" }),
+      msg(9999, { id: "edge", country: "FR", at: NOW - 250_000, account: "old" }),
     ];
     expect(ids(pick(window).bubbles)).toContain("edge");
   });
