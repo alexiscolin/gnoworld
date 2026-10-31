@@ -93,6 +93,32 @@ describe("a world's actions", () => {
     vi.useRealTimers();
   });
 
+  it("keeps the words after a second click for their whole time, not for what was left of the first's (F2870)", async () => {
+    vi.useFakeTimers();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    const el = draw();
+    const click = () =>
+      act(async () => {
+        share(el)?.click();
+        await Promise.resolve();
+      });
+    await click();
+    act(() => {
+      vi.advanceTimersByTime(2_400);
+    });
+    await click();
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    expect(el.querySelector("[role='status']")?.textContent).toBe("Copied");
+    act(() => {
+      vi.advanceTimersByTime(2_000);
+    });
+    expect(el.querySelector("[role='status']")?.textContent).toBe("");
+    vi.useRealTimers();
+  });
+
   it("leaves Share out where the browser cannot copy: no clipboard, or one with no writeText", () => {
     for (const none of [{}, { clipboard: undefined }, { clipboard: {} }]) {
       vi.stubGlobal("navigator", none);

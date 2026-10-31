@@ -27,7 +27,8 @@ const focusComposer = (event: MouseEvent) => {
 export function Actions({ address }: { address: string }) {
   // false in the pre-render and while hydrating, then what the browser says: the same words are drawn first.
   const copying = useSyncExternalStore(unchanging, canCopy, cannotKnow);
-  const [said, setSaid] = useState<string | null>(null);
+  // An object, so each answer is a new value: the timer starts again with each click, even when the words are the same.
+  const [said, setSaid] = useState<{ words: string } | null>(null);
   useEffect(() => {
     if (said === null) return;
     const timer = setTimeout(() => {
@@ -56,10 +57,10 @@ export function Actions({ address }: { address: string }) {
           onClick={() => {
             navigator.clipboard.writeText(address).then(
               () => {
-                setSaid("Copied");
+                setSaid({ words: "Copied" });
               },
               () => {
-                setSaid("Could not copy the address");
+                setSaid({ words: "Could not copy the address" });
               },
             );
           }}
@@ -68,7 +69,7 @@ export function Actions({ address }: { address: string }) {
         </Button>
       ) : null}
       <span role="status" className="label">
-        {said}
+        {said?.words}
       </span>
     </Cluster>
   );
