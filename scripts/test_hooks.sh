@@ -2069,6 +2069,7 @@ case ",${FLAKY:-}," in *,"$n",*) [ -e "$GATE_LOG.flaked.$n" ] || { : >"$GATE_LOG
 case ",${FAIL:-}," in *,"$n",*) down=1 ;; esac
 if [ -n "$down" ]; then
 	echo "$n failed here" >&2
+	[ -z "${TAILPASS:-}" ] || echo "all checks passed in 3 s (budget 120 s)" >&2 # a nested fixture's log, which ends on a pass line
 	for a in "$@"; do
 		case $a in
 		--outputFile.json=*)
@@ -2387,6 +2388,19 @@ printf '%s\n' "$out" | grep -q "^check.sh: lane types failed at lint" || fail "c
 printf '%s\n' "$out" | grep -q "^check.sh: lane gno failed at gno" || fail "check.sh did not name the failed lane gno: $out"
 ran py:mutate && fail "a lane went on past its failed step"
 [ ! -e "$g/.claude/tmp/green-fast" ] || fail "check.sh recorded a gate that failed"
+# A failing run ends on its own last line, `check.sh: FAILED at <lane>:<step>`, whatever the failed lane's tail ended on (the first merge
+# check of the sum read a nested fixture's `all checks passed in 3 s` as the run's last line, F2638); the exit path of a lane, of a step in
+# the main shell, of a refused argument and of a signal each end on it.
+last() { printf '%s\n' "$1" | tail -n 1; }
+[ "$(last "$out")" = "check.sh: FAILED at types:lint" ] || fail "a run that failed at lint did not end on its FAILED line: $(last "$out")"
+out=$(TAILPASS=1 FAIL=lint gate) && fail "check.sh passed with a failing lint whose tail says it passed"
+printf '%s\n' "$out" | grep -q "^all checks passed in 3 s" || fail "the planted tail was not shown: $out"
+[ "$(last "$out")" = "check.sh: FAILED at types:lint" ] || fail "a failing run whose tail ended on a pass line ended on '$(last "$out")', not its FAILED line (F2638)"
+out=$(gate --merge --base 2>&1) && fail "check.sh passed a --base with no ref"
+[ "$(last "$out")" = "check.sh: FAILED at main:start" ] || fail "a refused argument did not end on the FAILED line: $(last "$out")"
+out=$(gate) || fail "check.sh failed on a copy whose every step passes: $out"
+printf '%s\n' "$out" | grep -q "FAILED" && fail "a run that passed said FAILED: $out"
+last "$out" | grep -q "^all checks passed in [0-9]* s" || fail "a run that passed did not end on its pass line: $(last "$out")"
 # A lane that fails at once leaves a slow one to finish.
 (SLOW_STEP=py:check_docs FAIL=lint gate) >/dev/null && fail "check.sh passed with a failing lint"
 ran sh:test_hooks || fail "a lane's failure stopped another lane before its end"
@@ -3594,6 +3608,7 @@ for sig in TERM HUP INT; do
 		sleep 0.1
 	done
 	wait "$w" 2>/dev/null || :
+	[ "$(tail -n 1 "$t/w.out")" = "check.sh: FAILED at main:start" ] || fail "a merge check interrupted by $sig did not end on its FAILED line (F2638): $(tail -n 2 "$t/w.out")"
 	[ "$(cat "$lockdir/pid" 2>/dev/null)" = "$holder" ] && [ "$(cat "$lockdir/worktree" 2>/dev/null)" = /other/worktree ] || fail "a merge check interrupted by $sig while it waited took or dropped the lock of the holder"
 	[ ! -s "$log" ] || fail "a merge check interrupted by $sig while it waited ran a step: $(head -2 "$log")"
 done
@@ -4607,7 +4622,7 @@ async function run(answer, extra = {}) {
   const r = await body(agent, parallel, () => {}, () => {}, { branch: "b", worktree: "w", plan: "p", brief: "x", shared: "s", ids: "F9000-F9049", ...extra }, { spent: () => 0 });
   return { r, labels: calls.map((c) => c.label), calls };
 }
-const gateOf = (files) => ({ passed: true, failingLane: "", tail: "", lastLine: "all checks passed in 412 s (budget 120 s)", survivors: [], files, relaxations: [], seconds: 1, branch: "b" });
+const gateOf = (files) => ({ passed: true, failingLane: "", tail: "", lastLine: "all checks passed in 412 s (budget 120 s)", exit: 0, survivors: [], files, relaxations: [], seconds: 1, branch: "b" });
 const base = (files) => (l) =>
   l === "tests" ? { files: ["t"], seenFailing: true, notes: "" }
   : l === "red pass" ? { findings: [] }
@@ -4630,6 +4645,16 @@ const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
   // A real last line, with the run's own time in it, passes; so does the same line of a run past its budget.
   t = await run((l, p) => (l === "merge check" ? { ...gateOf(["app/src/a.ts"]), lastLine: "all checks passed in 5 s" } : base(["app/src/a.ts"])(l, p)));
   ok(t.r.status === "ready for the chief", `a merge check ending in its pass line did not pass: ${t.r.status}`);
+  // The gate's exit code is the other half of the proof (F2638): a last line that reads as a pass over an exit code that is not 0, or over
+  // none reported, never passes.
+  for (const code of [1, 2, 130, null, undefined, "0"]) {
+    t = await run((l, p) => (l === "merge check" ? { ...gateOf(["app/src/a.ts"]), lastLine: "all checks passed in 5 s", exit: code } : base(["app/src/a.ts"])(l, p)));
+    ok(t.r.status.startsWith("blocked at the merge check") && !t.labels.includes("reviewer"), `a merge check with exit ${code} and a pass line passed: ${t.r.status} ${t.labels}`);
+    ok(t.calls.some((c) => (c.label || "").startsWith("gate fix") && c.prompt.includes("exit code")), `a merge check with exit ${code} was not sent to a fixer with the reason: ${t.labels}`);
+  }
+  t = await run((l, p) => (l === "merge check" ? { ...gateOf(["app/src/a.ts"]), exit: 0 } : base(["app/src/a.ts"])(l, p)));
+  ok(t.r.status === "ready for the chief", `a merge check with exit 0 and its pass line did not pass: ${t.r.status}`);
+  ok(t.calls.some((c) => c.label === "merge check" && c.schema.required.includes("exit") && c.prompt.includes("exit code")), "the merge check's schema or brief does not ask for the exit code");
   // A failure stays a failure whatever the line says.
   t = await run((l, p) => (l === "merge check" ? { ...gateOf(["app/src/a.ts"]), passed: false, failingLane: "probe", lastLine: "all checks passed in 5 s" } : base(["app/src/a.ts"])(l, p)));
   ok(t.r.status.startsWith("blocked"), `a merge check the agent called failed passed on its line: ${t.r.status}`);

@@ -93,13 +93,25 @@ const GATE = {
     failingLane: { type: "string" },
     tail: { type: "string" },
     lastLine: { type: "string" },
+    exit: { type: "number" },
     survivors: { type: "array", items: { type: "string" } },
     files: { type: "array", items: { type: "string" } },
     relaxations: { type: "array", items: { type: "string" } },
     seconds: { type: "number" },
     branch: BRANCH,
   },
-  required: ["passed", "failingLane", "tail", "lastLine", "survivors", "files", "relaxations", "seconds", "branch"],
+  required: [
+    "passed",
+    "failingLane",
+    "tail",
+    "lastLine",
+    "exit",
+    "survivors",
+    "files",
+    "relaxations",
+    "seconds",
+    "branch",
+  ],
 };
 // The verifier answers for the ids it is given, and only those.
 const verdictsFor = (ids) => ({
@@ -194,19 +206,22 @@ const where = (step, writes) =>
 // the background has none.
 const PASS_LINE = /^all checks passed in \d+ s/;
 const proven = (g) => {
-  if (!g || !g.passed || PASS_LINE.test(g.lastLine || "")) return g;
+  if (!g || !g.passed || (g.exit === 0 && PASS_LINE.test(g.lastLine || ""))) return g;
   return {
     ...g,
     passed: false,
     failingLane: g.failingLane || "unproven",
-    tail: `the agent said passed, but the last line of check.sh's output was '${g.lastLine || ""}', not 'all checks passed in N s': a run killed, timed out or left in the background is no pass. Run it again to its end.\n${g.tail || ""}`,
+    tail:
+      g.exit === 0
+        ? `the agent said passed, but the last line of check.sh's output was '${g.lastLine || ""}', not 'all checks passed in N s': a run killed, timed out or left in the background is no pass. Run it again to its end.\n${g.tail || ""}`
+        : `the agent said passed, but check.sh's exit code was ${g.exit === undefined ? "not reported" : g.exit}, not 0 (its last line: '${g.lastLine || ""}'): only an exit code of 0 is a pass. Run it again to its end.\n${g.tail || ""}`,
   };
 };
 const gateCheck = async () =>
   proven(
     await write(
       `${where("merge-check", true)}. Run \`sh scripts/check.sh --merge${BASE === "main" ? "" : ` --base ${BASE}`}\` (minutes) and time it. Wait for it to end: a run killed, timed out or left in the background is not a pass. Report whether it passed, the failing lane, the ` +
-        "tail of its output, `lastLine`, the literal last line of its output (a pass is the line `all checks passed in N s`; anything else is a failure whatever you think, and the script reads this line itself), the surviving mutants it printed, pass or fail (every line that starts with `survivor: `, StrykerJS's and harness_mutate's: " +
+        "tail of its output, `lastLine`, the literal last line of its output (a pass is the line `all checks passed in N s`; a failure ends on `check.sh: FAILED at <lane>:<step>`; anything else is a failure whatever you think, and the script reads this line itself), `exit`, check.sh's exit code, read with `echo $?` right after it ended (run it with its output to a file, never into a pipe, whose exit code is another's; anything but 0 is a failure), the surviving mutants it printed, pass or fail (every line that starts with `survivor: `, StrykerJS's and harness_mutate's: " +
         `copy each whole, one string each, and the line \`survivors not listed: \` if it prints one: the survivors of files this branch did not change), the files changed since ${BASE} as \`git diff --name-only ${BASE}...HEAD\` prints them (nothing else: not the files you write), and every line of ` +
         `\`git log ${BASE}..HEAD\` that loosens the net (\`Removed-test:\`, \`Lowered-floor:\`, \`Updated-baseline:\`, \`Batch-size:\`, \`No-test:\`), which ` +
         `the chief and Alexis read. Write the diff since ${BASE} ` +
