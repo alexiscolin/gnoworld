@@ -80,7 +80,7 @@ export function RealmView({ realm, chain, home, options }: RealmViewProps) {
   const navigate = useNavigate();
   const { key } = useLocation();
   return (
-    <main aria-labelledby="realm-title">
+    <section aria-labelledby="realm-title">
       <Center gutter="all">
         <Stack space="m">
           <Cluster space="s">
@@ -108,6 +108,6 @@ export function RealmView({ realm, chain, home, options }: RealmViewProps) {
           {state.state === "read" ? <Read height={state.height} rpc={chain.rpc} /> : null}
         </Stack>
       </Center>
-    </main>
+    </section>
   );
 }
