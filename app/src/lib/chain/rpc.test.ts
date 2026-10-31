@@ -1,8 +1,16 @@
 import fc from "fast-check";
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ANY_EXPRESSION_RUNS, EVALS, FUNCTIONS, PAGES, REFUSALS, STATUS, WUGNOT } from "./chainFixture.ts";
-import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "./chainEnvelopes.ts";
+import {
+  ANY_EXPRESSION_RUNS,
+  EVALS,
+  FUNCTIONS,
+  PAGES,
+  REFUSALS,
+  STATUS,
+  WUGNOT,
+} from "../../../tests/chain/chainFixture.ts";
+import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "../../../tests/chain/chainEnvelopes.ts";
 import { evalCall } from "./evalCall.ts";
 import type { ChainFetch, ChainRead, Failure, ReadOptions } from "./read.ts";
 import { readEval, readFunctions, readHeight, readPage } from "./rpc.ts";

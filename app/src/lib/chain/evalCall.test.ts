@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { ANY_EXPRESSION_RUNS, REFUSALS, WUGNOT } from "./chainFixture.ts";
+import { ANY_EXPRESSION_RUNS, REFUSALS, WUGNOT } from "../../../tests/chain/chainFixture.ts";
 import { evalCall, isRealmPath } from "./evalCall.ts";
 
 // 5g-reads, tier 1: the one place a `vm/qeval` expression is built. The chain runs ANY expression it is sent (ANY_EXPRESSION_RUNS,

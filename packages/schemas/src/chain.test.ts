@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { QueryAnswer, FunctionList, StatusAnswer } from "./chain.ts";
 
 // 5g-reads: the three shapes the browser reads from a chain's RPC. The bodies are written the way gno's source at v1.5.0 gives them
-// (see app/src/lib/chain/chainFixture.ts: the envelopes are read from source, not recorded). Fields the reader does not read may
+// (see app/tests/chain/chainFixture.ts: the envelopes are read from source, not recorded). Fields the reader does not read may
 // be there or not; only the ones it reads decide whether an answer is the right shape.
 const envelope = (base: Record<string, unknown>) => ({
   jsonrpc: "2.0",
