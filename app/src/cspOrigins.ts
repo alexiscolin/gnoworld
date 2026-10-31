@@ -1,5 +1,7 @@
-// The origins connect-src names beside 'self' (slice 5 part 2, 5g): the universes' https RPC, read from the data at build.
+// The origins connect-src names beside 'self' (slice 5 part 2, 5g, 5k): the universes' https RPC and their chains' public
+// indexers, read from the data at build.
 // The data's `rpc` ends up in a header, so only a bare lower-case https host and port is ever written (csp.ts holds the rest).
+import { indexerOf } from "./lib/chain/indexerOf.ts";
 
 // A bare https origin as a CSP source list takes it: a lower-case host of letters, digits, dots and hyphens, an optional port,
 // and nothing else (no wildcard, path, quote, space, `;` or `,`).
@@ -27,6 +29,17 @@ export function rpcOrigins(universes: readonly { readonly rpc: string }[]): stri
     found.add(origin);
   }
   return [...found].sort();
+}
+
+/**
+ * The origins connect-src names: the RPC of each universe and the public indexer of its chain (lib/chain/indexerOf.ts, none for a
+ * chain it does not know), each once, in code-unit order. A universe's RPC is checked as `rpcOrigins` does.
+ */
+export function connectOrigins(universes: readonly { readonly rpc: string; readonly chainId: string }[]): string[] {
+  const indexers = universes
+    .flatMap(({ chainId }) => indexerOf(chainId) ?? [])
+    .map((address) => new URL(address).origin);
+  return [...new Set([...rpcOrigins(universes), ...indexers])].sort();
 }
 
 /** The connect-src directive: 'self', then each origin once, in code-unit order; an origin that is not bare refuses. */

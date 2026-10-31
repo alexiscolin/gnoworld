@@ -20,6 +20,8 @@ import { headerRules, nginxTable } from "../tests/e2e/cspFiles.mjs";
 
 // 5g: the origins of the default data's two RPCs (app/data/universes.json), the only hosts connect-src names besides 'self'.
 const RPC_ORIGINS = ["https://rpc.gno.land", "https://rpc.onyx.testnets.gno.land"];
+// 5k: and of their chains' public indexers (lib/chain/indexerOf.ts), named by the data's chain ids.
+const INDEXER_ORIGINS = ["https://indexer.gno.land", "https://indexer.onyx.testnets.gno.land"];
 
 // Markup, a comment opener and a line separator in a description: what JSON-LD must carry as text.
 const HOSTILE = "</script><script>alert(1)</script><!-- \u2028";
@@ -334,7 +336,7 @@ describe("react-router build", () => {
     try {
       const run = build(dir);
       expect(run.status, `${run.stdout}${run.stderr}`).toBe(0);
-      const want = ["https://rpc.extra.example:8443", ...RPC_ORIGINS];
+      const want = ["https://rpc.extra.example:8443", ...RPC_ORIGINS, ...INDEXER_ORIGINS].sort();
       const directive = `connect-src 'self' ${want.join(" ")}`;
       expect(run.stdout).toContain(`csp: ${directive}`);
       const client = join(copy, "build", "client");

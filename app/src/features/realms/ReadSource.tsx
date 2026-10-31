@@ -15,10 +15,18 @@ export function ReadSource({ source }: { source: Source }) {
   );
 }
 
-/** A failed read: what the reader may do now, and where it was asked. */
-export function ReadFailed({ failure, source }: { failure: Failure; source: Source }) {
+/** A failed read: what the reader may do now, and where it was asked. A read the page stands without is a `status`, not an alert. */
+export function ReadFailed({
+  failure,
+  source,
+  role = "alert",
+}: {
+  failure: Failure;
+  source: Source;
+  role?: "alert" | "status";
+}) {
   return (
-    <div role="alert">
+    <div role={role}>
       <p>{failure.next}</p>
       <ReadSource source={source} />
     </div>

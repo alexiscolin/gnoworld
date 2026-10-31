@@ -19,7 +19,7 @@ function Fact({ label, children, ltr = false }: { label: string; children: strin
 }
 
 export function RealmFacts({ read }: { read: ChainRead<RealmFactsValue> }) {
-  if (!read.ok) return <ReadFailed failure={read.failure} source={read.source} />;
+  if (!read.ok) return <ReadFailed failure={read.failure} source={read.source} role="status" />;
   const { path, deployer, firstBlock, callsPerDay } = read.value;
   return (
     <section aria-label="Facts from the indexer">

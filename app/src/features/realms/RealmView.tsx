@@ -5,12 +5,15 @@
 import { Button, Center, Cluster, Kicker, Skeleton, Stack } from "@gnoworld/ui";
 import { useLocation, useNavigate } from "react-router";
 import { gnowebLink, gnowebOrigin } from "../../lib/chain/gnoweb.ts";
+import { indexerOf } from "../../lib/chain/indexerOf.ts";
 import { hostOf, type Failure, type ReadOptions } from "../../lib/chain/read.ts";
 import { bigLine } from "./RealmCard.tsx";
 import { RealmBlocks } from "./RealmBlocks.tsx";
+import { RealmFacts } from "./RealmFacts.tsx";
 import { RealmFunctions } from "./RealmFunctions.tsx";
 import styles from "./RealmView.module.css";
 import { isHeight, useRealm, type Height, type Realm } from "./useRealm.ts";
+import { useRealmFacts } from "./useRealmFacts.ts";
 
 export interface RealmViewProps {
   /** The realm, `gno.land/r/demo/dao`. */
@@ -72,9 +75,23 @@ function Body({ state, origin, link }: { state: Realm; origin: string | undefine
   );
 }
 
+// The realm's facts from the chain's indexer, read on their own: the page does not wait for them, nor do they hide when it fails.
+function Facts({ indexer, realm, options }: { indexer: string; realm: string; options: ReadOptions | undefined }) {
+  const read = useRealmFacts(indexer, realm, options);
+  if (read === undefined) {
+    return (
+      <div aria-busy="true" aria-label="Reading the facts">
+        <Skeleton lines={1} />
+      </div>
+    );
+  }
+  return <RealmFacts read={read} />;
+}
+
 export function RealmView({ realm, chain, home, options }: RealmViewProps) {
   const origin = gnowebOrigin(chain.chainId);
   const link = origin === undefined ? undefined : gnowebLink(origin, realm);
+  const indexer = indexerOf(chain.chainId);
   const state = useRealm({ rpc: chain.rpc, realm, origin }, options);
   const navigate = useNavigate();
   const { key } = useLocation();
@@ -106,6 +123,7 @@ export function RealmView({ realm, chain, home, options }: RealmViewProps) {
           <Body state={state} origin={origin} link={link} />
           {state.state === "read" ? <Read height={state.height} rpc={chain.rpc} /> : null}
           <RealmFunctions realm={realm} chain={chain} {...(options === undefined ? {} : { options })} />
+          {indexer === undefined ? null : <Facts indexer={indexer} realm={realm} options={options} />}
         </Stack>
       </Center>
     </section>

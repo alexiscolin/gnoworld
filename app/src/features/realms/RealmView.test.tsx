@@ -14,9 +14,28 @@ const COINS = PAGES.find((row) => row.realm === "gno.land/r/gnoland/coins");
 const WUGNOT = PAGES[1];
 const CHAIN = { name: "Onyx", chainId: "onyx-1", rpc: "https://rpc.onyx.testnets.gno.land:443" };
 
-// A fetch that answers /status with a height and any query with `page`; or fails as `fail` says.
-function chain(page: string | null, { status = true, error }: { status?: boolean; error?: string } = {}) {
+// 5k: the facts the indexer gives for the realm, in the shape the schema takes (synthetic: nothing is recorded, F2950).
+const FACTS = {
+  path: "gno.land/r/gnoland/wugnot",
+  deployer: "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5",
+  firstBlock: 12,
+  callsPerDay: 96,
+};
+
+// A fetch that answers /status with a height, the indexer with `facts` (or as `indexer` says) and any query with `page`; or
+// fails as `fail` says.
+function chain(
+  page: string | null,
+  { status = true, error, indexer = "facts" }: { status?: boolean; error?: string; indexer?: "facts" | "down" } = {},
+) {
   return vi.fn<ChainFetch>((url) => {
+    if (url.startsWith("https://indexer.")) {
+      return Promise.resolve(
+        indexer === "down"
+          ? new Response("down", { status: 503 })
+          : new Response(JSON.stringify({ data: { realmFacts: FACTS } })),
+      );
+    }
     const body = url.includes("/status")
       ? status
         ? statusEnvelope(786661, "2026-10-30T23:43:10Z")
@@ -76,13 +95,44 @@ describe("a realm's view", () => {
       await vi.advanceTimersByTimeAsync(60_000);
     });
     vi.useRealTimers();
-    // 5i: the read functions' list is a third request (vm/qfuncs), asked once; no result is asked before a click.
-    expect(fetcher).toHaveBeenCalledTimes(3);
+    // 5i: the read functions' list is a third request (vm/qfuncs), asked once; no result is asked before a click. 5k: the indexer
+    // is a fourth, to its own address, asked once.
+    expect(fetcher).toHaveBeenCalledTimes(4);
     const urls = fetcher.mock.calls.map(([url]) => url);
+    expect(urls.filter((url) => url.startsWith("https://indexer.onyx.testnets.gno.land/graphql/query?"))).toHaveLength(
+      1,
+    );
     expect(urls.filter((url) => url.includes("/status"))).toHaveLength(1);
     expect(urls.filter((url) => url.includes("vm%2Fqrender"))).toHaveLength(1);
     expect(urls.filter((url) => url.includes("vm%2Fqfuncs"))).toHaveLength(1);
     expect(urls.filter((url) => url.includes("vm%2Fqeval"))).toHaveLength(0);
+  });
+
+  test("shows the realm's facts from the indexer with their source and time, and asks for the realm's own path", async () => {
+    const fetcher = chain(WUGNOT?.body ?? null);
+    const box = await view(fetcher);
+    const facts = one(box, '[aria-label="Facts from the indexer"]');
+    expect(facts.textContent).toContain("96");
+    expect(facts.textContent).toContain("Read from indexer.onyx.testnets.gno.land at ");
+    const asked = fetcher.mock.calls.map(([url]) => url).find((url) => url.startsWith("https://indexer."));
+    expect(decodeURIComponent(asked ?? "")).toContain('"path":"gno.land/r/gnoland/wugnot"');
+  });
+
+  test("shows a state with its next step when the indexer is down, and the page and its height stand", async () => {
+    const box = await view(chain(WUGNOT?.body ?? null, { indexer: "down" }));
+    expect(box.querySelector('[aria-label="Facts from the indexer"]')).toBeNull();
+    const state = all(box, '[role="status"]').find((el) => el.textContent.includes("Read from indexer."));
+    expect(state?.textContent).toMatch(/did not answer/);
+    expect(box.textContent).toContain("wrapped GNOT ($wugnot)");
+    expect(box.textContent).toContain("Read at block 786,661");
+    // The facts' failure does not take the page's alert.
+    expect(box.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  test("shows the facts while the page could not be read, each read on its own", async () => {
+    const box = await view(chain(null, { error: "down" }));
+    expect(one(box, '[role="alert"]').textContent).toContain("could not be read");
+    expect(one(box, '[aria-label="Facts from the indexer"]').textContent).toContain("96");
   });
 
   test("shows a page's form read only, and a link off gnoweb behind a button, whatever the realm wrote", async () => {
@@ -167,9 +217,13 @@ describe("a realm's view", () => {
   });
 
   test("names no gnoweb link for a chain whose gnoweb is not known, and still shows the page", async () => {
-    const box = await view(chain(WUGNOT?.body ?? null), "gno.land/r/gnoland/wugnot", { ...CHAIN, chainId: "other-1" });
+    const fetcher = chain(WUGNOT?.body ?? null);
+    const box = await view(fetcher, "gno.land/r/gnoland/wugnot", { ...CHAIN, chainId: "other-1" });
     expect(box.textContent).toContain("wrapped GNOT ($wugnot)");
     expect(all(box, "a")).toHaveLength(0);
+    // A chain with no known indexer asks none, and draws no facts.
+    expect(fetcher.mock.calls.filter(([url]) => url.startsWith("https://indexer."))).toHaveLength(0);
+    expect(box.querySelector('[aria-label="Facts from the indexer"]')).toBeNull();
   });
 
   // Back goes where the reader came from; opened by its address, with nothing behind it, to the universe's home.
