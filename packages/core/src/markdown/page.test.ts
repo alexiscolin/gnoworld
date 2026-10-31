@@ -1,6 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, test } from "vitest";
 import { MAX_QUOTE_DEPTH, markdown, type Inline } from "./markdown.ts";
+import { originOf } from "./address.ts";
 import { PAGE_MAX_BYTES, page, type FormField, type Page, type PageBlock } from "./page.ts";
 
 // The same seed as core's other properties, so the gate never flaps on one.
@@ -22,6 +23,7 @@ const field = (tag: FormField["tag"], name: string, rest: Partial<FormField> = {
   value: "",
   placeholder: "",
   description: "",
+  flags: "",
   ...rest,
 });
 
@@ -61,8 +63,9 @@ function shown(blocks: readonly PageBlock[]): string {
   for (const block of blocksIn(blocks)) {
     if (block.type === "codeBlock") parts.push(block.text);
     if (block.type === "form") {
-      parts.push(block.exec);
-      for (const f of block.fields) parts.push(f.tag, f.name, f.inputType, f.value, f.placeholder, f.description);
+      parts.push(block.exec, block.path);
+      for (const f of block.fields)
+        parts.push(f.tag, f.name, f.inputType, f.value, f.placeholder, f.description, f.flags);
     }
   }
   for (const node of inlinesOf(blocks)) {
@@ -88,9 +91,9 @@ const KEYS: Readonly<Record<string, string>> = {
   heading: "children,level,type",
   codeBlock: "text,type",
   quote: "children,type",
-  form: "exec,fields,type",
+  form: "exec,fields,path,type",
 };
-const FIELD_KEYS = "description,inputType,name,placeholder,tag,value";
+const FIELD_KEYS = "description,flags,inputType,name,placeholder,tag,value";
 const FORM_TAGS = new Set(["input", "textarea", "select", "other"]);
 // An address a link may name: the chat's own rule (markdown.test.ts): https, a plain ASCII host, a port, then a path with no
 // space, backslash, quote, angle, backtick or control or format character; never a user before an @.
@@ -376,6 +379,7 @@ describe("page: gnoweb's tags, degraded (ADR-0002 §4; gnoweb at gno v1.5.0)", (
       {
         type: "form",
         exec: "Vote",
+        path: "",
         fields: [
           field("input", "who", { inputType: "text", placeholder: "Your name", description: "Who votes" }),
           field("textarea", "why", { placeholder: "Reason" }),
@@ -389,6 +393,7 @@ describe("page: gnoweb's tags, degraded (ADR-0002 §4; gnoweb at gno v1.5.0)", (
     reads('<gno-form>\n<gno-input name="a" />\n</gno-form>', {
       type: "form",
       exec: "",
+      path: "",
       fields: [field("input", "a", { inputType: "text" })],
     });
   });
@@ -397,6 +402,7 @@ describe("page: gnoweb's tags, degraded (ADR-0002 §4; gnoweb at gno v1.5.0)", (
     reads('<gno-form exec="Send">\n<gno-input name="to" type="hidden" value="g1evil" />\n</gno-form>', {
       type: "form",
       exec: "Send",
+      path: "",
       fields: [field("input", "to", { inputType: "hidden", value: "g1evil" })],
     });
   });
@@ -405,6 +411,7 @@ describe("page: gnoweb's tags, degraded (ADR-0002 §4; gnoweb at gno v1.5.0)", (
     reads('<gno-form>\n<script>alert(1)</script>\n<gno-input name="a" />\n</gno-form>', {
       type: "form",
       exec: "",
+      path: "",
       fields: [field("other", "", { value: "<script>alert(1)</script>" }), field("input", "a", { inputType: "text" })],
     });
   });
@@ -414,6 +421,7 @@ describe("page: gnoweb's tags, degraded (ADR-0002 §4; gnoweb at gno v1.5.0)", (
     reads(`<gno-form>\n${line}\n</gno-form>`, {
       type: "form",
       exec: "",
+      path: "",
       fields: [field("other", "", { value: line })],
     });
   });
@@ -437,6 +445,7 @@ describe("page: gnoweb's tags, degraded (ADR-0002 §4; gnoweb at gno v1.5.0)", (
     reads('<gno-form>\n<gno-input type="hidden" value="v" />\n</gno-form>', {
       type: "form",
       exec: "",
+      path: "",
       fields: [field("input", "", { inputType: "hidden", value: "v" })],
     });
   });
@@ -445,26 +454,28 @@ describe("page: gnoweb's tags, degraded (ADR-0002 §4; gnoweb at gno v1.5.0)", (
     reads("<GNO-FORM EXEC=Go>\n<GNO-INPUT NAME=a TYPE=HIDDEN VALUE=v1/>\n</GNO-FORM>", {
       type: "form",
       exec: "Go",
+      path: "",
       fields: [field("input", "a", { inputType: "hidden", value: "v1/" })],
     });
   });
 
   test("shows an attribute that no field shows, or one given twice, as a line whole", () => {
     for (const line of [
-      '<gno-input name="a" required="true" />',
+      '<gno-input name="a" selected="true" />',
       '<gno-input name="a" name="b" />',
       '<gno-input name="a" onclick="x" />',
     ]) {
       reads(`<gno-form>\n${line}\n</gno-form>`, {
         type: "form",
         exec: "",
+        path: "",
         fields: [field("other", "", { value: line })],
       });
     }
   });
 
   test("reads a form whose opener has an attribute no form shows as text", () => {
-    const opener = '<gno-form exec="X" path="/r/other">';
+    const opener = '<gno-form exec="X" onclick="y">';
     reads(`${opener}\n</gno-form>`, paragraph(text(opener), br, text("</gno-form>")));
   });
 
@@ -474,10 +485,115 @@ describe("page: gnoweb's tags, degraded (ADR-0002 §4; gnoweb at gno v1.5.0)", (
       {
         type: "form",
         exec: "A",
+        path: "",
         fields: [field("other", "", { value: '<gno-form exec="B">' }), field("input", "x", { inputType: "text" })],
       },
       paragraph(text("tail")),
     );
+  });
+
+  test("reads a form's path, gnoweb's own attribute, and shows it (R-F7)", () => {
+    reads('<gno-form path="balances">\n<gno-input name="a" />\n</gno-form>', {
+      type: "form",
+      exec: "",
+      path: "balances",
+      fields: [field("input", "a", { inputType: "text" })],
+    });
+    reads('<gno-form exec="Send" path="/r/other?x=1">\n</gno-form>', {
+      type: "form",
+      exec: "Send",
+      path: "/r/other?x=1",
+      fields: [],
+    });
+  });
+
+  test("shows gnoweb's required, readonly, checked and rows on a field, not as a line unread (R-F7)", () => {
+    const lines = [
+      '<gno-input name="a" required="true" readonly="true" checked="true" type="checkbox" value="y" />',
+      '<gno-textarea name="b" rows="6" required="true" />',
+      '<gno-select name="c" readonly="true" />',
+      '<gno-input name="d" required="false" />',
+    ];
+    reads(`<gno-form>\n${lines.join("\n")}\n</gno-form>`, {
+      type: "form",
+      exec: "",
+      path: "",
+      fields: [
+        field("input", "a", { inputType: "checkbox", value: "y", flags: "required, readonly, checked" }),
+        field("textarea", "b", { flags: "required, rows 6" }),
+        field("select", "c", { flags: "readonly" }),
+        field("input", "d", { inputType: "text" }),
+      ],
+    });
+  });
+
+  test("does not read a tag of the form's own names that is an object's key (S-F3)", () => {
+    for (const name of ["constructor", "toString", "hasOwnProperty", "__proto__", "valueOf"]) {
+      const line = `<${name} name="to">`;
+      const [form] = blocksOf(`<gno-form>\n${line}\n</gno-form>`);
+      expect(form).toMatchObject({ fields: [{ tag: "other", value: line }] });
+      expectAllowlisted(blocksOf(`<gno-form>\n${line}\n</gno-form>`));
+    }
+  });
+
+  test("shows an alert of an object's key as an Info, with a string for its title (S-F3)", () => {
+    for (const name of ["constructor", "toString", "hasOwnProperty"]) {
+      reads(`> [!${name}]\n> body`, {
+        type: "quote",
+        children: [paragraph(strong(text("Info"))), paragraph(text("body"))],
+      });
+    }
+  });
+
+  test("reads a closing tag as no field, whatever it holds (R-F8)", () => {
+    const line = '</gno-input name="a">';
+    reads(`<gno-form>\n${line}\n</gno-form>`, {
+      type: "form",
+      exec: "",
+      path: "",
+      fields: [field("other", "", { value: line })],
+    });
+  });
+
+  test("opens a form only with an opening tag that does not close itself (R-F8)", () => {
+    for (const opener of ['</gno-form exec="x">', '<gno-form exec="x" />']) {
+      reads(`${opener}\n</gno-form>`, paragraph(text(opener), br, text("</gno-form>")));
+    }
+  });
+
+  test("closes a form only with a bare </gno-form>: not with an attribute, not self-closing (R-F8)", () => {
+    for (const closer of ['</gno-form value="x">', "</gno-form/>"]) {
+      reads(`<gno-form>\n${closer}`, paragraph(text("<gno-form>"), br, text(closer)));
+    }
+  });
+
+  test("drops the blank lines of a form, they are no field (R-F8)", () => {
+    reads('<gno-form>\n\n<gno-input name="a" />\n  \t\n</gno-form>', {
+      type: "form",
+      exec: "",
+      path: "",
+      fields: [field("input", "a", { inputType: "text" })],
+    });
+  });
+
+  test("keeps a separator before its columns' opener as text (R-F8)", () => {
+    reads(
+      "<gno-columns-sep>\n<gno-columns>\na\n</gno-columns>",
+      paragraph(text("<gno-columns-sep>")),
+      paragraph(text("a")),
+    );
+  });
+
+  test("takes an indented tag of columns, and each spelling of the separator, as a tag (R-F8)", () => {
+    for (const sep of ["<gno-columns-sep>", "<gno-columns-sep/>", "<gno-columns-sep />", "  <gno-columns-sep /> "]) {
+      reads(`  <gno-columns> \na\n${sep}\nb\n  </gno-columns>\t`, paragraph(text("a")), paragraph(text("b")));
+    }
+  });
+
+  test("resolves a path against the origin and leaves an https address as it is (R-F8)", () => {
+    expect(blocksOf("[a](https://other.test/x) [b](/r/demo)", "https://gno.land")).toStrictEqual([
+      paragraph(link("https://other.test/x", "a"), text(" "), link("https://gno.land/r/demo", "b")),
+    ]);
   });
 
   test("keeps markup in an attribute as a string", () => {
@@ -569,7 +685,9 @@ describe("page: gnoweb's tags, degraded (ADR-0002 §4; gnoweb at gno v1.5.0)", (
   test("reads a form inside a quote, from the quote's own lines", () => {
     reads('> <gno-form>\n> <gno-input name="a" type="hidden" value="v" />\n> </gno-form>', {
       type: "quote",
-      children: [{ type: "form", exec: "", fields: [field("input", "a", { inputType: "hidden", value: "v" })] }],
+      children: [
+        { type: "form", exec: "", path: "", fields: [field("input", "a", { inputType: "hidden", value: "v" })] },
+      ],
     });
   });
 
@@ -947,5 +1065,26 @@ describe("page: linear in bytes (a guard against quadratic input; the bench meas
     const start = Date.now();
     expect(page(make(PAGE_MAX_BYTES).slice(0, PAGE_MAX_BYTES)).kind).toBe("page");
     expect(Date.now() - start).toBeLessThan(5000); // the bench holds the budget; a quadratic regex takes half a minute
+  });
+});
+
+describe("originOf: the origin a page's links resolve against", () => {
+  test("keeps https://host[:port] and drops one closing slash", () => {
+    expect(originOf("https://gno.land")).toBe("https://gno.land");
+    expect(originOf("https://gno.land/")).toBe("https://gno.land");
+    expect(originOf("https://onyx.testnets.gno.land:8443")).toBe("https://onyx.testnets.gno.land:8443");
+  });
+
+  test("refuses anything else: a path, a user, a scheme, a look-alike letter, a port past 65535", () => {
+    for (const origin of [
+      "https://gno.land/r",
+      "https://a@gno.land",
+      "http://gno.land",
+      "https://gn\u043e.land",
+      "https://gno.land:70000",
+      "https://gno.land//",
+      "",
+    ])
+      expect(originOf(origin)).toBeUndefined();
   });
 });

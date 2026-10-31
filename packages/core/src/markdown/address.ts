@@ -55,7 +55,7 @@ const count = (source: string, char: string): number => source.split(char).lengt
 export function originOf(origin: string): string | undefined {
   const end = authority(origin, 0);
   const bare = origin.endsWith("/") ? origin.slice(0, -1) : origin;
-  return end !== -1 && end === bare.length ? bare : undefined;
+  return end === bare.length ? bare : undefined;
 }
 
 /** A line's addresses, its tables made once and only when an address is asked. With an origin (originOf's), a link to a
@@ -78,7 +78,7 @@ export class Addresses {
     const end = this.#parens[at] ?? -1;
     const path = authority(this.#source, at + 1);
     if (path === end || (PATH.test(this.#source.charAt(path)) && this.#stop(path) >= end)) return end;
-    return end !== -1 && this.#local(at + 1) && this.#stop(at + 1) >= end ? end : -1;
+    return this.#local(at + 1) && this.#stop(at + 1) >= end ? end : -1;
   }
 
   /** The address of a link whose `(` is at `at` and `)` at `end`, as `destination` accepted it: the path, under the origin. */

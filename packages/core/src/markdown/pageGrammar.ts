@@ -14,35 +14,54 @@ export interface FormField {
   value: string;
   placeholder: string;
   description: string;
+  /** gnoweb's flags the field carries, as the page wrote them: `required, readonly, checked, rows 4`. */
+  flags: string;
 }
 
 /** What a page holds beyond the chat's blocks. */
 export type PageExtra =
   | { type: "heading"; level: 1 | 2 | 3 | 4 | 5 | 6; children: Inline[] }
-  | { type: "form"; exec: string; fields: FormField[] };
+  | { type: "form"; exec: string; path: string; fields: FormField[] };
 
 /** A page's tree. */
 export type PageBlock = Tree<PageExtra>;
 
 const HEADING = /^(#{1,6}) (.*)$/s;
 const ALERT = /^\[!([A-Za-z]+)\](-)?(?:[ \t]+(.*))?$/s;
-const LABELS: Readonly<Record<string, string>> = {
-  note: "Note",
-  tip: "Tip",
-  caution: "Caution",
-  warning: "Warning",
-  success: "Success",
-};
-const FIELDS = { "gno-input": "input", "gno-textarea": "textarea", "gno-select": "select" } as const;
-// The attributes a field shows; any other makes the line an `other` one, shown whole.
-const SHOWN = ["name", "type", "placeholder", "description", "value"];
+// Looked up in Maps, never in objects: a page's word (`constructor`) must find nothing on an object's own keys (S-F3). Each
+// is made where it is used, as the tests see it.
+const alertLabel = (kind: string): string | undefined =>
+  new Map([
+    ["note", "Note"],
+    ["tip", "Tip"],
+    ["caution", "Caution"],
+    ["warning", "Warning"],
+    ["success", "Success"],
+  ]).get(kind);
+const fieldKind = (name: string): "input" | "textarea" | "select" | undefined =>
+  new Map<string, "input" | "textarea" | "select">([
+    ["gno-input", "input"],
+    ["gno-textarea", "textarea"],
+    ["gno-select", "select"],
+  ]).get(name);
+// The attributes a field shows; any other makes the line an `other` one, shown whole. The last four are gnoweb's flags
+// (ext_forms.go at v1.5.0: `required`, `readonly` and `checked` count only as "true"; `rows` is a number of lines).
+const SHOWN = ["name", "type", "placeholder", "description", "value", "required", "readonly", "checked", "rows"];
+const FLAGS = ["required", "readonly", "checked"];
+
+// The flags a field carries as gnoweb reads them, in one line.
+function flagsOf(attributes: ReadonlyMap<string, string>): string {
+  const flags = FLAGS.filter((flag) => attributes.get(flag)?.trim() === "true");
+  const rows = attributes.get("rows");
+  return (rows === undefined ? flags : [...flags, `rows ${rows.trim()}`]).join(", ");
+}
 
 // A field of gnoweb's from a line, or, if the line is no tag of one or holds an attribute not shown, an `other` one.
 function fieldOf(line: string): FormField {
   const tag = tagOf(line);
-  const kind = tag === undefined || tag.closing ? undefined : FIELDS[tag.name as keyof typeof FIELDS];
+  const kind = tag === undefined || tag.closing ? undefined : fieldKind(tag.name);
   if (tag === undefined || kind === undefined || [...tag.attributes.keys()].some((key) => !SHOWN.includes(key))) {
-    return { tag: "other", name: "", inputType: "", value: line.trim(), placeholder: "", description: "" };
+    return { tag: "other", name: "", inputType: "", value: line.trim(), placeholder: "", description: "", flags: "" };
   }
   const get = (key: string) => tag.attributes.get(key) ?? "";
   const type = get("type").toLowerCase();
@@ -53,15 +72,17 @@ function fieldOf(line: string): FormField {
     value: get("value"),
     placeholder: get("placeholder"),
     description: get("description"),
+    flags: flagsOf(tag.attributes),
   };
 }
 
-// A form's opening line: `<gno-form>`, its only attribute `exec`; its function, or none.
-function opening(line: string): { exec: string } | undefined {
+// A form's opening line: `<gno-form>`, its attributes `exec` and `path` (gnoweb's own) and no other; those, or none.
+function opening(line: string): { exec: string; path: string } | undefined {
   const tag = tagOf(line);
   if (tag?.name !== "gno-form" || tag.closing || tag.selfClosing) return undefined;
   const keys = [...tag.attributes.keys()];
-  return keys.every((key) => key === "exec") ? { exec: tag.attributes.get("exec") ?? "" } : undefined;
+  if (!keys.every((key) => key === "exec" || key === "path")) return undefined;
+  return { exec: tag.attributes.get("exec") ?? "", path: tag.attributes.get("path") ?? "" };
 }
 const closing = (line: string): boolean => {
   const tag = tagOf(line);
@@ -136,7 +157,7 @@ class PageLines implements Grammar<PageExtra> {
   head(inner: readonly string[]): { block: PageBlock; rest: string[] } | undefined {
     const alert = ALERT.exec((inner[0] ?? "").trim());
     if (alert === null) return undefined;
-    const label = LABELS[(alert[1] ?? "").toLowerCase()] ?? "Info";
+    const label = alertLabel((alert[1] ?? "").toLowerCase()) ?? "Info";
     const title = (alert[3] ?? "").trim() || label;
     const strong: Inline = { type: "strong", children: [{ type: "text", text: title }] };
     return { block: { type: "paragraph", children: [strong] }, rest: inner.slice(1) };
@@ -145,7 +166,7 @@ class PageLines implements Grammar<PageExtra> {
   #heading(at: number, body: string): (() => Read<PageExtra>) | undefined {
     const found = HEADING.exec(body);
     const text = (found?.[2] ?? "").trim();
-    if (found === null || text === "") return undefined;
+    if (found === null) return undefined;
     const level = (found[1] ?? "#").length as Level;
     return () => ({ next: at + 1, block: { type: "heading", level, children: this.inline(text) } });
   }
@@ -160,7 +181,7 @@ class PageLines implements Grammar<PageExtra> {
         .slice(at + 1, end)
         .filter((line) => line.trim() !== "")
         .map(fieldOf);
-    return () => ({ next: end + 1, block: { type: "form", exec: form.exec, fields: fields() } });
+    return () => ({ next: end + 1, block: { type: "form", exec: form.exec, path: form.path, fields: fields() } });
   }
 }
 

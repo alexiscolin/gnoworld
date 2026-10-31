@@ -25,13 +25,18 @@ function blockWords(block: Block): string {
 /** A message's words in one line, its spaces collapsed. */
 export const plain = (source: string): string => markdown(source).map(blockWords).join(" ").replace(/\s+/g, " ").trim();
 
-/** A message's words cut to `length` graphemes, the last an ellipsis when cut: a skin tone, a ZWJ family or a flag
- * stays whole. */
-export function excerpt(source: string, length: number): string {
-  if (!Number.isInteger(length) || length < 2) throw new RangeError("excerpt: the length is a whole number, 2 or more");
-  const text = plain(source);
+/** A text cut to `length` graphemes, the last an ellipsis when cut: a skin tone, a ZWJ family or a flag stays whole. */
+export function cutGraphemes(text: string, length: number): string {
+  if (!Number.isInteger(length) || length < 2)
+    throw new RangeError("cutGraphemes: the length is a whole number, 2 or more");
   const kept = firstGraphemes(text, length + 1);
   return kept.length <= length ? text : `${kept.slice(0, length - 1).join("")}…`;
+}
+
+/** A message's words cut to `length` graphemes, the last an ellipsis when cut. */
+export function excerpt(source: string, length: number): string {
+  if (!Number.isInteger(length) || length < 2) throw new RangeError("excerpt: the length is a whole number, 2 or more");
+  return cutGraphemes(plain(source), length);
 }
 
 export { firstGraphemes };
