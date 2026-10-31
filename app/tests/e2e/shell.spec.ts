@@ -21,17 +21,19 @@ const edgesOf = (page: Page) =>
     for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
       const text = (node.textContent ?? "").trim();
       const parent = node.parentElement;
-      if (text === "" || parent?.closest("script, style, [hidden]") !== null) continue;
+      if (text === "" || parent?.closest("script, style, [hidden], [data-ticker]") !== null) continue;
       if (getComputedStyle(parent).visibility === "hidden") continue;
       const range = document.createRange();
       range.selectNodeContents(node);
       for (const rect of range.getClientRects()) take(text.slice(0, 30), rect);
     }
+    // The ticker is a strip across the foot of the screen, edge to edge by design: homeLive.spec measures it.
     for (const control of document.querySelectorAll("a[href], button, input, textarea, select, [tabindex]"))
-      take(
-        `<${control.tagName.toLowerCase()}> ${control.textContent.trim().slice(0, 30)}`,
-        control.getBoundingClientRect(),
-      );
+      if (control.closest("[data-ticker]") === null)
+        take(
+          `<${control.tagName.toLowerCase()}> ${control.textContent.trim().slice(0, 30)}`,
+          control.getBoundingClientRect(),
+        );
     return found;
   });
 

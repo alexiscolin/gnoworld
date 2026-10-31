@@ -10,6 +10,7 @@ import { createServer } from "node:http";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { inlineScripts, policy, sha256 } from "../../src/csp.ts";
+import { originsOf } from "../../src/cspOrigins.ts";
 import { dropSockets, relay, relayUpgrade, startBackend, walletAnswer } from "./api.mjs";
 import { headerRules } from "./cspFiles.mjs";
 
@@ -99,9 +100,10 @@ function workerOfRelease() {
 }
 
 // A page of the release: its own scripts' hashes, from the bytes it is sent with (a data block has none).
-// The build's own reading of the page (csp.ts), so the journeys hold a release to the rule the build holds.
+// The build's own reading of the page (csp.ts), so the journeys hold a release to the rule the build holds, the RPC origins
+// the build named included (the home reads a block height).
 async function policyOfRelease(file) {
-  return policy(await Promise.all(inlineScripts(released(file).toString("utf8")).map(sha256)));
+  return policy(await Promise.all(inlineScripts(released(file).toString("utf8")).map(sha256)), originsOf(ANY));
 }
 
 // The policy of an answer: a page's, as a host that reads _headers picks it, by the request path (the rule that names it, else
