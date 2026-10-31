@@ -222,13 +222,13 @@ describe("a world's plate", () => {
     const links = [...plate.matchAll(/<a\b[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g)];
     expect(links.map(([, href]) => href)).toEqual(["#chat"]);
     expect(links[0]?.[2]).toMatch(/Say hi in the chat/);
-    expect(html).toMatch(/<div id="chat">/);
+    expect(html).toMatch(/<div id="chat"[^>]*>/);
   });
 
   // Slice 5j (DESIGN-SYSTEM.md, Breakpoints): the chat's slot comes before the plate in the page, so a phone shows it first and a
   // screen reader reads it first; the computer's layout places the plate first by CSS (worldPage.spec.ts).
   test("keeps the chat's slot in the page, before the plate opens", async () => {
     const { html } = await plateOf();
-    expect(html).toMatch(/<div id="chat">[\s\S]*Loading the chat[\s\S]*<section [^>]*data-look="plate"/);
+    expect(html).toMatch(/<div id="chat"[^>]*>[\s\S]*Loading the chat[\s\S]*<section [^>]*data-look="plate"/);
   });
 });
