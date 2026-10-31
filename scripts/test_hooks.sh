@@ -2171,6 +2171,17 @@ grep -q '^test .*--changed' "$log" && fail "check.sh ran only Vitest's related t
 printf '%s\n' "$out" | grep -q "(budget 30 s)$" || fail "check.sh gave a scoped run another budget than 30 s: $out"
 [ ! -e "$g/.claude/tmp/green-full" ] || fail "a fast run recorded the full gate"
 reset
+# Prettier keeps its cache in the worktree's own .claude/tmp (a rerun of an unchanged tree costs 0.9 s of 7.5), not in pre-commit's staged
+# copy, a new folder each time; and a file that changed is refused with the cache warm.
+flags=$(sed -n 's/^format:check //p' "$log")
+[ "$flags" = "--cache --cache-strategy content --cache-location=.claude/tmp/prettier-cache" ] || fail "check.sh gave Prettier no cache in the worktree's .claude/tmp: '$flags'"
+pc="$t/prettier_cache" && mkdir -p "$pc" && cp "$here/../.prettierrc.json" "$pc/" 2>/dev/null
+printf 'export const a = 1;\n' >"$pc/a.ts"
+(cd "$pc" && "$here/../node_modules/.bin/prettier" --check --log-level warn $flags .) >/dev/null 2>&1 || fail "Prettier refused a formatted file with a cold cache"
+(cd "$pc" && "$here/../node_modules/.bin/prettier" --check --log-level warn $flags .) >/dev/null 2>&1 || fail "Prettier refused a formatted file with a warm cache"
+printf 'export   const a =   1\n' >"$pc/a.ts"
+(cd "$pc" && "$here/../node_modules/.bin/prettier" --check --log-level warn $flags .) >/dev/null 2>&1 && fail "Prettier passed a changed, unformatted file with a warm cache"
+[ -d "$pc/.claude/tmp" ] || fail "Prettier kept no cache under .claude/tmp"
 # A server file deleted: its types still checked, which see what imported it.
 git -C "$g" rm -q server/src/b.ts
 gate >/dev/null || fail "check.sh failed on a deleted server file"
@@ -2940,6 +2951,7 @@ regr_fixture() { # $1: a folder
 }
 logged() { grep -qx "$(cd "$c3" && pwd -P) $1" "$t/reg.log" 2>/dev/null || grep -qx "$c3 $1" "$t/reg.log" 2>/dev/null; }
 regr_fixture "$c3"
+[ -z "$(sed -n 's/^format:check //p' "$log")" ] || fail "check.sh gave Prettier a cache in a copy outside a repository, a new folder each time"
 git -C "$c3" add -A && git -C "$c3" commit -qm base
 head3=$(git -C "$c3" rev-parse HEAD) && rm -f "$t/reg.log"
 git -C "$c3" mv server/src/a.test.ts server/src/b.test.ts

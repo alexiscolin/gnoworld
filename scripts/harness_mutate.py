@@ -120,7 +120,8 @@ def selectors(path, test):
 
 
 def journeys_mutants():
-    """A commit's gate walks no journey (Alexis, 2026-10-31): it builds the app and starts no browser for it; the merge check and --full walk every journey."""
+    """A commit's gate walks no journey (Alexis, 2026-10-31): it builds the app and starts no browser for it; the merge check and --full walk every journey.
+    And Prettier's cache lives in the worktree's .claude/tmp, in a repository only (harness-c, speed-audit.md row 6)."""
     check = "scripts/check.sh"
     for find, replace, label in (
         ("\tif ! $full; then\n\t\t# A commit's gate builds the app", "\tif false; then\n\t\t# A commit's gate builds the app", "walks the journeys at a commit"),
@@ -129,6 +130,10 @@ def journeys_mutants():
         ("\t\tapp/src/*.test.ts | app/src/*.test.tsx) ts=true ;;", "\t\tapp/src/*.test.ts | app/src/*.test.tsx) ts=true app=true ;;", "builds the app for a change of its tests alone"),
         ("\t\tapp/tests/*.ts) ts=true ;;", "\t\tapp/tests/*.ts) ts=true app=true ;;", "builds the app for a change of a journey"),
         ("--reporter=dot,json >", "--reporter=dot,json app/tests/e2e/home.spec.ts >", "gives the merge check's journeys a filter"),
+        ('[ -z "$tested" ] || format_cache=', '[ -n "$tested" ] || format_cache=', "keeps Prettier's cache in a staged copy and none in a repository"),
+        ('[ -z "$tested" ] || format_cache=', "format_cache=", "keeps Prettier's cache in a staged copy"),
+        ("--cache --cache-strategy content --cache-location=.claude/tmp/prettier-cache", "--cache-strategy content", "gives Prettier no cache"),
+        ("--cache --cache-strategy content --cache-location", "--cache --cache-strategy metadata --cache-location", "keys Prettier's cache by modification time, not content"),
     ):
         yield from each(check, find, replace, "hooks", f"check.sh {label}")
 

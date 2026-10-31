@@ -320,7 +320,11 @@ else:
 
 lane_ts() {
 	step format
-	run format:check
+	# Prettier's cache is keyed by a file's path and content: in a repository it lives in the worktree's own .claude/tmp and makes a rerun of
+	# an unchanged tree 0.9 s of 7.5 (speed-audit.md, row 6); pre-commit's staged copy is a new folder each time, so it keeps none.
+	format_cache=
+	[ -z "$tested" ] || format_cache="--cache --cache-strategy content --cache-location=.claude/tmp/prettier-cache"
+	run format:check "$format_cache"
 	step unused
 	run unused
 	step copies
