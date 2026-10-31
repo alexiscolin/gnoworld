@@ -260,6 +260,33 @@ describe("ActivityChart's tooltip (F304)", () => {
     expect(words(96, "5 hours ago")).not.toBeNull();
   });
 
+  // A click or a tap: the pointer goes down, then the browser focuses the group, which is no keyboard focus.
+  const clickFocus = (target: Element) => {
+    fireEvent.pointerDown(target);
+    fireEvent.mouseDown(target);
+    act(() => {
+      group().focus();
+    });
+  };
+
+  it("holds no words after a mouse click on a bar once the pointer has left it (F2862)", () => {
+    const { container } = draw();
+    fireEvent.pointerEnter(bar(container, 5));
+    clickFocus(bar(container, 5));
+    fireEvent.pointerLeave(bar(container, 5));
+    expect(anyWords()).toBeNull();
+  });
+
+  it("shows a tapped bar's own count while the finger is on it, never the last bar's (F2862)", () => {
+    const { container } = draw();
+    fireEvent.pointerEnter(bar(container, 18));
+    clickFocus(bar(container, 18));
+    expect(words(96, "5 hours ago")).not.toBeNull();
+    expect(words(23, "This hour")).toBeNull();
+    fireEvent.pointerLeave(bar(container, 18));
+    expect(anyWords()).toBeNull();
+  });
+
   it("shows the words again when the pointer or the focus comes after Escape", () => {
     const { container } = draw();
     fireEvent.pointerEnter(bar(container, 18));

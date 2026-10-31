@@ -1,4 +1,5 @@
-import { useEffect, useState, type KeyboardEvent } from "react";
+import { useState, type FocusEvent, type KeyboardEvent } from "react";
+import { keyboardFocus, useFirstEscape } from "../Tooltip/hold.ts";
 
 // The bar under the pointer, and the one the keyboard rests on when the chart has the focus: each its own, so one
 // leaving never hides the other's words (F334's class); Esc hides the words until either comes again (WCAG 1.4.13).
@@ -11,23 +12,9 @@ export function useReading(bars: number) {
   const shown = !dismissed && under !== null && under < bars ? under : null;
   const showing = shown !== null;
   // A shown tooltip takes the first Esc, before a dialog or popover around the chart.
-  useEffect(() => {
-    if (!showing) return;
-    const stop = new AbortController();
-    document.addEventListener(
-      "keydown",
-      (event) => {
-        if (event.key !== "Escape") return;
-        event.preventDefault();
-        event.stopPropagation();
-        setDismissed(true);
-      },
-      { capture: true, signal: stop.signal },
-    );
-    return () => {
-      stop.abort();
-    };
-  }, [showing]);
+  useFirstEscape(showing, true, () => {
+    setDismissed(true);
+  });
   const walk = (event: KeyboardEvent<HTMLDivElement>) => {
     const from = focusAt ?? last;
     const to: Record<string, number> = {
@@ -46,7 +33,9 @@ export function useReading(bars: number) {
     shown,
     focusAt: dismissed ? null : focusAt,
     group: {
-      onFocus: () => {
+      // Only the keyboard's focus holds the words: a click or a tap focuses the group too, and the hold would outlast the pointer (F2862).
+      onFocus: (event: FocusEvent<HTMLDivElement>) => {
+        if (!keyboardFocus(event)) return;
         setFocusAt(last);
         setDismissed(false);
       },
