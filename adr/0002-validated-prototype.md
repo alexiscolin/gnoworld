@@ -126,7 +126,7 @@ Phases are ADR-0001's:
 | Auroras | The poles light with calls to the realm, stronger with calls per minute | 1 | The signals at scale (§7) | Read |
 | Comets in space | A message sent to another world's room crosses space as a comet (Chat, comets) | 1 | The comets bot | — |
 | Talk box | With the chat closed, the last lines of the world's room on its plate | 0 | — | — |
-| Realm facts | Path, deployer, first block, calls in 24 h | 0 | The public indexer | Read |
+| Realm facts | Path, deployer, first block; the calls in 24 h wait for an indexer with dates (F2974: it has no time field) | 0 | The public indexer | Read |
 | Latest post on X | — | Cut, unless a source is decided | — | — |
 | The Earth | Bubbles where people speak from, with counts for the far side ("Japan · 12, far side"); hotspots per country with the last hour's trend ("+15% · 1 h", from the activity API); the globe turns to show your own message; "N realms deployed in 24 h" from the indexer | 0 | `pickBubbles` and its rules file (ADR-0001 §7) | — |
 | Bubbles on other worlds | The prototype pops messages on any planet | Cut: bubbles are the Earth's, by country (ADR-0001 §7). Moons, storms, auroras and heat carry activity elsewhere (§3) | — | — |
