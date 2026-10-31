@@ -110,6 +110,7 @@ export const BubbleRules = z.strictObject({
   speakerDelaySeconds: rule(1, 120),
   maxChars: rule(20, 160),
   readLast: rule(1, 2000),
+  maxAgeSeconds: rule(30, 86_400),
 });
 
 export const News = byId(

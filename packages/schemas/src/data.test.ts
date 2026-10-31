@@ -375,13 +375,21 @@ describe("Universes", () => {
 // Slice 6's 6a: the rules of the Earth's bubbles (ADR-0001 §7), one object, checked when the app builds. The bounds are
 // the plan's proposal (docs/plans/slice-6.md §3): each is tested at the bound and one past it.
 describe("BubbleRules", () => {
-  const rules = { maxOnScreen: 6, showSeconds: 5, speakerDelaySeconds: 30, maxChars: 80, readLast: 500 };
+  const rules = {
+    maxOnScreen: 6,
+    showSeconds: 5,
+    speakerDelaySeconds: 30,
+    maxChars: 80,
+    readLast: 500,
+    maxAgeSeconds: 300,
+  };
   const BOUNDS = [
     ["maxOnScreen", 1, 12],
     ["showSeconds", 1, 15],
     ["speakerDelaySeconds", 1, 120],
     ["maxChars", 20, 160],
     ["readLast", 1, 2000],
+    ["maxAgeSeconds", 30, 86_400],
   ] as const;
 
   it("takes the rules ADR-0001 §7 starts with", () => {
@@ -433,6 +441,7 @@ describe("BubbleRules", () => {
           speakerDelaySeconds: fc.integer({ min: 1, max: 120 }),
           maxChars: fc.integer({ min: 20, max: 160 }),
           readLast: fc.integer({ min: 1, max: 2000 }),
+          maxAgeSeconds: fc.integer({ min: 30, max: 86_400 }),
         }),
         (row) => {
           expect(BubbleRules.safeParse(row).success).toBe(true);

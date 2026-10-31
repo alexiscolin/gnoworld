@@ -24,7 +24,14 @@ const GOOD: Files = {
   "events.json": [],
   "expedition.json": [],
   "quests.json": [],
-  "bubbles.json": { maxOnScreen: 6, showSeconds: 5, speakerDelaySeconds: 30, maxChars: 80, readLast: 500 },
+  "bubbles.json": {
+    maxOnScreen: 6,
+    showSeconds: 5,
+    speakerDelaySeconds: 30,
+    maxChars: 80,
+    readLast: 500,
+    maxAgeSeconds: 300,
+  },
   "news.json": [{ id: "n1", title: "News", date: "2026-10-29", link: "https://gno.land/" }],
 };
 

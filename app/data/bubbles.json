@@ -3,5 +3,6 @@
   "showSeconds": 5,
   "speakerDelaySeconds": 30,
   "maxChars": 80,
-  "readLast": 500
+  "readLast": 500,
+  "maxAgeSeconds": 300
 }

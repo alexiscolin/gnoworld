@@ -561,6 +561,50 @@ describe("a clock that steps back (finding 6)", () => {
   });
 });
 
+describe("how old a line may be (F3364)", () => {
+  const AGE = RULES.maxAgeSeconds * 1000;
+
+  it("takes a line of exactly maxAgeSeconds and refuses one a millisecond older, shown and counted alike", () => {
+    const edge = msg(1, { country: "JP", at: NOW - AGE });
+    const past = msg(2, { country: "FR", at: NOW - AGE - 1 });
+    const old = msg(3, { country: "FR", account: "late", at: NOW - AGE * 20 });
+    const out = pick([edge, past, old]);
+    expect(ids(out.bubbles)).toEqual(["m1"]);
+    expect(out.counts).toEqual([]);
+    expect(pick([past, old]).bubbles).toEqual([]);
+  });
+
+  it("does not count an old line of a country with a bubble, nor of the far side", () => {
+    const here = msg(1, { country: "JP", at: NOW - 1000 });
+    const old = msg(2, { country: "JP", account: "old", at: NOW - AGE - 1 });
+    expect(pick([here, old]).counts).toEqual([]);
+    const far = { ...ME, facing: { lat: 0, lon: -60 } };
+    expect(pick([old], far).counts).toEqual([]);
+  });
+
+  it("lets a quiet room go quiet: a line turns old as the clock goes on, a bubble already shown keeps its time", () => {
+    const line = msg(1, { at: NOW });
+    const first = pick([line]);
+    const mid = pick([line], ME, { shown: first.shown, now: NOW + SHOW - 1 });
+    expect(ids(mid.bubbles)).toEqual(["m1"]);
+    const later = msg(2, { country: "FR", account: "late", at: NOW });
+    expect(pick([later], ME, { now: NOW + AGE + 1 }).bubbles).toEqual([]);
+    expect(ids(pick([later], ME, { now: NOW + AGE }).bubbles)).toEqual(["m2"]);
+  });
+
+  it("reads the rule from the rules it is given", () => {
+    const line = msg(1, { at: NOW - 60_000 });
+    expect(pickBubbles([line], NOW, ME, { ...RULES, maxAgeSeconds: 59 }, []).bubbles).toEqual([]);
+    expect(ids(pickBubbles([line], NOW, ME, { ...RULES, maxAgeSeconds: 60 }, []).bubbles)).toEqual(["m1"]);
+  });
+
+  it("dates a line from its time, not from where it is in the list: the window holds nothing older", () => {
+    const old = Array.from({ length: 5 }, (_, n) => msg(n, { at: NOW - AGE - 1000 - n, country: CODES[n] ?? "JP" }));
+    const out = pick(old);
+    expect(out).toEqual({ bubbles: [], counts: [], shown: [] });
+  });
+});
+
 describe("how much it reads", () => {
   const crowd = (count: number): BubbleMessage[] =>
     Array.from({ length: count }, (_, n) => msg(n, { country: "JP", at: NOW - 1000 - n, account: `p${String(n)}` }));
@@ -793,6 +837,7 @@ describe("for any input (property)", () => {
     speakerDelaySeconds: fc.integer({ min: 1, max: 120 }),
     maxChars: fc.integer({ min: 20, max: 160 }),
     readLast: fc.oneof(fc.integer({ min: 1, max: 2000 }), fc.integer({ min: 1, max: 60 })),
+    maxAgeSeconds: fc.oneof(fc.integer({ min: 30, max: 86_400 }), fc.integer({ min: 30, max: 150 })),
   });
   /** A message nothing in the rules refuses, at the first step (an empty state): one at least must then be shown. */
   const open = (m: BubbleMessage): boolean => m.visibility === "public" && m.joined && m.hidden !== true;
@@ -801,12 +846,14 @@ describe("for any input (property)", () => {
     [...messages].sort((a, b) => b.at - a.at || (a.id < b.id ? -1 : 1)).slice(0, limit);
   /** Who looks, under which rules, and where the globe faces (none: no far side). */
   interface Look {
+    readonly now: number;
     readonly who: Viewer;
     readonly rule: Rules;
     readonly at: LatLon | undefined;
   }
-  const eligible = (m: BubbleMessage, { who, rule, at }: Look): boolean =>
+  const eligible = (m: BubbleMessage, { now, who, rule, at }: Look): boolean =>
     open(m) &&
+    now - m.at <= rule.maxAgeSeconds * 1000 &&
     m.country !== undefined &&
     CODES.includes(m.country) &&
     !isBlank(cutText(m.text, rule.maxChars)) &&
@@ -862,14 +909,14 @@ describe("for any input (property)", () => {
           const at = facings[k];
           const here: Viewer = at === undefined ? who : { ...who, facing: at };
           const out = pickBubbles(messages, now, here, rule, shown);
-          if (k === 0) expect(shownIfAny(messages, { who, rule, at }, out.bubbles)).toBe(true);
+          if (k === 0) expect(shownIfAny(messages, { now, who, rule, at }, out.bubbles)).toBe(true);
           expect(out.bubbles.length).toBeLessThanOrEqual(rule.maxOnScreen);
           const countries = out.bubbles.map((b) => b.country);
           expect(new Set(countries).size).toBe(countries.length);
           for (const b of out.bubbles) {
             expect(b.until).toBeGreaterThan(now);
             expect(gone.has(b.id), "a message that left the screen is back").toBe(false);
-            checkBubble(b, byId.get(b.id), { who, rule, at });
+            checkBubble(b, byId.get(b.id), { now, who, rule, at });
           }
           const onScreen = new Set(ids(out.bubbles));
           for (const id of before) if (!onScreen.has(id)) gone.add(id);
@@ -933,7 +980,7 @@ describe("for any input (property)", () => {
           const unique = [...new Map(messages.map((m) => [m.id, m])).values()];
           const here: Viewer = { ...who, facing: at };
           const one = pickBubbles(unique, NOW + k * 1000, here, rule, []);
-          if (readBy(unique, rule.readLast).some((m) => eligible(m, { who, rule, at })))
+          if (readBy(unique, rule.readLast).some((m) => eligible(m, { now: NOW + k * 1000, who, rule, at })))
             expect(one.bubbles.length).toBeGreaterThan(0);
           expect(pickBubbles(unique, NOW + k * 1000, here, rule, [])).toEqual(one);
           expect(pickBubbles([...unique].reverse(), NOW + k * 1000, here, rule, [])).toEqual(one);

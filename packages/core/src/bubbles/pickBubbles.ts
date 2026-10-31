@@ -5,6 +5,7 @@ import { isBlank } from "../markdown/nodes.ts";
 import { centreOf } from "./countries.ts";
 import { cutText } from "./cut.ts";
 import { isFarSide } from "./farSide.ts";
+import { newestFirst, readWindow } from "./window.ts";
 import type { Bubble, BubbleMessage, PickArgs, Picked, Viewer } from "./types.ts";
 
 export type { Bubble, BubbleMessage, PickArgs, Picked, Viewer } from "./types.ts";
@@ -22,6 +23,7 @@ interface Run {
   readonly delay: number;
   readonly max: number;
   readonly chars: number;
+  readonly age: number;
   readonly viewer: Viewer;
   readonly me: string;
   readonly blocked: ReadonlySet<string>;
@@ -30,19 +32,6 @@ interface Run {
   readonly began: Map<string, number>;
   readonly tally: Map<string, number>;
   screen: Bubble[];
-}
-
-const newestFirst = (a: BubbleMessage, b: BubbleMessage): number =>
-  b.at - a.at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
-
-/** The newest `limit` messages, each id once. */
-function readWindow(messages: readonly BubbleMessage[], limit: number): Map<string, BubbleMessage> {
-  const window = new Map<string, BubbleMessage>();
-  for (const m of [...messages].sort(newestFirst)) {
-    if (window.size >= limit) break;
-    if (!window.has(m.id)) window.set(m.id, m);
-  }
-  return window;
 }
 
 /** What was shown, with a clock that stepped back brought back to now; kept while it shows, inside the delay or while still listed. */
@@ -87,6 +76,7 @@ function open(run: Run, m: BubbleMessage): boolean {
     m.visibility === "public" &&
     m.joined &&
     m.hidden !== true &&
+    run.now - m.at <= run.age &&
     !run.state.has(m.id) &&
     centreOf(m.country) !== undefined &&
     !run.blocked.has(fold(m.account))
@@ -218,6 +208,7 @@ export function pickBubbles(...[messages, now, viewer, rules, shown]: PickArgs):
     ...{ now, show, delay, viewer, window },
     max: rules.maxOnScreen,
     chars: rules.maxChars,
+    age: rules.maxAgeSeconds * 1000,
     me: fold(viewer.account),
     blocked: new Set([...viewer.muted, ...viewer.banned].map(fold)),
     state: new Map(),

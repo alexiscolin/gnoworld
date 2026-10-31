@@ -245,6 +245,7 @@ describe("bubbles.json", () => {
       speakerDelaySeconds: 30,
       maxChars: 80,
       readLast: 500,
+      maxAgeSeconds: 300,
     });
   });
 
@@ -255,6 +256,8 @@ describe("bubbles.json", () => {
     ["maxChars", 19],
     ["maxChars", 161],
     ["readLast", 2001],
+    ["maxAgeSeconds", 29],
+    ["maxAgeSeconds", 86_401],
     ["maxOnScreen", 0],
   ])("stops the build on %s of %d, naming the file and the field", (field, value) => {
     expect(

@@ -11,4 +11,6 @@ export interface Rules {
   readonly maxChars: number;
   /** How many of the newest messages are read. */
   readonly readLast: number;
+  /** How old a message may be to be picked or counted, in seconds; an older one is not a bubble, whatever is listed. */
+  readonly maxAgeSeconds: number;
 }
