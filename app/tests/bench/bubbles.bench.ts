@@ -15,12 +15,17 @@ const VIEWER: Viewer = {
   banned: ["acct9"],
   facing: { lat: 36, lon: 138 },
 };
-const crowd = (count: number): BubbleMessage[] =>
+const SAYINGS = [
+  (n: number) => `hello from number ${String(n)} `.repeat(1 + (n % 5)),
+  (n: number) => `こんにちは、${String(n)}番目の発言です。`.repeat(1 + (n % 9)),
+  (n: number) => `Bonjour à tous, ça va très bien, merci ${String(n)} ! `.repeat(1 + (n % 6)),
+];
+const crowd = (count: number, said = 0): BubbleMessage[] =>
   Array.from({ length: count }, (_, n) => ({
     id: `m${String(n)}`,
     at: NOW - 1000 - n * 37,
     account: `acct${String(n % 400)}`,
-    text: `hello from number ${String(n)} `.repeat(1 + (n % 5)),
+    text: SAYINGS[said]?.(n) ?? "",
     country: CODES[n % CODES.length] ?? "JP",
     visibility: n % 11 === 0 ? ("private" as const) : ("public" as const),
     joined: true,
@@ -40,9 +45,13 @@ describe("bubbles", () => {
   const small = crowd(125);
   const cap = crowd(500);
   const past = crowd(2000);
+  const japanese = crowd(500, 1);
+  const accents = crowd(500, 2);
   bench("a pick over 125 messages [1 ms]", timed(small));
   bench("a pick over 500 messages [1 ms]", timed(cap));
   bench("a pick over 2000 messages, which reads 500 [1 ms]", timed(past));
+  bench("a pick over 500 Japanese messages [2 ms]", timed(japanese));
+  bench("a pick over 500 accented messages [2 ms]", timed(accents));
   const megabyte = "ab​\n".repeat(256 * 1024);
   bench("the cut of a text of a megabyte [2 ms]", () => {
     if (cutText(megabyte, rules.maxChars).length === 0) throw new Error("the bench cuts to nothing");

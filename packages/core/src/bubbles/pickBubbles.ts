@@ -1,5 +1,6 @@
 // Which messages the Earth shows as bubbles (ADR-0001 §7, docs/plans/slice-6.md): a pure function of the messages, the
 // time, the viewer, the rules and what is already on screen. No clock, no chance, nothing it is given is changed.
+import { isBlank } from "../markdown/nodes.ts";
 import { centreOf } from "./countries.ts";
 import { cutText } from "./cut.ts";
 import { isFarSide } from "./farSide.ts";
@@ -9,7 +10,6 @@ export type { Bubble, BubbleMessage, PickArgs, Picked, Viewer } from "./types.ts
 
 interface Candidate {
   readonly message: BubbleMessage;
-  readonly text: string;
   readonly country: string;
   /** 0 yours, 1 a mention of you, 2 your hub, 3 the rest. */
   readonly rank: number;
@@ -20,6 +20,7 @@ interface Run {
   readonly show: number;
   readonly delay: number;
   readonly max: number;
+  readonly chars: number;
   readonly viewer: Viewer;
   readonly me: string;
   readonly blocked: ReadonlySet<string>;
@@ -92,14 +93,17 @@ function open(run: Run, m: BubbleMessage): boolean {
   );
 }
 
+/** Whether a text draws nothing once cleaned: what the cut would remove (controls, lone surrogates), then the shared
+ * check of the line reader. It never segments, so a line that is not placed is not cut (F3363). A text the cut would
+ * empty only for its clusters over the limit passes here and is dropped when placed. */
+const blank = (text: string): boolean => isBlank(text.replace(/[\p{Cc}\p{Cs}]/gu, ""));
+
 /** The messages that may be picked, with a text that says something, yours first, then by rank, newest first. */
-function candidates(run: Run, maxChars: number): Candidate[] {
+function candidates(run: Run): Candidate[] {
   const found: Candidate[] = [];
-  for (const message of run.window.values()) {
-    const text = open(run, message) ? cutText(message.text, maxChars) : "";
-    if (text.trim().length > 0)
-      found.push({ message, text, country: message.country ?? "", rank: rankOf(run, message) });
-  }
+  for (const message of run.window.values())
+    if (open(run, message) && !blank(message.text))
+      found.push({ message, country: message.country ?? "", rank: rankOf(run, message) });
   return found.sort((a, b) => a.rank - b.rank || newestFirst(a.message, b.message));
 }
 
@@ -107,13 +111,19 @@ function count(run: Run, country: string): void {
   run.tally.set(country, (run.tally.get(country) ?? 0) + 1);
 }
 
-function put(run: Run, c: Candidate): void {
+/** A candidate's text cut, or none when the cut leaves nothing to say: the only place a text is segmented. */
+function say(run: Run, c: Candidate): string | undefined {
+  const text = cutText(c.message.text, run.chars);
+  return isBlank(text) ? undefined : text;
+}
+
+function put(run: Run, c: Candidate, text: string): void {
   const { message } = c;
   const bubble: Bubble = {
     id: message.id,
     account: message.account,
     country: c.country,
-    text: c.text,
+    text,
     since: run.now,
     until: run.now + run.show,
     own: c.rank === 0,
@@ -138,28 +148,33 @@ function oldestOfOthers(screen: readonly Bubble[]): Bubble | undefined {
 /** Yours: shown whatever the delay or the far side, in your country's place, and the oldest other bubble's if the screen
  * is full; of your messages of one country in a call, the newest. */
 function placeYours(run: Run, c: Candidate, done: Set<string>): void {
-  if (!done.has(c.country)) {
-    run.screen
-      .filter((s) => s.country === c.country)
-      .forEach((s) => {
-        end(run, s);
-      });
-    const oldest = oldestOfOthers(run.screen);
-    if (run.screen.length >= run.max && oldest !== undefined) end(run, oldest);
-    if (run.screen.length < run.max) {
-      put(run, c);
-      done.add(c.country);
-      return;
-    }
+  if (done.has(c.country)) {
+    count(run, c.country);
+    return;
   }
-  count(run, c.country);
+  const text = say(run, c);
+  if (text === undefined) return;
+  run.screen
+    .filter((s) => s.country === c.country)
+    .forEach((s) => {
+      end(run, s);
+    });
+  const oldest = oldestOfOthers(run.screen);
+  if (run.screen.length >= run.max && oldest !== undefined) end(run, oldest);
+  if (run.screen.length < run.max) {
+    put(run, c, text);
+    done.add(c.country);
+  } else count(run, c.country);
 }
 
 function placeOther(run: Run, c: Candidate): void {
   const waiting = run.now - (run.began.get(fold(c.message.account)) ?? -Infinity) < run.delay;
   const taken = run.screen.length >= run.max || run.screen.some((s) => s.country === c.country);
   if (waiting || taken || far(run, c.country)) count(run, c.country);
-  else put(run, c);
+  else {
+    const text = say(run, c);
+    if (text !== undefined) put(run, c, text);
+  }
 }
 
 export function pickBubbles(...[messages, now, viewer, rules, shown]: PickArgs): Picked {
@@ -169,6 +184,7 @@ export function pickBubbles(...[messages, now, viewer, rules, shown]: PickArgs):
   const run: Run = {
     ...{ now, show, delay, viewer, window },
     max: rules.maxOnScreen,
+    chars: rules.maxChars,
     me: fold(viewer.account),
     blocked: new Set([...viewer.muted, ...viewer.banned].map(fold)),
     state: new Map(),
@@ -182,7 +198,7 @@ export function pickBubbles(...[messages, now, viewer, rules, shown]: PickArgs):
     run.began.set(fold(s.account), Math.max(run.began.get(fold(s.account)) ?? -Infinity, s.since));
 
   const yours = new Set<string>();
-  for (const c of candidates(run, rules.maxChars)) {
+  for (const c of candidates(run)) {
     if (c.rank === 0) placeYours(run, c, yours);
     else placeOther(run, c);
   }

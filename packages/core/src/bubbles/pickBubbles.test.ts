@@ -456,6 +456,31 @@ describe("the text", () => {
     expect(out.shown.map((s) => s.id)).toEqual(["m2"]);
   });
 
+  it.each([
+    ["a Hangul filler", "\u3164"],
+    ["the braille blank", "\u2800"],
+    ["a variation selector", "\ufe0f"],
+    ["a grapheme joiner", "\u034f"],
+    ["a halfwidth Hangul filler", "\uffa0"],
+    ["a Hangul jungseong filler pair", "\u115f\u1160"],
+    ["control characters", "\u0001\u0002"],
+    ["a lone surrogate", "\ud800"],
+  ])("drops %s alone as it drops any text that draws nothing (F3365)", (_name, text) => {
+    const out = pick([msg(1, { text, account: "ann" }), msg(2, { country: "JP", at: NOW - 5000 })]);
+    expect(ids(out.bubbles)).toEqual(["m2"]);
+    expect(out.counts).toEqual([]);
+    expect(out.shown.map((s) => s.id)).toEqual(["m2"]);
+  });
+
+  it("cuts only the texts it places: 500 Japanese lines cost one cut a bubble, not one a line (F3363)", () => {
+    const segment = vi.spyOn(Intl.Segmenter.prototype, "segment");
+    const lines = many(RULES.readLast, (n) => ({ text: `こんにちは世界、これは${String(n)}番目の発言です`.repeat(4) }));
+    const out = pick(lines);
+    expect(out.bubbles).toHaveLength(RULES.maxOnScreen);
+    expect(segment.mock.calls.length).toBeLessThanOrEqual(RULES.maxOnScreen);
+    expect(out.counts.reduce((sum, c) => sum + c.count, 0)).toBe(RULES.readLast - RULES.maxOnScreen);
+  });
+
   it("joins nothing between letters, and cleans a lone surrogate (findings 2 and 8)", () => {
     expect(pick([msg(1, { text: "a\u200db\ud800c" })]).bubbles[0]?.text).toBe("abc");
   });
