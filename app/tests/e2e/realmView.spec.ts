@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { PAGES } from "../chain/chainFixture.ts";
+import { FUNCTIONS, PAGES } from "../chain/chainFixture.ts";
 import { queryEnvelope, statusEnvelope } from "../chain/chainEnvelopes.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 
@@ -15,10 +15,16 @@ async function chain(page: Page, pages: Record<string, string>): Promise<{ asked
   const asked: string[] = [];
   await page.route(RPC, async (route) => {
     const url = new URL(route.request().url());
-    asked.push(url.pathname);
+    // A request is told by its query (vm/qrender, vm/qfuncs, vm/qeval) when it has one, by its path otherwise (/status).
+    const query = (url.searchParams.get("path") ?? "").replaceAll('"', "");
+    asked.push(query === "" ? url.pathname : query);
     const cors = { "access-control-allow-origin": "*", "content-type": "application/json" };
     if (url.pathname === "/status") {
       await route.fulfill({ headers: cors, body: JSON.stringify(statusEnvelope(HEIGHT, TIME)) });
+      return;
+    }
+    if (query === "vm/qfuncs") {
+      await route.fulfill({ headers: cors, body: JSON.stringify(queryEnvelope({ data: JSON.stringify(FUNCTIONS) })) });
       return;
     }
     const hex = (url.searchParams.get("data") ?? "").slice(2);
@@ -73,10 +79,13 @@ test.describe("a realm's view", () => {
       "href",
       "https://onyx.testnets.gno.land/r/demo/hostile",
     );
-    // One request for the page and one for the height, and nothing after.
+    // One request for the page, one for the height and one for the read functions' list, and nothing after: no result is asked
+    // before a click.
     await page.waitForTimeout(1500);
     expect(asked.filter((path) => path === "/status")).toHaveLength(1);
-    expect(asked.filter((path) => path === "/abci_query")).toHaveLength(1);
+    expect(asked.filter((path) => path === "vm/qrender")).toHaveLength(1);
+    expect(asked.filter((path) => path === "vm/qfuncs")).toHaveLength(1);
+    expect(asked.filter((path) => path === "vm/qeval")).toHaveLength(0);
   });
 
   test("puts a link off gnoweb behind a warning that names the real host", async ({ page }) => {

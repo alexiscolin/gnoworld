@@ -1,7 +1,8 @@
 // The four reads of a chain (slice 5 part 2, 5g-reads), each one `readChain` of read.ts: the block height, a realm's page
 // (vm/qrender), a realm's functions (vm/qfuncs) and one call (vm/qeval). One request a call. What the realm wrote is returned
 // as text and never interpreted; its error text, Log and Info reach no failure and no value.
-import { FunctionList, QueryAnswer, StatusAnswer } from "@gnoworld/schemas";
+import { QueryAnswer, StatusAnswer } from "@gnoworld/schemas";
+import { FunctionList } from "@gnoworld/schemas/functions";
 import { evalCall, isExportedName, isRealmPath } from "./evalCall.ts";
 import {
   failedRead,

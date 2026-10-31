@@ -8,9 +8,10 @@ export function isRealmPath(path: string): boolean {
   return realm.test(path) && !path.endsWith("_test");
 }
 
-/** An exported Go identifier, narrowed to ASCII: qfuncs' own test looks at one byte, so `_helper` passes it (keeper.go:1782). */
+/** An exported Go identifier, narrowed to ASCII: qfuncs' own test looks at one byte, so `_helper` passes it (keeper.go:1782).
+ * At most 128 characters: a realm's own list may hold a name of a megabyte, which would be a request of that size. */
 export function isExportedName(name: string): boolean {
-  return /^[A-Z][A-Za-z0-9_]*$/.test(name);
+  return /^[A-Z][A-Za-z0-9_]{0,127}$/.test(name);
 }
 
 /** The data `vm/qeval` is asked: the call of one exported name in one realm, or null. gno cuts it at the first dot after the

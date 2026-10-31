@@ -17,6 +17,7 @@ import { OnlyKnown } from "./OnlyKnown.tsx";
 import { RoomMenu } from "./RoomMenu.tsx";
 import { multilineOf, roomActs } from "./roomActs.ts";
 import { useRoomKeeping } from "./RoomKeeping.ts";
+import { RoomChips } from "./RoomChips.tsx";
 import { ChatScreen, Dock, type ChatPlace } from "./ChatScreen.tsx";
 import { Saved } from "./Saved.tsx";
 import { NoticeStatus, RoomsView } from "./RoomsView.tsx";
@@ -159,6 +160,9 @@ function LoadedRoom({
   );
 }
 
+// A direct message's header says what it is, where a room's says the place (frame f0080).
+const kickerOf = (shown: Shown | undefined) => (shown?.kind === "dm" ? "Direct message" : undefined);
+
 export function Loaded(props: LoadedProps) {
   const { sections, verdicts, saving, chat, session, link, dms, noticing, failed, place } = props;
   const { room, acts, me, noteId, people, shown } = useConversation(props);
@@ -190,6 +194,8 @@ export function Loaded(props: LoadedProps) {
     <ChatScreen
       place={place}
       title={shown?.title ?? place.name}
+      kicker={kickerOf(shown)}
+      chips={<RoomChips sections={sections} current={room} badges={noticing.badges} />}
       menu={{ label: shown?.kind === "dm" ? "Conversation" : "Room", content: menu }}
       mark={shown?.mark}
       rail={rail}
