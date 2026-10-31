@@ -14,6 +14,7 @@ const BASE: Record<string, string> = {
   amber: "#FFC46B",
   violet: "#B79CFF",
   coral: "#FF8A7A",
+  dusk: "#6885D9",
 };
 
 // WCAG 2.2's contrast ratio, from two #rrggbb colours.
