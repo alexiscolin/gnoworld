@@ -11,9 +11,19 @@ const CHAIN_MAX_BYTES = 1024 * 1024;
 
 export type ChainFetch = (url: string, init?: RequestInit) => Promise<Response>;
 
-type FailureKind = "refused" | "down" | "timeout" | "too-big" | "not-json" | "wrong-shape";
+export type FailureKind =
+  | "refused"
+  | "down"
+  | "timeout"
+  | "too-big"
+  | "not-json"
+  | "wrong-shape"
+  | "no-realm"
+  | "no-page"
+  | "chain-refused"
+  | "bad-name";
 
-interface Source {
+export interface Source {
   /** The address that was asked. */
   readonly url: string;
   /** When it was asked, as an ISO time. */
@@ -47,11 +57,21 @@ const NEXT: Record<FailureKind, string> = {
   "too-big": "The chain's answer was larger than this page reads. Try a smaller view.",
   "not-json": "The chain's service answered with something that is not data. Try again later.",
   "wrong-shape": "The chain's answer was not the shape this page expects. Try again later, or report it.",
+  "no-realm": "This realm is not on this chain. Check its path.",
+  "no-page": "This realm has no page to show. Open it on gnoweb.",
+  "chain-refused": "The chain refused this read. Try again later, or open it on gnoweb.",
+  "bad-name": "This name cannot be read from here. Open it on gnoweb.",
 };
+
+/** A failed read of a kind of ours, for a layer above the transport: the failure carries our sentence, never the answer's. */
+export function failedRead<T>(kind: FailureKind, source: Source, status?: number): ChainRead<T> {
+  return { ok: false, failure: { kind, next: NEXT[kind], ...(status === undefined ? {} : { status }) }, source };
+}
 
 type Outcome = { kind: FailureKind; status?: number } | { value: unknown };
 
-function isHttps(url: string): boolean {
+/** Whether an address is https with no credentials in it: the only kind a read asks. */
+export function isHttps(url: string): boolean {
   try {
     const parsed = new URL(url);
     return parsed.protocol === "https:" && parsed.username === "" && parsed.password === "";
@@ -155,11 +175,7 @@ export async function readChain<T>(
   const { fetch: fetcher = (address, init) => fetch(address, init), timeoutMs = CHAIN_TIMEOUT_MS } = options;
   const { maxBytes = CHAIN_MAX_BYTES, now = () => new Date() } = options;
   const source: Source = { url, at: now().toISOString() };
-  const failed = (kind: FailureKind, status?: number): ChainRead<T> => ({
-    ok: false,
-    failure: { kind, next: NEXT[kind], ...(status === undefined ? {} : { status }) },
-    source,
-  });
+  const failed = (kind: FailureKind, status?: number): ChainRead<T> => failedRead(kind, source, status);
   if (!isHttps(url)) return failed("refused");
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;

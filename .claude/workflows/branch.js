@@ -139,6 +139,7 @@ const TIER1 = [
   "app/src/csp.ts",
   "app/src/cspOrigins.ts",
   "app/src/cspForms.ts",
+  "app/src/lib/chain/evalCall.ts",
   "deploy/",
   "packages/core/src/markdown/",
   "app/src/lib/adena/",
