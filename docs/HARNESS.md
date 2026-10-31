@@ -214,7 +214,7 @@ refuses another Node (F816).
 `worktree` and `since`, shared by every worktree of the machine: five side by side at a load of 25 to 40 on 16 cores failed by load
 alone (2026-10-30). It waits for a live holder, printing which worktree holds it and since when, and never refuses; a holder whose pid is
 gone (a crash, `kill -9`) leaves no wait, its lock taken over; a waiter that is interrupted frees nothing of another's. The fast gate and
-`--full` take none, and the time a run prints leaves the wait out. `check.sh` also raises the soft limit of open files to 10240 for its
+`--full` take none, and the time a run prints leaves the wait out. `check.sh` also sets the soft limit (up or down) of open files to 10240 for its
 steps (F2543), saying so when it cannot.
 
 **Full** (`--full`: the slice's last merge and a push of `main`; `--merge`: each branch's

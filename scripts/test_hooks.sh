@@ -3792,7 +3792,7 @@ fi
 if part gate_limits; then
 gate_fixture gate_limits
 # check.sh raises its own open-files limit (F2543): the e2e web server dies of EMFILE under a low one, and each session had to
-# remember `ulimit -n 10240`. A limit it cannot raise is said, never hidden, and a higher one is left as it is.
+# remember `ulimit -n 10240`. It sets the soft limit to 10240, up or down; a limit it cannot set is said, never hidden.
 # The lowest limit a step saw (a Node step raises its own soft limit to the hard one, whatever check.sh gave).
 ul() { sort -n "$log.ulimit" 2>/dev/null | head -1; }
 rm -f "$log.ulimit"
@@ -3809,11 +3809,14 @@ out=$(NGINX_SHA256=x BENCH_WAIT_CEILING=0 BENCH_WAIT_STEP=0 NGINX_START_TIMEOUT=
 [ -s "$log.env" ] || fail "no step logged the switches it saw"
 leak=$(grep -v "^[^ ]* sha= ceiling= step= timeout=$" "$log.env" | head -1)
 [ -z "$leak" ] || fail "check.sh passed one of NGINX_SHA256, BENCH_WAIT_CEILING, BENCH_WAIT_STEP, NGINX_START_TIMEOUT to a step: $leak"
-if (ulimit -S -n 20000) 2>/dev/null; then
-	rm -f "$log.ulimit"
-	out=$( (ulimit -S -n 20000 && gate) ) || fail "check.sh failed under a high soft limit: $out"
-	[ "$(ul)" = 20000 ] || fail "check.sh lowered an open-files limit above 10240: got '$(ul)'"
-fi
+# The soft limit is set to 10240, up or down (F2543 failed at 1048576, where a raise-only block did nothing): a limit above it is lowered.
+for high in 20000 1048576; do
+	if (ulimit -S -n "$high") 2>/dev/null; then
+		rm -f "$log.ulimit"
+		out=$( (ulimit -S -n "$high" && gate) ) || fail "check.sh failed under a high soft limit of $high: $out"
+		[ "$(ul)" = 10240 ] || fail "check.sh did not set the open-files limit to 10240 from $high: got '$(ul)'"
+	fi
+done
 fi
 
 if part nginx_check; then

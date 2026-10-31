@@ -19,12 +19,11 @@ cd "$(realpath "$(dirname "$0")/..")" # the folder's own case: a $PWD spelled ot
 unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a hook's git environment must not steer the gate's git calls
 unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO PICTURES_OF STORIES_PORT STORIES_OUT # the scripts' test switches, which would fake a pass
 unset NGINX_SHA256 NGINX_START_TIMEOUT BENCH_WAIT_CEILING BENCH_WAIT_STEP # a run must not trust any nginx binary, nor measure a busy machine, on a caller's say-so
-# The e2e web server dies of EMFILE under the default soft limit of open files (F2543): raised for every step, never lowered, and a limit
-# that cannot be raised is said. This covers a low default only: F2543's failure came at a soft limit of 1048576, where this does nothing, and
-# its cause is unproved (F2624), so F2543 stays open.
+# The e2e web server dies of EMFILE under a soft limit of open files that is too low, and F2543 failed at 1048576 too: the soft limit is set
+# to 10240 for every step, up or down, and a limit that cannot be set is said, never hidden.
 open_files=$(ulimit -S -n)
-if [ "$open_files" != unlimited ] && [ "$open_files" -lt 10240 ]; then
-	ulimit -S -n 10240 2>/dev/null || echo "check.sh: could not raise the limit of open files from $open_files to 10240 (its hard limit is $(ulimit -H -n)): the e2e web server may die of EMFILE" >&2
+if [ "$open_files" != 10240 ]; then
+	ulimit -S -n 10240 2>/dev/null || echo "check.sh: could not set the limit of open files from $open_files to 10240 (its hard limit is $(ulimit -H -n)): the e2e web server may die of EMFILE" >&2
 fi
 full=false merge=false
 [ "${1:-}" = "--full" ] && full=true
