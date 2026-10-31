@@ -3,6 +3,8 @@
 @layer components {
   .panel {
     inline-size: min(100%, var(--column-m));
+    /* the video's thread text, 13.5 px, as the room's lines (prototype #threadList li) */
+    font: var(--font-chat);
   }
 
   /* raw: the design system's one breakpoint for the chat, read from the chat's own width: a narrow chat's thread takes the
@@ -18,7 +20,7 @@
 
   /* The root's words, cut: the room's text size and a heavier weight, the close button at its end. */
   .title {
-    font: var(--font-body);
+    font: var(--font-chat);
     font-weight: 500;
     overflow-wrap: anywhere;
   }
