@@ -1,11 +1,17 @@
-/* The stat: a large tabular figure, its unit in the muted grey, its change in words, coral when it falls. */
+/* The stat: an instrument figure (Geist Mono 500, tabular), its unit in the muted grey, its caption the label in mono capitals, its
+   change in words, coral when it falls. */
 @layer components {
   .figure {
-    font: var(--font-title-m);
+    font: var(--font-figure);
     font-variant-numeric: tabular-nums;
+    /* raw: the board "Instrument"'s tracking, -0.04em */
+    letter-spacing: -0.04em;
   }
 
   .unit {
+    /* raw: the frame sets its unit about 5 px after the figure, the space counted (frame 26) */
+    /* layout: the unit stands a little off its figure */
+    margin-inline-start: 0.2em;
     color: var(--color-text-muted);
     font: var(--font-body);
   }

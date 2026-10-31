@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { floating, usePlaced } from "../Popover/floating.ts";
+import { keyboardFocus, useFirstEscape } from "./hold.ts";
 import styles from "./Tooltip.module.css";
 
 export interface TooltipProps {
@@ -73,27 +74,11 @@ export function Tooltip({ label, children }: TooltipProps) {
       clearTimeout(timer);
     };
   }, [pointer]);
-  // Esc wherever the focus is: the pointer may rest on the control while the keyboard works elsewhere.
-  useEffect(() => {
-    if (!near) return;
-    const stop = new AbortController();
-    // A shown tooltip takes the first Esc, before the dialog or popover around its control (WCAG 1.4.13).
-    document.addEventListener(
-      "keydown",
-      (event) => {
-        if (event.key !== "Escape") return;
-        if (shown) {
-          event.preventDefault();
-          event.stopPropagation();
-        }
-        setDismissed(true);
-      },
-      { capture: true, signal: stop.signal },
-    );
-    return () => {
-      stop.abort();
-    };
-  }, [near, shown]);
+  // Esc wherever the focus is: the pointer may rest on the control while the keyboard works elsewhere. A shown tooltip
+  // takes the first Esc, before the dialog or popover around its control (WCAG 1.4.13).
+  useFirstEscape(near, shown, () => {
+    setDismissed(true);
+  });
   // A focused control removed may fire no blur (jsdom fires none): while the focus holds the words, a
   // change inside reads where the focus is now (F353, F316's class).
   useEffect(() => {
@@ -121,7 +106,7 @@ export function Tooltip({ label, children }: TooltipProps) {
         setPointer("away");
       }}
       onFocus={(event) => {
-        if (!(event.target instanceof Element && event.target.matches(":focus-visible"))) return;
+        if (!keyboardFocus(event)) return;
         setFocused(true);
         setDismissed(false);
       }}
