@@ -17,6 +17,10 @@ export interface FieldProps {
   placeholder?: string | undefined;
   /** Words before the box, outside its value: "@" before a name. */
   prefix?: string;
+  /** A box of lines has a handle to drag its height by, unless it grows on its own, as a chat's does to ten lines. */
+  resizable?: boolean | undefined;
+  /** The label is for assistive technology alone: the box says what it is for itself (a placeholder). */
+  hideLabel?: boolean | undefined;
   /** The ids of what else on the page says what the box is about (a composer's reply bar), after its help. */
   describedBy?: string | undefined;
 }
@@ -34,7 +38,7 @@ function submitOnEnter(event: KeyboardEvent<HTMLTextAreaElement>, composing: boo
   event.currentTarget.form?.requestSubmit();
 }
 
-interface BoxProps extends Pick<FieldProps, "value" | "onChange" | "enterAddsLine" | "placeholder"> {
+interface BoxProps extends Pick<FieldProps, "value" | "onChange" | "enterAddsLine" | "placeholder" | "resizable"> {
   kind: NonNullable<FieldProps["kind"]>;
   id: string;
   invalid: boolean;
@@ -42,7 +46,7 @@ interface BoxProps extends Pick<FieldProps, "value" | "onChange" | "enterAddsLin
 }
 
 // The box itself: a line of text, or the lines of a message.
-function Box({ kind, id, value, invalid, described, enterAddsLine, placeholder, onChange }: BoxProps) {
+function Box({ kind, id, value, invalid, described, enterAddsLine, placeholder, resizable, onChange }: BoxProps) {
   const composingRef = useRef(false);
   const shared = {
     id,
@@ -51,6 +55,7 @@ function Box({ kind, id, value, invalid, described, enterAddsLine, placeholder, 
     placeholder,
     "aria-invalid": invalid ? true : undefined,
     "aria-describedby": described,
+    "data-fixed": resizable === false ? "" : undefined,
   };
   return kind === "lines" ? (
     <textarea
@@ -90,6 +95,8 @@ export function Field({
   error,
   prefix,
   describedBy,
+  hideLabel,
+  resizable,
   enterAddsLine,
   placeholder,
 }: FieldProps) {
@@ -108,12 +115,13 @@ export function Field({
       described={described.join(" ") || undefined}
       enterAddsLine={enterAddsLine}
       placeholder={placeholder}
+      resizable={resizable}
       onChange={onChange}
     />
   );
   return (
     <Stack space="2xs">
-      <label htmlFor={id} className={styles["label"]}>
+      <label htmlFor={id} className={hideLabel === true ? "visually-hidden" : styles["label"]}>
         {label}
       </label>
       {prefix === undefined ? (

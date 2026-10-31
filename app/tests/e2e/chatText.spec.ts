@@ -25,6 +25,7 @@ test.describe("the chat's text at the video's size", () => {
     await expect(first).toBeVisible();
     expect(await first.locator("[data-line-text]").evaluate((e) => getComputedStyle(e).fontSize)).toBe("13.5px");
     expect(await of('[role="group"][aria-label="Message box"] textarea')).toBe("13.5px 1.45");
-    expect(await of('section[aria-label="Pinned messages"] button')).toBe("13.5px 1.45");
+    // The pin is 13 px (prototype index.html:180; frame 66: "Welcome...fine." 289 px wide), a half point under the lines.
+    expect(await of('section[aria-label="Pinned messages"] button')).toBe("13px 1.45");
   });
 });

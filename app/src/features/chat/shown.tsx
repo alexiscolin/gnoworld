@@ -34,7 +34,7 @@ const stateOf = (dms: Dms): NonNullable<RoomViewProps["state"]> => ({
 });
 
 // A direct message's (4e): said to be one, its partner named, the address whole in its title (U7); not encrypted, by a
-// lock and a word in amber, caution's colour (U6); no one beside it; a line Ergo refused said so.
+// lock and a word in amber, caution's colour (U6); a line Ergo refused said so.
 function dmShown(partner: string, dms: Dms, { sayTo, focus, noteId, seen, acts }: DmPage): Shown {
   const short = shortAddress(partner);
   const { refused } = dms;

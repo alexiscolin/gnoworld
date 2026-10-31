@@ -179,7 +179,8 @@ test.describe("a message of several lines", () => {
     expect(twelve).toBeGreaterThan(nine);
     await field(page).fill(draft(60));
     expect(await height()).toBe(twelve);
-    expect(await field(page).evaluate((box) => getComputedStyle(box).resize)).toBe("block");
+    // The composer's box takes the handle off its field (review 11 of 5q): it grows to ten lines on its own.
+    expect(await field(page).evaluate((box) => getComputedStyle(box).resize)).toBe("none");
     // What a drag of the handle sets on the box: a width far past its place.
     await field(page).evaluate((box) => {
       box.style.width = "2000px";

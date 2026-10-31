@@ -8,7 +8,7 @@ export interface ChatHeaderProps {
   kicker: string;
   /** The room's name, or a direct message's partner. */
   title: ReactNode;
-  onClose?: () => void;
+  onClose: () => void;
   /** Expands the docked chat to the full chat, or shrinks the full one to its dock: none where there is no dock to go to. */
   size?: { full: boolean; onToggle: () => void } | undefined;
   /** What the name opens, behind a chevron after it (what the room says of itself, its modes): none draws a plain name. */
@@ -69,7 +69,7 @@ export function ChatHeader({ kicker, title, onClose, size, rooms, menu, mark }: 
               onClick={size.onToggle}
             />
           )}
-          {onClose === undefined ? null : <IconButton icon="close" label="Close the chat" size="s" onClick={onClose} />}
+          <IconButton icon="close" label="Close the chat" size="s" onClick={onClose} />
         </Cluster>
       </div>
     </Cluster>

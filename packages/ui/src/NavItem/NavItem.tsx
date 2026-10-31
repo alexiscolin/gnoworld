@@ -21,13 +21,13 @@ export function NavItem({ children, current = false, lead, badge, href, onClick 
   const face = (
     <>
       {lead === undefined ? null : <span className={styles["lead"]}>{lead}</span>}
-      <span>{children}</span>
+      <span className="truncate">{children}</span>
     </>
   );
   return (
     <div className={styles["item"]} data-nav-item="" data-current={current ? "" : undefined}>
       {href === undefined ? (
-        <button type="button" className={styles["main"]} onClick={onClick}>
+        <button type="button" className={styles["main"]} aria-current={current ? "true" : undefined} onClick={onClick}>
           {face}
         </button>
       ) : (

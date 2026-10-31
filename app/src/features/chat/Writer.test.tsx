@@ -48,7 +48,6 @@ function Page() {
     session: { kind: "in", address: ALICE },
     rooms: [],
     acts,
-    people: null,
   });
   return (
     <div>

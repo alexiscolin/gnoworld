@@ -9,7 +9,7 @@ import { PlaceInfo } from "./PlaceInfo.tsx";
 describe("the info panel", () => {
   it("is a complementary region named by the place, its name a heading and its words a paragraph", () => {
     const box = mount(
-      <PlaceInfo kicker="Home · The general chat" name="Earth" description="Where people speak from." />,
+      <PlaceInfo kicker="Home · The general chat" name="Earth" description="Where people speak from." here={null} />,
     );
     const panel = one(box, "aside");
     expect(panel.getAttribute("aria-label")).toBe("Earth");
@@ -24,30 +24,28 @@ describe("the info panel", () => {
     expect(all(nth(sections, 0), "[data-slot='people']")).toHaveLength(1);
   });
 
-  it("leaves out Here now when it is given nothing, and never fills the panel with sample figures", () => {
-    const box = mount(<PlaceInfo kicker="Home" name="Earth" description="d" />);
-    expect(all(box, "section")).toHaveLength(0);
+  it("never fills the panel with sample figures: none while it is not told", () => {
+    const box = mount(<PlaceInfo kicker="Home" name="Earth" description="d" here={null} />);
     expect(one(box, "aside").textContent).not.toMatch(/\d{3}|talking|countries/i);
   });
 
   it("shows how many are talking here now between two rules, when it is told, a figure a screen reader reads whole", () => {
-    const box = mount(<PlaceInfo kicker="Home" name="Earth" description="d" talking={12} />);
-    const figure = one(box, "[data-value]");
-    expect(figure.getAttribute("data-value")).toBe("12");
+    const box = mount(<PlaceInfo kicker="Home" name="Earth" description="d" talking={12} here={null} />);
     expect(box.textContent).toContain("Talking now");
     expect(box.textContent).toContain("12");
   });
 
-  it("shows no figure while it is not told, not even a zero", () => {
-    const box = mount(<PlaceInfo kicker="Home" name="Earth" description="d" />);
-    expect(all(box, "[data-value]")).toHaveLength(0);
-    expect(
-      all(mount(<PlaceInfo kicker="Home" name="Earth" description="d" talking={0} />), "[data-value]"),
-    ).toHaveLength(1);
+  it("shows no figure while it is not told, not even a zero, and a zero when it is told one", () => {
+    const stat = (talking?: number) =>
+      all(mount(<PlaceInfo kicker="Home" name="Earth" description="d" here={null} talking={talking} />), "p").map(
+        (each) => each.textContent,
+      );
+    expect(stat()).not.toContain("Talking now");
+    expect(stat(0)).toEqual(expect.arrayContaining(["0", "Talking now"]));
   });
 
   it("can be given the focus by code, for Who's here to move the reader to the list, and never by the Tab key", () => {
-    const box = mount(<PlaceInfo kicker="Home" name="Earth" description="d" />);
+    const box = mount(<PlaceInfo kicker="Home" name="Earth" description="d" here={null} />);
     expect(one(box, "aside").getAttribute("tabindex")).toBe("-1");
   });
 });

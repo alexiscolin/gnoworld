@@ -1,7 +1,6 @@
 // The world's rooms once listed (slice 4's 4b, moved out of ChatPanel.tsx): the switcher, the conversation in view (a
 // room, or a direct message, 4e) and what writes in it.
 import type { RoomList } from "@gnoworld/schemas";
-import { Stack } from "@gnoworld/ui";
 import { useId, useState, type ReactNode, type RefObject } from "react";
 import { useSearchParams } from "react-router";
 import { useAppStore } from "../../storeContext.tsx";
@@ -95,7 +94,7 @@ export interface LoadedProps {
   place: ChatPlace;
 }
 
-// The rooms' column: the rooms, and for an account its saved messages, a button under them until slice 8's menu (4d).
+// The rooms' column: the rooms, and for an account its saved messages, a button between them and the conversations until slice 8's menu (4d).
 // On a phone it sits in the rooms' drawer instead (5b), without the column's width.
 function Rail({
   signedIn,
@@ -106,17 +105,15 @@ function Rail({
   noticing,
 }: Pick<LoadedProps, "sections" | "dms" | "failed" | "noticing"> & { signedIn: boolean; current: string | undefined }) {
   return (
-    <Stack space="s">
-      <RoomsView
-        sections={sections}
-        current={current}
-        dms={dms.nav}
-        failed={failed}
-        badges={noticing.badges}
-        notices={noticing.list}
-      />
-      {signedIn ? <Saved /> : null}
-    </Stack>
+    <RoomsView
+      sections={sections}
+      current={current}
+      dms={dms.nav}
+      failed={failed}
+      badges={noticing.badges}
+      notices={noticing.list}
+      saved={signedIn ? <Saved /> : undefined}
+    />
   );
 }
 
@@ -169,7 +166,7 @@ export function Loaded(props: LoadedProps) {
   // What the reader keeps in the room in view and the room's pins, which are asked for it: none for a direct message.
   const { keeping, pins } = useRoomKeeping(room, usePins(useAppStore(), room, me));
   const composing = useComposing(shown, me);
-  const threads = useThreads({ shown, state: props.state, session, rooms: ids, acts, people });
+  const threads = useThreads({ shown, state: props.state, session, rooms: ids, acts });
   const rail = <Rail signedIn={me !== undefined} {...{ sections, dms, failed }} current={room} noticing={noticing} />;
   const writer =
     shown === undefined ? undefined : (

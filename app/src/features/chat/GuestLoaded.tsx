@@ -1,7 +1,6 @@
 // A visitor's world, its rooms once listed (slice 4's 4b): the switcher, the room in view and its people, read alone:
 // no direct message, no notice, nothing kept, no composer. What an account adds is AccountChat's, loaded for one.
 import type { RoomList } from "@gnoworld/schemas";
-import { Stack } from "@gnoworld/ui";
 import type { RefObject } from "react";
 import { useAppStore } from "../../storeContext.tsx";
 import { chunked } from "./Failing.tsx";
@@ -21,7 +20,7 @@ import { usePins } from "./usePins.ts";
 import { useRoomKeys } from "./useRoomKeys.ts";
 import type { AppState } from "../../store/index.ts";
 
-// The people's list, its code (the nebula faces, the country tags) asked once someone is here: a room nobody has joined yet
+// The people's list, its code (the nebula faces) asked once someone is here: a room nobody has joined yet
 // draws none, and the first screen's budget (ADR-0001 §12) does not carry it.
 // A chunk that cannot be fetched leaves the list's place with a word, never the page (F1763).
 const People = chunked(async () => ({ default: (await import("./People.tsx")).People }), {
@@ -110,14 +109,11 @@ export function GuestLoaded({
     session: { kind: "out" },
     rooms: roomIds(sections),
     acts,
-    people,
   });
   const rail = (
-    <Stack space="s">
-      <RoomsNav label="Rooms">
-        <RoomSections sections={sections} current={room} />
-      </RoomsNav>
-    </Stack>
+    <RoomsNav label="Rooms">
+      <RoomSections sections={sections} current={room} />
+    </RoomsNav>
   );
   return (
     <ChatScreen

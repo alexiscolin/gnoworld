@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import type { ShownLine } from "@gnoworld/core";
 import { describe, expect, it } from "vitest";
-import { all, faceOf, follows, mount, one, staysText } from "../../../tests/mount.tsx";
+import { all, faceOf, follows, mount, one } from "../../../tests/mount.tsx";
 import { LineView, type LineViewProps } from "./LineView.tsx";
 
-// 5q: a message as the video shows it (frame 23.58.01): the person's nebula, the name, the country tag when they opted in,
+// 5q: a message as the video shows it (frame 23.58.01): the person's nebula, the name,
 // the time at the right edge, the text below. "Translated" waits for slice 10.
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
@@ -66,15 +66,10 @@ describe("a line's look", () => {
     expect(faceOf(one(guest, "[data-kind='person']"))).toBe("");
   });
 
-  it("holds the head in this order: the face, the country's tag, the name, then the time; the text is under it", () => {
-    const { row } = drawn({ country: { code: "NG", name: "Nigeria" } });
+  it("holds the head in this order: the face, the name, then the time; the text is under it", () => {
+    const { row } = drawn();
     const head = one(row, "[data-line-head]");
-    const order = [
-      one(head, "[data-kind='person']"),
-      one(head, "[data-country]"),
-      one(head, `[title="${ALICE}"]`),
-      one(head, "time"),
-    ];
+    const order = [one(head, "[data-kind='person']"), one(head, `[title="${ALICE}"]`), one(head, "time")];
     for (let at = 1; at < order.length; at += 1)
       expect(follows(order[at - 1] as Element, order[at] as Element)).toBe(true);
     expect(one(head, "time").getAttribute("datetime")).toBe("2026-10-25T15:31:00.000Z");
@@ -82,28 +77,6 @@ describe("a line's look", () => {
     expect(head.contains(textOf(row))).toBe(false);
     expect(follows(head, textOf(row))).toBe(true);
     expect(textOf(row).textContent).toBe("Lagos builders, we have a room now");
-  });
-
-  it("shows the country as a tag before the name when the author opted in, named for a screen reader by the country", () => {
-    const { row } = drawn({ country: { code: "NG", name: "Nigeria" } });
-    const tag = one(row, "[data-country]");
-    expect(tag.textContent).toBe("NG");
-    expect(tag.getAttribute("data-country")).toBe("NG");
-    expect(tag.getAttribute("title")).toBe("Nigeria");
-    expect(tag.getAttribute("aria-label")).toBe("Nigeria");
-    expect(follows(tag, one(row, `[title="${ALICE}"]`))).toBe(true);
-  });
-
-  it("shows no tag for an author who did not opt in, and never one guessed from the address or the zone", () => {
-    expect(all(drawn().row, "[data-country]")).toHaveLength(0);
-  });
-
-  it("keeps a country's words as text, whatever they hold or however long", () => {
-    staysText((name) => (
-      <ol>
-        <LineView {...props({ country: { code: "NG", name } })} />
-      </ol>
-    ));
   });
 
   it("keeps my own line's mark: my name and the word you, and no 'Translated' slot before slice 10", () => {

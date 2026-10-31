@@ -1,5 +1,4 @@
-// A line's head (slice 4's 4b, moved out of LineView.tsx): the face, where its author comes from, the name, the marks and
-// the time.
+// A line's head (slice 4's 4b, moved out of LineView.tsx): the face, the name, the marks and the time.
 import type { Line, ShownLine } from "@gnoworld/core";
 import { Avatar, Cluster, Icon } from "@gnoworld/ui";
 import { Person } from "./Person.tsx";
@@ -14,30 +13,6 @@ function Author({ line, mine }: { line: Line; mine: boolean }) {
       <Person name={line.account ?? line.from} guest={line.account === undefined} />
       {mine ? " you" : null}
     </span>
-  );
-}
-
-/** Where a person comes from, when they chose to say so: the two letters the video draws, the country in words for a
- * screen reader and a pointer. */
-export interface Country {
-  code: string;
-  name: string;
-}
-
-/** The country's tag, drawn before a name, whose words say the country: none for a person who did not opt in. */
-export function CountryTag({ country }: { country: Country | undefined }) {
-  return country === undefined ? null : (
-    <>
-      <span
-        role="img"
-        className={styles["country"]}
-        data-country={country.code}
-        title={country.name}
-        aria-label={country.name}
-      >
-        {country.code}
-      </span>{" "}
-    </>
   );
 }
 
@@ -85,16 +60,14 @@ interface HeadProps {
   mentioned: boolean;
   saved: boolean;
   pinned: boolean;
-  country?: Country | undefined;
 }
 
-// The head: the face, where they come from, the name, what the line is marked, and the time at the far end.
-export function Head({ line, mine, mentioned, saved, pinned, country }: HeadProps) {
+// The head: the face, the name, what the line is marked, and the time at the far end.
+export function Head({ line, mine, mentioned, saved, pinned }: HeadProps) {
   return (
     <div className={styles["head"]} data-line-head="">
       <Cluster space="2xs">
         <Avatar address={line.account ?? line.from} name={line.from} size="s" decorative />
-        <CountryTag country={country} />
         {line.kind === "action" ? "* " : null}
         <Author line={line} mine={mine} />{" "}
         <Marks mentioned={mentioned} notice={line.kind === "notice"} saved={saved} pinned={pinned} />

@@ -35,6 +35,11 @@
     max-block-size: calc(10lh + var(--_frame));
   }
 
+  /* A box that grows on its own has no handle to drag. */
+  textarea.box[data-fixed] {
+    resize: none;
+  }
+
   .box:hover {
     --_line: var(--color-line-strong);
   }

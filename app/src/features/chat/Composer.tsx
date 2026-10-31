@@ -169,6 +169,8 @@ export function Composer(props: ComposerProps) {
             enterAddsLine={coarse}
             label={`Message ${label}`}
             placeholder={`Message ${label}`}
+            hideLabel
+            resizable={false}
             describedBy={editing.describedBy}
             value={draft}
             onChange={(value) => {

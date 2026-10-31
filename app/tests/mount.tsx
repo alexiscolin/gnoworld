@@ -3,7 +3,7 @@
 import { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, beforeAll, expect } from "vitest";
+import { afterEach, beforeAll } from "vitest";
 
 const roots: { root: Root; host: HTMLElement }[] = [];
 // React flushes an update inside act only in an environment that says so; restored as the file ends.
@@ -90,18 +90,4 @@ export function markup(element: ReactElement): HTMLElement {
   const host = document.createElement("div");
   host.innerHTML = renderToStaticMarkup(element);
   return host;
-}
-
-/** The threat model's abuse cases, as ui's staysText has them: markup that would run if parsed, and a name of 10,000 letters. */
-const ABUSE = ['<img src="x" onerror="alert(1)">', "nym-".padEnd(10_000, "a")];
-
-/** Text that looks like markup, or runs to 10,000 characters, reaches the page as text: no image comes of it, and the words
- * are read whole in the text or in a label. */
-export function staysText(draw: (text: string) => ReactElement): void {
-  for (const text of ABUSE) {
-    const box = mount(draw(text));
-    const said = [box.textContent, ...all(box, "[aria-label]").map((each) => each.getAttribute("aria-label") ?? "")];
-    expect(all(box, "img")).toHaveLength(0);
-    expect(said.some((each) => each.includes(text))).toBe(true);
-  }
 }

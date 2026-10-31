@@ -2,10 +2,11 @@
    or a dot at its end (the prototype's .room, index.html:603-641). */
 @layer components {
   .item {
+    position: relative;
     /* layout: the link and the badge side by side, the link taking what the badge leaves */
     display: grid;
     /* layout: the link takes the width, the badge its own */
-    grid-template-columns: 1fr auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     /* layout: the badge centred on the link's line */
     align-items: center;
     min-block-size: var(--chat-item);
@@ -25,6 +26,7 @@
   }
 
   .main {
+    min-inline-size: 0;
     /* layout: the lead and the words side by side from the start */
     display: flex;
     /* layout: the lead centred on the words' line */
@@ -34,6 +36,14 @@
     /* layout: as tall as the item, so the whole height is the link */
     align-self: stretch;
     text-decoration: none;
+  }
+
+  /* The whole pill is the link: its sides and its count too (review 25 of 5q). */
+  .main::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
   }
 
   /* The item in view says so on its link too, a half step heavier, as a Row's current link does. */

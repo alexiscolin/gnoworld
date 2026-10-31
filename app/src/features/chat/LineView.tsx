@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 import { Embed } from "./Embed.tsx";
 import { embedIn } from "./embeds.ts";
 import { Markdown } from "./Message.tsx";
-import { Head, type Country } from "./LineHead.tsx";
+import { Head } from "./LineHead.tsx";
 import { Reactions } from "./Reactions.tsx";
 import { Quote } from "./Replying.tsx";
 import { ThreadChip } from "./ThreadChip.tsx";
@@ -136,12 +136,11 @@ export interface LineViewProps {
   /** A row of a thread's own list: no quote, no tab stop of the list's, its links Tab stops. */
   inThread?: true | undefined;
   /** Where its author comes from, when they opted in: none draws no tag. */
-  country?: Country | undefined;
 }
 
 export function LineView(props: LineViewProps) {
   const { line, me, members, stop, actions, fresh, verdict, players, saved, pinned, chips, react, answers } = props;
-  const { replies, onThread, inThread, country } = props;
+  const { replies, onThread, inThread } = props;
   const row = rowOf({ id: line.id, stop, inThread, threads: onThread !== undefined });
   const blocks = markdown(line.text);
   // Its first link to an accepted service gets a player, but for a reader who saves data (4g).
@@ -163,7 +162,7 @@ export function LineView(props: LineViewProps) {
       {...row.attrs}
     >
       {fresh ? <NewDivider /> : null}
-      <Head {...{ line, mine, mentioned, saved, pinned, country }} />
+      <Head {...{ line, mine, mentioned, saved, pinned }} />
       {inThread === true ? null : <Quote line={line} answers={answers} known={quoted} />}
       <div data-line-text="">
         <LineText blocks={blocks} me={me} known={known} stop={row.links} />

@@ -4,6 +4,9 @@
   .bar {
     /* layout: the rule under the pins stops at the lines' inset, as the lines do */
     margin-inline: var(--chat-inset);
+    /* layout: the pin stands off the header's rule */
+    /* raw: 12 px, the prototype's #pinBar margin */
+    margin-block-start: 12px;
     border-block-end: var(--line-width) solid var(--color-line);
   }
 
@@ -17,7 +20,8 @@
     inline-size: 100%;
     padding-block: var(--space-2xs);
     color: var(--color-text);
-    font: var(--font-chat);
+    /* raw: the pin is 13 px on 1.45, a half point under the lines (the prototype's #pinBar, index.html:180) */
+    font: 400 13px/1.45 var(--family-sans);
     cursor: pointer;
   }
 
@@ -26,10 +30,7 @@
     flex: 1;
     /* layout: a flex item shrinks below its words only with this */
     min-inline-size: 0;
-    overflow: clip;
-    text-overflow: ellipsis;
     text-align: start;
-    white-space: nowrap;
   }
 
   .newest b,

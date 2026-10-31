@@ -24,6 +24,8 @@ export interface RoomsViewProps {
   badges?: Readonly<Record<string, number>> | undefined;
   /** What the account was told: none for a guest (4f-n). */
   notices?: NoticesProps | undefined;
+  /** What stands between the rooms and the direct messages: an account's saved messages (4d). */
+  saved?: ReactNode;
 }
 
 interface NoticesProps {
@@ -136,7 +138,7 @@ function Dms({
                 <NavItem
                   href={dmHref(world, partner, full)}
                   current={partner === current}
-                  lead={<Avatar address={partner} name={partner} decorative />}
+                  lead={<Avatar address={partner} name={partner} size="s" decorative />}
                   badge={badged(badges?.[partner], true)}
                 >
                   {shortAddress(partner)}
@@ -167,7 +169,7 @@ export function NoticeStatus({ notices }: { notices: Pick<NoticesProps, "said" |
   );
 }
 
-export function RoomsView({ sections, current, dms, failed, badges, notices }: RoomsViewProps) {
+export function RoomsView({ sections, current, dms, failed, badges, notices, saved }: RoomsViewProps) {
   const navRef = useRef<HTMLElement>(null);
   const listed = (
     <RoomSections sections={sections} current={current} failed={failed} badge={(room) => badged(badges?.[room])} />
@@ -178,6 +180,8 @@ export function RoomsView({ sections, current, dms, failed, badges, notices }: R
     ) : (
       <Stack space="l">
         {listed}
+        {/* Between the rooms and the conversations, under a rule, as the video's column has it. */}
+        {saved === undefined ? null : <div className={styles["saved"]}>{saved}</div>}
         <Dms {...dms} badges={badges} />
       </Stack>
     );

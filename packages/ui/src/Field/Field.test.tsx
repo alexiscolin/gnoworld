@@ -185,6 +185,21 @@ describe("Field", () => {
     expect(said).toEqual(["first", "second"]);
   });
 
+  it("keeps a label for assistive technology alone when asked, the box still named by it", () => {
+    const { rerender } = render(<Field label="Message" value="" onChange={vi.fn()} />);
+    expect(screen.getByText("Message").className).not.toBe("visually-hidden");
+    rerender(<Field label="Message" hideLabel value="" onChange={vi.fn()} />);
+    expect(screen.getByText("Message").className).toBe("visually-hidden");
+    expect(screen.getByRole("textbox", { name: "Message" })).toBeTruthy();
+  });
+
+  it("takes the handle off a box of lines that grows on its own, and leaves it on the others", () => {
+    const { rerender } = render(<Field kind="lines" label="Message" value="" onChange={vi.fn()} />);
+    expect(screen.getByRole("textbox", { name: "Message" }).hasAttribute("data-fixed")).toBe(false);
+    rerender(<Field kind="lines" label="Message" resizable={false} value="" onChange={vi.fn()} />);
+    expect(screen.getByRole("textbox", { name: "Message" }).hasAttribute("data-fixed")).toBe(true);
+  });
+
   it("shows a label, help, error and prefix made of markup, or very long, as text", () => {
     staysText((text) => <Field label={text} help={text} error={text} value="" onChange={vi.fn()} />);
     staysText((text) => <Field label="Name" prefix={text} value="" onChange={vi.fn()} />);

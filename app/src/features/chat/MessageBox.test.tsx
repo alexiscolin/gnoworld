@@ -26,8 +26,11 @@ describe("the composer's box", () => {
     click(button(box, "Mention someone"));
     click(button(box, "Start a command"));
     expect(onInsert.mock.calls).toEqual([["@"], ["/"]]);
-    expect(button(box, "Add something")).toBeUndefined();
-    expect(button(box, "Emoji")).toBeUndefined();
+    // The foot holds these two and Send, nothing else: the buttons outside the format bar, by their names.
+    const foot = all(box, "button")
+      .filter((each) => each.closest('[aria-label="Format"]') === null)
+      .map((each) => each.getAttribute("aria-label") ?? each.textContent);
+    expect(foot).toEqual(["Mention someone", "Start a command", "Send"]);
   });
 
   it("applies a format of the bar to the draft", () => {

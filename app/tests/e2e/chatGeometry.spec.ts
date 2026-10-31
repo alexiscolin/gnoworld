@@ -87,6 +87,88 @@ test.describe("the chat at the video's size", () => {
     expect(radius).toBe("16px");
   });
 
+  // Review 15 of 5q: fourteen CSS mutants passed every assertion above; these read the frame (f0066, 1728 by 1080).
+  test("sets the rooms' pills, the pin, the lines' time and the panel as frame 66 does", async ({ page }) => {
+    await logIn(page, "geometry-frame");
+    await open(page, { width: 1728, as: ACCOUNT, pinned: true, height: 1080 });
+    const rooms = page.locator('[data-region="rooms"] [data-nav-item]');
+    const [first, second] = [rooms.nth(0), rooms.nth(1)];
+    const [one, two] = await Promise.all([first.boundingBox(), second.boundingBox()]);
+    if (one === null || two === null) throw new Error("no pill");
+    // The pill is 38 px high, 10 px round, a step of 44 to the next (frame: #general 101 to 139, #help 145 to 183).
+    near(one.height, 38);
+    near(two.y - one.y, 44);
+    const current = await page.locator('[data-region="rooms"] [data-nav-item][data-current]').evaluate((element) => {
+      const css = getComputedStyle(element);
+      const [red = 0, green = 0, blue = 0] = css.backgroundColor.match(/\d+/g)?.map(Number) ?? [];
+      return { radius: css.borderTopLeftRadius, cream: red + green + blue > 600, size: css.fontSize };
+    });
+    expect(current).toEqual({ radius: "10px", cream: true, size: "14px" });
+    // The pin's words stand at y 84, 13 px on its line; the first line's head 129 (frame: 84 and 129).
+    const pin = await page.getByRole("region", { name: "Pinned messages" }).getByRole("button").first().boundingBox();
+    if (pin === null) throw new Error("no pin");
+    near(pin.y + pin.height / 2, 84, 3);
+    expect(
+      await page
+        .getByRole("region", { name: "Pinned messages" })
+        .getByRole("button")
+        .first()
+        .evaluate((element) => getComputedStyle(element).fontSize),
+    ).toBe("13px");
+    const line = lines(page).first();
+    const [face, time] = await Promise.all([
+      line.locator("[data-kind]").first().boundingBox(),
+      line.locator("time").boundingBox(),
+    ]);
+    if (face === null || time === null) throw new Error("no line");
+    near(face.y + face.height / 2, 129, 3);
+    const look = await line.locator("time").evaluate((element) => {
+      const css = getComputedStyle(element);
+      return { size: css.fontSize, mono: /mono/i.test(css.fontFamily) };
+    });
+    expect(look).toEqual({ size: "10px", mono: true });
+  });
+
+  test("sets the panel and the composer as frame 66 does", async ({ page }) => {
+    await logIn(page, "geometry-panel");
+    await open(page, { width: 1728, as: ACCOUNT, pinned: true, height: 1080 });
+    // The panel: 20 px in from its edge, its title 32 px, the people a step of 41 (frame: Earth at x 1449, rows 410, 451).
+    const info = await page.locator('[data-region="info"]').boundingBox();
+    if (info === null) throw new Error("no panel");
+    const title = await page.locator('[data-region="info"] h2').boundingBox();
+    const people = page.locator('[data-region="info"] section[aria-label="Who\'s here"] li');
+    if (title === null) throw new Error("no title");
+    near(title.x - info.x, 20 + 1, 3);
+    expect(
+      await page.locator('[data-region="info"] h2').evaluate((element) => getComputedStyle(element).fontSize),
+    ).toBe("32px");
+    const [row1, row2] = await Promise.all([people.nth(0).boundingBox(), people.nth(1).boundingBox()]);
+    if (row1 === null || row2 === null) throw new Error("no people");
+    near(row2.y - row1.y, 41);
+    // Send is round, 32 px; the format bar's icons 13 px in the muted grey; the field has no handle or ring of its own.
+    const send = await page.getByRole("button", { name: "Send" }).evaluate((element) => {
+      const css = getComputedStyle(element);
+      return { radius: css.borderTopLeftRadius, wide: element.getBoundingClientRect().width };
+    });
+    expect(send.radius).toBe("50%");
+    near(send.wide, 32);
+    const field = await page.getByRole("textbox", { name: /^Message/ }).evaluate((element) => {
+      const css = getComputedStyle(element);
+      return { resize: css.resize, outline: css.outlineStyle };
+    });
+    expect(field).toEqual({ resize: "none", outline: "none" });
+    const bar = await page
+      .getByRole("group", { name: "Format" })
+      .getByRole("button")
+      .first()
+      .evaluate((element) => ({
+        icon: element.querySelector("svg")?.getBoundingClientRect().width,
+        ink: getComputedStyle(element).color,
+      }));
+    near(bar.icon ?? 0, 13, 0.5);
+    expect(bar.ink).not.toBe("rgb(244, 246, 250)");
+  });
+
   test("draws the quick actions as the video's pills: an edge, 12 px words centred, the row's whole width shared", async ({
     page,
   }) => {

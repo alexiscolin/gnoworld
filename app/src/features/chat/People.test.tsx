@@ -1,10 +1,9 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
-import { all, click, faceOf, follows, mount, nth, one, staysText } from "../../../tests/mount.tsx";
+import { all, click, faceOf, follows, mount, nth, one } from "../../../tests/mount.tsx";
 import { People } from "./People.tsx";
 
-// 5q: "Here now" as the video's info panel draws it (frame 23.58.01): each person's nebula, their name, their country at
-// the end of the row when they opted in, a rule under each row. The list and the way to write to a person stay (4e): the
+// 5q: "Here now" as the video's info panel draws it (frame 23.58.01): each person's nebula, their name, a rule under each row. The list and the way to write to a person stay (4e): the
 // whole face and name is one button, named "Message" and the address, which opens the conversation.
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
@@ -29,33 +28,6 @@ describe("who is here, as the info panel shows it", () => {
     const row = one(people({ members: ["guest-ab12cd"] }), "li");
     expect(all(row, "svg circle")).toHaveLength(0);
     expect(all(row, "svg")).toHaveLength(1);
-  });
-
-  it("shows a country's tag and its name at the end of a row, for a person who opted in alone", () => {
-    const rows = all(people({ countries: { [ALICE]: { code: "NG", name: "Nigeria" } } }), "li");
-    expect(nth(rows, 0).textContent).toContain("Nigeria");
-    expect(all(nth(rows, 0), "[data-country='NG']")).toHaveLength(1);
-    expect(all(nth(rows, 1), "[data-country]")).toHaveLength(0);
-  });
-
-  it("reads the country of a member by its own key: a nick named like an object's own property draws no tag", () => {
-    for (const nick of ["constructor", "__proto__", "toString", "hasOwnProperty"]) {
-      const row = one(people({ members: [nick], countries: {} }), "li");
-      expect(all(row, "[data-country]")).toHaveLength(0);
-      expect(row.textContent).toContain(nick);
-    }
-  });
-
-  it("keeps a country's words as text, whatever they hold or however long", () => {
-    staysText((name) => (
-      <People
-        members={[ALICE]}
-        connected
-        me={undefined}
-        onMessage={undefined}
-        countries={{ [ALICE]: { code: "NG", name } }}
-      />
-    ));
   });
 
   it("keeps the count for a screen reader, the bot left out, and a button to write to each other account", () => {

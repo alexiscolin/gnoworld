@@ -24,10 +24,8 @@ type Room = NonNullable<RoomViewProps["state"]> | undefined;
 type Over = Omit<Partial<RoomViewProps>, "state"> & {
   state?: Room;
   onMessage?: PeopleProps["onMessage"];
-  /** Whether the page draws who is here: not beside a direct message. */
-  people?: boolean;
 };
-const view = ({ onMessage, people = true, ...over }: Over = {}) => {
+const view = ({ onMessage, ...over }: Over = {}) => {
   const state = "state" in over ? over.state : ROOM;
   const { chat = "connected", me } = over;
   const aside = (
@@ -43,7 +41,7 @@ const view = ({ onMessage, people = true, ...over }: Over = {}) => {
         {...over}
         state={state}
       />
-      {people ? aside : null}
+      {aside}
     </>,
   );
 };
@@ -381,13 +379,6 @@ describe("RoomView", () => {
       items(part(view({ me: BOB, state: { ...ROOM, members: [ALICE] }, onMessage: () => undefined }), "Who's here")),
     ).toEqual(["Message g10gh7…3y5tv"]);
     expect(part(view({ me: BOB, state: { ...ROOM, members } }), "Who's here")).not.toContain("<button");
-  });
-
-  // 4e's own review: a conversation has its two people, never a room's "who is here".
-  it("leaves who is here out of a conversation", () => {
-    const html = view({ people: false });
-    expect(html).not.toContain("Who&#x27;s here");
-    expect(said(html)).not.toMatch(/\d+ here/);
   });
 
   it("leaves the moderation bot out of who is here, and out of the count", () => {

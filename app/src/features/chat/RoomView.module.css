@@ -44,7 +44,8 @@
     flex: 1;
     min-block-size: 0;
     overflow: auto;
-    padding-block: var(--space-m);
+    /* raw: 20 px above the first line and below the last (the prototype's #chatList padding) */
+    padding-block: 20px;
     padding-inline: calc(var(--chat-inset) - var(--focus-width) - var(--focus-offset));
     /* the video's chat text, a half point under the body's */
     font: var(--font-chat);
@@ -68,11 +69,6 @@
     .lines > li {
       --_gutter: calc(0 * var(--control-s));
     }
-  }
-
-  .lines > li:first-child {
-    /* layout: room above the oldest line for its bar, which rises above a line (LineActions) */
-    margin-block-start: var(--space-s);
   }
 
   .lines > li:last-child {
@@ -113,16 +109,8 @@
   .head .time {
     /* layout: the far end of the head's row */
     margin-inline-start: auto;
-    font: var(--font-data);
-  }
-
-  /* Where the person comes from, as the video draws it: two letters on a fill, in the label's face. */
-  .country {
-    padding-inline: var(--space-3xs);
-    border-radius: var(--radius-s);
-    background: var(--color-fill);
-    color: var(--color-text-muted);
-    font: var(--font-label);
+    /* raw: the video's time, 10 px in mono (the prototype's #chatList li em) */
+    font: 10px/1 var(--family-mono);
   }
 
   [data-line-text] {

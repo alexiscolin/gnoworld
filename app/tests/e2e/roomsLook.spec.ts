@@ -34,6 +34,7 @@ test.describe("a world's rooms, as they look", () => {
       await asGuest(page, width);
       // A phone has no info panel: its people open from the quick action, in a dialog.
       if (screen === "computer") await expect(page.getByRole("region", { name: "Who's here" })).toContainText("2 here");
+      else await expect(page.getByRole("toolbar", { name: "Quick actions" })).toBeVisible();
       await expect(page).toHaveScreenshot(`rooms-${screen}.png`);
     });
   }

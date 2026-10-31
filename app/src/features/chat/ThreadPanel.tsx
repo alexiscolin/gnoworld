@@ -31,7 +31,7 @@ export function ThreadPanel({
   acts,
   close,
   typed,
-}: Omit<Page, "people"> & { open: Open; shown: Shown; close: () => void; typed: Typed }) {
+}: Page & { open: Open; shown: Shown; close: () => void; typed: Typed }) {
   const members = state?.members ?? [];
   const root = rootOf(state?.lines ?? [], open.from);
   const slot = `${session.kind === "in" ? session.address : ""} ${open.from}`;

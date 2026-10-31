@@ -10,8 +10,8 @@ export interface PlaceInfoProps {
   description: string;
   /** How many are talking here now: none draws no figure (the video's other figure, its countries, waits for the data). */
   talking?: number | undefined;
-  /** Who is here: none draws no section. */
-  here?: ReactNode;
+  /** Who is here, drawn under Here now. */
+  here: ReactNode;
   /** Takes the focus from code, as Who's here moves the reader to the list. */
   panelRef?: Ref<HTMLElement>;
 }
@@ -26,20 +26,16 @@ export function PlaceInfo({ kicker, name, description, talking, here, panelRef }
         {talking === undefined ? null : (
           <div className={styles["stats"]}>
             {/* The figure and its caption, as ui's Stat sets them, without its count-up, which the first screen's budget cannot carry. */}
-            <p className={styles["figure"]} data-value={talking}>
-              {talking}
-            </p>
+            <p className={styles["figure"]}>{talking}</p>
             <p className="label">Talking now</p>
           </div>
         )}
-        {here === undefined || here === null ? null : (
-          <section className={styles["here"]}>
-            <Stack space="2xs">
-              <h3 className="label">Here now</h3>
-              {here}
-            </Stack>
-          </section>
-        )}
+        <section className={styles["here"]}>
+          <Stack space="2xs">
+            <h3 className="label">Here now</h3>
+            {here}
+          </Stack>
+        </section>
       </Stack>
     </aside>
   );

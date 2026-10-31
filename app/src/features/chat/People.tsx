@@ -1,7 +1,6 @@
-// Who is here, in the info panel (4b; 5q's nebula and country): counted once connected, the bot left out, the first
+// Who is here, in the info panel (4b; 5q's nebula): counted once connected, the bot left out, the first
 // MEMBERS_SHOWN named.
 import { Avatar, Cluster } from "@gnoworld/ui";
-import { CountryTag, type Country } from "./LineHead.tsx";
 import { BOT, isAccount } from "./names.ts";
 import { Person } from "./Person.tsx";
 import shared from "./lists.module.css";
@@ -17,8 +16,6 @@ export interface PeopleProps {
   /** The reader's address, and how it opens a direct message with another account: each offered beside it. */
   me: string | undefined;
   onMessage: ((partner: string) => void) | undefined;
-  /** Where each member comes from, by nick, for those who opted in: none draws no tag. */
-  countries?: Readonly<Record<string, Country>> | undefined;
 }
 
 // A person: their nebula and their name, what `said` adds before it for a screen reader alone.
@@ -32,7 +29,7 @@ function Who({ nick, account, said }: { nick: string; account: boolean; said?: s
   );
 }
 
-export function People({ members, connected, me, onMessage, countries }: PeopleProps) {
+export function People({ members, connected, me, onMessage }: PeopleProps) {
   const people = members.filter((nick) => nick !== BOT);
   return (
     <section aria-label="Who's here">
@@ -40,11 +37,9 @@ export function People({ members, connected, me, onMessage, countries }: PeopleP
       <ul className={shared["plain"]}>
         {people.slice(0, MEMBERS_SHOWN).map((nick) => {
           const account = isAccount(nick);
-          // A nick is any string Ergo allows, `constructor` too: read as the member's own key alone.
-          const country = countries !== undefined && Object.hasOwn(countries, nick) ? countries[nick] : undefined;
           return (
             <li key={nick} className={styles["row"]}>
-              {/* The face and the name at the start, the country at the end: one column whatever the name's width (U18). A
+              {/* The face and the name at the start: one column whatever the name's width (U18). A
                   person the reader may write to is one button, the whole of its face and name: it opens the conversation. */}
               <Cluster space="3xs" justify="between">
                 {onMessage !== undefined && account && me !== undefined && nick !== me ? (
@@ -60,12 +55,6 @@ export function People({ members, connected, me, onMessage, countries }: PeopleP
                   </button>
                 ) : (
                   <Who nick={nick} account={account} />
-                )}
-                {country === undefined ? null : (
-                  <span className={styles["where"]}>
-                    <CountryTag country={country} />
-                    {country.name}
-                  </span>
                 )}
               </Cluster>
             </li>

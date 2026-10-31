@@ -23,10 +23,10 @@ function focusAfterClose(from: string, lines: readonly Line[]) {
   );
 }
 
-/** What a room's thread adds to its page: how a line opens one, and what stands beside the lines: the panel while one is
- * open, else who is here (none beside a direct message's). Another conversation in view closes it. */
+/** What a room's thread adds to its page: how a line opens one, and the panel that takes the info panel's place while one is
+ * open. Another conversation in view closes it. */
 export function useThreads(page: Page) {
-  const { shown, state, people } = page;
+  const { shown, state } = page;
   const [open, setOpen] = useState<Open>();
   const [typed] = useState<Typed>(() => new Map());
   // A logout is a fresh start: the words are handed to no next account, and kept for no return of the same one (R1).
@@ -56,9 +56,7 @@ export function useThreads(page: Page) {
       threaded: open !== undefined,
     },
     aside:
-      open === undefined ? (
-        people
-      ) : (
+      open === undefined ? undefined : (
         <Failing
           key={open.from}
           fallback={<Standing word="Could not open the thread." close={close} />}

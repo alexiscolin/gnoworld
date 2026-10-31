@@ -1,6 +1,7 @@
 @layer components {
   .panel {
-    padding: var(--space-m);
+    /* raw: the video's 20 px round the panel (the prototype's #chatSide padding) */
+    padding: 20px;
   }
 
   /* Who's here lands here from code: the ring says where the reader is. */
@@ -10,12 +11,17 @@
   }
 
   .name {
-    font: var(--font-title-l);
-    letter-spacing: var(--tracking-tight);
+    /* raw: the video's panel title, 32 px at 400 (the prototype's #chatSide h3) */
+    font: 400 32px/1.1 var(--family-sans);
+    /* raw: the prototype's -0.03em */
+    letter-spacing: -0.03em;
   }
 
   .about {
-    color: var(--color-text-muted);
+    /* raw: 13.5 px on 1.5 in the panel's own grey (the prototype's #chatSide p) */
+    color: #c8d0de;
+    /* raw: 13.5 px on 1.5 in the panel's own grey (the prototype's #chatSide p) */
+    font: 400 13.5px/1.5 var(--family-sans);
   }
 
   /* The figures between two rules, as the video's panel sets them. */

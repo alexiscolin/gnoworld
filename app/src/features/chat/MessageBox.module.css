@@ -12,8 +12,9 @@
     background: var(--color-fill);
   }
 
+  /* The box carries the focus: one mint edge, as the video's (prototype .cbox:focus-within), the field's own ring and handle gone. */
   .box:focus-within {
-    border-color: var(--color-mine-line);
+    border-color: var(--color-mine);
   }
 
   /* The format bar: small, in a row of its own under a rule. */
@@ -25,6 +26,19 @@
     padding-block: var(--space-3xs);
     border-block-end: var(--line-width) solid var(--color-line);
     color: var(--color-text-muted);
+  }
+
+  /* The icons at the video's 62% of the muted grey and 13 px (prototype #fmtBar button, #fmtBar svg). */
+  .format button {
+    /* raw: the video's 62% of the muted grey (the prototype's #fmtBar button) */
+    --_ink: color-mix(in oklab, var(--color-text-muted) 62%, transparent);
+  }
+
+  .format svg {
+    /* raw: the video's 13 px icon of the format bar */
+    inline-size: 13px;
+    /* raw: the video's 13 px icon of the format bar */
+    block-size: 13px;
   }
 
   /* The field's wrapper and the field's own column dissolve, so its box and its words are the grid's. */
@@ -41,6 +55,7 @@
     padding-block: var(--space-xs) var(--space-3xs);
     padding-inline: var(--space-s);
     border: 0;
+    outline: none;
     background: none;
     font: var(--font-chat);
   }
@@ -53,6 +68,10 @@
     place-self: center end;
     /* layout: a step from the marks and from Send */
     margin-inline: var(--space-2xs);
+  }
+
+  /* The hint is muted and small; a refusal, which the field draws in the same place, keeps its own danger colour and size. */
+  .box p:not([aria-hidden]) {
     color: var(--color-text-muted);
     font: var(--font-hint);
   }
@@ -63,6 +82,21 @@
     /* layout: the foot's row, its first column */
     grid-area: 3 / 1;
     padding: var(--space-3xs) var(--space-2xs);
+  }
+
+  /* The marks at the video's 34 px and 18 px icons, in the lighter grey (prototype .ctools .tbtn). */
+  .marks button {
+    /* raw: the video's 34 px tool */
+    --_h: 34px;
+    /* raw: the prototype's .ctools .tbtn colour */
+    --_ink: #c8d0de;
+  }
+
+  .marks svg {
+    /* raw: the video's 18 px icon of the foot's tools */
+    inline-size: 18px;
+    /* raw: the video's 18 px icon of the foot's tools */
+    block-size: 18px;
   }
 
   /* Send: a round button with an arrow up, on the cream fill, at the foot's end. */
@@ -92,15 +126,5 @@
   .send:disabled {
     cursor: not-allowed;
     opacity: var(--opacity-disabled);
-  }
-
-  .box label {
-    position: absolute;
-    /* raw: one pixel, the least a box can be and still be read (the utility's own, for a label ui draws) */
-    inline-size: 1px;
-    /* raw: one pixel, the least a box can be and still be read (the utility's own, for a label ui draws) */
-    block-size: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
   }
 }

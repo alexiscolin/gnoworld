@@ -95,7 +95,12 @@ test.describe("the chat as the video shows it", () => {
     await expect(pin).toContainText("g10gh7…3y5tv");
     const [p, talk] = await Promise.all([box(pin), box(page.getByRole("list", { name: "Messages" }))]);
     expect(p.y + p.height).toBeLessThanOrEqual(talk.y + 1);
-    expect(await conversation.locator(":scope > *").first().innerHTML()).toContain("Pinned messages");
+    // The child order of the conversation's room, not the markup's words: the pin comes before the lines' own list.
+    const labels = await conversation
+      .locator(":scope > * > *")
+      .evaluateAll((children) => children.map((child) => child.getAttribute("aria-label")));
+    expect(labels.indexOf("Pinned messages")).toBeGreaterThanOrEqual(0);
+    expect(labels.indexOf("Pinned messages")).toBeLessThan(labels.indexOf("Messages"));
   });
 
   test("keeps the quick actions, over the composer's one box, an account's", async ({ page }) => {
