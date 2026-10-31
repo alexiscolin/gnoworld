@@ -14,7 +14,7 @@ export function Worlds({ worlds, current }: WorldsProps) {
   return (
     <nav aria-label="Worlds" className={styles["list"]}>
       {/* One planet to a line: the column is no wider than one, so a Cluster wraps each onto its own. */}
-      <Cluster as="ul" space="3xs" justify="center">
+      <Cluster as="ul" space="2xs" justify="center">
         {worlds.map((world) => (
           <li key={world.slug}>
             <RouterLink

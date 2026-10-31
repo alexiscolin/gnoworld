@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { QueryAnswer, FunctionList, StatusAnswer } from "./chain.ts";
+import { QueryAnswer, StatusAnswer } from "./chain.ts";
+import { FunctionList } from "./functions.ts";
 
 // 5g-reads: the three shapes the browser reads from a chain's RPC. The bodies are written the way gno's source at v1.5.0 gives them
 // (see app/tests/chain/chainFixture.ts: the envelopes are read from source, not recorded). Fields the reader does not read may

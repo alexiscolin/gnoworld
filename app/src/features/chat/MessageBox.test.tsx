@@ -20,6 +20,27 @@ describe("the composer's box", () => {
     expect(button(box, "Send")?.getAttribute("type")).toBe("submit");
   });
 
+  // 5q2 (frame f0066): the bar's tools in groups, a rule between them (prototype #fmtBar .sep): marks, then code, then lists.
+  it("sets a rule between the format bar's groups: after the marks, after the code and the quote", () => {
+    const bar = one(draw(), '[role="group"][aria-label="Format"]');
+    const order = [...bar.querySelectorAll("button, [role='separator']")].map((each) =>
+      each.getAttribute("role") === "separator" ? "|" : each.getAttribute("aria-label"),
+    );
+    expect(order).toEqual([
+      "Bold",
+      "Italic",
+      "Strikethrough",
+      "|",
+      "Code",
+      "Link",
+      "Quote",
+      "|",
+      "Bulleted list",
+      "Numbered list",
+    ]);
+    expect(bar.querySelectorAll("[role='separator'][aria-orientation='vertical']")).toHaveLength(2);
+  });
+
   it("puts an @ or a / in the draft through its marks, and offers no button for what does not work yet", () => {
     const onInsert = vi.fn();
     const box = draw({ onInsert });

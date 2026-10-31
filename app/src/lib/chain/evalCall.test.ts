@@ -83,6 +83,13 @@ describe("evalCall, one call of one exported name or nothing", () => {
     expect(evalCall(WUGNOT, name)).toBe(`${WUGNOT}.${name}()`);
   });
 
+  it("builds a name of 128 characters and nothing for 129, so a request keeps a bounded size", () => {
+    const edge = `A${"b".repeat(127)}`;
+    expect(evalCall(WUGNOT, edge)).toBe(`${WUGNOT}.${edge}()`);
+    expect(evalCall(WUGNOT, `${edge}c`)).toBeNull();
+    expect(evalCall(WUGNOT, `A${"b".repeat(100_000)}`)).toBeNull();
+  });
+
   it("gives, for a recorded call, the exact data the chain answered", () => {
     expect(evalCall(WUGNOT, "TotalSupply")).toBe(`${ANY_EXPRESSION_RUNS.realm}.TotalSupply()`);
   });
@@ -158,7 +165,7 @@ describe("evalCall, for any strings", () => {
   function model(realm: string, name: string): boolean {
     const word = "[a-z][a-z0-9]*(?:[_-][a-z0-9]+)*";
     const path = new RegExp(`^(?:[a-z0-9-]+\\.)+[a-z]{2,63}/r/${word}(?:/${word})*$`);
-    return path.test(realm) && !realm.endsWith("_test") && /^[A-Z][A-Za-z0-9_]*$/.test(name);
+    return path.test(realm) && !realm.endsWith("_test") && /^[A-Z][A-Za-z0-9_]*$/.test(name) && name.length <= 128;
   }
 
   it("builds a call exactly when the model says so, and then it is exactly <realm>.<Name>()", () => {
