@@ -68,6 +68,39 @@ describe("Panel", () => {
       expect(caption.closest("[class*='label']")).not.toBeNull();
     });
 
+    // F3269: the plate's title is fitted to its words as the prototype's fitName does (the column over 0.58 em a letter, from 4
+    // letters), in steps a sheet reads: each step holds the longest name its size fits, so no name runs past the text column.
+    it.each([
+      ["Earth", "6"],
+      ["GovDAO", "6"],
+      ["BUBBLE", "6"],
+      ["Boopers", "8"],
+      ["Fresh Mint", "10"],
+      ["Art Hall Lagos", "16"],
+      ["Kyoto builders of dapps", "more"],
+    ])("fits the title of %s to the step %s", (label, fit) => {
+      render(
+        <Panel label={label} look="plate">
+          x
+        </Panel>,
+      );
+      expect(screen.getByRole("region", { name: label }).dataset["fit"]).toBe(fit);
+    });
+
+    it("counts a name's letters, not its code units: an emoji is one", () => {
+      render(
+        <Panel label="🌍🌍🌍🌍🌍🌍" look="plate">
+          x
+        </Panel>,
+      );
+      expect(screen.getByRole("region", { name: "🌍🌍🌍🌍🌍🌍" }).dataset["fit"]).toBe("6");
+    });
+
+    it("fits no title of a panel that is no plate", () => {
+      render(<Panel label="Fresh Mint">x</Panel>);
+      expect(screen.getByRole("region", { name: "Fresh Mint" }).dataset["fit"]).toBeUndefined();
+    });
+
     it("draws no caption for another look, whatever a caller passes", () => {
       render(
         <Panel label="Dock" caption="gnoworld · hub atlas">
@@ -75,6 +108,43 @@ describe("Panel", () => {
         </Panel>,
       );
       expect(screen.queryByText("gnoworld · hub atlas")).toBeNull();
+    });
+  });
+
+  // F3259: the page's layout round a plate: the plate in its place, one outline no reader meets, and what stands beside it.
+  describe("Panel.Layout", () => {
+    it("holds the plate in its place, then what stands beside it, after an outline no reader meets", () => {
+      const { container } = render(
+        <Panel.Layout
+          plate={
+            <Panel label="Bubble" look="plate">
+              x
+            </Panel>
+          }
+        >
+          <p>beside</p>
+        </Panel.Layout>,
+      );
+      const layout = container.firstElementChild;
+      const parts = [...(layout?.children ?? [])];
+      expect(parts).toHaveLength(3);
+      expect(parts[0]?.getAttribute("aria-hidden")).toBe("true");
+      expect(parts[0]?.childElementCount).toBe(0);
+      expect(parts[1]?.querySelector("section")?.getAttribute("aria-label")).toBe("Bubble");
+      expect(parts[2]?.textContent).toBe("beside");
+    });
+
+    it("is the plate and its outline alone when nothing stands beside it", () => {
+      const { container } = render(
+        <Panel.Layout
+          plate={
+            <Panel label="Earth" look="plate">
+              x
+            </Panel>
+          }
+        />,
+      );
+      expect(container.firstElementChild?.children).toHaveLength(2);
     });
   });
 

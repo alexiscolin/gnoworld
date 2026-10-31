@@ -1,7 +1,7 @@
-// The header as the video's frames 1, 20 and 37 draw it: the logo at the left, the views Earth, Cosmos and List in the middle,
-// the network the page is in (and "Testnet" when it is one), search and the login at the right. A control stands here only when
-// it works: Jarvis, chat, the passport and the bell join as their slices land.
-import { Chip, Cluster, Icon, Logo } from "@gnoworld/ui";
+// The header as the video's frames 1, 20 and 37 draw it: the logo at the left, the views Earth, Cosmos and List in the middle
+// with search inside their pill, the network the page is in ("Testnet" when it is one) and the login at the right. A control
+// stands here only when it works: Jarvis, chat, the passport and the bell join as their slices land.
+import { Chip, Icon, Logo } from "@gnoworld/ui";
 import { Link, useLocation } from "react-router";
 import { LoginControl } from "./features/login/index.ts";
 import { SearchPalette } from "./features/search/index.ts";
@@ -22,18 +22,18 @@ export function ShellHeader({ universe }: { universe: UniverseView }) {
         <Logo wordmark />
       </Link>
       <nav aria-label="Views" className={styles["views"]}>
-        <Cluster space="3xs" justify="center">
-          {views.map((view) => (
-            <Link
-              key={view.view}
-              to={view.path}
-              className={styles["view"]}
-              aria-current={view.view === current ? "page" : undefined}
-            >
-              {view.label}
-            </Link>
-          ))}
-        </Cluster>
+        {views.map((view) => (
+          <Link
+            key={view.view}
+            to={view.path}
+            className={styles["view"]}
+            aria-current={view.view === current ? "page" : undefined}
+          >
+            {view.label}
+          </Link>
+        ))}
+        <span className={styles["divider"]} aria-hidden="true" />
+        <SearchPalette />
       </nav>
       <div className={styles["end"]}>
         <p className={styles["network"]}>
@@ -45,10 +45,7 @@ export function ShellHeader({ universe }: { universe: UniverseView }) {
             </span>
           ) : null}
         </p>
-        <Cluster space="2xs" justify="end">
-          <SearchPalette />
-          <LoginControl />
-        </Cluster>
+        <LoginControl />
       </div>
     </header>
   );

@@ -1,4 +1,5 @@
 import { Cluster } from "../compositions/index.ts";
+import kicker from "../Kicker/Kicker.module.css";
 import { Anchor } from "../link.tsx";
 import styles from "./Breadcrumb.module.css";
 
@@ -9,12 +10,14 @@ export interface BreadcrumbProps {
   items: { label: string; href?: string }[];
 }
 
-/** Where the page sits in the site: a labelled trail of links ending on the current page, which is no link. */
+/** Where the page sits in the site: a labelled trail of links ending on the current page, which is no link. It is drawn as the
+ * video's kicker: the one label style, a dot in the world's colour, the steps apart by a chevron. */
 export function Breadcrumb({ label, items }: BreadcrumbProps) {
   if (items.length === 0) return null;
   const last = items.length - 1;
   return (
-    <nav aria-label={label} className={styles["trail"]}>
+    <nav aria-label={label} className={["label", styles["trail"]].join(" ")}>
+      <span className={[kicker["dot"], styles["world"]].join(" ")} aria-hidden="true" />
       <Cluster as="ol" space="2xs">
         {items.map((item, index) => (
           <li key={item.href ?? item.label}>

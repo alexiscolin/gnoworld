@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 import { PlacesList } from "./PlacesList.tsx";
 
@@ -25,13 +26,19 @@ function draw(props: Parameters<typeof PlacesList>[0]): HTMLElement {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
-  act(() => root?.render(<PlacesList {...props} />));
+  act(() =>
+    root?.render(
+      <MemoryRouter>
+        <PlacesList {...props} />
+      </MemoryRouter>,
+    ),
+  );
   return host;
 }
-// Each place is a Row (slice 5r): its link holds the title and the description, so a place is read by its title.
-const TITLE = '[class*="title"]:not([class*="subtitle"])';
+// Each place is a card (slice 5r): its link holds the name and the description, so a place is read by its name.
+const NAME = '[class*="name"]';
 const shown = (el: HTMLElement) =>
-  [...el.querySelectorAll(`ul[aria-label="Places"] a ${TITLE}`)].map((t) => t.textContent);
+  [...el.querySelectorAll(`ul[aria-label="Places"] a ${NAME}`)].map((t) => t.textContent);
 const button = (el: HTMLElement, name: string) => {
   const found = [...el.querySelectorAll("button")].find((b) => b.textContent === name);
   if (!found) throw new Error(`no button ${name}`);
@@ -47,7 +54,7 @@ describe("PlacesList", () => {
   it("lists every place as a link to its path, all of them while no genre is chosen", () => {
     const el = draw({ places, genres });
     expect(shown(el)).toEqual(["Arcade", "Forge", "Bubble"]);
-    expect(el.querySelector(`a[href="/w/forge"] ${TITLE}`)?.textContent).toBe("Forge");
+    expect(el.querySelector(`a[href="/w/forge"] ${NAME}`)?.textContent).toBe("Forge");
   });
 
   it("offers each genre as a toggle button in a group named Genres, none pressed at first", () => {
@@ -121,7 +128,7 @@ describe("PlacesList", () => {
       genres: [],
     });
     expect(el.querySelector("b, script")).toBeNull();
-    expect(el.querySelector(`a ${TITLE}`)?.textContent).toBe("<b>x</b>");
+    expect(el.querySelector(`a ${NAME}`)?.textContent).toBe("<b>x</b>");
     expect(el.querySelector("a b")).toBeNull();
   });
 });
@@ -173,32 +180,31 @@ describe("PlacesList thumbnails", () => {
   });
 });
 
-// Slice 5r (F3157): the list's rows are ui's Row, with the planet's thumbnail as their lead, as the prototype's CSS draws them.
-describe("PlacesList's rows", () => {
-  it("draws each place as one Row: one link to its page, its name, then its description, a planet before them", () => {
+// Slice 5r (F3157, F3266): the list's cards are the prototype's .hubcard: a planet, the name and the description in one link.
+describe("PlacesList's cards", () => {
+  it("draws each place as one card: one link to its page, its name, then its description, a planet before them", () => {
     const el = draw({ places, genres });
-    const rows = [...el.querySelectorAll("ul[aria-label='Places'] [data-look]")];
-    expect(rows).toHaveLength(3);
-    for (const [index, row] of rows.entries()) {
+    const cards = [...el.querySelectorAll("ul[aria-label='Places'] > li")];
+    expect(cards).toHaveLength(3);
+    for (const [index, card] of cards.entries()) {
       const place = places[index];
-      expect(row.querySelectorAll("a")).toHaveLength(1);
-      expect(row.querySelector("a")?.getAttribute("href")).toBe(place?.path);
-      expect(row.textContent).toBe(`${place?.name ?? ""}${place?.description ?? ""}`);
+      expect(card.querySelectorAll("a")).toHaveLength(1);
+      expect(card.querySelector("a")?.getAttribute("href")).toBe(place?.path);
+      expect(card.textContent).toBe(`${place?.name ?? ""}${place?.description ?? ""}`);
       // F3157: the planet is inside the one link, so tapping it opens the place.
-      expect(row.querySelector("a img, a svg")).not.toBeNull();
+      expect(card.querySelector("a img, a svg")).not.toBeNull();
     }
   });
 
-  it("keeps the planet decorative, since the row's title already names the place", () => {
+  it("keeps the planet decorative, since the name already names the place", () => {
     const el = draw({ places, genres });
     for (const picture of el.querySelectorAll("ul[aria-label='Places'] img")) {
       expect(picture.getAttribute("alt")).toBe("");
     }
   });
 
-  it("draws no loose paragraph or quiet button beside a row: the Row is the whole line", () => {
+  it("draws no loose paragraph or quiet button beside a card: the link is the whole card", () => {
     const el = draw({ places, genres });
-    expect(el.querySelectorAll("ul[aria-label='Places'] li > p")).toHaveLength(0);
-    expect(el.querySelectorAll("ul[aria-label='Places'] li > a")).toHaveLength(0);
+    expect(el.querySelectorAll("ul[aria-label='Places'] li > p, ul[aria-label='Places'] li > button")).toHaveLength(0);
   });
 });

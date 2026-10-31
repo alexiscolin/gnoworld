@@ -1,14 +1,44 @@
+/* The trail: the video's kicker over a title, in the label style at the kicker's size, a dot in the world's colour before it and
+   a chevron between the steps. */
 @layer components {
+  .trail {
+    /* raw: the video's crumbs are 12 px sans, 0.08em apart, at 70% (the prototype's .kicker), set through the label style's own values */
+    --font-label: 500 12px/1 var(--family-sans);
+    --tracking-caps: 0.08em;
+    --color-text-muted: color-mix(in oklab, var(--color-text) 70%, transparent);
+
+    /* layout: the dot and the steps share a line */
+    display: flex;
+    /* layout: the dot and the steps' words share a middle */
+    align-items: center;
+  }
+
+  .world {
+    --_dot: var(--world);
+
+    /* raw: the dot is 7 px and glows 10 px in the world's colour (the prototype's .kicker i) */
+    inline-size: 7px;
+    /* raw: the prototype's and the frames' own value */
+    block-size: 7px;
+    /* raw: the prototype's and the frames' own value */
+    box-shadow: 0 0 10px var(--world);
+  }
+
   .trail ol {
     padding-inline-start: 0;
     list-style: none;
-    /* layout: the list's own margin, which the browser gives it, taken off */
+    /* layout: the list's own margin, which the browser gives it, taken off; the chevrons space the steps */
     margin: 0;
+    /* layout: the arrangement the prototype and the frames draw */
+    gap: 0;
   }
 
   .trail li + li::before {
-    content: "/\00a0";
-    color: var(--color-text-muted);
+    /* raw: the chevron stands 8 px off each step, at 60% (the prototype's #fCrumbs span) */
+    /* layout: the arrangement the prototype and the frames draw */
+    margin-inline: 8px;
+    content: "\203a";
+    opacity: 0.6;
   }
 
   /* A step is a target of 24 px at least, as every control (WCAG 2.5.8). */
@@ -18,10 +48,18 @@
     /* layout: a step's words centred in its 24 px target */
     align-items: center;
     min-block-size: var(--control-xs);
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .trail a:hover {
+    color: var(--color-text);
+    text-decoration: underline;
+    /* raw: the prototype's and the frames' own value */
+    text-underline-offset: 3px;
   }
 
   .trail [aria-current="page"] {
     color: var(--color-text);
-    font-weight: 500;
   }
 }

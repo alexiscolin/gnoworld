@@ -6,7 +6,6 @@ import { failedWorldMeta, worldMeta } from "../meta.ts";
 import { pageOf, site } from "../places.ts";
 import { Chat } from "../features/chat/index.ts";
 import { isMissing, PageError } from "../features/errors/index.ts";
-import styles from "./plate.module.css";
 
 export function loader({ request }: { request: Request }) {
   return site.world(pageOf(request));
@@ -27,8 +26,8 @@ export default function World() {
   const world = useLoaderData<typeof loader>();
   const universe = site.home(world);
   return (
-    <div className={styles["beside"]}>
-      <div className={styles["plate"]}>
+    <Panel.Layout
+      plate={
         <Panel label={world.name} look="plate" caption="gnoworld · hub atlas">
           <Panel.Body>
             <Stack>
@@ -45,9 +44,10 @@ export default function World() {
             </Stack>
           </Panel.Body>
         </Panel>
-      </div>
+      }
+    >
       <Chat world={world.slug} />
-    </div>
+    </Panel.Layout>
   );
 }
 

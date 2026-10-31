@@ -54,7 +54,9 @@ describe("the header", () => {
     "%s: holds the logo, as the link home, named gnoworld",
     async (path) => {
       const html = await header(path);
-      expect(html).toMatch(/<a [^>]*href="\/"[^>]*>(?:(?!<\/a>)[\s\S])*gnoworld(?:(?!<\/a>)[\s\S])*<\/a>/);
+      // The word is "gno" in the semibold and "world" in the light weight: the link's text, tags off, is gnoworld.
+      const link = /<a [^>]*href="\/"[^>]*>((?:(?!<\/a>)[\s\S])*)<\/a>/.exec(html)?.[1] ?? "";
+      expect(link.replace(/<[^>]*>/g, "")).toBe("gnoworld");
     },
   );
 
@@ -122,9 +124,13 @@ describe("the header", () => {
     expect(mainnet).not.toContain("Testnet");
   });
 
-  test("keeps search, so a person can still find a place", async () => {
+  // F3265: the video's search is the last of the views' pill, after a divider.
+  test("keeps search inside the views' pill, after the three views", async () => {
     const html = await header("/earth");
-    expect(html).toMatch(/aria-label="Search|>Search/);
+    const pill = /<nav [^>]*aria-label="Views"[^>]*>([\s\S]*?)<\/nav>/.exec(html)?.[1] ?? "";
+    expect(pill.indexOf("List")).toBeGreaterThan(0);
+    expect(pill.indexOf('aria-label="Search"')).toBeGreaterThan(pill.indexOf("List"));
+    expect(html.match(/aria-label="Search"/g)).toHaveLength(1);
   });
 
   // No dead control: the video's Jarvis, chat, bell and passport work only once their slices land.

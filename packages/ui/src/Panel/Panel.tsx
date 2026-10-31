@@ -13,10 +13,23 @@ export interface PanelProps {
   children: ReactNode;
 }
 
+// The plate's title is fitted to its words, as the prototype's fitName does (app.js: the column over the letters at 0.58 em,
+// from 4 letters): each step is the longest name its size holds, so a name never runs past the plate's text column.
+const FITS = [6, 8, 10, 12, 16, 20] as const;
+const fitOf = (label: string) => {
+  const letters = [...new Intl.Segmenter().segment(label)].length;
+  return FITS.find((step) => letters <= step) ?? "more";
+};
+
 /** A panel: a region with its header, body and footer; the plate adds its dot grid and its caption. */
 export function Panel({ label, look = "docked", caption, children }: PanelProps) {
   return (
-    <section className={styles["panel"]} aria-label={label} data-look={look}>
+    <section
+      className={styles["panel"]}
+      aria-label={label}
+      data-look={look}
+      data-fit={look === "plate" ? fitOf(label) : undefined}
+    >
       {look === "plate" && caption !== undefined ? (
         <div className={styles["caption"]} aria-hidden="true">
           <Kicker vertical>{caption}</Kicker>
@@ -44,3 +57,23 @@ function Footer({ children }: { children: ReactNode }) {
 Panel.Header = Header;
 Panel.Body = Body;
 Panel.Footer = Footer;
+Panel.Layout = Layout;
+
+interface LayoutProps {
+  /** The plate: a Panel of the plate look. */
+  plate: ReactNode;
+  /** What the page holds beside the plate: it keeps to the plate's right on a wide screen, and follows it in the page otherwise. */
+  children?: ReactNode;
+}
+
+/** A world's page: the plate and what stands beside it. On a wide screen the plate is fixed at the left, inside one outline
+ * the scene and the dock will share; under that width it is a block in the page. The width is this sheet's alone. */
+function Layout({ plate, children }: LayoutProps) {
+  return (
+    <div className={styles["layout"]}>
+      <div className={styles["frame"]} aria-hidden="true" />
+      <div className={styles["place"]}>{plate}</div>
+      {children}
+    </div>
+  );
+}

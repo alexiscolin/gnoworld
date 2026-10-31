@@ -1,9 +1,11 @@
-import { Button, Chip, Cluster, PlanetThumb, Row, Stack } from "@gnoworld/ui";
+import { Button, Chip, Cluster, PlanetThumb, Stack } from "@gnoworld/ui";
+import type { ReactNode } from "react";
 import { useState } from "react";
+import { Link } from "react-router";
 import styles from "./PlacesList.module.css";
 import { filterByGenre, type ListedPlace } from "./filter.ts";
 
-/** The places, as links to their pages, with a toggle per genre: a native button, so the keyboard reaches it. */
+/** The places as the prototype's cards (#board's .hubcard), each a link to its page, with a toggle per genre: a native button, so the keyboard reaches it. */
 export function PlacesList({ places, genres }: { places: ListedPlace[]; genres: { slug: string; name: string }[] }) {
   const [chosen, setChosen] = useState<string[]>([]);
   if (places.length === 0) return <p>No place yet.</p>;
@@ -44,20 +46,33 @@ export function PlacesList({ places, genres }: { places: ListedPlace[]; genres: 
           </Cluster>
         </Stack>
       ) : (
-        <ul aria-label="Places" className={styles["places"]}>
+        <ul aria-label="Places" className={styles["cards"]}>
           {shown.map((place) => (
             <li key={place.path}>
               {/* No capture exists yet: the drawn fallback, never a picture from elsewhere. */}
-              <Row
-                href={place.path}
-                title={place.name}
-                subtitle={place.description}
-                lead={<PlanetThumb src="" name={place.name} size="s" decorative />}
-              />
+              <Link to={place.path} className={styles["card"]}>
+                <span className={styles["head"]}>
+                  <PlanetThumb src="" name={place.name} size="m" decorative />
+                  <span className={styles["words"]}>
+                    <span className={styles["name"]}>{place.name}</span>
+                    <span className={styles["description"]}>{place.description}</span>
+                  </span>
+                </span>
+              </Link>
             </li>
           ))}
         </ul>
       )}
     </Stack>
+  );
+}
+
+/** The list's board: on a computer, the prototype's #board, a box of its own over the page from 98 px under the top to 24 px
+ * over the foot; on a phone, the page itself. */
+export function Board({ children }: { children: ReactNode }) {
+  return (
+    <div className={styles["board"]}>
+      <Stack>{children}</Stack>
+    </div>
   );
 }

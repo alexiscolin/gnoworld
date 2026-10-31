@@ -7,6 +7,7 @@ import { UpdatePrompt } from "./features/update/index.ts";
 import { site } from "./places.ts";
 import { AppLinks } from "./routerLink.tsx";
 import { ShellHeader } from "./shellHeader.tsx";
+import header from "./shellHeader.module.css";
 import { StoreProvider } from "./storeContext.tsx";
 
 export function Shell({ children }: { children: ReactNode }) {
@@ -16,7 +17,7 @@ export function Shell({ children }: { children: ReactNode }) {
       <AppLinks>
         <ShellHeader universe={universe} />
         <Center max="page">
-          <main>{children}</main>
+          <main className={header["page"]}>{children}</main>
         </Center>
         <UpdatePrompt />
       </AppLinks>

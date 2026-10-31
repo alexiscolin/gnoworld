@@ -289,12 +289,12 @@ describe("react-router build", () => {
         const client = join(copy, "build", "client");
         const page = (...path: string[]) => readFileSync(join(client, ...path, "index.html"), "utf8");
         const pages: [string[], string, string][] = [
-          [[], "gno.world", "/net/onyx/"],
+          [[], "\\d+ worlds? in Onyx", "/net/onyx/"],
           [["w", "bubble"], "Bubble", "/net/onyx/w/bubble"],
           [["w", "mars"], "Mars", "/net/onyx/w/mars"],
-          [["net", "onyx"], "gno.world", "/net/onyx/"],
+          [["net", "onyx"], "\\d+ worlds? in Onyx", "/net/onyx/"],
           [["net", "onyx", "w", "mars"], "Mars", "/net/onyx/w/mars"],
-          [["net", "gnoland"], "gno.land", "/net/gnoland/"],
+          [["net", "gnoland"], "\\d+ worlds? in gno\\.land", "/net/gnoland/"],
           [["net", "gnoland", "w", "other"], "Other", "/net/gnoland/w/other"],
           [["earth"], "Earth", "/net/onyx/earth"],
           [["net", "onyx", "earth"], "Earth", "/net/onyx/earth"],
@@ -306,7 +306,8 @@ describe("react-router build", () => {
         for (const [path, heading, canonical] of pages) {
           const html = page(...path);
           const where = path.join("/") || "/";
-          expect(html, where).toContain(`<h1>${heading}</h1>`);
+          // The cosmos' heading is the hero's line (F3267), so a heading is a pattern.
+          expect(html.replaceAll("<!-- -->", ""), where).toMatch(new RegExp(`<h1\\b[^>]*>${heading}</h1>`));
           expect(html, where).toContain(`<link rel="canonical" href="https://gno.world${canonical}"/>`);
         }
         // The home lists the worlds of its universe alone, and the data's order is not a page.
