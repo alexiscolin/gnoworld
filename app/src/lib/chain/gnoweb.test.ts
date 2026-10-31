@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { gnowebLink, gnowebOrigin, isGnowebAddress } from "./gnoweb.ts";
+import { gnowebLink, gnowebOrigin } from "./gnoweb.ts";
 
 describe("gnowebOrigin: where a chain's gnoweb is", () => {
   it("names the two hosts of the recorded answers", () => {
@@ -43,25 +43,25 @@ describe("gnowebLink: a realm's address on gnoweb", () => {
   );
 });
 
-describe("isGnowebAddress: a realm's page on one of the two gnoweb origins, written out", () => {
-  it.each(["https://gno.land/r/gov/dao:15", "https://onyx.testnets.gno.land/r/gov/dao"])("accepts %s", (href) => {
-    expect(isGnowebAddress(href)).toBe(true);
+describe("gnowebLink with a page of the realm: `realm:15`", () => {
+  it("adds the page after the realm's path, on either origin", () => {
+    expect(gnowebLink("https://gno.land", "gno.land/r/gov/dao", 15)).toBe("https://gno.land/r/gov/dao:15");
+    expect(gnowebLink("https://onyx.testnets.gno.land", "/r/gov/dao", 0)).toBe(
+      "https://onyx.testnets.gno.land/r/gov/dao:0",
+    );
   });
 
-  it.each([
-    "http://gno.land/r/gov/dao",
-    "https://gno.land.evil.example/r/gov/dao",
-    "https://gno.land@evil.example/r/gov/dao",
-    "https://gno.land:8443/r/gov/dao",
-    "https://evil.example/r/gov/dao",
-    "HTTPS://gno.land/r/gov/dao",
-    "https://gno.land/r/",
-    "https://gno.land/r/gov/dao?x=1",
-    "https://gno.land/r/gov/dao#x",
-    "https://gno.land/r/gov dao",
-    "https://gno.land/p/demo/avl",
-    "",
-  ])("refuses %j", (href) => {
-    expect(isGnowebAddress(href)).toBe(false);
+  it.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1])(
+    "leads nowhere for the page %j",
+    (page) => {
+      expect(gnowebLink("https://gno.land", "/r/gov/dao", page)).toBeUndefined();
+    },
+  );
+
+  it("still leads nowhere for a path that leaves the realm's, with a page or without", () => {
+    for (const path of ["/r/../../evil", "/r/a/./b", "/r/a/.."]) {
+      expect(gnowebLink("https://gno.land", path, 1)).toBeUndefined();
+      expect(gnowebLink("https://gno.land", path)).toBeUndefined();
+    }
   });
 });

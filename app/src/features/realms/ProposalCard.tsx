@@ -3,7 +3,6 @@
 // are text; the link is drawn only when it is one of gnoweb's own addresses. No vote button.
 import { cutGraphemes } from "@gnoworld/core";
 import { Card } from "@gnoworld/ui";
-import { isGnowebAddress } from "../../lib/chain/gnoweb.ts";
 import { tallyOf, type Proposal } from "../../lib/chain/proposal.ts";
 import type { ChainRead, Source } from "../../lib/chain/read.ts";
 import { ReadFailed, ReadSource } from "./ReadSource.tsx";
@@ -14,8 +13,8 @@ const CARD_TITLE = 120;
 export interface ProposalCardProps {
   proposal: Proposal;
   source: Source;
-  /** The proposal on gnoweb; drawn as a link only when it is a realm page on one of gnoweb's origins. */
-  href: string;
+  /** The proposal on gnoweb, from `gnowebLink` (lib/chain/gnoweb.ts); no link is drawn without one. */
+  href?: string;
 }
 
 export function ProposalCard({ proposal, source, href }: ProposalCardProps) {
@@ -28,20 +27,20 @@ export function ProposalCard({ proposal, source, href }: ProposalCardProps) {
         {proposal.state === "" ? null : <p data-field="state">{proposal.state}</p>}
         {tally === undefined ? null : <p data-field="tally">{tally}</p>}
         <ReadSource source={source} />
-        {isGnowebAddress(href) ? (
+        {href === undefined ? null : (
           <a href={href} target="_blank" rel="noopener noreferrer">
             Read it on gnoweb
           </a>
-        ) : null}
+        )}
       </Card.Body>
     </Card>
   );
 }
 
 /** A proposal's read as the page draws it: the card, or the failure with its next step. */
-export function ProposalView({ read, href }: { read: ChainRead<Proposal>; href: string }) {
+export function ProposalView({ read, href }: { read: ChainRead<Proposal>; href?: string }) {
   return read.ok ? (
-    <ProposalCard proposal={read.value} source={read.source} href={href} />
+    <ProposalCard proposal={read.value} source={read.source} {...(href === undefined ? {} : { href })} />
   ) : (
     <ReadFailed failure={read.failure} source={read.source} />
   );
