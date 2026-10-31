@@ -21,5 +21,8 @@ export async function readRealmFacts(
   const answer = await readChain(asked, RealmFactsAnswer, options);
   if (!answer.ok) return answer;
   const facts = answer.value.data.realmFacts;
-  return facts === null ? failedRead("no-realm", answer.source) : { ok: true, value: facts, source: answer.source };
+  if (facts === null) return failedRead("no-realm", answer.source);
+  // An answer about another realm than the one asked is not this realm's facts.
+  if (facts.path !== undefined && facts.path !== path) return failedRead("wrong-shape", answer.source);
+  return { ok: true, value: facts, source: answer.source };
 }

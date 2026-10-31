@@ -68,6 +68,18 @@ describe("readRealmFacts", () => {
     expect(result.ok && result.value).toEqual({ path: REALM, deployer: HOSTILE });
   });
 
+  it("says wrong-shape for facts of another realm than the one asked, and takes facts that name the same one or none", async () => {
+    const other = readRealmFacts(
+      INDEXER,
+      REALM,
+      options(answering(withFacts({ ...FACTS, path: "gno.land/r/other/realm" }))),
+    );
+    expect(failureOf(await other).kind).toBe("wrong-shape");
+    expect(JSON.stringify(await other)).not.toContain("other/realm");
+    expect((await readRealmFacts(INDEXER, REALM, options(answering(withFacts(FACTS))))).ok).toBe(true);
+    expect((await readRealmFacts(INDEXER, REALM, options(answering(withFacts({ firstBlock: 1 }))))).ok).toBe(true);
+  });
+
   it("says no-realm for a realm the indexer does not know", async () => {
     const result = await readRealmFacts(INDEXER, REALM, options(answering(withFacts(null))));
     expect(failureOf(result).kind).toBe("no-realm");
