@@ -66,13 +66,14 @@ function far(run: Run, country: string): boolean {
   return run.viewer.facing !== undefined && centre !== undefined && isFarSide(centre, run.viewer.facing);
 }
 
+/** Whether a bubble of the state may stay on screen: yours shows whatever the far side (§1, question 4), the rest not. */
 function visible(run: Run, s: Bubble): boolean {
   return (
     s.until > run.now &&
     centreOf(s.country) !== undefined &&
     !run.blocked.has(fold(s.account)) &&
     run.window.get(s.id)?.hidden !== true &&
-    !far(run, s.country)
+    (s.own || !far(run, s.country))
   );
 }
 
@@ -145,10 +146,26 @@ function oldestOfOthers(screen: readonly Bubble[]): Bubble | undefined {
   return oldest;
 }
 
+/** Keeps a line of yours that was not shown because a newer one of its country was, so no later call takes it for a new
+ * one and ends the newer bubble for it (F3361). It is in the state and on no screen. */
+function spend(run: Run, c: Candidate): void {
+  const { message } = c;
+  run.state.set(message.id, {
+    id: message.id,
+    account: message.account,
+    country: c.country,
+    text: "",
+    since: run.now,
+    until: run.now,
+    own: true,
+  });
+}
+
 /** Yours: shown whatever the delay or the far side, in your country's place, and the oldest other bubble's if the screen
  * is full; of your messages of one country in a call, the newest. */
 function placeYours(run: Run, c: Candidate, done: Set<string>): void {
   if (done.has(c.country)) {
+    spend(run, c);
     count(run, c.country);
     return;
   }
@@ -177,6 +194,23 @@ function placeOther(run: Run, c: Candidate): void {
   }
 }
 
+/** The screen from the state, which keeps every rule at every call: a bubble that stops being allowed (its country went
+ * to the far side, its speaker was muted, its line hidden) ends for good, so it cannot come back past the caps; and a
+ * smaller `maxOnScreen` takes the oldest bubbles off (F3360). */
+function settle(run: Run): void {
+  run.screen = [];
+  for (const s of [...run.state.values()]) {
+    if (s.until <= run.now) continue;
+    if (visible(run, s)) run.screen.push(s);
+    else end(run, s);
+  }
+  while (run.screen.length > run.max) {
+    const oldest = oldestOfOthers(run.screen) ?? run.screen[0];
+    if (oldest === undefined) break;
+    end(run, oldest);
+  }
+}
+
 export function pickBubbles(...[messages, now, viewer, rules, shown]: PickArgs): Picked {
   const window = readWindow(messages, rules.readLast);
   const show = rules.showSeconds * 1000;
@@ -193,7 +227,7 @@ export function pickBubbles(...[messages, now, viewer, rules, shown]: PickArgs):
     screen: [],
   };
   for (const [id, bubble] of remembered(shown, window, run)) run.state.set(id, bubble);
-  run.screen = [...run.state.values()].filter((s) => visible(run, s));
+  settle(run);
   for (const s of run.state.values())
     run.began.set(fold(s.account), Math.max(run.began.get(fold(s.account)) ?? -Infinity, s.since));
 

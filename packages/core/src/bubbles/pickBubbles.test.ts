@@ -1,7 +1,10 @@
 import fc from "fast-check";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import data from "../../../../app/data/bubbles.json" with { type: "json" };
+import { isBlank } from "../markdown/nodes.ts";
+import { centreOf } from "./countries.ts";
 import { cutText } from "./cut.ts";
+import { isFarSide, type LatLon } from "./farSide.ts";
 import { pickBubbles, type Bubble, type BubbleMessage, type Viewer } from "./pickBubbles.ts";
 import type { Rules } from "./rules.ts";
 
@@ -657,6 +660,90 @@ describe("it is a function", () => {
   });
 });
 
+// One rule (F3360, F3361, F3362): a bubble kept in the state keeps every invariant at every call, whatever the globe did
+// between two calls. A bubble that stops being allowed leaves for good; one message is never refused in one call and
+// taken in the next.
+describe("a bubble in the state at every call", () => {
+  const BRAZIL = { lat: 0, lon: -60 };
+  const INDIA = { lat: 0, lon: 80 };
+  const BETWEEN = { lat: 0, lon: 10 };
+  const SOUTH_AMERICA = ["BR", "AR", "CL", "CO", "PE", "VE"];
+  const SOUTH_ASIA = ["IN", "CN", "TH", "VN", "BD", "PK"];
+  const facing = (at: { lat: number; lon: number }): Viewer => ({ ...ME, facing: at });
+  const from = (countries: readonly string[], tag: string, at: number): BubbleMessage[] =>
+    countries.map((country, n) =>
+      msg(n, { id: `${tag}${country}`, account: `${tag}${String(n)}`, country, at: at - n }),
+    );
+  const mine = (over: Partial<BubbleMessage> = {}): BubbleMessage =>
+    msg(90, { id: "mine", account: "me", country: "JP", at: NOW - 60_000, ...over });
+
+  it("does not bring far bubbles back past the cap when the globe turns back (F3360)", () => {
+    const messages = [...from(SOUTH_AMERICA, "sa", NOW - 3000), ...from(SOUTH_ASIA, "as", NOW - 2000)];
+    const one = pick(messages, facing(BRAZIL));
+    expect(ids(one.bubbles)).toEqual(SOUTH_AMERICA.map((c) => `sa${c}`));
+    const two = pick(messages, facing(INDIA), { shown: one.shown, now: NOW + 1000 });
+    expect(ids(two.bubbles)).toEqual(SOUTH_ASIA.map((c) => `as${c}`));
+    const three = pick(messages, facing(BETWEEN), { shown: two.shown, now: NOW + 2000 });
+    expect(three.bubbles.length).toBeLessThanOrEqual(RULES.maxOnScreen);
+    expect(ids(three.bubbles).filter((id) => id.startsWith("sa"))).toEqual([]);
+    expect(ids(three.bubbles).every((id) => ids(two.bubbles).includes(id))).toBe(true);
+  });
+
+  it("does not bring a displaced country's bubble back beside yours when the globe turns (F3360)", () => {
+    const kenji = msg(1, { id: "kenji", account: "kenji", country: "JP", at: NOW - 3000 });
+    const one = pick([kenji], facing(BRAZIL));
+    expect(one.bubbles).toEqual([]);
+    const home = pick([kenji], facing({ lat: 36, lon: 138 }), { shown: one.shown });
+    const out = pick([kenji, mine({ at: NOW + 1000 })], facing(BRAZIL), { shown: home.shown, now: NOW + 1000 });
+    expect(ids(out.bubbles)).toEqual(["mine"]);
+    const back = pick([kenji, mine({ at: NOW + 1000 })], facing({ lat: 36, lon: 138 }), {
+      shown: out.shown,
+      now: NOW + 2000,
+    });
+    expect(ids(back.bubbles)).toEqual(["mine"]);
+  });
+
+  it("keeps the newest of several lines of yours for its whole time, not one tick (F3361)", () => {
+    const lines = [4, 3, 2, 1].map((k) => mine({ id: `mine${String(k)}`, at: NOW - k * 1000 }));
+    let shown: readonly Bubble[] = [];
+    for (let tick = 0; tick < RULES.showSeconds; tick++) {
+      const out = pick(lines, ME, { shown, now: NOW + tick * 1000 });
+      expect(ids(out.bubbles)).toEqual(["mine1"]);
+      expect(out.bubbles[0]?.until).toBe(NOW + SHOW);
+      shown = out.shown;
+    }
+    expect(pick(lines, ME, { shown, now: NOW + SHOW }).bubbles).toEqual([]);
+  });
+
+  it("shows two lines of yours sent in one tick as the newest alone, then neither of them again (F3361)", () => {
+    const lines = [mine({ id: "first", at: NOW - 200 }), mine({ id: "second", at: NOW - 100 })];
+    const one = pick(lines);
+    const two = pick(lines, ME, { shown: one.shown, now: NOW + 1000 });
+    expect(ids(one.bubbles)).toEqual(["second"]);
+    expect(ids(two.bubbles)).toEqual(["second"]);
+    expect(two.counts).toEqual([]);
+  });
+
+  it("keeps yours on the far side for its time: the exemption holds at the next call (F3362)", () => {
+    const line = mine({ at: NOW - 100 });
+    const one = pick([line], facing(BRAZIL));
+    const two = pick([line], facing(BRAZIL), { shown: one.shown, now: NOW + 1000 });
+    expect(ids(one.bubbles)).toEqual(["mine"]);
+    expect(ids(two.bubbles)).toEqual(["mine"]);
+    expect(two.counts).toEqual([]);
+    expect(pick([line], facing(BRAZIL), { shown: two.shown, now: NOW + SHOW }).bubbles).toEqual([]);
+  });
+
+  it("takes the oldest bubbles off when maxOnScreen is smaller than the screen it was given", () => {
+    const full = pick(many(RULES.maxOnScreen, (n) => ({ country: CODES[n] ?? "JP" })));
+    const rules: Rules = { ...RULES, maxOnScreen: 2 };
+    const out = pickBubbles([], NOW + 1000, ME, rules, full.shown);
+    expect(out.bubbles).toHaveLength(2);
+    const later = pickBubbles([], NOW + 2000, ME, { ...RULES, maxOnScreen: RULES.maxOnScreen }, out.shown);
+    expect(ids(later.bubbles)).toEqual(ids(out.bubbles));
+  });
+});
+
 describe("for any input (property)", () => {
   const others = ["ann", "bob", "cy", "dee", "eve"];
   const speakers = [...others, "me"];
@@ -664,7 +751,7 @@ describe("for any input (property)", () => {
     {
       id: fc.uuid(),
       at: fc.integer({ min: NOW - 120_000, max: NOW + 60_000 }),
-      account: fc.constantFrom(...speakers, "ANN", "Bob"),
+      account: fc.constantFrom(...speakers, "ANN", "Bob", "ME"),
       text: fc.string({ unit: "grapheme", maxLength: 400 }),
       country: fc.oneof(fc.constantFrom(...CODES), fc.constantFrom("jp", "", "XYZ")),
       visibility: fc.constantFrom("public", "public", "public", "private", "dm"),
@@ -675,28 +762,56 @@ describe("for any input (property)", () => {
     },
     { requiredKeys: ["id", "at", "account", "text", "visibility", "joined"] },
   ) as fc.Arbitrary<BubbleMessage>;
+  const place = fc.record({ lat: fc.integer({ min: -90, max: 90 }), lon: fc.integer({ min: -180, max: 180 }) });
   const viewer = fc.record({
     account: fc.constant("me"),
     hub: fc.constantFrom("bubble", "other"),
     muted: fc.subarray(others),
     banned: fc.subarray(others),
   }) as fc.Arbitrary<Viewer>;
+  /** The rules drawn from the bounds BubbleRules (packages/schemas/src/data.ts) allows, each end included. */
+  const rules: fc.Arbitrary<Rules> = fc.record({
+    maxOnScreen: fc.integer({ min: 1, max: 12 }),
+    showSeconds: fc.integer({ min: 1, max: 15 }),
+    speakerDelaySeconds: fc.integer({ min: 1, max: 120 }),
+    maxChars: fc.integer({ min: 20, max: 160 }),
+    readLast: fc.oneof(fc.integer({ min: 1, max: 2000 }), fc.integer({ min: 1, max: 60 })),
+  });
   /** A message nothing in the rules refuses, at the first step (an empty state): one at least must then be shown. */
   const open = (m: BubbleMessage): boolean => m.visibility === "public" && m.joined && m.hidden !== true;
-  const eligible = (m: BubbleMessage, who: Viewer): boolean =>
+  /** The messages that are read: the newest `readLast`, as the function reads them. */
+  const readBy = (messages: readonly BubbleMessage[], limit: number): BubbleMessage[] =>
+    [...messages].sort((a, b) => b.at - a.at || (a.id < b.id ? -1 : 1)).slice(0, limit);
+  /** Who looks, under which rules, and where the globe faces (none: no far side). */
+  interface Look {
+    readonly who: Viewer;
+    readonly rule: Rules;
+    readonly at: LatLon | undefined;
+  }
+  const eligible = (m: BubbleMessage, { who, rule, at }: Look): boolean =>
     open(m) &&
     m.country !== undefined &&
     CODES.includes(m.country) &&
-    cutText(m.text, RULES.maxChars).trim().length > 0 &&
-    ![...who.muted, ...who.banned].some((a) => a.toLowerCase() === m.account.toLowerCase());
-  const steps = Array.from({ length: 45 }, (_, k) => NOW + k * 1000);
+    !isBlank(cutText(m.text, rule.maxChars)) &&
+    ![...who.muted, ...who.banned].some((a) => a.toLowerCase() === m.account.toLowerCase()) &&
+    (m.account.toLowerCase() === who.account ||
+      at === undefined ||
+      !isFarSide(centreOf(m.country) ?? { lat: 0, lon: 0 }, at));
+  const steps = Array.from({ length: 120 }, (_, k) => NOW + k * 1000);
+  const turns = fc.array(fc.option(place, { nil: undefined }), { minLength: steps.length, maxLength: steps.length });
+  const scenario = fc.record({
+    messages: fc.array(message, { maxLength: 60 }),
+    who: viewer,
+    rule: rules,
+    facings: turns,
+  });
 
-  const shownIfAny = (messages: readonly BubbleMessage[], who: Viewer, bubbles: readonly Bubble[]): boolean =>
-    bubbles.length > 0 || !messages.some((m) => eligible(m, who));
+  const shownIfAny = (messages: readonly BubbleMessage[], look: Look, bubbles: readonly Bubble[]): boolean =>
+    bubbles.length > 0 || !readBy(messages, look.rule.readLast).some((m) => eligible(m, look));
 
   /** What a bubble on screen must be: of a public, joined, visible line of an account the viewer did not mute or ban. */
-  function checkBubble(b: Bubble, source: BubbleMessage | undefined, who: Viewer): void {
-    expect(graphemes(b.text)).toBeLessThanOrEqual(RULES.maxChars);
+  function checkBubble(b: Bubble, source: BubbleMessage | undefined, { who, rule }: Look): void {
+    expect(graphemes(b.text)).toBeLessThanOrEqual(rule.maxChars);
     if (source === undefined) return;
     expect(open(source)).toBe(true);
     const account = source.account.toLowerCase();
@@ -718,28 +833,36 @@ describe("for any input (property)", () => {
     return [...by.values()];
   }
 
-  it("never breaks a cap, a place or a rule, and never shows what is private, hidden or muted", () => {
+  it("never breaks a cap, a place or a rule, whatever the rules and the turns of the globe, over many ticks", () => {
     fc.assert(
-      fc.property(fc.array(message, { maxLength: 60 }), viewer, (messages, who) => {
+      fc.property(scenario, ({ messages, who, rule, facings }) => {
         const byId = new Map(messages.map((m) => [m.id, m]));
         let shown: readonly Bubble[] = [];
         const everShown = new Map<string, Bubble>();
-        for (const now of steps) {
-          const out = pickBubbles(messages, now, who, RULES, shown);
-          if (now === NOW) expect(shownIfAny(messages, who, out.bubbles)).toBe(true);
-          expect(out.bubbles.length).toBeLessThanOrEqual(RULES.maxOnScreen);
+        const gone = new Set<string>();
+        let before = new Set<string>();
+        steps.forEach((now, k) => {
+          const at = facings[k];
+          const here: Viewer = at === undefined ? who : { ...who, facing: at };
+          const out = pickBubbles(messages, now, here, rule, shown);
+          if (k === 0) expect(shownIfAny(messages, { who, rule, at }, out.bubbles)).toBe(true);
+          expect(out.bubbles.length).toBeLessThanOrEqual(rule.maxOnScreen);
           const countries = out.bubbles.map((b) => b.country);
           expect(new Set(countries).size).toBe(countries.length);
           for (const b of out.bubbles) {
             expect(b.until).toBeGreaterThan(now);
-            checkBubble(b, byId.get(b.id), who);
+            expect(gone.has(b.id), "a message that left the screen is back").toBe(false);
+            checkBubble(b, byId.get(b.id), { who, rule, at });
           }
+          const onScreen = new Set(ids(out.bubbles));
+          for (const id of before) if (!onScreen.has(id)) gone.add(id);
+          before = onScreen;
           for (const s of out.shown) if (!everShown.has(s.id)) everShown.set(s.id, s);
           shown = out.shown;
-        }
+        });
         for (const times of startsOf(everShown, who))
           for (let i = 1; i < times.length; i++)
-            expect((times[i] ?? 0) - (times[i - 1] ?? 0)).toBeGreaterThanOrEqual(DELAY);
+            expect((times[i] ?? 0) - (times[i - 1] ?? 0)).toBeGreaterThanOrEqual(rule.speakerDelaySeconds * 1000);
       }),
       { numRuns: 60 },
     );
@@ -765,12 +888,13 @@ describe("for any input (property)", () => {
 
   it("keeps in its state only what is shown, or in the list, or inside the delay", () => {
     fc.assert(
-      fc.property(fc.array(message, { maxLength: 40 }), (messages) => {
+      fc.property(fc.array(message, { maxLength: 40 }), rules, (messages, rule) => {
         let shown: readonly Bubble[] = [];
         for (const now of steps) {
-          const out = pickBubbles(messages, now, ME, RULES, shown);
+          const out = pickBubbles(messages, now, ME, rule, shown);
           const listed = new Set(messages.map((m) => m.id));
-          for (const s of out.shown) expect(listed.has(s.id) || now - s.since < DELAY).toBe(true);
+          for (const s of out.shown)
+            expect(listed.has(s.id) || s.until > now || now - s.since < rule.speakerDelaySeconds * 1000).toBe(true);
           shown = out.shown;
         }
       }),
@@ -780,13 +904,24 @@ describe("for any input (property)", () => {
 
   it("gives the same answer twice, and the same for a list in any order (determinism)", () => {
     fc.assert(
-      fc.property(fc.array(message, { maxLength: 40 }), viewer, fc.integer({ min: 0, max: 40 }), (messages, who, k) => {
-        const unique = [...new Map(messages.map((m) => [m.id, m])).values()];
-        const one = pickBubbles(unique, NOW + k * 1000, who, RULES, []);
-        if (unique.some((m) => eligible(m, who))) expect(one.bubbles.length).toBeGreaterThan(0);
-        expect(pickBubbles(unique, NOW + k * 1000, who, RULES, [])).toEqual(one);
-        expect(pickBubbles([...unique].reverse(), NOW + k * 1000, who, RULES, [])).toEqual(one);
-      }),
+      fc.property(
+        fc.record({
+          messages: fc.array(message, { maxLength: 40 }),
+          who: viewer,
+          rule: rules,
+          at: place,
+          k: fc.integer({ min: 0, max: 40 }),
+        }),
+        ({ messages, who, rule, at, k }) => {
+          const unique = [...new Map(messages.map((m) => [m.id, m])).values()];
+          const here: Viewer = { ...who, facing: at };
+          const one = pickBubbles(unique, NOW + k * 1000, here, rule, []);
+          if (readBy(unique, rule.readLast).some((m) => eligible(m, { who, rule, at })))
+            expect(one.bubbles.length).toBeGreaterThan(0);
+          expect(pickBubbles(unique, NOW + k * 1000, here, rule, [])).toEqual(one);
+          expect(pickBubbles([...unique].reverse(), NOW + k * 1000, here, rule, [])).toEqual(one);
+        },
+      ),
       { numRuns: 60 },
     );
   });
