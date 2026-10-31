@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { queryEnvelope } from "../../../tests/chain/chainEnvelopes.ts";
 import type { ChainFetch, ChainRead, ReadOptions } from "./read.ts";
 import { PROPOSAL_CAPS, Proposal } from "@gnoworld/schemas/proposal";
-import { proposalOf, proposalsOf, readProposal } from "./proposal.ts";
+import { proposalOf, proposalsOf, readProposal, readProposals } from "./proposal.ts";
 
 // 5k2, a GovDAO page to a Proposal, against pages RECORDED through gnomcp (F2951): app/tests/chain/recorded/, each file's first
 // line naming its chain, height and date. What the real pages state is read; what they do not state (a threshold) stays absent.
@@ -432,5 +432,37 @@ describe("readProposal", () => {
       "refused",
     );
     expect(fetcher).not.toHaveBeenCalled();
+  });
+});
+
+describe("readProposals", () => {
+  const answering = (body: unknown, init?: ResponseInit) =>
+    vi.fn<ChainFetch>(() => Promise.resolve(new Response(JSON.stringify(body), init)));
+  const options = (fetcher: ChainFetch): ReadOptions => ({ fetch: fetcher, now: () => NOW });
+
+  it("asks the realm's home page once and gives the proposals it lists, newest first as written, with its source", async () => {
+    const fetcher = answering(queryEnvelope({ data: HOME_ONYX }));
+    const result = await readProposals(RPC, REALM, options(fetcher));
+    expect(result.ok && result.value.map(({ id }) => id)).toEqual([37, 36, 35, 34, 33]);
+    expect(result.ok && result.value.every(({ yes, threshold }) => yes === undefined && threshold === undefined)).toBe(
+      true,
+    );
+    expect(result.source.at).toBe(NOW.toISOString());
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    const hex = /data=0x([0-9a-f]+)/.exec(fetcher.mock.calls[0]?.[0] ?? "")?.[1] ?? "";
+    expect(new TextDecoder().decode(Uint8Array.from(hex.match(/../g) ?? [], (byte) => Number.parseInt(byte, 16)))).toBe(
+      `${REALM}:`,
+    );
+  });
+
+  it("gives no proposal, not a failure, for a home page that lists none", async () => {
+    const result = await readProposals(RPC, REALM, options(answering(queryEnvelope({ data: "# GovDAO\n" }))));
+    expect(result.ok && result.value).toEqual([]);
+  });
+
+  it("passes a failed read on with its kind, as the page's own", async () => {
+    const result = await readProposals(RPC, REALM, options(answering({}, { status: 503 })));
+    expect(result.ok).toBe(false);
+    expect(!result.ok && result.failure.kind).toBe("down");
   });
 });

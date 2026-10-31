@@ -22,6 +22,8 @@ export interface Listed {
   path: string;
   /** Its one address on the site, always under /net/<universe>. */
   canonical: string;
+  /** The realms a world is about, on its universe's chain: the first is the one its page reads proposals from. */
+  realms?: readonly string[];
 }
 export type World = Listed;
 export type Ecosystem = Listed;
@@ -46,6 +48,7 @@ interface Row {
   name: string;
   description: string;
   universe: string;
+  realms?: readonly string[] | undefined;
 }
 interface Source {
   universes: { id: string; name: string; rpc: string; default?: boolean | undefined; testnet?: boolean | undefined }[];
@@ -127,7 +130,15 @@ function viewAt(universe: UniverseView, pathname: string): View | undefined {
 const trimmed = (pathname: string) => (pathname.length > 1 ? pathname.replace(/\/$/, "") : pathname);
 
 function listedFrom(row: Row, testnet: boolean, at: { path: string; canonical: string }): Listed {
-  return { slug: row.slug, name: row.name, description: row.description, universe: row.universe, testnet, ...at };
+  return {
+    slug: row.slug,
+    name: row.name,
+    description: row.description,
+    universe: row.universe,
+    testnet,
+    ...at,
+    ...(row.realms === undefined ? {} : { realms: row.realms }),
+  };
 }
 
 function build(source: Source) {

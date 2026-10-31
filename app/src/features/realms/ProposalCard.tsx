@@ -5,8 +5,8 @@ import { cutGraphemes } from "@gnoworld/core";
 import { Card } from "@gnoworld/ui";
 import type { Proposal } from "../../lib/chain/proposal.ts";
 import { tallyOf } from "../../lib/chain/tally.ts";
-import type { ChainRead, Source } from "../../lib/chain/read.ts";
-import { ReadFailed, ReadSource } from "./ReadSource.tsx";
+import type { Source } from "../../lib/chain/read.ts";
+import { ReadSource } from "./ReadSource.tsx";
 
 /** The graphemes of a title a card shows, at most. */
 const CARD_TITLE = 120;
@@ -35,14 +35,5 @@ export function ProposalCard({ proposal, source, href }: ProposalCardProps) {
         )}
       </Card.Body>
     </Card>
-  );
-}
-
-/** A proposal's read as the page draws it: the card, or the failure with its next step. */
-export function ProposalView({ read, href }: { read: ChainRead<Proposal>; href?: string }) {
-  return read.ok ? (
-    <ProposalCard proposal={read.value} source={read.source} {...(href === undefined ? {} : { href })} />
-  ) : (
-    <ReadFailed failure={read.failure} source={read.source} />
   );
 }

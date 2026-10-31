@@ -117,3 +117,13 @@ export async function readProposal(
     ? { ok: true, value: proposal, source: page.source }
     : failedRead("wrong-shape", page.source);
 }
+
+/** The proposals a realm's home page lists, newest first as written: one request, or a typed failure. */
+export async function readProposals(
+  rpc: string,
+  realm: string,
+  options: ReadOptions = {},
+): Promise<ChainRead<Proposal[]>> {
+  const page = await readPage(rpc, { realm }, options);
+  return page.ok ? { ok: true, value: proposalsOf(page.value), source: page.source } : page;
+}

@@ -184,7 +184,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
     await listening(server);
     const peer = await ergo.peer(0);
     await welcome(peer, { echo: false });
-    expect(peer.lines.filter((line) => line.startsWith("JOIN "))).toEqual(["JOIN #bubble,#earth"]);
+    expect(peer.lines.filter((line) => line.startsWith("JOIN "))).toEqual(["JOIN #bubble,#earth,#govdao"]);
     const left = once(peer.socket, "close");
     server.child.kill("SIGTERM");
     expect(await exited(server)).toBe(0);

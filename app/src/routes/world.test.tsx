@@ -34,6 +34,13 @@ const failures: [string, () => never][] = [
 ];
 
 describe("a world's page", () => {
+  // GovDAO has a realm (hubs.json): its page leads with reading the proposals, at the realm's view; Bubble has none.
+  test("leads with Read the proposals, at the realm's view, for a world with a realm only", async () => {
+    const govdao = await render(route(), "/w/govdao");
+    expect(govdao).toMatch(/<a [^>]*href="\/r\/gov\/dao"[^>]*>(?:<svg.*?<\/svg>)?Read the proposals/);
+    expect(await render(route(), "/w/bubble")).not.toContain("Read the proposals");
+  });
+
   test("shows the world's name and its description", async () => {
     const html = await render(route(), "/w/bubble");
     expect(html).toContain("<h1>Bubble</h1>");

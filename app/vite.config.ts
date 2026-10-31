@@ -71,7 +71,7 @@ const CHUNKS = [
   // Nor are Avatar, Popover, Card, Skeleton (3 KB on every page, F2926), Breadcrumb, EmptyState, Combobox, Field (7.7 KB, F2976).
   {
     name: "ui",
-    test: /\/packages\/ui\/src\/(?!(?:ActivityChart|Stat|Avatar|Popover|Card|Skeleton|Breadcrumb|EmptyState|Combobox|Field)\/)/,
+    test: /\/packages\/ui\/src\/(?!(?:ActivityChart|Stat|Avatar|Popover|Card|Skeleton|Breadcrumb|EmptyState|Combobox|Field|Row)\/)/,
   },
   { name: "vendor", test: /node_modules/, minShareCount: 2 },
 ];

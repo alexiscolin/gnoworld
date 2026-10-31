@@ -4,14 +4,14 @@ import { CHAIN_READS, expect, hydrated, reactMark, test, type Page } from "./fix
 
 // The pages slice 1 pre-renders (ADR-0002 §2), with the address each names as its own.
 const pages = [
-  { path: "/", title: "gno.world", heading: "1 world in Onyx", canonical: "https://gno.world/net/onyx/" },
+  { path: "/", title: "gno.world", heading: "2 worlds in Onyx", canonical: "https://gno.world/net/onyx/" },
   {
     path: "/w/bubble",
     title: "Bubble · gno.world",
     heading: "Bubble",
     canonical: "https://gno.world/net/onyx/w/bubble",
   },
-  { path: "/net/onyx/", title: "gno.world", heading: "1 world in Onyx", canonical: "https://gno.world/net/onyx/" },
+  { path: "/net/onyx/", title: "gno.world", heading: "2 worlds in Onyx", canonical: "https://gno.world/net/onyx/" },
   {
     path: "/net/onyx/w/bubble",
     title: "Bubble · gno.world",

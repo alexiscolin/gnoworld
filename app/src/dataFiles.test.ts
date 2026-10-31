@@ -181,7 +181,7 @@ describe("loadData", () => {
   });
 
   // What worlds.ts held, moved and nothing more (the brief: "nothing invented"): one world, and the two networks it needs.
-  it("reads the files the repository ships: Bubble in Onyx, the build's default, and nothing else", () => {
+  it("reads the files the repository ships: Bubble and GovDAO in Onyx, the build's default, and nothing else", () => {
     const data = loadData(new URL("../data", import.meta.url).pathname);
     expect(data.universes.map((u) => [u.id, u.default === true])).toEqual([
       ["onyx", true],
@@ -194,6 +194,13 @@ describe("loadData", () => {
         description:
           "Bubble, a world of gno.land: the BUBBLE token, its governance, and the games played with it on chain.",
         universe: "onyx",
+      },
+      {
+        slug: "govdao",
+        name: "GovDAO",
+        description: "GovDAO, the governance of gno.land: its proposals and the votes that accept or refuse them.",
+        universe: "onyx",
+        realms: ["gno.land/r/gov/dao"],
       },
     ]);
     // events and news hold the ticker's placeholders, listed below.

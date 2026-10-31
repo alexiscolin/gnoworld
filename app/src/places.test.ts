@@ -75,7 +75,7 @@ describe("the site's worlds, by request", () => {
 });
 
 describe("the worlds of the data files", () => {
-  test("hold Bubble, at /w/bubble, its canonical under /net/onyx", () => {
+  test("hold Bubble and GovDAO, at /w/<slug>, each canonical under /net/onyx", () => {
     expect(site.worlds).toEqual([
       {
         slug: "bubble",
@@ -86,6 +86,16 @@ describe("the worlds of the data files", () => {
         testnet: true,
         path: "/w/bubble",
         canonical: "/net/onyx/w/bubble",
+      },
+      {
+        slug: "govdao",
+        name: "GovDAO",
+        description: "GovDAO, the governance of gno.land: its proposals and the votes that accept or refuse them.",
+        universe: "onyx",
+        testnet: true,
+        path: "/w/govdao",
+        canonical: "/net/onyx/w/govdao",
+        realms: ["gno.land/r/gov/dao"],
       },
     ]);
   });

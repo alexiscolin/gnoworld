@@ -8,9 +8,11 @@ test("home links to each world by its name, at the world's path", async () => {
   const html = await render({ path: "/", Component: Home, loader }, "/");
   // F3267: the kicker says gno.world, and the one heading is the hero's line.
   expect(html).toMatch(/<p [^>]*>(?:<span [^>]*><\/span>)?gno\.world<\/p>/);
-  expect(html).toMatch(/<h1\b[^>]*>1 world in Onyx<\/h1>/);
+  expect(html).toMatch(/<h1\b[^>]*>2 worlds in Onyx<\/h1>/);
   expect(html).toContain('<a href="/w/bubble"');
   expect(html).toContain(">Bubble</a>");
+  expect(html).toContain('<a href="/w/govdao"');
+  expect(html).toContain(">GovDAO</a>");
 });
 
 const failing = {
@@ -45,8 +47,8 @@ test("the browser's loader gives each pre-rendered home what the build's does", 
 describe("home's hero", () => {
   test("shows the number of worlds the data holds as its big number, its line saying what it counts", async () => {
     const html = await render({ path: "/", Component: Home, loader }, "/");
-    expect(/data-hero="number"[^>]*>\s*(?:<[^>]*>\s*)*([^<\s]+)/.exec(html)?.[1]).toBe("1");
-    expect(html).toMatch(/\b1 world\b/);
+    expect(/data-hero="number"[^>]*>\s*(?:<[^>]*>\s*)*([^<\s]+)/.exec(html)?.[1]).toBe("2");
+    expect(html).toMatch(/\b2 worlds\b/);
   });
 
   test("claims nobody online while no source says so: no number of people, no sample (5m fills it)", async () => {

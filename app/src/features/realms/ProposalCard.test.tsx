@@ -1,10 +1,8 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { FAILURE_KINDS } from "../../../tests/chain/failureKinds.ts";
 import { mount } from "../../../tests/mount.tsx";
 import type { Proposal } from "../../lib/chain/proposal.ts";
-import type { ChainRead } from "../../lib/chain/read.ts";
-import { ProposalCard, ProposalView } from "./ProposalCard.tsx";
+import { ProposalCard } from "./ProposalCard.tsx";
 
 // Slice 5k (ADR-0002 §4, proposal cards: read only, votes stay in their realms; frames 22 and 27). The proposal is invented:
 // no GovDAO answer is recorded, so these prove how a parsed proposal is DRAWN. The card has no vote button, and links only to
@@ -102,24 +100,4 @@ describe("a proposal's card", () => {
   it("draws no link when it has no address", () => {
     expect(mount(<ProposalCard proposal={PROPOSAL} source={SOURCE} />).querySelector("a")).toBeNull();
   });
-});
-
-describe("a proposal read, as the page draws it", () => {
-  it("draws the card of a read that worked", () => {
-    const read: ChainRead<Proposal> = { ok: true, value: PROPOSAL, source: SOURCE };
-    expect(field(mount(<ProposalView read={read} href={GNOWEB} />), "number")).toBe("Proposal 15");
-  });
-
-  it.each(FAILURE_KINDS)(
-    "draws a failed read of kind %s as its next step and its source, with no card and no number",
-    (kind) => {
-      const next = `The next step for ${kind}.`;
-      const read: ChainRead<Proposal> = { ok: false, failure: { kind, next }, source: SOURCE };
-      const el = mount(<ProposalView read={read} href={GNOWEB} />);
-      expect(el.querySelector("[role='alert']")?.textContent).toContain(next);
-      expect(el.textContent).toContain("rpc.onyx.testnets.gno.land");
-      expect(el.querySelector("time")?.getAttribute("datetime")).toBe(SOURCE.at);
-      expect(el.querySelector("h3, [data-field]")).toBeNull();
-    },
-  );
 });
