@@ -1,4 +1,4 @@
-import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { type Nginx, serveImage } from "../../../tests/nginx.ts";
 import type { Fetcher } from "./http.ts";
@@ -204,6 +204,7 @@ describe("the web image's nginx, read", () => {
     expect(block).not.toBe("");
     expect(block).toMatch(/\b(root\s+\/markets;|alias\s+\/markets\/markets\.json;)/);
     expect(block).not.toMatch(/add_header/);
+    expect(block).toMatch(/disable_symlinks\s+on\s+from=\$document_root;/);
     expect(conf.match(/location\s*=\s*\/markets\.json/g) ?? []).toHaveLength(1);
   });
 
@@ -254,6 +255,16 @@ describe("the web image's nginx, served", () => {
     expect(answer.headers.get("x-content-type-options")).toBe("nosniff");
   });
 
+  it("does not follow a link planted in the volume: the server's code can write there, web's secrets are not its to read", async () => {
+    writeFileSync(nginx.outside, "team:$apr1$secrethash");
+    rmSync(nginx.markets, { force: true });
+    symlinkSync(nginx.outside, nginx.markets);
+    const answer = await nginx.get("/markets.json");
+    expect(answer.status).toBe(404);
+    expect(answer.body).not.toContain("secrethash");
+    rmSync(nginx.markets, { force: true });
+  });
+
   it("serves that path alone: another file of the folder is not reachable", async () => {
     writeFileSync(nginx.markets.replace("markets.json", "other.json"), "{}");
     expect((await nginx.get("/other.json")).status).toBe(404);
@@ -276,10 +287,31 @@ describe("deploy/test.sh", () => {
     );
   });
 
-  it("checks, as a call, that web cannot write in the folder of markets.json", () => {
-    expect(calls("expect", "web cannot write in the folder of markets.json")[0]).toMatch(
-      /docker exec "\$web"[^\n]*touch \/markets\/[^\n]*refused/,
+  it("checks, as a call, that web's mount of the markets volume is read-only, and the volume the server's", () => {
+    expect(script).toMatch(
+      /expect "web cannot write in the folder of markets\.json" \\\n[^\n]*Destination "\/markets"[^\n]*\{\{\.RW\}\}[^\n]*"\$web"\)" false\n/,
     );
+    expect(calls("expect", "and it is the volume the server writes")[0]).toMatch(
+      /mounted "\$web" \/markets\).*mounted "\$server" \/markets\)/,
+    );
+  });
+
+  it("checks, as calls, the password on markets.json and a link planted in its volume", () => {
+    expect(calls("expect", "web serves markets.json only with the password")[0]).toMatch(
+      /status \/markets\.json [0-9.]+\)" 401/,
+    );
+    const link = calls("expect", "web does not follow a link planted in the markets volume")[0] ?? "";
+    expect(link).toMatch(/404$/);
+    expect(script).toMatch(/symlinkSync\('\/etc\/nginx\/nginx\.conf', '\/markets\/markets\.json'\)/);
+  });
+
+  it("plants the password dropped on the location and the link followed, each killed by a check that is a call", () => {
+    const open = calls("mutant", "markets.json open without the password")[0] ?? "";
+    expect(open).toContain('"web serves markets.json only with the password"');
+    expect(script).toMatch(/location = \\\/markets\\\.json \\\{\/ \{ print "\s+auth_basic off;"/);
+    const followed = calls("mutant", "web follows a link in the markets volume")[0] ?? "";
+    expect(followed).toContain('"web does not follow a link planted in the markets volume"');
+    expect(script).toContain("sed '/disable_symlinks on/d'");
   });
 
   it("plants the volume dropped and the volume mounted writable, each killed by a check that is a call", () => {

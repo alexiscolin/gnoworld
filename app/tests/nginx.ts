@@ -14,6 +14,8 @@ const ROOT = new URL("../../", import.meta.url).pathname;
 export interface Nginx {
   /** Where the file served at /markets.json lives. */
   markets: string;
+  /** A file outside the markets folder, readable by nginx: what a link planted in the volume would point at. */
+  outside: string;
   /** A GET with no password and no PROXY header, as the staged config takes it. */
   get(path: string): Promise<{ status: number; headers: Headers; body: string }>;
   stop(): void;
@@ -93,7 +95,7 @@ export async function serveImage(): Promise<Nginx> {
   for (let tries = 0; tries < 100; tries += 1) {
     try {
       await get("/");
-      return { markets: join(where, "markets", "markets.json"), get, stop };
+      return { markets: join(where, "markets", "markets.json"), outside: join(where, "secret"), get, stop };
     } catch {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }

@@ -437,6 +437,10 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "web's files left to Docker's default" "web may hold 8,192 files" compose 'services: { web: { ulimits: !reset {} } }'
 	mutant "web does not mount markets" "web serves markets.json from the volume" \
 		compose 'services: { web: { volumes: !override [] } }'
+	mutant "markets.json open without the password" "web serves markets.json only with the password" \
+		nginx awk '{ print } /location = \/markets\.json \{/ { print "            auth_basic off;" }'
+	mutant "web follows a link in the markets volume" "web does not follow a link planted in the markets volume" \
+		nginx sed '/disable_symlinks on/d'
 	mutant "web mounts markets writable" "web cannot write in the folder of markets.json" \
 		compose 'services: { web: { volumes: !override [ "markets:/markets" ] } }'
 	mutant "the server may write Ergo's volume" "the server holds Ergo's volume read-only" \
@@ -1342,7 +1346,14 @@ setTimeout(() => {
 	expect "web serves markets.json with a short cache" "$(header cache-control /markets.json 203.0.113.1 -u "$auth")" "public, max-age=60"
 	expect "web serves markets.json never sniffed" "$(header x-content-type-options /markets.json 203.0.113.1 -u "$auth")" nosniff
 	expect "web serves markets.json as JSON" "$(header content-type /markets.json 203.0.113.1 -u "$auth")" application/json
-	expect "web cannot write in the folder of markets.json" "$(docker exec "$web" sh -c 'touch /markets/probe 2>&1 && echo written || echo refused' | tail -n 1)" refused
+	expect "web serves markets.json only with the password" "$(status /markets.json 203.0.113.3)" 401
+	# Whoever runs code in the server owns the volume: a link there to a file of web's own (its settings here) is not followed.
+	docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); f.unlinkSync('/markets/markets.json'); f.symlinkSync('/etc/nginx/nginx.conf', '/markets/markets.json')" >/dev/null 2>&1 || true
+	expect "web does not follow a link planted in the markets volume" "$(status /markets.json 203.0.113.4 -u "$auth")" 404
+	# The mount itself, as Ergo's volume is checked: web is not the folder's owner, so a write is refused even on a writable mount.
+	expect "web cannot write in the folder of markets.json" \
+		"$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/markets"}}{{.RW}}{{end}}{{end}}' "$web")" false
+	expect "and it is the volume the server writes" "$(mounted "$web" /markets) $(mounted "$server" /markets)" "${project}_markets ${project}_markets"
 	docker exec "$server" /nodejs/bin/node -e "require('fs').unlinkSync('/markets/markets.json')" >/dev/null 2>&1 || true
 	expect "web answers a missing markets.json with a 404" "$(status /markets.json 203.0.113.2 -u "$auth")" 404
 	# It resolves before it connects (smokescreen.go, safeResolve): a public name for a private address is refused,
